@@ -1,0 +1,361 @@
+Verbosity level can be increased via `-v, -vv, or -vvv` option
+Collected 12 tests
+
+Processing test_unit/test_webServer in native environment
+--------------------------------------------------------------------------------
+Building...
+In file included from modules/webServer/webServer.cpp:19:
+include/portal_assets/index_html.hpp:20:10: fatal error: 'Arduino.h' file not found
+   20 | #include <Arduino.h>
+      |          ^~~~~~~~~~~
+1 error generated.
+*** [.pio/build/native/lib632/webServer/webServer.o] Error 1
+Building stage has failed, see errors above. Use `pio test -vvv` option to enable verbose output.
+--------- native:test_unit/test_webServer [ERRORED] Took 1.21 seconds ---------
+
+Processing test_unit/test_dataManager in native environment
+--------------------------------------------------------------------------------
+Building...
+ld: warning: ignoring file '.pio/build/native/test/test_unit/test_dataManager/test_main.o': found architecture 'arm64', required architecture 'x86_64'
+ld: warning: ignoring file '.pio/build/native/lib072/libdataManager.a(dataManager.o)': found architecture 'arm64', required architecture 'x86_64'
+ld: warning: ignoring file '.pio/build/native/lib613/libgoogletest.a(gtest.o)': found architecture 'arm64', required architecture 'x86_64'
+ld: warning: ignoring file '.pio/build/native/lib613/libgoogletest.a(gtest-typed-test.o)': found architecture 'arm64', required architecture 'x86_64'
+ld: warning: ignoring file '.pio/build/native/lib613/libgoogletest.a(gtest-test-part.o)': found architecture 'arm64', required architecture 'x86_64'
+ld: warning: ignoring file '.pio/build/native/lib613/libgoogletest.a(gtest-printers.o)': found architecture 'arm64', required architecture 'x86_64'
+ld: warning: ignoring file '.pio/build/native/lib613/libgoogletest.a(gtest-port.o)': found architecture 'arm64', required architecture 'x86_64'
+ld: warning: ignoring file '.pio/build/native/lib613/libgoogletest.a(gtest-matchers.o)': found architecture 'arm64', required architecture 'x86_64'
+ld: warning: ignoring file '.pio/build/native/lib613/libgoogletest.a(gtest-filepath.o)': found architecture 'arm64', required architecture 'x86_64'
+ld: warning: ignoring file '.pio/build/native/lib613/libgoogletest.a(gtest-death-test.o)': found architecture 'arm64', required architecture 'x86_64'
+ld: warning: ignoring file '.pio/build/native/lib613/libgoogletest.a(gtest-assertion-result.o)': found architecture 'arm64', required architecture 'x86_64'
+ld: warning: ignoring file '.pio/build/native/lib613/libgoogletest.a(gmock.o)': found architecture 'arm64', required architecture 'x86_64'
+ld: warning: ignoring file '.pio/build/native/lib613/libgoogletest.a(gmock-spec-builders.o)': found architecture 'arm64', required architecture 'x86_64'
+ld: warning: ignoring file '.pio/build/native/lib613/libgoogletest.a(gmock-matchers.o)': found architecture 'arm64', required architecture 'x86_64'
+ld: warning: ignoring file '.pio/build/native/lib613/libgoogletest.a(gmock-internal-utils.o)': found architecture 'arm64', required architecture 'x86_64'
+ld: warning: ignoring file '.pio/build/native/lib613/libgoogletest.a(gmock-cardinalities.o)': found architecture 'arm64', required architecture 'x86_64'
+Undefined symbols for architecture x86_64:
+  "_main", referenced from:
+      <initial-undefines>
+ld: symbol(s) not found for architecture x86_64
+clang++: error: linker command failed with exit code 1 (use -v to see invocation)
+*** [.pio/build/native/program] Error 1
+Building stage has failed, see errors above. Use `pio test -vvv` option to enable verbose output.
+-------- native:test_unit/test_dataManager [ERRORED] Took 1.01 seconds --------
+
+Processing test_unit/test_application in native environment
+--------------------------------------------------------------------------------
+Building...
+In file included from modules/webServer/webServer.cpp:19:
+include/portal_assets/index_html.hpp:20:10: fatal error: 'Arduino.h' file not found
+   20 | #include <Arduino.h>
+      |          ^~~~~~~~~~~
+1 error generated.
+*** [.pio/build/native/lib632/webServer/webServer.o] Error 1
+Building stage has failed, see errors above. Use `pio test -vvv` option to enable verbose output.
+-------- native:test_unit/test_application [ERRORED] Took 0.83 seconds --------
+
+Processing test_unit/test_eventbus in native environment
+--------------------------------------------------------------------------------
+Building...
+ld: warning: ignoring file '.pio/build/native/lib832/libeventBus.a(EventBus.o)': found architecture 'arm64', required architecture 'x86_64'
+ld: warning: ignoring file '.pio/build/native/lib613/libgoogletest.a(gtest.o)': found architecture 'arm64', required architecture 'x86_64'
+ld: warning: ignoring file '.pio/build/native/test/test_unit/test_eventbus/test_main.o': found architecture 'arm64', required architecture 'x86_64'
+ld: warning: ignoring file '.pio/build/native/lib613/libgoogletest.a(gtest-typed-test.o)': found architecture 'arm64', required architecture 'x86_64'
+ld: warning: ignoring file '.pio/build/native/lib613/libgoogletest.a(gtest-test-part.o)': found architecture 'arm64', required architecture 'x86_64'
+ld: warning: ignoring file '.pio/build/native/lib613/libgoogletest.a(gtest-printers.o)': found architecture 'arm64', required architecture 'x86_64'
+ld: warning: ignoring file '.pio/build/native/lib613/libgoogletest.a(gtest-port.o)': found architecture 'arm64', required architecture 'x86_64'
+ld: warning: ignoring file '.pio/build/native/lib613/libgoogletest.a(gtest-matchers.o)': found architecture 'arm64', required architecture 'x86_64'
+ld: warning: ignoring file '.pio/build/native/lib613/libgoogletest.a(gtest-filepath.o)': found architecture 'arm64', required architecture 'x86_64'
+ld: warning: ignoring file '.pio/build/native/lib613/libgoogletest.a(gtest-death-test.o)': found architecture 'arm64', required architecture 'x86_64'
+ld: warning: ignoring file '.pio/build/native/lib613/libgoogletest.a(gtest-assertion-result.o)': found architecture 'arm64', required architecture 'x86_64'
+ld: warning: ignoring file '.pio/build/native/lib613/libgoogletest.a(gmock.o)': found architecture 'arm64', required architecture 'x86_64'
+ld: warning: ignoring file '.pio/build/native/lib613/libgoogletest.a(gmock-spec-builders.o)': found architecture 'arm64', required architecture 'x86_64'
+ld: warning: ignoring file '.pio/build/native/lib613/libgoogletest.a(gmock-matchers.o)': found architecture 'arm64', required architecture 'x86_64'
+ld: warning: ignoring file '.pio/build/native/lib613/libgoogletest.a(gmock-internal-utils.o)': found architecture 'arm64', required architecture 'x86_64'
+ld: warning: ignoring file '.pio/build/native/lib613/libgoogletest.a(gmock-cardinalities.o)': found architecture 'arm64', required architecture 'x86_64'
+Undefined symbols for architecture x86_64:
+  "_main", referenced from:
+      <initial-undefines>
+ld: symbol(s) not found for architecture x86_64
+clang++: error: linker command failed with exit code 1 (use -v to see invocation)
+*** [.pio/build/native/program] Error 1
+Building stage has failed, see errors above. Use `pio test -vvv` option to enable verbose output.
+---------- native:test_unit/test_eventbus [ERRORED] Took 0.51 seconds ----------
+
+Processing test_unit/test_configManager in native environment
+--------------------------------------------------------------------------------
+Building...
+ld: warning: ignoring file '.pio/build/native/test/test_unit/test_configManager/test_configManager.o': found architecture 'arm64', required architecture 'x86_64'
+ld: warning: ignoring file '.pio/build/native/lib5f5/libconfigManager.a(configManager.o)': found architecture 'arm64', required architecture 'x86_64'
+ld: warning: ignoring file '.pio/build/native/lib613/libgoogletest.a(gtest.o)': found architecture 'arm64', required architecture 'x86_64'
+ld: warning: ignoring file '.pio/build/native/lib613/libgoogletest.a(gtest-typed-test.o)': found architecture 'arm64', required architecture 'x86_64'
+ld: warning: ignoring file '.pio/build/native/lib613/libgoogletest.a(gtest-test-part.o)': found architecture 'arm64', required architecture 'x86_64'
+ld: warning: ignoring file '.pio/build/native/lib613/libgoogletest.a(gtest-printers.o)': found architecture 'arm64', required architecture 'x86_64'
+ld: warning: ignoring file '.pio/build/native/lib613/libgoogletest.a(gtest-port.o)': found architecture 'arm64', required architecture 'x86_64'
+ld: warning: ignoring file '.pio/build/native/lib613/libgoogletest.a(gtest-matchers.o)': found architecture 'arm64', required architecture 'x86_64'
+ld: warning: ignoring file '.pio/build/native/lib613/libgoogletest.a(gtest-filepath.o)': found architecture 'arm64', required architecture 'x86_64'
+ld: warning: ignoring file '.pio/build/native/lib613/libgoogletest.a(gtest-death-test.o)': found architecture 'arm64', required architecture 'x86_64'
+ld: warning: ignoring file '.pio/build/native/lib613/libgoogletest.a(gtest-assertion-result.o)': found architecture 'arm64', required architecture 'x86_64'
+ld: warning: ignoring file '.pio/build/native/lib613/libgoogletest.a(gmock.o)': found architecture 'arm64', required architecture 'x86_64'
+ld: warning: ignoring file '.pio/build/native/lib613/libgoogletest.a(gmock-spec-builders.o)': found architecture 'arm64', required architecture 'x86_64'
+ld: warning: ignoring file '.pio/build/native/lib613/libgoogletest.a(gmock-matchers.o)': found architecture 'arm64', required architecture 'x86_64'
+ld: warning: ignoring file '.pio/build/native/lib613/libgoogletest.a(gmock-internal-utils.o)': found architecture 'arm64', required architecture 'x86_64'
+ld: warning: ignoring file '.pio/build/native/lib613/libgoogletest.a(gmock-cardinalities.o)': found architecture 'arm64', required architecture 'x86_64'
+Undefined symbols for architecture x86_64:
+  "_main", referenced from:
+      <initial-undefines>
+ld: symbol(s) not found for architecture x86_64
+clang++: error: linker command failed with exit code 1 (use -v to see invocation)
+*** [.pio/build/native/program] Error 1
+Building stage has failed, see errors above. Use `pio test -vvv` option to enable verbose output.
+------- native:test_unit/test_configManager [ERRORED] Took 0.49 seconds -------
+
+Processing test_unit/test_u8g2Display in native environment
+--------------------------------------------------------------------------------
+Building...
+ld: warning: ignoring file '.pio/build/native/test/test_unit/test_u8g2Display/test_boards.o': found architecture 'arm64', required architecture 'x86_64'
+ld: warning: ignoring file '.pio/build/native/test/test_unit/test_u8g2Display/test_status_reporter.o': found architecture 'arm64', required architecture 'x86_64'
+ld: warning: ignoring file '.pio/build/native/test/test_unit/test_u8g2Display/test_eventbus_integration.o': found architecture 'arm64', required architecture 'x86_64'
+ld: warning: ignoring file '.pio/build/native/test/test_unit/test_u8g2Display/test_carousel.o': found architecture 'arm64', required architecture 'x86_64'
+ld: warning: ignoring file '.pio/build/native/test/test_unit/test_u8g2Display/test_config.o': found architecture 'arm64', required architecture 'x86_64'
+ld: warning: ignoring file '.pio/build/native/test/test_unit/test_u8g2Display/test_widgets_primitives.o': found architecture 'arm64', required architecture 'x86_64'
+ld: warning: ignoring file '.pio/build/native/lib613/libgoogletest.a(gtest.o)': found architecture 'arm64', required architecture 'x86_64'
+ld: warning: ignoring file '.pio/build/native/lib832/libeventBus.a(EventBus.o)': found architecture 'arm64', required architecture 'x86_64'
+ld: warning: ignoring file '.pio/build/native/lib613/libgoogletest.a(gtest-typed-test.o)': found architecture 'arm64', required architecture 'x86_64'
+ld: warning: ignoring file '.pio/build/native/lib613/libgoogletest.a(gtest-test-part.o)': found architecture 'arm64', required architecture 'x86_64'
+ld: warning: ignoring file '.pio/build/native/lib613/libgoogletest.a(gtest-printers.o)': found architecture 'arm64', required architecture 'x86_64'
+ld: warning: ignoring file '.pio/build/native/lib613/libgoogletest.a(gtest-port.o)': found architecture 'arm64', required architecture 'x86_64'
+ld: warning: ignoring file '.pio/build/native/lib613/libgoogletest.a(gtest-matchers.o)': found architecture 'arm64', required architecture 'x86_64'
+ld: warning: ignoring file '.pio/build/native/lib613/libgoogletest.a(gtest-filepath.o)': found architecture 'arm64', required architecture 'x86_64'
+ld: warning: ignoring file '.pio/build/native/lib613/libgoogletest.a(gtest-death-test.o)': found architecture 'arm64', required architecture 'x86_64'
+ld: warning: ignoring file '.pio/build/native/lib613/libgoogletest.a(gtest-assertion-result.o)': found architecture 'arm64', required architecture 'x86_64'
+ld: warning: ignoring file '.pio/build/native/lib613/libgoogletest.a(gmock.o)': found architecture 'arm64', required architecture 'x86_64'
+ld: warning: ignoring file '.pio/build/native/lib613/libgoogletest.a(gmock-spec-builders.o)': found architecture 'arm64', required architecture 'x86_64'
+ld: warning: ignoring file '.pio/build/native/lib613/libgoogletest.a(gmock-matchers.o)': found architecture 'arm64', required architecture 'x86_64'
+ld: warning: ignoring file '.pio/build/native/lib613/libgoogletest.a(gmock-internal-utils.o)': found architecture 'arm64', required architecture 'x86_64'
+ld: warning: ignoring file '.pio/build/native/lib613/libgoogletest.a(gmock-cardinalities.o)': found architecture 'arm64', required architecture 'x86_64'
+Undefined symbols for architecture x86_64:
+  "testing::InitGoogleTest(int*, char**)", referenced from:
+      _main in test_main.o
+  "testing::AssertionSuccess()", referenced from:
+      testing::AssertionResult testing::internal::CmpHelperEQ<int, int>(char const*, char const*, int const&, int const&) in test_widgets_generic.o
+  "testing::Test::SetUp()", referenced from:
+      vtable for LabelWidgetTest_Construction_DefaultState_Test in test_widgets_generic.o
+      vtable for LabelWidgetTest_SetText_StoresText_Test in test_widgets_generic.o
+      vtable for LabelWidgetTest_SetText_NullClears_Test in test_widgets_generic.o
+      vtable for LabelWidgetTest_SetText_BoundsChecked_Test in test_widgets_generic.o
+      vtable for LabelWidgetTest_SetAlignment_StoresValue_Test in test_widgets_generic.o
+      vtable for LabelWidgetTest_SetTruncated_Toggle_Test in test_widgets_generic.o
+      vtable for LabelWidgetTest_Tick_NoOp_Test in test_widgets_generic.o
+      ...
+  "testing::Test::TearDown()", referenced from:
+      vtable for LabelWidgetTest_Construction_DefaultState_Test in test_widgets_generic.o
+      vtable for LabelWidgetTest_SetText_StoresText_Test in test_widgets_generic.o
+      vtable for LabelWidgetTest_SetText_NullClears_Test in test_widgets_generic.o
+      vtable for LabelWidgetTest_SetText_BoundsChecked_Test in test_widgets_generic.o
+      vtable for LabelWidgetTest_SetAlignment_StoresValue_Test in test_widgets_generic.o
+      vtable for LabelWidgetTest_SetTruncated_Toggle_Test in test_widgets_generic.o
+      vtable for LabelWidgetTest_Tick_NoOp_Test in test_widgets_generic.o
+      ...
+  "testing::Test::Test()", referenced from:
+      LabelWidgetTest::LabelWidgetTest() in test_widgets_generic.o
+      ScrollingTextWidgetTest::ScrollingTextWidgetTest() in test_widgets_generic.o
+      ClockWidgetTest::ClockWidgetTest() in test_widgets_generic.o
+      ProgressBarWidgetTest::ProgressBarWidgetTest() in test_widgets_generic.o
+      ImageWidgetNullTest_Construction_NullBits_DoesNotCrash_Test::ImageWidgetNullTest_Construction_NullBits_DoesNotCrash_Test() in test_widgets_generic.o
+      ImageWidgetTest::ImageWidgetTest() in test_widgets_generic.o
+  "testing::Test::~Test()", referenced from:
+      LabelWidgetTest::LabelWidgetTest() in test_widgets_generic.o
+      ScrollingTextWidgetTest::ScrollingTextWidgetTest() in test_widgets_generic.o
+      ClockWidgetTest::ClockWidgetTest() in test_widgets_generic.o
+      ProgressBarWidgetTest::ProgressBarWidgetTest() in test_widgets_generic.o
+      ImageWidgetTest::ImageWidgetTest() in test_widgets_generic.o
+      LabelWidgetTest::~LabelWidgetTest() in test_widgets_generic.o
+      ScrollingTextWidgetTest::~ScrollingTextWidgetTest() in test_widgets_generic.o
+      ...
+  "testing::Message::Message()", referenced from:
+      LabelWidgetTest_Construction_DefaultState_Test::TestBody() in test_widgets_generic.o
+      LabelWidgetTest_Construction_DefaultState_Test::TestBody() in test_widgets_generic.o
+      LabelWidgetTest_Construction_DefaultState_Test::TestBody() in test_widgets_generic.o
+      LabelWidgetTest_Construction_DefaultState_Test::TestBody() in test_widgets_generic.o
+      LabelWidgetTest_Construction_DefaultState_Test::TestBody() in test_widgets_generic.o
+      LabelWidgetTest_SetText_StoresText_Test::TestBody() in test_widgets_generic.o
+      LabelWidgetTest_SetText_NullClears_Test::TestBody() in test_widgets_generic.o
+      ...
+  "testing::UnitTest::GetInstance()", referenced from:
+      RUN_ALL_TESTS() in test_main.o
+  "testing::UnitTest::Run()", referenced from:
+      RUN_ALL_TESTS() in test_main.o
+  "testing::internal::AlwaysTrue()", referenced from:
+      LabelWidgetTest_SetText_StoresText_Test::TestBody() in test_widgets_generic.o
+      LabelWidgetTest_SetText_StoresText_Test::TestBody() in test_widgets_generic.o
+      LabelWidgetTest_SetText_NullClears_Test::TestBody() in test_widgets_generic.o
+      LabelWidgetTest_SetText_NullClears_Test::TestBody() in test_widgets_generic.o
+      LabelWidgetTest_SetText_BoundsChecked_Test::TestBody() in test_widgets_generic.o
+      LabelWidgetTest_SetText_BoundsChecked_Test::TestBody() in test_widgets_generic.o
+      LabelWidgetTest_SetAlignment_StoresValue_Test::TestBody() in test_widgets_generic.o
+      LabelWidgetTest_SetAlignment_StoresValue_Test::TestBody() in test_widgets_generic.o
+      LabelWidgetTest_SetAlignment_StoresValue_Test::TestBody() in test_widgets_generic.o
+      LabelWidgetTest_SetAlignment_StoresValue_Test::TestBody() in test_widgets_generic.o
+      LabelWidgetTest_SetAlignment_StoresValue_Test::TestBody() in test_widgets_generic.o
+      LabelWidgetTest_SetAlignment_StoresValue_Test::TestBody() in test_widgets_generic.o
+      ...
+  "testing::internal::AssertHelper::AssertHelper(testing::TestPartResult::Type, char const*, int, char const*)", referenced from:
+      LabelWidgetTest_Construction_DefaultState_Test::TestBody() in test_widgets_generic.o
+      LabelWidgetTest_Construction_DefaultState_Test::TestBody() in test_widgets_generic.o
+      LabelWidgetTest_Construction_DefaultState_Test::TestBody() in test_widgets_generic.o
+      LabelWidgetTest_Construction_DefaultState_Test::TestBody() in test_widgets_generic.o
+      LabelWidgetTest_Construction_DefaultState_Test::TestBody() in test_widgets_generic.o
+      LabelWidgetTest_SetText_StoresText_Test::TestBody() in test_widgets_generic.o
+      LabelWidgetTest_SetText_NullClears_Test::TestBody() in test_widgets_generic.o
+      ...
+  "testing::internal::AssertHelper::~AssertHelper()", referenced from:
+      LabelWidgetTest_Construction_DefaultState_Test::TestBody() in test_widgets_generic.o
+      LabelWidgetTest_Construction_DefaultState_Test::TestBody() in test_widgets_generic.o
+      LabelWidgetTest_Construction_DefaultState_Test::TestBody() in test_widgets_generic.o
+      LabelWidgetTest_Construction_DefaultState_Test::TestBody() in test_widgets_generic.o
+      LabelWidgetTest_Construction_DefaultState_Test::TestBody() in test_widgets_generic.o
+      LabelWidgetTest_Construction_DefaultState_Test::TestBody() in test_widgets_generic.o
+      LabelWidgetTest_Construction_DefaultState_Test::TestBody() in test_widgets_generic.o
+      LabelWidgetTest_Construction_DefaultState_Test::TestBody() in test_widgets_generic.o
+      LabelWidgetTest_Construction_DefaultState_Test::TestBody() in test_widgets_generic.o
+      LabelWidgetTest_Construction_DefaultState_Test::TestBody() in test_widgets_generic.o
+      ...
+  "testing::internal::GetTestTypeId()", referenced from:
+      ___cxx_global_var_init.138 in test_widgets_generic.o
+  "testing::internal::MakeAndRegisterTestInfo(std::__1::basic_string<char, std::__1::char_traits<char>, std::__1::allocator<char>>, char const*, char const*, char const*, testing::internal::CodeLocation, void const*, void (*)(), void (*)(), testing::internal::TestFactoryBase*)", referenced from:
+      ___cxx_global_var_init in test_widgets_generic.o
+      ___cxx_global_var_init.14 in test_widgets_generic.o
+      ___cxx_global_var_init.18 in test_widgets_generic.o
+      ___cxx_global_var_init.22 in test_widgets_generic.o
+      ___cxx_global_var_init.25 in test_widgets_generic.o
+      ___cxx_global_var_init.30 in test_widgets_generic.o
+      ___cxx_global_var_init.34 in test_widgets_generic.o
+      ...
+  "testing::internal::HasNewFatalFailureHelper::HasNewFatalFailureHelper()", referenced from:
+      LabelWidgetTest_SetText_StoresText_Test::TestBody() in test_widgets_generic.o
+      LabelWidgetTest_SetText_NullClears_Test::TestBody() in test_widgets_generic.o
+      LabelWidgetTest_SetText_BoundsChecked_Test::TestBody() in test_widgets_generic.o
+      LabelWidgetTest_SetAlignment_StoresValue_Test::TestBody() in test_widgets_generic.o
+      LabelWidgetTest_SetAlignment_StoresValue_Test::TestBody() in test_widgets_generic.o
+      LabelWidgetTest_SetAlignment_StoresValue_Test::TestBody() in test_widgets_generic.o
+      LabelWidgetTest_SetTruncated_Toggle_Test::TestBody() in test_widgets_generic.o
+      LabelWidgetTest_SetTruncated_Toggle_Test::TestBody() in test_widgets_generic.o
+      ...
+  "testing::internal::HasNewFatalFailureHelper::~HasNewFatalFailureHelper()", referenced from:
+      LabelWidgetTest_SetText_StoresText_Test::TestBody() in test_widgets_generic.o
+      LabelWidgetTest_SetText_StoresText_Test::TestBody() in test_widgets_generic.o
+      LabelWidgetTest_SetText_NullClears_Test::TestBody() in test_widgets_generic.o
+      LabelWidgetTest_SetText_NullClears_Test::TestBody() in test_widgets_generic.o
+      LabelWidgetTest_SetText_BoundsChecked_Test::TestBody() in test_widgets_generic.o
+      LabelWidgetTest_SetText_BoundsChecked_Test::TestBody() in test_widgets_generic.o
+      LabelWidgetTest_SetAlignment_StoresValue_Test::TestBody() in test_widgets_generic.o
+      LabelWidgetTest_SetAlignment_StoresValue_Test::TestBody() in test_widgets_generic.o
+      LabelWidgetTest_SetAlignment_StoresValue_Test::TestBody() in test_widgets_generic.o
+      LabelWidgetTest_SetAlignment_StoresValue_Test::TestBody() in test_widgets_generic.o
+      LabelWidgetTest_SetAlignment_StoresValue_Test::TestBody() in test_widgets_generic.o
+      LabelWidgetTest_SetAlignment_StoresValue_Test::TestBody() in test_widgets_generic.o
+      ...
+  "testing::internal::GetBoolAssertionFailureMessage(testing::AssertionResult const&, char const*, char const*, char const*)", referenced from:
+      LabelWidgetTest_Construction_DefaultState_Test::TestBody() in test_widgets_generic.o
+      ScrollingTextWidgetTest_IsScrollFinished_DefaultFalse_Test::TestBody() in test_widgets_generic.o
+      ScrollingTextWidgetTest_ResetScroll_ResetsState_Test::TestBody() in test_widgets_generic.o
+      ScrollingTextWidgetTest_Tick_ThreeSecondDelayLogic_Test::TestBody() in test_widgets_generic.o
+      ScrollingTextWidgetTest_Tick_StaticTextDwell_Test::TestBody() in test_widgets_generic.o
+      ClockWidgetTest_Construction_NullTimeMgr_DoesNotCrash_Test::TestBody() in test_widgets_generic.o
+      ImageWidgetTest_Visibility_Toggle_Test::TestBody() in test_widgets_generic.o
+      ImageWidgetTest_Visibility_Toggle_Test::TestBody() in test_widgets_generic.o
+      ImageWidgetTest_Visibility_Toggle_Test::TestBody() in test_widgets_generic.o
+      ...
+  "testing::internal::IsTrue(bool)", referenced from:
+      testing::internal::SuiteApiResolver<LabelWidgetTest>::GetSetUpCaseOrSuite(char const*, int) in test_widgets_generic.o
+      testing::internal::SuiteApiResolver<LabelWidgetTest>::GetTearDownCaseOrSuite(char const*, int) in test_widgets_generic.o
+      testing::internal::SuiteApiResolver<ScrollingTextWidgetTest>::GetSetUpCaseOrSuite(char const*, int) in test_widgets_generic.o
+      testing::internal::SuiteApiResolver<ScrollingTextWidgetTest>::GetTearDownCaseOrSuite(char const*, int) in test_widgets_generic.o
+      testing::internal::SuiteApiResolver<ClockWidgetTest>::GetSetUpCaseOrSuite(char const*, int) in test_widgets_generic.o
+      testing::internal::SuiteApiResolver<ClockWidgetTest>::GetTearDownCaseOrSuite(char const*, int) in test_widgets_generic.o
+      testing::internal::SuiteApiResolver<ProgressBarWidgetTest>::GetSetUpCaseOrSuite(char const*, int) in test_widgets_generic.o
+      ...
+  "testing::internal::GTestLog::GTestLog(testing::internal::GTestLogSeverity, char const*, int)", referenced from:
+      testing::internal::SuiteApiResolver<LabelWidgetTest>::GetSetUpCaseOrSuite(char const*, int) in test_widgets_generic.o
+      testing::internal::SuiteApiResolver<LabelWidgetTest>::GetTearDownCaseOrSuite(char const*, int) in test_widgets_generic.o
+      testing::internal::SuiteApiResolver<ScrollingTextWidgetTest>::GetSetUpCaseOrSuite(char const*, int) in test_widgets_generic.o
+      testing::internal::SuiteApiResolver<ScrollingTextWidgetTest>::GetTearDownCaseOrSuite(char const*, int) in test_widgets_generic.o
+      testing::internal::SuiteApiResolver<ClockWidgetTest>::GetSetUpCaseOrSuite(char const*, int) in test_widgets_generic.o
+      testing::internal::SuiteApiResolver<ClockWidgetTest>::GetTearDownCaseOrSuite(char const*, int) in test_widgets_generic.o
+      testing::internal::SuiteApiResolver<ProgressBarWidgetTest>::GetSetUpCaseOrSuite(char const*, int) in test_widgets_generic.o
+      ...
+  "testing::internal::GTestLog::~GTestLog()", referenced from:
+      testing::internal::SuiteApiResolver<LabelWidgetTest>::GetSetUpCaseOrSuite(char const*, int) in test_widgets_generic.o
+      testing::internal::SuiteApiResolver<LabelWidgetTest>::GetSetUpCaseOrSuite(char const*, int) in test_widgets_generic.o
+      testing::internal::SuiteApiResolver<LabelWidgetTest>::GetTearDownCaseOrSuite(char const*, int) in test_widgets_generic.o
+      testing::internal::SuiteApiResolver<LabelWidgetTest>::GetTearDownCaseOrSuite(char const*, int) in test_widgets_generic.o
+      testing::internal::SuiteApiResolver<ScrollingTextWidgetTest>::GetSetUpCaseOrSuite(char const*, int) in test_widgets_generic.o
+      testing::internal::SuiteApiResolver<ScrollingTextWidgetTest>::GetSetUpCaseOrSuite(char const*, int) in test_widgets_generic.o
+      testing::internal::SuiteApiResolver<ScrollingTextWidgetTest>::GetTearDownCaseOrSuite(char const*, int) in test_widgets_generic.o
+      testing::internal::SuiteApiResolver<ScrollingTextWidgetTest>::GetTearDownCaseOrSuite(char const*, int) in test_widgets_generic.o
+      ...
+  "testing::internal::EqFailure(char const*, char const*, std::__1::basic_string<char, std::__1::char_traits<char>, std::__1::allocator<char>> const&, std::__1::basic_string<char, std::__1::char_traits<char>, std::__1::allocator<char>> const&, bool)", referenced from:
+      testing::AssertionResult testing::internal::CmpHelperEQFailure<int, int>(char const*, char const*, int const&, int const&) in test_widgets_generic.o
+  "testing::internal::AssertHelper::operator=(testing::Message const&) const", referenced from:
+      LabelWidgetTest_Construction_DefaultState_Test::TestBody() in test_widgets_generic.o
+      LabelWidgetTest_Construction_DefaultState_Test::TestBody() in test_widgets_generic.o
+      LabelWidgetTest_Construction_DefaultState_Test::TestBody() in test_widgets_generic.o
+      LabelWidgetTest_Construction_DefaultState_Test::TestBody() in test_widgets_generic.o
+      LabelWidgetTest_Construction_DefaultState_Test::TestBody() in test_widgets_generic.o
+      LabelWidgetTest_SetText_StoresText_Test::TestBody() in test_widgets_generic.o
+      LabelWidgetTest_SetText_NullClears_Test::TestBody() in test_widgets_generic.o
+      ...
+  "typeinfo for testing::Test", referenced from:
+      typeinfo for LabelWidgetTest in test_widgets_generic.o
+      typeinfo for ScrollingTextWidgetTest in test_widgets_generic.o
+      typeinfo for ClockWidgetTest in test_widgets_generic.o
+      typeinfo for ProgressBarWidgetTest in test_widgets_generic.o
+      typeinfo for ImageWidgetNullTest_Construction_NullBits_DoesNotCrash_Test in test_widgets_generic.o
+      typeinfo for ImageWidgetTest in test_widgets_generic.o
+ld: symbol(s) not found for architecture x86_64
+clang++: error: linker command failed with exit code 1 (use -v to see invocation)
+*** [.pio/build/native/program] Error 1
+Building stage has failed, see errors above. Use `pio test -vvv` option to enable verbose output.
+-------- native:test_unit/test_u8g2Display [ERRORED] Took 1.27 seconds --------
+
+Processing test_unit/test_keyManager in native environment
+--------------------------------------------------------------------------------
+Building...
+ld: warning: ignoring file '.pio/build/native/test/test_unit/test_keyManager/test_keyManager.o': found architecture 'arm64', required architecture 'x86_64'
+ld: warning: ignoring file '.pio/build/native/liba08/libdeviceCrypto.a(deviceCrypto.o)': found architecture 'arm64', required architecture 'x86_64'
+ld: warning: ignoring file '.pio/build/native/lib613/libgoogletest.a(gtest.o)': found architecture 'arm64', required architecture 'x86_64'
+ld: warning: ignoring file '.pio/build/native/lib6cd/liblogger.a(logger.o)': found architecture 'arm64', required architecture 'x86_64'
+ld: warning: ignoring file '.pio/build/native/lib613/libgoogletest.a(gtest-typed-test.o)': found architecture 'arm64', required architecture 'x86_64'
+ld: warning: ignoring file '.pio/build/native/libb38/libkeyManager.a(keyManager.o)': found architecture 'arm64', required architecture 'x86_64'
+ld: warning: ignoring file '.pio/build/native/lib613/libgoogletest.a(gtest-test-part.o)': found architecture 'arm64', required architecture 'x86_64'
+ld: warning: ignoring file '.pio/build/native/lib613/libgoogletest.a(gtest-printers.o)': found architecture 'arm64', required architecture 'x86_64'
+ld: warning: ignoring file '.pio/build/native/lib613/libgoogletest.a(gtest-port.o)': found architecture 'arm64', required architecture 'x86_64'
+ld: warning: ignoring file '.pio/build/native/lib613/libgoogletest.a(gtest-matchers.o)': found architecture 'arm64', required architecture 'x86_64'
+ld: warning: ignoring file '.pio/build/native/lib613/libgoogletest.a(gtest-filepath.o)': found architecture 'arm64', required architecture 'x86_64'
+ld: warning: ignoring file '.pio/build/native/lib613/libgoogletest.a(gtest-death-test.o)': found architecture 'arm64', required architecture 'x86_64'
+ld: warning: ignoring file '.pio/build/native/lib613/libgoogletest.a(gtest-assertion-result.o)': found architecture 'arm64', required architecture 'x86_64'
+ld: warning: ignoring file '.pio/build/native/lib613/libgoogletest.a(gmock.o)': found architecture 'arm64', required architecture 'x86_64'
+ld: warning: ignoring file '.pio/build/native/lib613/libgoogletest.a(gmock-spec-builders.o)': found architecture 'arm64', required architecture 'x86_64'
+ld: warning: ignoring file '.pio/build/native/lib613/libgoogletest.a(gmock-matchers.o)': found architecture 'arm64', required architecture 'x86_64'
+ld: warning: ignoring file '.pio/build/native/lib613/libgoogletest.a(gmock-internal-utils.o)': found architecture 'arm64', required architecture 'x86_64'
+ld: warning: ignoring file '.pio/build/native/lib613/libgoogletest.a(gmock-cardinalities.o)': found architecture 'arm64', required architecture 'x86_64'
+Undefined symbols for architecture x86_64:
+  "_main", referenced from:
+      <initial-undefines>
+ld: symbol(s) not found for architecture x86_64
+clang++: error: linker command failed with exit code 1 (use -v to see invocation)
+*** [.pio/build/native/program] Error 1
+Building stage has failed, see errors above. Use `pio test -vvv` option to enable verbose output.
+--------- native:test_unit/test_keyManager [ERRORED] Took 0.47 seconds ---------
+
+=================================== SUMMARY ===================================
+Environment    Test                          Status    Duration
+-------------  ----------------------------  --------  ------------
+native         test_unit/test_webServer      ERRORED   00:00:01.208
+native         test_unit/test_dataManager    ERRORED   00:00:01.012
+native         test_unit/test_application    ERRORED   00:00:00.825
+native         test_unit/test_eventbus       ERRORED   00:00:00.510
+native         test_unit/test_configManager  ERRORED   00:00:00.492
+native         test_unit/test_u8g2Display    ERRORED   00:00:01.265
+native         test_unit/test_keyManager     ERRORED   00:00:00.474
+================== 7 test cases: 0 succeeded in 00:00:05.786 ==================

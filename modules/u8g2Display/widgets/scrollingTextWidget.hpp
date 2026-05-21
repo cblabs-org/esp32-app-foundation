@@ -1,0 +1,111 @@
+/*
+ * ESP32 App Foundation (c) 2026 CB Labs
+ *
+ * https://github.com/matthewmcneill/esp32-app-foundation
+ *
+ * This work is licensed under Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International.
+ * To view a copy of this license, visit https://creativecommons.org/licenses/by-nc-sa/4.0/
+ *
+ * Module: modules/u8g2Display/widgets/scrollingTextWidget.hpp
+ * Description: Horizontal marquee scrolling text widget. Implements smooth
+ *              pixel-based scrolling with initial delay, ~25 FPS pacing,
+ *              and loop detection. Supports both partial-screen (Escape Hatch)
+ *              and full-frame rendering modes. Zero dependency on framework services.
+ *
+ * Exported Classes:
+ * - scrollingTextWidget: [Class] Base widget for scrolling text rendering.
+ *   - setText(): Assigns new text with change detection and layout invalidation.
+ *   - setFont(): Updates the rendering font and triggers layout recalc.
+ *   - isScrollFinished(): Returns true when text completes a full scroll loop.
+ *   - resetScroll(): Rewinds scroll position and resets timers.
+ *   - tick(): Marquee animation math (pixel shifts, delays, loop detection).
+ *   - render(): Full-frame rendering with static/scroll detection.
+ *   - renderAnimationUpdate(): Partial-screen refresh for smooth scrolling.
+ */
+
+#ifndef SCROLLING_TEXT_WIDGET_HPP
+#define SCROLLING_TEXT_WIDGET_HPP
+
+#include "iGfxWidget.hpp"
+
+/**
+ * @brief Base widget for horizontal marquee scrolling of text within a
+ *        physical bounding box. Handles all scroll math, delay logic,
+ *        and loop detection independently.
+ */
+class scrollingTextWidget : public iGfxWidget {
+protected:
+    char currentText[512];        // Buffer for the active scrolling string
+    int scrollX;                  // Current pixel offset for the scroll
+    int messageWidth;             // Total rendered width of the string in pixels
+    uint32_t lastScrollMs;        // Timestamp of the last scroll tick
+    bool needsScroll;             // True if text is wider than bounding box
+    bool needsLayout;             // True when text/font changed (needs remeasure)
+    const uint8_t* font;          // Active font pointer
+    bool scrollFinished;          // True when text has fully exited the left bound
+
+public:
+    /**
+     * @brief Construct a new scrolling text widget.
+     * @param _x X coordinate of top-left corner.
+     * @param _y Y coordinate of top-left corner.
+     * @param _w Width of bounding box in pixels.
+     * @param _h Height of bounding box in pixels.
+     * @param _font U8G2 font array to use for rendering (nullptr for default).
+     */
+    scrollingTextWidget(int _x, int _y, int _w, int _h, const uint8_t* _font = nullptr);
+    virtual ~scrollingTextWidget() = default;
+
+    /**
+     * @brief Set the text to be scrolled. Triggers layout recalculation.
+     *        Deduplicates: identical text is ignored to prevent layout thrash.
+     * @param newText Null-terminated string. nullptr clears the buffer.
+     */
+    void setText(const char* newText);
+
+    /**
+     * @brief Update the font used for rendering and trigger layout recalc.
+     * @param _font Pointer to U8G2 font array.
+     */
+    void setFont(const uint8_t* _font) { font = _font; needsLayout = true; }
+
+    /**
+     * @brief Check if the text has completed a full scroll loop off-screen.
+     *        Useful for derived classes to trigger data loads or message cycling.
+     * @return True when the scroll cycle is complete.
+     */
+    bool isScrollFinished() const { return scrollFinished; }
+
+    /**
+     * @brief Manually reset the scroll position to the starting position.
+     *        Also resets the initial delay timer.
+     */
+    void resetScroll();
+
+    /**
+     * @brief Marquee animation math: initial delay, pixel shift, loop detection.
+     *        - 3-second initial delay before scrolling starts
+     *        - Pixel shift at ~25 FPS (40ms interval)
+     *        - Loop detection when text exits left edge (scrollX > messageWidth + 30)
+     *        - Static text dwell: 5-second timer then set scrollFinished
+     * @param currentMillis Current system uptime in milliseconds.
+     */
+    virtual void tick(uint32_t currentMillis) override;
+
+    /**
+     * @brief Full-frame render of the text inside the bounding box.
+     *        Handles layout recalculation, static centering, and scrolling clip.
+     * @param display Reference to the U8G2 display instance.
+     */
+    virtual void render(U8G2& display) override;
+
+    /**
+     * @brief Partial-screen refresh for smooth marquee scrolling updates.
+     *        Uses display.updateDisplayArea() for minimal SPI bus traffic.
+     * @param display Reference to the U8G2 display instance.
+     * @param currentMillis Current system uptime in milliseconds.
+     */
+    virtual void renderAnimationUpdate(U8G2& display, uint32_t currentMillis) override;
+};
+
+#endif // SCROLLING_TEXT_WIDGET_HPP

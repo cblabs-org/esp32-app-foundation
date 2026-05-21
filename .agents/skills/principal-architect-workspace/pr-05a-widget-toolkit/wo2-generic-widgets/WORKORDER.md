@@ -206,3 +206,38 @@ Before distilling or committing, you MUST ask the user if they are happy with th
 - [ ] Code follows house-style documentation standards
 - [ ] No files outside the Strict Boundary Box were modified
 - [ ] **Distillation Requirement**: When you have completed and verified all code changes, you MUST invoke the `@distillery` skill to package your WO output. Pass `.agents/skills/principal-architect-workspace/pr-05a-widget-toolkit/wo2-generic-widgets/` as the target directory. Wait for it to finish before dropping control back to the PA.
+
+---
+
+## Execution Status
+
+**Status**: ✅ COMPLETE  
+**Completed**: 2026-05-21T18:00:00Z  
+**Session**: `3fa0959a-2198-47ec-887d-2500e280b68a`
+
+### Checklist Completion
+
+- [x] labelWidget.hpp / .cpp — Static text with alignment and truncation
+- [x] scrollingTextWidget.hpp / .cpp — Horizontal marquee with 3s delay, ~25 FPS, loop detection
+- [x] clockWidget.hpp / .cpp — Real-time HH:MM/HH:MM:SS with DI'd TimeManager, 1Hz blink
+- [x] progressBarWidget.hpp / .cpp — Animated bar with integer-math interpolation, stipple fill
+- [x] imageWidget.hpp / .cpp — Static XBM bitmap rendering
+- [x] test_widgets_generic.cpp — 30+ GoogleTest cases covering all 5 widgets
+- [x] test_main.cpp updated with new test file reference
+
+### Verification Results
+
+| Gate | Result | Details |
+|---|---|---|
+| Native unit tests | ✅ PASSED | `test_u8g2Display` — all WO1 + WO2 tests pass |
+| ESP32dev build | ✅ SUCCESS | 79.77s, 0 errors, RAM 12.7%, Flash 77.6% |
+| House-style docs | ✅ COMPLIANT | All headers have module description, exported functions list |
+| Boundary compliance | ✅ CLEAN | Only `modules/u8g2Display/widgets/` and `test/test_unit/test_u8g2Display/` modified |
+
+### Distillation
+
+- `context_bridge.md` — Progressive-reveal index for future agents
+- `sessions.md` — Session registry
+- `context_artifacts/adr_widget_architecture.md` — All architectural decisions
+- `context_artifacts/adr_reference_adaptation.md` — departures-board → foundation adaptations
+- `context_artifacts/graveyard_build_issues.md` — Build failures and resolutions

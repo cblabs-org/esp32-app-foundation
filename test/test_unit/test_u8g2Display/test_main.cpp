@@ -15,6 +15,7 @@
  *              - test_eventbus_integration.cpp:  EventBus subscription integration
  *              - test_boards.cpp:               System board unit tests
  *              - test_widgets_primitives.cpp:   Widget primitives layer tests
+ *              - test_widgets_generic.cpp:      Generic widget unit tests (WO2)
  *
  *              This file provides only the GoogleTest main() entry point
  *              that discovers and runs all test fixtures linked into the binary.
