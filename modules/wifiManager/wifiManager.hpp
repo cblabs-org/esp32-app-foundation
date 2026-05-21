@@ -45,14 +45,16 @@ private:
 #include <cstring>
 #include "../../include/interfaces/ITickable.hpp"
 #include "../../include/interfaces/iConfigurable.hpp"
+#include "../../include/interfaces/IWebContributor.hpp"
 
 class DNSServer;
 
 /**
  * @brief Class managing WiFi connectivity and configuration.
- *        Implements ITickable for state machine and iConfigurable for persistent config.
+ *        Implements ITickable for state machine, iConfigurable for persistent config,
+ *        and IWebContributor for REST API endpoints.
  */
-class WifiManager : public ITickable, public iConfigurable {
+class WifiManager : public ITickable, public iConfigurable, public IWebContributor {
 private:
     /**
      * @brief High-level states for the WiFi connection state machine.
@@ -74,6 +76,7 @@ private:
     int connectionRetries = 0;
     unsigned long wifiDisconnectTimer = 0; ///< Continuous downtime counter (ms)
     char myUrl[24];                        ///< Formatted string URL for local IP
+    unsigned long lastApiRequestTime = 0;  ///< Last time an API request was received
 
     std::unique_ptr<DNSServer> dnsServer;
 
@@ -116,7 +119,26 @@ public:
      */
     void tick() override;
 
+    // --- IWebContributor Interface ---
+
+    /**
+     * @brief Register all REST API route handlers with the web server.
+     * @param server Reference to the AsyncWebServer instance.
+     */
+    void registerRoutes(AsyncWebServer& server) override;
+
+    /**
+     * @brief Get the UI tab name for this contributor.
+     * @return String name of the tab, or nullptr if no UI tab.
+     */
+    const char* getTabName() const override { return "WiFi"; }
+
     // --- Custom Methods ---
+
+    /**
+     * @brief Record that an API request was received to keep AP mode alive.
+     */
+    void notifyApiActivity();
 
     /**
      * @brief Update and save WiFi credentials.

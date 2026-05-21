@@ -22,8 +22,9 @@
 
 #include <Arduino.h>
 #include <Stream.h>
+#include "../../include/interfaces/IWebContributor.hpp"
 
-class otaUpdateManager {
+class otaUpdateManager : public IWebContributor {
 private:
     size_t expectedSize; // Tracks the total expected size of the update
     
@@ -64,6 +65,20 @@ public:
      * @brief Triggers a rollback to the previous firmware partition and reboots.
      */
     void rollbackFirmware();
+
+    // --- IWebContributor Interface ---
+
+    /**
+     * @brief Register all REST API route handlers with the web server.
+     * @param server Reference to the AsyncWebServer instance.
+     */
+    void registerRoutes(AsyncWebServer& server) override;
+
+    /**
+     * @brief Get the UI tab name for this contributor.
+     * @return String name of the tab, or nullptr if no UI tab.
+     */
+    const char* getTabName() const override { return "OTA"; }
 };
 
 extern otaUpdateManager otaManager;

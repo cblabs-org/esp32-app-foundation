@@ -36,6 +36,7 @@
 
 #include <ArduinoJson.h>
 #include "FrameworkConfig.hpp"
+#include "../../include/interfaces/IWebContributor.hpp"
 
 #define SYSTEM_CONFIG_VERSION 1.0f // Current configuration schema version
 
@@ -59,7 +60,7 @@ struct SystemConfig {
 /**
  * @brief Kernel service that manages global framework configuration on LittleFS.
  */
-class ConfigManager {
+class ConfigManager : public IWebContributor {
 public:
     ConfigManager() = default;
 
@@ -115,6 +116,20 @@ public:
      * @return true if a reload was pending and is now cleared, false otherwise.
      */
     bool checkAndClearReload();
+
+    // --- IWebContributor Interface ---
+
+    /**
+     * @brief Register all REST API route handlers with the web server.
+     * @param server Reference to the AsyncWebServer instance.
+     */
+    void registerRoutes(AsyncWebServer& server) override;
+
+    /**
+     * @brief Get the UI tab name for this contributor.
+     * @return String name of the tab, or nullptr if no UI tab.
+     */
+    const char* getTabName() const override { return "Config"; }
 
 private:
     SystemConfig _config;        // Master configuration state container

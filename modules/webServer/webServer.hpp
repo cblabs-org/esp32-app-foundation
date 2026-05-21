@@ -18,6 +18,8 @@
  */
 
 #pragma once
+#include <vector>
+#include <string>
 
 #ifndef NATIVE_BUILD
 #include <ESPAsyncWebServer.h>
@@ -41,7 +43,17 @@ class AsyncWebServer {
 public:
     AsyncWebServer(uint16_t port) {}
     void begin() {}
-    void on(const char* uri, int method, ArRequestHandlerFunction handler) {}
+    
+    struct Route {
+        std::string uri;
+        int method;
+        ArRequestHandlerFunction handler;
+    };
+    std::vector<Route> routes;
+
+    void on(const char* uri, int method, ArRequestHandlerFunction handler) {
+        routes.push_back({uri, method, handler});
+    }
     static void setMaxBodySize(uint32_t size) {
         lastMaxBodySize = size;
     }
@@ -50,7 +62,6 @@ public:
 };
 #endif
 
-#include <vector>
 #include "interfaces/IWebContributor.hpp"
 
 /**

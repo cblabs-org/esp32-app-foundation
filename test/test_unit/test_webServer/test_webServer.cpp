@@ -25,6 +25,16 @@ TEST(WebServerManagerTest, InitializationAndDispatch) {
     
 #ifdef NATIVE_BUILD
     EXPECT_EQ(AsyncWebServer::lastMaxBodySize, 4096);
+    
+    // Check if new endpoints are registered
+    bool tabsRegistered = false;
+    bool systemRegistered = false;
+    for (const auto& route : manager.getServer().routes) {
+        if (route.uri == "/api/tabs") tabsRegistered = true;
+        if (route.uri == "/api/system") systemRegistered = true;
+    }
+    EXPECT_TRUE(tabsRegistered);
+    EXPECT_TRUE(systemRegistered);
 #endif
 }
 

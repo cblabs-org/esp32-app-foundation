@@ -14,6 +14,7 @@
  */
 
 #include "webServer.hpp"
+#include <ArduinoJson.h>
 
 #ifndef NATIVE_BUILD
 #include "esp_log.h"
@@ -47,12 +48,44 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors) 
         // Stub for serving app.js
     });
 
-    // Register all IWebContributor routes
+    // Register all IWebContributor routes and build tabs array
+    JsonDocument tabsDoc;
+    JsonArray tabsArr = tabsDoc.to<JsonArray>();
+    
     for (auto* contributor : contributors) {
         if (contributor != nullptr) {
             contributor->registerRoutes(_server);
+            const char* tabName = contributor->getTabName();
+            if (tabName != nullptr) {
+                JsonObject tabObj = tabsArr.add<JsonObject>();
+                tabObj["name"] = tabName;
+                tabObj["id"] = tabName; // Using name as ID for simplicity
+            }
         }
     }
+    
+#ifndef NATIVE_BUILD
+    String tabsJson;
+    serializeJson(tabsDoc, tabsJson);
+
+    _server.on("/api/tabs", HTTP_GET, [tabsJson](AsyncWebServerRequest* request) {
+        request->send(200, "application/json", tabsJson);
+    });
+
+    _server.on("/api/system", HTTP_GET, [](AsyncWebServerRequest* request) {
+        JsonDocument doc;
+        doc["heap"] = ESP.getFreeHeap();
+        doc["uptime"] = millis() / 1000;
+        doc["max_alloc"] = ESP.getMaxAllocHeap();
+        doc["status"] = "ok";
+        String out;
+        serializeJson(doc, out);
+        request->send(200, "application/json", out);
+    });
+#else
+    _server.on("/api/tabs", HTTP_GET, [](AsyncWebServerRequest* request) {});
+    _server.on("/api/system", HTTP_GET, [](AsyncWebServerRequest* request) {});
+#endif
 
     _server.begin();
     WEB_LOGI("WebServer started, registered %zu contributors", contributors.size());

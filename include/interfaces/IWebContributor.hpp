@@ -33,9 +33,11 @@ class IWebContributor {
 public:
     virtual ~IWebContributor() = default;
 
-    /**
-     * @brief Register all REST API route handlers with the web server.
-     * @param server Reference to the AsyncWebServer instance.
-     */
     virtual void registerRoutes(AsyncWebServer& server) = 0;
+
+    /**
+     * @brief Get the UI tab name for this contributor.
+     * @return String name of the tab, or nullptr if no UI tab.
+     */
+    virtual const char* getTabName() const { return nullptr; }
 };

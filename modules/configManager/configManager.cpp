@@ -12,6 +12,9 @@
  */
 
 #include "configManager.hpp"
+#ifndef NATIVE_BUILD
+#include <ESPAsyncWebServer.h>
+#endif
 #include <string.h>
 
 #ifndef NATIVE_BUILD
@@ -179,9 +182,45 @@ void ConfigManager::resetConfig() {
  * @return true if a reload was pending and is now cleared, false otherwise.
  */
 bool ConfigManager::checkAndClearReload() {
-    if (_reloadPending) {
-        _reloadPending = false;
-        return true;
-    }
-    return false;
+    bool wasPending = _reloadPending;
+    _reloadPending = false;
+    return wasPending;
+}
+
+void ConfigManager::registerRoutes(AsyncWebServer& server) {
+#ifndef NATIVE_BUILD
+    server.on("/api/config", HTTP_GET, [this](AsyncWebServerRequest* request) {
+        StaticJsonDocument<512> doc;
+        doc["hostname"] = _config.hostname;
+        doc["timezone"] = _config.timezone;
+        doc["firmwareUpdatesEnabled"] = _config.firmwareUpdatesEnabled;
+        doc["otaQuietHour"] = _config.otaQuietHour;
+        
+        String output;
+        serializeJson(doc, output);
+        request->send(200, "application/json", output);
+    });
+
+    server.on("/api/config", HTTP_POST, 
+        [](AsyncWebServerRequest *request) {},
+        NULL,
+        [this](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
+            StaticJsonDocument<512> doc;
+            DeserializationError error = deserializeJson(doc, data, len);
+            if (!error) {
+                if (doc["hostname"].is<const char*>()) strlcpy(_config.hostname, doc["hostname"], sizeof(_config.hostname));
+                if (doc["timezone"].is<const char*>()) strlcpy(_config.timezone, doc["timezone"], sizeof(_config.timezone));
+                if (doc["firmwareUpdatesEnabled"].is<bool>()) _config.firmwareUpdatesEnabled = doc["firmwareUpdatesEnabled"];
+                if (doc["otaQuietHour"].is<int>()) _config.otaQuietHour = doc["otaQuietHour"];
+                
+                this->saveConfig();
+                this->requestReload();
+                
+                request->send(200, "application/json", "{\"status\":\"ok\"}");
+                return;
+            }
+            request->send(400, "application/json", "{\"status\":\"error\",\"msg\":\"Invalid JSON\"}");
+        }
+    );
+#endif
 }

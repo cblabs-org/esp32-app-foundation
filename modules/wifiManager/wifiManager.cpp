@@ -30,6 +30,7 @@
 #include <WiFi.h>
 #include <DNSServer.h>
 #include <ESPmDNS.h>
+#include <ESPAsyncWebServer.h>
 #include "esp_wifi.h"
 #include "esp_log.h"
 static const char* TAG = "WIFI_MGR";
@@ -140,6 +141,7 @@ void WifiManager::begin(const char* hostname) {
     loadConfig();
 
 #ifndef NATIVE_BUILD
+    lastApiRequestTime = millis();
     // Prepare for tick-based init
     WiFi.persistent(false);
     WiFi.disconnect(true, true);
@@ -206,6 +208,7 @@ void WifiManager::tick() {
                 dnsServer = std::make_unique<DNSServer>();
                 dnsServer->start(53, "*", apIP);
                 WIFI_LOGI("Access Point '%s' is online.", portalName);
+                lastApiRequestTime = millis(); // Reset AP timeout timer
             }
             
             transitionTo(WiFiState::WIFI_READY);
@@ -227,6 +230,12 @@ void WifiManager::tick() {
                     WIFI_LOGW("Primary connection lost. Retrying...");
                     transitionTo(WiFiState::WIFI_INIT);
                 }
+            } else if (isAPMode) {
+                // AP Mode 10-minute inactivity timeout
+                if (millis() - lastApiRequestTime > 600000) {
+                    WIFI_LOGW("AP Mode inactive for 10 minutes. Shutting down AP to save power.");
+                    transitionTo(WiFiState::WIFI_SHUTDOWN);
+                }
             } else {
                 // Reset timer if we are connected or in AP mode
                 stateTimer = millis();
@@ -237,6 +246,16 @@ void WifiManager::tick() {
             break;
 
         case WiFiState::WIFI_SHUTDOWN:
+            if (isAPMode) {
+                isAPMode = false;
+                WiFi.softAPdisconnect(true);
+                WiFi.mode(WIFI_OFF);
+                if (dnsServer != nullptr) {
+                    dnsServer->stop();
+                    dnsServer.reset();
+                }
+                WIFI_LOGI("WiFi AP has been shut down.");
+            }
             break;
     }
 #endif
@@ -250,6 +269,58 @@ void WifiManager::processDNS() {
     if (isAPMode && dnsServer != nullptr) {
         dnsServer->processNextRequest();
     }
+#endif
+}
+
+/**
+ * @brief Record that an API request was received.
+ */
+void WifiManager::notifyApiActivity() {
+#ifndef NATIVE_BUILD
+    lastApiRequestTime = millis();
+#endif
+}
+
+/**
+ * @brief Register all REST API route handlers with the web server.
+ */
+void WifiManager::registerRoutes(AsyncWebServer& server) {
+#ifndef NATIVE_BUILD
+    server.on("/api/wifi", HTTP_GET, [this](AsyncWebServerRequest* request) {
+        this->notifyApiActivity();
+        StaticJsonDocument<256> doc;
+        doc["ssid"] = this->getSSID();
+        doc["passExists"] = this->hasPassword();
+        doc["ap_mode"] = this->getAPMode();
+        doc["ip"] = WiFi.localIP().toString();
+        
+        String output;
+        serializeJson(doc, output);
+        request->send(200, "application/json", output);
+    });
+
+    server.on("/api/wifi", HTTP_POST, 
+        [](AsyncWebServerRequest *request) {
+            // Default handler. In ESPAsyncWebServer, if we only process body, we send response in the body handler.
+            // If body was processed and response sent, this is ignored.
+        },
+        NULL,
+        [this](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
+            this->notifyApiActivity();
+            StaticJsonDocument<256> doc;
+            DeserializationError error = deserializeJson(doc, data, len);
+            if (!error) {
+                const char* ssid = doc["ssid"] | "";
+                const char* pass = doc["pass"] | "";
+                if (strlen(ssid) > 0) {
+                    this->updateWiFi(ssid, pass);
+                    request->send(200, "application/json", "{\"status\":\"ok\"}");
+                    return;
+                }
+            }
+            request->send(400, "application/json", "{\"status\":\"error\",\"msg\":\"Invalid JSON or missing SSID\"}");
+        }
+    );
 #endif
 }
 
