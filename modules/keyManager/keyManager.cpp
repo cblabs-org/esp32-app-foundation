@@ -80,6 +80,10 @@ bool KeyManager::saveRegistry(const JsonDocument& doc) const {
 }
 
 bool KeyManager::addKey(const char* id, const char* secret) {
+    if (!id || strlen(id) == 0 || !secret || strlen(secret) == 0) {
+        LOG_KEYMGR("Invalid ID or Secret.");
+        return false;
+    }
     if (!_crypto) {
         LOG_KEYMGR("DeviceCrypto not initialized.");
         return false;
@@ -108,6 +112,9 @@ bool KeyManager::addKey(const char* id, const char* secret) {
 }
 
 std::string KeyManager::getKeyById(const char* id) const {
+    if (!id || strlen(id) == 0) {
+        return "";
+    }
     if (!_crypto) {
         LOG_KEYMGR("DeviceCrypto not initialized.");
         return "";
@@ -136,6 +143,9 @@ std::string KeyManager::getKeyById(const char* id) const {
 }
 
 bool KeyManager::deleteKey(const char* id) {
+    if (!id || strlen(id) == 0) {
+        return false;
+    }
     JsonDocument doc;
     if (!loadRegistry(doc)) {
         return false;

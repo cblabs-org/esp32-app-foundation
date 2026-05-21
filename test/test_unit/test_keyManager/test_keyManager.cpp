@@ -85,6 +85,34 @@ TEST_F(KeyManagerTest, PersistsAcrossInstances) {
     EXPECT_EQ(newInstance.getKeyById("persistent_key"), "persistent_secret");
 }
 
+TEST_F(KeyManagerTest, AddKeyNullptrId) {
+    EXPECT_FALSE(keyManager.addKey(nullptr, "secret"));
+}
+
+TEST_F(KeyManagerTest, AddKeyEmptyId) {
+    EXPECT_FALSE(keyManager.addKey("", "secret"));
+}
+
+TEST_F(KeyManagerTest, AddKeyNullptrSecret) {
+    EXPECT_FALSE(keyManager.addKey("mykey", nullptr));
+}
+
+TEST_F(KeyManagerTest, GetKeyByIdNullptr) {
+    EXPECT_EQ(keyManager.getKeyById(nullptr), "");
+}
+
+TEST_F(KeyManagerTest, GetKeyByIdNonExistent) {
+    EXPECT_EQ(keyManager.getKeyById("non_existent_key_2"), "");
+}
+
+TEST_F(KeyManagerTest, DeleteKeyNullptr) {
+    EXPECT_FALSE(keyManager.deleteKey(nullptr));
+}
+
+TEST_F(KeyManagerTest, DeleteKeyNonExistent) {
+    EXPECT_FALSE(keyManager.deleteKey("no-such-key"));
+}
+
 int main(int argc, char** argv) {
     ::testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();

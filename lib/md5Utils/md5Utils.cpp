@@ -79,8 +79,12 @@ String Md5Utils::base64ToHex(String base64Hash) {
     int index = 0, buffer = 0, bits = 0;
     
     for (int i = 0; i < len; i++) {
+        if (base64Hash[i] == '=') continue;
         int value = base64Value[(int)base64Hash[i]];
-        if (value == -1) continue;
+        if (value == -1) {
+            delete[] binaryData;
+            return String();
+        }
         buffer = (buffer << 6) | value;
         bits += 6;
         if (bits >= 8) {
@@ -92,7 +96,7 @@ String Md5Utils::base64ToHex(String base64Hash) {
     }
 
     String hexHash = "";
-    for (int i = 0; i < binarySize; i++) {
+    for (int i = 0; i < index; i++) {
         if (binaryData[i] < 16) hexHash += '0';
         hexHash += String(binaryData[i], HEX);
     }

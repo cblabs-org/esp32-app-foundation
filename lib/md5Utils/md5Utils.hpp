@@ -16,7 +16,51 @@
 #ifndef MD5_UTILS_HPP
 #define MD5_UTILS_HPP
 
+#ifndef NATIVE_BUILD
 #include <Arduino.h>
+#else
+#include <string>
+#include <cstdint>
+#include <cstddef>
+#ifndef HEX
+#define HEX 16
+#endif
+// Provide String stub if not already available
+#ifndef STRING_STUB_DEFINED
+#define STRING_STUB_DEFINED
+class String {
+public:
+    String() {}
+    String(const char* s) : _str(s ? s : "") {}
+    String(const std::string& s) : _str(s) {}
+    String(int value, int base) {
+        if (base == 16) {
+            char buf[20];
+            snprintf(buf, sizeof(buf), "%x", value);
+            _str = buf;
+        } else {
+            _str = std::to_string(value);
+        }
+    }
+    const char* c_str() const { return _str.c_str(); }
+    bool isEmpty() const { return _str.empty(); }
+    int length() const { return _str.length(); }
+    String operator+(const char* s) const { return String(_str + s); }
+    String operator+(const String& s) const { return String(_str + s._str); }
+    bool operator==(const String& other) const { return _str == other._str; }
+    bool operator==(const char* s) const { return _str == s; }
+    char operator[](int i) const { return _str[i]; }
+    String& operator+=(char c) { _str += c; return *this; }
+    String& operator+=(const String& s) { _str += s._str; return *this; }
+    friend String operator+(const char* lhs, const String& rhs) {
+        return String(lhs) + rhs;
+    }
+    operator std::string() const { return _str; }
+private:
+    std::string _str;
+};
+#endif
+#endif
 
 /**
  * @brief Wrapper class for MD5 generation operations.
