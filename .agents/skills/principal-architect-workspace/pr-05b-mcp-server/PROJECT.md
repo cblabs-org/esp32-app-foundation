@@ -3,7 +3,7 @@
 **Branch:** `pr-05b-mcp-server`  
 **Depends on:** PR-01, PR-02, PR-03, PR-04  
 **Blocks:** PR-06  
-**Status:** 🔄 IN PROGRESS
+**Status:** ✅ COMPLETE
 
 ---
 
@@ -103,7 +103,7 @@ test/test_unit/
 |---|---|---|---|
 | **[x] [wo1-skeleton](wo1-skeleton/WORKORDER.md)** | `IMcpContributor` interface + `McpToolRegistry` + `McpServer` skeleton (Serial JSON-RPC transport) | `pr-05b-wo1-skeleton` | ✅ MERGED `3166d78` |
 | **[x] [wo2-builtin-tools](wo2-builtin-tools/WORKORDER.md)** | Built-in tools: `system_info`, `get_config`/`set_config`, `reboot`, `get_logs`, `list_tools` | `pr-05b-wo2-builtin-tools` | ✅ MERGED `ca47c08` |
-| **[ ] [wo3-integration](wo3-integration/WORKORDER.md)** | `capture_display` tool + Application hub wiring + native unit tests | `pr-05b-wo3-integration` | QUEUED |
+| **[x] [wo3-integration](wo3-integration/WORKORDER.md)** | `capture_display` tool + Application hub wiring + native unit tests | `pr-05b-wo3-integration` | ✅ MERGED `9b9010a` |
 
 ---
 
