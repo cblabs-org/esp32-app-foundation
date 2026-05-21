@@ -27,10 +27,11 @@
   "export": {
     "include": [
       "include",
-      "modules/application",
+      "modules",
       "lib"
     ],
     "exclude": [
+      "src",
       "test",
       "docs",
       ".agents",
@@ -38,6 +39,24 @@
       "web",
       "template"
     ]
+  },
+  "build": {
+    "srcFilter": [
+      "+<modules/>",
+      "+<lib/>",
+      "-<src/>",
+      "-<test/>",
+      "-<template/>"
+    ],
+    "flags": [
+      "-I include"
+    ]
+  },
+  "dependencies": {
+    "bblanchon/ArduinoJson": "^7.4.3",
+    "ESP32Async/ESPAsyncWebServer": "^3.7.7",
+    "ESP32Async/AsyncTCP": "^3.4.5",
+    "olikraus/U8g2": "^2.36.18"
   },
   "frameworks": ["arduino", "espidf"],
   "platforms": ["espressif32"]
