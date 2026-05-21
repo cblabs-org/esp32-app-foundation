@@ -196,10 +196,38 @@ feat(display): Add u8g2Display module skeleton with carousel engine and board sl
 
 ## Closure Gate
 
-- [ ] All files match the house style documentation standard
-- [ ] `esp32dev` build passes
-- [ ] `esp32s3nano` build passes
-- [ ] Native unit tests pass
-- [ ] Code committed to `pr-05-wo1-skeleton` branch
-- [ ] **Ask the user if they are happy with the implementation before proceeding**
-- [ ] **Distillation Requirement**: When you have completed and verified all code changes, you MUST invoke the `@distillery` skill to package your WO output. Pass `.agents/skills/principal-architect-workspace/pr-05-display-module/wo1-skeleton/` as the target directory. Wait for it to finish before dropping control back to the PA.
+- [x] All files match the house style documentation standard
+- [x] `esp32dev` build passes
+- [x] `esp32s3nano` build passes
+- [x] Native unit tests pass
+- [x] Code committed to `pr-05-wo1-skeleton` branch
+- [x] **Ask the user if they are happy with the implementation before proceeding**
+- [x] **Distillation Requirement**: When you have completed and verified all code changes, you MUST invoke the `@distillery` skill to package your WO output. Pass `.agents/skills/principal-architect-workspace/pr-05-display-module/wo1-skeleton/` as the target directory. Wait for it to finish before dropping control back to the PA.
+
+---
+
+## Execution Status
+
+| Field | Value |
+|---|---|
+| **Status** | ✅ COMPLETE |
+| **Executed** | 2026-05-21T12:24:00Z |
+| **Session** | `bc96a6ba-1050-4f5c-9638-ebdf6d6212e3` |
+| **Branch** | `pr-05-wo1-skeleton` |
+| **Commit** | `da619cb` |
+| **Agent** | Worker subagent |
+
+### Build Results
+
+| Target | Status | Flash Usage |
+|---|---|---|
+| esp32dev | ✅ SUCCESS | 77.4% (1014KB / 1280KB) |
+| esp32s3nano | ✅ SUCCESS | 52.4% (1064KB / 1984KB) |
+| Native tests | ✅ 16/16 PASSED | N/A |
+
+### Deviations from WO Spec
+
+1. **Partition resize**: `partitions.esp32dev.csv` app partitions increased from 960KB to 1280KB to accommodate U8G2 library. LittleFS reduced from 1536KB to 896KB. See `context_artifacts/adr_partition_resize.md`.
+2. **library.json**: Removed `platforms`/`frameworks` restrictions to allow native LDF discovery. See `context_artifacts/adr_module_skeleton.md`.
+3. **Lock tests deferred**: `begin(Application&)` lock tests excluded from native suite due to pre-existing `Arduino.h` transitive include issue. See `context_artifacts/graveyard_native_build.md`.
+4. **Override board pointer**: Added `_overrideBoard` member to support `showBoard()` with non-pool system boards. See `context_artifacts/adr_module_skeleton.md`.
