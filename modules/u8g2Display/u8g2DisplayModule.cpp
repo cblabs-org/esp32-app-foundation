@@ -7,9 +7,10 @@
  * To view a copy of this license, visit https://creativecommons.org/licenses/by-nc-sa/4.0/
  *
  * Module: modules/u8g2Display/u8g2DisplayModule.cpp
- * Description: Implementation of the U8G2 display module skeleton with
- *              carousel engine, board slot pool, sleep/wake power management,
- *              and stub IStatusReporter / iConfigurable methods.
+ * Description: Implementation of the U8G2 display module with carousel engine,
+ *              board slot pool, sleep/wake power management, system board
+ *              ownership (BootSplash, Loading, WiFiWizard), and stub
+ *              IStatusReporter / iConfigurable methods.
  *
  * Exported Functions:
  * - U8g2DisplayModule::begin():            Hardware init, pool lock, timer reset
@@ -19,6 +20,9 @@
  * - U8g2DisplayModule::resetActivity():    Reset inactivity timer, wake if sleeping
  * - U8g2DisplayModule::getBoardCount():    Return pool size
  * - U8g2DisplayModule::getActiveBoard():   Return current rendering board or nullptr
+ * - U8g2DisplayModule::getBootSplash():    Return reference to BootSplashBoard
+ * - U8g2DisplayModule::getLoading():       Return reference to LoadingBoard
+ * - U8g2DisplayModule::getWifiWizard():    Return reference to WiFiWizardBoard
  * - U8g2DisplayModule::reportStatus():     IStatusReporter stub (no-op)
  * - U8g2DisplayModule::reportError():      IStatusReporter stub (no-op)
  * - U8g2DisplayModule::clearStatus():      IStatusReporter stub (no-op)
@@ -56,7 +60,11 @@ void U8g2DisplayModule::begin(Application& app) {
     _locked = true;
     _boards.shrink_to_fit();
 
-    // --- Step 3: Reset timers to current time ---
+    // --- Step 3: Activate boot splash and show it ---
+    _bootSplash.activate(APP_FOUNDATION_VERSION);
+    showBoard(&_bootSplash);
+
+    // --- Step 4: Reset timers to current time ---
 #ifndef NATIVE_BUILD
     _lastActivityMs = millis();
     _lastRotationMs = millis();
@@ -187,6 +195,34 @@ IDisplayBoard* U8g2DisplayModule::getActiveBoard() const {
     }
 
     return _boards[_activeBoardIndex];
+}
+
+// =============================================================================
+// System board accessors
+// =============================================================================
+
+/**
+ * @brief Return a reference to the owned BootSplashBoard instance.
+ * @return Mutable reference to _bootSplash.
+ */
+BootSplashBoard& U8g2DisplayModule::getBootSplash() {
+    return _bootSplash;
+}
+
+/**
+ * @brief Return a reference to the owned LoadingBoard instance.
+ * @return Mutable reference to _loading.
+ */
+LoadingBoard& U8g2DisplayModule::getLoading() {
+    return _loading;
+}
+
+/**
+ * @brief Return a reference to the owned WiFiWizardBoard instance.
+ * @return Mutable reference to _wifiWizard.
+ */
+WiFiWizardBoard& U8g2DisplayModule::getWifiWizard() {
+    return _wifiWizard;
 }
 
 // =============================================================================
