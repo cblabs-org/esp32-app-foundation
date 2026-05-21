@@ -132,6 +132,66 @@ TEST_F(DataManagerTest, UnregisterSource) {
     EXPECT_EQ(src.fetchCount, 0);
 }
 
+TEST_F(DataManagerTest, RegisterNullptr) {
+    // Should not crash
+    dm.registerSource(nullptr);
+    dm.processNext();
+}
+
+TEST_F(DataManagerTest, UnregisterNonExistentSource) {
+    MockDataSource src("src", 1000, PriorityTier::LOW);
+    // Unregister without registering first, should not crash
+    dm.unregisterSource(&src);
+    dm.processNext();
+    EXPECT_EQ(src.fetchCount, 0);
+}
+
+TEST_F(DataManagerTest, UnregisterNullptr) {
+    // Should not crash
+    dm.unregisterSource(nullptr);
+    dm.processNext();
+}
+
+TEST_F(DataManagerTest, RequestPriorityOnUnregisteredSource) {
+    MockDataSource src("src", 1000, PriorityTier::LOW);
+    // Request priority without registering first, should not crash
+    dm.requestPriorityFetch(&src);
+    dm.processNext();
+    EXPECT_EQ(src.fetchCount, 0);
+}
+
+TEST_F(DataManagerTest, DoubleRegistration) {
+    MockDataSource src("src", 5000, PriorityTier::LOW);
+    dm.registerSource(&src);
+    dm.registerSource(&src); // Register second time
+    
+    // Initial fetch, should fetch once
+    dm.processNext();
+    EXPECT_EQ(src.fetchCount, 1);
+    
+    // Process again, shouldn't fetch
+    dm.processNext();
+    EXPECT_EQ(src.fetchCount, 1);
+}
+
+TEST_F(DataManagerTest, RegisterAfterUnregister) {
+    MockDataSource src("src", 5000, PriorityTier::LOW);
+    dm.registerSource(&src);
+    dm.unregisterSource(&src);
+    
+    // Re-register
+    dm.registerSource(&src);
+    
+    // Process, should fetch because it was re-registered
+    dm.processNext();
+    EXPECT_EQ(src.fetchCount, 1);
+}
+
+TEST_F(DataManagerTest, ProcessNext_WithNoSources_DoesNotCrash) {
+    dm.processNext();
+    SUCCEED();
+}
+
 #if defined(NATIVE_BUILD)
 int main(int argc, char **argv) {
     ::testing::InitGoogleTest(&argc, argv);

@@ -124,6 +124,83 @@ TEST_F(EventBusTest, InvalidTopicSubscription) {
     EXPECT_FALSE(bus.subscribe(longTopic, testCallback, &ctx));
 }
 
+TEST_F(EventBusTest, UnsubscribeNonExistent) {
+    TestContext ctx = {0, "", 0};
+    bool removed = bus.unsubscribe("no/such", testCallback, &ctx);
+    EXPECT_FALSE(removed);
+}
+
+TEST_F(EventBusTest, PublishWithNullptrTopic) {
+    int val = 1;
+    int count = bus.publish(nullptr, &val);
+    EXPECT_EQ(count, 0);
+}
+
+TEST_F(EventBusTest, PublishWithEmptyTopic) {
+    int val = 1;
+    int count = bus.publish("", &val);
+    EXPECT_EQ(count, 0);
+}
+
+TEST_F(EventBusTest, NullCallbackSubscription) {
+    TestContext ctx = {0, "", 0};
+    bool res = bus.subscribe("sys/test", nullptr, &ctx);
+    EXPECT_FALSE(res);
+}
+
+TEST_F(EventBusTest, MultipleTopicsSameCallback) {
+    TestContext ctx = {0, "", 0};
+    bus.subscribe("topic/one", testCallback, &ctx);
+    bus.subscribe("topic/two", testCallback, &ctx);
+
+    int val1 = 100;
+    int count1 = bus.publish("topic/one", &val1);
+    EXPECT_EQ(count1, 1);
+    EXPECT_EQ(ctx.callCount, 1);
+    EXPECT_STREQ(ctx.lastTopic, "topic/one");
+    EXPECT_EQ(ctx.lastPayloadValue, 100);
+
+    int val2 = 200;
+    int count2 = bus.publish("topic/two", &val2);
+    EXPECT_EQ(count2, 1);
+    EXPECT_EQ(ctx.callCount, 2);
+    EXPECT_STREQ(ctx.lastTopic, "topic/two");
+    EXPECT_EQ(ctx.lastPayloadValue, 200);
+}
+
+TEST_F(EventBusTest, UnsubscribeThenResubscribe) {
+    TestContext ctx = {0, "", 0};
+    bus.subscribe("sys/test", testCallback, &ctx);
+    EXPECT_TRUE(bus.unsubscribe("sys/test", testCallback, &ctx));
+    
+    // Resubscribe
+    EXPECT_TRUE(bus.subscribe("sys/test", testCallback, &ctx));
+    
+    int val = 1;
+    int count = bus.publish("sys/test", &val);
+    EXPECT_EQ(count, 1);
+    EXPECT_EQ(ctx.callCount, 1);
+}
+
+TEST_F(EventBusTest, PublishWithNullptrPayload) {
+    TestContext ctx = {0, "", 0};
+    // Ensure initial state
+    ctx.lastPayloadValue = -1;
+    
+    bus.subscribe("sys/test", testCallback, &ctx);
+    
+    int count = bus.publish("sys/test", nullptr);
+    EXPECT_EQ(count, 1);
+    EXPECT_EQ(ctx.callCount, 1);
+    // Payload should not have modified lastPayloadValue
+    EXPECT_EQ(ctx.lastPayloadValue, -1);
+}
+
+TEST_F(EventBusTest, Unsubscribe_WithNullptrTopic_ReturnsFalse) {
+    TestContext ctx = {0, "", 0};
+    EXPECT_FALSE(bus.unsubscribe(nullptr, testCallback, &ctx));
+}
+
 #if defined(NATIVE_BUILD)
 int main(int argc, char **argv) {
     ::testing::InitGoogleTest(&argc, argv);

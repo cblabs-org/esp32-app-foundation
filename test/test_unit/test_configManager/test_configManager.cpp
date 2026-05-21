@@ -111,6 +111,94 @@ TEST_F(ConfigManagerTest, ResetConfig_RestoresDefaults) {
     EXPECT_TRUE(configManager.getConfig().firmwareUpdatesEnabled);
 }
 
+TEST_F(ConfigManagerTest, SaveConfig_WithoutPriorLoad_Succeeds) {
+    EXPECT_TRUE(configManager.saveConfig());
+    std::ifstream file(SYSTEM_CONFIG_PATH);
+    EXPECT_TRUE(file.is_open());
+}
+
+TEST_F(ConfigManagerTest, LoadConfig_CorruptedJson_ReturnsFalseAndAppliesDefaults) {
+    std::ofstream file(SYSTEM_CONFIG_PATH);
+    file << "{ invalid json : ";
+    file.close();
+
+    EXPECT_FALSE(configManager.loadConfig());
+    EXPECT_STREQ(configManager.getConfig().hostname, "esp32-device");
+}
+
+TEST_F(ConfigManagerTest, LoadConfig_EmptyFile_ReturnsFalseAndAppliesDefaults) {
+    std::ofstream file(SYSTEM_CONFIG_PATH);
+    file.close();
+
+    EXPECT_FALSE(configManager.loadConfig());
+    EXPECT_STREQ(configManager.getConfig().hostname, "esp32-device");
+}
+
+TEST_F(ConfigManagerTest, HostnameBoundary_32Chars_PreservedExactly) {
+    std::string boundaryHostname(32, 'A');
+    strncpy(configManager.getMutableConfig().hostname, boundaryHostname.c_str(), 33);
+    EXPECT_TRUE(configManager.saveConfig());
+
+    ConfigManager newConfigManager;
+    EXPECT_TRUE(newConfigManager.loadConfig());
+    EXPECT_STREQ(newConfigManager.getConfig().hostname, boundaryHostname.c_str());
+}
+
+TEST_F(ConfigManagerTest, HostnameOverflow_TruncatedToBuffer) {
+    std::string overflowHostname(50, 'B');
+    // Using strncpy to simulate what happens if a long string is in the JSON
+    // Wait, let's test the JSON load behavior with a long string:
+    std::ofstream file(SYSTEM_CONFIG_PATH);
+    file << "{\"hostname\":\"" << overflowHostname << "\"}";
+    file.close();
+
+    EXPECT_TRUE(configManager.loadConfig());
+    
+    // The buffer size is 33, so it should store 32 'B's + null terminator
+    std::string expected(32, 'B');
+    EXPECT_STREQ(configManager.getConfig().hostname, expected.c_str());
+}
+
+TEST_F(ConfigManagerTest, TimezoneBoundary_63Chars_PreservedExactly) {
+    std::string boundaryTimezone(63, 'T');
+    strncpy(configManager.getMutableConfig().timezone, boundaryTimezone.c_str(), 64);
+    EXPECT_TRUE(configManager.saveConfig());
+
+    ConfigManager newConfigManager;
+    EXPECT_TRUE(newConfigManager.loadConfig());
+    EXPECT_STREQ(newConfigManager.getConfig().timezone, boundaryTimezone.c_str());
+}
+
+TEST_F(ConfigManagerTest, MultipleSaveLoadCycles_StatePreserved) {
+    configManager.getMutableConfig().otaQuietHour = 1;
+    EXPECT_TRUE(configManager.saveConfig());
+
+    ConfigManager manager2;
+    EXPECT_TRUE(manager2.loadConfig());
+    EXPECT_EQ(manager2.getConfig().otaQuietHour, 1);
+    
+    manager2.getMutableConfig().otaQuietHour = 2;
+    EXPECT_TRUE(manager2.saveConfig());
+
+    ConfigManager manager3;
+    EXPECT_TRUE(manager3.loadConfig());
+    EXPECT_EQ(manager3.getConfig().otaQuietHour, 2);
+}
+
+TEST_F(ConfigManagerTest, GetMutableConfig_Modification_ReflectedInConstRef) {
+    configManager.getMutableConfig().firmwareUpdatesEnabled = false;
+    
+    const SystemConfig& constConfig = configManager.getConfig();
+    EXPECT_FALSE(constConfig.firmwareUpdatesEnabled);
+}
+
+TEST_F(ConfigManagerTest, ResetConfig_AfterModification_Succeeds) {
+    configManager.getMutableConfig().otaQuietHour = 9;
+    configManager.saveConfig();
+    configManager.resetConfig();
+    EXPECT_EQ(configManager.getConfig().otaQuietHour, 3);
+}
+
 int main(int argc, char** argv) {
     ::testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();
