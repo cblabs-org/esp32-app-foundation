@@ -360,5 +360,59 @@
         }
       ]
     }
+  },
+  {
+    "id": "148d9329-305f-4eb1-94b5-7603869d2d02",
+    "commandDesc": "MCP Tool: build_project",
+    "timestamp": 1779364575464,
+    "status": "error",
+    "tasks": [
+      {
+        "taskId": "3da13fdc-629f-4d6d-9e2c-542ad765c565",
+        "type": "build",
+        "status": "error",
+        "logPaths": [
+          "/Users/mcneillm/Documents/Projects/esp32-app-foundation/.pio-mcp-workspace/logs/build/build-2026-05-21T11-56-15-470Z-09c281f9.log"
+        ],
+        "pid": 44937,
+        "commandDesc": "pio run --environment native",
+        "exitCode": 1,
+        "error": "include/portal_assets/index_html.hpp:20:10: fatal error: 'Arduino.h' file not found"
+      }
+    ],
+    "mcpRequest": {
+      "background": true,
+      "environment": "native",
+      "projectDir": "/Users/mcneillm/Documents/Projects/esp32-app-foundation"
+    },
+    "mcpToolName": "build_project",
+    "mcpResponse": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"status\": \"running\",\n  \"message\": \"Task dispatched to background.\",\n  \"pid\": 44937,\n  \"taskId\": \"148d9329-305f-4eb1-94b5-7603869d2d02\",\n  \"logPaths\": [\n    \"/Users/mcneillm/Documents/Projects/esp32-app-foundation/.pio-mcp-workspace/logs/build/build-2026-05-21T11-56-15-470Z-09c281f9.log\"\n  ]\n}"
+        }
+      ]
+    },
+    "error": "include/portal_assets/index_html.hpp:20:10: fatal error: 'Arduino.h' file not found"
+  },
+  {
+    "id": "8a87447d-95d3-45bd-ac76-94d0485c0f78",
+    "commandDesc": "MCP Tool: check_task_status",
+    "timestamp": 1779364578073,
+    "status": "success",
+    "tasks": [],
+    "mcpRequest": {
+      "taskId": "148d9329-305f-4eb1-94b5-7603869d2d02"
+    },
+    "mcpToolName": "check_task_status",
+    "mcpResponse": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"status\": \"success\",\n  \"targetStatus\": \"failed\",\n  \"taskId\": \"148d9329-305f-4eb1-94b5-7603869d2d02\",\n  \"logPaths\": [],\n  \"output\": \"Task ID not found: 148d9329-305f-4eb1-94b5-7603869d2d02\"\n}"
+        }
+      ]
+    }
   }
 ]
