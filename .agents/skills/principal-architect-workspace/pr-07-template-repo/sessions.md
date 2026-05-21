@@ -1,0 +1,3 @@
+- 60edc6be-35bc-4d74-964b-cdad12e94ffb (Principal Architect PR-07)
+- f6f46833-fdf7-455d-9f63-2e97c69eb26b (WO1 subagent)
+- 7274ca7b-fcfa-460c-bb69-0e46e98efcf9 (WO2 subagent)
