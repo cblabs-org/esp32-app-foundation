@@ -2,7 +2,7 @@
 
 **Program:** ESP32 App Foundation  
 **Branch:** `pr-01-kernel-interfaces`  
-**Status:** IN PROGRESS  
+**Status:** ✅ MERGED — squash-committed to `main` as `a2b1666`  
 **Principal Architect Session:** 30aaf023-db75-4615-bf03-5b7bf9e9bacc  
 **Last Updated:** 2026-05-21  
 
@@ -37,10 +37,10 @@ is the skeleton that every downstream PR builds on.
 
 | # | Status | Branch | Link |
 |---|---|---|---|
-| WO1 | **⬜ QUEUED** | `pr-01-kernel-interfaces/wo1-scaffold` | [wo1-scaffold/WORKORDER.md](wo1-scaffold/WORKORDER.md) |
-| WO2 | **⬜ QUEUED** | `pr-01-kernel-interfaces/wo2-interfaces` | [wo2-interfaces/WORKORDER.md](wo2-interfaces/WORKORDER.md) |
-| WO3 | **⬜ QUEUED** | `pr-01-kernel-interfaces/wo3-app-hub` | [wo3-app-hub/WORKORDER.md](wo3-app-hub/WORKORDER.md) |
-| WO4 | **⬜ QUEUED** | `pr-01-kernel-interfaces/wo4-entry-point` | [wo4-entry-point/WORKORDER.md](wo4-entry-point/WORKORDER.md) |
+| WO1 | **✅ MERGED** (`f725eab`) | ~~`pr-01-kernel-interfaces/wo1-scaffold`~~ → `main` | [wo1-scaffold/WORKORDER.md](wo1-scaffold/WORKORDER.md) |
+| WO2 | **✅ MERGED** (`070c9be`) | ~~`pr-01-wo2-interfaces`~~ → `pr-01-kernel-interfaces` | [wo2-interfaces/WORKORDER.md](wo2-interfaces/WORKORDER.md) |
+| WO3 | **✅ MERGED** (`408c3da`) | ~~`pr-01-wo3-app-hub`~~ → `pr-01-kernel-interfaces` | [wo3-app-hub/WORKORDER.md](wo3-app-hub/WORKORDER.md) |
+| WO4 | **✅ MERGED** (`3542823`) | ~~`pr-01-wo4-entry-point`~~ → `pr-01-kernel-interfaces` → `main` (`a2b1666`) | [wo4-entry-point/WORKORDER.md](wo4-entry-point/WORKORDER.md) |
 
 ---
 
@@ -94,13 +94,20 @@ is the skeleton that every downstream PR builds on.
 
 ## Git Branch Map
 
+> [!NOTE]
+> **Branch naming resolution:** Git cannot simultaneously hold `pr-01-kernel-interfaces`
+> (as a branch ref) AND `pr-01-kernel-interfaces/woX-*` branches (which treat the former
+> as a directory prefix). WO1 exposed this. Resolution: WO branches use `pr-01-woX-topic`
+> (no slash) and the feature integration branch is `pr-01-kernel-interfaces` (created
+> only after WO1's slash-prefixed branch was deleted post-merge).
+
 ```
 main
-  └─ pr-01-kernel-interfaces          ← PA feature branch (this PR)
-       └─ pr-01-kernel-interfaces/wo1-scaffold      ← repo bootstrap + pio scaffold
-       └─ pr-01-kernel-interfaces/wo2-interfaces    ← interface headers + AppState + FrameworkConfig
-       └─ pr-01-kernel-interfaces/wo3-app-hub       ← Application hub class + unit tests
-       └─ pr-01-kernel-interfaces/wo4-entry-point   ← main.cpp + AppFoundation.h + library.json
+  └─ pr-01-kernel-interfaces          ← PA feature branch (integration target)
+       pr-01-wo1-scaffold              ← MERGED to main (f725eab) then deleted
+       pr-01-wo2-interfaces            ← IN PROGRESS
+       pr-01-wo3-app-hub              ← to be created
+       pr-01-wo4-entry-point          ← to be created
 ```
 
 ---

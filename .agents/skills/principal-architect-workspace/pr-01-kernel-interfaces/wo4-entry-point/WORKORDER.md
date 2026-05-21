@@ -31,7 +31,7 @@ native unit tests must pass clean before this PR is ready to merge.
 
 ## Context
 
-- **Branch:** `pr-01-kernel-interfaces/wo4-entry-point` (branch off `pr-01-kernel-interfaces` **after WO3 is merged**)
+- **Branch:** `pr-01-wo4-entry-point` (already created by PA — you are on it)
 - **Repo:** `/Users/mcneillm/Documents/Projects/esp32-app-foundation/`
 - **Hollywood Principle:** `main.cpp` must delegate `setup()` and `loop()` to the framework. App code never touches these directly. The `Application` instance is declared as a file-scope static in `main.cpp`, not inside `setup()`.
 - **Façade header purpose:** An app developer should only ever need `#include "AppFoundation.h"` — this single include pulls in all framework headers they need.
@@ -49,14 +49,32 @@ native unit tests must pass clean before this PR is ready to merge.
 
 ---
 
-## Pre-flight: Branch Setup
+## Pre-flight: Confirm Branch & State
+
+The PA has already created your branch and WO3 is merged. Confirm before writing any files:
 
 ```bash
-# Ensure WO3 is merged to the feature branch first (PA handles this)
-git checkout pr-01-kernel-interfaces
-# Then create your WO branch:
-git checkout -b pr-01-kernel-interfaces/wo4-entry-point pr-01-kernel-interfaces
+git -C /Users/mcneillm/Documents/Projects/esp32-app-foundation branch --show-current
+# Expected output: pr-01-wo4-entry-point
 ```
+
+Confirm the Application hub exists:
+```bash
+ls /Users/mcneillm/Documents/Projects/esp32-app-foundation/modules/application/
+# Expected: Application.hpp  Application.cpp  library.json
+```
+
+### ⚠️ Important: platformio.ini Already Updated by WO3
+
+WO3 made necessary corrections to `platformio.ini` that are already merged:
+- `lib_extra_dirs = modules` added to `[env:base_esp32]` and `[env:native]`
+- `test_filter = test_unit/*` added to `[env:native]`
+- `build_flags` block cleaned up (removed malformed `+=`)
+- `-DAPP_FOUNDATION_VERSION=\"0.1.0\"` added to `[env:native]`
+
+**Do NOT re-apply these changes.** Read the current `platformio.ini` before any edits.
+
+If you are not on `pr-01-wo4-entry-point` or the Application hub is missing, do NOT proceed — report back to the PA.
 
 ---
 
@@ -410,4 +428,55 @@ Once approved, invoke the `@distillery` skill, passing `.agents/skills/principal
 
 ## Status
 
-*Awaiting execution.*
+**COMPLETED** — 2026-05-21
+
+### Gate Report
+
+| Check | Result |
+|-------|--------|
+| Native unit tests (24/24) | ✅ PASSED |
+| `esp32dev` build | ✅ SUCCESS |
+| `esp32s3nano` build | ✅ SUCCESS |
+| `src/main.cpp` exists | ✅ Confirmed |
+| `include/AppFoundation.h` exists | ✅ Confirmed |
+| `library.json` (repo root) exists | ✅ Confirmed |
+
+### Commit SHA
+
+```
+48ebcb9 feat(entry-point): src/main.cpp, AppFoundation.h facade, library.json
+```
+
+### Build Stats
+
+| Environment | RAM Used | Flash Used | Status |
+|-------------|----------|------------|--------|
+| esp32dev | 11.4% (37,456 / 327,680 B) | 93.0% (913,737 / 983,040 B) | ✅ SUCCESS |
+| esp32s3nano | 12.2% (39,920 / 327,680 B) | 47.6% (966,728 / 2,031,616 B) | ✅ SUCCESS |
+
+### `git log --oneline pr-01-kernel-interfaces` (full feature branch history)
+
+```
+3542823 merge(wo4): entry point, AppFoundation.h facade, library.json — PR-01/WO4
+48ebcb9 feat(entry-point): src/main.cpp, AppFoundation.h facade, library.json
+408c3da merge(wo3): Application hub, two-tier vector, 24/24 unit tests — PR-01/WO3
+d470a86 feat(application): Application hub with two-tier vector model
+070c9be merge(wo2): interface headers, AppState, FrameworkConfig — PR-01/WO2
+3419a13 feat(interfaces): interface headers, AppState, FrameworkConfig
+22dc235 chore(wo1): mark WORKORDER.md APPROVED with build stats
+f725eab merge(wo1): repo scaffold, platformio.ini, partition tables, sdkconfig — PR-01/WO1
+aa1dc77 chore(gitignore): untrack IDF root CMakeLists.txt and dependencies.lock
+1d711e3 chore(gitignore): exclude all IDF root-level generated files
+79b5228 chore(gitignore): exclude IDF-generated build artifacts
+7e877a0 feat(scaffold): PlatformIO config, partition tables, sdkconfig.defaults
+1dd3bed chore: initial repo scaffold — docs, agents, gitignore
+```
+
+WO4 commit `48ebcb9` sits on top of `pr-01-wo4-entry-point` branched from `pr-01-kernel-interfaces`.
+
+### Engineering Notes
+
+- **`CONFIG_AUTOSTART_ARDUINO=y`** was missing from both `sdkconfig.defaults` files. Without it, the Arduino framework's `cores/esp32/main.cpp` does not compile its `app_main()` wrapper (which is gated on `#if CONFIG_AUTOSTART_ARDUINO`), causing an undefined reference to `app_main` at link time. Added to both `sdkconfig.defaults` and `sdkconfig.defaults.esp32s3nano`.
+- **`<Arduino.h>` include guard** added to `src/main.cpp` under `#ifndef NATIVE_BUILD` so `delay()` is visible in the dual `arduino+espidf` build. Pattern mirrors `Application.cpp`.
+- All other WO4 deliverables written verbatim per the WORKORDER spec.
+

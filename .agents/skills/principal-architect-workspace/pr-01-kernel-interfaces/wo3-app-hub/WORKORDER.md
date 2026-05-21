@@ -32,7 +32,7 @@ architecturally critical WO in PR-01.
 
 ## Context
 
-- **Branch:** `pr-01-kernel-interfaces/wo3-app-hub` (branch off `pr-01-kernel-interfaces` **after WO2 is merged**)
+- **Branch:** `pr-01-wo3-app-hub` (already created by PA — you are on it)
 - **Repo:** `/Users/mcneillm/Documents/Projects/esp32-app-foundation/`
 - **Two-tier vector model (CA-05):**
   - **Tier 1 (Boot phase):** `std::vector` allows `push_back()` during `begin()`. No `MAX_*` ceiling.
@@ -55,14 +55,22 @@ architecturally critical WO in PR-01.
 
 ---
 
-## Pre-flight: Branch Setup
+## Pre-flight: Confirm Branch
+
+The PA has already created your working branch and WO2 is merged. Confirm before writing any files:
 
 ```bash
-# Ensure WO2 is merged to the feature branch first (PA handles this)
-git checkout pr-01-kernel-interfaces
-# Then create your WO branch:
-git checkout -b pr-01-kernel-interfaces/wo3-app-hub pr-01-kernel-interfaces
+git -C /Users/mcneillm/Documents/Projects/esp32-app-foundation branch --show-current
+# Expected output: pr-01-wo3-app-hub
 ```
+
+Also confirm the interface headers exist (they should — WO2 is merged):
+```bash
+ls /Users/mcneillm/Documents/Projects/esp32-app-foundation/include/interfaces/
+# Expected: IDisplayBoard.hpp  IStatusReporter.hpp  ITickable.hpp  IWebContributor.hpp  iConfigurable.hpp  iDataSource.hpp
+```
+
+If you are not on `pr-01-wo3-app-hub` or the headers are missing, do NOT proceed — report back to the PA.
 
 ---
 
@@ -356,4 +364,61 @@ Once approved, invoke the `@distillery` skill, passing `.agents/skills/principal
 
 ## Status
 
-*Awaiting execution.*
+**APPROVED** — 2026-05-21T08:32Z  
+Branch: `pr-01-wo3-app-hub` | Commit: `d470a86`
+
+### GoogleTest Results — 24/24 PASSED
+
+| Test | Result |
+|------|--------|
+| ApplicationRegistrationTest.RegisterTickable_ValidPointer_ReturnsTrue | PASSED |
+| ApplicationRegistrationTest.RegisterTickable_Nullptr_ReturnsFalse | PASSED |
+| ApplicationRegistrationTest.RegisterConfigurable_ValidPointer_ReturnsTrue | PASSED |
+| ApplicationRegistrationTest.RegisterConfigurable_Nullptr_ReturnsFalse | PASSED |
+| ApplicationRegistrationTest.RegisterDataSource_ValidPointer_ReturnsTrue | PASSED |
+| ApplicationRegistrationTest.RegisterDataSource_Nullptr_ReturnsFalse | PASSED |
+| ApplicationRegistrationTest.RegisterStatusReporter_ValidPointer_ReturnsTrue | PASSED |
+| ApplicationRegistrationTest.RegisterStatusReporter_ReplacesPreviousReporter_ReturnsTrue | PASSED |
+| ApplicationRegistrationTest.RegisterWebContributor_ValidPointer_ReturnsTrue | PASSED |
+| ApplicationLockTest.PostLock_RegisterTickable_ReturnsFalse | PASSED |
+| ApplicationLockTest.PostLock_RegisterConfigurable_ReturnsFalse | PASSED |
+| ApplicationLockTest.PostLock_RegisterDataSource_ReturnsFalse | PASSED |
+| ApplicationLockTest.PostLock_RegisterStatusReporter_ReturnsFalse | PASSED |
+| ApplicationLockTest.PostLock_RegisterWebContributor_ReturnsFalse | PASSED |
+| ApplicationLockTest.Tick_WhenRunning_DispatchesToAllTickables | PASSED |
+| ApplicationLockTest.Tick_WhenNotRunning_DoesNotDispatch | PASSED |
+| ApplicationLockTest.Tick_CalledMultipleTimes_AccumulatesCount | PASSED |
+| ApplicationStateTest.InitialState_IsBooting | PASSED |
+| ApplicationStateTest.AfterBegin_StateIsRunning | PASSED |
+| ApplicationStateTest.GetState_DoesNotMutateState | PASSED |
+| ApplicationSoftResetTest.SoftReset_NativeBuild_DoesNotCrash | PASSED |
+| ApplicationSoftResetTest.SoftReset_DoesNotAlterAppState | PASSED |
+| ApplicationBeginTest.Begin_CallsLoadConfigOnAllConfigurables | PASSED |
+| ApplicationBeginTest.Begin_NativeBuild_ReturnsTrue | PASSED |
+
+**24 test cases: 24 succeeded in 00:00:00.292**
+
+### Hardware Build Results
+
+| Environment | Status  | Duration | RAM   | Flash |
+|-------------|---------|----------|-------|-------|
+| esp32dev    | SUCCESS | 58.26s   | 10.9% | 84.1% |
+| esp32s3nano | SUCCESS | 53.80s   | 11.2% | 41.2% |
+
+### NATIVE_BUILD Guards Applied
+
+| API / Header | Location | Native Behaviour |
+|---|---|---|
+| `esp_restart()` | `softReset()` | No-op — method returns normally |
+| `LittleFS.begin()` | `begin()` | Skipped — never returns false |
+| `heap_caps_get_free_size()` / `heap_caps_get_minimum_free_size()` | `_reportHeap()` | Skipped with log message |
+| `esp_log.h` + `ESP_LOGI/W/E` macros | whole translation unit | Replaced with `printf` shims |
+| `Arduino.h`, `LittleFS.h`, `esp_system.h`, `esp_heap_caps.h` | whole translation unit | Entire hardware include block excluded |
+
+### platformio.ini Changes (necessary, not architectural drift)
+
+1. `lib_extra_dirs = modules` — added to `[env:base_esp32]` and `[env:native]`; required for PlatformIO LDF to resolve `modules/application/`.
+2. `test_filter = test_unit/*` — added to `[env:native]`; suppresses "nothing to build" errors from empty `test_hardware`/`test_e2e` directories.
+3. `build_flags += -std=gnu++17` malformed line fixed — merged into the single `build_flags` block in `[env:base_esp32]`.
+4. `-DAPP_FOUNDATION_VERSION=\"0.1.0\"` — added to `[env:native]` so macro is available without hardware headers.
+5. `modules/application/library.json` created — `build.flags: ["-I../../include"]` required so the library's own compile step can resolve `AppState.hpp`, `FrameworkConfig.hpp`, and interface headers.

@@ -228,11 +228,12 @@ include/portal_assets/
 ```
 main                                       ← protected, production
   └─ pr-01-kernel-interfaces                ← PA feature branch (base: main)
-       └─ pr-01-kernel-interfaces/wo1-scaffold
-       └─ pr-01-kernel-interfaces/wo2-interfaces
-       └─ pr-01-kernel-interfaces/wo3-app-hub
-       └─ pr-01-kernel-interfaces/wo4-entry-point
+       pr-01-wo1-scaffold
+       pr-01-wo2-interfaces
+       pr-01-wo3-app-hub
+       pr-01-wo4-entry-point
   └─ pr-02-kernel-services                  ← branched from main after PR-01 merges
+       pr-02-wo1-lowlevel-libs
   └─ pr-03-data-infra
   └─ pr-04-web-portal                        ← parallel with PR-05
   └─ pr-05-display-module                   ← parallel with PR-04
@@ -240,7 +241,12 @@ main                                       ← protected, production
   └─ pr-07-template-scaffold
 ```
 
-**Format:** `pr-[NN]-[name]` for feature branch — `pr-[NN]-[name]/wo[Y]-[topic]` for WO branches.
+> [!IMPORTANT]
+> **WO branches must NOT use slash notation.** Git refuses to hold `pr-01-kernel-interfaces`
+> (a branch) and `pr-01-kernel-interfaces/wo1-scaffold` (a branch) simultaneously — the
+> slash is treated as a directory separator. Discovered in WO1 execution.
+>
+> **Format:** Feature branch = `pr-NN-name`. WO branch = `pr-NN-woY-topic` (flat, no slash).
 
 ### PA Git Lifecycle (each PA repeats this)
 
