@@ -18,7 +18,14 @@
 #ifndef LOGGER_HPP
 #define LOGGER_HPP
 
+#ifndef NATIVE_BUILD
 #include <Arduino.h>
+#else
+#include <stdint.h>
+#include <stddef.h>
+#include <string>
+typedef std::string String;
+#endif
 #include <vector>
 
 #ifndef PIO_UNIT_TESTING
