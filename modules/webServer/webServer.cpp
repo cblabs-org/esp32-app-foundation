@@ -16,12 +16,15 @@
 #include "webServer.hpp"
 #include <ArduinoJson.h>
 
+// Portal PROGMEM assets — hardware only (require Arduino.h for PROGMEM macro)
+#ifndef NATIVE_BUILD
 #include "portal_assets/index_html.hpp"
 #include "portal_assets/app_css.hpp"
 #include "portal_assets/app_js.hpp"
 #include "portal_assets/system_js.hpp"
 #include "portal_assets/wifi_js.hpp"
 #include "portal_assets/ota_js.hpp"
+#endif
 
 #ifndef NATIVE_BUILD
 #include "esp_log.h"
@@ -42,7 +45,8 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors) 
     // Cap global POST bodies to 4KB as per requirements.
     // AsyncWebServer::setMaxBodySize(4096); // Not supported in this version
 
-    // Setup routing for static files served from PROGMEM
+    // Setup routing for static files served from PROGMEM (hardware only)
+#ifndef NATIVE_BUILD
     _server.on("/", HTTP_GET, [](AsyncWebServerRequest* request) {
         AsyncWebServerResponse *response = request->beginResponse_P(200, "text/html", index_html_gz, index_html_gz_len);
         response->addHeader("Content-Encoding", "gzip");
@@ -78,6 +82,7 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors) 
         response->addHeader("Content-Encoding", "gzip");
         request->send(response);
     });
+#endif
 
     // Register all IWebContributor routes and build tabs array
     JsonDocument tabsDoc;

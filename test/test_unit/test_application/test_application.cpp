@@ -22,6 +22,8 @@
 
 #include <gtest/gtest.h>
 #include "Application.hpp"
+#include "interfaces/IMcpContributor.hpp"
+#include "mcpToolRegistry.hpp"
 
 // =============================================================================
 // Mock implementations
@@ -76,6 +78,24 @@ public:
     // accepts the reference signature but never dereferences the pointer so
     // no linker dependency on ESPAsyncWebServer is introduced.
     void registerRoutes(AsyncWebServer& /*server*/) override {}
+};
+
+/** @brief Minimal IMcpContributor mock that registers a named test tool. */
+class MockMcpContributor : public IMcpContributor {
+public:
+    bool registered = false; ///< Set true when registerMcpTools() is invoked
+
+    void registerMcpTools(McpToolRegistry& registry) override {
+        registered = true;
+        registry.addTool(
+            "mock_mcp_tool",
+            "A mock MCP tool for testing",
+            [](JsonObject& params, JsonObject& result) {
+                (void)params;
+                result["test"] = true;
+            }
+        );
+    }
 };
 
 // =============================================================================
@@ -143,6 +163,17 @@ TEST_F(ApplicationRegistrationTest, RegisterWebContributor_ValidPointer_ReturnsT
     EXPECT_TRUE(app.registerWebContributor(&contributor));
 }
 
+/** registerMcpContributor with a valid pointer must return true. */
+TEST_F(ApplicationRegistrationTest, RegisterMcpContributor_ValidPointer_ReturnsTrue) {
+    MockMcpContributor contributor;
+    EXPECT_TRUE(app.registerMcpContributor(&contributor));
+}
+
+/** registerMcpContributor with nullptr must return false. */
+TEST_F(ApplicationRegistrationTest, RegisterMcpContributor_Nullptr_ReturnsFalse) {
+    EXPECT_FALSE(app.registerMcpContributor(nullptr));
+}
+
 // =============================================================================
 // Test Group 2: Vector Lock Behaviour
 // =============================================================================
@@ -208,6 +239,26 @@ TEST_F(ApplicationLockTest, PostLock_RegisterWebContributor_ReturnsFalse) {
     lockApp();
     MockWebContributor contributor;
     EXPECT_FALSE(app.registerWebContributor(&contributor));
+}
+
+/** After begin(), registerMcpContributor must return false. */
+TEST_F(ApplicationLockTest, PostLock_RegisterMcpContributor_ReturnsFalse) {
+    lockApp();
+    MockMcpContributor contributor;
+    EXPECT_FALSE(app.registerMcpContributor(&contributor));
+}
+
+/**
+ * A MockMcpContributor registered before begin() must have its tool
+ * visible in the McpServer's registry after begin() completes.
+ */
+TEST_F(ApplicationLockTest, McpContributor_ToolVisibleAfterBegin) {
+    MockMcpContributor contributor;
+    app.registerMcpContributor(&contributor);
+    lockApp();
+
+    EXPECT_TRUE(contributor.registered);
+    EXPECT_NE(app.getMcpServer().getRegistry().findTool("mock_mcp_tool"), nullptr);
 }
 
 /**

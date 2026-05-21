@@ -8,13 +8,14 @@
  *
  * Module: modules/mcpServer/mcpBuiltinTools.cpp
  * Description: Implementation of all foundation-level MCP tools that are always
- *              available in the framework. Registers 6 tools into the McpToolRegistry:
- *                - system_info:  Device heap, uptime, chip info, firmware version
- *                - get_config:   Read current SystemConfig fields
- *                - set_config:   Update SystemConfig fields and persist
- *                - reboot:       Restart the ESP32 device
- *                - get_logs:     Placeholder for future log ring-buffer
- *                - list_tools:   Enumerate all registered MCP tools
+ *              available in the framework. Registers 7 tools into the McpToolRegistry:
+ *                - system_info:      Device heap, uptime, chip info, firmware version
+ *                - get_config:       Read current SystemConfig fields
+ *                - set_config:       Update SystemConfig fields and persist
+ *                - reboot:           Restart the ESP32 device
+ *                - get_logs:         Placeholder for future log ring-buffer
+ *                - list_tools:       Enumerate all registered MCP tools
+ *                - capture_display:  Capture the display framebuffer as base64-encoded XBM
  *
  * Exported Functions:
  * - mcpBuiltinTools::registerAll(): see mcpBuiltinTools.hpp
@@ -33,6 +34,7 @@
     #include <Arduino.h>
     #include "esp_log.h"
     #include "esp_system.h"
+    #include <base64.h>
     static const char* TAG = "McpBuiltinTools"; // ESP-IDF log tag
     #define BUILTIN_LOGI(fmt, ...) ESP_LOGI(TAG, fmt, ##__VA_ARGS__)
     #define BUILTIN_LOGW(fmt, ...) ESP_LOGW(TAG, fmt, ##__VA_ARGS__)
@@ -45,10 +47,55 @@
 #endif
 
 // ---------------------------------------------------------------------------
+// Base64 lookup table (hardware uses the ESP32 base64 library; native needs
+// a minimal inline implementation to avoid external dependencies).
+// ---------------------------------------------------------------------------
+#ifdef NATIVE_BUILD
+namespace {
+
+// Standard Base64 alphabet
+static const char kBase64Chars[] =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+/**
+ * @brief Encode a byte array to Base64 (native build only).
+ *
+ * On hardware the ESP32 base64 library is used instead. This minimal
+ * implementation avoids pulling in any additional native dependencies.
+ *
+ * @param data  Pointer to the raw byte array.
+ * @param len   Length of the byte array.
+ * @return Base64-encoded std::string.
+ */
+std::string base64Encode(const uint8_t* data, size_t len) {
+    std::string result;
+    result.reserve(((len + 2) / 3) * 4); // Pre-allocate to avoid reallocation
+
+    for (size_t i = 0; i < len; i += 3) {
+        // --- Pack up to 3 input bytes into a 24-bit value ---
+        uint32_t n = static_cast<uint32_t>(data[i]) << 16;
+        if (i + 1 < len) n |= static_cast<uint32_t>(data[i + 1]) << 8;
+        if (i + 2 < len) n |= static_cast<uint32_t>(data[i + 2]);
+
+        // --- Extract 4 six-bit groups from the 24-bit value ---
+        result += kBase64Chars[(n >> 18) & 0x3F];
+        result += kBase64Chars[(n >> 12) & 0x3F];
+        result += (i + 1 < len) ? kBase64Chars[(n >> 6) & 0x3F] : '=';
+        result += (i + 2 < len) ? kBase64Chars[n & 0x3F] : '=';
+    }
+    return result;
+}
+
+} // anonymous namespace
+#endif
+
+// ---------------------------------------------------------------------------
 // Built-in tool registration
 // ---------------------------------------------------------------------------
 
-void mcpBuiltinTools::registerAll(McpToolRegistry& registry, ConfigManager* configManager) {
+void mcpBuiltinTools::registerAll(McpToolRegistry& registry,
+                                  ConfigManager* configManager,
+                                  const DisplayInfo* displayInfo) {
 
     // -----------------------------------------------------------------
     // Tool 1: system_info — Device system telemetry
@@ -242,6 +289,57 @@ void mcpBuiltinTools::registerAll(McpToolRegistry& registry, ConfigManager* conf
             }
 
             result["count"] = registryPtr->size();
+        }
+    );
+
+    // -----------------------------------------------------------------
+    // Tool 7: capture_display — Capture the display framebuffer as base64
+    // -----------------------------------------------------------------
+    // Copy the display info into a local struct captured by value so the
+    // lambda remains valid beyond this function's scope.
+    DisplayInfo capturedDisplay;
+    if (displayInfo != nullptr) {
+        capturedDisplay = *displayInfo;
+    }
+
+    registry.addTool(
+        "capture_display",
+        "Capture the current display buffer as a base64-encoded image",
+        [capturedDisplay](JsonObject& params, JsonObject& result) {
+            (void)params; // No input parameters required
+
+            // --- Guard: no display registered ---
+            if (capturedDisplay.framebuffer == nullptr || capturedDisplay.framebufferSize == 0) {
+                result["error"]   = "No display registered";
+                result["isError"] = true;
+                return;
+            }
+
+            // --- Encode framebuffer to base64 ---
+            #ifndef NATIVE_BUILD
+                // Hardware: use the ESP32 base64 library with chunked encoding
+                // to avoid a single massive heap allocation. Process 48-byte
+                // chunks (48 divides cleanly by 3 for base64 padding alignment).
+                std::string b64;
+                size_t offset = 0;
+                size_t len = capturedDisplay.framebufferSize;
+                const uint8_t* data = capturedDisplay.framebuffer;
+                while (offset < len) {
+                    size_t chunk = (len - offset > 48) ? 48 : (len - offset);
+                    String b64Chunk = base64::encode(&data[offset], chunk);
+                    b64 += b64Chunk.c_str();
+                    offset += chunk;
+                }
+            #else
+                // Native build: use the inline base64 encoder
+                std::string b64 = base64Encode(capturedDisplay.framebuffer,
+                                               capturedDisplay.framebufferSize);
+            #endif
+
+            result["format"] = "xbm";
+            result["width"]  = capturedDisplay.width;
+            result["height"] = capturedDisplay.height;
+            result["data"]   = b64;
         }
     );
 

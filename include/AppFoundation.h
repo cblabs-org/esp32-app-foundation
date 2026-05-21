@@ -21,6 +21,7 @@
  * - iDataSource:       Interface — background data fetch contract
  * - IStatusReporter:   Interface — display status overlay contract
  * - IWebContributor:   Interface — REST route registration contract
+ * - IMcpContributor:   Interface — MCP tool registration contract
  * - IDisplayBoard:     Interface — U8G2 carousel board render contract
  * - UpdateStatus:      Enum — data fetch result codes
  * - PriorityTier:      Enum — DataManager scheduling tier
@@ -38,6 +39,7 @@
 #include "interfaces/iDataSource.hpp"
 #include "interfaces/IStatusReporter.hpp"
 #include "interfaces/IWebContributor.hpp"
+#include "interfaces/IMcpContributor.hpp"
 #include "interfaces/IDisplayBoard.hpp"
 
 // Application hub
