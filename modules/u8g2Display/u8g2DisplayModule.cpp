@@ -23,6 +23,9 @@
  * - U8g2DisplayModule::getBootSplash():    Return reference to BootSplashBoard
  * - U8g2DisplayModule::getLoading():       Return reference to LoadingBoard
  * - U8g2DisplayModule::getWifiWizard():    Return reference to WiFiWizardBoard
+ * - U8g2DisplayModule::getOtaProgress():   Return reference to OtaProgressBoard
+ * - U8g2DisplayModule::getError():         Return reference to ErrorBoard
+ * - U8g2DisplayModule::getScreensaver():   Return reference to ScreensaverBoard
  * - U8g2DisplayModule::reportStatus():     IStatusReporter stub (no-op)
  * - U8g2DisplayModule::reportError():      IStatusReporter stub (no-op)
  * - U8g2DisplayModule::clearStatus():      IStatusReporter stub (no-op)
@@ -225,6 +228,30 @@ WiFiWizardBoard& U8g2DisplayModule::getWifiWizard() {
     return _wifiWizard;
 }
 
+/**
+ * @brief Return a reference to the owned OtaProgressBoard instance.
+ * @return Mutable reference to _otaProgress.
+ */
+OtaProgressBoard& U8g2DisplayModule::getOtaProgress() {
+    return _otaProgress;
+}
+
+/**
+ * @brief Return a reference to the owned ErrorBoard instance.
+ * @return Mutable reference to _error.
+ */
+ErrorBoard& U8g2DisplayModule::getError() {
+    return _error;
+}
+
+/**
+ * @brief Return a reference to the owned ScreensaverBoard instance.
+ * @return Mutable reference to _screensaver.
+ */
+ScreensaverBoard& U8g2DisplayModule::getScreensaver() {
+    return _screensaver;
+}
+
 // =============================================================================
 // IStatusReporter stubs (empty body — deferred to WO2/3)
 // =============================================================================
@@ -341,6 +368,11 @@ void U8g2DisplayModule::_checkSleep() {
  */
 void U8g2DisplayModule::_sleep() {
     _sleeping = true;
+
+    // --- Activate the screensaver and show it ---
+    _screensaver.activate();
+    showBoard(&_screensaver);
+
 #ifndef NATIVE_BUILD
     _u8g2.setPowerSave(1);
 #endif
@@ -351,6 +383,10 @@ void U8g2DisplayModule::_sleep() {
  */
 void U8g2DisplayModule::_wake() {
     _sleeping = false;
+
+    // --- Deactivate the screensaver ---
+    _screensaver.deactivate();
+
 #ifndef NATIVE_BUILD
     _u8g2.setPowerSave(0);
     _u8g2.setContrast(_brightness);

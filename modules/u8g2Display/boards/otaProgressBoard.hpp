@@ -1,0 +1,89 @@
+/*
+ * ESP32 App Foundation (c) 2026 CB Labs
+ *
+ * https://github.com/matthewmcneill/esp32-app-foundation
+ *
+ * This work is licensed under Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International.
+ * To view a copy of this license, visit https://creativecommons.org/licenses/by-nc-sa/4.0/
+ *
+ * Module: modules/u8g2Display/boards/otaProgressBoard.hpp
+ * Description: Display board for OTA firmware updates. Shows a progress bar,
+ *              percentage text, and status message during the download phase.
+ *              Marks itself as expired on successful completion so the carousel
+ *              engine can auto-dismiss it. Failed updates persist until reset.
+ *
+ * Exported Classes:
+ * - OtaProgressBoard: OTA firmware update progress screen implementing IDisplayBoard
+ *   - setProgress():   Update the download progress fraction and status message
+ *   - setComplete():   Mark the OTA as finished (success or failure)
+ *   - reset():         Reset the board to its initial idle state for reuse
+ *   - render():        Draw firmware update UI to the U8G2 display buffer
+ *   - isExpired():     True when complete and successful (auto-dismiss)
+ *   - getBoardName():  Returns "SYS: OTA Progress"
+ */
+
+#pragma once
+
+#include "interfaces/IDisplayBoard.hpp"
+
+/**
+ * @brief OTA firmware update progress board.
+ *
+ * Displays a "Firmware Update" title, a horizontal progress bar with percentage
+ * text, and a status message. When the update completes successfully the board
+ * self-expires; failed updates persist until manually reset so the user can
+ * see the error state.
+ */
+class OtaProgressBoard : public IDisplayBoard {
+public:
+    /**
+     * @brief Update the download progress and status message.
+     * @param progress Download fraction in the range [0.0, 1.0].
+     * @param status   Null-terminated status text (e.g. "Downloading...").
+     *                 Safely truncated to fit the internal buffer.
+     */
+    void setProgress(float progress, const char* status);
+
+    /**
+     * @brief Mark the OTA update as complete.
+     * @param success true if the update succeeded, false on failure.
+     */
+    void setComplete(bool success);
+
+    /**
+     * @brief Reset the board to its initial idle state for reuse.
+     *
+     * Clears progress, status, and completion flags so the board can be
+     * reused for a subsequent OTA update cycle.
+     */
+    void reset();
+
+    /**
+     * @brief Render the OTA progress UI into the U8G2 display buffer.
+     *
+     * Draws a "Firmware Update" title, a progress bar, a percentage label,
+     * and the current status message. On failure, an error indicator is shown.
+     *
+     * @param u8g2 Reference to the active U8G2 driver instance.
+     */
+    void render(U8G2& u8g2) override;
+
+    /**
+     * @brief Query whether this board should be auto-dismissed.
+     * @return true when the update completed successfully; false if still
+     *         in progress or if the update failed (persist for user visibility).
+     */
+    bool isExpired() const override;
+
+    /**
+     * @brief Return the human-readable board name for logging.
+     * @return "SYS: OTA Progress"
+     */
+    const char* getBoardName() const override;
+
+private:
+    float _progress = 0.0f;                            ///< Download fraction (0.0–1.0)
+    char  _status[48] = "Checking for updates...";     ///< Current status text
+    bool  _complete = false;                            ///< True when OTA has finished
+    bool  _failed   = false;                            ///< True if OTA ended in failure
+};
