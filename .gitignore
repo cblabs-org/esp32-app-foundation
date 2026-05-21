@@ -12,5 +12,7 @@ managed_components/
 sdkconfig.esp32dev
 sdkconfig.esp32s3nano
 src/CMakeLists.txt
+CMakeLists.txt
+dependencies.lock
 idf_component.yml
 
