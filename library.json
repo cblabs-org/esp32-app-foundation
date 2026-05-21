@@ -1,0 +1,44 @@
+{
+  "name": "esp32-app-foundation",
+  "version": "0.1.0",
+  "description": "Reusable ESP32 application framework — Arduino + ESP-IDF dual-framework. Provides a composition root, interface contracts, two-tier vector module registration, and a clean Hollywood-Principle entry point.",
+  "keywords": [
+    "esp32",
+    "framework",
+    "arduino",
+    "espidf",
+    "iot",
+    "application",
+    "ota",
+    "littlefs"
+  ],
+  "authors": [
+    {
+      "name": "CB Labs",
+      "url": "https://github.com/matthewmcneill"
+    }
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/matthewmcneill/esp32-app-foundation"
+  },
+  "license": "CC-BY-NC-SA-4.0",
+  "homepage": "https://github.com/matthewmcneill/esp32-app-foundation",
+  "export": {
+    "include": [
+      "include",
+      "modules/application",
+      "lib"
+    ],
+    "exclude": [
+      "test",
+      "docs",
+      ".agents",
+      "scripts",
+      "web",
+      "template"
+    ]
+  },
+  "frameworks": ["arduino", "espidf"],
+  "platforms": ["espressif32"]
+}

@@ -1,5 +1,10 @@
 # ESP32 App Foundation — sdkconfig.defaults.esp32s3nano
 # Inherits base defaults; S3-specific overrides below.
+# Arduino framework autostart — enables the Arduino core's app_main() wrapper
+# which calls setup() then drives the loop() task. Without this, ESP-IDF's
+# app_startup.c has an undefined reference to app_main().
+CONFIG_AUTOSTART_ARDUINO=y
+
 CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y
 
 # S3 main task stack — larger due to PSRAM availability

@@ -357,4 +357,45 @@ Once approved, invoke the `@distillery` skill, passing `.agents/skills/principal
 
 ## Status
 
-*Awaiting execution.*
+**APPROVED** — Completed 2026-05-21 by worker agent on branch `pr-01-kernel-interfaces/wo1-scaffold`.
+
+### Outcome
+
+All checklist phases executed successfully:
+
+| Phase | Deliverable | Result |
+|-------|-------------|--------|
+| 0 — Git Bootstrap | `.gitignore`, `git init`, `main` + WO branch | ✅ |
+| 1 — Directory Skeleton | 13 directories + `.gitkeep` sentinels | ✅ |
+| 2 — `platformio.ini` | Dual-framework (arduino+espidf), 3 environments | ✅ |
+| 3 — Partition Tables | `partitions.esp32dev.csv` + `partitions.esp32s3nano.csv` | ✅ |
+| 4 — sdkconfig | `sdkconfig.defaults` + `sdkconfig.defaults.esp32s3nano` (rollback enabled) | ✅ |
+| 5 — Build Verification | `esp32dev` first-time build SUCCESS | ✅ |
+
+### Build Stats (`esp32dev` stub, first run)
+
+```
+Environment  Status   Duration
+-----------  -------  ------------
+esp32dev     SUCCESS  00:02:25.193  (145.19 s — includes full ESP-IDF download)
+
+RAM:   10.9%  (35,720 / 327,680 bytes)
+Flash: 84.1%  (826,293 / 983,040 bytes)  ← stub only; WO4 will replace app_main()
+```
+
+### Key Notes
+
+- **Branch naming:** Git prevents a ref named `pr-01-kernel-interfaces` and a child ref `pr-01-kernel-interfaces/wo1-scaffold` simultaneously. The WO1 branch was created directly from `main`; the `pr-01-kernel-interfaces` parent branch will be created at PR merge time.
+- **IDF artifact exclusion:** The first build generated `CMakeLists.txt`, `dependencies.lock`, `managed_components/`, and `sdkconfig.esp32dev` at the repo root. All were added to `.gitignore` and removed from tracking via `git rm --cached`.
+- **Stub:** `src/main.cpp` contains only `extern "C" void app_main() {}` — to be replaced by WO4.
+- **Distillery:** Deferred to PA at PR-01 wrap time (per approval instruction).
+
+### Git Log
+
+```
+aa1dc77 chore(gitignore): untrack IDF root CMakeLists.txt and dependencies.lock
+1d711e3 chore(gitignore): exclude all IDF root-level generated files
+79b5228 chore(gitignore): exclude IDF-generated build artifacts
+7e877a0 feat(scaffold): PlatformIO config, partition tables, sdkconfig.defaults
+1dd3bed chore: initial repo scaffold — docs, agents, gitignore
+```
