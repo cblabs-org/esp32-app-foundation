@@ -1,0 +1,57 @@
+{
+  "version": 1,
+  "library": "/Users/mcneillm/.gemini/skill-library",
+  "skills": {
+    "embedded-systems": {
+      "type": "authored",
+      "origin": {
+        "repo": "https://github.com/matthewmcneill/agent-skills.git",
+        "path": "skills/embedded-systems"
+      },
+      "importedAt": "2026-05-15T23:13:02Z"
+    },
+    "oo-expert": {
+      "type": "forked",
+      "origin": {
+        "repo": "unknown",
+        "branch": "unknown",
+        "path": "oo-expert",
+        "pinnedHash": null,
+        "forkedFromHash": null,
+        "forkedAt": "2026-05-15T23:19:02Z"
+      },
+      "importedAt": "2026-05-15T23:19:02Z"
+    },
+    "principal-architect": {
+      "type": "imported",
+      "origin": {
+        "repo": "https://github.com/matthewmcneill/agent-skills.git",
+        "path": "skills/principal-architect"
+      },
+      "importedAt": "2026-05-15T22:17:14Z"
+    },
+    "distillery": {
+      "type": "imported",
+      "origin": {
+        "repo": "https://github.com/matthewmcneill/agent-skills.git",
+        "path": "skills/distillery"
+      },
+      "importedAt": "2026-05-15T22:17:13Z"
+    },
+    "pio-manager": {
+      "type": "imported",
+      "origin": {
+        "repo": "https://github.com/jl-codes/platformio-mcp.git",
+        "branch": "main",
+        "path": ".agents/skills/pio-manager",
+        "pinnedHash": "09f3d8e18d10af174bbdf9ae82d80a840ed238f5"
+      },
+      "importedAt": "2026-05-15T22:32:44Z"
+    },
+    "house-style-docs": {
+      "type": "authored",
+      "origin": null,
+      "importedAt": "2026-05-15T23:16:04Z"
+    }
+  }
+}

@@ -1,0 +1,10 @@
+.pio/
+.vscode/
+build/
+.DS_Store
+*.o
+*.a
+*.elf
+*.bin
+*.map
+include/portal_assets/
