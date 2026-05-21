@@ -8,3 +8,9 @@ build/
 *.bin
 *.map
 include/portal_assets/
+managed_components/
+sdkconfig.esp32dev
+sdkconfig.esp32s3nano
+src/CMakeLists.txt
+idf_component.yml
+
