@@ -24,6 +24,7 @@ by Principal Architects under the ESP32 App Foundation program.
 | [pr-04-web-portal](./esp32-app-foundation/PROGRAM-PLAN.md#pr-04) | Web Portal (Base SPA + API layer) | QUEUED | — |
 | [pr-05-display-module](./pr-05-display-module/PROJECT.md) | U8G2 Display Module (Optional Module Catalog Seed) | ✅ **COMPLETE** | Session 93b19420 |
 | [pr-05a-widget-toolkit](./pr-05a-widget-toolkit/PROJECT.md) | Widget Toolkit (Composable UI for U8G2 displays) | 🔄 **IN PROGRESS** | Session 21161294 |
+| [pr-05b-mcp-server](./pr-05b-mcp-server/PROJECT.md) | MCP Server (JSON-RPC device telemetry + control) | 🔄 **IN PROGRESS** | Session 0ef5f49d |
 | [pr-06-build-infra](./esp32-app-foundation/PROGRAM-PLAN.md#pr-06) | Build Infrastructure (Scripts, PlatformIO, CI) | QUEUED | — |
 | [pr-07-template-repo](./esp32-app-foundation/PROGRAM-PLAN.md#pr-07) | App Template Repository | QUEUED | — |
 
