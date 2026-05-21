@@ -47,7 +47,16 @@ private:
 #include "../../include/interfaces/iConfigurable.hpp"
 #include "../../include/interfaces/IWebContributor.hpp"
 
+#ifndef NATIVE_BUILD
 class DNSServer;
+#else
+class DNSServer {
+public:
+    DNSServer() {}
+    ~DNSServer() {}
+};
+#endif
+
 
 /**
  * @brief Class managing WiFi connectivity and configuration.

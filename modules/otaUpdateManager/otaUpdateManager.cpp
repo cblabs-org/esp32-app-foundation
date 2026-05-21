@@ -21,7 +21,9 @@
  */
 
 #include "otaUpdateManager.hpp"
+#ifndef NATIVE_BUILD
 #include <ESPAsyncWebServer.h>
+#endif
 #include <ArduinoJson.h>
 
 #ifndef NATIVE_BUILD

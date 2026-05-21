@@ -20,8 +20,15 @@
 
 #pragma once
 
+#ifndef NATIVE_BUILD
 #include <Arduino.h>
 #include <Stream.h>
+#else
+#include <cstddef>  // for size_t
+#include <stdint.h>
+// Minimal Stream stub for NATIVE_BUILD
+class Stream {};
+#endif
 #include "../../include/interfaces/IWebContributor.hpp"
 
 class otaUpdateManager : public IWebContributor {
