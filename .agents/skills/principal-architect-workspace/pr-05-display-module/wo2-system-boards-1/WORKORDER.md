@@ -152,9 +152,48 @@ feat(display): Add BootSplash, Loading, and WiFiWizard system boards
 ## Closure Gate
 
 - [ ] All files match house style documentation standard
-- [ ] `esp32dev` build passes
-- [ ] `esp32s3nano` build passes
-- [ ] Native unit tests pass
-- [ ] Code committed to `pr-05-wo2-system-boards-1` branch
-- [ ] **Ask the user if they are happy with the implementation before proceeding**
-- [ ] **Distillation Requirement**: When you have completed and verified all code changes, you MUST invoke the `@distillery` skill to package your WO output. Pass `.agents/skills/principal-architect-workspace/pr-05-display-module/wo2-system-boards-1/` as the target directory. Wait for it to finish before dropping control back to the PA.
+- [x] `esp32dev` build passes
+- [x] `esp32s3nano` build passes
+- [x] Native unit tests pass
+- [x] Code committed to `pr-05-wo2-system-boards-1` branch
+- [x] **Ask the user if they are happy with the implementation before proceeding**
+- [x] **Distillation Requirement**: When you have completed and verified all code changes, you MUST invoke the `@distillery` skill to package your WO output. Pass `.agents/skills/principal-architect-workspace/pr-05-display-module/wo2-system-boards-1/` as the target directory. Wait for it to finish before dropping control back to the PA.
+
+---
+
+## Execution Status
+
+| Field | Value |
+|---|---|
+| **Status** | ✅ COMPLETE |
+| **Executed By** | Worker subagent (session `c1245ace-b1dd-4465-919f-e5c03f1e617a`) |
+| **Date** | 2026-05-21 |
+| **Branch** | `pr-05-wo2-system-boards-1` |
+| **Commit** | `b29bfe8` — `feat(display): Add BootSplash, Loading, and WiFiWizard system boards` |
+
+### Build Verification
+
+| Target | Result |
+|---|---|
+| `esp32dev` | ✅ SUCCESS (clean build required — stale `lan867x` component cleared) |
+| `esp32s3nano` | ✅ SUCCESS |
+| `native` tests | ✅ 35/35 PASSED (19 new board tests + 16 existing module tests) |
+
+### Files Created (7)
+- `modules/u8g2Display/boards/bootSplashBoard.hpp`
+- `modules/u8g2Display/boards/bootSplashBoard.cpp`
+- `modules/u8g2Display/boards/loadingBoard.hpp`
+- `modules/u8g2Display/boards/loadingBoard.cpp`
+- `modules/u8g2Display/boards/wifiWizardBoard.hpp`
+- `modules/u8g2Display/boards/wifiWizardBoard.cpp`
+- `test/test_unit/test_u8g2Display/test_boards.cpp`
+
+### Files Modified (2)
+- `modules/u8g2Display/u8g2DisplayModule.hpp` — Board includes, member instances, public accessors
+- `modules/u8g2Display/u8g2DisplayModule.cpp` — Accessor implementations, boot splash activation in `begin()`
+
+### Distillery Output
+- `context_bridge.md` — Progressive-reveal index for future agents
+- `sessions.md` — Session registry
+- `context_artifacts/adr_system_boards.md` — Architecture decisions
+- `context_artifacts/state_board_integration.md` — Final integration state
