@@ -161,10 +161,43 @@ feat(display): Add OtaProgress, Error, and Screensaver system boards
 
 ## Closure Gate
 
-- [ ] All files match house style documentation standard
-- [ ] `esp32dev` build passes
-- [ ] `esp32s3nano` build passes
-- [ ] Native unit tests pass
-- [ ] Code committed to `pr-05-wo3-system-boards-2` branch
-- [ ] **Ask the user if they are happy with the implementation before proceeding**
-- [ ] **Distillation Requirement**: When you have completed and verified all code changes, you MUST invoke the `@distillery` skill to package your WO output. Pass `.agents/skills/principal-architect-workspace/pr-05-display-module/wo3-system-boards-2/` as the target directory. Wait for it to finish before dropping control back to the PA.
+- [x] All files match house style documentation standard
+- [x] `esp32dev` build passes
+- [x] `esp32s3nano` build passes
+- [x] Native unit tests pass
+- [x] Code committed to `pr-05-wo3-system-boards-2` branch
+- [x] **Ask the user if they are happy with the implementation before proceeding**
+- [x] **Distillation Requirement**: When you have completed and verified all code changes, you MUST invoke the `@distillery` skill to package your WO output. Pass `.agents/skills/principal-architect-workspace/pr-05-display-module/wo3-system-boards-2/` as the target directory. Wait for it to finish before dropping control back to the PA.
+
+---
+
+## Execution Status
+
+| Field | Value |
+|-------|-------|
+| **Status** | ✅ COMPLETE |
+| **Executed** | 2026-05-21T12:42:00Z |
+| **Session** | `11685afb-08c2-4dbb-9ad0-fb5254dcd43c` |
+| **Branch** | `pr-05-wo3-system-boards-2` |
+| **Commit** | `0dc86dc` — `feat(display): Add OtaProgress, Error, and Screensaver system boards` |
+| **Diff** | 9 files changed, 925 insertions(+), 6 deletions(-) |
+
+### Build Verification
+
+| Target | Status | RAM | Flash |
+|--------|--------|-----|-------|
+| `esp32dev` | ✅ SUCCESS | 12.7% (41,544 B) | 77.6% (1,016,977 B) |
+| `esp32s3nano` | ✅ SUCCESS | 13.4% (43,992 B) | 52.4% (1,063,828 B) |
+| Native tests | ✅ 80/80 PASSED | — | — |
+
+### New Test Cases (22)
+- OtaProgressBoard: 8 tests (name, initial state, setProgress, nullptr, expiry, success/failure, reset)
+- ErrorBoard: 8 tests (name, initial state, showError, dismiss, fatal flag, re-show, nullptr)
+- ScreensaverBoard: 6 tests (name, initial state, activate/deactivate, isActive, multi-cycle)
+
+### Distillation
+- `context_bridge.md` — Progressive-reveal manifest
+- `sessions.md` — Session registry
+- `context_artifacts/adr_board_expiry_semantics.md` — Expiry policy decisions
+- `context_artifacts/adr_screensaver_sleep_integration.md` — Sleep/wake wiring
+- `context_artifacts/state_files_changed.md` — Complete file manifest
