@@ -11,5 +11,5 @@ This PR establishes:
 ## Work Orders
 
 - [x] WO1: `EventBus`
-- [ ] WO2: `dataManager`
+- [x] WO2: `dataManager`
 - [ ] WO3: `NullStatusReporter` + App Hub Wiring
