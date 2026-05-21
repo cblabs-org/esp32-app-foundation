@@ -18,7 +18,12 @@
 #ifndef DEVICE_CRYPTO_HPP
 #define DEVICE_CRYPTO_HPP
 
+#ifndef NATIVE_BUILD
 #include <Arduino.h>
+#else
+#include <stdint.h>
+#include <stddef.h>
+#endif
 #include <memory>
 
 /**
@@ -63,7 +68,7 @@ public:
      * @param outLen Pointer to receive the exported Base64 output size.
      * @return Managed RAII pointer containing the Base64 ciphertext, or nullptr on failure.
      */
-    std::unique_ptr<char[]> encrypt(const char* plaintext, size_t inputLen, size_t* outLen);
+    virtual std::unique_ptr<char[]> encrypt(const char* plaintext, size_t inputLen, size_t* outLen);
 
     /**
      * @brief Decrypts a base64 encoded ciphertext payload back into plaintext.
@@ -72,7 +77,7 @@ public:
      * @param outLen Pointer to receive the verified plaintext string size.
      * @return Managed RAII pointer containing the plaintext string, or nullptr on failure.
      */
-    std::unique_ptr<char[]> decrypt(const char* ciphertext, size_t inputLen, size_t* outLen);
+    virtual std::unique_ptr<char[]> decrypt(const char* ciphertext, size_t inputLen, size_t* outLen);
 };
 
 #endif // DEVICE_CRYPTO_HPP

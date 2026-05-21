@@ -36,8 +36,8 @@ All code must be authored fresh; no copying wholesale from `departures-board`, t
 
 | # | Status | Branch | Link |
 |---|---|---|---|
-| WO1 | QUEUED | `pr-02-wo1-lowlevel-libs` | [wo1-lowlevel-libs/WORKORDER.md](wo1-lowlevel-libs/WORKORDER.md) |
-| WO2 | QUEUED | `pr-02-wo2-configmanager` | [wo2-configmanager/WORKORDER.md](wo2-configmanager/WORKORDER.md) |
+| WO1 | **✅ MERGED** | ~~`pr-02-wo1-lowlevel-libs`~~ → `pr-02-kernel-services` | [wo1-lowlevel-libs/WORKORDER.md](wo1-lowlevel-libs/WORKORDER.md) |
+| WO2 | **✅ MERGED** | ~~`pr-02-wo2-configmanager`~~ → `pr-02-kernel-services` | [wo2-configmanager/WORKORDER.md](wo2-configmanager/WORKORDER.md) |
 | WO3 | QUEUED | `pr-02-wo3-keymanager` | [wo3-keymanager/WORKORDER.md](wo3-keymanager/WORKORDER.md) |
 | WO4 | QUEUED | `pr-02-wo4-wifimanager` | [wo4-wifimanager/WORKORDER.md](wo4-wifimanager/WORKORDER.md) |
 | WO5 | QUEUED | `pr-02-wo5-timemanager` | [wo5-timemanager/WORKORDER.md](wo5-timemanager/WORKORDER.md) |
