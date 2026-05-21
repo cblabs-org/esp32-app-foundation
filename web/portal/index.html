@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>ESP32 App Foundation</title>
+  <link rel="stylesheet" href="app.css">
+</head>
+<body>
+  <div class="container">
+    <header class="top-bar">
+      <h2>Device Portal</h2>
+    </header>
+
+    <div class="ap-banner" id="ap-banner">
+      Access Point Mode Active
+    </div>
+
+    <div class="tab-content-container">
+      <div id="tab-config" class="tab-content active">
+        <article>
+          <header>Configuration</header>
+          <p>Application specific configuration will appear here.</p>
+        </article>
+      </div>
+      <div id="tab-wifi" class="tab-content">
+        <!-- Fragment injected by wifi.js -->
+      </div>
+      <div id="tab-system" class="tab-content">
+        <!-- Fragment injected by system.js -->
+      </div>
+      <div id="tab-ota" class="tab-content">
+        <!-- Fragment injected by ota.js -->
+      </div>
+    </div>
+
+    <nav class="bottom-nav">
+      <a href="#" class="tab-link active" data-target="tab-config">
+        <span>Config</span>
+      </a>
+      <a href="#" class="tab-link" data-target="tab-wifi">
+        <span>WiFi</span>
+      </a>
+      <a href="#" class="tab-link" data-target="tab-system">
+        <span>System</span>
+      </a>
+      <a href="#" class="tab-link" data-target="tab-ota">
+        <span>OTA</span>
+      </a>
+    </nav>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
