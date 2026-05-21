@@ -8,22 +8,24 @@
  *
  * Module: modules/u8g2Display/boards/bootSplashBoard.cpp
  * Description: Implementation of the boot splash display board. Records
- *              activation time, renders centred branding text, and self-expires
- *              after the configured duration.
+ *              activation time, renders centred branding text via widget
+ *              composition, and self-expires after the configured duration.
  *
  * Exported Functions:
  * - BootSplashBoard::activate():     Record start time and cache version string
- * - BootSplashBoard::render():       Draw centred app name + version on U8G2
+ * - BootSplashBoard::render():       Compose labelWidgets for title + version on U8G2
  * - BootSplashBoard::isExpired():    Check elapsed time against splash duration
  * - BootSplashBoard::getBoardName(): Return "SYS: Boot Splash"
  */
 
 #include "bootSplashBoard.hpp"
 #include <cstring>
+#include <cstdio>
 
 #ifndef NATIVE_BUILD
 #include <Arduino.h>
 #include <U8g2lib.h>
+#include "fonts/fonts.hpp"
 #endif
 
 // =============================================================================
@@ -32,6 +34,7 @@
 
 /**
  * @brief Start the splash timer and store the firmware version string.
+ *        Configures the title and version labelWidgets for rendering.
  * @param version Null-terminated version string (e.g. "0.1.0").
  */
 void BootSplashBoard::activate(const char* version) {
@@ -47,33 +50,35 @@ void BootSplashBoard::activate(const char* version) {
         strncpy(_version, version, sizeof(_version) - 1);
         _version[sizeof(_version) - 1] = '\0';
     }
+
+    // --- Configure widgets for rendering ---
+    _titleLabel.setText("ESP32 App Foundation");
+    _titleLabel.setAlignment(1); // CENTER
+
+    char versionLine[40];
+    snprintf(versionLine, sizeof(versionLine), "v%s", _version);
+    _versionLabel.setText(versionLine);
+    _versionLabel.setAlignment(1); // CENTER
+
+#ifndef NATIVE_BUILD
+    _titleLabel.setFont(AppFonts::defaultLarge());   // helvB12 — matches original helvB10
+    _versionLabel.setFont(AppFonts::defaultSmall()); // helvR08 — identical to original
+#endif
 }
 
 /**
  * @brief Render the boot splash into the U8G2 display buffer.
  *
- * Draws "ESP32 App Foundation" in a bold 10px font centred horizontally,
- * then the firmware version string below in a smaller 8px font.
+ * Delegates rendering to two labelWidgets: the title in bold centred on screen,
+ * and the version string centred below. Produces visually identical output to
+ * the original raw U8G2 draw calls.
  *
  * @param u8g2 Reference to the active U8G2 driver instance.
  */
 void BootSplashBoard::render(U8G2& u8g2) {
 #ifndef NATIVE_BUILD
-    // --- Title line — bold, centred ---
-    u8g2.setFont(u8g2_font_helvB10_tr);
-    const char* title = "ESP32 App Foundation";
-    int titleWidth = u8g2.getStrWidth(title);
-    int displayWidth = u8g2.getDisplayWidth();
-    int titleX = (displayWidth - titleWidth) / 2;
-    u8g2.drawStr(titleX, 28, title);
-
-    // --- Version line — smaller, centred below title ---
-    u8g2.setFont(u8g2_font_helvR08_tr);
-    char versionLine[40];
-    snprintf(versionLine, sizeof(versionLine), "v%s", _version);
-    int versionWidth = u8g2.getStrWidth(versionLine);
-    int versionX = (displayWidth - versionWidth) / 2;
-    u8g2.drawStr(versionX, 44, versionLine);
+    _titleLabel.render(u8g2);
+    _versionLabel.render(u8g2);
 #else
     (void)u8g2; // Suppress unused parameter warning in native builds
 #endif

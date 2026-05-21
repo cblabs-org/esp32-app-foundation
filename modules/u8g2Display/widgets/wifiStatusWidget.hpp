@@ -1,0 +1,80 @@
+/*
+ * ESP32 App Foundation (c) 2026 CB Labs
+ *
+ * https://github.com/matthewmcneill/esp32-app-foundation
+ *
+ * This work is licensed under Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International.
+ * To view a copy of this license, visit https://creativecommons.org/licenses/by-nc-sa/4.0/
+ *
+ * Module: modules/u8g2Display/widgets/wifiStatusWidget.hpp
+ * Description: Module-aware WiFi status indicator widget. Monitors WiFi
+ *              connection state and RSSI signal strength, rendering ascending
+ *              signal bars (1-4) when connected or a blinking disconnection
+ *              icon when offline. Uses direct Arduino WiFi.status() / WiFi.RSSI()
+ *              calls, all guarded with NATIVE_BUILD preprocessor guards.
+ *
+ * Exported Classes:
+ * - wifiStatusWidget: [Class] WiFi status indicator extending iGfxWidget.
+ *   - tick(): Monitors connection state changes and blink timer.
+ *   - render(): Draws RSSI bars (connected) or disconnection icon (offline).
+ *   - renderAnimationUpdate(): Partial-screen refresh for blink/RSSI transitions.
+ */
+
+#ifndef WIFI_STATUS_WIDGET_HPP
+#define WIFI_STATUS_WIDGET_HPP
+
+#include "iGfxWidget.hpp"
+
+/**
+ * @brief WiFi status indicator widget that monitors network connectivity.
+ *        Draws ascending RSSI signal bars (1-4 levels) when connected,
+ *        or a blinking exclamation icon when disconnected.
+ */
+class wifiStatusWidget : public iGfxWidget {
+private:
+    bool wasConnected;              // Tracks previous connection state for transition detection
+    unsigned long disconnectTime;   // Timestamp when disconnection was first detected
+    bool blinkState;                // Current blink toggle for disconnected icon
+    unsigned long lastBlinkMs;      // Timestamp of last blink toggle
+    int lastRssiCategory;           // Cached RSSI category (1-4 bars, -1 disconnected)
+
+    /**
+     * @brief Categorise the current WiFi RSSI into a 1-4 signal strength scale.
+     * @return 1 (poor) to 4 (excellent), or -1 if disconnected.
+     */
+    int getRssiCategory();
+
+public:
+    /**
+     * @brief Construct a WiFi status widget at the given position.
+     *        Fixed size of 16x16 pixels for the signal indicator icon.
+     * @param _x X coordinate on the display.
+     * @param _y Y coordinate on the display.
+     */
+    wifiStatusWidget(int _x, int _y);
+
+    /**
+     * @brief Monitor WiFi connection state for changes and manage blink timer.
+     *        After 30 seconds of disconnection, starts a 1Hz blink cycle.
+     * @param currentMillis Current system time in milliseconds.
+     */
+    void tick(uint32_t currentMillis) override;
+
+    /**
+     * @brief Render the WiFi status icon to the display buffer.
+     *        Connected: ascending RSSI bars (1-4 rectangles).
+     *        Disconnected: exclamation "!" icon (blinking after 30s).
+     * @param display Reference to the U8G2 display instance.
+     */
+    void render(U8G2& display) override;
+
+    /**
+     * @brief Partial-screen refresh for connection state transitions.
+     *        Uses display.updateDisplayArea() for minimal SPI bus traffic.
+     * @param display Reference to the U8G2 display instance.
+     * @param currentMillis Current system time in milliseconds.
+     */
+    void renderAnimationUpdate(U8G2& display, uint32_t currentMillis) override;
+};
+
+#endif // WIFI_STATUS_WIDGET_HPP

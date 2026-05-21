@@ -23,13 +23,14 @@
 #pragma once
 
 #include "interfaces/IDisplayBoard.hpp"
+#include "widgets/progressBarWidget.hpp"
 
 /**
  * @brief Loading screen shown during the APP_SETUP lifecycle phase.
  *
- * Displays a status message string and an optional horizontal progress bar.
- * When progress is negative, an indeterminate "..." indicator is drawn instead
- * of a filled bar. The board self-expires when setComplete() is called.
+ * Displays a status message string and an optional horizontal progress bar
+ * via progressBarWidget composition. When progress is negative, an indeterminate
+ * "..." indicator is drawn. The board self-expires when setComplete() is called.
  */
 class LoadingBoard : public IDisplayBoard {
 public:
@@ -50,9 +51,8 @@ public:
     /**
      * @brief Render the loading screen into the U8G2 display buffer.
      *
-     * Draws the status message centred on screen. If progress >= 0, draws a
-     * horizontal progress bar below the message. If progress < 0, draws "..."
-     * as an indeterminate indicator.
+     * Delegates to the composed progressBarWidget which draws the status
+     * message centred on screen with a progress bar below.
      *
      * @param u8g2 Reference to the active U8G2 driver instance.
      */
@@ -71,7 +71,9 @@ public:
     const char* getBoardName() const override;
 
 private:
-    char  _message[48] = "Loading..."; ///< Current status text
     float _progress    = -1.0f;        ///< Progress fraction (negative = indeterminate)
     bool  _complete    = false;        ///< True when loading is done
+
+    // --- Widget composition (WO3 refactor) ---
+    progressBarWidget _progressBar{16, 20, -1, 24, nullptr}; ///< Status text + progress bar
 };

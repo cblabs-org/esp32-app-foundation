@@ -24,13 +24,15 @@
 #pragma once
 
 #include "interfaces/IDisplayBoard.hpp"
+#include "widgets/systemMessageWidget.hpp"
 
 /**
  * @brief Error message display board.
  *
- * Shows a bold "ERROR" header with the error message text. Fatal errors
- * additionally display a "System halted" indicator and are never auto-expired
- * by the carousel engine. Non-fatal errors can be manually dismissed.
+ * Shows a bold "ERROR" header with the error message text via systemMessageWidget
+ * composition. Fatal errors additionally display a "System halted" indicator
+ * and are never auto-expired by the carousel engine. Non-fatal errors can be
+ * manually dismissed.
  */
 class ErrorBoard : public IDisplayBoard {
 public:
@@ -51,8 +53,8 @@ public:
     /**
      * @brief Render the error screen into the U8G2 display buffer.
      *
-     * Draws "ERROR" header in bold, the error message wrapped/truncated below,
-     * and a "System halted" indicator if the error is fatal.
+     * Delegates to a systemMessageWidget to draw "ERROR" header and the
+     * error message. Fatal errors include a "System halted" indicator.
      *
      * @param u8g2 Reference to the active U8G2 driver instance.
      */
@@ -74,4 +76,7 @@ private:
     char _errorMessage[64] = "";   ///< Error message text
     bool _dismissed = false;       ///< True when the error has been dismissed
     bool _fatal     = false;       ///< True for fatal errors (shows halt indicator)
+
+    // --- Widget composition (WO3 refactor) ---
+    systemMessageWidget _msgWidget{0, 0, 128, 64}; ///< Centred error message display
 };

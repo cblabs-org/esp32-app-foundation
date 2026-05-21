@@ -25,13 +25,14 @@
 #pragma once
 
 #include "interfaces/IDisplayBoard.hpp"
+#include "widgets/labelWidget.hpp"
 
 /**
  * @brief Screensaver board with bouncing clock for OLED burn-in prevention.
  *
- * When activated, renders a large HH:MM clock that bounces off the edges of
- * the display. The position updates on each render cycle based on direction
- * vectors (_xDir, _yDir) that flip on edge collisions.
+ * When activated, renders a large HH:MM clock via labelWidget that bounces off
+ * the edges of the display. The position updates on each render cycle based on
+ * direction vectors (_xDir, _yDir) that flip on edge collisions.
  */
 class ScreensaverBoard : public IDisplayBoard {
 public:
@@ -55,8 +56,8 @@ public:
      * @brief Render the bouncing clock into the U8G2 display buffer.
      *
      * Gets the current time via time()/localtime() (guarded for native builds),
-     * formats HH:MM, and draws it at the current bounce position. Updates the
-     * position by _xDir/_yDir and bounces off display edges.
+     * formats HH:MM, and renders via labelWidget at the current bounce position.
+     * Updates the position by _xDir/_yDir and bounces off display edges.
      *
      * @param u8g2 Reference to the active U8G2 driver instance.
      */
@@ -81,4 +82,7 @@ private:
     int           _yPos         = 0;     ///< Current vertical position (pixels)
     int           _xDir         = 1;     ///< Horizontal direction (+1 right, -1 left)
     int           _yDir         = 1;     ///< Vertical direction (+1 down, -1 up)
+
+    // --- Widget composition (WO3 refactor) ---
+    labelWidget _clockLabel{0, 0, -1, -1}; ///< HH:MM clock text widget
 };

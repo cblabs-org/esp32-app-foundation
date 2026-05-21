@@ -662,5 +662,111 @@
         }
       ]
     }
+  },
+  {
+    "id": "1afd71a7-4e2b-41a6-b750-7a3f4ba2d35e",
+    "commandDesc": "MCP Tool: build_project",
+    "timestamp": 1779387252998,
+    "status": "error",
+    "tasks": [
+      {
+        "taskId": "c974e893-3848-4d32-88f9-01bfa9c2f3a3",
+        "type": "build",
+        "status": "error",
+        "logPaths": [
+          "/Users/mcneillm/Documents/Projects/esp32-app-foundation/.pio-mcp-workspace/logs/build/build-2026-05-21T18-14-13-004Z-e766e63b.log"
+        ],
+        "pid": 91919,
+        "commandDesc": "pio run --environment native",
+        "exitCode": 1,
+        "error": "include/portal_assets/index_html.hpp:20:10: fatal error: 'Arduino.h' file not found"
+      }
+    ],
+    "mcpRequest": {
+      "background": true,
+      "environment": "native",
+      "projectDir": "/Users/mcneillm/Documents/Projects/esp32-app-foundation"
+    },
+    "mcpToolName": "build_project",
+    "mcpResponse": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"status\": \"running\",\n  \"message\": \"Task dispatched to background.\",\n  \"pid\": 91919,\n  \"taskId\": \"1afd71a7-4e2b-41a6-b750-7a3f4ba2d35e\",\n  \"logPaths\": [\n    \"/Users/mcneillm/Documents/Projects/esp32-app-foundation/.pio-mcp-workspace/logs/build/build-2026-05-21T18-14-13-004Z-e766e63b.log\"\n  ]\n}"
+        }
+      ]
+    },
+    "error": "include/portal_assets/index_html.hpp:20:10: fatal error: 'Arduino.h' file not found"
+  },
+  {
+    "id": "bf02fa89-c8d6-42fb-8348-c12627bdbf26",
+    "commandDesc": "MCP Tool: check_task_status",
+    "timestamp": 1779387283061,
+    "status": "success",
+    "tasks": [],
+    "mcpRequest": {
+      "taskId": "1afd71a7-4e2b-41a6-b750-7a3f4ba2d35e"
+    },
+    "mcpToolName": "check_task_status",
+    "mcpResponse": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"status\": \"success\",\n  \"targetStatus\": \"failed\",\n  \"taskId\": \"1afd71a7-4e2b-41a6-b750-7a3f4ba2d35e\",\n  \"logPaths\": [],\n  \"output\": \"Task ID not found: 1afd71a7-4e2b-41a6-b750-7a3f4ba2d35e\"\n}"
+        }
+      ]
+    }
+  },
+  {
+    "id": "db036ecb-b7a4-4649-8c36-639c6620114f",
+    "commandDesc": "MCP Tool: build_project",
+    "timestamp": 1779387371689,
+    "status": "success",
+    "tasks": [
+      {
+        "taskId": "e15cdef4-4539-47ae-9375-8ab3c06236a6",
+        "type": "build",
+        "status": "success",
+        "logPaths": [
+          "/Users/mcneillm/Documents/Projects/esp32-app-foundation/.pio-mcp-workspace/logs/build/build-2026-05-21T18-16-11-694Z-a0232dbe.log"
+        ],
+        "pid": 92514,
+        "commandDesc": "pio run --environment esp32dev",
+        "exitCode": 0
+      }
+    ],
+    "mcpRequest": {
+      "background": true,
+      "environment": "esp32dev",
+      "projectDir": "/Users/mcneillm/Documents/Projects/esp32-app-foundation"
+    },
+    "mcpToolName": "build_project",
+    "mcpResponse": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"status\": \"running\",\n  \"message\": \"Task dispatched to background.\",\n  \"pid\": 92514,\n  \"taskId\": \"db036ecb-b7a4-4649-8c36-639c6620114f\",\n  \"logPaths\": [\n    \"/Users/mcneillm/Documents/Projects/esp32-app-foundation/.pio-mcp-workspace/logs/build/build-2026-05-21T18-16-11-694Z-a0232dbe.log\"\n  ]\n}"
+        }
+      ]
+    }
+  },
+  {
+    "id": "c8bfd849-d185-4325-808b-2a95b7bee2a2",
+    "commandDesc": "MCP Tool: check_task_status",
+    "timestamp": 1779387423271,
+    "status": "success",
+    "tasks": [],
+    "mcpRequest": {
+      "taskId": "db036ecb-b7a4-4649-8c36-639c6620114f"
+    },
+    "mcpToolName": "check_task_status",
+    "mcpResponse": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"status\": \"success\",\n  \"targetStatus\": \"failed\",\n  \"taskId\": \"db036ecb-b7a4-4649-8c36-639c6620114f\",\n  \"logPaths\": [],\n  \"output\": \"Task ID not found: db036ecb-b7a4-4649-8c36-639c6620114f\"\n}"
+        }
+      ]
+    }
   }
 ]

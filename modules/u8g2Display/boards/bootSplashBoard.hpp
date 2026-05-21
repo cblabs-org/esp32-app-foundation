@@ -22,13 +22,14 @@
 #pragma once
 
 #include "interfaces/IDisplayBoard.hpp"
+#include "widgets/labelWidget.hpp"
 
 /**
  * @brief Boot splash screen shown during the BOOTING lifecycle phase.
  *
  * Displays a centred application title and firmware version string for a
- * configurable duration. The board self-expires once the timer elapses,
- * signalling the carousel engine to evict it.
+ * configurable duration using labelWidget composition. The board self-expires
+ * once the timer elapses, signalling the carousel engine to evict it.
  */
 class BootSplashBoard : public IDisplayBoard {
 public:
@@ -42,8 +43,8 @@ public:
     /**
      * @brief Render the splash screen into the U8G2 display buffer.
      *
-     * Draws "ESP32 App Foundation" centred in a bold font, with the firmware
-     * version string centred below in a smaller font.
+     * Composes two labelWidgets: the application title (bold) centred on screen,
+     * and the firmware version string (regular) centred below.
      *
      * @param u8g2 Reference to the active U8G2 driver instance.
      */
@@ -66,4 +67,8 @@ private:
     unsigned long _durationMs = 3000; ///< Splash display duration in milliseconds (3s default)
     bool          _active     = false; ///< True after activate() has been called
     char          _version[32] = "";   ///< Firmware version string (safe copy)
+
+    // --- Widget composition (WO3 refactor) ---
+    labelWidget _titleLabel{0, 18, -1, -1};    ///< "ESP32 App Foundation" centred title
+    labelWidget _versionLabel{0, 34, -1, -1};  ///< "vX.Y.Z" centred version string
 };

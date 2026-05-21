@@ -8,15 +8,15 @@
  *
  * Module: modules/u8g2Display/boards/screensaverBoard.cpp
  * Description: Implementation of the screensaver display board. Renders a
- *              bouncing HH:MM clock that moves around the screen to prevent
- *              OLED burn-in. Position updates on each render frame with
- *              direction reversal on edge collision.
+ *              bouncing HH:MM clock via labelWidget that moves around the
+ *              screen to prevent OLED burn-in. Position updates on each render
+ *              frame with direction reversal on edge collision.
  *
  * Exported Functions:
  * - ScreensaverBoard::activate():     Start screensaver, centre position
  * - ScreensaverBoard::deactivate():   Stop screensaver (triggers expiry)
  * - ScreensaverBoard::isActive():     Return true if screensaver is running
- * - ScreensaverBoard::render():       Draw bouncing clock on U8G2
+ * - ScreensaverBoard::render():       Compose labelWidget with bounce logic on U8G2
  * - ScreensaverBoard::isExpired():    Return true when deactivated
  * - ScreensaverBoard::getBoardName(): Return "SYS: Screensaver"
  */
@@ -27,6 +27,7 @@
 #include <Arduino.h>
 #include <U8g2lib.h>
 #include <ctime>
+#include "fonts/fonts.hpp"
 #endif
 
 #include <cstdio>
@@ -71,7 +72,7 @@ bool ScreensaverBoard::isActive() const {
  *
  * Steps:
  *   1. Get current time via time()/localtime() and format as HH:MM
- *   2. Draw the time string at the current bounce position
+ *   2. Update the labelWidget text and position, then render it
  *   3. Update position by _xDir/_yDir (throttled to ~100ms intervals)
  *   4. Reverse direction on edge collision to create the bounce effect
  *
@@ -91,9 +92,11 @@ void ScreensaverBoard::render(U8G2& u8g2) {
                  timeInfo->tm_hour, timeInfo->tm_min);
     }
 
-    // --- Step 2: Draw the clock text at the bounce position ---
-    u8g2.setFont(u8g2_font_helvB14_tr);
-    u8g2.drawStr(_xPos, _yPos, timeBuf);
+    // --- Step 2: Configure and render the labelWidget at bounce position ---
+    _clockLabel.setFont(u8g2_font_helvB14_tr);
+    _clockLabel.setText(timeBuf);
+    _clockLabel.setCoords(_xPos, _yPos);
+    _clockLabel.render(u8g2);
 
     // --- Step 3: Throttled position update (~100ms per step) ---
     unsigned long now_ms = millis();

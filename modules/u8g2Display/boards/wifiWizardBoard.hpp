@@ -23,13 +23,15 @@
 #pragma once
 
 #include "interfaces/IDisplayBoard.hpp"
+#include "widgets/systemMessageWidget.hpp"
 
 /**
  * @brief WiFi setup wizard screen shown during the WIFI_SETUP lifecycle phase.
  *
  * Displays instructions guiding the user to connect to the device's AP and
- * navigate to the captive portal IP for WiFi configuration. The board
- * self-expires when dismiss() is called after a successful WiFi connection.
+ * navigate to the captive portal IP for WiFi configuration via systemMessageWidget
+ * composition. The board self-expires when dismiss() is called after a
+ * successful WiFi connection.
  */
 class WiFiWizardBoard : public IDisplayBoard {
 public:
@@ -48,8 +50,8 @@ public:
     /**
      * @brief Render AP connection instructions into the U8G2 display buffer.
      *
-     * Draws four lines: "Connect to WiFi:", the SSID in bold, "then visit:",
-     * and the portal IP address.
+     * Delegates to a systemMessageWidget to draw the instruction lines
+     * centred on screen.
      *
      * @param u8g2 Reference to the active U8G2 driver instance.
      */
@@ -71,4 +73,7 @@ private:
     char _ssid[33]  = "";            ///< AP SSID to display (max 32 chars + null)
     char _ip[16]    = "192.168.4.1"; ///< Portal IP address to display
     bool _dismissed = false;         ///< True after dismiss() — triggers board expiry
+
+    // --- Widget composition (WO3 refactor) ---
+    systemMessageWidget _msgWidget{0, 0, 128, 64}; ///< Centred multi-line AP instructions
 };

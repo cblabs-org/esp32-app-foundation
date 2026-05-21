@@ -7,14 +7,14 @@
  * To view a copy of this license, visit https://creativecommons.org/licenses/by-nc-sa/4.0/
  *
  * Module: modules/u8g2Display/boards/loadingBoard.cpp
- * Description: Implementation of the loading display board. Renders a status
- *              message with a horizontal progress bar (determinate or
- *              indeterminate). Self-expires when setComplete() is called.
+ * Description: Implementation of the loading display board. Delegates
+ *              rendering to a progressBarWidget for the status message and
+ *              progress bar. Self-expires when setComplete() is called.
  *
  * Exported Functions:
  * - LoadingBoard::setStatus():    Update message text and progress fraction
  * - LoadingBoard::setComplete():  Mark loading as done (triggers expiry)
- * - LoadingBoard::render():       Draw status text and progress bar on U8G2
+ * - LoadingBoard::render():       Compose progressBarWidget on U8G2
  * - LoadingBoard::isExpired():    Return true when loading is complete
  * - LoadingBoard::getBoardName(): Return "SYS: Loading"
  */
@@ -25,6 +25,7 @@
 #ifndef NATIVE_BUILD
 #include <Arduino.h>
 #include <U8g2lib.h>
+#include "fonts/fonts.hpp"
 #endif
 
 // =============================================================================
@@ -33,15 +34,25 @@
 
 /**
  * @brief Update the status message and progress fraction.
+ *        Delegates to the composed progressBarWidget for text and percentage.
  * @param message Status text to display.
  * @param progress 0.0–1.0 for determinate progress, negative for indeterminate.
  */
 void LoadingBoard::setStatus(const char* message, float progress) {
-    if (message != nullptr) {
-        strncpy(_message, message, sizeof(_message) - 1);
-        _message[sizeof(_message) - 1] = '\0';
-    }
     _progress = progress;
+
+    // --- Delegate to widget ---
+    if (message != nullptr) {
+        _progressBar.setMessage(message);
+    }
+
+    if (progress >= 0.0f) {
+        // Clamp and convert to percentage for the widget
+        float clamped = progress;
+        if (clamped > 1.0f) clamped = 1.0f;
+        _progressBar.setPercent(static_cast<int>(clamped * 100), 0);
+        _progressBar.setShowPercentText(false);
+    }
 }
 
 /**
@@ -54,48 +65,29 @@ void LoadingBoard::setComplete() {
 /**
  * @brief Render the loading screen into the U8G2 display buffer.
  *
- * Draws the status message centred horizontally. Below the text, either a
- * filled progress bar (determinate) or a "..." indicator (indeterminate).
+ * Delegates to the composed progressBarWidget for the status message and
+ * progress bar. For indeterminate progress (negative value), draws a "..."
+ * indicator using the widget's message-only mode.
  *
  * @param u8g2 Reference to the active U8G2 driver instance.
  */
 void LoadingBoard::render(U8G2& u8g2) {
 #ifndef NATIVE_BUILD
-    int displayWidth = u8g2.getDisplayWidth();
-    int displayHeight = u8g2.getDisplayHeight();
+    _progressBar.setFont(AppFonts::defaultSmall());
+    _progressBar.render(u8g2);
 
-    // --- Status message — centred ---
-    u8g2.setFont(u8g2_font_helvR08_tr);
-    int msgWidth = u8g2.getStrWidth(_message);
-    int msgX = (displayWidth - msgWidth) / 2;
-    u8g2.drawStr(msgX, displayHeight / 2 - 4, _message);
-
-    // --- Progress indicator ---
-    int barMargin = 16;                          // Horizontal margin from edges
-    int barY      = displayHeight / 2 + 8;       // Vertical position below text
-    int barWidth  = displayWidth - (barMargin * 2);
-    int barHeight = 6;
-
-    if (_progress >= 0.0f) {
-        // --- Determinate progress bar ---
-        // Clamp progress to [0, 1]
-        float clamped = _progress;
-        if (clamped > 1.0f) clamped = 1.0f;
-
-        // Draw outline frame
-        u8g2.drawFrame(barMargin, barY, barWidth, barHeight);
-
-        // Draw filled portion (inset by 1px for visual clarity)
-        int fillWidth = (int)((barWidth - 2) * clamped);
-        if (fillWidth > 0) {
-            u8g2.drawBox(barMargin + 1, barY + 1, fillWidth, barHeight - 2);
-        }
-    } else {
-        // --- Indeterminate indicator — draw "..." centred ---
+    // --- Indeterminate indicator (when no determinate progress) ---
+    if (_progress < 0.0f) {
+        // The progressBarWidget handles the message. We draw "..." below it
+        // to match the original indeterminate indicator.
+        int displayWidth = u8g2.getDisplayWidth();
+        int displayHeight = u8g2.getDisplayHeight();
+        u8g2.setFont(u8g2_font_helvR08_tr);
         const char* dots = "...";
         int dotsWidth = u8g2.getStrWidth(dots);
         int dotsX = (displayWidth - dotsWidth) / 2;
-        u8g2.drawStr(dotsX, barY + barHeight, dots);
+        int barY = displayHeight / 2 + 8;
+        u8g2.drawStr(dotsX, barY + 6, dots);
     }
 #else
     (void)u8g2; // Suppress unused parameter warning in native builds

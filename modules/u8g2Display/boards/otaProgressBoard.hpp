@@ -25,14 +25,16 @@
 #pragma once
 
 #include "interfaces/IDisplayBoard.hpp"
+#include "widgets/labelWidget.hpp"
+#include "widgets/progressBarWidget.hpp"
 
 /**
  * @brief OTA firmware update progress board.
  *
- * Displays a "Firmware Update" title, a horizontal progress bar with percentage
- * text, and a status message. When the update completes successfully the board
- * self-expires; failed updates persist until manually reset so the user can
- * see the error state.
+ * Displays a "Firmware Update" title via labelWidget, a horizontal progress bar
+ * with percentage text via progressBarWidget, and a status message via a second
+ * labelWidget. When the update completes successfully the board self-expires;
+ * failed updates persist until manually reset so the user can see the error state.
  */
 class OtaProgressBoard : public IDisplayBoard {
 public:
@@ -61,8 +63,8 @@ public:
     /**
      * @brief Render the OTA progress UI into the U8G2 display buffer.
      *
-     * Draws a "Firmware Update" title, a progress bar, a percentage label,
-     * and the current status message. On failure, an error indicator is shown.
+     * Composes labelWidgets for the title and status, and a progressBarWidget
+     * for the download progress. On failure, the status label shows "FAILED".
      *
      * @param u8g2 Reference to the active U8G2 driver instance.
      */
@@ -86,4 +88,9 @@ private:
     char  _status[48] = "Checking for updates...";     ///< Current status text
     bool  _complete = false;                            ///< True when OTA has finished
     bool  _failed   = false;                            ///< True if OTA ended in failure
+
+    // --- Widget composition (WO3 refactor) ---
+    labelWidget       _titleLabel{0, 2, -1, -1};       ///< "Firmware Update" title
+    progressBarWidget _progressBar{16, 18, -1, 22, nullptr}; ///< Progress bar with percentage
+    labelWidget       _statusLabel{0, 50, -1, -1};     ///< Status message at the bottom
 };

@@ -74,6 +74,13 @@ public:
     void setShowPercentText(bool show);
 
     /**
+     * @brief Update the font used for rendering the message and percentage text.
+     * @param _font Pointer to U8G2 font array. nullptr defers to the current
+     *              display font.
+     */
+    void setFont(const uint8_t* _font) { font = _font; }
+
+    /**
      * @brief Set the progress value (0-100) with optional animation.
      *        Clamped to [0, 100]. durationMs=0 snaps immediately.
      * @param percent Target progress amount (0-100).
