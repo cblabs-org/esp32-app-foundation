@@ -119,6 +119,11 @@ bool Application::begin(const FrameworkConfig& config) {
     _eventBus.begin();
     _webServerManager.begin(_webContributors);
 
+    // MCP server: pass nullptr for configManager — Application does not currently
+    // own a ConfigManager instance. When a ConfigManager is wired in a future PR,
+    // update this call to pass a valid pointer. See WO3 design notes.
+    _mcpServer.begin(_mcpContributors, nullptr);
+
     // --- Step 10: Lock all registration vectors ---
     // No further registrations are permitted after this point.
     _compactAndLock();
@@ -158,6 +163,9 @@ void Application::tick() {
     for (auto* module : _tickables) {
         module->tick();
     }
+
+    // MCP server: poll Serial for incoming JSON-RPC requests
+    _mcpServer.tick();
 }
 
 /**
@@ -248,6 +256,22 @@ bool Application::registerWebContributor(IWebContributor* contributor) {
 }
 
 /**
+ * @brief Register a module that contributes MCP tools to the MCP server.
+ */
+bool Application::registerMcpContributor(IMcpContributor* contributor) {
+    if (_locked) {
+        APP_LOGE("registerMcpContributor() rejected — registration is closed after begin()");
+        return false;
+    }
+    if (contributor == nullptr) {
+        APP_LOGE("registerMcpContributor() rejected — null pointer");
+        return false;
+    }
+    _mcpContributors.push_back(contributor);
+    return true;
+}
+
+/**
  * @brief Register a background data-fetch worker with the DataManager.
  */
 bool Application::registerDataSource(iDataSource* source) {
@@ -277,6 +301,10 @@ DataManager& Application::getDataManager() {
 
 WebServerManager& Application::getWebServerManager() {
     return _webServerManager;
+}
+
+McpServer& Application::getMcpServer() {
+    return _mcpServer;
 }
 
 // ---------------------------------------------------------------------------
@@ -323,15 +351,17 @@ void Application::_compactAndLock() {
     _tickables.shrink_to_fit();
     _configurables.shrink_to_fit();
     _webContributors.shrink_to_fit();
+    _mcpContributors.shrink_to_fit();
     _dataSources.shrink_to_fit();
 
     _locked = true;
 
     APP_LOGI("Registry locked — tickables=%zu configurables=%zu "
-             "webContributors=%zu dataSources=%zu statusReporter=%s",
+             "webContributors=%zu mcpContributors=%zu dataSources=%zu statusReporter=%s",
              _tickables.size(),
              _configurables.size(),
              _webContributors.size(),
+             _mcpContributors.size(),
              _dataSources.size(),
              (_statusReporter != nullptr) ? "registered" : "none");
 }

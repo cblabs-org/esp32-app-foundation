@@ -23,8 +23,10 @@
  *   - registerConfigurable():    Add an iConfigurable module to the config-load vector
  *   - registerStatusReporter():  Set (or replace) the single IStatusReporter adapter
  *   - registerWebContributor():  Add an IWebContributor module to the route-registration vector
+ *   - registerMcpContributor():  Add an IMcpContributor module to the MCP tools vector
  *   - registerDataSource():      Add an iDataSource worker to the DataManager vector
  *   - getState():                Query the current AppState lifecycle phase
+ *   - getMcpServer():            Access the MCP JSON-RPC server instance
  */
 
 #pragma once
@@ -36,10 +38,12 @@
 #include "interfaces/iDataSource.hpp"
 #include "interfaces/IStatusReporter.hpp"
 #include "interfaces/IWebContributor.hpp"
+#include "interfaces/IMcpContributor.hpp"
 
 #include "../eventBus/EventBus.hpp"
 #include "../dataManager/dataManager.hpp"
 #include "../webServer/webServer.hpp"
+#include "../mcpServer/mcpServer.hpp"
 
 /**
  * @brief Composition root for the ESP32 App Foundation framework.
@@ -74,7 +78,7 @@ public:
      *   6. TODO: wifiManager.begin()  (PR-02)
      *   7. Set state to APP_SETUP
      *   8. Call loadConfig() on all registered iConfigurable modules
-     *   9. TODO: DataManager and EventBus begin() stubs (PR-03)
+     *   9. Core services begin() — DataManager, EventBus, WebServerManager, McpServer
      *  10. Call _compactAndLock() — vectors are locked from this point
      *  11. Call _reportHeap()
      *  12. Set state to RUNNING
@@ -90,6 +94,7 @@ public:
      *
      * Guarded: does nothing unless the current state is AppState::RUNNING.
      * Each registered ITickable::tick() must complete within 10ms.
+     * Also ticks the McpServer for JSON-RPC serial polling.
      */
     void tick();
 
@@ -137,6 +142,13 @@ public:
     bool registerWebContributor(IWebContributor* contributor);
 
     /**
+     * @brief Register a module that contributes MCP tools to the MCP server.
+     * @param contributor Non-null pointer to the IMcpContributor implementation.
+     * @return true if registration succeeded; false if locked or nullptr.
+     */
+    bool registerMcpContributor(IMcpContributor* contributor);
+
+    /**
      * @brief Register a background data-fetch worker with the DataManager.
      * @param source  Non-null pointer to the iDataSource implementation.
      * @return true if registration succeeded; false if locked or nullptr.
@@ -164,6 +176,12 @@ public:
      * @return Reference to the WebServerManager.
      */
     WebServerManager& getWebServerManager();
+
+    /**
+     * @brief Get the application's McpServer instance.
+     * @return Reference to the McpServer.
+     */
+    McpServer& getMcpServer();
 
     // -------------------------------------------------------------------------
     // State Accessors
@@ -210,10 +228,11 @@ private:
     FrameworkConfig _config;                     ///< Cached framework configuration
 
     // Module registry vectors (two-tier model)
-    std::vector<ITickable*>       _tickables;       ///< Modules receiving tick() dispatches
-    std::vector<iConfigurable*>   _configurables;   ///< Modules whose loadConfig() is called during begin()
-    std::vector<IWebContributor*> _webContributors; ///< Modules that contribute REST API routes
-    std::vector<iDataSource*>     _dataSources;     ///< Background data-fetch workers
+    std::vector<ITickable*>        _tickables;       ///< Modules receiving tick() dispatches
+    std::vector<iConfigurable*>    _configurables;   ///< Modules whose loadConfig() is called during begin()
+    std::vector<IWebContributor*>  _webContributors; ///< Modules that contribute REST API routes
+    std::vector<IMcpContributor*>  _mcpContributors; ///< Modules that contribute MCP tools
+    std::vector<iDataSource*>      _dataSources;     ///< Background data-fetch workers
 
     // Single-pointer registrations (no vector needed)
     
@@ -234,4 +253,5 @@ private:
     EventBus _eventBus;           ///< Central event bus
     DataManager _dataManager;     ///< Background data manager
     WebServerManager _webServerManager; ///< Local HTTP Server
+    McpServer _mcpServer;               ///< MCP JSON-RPC server
 };

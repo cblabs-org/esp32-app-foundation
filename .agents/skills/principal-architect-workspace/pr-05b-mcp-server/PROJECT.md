@@ -101,8 +101,8 @@ test/test_unit/
 
 | WO | Topic | Branch | Status |
 |---|---|---|---|
-| **[ ] [wo1-skeleton](wo1-skeleton/WORKORDER.md)** | `IMcpContributor` interface + `McpToolRegistry` + `McpServer` skeleton (Serial JSON-RPC transport) | `pr-05b-wo1-skeleton` | QUEUED |
-| **[ ] [wo2-builtin-tools](wo2-builtin-tools/WORKORDER.md)** | Built-in tools: `system_info`, `get_config`/`set_config`, `reboot`, `get_logs`, `list_tools` | `pr-05b-wo2-builtin-tools` | QUEUED |
+| **[x] [wo1-skeleton](wo1-skeleton/WORKORDER.md)** | `IMcpContributor` interface + `McpToolRegistry` + `McpServer` skeleton (Serial JSON-RPC transport) | `pr-05b-wo1-skeleton` | ✅ MERGED `3166d78` |
+| **[x] [wo2-builtin-tools](wo2-builtin-tools/WORKORDER.md)** | Built-in tools: `system_info`, `get_config`/`set_config`, `reboot`, `get_logs`, `list_tools` | `pr-05b-wo2-builtin-tools` | ✅ MERGED `ca47c08` |
 | **[ ] [wo3-integration](wo3-integration/WORKORDER.md)** | `capture_display` tool + Application hub wiring + native unit tests | `pr-05b-wo3-integration` | QUEUED |
 
 ---
