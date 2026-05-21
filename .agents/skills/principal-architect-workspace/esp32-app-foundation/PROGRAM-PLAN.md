@@ -311,6 +311,17 @@ git checkout pr-NN-name && git rebase main
 
 ---
 
+## Discovered Standards (from PR-01 execution)
+
+These were found during PR-01 and apply to **all subsequent PAs**:
+
+| # | Discovery | Fix | Affects |
+|---|---|---|---|
+| D-01 | `CONFIG_AUTOSTART_ARDUINO=y` missing from `sdkconfig.defaults` | **Required** in both `sdkconfig.defaults` and `sdkconfig.defaults.esp32s3nano`. Without it, Arduino framework's `app_main()` wrapper fails to link against ESP-IDF's `app_startup.c`, breaking the Hollywood Principle `setup()`/`loop()` entry point. ✅ Already added by PR-01. | All PRs that build firmware |
+| D-02 | `lib_extra_dirs = modules` must appear in **both** `[base_esp32]` and `[env:native]` sections of `platformio.ini` | Library discovery does not cascade from `library.json` `srcDirs` to the native test environment. Both sections need the explicit declaration. ✅ Already added by PR-01. | All PRs adding modules |
+
+---
+
 ## Dependency Graph
 
 ```
