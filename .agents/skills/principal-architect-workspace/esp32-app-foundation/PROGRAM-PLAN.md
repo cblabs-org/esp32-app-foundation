@@ -615,6 +615,45 @@ generic device tools; departures-specific tools stay app-side.
 
 ---
 
+### PR-05c: Test Hardening {#pr-05c}
+
+**Branch:** `pr-05c-test-hardening`  
+**Depends on:** PR-01 through PR-05b  
+**Blocks:** PR-07 (template must demonstrate a well-tested framework)  
+**Estimated WOs:** 3
+
+**Scope:**
+Fill critical test coverage gaps across kernel services, data infrastructure,
+web portal, and low-level libraries. All modules that interact with ESP-IDF
+hardware APIs must be tested via mocked dependencies under the `NATIVE_BUILD`
+guard pattern established in PR-05/PR-05a.
+
+**Coverage Audit (current → target):**
+
+| Module | Current | Gap | Target |
+|---|---|---|---|
+| `wifiManager` | 0 | State machine, AP mode, reconnect logic | 15+ |
+| `timeManager` | 0 | NTP sync states, timezone config, non-blocking tick | 10+ |
+| `otaUpdateManager` | 0 | Download states, MD5 verification, rollback logic | 15+ |
+| `webServer` | 2 | Route registration, IWebContributor dispatch, API handlers | 15+ |
+| `configManager` | 7 | Version migration, hot-reload, edge cases | 15+ |
+| `dataManager` | 6 | Priority scheduling, source lifecycle, error handling | 12+ |
+| `eventBus` | 8 | Unsubscribe, topic overflow, multi-subscriber | 15+ |
+| `keyManager` | 5 | CRUD edge cases, encryption round-trip, capacity | 12+ |
+| `deviceCrypto` (lib) | 0 | Key derivation, encrypt/decrypt (mocked hardware) | 8+ |
+| `logger` (lib) | 0 | Level filtering, secure redaction, format | 8+ |
+| `md5Utils` (lib) | 0 | Streaming hash, known-vector validation | 6+ |
+| `githubClient` (lib) | 0 | URL construction, header parsing, error paths | 8+ |
+
+**Sketch WOs:**
+| WO | Topic |
+|---|---|
+| WO1 | Kernel service tests: `wifiManager`, `timeManager`, `otaUpdateManager` (mock ESP-IDF APIs, test state machines) |
+| WO2 | Data + web tests: `configManager` expansion, `dataManager` expansion, `eventBus` expansion, `webServer` expansion |
+| WO3 | Low-level lib tests: `deviceCrypto`, `logger`, `md5Utils`, `githubClient` + `keyManager` expansion |
+
+---
+
 ### PR-06: Build Infrastructure {#pr-06}
 
 **Branch:** `pr-06-build-infra`  
@@ -648,7 +687,7 @@ Build scripts, GitHub Actions CI (dual-env + include-graph lint), `README.md`,
 ### PR-07: App Template Scaffold {#pr-07}
 
 **Branch:** `pr-07-template-scaffold`  
-**Depends on:** PR-01 through PR-06  
+**Depends on:** PR-01 through PR-06 + PR-05c  
 **Blocks:** nothing (final deliverable)  
 **Estimated WOs:** 2
 
@@ -710,8 +749,10 @@ wire a new application into the framework via git submodule. NOT a separate repo
 | 4 — Features | PR-04 + PR-05 in parallel | Blocked by PR-03; no file overlap |
 | 4a — Enhancement | PR-05a (widget toolkit) | Blocked by PR-05 |
 | 4b — Enhancement | PR-05b (MCP server) | Blocked by PR-04; parallel with PR-05a |
-| 5 — Finalization | PR-06 then PR-07 | PR-06 validates CI; PR-07 creates template |
+| 4c — Quality | PR-05c (test hardening) | Parallel with PR-06; both blocked by PR-05b |
+| 5 — Finalization | PR-06 (build infra) | Parallel with PR-05c |
+| 6 — Delivery | PR-07 (template) | Blocked by PR-05c + PR-06 |
 
 ---
 
-*Chief Architect Program Plan — ESP32 App Foundation — 2026-05-21 (rev 5 — added PR-05a widget toolkit + PR-05b MCP server)*
+*Chief Architect Program Plan — ESP32 App Foundation — 2026-05-21 (rev 6 — added PR-05c test hardening)*

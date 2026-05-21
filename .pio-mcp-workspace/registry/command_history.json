@@ -1,240 +1,5 @@
 [
   {
-    "id": "7ce76684-5c76-4a27-99f5-1ab64c157d0e",
-    "commandDesc": "MCP Tool: build_project",
-    "timestamp": 1779359410308,
-    "status": "success",
-    "tasks": [
-      {
-        "taskId": "55ebf96c-b1a6-4bc2-b6c7-806ee5bfd6da",
-        "type": "build",
-        "status": "success",
-        "logPaths": [
-          "/Users/mcneillm/Documents/Projects/esp32-app-foundation/.pio-mcp-workspace/logs/build/build-2026-05-21T10-30-10-327Z-d9d35236.log"
-        ],
-        "pid": 70804,
-        "commandDesc": "pio run --environment esp32dev",
-        "exitCode": 0
-      }
-    ],
-    "mcpRequest": {
-      "background": true,
-      "environment": "esp32dev",
-      "projectDir": "/Users/mcneillm/Documents/Projects/esp32-app-foundation"
-    },
-    "mcpToolName": "build_project",
-    "mcpResponse": {
-      "content": [
-        {
-          "type": "text",
-          "text": "{\n  \"status\": \"running\",\n  \"message\": \"Task dispatched to background.\",\n  \"pid\": 70804,\n  \"taskId\": \"7ce76684-5c76-4a27-99f5-1ab64c157d0e\",\n  \"logPaths\": [\n    \"/Users/mcneillm/Documents/Projects/esp32-app-foundation/.pio-mcp-workspace/logs/build/build-2026-05-21T10-30-10-327Z-d9d35236.log\"\n  ]\n}"
-        }
-      ]
-    }
-  },
-  {
-    "id": "e6728e9f-8e1a-453a-9313-64f402cc27ae",
-    "commandDesc": "MCP Tool: check_task_status",
-    "timestamp": 1779359418692,
-    "status": "success",
-    "tasks": [],
-    "mcpRequest": {
-      "taskId": "7ce76684-5c76-4a27-99f5-1ab64c157d0e"
-    },
-    "mcpToolName": "check_task_status",
-    "mcpResponse": {
-      "content": [
-        {
-          "type": "text",
-          "text": "{\n  \"status\": \"success\",\n  \"targetStatus\": \"failed\",\n  \"taskId\": \"7ce76684-5c76-4a27-99f5-1ab64c157d0e\",\n  \"logPaths\": [],\n  \"output\": \"Task ID not found: 7ce76684-5c76-4a27-99f5-1ab64c157d0e\"\n}"
-        }
-      ]
-    }
-  },
-  {
-    "id": "ae53dc72-20c1-40ba-97b2-907900839dc8",
-    "commandDesc": "MCP Tool: get_lock_status",
-    "timestamp": 1779359432015,
-    "status": "success",
-    "tasks": [],
-    "mcpRequest": {},
-    "mcpToolName": "get_lock_status",
-    "mcpResponse": {
-      "content": [
-        {
-          "type": "text",
-          "text": "{\n  \"isLocked\": false\n}"
-        }
-      ]
-    }
-  },
-  {
-    "id": "10a5a9c8-196c-434f-9a81-b347d0dd574b",
-    "commandDesc": "MCP Tool: build_project",
-    "timestamp": 1779359499954,
-    "status": "success",
-    "tasks": [
-      {
-        "taskId": "31cebb53-29e1-4b6c-9753-db603c2f6767",
-        "type": "build",
-        "status": "success",
-        "logPaths": [
-          "/Users/mcneillm/Documents/Projects/esp32-app-foundation/.pio-mcp-workspace/logs/build/build-2026-05-21T10-31-39-961Z-9010370d.log"
-        ],
-        "pid": 71929,
-        "commandDesc": "pio run --environment esp32dev",
-        "exitCode": 0
-      }
-    ],
-    "mcpRequest": {
-      "background": true,
-      "environment": "esp32dev",
-      "projectDir": "/Users/mcneillm/Documents/Projects/esp32-app-foundation"
-    },
-    "mcpToolName": "build_project",
-    "mcpResponse": {
-      "content": [
-        {
-          "type": "text",
-          "text": "{\n  \"status\": \"running\",\n  \"message\": \"Task dispatched to background.\",\n  \"pid\": 71929,\n  \"taskId\": \"10a5a9c8-196c-434f-9a81-b347d0dd574b\",\n  \"logPaths\": [\n    \"/Users/mcneillm/Documents/Projects/esp32-app-foundation/.pio-mcp-workspace/logs/build/build-2026-05-21T10-31-39-961Z-9010370d.log\"\n  ]\n}"
-        }
-      ]
-    }
-  },
-  {
-    "id": "07552968-c8d9-4283-a347-c97803eea324",
-    "commandDesc": "MCP Tool: build_project",
-    "timestamp": 1779359554614,
-    "status": "success",
-    "tasks": [
-      {
-        "taskId": "c2d86246-4492-433a-9363-9c4c1a9f5f98",
-        "type": "build",
-        "status": "success",
-        "logPaths": [
-          "/Users/mcneillm/Documents/Projects/esp32-app-foundation/.pio-mcp-workspace/logs/build/build-2026-05-21T10-32-34-617Z-b08960cc.log"
-        ],
-        "pid": 72514,
-        "commandDesc": "pio run --environment esp32dev",
-        "exitCode": 0
-      }
-    ],
-    "mcpRequest": {
-      "background": true,
-      "environment": "esp32dev",
-      "projectDir": "/Users/mcneillm/Documents/Projects/esp32-app-foundation"
-    },
-    "mcpToolName": "build_project",
-    "mcpResponse": {
-      "content": [
-        {
-          "type": "text",
-          "text": "{\n  \"status\": \"running\",\n  \"message\": \"Task dispatched to background.\",\n  \"pid\": 72514,\n  \"taskId\": \"07552968-c8d9-4283-a347-c97803eea324\",\n  \"logPaths\": [\n    \"/Users/mcneillm/Documents/Projects/esp32-app-foundation/.pio-mcp-workspace/logs/build/build-2026-05-21T10-32-34-617Z-b08960cc.log\"\n  ]\n}"
-        }
-      ]
-    }
-  },
-  {
-    "id": "8933f967-fb89-4d4b-8c8d-11ae304759d2",
-    "commandDesc": "MCP Tool: build_project",
-    "timestamp": 1779359843742,
-    "status": "success",
-    "tasks": [
-      {
-        "taskId": "832e3324-2f83-4556-abb4-f8f560d16bbf",
-        "type": "build",
-        "status": "success",
-        "logPaths": [
-          "/Users/mcneillm/Documents/Projects/esp32-app-foundation/.pio-mcp-workspace/logs/build/build-2026-05-21T10-37-23-748Z-59638477.log"
-        ],
-        "pid": 73909,
-        "commandDesc": "pio run ",
-        "exitCode": 0
-      }
-    ],
-    "mcpRequest": {
-      "background": true,
-      "projectDir": "/Users/mcneillm/Documents/Projects/esp32-app-foundation"
-    },
-    "mcpToolName": "build_project",
-    "mcpResponse": {
-      "content": [
-        {
-          "type": "text",
-          "text": "{\n  \"status\": \"running\",\n  \"message\": \"Task dispatched to background.\",\n  \"pid\": 73909,\n  \"taskId\": \"8933f967-fb89-4d4b-8c8d-11ae304759d2\",\n  \"logPaths\": [\n    \"/Users/mcneillm/Documents/Projects/esp32-app-foundation/.pio-mcp-workspace/logs/build/build-2026-05-21T10-37-23-748Z-59638477.log\"\n  ]\n}"
-        }
-      ]
-    }
-  },
-  {
-    "id": "bf65684f-a991-4050-9720-ea210f63244a",
-    "commandDesc": "MCP Tool: check_task_status",
-    "timestamp": 1779359851950,
-    "status": "success",
-    "tasks": [],
-    "mcpRequest": {
-      "taskId": "8933f967-fb89-4d4b-8c8d-11ae304759d2"
-    },
-    "mcpToolName": "check_task_status",
-    "mcpResponse": {
-      "content": [
-        {
-          "type": "text",
-          "text": "{\n  \"status\": \"success\",\n  \"targetStatus\": \"failed\",\n  \"taskId\": \"8933f967-fb89-4d4b-8c8d-11ae304759d2\",\n  \"logPaths\": [],\n  \"output\": \"Task ID not found: 8933f967-fb89-4d4b-8c8d-11ae304759d2\"\n}"
-        }
-      ]
-    }
-  },
-  {
-    "id": "3a6734ed-be11-4278-92f1-1a51eee5d943",
-    "commandDesc": "MCP Tool: build_project",
-    "timestamp": 1779360896061,
-    "status": "success",
-    "tasks": [
-      {
-        "taskId": "3de1f2ba-404c-4dc3-bd7c-bdceeaf11bfc",
-        "type": "build",
-        "status": "success",
-        "logPaths": [
-          "/Users/mcneillm/Documents/Projects/esp32-app-foundation/.pio-mcp-workspace/logs/build/build-2026-05-21T10-54-56-068Z-040d1d8c.log"
-        ],
-        "pid": 91562,
-        "commandDesc": "pio run --environment esp32dev",
-        "exitCode": 0
-      }
-    ],
-    "mcpRequest": {
-      "background": true,
-      "environment": "esp32dev",
-      "projectDir": "/Users/mcneillm/Documents/Projects/esp32-app-foundation"
-    },
-    "mcpToolName": "build_project",
-    "mcpResponse": {
-      "content": [
-        {
-          "type": "text",
-          "text": "{\n  \"status\": \"running\",\n  \"message\": \"Task dispatched to background.\",\n  \"pid\": 91562,\n  \"taskId\": \"3a6734ed-be11-4278-92f1-1a51eee5d943\",\n  \"logPaths\": [\n    \"/Users/mcneillm/Documents/Projects/esp32-app-foundation/.pio-mcp-workspace/logs/build/build-2026-05-21T10-54-56-068Z-040d1d8c.log\"\n  ]\n}"
-        }
-      ]
-    }
-  },
-  {
-    "id": "44d1594d-f7bc-4c6a-b6f4-b586edbf6706",
-    "commandDesc": "MCP Tool: build_project",
-    "timestamp": 1779360896199,
-    "status": "error",
-    "tasks": [],
-    "mcpRequest": {
-      "background": true,
-      "environment": "esp32s3nano",
-      "projectDir": "/Users/mcneillm/Documents/Projects/esp32-app-foundation"
-    },
-    "mcpToolName": "build_project",
-    "mcpResponse": {
-      "error": "Failed to build project: Error: A build is already actively running for this project."
-    }
-  },
-  {
     "id": "2e36631c-3724-4d4d-b951-ba8c82e16d4b",
     "commandDesc": "MCP Tool: check_task_status",
     "timestamp": 1779360903364,
@@ -765,6 +530,275 @@
         {
           "type": "text",
           "text": "{\n  \"status\": \"success\",\n  \"targetStatus\": \"failed\",\n  \"taskId\": \"db036ecb-b7a4-4649-8c36-639c6620114f\",\n  \"logPaths\": [],\n  \"output\": \"Task ID not found: db036ecb-b7a4-4649-8c36-639c6620114f\"\n}"
+        }
+      ]
+    }
+  },
+  {
+    "id": "095c741f-ddc7-4d80-97b8-95368363692f",
+    "commandDesc": "MCP Tool: build_project",
+    "timestamp": 1779388407995,
+    "status": "error",
+    "tasks": [
+      {
+        "taskId": "6c4b19e4-0d62-4471-b9e8-6302b5787139",
+        "type": "build",
+        "status": "error",
+        "logPaths": [
+          "/Users/mcneillm/Documents/Projects/esp32-app-foundation/.pio-mcp-workspace/logs/build/build-2026-05-21T18-33-28-003Z-8533cc9f.log"
+        ],
+        "pid": 98336,
+        "commandDesc": "pio run --environment native",
+        "exitCode": 1,
+        "error": "include/portal_assets/index_html.hpp:20:10: fatal error: 'Arduino.h' file not found"
+      }
+    ],
+    "mcpRequest": {
+      "background": true,
+      "environment": "native",
+      "projectDir": "/Users/mcneillm/Documents/Projects/esp32-app-foundation"
+    },
+    "mcpToolName": "build_project",
+    "mcpResponse": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"status\": \"running\",\n  \"message\": \"Task dispatched to background.\",\n  \"pid\": 98336,\n  \"taskId\": \"095c741f-ddc7-4d80-97b8-95368363692f\",\n  \"logPaths\": [\n    \"/Users/mcneillm/Documents/Projects/esp32-app-foundation/.pio-mcp-workspace/logs/build/build-2026-05-21T18-33-28-003Z-8533cc9f.log\"\n  ]\n}"
+        }
+      ]
+    },
+    "error": "include/portal_assets/index_html.hpp:20:10: fatal error: 'Arduino.h' file not found"
+  },
+  {
+    "id": "7fc1cb77-e561-482f-a191-0ae2195f21be",
+    "commandDesc": "MCP Tool: check_task_status",
+    "timestamp": 1779388414989,
+    "status": "success",
+    "tasks": [],
+    "mcpRequest": {
+      "taskId": "095c741f-ddc7-4d80-97b8-95368363692f"
+    },
+    "mcpToolName": "check_task_status",
+    "mcpResponse": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"status\": \"success\",\n  \"targetStatus\": \"failed\",\n  \"taskId\": \"095c741f-ddc7-4d80-97b8-95368363692f\",\n  \"logPaths\": [],\n  \"output\": \"Task ID not found: 095c741f-ddc7-4d80-97b8-95368363692f\"\n}"
+        }
+      ]
+    }
+  },
+  {
+    "id": "d006deca-0342-4727-a4d1-d3e2464b55dc",
+    "commandDesc": "MCP Tool: query_logs",
+    "timestamp": 1779388428467,
+    "status": "success",
+    "tasks": [],
+    "mcpRequest": {
+      "searchPattern": "error|Error|warning|SUCCESS|FAILED",
+      "taskId": "095c741f-ddc7-4d80-97b8-95368363692f"
+    },
+    "mcpToolName": "query_logs",
+    "mcpResponse": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"success\": false,\n  \"content\": \"No active or recent logs found for query context (taskId: 095c741f-ddc7-4d80-97b8-95368363692f, port: none, logPath: none).\"\n}"
+        }
+      ]
+    }
+  },
+  {
+    "id": "9a83c5e7-1f01-4e56-8b75-eb3cb3dc6e75",
+    "commandDesc": "MCP Tool: build_project",
+    "timestamp": 1779388496198,
+    "status": "error",
+    "tasks": [
+      {
+        "taskId": "21576c2f-737b-4cd3-a836-b2f63fea9be1",
+        "type": "build",
+        "status": "error",
+        "logPaths": [
+          "/Users/mcneillm/Documents/Projects/esp32-app-foundation/.pio-mcp-workspace/logs/build/build-2026-05-21T18-34-56-208Z-67bb355f.log"
+        ],
+        "pid": 98817,
+        "commandDesc": "pio run --environment native",
+        "exitCode": 1,
+        "error": "include/portal_assets/index_html.hpp:20:10: fatal error: 'Arduino.h' file not found"
+      }
+    ],
+    "mcpRequest": {
+      "background": true,
+      "environment": "native",
+      "projectDir": "/Users/mcneillm/Documents/Projects/esp32-app-foundation"
+    },
+    "mcpToolName": "build_project",
+    "mcpResponse": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"status\": \"running\",\n  \"message\": \"Task dispatched to background.\",\n  \"pid\": 98817,\n  \"taskId\": \"9a83c5e7-1f01-4e56-8b75-eb3cb3dc6e75\",\n  \"logPaths\": [\n    \"/Users/mcneillm/Documents/Projects/esp32-app-foundation/.pio-mcp-workspace/logs/build/build-2026-05-21T18-34-56-208Z-67bb355f.log\"\n  ]\n}"
+        }
+      ]
+    },
+    "error": "include/portal_assets/index_html.hpp:20:10: fatal error: 'Arduino.h' file not found"
+  },
+  {
+    "id": "14a8c04a-d421-490a-98a3-674f2ecbe278",
+    "commandDesc": "MCP Tool: build_project",
+    "timestamp": 1779388510582,
+    "status": "success",
+    "tasks": [
+      {
+        "taskId": "c33e629a-90c1-4e2d-8b0e-e31ecfc466a0",
+        "type": "build",
+        "status": "success",
+        "logPaths": [
+          "/Users/mcneillm/Documents/Projects/esp32-app-foundation/.pio-mcp-workspace/logs/build/build-2026-05-21T18-35-10-584Z-2b258bcf.log"
+        ],
+        "pid": 98919,
+        "commandDesc": "pio run --environment esp32dev",
+        "exitCode": 0
+      }
+    ],
+    "mcpRequest": {
+      "background": true,
+      "environment": "esp32dev",
+      "projectDir": "/Users/mcneillm/Documents/Projects/esp32-app-foundation"
+    },
+    "mcpToolName": "build_project",
+    "mcpResponse": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"status\": \"running\",\n  \"message\": \"Task dispatched to background.\",\n  \"pid\": 98919,\n  \"taskId\": \"14a8c04a-d421-490a-98a3-674f2ecbe278\",\n  \"logPaths\": [\n    \"/Users/mcneillm/Documents/Projects/esp32-app-foundation/.pio-mcp-workspace/logs/build/build-2026-05-21T18-35-10-584Z-2b258bcf.log\"\n  ]\n}"
+        }
+      ]
+    }
+  },
+  {
+    "id": "b65ac502-be4a-4730-86bb-4d1f433ce46e",
+    "commandDesc": "MCP Tool: build_project",
+    "timestamp": 1779388833588,
+    "status": "error",
+    "tasks": [
+      {
+        "taskId": "2f066d9c-ae54-4c87-bec7-ccfb3a00f98e",
+        "type": "build",
+        "status": "error",
+        "logPaths": [
+          "/Users/mcneillm/Documents/Projects/esp32-app-foundation/.pio-mcp-workspace/logs/build/build-2026-05-21T18-40-33-604Z-da4f8f4b.log"
+        ],
+        "pid": 11282,
+        "commandDesc": "pio run --environment native",
+        "exitCode": 1,
+        "error": "include/portal_assets/index_html.hpp:20:10: fatal error: 'Arduino.h' file not found"
+      }
+    ],
+    "mcpRequest": {
+      "background": true,
+      "environment": "native",
+      "projectDir": "/Users/mcneillm/Documents/Projects/esp32-app-foundation"
+    },
+    "mcpToolName": "build_project",
+    "mcpResponse": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"status\": \"running\",\n  \"message\": \"Task dispatched to background.\",\n  \"pid\": 11282,\n  \"taskId\": \"b65ac502-be4a-4730-86bb-4d1f433ce46e\",\n  \"logPaths\": [\n    \"/Users/mcneillm/Documents/Projects/esp32-app-foundation/.pio-mcp-workspace/logs/build/build-2026-05-21T18-40-33-604Z-da4f8f4b.log\"\n  ]\n}"
+        }
+      ]
+    },
+    "error": "include/portal_assets/index_html.hpp:20:10: fatal error: 'Arduino.h' file not found"
+  },
+  {
+    "id": "d89aa2d2-bf9e-4a44-88d8-c8f270d11e0f",
+    "commandDesc": "MCP Tool: check_task_status",
+    "timestamp": 1779388840150,
+    "status": "success",
+    "tasks": [],
+    "mcpRequest": {
+      "taskId": "b65ac502-be4a-4730-86bb-4d1f433ce46e"
+    },
+    "mcpToolName": "check_task_status",
+    "mcpResponse": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"status\": \"success\",\n  \"targetStatus\": \"failed\",\n  \"taskId\": \"b65ac502-be4a-4730-86bb-4d1f433ce46e\",\n  \"logPaths\": [],\n  \"output\": \"Task ID not found: b65ac502-be4a-4730-86bb-4d1f433ce46e\"\n}"
+        }
+      ]
+    }
+  },
+  {
+    "id": "60e39ff8-2377-4acd-b502-2d4faaa76988",
+    "commandDesc": "MCP Tool: query_logs",
+    "timestamp": 1779388854193,
+    "status": "success",
+    "tasks": [],
+    "mcpRequest": {
+      "limit": 50,
+      "searchPattern": "error|Error|ERROR|warning",
+      "taskId": "b65ac502-be4a-4730-86bb-4d1f433ce46e"
+    },
+    "mcpToolName": "query_logs",
+    "mcpResponse": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"success\": false,\n  \"content\": \"No active or recent logs found for query context (taskId: b65ac502-be4a-4730-86bb-4d1f433ce46e, port: none, logPath: none).\"\n}"
+        }
+      ]
+    }
+  },
+  {
+    "id": "6ad01415-f0c3-4a05-a7dc-758ac9d33110",
+    "commandDesc": "MCP Tool: build_project",
+    "timestamp": 1779388959792,
+    "status": "success",
+    "tasks": [
+      {
+        "taskId": "197d25c7-5490-42c2-ac1e-b285fa74181e",
+        "type": "build",
+        "status": "success",
+        "logPaths": [
+          "/Users/mcneillm/Documents/Projects/esp32-app-foundation/.pio-mcp-workspace/logs/build/build-2026-05-21T18-42-39-802Z-5dd3c7f1.log"
+        ],
+        "pid": 11928,
+        "commandDesc": "pio run --environment esp32dev",
+        "exitCode": 0
+      }
+    ],
+    "mcpRequest": {
+      "background": true,
+      "environment": "esp32dev",
+      "projectDir": "/Users/mcneillm/Documents/Projects/esp32-app-foundation"
+    },
+    "mcpToolName": "build_project",
+    "mcpResponse": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"status\": \"running\",\n  \"message\": \"Task dispatched to background.\",\n  \"pid\": 11928,\n  \"taskId\": \"6ad01415-f0c3-4a05-a7dc-758ac9d33110\",\n  \"logPaths\": [\n    \"/Users/mcneillm/Documents/Projects/esp32-app-foundation/.pio-mcp-workspace/logs/build/build-2026-05-21T18-42-39-802Z-5dd3c7f1.log\"\n  ]\n}"
+        }
+      ]
+    }
+  },
+  {
+    "id": "b19bb010-e5ec-4cd2-a699-446e7daf896f",
+    "commandDesc": "MCP Tool: check_task_status",
+    "timestamp": 1779389030638,
+    "status": "success",
+    "tasks": [],
+    "mcpRequest": {
+      "taskId": "6ad01415-f0c3-4a05-a7dc-758ac9d33110"
+    },
+    "mcpToolName": "check_task_status",
+    "mcpResponse": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"status\": \"success\",\n  \"targetStatus\": \"failed\",\n  \"taskId\": \"6ad01415-f0c3-4a05-a7dc-758ac9d33110\",\n  \"logPaths\": [],\n  \"output\": \"Task ID not found: 6ad01415-f0c3-4a05-a7dc-758ac9d33110\"\n}"
         }
       ]
     }
