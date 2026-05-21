@@ -41,7 +41,7 @@ All code must be authored fresh; no copying wholesale from `departures-board`, t
 | WO3 | **✅ MERGED** | ~~`pr-02-wo3-keymanager`~~ → `pr-02-kernel-services` | [wo3-keymanager/WORKORDER.md](wo3-keymanager/WORKORDER.md) |
 | WO4 | **✅ MERGED (HW Pending)** | ~~`pr-02-wo4-wifimanager`~~ → `pr-02-kernel-services` | [wo4-wifimanager/WORKORDER.md](wo4-wifimanager/WORKORDER.md) |
 | WO5 | **✅ MERGED** | ~~`pr-02-wo5-timemanager`~~ → `pr-02-kernel-services` | [wo5-timemanager/WORKORDER.md](wo5-timemanager/WORKORDER.md) |
-| WO6 | QUEUED | `pr-02-wo6-otaupdatemanager` | [wo6-otaupdatemanager/WORKORDER.md](wo6-otaupdatemanager/WORKORDER.md) |
+| WO6 | **✅ MERGED (HW Pending)** | ~~`pr-02-wo6-otaupdatemanager`~~ → `pr-02-kernel-services` | [wo6-otaupdatemanager/WORKORDER.md](wo6-otaupdatemanager/WORKORDER.md) |
 
 ---
 
