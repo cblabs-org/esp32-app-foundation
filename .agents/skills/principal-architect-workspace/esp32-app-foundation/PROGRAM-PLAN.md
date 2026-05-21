@@ -336,16 +336,22 @@ pr-03-data-infra  ────────────────────�
     ▼                                                        ▼    ▼ ▼
 pr-04-web-portal  ◄── (depends on 01, 02, 03)          pr-05-display-module
     │                                                        │
+    │                                                        ▼
+    │                                               pr-05a-widget-toolkit
+    │                                                        │
     └──────────────────┐                                     │
                        ▼                                     ▼
-                pr-06-build-infra  ◄── (depends on 01–05)
+               pr-05b-mcp-server  ◄── (depends on 01–04, optional 05a)
+                       │
+                       ▼
+                pr-06-build-infra  ◄── (depends on 01–05b)
                        │
                        ▼
                 pr-07-template-scaffold  ◄── (depends on all)
 ```
 
-**Critical Path:** `01 → 02 → 03 → 04 → 06 → 07`  
-**Parallel Opportunity:** `pr-05-display-module` runs alongside `pr-04` once `pr-03` merges.
+**Critical Path:** `01 → 02 → 03 → 05 → 05a → 06 → 07`  
+**Parallel Opportunity:** `pr-05b-mcp-server` can run alongside `pr-05a` once `pr-04` merges.
 
 ---
 
@@ -519,10 +525,100 @@ extraction to its own repo/submodule when appropriate.
 
 ---
 
+### PR-05a: Widget Toolkit {#pr-05a}
+
+**Branch:** `pr-05a-widget-toolkit`  
+**Depends on:** PR-05  
+**Blocks:** PR-06  
+**Estimated WOs:** 3
+
+**Scope:**
+Composable UI widget system for U8G2 displays. Provides the building blocks that
+boards use to construct their layouts. Mined from departures-board's proven widget
+architecture, authored fresh for the foundation.
+
+**Architecture:**
+- `iGfxWidget` — abstract base class (position, size, visibility, `tick`/`render`/`renderAnimationUpdate`)
+- `drawingPrimitives` — stateless U8G2 utility wrappers (`drawText` with alignment/truncation, `blankArea`, `drawTriangle`)
+- `U8g2StateSaver` — RAII scope guard preserving font, clip window, draw color
+- `iBoardLayout` — abstract view interface decoupling rendering from board controller logic
+
+**Three tiers of widgets:**
+
+| Tier | Widgets | Notes |
+|---|---|---|
+| Primitives | `iGfxWidget`, `drawingPrimitives`, `U8g2StateSaver` | Zero dependencies beyond U8G2 |
+| Generic widgets | `labelWidget`, `scrollingTextWidget`, `clockWidget`, `progressBarWidget`, `imageWidget` | Reusable by any app |
+| Module-aware widgets | `wifiStatusWidget`, `systemMessageWidget`, `scrollingMessagePoolWidget` | Depend on framework services (EventBus, WiFi state) |
+
+**Reference mining:** `departures-board/modules/displayManager/widgets/` — all widget implementations.
+Mine the interfaces and math, author fresh. Do NOT carry over `trainFormationWidget`, `weatherWidget`,
+`locationAndFiltersWidget`, `serviceListWidget` — those are app-specific.
+
+**Sketch WOs:**
+| WO | Topic |
+|---|---|
+| WO1 | `iGfxWidget` base, `drawingPrimitives`, `U8g2StateSaver`, `iBoardLayout` interface, font management |
+| WO2 | Generic widgets: `labelWidget`, `scrollingTextWidget`, `clockWidget`, `progressBarWidget`, `imageWidget` |
+| WO3 | Module-aware widgets: `wifiStatusWidget`, `systemMessageWidget`, `scrollingMessagePoolWidget` + refactor system boards to compose from widgets |
+
+---
+
+### PR-05b: MCP Server {#pr-05b}
+
+**Branch:** `pr-05b-mcp-server`  
+**Depends on:** PR-01, PR-02, PR-03, PR-04  
+**Blocks:** PR-06  
+**Estimated WOs:** 3
+
+**Scope:**
+Foundation-level MCP (Model Context Protocol) server providing device telemetry,
+configuration, and control via JSON-RPC. Follows the same extensibility pattern
+as the web portal (`IWebContributor`) — apps and modules register their own tools
+via a new `IMcpContributor` interface.
+
+**Architecture:**
+- `include/interfaces/IMcpContributor.hpp` — extension interface for registering MCP tools
+- `modules/mcpServer/mcpServer.hpp/.cpp` — JSON-RPC server (Serial transport, extensible to WebSocket)
+- Application hub wiring: `registerMcpContributor()`
+
+**Foundation-level tools (built-in):**
+
+| Tool | Description |
+|---|---|
+| `system_info` | Heap, uptime, chip info, AppState, firmware version |
+| `get_config` / `set_config` | Read/write via configManager |
+| `reboot` | Controlled restart |
+| `get_logs` | Recent log buffer query |
+| `capture_display` | Display buffer snapshot (if u8g2Display registered) |
+| `list_tools` | Introspection — enumerate all registered tools |
+
+**Extension pattern (app-side):**
+```cpp
+class MyDataSource : public IMcpContributor {
+    void registerMcpTools(McpToolRegistry& registry) override {
+        registry.addTool("get_departures", [this](JsonObject& params) { ... });
+    }
+};
+```
+
+**Reference mining:** `departures-board/modules/mcpServer/` — JSON-RPC patterns.
+Mine the transport and dispatch architecture, author fresh. Extract only the
+generic device tools; departures-specific tools stay app-side.
+
+**Sketch WOs:**
+| WO | Topic |
+|---|---|
+| WO1 | `IMcpContributor` interface + `McpToolRegistry` + `mcpServer` skeleton (Serial JSON-RPC transport) |
+| WO2 | Built-in tools: `system_info`, `get_config`/`set_config`, `reboot`, `get_logs`, `list_tools` |
+| WO3 | `capture_display` tool + Application hub wiring (`registerMcpContributor`) + native unit tests |
+
+---
+
 ### PR-06: Build Infrastructure {#pr-06}
 
 **Branch:** `pr-06-build-infra`  
-**Depends on:** PR-01 through PR-05  
+**Depends on:** PR-01 through PR-05b  
 **Blocks:** PR-07  
 **Estimated WOs:** 3
 
@@ -585,11 +681,14 @@ wire a new application into the framework via git submodule. NOT a separate repo
 | OTA pipeline | `modules/otaUpdateManager/` | GitHub HTTPS, streaming MD5, rollback |
 | Background fetches | `modules/dataManager/` | FreeRTOS task, queue pattern |
 | Display carousel | `modules/displayManager/` | Board slot pool, rotation timer |
+| **Widget toolkit** | `modules/displayManager/widgets/` | `iGfxWidget`, `drawingPrimitives`, all generic widgets |
+| **Board layouts** | `modules/displayManager/boards/interfaces/` | `iBoardLayout` MVC pattern |
 | Crypto engine | `lib/deviceCrypto/` | Hardware key derivation, AES-256 |
 | Logger | `lib/logger/` | ESP-IDF wrapper, secret redaction |
 | GitHub HTTPS client | `lib/githubClient/` | Certificate validation |
 | Web portal UI | `web/index.html` | Portal UX patterns |
 | Web server routes | `modules/webServer/` | ESPAsyncWebServer handler patterns |
+| **MCP server** | `modules/mcpServer/` | JSON-RPC transport, tool dispatch |
 
 **Do NOT carry over:**
 - `MessagePool` → use `EventBus.publish("display.message", ...)`
@@ -597,6 +696,7 @@ wire a new application into the framework via git submodule. NOT a separate repo
 - `weatherClient`/`rssClient` in the kernel → optional modules only
 - `schedulerManager` in the kernel → optional module
 - Fixed `MAX_BOARDS` arrays → `std::vector` two-tier model
+- `trainFormationWidget`/`weatherWidget`/`serviceListWidget` → app-specific widgets, not foundation
 
 ---
 
@@ -608,8 +708,10 @@ wire a new application into the framework via git submodule. NOT a separate repo
 | 2 — Core Services | PR-02 | Begin immediately after Phase 1 merges |
 | 3 — Infrastructure | PR-03 | Blocked by PR-02 |
 | 4 — Features | PR-04 + PR-05 in parallel | Blocked by PR-03; no file overlap |
+| 4a — Enhancement | PR-05a (widget toolkit) | Blocked by PR-05 |
+| 4b — Enhancement | PR-05b (MCP server) | Blocked by PR-04; parallel with PR-05a |
 | 5 — Finalization | PR-06 then PR-07 | PR-06 validates CI; PR-07 creates template |
 
 ---
 
-*Chief Architect Program Plan — ESP32 App Foundation — 2026-05-21 (rev 2)*
+*Chief Architect Program Plan — ESP32 App Foundation — 2026-05-21 (rev 5 — added PR-05a widget toolkit + PR-05b MCP server)*
