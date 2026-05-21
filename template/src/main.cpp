@@ -15,8 +15,8 @@
  * - loop(): Arduino framework main loop.
  */
 
+#include "AppFoundation.h"
 #include <Arduino.h>
-#include "application/Application.hpp"
 #include "myApp.hpp"
 
 Application app;
