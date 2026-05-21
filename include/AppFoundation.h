@@ -42,3 +42,4 @@
 
 // Application hub
 #include "../modules/application/Application.hpp"
+#include "../modules/timeManager/timeManager.hpp"
