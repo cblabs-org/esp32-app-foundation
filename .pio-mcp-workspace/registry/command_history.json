@@ -184,5 +184,73 @@
         }
       ]
     }
+  },
+  {
+    "id": "3a6734ed-be11-4278-92f1-1a51eee5d943",
+    "commandDesc": "MCP Tool: build_project",
+    "timestamp": 1779360896061,
+    "status": "success",
+    "tasks": [
+      {
+        "taskId": "3de1f2ba-404c-4dc3-bd7c-bdceeaf11bfc",
+        "type": "build",
+        "status": "success",
+        "logPaths": [
+          "/Users/mcneillm/Documents/Projects/esp32-app-foundation/.pio-mcp-workspace/logs/build/build-2026-05-21T10-54-56-068Z-040d1d8c.log"
+        ],
+        "pid": 91562,
+        "commandDesc": "pio run --environment esp32dev",
+        "exitCode": 0
+      }
+    ],
+    "mcpRequest": {
+      "background": true,
+      "environment": "esp32dev",
+      "projectDir": "/Users/mcneillm/Documents/Projects/esp32-app-foundation"
+    },
+    "mcpToolName": "build_project",
+    "mcpResponse": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"status\": \"running\",\n  \"message\": \"Task dispatched to background.\",\n  \"pid\": 91562,\n  \"taskId\": \"3a6734ed-be11-4278-92f1-1a51eee5d943\",\n  \"logPaths\": [\n    \"/Users/mcneillm/Documents/Projects/esp32-app-foundation/.pio-mcp-workspace/logs/build/build-2026-05-21T10-54-56-068Z-040d1d8c.log\"\n  ]\n}"
+        }
+      ]
+    }
+  },
+  {
+    "id": "44d1594d-f7bc-4c6a-b6f4-b586edbf6706",
+    "commandDesc": "MCP Tool: build_project",
+    "timestamp": 1779360896199,
+    "status": "error",
+    "tasks": [],
+    "mcpRequest": {
+      "background": true,
+      "environment": "esp32s3nano",
+      "projectDir": "/Users/mcneillm/Documents/Projects/esp32-app-foundation"
+    },
+    "mcpToolName": "build_project",
+    "mcpResponse": {
+      "error": "Failed to build project: Error: A build is already actively running for this project."
+    }
+  },
+  {
+    "id": "2e36631c-3724-4d4d-b951-ba8c82e16d4b",
+    "commandDesc": "MCP Tool: check_task_status",
+    "timestamp": 1779360903364,
+    "status": "success",
+    "tasks": [],
+    "mcpRequest": {
+      "taskId": "3a6734ed-be11-4278-92f1-1a51eee5d943"
+    },
+    "mcpToolName": "check_task_status",
+    "mcpResponse": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"status\": \"success\",\n  \"targetStatus\": \"failed\",\n  \"taskId\": \"3a6734ed-be11-4278-92f1-1a51eee5d943\",\n  \"logPaths\": [],\n  \"output\": \"Task ID not found: 3a6734ed-be11-4278-92f1-1a51eee5d943\"\n}"
+        }
+      ]
+    }
   }
 ]

@@ -114,13 +114,19 @@ bool Application::begin(const FrameworkConfig& config) {
         }
     }
 
-    // --- Step 9: DataManager and EventBus begin() stubs (PR-03) ---
-    // TODO: dataManager.begin();
-    // TODO: eventBus.begin();
+    // --- Step 9: DataManager and EventBus begin() ---
+    _dataManager.begin();
+    _eventBus.begin();
 
     // --- Step 10: Lock all registration vectors ---
     // No further registrations are permitted after this point.
     _compactAndLock();
+
+    // Publish system heap event
+#ifndef NATIVE_BUILD
+    uint32_t freeHeap = heap_caps_get_free_size(MALLOC_CAP_8BIT);
+    _eventBus.publish("system.heap", &freeHeap);
+#endif
 
     // --- Step 11: Log heap figures ---
     _reportHeap();
@@ -141,6 +147,11 @@ bool Application::begin(const FrameworkConfig& config) {
 void Application::tick() {
     // Guard: do not tick until fully running
     if (_state != AppState::RUNNING) return;
+
+#ifdef NATIVE_BUILD
+    // In native builds, drive DataManager synchronously for tests
+    _dataManager.processNext();
+#endif
 
     // Dispatch to all registered tickables in registration order
     for (auto* module : _tickables) {
@@ -249,6 +260,18 @@ bool Application::registerDataSource(iDataSource* source) {
     }
     _dataSources.push_back(source);
     return true;
+}
+
+// ---------------------------------------------------------------------------
+// Core Services Accessors
+// ---------------------------------------------------------------------------
+
+EventBus& Application::getEventBus() {
+    return _eventBus;
+}
+
+DataManager& Application::getDataManager() {
+    return _dataManager;
 }
 
 // ---------------------------------------------------------------------------

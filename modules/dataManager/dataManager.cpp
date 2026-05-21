@@ -15,6 +15,8 @@
 
 #ifndef NATIVE_BUILD
 #include <Arduino.h>
+#undef HIGH
+#undef LOW
 #endif
 
 /**

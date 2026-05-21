@@ -37,6 +37,9 @@
 #include "interfaces/IStatusReporter.hpp"
 #include "interfaces/IWebContributor.hpp"
 
+#include "../eventBus/EventBus.hpp"
+#include "../dataManager/dataManager.hpp"
+
 /**
  * @brief Composition root for the ESP32 App Foundation framework.
  *
@@ -140,6 +143,22 @@ public:
     bool registerDataSource(iDataSource* source);
 
     // -------------------------------------------------------------------------
+    // Core Services Accessors
+    // -------------------------------------------------------------------------
+
+    /**
+     * @brief Get the application's EventBus instance.
+     * @return Reference to the EventBus.
+     */
+    EventBus& getEventBus();
+
+    /**
+     * @brief Get the application's DataManager instance.
+     * @return Reference to the DataManager.
+     */
+    DataManager& getDataManager();
+
+    // -------------------------------------------------------------------------
     // State Accessors
     // -------------------------------------------------------------------------
 
@@ -190,5 +209,21 @@ private:
     std::vector<iDataSource*>     _dataSources;     ///< Background data-fetch workers
 
     // Single-pointer registrations (no vector needed)
-    IStatusReporter* _statusReporter = nullptr;     ///< Display adapter for boot-phase status overlays
+    
+    /**
+     * @brief Silent fallback reporter used when no display is registered.
+     */
+    class NullStatusReporter : public IStatusReporter {
+    public:
+        void reportStatus(const char* /*message*/, float /*progress*/ = -1.0f) override {}
+        void reportError(const char* /*errorMessage*/) override {}
+        void clearStatus() override {}
+    };
+
+    NullStatusReporter _nullReporter;                               ///< Fallback status reporter instance
+    IStatusReporter* _statusReporter = &_nullReporter;              ///< Display adapter for boot-phase status overlays
+
+    // Core services
+    EventBus _eventBus;           ///< Central event bus
+    DataManager _dataManager;     ///< Background data manager
 };
