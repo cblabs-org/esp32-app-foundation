@@ -114,9 +114,10 @@ bool Application::begin(const FrameworkConfig& config) {
         }
     }
 
-    // --- Step 9: DataManager and EventBus begin() ---
+    // --- Step 9: Core services begin() ---
     _dataManager.begin();
     _eventBus.begin();
+    _webServerManager.begin(_webContributors);
 
     // --- Step 10: Lock all registration vectors ---
     // No further registrations are permitted after this point.
@@ -272,6 +273,10 @@ EventBus& Application::getEventBus() {
 
 DataManager& Application::getDataManager() {
     return _dataManager;
+}
+
+WebServerManager& Application::getWebServerManager() {
+    return _webServerManager;
 }
 
 // ---------------------------------------------------------------------------

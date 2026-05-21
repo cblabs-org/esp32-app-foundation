@@ -39,6 +39,7 @@
 
 #include "../eventBus/EventBus.hpp"
 #include "../dataManager/dataManager.hpp"
+#include "../webServer/webServer.hpp"
 
 /**
  * @brief Composition root for the ESP32 App Foundation framework.
@@ -158,6 +159,12 @@ public:
      */
     DataManager& getDataManager();
 
+    /**
+     * @brief Get the application's WebServerManager instance.
+     * @return Reference to the WebServerManager.
+     */
+    WebServerManager& getWebServerManager();
+
     // -------------------------------------------------------------------------
     // State Accessors
     // -------------------------------------------------------------------------
@@ -226,4 +233,5 @@ private:
     // Core services
     EventBus _eventBus;           ///< Central event bus
     DataManager _dataManager;     ///< Background data manager
+    WebServerManager _webServerManager; ///< Local HTTP Server
 };
