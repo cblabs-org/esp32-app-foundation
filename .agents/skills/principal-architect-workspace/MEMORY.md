@@ -26,8 +26,9 @@ by Principal Architects under the ESP32 App Foundation program.
 | [pr-05a-widget-toolkit](./pr-05a-widget-toolkit/PROJECT.md) | Widget Toolkit (Composable UI for U8G2 displays) | 🔄 **IN PROGRESS** | Session 21161294 |
 | [pr-05b-mcp-server](./pr-05b-mcp-server/PROJECT.md) | MCP Server (JSON-RPC device telemetry + control) | 🔄 **IN PROGRESS** | Session 0ef5f49d |
 | [pr-06-build-infra](./esp32-app-foundation/PROGRAM-PLAN.md#pr-06) | Build Infrastructure (Scripts, PlatformIO, CI) | QUEUED | — |
+| [pr-05c-test-hardening](./pr-05c-test-hardening/PROJECT.md) | Test Hardening (Coverage expansion across all modules) | 🔄 **IN PROGRESS** | Session (current) |
 | [pr-07-template-repo](./esp32-app-foundation/PROGRAM-PLAN.md#pr-07) | App Template Repository | QUEUED | — |
 
 ---
 
-*Updated by Chief Architect — 2026-05-21*
+*Updated by Principal Architect — PR-05c — 2026-05-21*
