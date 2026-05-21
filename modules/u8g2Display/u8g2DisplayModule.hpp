@@ -15,27 +15,38 @@
  *              Error, Screensaver) can bypass the carousel via showBoard().
  *              Owns all system board instances and activates the splash on begin().
  *
+ *              Implements IStatusReporter by delegating to LoadingBoard and
+ *              ErrorBoard. Subscribes to EventBus topics "ota.progress" and
+ *              "display.message" for runtime event integration. Implements
+ *              iConfigurable for persistent display settings at /mod/display.json.
+ *
  * Exported Classes:
+ * - OtaProgressPayload:      EventBus payload struct for OTA progress events
+ * - DisplayMessagePayload:   EventBus payload struct for display message events
  * - U8g2DisplayModule: Display carousel engine and board slot pool
- *   - begin():          Initialize hardware, apply settings, lock the board pool
- *   - tick():           Carousel rotation, sleep check, render current board
- *   - addBoard():       Pre-lock registration of boards into the carousel pool
- *   - showBoard():      Force-show a specific board (bypasses carousel timer)
- *   - resetActivity():  Reset the inactivity timer (called on user interaction)
- *   - getBoardCount():  Return the number of registered boards in the pool
- *   - getActiveBoard(): Return the currently rendering board (or nullptr)
- *   - getBootSplash():  Return reference to the owned BootSplashBoard instance
- *   - getLoading():     Return reference to the owned LoadingBoard instance
- *   - getWifiWizard():  Return reference to the owned WiFiWizardBoard instance
- *   - getOtaProgress(): Return reference to the owned OtaProgressBoard instance
- *   - getError():       Return reference to the owned ErrorBoard instance
- *   - getScreensaver(): Return reference to the owned ScreensaverBoard instance
- *   - reportStatus():   IStatusReporter stub (empty body — WO3)
- *   - reportError():    IStatusReporter stub (empty body — WO3)
- *   - clearStatus():    IStatusReporter stub (empty body — WO3)
- *   - loadConfig():     iConfigurable stub (returns true — WO4)
- *   - saveConfig():     iConfigurable stub (returns true — WO4)
- *   - resetConfig():    iConfigurable stub (no-op — WO4)
+ *   - begin():              Initialize hardware, subscribe to EventBus, lock pool
+ *   - tick():               Carousel rotation, sleep check, render current board
+ *   - addBoard():           Pre-lock registration of boards into the carousel pool
+ *   - showBoard():          Force-show a specific board (bypasses carousel timer)
+ *   - resetActivity():      Reset the inactivity timer (called on user interaction)
+ *   - getBoardCount():      Return the number of registered boards in the pool
+ *   - getActiveBoard():     Return the currently rendering board (or nullptr)
+ *   - getBootSplash():      Return reference to the owned BootSplashBoard instance
+ *   - getLoading():         Return reference to the owned LoadingBoard instance
+ *   - getWifiWizard():      Return reference to the owned WiFiWizardBoard instance
+ *   - getOtaProgress():     Return reference to the owned OtaProgressBoard instance
+ *   - getError():           Return reference to the owned ErrorBoard instance
+ *   - getScreensaver():     Return reference to the owned ScreensaverBoard instance
+ *   - reportStatus():       Delegate to LoadingBoard and show it
+ *   - reportError():        Delegate to ErrorBoard (fatal) and show it
+ *   - clearStatus():        Mark LoadingBoard complete, advance if showing it
+ *   - loadConfig():         Load display settings from /mod/display.json (LittleFS)
+ *   - saveConfig():         Persist display settings to /mod/display.json (LittleFS)
+ *   - resetConfig():        Restore factory defaults and persist
+ *   - setBrightness():      Runtime brightness adjustment (0–255)
+ *   - setFlipScreen():      Runtime screen flip toggle
+ *   - setSleepTimeout():    Runtime sleep timeout adjustment
+ *   - setRotationInterval(): Runtime carousel rotation interval adjustment
  */
 
 #pragma once
@@ -56,11 +67,40 @@
 // --- Hardware-only includes (excluded from native GoogleTest builds) ---
 #ifndef NATIVE_BUILD
 #include <U8g2lib.h>
+#include <ArduinoJson.h>
 #endif
 
 // --- Forward declarations (no header dependency in this WO) ---
 class EventBus;
 class Application;
+
+// ---------------------------------------------------------------------------
+// EventBus Payload Structs
+// ---------------------------------------------------------------------------
+
+/**
+ * @brief EventBus payload for "ota.progress" topic.
+ *
+ * Published by the OTA manager during firmware update cycles. The display
+ * module subscribes and delegates to OtaProgressBoard.
+ */
+struct OtaProgressPayload {
+    float progress;       // 0.0 to 1.0 download fraction
+    const char* status;   // Status message (e.g. "Downloading...")
+    bool complete;        // True when OTA cycle is finished
+    bool success;         // True if OTA succeeded (only valid when complete)
+};
+
+/**
+ * @brief EventBus payload for "display.message" topic.
+ *
+ * Published by any module that wants to temporarily display a message
+ * on the loading screen overlay.
+ */
+struct DisplayMessagePayload {
+    const char* message;       // Text to display
+    unsigned long durationMs;  // How long to display (0 = until cleared)
+};
 
 // ---------------------------------------------------------------------------
 // Default U8G2 driver type — apps override this via build_flags
@@ -76,12 +116,15 @@ class Application;
  * @brief U8G2 monochrome display module with carousel engine and board slot pool.
  *
  * Implements ITickable for main-loop rendering, IStatusReporter for boot-phase
- * status overlays (stubbed in this WO), and iConfigurable for persistent
- * settings (stubbed in this WO).
+ * status overlays (delegates to LoadingBoard/ErrorBoard), and iConfigurable
+ * for persistent display settings via /mod/display.json on LittleFS.
  *
  * The board slot pool is a std::vector<IDisplayBoard*> that accepts registrations
  * via addBoard() before begin() locks the pool. The carousel engine rotates
  * through registered boards at a configurable interval.
+ *
+ * Subscribes to EventBus topics "ota.progress" and "display.message" for
+ * runtime integration with other framework modules.
  */
 class U8g2DisplayModule : public ITickable, public IStatusReporter, public iConfigurable {
 public:
@@ -90,13 +133,13 @@ public:
     // -------------------------------------------------------------------------
 
     /**
-     * @brief Initialize hardware, apply flip/brightness, and lock the board pool.
+     * @brief Initialize hardware, subscribe to EventBus, and lock the board pool.
      *
      * After this call, addBoard() will reject new registrations. The U8G2
-     * driver is started, contrast and flip mode are applied, and the inactivity
-     * timer is reset.
+     * driver is started, contrast and flip mode are applied, EventBus
+     * subscriptions are registered, and the inactivity timer is reset.
      *
-     * @param app Reference to the Application composition root (cached for WO4).
+     * @param app Reference to the Application composition root.
      */
     void begin(Application& app);
 
@@ -195,30 +238,99 @@ public:
     ScreensaverBoard& getScreensaver();
 
     // -------------------------------------------------------------------------
-    // IStatusReporter stubs (empty body — implementation deferred to WO2/3)
+    // IStatusReporter — delegates to LoadingBoard and ErrorBoard
     // -------------------------------------------------------------------------
 
-    /** @brief Stub — no-op in this WO. */
+    /**
+     * @brief Report a status message with optional progress.
+     *
+     * Delegates to LoadingBoard::setStatus(), shows the loading board if not
+     * already active, and resets the inactivity timer.
+     *
+     * @param message  Null-terminated status text.
+     * @param progress Fractional progress [0.0, 1.0]; negative = indeterminate.
+     */
     void reportStatus(const char* message, float progress = -1.0f) override;
 
-    /** @brief Stub — no-op in this WO. */
+    /**
+     * @brief Report a fatal error message.
+     *
+     * Delegates to ErrorBoard::showError() with fatal=true, shows the error
+     * board, and resets the inactivity timer.
+     *
+     * @param errorMessage Null-terminated error description.
+     */
     void reportError(const char* errorMessage) override;
 
-    /** @brief Stub — no-op in this WO. */
+    /**
+     * @brief Clear the status overlay.
+     *
+     * Marks LoadingBoard as complete. If the loading board is currently
+     * showing, advances the carousel to the next board.
+     */
     void clearStatus() override;
 
     // -------------------------------------------------------------------------
-    // iConfigurable stubs (return defaults — implementation deferred to WO4)
+    // iConfigurable — persistent display settings at /mod/display.json
     // -------------------------------------------------------------------------
 
-    /** @brief Stub — returns true (no config to load yet). */
+    /**
+     * @brief Load display settings from /mod/display.json on LittleFS.
+     *
+     * Reads brightness, flipScreen, sleepTimeout, and rotationInterval from
+     * JSON. Applies defaults if keys are missing. In NATIVE_BUILD, returns
+     * true without file I/O.
+     *
+     * @return true if config loaded or defaults applied; false on parse error.
+     */
     bool loadConfig() override;
 
-    /** @brief Stub — returns true (no config to persist yet). */
+    /**
+     * @brief Persist display settings to /mod/display.json on LittleFS.
+     *
+     * Serializes brightness, flipScreen, sleepTimeout, and rotationInterval
+     * to JSON. Creates the /mod/ directory if needed. In NATIVE_BUILD,
+     * returns true without file I/O.
+     *
+     * @return true if successfully saved.
+     */
     bool saveConfig() override;
 
-    /** @brief Stub — no-op (no config to reset yet). */
+    /**
+     * @brief Reset display settings to factory defaults and persist.
+     *
+     * Sets: brightness=255, flipScreen=false, sleepTimeout=300000ms,
+     * rotationInterval=8000ms. Applies hardware settings and calls saveConfig().
+     */
     void resetConfig() override;
+
+    // -------------------------------------------------------------------------
+    // Runtime display configuration setters
+    // -------------------------------------------------------------------------
+
+    /**
+     * @brief Set the display brightness and apply to hardware.
+     * @param brightness Brightness level (0–255).
+     */
+    void setBrightness(uint8_t brightness);
+
+    /**
+     * @brief Set the screen flip mode and apply to hardware.
+     * @param flip True to flip the display 180 degrees.
+     */
+    void setFlipScreen(bool flip);
+
+    /**
+     * @brief Set the inactivity sleep timeout.
+     * @param timeoutMs Timeout in milliseconds (0 = sleep disabled).
+     */
+    void setSleepTimeout(unsigned long timeoutMs);
+
+    /**
+     * @brief Set the carousel rotation interval.
+     * @param intervalMs Interval in milliseconds between board rotations.
+     */
+    void setRotationInterval(unsigned long intervalMs);
 
 private:
     // -------------------------------------------------------------------------
@@ -260,6 +372,26 @@ private:
     void _sleep();
 
     // -------------------------------------------------------------------------
+    // Private EventBus callback statics
+    // -------------------------------------------------------------------------
+
+    /**
+     * @brief Static callback for "ota.progress" EventBus topic.
+     * @param topic The topic string ("ota.progress").
+     * @param payload Pointer to an OtaProgressPayload struct.
+     * @param ctx Context pointer (this U8g2DisplayModule instance).
+     */
+    static void _onOtaProgress(const char* topic, const void* payload, void* ctx);
+
+    /**
+     * @brief Static callback for "display.message" EventBus topic.
+     * @param topic The topic string ("display.message").
+     * @param payload Pointer to a DisplayMessagePayload struct.
+     * @param ctx Context pointer (this U8g2DisplayModule instance).
+     */
+    static void _onDisplayMessage(const char* topic, const void* payload, void* ctx);
+
+    // -------------------------------------------------------------------------
     // Member variables
     // -------------------------------------------------------------------------
 
@@ -268,7 +400,7 @@ private:
     U8G2_DISPLAY_TYPE _u8g2;                      ///< The U8G2 hardware driver instance
 #endif
 
-    Application* _app = nullptr;                   ///< Cached reference to Application hub (for WO4 EventBus access)
+    Application* _app = nullptr;                   ///< Cached reference to Application hub (for EventBus access)
 
     // --- Board slot pool ---
     std::vector<IDisplayBoard*> _boards;           ///< Carousel board pool — populated before begin()
