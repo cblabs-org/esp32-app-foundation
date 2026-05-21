@@ -12,4 +12,4 @@ This PR establishes:
 
 - [x] WO1: `EventBus`
 - [x] WO2: `dataManager`
-- [ ] WO3: `NullStatusReporter` + App Hub Wiring
+- [x] WO3: `NullStatusReporter` + App Hub Wiring
