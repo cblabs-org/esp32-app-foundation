@@ -1,0 +1,42 @@
+/*
+ * ESP32 App Foundation (c) 2026 CB Labs
+ *
+ * https://github.com/matthewmcneill/esp32-app-foundation
+ *
+ * This work is licensed under Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International.
+ * To view a copy of this license, visit https://creativecommons.org/licenses/by-nc-sa/4.0/
+ *
+ * Module: modules/mcpServer/mcpBuiltinTools.hpp
+ * Description: Declaration of the built-in MCP tool registration function.
+ *              These foundation-level tools (system_info, get_config, set_config,
+ *              reboot, get_logs, list_tools) are always available regardless of
+ *              which application uses the framework. The McpServer calls
+ *              registerAll() during begin() before any contributor registration.
+ *
+ * Exported Functions:
+ * - mcpBuiltinTools::registerAll(): Register all foundation-level MCP tools
+ */
+
+#pragma once
+
+// Forward declarations — avoid pulling in full headers for interface-only usage
+class McpToolRegistry;
+class ConfigManager;
+
+/**
+ * @brief Namespace containing built-in MCP tool registration.
+ *
+ * Foundation-level tools are registered into the McpToolRegistry before any
+ * IMcpContributor modules, ensuring they are always available for system
+ * introspection and management.
+ */
+namespace mcpBuiltinTools {
+
+    /**
+     * @brief Register all foundation-level MCP tools into the registry.
+     * @param registry      The McpToolRegistry to register tools into.
+     * @param configManager Pointer to the ConfigManager (nullable if unavailable).
+     */
+    void registerAll(McpToolRegistry& registry, ConfigManager* configManager);
+
+} // namespace mcpBuiltinTools

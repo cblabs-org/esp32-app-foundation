@@ -9,13 +9,16 @@
  * Module: modules/mcpServer/mcpServer.hpp
  * Description: MCP (Model Context Protocol) JSON-RPC 2.0 server skeleton that
  *              reads line-delimited JSON from Serial and dispatches to registered
- *              tool handlers via the McpToolRegistry. On hardware, tick() reads
- *              characters from Serial; in NATIVE_BUILD, a mock Serial class is
- *              provided so the module compiles for the native test runner.
+ *              tool handlers via the McpToolRegistry. Built-in foundation tools
+ *              are registered first via mcpBuiltinTools::registerAll(), then
+ *              contributor tools are collected from IMcpContributor modules.
+ *              On hardware, tick() reads characters from Serial; in NATIVE_BUILD,
+ *              a mock Serial class is provided so the module compiles for the
+ *              native test runner.
  *
  * Exported Functions/Classes:
  * - McpServer: MCP JSON-RPC server over Serial transport
- *   - begin():  Collect tools from all IMcpContributor modules and start serving
+ *   - begin():  Register built-in tools, collect contributor tools, and start serving
  *   - tick():   Poll Serial for incoming JSON-RPC lines (hardware only)
  */
 
@@ -102,8 +105,9 @@
 
 #include "mcpToolRegistry.hpp"
 
-// Forward-declare to avoid pulling in the full interface header
+// Forward-declare to avoid pulling in the full headers
 class IMcpContributor;
+class ConfigManager;
 
 /**
  * @brief MCP JSON-RPC 2.0 server with Serial line-delimited transport.
@@ -115,10 +119,11 @@ class IMcpContributor;
 class McpServer {
 public:
     /**
-     * @brief Initialise the MCP server: register all contributor tools.
-     * @param contributors List of IMcpContributor pointers to collect tools from.
+     * @brief Initialise the MCP server: register built-in and contributor tools.
+     * @param contributors   List of IMcpContributor pointers to collect tools from.
+     * @param configManager  Optional pointer to the ConfigManager for config tools.
      */
-    void begin(const std::vector<IMcpContributor*>& contributors);
+    void begin(const std::vector<IMcpContributor*>& contributors, ConfigManager* configManager = nullptr);
 
     /**
      * @brief Poll Serial for incoming data and dispatch complete lines.
@@ -145,6 +150,7 @@ public:
 
 private:
     McpToolRegistry _registry;                    ///< Registered tool collection
+    McpToolRegistry* _registryPtr = nullptr;      ///< Pointer for list_tools lambda capture
     String          _inputBuffer;                 ///< Accumulator for incoming Serial bytes
     bool            _initialized = false;         ///< Guard: begin() must be called first
 
