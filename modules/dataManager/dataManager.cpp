@@ -15,8 +15,6 @@
 
 #ifndef NATIVE_BUILD
 #include <Arduino.h>
-#undef HIGH
-#undef LOW
 #endif
 
 /**
@@ -129,7 +127,7 @@ void DataManager::executeLoop() {
     uint32_t now = getCurrentTimeMs();
     int bestIndex = -1;
     bool foundPriority = false;
-    PriorityTier bestTier = PriorityTier::LOW;
+    PriorityTier bestTier = PriorityTier::PRIORITY_LOW;
     
     for (size_t i = 0; i < registry.size(); ++i) {
         auto& r = registry[i];

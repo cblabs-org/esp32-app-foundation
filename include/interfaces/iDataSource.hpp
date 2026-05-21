@@ -40,9 +40,9 @@ enum class UpdateStatus : uint8_t {
 
 /** @brief Scheduling priority tier for DataManager worker scheduling. */
 enum class PriorityTier : uint8_t {
-    HIGH   = 0, ///< Refresh approximately every 60 seconds
-    MEDIUM = 1, ///< Refresh approximately every 5 minutes
-    LOW    = 2  ///< Refresh approximately every 30 minutes
+    PRIORITY_HIGH   = 0, ///< Refresh approximately every 60 seconds
+    PRIORITY_NORMAL = 1, ///< Refresh approximately every 300 seconds (5 mins)
+    PRIORITY_LOW    = 2  ///< Refresh approximately every 1800 seconds (30 mins)utes
 };
 
 /**

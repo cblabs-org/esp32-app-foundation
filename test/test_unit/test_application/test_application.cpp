@@ -60,7 +60,7 @@ public:
     UpdateStatus fetchUpdate() override               { return UpdateStatus::SUCCESS; }
     uint32_t     getUpdateIntervalMs() const override { return 60000; } // 60 s
     const char*  getSourceName()       const override { return "MockDataSource"; }
-    PriorityTier getPriorityTier()     const override { return PriorityTier::MEDIUM; }
+    PriorityTier getPriorityTier()     const override { return PriorityTier::PRIORITY_NORMAL; }
 };
 
 /** @brief Minimal IStatusReporter mock. */

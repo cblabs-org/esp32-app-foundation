@@ -18,6 +18,10 @@
 
 #include "imageWidget.hpp"
 
+#ifndef NATIVE_BUILD
+#include <U8g2lib.h>
+#endif
+
 /**
  * @brief Initialize the static image widget.
  * @param _x X coordinate (top-left).

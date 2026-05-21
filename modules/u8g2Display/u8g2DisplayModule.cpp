@@ -46,22 +46,10 @@
 #ifndef NATIVE_BUILD
 #include <Arduino.h>
 #include <LittleFS.h>
+#include "../application/Application.hpp"
 #endif
 
 // Include EventBus directly — it is native-safe (no Arduino.h dependency).
-// IMPORTANT: We intentionally do NOT include Application.hpp anywhere in
-// this translation unit. PlatformIO's LDF scanner reads ALL #include
-// directives regardless of preprocessor guards (#ifndef NATIVE_BUILD).
-// Application.hpp → webServer.hpp → portal_assets → Arduino.h breaks
-// native GoogleTest builds. The EventBus subscription in begin() is
-// guarded behind #ifndef NATIVE_BUILD. On hardware, Application.hpp is
-// resolved transitively by the linker from the application module.
-//
-// For hardware builds, we rely on the linker resolving Application's
-// getEventBus() symbol from the separately compiled application module.
-// The compiler sees the full Application definition via the u8g2Display
-// library.json build flag (-I../../include) and the Application module's
-// own header being available in the lib_extra_dirs include path.
 #include "../eventBus/EventBus.hpp"
 
 // =============================================================================

@@ -44,7 +44,7 @@ protected:
 };
 
 TEST_F(DataManagerTest, InitialFetchImmediate) {
-    MockDataSource src("src1", 5000, PriorityTier::LOW);
+    MockDataSource src("src1", 5000, PriorityTier::PRIORITY_LOW);
     dm.registerSource(&src);
     
     dm.processNext();
@@ -56,7 +56,7 @@ TEST_F(DataManagerTest, InitialFetchImmediate) {
 }
 
 TEST_F(DataManagerTest, IntervalScheduling) {
-    MockDataSource src("src1", 2000, PriorityTier::LOW);
+    MockDataSource src("src1", 2000, PriorityTier::PRIORITY_LOW);
     dm.registerSource(&src);
     
     // t=1000 (initial fetch)
@@ -75,8 +75,8 @@ TEST_F(DataManagerTest, IntervalScheduling) {
 }
 
 TEST_F(DataManagerTest, PriorityTierScheduling) {
-    MockDataSource lowSrc("low", 1000, PriorityTier::LOW);
-    MockDataSource highSrc("high", 1000, PriorityTier::HIGH);
+    MockDataSource lowSrc("low", 1000, PriorityTier::PRIORITY_LOW);
+    MockDataSource highSrc("high", 1000, PriorityTier::PRIORITY_HIGH);
     
     dm.registerSource(&lowSrc);
     dm.registerSource(&highSrc);
@@ -101,7 +101,7 @@ TEST_F(DataManagerTest, PriorityTierScheduling) {
 }
 
 TEST_F(DataManagerTest, RequestPriorityFetch) {
-    MockDataSource src("src", 5000, PriorityTier::LOW);
+    MockDataSource src("src", 5000, PriorityTier::PRIORITY_LOW);
     dm.registerSource(&src);
     
     // Initial fetch
@@ -122,7 +122,7 @@ TEST_F(DataManagerTest, RequestPriorityFetch) {
 }
 
 TEST_F(DataManagerTest, UnregisterSource) {
-    MockDataSource src("src", 1000, PriorityTier::LOW);
+    MockDataSource src("src", 1000, PriorityTier::PRIORITY_LOW);
     dm.registerSource(&src);
     
     dm.unregisterSource(&src);
@@ -139,7 +139,7 @@ TEST_F(DataManagerTest, RegisterNullptr) {
 }
 
 TEST_F(DataManagerTest, UnregisterNonExistentSource) {
-    MockDataSource src("src", 1000, PriorityTier::LOW);
+    MockDataSource src("src", 1000, PriorityTier::PRIORITY_LOW);
     // Unregister without registering first, should not crash
     dm.unregisterSource(&src);
     dm.processNext();
@@ -153,7 +153,7 @@ TEST_F(DataManagerTest, UnregisterNullptr) {
 }
 
 TEST_F(DataManagerTest, RequestPriorityOnUnregisteredSource) {
-    MockDataSource src("src", 1000, PriorityTier::LOW);
+    MockDataSource src("src", 1000, PriorityTier::PRIORITY_LOW);
     // Request priority without registering first, should not crash
     dm.requestPriorityFetch(&src);
     dm.processNext();
@@ -161,7 +161,7 @@ TEST_F(DataManagerTest, RequestPriorityOnUnregisteredSource) {
 }
 
 TEST_F(DataManagerTest, DoubleRegistration) {
-    MockDataSource src("src", 5000, PriorityTier::LOW);
+    MockDataSource src("src", 5000, PriorityTier::PRIORITY_LOW);
     dm.registerSource(&src);
     dm.registerSource(&src); // Register second time
     
@@ -175,7 +175,7 @@ TEST_F(DataManagerTest, DoubleRegistration) {
 }
 
 TEST_F(DataManagerTest, RegisterAfterUnregister) {
-    MockDataSource src("src", 5000, PriorityTier::LOW);
+    MockDataSource src("src", 5000, PriorityTier::PRIORITY_LOW);
     dm.registerSource(&src);
     dm.unregisterSource(&src);
     
