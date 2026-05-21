@@ -18,6 +18,7 @@
  */
 
 #include "mcpServer.hpp"
+#include "mcpBuiltinTools.hpp"
 #include "interfaces/IMcpContributor.hpp"
 
 // ---------------------------------------------------------------------------
@@ -48,17 +49,23 @@
  * @brief Collect tools from all IMcpContributor modules and mark the server
  *        as initialised so tick() begins processing.
  */
-void McpServer::begin(const std::vector<IMcpContributor*>& contributors) {
-    // --- Step 1: Collect tools from all contributors ---
+void McpServer::begin(const std::vector<IMcpContributor*>& contributors, ConfigManager* configManager) {
+    // --- Step 1: Register built-in foundation tools ---
+    // These are always available regardless of which app uses the framework.
+    _registryPtr = &_registry;
+    mcpBuiltinTools::registerAll(_registry, configManager);
+
+    // --- Step 2: Collect tools from all contributors ---
     for (auto* contributor : contributors) {
         if (contributor != nullptr) {
             contributor->registerMcpTools(_registry);
         }
     }
 
-    MCP_LOGI("MCP Server started with %zu tools", _registry.size());
+    MCP_LOGI("MCP Server started with %zu tools (%zu built-in)",
+             _registry.size(), _registry.size() - 0);
 
-    // --- Step 2: Mark initialised ---
+    // --- Step 3: Mark initialised ---
     _initialized = true;
 }
 
