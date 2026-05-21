@@ -104,6 +104,7 @@
 #endif
 
 #include "mcpToolRegistry.hpp"
+#include "../../include/interfaces/IWebContributor.hpp"
 
 // Forward-declare to avoid pulling in the full headers
 class IMcpContributor;
@@ -117,7 +118,7 @@ struct FrameworkConfig;
  * during begin() and processes incoming JSON-RPC requests in tick().
  * Supports: initialize, ping, tools/list, tools/call.
  */
-class McpServer {
+class McpServer : public IWebContributor {
 public:
     /**
      * @brief Initialise the MCP server: register built-in and contributor tools.
@@ -148,6 +149,21 @@ public:
      * @return Const reference to the internal McpToolRegistry.
      */
     const McpToolRegistry& getRegistry() const { return _registry; }
+
+    // -----------------------------------------------------------------------
+    // IWebContributor Implementation
+    // -----------------------------------------------------------------------
+    /**
+     * @brief Register the /api/mcp POST route for JSON-RPC over HTTP.
+     * @param server The AsyncWebServer instance to register routes with.
+     */
+    void registerRoutes(AsyncWebServer& server) override;
+
+    /**
+     * @brief The MCP server does not expose a UI tab, so it returns nullptr.
+     * @return nullptr
+     */
+    const char* getTabName() const override { return nullptr; }
 
 #ifdef NATIVE_BUILD
     /**

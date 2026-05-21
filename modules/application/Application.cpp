@@ -117,6 +117,7 @@ bool Application::begin(const FrameworkConfig& config) {
     // --- Step 9: Core services begin() ---
     _dataManager.begin();
     _eventBus.begin();
+    _webContributors.push_back(&_mcpServer);
     _webServerManager.begin(_webContributors);
 
     // MCP server: pass nullptr for configManager — Application does not currently
