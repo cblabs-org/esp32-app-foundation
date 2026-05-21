@@ -9,43 +9,67 @@
  * Module: modules/u8g2Display/u8g2DisplayModule.cpp
  * Description: Implementation of the U8G2 display module with carousel engine,
  *              board slot pool, sleep/wake power management, system board
- *              ownership (BootSplash, Loading, WiFiWizard), and stub
- *              IStatusReporter / iConfigurable methods.
+ *              ownership, IStatusReporter delegation (Loading/Error boards),
+ *              EventBus subscriptions (ota.progress, display.message), and
+ *              iConfigurable persistence at /mod/display.json.
  *
  * Exported Functions:
- * - U8g2DisplayModule::begin():            Hardware init, pool lock, timer reset
- * - U8g2DisplayModule::tick():             Carousel rotation, sleep check, render
- * - U8g2DisplayModule::addBoard():         Pre-lock board registration
- * - U8g2DisplayModule::showBoard():        Force-show a specific board
- * - U8g2DisplayModule::resetActivity():    Reset inactivity timer, wake if sleeping
- * - U8g2DisplayModule::getBoardCount():    Return pool size
- * - U8g2DisplayModule::getActiveBoard():   Return current rendering board or nullptr
- * - U8g2DisplayModule::getBootSplash():    Return reference to BootSplashBoard
- * - U8g2DisplayModule::getLoading():       Return reference to LoadingBoard
- * - U8g2DisplayModule::getWifiWizard():    Return reference to WiFiWizardBoard
- * - U8g2DisplayModule::getOtaProgress():   Return reference to OtaProgressBoard
- * - U8g2DisplayModule::getError():         Return reference to ErrorBoard
- * - U8g2DisplayModule::getScreensaver():   Return reference to ScreensaverBoard
- * - U8g2DisplayModule::reportStatus():     IStatusReporter stub (no-op)
- * - U8g2DisplayModule::reportError():      IStatusReporter stub (no-op)
- * - U8g2DisplayModule::clearStatus():      IStatusReporter stub (no-op)
- * - U8g2DisplayModule::loadConfig():       iConfigurable stub (returns true)
- * - U8g2DisplayModule::saveConfig():       iConfigurable stub (returns true)
- * - U8g2DisplayModule::resetConfig():      iConfigurable stub (no-op)
+ * - U8g2DisplayModule::begin():              Hardware init, EventBus subscribe, pool lock
+ * - U8g2DisplayModule::tick():               Carousel rotation, sleep check, render
+ * - U8g2DisplayModule::addBoard():           Pre-lock board registration
+ * - U8g2DisplayModule::showBoard():          Force-show a specific board
+ * - U8g2DisplayModule::resetActivity():      Reset inactivity timer, wake if sleeping
+ * - U8g2DisplayModule::getBoardCount():      Return pool size
+ * - U8g2DisplayModule::getActiveBoard():     Return current rendering board or nullptr
+ * - U8g2DisplayModule::getBootSplash():      Return reference to BootSplashBoard
+ * - U8g2DisplayModule::getLoading():         Return reference to LoadingBoard
+ * - U8g2DisplayModule::getWifiWizard():      Return reference to WiFiWizardBoard
+ * - U8g2DisplayModule::getOtaProgress():     Return reference to OtaProgressBoard
+ * - U8g2DisplayModule::getError():           Return reference to ErrorBoard
+ * - U8g2DisplayModule::getScreensaver():     Return reference to ScreensaverBoard
+ * - U8g2DisplayModule::reportStatus():       Delegate to LoadingBoard, show it
+ * - U8g2DisplayModule::reportError():        Delegate to ErrorBoard (fatal), show it
+ * - U8g2DisplayModule::clearStatus():        Mark loading complete, advance if showing
+ * - U8g2DisplayModule::loadConfig():         Load display settings from LittleFS JSON
+ * - U8g2DisplayModule::saveConfig():         Persist display settings to LittleFS JSON
+ * - U8g2DisplayModule::resetConfig():        Reset to factory defaults, persist, apply
+ * - U8g2DisplayModule::setBrightness():      Runtime brightness adjustment
+ * - U8g2DisplayModule::setFlipScreen():      Runtime screen flip toggle
+ * - U8g2DisplayModule::setSleepTimeout():    Runtime sleep timeout adjustment
+ * - U8g2DisplayModule::setRotationInterval(): Runtime carousel interval adjustment
+ * - U8g2DisplayModule::_onOtaProgress():     Static EventBus callback for OTA events
+ * - U8g2DisplayModule::_onDisplayMessage():  Static EventBus callback for display messages
  */
 
 #include "u8g2DisplayModule.hpp"
 
 #ifndef NATIVE_BUILD
 #include <Arduino.h>
+#include <LittleFS.h>
 #endif
+
+// Include EventBus directly — it is native-safe (no Arduino.h dependency).
+// IMPORTANT: We intentionally do NOT include Application.hpp anywhere in
+// this translation unit. PlatformIO's LDF scanner reads ALL #include
+// directives regardless of preprocessor guards (#ifndef NATIVE_BUILD).
+// Application.hpp → webServer.hpp → portal_assets → Arduino.h breaks
+// native GoogleTest builds. The EventBus subscription in begin() is
+// guarded behind #ifndef NATIVE_BUILD. On hardware, Application.hpp is
+// resolved transitively by the linker from the application module.
+//
+// For hardware builds, we rely on the linker resolving Application's
+// getEventBus() symbol from the separately compiled application module.
+// The compiler sees the full Application definition via the u8g2Display
+// library.json build flag (-I../../include) and the Application module's
+// own header being available in the lib_extra_dirs include path.
+#include "../eventBus/EventBus.hpp"
 
 // =============================================================================
 // Lifecycle
 // =============================================================================
 
 /**
- * @brief Initialize the U8G2 hardware, apply display settings, and lock the pool.
+ * @brief Initialize the U8G2 hardware, subscribe to EventBus, and lock the pool.
  * @param app Reference to the Application composition root.
  */
 void U8g2DisplayModule::begin(Application& app) {
@@ -58,16 +82,23 @@ void U8g2DisplayModule::begin(Application& app) {
     _u8g2.setFlipMode(_flipScreen ? 1 : 0);
 #endif
 
-    // --- Step 2: Lock the board pool ---
+    // --- Step 2: Subscribe to EventBus topics ---
+    // Guarded: getEventBus() requires Application.hpp (unavailable in native)
+#ifndef NATIVE_BUILD
+    _app->getEventBus().subscribe("ota.progress", _onOtaProgress, this);
+    _app->getEventBus().subscribe("display.message", _onDisplayMessage, this);
+#endif
+
+    // --- Step 3: Lock the board pool ---
     // No more boards can be added after this point
     _locked = true;
     _boards.shrink_to_fit();
 
-    // --- Step 3: Activate boot splash and show it ---
+    // --- Step 4: Activate boot splash and show it ---
     _bootSplash.activate(APP_FOUNDATION_VERSION);
     showBoard(&_bootSplash);
 
-    // --- Step 4: Reset timers to current time ---
+    // --- Step 5: Reset timers to current time ---
 #ifndef NATIVE_BUILD
     _lastActivityMs = millis();
     _lastRotationMs = millis();
@@ -253,35 +284,275 @@ ScreensaverBoard& U8g2DisplayModule::getScreensaver() {
 }
 
 // =============================================================================
-// IStatusReporter stubs (empty body — deferred to WO2/3)
+// IStatusReporter — real implementations delegating to system boards
 // =============================================================================
 
-void U8g2DisplayModule::reportStatus(const char* /*message*/, float /*progress*/) {
-    // Stub — no-op
+/**
+ * @brief Report status by delegating to LoadingBoard.
+ *
+ * Updates the loading board's message and progress, shows the loading board
+ * if it isn't already the active board, and resets the inactivity timer.
+ *
+ * @param message  Status text for the loading board.
+ * @param progress Fractional progress [0.0, 1.0]; negative = indeterminate.
+ */
+void U8g2DisplayModule::reportStatus(const char* message, float progress) {
+    // --- Delegate to LoadingBoard ---
+    _loading.setStatus(message, progress);
+
+    // --- Show the loading board if not already active ---
+    if (getActiveBoard() != &_loading) {
+        showBoard(&_loading);
+    }
+
+    resetActivity();
 }
 
-void U8g2DisplayModule::reportError(const char* /*errorMessage*/) {
-    // Stub — no-op
+/**
+ * @brief Report a fatal error by delegating to ErrorBoard.
+ *
+ * Displays the error as fatal (no auto-dismiss), forces the error board
+ * onto the screen, and resets the inactivity timer.
+ *
+ * @param errorMessage Error description text.
+ */
+void U8g2DisplayModule::reportError(const char* errorMessage) {
+    // --- Delegate to ErrorBoard with fatal flag ---
+    _error.showError(errorMessage, true);
+
+    // --- Force-show the error board ---
+    showBoard(&_error);
+
+    resetActivity();
 }
 
+/**
+ * @brief Clear the active status overlay.
+ *
+ * Marks the LoadingBoard as complete (triggers isExpired()). If the loading
+ * board is currently the active board, advances the carousel to move past it.
+ */
 void U8g2DisplayModule::clearStatus() {
-    // Stub — no-op
+    _loading.setComplete();
+
+    // --- If currently showing the loading board, advance carousel ---
+    if (getActiveBoard() == &_loading) {
+        _advanceCarousel();
+    }
 }
 
 // =============================================================================
-// iConfigurable stubs (return defaults — deferred to WO4)
+// iConfigurable — persistent display settings at /mod/display.json
 // =============================================================================
 
+/**
+ * @brief Load display configuration from /mod/display.json.
+ *
+ * On hardware: Opens the JSON file, parses keys (brightness, flip,
+ * sleepTimeout, rotationInterval), and applies defaults for missing keys.
+ * In NATIVE_BUILD: Returns true immediately (no LittleFS available).
+ *
+ * @return true if config loaded or defaults applied; false on parse error.
+ */
 bool U8g2DisplayModule::loadConfig() {
+#ifndef NATIVE_BUILD
+    // --- Open the config file from LittleFS ---
+    File configFile = LittleFS.open("/mod/display.json", "r");
+    if (!configFile) {
+        // File not found — apply defaults (already set by member initialisers)
+        return false;
+    }
+
+    // --- Parse JSON with a fixed-size document (rule 10: no DynamicJsonDocument) ---
+    JsonDocument doc;
+    DeserializationError err = deserializeJson(doc, configFile);
+    configFile.close();
+
+    if (err) {
+        // Parse failure — defaults remain in place
+        return false;
+    }
+
+    // --- Read keys with fallback defaults ---
+    _brightness         = doc["brightness"]         | (uint8_t)255;
+    _flipScreen         = doc["flip"]               | false;
+    _sleepTimeoutMs     = doc["sleepTimeout"]        | (unsigned long)300000;
+    _rotationIntervalMs = doc["rotationInterval"]    | (unsigned long)8000;
+
+    // --- Apply hardware settings ---
+    _u8g2.setContrast(_brightness);
+    _u8g2.setFlipMode(_flipScreen ? 1 : 0);
+
     return true;
+#else
+    // NATIVE_BUILD — no LittleFS, defaults are fine
+    return true;
+#endif
 }
 
+/**
+ * @brief Persist display configuration to /mod/display.json.
+ *
+ * On hardware: Creates /mod/ directory if needed, serializes current settings
+ * to JSON, and writes to LittleFS.
+ * In NATIVE_BUILD: Returns true immediately.
+ *
+ * @return true if write succeeded.
+ */
 bool U8g2DisplayModule::saveConfig() {
+#ifndef NATIVE_BUILD
+    // --- Ensure the /mod/ directory exists ---
+    if (!LittleFS.exists("/mod")) {
+        LittleFS.mkdir("/mod");
+    }
+
+    // --- Serialize settings to JSON ---
+    JsonDocument doc;
+    doc["brightness"]       = _brightness;
+    doc["flip"]             = _flipScreen;
+    doc["sleepTimeout"]     = _sleepTimeoutMs;
+    doc["rotationInterval"] = _rotationIntervalMs;
+
+    // --- Write to LittleFS ---
+    File configFile = LittleFS.open("/mod/display.json", "w");
+    if (!configFile) {
+        return false;
+    }
+
+    serializeJson(doc, configFile);
+    configFile.close();
     return true;
+#else
+    // NATIVE_BUILD — no LittleFS
+    return true;
+#endif
 }
 
+/**
+ * @brief Reset display settings to factory defaults, persist, and apply.
+ *
+ * Sets: brightness=255, flipScreen=false, sleepTimeout=300000ms,
+ * rotationInterval=8000ms. Applies hardware contrast/flip and saves to disk.
+ */
 void U8g2DisplayModule::resetConfig() {
-    // Stub — no-op
+    // --- Set factory defaults ---
+    _brightness         = 255;
+    _flipScreen         = false;
+    _sleepTimeoutMs     = 300000;
+    _rotationIntervalMs = 8000;
+
+    // --- Persist to disk ---
+    saveConfig();
+
+    // --- Apply hardware settings ---
+#ifndef NATIVE_BUILD
+    _u8g2.setContrast(_brightness);
+    _u8g2.setFlipMode(_flipScreen ? 1 : 0);
+#endif
+}
+
+// =============================================================================
+// Runtime display configuration setters
+// =============================================================================
+
+/**
+ * @brief Set brightness and apply immediately to hardware.
+ * @param brightness Display contrast/brightness level (0–255).
+ */
+void U8g2DisplayModule::setBrightness(uint8_t brightness) {
+    _brightness = brightness;
+#ifndef NATIVE_BUILD
+    _u8g2.setContrast(_brightness);
+#endif
+}
+
+/**
+ * @brief Set the screen flip mode and apply immediately.
+ * @param flip True to flip the display 180 degrees.
+ */
+void U8g2DisplayModule::setFlipScreen(bool flip) {
+    _flipScreen = flip;
+#ifndef NATIVE_BUILD
+    _u8g2.setFlipMode(_flipScreen ? 1 : 0);
+#endif
+}
+
+/**
+ * @brief Set the inactivity sleep timeout.
+ * @param timeoutMs Timeout in milliseconds (0 disables sleep).
+ */
+void U8g2DisplayModule::setSleepTimeout(unsigned long timeoutMs) {
+    _sleepTimeoutMs = timeoutMs;
+}
+
+/**
+ * @brief Set the carousel rotation interval.
+ * @param intervalMs Interval in milliseconds between board rotations.
+ */
+void U8g2DisplayModule::setRotationInterval(unsigned long intervalMs) {
+    _rotationIntervalMs = intervalMs;
+}
+
+// =============================================================================
+// EventBus static callbacks
+// =============================================================================
+
+/**
+ * @brief Static callback for "ota.progress" EventBus events.
+ *
+ * Casts the context to U8g2DisplayModule*, the payload to OtaProgressPayload*,
+ * and delegates to the OtaProgressBoard. Shows the OTA board on screen.
+ *
+ * @param topic   Topic string ("ota.progress").
+ * @param payload Pointer to OtaProgressPayload.
+ * @param ctx     The U8g2DisplayModule instance (passed during subscribe).
+ */
+void U8g2DisplayModule::_onOtaProgress(const char* /*topic*/, const void* payload, void* ctx) {
+    auto* self = static_cast<U8g2DisplayModule*>(ctx);
+    if (payload == nullptr || self == nullptr) {
+        return;
+    }
+
+    const auto* ota = static_cast<const OtaProgressPayload*>(payload);
+
+    if (ota->complete) {
+        // --- OTA cycle finished — mark board complete ---
+        self->_otaProgress.setComplete(ota->success);
+    } else {
+        // --- OTA in progress — update progress bar ---
+        self->_otaProgress.setProgress(ota->progress, ota->status);
+    }
+
+    // --- Show the OTA board ---
+    self->showBoard(&self->_otaProgress);
+}
+
+/**
+ * @brief Static callback for "display.message" EventBus events.
+ *
+ * Casts the context to U8g2DisplayModule*, the payload to
+ * DisplayMessagePayload*, and shows the message via the LoadingBoard overlay.
+ * Resets the inactivity timer to keep the display awake.
+ *
+ * @param topic   Topic string ("display.message").
+ * @param payload Pointer to DisplayMessagePayload.
+ * @param ctx     The U8g2DisplayModule instance (passed during subscribe).
+ */
+void U8g2DisplayModule::_onDisplayMessage(const char* /*topic*/, const void* payload, void* ctx) {
+    auto* self = static_cast<U8g2DisplayModule*>(ctx);
+    if (payload == nullptr || self == nullptr) {
+        return;
+    }
+
+    const auto* msg = static_cast<const DisplayMessagePayload*>(payload);
+
+    // --- Use the loading board as a temporary message overlay ---
+    self->_loading.setStatus(msg->message, -1.0f);
+
+    // --- Show the loading board ---
+    self->showBoard(&self->_loading);
+
+    self->resetActivity();
 }
 
 // =============================================================================
