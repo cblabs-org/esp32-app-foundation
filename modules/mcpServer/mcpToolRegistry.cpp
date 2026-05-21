@@ -23,13 +23,14 @@
  */
 void McpToolRegistry::addTool(const char* name,
                               const char* description,
-                              std::function<void(JsonObject& params, JsonObject& result)> handler) {
+                              std::function<void(JsonObject& params, JsonObject& result)> handler,
+                              bool mutatesState) {
     // Build a minimal JSON Schema: { "type": "object", "properties": {} }
     JsonDocument defaultSchema;
     defaultSchema["type"] = "object";
     defaultSchema["properties"].to<JsonObject>();
 
-    addTool(name, description, defaultSchema, std::move(handler));
+    addTool(name, description, defaultSchema, std::move(handler), mutatesState);
 }
 
 /**
@@ -38,11 +39,13 @@ void McpToolRegistry::addTool(const char* name,
 void McpToolRegistry::addTool(const char* name,
                               const char* description,
                               const JsonDocument& inputSchema,
-                              std::function<void(JsonObject& params, JsonObject& result)> handler) {
+                              std::function<void(JsonObject& params, JsonObject& result)> handler,
+                              bool mutatesState) {
     McpToolEntry entry;
     entry.name        = name;
     entry.description = description;
     entry.handler     = std::move(handler);
+    entry.mutatesState = mutatesState;
 
     // Deep-copy the schema document into the entry
     entry.inputSchema.set(inputSchema);

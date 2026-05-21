@@ -61,20 +61,25 @@ Below the frontmatter, the WORKORDER MUST contain:
 - **Line-Item Instructions:** Checkboxes detailing the exact files to modify.
 - **Verification Requirement:** The worker must verify it compiles/runs. **CRITICAL:** Before distilling or committing, the worker MUST ask the user if they are happy. Only *after* approval should the worker invoke the `@distillery` skill to package the state and drop control.
 
-### 4. Bridge Prompt Formulation
-After writing the Handoff Document, drop terminal control to the user and generate a "Bridge Prompt" in a markdown block. 
+### 4. Worker Sub-Agent Spawning
+After writing the Handoff Document (`WORKORDER.md`), you must seamlessly spawn a worker agent to execute it natively. Do not ask the user to copy/paste prompts.
 
-**Format your message to the user exactly like this:**
-Here is the bridge prompt for the next stage. Please copy the block below and paste it to a fresh worker agent session:
+**Action:**
+Use the `invoke_subagent` tool to spawn a `self` subagent with the role `Execution Worker`. 
 
+**Prompt Format:**
+Construct the prompt for the sub-agent exactly like this:
 ```markdown
 # [project-name] / WO[Y] - [topic]
 
 You are an expert senior software engineer and execution-focused worker agent. **DO NOT trigger or act as the principal-architect.** I need you to completely execute Work Order [Y].
 Read your exact strict-instruction manual here via view_file: `.agents/skills/principal-architect-workspace/pr-[project-name]/wo[Y]-[topic]/WORKORDER.md`
 
-Execute the checklist and verify your changes. Once finished, **STOP and ASK ME** if the implementation is validated and if any iteration is needed. Do not wrap up or distill until I explicitly approve the work. Once I approve, invoke the `@distillery` skill to package your output, passing `.agents/skills/principal-architect-workspace/pr-[project-name]/wo[Y]-[topic]/` as the target directory. Finally, append a status update to the `WORKORDER.md` file and drop control back to me.
+Execute the checklist and verify your changes. Once finished, **STOP and send a message back to me** if the implementation is validated and if any iteration is needed. Do not wrap up or distill until I explicitly approve the work. Once I approve, invoke the `@distillery` skill to package your output, passing `.agents/skills/principal-architect-workspace/pr-[project-name]/wo[Y]-[topic]/` as the target directory. Finally, append a status update to the `WORKORDER.md` file and terminate your session.
 ```
+
+**Drop Control:**
+After spawning the sub-agent, inform the user that the worker has been spawned in the background, and drop terminal control. You will be automatically woken up when the worker sends you a message upon completion.
 
 ### 5. Context Re-Ingestion (The Return of the Worker)
 When the user returns to you stating the worker has finished WO[Y]:

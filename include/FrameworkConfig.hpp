@@ -36,4 +36,5 @@ struct FrameworkConfig {
     const char* timezone              = "GMT0";            ///< POSIX timezone string
     bool        firmwareUpdatesEnabled = true;             ///< OTA update kill-switch
     uint8_t     otaQuietHour          = 3;                 ///< Hour to suppress OTA (0-23)
+    bool        mcpReadOnly           = false;             ///< Prevent state mutation via MCP
 };

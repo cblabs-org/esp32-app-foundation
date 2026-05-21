@@ -122,7 +122,7 @@ bool Application::begin(const FrameworkConfig& config) {
     // MCP server: pass nullptr for configManager — Application does not currently
     // own a ConfigManager instance. When a ConfigManager is wired in a future PR,
     // update this call to pass a valid pointer. See WO3 design notes.
-    _mcpServer.begin(_mcpContributors, nullptr);
+    _mcpServer.begin(_mcpContributors, nullptr, &_config);
 
     // --- Step 10: Lock all registration vectors ---
     // No further registrations are permitted after this point.

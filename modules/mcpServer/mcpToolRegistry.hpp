@@ -40,6 +40,7 @@ struct McpToolEntry {
     std::string description;                                              ///< Human-readable description
     JsonDocument inputSchema;                                             ///< JSON Schema for params
     std::function<void(JsonObject& params, JsonObject& result)> handler;  ///< Execution callback
+    bool mutatesState = false;                                            ///< Whether the tool modifies state
 };
 
 /**
@@ -58,7 +59,8 @@ public:
      */
     void addTool(const char* name,
                  const char* description,
-                 std::function<void(JsonObject& params, JsonObject& result)> handler);
+                 std::function<void(JsonObject& params, JsonObject& result)> handler,
+                 bool mutatesState = false);
 
     /**
      * @brief Register a tool with an explicit JSON input schema.
@@ -70,7 +72,8 @@ public:
     void addTool(const char* name,
                  const char* description,
                  const JsonDocument& inputSchema,
-                 std::function<void(JsonObject& params, JsonObject& result)> handler);
+                 std::function<void(JsonObject& params, JsonObject& result)> handler,
+                 bool mutatesState = false);
 
     /**
      * @brief Find a tool by name.

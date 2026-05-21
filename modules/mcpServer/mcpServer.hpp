@@ -108,6 +108,7 @@
 // Forward-declare to avoid pulling in the full headers
 class IMcpContributor;
 class ConfigManager;
+struct FrameworkConfig;
 
 /**
  * @brief MCP JSON-RPC 2.0 server with Serial line-delimited transport.
@@ -122,8 +123,16 @@ public:
      * @brief Initialise the MCP server: register built-in and contributor tools.
      * @param contributors   List of IMcpContributor pointers to collect tools from.
      * @param configManager  Optional pointer to the ConfigManager for config tools.
+     * @param frameworkConfig Optional pointer to the FrameworkConfig for security settings.
      */
-    void begin(const std::vector<IMcpContributor*>& contributors, ConfigManager* configManager = nullptr);
+    void begin(const std::vector<IMcpContributor*>& contributors, ConfigManager* configManager = nullptr, const FrameworkConfig* frameworkConfig = nullptr);
+
+    /**
+     * @brief Process a single JSON-RPC request and write the response to the provided stream.
+     * @param requestJson Null-terminated JSON string containing the request.
+     * @param responseStream Print stream where the JSON response should be written.
+     */
+    void processRequest(const char* requestJson, Print& responseStream);
 
     /**
      * @brief Poll Serial for incoming data and dispatch complete lines.
@@ -153,6 +162,7 @@ private:
     McpToolRegistry* _registryPtr = nullptr;      ///< Pointer for list_tools lambda capture
     String          _inputBuffer;                 ///< Accumulator for incoming Serial bytes
     bool            _initialized = false;         ///< Guard: begin() must be called first
+    bool            _mcpReadOnly = false;         ///< Guard: if true, mutating tools return error
 
     /**
      * @brief Parse a complete JSON-RPC line and route to the appropriate handler.

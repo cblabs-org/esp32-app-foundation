@@ -20,6 +20,7 @@
 #include "mcpServer.hpp"
 #include "mcpBuiltinTools.hpp"
 #include "interfaces/IMcpContributor.hpp"
+#include "FrameworkConfig.hpp"
 
 // ---------------------------------------------------------------------------
 // Platform-conditional includes & logging shims
@@ -49,7 +50,11 @@
  * @brief Collect tools from all IMcpContributor modules and mark the server
  *        as initialised so tick() begins processing.
  */
-void McpServer::begin(const std::vector<IMcpContributor*>& contributors, ConfigManager* configManager) {
+void McpServer::begin(const std::vector<IMcpContributor*>& contributors, ConfigManager* configManager, const FrameworkConfig* frameworkConfig) {
+    if (frameworkConfig) {
+        _mcpReadOnly = frameworkConfig->mcpReadOnly;
+    }
+
     // --- Step 1: Register built-in foundation tools ---
     // These are always available regardless of which app uses the framework.
     _registryPtr = &_registry;
@@ -109,6 +114,54 @@ void McpServer::processLineForTest(const char* line) {
 // ---------------------------------------------------------------------------
 
 /**
+ * @brief Parse a JSON-RPC request and route to the correct handler.
+ */
+void McpServer::processRequest(const char* requestJson, Print& responseStream) {
+    // --- Step 1: Parse the JSON payload ---
+    JsonDocument doc;
+    DeserializationError err = deserializeJson(doc, requestJson);
+
+    if (err) {
+        // Parse error — respond with JSON-RPC parse error code
+        MCP_LOGE("JSON parse error: %s", err.c_str());
+        // Parse errors have no valid id — pass null via a temporary doc
+        JsonDocument nullDoc;
+        nullDoc["id"] = nullptr;
+        _sendError(-32700, "Parse error", nullDoc["id"], responseStream);
+        responseStream.println();
+        return;
+    }
+
+    // --- Step 2: Extract the method string ---
+    const char* method = doc["method"] | static_cast<const char*>(nullptr);
+
+    if (method == nullptr) {
+        // Missing "method" field — invalid request
+        _sendError(-32600, "Invalid Request: missing method", doc["id"], responseStream);
+        responseStream.println();
+        return;
+    }
+
+    // --- Step 3: Route to the appropriate handler ---
+    if (strcmp(method, "initialize") == 0) {
+        _handleInitialize(doc, responseStream);
+    } else if (strcmp(method, "tools/list") == 0) {
+        _handleToolsList(doc, responseStream);
+    } else if (strcmp(method, "tools/call") == 0) {
+        _handleToolsCall(doc, responseStream);
+    } else if (strcmp(method, "ping") == 0) {
+        _handlePing(doc, responseStream);
+    } else {
+        // Unknown method
+        MCP_LOGW("Unknown method: %s", method);
+        _sendError(-32601, "Method not found", doc["id"], responseStream);
+    }
+
+    // Newline delimiter after every response
+    responseStream.println();
+}
+
+/**
  * @brief Parse a JSON-RPC request line and route to the correct handler.
  *
  * Routing table:
@@ -119,48 +172,7 @@ void McpServer::processLineForTest(const char* line) {
  *   (other)      → method-not-found error (-32601)
  */
 void McpServer::_processLine(const char* line) {
-    // --- Step 1: Parse the JSON payload ---
-    JsonDocument doc;
-    DeserializationError err = deserializeJson(doc, line);
-
-    if (err) {
-        // Parse error — respond with JSON-RPC parse error code
-        MCP_LOGE("JSON parse error: %s", err.c_str());
-        // Parse errors have no valid id — pass null via a temporary doc
-        JsonDocument nullDoc;
-        nullDoc["id"] = nullptr;
-        _sendError(-32700, "Parse error", nullDoc["id"], Serial);
-        Serial.println();
-        return;
-    }
-
-    // --- Step 2: Extract the method string ---
-    const char* method = doc["method"] | static_cast<const char*>(nullptr);
-
-    if (method == nullptr) {
-        // Missing "method" field — invalid request
-        _sendError(-32600, "Invalid Request: missing method", doc["id"], Serial);
-        Serial.println();
-        return;
-    }
-
-    // --- Step 3: Route to the appropriate handler ---
-    if (strcmp(method, "initialize") == 0) {
-        _handleInitialize(doc, Serial);
-    } else if (strcmp(method, "tools/list") == 0) {
-        _handleToolsList(doc, Serial);
-    } else if (strcmp(method, "tools/call") == 0) {
-        _handleToolsCall(doc, Serial);
-    } else if (strcmp(method, "ping") == 0) {
-        _handlePing(doc, Serial);
-    } else {
-        // Unknown method
-        MCP_LOGW("Unknown method: %s", method);
-        _sendError(-32601, "Method not found", doc["id"], Serial);
-    }
-
-    // Newline delimiter after every response
-    Serial.println();
+    processRequest(line, Serial);
 }
 
 // ---------------------------------------------------------------------------
@@ -251,6 +263,19 @@ void McpServer::_handleToolsCall(const JsonDocument& req, Print& out) {
         msg += toolName;
         error["message"] = msg;
 
+        serializeJson(errResp, out);
+        return;
+    }
+
+    // --- Step 2.5: Enforce Security Toggle ---
+    if (_mcpReadOnly && tool->mutatesState) {
+        MCP_LOGW("Security error: tool %s mutates state in read-only mode", toolName);
+        JsonDocument errResp;
+        errResp["jsonrpc"] = "2.0";
+        errResp["id"]      = req["id"];
+        JsonObject error   = errResp["error"].to<JsonObject>();
+        error["code"]      = -32000;
+        error["message"]   = "Tool modifies state but server is in read-only mode";
         serializeJson(errResp, out);
         return;
     }
