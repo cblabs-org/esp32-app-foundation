@@ -8,9 +8,10 @@
  *
  * Module: test/test_unit/test_u8g2Display/test_boards.cpp
  * Description: GoogleTest unit-test suite for the system display boards:
- *              BootSplashBoard, LoadingBoard, and WiFiWizardBoard. Validates
- *              board names, state transitions, and API contracts. All tests
- *              execute on the native GoogleTest runner (no hardware required).
+ *              BootSplashBoard, LoadingBoard, WiFiWizardBoard, OtaProgressBoard,
+ *              ErrorBoard, and ScreensaverBoard. Validates board names, state
+ *              transitions, and API contracts. All tests execute on the native
+ *              GoogleTest runner (no hardware required).
  *
  * Exported Functions:
  * - main(): GoogleTest entry point — initialises and runs all board test suites
@@ -20,6 +21,9 @@
 #include "boards/bootSplashBoard.hpp"
 #include "boards/loadingBoard.hpp"
 #include "boards/wifiWizardBoard.hpp"
+#include "boards/otaProgressBoard.hpp"
+#include "boards/errorBoard.hpp"
+#include "boards/screensaverBoard.hpp"
 
 // =============================================================================
 // Test Group: BootSplashBoard
@@ -147,4 +151,188 @@ TEST_F(WiFiWizardBoardTest, Configure_NullSsid_DoesNotCrash) {
 TEST_F(WiFiWizardBoardTest, Configure_DoesNotCauseExpiry) {
     board.configure("TestAP");
     EXPECT_FALSE(board.isExpired());
+}
+
+// =============================================================================
+// Test Group: OtaProgressBoard
+// =============================================================================
+
+class OtaProgressBoardTest : public ::testing::Test {
+protected:
+    OtaProgressBoard board; ///< Fresh instance for each test
+};
+
+/** getBoardName must return the expected system board identifier. */
+TEST_F(OtaProgressBoardTest, GetBoardName_ReturnsCorrectName) {
+    EXPECT_STREQ(board.getBoardName(), "SYS: OTA Progress");
+}
+
+/** isExpired must return false initially (no update in progress). */
+TEST_F(OtaProgressBoardTest, IsExpired_Initially_ReturnsFalse) {
+    EXPECT_FALSE(board.isExpired());
+}
+
+/** setProgress must not crash with valid inputs. */
+TEST_F(OtaProgressBoardTest, SetProgress_ValidInput_DoesNotCrash) {
+    EXPECT_NO_FATAL_FAILURE(board.setProgress(0.5f, "Downloading..."));
+}
+
+/** setProgress must not crash with nullptr status. */
+TEST_F(OtaProgressBoardTest, SetProgress_NullStatus_DoesNotCrash) {
+    EXPECT_NO_FATAL_FAILURE(board.setProgress(0.5f, nullptr));
+}
+
+/** setProgress must not cause expiry. */
+TEST_F(OtaProgressBoardTest, SetProgress_DoesNotCauseExpiry) {
+    board.setProgress(0.75f, "75%");
+    EXPECT_FALSE(board.isExpired());
+}
+
+/** setComplete(true) must cause isExpired to return true (auto-dismiss). */
+TEST_F(OtaProgressBoardTest, SetComplete_Success_CausesExpiry) {
+    board.setComplete(true);
+    EXPECT_TRUE(board.isExpired());
+}
+
+/** setComplete(false) must NOT cause isExpired to return true (persist). */
+TEST_F(OtaProgressBoardTest, SetComplete_Failure_DoesNotCauseExpiry) {
+    board.setComplete(false);
+    EXPECT_FALSE(board.isExpired());
+}
+
+/** reset() must clear the completion state back to initial. */
+TEST_F(OtaProgressBoardTest, Reset_ClearsState) {
+    board.setProgress(0.9f, "Almost done");
+    board.setComplete(true);
+    EXPECT_TRUE(board.isExpired());
+
+    board.reset();
+    EXPECT_FALSE(board.isExpired());
+}
+
+/** reset() must clear the failure state. */
+TEST_F(OtaProgressBoardTest, Reset_ClearsFailure) {
+    board.setComplete(false);
+    EXPECT_FALSE(board.isExpired()); // Failed = not expired
+
+    board.reset();
+    EXPECT_FALSE(board.isExpired()); // Reset = back to initial
+}
+
+// =============================================================================
+// Test Group: ErrorBoard
+// =============================================================================
+
+class ErrorBoardTest : public ::testing::Test {
+protected:
+    ErrorBoard board; ///< Fresh instance for each test
+};
+
+/** getBoardName must return the expected system board identifier. */
+TEST_F(ErrorBoardTest, GetBoardName_ReturnsCorrectName) {
+    EXPECT_STREQ(board.getBoardName(), "SYS: Error");
+}
+
+/** isExpired must return false initially (no error shown). */
+TEST_F(ErrorBoardTest, IsExpired_Initially_ReturnsFalse) {
+    EXPECT_FALSE(board.isExpired());
+}
+
+/** showError must not cause expiry (error is active). */
+TEST_F(ErrorBoardTest, ShowError_DoesNotCauseExpiry) {
+    board.showError("Something went wrong");
+    EXPECT_FALSE(board.isExpired());
+}
+
+/** dismiss must cause isExpired to return true. */
+TEST_F(ErrorBoardTest, Dismiss_CausesExpiry) {
+    board.showError("Test error");
+    board.dismiss();
+    EXPECT_TRUE(board.isExpired());
+}
+
+/** showError with fatal flag must not cause expiry. */
+TEST_F(ErrorBoardTest, ShowError_Fatal_DoesNotCauseExpiry) {
+    board.showError("Critical failure", true);
+    EXPECT_FALSE(board.isExpired());
+}
+
+/** Fatal errors can still be dismissed manually. */
+TEST_F(ErrorBoardTest, Dismiss_Fatal_CausesExpiry) {
+    board.showError("Critical failure", true);
+    board.dismiss();
+    EXPECT_TRUE(board.isExpired());
+}
+
+/** showError must reset dismissed state (re-show after dismiss). */
+TEST_F(ErrorBoardTest, ShowError_AfterDismiss_ResetsExpiry) {
+    board.showError("Error 1");
+    board.dismiss();
+    EXPECT_TRUE(board.isExpired());
+
+    board.showError("Error 2");
+    EXPECT_FALSE(board.isExpired());
+}
+
+/** showError must not crash with nullptr message. */
+TEST_F(ErrorBoardTest, ShowError_NullMessage_DoesNotCrash) {
+    EXPECT_NO_FATAL_FAILURE(board.showError(nullptr));
+}
+
+// =============================================================================
+// Test Group: ScreensaverBoard
+// =============================================================================
+
+class ScreensaverBoardTest : public ::testing::Test {
+protected:
+    ScreensaverBoard board; ///< Fresh instance for each test
+};
+
+/** getBoardName must return the expected system board identifier. */
+TEST_F(ScreensaverBoardTest, GetBoardName_ReturnsCorrectName) {
+    EXPECT_STREQ(board.getBoardName(), "SYS: Screensaver");
+}
+
+/** isExpired must return true initially (screensaver not active). */
+TEST_F(ScreensaverBoardTest, IsExpired_Initially_ReturnsTrue) {
+    EXPECT_TRUE(board.isExpired());
+}
+
+/** activate must cause isExpired to return false. */
+TEST_F(ScreensaverBoardTest, Activate_CausesNotExpired) {
+    board.activate();
+    EXPECT_FALSE(board.isExpired());
+}
+
+/** deactivate must cause isExpired to return true. */
+TEST_F(ScreensaverBoardTest, Deactivate_CausesExpiry) {
+    board.activate();
+    EXPECT_FALSE(board.isExpired());
+
+    board.deactivate();
+    EXPECT_TRUE(board.isExpired());
+}
+
+/** isActive must reflect activation state. */
+TEST_F(ScreensaverBoardTest, IsActive_ReflectsState) {
+    EXPECT_FALSE(board.isActive());
+
+    board.activate();
+    EXPECT_TRUE(board.isActive());
+
+    board.deactivate();
+    EXPECT_FALSE(board.isActive());
+}
+
+/** Multiple activate/deactivate cycles must work correctly. */
+TEST_F(ScreensaverBoardTest, MultipleCycles_WorkCorrectly) {
+    board.activate();
+    EXPECT_FALSE(board.isExpired());
+    board.deactivate();
+    EXPECT_TRUE(board.isExpired());
+
+    board.activate();
+    EXPECT_FALSE(board.isExpired());
+    board.deactivate();
+    EXPECT_TRUE(board.isExpired());
 }

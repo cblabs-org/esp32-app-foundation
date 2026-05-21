@@ -11,9 +11,9 @@
  *              slot pool. Manages a vector of IDisplayBoard* entries, rotating
  *              through them on a configurable interval. Provides sleep/wake
  *              power management, brightness control, and screen flip support.
- *              System boards (BootSplash, Loading, WiFiWizard) can bypass the
- *              carousel via showBoard(). Owns BootSplashBoard, LoadingBoard,
- *              and WiFiWizardBoard instances and activates the splash on begin().
+ *              System boards (BootSplash, Loading, WiFiWizard, OtaProgress,
+ *              Error, Screensaver) can bypass the carousel via showBoard().
+ *              Owns all system board instances and activates the splash on begin().
  *
  * Exported Classes:
  * - U8g2DisplayModule: Display carousel engine and board slot pool
@@ -27,6 +27,9 @@
  *   - getBootSplash():  Return reference to the owned BootSplashBoard instance
  *   - getLoading():     Return reference to the owned LoadingBoard instance
  *   - getWifiWizard():  Return reference to the owned WiFiWizardBoard instance
+ *   - getOtaProgress(): Return reference to the owned OtaProgressBoard instance
+ *   - getError():       Return reference to the owned ErrorBoard instance
+ *   - getScreensaver(): Return reference to the owned ScreensaverBoard instance
  *   - reportStatus():   IStatusReporter stub (empty body — WO3)
  *   - reportError():    IStatusReporter stub (empty body — WO3)
  *   - clearStatus():    IStatusReporter stub (empty body — WO3)
@@ -46,6 +49,9 @@
 #include "boards/bootSplashBoard.hpp"
 #include "boards/loadingBoard.hpp"
 #include "boards/wifiWizardBoard.hpp"
+#include "boards/otaProgressBoard.hpp"
+#include "boards/errorBoard.hpp"
+#include "boards/screensaverBoard.hpp"
 
 // --- Hardware-only includes (excluded from native GoogleTest builds) ---
 #ifndef NATIVE_BUILD
@@ -170,6 +176,24 @@ public:
      */
     WiFiWizardBoard& getWifiWizard();
 
+    /**
+     * @brief Return a reference to the owned OtaProgressBoard instance.
+     * @return Mutable reference to _otaProgress.
+     */
+    OtaProgressBoard& getOtaProgress();
+
+    /**
+     * @brief Return a reference to the owned ErrorBoard instance.
+     * @return Mutable reference to _error.
+     */
+    ErrorBoard& getError();
+
+    /**
+     * @brief Return a reference to the owned ScreensaverBoard instance.
+     * @return Mutable reference to _screensaver.
+     */
+    ScreensaverBoard& getScreensaver();
+
     // -------------------------------------------------------------------------
     // IStatusReporter stubs (empty body — implementation deferred to WO2/3)
     // -------------------------------------------------------------------------
@@ -273,4 +297,7 @@ private:
     BootSplashBoard  _bootSplash;                  ///< Boot splash screen (BOOTING phase)
     LoadingBoard     _loading;                     ///< Loading progress screen (APP_SETUP phase)
     WiFiWizardBoard  _wifiWizard;                  ///< WiFi setup wizard screen (WIFI_SETUP phase)
+    OtaProgressBoard _otaProgress;                 ///< OTA firmware update progress screen
+    ErrorBoard       _error;                       ///< Error message display screen
+    ScreensaverBoard _screensaver;                 ///< Inactivity screensaver (burn-in prevention)
 };
