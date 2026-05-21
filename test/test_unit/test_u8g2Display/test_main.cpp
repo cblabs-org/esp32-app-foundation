@@ -14,6 +14,7 @@
  *              - test_config.cpp:               iConfigurable load/save/reset tests
  *              - test_eventbus_integration.cpp:  EventBus subscription integration
  *              - test_boards.cpp:               System board unit tests
+ *              - test_widgets_primitives.cpp:   Widget primitives layer tests
  *
  *              This file provides only the GoogleTest main() entry point
  *              that discovers and runs all test fixtures linked into the binary.
