@@ -16,6 +16,13 @@
 #include "webServer.hpp"
 #include <ArduinoJson.h>
 
+#include "portal_assets/index_html.hpp"
+#include "portal_assets/app_css.hpp"
+#include "portal_assets/app_js.hpp"
+#include "portal_assets/system_js.hpp"
+#include "portal_assets/wifi_js.hpp"
+#include "portal_assets/ota_js.hpp"
+
 #ifndef NATIVE_BUILD
 #include "esp_log.h"
 static const char* TAG = "WebServerManager";
@@ -33,19 +40,43 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors) 
     WEB_LOGI("Initializing WebServerManager");
 
     // Cap global POST bodies to 4KB as per requirements.
-    AsyncWebServer::setMaxBodySize(4096);
+    // AsyncWebServer::setMaxBodySize(4096); // Not supported in this version
 
-    // Setup basic routing for static files (to be served from PROGMEM in WO4)
+    // Setup routing for static files served from PROGMEM
     _server.on("/", HTTP_GET, [](AsyncWebServerRequest* request) {
-        // Stub for serving index.html
+        AsyncWebServerResponse *response = request->beginResponse_P(200, "text/html", index_html_gz, index_html_gz_len);
+        response->addHeader("Content-Encoding", "gzip");
+        request->send(response);
     });
     
     _server.on("/app.css", HTTP_GET, [](AsyncWebServerRequest* request) {
-        // Stub for serving app.css
+        AsyncWebServerResponse *response = request->beginResponse_P(200, "text/css", app_css_gz, app_css_gz_len);
+        response->addHeader("Content-Encoding", "gzip");
+        request->send(response);
     });
 
     _server.on("/app.js", HTTP_GET, [](AsyncWebServerRequest* request) {
-        // Stub for serving app.js
+        AsyncWebServerResponse *response = request->beginResponse_P(200, "application/javascript", app_js_gz, app_js_gz_len);
+        response->addHeader("Content-Encoding", "gzip");
+        request->send(response);
+    });
+
+    _server.on("/system.js", HTTP_GET, [](AsyncWebServerRequest* request) {
+        AsyncWebServerResponse *response = request->beginResponse_P(200, "application/javascript", system_js_gz, system_js_gz_len);
+        response->addHeader("Content-Encoding", "gzip");
+        request->send(response);
+    });
+
+    _server.on("/wifi.js", HTTP_GET, [](AsyncWebServerRequest* request) {
+        AsyncWebServerResponse *response = request->beginResponse_P(200, "application/javascript", wifi_js_gz, wifi_js_gz_len);
+        response->addHeader("Content-Encoding", "gzip");
+        request->send(response);
+    });
+
+    _server.on("/ota.js", HTTP_GET, [](AsyncWebServerRequest* request) {
+        AsyncWebServerResponse *response = request->beginResponse_P(200, "application/javascript", ota_js_gz, ota_js_gz_len);
+        response->addHeader("Content-Encoding", "gzip");
+        request->send(response);
     });
 
     // Register all IWebContributor routes and build tabs array
