@@ -11,10 +11,9 @@
  *              slot pool. Manages a vector of IDisplayBoard* entries, rotating
  *              through them on a configurable interval. Provides sleep/wake
  *              power management, brightness control, and screen flip support.
- *              System boards (BootSplash, Error) can bypass the carousel via
- *              showBoard(). This WO delivers the structural skeleton only —
- *              no system boards, no real IStatusReporter, no config persistence,
- *              and no Application hub wiring.
+ *              System boards (BootSplash, Loading, WiFiWizard) can bypass the
+ *              carousel via showBoard(). Owns BootSplashBoard, LoadingBoard,
+ *              and WiFiWizardBoard instances and activates the splash on begin().
  *
  * Exported Classes:
  * - U8g2DisplayModule: Display carousel engine and board slot pool
@@ -25,9 +24,12 @@
  *   - resetActivity():  Reset the inactivity timer (called on user interaction)
  *   - getBoardCount():  Return the number of registered boards in the pool
  *   - getActiveBoard(): Return the currently rendering board (or nullptr)
- *   - reportStatus():   IStatusReporter stub (empty body — WO2/3)
- *   - reportError():    IStatusReporter stub (empty body — WO2/3)
- *   - clearStatus():    IStatusReporter stub (empty body — WO2/3)
+ *   - getBootSplash():  Return reference to the owned BootSplashBoard instance
+ *   - getLoading():     Return reference to the owned LoadingBoard instance
+ *   - getWifiWizard():  Return reference to the owned WiFiWizardBoard instance
+ *   - reportStatus():   IStatusReporter stub (empty body — WO3)
+ *   - reportError():    IStatusReporter stub (empty body — WO3)
+ *   - clearStatus():    IStatusReporter stub (empty body — WO3)
  *   - loadConfig():     iConfigurable stub (returns true — WO4)
  *   - saveConfig():     iConfigurable stub (returns true — WO4)
  *   - resetConfig():    iConfigurable stub (no-op — WO4)
@@ -41,6 +43,9 @@
 #include "interfaces/IStatusReporter.hpp"
 #include "interfaces/iConfigurable.hpp"
 #include "interfaces/IDisplayBoard.hpp"
+#include "boards/bootSplashBoard.hpp"
+#include "boards/loadingBoard.hpp"
+#include "boards/wifiWizardBoard.hpp"
 
 // --- Hardware-only includes (excluded from native GoogleTest builds) ---
 #ifndef NATIVE_BUILD
@@ -144,6 +149,28 @@ public:
     IDisplayBoard* getActiveBoard() const;
 
     // -------------------------------------------------------------------------
+    // System board accessors
+    // -------------------------------------------------------------------------
+
+    /**
+     * @brief Return a reference to the owned BootSplashBoard instance.
+     * @return Mutable reference to _bootSplash.
+     */
+    BootSplashBoard& getBootSplash();
+
+    /**
+     * @brief Return a reference to the owned LoadingBoard instance.
+     * @return Mutable reference to _loading.
+     */
+    LoadingBoard& getLoading();
+
+    /**
+     * @brief Return a reference to the owned WiFiWizardBoard instance.
+     * @return Mutable reference to _wifiWizard.
+     */
+    WiFiWizardBoard& getWifiWizard();
+
+    // -------------------------------------------------------------------------
     // IStatusReporter stubs (empty body — implementation deferred to WO2/3)
     // -------------------------------------------------------------------------
 
@@ -241,4 +268,9 @@ private:
 
     // --- System board override pointer ---
     IDisplayBoard* _overrideBoard = nullptr;       ///< Non-pool board shown via showBoard() when not in pool
+
+    // --- Owned system board instances ---
+    BootSplashBoard  _bootSplash;                  ///< Boot splash screen (BOOTING phase)
+    LoadingBoard     _loading;                     ///< Loading progress screen (APP_SETUP phase)
+    WiFiWizardBoard  _wifiWizard;                  ///< WiFi setup wizard screen (WIFI_SETUP phase)
 };

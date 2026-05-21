@@ -41,7 +41,7 @@ Designed for future extraction to its own repo/submodule when appropriate.
 
 | WO | Topic | Branch | Status |
 |---|---|---|---|
-| **[ ] [wo1-skeleton](wo1-skeleton/WORKORDER.md)** | Module skeleton + carousel engine + board slot pool | `pr-05-wo1-skeleton` | PENDING |
+| **[x] [wo1-skeleton](wo1-skeleton/WORKORDER.md)** | Module skeleton + carousel engine + board slot pool | `pr-05-wo1-skeleton` | ✅ MERGED `da619cb` |
 | **[ ] [wo2-system-boards-1](wo2-system-boards-1/WORKORDER.md)** | BootSplash, Loading, WiFiWizard system boards | `pr-05-wo2-system-boards-1` | PENDING |
 | **[ ] [wo3-system-boards-2](wo3-system-boards-2/WORKORDER.md)** | OtaProgress, Error, Screensaver system boards | `pr-05-wo3-system-boards-2` | PENDING |
 | **[ ] [wo4-integration](wo4-integration/WORKORDER.md)** | IStatusReporter impl + EventBus subscription + config + hub wiring + native tests | `pr-05-wo4-integration` | PENDING |
