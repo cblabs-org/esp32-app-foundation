@@ -48,6 +48,9 @@ GithubClient::GithubClient(const String& repository, const String& token) {
         apiGetLatestRelease = "https://" + String(apiHost) + "/repos/" + repository + "/releases/latest";
     }
     accessToken = token;
+    if (accessToken.length() > 0) {
+        Logger::registerSecret(accessToken);
+    }
     releaseAssets = 0;
     strcpy(lastErrorMsg, "Initialized");
 }

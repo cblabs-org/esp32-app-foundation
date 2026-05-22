@@ -11,7 +11,10 @@
 
 #include "deviceCrypto.hpp"
 #include "../logger/logger.hpp"
+#include "platform/LogShim.h"
 #include <string.h>
+
+static const char* TAG = "DeviceCrypto";
 
 #ifndef PIO_UNIT_TESTING
 #include <Preferences.h>
@@ -114,6 +117,7 @@ size_t DeviceCrypto::removePKCS7Padding(const uint8_t* buffer, size_t paddedLen)
  */
 std::unique_ptr<char[]> DeviceCrypto::encrypt(const char* plaintext, size_t inputLen, size_t* outLen) {
     if (!keyLoaded || inputLen == 0) {
+        ESP_LOGE(TAG, "encrypt() failed: %s", !keyLoaded ? "key not loaded" : "empty input");
         if (outLen) *outLen = 0;
         return std::unique_ptr<char[]>();
     }
@@ -125,6 +129,7 @@ std::unique_ptr<char[]> DeviceCrypto::encrypt(const char* plaintext, size_t inpu
     size_t totalLen = 16 + paddedLen;
     uint8_t* buffer = (uint8_t*)malloc(totalLen);
     if (!buffer) {
+        ESP_LOGE(TAG, "encrypt() failed: memory allocation error (buffer size: %zu)", totalLen);
         if (outLen) *outLen = 0;
         return std::unique_ptr<char[]>();
     }
@@ -159,13 +164,16 @@ std::unique_ptr<char[]> DeviceCrypto::encrypt(const char* plaintext, size_t inpu
                 if (outLen) *outLen = b64Len;
                 LOG_SECURE("CRYPTO", "Encryption completed securely. Export Base64 size: %zu bytes", b64Len);
             } else {
+                ESP_LOGE(TAG, "encrypt() failed: base64 encoding error");
                 delete[] b64Buffer;
                 if (outLen) *outLen = 0;
             }
         } else {
+            ESP_LOGE(TAG, "encrypt() failed: base64 buffer allocation error (size: %zu)", b64Len + 1);
             if (outLen) *outLen = 0;
         }
     } else {
+        ESP_LOGE(TAG, "encrypt() failed: base64 output length is zero");
         if (outLen) *outLen = 0;
     }
     
@@ -195,6 +203,7 @@ std::unique_ptr<char[]> DeviceCrypto::encrypt(const char* plaintext, size_t inpu
  */
 std::unique_ptr<char[]> DeviceCrypto::decrypt(const char* ciphertext, size_t inputLen, size_t* outLen) {
     if (!keyLoaded || inputLen == 0) {
+        ESP_LOGE(TAG, "decrypt() failed: %s", !keyLoaded ? "key not loaded" : "empty input");
         if (outLen) *outLen = 0;
         return std::unique_ptr<char[]>();
     }
@@ -206,17 +215,20 @@ std::unique_ptr<char[]> DeviceCrypto::decrypt(const char* ciphertext, size_t inp
     mbedtls_base64_decode(nullptr, 0, &decOutLen, (const unsigned char*)ciphertext, inputLen);
     
     if (decOutLen <= 16) {
+        ESP_LOGE(TAG, "decrypt() failed: decoded data too short (length: %zu, need >16)", decOutLen);
         if (outLen) *outLen = 0;
         return std::unique_ptr<char[]>();
     }
 
     uint8_t* buffer = (uint8_t*)malloc(decOutLen);
     if (!buffer) {
+        ESP_LOGE(TAG, "decrypt() failed: memory allocation error (size: %zu)", decOutLen);
         if (outLen) *outLen = 0;
         return std::unique_ptr<char[]>();
     }
     
     if (mbedtls_base64_decode(buffer, decOutLen, &decOutLen, (const unsigned char*)ciphertext, inputLen) != 0) {
+        ESP_LOGE(TAG, "decrypt() failed: base64 decode error");
         free(buffer);
         if (outLen) *outLen = 0;
         return std::unique_ptr<char[]>();
@@ -224,6 +236,7 @@ std::unique_ptr<char[]> DeviceCrypto::decrypt(const char* ciphertext, size_t inp
     
     size_t ciphertextLen = decOutLen - 16;
     if (ciphertextLen % 16 != 0) {
+        ESP_LOGE(TAG, "decrypt() failed: ciphertext length %zu is not block-aligned", ciphertextLen);
         free(buffer);
         if (outLen) *outLen = 0;
         return std::unique_ptr<char[]>();
@@ -251,6 +264,7 @@ std::unique_ptr<char[]> DeviceCrypto::decrypt(const char* ciphertext, size_t inp
             if (outLen) *outLen = unpaddedLen;
             LOG_SECURE("CRYPTO", "Decryption verified. Extracted plaintext configuration length: %zu bytes", unpaddedLen);
         } else {
+            ESP_LOGE(TAG, "decrypt() failed: plaintext buffer allocation error");
             if (outLen) *outLen = 0;
         }
     } else {

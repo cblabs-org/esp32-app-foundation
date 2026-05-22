@@ -150,10 +150,12 @@ void U8g2DisplayModule::tick() {
 bool U8g2DisplayModule::addBoard(IDisplayBoard* board) {
     if (_locked) {
         // Pool is locked after begin() — reject late registrations
+        ESP_LOGW(TAG, "addBoard() rejected: pool is locked after begin()");
         return false;
     }
 
     if (board == nullptr) {
+        ESP_LOGW(TAG, "addBoard() rejected: null board pointer");
         return false;
     }
 

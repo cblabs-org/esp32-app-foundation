@@ -10,6 +10,7 @@
  */
 
 #include "keyManager.hpp"
+#include "../logger/logger.hpp"
 #include <fstream>
 #include <sstream>
 
@@ -111,6 +112,7 @@ bool KeyManager::addKey(const char* id, const char* secret) {
 
 std::string KeyManager::getKeyById(const char* id) const {
     if (!id || strlen(id) == 0) {
+        ESP_LOGW(TAG, "getKeyById() called with null/empty id");
         return "";
     }
     if (!_crypto) {
@@ -137,11 +139,14 @@ std::string KeyManager::getKeyById(const char* id) const {
         return "";
     }
 
-    return std::string(decrypted.get(), outLen);
+    std::string result(decrypted.get(), outLen);
+    Logger::registerSecret(String(result.c_str()));
+    return result;
 }
 
 bool KeyManager::deleteKey(const char* id) {
     if (!id || strlen(id) == 0) {
+        ESP_LOGW(TAG, "deleteKey() called with null/empty id");
         return false;
     }
     JsonDocument doc;

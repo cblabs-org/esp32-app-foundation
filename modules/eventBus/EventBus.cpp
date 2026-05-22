@@ -34,11 +34,13 @@ void EventBus::begin() {
 
 bool EventBus::subscribe(const char* topic, EventCallback callback, void* ctx) {
     if (topic == nullptr || callback == nullptr) {
+        ESP_LOGW(TAG, "subscribe() failed: null topic or callback");
         return false;
     }
 
     size_t topicLen = strlen(topic);
     if (topicLen == 0 || topicLen >= EVENT_BUS_MAX_TOPIC_LENGTH) {
+        ESP_LOGW(TAG, "subscribe() failed: topic length invalid (len=%zu, max=%d)", topicLen, EVENT_BUS_MAX_TOPIC_LENGTH);
         return false;
     }
 
@@ -63,6 +65,7 @@ bool EventBus::subscribe(const char* topic, EventCallback callback, void* ctx) {
 
 bool EventBus::unsubscribe(const char* topic, EventCallback callback, void* ctx) {
     if (topic == nullptr || callback == nullptr) {
+        ESP_LOGD(TAG, "unsubscribe() called with null topic or callback");
         return false;
     }
 
@@ -81,6 +84,7 @@ bool EventBus::unsubscribe(const char* topic, EventCallback callback, void* ctx)
         }
     }
 
+    ESP_LOGD(TAG, "unsubscribe(): no matching subscription found for topic '%s'", topic);
     return false;
 }
 

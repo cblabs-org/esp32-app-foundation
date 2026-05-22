@@ -28,6 +28,8 @@
 #else
 #include <string>
 // Stub String class for NATIVE_BUILD tests
+#ifndef STRING_STUB_DEFINED
+#define STRING_STUB_DEFINED
 class String {
 public:
     String(const char* s) : str(s) {}
@@ -39,6 +41,7 @@ public:
 private:
     std::string str;
 };
+#endif
 #endif
 
 #include <memory>

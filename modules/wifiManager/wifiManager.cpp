@@ -38,6 +38,7 @@ void delay(unsigned long ms) {}      // Stub
 #endif
 
 #include "platform/LogShim.h"
+#include "../logger/logger.hpp"
 
 static const char* TAG = "WIFI_MGR";
 
@@ -81,6 +82,9 @@ bool WifiManager::loadConfig() {
             strlcpy(wifiPass, doc["pass"] | "", sizeof(wifiPass));
             if (strlen(wifiSsid) > 0) {
                 ESP_LOGI(TAG, "Loaded WiFi credentials for: %s", wifiSsid);
+                if (strlen(wifiPass) > 0) {
+                    Logger::registerSecret(String(wifiPass));
+                }
             }
         } else {
             ESP_LOGE(TAG, "JSON deserialization failed");
@@ -326,6 +330,7 @@ void WifiManager::updateWiFi(const char* ssid, const char* pass) {
     if (ssid != nullptr) strlcpy(wifiSsid, ssid, sizeof(wifiSsid));
     if (pass != nullptr && strlen(pass) > 0) {
         strlcpy(wifiPass, pass, sizeof(wifiPass));
+        Logger::registerSecret(String(wifiPass));
     }
     saveConfig();
 }

@@ -9,6 +9,9 @@
  */
 
 #include "md5Utils.hpp"
+#include "platform/LogShim.h"
+
+static const char* TAG = "Md5Utils";
 
 #ifndef PIO_UNIT_TESTING
 #include <LittleFS.h>
@@ -24,6 +27,7 @@ String Md5Utils::calculateFileMD5(const char* filePath) {
 #ifndef PIO_UNIT_TESTING
     File file = LittleFS.open(filePath, "r");
     if (!file || file.isDirectory()) {
+        ESP_LOGW(TAG, "calculateFileMD5: cannot open file '%s'", filePath);
         return String();
     }
 
@@ -68,12 +72,18 @@ String Md5Utils::base64ToHex(String base64Hash) {
     for (int i = 0; i < 64; i++) base64Value[(int)base64Table[i]] = i;
 
     int len = base64Hash.length();
-    if (len == 0) return String();
+    if (len == 0) {
+        ESP_LOGW(TAG, "base64ToHex: empty input string");
+        return String();
+    }
 
     int padding = (base64Hash[len - 1] == '=') + ((len > 1 && base64Hash[len - 2] == '=') ? 1 : 0);
     int binarySize = (len * 3) / 4 - padding;
     
-    if (binarySize <= 0) return String();
+    if (binarySize <= 0) {
+        ESP_LOGW(TAG, "base64ToHex: invalid binary size after decode");
+        return String();
+    }
 
     uint8_t* binaryData = new uint8_t[binarySize];
     int index = 0, buffer = 0, bits = 0;
@@ -82,6 +92,7 @@ String Md5Utils::base64ToHex(String base64Hash) {
         if (base64Hash[i] == '=') continue;
         int value = base64Value[(int)base64Hash[i]];
         if (value == -1) {
+            ESP_LOGW(TAG, "base64ToHex: invalid base64 character at position %d", i);
             delete[] binaryData;
             return String();
         }
