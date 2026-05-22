@@ -1,4 +1,31 @@
+/*
+ * ESP32 App Foundation (c) 2026 CB Labs
+ *
+ * https://github.com/matthewmcneill/esp32-app-foundation
+ *
+ * Module: test/test_unit/test_otaUpdateManager/test_otaUpdateManager.cpp
+ * Description: Native unit tests for the otaUpdateManager OTA orchestrator.
+ *              Tests the new state machine, guard logic, and legacy API on
+ *              the native (non-FreeRTOS) platform.
+ */
+
 #include <gtest/gtest.h>
+
+// Include FrameworkConfig and EventBus before the otaUpdateManager header
+// so Application can be fully defined for the test (the cpp stub defines it).
+#ifdef NATIVE_BUILD
+#include "../../../include/FrameworkConfig.hpp"
+#include "../../../modules/eventBus/EventBus.hpp"
+// Match the Application stub in otaUpdateManager.cpp exactly.
+// The linker will merge these with the same-named class from the .cpp TU.
+// Since both TUs include the same inline definition, this is safe.
+class Application {
+public:
+    EventBus& getEventBus();
+    const FrameworkConfig& getConfig() const;
+};
+#endif
+
 #include "../../../modules/otaUpdateManager/otaUpdateManager.hpp"
 
 #ifdef NATIVE_BUILD
@@ -7,99 +34,109 @@
 
 class OtaUpdateManagerTest : public ::testing::Test {
 protected:
-    void SetUp() override {
-        // Reset state if needed
-    }
+    otaUpdateManager manager;
 };
 
-// Construction
-TEST_F(OtaUpdateManagerTest, Construction) {
-    otaUpdateManager manager;
+// ---------------------------------------------------------------------------
+// New Orchestrator API Tests
+// ---------------------------------------------------------------------------
+
+/// Verify the initial state is Idle.
+TEST_F(OtaUpdateManagerTest, DefaultState_IsIdle) {
+    EXPECT_EQ(OtaState::Idle, manager.getState());
+}
+
+/// checkForUpdate() must return false if begin() was never called.
+TEST_F(OtaUpdateManagerTest, CheckForUpdate_WithoutBegin_ReturnsFalse) {
+    EXPECT_FALSE(manager.checkForUpdate());
+}
+
+/// performUpdate() without begin() should set state to Error on native.
+TEST_F(OtaUpdateManagerTest, PerformUpdate_WithoutBegin_SetsError) {
+    manager.performUpdate();
+    EXPECT_EQ(OtaState::Error, manager.getState());
+}
+
+/// getLastOtaError() should return nullptr initially.
+TEST_F(OtaUpdateManagerTest, GetLastOtaError_Default_ReturnsNull) {
+    EXPECT_EQ(nullptr, manager.getLastOtaError());
+}
+
+/// performUpdate() after begin() but on native should set Error (no FreeRTOS).
+TEST_F(OtaUpdateManagerTest, PerformUpdate_OnNative_SetsError) {
+    Application app;
+    manager.begin(app);
+    manager.performUpdate();
+    EXPECT_EQ(OtaState::Error, manager.getState());
+    EXPECT_NE(nullptr, manager.getLastOtaError());
+}
+
+/// checkForUpdate() after begin() with no repo should return false.
+TEST_F(OtaUpdateManagerTest, CheckForUpdate_NoRepo_ReturnsFalse) {
+    Application app;
+    manager.begin(app);
+    EXPECT_FALSE(manager.checkForUpdate());
+    // State should return to Idle (not stuck in Checking)
+    EXPECT_EQ(OtaState::Idle, manager.getState());
+}
+
+// ---------------------------------------------------------------------------
+// Legacy API Tests
+// ---------------------------------------------------------------------------
+
+/// Legacy beginUpdate() should return false on native builds.
+TEST_F(OtaUpdateManagerTest, BeginUpdate_OnNative_ReturnsFalse) {
+    EXPECT_FALSE(manager.beginUpdate(1024, "abc123"));
+}
+
+/// Legacy endUpdate() should return false on native builds.
+TEST_F(OtaUpdateManagerTest, EndUpdate_OnNative_ReturnsFalse) {
+    EXPECT_FALSE(manager.endUpdate());
+}
+
+/// beginUpdate with nullptr MD5 should return false on native.
+TEST_F(OtaUpdateManagerTest, BeginUpdate_NullptrMD5_ReturnsFalse) {
+    EXPECT_FALSE(manager.beginUpdate(1024, nullptr));
+}
+
+/// beginUpdate with zero size should return false on native.
+TEST_F(OtaUpdateManagerTest, BeginUpdate_ZeroSize_ReturnsFalse) {
+    EXPECT_FALSE(manager.beginUpdate(0, "abc"));
+}
+
+/// markAppValid() should not crash.
+TEST_F(OtaUpdateManagerTest, MarkAppValid_NoCrash) {
+    manager.markAppValid();
     SUCCEED();
 }
 
-// beginUpdate() returns false
-TEST_F(OtaUpdateManagerTest, BeginUpdateReturnsFalse) {
-    EXPECT_FALSE(otaManager.beginUpdate(1024, "abc123"));
-}
-
-// beginUpdate() with nullptr MD5
-TEST_F(OtaUpdateManagerTest, BeginUpdateNullptrMD5) {
-    EXPECT_FALSE(otaManager.beginUpdate(1024, nullptr));
-}
-
-// beginUpdate() with zero size
-TEST_F(OtaUpdateManagerTest, BeginUpdateZeroSize) {
-    EXPECT_FALSE(otaManager.beginUpdate(0, "abc"));
-}
-
-// endUpdate() returns false
-TEST_F(OtaUpdateManagerTest, EndUpdateReturnsFalse) {
-    EXPECT_FALSE(otaManager.endUpdate());
-}
-
-// markAppValid()
-TEST_F(OtaUpdateManagerTest, MarkAppValid) {
-    otaManager.markAppValid(); // Should not crash
+/// rollbackFirmware() should not crash.
+TEST_F(OtaUpdateManagerTest, RollbackFirmware_NoCrash) {
+    manager.rollbackFirmware();
     SUCCEED();
 }
 
-// rollbackFirmware()
-TEST_F(OtaUpdateManagerTest, RollbackFirmware) {
-    otaManager.rollbackFirmware(); // Should not crash
-    SUCCEED();
+/// getTabName() should return "OTA".
+TEST_F(OtaUpdateManagerTest, GetTabName_ReturnsOTA) {
+    EXPECT_STREQ("OTA", manager.getTabName());
 }
 
-// getTabName()
-TEST_F(OtaUpdateManagerTest, GetTabName) {
-    EXPECT_STREQ("OTA", otaManager.getTabName());
-}
-
-// Global instance
-TEST_F(OtaUpdateManagerTest, GlobalInstance) {
-    // Access global instance
-    EXPECT_FALSE(otaManager.beginUpdate(1024, "abc"));
-}
-
-// Lifecycle sequence
-TEST_F(OtaUpdateManagerTest, LifecycleSequence) {
-    otaManager.beginUpdate(1024, "abc");
-    otaManager.endUpdate();
-    SUCCEED();
-}
-
-// markAppValid() multiple calls
-TEST_F(OtaUpdateManagerTest, MarkAppValidMultiple) {
-    otaManager.markAppValid();
-    otaManager.markAppValid();
-    SUCCEED();
-}
-
-// rollbackFirmware() multiple calls
-TEST_F(OtaUpdateManagerTest, RollbackFirmwareMultiple) {
-    otaManager.rollbackFirmware();
-    otaManager.rollbackFirmware();
-    SUCCEED();
-}
-
-// beginUpdate() after endUpdate()
-TEST_F(OtaUpdateManagerTest, BeginAfterEnd) {
-    otaManager.beginUpdate(1024, "abc");
-    otaManager.endUpdate();
-    EXPECT_FALSE(otaManager.beginUpdate(2048, "def"));
-}
-
-// writeStream() returns 0
-TEST_F(OtaUpdateManagerTest, WriteStreamReturns0) {
+/// writeStream() should return 0 on native.
+TEST_F(OtaUpdateManagerTest, WriteStream_OnNative_ReturnsZero) {
     Stream stream;
-    EXPECT_EQ(0, otaManager.writeStream(stream));
+    EXPECT_EQ(0u, manager.writeStream(stream));
 }
 
-// registerRoutes()
-TEST_F(OtaUpdateManagerTest, RegisterRoutes) {
+/// registerRoutes() should not crash on native.
+TEST_F(OtaUpdateManagerTest, RegisterRoutes_NoCrash) {
     AsyncWebServer server(80);
-    otaManager.registerRoutes(server);
+    manager.registerRoutes(server);
     SUCCEED();
+}
+
+/// Global instance should be accessible.
+TEST_F(OtaUpdateManagerTest, GlobalInstance_Accessible) {
+    EXPECT_EQ(OtaState::Idle, otaManager.getState());
 }
 
 #if defined(NATIVE_BUILD)

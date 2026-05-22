@@ -290,6 +290,10 @@ McpServer& Application::getMcpServer() {
     return _mcpServer;
 }
 
+const FrameworkConfig& Application::getConfig() const {
+    return _config;
+}
+
 // ---------------------------------------------------------------------------
 // State Accessors
 // ---------------------------------------------------------------------------
