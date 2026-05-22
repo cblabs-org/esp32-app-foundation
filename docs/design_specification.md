@@ -1,7 +1,7 @@
 # ESP32 App Foundation — Design Specification
 
-**Status:** v1.0 (Post-Implementation)  
-**Version:** 1.0  
+**Status:** v1.1 (Post-Implementation)  
+**Version:** 1.1  
 **Author:** CB Labs  
 **Last Updated:** 2026-05-22
 
@@ -20,12 +20,13 @@
 9. [Application Lifecycle](#9-application-lifecycle)
 10. [Web Portal Architecture](#10-web-portal-architecture)
 11. [Inter-Module Communication](#11-inter-module-communication)
-12. [Repository & Build Architecture](#12-repository--build-architecture)
-13. [Security Architecture](#13-security-architecture)
-14. [Resource Budget & Constraints](#14-resource-budget--constraints)
-15. [Module Authoring Guide](#15-module-authoring-guide)
-16. [Testing Architecture](#16-testing-architecture)
-17. [Open Questions & Decision Log](#17-open-questions--decision-log)
+12. [Logging & Observability Architecture](#11a-logging--observability-architecture)
+13. [Repository & Build Architecture](#12-repository--build-architecture)
+14. [Security Architecture](#13-security-architecture)
+15. [Resource Budget & Constraints](#14-resource-budget--constraints)
+16. [Module Authoring Guide](#15-module-authoring-guide)
+17. [Testing Architecture](#16-testing-architecture)
+18. [Open Questions & Decision Log](#17-open-questions--decision-log)
 
 ---
 
@@ -238,7 +239,7 @@ multiple concerns into a single "systemManager" is explicitly prohibited.
 │  wifiManager          │  otaUpdateManager               │
 │  webServer            │  timeManager                    │
 │  deviceCrypto         │  EventBus                       │
-│  mcpServer            │  logger (ESP-IDF wrap)          │
+│  mcpServer            │  LogRouter (vprintf pipeline)   │
 │  githubClient         │  md5Utils                       │
 └─────────────────────────────────────────────────────────┘
 │            PlatformIO / Arduino + ESP-IDF               │
@@ -312,7 +313,9 @@ The kernel is always present. No app can opt out of kernel services.
 | `EventBus` | Synchronous publish/subscribe with static fn-ptr callbacks | `modules/eventBus/` |
 | `mcpServer` | JSON-RPC MCP server (Serial + HTTP transport) | `modules/mcpServer/` |
 | `deviceCrypto` | Hardware-backed key derivation & AES-256 encryption | `lib/deviceCrypto/` |
-| `logger` | Thin wrapper around ESP-IDF logging (adds `LOG_SECURE()` redaction) | `lib/logger/` |
+| `logger` | Secret-redaction utility (`Logger::logSecure()`) wired into the LogRouter `vprintf` pipeline | `lib/logger/` |
+| `LogShim.h` | Unified logging shim — bridges ESP-IDF `esp_log.h` to native `printf` stubs | `include/platform/` |
+| `LogRouter` | Custom `esp_log_set_vprintf()` handler: redaction → serial → ILogSink dispatch | `modules/application/` |
 | `githubClient` | HTTPS GitHub API client (used by OTA) | `lib/githubClient/` |
 | `md5Utils` | Streaming MD5 hashing via MbedTLS (incremental, not full-file) | `lib/md5Utils/` |
 
@@ -812,16 +815,17 @@ an EventBus-dispatched reload — **no device reboot required**.
 
 ### 8.5 JSON Memory Safety
 
-**`DynamicJsonDocument` is banned project-wide.** All JSON operations must use
-`StaticJsonDocument<N>` with pre-calculated capacity sizes. `DynamicJsonDocument`
-causes heap fragmentation and OOM crashes on ESP32's limited heap.
+**`DynamicJsonDocument` is banned project-wide.** The framework uses ArduinoJson
+v7, which replaces `StaticJsonDocument<N>` and `DynamicJsonDocument` with a
+unified `JsonDocument` type. All JSON operations use the v7 API:
 
 ```cpp
-// ✅ Correct — bounded, predictable
-StaticJsonDocument<512> doc;
+// ✅ Correct — ArduinoJson v7 unified type
+JsonDocument doc;
 
-// ❌ Banned — heap fragmented, unpredictable
+// ❌ Banned — v6 API, causes heap fragmentation
 DynamicJsonDocument doc(1024);
+StaticJsonDocument<512> doc;  // v6 legacy — use JsonDocument instead
 ```
 
 ---
@@ -1085,6 +1089,168 @@ otaManager.setProgressCallback([&display](int pct) {
 
 ---
 
+## 11A. Logging & Observability Architecture
+
+### 11A.1 Design Principles
+
+The framework standardises on **ESP-IDF's `esp_log.h`** as the single logging API.
+No module invents custom macros. No module uses `Serial.print()` for logging.
+The ESP-IDF logging system provides compile-time stripping, runtime per-module
+verbosity control, thread safety (FreeRTOS), and pluggable backends — all of
+which are lost when modules use ad-hoc alternatives.
+
+### 11A.2 Unified Logging via `LogShim.h`
+
+All modules include `platform/LogShim.h` instead of `esp_log.h` directly. This
+header bridges ESP-IDF's logging to the native GoogleTest build:
+
+```cpp
+// include/platform/LogShim.h
+#pragma once
+#ifndef NATIVE_BUILD
+    #include "esp_log.h"
+#else
+    #include <cstdio>
+    #define ESP_LOGE(tag, fmt, ...) printf("E (%s): " fmt "\n", tag, ##__VA_ARGS__)
+    #define ESP_LOGW(tag, fmt, ...) printf("W (%s): " fmt "\n", tag, ##__VA_ARGS__)
+    #define ESP_LOGI(tag, fmt, ...) printf("I (%s): " fmt "\n", tag, ##__VA_ARGS__)
+    #define ESP_LOGD(tag, fmt, ...) printf("D (%s): " fmt "\n", tag, ##__VA_ARGS__)
+    #define ESP_LOGV(tag, fmt, ...) printf("V (%s): " fmt "\n", tag, ##__VA_ARGS__)
+#endif
+```
+
+**Module logging pattern** (every `.cpp` file):
+```cpp
+#include "platform/LogShim.h"
+static const char* TAG = "MyModule";
+
+ESP_LOGI(TAG, "Initialized with %d items", count);
+ESP_LOGW(TAG, "Timeout after %lu ms", elapsed);
+ESP_LOGE(TAG, "Fatal: filesystem mount failed");
+ESP_LOGD(TAG, "Scheduling source '%s' in %lu ms", name, interval);
+```
+
+### 11A.3 Three-Tier Log Level Control
+
+| Tier | When | Mechanism | Effect |
+|------|------|-----------|--------|
+| **Compile-time ceiling** | Build | `CORE_DEBUG_LEVEL` in `platformio.ini` | Logs above this level are **dead-code eliminated** — format strings removed from binary |
+| **Boot default** | Startup | `CONFIG_LOG_DEFAULT_LEVEL` in `sdkconfig.defaults` | What prints before any runtime configuration |
+| **Runtime per-module** | Anytime | `esp_log_level_set("WiFiManager", ESP_LOG_DEBUG)` | Dynamically crank one module to verbose without rebuilding |
+
+**Build flag configuration:**
+```ini
+# Development — see info, warnings, errors
+build_flags = -DCORE_DEBUG_LEVEL=3
+
+# Production — errors only, all other strings stripped from binary
+build_flags = -DCORE_DEBUG_LEVEL=1
+```
+
+### 11A.4 LogRouter Pipeline
+
+The framework installs a custom `esp_log_set_vprintf()` handler during
+`Application::begin()`. This handler forms a **log pipeline**:
+
+```
+ESP_LOGI(TAG, "...")   → esp_log_write()
+  → LogRouter (custom vprintf handler)
+    → Step 1: Format the string
+    → Step 2: Redact secrets (Logger::redactInPlace)
+    → Step 3: Write to Serial (always)
+    → Step 4: Write to RAM ring buffer (always, ~4-8KB)
+    → Step 5: Dispatch to registered ILogSink implementations
+```
+
+**Secret redaction** is applied globally via the `Logger` library's
+`redactInPlace()` function. Any string registered as a secret via
+`Logger::registerSecret()` is automatically masked with `*` characters
+in all log output. This is safe for development use; production builds
+strip most log output entirely via `CORE_DEBUG_LEVEL`.
+
+### 11A.5 `ILogSink` Interface
+
+```cpp
+class ILogSink {
+public:
+    virtual ~ILogSink() = default;
+    virtual void write(const char* formattedLine, size_t len) = 0;
+};
+```
+
+Registered via `app.registerLogSink(ILogSink*)`. The LogRouter dispatches
+formatted, redacted log lines to all registered sinks after writing to Serial.
+This follows the same Hollywood Principle pattern as `IWebContributor` and
+`IMcpContributor`.
+
+### 11A.6 RAM Ring Buffer & Crash Persistence
+
+The LogRouter maintains a **RAM ring buffer** (~4-8KB) that always contains
+the most recent log output. This buffer serves two purposes:
+
+1. **Live telemetry**: Optional `ILogSink` implementations (e.g., MQTT) read
+   from the buffer and flush to their transport periodically.
+2. **Post-mortem "black box"**: On panic/crash, a registered panic handler
+   dumps the ring buffer contents to a small LittleFS file. On next boot,
+   the application reads the crash log, optionally publishes it, and deletes it.
+
+**Why RAM, not flash?**
+- Flash write endurance is 10,000–100,000 erase cycles per sector
+- Continuous logging at ~10 lines/sec would kill the flash partition in ~4 months
+- Flash writes take 20–200ms, violating the ≤10ms tick budget if triggered from
+  a log call
+- RAM ring buffer has zero write latency and infinite write endurance
+- Flash persistence is only used on crash — maybe once a week/month — negligible
+  wear
+
+### 11A.7 Heartbeat Telemetry
+
+The `Application::tick()` loop emits a periodic heartbeat log every ~15 seconds
+containing:
+- Free heap (via `heap_caps_get_free_size(MALLOC_CAP_8BIT)`)
+- Minimum free heap watermark (via `heap_caps_get_minimum_free_size(MALLOC_CAP_8BIT)`)
+- Uptime in seconds
+- WiFi RSSI (if connected)
+
+This provides continuous runtime observability without requiring any external
+monitoring infrastructure — just a serial connection.
+
+### 11A.8 Optional MQTT Telemetry Module
+
+An optional module (`mqttTelemetry`) can be added to any application for remote
+log forwarding. It implements `ILogSink` and:
+
+- Reads from the LogRouter's RAM ring buffer
+- A background FreeRTOS task flushes batched log lines to the MQTT broker
+  periodically (e.g., every 5-15 seconds)
+- Publishes to a structured topic: `devices/{device_id}/logs`
+- If MQTT is disconnected, it silently drops the oldest entries (never blocks)
+- The `esp_log_set_vprintf()` call path is **never blocked** by network I/O
+
+This module is **not part of the kernel** — it is an optional module that
+applications include if they need remote observability.
+
+### 11A.9 Module Logging Requirements
+
+Every module in the framework MUST include logging at the following lifecycle
+points:
+
+| Lifecycle Point | Level | Purpose |
+|----------------|-------|--------|
+| `begin()` / init | `ESP_LOGI` | Confirm initialisation, log key parameters |
+| State transitions | `ESP_LOGI` | Boot phase changes, sleep/wake, sync completion |
+| Registration | `ESP_LOGD` | Source/board/tool registration (debug level) |
+| Error paths | `ESP_LOGE` | All error returns, failed operations |
+| Degraded paths | `ESP_LOGW` | Timeouts, fallbacks, rejected registrations |
+| Hot-path detail | `ESP_LOGD` | Per-fetch, per-dispatch detail (stripped in production) |
+
+**Prohibited patterns:**
+- `Serial.print()` / `Serial.printf()` for logging
+- Per-module custom macro shims (e.g., `MY_MODULE_LOGI`)
+- Logging inside `tick()` at `ESP_LOGI` level for per-frame events (use `ESP_LOGD`)
+
+---
+
 ## 12. Repository & Build Architecture
 
 ### 12.1 Repository Topology
@@ -1107,6 +1273,8 @@ The framework deliberately uses a monorepo topology rather than splitting into s
 esp32-app-foundation/           ← Monorepo (everything lives here)
   include/                      ← All framework interface headers + FrameworkConfig
     interfaces/                 ← Pure abstract interfaces (ITickable, etc.)
+    platform/                   ← Platform abstraction headers
+      LogShim.h                 ← Unified ESP-IDF ↔ native logging bridge
     portal_assets/              ← Generated PROGMEM gzip headers (build output)
     AppFoundation.h             ← Canonical single-include façade
     AppState.hpp                ← BOOTING, WIFI_SETUP, APP_SETUP, RUNNING
@@ -1536,7 +1704,7 @@ constexpr char CONFIG_PATH[] = "/mod/mymodule.json";
 void MyModule::loadConfig() {
     File f = LittleFS.open(CONFIG_PATH, "r");
     if (!f) { writeDefaults(); return; }
-    StaticJsonDocument<512> doc;   // bounded — never DynamicJsonDocument
+    JsonDocument doc;   // ArduinoJson v7 unified type
     deserializeJson(doc, f);
     strlcpy(_config.host, doc["host"] | "localhost", sizeof(_config.host));
     _config.port = doc["port"] | 1883;
@@ -1551,7 +1719,8 @@ void MyModule::loadConfig() {
 - [ ] Publishes to EventBus topics for cross-module messages (e.g., `"display.message"`)
 - [ ] Config file is stored at `/mod/<modulename>.json` — nowhere else
 - [ ] Config file includes a `configVersion` field; module validates and migrates on load
-- [ ] Config is parsed with `StaticJsonDocument<N>` — never `DynamicJsonDocument`
+- [ ] Config is parsed with `JsonDocument` (ArduinoJson v7) — never v6 `StaticJsonDocument` or `DynamicJsonDocument`
+- [ ] All logging uses `#include "platform/LogShim.h"` + `ESP_LOGx(TAG, ...)` — never `Serial.print()` or custom macros
 - [ ] Module instance declared `static` — never stack-allocated
 - [ ] Never `#include`s another optional module header
 - [ ] `tick()` completes in ≤ 10ms — long I/O is deferred to a FreeRTOS task
@@ -1665,6 +1834,13 @@ This section tracks decisions made and questions still to resolve.
 | D21 | `setMaxBodySize()` unavailable; per-handler body validation | Library method doesn't exist; manual len/total checks |
 | D22 | POSIX TZ via `setenv`/`tzset` for timezone | Leverages standard `localtime()` for automatic DST handling |
 | D23 | Non-blocking async NTP sync | Never blocks boot; sync checked asynchronously |
+| D27 | Standardise on `ESP_LOGx` via `LogShim.h` — no custom macros | ESP-IDF logging provides compile-time stripping, runtime per-module control, thread safety, and pluggable backends |
+| D28 | Global secret redaction via `esp_log_set_vprintf()` pipeline | All log output automatically redacted; only matters during debug builds where logging is active |
+| D29 | RAM ring buffer for log capture, flash only on crash | Flash endurance (10K-100K cycles) and write latency (20-200ms) make continuous flash logging infeasible; RAM has zero overhead |
+| D30 | `ILogSink` interface for pluggable log destinations | Mirrors `IWebContributor`/`IMcpContributor` pattern; enables optional MQTT telemetry without kernel coupling |
+| D31 | Heartbeat telemetry every ~15s in `Application::tick()` | Provides continuous runtime observability (heap, uptime, RSSI) with zero external infrastructure |
+| D32 | MQTT telemetry as optional module, not kernel | Not all apps need remote logging; kernel stays minimal |
+| D33 | ArduinoJson v7 `JsonDocument` replaces v6 `StaticJsonDocument`/`DynamicJsonDocument` | Unified API; v6 types are deprecated |
 | D24 | `build_fonts.py`/`generate_layouts.py` as standalone CLI, not PIO hooks | Avoids breaking builds if input files are missing |
 | D25 | `U8G2_DISPLAY_TYPE` macro for display controller selection | Overridable via `build_flags`; default SSD1306 128x64 |
 | D26 | Dual framework: Arduino + ESP-IDF | OTA rollback, IDF logging, DeviceCrypto require IDF; display/web libs require Arduino |
@@ -1691,4 +1867,6 @@ This section tracks decisions made and questions still to resolve.
 ---
 
 *This document is a living specification. It was updated on 2026-05-22 to reflect
-all architectural decisions made during PR-01 through PR-08 implementation.*
+all architectural decisions made during PR-01 through PR-08 implementation,
+including the unified logging/observability architecture (§11A) and ArduinoJson
+v7 migration.*
