@@ -183,6 +183,12 @@ public:
      */
     McpServer& getMcpServer();
 
+    /**
+     * @brief Get the application's FrameworkConfig (read-only).
+     * @return Const reference to the stored FrameworkConfig.
+     */
+    const FrameworkConfig& getConfig() const;
+
     // -------------------------------------------------------------------------
     // State Accessors
     // -------------------------------------------------------------------------

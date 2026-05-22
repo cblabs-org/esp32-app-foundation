@@ -1427,12 +1427,187 @@ and is handled by a dedicated `KeyManager` kernel component:
 
 ### 13.3 OTA Security & Blessing Ceremony
 
-GitHub-based OTA:
-- Downloads firmware only over HTTPS with certificate validation
-- Verifies firmware binary via streaming MD5 (per-chunk, never full-file in RAM)
-- Uses ESP-IDF's partition rollback (`CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y`)
+The framework provides a complete OTA firmware update pipeline: release discovery
+→ binary download → cryptographic signature verification → flash → reboot. The
+pipeline replaces the earlier MD5-only verification with full RSA+SHA256 signature
+validation, providing tamper-proof firmware authenticity when configured with a
+public key.
 
-**Firmware Blessing Ceremony:**
+#### 13.3.1 Architecture Overview
+
+The OTA subsystem is composed of three layers, each with a distinct responsibility:
+
+| Layer | Location | Responsibility |
+|-------|----------|----------------|
+| **`otaUpdateManager`** | `modules/otaUpdateManager/` | Orchestrator — state machine, FreeRTOS task, EventBus progress, REST API routes |
+| **`OtaDownloadEngine`** | `lib/otaDownloadEngine/` | Utility — redirect-aware HTTP download, binary header verification, chunked streaming flash, verifier integration |
+| **`IOtaVerifier` / `MbedTLSSignatureVerifier`** | `include/interfaces/` + `lib/otaDownloadEngine/` | Interface + default impl — RSA+SHA256 signature verification via mbedtls |
+
+The three layers follow the Hollywood Principle: `otaUpdateManager` (a module)
+depends on `OtaDownloadEngine` and `IOtaVerifier` (both in `lib/`), but the
+libraries have no knowledge of the module. The download engine accepts a
+`WiFiClient&` from the caller and never creates its own network client.
+
+#### 13.3.2 Cryptographic Verification Pipeline
+
+The `IOtaVerifier` interface defines a three-step verification contract:
+
+```cpp
+class IOtaVerifier {
+public:
+    virtual bool begin(const char* publicKeyPem) = 0;   // Load key + init digest
+    virtual void update(const uint8_t* data, size_t length) = 0;  // Per-chunk hash
+    virtual bool verify(const uint8_t* signature, size_t signatureLength) = 0;  // Validate
+};
+```
+
+**Default implementation: `MbedTLSSignatureVerifier`**
+
+- Uses `mbedtls_pk_context` for public key parsing and `mbedtls_md_context_t`
+  for SHA-256 digest accumulation
+- RAII lifecycle — destructor calls `mbedtls_pk_free()` + `mbedtls_sha256_free()`,
+  preventing resource leaks even on error paths
+- The public key is PEM-encoded RSA, injected at runtime via
+  `FrameworkConfig.otaPublicKey` — never hardcoded in the framework
+- Non-copyable, non-movable (owns mbedtls context handles)
+- On native builds (`NATIVE_BUILD`), stub implementations compile cleanly but
+  return failure, enabling interface contract tests without crypto dependencies
+
+**Degraded security mode:** If `FrameworkConfig.otaPublicKey` is `nullptr`,
+signature verification is **skipped entirely**. The download proceeds without
+cryptographic validation, and a warning is logged at `ESP_LOGW` level. This
+allows development and testing without key infrastructure but should never be
+used in production deployments.
+
+#### 13.3.3 Download Engine
+
+`OtaDownloadEngine` handles the complete binary download pipeline:
+
+1. **Redirect-following HTTP GET** — up to 5 hops (`kMaxRedirects`), using
+   HTTP/1.0 to avoid chunked-transfer encoding complications on the ESP32
+2. **Separate `.sig` file fetch** — `fetchSignature()` downloads the detached
+   signature file with its own redirect chain
+3. **ESP32 binary header validation** — verifies the first byte is the ESP32
+   magic byte `0xE9`, rejecting non-firmware payloads before any flash write
+4. **Partition space validation** — checks `Content-Length` against
+   `ESP.getFreeSketchSpace()`, failing early with `OtaError::InsufficientSpace`
+   if the binary exceeds the available OTA partition
+5. **Chunked streaming write** — reads the binary in 1024-byte chunks
+   (`kChunkSize`), writing each chunk to the flash via `Update.write()` and
+   feeding it to `IOtaVerifier::update()` for hash accumulation
+6. **Post-download signature verification** — calls `IOtaVerifier::verify()`
+   against the fetched `.sig` file contents
+7. **Progress callbacks** — invokes `OtaProgressCallback(bytesWritten, totalSize)`
+   after each chunk for UI integration
+
+**Error codes** (`OtaError` enum):
+
+| Code | Value | Description |
+|------|-------|-------------|
+| `None` | 0 | Success |
+| `HttpConnectionFailed` | -1 | TCP/TLS connection could not be established |
+| `HttpWrongResponseCode` | -2 | Unexpected HTTP status code |
+| `HttpFileNotFound` | -3 | Server returned 404 |
+| `HttpForbidden` | -4 | Server returned 403 |
+| `ServerNoContentLength` | -5 | Server did not report Content-Length |
+| `TooManyRedirects` | -6 | Exceeded 5 redirect hops |
+| `InsufficientSpace` | -7 | Binary exceeds free sketch space |
+| `NoOtaPartition` | -8 | No OTA partition available |
+| `BinaryHeaderInvalid` | -9 | First byte is not `0xE9` |
+| `SignatureFetchFailed` | -10 | Failed to download `.sig` file |
+| `SignatureVerifyFailed` | -11 | Cryptographic verification failed |
+| `UpdateBeginFailed` | -12 | `Update.begin()` returned false |
+| `UpdateWriteFailed` | -13 | `Update.write()` wrote fewer bytes than expected |
+| `UpdateEndFailed` | -14 | `Update.end()` returned false |
+| `StreamReadTimeout` | -15 | Stream read timed out during download |
+
+Each error maps to a human-readable string via `otaErrorToString()`.
+
+> **Design constraint:** The engine does NOT own the `WiFiClient` — the caller
+> passes a configured client by reference. This allows the orchestrator to
+> control TLS configuration and heap allocation per §14.3.
+
+#### 13.3.4 Orchestrator State Machine
+
+`otaUpdateManager` manages the OTA lifecycle through the `OtaState` enum:
+
+```
+Idle → Checking → Idle              (no update found)
+Idle → Downloading → Verifying → Complete → (reboot)
+Any  → Error                        (on failure)
+```
+
+| State | Description |
+|-------|-------------|
+| `Idle` | No OTA activity — ready to accept a check or update |
+| `Checking` | Querying GitHub for latest release metadata |
+| `Downloading` | FreeRTOS task running the download pipeline |
+| `Verifying` | Signature verification in progress |
+| `Complete` | Update finalised — waiting for reboot |
+| `Error` | An error occurred (query `getLastOtaError()` for details) |
+
+**`checkForUpdate()`** creates a `GithubClient` with the repo and token from
+`FrameworkConfig`, queries the latest release, and returns `true` if a new
+release is available. Guards: must be in `Idle` state with a configured
+`otaGithubRepo`.
+
+**`performUpdate()`** launches a FreeRTOS task (8KB stack, priority 1) that
+executes the full 8-step pipeline:
+
+1. Check GitHub for releases via `GithubClient`
+2. Find `.bin` and `.sig` assets in the release
+3. Initialise `MbedTLSSignatureVerifier` (if `otaPublicKey` configured)
+4. Allocate `WiFiClientSecure` on the heap (per §14.3)
+5. Create and configure `OtaDownloadEngine`
+6. Fetch the `.sig` signature file
+7. Download and flash the firmware binary
+8. Finalise and reboot (2-second delay for event propagation)
+
+The FreeRTOS task ensures the `tick() ≤ 10ms` constraint is never violated by
+blocking download I/O. On native builds, `performUpdate()` sets `OtaState::Error`
+(no FreeRTOS available).
+
+#### 13.3.5 FrameworkConfig OTA Fields
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `firmwareUpdatesEnabled` | `bool` | `true` | Master kill-switch for OTA update checks |
+| `otaQuietHour` | `uint8_t` | `3` | Hour (0–23) during which OTA checks are suppressed |
+| `otaPublicKey` | `const char*` | `nullptr` | PEM-encoded RSA public key for signature verification. `nullptr` = skip verification (degraded mode) |
+| `otaGithubRepo` | `const char*` | `nullptr` | GitHub repository in `"owner/repo"` format for OTA releases |
+| `otaGithubToken` | `const char*` | `nullptr` | Optional GitHub access token for private repos |
+
+All OTA config fields have safe defaults so the framework boots without
+requiring any OTA configuration. The consuming app populates these fields
+during the `BOOTING` phase via `FrameworkConfig`.
+
+#### 13.3.6 EventBus Integration
+
+The orchestrator publishes `OtaProgressEvent` on topic `"ota.progress"`:
+
+```cpp
+struct OtaProgressEvent {
+    float progress;       // 0.0 to 1.0 download fraction
+    const char* status;   // Human-readable status message
+    bool complete;        // True when OTA cycle is finished
+    bool success;         // True if OTA succeeded (only valid when complete)
+};
+```
+
+`OtaProgressEvent` is **layout-compatible** with `OtaProgressPayload` in
+`u8g2DisplayModule.hpp` — the display module subscribes to `"ota.progress"` and
+can safely cast the payload to either type for rendering the `OtaProgressBoard`.
+
+Events are published:
+- At each major pipeline step (checking, downloading, verifying, complete, error)
+- On every progress callback from the download engine (per-chunk granularity)
+- With `complete=true` on both success and failure (check `success` to distinguish)
+
+#### 13.3.7 Firmware Blessing Ceremony
+
+After the OTA pipeline completes and the device reboots, the new firmware enters
+a "pending verification" state managed by the ESP-IDF bootloader:
+
 1. New firmware boots in "pending verification" state
 2. The **`Application` hub** (not `otaUpdateManager`) calls
    `esp_ota_mark_app_valid_cancel_rollback()` after verifying:
@@ -1444,6 +1619,47 @@ GitHub-based OTA:
 
 > **Prohibited:** Blessing the partition at download/write time. This defeats the
 > rollback purpose — firmware could still have fatal startup or runtime crashes.
+
+This requires `CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y` in `sdkconfig.defaults`
+(see §14.3).
+
+#### 13.3.8 REST API
+
+The `otaUpdateManager` registers the following routes via `IWebContributor`:
+
+| Method | Route | Action | Description |
+|--------|-------|--------|-------------|
+| `GET` | `/api/ota` | — | Returns `{ "status": "ready" }` |
+| `POST` | `/api/ota` | `"checkGithub"` | Triggers `checkForUpdate()` + `performUpdate()` if an update is available |
+| `POST` | `/api/ota` | `"status"` | Returns `{ "state": "idle\|checking\|downloading\|verifying\|complete\|error", "lastError": "..." }` |
+| `POST` | `/api/ota` | `"rollback"` | Triggers `rollbackFirmware()` — reverts to previous partition and reboots |
+| `POST` | `/api/ota` | `"markValid"` | Calls `markAppValid()` — blesses the running firmware |
+
+The `checkGithub` action is the primary entry point for web-triggered OTA
+updates. It performs the check and immediately starts the update pipeline if a
+new release is found.
+
+#### 13.3.9 Security Considerations
+
+- **Public key management:** The consuming app provides the PEM-encoded RSA
+  public key via `FrameworkConfig.otaPublicKey`. The framework never hardcodes
+  key material — this is an app-side responsibility
+- **WiFiClientSecure allocation:** Always heap-allocated via
+  `std::unique_ptr<WiFiClientSecure>(new (std::nothrow) WiFiClientSecure())`
+  per §14.3 memory rules — never on the stack
+- **GitHub CDN TLS:** Uses `setInsecure()` for CDN redirect hops because GitHub's
+  CDN endpoints use different certificate chains than `api.github.com`. The
+  initial API call to `api.github.com` uses the standard cert chain
+- **Degraded mode warning:** If no public key is configured, downloads proceed
+  without signature verification. A warning is logged at `ESP_LOGW` level. This
+  is acceptable for development but should be addressed before production
+  deployment
+- **Rollback safety:** The blessing ceremony (§13.3.7) ensures that bad firmware
+  is automatically reverted by the bootloader if core services fail to initialise
+- **Legacy direct-upload path:** The web-upload OTA route
+  (`beginUpdate`/`writeStream`/`endUpdate`) is preserved alongside the new
+  GitHub pipeline. It uses MD5 verification via `Update.setMD5()` — this path
+  does not use RSA+SHA256 signature verification
 
 ### 13.4 Web Portal Security
 
