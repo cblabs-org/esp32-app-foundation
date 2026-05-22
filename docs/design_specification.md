@@ -1,9 +1,9 @@
 # ESP32 App Foundation — Design Specification
 
-**Status:** Draft  
-**Version:** 0.1  
+**Status:** v1.0 (Post-Implementation)  
+**Version:** 1.0  
 **Author:** CB Labs  
-**Last Updated:** 2026-05-19
+**Last Updated:** 2026-05-22
 
 ---
 
@@ -24,7 +24,8 @@
 13. [Security Architecture](#13-security-architecture)
 14. [Resource Budget & Constraints](#14-resource-budget--constraints)
 15. [Module Authoring Guide](#15-module-authoring-guide)
-16. [Open Questions & Decision Log](#16-open-questions--decision-log)
+16. [Testing Architecture](#16-testing-architecture)
+17. [Open Questions & Decision Log](#17-open-questions--decision-log)
 
 ---
 
@@ -44,10 +45,11 @@ The **ESP32 App Foundation** is a **C++ application framework** for ESP32 device
 built with PlatformIO (Arduino + ESP-IDF dual framework). It provides:
 
 - A structured, deterministic application lifecycle (`begin()` / `tick()`)
-- Pre-wired core services (WiFi, Config, OTA, Web Portal, Crypto, Logging)
+- Pre-wired core services (WiFi, Config, OTA, Web Portal, Crypto, Logging, MCP)
 - A registration bus so optional modules self-attach without kernel changes
 - Defined extension points where app-specific logic plugs in
 - A base web portal that apps extend with custom tabs
+- A composable widget toolkit for U8G2 monochrome displays
 
 ### 1.3 What This Framework Is Not
 
@@ -71,12 +73,13 @@ display) demonstrates the class of application this framework targets.
 
 ### 1.5 Goals
 
-- A new app can be created by cloning a template repo and writing only application-
-  specific code
+- A new app can be created by cloning the `template/` skeleton and writing only
+  application-specific code
 - Adding or removing optional modules requires only changes to `platformio.ini` and
-  `appSetup.cpp` — no kernel changes
-- Framework updates (bug fixes, new features) flow to all derived apps via `pio pkg update`
-- The framework compiles cleanly on both `esp32dev` and `esp32s3nano` environments
+  app setup code — no kernel changes
+- Framework updates flow to all derived apps via git submodule SHA pinning
+- The framework compiles cleanly on `esp32dev`, `esp32s3nano`, and `native`
+  (host CPU for GoogleTest) environments
 
 ---
 
@@ -99,14 +102,14 @@ rigidity and allows modules to be independently composed.
 
 Optional modules never `#include` other optional modules. All inter-module
 communication routes through the framework kernel via shared services
-(`MessagePool`, `IStatusReporter`) or framework-mediated callbacks. This
+(`EventBus`, `IStatusReporter`) or framework-mediated callbacks. This
 guarantees any combination of modules compiles correctly.
 
 ### 2.4 Kernel Knows Nothing About Modules
 
 The framework kernel does not `#include` any optional module. Modules self-register
 by calling `Application.register*()` methods. This is enforced at the include-graph
-level — a CI check should verify no kernel header imports a module header.
+level — the CI workflow verifies no kernel header imports a module header.
 
 ### 2.5 Boot-Phase Allocation — Not Static, Not Unconstrained
 
@@ -117,11 +120,11 @@ functionally indistinguishable from static allocation in terms of heap health.
 
 The framework uses a **two-tier vector model**:
 
-- **Structural arrays** (`ITickable*`, `IDisplayBoard*`, `iDataSource*`) — built
-  with `std::vector` during `begin()` or a controlled soft-reset sequence, then
-  `shrink_to_fit()` is called to release over-allocated capacity. These arrays
-  are **never mutated during `tick()` steady-state**. Any structural change
-  (e.g. adding a display board) requires a soft-reset.
+- **Structural arrays** (`ITickable*`, `IDisplayBoard*`, `iDataSource*`,
+  `IMcpContributor*`) — built with `std::vector` during `begin()` or a controlled
+  soft-reset sequence, then `shrink_to_fit()` is called to release over-allocated
+  capacity. These arrays are **never mutated during `tick()` steady-state**. Any
+  structural change (e.g. adding a display board) requires a soft-reset.
 
 - **Lightweight arrays** (`KeyManager` entries, web routes, config consumers) —
   `std::vector` that may grow at any time since additions do not affect loop
@@ -178,6 +181,33 @@ a Linux-inspired layout so that file ownership is immediately self-evident:
 
 **Why short names?** LittleFS stores directory entries inline; shorter path components reduce inode overhead on the 4MB flash partition.
 
+### 2.8 Native Build Portability
+
+All framework code must compile on both ESP32 hardware targets and host CPU
+(x86_64/arm64) for native GoogleTest execution. This is a non-negotiable
+cross-cutting concern that affects every module.
+
+- Hardware-specific APIs (`esp_restart()`, `LittleFS`, `WiFi.h`, free heap queries)
+  are wrapped in `#ifndef NATIVE_BUILD` preprocessor guards
+- Interface headers use forward declarations for external library types
+  (e.g., `class U8G2;`, `class AsyncWebServer;`) — never `#include` heavy
+  hardware-dependent headers
+- Widget and board `render()` methods are no-ops on native; logic-only paths
+  (tick, state machines, scheduling) are fully testable
+- The `millis()` function is avoided in headers; `currentMillis` parameter
+  injection is the preferred pattern for testability
+
+> **Critical LDF constraint:** PlatformIO's Library Dependency Finder (LDF)
+> scans `#include` directives as **text patterns** regardless of `#ifdef`
+> preprocessor guards. A conditional `#include "Application.hpp"` inside
+> `#ifndef NATIVE_BUILD` will still trigger LDF to resolve and compile the
+> entire dependency chain. Always forward-declare in headers.
+
+### 2.9 No Monolithic Services
+
+Each kernel concern lives in a distinct, self-contained service module. Bundling
+multiple concerns into a single "systemManager" is explicitly prohibited.
+
 ---
 
 ## 3. System Architecture Overview
@@ -197,51 +227,66 @@ a Linux-inspired layout so that file ownership is immediately self-evident:
 │  U8G2 Display Module  │  MQTT Module                    │
 │  TFT Display Module   │  HomeAssistant Module           │
 │  Weather Client       │  RSS Client                     │
-│  MCP Server Module    │  Scheduler Module               │
-│  boardLED             │  buttonHandler                  │
-│                       │  (future modules...)            │
+│  Scheduler            │  boardLED                       │
+│  buttonHandler        │  (future modules...)            │
 └───────────────────────┬─────────────────────────────────┘
                         │  uses framework interfaces
 ┌───────────────────────▼─────────────────────────────────┐
 │                  FRAMEWORK KERNEL                        │
-│  Application (DI hub) │  configManager                 │
-│  keyManager           │  dataManager + iDataSource     │
-│  wifiManager          │  otaUpdateManager              │
-│  webServer (base)     │  timeManager                   │
-│  deviceCrypto         │  EventBus                      │
-│  logger (ESP-IDF wrap)│                                │
+│  Application (DI hub) │  configManager                  │
+│  keyManager           │  dataManager + iDataSource      │
+│  wifiManager          │  otaUpdateManager               │
+│  webServer            │  timeManager                    │
+│  deviceCrypto         │  EventBus                       │
+│  mcpServer            │  logger (ESP-IDF wrap)          │
+│  githubClient         │  md5Utils                       │
 └─────────────────────────────────────────────────────────┘
 │            PlatformIO / Arduino + ESP-IDF               │
 └─────────────────────────────────────────────────────────┘
 ```
 
+All tiers live in a **single monorepo** (`esp32-app-foundation`). There is no
+separate `esp32-modules` repo — optional modules live alongside kernel modules
+under `modules/`. Apps consume the framework via git submodule.
+
 ### 3.2 `Application` as the System Hub
 
 `Application` is the single composition root and the central name for the framework's
 DI hub. It:
-- Owns all kernel services by value (deterministic lifetime, avoids heap)
-- Exposes kernel services via accessor methods (DI injection points)
-- Maintains registration lists for tickables, config consumers, and data sources
+- Owns all kernel services as member variables (deterministic lifetime, avoids heap):
+  - `EventBus _eventBus`
+  - `DataManager _dataManager`
+  - `WebServerManager _webServerManager`
+  - `McpServer _mcpServer`
+  - `NullStatusReporter _nullReporter` (private nested class)
+- Exposes kernel services via reference getter methods (DI injection points)
+- Maintains registration lists for tickables, config consumers, data sources,
+  web contributors, and MCP contributors
 - Owns and drives the `AppState` state machine
 - Dispatches `begin()` and `tick()` to all registered components in the correct order
+- Provides `softReset()` for structural changes at runtime
 
-Application code receives an `Application*` pointer at setup and uses it to access
-services — it never constructs kernel services directly.
+`Application` is instantiated as a **file-scope static** in `src/main.cpp` — never
+stack-allocated, never a singleton via `getInstance()`. Application code receives
+an `Application*` pointer at setup and uses it to access services — it never
+constructs kernel services directly.
 
 ### 3.3 Entry Point Contract
 
-The framework owns `setup()` and `loop()`. The template project's `main.cpp`
-contains only:
+The framework owns `setup()` and `loop()`. The `src/main.cpp` contains only:
 
 ```cpp
 #include <AppFoundation.h>
 #include "myApp.hpp"
 
-MyApp app;
+static MyApp app;
 
 void setup() { app.begin(); }
 void loop()  { app.tick();  }
 ```
+
+`AppFoundation.h` is the **canonical single-include façade** — it includes all
+framework interface headers. Downstream consumers should only include this file.
 
 `MyApp` instantiates its modules and registers them with the `Application` hub
 inside `begin()`.
@@ -257,35 +302,42 @@ The kernel is always present. No app can opt out of kernel services.
 | Component | Purpose | Source |
 |---|---|---|
 | `Application` | DI hub, orchestrator, AppState owner | `modules/application/` |
-| `configManager` | LittleFS JSON config persistence | `modules/configManager/` |
+| `configManager` | LittleFS JSON config persistence with schema versioning | `modules/configManager/` |
 | `keyManager` | Encrypted API key/credential registry (uses DeviceCrypto) | `modules/keyManager/` |
-| `dataManager` | Background HTTP fetch worker (FreeRTOS task) | `modules/dataManager/` |
+| `dataManager` | Background data-source scheduler (FreeRTOS task) | `modules/dataManager/` |
 | `wifiManager` | WiFi connection + captive portal AP mode | `modules/wifiManager/` |
-| `webServer` | ESPAsyncWebServer, base portal routes | `modules/webServer/` |
-| `otaUpdateManager` | GitHub-based OTA firmware updates | `modules/otaUpdateManager/` |
-| `timeManager` | NTP sync, timezone management | `modules/timeManager/` |
-| `EventBus` | Generic typed publish/subscribe event bus | `modules/eventBus/` |
-| `deviceCrypto` | Hardware-backed key derivation & encryption | `lib/deviceCrypto/` |
-| `logger` | Thin wrapper around ESP-IDF logging (adds secret redaction) | `lib/logger/` |
+| `webServer` | ESPAsyncWebServer, base portal routes, `IWebContributor` dispatch | `modules/webServer/` |
+| `otaUpdateManager` | GitHub-based OTA firmware updates with rollback | `modules/otaUpdateManager/` |
+| `timeManager` | Non-blocking NTP sync, POSIX timezone management | `modules/timeManager/` |
+| `EventBus` | Synchronous publish/subscribe with static fn-ptr callbacks | `modules/eventBus/` |
+| `mcpServer` | JSON-RPC MCP server (Serial + HTTP transport) | `modules/mcpServer/` |
+| `deviceCrypto` | Hardware-backed key derivation & AES-256 encryption | `lib/deviceCrypto/` |
+| `logger` | Thin wrapper around ESP-IDF logging (adds `LOG_SECURE()` redaction) | `lib/logger/` |
 | `githubClient` | HTTPS GitHub API client (used by OTA) | `lib/githubClient/` |
-| `md5Utils` | MD5 hashing utility | `lib/md5Utils/` |
+| `md5Utils` | Streaming MD5 hashing via MbedTLS (incremental, not full-file) | `lib/md5Utils/` |
 
 ### 4.2 Kernel Configuration
 
 The kernel's config schema (`FrameworkConfig`) covers only cross-cutting concerns:
 
 ```
-hostname          — Network mDNS hostname
-timezone          — POSIX timezone string
-brightness        — Default display brightness (if display present)
+hostname                — Network mDNS hostname
+timezone                — POSIX timezone string
+brightness              — Default display brightness (if display present)
 firmwareUpdatesEnabled  — OTA update toggle
-otaQuietHour      — Hour of quiet OTA check (default 3am)
+otaQuietHour            — Hour of quiet OTA check (default 3am)
 carouselIntervalSecs    — Default display rotation interval
 manualOverrideTimeoutSecs — Button override duration
+mcpReadOnly             — MCP read-only mode toggle (default false)
 ```
 
-All domain-specific and module-specific fields live in separate config files
-managed by their respective modules.
+`FrameworkConfig` is passed to `Application::begin(config)`. All domain-specific
+and module-specific fields live in separate config files managed by their
+respective modules.
+
+> **Required downstream build flag:** Apps must define `APP_FOUNDATION_VERSION`
+> in their `platformio.ini` `build_flags` (e.g., `-DAPP_FOUNDATION_VERSION=\"0.1.0\"`).
+> The Application hub uses this for the boot banner.
 
 ---
 
@@ -295,24 +347,25 @@ managed by their respective modules.
 
 A module is an optional unit of functionality that:
 1. Implements one or more framework interfaces (`ITickable`, `iConfigurable`,
-   `iDataSource`, `IStatusReporter`)
-2. Self-registers with `appContext` during app setup
-3. Manages its own configuration file on LittleFS
+   `iDataSource`, `IStatusReporter`, `IWebContributor`, `IMcpContributor`)
+2. Self-registers with `Application` during app setup
+3. Manages its own configuration file on LittleFS under `/mod/`
 4. Registers its own web portal routes (if it has a UI)
 5. **Never directly `#include`s another optional module**
 
-### 5.2 Module Catalog (Planned)
+### 5.2 Module Catalog
+
+All modules live under `modules/` in the monorepo alongside kernel modules.
 
 | Module | Interfaces | Config File | Notes |
 |---|---|---|---|
-| `u8g2-display` | `ITickable`, `IStatusReporter`, `iConfigurable` | `/display.json` | Monochrome OLED/LCD |
-| `tft-display` | `ITickable`, `IStatusReporter`, `iConfigurable` | `/display.json` | Colour TFT/touch |
-| `mqtt-client` | `ITickable`, `iConfigurable` | `/mqtt.json` | |
-| `homeassistant` | `ITickable`, `iConfigurable` | `/ha.json` | |
-| `weather-client` | `iDataSource`, `iConfigurable` | `/weather.json` | |
-| `rss-client` | `iDataSource`, `iConfigurable` | `/rss.json` | |
-| `mcp-server` | `ITickable` | `/mcp.json` | |
-| `scheduler` | `ITickable`, `iConfigurable` | `/scheduler.json` | Generic time-based callback scheduler |
+| `u8g2Display` | `ITickable`, `IStatusReporter`, `iConfigurable` | `/mod/display.json` | Monochrome OLED/LCD + widget toolkit |
+| `tft-display` | `ITickable`, `IStatusReporter`, `iConfigurable` | `/mod/display.json` | Colour TFT/touch (future) |
+| `mqtt-client` | `ITickable`, `iConfigurable` | `/mod/mqtt.json` | (future) |
+| `homeassistant` | `ITickable`, `iConfigurable` | `/mod/ha.json` | (future) |
+| `weather-client` | `iDataSource`, `iConfigurable` | `/mod/weather.json` | (future) |
+| `rss-client` | `iDataSource`, `iConfigurable` | `/mod/rss.json` | (future) |
+| `scheduler` | `ITickable`, `iConfigurable` | `/mod/scheduler.json` | Generic time-based callback scheduler |
 | `boardLED` | `ITickable` | — | Optional: device has a status LED |
 | `buttonHandler` | `ITickable` | — | Optional: device has a physical button |
 
@@ -324,29 +377,48 @@ A module is an optional unit of functionality that:
 
 ### 5.3 Adding a Module to an App
 
-In `platformio.ini`:
-```ini
-lib_deps =
-    https://github.com/matthewmcneill/esp32-app-foundation.git#main
-    https://github.com/matthewmcneill/esp32-modules.git#main
+Apps consume the framework via **git submodule**:
+
+```bash
+# Add the framework as a submodule (pinned to a commit SHA)
+git submodule add https://github.com/matthewmcneill/esp32-app-foundation.git framework
+git submodule update --init
 ```
 
-In `appSetup.cpp`:
+In `platformio.ini`:
+```ini
+[env:esp32dev]
+platform = espressif32
+framework = arduino, espidf
+lib_extra_dirs =
+    framework/modules
+    framework/lib
+lib_deps =
+    framework/                  ; local submodule path
+    olikraus/U8g2@2.36.18
+    bblanchon/ArduinoJson@7.4.3
+    ESP32Async/ESPAsyncWebServer
+extra_scripts =
+    pre:framework/scripts/build_timestamp.py
+```
+
+> **Warning:** `build_src_filter` does NOT work with ESP-IDF (it uses `CMakeLists.txt`
+> for component discovery, not PlatformIO's source filter). Use `lib_extra_dirs` +
+> explicit `lib_deps` instead.
+
+In app setup:
 ```cpp
+#include <AppFoundation.h>
 #include <u8g2DisplayModule.hpp>
-#include <mqttModule.hpp>
 #include <boardLED.hpp>
 
 static U8G2DisplayModule display;
-static MqttModule mqtt;
 static BoardLED statusLed;
 
 void MyApp::begin() {
     app.registerTickable(&display);
-    app.registerTickable(&mqtt);
     app.registerTickable(&statusLed);
     app.registerConfigConsumer(&display);
-    app.registerConfigConsumer(&mqtt);
 }
 ```
 
@@ -354,9 +426,23 @@ void MyApp::begin() {
 
 ## 6. Extension Points & Interfaces
 
-All interfaces live in the framework kernel and are the only cross-tier dependency.
+All interfaces live in the framework kernel under `include/interfaces/` and are the
+only cross-tier dependency.
 
-### 6.1 `ITickable`
+### 6.1 Interface Naming Convention
+
+The framework uses a mixed naming convention inherited from the reference application:
+
+- **PascalCase `I` prefix**: `ITickable`, `IStatusReporter`, `IWebContributor`,
+  `IDisplayBoard`, `IMcpContributor`
+- **camelCase `i` prefix**: `iConfigurable`, `iDataSource`
+
+All interfaces are **pure abstract classes** with only pure virtual methods and
+`virtual ~IFoo() = default;`. Interface headers MUST forward-declare external
+library types (e.g., `class U8G2;`, `class AsyncWebServer;`) — never `#include`
+them. This is required for native build portability.
+
+### 6.2 `ITickable`
 
 ```cpp
 class ITickable {
@@ -369,7 +455,7 @@ public:
 Registered via `app.registerTickable(ITickable*)`. Called every `loop()`.
 Modules use this for polling, state transitions, and heartbeat operations.
 
-### 6.2 `iConfigurable`
+### 6.3 `iConfigurable`
 
 ```cpp
 class iConfigurable {
@@ -382,7 +468,7 @@ public:
 Registered via `app.registerConfigConsumer(iConfigurable*)`. Called on
 boot after config load and after any web portal config update.
 
-### 6.3 `iDataSource`
+### 6.4 `iDataSource`
 
 ```cpp
 class iDataSource {
@@ -399,7 +485,12 @@ Registered via `app.registerDataSource(iDataSource*)`. The `dataManager`
 background task calls `executeFetch()` on a FreeRTOS worker thread — network
 operations must ONLY occur inside this method.
 
-### 6.4 `IStatusReporter`
+> **Note:** `dataManager` is a generic data-source scheduler, not HTTP-specific.
+> HTTP fetching is the responsibility of individual `iDataSource` implementations.
+> `PriorityTier` uses numerical mapping: `HIGH = 0`, `LOW = 2` — lower value
+> means higher scheduling precedence.
+
+### 6.5 `IStatusReporter`
 
 The framework-level abstraction for cross-module status display. Any module can
 report status without depending on a concrete display implementation.
@@ -415,14 +506,15 @@ public:
 ```
 
 Registered via `app.setStatusReporter(IStatusReporter*)`. If no display
-module is present, a `NullStatusReporter` handles calls silently.
+module is present, a `NullStatusReporter` (private nested class within
+`Application`) handles calls silently.
 
-### 6.5 `IDisplayBoard` (Display Module Interface)
+### 6.6 `IDisplayBoard` (Display Module Interface)
 
 See Section 7. This interface is defined by the display module, not the kernel.
 App display boards implement it and register with the display module directly.
 
-### 6.6 `IWebContributor`
+### 6.7 `IWebContributor`
 
 ```cpp
 class IWebContributor {
@@ -436,6 +528,22 @@ public:
 
 Registered via `app.registerWebContributor(IWebContributor*)`. The base
 web portal calls `registerRoutes()` on all contributors during `webServer.init()`.
+`WebServerManager` collects non-null `getTabName()` results to build the
+`GET /api/tabs` response.
+
+### 6.8 `IMcpContributor`
+
+```cpp
+class IMcpContributor {
+public:
+    virtual void registerMcpTools(McpToolRegistry& registry) = 0;
+    virtual ~IMcpContributor() = default;
+};
+```
+
+Registered via `app.registerMcpContributor(IMcpContributor*)`. Mirrors the
+`IWebContributor` pattern — Hollywood Principle applied to MCP tool registration.
+The `McpServer` calls `registerMcpTools()` on all contributors during init.
 
 ---
 
@@ -456,8 +564,8 @@ TFT colour displays implement is architecturally problematic:
 
 | Module | Technology | Use Case |
 |---|---|---|
-| `u8g2-display-module` | U8G2 library | Monochrome OLED/LCD (SSD1322, SH1106, etc.) |
-| `tft-display-module` | LovyanGFX | Colour TFT with touch (ILI9341, ST7789, etc.) |
+| `u8g2Display` | U8G2 library | Monochrome OLED/LCD (SSD1322, SH1106, SSD1306, etc.) |
+| `tft-display` | LovyanGFX | Colour TFT with touch (ILI9341, ST7789, etc.) — future |
 
 Each module provides its own board interface and carousel management. App display
 boards are written natively for their target display technology.
@@ -467,10 +575,24 @@ boards are written natively for their target display technology.
 A display module:
 1. Initialises the physical hardware driver
 2. Implements `IStatusReporter` — enables cross-module status messages
-3. Manages the board carousel (slot pool, rotation, screensaver)
+3. Manages the board carousel (slot pool via `std::vector<IDisplayBoard*>`, locked
+   post-`begin()` — no `MAX_BOARDS` ceiling)
 4. Provides system boards (boot splash, loading, WiFi wizard, OTA progress, error screens)
 5. Exposes `registerBoard(IDisplayBoard*)` for app-specific views
-6. Registers itself with `appContext` as `ITickable` and `iConfigurable`
+6. Registers itself with `Application` as `ITickable` and `iConfigurable`
+
+**Override Board Mechanism**: System boards bypass the carousel entirely via an
+`_overrideBoard` pointer. When `showBoard(IDisplayBoard*)` receives a non-pool
+board, the module stores it in `_overrideBoard` and renders it instead of the
+current carousel board. This ensures system boards (boot splash, error, OTA
+progress) are shown immediately without disrupting carousel state.
+
+**Display Controller Selection**: The `U8G2_DISPLAY_TYPE` macro defaults to
+`U8G2_SSD1306_128X64_NONAME_F_HW_I2C`, overridable via `build_flags` in
+`platformio.ini`. The module owns a `U8G2` instance by value (not pointer).
+
+**System boards** are stored as member variables of the module (not heap-allocated),
+ensuring predictable lifetime and zero heap fragmentation.
 
 ### 7.3 `IDisplayBoard` (U8G2 Variant)
 
@@ -484,12 +606,24 @@ public:
     virtual void render(U8G2& display) = 0;  // U8G2-native
     virtual UpdateStatus updateData() = 0;
     virtual bool isScrollFinished() { return true; }
+    virtual bool isExpired() { return false; }
     virtual ~IDisplayBoard() = default;
 };
 ```
 
-The TFT display module defines an equivalent `ITftDisplayBoard` with
-`render(LovyanGFX& display)`.
+#### Board Expiry Semantics
+
+The `isExpired()` method controls when a board auto-dismisses. The framework uses
+an **asymmetric expiry model** — different board types have different lifecycles:
+
+- **OTA Progress**: `isExpired()` returns `true` when complete AND successful.
+  Failed OTA persists to show the error.
+- **Error Board**: `isExpired()` returns `true` only when explicitly `dismiss()`ed.
+  The `fatal` flag controls UI text ("System halted") but NOT expiry.
+- **Screensaver**: `isExpired()` returns `true` when `!_active`. Starts expired
+  by default; controlled via `activate()`/`deactivate()` lifecycle.
+- **Transient boards** (boot splash, loading): Auto-dismiss after their purpose
+  is fulfilled.
 
 ### 7.4 Board Registration
 
@@ -498,23 +632,116 @@ The TFT display module defines an equivalent `ITftDisplayBoard` with
 u8g2Display.registerBoard(&myDeparturesBoard);
 ```
 
-The display module's static slot pool allocates the slot; the app provides the
+The board slot pool (`std::vector<IDisplayBoard*>`) allocates the slot during
+`begin()`; the pool is locked after `_compactAndLock()`. The app provides the
 board instance (app-owned, static lifetime).
 
 ### 7.5 System Boards
 
-Both display modules provide a standard set of system boards that the framework
+The display module provides a standard set of system boards that the framework
 drives directly during boot, WiFi setup, OTA, and error states:
 
 - Boot Splash
 - Loading / Progress
 - WiFi Setup Wizard
-- Station/App Setup Guide
-- OTA Firmware Update
+- OTA Firmware Update Progress
 - Error screens (WiFi lost, data error, auth error)
 - Screensaver / Sleep Clock
 
+All system boards internally compose with widgets from the widget toolkit (§7.7).
 System board content is customisable per app (app name, logo, branding).
+
+### 7.6 Sleep / Wake Integration
+
+The display module manages power saving via sleep/wake:
+
+- **`_sleep()` sequence**: Set `_sleeping=true` → activate screensaver → show
+  screensaver board → call `setPowerSave(1)` (display off)
+- **`_wake()` sequence**: Set `_sleeping=false` → deactivate screensaver →
+  `setPowerSave(0)` + restore contrast → carousel resumes from current position
+
+Activity tracking: `_lastActivityMs` updated on user interaction; sleep triggered
+after configurable timeout.
+
+### 7.7 Widget Toolkit Architecture
+
+The widget toolkit provides composable UI building blocks for U8G2 displays.
+All widget files live within `modules/u8g2Display/widgets/`, fonts in
+`modules/u8g2Display/fonts/`, and board layout interfaces in
+`modules/u8g2Display/boards/interfaces/`.
+
+#### Three-Tier Widget Architecture
+
+| Tier | Components | Dependencies |
+|---|---|---|
+| **Primitives** | `iGfxWidget`, `drawingPrimitives`, `U8g2StateSaver`, `iBoardLayout` | U8G2 only |
+| **Generic Widgets** | `labelWidget`, `scrollingTextWidget`, `clockWidget`, `progressBarWidget`, `imageWidget` | Tier 1 |
+| **Module-Aware Widgets** | `wifiStatusWidget`, `systemMessageWidget`, `scrollingMessagePoolWidget` | Tier 1 + framework services |
+
+#### `iGfxWidget` (Abstract Base)
+
+```cpp
+class iGfxWidget {
+public:
+    int16_t x, y, width, height;  // concrete members, not virtual getters
+    bool visible = true;
+
+    virtual void tick(uint32_t currentMillis) = 0;
+    virtual void render(U8G2& display) = 0;
+    virtual void renderAnimationUpdate(U8G2& display) {}
+    virtual ~iGfxWidget() = default;
+
+    void setCoords(int16_t x, int16_t y);
+};
+```
+
+Key design decisions:
+- **Concrete x/y/w/h members** — zero vtable overhead for position queries
+- **`currentMillis` parameter injection** — no `Arduino.h` in widget headers
+- **Three-phase lifecycle**: `tick()` for logic, `render()` for full redraw,
+  `renderAnimationUpdate()` for partial animation frames
+
+#### `drawingPrimitives` (Stateless Utility Functions)
+
+Free functions for consistent text rendering with alignment and truncation:
+- `drawText(U8G2&, x, y, text, align, maxWidth)` with `TextAlign` enum
+  (`LEFT`, `CENTER`, `RIGHT`)
+- `blankArea(U8G2&, x, y, w, h)`
+- `drawTriangle(U8G2&, ...)`
+
+`TextAlign` is declared outside `#ifndef NATIVE_BUILD` (universally available).
+All other drawing functions are guarded.
+
+#### `U8g2StateSaver` (RAII Scope Guard)
+
+Non-copyable scope guard that saves/restores U8G2 font, clip window, and draw
+colour. Constructor saves state, destructor restores. Holds `U8G2&` reference —
+zero heap allocation.
+
+#### `iBoardLayout` (Board View Interface)
+
+Decouples rendering from board controller logic. Receives `Application*` for
+framework service access. Forward-declares both `class U8G2;` and
+`class Application;` in the header.
+
+#### `AppFonts` Namespace
+
+Inline functions returning U8G2 built-in Helvetica fonts on hardware, `nullptr`
+on native. `#include <U8g2lib.h>` placed inside the namespace block (never at
+header top level).
+
+#### Display Dimension Queries
+
+All widgets use `display.getDisplayWidth()` and `display.getDisplayHeight()` at
+runtime — **no compile-time `SCREEN_WIDTH`/`SCREEN_HEIGHT` constants**. When
+`width == -1`, widgets fall back to full display width. In `tick()` (where no
+display reference is available), a conservative 256px fallback is used.
+
+#### `scrollingMessagePoolWidget`
+
+Consumes EventBus topic `"display.message"` via static callback + `void* ctx`.
+Maintains a fixed circular buffer (`MessageEntry[8]`). Uses late binding via
+`begin(EventBus*)` — no EventBus dependency at construction time.
 
 ---
 
@@ -527,7 +754,7 @@ the directory convention defined in §2.7:
 
 | Path | Owner | Contents |
 |---|---|---|
-| `/etc/config.json` | Framework kernel | FrameworkConfig (hostname, timezone, OTA) |
+| `/etc/config.json` | Framework kernel | FrameworkConfig (hostname, timezone, OTA, mcpReadOnly) |
 | `/etc/apikeys.json` | Framework kernel | KeyManager encrypted credential store |
 | `/mod/display.json` | Display module | Brightness, flip, sleep timeout |
 | `/mod/mqtt.json` | MQTT module | Broker host, port, credentials |
@@ -541,11 +768,14 @@ the directory convention defined in §2.7:
 - Application code reads/writes only `app/`
 - No component reads or writes outside its designated directory
 
-### 8.2 Config Versioning
+### 8.2 Config Versioning & Schema Migration
 
-Each config file includes a `configVersion` field. The owning module validates
-this on load and performs migration or writes a fresh default if the version is
-incompatible.
+Each config file includes a `configVersion` integer field. On load, the owning
+module:
+1. Reads the stored version
+2. Performs incremental migration if the stored version is older than the current schema
+3. Falls back to safe defaults if migration is impossible or the file is corrupt
+4. Writes the updated config with the current version
 
 ### 8.3 App Config Extension Pattern
 
@@ -569,7 +799,7 @@ public:
 
 The app's web portal endpoints read/write this config independently.
 
-### 8.4 Config Consumer Notification
+### 8.4 Config Consumer Notification & Hot Reload
 
 When the web portal saves any config, it calls:
 ```cpp
@@ -577,7 +807,22 @@ appContext.getConfigManager().requestReload();
 ```
 
 On the next `tick()`, the framework safely executes the reload on the main thread
-and calls `reapplyConfig()` on all registered `iConfigurable` consumers.
+and calls `reapplyConfig()` on all registered `iConfigurable` consumers. This is
+an EventBus-dispatched reload — **no device reboot required**.
+
+### 8.5 JSON Memory Safety
+
+**`DynamicJsonDocument` is banned project-wide.** All JSON operations must use
+`StaticJsonDocument<N>` with pre-calculated capacity sizes. `DynamicJsonDocument`
+causes heap fragmentation and OOM crashes on ESP32's limited heap.
+
+```cpp
+// ✅ Correct — bounded, predictable
+StaticJsonDocument<512> doc;
+
+// ❌ Banned — heap fragmented, unpredictable
+DynamicJsonDocument doc(1024);
+```
 
 ---
 
@@ -591,9 +836,10 @@ BOOTING
   │  (filesystem mount, config load)
   │  (WiFi connect attempt)
   ├──→ WIFI_SETUP   (WiFi failed, AP mode active — show WiFi wizard)
-  │       └──→ BOOTING (on successful connect)
+  │       ├──→ BOOTING (on successful connect)
+  │       └──→ WIFI_SHUTDOWN (10-min AP inactivity timeout)
   │
-  │  (NTP sync, web server init, first data fetch)
+  │  (NTP sync, web server init, MCP server init, first data fetch)
   ├──→ APP_SETUP    (no app config present — show setup guide)
   │       └──→ RUNNING (on config save via portal)
   │
@@ -612,10 +858,15 @@ The framework executes boot in this deterministic order:
 4. FrameworkConfig load → KeyManager load
 5. App config load (app-provided hook)
 6. WiFi init (non-blocking, transitions to WIFI_SETUP if AP mode needed)
-7. DataManager task start
-8. Register all module config consumers
-9. OTA manager init
-10. → Yield to `tick()` loop
+7. NTP sync (asynchronous — never blocks boot; sync status checked periodically)
+8. DataManager task start (FreeRTOS background worker, ≥ 8KB stack)
+9. Register all module config consumers
+10. WebServerManager init (registers all `IWebContributor` routes)
+11. McpServer init (registers built-in + all `IMcpContributor` tools)
+12. OTA manager init
+13. OTA firmware blessing (see §13.3)
+14. `_compactAndLock()` — shrink structural arrays, log heap, publish `"system.heap"`
+15. → Yield to `tick()` loop
 
 > Modules such as `boardLED` and `buttonHandler` self-initialise during their own
 > `registerTickable()` call. The framework does not assume their presence.
@@ -630,7 +881,11 @@ Progress is reported to `IStatusReporter` at each step (visible on display if pr
 4. AppState evaluation → drive state transitions
 5. Registered `ITickable` dispatch (all modules, including boardLED, buttonHandler,
    display module, MQTT, etc. — whatever the app registered)
-6. WiFi connection health monitor
+6. McpServer tick (Serial JSON-RPC polling)
+7. WiFi connection health monitor
+
+Under `NATIVE_BUILD`, `tick()` also calls `_dataManager.processNext()` synchronously
+(on hardware this runs on the FreeRTOS background task).
 
 ---
 
@@ -638,7 +893,7 @@ Progress is reported to `IStatusReporter` at each step (visible on display if pr
 
 ### 10.1 Base Portal
 
-The framework provides a base web portal as a LittleFS-hosted Single Page Application.
+The framework provides a base web portal as a PROGMEM-hosted Single Page Application.
 The SPA shell (HTML/CSS/JS) is framework-owned and serves:
 
 - **WiFi tab** — SSID scan, connect, hostname, password change
@@ -663,41 +918,87 @@ class MyModule : public IWebContributor {
 The portal shell fetches `/api/tabs` on load and dynamically builds the navigation.
 Each tab's content is fetched from its registered endpoint.
 
-### 10.3 Static Asset Organisation
+### 10.3 POST Body Handling
 
-The portal uses a **hybrid asset model** (see ADR D8):
+POST requests use ESPAsyncWebServer's multi-argument `server.on` with a chunk
+body callback:
+
+```cpp
+server.on("/api/endpoint", HTTP_POST,
+    onRequest,     // called after body received
+    nullptr,       // upload handler (unused)
+    onBody);       // (request, data, len, index, total)
+```
+
+Body size validation is performed **per-handler** by checking `len` and `total`
+in the body callback. `AsyncCallbackJsonWebHandler` / `AsyncJson.h` is NOT used.
+Single-chunk assumption for small WiFi/Config JSON payloads; deserialized directly
+with `deserializeJson(doc, data, len)`.
+
+> **Note:** `AsyncWebServer::setMaxBodySize()` does not exist in the ESPAsyncWebServer
+> library version used. All body validation must be manual.
+
+### 10.4 Static Asset Organisation
+
+The portal uses a **hybrid asset model**:
 - **Framework SPA shell** — compiled into PROGMEM as gzip-compressed `const uint8_t[]`
   arrays inside the kernel library. Served at ~0ms. Always present with the firmware.
   No LittleFS dependency for the base portal.
 - **App-specific tab fragments** — stored in LittleFS under `www/` and served at
   request time by ESPAsyncWebServer. Updated via `pio run --target uploadfs`.
 
+Source directory: `web/portal/` contains the SPA source files.
+
+PROGMEM assets (compiled by `portalBuilder.py`):
 ```
-data/                      ← LittleFS image root (portalBuilder.py output)
+[kernel library PROGMEM]
+  index_html_gz[]   ← SPA shell (HTML)
+  app_css_gz[]      ← Base styles
+  app_js_gz[]       ← Core SPA logic, tab routing, ApiQueue
+  wifi_js_gz[]      ← WiFi tab logic
+  system_js_gz[]    ← System tab logic
+  ota_js_gz[]       ← OTA tab logic
+```
+
+Generated PROGMEM headers (`include/portal_assets/*.h`) MUST include `#ifndef NATIVE_BUILD`
+guards with fallback `#define PROGMEM` and `<cstddef>`/`<cstdint>` includes for
+native test compatibility.
+
+LittleFS app fragments:
+```
+data/                      ← LittleFS image root
 └── www/                   ← Web portal app-specific assets only
     └── <appname>/         ← One subdirectory per app
         ├── station.html   ← App tab content fragment
         └── station.js     ← App tab logic
 ```
 
-Framework assets that ship in PROGMEM (NOT in LittleFS):
-```
-[kernel library PROGMEM]
-  index_html_gz[]   ← SPA shell (HTML)
-  app_css_gz[]      ← Base styles
-  app_js_gz[]       ← Core SPA logic, tab routing
-  wifi_js_gz[]      ← WiFi tab logic
-  system_js_gz[]    ← System tab logic
-  ota_js_gz[]       ← OTA tab logic
-```
+### 10.5 API Request Serialisation
 
-### 10.4 API Conventions
+The SPA serialises API requests via the `ApiQueue` class in `app.js`. All frontend
+code MUST use `window.apiFetch(url, options)` — never raw `fetch()` or `XMLHttpRequest`.
+
+- One HTTP request inflight at a time (protects ESP32's limited TCP socket pool)
+- Requests are queued and dispatched sequentially
+- Yields to event loop between requests to prevent UI blocking
+
+### 10.6 AP Mode Timeout
+
+When in AP (captive portal) mode, the framework tracks API activity:
+
+- `WifiManager::tick()` maintains `lastApiRequestTime`
+- Updated via `notifyApiActivity()` callback from API handlers
+- After 10 minutes of API inactivity → transitions to `WIFI_SHUTDOWN` state
+- Conserves power and limits vulnerability window
+
+### 10.7 API Conventions
 
 All API endpoints follow REST conventions:
 
 - `GET /api/<resource>` — read current state as JSON
 - `POST /api/<resource>` — update state, body is JSON, response is `{ok: true}` or error
 - `GET /api/tabs` — returns nav tab registry `[{name, endpoint}]`
+- `POST /api/mcp` — MCP JSON-RPC endpoint (registered by McpServer via IWebContributor)
 
 ---
 
@@ -708,31 +1009,47 @@ All API endpoints follow REST conventions:
 **Modules never call each other directly.** All inter-module communication
 uses one of three framework-mediated mechanisms:
 
-### 11.2 EventBus (General Publish/Subscribe)
+### 11.2 EventBus (Synchronous Publish/Subscribe)
 
 The `EventBus` is the primary mechanism for decoupled cross-module communication.
-Modules publish typed events by topic; any number of subscribers receive them
+Modules publish events by string topic; any number of subscribers receive them
 without the publisher knowing who (if anyone) is listening.
 
+**Callback signature:**
 ```cpp
-// Publisher (e.g., MQTT module)
-app.getEventBus().publish("mqtt.connected", "{\"broker\":\"192.168.1.10\"}");
-
-// Subscriber (e.g., display module, logger, HA module)
-app.getEventBus().subscribe("mqtt.connected", [](const char* payload) {
-    // react to the event
-});
+void (*callback)(const char* topic, const void* payload, void* ctx)
 ```
 
-- Topics are strings (e.g. `"mqtt.connected"`, `"sensor.temperature"`)
-- Payloads are small JSON strings or plain strings
-- Subscribers are registered at setup; the bus uses a static fixed-size table
+**Key design facts:**
+- Topics are `const char*` strings (e.g., `"ota.progress"`, `"display.message"`)
+- Payloads are `const void*` — **the EventBus is payload-type-agnostic**. JSON
+  typing (if desired) is the publisher/subscriber's responsibility, not the bus's.
+- Subscribers use **static function pointers** with a `void* ctx` context pointer
+  (never `std::function` — prevents heap fragmentation on ESP32)
+- Publishing is **synchronous** — `publish()` iterates subscribers sequentially
+  in the same thread. Payloads are valid **ONLY during callback execution**
+  (no copying, no queueing)
+- **Capacity limits:** 32 maximum subscribers, 64 bytes maximum topic length
 - If no subscribers exist for a topic, the event is silently dropped
 
-> **Note:** The departures-board's `MessagePool` (a scrolling-text ring buffer for
-> station messages) was a domain-specific implementation, not a general bus. Display
-> modules may subscribe to a `"display.message"` topic on the EventBus to achieve
-> a similar scrolling-text effect in a generalised way.
+**Usage example:**
+```cpp
+// Publisher (e.g., OTA manager)
+OtaProgressPayload payload = {45, "Downloading...", false, false};
+app.getEventBus().publish("ota.progress", &payload);
+
+// Subscriber (e.g., display module) — static function + void* ctx
+static void onOtaProgress(const char* topic, const void* payload, void* ctx) {
+    auto* self = static_cast<DisplayModule*>(ctx);
+    auto* p = static_cast<const OtaProgressPayload*>(payload);
+    self->updateOtaBoard(p->progress, p->status);
+}
+app.getEventBus().subscribe("ota.progress", onOtaProgress, this);
+```
+
+**Known payload structs:**
+- `OtaProgressPayload` — progress percentage, status text, complete flag, success flag
+- `DisplayMessagePayload` — message text, duration in ms
 
 ### 11.3 IStatusReporter (Structured UI Status)
 
@@ -747,7 +1064,7 @@ app.getStatusReporter().reportError("MQTT", "Auth failed");
 
 The display module's `IStatusReporter` implementation maps these to appropriate
 system boards or overlay widgets. If no display is present, the `NullStatusReporter`
-no-ops silently.
+(private nested class in `Application`) no-ops silently.
 
 ### 11.4 Callbacks / std::function (Point-to-Point)
 
@@ -761,87 +1078,153 @@ otaManager.setProgressCallback([&display](int pct) {
 });
 ```
 
+> **Known platform constraint:** `Arduino.h` defines `#define LOW 0x0` and
+> `#define HIGH 0x1`, which collide with the `PriorityTier` enum values.
+> `dataManager.cpp` must include explicit `#undef LOW` and `#undef HIGH`
+> after including `Arduino.h` (guarded by `#ifndef NATIVE_BUILD`).
+
 ---
 
 ## 12. Repository & Build Architecture
 
 ### 12.1 Repository Topology
 
+The framework is a **monorepo** — kernel, optional modules, scripts, template,
+and documentation all live in a single repository.
+
+#### Architectural Rationale: Monorepo vs Multi-repo
+
+The framework deliberately uses a monorepo topology rather than splitting into separate repositories (e.g., `esp32-app-foundation`, `esp-module-display`, `esp-module-mqtt`). This architectural decision solves several critical challenges inherent to embedded C++ development in PlatformIO:
+
+1. **Avoiding the "Version Matrix of Hell":** Multi-repo architectures require tight version orchestration. If a kernel interface changes, all module repos must be updated. App developers easily end up with incompatible version combinations in their `lib_deps`. A monorepo guarantees that every commit is a fully compatible, API-synchronised snapshot.
+2. **Rock-Solid OTA Reproducibility:** Pinning the monorepo via a single git submodule SHA ensures that the exact state of the kernel *and* all optional modules is recorded. If a deployed firmware crashes, the developer knows exactly what was compiled into it.
+3. **Atomic Refactoring:** Sweeping architectural changes can be executed and tested atomically in a single PR, rather than requiring synchronized merges across multiple repositories.
+4. **Linker Efficiency:** The monorepo does *not* cause firmware bloat. PlatformIO and the C++ linker only compile and link the modules explicitly `#include`'d in the application code. Unused modules take up zero bytes on the ESP32 flash.
+
+*Decision:* Keep it as a Monorepo for `v1.x`. While separating mature modules into their own repositories might encourage third-party development later (e.g., `v2.x`), doing so prematurely creates unnecessary fragmentation and versioning friction.
+
 ```
-esp32-app-foundation/    ← Framework kernel (this repo)
-  lib/                   ← Low-level utilities
-  modules/               ← Core framework modules
-  docs/                  ← This document
-  scripts/               ← Build scripts (portalBuilder, build_fonts, etc.)
-  data/                  ← Base portal LittleFS assets
-  library.json           ← PlatformIO library manifest
-
-esp32-modules/           ← Optional module catalog (separate repo)
-  u8g2-display/
-  tft-display/
-  mqtt-client/
-  homeassistant/
-  weather-client/
-  rss-client/
-  mcp-server/
-
-esp32-app-template/      ← GitHub Template repo (new project starting point)
-  src/main.cpp           ← Skeleton entry point
-  src/myApp.cpp          ← App setup skeleton
-  platformio.ini         ← Template with lib_deps
-  scripts/               ← Build scripts (symlinked or copied from framework)
-  partitions.*.csv       ← Standard partition tables
-  sdkconfig.defaults*    ← Standard SDK config
-
-<new-app-repo>/          ← Per-project app repo
-  src/                   ← App-specific logic
-  modules/               ← App-specific modules (if any)
-  data/<appname>/        ← App-specific web assets
-  platformio.ini         ← Selects modules via lib_deps
+esp32-app-foundation/           ← Monorepo (everything lives here)
+  include/                      ← All framework interface headers + FrameworkConfig
+    interfaces/                 ← Pure abstract interfaces (ITickable, etc.)
+    portal_assets/              ← Generated PROGMEM gzip headers (build output)
+    AppFoundation.h             ← Canonical single-include façade
+    AppState.hpp                ← BOOTING, WIFI_SETUP, APP_SETUP, RUNNING
+    FrameworkConfig.hpp         ← Kernel config struct
+  lib/                          ← Low-level utilities
+    deviceCrypto/
+    logger/
+    md5Utils/
+    githubClient/
+  modules/
+    application/                ← Kernel: Application hub + AppState
+    configManager/              ← Kernel: LittleFS JSON config
+    keyManager/                 ← Kernel: encrypted credential store
+    wifiManager/                ← Kernel: WiFi + captive portal
+    timeManager/                ← Kernel: NTP + POSIX timezone
+    otaUpdateManager/           ← Kernel: GitHub OTA + rollback
+    webServer/                  ← Kernel: ESPAsyncWebServer + REST API
+    eventBus/                   ← Kernel: typed pub/sub
+    dataManager/                ← Kernel: FreeRTOS background scheduler
+    mcpServer/                  ← Kernel: JSON-RPC MCP server
+    u8g2Display/                ← Optional: U8G2 monochrome display module
+      widgets/                  ← Widget toolkit (3-tier)
+      fonts/                    ← Font management
+      boards/interfaces/        ← iBoardLayout
+  scripts/                      ← Build scripts
+  web/portal/                   ← Web portal SPA source
+  test/                         ← All tests
+    test_unit/                  ← GoogleTest native — no hardware required
+    test_hardware/              ← Hardware integration tests
+    test_e2e/                   ← Full boot-to-RUNNING integration test
+  template/                     ← Starter skeleton for new apps
+    src/main.cpp                ← 3-line entry point
+    src/myApp.hpp/.cpp          ← Skeleton app class
+    platformio.ini              ← lib_deps = framework/
+    README.md                   ← "How to start a new app" guide
+  docs/                         ← This document
+  partitions.esp32dev.csv
+  partitions.esp32s3nano.csv
+  sdkconfig.defaults
+  sdkconfig.defaults.esp32s3nano
+  library.json                  ← PlatformIO library manifest
 ```
 
-### 12.2 `platformio.ini` Pattern for an App
+### 12.2 How Apps Consume the Framework
 
+Apps add the framework as a **git submodule** pinned to a commit SHA:
+
+```bash
+git submodule add https://github.com/matthewmcneill/esp32-app-foundation.git framework
+git submodule update --init
+```
+
+App `platformio.ini`:
 ```ini
 [env:esp32dev]
-platform = ...
+platform = espressif32
 framework = arduino, espidf
+lib_extra_dirs =
+    framework/modules
+    framework/lib
 lib_deps =
-    https://github.com/matthewmcneill/esp32-app-foundation.git#v1.0.0
-    https://github.com/matthewmcneill/esp32-modules.git#v1.0.0
+    framework/                  ; local submodule path — no registry, no absolute paths
     olikraus/U8g2@2.36.18
     bblanchon/ArduinoJson@7.4.3
     ESP32Async/ESPAsyncWebServer
 extra_scripts =
-    pre:scripts/build_timestamp.py
-    pre:scripts/portalBuilder.py
+    pre:framework/scripts/build_timestamp.py
+build_flags =
+    -DAPP_FOUNDATION_VERSION=\"0.1.0\"
 ```
+
+> **Warning:** `build_src_filter` does NOT work with ESP-IDF (it uses `CMakeLists.txt`
+> for component discovery). Use `lib_extra_dirs` + explicit `lib_deps` instead.
 
 ### 12.3 Local Development Workflow
 
-When actively developing the framework alongside an app, use a local path override:
-
-```ini
-lib_deps =
-    file:///Users/dev/esp32-app-foundation   ; local path for active development
-    file:///Users/dev/esp32-modules
-```
-
-Push changes to the framework repo; bump the `#tag` in app `lib_deps` when ready
-to adopt a new framework version.
+When actively developing the framework alongside an app, the submodule points at
+a local checkout. Push changes to the framework repo; update the submodule SHA
+when ready to adopt a new framework version.
 
 ### 12.4 Build Scripts
 
-Build scripts ship in the framework repo under `scripts/`. The template repo
-references them. Standard scripts:
+Build scripts ship in the framework repo under `scripts/`.
 
-| Script | Purpose |
-|---|---|
-| `build_timestamp.py` | Embeds build time as `BUILD_TIME` macro |
-| `portalBuilder.py` | Packages web assets into LittleFS image |
-| `build_fonts.py` | Compiles custom U8G2 fonts |
-| `auto_build_wasm.py` | Builds any WASM components |
-| `generate_layouts.py` | Generates display layout constants |
+| Script | Type | Purpose |
+|---|---|---|
+| `build_timestamp.py` | PIO hook (`extra_scripts`) | Injects `BUILD_TIME` and `BUILD_DATE` macros via SCons `Import("env")` |
+| `build_fonts.py` | Standalone CLI | Compiles custom U8G2 fonts → C++ headers. Run manually when font files change |
+| `generate_layouts.py` | Standalone CLI | Generates display layout constants from YAML/JSON → C++ headers. Run manually when layouts change |
+| `portalBuilder.py` | PIO hook | Packages `web/portal/` assets → PROGMEM gzip headers in `include/portal_assets/` |
+
+> **Standalone vs hook:** `build_fonts.py` and `generate_layouts.py` are deliberately
+> NOT PIO hooks — hooking them into compile-time would break builds if downstream
+> projects lack the input files (BDF fonts, YAML layouts). Run them manually, commit
+> the generated headers.
+
+### 12.5 CI Workflow
+
+The framework provides `.github/workflows/ci.yml`:
+
+1. **Dual-env firmware build**: `esp32dev` + `esp32s3nano`
+2. **Native test execution**: `pio test -e native` (GoogleTest)
+3. **Include-graph lint**: Verifies no kernel header imports a module header
+
+### 12.6 PlatformIO LDF Constraints
+
+> **Critical:** PlatformIO's Library Dependency Finder (LDF) scans `#include`
+> directives as **text patterns** regardless of `#ifdef` preprocessor guards.
+> A conditional `#include "Application.hpp"` inside `#ifndef NATIVE_BUILD` will
+> still trigger LDF to resolve and compile the entire dependency chain.
+
+**Mitigation strategies:**
+- Forward-declare types in headers; include only in `.cpp` files behind guards
+- `library.json` files should have NO `"platforms"` or `"frameworks"` restrictions
+  (unless the library is genuinely platform-specific)
+- Never include `Application.hpp` in display module native-visible translation units
+- Use `lib_extra_dirs = modules` so headers resolve by basename (e.g.,
+  `#include "EventBus.hpp"` without directory prefix)
 
 ---
 
@@ -854,8 +1237,10 @@ that derives a unique device key from the ESP32's hardware MAC/eFuse and uses it
 for symmetric encryption of sensitive configuration values (API tokens, passwords).
 
 - Keys are **never stored in plaintext** on LittleFS
-- Encrypted values are encrypted with AES-256 using the device-unique key
+- Encrypted values use AES-256 with the device-unique key
 - The device key is non-exportable — encrypted config is device-specific
+- All cryptographic operations use **ESP-IDF/MbedTLS** hardware-accelerated APIs
+  (not standard C++ library crypto)
 
 ### 13.2 KeyManager & API Key Registry
 
@@ -863,21 +1248,34 @@ Key and credential management is a distinct concern from configuration persisten
 and is handled by a dedicated `KeyManager` kernel component:
 
 - `KeyManager` depends on `DeviceCrypto` (initialised first) for encryption/decryption
-- API keys and tokens are stored in `/apikeys.json` in encrypted form
-- `KeyManager` exposes `addKey()`, `deleteKey()`, `getKeyById()` — ConfigManager
-  has no knowledge of key content
+- API keys and tokens are stored in `/etc/apikeys.json` in encrypted form
+- **CRUD API**: `addKey(id, secret)`, `getKeyById(id, buffer, size)`, `deleteKey(id)`
+  — ConfigManager has no knowledge of key content
 - Keys are referenced by opaque IDs (e.g., `k-12345678`) in module configs — the
   ID is not sensitive; only the resolved key value is
 - Modules retrieve keys at runtime via `app.getKeyManager().getKeyById(id)`
+- **Plaintext credential storage is prohibited** — all credentials must be AES-256
+  encrypted via DeviceCrypto before writing to flash
 
-### 13.3 OTA Security
+### 13.3 OTA Security & Blessing Ceremony
 
 GitHub-based OTA:
 - Downloads firmware only over HTTPS with certificate validation
-- Verifies firmware binary MD5 before applying
-- Uses ESP-IDF's partition rollback: if the new firmware fails to call
-  `esp_ota_mark_app_valid_cancel_rollback()` within the boot timeout, the
-  bootloader automatically reverts to the previous firmware
+- Verifies firmware binary via streaming MD5 (per-chunk, never full-file in RAM)
+- Uses ESP-IDF's partition rollback (`CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y`)
+
+**Firmware Blessing Ceremony:**
+1. New firmware boots in "pending verification" state
+2. The **`Application` hub** (not `otaUpdateManager`) calls
+   `esp_ota_mark_app_valid_cancel_rollback()` after verifying:
+   - WiFi connectivity established
+   - LittleFS mounted successfully
+   - Core services initialised without fatal errors
+3. If blessing never occurs, the bootloader automatically reverts to the previous
+   firmware on next restart
+
+> **Prohibited:** Blessing the partition at download/write time. This defeats the
+> rollback purpose — firmware could still have fatal startup or runtime crashes.
 
 ### 13.4 Web Portal Security
 
@@ -885,18 +1283,33 @@ GitHub-based OTA:
 - No authentication is implemented by default (local network trust model)
 - Future: optional HTTP Basic Auth configurable via `FrameworkConfig`
 
+### 13.5 MCP Security
+
+- `FrameworkConfig.mcpReadOnly` toggle (default `false`)
+- Each tool in `McpToolEntry` has a `bool mutatesState` metadata field (default `false`)
+- When `mcpReadOnly == true`, tools with `mutatesState == true` return JSON-RPC
+  error code `-32000` ("Read-only mode")
+- HTTP transport (`POST /api/mcp`) inherits the same security checks as Serial
+  transport — both call the same `processRequest()` core
+
 ---
 
 ## 14. Resource Budget & Constraints
 
-### 14.1 Target Hardware
+### 14.1 Target Hardware & Partition Layout
 
-| Parameter | esp32dev | esp32s3nano |
+| Parameter | esp32dev (4MB) | esp32s3nano (8MB+) |
 |---|---|---|
-| Flash | 4MB (default) / 16MB (S3) | 16MB |
+| Flash | 4MB | 8MB+ |
 | DRAM | 320KB (usable ~200KB) | 512KB |
 | IRAM | 128KB | 128KB |
 | PSRAM | Not assumed | Board-dependent |
+| OTA Partition A | 1280KB | 2MB |
+| OTA Partition B | 1280KB | 2MB |
+| LittleFS | 896KB | 3.75MB |
+
+> **Note:** esp32dev partition layout was resized from the original 960KB OTA / 1.5MB
+> LittleFS to accommodate U8G2 font tables in the firmware binary.
 
 ### 14.2 Framework Kernel Budget
 
@@ -922,6 +1335,17 @@ The kernel (without any optional modules) should target:
   Stack-allocated module destructors fire on scope exit, leaving dangling pointers
   in the `Application` hub's tick array.
 
+**Required SDK configuration:**
+- `CONFIG_AUTOSTART_ARDUINO=y` in `sdkconfig.defaults` — mandatory for dual-framework
+  (Arduino + ESP-IDF) projects. Without it, Arduino's `app_main()` wrapper fails
+  to link against ESP-IDF's `app_startup.c`.
+- `CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y` — enables OTA rollback.
+
+**Known platform constraint:**
+- `Arduino.h` defines `#define LOW 0x0` and `#define HIGH 0x1`, which collide with
+  the `PriorityTier` enum. `dataManager.cpp` must `#undef LOW` and `#undef HIGH`
+  after including `Arduino.h`.
+
 ### 14.4 Registration Array Model
 
 There are **no `MAX_*` compile-time ceilings**. The framework sizes arrays exactly
@@ -934,6 +1358,7 @@ to what the application registers — no waste, no artificial constraints.
 | `ITickable*` | `std::vector` | Soft-reset only |
 | `IDisplayBoard*` | `std::vector` | Soft-reset only |
 | `iDataSource*` | `std::vector` | Soft-reset only |
+| `IMcpContributor*` | `std::vector` | Soft-reset only |
 
 **Lightweight arrays** (may grow at any time):
 
@@ -945,9 +1370,7 @@ to what the application registers — no waste, no artificial constraints.
 
 **After each build phase**, the framework logs heap stats and publishes:
 ```cpp
-app.getEventBus().publish("system.heap",
-    "{\"free\":" + String(ESP.getFreeHeap()) +
-    ",\"minFree\":" + String(ESP.getMinFreeHeap()) + "}");
+app.getEventBus().publish("system.heap", &heapPayload);
 ```
 The web portal's System tab consumes this directly.
 
@@ -960,21 +1383,21 @@ or extending the hub.
 #### The Three Lifecycle Phases
 
 ```
-╔══════════════════════════════════════════════════════════════════╗
+╔══════════════════════════════════════════════════════════════════════╗
 ║  PHASE 1: REGISTRATION                                           ║
 ║  begin() open — all register*() calls accepted                  ║
 ║  std::vector grows via push_back() (amortised doubling)         ║
-╠══════════════════════════════════════════════════════════════════╣
+╠══════════════════════════════════════════════════════════════════════╣
 ║  PHASE 2: COMPACTION                                             ║
 ║  Structural arrays: shrink_to_fit() releases over-capacity      ║
 ║  Heap stats logged + 'system.heap' EventBus event fired         ║
 ║  _locked = true  ← structural arrays are now immutable          ║
-╠══════════════════════════════════════════════════════════════════╣
+╠══════════════════════════════════════════════════════════════════════╣
 ║  PHASE 3: STEADY-STATE  (tick() loop)                           ║
 ║  Structural: reads only — zero allocation, zero deallocation    ║
 ║  Lightweight: append freely — no lock, no shrink                ║
 ║  Any call to register structural array → assert / panic         ║
-╚══════════════════════════════════════════════════════════════════╝
+╚══════════════════════════════════════════════════════════════════════╝
 ```
 
 #### `Application` Hub Sketch
@@ -991,65 +1414,54 @@ public:
         ASSERT_MESSAGE(!_locked, "registerDataSource() after begin() — use softReset()");
         _dataSources.push_back(ds);
     }
+    void registerMcpContributor(IMcpContributor* mc) {
+        ASSERT_MESSAGE(!_locked, "registerMcpContributor() after begin()");
+        _mcpContributors.push_back(mc);
+    }
 
     // ── Lightweight registration (any phase) ────────────────────
     void registerConfigConsumer(iConfigurable* c)  { _configConsumers.push_back(c); }
     void registerWebContributor(IWebContributor* w) { _webContributors.push_back(w); }
 
+    // ── Kernel service accessors ────────────────────────────────
+    EventBus& getEventBus()                { return _eventBus; }
+    DataManager& getDataManager()          { return _dataManager; }
+    WebServerManager& getWebServerManager(){ return _webServerManager; }
+    McpServer& getMcpServer()              { return _mcpServer; }
+    IStatusReporter& getStatusReporter();
+
     // ── Lifecycle ───────────────────────────────────────────────
-    void begin() {
-        // ... boot sequence (DeviceCrypto, LittleFS, WiFi, etc.) ...
-        _compactAndLock();   // Phase 2: shrink + lock + heap report
-    }
-
-    void tick() {
-        // Phase 3: structural arrays are read-only pointer iteration — no alloc
-        for (ITickable* t : _tickables) {
-            t->tick(millis());
-            yield();  // feed TWDT between dispatches
-        }
-    }
-
-    // ── Soft-reset (for structural changes mid-session) ─────────
-    void softReset() {
-        // 1. Drain current tick cycle (caller ensures we're at a safe boundary)
-        // 2. Unlock structural arrays
-        _locked = false;
-        _tickables.clear();
-        _dataSources.clear();
-        // 3. App re-registers its modules (same as begin() setup block)
-        _onRegister();       // app-provided hook: calls all register*() again
-        // 4. Re-compact and re-lock
-        _compactAndLock();
-    }
+    void begin(const FrameworkConfig& config);
+    void tick();
+    void softReset();
 
 private:
+    // ── Kernel services (owned by value) ─────────────────────────
+    EventBus          _eventBus;
+    DataManager       _dataManager;
+    WebServerManager  _webServerManager;
+    McpServer         _mcpServer;
+
     // ── Structural arrays ────────────────────────────────────────
-    std::vector<ITickable*>   _tickables;
-    std::vector<iDataSource*> _dataSources;
-    bool                      _locked = false;
+    std::vector<ITickable*>        _tickables;
+    std::vector<iDataSource*>      _dataSources;
+    std::vector<IMcpContributor*>  _mcpContributors;
+    bool                           _locked = false;
 
     // ── Lightweight arrays ───────────────────────────────────────
-    std::vector<iConfigurable*>   _configConsumers;
-    std::vector<IWebContributor*> _webContributors;
+    std::vector<iConfigurable*>    _configConsumers;
+    std::vector<IWebContributor*>  _webContributors;
 
-    // ── Compaction + heap report ─────────────────────────────────
-    void _compactAndLock() {
-        _tickables.shrink_to_fit();
-        _dataSources.shrink_to_fit();
-        _locked = true;
-        _reportHeap();
-    }
+    // ── Status reporter fallback ─────────────────────────────────
+    class NullStatusReporter : public IStatusReporter {
+        void reportMessage(const char*, const char*) override {}
+        void reportProgress(const char*, int) override {}
+        void reportError(const char*, const char*) override {}
+    };
+    NullStatusReporter _nullReporter;
 
-    void _reportHeap() {
-        uint32_t free    = ESP.getFreeHeap();
-        uint32_t minFree = ESP.getMinFreeHeap();
-        ESP_LOGI("Application", "Heap after build: free=%u minFree=%u", free, minFree);
-        char payload[64];
-        snprintf(payload, sizeof(payload),
-                 "{\"free\":%u,\"minFree\":%u}", free, minFree);
-        getEventBus().publish("system.heap", payload);
-    }
+    void _compactAndLock();
+    void _reportHeap();
 };
 ```
 
@@ -1065,7 +1477,7 @@ enabled by a config change):
 3. Next tick() boundary: framework detects flag before dispatching tickables
 4. framework calls softReset():
      a. _locked = false
-     b. _tickables.clear() / _dataSources.clear()
+     b. _tickables.clear() / _dataSources.clear() / _mcpContributors.clear()
      c. _onRegister() — app re-registers all modules (including new one)
      d. _compactAndLock() — shrink_to_fit + heap report + _locked = true
 5. tick() resumes with the updated arrays
@@ -1073,17 +1485,6 @@ enabled by a config change):
 
 The deferred flag pattern mirrors the existing config reload flag — structural
 changes are never applied mid-dispatch.
-
-#### Why This Is Safer Than Fixed `MAX_*` Arrays on ESP32
-
-| | Fixed `MAX_*` | Two-Tier Vector |
-|---|---|---|
-| RAM cost (4 modules registered) | `MAX_TICKABLES × 4 bytes` regardless | `4 × 4 bytes` exactly |
-| RAM cost (worst case) | Same as above | Slightly higher (vector metadata: 12 bytes) |
-| Overflow behaviour | Silent memory corruption | Assertion → watchdog rollback |
-| Adding an 9th module when MAX=8 | Cannot — recompile required | Works — vector grows |
-| Runtime fragmentation risk | None (static) | None (allocated once, `shrink_to_fit`) |
-| Heap observability | None | `'system.heap'` EventBus after each build |
 
 ---
 
@@ -1096,18 +1497,18 @@ A minimal module that participates in the framework tick loop:
 **`myModule.hpp`**
 ```cpp
 #pragma once
-#include <AppFoundation.h>  // Framework interfaces
+#include <AppFoundation.h>  // Canonical single-include façade
 
 class MyModule : public ITickable, public iConfigurable, public IWebContributor {
 public:
-    void begin(appContext* ctx);
+    void begin(Application* ctx);
     void tick(uint32_t ms) override;
     void reapplyConfig(const FrameworkConfig& cfg) override;
     void registerRoutes(WebServerManager& server) override;
     const char* getTabName() const override { return "My Module"; }
     const char* getTabEndpoint() const override { return "/api/mymodule"; }
 private:
-    appContext* _ctx = nullptr;
+    Application* _ctx = nullptr;
     // module state...
 };
 ```
@@ -1135,17 +1536,10 @@ constexpr char CONFIG_PATH[] = "/mod/mymodule.json";
 void MyModule::loadConfig() {
     File f = LittleFS.open(CONFIG_PATH, "r");
     if (!f) { writeDefaults(); return; }
-    StaticJsonDocument<512> doc;   // bounded — never DynamicJsonDocument in handlers
+    StaticJsonDocument<512> doc;   // bounded — never DynamicJsonDocument
     deserializeJson(doc, f);
     strlcpy(_config.host, doc["host"] | "localhost", sizeof(_config.host));
     _config.port = doc["port"] | 1883;
-    f.close();
-}
-
-void MyModule::writeDefaults() {
-    File f = LittleFS.open(CONFIG_PATH, "w");
-    if (!f) return;
-    f.print("{\"configVersion\":1,\"host\":\"localhost\",\"port\":1883}");
     f.close();
 }
 ```
@@ -1154,9 +1548,9 @@ void MyModule::writeDefaults() {
 
 - [ ] Implements required interfaces (at minimum `ITickable`)
 - [ ] Uses `app.getStatusReporter()` for user-visible status
-- [ ] Publishes to `"display.message"` EventBus topic for scrolling text (not MessagePool)
+- [ ] Publishes to EventBus topics for cross-module messages (e.g., `"display.message"`)
 - [ ] Config file is stored at `/mod/<modulename>.json` — nowhere else
-- [ ] Config file includes a `configVersion` field; module validates it on load
+- [ ] Config file includes a `configVersion` field; module validates and migrates on load
 - [ ] Config is parsed with `StaticJsonDocument<N>` — never `DynamicJsonDocument`
 - [ ] Module instance declared `static` — never stack-allocated
 - [ ] Never `#include`s another optional module header
@@ -1165,10 +1559,82 @@ void MyModule::writeDefaults() {
 - [ ] Web assets (if any) stored under `www/<appname>/` in LittleFS
 - [ ] Implements `reapplyConfig()` to respond to config changes
 - [ ] Has no compile-time dependency on display hardware
+- [ ] All hardware-specific calls wrapped in `#ifndef NATIVE_BUILD`
+- [ ] Module compiles on `native` environment for GoogleTest
+- [ ] Interface headers forward-declare external types — never `#include` heavy libs
+- [ ] `currentMillis` parameter injection preferred over calling `millis()` directly
+- [ ] `library.json` has NO `"platforms"` or `"frameworks"` restrictions (unless platform-specific)
 
 ---
 
-## 16. Open Questions & Decision Log
+## 16. Testing Architecture
+
+### 16.1 Three Testing Tiers
+
+| Tier | Runs Where | Purpose |
+|---|---|---|
+| **Tier 1 — Native Unit Tests** | Host CPU via `[env:native]` + GoogleTest | Logic, state machines, registration, scheduling |
+| **Tier 2 — Hardware Integration** | Physical ESP32 board | WiFi, OTA, LittleFS, crypto, display |
+| **Tier 3 — End-to-End Boot** | Physical board, full stack | Boot-to-`RUNNING` all services |
+
+### 16.2 `NATIVE_BUILD` Guard Pattern
+
+All modules must compile on native (host CPU) for Tier 1 testing. The `NATIVE_BUILD`
+preprocessor define (set by `[env:native]`) controls hardware-specific code:
+
+#### Architectural Rationale: The Cost vs Benefit of Native Builds
+
+While littering the codebase with `#ifndef NATIVE_BUILD` guards may feel like a heavy aesthetic tax, it is the most important architectural discipline in the framework:
+
+1. **Iteration Speed:** Hardware-only testing (compile → flash via USB → boot) takes 15–45 seconds per cycle. Native GoogleTest execution runs in milliseconds, fundamentally changing how developers write and refactor logic.
+2. **CI/CD Feasibility:** Native builds allow the full logic suite to run on standard cloud runners (e.g., GitHub Actions) without complex Hardware-in-the-Loop server farms.
+3. **Forced Decoupling:** The host CPU lacks `<WiFi.h>` and `<LittleFS.h>`. This missing dependency actively prevents developers from tightly coupling high-level logic to low-level hardware drivers. It forces the use of forward declarations (e.g., `class U8G2;`) and dependency injection (e.g., passing `currentMillis` instead of calling `millis()`), ensuring business logic remains pure and testable.
+
+```cpp
+#ifndef NATIVE_BUILD
+#include <WiFi.h>
+#include <LittleFS.h>
+// ... hardware-specific implementation
+#else
+// ... stubs or no-ops for native testing
+#endif
+```
+
+**Guard strategies:**
+- **Individual call wrapping**: Hardware calls wrapped inline — same source compiles
+  on both targets
+- **Split guards**: Enums/structs outside guard (always available), function bodies
+  inside guard
+- **Full-file guards**: Entire `.cpp` file wrapped when it's purely hardware rendering
+
+**Testing helpers exposed under `NATIVE_BUILD`:**
+- `DataManager::processNext()` — drive scheduling synchronously
+- `DataManager::setSimulatedTimeMs()` — manual time progression
+- `McpServer::_processLine()` — direct JSON-RPC dispatch without Serial
+
+### 16.3 Mock Strategy
+
+- `MockDeviceCrypto` subclass for `encrypt()`/`decrypt()` virtual methods
+- `AsyncWebServer` dummy class in `webServer.hpp` (canonical mock — never define
+  inline duplicates)
+- `AsyncWebServerResponse` stub with `beginResponse_P`, `addHeader`, `send`
+- `DNSServer` dummy class in `wifiManager.hpp` (resolves incomplete type for
+  `std::unique_ptr<DNSServer>`)
+- `Logger` uses `PIO_UNIT_TESTING` flag to stub ESP log macros
+- Serial mocked with string-buffer class for MCP server tests
+
+> **Critical:** Always use project-wide canonical mocks. Defining inline duplicate
+> mocks causes ODR (One Definition Rule) violations that break downstream tests.
+
+### 16.4 Build Cache
+
+`pio run -t clean -e native` MUST be run whenever core test entry points or
+preprocessor guards change fundamentally. Stale cached objects from different
+architectures (x86_64 vs arm64) cause linker errors.
+
+---
+
+## 17. Open Questions & Decision Log
 
 This section tracks decisions made and questions still to resolve.
 
@@ -1178,13 +1644,30 @@ This section tracks decisions made and questions still to resolve.
 |---|---|---|
 | D1 | No unified `IDisplayDriver` interface | U8G2 and TFT API models are incompatible; display module variants are the correct embedded pattern |
 | D2 | Per-module LittleFS config files, not a monolithic struct | Enables true module independence; avoids schema coupling |
-| D3 | Two-tier `std::vector` model, no `MAX_*` ceilings | Boot-phase allocation is functionally static (no runtime fragmentation). Avoids over-allocating for a worst-case that never occurs, and removes artificial ceilings that constrain development. Structural arrays use `shrink_to_fit()` after each build phase. |
+| D3 | Two-tier `std::vector` model, no `MAX_*` ceilings | Boot-phase allocation is functionally static. Avoids over-allocating and removes artificial ceilings. Structural arrays use `shrink_to_fit()` after each build phase. |
 | D4 | Framework owns `setup()` and `loop()` | Defines this as an application framework (Hollywood Principle) |
-| D5 | lib_deps for kernel + modules, template repo for scripts | Separates versioned library code from project scaffolding |
-| D6 | Structural array mutations require soft-reset; lightweight arrays may grow freely | Keeps `tick()` hot path completely free of vector mutations. Structural changes (adding a display board) are rare; the soft-reset cost is acceptable. Lightweight changes (adding an API key) are safe to append at any time. |
-| D7 | Heap stats logged + published on `'system.heap'` EventBus after each build phase | Replaces artificial MAX_* ceilings with observable runtime evidence. Portal System tab surfaces live heap; monitoring modules can subscribe to the event. |
-| D8 | Linux-inspired LittleFS directory layout: `etc/`, `mod/`, `app/`, `www/` | LittleFS supports directories; flat root is an anti-pattern inherited from SPIFFS. Directory-per-tier makes ownership self-evident, enables selective wipe (e.g. `rm /mod/*` to reset all module configs), and prevents naming collisions between modules. |
-| D9 | Hybrid web portal asset model: PROGMEM shell + LittleFS `www/` app fragments | Framework shell in PROGMEM: serves at ~0ms, always present with firmware, no LittleFS dependency in AP/captive mode. App fragments in LittleFS: updated independently via `uploadfs` without reflashing firmware. |
+| D5 | Monorepo — kernel + all optional modules in one repo | No premature repo fragmentation; avoids version compatibility matrix in v1. Modules extracted to submodules only when mature |
+| D6 | Structural array mutations require soft-reset; lightweight arrays may grow freely | Keeps `tick()` hot path completely free of vector mutations. Structural changes are rare; the soft-reset cost is acceptable. |
+| D7 | Heap stats logged + published on `'system.heap'` EventBus after each build phase | Replaces artificial MAX_* ceilings with observable runtime evidence |
+| D8 | Linux-inspired LittleFS directory layout: `etc/`, `mod/`, `app/`, `www/` | Directory-per-tier makes ownership self-evident, enables selective wipe, prevents naming collisions |
+| D9 | Hybrid web portal asset model: PROGMEM shell + LittleFS `www/` app fragments | Framework shell in PROGMEM: serves at ~0ms, always present with firmware. App fragments in LittleFS: updated independently |
+| D10 | Apps consume framework via git submodule, not `lib_deps` registry | Deterministic SHA pinning; no absolute path hacks; CI reproducible |
+| D11 | Template as `template/` within monorepo, not separate repo | One repo to clone; no separate template overhead |
+| D12 | EventBus uses static fn-ptr + `void* ctx`, not `std::function` | Prevents heap fragmentation on ESP32; zero overhead |
+| D13 | EventBus is payload-type-agnostic (`const void*`), not JSON-typed | Maximum flexibility; JSON typing is subscriber's responsibility |
+| D14 | DataManager is a generic scheduler, not HTTP-specific | HTTP fetching is individual `iDataSource`'s concern |
+| D15 | `NullStatusReporter` as private nested class in Application | Fully encapsulated; no external/global class |
+| D16 | Widget toolkit: three-tier composable architecture | Primitives → Generic → Module-Aware. Runtime display dimensions, parameter injection |
+| D17 | MCP Server as kernel service with `IMcpContributor` extension | Mirrors IWebContributor pattern; Hollywood Principle |
+| D18 | MCP transport-agnostic via `processRequest()` | Decouples from Serial; enables HTTP and future WebSocket |
+| D19 | `McpServer` implements `IWebContributor` for HTTP route | Follows Hollywood Principle; WebServerManager has no MCP coupling |
+| D20 | OTA blessing by Application hub, not OTA manager | App must verify WiFi, LittleFS, core services before blessing |
+| D21 | `setMaxBodySize()` unavailable; per-handler body validation | Library method doesn't exist; manual len/total checks |
+| D22 | POSIX TZ via `setenv`/`tzset` for timezone | Leverages standard `localtime()` for automatic DST handling |
+| D23 | Non-blocking async NTP sync | Never blocks boot; sync checked asynchronously |
+| D24 | `build_fonts.py`/`generate_layouts.py` as standalone CLI, not PIO hooks | Avoids breaking builds if input files are missing |
+| D25 | `U8G2_DISPLAY_TYPE` macro for display controller selection | Overridable via `build_flags`; default SSD1306 128x64 |
+| D26 | Dual framework: Arduino + ESP-IDF | OTA rollback, IDF logging, DeviceCrypto require IDF; display/web libs require Arduino |
 
 ### Open Questions
 
@@ -1194,10 +1677,18 @@ This section tracks decisions made and questions still to resolve.
 | Q2 | What is the `webServer` base portal's auth model? | Security — no auth vs. optional HTTP Basic Auth |
 | Q3 | Should display modules provide a `PSRAM framebuffer` option for S3 boards? | Performance — large colour displays need framebuffer in PSRAM |
 | Q4 | How should multi-board hardware configs (e.g., dual display) be handled? | Scope — possibly out of scope for v1 |
-| Q5 | What is the versioning / release cadence for the framework? | DX — semver tags vs. rolling `#main` |
-| Q6 | Should the template repo use git submodules or lib_deps for the scripts? | Build — scripts need to be editable in local dev |
+
+### Known Issues & Technical Debt
+
+| # | Issue | Status |
+|---|---|---|
+| TD-1 | `u8g2Display` has broken forward declarations on `esp32s3nano` (missing `Application.hpp` include) | Needs fix |
+| TD-2 | `test_webServer` pre-existing failure (`setMaxBodySize` assertion) | Known — requires mock update |
+| TD-3 | `get_logs` MCP tool is a stub placeholder | Needs implementation |
+| TD-4 | `portalBuilder.py` referenced in spec but not fully integrated into CI | Deferred |
+| TD-5 | `webServer` portal_assets headers break native builds without `NATIVE_BUILD` guards | Requires guard on all generated headers |
 
 ---
 
-*This document is a living specification. Update the Decision Log as design choices
-are finalised during implementation.*
+*This document is a living specification. It was updated on 2026-05-22 to reflect
+all architectural decisions made during PR-01 through PR-08 implementation.*
