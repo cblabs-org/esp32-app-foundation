@@ -288,7 +288,7 @@ void WifiManager::registerRoutes(AsyncWebServer& server) {
 #ifndef NATIVE_BUILD
     server.on("/api/wifi", HTTP_GET, [this](AsyncWebServerRequest* request) {
         this->notifyApiActivity();
-        StaticJsonDocument<256> doc;
+        JsonDocument doc;
         doc["ssid"] = this->getSSID();
         doc["passExists"] = this->hasPassword();
         doc["ap_mode"] = this->getAPMode();
@@ -307,7 +307,7 @@ void WifiManager::registerRoutes(AsyncWebServer& server) {
         NULL,
         [this](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
             this->notifyApiActivity();
-            StaticJsonDocument<256> doc;
+            JsonDocument doc;
             DeserializationError error = deserializeJson(doc, data, len);
             if (!error) {
                 const char* ssid = doc["ssid"] | "";

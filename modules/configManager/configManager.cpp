@@ -190,7 +190,7 @@ bool ConfigManager::checkAndClearReload() {
 void ConfigManager::registerRoutes(AsyncWebServer& server) {
 #ifndef NATIVE_BUILD
     server.on("/api/config", HTTP_GET, [this](AsyncWebServerRequest* request) {
-        StaticJsonDocument<512> doc;
+        JsonDocument doc;
         doc["hostname"] = _config.hostname;
         doc["timezone"] = _config.timezone;
         doc["firmwareUpdatesEnabled"] = _config.firmwareUpdatesEnabled;
@@ -205,7 +205,7 @@ void ConfigManager::registerRoutes(AsyncWebServer& server) {
         [](AsyncWebServerRequest *request) {},
         NULL,
         [this](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
-            StaticJsonDocument<512> doc;
+            JsonDocument doc;
             DeserializationError error = deserializeJson(doc, data, len);
             if (!error) {
                 if (doc["hostname"].is<const char*>()) strlcpy(_config.hostname, doc["hostname"], sizeof(_config.hostname));

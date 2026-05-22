@@ -108,7 +108,7 @@ void otaUpdateManager::rollbackFirmware() {
 void otaUpdateManager::registerRoutes(AsyncWebServer& server) {
 #ifndef NATIVE_BUILD
     server.on("/api/ota", HTTP_GET, [](AsyncWebServerRequest* request) {
-        StaticJsonDocument<256> doc;
+        JsonDocument doc;
         doc["status"] = "ready";
         String output;
         serializeJson(doc, output);
@@ -119,7 +119,7 @@ void otaUpdateManager::registerRoutes(AsyncWebServer& server) {
         [](AsyncWebServerRequest *request) {},
         NULL,
         [this](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
-            StaticJsonDocument<256> doc;
+            JsonDocument doc;
             DeserializationError error = deserializeJson(doc, data, len);
             if (!error) {
                 const char* action = doc["action"] | "";
