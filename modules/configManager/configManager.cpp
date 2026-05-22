@@ -16,16 +16,13 @@
 #include <ESPAsyncWebServer.h>
 #endif
 #include <string.h>
+#include "platform/LogShim.h"
 
 #ifndef NATIVE_BUILD
-#include "esp_log.h"
+// (no additional hardware-only includes needed)
 #else
 #include <fstream>
 #include <sstream>
-#include <stdio.h>
-#define ESP_LOGI(tag, fmt, ...) printf("I (%s): " fmt "\n", tag, ##__VA_ARGS__)
-#define ESP_LOGW(tag, fmt, ...) printf("W (%s): " fmt "\n", tag, ##__VA_ARGS__)
-#define ESP_LOGE(tag, fmt, ...) printf("E (%s): " fmt "\n", tag, ##__VA_ARGS__)
 #endif
 
 static const char* TAG = "ConfigManager";

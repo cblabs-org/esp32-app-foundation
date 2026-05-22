@@ -28,29 +28,11 @@
     #include <LittleFS.h>         // LittleFS.begin()
     #include "esp_system.h"       // esp_restart()
     #include "esp_heap_caps.h"    // heap_caps_get_free_size(), heap_caps_get_minimum_free_size()
-#else
-    // Minimal stdio for native logging stub
-    #include <cstdio>
 #endif
 
-// ---------------------------------------------------------------------------
-// Logging helpers
-// On hardware we use the ESP-IDF log macros.
-// In the native build we map them to printf so tests capture output without
-// pulling in Arduino/ESP-IDF headers.
-// ---------------------------------------------------------------------------
-#ifndef NATIVE_BUILD
-    #include "esp_log.h"
-    static const char* TAG = "Application"; // ESP-IDF log tag
-    #define APP_LOGI(fmt, ...) ESP_LOGI(TAG, fmt, ##__VA_ARGS__)
-    #define APP_LOGW(fmt, ...) ESP_LOGW(TAG, fmt, ##__VA_ARGS__)
-    #define APP_LOGE(fmt, ...) ESP_LOGE(TAG, fmt, ##__VA_ARGS__)
-#else
-    // Thin printf shims — keep messages human-readable in GoogleTest output
-    #define APP_LOGI(fmt, ...) printf("[I] Application: " fmt "\n", ##__VA_ARGS__)
-    #define APP_LOGW(fmt, ...) printf("[W] Application: " fmt "\n", ##__VA_ARGS__)
-    #define APP_LOGE(fmt, ...) printf("[E] Application: " fmt "\n", ##__VA_ARGS__)
-#endif
+#include "platform/LogShim.h"
+
+static const char* TAG = "Application";
 
 // ---------------------------------------------------------------------------
 // Lifecycle
@@ -70,7 +52,7 @@
 bool Application::begin(const FrameworkConfig& config) {
     // --- Step 1: Boot banner ---
     // Print the firmware version so the first log line is always identifiable.
-    APP_LOGI("ESP32 App Foundation v%s — booting", APP_FOUNDATION_VERSION);
+    ESP_LOGI(TAG, "ESP32 App Foundation v%s — booting", APP_FOUNDATION_VERSION);
 
     // --- Step 2: Enter BOOTING state ---
     setState(AppState::BOOTING);
@@ -81,17 +63,17 @@ bool Application::begin(const FrameworkConfig& config) {
     if (!LittleFS.begin(true)) {
         // formatOnFail = true: first-boot will auto-format, subsequent failures
         // indicate a hardware fault — abort and return false.
-        APP_LOGE("LittleFS mount failed — cannot continue boot");
+        ESP_LOGE(TAG, "LittleFS mount failed — cannot continue boot");
         return false;
     }
-    APP_LOGI("LittleFS mounted successfully");
+    ESP_LOGI(TAG, "LittleFS mounted successfully");
 #else
-    APP_LOGI("LittleFS mount skipped (NATIVE_BUILD)");
+    ESP_LOGI(TAG, "LittleFS mount skipped (NATIVE_BUILD)");
 #endif
 
     // --- Step 4: Store FrameworkConfig internally ---
     _config = config;
-    APP_LOGI("FrameworkConfig stored: hostname=%s timezone=%s",
+    ESP_LOGI(TAG, "FrameworkConfig stored: hostname=%s timezone=%s",
              _config.hostname, _config.timezone);
 
     // --- Step 5: Enter WIFI_SETUP state ---
@@ -99,18 +81,18 @@ bool Application::begin(const FrameworkConfig& config) {
 
     // --- Step 6: WiFi bring-up (PR-02 placeholder) ---
     // TODO: wifiManager.begin(_config.hostname);
-    APP_LOGI("WiFi setup deferred (PR-02)");
+    ESP_LOGI(TAG, "WiFi setup deferred (PR-02)");
 
     // --- Step 7: Enter APP_SETUP state ---
     setState(AppState::APP_SETUP);
 
     // --- Step 8: Dispatch loadConfig() to all registered iConfigurable modules ---
     // Modules receive their stored configuration before tick() begins.
-    APP_LOGI("Loading config for %zu configurable module(s)", _configurables.size());
+    ESP_LOGI(TAG, "Loading config for %zu configurable module(s)", _configurables.size());
     for (auto* module : _configurables) {
         if (!module->loadConfig()) {
             // A failed config load is non-fatal — the module applies its own defaults.
-            APP_LOGW("loadConfig() returned false for a configurable module (defaults applied)");
+            ESP_LOGW(TAG, "loadConfig() returned false for a configurable module (defaults applied)");
         }
     }
 
@@ -141,7 +123,7 @@ bool Application::begin(const FrameworkConfig& config) {
     // --- Step 12: Enter RUNNING state ---
     setState(AppState::RUNNING);
 
-    APP_LOGI("Boot sequence complete — entering RUNNING state");
+    ESP_LOGI(TAG, "Boot sequence complete — entering RUNNING state");
     return true;
 }
 
@@ -176,7 +158,7 @@ void Application::tick() {
  * softReset() and verify it completes without crashing the test process.
  */
 void Application::softReset() {
-    APP_LOGW("Application::softReset() triggered — restarting device");
+    ESP_LOGW(TAG, "Application::softReset() triggered — restarting device");
 
 #ifndef NATIVE_BUILD
     esp_restart(); // Hardware restart — this call never returns
@@ -194,11 +176,11 @@ void Application::softReset() {
  */
 bool Application::registerTickable(ITickable* module) {
     if (_locked) {
-        APP_LOGE("registerTickable() rejected — registration is closed after begin()");
+        ESP_LOGE(TAG, "registerTickable() rejected — registration is closed after begin()");
         return false;
     }
     if (module == nullptr) {
-        APP_LOGE("registerTickable() rejected — null pointer");
+        ESP_LOGE(TAG, "registerTickable() rejected — null pointer");
         return false;
     }
     _tickables.push_back(module);
@@ -210,11 +192,11 @@ bool Application::registerTickable(ITickable* module) {
  */
 bool Application::registerConfigurable(iConfigurable* module) {
     if (_locked) {
-        APP_LOGE("registerConfigurable() rejected — registration is closed after begin()");
+        ESP_LOGE(TAG, "registerConfigurable() rejected — registration is closed after begin()");
         return false;
     }
     if (module == nullptr) {
-        APP_LOGE("registerConfigurable() rejected — null pointer");
+        ESP_LOGE(TAG, "registerConfigurable() rejected — null pointer");
         return false;
     }
     _configurables.push_back(module);
@@ -228,11 +210,11 @@ bool Application::registerConfigurable(iConfigurable* module) {
  */
 bool Application::registerStatusReporter(IStatusReporter* reporter) {
     if (_locked) {
-        APP_LOGE("registerStatusReporter() rejected — registration is closed after begin()");
+        ESP_LOGE(TAG, "registerStatusReporter() rejected — registration is closed after begin()");
         return false;
     }
     if (reporter == nullptr) {
-        APP_LOGE("registerStatusReporter() rejected — null pointer");
+        ESP_LOGE(TAG, "registerStatusReporter() rejected — null pointer");
         return false;
     }
     // Last-write-wins: replace any previously registered reporter
@@ -245,11 +227,11 @@ bool Application::registerStatusReporter(IStatusReporter* reporter) {
  */
 bool Application::registerWebContributor(IWebContributor* contributor) {
     if (_locked) {
-        APP_LOGE("registerWebContributor() rejected — registration is closed after begin()");
+        ESP_LOGE(TAG, "registerWebContributor() rejected — registration is closed after begin()");
         return false;
     }
     if (contributor == nullptr) {
-        APP_LOGE("registerWebContributor() rejected — null pointer");
+        ESP_LOGE(TAG, "registerWebContributor() rejected — null pointer");
         return false;
     }
     _webContributors.push_back(contributor);
@@ -261,11 +243,11 @@ bool Application::registerWebContributor(IWebContributor* contributor) {
  */
 bool Application::registerMcpContributor(IMcpContributor* contributor) {
     if (_locked) {
-        APP_LOGE("registerMcpContributor() rejected — registration is closed after begin()");
+        ESP_LOGE(TAG, "registerMcpContributor() rejected — registration is closed after begin()");
         return false;
     }
     if (contributor == nullptr) {
-        APP_LOGE("registerMcpContributor() rejected — null pointer");
+        ESP_LOGE(TAG, "registerMcpContributor() rejected — null pointer");
         return false;
     }
     _mcpContributors.push_back(contributor);
@@ -277,11 +259,11 @@ bool Application::registerMcpContributor(IMcpContributor* contributor) {
  */
 bool Application::registerDataSource(iDataSource* source) {
     if (_locked) {
-        APP_LOGE("registerDataSource() rejected — registration is closed after begin()");
+        ESP_LOGE(TAG, "registerDataSource() rejected — registration is closed after begin()");
         return false;
     }
     if (source == nullptr) {
-        APP_LOGE("registerDataSource() rejected — null pointer");
+        ESP_LOGE(TAG, "registerDataSource() rejected — null pointer");
         return false;
     }
     _dataSources.push_back(source);
@@ -337,7 +319,7 @@ void Application::setState(AppState state) {
         case AppState::APP_SETUP:  name = "APP_SETUP";  break;
         case AppState::RUNNING:    name = "RUNNING";    break;
     }
-    APP_LOGI("State → %s", name);
+    ESP_LOGI(TAG, "State → %s", name);
 }
 
 /**
@@ -357,7 +339,7 @@ void Application::_compactAndLock() {
 
     _locked = true;
 
-    APP_LOGI("Registry locked — tickables=%zu configurables=%zu "
+    ESP_LOGI(TAG, "Registry locked — tickables=%zu configurables=%zu "
              "webContributors=%zu mcpContributors=%zu dataSources=%zu statusReporter=%s",
              _tickables.size(),
              _configurables.size(),
@@ -379,9 +361,9 @@ void Application::_reportHeap() {
     uint32_t freeHeap    = heap_caps_get_free_size(MALLOC_CAP_8BIT);      // Current free bytes
     uint32_t minFreeHeap = heap_caps_get_minimum_free_size(MALLOC_CAP_8BIT); // Historical low-watermark
 
-    APP_LOGI("Heap report — free: %" PRIu32 " B  min-free: %" PRIu32 " B",
+    ESP_LOGI(TAG, "Heap report — free: %" PRIu32 " B  min-free: %" PRIu32 " B",
              freeHeap, minFreeHeap);
 #else
-    APP_LOGI("Heap report skipped (NATIVE_BUILD)");
+    ESP_LOGI(TAG, "Heap report skipped (NATIVE_BUILD)");
 #endif
 }

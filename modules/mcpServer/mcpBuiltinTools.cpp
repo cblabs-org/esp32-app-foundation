@@ -32,19 +32,13 @@
 // ---------------------------------------------------------------------------
 #ifndef NATIVE_BUILD
     #include <Arduino.h>
-    #include "esp_log.h"
     #include "esp_system.h"
     #include <base64.h>
-    static const char* TAG = "McpBuiltinTools"; // ESP-IDF log tag
-    #define BUILTIN_LOGI(fmt, ...) ESP_LOGI(TAG, fmt, ##__VA_ARGS__)
-    #define BUILTIN_LOGW(fmt, ...) ESP_LOGW(TAG, fmt, ##__VA_ARGS__)
-    #define BUILTIN_LOGE(fmt, ...) ESP_LOGE(TAG, fmt, ##__VA_ARGS__)
-#else
-    #include <cstdio>
-    #define BUILTIN_LOGI(fmt, ...) printf("[I] McpBuiltinTools: " fmt "\n", ##__VA_ARGS__)
-    #define BUILTIN_LOGW(fmt, ...) printf("[W] McpBuiltinTools: " fmt "\n", ##__VA_ARGS__)
-    #define BUILTIN_LOGE(fmt, ...) printf("[E] McpBuiltinTools: " fmt "\n", ##__VA_ARGS__)
 #endif
+
+#include "platform/LogShim.h"
+
+static const char* TAG = "McpBuiltinTools";
 
 // ---------------------------------------------------------------------------
 // Base64 lookup table (hardware uses the ESP32 base64 library; native needs
@@ -204,7 +198,7 @@ void mcpBuiltinTools::registerAll(McpToolRegistry& registry,
 
             // --- Persist to flash ---
             configManager->saveConfig();
-            BUILTIN_LOGI("Configuration updated and saved");
+            ESP_LOGI(TAG, "Configuration updated and saved");
 
             // --- Return updated config in result ---
             result["hostname"]                = cfg.hostname;
@@ -231,11 +225,11 @@ void mcpBuiltinTools::registerAll(McpToolRegistry& registry,
                 // Flush the JSON-RPC response before restarting.
                 // The serial output is written synchronously, so by the
                 // time we reach here the response has already been serialized.
-                BUILTIN_LOGI("Reboot requested via MCP — restarting in 1s");
+                ESP_LOGI(TAG, "Reboot requested via MCP — restarting in 1s");
                 delay(1000);
                 esp_restart();
             #else
-                BUILTIN_LOGI("Reboot requested via MCP (native build — no-op)");
+                ESP_LOGI(TAG, "Reboot requested via MCP (native build — no-op)");
             #endif
         }
     );
@@ -343,5 +337,5 @@ void mcpBuiltinTools::registerAll(McpToolRegistry& registry,
         }
     );
 
-    BUILTIN_LOGI("Registered %zu built-in tools", registry.size());
+    ESP_LOGI(TAG, "Registered %zu built-in tools", registry.size());
 }

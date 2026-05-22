@@ -11,7 +11,10 @@
  */
 
 #include "dataManager.hpp"
+#include "platform/LogShim.h"
 #include <algorithm>
+
+static const char* TAG = "DataManager";
 
 #ifndef NATIVE_BUILD
 #include <Arduino.h>
@@ -57,6 +60,7 @@ void DataManager::begin() {
 #ifndef NATIVE_BUILD
     // Implement a FreeRTOS task with STACK_SIZE >= 8KB
     // Priority 5 is generally suitable for background data fetchers, adjust if needed
+    ESP_LOGI(TAG, "Creating worker task (stack=8192, priority=5, core=any)");
     xTaskCreate(workerTaskLoop, "DataManager", 8192, this, 5, &workerTask);
 #endif
 }
@@ -75,10 +79,12 @@ void DataManager::registerSource(iDataSource* source) {
     record.priorityRequested = false;
     
     registry.push_back(record);
+    ESP_LOGI(TAG, "Registered source: %s", source->getSourceName());
 }
 
 void DataManager::unregisterSource(iDataSource* source) {
     if (!source) return;
+    ESP_LOGI(TAG, "Unregistering source: %s", source->getSourceName());
     MutexLock lock(registryMutex);
     
     registry.erase(std::remove_if(registry.begin(), registry.end(),
@@ -88,6 +94,7 @@ void DataManager::unregisterSource(iDataSource* source) {
 
 void DataManager::requestPriorityFetch(iDataSource* source) {
     if (!source) return;
+    ESP_LOGI(TAG, "Priority fetch requested for source: %s", source->getSourceName());
     MutexLock lock(registryMutex);
     
     for (auto& r : registry) {
@@ -157,6 +164,7 @@ void DataManager::executeLoop() {
         
         // Extract the target source before releasing the lock
         iDataSource* fetchTarget = r.source;
+        ESP_LOGD(TAG, "Selected source for fetch: %s", fetchTarget->getSourceName());
         
 #ifndef NATIVE_BUILD
         // Unlock mutex during fetch to prevent holding the lock during potentially long network calls
@@ -164,7 +172,11 @@ void DataManager::executeLoop() {
 #endif
         
         // --- Execute the fetch cycle ---
-        fetchTarget->fetchUpdate();
+        UpdateStatus result = fetchTarget->fetchUpdate();
+        if (result >= UpdateStatus::FETCH_ERROR) {
+            ESP_LOGW(TAG, "Fetch failed for source: %s (status=%d)",
+                     fetchTarget->getSourceName(), static_cast<int>(result));
+        }
         
 #ifndef NATIVE_BUILD
         // Re-acquire mutex to update state

@@ -32,19 +32,14 @@
 #include <ESPmDNS.h>
 #include <ESPAsyncWebServer.h>
 #include "esp_wifi.h"
-#include "esp_log.h"
-static const char* TAG = "WIFI_MGR";
-#define WIFI_LOGI(fmt, ...) ESP_LOGI(TAG, fmt, ##__VA_ARGS__)
-#define WIFI_LOGW(fmt, ...) ESP_LOGW(TAG, fmt, ##__VA_ARGS__)
-#define WIFI_LOGE(fmt, ...) ESP_LOGE(TAG, fmt, ##__VA_ARGS__)
 #else
-#include <cstdio>
-#define WIFI_LOGI(fmt, ...) printf("[I] WIFI: " fmt "\n", ##__VA_ARGS__)
-#define WIFI_LOGW(fmt, ...) printf("[W] WIFI: " fmt "\n", ##__VA_ARGS__)
-#define WIFI_LOGE(fmt, ...) printf("[E] WIFI: " fmt "\n", ##__VA_ARGS__)
 unsigned long millis() { return 0; } // Stub
 void delay(unsigned long ms) {}      // Stub
 #endif
+
+#include "platform/LogShim.h"
+
+static const char* TAG = "WIFI_MGR";
 
 WifiManager::WifiManager() : wifiDisconnectTimer(0) {
     memset(wifiSsid, 0, sizeof(wifiSsid));
@@ -72,11 +67,11 @@ void WifiManager::transitionTo(WiFiState newState) {
  */
 bool WifiManager::loadConfig() {
 #ifndef NATIVE_BUILD
-    WIFI_LOGI("Loading WiFi configuration from LittleFS...");
+    ESP_LOGI(TAG, "Loading WiFi configuration from LittleFS...");
     if (LittleFS.exists("/mod/wifiManager.json")) {
         File f = LittleFS.open("/mod/wifiManager.json", "r");
         if (!f) {
-            WIFI_LOGE("Failed to open /mod/wifiManager.json for reading");
+            ESP_LOGE(TAG, "Failed to open /mod/wifiManager.json for reading");
             return false;
         }
         JsonDocument doc;
@@ -85,10 +80,10 @@ bool WifiManager::loadConfig() {
             strlcpy(wifiSsid, doc["ssid"] | "", sizeof(wifiSsid));
             strlcpy(wifiPass, doc["pass"] | "", sizeof(wifiPass));
             if (strlen(wifiSsid) > 0) {
-                WIFI_LOGI("Loaded WiFi credentials for: %s", wifiSsid);
+                ESP_LOGI(TAG, "Loaded WiFi credentials for: %s", wifiSsid);
             }
         } else {
-            WIFI_LOGE("JSON deserialization failed");
+            ESP_LOGE(TAG, "JSON deserialization failed");
         }
         f.close();
         return true;
@@ -102,14 +97,14 @@ bool WifiManager::loadConfig() {
  */
 bool WifiManager::saveConfig() {
 #ifndef NATIVE_BUILD
-    WIFI_LOGI("Saving WiFi credentials...");
+    ESP_LOGI(TAG, "Saving WiFi credentials...");
     JsonDocument doc;
     doc["ssid"] = wifiSsid;
     doc["pass"] = wifiPass;
     
     File f = LittleFS.open("/mod/wifiManager.json", "w");
     if (!f) {
-        WIFI_LOGE("Failed to open /mod/wifiManager.json for writing");
+        ESP_LOGE(TAG, "Failed to open /mod/wifiManager.json for writing");
         return false;
     }
     serializeJson(doc, f);
@@ -129,7 +124,7 @@ void WifiManager::resetConfig() {
     WiFi.disconnect(true, true);
     esp_wifi_restore();
 #endif
-    WIFI_LOGI("WiFi settings erased and restored to factory defaults.");
+    ESP_LOGI(TAG, "WiFi settings erased and restored to factory defaults.");
 }
 
 /**
@@ -149,7 +144,7 @@ void WifiManager::begin(const char* hostname) {
 #endif
     
     transitionTo(WiFiState::WIFI_INIT);
-    WIFI_LOGI("WiFi Manager initialized in NON-BLOCKING mode. Hostname: %s", currentHostname);
+    ESP_LOGI(TAG, "WiFi Manager initialized in NON-BLOCKING mode. Hostname: %s", currentHostname);
 }
 
 /**
@@ -162,7 +157,7 @@ void WifiManager::tick() {
             // Wait 2 seconds for system stability before touching the radio
             if (millis() - stateTimer > 2000) {
                 if (strlen(wifiSsid) > 0) {
-                    WIFI_LOGI("Connecting to %s...", wifiSsid);
+                    ESP_LOGI(TAG, "Connecting to %s...", wifiSsid);
                     WiFi.mode(WIFI_STA);
                     WiFi.setSleep(WIFI_PS_NONE);
                     if (strlen(currentHostname) > 0) {
@@ -172,7 +167,7 @@ void WifiManager::tick() {
                     connectionRetries = 0;
                     transitionTo(WiFiState::WIFI_STA_CONNECTING);
                 } else {
-                    WIFI_LOGW("No credentials found. Falling back to AP mode.");
+                    ESP_LOGW(TAG, "No credentials found. Falling back to AP mode.");
                     transitionTo(WiFiState::WIFI_AP_STARTING);
                 }
             }
@@ -180,20 +175,20 @@ void WifiManager::tick() {
 
         case WiFiState::WIFI_STA_CONNECTING:
             if (WiFi.status() == WL_CONNECTED) {
-                WIFI_LOGI("Connected successfully. IP: %s", WiFi.localIP().toString().c_str());
+                ESP_LOGI(TAG, "Connected successfully. IP: %s", WiFi.localIP().toString().c_str());
                 isAPMode = false;
                 wifiDisconnectTimer = 0; // Reset downtime tracker
                 updateMyUrl();
                 transitionTo(WiFiState::WIFI_READY);
             } else if (millis() - stateTimer > 15000) { // 15 second timeout for STA
-                WIFI_LOGW("WiFi connection timed out. Falling back to AP.");
+                ESP_LOGW(TAG, "WiFi connection timed out. Falling back to AP.");
                 WiFi.disconnect(true); // Ensure clean slate
                 transitionTo(WiFiState::WIFI_AP_STARTING);
             }
             break;
 
         case WiFiState::WIFI_AP_STARTING:
-            WIFI_LOGI("Starting Access Point setup (Captive Portal)...");
+            ESP_LOGI(TAG, "Starting Access Point setup (Captive Portal)...");
             isAPMode = true;
             WiFi.mode(WIFI_AP);
             
@@ -207,7 +202,7 @@ void WifiManager::tick() {
                 // Start DNS Hijacker
                 dnsServer = std::make_unique<DNSServer>();
                 dnsServer->start(53, "*", apIP);
-                WIFI_LOGI("Access Point '%s' is online.", portalName);
+                ESP_LOGI(TAG, "Access Point '%s' is online.", portalName);
                 lastApiRequestTime = millis(); // Reset AP timeout timer
             }
             
@@ -227,13 +222,13 @@ void WifiManager::tick() {
 
                 // Wait 10 seconds before attempting to recycle the connection
                 if (millis() - stateTimer > 10000) {
-                    WIFI_LOGW("Primary connection lost. Retrying...");
+                    ESP_LOGW(TAG, "Primary connection lost. Retrying...");
                     transitionTo(WiFiState::WIFI_INIT);
                 }
             } else if (isAPMode) {
                 // AP Mode 10-minute inactivity timeout
                 if (millis() - lastApiRequestTime > 600000) {
-                    WIFI_LOGW("AP Mode inactive for 10 minutes. Shutting down AP to save power.");
+                    ESP_LOGW(TAG, "AP Mode inactive for 10 minutes. Shutting down AP to save power.");
                     transitionTo(WiFiState::WIFI_SHUTDOWN);
                 }
             } else {
@@ -254,7 +249,7 @@ void WifiManager::tick() {
                     dnsServer->stop();
                     dnsServer.reset();
                 }
-                WIFI_LOGI("WiFi AP has been shut down.");
+                ESP_LOGI(TAG, "WiFi AP has been shut down.");
             }
             break;
     }
@@ -339,17 +334,17 @@ void WifiManager::updateWiFi(const char* ssid, const char* pass) {
  * @brief Test a WiFi connection without permanently changing stored credentials.
  */
 bool WifiManager::testConnection(const char* ssid, const char* pass, String& ipOut) {
-    WIFI_LOGI("WIFI_TEST: Starting connection test...");
+    ESP_LOGI(TAG, "WIFI_TEST: Starting connection test...");
 #ifndef NATIVE_BUILD
     const char* realPass = pass;
     if (pass != nullptr && strlen(pass) == 0) {
-        WIFI_LOGI("WIFI_TEST: Using stored credentials for test.");
+        ESP_LOGI(TAG, "WIFI_TEST: Using stored credentials for test.");
         realPass = wifiPass;
     }
 
     if (WiFi.status() == WL_CONNECTED && strcmp(WiFi.SSID().c_str(), ssid) == 0 && strcmp(realPass, wifiPass) == 0) {
         ipOut = WiFi.localIP().toString().c_str();
-        WIFI_LOGI("WIFI_TEST: Already connected to this network. IP: %s", ipOut.c_str());
+        ESP_LOGI(TAG, "WIFI_TEST: Already connected to this network. IP: %s", ipOut.c_str());
         return true;
     }
 
@@ -366,10 +361,10 @@ bool WifiManager::testConnection(const char* ssid, const char* pass, String& ipO
 
     if (WiFi.status() == WL_CONNECTED) {
         ipOut = WiFi.localIP().toString().c_str();
-        WIFI_LOGI("WIFI_TEST: Success! IP: %s", ipOut.c_str());
+        ESP_LOGI(TAG, "WIFI_TEST: Success! IP: %s", ipOut.c_str());
         return true;
     } else {
-        WIFI_LOGW("WIFI_TEST: Failed. Reconnecting to primary credentials.");
+        ESP_LOGW(TAG, "WIFI_TEST: Failed. Reconnecting to primary credentials.");
         if (strlen(wifiSsid) > 0) {
             WiFi.disconnect(true);
             delay(100);

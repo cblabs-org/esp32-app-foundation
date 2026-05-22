@@ -21,6 +21,9 @@
  */
 
 #include "otaUpdateManager.hpp"
+#include "platform/LogShim.h"
+
+static const char* TAG = "OtaUpdateManager";
 #ifndef NATIVE_BUILD
 #include <ESPAsyncWebServer.h>
 #endif
@@ -37,10 +40,13 @@ otaUpdateManager::otaUpdateManager() : expectedSize(0) {
 }
 
 bool otaUpdateManager::beginUpdate(size_t size, const char* expectedMD5) {
+    ESP_LOGI(TAG, "Beginning OTA update: size=%zu, MD5=%s",
+             size, expectedMD5 ? expectedMD5 : "(none)");
 #ifndef NATIVE_BUILD
     // --- Step 1: Initialize the Update library ---
     // Start the update process with the expected size
     if (!Update.begin(size)) {
+        ESP_LOGE(TAG, "Update.begin() failed for size %zu", size);
         return false;
     }
     
@@ -61,7 +67,9 @@ bool otaUpdateManager::beginUpdate(size_t size, const char* expectedMD5) {
 size_t otaUpdateManager::writeStream(Stream& dataStream) {
 #ifndef NATIVE_BUILD
     // Write data from the provided stream directly into the OTA partition
-    return Update.writeStream(dataStream);
+    size_t written = Update.writeStream(dataStream);
+    ESP_LOGD(TAG, "writeStream: %zu bytes written", written);
+    return written;
 #else
     return 0;
 #endif
@@ -72,8 +80,10 @@ bool otaUpdateManager::endUpdate() {
     // Finalize the update. This checks if the total bytes written 
     // match the expected size, and validates the MD5 hash.
     if (Update.end()) {
+        ESP_LOGI(TAG, "OTA update finalized successfully");
         return true;
     }
+    ESP_LOGE(TAG, "OTA update finalization failed");
     return false;
 #else
     return false;
@@ -81,6 +91,7 @@ bool otaUpdateManager::endUpdate() {
 }
 
 void otaUpdateManager::markAppValid() {
+    ESP_LOGI(TAG, "Marking firmware as valid (blessing app)");
     // Bless the application by cancelling the auto-rollback feature.
     // This indicates that the firmware successfully booted and passed basic checks.
 #ifndef NATIVE_BUILD
@@ -91,6 +102,7 @@ void otaUpdateManager::markAppValid() {
 }
 
 void otaUpdateManager::rollbackFirmware() {
+    ESP_LOGW(TAG, "Firmware rollback triggered");
 #ifndef NATIVE_BUILD
     // Retrieve the partition we should rollback to
     const esp_partition_t* updatePartition = esp_ota_get_next_update_partition(NULL);

@@ -42,6 +42,9 @@
  */
 
 #include "u8g2DisplayModule.hpp"
+#include "platform/LogShim.h"
+
+static const char* TAG = "U8g2Display";
 
 #ifndef NATIVE_BUILD
 #include <Arduino.h>
@@ -65,6 +68,7 @@ void U8g2DisplayModule::begin(Application& app) {
 
     // --- Step 1: Initialize hardware display driver ---
 #ifndef NATIVE_BUILD
+    ESP_LOGI(TAG, "Initializing hardware display driver");
     _u8g2.begin();
     _u8g2.setContrast(_brightness);
     _u8g2.setFlipMode(_flipScreen ? 1 : 0);
@@ -73,6 +77,7 @@ void U8g2DisplayModule::begin(Application& app) {
     // --- Step 2: Subscribe to EventBus topics ---
     // Guarded: getEventBus() requires Application.hpp (unavailable in native)
 #ifndef NATIVE_BUILD
+    ESP_LOGI(TAG, "Subscribing to EventBus topics: ota.progress, display.message");
     _app->getEventBus().subscribe("ota.progress", _onOtaProgress, this);
     _app->getEventBus().subscribe("display.message", _onDisplayMessage, this);
 #endif
@@ -81,6 +86,7 @@ void U8g2DisplayModule::begin(Application& app) {
     // No more boards can be added after this point
     _locked = true;
     _boards.shrink_to_fit();
+    ESP_LOGI(TAG, "Board pool locked with %d board(s)", (int)_boards.size());
 
     // --- Step 4: Activate boot splash and show it ---
     _bootSplash.activate(APP_FOUNDATION_VERSION);
@@ -152,6 +158,7 @@ bool U8g2DisplayModule::addBoard(IDisplayBoard* board) {
     }
 
     _boards.push_back(board);
+    ESP_LOGD(TAG, "Board added (pool size: %d)", (int)_boards.size());
     return true;
 }
 
@@ -176,6 +183,7 @@ void U8g2DisplayModule::showBoard(IDisplayBoard* board) {
 
     // --- Board not in pool (system board override) ---
     // Render it directly without affecting the carousel index
+    ESP_LOGD(TAG, "Override board set (not in pool)");
     _activeBoardIndex = -1;
     _overrideBoard = board;
     resetActivity();
@@ -344,10 +352,12 @@ void U8g2DisplayModule::clearStatus() {
  */
 bool U8g2DisplayModule::loadConfig() {
 #ifndef NATIVE_BUILD
+    ESP_LOGI(TAG, "Loading config from /mod/display.json");
     // --- Open the config file from LittleFS ---
     File configFile = LittleFS.open("/mod/display.json", "r");
     if (!configFile) {
         // File not found — apply defaults (already set by member initialisers)
+        ESP_LOGW(TAG, "Config file /mod/display.json not found, using defaults");
         return false;
     }
 
@@ -358,6 +368,7 @@ bool U8g2DisplayModule::loadConfig() {
 
     if (err) {
         // Parse failure — defaults remain in place
+        ESP_LOGE(TAG, "Failed to parse /mod/display.json");
         return false;
     }
 
@@ -371,6 +382,7 @@ bool U8g2DisplayModule::loadConfig() {
     _u8g2.setContrast(_brightness);
     _u8g2.setFlipMode(_flipScreen ? 1 : 0);
 
+    ESP_LOGI(TAG, "Config loaded successfully (brightness=%d, flip=%d)", _brightness, _flipScreen);
     return true;
 #else
     // NATIVE_BUILD — no LittleFS, defaults are fine
@@ -389,6 +401,7 @@ bool U8g2DisplayModule::loadConfig() {
  */
 bool U8g2DisplayModule::saveConfig() {
 #ifndef NATIVE_BUILD
+    ESP_LOGI(TAG, "Saving config to /mod/display.json");
     // --- Ensure the /mod/ directory exists ---
     if (!LittleFS.exists("/mod")) {
         LittleFS.mkdir("/mod");
@@ -404,11 +417,13 @@ bool U8g2DisplayModule::saveConfig() {
     // --- Write to LittleFS ---
     File configFile = LittleFS.open("/mod/display.json", "w");
     if (!configFile) {
+        ESP_LOGE(TAG, "Failed to open /mod/display.json for writing");
         return false;
     }
 
     serializeJson(doc, configFile);
     configFile.close();
+    ESP_LOGI(TAG, "Config saved successfully");
     return true;
 #else
     // NATIVE_BUILD — no LittleFS
@@ -626,6 +641,7 @@ void U8g2DisplayModule::_checkSleep() {
  * @brief Enter sleep mode — power-save the display.
  */
 void U8g2DisplayModule::_sleep() {
+    ESP_LOGI(TAG, "Display entering sleep mode");
     _sleeping = true;
 
     // --- Activate the screensaver and show it ---
@@ -641,6 +657,7 @@ void U8g2DisplayModule::_sleep() {
  * @brief Exit sleep mode — restore display power and brightness.
  */
 void U8g2DisplayModule::_wake() {
+    ESP_LOGI(TAG, "Display waking from sleep");
     _sleeping = false;
 
     // --- Deactivate the screensaver ---

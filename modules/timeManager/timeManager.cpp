@@ -18,6 +18,9 @@
  */
 
 #include "timeManager.hpp"
+#include "platform/LogShim.h"
+
+static const char* TAG = "TimeManager";
 
 #ifndef NATIVE_BUILD
 #include <esp_sntp.h>
@@ -30,6 +33,11 @@
  * @param ntpServer3 Tertiary NTP server.
  */
 void TimeManager::begin(const char* timezone, const char* ntpServer1, const char* ntpServer2, const char* ntpServer3) {
+    ESP_LOGI(TAG, "Configuring NTP servers: %s, %s, %s",
+             ntpServer1 ? ntpServer1 : "(null)",
+             ntpServer2 ? ntpServer2 : "(null)",
+             ntpServer3 ? ntpServer3 : "(null)");
+
     // --- Step 1: Initialize timezone ---
     // Ensure the timezone is set before starting time synchronization
     setTimezone(timezone);
@@ -59,6 +67,7 @@ void TimeManager::tick() {
     if (syncStatus == SNTP_SYNC_STATUS_COMPLETED) {
         // Time has been successfully retrieved from NTP servers
         _syncStatus = TimeSyncStatus::SYNCED;
+        ESP_LOGI(TAG, "NTP time synchronization complete");
     }
 }
 
@@ -68,6 +77,7 @@ void TimeManager::tick() {
  */
 void TimeManager::setTimezone(const char* timezone) {
     if (timezone != nullptr) {
+        ESP_LOGI(TAG, "Setting timezone: %s", timezone);
         setenv("TZ", timezone, 1); // 1 = overwrite existing TZ variable
         tzset();
     }
@@ -84,6 +94,7 @@ bool TimeManager::getLocalTime(struct tm* timeinfo) {
     }
     
     if (_syncStatus != TimeSyncStatus::SYNCED) {
+        ESP_LOGD(TAG, "getLocalTime() called but time is not yet synced");
         return false;
     }
     

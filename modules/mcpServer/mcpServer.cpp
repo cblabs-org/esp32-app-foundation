@@ -27,18 +27,11 @@
 // Platform-conditional includes & logging shims
 // Matches the Application.cpp pattern: ESP-IDF logs on hardware, printf on native.
 // ---------------------------------------------------------------------------
-#ifndef NATIVE_BUILD
-    #include "esp_log.h"
-    static const char* TAG = "McpServer"; // ESP-IDF log tag
-    #define MCP_LOGI(fmt, ...) ESP_LOGI(TAG, fmt, ##__VA_ARGS__)
-    #define MCP_LOGW(fmt, ...) ESP_LOGW(TAG, fmt, ##__VA_ARGS__)
-    #define MCP_LOGE(fmt, ...) ESP_LOGE(TAG, fmt, ##__VA_ARGS__)
-#else
-    #include <cstdio>
-    #define MCP_LOGI(fmt, ...) printf("[I] McpServer: " fmt "\n", ##__VA_ARGS__)
-    #define MCP_LOGW(fmt, ...) printf("[W] McpServer: " fmt "\n", ##__VA_ARGS__)
-    #define MCP_LOGE(fmt, ...) printf("[E] McpServer: " fmt "\n", ##__VA_ARGS__)
+#include "platform/LogShim.h"
 
+static const char* TAG = "McpServer";
+
+#ifdef NATIVE_BUILD
     // Instantiate the mock Serial object for the native build linker
     MockSerial Serial;
 #endif
@@ -68,7 +61,7 @@ void McpServer::begin(const std::vector<IMcpContributor*>& contributors, ConfigM
         }
     }
 
-    MCP_LOGI("MCP Server started with %zu tools (%zu built-in)",
+    ESP_LOGI(TAG, "MCP Server started with %zu tools (%zu built-in)",
              _registry.size(), _registry.size() - 0);
 
     // --- Step 3: Mark initialised ---
@@ -124,7 +117,7 @@ void McpServer::processRequest(const char* requestJson, Print& responseStream) {
 
     if (err) {
         // Parse error — respond with JSON-RPC parse error code
-        MCP_LOGE("JSON parse error: %s", err.c_str());
+        ESP_LOGE(TAG, "JSON parse error: %s", err.c_str());
         // Parse errors have no valid id — pass null via a temporary doc
         JsonDocument nullDoc;
         nullDoc["id"] = nullptr;
@@ -154,7 +147,7 @@ void McpServer::processRequest(const char* requestJson, Print& responseStream) {
         _handlePing(doc, responseStream);
     } else {
         // Unknown method
-        MCP_LOGW("Unknown method: %s", method);
+        ESP_LOGW(TAG, "Unknown method: %s", method);
         _sendError(-32601, "Method not found", doc["id"], responseStream);
     }
 
@@ -252,7 +245,7 @@ void McpServer::_handleToolsCall(const JsonDocument& req, Print& out) {
 
     if (tool == nullptr) {
         // Build descriptive error message
-        MCP_LOGW("Unknown tool: %s", toolName);
+        ESP_LOGW(TAG, "Unknown tool: %s", toolName);
         JsonDocument errResp;
         errResp["jsonrpc"] = "2.0";
         errResp["id"]      = req["id"];
@@ -270,7 +263,7 @@ void McpServer::_handleToolsCall(const JsonDocument& req, Print& out) {
 
     // --- Step 2.5: Enforce Security Toggle ---
     if (_mcpReadOnly && tool->mutatesState) {
-        MCP_LOGW("Security error: tool %s mutates state in read-only mode", toolName);
+        ESP_LOGW(TAG, "Security error: tool %s mutates state in read-only mode", toolName);
         JsonDocument errResp;
         errResp["jsonrpc"] = "2.0";
         errResp["id"]      = req["id"];

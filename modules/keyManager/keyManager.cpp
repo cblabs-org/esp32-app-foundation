@@ -13,15 +13,13 @@
 #include <fstream>
 #include <sstream>
 
-#ifndef NATIVE_BUILD
-#define LOG_KEYMGR(fmt, ...) Serial.printf("[KEY_MGR] " fmt "\n", ##__VA_ARGS__)
-#else
-#define LOG_KEYMGR(fmt, ...) printf("[KEY_MGR] " fmt "\n", ##__VA_ARGS__)
-#endif
+#include "platform/LogShim.h"
+
+static const char* TAG = "KeyManager";
 
 void KeyManager::begin(DeviceCrypto* crypto) {
     _crypto = crypto;
-    LOG_KEYMGR("Initialized with DeviceCrypto reference.");
+    ESP_LOGI(TAG, "Initialized with DeviceCrypto reference.");
 }
 
 bool KeyManager::loadRegistry(JsonDocument& doc) const {
@@ -31,7 +29,7 @@ bool KeyManager::loadRegistry(JsonDocument& doc) const {
     }
     File file = LittleFS.open(KEY_MANAGER_PATH, "r");
     if (!file) {
-        LOG_KEYMGR("Failed to open registry for reading.");
+        ESP_LOGE(TAG, "Failed to open registry for reading.");
         return false;
     }
     DeserializationError error = deserializeJson(doc, file);
@@ -50,7 +48,7 @@ bool KeyManager::loadRegistry(JsonDocument& doc) const {
 #endif
 
     if (error) {
-        LOG_KEYMGR("Failed to parse registry: %s", error.c_str());
+        ESP_LOGE(TAG, "Failed to parse registry: %s", error.c_str());
         return false;
     }
     return true;
@@ -60,7 +58,7 @@ bool KeyManager::saveRegistry(const JsonDocument& doc) const {
 #ifndef NATIVE_BUILD
     File file = LittleFS.open(KEY_MANAGER_PATH, "w");
     if (!file) {
-        LOG_KEYMGR("Failed to open registry for writing.");
+        ESP_LOGE(TAG, "Failed to open registry for writing.");
         return false;
     }
     serializeJson(doc, file);
@@ -68,7 +66,7 @@ bool KeyManager::saveRegistry(const JsonDocument& doc) const {
 #else
     std::ofstream file(KEY_MANAGER_PATH);
     if (!file.is_open()) {
-        LOG_KEYMGR("Failed to open local registry file for writing.");
+        ESP_LOGE(TAG, "Failed to open local registry file for writing.");
         return false;
     }
     std::string jsonStr;
@@ -81,18 +79,18 @@ bool KeyManager::saveRegistry(const JsonDocument& doc) const {
 
 bool KeyManager::addKey(const char* id, const char* secret) {
     if (!id || strlen(id) == 0 || !secret || strlen(secret) == 0) {
-        LOG_KEYMGR("Invalid ID or Secret.");
+        ESP_LOGE(TAG, "Invalid ID or Secret.");
         return false;
     }
     if (!_crypto) {
-        LOG_KEYMGR("DeviceCrypto not initialized.");
+        ESP_LOGE(TAG, "DeviceCrypto not initialized.");
         return false;
     }
     
     size_t outLen = 0;
     std::unique_ptr<char[]> encrypted = _crypto->encrypt(secret, strlen(secret), &outLen);
     if (!encrypted || outLen == 0) {
-        LOG_KEYMGR("Encryption failed for id: %s", id);
+        ESP_LOGE(TAG, "Encryption failed for id: %s", id);
         return false;
     }
 
@@ -107,7 +105,7 @@ bool KeyManager::addKey(const char* id, const char* secret) {
         return false;
     }
 
-    LOG_KEYMGR("Successfully stored encrypted key: %s", id);
+    ESP_LOGI(TAG, "Successfully stored encrypted key: %s", id);
     return true;
 }
 
@@ -116,7 +114,7 @@ std::string KeyManager::getKeyById(const char* id) const {
         return "";
     }
     if (!_crypto) {
-        LOG_KEYMGR("DeviceCrypto not initialized.");
+        ESP_LOGE(TAG, "DeviceCrypto not initialized.");
         return "";
     }
 
@@ -126,7 +124,7 @@ std::string KeyManager::getKeyById(const char* id) const {
     }
 
     if (!doc.containsKey(id)) {
-        LOG_KEYMGR("Key not found: %s", id);
+        ESP_LOGW(TAG, "Key not found: %s", id);
         return "";
     }
 
@@ -135,7 +133,7 @@ std::string KeyManager::getKeyById(const char* id) const {
     std::unique_ptr<char[]> decrypted = _crypto->decrypt(ciphertext, strlen(ciphertext), &outLen);
     
     if (!decrypted || outLen == 0) {
-        LOG_KEYMGR("Decryption failed for id: %s", id);
+        ESP_LOGE(TAG, "Decryption failed for id: %s", id);
         return "";
     }
 
@@ -152,7 +150,7 @@ bool KeyManager::deleteKey(const char* id) {
     }
 
     if (!doc.containsKey(id)) {
-        LOG_KEYMGR("Key not found to delete: %s", id);
+        ESP_LOGW(TAG, "Key not found to delete: %s", id);
         return false;
     }
 
@@ -162,6 +160,6 @@ bool KeyManager::deleteKey(const char* id) {
         return false;
     }
 
-    LOG_KEYMGR("Successfully deleted key: %s", id);
+    ESP_LOGI(TAG, "Successfully deleted key: %s", id);
     return true;
 }

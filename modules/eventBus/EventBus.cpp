@@ -17,9 +17,13 @@
  */
 
 #include "EventBus.hpp"
+#include "platform/LogShim.h"
 #include <string.h>
 
+static const char* TAG = "EventBus";
+
 void EventBus::begin() {
+    ESP_LOGI(TAG, "Initializing EventBus (max_subscribers=%d)", EVENT_BUS_MAX_SUBSCRIBERS);
     for (int i = 0; i < EVENT_BUS_MAX_SUBSCRIBERS; i++) {
         _subscribers[i].active = false;
         _subscribers[i].topic[0] = '\0';
@@ -47,11 +51,13 @@ bool EventBus::subscribe(const char* topic, EventCallback callback, void* ctx) {
             _subscribers[i].callback = callback;
             _subscribers[i].ctx = ctx;
             _subscribers[i].active = true;
+            ESP_LOGD(TAG, "Subscribed to topic: %s", topic);
             return true;
         }
     }
 
     // No empty slot found
+    ESP_LOGW(TAG, "Subscribe failed for topic '%s': no free slot", topic);
     return false;
 }
 
@@ -98,5 +104,6 @@ int EventBus::publish(const char* topic, const void* payload) {
         }
     }
 
+    ESP_LOGD(TAG, "Published topic '%s' to %d subscriber(s)", topic, count);
     return count;
 }

@@ -26,13 +26,11 @@
 #include "portal_assets/ota_js.hpp"
 #endif
 
-#ifndef NATIVE_BUILD
-#include "esp_log.h"
+#include "platform/LogShim.h"
+
 static const char* TAG = "WebServerManager";
-#define WEB_LOGI(fmt, ...) ESP_LOGI(TAG, fmt, ##__VA_ARGS__)
-#else
-#include <cstdio>
-#define WEB_LOGI(fmt, ...) printf("[I] WebServerManager: " fmt "\n", ##__VA_ARGS__)
+
+#ifdef NATIVE_BUILD
 uint32_t AsyncWebServer::lastMaxBodySize = 0;
 #endif
 
@@ -40,7 +38,7 @@ WebServerManager::WebServerManager() : _server(80) {
 }
 
 void WebServerManager::begin(const std::vector<IWebContributor*>& contributors) {
-    WEB_LOGI("Initializing WebServerManager");
+    ESP_LOGI(TAG, "Initializing WebServerManager");
 
     // Cap global POST bodies to 4KB as per requirements.
     // AsyncWebServer::setMaxBodySize(4096); // Not supported in this version
@@ -124,7 +122,7 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors) 
 #endif
 
     _server.begin();
-    WEB_LOGI("WebServer started, registered %zu contributors", contributors.size());
+    ESP_LOGI(TAG, "WebServer started, registered %zu contributors", contributors.size());
 }
 
 AsyncWebServer& WebServerManager::getServer() {
