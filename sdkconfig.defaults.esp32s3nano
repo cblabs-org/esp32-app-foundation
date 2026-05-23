@@ -23,3 +23,89 @@ CONFIG_MBEDTLS_SSL_IN_CONTENT_LEN=16384
 CONFIG_MBEDTLS_SSL_OUT_CONTENT_LEN=8192
 
 CONFIG_FREERTOS_HZ=1000
+
+# --- PR-10: Disable unused ESP-IDF components to reduce binary size ---
+
+# WiFi Provisioning — framework uses its own wifiManager with captive portal.
+# NOTE: No Kconfig toggle exists to fully disable wifi_provisioning in Arduino+ESP-IDF.
+# The component compiles but the linker GC strips unused symbols.
+CONFIG_ESP_WIFI_SOFTAP_SUPPORT=y
+
+# SPIFFS — framework uses LittleFS exclusively.
+# NOTE: CONFIG_SPIFFS_MAX_PARTITIONS has Kconfig min=1; cannot be set to 0.
+# The SPIFFS library compiles but is unused; linker GC handles dead code.
+
+# FatFS — no SD card support in framework.
+# NOTE: CONFIG_FATFS_VOLUME_COUNT has Kconfig min=1; cannot be set to 0.
+# The FatFS library compiles but is unused; linker GC handles dead code.
+
+# ESP Console — framework uses MCP over serial, not ESP-IDF REPL
+CONFIG_ESP_CONSOLE_NONE=y
+CONFIG_ESP_CONSOLE_UART=n
+
+# PPP/Modem — no cellular modem hardware
+CONFIG_LWIP_PPP_SUPPORT=n
+
+# libsodium — all crypto handled by mbedTLS (OTA signature verification, etc.)
+CONFIG_LIBSODIUM_USE_MBEDTLS_SHA=n
+
+# --- PR-10 WO2: Compiler & linker optimization for size ---
+
+# Switch from -Og (debug) to -Os (optimize for size)
+CONFIG_COMPILER_OPTIMIZATION_SIZE=y
+
+# Newlib nano — smaller printf/scanf (~25-50KB savings)
+CONFIG_NEWLIB_NANO_FORMAT=y
+
+# Strip VERBOSE and DEBUG log strings at compile time
+CONFIG_LOG_MAXIMUM_LEVEL=3
+
+# Use silent assertions — saves flash from assertion message strings
+CONFIG_COMPILER_OPTIMIZATION_ASSERTIONS_SILENT=y
+
+# --- PR-10 WO3: mbedTLS cipher pruning & LWIP optimization ---
+
+# Disable unused symmetric ciphers (framework only uses AES)
+CONFIG_MBEDTLS_DES_C=n
+CONFIG_MBEDTLS_BLOWFISH_C=n
+CONFIG_MBEDTLS_XTEA_C=n
+CONFIG_MBEDTLS_CAMELLIA_C=n
+CONFIG_MBEDTLS_RC4_DISABLED=y
+
+# Disable DHE key exchange (use ECDHE instead for TLS)
+CONFIG_MBEDTLS_KEY_EXCHANGE_DHE_RSA=n
+CONFIG_MBEDTLS_KEY_EXCHANGE_DHE_PSK=n
+CONFIG_MBEDTLS_KEY_EXCHANGE_RSA_PSK=n
+CONFIG_MBEDTLS_KEY_EXCHANGE_PSK=n
+
+# Disable RIPEMD-160 (framework uses SHA-256 and MD5 only)
+CONFIG_MBEDTLS_RIPEMD160_C=n
+
+# Disable IPv6 — framework is IPv4-only
+CONFIG_LWIP_IPV6=n
+
+# --- PR-10 WO4: Final sweep ---
+
+# Remove ESP error code-to-string lookup table (~3-8KB of string constants)
+CONFIG_ESP_ERR_TO_NAME_LOOKUP=n
+
+# Disable ChaCha20-Poly1305 cipher suite (framework uses AES-based TLS)
+CONFIG_MBEDTLS_CHACHA20_C=n
+CONFIG_MBEDTLS_POLY1305_C=n
+CONFIG_MBEDTLS_CHACHAPOLY_C=n
+
+# Disable unused ECC curves — keep only secp256r1 (P-256, standard TLS curve)
+CONFIG_MBEDTLS_ECP_DP_SECP192R1_ENABLED=n
+CONFIG_MBEDTLS_ECP_DP_SECP224R1_ENABLED=n
+CONFIG_MBEDTLS_ECP_DP_SECP384R1_ENABLED=n
+CONFIG_MBEDTLS_ECP_DP_SECP521R1_ENABLED=n
+CONFIG_MBEDTLS_ECP_DP_BP256R1_ENABLED=n
+CONFIG_MBEDTLS_ECP_DP_BP384R1_ENABLED=n
+CONFIG_MBEDTLS_ECP_DP_BP512R1_ENABLED=n
+CONFIG_MBEDTLS_ECP_DP_SECP192K1_ENABLED=n
+CONFIG_MBEDTLS_ECP_DP_SECP224K1_ENABLED=n
+CONFIG_MBEDTLS_ECP_DP_SECP256K1_ENABLED=n
+CONFIG_MBEDTLS_ECP_DP_CURVE25519_ENABLED=n
+
+# Disable WPS (WiFi Protected Setup — not used)
+CONFIG_ESP_WIFI_ENABLE_WPS=n

@@ -28,7 +28,10 @@ by Principal Architects under the ESP32 App Foundation program.
 | [pr-05c-test-hardening](./pr-05c-test-hardening/PROJECT.md) | Test Hardening (Coverage expansion across all modules) | ✅ **COMPLETE** | Session fa65bace |
 | [pr-06-build-infra](./esp32-app-foundation/PROGRAM-PLAN.md#pr-06) | Build Infrastructure (Scripts, PlatformIO, CI) | ✅ **COMPLETE** | Session 0f3caf69 |
 | [pr-07-template-repo](./pr-07-template-repo/PROJECT.md) | App Template Repository | ✅ **COMPLETE** | Session 60edc6be |
+| [pr-08-mcp-web-transport](./pr-08-mcp-web-transport/PROJECT.md) | MCP HTTP Web Transport | ✅ **COMPLETE** | — |
+| [pr-09-ota-security](./pr-09-ota-security/PROJECT.md) | OTA Security Pipeline (Verifier + Download Engine + Manager Upgrade) | ✅ **COMPLETE** | Session 8f4f1c2a |
+| [pr-10-firmware-optimization](./pr-10-firmware-optimization/PROJECT.md) | Firmware Size Optimization (sdkconfig + compiler + library audit) | 🔄 **WIP** — WO1 queued | Current Session |
 
 ---
 
-*Updated by Principal Architect — PR-05c — 2026-05-21*
+*Updated by Principal Architect — PR-10 — 2026-05-23*

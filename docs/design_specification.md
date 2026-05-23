@@ -1870,6 +1870,202 @@ enabled by a config change):
 The deferred flag pattern mirrors the existing config reload flag — structural
 changes are never applied mid-dispatch.
 
+### 14.6 Build Profiles & Compiler Optimization
+
+The framework uses aggressive binary size optimization to maximise headroom on
+the 4MB esp32dev target. All settings are in `sdkconfig.defaults` and apply to
+both esp32dev and esp32s3nano environments unless overridden by
+`sdkconfig.defaults.<env>`.
+
+#### 14.6.1 Compiler Optimization: `-Os`
+
+The production build uses `CONFIG_COMPILER_OPTIMIZATION_SIZE=y` (`-Os`), which
+enables the same optimization passes as `-O2` (the "fast" flag) but disables
+optimizations that increase code size — specifically loop unrolling and
+aggressive function inlining.
+
+**Performance impact on ESP32: negligible to beneficial.**
+
+- The ESP32 executes code from external SPI flash via a 32KB instruction cache.
+  Smaller code means fewer cache misses, which can make `-Os` *faster* than
+  `-O2` on cache-constrained microcontrollers.
+- The framework is I/O-bound — WiFi packets (milliseconds), HTTP responses
+  (hundreds of milliseconds), display refresh (I2C at 400KHz), and `tick()`
+  sleep intervals (10ms+). The 10–20% instruction-level overhead of `-Os` vs
+  `-O2` on tight computational loops is invisible when the CPU is idle 99%+ of
+  the time.
+- ESP-IDF documentation recommends `-Os` as the standard production setting.
+  The default `-Og` exists specifically for debugger-friendly code layout, not
+  for performance.
+- The only workloads where `-Os` has measurable impact are pure CPU tasks like
+  mbedTLS RSA signature verification (~10–20% slower) and large JSON parsing
+  (~5–15% slower). Both are infrequent, one-shot operations (OTA updates and
+  API responses) where sub-millisecond differences are irrelevant.
+
+#### 14.6.2 Logging Strategy
+
+The framework maintains **208 active log call sites** (82 ERROR, 40 WARN,
+86 INFO) across all modules, consuming approximately 8.5KB of format strings
+in the binary. An additional 15 DEBUG-level call sites exist in the source but
+are stripped at compile time.
+
+**Production builds use `CONFIG_LOG_MAXIMUM_LEVEL=3` (INFO).** This is a
+**compile-time ceiling** — the preprocessor completely removes `ESP_LOGD` and
+`ESP_LOGV` calls from the binary. They cannot be re-enabled at runtime via
+`esp_log_level_set()` without recompiling.
+
+| Level | Macro | Ceiling | Status in Production |
+|-------|-------|:---:|---|
+| ERROR (1) | `ESP_LOGE` | ≤3 | ✅ Always compiled in |
+| WARN (2) | `ESP_LOGW` | ≤3 | ✅ Always compiled in |
+| INFO (3) | `ESP_LOGI` | ≤3 | ✅ Always compiled in |
+| DEBUG (4) | `ESP_LOGD` | >3 | ❌ Stripped by preprocessor |
+| VERBOSE (5) | `ESP_LOGV` | >3 | ❌ Stripped by preprocessor |
+
+**Rationale for keeping INFO in production:**
+
+- INFO provides full lifecycle visibility: boot sequence, WiFi connection,
+  OTA progress, state transitions, module initialisation. These are essential
+  for field diagnostics when a USB cable is the only debugging tool.
+- Dropping to WARN would save only ~5.6KB (0.7% of the binary) — not
+  meaningful given the 469KB of available headroom.
+- The serial port is shared with the MCP server, making logging a first-class
+  diagnostic channel alongside structured MCP tool queries.
+- The framework invested significant effort instrumenting all modules with
+  consistent `ESP_LOGx` calls via `LogShim.h`. Stripping them at compile time
+  would undermine that observability architecture.
+
+**Runtime log level control** remains available within the compiled ceiling.
+An app can call `esp_log_level_set("McpServer", ESP_LOG_ERROR)` to silence a
+noisy module at runtime without recompiling, as long as the requested level
+is ≤ the compile-time maximum (3 = INFO).
+
+#### 14.6.3 Build Profiles
+
+Three build profiles are supported via `sdkconfig.defaults` overrides. The
+production profile is the default; debug and release profiles can be activated
+by creating environment-specific override files or by modifying
+`sdkconfig.defaults` before building.
+
+**Production (default):**
+
+| Setting | Value | Effect |
+|---------|-------|--------|
+| `CONFIG_COMPILER_OPTIMIZATION_SIZE` | `y` | `-Os` compiler flag |
+| `CONFIG_NEWLIB_NANO_FORMAT` | `y` | Smaller `printf`/`scanf` (~25–50KB savings) |
+| `CONFIG_LOG_MAXIMUM_LEVEL` | `3` (INFO) | DEBUG/VERBOSE stripped at compile time |
+| `CONFIG_COMPILER_OPTIMIZATION_ASSERTIONS_SILENT` | `y` | `assert()` aborts without file/line strings |
+| `CONFIG_ESP_ERR_TO_NAME_LOOKUP` | `n` | `esp_err_to_name()` returns `"UNKNOWN"` |
+
+**Debug** (for development — override with `CONFIG_LOG_MAXIMUM_LEVEL=5` etc.):
+
+| Setting | Value | Effect |
+|---------|-------|--------|
+| `CONFIG_COMPILER_OPTIMIZATION_DEBUG` | `y` | `-Og` for debugger-friendly code |
+| `CONFIG_NEWLIB_NANO_FORMAT` | `n` | Full `printf` formatting |
+| `CONFIG_LOG_MAXIMUM_LEVEL` | `5` (VERBOSE) | All log levels available at runtime |
+| `CONFIG_COMPILER_OPTIMIZATION_ASSERTIONS_DISABLE` | `n` | Full assertion messages with file/line |
+| `CONFIG_ESP_ERR_TO_NAME_LOOKUP` | `y` | Human-readable error names |
+
+> **Note:** The debug profile increases binary size by ~220KB. On the 4MB
+> esp32dev target this exceeds 80% flash usage. Debug builds are recommended
+> only on the esp32s3nano (8MB) target or when temporarily overriding for a
+> specific investigation on esp32dev.
+
+**Release** (maximum size reduction for space-constrained deployments):
+
+| Setting | Value | Effect |
+|---------|-------|--------|
+| All production settings | — | As above |
+| `CONFIG_LOG_MAXIMUM_LEVEL` | `2` (WARN) | INFO stripped, saves ~5.6KB |
+| `CONFIG_LOG_DEFAULT_LEVEL` | `1` (ERROR) | Only errors emitted at runtime |
+
+> **Warning:** The release profile strips INFO-level lifecycle logging. Serial
+> monitoring will show only warnings and errors. Use only for final production
+> deployments where serial diagnostics are not expected.
+
+#### 14.6.4 Observability Implications of Silent Assertions & Error Lookup
+
+Two production settings reduce diagnostic clarity in exchange for flash savings:
+
+**`CONFIG_COMPILER_OPTIMIZATION_ASSERTIONS_SILENT=y`** — when `assert()` or
+`configASSERT()` fires, the device aborts and reboots *without printing the
+file name and line number* that triggered the assertion. The abort still occurs
+(the watchdog catches it), but the serial output will show only the panic
+handler backtrace, not the assertion source location. Use `addr2line` on the
+backtrace addresses against the `.elf` file to locate the source.
+
+**`CONFIG_ESP_ERR_TO_NAME_LOOKUP=n`** — `esp_err_to_name(err)` returns
+`"UNKNOWN"` for all error codes instead of human-readable strings like
+`"ESP_ERR_NO_MEM"`. Framework log messages that include `esp_err_to_name()`
+will show the numeric error code but not the symbolic name. Consult the ESP-IDF
+`esp_err.h` header to decode numeric values.
+
+#### 14.6.5 Size Optimization Summary
+
+The cumulative effect of all optimizations (PR-10):
+
+| Optimization | Savings | Section |
+|---|---|---|
+| Compiler `-Os` + newlib nano + silent assertions | ~174KB | §14.6.1, §14.6.3 |
+| mbedTLS cipher pruning (3DES, Blowfish, Camellia, etc.) | ~24KB | §14.6.6 |
+| ECC curve pruning, WPS disable, ChaCha20 disable | ~17KB | §14.6.6 |
+| sdkconfig cleanup (console, PPP, libsodium) | ~11KB | §14.6.6 |
+| **Total** | **~226KB (−21.4%)** | |
+
+Final binary: **830KB (63.4%)** on esp32dev, leaving **469KB (36.6%)** headroom
+for application code and optional modules.
+
+#### 14.6.6 mbedTLS & Network Pruning
+
+The production build disables unused cryptographic primitives to reduce the
+mbedTLS contribution to the binary. Only the cipher suites required for
+HTTPS (GitHub API, OTA downloads) and OTA signature verification are retained.
+
+**Disabled ciphers:** 3DES, Blowfish, XTEA, Camellia, RC4, ChaCha20-Poly1305,
+RIPEMD-160.
+
+**Disabled key exchange modes:** DHE-RSA, DHE-PSK, RSA-PSK, PSK. The framework
+uses ECDHE-RSA and ECDHE-ECDSA for TLS, which are retained.
+
+**Disabled ECC curves:** All except secp256r1 (P-256), which is the standard
+TLS curve used by GitHub's servers and most HTTPS endpoints.
+
+**Network:** IPv6 is disabled (`CONFIG_LWIP_IPV6=n`). The framework operates
+exclusively on IPv4 local networks. WPS (WiFi Protected Setup) is disabled
+as the framework uses its own captive portal for WiFi provisioning.
+
+> **TLS compatibility note:** These pruning decisions are based on GitHub's
+> current TLS requirements (TLS 1.2+ with AES-GCM or AES-CBC, ECDHE key
+> exchange, P-256 curve). If future OTA sources require different cipher
+> suites, the corresponding `CONFIG_MBEDTLS_*` options must be re-enabled
+> in `sdkconfig.defaults`.
+
+#### 14.6.7 Known Platform Limitation: Arduino Managed Components
+
+The Arduino Core framework (`framework-arduinoespressif32`) declares 27
+managed component dependencies in its `idf_component.yml` manifest, of which
+the framework uses only 3 (`littlefs`, `mdns`, and the Arduino core itself).
+The unused components include Rainmaker (cloud IoT), Zigbee, Modbus, cellular
+modem, DSP, speech recognition, MP3 decoding, and libsodium.
+
+**The standard ESP-IDF `EXCLUDE_COMPONENTS` mechanism does not work with
+PlatformIO's dual-framework build.** PlatformIO's IDF Component Manager
+resolves and compiles managed components before CMake processes the
+`EXCLUDE_COMPONENTS` variable. Additionally, PlatformIO auto-generates
+`CMakeLists.txt` (gitignored), so persistent modifications are not possible.
+
+The linker's garbage collector (`--gc-sections`) strips most unused code from
+these components, but static initialisers, VFS registration macros, and
+`.rodata` string tables may survive. This is an estimated 20–60KB of residual
+dead weight that cannot currently be eliminated without switching away from
+PlatformIO or using ESP-IDF as the sole framework.
+
+**Mitigation:** Monitor PlatformIO releases for `EXCLUDE_COMPONENTS` support
+in dual-framework builds. If space becomes critical, evaluate migrating to
+pure ESP-IDF with Arduino as a manually managed component (bypassing the
+Component Manager entirely).
+
 ---
 
 ## 15. Module Authoring Guide
