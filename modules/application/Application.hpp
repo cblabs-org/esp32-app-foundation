@@ -14,17 +14,20 @@
  *              A single static instance is created by main.cpp (WO4); the
  *              class is NOT a singleton — there is no getInstance().
  *
+ *              ConfigManager is owned by Application and serves as the
+ *              centralised gateway for all module configuration I/O.
+ *
  * Exported Classes:
  * - Application: Framework composition root and module registry
  *   - begin():                   Run the full boot sequence; returns false on fatal error
  *   - tick():                    Dispatch to all registered ITickable modules (RUNNING guard)
  *   - softReset():               Log reason and trigger esp_restart() (NATIVE_BUILD guarded)
  *   - registerTickable():        Add an ITickable module to the tick dispatch vector
- *   - registerConfigurable():    Add an iConfigurable module to the config-load vector
  *   - registerStatusReporter():  Set (or replace) the single IStatusReporter adapter
  *   - registerWebContributor():  Add an IWebContributor module to the route-registration vector
  *   - registerMcpContributor():  Add an IMcpContributor module to the MCP tools vector
  *   - registerDataSource():      Add an iDataSource worker to the DataManager vector
+ *   - getConfigManager():        Access the ConfigManager gateway
  *   - getState():                Query the current AppState lifecycle phase
  *   - getMcpServer():            Access the MCP JSON-RPC server instance
  */
@@ -44,6 +47,7 @@
 #include "../dataManager/dataManager.hpp"
 #include "../webServer/webServer.hpp"
 #include "../mcpServer/mcpServer.hpp"
+#include "../configManager/configManager.hpp"
 
 /**
  * @brief Composition root for the ESP32 App Foundation framework.
@@ -59,6 +63,10 @@
  *    and a _locked flag is set. Any subsequent registration attempt is rejected with
  *    an error log and returns false. This provides functionally-static runtime
  *    behaviour without requiring MAX_* compile-time constants.
+ *
+ * ConfigManager is owned directly by Application and registered as a web
+ * contributor. Modules register with _configManager via registerModule()
+ * and their config is loaded during beginAll().
  */
 class Application {
 public:
@@ -77,7 +85,7 @@ public:
      *   5. Set state to WIFI_SETUP
      *   6. TODO: wifiManager.begin()  (PR-02)
      *   7. Set state to APP_SETUP
-     *   8. Call loadConfig() on all registered iConfigurable modules
+     *   8. ConfigManager: registerModule() + beginAll() for all iConfigurable modules
      *   9. Core services begin() — DataManager, EventBus, WebServerManager, McpServer
      *  10. Call _compactAndLock() — vectors are locked from this point
      *  11. Call _reportHeap()
@@ -117,13 +125,6 @@ public:
      * @return true if registration succeeded; false if locked or nullptr.
      */
     bool registerTickable(ITickable* module);
-
-    /**
-     * @brief Register a module that loads/persists configuration via LittleFS.
-     * @param module  Non-null pointer to the iConfigurable implementation.
-     * @return true if registration succeeded; false if locked or nullptr.
-     */
-    bool registerConfigurable(iConfigurable* module);
 
     /**
      * @brief Set (or replace pre-lock) the single status-reporter adapter.
@@ -184,6 +185,12 @@ public:
     McpServer& getMcpServer();
 
     /**
+     * @brief Get the application's ConfigManager instance.
+     * @return Reference to the ConfigManager gateway.
+     */
+    ConfigManager& getConfigManager();
+
+    /**
      * @brief Get the application's FrameworkConfig (read-only).
      * @return Const reference to the stored FrameworkConfig.
      */
@@ -235,7 +242,6 @@ private:
 
     // Module registry vectors (two-tier model)
     std::vector<ITickable*>        _tickables;       ///< Modules receiving tick() dispatches
-    std::vector<iConfigurable*>    _configurables;   ///< Modules whose loadConfig() is called during begin()
     std::vector<IWebContributor*>  _webContributors; ///< Modules that contribute REST API routes
     std::vector<IMcpContributor*>  _mcpContributors; ///< Modules that contribute MCP tools
     std::vector<iDataSource*>      _dataSources;     ///< Background data-fetch workers
@@ -256,8 +262,9 @@ private:
     IStatusReporter* _statusReporter = &_nullReporter;              ///< Display adapter for boot-phase status overlays
 
     // Core services
-    EventBus _eventBus;           ///< Central event bus
-    DataManager _dataManager;     ///< Background data manager
+    ConfigManager _configManager;       ///< Centralised config gateway (owned by Application)
+    EventBus _eventBus;                 ///< Central event bus
+    DataManager _dataManager;           ///< Background data manager
     WebServerManager _webServerManager; ///< Local HTTP Server
     McpServer _mcpServer;               ///< MCP JSON-RPC server
 };

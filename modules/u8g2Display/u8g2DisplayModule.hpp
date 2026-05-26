@@ -18,7 +18,8 @@
  *              Implements IStatusReporter by delegating to LoadingBoard and
  *              ErrorBoard. Subscribes to EventBus topics "ota.progress" and
  *              "display.message" for runtime event integration. Implements
- *              iConfigurable for persistent display settings at /mod/display.json.
+ *              iConfigurable via ConfigManager gateway for persistent display
+ *              settings (namespace: "display", schema version: 1).
  *
  * Exported Classes:
  * - OtaProgressPayload:      EventBus payload struct for OTA progress events
@@ -40,9 +41,11 @@
  *   - reportStatus():       Delegate to LoadingBoard and show it
  *   - reportError():        Delegate to ErrorBoard (fatal) and show it
  *   - clearStatus():        Mark LoadingBoard complete, advance if showing it
- *   - loadConfig():         Load display settings from /mod/display.json (LittleFS)
- *   - saveConfig():         Persist display settings to /mod/display.json (LittleFS)
- *   - resetConfig():        Restore factory defaults and persist
+ *   - getConfigNamespace(): Return "display"
+ *   - getSchemaVersion():   Return 1
+ *   - applyConfig():        Apply display settings from JSON section
+ *   - serializeConfig():    Serialize display settings to JSON section
+ *   - resetConfig():        Restore factory defaults
  *   - setBrightness():      Runtime brightness adjustment (0–255)
  *   - setFlipScreen():      Runtime screen flip toggle
  *   - setSleepTimeout():    Runtime sleep timeout adjustment
@@ -117,7 +120,7 @@ struct DisplayMessagePayload {
  *
  * Implements ITickable for main-loop rendering, IStatusReporter for boot-phase
  * status overlays (delegates to LoadingBoard/ErrorBoard), and iConfigurable
- * for persistent display settings via /mod/display.json on LittleFS.
+ * for persistent display settings via ConfigManager gateway (namespace: "display").
  *
  * The board slot pool is a std::vector<IDisplayBoard*> that accepts registrations
  * via addBoard() before begin() locks the pool. The carousel engine rotates
@@ -271,36 +274,46 @@ public:
     void clearStatus() override;
 
     // -------------------------------------------------------------------------
-    // iConfigurable — persistent display settings at /mod/display.json
+    // iConfigurable — ConfigManager gateway (namespace: "display")
     // -------------------------------------------------------------------------
 
     /**
-     * @brief Load display settings from /mod/display.json on LittleFS.
-     *
-     * Reads brightness, flipScreen, sleepTimeout, and rotationInterval from
-     * JSON. Applies defaults if keys are missing. In NATIVE_BUILD, returns
-     * true without file I/O.
-     *
-     * @return true if config loaded or defaults applied; false on parse error.
+     * @brief Return the config namespace for display settings.
+     * @return "display"
      */
-    bool loadConfig() override;
+    const char* getConfigNamespace() const override { return "display"; }
 
     /**
-     * @brief Persist display settings to /mod/display.json on LittleFS.
-     *
-     * Serializes brightness, flipScreen, sleepTimeout, and rotationInterval
-     * to JSON. Creates the /mod/ directory if needed. In NATIVE_BUILD,
-     * returns true without file I/O.
-     *
-     * @return true if successfully saved.
+     * @brief Return the current schema version for display config.
+     * @return 1
      */
-    bool saveConfig() override;
+    int getSchemaVersion() const override { return 1; }
 
     /**
-     * @brief Reset display settings to factory defaults and persist.
+     * @brief Apply display settings from a parsed JSON section.
+     *
+     * Reads brightness, flip, sleepTimeout, and rotationInterval from the
+     * JSON object and applies them to internal state and hardware.
+     *
+     * @param section Read-only JSON object containing display config keys.
+     */
+    void applyConfig(const JsonObject& section) override;
+
+    /**
+     * @brief Serialize current display settings into a JSON section.
+     *
+     * Writes brightness, flip, sleepTimeout, and rotationInterval to the
+     * JSON object.
+     *
+     * @param section Mutable JSON object to write config into.
+     */
+    void serializeConfig(JsonObject& section) const override;
+
+    /**
+     * @brief Reset display settings to factory defaults.
      *
      * Sets: brightness=255, flipScreen=false, sleepTimeout=300000ms,
-     * rotationInterval=8000ms. Applies hardware settings and calls saveConfig().
+     * rotationInterval=8000ms. Applies hardware settings.
      */
     void resetConfig() override;
 

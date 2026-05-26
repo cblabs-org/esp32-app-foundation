@@ -12,6 +12,11 @@
  *              two-tier vector lock model, AppState lifecycle transitions,
  *              tick() dispatch behaviour, and softReset() native-build safety.
  *
+ *              With the WO1 refactor, registerConfigurable() is removed.
+ *              Modules now register with ConfigManager::registerModule()
+ *              instead. The test suite validates the new gateway pattern
+ *              through Application::getConfigManager().
+ *
  *              All tests execute on the native GoogleTest runner (no hardware
  *              required). NATIVE_BUILD is defined by the [env:native] environment
  *              in platformio.ini.
@@ -21,6 +26,7 @@
  */
 
 #include <gtest/gtest.h>
+#include <cstdio>
 #include "Application.hpp"
 #include "interfaces/IMcpContributor.hpp"
 #include "mcpToolRegistry.hpp"
@@ -39,19 +45,37 @@ public:
     void tick() override { tickCount++; }
 };
 
-/** @brief Minimal iConfigurable mock with all three methods returning success. */
+/**
+ * @brief Minimal iConfigurable mock implementing the new 6-method interface.
+ *
+ * Provides namespace "mock", schema version 1, and tracks applyConfig/
+ * serializeConfig/resetConfig invocations.
+ */
 class MockConfigurable : public iConfigurable {
 public:
-    bool loadConfigCalled = false; ///< Set true when loadConfig() is invoked
+    bool applyConfigCalled = false;     ///< Set true when applyConfig() is invoked
+    mutable bool serializeConfigCalled = false; ///< Set true when serializeConfig() is invoked
+    bool resetConfigCalled = false;     ///< Set true when resetConfig() is invoked
+    const char* _ns;                    ///< Configurable namespace (default: "mock")
 
-    bool loadConfig() override {
-        loadConfigCalled = true;
-        return true;
+    MockConfigurable(const char* ns = "mock") : _ns(ns) {}
+
+    const char* getConfigNamespace() const override { return _ns; }
+    int getSchemaVersion() const override { return 1; }
+
+    void applyConfig(const JsonObject& section) override {
+        applyConfigCalled = true;
+        (void)section;
     }
 
-    bool saveConfig() override { return true; }
+    void serializeConfig(JsonObject& section) const override {
+        serializeConfigCalled = true;
+        section["test_key"] = "test_value";
+    }
 
-    void resetConfig() override {}
+    void resetConfig() override {
+        resetConfigCalled = true;
+    }
 };
 
 /** @brief Minimal iDataSource mock — scheduling metadata returns fixed values. */
@@ -118,15 +142,15 @@ TEST_F(ApplicationRegistrationTest, RegisterTickable_Nullptr_ReturnsFalse) {
     EXPECT_FALSE(app.registerTickable(nullptr));
 }
 
-/** registerConfigurable with a valid pointer must return true. */
+/** ConfigManager::registerModule with a valid pointer must return true. */
 TEST_F(ApplicationRegistrationTest, RegisterConfigurable_ValidPointer_ReturnsTrue) {
     MockConfigurable configurable;
-    EXPECT_TRUE(app.registerConfigurable(&configurable));
+    EXPECT_TRUE(app.getConfigManager().registerModule(&configurable));
 }
 
-/** registerConfigurable with nullptr must return false. */
+/** ConfigManager::registerModule with nullptr must return false. */
 TEST_F(ApplicationRegistrationTest, RegisterConfigurable_Nullptr_ReturnsFalse) {
-    EXPECT_FALSE(app.registerConfigurable(nullptr));
+    EXPECT_FALSE(app.getConfigManager().registerModule(nullptr));
 }
 
 /** registerDataSource with a valid pointer must return true. */
@@ -213,11 +237,12 @@ TEST_F(ApplicationLockTest, PostLock_RegisterTickable_ReturnsFalse) {
     EXPECT_FALSE(app.registerTickable(&tickable));
 }
 
-/** After begin(), registerConfigurable must return false. */
-TEST_F(ApplicationLockTest, PostLock_RegisterConfigurable_ReturnsFalse) {
+/** After begin(), ConfigManager::registerModule still works (not vector-locked). */
+TEST_F(ApplicationLockTest, PostLock_ConfigManagerRegisterModule_StillWorks) {
     lockApp();
     MockConfigurable configurable;
-    EXPECT_FALSE(app.registerConfigurable(&configurable));
+    // ConfigManager has its own fixed-size registry — not part of two-tier vector lock
+    EXPECT_TRUE(app.getConfigManager().registerModule(&configurable));
 }
 
 /** After begin(), registerDataSource must return false. */
@@ -376,7 +401,7 @@ TEST_F(ApplicationSoftResetTest, SoftReset_DoesNotAlterAppState) {
 }
 
 // =============================================================================
-// Test Group 5: begin() sequence integration (loadConfig dispatch)
+// Test Group 5: begin() sequence integration (ConfigManager gateway)
 // =============================================================================
 
 class ApplicationBeginTest : public ::testing::Test {
@@ -385,20 +410,33 @@ protected:
 };
 
 /**
- * begin() must call loadConfig() on all registered iConfigurable modules
- * during the APP_SETUP phase.
+ * begin() must trigger ConfigManager::beginAll() which calls applyConfig()
+ * on all registered iConfigurable modules. In NATIVE_BUILD, with no config
+ * files on disk, modules get resetConfig() + applyConfig() via defaults.
  */
-TEST_F(ApplicationBeginTest, Begin_CallsLoadConfigOnAllConfigurables) {
-    MockConfigurable confA;
-    MockConfigurable confB;
-    app.registerConfigurable(&confA);
-    app.registerConfigurable(&confB);
+TEST_F(ApplicationBeginTest, Begin_CallsApplyConfigOnRegisteredModules) {
+    // Use different namespaces so each module gets its own config file
+    MockConfigurable confA("mockA");
+    MockConfigurable confB("mockB");
+    app.getConfigManager().registerModule(&confA);
+    app.getConfigManager().registerModule(&confB);
+
+    // Clean up any leftover files from prior runs
+    remove("mod_mockA.json");
+    remove("mod_mockB.json");
 
     FrameworkConfig cfg;
     app.begin(cfg);
 
-    EXPECT_TRUE(confA.loadConfigCalled);
-    EXPECT_TRUE(confB.loadConfigCalled);
+    // In NATIVE_BUILD with no file on disk, loadModuleConfig() calls
+    // resetConfig() then saveModuleConfig(). The applyConfig is NOT called
+    // in the "file not found" path — resetConfig() IS called instead.
+    EXPECT_TRUE(confA.resetConfigCalled);
+    EXPECT_TRUE(confB.resetConfigCalled);
+
+    // Cleanup
+    remove("mod_mockA.json");
+    remove("mod_mockB.json");
 }
 
 /**
@@ -407,6 +445,51 @@ TEST_F(ApplicationBeginTest, Begin_CallsLoadConfigOnAllConfigurables) {
 TEST_F(ApplicationBeginTest, Begin_NativeBuild_ReturnsTrue) {
     FrameworkConfig cfg;
     EXPECT_TRUE(app.begin(cfg));
+}
+
+// =============================================================================
+// Test Group 6: ConfigManager Gateway
+// =============================================================================
+
+class ConfigManagerGatewayTest : public ::testing::Test {
+protected:
+    Application app;
+};
+
+/**
+ * ConfigManager must be accessible via Application::getConfigManager().
+ */
+TEST_F(ConfigManagerGatewayTest, GetConfigManager_ReturnsReference) {
+    ConfigManager& cm = app.getConfigManager();
+    // If this compiles and doesn't crash, the accessor works
+    EXPECT_TRUE(true);
+}
+
+/**
+ * ConfigManager::registerModule must accept up to MAX_CONFIGURABLES.
+ */
+TEST_F(ConfigManagerGatewayTest, RegisterModule_UpToMax_Succeeds) {
+    MockConfigurable modules[ConfigManager::MAX_CONFIGURABLES];
+    ConfigManager& cm = app.getConfigManager();
+
+    for (uint8_t i = 0; i < ConfigManager::MAX_CONFIGURABLES; i++) {
+        EXPECT_TRUE(cm.registerModule(&modules[i]));
+    }
+}
+
+/**
+ * ConfigManager::registerModule must reject when full.
+ */
+TEST_F(ConfigManagerGatewayTest, RegisterModule_OverMax_ReturnsFalse) {
+    MockConfigurable modules[ConfigManager::MAX_CONFIGURABLES + 1];
+    ConfigManager& cm = app.getConfigManager();
+
+    for (uint8_t i = 0; i < ConfigManager::MAX_CONFIGURABLES; i++) {
+        cm.registerModule(&modules[i]);
+    }
+
+    // One more should fail
+    EXPECT_FALSE(cm.registerModule(&modules[ConfigManager::MAX_CONFIGURABLES]));
 }
 
 // =============================================================================

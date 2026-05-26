@@ -30,9 +30,9 @@
  * - U8g2DisplayModule::reportStatus():       Delegate to LoadingBoard, show it
  * - U8g2DisplayModule::reportError():        Delegate to ErrorBoard (fatal), show it
  * - U8g2DisplayModule::clearStatus():        Mark loading complete, advance if showing
- * - U8g2DisplayModule::loadConfig():         Load display settings from LittleFS JSON
- * - U8g2DisplayModule::saveConfig():         Persist display settings to LittleFS JSON
- * - U8g2DisplayModule::resetConfig():        Reset to factory defaults, persist, apply
+ * - U8g2DisplayModule::applyConfig():        Apply display settings from JSON section
+ * - U8g2DisplayModule::serializeConfig():    Serialize display settings to JSON section
+ * - U8g2DisplayModule::resetConfig():        Reset to factory defaults
  * - U8g2DisplayModule::setBrightness():      Runtime brightness adjustment
  * - U8g2DisplayModule::setFlipScreen():      Runtime screen flip toggle
  * - U8g2DisplayModule::setSleepTimeout():    Runtime sleep timeout adjustment
@@ -48,7 +48,6 @@ static const char* TAG = "U8g2Display";
 
 #ifndef NATIVE_BUILD
 #include <Arduino.h>
-#include <LittleFS.h>
 #include "../application/Application.hpp"
 #endif
 
@@ -340,104 +339,56 @@ void U8g2DisplayModule::clearStatus() {
 }
 
 // =============================================================================
-// iConfigurable — persistent display settings at /mod/display.json
+// iConfigurable — ConfigManager gateway (namespace: "display")
 // =============================================================================
 
 /**
- * @brief Load display configuration from /mod/display.json.
+ * @brief Apply display settings from a parsed JSON section.
  *
- * On hardware: Opens the JSON file, parses keys (brightness, flip,
- * sleepTimeout, rotationInterval), and applies defaults for missing keys.
- * In NATIVE_BUILD: Returns true immediately (no LittleFS available).
+ * Called by ConfigManager during beginAll(). Reads brightness, flip,
+ * sleepTimeout, and rotationInterval from the JSON object and applies
+ * them to internal state and hardware.
  *
- * @return true if config loaded or defaults applied; false on parse error.
+ * @param section Read-only JSON object containing display config keys.
  */
-bool U8g2DisplayModule::loadConfig() {
-#ifndef NATIVE_BUILD
-    ESP_LOGI(TAG, "Loading config from /mod/display.json");
-    // --- Open the config file from LittleFS ---
-    File configFile = LittleFS.open("/mod/display.json", "r");
-    if (!configFile) {
-        // File not found — apply defaults (already set by member initialisers)
-        ESP_LOGW(TAG, "Config file /mod/display.json not found, using defaults");
-        return false;
-    }
-
-    // --- Parse JSON with a fixed-size document (rule 10: no DynamicJsonDocument) ---
-    JsonDocument doc;
-    DeserializationError err = deserializeJson(doc, configFile);
-    configFile.close();
-
-    if (err) {
-        // Parse failure — defaults remain in place
-        ESP_LOGE(TAG, "Failed to parse /mod/display.json");
-        return false;
-    }
-
-    // --- Read keys with fallback defaults ---
-    _brightness         = doc["brightness"]         | (uint8_t)255;
-    _flipScreen         = doc["flip"]               | false;
-    _sleepTimeoutMs     = doc["sleepTimeout"]        | (unsigned long)300000;
-    _rotationIntervalMs = doc["rotationInterval"]    | (unsigned long)8000;
+void U8g2DisplayModule::applyConfig(const JsonObject& section) {
+    _brightness         = section["brightness"]      | (uint8_t)255;
+    _flipScreen         = section["flip"]            | false;
+    _sleepTimeoutMs     = section["sleepTimeout"]     | (unsigned long)300000;
+    _rotationIntervalMs = section["rotationInterval"] | (unsigned long)8000;
 
     // --- Apply hardware settings ---
+#ifndef NATIVE_BUILD
     _u8g2.setContrast(_brightness);
     _u8g2.setFlipMode(_flipScreen ? 1 : 0);
-
-    ESP_LOGI(TAG, "Config loaded successfully (brightness=%d, flip=%d)", _brightness, _flipScreen);
-    return true;
-#else
-    // NATIVE_BUILD — no LittleFS, defaults are fine
-    return true;
 #endif
+
+    ESP_LOGI(TAG, "Config applied (brightness=%d, flip=%d, sleep=%lu, rotation=%lu)",
+             _brightness, _flipScreen, _sleepTimeoutMs, _rotationIntervalMs);
 }
 
 /**
- * @brief Persist display configuration to /mod/display.json.
+ * @brief Serialize current display settings into a JSON section.
  *
- * On hardware: Creates /mod/ directory if needed, serializes current settings
- * to JSON, and writes to LittleFS.
- * In NATIVE_BUILD: Returns true immediately.
+ * Called by ConfigManager during saveModuleConfig(). Writes the four
+ * display config keys into the provided JSON object. ConfigManager
+ * appends the _v field separately.
  *
- * @return true if write succeeded.
+ * @param section Mutable JSON object to write config into.
  */
-bool U8g2DisplayModule::saveConfig() {
-#ifndef NATIVE_BUILD
-    ESP_LOGI(TAG, "Saving config to /mod/display.json");
-    // --- Ensure the /mod/ directory exists ---
-    if (!LittleFS.exists("/mod")) {
-        LittleFS.mkdir("/mod");
-    }
-
-    // --- Serialize settings to JSON ---
-    JsonDocument doc;
-    doc["brightness"]       = _brightness;
-    doc["flip"]             = _flipScreen;
-    doc["sleepTimeout"]     = _sleepTimeoutMs;
-    doc["rotationInterval"] = _rotationIntervalMs;
-
-    // --- Write to LittleFS ---
-    File configFile = LittleFS.open("/mod/display.json", "w");
-    if (!configFile) {
-        ESP_LOGE(TAG, "Failed to open /mod/display.json for writing");
-        return false;
-    }
-
-    serializeJson(doc, configFile);
-    configFile.close();
-    ESP_LOGI(TAG, "Config saved successfully");
-    return true;
-#else
-    // NATIVE_BUILD — no LittleFS
-    return true;
-#endif
+void U8g2DisplayModule::serializeConfig(JsonObject& section) const {
+    section["brightness"]       = _brightness;
+    section["flip"]             = _flipScreen;
+    section["sleepTimeout"]     = _sleepTimeoutMs;
+    section["rotationInterval"] = _rotationIntervalMs;
 }
 
 /**
- * @brief Reset display settings to factory defaults, persist, and apply.
+ * @brief Reset display settings to factory defaults.
  *
  * Sets: brightness=255, flipScreen=false, sleepTimeout=300000ms,
- * rotationInterval=8000ms. Applies hardware contrast/flip and saves to disk.
+ * rotationInterval=8000ms. Applies hardware settings. ConfigManager
+ * will call saveModuleConfig() afterwards to persist.
  */
 void U8g2DisplayModule::resetConfig() {
     // --- Set factory defaults ---
@@ -445,9 +396,6 @@ void U8g2DisplayModule::resetConfig() {
     _flipScreen         = false;
     _sleepTimeoutMs     = 300000;
     _rotationIntervalMs = 8000;
-
-    // --- Persist to disk ---
-    saveConfig();
 
     // --- Apply hardware settings ---
 #ifndef NATIVE_BUILD

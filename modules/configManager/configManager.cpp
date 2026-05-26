@@ -7,8 +7,13 @@
  * To view a copy of this license, visit https://creativecommons.org/licenses/by-nc-sa/4.0/
  *
  * Module: modules/configManager/configManager.cpp
- * Description: Implementation of the ConfigManager kernel service. Handles reading
- *              and writing the generic JSON configuration file for the framework.
+ * Description: Implementation of the ConfigManager centralised configuration gateway.
+ *              Owns all config file I/O for registered iConfigurable modules,
+ *              handles schema versioning and migration, and provides bulk
+ *              export/import for backup/restore.
+ *
+ * Exported Functions/Classes:
+ * - ConfigManager: see configManager.hpp
  */
 
 #include "configManager.hpp"
@@ -23,136 +28,231 @@
 #else
 #include <fstream>
 #include <sstream>
+#include <cstdio>
 #endif
 
 static const char* TAG = "ConfigManager";
 
-#ifdef NATIVE_BUILD
-// A simple fallback for strlcpy in native testing environment if not available.
-// macOS has strlcpy natively, but just to be safe if Linux is used:
-#if !defined(__APPLE__) && !defined(__FreeBSD__)
-static size_t strlcpy(char *dst, const char *src, size_t siz) {
-    char *d = dst;
-    const char *s = src;
-    size_t n = siz;
-    if (n != 0) {
-        while (--n != 0) {
-            if ((*d++ = *s++) == '\0') break;
-        }
-    }
-    if (n == 0) {
-        if (siz != 0) *d = '\0';
-        while (*s++) ;
-    }
-    return (s - src - 1);
-}
-#endif
-#endif
+// =============================================================================
+// Path Helper
+// =============================================================================
 
 /**
- * @brief Loads the system configuration from LittleFS.
- * @return true if successfully loaded and parsed, false if defaults were applied.
+ * @brief Format the config file path for a given namespace.
+ *
+ * On hardware: "/mod/<ns>.json" (LittleFS path convention)
+ * On native:   "mod_<ns>.json" (flat file in working directory for tests)
+ *
+ * @param ns   Namespace string (e.g. "wifi").
+ * @param buf  Output buffer.
+ * @param size Buffer size in bytes.
  */
-bool ConfigManager::loadConfig() {
-    ESP_LOGI(TAG, "Loading system configuration from %s", SYSTEM_CONFIG_PATH);
-
+void ConfigManager::getConfigPath(const char* ns, char* buf, size_t size) {
 #ifndef NATIVE_BUILD
-    if (!LittleFS.exists(SYSTEM_CONFIG_PATH)) {
-        ESP_LOGW(TAG, "Configuration file not found. Applying defaults.");
-        saveConfig();
-        return false;
-    }
-
-    File file = LittleFS.open(SYSTEM_CONFIG_PATH, "r");
-    if (!file) {
-        ESP_LOGE(TAG, "Failed to open configuration file for reading.");
-        return false;
-    }
-
-    JsonDocument doc;
-    DeserializationError error = deserializeJson(doc, file);
-    file.close();
+    snprintf(buf, size, "/mod/%s.json", ns);
 #else
-    std::ifstream file(SYSTEM_CONFIG_PATH);
-    if (!file.is_open()) {
-        ESP_LOGW(TAG, "Configuration file not found. Applying defaults.");
-        saveConfig();
-        return false;
-    }
-    
-    std::stringstream buffer;
-    buffer << file.rdbuf();
-    std::string jsonStr = buffer.str();
-    file.close();
-
-    JsonDocument doc;
-    DeserializationError error = deserializeJson(doc, jsonStr);
+    snprintf(buf, size, "mod_%s.json", ns);
 #endif
+}
 
-    if (error) {
-        ESP_LOGE(TAG, "Failed to parse configuration file: %s", error.c_str());
-        ESP_LOGW(TAG, "Reverting to safe factory defaults.");
-        resetConfig();
+// =============================================================================
+// Module Registry
+// =============================================================================
+
+/**
+ * @brief Register an iConfigurable module with the gateway.
+ *
+ * Performs bounds checking against MAX_CONFIGURABLES and null-pointer guard.
+ *
+ * @param module Non-null pointer to the iConfigurable module.
+ * @return true if registration succeeded; false if full or nullptr.
+ */
+bool ConfigManager::registerModule(iConfigurable* module) {
+    if (module == nullptr) {
+        ESP_LOGE(TAG, "registerModule() rejected — null pointer");
         return false;
     }
-
-    // Process variables with safe defaults
-    float loadedVersion = doc["configVersion"] | 1.0f;
-    _config.configVersion = loadedVersion;
-
-    if (doc["hostname"].is<const char*>()) {
-        strlcpy(_config.hostname, doc["hostname"], sizeof(_config.hostname));
+    if (_moduleCount >= MAX_CONFIGURABLES) {
+        ESP_LOGE(TAG, "registerModule() rejected — registry full (%u/%u)",
+                 _moduleCount, MAX_CONFIGURABLES);
+        return false;
     }
-    if (doc["timezone"].is<const char*>()) {
-        strlcpy(_config.timezone, doc["timezone"], sizeof(_config.timezone));
-    }
-    
-    _config.firmwareUpdatesEnabled = doc["firmwareUpdatesEnabled"] | true;
-    _config.otaQuietHour = doc["otaQuietHour"] | 3;
-
-    // Handle version migration if necessary
-    if (loadedVersion < SYSTEM_CONFIG_VERSION) {
-        ESP_LOGI(TAG, "Migrating configuration from v%.1f to v%.1f", loadedVersion, SYSTEM_CONFIG_VERSION);
-        _config.configVersion = SYSTEM_CONFIG_VERSION;
-        saveConfig();
-    }
-
-    ESP_LOGI(TAG, "Configuration successfully loaded.");
+    _modules[_moduleCount++] = module;
+    ESP_LOGI(TAG, "Registered module '%s' (slot %u/%u)",
+             module->getConfigNamespace(), _moduleCount, MAX_CONFIGURABLES);
     return true;
 }
 
-/**
- * @brief Persists the current configuration to LittleFS.
- * @return true if successfully saved.
- */
-bool ConfigManager::saveConfig() {
-    ESP_LOGI(TAG, "Saving system configuration to %s", SYSTEM_CONFIG_PATH);
+// =============================================================================
+// Boot Sequence
+// =============================================================================
 
+/**
+ * @brief Load and apply configuration for all registered modules.
+ *
+ * Iterates the fixed-size module registry and calls loadModuleConfig()
+ * on each registered module. Handles file reads, version checks,
+ * migrations, and applyConfig() dispatch.
+ */
+void ConfigManager::beginAll() {
+    ESP_LOGI(TAG, "beginAll() — loading config for %u module(s)", _moduleCount);
+
+    for (uint8_t i = 0; i < _moduleCount; i++) {
+        loadModuleConfig(_modules[i]);
+    }
+
+    ESP_LOGI(TAG, "beginAll() complete");
+}
+
+/**
+ * @brief Load a single module's config from its namespace file.
+ *
+ * Opens /mod/<namespace>.json, deserialises it, reads the stored _v version,
+ * compares against the module's getSchemaVersion(), calls migrateConfig()
+ * if needed, then calls applyConfig(). Rewrites the file if migration occurred.
+ *
+ * @param module Pointer to the iConfigurable module.
+ */
+void ConfigManager::loadModuleConfig(iConfigurable* module) {
+    const char* ns = module->getConfigNamespace();
+    char path[48]; // "/mod/" (5) + namespace (max ~32) + ".json" (5) + null
+    getConfigPath(ns, path, sizeof(path));
+
+    ESP_LOGI(TAG, "Loading config for '%s' from %s", ns, path);
+
+    // --- Read the config file ---
     JsonDocument doc;
-    doc["configVersion"] = _config.configVersion;
-    doc["hostname"] = _config.hostname;
-    doc["timezone"] = _config.timezone;
-    doc["firmwareUpdatesEnabled"] = _config.firmwareUpdatesEnabled;
-    doc["otaQuietHour"] = _config.otaQuietHour;
+    bool fileExists = false;
 
 #ifndef NATIVE_BUILD
-    File file = LittleFS.open(SYSTEM_CONFIG_PATH, "w");
-    if (!file) {
-        ESP_LOGE(TAG, "Failed to open configuration file for writing.");
+    if (LittleFS.exists(path)) {
+        File file = LittleFS.open(path, "r");
+        if (file) {
+            DeserializationError err = deserializeJson(doc, file);
+            file.close();
+            if (err) {
+                ESP_LOGE(TAG, "Failed to parse %s: %s — applying defaults", path, err.c_str());
+                module->resetConfig();
+                saveModuleConfig(module);
+                return;
+            }
+            fileExists = true;
+        } else {
+            ESP_LOGW(TAG, "Failed to open %s for reading", path);
+        }
+    }
+#else
+    std::ifstream file(path);
+    if (file.is_open()) {
+        std::stringstream buffer;
+        buffer << file.rdbuf();
+        std::string jsonStr = buffer.str();
+        file.close();
+
+        DeserializationError err = deserializeJson(doc, jsonStr);
+        if (err) {
+            ESP_LOGE(TAG, "Failed to parse %s: %s — applying defaults", path, err.c_str());
+            module->resetConfig();
+            saveModuleConfig(module);
+            return;
+        }
+        fileExists = true;
+    }
+#endif
+
+    if (!fileExists) {
+        // No config file — apply defaults and create the file
+        ESP_LOGW(TAG, "Config file %s not found — applying defaults for '%s'", path, ns);
+        module->resetConfig();
+        saveModuleConfig(module);
+        return;
+    }
+
+    // --- Version check and migration ---
+    int storedVersion = doc["_v"] | 0;
+    int declaredVersion = module->getSchemaVersion();
+    bool migrated = false;
+
+    if (storedVersion < declaredVersion) {
+        ESP_LOGI(TAG, "Schema migration needed for '%s': v%d → v%d", ns, storedVersion, declaredVersion);
+        JsonObject root = doc.as<JsonObject>();
+        if (module->migrateConfig(root, storedVersion)) {
+            ESP_LOGI(TAG, "Migration succeeded for '%s'", ns);
+            migrated = true;
+        } else {
+            ESP_LOGW(TAG, "Migration failed for '%s' — resetting to defaults", ns);
+            module->resetConfig();
+            saveModuleConfig(module);
+            return;
+        }
+    }
+
+    // --- Apply the configuration ---
+    JsonObject root = doc.as<JsonObject>();
+    module->applyConfig(root);
+
+    // --- Rewrite file if migration occurred ---
+    if (migrated) {
+        saveModuleConfig(module);
+    }
+}
+
+// =============================================================================
+// Save
+// =============================================================================
+
+/**
+ * @brief Persist a single module's current configuration to its namespace file.
+ *
+ * Creates a JsonDocument (~256 bytes), calls serializeConfig() to populate it,
+ * sets the _v field, and writes directly to the file stream (no intermediate
+ * String buffer — critical for embedded memory constraints).
+ *
+ * @param module Pointer to the iConfigurable module to save.
+ * @return true if successfully saved; false on error.
+ */
+bool ConfigManager::saveModuleConfig(iConfigurable* module) {
+    if (module == nullptr) {
+        ESP_LOGE(TAG, "saveModuleConfig() — null module pointer");
         return false;
     }
 
+    const char* ns = module->getConfigNamespace();
+    char path[48];
+    getConfigPath(ns, path, sizeof(path));
+
+    ESP_LOGI(TAG, "Saving config for '%s' to %s", ns, path);
+
+    // --- Build the JSON document ---
+    JsonDocument doc;
+    JsonObject root = doc.to<JsonObject>();
+    module->serializeConfig(root);
+    doc["_v"] = module->getSchemaVersion();
+
+    // --- Write to file ---
+#ifndef NATIVE_BUILD
+    // Ensure the /mod/ directory exists
+    if (!LittleFS.exists("/mod")) {
+        LittleFS.mkdir("/mod");
+    }
+
+    File file = LittleFS.open(path, "w");
+    if (!file) {
+        ESP_LOGE(TAG, "Failed to open %s for writing", path);
+        return false;
+    }
+
+    // CRITICAL: serialize directly to File stream — no intermediate String
     if (serializeJson(doc, file) == 0) {
-        ESP_LOGE(TAG, "Failed to write to configuration file.");
+        ESP_LOGE(TAG, "Failed to write config to %s", path);
         file.close();
         return false;
     }
-
     file.close();
 #else
-    std::ofstream file(SYSTEM_CONFIG_PATH);
+    std::ofstream file(path);
     if (!file.is_open()) {
-        ESP_LOGE(TAG, "Failed to open configuration file for writing.");
+        ESP_LOGE(TAG, "Failed to open %s for writing", path);
         return false;
     }
     std::string jsonStr;
@@ -161,18 +261,74 @@ bool ConfigManager::saveConfig() {
     file.close();
 #endif
 
-    ESP_LOGI(TAG, "Configuration saved successfully.");
+    ESP_LOGI(TAG, "Config saved for '%s'", ns);
     return true;
 }
 
+// =============================================================================
+// Bulk Export / Import
+// =============================================================================
+
 /**
- * @brief Reverts configuration to factory defaults and persists them.
+ * @brief Export all registered module configs into a master JSON document.
+ *
+ * For each registered module, creates a nested object keyed by namespace,
+ * calls serializeConfig(), and adds the _v field. The master document is
+ * suitable for full-device backup (~2-3KB heap).
+ *
+ * @param outDoc Reference to the output JsonDocument (caller-owned).
  */
-void ConfigManager::resetConfig() {
-    ESP_LOGW(TAG, "Resetting system configuration to factory defaults.");
-    _config = SystemConfig(); // Reset struct to defaults
-    saveConfig();
+void ConfigManager::exportAllConfig(JsonDocument& outDoc) {
+    ESP_LOGI(TAG, "Exporting config for %u module(s)", _moduleCount);
+
+    for (uint8_t i = 0; i < _moduleCount; i++) {
+        iConfigurable* mod = _modules[i];
+        const char* ns = mod->getConfigNamespace();
+
+        JsonObject section = outDoc[ns].to<JsonObject>();
+        mod->serializeConfig(section);
+        section["_v"] = mod->getSchemaVersion();
+    }
 }
+
+/**
+ * @brief Import module configs from a master JSON document.
+ *
+ * For each registered module, extracts its namespace section from the input
+ * document, calls applyConfig(), and persists via saveModuleConfig().
+ * Modules whose namespace is not found in the input are skipped.
+ *
+ * @param inDoc Reference to the input JsonDocument.
+ * @return true if all found modules imported successfully.
+ */
+bool ConfigManager::importAllConfig(JsonDocument& inDoc) {
+    ESP_LOGI(TAG, "Importing config for %u module(s)", _moduleCount);
+    bool allOk = true;
+
+    for (uint8_t i = 0; i < _moduleCount; i++) {
+        iConfigurable* mod = _modules[i];
+        const char* ns = mod->getConfigNamespace();
+
+        if (!inDoc[ns].is<JsonObject>()) {
+            ESP_LOGW(TAG, "No config section found for '%s' in import — skipping", ns);
+            continue;
+        }
+
+        JsonObject section = inDoc[ns].as<JsonObject>();
+        mod->applyConfig(section);
+
+        if (!saveModuleConfig(mod)) {
+            ESP_LOGE(TAG, "Failed to save imported config for '%s'", ns);
+            allOk = false;
+        }
+    }
+
+    return allOk;
+}
+
+// =============================================================================
+// Reload Mechanism
+// =============================================================================
 
 /**
  * @brief Examines the pending reload flag and resets it if necessary.
@@ -184,39 +340,41 @@ bool ConfigManager::checkAndClearReload() {
     return wasPending;
 }
 
+// =============================================================================
+// IWebContributor — REST API Routes
+// =============================================================================
+
+/**
+ * @brief Register REST API routes for the config gateway.
+ *
+ * GET /api/config — returns a JSON array of registered namespace identifiers.
+ * POST /api/config — reserved for future use.
+ *
+ * @param server Reference to the AsyncWebServer instance.
+ */
 void ConfigManager::registerRoutes(AsyncWebServer& server) {
 #ifndef NATIVE_BUILD
+    // --- GET /api/config — list registered namespaces ---
     server.on("/api/config", HTTP_GET, [this](AsyncWebServerRequest* request) {
         JsonDocument doc;
-        doc["hostname"] = _config.hostname;
-        doc["timezone"] = _config.timezone;
-        doc["firmwareUpdatesEnabled"] = _config.firmwareUpdatesEnabled;
-        doc["otaQuietHour"] = _config.otaQuietHour;
-        
+        JsonArray namespaces = doc["namespaces"].to<JsonArray>();
+        for (uint8_t i = 0; i < _moduleCount; i++) {
+            namespaces.add(_modules[i]->getConfigNamespace());
+        }
+        doc["count"] = _moduleCount;
+
         String output;
         serializeJson(doc, output);
         request->send(200, "application/json", output);
     });
 
-    server.on("/api/config", HTTP_POST, 
+    // --- POST /api/config — reserved for future bulk operations ---
+    server.on("/api/config", HTTP_POST,
         [](AsyncWebServerRequest *request) {},
         NULL,
         [this](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
-            JsonDocument doc;
-            DeserializationError error = deserializeJson(doc, data, len);
-            if (!error) {
-                if (doc["hostname"].is<const char*>()) strlcpy(_config.hostname, doc["hostname"], sizeof(_config.hostname));
-                if (doc["timezone"].is<const char*>()) strlcpy(_config.timezone, doc["timezone"], sizeof(_config.timezone));
-                if (doc["firmwareUpdatesEnabled"].is<bool>()) _config.firmwareUpdatesEnabled = doc["firmwareUpdatesEnabled"];
-                if (doc["otaQuietHour"].is<int>()) _config.otaQuietHour = doc["otaQuietHour"];
-                
-                this->saveConfig();
-                this->requestReload();
-                
-                request->send(200, "application/json", "{\"status\":\"ok\"}");
-                return;
-            }
-            request->send(400, "application/json", "{\"status\":\"error\",\"msg\":\"Invalid JSON\"}");
+            // Reserved for future use — bulk config import via API
+            request->send(501, "application/json", "{\"status\":\"not_implemented\"}");
         }
     );
 #endif

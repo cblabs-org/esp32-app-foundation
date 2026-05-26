@@ -1,4 +1,5 @@
 #include <gtest/gtest.h>
+#include <ArduinoJson.h>
 #include "../../../modules/wifiManager/wifiManager.hpp"
 
 class WifiManagerTest : public ::testing::Test {
@@ -105,9 +106,69 @@ TEST_F(WifiManagerTest, GetTabName) {
     EXPECT_STREQ("WiFi", wifiManager.getTabName());
 }
 
+// getConfigNamespace()
+TEST_F(WifiManagerTest, GetConfigNamespace) {
+    EXPECT_STREQ("wifi", wifiManager.getConfigNamespace());
+}
+
+// getSchemaVersion()
+TEST_F(WifiManagerTest, GetSchemaVersion) {
+    EXPECT_EQ(1, wifiManager.getSchemaVersion());
+}
+
+// getTabOrder()
+TEST_F(WifiManagerTest, GetTabOrder) {
+    EXPECT_EQ(10, wifiManager.getTabOrder());
+}
+
+// applyConfig with valid JSON
+TEST_F(WifiManagerTest, ApplyConfig_SetsSSIDAndHostname) {
+    JsonDocument doc;
+    JsonObject section = doc.to<JsonObject>();
+    section["ssid"] = "TestNetwork";
+    section["hostname"] = "test-device";
+
+    wifiManager.applyConfig(section);
+    EXPECT_STREQ("TestNetwork", wifiManager.getSSID());
+}
+
+// applyConfig with empty JSON
+TEST_F(WifiManagerTest, ApplyConfig_EmptySection_DoesNotCrash) {
+    JsonDocument doc;
+    JsonObject section = doc.to<JsonObject>();
+    EXPECT_NO_FATAL_FAILURE(wifiManager.applyConfig(section));
+}
+
+// serializeConfig produces expected keys
+TEST_F(WifiManagerTest, SerializeConfig_ProducesExpectedKeys) {
+    wifiManager.updateWiFi("MySSID", "MyPass");
+
+    JsonDocument doc;
+    JsonObject section = doc.to<JsonObject>();
+    wifiManager.serializeConfig(section);
+
+    EXPECT_TRUE(section.containsKey("ssid"));
+    EXPECT_TRUE(section.containsKey("hostname"));
+    EXPECT_STREQ("MySSID", section["ssid"].as<const char*>());
+}
+
+// serializeConfig roundtrip
+TEST_F(WifiManagerTest, SerializeApplyRoundtrip_Consistent) {
+    wifiManager.updateWiFi("RoundtripSSID", "pass");
+
+    JsonDocument doc;
+    JsonObject section = doc.to<JsonObject>();
+    wifiManager.serializeConfig(section);
+
+    WifiManager wm2;
+    wm2.applyConfig(section);
+    EXPECT_STREQ("RoundtripSSID", wm2.getSSID());
+}
+
 #if defined(NATIVE_BUILD)
 int main(int argc, char **argv) {
     ::testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();
 }
 #endif
+

@@ -10,22 +10,26 @@
  * Description: Implementation of Wi-Fi credentials management and connection state machine.
  *              Handles AP captive portal and connection recovery.
  *
+ *              Config persistence is delegated to ConfigManager via the iConfigurable
+ *              gateway interface. WifiManager never touches LittleFS directly for
+ *              configuration — it provides applyConfig()/serializeConfig() callbacks.
+ *
  * Exported Functions/Classes:
  * - WifiManager: [Class implementation]
  *   - begin: Initial non-blocking hardware initialization.
  *   - tick: Main non-blocking state machine for connection maintenance.
- *   - loadConfig: Load credentials.
- *   - saveConfig: Save credentials.
+ *   - applyConfig: Apply config from JSON section.
+ *   - serializeConfig: Serialize config to JSON section.
  *   - resetConfig: Erase credentials.
- *   - updateWiFi: Configuration persistence.
+ *   - updateWiFi: Configuration persistence via ConfigManager.
  *   - testConnection: Momentary connection probe for verification.
  */
 
 #include "wifiManager.hpp"
+#include "../configManager/configManager.hpp"
 
 #ifndef NATIVE_BUILD
 #include <FS.h>
-#include <LittleFS.h>
 #include <ArduinoJson.h>
 #include <WiFi.h>
 #include <DNSServer.h>
@@ -41,6 +45,28 @@ void delay(unsigned long ms) {}      // Stub
 #include "../logger/logger.hpp"
 
 static const char* TAG = "WIFI_MGR";
+
+#ifdef NATIVE_BUILD
+// A simple fallback for strlcpy in native testing environment if not available.
+// macOS has strlcpy natively, but just to be safe if Linux is used:
+#if !defined(__APPLE__) && !defined(__FreeBSD__)
+static size_t strlcpy(char *dst, const char *src, size_t siz) {
+    char *d = dst;
+    const char *s = src;
+    size_t n = siz;
+    if (n != 0) {
+        while (--n != 0) {
+            if ((*d++ = *s++) == '\0') break;
+        }
+    }
+    if (n == 0) {
+        if (siz != 0) *d = '\0';
+        while (*s++) ;
+    }
+    return (s - src - 1);
+}
+#endif
+#endif
 
 WifiManager::WifiManager() : wifiDisconnectTimer(0) {
     memset(wifiSsid, 0, sizeof(wifiSsid));
@@ -63,58 +89,50 @@ void WifiManager::transitionTo(WiFiState newState) {
 #endif
 }
 
+// =============================================================================
+// iConfigurable — ConfigManager Gateway Callbacks
+// =============================================================================
+
 /**
- * @brief Load Wi-Fi credentials from /mod/wifiManager.json on LittleFS.
+ * @brief Apply WiFi configuration from a parsed JSON section.
+ *
+ * Reads "ssid" and "hostname" from the provided JSON object and copies
+ * them into internal buffers. Password is NOT stored in config files —
+ * it will be retrieved from KeyManager in a future PR.
+ *
+ * @param section Read-only JSON object containing config keys.
  */
-bool WifiManager::loadConfig() {
-#ifndef NATIVE_BUILD
-    ESP_LOGI(TAG, "Loading WiFi configuration from LittleFS...");
-    if (LittleFS.exists("/mod/wifiManager.json")) {
-        File f = LittleFS.open("/mod/wifiManager.json", "r");
-        if (!f) {
-            ESP_LOGE(TAG, "Failed to open /mod/wifiManager.json for reading");
-            return false;
+void WifiManager::applyConfig(const JsonObject& section) {
+    // --- Read SSID ---
+    if (section["ssid"].is<const char*>()) {
+        strlcpy(wifiSsid, section["ssid"], sizeof(wifiSsid));
+        if (strlen(wifiSsid) > 0) {
+            ESP_LOGI(TAG, "Config applied — SSID: %s", wifiSsid);
         }
-        JsonDocument doc;
-        DeserializationError error = deserializeJson(doc, f);
-        if (!error) {
-            strlcpy(wifiSsid, doc["ssid"] | "", sizeof(wifiSsid));
-            strlcpy(wifiPass, doc["pass"] | "", sizeof(wifiPass));
-            if (strlen(wifiSsid) > 0) {
-                ESP_LOGI(TAG, "Loaded WiFi credentials for: %s", wifiSsid);
-                if (strlen(wifiPass) > 0) {
-                    Logger::registerSecret(String(wifiPass));
-                }
-            }
-        } else {
-            ESP_LOGE(TAG, "JSON deserialization failed");
-        }
-        f.close();
-        return true;
     }
-#endif
-    return false;
+
+    // --- Read hostname ---
+    if (section["hostname"].is<const char*>()) {
+        strlcpy(currentHostname, section["hostname"], sizeof(currentHostname));
+    }
+
+    // TODO: P0 — retrieve password from KeyManager
+    // Password is NOT in config files. In a future PR, the password will be
+    // fetched from KeyManager (AES-256 encrypted) during applyConfig().
 }
 
 /**
- * @brief Save Wi-Fi credentials to JSON.
+ * @brief Serialize current WiFi configuration into a JSON section.
+ *
+ * Writes "ssid" and "hostname" to the JSON object. Password is deliberately
+ * excluded — secrets are managed by KeyManager.
+ *
+ * @param section Mutable JSON object to write config into.
  */
-bool WifiManager::saveConfig() {
-#ifndef NATIVE_BUILD
-    ESP_LOGI(TAG, "Saving WiFi credentials...");
-    JsonDocument doc;
-    doc["ssid"] = wifiSsid;
-    doc["pass"] = wifiPass;
-    
-    File f = LittleFS.open("/mod/wifiManager.json", "w");
-    if (!f) {
-        ESP_LOGE(TAG, "Failed to open /mod/wifiManager.json for writing");
-        return false;
-    }
-    serializeJson(doc, f);
-    f.close();
-#endif
-    return true;
+void WifiManager::serializeConfig(JsonObject& section) const {
+    section["ssid"] = wifiSsid;
+    section["hostname"] = currentHostname;
+    // Password deliberately excluded — managed by KeyManager
 }
 
 /**
@@ -123,8 +141,8 @@ bool WifiManager::saveConfig() {
 void WifiManager::resetConfig() {
     memset(wifiSsid, 0, sizeof(wifiSsid));
     memset(wifiPass, 0, sizeof(wifiPass));
+    memset(currentHostname, 0, sizeof(currentHostname));
 #ifndef NATIVE_BUILD
-    LittleFS.remove("/mod/wifiManager.json");
     WiFi.disconnect(true, true);
     esp_wifi_restore();
 #endif
@@ -133,11 +151,15 @@ void WifiManager::resetConfig() {
 
 /**
  * @brief Core initialization routine (Non-Blocking).
+ *
+ * Note: loadConfig() is no longer called here — ConfigManager calls
+ * applyConfig() during beginAll() before WifiManager::begin() runs.
+ *
  * @param hostname The hostname to set for station/AP modes.
  */
 void WifiManager::begin(const char* hostname) {
     if (hostname != nullptr) strlcpy(currentHostname, hostname, sizeof(currentHostname));
-    loadConfig();
+    // Config is already loaded by ConfigManager::beginAll() calling applyConfig()
 
 #ifndef NATIVE_BUILD
     lastApiRequestTime = millis();
@@ -324,7 +346,10 @@ void WifiManager::registerRoutes(AsyncWebServer& server) {
 }
 
 /**
- * @brief Update and save WiFi credentials.
+ * @brief Update and save WiFi credentials via ConfigManager.
+ *
+ * Instead of calling saveConfig() directly, delegates to ConfigManager
+ * to persist the config through the gateway.
  */
 void WifiManager::updateWiFi(const char* ssid, const char* pass) {
     if (ssid != nullptr) strlcpy(wifiSsid, ssid, sizeof(wifiSsid));
@@ -332,7 +357,13 @@ void WifiManager::updateWiFi(const char* ssid, const char* pass) {
         strlcpy(wifiPass, pass, sizeof(wifiPass));
         Logger::registerSecret(String(wifiPass));
     }
-    saveConfig();
+
+    // Persist via ConfigManager gateway
+    if (_configManager != nullptr) {
+        _configManager->saveModuleConfig(this);
+    } else {
+        ESP_LOGW(TAG, "updateWiFi: ConfigManager not wired — config not saved!");
+    }
 }
 
 /**

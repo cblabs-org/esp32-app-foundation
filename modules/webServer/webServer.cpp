@@ -94,6 +94,11 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors) 
                 JsonObject tabObj = tabsArr.add<JsonObject>();
                 tabObj["name"] = tabName;
                 tabObj["id"] = tabName; // Using name as ID for simplicity
+                const char* parentTab = contributor->getParentTab();
+                if (parentTab != nullptr) {
+                    tabObj["parent"] = parentTab;
+                }
+                tabObj["order"] = contributor->getTabOrder();
             }
         }
     }

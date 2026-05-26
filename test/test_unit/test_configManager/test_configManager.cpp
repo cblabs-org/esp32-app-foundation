@@ -1,203 +1,418 @@
+/*
+ * ESP32 App Foundation (c) 2026 CB Labs
+ *
+ * https://github.com/matthewmcneill/esp32-app-foundation
+ *
+ * This work is licensed under Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International.
+ * To view a copy of this license, visit https://creativecommons.org/licenses/by-nc-sa/4.0/
+ *
+ * Module: test/test_unit/test_configManager/test_configManager.cpp
+ * Description: GoogleTest unit-test suite for the ConfigManager centralised
+ *              configuration gateway. Validates module registration, beginAll()
+ *              dispatch, saveModuleConfig, exportAllConfig, importAllConfig,
+ *              schema version migration, reload mechanism, and error handling.
+ *
+ *              All tests execute on the native GoogleTest runner (NATIVE_BUILD).
+ *              Config files are written as "mod_<ns>.json" in the working directory.
+ *
+ * Exported Functions:
+ * - main(): GoogleTest entry point
+ */
+
 #include <gtest/gtest.h>
 #include "configManager.hpp"
 #include <fstream>
-#include <stdio.h>
+#include <cstdio>
 #include <string>
+
+// =============================================================================
+// Mock iConfigurable Implementations
+// =============================================================================
+
+/** @brief Basic mock configurable with namespace "testmod" and schema v1. */
+class MockModule : public iConfigurable {
+public:
+    bool applyConfigCalled = false;
+    mutable bool serializeConfigCalled = false;
+    bool resetConfigCalled = false;
+    int lastFromVersion = -1;
+
+    // Internal state that config should round-trip
+    int setting1 = 42;
+    bool setting2 = false;
+
+    const char* getConfigNamespace() const override { return "testmod"; }
+    int getSchemaVersion() const override { return 1; }
+
+    void applyConfig(const JsonObject& section) override {
+        applyConfigCalled = true;
+        setting1 = section["setting1"] | 42;
+        setting2 = section["setting2"] | false;
+    }
+
+    void serializeConfig(JsonObject& section) const override {
+        serializeConfigCalled = true;
+        section["setting1"] = setting1;
+        section["setting2"] = setting2;
+    }
+
+    void resetConfig() override {
+        resetConfigCalled = true;
+        setting1 = 42;
+        setting2 = false;
+    }
+};
+
+/** @brief Mock module with a different namespace for multi-module tests. */
+class MockModuleB : public iConfigurable {
+public:
+    bool applyConfigCalled = false;
+    bool resetConfigCalled = false;
+    std::string name = "default";
+
+    const char* getConfigNamespace() const override { return "modB"; }
+    int getSchemaVersion() const override { return 1; }
+
+    void applyConfig(const JsonObject& section) override {
+        applyConfigCalled = true;
+        const char* n = section["name"] | "default";
+        name = n;
+    }
+
+    void serializeConfig(JsonObject& section) const override {
+        section["name"] = name.c_str();
+    }
+
+    void resetConfig() override {
+        resetConfigCalled = true;
+        name = "default";
+    }
+};
+
+/** @brief Mock with schema version 2 that can migrate from v1. */
+class MockModuleV2 : public iConfigurable {
+public:
+    bool migrateCalled = false;
+    int lastFromVersion = -1;
+    int value = 0;
+
+    const char* getConfigNamespace() const override { return "v2mod"; }
+    int getSchemaVersion() const override { return 2; }
+
+    void applyConfig(const JsonObject& section) override {
+        value = section["value"] | 0;
+    }
+
+    void serializeConfig(JsonObject& section) const override {
+        section["value"] = value;
+    }
+
+    bool migrateConfig(JsonObject& section, int fromVersion) override {
+        migrateCalled = true;
+        lastFromVersion = fromVersion;
+        // Migration: rename old_value → value
+        if (section.containsKey("old_value")) {
+            section["value"] = section["old_value"];
+            section.remove("old_value");
+        }
+        return true;
+    }
+
+    void resetConfig() override {
+        value = 0;
+    }
+};
+
+// =============================================================================
+// Test Fixture
+// =============================================================================
 
 class ConfigManagerTest : public ::testing::Test {
 protected:
     ConfigManager configManager;
 
     void SetUp() override {
-        // Ensure the config file is removed before each test
-        remove(SYSTEM_CONFIG_PATH);
+        // Clean up any leftover config files from previous test runs
+        remove("mod_testmod.json");
+        remove("mod_modB.json");
+        remove("mod_v2mod.json");
     }
 
     void TearDown() override {
-        // Clean up the config file after each test
-        remove(SYSTEM_CONFIG_PATH);
+        remove("mod_testmod.json");
+        remove("mod_modB.json");
+        remove("mod_v2mod.json");
     }
 };
 
-TEST_F(ConfigManagerTest, InitialLoad_FileDoesNotExist_AppliesDefaultsAndSaves) {
-    EXPECT_FALSE(configManager.loadConfig()); // Returns false if defaults were applied
-    
-    // Check that defaults were loaded into the struct
-    EXPECT_STREQ(configManager.getConfig().hostname, "esp32-device");
-    EXPECT_STREQ(configManager.getConfig().timezone, "GMT0");
-    EXPECT_TRUE(configManager.getConfig().firmwareUpdatesEnabled);
-    EXPECT_EQ(configManager.getConfig().otaQuietHour, 3);
-    
-    // Check that the file was created
-    std::ifstream file(SYSTEM_CONFIG_PATH);
+// =============================================================================
+// Test Group 1: Module Registration
+// =============================================================================
+
+TEST_F(ConfigManagerTest, RegisterModule_ValidPointer_ReturnsTrue) {
+    MockModule mod;
+    EXPECT_TRUE(configManager.registerModule(&mod));
+}
+
+TEST_F(ConfigManagerTest, RegisterModule_Nullptr_ReturnsFalse) {
+    EXPECT_FALSE(configManager.registerModule(nullptr));
+}
+
+TEST_F(ConfigManagerTest, RegisterModule_UpToMax_AllSucceed) {
+    MockModule modules[ConfigManager::MAX_CONFIGURABLES];
+    for (uint8_t i = 0; i < ConfigManager::MAX_CONFIGURABLES; i++) {
+        EXPECT_TRUE(configManager.registerModule(&modules[i]));
+    }
+}
+
+TEST_F(ConfigManagerTest, RegisterModule_OverMax_ReturnsFalse) {
+    MockModule modules[ConfigManager::MAX_CONFIGURABLES];
+    for (uint8_t i = 0; i < ConfigManager::MAX_CONFIGURABLES; i++) {
+        configManager.registerModule(&modules[i]);
+    }
+    MockModule overflow;
+    EXPECT_FALSE(configManager.registerModule(&overflow));
+}
+
+// =============================================================================
+// Test Group 2: beginAll — Load dispatch
+// =============================================================================
+
+TEST_F(ConfigManagerTest, BeginAll_NoModules_DoesNotCrash) {
+    EXPECT_NO_FATAL_FAILURE(configManager.beginAll());
+}
+
+TEST_F(ConfigManagerTest, BeginAll_NoFile_CallsResetConfig) {
+    MockModule mod;
+    configManager.registerModule(&mod);
+    configManager.beginAll();
+
+    // No file on disk → module should get resetConfig() called
+    EXPECT_TRUE(mod.resetConfigCalled);
+}
+
+TEST_F(ConfigManagerTest, BeginAll_WithFile_CallsApplyConfig) {
+    // Pre-create a config file
+    std::ofstream file("mod_testmod.json");
+    file << R"({"setting1":99,"setting2":true,"_v":1})";
+    file.close();
+
+    MockModule mod;
+    configManager.registerModule(&mod);
+    configManager.beginAll();
+
+    EXPECT_TRUE(mod.applyConfigCalled);
+    EXPECT_EQ(mod.setting1, 99);
+    EXPECT_TRUE(mod.setting2);
+}
+
+TEST_F(ConfigManagerTest, BeginAll_CorruptedFile_CallsResetConfig) {
+    std::ofstream file("mod_testmod.json");
+    file << "{ invalid json : ";
+    file.close();
+
+    MockModule mod;
+    configManager.registerModule(&mod);
+    configManager.beginAll();
+
+    EXPECT_TRUE(mod.resetConfigCalled);
+}
+
+TEST_F(ConfigManagerTest, BeginAll_MultipleModules_AllProcessed) {
+    MockModule modA;
+    MockModuleB modB;
+    configManager.registerModule(&modA);
+    configManager.registerModule(&modB);
+    configManager.beginAll();
+
+    // Both should have resetConfig called (no files exist)
+    EXPECT_TRUE(modA.resetConfigCalled);
+    EXPECT_TRUE(modB.resetConfigCalled);
+}
+
+// =============================================================================
+// Test Group 3: saveModuleConfig
+// =============================================================================
+
+TEST_F(ConfigManagerTest, SaveModuleConfig_ValidModule_CreatesFile) {
+    MockModule mod;
+    mod.setting1 = 77;
+    mod.setting2 = true;
+
+    configManager.registerModule(&mod);
+    EXPECT_TRUE(configManager.saveModuleConfig(&mod));
+
+    // Verify file was created
+    std::ifstream file("mod_testmod.json");
     EXPECT_TRUE(file.is_open());
 }
 
-TEST_F(ConfigManagerTest, SaveAndLoad_ValidConfig_LoadsCorrectly) {
-    // Modify config and save
-    configManager.getMutableConfig().firmwareUpdatesEnabled = false;
-    configManager.getMutableConfig().otaQuietHour = 5;
-    strcpy(configManager.getMutableConfig().hostname, "test-host");
-    strcpy(configManager.getMutableConfig().timezone, "EST");
-    
-    EXPECT_TRUE(configManager.saveConfig());
-    
-    // Create a new instance to load the saved config
-    ConfigManager newConfigManager;
-    EXPECT_TRUE(newConfigManager.loadConfig()); // Returns true on successful load
-    
-    // Verify loaded config
-    EXPECT_STREQ(newConfigManager.getConfig().hostname, "test-host");
-    EXPECT_STREQ(newConfigManager.getConfig().timezone, "EST");
-    EXPECT_FALSE(newConfigManager.getConfig().firmwareUpdatesEnabled);
-    EXPECT_EQ(newConfigManager.getConfig().otaQuietHour, 5);
+TEST_F(ConfigManagerTest, SaveModuleConfig_Nullptr_ReturnsFalse) {
+    EXPECT_FALSE(configManager.saveModuleConfig(nullptr));
 }
 
-TEST_F(ConfigManagerTest, LoadConfig_Migration_UpdatesVersionAndSaves) {
-    // Create an old version config file manually
-    std::ofstream file(SYSTEM_CONFIG_PATH);
-    file << "{\"configVersion\":0.5,\"hostname\":\"old-host\",\"timezone\":\"PST\",\"firmwareUpdatesEnabled\":false,\"otaQuietHour\":10}";
+TEST_F(ConfigManagerTest, SaveModuleConfig_Roundtrip_ValuesPreserved) {
+    MockModule mod;
+    mod.setting1 = 77;
+    mod.setting2 = true;
+
+    configManager.registerModule(&mod);
+    EXPECT_TRUE(configManager.saveModuleConfig(&mod));
+
+    // Read back via beginAll
+    MockModule mod2;
+    ConfigManager cm2;
+    cm2.registerModule(&mod2);
+    cm2.beginAll();
+
+    EXPECT_TRUE(mod2.applyConfigCalled);
+    EXPECT_EQ(mod2.setting1, 77);
+    EXPECT_TRUE(mod2.setting2);
+}
+
+TEST_F(ConfigManagerTest, SaveModuleConfig_IncludesSchemaVersion) {
+    MockModule mod;
+    configManager.registerModule(&mod);
+    configManager.saveModuleConfig(&mod);
+
+    // Read the file directly
+    std::ifstream file("mod_testmod.json");
+    std::string jsonStr((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
     file.close();
-    
-    EXPECT_TRUE(configManager.loadConfig()); // Successful load
-    
-    // Verify that the version was migrated in memory
-    EXPECT_EQ(configManager.getConfig().configVersion, SYSTEM_CONFIG_VERSION);
-    EXPECT_STREQ(configManager.getConfig().hostname, "old-host");
-    
-    // Verify that the file on disk was updated to the new version
-    std::ifstream inFile(SYSTEM_CONFIG_PATH);
-    std::string jsonStr((std::istreambuf_iterator<char>(inFile)), std::istreambuf_iterator<char>());
-    
-    // We check if the new version string is present. e.g. "configVersion":1.0
-    // std::to_string(1.0f) might produce "1.000000" but ArduinoJson produces "1.0" or "1" depending on precision.
-    // It's safer to just check that it parses back as SYSTEM_CONFIG_VERSION
+
     JsonDocument doc;
     deserializeJson(doc, jsonStr);
-    float diskVersion = doc["configVersion"];
-    EXPECT_EQ(diskVersion, SYSTEM_CONFIG_VERSION);
+    EXPECT_EQ(doc["_v"].as<int>(), 1);
 }
+
+// =============================================================================
+// Test Group 4: Schema Migration
+// =============================================================================
+
+TEST_F(ConfigManagerTest, BeginAll_OldVersion_CallsMigrateConfig) {
+    // Create a v1 config file for a module that declares v2
+    std::ofstream file("mod_v2mod.json");
+    file << R"({"old_value":55,"_v":1})";
+    file.close();
+
+    MockModuleV2 mod;
+    configManager.registerModule(&mod);
+    configManager.beginAll();
+
+    EXPECT_TRUE(mod.migrateCalled);
+    EXPECT_EQ(mod.lastFromVersion, 1);
+    EXPECT_EQ(mod.value, 55); // Should have migrated old_value → value
+}
+
+TEST_F(ConfigManagerTest, BeginAll_CurrentVersion_DoesNotMigrate) {
+    // Create a v2 config file (current version)
+    std::ofstream file("mod_v2mod.json");
+    file << R"({"value":42,"_v":2})";
+    file.close();
+
+    MockModuleV2 mod;
+    configManager.registerModule(&mod);
+    configManager.beginAll();
+
+    EXPECT_FALSE(mod.migrateCalled);
+    EXPECT_EQ(mod.value, 42);
+}
+
+// =============================================================================
+// Test Group 5: Bulk Export/Import
+// =============================================================================
+
+TEST_F(ConfigManagerTest, ExportAllConfig_ProducesNamespaceSections) {
+    MockModule modA;
+    modA.setting1 = 88;
+    MockModuleB modB;
+    modB.name = "exported";
+
+    configManager.registerModule(&modA);
+    configManager.registerModule(&modB);
+
+    JsonDocument outDoc;
+    configManager.exportAllConfig(outDoc);
+
+    EXPECT_TRUE(outDoc.containsKey("testmod"));
+    EXPECT_TRUE(outDoc.containsKey("modB"));
+    EXPECT_EQ(outDoc["testmod"]["setting1"].as<int>(), 88);
+    EXPECT_STREQ(outDoc["modB"]["name"].as<const char*>(), "exported");
+}
+
+TEST_F(ConfigManagerTest, ExportAllConfig_IncludesVersionPerSection) {
+    MockModule mod;
+    configManager.registerModule(&mod);
+
+    JsonDocument outDoc;
+    configManager.exportAllConfig(outDoc);
+
+    EXPECT_EQ(outDoc["testmod"]["_v"].as<int>(), 1);
+}
+
+TEST_F(ConfigManagerTest, ImportAllConfig_AppliesAndPersists) {
+    MockModule mod;
+    configManager.registerModule(&mod);
+
+    JsonDocument inDoc;
+    JsonObject section = inDoc["testmod"].to<JsonObject>();
+    section["setting1"] = 123;
+    section["setting2"] = true;
+
+    EXPECT_TRUE(configManager.importAllConfig(inDoc));
+    EXPECT_EQ(mod.setting1, 123);
+    EXPECT_TRUE(mod.setting2);
+
+    // Verify persisted to disk
+    std::ifstream file("mod_testmod.json");
+    EXPECT_TRUE(file.is_open());
+}
+
+TEST_F(ConfigManagerTest, ImportAllConfig_MissingNamespace_Skipped) {
+    MockModule mod;
+    configManager.registerModule(&mod);
+
+    JsonDocument inDoc;
+    // Deliberately don't include "testmod" section
+    inDoc["other"] = "data";
+
+    EXPECT_TRUE(configManager.importAllConfig(inDoc));
+    // Module should not have been touched
+    EXPECT_FALSE(mod.applyConfigCalled);
+}
+
+// =============================================================================
+// Test Group 6: Reload Mechanism
+// =============================================================================
 
 TEST_F(ConfigManagerTest, RequestReload_SetsAndClearsFlag) {
     EXPECT_FALSE(configManager.checkAndClearReload());
-    
+
     configManager.requestReload();
-    
+
     EXPECT_TRUE(configManager.checkAndClearReload());
     EXPECT_FALSE(configManager.checkAndClearReload()); // Should be cleared
 }
 
-TEST_F(ConfigManagerTest, GetFrameworkConfig_Adapter_CorrectlyPopulates) {
-    configManager.getMutableConfig().firmwareUpdatesEnabled = false;
-    configManager.getMutableConfig().otaQuietHour = 7;
-    strcpy(configManager.getMutableConfig().hostname, "adapter-host");
-    strcpy(configManager.getMutableConfig().timezone, "UTC");
-    
-    FrameworkConfig fc = configManager.getFrameworkConfig();
-    
-    EXPECT_STREQ(fc.hostname, "adapter-host");
-    EXPECT_STREQ(fc.timezone, "UTC");
-    EXPECT_FALSE(fc.firmwareUpdatesEnabled);
-    EXPECT_EQ(fc.otaQuietHour, 7);
+// =============================================================================
+// Test Group 7: IWebContributor
+// =============================================================================
+
+TEST_F(ConfigManagerTest, GetTabName_ReturnsConfig) {
+    EXPECT_STREQ("Config", configManager.getTabName());
 }
 
-TEST_F(ConfigManagerTest, ResetConfig_RestoresDefaults) {
-    configManager.getMutableConfig().firmwareUpdatesEnabled = false;
-    strcpy(configManager.getMutableConfig().hostname, "modified");
-    
-    configManager.resetConfig();
-    
-    EXPECT_STREQ(configManager.getConfig().hostname, "esp32-device");
-    EXPECT_TRUE(configManager.getConfig().firmwareUpdatesEnabled);
+TEST_F(ConfigManagerTest, GetParentTab_ReturnsSystem) {
+    EXPECT_STREQ("System", configManager.getParentTab());
 }
 
-TEST_F(ConfigManagerTest, SaveConfig_WithoutPriorLoad_Succeeds) {
-    EXPECT_TRUE(configManager.saveConfig());
-    std::ifstream file(SYSTEM_CONFIG_PATH);
-    EXPECT_TRUE(file.is_open());
+TEST_F(ConfigManagerTest, GetTabOrder_Returns25) {
+    EXPECT_EQ(25, configManager.getTabOrder());
 }
 
-TEST_F(ConfigManagerTest, LoadConfig_CorruptedJson_ReturnsFalseAndAppliesDefaults) {
-    std::ofstream file(SYSTEM_CONFIG_PATH);
-    file << "{ invalid json : ";
-    file.close();
-
-    EXPECT_FALSE(configManager.loadConfig());
-    EXPECT_STREQ(configManager.getConfig().hostname, "esp32-device");
-}
-
-TEST_F(ConfigManagerTest, LoadConfig_EmptyFile_ReturnsFalseAndAppliesDefaults) {
-    std::ofstream file(SYSTEM_CONFIG_PATH);
-    file.close();
-
-    EXPECT_FALSE(configManager.loadConfig());
-    EXPECT_STREQ(configManager.getConfig().hostname, "esp32-device");
-}
-
-TEST_F(ConfigManagerTest, HostnameBoundary_32Chars_PreservedExactly) {
-    std::string boundaryHostname(32, 'A');
-    strncpy(configManager.getMutableConfig().hostname, boundaryHostname.c_str(), 33);
-    EXPECT_TRUE(configManager.saveConfig());
-
-    ConfigManager newConfigManager;
-    EXPECT_TRUE(newConfigManager.loadConfig());
-    EXPECT_STREQ(newConfigManager.getConfig().hostname, boundaryHostname.c_str());
-}
-
-TEST_F(ConfigManagerTest, HostnameOverflow_TruncatedToBuffer) {
-    std::string overflowHostname(50, 'B');
-    // Using strncpy to simulate what happens if a long string is in the JSON
-    // Wait, let's test the JSON load behavior with a long string:
-    std::ofstream file(SYSTEM_CONFIG_PATH);
-    file << "{\"hostname\":\"" << overflowHostname << "\"}";
-    file.close();
-
-    EXPECT_TRUE(configManager.loadConfig());
-    
-    // The buffer size is 33, so it should store 32 'B's + null terminator
-    std::string expected(32, 'B');
-    EXPECT_STREQ(configManager.getConfig().hostname, expected.c_str());
-}
-
-TEST_F(ConfigManagerTest, TimezoneBoundary_63Chars_PreservedExactly) {
-    std::string boundaryTimezone(63, 'T');
-    strncpy(configManager.getMutableConfig().timezone, boundaryTimezone.c_str(), 64);
-    EXPECT_TRUE(configManager.saveConfig());
-
-    ConfigManager newConfigManager;
-    EXPECT_TRUE(newConfigManager.loadConfig());
-    EXPECT_STREQ(newConfigManager.getConfig().timezone, boundaryTimezone.c_str());
-}
-
-TEST_F(ConfigManagerTest, MultipleSaveLoadCycles_StatePreserved) {
-    configManager.getMutableConfig().otaQuietHour = 1;
-    EXPECT_TRUE(configManager.saveConfig());
-
-    ConfigManager manager2;
-    EXPECT_TRUE(manager2.loadConfig());
-    EXPECT_EQ(manager2.getConfig().otaQuietHour, 1);
-    
-    manager2.getMutableConfig().otaQuietHour = 2;
-    EXPECT_TRUE(manager2.saveConfig());
-
-    ConfigManager manager3;
-    EXPECT_TRUE(manager3.loadConfig());
-    EXPECT_EQ(manager3.getConfig().otaQuietHour, 2);
-}
-
-TEST_F(ConfigManagerTest, GetMutableConfig_Modification_ReflectedInConstRef) {
-    configManager.getMutableConfig().firmwareUpdatesEnabled = false;
-    
-    const SystemConfig& constConfig = configManager.getConfig();
-    EXPECT_FALSE(constConfig.firmwareUpdatesEnabled);
-}
-
-TEST_F(ConfigManagerTest, ResetConfig_AfterModification_Succeeds) {
-    configManager.getMutableConfig().otaQuietHour = 9;
-    configManager.saveConfig();
-    configManager.resetConfig();
-    EXPECT_EQ(configManager.getConfig().otaQuietHour, 3);
-}
+// =============================================================================
+// GoogleTest main entry point
+// =============================================================================
 
 int main(int argc, char** argv) {
     ::testing::InitGoogleTest(&argc, argv);

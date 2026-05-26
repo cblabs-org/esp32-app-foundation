@@ -13,6 +13,11 @@
  *              native runner can compile and execute the class without hardware
  *              headers. The two-tier vector model is enforced by _compactAndLock().
  *
+ *              ConfigManager is now the centralised configuration gateway.
+ *              The old _configurables vector and registerConfigurable() are
+ *              removed. Modules register with _configManager.registerModule()
+ *              and config is loaded via _configManager.beginAll().
+ *
  * Exported Classes:
  * - Application: see Application.hpp
  */
@@ -43,7 +48,7 @@ static const char* TAG = "Application";
  *
  * The boot order is strictly:
  *   BOOTING → (LittleFS mount) → (config load) → WIFI_SETUP →
- *   APP_SETUP → (loadConfig dispatch) → _compactAndLock() →
+ *   APP_SETUP → (ConfigManager beginAll) → _compactAndLock() →
  *   _reportHeap() → RUNNING
  *
  * @param config Framework-level configuration (hostname, timezone, etc.)
@@ -86,26 +91,23 @@ bool Application::begin(const FrameworkConfig& config) {
     // --- Step 7: Enter APP_SETUP state ---
     setState(AppState::APP_SETUP);
 
-    // --- Step 8: Dispatch loadConfig() to all registered iConfigurable modules ---
-    // Modules receive their stored configuration before tick() begins.
-    ESP_LOGI(TAG, "Loading config for %zu configurable module(s)", _configurables.size());
-    for (auto* module : _configurables) {
-        if (!module->loadConfig()) {
-            // A failed config load is non-fatal — the module applies its own defaults.
-            ESP_LOGW(TAG, "loadConfig() returned false for a configurable module (defaults applied)");
-        }
-    }
+    // --- Step 8: ConfigManager — load all registered module configs ---
+    // ConfigManager::beginAll() iterates the registry, loads each module's
+    // namespace file from /mod/<ns>.json, runs version checks and migrations,
+    // and calls applyConfig() on each module.
+    _configManager.beginAll();
 
     // --- Step 9: Core services begin() ---
     _dataManager.begin();
     _eventBus.begin();
+
+    // Register ConfigManager as a web contributor (System > Config tab)
+    _webContributors.push_back(&_configManager);
     _webContributors.push_back(&_mcpServer);
     _webServerManager.begin(_webContributors);
 
-    // MCP server: pass nullptr for configManager — Application does not currently
-    // own a ConfigManager instance. When a ConfigManager is wired in a future PR,
-    // update this call to pass a valid pointer. See WO3 design notes.
-    _mcpServer.begin(_mcpContributors, nullptr, &_config);
+    // MCP server: pass the ConfigManager reference for config operations
+    _mcpServer.begin(_mcpContributors, &_configManager, &_config);
 
     // --- Step 10: Lock all registration vectors ---
     // No further registrations are permitted after this point.
@@ -184,22 +186,6 @@ bool Application::registerTickable(ITickable* module) {
         return false;
     }
     _tickables.push_back(module);
-    return true;
-}
-
-/**
- * @brief Register a module that loads/persists configuration via LittleFS.
- */
-bool Application::registerConfigurable(iConfigurable* module) {
-    if (_locked) {
-        ESP_LOGE(TAG, "registerConfigurable() rejected — registration is closed after begin()");
-        return false;
-    }
-    if (module == nullptr) {
-        ESP_LOGE(TAG, "registerConfigurable() rejected — null pointer");
-        return false;
-    }
-    _configurables.push_back(module);
     return true;
 }
 
@@ -290,6 +276,10 @@ McpServer& Application::getMcpServer() {
     return _mcpServer;
 }
 
+ConfigManager& Application::getConfigManager() {
+    return _configManager;
+}
+
 const FrameworkConfig& Application::getConfig() const {
     return _config;
 }
@@ -336,17 +326,15 @@ void Application::setState(AppState state) {
 void Application::_compactAndLock() {
     // Release excess vector capacity to reclaim heap before entering RUNNING
     _tickables.shrink_to_fit();
-    _configurables.shrink_to_fit();
     _webContributors.shrink_to_fit();
     _mcpContributors.shrink_to_fit();
     _dataSources.shrink_to_fit();
 
     _locked = true;
 
-    ESP_LOGI(TAG, "Registry locked — tickables=%zu configurables=%zu "
+    ESP_LOGI(TAG, "Registry locked — tickables=%zu "
              "webContributors=%zu mcpContributors=%zu dataSources=%zu statusReporter=%s",
              _tickables.size(),
-             _configurables.size(),
              _webContributors.size(),
              _mcpContributors.size(),
              _dataSources.size(),
