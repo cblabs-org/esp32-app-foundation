@@ -91,7 +91,10 @@ bool Application::begin(const FrameworkConfig& config) {
     // --- Step 7: Enter APP_SETUP state ---
     setState(AppState::APP_SETUP);
 
-    // --- Step 8: ConfigManager — load all registered module configs ---
+    // --- Step 8: ConfigManager — register and load all module configs ---
+    // Application does not own any iConfigurable modules directly.
+    // WifiManager and U8g2DisplayModule are owned by downstream apps and
+    // registered via getConfigManager().registerModule() before begin().
     // ConfigManager::beginAll() iterates the registry, loads each module's
     // namespace file from /mod/<ns>.json, runs version checks and migrations,
     // and calls applyConfig() on each module.
@@ -101,9 +104,10 @@ bool Application::begin(const FrameworkConfig& config) {
     _dataManager.begin();
     _eventBus.begin();
 
-    // Register ConfigManager as a web contributor (System > Config tab)
+    // Register framework-owned web contributors
     _webContributors.push_back(&_configManager);
     _webContributors.push_back(&_mcpServer);
+    // Note: OtaUpdateManager is registered by downstream apps via registerWebContributor()
     _webServerManager.begin(_webContributors);
 
     // MCP server: pass the ConfigManager reference for config operations

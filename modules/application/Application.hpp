@@ -83,9 +83,10 @@ public:
      *   3. Mount LittleFS (hardware only; stubbed in NATIVE_BUILD)
      *   4. Store FrameworkConfig fields internally
      *   5. Set state to WIFI_SETUP
-     *   6. TODO: wifiManager.begin()  (PR-02)
+     *   6. WiFi bring-up (deferred — PR-02)
      *   7. Set state to APP_SETUP
-     *   8. ConfigManager: registerModule() + beginAll() for all iConfigurable modules
+     *   8. ConfigManager beginAll() — loads config for all downstream-registered
+     *      iConfigurable modules (WifiManager, U8g2DisplayModule, etc.)
      *   9. Core services begin() — DataManager, EventBus, WebServerManager, McpServer
      *  10. Call _compactAndLock() — vectors are locked from this point
      *  11. Call _reportHeap()
