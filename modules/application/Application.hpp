@@ -121,6 +121,11 @@ public:
      *  18. Publish system.heap event + _reportHeap()
      *  19. Set state to RUNNING
      *
+     * Boot progress is reported via IStatusReporter at each milestone.
+     * Downstream apps can call registerStatusReporter() before begin()
+     * to enable visual boot progress on a display. When no reporter is
+     * registered, the NullStatusReporter fallback absorbs all calls.
+     *
      * @param config  Framework-level configuration struct (hostname, timezone, etc.)
      * @return true if boot completed successfully; false on a fatal error (e.g. LittleFS mount failure)
      */

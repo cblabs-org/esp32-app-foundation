@@ -71,13 +71,19 @@ bool Application::begin(const FrameworkConfig& config) {
     // Print the firmware version so the first log line is always identifiable.
     ESP_LOGI(TAG, "ESP32 App Foundation v%s — booting", APP_FOUNDATION_VERSION);
 
+    // Boot progress: IStatusReporter receives progress updates at each
+    // milestone. Downstream apps register a display module before begin()
+    // to show visual boot progress. Default NullStatusReporter is a no-op.
+
     // --- Step 2: Enter BOOTING state ---
     setState(AppState::BOOTING);
+    _statusReporter->reportStatus("Initializing...", 0.0f);
 
     // --- Step 3: EventBus.begin() ---
     // FIRST service to init — zero dependencies, pure in-memory.
     // Starting early enables all subsequent services to publish boot-time events.
     _eventBus.begin();
+    _statusReporter->reportStatus("Event system ready", 0.05f);
 
     // --- Step 4: Mount LittleFS ---
     // Foundation for all persistence. Only available on hardware;
@@ -87,9 +93,11 @@ bool Application::begin(const FrameworkConfig& config) {
         // formatOnFail = true: first-boot will auto-format, subsequent failures
         // indicate a hardware fault — abort and return false.
         ESP_LOGE(TAG, "LittleFS mount failed — cannot continue boot");
+        _statusReporter->reportError("Filesystem mount failed");
         return false;
     }
     ESP_LOGI(TAG, "LittleFS mounted successfully");
+    _statusReporter->reportStatus("Filesystem mounted", 0.10f);
 #else
     ESP_LOGI(TAG, "LittleFS mount skipped (NATIVE_BUILD)");
 #endif
@@ -98,11 +106,13 @@ bool Application::begin(const FrameworkConfig& config) {
     _config = config;
     ESP_LOGI(TAG, "FrameworkConfig stored: hostname=%s timezone=%s",
              _config.hostname, _config.timezone);
+    _statusReporter->reportStatus("Configuration defaults loaded", 0.15f);
 
     // --- Step 6: DeviceCrypto + KeyManager ---
     // DeviceCrypto needs filesystem for key material; KeyManager needs DeviceCrypto.
     _deviceCrypto.begin();
     _keyManager.begin(&_deviceCrypto);
+    _statusReporter->reportStatus("Security services ready", 0.20f);
 
     // --- Step 7: ConfigManager — register all framework iConfigurable modules ---
     // WifiManager: inject ConfigManager dependency, then register with it.
@@ -117,27 +127,33 @@ bool Application::begin(const FrameworkConfig& config) {
     // applyConfig() on each module.
     // ALL persisted config is now available before any service starts.
     _configManager.beginAll();
+    _statusReporter->reportStatus("Module configuration loaded", 0.35f);
 
     // --- Step 9: Enter WIFI_SETUP state ---
     setState(AppState::WIFI_SETUP);
+    _statusReporter->reportStatus("Connecting to WiFi...", 0.40f);
 
     // --- Step 10: WifiManager.begin() ---
     // Now has persisted SSID/hostname from ConfigManager (step 8).
     _wifiManager.begin(_config.hostname);
     ESP_LOGI(TAG, "WiFi setup initiated");
+    _statusReporter->reportStatus("WiFi initialized", 0.55f);
 
     // --- Step 11: Enter APP_SETUP state ---
     setState(AppState::APP_SETUP);
 
     // --- Step 12: TimeManager — after WiFi, needs network for NTP ---
     _timeManager.begin(_config.timezone);
+    _statusReporter->reportStatus("Time synchronization started", 0.65f);
 
     // --- Step 13: DataManager — background data workers ---
     _dataManager.begin();
+    _statusReporter->reportStatus("Data services ready", 0.70f);
 
     // --- Step 14: OTA — heap-allocate (header is forward-declared to avoid LDF issues) ---
     _otaManager = new otaUpdateManager();
     _otaManager->begin(*this);
+    _statusReporter->reportStatus("Update service ready", 0.80f);
 
     // --- Step 15: Register core web contributors and tickables ---
     _webContributors.push_back(&_wifiManager);
@@ -153,10 +169,12 @@ bool Application::begin(const FrameworkConfig& config) {
 
     // MCP server: pass the ConfigManager reference for config operations
     _mcpServer.begin(_mcpContributors, &_configManager, &_config);
+    _statusReporter->reportStatus("Web portal starting...", 0.90f);
 
     // --- Step 17: Lock all registration vectors ---
     // No further registrations are permitted after this point.
     _compactAndLock();
+    _statusReporter->reportStatus("Boot complete", 1.0f);
 
     // --- Step 18: Publish system heap event + heap report ---
 #ifndef NATIVE_BUILD
@@ -166,6 +184,7 @@ bool Application::begin(const FrameworkConfig& config) {
     _reportHeap();
 
     // --- Step 19: Enter RUNNING state ---
+    _statusReporter->clearStatus();
     setState(AppState::RUNNING);
 
     ESP_LOGI(TAG, "Boot sequence complete — entering RUNNING state");
@@ -391,12 +410,12 @@ void Application::_compactAndLock() {
 
     _locked = true;
 
-    ESP_LOGI(TAG, "Registry locked — tickables=%zu "
-             "webContributors=%zu mcpContributors=%zu dataSources=%zu statusReporter=%s",
-             _tickables.size(),
-             _webContributors.size(),
-             _mcpContributors.size(),
-             _dataSources.size(),
+    ESP_LOGI(TAG, "Registry locked — tickables=%u "
+             "webContributors=%u mcpContributors=%u dataSources=%u statusReporter=%s",
+             (unsigned)_tickables.size(),
+             (unsigned)_webContributors.size(),
+             (unsigned)_mcpContributors.size(),
+             (unsigned)_dataSources.size(),
              (_statusReporter != nullptr) ? "registered" : "none");
 }
 
