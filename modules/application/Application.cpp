@@ -57,10 +57,11 @@ Application::~Application() {
 /**
  * @brief Execute the full framework boot sequence.
  *
- * The boot order is strictly:
- *   BOOTING → (LittleFS mount) → (config load) → WIFI_SETUP →
- *   APP_SETUP → (ConfigManager beginAll) → _compactAndLock() →
- *   _reportHeap() → RUNNING
+ * The boot order respects the dependency tree strictly:
+ *   EventBus (no deps) → LittleFS → FrameworkConfig → DeviceCrypto →
+ *   KeyManager → ConfigManager (register + beginAll) → WIFI_SETUP →
+ *   WifiManager → APP_SETUP → TimeManager → DataManager → OTA →
+ *   WebServer + MCP → _compactAndLock() → _reportHeap() → RUNNING
  *
  * @param config Framework-level configuration (hostname, timezone, etc.)
  * @return true on success; false if a fatal error prevents normal operation.
@@ -73,10 +74,16 @@ bool Application::begin(const FrameworkConfig& config) {
     // --- Step 2: Enter BOOTING state ---
     setState(AppState::BOOTING);
 
-    // --- Step 3: Mount LittleFS ---
-    // LittleFS is only available on hardware; in NATIVE_BUILD we skip this.
+    // --- Step 3: EventBus.begin() ---
+    // FIRST service to init — zero dependencies, pure in-memory.
+    // Starting early enables all subsequent services to publish boot-time events.
+    _eventBus.begin();
+
+    // --- Step 4: Mount LittleFS ---
+    // Foundation for all persistence. Only available on hardware;
+    // in NATIVE_BUILD we skip this.
 #ifndef NATIVE_BUILD
-    if (!LittleFS.begin(true)) {
+    if (!LittleFS.begin(true, "/littlefs", 10, "littlefs")) {
         // formatOnFail = true: first-boot will auto-format, subsequent failures
         // indicate a hardware fault — abort and return false.
         ESP_LOGE(TAG, "LittleFS mount failed — cannot continue boot");
@@ -87,50 +94,52 @@ bool Application::begin(const FrameworkConfig& config) {
     ESP_LOGI(TAG, "LittleFS mount skipped (NATIVE_BUILD)");
 #endif
 
-    // --- Step 4: Store FrameworkConfig internally ---
+    // --- Step 5: Store FrameworkConfig internally ---
     _config = config;
     ESP_LOGI(TAG, "FrameworkConfig stored: hostname=%s timezone=%s",
              _config.hostname, _config.timezone);
 
-    // --- Step 5: Enter WIFI_SETUP state ---
-    setState(AppState::WIFI_SETUP);
-
-    // --- Step 6: Core domain services init ---
-    // DeviceCrypto + KeyManager must init before WiFi (WiFi will need
-    // KeyManager for credential storage in a future PR).
+    // --- Step 6: DeviceCrypto + KeyManager ---
+    // DeviceCrypto needs filesystem for key material; KeyManager needs DeviceCrypto.
     _deviceCrypto.begin();
     _keyManager.begin(&_deviceCrypto);
 
-    // WifiManager: inject dependencies, register with ConfigManager, begin
+    // --- Step 7: ConfigManager — register all framework iConfigurable modules ---
+    // WifiManager: inject ConfigManager dependency, then register with it.
     _wifiManager.setConfigManager(&_configManager);
     _configManager.registerModule(&_wifiManager);
+    // Downstream modules (U8g2DisplayModule, etc.) are registered by app code
+    // via getConfigManager().registerModule() before begin() is called.
+
+    // --- Step 8: ConfigManager.beginAll() — load all persisted config ---
+    // Iterates the registry, loads each module's namespace file from
+    // /mod/<ns>.json, runs version checks and migrations, and calls
+    // applyConfig() on each module.
+    // ALL persisted config is now available before any service starts.
+    _configManager.beginAll();
+
+    // --- Step 9: Enter WIFI_SETUP state ---
+    setState(AppState::WIFI_SETUP);
+
+    // --- Step 10: WifiManager.begin() ---
+    // Now has persisted SSID/hostname from ConfigManager (step 8).
     _wifiManager.begin(_config.hostname);
     ESP_LOGI(TAG, "WiFi setup initiated");
 
-    // --- Step 7: Enter APP_SETUP state ---
+    // --- Step 11: Enter APP_SETUP state ---
     setState(AppState::APP_SETUP);
 
-    // --- Step 8: ConfigManager — register and load all module configs ---
-    // WifiManager is already registered above. U8g2DisplayModule and other
-    // downstream modules are registered by downstream apps via
-    // getConfigManager().registerModule() before begin().
-    // ConfigManager::beginAll() iterates the registry, loads each module's
-    // namespace file from /mod/<ns>.json, runs version checks and migrations,
-    // and calls applyConfig() on each module.
-    _configManager.beginAll();
-
-    // --- Step 9: Core services begin() ---
-    _dataManager.begin();
-    _eventBus.begin();
-
-    // TimeManager — after WiFi since it needs network for NTP
+    // --- Step 12: TimeManager — after WiFi, needs network for NTP ---
     _timeManager.begin(_config.timezone);
 
-    // OTA — heap-allocate (header is forward-declared to avoid LDF issues)
+    // --- Step 13: DataManager — background data workers ---
+    _dataManager.begin();
+
+    // --- Step 14: OTA — heap-allocate (header is forward-declared to avoid LDF issues) ---
     _otaManager = new otaUpdateManager();
     _otaManager->begin(*this);
 
-    // --- Step 10: Register core web contributors and tickables ---
+    // --- Step 15: Register core web contributors and tickables ---
     _webContributors.push_back(&_wifiManager);
     _webContributors.push_back(&_configManager);
     _webContributors.push_back(_otaManager);
@@ -139,26 +148,24 @@ bool Application::begin(const FrameworkConfig& config) {
     _tickables.push_back(&_wifiManager);
     _tickables.push_back(&_timeManager);
 
-    // --- Step 11: WebServerManager + McpServer begin() ---
+    // --- Step 16: WebServerManager + McpServer begin() ---
     _webServerManager.begin(_webContributors);
 
     // MCP server: pass the ConfigManager reference for config operations
     _mcpServer.begin(_mcpContributors, &_configManager, &_config);
 
-    // --- Step 12: Lock all registration vectors ---
+    // --- Step 17: Lock all registration vectors ---
     // No further registrations are permitted after this point.
     _compactAndLock();
 
-    // Publish system heap event
+    // --- Step 18: Publish system heap event + heap report ---
 #ifndef NATIVE_BUILD
     uint32_t freeHeap = heap_caps_get_free_size(MALLOC_CAP_8BIT);
     _eventBus.publish("system.heap", &freeHeap);
 #endif
-
-    // --- Step 13: Log heap figures ---
     _reportHeap();
 
-    // --- Step 14: Enter RUNNING state ---
+    // --- Step 19: Enter RUNNING state ---
     setState(AppState::RUNNING);
 
     ESP_LOGI(TAG, "Boot sequence complete — entering RUNNING state");

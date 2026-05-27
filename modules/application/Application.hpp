@@ -103,21 +103,23 @@ public:
      * Ordered steps:
      *   1. Log boot banner with APP_FOUNDATION_VERSION
      *   2. Set state to BOOTING
-     *   3. Mount LittleFS (hardware only; stubbed in NATIVE_BUILD)
-     *   4. Store FrameworkConfig fields internally
-     *   5. Set state to WIFI_SETUP
-     *   6. Core domain services init — KeyManager (DeviceCrypto), WiFi
-     *      (inject EventBus, ConfigManager, register with ConfigManager, begin)
-     *   7. Set state to APP_SETUP
-     *   8. ConfigManager beginAll() — loads config for all registered
-     *      iConfigurable modules (WifiManager, U8g2DisplayModule, etc.)
-     *   9. Core services begin() — DataManager, EventBus, TimeManager, OTA
-     *  10. Register core web contributors and tickables
-     *  11. WebServerManager + McpServer begin()
-     *  12. Call _compactAndLock() — vectors are locked from this point
-     *  13. Call _reportHeap()
-     *  14. Set state to RUNNING
-     *  15. Return true
+     *   3. EventBus.begin() — first service, zero deps, enables boot-time events
+     *   4. Mount LittleFS (hardware only; stubbed in NATIVE_BUILD)
+     *   5. Store FrameworkConfig fields internally
+     *   6. DeviceCrypto.begin() + KeyManager.begin()
+     *   7. ConfigManager — register framework iConfigurable modules (WifiManager)
+     *   8. ConfigManager.beginAll() — loads persisted config for ALL registered modules
+     *   9. Set state to WIFI_SETUP
+     *  10. WifiManager.begin() — now has persisted SSID/hostname from step 8
+     *  11. Set state to APP_SETUP
+     *  12. TimeManager.begin() — after WiFi, needs network for NTP
+     *  13. DataManager.begin() — background data workers
+     *  14. OTA — heap-allocate and begin()
+     *  15. Register core web contributors and tickables
+     *  16. WebServerManager + McpServer begin()
+     *  17. _compactAndLock() — vectors are locked from this point
+     *  18. Publish system.heap event + _reportHeap()
+     *  19. Set state to RUNNING
      *
      * @param config  Framework-level configuration struct (hostname, timezone, etc.)
      * @return true if boot completed successfully; false on a fatal error (e.g. LittleFS mount failure)
