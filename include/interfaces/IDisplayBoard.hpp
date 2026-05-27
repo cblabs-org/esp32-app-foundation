@@ -17,9 +17,14 @@
  *   - render(): Draw a full-screen frame to the U8G2 display buffer
  *   - isExpired(): Return true if this board should be evicted from the carousel
  *   - getBoardName(): Human-readable name for logging and diagnostics
+ *   - onActivate(): Called when this board becomes the active rendering target
+ *   - onDeactivate(): Called when this board is no longer the active rendering target
+ *   - tick(): Per-frame timing hook for animations, scrolling, etc.
  */
 
 #pragma once
+
+#include <cstdint>
 
 // Forward-declare to avoid pulling in U8G2 header in interface files.
 // Concrete board classes include the U8G2 header directly.
@@ -31,6 +36,10 @@ class U8G2;
  * The u8g2Display module maintains a std::vector<IDisplayBoard*> slot pool.
  * On each carousel rotation, the current board's render() is called within
  * the U8G2 draw loop. Boards signal their own expiry via isExpired().
+ *
+ * Lifecycle hooks onActivate() / onDeactivate() are called by the carousel
+ * engine when the active board changes. tick() is called every frame to
+ * allow boards to run animation timers and scrolling logic.
  */
 class IDisplayBoard {
 public:
@@ -53,4 +62,32 @@ public:
      * @return Null-terminated string board identifier.
      */
     virtual const char* getBoardName() const = 0;
+
+    /**
+     * @brief Called when this board becomes the active rendering target.
+     *
+     * Override to initialise animation state, reset scroll positions, or
+     * trigger a data refresh when the board becomes visible.
+     * Default implementation is a no-op.
+     */
+    virtual void onActivate() {}
+
+    /**
+     * @brief Called when this board is no longer the active rendering target.
+     *
+     * Override to release resources, pause animations, or snapshot state
+     * before the board goes off-screen. Default implementation is a no-op.
+     */
+    virtual void onDeactivate() {}
+
+    /**
+     * @brief Per-frame timing hook for animations, scrolling, etc.
+     *
+     * Called by the carousel engine on every tick() before render().
+     * Override to advance scroll positions, update animation timers,
+     * or run board-specific periodic logic. Default implementation is a no-op.
+     *
+     * @param currentMillis Current system time in milliseconds.
+     */
+    virtual void tick(uint32_t currentMillis) { (void)currentMillis; }
 };

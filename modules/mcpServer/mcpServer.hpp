@@ -60,19 +60,28 @@
 
     // -----------------------------------------------------------------------
     // Minimal String mock for native builds
-    // Only the subset used by _inputBuffer (concatenation, c_str(), clear).
+    // Comprehensive stub satisfying mcpServer, wifiManager, and other modules.
     // -----------------------------------------------------------------------
+    #ifndef STRING_STUB_DEFINED
+    #define STRING_STUB_DEFINED
     class String {
     public:
         String() = default;
         String(const char* s) : _buf(s ? s : "") {}
+        String(const std::string& s) : _buf(s) {}
         const char* c_str() const { return _buf.c_str(); }
+        int length() const { return static_cast<int>(_buf.size()); }
+        bool isEmpty() const { return _buf.empty(); }
+        char operator[](int i) const { return _buf[static_cast<size_t>(i)]; }
         String& operator=(const char* s) { _buf = s ? s : ""; return *this; }
         String& operator+=(char c) { _buf += c; return *this; }
+        String operator+(const char* s) const { return String(_buf + s); }
+        String operator+(const String& s) const { return String(_buf + s._buf); }
         bool operator==(const char* s) const { return _buf == s; }
     private:
         std::string _buf;
     };
+    #endif
 
     // -----------------------------------------------------------------------
     // Minimal Serial mock — string-buffer class for native compilation

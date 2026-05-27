@@ -54,25 +54,12 @@ static const char* TAG = "OtaUpdateManager";
 #include "../../lib/otaDownloadEngine/MbedTLSSignatureVerifier.hpp"
 #else
 #include <ArduinoJson.h>
-#include "../../include/FrameworkConfig.hpp"
-#include "../eventBus/EventBus.hpp"
-// Stub Application class for native compilation
-class Application {
-public:
-    EventBus& getEventBus();
-    const FrameworkConfig& getConfig() const;
-};
-// Provide stub implementations for native
-static EventBus _stubEventBus;
-static FrameworkConfig _stubConfig;
-EventBus& Application::getEventBus() { return _stubEventBus; }
-const FrameworkConfig& Application::getConfig() const { return _stubConfig; }
+#include "../application/Application.hpp"
 #endif
 
 // ---------------------------------------------------------------------------
-// Global instance
+// Global instance — REMOVED (Application now owns _otaManager)
 // ---------------------------------------------------------------------------
-otaUpdateManager otaManager;
 
 // ---------------------------------------------------------------------------
 // Construction

@@ -61,7 +61,6 @@ class GithubClient;
 class OtaDownloadEngine;
 class IOtaVerifier;
 class MbedTLSSignatureVerifier;
-class WiFiClientSecure;
 
 // ---------------------------------------------------------------------------
 // OTA State Machine
@@ -221,6 +220,26 @@ public:
      */
     const char* getTabName() const override { return "OTA"; }
 
+    /**
+     * @brief Get the parent tab name for hierarchical navigation.
+     *
+     * OTA is a sub-section of the "System" top-level tab, alongside
+     * ConfigManager (order 20). This groups all system-level
+     * contributors under a single bottom-nav item.
+     *
+     * @return "System"
+     */
+    const char* getParentTab() const override { return "System"; }
+
+    /**
+     * @brief Get the display order within the System sub-navigation.
+     *
+     * ConfigManager is 20, OTA is 30 — OTA appears after Config.
+     *
+     * @return 30
+     */
+    int getTabOrder() const override { return 30; }
+
 private:
     // -------------------------------------------------------------------------
     // Legacy state
@@ -273,4 +292,3 @@ private:
     void publishProgress(float progress, const char* status, bool complete, bool success);
 };
 
-extern otaUpdateManager otaManager;

@@ -114,6 +114,9 @@ void WifiManager::applyConfig(const JsonObject& section) {
     // --- Read hostname ---
     if (section["hostname"].is<const char*>()) {
         strlcpy(currentHostname, section["hostname"], sizeof(currentHostname));
+        if (strlen(currentHostname) > 0) {
+            ESP_LOGI(TAG, "Config applied — Hostname: %s", currentHostname);
+        }
     }
 
     // TODO: P0 — retrieve password from KeyManager

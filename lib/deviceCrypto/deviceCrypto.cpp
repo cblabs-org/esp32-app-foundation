@@ -16,7 +16,7 @@
 
 static const char* TAG = "DeviceCrypto";
 
-#ifndef PIO_UNIT_TESTING
+#ifndef NATIVE_BUILD
 #include <Preferences.h>
 #include <mbedtls/aes.h>
 #include <mbedtls/base64.h>
@@ -34,7 +34,7 @@ static const char* TAG = "DeviceCrypto";
  *        If no key is configured, uses hardware MAC key derivation to generate and save one.
  */
 void DeviceCrypto::begin() {
-#ifndef PIO_UNIT_TESTING
+#ifndef NATIVE_BUILD
     // --- Step 1: Open Secure Persistence ---
     Preferences prefs;
     prefs.begin("secrets", false);
@@ -124,7 +124,7 @@ std::unique_ptr<char[]> DeviceCrypto::encrypt(const char* plaintext, size_t inpu
 
     LOG_SECURE("CRYPTO", "Executing AES-256-CBC Encryption. Plaintext payload size: %zu bytes", inputLen);
 
-#ifndef PIO_UNIT_TESTING
+#ifndef NATIVE_BUILD
     size_t paddedLen = inputLen + (16 - (inputLen % 16));
     size_t totalLen = 16 + paddedLen;
     uint8_t* buffer = (uint8_t*)malloc(totalLen);
@@ -210,7 +210,7 @@ std::unique_ptr<char[]> DeviceCrypto::decrypt(const char* ciphertext, size_t inp
     
     LOG_SECURE("CRYPTO", "Decoding inbound Base64 Ciphertext. Payload size: %zu bytes", inputLen);
 
-#ifndef PIO_UNIT_TESTING
+#ifndef NATIVE_BUILD
     size_t decOutLen = 0;
     mbedtls_base64_decode(nullptr, 0, &decOutLen, (const unsigned char*)ciphertext, inputLen);
     

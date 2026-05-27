@@ -17,6 +17,11 @@
  *              ConfigManager is owned by Application and serves as the
  *              centralised gateway for all module configuration I/O.
  *
+ *              Core domain services (WifiManager, otaUpdateManager,
+ *              TimeManager, KeyManager) are also Application-owned members,
+ *              wired into the boot sequence and registered with ConfigManager
+ *              and the tick/web contributor vectors where applicable.
+ *
  * Exported Classes:
  * - Application: Framework composition root and module registry
  *   - begin():                   Run the full boot sequence; returns false on fatal error
@@ -28,6 +33,10 @@
  *   - registerMcpContributor():  Add an IMcpContributor module to the MCP tools vector
  *   - registerDataSource():      Add an iDataSource worker to the DataManager vector
  *   - getConfigManager():        Access the ConfigManager gateway
+ *   - getWifiManager():          Access the WifiManager domain service
+ *   - getOtaManager():           Access the otaUpdateManager domain service
+ *   - getTimeManager():          Access the TimeManager domain service
+ *   - getKeyManager():           Access the KeyManager domain service
  *   - getState():                Query the current AppState lifecycle phase
  *   - getMcpServer():            Access the MCP JSON-RPC server instance
  */
@@ -48,6 +57,17 @@
 #include "../webServer/webServer.hpp"
 #include "../mcpServer/mcpServer.hpp"
 #include "../configManager/configManager.hpp"
+
+// Core domain services (owned by value — full includes required)
+#include "../wifiManager/wifiManager.hpp"
+#include "../timeManager/timeManager.hpp"
+#include "../keyManager/keyManager.hpp"
+#include "../../lib/deviceCrypto/deviceCrypto.hpp"
+
+// Forward declaration only — otaUpdateManager.hpp pulls in WiFiClientSecure
+// which causes LDF to discover NetworkClientSecure with missing SSL backend.
+// Full include deferred to Application.cpp; member held via unique_ptr.
+class otaUpdateManager;
 
 /**
  * @brief Composition root for the ESP32 App Foundation framework.
@@ -70,6 +90,9 @@
  */
 class Application {
 public:
+    /// Destructor — cleans up heap-allocated otaUpdateManager.
+    ~Application();
+
     // -------------------------------------------------------------------------
     // Lifecycle
     // -------------------------------------------------------------------------
@@ -83,15 +106,18 @@ public:
      *   3. Mount LittleFS (hardware only; stubbed in NATIVE_BUILD)
      *   4. Store FrameworkConfig fields internally
      *   5. Set state to WIFI_SETUP
-     *   6. WiFi bring-up (deferred — PR-02)
+     *   6. Core domain services init — KeyManager (DeviceCrypto), WiFi
+     *      (inject EventBus, ConfigManager, register with ConfigManager, begin)
      *   7. Set state to APP_SETUP
-     *   8. ConfigManager beginAll() — loads config for all downstream-registered
+     *   8. ConfigManager beginAll() — loads config for all registered
      *      iConfigurable modules (WifiManager, U8g2DisplayModule, etc.)
-     *   9. Core services begin() — DataManager, EventBus, WebServerManager, McpServer
-     *  10. Call _compactAndLock() — vectors are locked from this point
-     *  11. Call _reportHeap()
-     *  12. Set state to RUNNING
-     *  13. Return true
+     *   9. Core services begin() — DataManager, EventBus, TimeManager, OTA
+     *  10. Register core web contributors and tickables
+     *  11. WebServerManager + McpServer begin()
+     *  12. Call _compactAndLock() — vectors are locked from this point
+     *  13. Call _reportHeap()
+     *  14. Set state to RUNNING
+     *  15. Return true
      *
      * @param config  Framework-level configuration struct (hostname, timezone, etc.)
      * @return true if boot completed successfully; false on a fatal error (e.g. LittleFS mount failure)
@@ -191,6 +217,34 @@ public:
      */
     ConfigManager& getConfigManager();
 
+    // -------------------------------------------------------------------------
+    // Core Domain Service Accessors
+    // -------------------------------------------------------------------------
+
+    /**
+     * @brief Get the application's WifiManager instance.
+     * @return Reference to the WifiManager.
+     */
+    WifiManager& getWifiManager();
+
+    /**
+     * @brief Get the application's otaUpdateManager instance.
+     * @return Reference to the otaUpdateManager.
+     */
+    otaUpdateManager& getOtaManager();
+
+    /**
+     * @brief Get the application's TimeManager instance.
+     * @return Reference to the TimeManager.
+     */
+    TimeManager& getTimeManager();
+
+    /**
+     * @brief Get the application's KeyManager instance.
+     * @return Reference to the KeyManager.
+     */
+    KeyManager& getKeyManager();
+
     /**
      * @brief Get the application's FrameworkConfig (read-only).
      * @return Const reference to the stored FrameworkConfig.
@@ -262,10 +316,17 @@ private:
     NullStatusReporter _nullReporter;                               ///< Fallback status reporter instance
     IStatusReporter* _statusReporter = &_nullReporter;              ///< Display adapter for boot-phase status overlays
 
-    // Core services
+    // Core infrastructure services
     ConfigManager _configManager;       ///< Centralised config gateway (owned by Application)
     EventBus _eventBus;                 ///< Central event bus
     DataManager _dataManager;           ///< Background data manager
     WebServerManager _webServerManager; ///< Local HTTP Server
     McpServer _mcpServer;               ///< MCP JSON-RPC server
+
+    // Core domain services
+    DeviceCrypto _deviceCrypto;         ///< Hardware-bound AES-256 crypto service
+    KeyManager _keyManager;             ///< Encrypted credential registry
+    WifiManager _wifiManager;           ///< WiFi connection state machine
+    otaUpdateManager* _otaManager = nullptr;  ///< OTA firmware update orchestrator (heap, fwd-declared)
+    TimeManager _timeManager;           ///< NTP synchronization service
 };

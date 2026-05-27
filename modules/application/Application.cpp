@@ -18,11 +18,16 @@
  *              removed. Modules register with _configManager.registerModule()
  *              and config is loaded via _configManager.beginAll().
  *
+ *              Core domain services (WifiManager, otaUpdateManager,
+ *              TimeManager, KeyManager) are Application-owned members,
+ *              wired into the boot sequence during begin().
+ *
  * Exported Classes:
  * - Application: see Application.hpp
  */
 
 #include "Application.hpp"
+#include "../otaUpdateManager/otaUpdateManager.hpp"
 
 // ---------------------------------------------------------------------------
 // Platform-conditional includes
@@ -38,6 +43,12 @@
 #include "platform/LogShim.h"
 
 static const char* TAG = "Application";
+
+// Destructor — clean up heap-allocated otaUpdateManager
+Application::~Application() {
+    delete _otaManager;
+    _otaManager = nullptr;
+}
 
 // ---------------------------------------------------------------------------
 // Lifecycle
@@ -84,17 +95,25 @@ bool Application::begin(const FrameworkConfig& config) {
     // --- Step 5: Enter WIFI_SETUP state ---
     setState(AppState::WIFI_SETUP);
 
-    // --- Step 6: WiFi bring-up (PR-02 placeholder) ---
-    // TODO: wifiManager.begin(_config.hostname);
-    ESP_LOGI(TAG, "WiFi setup deferred (PR-02)");
+    // --- Step 6: Core domain services init ---
+    // DeviceCrypto + KeyManager must init before WiFi (WiFi will need
+    // KeyManager for credential storage in a future PR).
+    _deviceCrypto.begin();
+    _keyManager.begin(&_deviceCrypto);
+
+    // WifiManager: inject dependencies, register with ConfigManager, begin
+    _wifiManager.setConfigManager(&_configManager);
+    _configManager.registerModule(&_wifiManager);
+    _wifiManager.begin(_config.hostname);
+    ESP_LOGI(TAG, "WiFi setup initiated");
 
     // --- Step 7: Enter APP_SETUP state ---
     setState(AppState::APP_SETUP);
 
     // --- Step 8: ConfigManager — register and load all module configs ---
-    // Application does not own any iConfigurable modules directly.
-    // WifiManager and U8g2DisplayModule are owned by downstream apps and
-    // registered via getConfigManager().registerModule() before begin().
+    // WifiManager is already registered above. U8g2DisplayModule and other
+    // downstream modules are registered by downstream apps via
+    // getConfigManager().registerModule() before begin().
     // ConfigManager::beginAll() iterates the registry, loads each module's
     // namespace file from /mod/<ns>.json, runs version checks and migrations,
     // and calls applyConfig() on each module.
@@ -104,16 +123,29 @@ bool Application::begin(const FrameworkConfig& config) {
     _dataManager.begin();
     _eventBus.begin();
 
-    // Register framework-owned web contributors
+    // TimeManager — after WiFi since it needs network for NTP
+    _timeManager.begin(_config.timezone);
+
+    // OTA — heap-allocate (header is forward-declared to avoid LDF issues)
+    _otaManager = new otaUpdateManager();
+    _otaManager->begin(*this);
+
+    // --- Step 10: Register core web contributors and tickables ---
+    _webContributors.push_back(&_wifiManager);
     _webContributors.push_back(&_configManager);
+    _webContributors.push_back(_otaManager);
     _webContributors.push_back(&_mcpServer);
-    // Note: OtaUpdateManager is registered by downstream apps via registerWebContributor()
+
+    _tickables.push_back(&_wifiManager);
+    _tickables.push_back(&_timeManager);
+
+    // --- Step 11: WebServerManager + McpServer begin() ---
     _webServerManager.begin(_webContributors);
 
     // MCP server: pass the ConfigManager reference for config operations
     _mcpServer.begin(_mcpContributors, &_configManager, &_config);
 
-    // --- Step 10: Lock all registration vectors ---
+    // --- Step 12: Lock all registration vectors ---
     // No further registrations are permitted after this point.
     _compactAndLock();
 
@@ -123,10 +155,10 @@ bool Application::begin(const FrameworkConfig& config) {
     _eventBus.publish("system.heap", &freeHeap);
 #endif
 
-    // --- Step 11: Log heap figures ---
+    // --- Step 13: Log heap figures ---
     _reportHeap();
 
-    // --- Step 12: Enter RUNNING state ---
+    // --- Step 14: Enter RUNNING state ---
     setState(AppState::RUNNING);
 
     ESP_LOGI(TAG, "Boot sequence complete — entering RUNNING state");
@@ -282,6 +314,22 @@ McpServer& Application::getMcpServer() {
 
 ConfigManager& Application::getConfigManager() {
     return _configManager;
+}
+
+WifiManager& Application::getWifiManager() {
+    return _wifiManager;
+}
+
+otaUpdateManager& Application::getOtaManager() {
+    return *_otaManager;
+}
+
+TimeManager& Application::getTimeManager() {
+    return _timeManager;
+}
+
+KeyManager& Application::getKeyManager() {
+    return _keyManager;
 }
 
 const FrameworkConfig& Application::getConfig() const {

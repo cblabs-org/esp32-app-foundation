@@ -10,12 +10,15 @@
  * Description: Implementation of the U8G2 display module with carousel engine,
  *              board slot pool, sleep/wake power management, system board
  *              ownership, IStatusReporter delegation (Loading/Error boards),
- *              EventBus subscriptions (ota.progress, display.message), and
- *              iConfigurable persistence at /mod/display.json.
+ *              EventBus subscriptions (ota.progress, display.message),
+ *              EventBus publishing (display.sleep, display.wake,
+ *              display.board.changed), IWebContributor REST API routes
+ *              under /api/display/, and iConfigurable persistence at
+ *              /mod/display.json.
  *
  * Exported Functions:
  * - U8g2DisplayModule::begin():              Hardware init, EventBus subscribe, pool lock
- * - U8g2DisplayModule::tick():               Carousel rotation, sleep check, render
+ * - U8g2DisplayModule::tick():               Carousel rotation, sleep check, board tick, render
  * - U8g2DisplayModule::addBoard():           Pre-lock board registration
  * - U8g2DisplayModule::showBoard():          Force-show a specific board
  * - U8g2DisplayModule::resetActivity():      Reset inactivity timer, wake if sleeping
@@ -30,6 +33,7 @@
  * - U8g2DisplayModule::reportStatus():       Delegate to LoadingBoard, show it
  * - U8g2DisplayModule::reportError():        Delegate to ErrorBoard (fatal), show it
  * - U8g2DisplayModule::clearStatus():        Mark loading complete, advance if showing
+ * - U8g2DisplayModule::registerRoutes():     Register /api/display/* REST endpoints
  * - U8g2DisplayModule::applyConfig():        Apply display settings from JSON section
  * - U8g2DisplayModule::serializeConfig():    Serialize display settings to JSON section
  * - U8g2DisplayModule::resetConfig():        Reset to factory defaults
@@ -48,11 +52,13 @@ static const char* TAG = "U8g2Display";
 
 #ifndef NATIVE_BUILD
 #include <Arduino.h>
+#include <ESPAsyncWebServer.h>
 #include "../application/Application.hpp"
 #endif
 
 // Include EventBus directly — it is native-safe (no Arduino.h dependency).
 #include "../eventBus/EventBus.hpp"
+#include "../configManager/configManager.hpp"
 
 // =============================================================================
 // Lifecycle
@@ -99,11 +105,11 @@ void U8g2DisplayModule::begin(Application& app) {
 }
 
 /**
- * @brief Periodic tick — carousel rotation, sleep check, render.
+ * @brief Periodic tick — carousel rotation, sleep check, board tick, render.
  *
  * Called by the Application tick loop. If sleeping, returns early.
- * Otherwise checks the sleep timer, evaluates the carousel rotation
- * interval, and renders the current board.
+ * Otherwise checks the sleep timer, delegates tick() to the active board,
+ * evaluates the carousel rotation interval, and renders the current board.
  */
 void U8g2DisplayModule::tick() {
     // --- Early exit if sleeping ---
@@ -117,6 +123,17 @@ void U8g2DisplayModule::tick() {
     // --- Guard: no boards to render ---
     if (_boards.empty() && _overrideBoard == nullptr) {
         return;
+    }
+
+    // --- Delegate tick() to the active board ---
+    // This allows boards to update scroll positions, animation timers, etc.
+    IDisplayBoard* activeBoard = getActiveBoard();
+    if (activeBoard != nullptr) {
+#ifndef NATIVE_BUILD
+        activeBoard->tick(millis());
+#else
+        activeBoard->tick(0);
+#endif
     }
 
     // --- Carousel rotation ---
@@ -165,28 +182,57 @@ bool U8g2DisplayModule::addBoard(IDisplayBoard* board) {
 
 /**
  * @brief Force-show a specific board, bypassing the carousel timer.
+ *
+ * Calls onDeactivate() on the previous board and onActivate() on the new one.
+ * Publishes a "display.board.changed" event via EventBus.
+ *
  * @param board Pointer to the board to display.
  */
 void U8g2DisplayModule::showBoard(IDisplayBoard* board) {
+    // --- Notify the previous board that it is being deactivated ---
+    IDisplayBoard* previousBoard = getActiveBoard();
+    if (previousBoard != nullptr && previousBoard != board) {
+        previousBoard->onDeactivate();
+    }
+
     // --- Search for the board in the pool ---
+    int newIndex = -1;
     for (int i = 0; i < (int)_boards.size(); i++) {
         if (_boards[i] == board) {
             // Found in pool — set as active and reset rotation timer
             _activeBoardIndex = i;
             _overrideBoard = nullptr;
+            newIndex = i;
 #ifndef NATIVE_BUILD
             _lastRotationMs = millis();
 #endif
-            resetActivity();
-            return;
+            break;
         }
     }
 
-    // --- Board not in pool (system board override) ---
-    // Render it directly without affecting the carousel index
-    ESP_LOGD(TAG, "Override board set (not in pool)");
-    _activeBoardIndex = -1;
-    _overrideBoard = board;
+    if (newIndex < 0) {
+        // --- Board not in pool (system board override) ---
+        // Render it directly without affecting the carousel index
+        ESP_LOGD(TAG, "Override board set (not in pool)");
+        _activeBoardIndex = -1;
+        _overrideBoard = board;
+    }
+
+    // --- Notify the new board that it is now active ---
+    if (board != nullptr && board != previousBoard) {
+        board->onActivate();
+    }
+
+    // --- Publish board-changed event ---
+#ifndef NATIVE_BUILD
+    if (_app != nullptr && board != nullptr) {
+        DisplayBoardChangedPayload payload;
+        payload.boardName = board->getBoardName();
+        payload.boardIndex = newIndex;
+        _app->getEventBus().publish("display.board.changed", &payload);
+    }
+#endif
+
     resetActivity();
 }
 
@@ -447,6 +493,165 @@ void U8g2DisplayModule::setRotationInterval(unsigned long intervalMs) {
 }
 
 // =============================================================================
+// IWebContributor — REST API Routes
+// =============================================================================
+
+/**
+ * @brief Register display REST API routes with the web server.
+ *
+ * All route handler bodies are guarded by #ifndef NATIVE_BUILD since
+ * ESPAsyncWebServer is unavailable in the native GoogleTest runner.
+ *
+ * @param server Reference to the AsyncWebServer instance.
+ */
+void U8g2DisplayModule::registerRoutes(AsyncWebServer& server) {
+#ifndef NATIVE_BUILD
+    // --- GET /api/display/status — current display state ---
+    server.on("/api/display/status", HTTP_GET, [this](AsyncWebServerRequest* request) {
+        JsonDocument doc;
+        doc["brightness"]       = _brightness;
+        doc["flip"]             = _flipScreen;
+        doc["sleeping"]         = _sleeping;
+        doc["sleepTimeout"]     = _sleepTimeoutMs;
+        doc["rotationInterval"] = _rotationIntervalMs;
+        doc["boardCount"]       = (int)_boards.size();
+
+        IDisplayBoard* active = getActiveBoard();
+        doc["activeBoard"] = (active != nullptr) ? active->getBoardName() : "none";
+
+        String output;
+        serializeJson(doc, output);
+        request->send(200, "application/json", output);
+    });
+
+    // --- POST /api/display/brightness — set brightness level ---
+    server.on("/api/display/brightness", HTTP_POST,
+        [](AsyncWebServerRequest *request) {},
+        NULL,
+        [this](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t /*index*/, size_t /*total*/) {
+            JsonDocument doc;
+            DeserializationError err = deserializeJson(doc, data, len);
+            if (err || !doc["value"].is<int>()) {
+                request->send(400, "application/json", "{\"error\":\"Invalid JSON or missing 'value'\"}");
+                return;
+            }
+
+            int value = doc["value"] | 255;
+            if (value < 0) value = 0;
+            if (value > 255) value = 255;
+
+            setBrightness((uint8_t)value);
+
+            // Persist via ConfigManager gateway
+            if (_app != nullptr) {
+                _app->getConfigManager().saveModuleConfig(this);
+            }
+
+            request->send(200, "application/json", "{\"status\":\"ok\"}");
+        }
+    );
+
+    // --- POST /api/display/flip — toggle screen flip ---
+    server.on("/api/display/flip", HTTP_POST,
+        [](AsyncWebServerRequest *request) {},
+        NULL,
+        [this](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t /*index*/, size_t /*total*/) {
+            JsonDocument doc;
+            DeserializationError err = deserializeJson(doc, data, len);
+            if (err || !doc["value"].is<bool>()) {
+                request->send(400, "application/json", "{\"error\":\"Invalid JSON or missing 'value'\"}");
+                return;
+            }
+
+            setFlipScreen(doc["value"] | false);
+
+            // Persist via ConfigManager gateway
+            if (_app != nullptr) {
+                _app->getConfigManager().saveModuleConfig(this);
+            }
+
+            request->send(200, "application/json", "{\"status\":\"ok\"}");
+        }
+    );
+
+    // --- POST /api/display/sleep — control sleep behaviour ---
+    server.on("/api/display/sleep", HTTP_POST,
+        [](AsyncWebServerRequest *request) {},
+        NULL,
+        [this](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t /*index*/, size_t /*total*/) {
+            JsonDocument doc;
+            DeserializationError err = deserializeJson(doc, data, len);
+            if (err) {
+                request->send(400, "application/json", "{\"error\":\"Invalid JSON\"}");
+                return;
+            }
+
+            // Handle immediate sleep/wake toggle
+            if (doc["action"].is<const char*>()) {
+                const char* action = doc["action"];
+                if (strcmp(action, "sleep") == 0) {
+                    _sleep();
+                } else if (strcmp(action, "wake") == 0) {
+                    resetActivity();
+                }
+            }
+
+            // Handle timeout configuration
+            if (doc["timeout"].is<unsigned long>()) {
+                setSleepTimeout(doc["timeout"] | (unsigned long)300000);
+                if (_app != nullptr) {
+                    _app->getConfigManager().saveModuleConfig(this);
+                }
+            }
+
+            request->send(200, "application/json", "{\"status\":\"ok\"}");
+        }
+    );
+
+    // --- GET /api/display/boards — list all pool boards ---
+    server.on("/api/display/boards", HTTP_GET, [this](AsyncWebServerRequest* request) {
+        JsonDocument doc;
+        JsonArray boardsArr = doc["boards"].to<JsonArray>();
+
+        for (int i = 0; i < (int)_boards.size(); i++) {
+            JsonObject entry = boardsArr.add<JsonObject>();
+            entry["index"]    = i;
+            entry["name"]     = _boards[i]->getBoardName();
+            entry["isActive"] = (i == _activeBoardIndex && _overrideBoard == nullptr);
+            entry["isExpired"]= _boards[i]->isExpired();
+        }
+
+        String output;
+        serializeJson(doc, output);
+        request->send(200, "application/json", output);
+    });
+
+    // --- POST /api/display/show — force a specific board by index ---
+    server.on("/api/display/show", HTTP_POST,
+        [](AsyncWebServerRequest *request) {},
+        NULL,
+        [this](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t /*index*/, size_t /*total*/) {
+            JsonDocument doc;
+            DeserializationError err = deserializeJson(doc, data, len);
+            if (err || !doc["index"].is<int>()) {
+                request->send(400, "application/json", "{\"error\":\"Invalid JSON or missing 'index'\"}");
+                return;
+            }
+
+            int idx = doc["index"] | 0;
+            if (idx < 0 || idx >= (int)_boards.size()) {
+                request->send(400, "application/json", "{\"error\":\"Index out of range\"}");
+                return;
+            }
+
+            showBoard(_boards[idx]);
+            request->send(200, "application/json", "{\"status\":\"ok\"}");
+        }
+    );
+#endif
+}
+
+// =============================================================================
 // EventBus static callbacks
 // =============================================================================
 
@@ -515,11 +720,19 @@ void U8g2DisplayModule::_onDisplayMessage(const char* /*topic*/, const void* pay
 /**
  * @brief Advance carousel to next non-expired board.
  *
- * Removes expired boards (isExpired() == true) from the pool, then
- * advances _activeBoardIndex to the next valid entry with wrap-around.
+ * Calls onDeactivate() on the current board, removes expired boards
+ * (isExpired() == true) from the pool, advances _activeBoardIndex to
+ * the next valid entry with wrap-around, calls onActivate() on the new
+ * board, and publishes a "display.board.changed" event.
  */
 void U8g2DisplayModule::_advanceCarousel() {
-    // --- Step 1: Evict expired boards ---
+    // --- Step 1: Deactivate the current board ---
+    IDisplayBoard* previousBoard = getActiveBoard();
+    if (previousBoard != nullptr) {
+        previousBoard->onDeactivate();
+    }
+
+    // --- Step 2: Evict expired boards ---
     // Iterate backwards to safely erase without invalidating indices
     for (int i = (int)_boards.size() - 1; i >= 0; i--) {
         if (_boards[i]->isExpired()) {
@@ -531,14 +744,30 @@ void U8g2DisplayModule::_advanceCarousel() {
         }
     }
 
-    // --- Step 2: Guard empty pool ---
+    // --- Step 3: Guard empty pool ---
     if (_boards.empty()) {
         _activeBoardIndex = 0;
         return;
     }
 
-    // --- Step 3: Advance to next board (wrap around) ---
+    // --- Step 4: Advance to next board (wrap around) ---
     _activeBoardIndex = (_activeBoardIndex + 1) % (int)_boards.size();
+
+    // --- Step 5: Activate the new board ---
+    IDisplayBoard* newBoard = getActiveBoard();
+    if (newBoard != nullptr) {
+        newBoard->onActivate();
+
+        // --- Publish board-changed event ---
+#ifndef NATIVE_BUILD
+        if (_app != nullptr) {
+            DisplayBoardChangedPayload payload;
+            payload.boardName = newBoard->getBoardName();
+            payload.boardIndex = _activeBoardIndex;
+            _app->getEventBus().publish("display.board.changed", &payload);
+        }
+#endif
+    }
 }
 
 /**
@@ -589,32 +818,56 @@ void U8g2DisplayModule::_checkSleep() {
 
 /**
  * @brief Enter sleep mode — power-save the display.
+ *
+ * CRITICAL: The order of operations prevents the race condition where
+ * showBoard() → resetActivity() → _wake() would immediately undo sleep.
+ * We set _sleeping=true FIRST, then power-save the OLED, then publish.
+ * The screensaver is NOT shown here because the OLED is being powered off;
+ * screensaver logic should be handled separately if a visible screensaver
+ * phase is desired before full power-off.
  */
 void U8g2DisplayModule::_sleep() {
     ESP_LOGI(TAG, "Display entering sleep mode");
+
+    // --- Step 1: Set sleeping flag FIRST to prevent re-entry ---
     _sleeping = true;
 
-    // --- Activate the screensaver and show it ---
-    _screensaver.activate();
-    showBoard(&_screensaver);
-
+    // --- Step 2: Power-save the OLED hardware ---
 #ifndef NATIVE_BUILD
     _u8g2.setPowerSave(1);
+#endif
+
+    // --- Step 3: Publish sleep event ---
+#ifndef NATIVE_BUILD
+    if (_app != nullptr) {
+        _app->getEventBus().publish("display.sleep");
+    }
 #endif
 }
 
 /**
  * @brief Exit sleep mode — restore display power and brightness.
+ *
+ * Clears the sleeping flag, restores OLED power and brightness,
+ * and publishes a "display.wake" event.
  */
 void U8g2DisplayModule::_wake() {
     ESP_LOGI(TAG, "Display waking from sleep");
     _sleeping = false;
 
-    // --- Deactivate the screensaver ---
+    // --- Deactivate the screensaver (if it was running) ---
     _screensaver.deactivate();
 
+    // --- Restore OLED power and brightness ---
 #ifndef NATIVE_BUILD
     _u8g2.setPowerSave(0);
     _u8g2.setContrast(_brightness);
+#endif
+
+    // --- Publish wake event ---
+#ifndef NATIVE_BUILD
+    if (_app != nullptr) {
+        _app->getEventBus().publish("display.wake");
+    }
 #endif
 }

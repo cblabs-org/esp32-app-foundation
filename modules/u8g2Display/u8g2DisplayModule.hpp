@@ -17,16 +17,20 @@
  *
  *              Implements IStatusReporter by delegating to LoadingBoard and
  *              ErrorBoard. Subscribes to EventBus topics "ota.progress" and
- *              "display.message" for runtime event integration. Implements
- *              iConfigurable via ConfigManager gateway for persistent display
- *              settings (namespace: "display", schema version: 1).
+ *              "display.message" for runtime event integration. Publishes
+ *              "display.sleep", "display.wake", and "display.board.changed"
+ *              events via EventBus. Implements iConfigurable via ConfigManager
+ *              gateway for persistent display settings (namespace: "display",
+ *              schema version: 1). Implements IWebContributor for REST API
+ *              routes under /api/display/ and a top-level "Display" tab.
  *
  * Exported Classes:
- * - OtaProgressPayload:      EventBus payload struct for OTA progress events
- * - DisplayMessagePayload:   EventBus payload struct for display message events
+ * - OtaProgressPayload:            EventBus payload struct for OTA progress events
+ * - DisplayMessagePayload:         EventBus payload struct for display message events
+ * - DisplayBoardChangedPayload:    EventBus payload struct for board change events
  * - U8g2DisplayModule: Display carousel engine and board slot pool
  *   - begin():              Initialize hardware, subscribe to EventBus, lock pool
- *   - tick():               Carousel rotation, sleep check, render current board
+ *   - tick():               Carousel rotation, sleep check, board tick, render
  *   - addBoard():           Pre-lock registration of boards into the carousel pool
  *   - showBoard():          Force-show a specific board (bypasses carousel timer)
  *   - resetActivity():      Reset the inactivity timer (called on user interaction)
@@ -41,6 +45,9 @@
  *   - reportStatus():       Delegate to LoadingBoard and show it
  *   - reportError():        Delegate to ErrorBoard (fatal) and show it
  *   - clearStatus():        Mark LoadingBoard complete, advance if showing it
+ *   - registerRoutes():     Register display REST API routes (/api/display/*)
+ *   - getTabName():         Return "Display" for portal tab
+ *   - getTabOrder():        Return 30 for portal tab ordering
  *   - getConfigNamespace(): Return "display"
  *   - getSchemaVersion():   Return 1
  *   - applyConfig():        Apply display settings from JSON section
@@ -59,6 +66,7 @@
 #include "interfaces/ITickable.hpp"
 #include "interfaces/IStatusReporter.hpp"
 #include "interfaces/iConfigurable.hpp"
+#include "interfaces/IWebContributor.hpp"
 #include "interfaces/IDisplayBoard.hpp"
 #include "boards/bootSplashBoard.hpp"
 #include "boards/loadingBoard.hpp"
@@ -105,6 +113,17 @@ struct DisplayMessagePayload {
     unsigned long durationMs;  // How long to display (0 = until cleared)
 };
 
+/**
+ * @brief EventBus payload for "display.board.changed" topic.
+ *
+ * Published by the display module when the active rendering board changes,
+ * either via carousel rotation or explicit showBoard() call.
+ */
+struct DisplayBoardChangedPayload {
+    const char* boardName;  // Name of the newly active board
+    int boardIndex;         // Pool index, or -1 for override (system) boards
+};
+
 // ---------------------------------------------------------------------------
 // Default U8G2 driver type — apps override this via build_flags
 // e.g. -DU8G2_DISPLAY_TYPE=U8G2_SSD1322_NHD_256X64_F_4W_HW_SPI
@@ -129,7 +148,7 @@ struct DisplayMessagePayload {
  * Subscribes to EventBus topics "ota.progress" and "display.message" for
  * runtime integration with other framework modules.
  */
-class U8g2DisplayModule : public ITickable, public IStatusReporter, public iConfigurable {
+class U8g2DisplayModule : public ITickable, public IStatusReporter, public iConfigurable, public IWebContributor {
 public:
     // -------------------------------------------------------------------------
     // Lifecycle
@@ -316,6 +335,32 @@ public:
      * rotationInterval=8000ms. Applies hardware settings.
      */
     void resetConfig() override;
+
+    // -------------------------------------------------------------------------
+    // IWebContributor — Display REST API and portal tab
+    // -------------------------------------------------------------------------
+
+    /**
+     * @brief Register display REST API routes with the web server.
+     *
+     * Registers endpoints under /api/display/ for status, brightness,
+     * flip, sleep, board listing, and board selection.
+     *
+     * @param server Reference to the AsyncWebServer instance.
+     */
+    void registerRoutes(AsyncWebServer& server) override;
+
+    /**
+     * @brief Get the UI tab name for this contributor.
+     * @return "Display"
+     */
+    const char* getTabName() const override { return "Display"; }
+
+    /**
+     * @brief Get the tab display order.
+     * @return 30 — Display tab appears before mid-range tabs.
+     */
+    int getTabOrder() const override { return 30; }
 
     // -------------------------------------------------------------------------
     // Runtime display configuration setters

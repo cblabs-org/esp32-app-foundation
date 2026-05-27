@@ -11,19 +11,9 @@
 
 #include <gtest/gtest.h>
 
-// Include FrameworkConfig and EventBus before the otaUpdateManager header
-// so Application can be fully defined for the test (the cpp stub defines it).
+// Include the real Application header (Application now owns otaUpdateManager)
 #ifdef NATIVE_BUILD
-#include "../../../include/FrameworkConfig.hpp"
-#include "../../../modules/eventBus/EventBus.hpp"
-// Match the Application stub in otaUpdateManager.cpp exactly.
-// The linker will merge these with the same-named class from the .cpp TU.
-// Since both TUs include the same inline definition, this is safe.
-class Application {
-public:
-    EventBus& getEventBus();
-    const FrameworkConfig& getConfig() const;
-};
+#include "../../../modules/application/Application.hpp"
 #endif
 
 #include "../../../modules/otaUpdateManager/otaUpdateManager.hpp"
@@ -134,9 +124,10 @@ TEST_F(OtaUpdateManagerTest, RegisterRoutes_NoCrash) {
     SUCCEED();
 }
 
-/// Global instance should be accessible.
-TEST_F(OtaUpdateManagerTest, GlobalInstance_Accessible) {
-    EXPECT_EQ(OtaState::Idle, otaManager.getState());
+/// A locally-constructed otaUpdateManager instance starts in Idle state.
+TEST_F(OtaUpdateManagerTest, LocalInstance_StartsIdle) {
+    otaUpdateManager localManager;
+    EXPECT_EQ(OtaState::Idle, localManager.getState());
 }
 
 #if defined(NATIVE_BUILD)
