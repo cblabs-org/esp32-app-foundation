@@ -8,16 +8,16 @@
  *
  * Module: modules/u8g2Display/boards/configuringStatusBoard.hpp
  * Description: System board displayed during the CONFIGURING lifecycle phase.
- *              Renders a "Configuring..." header, dynamic rows for each
- *              registered IConfigGate with status icons (checkmark, spinner,
- *              or empty circle), and a progress bar showing the ratio of
- *              satisfied gates to total gates.
+ *              Renders a single-line layout matching the boot board's LOADING
+ *              phase: centred "Configuring..." header, a status label showing
+ *              the current gate name, and a progress bar at the same position
+ *              as the boot screen (Y=38, X=16, width=dw-32, height=16).
  *
  * Exported Classes:
  * - ConfiguringStatusBoard: Gate-progress display implementing IDisplayBoard
  *   - setGates():      Bind the gate list (vector of IConfigGate pointers)
  *   - dismiss():       Mark the board as dismissed (triggers expiry)
- *   - render():        Draw header, gate rows, and progress bar to U8G2 buffer
+ *   - render():        Draw header, status label, and progress bar to U8G2 buffer
  *   - isExpired():     True when dismiss() has been called
  *   - getBoardName():  Returns "SYS: Configuring"
  */
@@ -33,20 +33,18 @@
 /**
  * @brief System board showing gate-by-gate progress during the CONFIGURING phase.
  *
- * Visual layout (256×64 example):
+ * Visual layout (256x64, matching boot board LOADING phase):
  * ```
- * ┌──────────────────────────────────────────┐
- * │  Configuring...                          │   <- Header row (bold)
- * │                                          │
- * │  ✓ WiFi connected                        │   <- Gate rows with status icons
- * │  ⟳ Checking for updates...               │      ✓ = satisfied
- * │  ○ API keys validated                    │      ⟳ = in-progress (first unsatisfied)
- * │                                          │      ○ = waiting
- * │  ▓▓▓▓▓▓▓▓▓▓░░░░░░░  55%                 │   <- Progress bar
- * └──────────────────────────────────────────┘
+ * +------------------------------------------+
+ * |          Configuring...                   |  <- Header (Y=0, bold, centred)
+ * |                                          |
+ * |          > WiFi Station                  |  <- Status label (Y=24, centred)
+ * |                                          |
+ * |    [==========>              ]            |  <- Progress bar (Y=38, X=16)
+ * +------------------------------------------+
  * ```
  *
- * The board does NOT own the gate list — it holds a non-owning pointer set via
+ * The board does NOT own the gate list -- it holds a non-owning pointer set via
  * setGates(). The Application owns the vector and the board reads it each frame.
  */
 class ConfiguringStatusBoard : public IDisplayBoard {
@@ -80,8 +78,8 @@ public:
     /**
      * @brief Render the configuring status screen to the U8G2 display buffer.
      *
-     * Draws: (1) "Configuring..." header, (2) gate rows with status icons,
-     * (3) progress bar showing satisfied/total ratio.
+     * Draws: (1) "Configuring..." header (centred), (2) status label showing
+     * the first unsatisfied actionable gate name, (3) progress bar at Y=38.
      *
      * @param u8g2 Reference to the active U8G2 driver instance.
      */
@@ -119,6 +117,7 @@ private:
     const std::vector<IConfigGate*>* _gates = nullptr;    ///< Non-owning pointer to gate list
 
     // --- Widgets ---
-    labelWidget       _headerLabel;                       ///< "Configuring..." header
+    labelWidget       _headerLabel;                       ///< "Configuring..." header (centred)
+    labelWidget       _statusLabel;                       ///< Gate name status text (centred)
     progressBarWidget _progressBar;                       ///< Gate satisfaction progress bar
 };

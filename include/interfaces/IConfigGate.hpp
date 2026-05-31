@@ -99,3 +99,72 @@ public:
      */
     virtual uint32_t getRegressionToleranceMs() const { return 30000; } // 30s default
 };
+
+// =============================================================================
+// Extensibility Guide
+// =============================================================================
+
+/**
+ * @page config_gate_extensibility Extending the Configuration Gate System
+ *
+ * ## Registration Model
+ *
+ * Only gates registered via `Application::registerConfigGate()` are mandatory.
+ * Anything NOT registered is implicitly optional — the app handles it at
+ * runtime without blocking the CONFIGURING → RUNNING transition.
+ *
+ * ## Framework Auto-Registration
+ *
+ * The framework automatically registers `WifiConfigGate` when WiFi is enabled.
+ * Downstream apps do NOT need to register it manually.
+ *
+ * ## Downstream App Usage
+ *
+ * Add your own gates in `main.cpp` before calling `app.begin()`:
+ *
+ * ```cpp
+ * #include "interfaces/IConfigGate.hpp"
+ *
+ * class ApiKeyGate : public IConfigGate {
+ * public:
+ *     bool isSatisfied() const override { return _hasApiKey; }
+ *     const char* getGateName() const override { return "API Keys"; }
+ *     const char* getHelpText() const override {
+ *         return "Enter your API key via the web portal";
+ *     }
+ *
+ *     // Depend on WiFi being connected first
+ *     const char* const* getDependencies(uint8_t& count) const override {
+ *         static const char* deps[] = {"WiFi Station"};
+ *         count = 1;
+ *         return deps;
+ *     }
+ *
+ *     // Allow 60s of regression before forcing re-configuration
+ *     uint32_t getRegressionToleranceMs() const override { return 60000; }
+ *
+ *     void setHasApiKey(bool val) { _hasApiKey = val; }
+ * private:
+ *     bool _hasApiKey = false;
+ * };
+ *
+ * // In main.cpp setup():
+ * static ApiKeyGate apiKeyGate;
+ * app.registerConfigGate(&apiKeyGate);
+ * app.begin();
+ * ```
+ *
+ * ## Gate Ordering
+ *
+ * Use `getDependencies()` to declare gate ordering. A gate is only "actionable"
+ * when all of its dependency gates are already satisfied. This controls the
+ * order in which the configuring status board presents gates to the user.
+ *
+ * ## Regression Tolerance
+ *
+ * Use `getRegressionToleranceMs()` to control how long a gate can remain
+ * unsatisfied during RUNNING before triggering regression to CONFIGURING:
+ * - Return `0` for immediate regression
+ * - Return `UINT32_MAX` to never regress (app handles recovery internally)
+ * - Default: `30000` (30 seconds)
+ */

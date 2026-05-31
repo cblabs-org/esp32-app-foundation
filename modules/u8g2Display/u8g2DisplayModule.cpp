@@ -217,16 +217,24 @@ void U8g2DisplayModule::begin(Application& app) {
     // system board if the app is already waiting for configuration.
 #ifndef NATIVE_BUILD
     if (_app->getState() == AppState::CONFIGURING) {
-        // Bind gate list to the configuring status board
         _configuringStatusBoard.setGates(&_app->getConfigGates());
 
-        const char* ssid = _app->getWifiManager().getSSID();
-        const char* apName = (ssid != nullptr && ssid[0] != '\0')
-            ? ssid
-            : _app->getConfig().hostname;
-        _wifiWizard.configure(apName);
-        showBoard(&_configuringStatusBoard);
-        ESP_LOGI(TAG, "App already in CONFIGURING — showing configuring status board (late catch-up)");
+        // Find the first unsatisfied gate and route to the appropriate board
+        for (const auto* gate : _app->getConfigGates()) {
+            if (!gate->isSatisfied()) {
+                if (strcmp(gate->getGateName(), "WiFi Station") == 0) {
+                    const char* ssid = _app->getWifiManager().getSSID();
+                    const char* apName = (ssid && ssid[0] != '\0') ? ssid : _app->getConfig().hostname;
+                    _wifiWizard.configure(apName);
+                    showBoard(&_wifiWizard);
+                    ESP_LOGI(TAG, "App already in CONFIGURING — showing WiFi wizard (late catch-up)");
+                } else {
+                    showBoard(&_configuringStatusBoard);
+                    ESP_LOGI(TAG, "App already in CONFIGURING — showing configuring status board (late catch-up)");
+                }
+                break;
+            }
+        }
     }
 #endif
 
