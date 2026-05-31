@@ -44,8 +44,15 @@ void WiFiWizardBoard::configure(const char* ssid, const char* ip) {
         _ip[sizeof(_ip) - 1] = '\0';
     }
 
-    // --- Update inherited widget content ---
-    _msgWidget.setMessage("Connect to WiFi:", _ssid, "then visit:", _ip);
+    // --- Build formatted detail lines with labels ---
+    char ssidLine[48];
+    snprintf(ssidLine, sizeof(ssidLine), "SSID: %s", _ssid);
+
+    char urlLine[48];
+    snprintf(urlLine, sizeof(urlLine), "visit: http://%s", _ip);
+
+    // --- Update inherited widget content (3 lines: title + 2 detail) ---
+    _msgWidget.setMessage("Connect to WiFi:", ssidLine, urlLine, nullptr);
 }
 
 /**

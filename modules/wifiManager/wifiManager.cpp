@@ -361,10 +361,12 @@ void WifiManager::registerRoutes(AsyncWebServer& server) {
 }
 
 /**
- * @brief Update and save WiFi credentials via ConfigManager.
+ * @brief Update, save, and reconnect with new WiFi credentials.
  *
- * Instead of calling saveConfig() directly, delegates to ConfigManager
- * to persist the config through the gateway.
+ * Persists SSID via ConfigManager and password via KeyManager (AES-256).
+ * Then restarts the WiFi state machine to connect with the new
+ * credentials. If currently in AP mode, tears down the access point
+ * and DNS server before transitioning to WIFI_INIT.
  */
 void WifiManager::updateWiFi(const char* ssid, const char* pass) {
     if (ssid != nullptr) strlcpy(wifiSsid, ssid, sizeof(wifiSsid));
@@ -387,6 +389,22 @@ void WifiManager::updateWiFi(const char* ssid, const char* pass) {
     } else {
         ESP_LOGW(TAG, "updateWiFi: ConfigManager not wired — config not saved!");
     }
+
+    // --- Restart WiFi state machine with new credentials ---
+    ESP_LOGI(TAG, "New credentials saved — restarting WiFi connection...");
+#ifndef NATIVE_BUILD
+    if (isAPMode) {
+        if (dnsServer) {
+            dnsServer->stop();
+            dnsServer.reset();
+        }
+        WiFi.softAPdisconnect(true);
+        isAPMode = false;
+    }
+    WiFi.disconnect(true);
+    WiFi.mode(WIFI_OFF);
+#endif
+    transitionTo(WiFiState::WIFI_INIT);
 }
 
 /**

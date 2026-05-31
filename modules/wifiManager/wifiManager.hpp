@@ -24,7 +24,7 @@
  *   - applyConfig():        Apply WiFi config from JSON section
  *   - serializeConfig():    Serialize WiFi config to JSON section
  *   - resetConfig():        Clear credentials.
- *   - updateWiFi(): Persists new credentials to non-volatile storage.
+ *   - updateWiFi(): Persists new credentials and restarts the WiFi state machine.
  *   - testConnection(): Validation probe for new credentials.
  *   - setConfigManager(): Wire the ConfigManager pointer for save operations.
  */
@@ -205,7 +205,13 @@ public:
     void notifyApiActivity();
 
     /**
-     * @brief Update and save WiFi credentials.
+     * @brief Update, save, and reconnect with new WiFi credentials.
+     *
+     * Persists SSID via ConfigManager and password via KeyManager (AES-256).
+     * Then restarts the WiFi state machine to connect with the new
+     * credentials. If currently in AP mode, tears down the access point
+     * and DNS server before transitioning to WIFI_INIT.
+     *
      * @param ssid SSID to save.
      * @param pass Password to save (Masked as dots in UI).
      */

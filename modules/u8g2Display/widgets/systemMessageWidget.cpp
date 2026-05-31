@@ -97,11 +97,11 @@ void systemMessageWidget::render(U8G2& display) {
              TextAlign::CENTER, false, AppFonts::defaultLarge());
 
     // --- Detail lines: small font, stacked below title ---
-    int yOffset = y + 28;
+    int yOffset = y + 30;
     for (int i = 0; i < numLines; i++) {
         drawText(display, lines[i], x, yOffset, renderW, -1,
                  TextAlign::CENTER, false, AppFonts::defaultSmall());
-        yOffset += 12;
+        yOffset += 14;
     }
 }
 
