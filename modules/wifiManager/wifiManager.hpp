@@ -102,6 +102,8 @@ private:
     char myUrl[24];                        ///< Formatted string URL for local IP
     unsigned long lastApiRequestTime = 0;  ///< Last time an API request was received
 
+    bool _reconnectRequested = false;        ///< Deferred reconnect flag (set by updateWiFi, acted on by tick)
+
     ConfigManager* _configManager = nullptr; ///< Pointer to ConfigManager for save operations
     KeyManager* _keyManager = nullptr;       ///< Pointer to KeyManager for encrypted password storage
 
@@ -205,12 +207,12 @@ public:
     void notifyApiActivity();
 
     /**
-     * @brief Update, save, and reconnect with new WiFi credentials.
+     * @brief Save new WiFi credentials and request a deferred reconnect.
      *
      * Persists SSID via ConfigManager and password via KeyManager (AES-256).
-     * Then restarts the WiFi state machine to connect with the new
-     * credentials. If currently in AP mode, tears down the access point
-     * and DNS server before transitioning to WIFI_INIT.
+     * Sets a deferred reconnect flag that is acted on by tick() on the main
+     * loop. This avoids tearing down the WiFi stack from within an HTTP
+     * handler (which would crash the AsyncWebServer running on that stack).
      *
      * @param ssid SSID to save.
      * @param pass Password to save (Masked as dots in UI).

@@ -251,6 +251,24 @@ void WifiManager::tick() {
             break;
 
         case WiFiState::WIFI_READY:
+            // --- Deferred reconnect (triggered by updateWiFi via portal) ---
+            if (_reconnectRequested) {
+                _reconnectRequested = false;
+                ESP_LOGI(TAG, "Executing deferred reconnect with new credentials...");
+                if (isAPMode) {
+                    if (dnsServer) {
+                        dnsServer->stop();
+                        dnsServer.reset();
+                    }
+                    WiFi.softAPdisconnect(true);
+                    isAPMode = false;
+                }
+                WiFi.disconnect(true);
+                WiFi.mode(WIFI_OFF);
+                transitionTo(WiFiState::WIFI_INIT);
+                break;
+            }
+
             // Standard operational maintenance
             processDNS();
             
@@ -267,9 +285,9 @@ void WifiManager::tick() {
                     transitionTo(WiFiState::WIFI_INIT);
                 }
             } else if (isAPMode) {
-                // AP Mode 10-minute inactivity timeout
-                if (millis() - lastApiRequestTime > 600000) {
-                    ESP_LOGW(TAG, "AP Mode inactive for 10 minutes. Shutting down AP to save power.");
+                // AP Mode 1-hour inactivity timeout (pragmatic interim; see WO10 notes)
+                if (millis() - lastApiRequestTime > 3600000) {
+                    ESP_LOGW(TAG, "AP Mode inactive for 1 hour. Shutting down AP to save power.");
                     transitionTo(WiFiState::WIFI_SHUTDOWN);
                 }
             } else {
@@ -361,12 +379,12 @@ void WifiManager::registerRoutes(AsyncWebServer& server) {
 }
 
 /**
- * @brief Update, save, and reconnect with new WiFi credentials.
+ * @brief Save new WiFi credentials and request a deferred reconnect.
  *
  * Persists SSID via ConfigManager and password via KeyManager (AES-256).
- * Then restarts the WiFi state machine to connect with the new
- * credentials. If currently in AP mode, tears down the access point
- * and DNS server before transitioning to WIFI_INIT.
+ * Sets _reconnectRequested so tick() will tear down and reconnect on the
+ * main loop. This avoids destroying the WiFi stack from within an HTTP
+ * handler (AsyncWebServer runs on the same connection being torn down).
  */
 void WifiManager::updateWiFi(const char* ssid, const char* pass) {
     if (ssid != nullptr) strlcpy(wifiSsid, ssid, sizeof(wifiSsid));
@@ -390,21 +408,9 @@ void WifiManager::updateWiFi(const char* ssid, const char* pass) {
         ESP_LOGW(TAG, "updateWiFi: ConfigManager not wired — config not saved!");
     }
 
-    // --- Restart WiFi state machine with new credentials ---
-    ESP_LOGI(TAG, "New credentials saved — restarting WiFi connection...");
-#ifndef NATIVE_BUILD
-    if (isAPMode) {
-        if (dnsServer) {
-            dnsServer->stop();
-            dnsServer.reset();
-        }
-        WiFi.softAPdisconnect(true);
-        isAPMode = false;
-    }
-    WiFi.disconnect(true);
-    WiFi.mode(WIFI_OFF);
-#endif
-    transitionTo(WiFiState::WIFI_INIT);
+    // --- Request deferred reconnect (handled safely in tick()) ---
+    _reconnectRequested = true;
+    ESP_LOGI(TAG, "Credentials saved — deferred reconnect requested");
 }
 
 /**
