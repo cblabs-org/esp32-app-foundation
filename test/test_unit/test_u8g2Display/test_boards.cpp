@@ -9,9 +9,10 @@
  * Module: test/test_unit/test_u8g2Display/test_boards.cpp
  * Description: GoogleTest unit-test suite for the system display boards:
  *              BootBoard, WiFiWizardBoard, OtaProgressBoard,
- *              ErrorBoard, and ScreensaverBoard. Validates board names, state
- *              transitions, and API contracts. All tests execute on the native
- *              GoogleTest runner (no hardware required).
+ *              ErrorBoard, ScreensaverBoard, and ConfiguringStatusBoard.
+ *              Validates board names, state transitions, and API contracts.
+ *              All tests execute on the native GoogleTest runner (no hardware
+ *              required).
  *
  * Exported Functions:
  * - main(): GoogleTest entry point — initialises and runs all board test suites
@@ -23,6 +24,33 @@
 #include "boards/otaProgressBoard.hpp"
 #include "boards/errorBoard.hpp"
 #include "boards/screensaverBoard.hpp"
+#include "boards/configuringStatusBoard.hpp"
+
+// =============================================================================
+// Mock: IConfigGate for unit testing
+// =============================================================================
+
+/**
+ * @brief Simple mock IConfigGate for testing ConfiguringStatusBoard.
+ *
+ * Allows manual control of satisfaction state via setSatisfied().
+ */
+class MockConfigGate : public IConfigGate {
+public:
+    MockConfigGate(const char* name, const char* help, bool satisfied = false)
+        : _name(name), _help(help), _satisfied(satisfied) {}
+
+    bool isSatisfied() const override { return _satisfied; }
+    const char* getGateName() const override { return _name; }
+    const char* getHelpText() const override { return _help; }
+
+    void setSatisfied(bool val) { _satisfied = val; }
+
+private:
+    const char* _name;
+    const char* _help;
+    bool _satisfied;
+};
 
 // =============================================================================
 // Test Group: BootBoard
@@ -318,4 +346,109 @@ TEST_F(ScreensaverBoardTest, MultipleCycles_WorkCorrectly) {
     EXPECT_FALSE(board.isExpired());
     board.deactivate();
     EXPECT_TRUE(board.isExpired());
+}
+
+// =============================================================================
+// Test Group: ConfiguringStatusBoard
+// =============================================================================
+
+class ConfiguringStatusBoardTest : public ::testing::Test {
+protected:
+    ConfiguringStatusBoard board{256, 64}; ///< Fresh instance for each test
+
+    // Mock gates for binding
+    MockConfigGate gate1{"WiFi Station", "Connect to WiFi", true};
+    MockConfigGate gate2{"API Keys", "Validate API keys", false};
+    MockConfigGate gate3{"Time Sync", "Synchronize NTP", false};
+    std::vector<IConfigGate*> gates;
+
+    void SetUp() override {
+        gates = {&gate1, &gate2, &gate3};
+    }
+};
+
+/** getBoardName must return the expected system board identifier. */
+TEST_F(ConfiguringStatusBoardTest, GetBoardName_ReturnsCorrectName) {
+    EXPECT_STREQ(board.getBoardName(), "SYS: Configuring");
+}
+
+/** isExpired must return false initially (not dismissed). */
+TEST_F(ConfiguringStatusBoardTest, IsExpired_Initially_ReturnsFalse) {
+    EXPECT_FALSE(board.isExpired());
+}
+
+/** dismiss must cause isExpired to return true. */
+TEST_F(ConfiguringStatusBoardTest, Dismiss_CausesExpiry) {
+    board.dismiss();
+    EXPECT_TRUE(board.isExpired());
+}
+
+/** setGates must bind the gate list for counting. */
+TEST_F(ConfiguringStatusBoardTest, SetGates_BindsGateList) {
+    board.setGates(&gates);
+    EXPECT_EQ(board.getTotalGateCount(), 3);
+}
+
+/** getSatisfiedCount must reflect gate satisfaction state. */
+TEST_F(ConfiguringStatusBoardTest, GetSatisfiedCount_ReflectsState) {
+    board.setGates(&gates);
+    EXPECT_EQ(board.getSatisfiedCount(), 1); // Only gate1 is satisfied
+}
+
+/** getSatisfiedCount must update as gates become satisfied. */
+TEST_F(ConfiguringStatusBoardTest, GetSatisfiedCount_UpdatesAsGatesSatisfied) {
+    board.setGates(&gates);
+    EXPECT_EQ(board.getSatisfiedCount(), 1);
+
+    gate2.setSatisfied(true);
+    EXPECT_EQ(board.getSatisfiedCount(), 2);
+
+    gate3.setSatisfied(true);
+    EXPECT_EQ(board.getSatisfiedCount(), 3);
+}
+
+/** getTotalGateCount must return 0 when no gates are bound. */
+TEST_F(ConfiguringStatusBoardTest, GetTotalGateCount_NoGates_ReturnsZero) {
+    EXPECT_EQ(board.getTotalGateCount(), 0);
+}
+
+/** getSatisfiedCount must return 0 when no gates are bound. */
+TEST_F(ConfiguringStatusBoardTest, GetSatisfiedCount_NoGates_ReturnsZero) {
+    EXPECT_EQ(board.getSatisfiedCount(), 0);
+}
+
+/** setGates(nullptr) must unbind the gate list safely. */
+TEST_F(ConfiguringStatusBoardTest, SetGates_Nullptr_UnbindsGates) {
+    board.setGates(&gates);
+    EXPECT_EQ(board.getTotalGateCount(), 3);
+
+    board.setGates(nullptr);
+    EXPECT_EQ(board.getTotalGateCount(), 0);
+    EXPECT_EQ(board.getSatisfiedCount(), 0);
+}
+
+/** dismiss must not affect gate counts. */
+TEST_F(ConfiguringStatusBoardTest, Dismiss_DoesNotAffectGateCounts) {
+    board.setGates(&gates);
+    board.dismiss();
+    EXPECT_TRUE(board.isExpired());
+    EXPECT_EQ(board.getTotalGateCount(), 3);
+    EXPECT_EQ(board.getSatisfiedCount(), 1);
+}
+
+/** All gates satisfied count must equal total gate count. */
+TEST_F(ConfiguringStatusBoardTest, AllGatesSatisfied_CountMatchesTotal) {
+    gate1.setSatisfied(true);
+    gate2.setSatisfied(true);
+    gate3.setSatisfied(true);
+    board.setGates(&gates);
+    EXPECT_EQ(board.getSatisfiedCount(), board.getTotalGateCount());
+}
+
+/** Empty gate vector must return zero counts. */
+TEST_F(ConfiguringStatusBoardTest, EmptyGateVector_ReturnsZeroCounts) {
+    std::vector<IConfigGate*> emptyGates;
+    board.setGates(&emptyGates);
+    EXPECT_EQ(board.getTotalGateCount(), 0);
+    EXPECT_EQ(board.getSatisfiedCount(), 0);
 }
