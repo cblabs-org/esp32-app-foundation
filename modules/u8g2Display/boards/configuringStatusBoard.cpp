@@ -73,6 +73,22 @@ void ConfiguringStatusBoard::setGates(const std::vector<IConfigGate*>* gates) {
 }
 
 /**
+ * @brief Set network connection info for the footer display.
+ * @param network  The WiFi network name (SSID) the device is connected to.
+ * @param url      The device URL (e.g., "http://192.168.1.42").
+ */
+void ConfiguringStatusBoard::setConnectionInfo(const char* network, const char* url) {
+    if (network) {
+        strncpy(_networkName, network, sizeof(_networkName) - 1);
+        _networkName[sizeof(_networkName) - 1] = '\0';
+    }
+    if (url) {
+        strncpy(_deviceUrl, url, sizeof(_deviceUrl) - 1);
+        _deviceUrl[sizeof(_deviceUrl) - 1] = '\0';
+    }
+}
+
+/**
  * @brief Mark the board as dismissed, causing isExpired() to return true.
  */
 void ConfiguringStatusBoard::dismiss() {
@@ -154,6 +170,18 @@ void ConfiguringStatusBoard::render(U8G2& u8g2) {
         _statusLabel.setText("Waiting...");
         _statusLabel.setFont(AppFonts::defaultSmall());
         _statusLabel.render(u8g2);
+    }
+
+    // --- 4. Draw connection info footer ---
+    if (_networkName[0] != '\0' && _deviceUrl[0] != '\0') {
+        char footerBuf[80];
+        snprintf(footerBuf, sizeof(footerBuf), "%s  %s", _networkName, _deviceUrl);
+        u8g2.setFont(AppFonts::defaultSmall());
+        // Centre the footer text at the very bottom
+        int textWidth = u8g2.getStrWidth(footerBuf);
+        int footerX = (_displayWidth - textWidth) / 2;
+        if (footerX < 0) footerX = 0;
+        u8g2.drawStr(footerX, _displayHeight - 2, footerBuf);
     }
 #else
     (void)u8g2; // Suppress unused parameter warning in native builds

@@ -109,6 +109,13 @@ public:
      */
     int getTotalGateCount() const;
 
+    /**
+     * @brief Set network connection info for the footer display.
+     * @param network  The WiFi network name (SSID) the device is connected to.
+     * @param url      The device URL (e.g., "http://192.168.1.42").
+     */
+    void setConnectionInfo(const char* network, const char* url);
+
 private:
     uint16_t _displayWidth;                               ///< Display width in pixels
     uint16_t _displayHeight;                              ///< Display height in pixels
@@ -120,4 +127,7 @@ private:
     labelWidget       _headerLabel;                       ///< "Configuring..." header (centred)
     labelWidget       _statusLabel;                       ///< Gate name status text (centred)
     progressBarWidget _progressBar;                       ///< Gate satisfaction progress bar
+
+    char _networkName[33] = "";                            ///< Connected WiFi network name
+    char _deviceUrl[48] = "";                              ///< Device URL for portal access
 };

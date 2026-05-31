@@ -226,8 +226,13 @@ void U8g2DisplayModule::tick() {
         return;
     }
 
-    // --- Check inactivity timer ---
-    _checkSleep();
+    // --- Check inactivity timer (RUNNING state only) ---
+    // Sleep is a carousel/RUNNING concern — never blank during BOOT or CONFIGURING
+#ifndef NATIVE_BUILD
+    if (_app != nullptr && _app->getState() == AppState::RUNNING) {
+        _checkSleep();
+    }
+#endif
 
     // --- State-driven lifecycle polling ---
     // Single code path for all transitions (boot, configure, regression).
@@ -896,20 +901,18 @@ void U8g2DisplayModule::_onStateChanged(AppState newState) {
         for (const auto* gate : _app->getConfigGates()) {
             if (!gate->isSatisfied()) {
                 if (strcmp(gate->getGateName(), "WiFi Station") == 0) {
-                    // WiFi gate: determine correct AP name
-                    const char* apName;
-                    if (_app->getWifiManager().getAPMode()) {
-                        apName = _app->getConfig().hostname;
-                    } else {
-                        const char* ssid = _app->getWifiManager().getSSID();
-                        apName = (ssid && ssid[0] != '\0') ? ssid : _app->getConfig().hostname;
-                    }
-                    _wifiWizard.configure(apName);
+                    // WiFi gate unsatisfied — device is/will-be in AP mode.
+                    // AP always broadcasts as hostname.
+                    _wifiWizard.configure(_app->getConfig().hostname);
                     showBoard(&_wifiWizard);
                     ESP_LOGI(TAG, "State → CONFIGURING: showing WiFi wizard");
                     return;
                 }
-                // Non-WiFi gate: show configuring status board
+                // Non-WiFi gate: show configuring status board with connection info
+                _configuringStatusBoard.setConnectionInfo(
+                    _app->getWifiManager().getSSID(),
+                    _app->getWifiManager().getMyUrl()
+                );
                 showBoard(&_configuringStatusBoard);
                 ESP_LOGI(TAG, "State → CONFIGURING: showing configuring status board");
                 return;
