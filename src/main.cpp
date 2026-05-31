@@ -34,6 +34,7 @@
 #ifndef NATIVE_BUILD
     #include <Arduino.h>
     #include "u8g2DisplayModule.hpp"
+    #include "boards/diagnosticsBoard.hpp"
 #endif
 
 // ---------------------------------------------------------------------------
@@ -46,6 +47,7 @@ static Application app; ///< Single framework hub instance
 
 #ifndef NATIVE_BUILD
 static U8g2DisplayModule display; ///< Display module with carousel engine
+static DiagnosticsBoard diagnosticsBoard(256, 64); ///< System telemetry carousel board
 #endif
 
 /**
@@ -74,6 +76,7 @@ void setup() {
     app.registerTickable(&display);
     app.registerWebContributor(&display);
     app.getConfigManager().registerModule(&display);
+    display.addBoard(&diagnosticsBoard);
 #endif
 
     // --- Configure the framework ---
@@ -102,6 +105,7 @@ void setup() {
     // Exits bootstrap mode — tick() handles rendering from here.
 #ifndef NATIVE_BUILD
     display.begin(app);
+    diagnosticsBoard.setApplication(&app);
 #endif
 }
 
