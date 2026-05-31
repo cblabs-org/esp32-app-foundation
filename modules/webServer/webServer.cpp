@@ -126,6 +126,15 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors) 
     _server.on("/api/system", HTTP_GET, [](AsyncWebServerRequest* request) {});
 #endif
 
+    // --- Captive portal redirect ---
+    // When in AP mode, the DNS server resolves ALL domains to 192.168.4.1.
+    // Phones/OS probe specific URLs to detect captive portals. If those return
+    // anything other than the expected response, the OS pops up a portal window.
+    // This catch-all 302 redirect ensures any unhandled request opens the portal.
+    _server.onNotFound([](AsyncWebServerRequest* request) {
+        request->redirect("http://192.168.4.1/");
+    });
+
     _server.begin();
     ESP_LOGI(TAG, "WebServer started, registered %zu contributors", contributors.size());
 }

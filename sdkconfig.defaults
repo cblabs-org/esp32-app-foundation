@@ -38,9 +38,9 @@ CONFIG_ESP_WIFI_SOFTAP_SUPPORT=y
 # NOTE: CONFIG_FATFS_VOLUME_COUNT has Kconfig min=1; cannot be set to 0.
 # The FatFS library compiles but is unused; linker GC handles dead code.
 
-# ESP Console — framework uses MCP over serial, not ESP-IDF REPL
-CONFIG_ESP_CONSOLE_NONE=y
-CONFIG_ESP_CONSOLE_UART=n
+# ESP Console — UART must be enabled for boot diagnostics and ESP_LOG* output.
+# WARNING: CONFIG_ESP_CONSOLE_NONE silences ALL serial output. Never enable it.
+CONFIG_ESP_CONSOLE_UART_DEFAULT=y
 
 # PPP/Modem — no cellular modem hardware
 CONFIG_LWIP_PPP_SUPPORT=n

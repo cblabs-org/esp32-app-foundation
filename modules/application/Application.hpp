@@ -9,7 +9,7 @@
  * Module: modules/application/Application.hpp
  * Description: Composition root for the ESP32 App Foundation framework.
  *              Owns the module registry (two-tier vector model), the
- *              BOOTING → WIFI_SETUP → APP_SETUP → RUNNING lifecycle, the
+ *              BOOTING → APP_SETUP → CONFIGURING → RUNNING lifecycle, the
  *              main-loop tick dispatch, and the soft-reset escape hatch.
  *              A single static instance is created by main.cpp (WO4); the
  *              class is NOT a singleton — there is no getInstance().
@@ -39,6 +39,7 @@
  *   - getKeyManager():           Access the KeyManager domain service
  *   - getState():                Query the current AppState lifecycle phase
  *   - getMcpServer():            Access the MCP JSON-RPC server instance
+ *   - registerConfigGate():      Add an IConfigGate prerequisite for RUNNING entry
  */
 
 #pragma once
@@ -51,6 +52,7 @@
 #include "interfaces/IStatusReporter.hpp"
 #include "interfaces/IWebContributor.hpp"
 #include "interfaces/IMcpContributor.hpp"
+#include "interfaces/IConfigGate.hpp"
 
 #include "../eventBus/EventBus.hpp"
 #include "../dataManager/dataManager.hpp"
@@ -60,6 +62,7 @@
 
 // Core domain services (owned by value — full includes required)
 #include "../wifiManager/wifiManager.hpp"
+#include "../wifiManager/WifiConfigGate.hpp"
 #include "../timeManager/timeManager.hpp"
 #include "../keyManager/keyManager.hpp"
 #include "../../lib/deviceCrypto/deviceCrypto.hpp"
@@ -109,17 +112,18 @@ public:
      *   6. DeviceCrypto.begin() + KeyManager.begin()
      *   7. ConfigManager — register framework iConfigurable modules (WifiManager)
      *   8. ConfigManager.beginAll() — loads persisted config for ALL registered modules
-     *   9. Set state to WIFI_SETUP
+     *   9. Set state to APP_SETUP
      *  10. WifiManager.begin() — now has persisted SSID/hostname from step 8
-     *  11. Set state to APP_SETUP
-     *  12. TimeManager.begin() — after WiFi, needs network for NTP
-     *  13. DataManager.begin() — background data workers
-     *  14. OTA — heap-allocate and begin()
-     *  15. Register core web contributors and tickables
-     *  16. WebServerManager + McpServer begin()
+     *  11. TimeManager.begin() — after WiFi, needs network for NTP
+     *  12. DataManager.begin() — background data workers
+     *  13. OTA — heap-allocate and begin()
+     *  14. Register core web contributors and tickables
+     *  15. WebServerManager + McpServer begin()
+     *  16. Register built-in WiFi config gate
      *  17. _compactAndLock() — vectors are locked from this point
      *  18. Publish system.heap event + _reportHeap()
-     *  19. Set state to RUNNING
+     *  19. clearStatus()
+     *  20. Check config gates → RUNNING or CONFIGURING
      *
      * Boot progress is reported via IStatusReporter at each milestone.
      * Downstream apps can call registerStatusReporter() before begin()
@@ -134,7 +138,9 @@ public:
     /**
      * @brief Dispatch the periodic update tick to all registered ITickable modules.
      *
-     * Guarded: does nothing unless the current state is AppState::RUNNING.
+     * Guarded: does nothing unless the current state is AppState::CONFIGURING
+ *     or AppState::RUNNING. During CONFIGURING, polls config gates each cycle
+ *     and transitions to RUNNING when all are satisfied.
      * Each registered ITickable::tick() must complete within 10ms.
      * Also ticks the McpServer for JSON-RPC serial polling.
      */
@@ -189,6 +195,21 @@ public:
      * @return true if registration succeeded; false if locked or nullptr.
      */
     bool registerDataSource(iDataSource* source);
+
+    /**
+     * @brief Register a configuration prerequisite gate.
+     *
+     * Gates are evaluated after boot completes. If any gate is unsatisfied,
+     * the app enters CONFIGURING instead of RUNNING. During CONFIGURING,
+     * tick() polls all gates each cycle and transitions to RUNNING when
+     * all return isSatisfied() == true.
+     *
+     * Pre-lock only (same as other registration methods).
+     *
+     * @param gate  Non-null pointer to the IConfigGate implementation.
+     * @return true if registration succeeded; false if locked or nullptr.
+     */
+    bool registerConfigGate(IConfigGate* gate);
 
     // -------------------------------------------------------------------------
     // Core Services Accessors
@@ -288,6 +309,18 @@ private:
     void _compactAndLock();
 
     /**
+     * @brief Check whether all registered config gates are satisfied.
+     * @return true if no gates are registered or all return isSatisfied().
+     */
+    bool _allGatesSatisfied() const;
+
+    /**
+     * @brief Publish an "app.configuring" EventBus event for the first
+     *        unsatisfied gate, allowing display modules to react.
+     */
+    void _publishConfiguringEvent();
+
+    /**
      * @brief Log the current free-heap and minimum free-heap figures.
      *
      * Hardware only (wrapped in NATIVE_BUILD guard).
@@ -307,6 +340,7 @@ private:
     std::vector<IWebContributor*>  _webContributors; ///< Modules that contribute REST API routes
     std::vector<IMcpContributor*>  _mcpContributors; ///< Modules that contribute MCP tools
     std::vector<iDataSource*>      _dataSources;     ///< Background data-fetch workers
+    std::vector<IConfigGate*>       _configGates;     ///< Configuration prerequisite gates
 
     // Single-pointer registrations (no vector needed)
     
@@ -334,6 +368,7 @@ private:
     DeviceCrypto _deviceCrypto;         ///< Hardware-bound AES-256 crypto service
     KeyManager _keyManager;             ///< Encrypted credential registry
     WifiManager _wifiManager;           ///< WiFi connection state machine
+    WifiConfigGate _wifiGate{_wifiManager}; ///< Built-in WiFi STA config gate
     otaUpdateManager* _otaManager = nullptr;  ///< OTA firmware update orchestrator (heap, fwd-declared)
     TimeManager _timeManager;           ///< NTP synchronization service
 };

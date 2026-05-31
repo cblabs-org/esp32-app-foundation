@@ -37,6 +37,15 @@
 class ScreensaverBoard : public IDisplayBoard {
 public:
     /**
+     * @brief Construct with display dimensions for widget layout.
+     * @param displayWidth  Display width in pixels (from U8G2 driver).
+     * @param displayHeight Display height in pixels (from U8G2 driver).
+     */
+    ScreensaverBoard(uint16_t displayWidth, uint16_t displayHeight)
+        : _clockLabel(0, 0, static_cast<int>(displayWidth), static_cast<int>(displayHeight))
+    {}
+
+    /**
      * @brief Start the screensaver and initialise the clock position to centre.
      */
     void activate();
@@ -84,5 +93,5 @@ private:
     int           _yDir         = 1;     ///< Vertical direction (+1 down, -1 up)
 
     // --- Widget composition (WO3 refactor) ---
-    labelWidget _clockLabel{0, 0, -1, -1}; ///< HH:MM clock text widget
+    labelWidget _clockLabel; ///< HH:MM clock text widget
 };

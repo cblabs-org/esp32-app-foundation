@@ -26,15 +26,15 @@ Refactor `ConfigManager` from a passive `SystemConfig` struct holder into a cent
 ## Work Order Ledger
 
 - **[x] [wo1-interface-refactor](wo1-interface-refactor/WORKORDER.md):** Redesign `iConfigurable` interface (6 methods), refactor `ConfigManager` to gateway, update `IWebContributor` with navigation hierarchy, migrate all implementors (`WifiManager`, `U8g2DisplayModule`), update `Application.cpp` boot sequence. Register `ConfigManager` + `otaUpdateManager` as web contributors.
-- **[ ] [wo2-core-service-ownership](wo2-core-service-ownership/WORKORDER.md):** Promote core domain services (WifiManager, otaUpdateManager, TimeManager, KeyManager) to Application-owned members. Wire into boot sequence and ConfigManager gateway. Add navigation hierarchy to OTA. Make TimeManager ITickable.
+- **[x] [wo2-core-service-ownership](wo2-core-service-ownership/WORKORDER.md):** Promote core domain services (WifiManager, otaUpdateManager, TimeManager, KeyManager) to Application-owned members. Wire into boot sequence and ConfigManager gateway. Add navigation hierarchy to OTA. Make TimeManager ITickable.
 
 ## Branch State
 
 | Branch | Base | Status |
 |--------|------|--------|
 | `pr-11-config-gateway` | `main` | Feature PR branch |
-| `pr-11-config-gateway-wo1-interface-refactor` | `pr-11-config-gateway` | ✅ Complete — all tests pass, both HW targets build |
-| `pr-11-config-gateway-wo2-core-service-ownership` | `pr-11-config-gateway` | 🔄 Active |
+| `pr-11-config-gateway-wo1-interface-refactor` | `pr-11-config-gateway` | ✅ Complete |
+| `pr-11-config-gateway-wo2-core-service-ownership` | `pr-11-config-gateway` | ✅ Complete — 376 tests pass, both HW targets build |
 
 ---
 

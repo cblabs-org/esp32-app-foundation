@@ -354,14 +354,15 @@ TEST_F(ApplicationStateTest, InitialState_IsBooting) {
 }
 
 /**
- * After a successful begin(), state must be RUNNING.
- * In NATIVE_BUILD, LittleFS is skipped so begin() always returns true
- * and the state reaches RUNNING.
+ * After a successful begin(), state must be CONFIGURING in NATIVE_BUILD.
+ * The WiFi config gate requires isReady() && !isAPMode(), which cannot be
+ * satisfied without real WiFi hardware. On real hardware, the gate would
+ * be satisfied during tick() once WiFi connects.
  */
-TEST_F(ApplicationStateTest, AfterBegin_StateIsRunning) {
+TEST_F(ApplicationStateTest, AfterBegin_StateIsConfiguring) {
     FrameworkConfig cfg;
     app.begin(cfg);
-    EXPECT_EQ(app.getState(), AppState::RUNNING);
+    EXPECT_EQ(app.getState(), AppState::CONFIGURING);
 }
 
 /**
@@ -545,13 +546,10 @@ TEST_F(ApplicationDomainServiceTest, AfterBegin_WifiManagerRegisteredWithConfigM
     FrameworkConfig cfg;
     app.begin(cfg);
 
-    // WifiManager registers itself with ConfigManager during begin().
-    // We can verify by checking that the "wifi" namespace config file was
-    // processed. Since WifiManager implements iConfigurable with namespace
-    // "wifi", ConfigManager::beginAll() will have called loadModuleConfig()
-    // which creates the file in NATIVE_BUILD when not found.
-    // The fact that begin() completed without error is sufficient proof.
-    EXPECT_EQ(app.getState(), AppState::RUNNING);
+    // In NATIVE_BUILD, WiFi gate cannot be satisfied (no hardware), so
+    // the app enters CONFIGURING rather than RUNNING. This validates that
+    // the WiFi module was registered and the gate system is working.
+    EXPECT_EQ(app.getState(), AppState::CONFIGURING);
 
     // Cleanup
     remove("mod_wifi.json");

@@ -75,14 +75,22 @@ void McpServer::begin(const std::vector<IMcpContributor*>& contributors, ConfigM
 /**
  * @brief Read available bytes from Serial, accumulate into a line buffer,
  *        and dispatch complete lines to _processLine().
+ *
+ * A per-tick read limit prevents the loop from monopolising CPU time.
+ * On some ESP32-S3 boards with CONFIG_ESP_CONSOLE_NONE, Serial.available()
+ * can return non-zero indefinitely, which would block the main task without
+ * this guard.
  */
 void McpServer::tick() {
     if (!_initialized) return;
 
 #ifndef NATIVE_BUILD
     // --- Hardware: read characters from Serial until newline ---
-    while (Serial.available()) {
+    static constexpr int kMaxBytesPerTick = 2048;
+    int bytesRead = 0;
+    while (Serial.available() && bytesRead < kMaxBytesPerTick) {
         char c = Serial.read();
+        bytesRead++;
         if (c == '\n') {
             _processLine(_inputBuffer.c_str());
             _inputBuffer = "";

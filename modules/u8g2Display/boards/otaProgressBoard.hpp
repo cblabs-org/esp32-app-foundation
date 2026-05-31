@@ -39,6 +39,17 @@
 class OtaProgressBoard : public IDisplayBoard {
 public:
     /**
+     * @brief Construct with display dimensions for widget layout.
+     * @param displayWidth  Display width in pixels (from U8G2 driver).
+     * @param displayHeight Display height in pixels (from U8G2 driver).
+     */
+    OtaProgressBoard(uint16_t displayWidth, uint16_t displayHeight)
+        : _titleLabel(0, 2, static_cast<int>(displayWidth), -1),
+          _progressBar(16, 18, static_cast<int>(displayWidth) - 32, 22, nullptr),
+          _statusLabel(0, 50, static_cast<int>(displayWidth), -1)
+    {}
+
+    /**
      * @brief Update the download progress and status message.
      * @param progress Download fraction in the range [0.0, 1.0].
      * @param status   Null-terminated status text (e.g. "Downloading...").
@@ -90,7 +101,7 @@ private:
     bool  _failed   = false;                            ///< True if OTA ended in failure
 
     // --- Widget composition (WO3 refactor) ---
-    labelWidget       _titleLabel{0, 2, -1, -1};       ///< "Firmware Update" title
-    progressBarWidget _progressBar{16, 18, -1, 22, nullptr}; ///< Progress bar with percentage
-    labelWidget       _statusLabel{0, 50, -1, -1};     ///< Status message at the bottom
+    labelWidget       _titleLabel;                      ///< "Firmware Update" title
+    progressBarWidget _progressBar;                     ///< Progress bar with percentage
+    labelWidget       _statusLabel;                     ///< Status message at the bottom
 };

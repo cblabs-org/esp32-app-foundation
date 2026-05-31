@@ -24,13 +24,12 @@
  * - U8g2DisplayModule::resetActivity():      Reset inactivity timer, wake if sleeping
  * - U8g2DisplayModule::getBoardCount():      Return pool size
  * - U8g2DisplayModule::getActiveBoard():     Return current rendering board or nullptr
- * - U8g2DisplayModule::getBootSplash():      Return reference to BootSplashBoard
- * - U8g2DisplayModule::getLoading():         Return reference to LoadingBoard
+ * - U8g2DisplayModule::getBootBoard():       Return reference to BootBoard
  * - U8g2DisplayModule::getWifiWizard():      Return reference to WiFiWizardBoard
  * - U8g2DisplayModule::getOtaProgress():     Return reference to OtaProgressBoard
  * - U8g2DisplayModule::getError():           Return reference to ErrorBoard
  * - U8g2DisplayModule::getScreensaver():     Return reference to ScreensaverBoard
- * - U8g2DisplayModule::reportStatus():       Delegate to LoadingBoard, show it
+ * - U8g2DisplayModule::reportStatus():       Delegate to BootBoard, show it
  * - U8g2DisplayModule::reportError():        Delegate to ErrorBoard (fatal), show it
  * - U8g2DisplayModule::clearStatus():        Mark loading complete, advance if showing
  * - U8g2DisplayModule::registerRoutes():     Register /api/display/* REST endpoints
@@ -47,6 +46,7 @@
 
 #include "u8g2DisplayModule.hpp"
 #include "platform/LogShim.h"
+#include <cstring>
 
 static const char* TAG = "U8g2Display";
 
@@ -54,6 +54,9 @@ static const char* TAG = "U8g2Display";
 #include <Arduino.h>
 #include <ESPAsyncWebServer.h>
 #include "../application/Application.hpp"
+  #if defined(DISPLAY_SPI_SCK) && defined(DISPLAY_SPI_MISO) && defined(DISPLAY_SPI_MOSI)
+  #include <SPI.h>
+  #endif
 #endif
 
 // Include EventBus directly — it is native-safe (no Arduino.h dependency).
@@ -65,26 +68,124 @@ static const char* TAG = "U8g2Display";
 // =============================================================================
 
 /**
- * @brief Initialize the U8G2 hardware, subscribe to EventBus, and lock the pool.
+ * @brief Phase 1: Bootstrap display hardware with zero framework dependencies.
+ *
+ * Initializes SPI bus and U8G2 driver, activates the boot splash, and renders
+ * it immediately. Sets bootstrap mode so that reportStatus() performs inline
+ * blocking animations during the subsequent app.begin() call.
+ *
+ * Safe to call before any framework service (EventBus, ConfigManager, etc.)
+ * is available. Call begin(app) after app.begin() to complete integration.
+ */
+void U8g2DisplayModule::bootstrapHardware() {
+#ifndef NATIVE_BUILD
+    // --- Step 1: Initialize SPI bus ---
+    // If explicit SPI pins are defined, secure the SPI bus before U8G2 init.
+    // CRITICAL: On ESP32-S3, the default Arduino pin mapping can collide with
+    // the internal Flash/PSRAM bus. Explicit pins prevent watchdog crashes.
+  #if defined(DISPLAY_SPI_SCK) && defined(DISPLAY_SPI_MISO) && defined(DISPLAY_SPI_MOSI)
+    ESP_LOGI(TAG, "Bootstrap: SPI.begin(SCK=%d, MISO=%d, MOSI=%d)",
+             DISPLAY_SPI_SCK, DISPLAY_SPI_MISO, DISPLAY_SPI_MOSI);
+    SPI.begin(DISPLAY_SPI_SCK, DISPLAY_SPI_MISO, DISPLAY_SPI_MOSI, -1);
+  #else
+    ESP_LOGW(TAG, "Bootstrap: No explicit SPI pins — using Arduino defaults");
+    SPI.begin();
+  #endif
+
+    // --- Step 2: Initialize U8G2 driver ---
+  #ifdef DISPLAY_CS_PIN
+    ESP_LOGI(TAG, "Bootstrap: U8G2 init (CS=%d, DC=%d, RST=%d)",
+             DISPLAY_CS_PIN, DISPLAY_DC_PIN, DISPLAY_RST_PIN);
+  #else
+    ESP_LOGI(TAG, "Bootstrap: U8G2 init (I2C mode, no pin defines)");
+  #endif
+
+    _u8g2.begin();
+
+    // --- Step 3: Configure draw mode ---
+    // These calls match the departures-board's proven init sequence.
+    // setDrawColor(1) is critical — without it the display may draw
+    // black-on-black (invisible) on some SSD13xx controllers.
+    _u8g2.setDrawColor(1);
+    _u8g2.setFontMode(1);
+    _u8g2.setFontRefHeightAll();
+    _u8g2.setFontPosTop();
+    _u8g2.setContrast(0); // Start dark — fade-in will ramp to _brightness
+    _u8g2.setFlipMode(_flipScreen ? 1 : 0);
+
+    ESP_LOGI(TAG, "Bootstrap: U8G2 driver ready (brightness=%u, flip=%s)",
+             _brightness, _flipScreen ? "yes" : "no");
+
+    // --- Step 4: Show boot splash with fade-in ---
+    _bootBoard.activate(APP_FOUNDATION_VERSION);
+    showBoard(&_bootBoard);
+    _renderCurrentBoard();
+
+    // --- Step 4b: Fade-in over first 1 second, then hold for 2 more ---
+    // Ramp display contrast from 0 → _brightness across ~30 steps (33ms each)
+    // for a smooth fade-in effect. Then hold the remaining 2 seconds.
+    {
+        const unsigned long kFadeDurationMs = 1000;
+        const unsigned long kHoldDurationMs = 2000;
+        const int kFadeSteps = 250;
+        const unsigned long kStepMs = 4;
+
+        for (int i = 1; i <= kFadeSteps; i++) {
+            uint8_t level = static_cast<uint8_t>(
+                (static_cast<unsigned long>(_brightness) * i) / kFadeSteps
+            );
+            _u8g2.setContrast(level);
+            delay(kStepMs);
+        }
+        // Ensure we land exactly on the target brightness
+        _u8g2.setContrast(_brightness);
+        delay(kHoldDurationMs);
+    }
+#endif
+
+    // --- Step 5: Enter bootstrap mode ---
+    // reportStatus() will render inline until begin(app) exits bootstrap mode.
+    _bootstrapMode = true;
+    _lastBootProgress = 0.0f;
+    ESP_LOGI(TAG, "Bootstrap: display hardware ready, inline rendering enabled");
+}
+
+/**
+ * @brief Phase 2: Complete framework integration.
+ *
+ * Subscribes to EventBus topics, locks the board pool, and exits bootstrap
+ * mode. If bootstrapHardware() was already called, skips hardware init.
+ * Otherwise performs full hardware + framework init in one step.
+ *
  * @param app Reference to the Application composition root.
  */
 void U8g2DisplayModule::begin(Application& app) {
     _app = &app;
 
-    // --- Step 1: Initialize hardware display driver ---
+    // --- Step 1: Initialize hardware (skip if already bootstrapped) ---
+    if (!_bootstrapMode) {
 #ifndef NATIVE_BUILD
-    ESP_LOGI(TAG, "Initializing hardware display driver");
-    _u8g2.begin();
-    _u8g2.setContrast(_brightness);
-    _u8g2.setFlipMode(_flipScreen ? 1 : 0);
+      #if defined(DISPLAY_SPI_SCK) && defined(DISPLAY_SPI_MISO) && defined(DISPLAY_SPI_MOSI)
+        SPI.begin(DISPLAY_SPI_SCK, DISPLAY_SPI_MISO, DISPLAY_SPI_MOSI, -1);
+      #endif
+
+        ESP_LOGI(TAG, "Initializing hardware display driver");
+        _u8g2.begin();
+        _u8g2.setContrast(_brightness);
+        _u8g2.setFlipMode(_flipScreen ? 1 : 0);
 #endif
+    } else {
+        ESP_LOGI(TAG, "Hardware already bootstrapped — skipping SPI/U8G2 init");
+    }
 
     // --- Step 2: Subscribe to EventBus topics ---
     // Guarded: getEventBus() requires Application.hpp (unavailable in native)
 #ifndef NATIVE_BUILD
-    ESP_LOGI(TAG, "Subscribing to EventBus topics: ota.progress, display.message");
+    ESP_LOGI(TAG, "Subscribing to EventBus topics: ota.progress, display.message, app.configuring, app.running");
     _app->getEventBus().subscribe("ota.progress", _onOtaProgress, this);
     _app->getEventBus().subscribe("display.message", _onDisplayMessage, this);
+    _app->getEventBus().subscribe("app.configuring", _onAppConfiguring, this);
+    _app->getEventBus().subscribe("app.running", _onAppRunning, this);
 #endif
 
     // --- Step 3: Lock the board pool ---
@@ -93,15 +194,40 @@ void U8g2DisplayModule::begin(Application& app) {
     _boards.shrink_to_fit();
     ESP_LOGI(TAG, "Board pool locked with %d board(s)", (int)_boards.size());
 
-    // --- Step 4: Activate boot splash and show it ---
-    _bootSplash.activate(APP_FOUNDATION_VERSION);
-    showBoard(&_bootSplash);
+    // --- Step 4: Activate boot splash (skip if bootstrapped — already shown) ---
+    if (!_bootstrapMode) {
+        _bootBoard.activate(APP_FOUNDATION_VERSION);
+        showBoard(&_bootBoard);
+    }
 
-    // --- Step 5: Reset timers to current time ---
+    // --- Step 5: Exit bootstrap mode ---
+    // From this point, tick() handles rendering via the main loop.
+    _bootstrapMode = false;
+    _lastBootProgress = 0.0f;
+
+    // --- Step 6: Reset timers to current time ---
 #ifndef NATIVE_BUILD
     _lastActivityMs = millis();
     _lastRotationMs = millis();
 #endif
+
+    // --- Step 7: Late-subscriber catch-up for CONFIGURING state ---
+    // app.begin() may have entered CONFIGURING before we subscribed to
+    // "app.configuring". Check the current state and show the appropriate
+    // system board if the app is already waiting for configuration.
+#ifndef NATIVE_BUILD
+    if (_app->getState() == AppState::CONFIGURING) {
+        const char* ssid = _app->getWifiManager().getSSID();
+        const char* apName = (ssid != nullptr && ssid[0] != '\0')
+            ? ssid
+            : _app->getConfig().hostname;
+        _wifiWizard.configure(apName);
+        showBoard(&_wifiWizard);
+        ESP_LOGI(TAG, "App already in CONFIGURING — showing WiFi wizard (late catch-up)");
+    }
+#endif
+
+    ESP_LOGI(TAG, "Display module fully initialized — tick-driven rendering active");
 }
 
 /**
@@ -279,19 +405,11 @@ IDisplayBoard* U8g2DisplayModule::getActiveBoard() const {
 // =============================================================================
 
 /**
- * @brief Return a reference to the owned BootSplashBoard instance.
- * @return Mutable reference to _bootSplash.
+ * @brief Return a reference to the owned BootBoard instance.
+ * @return Mutable reference to _bootBoard.
  */
-BootSplashBoard& U8g2DisplayModule::getBootSplash() {
-    return _bootSplash;
-}
-
-/**
- * @brief Return a reference to the owned LoadingBoard instance.
- * @return Mutable reference to _loading.
- */
-LoadingBoard& U8g2DisplayModule::getLoading() {
-    return _loading;
+BootBoard& U8g2DisplayModule::getBootBoard() {
+    return _bootBoard;
 }
 
 /**
@@ -331,31 +449,59 @@ ScreensaverBoard& U8g2DisplayModule::getScreensaver() {
 // =============================================================================
 
 /**
- * @brief Report status by delegating to LoadingBoard.
+ * @brief Report status by delegating to BootBoard.
  *
  * Updates the loading board's message and progress, shows the loading board
  * if it isn't already the active board, and resets the inactivity timer.
+ *
+ * In bootstrap mode (before begin()), performs a blocking inline animation
+ * that smoothly interpolates the progress bar from the previous value to
+ * the new value over ~150ms. Each frame is rendered directly to the display.
  *
  * @param message  Status text for the loading board.
  * @param progress Fractional progress [0.0, 1.0]; negative = indeterminate.
  */
 void U8g2DisplayModule::reportStatus(const char* message, float progress) {
-    // --- Delegate to LoadingBoard ---
-    _loading.setStatus(message, progress);
-
-    // --- Show the loading board if not already active ---
-    if (getActiveBoard() != &_loading) {
-        showBoard(&_loading);
+    if (getActiveBoard() != &_bootBoard) {
+        showBoard(&_bootBoard);
     }
 
-    resetActivity();
+    if (_bootstrapMode) {
+        // --- Inline blocking animation during boot ---
+        // Smoothly interpolate progress bar from previous to new value.
+        // ~10 frames × 15ms = 150ms per milestone for premium boot UX.
+#ifndef NATIVE_BUILD
+        float delta = progress - _lastBootProgress;
+        if (delta > 0.005f) {
+            const int kSteps = 10;
+            const int kStepDelayMs = 15;
+            for (int i = 1; i <= kSteps; i++) {
+                float p = _lastBootProgress + (delta * (float)i / (float)kSteps);
+                _bootBoard.setStatus(message, p);
+                _renderCurrentBoard();
+                delay(kStepDelayMs);
+            }
+        } else {
+            _bootBoard.setStatus(message, progress);
+            _renderCurrentBoard();
+        }
+#else
+        _bootBoard.setStatus(message, progress);
+#endif
+        _lastBootProgress = progress;
+    } else {
+        // --- Normal mode: update state, tick() renders ---
+        _bootBoard.setStatus(message, progress);
+        resetActivity();
+    }
 }
 
 /**
  * @brief Report a fatal error by delegating to ErrorBoard.
  *
  * Displays the error as fatal (no auto-dismiss), forces the error board
- * onto the screen, and resets the inactivity timer.
+ * onto the screen, and resets the inactivity timer. In bootstrap mode,
+ * renders the error board immediately (no tick loop available).
  *
  * @param errorMessage Error description text.
  */
@@ -366,21 +512,32 @@ void U8g2DisplayModule::reportError(const char* errorMessage) {
     // --- Force-show the error board ---
     showBoard(&_error);
 
+    // --- Immediate render in bootstrap mode (no tick loop yet) ---
+    if (_bootstrapMode) {
+        _renderCurrentBoard();
+    }
+
     resetActivity();
 }
 
 /**
  * @brief Clear the active status overlay.
  *
- * Marks the LoadingBoard as complete (triggers isExpired()). If the loading
+ * Marks the BootBoard as complete (triggers isExpired()). If the boot
  * board is currently the active board, advances the carousel to move past it.
+ * In bootstrap mode, renders the resulting board immediately.
  */
 void U8g2DisplayModule::clearStatus() {
-    _loading.setComplete();
+    _bootBoard.setComplete();
 
-    // --- If currently showing the loading board, advance carousel ---
-    if (getActiveBoard() == &_loading) {
+    // --- If currently showing the boot board, advance carousel ---
+    if (getActiveBoard() == &_bootBoard) {
         _advanceCarousel();
+    }
+
+    // --- Immediate render in bootstrap mode (show whatever board advanced to) ---
+    if (_bootstrapMode) {
+        _renderCurrentBoard();
     }
 }
 
@@ -689,7 +846,7 @@ void U8g2DisplayModule::_onOtaProgress(const char* /*topic*/, const void* payloa
  * @brief Static callback for "display.message" EventBus events.
  *
  * Casts the context to U8g2DisplayModule*, the payload to
- * DisplayMessagePayload*, and shows the message via the LoadingBoard overlay.
+ * DisplayMessagePayload*, and shows the message via the BootBoard overlay.
  * Resets the inactivity timer to keep the display awake.
  *
  * @param topic   Topic string ("display.message").
@@ -704,13 +861,83 @@ void U8g2DisplayModule::_onDisplayMessage(const char* /*topic*/, const void* pay
 
     const auto* msg = static_cast<const DisplayMessagePayload*>(payload);
 
-    // --- Use the loading board as a temporary message overlay ---
-    self->_loading.setStatus(msg->message, -1.0f);
+    // --- Use the boot board as a temporary message overlay ---
+    self->_bootBoard.setStatus(msg->message, -1.0f);
 
-    // --- Show the loading board ---
-    self->showBoard(&self->_loading);
+    // --- Show the boot board ---
+    self->showBoard(&self->_bootBoard);
 
     self->resetActivity();
+}
+
+/**
+ * @brief Static callback for "app.configuring" EventBus events.
+ *
+ * Fired when the Application enters CONFIGURING state because a config
+ * gate is unsatisfied. Routes the gate name to the appropriate system
+ * board (e.g., WiFi wizard when the WiFi gate is unsatisfied).
+ *
+ * @param topic   Topic string ("app.configuring").
+ * @param payload Pointer to AppConfiguringPayload.
+ * @param ctx     The U8g2DisplayModule instance (passed during subscribe).
+ */
+void U8g2DisplayModule::_onAppConfiguring(const char* /*topic*/, const void* payload, void* ctx) {
+    auto* self = static_cast<U8g2DisplayModule*>(ctx);
+    if (self == nullptr) return;
+
+    if (payload != nullptr) {
+        const auto* config = static_cast<const AppConfiguringPayload*>(payload);
+
+        // Route to the appropriate system board based on gate name
+        if (config->gateName != nullptr && strcmp(config->gateName, "WiFi Station") == 0) {
+            // --- WiFi gate unsatisfied: show the WiFi wizard ---
+#ifndef NATIVE_BUILD
+            if (self->_app != nullptr) {
+                const char* ssid = self->_app->getWifiManager().getSSID();
+                // Use hostname as AP name if no SSID stored
+                const char* apName = (ssid != nullptr && ssid[0] != '\0')
+                    ? ssid
+                    : self->_app->getConfig().hostname;
+                self->_wifiWizard.configure(apName);
+            } else
+#endif
+            {
+                self->_wifiWizard.configure("ESP32-Device");
+            }
+            self->showBoard(&self->_wifiWizard);
+            ESP_LOGI(TAG, "Showing WiFi wizard board (config gate: WiFi Station)");
+            return;
+        }
+    }
+
+    // --- Unknown or null gate: show a generic configuring message ---
+    ESP_LOGI(TAG, "App is CONFIGURING — no specific board for this gate");
+}
+
+/**
+ * @brief Static callback for "app.running" EventBus events.
+ *
+ * Fired when the Application transitions from CONFIGURING to RUNNING
+ * because all config gates are now satisfied. Dismisses any active
+ * system board (WiFi wizard, etc.) so the carousel can resume.
+ *
+ * @param topic   Topic string ("app.running").
+ * @param payload Unused (nullptr).
+ * @param ctx     The U8g2DisplayModule instance (passed during subscribe).
+ */
+void U8g2DisplayModule::_onAppRunning(const char* /*topic*/, const void* /*payload*/, void* ctx) {
+    auto* self = static_cast<U8g2DisplayModule*>(ctx);
+    if (self == nullptr) return;
+
+    // Dismiss the WiFi wizard if it's currently showing
+    self->_wifiWizard.dismiss();
+
+    // If the WiFi wizard was the active board, advance to next board
+    if (self->getActiveBoard() == &self->_wifiWizard) {
+        self->_advanceCarousel();
+    }
+
+    ESP_LOGI(TAG, "App entered RUNNING — dismissing system boards");
 }
 
 // =============================================================================

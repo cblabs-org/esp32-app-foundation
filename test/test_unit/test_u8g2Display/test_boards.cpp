@@ -8,7 +8,7 @@
  *
  * Module: test/test_unit/test_u8g2Display/test_boards.cpp
  * Description: GoogleTest unit-test suite for the system display boards:
- *              BootSplashBoard, LoadingBoard, WiFiWizardBoard, OtaProgressBoard,
+ *              BootBoard, WiFiWizardBoard, OtaProgressBoard,
  *              ErrorBoard, and ScreensaverBoard. Validates board names, state
  *              transitions, and API contracts. All tests execute on the native
  *              GoogleTest runner (no hardware required).
@@ -18,91 +18,74 @@
  */
 
 #include <gtest/gtest.h>
-#include "boards/bootSplashBoard.hpp"
-#include "boards/loadingBoard.hpp"
+#include "boards/bootBoard.hpp"
 #include "boards/wifiWizardBoard.hpp"
 #include "boards/otaProgressBoard.hpp"
 #include "boards/errorBoard.hpp"
 #include "boards/screensaverBoard.hpp"
 
 // =============================================================================
-// Test Group: BootSplashBoard
+// Test Group: BootBoard
 // =============================================================================
 
-class BootSplashBoardTest : public ::testing::Test {
+class BootBoardTest : public ::testing::Test {
 protected:
-    BootSplashBoard board; ///< Fresh instance for each test
+    BootBoard board{256, 64}; ///< Fresh instance for each test
 };
 
 /** getBoardName must return the expected system board identifier. */
-TEST_F(BootSplashBoardTest, GetBoardName_ReturnsCorrectName) {
-    EXPECT_STREQ(board.getBoardName(), "SYS: Boot Splash");
+TEST_F(BootBoardTest, GetBoardName_ReturnsCorrectName) {
+    EXPECT_STREQ(board.getBoardName(), "SYS: Boot");
 }
 
 /** isExpired must return false before activate() is called. */
-TEST_F(BootSplashBoardTest, IsExpired_BeforeActivate_ReturnsFalse) {
+TEST_F(BootBoardTest, IsExpired_BeforeActivate_ReturnsFalse) {
     EXPECT_FALSE(board.isExpired());
 }
 
 /** isExpired must return false immediately after activate() (native build). */
-TEST_F(BootSplashBoardTest, IsExpired_AfterActivate_ReturnsFalse) {
+TEST_F(BootBoardTest, IsExpired_AfterActivate_ReturnsFalse) {
     board.activate("1.0.0");
-    // In NATIVE_BUILD, millis() is unavailable — isExpired() always returns false
     EXPECT_FALSE(board.isExpired());
 }
 
 /** activate must not crash with a nullptr version. */
-TEST_F(BootSplashBoardTest, Activate_NullVersion_DoesNotCrash) {
+TEST_F(BootBoardTest, Activate_NullVersion_DoesNotCrash) {
     EXPECT_NO_FATAL_FAILURE(board.activate(nullptr));
 }
 
 /** activate must not crash with an empty string. */
-TEST_F(BootSplashBoardTest, Activate_EmptyVersion_DoesNotCrash) {
+TEST_F(BootBoardTest, Activate_EmptyVersion_DoesNotCrash) {
     EXPECT_NO_FATAL_FAILURE(board.activate(""));
 }
 
-// =============================================================================
-// Test Group: LoadingBoard
-// =============================================================================
-
-class LoadingBoardTest : public ::testing::Test {
-protected:
-    LoadingBoard board; ///< Fresh instance for each test
-};
-
-/** getBoardName must return the expected system board identifier. */
-TEST_F(LoadingBoardTest, GetBoardName_ReturnsCorrectName) {
-    EXPECT_STREQ(board.getBoardName(), "SYS: Loading");
-}
-
-/** isExpired must return false initially (loading not complete). */
-TEST_F(LoadingBoardTest, IsExpired_Initially_ReturnsFalse) {
-    EXPECT_FALSE(board.isExpired());
-}
-
 /** setComplete must cause isExpired to return true. */
-TEST_F(LoadingBoardTest, SetComplete_CausesExpiry) {
+TEST_F(BootBoardTest, SetComplete_CausesExpiry) {
     board.setComplete();
     EXPECT_TRUE(board.isExpired());
 }
 
 /** setStatus must not crash with valid message and progress. */
-TEST_F(LoadingBoardTest, SetStatus_ValidInput_DoesNotCrash) {
+TEST_F(BootBoardTest, SetStatus_ValidInput_DoesNotCrash) {
+    board.activate("1.0.0");
     EXPECT_NO_FATAL_FAILURE(board.setStatus("Connecting...", 0.5f));
 }
 
 /** setStatus must not crash with nullptr message. */
-TEST_F(LoadingBoardTest, SetStatus_NullMessage_DoesNotCrash) {
+TEST_F(BootBoardTest, SetStatus_NullMessage_DoesNotCrash) {
+    board.activate("1.0.0");
     EXPECT_NO_FATAL_FAILURE(board.setStatus(nullptr, 0.0f));
 }
 
 /** setStatus with indeterminate progress must not crash. */
-TEST_F(LoadingBoardTest, SetStatus_IndeterminateProgress_DoesNotCrash) {
+TEST_F(BootBoardTest, SetStatus_IndeterminateProgress_DoesNotCrash) {
+    board.activate("1.0.0");
     EXPECT_NO_FATAL_FAILURE(board.setStatus("Loading...", -1.0f));
 }
 
 /** isExpired remains false after setStatus (loading not complete). */
-TEST_F(LoadingBoardTest, SetStatus_DoesNotCauseExpiry) {
+TEST_F(BootBoardTest, SetStatus_DoesNotCauseExpiry) {
+    board.activate("1.0.0");
     board.setStatus("Step 1", 0.25f);
     EXPECT_FALSE(board.isExpired());
 }
@@ -113,7 +96,7 @@ TEST_F(LoadingBoardTest, SetStatus_DoesNotCauseExpiry) {
 
 class WiFiWizardBoardTest : public ::testing::Test {
 protected:
-    WiFiWizardBoard board; ///< Fresh instance for each test
+    WiFiWizardBoard board{256, 64}; ///< Fresh instance for each test
 };
 
 /** getBoardName must return the expected system board identifier. */
@@ -159,7 +142,7 @@ TEST_F(WiFiWizardBoardTest, Configure_DoesNotCauseExpiry) {
 
 class OtaProgressBoardTest : public ::testing::Test {
 protected:
-    OtaProgressBoard board; ///< Fresh instance for each test
+    OtaProgressBoard board{256, 64}; ///< Fresh instance for each test
 };
 
 /** getBoardName must return the expected system board identifier. */
@@ -225,7 +208,7 @@ TEST_F(OtaProgressBoardTest, Reset_ClearsFailure) {
 
 class ErrorBoardTest : public ::testing::Test {
 protected:
-    ErrorBoard board; ///< Fresh instance for each test
+    ErrorBoard board{256, 64}; ///< Fresh instance for each test
 };
 
 /** getBoardName must return the expected system board identifier. */
@@ -285,7 +268,7 @@ TEST_F(ErrorBoardTest, ShowError_NullMessage_DoesNotCrash) {
 
 class ScreensaverBoardTest : public ::testing::Test {
 protected:
-    ScreensaverBoard board; ///< Fresh instance for each test
+    ScreensaverBoard board{256, 64}; ///< Fresh instance for each test
 };
 
 /** getBoardName must return the expected system board identifier. */

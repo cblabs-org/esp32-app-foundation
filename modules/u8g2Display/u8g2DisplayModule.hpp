@@ -15,7 +15,7 @@
  *              Error, Screensaver) can bypass the carousel via showBoard().
  *              Owns all system board instances and activates the splash on begin().
  *
- *              Implements IStatusReporter by delegating to LoadingBoard and
+ *              Implements IStatusReporter by delegating to BootBoard and
  *              ErrorBoard. Subscribes to EventBus topics "ota.progress" and
  *              "display.message" for runtime event integration. Publishes
  *              "display.sleep", "display.wake", and "display.board.changed"
@@ -29,22 +29,22 @@
  * - DisplayMessagePayload:         EventBus payload struct for display message events
  * - DisplayBoardChangedPayload:    EventBus payload struct for board change events
  * - U8g2DisplayModule: Display carousel engine and board slot pool
- *   - begin():              Initialize hardware, subscribe to EventBus, lock pool
+ *   - bootstrapHardware():   Phase 1 init — SPI + U8G2 only, zero framework deps
+ *   - begin():              Phase 2 init — EventBus, config, pool lock (skips HW if bootstrapped)
  *   - tick():               Carousel rotation, sleep check, board tick, render
  *   - addBoard():           Pre-lock registration of boards into the carousel pool
  *   - showBoard():          Force-show a specific board (bypasses carousel timer)
  *   - resetActivity():      Reset the inactivity timer (called on user interaction)
  *   - getBoardCount():      Return the number of registered boards in the pool
  *   - getActiveBoard():     Return the currently rendering board (or nullptr)
- *   - getBootSplash():      Return reference to the owned BootSplashBoard instance
- *   - getLoading():         Return reference to the owned LoadingBoard instance
+ *   - getBootBoard():       Return reference to the owned BootBoard instance
  *   - getWifiWizard():      Return reference to the owned WiFiWizardBoard instance
  *   - getOtaProgress():     Return reference to the owned OtaProgressBoard instance
  *   - getError():           Return reference to the owned ErrorBoard instance
  *   - getScreensaver():     Return reference to the owned ScreensaverBoard instance
- *   - reportStatus():       Delegate to LoadingBoard and show it
+ *   - reportStatus():       Delegate to BootBoard and show it
  *   - reportError():        Delegate to ErrorBoard (fatal) and show it
- *   - clearStatus():        Mark LoadingBoard complete, advance if showing it
+ *   - clearStatus():        Mark BootBoard complete, advance if showing it
  *   - registerRoutes():     Register display REST API routes (/api/display/*)
  *   - getTabName():         Return "Display" for portal tab
  *   - getTabOrder():        Return 30 for portal tab ordering
@@ -68,12 +68,12 @@
 #include "interfaces/iConfigurable.hpp"
 #include "interfaces/IWebContributor.hpp"
 #include "interfaces/IDisplayBoard.hpp"
-#include "boards/bootSplashBoard.hpp"
-#include "boards/loadingBoard.hpp"
+#include "boards/bootBoard.hpp"
 #include "boards/wifiWizardBoard.hpp"
 #include "boards/otaProgressBoard.hpp"
 #include "boards/errorBoard.hpp"
 #include "boards/screensaverBoard.hpp"
+#include "events/AppConfiguringPayload.hpp"
 
 // --- Hardware-only includes (excluded from native GoogleTest builds) ---
 #ifndef NATIVE_BUILD
@@ -138,7 +138,7 @@ struct DisplayBoardChangedPayload {
  * @brief U8G2 monochrome display module with carousel engine and board slot pool.
  *
  * Implements ITickable for main-loop rendering, IStatusReporter for boot-phase
- * status overlays (delegates to LoadingBoard/ErrorBoard), and iConfigurable
+ * status overlays (delegates to BootBoard/ErrorBoard), and iConfigurable
  * for persistent display settings via ConfigManager gateway (namespace: "display").
  *
  * The board slot pool is a std::vector<IDisplayBoard*> that accepts registrations
@@ -155,11 +155,25 @@ public:
     // -------------------------------------------------------------------------
 
     /**
-     * @brief Initialize hardware, subscribe to EventBus, and lock the board pool.
+     * @brief Phase 1: Bootstrap display hardware with zero framework dependencies.
      *
-     * After this call, addBoard() will reject new registrations. The U8G2
-     * driver is started, contrast and flip mode are applied, EventBus
-     * subscriptions are registered, and the inactivity timer is reset.
+     * Initializes the SPI bus and U8G2 driver, applies default contrast and
+     * flip mode, activates the boot splash, and renders it immediately.
+     * Enters bootstrap mode where reportStatus() performs inline blocking
+     * animations instead of waiting for the tick loop.
+     *
+     * Call this BEFORE app.begin() so the display is ready to show boot progress.
+     * Call begin(app) AFTER app.begin() to complete framework integration.
+     */
+    void bootstrapHardware();
+
+    /**
+     * @brief Phase 2: Complete framework integration.
+     *
+     * Subscribes to EventBus topics, locks the board pool, and exits
+     * bootstrap mode. If bootstrapHardware() was called first, skips
+     * hardware init (SPI + U8G2 already running). Otherwise performs
+     * full hardware + framework init in one step.
      *
      * @param app Reference to the Application composition root.
      */
@@ -224,16 +238,10 @@ public:
     // -------------------------------------------------------------------------
 
     /**
-     * @brief Return a reference to the owned BootSplashBoard instance.
-     * @return Mutable reference to _bootSplash.
+     * @brief Return a reference to the owned BootBoard instance.
+     * @return Mutable reference to _bootBoard.
      */
-    BootSplashBoard& getBootSplash();
-
-    /**
-     * @brief Return a reference to the owned LoadingBoard instance.
-     * @return Mutable reference to _loading.
-     */
-    LoadingBoard& getLoading();
+    BootBoard& getBootBoard();
 
     /**
      * @brief Return a reference to the owned WiFiWizardBoard instance.
@@ -260,13 +268,13 @@ public:
     ScreensaverBoard& getScreensaver();
 
     // -------------------------------------------------------------------------
-    // IStatusReporter — delegates to LoadingBoard and ErrorBoard
+    // IStatusReporter — delegates to BootBoard and ErrorBoard
     // -------------------------------------------------------------------------
 
     /**
      * @brief Report a status message with optional progress.
      *
-     * Delegates to LoadingBoard::setStatus(), shows the loading board if not
+     * Delegates to BootBoard::setStatus(), shows the boot board if not
      * already active, and resets the inactivity timer.
      *
      * @param message  Null-terminated status text.
@@ -287,7 +295,7 @@ public:
     /**
      * @brief Clear the status overlay.
      *
-     * Marks LoadingBoard as complete. If the loading board is currently
+     * Marks BootBoard as complete. If the boot board is currently
      * showing, advances the carousel to the next board.
      */
     void clearStatus() override;
@@ -449,13 +457,52 @@ private:
      */
     static void _onDisplayMessage(const char* topic, const void* payload, void* ctx);
 
+    /**
+     * @brief Static callback for "app.configuring" EventBus topic.
+     * @param topic The topic string ("app.configuring").
+     * @param payload Pointer to an AppConfiguringPayload struct.
+     * @param ctx Context pointer (this U8g2DisplayModule instance).
+     */
+    static void _onAppConfiguring(const char* topic, const void* payload, void* ctx);
+
+    /**
+     * @brief Static callback for "app.running" EventBus topic.
+     * @param topic The topic string ("app.running").
+     * @param payload Unused (nullptr).
+     * @param ctx Context pointer (this U8g2DisplayModule instance).
+     */
+    static void _onAppRunning(const char* topic, const void* payload, void* ctx);
+
     // -------------------------------------------------------------------------
     // Member variables
     // -------------------------------------------------------------------------
 
     // --- Hardware driver (excluded from native builds) ---
+    // Pin configuration is injected via build_flags in platformio.ini.
+    // SPI displays: define DISPLAY_CS_PIN, DISPLAY_DC_PIN (required),
+    //               DISPLAY_RST_PIN (optional, defaults to U8X8_PIN_NONE).
+    // I2C displays: no pin defines needed (U8G2 uses Arduino defaults).
 #ifndef NATIVE_BUILD
-    U8G2_DISPLAY_TYPE _u8g2;                      ///< The U8G2 hardware driver instance
+  #ifdef DISPLAY_CS_PIN
+    #ifndef DISPLAY_RST_PIN
+    #define DISPLAY_RST_PIN U8X8_PIN_NONE
+    #endif
+    U8G2_DISPLAY_TYPE _u8g2{U8G2_R0, DISPLAY_CS_PIN, DISPLAY_DC_PIN, DISPLAY_RST_PIN};
+  #else
+    U8G2_DISPLAY_TYPE _u8g2{U8G2_R0};
+  #endif
+
+    // --- Display geometry pseudo-constants ---
+    // Read once from the U8G2 driver descriptor at member-init time.
+    // U8G2 populates tile dimensions in its constructor (before begin()),
+    // and _u8g2 is declared above so it is fully constructed first.
+    const uint16_t _displayWidth  = _u8g2.getDisplayWidth();
+    const uint16_t _displayHeight = _u8g2.getDisplayHeight();
+#else
+    // --- Native build defaults (no U8G2 hardware driver) ---
+    // Match the primary hardware target (SSD1322 256×64) for test consistency.
+    const uint16_t _displayWidth  = 256;
+    const uint16_t _displayHeight = 64;
 #endif
 
     Application* _app = nullptr;                   ///< Cached reference to Application hub (for EventBus access)
@@ -483,11 +530,14 @@ private:
     // --- System board override pointer ---
     IDisplayBoard* _overrideBoard = nullptr;       ///< Non-pool board shown via showBoard() when not in pool
 
+    // --- Bootstrap state ---
+    bool  _bootstrapMode    = false;               ///< True between bootstrapHardware() and begin()
+    float _lastBootProgress = 0.0f;                ///< Cached progress for smooth inline interpolation
+
     // --- Owned system board instances ---
-    BootSplashBoard  _bootSplash;                  ///< Boot splash screen (BOOTING phase)
-    LoadingBoard     _loading;                     ///< Loading progress screen (APP_SETUP phase)
-    WiFiWizardBoard  _wifiWizard;                  ///< WiFi setup wizard screen (WIFI_SETUP phase)
-    OtaProgressBoard _otaProgress;                 ///< OTA firmware update progress screen
-    ErrorBoard       _error;                       ///< Error message display screen
-    ScreensaverBoard _screensaver;                 ///< Inactivity screensaver (burn-in prevention)
+    BootBoard        _bootBoard{_displayWidth, _displayHeight};   ///< Unified boot board (splash + loading phases)
+    WiFiWizardBoard  _wifiWizard{_displayWidth, _displayHeight};   ///< WiFi setup wizard screen (CONFIGURING phase)
+    OtaProgressBoard _otaProgress{_displayWidth, _displayHeight};  ///< OTA firmware update progress screen
+    ErrorBoard       _error{_displayWidth, _displayHeight};        ///< Error message display screen
+    ScreensaverBoard _screensaver{_displayWidth, _displayHeight};  ///< Inactivity screensaver (burn-in prevention)
 };

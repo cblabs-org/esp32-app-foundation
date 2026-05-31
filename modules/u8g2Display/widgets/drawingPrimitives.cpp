@@ -48,7 +48,9 @@ U8g2StateSaver::U8g2StateSaver(U8G2& _display) : display(_display) {
  *        Restores font, draw color, and clip window exactly as captured.
  */
 U8g2StateSaver::~U8g2StateSaver() {
-    display.setFont(oldFont);
+    if (oldFont != nullptr) {
+        display.setFont(oldFont);
+    }
     display.setDrawColor(oldDrawColor);
     display.setClipWindow(oldClipX0, oldClipY0, oldClipX1, oldClipY1);
 }

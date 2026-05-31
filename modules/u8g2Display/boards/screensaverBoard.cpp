@@ -93,7 +93,7 @@ void ScreensaverBoard::render(U8G2& u8g2) {
     }
 
     // --- Step 2: Configure and render the labelWidget at bounce position ---
-    _clockLabel.setFont(u8g2_font_helvB14_tr);
+    _clockLabel.setFont(AppFonts::defaultLarge());
     _clockLabel.setText(timeBuf);
     _clockLabel.setCoords(_xPos, _yPos);
     _clockLabel.render(u8g2);
@@ -105,7 +105,7 @@ void ScreensaverBoard::render(U8G2& u8g2) {
 
         // Get approximate text dimensions for edge detection
         int textWidth  = u8g2.getStrWidth(timeBuf);
-        int textHeight = 14; // Approximate height for helvB14 font
+        int textHeight = 12; // Approximate height for AppFonts::defaultLarge()
 
         // Update position
         _xPos += _xDir;
