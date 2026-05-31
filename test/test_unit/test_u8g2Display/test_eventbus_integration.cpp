@@ -124,7 +124,7 @@ TEST_F(EventBusIntegrationTest, OtaProgress_Publish_DelegatesToBoard) {
             } else {
                 self->getOtaProgress().setProgress(ota->progress, ota->status);
             }
-            self->showBoard(&self->getOtaProgress());
+            self->pushModal(&self->getOtaProgress());
         },
         &display);
 
@@ -154,7 +154,7 @@ TEST_F(EventBusIntegrationTest, OtaProgress_Complete_Success_BoardExpires) {
             } else {
                 self->getOtaProgress().setProgress(ota->progress, ota->status);
             }
-            self->showBoard(&self->getOtaProgress());
+            self->pushModal(&self->getOtaProgress());
         },
         &display);
 
@@ -176,7 +176,7 @@ TEST_F(EventBusIntegrationTest, DisplayMessage_Publish_ShowsMessage) {
             if (payload == nullptr || self == nullptr) return;
             const auto* msg = static_cast<const DisplayMessagePayload*>(payload);
             self->getBootBoard().setStatus(msg->message, -1.0f);
-            self->showBoard(&self->getBootBoard());
+            self->pushModal(&self->getBootBoard());
         },
         &display);
 

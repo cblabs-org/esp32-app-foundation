@@ -7,9 +7,10 @@
  * To view a copy of this license, visit https://creativecommons.org/licenses/by-nc-sa/4.0/
  *
  * Module: modules/u8g2Display/u8g2DisplayModule.cpp
- * Description: Implementation of the U8G2 display module with carousel engine,
- *              board slot pool, sleep/wake power management, system board
- *              ownership, IStatusReporter delegation (Loading/Error boards),
+ * Description: Implementation of the U8G2 display module with two-layer
+ *              base+modal architecture, carousel engine, sleep/wake power
+ *              management, phase-aware brightness dimming, system board
+ *              ownership, IStatusReporter delegation (Boot/Error boards),
  *              EventBus subscriptions (ota.progress, display.message),
  *              EventBus publishing (display.sleep, display.wake,
  *              display.board.changed), IWebContributor REST API routes
@@ -119,7 +120,7 @@ void U8g2DisplayModule::bootstrapHardware() {
 
     // --- Step 4: Show boot splash with fade-in ---
     _bootBoard.activate(APP_FOUNDATION_VERSION);
-    showBoard(&_bootBoard);
+    pushModal(&_bootBoard);
     _renderCurrentBoard();
 
     // --- Step 4b: Fade-in over first 1 second, then hold for 2 more ---
@@ -196,7 +197,7 @@ void U8g2DisplayModule::begin(Application& app) {
     // --- Step 4: Activate boot splash (skip if bootstrapped — already shown) ---
     if (!_bootstrapMode) {
         _bootBoard.activate(APP_FOUNDATION_VERSION);
-        showBoard(&_bootBoard);
+        pushModal(&_bootBoard);
     }
 
     // --- Step 5: Exit bootstrap mode ---
@@ -214,11 +215,18 @@ void U8g2DisplayModule::begin(Application& app) {
 }
 
 /**
- * @brief Periodic tick — carousel rotation, sleep check, board tick, render.
+ * @brief Periodic tick — two-layer base+modal architecture.
  *
  * Called by the Application tick loop. If sleeping, returns early.
- * Otherwise checks the sleep timer, delegates tick() to the active board,
- * evaluates the carousel rotation interval, and renders the current board.
+ * Flow:
+ *   1. State polling (detect AppState changes)
+ *   2. Auto-clear expired modals
+ *   3. Phase-aware behaviour:
+ *      - BOOT: always on, no dimming
+ *      - CONFIGURING or modal active: dim after timeout, never blank
+ *      - RUNNING + no modal: carousel rotation + sleep check
+ *   4. Determine visible board: modal if active, else base layer
+ *   5. Tick + render visible board
  */
 void U8g2DisplayModule::tick() {
     // --- Early exit if sleeping ---
@@ -226,15 +234,7 @@ void U8g2DisplayModule::tick() {
         return;
     }
 
-    // --- Check inactivity timer (RUNNING state only) ---
-    // Sleep is a carousel/RUNNING concern — never blank during BOOT or CONFIGURING
-#ifndef NATIVE_BUILD
-    if (_app != nullptr && _app->getState() == AppState::RUNNING) {
-        _checkSleep();
-    }
-#endif
-
-    // --- State-driven lifecycle polling ---
+    // --- 1. State-driven lifecycle polling ---
     // Single code path for all transitions (boot, configure, regression).
     // Replaces EventBus subscriptions for app.configuring / app.running.
 #ifndef NATIVE_BUILD
@@ -247,37 +247,58 @@ void U8g2DisplayModule::tick() {
     }
 #endif
 
-    // --- Guard: no boards to render ---
-    if (_boards.empty() && _overrideBoard == nullptr) {
-        return;
+    // --- 2. Auto-clear expired modals ---
+    if (_modal != nullptr && _modal->isExpired()) {
+        clearModal();
     }
 
-    // --- Delegate tick() to the active board ---
-    // This allows boards to update scroll positions, animation timers, etc.
-    IDisplayBoard* activeBoard = getActiveBoard();
-    if (activeBoard != nullptr) {
+    // --- 3. Phase-aware behaviour ---
 #ifndef NATIVE_BUILD
-        activeBoard->tick(millis());
-#else
-        activeBoard->tick(0);
-#endif
+    if (_app != nullptr) {
+        if (_app->getState() == AppState::RUNNING && _modal == nullptr) {
+            // RUNNING with no modal: carousel rotation + screensaver/sleep
+            _checkSleep();
+            if (!_boards.empty() && _activeBoardIndex >= 0) {
+                unsigned long now = millis();
+                if ((now - _lastRotationMs) >= _rotationIntervalMs) {
+                    _advanceCarousel();
+                    _lastRotationMs = now;
+                }
+            }
+        } else if (_app->getState() != AppState::BOOT) {
+            // CONFIGURING (base) or modal active (any phase): dim, never blank
+            _checkDim();
+        }
+        // BOOT: no dimming, no sleep — always full brightness
     }
-
-    // --- Carousel rotation ---
-    // Only rotate if we have pool boards and no override is active
-    if (!_boards.empty() && _activeBoardIndex >= 0) {
-#ifndef NATIVE_BUILD
-        unsigned long now = millis();
-#else
-        unsigned long now = 0;
 #endif
-        if ((now - _lastRotationMs) >= _rotationIntervalMs) {
-            _advanceCarousel();
-            _lastRotationMs = now;
+
+    // --- 4. Determine visible board ---
+    IDisplayBoard* visible = nullptr;
+    if (_modal != nullptr) {
+        visible = _modal;
+    } else {
+        visible = _getBaseBoard();
+        // Fallback: if _getBaseBoard() returns nullptr (native build or early boot),
+        // try the carousel pool directly
+        if (visible == nullptr && !_boards.empty() && _activeBoardIndex >= 0 &&
+            _activeBoardIndex < (int)_boards.size()) {
+            visible = _boards[_activeBoardIndex];
         }
     }
 
-    // --- Render ---
+    // --- Guard: nothing to render ---
+    if (visible == nullptr) {
+        return;
+    }
+
+    // --- 5. Tick + render the visible board ---
+#ifndef NATIVE_BUILD
+    visible->tick(millis());
+#else
+    visible->tick(0);
+#endif
+
     _renderCurrentBoard();
 }
 
@@ -308,12 +329,16 @@ bool U8g2DisplayModule::addBoard(IDisplayBoard* board) {
 }
 
 /**
- * @brief Force-show a specific board, bypassing the carousel timer.
+ * @brief Force-show a specific pool board, bypassing the carousel timer.
+ *
+ * Searches the pool for the board and updates the active index. Resets the
+ * rotation timer. This method is carousel-only — for system/modal boards,
+ * use pushModal() instead.
  *
  * Calls onDeactivate() on the previous board and onActivate() on the new one.
  * Publishes a "display.board.changed" event via EventBus.
  *
- * @param board Pointer to the board to display.
+ * @param board Pointer to a pool board to display.
  */
 void U8g2DisplayModule::showBoard(IDisplayBoard* board) {
     // --- Notify the previous board that it is being deactivated ---
@@ -323,26 +348,15 @@ void U8g2DisplayModule::showBoard(IDisplayBoard* board) {
     }
 
     // --- Search for the board in the pool ---
-    int newIndex = -1;
     for (int i = 0; i < (int)_boards.size(); i++) {
         if (_boards[i] == board) {
             // Found in pool — set as active and reset rotation timer
             _activeBoardIndex = i;
-            _overrideBoard = nullptr;
-            newIndex = i;
 #ifndef NATIVE_BUILD
             _lastRotationMs = millis();
 #endif
             break;
         }
-    }
-
-    if (newIndex < 0) {
-        // --- Board not in pool (system board override) ---
-        // Render it directly without affecting the carousel index
-        ESP_LOGD(TAG, "Override board set (not in pool)");
-        _activeBoardIndex = -1;
-        _overrideBoard = board;
     }
 
     // --- Notify the new board that it is now active ---
@@ -355,12 +369,50 @@ void U8g2DisplayModule::showBoard(IDisplayBoard* board) {
     if (_app != nullptr && board != nullptr) {
         DisplayBoardChangedPayload payload;
         payload.boardName = board->getBoardName();
-        payload.boardIndex = newIndex;
+        payload.boardIndex = _activeBoardIndex;
         _app->getEventBus().publish("display.board.changed", &payload);
     }
 #endif
 
     resetActivity();
+}
+
+/**
+ * @brief Push a modal overlay board onto the display.
+ *
+ * Deactivates any existing modal, activates the new one, resets the
+ * inactivity timer and dim state. The modal auto-clears when isExpired()
+ * returns true (checked in tick()).
+ *
+ * @param board Pointer to the modal board to display.
+ */
+void U8g2DisplayModule::pushModal(IDisplayBoard* board) {
+    if (_modal != nullptr && _modal != board) {
+        _modal->onDeactivate();
+    }
+    _modal = board;
+    _modalDimmed = false;
+    if (board != nullptr) {
+        board->onActivate();
+    }
+    resetActivity();
+}
+
+/**
+ * @brief Manually clear the active modal overlay.
+ *
+ * Deactivates the current modal, restores brightness to the configured
+ * level, and returns rendering to the phase-determined base layer.
+ */
+void U8g2DisplayModule::clearModal() {
+    if (_modal != nullptr) {
+        _modal->onDeactivate();
+        _modal = nullptr;
+        _modalDimmed = false;
+#ifndef NATIVE_BUILD
+        _u8g2.setContrast(_brightness);
+#endif
+    }
 }
 
 /**
@@ -370,6 +422,7 @@ void U8g2DisplayModule::resetActivity() {
 #ifndef NATIVE_BUILD
     _lastActivityMs = millis();
 #endif
+    _modalDimmed = false;
     if (_sleeping) {
         _wake();
     }
@@ -388,9 +441,9 @@ int U8g2DisplayModule::getBoardCount() const {
  * @return Pointer to the active board.
  */
 IDisplayBoard* U8g2DisplayModule::getActiveBoard() const {
-    // If an override board is active, return it
-    if (_activeBoardIndex < 0 && _overrideBoard != nullptr) {
-        return _overrideBoard;
+    // Modal layer takes priority
+    if (_modal != nullptr) {
+        return _modal;
     }
 
     // Bounds check on the pool
@@ -472,7 +525,7 @@ ConfiguringStatusBoard& U8g2DisplayModule::getConfiguringStatus() {
  */
 void U8g2DisplayModule::reportStatus(const char* message, float progress) {
     if (getActiveBoard() != &_bootBoard) {
-        showBoard(&_bootBoard);
+        pushModal(&_bootBoard);
     }
 
     if (_bootstrapMode) {
@@ -519,7 +572,7 @@ void U8g2DisplayModule::reportError(const char* errorMessage) {
     _error.showError(errorMessage, true);
 
     // --- Force-show the error board ---
-    showBoard(&_error);
+    pushModal(&_error);
 
     // --- Immediate render in bootstrap mode (no tick loop yet) ---
     if (_bootstrapMode) {
@@ -783,7 +836,7 @@ void U8g2DisplayModule::registerRoutes(AsyncWebServer& server) {
             JsonObject entry = boardsArr.add<JsonObject>();
             entry["index"]    = i;
             entry["name"]     = _boards[i]->getBoardName();
-            entry["isActive"] = (i == _activeBoardIndex && _overrideBoard == nullptr);
+            entry["isActive"] = (i == _activeBoardIndex && _modal == nullptr);
             entry["isExpired"]= _boards[i]->isExpired();
         }
 
@@ -840,15 +893,15 @@ void U8g2DisplayModule::_onOtaProgress(const char* /*topic*/, const void* payloa
     const auto* ota = static_cast<const OtaProgressPayload*>(payload);
 
     if (ota->complete) {
-        // --- OTA cycle finished — mark board complete ---
+        // --- OTA cycle finished — mark board as complete ---
         self->_otaProgress.setComplete(ota->success);
     } else {
         // --- OTA in progress — update progress bar ---
         self->_otaProgress.setProgress(ota->progress, ota->status);
     }
 
-    // --- Show the OTA board ---
-    self->showBoard(&self->_otaProgress);
+    // --- Push OTA board as modal overlay ---
+    self->pushModal(&self->_otaProgress);
 }
 
 /**
@@ -873,10 +926,8 @@ void U8g2DisplayModule::_onDisplayMessage(const char* /*topic*/, const void* pay
     // --- Use the boot board as a temporary message overlay ---
     self->_bootBoard.setStatus(msg->message, -1.0f);
 
-    // --- Show the boot board ---
-    self->showBoard(&self->_bootBoard);
-
-    self->resetActivity();
+    // --- Push boot board as modal overlay ---
+    self->pushModal(&self->_bootBoard);
 }
 
 // =============================================================================
@@ -897,39 +948,38 @@ void U8g2DisplayModule::_onStateChanged(AppState newState) {
     if (newState == AppState::CONFIGURING) {
         _configuringStatusBoard.setGates(&_app->getConfigGates());
 
-        // Find first actionable unsatisfied gate and route to helper board
+        // Check if WiFi gate needs a modal wizard
+        for (const auto* gate : _app->getConfigGates()) {
+            if (!gate->isSatisfied() && strcmp(gate->getGateName(), "WiFi Station") == 0) {
+                // WiFi gate unsatisfied — device is/will-be in AP mode.
+                // AP always broadcasts as hostname.
+                _wifiWizard.configure(_app->getConfig().hostname);
+                pushModal(&_wifiWizard);
+                ESP_LOGI(TAG, "State → CONFIGURING: WiFi wizard modal pushed");
+                return;
+            }
+        }
+
+        // Non-WiFi unsatisfied gates: set connection info on configuring board.
+        // The base layer (_getBaseBoard) auto-shows configuringStatusBoard.
         for (const auto* gate : _app->getConfigGates()) {
             if (!gate->isSatisfied()) {
-                if (strcmp(gate->getGateName(), "WiFi Station") == 0) {
-                    // WiFi gate unsatisfied — device is/will-be in AP mode.
-                    // AP always broadcasts as hostname.
-                    _wifiWizard.configure(_app->getConfig().hostname);
-                    showBoard(&_wifiWizard);
-                    ESP_LOGI(TAG, "State → CONFIGURING: showing WiFi wizard");
-                    return;
-                }
-                // Non-WiFi gate: show configuring status board with connection info
                 _configuringStatusBoard.setConnectionInfo(
                     _app->getWifiManager().getSSID(),
                     _app->getWifiManager().getMyUrl()
                 );
-                showBoard(&_configuringStatusBoard);
-                ESP_LOGI(TAG, "State → CONFIGURING: showing configuring status board");
-                return;
+                break;
             }
         }
-        // All gates satisfied but state is CONFIGURING (shouldn't happen normally)
-        showBoard(&_configuringStatusBoard);
+        // No modal needed — base layer (configuring status) shows automatically
+        ESP_LOGI(TAG, "State → CONFIGURING: base layer active");
 
     } else if (newState == AppState::RUNNING) {
+        // Clear any lingering modals, dismiss system boards
+        clearModal();
         _wifiWizard.dismiss();
         _configuringStatusBoard.dismiss();
-
-        if (getActiveBoard() == &_wifiWizard ||
-            getActiveBoard() == &_configuringStatusBoard) {
-            _advanceCarousel();
-        }
-        ESP_LOGI(TAG, "State → RUNNING: resuming carousel");
+        ESP_LOGI(TAG, "State → RUNNING: base auto-switches to carousel");
     }
 #endif
 }
@@ -1001,12 +1051,15 @@ void U8g2DisplayModule::_renderCurrentBoard() {
     // --- Determine which board to render ---
     IDisplayBoard* boardToRender = nullptr;
 
-    if (_activeBoardIndex < 0 && _overrideBoard != nullptr) {
-        // System board override — render the override board directly
-        boardToRender = _overrideBoard;
+    if (_modal != nullptr) {
+        // Modal layer takes priority
+        boardToRender = _modal;
     } else if (_activeBoardIndex >= 0 && _activeBoardIndex < (int)_boards.size()) {
-        // Normal pool board
+        // Normal pool board (carousel base layer for RUNNING)
         boardToRender = _boards[_activeBoardIndex];
+    } else {
+        // Base layer for non-RUNNING phases
+        boardToRender = _getBaseBoard();
     }
 
     if (boardToRender == nullptr) {
@@ -1033,6 +1086,51 @@ void U8g2DisplayModule::_checkSleep() {
     unsigned long elapsed = millis() - _lastActivityMs;
     if (elapsed >= _sleepTimeoutMs) {
         _sleep();
+    }
+#endif
+}
+
+/**
+ * @brief Derive the base-layer board from the current Application state.
+ * @return Phase-appropriate base board, or nullptr.
+ */
+IDisplayBoard* U8g2DisplayModule::_getBaseBoard() {
+#ifndef NATIVE_BUILD
+    if (_app == nullptr) return nullptr;
+    switch (_app->getState()) {
+        case AppState::BOOT:
+            return &_bootBoard;
+        case AppState::CONFIGURING:
+            return &_configuringStatusBoard;
+        case AppState::RUNNING: {
+            // Return the current carousel pool board
+            if (_activeBoardIndex >= 0 && _activeBoardIndex < (int)_boards.size()) {
+                return _boards[_activeBoardIndex];
+            }
+            return nullptr;
+        }
+        default:
+            return nullptr;
+    }
+#else
+    return nullptr;
+#endif
+}
+
+/**
+ * @brief Check inactivity timer and dim display if timed out.
+ * Dims to minimum brightness (1) — never blanks. Used during
+ * CONFIGURING and when a modal is active.
+ */
+void U8g2DisplayModule::_checkDim() {
+#ifndef NATIVE_BUILD
+    if (_sleepTimeoutMs == 0) return;  // Dimming disabled
+
+    unsigned long elapsed = millis() - _lastActivityMs;
+    if (elapsed >= _sleepTimeoutMs && !_modalDimmed) {
+        _u8g2.setContrast(1);  // Minimum non-zero brightness
+        _modalDimmed = true;
+        ESP_LOGI(TAG, "Display dimmed (inactivity during configuring/modal)");
     }
 #endif
 }

@@ -364,36 +364,32 @@ void McpServer::_sendError(int code, const char* message, JsonVariantConst id, P
 void McpServer::registerRoutes(AsyncWebServer& server) {
 #ifndef NATIVE_BUILD
     server.on("/api/mcp", HTTP_POST,
-        [](AsyncWebServerRequest* request) {
-            // If the body was empty, the body handler isn't called.
-            // We should return an error if no body was provided.
+        [this](AsyncWebServerRequest* request) {
+            // Request handler fires AFTER body handler completes
             if (!request->_tempObject) {
                 request->send(400, "application/json", "{\"error\":\"Missing body\"}");
+                return;
             }
+            String* bodyStr = static_cast<String*>(request->_tempObject);
+            AsyncResponseStream* responseStream = request->beginResponseStream("application/json");
+            this->processRequest(bodyStr->c_str(), *responseStream);
+            request->send(responseStream);
+            delete bodyStr;
+            request->_tempObject = nullptr;
         },
         nullptr,
-        [this](AsyncWebServerRequest* request, uint8_t* data, size_t len, size_t index, size_t total) {
+        [](AsyncWebServerRequest* request, uint8_t* data, size_t len, size_t index, size_t total) {
+            // Body handler: just accumulate, don't send response
             if (index == 0) {
                 request->_tempObject = new String();
             }
-            
             String* bodyStr = static_cast<String*>(request->_tempObject);
             for (size_t i = 0; i < len; i++) {
                 *bodyStr += (char)data[i];
             }
-
-            if (index + len == total) {
-                AsyncResponseStream* responseStream = request->beginResponseStream("application/json");
-                this->processRequest(bodyStr->c_str(), *responseStream);
-                request->send(responseStream);
-                
-                delete bodyStr;
-                request->_tempObject = nullptr;
-            }
         }
     );
 #else
-    // Mock for NATIVE_BUILD tests
     server.on("/api/mcp", HTTP_POST, [](AsyncWebServerRequest* request) {});
 #endif
 }
