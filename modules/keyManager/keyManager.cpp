@@ -57,6 +57,10 @@ bool KeyManager::loadRegistry(JsonDocument& doc) const {
 
 bool KeyManager::saveRegistry(const JsonDocument& doc) const {
 #ifndef NATIVE_BUILD
+    // Ensure parent directory exists (fresh filesystem won't have /etc/)
+    if (!LittleFS.exists("/etc")) {
+        LittleFS.mkdir("/etc");
+    }
     File file = LittleFS.open(KEY_MANAGER_PATH, "w");
     if (!file) {
         ESP_LOGE(TAG, "Failed to open registry for writing.");

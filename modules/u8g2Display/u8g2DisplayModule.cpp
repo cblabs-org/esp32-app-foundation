@@ -252,6 +252,24 @@ void U8g2DisplayModule::tick() {
         clearModal();
     }
 
+    // --- 2b. Re-evaluate modal relevance during CONFIGURING ---
+    // If the WiFi wizard is the active modal but WiFi is now connected,
+    // clear it so the configuring status board (base layer) is visible.
+    // This ensures the user sees the status board before RUNNING.
+#ifndef NATIVE_BUILD
+    if (_modal == &_wifiWizard && _app != nullptr &&
+        _app->getState() == AppState::CONFIGURING) {
+        // Check if the WiFi gate is now satisfied
+        for (const auto* gate : _app->getConfigGates()) {
+            if (strcmp(gate->getGateName(), "WiFi Station") == 0 && gate->isSatisfied()) {
+                ESP_LOGI(TAG, "WiFi gate satisfied — clearing wizard modal");
+                clearModal();
+                break;
+            }
+        }
+    }
+#endif
+
     // --- 3. Phase-aware behaviour ---
 #ifndef NATIVE_BUILD
     if (_app != nullptr) {
@@ -975,11 +993,21 @@ void U8g2DisplayModule::_onStateChanged(AppState newState) {
         ESP_LOGI(TAG, "State → CONFIGURING: base layer active");
 
     } else if (newState == AppState::RUNNING) {
-        // Clear any lingering modals, dismiss system boards
+        // --- Step 1: Clear any active modal (e.g. WiFi wizard) ---
         clearModal();
+
+        // --- Step 2: Flash the configuring status board showing all-green ---
+        // Force one render cycle so the user sees the completed state
+        // before the carousel takes over.
+        _configuringStatusBoard.setGates(&_app->getConfigGates());
+        _u8g2.clearBuffer();
+        _configuringStatusBoard.render(_u8g2);
+        _u8g2.sendBuffer();
+
+        // --- Step 3: Dismiss system boards and switch to carousel ---
         _wifiWizard.dismiss();
         _configuringStatusBoard.dismiss();
-        ESP_LOGI(TAG, "State → RUNNING: base auto-switches to carousel");
+        ESP_LOGI(TAG, "State → RUNNING: configuring complete, carousel starting");
     }
 #endif
 }
@@ -1104,7 +1132,11 @@ IDisplayBoard* U8g2DisplayModule::_getBaseBoard() {
             return &_configuringStatusBoard;
         case AppState::RUNNING: {
             // Return the current carousel pool board
-            if (_activeBoardIndex >= 0 && _activeBoardIndex < (int)_boards.size()) {
+            if (!_boards.empty()) {
+                // Reset index if it was left invalid (e.g. after modal clear)
+                if (_activeBoardIndex < 0 || _activeBoardIndex >= (int)_boards.size()) {
+                    _activeBoardIndex = 0;
+                }
                 return _boards[_activeBoardIndex];
             }
             return nullptr;
