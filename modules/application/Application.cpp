@@ -532,24 +532,45 @@ bool Application::_allGatesSatisfied() const {
 
 /**
  * @brief Publish an "app.configuring" EventBus event for the first
- *        unsatisfied gate.
+ *        **actionable** unsatisfied gate.
  *
- * Display modules subscribe to this event to show the appropriate
- * helper board (e.g., WiFi wizard when the WiFi gate is unsatisfied).
+ * A gate is actionable when it is unsatisfied AND all of its declared
+ * dependencies (getDependencies()) are satisfied. Gates whose dependencies
+ * are not yet met are silently skipped, ensuring the user sees only the
+ * gate they can act on next.
  */
 void Application::_publishConfiguringEvent(bool isRegression) {
     for (const auto* gate : _configGates) {
-        if (!gate->isSatisfied()) {
-            // Publish the gate info for display/UI modules to react
-            AppConfiguringPayload payload;
-            payload.gateName = gate->getGateName();
-            payload.helpText = gate->getHelpText();
-            payload.isRegression = isRegression;
-            _eventBus.publish("app.configuring", &payload);
+        if (gate->isSatisfied()) continue;
 
-            ESP_LOGI(TAG, "Config gate unsatisfied: %s%s", gate->getGateName(),
-                     isRegression ? " (regression)" : "");
-            return; // Only publish for the first unsatisfied gate
+        // Check if all dependencies are satisfied
+        uint8_t depCount = 0;
+        const char* const* deps = gate->getDependencies(depCount);
+        bool depsOk = true;
+        for (uint8_t d = 0; d < depCount; d++) {
+            // Find the dependency gate by name and check if satisfied
+            bool found = false;
+            for (const auto* other : _configGates) {
+                if (strcmp(other->getGateName(), deps[d]) == 0) {
+                    if (!other->isSatisfied()) depsOk = false;
+                    found = true;
+                    break;
+                }
+            }
+            if (!found || !depsOk) { depsOk = false; break; }
         }
+
+        if (!depsOk) continue; // Skip — deps not met
+
+        // This gate is actionable
+        AppConfiguringPayload payload;
+        payload.gateName = gate->getGateName();
+        payload.helpText = gate->getHelpText();
+        payload.isRegression = isRegression;
+        _eventBus.publish("app.configuring", &payload);
+        ESP_LOGI(TAG, "Config gate unsatisfied: %s%s", gate->getGateName(),
+                 isRegression ? " (regression)" : "");
+        return;
     }
 }
+

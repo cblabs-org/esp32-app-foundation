@@ -100,7 +100,6 @@ void ConfiguringStatusBoard::render(U8G2& u8g2) {
     if (_gates != nullptr && !_gates->empty()) {
         const int gateCount = static_cast<int>(_gates->size());
         int satisfiedCount = 0;
-        bool foundFirstUnsatisfied = false;
 
         // Use small font for gate rows
         u8g2.setFont(AppFonts::defaultSmall());
@@ -112,24 +111,71 @@ void ConfiguringStatusBoard::render(U8G2& u8g2) {
         const int textX = 16;           // X position of gate name text
         const int maxVisibleRows = (_displayHeight - rowStartY - 18) / rowHeight;
 
-        for (int i = 0; i < gateCount && i < maxVisibleRows; i++) {
+        // --- Classify gates into three buckets: satisfied, actionable, blocked ---
+        // We render them in this order: satisfied first, then actionable, then blocked.
+        struct GateEntry { const IConfigGate* gate; uint8_t category; /* 0=satisfied, 1=actionable, 2=blocked */ };
+        // Stack-allocate a small array (max 8 gates typical in embedded)
+        static constexpr int MAX_RENDER_GATES = 16;
+        GateEntry sorted[MAX_RENDER_GATES];
+        int sortedCount = 0;
+
+        for (int i = 0; i < gateCount && sortedCount < MAX_RENDER_GATES; i++) {
             const IConfigGate* gate = (*_gates)[i];
+            if (gate->isSatisfied()) {
+                sorted[sortedCount++] = {gate, 0}; // satisfied
+                satisfiedCount++;
+            } else {
+                // Check dependencies
+                uint8_t depCount = 0;
+                const char* const* deps = gate->getDependencies(depCount);
+                bool depsOk = true;
+                for (uint8_t d = 0; d < depCount; d++) {
+                    bool found = false;
+                    for (int j = 0; j < gateCount; j++) {
+                        if (strcmp((*_gates)[j]->getGateName(), deps[d]) == 0) {
+                            if (!(*_gates)[j]->isSatisfied()) depsOk = false;
+                            found = true;
+                            break;
+                        }
+                    }
+                    if (!found || !depsOk) { depsOk = false; break; }
+                }
+                sorted[sortedCount++] = {gate, static_cast<uint8_t>(depsOk ? 1 : 2)};
+            }
+        }
+
+        // Simple insertion sort by category (0 < 1 < 2)
+        for (int i = 1; i < sortedCount; i++) {
+            GateEntry key = sorted[i];
+            int j = i - 1;
+            while (j >= 0 && sorted[j].category > key.category) {
+                sorted[j + 1] = sorted[j];
+                j--;
+            }
+            sorted[j + 1] = key;
+        }
+
+        // Render sorted gate rows
+        bool foundFirstActionable = false;
+        for (int i = 0; i < sortedCount && i < maxVisibleRows; i++) {
+            const IConfigGate* gate = sorted[i].gate;
+            uint8_t category = sorted[i].category;
             int rowY = rowStartY + (i * rowHeight);
 
-            // Determine status icon
-            char icon;
-            if (gate->isSatisfied()) {
-                satisfiedCount++;
-                icon = '*';  // Checkmark stand-in (U8G2 glyph)
-                // Draw a small checkmark using line primitives
+            if (category == 0) {
+                // Satisfied: checkmark
                 u8g2.drawLine(iconX, rowY + 5, iconX + 2, rowY + 7);
                 u8g2.drawLine(iconX + 2, rowY + 7, iconX + 6, rowY + 3);
-            } else if (!foundFirstUnsatisfied) {
-                foundFirstUnsatisfied = true;
-                icon = '>';  // Spinner stand-in — draw a small arrow
+            } else if (category == 1 && !foundFirstActionable) {
+                // First actionable: arrow/spinner
+                foundFirstActionable = true;
                 u8g2.drawTriangle(iconX, rowY + 2, iconX, rowY + 8, iconX + 5, rowY + 5);
+            } else if (category == 1) {
+                // Subsequent actionable: spinning icon (circle with dot)
+                u8g2.drawCircle(iconX + 3, rowY + 5, 3, U8G2_DRAW_ALL);
+                u8g2.drawDisc(iconX + 3, rowY + 3, 1, U8G2_DRAW_ALL);
             } else {
-                icon = 'o';  // Empty circle
+                // Blocked: empty circle
                 u8g2.drawCircle(iconX + 3, rowY + 5, 3, U8G2_DRAW_ALL);
             }
 
@@ -137,10 +183,10 @@ void ConfiguringStatusBoard::render(U8G2& u8g2) {
             u8g2.drawStr(textX, rowY, gate->getGateName());
         }
 
-        // Count remaining satisfied gates (if more than visible)
-        for (int i = maxVisibleRows; i < gateCount; i++) {
-            if ((*_gates)[i]->isSatisfied()) {
-                satisfiedCount++;
+        // Count remaining satisfied gates beyond visible rows
+        for (int i = maxVisibleRows; i < sortedCount; i++) {
+            if (sorted[i].category == 0) {
+                // Already counted above
             }
         }
 

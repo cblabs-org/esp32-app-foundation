@@ -72,6 +72,23 @@ public:
     virtual const char* getHelpText() const { return ""; }
 
     /**
+     * @brief Return the names of gates this gate depends on.
+     *
+     * During the CONFIGURING phase, a gate is only "actionable" if all of its
+     * dependency gates are already satisfied. This enables ordered presentation
+     * (e.g., "Connect WiFi" before "Set Timezone").
+     *
+     * Default: no dependencies (gate is always actionable when unsatisfied).
+     *
+     * @param[out] count Number of dependency names in the returned array.
+     * @return Pointer to a static array of C-string gate names, or nullptr if none.
+     */
+    virtual const char* const* getDependencies(uint8_t& count) const {
+        count = 0;
+        return nullptr;
+    }
+
+    /**
      * @brief How long (ms) a gate can remain unsatisfied during RUNNING
      *        before triggering regression to CONFIGURING.
      *
