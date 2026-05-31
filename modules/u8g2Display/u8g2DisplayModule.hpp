@@ -16,8 +16,10 @@
  *              Owns all system board instances and activates the splash on begin().
  *
  *              Implements IStatusReporter by delegating to BootBoard and
- *              ErrorBoard. Subscribes to EventBus topics "ota.progress" and
- *              "display.message" for runtime event integration. Publishes
+ *              ErrorBoard. Polls Application state in tick() for lifecycle
+ *              transitions (CONFIGURING ↔ RUNNING), eliminating EventBus
+ *              race conditions. Subscribes to EventBus topics "ota.progress"
+ *              and "display.message" for async runtime events. Publishes
  *              "display.sleep", "display.wake", and "display.board.changed"
  *              events via EventBus. Implements iConfigurable via ConfigManager
  *              gateway for persistent display settings (namespace: "display",
@@ -75,7 +77,7 @@
 #include "boards/errorBoard.hpp"
 #include "boards/screensaverBoard.hpp"
 #include "boards/configuringStatusBoard.hpp"
-#include "events/AppConfiguringPayload.hpp"
+#include "AppState.hpp"
 
 // --- Hardware-only includes (excluded from native GoogleTest builds) ---
 #ifndef NATIVE_BUILD
@@ -465,21 +467,20 @@ private:
      */
     static void _onDisplayMessage(const char* topic, const void* payload, void* ctx);
 
-    /**
-     * @brief Static callback for "app.configuring" EventBus topic.
-     * @param topic The topic string ("app.configuring").
-     * @param payload Pointer to an AppConfiguringPayload struct.
-     * @param ctx Context pointer (this U8g2DisplayModule instance).
-     */
-    static void _onAppConfiguring(const char* topic, const void* payload, void* ctx);
+    // -------------------------------------------------------------------------
+    // Private state-polling lifecycle handler
+    // -------------------------------------------------------------------------
 
     /**
-     * @brief Static callback for "app.running" EventBus topic.
-     * @param topic The topic string ("app.running").
-     * @param payload Unused (nullptr).
-     * @param ctx Context pointer (this U8g2DisplayModule instance).
+     * @brief React to an Application state transition detected by tick().
+     *
+     * Single code path for all lifecycle transitions — replaces both the
+     * EventBus callbacks (_onAppConfiguring, _onAppRunning) and the
+     * late catch-up block in begin().
+     *
+     * @param newState The newly detected Application state.
      */
-    static void _onAppRunning(const char* topic, const void* payload, void* ctx);
+    void _onStateChanged(AppState newState);
 
     // -------------------------------------------------------------------------
     // Member variables
@@ -514,6 +515,7 @@ private:
 #endif
 
     Application* _app = nullptr;                   ///< Cached reference to Application hub (for EventBus access)
+    AppState _lastKnownState = AppState::BOOT;     ///< Cached state for change detection in tick()
 
     // --- Board slot pool ---
     std::vector<IDisplayBoard*> _boards;           ///< Carousel board pool — populated before begin()

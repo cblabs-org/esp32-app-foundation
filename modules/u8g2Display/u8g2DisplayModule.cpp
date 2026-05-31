@@ -42,6 +42,7 @@
  * - U8g2DisplayModule::setRotationInterval(): Runtime carousel interval adjustment
  * - U8g2DisplayModule::_onOtaProgress():     Static EventBus callback for OTA events
  * - U8g2DisplayModule::_onDisplayMessage():  Static EventBus callback for display messages
+ * - U8g2DisplayModule::_onStateChanged():    State-polling lifecycle handler (replaces EventBus callbacks)
  */
 
 #include "u8g2DisplayModule.hpp"
@@ -181,11 +182,9 @@ void U8g2DisplayModule::begin(Application& app) {
     // --- Step 2: Subscribe to EventBus topics ---
     // Guarded: getEventBus() requires Application.hpp (unavailable in native)
 #ifndef NATIVE_BUILD
-    ESP_LOGI(TAG, "Subscribing to EventBus topics: ota.progress, display.message, app.configuring, app.running");
+    ESP_LOGI(TAG, "Subscribing to EventBus topics: ota.progress, display.message");
     _app->getEventBus().subscribe("ota.progress", _onOtaProgress, this);
     _app->getEventBus().subscribe("display.message", _onDisplayMessage, this);
-    _app->getEventBus().subscribe("app.configuring", _onAppConfiguring, this);
-    _app->getEventBus().subscribe("app.running", _onAppRunning, this);
 #endif
 
     // --- Step 3: Lock the board pool ---
@@ -211,33 +210,6 @@ void U8g2DisplayModule::begin(Application& app) {
     _lastRotationMs = millis();
 #endif
 
-    // --- Step 7: Late-subscriber catch-up for CONFIGURING state ---
-    // app.begin() may have entered CONFIGURING before we subscribed to
-    // "app.configuring". Check the current state and show the appropriate
-    // system board if the app is already waiting for configuration.
-#ifndef NATIVE_BUILD
-    if (_app->getState() == AppState::CONFIGURING) {
-        _configuringStatusBoard.setGates(&_app->getConfigGates());
-
-        // Find the first unsatisfied gate and route to the appropriate board
-        for (const auto* gate : _app->getConfigGates()) {
-            if (!gate->isSatisfied()) {
-                if (strcmp(gate->getGateName(), "WiFi Station") == 0) {
-                    const char* ssid = _app->getWifiManager().getSSID();
-                    const char* apName = (ssid && ssid[0] != '\0') ? ssid : _app->getConfig().hostname;
-                    _wifiWizard.configure(apName);
-                    showBoard(&_wifiWizard);
-                    ESP_LOGI(TAG, "App already in CONFIGURING — showing WiFi wizard (late catch-up)");
-                } else {
-                    showBoard(&_configuringStatusBoard);
-                    ESP_LOGI(TAG, "App already in CONFIGURING — showing configuring status board (late catch-up)");
-                }
-                break;
-            }
-        }
-    }
-#endif
-
     ESP_LOGI(TAG, "Display module fully initialized — tick-driven rendering active");
 }
 
@@ -256,6 +228,19 @@ void U8g2DisplayModule::tick() {
 
     // --- Check inactivity timer ---
     _checkSleep();
+
+    // --- State-driven lifecycle polling ---
+    // Single code path for all transitions (boot, configure, regression).
+    // Replaces EventBus subscriptions for app.configuring / app.running.
+#ifndef NATIVE_BUILD
+    if (_app != nullptr) {
+        AppState currentState = _app->getState();
+        if (currentState != _lastKnownState) {
+            _onStateChanged(currentState);
+            _lastKnownState = currentState;
+        }
+    }
+#endif
 
     // --- Guard: no boards to render ---
     if (_boards.empty() && _overrideBoard == nullptr) {
@@ -889,86 +874,61 @@ void U8g2DisplayModule::_onDisplayMessage(const char* /*topic*/, const void* pay
     self->resetActivity();
 }
 
+// =============================================================================
+// State-polling lifecycle handler
+// =============================================================================
+
 /**
- * @brief Static callback for "app.configuring" EventBus events.
+ * @brief React to an Application state transition detected by tick().
  *
- * Fired when the Application enters CONFIGURING state because a config
- * gate is unsatisfied. Routes the gate name to the appropriate system
- * board (e.g., WiFi wizard when the WiFi gate is unsatisfied).
+ * Single code path for all lifecycle transitions — replaces both the
+ * EventBus callbacks (_onAppConfiguring, _onAppRunning) and the late
+ * catch-up block that was previously in begin().
  *
- * @param topic   Topic string ("app.configuring").
- * @param payload Pointer to AppConfiguringPayload.
- * @param ctx     The U8g2DisplayModule instance (passed during subscribe).
+ * @param newState The newly detected Application state.
  */
-void U8g2DisplayModule::_onAppConfiguring(const char* /*topic*/, const void* payload, void* ctx) {
-    auto* self = static_cast<U8g2DisplayModule*>(ctx);
-    if (self == nullptr) return;
-
-    if (payload != nullptr) {
-        const auto* config = static_cast<const AppConfiguringPayload*>(payload);
-
-        // --- Always show the configuring status board as the base view ---
+void U8g2DisplayModule::_onStateChanged(AppState newState) {
 #ifndef NATIVE_BUILD
-        if (self->_app != nullptr) {
-            self->_configuringStatusBoard.setGates(&self->_app->getConfigGates());
-        }
-#endif
+    if (newState == AppState::CONFIGURING) {
+        _configuringStatusBoard.setGates(&_app->getConfigGates());
 
-        // Route to the appropriate helper board based on gate name
-        if (config->gateName != nullptr && strcmp(config->gateName, "WiFi Station") == 0) {
-            // --- WiFi gate unsatisfied: overlay the WiFi wizard ---
-#ifndef NATIVE_BUILD
-            if (self->_app != nullptr) {
-                const char* ssid = self->_app->getWifiManager().getSSID();
-                // Use hostname as AP name if no SSID stored
-                const char* apName = (ssid != nullptr && ssid[0] != '\0')
-                    ? ssid
-                    : self->_app->getConfig().hostname;
-                self->_wifiWizard.configure(apName);
-            } else
-#endif
-            {
-                self->_wifiWizard.configure("ESP32-Device");
+        // Find first actionable unsatisfied gate and route to helper board
+        for (const auto* gate : _app->getConfigGates()) {
+            if (!gate->isSatisfied()) {
+                if (strcmp(gate->getGateName(), "WiFi Station") == 0) {
+                    // WiFi gate: determine correct AP name
+                    const char* apName;
+                    if (_app->getWifiManager().getAPMode()) {
+                        apName = _app->getConfig().hostname;
+                    } else {
+                        const char* ssid = _app->getWifiManager().getSSID();
+                        apName = (ssid && ssid[0] != '\0') ? ssid : _app->getConfig().hostname;
+                    }
+                    _wifiWizard.configure(apName);
+                    showBoard(&_wifiWizard);
+                    ESP_LOGI(TAG, "State → CONFIGURING: showing WiFi wizard");
+                    return;
+                }
+                // Non-WiFi gate: show configuring status board
+                showBoard(&_configuringStatusBoard);
+                ESP_LOGI(TAG, "State → CONFIGURING: showing configuring status board");
+                return;
             }
-            self->showBoard(&self->_wifiWizard);
-            ESP_LOGI(TAG, "Showing WiFi wizard board (config gate: WiFi Station)");
-            return;
         }
+        // All gates satisfied but state is CONFIGURING (shouldn't happen normally)
+        showBoard(&_configuringStatusBoard);
+
+    } else if (newState == AppState::RUNNING) {
+        _wifiWizard.dismiss();
+        _configuringStatusBoard.dismiss();
+
+        if (getActiveBoard() == &_wifiWizard ||
+            getActiveBoard() == &_configuringStatusBoard) {
+            _advanceCarousel();
+        }
+        ESP_LOGI(TAG, "State → RUNNING: resuming carousel");
     }
-
-    // --- Non-WiFi gate or unknown gate: show the configuring status board ---
-    self->showBoard(&self->_configuringStatusBoard);
-    ESP_LOGI(TAG, "Showing configuring status board");
-}
-
-/**
- * @brief Static callback for "app.running" EventBus events.
- *
- * Fired when the Application transitions from CONFIGURING to RUNNING
- * because all config gates are now satisfied. Dismisses any active
- * system board (WiFi wizard, etc.) so the carousel can resume.
- *
- * @param topic   Topic string ("app.running").
- * @param payload Unused (nullptr).
- * @param ctx     The U8g2DisplayModule instance (passed during subscribe).
- */
-void U8g2DisplayModule::_onAppRunning(const char* /*topic*/, const void* /*payload*/, void* ctx) {
-    auto* self = static_cast<U8g2DisplayModule*>(ctx);
-    if (self == nullptr) return;
-
-    // Dismiss the WiFi wizard if it's currently showing
-    self->_wifiWizard.dismiss();
-
-    // Dismiss the configuring status board
-    self->_configuringStatusBoard.dismiss();
-
-    // If a system board was the active board, advance to next board
-    if (self->getActiveBoard() == &self->_wifiWizard ||
-        self->getActiveBoard() == &self->_configuringStatusBoard) {
-        self->_advanceCarousel();
-    }
-
-    ESP_LOGI(TAG, "App entered RUNNING — dismissing system boards");
+#endif
 }
 
 // =============================================================================
