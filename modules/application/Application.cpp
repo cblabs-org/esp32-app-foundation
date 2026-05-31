@@ -39,7 +39,14 @@
     #include <LittleFS.h>         // LittleFS.begin()
     #include "esp_system.h"       // esp_restart()
     #include "esp_heap_caps.h"    // heap_caps_get_free_size(), heap_caps_get_minimum_free_size()
+#else
+    #include <cstdlib>            // For native-build stubs
+    // millis() stub — returns 0 in native builds; sufficient for compilation
+    // and basic test execution. Regression logic won't trigger (always time=0).
+    static unsigned long millis() { return 0; }
 #endif
+
+#include <cstring>                // memset()
 
 #include "platform/LogShim.h"
 
@@ -76,8 +83,8 @@ bool Application::begin(const FrameworkConfig& config) {
     // milestone. Downstream apps register a display module before begin()
     // to show visual boot progress. Default NullStatusReporter is a no-op.
 
-    // --- Step 2: Enter BOOTING state ---
-    setState(AppState::BOOTING);
+    // --- Step 2: Enter BOOT state ---
+    setState(AppState::BOOT);
     _statusReporter->reportStatus("Initializing...", 0.0f);
 
     // --- Step 3: EventBus.begin() ---
@@ -131,8 +138,7 @@ bool Application::begin(const FrameworkConfig& config) {
     _configManager.beginAll();
     _statusReporter->reportStatus("Module configuration loaded", 0.35f);
 
-    // --- Step 9: Enter APP_SETUP state ---
-    setState(AppState::APP_SETUP);
+    // --- Step 9: (Removed — entire begin() runs under BOOT) ---
     _statusReporter->reportStatus("Connecting to WiFi...", 0.40f);
 
     // --- Step 10: WifiManager.begin() ---
@@ -212,6 +218,33 @@ bool Application::begin(const FrameworkConfig& config) {
 void Application::tick() {
     // Guard: do not tick during boot phases
     if (_state != AppState::CONFIGURING && _state != AppState::RUNNING) return;
+
+    // --- RUNNING: throttled gate regression check ---
+    if (_state == AppState::RUNNING) {
+        unsigned long now = millis();
+        if ((now - _lastGateCheckMs) >= GATE_CHECK_INTERVAL_MS) {
+            _lastGateCheckMs = now;
+            for (uint8_t i = 0; i < _configGates.size(); i++) {
+                if (!_configGates[i]->isSatisfied()) {
+                    uint32_t tolerance = _configGates[i]->getRegressionToleranceMs();
+                    if (tolerance == UINT32_MAX) continue; // App handles recovery
+
+                    if (_gateFailedSinceMs[i] == 0) {
+                        _gateFailedSinceMs[i] = now; // Start timer
+                    } else if ((now - _gateFailedSinceMs[i]) >= tolerance) {
+                        ESP_LOGW(TAG, "Gate '%s' unsatisfied for %lums — regressing to CONFIGURING",
+                                 _configGates[i]->getGateName(), (now - _gateFailedSinceMs[i]));
+                        setState(AppState::CONFIGURING);
+                        _publishConfiguringEvent(true); // isRegression = true
+                        memset(_gateFailedSinceMs, 0, sizeof(_gateFailedSinceMs));
+                        break;
+                    }
+                } else {
+                    _gateFailedSinceMs[i] = 0; // Gate re-satisfied, reset timer
+                }
+            }
+        }
+    }
 
     // --- CONFIGURING: poll config gates for transition ---
     if (_state == AppState::CONFIGURING) {
@@ -423,8 +456,7 @@ void Application::setState(AppState state) {
     // Emit a human-readable state name for log correlation
     const char* name = "UNKNOWN";
     switch (state) {
-        case AppState::BOOTING:     name = "BOOTING";     break;
-        case AppState::APP_SETUP:   name = "APP_SETUP";   break;
+        case AppState::BOOT:        name = "BOOT";        break;
         case AppState::CONFIGURING: name = "CONFIGURING"; break;
         case AppState::RUNNING:     name = "RUNNING";     break;
     }
@@ -502,16 +534,18 @@ bool Application::_allGatesSatisfied() const {
  * Display modules subscribe to this event to show the appropriate
  * helper board (e.g., WiFi wizard when the WiFi gate is unsatisfied).
  */
-void Application::_publishConfiguringEvent() {
+void Application::_publishConfiguringEvent(bool isRegression) {
     for (const auto* gate : _configGates) {
         if (!gate->isSatisfied()) {
             // Publish the gate info for display/UI modules to react
             AppConfiguringPayload payload;
             payload.gateName = gate->getGateName();
             payload.helpText = gate->getHelpText();
+            payload.isRegression = isRegression;
             _eventBus.publish("app.configuring", &payload);
 
-            ESP_LOGI(TAG, "Config gate unsatisfied: %s", gate->getGateName());
+            ESP_LOGI(TAG, "Config gate unsatisfied: %s%s", gate->getGateName(),
+                     isRegression ? " (regression)" : "");
             return; // Only publish for the first unsatisfied gate
         }
     }

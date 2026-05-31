@@ -70,4 +70,15 @@ public:
      *         Default implementation returns an empty string.
      */
     virtual const char* getHelpText() const { return ""; }
+
+    /**
+     * @brief How long (ms) a gate can remain unsatisfied during RUNNING
+     *        before triggering regression to CONFIGURING.
+     *
+     * Return 0 for immediate regression.
+     * Return UINT32_MAX to never regress (app handles recovery internally).
+     *
+     * @return Tolerance threshold in milliseconds. Default: 30000 (30s).
+     */
+    virtual uint32_t getRegressionToleranceMs() const { return 30000; } // 30s default
 };

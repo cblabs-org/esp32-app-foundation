@@ -9,7 +9,7 @@
  * Module: modules/application/Application.hpp
  * Description: Composition root for the ESP32 App Foundation framework.
  *              Owns the module registry (two-tier vector model), the
- *              BOOTING → APP_SETUP → CONFIGURING → RUNNING lifecycle, the
+ *              BOOT → CONFIGURING ↔ RUNNING lifecycle, the
  *              main-loop tick dispatch, and the soft-reset escape hatch.
  *              A single static instance is created by main.cpp (WO4); the
  *              class is NOT a singleton — there is no getInstance().
@@ -105,14 +105,14 @@ public:
      *
      * Ordered steps:
      *   1. Log boot banner with APP_FOUNDATION_VERSION
-     *   2. Set state to BOOTING
+     *   2. Set state to BOOT
      *   3. EventBus.begin() — first service, zero deps, enables boot-time events
      *   4. Mount LittleFS (hardware only; stubbed in NATIVE_BUILD)
      *   5. Store FrameworkConfig fields internally
      *   6. DeviceCrypto.begin() + KeyManager.begin()
      *   7. ConfigManager — register framework iConfigurable modules (WifiManager)
      *   8. ConfigManager.beginAll() — loads persisted config for ALL registered modules
-     *   9. Set state to APP_SETUP
+     *   9. (Removed — entire begin() runs under BOOT)
      *  10. WifiManager.begin() — now has persisted SSID/hostname from step 8
      *  11. TimeManager.begin() — after WiFi, needs network for NTP
      *  12. DataManager.begin() — background data workers
@@ -317,8 +317,9 @@ private:
     /**
      * @brief Publish an "app.configuring" EventBus event for the first
      *        unsatisfied gate, allowing display modules to react.
+     * @param isRegression true if this CONFIGURING entry is a regression from RUNNING.
      */
-    void _publishConfiguringEvent();
+    void _publishConfiguringEvent(bool isRegression = false);
 
     /**
      * @brief Log the current free-heap and minimum free-heap figures.
@@ -331,7 +332,7 @@ private:
     // Member variables
     // -------------------------------------------------------------------------
 
-    AppState       _state   = AppState::BOOTING; ///< Current lifecycle phase
+    AppState       _state   = AppState::BOOT;    ///< Current lifecycle phase
     bool           _locked  = false;             ///< True once _compactAndLock() has been called
     FrameworkConfig _config;                     ///< Cached framework configuration
 
@@ -341,6 +342,12 @@ private:
     std::vector<IMcpContributor*>  _mcpContributors; ///< Modules that contribute MCP tools
     std::vector<iDataSource*>      _dataSources;     ///< Background data-fetch workers
     std::vector<IConfigGate*>       _configGates;     ///< Configuration prerequisite gates
+
+    // Regression gate-check members
+    static constexpr uint32_t GATE_CHECK_INTERVAL_MS = 5000; ///< Throttle interval for runtime gate checks
+    unsigned long _lastGateCheckMs = 0;                      ///< Timestamp of last gate regression check
+    static constexpr uint8_t MAX_CONFIG_GATES = 8;           ///< Maximum number of config gates
+    unsigned long _gateFailedSinceMs[MAX_CONFIG_GATES] = {0}; ///< Per-gate unsatisfied-since timestamps
 
     // Single-pointer registrations (no vector needed)
     

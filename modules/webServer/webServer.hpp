@@ -26,7 +26,10 @@
 #else
 #include <cstdint>
 // Mock AsyncWebServer for native testing
-class AsyncWebServerRequest {};
+class AsyncWebServerRequest {
+public:
+    void redirect(const char* url) {} // Stub for captive portal redirect
+};
 
 typedef void (*ArRequestHandlerFunction)(AsyncWebServerRequest *request);
 
@@ -54,6 +57,7 @@ public:
     void on(const char* uri, int method, ArRequestHandlerFunction handler) {
         routes.push_back({uri, method, handler});
     }
+    void onNotFound(ArRequestHandlerFunction handler) {} // Stub for captive portal
     static void setMaxBodySize(uint32_t size) {
         lastMaxBodySize = size;
     }

@@ -314,7 +314,7 @@ TEST_F(ApplicationLockTest, Tick_WhenNotRunning_DoesNotDispatch) {
     MockTickable tickable;
     app.registerTickable(&tickable);
 
-    // Do NOT call begin() — state remains BOOTING
+    // Do NOT call begin() — state remains BOOT
     app.tick();
 
     EXPECT_EQ(tickable.tickCount, 0);
@@ -346,11 +346,11 @@ protected:
 };
 
 /**
- * A freshly constructed Application must report BOOTING as its initial state.
+ * A freshly constructed Application must report BOOT as its initial state.
  * This is the safe default for any code that queries state before begin().
  */
-TEST_F(ApplicationStateTest, InitialState_IsBooting) {
-    EXPECT_EQ(app.getState(), AppState::BOOTING);
+TEST_F(ApplicationStateTest, InitialState_IsBoot) {
+    EXPECT_EQ(app.getState(), AppState::BOOT);
 }
 
 /**
