@@ -7,12 +7,13 @@
  * To view a copy of this license, visit https://creativecommons.org/licenses/by-nc-sa/4.0/
  *
  * Module: modules/u8g2Display/u8g2DisplayModule.hpp
- * Description: U8G2 monochrome display module with carousel engine and board
- *              slot pool. Manages a vector of IDisplayBoard* entries, rotating
- *              through them on a configurable interval. Provides sleep/wake
- *              power management, brightness control, and screen flip support.
- *              System boards (BootSplash, Loading, WiFiWizard, OtaProgress,
- *              Error, Screensaver, Configuring) can bypass the carousel via showBoard().
+ * Description: U8G2 monochrome display module with two-layer base+modal
+ *              architecture. The BASE layer is phase-determined and never
+ *              manually set: BOOT→bootBoard, CONFIGURING→configuringStatusBoard,
+ *              RUNNING→carousel pool rotation. The MODAL layer holds temporary
+ *              overlays (WiFi wizard, OTA progress, error) that auto-clear
+ *              when expired. Provides sleep/wake power management, phase-aware
+ *              brightness dimming, screen flip support, and carousel engine.
  *              Owns all system board instances and activates the splash on begin().
  *
  *              Implements IStatusReporter by delegating to BootBoard and
@@ -35,7 +36,9 @@
  *   - begin():              Phase 2 init — EventBus, config, pool lock (skips HW if bootstrapped)
  *   - tick():               Carousel rotation, sleep check, board tick, render
  *   - addBoard():           Pre-lock registration of boards into the carousel pool
- *   - showBoard():          Force-show a specific board (bypasses carousel timer)
+ *   - showBoard():          Force-show a specific pool board (bypasses carousel timer)
+ *   - pushModal():          Push a modal overlay board (auto-clears on expiry)
+ *   - clearModal():         Manually clear the active modal overlay
  *   - resetActivity():      Reset the inactivity timer (called on user interaction)
  *   - getBoardCount():      Return the number of registered boards in the pool
  *   - getActiveBoard():     Return the currently rendering board (or nullptr)
@@ -121,11 +124,11 @@ struct DisplayMessagePayload {
  * @brief EventBus payload for "display.board.changed" topic.
  *
  * Published by the display module when the active rendering board changes,
- * either via carousel rotation or explicit showBoard() call.
+ * either via carousel rotation, explicit showBoard(), or modal push/clear.
  */
 struct DisplayBoardChangedPayload {
     const char* boardName;  // Name of the newly active board
-    int boardIndex;         // Pool index, or -1 for override (system) boards
+    int boardIndex;         // Pool index, or -1 for modal/system boards
 };
 
 // ---------------------------------------------------------------------------
@@ -208,15 +211,36 @@ public:
     bool addBoard(IDisplayBoard* board);
 
     /**
-     * @brief Force-show a specific board, bypassing the carousel timer.
+     * @brief Force-show a specific pool board, bypassing the carousel timer.
      *
-     * If the board is found in the pool, the active index is updated and the
-     * rotation timer is reset. If the board is NOT in the pool (e.g. a system
-     * board), it is rendered directly via a special override index of -1.
+     * Searches the pool for the board and updates the active index. Resets the
+     * rotation timer. This method is carousel-only — for system/modal boards,
+     * use pushModal() instead.
      *
-     * @param board Pointer to the board to display.
+     * @param board Pointer to a pool board to display.
      */
     void showBoard(IDisplayBoard* board);
+
+    /**
+     * @brief Push a modal overlay board onto the display.
+     *
+     * The modal board is rendered on top of the base layer until it is
+     * manually cleared via clearModal() or auto-cleared when isExpired()
+     * returns true. Deactivates any existing modal, activates the new one,
+     * and resets the inactivity timer.
+     *
+     * @param board Pointer to the modal board to display.
+     */
+    void pushModal(IDisplayBoard* board);
+
+    /**
+     * @brief Manually clear the active modal overlay.
+     *
+     * Deactivates the current modal board, restores display brightness to
+     * the configured level, and returns rendering to the phase-determined
+     * base layer.
+     */
+    void clearModal();
 
     /**
      * @brief Reset the inactivity timer (called on user interaction events).
@@ -233,6 +257,10 @@ public:
 
     /**
      * @brief Return the board currently being rendered (or nullptr if empty).
+     *
+     * Returns the modal board if one is active, otherwise the current
+     * carousel pool board.
+     *
      * @return Pointer to the active IDisplayBoard, or nullptr.
      */
     IDisplayBoard* getActiveBoard() const;
@@ -430,6 +458,31 @@ private:
     void _renderCurrentBoard();
 
     /**
+     * @brief Derive the base-layer board from the current Application state.
+     *
+     * Returns the phase-appropriate board:
+     * - BOOT → _bootBoard
+     * - CONFIGURING → _configuringStatusBoard
+     * - RUNNING → current carousel pool board
+     *
+     * Guarded by NATIVE_BUILD — returns nullptr in native test builds
+     * because Application is forward-declared only.
+     *
+     * @return Phase-appropriate base board, or nullptr.
+     */
+    IDisplayBoard* _getBaseBoard();
+
+    /**
+     * @brief Check inactivity timer and dim display if timed out.
+     *
+     * Dims brightness to minimum (1) after _sleepTimeoutMs of inactivity.
+     * Does NOT blank or power-save the display. Used during CONFIGURING
+     * phase and when a modal is active (any phase). Tracks state with
+     * _modalDimmed to avoid repeated hardware calls.
+     */
+    void _checkDim();
+
+    /**
      * @brief Check the inactivity timer and enter sleep if timed out.
      *
      * Compares millis() against _lastActivityMs + _sleepTimeoutMs.
@@ -537,8 +590,9 @@ private:
     uint8_t _brightness = 255;                     ///< Display brightness / contrast level (0–255)
     bool _flipScreen = false;                      ///< True if the display is flipped 180 degrees
 
-    // --- System board override pointer ---
-    IDisplayBoard* _overrideBoard = nullptr;       ///< Non-pool board shown via showBoard() when not in pool
+    // --- Modal layer ---
+    IDisplayBoard* _modal = nullptr;               ///< Active modal board (auto-clears on expired)
+    bool           _modalDimmed = false;            ///< True when modal/configuring brightness has been dimmed
 
     // --- Bootstrap state ---
     bool  _bootstrapMode    = false;               ///< True between bootstrapHardware() and begin()

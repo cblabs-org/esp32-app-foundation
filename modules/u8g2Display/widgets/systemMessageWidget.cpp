@@ -93,7 +93,7 @@ void systemMessageWidget::render(U8G2& display) {
     blankArea(display, x, y, renderW, renderH);
 
     // --- Title line: large font, centred ---
-    drawText(display, title, x, y + 4, renderW, -1,
+    drawText(display, title, x, y, renderW, -1,
              TextAlign::CENTER, false, AppFonts::defaultLarge());
 
     // --- Detail lines: small font, stacked below title ---
