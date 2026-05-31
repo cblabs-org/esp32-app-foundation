@@ -441,8 +441,16 @@ void U8g2DisplayModule::resetActivity() {
     _lastActivityMs = millis();
 #endif
     _modalDimmed = false;
+    _sleepDiagLogged = false;
     if (_sleeping) {
         _wake();
+    }
+
+    // --- Dismiss screensaver if it's the active modal ---
+    if (_modal == &_screensaver) {
+        _screensaver.deactivate();
+        // Modal auto-clears on next tick via isExpired() check
+        ESP_LOGI(TAG, "Screensaver dismissed — activity detected");
     }
 }
 
@@ -1046,6 +1054,11 @@ void U8g2DisplayModule::_advanceCarousel() {
     // --- Step 3: Guard empty pool ---
     if (_boards.empty()) {
         _activeBoardIndex = 0;
+
+        // Clear stale modal if it's an expired system board
+        if (_modal != nullptr && _modal->isExpired()) {
+            _modal = nullptr;
+        }
         return;
     }
 
@@ -1112,6 +1125,14 @@ void U8g2DisplayModule::_checkSleep() {
     }
 
     unsigned long elapsed = millis() - _lastActivityMs;
+
+    // --- Diagnostic: one-shot log at 50% of timeout ---
+    if (!_sleepDiagLogged && elapsed >= (_sleepTimeoutMs / 2)) {
+        ESP_LOGW(TAG, "Sleep diagnostic: elapsed=%lu timeout=%lu (50%% reached)",
+                 elapsed, _sleepTimeoutMs);
+        _sleepDiagLogged = true;
+    }
+
     if (elapsed >= _sleepTimeoutMs) {
         _sleep();
     }
@@ -1168,32 +1189,27 @@ void U8g2DisplayModule::_checkDim() {
 }
 
 /**
- * @brief Enter sleep mode — power-save the display.
+ * @brief Enter sleep mode — activate the screensaver for burn-in prevention.
  *
- * CRITICAL: The order of operations prevents the race condition where
- * showBoard() → resetActivity() → _wake() would immediately undo sleep.
- * We set _sleeping=true FIRST, then power-save the OLED, then publish.
- * The screensaver is NOT shown here because the OLED is being powered off;
- * screensaver logic should be handled separately if a visible screensaver
- * phase is desired before full power-off.
+ * Instead of powering off the OLED, this pushes the screensaver as a modal
+ * overlay. The display stays awake (_sleeping is NOT set) so the tick loop
+ * continues running to tick/render the screensaver. The screensaver's
+ * isExpired() returns !_active, so while active it won't auto-clear.
+ * _checkSleep() won't fire again because _modal != nullptr routes tick()
+ * to the dim path rather than the RUNNING+no-modal sleep path.
+ *
+ * Dismissal: resetActivity() deactivates the screensaver, and the modal
+ * auto-clears on the next tick via the isExpired() check.
  */
 void U8g2DisplayModule::_sleep() {
-    ESP_LOGI(TAG, "Display entering sleep mode");
+    ESP_LOGI(TAG, "Display entering idle — activating screensaver");
 
-    // --- Step 1: Set sleeping flag FIRST to prevent re-entry ---
-    _sleeping = true;
-
-    // --- Step 2: Power-save the OLED hardware ---
-#ifndef NATIVE_BUILD
-    _u8g2.setPowerSave(1);
-#endif
-
-    // --- Step 3: Publish sleep event ---
-#ifndef NATIVE_BUILD
-    if (_app != nullptr) {
-        _app->getEventBus().publish("display.sleep");
-    }
-#endif
+    // --- Activate screensaver as a modal overlay ---
+    // Do NOT set _sleeping = true — the tick loop must continue
+    // running to tick/render the screensaver modal.
+    // Do NOT call setPowerSave(1) — OLED stays on for the screensaver.
+    _screensaver.activate();
+    pushModal(&_screensaver);
 }
 
 /**

@@ -585,6 +585,7 @@ private:
     bool _sleeping = false;                        ///< True when the display is in power-save sleep
     unsigned long _lastActivityMs = 0;             ///< Timestamp of last user interaction
     unsigned long _sleepTimeoutMs = 300000;        ///< Inactivity timeout before sleep (5 minutes default)
+    bool _sleepDiagLogged = false;                 ///< One-shot flag for sleep timer diagnostic log
 
     // --- Display settings ---
     uint8_t _brightness = 255;                     ///< Display brightness / contrast level (0–255)
