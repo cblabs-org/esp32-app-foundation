@@ -1,0 +1,203 @@
+/*
+ * ESP32 App Foundation (c) 2026 CB Labs
+ *
+ * https://github.com/matthewmcneill/esp32-app-foundation
+ *
+ * This work is licensed under Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International.
+ * To view a copy of this license, visit https://creativecommons.org/licenses/by-nc-sa/4.0/
+ *
+ * Module: modules/u8g2Display/boards/configuringStatusBoard.cpp
+ * Description: Implementation of the ConfiguringStatusBoard. Renders a header,
+ *              dynamic gate rows with status icons, and a progress bar during
+ *              the CONFIGURING lifecycle phase.
+ *
+ * Exported Functions:
+ * - ConfiguringStatusBoard::ConfiguringStatusBoard(): Layout widgets for display
+ * - ConfiguringStatusBoard::setGates():      Bind gate list pointer
+ * - ConfiguringStatusBoard::dismiss():       Mark dismissed for expiry
+ * - ConfiguringStatusBoard::render():        Draw header, gate rows, progress bar
+ * - ConfiguringStatusBoard::isExpired():     Return dismissed state
+ * - ConfiguringStatusBoard::getBoardName():  Return "SYS: Configuring"
+ * - ConfiguringStatusBoard::getSatisfiedCount(): Return count of satisfied gates
+ * - ConfiguringStatusBoard::getTotalGateCount(): Return total bound gate count
+ */
+
+#include "configuringStatusBoard.hpp"
+#include <cstring>
+#include <cstdio>
+
+#ifndef NATIVE_BUILD
+#include <Arduino.h>
+#include <U8g2lib.h>
+#include "fonts/fonts.hpp"
+#endif
+
+// =============================================================================
+// Construction
+// =============================================================================
+
+/**
+ * @brief Construct the configuring status board, laying out widgets.
+ *
+ * Layout (256×64 example):
+ *   Row 0-13:  Header label "Configuring..." (bold, left-aligned)
+ *   Row 14-47: Gate rows (drawn directly — up to ~4 visible rows)
+ *   Row 48-63: Progress bar (bottom strip)
+ *
+ * @param displayWidth  Display width in pixels.
+ * @param displayHeight Display height in pixels.
+ */
+ConfiguringStatusBoard::ConfiguringStatusBoard(uint16_t displayWidth, uint16_t displayHeight)
+    : _displayWidth(displayWidth),
+      _displayHeight(displayHeight),
+      _headerLabel(4, 0, static_cast<int>(displayWidth) - 8, -1),
+      _progressBar(8, static_cast<int>(displayHeight) - 14,
+                   static_cast<int>(displayWidth) - 16, 10, nullptr)
+{
+    _headerLabel.setText("Configuring...");
+    _headerLabel.setAlignment(0); // LEFT
+}
+
+// =============================================================================
+// Public API
+// =============================================================================
+
+/**
+ * @brief Bind the gate list for rendering.
+ * @param gates Pointer to the Application's gate vector (non-owning).
+ */
+void ConfiguringStatusBoard::setGates(const std::vector<IConfigGate*>* gates) {
+    _gates = gates;
+}
+
+/**
+ * @brief Mark the board as dismissed, causing isExpired() to return true.
+ */
+void ConfiguringStatusBoard::dismiss() {
+    _dismissed = true;
+}
+
+/**
+ * @brief Render the configuring status screen to the U8G2 display buffer.
+ *
+ * Layout:
+ *   1. Header "Configuring..." at the top (bold font)
+ *   2. Gate rows: each gate gets a status icon + gate name
+ *      - ✓ (checkmark glyph) = isSatisfied() == true
+ *      - > (arrow/spinner) = first unsatisfied gate (in-progress)
+ *      - ○ (circle) = not yet reached / waiting
+ *   3. Progress bar at the bottom showing (satisfied / total) as percentage
+ *
+ * @param u8g2 Reference to the active U8G2 driver instance.
+ */
+void ConfiguringStatusBoard::render(U8G2& u8g2) {
+#ifndef NATIVE_BUILD
+    // --- 1. Draw header ---
+    _headerLabel.setFont(AppFonts::defaultLarge());
+    _headerLabel.render(u8g2);
+
+    // --- 2. Draw gate rows ---
+    if (_gates != nullptr && !_gates->empty()) {
+        const int gateCount = static_cast<int>(_gates->size());
+        int satisfiedCount = 0;
+        bool foundFirstUnsatisfied = false;
+
+        // Use small font for gate rows
+        u8g2.setFont(AppFonts::defaultSmall());
+
+        // Layout constants
+        const int rowStartY = 16;       // Y position of first gate row
+        const int rowHeight = 10;        // Pixels per row
+        const int iconX = 6;            // X position of status icon
+        const int textX = 16;           // X position of gate name text
+        const int maxVisibleRows = (_displayHeight - rowStartY - 18) / rowHeight;
+
+        for (int i = 0; i < gateCount && i < maxVisibleRows; i++) {
+            const IConfigGate* gate = (*_gates)[i];
+            int rowY = rowStartY + (i * rowHeight);
+
+            // Determine status icon
+            char icon;
+            if (gate->isSatisfied()) {
+                satisfiedCount++;
+                icon = '*';  // Checkmark stand-in (U8G2 glyph)
+                // Draw a small checkmark using line primitives
+                u8g2.drawLine(iconX, rowY + 5, iconX + 2, rowY + 7);
+                u8g2.drawLine(iconX + 2, rowY + 7, iconX + 6, rowY + 3);
+            } else if (!foundFirstUnsatisfied) {
+                foundFirstUnsatisfied = true;
+                icon = '>';  // Spinner stand-in — draw a small arrow
+                u8g2.drawTriangle(iconX, rowY + 2, iconX, rowY + 8, iconX + 5, rowY + 5);
+            } else {
+                icon = 'o';  // Empty circle
+                u8g2.drawCircle(iconX + 3, rowY + 5, 3, U8G2_DRAW_ALL);
+            }
+
+            // Draw gate name
+            u8g2.drawStr(textX, rowY, gate->getGateName());
+        }
+
+        // Count remaining satisfied gates (if more than visible)
+        for (int i = maxVisibleRows; i < gateCount; i++) {
+            if ((*_gates)[i]->isSatisfied()) {
+                satisfiedCount++;
+            }
+        }
+
+        // --- 3. Draw progress bar ---
+        int percent = (gateCount > 0)
+            ? static_cast<int>((static_cast<float>(satisfiedCount) / gateCount) * 100.0f)
+            : 0;
+        _progressBar.setPercent(percent, 0);
+        _progressBar.setShowPercentText(true);
+        _progressBar.setFont(AppFonts::defaultSmall());
+        _progressBar.render(u8g2);
+    } else {
+        // No gates bound — show a simple waiting message
+        u8g2.setFont(AppFonts::defaultSmall());
+        u8g2.drawStr(4, 28, "Waiting for configuration...");
+    }
+#else
+    (void)u8g2; // Suppress unused parameter warning in native builds
+#endif
+}
+
+/**
+ * @brief Query whether the board has been dismissed.
+ * @return true when dismiss() has been called.
+ */
+bool ConfiguringStatusBoard::isExpired() const {
+    return _dismissed;
+}
+
+/**
+ * @brief Return the human-readable board name.
+ * @return "SYS: Configuring"
+ */
+const char* ConfiguringStatusBoard::getBoardName() const {
+    return "SYS: Configuring";
+}
+
+/**
+ * @brief Return the count of satisfied gates.
+ * @return Number of gates where isSatisfied() == true, or 0 if no gates bound.
+ */
+int ConfiguringStatusBoard::getSatisfiedCount() const {
+    if (_gates == nullptr) return 0;
+    int count = 0;
+    for (const auto* gate : *_gates) {
+        if (gate->isSatisfied()) {
+            count++;
+        }
+    }
+    return count;
+}
+
+/**
+ * @brief Return the total number of bound gates.
+ * @return Total gate count, or 0 if no gates bound.
+ */
+int ConfiguringStatusBoard::getTotalGateCount() const {
+    if (_gates == nullptr) return 0;
+    return static_cast<int>(_gates->size());
+}

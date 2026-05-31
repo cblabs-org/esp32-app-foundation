@@ -12,7 +12,7 @@
  *              through them on a configurable interval. Provides sleep/wake
  *              power management, brightness control, and screen flip support.
  *              System boards (BootSplash, Loading, WiFiWizard, OtaProgress,
- *              Error, Screensaver) can bypass the carousel via showBoard().
+ *              Error, Screensaver, Configuring) can bypass the carousel via showBoard().
  *              Owns all system board instances and activates the splash on begin().
  *
  *              Implements IStatusReporter by delegating to BootBoard and
@@ -41,6 +41,7 @@
  *   - getWifiWizard():      Return reference to the owned WiFiWizardBoard instance
  *   - getOtaProgress():     Return reference to the owned OtaProgressBoard instance
  *   - getError():           Return reference to the owned ErrorBoard instance
+ *   - getConfiguringStatus(): Return reference to the owned ConfiguringStatusBoard instance
  *   - getScreensaver():     Return reference to the owned ScreensaverBoard instance
  *   - reportStatus():       Delegate to BootBoard and show it
  *   - reportError():        Delegate to ErrorBoard (fatal) and show it
@@ -73,6 +74,7 @@
 #include "boards/otaProgressBoard.hpp"
 #include "boards/errorBoard.hpp"
 #include "boards/screensaverBoard.hpp"
+#include "boards/configuringStatusBoard.hpp"
 #include "events/AppConfiguringPayload.hpp"
 
 // --- Hardware-only includes (excluded from native GoogleTest builds) ---
@@ -266,6 +268,12 @@ public:
      * @return Mutable reference to _screensaver.
      */
     ScreensaverBoard& getScreensaver();
+
+    /**
+     * @brief Return a reference to the owned ConfiguringStatusBoard instance.
+     * @return Mutable reference to _configuringStatusBoard.
+     */
+    ConfiguringStatusBoard& getConfiguringStatus();
 
     // -------------------------------------------------------------------------
     // IStatusReporter — delegates to BootBoard and ErrorBoard
@@ -540,4 +548,5 @@ private:
     OtaProgressBoard _otaProgress{_displayWidth, _displayHeight};  ///< OTA firmware update progress screen
     ErrorBoard       _error{_displayWidth, _displayHeight};        ///< Error message display screen
     ScreensaverBoard _screensaver{_displayWidth, _displayHeight};  ///< Inactivity screensaver (burn-in prevention)
+    ConfiguringStatusBoard _configuringStatusBoard{_displayWidth, _displayHeight}; ///< Gate progress during CONFIGURING phase
 };

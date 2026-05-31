@@ -289,6 +289,17 @@ public:
      */
     AppState getState() const;
 
+    /**
+     * @brief Return a const reference to the registered config gates vector.
+     *
+     * Used by the display module to bind ConfiguringStatusBoard to the
+     * gate list for rendering gate-by-gate progress during CONFIGURING.
+     *
+     * @return Const reference to the config gates vector.
+     */
+    const std::vector<IConfigGate*>& getConfigGates() const { return _configGates; }
+
+
 private:
     // -------------------------------------------------------------------------
     // Private lifecycle helpers

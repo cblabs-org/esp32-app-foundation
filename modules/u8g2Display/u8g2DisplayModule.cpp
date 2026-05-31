@@ -217,13 +217,16 @@ void U8g2DisplayModule::begin(Application& app) {
     // system board if the app is already waiting for configuration.
 #ifndef NATIVE_BUILD
     if (_app->getState() == AppState::CONFIGURING) {
+        // Bind gate list to the configuring status board
+        _configuringStatusBoard.setGates(&_app->getConfigGates());
+
         const char* ssid = _app->getWifiManager().getSSID();
         const char* apName = (ssid != nullptr && ssid[0] != '\0')
             ? ssid
             : _app->getConfig().hostname;
         _wifiWizard.configure(apName);
-        showBoard(&_wifiWizard);
-        ESP_LOGI(TAG, "App already in CONFIGURING — showing WiFi wizard (late catch-up)");
+        showBoard(&_configuringStatusBoard);
+        ESP_LOGI(TAG, "App already in CONFIGURING — showing configuring status board (late catch-up)");
     }
 #endif
 
@@ -442,6 +445,14 @@ ErrorBoard& U8g2DisplayModule::getError() {
  */
 ScreensaverBoard& U8g2DisplayModule::getScreensaver() {
     return _screensaver;
+}
+
+/**
+ * @brief Return a reference to the owned ConfiguringStatusBoard instance.
+ * @return Mutable reference to _configuringStatusBoard.
+ */
+ConfiguringStatusBoard& U8g2DisplayModule::getConfiguringStatus() {
+    return _configuringStatusBoard;
 }
 
 // =============================================================================
@@ -888,9 +899,16 @@ void U8g2DisplayModule::_onAppConfiguring(const char* /*topic*/, const void* pay
     if (payload != nullptr) {
         const auto* config = static_cast<const AppConfiguringPayload*>(payload);
 
-        // Route to the appropriate system board based on gate name
+        // --- Always show the configuring status board as the base view ---
+#ifndef NATIVE_BUILD
+        if (self->_app != nullptr) {
+            self->_configuringStatusBoard.setGates(&self->_app->getConfigGates());
+        }
+#endif
+
+        // Route to the appropriate helper board based on gate name
         if (config->gateName != nullptr && strcmp(config->gateName, "WiFi Station") == 0) {
-            // --- WiFi gate unsatisfied: show the WiFi wizard ---
+            // --- WiFi gate unsatisfied: overlay the WiFi wizard ---
 #ifndef NATIVE_BUILD
             if (self->_app != nullptr) {
                 const char* ssid = self->_app->getWifiManager().getSSID();
@@ -910,8 +928,9 @@ void U8g2DisplayModule::_onAppConfiguring(const char* /*topic*/, const void* pay
         }
     }
 
-    // --- Unknown or null gate: show a generic configuring message ---
-    ESP_LOGI(TAG, "App is CONFIGURING — no specific board for this gate");
+    // --- Non-WiFi gate or unknown gate: show the configuring status board ---
+    self->showBoard(&self->_configuringStatusBoard);
+    ESP_LOGI(TAG, "Showing configuring status board");
 }
 
 /**
@@ -932,8 +951,12 @@ void U8g2DisplayModule::_onAppRunning(const char* /*topic*/, const void* /*paylo
     // Dismiss the WiFi wizard if it's currently showing
     self->_wifiWizard.dismiss();
 
-    // If the WiFi wizard was the active board, advance to next board
-    if (self->getActiveBoard() == &self->_wifiWizard) {
+    // Dismiss the configuring status board
+    self->_configuringStatusBoard.dismiss();
+
+    // If a system board was the active board, advance to next board
+    if (self->getActiveBoard() == &self->_wifiWizard ||
+        self->getActiveBoard() == &self->_configuringStatusBoard) {
         self->_advanceCarousel();
     }
 
