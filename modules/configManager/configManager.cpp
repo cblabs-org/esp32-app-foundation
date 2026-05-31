@@ -326,19 +326,6 @@ bool ConfigManager::importAllConfig(JsonDocument& inDoc) {
     return allOk;
 }
 
-// =============================================================================
-// Reload Mechanism
-// =============================================================================
-
-/**
- * @brief Examines the pending reload flag and resets it if necessary.
- * @return true if a reload was pending and is now cleared, false otherwise.
- */
-bool ConfigManager::checkAndClearReload() {
-    bool wasPending = _reloadPending;
-    _reloadPending = false;
-    return wasPending;
-}
 
 // =============================================================================
 // IWebContributor — REST API Routes

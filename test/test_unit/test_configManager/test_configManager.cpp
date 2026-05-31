@@ -10,7 +10,7 @@
  * Description: GoogleTest unit-test suite for the ConfigManager centralised
  *              configuration gateway. Validates module registration, beginAll()
  *              dispatch, saveModuleConfig, exportAllConfig, importAllConfig,
- *              schema version migration, reload mechanism, and error handling.
+ *              schema version migration, and error handling.
  *
  *              All tests execute on the native GoogleTest runner (NATIVE_BUILD).
  *              Config files are written as "mod_<ns>.json" in the working directory.
@@ -381,18 +381,6 @@ TEST_F(ConfigManagerTest, ImportAllConfig_MissingNamespace_Skipped) {
     EXPECT_FALSE(mod.applyConfigCalled);
 }
 
-// =============================================================================
-// Test Group 6: Reload Mechanism
-// =============================================================================
-
-TEST_F(ConfigManagerTest, RequestReload_SetsAndClearsFlag) {
-    EXPECT_FALSE(configManager.checkAndClearReload());
-
-    configManager.requestReload();
-
-    EXPECT_TRUE(configManager.checkAndClearReload());
-    EXPECT_FALSE(configManager.checkAndClearReload()); // Should be cleared
-}
 
 // =============================================================================
 // Test Group 7: IWebContributor

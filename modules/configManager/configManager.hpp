@@ -23,8 +23,7 @@
  *   - saveModuleConfig():    Persist a single module's config to its namespace file
  *   - exportAllConfig():     Export all module configs into a master JSON document
  *   - importAllConfig():     Import configs from a master JSON document
- *   - requestReload():       Set the flag to indicate a configuration reload is requested
- *   - checkAndClearReload(): Return and clear the reload pending flag
+
  *   - registerRoutes():      Register REST API routes (IWebContributor)
  *   - getTabName():          Return the UI tab name ("Config")
  *   - getParentTab():        Return parent tab ("System")
@@ -114,20 +113,6 @@ public:
      */
     bool importAllConfig(JsonDocument& inDoc);
 
-    // -------------------------------------------------------------------------
-    // Reload Mechanism
-    // -------------------------------------------------------------------------
-
-    /**
-     * @brief Requests a pending reconfiguration by setting the internal flag to true.
-     */
-    void requestReload() { _reloadPending = true; }
-
-    /**
-     * @brief Examines the pending reload flag and resets it if necessary.
-     * @return true if a reload was pending and is now cleared, false otherwise.
-     */
-    bool checkAndClearReload();
 
     // -------------------------------------------------------------------------
     // IWebContributor Interface
@@ -191,5 +176,5 @@ private:
 
     iConfigurable* _modules[MAX_CONFIGURABLES] = {}; ///< Fixed-size registry of iConfigurable modules
     uint8_t _moduleCount = 0;                        ///< Number of registered modules
-    bool _reloadPending = false;                     ///< Flag to safely trigger reconfiguration defensively
+
 };
