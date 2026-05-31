@@ -117,6 +117,10 @@ void DataManager::processNext() {
     executeLoop();
 }
 
+void DataManager::setAppRunning(bool running) {
+    _appRunning.store(running);
+}
+
 void DataManager::workerTaskLoop(void* param) {
     DataManager* manager = static_cast<DataManager*>(param);
     while (true) {
@@ -128,6 +132,8 @@ void DataManager::workerTaskLoop(void* param) {
 }
 
 void DataManager::executeLoop() {
+    if (!_appRunning.load()) return;
+
     MutexLock lock(registryMutex);
     if (registry.empty()) return;
 

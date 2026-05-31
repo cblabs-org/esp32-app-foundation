@@ -197,6 +197,7 @@ bool Application::begin(const FrameworkConfig& config) {
     // --- Step 20: Check config gates → RUNNING or CONFIGURING ---
     if (_allGatesSatisfied()) {
         setState(AppState::RUNNING);
+        _dataManager.setAppRunning(true);
         ESP_LOGI(TAG, "Boot sequence complete — all gates satisfied, entering RUNNING state");
     } else {
         setState(AppState::CONFIGURING);
@@ -235,6 +236,7 @@ void Application::tick() {
                         ESP_LOGW(TAG, "Gate '%s' unsatisfied for %lums — regressing to CONFIGURING",
                                  _configGates[i]->getGateName(), (now - _gateFailedSinceMs[i]));
                         setState(AppState::CONFIGURING);
+                        _dataManager.setAppRunning(false);
                         _publishConfiguringEvent(true); // isRegression = true
                         memset(_gateFailedSinceMs, 0, sizeof(_gateFailedSinceMs));
                         break;
@@ -250,6 +252,7 @@ void Application::tick() {
     if (_state == AppState::CONFIGURING) {
         if (_allGatesSatisfied()) {
             setState(AppState::RUNNING);
+            _dataManager.setAppRunning(true);
             _eventBus.publish("app.running");
             ESP_LOGI(TAG, "All config gates satisfied — entering RUNNING state");
         }

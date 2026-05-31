@@ -40,6 +40,7 @@ protected:
 
     void SetUp() override {
         dm.setSimulatedTimeMs(1000); // Start at t=1000ms
+        dm.setAppRunning(true);      // Enable fetching for standard tests
     }
 };
 
@@ -190,6 +191,66 @@ TEST_F(DataManagerTest, RegisterAfterUnregister) {
 TEST_F(DataManagerTest, ProcessNext_WithNoSources_DoesNotCrash) {
     dm.processNext();
     SUCCEED();
+}
+
+// =============================================================================
+// Test Group: AppRunning Gating (WO2)
+// =============================================================================
+
+/**
+ * When _appRunning is false (default), processNext() must not fetch any source.
+ */
+TEST(DataManagerGatingTest, AppNotRunning_SkipsFetch) {
+    DataManager dm;
+    dm.setSimulatedTimeMs(1000);
+    // Do NOT call setAppRunning(true)
+
+    MockDataSource src("gated", 1000, PriorityTier::PRIORITY_HIGH);
+    dm.registerSource(&src);
+
+    dm.processNext();
+    EXPECT_EQ(src.fetchCount, 0);
+}
+
+/**
+ * After setAppRunning(true), fetches proceed normally.
+ */
+TEST(DataManagerGatingTest, AppRunning_AllowsFetch) {
+    DataManager dm;
+    dm.setSimulatedTimeMs(1000);
+    dm.setAppRunning(true);
+
+    MockDataSource src("gated", 1000, PriorityTier::PRIORITY_HIGH);
+    dm.registerSource(&src);
+
+    dm.processNext();
+    EXPECT_EQ(src.fetchCount, 1);
+}
+
+/**
+ * Toggling _appRunning back to false after fetches must prevent further fetches.
+ */
+TEST(DataManagerGatingTest, AppRunningToggle_StopsFetch) {
+    DataManager dm;
+    dm.setSimulatedTimeMs(1000);
+    dm.setAppRunning(true);
+
+    MockDataSource src("gated", 1000, PriorityTier::PRIORITY_HIGH);
+    dm.registerSource(&src);
+
+    dm.processNext();
+    EXPECT_EQ(src.fetchCount, 1);
+
+    // Disable and advance time
+    dm.setAppRunning(false);
+    dm.setSimulatedTimeMs(5000);
+    dm.processNext();
+    EXPECT_EQ(src.fetchCount, 1); // Still 1 — gated
+
+    // Re-enable
+    dm.setAppRunning(true);
+    dm.processNext();
+    EXPECT_EQ(src.fetchCount, 2);
 }
 
 #if defined(NATIVE_BUILD)

@@ -22,6 +22,7 @@
 
 #include <stdint.h>
 #include <vector>
+#include <atomic>
 #include "interfaces/iDataSource.hpp"
 
 #ifndef NATIVE_BUILD
@@ -70,6 +71,17 @@ public:
     void processNext();
 
     /**
+     * @brief Enable or disable data fetching.
+     *
+     * When false the worker task loop idles without fetching any sources.
+     * Application sets this to true on RUNNING entry and false on
+     * CONFIGURING regression.
+     *
+     * @param running true to allow fetches; false to gate them.
+     */
+    void setAppRunning(bool running);
+
+    /**
      * @brief Test helper to override current time in native builds
      * @param timeMs The simulated current time in milliseconds
      */
@@ -87,6 +99,7 @@ private:
     std::vector<SourceRecord> registry;
     SemaphoreHandle_t registryMutex;
     TaskHandle_t workerTask;
+    std::atomic<bool> _appRunning{false};
 #ifdef NATIVE_BUILD
     uint32_t simulatedTimeMs = 0;
 #endif
