@@ -68,8 +68,9 @@ public:
 };
 #endif
 
-// Forward declaration — avoids circular include with configManager.hpp
+// Forward declarations — avoids circular include with configManager.hpp / keyManager.hpp
 class ConfigManager;
+class KeyManager;
 
 
 /**
@@ -102,6 +103,7 @@ private:
     unsigned long lastApiRequestTime = 0;  ///< Last time an API request was received
 
     ConfigManager* _configManager = nullptr; ///< Pointer to ConfigManager for save operations
+    KeyManager* _keyManager = nullptr;       ///< Pointer to KeyManager for encrypted password storage
 
     std::unique_ptr<DNSServer> dnsServer;
 
@@ -135,8 +137,8 @@ public:
     /**
      * @brief Apply WiFi configuration from a parsed JSON section.
      *
-     * Reads "ssid" and "hostname" from the section. Password is NOT stored
-     * in config — it is managed by KeyManager.
+     * Reads "ssid" and "hostname" from the section. Password is retrieved
+     * from KeyManager (AES-256 encrypted) rather than from config files.
      *
      * @param section Read-only JSON object containing config keys.
      */
@@ -190,6 +192,12 @@ public:
      * @param cm Pointer to the ConfigManager instance.
      */
     void setConfigManager(ConfigManager* cm) { _configManager = cm; }
+
+    /**
+     * @brief Wire the KeyManager pointer for encrypted password storage.
+     * @param km Pointer to the KeyManager instance.
+     */
+    void setKeyManager(KeyManager* km) { _keyManager = km; }
 
     /**
      * @brief Record that an API request was received to keep AP mode alive.

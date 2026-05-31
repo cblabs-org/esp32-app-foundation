@@ -27,6 +27,7 @@
 
 #include "wifiManager.hpp"
 #include "../configManager/configManager.hpp"
+#include "../keyManager/keyManager.hpp"
 
 #ifndef NATIVE_BUILD
 #include <FS.h>
@@ -97,8 +98,8 @@ void WifiManager::transitionTo(WiFiState newState) {
  * @brief Apply WiFi configuration from a parsed JSON section.
  *
  * Reads "ssid" and "hostname" from the provided JSON object and copies
- * them into internal buffers. Password is NOT stored in config files —
- * it will be retrieved from KeyManager in a future PR.
+ * them into internal buffers. Password is retrieved from KeyManager
+ * (AES-256 encrypted) rather than from config files.
  *
  * @param section Read-only JSON object containing config keys.
  */
@@ -119,9 +120,16 @@ void WifiManager::applyConfig(const JsonObject& section) {
         }
     }
 
-    // TODO: P0 — retrieve password from KeyManager
-    // Password is NOT in config files. In a future PR, the password will be
-    // fetched from KeyManager (AES-256 encrypted) during applyConfig().
+    // --- Retrieve encrypted password from KeyManager ---
+    if (_keyManager != nullptr) {
+        std::string storedPass = _keyManager->getKeyById("wifi_password");
+        if (!storedPass.empty()) {
+            strlcpy(wifiPass, storedPass.c_str(), sizeof(wifiPass));
+            ESP_LOGI(TAG, "Config applied — password retrieved from KeyManager");
+        }
+    } else {
+        ESP_LOGW(TAG, "applyConfig: KeyManager not wired — password not restored");
+    }
 }
 
 /**
@@ -182,9 +190,11 @@ void WifiManager::begin(const char* hostname) {
 void WifiManager::tick() {
 #ifndef NATIVE_BUILD
     switch (currentState) {
-        case WiFiState::WIFI_INIT:
-            // Wait 2 seconds for system stability before touching the radio
-            if (millis() - stateTimer > 2000) {
+        case WiFiState::WIFI_INIT: {
+            unsigned long elapsed = millis() - stateTimer;
+            if (elapsed > 2000) {
+                ESP_LOGI(TAG, "WIFI_INIT complete (waited %lums). SSID='%s' len=%d",
+                         elapsed, wifiSsid, (int)strlen(wifiSsid));
                 if (strlen(wifiSsid) > 0) {
                     ESP_LOGI(TAG, "Connecting to %s...", wifiSsid);
                     WiFi.mode(WIFI_STA);
@@ -201,6 +211,7 @@ void WifiManager::tick() {
                 }
             }
             break;
+        }
 
         case WiFiState::WIFI_STA_CONNECTING:
             if (WiFi.status() == WL_CONNECTED) {
@@ -226,12 +237,13 @@ void WifiManager::tick() {
                 WiFi.softAPConfig(apIP, apIP, IPAddress(255, 255, 255, 0));
                 
                 const char* portalName = (strlen(currentHostname) > 0) ? currentHostname : "ESP32-Setup";
-                WiFi.softAP(portalName);
+                bool apResult = WiFi.softAP(portalName);
+                ESP_LOGI(TAG, "softAP('%s') returned %s", portalName, apResult ? "true" : "FALSE");
                 
                 // Start DNS Hijacker
                 dnsServer = std::make_unique<DNSServer>();
                 dnsServer->start(53, "*", apIP);
-                ESP_LOGI(TAG, "Access Point '%s' is online.", portalName);
+                ESP_LOGI(TAG, "Access Point '%s' is online. IP: %s", portalName, apIP.toString().c_str());
                 lastApiRequestTime = millis(); // Reset AP timeout timer
             }
             
@@ -359,6 +371,14 @@ void WifiManager::updateWiFi(const char* ssid, const char* pass) {
     if (pass != nullptr && strlen(pass) > 0) {
         strlcpy(wifiPass, pass, sizeof(wifiPass));
         Logger::registerSecret(String(wifiPass));
+
+        // Persist password via KeyManager (AES-256 encrypted)
+        if (_keyManager != nullptr) {
+            _keyManager->addKey("wifi_password", pass);
+            ESP_LOGI(TAG, "WiFi password persisted via KeyManager");
+        } else {
+            ESP_LOGW(TAG, "updateWiFi: KeyManager not wired — password not persisted!");
+        }
     }
 
     // Persist via ConfigManager gateway
