@@ -164,7 +164,7 @@ public:
      * @brief Late-bind display info for the capture_display tool.
      * @param info Populated display descriptor with framebuffer pointer.
      */
-    void setDisplayInfo(const mcpBuiltinTools::DisplayInfo& info);
+    void setDisplayInfo(const DisplayInfo& info);
 
     // -----------------------------------------------------------------------
     // IWebContributor Implementation

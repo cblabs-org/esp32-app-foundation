@@ -729,8 +729,8 @@ void U8g2DisplayModule::resetConfig() {
  *
  * @return Populated DisplayInfo (framebuffer is nullptr in native builds).
  */
-mcpBuiltinTools::DisplayInfo U8g2DisplayModule::getDisplayInfo() {
-    mcpBuiltinTools::DisplayInfo info;
+DisplayInfo U8g2DisplayModule::getDisplayInfo() {
+    DisplayInfo info;
 #ifndef NATIVE_BUILD
     info.framebuffer     = _u8g2.getBufferPtr();
     info.framebufferSize = 8u * _u8g2.getBufferTileHeight() * _u8g2.getBufferTileWidth();

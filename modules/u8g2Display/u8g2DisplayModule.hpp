@@ -81,7 +81,7 @@
 #include "boards/screensaverBoard.hpp"
 #include "boards/configuringStatusBoard.hpp"
 #include "AppState.hpp"
-#include "../mcpServer/mcpBuiltinTools.hpp"
+#include "../../include/types/DisplayInfo.hpp"
 
 // --- Hardware-only includes (excluded from native GoogleTest builds) ---
 #ifndef NATIVE_BUILD
@@ -446,7 +446,7 @@ public:
      *
      * @return DisplayInfo struct with live framebuffer pointer.
      */
-    mcpBuiltinTools::DisplayInfo getDisplayInfo();
+    DisplayInfo getDisplayInfo();
 
 private:
     // -------------------------------------------------------------------------

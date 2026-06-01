@@ -42,7 +42,7 @@ static const char* TAG = "McpBuiltinTools";
 
 // File-scope display info — updated via setDisplayInfo() for late-binding.
 // The capture_display lambda reads from this directly (no by-value capture).
-static mcpBuiltinTools::DisplayInfo s_displayInfo;
+static DisplayInfo s_displayInfo;
 
 // ---------------------------------------------------------------------------
 // Base64 lookup table (hardware uses the ESP32 base64 library; native needs

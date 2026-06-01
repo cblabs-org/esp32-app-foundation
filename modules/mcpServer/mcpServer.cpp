@@ -72,7 +72,7 @@ void McpServer::begin(const std::vector<IMcpContributor*>& contributors, ConfigM
 // Late-binding display info
 // ---------------------------------------------------------------------------
 
-void McpServer::setDisplayInfo(const mcpBuiltinTools::DisplayInfo& info) {
+void McpServer::setDisplayInfo(const DisplayInfo& info) {
     mcpBuiltinTools::setDisplayInfo(info);
 }
 
