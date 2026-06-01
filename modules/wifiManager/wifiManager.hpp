@@ -15,6 +15,13 @@
  *              - Schema version: 1
  *              - Hostname is stored in the wifi config section
  *
+ *              RESTful API endpoints (PR-04a/WO1):
+ *              - GET  /api/wifi/status  — connection status + diagnostics
+ *              - GET  /api/wifi/scan    — async WiFi scan with dedup
+ *              - POST /api/wifi/test    — test credentials without saving
+ *              - POST /api/wifi/connect — save credentials + deferred restart
+ *              - POST /api/wifi/forget  — erase credentials + restart to AP
+ *
  * Exported Functions/Classes:
  * - WifiManager: Standard ESP32 WiFi lifecycle manager.
  *   - begin(): Connects to station or initializes AP recovery mode.
@@ -24,9 +31,11 @@
  *   - applyConfig():        Apply WiFi config from JSON section
  *   - serializeConfig():    Serialize WiFi config to JSON section
  *   - resetConfig():        Clear credentials.
+ *   - registerRoutes():     Register 5 RESTful WiFi API endpoints
  *   - updateWiFi(): Persists new credentials and restarts the WiFi state machine.
  *   - testConnection(): Validation probe for new credentials.
  *   - setConfigManager(): Wire the ConfigManager pointer for save operations.
+ *   - setKeyManager(): Wire the KeyManager pointer for encrypted password storage.
  */
 
 #pragma once
@@ -60,12 +69,14 @@ private:
 
 #ifndef NATIVE_BUILD
 class DNSServer;
+class AsyncWebServerRequest;
 #else
 class DNSServer {
 public:
     DNSServer() {}
     ~DNSServer() {}
 };
+class AsyncWebServerRequest {};
 #endif
 
 // Forward declarations — avoids circular include with configManager.hpp / keyManager.hpp
@@ -103,6 +114,7 @@ private:
     unsigned long lastApiRequestTime = 0;  ///< Last time an API request was received
 
     bool _reconnectRequested = false;        ///< Deferred reconnect flag (set by updateWiFi, acted on by tick)
+    bool _restartRequested = false;          ///< Deferred restart flag (set by connect/forget, acted on by tick)
 
     ConfigManager* _configManager = nullptr; ///< Pointer to ConfigManager for save operations
     KeyManager* _keyManager = nullptr;       ///< Pointer to KeyManager for encrypted password storage
@@ -111,6 +123,67 @@ private:
 
     void transitionTo(WiFiState newState);
     void processDNS();
+
+    // --- RESTful API Handlers (PR-04a/WO1) ---
+
+    /**
+     * @brief Handle GET /api/wifi/status — returns connection mode, SSID, IP, RSSI, etc.
+     * @param request The incoming HTTP request.
+     */
+    void handleStatus(AsyncWebServerRequest* request);
+
+    /**
+     * @brief Handle GET /api/wifi/scan — triggers async WiFi scan and returns results.
+     *        Returns 202 while scan is running; final result is RSSI-sorted, deduplicated,
+     *        capped at 15 networks.
+     * @param request The incoming HTTP request.
+     */
+    void handleScan(AsyncWebServerRequest* request);
+
+    /**
+     * @brief Handle POST /api/wifi/test — test credentials without saving.
+     *        Accepts {ssid, pass}. Returns {status:"ok", ip:"..."} or {status:"failed"}.
+     *        Body limit: 1 KB.
+     * @param request The incoming HTTP request.
+     * @param data    Request body data.
+     * @param len     Length of the body data.
+     * @param index   Current chunk index.
+     * @param total   Total body size.
+     */
+    void handleTest(AsyncWebServerRequest* request, uint8_t* data,
+                    size_t len, size_t index, size_t total);
+
+    /**
+     * @brief Handle POST /api/wifi/connect — save credentials and schedule restart.
+     *        Accepts {ssid, pass}. Saves via KeyManager, returns 200, schedules restart.
+     *        Body limit: 1 KB.
+     * @param request The incoming HTTP request.
+     * @param data    Request body data.
+     * @param len     Length of the body data.
+     * @param index   Current chunk index.
+     * @param total   Total body size.
+     */
+    void handleConnect(AsyncWebServerRequest* request, uint8_t* data,
+                       size_t len, size_t index, size_t total);
+
+    /**
+     * @brief Handle POST /api/wifi/forget — erase credentials and restart to AP mode.
+     *        Clears KeyManager + config, returns 200, schedules restart.
+     *        Body limit: 256 bytes.
+     * @param request The incoming HTTP request.
+     * @param data    Request body data.
+     * @param len     Length of the body data.
+     * @param index   Current chunk index.
+     * @param total   Total body size.
+     */
+    void handleForget(AsyncWebServerRequest* request, uint8_t* data,
+                      size_t len, size_t index, size_t total);
+
+    /**
+     * @brief Schedule a deferred ESP restart (500ms delay).
+     *        Safe to call from HTTP handlers — actual restart happens in tick().
+     */
+    void scheduleRestart();
 
 public:
     WifiManager();
