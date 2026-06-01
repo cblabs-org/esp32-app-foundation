@@ -40,6 +40,10 @@
 
 static const char* TAG = "McpBuiltinTools";
 
+// File-scope display info — updated via setDisplayInfo() for late-binding.
+// The capture_display lambda reads from this directly (no by-value capture).
+static mcpBuiltinTools::DisplayInfo s_displayInfo;
+
 // ---------------------------------------------------------------------------
 // Base64 lookup table (hardware uses the ESP32 base64 library; native needs
 // a minimal inline implementation to avoid external dependencies).
@@ -274,21 +278,21 @@ void mcpBuiltinTools::registerAll(McpToolRegistry& registry,
     // -----------------------------------------------------------------
     // Tool 7: capture_display — Capture the display framebuffer as base64
     // -----------------------------------------------------------------
-    // Copy the display info into a local struct captured by value so the
-    // lambda remains valid beyond this function's scope.
-    DisplayInfo capturedDisplay;
+    // The display info is stored at file scope (s_displayInfo) so the lambda
+    // can read it via pointer. Late-binding via setDisplayInfo() is supported
+    // for displays that initialise after McpServer::begin().
     if (displayInfo != nullptr) {
-        capturedDisplay = *displayInfo;
+        s_displayInfo = *displayInfo;
     }
 
     registry.addTool(
         "capture_display",
         "Capture the current display buffer as a base64-encoded image",
-        [capturedDisplay](JsonObject& params, JsonObject& result) {
+        [](JsonObject& params, JsonObject& result) {
             (void)params; // No input parameters required
 
             // --- Guard: no display registered ---
-            if (capturedDisplay.framebuffer == nullptr || capturedDisplay.framebufferSize == 0) {
+            if (s_displayInfo.framebuffer == nullptr || s_displayInfo.framebufferSize == 0) {
                 result["error"]   = "No display registered";
                 result["isError"] = true;
                 return;
@@ -301,8 +305,8 @@ void mcpBuiltinTools::registerAll(McpToolRegistry& registry,
                 // chunks (48 divides cleanly by 3 for base64 padding alignment).
                 std::string b64;
                 size_t offset = 0;
-                size_t len = capturedDisplay.framebufferSize;
-                const uint8_t* data = capturedDisplay.framebuffer;
+                size_t len = s_displayInfo.framebufferSize;
+                const uint8_t* data = s_displayInfo.framebuffer;
                 while (offset < len) {
                     size_t chunk = (len - offset > 48) ? 48 : (len - offset);
                     String b64Chunk = base64::encode(&data[offset], chunk);
@@ -311,16 +315,26 @@ void mcpBuiltinTools::registerAll(McpToolRegistry& registry,
                 }
             #else
                 // Native build: use the inline base64 encoder
-                std::string b64 = base64Encode(capturedDisplay.framebuffer,
-                                               capturedDisplay.framebufferSize);
+                std::string b64 = base64Encode(s_displayInfo.framebuffer,
+                                               s_displayInfo.framebufferSize);
             #endif
 
             result["format"] = "xbm";
-            result["width"]  = capturedDisplay.width;
-            result["height"] = capturedDisplay.height;
+            result["width"]  = s_displayInfo.width;
+            result["height"] = s_displayInfo.height;
             result["data"]   = b64;
         }
     );
 
     ESP_LOGI(TAG, "Registered %zu built-in tools", registry.size());
+}
+
+// =============================================================================
+// Late-binding display info
+// =============================================================================
+
+void mcpBuiltinTools::setDisplayInfo(const DisplayInfo& info) {
+    s_displayInfo = info;
+    ESP_LOGI(TAG, "Display info updated: %ux%u (%zu bytes)",
+             info.width, info.height, info.framebufferSize);
 }

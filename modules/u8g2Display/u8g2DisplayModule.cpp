@@ -252,19 +252,25 @@ void U8g2DisplayModule::tick() {
         clearModal();
     }
 
-    // --- 2b. Re-evaluate modal relevance during CONFIGURING ---
-    // If the WiFi wizard is the active modal but WiFi is now connected,
-    // clear it so the configuring status board (base layer) is visible.
-    // This ensures the user sees the status board before RUNNING.
+    // --- 2b. WiFi wizard modal management during CONFIGURING ---
+    // Push the wizard when WifiManager enters AP mode (not just when gate
+    // is unsatisfied — the device may be attempting STA with stored creds).
+    // Clear the wizard when the WiFi gate becomes satisfied.
 #ifndef NATIVE_BUILD
-    if (_modal == &_wifiWizard && _app != nullptr &&
-        _app->getState() == AppState::CONFIGURING) {
-        // Check if the WiFi gate is now satisfied
-        for (const auto* gate : _app->getConfigGates()) {
-            if (strcmp(gate->getGateName(), "WiFi Station") == 0 && gate->isSatisfied()) {
-                ESP_LOGI(TAG, "WiFi gate satisfied — clearing wizard modal");
-                clearModal();
-                break;
+    if (_app != nullptr && _app->getState() == AppState::CONFIGURING) {
+        if (_modal != &_wifiWizard && _app->getWifiManager().getAPMode()) {
+            // AP mode just started — push the WiFi wizard
+            _wifiWizard.configure(_app->getConfig().hostname);
+            pushModal(&_wifiWizard);
+            ESP_LOGI(TAG, "AP mode detected — WiFi wizard modal pushed");
+        } else if (_modal == &_wifiWizard) {
+            // Wizard is showing — check if WiFi gate is now satisfied
+            for (const auto* gate : _app->getConfigGates()) {
+                if (strcmp(gate->getGateName(), "WiFi Station") == 0 && gate->isSatisfied()) {
+                    ESP_LOGI(TAG, "WiFi gate satisfied — clearing wizard modal");
+                    clearModal();
+                    break;
+                }
             }
         }
     }
@@ -413,7 +419,7 @@ void U8g2DisplayModule::pushModal(IDisplayBoard* board) {
     if (board != nullptr) {
         board->onActivate();
     }
-    resetActivity();
+    _resetTimer();
 }
 
 /**
@@ -435,13 +441,14 @@ void U8g2DisplayModule::clearModal() {
 
 /**
  * @brief Reset the inactivity timer. If sleeping, wake the display.
+ *
+ * This is the public API for signalling user-initiated activity (HTTP
+ * requests, touch events, EventBus interactions). It resets the timer,
+ * wakes from sleep, and dismisses the screensaver if active.
  */
 void U8g2DisplayModule::resetActivity() {
-#ifndef NATIVE_BUILD
-    _lastActivityMs = millis();
-#endif
-    _modalDimmed = false;
-    _sleepDiagLogged = false;
+    _resetTimer();
+
     if (_sleeping) {
         _wake();
     }
@@ -452,6 +459,21 @@ void U8g2DisplayModule::resetActivity() {
         // Modal auto-clears on next tick via isExpired() check
         ESP_LOGI(TAG, "Screensaver dismissed — activity detected");
     }
+}
+
+/**
+ * @brief Reset only the inactivity timer and dim/diagnostic flags.
+ *
+ * Internal helper that does NOT dismiss the screensaver or wake from
+ * sleep. Used by pushModal() to reset the dim timer without triggering
+ * user-activity side-effects.
+ */
+void U8g2DisplayModule::_resetTimer() {
+#ifndef NATIVE_BUILD
+    _lastActivityMs = millis();
+#endif
+    _modalDimmed = false;
+    _sleepDiagLogged = false;
 }
 
 /**
@@ -693,6 +715,29 @@ void U8g2DisplayModule::resetConfig() {
     _u8g2.setContrast(_brightness);
     _u8g2.setFlipMode(_flipScreen ? 1 : 0);
 #endif
+}
+
+// =============================================================================
+// MCP display info accessor
+// =============================================================================
+
+/**
+ * @brief Return a DisplayInfo struct with the live U8G2 framebuffer pointer.
+ *
+ * The buffer pointer remains valid for the lifetime of the U8G2 instance
+ * (i.e. the entire program). Size is calculated from tile dimensions.
+ *
+ * @return Populated DisplayInfo (framebuffer is nullptr in native builds).
+ */
+mcpBuiltinTools::DisplayInfo U8g2DisplayModule::getDisplayInfo() {
+    mcpBuiltinTools::DisplayInfo info;
+#ifndef NATIVE_BUILD
+    info.framebuffer     = _u8g2.getBufferPtr();
+    info.framebufferSize = 8u * _u8g2.getBufferTileHeight() * _u8g2.getBufferTileWidth();
+    info.width           = _displayWidth;
+    info.height          = _displayHeight;
+#endif
+    return info;
 }
 
 // =============================================================================
@@ -974,17 +1019,10 @@ void U8g2DisplayModule::_onStateChanged(AppState newState) {
     if (newState == AppState::CONFIGURING) {
         _configuringStatusBoard.setGates(&_app->getConfigGates());
 
-        // Check if WiFi gate needs a modal wizard
-        for (const auto* gate : _app->getConfigGates()) {
-            if (!gate->isSatisfied() && strcmp(gate->getGateName(), "WiFi Station") == 0) {
-                // WiFi gate unsatisfied — device is/will-be in AP mode.
-                // AP always broadcasts as hostname.
-                _wifiWizard.configure(_app->getConfig().hostname);
-                pushModal(&_wifiWizard);
-                ESP_LOGI(TAG, "State → CONFIGURING: WiFi wizard modal pushed");
-                return;
-            }
-        }
+        // WiFi wizard is NOT pushed here — it is managed by tick() step 2b,
+        // which polls WifiManager.getAPMode() so the wizard only appears
+        // when the device actually enters AP mode (not during STA attempts).
+        // The configuring status board (base layer) shows in the meantime.
 
         // Non-WiFi unsatisfied gates: set connection info on configuring board.
         // The base layer (_getBaseBoard) auto-shows configuringStatusBoard.
@@ -1191,28 +1229,22 @@ void U8g2DisplayModule::_checkDim() {
 /**
  * @brief Enter sleep mode — activate the screensaver for burn-in prevention.
  *
- * Instead of powering off the OLED, this pushes the screensaver as a modal
- * overlay. The display stays awake (_sleeping is NOT set) so the tick loop
- * continues running to tick/render the screensaver. The screensaver's
- * isExpired() returns !_active, so while active it won't auto-clear.
+ * Pushes the screensaver as a modal overlay via pushModal(). The display
+ * stays awake (_sleeping is NOT set) so the tick loop continues running
+ * to tick/render the screensaver animation. The screensaver's isExpired()
+ * returns !_active, so while active it won't auto-clear.
+ *
  * _checkSleep() won't fire again because _modal != nullptr routes tick()
  * to the dim path rather than the RUNNING+no-modal sleep path.
  *
- * Dismissal: resetActivity() deactivates the screensaver, and the modal
- * auto-clears on the next tick via the isExpired() check.
+ * pushModal() calls _resetTimer() (not resetActivity()), so the screensaver
+ * is NOT immediately dismissed. Dismissal happens when resetActivity() is
+ * called from a user-initiated event (HTTP request, touch, EventBus).
  */
 void U8g2DisplayModule::_sleep() {
     ESP_LOGI(TAG, "Display entering idle — activating screensaver");
-
-    // --- Set modal directly — bypass pushModal() ---
-    // pushModal() calls resetActivity() which would immediately dismiss
-    // the screensaver via the _modal == &_screensaver check. Setting
-    // _modal directly avoids this self-defeating loop.
-    if (_modal != nullptr && _modal != &_screensaver) {
-        _modal->onDeactivate();
-    }
-    _modal = &_screensaver;
     _screensaver.activate();
+    pushModal(&_screensaver);
 }
 
 /**

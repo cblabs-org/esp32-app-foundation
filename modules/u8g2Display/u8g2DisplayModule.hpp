@@ -81,6 +81,7 @@
 #include "boards/screensaverBoard.hpp"
 #include "boards/configuringStatusBoard.hpp"
 #include "AppState.hpp"
+#include "../mcpServer/mcpBuiltinTools.hpp"
 
 // --- Hardware-only includes (excluded from native GoogleTest builds) ---
 #ifndef NATIVE_BUILD
@@ -436,6 +437,17 @@ public:
      */
     void setRotationInterval(unsigned long intervalMs);
 
+    /**
+     * @brief Get the display info struct for MCP capture_display wiring.
+     *
+     * Returns a populated DisplayInfo with the U8G2 framebuffer pointer,
+     * size, and dimensions. Only valid after bootstrapHardware() has been
+     * called (the buffer is allocated during U8G2 begin()).
+     *
+     * @return DisplayInfo struct with live framebuffer pointer.
+     */
+    mcpBuiltinTools::DisplayInfo getDisplayInfo();
+
 private:
     // -------------------------------------------------------------------------
     // Private carousel engine methods
@@ -499,6 +511,15 @@ private:
      * @brief Enter sleep mode and power-save the display.
      */
     void _sleep();
+
+    /**
+     * @brief Reset only the inactivity timer and dim/diagnostic flags.
+     *
+     * Internal helper used by pushModal() and resetActivity(). Does NOT
+     * dismiss the screensaver or wake from sleep — those are user-activity
+     * concerns handled exclusively by resetActivity().
+     */
+    void _resetTimer();
 
     // -------------------------------------------------------------------------
     // Private EventBus callback statics

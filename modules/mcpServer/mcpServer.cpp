@@ -69,6 +69,14 @@ void McpServer::begin(const std::vector<IMcpContributor*>& contributors, ConfigM
 }
 
 // ---------------------------------------------------------------------------
+// Late-binding display info
+// ---------------------------------------------------------------------------
+
+void McpServer::setDisplayInfo(const mcpBuiltinTools::DisplayInfo& info) {
+    mcpBuiltinTools::setDisplayInfo(info);
+}
+
+// ---------------------------------------------------------------------------
 // Tick — Serial polling (hardware) / no-op (native)
 // ---------------------------------------------------------------------------
 

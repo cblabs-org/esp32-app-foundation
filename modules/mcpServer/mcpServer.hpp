@@ -113,6 +113,7 @@
 #endif
 
 #include "mcpToolRegistry.hpp"
+#include "mcpBuiltinTools.hpp"
 #include "../../include/interfaces/IWebContributor.hpp"
 
 // Forward-declare to avoid pulling in the full headers
@@ -158,6 +159,12 @@ public:
      * @return Const reference to the internal McpToolRegistry.
      */
     const McpToolRegistry& getRegistry() const { return _registry; }
+
+    /**
+     * @brief Late-bind display info for the capture_display tool.
+     * @param info Populated display descriptor with framebuffer pointer.
+     */
+    void setDisplayInfo(const mcpBuiltinTools::DisplayInfo& info);
 
     // -----------------------------------------------------------------------
     // IWebContributor Implementation

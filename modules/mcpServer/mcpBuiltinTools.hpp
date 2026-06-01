@@ -67,4 +67,15 @@ namespace mcpBuiltinTools {
                      ConfigManager* configManager,
                      const DisplayInfo* displayInfo = nullptr);
 
+    /**
+     * @brief Update the display info after initial registration.
+     *
+     * Allows late-binding the framebuffer pointer when the display module
+     * initialises after McpServer::begin(). The capture_display tool
+     * reads from this stored info on each invocation.
+     *
+     * @param info The populated display descriptor.
+     */
+    void setDisplayInfo(const DisplayInfo& info);
+
 } // namespace mcpBuiltinTools

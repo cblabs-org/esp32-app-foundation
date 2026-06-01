@@ -106,6 +106,9 @@ void setup() {
 #ifndef NATIVE_BUILD
     display.begin(app);
     diagnosticsBoard.setApplication(&app);
+
+    // --- Wire display framebuffer to MCP for capture_display tool ---
+    app.getMcpServer().setDisplayInfo(display.getDisplayInfo());
 #endif
 }
 
