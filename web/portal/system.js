@@ -1,26 +1,10 @@
 // web/portal/system.js
-// System Status sub-pill — displays device metrics with RAG diagnostic bars.
+// System Status sub-pill — "Status" under the System tab.
+// Displays 20+ device metrics with RAG diagnostic bars, auto-refresh,
+// armed restart, and double-confirm factory reset.
 
 (function() {
   const container = document.getElementById('tab-system');
-
-  // -------------------------------------------------------------------------
-  // Helper: Format bytes to human-readable (KB/MB)
-  // -------------------------------------------------------------------------
-  function formatBytes(bytes) {
-    if (bytes >= 1048576) return (bytes / 1048576).toFixed(1) + ' MB';
-    if (bytes >= 1024) return (bytes / 1024).toFixed(1) + ' KB';
-    return bytes + ' B';
-  }
-
-  // -------------------------------------------------------------------------
-  // Helper: RAG colour based on percentage (Green ≥ 50%, Amber ≥ 25%, Red < 25%)
-  // -------------------------------------------------------------------------
-  function ragColor(pct) {
-    if (pct >= 50) return '#2e7d32';
-    if (pct >= 25) return '#f9a825';
-    return '#c62828';
-  }
 
   // -------------------------------------------------------------------------
   // Helper: Format uptime seconds to "Xd Xh Xm" or "Xm Xs"
@@ -33,6 +17,73 @@
     if (d > 0) return d + 'd ' + h + 'h ' + m + 'm';
     if (h > 0) return h + 'h ' + m + 'm';
     return m + 'm ' + s + 's';
+  }
+
+  // -------------------------------------------------------------------------
+  // Helper: Format bytes to human-readable (KB/MB)
+  // -------------------------------------------------------------------------
+  function formatBytes(bytes) {
+    if (bytes >= 1048576) return (bytes / 1048576).toFixed(1) + ' MB';
+    if (bytes >= 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return bytes + ' B';
+  }
+
+  // -------------------------------------------------------------------------
+  // Helper: RAG colour based on percentage
+  //   Green  ≥ 50%
+  //   Amber  ≥ 25% and < 50%
+  //   Red    < 25%
+  // -------------------------------------------------------------------------
+  function ragColor(pct) {
+    if (pct >= 50) return '#2e7d32';   // Green
+    if (pct >= 25) return '#f9a825';   // Amber
+    return '#c62828';                   // Red
+  }
+
+  // -------------------------------------------------------------------------
+  // Helper: RSSI descriptor string
+  // -------------------------------------------------------------------------
+  function rssiDescriptor(rssi) {
+    if (rssi === 0) return 'N/A';
+    if (rssi >= -50) return 'Excellent';
+    if (rssi >= -60) return 'Good';
+    if (rssi >= -70) return 'Fair';
+    return 'Weak';
+  }
+
+  // -------------------------------------------------------------------------
+  // Helper: RSSI to signal bar count (0–4)
+  // -------------------------------------------------------------------------
+  function rssiBars(rssi) {
+    if (rssi === 0) return 0;
+    if (rssi >= -50) return 4;
+    if (rssi >= -60) return 3;
+    if (rssi >= -70) return 2;
+    if (rssi >= -80) return 1;
+    return 0;
+  }
+
+  // -------------------------------------------------------------------------
+  // Helper: Render a single signal bar SVG
+  // -------------------------------------------------------------------------
+  function signalBarsHTML(bars) {
+    let html = '<span style="display:inline-flex;align-items:flex-end;gap:2px;height:16px;vertical-align:middle;margin-left:4px;">';
+    for (let i = 0; i < 4; i++) {
+      const h = 4 + (i * 3);
+      const active = i < bars;
+      html += '<span style="display:inline-block;width:3px;height:' + h + 'px;border-radius:1px;background:' + (active ? 'var(--primary)' : 'var(--border)') + ';"></span>';
+    }
+    html += '</span>';
+    return html;
+  }
+
+  // -------------------------------------------------------------------------
+  // Helper: Temperature colour
+  // -------------------------------------------------------------------------
+  function tempColor(temp) {
+    if (temp >= 70) return '#c62828';
+    if (temp >= 55) return '#f9a825';
+    return '#2e7d32';
   }
 
   // -------------------------------------------------------------------------
@@ -53,10 +104,23 @@
       </div>
     </article>
 
+    <article>
+      <header>Network</header>
+      <div id="sys-network-info">
+        <p style="color: var(--text-muted);">Loading...</p>
+      </div>
+    </article>
+
     <article style="border-color: var(--error); background: rgba(198, 40, 40, 0.04);">
       <header style="color: var(--error);">Danger Zone</header>
       <div style="display: flex; gap: 10px; margin-top: 0.5rem;">
         <button id="btn-sys-restart" style="flex:1; background: var(--card-bg); color: var(--text); border: 1px solid var(--border);">Restart Device</button>
+        <button id="btn-sys-factory" style="flex:1; background: var(--card-bg); color: var(--error); border: 1px solid var(--error);">Factory Reset</button>
+      </div>
+      <div id="sys-factory-confirm" style="display:none; margin-top:1rem;">
+        <p style="font-size:0.8rem; color:var(--error); margin-bottom:0.5rem;">Type <strong>RESET</strong> to confirm factory reset. This erases all configuration.</p>
+        <input type="text" id="sys-factory-input" placeholder="Type RESET..." style="margin-bottom:0.5rem;" autocomplete="off" />
+        <button id="btn-sys-factory-confirm" style="background:var(--error);" disabled>Confirm Factory Reset</button>
       </div>
     </article>
 
@@ -109,8 +173,17 @@
       // --- Device info card ---
       const deviceInfo = document.getElementById('sys-device-info');
       deviceInfo.innerHTML =
+        infoRow('Firmware', 'v' + (data.firmware_version || '?')) +
+        infoRow('Build', data.build_serial || 'Unknown') +
+        infoRow('SDK', data.sdk_version || '?') +
+        infoRow('Chip', (data.chip_model || 'ESP32') + ' rev ' + (data.chip_revision || '?')) +
+        infoRow('Cores', data.chip_cores || '?') +
+        infoRow('Flash', formatBytes(data.flash_size || 0)) +
+        infoRow('Partition', data.partition || '?') +
         infoRow('Uptime', formatUptime(data.uptime || 0)) +
-        infoRow('Status', data.status || '?');
+        infoRow('Temperature',
+          '<span style="color:' + tempColor(data.chip_temp || 0) + ';">' +
+          (data.chip_temp || 0).toFixed(1) + '°C</span>');
 
       // --- Memory & storage bars ---
       const memBars = document.getElementById('sys-memory-bars');
@@ -130,12 +203,21 @@
       }
 
       // --- Section 3: Storage ---
-      if ((data.storage_total || 0) > 0) {
-        memHTML += '<div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.05em; margin:0.75rem 0 0.4rem;">Storage</div>';
-        memHTML += progressBarHTML('Storage Used', data.storage_used || 0, data.storage_total || 1, 'bytes');
-      }
+      memHTML += '<div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.05em; margin:0.75rem 0 0.4rem;">Storage</div>';
+      memHTML += progressBarHTML('Storage Used', data.storage_used || 0, data.storage_total || 1, 'bytes');
 
       memBars.innerHTML = memHTML;
+
+      // --- Network info ---
+      const netInfo = document.getElementById('sys-network-info');
+      const bars = rssiBars(data.wifi_rssi || 0);
+      const modeLabel = data.ap_mode ? '<span style="color:var(--primary);">AP Mode</span>' : 'Station';
+      netInfo.innerHTML =
+        infoRow('Mode', modeLabel) +
+        infoRow('SSID', data.wifi_ssid || 'N/A') +
+        infoRow('IP Address', data.wifi_ip || '0.0.0.0') +
+        infoRow('MAC', data.wifi_mac || '?') +
+        infoRow('Signal', (data.wifi_rssi || 0) + ' dBm ' + rssiDescriptor(data.wifi_rssi || 0) + signalBarsHTML(bars));
 
     } catch (error) {
       document.getElementById('sys-device-info').innerHTML =
@@ -184,12 +266,14 @@
 
   restartBtn.addEventListener('click', async () => {
     if (!restartArmed) {
+      // Arm the button
       restartArmed = true;
       restartBtn.textContent = 'Confirm Restart?';
       restartBtn.style.background = 'var(--error)';
       restartBtn.style.color = '#fff';
       restartBtn.style.borderColor = 'var(--error)';
 
+      // Auto-disarm after 3 seconds
       restartTimeout = setTimeout(() => {
         restartArmed = false;
         restartBtn.textContent = 'Restart Device';
@@ -198,16 +282,51 @@
         restartBtn.style.borderColor = 'var(--border)';
       }, 3000);
     } else {
+      // Confirmed — send restart
       clearTimeout(restartTimeout);
       restartBtn.textContent = 'Restarting...';
       restartBtn.disabled = true;
       stopAutoRefresh();
 
       try {
-        await window.apiFetch('/api/system/reboot', { method: 'POST' });
+        await window.apiFetch('/api/system/restart', { method: 'POST' });
       } catch (e) {
         // Expected — device restarts, connection drops
       }
+    }
+  });
+
+  // -------------------------------------------------------------------------
+  // Factory Reset — double confirmation ("Type RESET to confirm")
+  // -------------------------------------------------------------------------
+  const factoryBtn = document.getElementById('btn-sys-factory');
+  const factoryConfirm = document.getElementById('sys-factory-confirm');
+  const factoryInput = document.getElementById('sys-factory-input');
+  const factoryConfirmBtn = document.getElementById('btn-sys-factory-confirm');
+
+  factoryBtn.addEventListener('click', () => {
+    // Toggle the confirmation area
+    const visible = factoryConfirm.style.display !== 'none';
+    factoryConfirm.style.display = visible ? 'none' : 'block';
+    factoryInput.value = '';
+    factoryConfirmBtn.disabled = true;
+  });
+
+  factoryInput.addEventListener('input', () => {
+    factoryConfirmBtn.disabled = (factoryInput.value.trim() !== 'RESET');
+  });
+
+  factoryConfirmBtn.addEventListener('click', async () => {
+    if (factoryInput.value.trim() !== 'RESET') return;
+
+    factoryConfirmBtn.textContent = 'Erasing...';
+    factoryConfirmBtn.disabled = true;
+    stopAutoRefresh();
+
+    try {
+      await window.apiFetch('/api/system/factory-reset', { method: 'POST' });
+    } catch (e) {
+      // Expected — device restarts, connection drops
     }
   });
 
@@ -227,5 +346,3 @@
     startAutoRefresh();
   }
 })();
-
-

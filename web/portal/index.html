@@ -3,53 +3,106 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>ESP32 App Foundation</title>
+  <meta name="description" content="ESP32 Device Configuration Portal">
+  <title>Device Portal</title>
   <link rel="stylesheet" href="app.css">
 </head>
 <body>
   <div class="container">
+    <!-- ================================================================== -->
+    <!-- Top Bar: App name + theme toggle                                    -->
+    <!-- ================================================================== -->
     <header class="top-bar">
-      <h2>Device Portal</h2>
+      <h2 id="portal-title">Device Portal</h2>
+      <div class="theme-toggle" id="theme-toggle">
+        <button class="theme-btn" data-theme="auto" title="Auto (System)">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+        </button>
+        <button class="theme-btn" data-theme="light" title="Light">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+        </button>
+        <button class="theme-btn" data-theme="dark" title="Dark">
+          <svg viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        </button>
+      </div>
     </header>
 
+    <!-- AP mode banner (shown via JS when in AP mode) -->
     <div class="ap-banner" id="ap-banner">
       Access Point Mode Active
     </div>
 
+    <!-- Sub-pill navigation bar (populated by app.js) -->
+    <div id="pill-bar" class="pill-bar" style="display:none;"></div>
+
+    <!-- ================================================================== -->
+    <!-- Tab Content Area                                                    -->
+    <!-- All tab content divs are dynamically shown/hidden by app.js.        -->
+    <!-- Fragment JS files inject their UI into their container div.          -->
+    <!-- ================================================================== -->
     <div class="tab-content-container">
-      <div id="tab-config" class="tab-content active">
-        <article>
-          <header>Configuration</header>
-          <p>Application specific configuration will appear here.</p>
-        </article>
-      </div>
+      <!-- WiFi tab (top-level, framework) -->
       <div id="tab-wifi" class="tab-content">
-        <!-- Fragment injected by wifi.js -->
+        <!-- Populated by wifi.js -->
       </div>
+
+      <!-- System sub-pill containers (framework) -->
       <div id="tab-system" class="tab-content">
-        <!-- Fragment injected by system.js -->
+        <!-- Status sub-pill content (populated by system.js) -->
+      </div>
+      <div id="tab-keys" class="tab-content">
+        <!-- Populated by keys.js -->
+      </div>
+      <div id="tab-mcp" class="tab-content">
+        <!-- Populated by mcp.js -->
+      </div>
+      <div id="tab-backup" class="tab-content">
+        <!-- Populated by backup.js -->
       </div>
       <div id="tab-ota" class="tab-content">
-        <!-- Fragment injected by ota.js -->
+        <!-- Populated by ota.js -->
+      </div>
+      <div id="tab-screenshot" class="tab-content">
+        <!-- Populated by screenshot.js (conditional) -->
       </div>
     </div>
 
-    <nav class="bottom-nav">
-      <a href="#" class="tab-link active" data-target="tab-config">
-        <span>Config</span>
-      </a>
-      <a href="#" class="tab-link" data-target="tab-wifi">
-        <span>WiFi</span>
+    <!-- Toast notification container -->
+    <div id="toast-container"></div>
+
+    <!-- ================================================================== -->
+    <!-- Bottom Navigation Bar                                               -->
+    <!-- Framework tabs (WiFi, System) are hardcoded with SVG icons.          -->
+    <!-- App tabs are injected dynamically by app.js.                        -->
+    <!-- ================================================================== -->
+    <nav class="bottom-nav" id="bottom-nav">
+      <a href="#" class="tab-link active" data-target="tab-wifi">
+        <span class="icon">
+          <!-- WiFi arcs SVG -->
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M5 12.55a11 11 0 0 1 14.08 0"/>
+            <path d="M1.42 9a16 16 0 0 1 21.16 0"/>
+            <path d="M8.53 16.11a6 6 0 0 1 6.95 0"/>
+            <line x1="12" y1="20" x2="12.01" y2="20"/>
+          </svg>
+        </span>
+        WIFI
       </a>
       <a href="#" class="tab-link" data-target="tab-system">
-        <span>System</span>
+        <span class="icon">
+          <!-- Gear/Settings SVG -->
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+          </svg>
+        </span>
+        SYSTEM
       </a>
-      <a href="#" class="tab-link" data-target="tab-ota">
-        <span>OTA</span>
-      </a>
+      <!-- App-contributed tabs are injected here by app.js -->
     </nav>
   </div>
 
+  <!-- Load app.js — this bootstraps everything else -->
   <script src="app.js"></script>
 </body>
 </html>

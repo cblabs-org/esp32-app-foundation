@@ -13,6 +13,11 @@
  *              regardless of which application uses the framework. The McpServer
  *              calls registerAll() during begin() before any contributor registration.
  *
+ *              Convention: Any built-in tool that writes data, modifies device
+ *              state, or triggers an action (e.g. reboot, set_config) MUST pass
+ *              mutatesState = true when calling registry.addTool(). Read-only
+ *              query tools leave the default (false).
+ *
  * Exported Functions:
  * - mcpBuiltinTools::registerAll(): Register all foundation-level MCP tools
  */

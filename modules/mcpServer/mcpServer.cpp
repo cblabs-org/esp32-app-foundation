@@ -22,6 +22,7 @@
 #include "interfaces/IMcpContributor.hpp"
 #include "FrameworkConfig.hpp"
 #include "../webServer/webServer.hpp"
+#include <configManager.hpp>
 
 // ---------------------------------------------------------------------------
 // Platform-conditional includes & logging shims
@@ -45,8 +46,12 @@ static const char* TAG = "McpServer";
  *        as initialised so tick() begins processing.
  */
 void McpServer::begin(const std::vector<IMcpContributor*>& contributors, ConfigManager* configManager, const FrameworkConfig* frameworkConfig) {
+    // --- Step 0: Cache dependencies for runtime config persistence ---
+    _configManager = configManager;
+
     if (frameworkConfig) {
         _mcpReadOnly = frameworkConfig->mcpReadOnly;
+        _frameworkConfig = frameworkConfig;
     }
 
     // --- Step 1: Register built-in foundation tools ---
@@ -90,7 +95,7 @@ void McpServer::setDisplayInfo(const DisplayInfo& info) {
  * this guard.
  */
 void McpServer::tick() {
-    if (!_initialized) return;
+    if (!_initialized || !_mcpEnabled) return;
 
 #ifndef NATIVE_BUILD
     // --- Hardware: read characters from Serial until newline ---
@@ -234,6 +239,7 @@ void McpServer::_handleToolsList(const JsonDocument& req, Print& out) {
         toolObj["name"]          = tool.name;
         toolObj["description"]   = tool.description;
         toolObj["inputSchema"]   = tool.inputSchema;
+        toolObj["mutatesState"]  = tool.mutatesState;
     }
 
     serializeJson(resp, out);
@@ -371,8 +377,14 @@ void McpServer::_sendError(int code, const char* message, JsonVariantConst id, P
 
 void McpServer::registerRoutes(AsyncWebServer& server) {
 #ifndef NATIVE_BUILD
+    // --- POST /api/mcp — JSON-RPC endpoint for MCP tool calls ---
     server.on("/api/mcp", HTTP_POST,
         [this](AsyncWebServerRequest* request) {
+            // --- Guard: reject requests when MCP server is disabled ---
+            if (!_mcpEnabled) {
+                request->send(503, "application/json", "{\"error\":\"MCP server disabled\"}");
+                return;
+            }
             // Request handler fires AFTER body handler completes
             if (!request->_tempObject) {
                 request->send(400, "application/json", "{\"error\":\"Missing body\"}");
@@ -387,7 +399,108 @@ void McpServer::registerRoutes(AsyncWebServer& server) {
         },
         nullptr,
         [](AsyncWebServerRequest* request, uint8_t* data, size_t len, size_t index, size_t total) {
-            // Body handler: just accumulate, don't send response
+            // --- Per-route body size enforcement (1KB) ---
+            constexpr size_t MAX_BODY_SIZE = 1024;
+            if (total > MAX_BODY_SIZE) {
+                request->send(413, "application/json", "{\"error\":\"Payload too large\"}");
+                return;
+            }
+            if (index == 0) {
+                request->_tempObject = new String();
+            }
+            String* bodyStr = static_cast<String*>(request->_tempObject);
+            for (size_t i = 0; i < len; i++) {
+                *bodyStr += (char)data[i];
+            }
+        }
+    );
+
+    // --- GET /api/mcp/status — MCP server status summary ---
+    server.on("/api/mcp/status", HTTP_GET, [this](AsyncWebServerRequest* request) {
+        JsonDocument doc;
+        doc["initialized"] = _initialized;
+        doc["enabled"]     = _mcpEnabled;
+        doc["readOnly"]    = _mcpReadOnly;
+        doc["toolCount"]   = _registry.size();
+        String output;
+        serializeJson(doc, output);
+        request->send(200, "application/json", output);
+    });
+
+    // --- GET /api/mcp/config — MCP runtime configuration ---
+    server.on("/api/mcp/config", HTTP_GET, [this](AsyncWebServerRequest* request) {
+        JsonDocument doc;
+        doc["enabled"]     = _mcpEnabled;
+        doc["readOnly"]    = _mcpReadOnly;
+        if (_frameworkConfig) {
+            doc["hostname"] = _frameworkConfig->hostname ? _frameworkConfig->hostname : "";
+        }
+        String output;
+        serializeJson(doc, output);
+        request->send(200, "application/json", output);
+    });
+
+    // --- POST /api/mcp/config — Runtime toggle for enabled/readOnly ---
+    server.on("/api/mcp/config", HTTP_POST,
+        [this](AsyncWebServerRequest* request) {
+            if (!request->_tempObject) {
+                request->send(400, "application/json", "{\"error\":\"Missing body\"}");
+                return;
+            }
+            String* bodyStr = static_cast<String*>(request->_tempObject);
+
+            // --- Step 1: Parse the JSON body ---
+            JsonDocument inDoc;
+            DeserializationError err = deserializeJson(inDoc, bodyStr->c_str());
+            delete bodyStr;
+            request->_tempObject = nullptr;
+
+            if (err) {
+                request->send(400, "application/json", "{\"error\":\"Invalid JSON\"}");
+                return;
+            }
+
+            // --- Step 2: Apply requested changes ---
+            bool changed = false;
+            if (inDoc["enabled"].is<bool>()) {
+                bool newEnabled = inDoc["enabled"].as<bool>();
+                if (newEnabled != _mcpEnabled) {
+                    _mcpEnabled = newEnabled;
+                    changed = true;
+                    ESP_LOGI(TAG, "MCP server %s via runtime toggle",
+                             _mcpEnabled ? "enabled" : "disabled");
+                }
+            }
+            if (inDoc["readOnly"].is<bool>()) {
+                bool newReadOnly = inDoc["readOnly"].as<bool>();
+                if (newReadOnly != _mcpReadOnly) {
+                    _mcpReadOnly = newReadOnly;
+                    changed = true;
+                    ESP_LOGI(TAG, "MCP read-only mode %s via runtime toggle",
+                             _mcpReadOnly ? "enabled" : "disabled");
+                }
+            }
+
+            // --- Step 3: Persist via ConfigManager if anything changed ---
+            if (changed && _configManager) {
+                _configManager->saveModuleConfig(this);
+            }
+
+            // --- Step 4: Return updated state ---
+            JsonDocument outDoc;
+            outDoc["enabled"]  = _mcpEnabled;
+            outDoc["readOnly"] = _mcpReadOnly;
+            String output;
+            serializeJson(outDoc, output);
+            request->send(200, "application/json", output);
+        },
+        nullptr,
+        [](AsyncWebServerRequest* request, uint8_t* data, size_t len, size_t index, size_t total) {
+            constexpr size_t MAX_BODY_SIZE = 512;
+            if (total > MAX_BODY_SIZE) {
+                request->send(413, "application/json", "{\"error\":\"Payload too large\"}");
+                return;
+            }
             if (index == 0) {
                 request->_tempObject = new String();
             }
@@ -399,5 +512,59 @@ void McpServer::registerRoutes(AsyncWebServer& server) {
     );
 #else
     server.on("/api/mcp", HTTP_POST, [](AsyncWebServerRequest* request) {});
+    server.on("/api/mcp/status", HTTP_GET, [](AsyncWebServerRequest* request) {});
+    server.on("/api/mcp/config", HTTP_GET, [](AsyncWebServerRequest* request) {});
+    server.on("/api/mcp/config", HTTP_POST, [](AsyncWebServerRequest* request) {});
 #endif
+}
+
+// ---------------------------------------------------------------------------
+// iConfigurable Implementation
+// ---------------------------------------------------------------------------
+
+/**
+ * @brief Return the config namespace identifier.
+ * @return "mcp" — config file stored at /mod/mcp.json.
+ */
+const char* McpServer::getConfigNamespace() const {
+    return "mcp";
+}
+
+/**
+ * @brief Return the config schema version.
+ * @return 1 (initial schema: enabled + readOnly).
+ */
+int McpServer::getSchemaVersion() const {
+    return 1;
+}
+
+/**
+ * @brief Apply persisted MCP settings from a JSON config section.
+ *
+ * Called by ConfigManager during beginAll() to restore runtime toggles.
+ * Missing keys fall back to secure defaults.
+ */
+void McpServer::applyConfig(const JsonObject& section) {
+    _mcpEnabled  = section["enabled"]  | true;   // Default: server enabled
+    _mcpReadOnly = section["readOnly"] | true;    // Default: secure read-only
+    ESP_LOGI(TAG, "Config applied: enabled=%d readOnly=%d", _mcpEnabled, _mcpReadOnly);
+}
+
+/**
+ * @brief Serialize current MCP runtime settings for persistence.
+ */
+void McpServer::serializeConfig(JsonObject& section) const {
+    section["enabled"]  = _mcpEnabled;
+    section["readOnly"] = _mcpReadOnly;
+}
+
+/**
+ * @brief Reset MCP settings to secure factory defaults.
+ *
+ * Server enabled, read-only mode on (secure-by-default).
+ */
+void McpServer::resetConfig() {
+    _mcpEnabled  = true;
+    _mcpReadOnly = true;
+    ESP_LOGI(TAG, "Config reset to factory defaults");
 }

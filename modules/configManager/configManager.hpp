@@ -25,9 +25,9 @@
  *   - importAllConfig():     Import configs from a master JSON document
 
  *   - registerRoutes():      Register REST API routes (IWebContributor)
- *   - getTabName():          Return the UI tab name ("Config")
+ *   - getTabName():          Return the UI tab name ("Backup")
  *   - getParentTab():        Return parent tab ("System")
- *   - getTabOrder():         Return tab order (25)
+ *   - getTabOrder():         Return tab order (40)
  */
 
 #pragma once
@@ -126,9 +126,9 @@ public:
 
     /**
      * @brief Get the UI tab name for this contributor.
-     * @return "Config"
+     * @return "Backup"
      */
-    const char* getTabName() const override { return "Config"; }
+    const char* getTabName() const override { return "Backup"; }
 
     /**
      * @brief Get the parent tab for navigation hierarchy.
@@ -138,9 +138,9 @@ public:
 
     /**
      * @brief Get the tab display order within the System sub-navigation.
-     * @return 25
+     * @return 40 — positioned after Keys (20) and MCP (30) in the pill bar.
      */
-    int getTabOrder() const override { return 25; }
+    int getTabOrder() const override { return 40; }
 
 private:
     // -------------------------------------------------------------------------

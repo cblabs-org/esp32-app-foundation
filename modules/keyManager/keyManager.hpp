@@ -1,5 +1,7 @@
 /*
- * ESP32 App Foundation (c) 2026
+ * ESP32 App Foundation (c) 2026 CB Labs
+ *
+ * https://github.com/matthewmcneill/esp32-app-foundation
  *
  * This work is licensed under Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International.
  * To view a copy of this license, visit https://creativecommons.org/licenses/by-nc-sa/4.0/
@@ -7,13 +9,21 @@
  * Module: modules/keyManager/keyManager.hpp
  * Description: Kernel service that provides an encrypted registry for storing
  *              and retrieving sensitive credentials (e.g. API keys).
+ *              Implements IWebContributor for REST API routes under
+ *              System → Keys sub-pill. Exposes GET/POST/DELETE /api/keys
+ *              endpoints; GET never returns plaintext values.
  *
  * Exported Functions/Classes:
  * - KeyManager: [Class] Service provider for secure credential storage.
- *   - begin(): Initializes the KeyManager with a dependency-injected DeviceCrypto instance.
- *   - addKey(): Encrypts and stores a credential securely.
- *   - getKeyById(): Retrieves and decrypts a credential.
- *   - deleteKey(): Removes a credential from the registry.
+ *   - begin():           Initializes the KeyManager with a dependency-injected DeviceCrypto instance.
+ *   - addKey():           Encrypts and stores a credential securely.
+ *   - getKeyById():       Retrieves and decrypts a credential.
+ *   - deleteKey():        Removes a credential from the registry.
+ *   - listKeys():         Returns a list of stored key IDs (no values).
+ *   - registerRoutes():   Register REST API routes (IWebContributor)
+ *   - getTabName():       Return "Keys" for portal tab
+ *   - getParentTab():     Return "System" for navigation hierarchy
+ *   - getTabOrder():      Return 20 for pill ordering
  */
 
 #pragma once
@@ -27,8 +37,10 @@
 #endif
 
 #include <memory>
+#include <vector>
 #include <ArduinoJson.h>
 #include "deviceCrypto.hpp"
+#include "../../include/interfaces/IWebContributor.hpp"
 
 #ifndef NATIVE_BUILD
 #define KEY_MANAGER_PATH "/etc/keys.json"
@@ -38,8 +50,12 @@
 
 /**
  * @brief Kernel service providing an encrypted registry for credentials.
+ *
+ * Implements IWebContributor to register REST API routes for managing keys
+ * via the web portal. The "Keys" pill appears under the System tab at order 20.
+ * GET /api/keys returns key IDs only (never plaintext values).
  */
-class KeyManager {
+class KeyManager : public IWebContributor {
 private:
     DeviceCrypto* _crypto = nullptr; ///< Pointer to injected DeviceCrypto service.
     
@@ -88,4 +104,38 @@ public:
      * @return true if successfully removed, false if not found or error.
      */
     bool deleteKey(const char* id);
+
+    /**
+     * @brief List all stored key IDs (never exposes plaintext values).
+     * @return Vector of key ID strings.
+     */
+    std::vector<std::string> listKeys() const;
+
+    // -------------------------------------------------------------------------
+    // IWebContributor Interface
+    // -------------------------------------------------------------------------
+
+    /**
+     * @brief Register all REST API route handlers with the web server.
+     * @param server Reference to the AsyncWebServer instance.
+     */
+    void registerRoutes(AsyncWebServer& server) override;
+
+    /**
+     * @brief Get the UI tab name for this contributor.
+     * @return "Keys"
+     */
+    const char* getTabName() const override { return "Keys"; }
+
+    /**
+     * @brief Get the parent tab for navigation hierarchy.
+     * @return "System" — Keys appears as a sub-section of the System tab.
+     */
+    const char* getParentTab() const override { return "System"; }
+
+    /**
+     * @brief Get the tab display order within the System sub-navigation.
+     * @return 20 — Keys pill appears after Status (10).
+     */
+    int getTabOrder() const override { return 20; }
 };

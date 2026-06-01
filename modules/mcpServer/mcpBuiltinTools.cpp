@@ -215,7 +215,8 @@ void mcpBuiltinTools::registerAll(McpToolRegistry& registry,
             for (JsonPair kv : exportDoc.as<JsonObject>()) {
                 result[kv.key()] = kv.value();
             }
-        }
+        },
+        true  // mutatesState — writes config via ConfigManager
     );
 
     // -----------------------------------------------------------------
@@ -239,7 +240,8 @@ void mcpBuiltinTools::registerAll(McpToolRegistry& registry,
             #else
                 ESP_LOGI(TAG, "Reboot requested via MCP (native build — no-op)");
             #endif
-        }
+        },
+        true  // mutatesState — restarts the device
     );
 
     // -----------------------------------------------------------------

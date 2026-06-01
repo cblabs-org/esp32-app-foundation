@@ -14,6 +14,13 @@
  *              gateway interface. WifiManager never touches LittleFS directly for
  *              configuration — it provides applyConfig()/serializeConfig() callbacks.
  *
+ *              RESTful API endpoints (PR-04a/WO1):
+ *              - GET  /api/wifi/status  — connection status + diagnostics
+ *              - GET  /api/wifi/scan    — async WiFi scan with dedup + RSSI sort
+ *              - POST /api/wifi/test    — test credentials without saving (1KB limit)
+ *              - POST /api/wifi/connect — save credentials + deferred restart (1KB limit)
+ *              - POST /api/wifi/forget  — erase credentials + restart to AP (256B limit)
+ *
  * Exported Functions/Classes:
  * - WifiManager: [Class implementation]
  *   - begin: Initial non-blocking hardware initialization.
@@ -21,8 +28,14 @@
  *   - applyConfig: Apply config from JSON section.
  *   - serializeConfig: Serialize config to JSON section.
  *   - resetConfig: Erase credentials.
+ *   - registerRoutes: Register 5 RESTful WiFi API endpoints.
  *   - updateWiFi: Configuration persistence via ConfigManager.
  *   - testConnection: Momentary connection probe for verification.
+ *   - handleStatus: GET /api/wifi/status handler.
+ *   - handleScan: GET /api/wifi/scan handler.
+ *   - handleTest: POST /api/wifi/test handler.
+ *   - handleConnect: POST /api/wifi/connect handler.
+ *   - handleForget: POST /api/wifi/forget handler.
  */
 
 #include "wifiManager.hpp"
@@ -46,6 +59,14 @@ void delay(unsigned long ms) {}      // Stub
 #include "../logger/logger.hpp"
 
 static const char* TAG = "WIFI_MGR";
+
+// --- Per-Route Body Size Limits (PR-04a/WO1) ---
+static constexpr size_t BODY_LIMIT_WIFI_TEST    = 1024; // 1 KB for test/connect
+static constexpr size_t BODY_LIMIT_WIFI_CONNECT = 1024; // 1 KB for test/connect
+static constexpr size_t BODY_LIMIT_WIFI_FORGET  = 256;  // 256 B for forget
+
+// --- Maximum networks returned by scan ---
+static constexpr int MAX_SCAN_RESULTS = 15;
 
 #ifdef NATIVE_BUILD
 // A simple fallback for strlcpy in native testing environment if not available.
@@ -189,6 +210,15 @@ void WifiManager::begin(const char* hostname) {
  */
 void WifiManager::tick() {
 #ifndef NATIVE_BUILD
+    // --- Handle deferred restart (set by connect/forget handlers) ---
+    if (_restartRequested) {
+        _restartRequested = false;
+        ESP_LOGI(TAG, "Executing deferred restart...");
+        delay(500); // Allow HTTP response to flush
+        esp_restart();
+        return; // Unreachable, but makes intent clear
+    }
+
     switch (currentState) {
         case WiFiState::WIFI_INIT: {
             unsigned long elapsed = millis() - stateTimer;
@@ -335,48 +365,377 @@ void WifiManager::notifyApiActivity() {
 #endif
 }
 
+// =============================================================================
+// RESTful API Route Registration (PR-04a/WO1)
+// =============================================================================
+
 /**
  * @brief Register all REST API route handlers with the web server.
+ *
+ * Replaces the old GET/POST /api/wifi with 5 RESTful endpoints:
+ *   GET  /api/wifi/status  — connection diagnostics
+ *   GET  /api/wifi/scan    — async network scan
+ *   POST /api/wifi/test    — test credentials (1KB body limit)
+ *   POST /api/wifi/connect — save + restart (1KB body limit)
+ *   POST /api/wifi/forget  — erase + restart to AP (256B body limit)
  */
 void WifiManager::registerRoutes(AsyncWebServer& server) {
 #ifndef NATIVE_BUILD
-    server.on("/api/wifi", HTTP_GET, [this](AsyncWebServerRequest* request) {
-        this->notifyApiActivity();
-        JsonDocument doc;
-        doc["ssid"] = this->getSSID();
-        doc["passExists"] = this->hasPassword();
-        doc["ap_mode"] = this->getAPMode();
-        doc["ip"] = WiFi.localIP().toString();
-        
-        String output;
-        serializeJson(doc, output);
-        request->send(200, "application/json", output);
+    // --- GET /api/wifi/status ---
+    server.on("/api/wifi/status", HTTP_GET, [this](AsyncWebServerRequest* request) {
+        this->handleStatus(request);
     });
 
-    server.on("/api/wifi", HTTP_POST, 
-        [](AsyncWebServerRequest *request) {
-            // Default handler. In ESPAsyncWebServer, if we only process body, we send response in the body handler.
-            // If body was processed and response sent, this is ignored.
+    // --- GET /api/wifi/scan ---
+    server.on("/api/wifi/scan", HTTP_GET, [this](AsyncWebServerRequest* request) {
+        this->handleScan(request);
+    });
+
+    // --- POST /api/wifi/test ---
+    server.on("/api/wifi/test", HTTP_POST,
+        [](AsyncWebServerRequest* request) {
+            // Final handler — response is sent in the body handler
         },
         NULL,
-        [this](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
-            this->notifyApiActivity();
-            JsonDocument doc;
-            DeserializationError error = deserializeJson(doc, data, len);
-            if (!error) {
-                const char* ssid = doc["ssid"] | "";
-                const char* pass = doc["pass"] | "";
-                if (strlen(ssid) > 0) {
-                    this->updateWiFi(ssid, pass);
-                    request->send(200, "application/json", "{\"status\":\"ok\"}");
-                    return;
-                }
-            }
-            request->send(400, "application/json", "{\"status\":\"error\",\"msg\":\"Invalid JSON or missing SSID\"}");
+        [this](AsyncWebServerRequest* request, uint8_t* data,
+               size_t len, size_t index, size_t total) {
+            this->handleTest(request, data, len, index, total);
+        }
+    );
+
+    // --- POST /api/wifi/connect ---
+    server.on("/api/wifi/connect", HTTP_POST,
+        [](AsyncWebServerRequest* request) {
+            // Final handler — response is sent in the body handler
+        },
+        NULL,
+        [this](AsyncWebServerRequest* request, uint8_t* data,
+               size_t len, size_t index, size_t total) {
+            this->handleConnect(request, data, len, index, total);
+        }
+    );
+
+    // --- POST /api/wifi/forget ---
+    server.on("/api/wifi/forget", HTTP_POST,
+        [](AsyncWebServerRequest* request) {
+            // Final handler — response is sent in the body handler
+        },
+        NULL,
+        [this](AsyncWebServerRequest* request, uint8_t* data,
+               size_t len, size_t index, size_t total) {
+            this->handleForget(request, data, len, index, total);
         }
     );
 #endif
 }
+
+// =============================================================================
+// RESTful API Handler Implementations (PR-04a/WO1)
+// =============================================================================
+
+/**
+ * @brief Handle GET /api/wifi/status.
+ *
+ * Returns comprehensive WiFi status including mode, SSID, IP, RSSI,
+ * MAC address, channel, gateway, password existence flag, and AP mode state.
+ */
+void WifiManager::handleStatus(AsyncWebServerRequest* request) {
+#ifndef NATIVE_BUILD
+    this->notifyApiActivity();
+
+    JsonDocument doc;
+    doc["ssid"]       = this->getSSID();
+    doc["passExists"] = this->hasPassword();
+    doc["ap_mode"]    = this->getAPMode();
+    doc["ip"]         = WiFi.localIP().toString();
+    doc["mac"]        = WiFi.macAddress();
+
+    // --- STA-mode specific fields ---
+    if (!isAPMode && WiFi.status() == WL_CONNECTED) {
+        doc["mode"]    = "STA";
+        doc["rssi"]    = WiFi.RSSI();
+        doc["channel"] = WiFi.channel();
+        doc["gateway"] = WiFi.gatewayIP().toString();
+    } else if (isAPMode) {
+        doc["mode"]    = "AP";
+        doc["ip"]      = WiFi.softAPIP().toString();
+        doc["channel"] = 1; // Default AP channel
+    } else {
+        doc["mode"]    = "DISCONNECTED";
+    }
+
+    String output;
+    serializeJson(doc, output);
+    request->send(200, "application/json", output);
+#endif
+}
+
+/**
+ * @brief Handle GET /api/wifi/scan.
+ *
+ * Uses the async WiFi.scanNetworks() API:
+ * - First call triggers an async scan and returns 202 {status:"scanning"}
+ * - Subsequent calls while scan is running return 202 {status:"scanning"}
+ * - When scan completes, returns 200 with networks array (RSSI-sorted,
+ *   deduplicated by SSID, capped at MAX_SCAN_RESULTS)
+ * - Calls WiFi.scanDelete() after reading results to free memory
+ */
+void WifiManager::handleScan(AsyncWebServerRequest* request) {
+#ifndef NATIVE_BUILD
+    this->notifyApiActivity();
+
+    int16_t scanResult = WiFi.scanComplete();
+
+    if (scanResult == WIFI_SCAN_FAILED) {
+        // --- No scan in progress — start one ---
+        ESP_LOGI(TAG, "Starting async WiFi scan...");
+        WiFi.scanNetworks(true); // true = async
+        request->send(202, "application/json", "{\"status\":\"scanning\"}");
+        return;
+    }
+
+    if (scanResult == WIFI_SCAN_RUNNING) {
+        // --- Scan is still in progress ---
+        request->send(202, "application/json", "{\"status\":\"scanning\"}");
+        return;
+    }
+
+    // --- Scan complete — process results ---
+    ESP_LOGI(TAG, "Scan complete. Found %d networks.", scanResult);
+
+    JsonDocument doc;
+    JsonArray networks = doc["networks"].to<JsonArray>();
+
+    // --- Build deduplicated, RSSI-sorted list ---
+    // Use a simple O(n²) dedup since scan results are small (typically <30)
+    struct ScanEntry {
+        String ssid;
+        int32_t rssi;
+        bool secure;
+        uint8_t channel;
+    };
+
+    // Temporary storage for dedup
+    ScanEntry entries[MAX_SCAN_RESULTS];
+    int entryCount = 0;
+
+    for (int i = 0; i < scanResult && entryCount < MAX_SCAN_RESULTS; i++) {
+        String ssid = WiFi.SSID(i);
+        if (ssid.length() == 0) continue; // Skip hidden networks with no SSID
+
+        // --- Dedup: keep strongest RSSI per SSID ---
+        bool found = false;
+        for (int j = 0; j < entryCount; j++) {
+            if (entries[j].ssid == ssid) {
+                found = true;
+                if (WiFi.RSSI(i) > entries[j].rssi) {
+                    entries[j].rssi    = WiFi.RSSI(i);
+                    entries[j].secure  = (WiFi.encryptionType(i) != WIFI_AUTH_OPEN);
+                    entries[j].channel = WiFi.channel(i);
+                }
+                break;
+            }
+        }
+
+        if (!found) {
+            entries[entryCount].ssid    = ssid;
+            entries[entryCount].rssi    = WiFi.RSSI(i);
+            entries[entryCount].secure  = (WiFi.encryptionType(i) != WIFI_AUTH_OPEN);
+            entries[entryCount].channel = WiFi.channel(i);
+            entryCount++;
+        }
+    }
+
+    // --- Sort by RSSI (strongest first) using simple insertion sort ---
+    for (int i = 1; i < entryCount; i++) {
+        ScanEntry key = entries[i];
+        int j = i - 1;
+        while (j >= 0 && entries[j].rssi < key.rssi) {
+            entries[j + 1] = entries[j];
+            j--;
+        }
+        entries[j + 1] = key;
+    }
+
+    // --- Serialize to JSON ---
+    for (int i = 0; i < entryCount; i++) {
+        JsonObject net = networks.add<JsonObject>();
+        net["ssid"]    = entries[i].ssid;
+        net["rssi"]    = entries[i].rssi;
+        net["secure"]  = entries[i].secure;
+        net["channel"] = entries[i].channel;
+    }
+
+    // --- Free scan memory ---
+    WiFi.scanDelete();
+
+    String output;
+    serializeJson(doc, output);
+    request->send(200, "application/json", output);
+#endif
+}
+
+/**
+ * @brief Handle POST /api/wifi/test.
+ *
+ * Accepts {ssid, pass} JSON body. Tests credentials without saving.
+ * Returns {status:"ok", ip:"x.x.x.x"} on success or {status:"failed"} on failure.
+ * Enforces 1KB body size limit — rejects with HTTP 413 if exceeded.
+ */
+void WifiManager::handleTest(AsyncWebServerRequest* request, uint8_t* data,
+                              size_t len, size_t index, size_t total) {
+#ifndef NATIVE_BUILD
+    this->notifyApiActivity();
+
+    // --- Per-route body size guard (PR-04a/WO1) ---
+    if (total > BODY_LIMIT_WIFI_TEST) {
+        request->send(413, "application/json", "{\"error\":\"Payload too large\"}");
+        return;
+    }
+
+    // --- Only process on first/complete chunk ---
+    if (index != 0) return;
+
+    JsonDocument doc;
+    DeserializationError error = deserializeJson(doc, data, len);
+    if (error) {
+        request->send(400, "application/json", "{\"status\":\"error\",\"msg\":\"Invalid JSON\"}");
+        return;
+    }
+
+    const char* ssid = doc["ssid"] | "";
+    const char* pass = doc["pass"] | "";
+
+    if (strlen(ssid) == 0) {
+        request->send(400, "application/json", "{\"status\":\"error\",\"msg\":\"Missing SSID\"}");
+        return;
+    }
+
+    // --- Test connection ---
+    String ipOut;
+    bool success = this->testConnection(ssid, pass, ipOut);
+
+    if (success) {
+        JsonDocument resp;
+        resp["status"] = "ok";
+        resp["ip"]     = ipOut;
+        String output;
+        serializeJson(resp, output);
+        request->send(200, "application/json", output);
+    } else {
+        request->send(200, "application/json", "{\"status\":\"failed\"}");
+    }
+#endif
+}
+
+/**
+ * @brief Handle POST /api/wifi/connect.
+ *
+ * Accepts {ssid, pass} JSON body. Saves credentials via KeyManager (AES-256)
+ * and ConfigManager, returns 200, and schedules a deferred device restart
+ * so the WiFi stack reconnects with the new credentials.
+ * Enforces 1KB body size limit — rejects with HTTP 413 if exceeded.
+ */
+void WifiManager::handleConnect(AsyncWebServerRequest* request, uint8_t* data,
+                                 size_t len, size_t index, size_t total) {
+#ifndef NATIVE_BUILD
+    this->notifyApiActivity();
+
+    // --- Per-route body size guard ---
+    if (total > BODY_LIMIT_WIFI_CONNECT) {
+        request->send(413, "application/json", "{\"error\":\"Payload too large\"}");
+        return;
+    }
+
+    // --- Only process on first/complete chunk ---
+    if (index != 0) return;
+
+    JsonDocument doc;
+    DeserializationError error = deserializeJson(doc, data, len);
+    if (error) {
+        request->send(400, "application/json", "{\"status\":\"error\",\"msg\":\"Invalid JSON\"}");
+        return;
+    }
+
+    const char* ssid = doc["ssid"] | "";
+    const char* pass = doc["pass"] | "";
+
+    if (strlen(ssid) == 0) {
+        request->send(400, "application/json", "{\"status\":\"error\",\"msg\":\"Missing SSID\"}");
+        return;
+    }
+
+    // --- Save credentials and request deferred reconnect ---
+    this->updateWiFi(ssid, pass);
+
+    request->send(200, "application/json", "{\"status\":\"ok\",\"msg\":\"Credentials saved. Restarting...\"}");
+
+    // --- Schedule deferred restart to apply new credentials ---
+    this->scheduleRestart();
+#endif
+}
+
+/**
+ * @brief Handle POST /api/wifi/forget.
+ *
+ * Clears stored SSID, password (KeyManager), and config (ConfigManager).
+ * Returns 200 and schedules a deferred restart so the device boots into AP mode.
+ * Enforces 256B body size limit — rejects with HTTP 413 if exceeded.
+ */
+void WifiManager::handleForget(AsyncWebServerRequest* request, uint8_t* data,
+                                size_t len, size_t index, size_t total) {
+#ifndef NATIVE_BUILD
+    this->notifyApiActivity();
+
+    // --- Per-route body size guard ---
+    if (total > BODY_LIMIT_WIFI_FORGET) {
+        request->send(413, "application/json", "{\"error\":\"Payload too large\"}");
+        return;
+    }
+
+    // --- Only process on first/complete chunk ---
+    if (index != 0) return;
+
+    ESP_LOGW(TAG, "Forget WiFi requested — erasing credentials...");
+
+    // --- Clear in-memory credentials ---
+    memset(wifiSsid, 0, sizeof(wifiSsid));
+    memset(wifiPass, 0, sizeof(wifiPass));
+
+    // --- Delete encrypted password from KeyManager ---
+    if (_keyManager != nullptr) {
+        _keyManager->deleteKey("wifi_password");
+        ESP_LOGI(TAG, "WiFi password removed from KeyManager");
+    }
+
+    // --- Persist empty config via ConfigManager ---
+    if (_configManager != nullptr) {
+        _configManager->saveModuleConfig(this);
+        ESP_LOGI(TAG, "WiFi config cleared via ConfigManager");
+    }
+
+    request->send(200, "application/json", "{\"status\":\"ok\",\"msg\":\"WiFi credentials erased. Restarting to AP mode...\"}");
+
+    // --- Schedule deferred restart to AP mode ---
+    this->scheduleRestart();
+#endif
+}
+
+/**
+ * @brief Schedule a deferred ESP restart.
+ *
+ * Sets the _restartRequested flag which is checked at the top of tick().
+ * This is safe to call from HTTP handlers — the actual restart happens
+ * on the main loop after the HTTP response has been flushed.
+ */
+void WifiManager::scheduleRestart() {
+    _restartRequested = true;
+    ESP_LOGI(TAG, "Deferred restart scheduled");
+}
+
+// =============================================================================
+// Credential Management
+// =============================================================================
 
 /**
  * @brief Save new WiFi credentials and request a deferred reconnect.

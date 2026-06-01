@@ -127,6 +127,7 @@ bool Application::begin(const FrameworkConfig& config) {
     _wifiManager.setConfigManager(&_configManager);
     _wifiManager.setKeyManager(&_keyManager);
     _configManager.registerModule(&_wifiManager);
+    _configManager.registerModule(&_mcpServer);
     // Downstream modules (U8g2DisplayModule, etc.) are registered by app code
     // via getConfigManager().registerModule() before begin() is called.
 
@@ -163,6 +164,7 @@ bool Application::begin(const FrameworkConfig& config) {
     // --- Step 14: Register core web contributors and tickables ---
     _webContributors.push_back(&_wifiManager);
     _webContributors.push_back(&_configManager);
+    _webContributors.push_back(&_keyManager);
     _webContributors.push_back(_otaManager);
     _webContributors.push_back(&_mcpServer);
 

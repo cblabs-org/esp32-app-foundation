@@ -9,12 +9,34 @@
  * Module: modules/webServer/webServer.hpp
  * Description: Manages the ESPAsyncWebServer instance and coordinates the
  *              registration of REST routes via the IWebContributor interface.
- *              Initializes basic routing for static files and caps POST body sizes.
+ *              Initializes basic routing for static files, caps POST body sizes
+ *              via per-route guards, and provides a heap-guard semaphore to
+ *              protect high-memory responses from concurrent exhaustion.
  *
  * Exported Functions/Classes:
  * - WebServerManager: Manages the internal AsyncWebServer.
- *   - begin(): Starts the web server and registers all contributor routes.
+ *   - begin():     Starts the web server and registers all contributor routes.
  *   - getServer(): Returns a reference to the internal AsyncWebServer.
+ *
+ * Heap Guard:
+ *   A static atomic counter limits concurrent high-memory requests (portal HTML,
+ *   large JSON responses). When activeHighMemRequests >= MAX_CONCURRENT_HIGH_MEM
+ *   or largest free block < HEAP_GUARD_MIN_BLOCK_BYTES, new requests receive
+ *   HTTP 503 "Low memory — retry".
+ *
+ * POST Body Size Guard (shared pattern for WO1/WO3/WO5):
+ *   Per-route body limits are enforced in the chunked body handler at index==0.
+ *   Each POST route specifies its own limit from the table below. Payloads
+ *   exceeding the limit receive HTTP 413 "Payload too large".
+ *
+ *   | Route                        | Max Body | Rationale                      |
+ *   |------------------------------|----------|--------------------------------|
+ *   | WiFi test/connect/forget     | 1 KB     | Tiny JSON payloads             |
+ *   | System restart/factory-reset | 256 B    | Action-only, minimal body      |
+ *   | Config restore               | 8 KB     | Generous for multi-module JSON |
+ *   | Key add                      | 1 KB     | Key name + value               |
+ *   | MCP config save              | 1 KB     | Small config object            |
+ *   | OTA action dispatch          | 1 KB     | Action string only             |
  */
 
 #pragma once
@@ -70,6 +92,9 @@ public:
 
 /**
  * @brief Manages the web server lifecycle and IWebContributor dispatch.
+ *
+ * Provides the heap guard and POST body size guard patterns that all
+ * route handlers across the portal use for memory safety.
  */
 class WebServerManager {
 public:
@@ -79,8 +104,8 @@ public:
     WebServerManager();
 
     /**
-     * @brief Initialize the web server, cap POST size, set up basic routes,
-     *        and register all contributor routes.
+     * @brief Initialize the web server, set up basic routes, register all
+     *        contributor routes, and start listening.
      * @param contributors List of IWebContributor pointers to register.
      */
     void begin(const std::vector<IWebContributor*>& contributors);
