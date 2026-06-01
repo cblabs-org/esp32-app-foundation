@@ -1204,12 +1204,15 @@ void U8g2DisplayModule::_checkDim() {
 void U8g2DisplayModule::_sleep() {
     ESP_LOGI(TAG, "Display entering idle — activating screensaver");
 
-    // --- Activate screensaver as a modal overlay ---
-    // Do NOT set _sleeping = true — the tick loop must continue
-    // running to tick/render the screensaver modal.
-    // Do NOT call setPowerSave(1) — OLED stays on for the screensaver.
+    // --- Set modal directly — bypass pushModal() ---
+    // pushModal() calls resetActivity() which would immediately dismiss
+    // the screensaver via the _modal == &_screensaver check. Setting
+    // _modal directly avoids this self-defeating loop.
+    if (_modal != nullptr && _modal != &_screensaver) {
+        _modal->onDeactivate();
+    }
+    _modal = &_screensaver;
     _screensaver.activate();
-    pushModal(&_screensaver);
 }
 
 /**
