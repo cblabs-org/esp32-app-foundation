@@ -18,10 +18,13 @@
  *
  * Exported Functions/Classes:
  * - McpServer: MCP JSON-RPC server over Serial transport
- *   - begin():  Register built-in tools, collect contributor tools, and start serving
- *   - tick():   Poll Serial for incoming JSON-RPC lines (hardware only)
+ *   - begin():          Register built-in tools, collect contributor tools, and start serving
+ *   - tick():           Poll Serial for incoming JSON-RPC lines (hardware only)
+ *   - registerRoutes(): Register REST API routes (IWebContributor)
+ *   - getTabName():     Return "MCP" for portal tab
+ *   - getParentTab():   Return "System" for navigation hierarchy
+ *   - getTabOrder():    Return 30 for pill ordering
  */
-
 #pragma once
 
 #include <vector>
@@ -176,10 +179,22 @@ public:
     void registerRoutes(AsyncWebServer& server) override;
 
     /**
-     * @brief The MCP server does not expose a UI tab, so it returns nullptr.
-     * @return nullptr
+     * @brief The MCP server exposes a "MCP" UI tab under System.
+     * @return "MCP"
      */
-    const char* getTabName() const override { return nullptr; }
+    const char* getTabName() const override { return "MCP"; }
+
+    /**
+     * @brief Get the parent tab for navigation hierarchy.
+     * @return "System" — MCP appears as a sub-section of the System tab.
+     */
+    const char* getParentTab() const override { return "System"; }
+
+    /**
+     * @brief Get the tab display order within the System sub-navigation.
+     * @return 30 — MCP pill appears after Keys (20).
+     */
+    int getTabOrder() const override { return 30; }
 
 #ifdef NATIVE_BUILD
     /**
@@ -195,6 +210,7 @@ private:
     String          _inputBuffer;                 ///< Accumulator for incoming Serial bytes
     bool            _initialized = false;         ///< Guard: begin() must be called first
     bool            _mcpReadOnly = false;         ///< Guard: if true, mutating tools return error
+    const FrameworkConfig* _frameworkConfig = nullptr; ///< Cached reference for status endpoint
 
     /**
      * @brief Parse a complete JSON-RPC line and route to the appropriate handler.

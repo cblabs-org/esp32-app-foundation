@@ -47,6 +47,7 @@ static const char* TAG = "McpServer";
 void McpServer::begin(const std::vector<IMcpContributor*>& contributors, ConfigManager* configManager, const FrameworkConfig* frameworkConfig) {
     if (frameworkConfig) {
         _mcpReadOnly = frameworkConfig->mcpReadOnly;
+        _frameworkConfig = frameworkConfig;
     }
 
     // --- Step 1: Register built-in foundation tools ---
@@ -371,6 +372,7 @@ void McpServer::_sendError(int code, const char* message, JsonVariantConst id, P
 
 void McpServer::registerRoutes(AsyncWebServer& server) {
 #ifndef NATIVE_BUILD
+    // --- POST /api/mcp — JSON-RPC endpoint for MCP tool calls ---
     server.on("/api/mcp", HTTP_POST,
         [this](AsyncWebServerRequest* request) {
             // Request handler fires AFTER body handler completes
@@ -387,7 +389,12 @@ void McpServer::registerRoutes(AsyncWebServer& server) {
         },
         nullptr,
         [](AsyncWebServerRequest* request, uint8_t* data, size_t len, size_t index, size_t total) {
-            // Body handler: just accumulate, don't send response
+            // --- Per-route body size enforcement (1KB) ---
+            constexpr size_t MAX_BODY_SIZE = 1024;
+            if (total > MAX_BODY_SIZE) {
+                request->send(413, "application/json", "{\"error\":\"Payload too large\"}");
+                return;
+            }
             if (index == 0) {
                 request->_tempObject = new String();
             }
@@ -397,7 +404,32 @@ void McpServer::registerRoutes(AsyncWebServer& server) {
             }
         }
     );
+
+    // --- GET /api/mcp/status — MCP server status summary ---
+    server.on("/api/mcp/status", HTTP_GET, [this](AsyncWebServerRequest* request) {
+        JsonDocument doc;
+        doc["initialized"] = _initialized;
+        doc["readOnly"] = _mcpReadOnly;
+        doc["toolCount"] = _registry.size();
+        String output;
+        serializeJson(doc, output);
+        request->send(200, "application/json", output);
+    });
+
+    // --- GET /api/mcp/config — MCP-related framework configuration ---
+    server.on("/api/mcp/config", HTTP_GET, [this](AsyncWebServerRequest* request) {
+        JsonDocument doc;
+        doc["mcpReadOnly"] = _mcpReadOnly;
+        if (_frameworkConfig) {
+            doc["hostname"] = _frameworkConfig->hostname ? _frameworkConfig->hostname : "";
+        }
+        String output;
+        serializeJson(doc, output);
+        request->send(200, "application/json", output);
+    });
 #else
     server.on("/api/mcp", HTTP_POST, [](AsyncWebServerRequest* request) {});
+    server.on("/api/mcp/status", HTTP_GET, [](AsyncWebServerRequest* request) {});
+    server.on("/api/mcp/config", HTTP_GET, [](AsyncWebServerRequest* request) {});
 #endif
 }

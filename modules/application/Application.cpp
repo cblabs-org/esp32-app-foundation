@@ -163,6 +163,7 @@ bool Application::begin(const FrameworkConfig& config) {
     // --- Step 14: Register core web contributors and tickables ---
     _webContributors.push_back(&_wifiManager);
     _webContributors.push_back(&_configManager);
+    _webContributors.push_back(&_keyManager);
     _webContributors.push_back(_otaManager);
     _webContributors.push_back(&_mcpServer);
 

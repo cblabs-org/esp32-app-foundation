@@ -938,6 +938,30 @@ void U8g2DisplayModule::registerRoutes(AsyncWebServer& server) {
             request->send(200, "application/json", "{\"status\":\"ok\"}");
         }
     );
+
+    // --- GET /api/display/screenshot — raw framebuffer capture ---
+    server.on("/api/display/screenshot", HTTP_GET, [this](AsyncWebServerRequest* request) {
+        uint8_t* buf = _u8g2.getBufferPtr();
+        if (buf == nullptr) {
+            request->send(500, "application/json", "{\"error\":\"Framebuffer unavailable\"}");
+            return;
+        }
+
+        // U8G2 buffer: 8 pixels per tile row × tileWidth × tileHeight
+        size_t bufferSize = 8 * _u8g2.getBufferTileWidth() * _u8g2.getBufferTileHeight();
+
+        AsyncWebServerResponse* response = request->beginResponse(
+            200, "application/octet-stream", buf, bufferSize
+        );
+        // Prevent caching so each capture is fresh
+        response->addHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+        response->addHeader("Pragma", "no-cache");
+        response->addHeader("Expires", "0");
+        // Pass display geometry so the JS client can render correctly
+        response->addHeader("X-Display-Width", String(_displayWidth));
+        response->addHeader("X-Display-Height", String(_displayHeight));
+        request->send(response);
+    });
 #endif
 }
 
