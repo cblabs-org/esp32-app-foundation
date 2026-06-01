@@ -28,6 +28,7 @@
 #include "mcpServer.hpp"
 #include "mcpBuiltinTools.hpp"
 #include "interfaces/IMcpContributor.hpp"
+#include "FrameworkConfig.hpp"
 
 // =============================================================================
 // Test Group 1: McpToolRegistry — Core registry mechanics
@@ -458,6 +459,197 @@ TEST(McpServerTest, ContributorToolCallable) {
 
     EXPECT_EQ(doc["id"].as<int>(), 7);
     EXPECT_FALSE(doc["result"]["isError"].as<bool>());
+}
+
+// =============================================================================
+// Test Group 4: Mutation Tagging & Security
+// =============================================================================
+
+/** set_config and reboot must have mutatesState == true; read-only tools must be false. */
+TEST(McpSecurityTest, MutatesStateTaggedCorrectly) {
+    McpToolRegistry registry;
+    mcpBuiltinTools::registerAll(registry, nullptr);
+
+    // Mutating tools
+    const McpToolEntry* setConfig = registry.findTool("set_config");
+    ASSERT_NE(setConfig, nullptr);
+    EXPECT_TRUE(setConfig->mutatesState) << "set_config must be tagged as mutating";
+
+    const McpToolEntry* reboot = registry.findTool("reboot");
+    ASSERT_NE(reboot, nullptr);
+    EXPECT_TRUE(reboot->mutatesState) << "reboot must be tagged as mutating";
+
+    // Read-only tools
+    const McpToolEntry* sysInfo = registry.findTool("system_info");
+    ASSERT_NE(sysInfo, nullptr);
+    EXPECT_FALSE(sysInfo->mutatesState) << "system_info must NOT be tagged as mutating";
+
+    const McpToolEntry* getConfig = registry.findTool("get_config");
+    ASSERT_NE(getConfig, nullptr);
+    EXPECT_FALSE(getConfig->mutatesState) << "get_config must NOT be tagged as mutating";
+
+    const McpToolEntry* getLogs = registry.findTool("get_logs");
+    ASSERT_NE(getLogs, nullptr);
+    EXPECT_FALSE(getLogs->mutatesState) << "get_logs must NOT be tagged as mutating";
+}
+
+/** In read-only mode, calling a mutating tool must return error -32000. */
+TEST(McpSecurityTest, ReadOnlyBlocksMutatingTool) {
+    FrameworkConfig config;
+    config.mcpReadOnly = true;
+    std::vector<IMcpContributor*> contributors;
+
+    McpServer server;
+    server.begin(contributors, nullptr, &config);
+
+    std::string response = processAndCapture(server,
+        R"({"jsonrpc":"2.0","id":10,"method":"tools/call","params":{"name":"reboot"}})");
+
+    JsonDocument doc;
+    DeserializationError err = deserializeJson(doc, response);
+    ASSERT_FALSE(err);
+
+    EXPECT_EQ(doc["id"].as<int>(), 10);
+    EXPECT_TRUE(doc["error"].is<JsonObject>()) << "Expected JSON-RPC error for mutating tool in read-only mode";
+    EXPECT_EQ(doc["error"]["code"].as<int>(), -32000);
+}
+
+/** In read-only mode, calling a non-mutating tool must succeed. */
+TEST(McpSecurityTest, ReadOnlyAllowsReadTool) {
+    FrameworkConfig config;
+    config.mcpReadOnly = true;
+    std::vector<IMcpContributor*> contributors;
+
+    McpServer server;
+    server.begin(contributors, nullptr, &config);
+
+    std::string response = processAndCapture(server,
+        R"({"jsonrpc":"2.0","id":11,"method":"tools/call","params":{"name":"system_info"}})");
+
+    JsonDocument doc;
+    DeserializationError err = deserializeJson(doc, response);
+    ASSERT_FALSE(err);
+
+    EXPECT_EQ(doc["id"].as<int>(), 11);
+    EXPECT_FALSE(doc.containsKey("error")) << "Read-only tool should succeed in read-only mode";
+}
+
+/** In read-write mode, calling a mutating tool must succeed. */
+TEST(McpSecurityTest, ReadWriteAllowsMutatingTool) {
+    FrameworkConfig config;
+    config.mcpReadOnly = false;
+    std::vector<IMcpContributor*> contributors;
+
+    McpServer server;
+    server.begin(contributors, nullptr, &config);
+
+    std::string response = processAndCapture(server,
+        R"({"jsonrpc":"2.0","id":12,"method":"tools/call","params":{"name":"reboot"}})");
+
+    JsonDocument doc;
+    DeserializationError err = deserializeJson(doc, response);
+    ASSERT_FALSE(err);
+
+    EXPECT_EQ(doc["id"].as<int>(), 12);
+    EXPECT_FALSE(doc.containsKey("error")) << "Mutating tool should succeed in read-write mode";
+}
+
+/** tools/list response must include mutatesState for each tool. */
+TEST(McpSecurityTest, ToolsListIncludesMutatesState) {
+    FrameworkConfig config;
+    config.mcpReadOnly = true;
+    std::vector<IMcpContributor*> contributors;
+
+    McpServer server;
+    server.begin(contributors, nullptr, &config);
+
+    std::string response = processAndCapture(server,
+        R"({"jsonrpc":"2.0","id":13,"method":"tools/list"})");
+
+    JsonDocument doc;
+    DeserializationError err = deserializeJson(doc, response);
+    ASSERT_FALSE(err);
+
+    // Find the reboot tool and verify mutatesState is present and true
+    JsonArray tools = doc["result"]["tools"].as<JsonArray>();
+    bool found = false;
+    for (JsonObject tool : tools) {
+        if (strcmp(tool["name"].as<const char*>(), "reboot") == 0) {
+            found = true;
+            EXPECT_TRUE(tool["mutatesState"].as<bool>()) << "reboot should have mutatesState = true in tools/list";
+            break;
+        }
+    }
+    EXPECT_TRUE(found) << "reboot tool must appear in tools/list";
+}
+
+// =============================================================================
+// Test Group 5: iConfigurable Persistence
+// =============================================================================
+
+/** applyConfig/serializeConfig round-trip preserves enabled and readOnly state. */
+TEST(McpConfigTest, ConfigPersistenceRoundTrip) {
+    std::vector<IMcpContributor*> contributors;
+    McpServer server;
+    server.begin(contributors, nullptr);
+
+    // Server starts enabled by default
+    EXPECT_TRUE(server.isEnabled());
+
+    // Serialize initial state
+    JsonDocument doc;
+    JsonObject section = doc.to<JsonObject>();
+    server.serializeConfig(section);
+    EXPECT_TRUE(section["enabled"].as<bool>());
+
+    // Simulate persisted config with enabled=false
+    section["enabled"] = false;
+    server.applyConfig(section);
+    EXPECT_FALSE(server.isEnabled());
+
+    // Verify re-serialization reflects the change
+    JsonDocument verifyDoc;
+    JsonObject verifySection = verifyDoc.to<JsonObject>();
+    server.serializeConfig(verifySection);
+    EXPECT_FALSE(verifySection["enabled"].as<bool>());
+}
+
+/** resetConfig() restores enabled=true and readOnly=true defaults. */
+TEST(McpConfigTest, ResetRestoresDefaults) {
+    std::vector<IMcpContributor*> contributors;
+    McpServer server;
+    server.begin(contributors, nullptr);
+
+    // Force non-default state
+    JsonDocument doc;
+    JsonObject section = doc.to<JsonObject>();
+    section["enabled"] = false;
+    section["readOnly"] = false;
+    server.applyConfig(section);
+    EXPECT_FALSE(server.isEnabled());
+
+    // Reset and verify defaults
+    server.resetConfig();
+    EXPECT_TRUE(server.isEnabled());
+
+    // Verify via serialization
+    JsonDocument verifyDoc;
+    JsonObject verifySection = verifyDoc.to<JsonObject>();
+    server.serializeConfig(verifySection);
+    EXPECT_TRUE(verifySection["enabled"].as<bool>());
+    EXPECT_TRUE(verifySection["readOnly"].as<bool>());
+}
+
+/** getConfigNamespace() must return "mcp". */
+TEST(McpConfigTest, NamespaceIsMcp) {
+    McpServer server;
+    EXPECT_STREQ(server.getConfigNamespace(), "mcp");
+}
+
+/** getSchemaVersion() must return 1. */
+TEST(McpConfigTest, SchemaVersionIsOne) {
+    McpServer server;
+    EXPECT_EQ(server.getSchemaVersion(), 1);
 }
 
 // =============================================================================

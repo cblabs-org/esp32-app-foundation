@@ -204,11 +204,19 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors) 
 
         JsonDocument doc;
 
-        // --- Memory metrics ---
-        doc["heap_free"]      = heap_caps_get_free_size(MALLOC_CAP_8BIT);
-        doc["heap_total"]     = heap_caps_get_total_size(MALLOC_CAP_8BIT);
-        doc["heap_min_free"]  = heap_caps_get_minimum_free_size(MALLOC_CAP_8BIT);
-        doc["heap_max_alloc"] = heap_caps_get_largest_free_block(MALLOC_CAP_8BIT);
+        // --- Internal DRAM metrics (always present on all ESP32 variants) ---
+        doc["heap_free"]             = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
+        doc["heap_total"]            = heap_caps_get_total_size(MALLOC_CAP_INTERNAL);
+        doc["heap_min_free"]         = heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL);
+        doc["heap_max_alloc"]        = heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL);
+
+        // --- PSRAM metrics (returns 0 on boards without PSRAM) ---
+        doc["psram_free"]            = heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
+        doc["psram_total"]           = heap_caps_get_total_size(MALLOC_CAP_SPIRAM);
+
+        // --- Combined totals (DEFAULT = internal + PSRAM if available) ---
+        doc["heap_default_free"]     = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
+        doc["heap_default_total"]    = heap_caps_get_total_size(MALLOC_CAP_DEFAULT);
 
         // --- Storage metrics (LittleFS) ---
         doc["storage_used"]   = LittleFS.usedBytes();

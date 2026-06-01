@@ -188,11 +188,25 @@
       // --- Memory & storage bars ---
       const memBars = document.getElementById('sys-memory-bars');
       const heapTotal = data.heap_total || 1;
-      memBars.innerHTML =
-        progressBarHTML('Free Heap', data.heap_free || 0, heapTotal, 'bytes') +
-        progressBarHTML('Min Free (Watermark)', data.heap_min_free || 0, heapTotal, 'bytes') +
-        progressBarHTML('Max Block', data.heap_max_alloc || 0, heapTotal, 'bytes') +
-        progressBarHTML('Storage Used', data.storage_used || 0, data.storage_total || 1, 'bytes');
+      let memHTML = '';
+
+      // --- Section 1: Internal DRAM ---
+      memHTML += '<div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:0.4rem;">Internal DRAM</div>';
+      memHTML += progressBarHTML('Free Heap', data.heap_free || 0, heapTotal, 'bytes');
+      memHTML += progressBarHTML('Min Free (Watermark)', data.heap_min_free || 0, heapTotal, 'bytes');
+      memHTML += progressBarHTML('Largest Free Block', data.heap_max_alloc || 0, heapTotal, 'bytes');
+
+      // --- Section 2: PSRAM (only shown when available) ---
+      if ((data.psram_total || 0) > 0) {
+        memHTML += '<div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.05em; margin:0.75rem 0 0.4rem;">PSRAM</div>';
+        memHTML += progressBarHTML('PSRAM Free', data.psram_free || 0, data.psram_total, 'bytes');
+      }
+
+      // --- Section 3: Storage ---
+      memHTML += '<div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.05em; margin:0.75rem 0 0.4rem;">Storage</div>';
+      memHTML += progressBarHTML('Storage Used', data.storage_used || 0, data.storage_total || 1, 'bytes');
+
+      memBars.innerHTML = memHTML;
 
       // --- Network info ---
       const netInfo = document.getElementById('sys-network-info');

@@ -44,7 +44,7 @@ struct FrameworkConfig {
     const char* timezone              = "GMT0";            ///< POSIX timezone string
     bool        firmwareUpdatesEnabled = true;             ///< OTA update kill-switch
     uint8_t     otaQuietHour          = 3;                 ///< Hour to suppress OTA (0-23)
-    bool        mcpReadOnly           = false;             ///< Prevent state mutation via MCP
+    bool        mcpReadOnly           = true;              ///< Prevent state mutation via MCP (secure-by-default)
     const char* otaPublicKey          = nullptr;           ///< PEM-encoded RSA public key for OTA signature verification (nullptr = skip)
     const char* otaGithubRepo         = nullptr;           ///< GitHub repository in "owner/repo" format for OTA releases
     const char* otaGithubToken        = nullptr;           ///< Optional GitHub access token for private repos

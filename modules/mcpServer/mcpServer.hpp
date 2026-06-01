@@ -16,14 +16,24 @@
  *              a mock Serial class is provided so the module compiles for the
  *              native test runner.
  *
+ *              Implements iConfigurable (namespace "mcp") for runtime toggle
+ *              persistence. The _mcpEnabled flag gates all Serial/HTTP processing;
+ *              _mcpReadOnly blocks tools tagged with mutatesState = true.
+ *
  * Exported Functions/Classes:
  * - McpServer: MCP JSON-RPC server over Serial transport
- *   - begin():          Register built-in tools, collect contributor tools, and start serving
- *   - tick():           Poll Serial for incoming JSON-RPC lines (hardware only)
- *   - registerRoutes(): Register REST API routes (IWebContributor)
- *   - getTabName():     Return "MCP" for portal tab
- *   - getParentTab():   Return "System" for navigation hierarchy
- *   - getTabOrder():    Return 30 for pill ordering
+ *   - begin():             Register built-in tools, collect contributor tools, and start serving
+ *   - tick():              Poll Serial for incoming JSON-RPC lines (hardware only)
+ *   - processRequest():    Process a single JSON-RPC request via Print stream
+ *   - registerRoutes():    Register REST API routes (IWebContributor)
+ *   - isEnabled():         Query whether the MCP server is currently enabled
+ *   - getConfigNamespace(): Return "mcp" for iConfigurable gateway
+ *   - applyConfig():       Apply persisted MCP settings from JSON
+ *   - serializeConfig():   Serialize current MCP settings to JSON
+ *   - resetConfig():       Restore secure defaults
+ *   - getTabName():        Return "MCP" for portal tab
+ *   - getParentTab():      Return "System" for navigation hierarchy
+ *   - getTabOrder():       Return 30 for pill ordering
  */
 #pragma once
 
@@ -118,6 +128,7 @@
 #include "mcpToolRegistry.hpp"
 #include "mcpBuiltinTools.hpp"
 #include "../../include/interfaces/IWebContributor.hpp"
+#include "../../include/interfaces/iConfigurable.hpp"
 
 // Forward-declare to avoid pulling in the full headers
 class IMcpContributor;
@@ -130,8 +141,11 @@ struct FrameworkConfig;
  * The server collects tools from all registered IMcpContributor modules
  * during begin() and processes incoming JSON-RPC requests in tick().
  * Supports: initialize, ping, tools/list, tools/call.
+ *
+ * Also implements iConfigurable (namespace "mcp") so runtime toggle
+ * state (enabled/readOnly) persists across reboots via ConfigManager.
  */
-class McpServer : public IWebContributor {
+class McpServer : public IWebContributor, public iConfigurable {
 public:
     /**
      * @brief Initialise the MCP server: register built-in and contributor tools.
@@ -169,6 +183,12 @@ public:
      */
     void setDisplayInfo(const DisplayInfo& info);
 
+    /**
+     * @brief Query whether the MCP server is currently enabled.
+     * @return true if the server is processing requests; false if disabled.
+     */
+    bool isEnabled() const { return _mcpEnabled; }
+
     // -----------------------------------------------------------------------
     // IWebContributor Implementation
     // -----------------------------------------------------------------------
@@ -196,6 +216,40 @@ public:
      */
     int getTabOrder() const override { return 30; }
 
+    // -----------------------------------------------------------------------
+    // iConfigurable Implementation
+    // -----------------------------------------------------------------------
+    /**
+     * @brief Return the config namespace for MCP settings persistence.
+     * @return "mcp"
+     */
+    const char* getConfigNamespace() const override;
+
+    /**
+     * @brief Return the current config schema version.
+     * @return 1 (initial schema)
+     */
+    int getSchemaVersion() const override;
+
+    /**
+     * @brief Apply MCP settings from a parsed JSON config section.
+     * @param section JSON object containing "enabled" and "readOnly" keys.
+     */
+    void applyConfig(const JsonObject& section) override;
+
+    /**
+     * @brief Serialize current MCP settings into a JSON config section.
+     * @param section Mutable JSON object to write "enabled" and "readOnly" into.
+     */
+    void serializeConfig(JsonObject& section) const override;
+
+    /**
+     * @brief Reset MCP settings to secure factory defaults.
+     *
+     * Defaults: enabled = true, readOnly = true (secure-by-default).
+     */
+    void resetConfig() override;
+
 #ifdef NATIVE_BUILD
     /**
      * @brief Expose _processLine for native unit tests.
@@ -209,7 +263,9 @@ private:
     McpToolRegistry* _registryPtr = nullptr;      ///< Pointer for list_tools lambda capture
     String          _inputBuffer;                 ///< Accumulator for incoming Serial bytes
     bool            _initialized = false;         ///< Guard: begin() must be called first
+    bool            _mcpEnabled  = true;          ///< Master on/off switch — false disables all processing
     bool            _mcpReadOnly = false;         ///< Guard: if true, mutating tools return error
+    ConfigManager*  _configManager = nullptr;     ///< Cached for runtime config persistence
     const FrameworkConfig* _frameworkConfig = nullptr; ///< Cached reference for status endpoint
 
     /**

@@ -36,6 +36,12 @@ public:
 
     /**
      * @brief Register all MCP tools this module provides.
+     *
+     * Contributors MUST declare mutatesState = true on any tool that writes
+     * data, changes device state, or triggers actions. When the MCP server
+     * is in read-only mode, tools with mutatesState = true are blocked with
+     * error code -32000.
+     *
      * @param registry The McpToolRegistry to register tools with.
      */
     virtual void registerMcpTools(McpToolRegistry& registry) = 0;

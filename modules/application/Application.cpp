@@ -127,6 +127,7 @@ bool Application::begin(const FrameworkConfig& config) {
     _wifiManager.setConfigManager(&_configManager);
     _wifiManager.setKeyManager(&_keyManager);
     _configManager.registerModule(&_wifiManager);
+    _configManager.registerModule(&_mcpServer);
     // Downstream modules (U8g2DisplayModule, etc.) are registered by app code
     // via getConfigManager().registerModule() before begin() is called.
 

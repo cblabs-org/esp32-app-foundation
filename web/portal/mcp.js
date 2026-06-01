@@ -1,6 +1,7 @@
 // web/portal/mcp.js
-// System → MCP sub-pill — MCP server status and configuration.
-// Displays server state, tool count, read-only mode, and hostname.
+// System → MCP sub-pill — MCP server runtime controls and tool inventory.
+// Provides interactive toggles for enabled/readOnly with config persistence,
+// a tool list with mutatesState badges, and protocol info.
 
 (function() {
   const container = document.getElementById('tab-mcp');
@@ -11,15 +12,15 @@
   // -------------------------------------------------------------------------
   container.innerHTML = `
     <article>
-      <header>MCP Server Status</header>
-      <div id="mcp-status-info">
+      <header>MCP Server Controls</header>
+      <div id="mcp-controls">
         <p style="color: var(--text-muted);">Loading...</p>
       </div>
     </article>
 
     <article>
-      <header>Configuration</header>
-      <div id="mcp-config-info">
+      <header>Registered Tools</header>
+      <div id="mcp-tools-list">
         <p style="color: var(--text-muted);">Loading...</p>
       </div>
     </article>
@@ -38,51 +39,149 @@
   `;
 
   // -------------------------------------------------------------------------
-  // Helper: Render a key/value info row
+  // Helper: Render a toggle row with label and switch
   // -------------------------------------------------------------------------
-  function infoRow(label, value) {
+  function toggleRow(id, label, description, checked) {
     return `
-      <div style="display:flex; justify-content:space-between; padding:0.4rem 0; border-bottom:1px solid var(--border); font-size:0.85rem;">
-        <span style="color:var(--text-muted);">${label}</span>
-        <strong>${value}</strong>
+      <div style="display:flex; justify-content:space-between; align-items:center; padding:0.6rem 0; border-bottom:1px solid var(--border);">
+        <div>
+          <span style="font-size:0.85rem; font-weight:600;">${label}</span>
+          <span style="display:block; font-size:0.75rem; color:var(--text-muted); margin-top:2px;">${description}</span>
+        </div>
+        <label class="toggle-switch" style="position:relative; width:44px; height:24px; flex-shrink:0;">
+          <input type="checkbox" id="${id}" ${checked ? 'checked' : ''}
+                 style="opacity:0; width:0; height:0;">
+          <span style="position:absolute; cursor:pointer; top:0; left:0; right:0; bottom:0;
+                       background:${checked ? 'var(--primary)' : '#ccc'};
+                       border-radius:24px; transition:0.3s;">
+            <span style="position:absolute; height:18px; width:18px; left:${checked ? '22px' : '3px'}; bottom:3px;
+                         background:white; border-radius:50%; transition:0.3s; box-shadow:0 1px 3px rgba(0,0,0,0.3);"></span>
+          </span>
+        </label>
       </div>
     `;
   }
 
   // -------------------------------------------------------------------------
-  // Fetch and render MCP status + config
+  // Helper: Render a tool entry with mutatesState badge
+  // -------------------------------------------------------------------------
+  function toolRow(tool) {
+    const badge = tool.mutatesState
+      ? '<span style="background:#ff8f00; color:white; font-size:0.65rem; padding:1px 6px; border-radius:8px; margin-left:8px; font-weight:600;">MUTATING</span>'
+      : '<span style="background:#43a047; color:white; font-size:0.65rem; padding:1px 6px; border-radius:8px; margin-left:8px; font-weight:600;">READ-ONLY</span>';
+    return `
+      <div style="padding:0.5rem 0; border-bottom:1px solid var(--border); font-size:0.85rem;">
+        <div style="display:flex; align-items:center;">
+          <code style="font-weight:600;">${tool.name}</code>
+          ${badge}
+        </div>
+        <div style="color:var(--text-muted); font-size:0.75rem; margin-top:2px;">${tool.description || ''}</div>
+      </div>
+    `;
+  }
+
+  // -------------------------------------------------------------------------
+  // Toggle handler: POST to /api/mcp/config
+  // -------------------------------------------------------------------------
+  async function handleToggle(key, value) {
+    try {
+      const body = {};
+      body[key] = value;
+      await window.apiFetch('/api/mcp/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+    } catch (error) {
+      console.error('Failed to update MCP config:', error);
+      // Reload to restore correct state
+      loadMcpInfo();
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Wire toggle switch behavior (visual + API call)
+  // -------------------------------------------------------------------------
+  function wireToggle(id, key) {
+    const input = document.getElementById(id);
+    if (!input) return;
+
+    input.addEventListener('change', (e) => {
+      const checked = e.target.checked;
+      // Update visual state immediately
+      const slider = input.nextElementSibling;
+      const dot = slider.querySelector('span');
+      slider.style.background = checked ? 'var(--primary)' : '#ccc';
+      dot.style.left = checked ? '22px' : '3px';
+      handleToggle(key, checked);
+    });
+  }
+
+  // -------------------------------------------------------------------------
+  // Fetch and render MCP status, config, and tool list
   // -------------------------------------------------------------------------
   async function loadMcpInfo() {
     try {
-      // Fetch both endpoints
+      // Fetch status and config
       const status = await window.apiFetch('/api/mcp/status');
       const config = await window.apiFetch('/api/mcp/config');
 
-      // --- Status card ---
-      const statusEl = document.getElementById('mcp-status-info');
-      const initBadge = status.initialized
-        ? '<span style="color:#2e7d32;">● Active</span>'
-        : '<span style="color:#c62828;">● Inactive</span>';
-      const readOnlyBadge = status.readOnly
-        ? '<span style="color:#f9a825;">⚠ Read-Only</span>'
-        : '<span style="color:#2e7d32;">Read-Write</span>';
+      // --- Controls card ---
+      const controlsEl = document.getElementById('mcp-controls');
 
-      statusEl.innerHTML =
-        infoRow('Server', initBadge) +
-        infoRow('Mode', readOnlyBadge) +
-        infoRow('Registered Tools', status.toolCount || 0);
+      const enabledVal = config.enabled !== undefined ? config.enabled : true;
+      const readOnlyVal = config.readOnly !== undefined ? config.readOnly : true;
 
-      // --- Config card ---
-      const configEl = document.getElementById('mcp-config-info');
-      configEl.innerHTML =
-        infoRow('Read-Only Mode', config.mcpReadOnly ? 'Enabled' : 'Disabled') +
-        infoRow('Device Hostname', config.hostname || 'N/A');
+      controlsEl.innerHTML =
+        toggleRow('mcp-toggle-enabled', 'Server Enabled',
+                  'When disabled, all Serial and HTTP MCP requests are rejected (503)',
+                  enabledVal) +
+        toggleRow('mcp-toggle-readonly', 'Read-Only Mode',
+                  'When enabled, tools with mutatesState = true are blocked',
+                  readOnlyVal) +
+        `<div style="display:flex; justify-content:space-between; padding:0.5rem 0; font-size:0.8rem; color:var(--text-muted);">
+          <span>Registered Tools: <strong>${status.toolCount || 0}</strong></span>
+          <span>Status: ${status.initialized
+            ? '<span style="color:#2e7d32;">● Active</span>'
+            : '<span style="color:#c62828;">● Inactive</span>'}</span>
+        </div>`;
+
+      wireToggle('mcp-toggle-enabled', 'enabled');
+      wireToggle('mcp-toggle-readonly', 'readOnly');
+
+      // --- Tools list: fetch via JSON-RPC tools/list ---
+      try {
+        const rpcResponse = await window.apiFetch('/api/mcp', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            jsonrpc: '2.0',
+            id: 1,
+            method: 'tools/list'
+          })
+        });
+
+        const toolsEl = document.getElementById('mcp-tools-list');
+        if (rpcResponse && rpcResponse.result && rpcResponse.result.tools) {
+          const tools = rpcResponse.result.tools;
+          if (tools.length === 0) {
+            toolsEl.innerHTML = '<p style="color:var(--text-muted); font-size:0.85rem;">No tools registered.</p>';
+          } else {
+            toolsEl.innerHTML = tools.map(toolRow).join('');
+          }
+        } else {
+          toolsEl.innerHTML = '<p style="color:var(--text-muted); font-size:0.85rem;">Unable to fetch tool list.</p>';
+        }
+      } catch (toolErr) {
+        document.getElementById('mcp-tools-list').innerHTML =
+          '<p style="color:var(--text-muted); font-size:0.85rem;">Tool list unavailable (server may be disabled).</p>';
+      }
 
     } catch (error) {
-      document.getElementById('mcp-status-info').innerHTML =
+      document.getElementById('mcp-controls').innerHTML =
         '<p style="color: var(--error);">Failed to load MCP status.</p>';
-      document.getElementById('mcp-config-info').innerHTML =
-        '<p style="color: var(--error);">Failed to load MCP config.</p>';
+      document.getElementById('mcp-tools-list').innerHTML =
+        '<p style="color: var(--error);">Failed to load tool list.</p>';
     }
   }
 
