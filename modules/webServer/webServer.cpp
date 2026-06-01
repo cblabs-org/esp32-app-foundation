@@ -7,13 +7,15 @@
  * To view a copy of this license, visit https://creativecommons.org/licenses/by-nc-sa/4.0/
  *
  * Module: modules/webServer/webServer.cpp
- * Description: Implementation of WebServerManager — enhanced for WO2 with:
+ * Description: Implementation of WebServerManager — enhanced for WO2/WO4 with:
  *              - Heap guard (atomic semaphore + largest-free-block check)
  *              - Enhanced /api/system endpoint (20+ fields)
  *              - GET /api/app (application metadata)
+ *              - GET /api/tabs (tab hierarchy for navigation)
  *              - POST /api/system/restart (armed restart)
  *              - POST /api/system/factory-reset (full erase + restart)
  *              - POST body size guard pattern for all POST routes
+ *              - PROGMEM static routes for all portal assets (WO4)
  *
  * Exported Functions/Classes:
  * - WebServerManager: see webServer.hpp
@@ -27,9 +29,14 @@
 #include "portal_assets/index_html.hpp"
 #include "portal_assets/app_css.hpp"
 #include "portal_assets/app_js.hpp"
+#include "portal_assets/utils_js.hpp"
 #include "portal_assets/system_js.hpp"
 #include "portal_assets/wifi_js.hpp"
 #include "portal_assets/ota_js.hpp"
+#include "portal_assets/backup_js.hpp"
+#include "portal_assets/keys_js.hpp"
+#include "portal_assets/mcp_js.hpp"
+#include "portal_assets/screenshot_js.hpp"
 #endif
 
 #include "platform/LogShim.h"
@@ -117,6 +124,36 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors) 
 
     _server.on("/ota.js", HTTP_GET, [](AsyncWebServerRequest* request) {
         AsyncWebServerResponse *response = request->beginResponse(200, "application/javascript", ota_js_gz, ota_js_gz_len);
+        response->addHeader("Content-Encoding", "gzip");
+        request->send(response);
+    });
+
+    _server.on("/utils.js", HTTP_GET, [](AsyncWebServerRequest* request) {
+        AsyncWebServerResponse *response = request->beginResponse(200, "application/javascript", utils_js_gz, utils_js_gz_len);
+        response->addHeader("Content-Encoding", "gzip");
+        request->send(response);
+    });
+
+    _server.on("/backup.js", HTTP_GET, [](AsyncWebServerRequest* request) {
+        AsyncWebServerResponse *response = request->beginResponse(200, "application/javascript", backup_js_gz, backup_js_gz_len);
+        response->addHeader("Content-Encoding", "gzip");
+        request->send(response);
+    });
+
+    _server.on("/keys.js", HTTP_GET, [](AsyncWebServerRequest* request) {
+        AsyncWebServerResponse *response = request->beginResponse(200, "application/javascript", keys_js_gz, keys_js_gz_len);
+        response->addHeader("Content-Encoding", "gzip");
+        request->send(response);
+    });
+
+    _server.on("/mcp.js", HTTP_GET, [](AsyncWebServerRequest* request) {
+        AsyncWebServerResponse *response = request->beginResponse(200, "application/javascript", mcp_js_gz, mcp_js_gz_len);
+        response->addHeader("Content-Encoding", "gzip");
+        request->send(response);
+    });
+
+    _server.on("/screenshot.js", HTTP_GET, [](AsyncWebServerRequest* request) {
+        AsyncWebServerResponse *response = request->beginResponse(200, "application/javascript", screenshot_js_gz, screenshot_js_gz_len);
         response->addHeader("Content-Encoding", "gzip");
         request->send(response);
     });
