@@ -33,6 +33,7 @@
 #ifndef NATIVE_BUILD
     #include <Arduino.h>
     #include "esp_system.h"
+    #include "esp_heap_caps.h"
     #include <base64.h>
 #endif
 
@@ -104,20 +105,38 @@ void mcpBuiltinTools::registerAll(McpToolRegistry& registry,
         [](JsonObject& params, JsonObject& result) {
             (void)params; // No input parameters required
             #ifndef NATIVE_BUILD
-                result["heap_free"]      = ESP.getFreeHeap();
-                result["heap_max_alloc"] = ESP.getMaxAllocHeap();
-                result["uptime_seconds"] = millis() / 1000;
-                result["chip_model"]     = ESP.getChipModel();
-                result["chip_cores"]     = ESP.getChipCores();
-                result["flash_size"]     = ESP.getFlashChipSize();
+                // --- Internal DRAM metrics (always present on all ESP32 variants) ---
+                result["heap_free"]          = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
+                result["heap_total"]         = heap_caps_get_total_size(MALLOC_CAP_INTERNAL);
+                result["heap_min_free"]      = heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL);
+                result["heap_max_alloc"]     = heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL);
+
+                // --- PSRAM metrics (returns 0 on boards without PSRAM) ---
+                result["psram_free"]         = heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
+                result["psram_total"]        = heap_caps_get_total_size(MALLOC_CAP_SPIRAM);
+
+                // --- Combined totals (DEFAULT = internal + PSRAM if available) ---
+                result["heap_default_free"]  = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
+                result["heap_default_total"] = heap_caps_get_total_size(MALLOC_CAP_DEFAULT);
+
+                result["uptime_seconds"]     = millis() / 1000;
+                result["chip_model"]         = ESP.getChipModel();
+                result["chip_cores"]         = ESP.getChipCores();
+                result["flash_size"]         = ESP.getFlashChipSize();
             #else
                 // Native build stubs — no hardware telemetry available
-                result["heap_free"]      = 0;
-                result["heap_max_alloc"] = 0;
-                result["uptime_seconds"] = 0;
-                result["chip_model"]     = "native";
-                result["chip_cores"]     = 0;
-                result["flash_size"]     = 0;
+                result["heap_free"]          = 0;
+                result["heap_total"]         = 0;
+                result["heap_min_free"]      = 0;
+                result["heap_max_alloc"]     = 0;
+                result["psram_free"]         = 0;
+                result["psram_total"]        = 0;
+                result["heap_default_free"]  = 0;
+                result["heap_default_total"] = 0;
+                result["uptime_seconds"]     = 0;
+                result["chip_model"]         = "native";
+                result["chip_cores"]         = 0;
+                result["flash_size"]         = 0;
             #endif
             result["firmware_version"] = APP_FOUNDATION_VERSION;
         }

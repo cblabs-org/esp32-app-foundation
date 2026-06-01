@@ -16,6 +16,10 @@
 #include "webServer.hpp"
 #include <ArduinoJson.h>
 
+#ifndef NATIVE_BUILD
+    #include "esp_heap_caps.h"
+#endif
+
 // Portal PROGMEM assets — hardware only (require Arduino.h for PROGMEM macro)
 #ifndef NATIVE_BUILD
 #include "portal_assets/index_html.hpp"
@@ -113,9 +117,22 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors) 
 
     _server.on("/api/system", HTTP_GET, [](AsyncWebServerRequest* request) {
         JsonDocument doc;
-        doc["heap"] = ESP.getFreeHeap();
+
+        // --- Internal DRAM metrics (always present on all ESP32 variants) ---
+        doc["heap_free"]             = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
+        doc["heap_total"]            = heap_caps_get_total_size(MALLOC_CAP_INTERNAL);
+        doc["heap_min_free"]         = heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL);
+        doc["heap_max_alloc"]        = heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL);
+
+        // --- PSRAM metrics (returns 0 on boards without PSRAM) ---
+        doc["psram_free"]            = heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
+        doc["psram_total"]           = heap_caps_get_total_size(MALLOC_CAP_SPIRAM);
+
+        // --- Combined totals (DEFAULT = internal + PSRAM if available) ---
+        doc["heap_default_free"]     = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
+        doc["heap_default_total"]    = heap_caps_get_total_size(MALLOC_CAP_DEFAULT);
+
         doc["uptime"] = millis() / 1000;
-        doc["max_alloc"] = ESP.getMaxAllocHeap();
         doc["status"] = "ok";
         String out;
         serializeJson(doc, out);
