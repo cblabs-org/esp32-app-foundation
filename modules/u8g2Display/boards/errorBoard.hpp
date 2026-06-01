@@ -7,35 +7,40 @@
  * To view a copy of this license, visit https://creativecommons.org/licenses/by-nc-sa/4.0/
  *
  * Module: modules/u8g2Display/boards/errorBoard.hpp
- * Description: Display board for fatal and non-fatal error messages. Shows an
- *              "ERROR" header in bold with the error text below. Fatal errors
- *              include a "System halted" indicator and never auto-expire.
- *              Non-fatal errors can be dismissed manually via dismiss().
+ * Description: Display board for fatal and non-fatal error messages. Extends
+ *              MessageBoardBase to inherit systemMessageWidget composition,
+ *              dismiss(), and render(). Adds fatal-error semantics where
+ *              fatal errors never auto-expire.
  *
  * Exported Classes:
- * - ErrorBoard: Error message display implementing IDisplayBoard
+ * - ErrorBoard: Error message display extending MessageBoardBase
  *   - showError():    Set the error message and fatal flag
- *   - dismiss():      Manually dismiss the error (marks board as expired)
- *   - render():       Draw the error UI to the U8G2 display buffer
- *   - isExpired():    True when the error has been dismissed
+ *   - isExpired():    Override — fatal errors never expire
  *   - getBoardName(): Returns "SYS: Error"
  */
 
 #pragma once
 
-#include "interfaces/IDisplayBoard.hpp"
-#include "widgets/systemMessageWidget.hpp"
+#include "messageBoardBase.hpp"
 
 /**
  * @brief Error message display board.
  *
- * Shows a bold "ERROR" header with the error message text via systemMessageWidget
- * composition. Fatal errors additionally display a "System halted" indicator
- * and are never auto-expired by the carousel engine. Non-fatal errors can be
- * manually dismissed.
+ * Extends MessageBoardBase to show a bold "ERROR" header with the error message
+ * text via systemMessageWidget composition. Fatal errors additionally display
+ * a "System halted" indicator and are never auto-expired by the carousel engine.
  */
-class ErrorBoard : public IDisplayBoard {
+class ErrorBoard : public MessageBoardBase {
 public:
+    /**
+     * @brief Construct with display dimensions for widget layout.
+     * @param displayWidth  Display width in pixels (from U8G2 driver).
+     * @param displayHeight Display height in pixels (from U8G2 driver).
+     */
+    ErrorBoard(uint16_t displayWidth, uint16_t displayHeight)
+        : MessageBoardBase(displayWidth, displayHeight)
+    {}
+
     /**
      * @brief Display an error message.
      * @param message Null-terminated error text. Safely truncated to fit the
@@ -46,23 +51,12 @@ public:
     void showError(const char* message, bool fatal = false);
 
     /**
-     * @brief Manually dismiss the error, causing the board to expire.
-     */
-    void dismiss();
-
-    /**
-     * @brief Render the error screen into the U8G2 display buffer.
-     *
-     * Delegates to a systemMessageWidget to draw "ERROR" header and the
-     * error message. Fatal errors include a "System halted" indicator.
-     *
-     * @param u8g2 Reference to the active U8G2 driver instance.
-     */
-    void render(U8G2& u8g2) override;
-
-    /**
      * @brief Query whether the error has been dismissed.
-     * @return true when dismiss() has been called.
+     *
+     * Overrides MessageBoardBase::isExpired() to prevent fatal errors from
+     * ever expiring, even if dismiss() is called.
+     *
+     * @return true when dismiss() has been called AND the error is non-fatal.
      */
     bool isExpired() const override;
 
@@ -74,9 +68,5 @@ public:
 
 private:
     char _errorMessage[64] = "";   ///< Error message text
-    bool _dismissed = false;       ///< True when the error has been dismissed
     bool _fatal     = false;       ///< True for fatal errors (shows halt indicator)
-
-    // --- Widget composition (WO3 refactor) ---
-    systemMessageWidget _msgWidget{0, 0, 128, 64}; ///< Centred error message display
 };

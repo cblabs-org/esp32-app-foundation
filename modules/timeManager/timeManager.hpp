@@ -31,6 +31,8 @@
 #include <time.h>
 #endif
 
+#include "../../include/interfaces/ITickable.hpp"
+
 /**
  * @brief Enum representing the current NTP synchronization status
  */
@@ -42,11 +44,14 @@ enum class TimeSyncStatus {
 
 /**
  * @brief Kernel service that manages NTP synchronization and POSIX timezone rules.
+ *
+ * Implements ITickable so it can be registered in the Application tick dispatch
+ * vector alongside other periodic services.
  */
-class TimeManager {
+class TimeManager : public ITickable {
 public:
     TimeManager() = default;
-    ~TimeManager() = default;
+    ~TimeManager() override = default;
 
     /**
      * @brief Initializes NTP config and sets the POSIX timezone.
@@ -61,7 +66,7 @@ public:
      * @brief Non-blocking update routine to be called in main loop.
      * Handled NTP state machine and time sync events.
      */
-    void tick();
+    void tick() override;
 
     /**
      * @brief Sets POSIX timezone string.

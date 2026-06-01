@@ -8,9 +8,10 @@
  *
  * Module: test/test_unit/test_u8g2Display/test_config.cpp
  * Description: GoogleTest unit-test suite for the U8g2DisplayModule's
- *              iConfigurable implementation. Validates that resetConfig()
- *              sets factory defaults, loadConfig() and saveConfig() return
- *              true in NATIVE_BUILD, and runtime setters work correctly.
+ *              iConfigurable implementation (new 6-method gateway interface).
+ *              Validates that resetConfig() sets factory defaults,
+ *              applyConfig() accepts a JSON section, serializeConfig() writes
+ *              expected keys, and runtime setters work correctly.
  *
  * Exported Functions:
  * - (GoogleTest fixtures — discovered automatically by gtest_main)
@@ -20,7 +21,7 @@
 #include "u8g2DisplayModule.hpp"
 
 // =============================================================================
-// Test Group: iConfigurable — config load/save/reset
+// Test Group: iConfigurable — config apply/serialize/reset
 // =============================================================================
 
 class ConfigTest : public ::testing::Test {
@@ -28,14 +29,48 @@ protected:
     U8g2DisplayModule display; ///< Fresh module instance for each test
 };
 
-/** loadConfig must return true in NATIVE_BUILD (no LittleFS). */
-TEST_F(ConfigTest, LoadConfig_NativeBuild_ReturnsTrue) {
-    EXPECT_TRUE(display.loadConfig());
+/** getConfigNamespace must return "display". */
+TEST_F(ConfigTest, GetConfigNamespace_ReturnsDisplay) {
+    EXPECT_STREQ("display", display.getConfigNamespace());
 }
 
-/** saveConfig must return true in NATIVE_BUILD (no LittleFS). */
-TEST_F(ConfigTest, SaveConfig_NativeBuild_ReturnsTrue) {
-    EXPECT_TRUE(display.saveConfig());
+/** getSchemaVersion must return 1. */
+TEST_F(ConfigTest, GetSchemaVersion_ReturnsOne) {
+    EXPECT_EQ(1, display.getSchemaVersion());
+}
+
+/** applyConfig with valid JSON section must not crash. */
+TEST_F(ConfigTest, ApplyConfig_ValidSection_DoesNotCrash) {
+    JsonDocument doc;
+    JsonObject section = doc.to<JsonObject>();
+    section["brightness"] = 128;
+    section["flip"] = true;
+    section["sleepTimeout"] = 60000;
+    section["rotationInterval"] = 5000;
+
+    EXPECT_NO_FATAL_FAILURE(display.applyConfig(section));
+}
+
+/** applyConfig with empty section must apply defaults without crash. */
+TEST_F(ConfigTest, ApplyConfig_EmptySection_AppliesDefaults) {
+    JsonDocument doc;
+    JsonObject section = doc.to<JsonObject>();
+    // Empty section — all keys use fallback defaults
+
+    EXPECT_NO_FATAL_FAILURE(display.applyConfig(section));
+}
+
+/** serializeConfig must produce expected keys. */
+TEST_F(ConfigTest, SerializeConfig_ProducesExpectedKeys) {
+    JsonDocument doc;
+    JsonObject section = doc.to<JsonObject>();
+
+    display.serializeConfig(section);
+
+    EXPECT_TRUE(section.containsKey("brightness"));
+    EXPECT_TRUE(section.containsKey("flip"));
+    EXPECT_TRUE(section.containsKey("sleepTimeout"));
+    EXPECT_TRUE(section.containsKey("rotationInterval"));
 }
 
 /** resetConfig must not crash. */
@@ -43,16 +78,44 @@ TEST_F(ConfigTest, ResetConfig_DoesNotCrash) {
     EXPECT_NO_FATAL_FAILURE(display.resetConfig());
 }
 
-/** After resetConfig, loadConfig still returns true. */
-TEST_F(ConfigTest, ResetConfig_ThenLoadConfig_ReturnsTrue) {
+/** After resetConfig, applyConfig with empty section must not crash. */
+TEST_F(ConfigTest, ResetConfig_ThenApplyConfig_DoesNotCrash) {
     display.resetConfig();
-    EXPECT_TRUE(display.loadConfig());
+    JsonDocument doc;
+    JsonObject section = doc.to<JsonObject>();
+    EXPECT_NO_FATAL_FAILURE(display.applyConfig(section));
 }
 
-/** After resetConfig, saveConfig still returns true. */
-TEST_F(ConfigTest, ResetConfig_ThenSaveConfig_ReturnsTrue) {
+/** After resetConfig, serializeConfig still produces expected keys. */
+TEST_F(ConfigTest, ResetConfig_ThenSerializeConfig_ProducesKeys) {
     display.resetConfig();
-    EXPECT_TRUE(display.saveConfig());
+    JsonDocument doc;
+    JsonObject section = doc.to<JsonObject>();
+    display.serializeConfig(section);
+    EXPECT_TRUE(section.containsKey("brightness"));
+    EXPECT_TRUE(section.containsKey("flip"));
+}
+
+/** Roundtrip: serialize → apply → serialize must produce consistent values. */
+TEST_F(ConfigTest, Roundtrip_SerializeApplySerialize_Consistent) {
+    // Set custom values via applyConfig
+    JsonDocument doc1;
+    JsonObject section1 = doc1.to<JsonObject>();
+    section1["brightness"] = 42;
+    section1["flip"] = true;
+    section1["sleepTimeout"] = 12345;
+    section1["rotationInterval"] = 6789;
+    display.applyConfig(section1);
+
+    // Serialize back
+    JsonDocument doc2;
+    JsonObject section2 = doc2.to<JsonObject>();
+    display.serializeConfig(section2);
+
+    EXPECT_EQ(42, section2["brightness"].as<int>());
+    EXPECT_EQ(true, section2["flip"].as<bool>());
+    EXPECT_EQ(12345, section2["sleepTimeout"].as<unsigned long>());
+    EXPECT_EQ(6789, section2["rotationInterval"].as<unsigned long>());
 }
 
 // =============================================================================

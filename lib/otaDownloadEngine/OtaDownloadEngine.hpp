@@ -42,8 +42,12 @@
 
 #ifndef NATIVE_BUILD
     #include <Arduino.h>
-    // Forward declarations only — heavy headers included in .cpp
-    class WiFiClient;
+    // WiFiClient is a typedef for NetworkClient in the ESP32 Arduino framework.
+    // Forward-declare the real class and replicate the typedef to avoid pulling
+    // the full WiFi library into the LDF dependency graph from this header.
+    class NetworkClient;
+    typedef NetworkClient WiFiClient;
+    // Forward declaration only — heavy HTTPClient header included in .cpp
     class HTTPClient;
 #else
     // --- Native build stubs ---

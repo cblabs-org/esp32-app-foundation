@@ -12,7 +12,7 @@
 #include "../logger/logger.hpp"
 #include <string.h>
 
-#ifndef PIO_UNIT_TESTING
+#ifndef NATIVE_BUILD
 #include <WiFiClientSecure.h>
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
@@ -64,7 +64,7 @@ bool GithubClient::getLatestRelease() {
     releaseDescription = "";
     releaseAssets = 0;
 
-#ifndef PIO_UNIT_TESTING
+#ifndef NATIVE_BUILD
     WiFiClientSecure client;
     client.setCACert(githubRootCACert);
     client.setTimeout(10000);

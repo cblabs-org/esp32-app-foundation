@@ -100,7 +100,6 @@ void OtaProgressBoard::reset() {
  */
 void OtaProgressBoard::render(U8G2& u8g2) {
 #ifndef NATIVE_BUILD
-    // --- Configure widget fonts and alignment ---
     _titleLabel.setFont(AppFonts::defaultMedium());
     _titleLabel.setText("Firmware Update");
     _titleLabel.setAlignment(1); // CENTER

@@ -28,10 +28,15 @@
 #include <stdint.h>
 
 /**
- * @brief Framework-level configuration populated by the app during BOOTING.
+ * @brief Boot-time framework configuration.
  *
- * The app is responsible for reading these values from LittleFS via ConfigManager
- * and passing a populated FrameworkConfig to Application::begin().
+ * Provides initial/default values for core services before ConfigManager
+ * loads persisted state. Once ConfigManager::beginAll() runs, persisted
+ * values (if any) override these defaults via applyConfig().
+ *
+ * In a downstream app, main.cpp populates this struct and passes it to
+ * Application::begin().
+ *
  * All fields have safe defaults so the framework can boot without a config file.
  */
 struct FrameworkConfig {

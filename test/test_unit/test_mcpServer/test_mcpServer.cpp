@@ -246,7 +246,7 @@ TEST(McpBuiltinToolsTest, CaptureDisplayWithDisplay) {
 
     // Create a small synthetic framebuffer (4 bytes)
     uint8_t buffer[] = { 0xAA, 0xBB, 0xCC, 0xDD };
-    mcpBuiltinTools::DisplayInfo display;
+    DisplayInfo display;
     display.framebuffer     = buffer;
     display.framebufferSize = sizeof(buffer);
     display.width           = 16;

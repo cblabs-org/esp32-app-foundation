@@ -139,7 +139,7 @@ void progressBarWidget::tick(uint32_t currentMillis) {
 void progressBarWidget::render(U8G2& display) {
     if (!isVisible) return;
 
-    int renderW = (width > 0) ? width : display.getDisplayWidth();
+    int renderW = (width > 0) ? width : (display.getDisplayWidth() - x);
     int renderH = (height > 0) ? height : 20;
 
     // --- Step 1: Clear the bounding box ---
@@ -209,7 +209,7 @@ void progressBarWidget::renderAnimationUpdate(U8G2& display, uint32_t currentMil
 
         render(display);
 
-        int renderW = (width > 0) ? width : display.getDisplayWidth();
+        int renderW = (width > 0) ? width : (display.getDisplayWidth() - x);
         int renderH = (height > 0) ? height : 20;
         display.updateDisplayArea(x / 8, y / 8, (renderW + 7) / 8, (renderH + 7) / 8);
     }

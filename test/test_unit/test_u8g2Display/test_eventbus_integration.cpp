@@ -124,7 +124,7 @@ TEST_F(EventBusIntegrationTest, OtaProgress_Publish_DelegatesToBoard) {
             } else {
                 self->getOtaProgress().setProgress(ota->progress, ota->status);
             }
-            self->showBoard(&self->getOtaProgress());
+            self->pushModal(&self->getOtaProgress());
         },
         &display);
 
@@ -154,7 +154,7 @@ TEST_F(EventBusIntegrationTest, OtaProgress_Complete_Success_BoardExpires) {
             } else {
                 self->getOtaProgress().setProgress(ota->progress, ota->status);
             }
-            self->showBoard(&self->getOtaProgress());
+            self->pushModal(&self->getOtaProgress());
         },
         &display);
 
@@ -168,15 +168,15 @@ TEST_F(EventBusIntegrationTest, OtaProgress_Complete_Success_BoardExpires) {
     EXPECT_TRUE(display.getOtaProgress().isExpired());
 }
 
-/** Publish display.message — loading board should activate. */
+/** Publish display.message — boot board should activate. */
 TEST_F(EventBusIntegrationTest, DisplayMessage_Publish_ShowsMessage) {
     bus.subscribe("display.message",
         [](const char* topic, const void* payload, void* ctx) {
             auto* self = static_cast<U8g2DisplayModule*>(ctx);
             if (payload == nullptr || self == nullptr) return;
             const auto* msg = static_cast<const DisplayMessagePayload*>(payload);
-            self->getLoading().setStatus(msg->message, -1.0f);
-            self->showBoard(&self->getLoading());
+            self->getBootBoard().setStatus(msg->message, -1.0f);
+            self->pushModal(&self->getBootBoard());
         },
         &display);
 
@@ -187,8 +187,8 @@ TEST_F(EventBusIntegrationTest, DisplayMessage_Publish_ShowsMessage) {
     int delivered = bus.publish("display.message", &payload);
     EXPECT_EQ(delivered, 1);
 
-    // Loading board should be active (used as message overlay)
-    EXPECT_EQ(display.getActiveBoard(), &display.getLoading());
+    // Boot board should be active (used as message overlay)
+    EXPECT_EQ(display.getActiveBoard(), &display.getBootBoard());
 }
 
 /** EventBus with no subscribers must return 0 delivered. */

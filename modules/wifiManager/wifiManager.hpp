@@ -10,15 +10,23 @@
  * Description: Wi-Fi credentials management and connection state machine.
  *              Handles AP captive portal and connection recovery.
  *
+ *              Implements iConfigurable via ConfigManager gateway pattern:
+ *              - Namespace: "wifi" (config stored at /mod/wifi.json)
+ *              - Schema version: 1
+ *              - Hostname is stored in the wifi config section
+ *
  * Exported Functions/Classes:
  * - WifiManager: Standard ESP32 WiFi lifecycle manager.
  *   - begin(): Connects to station or initializes AP recovery mode.
  *   - tick(): State machine for connection monitoring.
- *   - loadConfig(): Load credentials from LittleFS.
- *   - saveConfig(): Save credentials to LittleFS.
- *   - resetConfig(): Clear credentials.
- *   - updateWiFi(): Persists new credentials to non-volatile storage.
+ *   - getConfigNamespace(): Return "wifi"
+ *   - getSchemaVersion():   Return 1
+ *   - applyConfig():        Apply WiFi config from JSON section
+ *   - serializeConfig():    Serialize WiFi config to JSON section
+ *   - resetConfig():        Clear credentials.
+ *   - updateWiFi(): Persists new credentials and restarts the WiFi state machine.
  *   - testConnection(): Validation probe for new credentials.
+ *   - setConfigManager(): Wire the ConfigManager pointer for save operations.
  */
 
 #pragma once
@@ -60,11 +68,15 @@ public:
 };
 #endif
 
+// Forward declarations — avoids circular include with configManager.hpp / keyManager.hpp
+class ConfigManager;
+class KeyManager;
+
 
 /**
  * @brief Class managing WiFi connectivity and configuration.
- *        Implements ITickable for state machine, iConfigurable for persistent config,
- *        and IWebContributor for REST API endpoints.
+ *        Implements ITickable for state machine, iConfigurable for persistent config
+ *        (via ConfigManager gateway), and IWebContributor for REST API endpoints.
  */
 class WifiManager : public ITickable, public iConfigurable, public IWebContributor {
 private:
@@ -90,6 +102,11 @@ private:
     char myUrl[24];                        ///< Formatted string URL for local IP
     unsigned long lastApiRequestTime = 0;  ///< Last time an API request was received
 
+    bool _reconnectRequested = false;        ///< Deferred reconnect flag (set by updateWiFi, acted on by tick)
+
+    ConfigManager* _configManager = nullptr; ///< Pointer to ConfigManager for save operations
+    KeyManager* _keyManager = nullptr;       ///< Pointer to KeyManager for encrypted password storage
+
     std::unique_ptr<DNSServer> dnsServer;
 
     void transitionTo(WiFiState newState);
@@ -105,22 +122,41 @@ public:
      */
     void begin(const char* hostname);
 
-    // --- iConfigurable Interface ---
+    // --- iConfigurable Interface (ConfigManager Gateway) ---
 
     /**
-     * @brief Load module configuration from LittleFS.
-     * @return true if successful
+     * @brief Return the config namespace for WiFi settings.
+     * @return "wifi"
      */
-    bool loadConfig() override;
+    const char* getConfigNamespace() const override { return "wifi"; }
 
     /**
-     * @brief Save module configuration to LittleFS.
-     * @return true if successful
+     * @brief Return the current schema version for WiFi config.
+     * @return 1
      */
-    bool saveConfig() override;
+    int getSchemaVersion() const override { return 1; }
 
     /**
-     * @brief Reset module configuration to factory defaults.
+     * @brief Apply WiFi configuration from a parsed JSON section.
+     *
+     * Reads "ssid" and "hostname" from the section. Password is retrieved
+     * from KeyManager (AES-256 encrypted) rather than from config files.
+     *
+     * @param section Read-only JSON object containing config keys.
+     */
+    void applyConfig(const JsonObject& section) override;
+
+    /**
+     * @brief Serialize current WiFi configuration into a JSON section.
+     *
+     * Writes "ssid" and "hostname" to the section. Password is NOT serialised.
+     *
+     * @param section Mutable JSON object to write config into.
+     */
+    void serializeConfig(JsonObject& section) const override;
+
+    /**
+     * @brief Reset WiFi configuration to factory defaults.
      */
     void resetConfig() override;
 
@@ -141,11 +177,29 @@ public:
 
     /**
      * @brief Get the UI tab name for this contributor.
-     * @return String name of the tab, or nullptr if no UI tab.
+     * @return "WiFi"
      */
     const char* getTabName() const override { return "WiFi"; }
 
+    /**
+     * @brief Get the tab display order. WiFi is the primary/first tab.
+     * @return 10
+     */
+    int getTabOrder() const override { return 10; }
+
     // --- Custom Methods ---
+
+    /**
+     * @brief Wire the ConfigManager pointer for save operations.
+     * @param cm Pointer to the ConfigManager instance.
+     */
+    void setConfigManager(ConfigManager* cm) { _configManager = cm; }
+
+    /**
+     * @brief Wire the KeyManager pointer for encrypted password storage.
+     * @param km Pointer to the KeyManager instance.
+     */
+    void setKeyManager(KeyManager* km) { _keyManager = km; }
 
     /**
      * @brief Record that an API request was received to keep AP mode alive.
@@ -153,7 +207,13 @@ public:
     void notifyApiActivity();
 
     /**
-     * @brief Update and save WiFi credentials.
+     * @brief Save new WiFi credentials and request a deferred reconnect.
+     *
+     * Persists SSID via ConfigManager and password via KeyManager (AES-256).
+     * Sets a deferred reconnect flag that is acted on by tick() on the main
+     * loop. This avoids tearing down the WiFi stack from within an HTTP
+     * handler (which would crash the AsyncWebServer running on that stack).
+     *
      * @param ssid SSID to save.
      * @param pass Password to save (Masked as dots in UI).
      */

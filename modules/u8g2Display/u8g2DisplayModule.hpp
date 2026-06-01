@@ -7,42 +7,58 @@
  * To view a copy of this license, visit https://creativecommons.org/licenses/by-nc-sa/4.0/
  *
  * Module: modules/u8g2Display/u8g2DisplayModule.hpp
- * Description: U8G2 monochrome display module with carousel engine and board
- *              slot pool. Manages a vector of IDisplayBoard* entries, rotating
- *              through them on a configurable interval. Provides sleep/wake
- *              power management, brightness control, and screen flip support.
- *              System boards (BootSplash, Loading, WiFiWizard, OtaProgress,
- *              Error, Screensaver) can bypass the carousel via showBoard().
+ * Description: U8G2 monochrome display module with two-layer base+modal
+ *              architecture. The BASE layer is phase-determined and never
+ *              manually set: BOOT→bootBoard, CONFIGURING→configuringStatusBoard,
+ *              RUNNING→carousel pool rotation. The MODAL layer holds temporary
+ *              overlays (WiFi wizard, OTA progress, error) that auto-clear
+ *              when expired. Provides sleep/wake power management, phase-aware
+ *              brightness dimming, screen flip support, and carousel engine.
  *              Owns all system board instances and activates the splash on begin().
  *
- *              Implements IStatusReporter by delegating to LoadingBoard and
- *              ErrorBoard. Subscribes to EventBus topics "ota.progress" and
- *              "display.message" for runtime event integration. Implements
- *              iConfigurable for persistent display settings at /mod/display.json.
+ *              Implements IStatusReporter by delegating to BootBoard and
+ *              ErrorBoard. Polls Application state in tick() for lifecycle
+ *              transitions (CONFIGURING ↔ RUNNING), eliminating EventBus
+ *              race conditions. Subscribes to EventBus topics "ota.progress"
+ *              and "display.message" for async runtime events. Publishes
+ *              "display.sleep", "display.wake", and "display.board.changed"
+ *              events via EventBus. Implements iConfigurable via ConfigManager
+ *              gateway for persistent display settings (namespace: "display",
+ *              schema version: 1). Implements IWebContributor for REST API
+ *              routes under /api/display/ and a top-level "Display" tab.
  *
  * Exported Classes:
- * - OtaProgressPayload:      EventBus payload struct for OTA progress events
- * - DisplayMessagePayload:   EventBus payload struct for display message events
+ * - OtaProgressPayload:            EventBus payload struct for OTA progress events
+ * - DisplayMessagePayload:         EventBus payload struct for display message events
+ * - DisplayBoardChangedPayload:    EventBus payload struct for board change events
  * - U8g2DisplayModule: Display carousel engine and board slot pool
- *   - begin():              Initialize hardware, subscribe to EventBus, lock pool
- *   - tick():               Carousel rotation, sleep check, render current board
+ *   - bootstrapHardware():   Phase 1 init — SPI + U8G2 only, zero framework deps
+ *   - begin():              Phase 2 init — EventBus, config, pool lock (skips HW if bootstrapped)
+ *   - tick():               Carousel rotation, sleep check, board tick, render
  *   - addBoard():           Pre-lock registration of boards into the carousel pool
- *   - showBoard():          Force-show a specific board (bypasses carousel timer)
+ *   - showBoard():          Force-show a specific pool board (bypasses carousel timer)
+ *   - pushModal():          Push a modal overlay board (auto-clears on expiry)
+ *   - clearModal():         Manually clear the active modal overlay
  *   - resetActivity():      Reset the inactivity timer (called on user interaction)
  *   - getBoardCount():      Return the number of registered boards in the pool
  *   - getActiveBoard():     Return the currently rendering board (or nullptr)
- *   - getBootSplash():      Return reference to the owned BootSplashBoard instance
- *   - getLoading():         Return reference to the owned LoadingBoard instance
+ *   - getBootBoard():       Return reference to the owned BootBoard instance
  *   - getWifiWizard():      Return reference to the owned WiFiWizardBoard instance
  *   - getOtaProgress():     Return reference to the owned OtaProgressBoard instance
  *   - getError():           Return reference to the owned ErrorBoard instance
+ *   - getConfiguringStatus(): Return reference to the owned ConfiguringStatusBoard instance
  *   - getScreensaver():     Return reference to the owned ScreensaverBoard instance
- *   - reportStatus():       Delegate to LoadingBoard and show it
+ *   - reportStatus():       Delegate to BootBoard and show it
  *   - reportError():        Delegate to ErrorBoard (fatal) and show it
- *   - clearStatus():        Mark LoadingBoard complete, advance if showing it
- *   - loadConfig():         Load display settings from /mod/display.json (LittleFS)
- *   - saveConfig():         Persist display settings to /mod/display.json (LittleFS)
- *   - resetConfig():        Restore factory defaults and persist
+ *   - clearStatus():        Mark BootBoard complete, advance if showing it
+ *   - registerRoutes():     Register display REST API routes (/api/display/*)
+ *   - getTabName():         Return "Display" for portal tab
+ *   - getTabOrder():        Return 30 for portal tab ordering
+ *   - getConfigNamespace(): Return "display"
+ *   - getSchemaVersion():   Return 1
+ *   - applyConfig():        Apply display settings from JSON section
+ *   - serializeConfig():    Serialize display settings to JSON section
+ *   - resetConfig():        Restore factory defaults
  *   - setBrightness():      Runtime brightness adjustment (0–255)
  *   - setFlipScreen():      Runtime screen flip toggle
  *   - setSleepTimeout():    Runtime sleep timeout adjustment
@@ -56,13 +72,16 @@
 #include "interfaces/ITickable.hpp"
 #include "interfaces/IStatusReporter.hpp"
 #include "interfaces/iConfigurable.hpp"
+#include "interfaces/IWebContributor.hpp"
 #include "interfaces/IDisplayBoard.hpp"
-#include "boards/bootSplashBoard.hpp"
-#include "boards/loadingBoard.hpp"
+#include "boards/bootBoard.hpp"
 #include "boards/wifiWizardBoard.hpp"
 #include "boards/otaProgressBoard.hpp"
 #include "boards/errorBoard.hpp"
 #include "boards/screensaverBoard.hpp"
+#include "boards/configuringStatusBoard.hpp"
+#include "AppState.hpp"
+#include "../../include/types/DisplayInfo.hpp"
 
 // --- Hardware-only includes (excluded from native GoogleTest builds) ---
 #ifndef NATIVE_BUILD
@@ -102,6 +121,17 @@ struct DisplayMessagePayload {
     unsigned long durationMs;  // How long to display (0 = until cleared)
 };
 
+/**
+ * @brief EventBus payload for "display.board.changed" topic.
+ *
+ * Published by the display module when the active rendering board changes,
+ * either via carousel rotation, explicit showBoard(), or modal push/clear.
+ */
+struct DisplayBoardChangedPayload {
+    const char* boardName;  // Name of the newly active board
+    int boardIndex;         // Pool index, or -1 for modal/system boards
+};
+
 // ---------------------------------------------------------------------------
 // Default U8G2 driver type — apps override this via build_flags
 // e.g. -DU8G2_DISPLAY_TYPE=U8G2_SSD1322_NHD_256X64_F_4W_HW_SPI
@@ -116,8 +146,8 @@ struct DisplayMessagePayload {
  * @brief U8G2 monochrome display module with carousel engine and board slot pool.
  *
  * Implements ITickable for main-loop rendering, IStatusReporter for boot-phase
- * status overlays (delegates to LoadingBoard/ErrorBoard), and iConfigurable
- * for persistent display settings via /mod/display.json on LittleFS.
+ * status overlays (delegates to BootBoard/ErrorBoard), and iConfigurable
+ * for persistent display settings via ConfigManager gateway (namespace: "display").
  *
  * The board slot pool is a std::vector<IDisplayBoard*> that accepts registrations
  * via addBoard() before begin() locks the pool. The carousel engine rotates
@@ -126,18 +156,32 @@ struct DisplayMessagePayload {
  * Subscribes to EventBus topics "ota.progress" and "display.message" for
  * runtime integration with other framework modules.
  */
-class U8g2DisplayModule : public ITickable, public IStatusReporter, public iConfigurable {
+class U8g2DisplayModule : public ITickable, public IStatusReporter, public iConfigurable, public IWebContributor {
 public:
     // -------------------------------------------------------------------------
     // Lifecycle
     // -------------------------------------------------------------------------
 
     /**
-     * @brief Initialize hardware, subscribe to EventBus, and lock the board pool.
+     * @brief Phase 1: Bootstrap display hardware with zero framework dependencies.
      *
-     * After this call, addBoard() will reject new registrations. The U8G2
-     * driver is started, contrast and flip mode are applied, EventBus
-     * subscriptions are registered, and the inactivity timer is reset.
+     * Initializes the SPI bus and U8G2 driver, applies default contrast and
+     * flip mode, activates the boot splash, and renders it immediately.
+     * Enters bootstrap mode where reportStatus() performs inline blocking
+     * animations instead of waiting for the tick loop.
+     *
+     * Call this BEFORE app.begin() so the display is ready to show boot progress.
+     * Call begin(app) AFTER app.begin() to complete framework integration.
+     */
+    void bootstrapHardware();
+
+    /**
+     * @brief Phase 2: Complete framework integration.
+     *
+     * Subscribes to EventBus topics, locks the board pool, and exits
+     * bootstrap mode. If bootstrapHardware() was called first, skips
+     * hardware init (SPI + U8G2 already running). Otherwise performs
+     * full hardware + framework init in one step.
      *
      * @param app Reference to the Application composition root.
      */
@@ -168,15 +212,36 @@ public:
     bool addBoard(IDisplayBoard* board);
 
     /**
-     * @brief Force-show a specific board, bypassing the carousel timer.
+     * @brief Force-show a specific pool board, bypassing the carousel timer.
      *
-     * If the board is found in the pool, the active index is updated and the
-     * rotation timer is reset. If the board is NOT in the pool (e.g. a system
-     * board), it is rendered directly via a special override index of -1.
+     * Searches the pool for the board and updates the active index. Resets the
+     * rotation timer. This method is carousel-only — for system/modal boards,
+     * use pushModal() instead.
      *
-     * @param board Pointer to the board to display.
+     * @param board Pointer to a pool board to display.
      */
     void showBoard(IDisplayBoard* board);
+
+    /**
+     * @brief Push a modal overlay board onto the display.
+     *
+     * The modal board is rendered on top of the base layer until it is
+     * manually cleared via clearModal() or auto-cleared when isExpired()
+     * returns true. Deactivates any existing modal, activates the new one,
+     * and resets the inactivity timer.
+     *
+     * @param board Pointer to the modal board to display.
+     */
+    void pushModal(IDisplayBoard* board);
+
+    /**
+     * @brief Manually clear the active modal overlay.
+     *
+     * Deactivates the current modal board, restores display brightness to
+     * the configured level, and returns rendering to the phase-determined
+     * base layer.
+     */
+    void clearModal();
 
     /**
      * @brief Reset the inactivity timer (called on user interaction events).
@@ -193,6 +258,10 @@ public:
 
     /**
      * @brief Return the board currently being rendered (or nullptr if empty).
+     *
+     * Returns the modal board if one is active, otherwise the current
+     * carousel pool board.
+     *
      * @return Pointer to the active IDisplayBoard, or nullptr.
      */
     IDisplayBoard* getActiveBoard() const;
@@ -202,16 +271,10 @@ public:
     // -------------------------------------------------------------------------
 
     /**
-     * @brief Return a reference to the owned BootSplashBoard instance.
-     * @return Mutable reference to _bootSplash.
+     * @brief Return a reference to the owned BootBoard instance.
+     * @return Mutable reference to _bootBoard.
      */
-    BootSplashBoard& getBootSplash();
-
-    /**
-     * @brief Return a reference to the owned LoadingBoard instance.
-     * @return Mutable reference to _loading.
-     */
-    LoadingBoard& getLoading();
+    BootBoard& getBootBoard();
 
     /**
      * @brief Return a reference to the owned WiFiWizardBoard instance.
@@ -237,14 +300,20 @@ public:
      */
     ScreensaverBoard& getScreensaver();
 
+    /**
+     * @brief Return a reference to the owned ConfiguringStatusBoard instance.
+     * @return Mutable reference to _configuringStatusBoard.
+     */
+    ConfiguringStatusBoard& getConfiguringStatus();
+
     // -------------------------------------------------------------------------
-    // IStatusReporter — delegates to LoadingBoard and ErrorBoard
+    // IStatusReporter — delegates to BootBoard and ErrorBoard
     // -------------------------------------------------------------------------
 
     /**
      * @brief Report a status message with optional progress.
      *
-     * Delegates to LoadingBoard::setStatus(), shows the loading board if not
+     * Delegates to BootBoard::setStatus(), shows the boot board if not
      * already active, and resets the inactivity timer.
      *
      * @param message  Null-terminated status text.
@@ -265,44 +334,80 @@ public:
     /**
      * @brief Clear the status overlay.
      *
-     * Marks LoadingBoard as complete. If the loading board is currently
+     * Marks BootBoard as complete. If the boot board is currently
      * showing, advances the carousel to the next board.
      */
     void clearStatus() override;
 
     // -------------------------------------------------------------------------
-    // iConfigurable — persistent display settings at /mod/display.json
+    // iConfigurable — ConfigManager gateway (namespace: "display")
     // -------------------------------------------------------------------------
 
     /**
-     * @brief Load display settings from /mod/display.json on LittleFS.
-     *
-     * Reads brightness, flipScreen, sleepTimeout, and rotationInterval from
-     * JSON. Applies defaults if keys are missing. In NATIVE_BUILD, returns
-     * true without file I/O.
-     *
-     * @return true if config loaded or defaults applied; false on parse error.
+     * @brief Return the config namespace for display settings.
+     * @return "display"
      */
-    bool loadConfig() override;
+    const char* getConfigNamespace() const override { return "display"; }
 
     /**
-     * @brief Persist display settings to /mod/display.json on LittleFS.
-     *
-     * Serializes brightness, flipScreen, sleepTimeout, and rotationInterval
-     * to JSON. Creates the /mod/ directory if needed. In NATIVE_BUILD,
-     * returns true without file I/O.
-     *
-     * @return true if successfully saved.
+     * @brief Return the current schema version for display config.
+     * @return 1
      */
-    bool saveConfig() override;
+    int getSchemaVersion() const override { return 1; }
 
     /**
-     * @brief Reset display settings to factory defaults and persist.
+     * @brief Apply display settings from a parsed JSON section.
+     *
+     * Reads brightness, flip, sleepTimeout, and rotationInterval from the
+     * JSON object and applies them to internal state and hardware.
+     *
+     * @param section Read-only JSON object containing display config keys.
+     */
+    void applyConfig(const JsonObject& section) override;
+
+    /**
+     * @brief Serialize current display settings into a JSON section.
+     *
+     * Writes brightness, flip, sleepTimeout, and rotationInterval to the
+     * JSON object.
+     *
+     * @param section Mutable JSON object to write config into.
+     */
+    void serializeConfig(JsonObject& section) const override;
+
+    /**
+     * @brief Reset display settings to factory defaults.
      *
      * Sets: brightness=255, flipScreen=false, sleepTimeout=300000ms,
-     * rotationInterval=8000ms. Applies hardware settings and calls saveConfig().
+     * rotationInterval=8000ms. Applies hardware settings.
      */
     void resetConfig() override;
+
+    // -------------------------------------------------------------------------
+    // IWebContributor — Display REST API and portal tab
+    // -------------------------------------------------------------------------
+
+    /**
+     * @brief Register display REST API routes with the web server.
+     *
+     * Registers endpoints under /api/display/ for status, brightness,
+     * flip, sleep, board listing, and board selection.
+     *
+     * @param server Reference to the AsyncWebServer instance.
+     */
+    void registerRoutes(AsyncWebServer& server) override;
+
+    /**
+     * @brief Get the UI tab name for this contributor.
+     * @return "Display"
+     */
+    const char* getTabName() const override { return "Display"; }
+
+    /**
+     * @brief Get the tab display order.
+     * @return 30 — Display tab appears before mid-range tabs.
+     */
+    int getTabOrder() const override { return 30; }
 
     // -------------------------------------------------------------------------
     // Runtime display configuration setters
@@ -332,6 +437,17 @@ public:
      */
     void setRotationInterval(unsigned long intervalMs);
 
+    /**
+     * @brief Get the display info struct for MCP capture_display wiring.
+     *
+     * Returns a populated DisplayInfo with the U8G2 framebuffer pointer,
+     * size, and dimensions. Only valid after bootstrapHardware() has been
+     * called (the buffer is allocated during U8G2 begin()).
+     *
+     * @return DisplayInfo struct with live framebuffer pointer.
+     */
+    DisplayInfo getDisplayInfo();
+
 private:
     // -------------------------------------------------------------------------
     // Private carousel engine methods
@@ -354,6 +470,31 @@ private:
     void _renderCurrentBoard();
 
     /**
+     * @brief Derive the base-layer board from the current Application state.
+     *
+     * Returns the phase-appropriate board:
+     * - BOOT → _bootBoard
+     * - CONFIGURING → _configuringStatusBoard
+     * - RUNNING → current carousel pool board
+     *
+     * Guarded by NATIVE_BUILD — returns nullptr in native test builds
+     * because Application is forward-declared only.
+     *
+     * @return Phase-appropriate base board, or nullptr.
+     */
+    IDisplayBoard* _getBaseBoard();
+
+    /**
+     * @brief Check inactivity timer and dim display if timed out.
+     *
+     * Dims brightness to minimum (1) after _sleepTimeoutMs of inactivity.
+     * Does NOT blank or power-save the display. Used during CONFIGURING
+     * phase and when a modal is active (any phase). Tracks state with
+     * _modalDimmed to avoid repeated hardware calls.
+     */
+    void _checkDim();
+
+    /**
      * @brief Check the inactivity timer and enter sleep if timed out.
      *
      * Compares millis() against _lastActivityMs + _sleepTimeoutMs.
@@ -370,6 +511,15 @@ private:
      * @brief Enter sleep mode and power-save the display.
      */
     void _sleep();
+
+    /**
+     * @brief Reset only the inactivity timer and dim/diagnostic flags.
+     *
+     * Internal helper used by pushModal() and resetActivity(). Does NOT
+     * dismiss the screensaver or wake from sleep — those are user-activity
+     * concerns handled exclusively by resetActivity().
+     */
+    void _resetTimer();
 
     // -------------------------------------------------------------------------
     // Private EventBus callback statics
@@ -392,15 +542,54 @@ private:
     static void _onDisplayMessage(const char* topic, const void* payload, void* ctx);
 
     // -------------------------------------------------------------------------
+    // Private state-polling lifecycle handler
+    // -------------------------------------------------------------------------
+
+    /**
+     * @brief React to an Application state transition detected by tick().
+     *
+     * Single code path for all lifecycle transitions — replaces both the
+     * EventBus callbacks (_onAppConfiguring, _onAppRunning) and the
+     * late catch-up block in begin().
+     *
+     * @param newState The newly detected Application state.
+     */
+    void _onStateChanged(AppState newState);
+
+    // -------------------------------------------------------------------------
     // Member variables
     // -------------------------------------------------------------------------
 
     // --- Hardware driver (excluded from native builds) ---
+    // Pin configuration is injected via build_flags in platformio.ini.
+    // SPI displays: define DISPLAY_CS_PIN, DISPLAY_DC_PIN (required),
+    //               DISPLAY_RST_PIN (optional, defaults to U8X8_PIN_NONE).
+    // I2C displays: no pin defines needed (U8G2 uses Arduino defaults).
 #ifndef NATIVE_BUILD
-    U8G2_DISPLAY_TYPE _u8g2;                      ///< The U8G2 hardware driver instance
+  #ifdef DISPLAY_CS_PIN
+    #ifndef DISPLAY_RST_PIN
+    #define DISPLAY_RST_PIN U8X8_PIN_NONE
+    #endif
+    U8G2_DISPLAY_TYPE _u8g2{U8G2_R0, DISPLAY_CS_PIN, DISPLAY_DC_PIN, DISPLAY_RST_PIN};
+  #else
+    U8G2_DISPLAY_TYPE _u8g2{U8G2_R0};
+  #endif
+
+    // --- Display geometry pseudo-constants ---
+    // Read once from the U8G2 driver descriptor at member-init time.
+    // U8G2 populates tile dimensions in its constructor (before begin()),
+    // and _u8g2 is declared above so it is fully constructed first.
+    const uint16_t _displayWidth  = _u8g2.getDisplayWidth();
+    const uint16_t _displayHeight = _u8g2.getDisplayHeight();
+#else
+    // --- Native build defaults (no U8G2 hardware driver) ---
+    // Match the primary hardware target (SSD1322 256×64) for test consistency.
+    const uint16_t _displayWidth  = 256;
+    const uint16_t _displayHeight = 64;
 #endif
 
     Application* _app = nullptr;                   ///< Cached reference to Application hub (for EventBus access)
+    AppState _lastKnownState = AppState::BOOT;     ///< Cached state for change detection in tick()
 
     // --- Board slot pool ---
     std::vector<IDisplayBoard*> _boards;           ///< Carousel board pool — populated before begin()
@@ -417,19 +606,25 @@ private:
     bool _sleeping = false;                        ///< True when the display is in power-save sleep
     unsigned long _lastActivityMs = 0;             ///< Timestamp of last user interaction
     unsigned long _sleepTimeoutMs = 300000;        ///< Inactivity timeout before sleep (5 minutes default)
+    bool _sleepDiagLogged = false;                 ///< One-shot flag for sleep timer diagnostic log
 
     // --- Display settings ---
     uint8_t _brightness = 255;                     ///< Display brightness / contrast level (0–255)
     bool _flipScreen = false;                      ///< True if the display is flipped 180 degrees
 
-    // --- System board override pointer ---
-    IDisplayBoard* _overrideBoard = nullptr;       ///< Non-pool board shown via showBoard() when not in pool
+    // --- Modal layer ---
+    IDisplayBoard* _modal = nullptr;               ///< Active modal board (auto-clears on expired)
+    bool           _modalDimmed = false;            ///< True when modal/configuring brightness has been dimmed
+
+    // --- Bootstrap state ---
+    bool  _bootstrapMode    = false;               ///< True between bootstrapHardware() and begin()
+    float _lastBootProgress = 0.0f;                ///< Cached progress for smooth inline interpolation
 
     // --- Owned system board instances ---
-    BootSplashBoard  _bootSplash;                  ///< Boot splash screen (BOOTING phase)
-    LoadingBoard     _loading;                     ///< Loading progress screen (APP_SETUP phase)
-    WiFiWizardBoard  _wifiWizard;                  ///< WiFi setup wizard screen (WIFI_SETUP phase)
-    OtaProgressBoard _otaProgress;                 ///< OTA firmware update progress screen
-    ErrorBoard       _error;                       ///< Error message display screen
-    ScreensaverBoard _screensaver;                 ///< Inactivity screensaver (burn-in prevention)
+    BootBoard        _bootBoard{_displayWidth, _displayHeight};   ///< Unified boot board (splash + loading phases)
+    WiFiWizardBoard  _wifiWizard{_displayWidth, _displayHeight};   ///< WiFi setup wizard screen (CONFIGURING phase)
+    OtaProgressBoard _otaProgress{_displayWidth, _displayHeight};  ///< OTA firmware update progress screen
+    ErrorBoard       _error{_displayWidth, _displayHeight};        ///< Error message display screen
+    ScreensaverBoard _screensaver{_displayWidth, _displayHeight};  ///< Inactivity screensaver (burn-in prevention)
+    ConfiguringStatusBoard _configuringStatusBoard{_displayWidth, _displayHeight}; ///< Gate progress during CONFIGURING phase
 };

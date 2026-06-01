@@ -7,31 +7,41 @@
  * To view a copy of this license, visit https://creativecommons.org/licenses/by-nc-sa/4.0/
  *
  * Module: include/AppState.hpp
- * Description: Application lifecycle state machine enum. Defines the four
- *              ordered boot phases that the Application hub transitions through.
- *              State advances monotonically; regression is not permitted.
+ * Description: Application lifecycle state machine enum. Defines a 3-state
+ *              bidirectional model for the Application hub. BOOT covers all
+ *              hardware initialisation during setup(). CONFIGURING and RUNNING
+ *              support bidirectional transitions: if a config gate becomes
+ *              unsatisfied beyond its regression tolerance, the system regresses
+ *              from RUNNING back to CONFIGURING.
+ *
+ * Valid transitions:
+ *   BOOT → CONFIGURING   (gates unsatisfied after begin())
+ *   BOOT → RUNNING       (all gates satisfied after begin())
+ *   CONFIGURING → RUNNING (all gates satisfied during tick())
+ *   RUNNING → CONFIGURING (gate regression tolerance exceeded)
  *
  * Exported Enums:
  * - AppState: Lifecycle phase identifier
- *   - BOOTING:    Hardware init, LittleFS mount, crypto init
- *   - WIFI_SETUP: WiFi connection or captive-portal AP mode
- *   - APP_SETUP:  Module begin() sequence, NTP sync, OTA check
- *   - RUNNING:    Normal operation; tick() loop active
+ *   - BOOT:        Hardware init, module begin() — only valid during setup()
+ *   - CONFIGURING: Kernel up, awaiting user configuration via IConfigGate
+ *   - RUNNING:     Normal tick() loop; all prerequisites satisfied
  */
 
 #pragma once
 #include <stdint.h>
 
 /**
- * @brief Ordered application lifecycle phases.
+ * @brief Bidirectional application lifecycle phases.
  *
- * The Application hub transitions through these states monotonically during
- * startup. Modules may query the current state via Application::getState()
- * to guard phase-sensitive operations (e.g., network calls only after RUNNING).
+ * The Application hub transitions through these states during startup and
+ * runtime. BOOT is the initial hardware-init phase. CONFIGURING and RUNNING
+ * support bidirectional transitions: if a registered IConfigGate becomes
+ * unsatisfied beyond its regression tolerance, the system regresses from
+ * RUNNING back to CONFIGURING. Modules may query the current state via
+ * Application::getState() to guard phase-sensitive operations.
  */
 enum class AppState : uint8_t {
-    BOOTING    = 0, ///< Hardware init, LittleFS mount, crypto initialisation
-    WIFI_SETUP = 1, ///< WiFi station connect or captive-portal AP activation
-    APP_SETUP  = 2, ///< Module begin() chain, NTP sync, OTA eligibility check
-    RUNNING    = 3  ///< Normal tick() loop; all services operational
+    BOOT         = 0, ///< Hardware init, module begin() — only valid during setup()
+    CONFIGURING  = 1, ///< Kernel up, awaiting user configuration via IConfigGate
+    RUNNING      = 2  ///< Normal tick() loop; all prerequisites satisfied
 };

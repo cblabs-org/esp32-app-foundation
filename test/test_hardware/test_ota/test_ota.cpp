@@ -13,7 +13,8 @@ void tearDown(void) {
 
 void test_ota_update_manager_begin(void) {
     // Start an update with a dummy size and a dummy MD5
-    bool started = otaManager.beginUpdate(1024, "d41d8cd98f00b204e9800998ecf8427e");
+    otaUpdateManager localManager;
+    bool started = localManager.beginUpdate(1024, "d41d8cd98f00b204e9800998ecf8427e");
     TEST_ASSERT_TRUE(started);
 }
 

@@ -7,21 +7,27 @@
  * To view a copy of this license, visit https://creativecommons.org/licenses/by-nc-sa/4.0/
  *
  * Module: modules/configManager/configManager.hpp
- * Description: Manages the loading, saving, and version migration of the 
- *              global framework configuration file (/etc/config.json) on LittleFS.
- *              Provides a safe interface for requesting configuration reloads.
+ * Description: Centralised configuration gateway that owns all config file I/O.
+ *              Manages a fixed-size registry of iConfigurable modules, handles
+ *              schema versioning via self-describing _v fields, orchestrates
+ *              migration on boot, and provides bulk export/import for backup.
+ *
+ *              Config files are stored at /mod/<namespace>.json (one per module).
+ *              Modules provide serialise/deserialise callbacks; they never touch
+ *              LittleFS directly.
  *
  * Exported Functions/Classes:
- * - SystemConfig: Struct containing global framework settings.
- * - ConfigManager: Class for handling configuration persistence and access.
- *   - loadConfig(): Loads the system config from LittleFS or creates a default.
- *   - saveConfig(): Persists the current configuration to LittleFS.
- *   - resetConfig(): Reverts configuration to factory defaults.
- *   - getConfig(): Retrieves read-only reference to the configuration.
- *   - getMutableConfig(): Retrieves mutable reference to the configuration.
- *   - getFrameworkConfig(): Returns a FrameworkConfig struct populated from the current config.
- *   - requestReload(): Sets the flag to indicate a configuration reload is requested.
- *   - checkAndClearReload(): Returns and clears the reload pending flag.
+ * - ConfigManager: Centralised configuration gateway
+ *   - registerModule():      Register an iConfigurable module in the gateway
+ *   - beginAll():            Load and apply config for all registered modules
+ *   - saveModuleConfig():    Persist a single module's config to its namespace file
+ *   - exportAllConfig():     Export all module configs into a master JSON document
+ *   - importAllConfig():     Import configs from a master JSON document
+
+ *   - registerRoutes():      Register REST API routes (IWebContributor)
+ *   - getTabName():          Return the UI tab name ("Config")
+ *   - getParentTab():        Return parent tab ("System")
+ *   - getTabOrder():         Return tab order (25)
  */
 
 #pragma once
@@ -35,89 +41,82 @@
 #endif
 
 #include <ArduinoJson.h>
-#include "FrameworkConfig.hpp"
+#include "../../include/interfaces/iConfigurable.hpp"
 #include "../../include/interfaces/IWebContributor.hpp"
 
-#define SYSTEM_CONFIG_VERSION 1.0f // Current configuration schema version
-
-#ifndef NATIVE_BUILD
-#define SYSTEM_CONFIG_PATH "/etc/config.json"
-#else
-#define SYSTEM_CONFIG_PATH "etc_config.json" // Local path for unit testing
-#endif
-
 /**
- * @brief Global framework settings stored in /etc/config.json.
- */
-struct SystemConfig {
-    float configVersion = SYSTEM_CONFIG_VERSION;
-    char hostname[33] = "esp32-device";
-    char timezone[64] = "GMT0";
-    bool firmwareUpdatesEnabled = true;
-    uint8_t otaQuietHour = 3;
-};
-
-/**
- * @brief Kernel service that manages global framework configuration on LittleFS.
+ * @brief Centralised configuration gateway that owns all config file I/O.
+ *
+ * Manages a fixed-size array of iConfigurable module pointers. On boot,
+ * beginAll() loads each module's config from /mod/<namespace>.json, checks
+ * schema versions, runs migrations if needed, and calls applyConfig().
+ * Individual modules call saveModuleConfig() when they need to persist changes.
  */
 class ConfigManager : public IWebContributor {
 public:
     ConfigManager() = default;
 
-    /**
-     * @brief Loads the system configuration from LittleFS.
-     * @return true if successfully loaded and parsed, false if defaults were applied.
-     */
-    bool loadConfig();
+    // -------------------------------------------------------------------------
+    // Module Registry
+    // -------------------------------------------------------------------------
+
+    static constexpr uint8_t MAX_CONFIGURABLES = 8; ///< Maximum number of registered iConfigurable modules
 
     /**
-     * @brief Persists the current configuration to LittleFS.
-     * @return true if successfully saved.
+     * @brief Register an iConfigurable module with the gateway.
+     *
+     * Modules must be registered before beginAll() is called. Bounds-checked
+     * against MAX_CONFIGURABLES.
+     *
+     * @param module Non-null pointer to the iConfigurable module.
+     * @return true if registration succeeded; false if full or nullptr.
      */
-    bool saveConfig();
+    bool registerModule(iConfigurable* module);
 
     /**
-     * @brief Reverts configuration to factory defaults and persists them.
+     * @brief Load and apply configuration for all registered modules.
+     *
+     * Iterates the module registry and calls loadModuleConfig() on each.
+     * This handles file reads, version checks, migrations, and applyConfig().
      */
-    void resetConfig();
+    void beginAll();
 
     /**
-     * @brief Access the current configuration (Read-only).
-     * @return Const reference to the internal SystemConfig struct.
+     * @brief Persist a single module's current configuration to its namespace file.
+     *
+     * Creates a JsonDocument, calls module->serializeConfig(), sets the _v
+     * field, and writes directly to /mod/<namespace>.json via file stream.
+     *
+     * @param module Pointer to the iConfigurable module to save.
+     * @return true if successfully saved; false on error.
      */
-    const SystemConfig& getConfig() const { return _config; }
+    bool saveModuleConfig(iConfigurable* module);
 
     /**
-     * @brief Access the current configuration (Mutable).
-     * @return Reference to the internal SystemConfig struct.
+     * @brief Export all registered module configs into a master JSON document.
+     *
+     * Each module's config is nested under its namespace key. Includes _v
+     * for each section. Used for full-device backup.
+     *
+     * @param outDoc Reference to the output JsonDocument (caller-owned).
      */
-    SystemConfig& getMutableConfig() { return _config; }
+    void exportAllConfig(JsonDocument& outDoc);
 
     /**
-     * @brief Extracts a FrameworkConfig adapter for Application::begin().
-     * @return FrameworkConfig struct with pointers to internal config values.
+     * @brief Import module configs from a master JSON document.
+     *
+     * Extracts each registered module's namespace section, calls applyConfig(),
+     * and persists via saveModuleConfig().
+     *
+     * @param inDoc Reference to the input JsonDocument containing config data.
+     * @return true if all modules imported successfully.
      */
-    FrameworkConfig getFrameworkConfig() const {
-        FrameworkConfig fc;
-        fc.hostname = _config.hostname;
-        fc.timezone = _config.timezone;
-        fc.firmwareUpdatesEnabled = _config.firmwareUpdatesEnabled;
-        fc.otaQuietHour = _config.otaQuietHour;
-        return fc;
-    }
+    bool importAllConfig(JsonDocument& inDoc);
 
-    /**
-     * @brief Requests a pending reconfiguration by setting the internal flag to true.
-     */
-    void requestReload() { _reloadPending = true; }
 
-    /**
-     * @brief Examines the pending reload flag and resets it if necessary.
-     * @return true if a reload was pending and is now cleared, false otherwise.
-     */
-    bool checkAndClearReload();
-
-    // --- IWebContributor Interface ---
+    // -------------------------------------------------------------------------
+    // IWebContributor Interface
+    // -------------------------------------------------------------------------
 
     /**
      * @brief Register all REST API route handlers with the web server.
@@ -127,11 +126,55 @@ public:
 
     /**
      * @brief Get the UI tab name for this contributor.
-     * @return String name of the tab, or nullptr if no UI tab.
+     * @return "Config"
      */
     const char* getTabName() const override { return "Config"; }
 
+    /**
+     * @brief Get the parent tab for navigation hierarchy.
+     * @return "System" — ConfigManager appears as a sub-section of the System tab.
+     */
+    const char* getParentTab() const override { return "System"; }
+
+    /**
+     * @brief Get the tab display order within the System sub-navigation.
+     * @return 25
+     */
+    int getTabOrder() const override { return 25; }
+
 private:
-    SystemConfig _config;        // Master configuration state container
-    bool _reloadPending = false; // Flag to safely trigger reconfiguration defensively
+    // -------------------------------------------------------------------------
+    // Private helpers
+    // -------------------------------------------------------------------------
+
+    /**
+     * @brief Load a single module's config from its namespace file.
+     *
+     * Opens /mod/<namespace>.json, reads the stored _v version, compares
+     * against the module's getSchemaVersion(), calls migrateConfig() if
+     * needed, then calls applyConfig(). Rewrites the file if migration occurred.
+     *
+     * @param module Pointer to the iConfigurable module.
+     */
+    void loadModuleConfig(iConfigurable* module);
+
+    /**
+     * @brief Format the config file path for a given namespace.
+     *
+     * Writes "/mod/<ns>.json" (hardware) or "mod_<ns>.json" (NATIVE_BUILD)
+     * into the provided buffer.
+     *
+     * @param ns   Namespace string (e.g. "wifi").
+     * @param buf  Output buffer.
+     * @param size Buffer size in bytes.
+     */
+    static void getConfigPath(const char* ns, char* buf, size_t size);
+
+    // -------------------------------------------------------------------------
+    // Member variables
+    // -------------------------------------------------------------------------
+
+    iConfigurable* _modules[MAX_CONFIGURABLES] = {}; ///< Fixed-size registry of iConfigurable modules
+    uint8_t _moduleCount = 0;                        ///< Number of registered modules
+
 };

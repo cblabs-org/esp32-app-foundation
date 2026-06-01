@@ -15,15 +15,11 @@
  *
  * Exported Functions:
  * - mcpBuiltinTools::registerAll(): Register all foundation-level MCP tools
- *
- * Exported Structs:
- * - mcpBuiltinTools::DisplayInfo: Optional display descriptor for capture_display
  */
 
 #pragma once
 
-#include <cstddef>
-#include <cstdint>
+#include "../../include/types/DisplayInfo.hpp"
 
 // Forward declarations — avoid pulling in full headers for interface-only usage
 class McpToolRegistry;
@@ -38,19 +34,7 @@ class ConfigManager;
  */
 namespace mcpBuiltinTools {
 
-    /**
-     * @brief Optional descriptor for a framebuffer-based display.
-     *
-     * Decoupled from any specific display driver (e.g. U8G2). The Application
-     * hub populates this struct if a display module is registered, otherwise
-     * capture_display gracefully returns an error indicating no display.
-     */
-    struct DisplayInfo {
-        const uint8_t* framebuffer = nullptr;  ///< Pointer to the raw framebuffer bytes
-        size_t framebufferSize     = 0;        ///< Total size of the framebuffer in bytes
-        uint16_t width             = 0;        ///< Display width in pixels
-        uint16_t height            = 0;        ///< Display height in pixels
-    };
+    // DisplayInfo is now defined in include/types/DisplayInfo.hpp
 
     /**
      * @brief Register all foundation-level MCP tools into the registry.
@@ -66,5 +50,16 @@ namespace mcpBuiltinTools {
     void registerAll(McpToolRegistry& registry,
                      ConfigManager* configManager,
                      const DisplayInfo* displayInfo = nullptr);
+
+    /**
+     * @brief Update the display info after initial registration.
+     *
+     * Allows late-binding the framebuffer pointer when the display module
+     * initialises after McpServer::begin(). The capture_display tool
+     * reads from this stored info on each invocation.
+     *
+     * @param info The populated display descriptor.
+     */
+    void setDisplayInfo(const DisplayInfo& info);
 
 } // namespace mcpBuiltinTools

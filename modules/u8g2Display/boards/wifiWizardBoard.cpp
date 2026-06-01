@@ -7,15 +7,13 @@
  * To view a copy of this license, visit https://creativecommons.org/licenses/by-nc-sa/4.0/
  *
  * Module: modules/u8g2Display/boards/wifiWizardBoard.cpp
- * Description: Implementation of the WiFi wizard display board. Delegates
- *              rendering to a systemMessageWidget for centred AP connection
- *              instructions. Self-expires when dismissed.
+ * Description: Implementation of the WiFi wizard display board. Extends
+ *              MessageBoardBase — dismiss(), render(), and isExpired() are
+ *              inherited. This file only implements configure() (content
+ *              configuration) and getBoardName().
  *
  * Exported Functions:
- * - WiFiWizardBoard::configure():   Copy SSID and IP, update systemMessageWidget
- * - WiFiWizardBoard::dismiss():     Set the dismissed flag (triggers expiry)
- * - WiFiWizardBoard::render():      Compose systemMessageWidget on U8G2
- * - WiFiWizardBoard::isExpired():   Return true when dismissed
+ * - WiFiWizardBoard::configure():   Copy SSID and IP, update inherited widget
  * - WiFiWizardBoard::getBoardName(): Return "SYS: WiFi Wizard"
  */
 
@@ -23,17 +21,13 @@
 #include <cstring>
 #include <cstdio>
 
-#ifndef NATIVE_BUILD
-#include <U8g2lib.h>
-#endif
-
 // =============================================================================
 // Public API
 // =============================================================================
 
 /**
  * @brief Set the AP SSID and portal IP address.
- *        Updates the systemMessageWidget content for rendering.
+ *        Updates the inherited systemMessageWidget content for rendering.
  * @param ssid AP SSID string.
  * @param ip   Portal IP address string (defaults to "192.168.4.1").
  */
@@ -50,44 +44,15 @@ void WiFiWizardBoard::configure(const char* ssid, const char* ip) {
         _ip[sizeof(_ip) - 1] = '\0';
     }
 
-    // --- Update widget content ---
-    // Title: "Connect to WiFi:"
-    // Line 1: SSID (bold emphasis via widget)
-    // Line 2: "then visit:"
-    // Line 3: IP address
-    _msgWidget.setMessage("Connect to WiFi:", _ssid, "then visit:", _ip);
-}
+    // --- Build formatted detail lines with labels ---
+    char ssidLine[48];
+    snprintf(ssidLine, sizeof(ssidLine), "SSID: %s", _ssid);
 
-/**
- * @brief Mark the board as dismissed (WiFi connected).
- */
-void WiFiWizardBoard::dismiss() {
-    _dismissed = true;
-}
+    char urlLine[48];
+    snprintf(urlLine, sizeof(urlLine), "visit: http://%s", _ip);
 
-/**
- * @brief Render AP connection instructions into the U8G2 display buffer.
- *
- * Delegates to the composed systemMessageWidget which draws the instruction
- * lines centred on screen. Produces visually identical output to the original
- * raw U8G2 draw calls.
- *
- * @param u8g2 Reference to the active U8G2 driver instance.
- */
-void WiFiWizardBoard::render(U8G2& u8g2) {
-#ifndef NATIVE_BUILD
-    _msgWidget.render(u8g2);
-#else
-    (void)u8g2; // Suppress unused parameter warning in native builds
-#endif
-}
-
-/**
- * @brief Check whether the board has been dismissed.
- * @return true when dismiss() has been called.
- */
-bool WiFiWizardBoard::isExpired() const {
-    return _dismissed;
+    // --- Update inherited widget content (3 lines: title + 2 detail) ---
+    _msgWidget.setMessage("Connect to WiFi:", ssidLine, urlLine, nullptr);
 }
 
 /**

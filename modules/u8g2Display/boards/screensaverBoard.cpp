@@ -44,9 +44,9 @@
  */
 void ScreensaverBoard::activate() {
     _active = true;
-    // Initialise to approximate centre — render() adjusts per actual display size
+    // Initialise to approximate centre (top-left of text bounding box)
     _xPos = 30;
-    _yPos = 32;
+    _yPos = 26;  // Centred vertically: (64 - 12) / 2 ≈ 26 for a 64px display
     _xDir = 1;
     _yDir = 1;
     _animFrameMs = 0;
@@ -93,7 +93,7 @@ void ScreensaverBoard::render(U8G2& u8g2) {
     }
 
     // --- Step 2: Configure and render the labelWidget at bounce position ---
-    _clockLabel.setFont(u8g2_font_helvB14_tr);
+    _clockLabel.setFont(AppFonts::defaultLarge());
     _clockLabel.setText(timeBuf);
     _clockLabel.setCoords(_xPos, _yPos);
     _clockLabel.render(u8g2);
@@ -105,13 +105,15 @@ void ScreensaverBoard::render(U8G2& u8g2) {
 
         // Get approximate text dimensions for edge detection
         int textWidth  = u8g2.getStrWidth(timeBuf);
-        int textHeight = 14; // Approximate height for helvB14 font
+        int textHeight = 12; // Approximate height for AppFonts::defaultLarge()
 
         // Update position
         _xPos += _xDir;
         _yPos += _yDir;
 
         // --- Step 4: Bounce off edges ---
+        // _xPos/_yPos are top-left of the text bounding box
+        // (matching labelWidget's coordinate system)
         if (_xPos <= 0) {
             _xPos = 0;
             _xDir = 1;
@@ -120,13 +122,11 @@ void ScreensaverBoard::render(U8G2& u8g2) {
             _xDir = -1;
         }
 
-        // Y position represents the text baseline, so the top of the text
-        // is at (_yPos - textHeight)
-        if (_yPos - textHeight <= 0) {
-            _yPos = textHeight;
+        if (_yPos <= 0) {
+            _yPos = 0;
             _yDir = 1;
-        } else if (_yPos >= displayHeight) {
-            _yPos = displayHeight - 1;
+        } else if (_yPos + textHeight >= displayHeight) {
+            _yPos = displayHeight - textHeight;
             _yDir = -1;
         }
     }

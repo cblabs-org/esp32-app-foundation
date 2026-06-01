@@ -8,101 +8,112 @@
  *
  * Module: test/test_unit/test_u8g2Display/test_boards.cpp
  * Description: GoogleTest unit-test suite for the system display boards:
- *              BootSplashBoard, LoadingBoard, WiFiWizardBoard, OtaProgressBoard,
- *              ErrorBoard, and ScreensaverBoard. Validates board names, state
- *              transitions, and API contracts. All tests execute on the native
- *              GoogleTest runner (no hardware required).
+ *              BootBoard, WiFiWizardBoard, OtaProgressBoard,
+ *              ErrorBoard, ScreensaverBoard, and ConfiguringStatusBoard.
+ *              Validates board names, state transitions, and API contracts.
+ *              All tests execute on the native GoogleTest runner (no hardware
+ *              required).
  *
  * Exported Functions:
  * - main(): GoogleTest entry point — initialises and runs all board test suites
  */
 
 #include <gtest/gtest.h>
-#include "boards/bootSplashBoard.hpp"
-#include "boards/loadingBoard.hpp"
+#include "boards/bootBoard.hpp"
 #include "boards/wifiWizardBoard.hpp"
 #include "boards/otaProgressBoard.hpp"
 #include "boards/errorBoard.hpp"
 #include "boards/screensaverBoard.hpp"
+#include "boards/configuringStatusBoard.hpp"
 
 // =============================================================================
-// Test Group: BootSplashBoard
+// Mock: IConfigGate for unit testing
 // =============================================================================
 
-class BootSplashBoardTest : public ::testing::Test {
+/**
+ * @brief Simple mock IConfigGate for testing ConfiguringStatusBoard.
+ *
+ * Allows manual control of satisfaction state via setSatisfied().
+ */
+class MockConfigGate : public IConfigGate {
+public:
+    MockConfigGate(const char* name, const char* help, bool satisfied = false)
+        : _name(name), _help(help), _satisfied(satisfied) {}
+
+    bool isSatisfied() const override { return _satisfied; }
+    const char* getGateName() const override { return _name; }
+    const char* getHelpText() const override { return _help; }
+
+    void setSatisfied(bool val) { _satisfied = val; }
+
+private:
+    const char* _name;
+    const char* _help;
+    bool _satisfied;
+};
+
+// =============================================================================
+// Test Group: BootBoard
+// =============================================================================
+
+class BootBoardTest : public ::testing::Test {
 protected:
-    BootSplashBoard board; ///< Fresh instance for each test
+    BootBoard board{256, 64}; ///< Fresh instance for each test
 };
 
 /** getBoardName must return the expected system board identifier. */
-TEST_F(BootSplashBoardTest, GetBoardName_ReturnsCorrectName) {
-    EXPECT_STREQ(board.getBoardName(), "SYS: Boot Splash");
+TEST_F(BootBoardTest, GetBoardName_ReturnsCorrectName) {
+    EXPECT_STREQ(board.getBoardName(), "SYS: Boot");
 }
 
 /** isExpired must return false before activate() is called. */
-TEST_F(BootSplashBoardTest, IsExpired_BeforeActivate_ReturnsFalse) {
+TEST_F(BootBoardTest, IsExpired_BeforeActivate_ReturnsFalse) {
     EXPECT_FALSE(board.isExpired());
 }
 
 /** isExpired must return false immediately after activate() (native build). */
-TEST_F(BootSplashBoardTest, IsExpired_AfterActivate_ReturnsFalse) {
+TEST_F(BootBoardTest, IsExpired_AfterActivate_ReturnsFalse) {
     board.activate("1.0.0");
-    // In NATIVE_BUILD, millis() is unavailable — isExpired() always returns false
     EXPECT_FALSE(board.isExpired());
 }
 
 /** activate must not crash with a nullptr version. */
-TEST_F(BootSplashBoardTest, Activate_NullVersion_DoesNotCrash) {
+TEST_F(BootBoardTest, Activate_NullVersion_DoesNotCrash) {
     EXPECT_NO_FATAL_FAILURE(board.activate(nullptr));
 }
 
 /** activate must not crash with an empty string. */
-TEST_F(BootSplashBoardTest, Activate_EmptyVersion_DoesNotCrash) {
+TEST_F(BootBoardTest, Activate_EmptyVersion_DoesNotCrash) {
     EXPECT_NO_FATAL_FAILURE(board.activate(""));
 }
 
-// =============================================================================
-// Test Group: LoadingBoard
-// =============================================================================
-
-class LoadingBoardTest : public ::testing::Test {
-protected:
-    LoadingBoard board; ///< Fresh instance for each test
-};
-
-/** getBoardName must return the expected system board identifier. */
-TEST_F(LoadingBoardTest, GetBoardName_ReturnsCorrectName) {
-    EXPECT_STREQ(board.getBoardName(), "SYS: Loading");
-}
-
-/** isExpired must return false initially (loading not complete). */
-TEST_F(LoadingBoardTest, IsExpired_Initially_ReturnsFalse) {
-    EXPECT_FALSE(board.isExpired());
-}
-
 /** setComplete must cause isExpired to return true. */
-TEST_F(LoadingBoardTest, SetComplete_CausesExpiry) {
+TEST_F(BootBoardTest, SetComplete_CausesExpiry) {
     board.setComplete();
     EXPECT_TRUE(board.isExpired());
 }
 
 /** setStatus must not crash with valid message and progress. */
-TEST_F(LoadingBoardTest, SetStatus_ValidInput_DoesNotCrash) {
+TEST_F(BootBoardTest, SetStatus_ValidInput_DoesNotCrash) {
+    board.activate("1.0.0");
     EXPECT_NO_FATAL_FAILURE(board.setStatus("Connecting...", 0.5f));
 }
 
 /** setStatus must not crash with nullptr message. */
-TEST_F(LoadingBoardTest, SetStatus_NullMessage_DoesNotCrash) {
+TEST_F(BootBoardTest, SetStatus_NullMessage_DoesNotCrash) {
+    board.activate("1.0.0");
     EXPECT_NO_FATAL_FAILURE(board.setStatus(nullptr, 0.0f));
 }
 
 /** setStatus with indeterminate progress must not crash. */
-TEST_F(LoadingBoardTest, SetStatus_IndeterminateProgress_DoesNotCrash) {
+TEST_F(BootBoardTest, SetStatus_IndeterminateProgress_DoesNotCrash) {
+    board.activate("1.0.0");
     EXPECT_NO_FATAL_FAILURE(board.setStatus("Loading...", -1.0f));
 }
 
 /** isExpired remains false after setStatus (loading not complete). */
-TEST_F(LoadingBoardTest, SetStatus_DoesNotCauseExpiry) {
+TEST_F(BootBoardTest, SetStatus_DoesNotCauseExpiry) {
+    board.activate("1.0.0");
     board.setStatus("Step 1", 0.25f);
     EXPECT_FALSE(board.isExpired());
 }
@@ -113,7 +124,7 @@ TEST_F(LoadingBoardTest, SetStatus_DoesNotCauseExpiry) {
 
 class WiFiWizardBoardTest : public ::testing::Test {
 protected:
-    WiFiWizardBoard board; ///< Fresh instance for each test
+    WiFiWizardBoard board{256, 64}; ///< Fresh instance for each test
 };
 
 /** getBoardName must return the expected system board identifier. */
@@ -159,7 +170,7 @@ TEST_F(WiFiWizardBoardTest, Configure_DoesNotCauseExpiry) {
 
 class OtaProgressBoardTest : public ::testing::Test {
 protected:
-    OtaProgressBoard board; ///< Fresh instance for each test
+    OtaProgressBoard board{256, 64}; ///< Fresh instance for each test
 };
 
 /** getBoardName must return the expected system board identifier. */
@@ -225,7 +236,7 @@ TEST_F(OtaProgressBoardTest, Reset_ClearsFailure) {
 
 class ErrorBoardTest : public ::testing::Test {
 protected:
-    ErrorBoard board; ///< Fresh instance for each test
+    ErrorBoard board{256, 64}; ///< Fresh instance for each test
 };
 
 /** getBoardName must return the expected system board identifier. */
@@ -285,7 +296,7 @@ TEST_F(ErrorBoardTest, ShowError_NullMessage_DoesNotCrash) {
 
 class ScreensaverBoardTest : public ::testing::Test {
 protected:
-    ScreensaverBoard board; ///< Fresh instance for each test
+    ScreensaverBoard board{256, 64}; ///< Fresh instance for each test
 };
 
 /** getBoardName must return the expected system board identifier. */
@@ -335,4 +346,109 @@ TEST_F(ScreensaverBoardTest, MultipleCycles_WorkCorrectly) {
     EXPECT_FALSE(board.isExpired());
     board.deactivate();
     EXPECT_TRUE(board.isExpired());
+}
+
+// =============================================================================
+// Test Group: ConfiguringStatusBoard
+// =============================================================================
+
+class ConfiguringStatusBoardTest : public ::testing::Test {
+protected:
+    ConfiguringStatusBoard board{256, 64}; ///< Fresh instance for each test
+
+    // Mock gates for binding
+    MockConfigGate gate1{"WiFi Station", "Connect to WiFi", true};
+    MockConfigGate gate2{"API Keys", "Validate API keys", false};
+    MockConfigGate gate3{"Time Sync", "Synchronize NTP", false};
+    std::vector<IConfigGate*> gates;
+
+    void SetUp() override {
+        gates = {&gate1, &gate2, &gate3};
+    }
+};
+
+/** getBoardName must return the expected system board identifier. */
+TEST_F(ConfiguringStatusBoardTest, GetBoardName_ReturnsCorrectName) {
+    EXPECT_STREQ(board.getBoardName(), "SYS: Configuring");
+}
+
+/** isExpired must return false initially (not dismissed). */
+TEST_F(ConfiguringStatusBoardTest, IsExpired_Initially_ReturnsFalse) {
+    EXPECT_FALSE(board.isExpired());
+}
+
+/** dismiss must cause isExpired to return true. */
+TEST_F(ConfiguringStatusBoardTest, Dismiss_CausesExpiry) {
+    board.dismiss();
+    EXPECT_TRUE(board.isExpired());
+}
+
+/** setGates must bind the gate list for counting. */
+TEST_F(ConfiguringStatusBoardTest, SetGates_BindsGateList) {
+    board.setGates(&gates);
+    EXPECT_EQ(board.getTotalGateCount(), 3);
+}
+
+/** getSatisfiedCount must reflect gate satisfaction state. */
+TEST_F(ConfiguringStatusBoardTest, GetSatisfiedCount_ReflectsState) {
+    board.setGates(&gates);
+    EXPECT_EQ(board.getSatisfiedCount(), 1); // Only gate1 is satisfied
+}
+
+/** getSatisfiedCount must update as gates become satisfied. */
+TEST_F(ConfiguringStatusBoardTest, GetSatisfiedCount_UpdatesAsGatesSatisfied) {
+    board.setGates(&gates);
+    EXPECT_EQ(board.getSatisfiedCount(), 1);
+
+    gate2.setSatisfied(true);
+    EXPECT_EQ(board.getSatisfiedCount(), 2);
+
+    gate3.setSatisfied(true);
+    EXPECT_EQ(board.getSatisfiedCount(), 3);
+}
+
+/** getTotalGateCount must return 0 when no gates are bound. */
+TEST_F(ConfiguringStatusBoardTest, GetTotalGateCount_NoGates_ReturnsZero) {
+    EXPECT_EQ(board.getTotalGateCount(), 0);
+}
+
+/** getSatisfiedCount must return 0 when no gates are bound. */
+TEST_F(ConfiguringStatusBoardTest, GetSatisfiedCount_NoGates_ReturnsZero) {
+    EXPECT_EQ(board.getSatisfiedCount(), 0);
+}
+
+/** setGates(nullptr) must unbind the gate list safely. */
+TEST_F(ConfiguringStatusBoardTest, SetGates_Nullptr_UnbindsGates) {
+    board.setGates(&gates);
+    EXPECT_EQ(board.getTotalGateCount(), 3);
+
+    board.setGates(nullptr);
+    EXPECT_EQ(board.getTotalGateCount(), 0);
+    EXPECT_EQ(board.getSatisfiedCount(), 0);
+}
+
+/** dismiss must not affect gate counts. */
+TEST_F(ConfiguringStatusBoardTest, Dismiss_DoesNotAffectGateCounts) {
+    board.setGates(&gates);
+    board.dismiss();
+    EXPECT_TRUE(board.isExpired());
+    EXPECT_EQ(board.getTotalGateCount(), 3);
+    EXPECT_EQ(board.getSatisfiedCount(), 1);
+}
+
+/** All gates satisfied count must equal total gate count. */
+TEST_F(ConfiguringStatusBoardTest, AllGatesSatisfied_CountMatchesTotal) {
+    gate1.setSatisfied(true);
+    gate2.setSatisfied(true);
+    gate3.setSatisfied(true);
+    board.setGates(&gates);
+    EXPECT_EQ(board.getSatisfiedCount(), board.getTotalGateCount());
+}
+
+/** Empty gate vector must return zero counts. */
+TEST_F(ConfiguringStatusBoardTest, EmptyGateVector_ReturnsZeroCounts) {
+    std::vector<IConfigGate*> emptyGates;
+    board.setGates(&emptyGates);
+    EXPECT_EQ(board.getTotalGateCount(), 0);
+    EXPECT_EQ(board.getSatisfiedCount(), 0);
 }

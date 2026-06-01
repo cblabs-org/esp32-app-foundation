@@ -30,8 +30,12 @@ by Principal Architects under the ESP32 App Foundation program.
 | [pr-07-template-repo](./pr-07-template-repo/PROJECT.md) | App Template Repository | ✅ **COMPLETE** | Session 60edc6be |
 | [pr-08-mcp-web-transport](./pr-08-mcp-web-transport/PROJECT.md) | MCP HTTP Web Transport | ✅ **COMPLETE** | — |
 | [pr-09-ota-security](./pr-09-ota-security/PROJECT.md) | OTA Security Pipeline (Verifier + Download Engine + Manager Upgrade) | ✅ **COMPLETE** | Session 8f4f1c2a |
-| [pr-10-firmware-optimization](./pr-10-firmware-optimization/PROJECT.md) | Firmware Size Optimization (sdkconfig + compiler + library audit) | 🔄 **WIP** — WO1 queued | Current Session |
+| [pr-10-firmware-optimization](./pr-10-firmware-optimization/PROJECT.md) | Firmware Size Optimization (sdkconfig + compiler + library audit) | 🔄 **WIP** — WO1 queued | Session unknown |
+| [pr-11-config-gateway](./pr-11-config-gateway/PROJECT.md) | ConfigManager-as-Gateway Refactoring (iConfigurable redesign + migration orchestration) | ✅ **WO1 MERGED** `2c0b840` — ready for PR submission | Current Session |
+| [pr-12-state-machine](./pr-12-state-machine/PROJECT.md) | State Machine Redesign (Boot → Configure ↔ Running, regression tolerance, ConfiguringStatusBoard) | 📋 **PLANNING** — 6 WOs defined, awaiting user approval | Current Session |
+| [pr-14-ota-production](./pr-14-ota-production/PROJECT.md) | OTA Production System (SemVer, channels, multi-arch, rollback wiring, config lifecycle, CI/CD) | 📋 **PLANNING** — 9 WOs defined, awaiting user approval | Session 2fdb967a |
+| [pr-13-test-app](./pr-13-test-app/PROJECT.md) | Foundation Test App (DiagnosticsBoard + Display Lifecycle Fixes) | ✅ **COMPLETE** `c92d3ea` | Session 4cc5a22f |
 
 ---
 
-*Updated by Principal Architect — PR-10 — 2026-05-23*
+*Updated by Principal Architect — PR-13 — 2026-05-31*
