@@ -334,8 +334,11 @@ bool ConfigManager::importAllConfig(JsonDocument& inDoc) {
 /**
  * @brief Register REST API routes for the config gateway.
  *
- * GET /api/config — returns a JSON array of registered namespace identifiers.
- * POST /api/config — reserved for future use.
+ * Routes:
+ *   GET  /api/config         — returns a JSON array of registered namespace identifiers.
+ *   GET  /api/config/backup  — exports all module configs as a downloadable JSON file.
+ *   POST /api/config/restore — upload JSON config, validate, import, and restart.
+ *                              Body limit: 8KB to prevent heap exhaustion.
  *
  * @param server Reference to the AsyncWebServer instance.
  */
@@ -355,14 +358,89 @@ void ConfigManager::registerRoutes(AsyncWebServer& server) {
         request->send(200, "application/json", output);
     });
 
-    // --- POST /api/config — reserved for future bulk operations ---
-    server.on("/api/config", HTTP_POST,
+    // --- GET /api/config/backup — export all config as downloadable JSON ---
+    server.on("/api/config/backup", HTTP_GET, [this](AsyncWebServerRequest* request) {
+        JsonDocument doc;
+        exportAllConfig(doc);
+
+        String output;
+        serializeJson(doc, output);
+
+        // Set Content-Disposition to trigger browser download
+        AsyncWebServerResponse* response = request->beginResponse(
+            200, "application/json", output);
+        response->addHeader("Content-Disposition",
+            "attachment; filename=\"config-backup.json\"");
+        request->send(response);
+
+        ESP_LOGI("ConfigManager", "Config backup exported (%u bytes)", output.length());
+    });
+
+    // --- POST /api/config/restore — upload JSON, validate, import, restart ---
+    server.on("/api/config/restore", HTTP_POST,
         [](AsyncWebServerRequest *request) {},
         NULL,
-        [this](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
-            // Reserved for future use — bulk config import via API
-            request->send(501, "application/json", "{\"status\":\"not_implemented\"}");
+        [this](AsyncWebServerRequest *request, uint8_t *data, size_t len,
+               size_t index, size_t total) {
+
+            // --- Body size guard (8KB max) ---
+            constexpr size_t MAX_RESTORE_BODY = 8192;
+            if (total > MAX_RESTORE_BODY) {
+                request->send(413, "application/json",
+                    "{\"error\":\"Payload too large\",\"max\":8192}");
+                return;
+            }
+
+            // Only process when we have the complete body (index + len == total)
+            // For chunked uploads, accumulate in the final chunk
+            if (index + len != total) {
+                return; // Wait for remaining chunks
+            }
+
+            // --- Parse the uploaded JSON ---
+            JsonDocument doc;
+            DeserializationError err = deserializeJson(doc, data, len);
+            if (err) {
+                ESP_LOGE("ConfigManager", "Restore JSON parse failed: %s", err.c_str());
+                String errMsg = "{\"error\":\"Invalid JSON: ";
+                errMsg += err.c_str();
+                errMsg += "\"}";
+                request->send(400, "application/json", errMsg);
+                return;
+            }
+
+            // --- Validate: must be a JSON object with at least one key ---
+            if (!doc.is<JsonObject>() || doc.as<JsonObject>().size() == 0) {
+                request->send(400, "application/json",
+                    "{\"error\":\"Config must be a non-empty JSON object\"}");
+                return;
+            }
+
+            // --- Import the config ---
+            bool success = importAllConfig(doc);
+            if (!success) {
+                ESP_LOGW("ConfigManager", "Some modules failed during config import");
+            }
+
+            ESP_LOGI("ConfigManager", "Config restore complete — scheduling restart");
+
+            // Send response before restart
+            request->send(200, "application/json",
+                "{\"status\":\"ok\",\"msg\":\"Config restored. Restarting...\"}");
+
+            // --- Schedule restart (500ms delay for response to flush) ---
+            // Use a FreeRTOS software timer to avoid blocking the async handler
+            TimerHandle_t restartTimer = xTimerCreate(
+                "cfg_restart", pdMS_TO_TICKS(500), pdFALSE, nullptr,
+                [](TimerHandle_t t) {
+                    ESP.restart();
+                }
+            );
+            if (restartTimer != nullptr) {
+                xTimerStart(restartTimer, 0);
+            }
         }
     );
 #endif
 }
+

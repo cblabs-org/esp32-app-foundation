@@ -234,11 +234,12 @@ public:
     /**
      * @brief Get the display order within the System sub-navigation.
      *
-     * ConfigManager is 20, OTA is 30 — OTA appears after Config.
+     * Positioned after Backup (40) in the System pill bar:
+     * Status=10, Keys=20, MCP=30, Backup=40, OTA=50, Screenshot=60.
      *
-     * @return 30
+     * @return 50
      */
-    int getTabOrder() const override { return 30; }
+    int getTabOrder() const override { return 50; }
 
 private:
     // -------------------------------------------------------------------------
