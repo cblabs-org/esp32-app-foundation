@@ -60,6 +60,13 @@ void ScreensaverBoard::deactivate() {
 }
 
 /**
+ * @brief Set the font to be used by the bouncing clock.
+ */
+void ScreensaverBoard::setClockFont(const uint8_t* font) {
+    _clockFont = font;
+}
+
+/**
  * @brief Check whether the screensaver is currently active.
  * @return true if the screensaver is running.
  */
@@ -93,7 +100,11 @@ void ScreensaverBoard::render(U8G2& u8g2) {
     }
 
     // --- Step 2: Configure and render the LabelWidget at bounce position ---
-    _clockLabel.setFont(AppFonts::defaultLarge());
+    if (_clockFont != nullptr) {
+        _clockLabel.setFont(_clockFont);
+    } else {
+        _clockLabel.setFont(AppFonts::defaultLarge());
+    }
     _clockLabel.setText(timeBuf);
     _clockLabel.setCoords(_xPos, _yPos);
     _clockLabel.render(u8g2);

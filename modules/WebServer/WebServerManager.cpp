@@ -43,6 +43,7 @@
 #include "portal_assets/mcp_js.hpp"
 #include "portal_assets/screenshot_js.hpp"
 #include "portal_assets/screenshot_html.hpp"
+#include "portal_assets/appconfig_js.hpp"
 #endif
 
 #include "platform/LogShim.h"
@@ -172,6 +173,12 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors) 
 
     _server.on("/screenshot.html", HTTP_GET, [](AsyncWebServerRequest* request) {
         AsyncWebServerResponse *response = request->beginResponse(200, "text/html", screenshot_html_gz, screenshot_html_gz_len);
+        response->addHeader("Content-Encoding", "gzip");
+        request->send(response);
+    });
+
+    _server.on("/appconfig.js", HTTP_GET, [](AsyncWebServerRequest* request) {
+        AsyncWebServerResponse *response = request->beginResponse(200, "application/javascript", appconfig_js_gz, appconfig_js_gz_len);
         response->addHeader("Content-Encoding", "gzip");
         request->send(response);
     });

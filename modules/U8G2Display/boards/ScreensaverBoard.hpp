@@ -84,6 +84,12 @@ public:
      */
     const char* getBoardName() const override;
 
+    /**
+     * @brief Set the font to be used by the bouncing clock.
+     * @param font Pointer to the U8G2 font array.
+     */
+    void setClockFont(const uint8_t* font);
+
 private:
     bool          _active       = false; ///< True when the screensaver is running
     unsigned long _animFrameMs  = 0;     ///< Timestamp of the last animation frame
@@ -91,6 +97,7 @@ private:
     int           _yPos         = 0;     ///< Current vertical position (pixels)
     int           _xDir         = 1;     ///< Horizontal direction (+1 right, -1 left)
     int           _yDir         = 1;     ///< Vertical direction (+1 down, -1 up)
+    const uint8_t* _clockFont   = nullptr; ///< Configured clock font (nullptr = use default)
 
     // --- Widget composition (WO3 refactor) ---
     LabelWidget _clockLabel; ///< HH:MM clock text widget

@@ -400,9 +400,9 @@ public:
 
     /**
      * @brief Get the UI tab name for this contributor.
-     * @return "Display"
+     * @return "App"
      */
-    const char* getTabName() const override { return "Display"; }
+    const char* getTabName() const override { return "App"; }
 
     /**
      * @brief Get the tab display order.
@@ -448,6 +448,18 @@ public:
      * @param fps Target frames per second (1–60). 0 treated as 30.
      */
     void setTargetFps(uint8_t fps);
+
+    /**
+     * @brief Set the clock font size.
+     * @param size Font size level (1=small, 2=medium, 3=large). Clamped to range.
+     */
+    void setClockFontSize(uint8_t size);
+
+    /**
+     * @brief Get the current clock font size.
+     * @return Font size level (1=small, 2=medium, 3=large).
+     */
+    uint8_t getClockFontSize() const;
 
     /**
      * @brief Get the display info struct for MCP capture_display wiring.
@@ -627,6 +639,7 @@ private:
     // --- Display settings ---
     uint8_t _brightness = 255;                     ///< Display brightness / contrast level (0–255)
     bool _flipScreen = false;                      ///< True if the display is flipped 180 degrees
+    uint8_t _clockFontSize = 2;                    ///< Clock font size (1=small, 2=medium, 3=large)
 
     // --- Modal layer ---
     IDisplayBoard* _modal = nullptr;               ///< Active modal board (auto-clears on expired)

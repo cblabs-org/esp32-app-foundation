@@ -67,6 +67,7 @@ static const char* TAG = "U8g2Display";
 // Include EventBus directly — it is native-safe (no Arduino.h dependency).
 #include "../EventBus/EventBus.hpp"
 #include "../ConfigManager/ConfigManager.hpp"
+#include "fonts/Fonts.hpp"
 
 // =============================================================================
 // Lifecycle
@@ -492,6 +493,7 @@ int U8G2DisplayModule::getBoardCount() const {
     return (int)_boards.size();
 }
 
+
 /**
  * @brief Return the currently rendering board, or nullptr if none.
  * @return Pointer to the active board.
@@ -678,6 +680,12 @@ void U8G2DisplayModule::applyConfig(const JsonObject& section) {
     _sleepTimeoutMs     = section["sleepTimeout"]     | (unsigned long)300000;
     _rotationIntervalMs = section["rotationInterval"] | (unsigned long)8000;
     _targetFrameIntervalMs = 1000UL / (section["targetFps"] | (uint8_t)30);
+    _clockFontSize      = section["clockFontSize"]    | (uint8_t)2;
+
+    const uint8_t* font = AppFonts::defaultMedium();
+    if (_clockFontSize == 1) font = AppFonts::defaultSmall();
+    else if (_clockFontSize == 3) font = AppFonts::defaultLarge();
+    _screensaver.setClockFont(font);
 
     // --- Apply hardware settings ---
 #ifndef NATIVE_BUILD
@@ -705,6 +713,7 @@ void U8G2DisplayModule::serializeConfig(JsonObject& section) const {
     section["sleepTimeout"]     = _sleepTimeoutMs;
     section["rotationInterval"] = _rotationIntervalMs;
     section["targetFps"]        = (uint8_t)(1000UL / _targetFrameIntervalMs);
+    section["clockFontSize"]    = _clockFontSize;
 }
 
 /**
@@ -722,6 +731,7 @@ void U8G2DisplayModule::resetConfig() {
     _sleepTimeoutMs     = 300000;
     _rotationIntervalMs = 8000;
     _targetFrameIntervalMs = 33;
+    _clockFontSize      = 2;
 
     // --- Apply hardware settings ---
 #ifndef NATIVE_BUILD
@@ -808,6 +818,29 @@ void U8G2DisplayModule::setTargetFps(uint8_t fps) {
     _targetFrameIntervalMs = (fps > 0) ? (1000UL / fps) : 33;
 }
 
+/**
+ * @brief Set the clock font size.
+ * @param size Font size level (1=small, 2=medium, 3=large). Clamped to range.
+ */
+void U8G2DisplayModule::setClockFontSize(uint8_t size) {
+    if (size < 1) size = 1;
+    if (size > 3) size = 3;
+    _clockFontSize = size;
+    
+    const uint8_t* font = AppFonts::defaultMedium();
+    if (_clockFontSize == 1) font = AppFonts::defaultSmall();
+    else if (_clockFontSize == 3) font = AppFonts::defaultLarge();
+    _screensaver.setClockFont(font);
+}
+
+/**
+ * @brief Get the current clock font size.
+ * @return Font size level (1=small, 2=medium, 3=large).
+ */
+uint8_t U8G2DisplayModule::getClockFontSize() const {
+    return _clockFontSize;
+}
+
 // =============================================================================
 // IWebContributor — REST API Routes
 // =============================================================================
@@ -831,6 +864,7 @@ void U8G2DisplayModule::registerRoutes(AsyncWebServer& server) {
         doc["sleepTimeout"]     = _sleepTimeoutMs;
         doc["rotationInterval"] = _rotationIntervalMs;
         doc["boardCount"]       = (int)_boards.size();
+        doc["clockFontSize"]    = _clockFontSize;
 
         IDisplayBoard* active = getActiveBoard();
         doc["activeBoard"] = (active != nullptr) ? active->getBoardName() : "none";
@@ -941,6 +975,30 @@ void U8G2DisplayModule::registerRoutes(AsyncWebServer& server) {
         serializeJson(doc, output);
         request->send(200, "application/json", output);
     });
+
+    // --- POST /api/display/clockFontSize — set clock font size ---
+    server.on("/api/display/clockFontSize", HTTP_POST,
+        [](AsyncWebServerRequest *request) {},
+        NULL,
+        [this](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t /*index*/, size_t /*total*/) {
+            JsonDocument doc;
+            DeserializationError err = deserializeJson(doc, data, len);
+            if (err || !doc["value"].is<int>()) {
+                request->send(400, "application/json", "{\"error\":\"Invalid JSON or missing 'value'\"}");
+                return;
+            }
+
+            int value = doc["value"] | 2;
+            setClockFontSize((uint8_t)value);
+
+            // Persist via ConfigManager gateway
+            if (_app != nullptr) {
+                _app->getConfigManager().saveModuleConfig(this);
+            }
+
+            request->send(200, "application/json", "{\"status\":\"ok\"}");
+        }
+    );
 
     // --- POST /api/display/show — force a specific board by index ---
     server.on("/api/display/show", HTTP_POST,

@@ -402,7 +402,8 @@ document.addEventListener('DOMContentLoaded', function() {
       'ota.js',
       'keys.js',
       'mcp.js',
-      'screenshot.js'
+      'screenshot.js',
+      'appconfig.js'
     ];
 
     var loaded = 0;
