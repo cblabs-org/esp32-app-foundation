@@ -9,11 +9,11 @@
  * Module: include/interfaces/IMCPContributor.hpp
  * Description: Pure interface for kernel modules and optional modules that
  *              contribute MCP tools to the MCPServer via the MCPToolRegistry.
- *              The MCP server calls registerMcpTools() once during begin().
+ *              The MCP server calls registerMCPTools() once during begin().
  *
  * Exported Classes:
  * - IMCPContributor: Abstract base for modules exposing MCP tools
- *   - registerMcpTools(): Register all tools with the provided MCPToolRegistry
+ *   - registerMCPTools(): Register all tools with the provided MCPToolRegistry
  */
 
 #pragma once
@@ -25,7 +25,7 @@ class MCPToolRegistry;
 /**
  * @brief Contract for modules that expose MCP tools to the MCPServer.
  *
- * Implementing modules call registry.addTool() inside registerMcpTools()
+ * Implementing modules call registry.addTool() inside registerMCPTools()
  * to install their tool handlers. The MCPServer passes its MCPToolRegistry
  * reference during the begin() phase, before the server starts processing
  * JSON-RPC requests.
@@ -44,5 +44,5 @@ public:
      *
      * @param registry The MCPToolRegistry to register tools with.
      */
-    virtual void registerMcpTools(MCPToolRegistry& registry) = 0;
+    virtual void registerMCPTools(MCPToolRegistry& registry) = 0;
 };

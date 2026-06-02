@@ -6,7 +6,7 @@
  * This work is licensed under Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International.
  * To view a copy of this license, visit https://creativecommons.org/licenses/by-nc-sa/4.0/
  *
- * Module: modules/MCPServer/mcpBuiltinTools.cpp
+ * Module: modules/mcpServer/mcpBuiltinTools.cpp
  * Description: Implementation of all foundation-level MCP tools that are always
  *              available in the framework. Registers 7 tools into the MCPToolRegistry:
  *                - system_info:      Device heap, uptime, chip info, firmware version
@@ -24,6 +24,7 @@
 #include "MCPBuiltinTools.hpp"
 #include "MCPToolRegistry.hpp"
 #include <ConfigManager.hpp>
+#include "../TimeManager/TimeManager.hpp"
 #include <ArduinoJson.h>
 
 // ---------------------------------------------------------------------------
@@ -44,7 +45,7 @@
 
 #include "platform/LogShim.h"
 
-static const char* TAG = "MCPBuiltinTools";
+static const char* TAG = "McpBuiltinTools";
 
 // File-scope display info — updated via setDisplayInfo() for late-binding.
 // The capture_display lambda reads from this directly (no by-value capture).
@@ -99,15 +100,16 @@ std::string base64Encode(const uint8_t* data, size_t len) {
 
 void mcpBuiltinTools::registerAll(MCPToolRegistry& registry,
                                   ConfigManager* configManager,
-                                  const DisplayInfo* displayInfo) {
+                                  const DisplayInfo* displayInfo,
+                                  TimeManager* timeManager) {
 
     // -----------------------------------------------------------------
     // Tool 1: system_info — Device system telemetry
     // -----------------------------------------------------------------
     registry.addTool(
         "system_info",
-        "Get device system information including heap, storage, WiFi, uptime, chip info, and firmware version",
-        [](JsonObject& params, JsonObject& result) {
+        "Get device system information including heap, storage, WiFi, time, uptime, chip info, and firmware version",
+        [timeManager](JsonObject& params, JsonObject& result) {
             (void)params; // No input parameters required
             #ifndef NATIVE_BUILD
                 // --- Internal DRAM metrics (always present on all ESP32 variants) ---
@@ -167,6 +169,28 @@ void mcpBuiltinTools::registerAll(MCPToolRegistry& registry,
                 if (running != nullptr) {
                     result["partition"] = running->label;
                 }
+
+                // --- Time info (NTP sync status, timezone, local time) ---
+                if (timeManager != nullptr) {
+                    result["time_configured"] = timeManager->isConfigured();
+                    result["time_synced"]     = timeManager->isTimeSet();
+                    result["time_timezone"]   = timeManager->getTimezone();
+                    result["time_posix"]      = timeManager->getPosixTz();
+
+                    const char* syncStr = "UNSYNCED";
+                    if (timeManager->getSyncStatus() == TimeSyncStatus::SYNCED) syncStr = "SYNCED";
+                    else if (timeManager->getSyncStatus() == TimeSyncStatus::IN_PROGRESS) syncStr = "IN_PROGRESS";
+                    result["time_sync_status"] = syncStr;
+
+                    if (timeManager->isTimeSet()) {
+                        struct tm timeinfo;
+                        if (timeManager->getLocalTime(&timeinfo)) {
+                            char buf[32];
+                            strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%S", &timeinfo);
+                            result["time_local"] = buf;
+                        }
+                    }
+                }
             #else
                 // Native build stubs — no hardware telemetry available
                 result["heap_free"]          = 0;
@@ -193,6 +217,11 @@ void mcpBuiltinTools::registerAll(MCPToolRegistry& registry,
                 result["wifi_mac"]           = "";
                 result["wifi_rssi"]          = 0;
                 result["partition"]          = "native";
+                result["time_configured"]    = false;
+                result["time_synced"]        = false;
+                result["time_timezone"]      = "";
+                result["time_posix"]         = "";
+                result["time_sync_status"]   = "UNSYNCED";
             #endif
             result["firmware_version"] = APP_FOUNDATION_VERSION;
         }

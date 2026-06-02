@@ -6,7 +6,7 @@
  * This work is licensed under Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International.
  * To view a copy of this license, visit https://creativecommons.org/licenses/by-nc-sa/4.0/
  *
- * Module: modules/MCPServer/MCPServer.hpp
+ * Module: modules/mcpServer/MCPServer.hpp
  * Description: MCP (Model Context Protocol) JSON-RPC 2.0 server skeleton that
  *              reads line-delimited JSON from Serial and dispatches to registered
  *              tool handlers via the MCPToolRegistry. Built-in foundation tools
@@ -98,7 +98,7 @@
 
     // -----------------------------------------------------------------------
     // Minimal Serial mock — string-buffer class for native compilation
-    // Mirrors the pattern used by WebServerManager.hpp for AsyncWebServer.
+    // Mirrors the pattern used by webServer.hpp for AsyncWebServer.
     // -----------------------------------------------------------------------
     class MockSerial : public Print {
     public:
@@ -133,6 +133,7 @@
 // Forward-declare to avoid pulling in the full headers
 class IMCPContributor;
 class ConfigManager;
+class TimeManager;
 struct FrameworkConfig;
 
 /**
@@ -153,7 +154,7 @@ public:
      * @param configManager  Optional pointer to the ConfigManager for config tools.
      * @param frameworkConfig Optional pointer to the FrameworkConfig for security settings.
      */
-    void begin(const std::vector<IMCPContributor*>& contributors, ConfigManager* configManager = nullptr, const FrameworkConfig* frameworkConfig = nullptr);
+    void begin(const std::vector<IMCPContributor*>& contributors, ConfigManager* configManager = nullptr, const FrameworkConfig* frameworkConfig = nullptr, TimeManager* timeManager = nullptr);
 
     /**
      * @brief Process a single JSON-RPC request and write the response to the provided stream.

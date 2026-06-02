@@ -106,7 +106,9 @@
   // -------------------------------------------------------------------------
   // Wire toggle switch behavior (visual + API call)
   // -------------------------------------------------------------------------
-  function wireToggle(id, key) {
+  let cachedTools = [];  // Cached tool list for re-rendering on toggle changes
+
+  function wireToggle(id, key, onToggled) {
     const input = document.getElementById(id);
     if (!input) return;
 
@@ -118,7 +120,23 @@
       slider.style.background = checked ? 'var(--primary)' : '#ccc';
       dot.style.left = checked ? '22px' : '3px';
       handleToggle(key, checked);
+      if (onToggled) onToggled();
     });
+  }
+
+  /**
+   * @brief Re-render the tool list using cached tools and current toggle states.
+   */
+  function refreshToolList() {
+    const toolsEl = document.getElementById('mcp-tools-list');
+    if (!toolsEl || cachedTools.length === 0) return;
+
+    const enabledInput = document.getElementById('mcp-toggle-enabled');
+    const readOnlyInput = document.getElementById('mcp-toggle-readonly');
+    const enabled = enabledInput ? enabledInput.checked : true;
+    const readOnly = readOnlyInput ? readOnlyInput.checked : true;
+
+    toolsEl.innerHTML = cachedTools.map(function(t) { return toolRow(t, enabled, readOnly); }).join('');
   }
 
   // -------------------------------------------------------------------------
@@ -150,8 +168,8 @@
             : '<span style="color:#c62828;">● Inactive</span>'}</span>
         </div>`;
 
-      wireToggle('mcp-toggle-enabled', 'enabled');
-      wireToggle('mcp-toggle-readonly', 'readOnly');
+      wireToggle('mcp-toggle-enabled', 'enabled', function() { refreshToolList(); });
+      wireToggle('mcp-toggle-readonly', 'readOnly', function() { refreshToolList(); });
 
       // --- Tools list: fetch via JSON-RPC tools/list ---
       try {
@@ -168,6 +186,7 @@
         const toolsEl = document.getElementById('mcp-tools-list');
         if (rpcResponse && rpcResponse.result && rpcResponse.result.tools) {
           const tools = rpcResponse.result.tools;
+          cachedTools = tools;
           if (tools.length === 0) {
             toolsEl.innerHTML = '<p style="color:var(--text-muted); font-size:0.85rem;">No tools registered.</p>';
           } else {

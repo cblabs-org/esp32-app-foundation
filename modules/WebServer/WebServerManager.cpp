@@ -6,7 +6,7 @@
  * This work is licensed under Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International.
  * To view a copy of this license, visit https://creativecommons.org/licenses/by-nc-sa/4.0/
  *
- * Module: modules/WebServer/webServer.cpp
+ * Module: modules/webServer/webServer.cpp
  * Description: Implementation of WebServerManager — enhanced for WO2/WO4 with:
  *              - Heap guard (atomic semaphore + largest-free-block check)
  *              - Enhanced /api/system endpoint (20+ fields)
@@ -35,6 +35,7 @@
 #include "portal_assets/app_js.hpp"
 #include "portal_assets/utils_js.hpp"
 #include "portal_assets/system_js.hpp"
+#include "portal_assets/time_js.hpp"
 #include "portal_assets/wifi_js.hpp"
 #include "portal_assets/ota_js.hpp"
 #include "portal_assets/backup_js.hpp"
@@ -117,6 +118,12 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors) 
 
     _server.on("/system.js", HTTP_GET, [](AsyncWebServerRequest* request) {
         AsyncWebServerResponse *response = request->beginResponse(200, "application/javascript", system_js_gz, system_js_gz_len);
+        response->addHeader("Content-Encoding", "gzip");
+        request->send(response);
+    });
+
+    _server.on("/time.js", HTTP_GET, [](AsyncWebServerRequest* request) {
+        AsyncWebServerResponse *response = request->beginResponse(200, "application/javascript", time_js_gz, time_js_gz_len);
         response->addHeader("Content-Encoding", "gzip");
         request->send(response);
     });
@@ -374,13 +381,24 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors) 
     _server.on("/api/system/factory-reset", HTTP_POST, [](AsyncWebServerRequest* request) {});
 #endif
 
-    // --- Captive portal redirect ---
+    // --- Captive portal redirect (AP mode only) / 404 (STA mode) ---
     // When in AP mode, the DNS server resolves ALL domains to 192.168.4.1.
     // Phones/OS probe specific URLs to detect captive portals. If those return
     // anything other than the expected response, the OS pops up a portal window.
     // This catch-all 302 redirect ensures any unhandled request opens the portal.
+    //
+    // In STA mode the redirect is harmful — it silently masks missing routes
+    // instead of returning a visible 404 error.
     _server.onNotFound([](AsyncWebServerRequest* request) {
-        request->redirect("http://192.168.4.1/");
+#ifndef NATIVE_BUILD
+        if (WiFi.getMode() == WIFI_AP || WiFi.getMode() == WIFI_AP_STA) {
+            request->redirect("http://192.168.4.1/");
+        } else {
+            request->send(404, "application/json", "{\"error\":\"Not found\"}");
+        }
+#else
+        request->send(404, "application/json", "{\"error\":\"Not found\"}");
+#endif
     });
 
     _server.begin();

@@ -6,7 +6,7 @@
  * This work is licensed under Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International.
  * To view a copy of this license, visit https://creativecommons.org/licenses/by-nc-sa/4.0/
  *
- * Module: modules/MCPServer/mcpServer.cpp
+ * Module: modules/mcpServer/mcpServer.cpp
  * Description: Implementation of the MCP JSON-RPC 2.0 server. Reads
  *              line-delimited JSON from Serial on hardware, parses each line
  *              into a JsonDocument, and dispatches to the appropriate handler
@@ -45,7 +45,7 @@ static const char* TAG = "MCPServer";
  * @brief Collect tools from all IMCPContributor modules and mark the server
  *        as initialised so tick() begins processing.
  */
-void MCPServer::begin(const std::vector<IMCPContributor*>& contributors, ConfigManager* configManager, const FrameworkConfig* frameworkConfig) {
+void MCPServer::begin(const std::vector<IMCPContributor*>& contributors, ConfigManager* configManager, const FrameworkConfig* frameworkConfig, TimeManager* timeManager) {
     // --- Step 0: Cache dependencies for runtime config persistence ---
     _configManager = configManager;
 
@@ -57,12 +57,12 @@ void MCPServer::begin(const std::vector<IMCPContributor*>& contributors, ConfigM
     // --- Step 1: Register built-in foundation tools ---
     // These are always available regardless of which app uses the framework.
     _registryPtr = &_registry;
-    mcpBuiltinTools::registerAll(_registry, configManager);
+    mcpBuiltinTools::registerAll(_registry, configManager, nullptr, timeManager);
 
     // --- Step 2: Collect tools from all contributors ---
     for (auto* contributor : contributors) {
         if (contributor != nullptr) {
-            contributor->registerMcpTools(_registry);
+            contributor->registerMCPTools(_registry);
         }
     }
 

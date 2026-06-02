@@ -397,6 +397,7 @@ document.addEventListener('DOMContentLoaded', function() {
       'utils.js',
       'wifi.js',
       'system.js',
+      'time.js',
       'backup.js',
       'ota.js',
       'keys.js',

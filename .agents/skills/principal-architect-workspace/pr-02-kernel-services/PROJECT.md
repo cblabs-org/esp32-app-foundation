@@ -2,9 +2,9 @@
 
 **Program:** ESP32 App Foundation  
 **Branch:** `pr-02-kernel-services`  
-**Status:** PLANNING  
+**Status:** ✅ MERGED to `main`  
 **Principal Architect Session:** 30aaf023-db75-4615-bf03-5b7bf9e9bacc *(inherited)*  
-**Last Updated:** 2026-05-21  
+**Last Updated:** 2026-06-02 (retrospective update)  
 
 ---
 
@@ -39,7 +39,7 @@ All code must be authored fresh; no copying wholesale from `departures-board`, t
 | WO1 | **✅ MERGED** | ~~`pr-02-wo1-lowlevel-libs`~~ → `pr-02-kernel-services` | [wo1-lowlevel-libs/WORKORDER.md](wo1-lowlevel-libs/WORKORDER.md) |
 | WO2 | **✅ MERGED** | ~~`pr-02-wo2-configmanager`~~ → `pr-02-kernel-services` | [wo2-configmanager/WORKORDER.md](wo2-configmanager/WORKORDER.md) |
 | WO3 | **✅ MERGED** | ~~`pr-02-wo3-keymanager`~~ → `pr-02-kernel-services` | [wo3-keymanager/WORKORDER.md](wo3-keymanager/WORKORDER.md) |
-| WO4 | **✅ MERGED (HW Pending)** | ~~`pr-02-wo4-wifimanager`~~ → `pr-02-kernel-services` | [wo4-wifimanager/WORKORDER.md](wo4-wifimanager/WORKORDER.md) |
+| WO4 | **✅ MERGED (HW Verified)** | ~~`pr-02-wo4-wifimanager`~~ → `pr-02-kernel-services` | [wo4-wifimanager/WORKORDER.md](wo4-wifimanager/WORKORDER.md) |
 | WO5 | **✅ MERGED** | ~~`pr-02-wo5-timemanager`~~ → `pr-02-kernel-services` | [wo5-timemanager/WORKORDER.md](wo5-timemanager/WORKORDER.md) |
 | WO6 | **✅ MERGED (HW Pending)** | ~~`pr-02-wo6-otaupdatemanager`~~ → `pr-02-kernel-services` | [wo6-otaupdatemanager/WORKORDER.md](wo6-otaupdatemanager/WORKORDER.md) |
 
@@ -48,16 +48,23 @@ All code must be authored fresh; no copying wholesale from `departures-board`, t
 ## Git Branch Map
 
 ```
-main
-  └─ pr-02-kernel-services            ← PA feature branch (integration target)
-       pr-02-wo1-lowlevel-libs        ← to be created
-       pr-02-wo2-configmanager        ← to be created
-       pr-02-wo3-keymanager           ← to be created
-       pr-02-wo4-wifimanager          ← to be created
-       pr-02-wo5-timemanager          ← to be created
-       pr-02-wo6-otaupdatemanager     ← to be created
+main  ← all PR-02 work merged, branch deleted
 ```
 
 ---
 
-*Principal Architect — PR-02 — 2026-05-21*
+## Distillation Artifacts
+
+- [context_bridge.md](context_bridge.md) — PR-02 Kernel Services final state distillation
+- [context_artifacts/](context_artifacts/) — ADRs and graveyards:
+  - `adr_kernel_services.md` — Core architectural decisions
+  - `graveyard_kernel_services.md` — Rejected approaches
+  - `adr_wifi_state_machine.md` — WiFi state machine design (from hardware verification session)
+  - `adr_webserver_deferred_start.md` — WebServer deferred start via EventBus
+  - `adr_captive_portal.md` — Captive portal with DNS hijack
+  - `graveyard_native_build_stubs.md` — Native build stub unification
+  - `state_files_changed.md` — WiFi integration file manifest
+
+---
+
+*Principal Architect — PR-02 — Retrospectively updated 2026-06-02*

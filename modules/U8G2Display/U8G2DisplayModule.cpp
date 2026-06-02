@@ -6,7 +6,7 @@
  * This work is licensed under Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International.
  * To view a copy of this license, visit https://creativecommons.org/licenses/by-nc-sa/4.0/
  *
- * Module: modules/U8G2Display/u8g2DisplayModule.cpp
+ * Module: modules/u8g2Display/u8g2DisplayModule.cpp
  * Description: Implementation of the U8G2 display module with two-layer
  *              base+modal architecture, carousel engine, sleep/wake power
  *              management, phase-aware brightness dimming, system board
@@ -41,6 +41,7 @@
  * - U8G2DisplayModule::setFlipScreen():      Runtime screen flip toggle
  * - U8G2DisplayModule::setSleepTimeout():    Runtime sleep timeout adjustment
  * - U8G2DisplayModule::setRotationInterval(): Runtime carousel interval adjustment
+ * - U8G2DisplayModule::setTargetFps():        Runtime frame-rate target adjustment
  * - U8G2DisplayModule::_onOtaProgress():     Static EventBus callback for OTA events
  * - U8G2DisplayModule::_onDisplayMessage():  Static EventBus callback for display messages
  * - U8G2DisplayModule::_onStateChanged():    State-polling lifecycle handler (replaces EventBus callbacks)
@@ -50,12 +51,14 @@
 #include "platform/LogShim.h"
 #include <cstring>
 
-static const char* TAG = "U8G2Display";
+static const char* TAG = "U8g2Display";
 
 #ifndef NATIVE_BUILD
 #include <Arduino.h>
 #include <ESPAsyncWebServer.h>
 #include "../Application/Application.hpp"
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
   #if defined(DISPLAY_SPI_SCK) && defined(DISPLAY_SPI_MISO) && defined(DISPLAY_SPI_MOSI)
   #include <SPI.h>
   #endif
@@ -209,6 +212,7 @@ void U8G2DisplayModule::begin(Application& app) {
 #ifndef NATIVE_BUILD
     _lastActivityMs = millis();
     _lastRotationMs = millis();
+    _lastRenderMs   = millis();
 #endif
 
     ESP_LOGI(TAG, "Display module fully initialized — tick-driven rendering active");
@@ -257,7 +261,7 @@ void U8G2DisplayModule::tick() {
     // is unsatisfied — the device may be attempting STA with stored creds).
     // Clear the wizard when the WiFi gate becomes satisfied.
 #ifndef NATIVE_BUILD
-    if (_app != nullptr && _app->getState() == AppState::Configuring) {
+    if (_app != nullptr && _app->getState() == AppState::CONFIGURING) {
         if (_modal != &_wifiWizard && _app->getWifiManager().getAPMode()) {
             // AP mode just started — push the WiFi wizard
             _wifiWizard.configure(_app->getConfig().hostname);
@@ -279,7 +283,7 @@ void U8G2DisplayModule::tick() {
     // --- 3. Phase-aware behaviour ---
 #ifndef NATIVE_BUILD
     if (_app != nullptr) {
-        if (_app->getState() == AppState::Running && _modal == nullptr) {
+        if (_app->getState() == AppState::RUNNING && _modal == nullptr) {
             // RUNNING with no modal: carousel rotation + screensaver/sleep
             _checkSleep();
             if (!_boards.empty() && _activeBoardIndex >= 0) {
@@ -289,7 +293,7 @@ void U8G2DisplayModule::tick() {
                     _lastRotationMs = now;
                 }
             }
-        } else if (_app->getState() != AppState::Boot) {
+        } else if (_app->getState() != AppState::BOOT) {
             // CONFIGURING (base) or modal active (any phase): dim, never blank
             _checkDim();
         }
@@ -316,14 +320,18 @@ void U8G2DisplayModule::tick() {
         return;
     }
 
-    // --- 5. Tick + render the visible board ---
+    // --- 5. Tick + render the visible board (frame-rate limited) ---
 #ifndef NATIVE_BUILD
     visible->tick(millis());
+    unsigned long now = millis();
+    if ((now - _lastRenderMs) >= _targetFrameIntervalMs) {
+        _renderCurrentBoard();
+        _lastRenderMs = now;
+    }
 #else
     visible->tick(0);
-#endif
-
     _renderCurrentBoard();
+#endif
 }
 
 // =============================================================================
@@ -659,8 +667,8 @@ void U8G2DisplayModule::clearStatus() {
  * @brief Apply display settings from a parsed JSON section.
  *
  * Called by ConfigManager during beginAll(). Reads brightness, flip,
- * sleepTimeout, and rotationInterval from the JSON object and applies
- * them to internal state and hardware.
+ * sleepTimeout, rotationInterval, and targetFps from the JSON object
+ * and applies them to internal state and hardware.
  *
  * @param section Read-only JSON object containing display config keys.
  */
@@ -669,7 +677,7 @@ void U8G2DisplayModule::applyConfig(const JsonObject& section) {
     _flipScreen         = section["flip"]            | false;
     _sleepTimeoutMs     = section["sleepTimeout"]     | (unsigned long)300000;
     _rotationIntervalMs = section["rotationInterval"] | (unsigned long)8000;
-    _clockFontSize      = section["clockFontSize"]    | (uint8_t)2;
+    _targetFrameIntervalMs = 1000UL / (section["targetFps"] | (uint8_t)30);
 
     // --- Apply hardware settings ---
 #ifndef NATIVE_BUILD
@@ -684,9 +692,10 @@ void U8G2DisplayModule::applyConfig(const JsonObject& section) {
 /**
  * @brief Serialize current display settings into a JSON section.
  *
- * Called by ConfigManager during saveModuleConfig(). Writes the four
- * display config keys into the provided JSON object. ConfigManager
- * appends the _v field separately.
+ * Called by ConfigManager during saveModuleConfig(). Writes the five
+ * display config keys (brightness, flip, sleepTimeout, rotationInterval,
+ * targetFps) into the provided JSON object. ConfigManager appends the
+ * _v field separately.
  *
  * @param section Mutable JSON object to write config into.
  */
@@ -695,15 +704,16 @@ void U8G2DisplayModule::serializeConfig(JsonObject& section) const {
     section["flip"]             = _flipScreen;
     section["sleepTimeout"]     = _sleepTimeoutMs;
     section["rotationInterval"] = _rotationIntervalMs;
-    section["clockFontSize"]    = _clockFontSize;
+    section["targetFps"]        = (uint8_t)(1000UL / _targetFrameIntervalMs);
 }
 
 /**
  * @brief Reset display settings to factory defaults.
  *
  * Sets: brightness=255, flipScreen=false, sleepTimeout=300000ms,
- * rotationInterval=8000ms. Applies hardware settings. ConfigManager
- * will call saveModuleConfig() afterwards to persist.
+ * rotationInterval=8000ms, targetFrameIntervalMs=33ms (30 FPS).
+ * Applies hardware settings. ConfigManager will call
+ * saveModuleConfig() afterwards to persist.
  */
 void U8G2DisplayModule::resetConfig() {
     // --- Set factory defaults ---
@@ -711,7 +721,7 @@ void U8G2DisplayModule::resetConfig() {
     _flipScreen         = false;
     _sleepTimeoutMs     = 300000;
     _rotationIntervalMs = 8000;
-    _clockFontSize      = 2;
+    _targetFrameIntervalMs = 33;
 
     // --- Apply hardware settings ---
 #ifndef NATIVE_BUILD
@@ -786,21 +796,16 @@ void U8G2DisplayModule::setRotationInterval(unsigned long intervalMs) {
 }
 
 /**
- * @brief Set the clock font size.
- * @param size Font size level (1=small, 2=medium, 3=large). Clamped to range.
+ * @brief Set the target render frame rate.
+ *
+ * Converts the FPS value to a millisecond interval stored in
+ * _targetFrameIntervalMs. Zero is treated as 30 FPS to prevent
+ * division-by-zero.
+ *
+ * @param fps Target frames per second (1–60). 0 treated as 30.
  */
-void U8G2DisplayModule::setClockFontSize(uint8_t size) {
-    if (size < 1) size = 1;
-    if (size > 3) size = 3;
-    _clockFontSize = size;
-}
-
-/**
- * @brief Get the current clock font size.
- * @return Font size level (1=small, 2=medium, 3=large).
- */
-uint8_t U8G2DisplayModule::getClockFontSize() const {
-    return _clockFontSize;
+void U8G2DisplayModule::setTargetFps(uint8_t fps) {
+    _targetFrameIntervalMs = (fps > 0) ? (1000UL / fps) : 33;
 }
 
 // =============================================================================
@@ -825,7 +830,6 @@ void U8G2DisplayModule::registerRoutes(AsyncWebServer& server) {
         doc["sleeping"]         = _sleeping;
         doc["sleepTimeout"]     = _sleepTimeoutMs;
         doc["rotationInterval"] = _rotationIntervalMs;
-        doc["clockFontSize"]    = _clockFontSize;
         doc["boardCount"]       = (int)_boards.size();
 
         IDisplayBoard* active = getActiveBoard();
@@ -984,33 +988,6 @@ void U8G2DisplayModule::registerRoutes(AsyncWebServer& server) {
         response->addHeader("X-Display-Height", String(_displayHeight));
         request->send(response);
     });
-
-    // --- POST /api/display/clockFontSize — set clock font size ---
-    server.on("/api/display/clockFontSize", HTTP_POST,
-        [](AsyncWebServerRequest *request) {},
-        NULL,
-        [this](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t /*index*/, size_t /*total*/) {
-            JsonDocument doc;
-            DeserializationError err = deserializeJson(doc, data, len);
-            if (err || !doc["value"].is<int>()) {
-                request->send(400, "application/json", "{\"error\":\"Invalid JSON or missing 'value'\"}");
-                return;
-            }
-
-            int value = doc["value"] | 2;
-            if (value < 1) value = 1;
-            if (value > 3) value = 3;
-
-            setClockFontSize((uint8_t)value);
-
-            // Persist via ConfigManager gateway
-            if (_app != nullptr) {
-                _app->getConfigManager().saveModuleConfig(this);
-            }
-
-            request->send(200, "application/json", "{\"status\":\"ok\"}");
-        }
-    );
 #endif
 }
 
@@ -1021,11 +998,11 @@ void U8G2DisplayModule::registerRoutes(AsyncWebServer& server) {
 /**
  * @brief Static callback for "ota.progress" EventBus events.
  *
- * Casts the context to U8G2DisplayModule*, the payload to OTAProgressPayload*,
+ * Casts the context to U8G2DisplayModule*, the payload to OtaProgressPayload*,
  * and delegates to the OTAProgressBoard. Shows the OTA board on screen.
  *
  * @param topic   Topic string ("ota.progress").
- * @param payload Pointer to OTAProgressPayload.
+ * @param payload Pointer to OtaProgressPayload.
  * @param ctx     The U8G2DisplayModule instance (passed during subscribe).
  */
 void U8G2DisplayModule::_onOtaProgress(const char* /*topic*/, const void* payload, void* ctx) {
@@ -1034,7 +1011,7 @@ void U8G2DisplayModule::_onOtaProgress(const char* /*topic*/, const void* payloa
         return;
     }
 
-    const auto* ota = static_cast<const OTAProgressPayload*>(payload);
+    const auto* ota = static_cast<const OtaProgressPayload*>(payload);
 
     if (ota->complete) {
         // --- OTA cycle finished — mark board as complete ---
@@ -1089,7 +1066,7 @@ void U8G2DisplayModule::_onDisplayMessage(const char* /*topic*/, const void* pay
  */
 void U8G2DisplayModule::_onStateChanged(AppState newState) {
 #ifndef NATIVE_BUILD
-    if (newState == AppState::Configuring) {
+    if (newState == AppState::CONFIGURING) {
         _configuringStatusBoard.setGates(&_app->getConfigGates());
 
         // WiFi wizard is NOT pushed here — it is managed by tick() step 2b,
@@ -1111,7 +1088,7 @@ void U8G2DisplayModule::_onStateChanged(AppState newState) {
         // No modal needed — base layer (configuring status) shows automatically
         ESP_LOGI(TAG, "State → CONFIGURING: base layer active");
 
-    } else if (newState == AppState::Running) {
+    } else if (newState == AppState::RUNNING) {
         // --- Step 1: Clear any active modal (e.g. WiFi wizard) ---
         clearModal();
 
@@ -1222,6 +1199,7 @@ void U8G2DisplayModule::_renderCurrentBoard() {
     _u8g2.clearBuffer();
     boardToRender->render(_u8g2);
     _u8g2.sendBuffer();
+    vTaskDelay(1);  // Yield to IDLE task + WiFi stack after SPI transfer
 #endif
 }
 
@@ -1258,11 +1236,11 @@ IDisplayBoard* U8G2DisplayModule::_getBaseBoard() {
 #ifndef NATIVE_BUILD
     if (_app == nullptr) return nullptr;
     switch (_app->getState()) {
-        case AppState::Boot:
+        case AppState::BOOT:
             return &_bootBoard;
-        case AppState::Configuring:
+        case AppState::CONFIGURING:
             return &_configuringStatusBoard;
-        case AppState::Running: {
+        case AppState::RUNNING: {
             // Return the current carousel pool board
             if (!_boards.empty()) {
                 // Reset index if it was left invalid (e.g. after modal clear)

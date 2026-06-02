@@ -10,7 +10,22 @@ by Principal Architects under the ESP32 App Foundation program.
 **Program:** `esp32-app-foundation`
 **Chief Architect Session:** f4e779d9-4aa1-46e2-8115-e1e8edc4fa42
 **Program Plan:** [PROGRAM-PLAN.md](./esp32-app-foundation/PROGRAM-PLAN.md)
-**Status:** PR-01 MERGED — ready to issue PA-02 bridge prompt
+**Chief Architect Distillation:** [context_bridge.md](./esp32-app-foundation/context_bridge.md) — ADRs, rejected approaches, program sequencing decisions
+**Status:** PR-01 through PR-15 delivered — PR-10, PR-11, PR-12, PR-14 in progress/planning
+
+---
+
+## Genesis Archives
+
+Pre-implementation design sessions that produced the architectural blueprint. These
+predate the formal PA pipeline and are filed retrospectively.
+
+| Archive | Date | Topic | Link |
+|---------|------|-------|------|
+| WO1 — Architecture Design | 2026-05-20 | 17 ADRs, design spec, rejected approaches, embedded-systems review | [wo1-architecture-design/](./pr-00-genesis/wo1-architecture-design/context_bridge.md) |
+| WO2 — Framework Selection | 2026-05-20 | Arduino+ESP-IDF dual framework decision (D6) | [wo2-framework-selection/](./pr-00-genesis/wo2-framework-selection/context_bridge.md) |
+
+**Retrospective Project:** [pr-00-genesis/PROJECT.md](./pr-00-genesis/PROJECT.md)
 
 ---
 
@@ -18,25 +33,34 @@ by Principal Architects under the ESP32 App Foundation program.
 
 | Project ID | Name | Status | Principal Architect Assigned |
 |---|---|---|---|
+| [pr-00-genesis](./pr-00-genesis/PROJECT.md) | Genesis — Architecture Design & Framework Selection (Retrospective) | ✅ **COMPLETE** | Pre-pipeline |
 | [pr-01-kernel-interfaces](./pr-01-kernel-interfaces/PROJECT.md) | Framework Kernel & Core Interfaces | ✅ **MERGED** `a2b1666` | Session 30aaf023 |
-| [pr-02-kernel-services](./esp32-app-foundation/PROGRAM-PLAN.md#pr-02) | Kernel Services (WiFi, Config, Crypto, OTA, Time, Logger) | QUEUED | — |
+| [pr-02-kernel-services](./pr-02-kernel-services/PROJECT.md) | Kernel Services (WiFi, Config, Crypto, OTA, Time, Logger) | ✅ **MERGED** — all 6 WOs complete, WiFi HW verified | Session 30aaf023 |
 | [pr-03-data-infra](./esp32-app-foundation/PROGRAM-PLAN.md#pr-03) | Data Infrastructure (DataManager, EventBus, KeyManager) | QUEUED | — |
 | [pr-04-web-portal](./esp32-app-foundation/PROGRAM-PLAN.md#pr-04) | Web Portal (Base SPA + API layer) | QUEUED | — |
 | [pr-05-display-module](./pr-05-display-module/PROJECT.md) | U8G2 Display Module (Optional Module Catalog Seed) | ✅ **COMPLETE** | Session 93b19420 |
 | [pr-05a-widget-toolkit](./pr-05a-widget-toolkit/PROJECT.md) | Widget Toolkit (Composable UI for U8G2 displays) | ✅ **COMPLETE** | Session 21161294 |
 | [pr-05b-mcp-server](./pr-05b-mcp-server/PROJECT.md) | MCP Server (JSON-RPC device telemetry + control) | ✅ **COMPLETE** | Session 0ef5f49d |
 | [pr-05c-test-hardening](./pr-05c-test-hardening/PROJECT.md) | Test Hardening (Coverage expansion across all modules) | ✅ **COMPLETE** | Session fa65bace |
-| [pr-06-build-infra](./esp32-app-foundation/PROGRAM-PLAN.md#pr-06) | Build Infrastructure (Scripts, PlatformIO, CI) | ✅ **COMPLETE** | Session 0f3caf69 |
+| [pr-06-build-infra](./pr-06-build-infra/PROJECT.md) | Build Infrastructure (Scripts, PlatformIO, CI) | ✅ **COMPLETE** | Session 0f3caf69 |
 | [pr-07-template-repo](./pr-07-template-repo/PROJECT.md) | App Template Repository | ✅ **COMPLETE** | Session 60edc6be |
 | [pr-08-mcp-web-transport](./pr-08-mcp-web-transport/PROJECT.md) | MCP HTTP Web Transport | ✅ **COMPLETE** | — |
 | [pr-09-ota-security](./pr-09-ota-security/PROJECT.md) | OTA Security Pipeline (Verifier + Download Engine + Manager Upgrade) | ✅ **COMPLETE** | Session 8f4f1c2a |
 | [pr-10-firmware-optimization](./pr-10-firmware-optimization/PROJECT.md) | Firmware Size Optimization (sdkconfig + compiler + library audit) | 🔄 **WIP** — WO1 queued | Session unknown |
 | [pr-11-config-gateway](./pr-11-config-gateway/PROJECT.md) | ConfigManager-as-Gateway Refactoring (iConfigurable redesign + migration orchestration) | ✅ **WO1 MERGED** `2c0b840` — ready for PR submission | Current Session |
 | [pr-12-state-machine](./pr-12-state-machine/PROJECT.md) | State Machine Redesign (Boot → Configure ↔ Running, regression tolerance, ConfiguringStatusBoard) | 📋 **PLANNING** — 6 WOs defined, awaiting user approval | Current Session |
-| [pr-14-ota-production](./pr-14-ota-production/PROJECT.md) | OTA Production System (SemVer, channels, multi-arch, rollback wiring, config lifecycle, CI/CD) | 📋 **PLANNING** — 9 WOs defined, awaiting user approval | Session 2fdb967a |
 | [pr-13-test-app](./pr-13-test-app/PROJECT.md) | Foundation Test App (DiagnosticsBoard + Display Lifecycle Fixes) | ✅ **COMPLETE** `c92d3ea` | Session 4cc5a22f |
+| [pr-14-ota-production](./pr-14-ota-production/PROJECT.md) | OTA Production System (SemVer, channels, multi-arch, rollback wiring, config lifecycle, CI/CD) | 📋 **PLANNING** — 9 WOs defined, awaiting user approval | Session 2fdb967a |
 | [pr-15-web-testing](./pr-15-web-testing/PROJECT.md) | Web Portal Testing Infrastructure (Mock Server + Playwright + Build Gate) | ✅ **MERGED** `f03972e` — 48 tests | Session 97274580 |
 
 ---
 
-*Updated by Principal Architect — PR-13 — 2026-05-31*
+## Ad-Hoc Work (Not Formally Tracked as PRs)
+
+| Archive | Date | Topic | Status | Link |
+|---------|------|-------|--------|------|
+| AppTab & Rules Bug | 2026-06-02 | App tab config wiring (clock font size) + Antigravity rules engine bug report | ⚠️ **PARTIAL** — PascalCase rename committed `544d60c`, `appconfig.js` untracked | [adhoc-app-tab-rules-bug/](./adhoc-app-tab-rules-bug/context_bridge.md) |
+
+---
+
+*Updated by Principal Architect — Context Archive Integration — 2026-06-02*

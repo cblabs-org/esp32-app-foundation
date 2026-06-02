@@ -6,7 +6,7 @@
  * This work is licensed under Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International.
  * To view a copy of this license, visit https://creativecommons.org/licenses/by-nc-sa/4.0/
  *
- * Module: modules/U8G2Display/U8G2DisplayModule.hpp
+ * Module: modules/u8g2Display/U8G2DisplayModule.hpp
  * Description: U8G2 monochrome display module with two-layer base+modal
  *              architecture. The BASE layer is phase-determined and never
  *              manually set: BOOT→bootBoard, CONFIGURING→configuringStatusBoard,
@@ -25,10 +25,10 @@
  *              events via EventBus. Implements IConfigurable via ConfigManager
  *              gateway for persistent display settings (namespace: "display",
  *              schema version: 1). Implements IWebContributor for REST API
- *              routes under /api/display/ and a top-level "App" tab.
+ *              routes under /api/display/ and a top-level "Display" tab.
  *
  * Exported Classes:
- * - OTAProgressPayload:            EventBus payload struct for OTA progress events
+ * - OtaProgressPayload:            EventBus payload struct for OTA progress events
  * - DisplayMessagePayload:         EventBus payload struct for display message events
  * - DisplayBoardChangedPayload:    EventBus payload struct for board change events
  * - U8G2DisplayModule: Display carousel engine and board slot pool
@@ -52,10 +52,10 @@
  *   - reportError():        Delegate to ErrorBoard (fatal) and show it
  *   - clearStatus():        Mark BootBoard complete, advance if showing it
  *   - registerRoutes():     Register display REST API routes (/api/display/*)
- *   - getTabName():         Return "App" for portal tab
+ *   - getTabName():         Return "Display" for portal tab
  *   - getTabOrder():        Return 30 for portal tab ordering
  *   - getConfigNamespace(): Return "display"
- *   - getSchemaVersion():   Return 2
+ *   - getSchemaVersion():   Return 1
  *   - applyConfig():        Apply display settings from JSON section
  *   - serializeConfig():    Serialize display settings to JSON section
  *   - resetConfig():        Restore factory defaults
@@ -63,8 +63,7 @@
  *   - setFlipScreen():      Runtime screen flip toggle
  *   - setSleepTimeout():    Runtime sleep timeout adjustment
  *   - setRotationInterval(): Runtime carousel rotation interval adjustment
- *   - setClockFontSize():   Runtime clock font size adjustment
- *   - getClockFontSize():   Return the current clock font size setting
+ *   - setTargetFps():        Runtime frame-rate target adjustment (default 30 FPS)
  */
 
 #pragma once
@@ -105,7 +104,7 @@ class Application;
  * Published by the OTA manager during firmware update cycles. The display
  * module subscribes and delegates to OTAProgressBoard.
  */
-struct OTAProgressPayload {
+struct OtaProgressPayload {
     float progress;       // 0.0 to 1.0 download fraction
     const char* status;   // Status message (e.g. "Downloading...")
     bool complete;        // True when OTA cycle is finished
@@ -353,9 +352,9 @@ public:
 
     /**
      * @brief Return the current schema version for display config.
-     * @return 2
+     * @return 1
      */
-    int getSchemaVersion() const override { return 2; }
+    int getSchemaVersion() const override { return 1; }
 
     /**
      * @brief Apply display settings from a parsed JSON section.
@@ -401,13 +400,13 @@ public:
 
     /**
      * @brief Get the UI tab name for this contributor.
-     * @return "App"
+     * @return "Display"
      */
-    const char* getTabName() const override { return "App"; }
+    const char* getTabName() const override { return "Display"; }
 
     /**
      * @brief Get the tab display order.
-     * @return 30 — App tab appears before mid-range tabs.
+     * @return 30 — Display tab appears before mid-range tabs.
      */
     int getTabOrder() const override { return 30; }
 
@@ -440,16 +439,15 @@ public:
     void setRotationInterval(unsigned long intervalMs);
 
     /**
-     * @brief Set the clock font size and persist via ConfigManager.
-     * @param size Font size level (1=small, 2=medium, 3=large).
+     * @brief Set the target render frame rate.
+     *
+     * The display will skip rendering if fewer than (1000/fps) milliseconds
+     * have elapsed since the last sendBuffer(). This reduces SPI bus load
+     * and prevents IDLE-task starvation on the ESP32.
+     *
+     * @param fps Target frames per second (1–60). 0 treated as 30.
      */
-    void setClockFontSize(uint8_t size);
-
-    /**
-     * @brief Get the current clock font size setting.
-     * @return Font size level (1=small, 2=medium, 3=large).
-     */
-    uint8_t getClockFontSize() const;
+    void setTargetFps(uint8_t fps);
 
     /**
      * @brief Get the display info struct for MCP capture_display wiring.
@@ -542,7 +540,7 @@ private:
     /**
      * @brief Static callback for "ota.progress" EventBus topic.
      * @param topic The topic string ("ota.progress").
-     * @param payload Pointer to an OTAProgressPayload struct.
+     * @param payload Pointer to an OtaProgressPayload struct.
      * @param ctx Context pointer (this U8G2DisplayModule instance).
      */
     static void _onOtaProgress(const char* topic, const void* payload, void* ctx);
@@ -603,7 +601,7 @@ private:
 #endif
 
     Application* _app = nullptr;                   ///< Cached reference to Application hub (for EventBus access)
-    AppState _lastKnownState = AppState::Boot;     ///< Cached state for change detection in tick()
+    AppState _lastKnownState = AppState::BOOT;     ///< Cached state for change detection in tick()
 
     // --- Board slot pool ---
     std::vector<IDisplayBoard*> _boards;           ///< Carousel board pool — populated before begin()
@@ -612,6 +610,10 @@ private:
     // --- Carousel timing ---
     unsigned long _lastRotationMs = 0;             ///< Timestamp of last carousel rotation
     unsigned long _rotationIntervalMs = 8000;      ///< Carousel rotation interval (8 seconds default)
+
+    // --- Frame-rate limiting ---
+    unsigned long _lastRenderMs = 0;               ///< Timestamp of last sendBuffer() call
+    unsigned long _targetFrameIntervalMs = 33;     ///< Minimum ms between renders (default 30 FPS: 1000/30≈33)
 
     // --- Pool lock ---
     bool _locked = false;                          ///< True after begin() — blocks addBoard()
@@ -625,7 +627,6 @@ private:
     // --- Display settings ---
     uint8_t _brightness = 255;                     ///< Display brightness / contrast level (0–255)
     bool _flipScreen = false;                      ///< True if the display is flipped 180 degrees
-    uint8_t _clockFontSize = 2;                    ///< Clock font size (1=small, 2=medium, 3=large)
 
     // --- Modal layer ---
     IDisplayBoard* _modal = nullptr;               ///< Active modal board (auto-clears on expired)

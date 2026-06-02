@@ -6,7 +6,7 @@
  * This work is licensed under Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International.
  * To view a copy of this license, visit https://creativecommons.org/licenses/by-nc-sa/4.0/
  *
- * Module: modules/Application/Application.cpp
+ * Module: modules/application/Application.cpp
  * Description: Implementation of the Application composition root.
  *              All ESP-IDF API calls (esp_restart, heap APIs, LittleFS.begin)
  *              are wrapped in #ifndef NATIVE_BUILD guards so the GoogleTest
@@ -18,7 +18,7 @@
  *              removed. Modules register with _configManager.registerModule()
  *              and config is loaded via _configManager.beginAll().
  *
- *              Core domain services (WifiManager, OTAUpdateManager,
+ *              Core domain services (WifiManager, otaUpdateManager,
  *              TimeManager, KeyManager) are Application-owned members,
  *              wired into the boot sequence during begin().
  *
@@ -52,7 +52,7 @@
 
 static const char* TAG = "Application";
 
-// Destructor — clean up heap-allocated OTAUpdateManager
+// Destructor — clean up heap-allocated otaUpdateManager
 Application::~Application() {
     delete _otaManager;
     _otaManager = nullptr;
@@ -84,7 +84,7 @@ bool Application::begin(const FrameworkConfig& config) {
     // to show visual boot progress. Default NullStatusReporter is a no-op.
 
     // --- Step 2: Enter BOOT state ---
-    setState(AppState::Boot);
+    setState(AppState::BOOT);
     _statusReporter->reportStatus("Initializing...", 0.0f);
 
     // --- Step 3: EventBus.begin() ---
@@ -124,10 +124,14 @@ bool Application::begin(const FrameworkConfig& config) {
 
     // --- Step 7: ConfigManager — register all framework IConfigurable modules ---
     // WifiManager: inject ConfigManager and KeyManager dependencies, then register.
+    // TimeManager: inject ConfigManager dependency, then register.
+    // MCPServer: registered directly.
     _wifiManager.setConfigManager(&_configManager);
     _wifiManager.setKeyManager(&_keyManager);
     _configManager.registerModule(&_wifiManager);
     _configManager.registerModule(&_mcpServer);
+    _timeManager.setConfigManager(&_configManager);
+    _configManager.registerModule(&_timeManager);
     // Downstream modules (U8G2DisplayModule, etc.) are registered by app code
     // via getConfigManager().registerModule() before begin() is called.
 
@@ -157,12 +161,13 @@ bool Application::begin(const FrameworkConfig& config) {
     _statusReporter->reportStatus("Data services ready", 0.70f);
 
     // --- Step 13: OTA — heap-allocate (header is forward-declared to avoid LDF issues) ---
-    _otaManager = new OTAUpdateManager();
+    _otaManager = new otaUpdateManager();
     _otaManager->begin(*this);
     _statusReporter->reportStatus("Update service ready", 0.80f);
 
     // --- Step 14: Register core web contributors and tickables ---
     _webContributors.push_back(&_wifiManager);
+    _webContributors.push_back(&_timeManager);
     _webContributors.push_back(&_configManager);
     _webContributors.push_back(&_keyManager);
     _webContributors.push_back(_otaManager);
@@ -175,7 +180,7 @@ bool Application::begin(const FrameworkConfig& config) {
     _webServerManager.begin(_webContributors);
 
     // MCP server: pass the ConfigManager reference for config operations
-    _mcpServer.begin(_mcpContributors, &_configManager, &_config);
+    _mcpServer.begin(_mcpContributors, &_configManager, &_config, &_timeManager);
     _statusReporter->reportStatus("Web portal starting...", 0.90f);
 
     // --- Step 16: Register built-in WiFi config gate ---
@@ -198,11 +203,11 @@ bool Application::begin(const FrameworkConfig& config) {
 
     // --- Step 20: Check config gates → RUNNING or CONFIGURING ---
     if (_allGatesSatisfied()) {
-        setState(AppState::Running);
+        setState(AppState::RUNNING);
         _dataManager.setAppRunning(true);
         ESP_LOGI(TAG, "Boot sequence complete — all gates satisfied, entering RUNNING state");
     } else {
-        setState(AppState::Configuring);
+        setState(AppState::CONFIGURING);
         _publishConfiguringEvent();
         ESP_LOGI(TAG, "Boot sequence complete — awaiting configuration");
     }
@@ -213,17 +218,17 @@ bool Application::begin(const FrameworkConfig& config) {
 /**
  * @brief Dispatch the periodic update tick to all registered ITickable modules.
  *
- * The guard ensures tick() is a no-op until AppState::Configuring or
- * AppState::Running. During CONFIGURING, all modules still receive ticks
+ * The guard ensures tick() is a no-op until AppState::CONFIGURING or
+ * AppState::RUNNING. During CONFIGURING, all modules still receive ticks
  * (WiFi, display, web portal) but config gates are polled each cycle.
  * Once all gates are satisfied, state advances to RUNNING.
  */
 void Application::tick() {
     // Guard: do not tick during boot phases
-    if (_state != AppState::Configuring && _state != AppState::Running) return;
+    if (_state != AppState::CONFIGURING && _state != AppState::RUNNING) return;
 
     // --- RUNNING: throttled gate regression check ---
-    if (_state == AppState::Running) {
+    if (_state == AppState::RUNNING) {
         unsigned long now = millis();
         if ((now - _lastGateCheckMs) >= GATE_CHECK_INTERVAL_MS) {
             _lastGateCheckMs = now;
@@ -237,7 +242,7 @@ void Application::tick() {
                     } else if ((now - _gateFailedSinceMs[i]) >= tolerance) {
                         ESP_LOGW(TAG, "Gate '%s' unsatisfied for %lums — regressing to CONFIGURING",
                                  _configGates[i]->getGateName(), (now - _gateFailedSinceMs[i]));
-                        setState(AppState::Configuring);
+                        setState(AppState::CONFIGURING);
                         _dataManager.setAppRunning(false);
                         _publishConfiguringEvent(true); // isRegression = true
                         memset(_gateFailedSinceMs, 0, sizeof(_gateFailedSinceMs));
@@ -251,9 +256,9 @@ void Application::tick() {
     }
 
     // --- CONFIGURING: poll config gates for transition ---
-    if (_state == AppState::Configuring) {
+    if (_state == AppState::CONFIGURING) {
         if (_allGatesSatisfied()) {
-            setState(AppState::Running);
+            setState(AppState::RUNNING);
             _dataManager.setAppRunning(true);
             _eventBus.publish("app.running");
             ESP_LOGI(TAG, "All config gates satisfied — entering RUNNING state");
@@ -409,7 +414,7 @@ WebServerManager& Application::getWebServerManager() {
     return _webServerManager;
 }
 
-MCPServer& Application::getMcpServer() {
+MCPServer& Application::getMCPServer() {
     return _mcpServer;
 }
 
@@ -421,12 +426,16 @@ WifiManager& Application::getWifiManager() {
     return _wifiManager;
 }
 
-OTAUpdateManager& Application::getOtaManager() {
+otaUpdateManager& Application::getOtaManager() {
     return *_otaManager;
 }
 
 TimeManager& Application::getTimeManager() {
     return _timeManager;
+}
+
+TimeConfigGate& Application::getTimeGate() {
+    return _timeGate;
 }
 
 KeyManager& Application::getKeyManager() {
@@ -461,9 +470,9 @@ void Application::setState(AppState state) {
     // Emit a human-readable state name for log correlation
     const char* name = "UNKNOWN";
     switch (state) {
-        case AppState::Boot:        name = "BOOT";        break;
-        case AppState::Configuring: name = "CONFIGURING"; break;
-        case AppState::Running:     name = "RUNNING";     break;
+        case AppState::BOOT:        name = "BOOT";        break;
+        case AppState::CONFIGURING: name = "CONFIGURING"; break;
+        case AppState::RUNNING:     name = "RUNNING";     break;
     }
     ESP_LOGI(TAG, "State → %s", name);
 }

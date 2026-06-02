@@ -6,7 +6,7 @@
  * This work is licensed under Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International.
  * To view a copy of this license, visit https://creativecommons.org/licenses/by-nc-sa/4.0/
  *
- * Module: modules/Application/Application.hpp
+ * Module: modules/application/Application.hpp
  * Description: Composition root for the ESP32 App Foundation framework.
  *              Owns the module registry (two-tier vector model), the
  *              BOOT → CONFIGURING ↔ RUNNING lifecycle, the
@@ -17,7 +17,7 @@
  *              ConfigManager is owned by Application and serves as the
  *              centralised gateway for all module configuration I/O.
  *
- *              Core domain services (WifiManager, OTAUpdateManager,
+ *              Core domain services (WifiManager, otaUpdateManager,
  *              TimeManager, KeyManager) are also Application-owned members,
  *              wired into the boot sequence and registered with ConfigManager
  *              and the tick/web contributor vectors where applicable.
@@ -34,11 +34,11 @@
  *   - registerDataSource():      Add an IDataSource worker to the DataManager vector
  *   - getConfigManager():        Access the ConfigManager gateway
  *   - getWifiManager():          Access the WifiManager domain service
- *   - getOtaManager():           Access the OTAUpdateManager domain service
+ *   - getOtaManager():           Access the otaUpdateManager domain service
  *   - getTimeManager():          Access the TimeManager domain service
  *   - getKeyManager():           Access the KeyManager domain service
  *   - getState():                Query the current AppState lifecycle phase
- *   - getMcpServer():            Access the MCP JSON-RPC server instance
+ *   - getMCPServer():            Access the MCP JSON-RPC server instance
  *   - registerConfigGate():      Add an IConfigGate prerequisite for RUNNING entry
  */
 
@@ -64,13 +64,14 @@
 #include "../WifiManager/WifiManager.hpp"
 #include "../WifiManager/WifiConfigGate.hpp"
 #include "../TimeManager/TimeManager.hpp"
+#include "../TimeManager/TimeConfigGate.hpp"
 #include "../KeyManager/KeyManager.hpp"
 #include "../../lib/DeviceCrypto/DeviceCrypto.hpp"
 
-// Forward declaration only — OTAUpdateManager.hpp pulls in WiFiClientSecure
+// Forward declaration only — otaUpdateManager.hpp pulls in WiFiClientSecure
 // which causes LDF to discover NetworkClientSecure with missing SSL backend.
 // Full include deferred to Application.cpp; member held via unique_ptr.
-class OTAUpdateManager;
+class otaUpdateManager;
 
 /**
  * @brief Composition root for the ESP32 App Foundation framework.
@@ -93,7 +94,7 @@ class OTAUpdateManager;
  */
 class Application {
 public:
-    /// Destructor — cleans up heap-allocated OTAUpdateManager.
+    /// Destructor — cleans up heap-allocated otaUpdateManager.
     ~Application();
 
     // -------------------------------------------------------------------------
@@ -138,8 +139,8 @@ public:
     /**
      * @brief Dispatch the periodic update tick to all registered ITickable modules.
      *
-     * Guarded: does nothing unless the current state is AppState::Configuring
- *     or AppState::Running. During CONFIGURING, polls config gates each cycle
+     * Guarded: does nothing unless the current state is AppState::CONFIGURING
+ *     or AppState::RUNNING. During CONFIGURING, polls config gates each cycle
  *     and transitions to RUNNING when all are satisfied.
      * Each registered ITickable::tick() must complete within 10ms.
      * Also ticks the MCPServer for JSON-RPC serial polling.
@@ -237,7 +238,7 @@ public:
      * @brief Get the application's MCPServer instance.
      * @return Reference to the MCPServer.
      */
-    MCPServer& getMcpServer();
+    MCPServer& getMCPServer();
 
     /**
      * @brief Get the application's ConfigManager instance.
@@ -256,16 +257,26 @@ public:
     WifiManager& getWifiManager();
 
     /**
-     * @brief Get the application's OTAUpdateManager instance.
-     * @return Reference to the OTAUpdateManager.
+     * @brief Get the application's otaUpdateManager instance.
+     * @return Reference to the otaUpdateManager.
      */
-    OTAUpdateManager& getOtaManager();
+    otaUpdateManager& getOtaManager();
 
     /**
      * @brief Get the application's TimeManager instance.
      * @return Reference to the TimeManager.
      */
     TimeManager& getTimeManager();
+
+    /**
+     * @brief Get the application's TimeConfigGate for downstream opt-in.
+     *
+     * Downstream apps that require timezone configuration can register
+     * this gate: app.registerConfigGate(&app.getTimeGate())
+     *
+     * @return Reference to the built-in TimeConfigGate.
+     */
+    TimeConfigGate& getTimeGate();
 
     /**
      * @brief Get the application's KeyManager instance.
@@ -343,7 +354,7 @@ private:
     // Member variables
     // -------------------------------------------------------------------------
 
-    AppState       _state   = AppState::Boot;    ///< Current lifecycle phase
+    AppState       _state   = AppState::BOOT;    ///< Current lifecycle phase
     bool           _locked  = false;             ///< True once _compactAndLock() has been called
     FrameworkConfig _config;                     ///< Cached framework configuration
 
@@ -387,6 +398,7 @@ private:
     KeyManager _keyManager;             ///< Encrypted credential registry
     WifiManager _wifiManager;           ///< WiFi connection state machine
     WifiConfigGate _wifiGate{_wifiManager}; ///< Built-in WiFi STA config gate
-    OTAUpdateManager* _otaManager = nullptr;  ///< OTA firmware update orchestrator (heap, fwd-declared)
+    otaUpdateManager* _otaManager = nullptr;  ///< OTA firmware update orchestrator (heap, fwd-declared)
     TimeManager _timeManager;           ///< NTP synchronization service
+    TimeConfigGate _timeGate{_timeManager}; ///< Optional timezone config gate (downstream opt-in)
 };

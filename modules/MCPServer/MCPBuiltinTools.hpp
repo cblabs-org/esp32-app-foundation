@@ -6,7 +6,7 @@
  * This work is licensed under Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International.
  * To view a copy of this license, visit https://creativecommons.org/licenses/by-nc-sa/4.0/
  *
- * Module: modules/MCPServer/MCPBuiltinTools.hpp
+ * Module: modules/mcpServer/MCPBuiltinTools.hpp
  * Description: Declaration of the built-in MCP tool registration function.
  *              These foundation-level tools (system_info, get_config, set_config,
  *              reboot, get_logs, list_tools, capture_display) are always available
@@ -29,6 +29,7 @@
 // Forward declarations — avoid pulling in full headers for interface-only usage
 class MCPToolRegistry;
 class ConfigManager;
+class TimeManager;
 
 /**
  * @brief Namespace containing built-in MCP tool registration.
@@ -54,7 +55,8 @@ namespace mcpBuiltinTools {
      */
     void registerAll(MCPToolRegistry& registry,
                      ConfigManager* configManager,
-                     const DisplayInfo* displayInfo = nullptr);
+                     const DisplayInfo* displayInfo = nullptr,
+                     TimeManager* timeManager = nullptr);
 
     /**
      * @brief Update the display info after initial registration.
