@@ -108,7 +108,7 @@ void setup() {
     diagnosticsBoard.setApplication(&app);
 
     // --- Wire display framebuffer to MCP for capture_display tool ---
-    app.getMcpServer().setDisplayInfo(display.getDisplayInfo());
+    app.getMCPServer().setDisplayInfo(display.getDisplayInfo());
 #endif
 }
 
