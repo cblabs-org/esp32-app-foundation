@@ -33,6 +33,9 @@ Establish a complete 3-phase web testing strategy for the ESP32 device portal. T
 - No live hardware test spec (deferred)
 - No CI/GitHub Actions wiring (deferred)
 
+## Distillation
+[Context Bridge](./context_bridge.md) — Strategic decisions, portal bugs, API surface catalog.
+
 ---
 
 *Completed by Principal Architect — 2026-06-02*
