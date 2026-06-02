@@ -48,9 +48,12 @@
 #else
 #include <cstdint>
 // Mock AsyncWebServer for native testing
+class AsyncWebServerResponse {}; // Stub — real class from ESPAsyncWebServer
 class AsyncWebServerRequest {
 public:
     void redirect(const char* url) {} // Stub for captive portal redirect
+    void send(int code, const char* contentType, const char* content) {} // Stub for direct responses
+    void send(AsyncWebServerResponse* response) {} // Stub for response object sends
 };
 
 typedef void (*ArRequestHandlerFunction)(AsyncWebServerRequest *request);

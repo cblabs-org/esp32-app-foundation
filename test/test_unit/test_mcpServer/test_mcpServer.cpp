@@ -430,7 +430,7 @@ TEST(McpServerTest, ContributorToolCallable) {
     // Create a mock contributor that registers a "echo_test" tool
     class EchoContributor : public IMCPContributor {
     public:
-        void registerMcpTools(MCPToolRegistry& registry) override {
+        void registerMCPTools(MCPToolRegistry& registry) override {
             registry.addTool("echo_test", "Echo test tool",
                 [](JsonObject& params, JsonObject& result) {
                     (void)params;

@@ -109,9 +109,9 @@ public:
 /** @brief Minimal IMCPContributor mock that registers a named test tool. */
 class MockMcpContributor : public IMCPContributor {
 public:
-    bool registered = false; ///< Set true when registerMcpTools() is invoked
+    bool registered = false; ///< Set true when registerMCPTools() is invoked
 
-    void registerMcpTools(MCPToolRegistry& registry) override {
+    void registerMCPTools(MCPToolRegistry& registry) override {
         registered = true;
         registry.addTool(
             "mock_mcp_tool",
@@ -285,7 +285,7 @@ TEST_F(ApplicationLockTest, McpContributor_ToolVisibleAfterBegin) {
     lockApp();
 
     EXPECT_TRUE(contributor.registered);
-    EXPECT_NE(app.getMcpServer().getRegistry().findTool("mock_mcp_tool"), nullptr);
+    EXPECT_NE(app.getMCPServer().getRegistry().findTool("mock_mcp_tool"), nullptr);
 }
 
 /**

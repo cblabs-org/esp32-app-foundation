@@ -28,7 +28,7 @@
  *              routes under /api/display/ and a top-level "Display" tab.
  *
  * Exported Classes:
- * - OtaProgressPayload:            EventBus payload struct for OTA progress events
+ * - OTAProgressPayload:            EventBus payload struct for OTA progress events
  * - DisplayMessagePayload:         EventBus payload struct for display message events
  * - DisplayBoardChangedPayload:    EventBus payload struct for board change events
  * - U8G2DisplayModule: Display carousel engine and board slot pool
@@ -55,7 +55,7 @@
  *   - getTabName():         Return "Display" for portal tab
  *   - getTabOrder():        Return 30 for portal tab ordering
  *   - getConfigNamespace(): Return "display"
- *   - getSchemaVersion():   Return 1
+ *   - getSchemaVersion():   Return 2
  *   - applyConfig():        Apply display settings from JSON section
  *   - serializeConfig():    Serialize display settings to JSON section
  *   - resetConfig():        Restore factory defaults
@@ -104,7 +104,7 @@ class Application;
  * Published by the OTA manager during firmware update cycles. The display
  * module subscribes and delegates to OTAProgressBoard.
  */
-struct OtaProgressPayload {
+struct OTAProgressPayload {
     float progress;       // 0.0 to 1.0 download fraction
     const char* status;   // Status message (e.g. "Downloading...")
     bool complete;        // True when OTA cycle is finished
@@ -354,7 +354,7 @@ public:
      * @brief Return the current schema version for display config.
      * @return 1
      */
-    int getSchemaVersion() const override { return 1; }
+    int getSchemaVersion() const override { return 2; }
 
     /**
      * @brief Apply display settings from a parsed JSON section.
@@ -540,7 +540,7 @@ private:
     /**
      * @brief Static callback for "ota.progress" EventBus topic.
      * @param topic The topic string ("ota.progress").
-     * @param payload Pointer to an OtaProgressPayload struct.
+     * @param payload Pointer to an OTAProgressPayload struct.
      * @param ctx Context pointer (this U8G2DisplayModule instance).
      */
     static void _onOtaProgress(const char* topic, const void* payload, void* ctx);
@@ -601,7 +601,7 @@ private:
 #endif
 
     Application* _app = nullptr;                   ///< Cached reference to Application hub (for EventBus access)
-    AppState _lastKnownState = AppState::BOOT;     ///< Cached state for change detection in tick()
+    AppState _lastKnownState = AppState::Boot;     ///< Cached state for change detection in tick()
 
     // --- Board slot pool ---
     std::vector<IDisplayBoard*> _boards;           ///< Carousel board pool — populated before begin()

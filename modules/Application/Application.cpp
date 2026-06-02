@@ -18,7 +18,7 @@
  *              removed. Modules register with _configManager.registerModule()
  *              and config is loaded via _configManager.beginAll().
  *
- *              Core domain services (WifiManager, otaUpdateManager,
+ *              Core domain services (WifiManager, OTAUpdateManager,
  *              TimeManager, KeyManager) are Application-owned members,
  *              wired into the boot sequence during begin().
  *
@@ -52,7 +52,7 @@
 
 static const char* TAG = "Application";
 
-// Destructor — clean up heap-allocated otaUpdateManager
+// Destructor — clean up heap-allocated OTAUpdateManager
 Application::~Application() {
     delete _otaManager;
     _otaManager = nullptr;
@@ -84,7 +84,7 @@ bool Application::begin(const FrameworkConfig& config) {
     // to show visual boot progress. Default NullStatusReporter is a no-op.
 
     // --- Step 2: Enter BOOT state ---
-    setState(AppState::BOOT);
+    setState(AppState::Boot);
     _statusReporter->reportStatus("Initializing...", 0.0f);
 
     // --- Step 3: EventBus.begin() ---
@@ -161,7 +161,7 @@ bool Application::begin(const FrameworkConfig& config) {
     _statusReporter->reportStatus("Data services ready", 0.70f);
 
     // --- Step 13: OTA — heap-allocate (header is forward-declared to avoid LDF issues) ---
-    _otaManager = new otaUpdateManager();
+    _otaManager = new OTAUpdateManager();
     _otaManager->begin(*this);
     _statusReporter->reportStatus("Update service ready", 0.80f);
 
@@ -203,11 +203,11 @@ bool Application::begin(const FrameworkConfig& config) {
 
     // --- Step 20: Check config gates → RUNNING or CONFIGURING ---
     if (_allGatesSatisfied()) {
-        setState(AppState::RUNNING);
+        setState(AppState::Running);
         _dataManager.setAppRunning(true);
         ESP_LOGI(TAG, "Boot sequence complete — all gates satisfied, entering RUNNING state");
     } else {
-        setState(AppState::CONFIGURING);
+        setState(AppState::Configuring);
         _publishConfiguringEvent();
         ESP_LOGI(TAG, "Boot sequence complete — awaiting configuration");
     }
@@ -218,17 +218,17 @@ bool Application::begin(const FrameworkConfig& config) {
 /**
  * @brief Dispatch the periodic update tick to all registered ITickable modules.
  *
- * The guard ensures tick() is a no-op until AppState::CONFIGURING or
- * AppState::RUNNING. During CONFIGURING, all modules still receive ticks
+ * The guard ensures tick() is a no-op until AppState::Configuring or
+ * AppState::Running. During CONFIGURING, all modules still receive ticks
  * (WiFi, display, web portal) but config gates are polled each cycle.
  * Once all gates are satisfied, state advances to RUNNING.
  */
 void Application::tick() {
     // Guard: do not tick during boot phases
-    if (_state != AppState::CONFIGURING && _state != AppState::RUNNING) return;
+    if (_state != AppState::Configuring && _state != AppState::Running) return;
 
     // --- RUNNING: throttled gate regression check ---
-    if (_state == AppState::RUNNING) {
+    if (_state == AppState::Running) {
         unsigned long now = millis();
         if ((now - _lastGateCheckMs) >= GATE_CHECK_INTERVAL_MS) {
             _lastGateCheckMs = now;
@@ -242,7 +242,7 @@ void Application::tick() {
                     } else if ((now - _gateFailedSinceMs[i]) >= tolerance) {
                         ESP_LOGW(TAG, "Gate '%s' unsatisfied for %lums — regressing to CONFIGURING",
                                  _configGates[i]->getGateName(), (now - _gateFailedSinceMs[i]));
-                        setState(AppState::CONFIGURING);
+                        setState(AppState::Configuring);
                         _dataManager.setAppRunning(false);
                         _publishConfiguringEvent(true); // isRegression = true
                         memset(_gateFailedSinceMs, 0, sizeof(_gateFailedSinceMs));
@@ -256,9 +256,9 @@ void Application::tick() {
     }
 
     // --- CONFIGURING: poll config gates for transition ---
-    if (_state == AppState::CONFIGURING) {
+    if (_state == AppState::Configuring) {
         if (_allGatesSatisfied()) {
-            setState(AppState::RUNNING);
+            setState(AppState::Running);
             _dataManager.setAppRunning(true);
             _eventBus.publish("app.running");
             ESP_LOGI(TAG, "All config gates satisfied — entering RUNNING state");
@@ -426,7 +426,7 @@ WifiManager& Application::getWifiManager() {
     return _wifiManager;
 }
 
-otaUpdateManager& Application::getOtaManager() {
+OTAUpdateManager& Application::getOtaManager() {
     return *_otaManager;
 }
 
@@ -470,9 +470,9 @@ void Application::setState(AppState state) {
     // Emit a human-readable state name for log correlation
     const char* name = "UNKNOWN";
     switch (state) {
-        case AppState::BOOT:        name = "BOOT";        break;
-        case AppState::CONFIGURING: name = "CONFIGURING"; break;
-        case AppState::RUNNING:     name = "RUNNING";     break;
+        case AppState::Boot:        name = "BOOT";        break;
+        case AppState::Configuring: name = "CONFIGURING"; break;
+        case AppState::Running:     name = "RUNNING";     break;
     }
     ESP_LOGI(TAG, "State → %s", name);
 }

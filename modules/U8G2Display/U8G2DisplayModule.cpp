@@ -261,7 +261,7 @@ void U8G2DisplayModule::tick() {
     // is unsatisfied — the device may be attempting STA with stored creds).
     // Clear the wizard when the WiFi gate becomes satisfied.
 #ifndef NATIVE_BUILD
-    if (_app != nullptr && _app->getState() == AppState::CONFIGURING) {
+    if (_app != nullptr && _app->getState() == AppState::Configuring) {
         if (_modal != &_wifiWizard && _app->getWifiManager().getAPMode()) {
             // AP mode just started — push the WiFi wizard
             _wifiWizard.configure(_app->getConfig().hostname);
@@ -283,7 +283,7 @@ void U8G2DisplayModule::tick() {
     // --- 3. Phase-aware behaviour ---
 #ifndef NATIVE_BUILD
     if (_app != nullptr) {
-        if (_app->getState() == AppState::RUNNING && _modal == nullptr) {
+        if (_app->getState() == AppState::Running && _modal == nullptr) {
             // RUNNING with no modal: carousel rotation + screensaver/sleep
             _checkSleep();
             if (!_boards.empty() && _activeBoardIndex >= 0) {
@@ -293,7 +293,7 @@ void U8G2DisplayModule::tick() {
                     _lastRotationMs = now;
                 }
             }
-        } else if (_app->getState() != AppState::BOOT) {
+        } else if (_app->getState() != AppState::Boot) {
             // CONFIGURING (base) or modal active (any phase): dim, never blank
             _checkDim();
         }
@@ -998,11 +998,11 @@ void U8G2DisplayModule::registerRoutes(AsyncWebServer& server) {
 /**
  * @brief Static callback for "ota.progress" EventBus events.
  *
- * Casts the context to U8G2DisplayModule*, the payload to OtaProgressPayload*,
+ * Casts the context to U8G2DisplayModule*, the payload to OTAProgressPayload*,
  * and delegates to the OTAProgressBoard. Shows the OTA board on screen.
  *
  * @param topic   Topic string ("ota.progress").
- * @param payload Pointer to OtaProgressPayload.
+ * @param payload Pointer to OTAProgressPayload.
  * @param ctx     The U8G2DisplayModule instance (passed during subscribe).
  */
 void U8G2DisplayModule::_onOtaProgress(const char* /*topic*/, const void* payload, void* ctx) {
@@ -1011,7 +1011,7 @@ void U8G2DisplayModule::_onOtaProgress(const char* /*topic*/, const void* payloa
         return;
     }
 
-    const auto* ota = static_cast<const OtaProgressPayload*>(payload);
+    const auto* ota = static_cast<const OTAProgressPayload*>(payload);
 
     if (ota->complete) {
         // --- OTA cycle finished — mark board as complete ---
@@ -1066,7 +1066,7 @@ void U8G2DisplayModule::_onDisplayMessage(const char* /*topic*/, const void* pay
  */
 void U8G2DisplayModule::_onStateChanged(AppState newState) {
 #ifndef NATIVE_BUILD
-    if (newState == AppState::CONFIGURING) {
+    if (newState == AppState::Configuring) {
         _configuringStatusBoard.setGates(&_app->getConfigGates());
 
         // WiFi wizard is NOT pushed here — it is managed by tick() step 2b,
@@ -1088,7 +1088,7 @@ void U8G2DisplayModule::_onStateChanged(AppState newState) {
         // No modal needed — base layer (configuring status) shows automatically
         ESP_LOGI(TAG, "State → CONFIGURING: base layer active");
 
-    } else if (newState == AppState::RUNNING) {
+    } else if (newState == AppState::Running) {
         // --- Step 1: Clear any active modal (e.g. WiFi wizard) ---
         clearModal();
 
@@ -1236,11 +1236,11 @@ IDisplayBoard* U8G2DisplayModule::_getBaseBoard() {
 #ifndef NATIVE_BUILD
     if (_app == nullptr) return nullptr;
     switch (_app->getState()) {
-        case AppState::BOOT:
+        case AppState::Boot:
             return &_bootBoard;
-        case AppState::CONFIGURING:
+        case AppState::Configuring:
             return &_configuringStatusBoard;
-        case AppState::RUNNING: {
+        case AppState::Running: {
             // Return the current carousel pool board
             if (!_boards.empty()) {
                 // Reset index if it was left invalid (e.g. after modal clear)

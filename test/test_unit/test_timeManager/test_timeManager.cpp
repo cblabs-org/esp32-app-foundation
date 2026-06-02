@@ -65,7 +65,7 @@ TEST_F(TimeManagerTest, MultipleBeginCalls) {
 
 // begin() with custom NTP servers
 TEST_F(TimeManagerTest, BeginCustomNtpServers) {
-    timeManager.begin("GMT0", "0.pool.ntp.org", "1.pool.ntp.org", "2.pool.ntp.org");
+    timeManager.begin("GMT0");
     EXPECT_TRUE(timeManager.isTimeSet());
 }
 

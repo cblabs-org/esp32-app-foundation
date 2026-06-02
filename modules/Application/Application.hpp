@@ -17,7 +17,7 @@
  *              ConfigManager is owned by Application and serves as the
  *              centralised gateway for all module configuration I/O.
  *
- *              Core domain services (WifiManager, otaUpdateManager,
+ *              Core domain services (WifiManager, OTAUpdateManager,
  *              TimeManager, KeyManager) are also Application-owned members,
  *              wired into the boot sequence and registered with ConfigManager
  *              and the tick/web contributor vectors where applicable.
@@ -34,7 +34,7 @@
  *   - registerDataSource():      Add an IDataSource worker to the DataManager vector
  *   - getConfigManager():        Access the ConfigManager gateway
  *   - getWifiManager():          Access the WifiManager domain service
- *   - getOtaManager():           Access the otaUpdateManager domain service
+ *   - getOtaManager():           Access the OTAUpdateManager domain service
  *   - getTimeManager():          Access the TimeManager domain service
  *   - getKeyManager():           Access the KeyManager domain service
  *   - getState():                Query the current AppState lifecycle phase
@@ -68,10 +68,10 @@
 #include "../KeyManager/KeyManager.hpp"
 #include "../../lib/DeviceCrypto/DeviceCrypto.hpp"
 
-// Forward declaration only — otaUpdateManager.hpp pulls in WiFiClientSecure
+// Forward declaration only — OTAUpdateManager.hpp pulls in WiFiClientSecure
 // which causes LDF to discover NetworkClientSecure with missing SSL backend.
 // Full include deferred to Application.cpp; member held via unique_ptr.
-class otaUpdateManager;
+class OTAUpdateManager;
 
 /**
  * @brief Composition root for the ESP32 App Foundation framework.
@@ -94,7 +94,7 @@ class otaUpdateManager;
  */
 class Application {
 public:
-    /// Destructor — cleans up heap-allocated otaUpdateManager.
+    /// Destructor — cleans up heap-allocated OTAUpdateManager.
     ~Application();
 
     // -------------------------------------------------------------------------
@@ -139,8 +139,8 @@ public:
     /**
      * @brief Dispatch the periodic update tick to all registered ITickable modules.
      *
-     * Guarded: does nothing unless the current state is AppState::CONFIGURING
- *     or AppState::RUNNING. During CONFIGURING, polls config gates each cycle
+     * Guarded: does nothing unless the current state is AppState::Configuring
+ *     or AppState::Running. During CONFIGURING, polls config gates each cycle
  *     and transitions to RUNNING when all are satisfied.
      * Each registered ITickable::tick() must complete within 10ms.
      * Also ticks the MCPServer for JSON-RPC serial polling.
@@ -257,10 +257,10 @@ public:
     WifiManager& getWifiManager();
 
     /**
-     * @brief Get the application's otaUpdateManager instance.
-     * @return Reference to the otaUpdateManager.
+     * @brief Get the application's OTAUpdateManager instance.
+     * @return Reference to the OTAUpdateManager.
      */
-    otaUpdateManager& getOtaManager();
+    OTAUpdateManager& getOtaManager();
 
     /**
      * @brief Get the application's TimeManager instance.
@@ -354,7 +354,7 @@ private:
     // Member variables
     // -------------------------------------------------------------------------
 
-    AppState       _state   = AppState::BOOT;    ///< Current lifecycle phase
+    AppState       _state   = AppState::Boot;    ///< Current lifecycle phase
     bool           _locked  = false;             ///< True once _compactAndLock() has been called
     FrameworkConfig _config;                     ///< Cached framework configuration
 
@@ -398,7 +398,7 @@ private:
     KeyManager _keyManager;             ///< Encrypted credential registry
     WifiManager _wifiManager;           ///< WiFi connection state machine
     WifiConfigGate _wifiGate{_wifiManager}; ///< Built-in WiFi STA config gate
-    otaUpdateManager* _otaManager = nullptr;  ///< OTA firmware update orchestrator (heap, fwd-declared)
+    OTAUpdateManager* _otaManager = nullptr;  ///< OTA firmware update orchestrator (heap, fwd-declared)
     TimeManager _timeManager;           ///< NTP synchronization service
     TimeConfigGate _timeGate{_timeManager}; ///< Optional timezone config gate (downstream opt-in)
 };
