@@ -64,3 +64,4 @@ predate the formal PA pipeline and are filed retrospectively.
 ---
 
 *Updated by Principal Architect — Context Archive Integration — 2026-06-02*
+- [TimeManager Upgrade Port](./pr-time-manager-upgrade/PROJECT.md)
