@@ -7,14 +7,14 @@
  * To view a copy of this license, visit https://creativecommons.org/licenses/by-nc-sa/4.0/
  *
  * Module: test/test_unit/test_ota_verifier/test_ota_verifier.cpp
- * Description: Native unit tests for the IOtaVerifier interface contract.
+ * Description: Native unit tests for the IOTAVerifier interface contract.
  *              Exercises the MbedTLSSignatureVerifier stub implementation
  *              under NATIVE_BUILD to validate defensive guards: null key
  *              rejection, empty key rejection, verify-without-begin, and
  *              update-without-begin safety.
  *
  * Exported Functions/Classes:
- * - OtaVerifierTest: GoogleTest fixture for IOtaVerifier contract tests
+ * - OtaVerifierTest: GoogleTest fixture for IOTAVerifier contract tests
  *   - InterfaceContract_BeginWithNullKey_ReturnsFalse
  *   - InterfaceContract_VerifyWithoutBegin_ReturnsFalse
  *   - InterfaceContract_UpdateWithoutBegin_NoOp
@@ -25,7 +25,7 @@
 #include "MbedTLSSignatureVerifier.hpp"
 
 /**
- * @brief Test fixture for IOtaVerifier interface contract tests.
+ * @brief Test fixture for IOTAVerifier interface contract tests.
  *
  * Each test creates a fresh MbedTLSSignatureVerifier instance to ensure
  * clean state isolation. Under NATIVE_BUILD, the stub implementation

@@ -1,5 +1,5 @@
 #include <gtest/gtest.h>
-#include "deviceCrypto.hpp"
+#include "DeviceCrypto.hpp"
 #include <string>
 #include <cstring>
 

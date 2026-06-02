@@ -8,9 +8,9 @@
  *
  * Module: test/test_unit/test_mcpServer/test_mcpServer.cpp
  * Description: GoogleTest unit-test suite for the MCP server module.
- *              Covers McpToolRegistry (add/find/size), mcpBuiltinTools
+ *              Covers MCPToolRegistry (add/find/size), mcpBuiltinTools
  *              (registration count, tool existence, handler execution),
- *              McpServer JSON-RPC dispatch (initialize, ping, tools/list,
+ *              MCPServer JSON-RPC dispatch (initialize, ping, tools/list,
  *              tools/call, parse error, method not found), and Application
  *              integration (registerMcpContributor pre/post lock, null guard).
  *
@@ -24,25 +24,25 @@
 
 #include <gtest/gtest.h>
 #include <ArduinoJson.h>
-#include "mcpToolRegistry.hpp"
-#include "mcpServer.hpp"
-#include "mcpBuiltinTools.hpp"
-#include "interfaces/IMcpContributor.hpp"
+#include "MCPToolRegistry.hpp"
+#include "MCPServer.hpp"
+#include "MCPBuiltinTools.hpp"
+#include "interfaces/IMCPContributor.hpp"
 #include "FrameworkConfig.hpp"
 
 // =============================================================================
-// Test Group 1: McpToolRegistry — Core registry mechanics
+// Test Group 1: MCPToolRegistry — Core registry mechanics
 // =============================================================================
 
 /** A freshly constructed registry must report size 0. */
 TEST(McpToolRegistryTest, StartsEmpty) {
-    McpToolRegistry registry;
+    MCPToolRegistry registry;
     EXPECT_EQ(registry.size(), 0u);
 }
 
 /** Adding one tool must increment the size to 1. */
 TEST(McpToolRegistryTest, AddToolIncreasesSize) {
-    McpToolRegistry registry;
+    MCPToolRegistry registry;
     registry.addTool("test_tool", "A test tool",
         [](JsonObject& params, JsonObject& result) {
             (void)params;
@@ -54,27 +54,27 @@ TEST(McpToolRegistryTest, AddToolIncreasesSize) {
 
 /** A registered tool must be findable by its exact name. */
 TEST(McpToolRegistryTest, FindRegisteredTool) {
-    McpToolRegistry registry;
+    MCPToolRegistry registry;
     registry.addTool("my_tool", "My tool",
         [](JsonObject& params, JsonObject& result) {
             (void)params;
             result["ok"] = true;
         }
     );
-    const McpToolEntry* found = registry.findTool("my_tool");
+    const MCPToolEntry* found = registry.findTool("my_tool");
     ASSERT_NE(found, nullptr);
     EXPECT_EQ(found->name, "my_tool");
 }
 
 /** Searching for an unregistered tool name must return nullptr. */
 TEST(McpToolRegistryTest, FindUnknownToolReturnsNull) {
-    McpToolRegistry registry;
+    MCPToolRegistry registry;
     EXPECT_EQ(registry.findTool("bogus"), nullptr);
 }
 
 /** A tool's handler must execute correctly when invoked directly. */
 TEST(McpToolRegistryTest, ToolHandlerExecutes) {
-    McpToolRegistry registry;
+    MCPToolRegistry registry;
 
     bool handlerCalled = false;
     registry.addTool("flag_tool", "Sets a flag",
@@ -85,7 +85,7 @@ TEST(McpToolRegistryTest, ToolHandlerExecutes) {
         }
     );
 
-    const McpToolEntry* tool = registry.findTool("flag_tool");
+    const MCPToolEntry* tool = registry.findTool("flag_tool");
     ASSERT_NE(tool, nullptr);
 
     // Invoke the handler directly
@@ -101,7 +101,7 @@ TEST(McpToolRegistryTest, ToolHandlerExecutes) {
 
 /** Adding multiple tools must make all of them findable. */
 TEST(McpToolRegistryTest, MultipleToolsRegistered) {
-    McpToolRegistry registry;
+    MCPToolRegistry registry;
     auto noop = [](JsonObject& p, JsonObject& r) { (void)p; (void)r; };
 
     registry.addTool("tool_a", "Tool A", noop);
@@ -116,7 +116,7 @@ TEST(McpToolRegistryTest, MultipleToolsRegistered) {
 
 /** getTools() must return a vector whose size matches size(). */
 TEST(McpToolRegistryTest, GetToolsReturnsAll) {
-    McpToolRegistry registry;
+    MCPToolRegistry registry;
     auto noop = [](JsonObject& p, JsonObject& r) { (void)p; (void)r; };
 
     registry.addTool("x", "X", noop);
@@ -126,71 +126,71 @@ TEST(McpToolRegistryTest, GetToolsReturnsAll) {
 }
 
 // =============================================================================
-// Test Group 2: McpBuiltinTools — Built-in tool registration and execution
+// Test Group 2: MCPBuiltinTools — Built-in tool registration and execution
 // =============================================================================
 
 /** registerAll() with null configManager must register at least 7 tools. */
 TEST(McpBuiltinToolsTest, RegistersExpectedToolCount) {
-    McpToolRegistry registry;
+    MCPToolRegistry registry;
     mcpBuiltinTools::registerAll(registry, nullptr);
     EXPECT_GE(registry.size(), 7u);
 }
 
 /** system_info tool must be findable after registerAll(). */
 TEST(McpBuiltinToolsTest, SystemInfoToolExists) {
-    McpToolRegistry registry;
+    MCPToolRegistry registry;
     mcpBuiltinTools::registerAll(registry, nullptr);
     EXPECT_NE(registry.findTool("system_info"), nullptr);
 }
 
 /** get_config tool must be findable after registerAll(). */
 TEST(McpBuiltinToolsTest, GetConfigToolExists) {
-    McpToolRegistry registry;
+    MCPToolRegistry registry;
     mcpBuiltinTools::registerAll(registry, nullptr);
     EXPECT_NE(registry.findTool("get_config"), nullptr);
 }
 
 /** set_config tool must be findable after registerAll(). */
 TEST(McpBuiltinToolsTest, SetConfigToolExists) {
-    McpToolRegistry registry;
+    MCPToolRegistry registry;
     mcpBuiltinTools::registerAll(registry, nullptr);
     EXPECT_NE(registry.findTool("set_config"), nullptr);
 }
 
 /** reboot tool must be findable after registerAll(). */
 TEST(McpBuiltinToolsTest, RebootToolExists) {
-    McpToolRegistry registry;
+    MCPToolRegistry registry;
     mcpBuiltinTools::registerAll(registry, nullptr);
     EXPECT_NE(registry.findTool("reboot"), nullptr);
 }
 
 /** get_logs tool must be findable after registerAll(). */
 TEST(McpBuiltinToolsTest, GetLogsToolExists) {
-    McpToolRegistry registry;
+    MCPToolRegistry registry;
     mcpBuiltinTools::registerAll(registry, nullptr);
     EXPECT_NE(registry.findTool("get_logs"), nullptr);
 }
 
 /** list_tools tool must be findable after registerAll(). */
 TEST(McpBuiltinToolsTest, ListToolsToolExists) {
-    McpToolRegistry registry;
+    MCPToolRegistry registry;
     mcpBuiltinTools::registerAll(registry, nullptr);
     EXPECT_NE(registry.findTool("list_tools"), nullptr);
 }
 
 /** capture_display tool must be findable after registerAll() even if display is null. */
 TEST(McpBuiltinToolsTest, CaptureDisplayToolExists) {
-    McpToolRegistry registry;
+    MCPToolRegistry registry;
     mcpBuiltinTools::registerAll(registry, nullptr);
     EXPECT_NE(registry.findTool("capture_display"), nullptr);
 }
 
 /** system_info handler must return firmware_version in its result. */
 TEST(McpBuiltinToolsTest, SystemInfoReturnsData) {
-    McpToolRegistry registry;
+    MCPToolRegistry registry;
     mcpBuiltinTools::registerAll(registry, nullptr);
 
-    const McpToolEntry* tool = registry.findTool("system_info");
+    const MCPToolEntry* tool = registry.findTool("system_info");
     ASSERT_NE(tool, nullptr);
 
     JsonDocument argsDoc;
@@ -206,10 +206,10 @@ TEST(McpBuiltinToolsTest, SystemInfoReturnsData) {
 
 /** get_config with null configManager must return an error in result. */
 TEST(McpBuiltinToolsTest, GetConfigWithoutManager) {
-    McpToolRegistry registry;
+    MCPToolRegistry registry;
     mcpBuiltinTools::registerAll(registry, nullptr);
 
-    const McpToolEntry* tool = registry.findTool("get_config");
+    const MCPToolEntry* tool = registry.findTool("get_config");
     ASSERT_NE(tool, nullptr);
 
     JsonDocument argsDoc;
@@ -224,10 +224,10 @@ TEST(McpBuiltinToolsTest, GetConfigWithoutManager) {
 
 /** capture_display with null display must return an error in result. */
 TEST(McpBuiltinToolsTest, CaptureDisplayWithoutDisplay) {
-    McpToolRegistry registry;
+    MCPToolRegistry registry;
     mcpBuiltinTools::registerAll(registry, nullptr); // No display info passed
 
-    const McpToolEntry* tool = registry.findTool("capture_display");
+    const MCPToolEntry* tool = registry.findTool("capture_display");
     ASSERT_NE(tool, nullptr);
 
     JsonDocument argsDoc;
@@ -243,7 +243,7 @@ TEST(McpBuiltinToolsTest, CaptureDisplayWithoutDisplay) {
 
 /** capture_display with a valid display buffer must return base64 data. */
 TEST(McpBuiltinToolsTest, CaptureDisplayWithDisplay) {
-    McpToolRegistry registry;
+    MCPToolRegistry registry;
 
     // Create a small synthetic framebuffer (4 bytes)
     uint8_t buffer[] = { 0xAA, 0xBB, 0xCC, 0xDD };
@@ -255,7 +255,7 @@ TEST(McpBuiltinToolsTest, CaptureDisplayWithDisplay) {
 
     mcpBuiltinTools::registerAll(registry, nullptr, &display);
 
-    const McpToolEntry* tool = registry.findTool("capture_display");
+    const MCPToolEntry* tool = registry.findTool("capture_display");
     ASSERT_NE(tool, nullptr);
 
     JsonDocument argsDoc;
@@ -274,7 +274,7 @@ TEST(McpBuiltinToolsTest, CaptureDisplayWithDisplay) {
 }
 
 // =============================================================================
-// Test Group 3: McpServer — JSON-RPC dispatch via processLineForTest()
+// Test Group 3: MCPServer — JSON-RPC dispatch via processLineForTest()
 // =============================================================================
 
 /**
@@ -283,7 +283,7 @@ TEST(McpBuiltinToolsTest, CaptureDisplayWithDisplay) {
  * Clears the MockSerial output buffer, processes the line via the native
  * test harness, and returns the full serialised response string.
  */
-static std::string processAndCapture(McpServer& server, const char* jsonLine) {
+static std::string processAndCapture(MCPServer& server, const char* jsonLine) {
     Serial.flush(); // Clear any prior output
     server.processLineForTest(jsonLine);
     return Serial.flush();
@@ -291,8 +291,8 @@ static std::string processAndCapture(McpServer& server, const char* jsonLine) {
 
 /** initialize must return protocolVersion in the result. */
 TEST(McpServerTest, InitializeReturnsCapabilities) {
-    McpServer server;
-    std::vector<IMcpContributor*> contributors;
+    MCPServer server;
+    std::vector<IMCPContributor*> contributors;
     server.begin(contributors, nullptr);
 
     std::string response = processAndCapture(server,
@@ -311,8 +311,8 @@ TEST(McpServerTest, InitializeReturnsCapabilities) {
 
 /** ping must return an empty result object. */
 TEST(McpServerTest, PingReturnsEmptyResult) {
-    McpServer server;
-    std::vector<IMcpContributor*> contributors;
+    MCPServer server;
+    std::vector<IMCPContributor*> contributors;
     server.begin(contributors, nullptr);
 
     std::string response = processAndCapture(server,
@@ -329,8 +329,8 @@ TEST(McpServerTest, PingReturnsEmptyResult) {
 
 /** tools/list must return a tools array with at least the built-in tools. */
 TEST(McpServerTest, ToolsListReturnsTools) {
-    McpServer server;
-    std::vector<IMcpContributor*> contributors;
+    MCPServer server;
+    std::vector<IMCPContributor*> contributors;
     server.begin(contributors, nullptr);
 
     std::string response = processAndCapture(server,
@@ -347,8 +347,8 @@ TEST(McpServerTest, ToolsListReturnsTools) {
 
 /** tools/call with an unknown tool name must return an error. */
 TEST(McpServerTest, ToolsCallUnknownToolReturnsError) {
-    McpServer server;
-    std::vector<IMcpContributor*> contributors;
+    MCPServer server;
+    std::vector<IMCPContributor*> contributors;
     server.begin(contributors, nullptr);
 
     std::string response = processAndCapture(server,
@@ -365,8 +365,8 @@ TEST(McpServerTest, ToolsCallUnknownToolReturnsError) {
 
 /** tools/call with a known tool must return a result with content. */
 TEST(McpServerTest, ToolsCallKnownToolReturnsResult) {
-    McpServer server;
-    std::vector<IMcpContributor*> contributors;
+    MCPServer server;
+    std::vector<IMCPContributor*> contributors;
     server.begin(contributors, nullptr);
 
     std::string response = processAndCapture(server,
@@ -392,8 +392,8 @@ TEST(McpServerTest, ToolsCallKnownToolReturnsResult) {
 
 /** Invalid JSON input must return parse error code -32700. */
 TEST(McpServerTest, InvalidJsonReturnsParseError) {
-    McpServer server;
-    std::vector<IMcpContributor*> contributors;
+    MCPServer server;
+    std::vector<IMCPContributor*> contributors;
     server.begin(contributors, nullptr);
 
     std::string response = processAndCapture(server,
@@ -409,8 +409,8 @@ TEST(McpServerTest, InvalidJsonReturnsParseError) {
 
 /** An unknown method must return method-not-found error code -32601. */
 TEST(McpServerTest, UnknownMethodReturnsError) {
-    McpServer server;
-    std::vector<IMcpContributor*> contributors;
+    MCPServer server;
+    std::vector<IMCPContributor*> contributors;
     server.begin(contributors, nullptr);
 
     std::string response = processAndCapture(server,
@@ -428,9 +428,9 @@ TEST(McpServerTest, UnknownMethodReturnsError) {
 /** A contributor-registered tool must be callable through the server dispatch. */
 TEST(McpServerTest, ContributorToolCallable) {
     // Create a mock contributor that registers a "echo_test" tool
-    class EchoContributor : public IMcpContributor {
+    class EchoContributor : public IMCPContributor {
     public:
-        void registerMcpTools(McpToolRegistry& registry) override {
+        void registerMcpTools(MCPToolRegistry& registry) override {
             registry.addTool("echo_test", "Echo test tool",
                 [](JsonObject& params, JsonObject& result) {
                     (void)params;
@@ -441,9 +441,9 @@ TEST(McpServerTest, ContributorToolCallable) {
     };
 
     EchoContributor contributor;
-    std::vector<IMcpContributor*> contributors = { &contributor };
+    std::vector<IMCPContributor*> contributors = { &contributor };
 
-    McpServer server;
+    MCPServer server;
     server.begin(contributors, nullptr);
 
     // Verify the tool exists in the registry
@@ -467,28 +467,28 @@ TEST(McpServerTest, ContributorToolCallable) {
 
 /** set_config and reboot must have mutatesState == true; read-only tools must be false. */
 TEST(McpSecurityTest, MutatesStateTaggedCorrectly) {
-    McpToolRegistry registry;
+    MCPToolRegistry registry;
     mcpBuiltinTools::registerAll(registry, nullptr);
 
     // Mutating tools
-    const McpToolEntry* setConfig = registry.findTool("set_config");
+    const MCPToolEntry* setConfig = registry.findTool("set_config");
     ASSERT_NE(setConfig, nullptr);
     EXPECT_TRUE(setConfig->mutatesState) << "set_config must be tagged as mutating";
 
-    const McpToolEntry* reboot = registry.findTool("reboot");
+    const MCPToolEntry* reboot = registry.findTool("reboot");
     ASSERT_NE(reboot, nullptr);
     EXPECT_TRUE(reboot->mutatesState) << "reboot must be tagged as mutating";
 
     // Read-only tools
-    const McpToolEntry* sysInfo = registry.findTool("system_info");
+    const MCPToolEntry* sysInfo = registry.findTool("system_info");
     ASSERT_NE(sysInfo, nullptr);
     EXPECT_FALSE(sysInfo->mutatesState) << "system_info must NOT be tagged as mutating";
 
-    const McpToolEntry* getConfig = registry.findTool("get_config");
+    const MCPToolEntry* getConfig = registry.findTool("get_config");
     ASSERT_NE(getConfig, nullptr);
     EXPECT_FALSE(getConfig->mutatesState) << "get_config must NOT be tagged as mutating";
 
-    const McpToolEntry* getLogs = registry.findTool("get_logs");
+    const MCPToolEntry* getLogs = registry.findTool("get_logs");
     ASSERT_NE(getLogs, nullptr);
     EXPECT_FALSE(getLogs->mutatesState) << "get_logs must NOT be tagged as mutating";
 }
@@ -497,9 +497,9 @@ TEST(McpSecurityTest, MutatesStateTaggedCorrectly) {
 TEST(McpSecurityTest, ReadOnlyBlocksMutatingTool) {
     FrameworkConfig config;
     config.mcpReadOnly = true;
-    std::vector<IMcpContributor*> contributors;
+    std::vector<IMCPContributor*> contributors;
 
-    McpServer server;
+    MCPServer server;
     server.begin(contributors, nullptr, &config);
 
     std::string response = processAndCapture(server,
@@ -518,9 +518,9 @@ TEST(McpSecurityTest, ReadOnlyBlocksMutatingTool) {
 TEST(McpSecurityTest, ReadOnlyAllowsReadTool) {
     FrameworkConfig config;
     config.mcpReadOnly = true;
-    std::vector<IMcpContributor*> contributors;
+    std::vector<IMCPContributor*> contributors;
 
-    McpServer server;
+    MCPServer server;
     server.begin(contributors, nullptr, &config);
 
     std::string response = processAndCapture(server,
@@ -538,9 +538,9 @@ TEST(McpSecurityTest, ReadOnlyAllowsReadTool) {
 TEST(McpSecurityTest, ReadWriteAllowsMutatingTool) {
     FrameworkConfig config;
     config.mcpReadOnly = false;
-    std::vector<IMcpContributor*> contributors;
+    std::vector<IMCPContributor*> contributors;
 
-    McpServer server;
+    MCPServer server;
     server.begin(contributors, nullptr, &config);
 
     std::string response = processAndCapture(server,
@@ -558,9 +558,9 @@ TEST(McpSecurityTest, ReadWriteAllowsMutatingTool) {
 TEST(McpSecurityTest, ToolsListIncludesMutatesState) {
     FrameworkConfig config;
     config.mcpReadOnly = true;
-    std::vector<IMcpContributor*> contributors;
+    std::vector<IMCPContributor*> contributors;
 
-    McpServer server;
+    MCPServer server;
     server.begin(contributors, nullptr, &config);
 
     std::string response = processAndCapture(server,
@@ -584,13 +584,13 @@ TEST(McpSecurityTest, ToolsListIncludesMutatesState) {
 }
 
 // =============================================================================
-// Test Group 5: iConfigurable Persistence
+// Test Group 5: IConfigurable Persistence
 // =============================================================================
 
 /** applyConfig/serializeConfig round-trip preserves enabled and readOnly state. */
 TEST(McpConfigTest, ConfigPersistenceRoundTrip) {
-    std::vector<IMcpContributor*> contributors;
-    McpServer server;
+    std::vector<IMCPContributor*> contributors;
+    MCPServer server;
     server.begin(contributors, nullptr);
 
     // Server starts enabled by default
@@ -616,8 +616,8 @@ TEST(McpConfigTest, ConfigPersistenceRoundTrip) {
 
 /** resetConfig() restores enabled=true and readOnly=true defaults. */
 TEST(McpConfigTest, ResetRestoresDefaults) {
-    std::vector<IMcpContributor*> contributors;
-    McpServer server;
+    std::vector<IMCPContributor*> contributors;
+    MCPServer server;
     server.begin(contributors, nullptr);
 
     // Force non-default state
@@ -642,13 +642,13 @@ TEST(McpConfigTest, ResetRestoresDefaults) {
 
 /** getConfigNamespace() must return "mcp". */
 TEST(McpConfigTest, NamespaceIsMcp) {
-    McpServer server;
+    MCPServer server;
     EXPECT_STREQ(server.getConfigNamespace(), "mcp");
 }
 
 /** getSchemaVersion() must return 1. */
 TEST(McpConfigTest, SchemaVersionIsOne) {
-    McpServer server;
+    MCPServer server;
     EXPECT_EQ(server.getSchemaVersion(), 1);
 }
 

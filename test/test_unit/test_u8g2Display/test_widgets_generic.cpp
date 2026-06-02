@@ -8,8 +8,8 @@
  *
  * Module: test/test_unit/test_u8g2Display/test_widgets_generic.cpp
  * Description: GoogleTest unit-test suite for the WO2 generic widget layer:
- *              labelWidget, scrollingTextWidget, clockWidget, progressBarWidget,
- *              and imageWidget. Validates construction, state management, text
+ *              LabelWidget, ScrollingTextWidget, ClockWidget, ProgressBarWidget,
+ *              and ImageWidget. Validates construction, state management, text
  *              handling, animation math, and safety invariants.
  *              All tests execute on the native GoogleTest runner (NATIVE_BUILD).
  *
@@ -20,19 +20,19 @@
 #include <gtest/gtest.h>
 #include <cstring>
 
-#include "widgets/labelWidget.hpp"
-#include "widgets/scrollingTextWidget.hpp"
-#include "widgets/clockWidget.hpp"
-#include "widgets/progressBarWidget.hpp"
-#include "widgets/imageWidget.hpp"
+#include "widgets/LabelWidget.hpp"
+#include "widgets/ScrollingTextWidget.hpp"
+#include "widgets/ClockWidget.hpp"
+#include "widgets/ProgressBarWidget.hpp"
+#include "widgets/ImageWidget.hpp"
 
 // =============================================================================
-// Test Group: labelWidget
+// Test Group: LabelWidget
 // =============================================================================
 
 class LabelWidgetTest : public ::testing::Test {
 protected:
-    labelWidget label{10, 20, 100, 16};
+    LabelWidget label{10, 20, 100, 16};
 };
 
 /** Default construction initializes empty text and left alignment. */
@@ -96,12 +96,12 @@ TEST_F(LabelWidgetTest, SetFont_NullSafe) {
 }
 
 // =============================================================================
-// Test Group: scrollingTextWidget
+// Test Group: ScrollingTextWidget
 // =============================================================================
 
 class ScrollingTextWidgetTest : public ::testing::Test {
 protected:
-    scrollingTextWidget scroller{0, 0, 200, 12, nullptr};
+    ScrollingTextWidget scroller{0, 0, 200, 12, nullptr};
 };
 
 /** setText() stores text and sets needsLayout. */
@@ -172,18 +172,18 @@ TEST_F(ScrollingTextWidgetTest, SetFont_TriggersLayout) {
 }
 
 // =============================================================================
-// Test Group: clockWidget
+// Test Group: ClockWidget
 // =============================================================================
 
 class ClockWidgetTest : public ::testing::Test {
 protected:
     // Construct with nullptr TimeManager — valid for testing state logic
-    clockWidget clock{nullptr, 10, 0, 56, 14, nullptr};
+    ClockWidget clock{nullptr, 10, 0, 56, 14, nullptr};
 };
 
 /** Construction with nullptr TimeManager does not crash. */
 TEST_F(ClockWidgetTest, Construction_NullTimeMgr_DoesNotCrash) {
-    EXPECT_NO_FATAL_FAILURE(clockWidget testClock(nullptr, 0, 0));
+    EXPECT_NO_FATAL_FAILURE(ClockWidget testClock(nullptr, 0, 0));
     EXPECT_TRUE(clock.getVisible());
 }
 
@@ -198,11 +198,11 @@ TEST_F(ClockWidgetTest, Tick_BlinkToggle) {
 
 /** setFormat changes format enum without crash. */
 TEST_F(ClockWidgetTest, SetFormat_HH_MM) {
-    EXPECT_NO_FATAL_FAILURE(clock.setFormat(clockWidget::ClockFormat::HH_MM));
+    EXPECT_NO_FATAL_FAILURE(clock.setFormat(ClockWidget::ClockFormat::HH_MM));
 }
 
 TEST_F(ClockWidgetTest, SetFormat_HH_MM_SS) {
-    EXPECT_NO_FATAL_FAILURE(clock.setFormat(clockWidget::ClockFormat::HH_MM_SS));
+    EXPECT_NO_FATAL_FAILURE(clock.setFormat(ClockWidget::ClockFormat::HH_MM_SS));
 }
 
 /** setBlink() toggle does not crash. */
@@ -232,12 +232,12 @@ TEST_F(ClockWidgetTest, SetFonts_NullSafe) {
 }
 
 // =============================================================================
-// Test Group: progressBarWidget
+// Test Group: ProgressBarWidget
 // =============================================================================
 
 class ProgressBarWidgetTest : public ::testing::Test {
 protected:
-    progressBarWidget bar{0, 0, 200, 20, nullptr};
+    ProgressBarWidget bar{0, 0, 200, 20, nullptr};
 };
 
 /** setPercent() snap (0 duration) sets currentPercent immediately. */
@@ -308,21 +308,21 @@ TEST_F(ProgressBarWidgetTest, Tick_InvisibleNoOp) {
 }
 
 // =============================================================================
-// Test Group: imageWidget
+// Test Group: ImageWidget
 // =============================================================================
 
 class ImageWidgetTest : public ::testing::Test {
 protected:
     // A small 8x8 test bitmap (all zeros)
     static const unsigned char testBits[8];
-    imageWidget img{0, 0, 8, 8, testBits};
+    ImageWidget img{0, 0, 8, 8, testBits};
 };
 
 const unsigned char ImageWidgetTest::testBits[8] = {0, 0, 0, 0, 0, 0, 0, 0};
 
 /** Construction with nullptr bits does not crash. */
 TEST(ImageWidgetNullTest, Construction_NullBits_DoesNotCrash) {
-    EXPECT_NO_FATAL_FAILURE(imageWidget nullImg(0, 0, 8, 8, nullptr));
+    EXPECT_NO_FATAL_FAILURE(ImageWidget nullImg(0, 0, 8, 8, nullptr));
 }
 
 /** tick() is a no-op — no crash. */

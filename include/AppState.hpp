@@ -8,23 +8,23 @@
  *
  * Module: include/AppState.hpp
  * Description: Application lifecycle state machine enum. Defines a 3-state
- *              bidirectional model for the Application hub. BOOT covers all
- *              hardware initialisation during setup(). CONFIGURING and RUNNING
+ *              bidirectional model for the Application hub. Boot covers all
+ *              hardware initialisation during setup(). Configuring and Running
  *              support bidirectional transitions: if a config gate becomes
  *              unsatisfied beyond its regression tolerance, the system regresses
- *              from RUNNING back to CONFIGURING.
+ *              from Running back to Configuring.
  *
  * Valid transitions:
- *   BOOT → CONFIGURING   (gates unsatisfied after begin())
- *   BOOT → RUNNING       (all gates satisfied after begin())
- *   CONFIGURING → RUNNING (all gates satisfied during tick())
- *   RUNNING → CONFIGURING (gate regression tolerance exceeded)
+ *   Boot → Configuring   (gates unsatisfied after begin())
+ *   Boot → Running       (all gates satisfied after begin())
+ *   Configuring → Running (all gates satisfied during tick())
+ *   Running → Configuring (gate regression tolerance exceeded)
  *
  * Exported Enums:
  * - AppState: Lifecycle phase identifier
- *   - BOOT:        Hardware init, module begin() — only valid during setup()
- *   - CONFIGURING: Kernel up, awaiting user configuration via IConfigGate
- *   - RUNNING:     Normal tick() loop; all prerequisites satisfied
+ *   - Boot:        Hardware init, module begin() — only valid during setup()
+ *   - Configuring: Kernel up, awaiting user configuration via IConfigGate
+ *   - Running:     Normal tick() loop; all prerequisites satisfied
  */
 
 #pragma once
@@ -34,14 +34,14 @@
  * @brief Bidirectional application lifecycle phases.
  *
  * The Application hub transitions through these states during startup and
- * runtime. BOOT is the initial hardware-init phase. CONFIGURING and RUNNING
+ * runtime. Boot is the initial hardware-init phase. Configuring and Running
  * support bidirectional transitions: if a registered IConfigGate becomes
  * unsatisfied beyond its regression tolerance, the system regresses from
- * RUNNING back to CONFIGURING. Modules may query the current state via
+ * Running back to Configuring. Modules may query the current state via
  * Application::getState() to guard phase-sensitive operations.
  */
 enum class AppState : uint8_t {
-    BOOT         = 0, ///< Hardware init, module begin() — only valid during setup()
-    CONFIGURING  = 1, ///< Kernel up, awaiting user configuration via IConfigGate
-    RUNNING      = 2  ///< Normal tick() loop; all prerequisites satisfied
+    Boot         = 0, ///< Hardware init, module begin() — only valid during setup()
+    Configuring  = 1, ///< Kernel up, awaiting user configuration via IConfigGate
+    Running      = 2  ///< Normal tick() loop; all prerequisites satisfied
 };

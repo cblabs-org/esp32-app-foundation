@@ -11,17 +11,17 @@
  */
 
 #include <gtest/gtest.h>
-#include "dataManager.hpp"
+#include "DataManager.hpp"
 #include <string>
 
-class MockDataSource : public iDataSource {
+class MockDataSource : public IDataSource {
 public:
     MockDataSource(std::string n, uint32_t ivl, PriorityTier p) 
         : name(n), interval(ivl), tier(p), fetchCount(0) {}
 
     UpdateStatus fetchUpdate() override {
         fetchCount++;
-        return UpdateStatus::SUCCESS;
+        return UpdateStatus::Success;
     }
 
     uint32_t getUpdateIntervalMs() const override { return interval; }
@@ -45,7 +45,7 @@ protected:
 };
 
 TEST_F(DataManagerTest, InitialFetchImmediate) {
-    MockDataSource src("src1", 5000, PriorityTier::PRIORITY_LOW);
+    MockDataSource src("src1", 5000, PriorityTier::Low);
     dm.registerSource(&src);
     
     dm.processNext();
@@ -57,7 +57,7 @@ TEST_F(DataManagerTest, InitialFetchImmediate) {
 }
 
 TEST_F(DataManagerTest, IntervalScheduling) {
-    MockDataSource src("src1", 2000, PriorityTier::PRIORITY_LOW);
+    MockDataSource src("src1", 2000, PriorityTier::Low);
     dm.registerSource(&src);
     
     // t=1000 (initial fetch)
@@ -76,8 +76,8 @@ TEST_F(DataManagerTest, IntervalScheduling) {
 }
 
 TEST_F(DataManagerTest, PriorityTierScheduling) {
-    MockDataSource lowSrc("low", 1000, PriorityTier::PRIORITY_LOW);
-    MockDataSource highSrc("high", 1000, PriorityTier::PRIORITY_HIGH);
+    MockDataSource lowSrc("low", 1000, PriorityTier::Low);
+    MockDataSource highSrc("high", 1000, PriorityTier::High);
     
     dm.registerSource(&lowSrc);
     dm.registerSource(&highSrc);
@@ -102,7 +102,7 @@ TEST_F(DataManagerTest, PriorityTierScheduling) {
 }
 
 TEST_F(DataManagerTest, RequestPriorityFetch) {
-    MockDataSource src("src", 5000, PriorityTier::PRIORITY_LOW);
+    MockDataSource src("src", 5000, PriorityTier::Low);
     dm.registerSource(&src);
     
     // Initial fetch
@@ -123,7 +123,7 @@ TEST_F(DataManagerTest, RequestPriorityFetch) {
 }
 
 TEST_F(DataManagerTest, UnregisterSource) {
-    MockDataSource src("src", 1000, PriorityTier::PRIORITY_LOW);
+    MockDataSource src("src", 1000, PriorityTier::Low);
     dm.registerSource(&src);
     
     dm.unregisterSource(&src);
@@ -140,7 +140,7 @@ TEST_F(DataManagerTest, RegisterNullptr) {
 }
 
 TEST_F(DataManagerTest, UnregisterNonExistentSource) {
-    MockDataSource src("src", 1000, PriorityTier::PRIORITY_LOW);
+    MockDataSource src("src", 1000, PriorityTier::Low);
     // Unregister without registering first, should not crash
     dm.unregisterSource(&src);
     dm.processNext();
@@ -154,7 +154,7 @@ TEST_F(DataManagerTest, UnregisterNullptr) {
 }
 
 TEST_F(DataManagerTest, RequestPriorityOnUnregisteredSource) {
-    MockDataSource src("src", 1000, PriorityTier::PRIORITY_LOW);
+    MockDataSource src("src", 1000, PriorityTier::Low);
     // Request priority without registering first, should not crash
     dm.requestPriorityFetch(&src);
     dm.processNext();
@@ -162,7 +162,7 @@ TEST_F(DataManagerTest, RequestPriorityOnUnregisteredSource) {
 }
 
 TEST_F(DataManagerTest, DoubleRegistration) {
-    MockDataSource src("src", 5000, PriorityTier::PRIORITY_LOW);
+    MockDataSource src("src", 5000, PriorityTier::Low);
     dm.registerSource(&src);
     dm.registerSource(&src); // Register second time
     
@@ -176,7 +176,7 @@ TEST_F(DataManagerTest, DoubleRegistration) {
 }
 
 TEST_F(DataManagerTest, RegisterAfterUnregister) {
-    MockDataSource src("src", 5000, PriorityTier::PRIORITY_LOW);
+    MockDataSource src("src", 5000, PriorityTier::Low);
     dm.registerSource(&src);
     dm.unregisterSource(&src);
     
@@ -205,7 +205,7 @@ TEST(DataManagerGatingTest, AppNotRunning_SkipsFetch) {
     dm.setSimulatedTimeMs(1000);
     // Do NOT call setAppRunning(true)
 
-    MockDataSource src("gated", 1000, PriorityTier::PRIORITY_HIGH);
+    MockDataSource src("gated", 1000, PriorityTier::High);
     dm.registerSource(&src);
 
     dm.processNext();
@@ -220,7 +220,7 @@ TEST(DataManagerGatingTest, AppRunning_AllowsFetch) {
     dm.setSimulatedTimeMs(1000);
     dm.setAppRunning(true);
 
-    MockDataSource src("gated", 1000, PriorityTier::PRIORITY_HIGH);
+    MockDataSource src("gated", 1000, PriorityTier::High);
     dm.registerSource(&src);
 
     dm.processNext();
@@ -235,7 +235,7 @@ TEST(DataManagerGatingTest, AppRunningToggle_StopsFetch) {
     dm.setSimulatedTimeMs(1000);
     dm.setAppRunning(true);
 
-    MockDataSource src("gated", 1000, PriorityTier::PRIORITY_HIGH);
+    MockDataSource src("gated", 1000, PriorityTier::High);
     dm.registerSource(&src);
 
     dm.processNext();

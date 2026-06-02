@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 #include <ArduinoJson.h>
-#include "../../../modules/wifiManager/wifiManager.hpp"
+#include "../../../modules/WifiManager/WifiManager.hpp"
 
 class WifiManagerTest : public ::testing::Test {
 protected:

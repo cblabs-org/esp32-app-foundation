@@ -6,7 +6,7 @@
  * This work is licensed under Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International.
  * To view a copy of this license, visit https://creativecommons.org/licenses/by-nc-sa/4.0/
  *
- * Module: include/interfaces/iConfigurable.hpp
+ * Module: include/interfaces/IConfigurable.hpp
  * Description: Pure interface for modules that participate in the centralised
  *              configuration gateway managed by ConfigManager. Modules provide
  *              serialisation/deserialisation callbacks and a namespace identifier;
@@ -18,7 +18,7 @@
  *              is required.
  *
  * Exported Classes:
- * - iConfigurable: Abstract base for config-aware modules
+ * - IConfigurable: Abstract base for config-aware modules
  *   - getConfigNamespace(): Return the module's unique config namespace identifier
  *   - getSchemaVersion():   Return the current schema version (integer)
  *   - applyConfig():        Apply configuration from a parsed JSON section
@@ -39,9 +39,9 @@
  * directly for configuration persistence. Config files are stored at
  * /mod/<namespace>.json with a self-describing _v schema version field.
  */
-class iConfigurable {
+class IConfigurable {
 public:
-    virtual ~iConfigurable() = default;
+    virtual ~IConfigurable() = default;
 
     /**
      * @brief Return the module's unique configuration namespace identifier.

@@ -8,7 +8,7 @@
  *
  * Module: test/test_unit/test_u8g2Display/test_boards.cpp
  * Description: GoogleTest unit-test suite for the system display boards:
- *              BootBoard, WiFiWizardBoard, OtaProgressBoard,
+ *              BootBoard, WiFiWizardBoard, OTAProgressBoard,
  *              ErrorBoard, ScreensaverBoard, and ConfiguringStatusBoard.
  *              Validates board names, state transitions, and API contracts.
  *              All tests execute on the native GoogleTest runner (no hardware
@@ -19,12 +19,12 @@
  */
 
 #include <gtest/gtest.h>
-#include "boards/bootBoard.hpp"
-#include "boards/wifiWizardBoard.hpp"
-#include "boards/otaProgressBoard.hpp"
-#include "boards/errorBoard.hpp"
-#include "boards/screensaverBoard.hpp"
-#include "boards/configuringStatusBoard.hpp"
+#include "boards/BootBoard.hpp"
+#include "boards/WiFiWizardBoard.hpp"
+#include "boards/OTAProgressBoard.hpp"
+#include "boards/ErrorBoard.hpp"
+#include "boards/ScreensaverBoard.hpp"
+#include "boards/ConfiguringStatusBoard.hpp"
 
 // =============================================================================
 // Mock: IConfigGate for unit testing
@@ -165,12 +165,12 @@ TEST_F(WiFiWizardBoardTest, Configure_DoesNotCauseExpiry) {
 }
 
 // =============================================================================
-// Test Group: OtaProgressBoard
+// Test Group: OTAProgressBoard
 // =============================================================================
 
 class OtaProgressBoardTest : public ::testing::Test {
 protected:
-    OtaProgressBoard board{256, 64}; ///< Fresh instance for each test
+    OTAProgressBoard board{256, 64}; ///< Fresh instance for each test
 };
 
 /** getBoardName must return the expected system board identifier. */

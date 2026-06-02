@@ -7,8 +7,8 @@
  * To view a copy of this license, visit https://creativecommons.org/licenses/by-nc-sa/4.0/
  *
  * Module: test/test_unit/test_u8g2Display/test_config.cpp
- * Description: GoogleTest unit-test suite for the U8g2DisplayModule's
- *              iConfigurable implementation (new 6-method gateway interface).
+ * Description: GoogleTest unit-test suite for the U8G2DisplayModule's
+ *              IConfigurable implementation (new 6-method gateway interface).
  *              Validates that resetConfig() sets factory defaults,
  *              applyConfig() accepts a JSON section, serializeConfig() writes
  *              expected keys, and runtime setters work correctly.
@@ -18,15 +18,15 @@
  */
 
 #include <gtest/gtest.h>
-#include "u8g2DisplayModule.hpp"
+#include "U8G2DisplayModule.hpp"
 
 // =============================================================================
-// Test Group: iConfigurable — config apply/serialize/reset
+// Test Group: IConfigurable — config apply/serialize/reset
 // =============================================================================
 
 class ConfigTest : public ::testing::Test {
 protected:
-    U8g2DisplayModule display; ///< Fresh module instance for each test
+    U8G2DisplayModule display; ///< Fresh module instance for each test
 };
 
 /** getConfigNamespace must return "display". */
@@ -34,9 +34,9 @@ TEST_F(ConfigTest, GetConfigNamespace_ReturnsDisplay) {
     EXPECT_STREQ("display", display.getConfigNamespace());
 }
 
-/** getSchemaVersion must return 1. */
-TEST_F(ConfigTest, GetSchemaVersion_ReturnsOne) {
-    EXPECT_EQ(1, display.getSchemaVersion());
+/** getSchemaVersion must return 2. */
+TEST_F(ConfigTest, GetSchemaVersion_ReturnsTwo) {
+    EXPECT_EQ(2, display.getSchemaVersion());
 }
 
 /** applyConfig with valid JSON section must not crash. */
@@ -124,7 +124,7 @@ TEST_F(ConfigTest, Roundtrip_SerializeApplySerialize_Consistent) {
 
 class ConfigSettersTest : public ::testing::Test {
 protected:
-    U8g2DisplayModule display; ///< Fresh module instance for each test
+    U8G2DisplayModule display; ///< Fresh module instance for each test
 };
 
 /** setBrightness must not crash. */

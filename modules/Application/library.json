@@ -1,0 +1,13 @@
+{
+  "name": "Application",
+  "version": "0.1.0",
+  "description": "Application composition root for the ESP32 App Foundation framework",
+  "keywords": ["esp32", "framework", "application"],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/matthewmcneill/esp32-app-foundation"
+  },
+  "build": {
+    "flags": ["-I../../include"]
+  }
+}

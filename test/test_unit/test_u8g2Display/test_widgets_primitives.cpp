@@ -8,7 +8,7 @@
  *
  * Module: test/test_unit/test_u8g2Display/test_widgets_primitives.cpp
  * Description: GoogleTest unit-test suite for the widget primitives layer:
- *              iGfxWidget, iBoardLayout, TextAlign, and AppFonts. Validates
+ *              IGfxWidget, IBoardLayout, TextAlign, and AppFonts. Validates
  *              construction, visibility, geometry, and enum value contracts.
  *              All tests execute on the native GoogleTest runner (NATIVE_BUILD).
  *
@@ -17,41 +17,41 @@
  */
 
 #include <gtest/gtest.h>
-#include "widgets/iGfxWidget.hpp"
-#include "widgets/drawingPrimitives.hpp"
-#include "boards/interfaces/iBoardLayout.hpp"
-#include "fonts/fonts.hpp"
+#include "widgets/IGfxWidget.hpp"
+#include "widgets/DrawingPrimitives.hpp"
+#include "boards/interfaces/IBoardLayout.hpp"
+#include "fonts/Fonts.hpp"
 
 // =============================================================================
 // Concrete test stubs — minimal implementations of abstract interfaces
 // =============================================================================
 
 /**
- * @brief Minimal concrete widget for testing iGfxWidget's non-virtual API.
+ * @brief Minimal concrete widget for testing IGfxWidget's non-virtual API.
  *        tick() and render() are trivial no-ops.
  */
-class TestWidget : public iGfxWidget {
+class TestWidget : public IGfxWidget {
 public:
-    using iGfxWidget::iGfxWidget; // Inherit constructors
+    using IGfxWidget::IGfxWidget; // Inherit constructors
 
     void tick(uint32_t /*currentMillis*/) override {}
     void render(U8G2& /*display*/) override {}
 };
 
 /**
- * @brief Minimal concrete layout for testing iBoardLayout's non-virtual API.
+ * @brief Minimal concrete layout for testing IBoardLayout's non-virtual API.
  *        tick() and render() are trivial no-ops.
  */
-class TestLayout : public iBoardLayout {
+class TestLayout : public IBoardLayout {
 public:
-    using iBoardLayout::iBoardLayout; // Inherit constructors
+    using IBoardLayout::IBoardLayout; // Inherit constructors
 
     void tick(uint32_t /*currentMillis*/) override {}
     void render(U8G2& /*display*/) override {}
 };
 
 // =============================================================================
-// Test Group: iGfxWidget
+// Test Group: IGfxWidget
 // =============================================================================
 
 class IGfxWidgetTest : public ::testing::Test {
@@ -116,7 +116,7 @@ TEST_F(IGfxWidgetTest, RenderAnimationUpdate_DefaultNoOp_DoesNotCrash) {
 }
 
 // =============================================================================
-// Test Group: iBoardLayout
+// Test Group: IBoardLayout
 // =============================================================================
 
 class IBoardLayoutTest : public ::testing::Test {
@@ -140,19 +140,19 @@ TEST_F(IBoardLayoutTest, RenderAnimationUpdate_DefaultNoOp_DoesNotCrash) {
 // Test Group: TextAlign Enum
 // =============================================================================
 
-/** TextAlign::LEFT must equal 0. */
+/** TextAlign::Left must equal 0. */
 TEST(TextAlignTest, LEFT_EqualsZero) {
-    EXPECT_EQ(static_cast<int>(TextAlign::LEFT), 0);
+    EXPECT_EQ(static_cast<int>(TextAlign::Left), 0);
 }
 
-/** TextAlign::CENTER must equal 1. */
+/** TextAlign::Center must equal 1. */
 TEST(TextAlignTest, CENTER_EqualsOne) {
-    EXPECT_EQ(static_cast<int>(TextAlign::CENTER), 1);
+    EXPECT_EQ(static_cast<int>(TextAlign::Center), 1);
 }
 
-/** TextAlign::RIGHT must equal 2. */
+/** TextAlign::Right must equal 2. */
 TEST(TextAlignTest, RIGHT_EqualsTwo) {
-    EXPECT_EQ(static_cast<int>(TextAlign::RIGHT), 2);
+    EXPECT_EQ(static_cast<int>(TextAlign::Right), 2);
 }
 
 // =============================================================================

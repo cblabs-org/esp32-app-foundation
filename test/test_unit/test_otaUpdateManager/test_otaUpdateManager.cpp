@@ -4,27 +4,27 @@
  * https://github.com/matthewmcneill/esp32-app-foundation
  *
  * Module: test/test_unit/test_otaUpdateManager/test_otaUpdateManager.cpp
- * Description: Native unit tests for the otaUpdateManager OTA orchestrator.
+ * Description: Native unit tests for the OTAUpdateManager OTA orchestrator.
  *              Tests the new state machine, guard logic, and legacy API on
  *              the native (non-FreeRTOS) platform.
  */
 
 #include <gtest/gtest.h>
 
-// Include the real Application header (Application now owns otaUpdateManager)
+// Include the real Application header (Application now owns OTAUpdateManager)
 #ifdef NATIVE_BUILD
-#include "../../../modules/application/Application.hpp"
+#include "../../../modules/Application/Application.hpp"
 #endif
 
-#include "../../../modules/otaUpdateManager/otaUpdateManager.hpp"
+#include "../../../modules/OTAUpdateManager/OTAUpdateManager.hpp"
 
 #ifdef NATIVE_BUILD
-#include "../../../modules/webServer/webServer.hpp"
+#include "../../../modules/WebServer/WebServerManager.hpp"
 #endif
 
 class OtaUpdateManagerTest : public ::testing::Test {
 protected:
-    otaUpdateManager manager;
+    OTAUpdateManager manager;
 };
 
 // ---------------------------------------------------------------------------
@@ -33,7 +33,7 @@ protected:
 
 /// Verify the initial state is Idle.
 TEST_F(OtaUpdateManagerTest, DefaultState_IsIdle) {
-    EXPECT_EQ(OtaState::Idle, manager.getState());
+    EXPECT_EQ(OTAState::Idle, manager.getState());
 }
 
 /// checkForUpdate() must return false if begin() was never called.
@@ -44,7 +44,7 @@ TEST_F(OtaUpdateManagerTest, CheckForUpdate_WithoutBegin_ReturnsFalse) {
 /// performUpdate() without begin() should set state to Error on native.
 TEST_F(OtaUpdateManagerTest, PerformUpdate_WithoutBegin_SetsError) {
     manager.performUpdate();
-    EXPECT_EQ(OtaState::Error, manager.getState());
+    EXPECT_EQ(OTAState::Error, manager.getState());
 }
 
 /// getLastOtaError() should return nullptr initially.
@@ -57,7 +57,7 @@ TEST_F(OtaUpdateManagerTest, PerformUpdate_OnNative_SetsError) {
     Application app;
     manager.begin(app);
     manager.performUpdate();
-    EXPECT_EQ(OtaState::Error, manager.getState());
+    EXPECT_EQ(OTAState::Error, manager.getState());
     EXPECT_NE(nullptr, manager.getLastOtaError());
 }
 
@@ -67,7 +67,7 @@ TEST_F(OtaUpdateManagerTest, CheckForUpdate_NoRepo_ReturnsFalse) {
     manager.begin(app);
     EXPECT_FALSE(manager.checkForUpdate());
     // State should return to Idle (not stuck in Checking)
-    EXPECT_EQ(OtaState::Idle, manager.getState());
+    EXPECT_EQ(OTAState::Idle, manager.getState());
 }
 
 // ---------------------------------------------------------------------------
@@ -124,10 +124,10 @@ TEST_F(OtaUpdateManagerTest, RegisterRoutes_NoCrash) {
     SUCCEED();
 }
 
-/// A locally-constructed otaUpdateManager instance starts in Idle state.
+/// A locally-constructed OTAUpdateManager instance starts in Idle state.
 TEST_F(OtaUpdateManagerTest, LocalInstance_StartsIdle) {
-    otaUpdateManager localManager;
-    EXPECT_EQ(OtaState::Idle, localManager.getState());
+    OTAUpdateManager localManager;
+    EXPECT_EQ(OTAState::Idle, localManager.getState());
 }
 
 #if defined(NATIVE_BUILD)

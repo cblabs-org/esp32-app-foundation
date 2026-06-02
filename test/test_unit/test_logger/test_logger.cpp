@@ -1,5 +1,5 @@
 #include <gtest/gtest.h>
-#include "logger.hpp"
+#include "Logger.hpp"
 #include <string>
 
 class LoggerTest : public ::testing::Test {

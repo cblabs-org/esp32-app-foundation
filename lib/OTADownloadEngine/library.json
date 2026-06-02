@@ -1,0 +1,6 @@
+{
+    "name": "OTADownloadEngine",
+    "version": "0.1.0",
+    "description": "OTA firmware download engine with cryptographic verification",
+    "dependencies": {}
+}

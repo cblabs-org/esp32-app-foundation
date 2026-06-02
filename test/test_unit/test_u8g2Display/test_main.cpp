@@ -11,7 +11,7 @@
  *              All test fixtures are defined in dedicated files:
  *              - test_carousel.cpp:             Carousel engine and board pool tests
  *              - test_status_reporter.cpp:      IStatusReporter delegation tests
- *              - test_config.cpp:               iConfigurable load/save/reset tests
+ *              - test_config.cpp:               IConfigurable load/save/reset tests
  *              - test_eventbus_integration.cpp:  EventBus subscription integration
  *              - test_boards.cpp:               System board unit tests
  *              - test_widgets_primitives.cpp:   Widget primitives layer tests

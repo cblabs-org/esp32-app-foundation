@@ -1,7 +1,7 @@
 #include "AppFoundation.h"
 #include <Arduino.h>
 #include <unity.h>
-#include "wifiManager.hpp"
+#include "WifiManager.hpp"
 #include <LittleFS.h>
 
 WifiManager* wifiMgr;

@@ -20,17 +20,17 @@
  */
 
 #include <gtest/gtest.h>
-#include "configManager.hpp"
+#include "ConfigManager.hpp"
 #include <fstream>
 #include <cstdio>
 #include <string>
 
 // =============================================================================
-// Mock iConfigurable Implementations
+// Mock IConfigurable Implementations
 // =============================================================================
 
 /** @brief Basic mock configurable with namespace "testmod" and schema v1. */
-class MockModule : public iConfigurable {
+class MockModule : public IConfigurable {
 public:
     bool applyConfigCalled = false;
     mutable bool serializeConfigCalled = false;
@@ -64,7 +64,7 @@ public:
 };
 
 /** @brief Mock module with a different namespace for multi-module tests. */
-class MockModuleB : public iConfigurable {
+class MockModuleB : public IConfigurable {
 public:
     bool applyConfigCalled = false;
     bool resetConfigCalled = false;
@@ -90,7 +90,7 @@ public:
 };
 
 /** @brief Mock with schema version 2 that can migrate from v1. */
-class MockModuleV2 : public iConfigurable {
+class MockModuleV2 : public IConfigurable {
 public:
     bool migrateCalled = false;
     int lastFromVersion = -1;
@@ -386,16 +386,16 @@ TEST_F(ConfigManagerTest, ImportAllConfig_MissingNamespace_Skipped) {
 // Test Group 7: IWebContributor
 // =============================================================================
 
-TEST_F(ConfigManagerTest, GetTabName_ReturnsConfig) {
-    EXPECT_STREQ("Config", configManager.getTabName());
+TEST_F(ConfigManagerTest, GetTabName_ReturnsBackup) {
+    EXPECT_STREQ("Backup", configManager.getTabName());
 }
 
 TEST_F(ConfigManagerTest, GetParentTab_ReturnsSystem) {
     EXPECT_STREQ("System", configManager.getParentTab());
 }
 
-TEST_F(ConfigManagerTest, GetTabOrder_Returns25) {
-    EXPECT_EQ(25, configManager.getTabOrder());
+TEST_F(ConfigManagerTest, GetTabOrder_Returns40) {
+    EXPECT_EQ(40, configManager.getTabOrder());
 }
 
 // =============================================================================

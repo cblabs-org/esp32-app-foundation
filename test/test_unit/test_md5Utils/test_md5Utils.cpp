@@ -1,13 +1,13 @@
 #include <gtest/gtest.h>
-#include "md5Utils.hpp"
+#include "MD5Utils.hpp"
 
 class Md5UtilsTest : public ::testing::Test {
 protected:
-    Md5Utils md5;
+    MD5Utils md5;
 };
 
 TEST_F(Md5UtilsTest, Construction) {
-    Md5Utils utils;
+    MD5Utils utils;
 }
 
 TEST_F(Md5UtilsTest, Base64ToHexKnownVector) {

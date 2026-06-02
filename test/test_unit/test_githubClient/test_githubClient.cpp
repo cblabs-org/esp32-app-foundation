@@ -1,5 +1,5 @@
 #include <gtest/gtest.h>
-#include "githubClient.hpp"
+#include "GithubClient.hpp"
 
 class GithubClientTest : public ::testing::Test {
 };

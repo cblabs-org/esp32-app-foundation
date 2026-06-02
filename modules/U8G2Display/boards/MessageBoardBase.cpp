@@ -1,0 +1,71 @@
+/*
+ * ESP32 App Foundation (c) 2026 CB Labs
+ *
+ * https://github.com/matthewmcneill/esp32-app-foundation
+ *
+ * This work is licensed under Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International.
+ * To view a copy of this license, visit https://creativecommons.org/licenses/by-nc-sa/4.0/
+ *
+ * Module: modules/U8G2Display/boards/messageBoardBase.cpp
+ * Description: Implementation of the shared message board base class.
+ *              Provides dismiss(), render(), isExpired(), and resetDismissed()
+ *              methods that ErrorBoard and WiFiWizardBoard inherit.
+ *
+ * Exported Functions:
+ * - MessageBoardBase::dismiss():        Set the dismissed flag
+ * - MessageBoardBase::render():         Delegate to SystemMessageWidget
+ * - MessageBoardBase::isExpired():      Return dismissed state
+ * - MessageBoardBase::resetDismissed(): Clear the dismissed flag
+ */
+
+#include "MessageBoardBase.hpp"
+
+#ifndef NATIVE_BUILD
+#include <U8g2lib.h>
+#endif
+
+// =============================================================================
+// Public API
+// =============================================================================
+
+/**
+ * @brief Mark the board as dismissed. isExpired() will return true.
+ */
+void MessageBoardBase::dismiss() {
+    _dismissed = true;
+}
+
+/**
+ * @brief Render the message screen into the U8G2 display buffer.
+ *
+ * Delegates to the composed SystemMessageWidget which draws the configured
+ * title and message lines centred on screen.
+ *
+ * @param u8g2 Reference to the active U8G2 driver instance.
+ */
+void MessageBoardBase::render(U8G2& u8g2) {
+#ifndef NATIVE_BUILD
+    _msgWidget.render(u8g2);
+#else
+    (void)u8g2; // Suppress unused parameter warning in native builds
+#endif
+}
+
+/**
+ * @brief Check whether the board has been dismissed.
+ * @return true when dismiss() has been called.
+ */
+bool MessageBoardBase::isExpired() const {
+    return _dismissed;
+}
+
+// =============================================================================
+// Protected API
+// =============================================================================
+
+/**
+ * @brief Reset the dismissed flag. Called by subclasses when new content is set.
+ */
+void MessageBoardBase::resetDismissed() {
+    _dismissed = false;
+}

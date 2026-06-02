@@ -28,9 +28,9 @@
 #include <gtest/gtest.h>
 #include <cstdio>
 #include "Application.hpp"
-#include "otaUpdateManager.hpp"
-#include "interfaces/IMcpContributor.hpp"
-#include "mcpToolRegistry.hpp"
+#include "OTAUpdateManager.hpp"
+#include "interfaces/IMCPContributor.hpp"
+#include "MCPToolRegistry.hpp"
 #include "events/AppConfiguringPayload.hpp"
 
 // =============================================================================
@@ -48,12 +48,12 @@ public:
 };
 
 /**
- * @brief Minimal iConfigurable mock implementing the new 6-method interface.
+ * @brief Minimal IConfigurable mock implementing the new 6-method interface.
  *
  * Provides namespace "mock", schema version 1, and tracks applyConfig/
  * serializeConfig/resetConfig invocations.
  */
-class MockConfigurable : public iConfigurable {
+class MockConfigurable : public IConfigurable {
 public:
     bool applyConfigCalled = false;     ///< Set true when applyConfig() is invoked
     mutable bool serializeConfigCalled = false; ///< Set true when serializeConfig() is invoked
@@ -80,13 +80,13 @@ public:
     }
 };
 
-/** @brief Minimal iDataSource mock — scheduling metadata returns fixed values. */
-class MockDataSource : public iDataSource {
+/** @brief Minimal IDataSource mock — scheduling metadata returns fixed values. */
+class MockDataSource : public IDataSource {
 public:
-    UpdateStatus fetchUpdate() override               { return UpdateStatus::SUCCESS; }
+    UpdateStatus fetchUpdate() override               { return UpdateStatus::Success; }
     uint32_t     getUpdateIntervalMs() const override { return 60000; } // 60 s
     const char*  getSourceName()       const override { return "MockDataSource"; }
-    PriorityTier getPriorityTier()     const override { return PriorityTier::PRIORITY_NORMAL; }
+    PriorityTier getPriorityTier()     const override { return PriorityTier::Normal; }
 };
 
 /** @brief Minimal IStatusReporter mock. */
@@ -106,12 +106,12 @@ public:
     void registerRoutes(AsyncWebServer& /*server*/) override {}
 };
 
-/** @brief Minimal IMcpContributor mock that registers a named test tool. */
-class MockMcpContributor : public IMcpContributor {
+/** @brief Minimal IMCPContributor mock that registers a named test tool. */
+class MockMcpContributor : public IMCPContributor {
 public:
     bool registered = false; ///< Set true when registerMcpTools() is invoked
 
-    void registerMcpTools(McpToolRegistry& registry) override {
+    void registerMcpTools(MCPToolRegistry& registry) override {
         registered = true;
         registry.addTool(
             "mock_mcp_tool",
@@ -277,7 +277,7 @@ TEST_F(ApplicationLockTest, PostLock_RegisterMcpContributor_ReturnsFalse) {
 
 /**
  * A MockMcpContributor registered before begin() must have its tool
- * visible in the McpServer's registry after begin() completes.
+ * visible in the MCPServer's registry after begin() completes.
  */
 TEST_F(ApplicationLockTest, McpContributor_ToolVisibleAfterBegin) {
     MockMcpContributor contributor;
@@ -351,7 +351,7 @@ protected:
  * This is the safe default for any code that queries state before begin().
  */
 TEST_F(ApplicationStateTest, InitialState_IsBoot) {
-    EXPECT_EQ(app.getState(), AppState::BOOT);
+    EXPECT_EQ(app.getState(), AppState::Boot);
 }
 
 /**
@@ -363,7 +363,7 @@ TEST_F(ApplicationStateTest, InitialState_IsBoot) {
 TEST_F(ApplicationStateTest, AfterBegin_StateIsConfiguring) {
     FrameworkConfig cfg;
     app.begin(cfg);
-    EXPECT_EQ(app.getState(), AppState::CONFIGURING);
+    EXPECT_EQ(app.getState(), AppState::Configuring);
 }
 
 /**
@@ -414,7 +414,7 @@ protected:
 
 /**
  * begin() must trigger ConfigManager::beginAll() which calls applyConfig()
- * on all registered iConfigurable modules. In NATIVE_BUILD, with no config
+ * on all registered IConfigurable modules. In NATIVE_BUILD, with no config
  * files on disk, modules get resetConfig() + applyConfig() via defaults.
  */
 TEST_F(ApplicationBeginTest, Begin_CallsApplyConfigOnRegisteredModules) {
@@ -550,7 +550,7 @@ TEST_F(ApplicationDomainServiceTest, AfterBegin_WifiManagerRegisteredWithConfigM
     // In NATIVE_BUILD, WiFi gate cannot be satisfied (no hardware), so
     // the app enters CONFIGURING rather than RUNNING. This validates that
     // the WiFi module was registered and the gate system is working.
-    EXPECT_EQ(app.getState(), AppState::CONFIGURING);
+    EXPECT_EQ(app.getState(), AppState::Configuring);
 
     // Cleanup
     remove("mod_wifi.json");
@@ -647,7 +647,7 @@ TEST_F(GateDependencyOrderingTest, GateWithUnmetDep_IsSkipped) {
     app.begin(cfg);
 
     // App should be in CONFIGURING — Timezone and API are unsatisfied
-    EXPECT_EQ(app.getState(), AppState::CONFIGURING);
+    EXPECT_EQ(app.getState(), AppState::Configuring);
 
     // Subscribe AFTER begin() to capture the next event
     app.getEventBus().subscribe("app.configuring", &GateDependencyOrderingTest::onConfiguring, this);
@@ -659,7 +659,7 @@ TEST_F(GateDependencyOrderingTest, GateWithUnmetDep_IsSkipped) {
     // API Keys depends on Timezone (now satisfied) → API becomes actionable
     // But all gates are not satisfied yet, so state stays CONFIGURING
     app.tick();
-    EXPECT_EQ(app.getState(), AppState::CONFIGURING);
+    EXPECT_EQ(app.getState(), AppState::Configuring);
 }
 
 /**
@@ -684,7 +684,7 @@ TEST_F(GateDependencyOrderingTest, GateWithSatisfiedDeps_IsActionable) {
     app.begin(cfg);
 
     // App should be CONFIGURING — tzGate is unsatisfied
-    EXPECT_EQ(app.getState(), AppState::CONFIGURING);
+    EXPECT_EQ(app.getState(), AppState::Configuring);
 
     // WiFi is already satisfied, so Timezone's dep is met.
     // Satisfy tzGate to move to RUNNING, confirming it was actionable.
@@ -723,7 +723,7 @@ TEST_F(GateDependencyOrderingTest, GateWithNoDeps_IsAlwaysActionable) {
     app.begin(cfg);
 
     // App is CONFIGURING because noDepsGate is unsatisfied
-    EXPECT_EQ(app.getState(), AppState::CONFIGURING);
+    EXPECT_EQ(app.getState(), AppState::Configuring);
 
     // Satisfy it → should allow progress (gate has no deps blocking it)
     noDepsGate.setSatisfied(true);
@@ -763,7 +763,7 @@ TEST_F(GateDependencyOrderingTest, ChainedDeps_ResolveCorrectly) {
     app.begin(cfg);
 
     // All three user gates unsatisfied → CONFIGURING
-    EXPECT_EQ(app.getState(), AppState::CONFIGURING);
+    EXPECT_EQ(app.getState(), AppState::Configuring);
 
     // Subscribe AFTER begin() for EventBus capture
     app.getEventBus().subscribe("app.configuring", &GateDependencyOrderingTest::onConfiguring, this);
@@ -786,12 +786,12 @@ TEST_F(GateDependencyOrderingTest, ChainedDeps_ResolveCorrectly) {
     // B's dep (A) is now satisfied → B is actionable
     // C's dep (B) is still unsatisfied → C is blocked
     app.tick();
-    EXPECT_EQ(app.getState(), AppState::CONFIGURING);
+    EXPECT_EQ(app.getState(), AppState::Configuring);
 
     // Satisfy B → C should become actionable
     gateB.setSatisfied(true);
     app.tick();
-    EXPECT_EQ(app.getState(), AppState::CONFIGURING); // C and built-in WifiGate still unsatisfied
+    EXPECT_EQ(app.getState(), AppState::Configuring); // C and built-in WifiGate still unsatisfied
 
     // Satisfy C → all user gates satisfied
     gateC.setSatisfied(true);

@@ -8,8 +8,8 @@
  *
  * Module: test/test_unit/test_u8g2Display/test_eventbus_integration.cpp
  * Description: GoogleTest unit-test suite for EventBus payload structs and
- *              the U8g2DisplayModule's EventBus integration. Validates the
- *              OtaProgressPayload and DisplayMessagePayload struct fields,
+ *              the U8G2DisplayModule's EventBus integration. Validates the
+ *              OTAProgressPayload and DisplayMessagePayload struct fields,
  *              and tests EventBus publish → callback → board state delegation.
  *
  * Exported Functions:
@@ -17,7 +17,7 @@
  */
 
 #include <gtest/gtest.h>
-#include "u8g2DisplayModule.hpp"
+#include "U8G2DisplayModule.hpp"
 #include "EventBus.hpp"
 
 // =============================================================================
@@ -26,9 +26,9 @@
 
 class PayloadStructTest : public ::testing::Test {};
 
-/** OtaProgressPayload must have expected field sizes/layout. */
+/** OTAProgressPayload must have expected field sizes/layout. */
 TEST_F(PayloadStructTest, OtaProgressPayload_HasExpectedFields) {
-    OtaProgressPayload payload;
+    OTAProgressPayload payload;
     payload.progress = 0.5f;
     payload.status = "Downloading...";
     payload.complete = false;
@@ -40,9 +40,9 @@ TEST_F(PayloadStructTest, OtaProgressPayload_HasExpectedFields) {
     EXPECT_FALSE(payload.success);
 }
 
-/** OtaProgressPayload complete + success state. */
+/** OTAProgressPayload complete + success state. */
 TEST_F(PayloadStructTest, OtaProgressPayload_CompleteSuccess) {
-    OtaProgressPayload payload;
+    OTAProgressPayload payload;
     payload.progress = 1.0f;
     payload.status = "Done";
     payload.complete = true;
@@ -53,9 +53,9 @@ TEST_F(PayloadStructTest, OtaProgressPayload_CompleteSuccess) {
     EXPECT_TRUE(payload.success);
 }
 
-/** OtaProgressPayload complete + failure state. */
+/** OTAProgressPayload complete + failure state. */
 TEST_F(PayloadStructTest, OtaProgressPayload_CompleteFailure) {
-    OtaProgressPayload payload;
+    OTAProgressPayload payload;
     payload.progress = 0.3f;
     payload.status = "Error: timeout";
     payload.complete = true;
@@ -93,7 +93,7 @@ TEST_F(PayloadStructTest, DisplayMessagePayload_ZeroDuration) {
 class EventBusIntegrationTest : public ::testing::Test {
 protected:
     EventBus bus;                ///< Standalone EventBus instance for testing
-    U8g2DisplayModule display;   ///< Display module under test
+    U8G2DisplayModule display;   ///< Display module under test
 
     void SetUp() override {
         bus.begin();
@@ -102,7 +102,7 @@ protected:
 
 /**
  * @brief Manually subscribe the display callbacks to EventBus and verify
- *        that publishing an OTA progress event delegates to OtaProgressBoard.
+ *        that publishing an OTA progress event delegates to OTAProgressBoard.
  *
  * NOTE: We cannot call begin(Application&) in native tests because
  * Application pulls in Arduino.h transitively. Instead, we test the
@@ -115,10 +115,10 @@ TEST_F(EventBusIntegrationTest, OtaProgress_Publish_DelegatesToBoard) {
     bus.subscribe("ota.progress",
         [](const char* topic, const void* payload, void* ctx) {
             // Simulate what _onOtaProgress does
-            auto* self = static_cast<U8g2DisplayModule*>(ctx);
+            auto* self = static_cast<U8G2DisplayModule*>(ctx);
             if (payload == nullptr || self == nullptr) return;
 
-            const auto* ota = static_cast<const OtaProgressPayload*>(payload);
+            const auto* ota = static_cast<const OTAProgressPayload*>(payload);
             if (ota->complete) {
                 self->getOtaProgress().setComplete(ota->success);
             } else {
@@ -129,7 +129,7 @@ TEST_F(EventBusIntegrationTest, OtaProgress_Publish_DelegatesToBoard) {
         &display);
 
     // Publish an OTA progress event
-    OtaProgressPayload payload;
+    OTAProgressPayload payload;
     payload.progress = 0.6f;
     payload.status = "Downloading firmware...";
     payload.complete = false;
@@ -146,9 +146,9 @@ TEST_F(EventBusIntegrationTest, OtaProgress_Publish_DelegatesToBoard) {
 TEST_F(EventBusIntegrationTest, OtaProgress_Complete_Success_BoardExpires) {
     bus.subscribe("ota.progress",
         [](const char* topic, const void* payload, void* ctx) {
-            auto* self = static_cast<U8g2DisplayModule*>(ctx);
+            auto* self = static_cast<U8G2DisplayModule*>(ctx);
             if (payload == nullptr || self == nullptr) return;
-            const auto* ota = static_cast<const OtaProgressPayload*>(payload);
+            const auto* ota = static_cast<const OTAProgressPayload*>(payload);
             if (ota->complete) {
                 self->getOtaProgress().setComplete(ota->success);
             } else {
@@ -158,7 +158,7 @@ TEST_F(EventBusIntegrationTest, OtaProgress_Complete_Success_BoardExpires) {
         },
         &display);
 
-    OtaProgressPayload payload;
+    OTAProgressPayload payload;
     payload.progress = 1.0f;
     payload.status = "Complete";
     payload.complete = true;
@@ -172,7 +172,7 @@ TEST_F(EventBusIntegrationTest, OtaProgress_Complete_Success_BoardExpires) {
 TEST_F(EventBusIntegrationTest, DisplayMessage_Publish_ShowsMessage) {
     bus.subscribe("display.message",
         [](const char* topic, const void* payload, void* ctx) {
-            auto* self = static_cast<U8g2DisplayModule*>(ctx);
+            auto* self = static_cast<U8G2DisplayModule*>(ctx);
             if (payload == nullptr || self == nullptr) return;
             const auto* msg = static_cast<const DisplayMessagePayload*>(payload);
             self->getBootBoard().setStatus(msg->message, -1.0f);
@@ -193,7 +193,7 @@ TEST_F(EventBusIntegrationTest, DisplayMessage_Publish_ShowsMessage) {
 
 /** EventBus with no subscribers must return 0 delivered. */
 TEST_F(EventBusIntegrationTest, Publish_NoSubscribers_ReturnsZero) {
-    OtaProgressPayload payload;
+    OTAProgressPayload payload;
     payload.progress = 0.1f;
     payload.status = "Test";
     payload.complete = false;

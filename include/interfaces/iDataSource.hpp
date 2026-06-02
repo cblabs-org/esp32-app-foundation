@@ -6,19 +6,19 @@
  * This work is licensed under Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International.
  * To view a copy of this license, visit https://creativecommons.org/licenses/by-nc-sa/4.0/
  *
- * Module: include/interfaces/iDataSource.hpp
+ * Module: include/interfaces/IDataSource.hpp
  * Description: Pure interface for background data-fetch workers scheduled
  *              by the DataManager. Defines the UpdateStatus result enum and
  *              the PriorityTier scheduling tier enum.
  *
  * Exported Enums:
  * - UpdateStatus: Result code returned by fetchUpdate()
- *   - SUCCESS, NO_CHANGE, RATE_LIMITED, FETCH_ERROR, PARSE_ERROR, AUTH_ERROR
+ *   - Success, NoChange, RateLimited, FetchError, ParseError, AuthError
  * - PriorityTier: Scheduling priority tier for DataManager
- *   - HIGH (every ~1 min), MEDIUM (every ~5 min), LOW (every ~30 min)
+ *   - High (every ~1 min), Normal (every ~5 min), Low (every ~30 min)
  *
  * Exported Classes:
- * - iDataSource: Abstract base for any module that provides periodic data
+ * - IDataSource: Abstract base for any module that provides periodic data
  *   - fetchUpdate(): Execute one data-fetch cycle; returns UpdateStatus
  *   - getUpdateIntervalMs(): Report the desired polling interval in milliseconds
  *   - getSourceName(): Human-readable identifier used in logs and EventBus topics
@@ -28,21 +28,21 @@
 #pragma once
 #include <stdint.h>
 
-/** @brief Result codes for a single iDataSource::fetchUpdate() execution. */
+/** @brief Result codes for a single IDataSource::fetchUpdate() execution. */
 enum class UpdateStatus : uint8_t {
-    SUCCESS      = 0, ///< Data fetched and parsed successfully
-    NO_CHANGE    = 1, ///< Server returned 304 or data is unchanged
-    RATE_LIMITED = 2, ///< Server returned 429 or local back-off triggered
-    FETCH_ERROR  = 3, ///< Network or TLS connection failure
-    PARSE_ERROR  = 4, ///< Response received but JSON/payload parsing failed
-    AUTH_ERROR   = 5  ///< API key rejected or credentials missing
+    Success      = 0, ///< Data fetched and parsed successfully
+    NoChange     = 1, ///< Server returned 304 or data is unchanged
+    RateLimited  = 2, ///< Server returned 429 or local back-off triggered
+    FetchError   = 3, ///< Network or TLS connection failure
+    ParseError   = 4, ///< Response received but JSON/payload parsing failed
+    AuthError    = 5  ///< API key rejected or credentials missing
 };
 
 /** @brief Scheduling priority tier for DataManager worker scheduling. */
 enum class PriorityTier : uint8_t {
-    PRIORITY_HIGH   = 0, ///< Refresh approximately every 60 seconds
-    PRIORITY_NORMAL = 1, ///< Refresh approximately every 300 seconds (5 mins)
-    PRIORITY_LOW    = 2  ///< Refresh approximately every 1800 seconds (30 mins)utes
+    High   = 0, ///< Refresh approximately every 60 seconds
+    Normal = 1, ///< Refresh approximately every 300 seconds (5 mins)
+    Low    = 2  ///< Refresh approximately every 1800 seconds (30 mins)
 };
 
 /**
@@ -52,9 +52,9 @@ enum class PriorityTier : uint8_t {
  * invokes fetchUpdate() at the interval requested by getUpdateIntervalMs()
  * from within a dedicated FreeRTOS task.
  */
-class iDataSource {
+class IDataSource {
 public:
-    virtual ~iDataSource() = default;
+    virtual ~IDataSource() = default;
 
     /**
      * @brief Execute one full data-fetch cycle.

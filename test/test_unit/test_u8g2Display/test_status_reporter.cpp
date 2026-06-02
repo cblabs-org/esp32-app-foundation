@@ -7,7 +7,7 @@
  * To view a copy of this license, visit https://creativecommons.org/licenses/by-nc-sa/4.0/
  *
  * Module: test/test_unit/test_u8g2Display/test_status_reporter.cpp
- * Description: GoogleTest unit-test suite for the U8g2DisplayModule's
+ * Description: GoogleTest unit-test suite for the U8G2DisplayModule's
  *              IStatusReporter implementation. Validates that reportStatus()
  *              delegates to BootBoard, reportError() delegates to ErrorBoard,
  *              and clearStatus() marks BootBoard as complete.
@@ -17,7 +17,7 @@
  */
 
 #include <gtest/gtest.h>
-#include "u8g2DisplayModule.hpp"
+#include "U8G2DisplayModule.hpp"
 
 // =============================================================================
 // Test Group: IStatusReporter delegation
@@ -25,7 +25,7 @@
 
 class StatusReporterTest : public ::testing::Test {
 protected:
-    U8g2DisplayModule display; ///< Fresh module instance for each test
+    U8G2DisplayModule display; ///< Fresh module instance for each test
 };
 
 /** reportStatus must not crash and must delegate to BootBoard. */

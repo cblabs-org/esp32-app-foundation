@@ -9,7 +9,7 @@
  * Module: src/main.cpp
  * Description: Framework entry point. Owns setup() and loop() per the
  *              Hollywood Principle — application code never writes these.
- *              Declares the static Application instance and U8g2DisplayModule,
+ *              Declares the static Application instance and U8G2DisplayModule,
  *              configures the FrameworkConfig, and delegates all lifecycle
  *              control to the hub.
  *
@@ -33,8 +33,8 @@
 // ---------------------------------------------------------------------------
 #ifndef NATIVE_BUILD
     #include <Arduino.h>
-    #include "u8g2DisplayModule.hpp"
-    #include "boards/diagnosticsBoard.hpp"
+    #include "U8G2DisplayModule.hpp"
+    #include "boards/DiagnosticsBoard.hpp"
 #endif
 
 // ---------------------------------------------------------------------------
@@ -46,7 +46,7 @@
 static Application app; ///< Single framework hub instance
 
 #ifndef NATIVE_BUILD
-static U8g2DisplayModule display; ///< Display module with carousel engine
+static U8G2DisplayModule display; ///< Display module with carousel engine
 static DiagnosticsBoard diagnosticsBoard(256, 64); ///< System telemetry carousel board
 #endif
 

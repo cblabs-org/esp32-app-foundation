@@ -17,11 +17,11 @@
  * - FrameworkConfig:   Boot-phase configuration struct
  * - AppState:          Lifecycle phase enum (BOOTING → RUNNING)
  * - ITickable:         Interface — periodic tick contract
- * - iConfigurable:     Interface — LittleFS config load/save contract
- * - iDataSource:       Interface — background data fetch contract
+ * - IConfigurable:     Interface — LittleFS config load/save contract
+ * - IDataSource:       Interface — background data fetch contract
  * - IStatusReporter:   Interface — display status overlay contract
  * - IWebContributor:   Interface — REST route registration contract
- * - IMcpContributor:   Interface — MCP tool registration contract
+ * - IMCPContributor:   Interface — MCP tool registration contract
  * - IDisplayBoard:     Interface — U8G2 carousel board render contract
  * - UpdateStatus:      Enum — data fetch result codes
  * - PriorityTier:      Enum — DataManager scheduling tier
@@ -35,13 +35,13 @@
 
 // Interface contracts
 #include "interfaces/ITickable.hpp"
-#include "interfaces/iConfigurable.hpp"
-#include "interfaces/iDataSource.hpp"
+#include "interfaces/IConfigurable.hpp"
+#include "interfaces/IDataSource.hpp"
 #include "interfaces/IStatusReporter.hpp"
 #include "interfaces/IWebContributor.hpp"
-#include "interfaces/IMcpContributor.hpp"
+#include "interfaces/IMCPContributor.hpp"
 #include "interfaces/IDisplayBoard.hpp"
 
 // Application hub
-#include "../modules/application/Application.hpp"
-#include "../modules/timeManager/timeManager.hpp"
+#include "../modules/Application/Application.hpp"
+#include "../modules/TimeManager/TimeManager.hpp"

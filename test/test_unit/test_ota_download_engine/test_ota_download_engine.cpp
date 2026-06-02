@@ -7,14 +7,14 @@
  * To view a copy of this license, visit https://creativecommons.org/licenses/by-nc-sa/4.0/
  *
  * Module: test/test_unit/test_ota_download_engine/test_ota_download_engine.cpp
- * Description: Native unit tests for the OtaDownloadEngine class and OtaError
+ * Description: Native unit tests for the OTADownloadEngine class and OTAError
  *              utilities. Validates the interface contract: default state,
  *              setter safety, error string coverage, and native stub return
  *              values. Uses a lightweight MockVerifier for verifier injection
  *              tests without crypto dependencies.
  *
  * Exported Functions/Classes:
- * - MockVerifier: Minimal IOtaVerifier implementation for testing
+ * - MockVerifier: Minimal IOTAVerifier implementation for testing
  * - OtaDownloadEngineTest: GoogleTest fixture for engine contract tests
  *   - DefaultState_NoVerifier_NullptrByDefault
  *   - SetVerifier_StoresPointer
@@ -27,20 +27,20 @@
  */
 
 #include <gtest/gtest.h>
-#include "OtaDownloadEngine.hpp"
-#include "OtaError.hpp"
+#include "OTADownloadEngine.hpp"
+#include "OTAError.hpp"
 
 // =============================================================================
-// Mock verifier — lightweight IOtaVerifier for injection testing
+// Mock verifier — lightweight IOTAVerifier for injection testing
 // =============================================================================
 
 /**
- * @brief Minimal IOtaVerifier mock for testing setVerifier() without crypto.
+ * @brief Minimal IOTAVerifier mock for testing setVerifier() without crypto.
  *
  * All methods are safe no-ops. begin() always returns false (matching the
  * native stub behavior of MbedTLSSignatureVerifier).
  */
-class MockVerifier : public IOtaVerifier {
+class MockVerifier : public IOTAVerifier {
 public:
     bool begin(const char* publicKeyPem) override {
         (void)publicKeyPem;
@@ -64,11 +64,11 @@ public:
 // =============================================================================
 
 /**
- * @brief GoogleTest fixture providing a fresh OtaDownloadEngine per test.
+ * @brief GoogleTest fixture providing a fresh OTADownloadEngine per test.
  */
 class OtaDownloadEngineTest : public ::testing::Test {
 protected:
-    OtaDownloadEngine engine;
+    OTADownloadEngine engine;
 };
 
 // =============================================================================
@@ -79,7 +79,7 @@ protected:
  * @brief A freshly constructed engine should report no error.
  */
 TEST_F(OtaDownloadEngineTest, DefaultState_NoVerifier_NullptrByDefault) {
-    EXPECT_EQ(engine.getLastError(), OtaError::None);
+    EXPECT_EQ(engine.getLastError(), OTAError::None);
 }
 
 /**
@@ -118,30 +118,30 @@ TEST_F(OtaDownloadEngineTest, SetHttpTimeout_StoresValue) {
 }
 
 /**
- * @brief Every OtaError enum value must map to a non-null, non-empty string.
+ * @brief Every OTAError enum value must map to a non-null, non-empty string.
  */
 TEST_F(OtaDownloadEngineTest, OtaErrorToString_AllCodes_ReturnNonNull) {
-    // Iterate all known OtaError values via their underlying int8_t range
-    const OtaError allErrors[] = {
-        OtaError::None,
-        OtaError::HttpConnectionFailed,
-        OtaError::HttpWrongResponseCode,
-        OtaError::HttpFileNotFound,
-        OtaError::HttpForbidden,
-        OtaError::ServerNoContentLength,
-        OtaError::TooManyRedirects,
-        OtaError::InsufficientSpace,
-        OtaError::NoOtaPartition,
-        OtaError::BinaryHeaderInvalid,
-        OtaError::SignatureFetchFailed,
-        OtaError::SignatureVerifyFailed,
-        OtaError::UpdateBeginFailed,
-        OtaError::UpdateWriteFailed,
-        OtaError::UpdateEndFailed,
-        OtaError::StreamReadTimeout,
+    // Iterate all known OTAError values via their underlying int8_t range
+    const OTAError allErrors[] = {
+        OTAError::None,
+        OTAError::HttpConnectionFailed,
+        OTAError::HttpWrongResponseCode,
+        OTAError::HttpFileNotFound,
+        OTAError::HttpForbidden,
+        OTAError::ServerNoContentLength,
+        OTAError::TooManyRedirects,
+        OTAError::InsufficientSpace,
+        OTAError::NoOtaPartition,
+        OTAError::BinaryHeaderInvalid,
+        OTAError::SignatureFetchFailed,
+        OTAError::SignatureVerifyFailed,
+        OTAError::UpdateBeginFailed,
+        OTAError::UpdateWriteFailed,
+        OTAError::UpdateEndFailed,
+        OTAError::StreamReadTimeout,
     };
 
-    for (OtaError err : allErrors) {
+    for (OTAError err : allErrors) {
         const char* str = otaErrorToString(err);
         EXPECT_NE(str, nullptr) << "otaErrorToString returned nullptr for code "
                                 << static_cast<int>(err);
@@ -151,10 +151,10 @@ TEST_F(OtaDownloadEngineTest, OtaErrorToString_AllCodes_ReturnNonNull) {
 }
 
 /**
- * @brief OtaError::None should map to a string containing "success" or "no error".
+ * @brief OTAError::None should map to a string containing "success" or "no error".
  */
 TEST_F(OtaDownloadEngineTest, OtaErrorToString_None_ReturnsSuccess) {
-    const char* str = otaErrorToString(OtaError::None);
+    const char* str = otaErrorToString(OTAError::None);
     ASSERT_NE(str, nullptr);
 
     // Convert to lowercase std::string for case-insensitive check
@@ -189,8 +189,8 @@ TEST_F(OtaDownloadEngineTest, DownloadAndFlash_NativeStub_ReturnsError) {
     String url("https://example.com/firmware.bin");
     String token("");
 
-    OtaError result = engine.downloadAndFlash(stubClient, url, token, sigBuf, sizeof(sigBuf));
-    EXPECT_NE(result, OtaError::None);
+    OTAError result = engine.downloadAndFlash(stubClient, url, token, sigBuf, sizeof(sigBuf));
+    EXPECT_NE(result, OTAError::None);
 }
 
 int main(int argc, char** argv) {

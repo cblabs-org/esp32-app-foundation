@@ -7,7 +7,7 @@
  * To view a copy of this license, visit https://creativecommons.org/licenses/by-nc-sa/4.0/
  *
  * Module: test/test_unit/test_u8g2Display/test_carousel.cpp
- * Description: GoogleTest unit-test suite for the U8g2DisplayModule carousel
+ * Description: GoogleTest unit-test suite for the U8G2DisplayModule carousel
  *              engine. Validates board pool add/count, pool locking behaviour
  *              (without Application), getActiveBoard state, expired board
  *              eviction, carousel wrap-around, and showBoard overrides.
@@ -17,7 +17,7 @@
  */
 
 #include <gtest/gtest.h>
-#include "u8g2DisplayModule.hpp"
+#include "U8G2DisplayModule.hpp"
 
 // =============================================================================
 // Mock IDisplayBoard — minimal concrete implementation for testing
@@ -52,7 +52,7 @@ public:
 
 class CarouselSlotPoolTest : public ::testing::Test {
 protected:
-    U8g2DisplayModule display; ///< Fresh module instance for each test
+    U8G2DisplayModule display; ///< Fresh module instance for each test
 };
 
 /** A freshly constructed module must have zero boards. */
@@ -102,7 +102,7 @@ TEST_F(CarouselSlotPoolTest, GetActiveBoard_OneBoard_ReturnsThatBoard) {
 
 class CarouselShowBoardTest : public ::testing::Test {
 protected:
-    U8g2DisplayModule display;
+    U8G2DisplayModule display;
 };
 
 /** showBoard with a pool board must update getActiveBoard. */
@@ -116,29 +116,31 @@ TEST_F(CarouselShowBoardTest, ShowBoard_PoolBoard_UpdatesActiveBoard) {
     EXPECT_EQ(display.getActiveBoard(), &boardB);
 }
 
-/** showBoard with a non-pool board must set override active board. */
-TEST_F(CarouselShowBoardTest, ShowBoard_NonPoolBoard_SetsOverride) {
+/** showBoard with a non-pool board must NOT change getActiveBoard (pool-only API). */
+TEST_F(CarouselShowBoardTest, ShowBoard_NonPoolBoard_DoesNotChangeActive) {
     CarouselMockBoard poolBoard;
     CarouselMockBoard systemBoard;
     display.addBoard(&poolBoard);
 
     display.showBoard(&systemBoard);
-    EXPECT_EQ(display.getActiveBoard(), &systemBoard);
+    // showBoard is pool-only — non-pool board is ignored
+    EXPECT_EQ(display.getActiveBoard(), &poolBoard);
 }
 
-/** showBoard back to a pool board must clear the override. */
-TEST_F(CarouselShowBoardTest, ShowBoard_BackToPoolBoard_ClearsOverride) {
-    CarouselMockBoard poolBoard;
-    CarouselMockBoard systemBoard;
-    display.addBoard(&poolBoard);
+/** showBoard with a pool board after showing another pool board must update. */
+TEST_F(CarouselShowBoardTest, ShowBoard_DifferentPoolBoard_UpdatesActive) {
+    CarouselMockBoard poolBoardA;
+    CarouselMockBoard poolBoardB;
+    display.addBoard(&poolBoardA);
+    display.addBoard(&poolBoardB);
 
-    // First override with system board
-    display.showBoard(&systemBoard);
-    EXPECT_EQ(display.getActiveBoard(), &systemBoard);
+    // Start on A, switch to B
+    display.showBoard(&poolBoardB);
+    EXPECT_EQ(display.getActiveBoard(), &poolBoardB);
 
-    // Then go back to pool board
-    display.showBoard(&poolBoard);
-    EXPECT_EQ(display.getActiveBoard(), &poolBoard);
+    // Switch back to A
+    display.showBoard(&poolBoardA);
+    EXPECT_EQ(display.getActiveBoard(), &poolBoardA);
 }
 
 // =============================================================================
@@ -147,7 +149,7 @@ TEST_F(CarouselShowBoardTest, ShowBoard_BackToPoolBoard_ClearsOverride) {
 
 class CarouselEvictionTest : public ::testing::Test {
 protected:
-    U8g2DisplayModule display;
+    U8G2DisplayModule display;
 };
 
 /** tick() with no boards must not crash. */
