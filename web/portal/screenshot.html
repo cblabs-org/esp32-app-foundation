@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Display Screenshot</title>
+  <style>
+    :root {
+      --bg: #121212;
+      --card-bg: #1e1e1e;
+      --text: #e0e0e0;
+      --text-muted: #888;
+      --border: #333;
+      --primary: #42a5f5;
+      --error: #c62828;
+    }
+
+    @media (prefers-color-scheme: light) {
+      :root {
+        --bg: #f5f5f5;
+        --card-bg: #ffffff;
+        --text: #212121;
+        --text-muted: #757575;
+        --border: #e0e0e0;
+        --primary: #1e88e5;
+        --error: #c62828;
+      }
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      padding: 1rem;
+      max-width: 600px;
+      margin: 0 auto;
+    }
+
+    .toolbar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .toolbar a {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 0.8rem;
+    }
+    .toolbar a:hover { color: var(--primary); }
+
+    h1 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      flex: 1;
+    }
+
+    button {
+      background: var(--card-bg);
+      color: var(--text);
+      border: 1px solid var(--border);
+      padding: 0.4rem 0.75rem;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      cursor: pointer;
+      transition: background 0.2s, border-color 0.2s;
+    }
+    button:hover { border-color: var(--primary); }
+    button:disabled { opacity: 0.4; cursor: default; }
+    button.active {
+      background: var(--primary);
+      color: #fff;
+      border-color: var(--primary);
+    }
+
+    .controls {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-bottom: 0.75rem;
+    }
+
+    .controls label {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .canvas-wrapper {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      text-align: center;
+      overflow: auto;
+    }
+
+    canvas { image-rendering: pixelated; }
+
+    .info {
+      margin-top: 0.5rem;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="toolbar">
+    <a href="/">← Back to Portal</a>
+    <h1>📷 Display Screenshot</h1>
+  </div>
+
+  <div class="controls">
+    <button id="btn-capture">Capture</button>
+    <button id="btn-download" disabled>💾 PNG</button>
+    <span style="flex:1;"></span>
+    <label>Zoom:</label>
+    <button class="zoom-btn" data-zoom="1">1×</button>
+    <button class="zoom-btn active" data-zoom="2">2×</button>
+    <button class="zoom-btn" data-zoom="4">4×</button>
+    <span style="flex:1;"></span>
+    <label><input type="checkbox" id="auto-refresh"> Auto (2s)</label>
+  </div>
+
+  <div class="canvas-wrapper">
+    <canvas id="canvas"></canvas>
+  </div>
+
+  <div class="info" id="info">Press Capture to grab the display buffer.</div>
+
+<script>
+(function() {
+  var canvas = document.getElementById('canvas');
+  var ctx = canvas.getContext('2d');
+  var captureBtn = document.getElementById('btn-capture');
+  var downloadBtn = document.getElementById('btn-download');
+  var infoEl = document.getElementById('info');
+  var currentZoom = 2;
+  var displayWidth = 0;
+  var displayHeight = 0;
+  var autoInterval = null;
+  var hasCapture = false;
+  var lastBytes = null;
+
+  // Capture screenshot from device
+  async function capture() {
+    captureBtn.textContent = 'Capturing...';
+    captureBtn.disabled = true;
+
+    try {
+      var response = await fetch('/api/display/screenshot');
+      if (!response.ok) throw new Error('HTTP ' + response.status);
+
+      displayWidth = parseInt(response.headers.get('X-Display-Width') || '256', 10);
+      displayHeight = parseInt(response.headers.get('X-Display-Height') || '64', 10);
+
+      var buffer = await response.arrayBuffer();
+      lastBytes = new Uint8Array(buffer);
+      render(lastBytes, displayWidth, displayHeight);
+
+      hasCapture = true;
+      downloadBtn.disabled = false;
+      infoEl.textContent = displayWidth + '×' + displayHeight +
+        ' · ' + lastBytes.length + ' bytes · ' + new Date().toLocaleTimeString();
+    } catch (err) {
+      infoEl.innerHTML = '<span style="color:var(--error);">Capture failed: ' + err.message + '</span>';
+    } finally {
+      captureBtn.textContent = 'Capture';
+      captureBtn.disabled = false;
+    }
+  }
+
+  // Render U8G2 vertical-byte buffer to canvas
+  function render(bytes, w, h) {
+    canvas.width = w * currentZoom;
+    canvas.height = h * currentZoom;
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    var pagesH = Math.ceil(h / 8);
+    for (var page = 0; page < pagesH; page++) {
+      for (var x = 0; x < w; x++) {
+        var byteIndex = page * w + x;
+        if (byteIndex >= bytes.length) break;
+        var b = bytes[byteIndex];
+        for (var bit = 0; bit < 8; bit++) {
+          var y = page * 8 + bit;
+          if (y >= h) break;
+          if (b & (1 << bit)) {
+            ctx.fillStyle = '#00ff88';
+            ctx.fillRect(x * currentZoom, y * currentZoom, currentZoom, currentZoom);
+          }
+        }
+      }
+    }
+  }
+
+  // Capture button
+  captureBtn.addEventListener('click', capture);
+
+  // Download PNG
+  downloadBtn.addEventListener('click', function() {
+    if (!hasCapture) return;
+    canvas.toBlob(function(blob) {
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = 'screenshot-' + new Date().toISOString().slice(0, 19).replace(/:/g, '-') + '.png';
+      a.click();
+      URL.revokeObjectURL(url);
+    }, 'image/png');
+  });
+
+  // Zoom buttons
+  document.querySelectorAll('.zoom-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      currentZoom = parseInt(btn.getAttribute('data-zoom'), 10);
+      document.querySelectorAll('.zoom-btn').forEach(function(b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      if (hasCapture && lastBytes) render(lastBytes, displayWidth, displayHeight);
+    });
+  });
+
+  // Auto-refresh toggle
+  document.getElementById('auto-refresh').addEventListener('change', function(e) {
+    if (e.target.checked) {
+      capture();
+      autoInterval = setInterval(capture, 2000);
+    } else {
+      if (autoInterval) { clearInterval(autoInterval); autoInterval = null; }
+    }
+  });
+
+  // Stop auto-refresh when page hidden
+  document.addEventListener('visibilitychange', function() {
+    if (document.hidden && autoInterval) {
+      clearInterval(autoInterval);
+      autoInterval = null;
+      document.getElementById('auto-refresh').checked = false;
+    }
+  });
+})();
+</script>
+</body>
+</html>

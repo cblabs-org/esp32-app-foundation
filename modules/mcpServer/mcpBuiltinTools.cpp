@@ -34,6 +34,11 @@
     #include <Arduino.h>
     #include "esp_system.h"
     #include "esp_heap_caps.h"
+    #include "esp_chip_info.h"
+    #include "esp_partition.h"
+    #include "esp_ota_ops.h"
+    #include <LittleFS.h>
+    #include <WiFi.h>
     #include <base64.h>
 #endif
 
@@ -101,7 +106,7 @@ void mcpBuiltinTools::registerAll(McpToolRegistry& registry,
     // -----------------------------------------------------------------
     registry.addTool(
         "system_info",
-        "Get device system information including heap, uptime, chip info, and firmware version",
+        "Get device system information including heap, storage, WiFi, uptime, chip info, and firmware version",
         [](JsonObject& params, JsonObject& result) {
             (void)params; // No input parameters required
             #ifndef NATIVE_BUILD
@@ -119,10 +124,49 @@ void mcpBuiltinTools::registerAll(McpToolRegistry& registry,
                 result["heap_default_free"]  = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
                 result["heap_default_total"] = heap_caps_get_total_size(MALLOC_CAP_DEFAULT);
 
+                // --- Storage metrics (LittleFS) ---
+                result["storage_used"]       = LittleFS.usedBytes();
+                result["storage_total"]      = LittleFS.totalBytes();
+
+                // --- Temperature (internal sensor) ---
+                float chipTemp = temperatureRead();
+                result["chip_temp"]          = chipTemp;
+
+                // --- Uptime ---
                 result["uptime_seconds"]     = millis() / 1000;
+
+                // --- Firmware / Build info ---
+                result["build_serial"]       = __DATE__ " " __TIME__;
+                result["sdk_version"]        = ESP.getSdkVersion();
+
+                // --- Chip info ---
+                esp_chip_info_t chipInfo;
+                esp_chip_info(&chipInfo);
                 result["chip_model"]         = ESP.getChipModel();
-                result["chip_cores"]         = ESP.getChipCores();
+                result["chip_revision"]      = chipInfo.revision;
+                result["chip_cores"]         = chipInfo.cores;
                 result["flash_size"]         = ESP.getFlashChipSize();
+
+                // --- WiFi info ---
+                if (WiFi.getMode() == WIFI_AP || WiFi.getMode() == WIFI_AP_STA) {
+                    result["ap_mode"]   = true;
+                    result["wifi_ssid"] = WiFi.softAPSSID();
+                    result["wifi_ip"]   = WiFi.softAPIP().toString();
+                    result["wifi_mac"]  = WiFi.softAPmacAddress();
+                    result["wifi_rssi"] = 0;
+                } else {
+                    result["ap_mode"]   = false;
+                    result["wifi_ssid"] = WiFi.SSID();
+                    result["wifi_ip"]   = WiFi.localIP().toString();
+                    result["wifi_mac"]  = WiFi.macAddress();
+                    result["wifi_rssi"] = WiFi.RSSI();
+                }
+
+                // --- Active partition ---
+                const esp_partition_t* running = esp_ota_get_running_partition();
+                if (running != nullptr) {
+                    result["partition"] = running->label;
+                }
             #else
                 // Native build stubs — no hardware telemetry available
                 result["heap_free"]          = 0;
@@ -133,10 +177,22 @@ void mcpBuiltinTools::registerAll(McpToolRegistry& registry,
                 result["psram_total"]        = 0;
                 result["heap_default_free"]  = 0;
                 result["heap_default_total"] = 0;
+                result["storage_used"]       = 0;
+                result["storage_total"]      = 0;
+                result["chip_temp"]          = 0.0;
                 result["uptime_seconds"]     = 0;
+                result["build_serial"]       = __DATE__ " " __TIME__;
+                result["sdk_version"]        = "native";
                 result["chip_model"]         = "native";
+                result["chip_revision"]      = 0;
                 result["chip_cores"]         = 0;
                 result["flash_size"]         = 0;
+                result["ap_mode"]            = false;
+                result["wifi_ssid"]          = "";
+                result["wifi_ip"]            = "0.0.0.0";
+                result["wifi_mac"]           = "";
+                result["wifi_rssi"]          = 0;
+                result["partition"]          = "native";
             #endif
             result["firmware_version"] = APP_FOUNDATION_VERSION;
         }

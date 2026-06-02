@@ -31,7 +31,18 @@
         </p>
       </div>
       <input type="file" id="backup-restore-file" accept=".json"
-        style="background: transparent; border: none; padding: 0; margin-bottom: 1rem; font-size: 0.85rem;" />
+        style="display:none;" />
+      <div style="display:flex; gap:8px; align-items:center; margin-bottom:1rem;">
+        <label for="backup-restore-file"
+          style="display:inline-block; padding:0.5rem 1rem; background:var(--card-bg); color:var(--text);
+                 border:1px solid var(--border); border-radius:10px; font-size:0.85rem;
+                 cursor:pointer; transition:border-color 0.2s; text-align:center; white-space:nowrap;">
+          Choose File
+        </label>
+        <span id="backup-file-name" style="font-size:0.8rem; color:var(--text-muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+          No file selected
+        </span>
+      </div>
       <button id="btn-backup-restore" style="width:100%; background: var(--card-bg); color: var(--text); border: 1px solid var(--border);">
         Upload &amp; Restore
       </button>
@@ -45,6 +56,14 @@
       </div>
     </article>
   `;
+
+  // -------------------------------------------------------------------------
+  // File input — show selected filename
+  // -------------------------------------------------------------------------
+  document.getElementById('backup-restore-file').addEventListener('change', (e) => {
+    const nameEl = document.getElementById('backup-file-name');
+    nameEl.textContent = e.target.files.length ? e.target.files[0].name : 'No file selected';
+  });
 
   // -------------------------------------------------------------------------
   // Download Config — GET /api/config/backup → browser download

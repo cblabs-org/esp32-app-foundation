@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-Queries ESP32 device diagnostics via the Device MCP Server.
+ESP32 App Foundation — Device Diagnostics via MCP Server.
 
-Invokes the system_info and get_config built-in MCP tools to retrieve
-telemetry, configuration, and system state.
+Queries system_info, MCP server status/config, device config, and tool list.
+Uses only stdlib (no pip dependencies).
 """
 import sys
 import json
@@ -12,100 +12,177 @@ import urllib.request
 import urllib.error
 
 
-def mcp_request(ip_address, method_name, arguments=None):
-    """Send a JSON-RPC 2.0 request to the device MCP server."""
-    url = f"http://{ip_address}/api/mcp"
+def mcp_request(ip, tool_name, arguments=None):
+    """Send a JSON-RPC 2.0 tools/call request to the device MCP server."""
+    url = f"http://{ip}/api/mcp"
     payload = {
         "jsonrpc": "2.0",
         "method": "tools/call",
-        "params": {"name": method_name, "arguments": arguments or {}},
+        "params": {"name": tool_name, "arguments": arguments or {}},
         "id": 1
     }
-
-    data = json.dumps(payload).encode('utf-8')
-    req = urllib.request.Request(url, data=data, headers={'Content-Type': 'application/json'}, method='POST')
-
+    data = json.dumps(payload).encode("utf-8")
+    req = urllib.request.Request(url, data=data,
+                                headers={"Content-Type": "application/json"},
+                                method="POST")
     try:
-        with urllib.request.urlopen(req, timeout=5) as response:
-            res_body = response.read().decode('utf-8')
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            body = json.loads(resp.read().decode("utf-8"))
     except urllib.error.URLError as e:
-        return {"error": f"Connection Failed: {e}"}
+        return {"error": f"Connection failed: {e}"}
 
+    if "error" in body:
+        return {"error": body["error"]}
     try:
-        res_json = json.loads(res_body)
-        if "error" in res_json:
-            return {"error": res_json['error']}
+        text = body["result"]["content"][0]["text"]
+        return json.loads(text)
+    except (json.JSONDecodeError, TypeError, KeyError):
+        return {"raw": text if "text" in dir() else str(body)}
 
-        inner_text = res_json['result']['content'][0]['text']
-        # Telemetry and config endpoints return stringified JSON in the text field
-        try:
-            return json.loads(inner_text)
-        except (json.JSONDecodeError, TypeError):
-            return {"raw": inner_text}
+
+def http_get_json(ip, path):
+    """Simple GET returning parsed JSON."""
+    try:
+        url = f"http://{ip}{path}"
+        req = urllib.request.Request(url)
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            return json.loads(resp.read().decode("utf-8"))
     except Exception as e:
-        return {"error": f"Parse Error: {e}\nRaw Response: {res_body[:200]}"}
+        return {"error": str(e)}
 
 
-def run_diagnostics(ip_address):
-    print(f"==========================================")
-    print(f" HARDWARE DIAGNOSTICS: {ip_address}")
-    print(f"==========================================\n")
+def fmt_bytes(b):
+    if b >= 1048576:
+        return f"{b / 1048576:.1f} MB"
+    if b >= 1024:
+        return f"{b / 1024:.1f} KB"
+    return f"{b} B"
 
-    # 1. System Info
-    print(">>> 1. SYSTEM INFO (system_info)")
-    sys_info = mcp_request(ip_address, "system_info")
-    if "error" in sys_info:
-        print(f"    [FAIL] {sys_info['error']}\n")
-    elif "raw" in sys_info:
-        print(f"    {sys_info['raw']}\n")
+
+def pct(value, total):
+    if total == 0:
+        return "N/A"
+    return f"{value * 100 / total:.0f}%"
+
+
+def run_diagnostics(ip):
+    sep = "=" * 50
+    print(f"\n{sep}")
+    print(f"  DEVICE DIAGNOSTICS: {ip}")
+    print(f"{sep}\n")
+
+    # --- 1. MCP Server Status ---
+    print(">>> MCP SERVER STATUS")
+    status = http_get_json(ip, "/api/mcp/status")
+    if "error" in status:
+        print(f"    [FAIL] {status['error']}\n")
     else:
-        print(f"    - Free Heap: {sys_info.get('freeHeap', sys_info.get('heap', 0)) / 1024:.2f} KB")
-        print(f"    - Min Free Heap: {sys_info.get('minFreeHeap', sys_info.get('min_free', 0)) / 1024:.2f} KB")
-        print(f"    - Uptime: {sys_info.get('uptimeMs', sys_info.get('uptime', 0))} ms")
-        print(f"    - SDK Version: {sys_info.get('sdkVersion', 'N/A')}")
-        print(f"    - App Version: {sys_info.get('appVersion', 'N/A')}")
-        print(f"    - Chip Model: {sys_info.get('chipModel', 'N/A')}")
-        print(f"    - CPU Freq: {sys_info.get('cpuFreqMhz', 'N/A')} MHz\n")
+        enabled = status.get("enabled", False)
+        read_only = status.get("readOnly", True)
+        init = status.get("initialized", False)
+        tools = status.get("toolCount", 0)
+        print(f"    Enabled:     {'YES' if enabled else 'NO'}")
+        print(f"    Read-Only:   {'YES' if read_only else 'NO'}")
+        print(f"    Initialized: {'YES' if init else 'NO'}")
+        print(f"    Tools:       {tools}\n")
 
-    # 2. Configuration
-    print(">>> 2. DEVICE CONFIGURATION (get_config)")
-    config = mcp_request(ip_address, "get_config")
+    # --- 2. System Info ---
+    print(">>> SYSTEM INFO (system_info)")
+    info = mcp_request(ip, "system_info")
+    if "error" in info:
+        print(f"    [FAIL] {info['error']}\n")
+    elif "raw" in info:
+        print(f"    {info['raw']}\n")
+    else:
+        # Memory
+        heap_free = info.get("heap_free", 0)
+        heap_total = info.get("heap_total", 0)
+        heap_min = info.get("heap_min_free", 0)
+        heap_max_blk = info.get("heap_max_alloc", 0)
+        psram_free = info.get("psram_free", 0)
+        psram_total = info.get("psram_total", 0)
+        stor_used = info.get("storage_used", 0)
+        stor_total = info.get("storage_total", 0)
+
+        print(f"    --- Memory ---")
+        print(f"    DRAM Free:       {fmt_bytes(heap_free)} / {fmt_bytes(heap_total)} ({pct(heap_free, heap_total)})")
+        print(f"    DRAM Min Free:   {fmt_bytes(heap_min)} ({pct(heap_min, heap_total)})")
+        print(f"    Largest Block:   {fmt_bytes(heap_max_blk)}")
+        if psram_total > 0:
+            print(f"    PSRAM Free:      {fmt_bytes(psram_free)} / {fmt_bytes(psram_total)} ({pct(psram_free, psram_total)})")
+        else:
+            print(f"    PSRAM:           Not available")
+        stor_free = stor_total - stor_used
+        print(f"    Storage Free:    {fmt_bytes(stor_free)} / {fmt_bytes(stor_total)} ({pct(stor_free, stor_total)})")
+
+        # Device
+        print(f"\n    --- Device ---")
+        print(f"    Chip:            {info.get('chip_model', 'N/A')} rev {info.get('chip_revision', '?')} ({info.get('chip_cores', '?')} cores)")
+        print(f"    Flash:           {fmt_bytes(info.get('flash_size', 0))}")
+        print(f"    Temperature:     {info.get('chip_temp', 0):.1f}°C")
+        print(f"    Uptime:          {info.get('uptime_seconds', 0)}s")
+        print(f"    Partition:       {info.get('partition', 'N/A')}")
+
+        # Firmware
+        print(f"\n    --- Firmware ---")
+        print(f"    Version:         {info.get('firmware_version', 'N/A')}")
+        print(f"    Build:           {info.get('build_serial', 'N/A')}")
+        print(f"    SDK:             {info.get('sdk_version', 'N/A')}")
+
+        # Network
+        print(f"\n    --- Network ---")
+        ap = info.get("ap_mode", False)
+        print(f"    Mode:            {'AP' if ap else 'Station'}")
+        print(f"    SSID:            {info.get('wifi_ssid', 'N/A')}")
+        print(f"    IP:              {info.get('wifi_ip', 'N/A')}")
+        print(f"    MAC:             {info.get('wifi_mac', 'N/A')}")
+        rssi = info.get("wifi_rssi", 0)
+        if not ap and rssi != 0:
+            if rssi >= -50:
+                quality = "Excellent"
+            elif rssi >= -60:
+                quality = "Good"
+            elif rssi >= -70:
+                quality = "Fair"
+            else:
+                quality = "Weak"
+            print(f"    RSSI:            {rssi} dBm ({quality})")
+        print()
+
+    # --- 3. Device Configuration ---
+    print(">>> DEVICE CONFIGURATION (get_config)")
+    config = mcp_request(ip, "get_config")
     if "error" in config:
         print(f"    [FAIL] {config['error']}\n")
     elif "raw" in config:
         print(f"    {config['raw']}\n")
     else:
-        # Pretty-print the full configuration tree
-        for key, value in config.items():
-            if isinstance(value, dict):
-                print(f"    [{key}]")
-                for k, v in value.items():
-                    print(f"      - {k}: {v}")
+        for ns, values in config.items():
+            if isinstance(values, dict):
+                print(f"    [{ns}]")
+                for k, v in values.items():
+                    print(f"      {k}: {v}")
             else:
-                print(f"    - {key}: {value}")
+                print(f"    {ns}: {values}")
         print()
 
-    # 3. Available Tools (list what the device exposes)
-    print(">>> 3. AVAILABLE MCP TOOLS (list_tools)")
-    tools = mcp_request(ip_address, "list_tools")
-    if "error" in tools:
-        print(f"    [FAIL] {tools['error']}\n")
-    elif "raw" in tools:
-        print(f"    {tools['raw']}\n")
+    # --- 4. Registered Tools ---
+    print(">>> REGISTERED TOOLS (list_tools)")
+    tools_resp = mcp_request(ip, "list_tools")
+    if "error" in tools_resp:
+        print(f"    [FAIL] {tools_resp['error']}\n")
+    elif "raw" in tools_resp:
+        print(f"    {tools_resp['raw']}\n")
     else:
-        if isinstance(tools, list):
-            for tool in tools:
-                name = tool.get('name', 'unknown')
-                desc = tool.get('description', '')
-                print(f"    - {name}: {desc}")
-        else:
-            print(f"    {json.dumps(tools, indent=4)}")
-        print()
+        tool_list = tools_resp.get("tools", tools_resp if isinstance(tools_resp, list) else [])
+        count = tools_resp.get("count", len(tool_list))
+        for t in tool_list:
+            print(f"    - {t.get('name', '?')}: {t.get('description', '')}")
+        print(f"    ({count} tools registered)\n")
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Query ESP32 diagnostic tree via MCP")
-    parser.add_argument("ip", help="Target ESP32 IP Address")
+    parser = argparse.ArgumentParser(description="ESP32 App Foundation — Device Diagnostics")
+    parser.add_argument("ip", help="Device IP address")
     args = parser.parse_args()
-
     run_diagnostics(args.ip)

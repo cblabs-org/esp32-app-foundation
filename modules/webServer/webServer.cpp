@@ -41,6 +41,7 @@
 #include "portal_assets/keys_js.hpp"
 #include "portal_assets/mcp_js.hpp"
 #include "portal_assets/screenshot_js.hpp"
+#include "portal_assets/screenshot_html.hpp"
 #endif
 
 #include "platform/LogShim.h"
@@ -161,6 +162,12 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors) 
         response->addHeader("Content-Encoding", "gzip");
         request->send(response);
     });
+
+    _server.on("/screenshot.html", HTTP_GET, [](AsyncWebServerRequest* request) {
+        AsyncWebServerResponse *response = request->beginResponse(200, "text/html", screenshot_html_gz, screenshot_html_gz_len);
+        response->addHeader("Content-Encoding", "gzip");
+        request->send(response);
+    });
 #endif
 
     // --- Register all IWebContributor routes and build tabs array ---
@@ -184,6 +191,14 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors) 
         }
     }
     
+    // Inject the "Status" sub-pill — WebServerManager hosts /api/system
+    // but is not itself an IWebContributor, so add it manually.
+    JsonObject statusTab = tabsArr.add<JsonObject>();
+    statusTab["name"]   = "Status";
+    statusTab["id"]     = "Status";
+    statusTab["parent"] = "System";
+    statusTab["order"]  = 10;
+
 #ifndef NATIVE_BUILD
     String tabsJson;
     serializeJson(tabsDoc, tabsJson);

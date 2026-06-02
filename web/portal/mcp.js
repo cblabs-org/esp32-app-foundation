@@ -65,15 +65,19 @@
   // -------------------------------------------------------------------------
   // Helper: Render a tool entry with mutatesState badge
   // -------------------------------------------------------------------------
-  function toolRow(tool) {
+  function toolRow(tool, serverEnabled, readOnly) {
+    const blocked = !serverEnabled || (readOnly && tool.mutatesState);
     const badge = tool.mutatesState
-      ? '<span style="background:#ff8f00; color:white; font-size:0.65rem; padding:1px 6px; border-radius:8px; margin-left:8px; font-weight:600;">MUTATING</span>'
-      : '<span style="background:#43a047; color:white; font-size:0.65rem; padding:1px 6px; border-radius:8px; margin-left:8px; font-weight:600;">READ-ONLY</span>';
+      ? '<span style="background:' + (blocked ? '#999' : '#ff8f00') + '; color:white; font-size:0.65rem; padding:1px 6px; border-radius:8px; margin-left:8px; font-weight:600;">MUTATING</span>'
+      : '<span style="background:' + (!serverEnabled ? '#999' : '#43a047') + '; color:white; font-size:0.65rem; padding:1px 6px; border-radius:8px; margin-left:8px; font-weight:600;">READ-ONLY</span>';
+    const blockedLabel = blocked
+      ? ' <span style="font-size:0.65rem; color:var(--text-muted); margin-left:6px;">BLOCKED</span>'
+      : '';
     return `
-      <div style="padding:0.5rem 0; border-bottom:1px solid var(--border); font-size:0.85rem;">
+      <div style="padding:0.5rem 0; border-bottom:1px solid var(--border); font-size:0.85rem; opacity:${blocked ? '0.4' : '1'}; transition:opacity 0.3s;">
         <div style="display:flex; align-items:center;">
           <code style="font-weight:600;">${tool.name}</code>
-          ${badge}
+          ${badge}${blockedLabel}
         </div>
         <div style="color:var(--text-muted); font-size:0.75rem; margin-top:2px;">${tool.description || ''}</div>
       </div>
@@ -167,7 +171,7 @@
           if (tools.length === 0) {
             toolsEl.innerHTML = '<p style="color:var(--text-muted); font-size:0.85rem;">No tools registered.</p>';
           } else {
-            toolsEl.innerHTML = tools.map(toolRow).join('');
+            toolsEl.innerHTML = tools.map(function(t) { return toolRow(t, enabledVal, readOnlyVal); }).join('');
           }
         } else {
           toolsEl.innerHTML = '<p style="color:var(--text-muted); font-size:0.85rem;">Unable to fetch tool list.</p>';

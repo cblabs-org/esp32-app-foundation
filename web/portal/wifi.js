@@ -63,6 +63,8 @@
   let selectedSsid = '';
   let forgetArmed = false;
   let forgetTimer = null;
+  let hasExistingPass = false;
+  let userIsTypingPass = false;
 
   // ==========================================================================
   // Render Layout
@@ -275,6 +277,20 @@
       // --- Diagnostics drawer ---
       updateDiagnostics(data);
 
+      // --- Password indicator ---
+      if (data.passExists && !userIsTypingPass) {
+        hasExistingPass = true;
+        passInput.value = '';
+        passInput.placeholder = '●●●●●●●● (saved)';
+        eyeBtn.style.opacity = '0.3';
+        eyeBtn.style.pointerEvents = 'none';
+      } else if (!data.passExists) {
+        hasExistingPass = false;
+        passInput.placeholder = 'Network password';
+        eyeBtn.style.opacity = '1';
+        eyeBtn.style.pointerEvents = 'auto';
+      }
+
     } catch (err) {
       statusSsid.textContent = 'Error loading status';
     }
@@ -440,13 +456,29 @@
   });
 
   // ==========================================================================
-  // Password Toggle
+  // Password Toggle + Input Tracking
   // ==========================================================================
 
+  passInput.addEventListener('input', () => {
+    if (passInput.value.length > 0) {
+      userIsTypingPass = true;
+      eyeBtn.style.opacity = '1';
+      eyeBtn.style.pointerEvents = 'auto';
+    } else {
+      userIsTypingPass = false;
+      if (hasExistingPass) {
+        passInput.placeholder = '●●●●●●●● (saved)';
+        eyeBtn.style.opacity = '0.3';
+        eyeBtn.style.pointerEvents = 'none';
+        passInput.type = 'password';
+      }
+    }
+  });
+
   eyeBtn.addEventListener('click', () => {
+    if (!userIsTypingPass) return;
     const isPassword = passInput.type === 'password';
     passInput.type = isPassword ? 'text' : 'password';
-    // Swap icon: open eye vs crossed eye
     const icon = document.getElementById('wifi-eye-icon');
     if (isPassword) {
       icon.innerHTML = '<path d="M2 2l20 20"></path><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>';

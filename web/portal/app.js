@@ -267,9 +267,7 @@ document.addEventListener('DOMContentLoaded', function() {
       // No children — hide pill bar and show the tab directly
       pillBar.style.display = 'none';
       showContentDiv(tabId);
-      if (!isInit) {
-        window.dispatchEvent(new CustomEvent('tab-changed', { detail: tabId }));
-      }
+      window.dispatchEvent(new CustomEvent('tab-changed', { detail: tabId }));
     }
   }
 
@@ -390,10 +388,11 @@ document.addEventListener('DOMContentLoaded', function() {
   // =========================================================================
 
   /**
-   * @brief Load fragment scripts in order. utils.js is loaded first,
-   *        then all tab fragment scripts.
+   * @brief Load fragment scripts sequentially. utils.js is loaded first,
+   *        then all tab fragment scripts. Calls the callback when all done.
+   * @param {Function} onComplete - Called after all scripts have loaded.
    */
-  function loadScripts() {
+  function loadScripts(onComplete) {
     var scripts = [
       'utils.js',
       'wifi.js',
@@ -405,19 +404,36 @@ document.addEventListener('DOMContentLoaded', function() {
       'screenshot.js'
     ];
 
-    scripts.forEach(function(src) {
+    var loaded = 0;
+    function loadNext() {
+      if (loaded >= scripts.length) {
+        if (onComplete) onComplete();
+        return;
+      }
       var script = document.createElement('script');
-      script.src = src;
+      script.src = scripts[loaded];
+      script.onload = function() {
+        loaded++;
+        loadNext();
+      };
+      script.onerror = function() {
+        console.warn('Failed to load ' + scripts[loaded]);
+        loaded++;
+        loadNext();
+      };
       document.body.appendChild(script);
-    });
+    }
+    loadNext();
   }
 
   // =========================================================================
   // 8. Boot Sequence
   // =========================================================================
 
-  loadScripts();
+  loadScripts(function() {
+    // Scripts are loaded — now safe to build tabs and dispatch tab-changed
+    loadTabs();
+  });
   loadAppInfo();
   checkApMode();
-  loadTabs();
 });

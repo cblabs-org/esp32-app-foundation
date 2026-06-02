@@ -4,7 +4,7 @@
 // armed restart, and double-confirm factory reset.
 
 (function() {
-  const container = document.getElementById('tab-system');
+  const container = document.getElementById('tab-status');
 
   // -------------------------------------------------------------------------
   // Helper: Format uptime seconds to "Xd Xh Xm" or "Xm Xs"
@@ -111,6 +111,14 @@
       </div>
     </article>
 
+    <article>
+      <a href="/screenshot.html" style="display:flex; align-items:center; gap:8px; padding:0.25rem 0; color:var(--primary); text-decoration:none; font-size:0.85rem;">
+        📷 Display Screenshot Tool
+        <span style="flex:1;"></span>
+        <span style="font-size:0.75rem; color:var(--text-muted);">→</span>
+      </a>
+    </article>
+
     <article style="border-color: var(--error); background: rgba(198, 40, 40, 0.04);">
       <header style="color: var(--error);">Danger Zone</header>
       <div style="display: flex; gap: 10px; margin-top: 0.5rem;">
@@ -202,9 +210,10 @@
         memHTML += progressBarHTML('PSRAM Free', data.psram_free || 0, data.psram_total, 'bytes');
       }
 
-      // --- Section 3: Storage ---
+      // --- Section 3: Storage (show free to match memory bar convention) ---
+      var storageFree = (data.storage_total || 0) - (data.storage_used || 0);
       memHTML += '<div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.05em; margin:0.75rem 0 0.4rem;">Storage</div>';
-      memHTML += progressBarHTML('Storage Used', data.storage_used || 0, data.storage_total || 1, 'bytes');
+      memHTML += progressBarHTML('Storage Free', storageFree, data.storage_total || 1, 'bytes');
 
       memBars.innerHTML = memHTML;
 
@@ -252,7 +261,7 @@
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) {
       stopAutoRefresh();
-    } else if (refreshActive || document.getElementById('tab-system').classList.contains('active')) {
+    } else if (refreshActive || document.getElementById('tab-status').classList.contains('active')) {
       startAutoRefresh();
     }
   });
@@ -334,7 +343,7 @@
   // Tab activation listener — start auto-refresh when System tab opens
   // -------------------------------------------------------------------------
   window.addEventListener('tab-changed', (e) => {
-    if (e.detail === 'tab-system') {
+    if (e.detail === 'tab-status') {
       startAutoRefresh();
     } else {
       stopAutoRefresh();
