@@ -20,3 +20,8 @@ CMakeLists.txt
 dependencies.lock
 idf_component.yml
 
+# Web test infrastructure (test/web/)
+test/web/node_modules/
+test/web/test-results/
+test/web/playwright-report/
+test/web/dist/

@@ -1,0 +1,14 @@
+{
+  "name": "esp32-app-foundation-web-tests",
+  "private": true,
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "server": "node server.js"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.52.0",
+    "@types/node": "^22.0.0",
+    "typescript": "^5.8.0"
+  }
+}
