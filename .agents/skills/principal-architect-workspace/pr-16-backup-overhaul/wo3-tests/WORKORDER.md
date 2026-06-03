@@ -66,4 +66,27 @@ After implementing changes:
 1. Run `pio test -e native` — ALL tests must pass, including the new ones
 2. Start mock server (`cd test/web && node server.js`) and confirm it starts without JS errors
 
+
 Once verified, **STOP and send a message back to the Principal Architect** with results. Do NOT distill or commit until the Principal Architect explicitly approves.
+
+---
+
+## Status: COMPLETE ✅
+
+**Approved by Principal Architect:** 2026-06-03T22:22:07Z
+
+### Commits
+- `5a85111` — `test(backup): add _meta envelope tests, update mock server to realistic 5-module format` (test_configManager.cpp: 3 new Group 6 tests)
+- `24bc69d` — server.js correction (module_count 4→5, add `time` namespace, fix `mcp.readOnly: false`)
+
+### Verification
+- `pio test -e native` → **17/17 PASSED** (including all 3 new `_meta` envelope tests)
+- `node test/web/server.js` → `[mock-server] Listening on http://localhost:3000` — no JS errors
+
+### Checklist Resolved
+- [x] Replace `MOCK_CONFIG_BACKUP` with `_meta` envelope format
+- [x] Remove `password: '***'` and `keys: { ... }` fields
+- [x] Update `MOCK_CONFIG` namespaces to `['wifi', 'mcp', 'time', 'display', 'ota']` and `count: 5`
+- [x] `ExportAllConfig_ContainsMetaKey` test added and passing
+- [x] `ImportAllConfig_SkipsMetaKey` test added and passing
+- [x] `ExportAllConfig_OtaNamespacePresent` test added and passing
