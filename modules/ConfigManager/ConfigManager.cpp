@@ -302,8 +302,8 @@ bool ConfigManager::saveModuleConfig(IConfigurable* module) {
 void ConfigManager::buildBackupMeta(JsonObject& meta) {
     meta["backup_version"] = 1;
 
-#ifdef FIRMWARE_VERSION
-    meta["firmware_version"] = FIRMWARE_VERSION;
+#ifdef APP_FOUNDATION_VERSION
+    meta["firmware_version"] = APP_FOUNDATION_VERSION;
 #else
     meta["firmware_version"] = "unknown";
 #endif
