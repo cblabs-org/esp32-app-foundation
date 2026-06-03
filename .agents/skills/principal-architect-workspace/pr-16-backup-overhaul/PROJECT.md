@@ -1,7 +1,7 @@
 # PR-16: Backup System Overhaul
 
-**Branch:** `pr-16-backup-overhaul`
-**Status:** 🔄 WIP — WO1 in progress
+**Branch:** `pr-16-backup-overhaul` → merged to `main` at `4d48d36`
+**Status:** ✅ COMPLETE — merged and pushed
 **Created:** 2026-06-03
 
 ## Summary
@@ -15,9 +15,9 @@ namespace list instead of actual config data.
 
 | ID | Topic | Branch | Status |
 |----|-------|--------|--------|
-| **[wo1-firmware](./wo1-firmware/WORKORDER.md)** | Route reorder, streaming response, `_meta` envelope, OTAUpdateManager IConfigurable | `pr-16-backup-overhaul-wo1-firmware` | 🔄 IN PROGRESS |
-| **[wo2-frontend](./wo2-frontend/WORKORDER.md)** | 16KB guard, metadata preview, restore summary UX | `pr-16-backup-overhaul-wo2-frontend` | ⏳ QUEUED (awaits WO1) |
-| **[wo3-tests](./wo3-tests/WORKORDER.md)** | Mock server realistic data, new unit tests | `pr-16-backup-overhaul-wo3-tests` | ⏳ QUEUED (awaits WO1) |
+| **[wo1-firmware](./wo1-firmware/WORKORDER.md)** | Route reorder, streaming response, `_meta` envelope, OTAUpdateManager IConfigurable | `4c67b43` | ✅ MERGED |
+| **[wo2-frontend](./wo2-frontend/WORKORDER.md)** | 16KB guard, metadata preview, restore summary UX | `2a5b9b6` | ✅ MERGED |
+| **[wo3-tests](./wo3-tests/WORKORDER.md)** | Mock server realistic data, new unit tests | `5a85111` | ✅ MERGED |
 
 ## Key Decisions
 
