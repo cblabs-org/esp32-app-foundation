@@ -55,6 +55,22 @@ void ConfigManager::getConfigPath(const char* ns, char* buf, size_t size) {
 #endif
 }
 
+/**
+ * @brief Register the timezone string for the backup _meta envelope.
+ *
+ * Called by TimeManager::applyConfig() to propagate the configured timezone
+ * into the backup envelope without creating a direct ConfigManager→TimeManager
+ * coupling. Stores up to 63 characters of the TZ string.
+ *
+ * @param tz Null-terminated POSIX timezone string (e.g. "Europe/London").
+ */
+void ConfigManager::setMetaTimezone(const char* tz) {
+    if (tz != nullptr) {
+        strlcpy(_metaTimezone, tz, sizeof(_metaTimezone));
+        ESP_LOGD(TAG, "Meta timezone set to '%s'", _metaTimezone);
+    }
+}
+
 // =============================================================================
 // Module Registry
 // =============================================================================
@@ -270,16 +286,79 @@ bool ConfigManager::saveModuleConfig(IConfigurable* module) {
 // =============================================================================
 
 /**
+ * @brief Populate the _meta envelope for a backup document.
+ *
+ * Writes standard metadata fields into the provided JsonObject:
+ *   - backup_version: always 1
+ *   - firmware_version: from FIRMWARE_VERSION build define (or "unknown")
+ *   - device_id: chip MAC address (or "00:00:00:00:00:00" on NATIVE_BUILD)
+ *   - device_type: chip model string (or "native" on NATIVE_BUILD)
+ *   - datetime: ISO-8601 UTC string if system clock is set, else "unknown"
+ *   - timezone: TZ string registered via setMetaTimezone(), else "UTC"
+ *   - module_count: number of registered IConfigurable modules
+ *
+ * @param meta Mutable reference to the JsonObject to populate.
+ */
+void ConfigManager::buildBackupMeta(JsonObject& meta) {
+    meta["backup_version"] = 1;
+
+#ifdef APP_FOUNDATION_VERSION
+    meta["firmware_version"] = APP_FOUNDATION_VERSION;
+#else
+    meta["firmware_version"] = "unknown";
+#endif
+
+#ifndef NATIVE_BUILD
+    meta["device_id"]   = WiFi.macAddress();
+    meta["device_type"] = ESP.getChipModel();
+
+    // Populate datetime from the system clock if it has been synchronised
+    // (epoch > 1 000 000 000 means the RTC has been set via NTP or RTC module)
+    time_t now = time(nullptr);
+    if (now > 1000000000) {
+        char buf[25];
+        struct tm tm_info;
+        gmtime_r(&now, &tm_info);
+        // Format as ISO-8601: "2024-01-15T12:34:56Z"
+        strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%SZ", &tm_info);
+        meta["datetime"] = buf;
+    } else {
+        meta["datetime"] = "unknown";
+    }
+#else
+    meta["device_id"]   = "00:00:00:00:00:00";
+    meta["device_type"] = "native";
+    meta["datetime"]    = "unknown";
+#endif
+
+    // TODO: call setMetaTimezone() from TimeManager::applyConfig() to propagate
+    //       the configured timezone into the backup envelope.
+    meta["timezone"]     = _metaTimezone[0] != '\0' ? _metaTimezone : "UTC";
+    meta["module_count"] = _moduleCount;
+}
+
+/**
  * @brief Export all registered module configs into a master JSON document.
  *
- * For each registered module, creates a nested object keyed by namespace,
- * calls serializeConfig(), and adds the _v field. The master document is
- * suitable for full-device backup (~2-3KB heap).
+ * The output document structure:
+ * {
+ *   "_meta": { backup_version, firmware_version, device_id, device_type,
+ *              datetime, timezone, module_count },
+ *   "<namespace>": { ... module fields ..., "_v": <schema_version> },
+ *   ...
+ * }
+ *
+ * The _meta key is always written first. Unknown keys (e.g. _meta) are
+ * skipped silently during importAllConfig().
  *
  * @param outDoc Reference to the output JsonDocument (caller-owned).
  */
 void ConfigManager::exportAllConfig(JsonDocument& outDoc) {
     ESP_LOGI(TAG, "Exporting config for %u module(s)", _moduleCount);
+
+    // Write _meta first so it appears as the leading key in the output
+    JsonObject meta = outDoc["_meta"].to<JsonObject>();
+    buildBackupMeta(meta);
 
     for (uint8_t i = 0; i < _moduleCount; i++) {
         IConfigurable* mod = _modules[i];
@@ -298,12 +377,32 @@ void ConfigManager::exportAllConfig(JsonDocument& outDoc) {
  * document, calls applyConfig(), and persists via saveModuleConfig().
  * Modules whose namespace is not found in the input are skipped.
  *
+ * Keys present in the import document that do not match any registered module
+ * namespace (e.g. "_meta") are silently skipped. A DEBUG-level log is emitted
+ * for each unmatched key to aid troubleshooting without filling the serial log.
+ *
  * @param inDoc Reference to the input JsonDocument.
  * @return true if all found modules imported successfully.
  */
 bool ConfigManager::importAllConfig(JsonDocument& inDoc) {
     ESP_LOGI(TAG, "Importing config for %u module(s)", _moduleCount);
     bool allOk = true;
+
+    // Iterate over every top-level key in the import document and emit a debug
+    // log for keys that are not matched by any registered module (e.g. "_meta")
+    for (JsonPair kv : inDoc.as<JsonObject>()) {
+        const char* ns = kv.key().c_str();
+        bool matched = false;
+        for (uint8_t i = 0; i < _moduleCount; i++) {
+            if (strcmp(_modules[i]->getConfigNamespace(), ns) == 0) {
+                matched = true;
+                break;
+            }
+        }
+        if (!matched) {
+            ESP_LOGD(TAG, "Skipping unknown key '%s' during import", ns);
+        }
+    }
 
     for (uint8_t i = 0; i < _moduleCount; i++) {
         IConfigurable* mod = _modules[i];
@@ -334,49 +433,36 @@ bool ConfigManager::importAllConfig(JsonDocument& inDoc) {
 /**
  * @brief Register REST API routes for the config gateway.
  *
- * Routes:
- *   GET  /api/config         — returns a JSON array of registered namespace identifiers.
+ * Routes are registered with specific sub-paths BEFORE the generic parent
+ * to prevent ESPAsyncWebServer prefix matching from swallowing sub-route requests:
  *   GET  /api/config/backup  — exports all module configs as a downloadable JSON file.
  *   POST /api/config/restore — upload JSON config, validate, import, and restart.
  *                              Body limit: 8KB to prevent heap exhaustion.
+ *   GET  /api/config         — returns a JSON object with registered namespace identifiers.
  *
  * @param server Reference to the AsyncWebServer instance.
  */
 void ConfigManager::registerRoutes(AsyncWebServer& server) {
 #ifndef NATIVE_BUILD
-    // --- GET /api/config — list registered namespaces ---
-    server.on("/api/config", HTTP_GET, [this](AsyncWebServerRequest* request) {
-        JsonDocument doc;
-        JsonArray namespaces = doc["namespaces"].to<JsonArray>();
-        for (uint8_t i = 0; i < _moduleCount; i++) {
-            namespaces.add(_modules[i]->getConfigNamespace());
-        }
-        doc["count"] = _moduleCount;
-
-        String output;
-        serializeJson(doc, output);
-        request->send(200, "application/json", output);
-    });
-
     // --- GET /api/config/backup — export all config as downloadable JSON ---
+    // IMPORTANT: registered BEFORE /api/config to prevent prefix-match swallowing.
     server.on("/api/config/backup", HTTP_GET, [this](AsyncWebServerRequest* request) {
         JsonDocument doc;
         exportAllConfig(doc);
 
-        String output;
-        serializeJson(doc, output);
-
-        // Set Content-Disposition to trigger browser download
-        AsyncWebServerResponse* response = request->beginResponse(
-            200, "application/json", output);
-        response->addHeader("Content-Disposition",
+        // Use AsyncResponseStream to serialize directly to the response without
+        // an intermediate String buffer — critical for embedded memory constraints.
+        AsyncResponseStream* stream = request->beginResponseStream("application/json");
+        stream->addHeader("Content-Disposition",
             "attachment; filename=\"config-backup.json\"");
-        request->send(response);
+        serializeJson(doc, *stream);
+        request->send(stream);
 
-        ESP_LOGI("ConfigManager", "Config backup exported (%u bytes)", output.length());
+        ESP_LOGI(TAG, "Config backup exported via stream");
     });
 
     // --- POST /api/config/restore — upload JSON, validate, import, restart ---
+    // IMPORTANT: registered BEFORE /api/config to prevent prefix-match swallowing.
     server.on("/api/config/restore", HTTP_POST,
         [](AsyncWebServerRequest *request) {},
         NULL,
@@ -441,6 +527,22 @@ void ConfigManager::registerRoutes(AsyncWebServer& server) {
             }
         }
     );
+
+    // --- GET /api/config — list registered namespaces ---
+    // IMPORTANT: registered AFTER specific sub-paths to prevent prefix matching
+    // from swallowing /api/config/backup and /api/config/restore requests.
+    server.on("/api/config", HTTP_GET, [this](AsyncWebServerRequest* request) {
+        JsonDocument doc;
+        JsonArray namespaces = doc["namespaces"].to<JsonArray>();
+        for (uint8_t i = 0; i < _moduleCount; i++) {
+            namespaces.add(_modules[i]->getConfigNamespace());
+        }
+        doc["count"] = _moduleCount;
+
+        String output;
+        serializeJson(doc, output);
+        request->send(200, "application/json", output);
+    });
 #endif
 }
 

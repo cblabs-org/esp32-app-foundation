@@ -16,14 +16,20 @@
  *              Modules provide serialise/deserialise callbacks; they never touch
  *              LittleFS directly.
  *
+ *              Backup output includes a _meta envelope (backup_version,
+ *              firmware_version, device_id, device_type, datetime, timezone,
+ *              module_count) prepended as the first key in the JSON document.
+ *
  * Exported Functions/Classes:
  * - ConfigManager: Centralised configuration gateway
  *   - registerModule():      Register an IConfigurable module in the gateway
  *   - beginAll():            Load and apply config for all registered modules
  *   - saveModuleConfig():    Persist a single module's config to its namespace file
  *   - exportAllConfig():     Export all module configs into a master JSON document
+ *                            (includes _meta as first key)
  *   - importAllConfig():     Import configs from a master JSON document
-
+ *                            (_meta and other unknown keys are skipped silently)
+ *   - setMetaTimezone():     Register the timezone string for the _meta envelope
  *   - registerRoutes():      Register REST API routes (IWebContributor)
  *   - getTabName():          Return the UI tab name ("Backup")
  *   - getParentTab():        Return parent tab ("System")
@@ -35,9 +41,12 @@
 #ifndef NATIVE_BUILD
 #include <Arduino.h>
 #include <LittleFS.h>
+#include <WiFi.h>    // WiFi.macAddress() for _meta envelope
+#include <time.h>    // time(), gmtime_r(), strftime() for _meta datetime
 #else
 #include <string>
 #include <stdint.h>
+#include <ctime>     // time(), gmtime_r(), strftime() — native build
 #endif
 
 #include <ArduinoJson.h>
@@ -95,8 +104,9 @@ public:
     /**
      * @brief Export all registered module configs into a master JSON document.
      *
-     * Each module's config is nested under its namespace key. Includes _v
-     * for each section. Used for full-device backup.
+     * Writes a _meta envelope as the first key, then nests each module's config
+     * under its namespace key. Each section includes a _v schema version field.
+     * Used for full-device backup. The _meta key is silently skipped on import.
      *
      * @param outDoc Reference to the output JsonDocument (caller-owned).
      */
@@ -106,12 +116,25 @@ public:
      * @brief Import module configs from a master JSON document.
      *
      * Extracts each registered module's namespace section, calls applyConfig(),
-     * and persists via saveModuleConfig().
+     * and persists via saveModuleConfig(). Unknown top-level keys (e.g. "_meta")
+     * that do not match any registered module namespace are silently skipped;
+     * a DEBUG-level log is emitted for each unmatched key.
      *
      * @param inDoc Reference to the input JsonDocument containing config data.
      * @return true if all modules imported successfully.
      */
     bool importAllConfig(JsonDocument& inDoc);
+
+    /**
+     * @brief Register the current timezone string for inclusion in backup _meta.
+     *
+     * Intended to be called from TimeManager::applyConfig() after the timezone
+     * is resolved, so that the backup envelope reflects the configured TZ.
+     * If not called, the _meta timezone field defaults to "UTC".
+     *
+     * @param tz Null-terminated POSIX timezone string (e.g. "Europe/London").
+     */
+    void setMetaTimezone(const char* tz);
 
 
     // -------------------------------------------------------------------------
@@ -159,6 +182,18 @@ private:
     void loadModuleConfig(IConfigurable* module);
 
     /**
+     * @brief Populate the _meta envelope for a backup document.
+     *
+     * Writes backup_version, firmware_version, device_id, device_type,
+     * datetime, timezone, and module_count into the provided JsonObject.
+     * Hardware values (MAC, chip model, clock) are only available outside
+     * NATIVE_BUILD; safe defaults are used in the native test environment.
+     *
+     * @param meta Mutable reference to the target JsonObject.
+     */
+    void buildBackupMeta(JsonObject& meta);
+
+    /**
      * @brief Format the config file path for a given namespace.
      *
      * Writes "/mod/<ns>.json" (hardware) or "mod_<ns>.json" (NATIVE_BUILD)
@@ -176,5 +211,6 @@ private:
 
     IConfigurable* _modules[MAX_CONFIGURABLES] = {}; ///< Fixed-size registry of IConfigurable modules
     uint8_t _moduleCount = 0;                        ///< Number of registered modules
+    char _metaTimezone[64] = {};                     ///< Timezone string for backup _meta envelope (default: "UTC")
 
 };

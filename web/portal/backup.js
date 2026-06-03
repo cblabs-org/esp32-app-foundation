@@ -61,8 +61,37 @@
   // File input — show selected filename
   // -------------------------------------------------------------------------
   document.getElementById('backup-restore-file').addEventListener('change', (e) => {
-    const nameEl = document.getElementById('backup-file-name');
-    nameEl.textContent = e.target.files.length ? e.target.files[0].name : 'No file selected';
+    const nameEl    = document.getElementById('backup-file-name');
+    const statusEl  = document.getElementById('backup-restore-status');
+
+    if (!e.target.files.length) {
+      nameEl.textContent    = 'No file selected';
+      statusEl.textContent  = '';
+      return;
+    }
+
+    const file = e.target.files[0];
+    nameEl.textContent = file.name;
+
+    // Parse immediately so we can show a module summary (or an early error)
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const parsed = JSON.parse(evt.target.result);
+        const modules = Object.keys(parsed).filter((k) => k !== '_meta');
+        if (modules.length === 0) {
+          statusEl.style.color  = 'var(--warning)';
+          statusEl.textContent  = 'No module keys found in file.';
+        } else {
+          statusEl.style.color  = 'var(--primary)';
+          statusEl.textContent  = 'Will restore: ' + modules.join(', ');
+        }
+      } catch {
+        statusEl.style.color  = 'var(--error)';
+        statusEl.textContent  = 'Invalid JSON — cannot parse this file.';
+      }
+    };
+    reader.readAsText(file);
   });
 
   // -------------------------------------------------------------------------
@@ -95,7 +124,21 @@
       URL.revokeObjectURL(url);
 
       statusEl.style.color = 'var(--success)';
-      statusEl.textContent = 'Downloaded: ' + filename;
+      // Build a human-readable metadata summary if _meta is present
+      if (response._meta) {
+        const m = response._meta;
+        const count = m.module_count !== undefined ? m.module_count : '?';
+        const fwVer = m.firmware_version || 'unknown';
+        const device = (m.device_type || '') + (m.device_id ? ' (' + m.device_id + ')' : '');
+        const dt     = m.datetime ? m.datetime.replace(':00Z', 'Z') : '';
+        statusEl.textContent =
+          'Downloaded: ' + count + ' modules — firmware v' + fwVer +
+          (device ? ', ' + device : '') +
+          (dt ? ' — ' + dt : '');
+      } else {
+        // Older firmware — no _meta block; show just the filename
+        statusEl.textContent = 'Downloaded: ' + filename;
+      }
     } catch (error) {
       statusEl.style.color = 'var(--error)';
       statusEl.textContent = 'Download failed. Check connection.';
@@ -117,10 +160,10 @@
 
     const file = fileInput.files[0];
 
-    // Validate file size (client-side check — server enforces 8KB too)
-    if (file.size > 8192) {
+    // Validate file size (client-side check — server enforces 16 KB too)
+    if (file.size > 16384) {
       statusEl.style.color = 'var(--error)';
-      statusEl.textContent = 'File too large (max 8 KB).';
+      statusEl.textContent = 'File too large (max 16 KB).';
       return;
     }
 
@@ -129,13 +172,18 @@
 
     try {
       // Read the file as text and validate JSON before sending
-      const text = await file.text();
-      JSON.parse(text); // Validate JSON syntax
+      const text   = await file.text();
+      const parsed = JSON.parse(text); // Validate JSON syntax
+
+      // Strip _meta before posting — belt-and-braces even though the server
+      // already ignores it
+      const payload = { ...parsed };
+      delete payload._meta;
 
       await window.apiFetch('/api/config/restore', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: text
+        body: JSON.stringify(payload)
       });
 
       statusEl.style.color = 'var(--success)';

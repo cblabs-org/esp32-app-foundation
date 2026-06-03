@@ -126,12 +126,17 @@ bool Application::begin(const FrameworkConfig& config) {
     // WifiManager: inject ConfigManager and KeyManager dependencies, then register.
     // TimeManager: inject ConfigManager dependency, then register.
     // MCPServer: registered directly.
+    // OTAUpdateManager: heap-allocated here (header is forward-declared to avoid
+    //   LDF circular-include issues). Registered with ConfigManager BEFORE beginAll()
+    //   so that OTA channel/autoCheck config is loaded from /mod/ota.json on boot.
     _wifiManager.setConfigManager(&_configManager);
     _wifiManager.setKeyManager(&_keyManager);
     _configManager.registerModule(&_wifiManager);
     _configManager.registerModule(&_mcpServer);
     _timeManager.setConfigManager(&_configManager);
     _configManager.registerModule(&_timeManager);
+    _otaManager = new OTAUpdateManager();
+    _configManager.registerModule(_otaManager);
     // Downstream modules (U8G2DisplayModule, etc.) are registered by app code
     // via getConfigManager().registerModule() before begin() is called.
 
@@ -160,8 +165,7 @@ bool Application::begin(const FrameworkConfig& config) {
     _dataManager.begin();
     _statusReporter->reportStatus("Data services ready", 0.70f);
 
-    // --- Step 13: OTA — heap-allocate (header is forward-declared to avoid LDF issues) ---
-    _otaManager = new OTAUpdateManager();
+    // --- Step 13: OTA — wire Application dependency (allocated in Step 7) ---
     _otaManager->begin(*this);
     _statusReporter->reportStatus("Update service ready", 0.80f);
 

@@ -26,3 +26,6 @@ test/web/test-results/
 test/web/playwright-report/
 test/web/dist/
 include/.DS_Store
+
+# Native test config artifacts written to project root by pio test -e native
+mod_*.json
