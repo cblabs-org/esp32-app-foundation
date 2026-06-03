@@ -116,12 +116,13 @@ const MOCK_CONFIG_BACKUP = {
     device_type:      'ESP32-S3',
     datetime:         '2026-06-03T22:00:00Z',
     timezone:         'Europe/London',
-    module_count:     4,
+    module_count:     5,
   },
   wifi:    { ssid: 'TestNetwork', _v: 1 },
+  mcp:     { enabled: true, readOnly: false, _v: 1 },
+  time:    { timezone: 'Europe/London', ntpEnabled: true, _v: 1 },
   display: { brightness: 80, timeout: 30, _v: 1 },
   ota:     { channel: 'stable', autoCheck: true, _v: 1 },
-  mcp:     { enabled: true, _v: 1 },
 };
 
 const MOCK_CONFIG = {
