@@ -24,18 +24,24 @@
  * - OTAState: Lifecycle state enum for the OTA pipeline
  * - OTAProgressEvent: EventBus payload struct for OTA progress events
  * - OTAUpdateManager: Full OTA orchestrator service class
- *   - begin():            Initialize with Application dependencies
- *   - checkForUpdate():   Query GitHub for a newer firmware release
- *   - performUpdate():    Launch the full download→verify→flash pipeline in a FreeRTOS task
- *   - getState():         Query the current OTA state machine state
- *   - getLastOtaError():  Retrieve the last OTA error string
- *   - beginUpdate():      [Legacy] Initiate direct OTA update with size and MD5
- *   - writeStream():      [Legacy] Stream firmware data to the flash partition
- *   - endUpdate():        [Legacy] Finalize the direct OTA update
- *   - markAppValid():     Bless the running firmware, cancelling auto-rollback
- *   - rollbackFirmware(): Revert to the previous firmware partition and reboot
- *   - registerRoutes():   Register REST API routes (IWebContributor)
- *   - getTabName():       Return the UI tab name for this contributor
+ *   - begin():                Initialize with Application dependencies
+ *   - checkForUpdate():       Query GitHub for a newer firmware release
+ *   - performUpdate():        Launch the full download→verify→flash pipeline in a FreeRTOS task
+ *   - getState():             Query the current OTA state machine state
+ *   - getLastOtaError():      Retrieve the last OTA error string
+ *   - beginUpdate():          [Legacy] Initiate direct OTA update with size and MD5
+ *   - writeStream():          [Legacy] Stream firmware data to the flash partition
+ *   - endUpdate():            [Legacy] Finalize the direct OTA update
+ *   - markAppValid():         Bless the running firmware, cancelling auto-rollback
+ *   - rollbackFirmware():     Revert to the previous firmware partition and reboot
+ *   - registerRoutes():       Register REST API routes (IWebContributor)
+ *   - getTabName():           Return the UI tab name for this contributor
+ *   - getConfigNamespace():   Return "ota" (IConfigurable)
+ *   - getSchemaVersion():     Return 1 (IConfigurable)
+ *   - applyConfig():          Apply OTA config from JSON section (IConfigurable)
+ *   - serializeConfig():      Serialize OTA config to JSON section (IConfigurable)
+ *   - migrateConfig():        Migrate from older schema version (IConfigurable)
+ *   - resetConfig():          Restore OTA config factory defaults (IConfigurable)
  */
 
 #pragma once
@@ -51,6 +57,7 @@ class Stream {};
 #endif
 
 #include "../../include/interfaces/IWebContributor.hpp"
+#include "../../include/interfaces/IConfigurable.hpp"
 
 // ---------------------------------------------------------------------------
 // Forward declarations — Hollywood Principle: never include other module headers
@@ -107,11 +114,16 @@ struct OTAProgressEvent {
 /**
  * @brief Full OTA orchestrator for GitHub-based firmware updates.
  *
- * Inherits IWebContributor for REST API route registration. Manages the
- * full lifecycle from release check through download, verification, flash,
- * and reboot. Also retains the legacy direct-upload path for web-based OTA.
+ * Inherits IWebContributor for REST API route registration and IConfigurable
+ * for persisted configuration via ConfigManager. Manages the full lifecycle
+ * from release check through download, verification, flash, and reboot.
+ * Also retains the legacy direct-upload path for web-based OTA.
+ *
+ * IConfigurable fields (namespace: "ota", schema version: 1):
+ *   - channel   (char[16]): OTA release channel ("stable" or "beta")
+ *   - autoCheck (bool):     Whether to auto-check for updates on boot
  */
-class OTAUpdateManager : public IWebContributor {
+class OTAUpdateManager : public IWebContributor, public IConfigurable {
 public:
     /**
      * @brief Default constructor.
@@ -241,7 +253,68 @@ public:
      */
     int getTabOrder() const override { return 50; }
 
+    // -------------------------------------------------------------------------
+    // IConfigurable Interface
+    // -------------------------------------------------------------------------
+
+    /**
+     * @brief Return the unique config namespace for OTA settings.
+     * @return "ota" — maps to /mod/ota.json on device filesystem.
+     */
+    const char* getConfigNamespace() const override;
+
+    /**
+     * @brief Return the current schema version for the OTA config format.
+     * @return 1 — initial schema version.
+     */
+    int getSchemaVersion() const override;
+
+    /**
+     * @brief Apply OTA configuration values from a parsed JSON section.
+     *
+     * Reads "channel" and "autoCheck" from the provided section and applies
+     * them to the internal state. Missing keys fall back to safe defaults.
+     *
+     * @param section Read-only reference to the JSON object containing config keys.
+     */
+    void applyConfig(const JsonObject& section) override;
+
+    /**
+     * @brief Serialize current OTA configuration into a JSON section.
+     *
+     * Writes "channel" and "autoCheck" into the provided section for
+     * persistence by ConfigManager.
+     *
+     * @param section Mutable reference to the target JSON object.
+     */
+    void serializeConfig(JsonObject& section) const override;
+
+    /**
+     * @brief Migrate OTA configuration from an older schema version.
+     *
+     * Logs the migration attempt and returns true (no migration logic required
+     * at schema version 1). Override in future versions when fields change.
+     *
+     * @param section   Mutable reference to the JSON config section.
+     * @param fromVersion The stored schema version being migrated from.
+     * @return true — migration always succeeds for v1.
+     */
+    bool migrateConfig(JsonObject& section, int fromVersion) override;
+
+    /**
+     * @brief Reset OTA configuration to factory defaults.
+     *
+     * Sets channel to "stable" and autoCheck to true.
+     */
+    void resetConfig() override;
+
 private:
+    // -------------------------------------------------------------------------
+    // IConfigurable config state
+    // -------------------------------------------------------------------------
+    char _channel[16] = "stable";  ///< OTA release channel ("stable" or "beta")
+    bool _autoCheck   = true;      ///< Whether to auto-check for updates on boot
+
     // -------------------------------------------------------------------------
     // Legacy state
     // -------------------------------------------------------------------------

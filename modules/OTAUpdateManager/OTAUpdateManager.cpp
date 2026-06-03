@@ -15,20 +15,26 @@
  *
  * Exported Classes:
  * - OTAUpdateManager: [Class implementation]
- *   - begin():            Store Application reference for dependency access
- *   - checkForUpdate():   Query GitHub for new releases via GithubClient
- *   - performUpdate():    Launch the download→verify→flash FreeRTOS task
- *   - performUpdateTask(): Execute the full OTA pipeline (runs in task context)
- *   - otaTaskWrapper():   Static entry point for FreeRTOS xTaskCreate
- *   - publishProgress():  Publish OTAProgressEvent to the EventBus
- *   - getState():         Return the current OTA state machine state
- *   - getLastOtaError():  Return the last error string
- *   - beginUpdate():      Legacy: initiate direct OTA with size and MD5
- *   - writeStream():      Legacy: stream data to the flash partition
- *   - endUpdate():        Legacy: finalize the direct OTA update
- *   - markAppValid():     Bless the running firmware
- *   - rollbackFirmware(): Revert to the previous firmware partition
- *   - registerRoutes():   Register REST API route handlers
+ *   - begin():              Store Application reference for dependency access
+ *   - checkForUpdate():     Query GitHub for new releases via GithubClient
+ *   - performUpdate():      Launch the download→verify→flash FreeRTOS task
+ *   - performUpdateTask():  Execute the full OTA pipeline (runs in task context)
+ *   - otaTaskWrapper():     Static entry point for FreeRTOS xTaskCreate
+ *   - publishProgress():    Publish OTAProgressEvent to the EventBus
+ *   - getState():           Return the current OTA state machine state
+ *   - getLastOtaError():    Return the last error string
+ *   - beginUpdate():        Legacy: initiate direct OTA with size and MD5
+ *   - writeStream():        Legacy: stream data to the flash partition
+ *   - endUpdate():          Legacy: finalize the direct OTA update
+ *   - markAppValid():       Bless the running firmware
+ *   - rollbackFirmware():   Revert to the previous firmware partition
+ *   - registerRoutes():     Register REST API route handlers
+ *   - getConfigNamespace(): Return "ota" (IConfigurable)
+ *   - getSchemaVersion():   Return 1 (IConfigurable)
+ *   - applyConfig():        Apply OTA config from JSON section (IConfigurable)
+ *   - serializeConfig():    Serialize OTA config to JSON section (IConfigurable)
+ *   - migrateConfig():      Migrate from older schema version (IConfigurable)
+ *   - resetConfig():        Restore OTA config factory defaults (IConfigurable)
  */
 
 #include "OTAUpdateManager.hpp"
@@ -68,8 +74,87 @@ static const char* TAG = "OTAUpdateManager";
 OTAUpdateManager::OTAUpdateManager() {}
 
 // ---------------------------------------------------------------------------
-// New Orchestrator API
+// IConfigurable Implementation
 // ---------------------------------------------------------------------------
+
+/**
+ * @brief Return the unique config namespace for OTA settings.
+ *
+ * Maps to /mod/ota.json on the device filesystem, managed exclusively
+ * by ConfigManager. Module code never reads or writes this file directly.
+ */
+const char* OTAUpdateManager::getConfigNamespace() const {
+    return "ota";
+}
+
+/**
+ * @brief Return the current schema version for the OTA config format.
+ *
+ * Version 1: initial schema with "channel" and "autoCheck" fields.
+ * Increment this when a future firmware change requires a config migration.
+ */
+int OTAUpdateManager::getSchemaVersion() const {
+    return 1;
+}
+
+/**
+ * @brief Apply OTA configuration values from a parsed JSON section.
+ *
+ * Reads "channel" and "autoCheck" from the section. Missing keys fall
+ * back to safe defaults ("stable" / true) via ArduinoJson's | operator.
+ *
+ * @param section Read-only reference to the JSON object containing config keys.
+ */
+void OTAUpdateManager::applyConfig(const JsonObject& section) {
+    const char* ch = section["channel"] | "stable";
+    strlcpy(_channel, ch, sizeof(_channel));
+    _autoCheck = section["autoCheck"] | true;
+    ESP_LOGI(TAG, "Config applied — channel='%s' autoCheck=%d", _channel, (int)_autoCheck);
+}
+
+/**
+ * @brief Serialize current OTA configuration into a JSON section.
+ *
+ * Writes "channel" and "autoCheck" into the provided section for
+ * persistence by ConfigManager (stored at /mod/ota.json).
+ *
+ * @param section Mutable reference to the target JSON object.
+ */
+void OTAUpdateManager::serializeConfig(JsonObject& section) const {
+    section["channel"]   = _channel;
+    section["autoCheck"] = _autoCheck;
+}
+
+/**
+ * @brief Migrate OTA configuration from an older schema version.
+ *
+ * At schema version 1 there are no migration transformations required.
+ * Logs the attempt for diagnostics and returns true to indicate success.
+ * Extend this method in future firmware versions when fields change.
+ *
+ * @param section   Mutable reference to the JSON config section.
+ * @param fromVersion The stored schema version being migrated from.
+ * @return true — migration always succeeds for v1.
+ */
+bool OTAUpdateManager::migrateConfig(JsonObject& section, int fromVersion) {
+    ESP_LOGI(TAG, "migrateConfig() called: v%d → v%d (no-op at v1)", fromVersion, getSchemaVersion());
+    (void)section;
+    return true;
+}
+
+/**
+ * @brief Reset OTA configuration to factory defaults.
+ *
+ * Sets channel to "stable" and autoCheck to true. ConfigManager calls
+ * saveModuleConfig() afterwards to persist the reset state.
+ */
+void OTAUpdateManager::resetConfig() {
+    strlcpy(_channel, "stable", sizeof(_channel));
+    _autoCheck = true;
+    ESP_LOGI(TAG, "Config reset to defaults — channel='stable' autoCheck=true");
+}
+
+
 
 /**
  * @brief Initialize the OTA manager with dependencies from the Application.
