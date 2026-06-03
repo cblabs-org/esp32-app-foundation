@@ -109,15 +109,24 @@ const MOCK_MCP_RPC = {
 };
 
 const MOCK_CONFIG_BACKUP = {
-  wifi:    { ssid: 'TestNetwork', password: '***' },
-  display: { brightness: 80, timeout: 30 },
-  ota:     { channel: 'stable', autoCheck: true },
-  keys:    { weather_key: '***', api_token: '***' },
+  _meta: {
+    backup_version:   1,
+    firmware_version: '1.0.0-test',
+    device_id:        'AA:BB:CC:DD:EE:FF',
+    device_type:      'ESP32-S3',
+    datetime:         '2026-06-03T22:00:00Z',
+    timezone:         'Europe/London',
+    module_count:     4,
+  },
+  wifi:    { ssid: 'TestNetwork', _v: 1 },
+  display: { brightness: 80, timeout: 30, _v: 1 },
+  ota:     { channel: 'stable', autoCheck: true, _v: 1 },
+  mcp:     { enabled: true, _v: 1 },
 };
 
 const MOCK_CONFIG = {
-  namespaces: ['wifi', 'display', 'ota', 'keys'],
-  count: 4,
+  namespaces: ['wifi', 'mcp', 'time', 'display', 'ota'],
+  count: 5,
 };
 
 // ── Helpers ──────────────────────────────────────────────────────────
