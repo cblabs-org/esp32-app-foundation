@@ -188,6 +188,11 @@ void TimeManager::applyConfig(const JsonObject& section) {
     // --- Mark as user-configured ---
     _configured = true;
 
+    // --- Notify ConfigManager of the active timezone for _meta envelope ---
+    if (_configManager != nullptr && strlen(_timezone) > 0) {
+        _configManager->setMetaTimezone(_timezone);
+    }
+
     ESP_LOGI(TAG, "Config applied — timezone: %s (%s), NTP: %s",
              _timezone, _posixTz, _ntpServer1);
 }
@@ -534,6 +539,11 @@ void TimeManager::applyConfig(const JsonObject& section) {
         _posixTz[sizeof(_posixTz) - 1] = '\0';
     }
     _configured = true;
+
+    // --- Notify ConfigManager of the active timezone for _meta envelope ---
+    if (_configManager != nullptr && strlen(_timezone) > 0) {
+        _configManager->setMetaTimezone(_timezone);
+    }
 }
 
 void TimeManager::serializeConfig(JsonObject& section) const {
