@@ -52,6 +52,7 @@ predate the formal PA pipeline and are filed retrospectively.
 | [pr-13-test-app](./pr-13-test-app/PROJECT.md) | Foundation Test App (DiagnosticsBoard + Display Lifecycle Fixes) | ✅ **COMPLETE** `c92d3ea` | Session 4cc5a22f |
 | [pr-14-ota-production](./pr-14-ota-production/PROJECT.md) | OTA Production System (SemVer, channels, multi-arch, rollback wiring, config lifecycle, CI/CD) | 📋 **PLANNING** — 9 WOs defined, awaiting user approval | Session 2fdb967a |
 | [pr-15-web-testing](./pr-15-web-testing/PROJECT.md) | Web Portal Testing Infrastructure (Mock Server + Playwright + Build Gate) | ✅ **MERGED** `f03972e` — 48 tests | Session 97274580 |
+| [pr-16-backup-overhaul](./pr-16-backup-overhaul/PROJECT.md) | Backup System Overhaul (Route fix, `_meta` envelope, OTA IConfigurable, streaming response) | 🔄 **WIP** — WO1 in progress | Session f6e289ed |
 
 ---
 
@@ -63,5 +64,5 @@ predate the formal PA pipeline and are filed retrospectively.
 
 ---
 
-*Updated by Principal Architect — Context Archive Integration — 2026-06-02*
+*Updated by Principal Architect — PR-16 Backup Overhaul initiated — 2026-06-03*
 - [TimeManager Upgrade Port](./pr-time-manager-upgrade/PROJECT.md)
