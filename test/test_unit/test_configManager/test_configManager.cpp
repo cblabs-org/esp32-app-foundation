@@ -383,6 +383,80 @@ TEST_F(ConfigManagerTest, ImportAllConfig_MissingNamespace_Skipped) {
 
 
 // =============================================================================
+// Test Group 6: _meta envelope — export/import WO1 behaviour
+// =============================================================================
+
+TEST_F(ConfigManagerTest, ExportAllConfig_ContainsMetaKey) {
+    MockModule modA;
+    MockModuleB modB;
+    configManager.registerModule(&modA);
+    configManager.registerModule(&modB);
+
+    JsonDocument outDoc;
+    configManager.exportAllConfig(outDoc);
+
+    // _meta must be present and must be a JSON object
+    ASSERT_TRUE(outDoc.containsKey("_meta"));
+    JsonObject meta = outDoc["_meta"].as<JsonObject>();
+    EXPECT_FALSE(meta.isNull());
+
+    // module_count must equal the number of registered modules (2)
+    EXPECT_EQ(meta["module_count"].as<int>(), 2);
+}
+
+TEST_F(ConfigManagerTest, ImportAllConfig_SkipsMetaKey) {
+    MockModule mod;
+    configManager.registerModule(&mod);
+
+    // Build a document that contains both a _meta envelope AND a valid namespace
+    JsonDocument inDoc;
+    JsonObject meta = inDoc["_meta"].to<JsonObject>();
+    meta["backup_version"]   = 1;
+    meta["firmware_version"] = "1.0.0-test";
+    meta["module_count"]     = 1;
+
+    JsonObject section = inDoc["testmod"].to<JsonObject>();
+    section["setting1"] = 77;
+    section["setting2"] = true;
+
+    // Must not crash, must return true
+    EXPECT_TRUE(configManager.importAllConfig(inDoc));
+
+    // The valid namespace must have been applied
+    EXPECT_TRUE(mod.applyConfigCalled);
+    EXPECT_EQ(mod.setting1, 77);
+    EXPECT_TRUE(mod.setting2);
+}
+
+TEST_F(ConfigManagerTest, ExportAllConfig_OtaNamespacePresent) {
+    // Use a simple MockOtaConfigurable stub with namespace "ota"
+    class MockOtaConfigurable : public IConfigurable {
+    public:
+        const char* getConfigNamespace() const override { return "ota"; }
+        int getSchemaVersion() const override { return 1; }
+
+        void applyConfig(const JsonObject& section) override {}
+
+        void serializeConfig(JsonObject& section) const override {
+            section["channel"]   = "stable";
+            section["autoCheck"] = true;
+        }
+
+        void resetConfig() override {}
+    };
+
+    MockOtaConfigurable otaMod;
+    configManager.registerModule(&otaMod);
+
+    JsonDocument outDoc;
+    configManager.exportAllConfig(outDoc);
+
+    ASSERT_TRUE(outDoc.containsKey("ota"));
+    EXPECT_STREQ(outDoc["ota"]["channel"].as<const char*>(), "stable");
+    EXPECT_TRUE(outDoc["ota"]["autoCheck"].as<bool>());
+}
+
+// =============================================================================
 // Test Group 7: IWebContributor
 // =============================================================================
 
