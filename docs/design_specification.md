@@ -746,6 +746,122 @@ Consumes EventBus topic `"display.message"` via static callback + `void* ctx`.
 Maintains a fixed circular buffer (`MessageEntry[8]`). Uses late binding via
 `begin(EventBus*)` — no EventBus dependency at construction time.
 
+### 7.8 Display Module Object Model (Target Architecture)
+
+> **Status**: This section documents the **target architecture** for `U8G2DisplayModule`
+> following the OO refactoring review of 2026-06 (see D34–D38 in §17). The implementation
+> plan for this refactoring is tracked as PR-16 in the PA workspace.
+
+#### 7.8.1 Hierarchical Sub-Object API
+
+The display module exposes three first-class sub-objects. Callers navigate these directly
+rather than calling flat methods on the root module:
+
+```
+display
+ ├── .carousel                 CarouselEngine — manages the rotating board pool
+ ├── .boards                   BoardCatalog   — named, concrete board references
+ │    ├── .boot                BootBoard&
+ │    ├── .wifiWizard          WiFiWizardBoard&
+ │    ├── .otaProgress         OTAProgressBoard&
+ │    └── .error               ErrorBoard&
+ └── .screensaver              ScreensaverController — display-intrinsic idle policy
+```
+
+Callers configure boards via their **concrete types** (the domain API differs per board).
+The `IDisplayBoard*` interface appears only at engine boundaries (`showModal`, `carousel.add`),
+where the render loop needs polymorphism but not board-specific methods.
+
+#### 7.8.2 Canonical API Usage
+
+```cpp
+// Configure a board (data concern — concrete type, caller's domain):
+display.boards.otaProgress.setProgress(0.5f, "Downloading...");
+display.boards.wifiWizard.configure(hostname);
+
+// Surface a board (presentation concern — root module, IDisplayBoard* boundary):
+display.showModal(&display.boards.otaProgress);
+display.clearModal();
+display.showBase(&display.boards.configuringStatus);
+
+// Carousel (sub-object — manages its own pool and timing):
+display.carousel.add(&myClockBoard);
+display.carousel.suspend();
+display.carousel.resume();
+display.carousel.setInterval(8000);
+
+// Screensaver (display-intrinsic — driven by inactivity, not app decision):
+display.screensaver.setDimTimeout(60000);
+display.screensaver.setBlankTimeout(300000);
+display.screensaver.setPolicy(ScreensaverPolicy::FullSleep);
+display.screensaver.resetActivity();     // called by App on user interaction
+```
+
+#### 7.8.3 Display Layer Priority Stack
+
+Three distinct rendering layers with explicit priority. A layer at lower priority
+automatically yields to any layer above it that is active:
+
+```
+┌──────────────────────────────────────────┐  Priority
+│  MODAL                                   │  HIGHEST
+│  display.showModal(IDisplayBoard*)       │  transient, app-driven
+│  display.clearModal()                    │  overrides base and screensaver
+├──────────────────────────────────────────┤
+│  BASE / CAROUSEL                         │  MID
+│  display.showBase(IDisplayBoard*)        │  persistent, app-driven
+│  display.carousel.*                      │  overrides screensaver
+├──────────────────────────────────────────┤
+│  SCREENSAVER                             │  LOWEST
+│  display.screensaver.*                   │  display-driven (inactivity timer)
+└──────────────────────────────────────────┘  yields to modal and base
+```
+
+**Critical**: `ScreensaverBoard` must NOT be pushed via `showModal()`. Doing so assigns
+it MODAL priority, allowing it to suppress legitimate OTA progress and wizard overlays.
+
+#### 7.8.4 Board Taxonomy: System vs User-Surfaced
+
+Not all boards are exposed in `display.boards`. System boards are driven by
+Application-layer state transitions; the module manages their rendering internally:
+
+| Board | Taxonomy | Visibility | Who controls |
+|---|---|---|---|
+| `BootBoard` | System | Not in `display.boards` | App via `display.reportStatus()` |
+| `ConfiguringStatusBoard` | System | Not in `display.boards` | App via `display.showBase()` |
+| `ScreensaverBoard` | Display-intrinsic | In `display.screensaver` | Screensaver sub-object internally |
+| `OTAProgressBoard` | User-surfaced | `display.boards.otaProgress` | Caller (OTA module) |
+| `WiFiWizardBoard` | User-surfaced | `display.boards.wifiWizard` | App (`onWifiAPStarted`) |
+| `ErrorBoard` | User-surfaced | `display.boards.error` | Any module via `display.reportError()` |
+| App-defined boards | User-surfaced | Registered via `display.carousel.add()` | Application |
+
+#### 7.8.5 Service Module Boundary
+
+The display module is a **pure service** — it accepts commands and renders. It does not
+poll `Application` state or make decisions based on `AppState`. All "when to show what"
+decisions belong to the Application layer:
+
+```cpp
+// Application owns state transitions — display is driven, not driving:
+void Application::onEnterConfiguring() {
+    _display.carousel.suspend();
+    _display.showBase(&_display.boards.configuringStatus);
+}
+
+void Application::onWifiAPStarted(const char* hostname) {
+    _display.boards.wifiWizard.configure(hostname);
+    _display.showModal(&_display.boards.wifiWizard);
+}
+
+void Application::onWifiConnected() { _display.clearModal(); }
+void Application::onEnterRunning()  { _display.carousel.resume(); }
+```
+
+`Application*` is removed from `U8G2DisplayModule`'s member variables. The module
+publishes `display.sleep`, `display.wake`, `display.board.changed` events via EventBus
+but does not read from the Application. The screensaver sub-object manages its own
+inactivity timer without needing application state.
+
 ---
 
 ## 8. Configuration Architecture
@@ -2256,6 +2372,11 @@ This section tracks decisions made and questions still to resolve.
 | D24 | `build_fonts.py`/`generate_layouts.py` as standalone CLI, not PIO hooks | Avoids breaking builds if input files are missing |
 | D25 | `U8G2_DISPLAY_TYPE` macro for display controller selection | Overridable via `build_flags`; default SSD1306 128x64 |
 | D26 | Dual framework: Arduino + ESP-IDF | OTA rollback, IDF logging, DeviceCrypto require IDF; display/web libs require Arduino |
+| D34 | Display module redesigned as pure service: `Application*` removed from member variables | Display module was polling `AppState`, `WifiManager`, and `ConfigGates` inside `tick()` — business logic in a hardware presenter. Application layer now owns all "when to show what" decisions; display module owns only rendering, carousel timing, and screensaver inactivity policy |
+| D35 | Hierarchical COM-style sub-object API for display module: `display.carousel`, `display.boards.*`, `display.screensaver` | Flat `getBootBoard()` / `getWifiWizard()` / etc. accessors exposed private concrete types with no hierarchy and required callers to three-step orchestrate (configure + take address + pushModal). Sub-objects with domain meaning are now navigable directly |
+| D36 | Concrete board types at caller layer; `IDisplayBoard*` only at engine boundaries | Callers need board-specific APIs (`setProgress()`, `configure()`); abstracting to `IDisplayBoard&` destroys the value of the hierarchy. Interface is used only where polymorphism is genuinely needed: `showModal(IDisplayBoard*)`, `carousel.add(IDisplayBoard*)` |
+| D37 | Screensaver is a distinct display-intrinsic policy layer (not a modal) | Pushing `ScreensaverBoard` via `showModal()` assigned it MODAL priority, allowing it to suppress OTA progress and wizard overlays. Screensaver is the lowest of three explicit rendering layers (Modal → Base/Carousel → Screensaver), driven by inactivity timer, not application decision |
+| D38 | Board taxonomy split: system boards (internal), user-surfaced boards (in `display.boards`), display-intrinsic boards (in `display.screensaver`) | Not all boards should be externally configurable. `BootBoard` and `ConfiguringStatusBoard` are driven by Application state transitions; exposing them via getters invited callers to bypass the module's lifecycle management |
 
 ### Open Questions
 
@@ -2281,4 +2402,5 @@ This section tracks decisions made and questions still to resolve.
 *This document is a living specification. It was updated on 2026-05-22 to reflect
 all architectural decisions made during PR-01 through PR-08 implementation,
 including the unified logging/observability architecture (§11A) and ArduinoJson
-v7 migration.*
+v7 migration. Updated 2026-06-03 to add §7.8 (Display Module Object Model target
+architecture) and D34–D38 (display module OO refactoring decisions).*
