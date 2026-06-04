@@ -23,7 +23,7 @@
  *              "display.sleep", "display.wake", and "display.board.changed"
  *              events via EventBus. Implements IConfigurable via ConfigManager
  *              gateway for persistent display settings (namespace: "display",
- *              schema version: 2). Implements IWebContributor for REST API
+ *              schema version: 3). Implements IWebContributor for REST API
  *              routes under /api/display/ and portal tab "App" (order 30).
  *
  * Exported Classes:
@@ -49,9 +49,9 @@
  *   - reportError():        Delegate to ErrorBoard (fatal) and show it
  *   - clearStatus():        Mark BootBoard complete, advance if showing it
  *
- *   IConfigurable (namespace: "display", schema v2):
+ *   IConfigurable (namespace: "display", schema v3):
  *   - getConfigNamespace(): Return "display"
- *   - getSchemaVersion():   Return 2
+ *   - getSchemaVersion():   Return 3
  *   - applyConfig():        Apply display settings from JSON section
  *   - serializeConfig():    Serialize display settings to JSON section
  *   - resetConfig():        Restore factory defaults
@@ -295,15 +295,16 @@ public:
 
     /**
      * @brief Return the current schema version for display config.
-     * @return 1
+     * @return 3
      */
-    int getSchemaVersion() const override { return 2; }
+    int getSchemaVersion() const override { return 3; }
 
     /**
      * @brief Apply display settings from a parsed JSON section.
      *
-     * Reads brightness, flip, sleepTimeout, and rotationInterval from the
-     * JSON object and applies them to internal state and hardware.
+     * Reads brightness, flip, screensaverEnabled, dimTimeout, blankTimeout,
+     * rotationInterval, and targetFps from the JSON object and applies them
+     * to internal state and hardware. Migrates legacy sleepTimeout config.
      *
      * @param section Read-only JSON object containing display config keys.
      */
@@ -312,8 +313,8 @@ public:
     /**
      * @brief Serialize current display settings into a JSON section.
      *
-     * Writes brightness, flip, sleepTimeout, and rotationInterval to the
-     * JSON object.
+     * Writes brightness, flip, screensaverEnabled, dimTimeout, blankTimeout,
+     * rotationInterval, targetFps, and clockFontSize to the JSON object.
      *
      * @param section Mutable JSON object to write config into.
      */
@@ -322,8 +323,9 @@ public:
     /**
      * @brief Reset display settings to factory defaults.
      *
-     * Sets: brightness=255, flipScreen=false, sleepTimeout=300000ms,
-     * rotationInterval=8000ms. Applies hardware settings.
+     * Sets: brightness=255, flipScreen=false, screensaverEnabled=true,
+     * dimTimeout=150000ms, blankTimeout=300000ms, rotationInterval=8000ms.
+     * Applies hardware settings.
      */
     void resetConfig() override;
 

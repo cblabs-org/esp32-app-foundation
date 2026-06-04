@@ -480,17 +480,41 @@ void U8G2DisplayModule::clearStatus() {
  * @brief Apply display settings from a parsed JSON section.
  *
  * Called by ConfigManager during beginAll(). Reads brightness, flip,
- * sleepTimeout, rotationInterval, and targetFps from the JSON object
- * and applies them to internal state and hardware.
+ * screensaverEnabled, dimTimeout, blankTimeout, rotationInterval, and
+ * targetFps from the JSON object and applies them to internal state
+ * and hardware.
+ *
+ * Provides migration from the legacy single-key "sleepTimeout" config:
+ * if "sleepTimeout" is present and the new keys are absent, derives
+ * dimTimeout = sleepTimeout / 2 and blankTimeout = sleepTimeout.
  *
  * @param section Read-only JSON object containing display config keys.
  */
 void U8G2DisplayModule::applyConfig(const JsonObject& section) {
     _brightness         = section["brightness"]      | (uint8_t)255;
     _flipScreen         = section["flip"]            | false;
-    unsigned long sleepTimeoutMs = section["sleepTimeout"] | (unsigned long)300000;
-    _screensaver.setBlankTimeout(sleepTimeoutMs);
-    _screensaver.setDimTimeout(sleepTimeoutMs / 2);
+
+    // --- Screensaver settings (with legacy migration) ---
+    bool screensaverEnabled = section["screensaverEnabled"] | true;
+    _screensaver.setEnabled(screensaverEnabled);
+
+    if (section.containsKey("dimTimeout")) {
+        // --- New-style config: independent timeouts ---
+        unsigned long dimTimeoutMs   = section["dimTimeout"]   | (unsigned long)150000;
+        unsigned long blankTimeoutMs = section["blankTimeout"]  | (unsigned long)300000;
+        _screensaver.setDimTimeout(dimTimeoutMs);
+        _screensaver.setBlankTimeout(blankTimeoutMs);
+    } else if (section.containsKey("sleepTimeout")) {
+        // --- Migration: derive from legacy sleepTimeout ---
+        unsigned long sleepTimeoutMs = section["sleepTimeout"] | (unsigned long)300000;
+        _screensaver.setDimTimeout(sleepTimeoutMs / 2);
+        _screensaver.setBlankTimeout(sleepTimeoutMs);
+    } else {
+        // --- Defaults (no config present) ---
+        _screensaver.setDimTimeout(150000);
+        _screensaver.setBlankTimeout(300000);
+    }
+
     unsigned long rotationInterval = section["rotationInterval"] | (unsigned long)8000;
     _carousel.setInterval(rotationInterval);
     _targetFrameIntervalMs = 1000UL / (section["targetFps"] | (uint8_t)30);
@@ -507,44 +531,47 @@ void U8G2DisplayModule::applyConfig(const JsonObject& section) {
     _u8g2.setFlipMode(_flipScreen ? 1 : 0);
 #endif
 
-    ESP_LOGI(TAG, "Config applied (brightness=%d, flip=%d, sleep=%lu)",
-             _brightness, _flipScreen, _screensaver.getBlankTimeout());
+    ESP_LOGI(TAG, "Config applied (brightness=%d, flip=%d, screensaver=%d, dim=%lu, blank=%lu)",
+             _brightness, _flipScreen, screensaverEnabled,
+             _screensaver.getDimTimeout(), _screensaver.getBlankTimeout());
 }
 
 /**
  * @brief Serialize current display settings into a JSON section.
  *
- * Called by ConfigManager during saveModuleConfig(). Writes the five
- * display config keys (brightness, flip, sleepTimeout, rotationInterval,
- * targetFps) into the provided JSON object. ConfigManager appends the
- * _v field separately.
+ * Called by ConfigManager during saveModuleConfig(). Writes the display
+ * config keys (brightness, flip, screensaverEnabled, dimTimeout,
+ * blankTimeout, rotationInterval, targetFps, clockFontSize) into the
+ * provided JSON object. ConfigManager appends the _v field separately.
  *
  * @param section Mutable JSON object to write config into.
  */
 void U8G2DisplayModule::serializeConfig(JsonObject& section) const {
-    section["brightness"]       = _brightness;
-    section["flip"]             = _flipScreen;
-    section["sleepTimeout"]     = _screensaver.getBlankTimeout();
-    section["rotationInterval"] = _carousel.getInterval();
-    section["targetFps"]        = (uint8_t)(1000UL / _targetFrameIntervalMs);
-    section["clockFontSize"]    = _clockFontSize;
+    section["brightness"]          = _brightness;
+    section["flip"]                = _flipScreen;
+    section["screensaverEnabled"]  = _screensaver.isEnabled();
+    section["dimTimeout"]          = _screensaver.getDimTimeout();
+    section["blankTimeout"]        = _screensaver.getBlankTimeout();
+    section["rotationInterval"]    = _carousel.getInterval();
+    section["targetFps"]           = (uint8_t)(1000UL / _targetFrameIntervalMs);
+    section["clockFontSize"]       = _clockFontSize;
 }
 
 /**
  * @brief Reset display settings to factory defaults.
  *
- * Sets: brightness=255, flipScreen=false, sleepTimeout=300000ms,
- * rotationInterval=8000ms, targetFrameIntervalMs=33ms (30 FPS).
- * Applies hardware settings. ConfigManager will call
- * saveModuleConfig() afterwards to persist.
+ * Sets: brightness=255, flipScreen=false, screensaverEnabled=true,
+ * dimTimeout=150000ms, blankTimeout=300000ms, rotationInterval=8000ms,
+ * targetFrameIntervalMs=33ms (30 FPS). Applies hardware settings.
+ * ConfigManager will call saveModuleConfig() afterwards to persist.
  */
 void U8G2DisplayModule::resetConfig() {
     // --- Set factory defaults ---
     _brightness         = 255;
     _flipScreen         = false;
-    unsigned long sleepTimeoutMs = 300000;
-    _screensaver.setBlankTimeout(sleepTimeoutMs);
-    _screensaver.setDimTimeout(sleepTimeoutMs / 2);
+    _screensaver.setEnabled(true);
+    _screensaver.setDimTimeout(150000);
+    _screensaver.setBlankTimeout(300000);
     _carousel.setInterval(8000);
     _targetFrameIntervalMs = 33;
     _clockFontSize      = 2;
@@ -674,13 +701,16 @@ void U8G2DisplayModule::registerRoutes(AsyncWebServer& server) {
     // --- GET /api/display/status — current display state ---
     server.on("/api/display/status", HTTP_GET, [this](AsyncWebServerRequest* request) {
         JsonDocument doc;
-        doc["brightness"]       = _brightness;
-        doc["flip"]             = _flipScreen;
-        doc["sleeping"]         = _screensaver.isBlanked();
-        doc["sleepTimeout"]     = _screensaver.getBlankTimeout();
-        doc["rotationInterval"] = _carousel.getInterval();
-        doc["boardCount"]       = _carousel.boardCount();
-        doc["clockFontSize"]    = _clockFontSize;
+        doc["brightness"]          = _brightness;
+        doc["flip"]                = _flipScreen;
+        doc["screensaverEnabled"]  = _screensaver.isEnabled();
+        doc["dimmed"]              = _screensaver.isDimmed();
+        doc["sleeping"]            = _screensaver.isBlanked();
+        doc["dimTimeout"]          = _screensaver.getDimTimeout();
+        doc["blankTimeout"]        = _screensaver.getBlankTimeout();
+        doc["rotationInterval"]    = _carousel.getInterval();
+        doc["boardCount"]          = _carousel.boardCount();
+        doc["clockFontSize"]       = _clockFontSize;
 
         IDisplayBoard* active = visibleBoard();
         doc["activeBoard"] = (active != nullptr) ? active->getBoardName() : "none";
@@ -740,7 +770,7 @@ void U8G2DisplayModule::registerRoutes(AsyncWebServer& server) {
         }
     );
 
-    // --- POST /api/display/sleep — control sleep behaviour ---
+    // --- POST /api/display/sleep — control screensaver behaviour ---
     server.on("/api/display/sleep", HTTP_POST,
         [](AsyncWebServerRequest *request) {},
         NULL,
@@ -752,6 +782,8 @@ void U8G2DisplayModule::registerRoutes(AsyncWebServer& server) {
                 return;
             }
 
+            bool needsPersist = false;
+
             // Handle immediate sleep/wake toggle
             if (doc["action"].is<const char*>()) {
                 const char* action = doc["action"];
@@ -762,12 +794,34 @@ void U8G2DisplayModule::registerRoutes(AsyncWebServer& server) {
                 }
             }
 
-            // Handle timeout configuration
+            // Handle screensaver enable/disable
+            if (doc["enabled"].is<bool>()) {
+                _screensaver.setEnabled(doc["enabled"].as<bool>());
+                needsPersist = true;
+            }
+
+            // Handle dimTimeout configuration
+            if (doc["dimTimeout"].is<unsigned long>()) {
+                _screensaver.setDimTimeout(doc["dimTimeout"] | (unsigned long)150000);
+                needsPersist = true;
+            }
+
+            // Handle blankTimeout configuration
+            if (doc["blankTimeout"].is<unsigned long>()) {
+                _screensaver.setBlankTimeout(doc["blankTimeout"] | (unsigned long)300000);
+                needsPersist = true;
+            }
+
+            // Handle legacy timeout configuration
             if (doc["timeout"].is<unsigned long>()) {
-                setSleepTimeout(doc["timeout"] | (unsigned long)300000);
-                if (_configManager != nullptr) {
-                    _configManager->saveModuleConfig(this);
-                }
+                unsigned long timeout = doc["timeout"] | (unsigned long)300000;
+                _screensaver.setDimTimeout(timeout / 2);
+                _screensaver.setBlankTimeout(timeout);
+                needsPersist = true;
+            }
+
+            if (needsPersist && _configManager != nullptr) {
+                _configManager->saveModuleConfig(this);
             }
 
             request->send(200, "application/json", "{\"status\":\"ok\"}");
