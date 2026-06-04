@@ -39,6 +39,7 @@ const MOCK_TABS = [
   { name: 'MCP',    id: 'mcp',    parent: 'system', order: 2   },
   { name: 'Backup', id: 'backup', parent: 'system', order: 3   },
   { name: 'OTA',    id: 'ota',    parent: 'system', order: 4   },
+  { name: 'App',    id: 'app',    parent: null,     order: 50  },
 ];
 
 const MOCK_SYSTEM = {
@@ -106,6 +107,20 @@ const MOCK_MCP_RPC = {
       { name: 'list_keys',        description: 'List stored API keys',         mutatesState: false },
     ],
   },
+};
+
+const MOCK_DISPLAY_STATUS = {
+  brightness:         200,
+  flip:               false,
+  screensaverEnabled: true,
+  dimmed:             false,
+  sleeping:           false,
+  dimTimeout:         150000,
+  blankTimeout:       300000,
+  rotationInterval:   8000,
+  boardCount:         2,
+  clockFontSize:      2,
+  activeBoard:        'Clock',
 };
 
 const MOCK_CONFIG_BACKUP = {
@@ -258,6 +273,23 @@ async function handleApiRoute(req, res) {
     return jsonResponse(res, 200, { status: 'ok' });
   }
   if (method === 'POST' && url === '/update') {
+    return jsonResponse(res, 200, { status: 'ok' });
+  }
+
+  // ── Display ──────────────────────────────────────────────────────
+  if (method === 'GET' && url === '/api/display/status') {
+    return jsonResponse(res, 200, MOCK_DISPLAY_STATUS);
+  }
+  if (method === 'POST' && url === '/api/display/brightness') {
+    return jsonResponse(res, 200, { status: 'ok' });
+  }
+  if (method === 'POST' && url === '/api/display/flip') {
+    return jsonResponse(res, 200, { status: 'ok' });
+  }
+  if (method === 'POST' && url === '/api/display/sleep') {
+    return jsonResponse(res, 200, { status: 'ok' });
+  }
+  if (method === 'POST' && url === '/api/display/clockFontSize') {
     return jsonResponse(res, 200, { status: 'ok' });
   }
 
