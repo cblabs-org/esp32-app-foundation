@@ -31,6 +31,26 @@ class U8G2 {};
 
 static const char* TAG = "ScreensaverCtrl";
 
+/**
+ * @brief Enable or disable the screensaver.
+ *
+ * When disabling while in a dimmed or blanked state, requests a wake
+ * so the display restores on the next tick().
+ *
+ * @param enabled True to enable, false to disable.
+ */
+void ScreensaverController::setEnabled(bool enabled) {
+    _enabled = enabled;
+    if (!_enabled && (_dimmed || _blanked)) {
+        _wakeRequested = true;
+    }
+}
+
+/** @brief Returns true if the screensaver is enabled. */
+bool ScreensaverController::isEnabled() const {
+    return _enabled;
+}
+
 /** @brief Set inactivity timeout (ms) before the display enters dim state. */
 void ScreensaverController::setDimTimeout(unsigned long ms) {
     _dimTimeoutMs = ms;
@@ -122,14 +142,22 @@ ScreensaverBoard* ScreensaverController::board() const {
  * @param activeBrightness Brightness to restore on wake.
  */
 void ScreensaverController::tick(unsigned long currentMs, U8G2& display, uint8_t activeBrightness) {
-    if (_dimTimeoutMs == 0) {
-        return; // Screensaver disabled
-    }
-
+    // --- Service pending wake requests first (even if disabled) ---
+    // setEnabled(false) while dimmed/blanked sets _wakeRequested so the
+    // display restores immediately; this MUST be checked before the
+    // !_enabled early-return.
     if (_wakeRequested) {
         _wake(display, activeBrightness);
         _wakeRequested = false;
         return;
+    }
+
+    if (_dimTimeoutMs == 0) {
+        return; // Screensaver disabled (zero timeout)
+    }
+
+    if (!_enabled) {
+        return; // Screensaver disabled (master switch)
     }
 
     unsigned long elapsed = currentMs - _lastActivityMs;

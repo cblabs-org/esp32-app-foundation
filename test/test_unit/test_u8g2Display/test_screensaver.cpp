@@ -23,8 +23,9 @@
 // NATIVE_BUILD guard, but we need it visible here for passing to tick())
 // =============================================================================
 
-// U8G2 is forward-declared in the header; the stub class is defined in the .cpp
-// under NATIVE_BUILD. We can construct one here because the stub is an empty class.
+// U8G2 is forward-declared in the header; define the stub here so we can
+// instantiate it in this TU (ScreensaverController.cpp has its own copy).
+class U8G2 {};
 static U8G2 stubDisplay;
 
 // =============================================================================

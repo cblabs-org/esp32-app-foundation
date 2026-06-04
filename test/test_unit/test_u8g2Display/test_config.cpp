@@ -10,8 +10,10 @@
  * Description: GoogleTest unit-test suite for the U8G2DisplayModule's
  *              IConfigurable implementation (new 6-method gateway interface).
  *              Validates that resetConfig() sets factory defaults,
- *              applyConfig() accepts a JSON section, serializeConfig() writes
- *              expected keys, and runtime setters work correctly.
+ *              applyConfig() accepts a JSON section (including legacy
+ *              sleepTimeout migration), serializeConfig() writes expected
+ *              keys, config round-trips are consistent, and runtime
+ *              setters work correctly.
  *
  * Exported Functions:
  * - (GoogleTest fixtures — discovered automatically by gtest_main)
@@ -34,9 +36,9 @@ TEST_F(ConfigTest, GetConfigNamespace_ReturnsDisplay) {
     EXPECT_STREQ("display", display.getConfigNamespace());
 }
 
-/** getSchemaVersion must return 2. */
-TEST_F(ConfigTest, GetSchemaVersion_ReturnsTwo) {
-    EXPECT_EQ(2, display.getSchemaVersion());
+/** getSchemaVersion must return 3. */
+TEST_F(ConfigTest, GetSchemaVersion_ReturnsThree) {
+    EXPECT_EQ(3, display.getSchemaVersion());
 }
 
 /** applyConfig with valid JSON section must not crash. */
@@ -45,7 +47,9 @@ TEST_F(ConfigTest, ApplyConfig_ValidSection_DoesNotCrash) {
     JsonObject section = doc.to<JsonObject>();
     section["brightness"] = 128;
     section["flip"] = true;
-    section["sleepTimeout"] = 60000;
+    section["screensaverEnabled"] = true;
+    section["dimTimeout"] = (unsigned long)30000;
+    section["blankTimeout"] = (unsigned long)60000;
     section["rotationInterval"] = 5000;
 
     EXPECT_NO_FATAL_FAILURE(display.applyConfig(section));
@@ -69,7 +73,9 @@ TEST_F(ConfigTest, SerializeConfig_ProducesExpectedKeys) {
 
     EXPECT_TRUE(section.containsKey("brightness"));
     EXPECT_TRUE(section.containsKey("flip"));
-    EXPECT_TRUE(section.containsKey("sleepTimeout"));
+    EXPECT_TRUE(section.containsKey("screensaverEnabled"));
+    EXPECT_TRUE(section.containsKey("dimTimeout"));
+    EXPECT_TRUE(section.containsKey("blankTimeout"));
     EXPECT_TRUE(section.containsKey("rotationInterval"));
 }
 
@@ -103,7 +109,9 @@ TEST_F(ConfigTest, Roundtrip_SerializeApplySerialize_Consistent) {
     JsonObject section1 = doc1.to<JsonObject>();
     section1["brightness"] = 42;
     section1["flip"] = true;
-    section1["sleepTimeout"] = 12345;
+    section1["screensaverEnabled"] = false;
+    section1["dimTimeout"] = (unsigned long)12345;
+    section1["blankTimeout"] = (unsigned long)67890;
     section1["rotationInterval"] = 6789;
     display.applyConfig(section1);
 
@@ -114,8 +122,28 @@ TEST_F(ConfigTest, Roundtrip_SerializeApplySerialize_Consistent) {
 
     EXPECT_EQ(42, section2["brightness"].as<int>());
     EXPECT_EQ(true, section2["flip"].as<bool>());
-    EXPECT_EQ(12345, section2["sleepTimeout"].as<unsigned long>());
-    EXPECT_EQ(6789, section2["rotationInterval"].as<unsigned long>());
+    EXPECT_EQ(false, section2["screensaverEnabled"].as<bool>());
+    EXPECT_EQ(12345UL, section2["dimTimeout"].as<unsigned long>());
+    EXPECT_EQ(67890UL, section2["blankTimeout"].as<unsigned long>());
+    EXPECT_EQ(6789UL, section2["rotationInterval"].as<unsigned long>());
+}
+
+/** Migration: legacy sleepTimeout key converts to dimTimeout/blankTimeout. */
+TEST_F(ConfigTest, Migration_SleepTimeout_ConvertsToDimAndBlank) {
+    JsonDocument doc;
+    JsonObject section = doc.to<JsonObject>();
+    section["sleepTimeout"] = (unsigned long)60000;
+    display.applyConfig(section);
+
+    // Serialize and check derived values
+    JsonDocument doc2;
+    JsonObject section2 = doc2.to<JsonObject>();
+    display.serializeConfig(section2);
+
+    EXPECT_EQ(30000UL, section2["dimTimeout"].as<unsigned long>());
+    EXPECT_EQ(60000UL, section2["blankTimeout"].as<unsigned long>());
+    // Migration should NOT emit the old key
+    EXPECT_FALSE(section2.containsKey("sleepTimeout"));
 }
 
 // =============================================================================

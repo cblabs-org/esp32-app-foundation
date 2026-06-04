@@ -47,6 +47,24 @@ enum class ScreensaverPolicy : uint8_t {
 class ScreensaverController {
 public:
     /**
+     * @brief Enable or disable the screensaver.
+     *
+     * When disabled, tick() skips all timeout checks and the display
+     * stays at full brightness. If the screensaver is currently in a
+     * dimmed or blanked state when disabled, a wake is requested so
+     * that the display restores immediately on the next tick().
+     *
+     * @param enabled True to enable, false to disable.
+     */
+    void setEnabled(bool enabled);
+
+    /**
+     * @brief Check whether the screensaver is enabled.
+     * @return True if the screensaver is enabled.
+     */
+    bool isEnabled() const;
+
+    /**
      * @brief Set inactivity timeout before dimming.
      * @param ms Timeout in milliseconds.
      */
@@ -59,8 +77,14 @@ public:
     void setBlankTimeout(unsigned long ms);
 
     /**
+     * @brief Get inactivity timeout before dimming.
+     * @return Timeout in milliseconds.
+     */
+    unsigned long getDimTimeout() const { return _dimTimeoutMs; }
+
+    /**
      * @brief Get inactivity timeout before full sleep (FullSleep only).
-     * @return ms Timeout in milliseconds.
+     * @return Timeout in milliseconds.
      */
     unsigned long getBlankTimeout() const { return _blankTimeoutMs; }
 
@@ -125,6 +149,7 @@ public:
     ScreensaverBoard* board() const;
 
 private:
+    bool _enabled = true;                    ///< Master enable flag (default ON — preserves current behaviour)
     unsigned long _dimTimeoutMs  = 300000;   ///< Inactivity timeout before dimming (5 min default)
     unsigned long _blankTimeoutMs = 600000;  ///< Inactivity timeout before power-save (10 min default)
     uint8_t  _dimLevel = 1;                  ///< Brightness level applied during dim state (1 = near-off)

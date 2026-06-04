@@ -158,20 +158,26 @@ TEST_F(ConfigManagerTest, RegisterModule_Nullptr_ReturnsFalse) {
     EXPECT_FALSE(configManager.registerModule(nullptr));
 }
 
-TEST_F(ConfigManagerTest, RegisterModule_UpToMax_AllSucceed) {
-    MockModule modules[ConfigManager::MAX_CONFIGURABLES];
-    for (uint8_t i = 0; i < ConfigManager::MAX_CONFIGURABLES; i++) {
-        EXPECT_TRUE(configManager.registerModule(&modules[i]));
-    }
+TEST_F(ConfigManagerTest, RegisterModule_ManyModules_AllSucceed) {
+    // Registry is now a dynamic vector — no hard cap. Verify multiple
+    // modules register successfully.
+    MockModule modA;
+    MockModuleB modB;
+    MockModuleV2 modC;
+    EXPECT_TRUE(configManager.registerModule(&modA));
+    EXPECT_TRUE(configManager.registerModule(&modB));
+    EXPECT_TRUE(configManager.registerModule(&modC));
 }
 
-TEST_F(ConfigManagerTest, RegisterModule_OverMax_ReturnsFalse) {
-    MockModule modules[ConfigManager::MAX_CONFIGURABLES];
-    for (uint8_t i = 0; i < ConfigManager::MAX_CONFIGURABLES; i++) {
-        configManager.registerModule(&modules[i]);
-    }
-    MockModule overflow;
-    EXPECT_FALSE(configManager.registerModule(&overflow));
+TEST_F(ConfigManagerTest, RegisterModule_AfterBeginAll_ReturnsFalse) {
+    // After beginAll() locks the registry, further registrations must be
+    // rejected — matching Application's two-tier locked-vector model.
+    MockModule mod;
+    configManager.registerModule(&mod);
+    configManager.beginAll();
+
+    MockModule late;
+    EXPECT_FALSE(configManager.registerModule(&late));
 }
 
 // =============================================================================
