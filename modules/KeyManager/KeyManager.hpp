@@ -15,12 +15,18 @@
  *
  * Exported Functions/Classes:
  * - KeyManager: [Class] Service provider for secure credential storage.
+ *
+ *   Lifecycle:
  *   - begin():           Initializes the KeyManager with a dependency-injected DeviceCrypto instance.
+ *
+ *   Credential Registry:
  *   - addKey():           Encrypts and stores a credential securely.
  *   - getKeyById():       Retrieves and decrypts a credential.
  *   - deleteKey():        Removes a credential from the registry.
  *   - listKeys():         Returns a list of stored key IDs (no values).
- *   - registerRoutes():   Register REST API routes (IWebContributor)
+ *
+ *   IWebContributor (tab: "Keys", parent: "System", order: 20):
+ *   - registerRoutes():   Register REST API routes
  *   - getTabName():       Return "Keys" for portal tab
  *   - getParentTab():     Return "System" for navigation hierarchy
  *   - getTabOrder():      Return 20 for pill ordering

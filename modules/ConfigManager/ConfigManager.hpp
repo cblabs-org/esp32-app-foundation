@@ -22,6 +22,8 @@
  *
  * Exported Functions/Classes:
  * - ConfigManager: Centralised configuration gateway
+ *
+ *   Module Registry:
  *   - registerModule():      Register an IConfigurable module in the gateway
  *   - beginAll():            Load and apply config for all registered modules
  *   - saveModuleConfig():    Persist a single module's config to its namespace file
@@ -30,10 +32,12 @@
  *   - importAllConfig():     Import configs from a master JSON document
  *                            (_meta and other unknown keys are skipped silently)
  *   - setMetaTimezone():     Register the timezone string for the _meta envelope
- *   - registerRoutes():      Register REST API routes (IWebContributor)
- *   - getTabName():          Return the UI tab name ("Backup")
- *   - getParentTab():        Return parent tab ("System")
- *   - getTabOrder():         Return tab order (40)
+ *
+ *   IWebContributor (tab: "Backup", parent: "System", order: 40):
+ *   - registerRoutes():      Register REST API routes
+ *   - getTabName():          Return "Backup" for portal tab
+ *   - getParentTab():        Return "System" for navigation hierarchy
+ *   - getTabOrder():         Return 40 for pill ordering
  */
 
 #pragma once

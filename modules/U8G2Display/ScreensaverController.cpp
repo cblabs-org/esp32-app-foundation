@@ -7,49 +7,62 @@
  * To view a copy of this license, visit https://creativecommons.org/licenses/by-nc-sa/4.0/
  *
  * Module: modules/U8G2Display/ScreensaverController.cpp
- * Description: Extracts screensaver / sleep / inactivity logic.
+ * Description:
+ *   Three-state inactivity manager for the display subsystem.
+ *   States: Active → Dimmed → Blanked (power-save).
+ *
+ *   The ScreensaverPolicy enum selects between DimOnly (reduce
+ *   brightness only) and FullSleep (dim then power-save after a
+ *   second timeout).  resetActivity() is the sole wake trigger.
+ *
+ *   This is a display-intrinsic concern — the application layer
+ *   need only call resetActivity() on user interaction; the
+ *   controller handles all state transitions internally.
  */
 
 #include "ScreensaverController.hpp"
+#include "platform/LogShim.h"
 
 #ifndef NATIVE_BUILD
 #include <U8g2lib.h>
-#include <esp_log.h>
 #else
-// Mock U8G2 for native build
 class U8G2 {};
 #endif
 
-// We use the same logging style as the display module
-#ifndef NATIVE_BUILD
-static const char* TAG = "ScreensaverController";
-#else
-static const char* TAG = "Test_ScreensaverController";
-#define ESP_LOGI(...)
-#define ESP_LOGW(...)
-#define millis() 0
-#endif
+static const char* TAG = "ScreensaverCtrl";
 
+/** @brief Set inactivity timeout (ms) before the display enters dim state. */
 void ScreensaverController::setDimTimeout(unsigned long ms) {
     _dimTimeoutMs = ms;
 }
 
+/** @brief Set inactivity timeout (ms) before full sleep (FullSleep policy only). */
 void ScreensaverController::setBlankTimeout(unsigned long ms) {
     _blankTimeoutMs = ms;
 }
 
+/** @brief Set the brightness level used during dim state (0-255). */
 void ScreensaverController::setDimLevel(uint8_t level) {
     _dimLevel = level;
 }
 
+/** @brief Select DimOnly or FullSleep screensaver policy. */
 void ScreensaverController::setPolicy(ScreensaverPolicy policy) {
     _policy = policy;
 }
 
-void ScreensaverController::setBoard(IDisplayBoard* board) {
+/** @brief Assign the ScreensaverBoard displayed when the screensaver is active. */
+void ScreensaverController::setBoard(ScreensaverBoard* board) {
     _board = board;
 }
 
+/**
+ * @brief Reset the inactivity timer and request a wake if currently dimmed/blanked.
+ *
+ * Called by the application on any user interaction.  If the display is
+ * in dim or blanked state, sets _wakeRequested so that the next tick()
+ * restores full brightness.
+ */
 void ScreensaverController::resetActivity() {
 #ifndef NATIVE_BUILD
     _lastActivityMs = millis();
@@ -63,6 +76,12 @@ void ScreensaverController::resetActivity() {
     }
 }
 
+/**
+ * @brief Force an immediate timeout so the screensaver triggers on the next tick().
+ *
+ * Moves _lastActivityMs far enough into the past that the blank-timeout
+ * threshold is already exceeded.
+ */
 void ScreensaverController::forceTimeout() {
 #ifndef NATIVE_BUILD
     // Set last activity far in the past to trigger timeout on next tick
@@ -72,22 +91,36 @@ void ScreensaverController::forceTimeout() {
 #endif
 }
 
+/** @brief Returns true if the screensaver is in any non-active state (dimmed or blanked). */
 bool ScreensaverController::isActive() const {
     return _dimmed || _blanked;
 }
 
+/** @brief Returns true if the display is currently in dim state. */
 bool ScreensaverController::isDimmed() const {
     return _dimmed;
 }
 
+/** @brief Returns true if the display is in power-save blanked state. */
 bool ScreensaverController::isBlanked() const {
     return _blanked;
 }
 
-IDisplayBoard* ScreensaverController::board() const {
+/** @brief Return the assigned ScreensaverBoard (may be nullptr). */
+ScreensaverBoard* ScreensaverController::board() const {
     return _board;
 }
 
+/**
+ * @brief Main loop tick — drives the Active → Dimmed → Blanked state machine.
+ *
+ * Checks elapsed time since last activity and transitions through states.
+ * A pending _wakeRequested (from resetActivity()) is serviced first.
+ *
+ * @param currentMs    Current time in milliseconds (e.g. millis()).
+ * @param display      Reference to the U8G2 driver.
+ * @param activeBrightness Brightness to restore on wake.
+ */
 void ScreensaverController::tick(unsigned long currentMs, U8G2& display, uint8_t activeBrightness) {
     if (_dimTimeoutMs == 0) {
         return; // Screensaver disabled
@@ -102,10 +135,8 @@ void ScreensaverController::tick(unsigned long currentMs, U8G2& display, uint8_t
     unsigned long elapsed = currentMs - _lastActivityMs;
 
     if (!_diagLogged && elapsed >= (_dimTimeoutMs / 2)) {
-#ifndef NATIVE_BUILD
         ESP_LOGW(TAG, "Sleep diagnostic: elapsed=%lu timeout=%lu (50%% reached)",
                  elapsed, _dimTimeoutMs);
-#endif
         _diagLogged = true;
     }
 
@@ -116,6 +147,9 @@ void ScreensaverController::tick(unsigned long currentMs, U8G2& display, uint8_t
     }
 }
 
+/**
+ * @brief Transition to dim state — lower contrast and activate the screensaver board.
+ */
 void ScreensaverController::_dim(U8G2& display) {
 #ifndef NATIVE_BUILD
     ESP_LOGI(TAG, "Display dimmed (inactivity)");
@@ -124,12 +158,13 @@ void ScreensaverController::_dim(U8G2& display) {
     _dimmed = true;
     
     if (_board) {
-        // Safe to cast since we only pass ScreensaverBoard internally
-        auto* sb = static_cast<ScreensaverBoard*>(_board);
-        sb->activate();
+        _board->activate();
     }
 }
 
+/**
+ * @brief Transition to blanked state — enable hardware power-save on the display.
+ */
 void ScreensaverController::_blank(U8G2& display) {
 #ifndef NATIVE_BUILD
     ESP_LOGI(TAG, "Display blanked (entering power save)");
@@ -138,6 +173,9 @@ void ScreensaverController::_blank(U8G2& display) {
     _blanked = true;
 }
 
+/**
+ * @brief Wake from any screensaver state — restore brightness and deactivate the board.
+ */
 void ScreensaverController::_wake(U8G2& display, uint8_t activeBrightness) {
 #ifndef NATIVE_BUILD
     ESP_LOGI(TAG, "Display waking from sleep");
@@ -150,7 +188,6 @@ void ScreensaverController::_wake(U8G2& display, uint8_t activeBrightness) {
     _blanked = false;
     
     if (_board) {
-        auto* sb = static_cast<ScreensaverBoard*>(_board);
-        sb->deactivate();
+        _board->deactivate();
     }
 }

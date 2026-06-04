@@ -12,10 +12,14 @@
  *              Refreshes telemetry data at 1-second intervals via tick().
  *              All hardware-specific code is guarded with NATIVE_BUILD.
  *
+ *              Dependencies are injected as narrow pointers (hostname, WifiManager)
+ *              rather than a full Application reference — the board only needs
+ *              the specific data it renders.
+ *
  * Exported Classes:
  * - DiagnosticsBoard: System telemetry display implementing IDisplayBoard
  *   - DiagnosticsBoard():  Construct with display dimensions for widget layout
- *   - setApplication():    Inject Application reference for config/WiFi access
+ *   - configure():         Inject hostname and WifiManager for telemetry access
  *   - render():            Draw 4 rows of telemetry to the U8G2 display buffer
  *   - tick():              Refresh telemetry data (~1s throttle)
  *   - isExpired():         Returns false (always-on carousel board)
@@ -27,9 +31,8 @@
 #include "interfaces/IDisplayBoard.hpp"
 #include "widgets/LabelWidget.hpp"
 
-// Forward-declare Application — do NOT include Application.hpp in the header.
-// Full definition is only needed in the .cpp for getConfig()/getWifiManager().
-class Application;
+// Forward-declare WifiManager — full definition only needed in the .cpp.
+class WifiManager;
 
 /**
  * @brief System telemetry carousel board for the ESP32 App Foundation.
@@ -53,14 +56,15 @@ public:
     DiagnosticsBoard(uint16_t displayWidth, uint16_t displayHeight);
 
     /**
-     * @brief Inject the Application reference for accessing config and WiFi.
+     * @brief Inject narrow dependencies for telemetry rendering.
      *
-     * Must be called after app.begin() so framework services are available.
-     * Sets the hostname label immediately (it's static for the device lifetime).
+     * Called after the framework has booted so services are available.
+     * Sets the hostname label immediately (static for device lifetime).
      *
-     * @param app Pointer to the fully-initialised Application instance.
+     * @param hostname    Device hostname string (must outlive this board).
+     * @param wifiManager Pointer to the WifiManager for SSID access.
      */
-    void setApplication(Application* app);
+    void configure(const char* hostname, WifiManager* wifiManager);
 
     /**
      * @brief Draw all 4 telemetry rows to the U8G2 display buffer.
@@ -91,7 +95,7 @@ public:
     const char* getBoardName() const override;
 
 private:
-    Application* _app = nullptr;  ///< Injected Application reference (set via setApplication)
+    WifiManager* _wifiManager = nullptr;  ///< Injected WiFi service (for SSID access)
 
     // --- Row label widgets ---
     LabelWidget _row1;  ///< Hostname (bold, centred)

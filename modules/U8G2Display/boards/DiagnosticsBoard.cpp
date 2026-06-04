@@ -6,14 +6,14 @@
  * This work is licensed under Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International.
  * To view a copy of this license, visit https://creativecommons.org/licenses/by-nc-sa/4.0/
  *
- * Module: modules/U8G2Display/boards/diagnosticsBoard.cpp
+ * Module: modules/U8G2Display/boards/DiagnosticsBoard.cpp
  * Description: Implementation of the DiagnosticsBoard — a system telemetry
  *              carousel board that renders hostname, WiFi status, uptime,
  *              and heap/version info across 4 rows on a 256×64 display.
  *
  * Exported Functions:
  * - DiagnosticsBoard::DiagnosticsBoard(): Construct with display dimensions
- * - DiagnosticsBoard::setApplication():   Inject Application* and set hostname
+ * - DiagnosticsBoard::configure():        Inject hostname + WifiManager
  * - DiagnosticsBoard::tick():             Refresh telemetry data (~1s throttle)
  * - DiagnosticsBoard::render():           Render 4 rows to U8G2 display buffer
  * - DiagnosticsBoard::isExpired():        Always returns false (permanent board)
@@ -21,7 +21,7 @@
  */
 
 #include "DiagnosticsBoard.hpp"
-#include "../../Application/Application.hpp"  // Full definition for getConfig(), getWifiManager()
+#include "../../WifiManager/WifiManager.hpp"  // Full definition for getSSID()
 #include "fonts/Fonts.hpp"
 #include <cstdio>
 
@@ -64,20 +64,21 @@ DiagnosticsBoard::DiagnosticsBoard(uint16_t displayWidth, uint16_t displayHeight
 // =============================================================================
 
 /**
- * @brief Inject the Application reference and set the static hostname label.
+ * @brief Inject narrow dependencies and set the static hostname label.
  *
  * The hostname is set once here since it doesn't change at runtime.
  * Font assignments are also done here (hardware only) since they only
  * need to be applied once.
  *
- * @param app Pointer to the fully-initialised Application instance.
+ * @param hostname    Device hostname (must outlive this board).
+ * @param wifiManager Pointer to WifiManager for SSID access.
  */
-void DiagnosticsBoard::setApplication(Application* app) {
-    _app = app;
+void DiagnosticsBoard::configure(const char* hostname, WifiManager* wifiManager) {
+    _wifiManager = wifiManager;
 
     // --- Set hostname label (static — only needs setting once) ---
-    if (_app != nullptr) {
-        _row1.setText(_app->getConfig().hostname);
+    if (hostname != nullptr) {
+        _row1.setText(hostname);
     }
     _row1.setAlignment(1);  // CENTER
 
@@ -109,8 +110,8 @@ void DiagnosticsBoard::setApplication(Application* app) {
  * @param currentMillis Current system time in milliseconds.
  */
 void DiagnosticsBoard::tick(uint32_t currentMillis) {
-    // --- Guard: no Application injected yet ---
-    if (_app == nullptr) return;
+    // --- Guard: not yet configured ---
+    if (_wifiManager == nullptr) return;
 
     // --- Throttle to 1-second refresh ---
     if (currentMillis - _lastRefreshMs < REFRESH_INTERVAL_MS) return;
@@ -120,7 +121,7 @@ void DiagnosticsBoard::tick(uint32_t currentMillis) {
     // --- Row 2: WiFi SSID + IP ---
     if (WiFi.isConnected()) {
         snprintf(_wifiLine, sizeof(_wifiLine), "%s \xB7 %s",
-                 _app->getWifiManager().getSSID(),
+                 _wifiManager->getSSID(),
                  WiFi.localIP().toString().c_str());
     } else {
         snprintf(_wifiLine, sizeof(_wifiLine), "WiFi: Not connected");
@@ -148,7 +149,7 @@ void DiagnosticsBoard::tick(uint32_t currentMillis) {
  * @brief Render all 4 telemetry rows to the U8G2 display buffer.
  *
  * Simply delegates to each LabelWidget's render() method. The labels
- * were populated by tick() and setApplication().
+ * were populated by tick() and configure().
  *
  * @param u8g2 Reference to the active U8G2 driver instance.
  */

@@ -22,18 +22,24 @@
  *
  * Exported Functions/Classes:
  * - MCPServer: MCP JSON-RPC server over Serial transport
+ *
+ *   Lifecycle:
  *   - begin():             Register built-in tools, collect contributor tools, and start serving
  *   - tick():              Poll Serial for incoming JSON-RPC lines (hardware only)
  *   - processRequest():    Process a single JSON-RPC request via Print stream
- *   - registerRoutes():    Register REST API routes (IWebContributor)
  *   - isEnabled():         Query whether the MCP server is currently enabled
- *   - getConfigNamespace(): Return "mcp" for IConfigurable gateway
- *   - applyConfig():       Apply persisted MCP settings from JSON
- *   - serializeConfig():   Serialize current MCP settings to JSON
- *   - resetConfig():       Restore secure defaults
+ *
+ *   IWebContributor (tab: "MCP", parent: "System", order: 30):
+ *   - registerRoutes():    Register REST API routes
  *   - getTabName():        Return "MCP" for portal tab
  *   - getParentTab():      Return "System" for navigation hierarchy
  *   - getTabOrder():       Return 30 for pill ordering
+ *
+ *   IConfigurable (namespace: "mcp"):
+ *   - getConfigNamespace(): Return "mcp"
+ *   - applyConfig():       Apply persisted MCP settings from JSON
+ *   - serializeConfig():   Serialize current MCP settings to JSON
+ *   - resetConfig():       Restore secure defaults
  */
 #pragma once
 

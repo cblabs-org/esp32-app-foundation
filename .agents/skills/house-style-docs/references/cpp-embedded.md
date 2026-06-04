@@ -28,8 +28,41 @@ Every `.hpp` and `.cpp` file must begin with this header block. Replace placehol
  */
 ```
 
+### Interface-Grouped Exports
+
+When a class inherits from one or more abstract interface classes, the exported method list should be **grouped by interface** rather than listed flat. A flat list forces the reader to cross-reference the class declaration to work out which methods belong to which contract; grouping makes this obvious at a glance.
+
+**Grouping principle:**
+1. **Lifecycle / own methods first.** Group the class's own public API (constructors, `begin()`, own methods) under descriptive headings. If a lifecycle method is also an interface override, annotate it with the interface name in brackets at the end of the line (e.g. `[IFoo]`).
+2. **One heading per interface.** Each inherited interface gets its own heading named after the interface class. Parenthetical context can be added to the heading when it aids understanding (e.g. key config values, identifiers).
+3. **Blank comment lines** between groups for visual separation.
+4. **One-line-per-method** format within each group — same as the flat style.
+
+Classes that do not implement interfaces should continue to use the flat list format shown in the base template above.
+
+```cpp
+/*
+ * Exported Classes:
+ * - MyModule: [Class description]
+ *
+ *   Lifecycle:
+ *   - begin():       [description]
+ *   - tick():        [description]  [IFoo]
+ *
+ *   [Own Public API heading]:
+ *   - doSomething(): [description]
+ *
+ *   IBar:
+ *   - barMethod():   [description]
+ *   - otherMethod(): [description]
+ *
+ *   IBaz (some-context-hint):
+ *   - bazMethod():   [description]
+ */
+```
+
 > [!IMPORTANT]
-> The "Exported Functions/Classes" list is critical. It allows a developer to quickly see the services offered by the module without reading the whole file. Provide a one-line summary for EVERY externalized method, property, and variable.
+> The "Exported Functions/Classes" list is critical. It allows a developer to quickly see the services offered by the module without reading the whole file. Provide a one-line summary for EVERY externalized method, property, and variable. When a class implements interfaces, group the methods by interface — a flat list obscures which contract each method fulfills.
 
 ---
 

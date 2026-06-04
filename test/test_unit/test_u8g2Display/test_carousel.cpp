@@ -8,9 +8,9 @@
  *
  * Module: test/test_unit/test_u8g2Display/test_carousel.cpp
  * Description: GoogleTest unit-test suite for the U8G2DisplayModule carousel
- *              engine. Validates board pool add/count, pool locking behaviour
- *              (without Application), getActiveBoard state, expired board
- *              eviction, carousel wrap-around, and showBoard overrides.
+ *              engine. Validates runtime collection (add/remove/clear/contains),
+ *              visibleBoard state, expired board
+ *              eviction, carousel wrap-around, and show() overrides.
  *
  * Exported Functions:
  * - (GoogleTest fixtures — discovered automatically by gtest_main)
@@ -47,7 +47,7 @@ public:
 };
 
 // =============================================================================
-// Test Group: Board Slot Pool (pre-lock)
+// Test Group: Collection (add/remove/clear/contains)
 // =============================================================================
 
 class CarouselSlotPoolTest : public ::testing::Test {
@@ -57,20 +57,14 @@ protected:
 
 /** A freshly constructed module must have zero boards. */
 TEST_F(CarouselSlotPoolTest, InitialBoardCount_IsZero) {
-    EXPECT_EQ(display.getBoardCount(), 0);
+    EXPECT_EQ(display.carousel.boardCount(), 0);
 }
 
-/** addBoard with a valid pointer must return true and increment count. */
+/** addBoard with a valid pointer must increment count. */
 TEST_F(CarouselSlotPoolTest, AddBoard_ValidPointer_ReturnsTrue) {
     CarouselMockBoard board;
-    EXPECT_TRUE(display.addBoard(&board));
-    EXPECT_EQ(display.getBoardCount(), 1);
-}
-
-/** addBoard with nullptr must return false and not change count. */
-TEST_F(CarouselSlotPoolTest, AddBoard_Nullptr_ReturnsFalse) {
-    EXPECT_FALSE(display.addBoard(nullptr));
-    EXPECT_EQ(display.getBoardCount(), 0);
+    display.carousel.add(&board);
+    EXPECT_EQ(display.carousel.boardCount(), 1);
 }
 
 /** Adding multiple boards must increment count correctly. */
@@ -78,22 +72,22 @@ TEST_F(CarouselSlotPoolTest, AddBoard_Multiple_IncrementCount) {
     CarouselMockBoard boardA;
     CarouselMockBoard boardB;
     CarouselMockBoard boardC;
-    EXPECT_TRUE(display.addBoard(&boardA));
-    EXPECT_TRUE(display.addBoard(&boardB));
-    EXPECT_TRUE(display.addBoard(&boardC));
-    EXPECT_EQ(display.getBoardCount(), 3);
+    display.carousel.add(&boardA);
+    display.carousel.add(&boardB);
+    display.carousel.add(&boardC);
+    EXPECT_EQ(display.carousel.boardCount(), 3);
 }
 
-/** getActiveBoard with no boards must return nullptr. */
+/** currentBoard with no boards must return nullptr. */
 TEST_F(CarouselSlotPoolTest, GetActiveBoard_EmptyPool_ReturnsNullptr) {
-    EXPECT_EQ(display.getActiveBoard(), nullptr);
+    EXPECT_EQ(display.carousel.currentBoard(), nullptr);
 }
 
-/** After adding one board, getActiveBoard must return that board. */
+/** After adding one board, currentBoard must return that board. */
 TEST_F(CarouselSlotPoolTest, GetActiveBoard_OneBoard_ReturnsThatBoard) {
     CarouselMockBoard board;
-    display.addBoard(&board);
-    EXPECT_EQ(display.getActiveBoard(), &board);
+    display.carousel.add(&board);
+    EXPECT_EQ(display.carousel.currentBoard(), &board);
 }
 
 // =============================================================================
@@ -105,42 +99,42 @@ protected:
     U8G2DisplayModule display;
 };
 
-/** showBoard with a pool board must update getActiveBoard. */
+/** show with a pool board must update currentBoard. */
 TEST_F(CarouselShowBoardTest, ShowBoard_PoolBoard_UpdatesActiveBoard) {
     CarouselMockBoard boardA;
     CarouselMockBoard boardB;
-    display.addBoard(&boardA);
-    display.addBoard(&boardB);
+    display.carousel.add(&boardA);
+    display.carousel.add(&boardB);
 
-    display.showBoard(&boardB);
-    EXPECT_EQ(display.getActiveBoard(), &boardB);
+    display.carousel.show(&boardB, 0);
+    EXPECT_EQ(display.carousel.currentBoard(), &boardB);
 }
 
-/** showBoard with a non-pool board must NOT change getActiveBoard (pool-only API). */
+/** show with a non-pool board must NOT change currentBoard (pool-only API). */
 TEST_F(CarouselShowBoardTest, ShowBoard_NonPoolBoard_DoesNotChangeActive) {
     CarouselMockBoard poolBoard;
     CarouselMockBoard systemBoard;
-    display.addBoard(&poolBoard);
+    display.carousel.add(&poolBoard);
 
-    display.showBoard(&systemBoard);
+    display.carousel.show(&systemBoard, 0);
     // showBoard is pool-only — non-pool board is ignored
-    EXPECT_EQ(display.getActiveBoard(), &poolBoard);
+    EXPECT_EQ(display.carousel.currentBoard(), &poolBoard);
 }
 
 /** showBoard with a pool board after showing another pool board must update. */
 TEST_F(CarouselShowBoardTest, ShowBoard_DifferentPoolBoard_UpdatesActive) {
     CarouselMockBoard poolBoardA;
     CarouselMockBoard poolBoardB;
-    display.addBoard(&poolBoardA);
-    display.addBoard(&poolBoardB);
+    display.carousel.add(&poolBoardA);
+    display.carousel.add(&poolBoardB);
 
     // Start on A, switch to B
-    display.showBoard(&poolBoardB);
-    EXPECT_EQ(display.getActiveBoard(), &poolBoardB);
+    display.carousel.show(&poolBoardB, 0);
+    EXPECT_EQ(display.carousel.currentBoard(), &poolBoardB);
 
     // Switch back to A
-    display.showBoard(&poolBoardA);
-    EXPECT_EQ(display.getActiveBoard(), &poolBoardA);
+    display.carousel.show(&poolBoardA, 0);
+    EXPECT_EQ(display.carousel.currentBoard(), &poolBoardA);
 }
 
 // =============================================================================
@@ -160,18 +154,110 @@ TEST_F(CarouselEvictionTest, Tick_EmptyPool_DoesNotCrash) {
 /** tick() with boards must not crash in native build. */
 TEST_F(CarouselEvictionTest, Tick_WithBoards_DoesNotCrash) {
     CarouselMockBoard board;
-    display.addBoard(&board);
+    display.carousel.add(&board);
     EXPECT_NO_FATAL_FAILURE(display.tick());
 }
 
-/** getBoardCount tracks additions correctly. */
+/** boardCount tracks additions correctly. */
 TEST_F(CarouselEvictionTest, GetBoardCount_TracksCorrectly) {
     CarouselMockBoard boardA;
     CarouselMockBoard boardB;
 
-    EXPECT_EQ(display.getBoardCount(), 0);
-    display.addBoard(&boardA);
-    EXPECT_EQ(display.getBoardCount(), 1);
-    display.addBoard(&boardB);
-    EXPECT_EQ(display.getBoardCount(), 2);
+    EXPECT_EQ(display.carousel.boardCount(), 0);
+    display.carousel.add(&boardA);
+    EXPECT_EQ(display.carousel.boardCount(), 1);
+    display.carousel.add(&boardB);
+    EXPECT_EQ(display.carousel.boardCount(), 2);
+}
+
+// =============================================================================
+// Test Group: Collection mutation (remove, clear, contains, duplicates)
+// =============================================================================
+
+class CarouselCollectionTest : public ::testing::Test {
+protected:
+    U8G2DisplayModule display;
+};
+
+/** remove() with a pool board must decrement count and return true. */
+TEST_F(CarouselCollectionTest, Remove_PoolBoard_ReturnsTrue) {
+    CarouselMockBoard boardA;
+    CarouselMockBoard boardB;
+    display.carousel.add(&boardA);
+    display.carousel.add(&boardB);
+    EXPECT_TRUE(display.carousel.remove(&boardA));
+    EXPECT_EQ(display.carousel.boardCount(), 1);
+    EXPECT_EQ(display.carousel.currentBoard(), &boardB);
+}
+
+/** remove() with a non-pool board must return false and leave pool unchanged. */
+TEST_F(CarouselCollectionTest, Remove_NonPoolBoard_ReturnsFalse) {
+    CarouselMockBoard poolBoard;
+    CarouselMockBoard otherBoard;
+    display.carousel.add(&poolBoard);
+    EXPECT_FALSE(display.carousel.remove(&otherBoard));
+    EXPECT_EQ(display.carousel.boardCount(), 1);
+}
+
+/** remove() on the active board must advance to the next board. */
+TEST_F(CarouselCollectionTest, Remove_ActiveBoard_AdvancesToNext) {
+    CarouselMockBoard boardA;
+    CarouselMockBoard boardB;
+    CarouselMockBoard boardC;
+    display.carousel.add(&boardA);
+    display.carousel.add(&boardB);
+    display.carousel.add(&boardC);
+
+    // Active is boardA (index 0), remove it
+    EXPECT_EQ(display.carousel.currentBoard(), &boardA);
+    display.carousel.remove(&boardA);
+    // boardB slides into slot 0
+    EXPECT_EQ(display.carousel.currentBoard(), &boardB);
+}
+
+/** remove() the last remaining board must leave pool empty. */
+TEST_F(CarouselCollectionTest, Remove_LastBoard_LeavesEmpty) {
+    CarouselMockBoard board;
+    display.carousel.add(&board);
+    display.carousel.remove(&board);
+    EXPECT_EQ(display.carousel.boardCount(), 0);
+    EXPECT_EQ(display.carousel.currentBoard(), nullptr);
+}
+
+/** clear() must empty the pool. */
+TEST_F(CarouselCollectionTest, Clear_EmptiesPool) {
+    CarouselMockBoard boardA;
+    CarouselMockBoard boardB;
+    display.carousel.add(&boardA);
+    display.carousel.add(&boardB);
+    display.carousel.clear();
+    EXPECT_EQ(display.carousel.boardCount(), 0);
+    EXPECT_EQ(display.carousel.currentBoard(), nullptr);
+}
+
+/** contains() must return true for registered boards. */
+TEST_F(CarouselCollectionTest, Contains_RegisteredBoard_ReturnsTrue) {
+    CarouselMockBoard board;
+    display.carousel.add(&board);
+    EXPECT_TRUE(display.carousel.contains(&board));
+}
+
+/** contains() must return false for unregistered boards. */
+TEST_F(CarouselCollectionTest, Contains_UnregisteredBoard_ReturnsFalse) {
+    CarouselMockBoard board;
+    EXPECT_FALSE(display.carousel.contains(&board));
+}
+
+/** add() with a duplicate pointer must be ignored. */
+TEST_F(CarouselCollectionTest, Add_Duplicate_IsIgnored) {
+    CarouselMockBoard board;
+    display.carousel.add(&board);
+    display.carousel.add(&board);
+    EXPECT_EQ(display.carousel.boardCount(), 1);
+}
+
+/** add() with nullptr must be ignored. */
+TEST_F(CarouselCollectionTest, Add_Nullptr_IsIgnored) {
+    display.carousel.add(nullptr);
+    EXPECT_EQ(display.carousel.boardCount(), 0);
 }

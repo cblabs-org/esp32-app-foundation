@@ -36,15 +36,15 @@ TEST_F(StatusReporterTest, ReportStatus_DoesNotCrash) {
 /** reportStatus must show the boot board as active. */
 TEST_F(StatusReporterTest, ReportStatus_ShowsBootBoard) {
     display.reportStatus("Connecting...", 0.3f);
-    EXPECT_NE(display.getActiveBoard(), nullptr);
-    EXPECT_STREQ(display.getActiveBoard()->getBoardName(), "SYS: Boot");
+    EXPECT_NE(display.visibleBoard(), nullptr);
+    EXPECT_STREQ(display.visibleBoard()->getBoardName(), "SYS: Boot");
 }
 
 /** reportStatus with indeterminate progress must work. */
 TEST_F(StatusReporterTest, ReportStatus_IndeterminateProgress) {
     EXPECT_NO_FATAL_FAILURE(display.reportStatus("Working...", -1.0f));
-    EXPECT_NE(display.getActiveBoard(), nullptr);
-    EXPECT_STREQ(display.getActiveBoard()->getBoardName(), "SYS: Boot");
+    EXPECT_NE(display.visibleBoard(), nullptr);
+    EXPECT_STREQ(display.visibleBoard()->getBoardName(), "SYS: Boot");
 }
 
 /** reportStatus with nullptr message must not crash. */
@@ -57,8 +57,8 @@ TEST_F(StatusReporterTest, ReportStatus_MultipleCalls_KeepsBootBoardActive) {
     display.reportStatus("Step 1", 0.25f);
     display.reportStatus("Step 2", 0.50f);
     display.reportStatus("Step 3", 0.75f);
-    EXPECT_NE(display.getActiveBoard(), nullptr);
-    EXPECT_STREQ(display.getActiveBoard()->getBoardName(), "SYS: Boot");
+    EXPECT_NE(display.visibleBoard(), nullptr);
+    EXPECT_STREQ(display.visibleBoard()->getBoardName(), "SYS: Boot");
 }
 
 /** reportError must not crash. */
@@ -69,7 +69,7 @@ TEST_F(StatusReporterTest, ReportError_DoesNotCrash) {
 /** reportError must show the error board as active. */
 TEST_F(StatusReporterTest, ReportError_ShowsErrorBoard) {
     display.reportError("Critical failure");
-    EXPECT_EQ(display.getActiveBoard(), &display.boards.error);
+    EXPECT_EQ(display.visibleBoard(), &display.boards.error);
 }
 
 /** reportError with nullptr must not crash. */
@@ -86,15 +86,15 @@ TEST_F(StatusReporterTest, ClearStatus_DoesNotCrash) {
 TEST_F(StatusReporterTest, ClearStatus_MarksBootComplete) {
     display.reportStatus("Loading...", 0.5f);
     display.clearStatus();
-    EXPECT_EQ(display.getActiveBoard(), nullptr); // Or whatever the base board is, but not BootBoard
+    EXPECT_EQ(display.visibleBoard(), nullptr); // Or whatever the base board is, but not BootBoard
 }
 
 /** After reportStatus then reportError, error board should be active. */
 TEST_F(StatusReporterTest, ReportError_OverridesBootBoard) {
     display.reportStatus("Loading...", 0.5f);
-    EXPECT_NE(display.getActiveBoard(), nullptr);
-    EXPECT_STREQ(display.getActiveBoard()->getBoardName(), "SYS: Boot");
+    EXPECT_NE(display.visibleBoard(), nullptr);
+    EXPECT_STREQ(display.visibleBoard()->getBoardName(), "SYS: Boot");
 
     display.reportError("Something failed");
-    EXPECT_EQ(display.getActiveBoard(), &display.boards.error);
+    EXPECT_EQ(display.visibleBoard(), &display.boards.error);
 }

@@ -10,7 +10,9 @@
  * Description: Composition root for the ESP32 App Foundation framework.
  *              Owns the module registry (two-tier vector model), the
  *              BOOT → CONFIGURING ↔ RUNNING lifecycle, the
- *              main-loop tick dispatch, and the soft-reset escape hatch.
+ *              main-loop tick dispatch, the display subsystem
+ *              (U8G2DisplayModule + DiagnosticsBoard), and the soft-reset
+ *              escape hatch.
  *              A single static instance is created by main.cpp (WO4); the
  *              class is NOT a singleton — there is no getInstance().
  *
@@ -67,6 +69,12 @@
 #include "../TimeManager/TimeConfigGate.hpp"
 #include "../KeyManager/KeyManager.hpp"
 #include "../../lib/DeviceCrypto/DeviceCrypto.hpp"
+
+// Display subsystem (hardware only — SPI/U8G2 headers unavailable in native builds)
+#ifndef NATIVE_BUILD
+    #include "../U8G2Display/U8G2DisplayModule.hpp"
+    #include "../U8G2Display/boards/DiagnosticsBoard.hpp"
+#endif
 
 // Forward declaration only — OTAUpdateManager.hpp pulls in WiFiClientSecure
 // which causes LDF to discover NetworkClientSecure with missing SSL backend.
@@ -290,6 +298,19 @@ public:
      */
     const FrameworkConfig& getConfig() const;
 
+#ifndef NATIVE_BUILD
+    /**
+     * @brief Get the application's display module instance.
+     *
+     * Downstream apps use this to register carousel boards, configure
+     * display settings, or access the sub-object API (carousel, screensaver,
+     * boards).
+     *
+     * @return Reference to the U8G2DisplayModule.
+     */
+    U8G2DisplayModule& getDisplay();
+#endif
+
     // -------------------------------------------------------------------------
     // State Accessors
     // -------------------------------------------------------------------------
@@ -350,6 +371,25 @@ private:
      */
     void _reportHeap();
 
+    /**
+     * @brief Display-driven state transition: entering CONFIGURING.
+     *
+     * Suspends carousel, shows the ConfiguringStatusBoard as base.
+     * Called from tick() when a gate regression is detected, and from
+     * begin() when initial gate check fails.
+     *
+     * @param isRegression true if regressing from RUNNING (vs initial boot).
+     */
+    void _onEnterConfiguring(bool isRegression = false);
+
+    /**
+     * @brief Display-driven state transition: entering RUNNING.
+     *
+     * Clears modal/base overlays and resumes carousel rotation.
+     * Called from tick() when all config gates become satisfied.
+     */
+    void _onEnterRunning();
+
     // -------------------------------------------------------------------------
     // Member variables
     // -------------------------------------------------------------------------
@@ -372,9 +412,13 @@ private:
     unsigned long _gateFailedSinceMs[MAX_CONFIG_GATES] = {0}; ///< Per-gate unsatisfied-since timestamps
 
     // Single-pointer registrations (no vector needed)
-    
+
     /**
      * @brief Silent fallback reporter used when no display is registered.
+     *
+     * In NATIVE_BUILD, no hardware display is available, so the null reporter
+     * absorbs all reportStatus/reportError/clearStatus calls silently.
+     * On hardware, _statusReporter is reassigned to &_display in begin().
      */
     class NullStatusReporter : public IStatusReporter {
     public:
@@ -401,4 +445,10 @@ private:
     OTAUpdateManager* _otaManager = nullptr;  ///< OTA firmware update orchestrator (heap, fwd-declared)
     TimeManager _timeManager;           ///< NTP synchronization service
     TimeConfigGate _timeGate{_timeManager}; ///< Optional timezone config gate (downstream opt-in)
+
+    // Display subsystem (hardware only)
+#ifndef NATIVE_BUILD
+    U8G2DisplayModule _display;                      ///< Display module with carousel engine
+    DiagnosticsBoard  _diagnosticsBoard{256, 64};    ///< System telemetry carousel board
+#endif
 };

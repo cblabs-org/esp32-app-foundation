@@ -6,59 +6,62 @@
  * This work is licensed under Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International.
  * To view a copy of this license, visit https://creativecommons.org/licenses/by-nc-sa/4.0/
  *
- * Module: modules/u8g2Display/U8G2DisplayModule.hpp
- * Description: U8G2 monochrome display module with two-layer base+modal
- *              architecture. The BASE layer is phase-determined and never
- *              manually set: BOOT→bootBoard, CONFIGURING→configuringStatusBoard,
- *              RUNNING→carousel pool rotation. The MODAL layer holds temporary
- *              overlays (WiFi wizard, OTA progress, error) that auto-clear
- *              when expired. Provides sleep/wake power management, phase-aware
- *              brightness dimming, screen flip support, and carousel engine.
- *              Owns all system board instances and activates the splash on begin().
+ * Module: modules/U8G2Display/U8G2DisplayModule.hpp
+ * Description: Pure-service U8G2 monochrome display module with three-layer
+ *              rendering architecture (Modal → Base/Carousel → Screensaver).
+ *              Accepts commands from callers; does NOT poll Application state
+ *              or make lifecycle decisions (see design spec §7.8.5, D34).
+ *
+ *              Exposes a hierarchical COM-style sub-object API (D35):
+ *                display.carousel    — CarouselEngine (rotating board pool)
+ *                display.boards      — BoardCatalog (concrete board refs)
+ *                display.screensaver — ScreensaverController (inactivity policy)
  *
  *              Implements IStatusReporter by delegating to BootBoard and
- *              ErrorBoard. Polls Application state in tick() for lifecycle
- *              transitions (CONFIGURING ↔ RUNNING), eliminating EventBus
- *              race conditions. Subscribes to EventBus topics "ota.progress"
- *              and "display.message" for async runtime events. Publishes
+ *              ErrorBoard. Subscribes to EventBus topics "ota.progress" and
+ *              "display.message" for async runtime events. Publishes
  *              "display.sleep", "display.wake", and "display.board.changed"
  *              events via EventBus. Implements IConfigurable via ConfigManager
  *              gateway for persistent display settings (namespace: "display",
- *              schema version: 1). Implements IWebContributor for REST API
- *              routes under /api/display/ and a top-level "Display" tab.
+ *              schema version: 2). Implements IWebContributor for REST API
+ *              routes under /api/display/ and portal tab "App" (order 30).
  *
  * Exported Classes:
  * - OTAProgressPayload:            EventBus payload struct for OTA progress events
  * - DisplayMessagePayload:         EventBus payload struct for display message events
  * - DisplayBoardChangedPayload:    EventBus payload struct for board change events
  * - U8G2DisplayModule: Display carousel engine and board slot pool
+ *
+ *   Lifecycle:
  *   - bootstrapHardware():   Phase 1 init — SPI + U8G2 only, zero framework deps
  *   - begin():              Phase 2 init — EventBus, config, pool lock (skips HW if bootstrapped)
- *   - tick():               Carousel rotation, sleep check, board tick, render
- *   - addBoard():           Pre-lock registration of boards into the carousel pool
- *   - showBoard():          Force-show a specific pool board (bypasses carousel timer)
- *   - pushModal():          Push a modal overlay board (auto-clears on expiry)
+ *   - tick():               Screensaver, modal expiry, carousel, render  [ITickable]
+ *
+ *   Layer Management:
+ *   - showModal():          Push a modal overlay board (auto-clears on expiry)
+ *   - showBase():           Show a persistent base layer board
  *   - clearModal():         Manually clear the active modal overlay
  *   - resetActivity():      Reset the inactivity timer (called on user interaction)
- *   - getBoardCount():      Return the number of registered boards in the pool
- *   - getActiveBoard():     Return the currently rendering board (or nullptr)
- *   - getBootBoard():       Return reference to the owned BootBoard instance
- *   - getWifiWizard():      Return reference to the owned WiFiWizardBoard instance
- *   - getOtaProgress():     Return reference to the owned OTAProgressBoard instance
- *   - getError():           Return reference to the owned ErrorBoard instance
- *   - getConfiguringStatus(): Return reference to the owned ConfiguringStatusBoard instance
- *   - getScreensaver():     Return reference to the owned ScreensaverBoard instance
+ *   - visibleBoard():       Return the board currently being rendered
+ *
+ *   IStatusReporter:
  *   - reportStatus():       Delegate to BootBoard and show it
  *   - reportError():        Delegate to ErrorBoard (fatal) and show it
  *   - clearStatus():        Mark BootBoard complete, advance if showing it
- *   - registerRoutes():     Register display REST API routes (/api/display/*)
- *   - getTabName():         Return "Display" for portal tab
- *   - getTabOrder():        Return 30 for portal tab ordering
+ *
+ *   IConfigurable (namespace: "display", schema v2):
  *   - getConfigNamespace(): Return "display"
  *   - getSchemaVersion():   Return 2
  *   - applyConfig():        Apply display settings from JSON section
  *   - serializeConfig():    Serialize display settings to JSON section
  *   - resetConfig():        Restore factory defaults
+ *
+ *   IWebContributor (tab: "App", order: 30):
+ *   - registerRoutes():     Register display REST API routes (/api/display/*)
+ *   - getTabName():         Return "App" for portal tab
+ *   - getTabOrder():        Return 30 for portal tab ordering
+ *
+ *   Runtime Display Setters:
  *   - setBrightness():      Runtime brightness adjustment (0–255)
  *   - setFlipScreen():      Runtime screen flip toggle
  *   - setSleepTimeout():    Runtime sleep timeout adjustment
@@ -84,9 +87,6 @@
 #include "boards/ErrorBoard.hpp"
 #include "boards/ScreensaverBoard.hpp"
 #include "boards/ConfiguringStatusBoard.hpp"
-#include "BoardCatalog.hpp"
-#include "CarouselEngine.hpp"
-#include "AppState.hpp"
 #include "../../include/types/DisplayInfo.hpp"
 
 // --- Hardware-only includes (excluded from native GoogleTest builds) ---
@@ -95,9 +95,9 @@
 #include <ArduinoJson.h>
 #endif
 
-// --- Forward declarations (no header dependency in this WO) ---
+// --- Forward declarations ---
 class EventBus;
-class Application;
+class ConfigManager;
 
 // ---------------------------------------------------------------------------
 // EventBus Payload Structs
@@ -131,7 +131,7 @@ struct DisplayMessagePayload {
  * @brief EventBus payload for "display.board.changed" topic.
  *
  * Published by the display module when the active rendering board changes,
- * either via carousel rotation, explicit showBoard(), or modal push/clear.
+ * either via carousel rotation, showModal()/clearModal(), or showBase().
  */
 struct DisplayBoardChangedPayload {
     const char* boardName;  // Name of the newly active board
@@ -155,8 +155,8 @@ struct DisplayBoardChangedPayload {
  * status overlays (delegates to BootBoard/ErrorBoard), and IConfigurable
  * for persistent display settings via ConfigManager gateway (namespace: "display").
  *
- * The board slot pool is a std::vector<IDisplayBoard*> that accepts registrations
- * via addBoard() before begin() locks the pool. The carousel engine rotates
+ * The carousel pool accepts registrations via display.carousel.add() and
+ * supports runtime mutation (add/remove/clear). The carousel engine rotates
  * through registered boards at a configurable interval.
  *
  * Subscribes to EventBus topics "ota.progress" and "display.message" for
@@ -189,9 +189,9 @@ public:
      * hardware init (SPI + U8G2 already running). Otherwise performs
      * full hardware + framework init in one step.
      *
-     * @param app Reference to the Application composition root.
+     * @param eventBus Pointer to the EventBus instance for messaging.
      */
-    void begin(Application& app);
+    void begin(EventBus* eventBus);
 
     /**
      * @brief Periodic update hook — carousel rotation, sleep check, render.
@@ -203,42 +203,26 @@ public:
     void tick() override;
 
     // -------------------------------------------------------------------------
-    // Board Pool Management
+    // Layer Management
     // -------------------------------------------------------------------------
 
     /**
-     * @brief Register a display board into the carousel pool (pre-lock only).
+     * @brief Set the base persistent board (e.g., configuring status).
      *
-     * Must be called before begin(). After begin() locks the pool, this method
-     * logs an error and returns false.
-     *
-     * @param board Non-null pointer to the IDisplayBoard implementation.
-     * @return true if the board was added; false if locked or nullptr.
+     * @param board Pointer to the base board, or nullptr to revert to carousel.
      */
-    bool addBoard(IDisplayBoard* board);
-
-    /**
-     * @brief Force-show a specific pool board, bypassing the carousel timer.
-     *
-     * Searches the pool for the board and updates the active index. Resets the
-     * rotation timer. This method is carousel-only — for system/modal boards,
-     * use pushModal() instead.
-     *
-     * @param board Pointer to a pool board to display.
-     */
-    void showBoard(IDisplayBoard* board);
+    void showBase(IDisplayBoard* board);
 
     /**
      * @brief Push a modal overlay board onto the display.
      *
      * The modal board is rendered on top of the base layer until it is
      * manually cleared via clearModal() or auto-cleared when isExpired()
-     * returns true. Deactivates any existing modal, activates the new one,
-     * and resets the inactivity timer.
+     * returns true. Deactivates any existing modal, activates the new one.
      *
      * @param board Pointer to the modal board to display.
      */
-    void pushModal(IDisplayBoard* board);
+    void showModal(IDisplayBoard* board);
 
     /**
      * @brief Manually clear the active modal overlay.
@@ -257,26 +241,14 @@ public:
     void resetActivity();
 
     /**
-     * @brief Return the number of boards currently in the carousel pool.
-     * @return Pool size as int.
-     */
-    int getBoardCount() const;
-
-    /**
-     * @brief Return the board currently being rendered (or nullptr if empty).
+     * @brief Return the board currently being rendered, considering all layers.
      *
-     * Returns the modal board if one is active, otherwise the current
-     * carousel pool board.
+     * Priority: modal → base → screensaver (idle) → carousel.
+     * Returns nullptr if no board is active on any layer.
      *
-     * @return Pointer to the active IDisplayBoard, or nullptr.
+     * @return Pointer to the visible IDisplayBoard, or nullptr.
      */
-    IDisplayBoard* getActiveBoard() const;
-
-
-
-
-
-
+    IDisplayBoard* visibleBoard() const;
 
     // -------------------------------------------------------------------------
     // IStatusReporter — delegates to BootBoard and ErrorBoard
@@ -386,6 +358,12 @@ public:
     // -------------------------------------------------------------------------
 
     /**
+     * @brief Set the ConfigManager reference for saving config changes.
+     * @param cm Pointer to the ConfigManager.
+     */
+    void setConfigManager(ConfigManager* cm) { _configManager = cm; }
+
+    /**
      * @brief Set the display brightness and apply to hardware.
      * @param brightness Brightness level (0–255).
      */
@@ -456,23 +434,6 @@ private:
      */
     void _renderCurrentBoard();
 
-    /**
-     * @brief Derive the base-layer board from the current Application state.
-     *
-     * Returns the phase-appropriate board:
-     * - BOOT → _bootBoard
-     * - CONFIGURING → _configuringStatusBoard
-     * - RUNNING → current carousel pool board
-     *
-     * Guarded by NATIVE_BUILD — returns nullptr in native test builds
-     * because Application is forward-declared only.
-     *
-     * @return Phase-appropriate base board, or nullptr.
-     */
-    IDisplayBoard* _getBaseBoard();
-
-
-
     // -------------------------------------------------------------------------
     // Private EventBus callback statics
     // -------------------------------------------------------------------------
@@ -493,20 +454,6 @@ private:
      */
     static void _onDisplayMessage(const char* topic, const void* payload, void* ctx);
 
-    // -------------------------------------------------------------------------
-    // Private state-polling lifecycle handler
-    // -------------------------------------------------------------------------
-
-    /**
-     * @brief React to an Application state transition detected by tick().
-     *
-     * Single code path for all lifecycle transitions — replaces both the
-     * EventBus callbacks (_onAppConfiguring, _onAppRunning) and the
-     * late catch-up block in begin().
-     *
-     * @param newState The newly detected Application state.
-     */
-    void _onStateChanged(AppState newState);
 
     // -------------------------------------------------------------------------
     // Member variables
@@ -540,8 +487,8 @@ private:
     const uint16_t _displayHeight = 64;
 #endif
 
-    Application* _app = nullptr;                   ///< Cached reference to Application hub (for EventBus access)
-    AppState _lastKnownState = AppState::Boot;     ///< Cached state for change detection in tick()
+    EventBus* _eventBus = nullptr;                 ///< Cached reference to EventBus (for publishing events)
+    ConfigManager* _configManager = nullptr;       ///< Cached reference to ConfigManager (for saving config)
 
     // --- Carousel Sub-system ---
     CarouselEngine _carousel;                      ///< Manages the rotating pool of display boards
@@ -559,6 +506,7 @@ private:
     uint8_t _clockFontSize = 2;                    ///< Clock font size (1=small, 2=medium, 3=large)
 
     // --- Modal layer ---
+    IDisplayBoard* _baseBoard = nullptr;           ///< Base board override (if nullptr, carousel is used)
     IDisplayBoard* _modal = nullptr;               ///< Active modal board (auto-clears on expired)
 
     // --- Bootstrap state ---
@@ -574,6 +522,16 @@ private:
     ConfiguringStatusBoard _configuringStatusBoard{_displayWidth, _displayHeight}; ///< Gate progress during CONFIGURING phase
 
 public:
-    // --- Sub-object API ---
-    BoardCatalog boards{_wifiWizard, _otaProgress, _error};  ///< Exposes caller-driven system boards (design spec §7.8.1)
+    // -------------------------------------------------------------------------
+    // Sub-object API (design spec §7.8.1, D35)
+    // -------------------------------------------------------------------------
+
+    /** @brief Carousel sub-object — manages the rotating pool of display boards. */
+    CarouselEngine& carousel = _carousel;
+
+    /** @brief Screensaver sub-object — display-intrinsic inactivity dim/blank policy. */
+    ScreensaverController& screensaver = _screensaver;
+
+    /** @brief Board catalog sub-object — named, concrete references to user-surfaced boards (§7.8.4). */
+    BoardCatalog boards{_bootBoard, _configuringStatusBoard, _wifiWizard, _otaProgress, _error};
 };

@@ -24,24 +24,34 @@
  * - OTAState: Lifecycle state enum for the OTA pipeline
  * - OTAProgressEvent: EventBus payload struct for OTA progress events
  * - OTAUpdateManager: Full OTA orchestrator service class
+ *
+ *   Orchestrator API:
  *   - begin():                Initialize with Application dependencies
  *   - checkForUpdate():       Query GitHub for a newer firmware release
  *   - performUpdate():        Launch the full download→verify→flash pipeline in a FreeRTOS task
  *   - getState():             Query the current OTA state machine state
  *   - getLastOtaError():      Retrieve the last OTA error string
- *   - beginUpdate():          [Legacy] Initiate direct OTA update with size and MD5
- *   - writeStream():          [Legacy] Stream firmware data to the flash partition
- *   - endUpdate():            [Legacy] Finalize the direct OTA update
+ *
+ *   Legacy Direct-Upload API:
+ *   - beginUpdate():          Initiate direct OTA update with size and MD5
+ *   - writeStream():          Stream firmware data to the flash partition
+ *   - endUpdate():            Finalize the direct OTA update
  *   - markAppValid():         Bless the running firmware, cancelling auto-rollback
  *   - rollbackFirmware():     Revert to the previous firmware partition and reboot
- *   - registerRoutes():       Register REST API routes (IWebContributor)
- *   - getTabName():           Return the UI tab name for this contributor
- *   - getConfigNamespace():   Return "ota" (IConfigurable)
- *   - getSchemaVersion():     Return 1 (IConfigurable)
- *   - applyConfig():          Apply OTA config from JSON section (IConfigurable)
- *   - serializeConfig():      Serialize OTA config to JSON section (IConfigurable)
- *   - migrateConfig():        Migrate from older schema version (IConfigurable)
- *   - resetConfig():          Restore OTA config factory defaults (IConfigurable)
+ *
+ *   IWebContributor (tab: "OTA", parent: "System", order: 50):
+ *   - registerRoutes():       Register REST API routes
+ *   - getTabName():           Return "OTA" for portal tab
+ *   - getParentTab():         Return "System" for navigation hierarchy
+ *   - getTabOrder():          Return 50 for pill ordering
+ *
+ *   IConfigurable (namespace: "ota", schema v1):
+ *   - getConfigNamespace():   Return "ota"
+ *   - getSchemaVersion():     Return 1
+ *   - applyConfig():          Apply OTA config from JSON section
+ *   - serializeConfig():      Serialize OTA config to JSON section
+ *   - migrateConfig():        Migrate from older schema version
+ *   - resetConfig():          Restore OTA config factory defaults
  */
 
 #pragma once

@@ -14,17 +14,25 @@
  * Exported Functions/Classes:
  * - TimeSyncStatus: Enum representing the current NTP synchronization status.
  * - TimeManager: Class managing time sync and rules.
+ *
+ *   Lifecycle:
  *   - begin():              Initializes NTP config and timezone.
- *   - tick():               Non-blocking update routine to be called in main loop.
+ *   - tick():               Non-blocking update routine to be called in main loop.  [ITickable]
+ *
+ *   Time Query API:
  *   - setTimezone():        Sets POSIX timezone string.
  *   - getLocalTime():       Gets current local time safely.
  *   - isTimeSet():          Returns true if time has been synchronized.
  *   - isConfigured():       Returns true if user has explicitly configured timezone.
+ *
+ *   IConfigurable (namespace: "time", schema v1):
  *   - getConfigNamespace(): Return "time"
  *   - getSchemaVersion():   Return 1
  *   - applyConfig():        Apply time config from JSON section
  *   - serializeConfig():    Serialize time config to JSON section
  *   - resetConfig():        Clear to defaults
+ *
+ *   IWebContributor (tab: "Time", parent: "System", order: 15):
  *   - registerRoutes():     Register REST API endpoints for time management
  *   - getTabName():         Return "Time" for portal tab
  *   - getParentTab():       Return "System" for navigation hierarchy

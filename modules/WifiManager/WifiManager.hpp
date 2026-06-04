@@ -24,18 +24,26 @@
  *
  * Exported Functions/Classes:
  * - WifiManager: Standard ESP32 WiFi lifecycle manager.
- *   - begin(): Connects to station or initializes AP recovery mode.
- *   - tick(): State machine for connection monitoring.
+ *
+ *   Lifecycle:
+ *   - begin():              Connects to station or initializes AP recovery mode.
+ *   - tick():               State machine for connection monitoring.  [ITickable]
+ *
+ *   Custom Methods:
+ *   - updateWiFi():         Persists new credentials and restarts the WiFi state machine.
+ *   - testConnection():     Validation probe for new credentials.
+ *   - setConfigManager():   Wire the ConfigManager pointer for save operations.
+ *   - setKeyManager():      Wire the KeyManager pointer for encrypted password storage.
+ *
+ *   IConfigurable (namespace: "wifi", schema v1):
  *   - getConfigNamespace(): Return "wifi"
  *   - getSchemaVersion():   Return 1
  *   - applyConfig():        Apply WiFi config from JSON section
  *   - serializeConfig():    Serialize WiFi config to JSON section
  *   - resetConfig():        Clear credentials.
+ *
+ *   IWebContributor (tab: "WiFi", order: 10):
  *   - registerRoutes():     Register 5 RESTful WiFi API endpoints
- *   - updateWiFi(): Persists new credentials and restarts the WiFi state machine.
- *   - testConnection(): Validation probe for new credentials.
- *   - setConfigManager(): Wire the ConfigManager pointer for save operations.
- *   - setKeyManager(): Wire the KeyManager pointer for encrypted password storage.
  */
 
 #pragma once

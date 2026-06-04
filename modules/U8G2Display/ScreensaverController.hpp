@@ -7,7 +7,17 @@
  * To view a copy of this license, visit https://creativecommons.org/licenses/by-nc-sa/4.0/
  *
  * Module: modules/U8G2Display/ScreensaverController.hpp
- * Description: Extracts screensaver / sleep / inactivity logic.
+ * Description:
+ *   Three-state inactivity manager for the display subsystem.
+ *   States: Active → Dimmed → Blanked (power-save).
+ *
+ *   The ScreensaverPolicy enum selects between DimOnly (reduce
+ *   brightness only) and FullSleep (dim then power-save after a
+ *   second timeout).  resetActivity() is the sole wake trigger.
+ *
+ *   This is a display-intrinsic concern — the application layer
+ *   need only call resetActivity() on user interaction; the
+ *   controller handles all state transitions internally.
  *
  * Exported Classes:
  * - ScreensaverController: Manages display inactivity timeouts, dimming, and sleep.
@@ -70,7 +80,7 @@ public:
      * @brief Set the screensaver board to display when blanked.
      * @param board Pointer to the screensaver board.
      */
-    void setBoard(IDisplayBoard* board);
+    void setBoard(ScreensaverBoard* board);
 
     /**
      * @brief Reset inactivity timer; wake if sleeping.
@@ -112,21 +122,26 @@ public:
      * @brief Return the screensaver board (for rendering).
      * @return Pointer to the board.
      */
-    IDisplayBoard* board() const;
+    ScreensaverBoard* board() const;
 
 private:
     unsigned long _dimTimeoutMs  = 300000;   ///< Inactivity timeout before dimming (5 min default)
     unsigned long _blankTimeoutMs = 600000;  ///< Inactivity timeout before power-save (10 min default)
     uint8_t  _dimLevel = 1;                  ///< Brightness level applied during dim state (1 = near-off)
     ScreensaverPolicy _policy = ScreensaverPolicy::FullSleep; ///< Dim-only vs full-sleep policy
-    IDisplayBoard* _board = nullptr;         ///< The screensaver board displayed when blanked
+    ScreensaverBoard* _board = nullptr;      ///< The screensaver board displayed when blanked
     unsigned long _lastActivityMs = 0;       ///< Timestamp of last user interaction
     bool _dimmed = false;                    ///< True when display is in dim state
     bool _blanked = false;                   ///< True when display is in power-save sleep
     bool _diagLogged = false;                ///< One-shot flag for sleep timer diagnostic log
     bool _wakeRequested = false;             ///< True when resetActivity() requires a wake during next tick()
 
-    void _dim(U8G2& display);    // Enter dim state - reduce contrast, set _dimmed
-    void _blank(U8G2& display);  // Enter blank/sleep state - setPowerSave(1), set _blanked
-    void _wake(U8G2& display, uint8_t activeBrightness);   // Exit all screensaver states - restore contrast, setPowerSave(0)
+    /** @brief Enter dim state — reduce contrast and activate the screensaver board. */
+    void _dim(U8G2& display);
+
+    /** @brief Enter blank/sleep state — setPowerSave(1). */
+    void _blank(U8G2& display);
+
+    /** @brief Exit all screensaver states — restore contrast, deactivate the board. */
+    void _wake(U8G2& display, uint8_t activeBrightness);
 };

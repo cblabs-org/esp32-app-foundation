@@ -75,13 +75,17 @@ Application::~Application() {
  * @return true on success; false if a fatal error prevents normal operation.
  */
 bool Application::begin(const FrameworkConfig& config) {
+    // --- Phase 1: Bootstrap display hardware (zero framework deps) ---
+    // SPI + U8G2 init, boot splash rendered immediately.
+    // Must happen before any reportStatus() calls so the boot splash is visible.
+#ifndef NATIVE_BUILD
+    _display.bootstrapHardware();
+    _statusReporter = &_display;  // Route all boot progress to the display
+#endif
+
     // --- Step 1: Boot banner ---
     // Print the firmware version so the first log line is always identifiable.
     ESP_LOGI(TAG, "ESP32 App Foundation v%s — booting", APP_FOUNDATION_VERSION);
-
-    // Boot progress: IStatusReporter receives progress updates at each
-    // milestone. Downstream apps register a display module before begin()
-    // to show visual boot progress. Default NullStatusReporter is a no-op.
 
     // --- Step 2: Enter BOOT state ---
     setState(AppState::Boot);
@@ -137,8 +141,9 @@ bool Application::begin(const FrameworkConfig& config) {
     _configManager.registerModule(&_timeManager);
     _otaManager = new OTAUpdateManager();
     _configManager.registerModule(_otaManager);
-    // Downstream modules (U8G2DisplayModule, etc.) are registered by app code
-    // via getConfigManager().registerModule() before begin() is called.
+#ifndef NATIVE_BUILD
+    _configManager.registerModule(&_display);
+#endif
 
     // --- Step 8: ConfigManager.beginAll() — load all persisted config ---
     // Iterates the registry, loads each module's namespace file from
@@ -176,9 +181,15 @@ bool Application::begin(const FrameworkConfig& config) {
     _webContributors.push_back(&_keyManager);
     _webContributors.push_back(_otaManager);
     _webContributors.push_back(&_mcpServer);
+#ifndef NATIVE_BUILD
+    _webContributors.push_back(&_display);
+#endif
 
     _tickables.push_back(&_wifiManager);
     _tickables.push_back(&_timeManager);
+#ifndef NATIVE_BUILD
+    _tickables.push_back(&_display);
+#endif
 
     // --- Step 15: WebServerManager + MCPServer begin() ---
     _webServerManager.begin(_webContributors);
@@ -186,6 +197,17 @@ bool Application::begin(const FrameworkConfig& config) {
     // MCP server: pass the ConfigManager reference for config operations
     _mcpServer.begin(_mcpContributors, &_configManager, &_config, &_timeManager);
     _statusReporter->reportStatus("Web portal starting...", 0.90f);
+
+    // --- Phase 2: Complete display integration ---
+    // EventBus subscriptions, config persistence, carousel board registration,
+    // MCP framebuffer binding. Exits bootstrap mode — tick() handles rendering.
+#ifndef NATIVE_BUILD
+    _display.begin(&_eventBus);
+    _display.setConfigManager(&_configManager);
+    _diagnosticsBoard.configure(_config.hostname, &_wifiManager);
+    _display.carousel.add(&_diagnosticsBoard);
+    _mcpServer.setDisplayInfo(_display.getDisplayInfo());
+#endif
 
     // --- Step 16: Register built-in WiFi config gate ---
     _configGates.push_back(&_wifiGate);
@@ -209,10 +231,12 @@ bool Application::begin(const FrameworkConfig& config) {
     if (_allGatesSatisfied()) {
         setState(AppState::Running);
         _dataManager.setAppRunning(true);
+        _onEnterRunning();
         ESP_LOGI(TAG, "Boot sequence complete — all gates satisfied, entering RUNNING state");
     } else {
         setState(AppState::Configuring);
         _publishConfiguringEvent();
+        _onEnterConfiguring(false);
         ESP_LOGI(TAG, "Boot sequence complete — awaiting configuration");
     }
 
@@ -249,6 +273,7 @@ void Application::tick() {
                         setState(AppState::Configuring);
                         _dataManager.setAppRunning(false);
                         _publishConfiguringEvent(true); // isRegression = true
+                        _onEnterConfiguring(true);
                         memset(_gateFailedSinceMs, 0, sizeof(_gateFailedSinceMs));
                         break;
                     }
@@ -264,6 +289,7 @@ void Application::tick() {
         if (_allGatesSatisfied()) {
             setState(AppState::Running);
             _dataManager.setAppRunning(true);
+            _onEnterRunning();
             _eventBus.publish("app.running");
             ESP_LOGI(TAG, "All config gates satisfied — entering RUNNING state");
         }
@@ -589,3 +615,47 @@ void Application::_publishConfiguringEvent(bool isRegression) {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Display-driven state transition helpers (WO5)
+// ---------------------------------------------------------------------------
+
+/**
+ * @brief Entering CONFIGURING — suspend carousel and show gate-status board.
+ *
+ * This is the Application-layer orchestration described in §7.8.5 of the
+ * design spec. The display module is a pure service — it doesn't know
+ * about AppState. Application drives it.
+ */
+void Application::_onEnterConfiguring(bool /*isRegression*/) {
+#ifndef NATIVE_BUILD
+    _display.carousel.suspend();
+    _display.showBase(&_display.boards.configuringStatus);
+#endif
+}
+
+/**
+ * @brief Entering RUNNING — clear overlays and resume carousel.
+ *
+ * Clears any modal or base board override so the carousel becomes the
+ * visible layer again, then resumes automatic rotation.
+ */
+void Application::_onEnterRunning() {
+#ifndef NATIVE_BUILD
+    _display.clearModal();
+    _display.showBase(nullptr);  // clear base → carousel becomes visible
+    _display.carousel.resume();
+#endif
+}
+
+// ---------------------------------------------------------------------------
+// Display accessor
+// ---------------------------------------------------------------------------
+
+#ifndef NATIVE_BUILD
+/**
+ * @brief Get the application's display module instance.
+ */
+U8G2DisplayModule& Application::getDisplay() {
+    return _display;
+}
+#endif

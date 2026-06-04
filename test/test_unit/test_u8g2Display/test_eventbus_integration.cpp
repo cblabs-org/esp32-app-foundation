@@ -124,7 +124,7 @@ TEST_F(EventBusIntegrationTest, OtaProgress_Publish_DelegatesToBoard) {
             } else {
                 self->boards.otaProgress.setProgress(ota->progress, ota->status);
             }
-            self->pushModal(&self->boards.otaProgress);
+            self->showModal(&self->boards.otaProgress);
         },
         &display);
 
@@ -139,7 +139,7 @@ TEST_F(EventBusIntegrationTest, OtaProgress_Publish_DelegatesToBoard) {
     EXPECT_EQ(delivered, 1);
 
     // Verify the OTA board is now active
-    EXPECT_EQ(display.getActiveBoard(), &display.boards.otaProgress);
+    EXPECT_EQ(display.visibleBoard(), &display.boards.otaProgress);
 }
 
 /** Publish OTA complete(success) — board should expire. */
@@ -154,7 +154,7 @@ TEST_F(EventBusIntegrationTest, OtaProgress_Complete_Success_BoardExpires) {
             } else {
                 self->boards.otaProgress.setProgress(ota->progress, ota->status);
             }
-            self->pushModal(&self->boards.otaProgress);
+            self->showModal(&self->boards.otaProgress);
         },
         &display);
 
@@ -188,8 +188,8 @@ TEST_F(EventBusIntegrationTest, DisplayMessage_Publish_ShowsMessage) {
     EXPECT_EQ(delivered, 1);
 
     // Boot board should be active (used as message overlay)
-    EXPECT_NE(display.getActiveBoard(), nullptr);
-    EXPECT_STREQ(display.getActiveBoard()->getBoardName(), "SYS: Boot");
+    EXPECT_NE(display.visibleBoard(), nullptr);
+    EXPECT_STREQ(display.visibleBoard()->getBoardName(), "SYS: Boot");
 }
 
 /** EventBus with no subscribers must return 0 delivered. */
