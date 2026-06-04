@@ -8,9 +8,9 @@
  *
  * Module: modules/ConfigManager/ConfigManager.hpp
  * Description: Centralised configuration gateway that owns all config file I/O.
- *              Manages a fixed-size registry of IConfigurable modules, handles
- *              schema versioning via self-describing _v fields, orchestrates
- *              migration on boot, and provides bulk export/import for backup.
+ *              Manages a dynamic locked registry of IConfigurable modules,
+ *              handles schema versioning via self-describing _v fields,
+ *              orchestrates migration on boot, and provides bulk export/import.
  *
  *              Config files are stored at /mod/<namespace>.json (one per module).
  *              Modules provide serialise/deserialise callbacks; they never touch
@@ -42,6 +42,8 @@
 
 #pragma once
 
+#include <vector>
+
 #ifndef NATIVE_BUILD
 #include <Arduino.h>
 #include <LittleFS.h>
@@ -60,10 +62,12 @@
 /**
  * @brief Centralised configuration gateway that owns all config file I/O.
  *
- * Manages a fixed-size array of IConfigurable module pointers. On boot,
- * beginAll() loads each module's config from /mod/<namespace>.json, checks
- * schema versions, runs migrations if needed, and calls applyConfig().
- * Individual modules call saveModuleConfig() when they need to persist changes.
+ * Manages a dynamic registry of IConfigurable module pointers. Modules are
+ * registered before beginAll() is called; the registry is locked afterwards
+ * (matching the Application two-tier model). On boot, beginAll() loads each
+ * module's config from /mod/<namespace>.json, checks schema versions, runs
+ * migrations if needed, and calls applyConfig(). Individual modules call
+ * saveModuleConfig() when they need to persist changes.
  */
 class ConfigManager : public IWebContributor {
 public:
@@ -73,16 +77,14 @@ public:
     // Module Registry
     // -------------------------------------------------------------------------
 
-    static constexpr uint8_t MAX_CONFIGURABLES = 8; ///< Maximum number of registered IConfigurable modules
-
     /**
      * @brief Register an IConfigurable module with the gateway.
      *
-     * Modules must be registered before beginAll() is called. Bounds-checked
-     * against MAX_CONFIGURABLES.
+     * Modules must be registered before beginAll() is called. Post-lock
+     * registration attempts are rejected and logged as errors.
      *
      * @param module Non-null pointer to the IConfigurable module.
-     * @return true if registration succeeded; false if full or nullptr.
+     * @return true if registration succeeded; false if locked or nullptr.
      */
     bool registerModule(IConfigurable* module);
 
@@ -213,8 +215,8 @@ private:
     // Member variables
     // -------------------------------------------------------------------------
 
-    IConfigurable* _modules[MAX_CONFIGURABLES] = {}; ///< Fixed-size registry of IConfigurable modules
-    uint8_t _moduleCount = 0;                        ///< Number of registered modules
-    char _metaTimezone[64] = {};                     ///< Timezone string for backup _meta envelope (default: "UTC")
+    std::vector<IConfigurable*> _modules;  ///< Dynamic registry of IConfigurable modules (locked after beginAll())
+    bool _locked = false;                  ///< True after beginAll() — post-lock registration is rejected
+    char _metaTimezone[64] = {};           ///< Timezone string for backup _meta envelope (default: "UTC")
 
 };

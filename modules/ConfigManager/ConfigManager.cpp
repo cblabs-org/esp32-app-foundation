@@ -78,24 +78,24 @@ void ConfigManager::setMetaTimezone(const char* tz) {
 /**
  * @brief Register an IConfigurable module with the gateway.
  *
- * Performs bounds checking against MAX_CONFIGURABLES and null-pointer guard.
+ * Rejected if called after beginAll() has locked the registry, or if the
+ * pointer is null. Matching Application's two-tier locked-vector model.
  *
  * @param module Non-null pointer to the IConfigurable module.
- * @return true if registration succeeded; false if full or nullptr.
+ * @return true if registration succeeded; false if locked or nullptr.
  */
 bool ConfigManager::registerModule(IConfigurable* module) {
     if (module == nullptr) {
         ESP_LOGE(TAG, "registerModule() rejected — null pointer");
         return false;
     }
-    if (_moduleCount >= MAX_CONFIGURABLES) {
-        ESP_LOGE(TAG, "registerModule() rejected — registry full (%u/%u)",
-                 _moduleCount, MAX_CONFIGURABLES);
+    if (_locked) {
+        ESP_LOGE(TAG, "registerModule() rejected — registry is locked after beginAll()");
         return false;
     }
-    _modules[_moduleCount++] = module;
-    ESP_LOGI(TAG, "Registered module '%s' (slot %u/%u)",
-             module->getConfigNamespace(), _moduleCount, MAX_CONFIGURABLES);
+    _modules.push_back(module);
+    ESP_LOGI(TAG, "Registered module '%s' (slot %d)",
+             module->getConfigNamespace(), (int)_modules.size());
     return true;
 }
 
@@ -106,15 +106,18 @@ bool ConfigManager::registerModule(IConfigurable* module) {
 /**
  * @brief Load and apply configuration for all registered modules.
  *
- * Iterates the fixed-size module registry and calls loadModuleConfig()
- * on each registered module. Handles file reads, version checks,
- * migrations, and applyConfig() dispatch.
+ * Locks the registry (matching Application's compact-and-lock model), then
+ * iterates the module list and calls loadModuleConfig() on each.
  */
 void ConfigManager::beginAll() {
-    ESP_LOGI(TAG, "beginAll() — loading config for %u module(s)", _moduleCount);
+    // Lock the registry — post-beginAll() registration attempts will be rejected
+    _locked = true;
+    _modules.shrink_to_fit();
 
-    for (uint8_t i = 0; i < _moduleCount; i++) {
-        loadModuleConfig(_modules[i]);
+    ESP_LOGI(TAG, "beginAll() — loading config for %d module(s)", (int)_modules.size());
+
+    for (IConfigurable* mod : _modules) {
+        loadModuleConfig(mod);
     }
 
     ESP_LOGI(TAG, "beginAll() complete");
@@ -334,7 +337,7 @@ void ConfigManager::buildBackupMeta(JsonObject& meta) {
     // TODO: call setMetaTimezone() from TimeManager::applyConfig() to propagate
     //       the configured timezone into the backup envelope.
     meta["timezone"]     = _metaTimezone[0] != '\0' ? _metaTimezone : "UTC";
-    meta["module_count"] = _moduleCount;
+    meta["module_count"] = (int)_modules.size();
 }
 
 /**
@@ -354,16 +357,14 @@ void ConfigManager::buildBackupMeta(JsonObject& meta) {
  * @param outDoc Reference to the output JsonDocument (caller-owned).
  */
 void ConfigManager::exportAllConfig(JsonDocument& outDoc) {
-    ESP_LOGI(TAG, "Exporting config for %u module(s)", _moduleCount);
+    ESP_LOGI(TAG, "Exporting config for %d module(s)", (int)_modules.size());
 
     // Write _meta first so it appears as the leading key in the output
     JsonObject meta = outDoc["_meta"].to<JsonObject>();
     buildBackupMeta(meta);
 
-    for (uint8_t i = 0; i < _moduleCount; i++) {
-        IConfigurable* mod = _modules[i];
+    for (IConfigurable* mod : _modules) {
         const char* ns = mod->getConfigNamespace();
-
         JsonObject section = outDoc[ns].to<JsonObject>();
         mod->serializeConfig(section);
         section["_v"] = mod->getSchemaVersion();
@@ -385,7 +386,7 @@ void ConfigManager::exportAllConfig(JsonDocument& outDoc) {
  * @return true if all found modules imported successfully.
  */
 bool ConfigManager::importAllConfig(JsonDocument& inDoc) {
-    ESP_LOGI(TAG, "Importing config for %u module(s)", _moduleCount);
+    ESP_LOGI(TAG, "Importing config for %d module(s)", (int)_modules.size());
     bool allOk = true;
 
     // Iterate over every top-level key in the import document and emit a debug
@@ -393,8 +394,8 @@ bool ConfigManager::importAllConfig(JsonDocument& inDoc) {
     for (JsonPair kv : inDoc.as<JsonObject>()) {
         const char* ns = kv.key().c_str();
         bool matched = false;
-        for (uint8_t i = 0; i < _moduleCount; i++) {
-            if (strcmp(_modules[i]->getConfigNamespace(), ns) == 0) {
+        for (IConfigurable* mod : _modules) {
+            if (strcmp(mod->getConfigNamespace(), ns) == 0) {
                 matched = true;
                 break;
             }
@@ -404,8 +405,7 @@ bool ConfigManager::importAllConfig(JsonDocument& inDoc) {
         }
     }
 
-    for (uint8_t i = 0; i < _moduleCount; i++) {
-        IConfigurable* mod = _modules[i];
+    for (IConfigurable* mod : _modules) {
         const char* ns = mod->getConfigNamespace();
 
         if (!inDoc[ns].is<JsonObject>()) {
@@ -534,10 +534,10 @@ void ConfigManager::registerRoutes(AsyncWebServer& server) {
     server.on("/api/config", HTTP_GET, [this](AsyncWebServerRequest* request) {
         JsonDocument doc;
         JsonArray namespaces = doc["namespaces"].to<JsonArray>();
-        for (uint8_t i = 0; i < _moduleCount; i++) {
-            namespaces.add(_modules[i]->getConfigNamespace());
+        for (IConfigurable* mod : _modules) {
+            namespaces.add(mod->getConfigNamespace());
         }
-        doc["count"] = _moduleCount;
+        doc["count"] = (int)_modules.size();
 
         String output;
         serializeJson(doc, output);
