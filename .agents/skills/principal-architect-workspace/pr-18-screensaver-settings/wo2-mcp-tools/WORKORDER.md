@@ -153,4 +153,13 @@ pio run -e esp32s3nano -t upload
 
 ## Status
 
-_(To be filled in by worker agent on completion)_
+**COMPLETE — Approved by Principal Architect on 2026-06-04T15:29:55Z**
+
+- ✅ `display_status` tool implemented (read-safe, no params, full JSON response)
+- ✅ `display_control` tool implemented (mutating, 5 optional params, ConfigManager persistence)
+- ✅ `pio test -e native` — 419/420 passed (1 pre-existing error in test_application)
+- ✅ `pio run -e esp32s3nano` — SUCCESS (31.2s, RAM 15.5%, Flash 58.7%)
+- ✅ 32 new GoogleTest cases in `test_displayMcpTools.cpp`
+- ⚠️ Application.cpp wiring deferred — architect will add `registerMcpContributor(&_display)` post-merge
+- Session ID: `1083988a-31c8-4e4e-960d-5fd304c09e5d`
+
