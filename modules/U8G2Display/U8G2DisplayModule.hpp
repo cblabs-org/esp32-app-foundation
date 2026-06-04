@@ -76,6 +76,9 @@
 #include "interfaces/IWebContributor.hpp"
 #include "interfaces/IDisplayBoard.hpp"
 #include "boards/BootBoard.hpp"
+#include "CarouselEngine.hpp"
+#include "ScreensaverController.hpp"
+#include "BoardCatalog.hpp"
 #include "boards/WiFiWizardBoard.hpp"
 #include "boards/OTAProgressBoard.hpp"
 #include "boards/ErrorBoard.hpp"
@@ -468,42 +471,7 @@ private:
      */
     IDisplayBoard* _getBaseBoard();
 
-    /**
-     * @brief Check inactivity timer and dim display if timed out.
-     *
-     * Dims brightness to minimum (1) after _sleepTimeoutMs of inactivity.
-     * Does NOT blank or power-save the display. Used during CONFIGURING
-     * phase and when a modal is active (any phase). Tracks state with
-     * _modalDimmed to avoid repeated hardware calls.
-     */
-    void _checkDim();
 
-    /**
-     * @brief Check the inactivity timer and enter sleep if timed out.
-     *
-     * Compares millis() against _lastActivityMs + _sleepTimeoutMs.
-     * If the timeout is 0, sleep is disabled.
-     */
-    void _checkSleep();
-
-    /**
-     * @brief Exit sleep mode and restore display brightness.
-     */
-    void _wake();
-
-    /**
-     * @brief Enter sleep mode and power-save the display.
-     */
-    void _sleep();
-
-    /**
-     * @brief Reset only the inactivity timer and dim/diagnostic flags.
-     *
-     * Internal helper used by pushModal() and resetActivity(). Does NOT
-     * dismiss the screensaver or wake from sleep — those are user-activity
-     * concerns handled exclusively by resetActivity().
-     */
-    void _resetTimer();
 
     // -------------------------------------------------------------------------
     // Private EventBus callback statics
@@ -583,10 +551,7 @@ private:
     unsigned long _targetFrameIntervalMs = 33;     ///< Minimum ms between renders (default 30 FPS: 1000/30≈33)
 
     // --- Sleep / power management ---
-    bool _sleeping = false;                        ///< True when the display is in power-save sleep
-    unsigned long _lastActivityMs = 0;             ///< Timestamp of last user interaction
-    unsigned long _sleepTimeoutMs = 300000;        ///< Inactivity timeout before sleep (5 minutes default)
-    bool _sleepDiagLogged = false;                 ///< One-shot flag for sleep timer diagnostic log
+    ScreensaverController _screensaver;            ///< Inactivity dim/blank/sleep state machine
 
     // --- Display settings ---
     uint8_t _brightness = 255;                     ///< Display brightness / contrast level (0–255)
@@ -595,7 +560,6 @@ private:
 
     // --- Modal layer ---
     IDisplayBoard* _modal = nullptr;               ///< Active modal board (auto-clears on expired)
-    bool           _modalDimmed = false;            ///< True when modal/configuring brightness has been dimmed
 
     // --- Bootstrap state ---
     bool  _bootstrapMode    = false;               ///< True between bootstrapHardware() and begin()
@@ -606,7 +570,7 @@ private:
     WiFiWizardBoard  _wifiWizard{_displayWidth, _displayHeight};   ///< WiFi setup wizard screen (CONFIGURING phase)
     OTAProgressBoard _otaProgress{_displayWidth, _displayHeight};  ///< OTA firmware update progress screen
     ErrorBoard       _error{_displayWidth, _displayHeight};        ///< Error message display screen
-    ScreensaverBoard _screensaver{_displayWidth, _displayHeight};  ///< Inactivity screensaver (burn-in prevention)
+    ScreensaverBoard _screensaverBoard{_displayWidth, _displayHeight};  ///< Inactivity screensaver (burn-in prevention)
     ConfiguringStatusBoard _configuringStatusBoard{_displayWidth, _displayHeight}; ///< Gate progress during CONFIGURING phase
 
 public:

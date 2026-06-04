@@ -163,6 +163,8 @@ void U8G2DisplayModule::bootstrapHardware() {
  */
 void U8G2DisplayModule::begin(Application& app) {
     _app = &app;
+    
+    _screensaver.setBoard(&_screensaverBoard);
 
     // --- Step 1: Initialize hardware (skip if already bootstrapped) ---
     if (!_bootstrapMode) {
@@ -203,9 +205,9 @@ void U8G2DisplayModule::begin(Application& app) {
     _bootstrapMode = false;
     _lastBootProgress = 0.0f;
 
-    // --- Step 6: Reset timers to current time ---
+    // --- Step 6: Start the inactivity timer
 #ifndef NATIVE_BUILD
-    _lastActivityMs = millis();
+    resetActivity();
     _lastRenderMs   = millis();
 #endif
 
@@ -228,7 +230,10 @@ void U8G2DisplayModule::begin(Application& app) {
  */
 void U8G2DisplayModule::tick() {
     // --- Early exit if sleeping ---
-    if (_sleeping) {
+    if (_screensaver.isBlanked()) {
+#ifndef NATIVE_BUILD
+        _screensaver.tick(millis(), _u8g2, _brightness);
+#endif
         return;
     }
 
@@ -279,11 +284,13 @@ void U8G2DisplayModule::tick() {
     if (_app != nullptr) {
         if (_app->getState() == AppState::Running && _modal == nullptr) {
             // RUNNING with no modal: carousel rotation + screensaver/sleep
-            _checkSleep();
+            _screensaver.setPolicy(ScreensaverPolicy::FullSleep);
+            _screensaver.tick(millis(), _u8g2, _brightness);
             _carousel.tick(millis());
         } else if (_app->getState() != AppState::Boot) {
             // CONFIGURING (base) or modal active (any phase): dim, never blank
-            _checkDim();
+            _screensaver.setPolicy(ScreensaverPolicy::DimOnly);
+            _screensaver.tick(millis(), _u8g2, _brightness);
         }
         // BOOT: no dimming, no sleep — always full brightness
     }
@@ -397,11 +404,10 @@ void U8G2DisplayModule::pushModal(IDisplayBoard* board) {
         _modal->onDeactivate();
     }
     _modal = board;
-    _modalDimmed = false;
     if (board != nullptr) {
         board->onActivate();
     }
-    _resetTimer();
+    _screensaver.resetActivity();
 }
 
 /**
@@ -414,7 +420,6 @@ void U8G2DisplayModule::clearModal() {
     if (_modal != nullptr) {
         _modal->onDeactivate();
         _modal = nullptr;
-        _modalDimmed = false;
 #ifndef NATIVE_BUILD
         _u8g2.setContrast(_brightness);
 #endif
@@ -429,34 +434,9 @@ void U8G2DisplayModule::clearModal() {
  * wakes from sleep, and dismisses the screensaver if active.
  */
 void U8G2DisplayModule::resetActivity() {
-    _resetTimer();
-
-    if (_sleeping) {
-        _wake();
-    }
-
-    // --- Dismiss screensaver if it's the active modal ---
-    if (_modal == &_screensaver) {
-        _screensaver.deactivate();
-        // Modal auto-clears on next tick via isExpired() check
-        ESP_LOGI(TAG, "Screensaver dismissed — activity detected");
-    }
+    _screensaver.resetActivity();
 }
 
-/**
- * @brief Reset only the inactivity timer and dim/diagnostic flags.
- *
- * Internal helper that does NOT dismiss the screensaver or wake from
- * sleep. Used by pushModal() to reset the dim timer without triggering
- * user-activity side-effects.
- */
-void U8G2DisplayModule::_resetTimer() {
-#ifndef NATIVE_BUILD
-    _lastActivityMs = millis();
-#endif
-    _modalDimmed = false;
-    _sleepDiagLogged = false;
-}
 
 /**
  * @brief Return the number of boards in the carousel pool.
@@ -601,7 +581,9 @@ void U8G2DisplayModule::clearStatus() {
 void U8G2DisplayModule::applyConfig(const JsonObject& section) {
     _brightness         = section["brightness"]      | (uint8_t)255;
     _flipScreen         = section["flip"]            | false;
-    _sleepTimeoutMs     = section["sleepTimeout"]     | (unsigned long)300000;
+    unsigned long sleepTimeoutMs = section["sleepTimeout"] | (unsigned long)300000;
+    _screensaver.setBlankTimeout(sleepTimeoutMs);
+    _screensaver.setDimTimeout(sleepTimeoutMs / 2);
     unsigned long rotationInterval = section["rotationInterval"] | (unsigned long)8000;
     _carousel.setInterval(rotationInterval);
     _targetFrameIntervalMs = 1000UL / (section["targetFps"] | (uint8_t)30);
@@ -610,7 +592,7 @@ void U8G2DisplayModule::applyConfig(const JsonObject& section) {
     const uint8_t* font = AppFonts::defaultMedium();
     if (_clockFontSize == 1) font = AppFonts::defaultSmall();
     else if (_clockFontSize == 3) font = AppFonts::defaultLarge();
-    _screensaver.setClockFont(font);
+    _screensaverBoard.setClockFont(font);
 
     // --- Apply hardware settings ---
 #ifndef NATIVE_BUILD
@@ -619,7 +601,7 @@ void U8G2DisplayModule::applyConfig(const JsonObject& section) {
 #endif
 
     ESP_LOGI(TAG, "Config applied (brightness=%d, flip=%d, sleep=%lu)",
-             _brightness, _flipScreen, _sleepTimeoutMs);
+             _brightness, _flipScreen, _screensaver.getBlankTimeout());
 }
 
 /**
@@ -635,7 +617,7 @@ void U8G2DisplayModule::applyConfig(const JsonObject& section) {
 void U8G2DisplayModule::serializeConfig(JsonObject& section) const {
     section["brightness"]       = _brightness;
     section["flip"]             = _flipScreen;
-    section["sleepTimeout"]     = _sleepTimeoutMs;
+    section["sleepTimeout"]     = _screensaver.getBlankTimeout();
     section["rotationInterval"] = _carousel.getInterval();
     section["targetFps"]        = (uint8_t)(1000UL / _targetFrameIntervalMs);
     section["clockFontSize"]    = _clockFontSize;
@@ -653,7 +635,9 @@ void U8G2DisplayModule::resetConfig() {
     // --- Set factory defaults ---
     _brightness         = 255;
     _flipScreen         = false;
-    _sleepTimeoutMs     = 300000;
+    unsigned long sleepTimeoutMs = 300000;
+    _screensaver.setBlankTimeout(sleepTimeoutMs);
+    _screensaver.setDimTimeout(sleepTimeoutMs / 2);
     _carousel.setInterval(8000);
     _targetFrameIntervalMs = 33;
     _clockFontSize      = 2;
@@ -719,7 +703,7 @@ void U8G2DisplayModule::setFlipScreen(bool flip) {
  * @param timeoutMs Timeout in milliseconds (0 disables sleep).
  */
 void U8G2DisplayModule::setSleepTimeout(unsigned long timeoutMs) {
-    _sleepTimeoutMs = timeoutMs;
+    _screensaver.setBlankTimeout(timeoutMs);
 }
 
 /**
@@ -755,7 +739,7 @@ void U8G2DisplayModule::setClockFontSize(uint8_t size) {
     const uint8_t* font = AppFonts::defaultMedium();
     if (_clockFontSize == 1) font = AppFonts::defaultSmall();
     else if (_clockFontSize == 3) font = AppFonts::defaultLarge();
-    _screensaver.setClockFont(font);
+    _screensaverBoard.setClockFont(font);
 }
 
 /**
@@ -785,8 +769,8 @@ void U8G2DisplayModule::registerRoutes(AsyncWebServer& server) {
         JsonDocument doc;
         doc["brightness"]       = _brightness;
         doc["flip"]             = _flipScreen;
-        doc["sleeping"]         = _sleeping;
-        doc["sleepTimeout"]     = _sleepTimeoutMs;
+        doc["sleeping"]         = _screensaver.isBlanked();
+        doc["sleepTimeout"]     = _screensaver.getBlankTimeout();
         doc["rotationInterval"] = _carousel.getInterval();
         doc["boardCount"]       = _carousel.boardCount();
         doc["clockFontSize"]    = _clockFontSize;
@@ -865,7 +849,7 @@ void U8G2DisplayModule::registerRoutes(AsyncWebServer& server) {
             if (doc["action"].is<const char*>()) {
                 const char* action = doc["action"];
                 if (strcmp(action, "sleep") == 0) {
-                    _sleep();
+                    _screensaver.forceTimeout();
                 } else if (strcmp(action, "wake") == 0) {
                     resetActivity();
                 }
@@ -1105,7 +1089,9 @@ void U8G2DisplayModule::_renderCurrentBoard() {
     // --- Determine which board to render ---
     IDisplayBoard* boardToRender = nullptr;
 
-    if (_modal != nullptr) {
+    if (_screensaver.isActive() && _screensaver.board() != nullptr) {
+        boardToRender = _screensaver.board();
+    } else if (_modal != nullptr) {
         // Modal layer takes priority
         boardToRender = _modal;
     } else if (_carousel.currentBoard() != nullptr) {
@@ -1128,30 +1114,6 @@ void U8G2DisplayModule::_renderCurrentBoard() {
 #endif
 }
 
-/**
- * @brief Check inactivity timer and enter sleep if timed out.
- */
-void U8G2DisplayModule::_checkSleep() {
-#ifndef NATIVE_BUILD
-    // Sleep disabled if timeout is 0
-    if (_sleepTimeoutMs == 0) {
-        return;
-    }
-
-    unsigned long elapsed = millis() - _lastActivityMs;
-
-    // --- Diagnostic: one-shot log at 50% of timeout ---
-    if (!_sleepDiagLogged && elapsed >= (_sleepTimeoutMs / 2)) {
-        ESP_LOGW(TAG, "Sleep diagnostic: elapsed=%lu timeout=%lu (50%% reached)",
-                 elapsed, _sleepTimeoutMs);
-        _sleepDiagLogged = true;
-    }
-
-    if (elapsed >= _sleepTimeoutMs) {
-        _sleep();
-    }
-#endif
-}
 
 /**
  * @brief Derive the base-layer board from the current Application state.
@@ -1177,68 +1139,5 @@ IDisplayBoard* U8G2DisplayModule::_getBaseBoard() {
 #endif
 }
 
-/**
- * @brief Check inactivity timer and dim display if timed out.
- * Dims to minimum brightness (1) — never blanks. Used during
- * CONFIGURING and when a modal is active.
- */
-void U8G2DisplayModule::_checkDim() {
-#ifndef NATIVE_BUILD
-    if (_sleepTimeoutMs == 0) return;  // Dimming disabled
 
-    unsigned long elapsed = millis() - _lastActivityMs;
-    if (elapsed >= _sleepTimeoutMs && !_modalDimmed) {
-        _u8g2.setContrast(1);  // Minimum non-zero brightness
-        _modalDimmed = true;
-        ESP_LOGI(TAG, "Display dimmed (inactivity during configuring/modal)");
-    }
-#endif
-}
 
-/**
- * @brief Enter sleep mode — activate the screensaver for burn-in prevention.
- *
- * Pushes the screensaver as a modal overlay via pushModal(). The display
- * stays awake (_sleeping is NOT set) so the tick loop continues running
- * to tick/render the screensaver animation. The screensaver's isExpired()
- * returns !_active, so while active it won't auto-clear.
- *
- * _checkSleep() won't fire again because _modal != nullptr routes tick()
- * to the dim path rather than the RUNNING+no-modal sleep path.
- *
- * pushModal() calls _resetTimer() (not resetActivity()), so the screensaver
- * is NOT immediately dismissed. Dismissal happens when resetActivity() is
- * called from a user-initiated event (HTTP request, touch, EventBus).
- */
-void U8G2DisplayModule::_sleep() {
-    ESP_LOGI(TAG, "Display entering idle — activating screensaver");
-    _screensaver.activate();
-    pushModal(&_screensaver);
-}
-
-/**
- * @brief Exit sleep mode — restore display power and brightness.
- *
- * Clears the sleeping flag, restores OLED power and brightness,
- * and publishes a "display.wake" event.
- */
-void U8G2DisplayModule::_wake() {
-    ESP_LOGI(TAG, "Display waking from sleep");
-    _sleeping = false;
-
-    // --- Deactivate the screensaver (if it was running) ---
-    _screensaver.deactivate();
-
-    // --- Restore OLED power and brightness ---
-#ifndef NATIVE_BUILD
-    _u8g2.setPowerSave(0);
-    _u8g2.setContrast(_brightness);
-#endif
-
-    // --- Publish wake event ---
-#ifndef NATIVE_BUILD
-    if (_app != nullptr) {
-        _app->getEventBus().publish("display.wake");
-    }
-#endif
-}
