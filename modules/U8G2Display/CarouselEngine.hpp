@@ -147,6 +147,12 @@ public:
     void resume();
 
     /**
+     * @brief Check whether automatic rotation is paused.
+     * @return True if the carousel is suspended.
+     */
+    bool isSuspended() const { return _suspended; }
+
+    /**
      * @brief Set the rotation interval in milliseconds.
      * @param ms Rotation interval.
      */

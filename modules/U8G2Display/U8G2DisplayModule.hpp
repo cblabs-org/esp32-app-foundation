@@ -25,6 +25,8 @@
  *              gateway for persistent display settings (namespace: "display",
  *              schema version: 3). Implements IWebContributor for REST API
  *              routes under /api/display/ and portal tab "App" (order 30).
+ *              Implements IMCPContributor for display_status (read-safe)
+ *              and display_control (mutating) MCP tools.
  *
  * Exported Classes:
  * - OTAProgressPayload:            EventBus payload struct for OTA progress events
@@ -61,6 +63,9 @@
  *   - getTabName():         Return "App" for portal tab
  *   - getTabOrder():        Return 30 for portal tab ordering
  *
+ *   IMCPContributor:
+ *   - registerMCPTools():   Register display_status/display_control MCP tools
+ *
  *   Runtime Display Setters:
  *   - setBrightness():      Runtime brightness adjustment (0–255)
  *   - setFlipScreen():      Runtime screen flip toggle
@@ -77,6 +82,7 @@
 #include "interfaces/IStatusReporter.hpp"
 #include "interfaces/IConfigurable.hpp"
 #include "interfaces/IWebContributor.hpp"
+#include "interfaces/IMCPContributor.hpp"
 #include "interfaces/IDisplayBoard.hpp"
 #include "boards/BootBoard.hpp"
 #include "CarouselEngine.hpp"
@@ -98,6 +104,7 @@
 // --- Forward declarations ---
 class EventBus;
 class ConfigManager;
+class MCPToolRegistry;
 
 // ---------------------------------------------------------------------------
 // EventBus Payload Structs
@@ -152,8 +159,9 @@ struct DisplayBoardChangedPayload {
  * @brief U8G2 monochrome display module with carousel engine and board slot pool.
  *
  * Implements ITickable for main-loop rendering, IStatusReporter for boot-phase
- * status overlays (delegates to BootBoard/ErrorBoard), and IConfigurable
- * for persistent display settings via ConfigManager gateway (namespace: "display").
+ * status overlays (delegates to BootBoard/ErrorBoard), IConfigurable
+ * for persistent display settings via ConfigManager gateway (namespace: "display"),
+ * and IMCPContributor for display_status / display_control MCP tools.
  *
  * The carousel pool accepts registrations via display.carousel.add() and
  * supports runtime mutation (add/remove/clear). The carousel engine rotates
@@ -162,7 +170,7 @@ struct DisplayBoardChangedPayload {
  * Subscribes to EventBus topics "ota.progress" and "display.message" for
  * runtime integration with other framework modules.
  */
-class U8G2DisplayModule : public ITickable, public IStatusReporter, public IConfigurable, public IWebContributor {
+class U8G2DisplayModule : public ITickable, public IStatusReporter, public IConfigurable, public IWebContributor, public IMCPContributor {
 public:
     // -------------------------------------------------------------------------
     // Lifecycle
@@ -354,6 +362,21 @@ public:
      * @return 30 — Display tab appears before mid-range tabs.
      */
     int getTabOrder() const override { return 30; }
+
+    // -------------------------------------------------------------------------
+    // IMCPContributor — MCP display tools
+    // -------------------------------------------------------------------------
+
+    /**
+     * @brief Register display_status and display_control MCP tools.
+     *
+     * display_status (read-safe) returns brightness, flip, active board,
+     * screensaver state, and carousel info. display_control (mutating)
+     * supports wake/sleep, brightness, screensaver toggle, and timeouts.
+     *
+     * @param registry The MCPToolRegistry to register tools with.
+     */
+    void registerMCPTools(MCPToolRegistry& registry) override;
 
     // -------------------------------------------------------------------------
     // Runtime display configuration setters

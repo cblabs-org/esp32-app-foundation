@@ -13,7 +13,8 @@
  *              delegation (Boot/Error boards), EventBus subscriptions
  *              (ota.progress, display.message), EventBus publishing
  *              (display.sleep, display.wake, display.board.changed),
- *              IWebContributor REST API under /api/display/, and
+ *              IWebContributor REST API under /api/display/,
+ *              IMCPContributor tools (display_status, display_control), and
  *              IConfigurable persistence at /mod/display.json.
  *
  * Exported Functions:
@@ -29,6 +30,7 @@
  * - U8G2DisplayModule::reportError():       Delegate to ErrorBoard (fatal), show it
  * - U8G2DisplayModule::clearStatus():       Mark loading complete, advance if showing
  * - U8G2DisplayModule::registerRoutes():    Register /api/display/* REST endpoints
+ * - U8G2DisplayModule::registerMCPTools():  Register display_status/display_control MCP tools
  * - U8G2DisplayModule::applyConfig():       Apply display settings from JSON section
  * - U8G2DisplayModule::serializeConfig():   Serialize display settings to JSON section
  * - U8G2DisplayModule::resetConfig():       Reset to factory defaults
@@ -61,6 +63,7 @@ static const char* TAG = "U8g2Display";
 // Include EventBus directly — it is native-safe (no Arduino.h dependency).
 #include "../EventBus/EventBus.hpp"
 #include "../ConfigManager/ConfigManager.hpp"
+#include "../MCPServer/MCPToolRegistry.hpp"
 #include "fonts/Fonts.hpp"
 
 // =============================================================================
@@ -917,6 +920,158 @@ void U8G2DisplayModule::registerRoutes(AsyncWebServer& server) {
         request->send(response);
     });
 #endif
+}
+
+// =============================================================================
+// IMCPContributor — display_status and display_control MCP tools
+// =============================================================================
+
+/**
+ * @brief Register display MCP tools: display_status (read) and display_control (write).
+ *
+ * display_status returns the current display state (brightness, flip, active board,
+ * screensaver state and timeouts, carousel info). It is read-safe and available
+ * even when MCP is in read-only mode.
+ *
+ * display_control allows remote agents to wake/sleep the display, change brightness,
+ * toggle screensaver, and set dim/blank timeouts. It is tagged as mutating and
+ * blocked when MCP is in read-only mode.
+ *
+ * @param registry The MCPToolRegistry to register tools with.
+ */
+void U8G2DisplayModule::registerMCPTools(MCPToolRegistry& registry) {
+
+    // --- Tool 1: display_status (read-only) ---
+    // Returns a JSON snapshot of display brightness, flip, active board,
+    // screensaver state/timeouts, and carousel info. No parameters required.
+    registry.addTool(
+        "display_status",
+        "Get current display state including brightness, active board, screensaver status, and timeout configuration",
+        [this](JsonObject& params, JsonObject& result) {
+            (void)params;
+
+            result["brightness"] = _brightness;
+            result["flip"]       = _flipScreen;
+
+            // --- Active board name ---
+            IDisplayBoard* active = visibleBoard();
+            result["activeBoard"] = (active != nullptr) ? active->getBoardName() : "none";
+
+            // --- Screensaver sub-object ---
+            JsonObject ss = result["screensaver"].to<JsonObject>();
+            ss["enabled"]      = _screensaver.isEnabled();
+
+            // Map three-state screensaver: blanked > dimmed > active
+            if (_screensaver.isBlanked()) {
+                ss["state"] = "blanked";
+            } else if (_screensaver.isDimmed()) {
+                ss["state"] = "dimmed";
+            } else {
+                ss["state"] = "active";
+            }
+
+            ss["dimTimeout"]   = _screensaver.getDimTimeout();
+            ss["blankTimeout"] = _screensaver.getBlankTimeout();
+
+            // --- Carousel sub-object ---
+            JsonObject car = result["carousel"].to<JsonObject>();
+            car["boardCount"]        = _carousel.boardCount();
+            car["rotationInterval"]  = _carousel.getInterval();
+            car["suspended"]         = _carousel.isSuspended();
+        },
+        /* mutatesState = */ false
+    );
+
+    // --- Tool 2: display_control (write, mutates state) ---
+    // Accepts optional parameters: action (wake/sleep), brightness (0-255),
+    // screensaverEnabled (bool), dimTimeout (ms), blankTimeout (ms).
+    // Persists config changes via ConfigManager when any setting is modified.
+    JsonDocument controlSchema;
+    controlSchema["type"] = "object";
+    JsonObject props = controlSchema["properties"].to<JsonObject>();
+
+    // action: immediate wake or force sleep
+    props["action"]["type"]        = "string";
+    props["action"]["description"] = "Immediate action: 'wake' to reset inactivity, 'sleep' to force screensaver";
+    JsonArray actionEnum = props["action"]["enum"].to<JsonArray>();
+    actionEnum.add("wake");
+    actionEnum.add("sleep");
+
+    // brightness: 0-255
+    props["brightness"]["type"]        = "integer";
+    props["brightness"]["description"] = "Display brightness level (0-255)";
+    props["brightness"]["minimum"]     = 0;
+    props["brightness"]["maximum"]     = 255;
+
+    // screensaverEnabled: toggle screensaver on/off
+    props["screensaverEnabled"]["type"]        = "boolean";
+    props["screensaverEnabled"]["description"] = "Enable or disable the screensaver";
+
+    // dimTimeout: milliseconds before dimming
+    props["dimTimeout"]["type"]        = "integer";
+    props["dimTimeout"]["description"] = "Milliseconds of inactivity before dimming";
+
+    // blankTimeout: milliseconds before blanking/sleep
+    props["blankTimeout"]["type"]        = "integer";
+    props["blankTimeout"]["description"] = "Milliseconds of inactivity before blanking";
+
+    registry.addTool(
+        "display_control",
+        "Control display settings: wake/sleep, enable/disable screensaver, set brightness and timeouts",
+        controlSchema,
+        [this](JsonObject& params, JsonObject& result) {
+            bool needsPersist = false;
+
+            // --- Handle immediate action (wake / sleep) ---
+            if (params["action"].is<const char*>()) {
+                const char* action = params["action"].as<const char*>();
+                if (strcmp(action, "wake") == 0) {
+                    resetActivity();
+                } else if (strcmp(action, "sleep") == 0) {
+                    _screensaver.forceTimeout();
+                }
+            }
+
+            // --- Handle brightness ---
+            if (params["brightness"].is<int>()) {
+                int val = params["brightness"].as<int>();
+                if (val < 0) val = 0;
+                if (val > 255) val = 255;
+                setBrightness(static_cast<uint8_t>(val));
+                needsPersist = true;
+            }
+
+            // --- Handle screensaver enabled toggle ---
+            if (params["screensaverEnabled"].is<bool>()) {
+                _screensaver.setEnabled(params["screensaverEnabled"].as<bool>());
+                needsPersist = true;
+            }
+
+            // --- Handle dim timeout ---
+            if (params["dimTimeout"].is<int>()) {
+                _screensaver.setDimTimeout(
+                    static_cast<unsigned long>(params["dimTimeout"].as<int>()));
+                needsPersist = true;
+            }
+
+            // --- Handle blank timeout ---
+            if (params["blankTimeout"].is<int>()) {
+                _screensaver.setBlankTimeout(
+                    static_cast<unsigned long>(params["blankTimeout"].as<int>()));
+                needsPersist = true;
+            }
+
+            // --- Persist configuration if any setting was changed ---
+            if (needsPersist && _configManager != nullptr) {
+                _configManager->saveModuleConfig(this);
+            }
+
+            result["status"] = "ok";
+        },
+        /* mutatesState = */ true
+    );
+
+    ESP_LOGI(TAG, "Registered MCP tools: display_status, display_control");
 }
 
 // =============================================================================
