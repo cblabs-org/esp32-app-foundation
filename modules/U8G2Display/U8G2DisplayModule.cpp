@@ -194,9 +194,7 @@ void U8G2DisplayModule::begin(Application& app) {
 
     // --- Step 3: Lock the board pool ---
     // No more boards can be added after this point
-    _locked = true;
-    _boards.shrink_to_fit();
-    ESP_LOGI(TAG, "Board pool locked with %d board(s)", (int)_boards.size());
+    _carousel.lock();
 
     // --- Step 4: Activate boot splash (skip if bootstrapped — already shown) ---
     if (!_bootstrapMode) {
@@ -212,7 +210,6 @@ void U8G2DisplayModule::begin(Application& app) {
     // --- Step 6: Reset timers to current time ---
 #ifndef NATIVE_BUILD
     _lastActivityMs = millis();
-    _lastRotationMs = millis();
     _lastRenderMs   = millis();
 #endif
 
@@ -287,13 +284,7 @@ void U8G2DisplayModule::tick() {
         if (_app->getState() == AppState::Running && _modal == nullptr) {
             // RUNNING with no modal: carousel rotation + screensaver/sleep
             _checkSleep();
-            if (!_boards.empty() && _activeBoardIndex >= 0) {
-                unsigned long now = millis();
-                if ((now - _lastRotationMs) >= _rotationIntervalMs) {
-                    _advanceCarousel();
-                    _lastRotationMs = now;
-                }
-            }
+            _carousel.tick(millis());
         } else if (_app->getState() != AppState::Boot) {
             // CONFIGURING (base) or modal active (any phase): dim, never blank
             _checkDim();
@@ -310,9 +301,8 @@ void U8G2DisplayModule::tick() {
         visible = _getBaseBoard();
         // Fallback: if _getBaseBoard() returns nullptr (native build or early boot),
         // try the carousel pool directly
-        if (visible == nullptr && !_boards.empty() && _activeBoardIndex >= 0 &&
-            _activeBoardIndex < (int)_boards.size()) {
-            visible = _boards[_activeBoardIndex];
+        if (visible == nullptr && _carousel.currentBoard() != nullptr) {
+            visible = _carousel.currentBoard();
         }
     }
 
@@ -345,19 +335,11 @@ void U8G2DisplayModule::tick() {
  * @return true if added; false if locked or nullptr.
  */
 bool U8G2DisplayModule::addBoard(IDisplayBoard* board) {
-    if (_locked) {
-        // Pool is locked after begin() — reject late registrations
-        ESP_LOGW(TAG, "addBoard() rejected: pool is locked after begin()");
-        return false;
-    }
-
     if (board == nullptr) {
         ESP_LOGW(TAG, "addBoard() rejected: null board pointer");
         return false;
     }
-
-    _boards.push_back(board);
-    ESP_LOGD(TAG, "Board added (pool size: %d)", (int)_boards.size());
+    _carousel.add(board);
     return true;
 }
 
@@ -380,17 +362,12 @@ void U8G2DisplayModule::showBoard(IDisplayBoard* board) {
         previousBoard->onDeactivate();
     }
 
-    // --- Search for the board in the pool ---
-    for (int i = 0; i < (int)_boards.size(); i++) {
-        if (_boards[i] == board) {
-            // Found in pool — set as active and reset rotation timer
-            _activeBoardIndex = i;
+    // --- Delegate pool search + timer reset to CarouselEngine ---
 #ifndef NATIVE_BUILD
-            _lastRotationMs = millis();
+    _carousel.show(board, millis());
+#else
+    _carousel.show(board, 0);
 #endif
-            break;
-        }
-    }
 
     // --- Notify the new board that it is now active ---
     if (board != nullptr && board != previousBoard) {
@@ -401,8 +378,8 @@ void U8G2DisplayModule::showBoard(IDisplayBoard* board) {
 #ifndef NATIVE_BUILD
     if (_app != nullptr && board != nullptr) {
         DisplayBoardChangedPayload payload;
-        payload.boardName = board->getBoardName();
-        payload.boardIndex = _activeBoardIndex;
+        payload.boardName  = board->getBoardName();
+        payload.boardIndex = -1;  // Index managed internally by CarouselEngine
         _app->getEventBus().publish("display.board.changed", &payload);
     }
 #endif
@@ -490,7 +467,7 @@ void U8G2DisplayModule::_resetTimer() {
  * @return Pool size.
  */
 int U8G2DisplayModule::getBoardCount() const {
-    return (int)_boards.size();
+    return _carousel.boardCount();
 }
 
 
@@ -504,12 +481,7 @@ IDisplayBoard* U8G2DisplayModule::getActiveBoard() const {
         return _modal;
     }
 
-    // Bounds check on the pool
-    if (_activeBoardIndex < 0 || _activeBoardIndex >= (int)_boards.size()) {
-        return nullptr;
-    }
-
-    return _boards[_activeBoardIndex];
+    return _carousel.currentBoard();
 }
 
 // =============================================================================
@@ -650,9 +622,11 @@ void U8G2DisplayModule::reportError(const char* errorMessage) {
 void U8G2DisplayModule::clearStatus() {
     _bootBoard.setComplete();
 
-    // --- If currently showing the boot board, advance carousel ---
+    // --- If currently showing the boot board, force carousel advance ---
+    // Manually clear the modal (boot board was shown via pushModal) so the
+    // carousel base layer becomes visible on the next tick.
     if (getActiveBoard() == &_bootBoard) {
-        _advanceCarousel();
+        clearModal();
     }
 
     // --- Immediate render in bootstrap mode (show whatever board advanced to) ---
@@ -678,7 +652,8 @@ void U8G2DisplayModule::applyConfig(const JsonObject& section) {
     _brightness         = section["brightness"]      | (uint8_t)255;
     _flipScreen         = section["flip"]            | false;
     _sleepTimeoutMs     = section["sleepTimeout"]     | (unsigned long)300000;
-    _rotationIntervalMs = section["rotationInterval"] | (unsigned long)8000;
+    unsigned long rotationInterval = section["rotationInterval"] | (unsigned long)8000;
+    _carousel.setInterval(rotationInterval);
     _targetFrameIntervalMs = 1000UL / (section["targetFps"] | (uint8_t)30);
     _clockFontSize      = section["clockFontSize"]    | (uint8_t)2;
 
@@ -693,8 +668,8 @@ void U8G2DisplayModule::applyConfig(const JsonObject& section) {
     _u8g2.setFlipMode(_flipScreen ? 1 : 0);
 #endif
 
-    ESP_LOGI(TAG, "Config applied (brightness=%d, flip=%d, sleep=%lu, rotation=%lu)",
-             _brightness, _flipScreen, _sleepTimeoutMs, _rotationIntervalMs);
+    ESP_LOGI(TAG, "Config applied (brightness=%d, flip=%d, sleep=%lu)",
+             _brightness, _flipScreen, _sleepTimeoutMs);
 }
 
 /**
@@ -711,7 +686,7 @@ void U8G2DisplayModule::serializeConfig(JsonObject& section) const {
     section["brightness"]       = _brightness;
     section["flip"]             = _flipScreen;
     section["sleepTimeout"]     = _sleepTimeoutMs;
-    section["rotationInterval"] = _rotationIntervalMs;
+    section["rotationInterval"] = _carousel.getInterval();
     section["targetFps"]        = (uint8_t)(1000UL / _targetFrameIntervalMs);
     section["clockFontSize"]    = _clockFontSize;
 }
@@ -729,7 +704,7 @@ void U8G2DisplayModule::resetConfig() {
     _brightness         = 255;
     _flipScreen         = false;
     _sleepTimeoutMs     = 300000;
-    _rotationIntervalMs = 8000;
+    _carousel.setInterval(8000);
     _targetFrameIntervalMs = 33;
     _clockFontSize      = 2;
 
@@ -802,7 +777,7 @@ void U8G2DisplayModule::setSleepTimeout(unsigned long timeoutMs) {
  * @param intervalMs Interval in milliseconds between board rotations.
  */
 void U8G2DisplayModule::setRotationInterval(unsigned long intervalMs) {
-    _rotationIntervalMs = intervalMs;
+    _carousel.setInterval(intervalMs);
 }
 
 /**
@@ -862,8 +837,8 @@ void U8G2DisplayModule::registerRoutes(AsyncWebServer& server) {
         doc["flip"]             = _flipScreen;
         doc["sleeping"]         = _sleeping;
         doc["sleepTimeout"]     = _sleepTimeoutMs;
-        doc["rotationInterval"] = _rotationIntervalMs;
-        doc["boardCount"]       = (int)_boards.size();
+        doc["rotationInterval"] = _carousel.getInterval();
+        doc["boardCount"]       = _carousel.boardCount();
         doc["clockFontSize"]    = _clockFontSize;
 
         IDisplayBoard* active = getActiveBoard();
@@ -963,12 +938,12 @@ void U8G2DisplayModule::registerRoutes(AsyncWebServer& server) {
         JsonDocument doc;
         JsonArray boardsArr = doc["boards"].to<JsonArray>();
 
-        for (int i = 0; i < (int)_boards.size(); i++) {
+        for (int i = 0; i < _carousel.boardCount(); i++) {
             JsonObject entry = boardsArr.add<JsonObject>();
             entry["index"]    = i;
-            entry["name"]     = _boards[i]->getBoardName();
-            entry["isActive"] = (i == _activeBoardIndex && _modal == nullptr);
-            entry["isExpired"]= _boards[i]->isExpired();
+            entry["name"]     = _carousel.getBoard(i)->getBoardName();
+            entry["isActive"] = (i == _carousel.activeIndex() && _modal == nullptr);
+            entry["isExpired"]= _carousel.getBoard(i)->isExpired();
         }
 
         String output;
@@ -1013,12 +988,12 @@ void U8G2DisplayModule::registerRoutes(AsyncWebServer& server) {
             }
 
             int idx = doc["index"] | 0;
-            if (idx < 0 || idx >= (int)_boards.size()) {
+            if (idx < 0 || idx >= _carousel.boardCount()) {
                 request->send(400, "application/json", "{\"error\":\"Index out of range\"}");
                 return;
             }
 
-            showBoard(_boards[idx]);
+            showBoard(_carousel.getBoard(idx));
             request->send(200, "application/json", "{\"status\":\"ok\"}");
         }
     );
@@ -1171,64 +1146,6 @@ void U8G2DisplayModule::_onStateChanged(AppState newState) {
 // =============================================================================
 
 /**
- * @brief Advance carousel to next non-expired board.
- *
- * Calls onDeactivate() on the current board, removes expired boards
- * (isExpired() == true) from the pool, advances _activeBoardIndex to
- * the next valid entry with wrap-around, calls onActivate() on the new
- * board, and publishes a "display.board.changed" event.
- */
-void U8G2DisplayModule::_advanceCarousel() {
-    // --- Step 1: Deactivate the current board ---
-    IDisplayBoard* previousBoard = getActiveBoard();
-    if (previousBoard != nullptr) {
-        previousBoard->onDeactivate();
-    }
-
-    // --- Step 2: Evict expired boards ---
-    // Iterate backwards to safely erase without invalidating indices
-    for (int i = (int)_boards.size() - 1; i >= 0; i--) {
-        if (_boards[i]->isExpired()) {
-            _boards.erase(_boards.begin() + i);
-            // Adjust active index if it was at or past the erased position
-            if (_activeBoardIndex >= (int)_boards.size()) {
-                _activeBoardIndex = 0;
-            }
-        }
-    }
-
-    // --- Step 3: Guard empty pool ---
-    if (_boards.empty()) {
-        _activeBoardIndex = 0;
-
-        // Clear stale modal if it's an expired system board
-        if (_modal != nullptr && _modal->isExpired()) {
-            _modal = nullptr;
-        }
-        return;
-    }
-
-    // --- Step 4: Advance to next board (wrap around) ---
-    _activeBoardIndex = (_activeBoardIndex + 1) % (int)_boards.size();
-
-    // --- Step 5: Activate the new board ---
-    IDisplayBoard* newBoard = getActiveBoard();
-    if (newBoard != nullptr) {
-        newBoard->onActivate();
-
-        // --- Publish board-changed event ---
-#ifndef NATIVE_BUILD
-        if (_app != nullptr) {
-            DisplayBoardChangedPayload payload;
-            payload.boardName = newBoard->getBoardName();
-            payload.boardIndex = _activeBoardIndex;
-            _app->getEventBus().publish("display.board.changed", &payload);
-        }
-#endif
-    }
-}
-
-/**
  * @brief Render the current board into the U8G2 display buffer.
  *
  * Uses clearBuffer() → render() → sendBuffer() inside NATIVE_BUILD guard.
@@ -1241,9 +1158,9 @@ void U8G2DisplayModule::_renderCurrentBoard() {
     if (_modal != nullptr) {
         // Modal layer takes priority
         boardToRender = _modal;
-    } else if (_activeBoardIndex >= 0 && _activeBoardIndex < (int)_boards.size()) {
+    } else if (_carousel.currentBoard() != nullptr) {
         // Normal pool board (carousel base layer for RUNNING)
-        boardToRender = _boards[_activeBoardIndex];
+        boardToRender = _carousel.currentBoard();
     } else {
         // Base layer for non-RUNNING phases
         boardToRender = _getBaseBoard();
@@ -1300,14 +1217,7 @@ IDisplayBoard* U8G2DisplayModule::_getBaseBoard() {
             return &_configuringStatusBoard;
         case AppState::Running: {
             // Return the current carousel pool board
-            if (!_boards.empty()) {
-                // Reset index if it was left invalid (e.g. after modal clear)
-                if (_activeBoardIndex < 0 || _activeBoardIndex >= (int)_boards.size()) {
-                    _activeBoardIndex = 0;
-                }
-                return _boards[_activeBoardIndex];
-            }
-            return nullptr;
+            return _carousel.currentBoard();
         }
         default:
             return nullptr;

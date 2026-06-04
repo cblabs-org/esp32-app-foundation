@@ -81,6 +81,7 @@
 #include "boards/ErrorBoard.hpp"
 #include "boards/ScreensaverBoard.hpp"
 #include "boards/ConfiguringStatusBoard.hpp"
+#include "CarouselEngine.hpp"
 #include "AppState.hpp"
 #include "../../include/types/DisplayInfo.hpp"
 
@@ -478,14 +479,6 @@ private:
     // -------------------------------------------------------------------------
 
     /**
-     * @brief Advance the carousel to the next non-expired board.
-     *
-     * Removes any expired boards (isExpired() == true) from the vector,
-     * then advances _activeBoardIndex to the next valid entry (wrapping).
-     */
-    void _advanceCarousel();
-
-    /**
      * @brief Render the current board into the U8G2 display buffer.
      *
      * Calls clearBuffer() → board->render(u8g2) → sendBuffer() inside
@@ -615,20 +608,12 @@ private:
     Application* _app = nullptr;                   ///< Cached reference to Application hub (for EventBus access)
     AppState _lastKnownState = AppState::Boot;     ///< Cached state for change detection in tick()
 
-    // --- Board slot pool ---
-    std::vector<IDisplayBoard*> _boards;           ///< Carousel board pool — populated before begin()
-    int _activeBoardIndex = 0;                     ///< Index of the currently rendering board in _boards
-
-    // --- Carousel timing ---
-    unsigned long _lastRotationMs = 0;             ///< Timestamp of last carousel rotation
-    unsigned long _rotationIntervalMs = 8000;      ///< Carousel rotation interval (8 seconds default)
+    // --- Carousel Sub-system ---
+    CarouselEngine _carousel;                      ///< Manages the rotating pool of display boards
 
     // --- Frame-rate limiting ---
     unsigned long _lastRenderMs = 0;               ///< Timestamp of last sendBuffer() call
     unsigned long _targetFrameIntervalMs = 33;     ///< Minimum ms between renders (default 30 FPS: 1000/30≈33)
-
-    // --- Pool lock ---
-    bool _locked = false;                          ///< True after begin() — blocks addBoard()
 
     // --- Sleep / power management ---
     bool _sleeping = false;                        ///< True when the display is in power-save sleep
