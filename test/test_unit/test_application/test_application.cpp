@@ -239,12 +239,12 @@ TEST_F(ApplicationLockTest, PostLock_RegisterTickable_ReturnsFalse) {
     EXPECT_FALSE(app.registerTickable(&tickable));
 }
 
-/** After begin(), ConfigManager::registerModule still works (not vector-locked). */
-TEST_F(ApplicationLockTest, PostLock_ConfigManagerRegisterModule_StillWorks) {
+/** After begin(), ConfigManager::registerModule is rejected (locked by beginAll). */
+TEST_F(ApplicationLockTest, PostLock_ConfigManagerRegisterModule_ReturnsFalse) {
     lockApp();
     MockConfigurable configurable;
-    // ConfigManager has its own fixed-size registry — not part of two-tier vector lock
-    EXPECT_TRUE(app.getConfigManager().registerModule(&configurable));
+    // ConfigManager locks its own registry during beginAll(), called inside begin()
+    EXPECT_FALSE(app.getConfigManager().registerModule(&configurable));
 }
 
 /** After begin(), registerDataSource must return false. */
@@ -469,30 +469,44 @@ TEST_F(ConfigManagerGatewayTest, GetConfigManager_ReturnsReference) {
 }
 
 /**
- * ConfigManager::registerModule must accept up to MAX_CONFIGURABLES.
+ * ConfigManager uses a dynamic vector — registering many modules must succeed.
  */
-TEST_F(ConfigManagerGatewayTest, RegisterModule_UpToMax_Succeeds) {
-    MockConfigurable modules[ConfigManager::MAX_CONFIGURABLES];
+TEST_F(ConfigManagerGatewayTest, RegisterModule_DynamicVector_AcceptsMany) {
+    constexpr int MODULE_COUNT = 16;
+    // Use unique namespaces to avoid duplicates
+    const char* namespaces[] = {
+        "m0", "m1", "m2", "m3", "m4", "m5", "m6", "m7",
+        "m8", "m9", "m10", "m11", "m12", "m13", "m14", "m15"
+    };
+    MockConfigurable modules[MODULE_COUNT] = {
+        {namespaces[0]},  {namespaces[1]},  {namespaces[2]},  {namespaces[3]},
+        {namespaces[4]},  {namespaces[5]},  {namespaces[6]},  {namespaces[7]},
+        {namespaces[8]},  {namespaces[9]},  {namespaces[10]}, {namespaces[11]},
+        {namespaces[12]}, {namespaces[13]}, {namespaces[14]}, {namespaces[15]}
+    };
     ConfigManager& cm = app.getConfigManager();
 
-    for (uint8_t i = 0; i < ConfigManager::MAX_CONFIGURABLES; i++) {
+    for (int i = 0; i < MODULE_COUNT; i++) {
         EXPECT_TRUE(cm.registerModule(&modules[i]));
     }
 }
 
 /**
- * ConfigManager::registerModule must reject when full.
+ * ConfigManager::registerModule must reject after beginAll() locks the registry.
  */
-TEST_F(ConfigManagerGatewayTest, RegisterModule_OverMax_ReturnsFalse) {
-    MockConfigurable modules[ConfigManager::MAX_CONFIGURABLES + 1];
+TEST_F(ConfigManagerGatewayTest, RegisterModule_AfterBeginAll_ReturnsFalse) {
     ConfigManager& cm = app.getConfigManager();
+    MockConfigurable confA("lockTestA");
+    EXPECT_TRUE(cm.registerModule(&confA));
 
-    for (uint8_t i = 0; i < ConfigManager::MAX_CONFIGURABLES; i++) {
-        cm.registerModule(&modules[i]);
-    }
+    // beginAll() locks the registry
+    cm.beginAll();
 
-    // One more should fail
-    EXPECT_FALSE(cm.registerModule(&modules[ConfigManager::MAX_CONFIGURABLES]));
+    MockConfigurable confB("lockTestB");
+    EXPECT_FALSE(cm.registerModule(&confB));
+
+    // Cleanup
+    remove("mod_lockTestA.json");
 }
 
 // =============================================================================
