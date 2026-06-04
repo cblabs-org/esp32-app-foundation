@@ -183,6 +183,7 @@ bool Application::begin(const FrameworkConfig& config) {
     _webContributors.push_back(&_mcpServer);
 #ifndef NATIVE_BUILD
     _webContributors.push_back(&_display);
+    _mcpContributors.push_back(&_display);
 #endif
 
     _tickables.push_back(&_wifiManager);
