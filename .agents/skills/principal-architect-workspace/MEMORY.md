@@ -54,7 +54,7 @@ predate the formal PA pipeline and are filed retrospectively.
 | [pr-15-web-testing](./pr-15-web-testing/PROJECT.md) | Web Portal Testing Infrastructure (Mock Server + Playwright + Build Gate) | ✅ **MERGED** `f03972e` — 48 tests | Session 97274580 |
 | [pr-16-backup-overhaul](./pr-16-backup-overhaul/PROJECT.md) | Backup System Overhaul (Route fix, `_meta` envelope, OTA IConfigurable, streaming response) | 🔄 **WIP** — WO1 in progress | Session f6e289ed |
 | [pr-17-display-refactor](./pr-17-display-refactor/PROJECT.md) | Display Module OO Refactoring (CarouselEngine, BoardCatalog, ScreensaverController, remove Application* coupling) | 📋 **PLANNING** — 5 WOs defined, awaiting user approval | Session 0735b228 |
-| [pr-18-screensaver-settings](./pr-18-screensaver-settings/PROJECT.md) | Screensaver & Display Settings (config expansion, MCP tools, web portal Display tab) | 📋 **PLANNING** — 3 WOs defined, awaiting user approval | Session 65275116 |
+| [pr-18-screensaver-settings](./pr-18-screensaver-settings/PROJECT.md) | Screensaver & Display Settings (config expansion, MCP tools, web portal Display tab) | ✅ **COMPLETE** — 3 WOs merged, 60 new tests | Session a1c50fdf |
 
 ---
 

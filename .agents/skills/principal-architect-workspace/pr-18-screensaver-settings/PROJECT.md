@@ -1,7 +1,7 @@
 ---
 id: pr-18
 title: "Screensaver & Display Settings"
-status: "📋 PLANNING"
+status: "✅ COMPLETE"
 branch: "pr-18-screensaver-settings"
 depends_on: []
 design_spec: "docs/design_specification.md#78-display-module-object-model-target-architecture"
@@ -48,9 +48,9 @@ agents to inspect or control it beyond the single `sleepTimeout` config key.
 
 ## Work Order Ledger
 
-- **[ ] [wo1-config-expansion](wo1-config-expansion/WORKORDER.md):** Expand display config schema with independent screensaver settings (screensaverEnabled, dimTimeout, blankTimeout) and update applyConfig/serializeConfig/resetConfig
-- **[ ] [wo2-mcp-tools](wo2-mcp-tools/WORKORDER.md):** Add `display_status` and `display_control` MCP tools for runtime screensaver inspection and control
-- **[ ] [wo3-display-tab](wo3-display-tab/WORKORDER.md):** Create web portal Display tab with brightness slider, flip toggle, screensaver settings controls, and Playwright tests
+- **[x] [wo1-config-expansion](wo1-config-expansion/WORKORDER.md):** Expand display config schema with independent screensaver settings — `e47db28` (14 new tests)
+- **[x] [wo2-mcp-tools](wo2-mcp-tools/WORKORDER.md):** Add `display_status` and `display_control` MCP tools — `87208b8` (32 new tests)
+- **[x] [wo3-display-tab](wo3-display-tab/WORKORDER.md):** Create web portal Display tab with brightness, flip, screensaver controls — `909df5b` (14 new Playwright tests)
 
 ## Sequencing
 
