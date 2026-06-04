@@ -81,6 +81,7 @@
 #include "boards/ErrorBoard.hpp"
 #include "boards/ScreensaverBoard.hpp"
 #include "boards/ConfiguringStatusBoard.hpp"
+#include "BoardCatalog.hpp"
 #include "CarouselEngine.hpp"
 #include "AppState.hpp"
 #include "../../include/types/DisplayInfo.hpp"
@@ -268,45 +269,11 @@ public:
      */
     IDisplayBoard* getActiveBoard() const;
 
-    // -------------------------------------------------------------------------
-    // System board accessors
-    // -------------------------------------------------------------------------
 
-    /**
-     * @brief Return a reference to the owned BootBoard instance.
-     * @return Mutable reference to _bootBoard.
-     */
-    BootBoard& getBootBoard();
 
-    /**
-     * @brief Return a reference to the owned WiFiWizardBoard instance.
-     * @return Mutable reference to _wifiWizard.
-     */
-    WiFiWizardBoard& getWifiWizard();
 
-    /**
-     * @brief Return a reference to the owned OTAProgressBoard instance.
-     * @return Mutable reference to _otaProgress.
-     */
-    OTAProgressBoard& getOtaProgress();
 
-    /**
-     * @brief Return a reference to the owned ErrorBoard instance.
-     * @return Mutable reference to _error.
-     */
-    ErrorBoard& getError();
 
-    /**
-     * @brief Return a reference to the owned ScreensaverBoard instance.
-     * @return Mutable reference to _screensaver.
-     */
-    ScreensaverBoard& getScreensaver();
-
-    /**
-     * @brief Return a reference to the owned ConfiguringStatusBoard instance.
-     * @return Mutable reference to _configuringStatusBoard.
-     */
-    ConfiguringStatusBoard& getConfiguringStatus();
 
     // -------------------------------------------------------------------------
     // IStatusReporter — delegates to BootBoard and ErrorBoard
@@ -641,4 +608,8 @@ private:
     ErrorBoard       _error{_displayWidth, _displayHeight};        ///< Error message display screen
     ScreensaverBoard _screensaver{_displayWidth, _displayHeight};  ///< Inactivity screensaver (burn-in prevention)
     ConfiguringStatusBoard _configuringStatusBoard{_displayWidth, _displayHeight}; ///< Gate progress during CONFIGURING phase
+
+public:
+    // --- Sub-object API ---
+    BoardCatalog boards{_wifiWizard, _otaProgress, _error};  ///< Exposes caller-driven system boards (design spec §7.8.1)
 };

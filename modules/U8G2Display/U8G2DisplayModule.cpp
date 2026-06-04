@@ -25,11 +25,7 @@
  * - U8G2DisplayModule::resetActivity():      Reset inactivity timer, wake if sleeping
  * - U8G2DisplayModule::getBoardCount():      Return pool size
  * - U8G2DisplayModule::getActiveBoard():     Return current rendering board or nullptr
- * - U8G2DisplayModule::getBootBoard():       Return reference to BootBoard
- * - U8G2DisplayModule::getWifiWizard():      Return reference to WiFiWizardBoard
- * - U8G2DisplayModule::getOtaProgress():     Return reference to OTAProgressBoard
- * - U8G2DisplayModule::getError():           Return reference to ErrorBoard
- * - U8G2DisplayModule::getScreensaver():     Return reference to ScreensaverBoard
+
  * - U8G2DisplayModule::reportStatus():       Delegate to BootBoard, show it
  * - U8G2DisplayModule::reportError():        Delegate to ErrorBoard (fatal), show it
  * - U8G2DisplayModule::clearStatus():        Mark loading complete, advance if showing
@@ -488,53 +484,7 @@ IDisplayBoard* U8G2DisplayModule::getActiveBoard() const {
 // System board accessors
 // =============================================================================
 
-/**
- * @brief Return a reference to the owned BootBoard instance.
- * @return Mutable reference to _bootBoard.
- */
-BootBoard& U8G2DisplayModule::getBootBoard() {
-    return _bootBoard;
-}
 
-/**
- * @brief Return a reference to the owned WiFiWizardBoard instance.
- * @return Mutable reference to _wifiWizard.
- */
-WiFiWizardBoard& U8G2DisplayModule::getWifiWizard() {
-    return _wifiWizard;
-}
-
-/**
- * @brief Return a reference to the owned OTAProgressBoard instance.
- * @return Mutable reference to _otaProgress.
- */
-OTAProgressBoard& U8G2DisplayModule::getOtaProgress() {
-    return _otaProgress;
-}
-
-/**
- * @brief Return a reference to the owned ErrorBoard instance.
- * @return Mutable reference to _error.
- */
-ErrorBoard& U8G2DisplayModule::getError() {
-    return _error;
-}
-
-/**
- * @brief Return a reference to the owned ScreensaverBoard instance.
- * @return Mutable reference to _screensaver.
- */
-ScreensaverBoard& U8G2DisplayModule::getScreensaver() {
-    return _screensaver;
-}
-
-/**
- * @brief Return a reference to the owned ConfiguringStatusBoard instance.
- * @return Mutable reference to _configuringStatusBoard.
- */
-ConfiguringStatusBoard& U8G2DisplayModule::getConfiguringStatus() {
-    return _configuringStatusBoard;
-}
 
 // =============================================================================
 // IStatusReporter — real implementations delegating to system boards

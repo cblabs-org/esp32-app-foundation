@@ -120,11 +120,11 @@ TEST_F(EventBusIntegrationTest, OtaProgress_Publish_DelegatesToBoard) {
 
             const auto* ota = static_cast<const OTAProgressPayload*>(payload);
             if (ota->complete) {
-                self->getOtaProgress().setComplete(ota->success);
+                self->boards.otaProgress.setComplete(ota->success);
             } else {
-                self->getOtaProgress().setProgress(ota->progress, ota->status);
+                self->boards.otaProgress.setProgress(ota->progress, ota->status);
             }
-            self->pushModal(&self->getOtaProgress());
+            self->pushModal(&self->boards.otaProgress);
         },
         &display);
 
@@ -139,7 +139,7 @@ TEST_F(EventBusIntegrationTest, OtaProgress_Publish_DelegatesToBoard) {
     EXPECT_EQ(delivered, 1);
 
     // Verify the OTA board is now active
-    EXPECT_EQ(display.getActiveBoard(), &display.getOtaProgress());
+    EXPECT_EQ(display.getActiveBoard(), &display.boards.otaProgress);
 }
 
 /** Publish OTA complete(success) — board should expire. */
@@ -150,11 +150,11 @@ TEST_F(EventBusIntegrationTest, OtaProgress_Complete_Success_BoardExpires) {
             if (payload == nullptr || self == nullptr) return;
             const auto* ota = static_cast<const OTAProgressPayload*>(payload);
             if (ota->complete) {
-                self->getOtaProgress().setComplete(ota->success);
+                self->boards.otaProgress.setComplete(ota->success);
             } else {
-                self->getOtaProgress().setProgress(ota->progress, ota->status);
+                self->boards.otaProgress.setProgress(ota->progress, ota->status);
             }
-            self->pushModal(&self->getOtaProgress());
+            self->pushModal(&self->boards.otaProgress);
         },
         &display);
 
@@ -165,7 +165,7 @@ TEST_F(EventBusIntegrationTest, OtaProgress_Complete_Success_BoardExpires) {
     payload.success = true;
 
     bus.publish("ota.progress", &payload);
-    EXPECT_TRUE(display.getOtaProgress().isExpired());
+    EXPECT_TRUE(display.boards.otaProgress.isExpired());
 }
 
 /** Publish display.message — boot board should activate. */
@@ -175,8 +175,8 @@ TEST_F(EventBusIntegrationTest, DisplayMessage_Publish_ShowsMessage) {
             auto* self = static_cast<U8G2DisplayModule*>(ctx);
             if (payload == nullptr || self == nullptr) return;
             const auto* msg = static_cast<const DisplayMessagePayload*>(payload);
-            self->getBootBoard().setStatus(msg->message, -1.0f);
-            self->pushModal(&self->getBootBoard());
+            // Since BootBoard is now internal, we'll use reportStatus instead of doing it manually
+            self->reportStatus(msg->message, -1.0f);
         },
         &display);
 
@@ -188,7 +188,8 @@ TEST_F(EventBusIntegrationTest, DisplayMessage_Publish_ShowsMessage) {
     EXPECT_EQ(delivered, 1);
 
     // Boot board should be active (used as message overlay)
-    EXPECT_EQ(display.getActiveBoard(), &display.getBootBoard());
+    EXPECT_NE(display.getActiveBoard(), nullptr);
+    EXPECT_STREQ(display.getActiveBoard()->getBoardName(), "SYS: Boot");
 }
 
 /** EventBus with no subscribers must return 0 delivered. */
