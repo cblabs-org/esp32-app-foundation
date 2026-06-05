@@ -162,3 +162,32 @@ Once all checklist items are verified, **STOP and send a message back to the Pri
 3. Any issues or decisions that need escalation
 
 Do NOT wrap up, distill, or commit until the PA explicitly approves.
+
+---
+
+## Execution Status
+
+**Status:** ✅ COMPLETE  
+**Executed by:** Session `80b887dc-8226-4e2b-bafb-cb83a13f0c7f`  
+**Date:** 2026-06-05  
+**Branch:** `pr-14-ota-production-wo6-web-portal-ota`
+
+### Checklist Results
+
+- [x] Activate channel dropdown in ota.js
+- [x] Activate manifest info in ota.js
+- [x] Enhance rollback button with typed confirmation
+- [x] Extend `status` API endpoint (OTAUpdateManager.cpp)
+- [x] Add `setChannel` API action (OTAUpdateManager.cpp)
+- [x] Add confirmation token to `rollback` API action (OTAUpdateManager.cpp)
+- [x] Update firmware info display in ota.js
+
+### Verification Results
+
+- [x] `pio run -e esp32dev` — **PASSED** (RAM: 15.0%, Flash: 88.4%)
+- [x] `pio run -e esp32s3nano` — **PASSED** (RAM: 15.7%, Flash: 59.6%)
+- [x] `pio test -e native` — **518/518 tests PASSED** (zero regressions)
+
+### Issues / Escalation
+
+None.

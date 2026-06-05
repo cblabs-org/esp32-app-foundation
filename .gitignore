@@ -29,3 +29,7 @@ include/.DS_Store
 
 # Native test config artifacts written to project root by pio test -e native
 mod_*.json
+
+# OTA signing artifacts
+private_key.pem
+*.sig
