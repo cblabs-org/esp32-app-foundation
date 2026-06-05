@@ -845,6 +845,12 @@ void OTAUpdateManager::registerRoutes(AsyncWebServer& server) {
                 const char* action = doc["action"] | "";
 
                 if (strcmp(action, "rollback") == 0) {
+                    const char* confirm = doc["confirm"] | "";
+                    if (strcmp(confirm, "ROLLBACK") != 0) {
+                        request->send(403, "application/json",
+                                      "{\"status\":\"error\",\"msg\":\"Missing or invalid confirmation token\"}");
+                        return;
+                    }
                     request->send(200, "application/json", "{\"status\":\"ok\"}");
                     this->rollbackFirmware();
                     return;
@@ -864,6 +870,20 @@ void OTAUpdateManager::registerRoutes(AsyncWebServer& server) {
                                       "{\"status\":\"ok\",\"msg\":\"No update available\"}");
                     }
                     return;
+                } else if (strcmp(action, "setChannel") == 0) {
+                    const char* ch = doc["channel"] | "";
+                    if (strlen(ch) > 0 && strlen(ch) < sizeof(this->_channel)) {
+                        strlcpy(this->_channel, ch, sizeof(this->_channel));
+                        // Persist via ConfigManager
+                        if (this->app_ != nullptr) {
+                            this->app_->getConfigManager().saveModuleConfig(this);
+                        }
+                        ESP_LOGI(TAG, "Channel changed to: %s", this->_channel);
+                        request->send(200, "application/json", "{\"status\":\"ok\"}");
+                    } else {
+                        request->send(400, "application/json", "{\"status\":\"error\",\"msg\":\"Invalid channel\"}");
+                    }
+                    return;
                 } else if (strcmp(action, "status") == 0) {
                     JsonDocument resp;
                     const char* stateStr = "unknown";
@@ -876,6 +896,10 @@ void OTAUpdateManager::registerRoutes(AsyncWebServer& server) {
                         case OTAState::Error:       stateStr = "error"; break;
                     }
                     resp["state"] = stateStr;
+                    resp["version"] = String(VERSION_MAJOR) + "." + String(VERSION_MINOR) + "." + String(VERSION_PATCH);
+                    resp["channel"] = this->_channel;
+                    resp["boardId"] = BOARD_ID;
+                    resp["autoCheck"] = this->_autoCheck;
                     if (this->lastOtaError_) {
                         resp["lastError"] = this->lastOtaError_;
                     }

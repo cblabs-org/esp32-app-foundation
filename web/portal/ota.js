@@ -2,7 +2,7 @@
 // OTA sub-pill — "OTA" under the System tab.
 // Full OTA management: firmware version display, GitHub update check,
 // OTA progress tracker, rollback, and manual file upload.
-// Includes hidden PR-14 stub sections for forward compatibility.
+// Includes channel selection, manifest info, and typed rollback confirmation.
 
 (function() {
   const container = document.getElementById('tab-ota');
@@ -18,8 +18,7 @@
       </div>
     </article>
 
-    <!-- PR-14 Stub: Update channel selector (hidden until PR-14 WO6 activates) -->
-    <div id="ota-channel-wrapper" style="display:none;">
+    <div id="ota-channel-wrapper">
       <article>
         <header>Update Channel</header>
         <select id="ota-channel" style="width:100%;">
@@ -27,11 +26,18 @@
           <option value="beta">Beta</option>
           <option value="dev">Dev</option>
         </select>
+        <div id="ota-channel-status" style="margin-top: 0.4rem; font-size: 0.8rem; text-align: center;"></div>
       </article>
     </div>
 
-    <!-- PR-14 Stub: Manifest info placeholder (hidden until PR-14 WO3 activates) -->
-    <div id="ota-manifest-info" style="display:none;"></div>
+    <div id="ota-manifest-info">
+      <article>
+        <header>Build Info</header>
+        <div id="ota-manifest-content">
+          <p style="color: var(--text-muted);">Loading...</p>
+        </div>
+      </article>
+    </div>
 
     <article>
       <header>GitHub Updates</header>
@@ -76,7 +82,7 @@
   `;
 
   // -------------------------------------------------------------------------
-  // Load firmware info from /api/system
+  // Load firmware info from /api/system + OTA status
   // -------------------------------------------------------------------------
   async function loadFirmwareInfo() {
     try {
@@ -95,6 +101,64 @@
     } catch (error) {
       document.getElementById('ota-firmware-info').innerHTML =
         '<p style="color: var(--error);">Error loading firmware info.</p>';
+    }
+
+    // Fetch OTA status for channel, board, autoCheck
+    try {
+      const status = await window.apiFetch('/api/ota', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'status' })
+      });
+
+      // Set channel dropdown to match current channel
+      if (status.channel) {
+        const channelSelect = document.getElementById('ota-channel');
+        channelSelect.value = status.channel;
+      }
+
+      // Populate manifest/build info
+      const manifestEl = document.getElementById('ota-manifest-content');
+      const infoEl = document.getElementById('ota-firmware-info');
+
+      // Enhance firmware info card with channel if available
+      if (status.version) {
+        const existingHtml = infoEl.innerHTML;
+        // Add channel row to firmware info
+        infoEl.innerHTML = existingHtml +
+          '<div style="display:flex; justify-content:space-between; padding:0.4rem 0; border-top:1px solid var(--border); font-size:0.85rem;">' +
+            '<span style="color:var(--text-muted);">Channel</span>' +
+            '<strong>' + (status.channel || '?') + '</strong>' +
+          '</div>';
+      }
+
+      // Build info section
+      var rows = '';
+      if (status.boardId) {
+        rows +=
+          '<div style="display:flex; justify-content:space-between; padding:0.4rem 0; border-bottom:1px solid var(--border); font-size:0.85rem;">' +
+            '<span style="color:var(--text-muted);">Board ID</span>' +
+            '<strong>' + status.boardId + '</strong>' +
+          '</div>';
+      }
+      if (status.channel) {
+        rows +=
+          '<div style="display:flex; justify-content:space-between; padding:0.4rem 0; border-bottom:1px solid var(--border); font-size:0.85rem;">' +
+            '<span style="color:var(--text-muted);">Channel</span>' +
+            '<strong>' + status.channel + '</strong>' +
+          '</div>';
+      }
+      rows +=
+        '<div style="display:flex; justify-content:space-between; padding:0.4rem 0; font-size:0.85rem;">' +
+          '<span style="color:var(--text-muted);">Auto-Check</span>' +
+          '<strong>' + (status.autoCheck ? 'Enabled' : 'Disabled') + '</strong>' +
+        '</div>';
+
+      manifestEl.innerHTML = rows;
+    } catch (error) {
+      // Non-fatal: status endpoint might not be available
+      document.getElementById('ota-manifest-content').innerHTML =
+        '<p style="color: var(--text-muted); font-size: 0.85rem;">Could not load build info.</p>';
     }
   }
 
@@ -262,44 +326,49 @@
   });
 
   // -------------------------------------------------------------------------
-  // Rollback — POST /api/ota {"action":"rollback"} with armed confirmation
+  // Rollback — POST /api/ota {"action":"rollback","confirm":"ROLLBACK"}
+  // with typed confirmation dialog
   // -------------------------------------------------------------------------
   const rollbackBtn = document.getElementById('btn-ota-rollback');
-  let rollbackArmed = false;
-  let rollbackTimeout = null;
 
   rollbackBtn.addEventListener('click', async () => {
-    if (!rollbackArmed) {
-      // Arm the button
-      rollbackArmed = true;
-      rollbackBtn.textContent = 'Confirm Rollback?';
-      rollbackBtn.style.background = 'var(--error, #c62828)';
-      rollbackBtn.style.color = '#fff';
-      rollbackBtn.style.borderColor = 'var(--error, #c62828)';
+    const input = prompt('Type ROLLBACK to confirm firmware rollback:');
+    if (input !== 'ROLLBACK') {
+      return; // User cancelled or typed wrong
+    }
 
-      // Auto-disarm after 3 seconds
-      rollbackTimeout = setTimeout(() => {
-        rollbackArmed = false;
-        rollbackBtn.textContent = 'Rollback to Previous';
-        rollbackBtn.style.background = 'var(--card-bg)';
-        rollbackBtn.style.color = 'var(--warning, #f9a825)';
-        rollbackBtn.style.borderColor = 'var(--warning, #f9a825)';
-      }, 3000);
-    } else {
-      // Confirmed — send rollback
-      clearTimeout(rollbackTimeout);
-      rollbackBtn.textContent = 'Rolling back...';
-      rollbackBtn.disabled = true;
+    rollbackBtn.textContent = 'Rolling back...';
+    rollbackBtn.disabled = true;
 
-      try {
-        await window.apiFetch('/api/ota', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'rollback' })
-        });
-      } catch (error) {
-        // Expected — device reboots, connection drops
-      }
+    try {
+      await window.apiFetch('/api/ota', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'rollback', confirm: 'ROLLBACK' })
+      });
+    } catch (error) {
+      // Expected — device reboots, connection drops
+    }
+  });
+
+  // -------------------------------------------------------------------------
+  // Channel change — POST /api/ota {"action":"setChannel","channel":"..."}
+  // -------------------------------------------------------------------------
+  document.getElementById('ota-channel').addEventListener('change', async (e) => {
+    const channel = e.target.value;
+    const statusEl = document.getElementById('ota-channel-status');
+    try {
+      await window.apiFetch('/api/ota', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'setChannel', channel: channel })
+      });
+      statusEl.style.color = 'var(--success)';
+      statusEl.textContent = 'Channel set to ' + channel;
+      setTimeout(() => { statusEl.textContent = ''; }, 3000);
+    } catch (error) {
+      statusEl.style.color = 'var(--error)';
+      statusEl.textContent = 'Failed to set channel.';
     }
   });
 
