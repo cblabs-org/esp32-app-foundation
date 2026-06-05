@@ -116,9 +116,17 @@ void ConfigManager::beginAll() {
 
     ESP_LOGI(TAG, "beginAll() — loading config for %d module(s)", (int)_modules.size());
 
+    // Load the Three-Tier config manifest (no-op on first boot)
+    _manifest.load();
+
     for (IConfigurable* mod : _modules) {
         loadModuleConfig(mod);
+        // Update the Active slot after each module's config is successfully applied
+        _manifest.updateActive(mod->getConfigNamespace(), mod->getSchemaVersion());
     }
+
+    // Persist the updated manifest with current Active versions
+    _manifest.save();
 
     ESP_LOGI(TAG, "beginAll() complete");
 }

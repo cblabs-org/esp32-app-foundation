@@ -545,6 +545,11 @@ void OTAUpdateManager::performUpdateTask() {
         return;
     }
 
+    // --- Snapshot config manifest: Active → Previous before download ---
+    app_->getConfigManager().getManifest().snapshotActiveToPrevious();
+    app_->getConfigManager().getManifest().save();
+    ESP_LOGI(TAG, "Config manifest: Active → Previous snapshot saved");
+
     // --- Step 3: Initialize the verifier (if public key configured) ---
     MbedTLSSignatureVerifier verifier;
     bool verifierReady = false;
@@ -755,6 +760,12 @@ void OTAUpdateManager::markAppValid() {
 #ifdef CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE
     esp_ota_mark_app_valid_cancel_rollback();
 #endif
+    // Snapshot config manifest: Active → Golden after firmware blessing
+    if (app_ != nullptr) {
+        app_->getConfigManager().getManifest().snapshotActiveToGolden();
+        app_->getConfigManager().getManifest().save();
+        ESP_LOGI(TAG, "Config manifest: Active → Golden snapshot saved (firmware blessed)");
+    }
 #endif
 }
 

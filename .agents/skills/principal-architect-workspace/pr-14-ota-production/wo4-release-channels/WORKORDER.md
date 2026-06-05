@@ -192,3 +192,36 @@ Once all checklist items are verified, **STOP and send a message back to the Pri
 3. Any issues or decisions that need escalation
 
 Do NOT wrap up, distill, or commit until the PA explicitly approves.
+
+---
+
+## Execution Status
+
+**Status:** ✅ COMPLETE  
+**Executed:** 2026-06-05T08:52Z – 2026-06-05T08:57Z  
+**Session ID:** `df360f0f-82b2-4a31-b136-5bfd2f8bf35c`  
+**Approved by PA:** 2026-06-05T08:57Z
+
+### Verification Results
+
+| Check | Result |
+|-------|--------|
+| `pio test -e native -f test_ota_channel` | ✅ 15/15 passed |
+| `pio test -e native` (full suite) | ✅ 505/505 passed — zero regressions |
+| `pio run -e esp32dev` | ✅ Build succeeded |
+| `pio run -e esp32s3nano` | ✅ Build succeeded |
+
+### Files Modified
+
+- `lib/GithubClient/GithubClient.hpp` — added `isPreRelease`, `getLatestReleaseForChannel()`
+- `lib/GithubClient/GithubClient.cpp` — implemented channel-aware release queries
+- `modules/OTAUpdateManager/OTAUpdateManager.hpp` — schema v2, `_lastCheckedChannel`
+- `modules/OTAUpdateManager/OTAUpdateManager.cpp` — v2 config, channel-aware checks, implicit downgrade
+
+### Files Created
+
+- `test/test_unit/test_ota_channel/test_ota_channel.cpp` — 15-test GoogleTest suite
+
+### Escalations
+
+None.

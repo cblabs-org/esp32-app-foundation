@@ -58,6 +58,7 @@
 #include <ArduinoJson.h>
 #include "../../include/interfaces/IConfigurable.hpp"
 #include "../../include/interfaces/IWebContributor.hpp"
+#include "../../lib/ConfigManifest/ConfigManifest.hpp"
 
 /**
  * @brief Centralised configuration gateway that owns all config file I/O.
@@ -142,6 +143,17 @@ public:
      */
     void setMetaTimezone(const char* tz);
 
+    /**
+     * @brief Access the Three-Tier config manifest.
+     *
+     * Provides direct access to the ConfigManifest for snapshot operations
+     * by OTAUpdateManager (Active→Previous before OTA, Active→Golden after
+     * firmware blessing).
+     *
+     * @return Mutable reference to the internal ConfigManifest.
+     */
+    ConfigManifest& getManifest() { return _manifest; }
+
 
     // -------------------------------------------------------------------------
     // IWebContributor Interface
@@ -218,5 +230,6 @@ private:
     std::vector<IConfigurable*> _modules;  ///< Dynamic registry of IConfigurable modules (locked after beginAll())
     bool _locked = false;                  ///< True after beginAll() — post-lock registration is rejected
     char _metaTimezone[64] = {};           ///< Timezone string for backup _meta envelope (default: "UTC")
+    ConfigManifest _manifest;              ///< Three-Tier config lifecycle manifest (Active/Previous/Golden)
 
 };
