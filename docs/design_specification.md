@@ -1541,35 +1541,172 @@ and is handled by a dedicated `KeyManager` kernel component:
 - **Plaintext credential storage is prohibited** — all credentials must be AES-256
   encrypted via DeviceCrypto before writing to flash
 
-### 13.3 OTA Security & Blessing Ceremony
+### 13.3 OTA Production System
 
-The framework provides a complete OTA firmware update pipeline: release discovery
-→ binary download → cryptographic signature verification → flash → reboot. The
-pipeline replaces the earlier MD5-only verification with full RSA+SHA256 signature
-validation, providing tamper-proof firmware authenticity when configured with a
-public key.
+The framework provides a complete, production-grade OTA firmware update pipeline:
+semantic version comparison → channel-aware release discovery → multi-architecture
+manifest resolution → binary download → cryptographic signature verification →
+flash → self-test → firmware blessing → config snapshot. The system is designed
+with defence-in-depth: fail-closed signature enforcement, task watchdog supervision,
+auto-rollback via the ESP-IDF bootloader, and application-layer anti-rollback via
+an NVS security version counter.
 
 #### 13.3.1 Architecture Overview
 
-The OTA subsystem is composed of three layers, each with a distinct responsibility:
+The OTA subsystem is composed of five libraries and one orchestrator module:
 
 | Layer | Location | Responsibility |
 |-------|----------|----------------|
-| **`otaUpdateManager`** | `modules/otaUpdateManager/` | Orchestrator — state machine, FreeRTOS task, EventBus progress, REST API routes |
-| **`OtaDownloadEngine`** | `lib/otaDownloadEngine/` | Utility — redirect-aware HTTP download, binary header verification, chunked streaming flash, verifier integration |
-| **`IOtaVerifier` / `MbedTLSSignatureVerifier`** | `include/interfaces/` + `lib/otaDownloadEngine/` | Interface + default impl — RSA+SHA256 signature verification via mbedtls |
+| **`OTAUpdateManager`** | `modules/otaUpdateManager/` | Orchestrator — state machine, FreeRTOS task, EventBus progress, REST API routes, IConfigurable channel/autoCheck persistence |
+| **`OTADownloadEngine`** | `lib/OTADownloadEngine/` | Utility — redirect-aware HTTP download, binary header verification, chunked streaming flash, verifier integration |
+| **`IOTAVerifier` / `MbedTLSSignatureVerifier`** | `include/interfaces/` + `lib/OTADownloadEngine/` | Interface + default impl — RSA+SHA256 signature verification via mbedtls |
+| **`SemVer`** | `lib/SemVer/` | Firmware version parsing, packed 32-bit comparison, channel-aware ordering |
+| **`OTAManifest`** | `lib/OTAManifest/` | Multi-architecture manifest parser — maps board IDs to firmware assets |
+| **`ConfigManifest`** | `lib/ConfigManifest/` | Three-Tier config lifecycle — Active/Previous/Golden schema version tracking |
 
-The three layers follow the Hollywood Principle: `otaUpdateManager` (a module)
-depends on `OtaDownloadEngine` and `IOtaVerifier` (both in `lib/`), but the
-libraries have no knowledge of the module. The download engine accepts a
-`WiFiClient&` from the caller and never creates its own network client.
+The layers follow the Hollywood Principle: `OTAUpdateManager` (a module)
+depends on the `lib/` libraries, but the libraries have no knowledge of the
+module. The download engine accepts a `WiFiClient&` from the caller and never
+creates its own network client.
 
-#### 13.3.2 Cryptographic Verification Pipeline
+```
+SemVer → OTAManifest → OTAUpdateManager → OTADownloadEngine → IOTAVerifier
+                              ↕
+                      ConfigManifest ↔ ConfigManager
+                              ↕
+                      GithubClient (release queries)
+```
 
-The `IOtaVerifier` interface defines a three-step verification contract:
+#### 13.3.2 SemVer Engine
+
+The `SemVer` library (`lib/SemVer/`) provides zero-allocation firmware version
+comparison on MCU using packed 32-bit integers.
+
+**`FirmwareVersion` struct:**
+```cpp
+struct FirmwareVersion {
+    uint8_t major   = 0;
+    uint8_t minor   = 0;
+    uint8_t patch   = 0;
+    Channel channel = Channel::STABLE;
+    uint8_t preNum  = 0;
+};
+```
+
+**`Channel` enum** — numeric values produce correct ordering via `packVersion()`:
+
+| Channel | Value | Example Tag |
+|---------|-------|-------------|
+| `DEV` | 0 | `v3.1.0-dev.3` |
+| `BETA` | 2 | `v3.1.0-beta.1` |
+| `RC` | 3 | `v3.1.0-rc.1` |
+| `STABLE` | 15 | `v3.1.0` |
+
+**`packVersion()`** — bit layout: `MAJOR(8) | MINOR(8) | PATCH(8) | CHANNEL(4) | PRE_NUM(4)`.
+A single 32-bit integer comparison replaces multi-field comparison logic.
+
+**`parseVersionTag()`** — parses git tag strings (`"v3.1.0"`, `"v3.1.0-beta.1"`,
+`"3.1.0-dev.3"`) into `FirmwareVersion` using `strtoul()` and `strncmp()` — zero
+heap allocation. Leading `v` prefix is optional.
+
+**Channel ordering:** `DEV < BETA < RC < STABLE`. A stable release always
+sorts higher than any pre-release of the same major.minor.patch.
+
+#### 13.3.3 Release Channels
+
+The OTA system supports three release channels for firmware distribution:
+
+| Channel | Description | Tag Convention |
+|---------|-------------|----------------|
+| `stable` | Production releases | `v3.1.0` (no pre-release suffix) |
+| `beta` | Pre-release testing | `v3.2.0-beta.1` |
+| `dev` | Development builds | `v3.2.0-dev.3` |
+
+**Channel persistence:** The active channel is stored as an `IConfigurable`
+field in `/mod/ota.json` (namespace: `"ota"`, schema version: 2). Fields:
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `channel` | `char[16]` | `"stable"` | Active release channel |
+| `autoCheck` | `bool` | `true` | Whether to auto-check for updates on boot |
+| `lastCheckedChannel` | `char[16]` | `""` | Channel used for the previous update check |
+
+**Implicit downgrade:** When the user changes channel (e.g., `beta` → `stable`),
+`checkForUpdate()` detects that `_channel != _lastCheckedChannel` and signals
+"update available" even if the remote version is numerically lower than the
+running version. This allows seamless channel switching without manual intervention.
+
+**`lastCheckedChannel` tracking:** Updated after each successful check. Enables
+detection of channel changes between checks. Persisted via `ConfigManager`.
+
+**`GithubClient::getLatestReleaseForChannel()`:** For `"stable"`, delegates to
+the standard `getLatestRelease()` endpoint. For `"beta"` or `"dev"`, queries
+`/repos/{owner}/{repo}/releases` (all releases including pre-releases) and finds
+the first release whose tag contains the channel string.
+
+#### 13.3.4 Multi-Architecture Manifest
+
+The OTA system supports multiple board architectures via a `manifest.json` file
+shipped as a release asset alongside firmware binaries.
+
+**Manifest schema (`OTAManifest`):**
+```json
+{
+  "version": "v3.1.0",
+  "channel": "stable",
+  "securityVersion": 1,
+  "assets": [
+    {
+      "board": "esp32dev",
+      "firmware": "firmware-esp32dev.bin",
+      "signature": "firmware-esp32dev.bin.sig",
+      "size": 1048576,
+      "sha256": "abc123..."
+    },
+    {
+      "board": "esp32s3nano",
+      "firmware": "firmware-esp32s3nano.bin",
+      "signature": "firmware-esp32s3nano.bin.sig",
+      "size": 1097152,
+      "sha256": "def456..."
+    }
+  ]
+}
+```
+
+**`OTAManifest` struct** (`lib/OTAManifest/`):
+- `version[32]` — release version tag
+- `channel[16]` — release channel
+- `securityVersion` — anti-rollback counter
+- `assets[kMaxBoards]` — array of per-board `OTAAsset` entries (max 4 boards)
+- All storage is stack-allocated using fixed-size char arrays — no heap, no String
+
+**`OTAAsset` struct** — per-board firmware asset descriptor:
+- `board[24]` — board identifier (e.g., `"esp32dev"`)
+- `firmware[64]` — firmware binary filename
+- `signature[64]` — signature filename
+- `size` — binary size in bytes
+- `sha256[65]` — SHA-256 hex digest
+
+**`BOARD_ID` compile-time injection:** Each PlatformIO environment defines
+`-DBOARD_ID=\"esp32dev\"` (or `\"esp32s3nano\"`, `\"native\"`) in `build_flags`.
+The orchestrator uses this macro to call `findAssetForBoard(manifest, BOARD_ID)`
+for board-specific asset resolution.
+
+**Legacy fallback:** If no `manifest.json` is present in a release (pre-manifest
+releases), the orchestrator falls back to a linear scan of release assets,
+matching by `.bin` and `.sig` file extensions. This ensures backward compatibility
+with older releases.
+
+**`parseManifest()` / `findAssetForBoard()`** — free functions: parse raw JSON
+into the struct and perform a linear scan for the board-matching asset.
+
+#### 13.3.5 Cryptographic Verification Pipeline
+
+The `IOTAVerifier` interface defines a three-step verification contract:
 
 ```cpp
-class IOtaVerifier {
+class IOTAVerifier {
 public:
     virtual bool begin(const char* publicKeyPem) = 0;   // Load key + init digest
     virtual void update(const uint8_t* data, size_t length) = 0;  // Per-chunk hash
@@ -1589,15 +1726,31 @@ public:
 - On native builds (`NATIVE_BUILD`), stub implementations compile cleanly but
   return failure, enabling interface contract tests without crypto dependencies
 
-**Degraded security mode:** If `FrameworkConfig.otaPublicKey` is `nullptr`,
-signature verification is **skipped entirely**. The download proceeds without
-cryptographic validation, and a warning is logged at `ESP_LOGW` level. This
-allows development and testing without key infrastructure but should never be
-used in production deployments.
+#### 13.3.6 Fail-Closed OTA Enforcement
 
-#### 13.3.3 Download Engine
+When `FrameworkConfig.otaPublicKey` is configured (non-null), the OTA pipeline
+operates in **fail-closed mode**:
 
-`OtaDownloadEngine` handles the complete binary download pipeline:
+- If the release has **no `.sig` asset**, the update is **aborted** with:
+  `"Missing .sig file — update rejected (fail-closed)"`
+- If the `.sig` file downloads but contains **zero bytes**, the update is
+  **aborted** with: `"Signature empty — update rejected (fail-closed)"`
+- If signature verification **fails**, the download engine returns
+  `OTAError::SignatureVerifyFailed`
+
+This is a **security invariant**: when a public key is present, there is no
+code path that accepts unsigned firmware. The check occurs at two levels:
+
+1. **Asset presence check** — before any download begins (fast rejection)
+2. **Post-download verification** — after the full binary is written and hashed
+
+**Degraded mode (no key):** If `FrameworkConfig.otaPublicKey` is `nullptr`,
+signature verification is skipped entirely. A warning is logged at `ESP_LOGW`.
+This is a dev convenience; production deployments must configure a public key.
+
+#### 13.3.7 Download Engine
+
+`OTADownloadEngine` handles the complete binary download pipeline:
 
 1. **Redirect-following HTTP GET** — up to 5 hops (`kMaxRedirects`), using
    HTTP/1.0 to avoid chunked-transfer encoding complications on the ESP32
@@ -1606,17 +1759,17 @@ used in production deployments.
 3. **ESP32 binary header validation** — verifies the first byte is the ESP32
    magic byte `0xE9`, rejecting non-firmware payloads before any flash write
 4. **Partition space validation** — checks `Content-Length` against
-   `ESP.getFreeSketchSpace()`, failing early with `OtaError::InsufficientSpace`
+   `ESP.getFreeSketchSpace()`, failing early with `OTAError::InsufficientSpace`
    if the binary exceeds the available OTA partition
 5. **Chunked streaming write** — reads the binary in 1024-byte chunks
    (`kChunkSize`), writing each chunk to the flash via `Update.write()` and
-   feeding it to `IOtaVerifier::update()` for hash accumulation
-6. **Post-download signature verification** — calls `IOtaVerifier::verify()`
+   feeding it to `IOTAVerifier::update()` for hash accumulation
+6. **Post-download signature verification** — calls `IOTAVerifier::verify()`
    against the fetched `.sig` file contents
-7. **Progress callbacks** — invokes `OtaProgressCallback(bytesWritten, totalSize)`
+7. **Progress callbacks** — invokes `OTAProgressCallback(bytesWritten, totalSize)`
    after each chunk for UI integration
 
-**Error codes** (`OtaError` enum):
+**Error codes** (`OTAError` enum):
 
 | Code | Value | Description |
 |------|-------|-------------|
@@ -1643,9 +1796,9 @@ Each error maps to a human-readable string via `otaErrorToString()`.
 > passes a configured client by reference. This allows the orchestrator to
 > control TLS configuration and heap allocation per §14.3.
 
-#### 13.3.4 Orchestrator State Machine
+#### 13.3.8 Orchestrator State Machine
 
-`otaUpdateManager` manages the OTA lifecycle through the `OtaState` enum:
+`OTAUpdateManager` manages the OTA lifecycle through the `OTAState` enum:
 
 ```
 Idle → Checking → Idle              (no update found)
@@ -1663,27 +1816,121 @@ Any  → Error                        (on failure)
 | `Error` | An error occurred (query `getLastOtaError()` for details) |
 
 **`checkForUpdate()`** creates a `GithubClient` with the repo and token from
-`FrameworkConfig`, queries the latest release, and returns `true` if a new
-release is available. Guards: must be in `Idle` state with a configured
-`otaGithubRepo`.
+`FrameworkConfig`, queries the latest release for the configured `_channel`,
+compares versions using `SemVer`, and returns `true` if a new release is
+available or if the channel has changed since the last check (implicit downgrade).
+Guards: must be in `Idle` state with a configured `otaGithubRepo`.
 
 **`performUpdate()`** launches a FreeRTOS task (8KB stack, priority 1) that
-executes the full 8-step pipeline:
+executes the full pipeline:
 
-1. Check GitHub for releases via `GithubClient`
-2. Find `.bin` and `.sig` assets in the release
-3. Initialise `MbedTLSSignatureVerifier` (if `otaPublicKey` configured)
-4. Allocate `WiFiClientSecure` on the heap (per §14.3)
-5. Create and configure `OtaDownloadEngine`
-6. Fetch the `.sig` signature file
-7. Download and flash the firmware binary
-8. Finalise and reboot (2-second delay for event propagation)
+1. Guard checks (firmware updates enabled, GitHub repo configured)
+2. Query GitHub for releases via `GithubClient::getLatestReleaseForChannel()`
+3. Download and parse `manifest.json` (or fall back to legacy asset scan)
+4. Match `BOARD_ID` to manifest assets via `findAssetForBoard()`
+5. Fail-closed check: reject missing/empty `.sig` when public key is configured
+6. Snapshot config manifest: Active → Previous (via `ConfigManifest`)
+7. Initialise `MbedTLSSignatureVerifier` (if `otaPublicKey` configured)
+8. Allocate `WiFiClientSecure` on the heap (per §14.3)
+9. Create and configure `OTADownloadEngine`
+10. Fetch the `.sig` signature file
+11. Download and flash the firmware binary (with per-chunk TWDT feeding)
+12. Finalise and reboot (2-second delay for event propagation)
 
 The FreeRTOS task ensures the `tick() ≤ 10ms` constraint is never violated by
-blocking download I/O. On native builds, `performUpdate()` sets `OtaState::Error`
+blocking download I/O. On native builds, `performUpdate()` sets `OTAState::Error`
 (no FreeRTOS available).
 
-#### 13.3.5 FrameworkConfig OTA Fields
+#### 13.3.9 Task Watchdog Supervision
+
+The OTA FreeRTOS task subscribes to the ESP-IDF Task Watchdog Timer (TWDT):
+
+```cpp
+esp_task_wdt_add(NULL);   // Subscribe at task start
+// ... download chunks, feed watchdog implicitly via chunk processing ...
+esp_task_wdt_delete(NULL); // Unsubscribe before reboot or error return
+```
+
+**`CONFIG_ESP_TASK_WDT_PANIC=y`** in `sdkconfig.defaults` means a TWDT timeout
+triggers a kernel panic → reboot. If the download hangs (network timeout,
+infinite redirect loop), the watchdog fires → panic → reboot → bootloader auto-
+rollback reverts to the previous firmware.
+
+This creates a closed safety loop: hung download → watchdog → panic → reboot →
+auto-rollback — with no human intervention required.
+
+#### 13.3.10 Auto-Rollback
+
+The ESP-IDF bootloader provides hardware-level auto-rollback via
+`CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y`:
+
+1. After OTA flash, the device reboots into the new firmware in **pending
+   verification** state
+2. The **`Application` hub** calls `markAppValid()` at **Step 17b** of the boot
+   sequence — after `_compactAndLock()` (Step 17). This means the self-test
+   barrier covers ALL subsystem initialisation:
+   - Display hardware bootstrap
+   - EventBus, LittleFS mount, FrameworkConfig
+   - DeviceCrypto, KeyManager
+   - ConfigManager (register + beginAll)
+   - WiFi, Time, Data, OTA, Web, MCP
+   - Display integration, carousel board registration
+   - Registry lock (`_compactAndLock`)
+3. If any step crashes or hangs before `markAppValid()`, the bootloader
+   automatically reverts to the previous firmware partition on the next reboot
+
+> **Prohibited:** Blessing the partition at download/write time. This defeats the
+> rollback purpose — firmware could still have fatal startup or runtime crashes.
+
+#### 13.3.11 Anti-Rollback (Application Layer)
+
+The application-layer anti-rollback mechanism uses an NVS security version counter
+to prevent downgrade past security-critical firmware boundaries:
+
+- **`SECURITY_VERSION` macro** — defined in `platformio.ini` `build_flags`
+  (e.g., `-DSECURITY_VERSION=1`). Incremented when a release contains a
+  security fix that must not be rolled back past.
+- **NVS storage** — `Preferences` namespace `"ota_security"`, key `"sec_ver"`
+- **Check logic** (`checkSecurityVersion()`, called from `markAppValid()`):
+  - If `SECURITY_VERSION > stored` → update NVS to the new value
+  - If `SECURITY_VERSION < stored` → firmware is running a version below the
+    security floor (this scenario is prevented by the orchestrator checking the
+    manifest's `securityVersion` field before download)
+
+The `OTAManifest.securityVersion` field enables the orchestrator to compare the
+remote release's security version against the stored NVS value before initiating
+a download, rejecting downgrades at the network layer before any flash write.
+
+#### 13.3.12 Config Lifecycle — Three-Tier Model
+
+The `ConfigManifest` library (`lib/ConfigManifest/`) manages configuration
+versioning across OTA updates using three tiers:
+
+| Tier | Description | Snapshot Trigger |
+|------|-------------|-----------------|
+| **Active** | Currently running config schema version per module | Updated by `ConfigManager` during `beginAll()` |
+| **Previous** | Config state before the last OTA download | `snapshotActiveToPrevious()` — called before OTA download |
+| **Golden** | Last-known-good config (firmware blessed) | `snapshotActiveToGolden()` — called from `markAppValid()` |
+
+**Persistence:** Stored as `/config_manifest.json` on LittleFS, alongside the
+per-module config files at `/mod/<namespace>.json`.
+
+**OTA integration points:**
+1. Before download: `_configManager.getManifest().snapshotActiveToPrevious()` +
+   `save()` — preserves the pre-update config state
+2. After firmware blessing: `_configManager.getManifest().snapshotActiveToGolden()`
+   + `save()` — records the last-known-good configuration
+
+**`ModuleSlot` struct** — per-module slot tracking Active/Previous/Golden schema
+versions. Up to `kMaxModules` (16) namespaces are tracked.
+
+**`ConfigManifest` API:**
+- `load()` / `save()` — JSON persistence on LittleFS
+- `updateActive()` / `updatePrevious()` / `updateGolden()` — per-namespace setters
+- `snapshotActiveToPrevious()` / `snapshotActiveToGolden()` — bulk copy all slots
+- `getSlot()` / `getActiveVersion()` / `getPreviousVersion()` / `getGoldenVersion()`
+
+#### 13.3.13 FrameworkConfig OTA Fields
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
@@ -1697,12 +1944,25 @@ All OTA config fields have safe defaults so the framework boots without
 requiring any OTA configuration. The consuming app populates these fields
 during the `BOOTING` phase via `FrameworkConfig`.
 
-#### 13.3.6 EventBus Integration
+#### 13.3.14 IConfigurable OTA Fields
 
-The orchestrator publishes `OtaProgressEvent` on topic `"ota.progress"`:
+`OTAUpdateManager` implements `IConfigurable` (namespace: `"ota"`, schema v2):
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `channel` | `char[16]` | `"stable"` | Active release channel (`"stable"`, `"beta"`, `"dev"`) |
+| `autoCheck` | `bool` | `true` | Auto-check for updates on boot |
+| `lastCheckedChannel` | `char[16]` | `""` | Last channel used for an update check (implicit downgrade detection) |
+
+Persisted at `/mod/ota.json` via `ConfigManager`. Schema migration from v1→v2
+adds the `lastCheckedChannel` field.
+
+#### 13.3.15 EventBus Integration
+
+The orchestrator publishes `OTAProgressEvent` on topic `"ota.progress"`:
 
 ```cpp
-struct OtaProgressEvent {
+struct OTAProgressEvent {
     float progress;       // 0.0 to 1.0 download fraction
     const char* status;   // Human-readable status message
     bool complete;        // True when OTA cycle is finished
@@ -1710,67 +1970,89 @@ struct OtaProgressEvent {
 };
 ```
 
-`OtaProgressEvent` is **layout-compatible** with `OtaProgressPayload` in
-`u8g2DisplayModule.hpp` — the display module subscribes to `"ota.progress"` and
-can safely cast the payload to either type for rendering the `OtaProgressBoard`.
+`OTAProgressEvent` is **layout-compatible** with `OTAProgressPayload` in
+`U8G2DisplayModule.hpp` — the display module subscribes to `"ota.progress"` and
+can safely cast the payload to either type for rendering the `OTAProgressBoard`.
 
 Events are published:
 - At each major pipeline step (checking, downloading, verifying, complete, error)
 - On every progress callback from the download engine (per-chunk granularity)
 - With `complete=true` on both success and failure (check `success` to distinguish)
 
-#### 13.3.7 Firmware Blessing Ceremony
+#### 13.3.16 CI/CD Pipeline
 
-After the OTA pipeline completes and the device reboots, the new firmware enters
-a "pending verification" state managed by the ESP-IDF bootloader:
+Firmware is built and released via a two-stage pipeline:
 
-1. New firmware boots in "pending verification" state
-2. The **`Application` hub** (not `otaUpdateManager`) calls
-   `esp_ota_mark_app_valid_cancel_rollback()` after verifying:
-   - WiFi connectivity established
-   - LittleFS mounted successfully
-   - Core services initialised without fatal errors
-3. If blessing never occurs, the bootloader automatically reverts to the previous
-   firmware on next restart
+**Stage 1 — GitHub Actions CI** (`.github/workflows/build.yml`):
+- Triggers on tag push (`v*`)
+- Matrix build: `esp32dev` + `esp32s3nano`
+- Each job: PlatformIO build → rename binary → generate SHA-256 hash → upload
+  unsigned artifacts
+- Artifacts are named `firmware-{board}.bin` + `firmware-{board}.bin.sha256`
 
-> **Prohibited:** Blessing the partition at download/write time. This defeats the
-> rollback purpose — firmware could still have fatal startup or runtime crashes.
+**Stage 2 — Local release** (`scripts/deploy_release.py`):
+1. Download CI artifacts: `gh run download <run-id>`
+2. Sign each board's firmware: `openssl dgst -sha256 -sign private_key.pem`
+3. Generate `manifest.json`: `scripts/generate_manifest.py`
+4. Create GitHub Release: `gh release create <tag>`
+5. Upload all assets: `.bin`, `.bin.sig`, `.bin.sha256`, `manifest.json`
 
-This requires `CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y` in `sdkconfig.defaults`
-(see §14.3).
+**Design rationale:** Signing is performed locally (not in CI) because the
+private key must never be stored in GitHub Secrets or any remote system. The
+CI pipeline produces unsigned artifacts; the human operator signs them with the
+locally-held private key before publishing the release.
 
-#### 13.3.8 REST API
+#### 13.3.17 REST API
 
-The `otaUpdateManager` registers the following routes via `IWebContributor`:
+The `OTAUpdateManager` registers the following routes via `IWebContributor`:
 
-| Method | Route | Action | Description |
-|--------|-------|--------|-------------|
+| Method | Route | Body | Description |
+|--------|-------|------|-------------|
 | `GET` | `/api/ota` | — | Returns `{ "status": "ready" }` |
-| `POST` | `/api/ota` | `"checkGithub"` | Triggers `checkForUpdate()` + `performUpdate()` if an update is available |
-| `POST` | `/api/ota` | `"status"` | Returns `{ "state": "idle\|checking\|downloading\|verifying\|complete\|error", "lastError": "..." }` |
-| `POST` | `/api/ota` | `"rollback"` | Triggers `rollbackFirmware()` — reverts to previous partition and reboots |
-| `POST` | `/api/ota` | `"markValid"` | Calls `markAppValid()` — blesses the running firmware |
+| `POST` | `/api/ota` | `{ "action": "checkGithub" }` | Check GitHub + perform update if available |
+| `POST` | `/api/ota` | `{ "action": "status" }` | Returns state, version, channel, boardId, autoCheck, lastError |
+| `POST` | `/api/ota` | `{ "action": "setChannel", "channel": "beta" }` | Change update channel (persisted via ConfigManager) |
+| `POST` | `/api/ota` | `{ "action": "rollback", "confirm": "ROLLBACK" }` | Rollback firmware (requires typed confirmation) |
+| `POST` | `/api/ota` | `{ "action": "markValid" }` | Bless the running firmware |
 
-The `checkGithub` action is the primary entry point for web-triggered OTA
-updates. It performs the check and immediately starts the update pipeline if a
-new release is found.
+**Rollback confirmation:** The `rollback` action requires `"confirm": "ROLLBACK"`
+in the POST body. Without this exact string, the server responds with HTTP 403
+and an error message. This prevents accidental rollbacks from automated tools.
 
-#### 13.3.9 Security Considerations
+**Status response** includes: `state`, `version` (major.minor.patch), `channel`,
+`boardId`, `autoCheck`, and `lastError` (if any).
+
+#### 13.3.18 Web Portal Integration
+
+The OTA tab in the web portal (parent: "System", order: 50) provides:
+
+- **Channel dropdown** — allows switching between `stable`, `beta`, and `dev`
+  channels. Calls `POST /api/ota { "action": "setChannel" }` on change.
+- **Check for update** button — triggers `POST /api/ota { "action": "checkGithub" }`
+- **Rollback** button — requires the user to type "ROLLBACK" in a confirmation
+  dialog before sending `POST /api/ota { "action": "rollback", "confirm": "ROLLBACK" }`
+- **Enhanced status display** — shows current firmware version, active channel,
+  board ID, and OTA state
+
+#### 13.3.19 Security Considerations
 
 - **Public key management:** The consuming app provides the PEM-encoded RSA
   public key via `FrameworkConfig.otaPublicKey`. The framework never hardcodes
   key material — this is an app-side responsibility
+- **Fail-closed enforcement:** When a public key is configured, missing or empty
+  `.sig` files cause an immediate abort — not a warning (see §13.3.6)
 - **WiFiClientSecure allocation:** Always heap-allocated via
   `std::unique_ptr<WiFiClientSecure>(new (std::nothrow) WiFiClientSecure())`
   per §14.3 memory rules — never on the stack
 - **GitHub CDN TLS:** Uses `setInsecure()` for CDN redirect hops because GitHub's
   CDN endpoints use different certificate chains than `api.github.com`. The
-  initial API call to `api.github.com` uses the standard cert chain
-- **Degraded mode warning:** If no public key is configured, downloads proceed
-  without signature verification. A warning is logged at `ESP_LOGW` level. This
-  is acceptable for development but should be addressed before production
-  deployment
-- **Rollback safety:** The blessing ceremony (§13.3.7) ensures that bad firmware
+  mandatory signature verification (not TLS certificate pinning) is the security
+  boundary — GitHub CDN uses rotating certs that cannot be reliably pinned
+- **Anti-rollback:** NVS `security_version` counter prevents downgrade past
+  security-critical firmware (see §13.3.11)
+- **Task watchdog:** Hung downloads are terminated by TWDT → panic → reboot →
+  auto-rollback (see §13.3.9)
+- **Rollback safety:** The blessing ceremony (§13.3.10) ensures that bad firmware
   is automatically reverted by the bootloader if core services fail to initialise
 - **Legacy direct-upload path:** The web-upload OTA route
   (`beginUpdate`/`writeStream`/`endUpdate`) is preserved alongside the new
