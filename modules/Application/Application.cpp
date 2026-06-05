@@ -218,6 +218,16 @@ bool Application::begin(const FrameworkConfig& config) {
     _compactAndLock();
     _statusReporter->reportStatus("Boot complete", 1.0f);
 
+    // --- Step 17b: Bless firmware (auto-rollback barrier) ---
+    // If the firmware crashes before reaching this point, the bootloader
+    // automatically reverts to the previous partition. This barrier covers:
+    // display bootstrap, EventBus, LittleFS, Crypto, Config, WiFi, Time,
+    // Data, OTA, Web, display integration, and registry lock.
+#ifndef NATIVE_BUILD
+    _otaManager->markAppValid();
+    ESP_LOGI(TAG, "✅ Firmware self-test PASSED — partition blessed");
+#endif
+
     // --- Step 18: Publish system heap event + heap report ---
 #ifndef NATIVE_BUILD
     uint32_t freeHeap = heap_caps_get_free_size(MALLOC_CAP_8BIT);

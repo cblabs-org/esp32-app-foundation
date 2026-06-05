@@ -54,6 +54,8 @@ static const char* TAG = "OTAUpdateManager";
 #include <Update.h>
 #include <esp_ota_ops.h>
 #include <WiFiClientSecure.h>
+#include <Preferences.h>
+#include "esp_task_wdt.h"
 #include "../Application/Application.hpp"
 #include "../../lib/GithubClient/GithubClient.hpp"
 #include "../../lib/OTADownloadEngine/OTADownloadEngine.hpp"
@@ -309,6 +311,7 @@ void OTAUpdateManager::otaTaskWrapper(void* param) {
 void OTAUpdateManager::performUpdateTask() {
 #ifndef NATIVE_BUILD
     ESP_LOGI(TAG, "OTA task started");
+    esp_task_wdt_add(NULL);  // Subscribe current task to TWDT
     publishProgress(0.0f, "Checking for update...", false, false);
 
     const FrameworkConfig& cfg = app_->getConfig();
@@ -319,6 +322,7 @@ void OTAUpdateManager::performUpdateTask() {
         publishProgress(0.0f, "Firmware updates disabled", true, false);
         state_ = OTAState::Error;
         lastOtaError_ = "Firmware updates disabled";
+        esp_task_wdt_delete(NULL);
         return;
     }
 
@@ -328,6 +332,7 @@ void OTAUpdateManager::performUpdateTask() {
         publishProgress(0.0f, "No GitHub repo configured", true, false);
         state_ = OTAState::Error;
         lastOtaError_ = "No GitHub repo configured";
+        esp_task_wdt_delete(NULL);
         return;
     }
 
@@ -341,6 +346,7 @@ void OTAUpdateManager::performUpdateTask() {
         publishProgress(0.0f, "GitHub query failed", true, false);
         state_ = OTAState::Error;
         lastOtaError_ = "GitHub release query failed";
+        esp_task_wdt_delete(NULL);
         return;
     }
 
@@ -383,11 +389,17 @@ void OTAUpdateManager::performUpdateTask() {
         publishProgress(0.0f, "No firmware binary in release", true, false);
         state_ = OTAState::Error;
         lastOtaError_ = "No firmware binary found in release";
+        esp_task_wdt_delete(NULL);
         return;
     }
 
     if (sigUrl.isEmpty() && cfg.otaPublicKey != nullptr) {
-        ESP_LOGW(TAG, "No .sig asset found but otaPublicKey is configured — security degraded");
+        ESP_LOGE(TAG, "SECURITY ABORT: No .sig asset found but otaPublicKey is configured — refusing unsigned firmware");
+        publishProgress(0.0f, "Missing signature — update rejected", true, false);
+        state_ = OTAState::Error;
+        lastOtaError_ = "Missing .sig file — update rejected (fail-closed)";
+        esp_task_wdt_delete(NULL);
+        return;
     }
 
     // --- Step 3: Initialize the verifier (if public key configured) ---
@@ -401,6 +413,7 @@ void OTAUpdateManager::performUpdateTask() {
             publishProgress(0.0f, "Verifier initialization failed", true, false);
             state_ = OTAState::Error;
             lastOtaError_ = "Verifier initialization failed";
+            esp_task_wdt_delete(NULL);
             return;
         }
         verifierReady = true;
@@ -415,6 +428,7 @@ void OTAUpdateManager::performUpdateTask() {
         publishProgress(0.0f, "Memory allocation failed", true, false);
         state_ = OTAState::Error;
         lastOtaError_ = "WiFiClientSecure heap allocation failed";
+        esp_task_wdt_delete(NULL);
         return;
     }
     // GitHub CDN redirects use different certs than the API — use insecure
@@ -444,7 +458,12 @@ void OTAUpdateManager::performUpdateTask() {
     if (!sigUrl.isEmpty()) {
         sigLen = engine.fetchSignature(*client, sigUrl, token, sigBuf, sizeof(sigBuf));
         if (sigLen == 0 && cfg.otaPublicKey != nullptr) {
-            ESP_LOGW(TAG, "Signature fetch returned 0 bytes but public key is configured");
+            ESP_LOGE(TAG, "SECURITY ABORT: Signature fetch returned 0 bytes — refusing update");
+            publishProgress(0.0f, "Signature fetch failed — update rejected", true, false);
+            state_ = OTAState::Error;
+            lastOtaError_ = "Signature empty — update rejected (fail-closed)";
+            esp_task_wdt_delete(NULL);  // Unsubscribe before early return
+            return;
         } else if (sigLen > 0) {
             ESP_LOGI(TAG, "Fetched signature: %zu bytes", sigLen);
         }
@@ -460,6 +479,7 @@ void OTAUpdateManager::performUpdateTask() {
         ESP_LOGE(TAG, "OTA download failed: %s", lastOtaError_);
         publishProgress(0.0f, lastOtaError_, true, false);
         state_ = OTAState::Error;
+        esp_task_wdt_delete(NULL);
         return;
     }
 
@@ -470,6 +490,7 @@ void OTAUpdateManager::performUpdateTask() {
     publishProgress(1.0f, "Update complete — rebooting...", true, true);
     ESP_LOGI(TAG, "OTA update complete — rebooting in 2 seconds");
 
+    esp_task_wdt_delete(NULL);  // Unsubscribe before reboot
     delay(2000);  // Allow event propagation and display update
     ESP.restart();
 #else
@@ -587,9 +608,34 @@ bool OTAUpdateManager::endUpdate() {
 void OTAUpdateManager::markAppValid() {
     ESP_LOGI(TAG, "Marking firmware as valid (blessing app)");
 #ifndef NATIVE_BUILD
+    checkSecurityVersion();
 #ifdef CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE
     esp_ota_mark_app_valid_cancel_rollback();
 #endif
+#endif
+}
+
+/**
+ * @brief Check and update the NVS security version counter.
+ *
+ * Compares the compile-time SECURITY_VERSION macro against the value
+ * stored in NVS under the "ota_security" namespace. If the compiled
+ * version is higher, it updates the stored value. This provides anti-
+ * rollback protection at the application layer.
+ */
+void OTAUpdateManager::checkSecurityVersion() {
+#ifndef NATIVE_BUILD
+    Preferences prefs;
+    prefs.begin("ota_security", false);
+    uint32_t stored = prefs.getUInt("sec_ver", 0);
+
+    if (SECURITY_VERSION > stored) {
+        prefs.putUInt("sec_ver", SECURITY_VERSION);
+        ESP_LOGI(TAG, "Security version updated: %u → %u", stored, (uint32_t)SECURITY_VERSION);
+    } else {
+        ESP_LOGD(TAG, "Security version OK: stored=%u compiled=%u", stored, (uint32_t)SECURITY_VERSION);
+    }
+    prefs.end();
 #endif
 }
 

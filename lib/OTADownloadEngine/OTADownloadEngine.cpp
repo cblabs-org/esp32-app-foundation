@@ -99,6 +99,7 @@ const char* OTADownloadEngine::getLastErrorString() const {
 #include <HTTPClient.h>
 #include <Update.h>
 #include <Esp.h>
+#include "esp_task_wdt.h"
 
 /**
  * @brief Follow HTTP redirects and return the final response code.
@@ -373,6 +374,9 @@ OTAError OTADownloadEngine::downloadAndFlash(WiFiClient& client, const String& b
 
         totalWritten += bytesRead;
 
+        // Feed watchdog after each chunk
+        esp_task_wdt_reset();
+
         // Report progress
         if (progressCb_) {
             progressCb_(totalWritten, static_cast<size_t>(contentLen));
@@ -390,7 +394,15 @@ OTAError OTADownloadEngine::downloadAndFlash(WiFiClient& client, const String& b
     ESP_LOGI(TAG, "Download complete — %zu bytes written to flash", totalWritten);
 
     // --- Step 10: Cryptographic signature verification ---
-    if (verifier_ != nullptr && sigBuf != nullptr && sigLen > 0) {
+    if (verifier_ != nullptr) {
+        // Fail closed: verifier is set, signature MUST be present
+        if (sigBuf == nullptr || sigLen == 0) {
+            ESP_LOGE(TAG, "SECURITY ABORT: Verifier configured but no signature provided — aborting");
+            Update.abort();
+            http.end();
+            lastError_ = OTAError::SignatureFetchFailed;
+            return lastError_;
+        }
         if (!verifier_->verify(sigBuf, sigLen)) {
             ESP_LOGE(TAG, "Cryptographic signature verification FAILED — update discarded securely");
             Update.abort();
@@ -399,8 +411,8 @@ OTAError OTADownloadEngine::downloadAndFlash(WiFiClient& client, const String& b
             return lastError_;
         }
         ESP_LOGI(TAG, "Cryptographic signature verification PASSED");
-    } else if (verifier_ == nullptr) {
-        ESP_LOGW(TAG, "Skipping signature verification — no verifier configured");
+    } else {
+        ESP_LOGW(TAG, "No OTA public key — signature verification SKIPPED (dev mode)");
     }
 
     // --- Step 11: Finalize update ---

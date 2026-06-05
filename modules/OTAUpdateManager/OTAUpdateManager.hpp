@@ -363,6 +363,15 @@ private:
     void performUpdateTask();
 
     /**
+     * @brief Check and update the NVS security version counter.
+     *
+     * Compares the compile-time SECURITY_VERSION against the stored NVS
+     * value. Updates NVS if the compiled version is higher. Called from
+     * markAppValid() before blessing the partition.
+     */
+    void checkSecurityVersion();
+
+    /**
      * @brief Publish an OTA progress event to the EventBus.
      *
      * Creates an OTAProgressEvent on the stack and publishes it on the

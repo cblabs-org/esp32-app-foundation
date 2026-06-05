@@ -111,3 +111,10 @@ CONFIG_MBEDTLS_ECP_DP_CURVE25519_ENABLED=n
 
 # Disable WPS (WiFi Protected Setup — not used)
 CONFIG_ESP_WIFI_ENABLE_WPS=n
+
+# --- PR-14: OTA production hardening ---
+
+# Task watchdog panic — triggers reboot on hung OTA downloads,
+# enabling auto-rollback via the bootloader if the firmware
+# has not yet been blessed by markAppValid().
+CONFIG_ESP_TASK_WDT_PANIC=y
