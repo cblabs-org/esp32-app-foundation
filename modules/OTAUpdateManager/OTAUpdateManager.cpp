@@ -58,6 +58,7 @@ static const char* TAG = "OTAUpdateManager";
 #include "../../lib/GithubClient/GithubClient.hpp"
 #include "../../lib/OTADownloadEngine/OTADownloadEngine.hpp"
 #include "../../lib/OTADownloadEngine/MbedTLSSignatureVerifier.hpp"
+#include "../../lib/SemVer/SemVer.hpp"
 #else
 #include <ArduinoJson.h>
 #include "../Application/Application.hpp"
@@ -211,10 +212,18 @@ bool OTAUpdateManager::checkForUpdate() {
 
     ESP_LOGI(TAG, "Latest release: %s (%d assets)", github.releaseId.c_str(), github.releaseAssets);
 
-    // For now, always report update available if a release was found.
-    // A proper version comparison can be added later.
+    // --- SemVer comparison: local build version vs. remote release tag ---
+    FirmwareVersion local = { VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH, Channel::STABLE, 0 };
+    FirmwareVersion remote = parseVersionTag(github.releaseId.c_str());
+    if (remote > local) {
+        ESP_LOGI(TAG, "Update available: remote version is newer");
+        state_ = OTAState::Idle;
+        return true;
+    }
+
+    ESP_LOGI(TAG, "No update available — local version is current or newer");
     state_ = OTAState::Idle;
-    return true;
+    return false;
 #else
     // Native builds cannot perform real GitHub checks
     state_ = OTAState::Idle;
