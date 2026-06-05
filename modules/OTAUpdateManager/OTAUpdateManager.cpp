@@ -30,7 +30,7 @@
  *   - rollbackFirmware():   Revert to the previous firmware partition
  *   - registerRoutes():     Register REST API route handlers
  *   - getConfigNamespace(): Return "ota" (IConfigurable)
- *   - getSchemaVersion():   Return 1 (IConfigurable)
+ *   - getSchemaVersion():   Return 2 (IConfigurable)
  *   - applyConfig():        Apply OTA config from JSON section (IConfigurable)
  *   - serializeConfig():    Serialize OTA config to JSON section (IConfigurable)
  *   - migrateConfig():      Migrate from older schema version (IConfigurable)
@@ -95,18 +95,18 @@ const char* OTAUpdateManager::getConfigNamespace() const {
 /**
  * @brief Return the current schema version for the OTA config format.
  *
- * Version 1: initial schema with "channel" and "autoCheck" fields.
+ * Version 2: adds "lastCheckedChannel" for implicit downgrade detection.
  * Increment this when a future firmware change requires a config migration.
  */
 int OTAUpdateManager::getSchemaVersion() const {
-    return 1;
+    return 2;
 }
 
 /**
  * @brief Apply OTA configuration values from a parsed JSON section.
  *
- * Reads "channel" and "autoCheck" from the section. Missing keys fall
- * back to safe defaults ("stable" / true) via ArduinoJson's | operator.
+ * Reads "channel", "autoCheck", and "lastCheckedChannel" from the section.
+ * Missing keys fall back to safe defaults via ArduinoJson's | operator.
  *
  * @param section Read-only reference to the JSON object containing config keys.
  */
@@ -114,49 +114,55 @@ void OTAUpdateManager::applyConfig(const JsonObject& section) {
     const char* ch = section["channel"] | "stable";
     strlcpy(_channel, ch, sizeof(_channel));
     _autoCheck = section["autoCheck"] | true;
-    ESP_LOGI(TAG, "Config applied — channel='%s' autoCheck=%d", _channel, (int)_autoCheck);
+    const char* lcc = section["lastCheckedChannel"] | "";
+    strlcpy(_lastCheckedChannel, lcc, sizeof(_lastCheckedChannel));
+    ESP_LOGI(TAG, "Config applied — channel='%s' autoCheck=%d lastCheckedChannel='%s'",
+             _channel, (int)_autoCheck, _lastCheckedChannel);
 }
 
 /**
  * @brief Serialize current OTA configuration into a JSON section.
  *
- * Writes "channel" and "autoCheck" into the provided section for
- * persistence by ConfigManager (stored at /mod/ota.json).
+ * Writes "channel", "autoCheck", and "lastCheckedChannel" into the
+ * provided section for persistence by ConfigManager (stored at /mod/ota.json).
  *
  * @param section Mutable reference to the target JSON object.
  */
 void OTAUpdateManager::serializeConfig(JsonObject& section) const {
-    section["channel"]   = _channel;
-    section["autoCheck"] = _autoCheck;
+    section["channel"]            = _channel;
+    section["autoCheck"]          = _autoCheck;
+    section["lastCheckedChannel"] = _lastCheckedChannel;
 }
 
 /**
  * @brief Migrate OTA configuration from an older schema version.
  *
- * At schema version 1 there are no migration transformations required.
- * Logs the attempt for diagnostics and returns true to indicate success.
- * Extend this method in future firmware versions when fields change.
+ * Handles v1→v2 migration by adding the lastCheckedChannel field.
  *
  * @param section   Mutable reference to the JSON config section.
  * @param fromVersion The stored schema version being migrated from.
- * @return true — migration always succeeds for v1.
+ * @return true on success.
  */
 bool OTAUpdateManager::migrateConfig(JsonObject& section, int fromVersion) {
-    ESP_LOGI(TAG, "migrateConfig() called: v%d → v%d (no-op at v1)", fromVersion, getSchemaVersion());
-    (void)section;
+    if (fromVersion < 2) {
+        section["lastCheckedChannel"] = "";
+        ESP_LOGI(TAG, "Migrated OTA config v%d → v2: added lastCheckedChannel", fromVersion);
+    }
     return true;
 }
 
 /**
  * @brief Reset OTA configuration to factory defaults.
  *
- * Sets channel to "stable" and autoCheck to true. ConfigManager calls
- * saveModuleConfig() afterwards to persist the reset state.
+ * Sets channel to "stable", autoCheck to true, and clears
+ * lastCheckedChannel. ConfigManager calls saveModuleConfig() afterwards
+ * to persist the reset state.
  */
 void OTAUpdateManager::resetConfig() {
     strlcpy(_channel, "stable", sizeof(_channel));
     _autoCheck = true;
-    ESP_LOGI(TAG, "Config reset to defaults — channel='stable' autoCheck=true");
+    _lastCheckedChannel[0] = '\0';
+    ESP_LOGI(TAG, "Config reset to defaults — channel='stable' autoCheck=true lastCheckedChannel=''");
 }
 
 
@@ -207,7 +213,7 @@ bool OTAUpdateManager::checkForUpdate() {
     GithubClient github(cfg.otaGithubRepo,
                         cfg.otaGithubToken ? cfg.otaGithubToken : "");
 
-    bool success = github.getLatestRelease();
+    bool success = github.getLatestReleaseForChannel(_channel);
     if (!success) {
         ESP_LOGE(TAG, "GitHub release check failed: %s", github.getLastError());
         state_ = OTAState::Idle;
@@ -219,11 +225,31 @@ bool OTAUpdateManager::checkForUpdate() {
     // --- SemVer comparison: local build version vs. remote release tag ---
     FirmwareVersion local = { VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH, Channel::STABLE, 0 };
     FirmwareVersion remote = parseVersionTag(github.releaseId.c_str());
+
+    // Normal case: remote > local → update available
     if (remote > local) {
         ESP_LOGI(TAG, "Update available: remote version is newer");
+        strlcpy(_lastCheckedChannel, _channel, sizeof(_lastCheckedChannel));
         state_ = OTAState::Idle;
         return true;
     }
+
+    // Implicit downgrade: channel changed since last check
+    // e.g., switched from beta to stable — allow "downgrade" to the latest stable
+    if (strcmp(_channel, _lastCheckedChannel) != 0 && _lastCheckedChannel[0] != '\0') {
+        ESP_LOGI(TAG, "Channel changed ('%s' → '%s') — allowing implicit version change",
+                 _lastCheckedChannel, _channel);
+        strlcpy(_lastCheckedChannel, _channel, sizeof(_lastCheckedChannel));
+        // Save the channel change to config
+        if (app_ != nullptr) {
+            app_->getConfigManager().saveModuleConfig(this);
+        }
+        state_ = OTAState::Idle;
+        return true;  // Signal update available even if remote <= local
+    }
+
+    // Update lastCheckedChannel
+    strlcpy(_lastCheckedChannel, _channel, sizeof(_lastCheckedChannel));
 
     ESP_LOGI(TAG, "No update available — local version is current or newer");
     state_ = OTAState::Idle;
@@ -343,7 +369,7 @@ void OTAUpdateManager::performUpdateTask() {
                         cfg.otaGithubToken ? cfg.otaGithubToken : "");
     ESP_LOGI(TAG, "Querying GitHub for latest release of %s", cfg.otaGithubRepo);
 
-    if (!github.getLatestRelease()) {
+    if (!github.getLatestReleaseForChannel(_channel)) {
         ESP_LOGE(TAG, "GitHub release query failed: %s", github.getLastError());
         publishProgress(0.0f, "GitHub query failed", true, false);
         state_ = OTAState::Error;

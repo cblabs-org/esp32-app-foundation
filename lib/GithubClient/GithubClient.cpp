@@ -44,14 +44,17 @@ const char* GithubClient::githubRootCACert = \
 "-----END CERTIFICATE-----\n";
 
 GithubClient::GithubClient(const String& repository, const String& token) {
+    repository_ = repository;
     if (repository.length() > 0) {
         apiGetLatestRelease = "https://" + String(apiHost) + "/repos/" + repository + "/releases/latest";
+        apiGetReleases      = "https://" + String(apiHost) + "/repos/" + repository + "/releases";
     }
     accessToken = token;
     if (accessToken.length() > 0) {
         Logger::registerSecret(accessToken);
     }
     releaseAssets = 0;
+    isPreRelease = false;
     strcpy(lastErrorMsg, "Initialized");
 }
 
@@ -63,6 +66,7 @@ bool GithubClient::getLatestRelease() {
     releaseId = "";
     releaseDescription = "";
     releaseAssets = 0;
+    isPreRelease = false;
 
 #ifndef NATIVE_BUILD
     WiFiClientSecure client;
@@ -131,6 +135,118 @@ bool GithubClient::getLatestRelease() {
     releaseAssets = 1;
     releaseAssetName[0] = "firmware.bin";
     releaseAssetURL[0] = "https://example.com/firmware.bin";
+    isPreRelease = false;
+    strcpy(lastErrorMsg, "SUCCESS");
+    return true;
+#endif
+}
+
+/**
+ * @brief Query releases and find the latest matching the specified channel.
+ *
+ * For "stable" (or empty/null), delegates to getLatestRelease().
+ * For "beta" or "dev", queries the /releases endpoint and scans for the
+ * first pre-release whose tag name contains the channel string.
+ *
+ * @param channel Channel to filter by ("stable", "beta", "dev")
+ * @return true if a matching release was found
+ */
+bool GithubClient::getLatestReleaseForChannel(const char* channel) {
+    // If channel is null, empty, or "stable", delegate to the existing method
+    if (channel == nullptr || channel[0] == '\0' || strcmp(channel, "stable") == 0) {
+        return getLatestRelease();
+    }
+
+    releaseId = "";
+    releaseDescription = "";
+    releaseAssets = 0;
+    isPreRelease = false;
+
+#ifndef NATIVE_BUILD
+    WiFiClientSecure client;
+    client.setCACert(githubRootCACert);
+    client.setTimeout(10000);
+
+    HTTPClient http;
+    http.begin(client, apiGetReleases);
+    http.addHeader("User-Agent", "esp32/1.0");
+    http.addHeader("X-GitHub-Api-Version", "2022-11-28");
+    http.addHeader("Accept", "application/vnd.github+json");
+    if (accessToken.length() > 0) {
+        http.addHeader("Authorization", "Bearer " + accessToken);
+    }
+
+    LOG_SECURE("GITHUB", "Requesting releases for channel '%s' from %s", channel, apiGetReleases.c_str());
+    int httpCode = http.GET();
+
+    if (httpCode != HTTP_CODE_OK) {
+        snprintf(lastErrorMsg, sizeof(lastErrorMsg), "HTTP request failed, error: %d", httpCode);
+        if (httpCode > 0) {
+            String payload = http.getString();
+            LOG_SECURE("GITHUB", "HTTP Response code: %d, payload: %s", httpCode, payload.c_str());
+        }
+        http.end();
+        return false;
+    }
+
+    // Filter document to reduce memory footprint
+    JsonDocument filter;
+    filter[0]["tag_name"] = true;
+    filter[0]["name"] = true;
+    filter[0]["prerelease"] = true;
+    filter[0]["assets"][0]["name"] = true;
+    filter[0]["assets"][0]["url"] = true;
+
+    JsonDocument doc;
+    DeserializationError error = deserializeJson(doc, http.getStream(), DeserializationOption::Filter(filter));
+
+    if (error) {
+        snprintf(lastErrorMsg, sizeof(lastErrorMsg), "JSON parse failed: %s", error.c_str());
+        LOG_SECURE("GITHUB", "JSON Parse Error: %s", error.c_str());
+        http.end();
+        return false;
+    }
+
+    // Scan releases for the first matching pre-release
+    JsonArray releases = doc.as<JsonArray>();
+    for (JsonObject release : releases) {
+        bool isPre = release["prerelease"] | false;
+        const char* tagName = release["tag_name"] | "";
+
+        if (isPre && strstr(tagName, channel) != nullptr) {
+            releaseId = tagName;
+            releaseDescription = release["name"] | "";
+            isPreRelease = true;
+
+            JsonArray assetsArray = release["assets"].as<JsonArray>();
+            for (JsonObject asset : assetsArray) {
+                if (releaseAssets >= MAX_RELEASE_ASSETS) break;
+                releaseAssetName[releaseAssets] = asset["name"] | "";
+                releaseAssetURL[releaseAssets] = asset["url"] | "";
+                if (releaseAssetName[releaseAssets].length() > 0 && releaseAssetURL[releaseAssets].length() > 0) {
+                    releaseAssets++;
+                }
+            }
+
+            http.end();
+            strcpy(lastErrorMsg, "SUCCESS");
+            LOG_SECURE("GITHUB", "Found matching pre-release: %s", tagName);
+            return true;
+        }
+    }
+
+    http.end();
+    snprintf(lastErrorMsg, sizeof(lastErrorMsg), "No matching pre-release for channel '%s'", channel);
+    LOG_SECURE("GITHUB", "No matching pre-release for channel '%s'", channel);
+    return false;
+#else
+    // Mock implementation for native testing — simulate a channel match
+    releaseId = String("v1.0.0-") + String(channel) + String(".1");
+    releaseDescription = "Mock Pre-Release";
+    releaseAssets = 1;
+    releaseAssetName[0] = "firmware.bin";
+    releaseAssetURL[0] = "https://example.com/firmware.bin";
+    isPreRelease = true;
     strcpy(lastErrorMsg, "SUCCESS");
     return true;
 #endif
