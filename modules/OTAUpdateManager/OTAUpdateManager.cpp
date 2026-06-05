@@ -54,6 +54,7 @@ static const char* TAG = "OTAUpdateManager";
 #include <Update.h>
 #include <esp_ota_ops.h>
 #include <WiFiClientSecure.h>
+#include <HTTPClient.h>
 #include <Preferences.h>
 #include "esp_task_wdt.h"
 #include "../Application/Application.hpp"
@@ -61,6 +62,7 @@ static const char* TAG = "OTAUpdateManager";
 #include "../../lib/OTADownloadEngine/OTADownloadEngine.hpp"
 #include "../../lib/OTADownloadEngine/MbedTLSSignatureVerifier.hpp"
 #include "../../lib/SemVer/SemVer.hpp"
+#include "../../lib/OTAManifest/OTAManifest.hpp"
 #else
 #include <ArduinoJson.h>
 #include "../Application/Application.hpp"
@@ -353,34 +355,149 @@ void OTAUpdateManager::performUpdateTask() {
     ESP_LOGI(TAG, "Found release: %s with %d assets",
              github.releaseId.c_str(), github.releaseAssets);
 
-    // --- Step 2: Find the .bin and .sig assets ---
+    // --- Step 2: Find firmware and signature assets (manifest-aware) ---
     String binUrl = "";
     String sigUrl = "";
     String binName = "";
 
+    // Check if this release contains a manifest.json
+    String manifestUrl = "";
     for (int i = 0; i < github.releaseAssets; i++) {
-        const String& name = github.releaseAssetName[i];
-        int nameLen = name.length();
+        if (strcmp(github.releaseAssetName[i].c_str(), "manifest.json") == 0) {
+            manifestUrl = github.releaseAssetURL[i];
+            ESP_LOGI(TAG, "Found manifest.json asset");
+            break;
+        }
+    }
 
-        // Check for .bin extension
-        if (nameLen > 4 &&
-            name[nameLen - 4] == '.' &&
-            name[nameLen - 3] == 'b' &&
-            name[nameLen - 2] == 'i' &&
-            name[nameLen - 1] == 'n') {
-            binUrl = github.releaseAssetURL[i];
-            binName = name;
-            ESP_LOGI(TAG, "Found firmware binary: %s", name.c_str());
+    if (!manifestUrl.isEmpty()) {
+        // --- Manifest path: download and parse manifest.json ---
+        ESP_LOGI(TAG, "Downloading manifest.json for board '%s'", BOARD_ID);
+
+        std::unique_ptr<WiFiClientSecure> manifestClient(new (std::nothrow) WiFiClientSecure());
+        if (!manifestClient) {
+            ESP_LOGE(TAG, "Failed to allocate WiFiClientSecure for manifest fetch");
+            publishProgress(0.0f, "Memory allocation failed", true, false);
+            state_ = OTAState::Error;
+            lastOtaError_ = "Manifest client allocation failed";
+            esp_task_wdt_delete(NULL);
+            return;
+        }
+        manifestClient->setInsecure();
+
+        HTTPClient http;
+        http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
+        String manifestToken = cfg.otaGithubToken ? cfg.otaGithubToken : "";
+
+        if (!http.begin(*manifestClient, manifestUrl)) {
+            ESP_LOGE(TAG, "HTTPClient.begin() failed for manifest URL");
+            publishProgress(0.0f, "Manifest download failed", true, false);
+            state_ = OTAState::Error;
+            lastOtaError_ = "Manifest HTTP begin failed";
+            esp_task_wdt_delete(NULL);
+            return;
         }
 
-        // Check for .sig extension
-        if (nameLen > 4 &&
-            name[nameLen - 4] == '.' &&
-            name[nameLen - 3] == 's' &&
-            name[nameLen - 2] == 'i' &&
-            name[nameLen - 1] == 'g') {
-            sigUrl = github.releaseAssetURL[i];
-            ESP_LOGI(TAG, "Found signature file: %s", name.c_str());
+        http.addHeader("Accept", "application/octet-stream");
+        if (!manifestToken.isEmpty()) {
+            http.addHeader("Authorization", String("Bearer ") + manifestToken);
+        }
+
+        int httpCode = http.GET();
+        if (httpCode != 200) {
+            ESP_LOGE(TAG, "Manifest download HTTP %d", httpCode);
+            http.end();
+            publishProgress(0.0f, "Manifest download failed", true, false);
+            state_ = OTAState::Error;
+            lastOtaError_ = "Manifest download HTTP error";
+            esp_task_wdt_delete(NULL);
+            return;
+        }
+
+        char manifestBuf[2048];
+        int payloadLen = http.getSize();
+        if (payloadLen <= 0 || payloadLen >= (int)sizeof(manifestBuf)) {
+            ESP_LOGE(TAG, "Manifest payload size invalid: %d", payloadLen);
+            http.end();
+            publishProgress(0.0f, "Manifest too large or empty", true, false);
+            state_ = OTAState::Error;
+            lastOtaError_ = "Manifest payload size invalid";
+            esp_task_wdt_delete(NULL);
+            return;
+        }
+
+        WiFiClient* stream = http.getStreamPtr();
+        int bytesRead = stream->readBytes(manifestBuf, payloadLen);
+        manifestBuf[bytesRead] = '\0';
+        http.end();
+
+        ESP_LOGI(TAG, "Manifest downloaded: %d bytes", bytesRead);
+
+        // Parse the manifest
+        OTAManifest manifest;
+        if (!parseManifest(manifestBuf, bytesRead, manifest)) {
+            ESP_LOGE(TAG, "Failed to parse manifest.json");
+            publishProgress(0.0f, "Manifest parse failed", true, false);
+            state_ = OTAState::Error;
+            lastOtaError_ = "Manifest JSON parse failed";
+            esp_task_wdt_delete(NULL);
+            return;
+        }
+
+        // Find the asset matching this board
+        const OTAAsset* boardAsset = findAssetForBoard(manifest, BOARD_ID);
+        if (boardAsset == nullptr) {
+            ESP_LOGE(TAG, "No firmware for board '%s' in manifest", BOARD_ID);
+            publishProgress(0.0f, "No firmware for this board in manifest", true, false);
+            state_ = OTAState::Error;
+            lastOtaError_ = "No firmware for this board in manifest";
+            esp_task_wdt_delete(NULL);
+            return;
+        }
+
+        ESP_LOGI(TAG, "Manifest: found asset for board '%s' — firmware='%s' sig='%s'",
+                 boardAsset->board, boardAsset->firmware, boardAsset->signature);
+
+        // Match manifest filenames to release asset URLs
+        for (int i = 0; i < github.releaseAssets; i++) {
+            if (strcmp(github.releaseAssetName[i].c_str(), boardAsset->firmware) == 0) {
+                binUrl = github.releaseAssetURL[i];
+                binName = github.releaseAssetName[i];
+                ESP_LOGI(TAG, "Matched firmware binary URL: %s", binName.c_str());
+            }
+            if (strcmp(github.releaseAssetName[i].c_str(), boardAsset->signature) == 0) {
+                sigUrl = github.releaseAssetURL[i];
+                ESP_LOGI(TAG, "Matched signature file URL: %s", github.releaseAssetName[i].c_str());
+            }
+        }
+    } else {
+        // --- Legacy fallback: no manifest.json found ---
+        ESP_LOGW(TAG, "No manifest.json found — using legacy asset search");
+
+        for (int i = 0; i < github.releaseAssets; i++) {
+            const String& name = github.releaseAssetName[i];
+            int nameLen = name.length();
+
+            // Check for .bin extension
+            if (nameLen > 4 &&
+                name[nameLen - 4] == '.' &&
+                name[nameLen - 3] == 'b' &&
+                name[nameLen - 2] == 'i' &&
+                name[nameLen - 1] == 'n') {
+                binUrl = github.releaseAssetURL[i];
+                binName = name;
+                ESP_LOGI(TAG, "Found firmware binary: %s", name.c_str());
+            }
+
+            // Check for .sig extension
+            if (nameLen > 4 &&
+                name[nameLen - 4] == '.' &&
+                name[nameLen - 3] == 's' &&
+                name[nameLen - 2] == 'i' &&
+                name[nameLen - 1] == 'g') {
+                sigUrl = github.releaseAssetURL[i];
+                ESP_LOGI(TAG, "Found signature file: %s", name.c_str());
+            }
         }
     }
 
