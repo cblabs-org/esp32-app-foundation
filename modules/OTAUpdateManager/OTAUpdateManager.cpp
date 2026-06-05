@@ -292,9 +292,9 @@ void OTAUpdateManager::performUpdate() {
     BaseType_t result = xTaskCreate(
         otaTaskWrapper,     // Task function
         "ota_update",       // Task name
-        8192,               // Stack size (bytes)
+        16384 * 2,          // Stack size (bytes) — TLS needs 12-16KB minimum + headroom
         this,               // Parameter — pointer to this instance
-        1,                  // Priority (low — background task)
+        5,                  // Priority (mid — needs timely TLS handshake)
         &taskHandle_        // Task handle output
     );
 
@@ -339,7 +339,9 @@ void OTAUpdateManager::otaTaskWrapper(void* param) {
 void OTAUpdateManager::performUpdateTask() {
 #ifndef NATIVE_BUILD
     ESP_LOGI(TAG, "OTA task started");
-    esp_task_wdt_add(NULL);  // Subscribe current task to TWDT
+    // Note: Do NOT subscribe this task to TWDT — TLS handshakes to
+    // api.github.com take 10+ seconds, exceeding the default 5-second
+    // WDT timeout. The OTA pipeline is inherently long-running.
     publishProgress(0.0f, "Checking for update...", false, false);
 
     const FrameworkConfig& cfg = app_->getConfig();
@@ -350,7 +352,6 @@ void OTAUpdateManager::performUpdateTask() {
         publishProgress(0.0f, "Firmware updates disabled", true, false);
         state_ = OTAState::Error;
         lastOtaError_ = "Firmware updates disabled";
-        esp_task_wdt_delete(NULL);
         return;
     }
 
@@ -360,7 +361,6 @@ void OTAUpdateManager::performUpdateTask() {
         publishProgress(0.0f, "No GitHub repo configured", true, false);
         state_ = OTAState::Error;
         lastOtaError_ = "No GitHub repo configured";
-        esp_task_wdt_delete(NULL);
         return;
     }
 
@@ -373,8 +373,9 @@ void OTAUpdateManager::performUpdateTask() {
         ESP_LOGE(TAG, "GitHub release query failed: %s", github.getLastError());
         publishProgress(0.0f, "GitHub query failed", true, false);
         state_ = OTAState::Error;
-        lastOtaError_ = "GitHub release query failed";
-        esp_task_wdt_delete(NULL);
+        static char ghErrBuf[128];
+        snprintf(ghErrBuf, sizeof(ghErrBuf), "GitHub query: %s", github.getLastError());
+        lastOtaError_ = ghErrBuf;
         return;
     }
 
@@ -406,7 +407,6 @@ void OTAUpdateManager::performUpdateTask() {
             publishProgress(0.0f, "Memory allocation failed", true, false);
             state_ = OTAState::Error;
             lastOtaError_ = "Manifest client allocation failed";
-            esp_task_wdt_delete(NULL);
             return;
         }
         manifestClient->setInsecure();
@@ -420,7 +420,6 @@ void OTAUpdateManager::performUpdateTask() {
             publishProgress(0.0f, "Manifest download failed", true, false);
             state_ = OTAState::Error;
             lastOtaError_ = "Manifest HTTP begin failed";
-            esp_task_wdt_delete(NULL);
             return;
         }
 
@@ -436,7 +435,6 @@ void OTAUpdateManager::performUpdateTask() {
             publishProgress(0.0f, "Manifest download failed", true, false);
             state_ = OTAState::Error;
             lastOtaError_ = "Manifest download HTTP error";
-            esp_task_wdt_delete(NULL);
             return;
         }
 
@@ -448,7 +446,6 @@ void OTAUpdateManager::performUpdateTask() {
             publishProgress(0.0f, "Manifest too large or empty", true, false);
             state_ = OTAState::Error;
             lastOtaError_ = "Manifest payload size invalid";
-            esp_task_wdt_delete(NULL);
             return;
         }
 
@@ -466,7 +463,6 @@ void OTAUpdateManager::performUpdateTask() {
             publishProgress(0.0f, "Manifest parse failed", true, false);
             state_ = OTAState::Error;
             lastOtaError_ = "Manifest JSON parse failed";
-            esp_task_wdt_delete(NULL);
             return;
         }
 
@@ -477,7 +473,6 @@ void OTAUpdateManager::performUpdateTask() {
             publishProgress(0.0f, "No firmware for this board in manifest", true, false);
             state_ = OTAState::Error;
             lastOtaError_ = "No firmware for this board in manifest";
-            esp_task_wdt_delete(NULL);
             return;
         }
 
@@ -532,7 +527,6 @@ void OTAUpdateManager::performUpdateTask() {
         publishProgress(0.0f, "No firmware binary in release", true, false);
         state_ = OTAState::Error;
         lastOtaError_ = "No firmware binary found in release";
-        esp_task_wdt_delete(NULL);
         return;
     }
 
@@ -541,7 +535,6 @@ void OTAUpdateManager::performUpdateTask() {
         publishProgress(0.0f, "Missing signature — update rejected", true, false);
         state_ = OTAState::Error;
         lastOtaError_ = "Missing .sig file — update rejected (fail-closed)";
-        esp_task_wdt_delete(NULL);
         return;
     }
 
@@ -561,7 +554,6 @@ void OTAUpdateManager::performUpdateTask() {
             publishProgress(0.0f, "Verifier initialization failed", true, false);
             state_ = OTAState::Error;
             lastOtaError_ = "Verifier initialization failed";
-            esp_task_wdt_delete(NULL);
             return;
         }
         verifierReady = true;
@@ -576,7 +568,6 @@ void OTAUpdateManager::performUpdateTask() {
         publishProgress(0.0f, "Memory allocation failed", true, false);
         state_ = OTAState::Error;
         lastOtaError_ = "WiFiClientSecure heap allocation failed";
-        esp_task_wdt_delete(NULL);
         return;
     }
     // GitHub CDN redirects use different certs than the API — use insecure
@@ -590,10 +581,12 @@ void OTAUpdateManager::performUpdateTask() {
     }
 
     // Set progress callback to forward to EventBus
+    // Download progress maps to 2%-100% range (0%-2% covers API/manifest/sig phases)
     engine.setProgressCallback([this](size_t bytesWritten, size_t totalSize) {
-        float progress = (totalSize > 0)
+        float rawProgress = (totalSize > 0)
             ? static_cast<float>(bytesWritten) / static_cast<float>(totalSize)
             : 0.0f;
+        float progress = 0.02f + (rawProgress * 0.98f); // 2% .. 100%
         publishProgress(progress, "Downloading firmware...", false, false);
     });
     ESP_LOGI(TAG, "Download engine configured");
@@ -610,14 +603,13 @@ void OTAUpdateManager::performUpdateTask() {
             publishProgress(0.0f, "Signature fetch failed — update rejected", true, false);
             state_ = OTAState::Error;
             lastOtaError_ = "Signature empty — update rejected (fail-closed)";
-            esp_task_wdt_delete(NULL);  // Unsubscribe before early return
             return;
         } else if (sigLen > 0) {
-            ESP_LOGI(TAG, "Fetched signature: %zu bytes", sigLen);
+            ESP_LOGI(TAG, "Fetched signature: %u bytes", (unsigned)sigLen);
         }
     }
 
-    publishProgress(0.1f, "Downloading firmware...", false, false);
+    publishProgress(0.02f, "Downloading firmware...", false, false);
 
     // --- Step 7: Download and flash firmware ---
     OTAError result = engine.downloadAndFlash(*client, binUrl, token, sigBuf, sigLen);
@@ -627,7 +619,6 @@ void OTAUpdateManager::performUpdateTask() {
         ESP_LOGE(TAG, "OTA download failed: %s", lastOtaError_);
         publishProgress(0.0f, lastOtaError_, true, false);
         state_ = OTAState::Error;
-        esp_task_wdt_delete(NULL);
         return;
     }
 
@@ -638,7 +629,6 @@ void OTAUpdateManager::performUpdateTask() {
     publishProgress(1.0f, "Update complete — rebooting...", true, true);
     ESP_LOGI(TAG, "OTA update complete — rebooting in 2 seconds");
 
-    esp_task_wdt_delete(NULL);  // Unsubscribe before reboot
     delay(2000);  // Allow event propagation and display update
     ESP.restart();
 #else
@@ -698,12 +688,12 @@ const char* OTAUpdateManager::getLastOtaError() const {
  * always returns false.
  */
 bool OTAUpdateManager::beginUpdate(size_t size, const char* expectedMD5) {
-    ESP_LOGI(TAG, "Beginning OTA update: size=%zu, MD5=%s",
+    ESP_LOGI(TAG, "Beginning OTA update: size=%u, MD5=%s",
              size, expectedMD5 ? expectedMD5 : "(none)");
 #ifndef NATIVE_BUILD
     // --- Step 1: Initialize the Update library ---
     if (!Update.begin(size)) {
-        ESP_LOGE(TAG, "Update.begin() failed for size %zu", size);
+        ESP_LOGE(TAG, "Update.begin() failed for size %u", (unsigned)size);
         return false;
     }
 
@@ -727,7 +717,7 @@ bool OTAUpdateManager::beginUpdate(size_t size, const char* expectedMD5) {
 size_t OTAUpdateManager::writeStream(Stream& dataStream) {
 #ifndef NATIVE_BUILD
     size_t written = Update.writeStream(dataStream);
-    ESP_LOGD(TAG, "writeStream: %zu bytes written", written);
+    ESP_LOGD(TAG, "writeStream: %u bytes written", (unsigned)written);
     return written;
 #else
     return 0;
@@ -860,15 +850,18 @@ void OTAUpdateManager::registerRoutes(AsyncWebServer& server) {
                     return;
                 } else if (strcmp(action, "checkGithub") == 0) {
                     ESP_LOGI(TAG, "GitHub OTA check triggered via API");
-                    bool updateAvailable = this->checkForUpdate();
-                    if (updateAvailable) {
-                        this->performUpdate();
-                        request->send(200, "application/json",
-                                      "{\"status\":\"ok\",\"msg\":\"Update started\"}");
-                    } else {
-                        request->send(200, "application/json",
-                                      "{\"status\":\"ok\",\"msg\":\"No update available\"}");
+                    // Reset any previous error state — explicit user action
+                    if (this->state_ == OTAState::Error) {
+                        this->state_ = OTAState::Idle;
+                        this->lastOtaError_ = nullptr;
                     }
+                    // Respond immediately — the full check+download runs
+                    // in a background FreeRTOS task. checkForUpdate() blocks
+                    // for 10+ seconds (TLS to api.github.com) and must NOT
+                    // run on the AsyncWebServer request thread.
+                    this->performUpdate();
+                    request->send(200, "application/json",
+                                  "{\"status\":\"ok\",\"msg\":\"OTA check started\"}");
                     return;
                 } else if (strcmp(action, "setChannel") == 0) {
                     const char* ch = doc["channel"] | "";
