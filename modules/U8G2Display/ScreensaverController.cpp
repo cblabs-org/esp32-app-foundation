@@ -196,7 +196,12 @@ void ScreensaverController::_dim(U8G2& display) {
 void ScreensaverController::_blank(U8G2& display) {
 #ifndef NATIVE_BUILD
     ESP_LOGI(TAG, "Display blanked (entering power save)");
-    display.setPowerSave(1);
+    // Blank by zeroing contrast rather than calling setPowerSave(1).
+    // setPowerSave() sends an SPI power-off command that triggers an MSPI
+    // bus fault on the UM NanoS3 when the display SPI shares MSPI timing
+    // with the OPI PSRAM bus. setContrast(0) is visually identical (screen
+    // appears off) and is safe on all supported targets.
+    display.setContrast(0);
 #endif
     _blanked = true;
 }
@@ -207,14 +212,12 @@ void ScreensaverController::_blank(U8G2& display) {
 void ScreensaverController::_wake(U8G2& display, uint8_t activeBrightness) {
 #ifndef NATIVE_BUILD
     ESP_LOGI(TAG, "Display waking from sleep");
-    if (_blanked) {
-        display.setPowerSave(0);
-    }
+    // Note: no setPowerSave(0) needed — blank used setContrast(0), not hardware power-save.
     display.setContrast(activeBrightness);
 #endif
     _dimmed = false;
     _blanked = false;
-    
+
     if (_board) {
         _board->deactivate();
     }
