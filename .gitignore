@@ -10,6 +10,7 @@ build/
 *.map
 include/portal_assets/
 managed_components/
+
 # Generated ESP-IDF configuration files
 sdkconfig
 sdkconfig.*

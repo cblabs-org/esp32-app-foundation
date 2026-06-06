@@ -214,7 +214,7 @@ void OTAUpdateManager::tick() {
     // --- Boot check: fire once, after Wi-Fi is confirmed connected ---
     if (!_hasBootChecked) {
         _hasBootChecked = true;
-        _silentCheck = true;  // Still silent — first boot may have marginal DNS
+        _silentCheck = true;  // Boot checks never show error modals
         ESP_LOGI(TAG, "Auto-check: boot trigger (Wi-Fi confirmed connected)");
         performUpdate();
         return;
