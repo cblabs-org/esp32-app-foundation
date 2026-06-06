@@ -87,4 +87,4 @@ All ──── WO8 (Documentation) ──── WO9 (E2E Validation)
 ---
 
 *Created by Principal Architect — 2026-06-01*
-*Updated: 2026-06-05 — PascalCase paths, OTA IConfigurable scope reduction, portal stub scope reduction, assessment findings*
+*Updated: 2026-06-06 — stash@{4} (pr-14 OTA workspace edits) reviewed and merged; PascalCase upstream version retained as canonical*

@@ -14,6 +14,9 @@
   - `mcpReadOnly` → `MCPServer` default
   This removes false coupling between `main.cpp` and module internals.
 
+- [ ] **Clarify `appconfig.js` portal tab scope** — A portal tab backed by `web/portal/appconfig.js` exists and is served/loaded, but its purpose relative to the FrameworkConfig refactor is unclear. Determine what configuration it surfaces, whether it duplicates or complements the planned module-level config migration, and whether it is feature-complete.
+  > 📦 **`stash@{2}`** (`580f2f5`, description: *"On main: portal-tab-wip"*) holds the integration plumbing (`appconfig.js` route + loader additions, rebuilt `app_js.hpp`). That plumbing appears **already incorporated into main** — but the stash was not formally dropped. Verify and drop once the tab's scope is confirmed.
+
 ---
 
 ## OTA
@@ -28,6 +31,7 @@
 
 - [ ] **Standardise "Advanced" sections** — The OTA Advanced card is correctly yellow and expanded. The Time module Advanced section is collapsed but blue. Rule: all Advanced sections across the portal should use the yellow warning style (`--warning`) AND be collapsed by default. Audit all tabs for Advanced sections and apply consistent treatment.
 - [ ] **Screensaver toggle switches always grey** — The on/off toggle switches for screensaver settings appear permanently grey and do not reflect state correctly. Investigate toggle styling and state binding in `display.js` / relevant CSS.
+  > 📦 **`stash@{1}`** (`34f07b6`, description: *"On main: remaining-unstaged"*) contains uncommitted `ScreensaverBoard.cpp/.hpp` and `U8G2DisplayModule.cpp` changes that may be the firmware-side fix for this. Apply and verify before investigating the portal toggle styling.
 
 ---
 
