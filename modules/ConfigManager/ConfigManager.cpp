@@ -51,7 +51,7 @@ void ConfigManager::getConfigPath(const char* ns, char* buf, size_t size) {
 #ifndef NATIVE_BUILD
     snprintf(buf, size, "/mod/%s.json", ns);
 #else
-    snprintf(buf, size, "mod_%s.json", ns);
+    snprintf(buf, size, "test/tmp/mod_%s.json", ns);
 #endif
 }
 
@@ -313,8 +313,8 @@ bool ConfigManager::saveModuleConfig(IConfigurable* module) {
 void ConfigManager::buildBackupMeta(JsonObject& meta) {
     meta["backup_version"] = 1;
 
-#ifdef APP_FOUNDATION_VERSION
-    meta["firmware_version"] = APP_FOUNDATION_VERSION;
+#ifdef BUILD_VERSION
+    meta["firmware_version"] = BUILD_VERSION;
 #else
     meta["firmware_version"] = "unknown";
 #endif

@@ -29,6 +29,9 @@
 
 #pragma once
 
+// Version — must be first; derives BUILD_VERSION from build flags
+#include "build_version.h"
+
 // Core framework headers — order matters for dependency resolution
 #include "AppState.hpp"
 #include "FrameworkConfig.hpp"

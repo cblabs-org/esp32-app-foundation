@@ -84,9 +84,10 @@ test.describe('OTA Update Sub-pill', () => {
     await page.route('**/api/ota', route => {
       const body = route.request().postData();
       if (body && body.includes('checkGithub')) {
-        return route.fulfill({ json: { msg: 'Update check started' } });
+        return route.fulfill({ json: { msg: 'OTA check started' } });
       }
       if (body && body.includes('status')) {
+        // Device is already up to date — returns to idle immediately
         return route.fulfill({ json: { state: 'idle', lastError: '' } });
       }
       return route.fulfill({ json: { status: 'ok' } });
@@ -100,38 +101,64 @@ test.describe('OTA Update Sub-pill', () => {
     // Click check for updates
     await checkBtn.click();
 
-    // Status should show the response message
-    await expect(statusEl).toContainText('Update check started');
+    // Polling detects idle → firmware is current → shows "Already up to date"
+    await expect(statusEl).toContainText('Already up to date');
+
+    // Progress bar should remain hidden (no download occurred)
+    await expect(page.locator('#ota-progress-wrapper')).toBeHidden();
   });
 
-  test('manual upload — file input accepts .bin, FormData POST to /update', async ({ page }) => {
+  test('manual upload — requires .bin + .sig, FormData POST to /api/ota/upload', async ({ page }) => {
     let uploadPostReceived = false;
 
-    await page.route('**/update', route => {
+    await page.route('**/api/ota/upload', route => {
       uploadPostReceived = true;
-      return route.fulfill({ json: { status: 'ok' } });
+      return route.fulfill({ json: { status: 'ok', msg: 'Firmware verified and flashed — rebooting' } });
     });
 
     await bootAndNavigateToOta(page);
 
-    // Set a .bin file on the file input
-    const fileInput = page.locator('#ota-file');
-    await fileInput.setInputFiles({
+    // Button should be disabled until both files selected
+    const uploadBtn = page.locator('#btn-ota-upload');
+    await expect(uploadBtn).toBeDisabled();
+
+    // Set the .bin file
+    await page.locator('#ota-file-bin').setInputFiles({
       name: 'firmware.bin',
       mimeType: 'application/octet-stream',
-      buffer: Buffer.from([0x00, 0x01, 0x02, 0x03]),
+      buffer: Buffer.from([0xE9, 0x01, 0x02, 0x03]),
     });
 
-    // Click Upload Firmware
-    await page.locator('#btn-ota-upload').click();
+    // Button still disabled — sig not provided yet
+    await expect(uploadBtn).toBeDisabled();
 
-    // Should show success
-    await expect(page.locator('#ota-upload-status')).toContainText('successful');
+    // Set the .sig file
+    await page.locator('#ota-file-sig').setInputFiles({
+      name: 'firmware.sig',
+      mimeType: 'application/octet-stream',
+      buffer: Buffer.from([0xAA, 0xBB, 0xCC, 0xDD]),
+    });
+
+    // Now button should be enabled
+    await expect(uploadBtn).toBeEnabled();
+
+    // Click Upload Firmware
+    await uploadBtn.click();
+
+    // Should show success from the server's msg field
+    await expect(page.locator('#ota-upload-status')).toContainText('verified');
     expect(uploadPostReceived).toBe(true);
   });
 
-  test('rollback button uses armed confirmation (3s timeout)', async ({ page }) => {
+  test('rollback button requires ROLLBACK confirmation prompt', async ({ page }) => {
+    let rollbackPostReceived = false;
     await page.route('**/api/ota', route => {
+      if (route.request().method() === 'POST') {
+        const data = route.request().postDataJSON();
+        if (data && data.action === 'rollback' && data.confirm === 'ROLLBACK') {
+          rollbackPostReceived = true;
+        }
+      }
       return route.fulfill({ json: { status: 'ok' } });
     });
 
@@ -140,14 +167,16 @@ test.describe('OTA Update Sub-pill', () => {
     const rollbackBtn = page.locator('#btn-ota-rollback');
     await expect(rollbackBtn).toContainText('Rollback to Previous');
 
-    // First click — arm
-    await rollbackBtn.click();
-    await expect(rollbackBtn).toContainText('Confirm Rollback?');
+    // Handle prompt
+    page.on('dialog', async dialog => {
+      expect(dialog.type()).toBe('prompt');
+      await dialog.accept('ROLLBACK');
+    });
 
-    // Second click — confirm
     await rollbackBtn.click();
     await expect(rollbackBtn).toContainText('Rolling back...');
     await expect(rollbackBtn).toBeDisabled();
+    expect(rollbackPostReceived).toBe(true);
   });
 
   test('error state — update check fails, shows error message', async ({ page }) => {

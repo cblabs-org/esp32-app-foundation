@@ -9,20 +9,20 @@ Description: Generates a manifest.json for OTA firmware distribution.
              OTA manifest schema.
 
 Usage:
-    python3 scripts/generate_manifest.py \\
-        --version v3.1.0 \\
-        --channel stable \\
-        --security-version 1 \\
-        --boards esp32dev,esp32s3nano \\
-        --firmware-dir ./artifacts/
+    python3 scripts/generate_manifest.py \
+        --version v3.1.0 \
+        --channel stable \
+        --security-version 1 \
+        --boards esp32dev,esp32s3nano \
+        --firmware-dir ./release/
 
     # Write to a file instead of stdout:
-    python3 scripts/generate_manifest.py \\
-        --version v3.1.0 \\
-        --channel stable \\
-        --security-version 1 \\
-        --boards esp32dev,esp32s3nano \\
-        --firmware-dir ./artifacts/ \\
+    python3 scripts/generate_manifest.py \
+        --version v3.1.0 \
+        --channel stable \
+        --security-version 1 \
+        --boards esp32dev,esp32s3nano \
+        --firmware-dir ./release/ \
         --output manifest.json
 
 Prerequisites: Python 3.8+

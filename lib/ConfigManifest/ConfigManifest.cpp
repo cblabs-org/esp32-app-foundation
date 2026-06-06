@@ -32,7 +32,7 @@ static const char* TAG = "ConfigManifest";
 #ifndef NATIVE_BUILD
 static constexpr const char* kManifestPath = "/config_manifest.json";
 #else
-static constexpr const char* kManifestPath = "config_manifest.json";
+static constexpr const char* kManifestPath = "test/tmp/config_manifest.json";
 #endif
 
 // =============================================================================

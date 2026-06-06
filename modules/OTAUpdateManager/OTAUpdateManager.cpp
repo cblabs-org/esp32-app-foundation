@@ -28,6 +28,7 @@
  *   - endUpdate():          Legacy: finalize the direct OTA update
  *   - markAppValid():       Bless the running firmware
  *   - rollbackFirmware():   Revert to the previous firmware partition
+ *   - handleSignedUpload():  Multipart upload handler with ECDSA verification
  *   - registerRoutes():     Register REST API route handlers
  *   - getConfigNamespace(): Return "ota" (IConfigurable)
  *   - getSchemaVersion():   Return 2 (IConfigurable)
@@ -95,11 +96,11 @@ const char* OTAUpdateManager::getConfigNamespace() const {
 /**
  * @brief Return the current schema version for the OTA config format.
  *
- * Version 2: adds "lastCheckedChannel" for implicit downgrade detection.
+ * Version 3: adds "checkHour" for daily scheduled updates.
  * Increment this when a future firmware change requires a config migration.
  */
 int OTAUpdateManager::getSchemaVersion() const {
-    return 2;
+    return 3;
 }
 
 /**
@@ -116,8 +117,10 @@ void OTAUpdateManager::applyConfig(const JsonObject& section) {
     _autoCheck = section["autoCheck"] | true;
     const char* lcc = section["lastCheckedChannel"] | "";
     strlcpy(_lastCheckedChannel, lcc, sizeof(_lastCheckedChannel));
-    ESP_LOGI(TAG, "Config applied — channel='%s' autoCheck=%d lastCheckedChannel='%s'",
-             _channel, (int)_autoCheck, _lastCheckedChannel);
+    _checkHour = section["checkHour"] | (uint8_t)3;
+    if (_checkHour > 23) _checkHour = 3; // Clamp invalid values
+    ESP_LOGI(TAG, "Config applied — channel='%s' autoCheck=%d checkHour=%u lastCheckedChannel='%s'",
+             _channel, (int)_autoCheck, (unsigned)_checkHour, _lastCheckedChannel);
 }
 
 /**
@@ -132,6 +135,7 @@ void OTAUpdateManager::serializeConfig(JsonObject& section) const {
     section["channel"]            = _channel;
     section["autoCheck"]          = _autoCheck;
     section["lastCheckedChannel"] = _lastCheckedChannel;
+    section["checkHour"]          = _checkHour;
 }
 
 /**
@@ -148,6 +152,10 @@ bool OTAUpdateManager::migrateConfig(JsonObject& section, int fromVersion) {
         section["lastCheckedChannel"] = "";
         ESP_LOGI(TAG, "Migrated OTA config v%d → v2: added lastCheckedChannel", fromVersion);
     }
+    if (fromVersion < 3) {
+        section["checkHour"] = 3;
+        ESP_LOGI(TAG, "Migrated OTA config v%d → v3: added checkHour=3", fromVersion);
+    }
     return true;
 }
 
@@ -162,7 +170,8 @@ void OTAUpdateManager::resetConfig() {
     strlcpy(_channel, "stable", sizeof(_channel));
     _autoCheck = true;
     _lastCheckedChannel[0] = '\0';
-    ESP_LOGI(TAG, "Config reset to defaults — channel='stable' autoCheck=true lastCheckedChannel=''");
+    _checkHour = 3;
+    ESP_LOGI(TAG, "Config reset to defaults — channel='stable' autoCheck=true checkHour=3 lastCheckedChannel=''");
 }
 
 
@@ -176,6 +185,47 @@ void OTAUpdateManager::resetConfig() {
 void OTAUpdateManager::begin(Application& app) {
     app_ = &app;
     ESP_LOGI(TAG, "OTA manager initialized with Application reference");
+}
+
+/**
+ * @brief Periodic tick — handles boot auto-check and daily scheduled check.
+ *
+ * Called by the Application main loop. Must complete in ≤10ms; all heavy
+ * work is deferred to the FreeRTOS task launched by performUpdate().
+ *
+ * Boot check: fires once on the first tick after entering Running state
+ *   (which guarantees Wi-Fi is connected) if autoCheck is enabled.
+ *
+ * Daily check: fires once per calendar day when the wall-clock hour
+ *   matches _checkHour and autoCheck is enabled. Requires NTP sync
+ *   (time() > 1 000 000).
+ */
+void OTAUpdateManager::tick() {
+    if (!_autoCheck || state_ != OTAState::Idle) return;
+
+    // --- Boot check: fire once on first tick (Wi-Fi confirmed connected) ---
+    if (!_hasBootChecked) {
+        _hasBootChecked = true;
+        ESP_LOGI(TAG, "Auto-check: boot trigger");
+        performUpdate();
+        return;
+    }
+
+#ifndef NATIVE_BUILD
+    // --- Daily scheduled check at _checkHour ---
+    time_t now = time(nullptr);
+    if (now < 1000000UL) return; // NTP not yet synced
+
+    struct tm t;
+    localtime_r(&now, &t);
+    uint32_t today = static_cast<uint32_t>(now / 86400);
+
+    if (static_cast<uint8_t>(t.tm_hour) == _checkHour && today > _lastCheckDay) {
+        _lastCheckDay = today;
+        ESP_LOGI(TAG, "Auto-check: daily trigger at hour %u", (unsigned)_checkHour);
+        performUpdate();
+    }
+#endif
 }
 
 /**
@@ -284,7 +334,6 @@ void OTAUpdateManager::performUpdate() {
     }
 
     state_ = OTAState::Downloading;
-    publishProgress(0.0f, "Starting OTA update...", false, false);
     ESP_LOGI(TAG, "Launching OTA update pipeline");
 
 #ifndef NATIVE_BUILD
@@ -342,7 +391,6 @@ void OTAUpdateManager::performUpdateTask() {
     // Note: Do NOT subscribe this task to TWDT — TLS handshakes to
     // api.github.com take 10+ seconds, exceeding the default 5-second
     // WDT timeout. The OTA pipeline is inherently long-running.
-    publishProgress(0.0f, "Checking for update...", false, false);
 
     const FrameworkConfig& cfg = app_->getConfig();
 
@@ -381,6 +429,24 @@ void OTAUpdateManager::performUpdateTask() {
 
     ESP_LOGI(TAG, "Found release: %s with %d assets",
              github.releaseId.c_str(), github.releaseAssets);
+
+    // --- Version guard: only proceed if remote > local ---
+    FirmwareVersion local = { VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH, Channel::STABLE, 0 };
+    FirmwareVersion remote = parseVersionTag(github.releaseId.c_str());
+
+    if (!(remote > local)) {
+        ESP_LOGI(TAG, "No update needed — local %d.%d.%d is current or newer than remote %s",
+                 VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH, github.releaseId.c_str());
+        // No publishProgress — don't show the OTA screen for a no-op check
+        state_ = OTAState::Idle;
+        return;
+    }
+
+    ESP_LOGI(TAG, "Update available: %s > %d.%d.%d — proceeding with download",
+             github.releaseId.c_str(), VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH);
+
+    // Only now show the OTA screen — a download will actually happen
+    publishProgress(0.0f, "Update found — preparing download...", false, false);
 
     // --- Step 2: Find firmware and signature assets (manifest-aware) ---
     String binUrl = "";
@@ -812,6 +878,179 @@ void OTAUpdateManager::rollbackFirmware() {
  *   POST /api/ota { "action": "checkGithub" } → check + perform update
  *   POST /api/ota { "action": "status" }   → current state + error
  */
+// ---------------------------------------------------------------------------
+// Signed Web Upload — POST /api/ota/upload (multipart: firmware + signature)
+// ---------------------------------------------------------------------------
+
+/**
+ * @brief Per-chunk multipart handler for signed firmware uploads.
+ *
+ * ESPAsyncWebServer invokes this callback once per chunk for each multipart
+ * field. The handler distinguishes between the "firmware" field (streamed
+ * directly into the Update partition with verifier accumulation) and the
+ * "signature" field (collected into uploadSigBuf_).
+ *
+ * Security contract (fail-closed):
+ *   - If otaPublicKey is configured and no signature bytes arrive → 400.
+ *   - If verify() returns false → 403, Update.abort() called.
+ *   - If the binary header magic (0xE9) is wrong → 400, Update.abort().
+ *
+ * State is reset at index == 0 of the "firmware" field so that the handler
+ * is safe across repeated upload attempts without a server restart.
+ *
+ * @param request  Incoming HTTP request context (used only for error responses).
+ * @param filename Multipart field name ("firmware" or "signature").
+ * @param index    Byte offset of this chunk within the field (0 = first chunk).
+ * @param data     Pointer to this chunk's bytes.
+ * @param len      Number of bytes in this chunk.
+ * @param final    True when this is the last chunk for this field.
+ */
+void OTAUpdateManager::handleSignedUpload(AsyncWebServerRequest* request,
+                                          const String& filename,
+                                          size_t index, uint8_t* data,
+                                          size_t len, bool final) {
+#ifndef NATIVE_BUILD
+    if (app_ == nullptr) {
+        ESP_LOGE(TAG, "Signed upload: app_ is null — module not initialized");
+        request->send(500, "application/json", "{\"status\":\"error\",\"msg\":\"OTA module not initialized\"}");
+        return;
+    }
+    const FrameworkConfig& cfg = app_->getConfig();
+
+    // ---- Signature field: collect bytes into uploadSigBuf_ ----
+    if (filename == "signature") {
+        if (index == 0) {
+            uploadSigLen_ = 0; // Reset on first chunk
+        }
+        size_t space = sizeof(uploadSigBuf_) - uploadSigLen_;
+        size_t toCopy = (len < space) ? len : space;
+        memcpy(uploadSigBuf_ + uploadSigLen_, data, toCopy);
+        uploadSigLen_ += toCopy;
+        return;
+    }
+
+    // ---- Firmware field ----
+    if (filename != "firmware") return; // Unknown field — ignore
+
+    if (uploadAborted_) return; // Already failed — drain remaining chunks silently
+
+    // --- First chunk: reset state and initialise verifier ---
+    if (index == 0) {
+        uploadAborted_  = false;
+        uploadBinSize_  = 0;
+
+        // Clean up any previous verifier
+        delete uploadVerifier_;
+        uploadVerifier_ = nullptr;
+
+        // Initialise MbedTLS verifier if a public key is configured
+        if (cfg.otaPublicKey != nullptr) {
+            uploadVerifier_ = new (std::nothrow) MbedTLSSignatureVerifier();
+            if (!uploadVerifier_ || !uploadVerifier_->begin(cfg.otaPublicKey)) {
+                ESP_LOGE(TAG, "Signed upload: verifier init failed");
+                delete uploadVerifier_;
+                uploadVerifier_ = nullptr;
+                uploadAborted_  = true;
+                request->send(500, "application/json",
+                              "{\"status\":\"error\",\"msg\":\"Verifier init failed\"}");
+                return;
+            }
+        }
+
+        // Validate ESP32 binary magic byte
+        if (len > 0 && data[0] != 0xE9) {
+            ESP_LOGE(TAG, "Signed upload: invalid binary header 0x%02X", data[0]);
+            uploadAborted_ = true;
+            request->send(400, "application/json",
+                          "{\"status\":\"error\",\"msg\":\"Invalid firmware header — not an ESP32 binary\"}");
+            return;
+        }
+
+        // Begin the flash update — size is unknown at this point so use OTA_SIZE_UNKNOWN
+        if (!Update.begin(UPDATE_SIZE_UNKNOWN)) {
+            ESP_LOGE(TAG, "Signed upload: Update.begin() failed");
+            uploadAborted_ = true;
+            request->send(500, "application/json",
+                          "{\"status\":\"error\",\"msg\":\"Update begin failed — insufficient space?\"}");
+            return;
+        }
+
+        ESP_LOGI(TAG, "Signed upload: started");
+    }
+
+    // --- Accumulate firmware bytes into verifier and flash ---
+    if (uploadVerifier_ != nullptr) {
+        uploadVerifier_->update(data, len);
+    }
+
+    if (Update.write(data, len) != len) {
+        ESP_LOGE(TAG, "Signed upload: Update.write() failed at offset %u",
+                 (unsigned)uploadBinSize_);
+        Update.abort();
+        uploadAborted_ = true;
+        delete uploadVerifier_;
+        uploadVerifier_ = nullptr;
+        request->send(500, "application/json",
+                      "{\"status\":\"error\",\"msg\":\"Flash write failed\"}");
+        return;
+    }
+
+    uploadBinSize_ += len;
+
+    // --- Final chunk: verify signature then finalise ---
+    if (final) {
+        // Fail-closed: public key configured → signature is mandatory
+        if (cfg.otaPublicKey != nullptr) {
+            if (uploadSigLen_ == 0) {
+                ESP_LOGE(TAG, "Signed upload: SECURITY ABORT — no signature provided");
+                Update.abort();
+                delete uploadVerifier_;
+                uploadVerifier_ = nullptr;
+                uploadAborted_  = true;
+                request->send(400, "application/json",
+                              "{\"status\":\"error\",\"msg\":\"Signature file required — upload both .bin and .sig\"}");
+                return;
+            }
+
+            if (uploadVerifier_ == nullptr ||
+                !uploadVerifier_->verify(uploadSigBuf_, uploadSigLen_)) {
+                ESP_LOGE(TAG, "Signed upload: ECDSA verification FAILED");
+                Update.abort();
+                delete uploadVerifier_;
+                uploadVerifier_ = nullptr;
+                uploadAborted_  = true;
+                request->send(403, "application/json",
+                              "{\"status\":\"error\",\"msg\":\"Signature verification failed — firmware rejected\"}");
+                return;
+            }
+
+            ESP_LOGI(TAG, "Signed upload: ECDSA verification PASSED (%u sig bytes, %u firmware bytes)",
+                     (unsigned)uploadSigLen_, (unsigned)uploadBinSize_);
+        } else {
+            ESP_LOGW(TAG, "Signed upload: no public key configured — signature check SKIPPED");
+        }
+
+        delete uploadVerifier_;
+        uploadVerifier_ = nullptr;
+
+        if (!Update.end(true /* set boot partition */)) {
+            ESP_LOGE(TAG, "Signed upload: Update.end() failed");
+            uploadAborted_ = true;
+            request->send(500, "application/json",
+                          "{\"status\":\"error\",\"msg\":\"Update finalisation failed\"}");
+            return;
+        }
+
+        ESP_LOGI(TAG, "Signed upload: complete — rebooting in 500ms");
+        request->send(200, "application/json", "{\"status\":\"ok\",\"msg\":\"Firmware verified and flashed — rebooting\"}");
+        delay(500);
+        ESP.restart();
+    }
+#else
+    (void)request; (void)filename; (void)index; (void)data; (void)len; (void)final;
+#endif
+}
+
 void OTAUpdateManager::registerRoutes(AsyncWebServer& server) {
 #ifndef NATIVE_BUILD
     // --- GET: status endpoint ---
@@ -877,6 +1116,36 @@ void OTAUpdateManager::registerRoutes(AsyncWebServer& server) {
                         request->send(400, "application/json", "{\"status\":\"error\",\"msg\":\"Invalid channel\"}");
                     }
                     return;
+                } else if (strcmp(action, "setAutoCheck") == 0) {
+                    if (doc["autoCheck"].is<bool>()) {
+                        this->_autoCheck = doc["autoCheck"].as<bool>();
+                        // Persist via ConfigManager
+                        if (this->app_ != nullptr) {
+                            this->app_->getConfigManager().saveModuleConfig(this);
+                        }
+                        ESP_LOGI(TAG, "Auto-check changed to: %d", (int)this->_autoCheck);
+                        request->send(200, "application/json", "{\"status\":\"ok\"}");
+                    } else {
+                        request->send(400, "application/json", "{\"status\":\"error\",\"msg\":\"Missing autoCheck boolean\"}");
+                    }
+                    return;
+                } else if (strcmp(action, "setCheckHour") == 0) {
+                    if (doc["checkHour"].is<int>()) {
+                        int h = doc["checkHour"].as<int>();
+                        if (h >= 0 && h <= 23) {
+                            this->_checkHour = static_cast<uint8_t>(h);
+                            if (this->app_ != nullptr) {
+                                this->app_->getConfigManager().saveModuleConfig(this);
+                            }
+                            ESP_LOGI(TAG, "Check hour changed to: %u", (unsigned)this->_checkHour);
+                            request->send(200, "application/json", "{\"status\":\"ok\"}");
+                        } else {
+                            request->send(400, "application/json", "{\"status\":\"error\",\"msg\":\"checkHour must be 0-23\"}");
+                        }
+                    } else {
+                        request->send(400, "application/json", "{\"status\":\"error\",\"msg\":\"Missing checkHour integer\"}");
+                    }
+                    return;
                 } else if (strcmp(action, "status") == 0) {
                     JsonDocument resp;
                     const char* stateStr = "unknown";
@@ -888,11 +1157,12 @@ void OTAUpdateManager::registerRoutes(AsyncWebServer& server) {
                         case OTAState::Complete:    stateStr = "complete"; break;
                         case OTAState::Error:       stateStr = "error"; break;
                     }
-                    resp["state"] = stateStr;
-                    resp["version"] = String(VERSION_MAJOR) + "." + String(VERSION_MINOR) + "." + String(VERSION_PATCH);
-                    resp["channel"] = this->_channel;
-                    resp["boardId"] = BOARD_ID;
+                    resp["state"]     = stateStr;
+                    resp["version"]   = String(VERSION_MAJOR) + "." + String(VERSION_MINOR) + "." + String(VERSION_PATCH);
+                    resp["channel"]   = this->_channel;
+                    resp["boardId"]   = BOARD_ID;
                     resp["autoCheck"] = this->_autoCheck;
+                    resp["checkHour"] = this->_checkHour;
                     if (this->lastOtaError_) {
                         resp["lastError"] = this->lastOtaError_;
                     }
@@ -904,6 +1174,23 @@ void OTAUpdateManager::registerRoutes(AsyncWebServer& server) {
             }
             request->send(400, "application/json",
                           "{\"status\":\"error\",\"msg\":\"Invalid action\"}");
+        }
+    );
+
+    // --- POST /api/ota/upload — signed multipart firmware upload ---
+    // Accepts multipart/form-data with fields:
+    //   "firmware"  — the compiled .bin binary
+    //   "signature" — the detached ECDSA .sig file
+    // Uses ArUploadHandlerFunction (4th arg) for multipart file data.
+    // The handler accumulates firmware bytes through MbedTLSSignatureVerifier
+    // and rejects the flash if the ECDSA signature does not verify.
+    server.on("/api/ota/upload", HTTP_POST,
+        [](AsyncWebServerRequest* request) {
+            // Completion handler — response already sent from handleSignedUpload().
+        },
+        [this](AsyncWebServerRequest* request, const String& filename,
+               size_t index, uint8_t* data, size_t len, bool final) {
+            this->handleSignedUpload(request, filename, index, data, len, final);
         }
     );
 #endif

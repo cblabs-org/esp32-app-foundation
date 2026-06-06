@@ -68,6 +68,9 @@ void OTAProgressBoard::setComplete(bool success) {
 
     if (_failed) {
         _statusLabel.setText("FAILED");
+#ifndef NATIVE_BUILD
+        _failedAtMs = millis();
+#endif
     }
 }
 
@@ -80,6 +83,7 @@ void OTAProgressBoard::reset() {
     _status[sizeof(_status) - 1] = '\0';
     _complete = false;
     _failed = false;
+    _failedAtMs = 0;
 
     // --- Reset widgets ---
     _progressBar.setPercent(0, 0);
@@ -122,7 +126,15 @@ void OTAProgressBoard::render(U8G2& u8g2) {
  *         Failed updates persist so the user can see the error state.
  */
 bool OTAProgressBoard::isExpired() const {
-    return _complete && !_failed;
+    if (!_complete) return false;
+    if (!_failed)   return true;   // Success → dismiss immediately
+
+    // Failure → dismiss after timeout so the user has time to read the error
+#ifndef NATIVE_BUILD
+    return (millis() - _failedAtMs) >= kFailureTimeoutMs;
+#else
+    return true;
+#endif
 }
 
 /**

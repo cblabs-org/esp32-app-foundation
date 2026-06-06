@@ -68,6 +68,7 @@ class Stream {};
 
 #include "../../include/interfaces/IWebContributor.hpp"
 #include "../../include/interfaces/IConfigurable.hpp"
+#include "../../include/interfaces/ITickable.hpp"
 
 // ---------------------------------------------------------------------------
 // Forward declarations — Hollywood Principle: never include other module headers
@@ -78,6 +79,7 @@ class GithubClient;
 class OTADownloadEngine;
 class IOTAVerifier;
 class MbedTLSSignatureVerifier;
+class AsyncWebServerRequest;
 
 // ---------------------------------------------------------------------------
 // OTA State Machine
@@ -134,7 +136,7 @@ struct OTAProgressEvent {
  *   - autoCheck          (bool):     Whether to auto-check for updates on boot
  *   - lastCheckedChannel (char[16]): Last channel used for an update check
  */
-class OTAUpdateManager : public IWebContributor, public IConfigurable {
+class OTAUpdateManager : public IWebContributor, public IConfigurable, public ITickable {
 public:
     /**
      * @brief Default constructor.
@@ -154,6 +156,9 @@ public:
      * @param app Reference to the Application composition root.
      */
     void begin(Application& app);
+
+    // --- ITickable ---
+    void tick() override;
 
     /**
      * @brief Check GitHub for a newer firmware version. Non-blocking.
@@ -324,14 +329,28 @@ private:
     // -------------------------------------------------------------------------
     // IConfigurable config state
     // -------------------------------------------------------------------------
-    char _channel[16] = "stable";           ///< OTA release channel ("stable", "beta", or "dev")
-    bool _autoCheck   = true;                ///< Whether to auto-check for updates on boot
-    char _lastCheckedChannel[16] = "";       ///< Last channel used for update check
+    char    _channel[16]            = "stable";
+    bool    _autoCheck              = true;
+    char    _lastCheckedChannel[16] = "";
+    uint8_t _checkHour              = 3;   ///< Hour (0-23) at which daily auto-check fires
+
+    // Scheduling state (not persisted — reset on each boot)
+    uint32_t _lastCheckDay   = 0;     ///< Unix day of last scheduled check (seconds/86400)
+    bool     _hasBootChecked = false; ///< Fires once on first tick after entering Running
 
     // -------------------------------------------------------------------------
     // Legacy state
     // -------------------------------------------------------------------------
     size_t expectedSize_ = 0;  // Tracks the total expected size for direct uploads
+
+    // -------------------------------------------------------------------------
+    // Signed web-upload state (per-request, reset at upload start)
+    // -------------------------------------------------------------------------
+    uint8_t  uploadSigBuf_[512] = {};   ///< Buffer for the .sig bytes from multipart upload
+    size_t   uploadSigLen_   = 0;        ///< Number of valid bytes in uploadSigBuf_
+    size_t   uploadBinSize_  = 0;        ///< Total firmware bytes received so far
+    bool     uploadAborted_  = false;    ///< Set true when a security check fails mid-upload
+    MbedTLSSignatureVerifier* uploadVerifier_ = nullptr; ///< Heap-allocated per upload, freed after use
 
     // -------------------------------------------------------------------------
     // Orchestrator state
@@ -386,5 +405,24 @@ private:
      * @param success  True if OTA succeeded.
      */
     void publishProgress(float progress, const char* status, bool complete, bool success);
+
+    /**
+     * @brief AsyncWebServer multipart upload handler for POST /api/ota/upload.
+     *
+     * Invoked per-chunk by ESPAsyncWebServer. Accumulates firmware bytes
+     * through MbedTLSSignatureVerifier::update() and collects the signature
+     * field bytes into uploadSigBuf_. On the final chunk, calls verify()
+     * before writing to flash with the Update library.
+     *
+     * @param request  Incoming HTTP request context.
+     * @param filename Multipart field name ("firmware" or "signature").
+     * @param index    Byte offset of this chunk within the field.
+     * @param data     Pointer to chunk data.
+     * @param len      Number of bytes in this chunk.
+     * @param final    True when this is the last chunk for this field.
+     */
+    void handleSignedUpload(AsyncWebServerRequest* request,
+                            const String& filename,
+                            size_t index, uint8_t* data, size_t len, bool final);
 };
 

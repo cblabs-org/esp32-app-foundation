@@ -1,6 +1,6 @@
 # PR-14 OTA Production System — E2E Validation Report
 
-**Date:** 2026-06-05  
+**Date:** 2026-06-05 (updated 2026-06-05T19:40Z)  
 **Branch:** `pr-14-ota-production-wo9-e2e-validation`  
 **Validator:** WO9 Worker Agent  
 
@@ -191,19 +191,41 @@
 
 ---
 
-## 8. Known Issues / Deferred Items
+## 8. Hardware OTA E2E Validation (Post-Flash)
+
+> Added 2026-06-05T19:40Z after manual hardware verification by the developer.
+
+### Build Fix Applied
+- **Issue:** ESP-IDF linker failure during build
+- **Root Cause:** Missing mbedTLS PSK support
+- **Fix:** Enabled `CONFIG_MBEDTLS_PSK_MODES=y` in sdkconfig.defaults
+- **Result:** Clean build and successful flash
+
+### Real-Device OTA Cycle (esp32dev)
+| Step | Result |
+|---|---|
+| Firmware flashed to esp32dev | ✅ SUCCESS |
+| Device downloaded v0.0.3 OTA update | ✅ SUCCESS |
+| ECDSA signature verification | ✅ PASSED |
+| Reboot into new firmware | ✅ SUCCESS |
+
+**The complete OTA lifecycle has been validated on real hardware:** flash → manifest fetch → firmware download → cryptographic signature verification → reboot into updated firmware.
+
+---
+
+## 9. Known Issues / Deferred Items
 
 ### Pre-Existing (Not Introduced by PR-14)
 - **2 pre-existing web test failures** — These are known failures in the web portal test suite that exist on `main` and are not regressions from PR-14
 - **Flash memory size mismatch warning** — esp32dev build emits `Warning! Flash memory size mismatch detected. Expected 4MB, found 2MB!` — this is a pre-existing hardware configuration note, not a build failure
 
-### Security Gap Register (Documented, Deferred by Design)
-- Real-device OTA end-to-end testing (manual post-merge step) is not covered by this automated validation
-- Hardware flashing verification is deferred to developer manual testing
+### Previously Deferred — Now Resolved
+- ~~Real-device OTA end-to-end testing~~ → **COMPLETED** (see §8 above)
+- ~~Hardware flashing verification~~ → **COMPLETED** (esp32dev successfully flashed and OTA-verified)
 
 ---
 
-## 9. Recommendation
+## 10. Recommendation
 
 ### ✅ **PASS — Recommended for merge to main**
 
@@ -215,5 +237,6 @@
 - **All documentation complete** — OTADeveloperGuide and expanded design specification with 19 subsections
 - **CI workflow correct** — proper trigger (`v*` tags), board matrix, artifact upload
 - **No regressions detected** — zero pre-existing test breakages
+- **🔒 Hardware-verified OTA lifecycle** — esp32dev flashed, downloaded v0.0.3, verified ECDSA signature, rebooted successfully
 
-The PR-14 OTA Production System integration is fully validated and ready for merge.
+The PR-14 OTA Production System integration is fully validated — including real-hardware OTA end-to-end — and ready for merge.

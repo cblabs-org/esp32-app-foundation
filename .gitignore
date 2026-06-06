@@ -27,9 +27,22 @@ test/web/playwright-report/
 test/web/dist/
 include/.DS_Store
 
-# Native test config artifacts written to project root by pio test -e native
-mod_*.json
+# Native test config artifacts
+test/tmp/*
+!test/tmp/.gitkeep
 
 # OTA signing artifacts
 private_key.pem
+public_key.pem
 *.sig
+*.sha256
+
+# OTA release staging directory
+release/
+
+# Legacy release artifacts in root (pre-cleanup)
+manifest.json
+
+# Generated OTA secrets (never commit)
+include/publicKey.hpp
+include/otaSecrets.hpp

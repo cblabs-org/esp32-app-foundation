@@ -18,6 +18,11 @@
  */
 
 #include "AppFoundation.h"
+#include "publicKey.hpp"
+
+#if __has_include("otaSecrets.hpp")
+#include "otaSecrets.hpp"
+#endif
 
 #ifndef NATIVE_BUILD
     #include <Arduino.h>
@@ -40,6 +45,12 @@ static Application app;  ///< Single framework hub instance
 void setup() {
     FrameworkConfig config;
     config.hostname = "esp32-foundation";
+    config.otaGithubRepo = "matthewmcneill/esp32-app-foundation";
+    config.otaPublicKey = (const char*)public_key_pem;
+
+    #ifdef OTA_GITHUB_TOKEN
+    config.otaGithubToken = OTA_GITHUB_TOKEN;
+    #endif
 
     if (!app.begin(config)) {
 #ifndef NATIVE_BUILD

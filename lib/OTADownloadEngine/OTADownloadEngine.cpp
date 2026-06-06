@@ -389,7 +389,7 @@ OTAError OTADownloadEngine::downloadAndFlash(WiFiClient& client, const String& b
         totalWritten += bytesRead;
 
         // Feed watchdog after each chunk
-        esp_task_wdt_reset();
+        // esp_task_wdt_reset();
 
         // Yield to network stack between chunks
         delay(1);

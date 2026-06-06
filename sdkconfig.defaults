@@ -79,7 +79,9 @@ CONFIG_MBEDTLS_KEY_EXCHANGE_RSA_PSK=n
 # PSK MUST be enabled — Arduino's ssl_client.cpp wraps ALL SSL functions
 # (ssl_init, start_ssl_client, etc.) inside #if MBEDTLS_KEY_EXCHANGE_SOME_PSK_ENABLED.
 # Disabling all PSK modes compiles out the entire SSL backend, breaking WiFiClientSecure.
+CONFIG_MBEDTLS_PSK_MODES=y
 CONFIG_MBEDTLS_KEY_EXCHANGE_PSK=y
+CONFIG_MBEDTLS_KEY_EXCHANGE_ECDHE_PSK=y
 
 # Disable RIPEMD-160 (framework uses SHA-256 and MD5 only)
 CONFIG_MBEDTLS_RIPEMD160_C=n
@@ -116,7 +118,7 @@ CONFIG_MBEDTLS_ECP_DP_BP512R1_ENABLED=n
 CONFIG_MBEDTLS_ECP_DP_SECP192K1_ENABLED=n
 CONFIG_MBEDTLS_ECP_DP_SECP224K1_ENABLED=n
 CONFIG_MBEDTLS_ECP_DP_SECP256K1_ENABLED=n
-CONFIG_MBEDTLS_ECP_DP_CURVE25519_ENABLED=n
+CONFIG_MBEDTLS_ECP_DP_CURVE25519_ENABLED=y
 
 # Disable WPS (WiFi Protected Setup — not used)
 CONFIG_ESP_WIFI_ENABLE_WPS=n
@@ -127,3 +129,4 @@ CONFIG_ESP_WIFI_ENABLE_WPS=n
 # enabling auto-rollback via the bootloader if the firmware
 # has not yet been blessed by markAppValid().
 CONFIG_ESP_TASK_WDT_PANIC=y
+CONFIG_MBEDTLS_ECP_DP_SECP256R1_ENABLED=y
