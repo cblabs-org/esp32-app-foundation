@@ -67,21 +67,22 @@ private:
 // ---------------------------------------------------------------------------
 // Release asset capacity
 //
-// Derived from board count rather than a magic number so that adding a new
-// board to BOARDS[] in deploy_release.py doesn't silently hit a hidden cap.
+// MAX_OTA_BOARDS is injected at build time by scripts/inject_version.py,
+// which reads [platformio] default_envs from platformio.ini.
+// That makes platformio.ini the single source of truth: adding a board to
+// default_envs automatically propagates to MAX_RELEASE_ASSETS here.
 //
-//   ASSETS_PER_BOARD  = .bin + .bin.sig + .bin.sha256  (3 files per board)
-//   SHARED_ASSETS     = manifest.json (+ any future shared files)
-//   MAX_OTA_BOARDS    = ceiling on supported boards in one release
+//   ASSETS_PER_BOARD = .bin + .bin.sig + .bin.sha256  (3 files per board)
+//   SHARED_ASSETS    = manifest.json (+ future shared files)
 //
-// At 8 boards: 8 × 3 + 2 = 26 → rounds up to MAX_RELEASE_ASSETS = 26.
-// Raise MAX_OTA_BOARDS if you add more boards.
+// Native builds do not run inject_version.py, so a safe fallback is provided.
 // ---------------------------------------------------------------------------
-static constexpr int MAX_OTA_BOARDS       = 8;
-static constexpr int ASSETS_PER_BOARD     = 3;
-static constexpr int SHARED_ASSETS        = 2;   // manifest.json + space for future
-static constexpr int MAX_RELEASE_ASSETS   = (MAX_OTA_BOARDS * ASSETS_PER_BOARD) + SHARED_ASSETS;
-// = 26
+#ifndef MAX_OTA_BOARDS
+#  define MAX_OTA_BOARDS 8   ///< Native-build fallback; hardware builds set this via -D
+#endif
+static constexpr int ASSETS_PER_BOARD   = 3;
+static constexpr int SHARED_ASSETS      = 2;
+static constexpr int MAX_RELEASE_ASSETS = (MAX_OTA_BOARDS * ASSETS_PER_BOARD) + SHARED_ASSETS;
 
 /**
  * @brief API client to interact with GitHub Releases securely.

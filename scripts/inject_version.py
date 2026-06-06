@@ -2,7 +2,7 @@
 ESP32 App Foundation (c) 2026 CB Labs
 
 PlatformIO pre-build script: scripts/inject_version.py
-Description: Single source of truth for build version flags.
+Description: Single source of truth for build version and board-count flags.
 
     Golden source: git tags on HEAD — all tags pointing at HEAD are read,
                    each is parsed as SemVer, and the highest version is
@@ -14,18 +14,49 @@ Description: Single source of truth for build version flags.
         -DVERSION_MAJOR=N
         -DVERSION_MINOR=N
         -DVERSION_PATCH=N
-        -DVERSION_CHANNEL=N   (0=dev, 2=beta, 3=rc, 15=stable)
+        -DVERSION_CHANNEL=N   (0=dev, 1=beta, 2=rc, 3=stable)
         -DVERSION_PRE_NUM=N
-        -DBUILD_VERSION="N.N.N"
+        -DBUILD_VERSION="N.N.N[-channel.pre]"
+        -DMAX_OTA_BOARDS=N    (count of hardware envs in platformio.ini default_envs)
 
-    No version flags should appear in platformio.ini — this script
-    is the sole owner.
+    No version or board-count flags should appear in platformio.ini —
+    this script is the sole owner.
 """
 
 Import("env")
 
+import configparser
 import subprocess
 import re
+
+
+def _count_ota_boards():
+    """Return the number of hardware build environments from platformio.ini.
+
+    Reads [platformio] default_envs, which is the canonical single declaration
+    of which boards are built and released. This count drives MAX_OTA_BOARDS
+    (and therefore MAX_RELEASE_ASSETS in GithubClient.hpp) so that adding a
+    board to platformio.ini is the only change required.
+
+    Returns a safe fallback of 8 if the file cannot be read.
+    """
+    cfg = configparser.ConfigParser()
+    try:
+        cfg.read("platformio.ini")
+        raw = cfg.get("platformio", "default_envs", fallback="")
+        boards = [e.strip() for e in raw.replace("\n", ",").split(",") if e.strip()]
+        count = len(boards)
+        if count == 0:
+            print("[inject_version] WARNING: default_envs is empty — "
+                  "defaulting MAX_OTA_BOARDS=8")
+            return 8
+        print(f"[inject_version] Board count from default_envs: {count} "
+              f"({', '.join(boards)})")
+        return count
+    except Exception as exc:
+        print(f"[inject_version] WARNING: could not read platformio.ini "
+              f"({exc}) — defaulting MAX_OTA_BOARDS=8")
+        return 8
 
 
 # SemVer tag pattern: v3.1.0 or v3.1.0-beta.1
@@ -146,18 +177,21 @@ def inject_version():
                 "-DVERSION_CHANNEL=",
                 "-DVERSION_PRE_NUM=",
                 "-DBUILD_VERSION=",
+                "-DMAX_OTA_BOARDS=",
                 "-DAPP_FOUNDATION_VERSION=",  # Legacy — remove if present
             ]
         )
     ]
 
+    board_count = _count_ota_boards()
     filtered.extend([
         f"-DVERSION_MAJOR={major}",
         f"-DVERSION_MINOR={minor}",
         f"-DVERSION_PATCH={patch}",
         f"-DVERSION_CHANNEL={channel}",
         f"-DVERSION_PRE_NUM={pre_num}",
-        f'-DBUILD_VERSION=\\"{version_str}\\"',
+        f'-DBUILD_VERSION=\\"{full_version_str}\\"',
+        f"-DMAX_OTA_BOARDS={board_count}",
     ])
 
     env.Replace(BUILD_FLAGS=filtered)
