@@ -157,10 +157,10 @@ def inject_version():
     chan_str = components["channel_str"]
     pre_num  = components["pre_num"]
 
-    version_str = f"{major}.{minor}.{patch}"
+    version_str      = f"{major}.{minor}.{patch}"
+    full_version_str = f"{version_str}-{chan_str}.{pre_num}" if chan_str else version_str
     print(
-        f"[inject_version] Building version: "
-        f"{version_str}-{chan_str or 'stable'}.{pre_num} "
+        f"[inject_version] Building version: {full_version_str} "
         f"(channel={channel})"
     )
 
