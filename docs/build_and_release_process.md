@@ -236,7 +236,7 @@ Each device independently selects its channel via the web portal:
 1. Open the device portal → navigate to **System → OTA**
 2. In the **Settings** card, use the **Update Channel** dropdown
 3. Select `Stable`, `Beta`, or `Dev`
-4. The setting is persisted to NVS — it survives reboots and OTA updates
+4. The setting is saved by `ConfigManager` to `/mod/ota.json` on LittleFS and survives reboots and OTA updates
 
 The device sends its subscribed channel to GitHub when checking for updates. The `GithubClient` filters releases by matching the channel label in the manifest before comparing versions.
 
