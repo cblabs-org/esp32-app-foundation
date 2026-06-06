@@ -140,7 +140,7 @@ void DiagnosticsBoard::tick(uint32_t currentMillis) {
     // --- Row 4: Free heap + firmware version ---
     uint32_t freeHeapKB = heap_caps_get_free_size(MALLOC_CAP_8BIT) / 1024;
     snprintf(_heapLine, sizeof(_heapLine), "Heap: %luKB  v%s",
-             (unsigned long)freeHeapKB, APP_FOUNDATION_VERSION);
+             (unsigned long)freeHeapKB, BUILD_VERSION);
     _row4.setText(_heapLine);
 #endif
 }

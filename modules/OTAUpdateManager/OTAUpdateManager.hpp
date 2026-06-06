@@ -45,9 +45,9 @@
  *   - getParentTab():         Return "System" for navigation hierarchy
  *   - getTabOrder():          Return 50 for pill ordering
  *
- *   IConfigurable (namespace: "ota", schema v1):
+ *   IConfigurable (namespace: "ota", schema v2):
  *   - getConfigNamespace():   Return "ota"
- *   - getSchemaVersion():     Return 1
+ *   - getSchemaVersion():     Return 2
  *   - applyConfig():          Apply OTA config from JSON section
  *   - serializeConfig():      Serialize OTA config to JSON section
  *   - migrateConfig():        Migrate from older schema version
@@ -68,6 +68,7 @@ class Stream {};
 
 #include "../../include/interfaces/IWebContributor.hpp"
 #include "../../include/interfaces/IConfigurable.hpp"
+#include "../../include/interfaces/ITickable.hpp"
 
 // ---------------------------------------------------------------------------
 // Forward declarations — Hollywood Principle: never include other module headers
@@ -78,6 +79,7 @@ class GithubClient;
 class OTADownloadEngine;
 class IOTAVerifier;
 class MbedTLSSignatureVerifier;
+class AsyncWebServerRequest;
 
 // ---------------------------------------------------------------------------
 // OTA State Machine
@@ -129,11 +131,12 @@ struct OTAProgressEvent {
  * from release check through download, verification, flash, and reboot.
  * Also retains the legacy direct-upload path for web-based OTA.
  *
- * IConfigurable fields (namespace: "ota", schema version: 1):
- *   - channel   (char[16]): OTA release channel ("stable" or "beta")
- *   - autoCheck (bool):     Whether to auto-check for updates on boot
+ * IConfigurable fields (namespace: "ota", schema version: 2):
+ *   - channel            (char[16]): OTA release channel ("stable", "beta", "dev")
+ *   - autoCheck          (bool):     Whether to auto-check for updates on boot
+ *   - lastCheckedChannel (char[16]): Last channel used for an update check
  */
-class OTAUpdateManager : public IWebContributor, public IConfigurable {
+class OTAUpdateManager : public IWebContributor, public IConfigurable, public ITickable {
 public:
     /**
      * @brief Default constructor.
@@ -153,6 +156,9 @@ public:
      * @param app Reference to the Application composition root.
      */
     void begin(Application& app);
+
+    // --- ITickable ---
+    void tick() override;
 
     /**
      * @brief Check GitHub for a newer firmware version. Non-blocking.
@@ -275,15 +281,16 @@ public:
 
     /**
      * @brief Return the current schema version for the OTA config format.
-     * @return 1 — initial schema version.
+     * @return 2 — adds lastCheckedChannel for implicit downgrade detection.
      */
     int getSchemaVersion() const override;
 
     /**
      * @brief Apply OTA configuration values from a parsed JSON section.
      *
-     * Reads "channel" and "autoCheck" from the provided section and applies
-     * them to the internal state. Missing keys fall back to safe defaults.
+     * Reads "channel", "autoCheck", and "lastCheckedChannel" from the
+     * provided section and applies them to internal state. Missing keys
+     * fall back to safe defaults.
      *
      * @param section Read-only reference to the JSON object containing config keys.
      */
@@ -292,8 +299,8 @@ public:
     /**
      * @brief Serialize current OTA configuration into a JSON section.
      *
-     * Writes "channel" and "autoCheck" into the provided section for
-     * persistence by ConfigManager.
+     * Writes "channel", "autoCheck", and "lastCheckedChannel" into the
+     * provided section for persistence by ConfigManager.
      *
      * @param section Mutable reference to the target JSON object.
      */
@@ -302,19 +309,19 @@ public:
     /**
      * @brief Migrate OTA configuration from an older schema version.
      *
-     * Logs the migration attempt and returns true (no migration logic required
-     * at schema version 1). Override in future versions when fields change.
+     * Handles v1→v2 migration by adding the lastCheckedChannel field.
      *
      * @param section   Mutable reference to the JSON config section.
      * @param fromVersion The stored schema version being migrated from.
-     * @return true — migration always succeeds for v1.
+     * @return true on success.
      */
     bool migrateConfig(JsonObject& section, int fromVersion) override;
 
     /**
      * @brief Reset OTA configuration to factory defaults.
      *
-     * Sets channel to "stable" and autoCheck to true.
+     * Sets channel to "stable", autoCheck to true, and clears
+     * lastCheckedChannel.
      */
     void resetConfig() override;
 
@@ -322,13 +329,28 @@ private:
     // -------------------------------------------------------------------------
     // IConfigurable config state
     // -------------------------------------------------------------------------
-    char _channel[16] = "stable";  ///< OTA release channel ("stable" or "beta")
-    bool _autoCheck   = true;      ///< Whether to auto-check for updates on boot
+    char    _channel[16]            = "stable";
+    bool    _autoCheck              = true;
+    char    _lastCheckedChannel[16] = "";
+    uint8_t _checkHour              = 3;   ///< Hour (0-23) at which daily auto-check fires
+
+    // Scheduling state (not persisted — reset on each boot)
+    uint32_t _lastCheckDay   = 0;     ///< Unix day of last scheduled check (seconds/86400)
+    bool     _hasBootChecked = false; ///< Fires once on first tick after entering Running
 
     // -------------------------------------------------------------------------
     // Legacy state
     // -------------------------------------------------------------------------
     size_t expectedSize_ = 0;  // Tracks the total expected size for direct uploads
+
+    // -------------------------------------------------------------------------
+    // Signed web-upload state (per-request, reset at upload start)
+    // -------------------------------------------------------------------------
+    uint8_t  uploadSigBuf_[512] = {};   ///< Buffer for the .sig bytes from multipart upload
+    size_t   uploadSigLen_   = 0;        ///< Number of valid bytes in uploadSigBuf_
+    size_t   uploadBinSize_  = 0;        ///< Total firmware bytes received so far
+    bool     uploadAborted_  = false;    ///< Set true when a security check fails mid-upload
+    MbedTLSSignatureVerifier* uploadVerifier_ = nullptr; ///< Heap-allocated per upload, freed after use
 
     // -------------------------------------------------------------------------
     // Orchestrator state
@@ -363,6 +385,15 @@ private:
     void performUpdateTask();
 
     /**
+     * @brief Check and update the NVS security version counter.
+     *
+     * Compares the compile-time SECURITY_VERSION against the stored NVS
+     * value. Updates NVS if the compiled version is higher. Called from
+     * markAppValid() before blessing the partition.
+     */
+    void checkSecurityVersion();
+
+    /**
      * @brief Publish an OTA progress event to the EventBus.
      *
      * Creates an OTAProgressEvent on the stack and publishes it on the
@@ -374,5 +405,24 @@ private:
      * @param success  True if OTA succeeded.
      */
     void publishProgress(float progress, const char* status, bool complete, bool success);
+
+    /**
+     * @brief AsyncWebServer multipart upload handler for POST /api/ota/upload.
+     *
+     * Invoked per-chunk by ESPAsyncWebServer. Accumulates firmware bytes
+     * through MbedTLSSignatureVerifier::update() and collects the signature
+     * field bytes into uploadSigBuf_. On the final chunk, calls verify()
+     * before writing to flash with the Update library.
+     *
+     * @param request  Incoming HTTP request context.
+     * @param filename Multipart field name ("firmware" or "signature").
+     * @param index    Byte offset of this chunk within the field.
+     * @param data     Pointer to chunk data.
+     * @param len      Number of bytes in this chunk.
+     * @param final    True when this is the last chunk for this field.
+     */
+    void handleSignedUpload(AsyncWebServerRequest* request,
+                            const String& filename,
+                            size_t index, uint8_t* data, size_t len, bool final);
 };
 

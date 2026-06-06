@@ -120,7 +120,7 @@ void U8G2DisplayModule::bootstrapHardware() {
              _brightness, _flipScreen ? "yes" : "no");
 
     // --- Step 4: Show boot splash with fade-in ---
-    _bootBoard.activate(APP_FOUNDATION_VERSION);
+    _bootBoard.activate(BUILD_VERSION);
     showModal(&_bootBoard);
     _renderCurrentBoard();
 
@@ -195,7 +195,7 @@ void U8G2DisplayModule::begin(EventBus* eventBus) {
 
     // --- Step 3: Activate boot splash (skip if bootstrapped — already shown) ---
     if (!_bootstrapMode) {
-        _bootBoard.activate(APP_FOUNDATION_VERSION);
+        _bootBoard.activate(BUILD_VERSION);
         showModal(&_bootBoard);
     }
 

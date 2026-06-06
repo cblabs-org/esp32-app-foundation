@@ -211,7 +211,7 @@ void MCPServer::_handleInitialize(const JsonDocument& req, Print& out) {
     // Server identity uses the compile-time version macro
     JsonObject serverInfo = result["serverInfo"].to<JsonObject>();
     serverInfo["name"]    = "esp32-app-foundation";
-    serverInfo["version"] = APP_FOUNDATION_VERSION;
+    serverInfo["version"] = BUILD_VERSION;
 
     // Capabilities: we support tool listing but not dynamic listChanged
     JsonObject capabilities = result["capabilities"].to<JsonObject>();

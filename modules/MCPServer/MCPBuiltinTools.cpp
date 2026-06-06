@@ -223,7 +223,7 @@ void mcpBuiltinTools::registerAll(MCPToolRegistry& registry,
                 result["time_posix"]         = "";
                 result["time_sync_status"]   = "UNSYNCED";
             #endif
-            result["firmware_version"] = APP_FOUNDATION_VERSION;
+            result["firmware_version"] = BUILD_VERSION;
         }
     );
 

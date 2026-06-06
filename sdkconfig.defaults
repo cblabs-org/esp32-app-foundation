@@ -16,8 +16,9 @@ CONFIG_LITTLEFS_FOR_IDF_3_2=y
 # Disable Bluetooth to reclaim ~70KB RAM (not needed for this framework)
 CONFIG_BT_ENABLED=n
 
-# HTTPS/TLS — mbedTLS heap-friendly settings
-CONFIG_MBEDTLS_SSL_IN_CONTENT_LEN=8192
+# HTTPS/TLS — mbedTLS settings
+# Input buffer MUST be 16384 to accept full TLS records from CDNs (GitHub objects.githubusercontent.com)
+CONFIG_MBEDTLS_SSL_IN_CONTENT_LEN=16384
 CONFIG_MBEDTLS_SSL_OUT_CONTENT_LEN=4096
 
 # FreeRTOS tick rate
@@ -78,13 +79,22 @@ CONFIG_MBEDTLS_KEY_EXCHANGE_RSA_PSK=n
 # PSK MUST be enabled — Arduino's ssl_client.cpp wraps ALL SSL functions
 # (ssl_init, start_ssl_client, etc.) inside #if MBEDTLS_KEY_EXCHANGE_SOME_PSK_ENABLED.
 # Disabling all PSK modes compiles out the entire SSL backend, breaking WiFiClientSecure.
+CONFIG_MBEDTLS_PSK_MODES=y
 CONFIG_MBEDTLS_KEY_EXCHANGE_PSK=y
+CONFIG_MBEDTLS_KEY_EXCHANGE_ECDHE_PSK=y
 
 # Disable RIPEMD-160 (framework uses SHA-256 and MD5 only)
 CONFIG_MBEDTLS_RIPEMD160_C=n
 
 # Disable IPv6 — framework is IPv4-only
 CONFIG_LWIP_IPV6=n
+
+# TCP window sizing for OTA downloads — the default 5760 (4×MSS) is too small.
+# During Update.write() flash operations (~20-200ms), the ESP32 can't ACK data.
+# A 5.7KB window fills in one packet, the server stalls, and drops the connection.
+CONFIG_LWIP_TCP_WND_DEFAULT=32768
+CONFIG_LWIP_TCP_SND_BUF_DEFAULT=16384
+CONFIG_LWIP_TCP_RECVMBOX_SIZE=12
 
 # --- PR-10 WO4: Final sweep ---
 
@@ -96,10 +106,11 @@ CONFIG_MBEDTLS_CHACHA20_C=n
 CONFIG_MBEDTLS_POLY1305_C=n
 CONFIG_MBEDTLS_CHACHAPOLY_C=n
 
-# Disable unused ECC curves — keep only secp256r1 (P-256, standard TLS curve)
+# Disable unused ECC curves — keep secp256r1 (P-256) and secp384r1 (P-384)
+# P-384 is required by GitHub's Sectigo Root E46 CA certificate (since 2026)
 CONFIG_MBEDTLS_ECP_DP_SECP192R1_ENABLED=n
 CONFIG_MBEDTLS_ECP_DP_SECP224R1_ENABLED=n
-CONFIG_MBEDTLS_ECP_DP_SECP384R1_ENABLED=n
+CONFIG_MBEDTLS_ECP_DP_SECP384R1_ENABLED=y
 CONFIG_MBEDTLS_ECP_DP_SECP521R1_ENABLED=n
 CONFIG_MBEDTLS_ECP_DP_BP256R1_ENABLED=n
 CONFIG_MBEDTLS_ECP_DP_BP384R1_ENABLED=n
@@ -107,7 +118,15 @@ CONFIG_MBEDTLS_ECP_DP_BP512R1_ENABLED=n
 CONFIG_MBEDTLS_ECP_DP_SECP192K1_ENABLED=n
 CONFIG_MBEDTLS_ECP_DP_SECP224K1_ENABLED=n
 CONFIG_MBEDTLS_ECP_DP_SECP256K1_ENABLED=n
-CONFIG_MBEDTLS_ECP_DP_CURVE25519_ENABLED=n
+CONFIG_MBEDTLS_ECP_DP_CURVE25519_ENABLED=y
 
 # Disable WPS (WiFi Protected Setup — not used)
 CONFIG_ESP_WIFI_ENABLE_WPS=n
+
+# --- PR-14: OTA production hardening ---
+
+# Task watchdog panic — triggers reboot on hung OTA downloads,
+# enabling auto-rollback via the bootloader if the firmware
+# has not yet been blessed by markAppValid().
+CONFIG_ESP_TASK_WDT_PANIC=y
+CONFIG_MBEDTLS_ECP_DP_SECP256R1_ENABLED=y

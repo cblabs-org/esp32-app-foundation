@@ -113,7 +113,7 @@ public:
      * @brief Execute the full framework boot sequence.
      *
      * Ordered steps:
-     *   1. Log boot banner with APP_FOUNDATION_VERSION
+     *   1. Log boot banner with BUILD_VERSION
      *   2. Set state to BOOT
      *   3. EventBus.begin() — first service, zero deps, enables boot-time events
      *   4. Mount LittleFS (hardware only; stubbed in NATIVE_BUILD)

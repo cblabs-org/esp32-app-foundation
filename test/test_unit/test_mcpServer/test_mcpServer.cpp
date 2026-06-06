@@ -199,9 +199,9 @@ TEST(McpBuiltinToolsTest, SystemInfoReturnsData) {
     JsonObject resultObj = resultDoc.to<JsonObject>();
     tool->handler(args, resultObj);
 
-    // Must contain firmware_version (the APP_FOUNDATION_VERSION macro)
+    // Must contain firmware_version (the BUILD_VERSION macro)
     EXPECT_TRUE(resultObj["firmware_version"].is<const char*>());
-    EXPECT_STREQ(resultObj["firmware_version"].as<const char*>(), APP_FOUNDATION_VERSION);
+    EXPECT_STREQ(resultObj["firmware_version"].as<const char*>(), BUILD_VERSION);
 }
 
 /** get_config with null configManager must return an error in result. */
@@ -387,7 +387,7 @@ TEST(McpServerTest, ToolsCallKnownToolReturnsResult) {
     ASSERT_NE(innerText, nullptr);
     JsonDocument innerDoc;
     ASSERT_FALSE(deserializeJson(innerDoc, innerText));
-    EXPECT_STREQ(innerDoc["firmware_version"].as<const char*>(), APP_FOUNDATION_VERSION);
+    EXPECT_STREQ(innerDoc["firmware_version"].as<const char*>(), BUILD_VERSION);
 }
 
 /** Invalid JSON input must return parse error code -32700. */

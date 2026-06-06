@@ -51,7 +51,7 @@ void ConfigManager::getConfigPath(const char* ns, char* buf, size_t size) {
 #ifndef NATIVE_BUILD
     snprintf(buf, size, "/mod/%s.json", ns);
 #else
-    snprintf(buf, size, "mod_%s.json", ns);
+    snprintf(buf, size, "test/tmp/mod_%s.json", ns);
 #endif
 }
 
@@ -116,9 +116,17 @@ void ConfigManager::beginAll() {
 
     ESP_LOGI(TAG, "beginAll() — loading config for %d module(s)", (int)_modules.size());
 
+    // Load the Three-Tier config manifest (no-op on first boot)
+    _manifest.load();
+
     for (IConfigurable* mod : _modules) {
         loadModuleConfig(mod);
+        // Update the Active slot after each module's config is successfully applied
+        _manifest.updateActive(mod->getConfigNamespace(), mod->getSchemaVersion());
     }
+
+    // Persist the updated manifest with current Active versions
+    _manifest.save();
 
     ESP_LOGI(TAG, "beginAll() complete");
 }
@@ -305,8 +313,8 @@ bool ConfigManager::saveModuleConfig(IConfigurable* module) {
 void ConfigManager::buildBackupMeta(JsonObject& meta) {
     meta["backup_version"] = 1;
 
-#ifdef APP_FOUNDATION_VERSION
-    meta["firmware_version"] = APP_FOUNDATION_VERSION;
+#ifdef BUILD_VERSION
+    meta["firmware_version"] = BUILD_VERSION;
 #else
     meta["firmware_version"] = "unknown";
 #endif

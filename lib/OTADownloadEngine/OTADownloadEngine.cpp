@@ -99,6 +99,7 @@ const char* OTADownloadEngine::getLastErrorString() const {
 #include <HTTPClient.h>
 #include <Update.h>
 #include <Esp.h>
+#include "esp_task_wdt.h"
 
 /**
  * @brief Follow HTTP redirects and return the final response code.
@@ -214,12 +215,12 @@ size_t OTADownloadEngine::fetchSignature(WiFiClient& client, const String& sigUr
     http.end();
 
     if (bytesRead != static_cast<size_t>(contentLen)) {
-        ESP_LOGE(TAG, "Signature read incomplete — got %zu of %d bytes", bytesRead, contentLen);
+        ESP_LOGE(TAG, "Signature read incomplete — got %u of %d bytes", (unsigned)bytesRead, contentLen);
         lastError_ = OTAError::SignatureFetchFailed;
         return 0;
     }
 
-    ESP_LOGI(TAG, "Signature fetched successfully (%zu bytes)", bytesRead);
+    ESP_LOGI(TAG, "Signature fetched successfully (%u bytes)", (unsigned)bytesRead);
     return bytesRead;
 }
 
@@ -310,6 +311,7 @@ OTAError OTADownloadEngine::downloadAndFlash(WiFiClient& client, const String& b
 
     // --- Step 5: Verify ESP32 binary header ---
     WiFiClient* tcp = http.getStreamPtr();
+    tcp->setTimeout(15000); // 15s — generous for flash write stalls and TLS record gaps
     delay(200); // Brief delay to ensure stream buffer is populated (per departures-board pattern)
 
     if (tcp->peek() != 0xE9) {
@@ -337,7 +339,7 @@ OTAError OTADownloadEngine::downloadAndFlash(WiFiClient& client, const String& b
         progressCb_(0, static_cast<size_t>(contentLen));
     }
 
-    ESP_LOGI(TAG, "Streaming firmware (%d bytes) in %zu-byte chunks...", contentLen, kChunkSize);
+    ESP_LOGI(TAG, "Streaming firmware (%d bytes) in %u-byte chunks...", contentLen, (unsigned)kChunkSize);
 
     // --- Step 9: Chunked streaming write with verifier accumulation ---
     size_t totalWritten = 0;
@@ -347,10 +349,23 @@ OTAError OTADownloadEngine::downloadAndFlash(WiFiClient& client, const String& b
         size_t remaining = static_cast<size_t>(contentLen) - totalWritten;
         size_t bytesToRead = (remaining < kChunkSize) ? remaining : kChunkSize;
 
-        int bytesRead = tcp->readBytes(buf, bytesToRead);
+        // Wait for data with retry — TLS record boundaries can cause
+        // brief gaps where no decrypted data is immediately available
+        int bytesRead = 0;
+        unsigned long readDeadline = millis() + 15000; // 15s hard deadline
+
+        while (bytesRead == 0 && millis() < readDeadline) {
+            if (tcp->available()) {
+                bytesRead = tcp->readBytes(buf, bytesToRead);
+            } else {
+                delay(10); // yield to WiFi/TCP stack
+            }
+        }
 
         if (bytesRead <= 0) {
-            ESP_LOGE(TAG, "Stream read timeout at %zu/%d bytes", totalWritten, contentLen);
+            ESP_LOGE(TAG, "Stream read timeout at %u/%d bytes (%.1f%%)",
+                     (unsigned)totalWritten, contentLen,
+                     (totalWritten * 100.0f) / contentLen);
             Update.abort();
             http.end();
             lastError_ = OTAError::StreamReadTimeout;
@@ -364,7 +379,7 @@ OTAError OTADownloadEngine::downloadAndFlash(WiFiClient& client, const String& b
 
         // Write chunk to OTA partition
         if (Update.write(buf, bytesRead) != static_cast<size_t>(bytesRead)) {
-            ESP_LOGE(TAG, "Update.write() failed at offset %zu", totalWritten);
+            ESP_LOGE(TAG, "Update.write() failed at offset %u", (unsigned)totalWritten);
             Update.abort();
             http.end();
             lastError_ = OTAError::UpdateWriteFailed;
@@ -372,6 +387,12 @@ OTAError OTADownloadEngine::downloadAndFlash(WiFiClient& client, const String& b
         }
 
         totalWritten += bytesRead;
+
+        // Feed watchdog after each chunk
+        // esp_task_wdt_reset();
+
+        // Yield to network stack between chunks
+        delay(1);
 
         // Report progress
         if (progressCb_) {
@@ -381,16 +402,24 @@ OTAError OTADownloadEngine::downloadAndFlash(WiFiClient& client, const String& b
         // Debug milestone logging at 25% intervals
         size_t quarter = static_cast<size_t>(contentLen) / 4;
         if (quarter > 0 && totalWritten % quarter < kChunkSize) {
-            ESP_LOGD(TAG, "Progress: %zu/%d bytes (%d%%)",
-                     totalWritten, contentLen,
+            ESP_LOGD(TAG, "Progress: %u/%d bytes (%d%%)",
+                     (unsigned)totalWritten, contentLen,
                      static_cast<int>((totalWritten * 100) / contentLen));
         }
     }
 
-    ESP_LOGI(TAG, "Download complete — %zu bytes written to flash", totalWritten);
+    ESP_LOGI(TAG, "Download complete — %u bytes written to flash", (unsigned)totalWritten);
 
     // --- Step 10: Cryptographic signature verification ---
-    if (verifier_ != nullptr && sigBuf != nullptr && sigLen > 0) {
+    if (verifier_ != nullptr) {
+        // Fail closed: verifier is set, signature MUST be present
+        if (sigBuf == nullptr || sigLen == 0) {
+            ESP_LOGE(TAG, "SECURITY ABORT: Verifier configured but no signature provided — aborting");
+            Update.abort();
+            http.end();
+            lastError_ = OTAError::SignatureFetchFailed;
+            return lastError_;
+        }
         if (!verifier_->verify(sigBuf, sigLen)) {
             ESP_LOGE(TAG, "Cryptographic signature verification FAILED — update discarded securely");
             Update.abort();
@@ -399,8 +428,8 @@ OTAError OTADownloadEngine::downloadAndFlash(WiFiClient& client, const String& b
             return lastError_;
         }
         ESP_LOGI(TAG, "Cryptographic signature verification PASSED");
-    } else if (verifier_ == nullptr) {
-        ESP_LOGW(TAG, "Skipping signature verification — no verifier configured");
+    } else {
+        ESP_LOGW(TAG, "No OTA public key — signature verification SKIPPED (dev mode)");
     }
 
     // --- Step 11: Finalize update ---

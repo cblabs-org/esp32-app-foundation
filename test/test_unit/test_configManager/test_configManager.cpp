@@ -13,7 +13,7 @@
  *              schema version migration, and error handling.
  *
  *              All tests execute on the native GoogleTest runner (NATIVE_BUILD).
- *              Config files are written as "mod_<ns>.json" in the working directory.
+ *              Config files are written as "test/tmp/mod_<ns>.json" in the working directory.
  *
  * Exported Functions:
  * - main(): GoogleTest entry point
@@ -133,15 +133,15 @@ protected:
 
     void SetUp() override {
         // Clean up any leftover config files from previous test runs
-        remove("mod_testmod.json");
-        remove("mod_modB.json");
-        remove("mod_v2mod.json");
+        remove("test/tmp/mod_testmod.json");
+        remove("test/tmp/mod_modB.json");
+        remove("test/tmp/mod_v2mod.json");
     }
 
     void TearDown() override {
-        remove("mod_testmod.json");
-        remove("mod_modB.json");
-        remove("mod_v2mod.json");
+        remove("test/tmp/mod_testmod.json");
+        remove("test/tmp/mod_modB.json");
+        remove("test/tmp/mod_v2mod.json");
     }
 };
 
@@ -199,7 +199,7 @@ TEST_F(ConfigManagerTest, BeginAll_NoFile_CallsResetConfig) {
 
 TEST_F(ConfigManagerTest, BeginAll_WithFile_CallsApplyConfig) {
     // Pre-create a config file
-    std::ofstream file("mod_testmod.json");
+    std::ofstream file("test/tmp/mod_testmod.json");
     file << R"({"setting1":99,"setting2":true,"_v":1})";
     file.close();
 
@@ -213,7 +213,7 @@ TEST_F(ConfigManagerTest, BeginAll_WithFile_CallsApplyConfig) {
 }
 
 TEST_F(ConfigManagerTest, BeginAll_CorruptedFile_CallsResetConfig) {
-    std::ofstream file("mod_testmod.json");
+    std::ofstream file("test/tmp/mod_testmod.json");
     file << "{ invalid json : ";
     file.close();
 
@@ -249,7 +249,7 @@ TEST_F(ConfigManagerTest, SaveModuleConfig_ValidModule_CreatesFile) {
     EXPECT_TRUE(configManager.saveModuleConfig(&mod));
 
     // Verify file was created
-    std::ifstream file("mod_testmod.json");
+    std::ifstream file("test/tmp/mod_testmod.json");
     EXPECT_TRUE(file.is_open());
 }
 
@@ -282,7 +282,7 @@ TEST_F(ConfigManagerTest, SaveModuleConfig_IncludesSchemaVersion) {
     configManager.saveModuleConfig(&mod);
 
     // Read the file directly
-    std::ifstream file("mod_testmod.json");
+    std::ifstream file("test/tmp/mod_testmod.json");
     std::string jsonStr((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
     file.close();
 
@@ -297,7 +297,7 @@ TEST_F(ConfigManagerTest, SaveModuleConfig_IncludesSchemaVersion) {
 
 TEST_F(ConfigManagerTest, BeginAll_OldVersion_CallsMigrateConfig) {
     // Create a v1 config file for a module that declares v2
-    std::ofstream file("mod_v2mod.json");
+    std::ofstream file("test/tmp/mod_v2mod.json");
     file << R"({"old_value":55,"_v":1})";
     file.close();
 
@@ -312,7 +312,7 @@ TEST_F(ConfigManagerTest, BeginAll_OldVersion_CallsMigrateConfig) {
 
 TEST_F(ConfigManagerTest, BeginAll_CurrentVersion_DoesNotMigrate) {
     // Create a v2 config file (current version)
-    std::ofstream file("mod_v2mod.json");
+    std::ofstream file("test/tmp/mod_v2mod.json");
     file << R"({"value":42,"_v":2})";
     file.close();
 
@@ -370,7 +370,7 @@ TEST_F(ConfigManagerTest, ImportAllConfig_AppliesAndPersists) {
     EXPECT_TRUE(mod.setting2);
 
     // Verify persisted to disk
-    std::ifstream file("mod_testmod.json");
+    std::ifstream file("test/tmp/mod_testmod.json");
     EXPECT_TRUE(file.is_open());
 }
 

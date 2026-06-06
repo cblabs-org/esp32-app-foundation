@@ -85,7 +85,7 @@ bool Application::begin(const FrameworkConfig& config) {
 
     // --- Step 1: Boot banner ---
     // Print the firmware version so the first log line is always identifiable.
-    ESP_LOGI(TAG, "ESP32 App Foundation v%s — booting", APP_FOUNDATION_VERSION);
+    ESP_LOGI(TAG, "ESP32 App Foundation v%s — booting", BUILD_VERSION);
 
     // --- Step 2: Enter BOOT state ---
     setState(AppState::Boot);
@@ -191,6 +191,8 @@ bool Application::begin(const FrameworkConfig& config) {
 #ifndef NATIVE_BUILD
     _tickables.push_back(&_display);
 #endif
+    _tickables.push_back(_otaManager); // Boot auto-check + daily scheduled check
+
 
     // --- Step 15: WebServerManager + MCPServer begin() ---
     _webServerManager.begin(_webContributors);
@@ -217,6 +219,16 @@ bool Application::begin(const FrameworkConfig& config) {
     // No further registrations are permitted after this point.
     _compactAndLock();
     _statusReporter->reportStatus("Boot complete", 1.0f);
+
+    // --- Step 17b: Bless firmware (auto-rollback barrier) ---
+    // If the firmware crashes before reaching this point, the bootloader
+    // automatically reverts to the previous partition. This barrier covers:
+    // display bootstrap, EventBus, LittleFS, Crypto, Config, WiFi, Time,
+    // Data, OTA, Web, display integration, and registry lock.
+#ifndef NATIVE_BUILD
+    _otaManager->markAppValid();
+    ESP_LOGI(TAG, "✅ Firmware self-test PASSED — partition blessed");
+#endif
 
     // --- Step 18: Publish system heap event + heap report ---
 #ifndef NATIVE_BUILD

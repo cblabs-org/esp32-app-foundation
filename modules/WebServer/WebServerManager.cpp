@@ -266,7 +266,7 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors) 
         doc["uptime"] = millis() / 1000;
 
         // --- Firmware / Build info ---
-        doc["firmware_version"] = APP_FOUNDATION_VERSION;
+        doc["firmware_version"] = BUILD_VERSION;
         doc["build_serial"]     = __DATE__ " " __TIME__;
         doc["sdk_version"]      = ESP.getSdkVersion();
 
@@ -315,7 +315,7 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors) 
     _server.on("/api/app", HTTP_GET, [](AsyncWebServerRequest* request) {
         JsonDocument doc;
         doc["name"]    = APP_TITLE;
-        doc["version"] = APP_FOUNDATION_VERSION;
+        doc["version"] = BUILD_VERSION;
         String out;
         serializeJson(doc, out);
         request->send(200, "application/json", out);

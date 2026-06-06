@@ -10,7 +10,8 @@
  * Description: Display board for OTA firmware updates. Shows a progress bar,
  *              percentage text, and status message during the download phase.
  *              Marks itself as expired on successful completion so the carousel
- *              engine can auto-dismiss it. Failed updates persist until reset.
+ *              engine can auto-dismiss it. Failed updates auto-dismiss after
+ *              60 seconds to avoid permanently blocking the display.
  *
  * Exported Classes:
  * - OTAProgressBoard: OTA firmware update progress screen implementing IDisplayBoard
@@ -34,7 +35,7 @@
  * Displays a "Firmware Update" title via LabelWidget, a horizontal progress bar
  * with percentage text via ProgressBarWidget, and a status message via a second
  * LabelWidget. When the update completes successfully the board self-expires;
- * failed updates persist until manually reset so the user can see the error state.
+ * failed updates auto-dismiss after 60 seconds.
  */
 class OTAProgressBoard : public IDisplayBoard {
 public:
@@ -83,8 +84,8 @@ public:
 
     /**
      * @brief Query whether this board should be auto-dismissed.
-     * @return true when the update completed successfully; false if still
-     *         in progress or if the update failed (persist for user visibility).
+     * @return true when the update completed successfully, or when a failed
+     *         update has been displayed for the timeout period (60 seconds).
      */
     bool isExpired() const override;
 
@@ -97,8 +98,11 @@ public:
 private:
     float _progress = 0.0f;                            ///< Download fraction (0.0–1.0)
     char  _status[48] = "Checking for updates...";     ///< Current status text
-    bool  _complete = false;                            ///< True when OTA has finished
-    bool  _failed   = false;                            ///< True if OTA ended in failure
+    bool          _complete   = false;                  ///< True when OTA has finished
+    bool          _failed     = false;                  ///< True if OTA ended in failure
+    unsigned long _failedAtMs = 0;                      ///< millis() timestamp when failure was recorded
+
+    static constexpr unsigned long kFailureTimeoutMs = 60000;  ///< 60s auto-dismiss for failures
 
     // --- Widget composition (WO3 refactor) ---
     LabelWidget       _titleLabel;                      ///< "Firmware Update" title
