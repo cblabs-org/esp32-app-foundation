@@ -101,9 +101,26 @@ head -1 private_key.pem
 
 ### Verify `.gitignore` protection
 
+The following sensitive files are excluded from git by `.gitignore` and must **never** be committed:
+
+| File | Reason |
+|------|--------|
+| `private_key.pem` | Private signing key — compromise allows unsigned firmware to be accepted by devices |
+| `public_key.pem` | Source form of the public key — the compiled header is what matters |
+| `include/publicKey.hpp` | Generated C header — regenerated from `public_key.pem` at any time |
+| `release/` | Staging directory containing signed binaries |
+| `*.sig` | Detached signatures |
+| `*.sha256` | Hash files |
+
+Verify nothing sensitive is tracked:
+
 ```bash
-git check-ignore private_key.pem && echo "Protected ✓" || echo "WARNING: not in .gitignore"
+git check-ignore private_key.pem include/publicKey.hpp release/ && echo "All protected ✓"
+git status --short | grep -E "pem|sig|sha256|release/"  # Should produce no output
 ```
+
+> [!CAUTION]
+> If `private_key.pem` ever appears in `git status` as untracked or staged, **do not commit**. Run `git rm --cached private_key.pem` immediately and verify `.gitignore` is correct.
 
 ---
 
@@ -126,7 +143,9 @@ config.otaGithubRepo = "matthewmcneill/esp32-app-foundation";
 ```
 
 > [!NOTE]
-> Whenever you rotate keys, you must regenerate `include/publicKey.hpp`, rebuild all targets, and flash all devices before the new private key can be used to sign releases. Devices running old firmware with the old public key will reject binaries signed with the new private key.
+> Whenever you rotate keys, devices in the field will still carry the **old** public key and will reject binaries signed with the new private key. You must use a two-step transitional process to avoid breaking OTA for deployed devices.
+
+**Transitional signing is mandatory.** See [Key Rotation](#11-key-rotation) for the full procedure.
 
 ---
 
@@ -318,13 +337,55 @@ The `--run-id` path downloads the unsigned CI artifacts, then signs them locally
 
 ## 11. Key Rotation
 
-If the private key is compromised or lost, you must rotate the key pair:
+Key rotation requires a **two-step transitional release** because of an inherent ordering constraint:
 
-1. **Delete the old key:** `rm private_key.pem`
-2. **Generate a new pair:** `./scripts/generate_keys.sh`
-3. **Regenerate the public key header:** `xxd -i public_key.pem > include/publicKey.hpp`
-4. **Rebuild and flash all devices** with the new firmware (containing the new public key) — this must happen **via the old private key** as the last signed release, since devices will still verify with the old public key
-5. Once all devices have been updated, the new private key takes over for all future releases
+- Devices in the field verify OTA downloads using the **old public key** embedded in their running firmware
+- A binary signed with the **new private key** will be rejected by those devices
+- Therefore you must use the **old private key** to sign one final transitional release that ships the **new public key** embedded in firmware — only then can you switch to signing with the new key
+
+### Step-by-step rotation procedure
+
+**Step 1 — Generate the new key pair**
+
+```bash
+rm private_key.pem public_key.pem          # remove old keys
+./scripts/generate_keys.sh                  # generate new pair (new passphrase)
+```
+
+**Step 2 — Embed the new public key in firmware**
+
+```bash
+xxd -i public_key.pem > include/publicKey.hpp
+```
+
+**Step 3 — Build the transitional release**
+
+This firmware contains the **new public key** but must be **signed with the old private key**. You must still have your old `private_key.pem` (or a backup of it) at this point:
+
+```bash
+git tag v1.2.4-transition                   # or whatever your next version is
+git push origin v1.2.4-transition
+python3 scripts/deploy_release.py \
+    --tag v1.2.4-transition \
+    --local --build \
+    --private-key old_private_key.pem        # sign with OLD key
+```
+
+**Step 4 — Deploy the transitional release to all devices**
+
+All devices in the field must install `v1.2.4-transition` via OTA. Once they do, they carry the new public key. Monitor adoption before proceeding.
+
+**Step 5 — Switch to the new key for all future releases**
+
+```bash
+python3 scripts/deploy_release.py \
+    --tag v1.3.0 \
+    --local --build \
+    --private-key private_key.pem            # sign with NEW key from here on
+```
 
 > [!WARNING]
-> Devices that miss the transitional update will be unable to accept OTA updates signed with the new key. They will need to be manually re-flashed via USB.
+> Any device that misses the transitional release (`v1.2.4-transition`) will still carry the old public key and will be unable to accept OTA updates signed with the new private key. Those devices must be **manually re-flashed via USB**. Ensure maximum fleet adoption of the transitional release before discarding the old private key.
+
+> [!CAUTION]
+> Keep a secure backup of the **old** private key until you are confident all deployed devices have received the transitional update. After that, the old key can be permanently deleted.
