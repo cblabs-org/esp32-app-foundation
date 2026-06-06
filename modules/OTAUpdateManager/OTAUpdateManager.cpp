@@ -206,6 +206,7 @@ void OTAUpdateManager::tick() {
     // --- Boot check: fire once on first tick (Wi-Fi confirmed connected) ---
     if (!_hasBootChecked) {
         _hasBootChecked = true;
+        _silentCheck = true;  // Boot checks never show error modals
         ESP_LOGI(TAG, "Auto-check: boot trigger");
         performUpdate();
         return;
@@ -222,6 +223,7 @@ void OTAUpdateManager::tick() {
 
     if (static_cast<uint8_t>(t.tm_hour) == _checkHour && today > _lastCheckDay) {
         _lastCheckDay = today;
+        _silentCheck = true;  // Scheduled checks never show error modals
         ESP_LOGI(TAG, "Auto-check: daily trigger at hour %u", (unsigned)_checkHour);
         performUpdate();
     }
@@ -419,11 +421,15 @@ void OTAUpdateManager::performUpdateTask() {
 
     if (!github.getLatestReleaseForChannel(_channel)) {
         ESP_LOGE(TAG, "GitHub release query failed: %s", github.getLastError());
-        publishProgress(0.0f, "GitHub query failed", true, false);
-        state_ = OTAState::Error;
-        static char ghErrBuf[128];
-        snprintf(ghErrBuf, sizeof(ghErrBuf), "GitHub query: %s", github.getLastError());
-        lastOtaError_ = ghErrBuf;
+        // Only show the error modal for manual checks — auto-checks (boot/daily)
+        // run while network may still be settling and a transient failure
+        // should never pop up a "Firmware Update Failed" modal unprompted.
+        if (!_silentCheck) {
+            publishProgress(0.0f, "GitHub query failed", true, false);
+        }
+        state_ = OTAState::Idle;  // Return to Idle, not Error, on silent path
+        lastOtaError_ = _silentCheck ? nullptr : github.getLastError();
+        _silentCheck = false;
         return;
     }
 
@@ -1094,6 +1100,8 @@ void OTAUpdateManager::registerRoutes(AsyncWebServer& server) {
                         this->state_ = OTAState::Idle;
                         this->lastOtaError_ = nullptr;
                     }
+                    // Manual check: always show errors (not a silent auto-check)
+                    this->_silentCheck = false;
                     // Respond immediately — the full check+download runs
                     // in a background FreeRTOS task. checkForUpdate() blocks
                     // for 10+ seconds (TLS to api.github.com) and must NOT
