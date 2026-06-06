@@ -177,10 +177,14 @@ def inject_version():
     pre_num  = components["pre_num"]
 
     version_str = f"{major}.{minor}.{patch}"
+    # Full version includes channel suffix for non-stable builds.
+    # e.g. "0.0.6-beta.1", "0.0.6-rc.2", "0.0.6" (stable omits suffix).
+    if chan_str:
+        full_version_str = f"{version_str}-{chan_str}.{pre_num}"
+    else:
+        full_version_str = version_str
     print(
-        f"[inject_version] Building version: "
-        f"{version_str}-{chan_str or 'stable'}.{pre_num} "
-        f"(channel={channel})"
+        f"[inject_version] Building version: {full_version_str} (channel={channel})"
     )
 
     # Strip any pre-existing version flags, then inject ours
@@ -207,7 +211,7 @@ def inject_version():
         f"-DVERSION_PATCH={patch}",
         f"-DVERSION_CHANNEL={channel}",
         f"-DVERSION_PRE_NUM={pre_num}",
-        f'-DBUILD_VERSION=\\"{version_str}\\"',
+        f'-DBUILD_VERSION=\\"{full_version_str}\\"',
     ])
 
     env.Replace(BUILD_FLAGS=filtered)
