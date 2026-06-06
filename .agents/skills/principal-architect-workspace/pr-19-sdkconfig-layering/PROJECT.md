@@ -41,8 +41,8 @@ file automatically invalidates the generated config and triggers regeneration.
 
 | ID | Topic | Branch | Status |
 |----|-------|--------|--------|
-| **[WO1](wo1-base-delta/WORKORDER.md)** | Restructure sdkconfig files (base+delta) + fix platformio.ini | `pr-19-sdkconfig-layering/wo1-base-delta` | ⬜ QUEUED |
-| **[WO2](wo2-sync-script/WORKORDER.md)** | Write `sync_sdkconfig.py` pre-build guard | `pr-19-sdkconfig-layering/wo2-sync-script` | ⬜ QUEUED |
+| **[WO1](wo1-base-delta/WORKORDER.md)** | Restructure sdkconfig files (base+delta) + fix platformio.ini | `pr-19/wo1-base-delta` | ✅ MERGED `8998538` |
+| **[WO2](wo2-sync-script/WORKORDER.md)** | Write `sync_sdkconfig.py` pre-build guard | `pr-19/wo2-sync-script` | ✅ MERGED `9e19d2c` |
 
 ## File Touch Map
 
@@ -62,8 +62,10 @@ file automatically invalidates the generated config and triggers regeneration.
 
 | WO | Merged At | Commit |
 |----|-----------|--------|
-| WO1 | — | — |
-| WO2 | — | — |
+| WO1 | 2026-06-06T11:03Z | `8998538` — CONFIG_SPIRAM=y confirmed, TCP_WND=32768 inherited ✅ |
+| WO2 | 2026-06-06T11:16Z | `9e19d2c` — stale detection verified, esp32dev no regression ✅ |
+
+> **WO1 note:** Worker also created `docs/build_and_release_process.md` (out of boundary box scope). File is benign — retained in merge.
 
 ---
 *Context distillation:* [./context_bridge.md](./context_bridge.md) (populated after wrap-up)

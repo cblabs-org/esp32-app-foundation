@@ -55,7 +55,7 @@ predate the formal PA pipeline and are filed retrospectively.
 | [pr-16-backup-overhaul](./pr-16-backup-overhaul/PROJECT.md) | Backup System Overhaul (Route fix, `_meta` envelope, OTA IConfigurable, streaming response) | 🔄 **WIP** — WO1 in progress | Session f6e289ed |
 | [pr-17-display-refactor](./pr-17-display-refactor/PROJECT.md) | Display Module OO Refactoring (CarouselEngine, BoardCatalog, ScreensaverController, remove Application* coupling) | 📋 **PLANNING** — 5 WOs defined, awaiting user approval | Session 0735b228 |
 | [pr-18-screensaver-settings](./pr-18-screensaver-settings/PROJECT.md) | Screensaver & Display Settings (config expansion, MCP tools, web portal Display tab) | ✅ **COMPLETE** — 3 WOs merged, 60 new tests | Session a1c50fdf |
-| [pr-19-sdkconfig-layering](./pr-19-sdkconfig-layering/PROJECT.md) | sdkconfig Architecture — Base+Delta Layering (fix PSRAM regression, eliminate ~90% duplication, add build guard) | 🔄 **WIP** — WO1 queued | Session 34de947b |
+| [pr-19-sdkconfig-layering](./pr-19-sdkconfig-layering/PROJECT.md) | sdkconfig Architecture — Base+Delta Layering (fix PSRAM regression, eliminate ~90% duplication, add build guard) | ✅ **COMPLETE** — 2 WOs merged, ready for PR submission | Session 34de947b |
 
 ---
 
