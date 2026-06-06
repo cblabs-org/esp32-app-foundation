@@ -242,3 +242,40 @@ Skips gracefully for native env and unconfigured environments."
 Once the user approves, invoke the `@distillery` skill targeting
 `.agents/skills/principal-architect-workspace/pr-19-sdkconfig-layering/wo2-sync-script/`
 and then terminate your session.
+
+---
+
+## ✅ Completion Status
+
+**Status:** COMPLETE  
+**Date:** 2026-06-06  
+**Session:** `02891bdb-8860-4b39-94e5-58d7633faa6a`  
+**Commit:** `9e19d2c` on branch `pr-19/wo2-sync-script`  
+**Approved by:** Parent agent (`34de947b-cd38-4c49-8e6b-3c79452f4912`)
+
+### Verification Results
+
+| Check | Result |
+|---|---|
+| `sync_sdkconfig.py` created with house-style header | ✅ |
+| Strategy 1: `BoardConfig().get("build.cmake_extra_args")` (S3 Nano) | ✅ |
+| Strategy 2: `GetProjectOption("custom_sdkconfig")` (esp32dev) | ✅ |
+| All `[sync_sdkconfig]` message paths verified in build log | ✅ |
+| Graceful skip for `native`/unconfigured envs | ✅ |
+| `platformio.ini` `extra_scripts` updated — `pre:sync_sdkconfig.py` first | ✅ |
+| `touch` regression test — stale detection + `CONFIG_SPIRAM=y` retained | ✅ |
+| `esp32dev` no regression | ✅ |
+
+### Critical Bug Fixed (not in spec)
+
+`GetProjectOption("board_build.cmake_extra_args")` silently returns empty string (exception swallowed by `try/except`). Fixed to use `env.BoardConfig().get("build.cmake_extra_args")` — the same API used by `espidf.py` line 2573. See `context_artifacts/graveyard_getprojectoption_board_build.md` for full diagnosis.
+
+### Distillery
+
+Context archived in:
+- `./context_bridge.md`
+- `./sessions.md`
+- `./context_artifacts/adr_board_config_api.md`
+- `./context_artifacts/graveyard_getprojectoption_board_build.md`
+- `./context_artifacts/state_sync_sdkconfig.md`
+
