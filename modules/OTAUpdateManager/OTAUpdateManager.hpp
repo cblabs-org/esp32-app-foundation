@@ -336,7 +336,8 @@ private:
 
     // Scheduling state (not persisted — reset on each boot)
     uint32_t _lastCheckDay   = 0;     ///< Unix day of last scheduled check (seconds/86400)
-    bool     _hasBootChecked = false; ///< Fires once on first tick after entering Running
+    bool     _hasBootChecked = false; ///< Set true once the boot auto-check has fired
+    bool     _silentCheck    = false; ///< True for auto-checks — suppresses transient error modals
 
     // -------------------------------------------------------------------------
     // Legacy state

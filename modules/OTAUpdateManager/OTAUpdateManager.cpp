@@ -193,20 +193,29 @@ void OTAUpdateManager::begin(Application& app) {
  * Called by the Application main loop. Must complete in ≤10ms; all heavy
  * work is deferred to the FreeRTOS task launched by performUpdate().
  *
- * Boot check: fires once on the first tick after entering Running state
- *   (which guarantees Wi-Fi is connected) if autoCheck is enabled.
+ * Boot check: fires once on the first tick after Wi-Fi is confirmed
+ *   connected (WiFi.status() == WL_CONNECTED) if autoCheck is enabled.
  *
  * Daily check: fires once per calendar day when the wall-clock hour
  *   matches _checkHour and autoCheck is enabled. Requires NTP sync
- *   (time() > 1 000 000).
+ *   (time() > 1 000 000) and an active Wi-Fi connection.
  */
 void OTAUpdateManager::tick() {
     if (!_autoCheck || state_ != OTAState::Idle) return;
 
-    // --- Boot check: fire once on first tick (Wi-Fi confirmed connected) ---
+#ifndef NATIVE_BUILD
+    // Gate: do not attempt any network operation until Wi-Fi is confirmed up.
+    // This prevents the boot check from racing the TLS/DNS stack during the
+    // first few seconds after association, and prevents the daily check from
+    // firing during a temporary network outage.
+    if (WiFi.status() != WL_CONNECTED) return;
+#endif
+
+    // --- Boot check: fire once, after Wi-Fi is confirmed connected ---
     if (!_hasBootChecked) {
         _hasBootChecked = true;
-        ESP_LOGI(TAG, "Auto-check: boot trigger");
+        _silentCheck = true;  // Still silent — first boot may have marginal DNS
+        ESP_LOGI(TAG, "Auto-check: boot trigger (Wi-Fi confirmed connected)");
         performUpdate();
         return;
     }
@@ -222,6 +231,7 @@ void OTAUpdateManager::tick() {
 
     if (static_cast<uint8_t>(t.tm_hour) == _checkHour && today > _lastCheckDay) {
         _lastCheckDay = today;
+        _silentCheck = true;  // Scheduled checks never show error modals
         ESP_LOGI(TAG, "Auto-check: daily trigger at hour %u", (unsigned)_checkHour);
         performUpdate();
     }
@@ -419,11 +429,19 @@ void OTAUpdateManager::performUpdateTask() {
 
     if (!github.getLatestReleaseForChannel(_channel)) {
         ESP_LOGE(TAG, "GitHub release query failed: %s", github.getLastError());
-        publishProgress(0.0f, "GitHub query failed", true, false);
-        state_ = OTAState::Error;
-        static char ghErrBuf[128];
-        snprintf(ghErrBuf, sizeof(ghErrBuf), "GitHub query: %s", github.getLastError());
-        lastOtaError_ = ghErrBuf;
+        // Only show the error modal for manual checks — auto-checks (boot/daily)
+        // run while network may be marginal; a transient failure must not pop
+        // up a 'Firmware Update Failed' modal unprompted.
+        if (!_silentCheck) {
+            static char ghErrBuf[128];
+            snprintf(ghErrBuf, sizeof(ghErrBuf), "GitHub query: %s", github.getLastError());
+            lastOtaError_ = ghErrBuf;
+            publishProgress(0.0f, "GitHub query failed", true, false);
+            state_ = OTAState::Error;
+        } else {
+            state_ = OTAState::Idle;
+        }
+        _silentCheck = false;
         return;
     }
 
@@ -1094,6 +1112,8 @@ void OTAUpdateManager::registerRoutes(AsyncWebServer& server) {
                         this->state_ = OTAState::Idle;
                         this->lastOtaError_ = nullptr;
                     }
+                    // Manual check: always show errors (not a silent auto-check)
+                    this->_silentCheck = false;
                     // Respond immediately — the full check+download runs
                     // in a background FreeRTOS task. checkForUpdate() blocks
                     // for 10+ seconds (TLS to api.github.com) and must NOT
