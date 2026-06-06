@@ -236,8 +236,12 @@ void U8G2DisplayModule::tick() {
         _eventBus->publish(isBlanked ? "display.sleep" : "display.wake");
     }
     
-    // If sleeping, skip carousel and rendering
+    // If sleeping, skip carousel and rendering.
+    // IMPORTANT: vTaskDelay ensures loopTask yields for ~1 frame even when blanked.
+    // Without this, tick() returns in microseconds (no rendering), loopTask spins
+    // at MHz speed, starves IDLE1 on CPU 1, and the Task Watchdog fires after 5s.
     if (isBlanked) {
+        vTaskDelay(pdMS_TO_TICKS(_targetFrameIntervalMs));
         return;
     }
 #endif
