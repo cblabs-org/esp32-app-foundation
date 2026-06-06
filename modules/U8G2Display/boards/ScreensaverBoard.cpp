@@ -91,9 +91,12 @@ void ScreensaverBoard::render(U8G2& u8g2) {
     int displayHeight = u8g2.getDisplayHeight();
 
     // --- Step 1: Format current time as HH:MM ---
+    // Use localtime_r (thread-safe) — localtime() uses a static buffer which
+    // can be corrupted if an NTP sync fires concurrently on another task.
     char timeBuf[6] = "--:--";
     time_t now = time(nullptr);
-    struct tm* timeInfo = localtime(&now);
+    struct tm timeInfoBuf;
+    struct tm* timeInfo = localtime_r(&now, &timeInfoBuf);
     if (timeInfo != nullptr) {
         snprintf(timeBuf, sizeof(timeBuf), "%02d:%02d",
                  timeInfo->tm_hour, timeInfo->tm_min);
