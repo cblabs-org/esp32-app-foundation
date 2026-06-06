@@ -32,14 +32,16 @@ TEST_F(SemVerTest, PackVersionProducesCorrectValues) {
     v.channel = Channel::STABLE;
     v.preNum  = 0;
 
-    // Expected: 0x030100F0
-    // major=3 (0x03) << 24 = 0x03000000
-    // minor=1 (0x01) << 16 = 0x00010000
-    // patch=0 (0x00) << 8  = 0x00000000
-    // channel=STABLE(15)<<4= 0x000000F0
-    // preNum=0              = 0x00000000
+    // Bit layout: MAJOR(8) | MINOR(8) | PATCH(8) | CHANNEL(2) | PRE_NUM(6)
+    // major=3  (0x03) << 24 = 0x03000000
+    // minor=1  (0x01) << 16 = 0x00010000
+    // patch=0  (0x00) <<  8 = 0x00000000
+    // channel=STABLE(3) <<6 = 0x000000C0
+    // preNum=0             = 0x00000000
+    //                        ----------
+    //                        0x030100C0
     uint32_t packed = packVersion(v);
-    EXPECT_EQ(packed, 0x030100F0u);
+    EXPECT_EQ(packed, 0x030100C0u);
 }
 
 TEST_F(SemVerTest, PackVersionWithPreRelease) {
@@ -47,13 +49,32 @@ TEST_F(SemVerTest, PackVersionWithPreRelease) {
     v.major   = 3;
     v.minor   = 1;
     v.patch   = 0;
-    v.channel = Channel::BETA;  // 2
+    v.channel = Channel::BETA;  // 1
     v.preNum  = 1;
 
-    // Expected: 0x03010021
-    // channel=BETA(2)<<4 = 0x20, preNum=1 = 0x01 → 0x21
+    // channel=BETA(1) << 6 = 0x40, preNum=1 = 0x01 → 0x41
+    // 0x03000000 | 0x00010000 | 0x00000000 | 0x41 = 0x03010041
     uint32_t packed = packVersion(v);
-    EXPECT_EQ(packed, 0x03010021u);
+    EXPECT_EQ(packed, 0x03010041u);
+}
+
+TEST_F(SemVerTest, PreNumUpTo63) {
+    // Validates the fix: PRE_NUM is now 6 bits (max 63), not 4 bits (max 15).
+    // beta.16 used to silently corrupt the channel field; now it must not.
+    FirmwareVersion beta15 = parseVersionTag("v1.0.0-beta.15");
+    FirmwareVersion beta16 = parseVersionTag("v1.0.0-beta.16");
+    FirmwareVersion beta63 = parseVersionTag("v1.0.0-beta.63");
+    FirmwareVersion stable = parseVersionTag("v1.0.0");
+
+    EXPECT_GT(beta16, beta15);  // beta.16 > beta.15 (was broken before fix)
+    EXPECT_GT(beta63, beta16);  // beta.63 > beta.16
+    EXPECT_GT(stable, beta63);  // stable always wins over any beta
+
+    // Confirm beta.63 packed value does not overflow into channel bits
+    // channel=BETA(1)<<6 = 0x40, preNum=63 = 0x3F → 0x7F
+    // Full: (1<<24)|(0<<16)|(0<<8)|0x40|0x3F = 0x0100007F
+    FirmwareVersion v = beta63;
+    EXPECT_EQ(packVersion(v), 0x0100007Fu);
 }
 
 // ---------------------------------------------------------------------------

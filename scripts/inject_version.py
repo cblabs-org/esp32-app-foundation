@@ -32,7 +32,9 @@ import re
 _SEMVER_RE = re.compile(
     r"^[vV]?(\d+)\.(\d+)\.(\d+)(?:-(dev|beta|rc)(?:\.(\d+))?)?$"
 )
-_CHANNEL_MAP = {"dev": 0, "beta": 2, "rc": 3}
+# Channel numeric values must match the Channel enum in lib/SemVer/SemVer.hpp.
+# Ordering: DEV(0) < BETA(1) < RC(2) < STABLE(3) — contiguous 2-bit values.
+_CHANNEL_MAP = {"dev": 0, "beta": 1, "rc": 2}
 
 
 def _parse_tag(tag):
@@ -51,7 +53,7 @@ def _parse_tag(tag):
     minor    = int(m.group(2))
     patch    = int(m.group(3))
     chan_str = m.group(4)           # None for stable releases
-    channel  = _CHANNEL_MAP.get(chan_str, 15)   # 15 = STABLE
+    channel  = _CHANNEL_MAP.get(chan_str, 3)   # 3 = STABLE (matches Channel::STABLE in SemVer.hpp)
     pre_num  = int(m.group(5)) if m.group(5) else 0
     sort_key = (major, minor, patch, channel, pre_num)
     return sort_key, {

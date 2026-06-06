@@ -27,14 +27,15 @@
 /**
  * @brief Release channel classification for firmware versions.
  *
- * Numeric values are chosen so that packed comparison produces the
- * correct ordering: DEV < BETA < RC < STABLE.
+ * Values are contiguous so they pack into exactly 2 bits and the
+ * ordering invariant DEV < BETA < RC < STABLE is preserved in the
+ * packed 32-bit integer comparison performed by packVersion().
  */
 enum class Channel : uint8_t {
-    DEV    = 0,
-    BETA   = 2,
-    RC     = 3,
-    STABLE = 15
+    DEV    = 0,   ///< Development / nightly builds
+    BETA   = 1,   ///< Beta pre-releases
+    RC     = 2,   ///< Release candidates
+    STABLE = 3,   ///< Production releases
 };
 
 /**
@@ -55,7 +56,11 @@ struct FirmwareVersion {
 /**
  * @brief Encode a FirmwareVersion into a packed 32-bit integer.
  *
- * Bit layout: MAJOR(8) | MINOR(8) | PATCH(8) | CHANNEL(4) | PRE_NUM(4)
+ * Bit layout: MAJOR(8) | MINOR(8) | PATCH(8) | CHANNEL(2) | PRE_NUM(6)
+ *
+ * Channel uses bits 7-6 (2 bits, values 0-3 — exact fit for 4 channels).
+ * PRE_NUM uses bits 5-0 (6 bits, values 0-63 — raised from the old 4-bit
+ * cap of 15 which silently corrupted at beta.16+).
  *
  * @param v The FirmwareVersion to pack.
  * @return Packed 32-bit representation suitable for integer comparison.

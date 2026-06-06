@@ -10,6 +10,7 @@
 
 #include "GithubClient.hpp"
 #include "../Logger/Logger.hpp"
+#include "../SemVer/SemVer.hpp"
 #include <string.h>
 
 #ifndef NATIVE_BUILD
@@ -143,17 +144,31 @@ bool GithubClient::getLatestRelease() {
 }
 
 /**
- * @brief Query releases and find the latest matching the specified channel.
+ * @brief Query releases and return the best available version for a subscriber's channel.
  *
- * For "stable" (or empty/null), delegates to getLatestRelease().
- * For "beta" or "dev", queries the /releases endpoint and scans for the
- * first pre-release whose tag name contains the channel string.
+ * Implements the risk-floor model: a subscriber's channel determines the
+ * MINIMUM stability they require, not the exact track they are locked to.
+ * Any release that meets or exceeds that stability floor is a candidate;
+ * the highest SemVer version among all candidates is returned.
  *
- * @param channel Channel to filter by ("stable", "beta", "dev")
- * @return true if a matching release was found
+ * Acceptance rules (single pass through /releases list):
+ *   stable channel  → delegates to getLatestRelease() (non-prerelease only)
+ *   rc     channel  → rc + stable
+ *   beta   channel  → beta + rc + stable
+ *   dev    channel  → dev + beta + rc + stable
+ *
+ * This means a device on beta will automatically receive v0.0.7 stable if
+ * it is ahead of the latest v0.0.6-beta.x — no manual channel switch needed.
+ *
+ * The acceptance check uses the Channel enum ordering (DEV=0 < BETA=2 < RC=3
+ * < STABLE=15): a prerelease is accepted when its parsed channel value >=
+ * the subscriber's floor channel value.
+ *
+ * @param channel Channel floor string: "stable", "rc", "beta", or "dev".
+ * @return true if any acceptable release was found.
  */
 bool GithubClient::getLatestReleaseForChannel(const char* channel) {
-    // If channel is null, empty, or "stable", delegate to the existing method
+    // Stable (or unset) delegates to the single-release fast-path
     if (channel == nullptr || channel[0] == '\0' || strcmp(channel, "stable") == 0) {
         return getLatestRelease();
     }
@@ -162,6 +177,10 @@ bool GithubClient::getLatestReleaseForChannel(const char* channel) {
     releaseDescription = "";
     releaseAssets = 0;
     isPreRelease = false;
+
+    // Convert the subscriber's channel string to a Channel enum floor value.
+    // Any release whose parsed channel >= this floor is an acceptable candidate.
+    Channel floor = stringToChannel(channel);
 
 #ifndef NATIVE_BUILD
     WiFiClientSecure client;
@@ -177,7 +196,7 @@ bool GithubClient::getLatestReleaseForChannel(const char* channel) {
         http.addHeader("Authorization", "Bearer " + accessToken);
     }
 
-    LOG_SECURE("GITHUB", "Requesting releases for channel '%s' from %s", channel, apiGetReleases.c_str());
+    LOG_SECURE("GITHUB", "Requesting releases (floor='%s') from %s", channel, apiGetReleases.c_str());
     int httpCode = http.GET();
 
     if (httpCode != HTTP_CODE_OK) {
@@ -190,7 +209,6 @@ bool GithubClient::getLatestReleaseForChannel(const char* channel) {
         return false;
     }
 
-    // Filter document to reduce memory footprint
     JsonDocument filter;
     filter[0]["tag_name"] = true;
     filter[0]["name"] = true;
@@ -200,54 +218,96 @@ bool GithubClient::getLatestReleaseForChannel(const char* channel) {
 
     JsonDocument doc;
     DeserializationError error = deserializeJson(doc, http.getStream(), DeserializationOption::Filter(filter));
+    http.end();
 
     if (error) {
         snprintf(lastErrorMsg, sizeof(lastErrorMsg), "JSON parse failed: %s", error.c_str());
         LOG_SECURE("GITHUB", "JSON Parse Error: %s", error.c_str());
-        http.end();
         return false;
     }
 
-    // Scan releases for the first matching pre-release
+    // --- Single-pass scan: find the highest SemVer release within the floor ---
+    // Track best candidate in local state; commit to member fields only at end.
+    String bestTag;
+    String bestDescription;
+    String bestAssetName[MAX_RELEASE_ASSETS];
+    String bestAssetURL[MAX_RELEASE_ASSETS];
+    int    bestAssetCount = 0;
+    bool   bestIsPre      = false;
+    FirmwareVersion bestVer = {};  // zero-initialised — effectively -infinity
+
     JsonArray releases = doc.as<JsonArray>();
     for (JsonObject release : releases) {
-        bool isPre = release["prerelease"] | false;
+        bool isPre          = release["prerelease"] | false;
         const char* tagName = release["tag_name"] | "";
+        if (tagName[0] == '\0') continue;
 
-        if (isPre && strstr(tagName, channel) != nullptr) {
-            releaseId = tagName;
-            releaseDescription = release["name"] | "";
-            isPreRelease = true;
+        // Determine whether this release meets the subscriber's floor.
+        bool accepted = false;
+        if (!isPre) {
+            // GitHub non-prerelease == stable: always accepted by non-stable subscribers.
+            accepted = true;
+        } else {
+            // Pre-release: parse the tag and compare its channel against the floor.
+            FirmwareVersion candidate = parseVersionTag(tagName);
+            accepted = (static_cast<uint8_t>(candidate.channel) >= static_cast<uint8_t>(floor));
+        }
+
+        if (!accepted) continue;
+
+        FirmwareVersion candidate = parseVersionTag(tagName);
+        if (bestTag.isEmpty() || candidate > bestVer) {
+            bestVer         = candidate;
+            bestTag         = tagName;
+            bestDescription = release["name"] | "";
+            bestIsPre       = isPre;
+            bestAssetCount  = 0;
 
             JsonArray assetsArray = release["assets"].as<JsonArray>();
             for (JsonObject asset : assetsArray) {
-                if (releaseAssets >= MAX_RELEASE_ASSETS) break;
-                releaseAssetName[releaseAssets] = asset["name"] | "";
-                releaseAssetURL[releaseAssets] = asset["url"] | "";
-                if (releaseAssetName[releaseAssets].length() > 0 && releaseAssetURL[releaseAssets].length() > 0) {
-                    releaseAssets++;
+                if (bestAssetCount >= MAX_RELEASE_ASSETS) break;
+                String name = asset["name"] | "";
+                String url  = asset["url"]  | "";
+                if (name.length() > 0 && url.length() > 0) {
+                    bestAssetName[bestAssetCount] = name;
+                    bestAssetURL[bestAssetCount]  = url;
+                    bestAssetCount++;
                 }
             }
-
-            http.end();
-            strcpy(lastErrorMsg, "SUCCESS");
-            LOG_SECURE("GITHUB", "Found matching pre-release: %s", tagName);
-            return true;
+            LOG_SECURE("GITHUB", "New best candidate: %s (isPre=%d)", tagName, (int)isPre);
         }
     }
 
-    http.end();
-    snprintf(lastErrorMsg, sizeof(lastErrorMsg), "No matching pre-release for channel '%s'", channel);
-    LOG_SECURE("GITHUB", "No matching pre-release for channel '%s'", channel);
-    return false;
+    if (bestTag.isEmpty()) {
+        snprintf(lastErrorMsg, sizeof(lastErrorMsg),
+                 "No release found at or above channel floor '%s'", channel);
+        LOG_SECURE("GITHUB", "%s", lastErrorMsg);
+        return false;
+    }
+
+    // Commit the winner to member fields
+    releaseId          = bestTag;
+    releaseDescription = bestDescription;
+    isPreRelease       = bestIsPre;
+    releaseAssets      = bestAssetCount;
+    for (int i = 0; i < bestAssetCount; ++i) {
+        releaseAssetName[i] = bestAssetName[i];
+        releaseAssetURL[i]  = bestAssetURL[i];
+    }
+
+    LOG_SECURE("GITHUB", "Selected release: %s (floor='%s')", releaseId.c_str(), channel);
+    strcpy(lastErrorMsg, "SUCCESS");
+    return true;
+
 #else
-    // Mock implementation for native testing — simulate a channel match
-    releaseId = String("v1.0.0-") + String(channel) + String(".1");
+    // Mock for native unit tests — return a plausible prerelease for the channel
+    // so tests exercising the risk-floor path get a testable result.
+    releaseId          = String("v0.0.6-") + String(channel) + String(".1");
     releaseDescription = "Mock Pre-Release";
-    releaseAssets = 1;
+    releaseAssets      = 1;
     releaseAssetName[0] = "firmware.bin";
-    releaseAssetURL[0] = "https://example.com/firmware.bin";
-    isPreRelease = true;
+    releaseAssetURL[0]  = "https://example.com/firmware.bin";
+    isPreRelease        = true;
     strcpy(lastErrorMsg, "SUCCESS");
     return true;
 #endif

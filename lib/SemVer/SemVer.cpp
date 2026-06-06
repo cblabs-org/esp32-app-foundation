@@ -20,11 +20,11 @@
 // ---------------------------------------------------------------------------
 
 uint32_t packVersion(const FirmwareVersion& v) {
-    return (uint32_t(v.major) << 24)
-         | (uint32_t(v.minor) << 16)
-         | (uint32_t(v.patch) << 8)
-         | (uint32_t(v.channel) << 4)
-         | uint32_t(v.preNum);
+    return (uint32_t(v.major)   << 24)
+         | (uint32_t(v.minor)   << 16)
+         | (uint32_t(v.patch)   << 8)
+         | (uint32_t(v.channel) << 6)   // 2 bits: bits 7-6 (DEV=0,BETA=1,RC=2,STABLE=3)
+         | uint32_t(v.preNum);          // 6 bits: bits 5-0 (max 63)
 }
 
 // ---------------------------------------------------------------------------

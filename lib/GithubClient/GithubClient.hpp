@@ -64,7 +64,24 @@ private:
 #endif
 #endif
 
-#define MAX_RELEASE_ASSETS 16
+// ---------------------------------------------------------------------------
+// Release asset capacity
+//
+// Derived from board count rather than a magic number so that adding a new
+// board to BOARDS[] in deploy_release.py doesn't silently hit a hidden cap.
+//
+//   ASSETS_PER_BOARD  = .bin + .bin.sig + .bin.sha256  (3 files per board)
+//   SHARED_ASSETS     = manifest.json (+ any future shared files)
+//   MAX_OTA_BOARDS    = ceiling on supported boards in one release
+//
+// At 8 boards: 8 × 3 + 2 = 26 → rounds up to MAX_RELEASE_ASSETS = 26.
+// Raise MAX_OTA_BOARDS if you add more boards.
+// ---------------------------------------------------------------------------
+static constexpr int MAX_OTA_BOARDS       = 8;
+static constexpr int ASSETS_PER_BOARD     = 3;
+static constexpr int SHARED_ASSETS        = 2;   // manifest.json + space for future
+static constexpr int MAX_RELEASE_ASSETS   = (MAX_OTA_BOARDS * ASSETS_PER_BOARD) + SHARED_ASSETS;
+// = 26
 
 /**
  * @brief API client to interact with GitHub Releases securely.
@@ -106,15 +123,22 @@ public:
     bool getLatestRelease();
 
     /**
-     * @brief Query all releases (including pre-releases) and find the latest
-     *        release matching the specified channel.
+     * @brief Query releases and return the best available version for the
+     *        subscriber's channel using the risk-floor model.
      *
-     * For "stable" (or empty/null), delegates to getLatestRelease().
-     * For "beta" or "dev", queries /repos/{owner}/{repo}/releases and finds
-     * the first pre-release whose tag contains the channel string.
+     * Channel determines MINIMUM stability, not an exact track:
+     *   stable → stable only (delegates to getLatestRelease())
+     *   rc     → rc + stable
+     *   beta   → beta + rc + stable
+     *   dev    → dev + beta + rc + stable
      *
-     * @param channel Channel to filter by ("stable", "beta", "dev")
-     * @return true if a matching release was found
+     * A single /releases request is made; the highest SemVer version among
+     * all releases that meet the floor is returned. This means a beta
+     * subscriber automatically receives v0.0.7 stable when it is ahead of
+     * the latest v0.0.6-beta.x with no manual channel change required.
+     *
+     * @param channel Channel floor string: "stable", "rc", "beta", or "dev".
+     * @return true if any acceptable release was found.
      */
     bool getLatestReleaseForChannel(const char* channel);
 
