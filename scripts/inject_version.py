@@ -61,19 +61,61 @@ def _parse_tag(tag):
 
 
 def _get_tags_on_head():
-    """Return a list of all tag names pointing at HEAD, or [] on error."""
+    """Return a list of tag names for the current HEAD, or [] when none exist.
+
+    Two-strategy lookup — both are attempted before giving up:
+
+    Strategy 1 — exact match (release builds):
+        ``git tag --points-at HEAD`` returns every tag whose object is exactly
+        the current HEAD commit.  This is the happy path for a proper release
+        build where the tag was created after all commits were finalised.
+
+    Strategy 2 — ancestor search (development / PA-commit builds):
+        ``git describe --tags --abbrev=0 --match 'v*'`` walks the commit graph
+        backwards to find the nearest reachable tag.  This handles the common
+        case where one or more housekeeping commits (PA workspace updates,
+        distillery artefacts, doc fixes) were pushed *after* the release tag
+        was created, moving HEAD past the tag and causing Strategy 1 to return
+        nothing.  A WARNING is emitted so the agent knows the tag is not on
+        HEAD and can retag before the next release.
+
+    Returns [] only when the repository has no tags at all in its history.
+    """
     try:
+        # --- Strategy 1: exact tag on HEAD (fastest, most precise) ---
         result = subprocess.run(
             ["git", "tag", "--points-at", "HEAD"],
             capture_output=True,
             text=True,
             timeout=5,
         )
+        if result.returncode == 0:
+            tags = [t.strip() for t in result.stdout.splitlines() if t.strip()]
+            if tags:
+                return tags
+
+        # --- Strategy 2: nearest ancestor tag via git describe ---
+        result = subprocess.run(
+            ["git", "describe", "--tags", "--abbrev=0", "--match", "v*"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        if result.returncode == 0:
+            tag = result.stdout.strip()
+            if tag:
+                print(
+                    f"[inject_version] WARNING: HEAD has no exact tag — "
+                    f"using nearest ancestor: '{tag}'. "
+                    f"Run 'git tag {tag} -f && git push origin --force {tag}' "
+                    f"to retag HEAD before the next release."
+                )
+                return [tag]
+
     except (subprocess.TimeoutExpired, FileNotFoundError):
-        return []
-    if result.returncode != 0:
-        return []
-    return [t.strip() for t in result.stdout.splitlines() if t.strip()]
+        pass
+
+    return []
 
 
 def inject_version():
@@ -88,7 +130,17 @@ def inject_version():
     tags = _get_tags_on_head()
 
     if not tags:
-        print("[inject_version] HEAD is not tagged — using defaults (0.0.1)")
+        # Emit on both stdout (captured by PlatformIO build log) and stderr
+        # (visible in agent terminal / CI output) so neither path is silent.
+        _no_tag_warning = (
+            "[inject_version] \u26a0\ufe0f  NO GIT TAGS FOUND in repository history. "
+            "Version will default to 0.0.1-stable.0. "
+            "This build MUST NOT be released — tag HEAD with a SemVer tag "
+            "(e.g. 'git tag v0.1.0') before building for release."
+        )
+        print(_no_tag_warning)
+        import sys as _sys
+        print(_no_tag_warning, file=_sys.stderr)
     else:
         # Parse all tags, collect those matching SemVer
         parsed = []

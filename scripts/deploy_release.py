@@ -96,6 +96,70 @@ def parse_channel(tag: str) -> str:
     return m.group(1) or "stable"
 
 
+def ensure_tag_on_head(tag: str, dry_run: bool) -> None:
+    """Ensure the given tag points at HEAD, creating or moving it as needed.
+
+    This makes the deploy script the single owner of the tag lifecycle:
+    - If the tag does not exist locally: creates it on HEAD.
+    - If the tag exists and already points at HEAD: no-op (logs confirmation).
+    - If the tag exists but points elsewhere: moves it to HEAD with a warning
+      (safe when the difference is only agent/PA workspace commits with no
+      firmware code changes).
+
+    After ensuring the local tag is correct, pushes it to origin with
+    ``--force`` so the subsequent ``gh release create`` always succeeds.
+
+    Must be called before any PlatformIO build step so that inject_version.py
+    picks up the tag from the exact HEAD that will be compiled.
+    """
+    print("\n--- Step 0: Ensure git tag is on HEAD ---")
+
+    # Get current HEAD commit hash
+    try:
+        head = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            capture_output=True, text=True, check=True, timeout=5,
+        ).stdout.strip()
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError):
+        print("  WARNING: Could not resolve HEAD — skipping tag check", file=sys.stderr)
+        return
+
+    # Check where the tag currently points (empty string if it doesn't exist)
+    tag_commit = ""
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", f"refs/tags/{tag}"],
+            capture_output=True, text=True, timeout=5,
+        )
+        if result.returncode == 0:
+            tag_commit = result.stdout.strip()
+    except (subprocess.TimeoutExpired, FileNotFoundError):
+        pass
+
+    if not tag_commit:
+        print(f"  Tag '{tag}' does not exist — creating on HEAD ({head[:12]})")
+        if not dry_run:
+            subprocess.run(["git", "tag", tag], check=True)
+    elif tag_commit == head:
+        print(f"  Tag '{tag}' already on HEAD ({head[:12]}) — no change needed")
+    else:
+        print(
+            f"  WARNING: Tag '{tag}' points to {tag_commit[:12]} but HEAD is {head[:12]}. "
+            f"Moving tag to HEAD (safe if the difference is only non-firmware commits).",
+            file=sys.stderr,
+        )
+        if not dry_run:
+            subprocess.run(["git", "tag", "-f", tag], check=True)
+
+    # Push tag to origin (force in case it was moved)
+    print(f"  Pushing tag '{tag}' to origin...")
+    if not dry_run:
+        subprocess.run(["git", "push", "origin", "--force", f"{tag}"], check=True)
+    else:
+        print(f"  [DRY-RUN] git push origin --force {tag}")
+    print(f"  Tag '{tag}' is confirmed on origin.")
+
+
 def build_firmware(dry_run: bool) -> None:
     """Build firmware for all boards with PlatformIO."""
     print("\n--- Step 0: Build firmware (local) ---")
@@ -199,10 +263,11 @@ def generate_manifest(tag: str, dry_run: bool) -> None:
 def create_release(tag: str, dry_run: bool) -> None:
     """Create a GitHub Release and upload all assets."""
     print("\n--- Step 4: Create GitHub Release ---")
-    run(
-        ["gh", "release", "create", tag, "--title", tag, "--generate-notes"],
-        dry_run=dry_run,
-    )
+    channel = parse_channel(tag)
+    release_cmd = ["gh", "release", "create", tag, "--title", tag, "--generate-notes"]
+    if channel != "stable":
+        release_cmd.append("--prerelease")
+    run(release_cmd, dry_run=dry_run)
 
     print("\n--- Step 5: Upload release assets ---")
     asset_patterns = ["*.bin", "*.bin.sig", "*.bin.sha256", "manifest.json"]
@@ -265,6 +330,7 @@ def main() -> None:
     print(f"  Dry-run:     {args.dry_run}")
 
     check_prerequisites(args.private_key, need_pio=args.build)
+    ensure_tag_on_head(args.tag, args.dry_run)
 
     if args.local:
         if args.build:
