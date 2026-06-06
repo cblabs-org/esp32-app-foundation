@@ -14,11 +14,12 @@ This document covers the complete lifecycle for a developer taking this reposito
 4. [Embedding the Public Key in Firmware](#4-embedding-the-public-key-in-firmware)
 5. [Building Firmware for All Targets](#5-building-firmware-for-all-targets)
 6. [Running Tests](#6-running-tests)
-7. [Tagging a Release](#7-tagging-a-release)
-8. [Signing and Publishing a Release](#8-signing-and-publishing-a-release)
-9. [Verifying the Release](#9-verifying-the-release)
-10. [CI-Assisted Workflow (Optional)](#10-ci-assisted-workflow-optional)
-11. [Key Rotation](#11-key-rotation)
+7. [Release Channels](#7-release-channels)
+8. [Tagging a Release](#8-tagging-a-release)
+9. [Signing and Publishing a Release](#9-signing-and-publishing-a-release)
+10. [Verifying the Release](#10-verifying-the-release)
+11. [CI-Assisted Workflow (Optional)](#11-ci-assisted-workflow-optional)
+12. [Key Rotation](#12-key-rotation)
 
 ---
 
@@ -204,7 +205,84 @@ All tests must pass. The test suite covers:
 
 ---
 
-## 7. Tagging a Release
+## 7. Release Channels
+
+The firmware supports three release channels that allow you to ship different stability tiers to different devices simultaneously.
+
+### Channel definitions
+
+| Channel | Tag suffix | Intended audience | Typical use |
+|---------|-----------|------------------|-------------|
+| **stable** | *(none)* e.g. `v1.2.3` | All production devices | Fully tested, recommended for all users |
+| **beta** | `-beta.N` e.g. `v1.2.3-beta.1` | Opt-in testers | Feature-complete but undergoing final validation |
+| **dev** | `-dev.N` e.g. `v1.2.3-dev.0` | Developers only | Work-in-progress builds, may be unstable |
+
+### How channel assignment works
+
+The channel is inferred automatically from the git tag suffix by `scripts/deploy_release.py` — no separate flag is needed. The tag pattern determines the channel written into `manifest.json`:
+
+```
+v1.2.3           → channel: stable
+v1.2.3-beta.1    → channel: beta
+v1.2.3-dev.0     → channel: dev
+```
+
+A device subscribed to `stable` will only ever see releases tagged without a suffix. A device subscribed to `beta` will see beta and stable releases (beta is a superset of stable). A device subscribed to `dev` sees all releases.
+
+### How devices subscribe to a channel
+
+Each device independently selects its channel via the web portal:
+
+1. Open the device portal → navigate to **System → OTA**
+2. In the **Settings** card, use the **Update Channel** dropdown
+3. Select `Stable`, `Beta`, or `Dev`
+4. The setting is persisted to NVS — it survives reboots and OTA updates
+
+The device sends its subscribed channel to GitHub when checking for updates. The `GithubClient` filters releases by matching the channel label in the manifest before comparing versions.
+
+### Typical promotion workflow
+
+For a significant change, the recommended process is:
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│  1. Ship v1.2.3-dev.0  →  dev-channel devices receive and test      │
+│  2. Ship v1.2.3-beta.1 →  beta-channel devices receive and test     │
+│  3. Ship v1.2.3        →  all stable devices receive the release    │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+Each stage uses the same signing and publishing command — only the tag changes:
+
+```bash
+# Stage 1 — dev release
+git tag v1.2.3-dev.0 && git push origin v1.2.3-dev.0
+python3 scripts/deploy_release.py --tag v1.2.3-dev.0 --local --build --private-key private_key.pem
+
+# Stage 2 — beta release (same commit or a fixed one)
+git tag v1.2.3-beta.1 && git push origin v1.2.3-beta.1
+python3 scripts/deploy_release.py --tag v1.2.3-beta.1 --local --build --private-key private_key.pem
+
+# Stage 3 — stable release
+git tag v1.2.3 && git push origin v1.2.3
+python3 scripts/deploy_release.py --tag v1.2.3 --local --build --private-key private_key.pem
+```
+
+> [!NOTE]
+> There is no automated promotion between channels — each stage is an explicit tag and publish. This is intentional: a dev build and a stable build may be built from slightly different commits after final fixes are cherry-picked.
+
+### Hotfix releases
+
+For urgent fixes that bypass the full dev → beta → stable cycle, tag directly on the stable channel with an incremented patch:
+
+```bash
+git tag v1.2.4 && git push origin v1.2.4
+python3 scripts/deploy_release.py --tag v1.2.4 --local --build --private-key private_key.pem
+```
+
+---
+
+## 8. Tagging a Release
 
 The version tag drives both the build version injection and the GitHub Release name.
 
@@ -228,7 +306,7 @@ git push origin v1.2.3
 
 ---
 
-## 8. Signing and Publishing a Release
+## 9. Signing and Publishing a Release
 
 All signing happens **locally**. The private key never touches GitHub Actions or any remote server.
 
@@ -285,7 +363,7 @@ python3 scripts/deploy_release.py \
 
 ---
 
-## 9. Verifying the Release
+## 10. Verifying the Release
 
 ### Check the GitHub Release
 
@@ -314,7 +392,7 @@ The device firmware verifies the ECDSA signature before writing a single byte. A
 
 ---
 
-## 10. CI-Assisted Workflow (Optional)
+## 11. CI-Assisted Workflow (Optional)
 
 GitHub Actions (`.github/workflows/build.yml`) builds unsigned binaries on every tag push. This is useful for reproducible builds on a clean environment but is **not required** — the local workflow above is self-contained.
 
@@ -335,7 +413,7 @@ The `--run-id` path downloads the unsigned CI artifacts, then signs them locally
 
 ---
 
-## 11. Key Rotation
+## 12. Key Rotation
 
 Key rotation requires a **two-step transitional release** because of an inherent ordering constraint:
 
