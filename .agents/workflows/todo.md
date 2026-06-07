@@ -1,16 +1,43 @@
 ---
-description: Workflow for managing the project backlog in .agents/todo_list.md. Supports adding items from the current session or synthesising them from another conversation, updating item status, and reviewing the list for PA handoff.
+description: Workflow for managing the project backlog in .agents/todo/todo.md (todo_list branch). Supports adding items from the current session or synthesising them from another conversation, updating item status, and reviewing the list for PA handoff.
 ---
 
 # /todo — Project Backlog Workflow
 
-Manages the canonical project backlog at `.agents/todo_list.md`.
+Manages the canonical project backlog at `.agents/todo/todo.md` on the `todo_list` orphan branch, accessed via a permanent git worktree.
 
-This file is repo-committed and persists across all sessions and agents. It is the single source of truth for outstanding work. Agent brain artifacts (`backlog.md` etc.) are ephemeral session views only.
+This file is **branch-isolated** on the `todo_list` orphan branch — completely independent of `main` and all feature branches. It can never be overwritten by a PR merge. Agent brain artifacts (`backlog.md` etc.) are ephemeral session views only.
+
+---
+
+## Setup (run once per clone)
+
+The worktree must exist before reading or writing the todo list:
+
+```bash
+# Check if worktree exists
+ls .agents/todo/todo.md 2>/dev/null || git worktree add .agents/todo todo_list
+```
+
+The worktree directory (`.agents/todo/`) is gitignored on `main` — it will never appear in a PR or be accidentally committed to a feature branch.
+
+`.agents/todo.md` (on `main`) is a navigation stub only — **never edit it**.
 
 ---
 
 ## Invocation Modes
+
+### Worktree Guard
+
+Before **any** write operation (add, update), verify the worktree exists:
+
+```bash
+ls .agents/todo/todo.md 2>/dev/null || git worktree add .agents/todo todo_list
+```
+
+If this fails (e.g. remote branch missing), stop and report to the user.
+
+---
 
 ### `/todo add "[note]"`
 
@@ -18,12 +45,20 @@ Add a new item distilled from the **current session**.
 
 **Steps:**
 
-1. Read `.agents/todo_list.md` to understand existing sections and avoid duplicates.
-2. Scan the current conversation context for the observation, bug, or deferred work the user is referencing.
-3. Identify the appropriate section (see **Section Taxonomy** below). Create a new section if none fits.
-4. Draft the item using the **Item Format** below. Infer any dependencies from the conversation.
-5. Present the draft to the user for confirmation — do NOT write yet.
-6. On approval, append the item to the correct section in `todo_list.md`.
+1. Run the **Worktree Guard** above.
+2. Read `.agents/todo/todo.md` to understand existing sections and avoid duplicates.
+3. Scan the current conversation context for the observation, bug, or deferred work the user is referencing.
+4. Identify the appropriate section (see **Section Taxonomy** below). Create a new section if none fits.
+5. Draft the item using the **Item Format** below. Infer any dependencies from the conversation.
+6. Present the draft to the user for confirmation — do NOT write yet.
+7. On approval, append the item to `.agents/todo/todo.md` and commit from within the worktree:
+```bash
+cd .agents/todo
+git add todo.md
+git commit -m "todo: add [item title]"
+git push origin todo_list
+cd -
+```
 
 ---
 
@@ -87,10 +122,18 @@ Sync status changes — mark items done, in-progress, or blocked.
 
 **Steps:**
 
-1. Read `.agents/todo_list.md`.
-2. Apply the requested status changes (user specifies which items).
-3. Show a diff of what will change.
-4. On approval, write the updated file.
+1. Run the **Worktree Guard** above.
+2. Read `.agents/todo/todo.md`.
+3. Apply the requested status changes (user specifies which items).
+4. Show a diff of what will change.
+5. On approval, write the updated file and commit from within the worktree:
+```bash
+cd .agents/todo
+git add todo.md
+git commit -m "todo: [description of status changes]"
+git push origin todo_list
+cd -
+```
 
 ---
 
@@ -100,7 +143,7 @@ Summarise the open backlog for `/principal-architect` handoff planning.
 
 **Steps:**
 
-1. Read `.agents/todo_list.md`.
+1. Read `.agents/todo/todo.md` (no write needed, worktree guard not required — but set up worktree if missing for consistency).
 2. List all open items (`[ ]`) grouped by section.
 3. Identify dependency chains and suggest PR groupings.
 4. Output a summary table suitable for pasting into a `/principal-architect` bridge prompt.
@@ -149,17 +192,23 @@ Use existing sections where they fit. Add new sections if genuinely needed.
 ## Canonical File Location
 
 ```
-.agents/todo_list.md
+.agents/todo/todo.md        ← live backlog (todo_list orphan branch, via worktree)
+.agents/todo.md             ← navigation stub on main (do not edit)
 ```
 
-This file is tracked by git. Commit it when items are added or completed — it is part of the project's working memory.
+All reads and writes go to `.agents/todo/todo.md`. Commits must be made from within the `.agents/todo/` worktree directory and pushed to `origin todo_list`.
+
+The `todo_list` branch is an **orphan** — it shares no history with `main` or any feature branch. PRs cannot touch it. It will never be overwritten by a merge.
 
 ---
 
 ## Notes for Agents
 
-- **Never** write to `todo_list.md` without user confirmation of the drafted item.
+- **Never** write to `todo/todo.md` without user confirmation of the drafted item.
+- **Always** run the worktree guard before any write operation.
+- **Always** commit and push to `origin todo_list` from within `.agents/todo/` after writing.
 - **Always** check for duplicates before drafting a new item.
+- **Never** edit `.agents/todo.md` (the stub on `main`) — it is a pointer only.
 - When a conversation reference is provided, **read the transcript** — don't guess at context from the user's note alone.
 - The user's note is the *intent signal*; the transcript is the *evidence*. Both are needed.
 - If a conversation GUID cannot be resolved, ask the user to confirm it before proceeding.
