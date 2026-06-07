@@ -50,7 +50,7 @@ predate the formal PA pipeline and are filed retrospectively.
 | [pr-11-config-gateway](./pr-11-config-gateway/PROJECT.md) | ConfigManager-as-Gateway Refactoring (iConfigurable redesign + migration orchestration) | ✅ **WO1 MERGED** `2c0b840` — ready for PR submission | Current Session |
 | [pr-12-state-machine](./pr-12-state-machine/PROJECT.md) | State Machine Redesign (Boot → Configure ↔ Running, regression tolerance, ConfiguringStatusBoard) | 📋 **PLANNING** — 6 WOs defined, awaiting user approval | Current Session |
 | [pr-13-test-app](./pr-13-test-app/PROJECT.md) | Foundation Test App (DiagnosticsBoard + Display Lifecycle Fixes) | ✅ **COMPLETE** `c92d3ea` | Session 4cc5a22f |
-| [pr-14-ota-production](./pr-14-ota-production/PROJECT.md) | OTA Production System (SemVer, channels, multi-arch, rollback wiring, config lifecycle, CI/CD) | 📋 **PLANNING** — 9 WOs defined, awaiting user approval | Session 2fdb967a |
+| [pr-14-ota-production](./pr-14-ota-production/PROJECT.md) | OTA Production System (SemVer, channels, multi-arch, rollback wiring, config lifecycle, CI/CD) | ✅ **COMPLETE** — 9 WOs merged + OTA boot gate + channel floor model | Session 2fdb967a / [distillation](./pr-14-ota-production/distillation/context_bridge.md) |
 | [pr-15-web-testing](./pr-15-web-testing/PROJECT.md) | Web Portal Testing Infrastructure (Mock Server + Playwright + Build Gate) | ✅ **MERGED** `f03972e` — 48 tests | Session 97274580 |
 | [pr-16-backup-overhaul](./pr-16-backup-overhaul/PROJECT.md) | Backup System Overhaul (Route fix, `_meta` envelope, OTA IConfigurable, streaming response) | 🔄 **WIP** — WO1 in progress | Session f6e289ed |
 | [pr-17-display-refactor](./pr-17-display-refactor/PROJECT.md) | Display Module OO Refactoring (CarouselEngine, BoardCatalog, ScreensaverController, remove Application* coupling) | 📋 **PLANNING** — 5 WOs defined, awaiting user approval | Session 0735b228 |
@@ -61,11 +61,22 @@ predate the formal PA pipeline and are filed retrospectively.
 
 ## Ad-Hoc Work (Not Formally Tracked as PRs)
 
+> [!NOTE]
+> All session distillations now live here. `context_archives/` at the repo root is **deprecated** — do not create new archives there. The canonical location for all distillations is inside this workspace, either under the relevant `pr-*/` project or a new `adhoc-*/` directory.
+
 | Archive | Date | Topic | Status | Link |
 |---------|------|-------|--------|------|
-| AppTab & Rules Bug | 2026-06-02 | App tab config wiring (clock font size) + Antigravity rules engine bug report | ⚠️ **PARTIAL** — PascalCase rename committed `544d60c`, `appconfig.js` untracked | [adhoc-app-tab-rules-bug/](./adhoc-app-tab-rules-bug/context_bridge.md) |
+| AppTab & Rules Bug | 2026-06-02 | App tab config wiring (clock font size) + Antigravity rules engine bug report | ⚠️ **PARTIAL** — `appconfig.js` scope unclear, stash `stash@{2}` pending drop | [adhoc-app-tab-rules-bug/](./adhoc-app-tab-rules-bug/context_bridge.md) |
+| OO Expert Review | 2026-06-04 | OO architecture review findings, ConfigManager locked-vector, module compliance scorecard | ✅ **COMPLETE** | [adhoc-oo-expert-review/](./adhoc-oo-expert-review/context_bridge.md) |
+| Screensaver TWDT Crash | 2026-06-07 | Deterministic TWDT crash at 313 s — `vTaskDelay` fix, `setPowerSave(1)`, `localtime_r` thread safety | ✅ **FIXED** — `026354b`, `842a7e5` | [adhoc-screensaver-twdt/](./adhoc-screensaver-twdt/context_bridge.md) |
+| OTA Docs & Boot Hotfix | 2026-06-07 | `build_and_release_process.md`, Wi-Fi gate in `tick()`, `_silentCheck`, channel risk-floor model | ✅ **COMPLETE** | [adhoc-ota-docs-hotfix/](./adhoc-ota-docs-hotfix/context_bridge.md) |
 
 ---
 
-*Updated by Principal Architect — PR-16 Backup Overhaul initiated — 2026-06-03*
+## TimeManager Upgrade
+
 - [TimeManager Upgrade Port](./pr-time-manager-upgrade/PROJECT.md)
+
+---
+
+*Updated: 2026-06-07 — context_archives migrated into PA workspace; pr-14 marked COMPLETE*
