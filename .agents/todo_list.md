@@ -1,6 +1,6 @@
 # Project Todo List
 
-> Last updated: 2026-06-06
+> Last updated: 2026-06-07
 
 ---
 
@@ -38,8 +38,10 @@
 ## 🌐 Web Portal — UI Consistency
 
 - [ ] **Standardise "Advanced" sections as collapsible yellow drawers** — Establish a consistent drawer component pattern for all Advanced/danger-zone functionality across the portal. The OTA Advanced card is the reference implementation: yellow (`--warning`) border/header. All other Advanced sections (currently blue and/or expanded) must be migrated to match. The drawer should be collapsed by default so advanced settings are hidden under a fold — users explicitly open them. Audit every tab for Advanced sections and apply the pattern consistently. The goal is a single reusable visual language: yellow = advanced/caution, fold = opt-in, so users aren't confronted with danger-zone controls on first glance.
+- [x] **Screensaver blanking crash (TWDT)** — Root cause identified and fixed. Deterministic crash at 313s every boot was a **Task Watchdog Timer** firing because `U8G2DisplayModule::tick()` returned in microseconds when blanked (no rendering path), causing `loopTask` on CPU 1 to spin at MHz speed and starve `IDLE1`. Fix: `vTaskDelay(targetFrameIntervalMs)` in the `isBlanked` early-return path maintains ~33ms cadence when blanked. Also confirmed `setPowerSave(1)` works correctly with this fix — genuine hardware sleep (DC-DC boost converter off, segments deenergised). USB JTAG console re-enabled (`CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y`) after PR-19 accidentally set it to NONE. `localtime()` → `localtime_r()` thread safety fix also applied.
+  > Commits: `026354b` (vTaskDelay fix), `767ee4f` (console + localtime_r), `842a7e5` (setPowerSave confirmed).
 - [ ] **Screensaver toggle switches always grey** — The on/off toggle switches for screensaver settings appear permanently grey and do not reflect state correctly. Investigate toggle styling and state binding in `display.js` / relevant CSS.
-  > 📦 **`stash@{1}`** (`34f07b6`, description: *"On main: remaining-unstaged"*) contains uncommitted `ScreensaverBoard.cpp/.hpp` and `U8G2DisplayModule.cpp` changes that may be the firmware-side fix for this. Apply and verify before investigating the portal toggle styling.
+  > 📦 **`stash@{1}`** (`34f07b6`) ScreensaverBoard changes — verify these are already in main (setClockFont wiring was confirmed merged); if so, drop the stash.
 
 ---
 
