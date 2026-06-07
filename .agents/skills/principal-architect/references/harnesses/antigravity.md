@@ -32,6 +32,14 @@ Key parameters to set on every Work Order spawn:
 
 Do not use `manage_subagents` to poll for completion. Wait to be woken.
 
+## Artifact-Write Authorization (not needed here)
+
+Unlike Claude Code, this runtime does **not** restrain workers from writing report-style `.md`
+files. Workers author their own WORKORDER status updates, ADRs, graveyard notes, and
+`@distillery` → `context_bridge.md` directly — this is the established pattern and the source of
+the existing distillations in this workspace. No special authorization block in the spawn prompt
+is required.
+
 ## Complexity → Capability (No Model Lever)
 
 Because per-spawn model selection is unavailable in this runtime, the WORKORDER's `complexity` field is **advisory only** for provisioning — it does not change which model runs the worker. It remains valuable, but the efficiency levers shift:
