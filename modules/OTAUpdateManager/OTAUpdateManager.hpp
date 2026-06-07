@@ -60,8 +60,29 @@
 #include <Arduino.h>
 #include <Stream.h>
 #else
+#include <string>
 #include <cstddef>  // for size_t
 #include <stdint.h>
+// Stub String class for NATIVE_BUILD tests
+#ifndef STRING_STUB_DEFINED
+#define STRING_STUB_DEFINED
+class String {
+public:
+    String(const char* s) : str(s ? s : "") {}
+    String(const std::string& s) : str(s) {}
+    String() {}
+    const char* c_str() const { return str.c_str(); }
+    bool isEmpty() const { return str.empty(); }
+    int length() const { return (int)str.size(); }
+    char operator[](int i) const { return str[i]; }
+    bool operator==(const char* s) const { return str == s; }
+    bool operator==(const String& s) const { return str == s.str; }
+    String operator+(const char* s) const { return String(str + s); }
+    String operator+(const String& s) const { return String(str + s.str); }
+private:
+    std::string str;
+};
+#endif
 // Minimal Stream stub for NATIVE_BUILD
 class Stream {};
 #endif
