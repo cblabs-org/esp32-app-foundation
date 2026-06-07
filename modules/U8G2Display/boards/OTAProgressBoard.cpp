@@ -133,7 +133,7 @@ bool OTAProgressBoard::isExpired() const {
 #ifndef NATIVE_BUILD
     return (millis() - _failedAtMs) >= kFailureTimeoutMs;
 #else
-    return true;
+    return false;  // Native: failure persists (no millis() — assume timeout not yet elapsed)
 #endif
 }
 
