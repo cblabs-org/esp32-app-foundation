@@ -194,16 +194,22 @@ void ScreensaverController::_dim(U8G2& display) {
  * @brief Transition to blanked state — enable hardware power-save on the display.
  */
 void ScreensaverController::_blank(U8G2& display) {
-    // No hardware call. The display was already dimmed in _dim().
-    // Root cause of the TWDT crash: loopTask spinning at MHz speed when blanked
-    // starves IDLE1 on CPU 1 (fixed by vTaskDelay in U8G2DisplayModule::tick()).
-    // Sending setContrast(0) or setPowerSave(1) during MSPI cache contention
-    // (octal PSRAM bus on UM NanoS3) was also found to aggravate the async_tcp
-    // spin — so we skip the hardware call entirely.
-    (void)display;
+    // Send a black frame so the display appears visually off.
+    // Using clearBuffer()/sendBuffer() rather than setPowerSave(1) or
+    // setContrast(0) — both of those triggered MSPI bus contention on the
+    // UM NanoS3 that caused async_tcp to spin and starve IDLE1 (TWDT crash).
+    // The actual TWDT fix is the vTaskDelay in U8G2DisplayModule::tick();
+    // this SPI call is safe because that yield fires on the very next loop.
     ESP_LOGI(TAG, "Display blanked (entering power save)");
+#ifndef NATIVE_BUILD
+    display.clearBuffer();
+    display.sendBuffer();
+#else
+    (void)display;
+#endif
     _blanked = true;
 }
+
 
 
 /**
