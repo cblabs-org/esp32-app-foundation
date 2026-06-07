@@ -194,16 +194,17 @@ void ScreensaverController::_dim(U8G2& display) {
  * @brief Transition to blanked state — enable hardware power-save on the display.
  */
 void ScreensaverController::_blank(U8G2& display) {
-    // Send a black frame so the display appears visually off.
-    // Using clearBuffer()/sendBuffer() rather than setPowerSave(1) or
-    // setContrast(0) — both of those triggered MSPI bus contention on the
-    // UM NanoS3 that caused async_tcp to spin and starve IDLE1 (TWDT crash).
-    // The actual TWDT fix is the vTaskDelay in U8G2DisplayModule::tick();
-    // this SPI call is safe because that yield fires on the very next loop.
+    // Use hardware power-save (setPowerSave(1) = display controller sleep).
+    // This is the correct approach — it deenergises the OLED segments and
+    // shuts down the DC-DC boost converter, unlike clearBuffer/sendBuffer
+    // which only visually blanks while the controller keeps running.
+    //
+    // Previously this crashed (TWDT) but the root cause was the tight main
+    // loop after blanking starving IDLE1 — not the SPI command itself.
+    // The vTaskDelay(33ms) in U8G2DisplayModule::tick() fixes that.
     ESP_LOGI(TAG, "Display blanked (entering power save)");
 #ifndef NATIVE_BUILD
-    display.clearBuffer();
-    display.sendBuffer();
+    display.setPowerSave(1);
 #else
     (void)display;
 #endif
@@ -218,7 +219,7 @@ void ScreensaverController::_blank(U8G2& display) {
 void ScreensaverController::_wake(U8G2& display, uint8_t activeBrightness) {
 #ifndef NATIVE_BUILD
     ESP_LOGI(TAG, "Display waking from sleep");
-    // Note: no setPowerSave(0) needed — blank used setContrast(0), not hardware power-save.
+    display.setPowerSave(0);  // Wake from hardware sleep before restoring contrast
     display.setContrast(activeBrightness);
 #endif
     _dimmed = false;
