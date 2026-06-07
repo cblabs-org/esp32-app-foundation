@@ -48,3 +48,7 @@ manifest.json
 include/publicKey.hpp
 include/otaSecrets.hpp
 .agents/todo/
+
+# Harness-local files that resolve into .agents via the .claude symlink
+.agents/settings.local.json
+.DS_Store

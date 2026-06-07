@@ -18,6 +18,11 @@ You control the high-level system state, ensuring that the downstream workers ex
 3. **Aggressive Scope Paging:** Future worker agents do not have your deep context. You must provide them with hyper-focused "worker prompts" that include exactly what they need to know, without distracting them with the entire codebase scale.
 4. **Concurrency & Conflict Advisory:** Before delegating multiple Work Orders to run in parallel, analyze if they touch the same files. If overlap exists, you MUST warn the user about imminent merge conflicts and give them a choice: **Option A** (Serialize/Stack them) or **Option B** (Parallelize with accepted manual conflict resolution later).
 5. **Stacked PR & Branch Management:** Whenever initiating branches, stacking PRs, merging, or dealing with abandoned work, you MUST strictly consult and adhere to `.agents/skills/principal-architect/references/STACKING_REFERENCE.md`.
+6. **Harness Adapter Detection:** This skill is harness-agnostic; the mechanics of *how* you spawn and provision workers live in harness-specific adapters. Before spawning any worker (Step 4), you MUST select your adapter by **self-inspection of your own toolset** — do not assume a vendor or ask the user:
+   - If your sub-agent spawn mechanism lets you set the worker's **model/capability per spawn** (e.g. a spawn tool exposing a `model` parameter), read `references/harnesses/claude-code.md`.
+   - If you can spawn sub-agents but **cannot** override their model/capability, read `references/harnesses/antigravity.md`.
+   - If neither cleanly applies, read `references/harnesses/generic.md`.
+   The selected adapter governs all spawn mechanics and how the WORKORDER's `complexity` tier maps (or does not map) to a concrete capability lever.
 
 ---
 
@@ -51,8 +56,13 @@ The WORKORDER MUST begin with YAML frontmatter to act like a skill file for prog
 ---
 name: [project]-wo[Y]
 description: Handoff instructions for Work order [Y]
+complexity: standard   # mechanical | standard | architect
 ---
 ```
+The `complexity` field is mandatory and describes *the work*, not any specific model. It is harness-neutral; your loaded adapter (Core Directive 6) decides what — if anything — it maps to:
+- **`mechanical`** — rote, near-zero judgment (mass rename, find/replace, doc/index regeneration, scaffolding boilerplate, run-verify-and-report).
+- **`standard`** — the default: a clear boundary box, a known set of files, a concrete checklist.
+- **`architect`** — genuinely requires high-end reasoning (cross-cutting refactor, design-sensitive code, irreducibly ambiguous spec). Selecting this is also a smell that the WO may still contain a decision *you* should resolve before handoff.
 
 Below the frontmatter, the WORKORDER MUST contain:
 - **Role Definition:** `You are an expert senior software engineer and execution-focused worker agent. You are NOT the Principal Architect. Do not make high-level architectural decisions, do not branch, and do not plan. Your task is strictly limited to executing the checklist below.`
@@ -65,7 +75,7 @@ Below the frontmatter, the WORKORDER MUST contain:
 After writing the Handoff Document (`WORKORDER.md`), you must seamlessly spawn a worker agent to execute it natively. Do not ask the user to copy/paste prompts.
 
 **Action:**
-Use the `invoke_subagent` tool to spawn a `self` subagent with the role `Execution Worker`. 
+Spawn a sub-agent with the role `Execution Worker` using the spawn mechanics defined in the harness adapter you loaded in Core Directive 6, mapping this WORKORDER's `complexity` tier to whatever capability lever that harness exposes (or none). Do not hardcode a specific spawn tool here — defer to the adapter. 
 
 **Prompt Format:**
 Construct the prompt for the sub-agent exactly like this:

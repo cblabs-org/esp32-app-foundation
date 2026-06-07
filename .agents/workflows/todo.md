@@ -1,5 +1,6 @@
 ---
 description: Workflow for managing the project backlog in .agents/todo/todo.md (todo_list branch). Supports adding items from the current session or synthesising them from another conversation, updating item status, and reviewing the list for PA handoff.
+argument-hint: [add|update|review|add from conversation] "<note>"
 ---
 
 # /todo — Project Backlog Workflow
@@ -74,45 +75,32 @@ Add an item synthesised from **another conversation**. Use when you noticed some
 
 **Steps:**
 
-1. **Resolve the conversation reference:**
-   - If a GUID is given, use it directly.
-   - If title keywords are given:
-     a. Check the conversation summaries in the current session context first.
-     b. If not found there, list `~/.gemini/antigravity/brain/` to get candidate GUIDs, then read each `transcript.jsonl` head to match the title from the first USER_INPUT or PLANNER_RESPONSE.
-     ```bash
-     ls ~/.gemini/antigravity/brain/
-     head -n 5 ~/.gemini/antigravity/brain/<guid>/.system_generated/logs/transcript.jsonl
-     ```
+> [!IMPORTANT]
+> **Harness adapter — read only yours.** Resolving a `[ref]` to a conversation and reading its transcript is harness-specific. Determine your harness by **self-inspection of your own toolset**, then read **only** the one matching adapter (do not read the others — that wastes context):
+> | If your toolset has… | Read this adapter |
+> |---|---|
+> | dedicated session / transcript-search tools | `.agents/harness-adapters/todo/claude-code.md` |
+> | a local on-disk `brain/` transcript store | `.agents/harness-adapters/todo/antigravity.md` |
+> | neither | *(no adapter)* — ask the user to paste the relevant transcript excerpt or a link, then skip to step 3 |
+>
+> The adapter defines, for steps 1–2 only, how to (a) resolve the reference and (b) read the transcript. Everything below it is harness-neutral.
 
-2. **Read the transcript** for context relevant to the user's note:
-   ```bash
-   cat ~/.gemini/antigravity/brain/<guid>/.system_generated/logs/transcript.jsonl | python3 -c "
-   import sys, json
-   for line in sys.stdin:
-       try:
-           step = json.loads(line)
-           src = step.get('source','')
-           t = step.get('type','')
-           content = step.get('content','')
-           if content and len(content) > 20 and t in ('USER_INPUT','PLANNER_RESPONSE'):
-               print(f'--- [{src}] [{t}] ---')
-               print(content[:2000])
-               print()
-       except: pass
-   "
-   ```
-   Focus on the tail of the transcript — that's where deferred observations typically appear.
+1. **Resolve the conversation reference** to a specific conversation, per your adapter:
+   - If a GUID is given, use it directly.
+   - If title keywords are given, check the current-session conversation summaries first, then fall back to your adapter's lookup.
+
+2. **Read that conversation's transcript** per your adapter, focusing on the **tail** — deferred observations typically appear there.
 
 3. **Synthesise** a context-rich todo item from the transcript evidence + the user's note. Include:
    - What was observed / what broke
    - Why it was deferred (what it depends on)
-   - A link to the source conversation
+   - A reference to the source conversation (see **Item Format** — use a repo-relative path or the bare conversation ref, **never** an absolute `file://` path)
 
-4. **Read `.agents/todo_list.md`** to check for duplicates and pick the right section.
+4. **Read `.agents/todo/todo.md`** to check for duplicates and pick the right section.
 
 5. **Present the draft** to the user for confirmation. Do NOT write yet.
 
-6. On approval, append the item to `todo_list.md`.
+6. On approval, append the item to `.agents/todo/todo.md` and commit/push from within the worktree (see the **Worktree Guard** and `/todo add` commit block).
 
 ---
 
@@ -152,14 +140,16 @@ Summarise the open backlog for `/principal-architect` handoff planning.
 
 ## Item Format
 
-All items written to `todo_list.md` must follow this format:
+All items written to `.agents/todo/todo.md` must follow this format:
 
 ```markdown
 - [ ] **Short imperative title** — One or two sentence description of what needs doing and why.
   Optional lines (only include if relevant):
   > ⚠️ Depends on: [item title or PR label]
-  > 📄 Context: conversation [`<short-guid>`](file:///path/to/brain/<guid>/implementation_plan.md) — one-line summary of what's there
+  > 📄 Context: conversation `<short-ref>` — one-line summary of what's there
 ```
+
+> **Conversation references must be portable.** Use the bare conversation ref (e.g. a short GUID) or a repo-relative path. **Never** embed an absolute `file://` OS path — it breaks on every other machine and harness. If your harness exposes a stable in-repo or tool-addressable link, the adapter you loaded will say so.
 
 **Status markers:**
 - `[ ]` — open / not started
