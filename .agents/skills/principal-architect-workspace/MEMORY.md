@@ -56,6 +56,7 @@ predate the formal PA pipeline and are filed retrospectively.
 | [pr-17-display-refactor](./pr-17-display-refactor/PROJECT.md) | Display Module OO Refactoring (CarouselEngine, BoardCatalog, ScreensaverController, remove Application* coupling) | 📋 **PLANNING** — 5 WOs defined, awaiting user approval | Session 0735b228 |
 | [pr-18-screensaver-settings](./pr-18-screensaver-settings/PROJECT.md) | Screensaver & Display Settings (config expansion, MCP tools, web portal Display tab) | ✅ **COMPLETE** — 3 WOs merged, 60 new tests | Session a1c50fdf |
 | [pr-19-sdkconfig-layering](./pr-19-sdkconfig-layering/PROJECT.md) | sdkconfig Architecture — Base+Delta Layering (fix PSRAM regression, eliminate ~90% duplication, add build guard) | ✅ **COMPLETE** — 2 WOs merged, ready for PR submission | Session 34de947b |
+| [pr-20-config-refactor](./pr-20-config-refactor/PROJECT.md) | FrameworkConfig Refactor + appconfig.js Clarity (move 5 runtime defaults to module `resetConfig()`; keep 3 OTA secrets) | 📋 **PLANNING** — WO1 authored, WO2 outlined; awaiting user approval | Current Session |
 
 ---
 
