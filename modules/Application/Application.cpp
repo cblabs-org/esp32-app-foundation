@@ -71,7 +71,7 @@ Application::~Application() {
  *   WiFi → Time → Data → OTA → Web → Lock → Gate check →
  *   CONFIGURING (if unsatisfied) or RUNNING (if all gates pass)
  *
- * @param config Framework-level configuration (hostname, timezone, etc.)
+ * @param config Framework-level configuration (OTA settings, etc.)
  * @return true on success; false if a fatal error prevents normal operation.
  */
 bool Application::begin(const FrameworkConfig& config) {
@@ -116,8 +116,7 @@ bool Application::begin(const FrameworkConfig& config) {
 
     // --- Step 5: Store FrameworkConfig internally ---
     _config = config;
-    ESP_LOGI(TAG, "FrameworkConfig stored: hostname=%s timezone=%s",
-             _config.hostname, _config.timezone);
+    ESP_LOGI(TAG, "FrameworkConfig stored");
     _statusReporter->reportStatus("Configuration defaults loaded", 0.15f);
 
     // --- Step 6: DeviceCrypto + KeyManager ---
@@ -157,13 +156,16 @@ bool Application::begin(const FrameworkConfig& config) {
     _statusReporter->reportStatus("Connecting to WiFi...", 0.40f);
 
     // --- Step 10: WifiManager.begin() ---
-    // Now has persisted SSID/hostname from ConfigManager (step 8).
-    _wifiManager.begin(_config.hostname);
+    // Now has persisted SSID/hostname from ConfigManager (step 8), or the
+    // factory default seeded by resetConfig() (from setDefaultHostname()).
+    _wifiManager.begin();
     ESP_LOGI(TAG, "WiFi setup initiated");
     _statusReporter->reportStatus("WiFi initialized", 0.55f);
 
     // --- Step 11: TimeManager — after WiFi, needs network for NTP ---
-    _timeManager.begin(_config.timezone);
+    // Uses the persisted timezone from ConfigManager, or the factory default
+    // ("GMT0") seeded by resetConfig().
+    _timeManager.begin();
     _statusReporter->reportStatus("Time synchronization started", 0.65f);
 
     // --- Step 12: DataManager — background data workers ---
@@ -197,8 +199,9 @@ bool Application::begin(const FrameworkConfig& config) {
     // --- Step 15: WebServerManager + MCPServer begin() ---
     _webServerManager.begin(_webContributors);
 
-    // MCP server: pass the ConfigManager reference for config operations
-    _mcpServer.begin(_mcpContributors, &_configManager, &_config, &_timeManager);
+    // MCP server: pass the ConfigManager reference for config operations,
+    // plus TimeManager (built-in time tools) and WifiManager (status hostname).
+    _mcpServer.begin(_mcpContributors, &_configManager, &_timeManager, &_wifiManager);
     _statusReporter->reportStatus("Web portal starting...", 0.90f);
 
     // --- Phase 2: Complete display integration ---
@@ -207,7 +210,7 @@ bool Application::begin(const FrameworkConfig& config) {
 #ifndef NATIVE_BUILD
     _display.begin(&_eventBus);
     _display.setConfigManager(&_configManager);
-    _diagnosticsBoard.configure(_config.hostname, &_wifiManager);
+    _diagnosticsBoard.configure(&_wifiManager);
     _display.carousel.add(&_diagnosticsBoard);
     _mcpServer.setDisplayInfo(_display.getDisplayInfo());
 #endif

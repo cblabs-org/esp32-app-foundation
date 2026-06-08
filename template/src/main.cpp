@@ -36,8 +36,11 @@ void setup() {
 
     // Prepare Framework config
     FrameworkConfig config;
-    config.hostname = "ESP32-App";
-    config.timezone = "UTC0";
+
+    // App names its hostname default — WiFiManager owns the persisted value
+    // and falls back to this on factory reset (resetConfig()). Must be set
+    // before app.begin().
+    app.getWifiManager().setDefaultHostname("ESP32-App");
 
     // Begin framework
     app.begin(config);

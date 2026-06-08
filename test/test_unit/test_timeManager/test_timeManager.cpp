@@ -13,7 +13,7 @@ TEST_F(TimeManagerTest, InitialState) {
 
 // begin() sets synced
 TEST_F(TimeManagerTest, BeginSetsSynced) {
-    timeManager.begin("GMT0");
+    timeManager.begin();
     EXPECT_TRUE(timeManager.isTimeSet());
 }
 
@@ -26,14 +26,14 @@ TEST_F(TimeManagerTest, GetLocalTimeBeforeBegin) {
 
 // getLocalTime() after begin
 TEST_F(TimeManagerTest, GetLocalTimeAfterBegin) {
-    timeManager.begin("GMT0");
+    timeManager.begin();
     struct tm timeinfo;
     EXPECT_TRUE(timeManager.getLocalTime(&timeinfo));
 }
 
 // getLocalTime() with nullptr
 TEST_F(TimeManagerTest, GetLocalTimeNullptr) {
-    timeManager.begin("GMT0");
+    timeManager.begin();
     EXPECT_FALSE(timeManager.getLocalTime(nullptr));
 }
 
@@ -45,7 +45,7 @@ TEST_F(TimeManagerTest, SetTimezone) {
 
 // tick() after begin
 TEST_F(TimeManagerTest, TickAfterBegin) {
-    timeManager.begin("GMT0");
+    timeManager.begin();
     timeManager.tick();
     SUCCEED();
 }
@@ -58,14 +58,17 @@ TEST_F(TimeManagerTest, TickBeforeBegin) {
 
 // Multiple begin() calls
 TEST_F(TimeManagerTest, MultipleBeginCalls) {
-    timeManager.begin("GMT0");
-    timeManager.begin("EST5EDT");
+    timeManager.begin();
+    timeManager.setTimezone("EST5EDT");
+    timeManager.begin();
     SUCCEED();
 }
 
-// begin() with custom NTP servers
-TEST_F(TimeManagerTest, BeginCustomNtpServers) {
-    timeManager.begin("GMT0");
+// resetConfig() seeds the factory default POSIX timezone ("GMT0")
+TEST_F(TimeManagerTest, ResetConfigSeedsDefaultPosixTimezone) {
+    timeManager.resetConfig();
+    EXPECT_STREQ("GMT0", timeManager.getPosixTz());
+    timeManager.begin();
     EXPECT_TRUE(timeManager.isTimeSet());
 }
 

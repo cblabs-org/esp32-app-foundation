@@ -92,12 +92,12 @@ public:
      * @brief Initializes NTP config and sets the POSIX timezone.
      *
      * Called during the Application boot sequence after WiFi.begin().
-     * Uses the effective timezone (from config if persisted, or FrameworkConfig default).
-     * NTP servers are taken from member variables (populated by applyConfig() or defaults).
-     *
-     * @param timezone POSIX timezone string (fallback from FrameworkConfig).
+     * Uses the effective POSIX timezone — either a persisted value already
+     * loaded by applyConfig(), or the factory default seeded by resetConfig()
+     * ("GMT0"). NTP servers are taken from member variables (populated by
+     * applyConfig() or defaults).
      */
-    void begin(const char* timezone);
+    void begin();
 
     /**
      * @brief Non-blocking update routine to be called in main loop.

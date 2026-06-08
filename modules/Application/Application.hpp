@@ -139,7 +139,7 @@ public:
      * to enable visual boot progress on a display. When no reporter is
      * registered, the NullStatusReporter fallback absorbs all calls.
      *
-     * @param config  Framework-level configuration struct (hostname, timezone, etc.)
+     * @param config  Framework-level configuration struct (OTA settings, etc.)
      * @return true if boot completed successfully; false on a fatal error (e.g. LittleFS mount failure)
      */
     bool begin(const FrameworkConfig& config);

@@ -34,6 +34,8 @@
  *   - testConnection():     Validation probe for new credentials.
  *   - setConfigManager():   Wire the ConfigManager pointer for save operations.
  *   - setKeyManager():      Wire the KeyManager pointer for encrypted password storage.
+ *   - setDefaultHostname(): App-supplied factory default hostname (used by resetConfig()).
+ *   - getHostname():        Current effective hostname (single source of truth for the framework).
  *
  *   IConfigurable (namespace: "wifi", schema v1):
  *   - getConfigNamespace(): Return "wifi"
@@ -114,6 +116,7 @@ private:
     char wifiSsid[33];
     char wifiPass[65];
     char currentHostname[33];
+    char _defaultHostname[33];               ///< App-supplied factory default hostname (set via setDefaultHostname)
     bool isAPMode = false;
     WiFiState currentState = WiFiState::Init;
     unsigned long stateTimer = 0;
@@ -200,9 +203,12 @@ public:
 
     /**
      * @brief Initialize WiFi. Sets up initial state.
-     * @param hostname The hostname to use for the AP and mDNS
+     *
+     * Relies on the hostname already being populated — either by a persisted
+     * value applied via applyConfig(), or by the factory default set in
+     * resetConfig() (seeded from setDefaultHostname()).
      */
-    void begin(const char* hostname);
+    void begin();
 
     // --- IConfigurable Interface (ConfigManager Gateway) ---
 
@@ -282,6 +288,23 @@ public:
      * @param km Pointer to the KeyManager instance.
      */
     void setKeyManager(KeyManager* km) { _keyManager = km; }
+
+    /**
+     * @brief Set the app-supplied factory default hostname.
+     *
+     * Called by the downstream app (via Application::getWifiManager()) before
+     * Application::begin() runs, so resetConfig() has an app-specific default
+     * to fall back to instead of the framework's generic "esp32-device".
+     *
+     * @param hostname Default hostname to seed resetConfig() with (truncated to 32 chars).
+     */
+    void setDefaultHostname(const char* hostname);
+
+    /**
+     * @brief Returns the current effective hostname (persisted value or factory default).
+     * @return Current hostname string.
+     */
+    const char* getHostname() const { return currentHostname; }
 
     /**
      * @brief Record that an API request was received to keep AP mode alive.

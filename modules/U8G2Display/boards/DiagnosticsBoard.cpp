@@ -13,7 +13,7 @@
  *
  * Exported Functions:
  * - DiagnosticsBoard::DiagnosticsBoard(): Construct with display dimensions
- * - DiagnosticsBoard::configure():        Inject hostname + WifiManager
+ * - DiagnosticsBoard::configure():        Inject WifiManager (sources hostname + SSID)
  * - DiagnosticsBoard::tick():             Refresh telemetry data (~1s throttle)
  * - DiagnosticsBoard::render():           Render 4 rows to U8G2 display buffer
  * - DiagnosticsBoard::isExpired():        Always returns false (permanent board)
@@ -21,7 +21,7 @@
  */
 
 #include "DiagnosticsBoard.hpp"
-#include "../../WifiManager/WifiManager.hpp"  // Full definition for getSSID()
+#include "../../WifiManager/WifiManager.hpp"  // Full definition for getHostname() + getSSID()
 #include "fonts/Fonts.hpp"
 #include <cstdio>
 
@@ -64,21 +64,21 @@ DiagnosticsBoard::DiagnosticsBoard(uint16_t displayWidth, uint16_t displayHeight
 // =============================================================================
 
 /**
- * @brief Inject narrow dependencies and set the static hostname label.
+ * @brief Inject the WifiManager dependency and set the static hostname label.
  *
- * The hostname is set once here since it doesn't change at runtime.
+ * The hostname is sourced directly from WifiManager (the framework's single
+ * source of truth) and set once here since it doesn't change at runtime.
  * Font assignments are also done here (hardware only) since they only
  * need to be applied once.
  *
- * @param hostname    Device hostname (must outlive this board).
- * @param wifiManager Pointer to WifiManager for SSID access.
+ * @param wifiManager Pointer to WifiManager for hostname + SSID access.
  */
-void DiagnosticsBoard::configure(const char* hostname, WifiManager* wifiManager) {
+void DiagnosticsBoard::configure(WifiManager* wifiManager) {
     _wifiManager = wifiManager;
 
     // --- Set hostname label (static — only needs setting once) ---
-    if (hostname != nullptr) {
-        _row1.setText(hostname);
+    if (_wifiManager != nullptr) {
+        _row1.setText(_wifiManager->getHostname());
     }
     _row1.setAlignment(1);  // CENTER
 

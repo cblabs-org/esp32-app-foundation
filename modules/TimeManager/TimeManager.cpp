@@ -43,20 +43,14 @@ static const char* TAG = "TimeManager";
 /**
  * @brief Initializes NTP config and sets the POSIX timezone.
  *
- * Uses the effective POSIX timezone: if applyConfig() has already loaded a
- * persisted timezone, _posixTz is used. Otherwise, the FrameworkConfig
- * fallback is applied.
- *
- * @param timezone POSIX timezone string (fallback from FrameworkConfig).
+ * Uses the effective POSIX timezone, which is already populated in _posixTz —
+ * either from a persisted value applied via applyConfig(), or from the
+ * factory default seeded by resetConfig() ("GMT0").
  */
-void TimeManager::begin(const char* timezone) {
+void TimeManager::begin() {
     // --- Step 1: Apply timezone ---
-    // If applyConfig() has already loaded a persisted POSIX timezone, use that.
-    // Otherwise, use the FrameworkConfig fallback passed by Application::begin().
-    if (strlen(_posixTz) == 0 && timezone != nullptr) {
-        strncpy(_posixTz, timezone, sizeof(_posixTz) - 1);
-        _posixTz[sizeof(_posixTz) - 1] = '\0';
-    }
+    // _posixTz is already populated by applyConfig() (persisted) or
+    // resetConfig() (factory default "GMT0") by the time begin() runs.
     setTimezone(_posixTz);
 
     // --- Step 2: Configure NTP servers ---
@@ -216,12 +210,14 @@ void TimeManager::serializeConfig(JsonObject& section) const {
 /**
  * @brief Reset time configuration to factory defaults.
  *
- * Clears timezone to empty, resets NTP servers to defaults, and marks
- * as unconfigured. ConfigManager will call saveModuleConfig() afterwards.
+ * Clears the IANA timezone name (no user choice yet), seeds the POSIX TZ
+ * with the factory default ("GMT0"), resets NTP servers to defaults, and
+ * marks as unconfigured. ConfigManager will call saveModuleConfig() afterwards.
  */
 void TimeManager::resetConfig() {
     memset(_timezone, 0, sizeof(_timezone));
     memset(_posixTz, 0, sizeof(_posixTz));
+    strncpy(_posixTz, "GMT0", sizeof(_posixTz) - 1);
     strncpy(_ntpServer1, "pool.ntp.org", sizeof(_ntpServer1) - 1);
     strncpy(_ntpServer2, "time.nist.gov", sizeof(_ntpServer2) - 1);
     strncpy(_ntpServer3, "time.windows.com", sizeof(_ntpServer3) - 1);
@@ -495,11 +491,7 @@ void TimeManager::_reinitNtp() {
 // Mock implementation for NATIVE_BUILD testing
 // =============================================================================
 
-void TimeManager::begin(const char* timezone) {
-    if (timezone != nullptr && strlen(_posixTz) == 0) {
-        strncpy(_posixTz, timezone, sizeof(_posixTz) - 1);
-        _posixTz[sizeof(_posixTz) - 1] = '\0';
-    }
+void TimeManager::begin() {
     setTimezone(_posixTz);
     _syncStatus = TimeSyncStatus::SYNCED;
 }
@@ -557,6 +549,7 @@ void TimeManager::serializeConfig(JsonObject& section) const {
 void TimeManager::resetConfig() {
     memset(_timezone, 0, sizeof(_timezone));
     memset(_posixTz, 0, sizeof(_posixTz));
+    strncpy(_posixTz, "GMT0", sizeof(_posixTz) - 1);
     strncpy(_ntpServer1, "pool.ntp.org", sizeof(_ntpServer1) - 1);
     strncpy(_ntpServer2, "time.nist.gov", sizeof(_ntpServer2) - 1);
     strncpy(_ntpServer3, "time.windows.com", sizeof(_ntpServer3) - 1);

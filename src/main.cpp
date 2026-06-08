@@ -44,13 +44,16 @@ static Application app;  ///< Single framework hub instance
  */
 void setup() {
     FrameworkConfig config;
-    config.hostname = "esp32-foundation";
     config.otaGithubRepo = "matthewmcneill/esp32-app-foundation";
     config.otaPublicKey = (const char*)public_key_pem;
 
     #ifdef OTA_GITHUB_TOKEN
     config.otaGithubToken = OTA_GITHUB_TOKEN;
     #endif
+
+    // App names its hostname default — WiFiManager owns the persisted value
+    // and falls back to this on factory reset (resetConfig()).
+    app.getWifiManager().setDefaultHostname("esp32-foundation");
 
     if (!app.begin(config)) {
 #ifndef NATIVE_BUILD

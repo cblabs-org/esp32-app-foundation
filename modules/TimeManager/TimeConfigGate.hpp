@@ -61,7 +61,8 @@ public:
      *
      * Returns true when /mod/time.json has been loaded by ConfigManager
      * and applyConfig() has set _configured = true. Returns false when
-     * the device is using the FrameworkConfig default (no user choice).
+     * the device is still using the factory default timezone seeded by
+     * resetConfig() ("GMT0" — no explicit user choice yet).
      *
      * @return true when timezone has been explicitly configured.
      */

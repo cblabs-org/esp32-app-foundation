@@ -28,7 +28,6 @@
 #include "MCPServer.hpp"
 #include "MCPBuiltinTools.hpp"
 #include "interfaces/IMCPContributor.hpp"
-#include "FrameworkConfig.hpp"
 
 // =============================================================================
 // Test Group 1: MCPToolRegistry — Core registry mechanics
@@ -289,6 +288,21 @@ static std::string processAndCapture(MCPServer& server, const char* jsonLine) {
     return Serial.flush();
 }
 
+/**
+ * @brief Test helper — set the server's runtime readOnly toggle via applyConfig().
+ *
+ * mcpReadOnly is no longer seeded from FrameworkConfig (WO2a moved it to be a
+ * module-owned, persisted runtime toggle with a secure-by-default factory
+ * value set in resetConfig()). Tests drive it directly via the IConfigurable
+ * gateway, mirroring how ConfigManager would apply a persisted value.
+ */
+static void setReadOnly(MCPServer& server, bool readOnly) {
+    JsonDocument doc;
+    JsonObject section = doc.to<JsonObject>();
+    section["readOnly"] = readOnly;
+    server.applyConfig(section);
+}
+
 /** initialize must return protocolVersion in the result. */
 TEST(McpServerTest, InitializeReturnsCapabilities) {
     MCPServer server;
@@ -495,12 +509,11 @@ TEST(McpSecurityTest, MutatesStateTaggedCorrectly) {
 
 /** In read-only mode, calling a mutating tool must return error -32000. */
 TEST(McpSecurityTest, ReadOnlyBlocksMutatingTool) {
-    FrameworkConfig config;
-    config.mcpReadOnly = true;
     std::vector<IMCPContributor*> contributors;
 
     MCPServer server;
-    server.begin(contributors, nullptr, &config);
+    server.begin(contributors, nullptr);
+    setReadOnly(server, true);
 
     std::string response = processAndCapture(server,
         R"({"jsonrpc":"2.0","id":10,"method":"tools/call","params":{"name":"reboot"}})");
@@ -516,12 +529,11 @@ TEST(McpSecurityTest, ReadOnlyBlocksMutatingTool) {
 
 /** In read-only mode, calling a non-mutating tool must succeed. */
 TEST(McpSecurityTest, ReadOnlyAllowsReadTool) {
-    FrameworkConfig config;
-    config.mcpReadOnly = true;
     std::vector<IMCPContributor*> contributors;
 
     MCPServer server;
-    server.begin(contributors, nullptr, &config);
+    server.begin(contributors, nullptr);
+    setReadOnly(server, true);
 
     std::string response = processAndCapture(server,
         R"({"jsonrpc":"2.0","id":11,"method":"tools/call","params":{"name":"system_info"}})");
@@ -536,12 +548,11 @@ TEST(McpSecurityTest, ReadOnlyAllowsReadTool) {
 
 /** In read-write mode, calling a mutating tool must succeed. */
 TEST(McpSecurityTest, ReadWriteAllowsMutatingTool) {
-    FrameworkConfig config;
-    config.mcpReadOnly = false;
     std::vector<IMCPContributor*> contributors;
 
     MCPServer server;
-    server.begin(contributors, nullptr, &config);
+    server.begin(contributors, nullptr);
+    setReadOnly(server, false);
 
     std::string response = processAndCapture(server,
         R"({"jsonrpc":"2.0","id":12,"method":"tools/call","params":{"name":"reboot"}})");
@@ -556,12 +567,11 @@ TEST(McpSecurityTest, ReadWriteAllowsMutatingTool) {
 
 /** tools/list response must include mutatesState for each tool. */
 TEST(McpSecurityTest, ToolsListIncludesMutatesState) {
-    FrameworkConfig config;
-    config.mcpReadOnly = true;
     std::vector<IMCPContributor*> contributors;
 
     MCPServer server;
-    server.begin(contributors, nullptr, &config);
+    server.begin(contributors, nullptr);
+    setReadOnly(server, true);
 
     std::string response = processAndCapture(server,
         R"({"jsonrpc":"2.0","id":13,"method":"tools/list"})");

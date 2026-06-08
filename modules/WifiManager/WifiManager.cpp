@@ -94,6 +94,7 @@ WifiManager::WifiManager() : wifiDisconnectTimer(0) {
     memset(wifiSsid, 0, sizeof(wifiSsid));
     memset(wifiPass, 0, sizeof(wifiPass));
     memset(currentHostname, 0, sizeof(currentHostname));
+    strlcpy(_defaultHostname, "esp32-device", sizeof(_defaultHostname));
     strlcpy(myUrl, "http://0.0.0.0", sizeof(myUrl));
 }
 
@@ -169,11 +170,14 @@ void WifiManager::serializeConfig(JsonObject& section) const {
 
 /**
  * @brief Reset module configuration to factory defaults.
+ *
+ * Hostname falls back to the app-supplied default (set via setDefaultHostname(),
+ * or the framework fallback "esp32-device" if the app never called it).
  */
 void WifiManager::resetConfig() {
     memset(wifiSsid, 0, sizeof(wifiSsid));
     memset(wifiPass, 0, sizeof(wifiPass));
-    memset(currentHostname, 0, sizeof(currentHostname));
+    strlcpy(currentHostname, _defaultHostname, sizeof(currentHostname));
 #ifndef NATIVE_BUILD
     WiFi.disconnect(true, true);
     esp_wifi_restore();
@@ -187,10 +191,11 @@ void WifiManager::resetConfig() {
  * Note: loadConfig() is no longer called here — ConfigManager calls
  * applyConfig() during beginAll() before WifiManager::begin() runs.
  *
- * @param hostname The hostname to set for station/AP modes.
+ * The hostname is already populated by this point — either from a persisted
+ * value (applyConfig) or the factory default (resetConfig) — so begin() simply
+ * relies on currentHostname rather than accepting a parameter.
  */
-void WifiManager::begin(const char* hostname) {
-    if (hostname != nullptr) strlcpy(currentHostname, hostname, sizeof(currentHostname));
+void WifiManager::begin() {
     // Config is already loaded by ConfigManager::beginAll() calling applyConfig()
 
 #ifndef NATIVE_BUILD
@@ -363,6 +368,22 @@ void WifiManager::notifyApiActivity() {
 #ifndef NATIVE_BUILD
     lastApiRequestTime = millis();
 #endif
+}
+
+/**
+ * @brief Set the app-supplied factory default hostname.
+ *
+ * Stored separately from currentHostname so resetConfig() can restore it
+ * without depending on the app calling begin() with a parameter. Must be
+ * called before Application::begin() (and therefore before resetConfig()
+ * could run) to take effect on a factory-reset boot.
+ *
+ * @param hostname Default hostname to seed resetConfig() with (truncated to 32 chars).
+ */
+void WifiManager::setDefaultHostname(const char* hostname) {
+    if (hostname != nullptr) {
+        strlcpy(_defaultHostname, hostname, sizeof(_defaultHostname));
+    }
 }
 
 // =============================================================================

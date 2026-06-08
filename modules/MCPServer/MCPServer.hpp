@@ -140,7 +140,7 @@
 class IMCPContributor;
 class ConfigManager;
 class TimeManager;
-struct FrameworkConfig;
+class WifiManager;
 
 /**
  * @brief MCP JSON-RPC 2.0 server with Serial line-delimited transport.
@@ -156,11 +156,13 @@ class MCPServer : public IWebContributor, public IConfigurable {
 public:
     /**
      * @brief Initialise the MCP server: register built-in and contributor tools.
-     * @param contributors   List of IMCPContributor pointers to collect tools from.
-     * @param configManager  Optional pointer to the ConfigManager for config tools.
-     * @param frameworkConfig Optional pointer to the FrameworkConfig for security settings.
+     * @param contributors  List of IMCPContributor pointers to collect tools from.
+     * @param configManager Optional pointer to the ConfigManager for config tools.
+     * @param timeManager   Optional pointer to the TimeManager for built-in time tools.
+     * @param wifiManager   Optional pointer to the WifiManager — single source of truth
+     *                      for the device hostname shown on the status endpoint.
      */
-    void begin(const std::vector<IMCPContributor*>& contributors, ConfigManager* configManager = nullptr, const FrameworkConfig* frameworkConfig = nullptr, TimeManager* timeManager = nullptr);
+    void begin(const std::vector<IMCPContributor*>& contributors, ConfigManager* configManager = nullptr, TimeManager* timeManager = nullptr, WifiManager* wifiManager = nullptr);
 
     /**
      * @brief Process a single JSON-RPC request and write the response to the provided stream.
@@ -273,7 +275,7 @@ private:
     bool            _mcpEnabled  = true;          ///< Master on/off switch — false disables all processing
     bool            _mcpReadOnly = false;         ///< Guard: if true, mutating tools return error
     ConfigManager*  _configManager = nullptr;     ///< Cached for runtime config persistence
-    const FrameworkConfig* _frameworkConfig = nullptr; ///< Cached reference for status endpoint
+    WifiManager*    _wifiManager = nullptr;       ///< Cached reference for status endpoint hostname (single source of truth)
 
     /**
      * @brief Parse a complete JSON-RPC line and route to the appropriate handler.

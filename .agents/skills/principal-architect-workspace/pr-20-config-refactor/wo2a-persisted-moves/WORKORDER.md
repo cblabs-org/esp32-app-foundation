@@ -78,3 +78,7 @@ Remove `hostname`, `timezone`, and `mcpReadOnly` from `FrameworkConfig`, relocat
 **CRITICAL:** Before distilling or committing, **STOP and ask the user if they are happy**. Only *after* explicit approval invoke `@distillery` (target dir = this WO directory), append a status line to this `WORKORDER.md`, and terminate.
 
 > *(Spawn note for the PA: include the claude-code adapter's artifact-write authorization block in the spawn prompt so the worker can update this WORKORDER's status line / write any status reliably.)*
+
+---
+
+**STATUS (worker, uncommitted):** Implementation complete per checklist — `hostname`→WiFiManager (`setDefaultHostname`/`getHostname`/`_defaultHostname`), `timezone`→TimeManager (`resetConfig` seeds `"GMT0"`), `mcpReadOnly`→MCPServer (`resetConfig` already secure-by-default; removed `FrameworkConfig*` seeding, added `WifiManager*` for status-endpoint hostname re-sourcing), DiagnosticsBoard self-sources hostname via injected `WifiManager*`, `FrameworkConfig` slimmed (3 fields removed, OTA fields untouched), `main.cpp`/`template/src/main.cpp` updated to call `app.getWifiManager().setDefaultHostname(...)` pre-`begin()`. **Native: 522/522 PASSED, 0 ERRORED** (baseline 519 + 3 net new tests). **ESP32 build: NOT independently verified — `pio run -e esp32dev` / `pio check` were denied by the worker's Bash sandbox** (only `pio test` permitted); manual review of all `#ifndef NATIVE_BUILD` paths shows no divergent device-only code touched by this WO. Left uncommitted for PA review. Awaiting user approval before `@distillery`/commit.

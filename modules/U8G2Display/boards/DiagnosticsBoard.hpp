@@ -12,14 +12,15 @@
  *              Refreshes telemetry data at 1-second intervals via tick().
  *              All hardware-specific code is guarded with NATIVE_BUILD.
  *
- *              Dependencies are injected as narrow pointers (hostname, WifiManager)
+ *              Dependencies are injected as a narrow WifiManager pointer
  *              rather than a full Application reference — the board only needs
- *              the specific data it renders.
+ *              the specific data it renders, sourcing the hostname directly
+ *              from WifiManager (the framework's single source of truth).
  *
  * Exported Classes:
  * - DiagnosticsBoard: System telemetry display implementing IDisplayBoard
  *   - DiagnosticsBoard():  Construct with display dimensions for widget layout
- *   - configure():         Inject hostname and WifiManager for telemetry access
+ *   - configure():         Inject WifiManager for hostname + telemetry access
  *   - render():            Draw 4 rows of telemetry to the U8G2 display buffer
  *   - tick():              Refresh telemetry data (~1s throttle)
  *   - isExpired():         Returns false (always-on carousel board)
@@ -59,12 +60,13 @@ public:
      * @brief Inject narrow dependencies for telemetry rendering.
      *
      * Called after the framework has booted so services are available.
-     * Sets the hostname label immediately (static for device lifetime).
+     * Sets the hostname label immediately (static for device lifetime),
+     * sourcing it directly from the injected WifiManager — the framework's
+     * single source of truth for the device hostname.
      *
-     * @param hostname    Device hostname string (must outlive this board).
-     * @param wifiManager Pointer to the WifiManager for SSID access.
+     * @param wifiManager Pointer to the WifiManager for hostname + SSID access.
      */
-    void configure(const char* hostname, WifiManager* wifiManager);
+    void configure(WifiManager* wifiManager);
 
     /**
      * @brief Draw all 4 telemetry rows to the U8G2 display buffer.

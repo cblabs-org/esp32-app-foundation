@@ -15,10 +15,32 @@ TEST_F(WifiManagerTest, ConstructionDefaults) {
     EXPECT_FALSE(wifiManager.isReady());
 }
 
-// begin() sets hostname
-TEST_F(WifiManagerTest, BeginSetsHostname) {
-    wifiManager.begin("test-host");
+// begin() initializes state machine
+TEST_F(WifiManagerTest, BeginInitializesStateMachine) {
+    wifiManager.begin();
     EXPECT_FALSE(wifiManager.isReady()); // In WIFI_INIT state
+}
+
+// setDefaultHostname() seeds resetConfig()'s factory default
+TEST_F(WifiManagerTest, SetDefaultHostnameSeedsResetConfig) {
+    wifiManager.setDefaultHostname("my-app-default");
+    wifiManager.resetConfig();
+    EXPECT_STREQ("my-app-default", wifiManager.getHostname());
+}
+
+// resetConfig() falls back to the framework default when no app default was set
+TEST_F(WifiManagerTest, ResetConfigUsesFrameworkDefaultHostname) {
+    wifiManager.resetConfig();
+    EXPECT_STREQ("esp32-device", wifiManager.getHostname());
+}
+
+// getHostname() reflects the persisted/applied hostname
+TEST_F(WifiManagerTest, GetHostnameReflectsAppliedConfig) {
+    JsonDocument doc;
+    JsonObject section = doc.to<JsonObject>();
+    section["hostname"] = "applied-host";
+    wifiManager.applyConfig(section);
+    EXPECT_STREQ("applied-host", wifiManager.getHostname());
 }
 
 // updateWiFi() stores SSID
@@ -78,8 +100,8 @@ TEST_F(WifiManagerTest, NotifyApiActivity) {
 
 // Multiple begin() calls
 TEST_F(WifiManagerTest, MultipleBeginCalls) {
-    wifiManager.begin("host1");
-    wifiManager.begin("host2");
+    wifiManager.begin();
+    wifiManager.begin();
     SUCCEED();
 }
 

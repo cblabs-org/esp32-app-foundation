@@ -20,7 +20,7 @@
 #include "MCPServer.hpp"
 #include "MCPBuiltinTools.hpp"
 #include "interfaces/IMCPContributor.hpp"
-#include "FrameworkConfig.hpp"
+#include "../WifiManager/WifiManager.hpp"
 #include "../WebServer/WebServerManager.hpp"
 #include <ConfigManager.hpp>
 
@@ -45,14 +45,10 @@ static const char* TAG = "MCPServer";
  * @brief Collect tools from all IMCPContributor modules and mark the server
  *        as initialised so tick() begins processing.
  */
-void MCPServer::begin(const std::vector<IMCPContributor*>& contributors, ConfigManager* configManager, const FrameworkConfig* frameworkConfig, TimeManager* timeManager) {
+void MCPServer::begin(const std::vector<IMCPContributor*>& contributors, ConfigManager* configManager, TimeManager* timeManager, WifiManager* wifiManager) {
     // --- Step 0: Cache dependencies for runtime config persistence ---
     _configManager = configManager;
-
-    if (frameworkConfig) {
-        _mcpReadOnly = frameworkConfig->mcpReadOnly;
-        _frameworkConfig = frameworkConfig;
-    }
+    _wifiManager = wifiManager;
 
     // --- Step 1: Register built-in foundation tools ---
     // These are always available regardless of which app uses the framework.
@@ -432,8 +428,8 @@ void MCPServer::registerRoutes(AsyncWebServer& server) {
         JsonDocument doc;
         doc["enabled"]     = _mcpEnabled;
         doc["readOnly"]    = _mcpReadOnly;
-        if (_frameworkConfig) {
-            doc["hostname"] = _frameworkConfig->hostname ? _frameworkConfig->hostname : "";
+        if (_wifiManager) {
+            doc["hostname"] = _wifiManager->getHostname();
         }
         String output;
         serializeJson(doc, output);
