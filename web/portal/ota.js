@@ -24,6 +24,21 @@
 
       <div style="display:flex; justify-content:space-between; align-items:center; padding:0.6rem 0; border-bottom:1px solid var(--border);">
         <div>
+          <span style="font-size:0.85rem; font-weight:600;">Enable Firmware Updates</span>
+          <span style="display:block; font-size:0.75rem; color:var(--text-muted); margin-top:2px;">Master switch — allow firmware to be applied to this device</span>
+        </div>
+        <label class="toggle-switch" style="position:relative; width:44px; height:24px; flex-shrink:0;">
+          <input type="checkbox" id="ota-updates-enabled" style="opacity:0; width:0; height:0;">
+          <span style="position:absolute; cursor:pointer; top:0; left:0; right:0; bottom:0;
+                       background:#ccc; border-radius:24px; transition:0.3s;">
+            <span style="position:absolute; height:18px; width:18px; left:3px; bottom:3px;
+                         background:white; border-radius:50%; transition:0.3s; box-shadow:0 1px 3px rgba(0,0,0,0.3);"></span>
+          </span>
+        </label>
+      </div>
+
+      <div style="display:flex; justify-content:space-between; align-items:center; padding:0.6rem 0; border-bottom:1px solid var(--border);">
+        <div>
           <span style="font-size:0.85rem; font-weight:600;">Auto-Check for Updates</span>
           <span style="display:block; font-size:0.75rem; color:var(--text-muted); margin-top:2px;">Periodically poll GitHub for new releases</span>
         </div>
@@ -182,6 +197,10 @@
       // Card 2: Settings — restore saved state
       if (ota.channel) {
         document.getElementById('ota-channel').value = ota.channel;
+      }
+      const updatesEnabledCb = document.getElementById('ota-updates-enabled');
+      if (updatesEnabledCb && ota.hasOwnProperty('updatesEnabled')) {
+        setToggleState(updatesEnabledCb, !!ota.updatesEnabled);
       }
       const autoCheckCb = document.getElementById('ota-autocheck');
       if (autoCheckCb && ota.hasOwnProperty('autoCheck')) {
@@ -353,6 +372,35 @@
       statusEl.textContent = 'Failed to set channel.';
     }
   });
+
+  // -------------------------------------------------------------------------
+  // Card 2: Enable firmware updates toggle
+  // -------------------------------------------------------------------------
+  const updatesEnabledEl = document.getElementById('ota-updates-enabled');
+  if (updatesEnabledEl) {
+    updatesEnabledEl.addEventListener('change', async (e) => {
+      const enabled  = e.target.checked;
+      const statusEl = document.getElementById('ota-settings-status');
+
+      // Optimistic UI update
+      setToggleState(updatesEnabledEl, enabled);
+
+      try {
+        await window.apiFetch('/api/ota', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'setUpdatesEnabled', updatesEnabled: enabled })
+        });
+        statusEl.style.color = 'var(--success)';
+        statusEl.textContent = 'Firmware updates ' + (enabled ? 'enabled' : 'disabled');
+        setTimeout(() => { statusEl.textContent = ''; }, 3000);
+      } catch (error) {
+        statusEl.style.color = 'var(--error)';
+        statusEl.textContent = 'Failed to save setting.';
+        setToggleState(updatesEnabledEl, !enabled); // Revert on failure
+      }
+    });
+  }
 
   // -------------------------------------------------------------------------
   // Card 2: Auto-check toggle

@@ -593,10 +593,13 @@ Bad firmware flashed
 
 ## 14. FrameworkConfig Reference
 
+`FrameworkConfig` carries only the compile-time secrets the framework cannot
+know. The master update kill-switch is now a persisted OTA module setting
+(`updatesEnabled`, below); `otaQuietHour` was removed — it was never implemented,
+and daily scheduling is handled by `checkHour`.
+
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `firmwareUpdatesEnabled` | `bool` | `true` | Master kill-switch for OTA |
-| `otaQuietHour` | `uint8_t` | `3` | Hour (0–23) when OTA checks are suppressed |
 | `otaPublicKey` | `const char*` | `nullptr` | PEM-encoded RSA public key |
 | `otaGithubRepo` | `const char*` | `nullptr` | Repository in `"owner/repo"` format |
 | `otaGithubToken` | `const char*` | `nullptr` | GitHub PAT for private repos |
@@ -607,6 +610,8 @@ Bad firmware flashed
 |-------|------|---------|-------------|
 | `channel` | `char[16]` | `"stable"` | Active release channel |
 | `autoCheck` | `bool` | `true` | Auto-check on boot |
+| `updatesEnabled` | `bool` | `true` | Master kill-switch for applying firmware updates |
+| `checkHour` | `uint8_t` | `3` | Hour (0–23) for the daily scheduled check |
 | `lastCheckedChannel` | `char[16]` | `""` | Implicit downgrade detection |
 
 ---

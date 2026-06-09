@@ -45,9 +45,9 @@
  *   - getParentTab():         Return "System" for navigation hierarchy
  *   - getTabOrder():          Return 50 for pill ordering
  *
- *   IConfigurable (namespace: "ota", schema v2):
+ *   IConfigurable (namespace: "ota", schema v4):
  *   - getConfigNamespace():   Return "ota"
- *   - getSchemaVersion():     Return 2
+ *   - getSchemaVersion():     Return 4
  *   - applyConfig():          Apply OTA config from JSON section
  *   - serializeConfig():      Serialize OTA config to JSON section
  *   - migrateConfig():        Migrate from older schema version
@@ -152,10 +152,11 @@ struct OTAProgressEvent {
  * from release check through download, verification, flash, and reboot.
  * Also retains the legacy direct-upload path for web-based OTA.
  *
- * IConfigurable fields (namespace: "ota", schema version: 2):
+ * IConfigurable fields (namespace: "ota", schema version: 4):
  *   - channel            (char[16]): OTA release channel ("stable", "beta", "dev")
  *   - autoCheck          (bool):     Whether to auto-check for updates on boot
  *   - lastCheckedChannel (char[16]): Last channel used for an update check
+ *   - updatesEnabled     (bool):     Master kill-switch for applying firmware updates
  */
 class OTAUpdateManager : public IWebContributor, public IConfigurable, public ITickable {
 public:
@@ -309,8 +310,8 @@ public:
     /**
      * @brief Apply OTA configuration values from a parsed JSON section.
      *
-     * Reads "channel", "autoCheck", and "lastCheckedChannel" from the
-     * provided section and applies them to internal state. Missing keys
+     * Reads "channel", "autoCheck", "lastCheckedChannel", and "updatesEnabled"
+     * from the provided section and applies them to internal state. Missing keys
      * fall back to safe defaults.
      *
      * @param section Read-only reference to the JSON object containing config keys.
@@ -320,8 +321,8 @@ public:
     /**
      * @brief Serialize current OTA configuration into a JSON section.
      *
-     * Writes "channel", "autoCheck", and "lastCheckedChannel" into the
-     * provided section for persistence by ConfigManager.
+     * Writes "channel", "autoCheck", "lastCheckedChannel", and "updatesEnabled"
+     * into the provided section for persistence by ConfigManager.
      *
      * @param section Mutable reference to the target JSON object.
      */
@@ -341,8 +342,8 @@ public:
     /**
      * @brief Reset OTA configuration to factory defaults.
      *
-     * Sets channel to "stable", autoCheck to true, and clears
-     * lastCheckedChannel.
+     * Sets channel to "stable", autoCheck to true, clears lastCheckedChannel,
+     * and sets updatesEnabled to true.
      */
     void resetConfig() override;
 
@@ -352,6 +353,7 @@ private:
     // -------------------------------------------------------------------------
     char    _channel[16]            = "stable";
     bool    _autoCheck              = true;
+    bool    _updatesEnabled         = true;  ///< Master kill-switch for applying firmware updates
     char    _lastCheckedChannel[16] = "";
     uint8_t _checkHour              = 3;   ///< Hour (0-23) at which daily auto-check fires
 

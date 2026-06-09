@@ -324,19 +324,16 @@ The kernel is always present. No app can opt out of kernel services.
 The kernel's config schema (`FrameworkConfig`) covers only cross-cutting concerns:
 
 ```
-hostname                — Network mDNS hostname
-timezone                — POSIX timezone string
-brightness              — Default display brightness (if display present)
-firmwareUpdatesEnabled  — OTA update toggle
-otaQuietHour            — Hour of quiet OTA check (default 3am)
-carouselIntervalSecs    — Default display rotation interval
-manualOverrideTimeoutSecs — Button override duration
-mcpReadOnly             — MCP read-only mode toggle (default false)
+otaPublicKey            — PEM-encoded RSA public key for OTA signature verification
+otaGithubRepo           — GitHub repository ("owner/repo") for OTA releases
+otaGithubToken          — Optional GitHub PAT for private repos
 ```
 
-`FrameworkConfig` is passed to `Application::begin(config)`. All domain-specific
-and module-specific fields live in separate config files managed by their
-respective modules.
+`FrameworkConfig` is passed to `Application::begin(config)` and now carries only
+compile-time OTA secrets. All runtime/module defaults that previously lived here
+(`hostname`, `timezone`, `mcpReadOnly`, `firmwareUpdatesEnabled`) are now factory
+defaults owned by their respective modules' `resetConfig()` and persisted in
+their own config files — see each module's IConfigurable section.
 
 > **Required downstream build flag:** Apps must define `APP_FOUNDATION_VERSION`
 > in their `platformio.ini` `build_flags` (e.g., `-DAPP_FOUNDATION_VERSION=\"0.1.0\"`).
@@ -1930,32 +1927,38 @@ versions. Up to `kMaxModules` (16) namespaces are tracked.
 - `snapshotActiveToPrevious()` / `snapshotActiveToGolden()` — bulk copy all slots
 - `getSlot()` / `getActiveVersion()` / `getPreviousVersion()` / `getGoldenVersion()`
 
-#### 13.3.13 FrameworkConfig OTA Fields
+#### 13.3.13 FrameworkConfig OTA Secrets
+
+`FrameworkConfig` carries only compile-time OTA secrets. The runtime master
+kill-switch moved to OTAUpdateManager's persisted config as `updatesEnabled`
+(see §13.3.14); `otaQuietHour` was removed (never implemented — daily
+scheduling is handled by `checkHour`).
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `firmwareUpdatesEnabled` | `bool` | `true` | Master kill-switch for OTA update checks |
-| `otaQuietHour` | `uint8_t` | `3` | Hour (0–23) during which OTA checks are suppressed |
 | `otaPublicKey` | `const char*` | `nullptr` | PEM-encoded RSA public key for signature verification. `nullptr` = skip verification (degraded mode) |
 | `otaGithubRepo` | `const char*` | `nullptr` | GitHub repository in `"owner/repo"` format for OTA releases |
 | `otaGithubToken` | `const char*` | `nullptr` | Optional GitHub access token for private repos |
 
-All OTA config fields have safe defaults so the framework boots without
-requiring any OTA configuration. The consuming app populates these fields
-during the `BOOTING` phase via `FrameworkConfig`.
+These secrets have safe defaults (`nullptr`) so the framework boots without
+requiring any OTA configuration. The consuming app populates them during the
+`BOOTING` phase via `FrameworkConfig`.
 
 #### 13.3.14 IConfigurable OTA Fields
 
-`OTAUpdateManager` implements `IConfigurable` (namespace: `"ota"`, schema v2):
+`OTAUpdateManager` implements `IConfigurable` (namespace: `"ota"`, schema v4):
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `channel` | `char[16]` | `"stable"` | Active release channel (`"stable"`, `"beta"`, `"dev"`) |
 | `autoCheck` | `bool` | `true` | Auto-check for updates on boot |
+| `updatesEnabled` | `bool` | `true` | Master kill-switch for applying firmware updates (moved from `FrameworkConfig`) |
+| `checkHour` | `uint8_t` | `3` | Hour (0–23) for the daily scheduled update check |
 | `lastCheckedChannel` | `char[16]` | `""` | Last channel used for an update check (implicit downgrade detection) |
 
-Persisted at `/mod/ota.json` via `ConfigManager`. Schema migration from v1→v2
-adds the `lastCheckedChannel` field.
+Persisted at `/mod/ota.json` via `ConfigManager`. Schema migrations: v1→v2 adds
+`lastCheckedChannel`; v2→v3 adds `checkHour`; v3→v4 adds `updatesEnabled`
+(defaults to `true`).
 
 #### 13.3.15 EventBus Integration
 

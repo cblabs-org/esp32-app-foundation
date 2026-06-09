@@ -17,6 +17,7 @@
 #endif
 
 #include "../../../modules/OTAUpdateManager/OTAUpdateManager.hpp"
+#include <ArduinoJson.h>
 
 #ifdef NATIVE_BUILD
 #include "../../../modules/WebServer/WebServerManager.hpp"
@@ -128,6 +129,55 @@ TEST_F(OtaUpdateManagerTest, RegisterRoutes_NoCrash) {
 TEST_F(OtaUpdateManagerTest, LocalInstance_StartsIdle) {
     OTAUpdateManager localManager;
     EXPECT_EQ(OTAState::Idle, localManager.getState());
+}
+
+// ---------------------------------------------------------------------------
+// updatesEnabled config persistence (WO2b — moved from FrameworkConfig)
+// ---------------------------------------------------------------------------
+
+/// resetConfig() must restore the secure-by-design default: updates enabled.
+TEST_F(OtaUpdateManagerTest, ResetConfig_UpdatesEnabled_DefaultsTrue) {
+    manager.resetConfig();
+    JsonDocument doc;
+    JsonObject section = doc.to<JsonObject>();
+    manager.serializeConfig(section);
+    ASSERT_TRUE(section["updatesEnabled"].is<bool>());
+    EXPECT_TRUE(section["updatesEnabled"].as<bool>());
+}
+
+/// applyConfig()/serializeConfig() must round-trip updatesEnabled in both states.
+TEST_F(OtaUpdateManagerTest, Config_UpdatesEnabled_RoundTrips) {
+    // false → persisted as false
+    JsonDocument inDoc;
+    inDoc["updatesEnabled"] = false;
+    manager.applyConfig(inDoc.as<JsonObject>());
+
+    JsonDocument outDoc;
+    JsonObject out = outDoc.to<JsonObject>();
+    manager.serializeConfig(out);
+    EXPECT_FALSE(out["updatesEnabled"].as<bool>());
+
+    // true → persisted as true
+    JsonDocument inDoc2;
+    inDoc2["updatesEnabled"] = true;
+    manager.applyConfig(inDoc2.as<JsonObject>());
+
+    JsonDocument outDoc2;
+    JsonObject out2 = outDoc2.to<JsonObject>();
+    manager.serializeConfig(out2);
+    EXPECT_TRUE(out2["updatesEnabled"].as<bool>());
+}
+
+/// A missing updatesEnabled key must default to true (secure-by-design fallback).
+TEST_F(OtaUpdateManagerTest, ApplyConfig_MissingUpdatesEnabled_DefaultsTrue) {
+    JsonDocument inDoc;
+    inDoc["channel"] = "stable";  // present but updatesEnabled absent
+    manager.applyConfig(inDoc.as<JsonObject>());
+
+    JsonDocument outDoc;
+    JsonObject out = outDoc.to<JsonObject>();
+    manager.serializeConfig(out);
+    EXPECT_TRUE(out["updatesEnabled"].as<bool>());
 }
 
 #if defined(NATIVE_BUILD)

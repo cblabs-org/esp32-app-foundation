@@ -31,7 +31,7 @@
  *   - handleSignedUpload():  Multipart upload handler with ECDSA verification
  *   - registerRoutes():     Register REST API route handlers
  *   - getConfigNamespace(): Return "ota" (IConfigurable)
- *   - getSchemaVersion():   Return 2 (IConfigurable)
+ *   - getSchemaVersion():   Return 4 (IConfigurable)
  *   - applyConfig():        Apply OTA config from JSON section (IConfigurable)
  *   - serializeConfig():    Serialize OTA config to JSON section (IConfigurable)
  *   - migrateConfig():      Migrate from older schema version (IConfigurable)
@@ -96,44 +96,48 @@ const char* OTAUpdateManager::getConfigNamespace() const {
 /**
  * @brief Return the current schema version for the OTA config format.
  *
- * Version 3: adds "checkHour" for daily scheduled updates.
+ * Version 4: adds "updatesEnabled" (master kill-switch for applying updates).
  * Increment this when a future firmware change requires a config migration.
  */
 int OTAUpdateManager::getSchemaVersion() const {
-    return 3;
+    return 4;
 }
 
 /**
  * @brief Apply OTA configuration values from a parsed JSON section.
  *
- * Reads "channel", "autoCheck", and "lastCheckedChannel" from the section.
- * Missing keys fall back to safe defaults via ArduinoJson's | operator.
+ * Reads "channel", "autoCheck", "lastCheckedChannel", and "updatesEnabled"
+ * from the section. Missing keys fall back to safe defaults via ArduinoJson's
+ * | operator.
  *
  * @param section Read-only reference to the JSON object containing config keys.
  */
 void OTAUpdateManager::applyConfig(const JsonObject& section) {
     const char* ch = section["channel"] | "stable";
     strlcpy(_channel, ch, sizeof(_channel));
-    _autoCheck = section["autoCheck"] | true;
+    _autoCheck      = section["autoCheck"]      | true;
+    _updatesEnabled = section["updatesEnabled"] | true;
     const char* lcc = section["lastCheckedChannel"] | "";
     strlcpy(_lastCheckedChannel, lcc, sizeof(_lastCheckedChannel));
     _checkHour = section["checkHour"] | (uint8_t)3;
     if (_checkHour > 23) _checkHour = 3; // Clamp invalid values
-    ESP_LOGI(TAG, "Config applied — channel='%s' autoCheck=%d checkHour=%u lastCheckedChannel='%s'",
-             _channel, (int)_autoCheck, (unsigned)_checkHour, _lastCheckedChannel);
+    ESP_LOGI(TAG, "Config applied — channel='%s' autoCheck=%d updatesEnabled=%d checkHour=%u lastCheckedChannel='%s'",
+             _channel, (int)_autoCheck, (int)_updatesEnabled, (unsigned)_checkHour, _lastCheckedChannel);
 }
 
 /**
  * @brief Serialize current OTA configuration into a JSON section.
  *
- * Writes "channel", "autoCheck", and "lastCheckedChannel" into the
- * provided section for persistence by ConfigManager (stored at /mod/ota.json).
+ * Writes "channel", "autoCheck", "lastCheckedChannel", and "updatesEnabled"
+ * into the provided section for persistence by ConfigManager
+ * (stored at /mod/ota.json).
  *
  * @param section Mutable reference to the target JSON object.
  */
 void OTAUpdateManager::serializeConfig(JsonObject& section) const {
     section["channel"]            = _channel;
     section["autoCheck"]          = _autoCheck;
+    section["updatesEnabled"]     = _updatesEnabled;
     section["lastCheckedChannel"] = _lastCheckedChannel;
     section["checkHour"]          = _checkHour;
 }
@@ -156,22 +160,27 @@ bool OTAUpdateManager::migrateConfig(JsonObject& section, int fromVersion) {
         section["checkHour"] = 3;
         ESP_LOGI(TAG, "Migrated OTA config v%d → v3: added checkHour=3", fromVersion);
     }
+    if (fromVersion < 4) {
+        section["updatesEnabled"] = true;
+        ESP_LOGI(TAG, "Migrated OTA config v%d → v4: added updatesEnabled=true", fromVersion);
+    }
     return true;
 }
 
 /**
  * @brief Reset OTA configuration to factory defaults.
  *
- * Sets channel to "stable", autoCheck to true, and clears
- * lastCheckedChannel. ConfigManager calls saveModuleConfig() afterwards
+ * Sets channel to "stable", autoCheck to true, updatesEnabled to true, and
+ * clears lastCheckedChannel. ConfigManager calls saveModuleConfig() afterwards
  * to persist the reset state.
  */
 void OTAUpdateManager::resetConfig() {
     strlcpy(_channel, "stable", sizeof(_channel));
-    _autoCheck = true;
+    _autoCheck      = true;
+    _updatesEnabled = true;
     _lastCheckedChannel[0] = '\0';
     _checkHour = 3;
-    ESP_LOGI(TAG, "Config reset to defaults — channel='stable' autoCheck=true checkHour=3 lastCheckedChannel=''");
+    ESP_LOGI(TAG, "Config reset to defaults — channel='stable' autoCheck=true updatesEnabled=true checkHour=3 lastCheckedChannel=''");
 }
 
 
@@ -404,8 +413,8 @@ void OTAUpdateManager::performUpdateTask() {
 
     const FrameworkConfig& cfg = app_->getConfig();
 
-    // --- Guard: firmware updates must be enabled ---
-    if (!cfg.firmwareUpdatesEnabled) {
+    // --- Guard: firmware updates must be enabled (persisted OTA config) ---
+    if (!_updatesEnabled) {
         ESP_LOGW(TAG, "Firmware updates are disabled in config");
         publishProgress(0.0f, "Firmware updates disabled", true, false);
         state_ = OTAState::Error;
@@ -1149,6 +1158,19 @@ void OTAUpdateManager::registerRoutes(AsyncWebServer& server) {
                         request->send(400, "application/json", "{\"status\":\"error\",\"msg\":\"Missing autoCheck boolean\"}");
                     }
                     return;
+                } else if (strcmp(action, "setUpdatesEnabled") == 0) {
+                    if (doc["updatesEnabled"].is<bool>()) {
+                        this->_updatesEnabled = doc["updatesEnabled"].as<bool>();
+                        // Persist via ConfigManager
+                        if (this->app_ != nullptr) {
+                            this->app_->getConfigManager().saveModuleConfig(this);
+                        }
+                        ESP_LOGI(TAG, "Updates-enabled changed to: %d", (int)this->_updatesEnabled);
+                        request->send(200, "application/json", "{\"status\":\"ok\"}");
+                    } else {
+                        request->send(400, "application/json", "{\"status\":\"error\",\"msg\":\"Missing updatesEnabled boolean\"}");
+                    }
+                    return;
                 } else if (strcmp(action, "setCheckHour") == 0) {
                     if (doc["checkHour"].is<int>()) {
                         int h = doc["checkHour"].as<int>();
@@ -1177,12 +1199,13 @@ void OTAUpdateManager::registerRoutes(AsyncWebServer& server) {
                         case OTAState::Complete:    stateStr = "complete"; break;
                         case OTAState::Error:       stateStr = "error"; break;
                     }
-                    resp["state"]     = stateStr;
-                    resp["version"]   = String(VERSION_MAJOR) + "." + String(VERSION_MINOR) + "." + String(VERSION_PATCH);
-                    resp["channel"]   = this->_channel;
-                    resp["boardId"]   = BOARD_ID;
-                    resp["autoCheck"] = this->_autoCheck;
-                    resp["checkHour"] = this->_checkHour;
+                    resp["state"]          = stateStr;
+                    resp["version"]        = String(VERSION_MAJOR) + "." + String(VERSION_MINOR) + "." + String(VERSION_PATCH);
+                    resp["channel"]        = this->_channel;
+                    resp["boardId"]        = BOARD_ID;
+                    resp["autoCheck"]      = this->_autoCheck;
+                    resp["updatesEnabled"] = this->_updatesEnabled;
+                    resp["checkHour"]      = this->_checkHour;
                     if (this->lastOtaError_) {
                         resp["lastError"] = this->lastOtaError_;
                     }

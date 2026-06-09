@@ -3,7 +3,7 @@
 **PR number:** 20
 **Project name:** `pr-20-config-refactor`
 **Base branch:** `main`
-**Status:** 📋 **PLANNING — awaiting user approval** (no branches cut, no source modified)
+**Status:** ✅ **ALL WOs COMPLETE & VERIFIED** — `FrameworkConfig` now holds only the 3 OTA secrets; native 525/525, esp32 build + web tests green. Ready for stack submission.
 **Principal Architect:** current session
 
 ---
@@ -89,7 +89,7 @@ module config field (`serializeConfig`/`applyConfig`/`resetConfig`). The modules
 
 - **[x] [wo1-appconfig-clarity](wo1-appconfig-clarity/WORKORDER.md):** Investigation only — ✅ **COMPLETE**. See [FINDINGS.md](wo1-appconfig-clarity/FINDINGS.md). Key results: `appconfig.js` is the Display tab controller (misnomer), **complements** the refactor with zero overlap; `stash@{1}`/`580f2f5` was **redundant** (superseded by `ef7be1e`) → **dropped**; portal exposure → only `timezone` (time.js) + `mcpReadOnly` (mcp.js), both already persisted module keys (no portal change needed). **Baseline:** native suite was RED — pre-existing `OTAUpdateManager` build breakage from `505b9da` → **fixed on `main`** (`f437a92`, `9f2b3cd`, `a377718`); WO1 branch **rebased onto green `main`** → **519/519 native tests pass**. Precondition for WO2a satisfied.
 - **[x] [wo2a-persisted-moves](wo2a-persisted-moves/WORKORDER.md):** ✅ **COMPLETE & verified.** Moved the three already-persisted defaults (`hostname`→WiFiManager via `setDefaultHostname`/`getHostname`, `timezone`→TimeManager `resetConfig`→`"GMT0"`, `mcpReadOnly`→MCPServer secure-`true`); DiagnosticsBoard + MCPServer re-source hostname from WiFiManager (MCPServer **shed its `FrameworkConfig` dependency**); `FrameworkConfig` slimmed to 2 OTA toggles + 3 secrets; `main.cpp`/`template` updated. **Verified: native 522/522 PASSED, 0 ERRORED + `esp32dev` device build SUCCESS + web-test hook passed.**
-- **[ ] wo2b-ota-new-persistence** *(WORKORDER.md authored after WO2a merges):* `standard` tier — add `firmwareUpdatesEnabled` + `otaQuietHour` as *new* persisted OTA config fields (member + serialize + apply + reset), replace the live `app_->getConfig()` reads, and update tests.
+- **[x] [wo2b-ota-new-persistence](wo2b-ota-new-persistence/WORKORDER.md):** ✅ **COMPLETE & verified.** `firmwareUpdatesEnabled` → OTAUpdateManager persisted config as `updatesEnabled` (default `true`), with config-schema **v4 migration** + full OTA-tab toggle (handler + status + `ota.js`), replacing the live `getConfig()` read. **`otaQuietHour` was dead → deleted** (+ stale docs corrected across `OTADeveloperGuide.md` & `design_specification.md`). `FrameworkConfig` now = **the 3 OTA secrets only** (PR-20 goal reached). **Verified: native 525/525 PASSED + `esp32dev` build SUCCESS + web tests + portal asset regenerated.** *(Worker did core impl; PA closed out asset regen + device build + tests + docs after the worker's sandbox blocked `pio`/python.)*
 
   *Rationale: WO2-as-one-order is `architect`-tier with a wide blast radius; the approved 2-way split yields two tight, independently-verifiable `standard` orders, serialized (they share `FrameworkConfig.hpp` + `Application.cpp`).*
 
