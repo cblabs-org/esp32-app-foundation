@@ -122,4 +122,4 @@ feature branch. The "PR-20 feature" is the stack itself.
 
 ## Distillation
 
-*(Populated at project wrap-up — `./context_bridge.md`.)*
+✅ Session distilled — see [./context_bridge.md](./context_bridge.md) for the strategic record (ADRs, graveyard, end-state) that future Architect sessions should page in first.
