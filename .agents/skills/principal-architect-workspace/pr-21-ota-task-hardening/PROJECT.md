@@ -3,7 +3,7 @@
 **PR Number:** 21  
 **Project Name:** `pr-21-ota-task-hardening`  
 **Base Branch:** `main`  
-**Status:** 📋 PLANNING — awaiting user approval  
+**Status:** ✅ COMPLETE — both WOs merged into feature branch  
 **Architect Session:** 8c58afa2-8ca2-4a85-b127-3fb94f785271  
 
 ---
@@ -46,7 +46,7 @@ They must be serialised: WO1 merged into feature branch → then WO2 branches of
 | # | Status | Branch | Topic | Link |
 |---|--------|--------|-------|------|
 | WO1 | ✅ MERGED `a58d046` | `pr-21-ota-task-hardening-wo1-heap-guard` | Heap guard + PSRAM stack allocation | **[wo1-firmware-heap-guard/WORKORDER.md](wo1-firmware-heap-guard/WORKORDER.md)** |
-| WO2 | 🔄 IN PROGRESS | `pr-21-ota-task-hardening-wo2-portal-warning` | Portal low-memory OTA warning | **[wo2-portal-memory-warning/WORKORDER.md](wo2-portal-memory-warning/WORKORDER.md)** |
+| WO2 | ✅ MERGED `4d8aff6` | `pr-21-ota-task-hardening-wo2-portal-warning` | Portal low-memory OTA warning | **[wo2-portal-memory-warning/WORKORDER.md](wo2-portal-memory-warning/WORKORDER.md)** |
 
 ---
 
