@@ -122,14 +122,14 @@ std::unique_ptr<char[]> DeviceCrypto::encrypt(const char* plaintext, size_t inpu
         return std::unique_ptr<char[]>();
     }
 
-    LOG_SECURE("CRYPTO", "Executing AES-256-CBC Encryption. Plaintext payload size: %zu bytes", inputLen);
+    LOG_SECURE("CRYPTO", "Executing AES-256-CBC Encryption. Plaintext payload size: %u bytes", (unsigned)inputLen);
 
 #ifndef NATIVE_BUILD
     size_t paddedLen = inputLen + (16 - (inputLen % 16));
     size_t totalLen = 16 + paddedLen;
     uint8_t* buffer = (uint8_t*)malloc(totalLen);
     if (!buffer) {
-        ESP_LOGE(TAG, "encrypt() failed: memory allocation error (buffer size: %zu)", totalLen);
+        ESP_LOGE(TAG, "encrypt() failed: memory allocation error (buffer size: %u)", (unsigned)totalLen);
         if (outLen) *outLen = 0;
         return std::unique_ptr<char[]>();
     }
@@ -162,14 +162,14 @@ std::unique_ptr<char[]> DeviceCrypto::encrypt(const char* plaintext, size_t inpu
                 b64Buffer[b64Len] = '\0';
                 result.reset(b64Buffer);
                 if (outLen) *outLen = b64Len;
-                LOG_SECURE("CRYPTO", "Encryption completed securely. Export Base64 size: %zu bytes", b64Len);
+                LOG_SECURE("CRYPTO", "Encryption completed securely. Export Base64 size: %u bytes", (unsigned)b64Len);
             } else {
                 ESP_LOGE(TAG, "encrypt() failed: base64 encoding error");
                 delete[] b64Buffer;
                 if (outLen) *outLen = 0;
             }
         } else {
-            ESP_LOGE(TAG, "encrypt() failed: base64 buffer allocation error (size: %zu)", b64Len + 1);
+            ESP_LOGE(TAG, "encrypt() failed: base64 buffer allocation error (size: %u)", (unsigned)(b64Len + 1));
             if (outLen) *outLen = 0;
         }
     } else {
@@ -208,21 +208,21 @@ std::unique_ptr<char[]> DeviceCrypto::decrypt(const char* ciphertext, size_t inp
         return std::unique_ptr<char[]>();
     }
     
-    LOG_SECURE("CRYPTO", "Decoding inbound Base64 Ciphertext. Payload size: %zu bytes", inputLen);
+    LOG_SECURE("CRYPTO", "Decoding inbound Base64 Ciphertext. Payload size: %u bytes", (unsigned)inputLen);
 
 #ifndef NATIVE_BUILD
     size_t decOutLen = 0;
     mbedtls_base64_decode(nullptr, 0, &decOutLen, (const unsigned char*)ciphertext, inputLen);
     
     if (decOutLen <= 16) {
-        ESP_LOGE(TAG, "decrypt() failed: decoded data too short (length: %zu, need >16)", decOutLen);
+        ESP_LOGE(TAG, "decrypt() failed: decoded data too short (length: %u, need >16)", (unsigned)decOutLen);
         if (outLen) *outLen = 0;
         return std::unique_ptr<char[]>();
     }
 
     uint8_t* buffer = (uint8_t*)malloc(decOutLen);
     if (!buffer) {
-        ESP_LOGE(TAG, "decrypt() failed: memory allocation error (size: %zu)", decOutLen);
+        ESP_LOGE(TAG, "decrypt() failed: memory allocation error (size: %u)", (unsigned)decOutLen);
         if (outLen) *outLen = 0;
         return std::unique_ptr<char[]>();
     }
@@ -236,7 +236,7 @@ std::unique_ptr<char[]> DeviceCrypto::decrypt(const char* ciphertext, size_t inp
     
     size_t ciphertextLen = decOutLen - 16;
     if (ciphertextLen % 16 != 0) {
-        ESP_LOGE(TAG, "decrypt() failed: ciphertext length %zu is not block-aligned", ciphertextLen);
+        ESP_LOGE(TAG, "decrypt() failed: ciphertext length %u is not block-aligned", (unsigned)ciphertextLen);
         free(buffer);
         if (outLen) *outLen = 0;
         return std::unique_ptr<char[]>();
@@ -262,7 +262,7 @@ std::unique_ptr<char[]> DeviceCrypto::decrypt(const char* ciphertext, size_t inp
             plaintextBuf[unpaddedLen] = '\0';
             result.reset(plaintextBuf);
             if (outLen) *outLen = unpaddedLen;
-            LOG_SECURE("CRYPTO", "Decryption verified. Extracted plaintext configuration length: %zu bytes", unpaddedLen);
+            LOG_SECURE("CRYPTO", "Decryption verified. Extracted plaintext configuration length: %u bytes", (unsigned)unpaddedLen);
         } else {
             ESP_LOGE(TAG, "decrypt() failed: plaintext buffer allocation error");
             if (outLen) *outLen = 0;

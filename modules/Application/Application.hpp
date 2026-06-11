@@ -450,5 +450,6 @@ private:
 #ifndef NATIVE_BUILD
     U8G2DisplayModule _display;                      ///< Display module with carousel engine
     DiagnosticsBoard  _diagnosticsBoard{256, 64};    ///< System telemetry carousel board
+    bool _wifiWizardShown = false;                   ///< Guard: WiFi wizard modal pushed this CONFIGURING phase
 #endif
 };
