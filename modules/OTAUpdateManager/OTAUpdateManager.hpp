@@ -141,6 +141,20 @@ struct OTAProgressEvent {
 };
 
 // ---------------------------------------------------------------------------
+// OTA Task Sizing Constants
+// ---------------------------------------------------------------------------
+
+/** Stack size (bytes) for the OTA FreeRTOS task. TLS requires 12–16 KB minimum;
+ *  32 KB provides comfortable headroom for certificate chains and redirect chains.
+ *  Used in performUpdate() and exposed via the status API for portal diagnostics. */
+static constexpr uint32_t OTA_TASK_STACK_BYTES = 32768;
+
+/** Minimum free DRAM headroom required before attempting an OTA task launch.
+ *  If free DRAM < (OTA_TASK_STACK_BYTES + OTA_TASK_DRAM_HEADROOM_BYTES),
+ *  the pre-flight guard will log a diagnostics message and attempt PSRAM fallback. */
+static constexpr uint32_t OTA_TASK_DRAM_HEADROOM_BYTES = 8192;
+
+// ---------------------------------------------------------------------------
 // OTA Update Manager
 // ---------------------------------------------------------------------------
 
