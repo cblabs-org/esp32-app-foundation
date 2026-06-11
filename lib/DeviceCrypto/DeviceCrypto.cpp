@@ -98,7 +98,7 @@ size_t DeviceCrypto::removePKCS7Padding(const uint8_t* buffer, size_t paddedLen)
     if (paddedLen == 0 || paddedLen % 16 != 0) return 0;
     uint8_t paddingValue = buffer[paddedLen - 1];
     
-    if (paddingValue == 0 || paddingValue > 16) return paddedLen;
+    if (paddingValue == 0 || paddingValue > 16) return 0; // Invalid padding — signal error to caller
     
     for (size_t i = 0; i < paddingValue; i++) {
         if (buffer[paddedLen - 1 - i] != paddingValue) {
