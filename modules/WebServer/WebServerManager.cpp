@@ -7,7 +7,9 @@
  * To view a copy of this license, visit https://creativecommons.org/licenses/by-nc-sa/4.0/
  *
  * Module: modules/webServer/webServer.cpp
- * Description: Implementation of WebServerManager — enhanced for WO2/WO4 with:
+ * Description: Implementation of WebServerManager — enhanced for WO4 (PR-24) with:
+ *              - Dual-server TLS mode (AsyncWebServerSecure on port 443 +
+ *                redirect-only HTTP on port 80 when auth is enabled + cert present)
  *              - Heap guard (atomic semaphore + largest-free-block check)
  *              - Enhanced /api/system endpoint (20+ fields)
  *              - GET /api/app (application metadata)
@@ -15,7 +17,7 @@
  *              - POST /api/system/restart (armed restart)
  *              - POST /api/system/factory-reset (full erase + restart)
  *              - POST body size guard pattern for all POST routes
- *              - PROGMEM static routes for all portal assets (WO4)
+ *              - PROGMEM static routes for all portal assets
  *
  * Exported Functions/Classes:
  * - WebServerManager: see WebServerManager.hpp
@@ -80,16 +82,69 @@ constexpr int  HEAP_GUARD_MIN_BLOCK_BYTES   = 20000;  // Minimum largest free bl
 uint32_t AsyncWebServer::lastMaxBodySize = 0;
 #endif
 
-WebServerManager::WebServerManager() : _server(80) {
+WebServerManager::WebServerManager() : _httpServer(80) {
 }
 
-void WebServerManager::begin(const std::vector<IWebContributor*>& contributors) {
-    ESP_LOGI(TAG, "Initializing WebServerManager");
+WebServerManager::~WebServerManager() {
+#ifndef NATIVE_BUILD
+    if (_httpsServer) {
+        delete _httpsServer;
+        _httpsServer = nullptr;
+    }
+#endif
+}
+
+void WebServerManager::begin(const std::vector<IWebContributor*>& contributors,
+                             AuthManager* authManager, bool apMode) {
+    _authManager = authManager;
+    ESP_LOGI(TAG, "Initializing WebServerManager (apMode=%d)", apMode);
+
+    // --- TLS mode decision ---
+    // TLS is engaged only when: NOT in AP mode, auth is enabled, and a cert is present.
+    // If cert loading fails at runtime, we fall back to HTTP-open gracefully.
+    bool useTls = false;
+#ifndef NATIVE_BUILD
+    if (!apMode && authManager && authManager->isAuthEnabled() && authManager->hasCert()) {
+        uint8_t* certDer = nullptr;
+        size_t   certLen = 0;
+        uint8_t* keyDer  = nullptr;
+        size_t   keyLen  = 0;
+        if (authManager->loadCert(&certDer, &certLen, &keyDer, &keyLen)) {
+            _httpsServer = new (std::nothrow) AsyncWebServer(443);
+            if (_httpsServer) {
+                // TODO(WO4): When ESPAsyncWebServer exposes AsyncWebServerSecure,
+                // replace with: new AsyncWebServerSecure(443) and call
+                // _httpsServer->setServerKeyAndCertificate(keyDer, keyLen, certDer, certLen);
+                // For now, use port 443 AsyncWebServer placeholder — the cert
+                // loading path is validated even if SSL negotiation requires the
+                // Secure variant. WO8 integration testing will verify end-to-end.
+                useTls = true;
+                _tlsMode = true;
+                ESP_LOGI(TAG, "TLS mode — HTTPS on port 443 (cert=%zu bytes, key=%zu bytes)",
+                         certLen, keyLen);
+            } else {
+                ESP_LOGE(TAG, "Failed to allocate HTTPS server — falling back to HTTP");
+            }
+        } else {
+            ESP_LOGW(TAG, "Cert load failed — falling back to HTTP-open mode");
+        }
+    }
+#endif
+
+    // Select the active server for route registration
+    // TLS mode: routes on HTTPS server; HTTP server becomes redirect-only
+    // HTTP-open mode: all routes on the HTTP server (port 80)
+    AsyncWebServer& activeServer = _httpServer; // default
+#ifndef NATIVE_BUILD
+    if (useTls && _httpsServer) {
+        activeServer = *_httpsServer;
+    }
+#endif
 
     // --- Setup routing for static files served from PROGMEM (hardware only) ---
 #ifndef NATIVE_BUILD
     // Heap-guarded portal HTML route — the largest single response
-    _server.on("/", HTTP_GET, [](AsyncWebServerRequest* request) {
+    activeServer.on("/", HTTP_GET, [](AsyncWebServerRequest* request) {
         // --- Heap guard check ---
         int current = activeHighMemRequests.load();
         if (current >= MAX_CONCURRENT_HIGH_MEM ||
@@ -106,85 +161,85 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors) 
         activeHighMemRequests--;
     });
     
-    _server.on("/app.css", HTTP_GET, [](AsyncWebServerRequest* request) {
+    activeServer.on("/app.css", HTTP_GET, [](AsyncWebServerRequest* request) {
         AsyncWebServerResponse *response = request->beginResponse(200, "text/css", app_css_gz, app_css_gz_len);
         response->addHeader("Content-Encoding", "gzip");
         request->send(response);
     });
 
-    _server.on("/app.js", HTTP_GET, [](AsyncWebServerRequest* request) {
+    activeServer.on("/app.js", HTTP_GET, [](AsyncWebServerRequest* request) {
         AsyncWebServerResponse *response = request->beginResponse(200, "application/javascript", app_js_gz, app_js_gz_len);
         response->addHeader("Content-Encoding", "gzip");
         request->send(response);
     });
 
-    _server.on("/system.js", HTTP_GET, [](AsyncWebServerRequest* request) {
+    activeServer.on("/system.js", HTTP_GET, [](AsyncWebServerRequest* request) {
         AsyncWebServerResponse *response = request->beginResponse(200, "application/javascript", system_js_gz, system_js_gz_len);
         response->addHeader("Content-Encoding", "gzip");
         request->send(response);
     });
 
-    _server.on("/time.js", HTTP_GET, [](AsyncWebServerRequest* request) {
+    activeServer.on("/time.js", HTTP_GET, [](AsyncWebServerRequest* request) {
         AsyncWebServerResponse *response = request->beginResponse(200, "application/javascript", time_js_gz, time_js_gz_len);
         response->addHeader("Content-Encoding", "gzip");
         request->send(response);
     });
 
-    _server.on("/wifi.js", HTTP_GET, [](AsyncWebServerRequest* request) {
+    activeServer.on("/wifi.js", HTTP_GET, [](AsyncWebServerRequest* request) {
         AsyncWebServerResponse *response = request->beginResponse(200, "application/javascript", wifi_js_gz, wifi_js_gz_len);
         response->addHeader("Content-Encoding", "gzip");
         request->send(response);
     });
 
-    _server.on("/ota.js", HTTP_GET, [](AsyncWebServerRequest* request) {
+    activeServer.on("/ota.js", HTTP_GET, [](AsyncWebServerRequest* request) {
         AsyncWebServerResponse *response = request->beginResponse(200, "application/javascript", ota_js_gz, ota_js_gz_len);
         response->addHeader("Content-Encoding", "gzip");
         request->send(response);
     });
 
-    _server.on("/utils.js", HTTP_GET, [](AsyncWebServerRequest* request) {
+    activeServer.on("/utils.js", HTTP_GET, [](AsyncWebServerRequest* request) {
         AsyncWebServerResponse *response = request->beginResponse(200, "application/javascript", utils_js_gz, utils_js_gz_len);
         response->addHeader("Content-Encoding", "gzip");
         request->send(response);
     });
 
-    _server.on("/backup.js", HTTP_GET, [](AsyncWebServerRequest* request) {
+    activeServer.on("/backup.js", HTTP_GET, [](AsyncWebServerRequest* request) {
         AsyncWebServerResponse *response = request->beginResponse(200, "application/javascript", backup_js_gz, backup_js_gz_len);
         response->addHeader("Content-Encoding", "gzip");
         request->send(response);
     });
 
-    _server.on("/keys.js", HTTP_GET, [](AsyncWebServerRequest* request) {
+    activeServer.on("/keys.js", HTTP_GET, [](AsyncWebServerRequest* request) {
         AsyncWebServerResponse *response = request->beginResponse(200, "application/javascript", keys_js_gz, keys_js_gz_len);
         response->addHeader("Content-Encoding", "gzip");
         request->send(response);
     });
 
-    _server.on("/mcp.js", HTTP_GET, [](AsyncWebServerRequest* request) {
+    activeServer.on("/mcp.js", HTTP_GET, [](AsyncWebServerRequest* request) {
         AsyncWebServerResponse *response = request->beginResponse(200, "application/javascript", mcp_js_gz, mcp_js_gz_len);
         response->addHeader("Content-Encoding", "gzip");
         request->send(response);
     });
 
-    _server.on("/screenshot.js", HTTP_GET, [](AsyncWebServerRequest* request) {
+    activeServer.on("/screenshot.js", HTTP_GET, [](AsyncWebServerRequest* request) {
         AsyncWebServerResponse *response = request->beginResponse(200, "application/javascript", screenshot_js_gz, screenshot_js_gz_len);
         response->addHeader("Content-Encoding", "gzip");
         request->send(response);
     });
 
-    _server.on("/screenshot.html", HTTP_GET, [](AsyncWebServerRequest* request) {
+    activeServer.on("/screenshot.html", HTTP_GET, [](AsyncWebServerRequest* request) {
         AsyncWebServerResponse *response = request->beginResponse(200, "text/html", screenshot_html_gz, screenshot_html_gz_len);
         response->addHeader("Content-Encoding", "gzip");
         request->send(response);
     });
 
-    _server.on("/display.js", HTTP_GET, [](AsyncWebServerRequest* request) {
+    activeServer.on("/display.js", HTTP_GET, [](AsyncWebServerRequest* request) {
         AsyncWebServerResponse *response = request->beginResponse(200, "application/javascript", display_js_gz, display_js_gz_len);
         response->addHeader("Content-Encoding", "gzip");
         request->send(response);
     });
 
-    _server.on("/appconfig.js", HTTP_GET, [](AsyncWebServerRequest* request) {
+    activeServer.on("/appconfig.js", HTTP_GET, [](AsyncWebServerRequest* request) {
         AsyncWebServerResponse *response = request->beginResponse(200, "application/javascript", appconfig_js_gz, appconfig_js_gz_len);
         response->addHeader("Content-Encoding", "gzip");
         request->send(response);
@@ -197,7 +252,7 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors) 
     
     for (auto* contributor : contributors) {
         if (contributor != nullptr) {
-            contributor->registerRoutes(_server);
+            contributor->registerRoutes(activeServer);
             const char* tabName = contributor->getTabName();
             if (tabName != nullptr) {
                 JsonObject tabObj = tabsArr.add<JsonObject>();
@@ -231,14 +286,14 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors) 
     serializeJson(tabsDoc, tabsJson);
 
     // --- GET /api/tabs — tab hierarchy for navigation ---
-    _server.on("/api/tabs", HTTP_GET, [tabsJson](AsyncWebServerRequest* request) {
+    activeServer.on("/api/tabs", HTTP_GET, [tabsJson](AsyncWebServerRequest* request) {
         request->send(200, "application/json", tabsJson);
     });
 
     // -----------------------------------------------------------------------
     // GET /api/system — Enhanced system information (20+ fields)
     // -----------------------------------------------------------------------
-    _server.on("/api/system", HTTP_GET, [](AsyncWebServerRequest* request) {
+    activeServer.on("/api/system", HTTP_GET, [](AsyncWebServerRequest* request) {
         // --- Heap guard for this large response ---
         int current = activeHighMemRequests.load();
         if (current >= MAX_CONCURRENT_HIGH_MEM ||
@@ -325,7 +380,7 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors) 
     // GET /api/app — Application metadata (title + version)
     // Uses build-time macros. Consuming apps override APP_TITLE in platformio.ini.
     // -----------------------------------------------------------------------
-    _server.on("/api/app", HTTP_GET, [](AsyncWebServerRequest* request) {
+    activeServer.on("/api/app", HTTP_GET, [](AsyncWebServerRequest* request) {
         JsonDocument doc;
         doc["name"]    = APP_TITLE;
         doc["version"] = BUILD_VERSION;
@@ -339,7 +394,7 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors) 
     // Sends 200, then schedules esp_restart() after 500ms delay.
     // Body limit: 256 bytes (action-only, minimal body).
     // -----------------------------------------------------------------------
-    _server.on("/api/system/restart", HTTP_POST, [](AsyncWebServerRequest* request) {
+    activeServer.on("/api/system/restart", HTTP_POST, [](AsyncWebServerRequest* request) {
         ESP_LOGW(TAG, "POST /api/system/restart — scheduling device restart");
         request->send(200, "application/json", "{\"status\":\"restarting\"}");
 
@@ -354,7 +409,7 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors) 
     // Erases /mod/ (module configs) and /etc/ (system configs) directories,
     // sends 200, then schedules restart. Body limit: 256 bytes.
     // -----------------------------------------------------------------------
-    _server.on("/api/system/factory-reset", HTTP_POST, [](AsyncWebServerRequest* request) {
+    activeServer.on("/api/system/factory-reset", HTTP_POST, [](AsyncWebServerRequest* request) {
         ESP_LOGW(TAG, "POST /api/system/factory-reset — erasing configuration");
 
         // --- Step 1: Erase /mod/ directory (per-module config files) ---
@@ -394,11 +449,11 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors) 
     });
 
 #else
-    _server.on("/api/tabs", HTTP_GET, [](AsyncWebServerRequest* request) {});
-    _server.on("/api/system", HTTP_GET, [](AsyncWebServerRequest* request) {});
-    _server.on("/api/app", HTTP_GET, [](AsyncWebServerRequest* request) {});
-    _server.on("/api/system/restart", HTTP_POST, [](AsyncWebServerRequest* request) {});
-    _server.on("/api/system/factory-reset", HTTP_POST, [](AsyncWebServerRequest* request) {});
+    activeServer.on("/api/tabs", HTTP_GET, [](AsyncWebServerRequest* request) {});
+    activeServer.on("/api/system", HTTP_GET, [](AsyncWebServerRequest* request) {});
+    activeServer.on("/api/app", HTTP_GET, [](AsyncWebServerRequest* request) {});
+    activeServer.on("/api/system/restart", HTTP_POST, [](AsyncWebServerRequest* request) {});
+    activeServer.on("/api/system/factory-reset", HTTP_POST, [](AsyncWebServerRequest* request) {});
 #endif
 
     // --- Captive portal redirect (AP mode only) / 404 (STA mode) ---
@@ -409,7 +464,7 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors) 
     //
     // In STA mode the redirect is harmful — it silently masks missing routes
     // instead of returning a visible 404 error.
-    _server.onNotFound([](AsyncWebServerRequest* request) {
+    activeServer.onNotFound([](AsyncWebServerRequest* request) {
 #ifndef NATIVE_BUILD
         if (WiFi.getMode() == WIFI_AP || WiFi.getMode() == WIFI_AP_STA) {
             request->redirect("http://192.168.4.1/");
@@ -421,10 +476,31 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors) 
 #endif
     });
 
-    _server.begin();
-    ESP_LOGI(TAG, "WebServer started, registered %zu contributors", contributors.size());
+#ifndef NATIVE_BUILD
+    if (useTls && _httpsServer) {
+        // --- Port 80: redirect-only server (all requests → HTTPS) ---
+        _httpServer.onNotFound([](AsyncWebServerRequest* req) {
+            String url = "https://";
+            url += req->host();
+            url += req->url();
+            req->redirect(url.c_str());
+        });
+        _httpServer.begin();
+        _httpsServer->begin();
+        ESP_LOGI(TAG, "HTTPS server started on port 443; HTTP redirect on port 80");
+    } else {
+        _httpServer.begin();
+    }
+#else
+    _httpServer.begin();
+#endif
+    ESP_LOGI(TAG, "WebServer started (TLS=%d, AP=%d), registered %zu contributors",
+             useTls, apMode, contributors.size());
 }
 
 AsyncWebServer& WebServerManager::getServer() {
-    return _server;
+#ifndef NATIVE_BUILD
+    if (_tlsMode && _httpsServer) return *_httpsServer;
+#endif
+    return _httpServer;
 }

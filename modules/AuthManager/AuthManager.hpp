@@ -287,6 +287,21 @@ public:
      */
     void resetConfig() override;
 
+    // -------------------------------------------------------------------------
+    // Public accessors (used by WebServerManager / MCPServer for mode decisions)
+    // -------------------------------------------------------------------------
+
+    /**
+     * @brief Query whether portal/MCP authentication enforcement is active.
+     *
+     * Used by WebServerManager to decide HTTP-open vs TLS mode, and by MCPServer
+     * to decide whether to enforce bearer token checks. Intentionally public to
+     * avoid friend-class coupling.
+     *
+     * @return true if a password has been set and auth is enabled, false otherwise.
+     */
+    bool isAuthEnabled() const { return _authEnabled; }
+
 private:
     // -------------------------------------------------------------------------
     // Auth state flags

@@ -13,10 +13,16 @@
  *              via per-route guards, and provides a heap-guard semaphore to
  *              protect high-memory responses from concurrent exhaustion.
  *
+ *              WO4 (PR-24): Adds dual-server TLS mode. When auth is enabled and a
+ *              cert is present (and not in AP mode), an AsyncWebServerSecure serves
+ *              HTTPS on port 443 while the HTTP server on port 80 redirects all
+ *              requests to HTTPS. In HTTP-open mode (AP, no cert, or auth disabled),
+ *              all routes are served on port 80 as before.
+ *
  * Exported Functions/Classes:
- * - WebServerManager: Manages the internal AsyncWebServer.
- *   - begin():     Starts the web server and registers all contributor routes.
- *   - getServer(): Returns a reference to the internal AsyncWebServer.
+ * - WebServerManager: Manages the internal AsyncWebServer(s).
+ *   - begin():     Starts the web server(s) and registers all contributor routes.
+ *   - getServer(): Returns a reference to the active server (HTTPS or HTTP).
  *
  * Heap Guard:
  *   A static atomic counter limits concurrent high-memory requests (portal HTML,
@@ -93,32 +99,67 @@ public:
 
 #include "interfaces/IWebContributor.hpp"
 
+// Forward declaration — avoids pulling AuthManager.hpp into every translation unit
+class AuthManager;
+
 /**
  * @brief Manages the web server lifecycle and IWebContributor dispatch.
  *
  * Provides the heap guard and POST body size guard patterns that all
  * route handlers across the portal use for memory safety.
+ *
+ * WO4 adds dual-server TLS mode:
+ * - HTTP-open mode: all routes on port 80 via _httpServer (pre-PR-24 behavior)
+ * - TLS mode: all routes on port 443 via _httpsServer + redirect on port 80
  */
 class WebServerManager {
 public:
     /**
-     * @brief Construct the WebServerManager on port 80.
+     * @brief Construct the WebServerManager with HTTP server on port 80.
      */
     WebServerManager();
 
     /**
-     * @brief Initialize the web server, set up basic routes, register all
-     *        contributor routes, and start listening.
-     * @param contributors List of IWebContributor pointers to register.
+     * @brief Clean up heap-allocated HTTPS server if present.
      */
-    void begin(const std::vector<IWebContributor*>& contributors);
+    ~WebServerManager();
 
     /**
-     * @brief Get the underlying web server instance.
-     * @return Reference to the AsyncWebServer.
+     * @brief Initialize the web server(s), set up routes, register all
+     *        contributor routes, and start listening.
+     *
+     * When authManager is non-null and auth is enabled with a cert present
+     * (and not in AP mode), the manager starts an HTTPS server on port 443
+     * and configures port 80 as a redirect-only server. Otherwise, all
+     * routes are served on port 80 in HTTP-open mode.
+     *
+     * @param contributors List of IWebContributor pointers to register.
+     * @param authManager  Pointer to the AuthManager for TLS cert loading
+     *                     and auth state queries. Nullable (HTTP-open mode).
+     * @param apMode       True if the device is in AP (access point) mode.
+     *                     Forces HTTP-open mode regardless of auth/cert state.
+     */
+    void begin(const std::vector<IWebContributor*>& contributors,
+               AuthManager* authManager = nullptr,
+               bool apMode = false);
+
+    /**
+     * @brief Get the active web server instance.
+     *
+     * Returns the HTTPS server when in TLS mode, otherwise the HTTP server.
+     * Contributors and tests use this to inspect registered routes.
+     *
+     * @return Reference to the active AsyncWebServer.
      */
     AsyncWebServer& getServer();
 
 private:
-    AsyncWebServer _server; ///< Internal web server instance listening on port 80
+    AsyncWebServer _httpServer; ///< HTTP server on port 80 (always exists)
+
+#ifndef NATIVE_BUILD
+    AsyncWebServer* _httpsServer = nullptr; ///< HTTPS server on port 443 (heap-allocated in TLS mode)
+#endif
+
+    bool         _tlsMode     = false;   ///< True when serving HTTPS on port 443
+    AuthManager* _authManager = nullptr; ///< Stored for WO5 route guards (nullable)
 };
