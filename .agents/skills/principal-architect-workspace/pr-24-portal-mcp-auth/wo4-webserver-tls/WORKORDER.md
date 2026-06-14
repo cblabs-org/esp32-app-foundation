@@ -1,3 +1,9 @@
+---
+name: pr-24-wo4
+description: Handoff instructions for PR-24 Work Order 4 — WebServerManager dual-server TLS mode (AsyncWebServerSecure port 443 + HTTP redirect port 80)
+complexity: architect
+---
+
 # WO4 — WebServerManager Dual-Server TLS Mode
 
 **Project:** PR-24 — Portal + MCP Auth + TLS  

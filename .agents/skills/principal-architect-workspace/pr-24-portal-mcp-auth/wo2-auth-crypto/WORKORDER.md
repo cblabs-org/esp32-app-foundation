@@ -1,3 +1,9 @@
+---
+name: pr-24-wo2
+description: Handoff instructions for PR-24 Work Order 2 — SHA-256 password hashing, session token lifecycle, all /api/auth/* route implementations
+complexity: standard
+---
+
 # WO2 — SHA-256 Password Store + Auth API Routes
 
 **Project:** PR-24 — Portal + MCP Auth + TLS  

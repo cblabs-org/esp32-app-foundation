@@ -24,6 +24,12 @@
  *
  * Exported Classes:
  * - AuthManager: Security module providing full portal + MCP authentication.
+ *              WO1: skeleton — auth-guard pass-through, 501 route stubs, config round-trip.
+ *              WO3: adds real EC P-256 cert generation (mbedTLS) + LittleFS storage.
+ *              WO2/WO5: will replace auth-guard stubs with real enforcement.
+ *
+ * Exported Classes:
+ * - AuthManager: Security module managing portal/MCP auth state and TLS certificates.
  *
  *   Lifecycle:
  *   - begin():                  Wire ConfigManager and KeyManager dependencies.
@@ -32,10 +38,10 @@
  *   - checkPortalAuth():        Returns true while auth is not enforced (WO5 stub).
  *   - checkMcpAuth():           Returns true while auth is not enforced (WO6 stub).
  *
- *   Cert Helpers (WO3 provides real implementation):
- *   - generateAndStoreCert():   Returns false — not implemented in WO1.
+ *   Cert Helpers (WO3 real implementation):
+ *   - generateAndStoreCert():   Generate EC P-256 self-signed cert; store to LittleFS.
  *   - hasCert():                Returns _certPresent flag state.
- *   - loadCert():               Returns false — not implemented in WO1.
+ *   - loadCert():               Load DER cert+key from LittleFS into static buffers.
  *
  *   IWebContributor (tab: "Security", order: 5, top-level):
  *   - registerRoutes():         Registers all /api/auth/... route handlers (WO2 real impl).
@@ -60,6 +66,10 @@
 #include "../../include/interfaces/IWebContributor.hpp"
 #include "../../include/interfaces/IConfigurable.hpp"
 
+#ifndef NATIVE_BUILD
+#include <LittleFS.h>
+#endif
+
 // Forward declarations — avoids circular includes with ConfigManager/KeyManager
 class ConfigManager;
 class KeyManager;
@@ -68,13 +78,17 @@ class KeyManager;
 class AsyncWebServerRequest;
 
 /**
- * @brief Security module managing portal and MCP authentication state.
+ * @brief Security module managing portal and MCP authentication state and TLS certificates.
  *
  * AuthManager implements IConfigurable to persist three boolean flags:
  * whether auth is enabled, whether a password hash exists, and whether
  * a TLS certificate has been generated. It implements IWebContributor
  * to register the /api/auth/... REST endpoint stubs (501 in WO1) and to
  * contribute the "Security" top-level bottom-nav tab with a lock icon.
+ *
+ * WO3 adds the real EC P-256 self-signed certificate generation via mbedTLS
+ * and DER storage to LittleFS (/etc/server.key, /etc/server.crt). Native
+ * build stubs allow all unit tests to compile and run without hardware.
  *
  * Dependencies are injected via begin() rather than the constructor to
  * allow the object to be owned by value in Application.
@@ -131,16 +145,26 @@ public:
     bool checkMcpAuth(AsyncWebServerRequest* request);
 
     // -------------------------------------------------------------------------
-    // Cert Helpers (WO3 provides real implementation)
+    // Cert Helpers (WO3 real implementation — mbedTLS + LittleFS)
     // -------------------------------------------------------------------------
 
     /**
-     * @brief Generate a self-signed EC P-256 certificate and store it in LittleFS.
+     * @brief Generate an EC P-256 self-signed certificate and store it in LittleFS.
      *
-     * Stub in WO1 — returns false. WO3 provides the mbedTLS implementation.
+     * Uses mbedTLS to generate a secp256r1 key pair and a self-signed X.509v3
+     * certificate with the given hostname as the Subject CN and SAN.
+     * The DER-encoded private key and certificate are written to
+     * /etc/server.key and /etc/server.crt respectively.
      *
-     * @param hostname  Common Name (CN) for the generated certificate.
-     * @return false — not implemented in WO1.
+     * On successful generation, _certPresent is set to true and
+     * _configManager->saveModuleConfig(this) is called to persist the flag.
+     *
+     * In NATIVE_BUILD, sets _certPresent = true and calls saveModuleConfig(),
+     * then returns true — no file I/O or mbedTLS operations are performed.
+     *
+     * @param hostname  Hostname for the certificate CN (e.g. "esp32").
+     *                  The resulting DN will be "CN=<hostname>.local".
+     * @return true on success, false if any mbedTLS or LittleFS step fails.
      */
     bool generateAndStoreCert(const char* hostname);
 
@@ -153,14 +177,20 @@ public:
     /**
      * @brief Load the DER-encoded certificate and key from LittleFS.
      *
-     * Stub in WO1 — returns false and leaves output pointers unchanged.
-     * WO3 provides the real LittleFS read implementation.
+     * Reads /etc/server.crt and /etc/server.key into static buffers and
+     * sets the output pointers. Buffers are statically allocated (1024 bytes
+     * for the cert, 256 bytes for the key) to avoid heap fragmentation.
      *
-     * @param certDer  Output pointer for the certificate DER buffer.
-     * @param certLen  Output length of the certificate buffer.
-     * @param keyDer   Output pointer for the private key DER buffer.
-     * @param keyLen   Output length of the private key buffer.
-     * @return false — not implemented in WO1.
+     * Caller must NOT free the returned pointers — they point into static
+     * storage valid for the lifetime of the application.
+     *
+     * In NATIVE_BUILD, always returns false (no LittleFS available).
+     *
+     * @param certDer  Output: pointer to the DER-encoded certificate buffer.
+     * @param certLen  Output: byte length of the certificate.
+     * @param keyDer   Output: pointer to the DER-encoded private key buffer.
+     * @param keyLen   Output: byte length of the private key.
+     * @return true if both files were read successfully, false otherwise.
      */
     bool loadCert(uint8_t** certDer, size_t* certLen,
                   uint8_t** keyDer,  size_t* keyLen) const;
@@ -250,6 +280,10 @@ public:
      * Sets all three flags to false and calls KeyManager::deleteKey() for
      * the password-hash and password-salt entries (WO2 will populate these;
      * resetConfig must clean them up symmetrically).
+     *
+     * Note: cert files (/etc/server.key, /etc/server.crt) are NOT deleted.
+     * A factory-reset leaves the cert inert (auth.enabled = false). On next
+     * password set, generateAndStoreCert() overwrites the old cert files.
      */
     void resetConfig() override;
 
@@ -386,5 +420,35 @@ private:
     // -------------------------------------------------------------------------
     friend class AuthManagerAccessor;
 #endif
+    // LittleFS helpers (hardware builds only — no-ops in NATIVE_BUILD)
+    // -------------------------------------------------------------------------
+
+    /**
+     * @brief Write a raw binary buffer to a LittleFS path.
+     *
+     * Creates /etc/ if it does not exist. Overwrites any existing file at
+     * the given path. Logs an error and returns false on any failure.
+     *
+     * @param path  Absolute LittleFS path (e.g. "/etc/server.key").
+     * @param data  Pointer to the bytes to write.
+     * @param len   Number of bytes to write.
+     * @return true on success, false if open or write fails.
+     */
+    bool _saveToLittleFS(const char* path, const uint8_t* data, size_t len) const;
+
+    /**
+     * @brief Read a raw binary file from LittleFS into a caller-supplied buffer.
+     *
+     * Logs an error and returns false if the file cannot be opened or if its
+     * size exceeds bufMax.
+     *
+     * @param path    Absolute LittleFS path (e.g. "/etc/server.crt").
+     * @param buf     Destination buffer.
+     * @param bufMax  Maximum number of bytes the buffer can hold.
+     * @param outLen  Output: actual number of bytes read.
+     * @return true on success, false if open fails or file exceeds bufMax.
+     */
+    bool _loadFromLittleFS(const char* path, uint8_t* buf, size_t bufMax,
+                           size_t* outLen) const;
 };
 

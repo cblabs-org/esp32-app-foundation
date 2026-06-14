@@ -1,3 +1,9 @@
+---
+name: pr-24-wo3
+description: Handoff instructions for PR-24 Work Order 3 — EC P-256 certificate generation with mbedTLS and LittleFS DER storage
+complexity: architect
+---
+
 # WO3 — EC P-256 Cert Generation + LittleFS Storage
 
 **Project:** PR-24 — Portal + MCP Auth + TLS  

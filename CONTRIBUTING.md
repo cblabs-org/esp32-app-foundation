@@ -72,3 +72,23 @@ void loop() {
 5. Open a Pull Request.
 
 Ensure all unit tests pass and that your code compiles for both `arduino` and `espidf` frameworks before submitting.
+
+## Agent Harness Configuration
+
+Agent context is kept single-source to avoid drift across coding assistants. The
+canonical store is `.agents/` (skills, workflows, rules, harness-adapters), and
+all harness entry points resolve into it:
+
+- **`AGENTS.md`** — the canonical, harness-neutral bootstrap. Edit this. It is
+  read natively by Antigravity (which uses the plural `.agents/` directory) and
+  Cursor, and imported by Claude Code.
+- **`CLAUDE.md`** — thin stub that imports `AGENTS.md` (`@AGENTS.md`) plus a few
+  Claude Code-specific notes. Claude Code also reaches the store via the
+  `.claude → .agents` symlink (`.claude/skills`, `.claude/commands`,
+  `.claude/rules`).
+- **`GEMINI.md`** — thin stub for Antigravity-specific overrides (highest
+  precedence in Antigravity) plus a backstop that re-states the mandatory
+  rules-load step, since Antigravity's rules-directory auto-load is unreliable.
+
+**Rule of thumb:** put shared content in `AGENTS.md`; only add to `CLAUDE.md` or
+`GEMINI.md` when the behaviour is genuinely specific to that harness.

@@ -1,3 +1,9 @@
+---
+name: pr-24-wo6
+description: Handoff instructions for PR-24 Work Order 6 — MCP server HTTP bearer token authentication
+complexity: standard
+---
+
 # WO6 — MCP Server Bearer Token Auth
 
 **Project:** PR-24 — Portal + MCP Auth + TLS  

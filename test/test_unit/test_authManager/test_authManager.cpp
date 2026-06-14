@@ -598,6 +598,67 @@ TEST_F(AuthManagerAccessorTest, test_hex_decode_invalid) {
 }
 
 // ===========================================================================
+// WO3 — Cert helper tests (native build stubs)
+// ===========================================================================
+
+/**
+ * @brief generateAndStoreCert() must set _certPresent to true and return true.
+ *
+ * In NATIVE_BUILD, no mbedTLS or LittleFS calls are made; the function
+ * sets the flag and calls saveModuleConfig(). Verifies hasCert() and
+ * serializeConfig() reflect the new state.
+ */
+TEST_F(AuthManagerTest, test_generate_cert_sets_flag) {
+    auth.begin(nullptr, nullptr);
+
+    bool result = auth.generateAndStoreCert("testhost");
+
+    EXPECT_TRUE(result);
+    EXPECT_TRUE(auth.hasCert());
+
+    JsonDocument doc;
+    JsonObject section = doc.to<JsonObject>();
+    auth.serializeConfig(section);
+    EXPECT_TRUE(section["certPresent"].as<bool>());
+}
+
+/**
+ * @brief loadCert() must return false in NATIVE_BUILD (no LittleFS available).
+ *
+ * WO4 hardware tests will verify successful loading on real firmware.
+ */
+TEST_F(AuthManagerTest, test_load_cert_fails_without_files) {
+    uint8_t* certDer = nullptr;
+    size_t   certLen = 0;
+    uint8_t* keyDer  = nullptr;
+    size_t   keyLen  = 0;
+
+    bool result = auth.loadCert(&certDer, &certLen, &keyDer, &keyLen);
+
+    EXPECT_FALSE(result);
+}
+
+/**
+ * @brief resetConfig() clears _certPresent; re-generate restores it.
+ *
+ * Factory reset sets _certPresent = false (cert is inert without auth.enabled)
+ * but does NOT delete /etc/server.{key,crt}. The cert file lifecycle is
+ * managed by generateAndStoreCert() which overwrites on next password set.
+ */
+TEST_F(AuthManagerTest, test_reset_does_not_depend_on_cert) {
+    auth.begin(nullptr, nullptr);
+
+    ASSERT_TRUE(auth.generateAndStoreCert("testhost"));
+    ASSERT_TRUE(auth.hasCert());
+
+    auth.resetConfig();
+    EXPECT_FALSE(auth.hasCert());
+
+    ASSERT_TRUE(auth.generateAndStoreCert("testhost2"));
+    EXPECT_TRUE(auth.hasCert());
+}
+
+// ===========================================================================
 // Main entry point
 // ===========================================================================
 
