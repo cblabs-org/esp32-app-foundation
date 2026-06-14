@@ -465,13 +465,19 @@ article.advanced-drawer > details > summary.advanced-summary {
 }
 
 article.advanced-drawer > details > summary.advanced-summary::after {
-  content: '▶';
-  font-size: 0.7rem;
+  content: '';
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(-45deg); /* points right when closed */
   transition: transform 0.2s;
+  flex-shrink: 0;
 }
 
 article.advanced-drawer > details[open] > summary.advanced-summary::after {
-  transform: rotate(90deg);
+  transform: rotate(45deg); /* points down when open */
 }
 
 /* Keyboard focus ring */
@@ -522,14 +528,19 @@ article.info-drawer > details > summary.info-summary {
 }
 
 article.info-drawer > details > summary.info-summary::after {
-  content: '▶';
-  font-size: 0.65rem;
+  content: '';
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(-45deg); /* points right when closed */
   transition: transform 0.2s;
-  opacity: 0.5;
+  flex-shrink: 0;
 }
 
 article.info-drawer > details[open] > summary.info-summary::after {
-  transform: rotate(90deg);
+  transform: rotate(45deg); /* points down when open */
 }
 
 /* Keyboard focus ring */
