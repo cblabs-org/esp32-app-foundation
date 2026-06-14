@@ -105,34 +105,15 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors,
     ESP_LOGI(TAG, "Initializing WebServerManager (apMode=%d)", apMode);
 
     // --- TLS mode decision ---
-    // TLS is engaged only when: NOT in AP mode, auth is enabled, and a cert is present.
-    // If cert loading fails at runtime, we fall back to HTTP-open gracefully.
+    // AsyncWebServer does NOT support TLS — it has no SSL layer.
+    // The cert/key are generated and stored (WO3) ready for the PsychicHttp
+    // migration (PR-25) which wraps ESP-IDF's esp_https_server with native HTTPS.
+    // Until then, all routes are served on HTTP port 80.
     bool useTls = false;
 #ifndef NATIVE_BUILD
     if (!apMode && authManager && authManager->isAuthEnabled() && authManager->hasCert()) {
-        uint8_t* certDer = nullptr;
-        size_t   certLen = 0;
-        uint8_t* keyDer  = nullptr;
-        size_t   keyLen  = 0;
-        if (authManager->loadCert(&certDer, &certLen, &keyDer, &keyLen)) {
-            _httpsServer = new (std::nothrow) AsyncWebServer(443);
-            if (_httpsServer) {
-                // TODO(WO4): When ESPAsyncWebServer exposes AsyncWebServerSecure,
-                // replace with: new AsyncWebServerSecure(443) and call
-                // _httpsServer->setServerKeyAndCertificate(keyDer, keyLen, certDer, certLen);
-                // For now, use port 443 AsyncWebServer placeholder — the cert
-                // loading path is validated even if SSL negotiation requires the
-                // Secure variant. WO8 integration testing will verify end-to-end.
-                useTls = true;
-                _tlsMode = true;
-                ESP_LOGI(TAG, "TLS mode — HTTPS on port 443 (cert=%zu bytes, key=%zu bytes)",
-                         certLen, keyLen);
-            } else {
-                ESP_LOGE(TAG, "Failed to allocate HTTPS server — falling back to HTTP");
-            }
-        } else {
-            ESP_LOGW(TAG, "Cert load failed — falling back to HTTP-open mode");
-        }
+        ESP_LOGI(TAG, "Auth enabled with TLS cert present — HTTPS pending "
+                 "PsychicHttp migration (PR-25); serving HTTP on port 80");
     }
 #endif
 
