@@ -11,21 +11,26 @@
  *              Owns the "auth" IConfigurable namespace (config stored at /mod/auth.json)
  *              and contributes the "Security" top-level bottom-nav tab via IWebContributor.
  *
- *              In WO1 (this skeleton):
- *              - All auth-guard methods return true (pass-through, no enforcement)
+ *              In WO2 (this implementation):
+ *              - All auth-guard methods return true (pass-through, no enforcement — WO5)
  *              - All cert helpers return false / do nothing (WO3 provides real impl)
- *              - All /api/auth/... routes return 501 Not Implemented (WO2 replaces these)
+ *              - All /api/auth/... routes are fully implemented with real logic
+ *              - Password hashing: SHA-256(salt ‖ password) via mbedTLS (hardware)
+ *                or portable SHA-256 (native test build)
+ *              - Session token: 16 bytes from esp_random() / std::random_device
+ *              - Cookie format: esp32_session=<hex>; HttpOnly; SameSite=Strict
+ *              - MCP bearer token: equals stored password hash (deterministic)
  *              - IConfigurable round-trip is fully implemented for the three state flags
  *
  * Exported Classes:
- * - AuthManager: Security module providing auth state persistence and route stubs.
+ * - AuthManager: Security module providing full portal + MCP authentication.
  *
  *   Lifecycle:
  *   - begin():                  Wire ConfigManager and KeyManager dependencies.
  *
- *   Auth Guards (WO2/WO5 implement real enforcement):
- *   - checkPortalAuth():        Returns true while auth is not enforced (WO1 stub).
- *   - checkMcpAuth():           Returns true while auth is not enforced (WO1 stub).
+ *   Auth Guards (WO5 wires real enforcement via these helpers):
+ *   - checkPortalAuth():        Returns true while auth is not enforced (WO5 stub).
+ *   - checkMcpAuth():           Returns true while auth is not enforced (WO6 stub).
  *
  *   Cert Helpers (WO3 provides real implementation):
  *   - generateAndStoreCert():   Returns false — not implemented in WO1.
@@ -33,7 +38,7 @@
  *   - loadCert():               Returns false — not implemented in WO1.
  *
  *   IWebContributor (tab: "Security", order: 5, top-level):
- *   - registerRoutes():         Registers all /api/auth/... route stubs (501).
+ *   - registerRoutes():         Registers all /api/auth/... route handlers (WO2 real impl).
  *   - getTabName():             Returns "Security".
  *   - getParentTab():           Returns nullptr (top-level tab).
  *   - getTabOrder():            Returns 5 (first in bottom nav, emphasises security).
@@ -269,4 +274,117 @@ private:
 
     ConfigManager* _configManager = nullptr; ///< Config gateway (owned by Application)
     KeyManager*    _keyManager    = nullptr; ///< Encrypted credential registry
+
+    // -------------------------------------------------------------------------
+    // WO2 — Crypto + session private helpers
+    // -------------------------------------------------------------------------
+
+    /**
+     * @brief Hash the password, store salt + hash in KeyManager.
+     *
+     * Generates 16 random salt bytes, computes SHA-256(salt ‖ password),
+     * and stores both as hex strings under the KeyManager keys
+     * "portal_password_salt" and "portal_password_hash".
+     *
+     * On hardware: uses mbedTLS md_context.
+     * On native: uses a portable SHA-256 implementation.
+     *
+     * @param password  Null-terminated plaintext password (≤ 64 chars).
+     * @return true if both KeyManager writes succeed, false otherwise.
+     */
+    bool _setPassword(const char* password);
+
+    /**
+     * @brief Verify a candidate password against the stored hash.
+     *
+     * Loads the salt from KeyManager, re-computes SHA-256(salt ‖ candidate),
+     * and compares against the stored hash using a constant-time comparator.
+     *
+     * @param candidate  Null-terminated password string to verify.
+     * @return true if the candidate hash matches the stored hash, false otherwise.
+     */
+    bool _verifyPassword(const char* candidate) const;
+
+    /**
+     * @brief Populate _sessionToken with 16 cryptographically random bytes.
+     *
+     * On hardware: uses esp_random() in 32-bit chunks.
+     * On native: uses std::random_device.
+     */
+    void _generateSessionToken();
+
+    /**
+     * @brief Test whether a session is currently active.
+     * @return true if _sessionToken is not all-zero, false otherwise.
+     */
+    bool _isSessionActive() const;
+
+    /**
+     * @brief Validate the incoming request's session cookie against _sessionToken.
+     *
+     * Parses the "Cookie" header for "esp32_session=<hex>", decodes the 32-char
+     * hex value, and performs a constant-time comparison against _sessionToken.
+     *
+     * @param request  Incoming request (must not be nullptr on hardware paths).
+     * @return true if the cookie matches the active session, false otherwise.
+     */
+    bool _checkSessionCookie(AsyncWebServerRequest* request) const;
+
+    /**
+     * @brief Hex-encode a binary buffer into a null-terminated hex string.
+     *
+     * @param bin  Input binary data.
+     * @param len  Number of bytes in bin.
+     * @param out  Output buffer; must be at least 2*len+1 bytes.
+     */
+    static void _toHex(const uint8_t* bin, size_t len, char* out);
+
+    /**
+     * @brief Decode a hex string into a binary buffer.
+     *
+     * @param hex  Null-terminated hex string (exactly 2*len characters).
+     * @param out  Output buffer; must be at least len bytes.
+     * @param len  Expected number of output bytes.
+     * @return true if decoding succeeded, false if hex string is malformed.
+     */
+    static bool _fromHex(const char* hex, uint8_t* out, size_t len);
+
+    /**
+     * @brief Constant-time memory comparison to mitigate timing side-channels.
+     *
+     * Accumulates XOR differences across all bytes so the comparison time
+     * is independent of the position of the first mismatch.
+     *
+     * @param a    First buffer.
+     * @param b    Second buffer.
+     * @param len  Number of bytes to compare.
+     * @return 0 if buffers are identical, non-zero if they differ.
+     */
+    static int _safeMemcmp(const uint8_t* a, const uint8_t* b, size_t len);
+
+    /**
+     * @brief Portable SHA-256 implementation used in native (test) builds.
+     *
+     * On native, mbedTLS is not linked. This pure-C++ implementation is
+     * compiled in when NATIVE_BUILD is defined and provides the same
+     * SHA-256(salt ‖ password) digest as the mbedTLS path on hardware.
+     *
+     * @param data  Input byte stream.
+     * @param len   Length of input in bytes.
+     * @param out   Output buffer; must be exactly 32 bytes.
+     */
+    static void _sha256Native(const uint8_t* data, size_t len, uint8_t* out);
+
+#ifdef UNIT_TEST
+    // -------------------------------------------------------------------------
+    // Unit-test access gate
+    //
+    // Grants AuthManagerAccessor (defined in test_authManager.cpp) access to
+    // the WO2 private crypto and session helpers. The friend declaration is
+    // compiled only when UNIT_TEST is defined (native GoogleTest build) and
+    // has no effect on production firmware builds.
+    // -------------------------------------------------------------------------
+    friend class AuthManagerAccessor;
+#endif
 };
+
