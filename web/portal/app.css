@@ -339,6 +339,13 @@ button.secondary {
   border-color: var(--primary);
 }
 
+/* Screenshot pixel colour preset — active state mirrors pill-btn.active */
+.btn-ss-colour.active {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
+
 /* ==========================================================================
    8. THEME TOGGLE
    ========================================================================== */

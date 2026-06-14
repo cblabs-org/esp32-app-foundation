@@ -183,8 +183,11 @@ bool Application::begin(const FrameworkConfig& config) {
     _webContributors.push_back(&_keyManager);
     _webContributors.push_back(_otaManager);
     _webContributors.push_back(&_mcpServer);
+    _webContributors.push_back(&_appTabContributor);
 #ifndef NATIVE_BUILD
     _webContributors.push_back(&_display);
+    _webContributors.push_back(_display.settingsTabStub());
+    _webContributors.push_back(_display.screenshotTabStub());
     _mcpContributors.push_back(&_display);
 #endif
 

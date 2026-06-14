@@ -446,6 +446,19 @@ private:
     TimeManager _timeManager;           ///< NTP synchronization service
     TimeConfigGate _timeGate{_timeManager}; ///< Optional timezone config gate (downstream opt-in)
 
+    // -------------------------------------------------------------------------
+    // App tab contributor — registers the top-level "App" bottom-nav tab.
+    // Application owns this tab; it is not the responsibility of any hardware
+    // module. App-level configuration (e.g., clock font size) lives here.
+    // -------------------------------------------------------------------------
+
+    struct AppTabContributor : public IWebContributor {
+        void        registerRoutes(AsyncWebServer& /*server*/) override {}
+        const char* getTabName()  const override { return "App"; }
+        int         getTabOrder() const override { return 30;    }
+    };
+    AppTabContributor _appTabContributor;  ///< Contributes "App" top-level nav tab
+
     // Display subsystem (hardware only)
 #ifndef NATIVE_BUILD
     U8G2DisplayModule _display;                      ///< Display module with carousel engine

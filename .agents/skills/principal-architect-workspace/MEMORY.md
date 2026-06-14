@@ -11,7 +11,7 @@ by Principal Architects under the ESP32 App Foundation program.
 **Chief Architect Session:** f4e779d9-4aa1-46e2-8115-e1e8edc4fa42
 **Program Plan:** [PROGRAM-PLAN.md](./esp32-app-foundation/PROGRAM-PLAN.md)
 **Chief Architect Distillation:** [context_bridge.md](./esp32-app-foundation/context_bridge.md) — ADRs, rejected approaches, program sequencing decisions
-**Status:** PR-01 through PR-20 delivered — PR-10, PR-11, PR-12 in progress/planning
+**Status:** PR-01 through PR-22 delivered — PR-23 active
 
 ---
 
@@ -49,6 +49,7 @@ predate the formal PA pipeline and are filed retrospectively.
 | [pr-10-firmware-optimization](./pr-10-firmware-optimization/PROJECT.md) | Firmware Size Optimization (sdkconfig + compiler + library audit) | 🔄 **WIP** — WO1 queued | Session unknown |
 | [pr-11-config-gateway](./pr-11-config-gateway/PROJECT.md) | ConfigManager-as-Gateway Refactoring (iConfigurable redesign + migration orchestration) | ✅ **WO1 MERGED** `2c0b840` — ready for PR submission | Current Session |
 | [pr-12-state-machine](./pr-12-state-machine/PROJECT.md) | State Machine Redesign (Boot → Configure ↔ Running, regression tolerance, ConfiguringStatusBoard) | 📋 **PLANNING** — 6 WOs defined, awaiting user approval | Current Session |
+| [pr-23-display-tab](./pr-23-display-tab/PROJECT.md) | Module-Owned Display Bottom-Nav Tab (rename "App"→"Display", Settings + Screenshot sub-pills, JS migration, test updates) | ✅ **COMPLETE** — WO1 merged `c1bde82`, 525/525 native + 61/61 Playwright | Session 8ed575fc |
 | [pr-13-test-app](./pr-13-test-app/PROJECT.md) | Foundation Test App (DiagnosticsBoard + Display Lifecycle Fixes) | ✅ **COMPLETE** `c92d3ea` | Session 4cc5a22f |
 | [pr-14-ota-production](./pr-14-ota-production/PROJECT.md) | OTA Production System (SemVer, channels, multi-arch, rollback wiring, config lifecycle, CI/CD) | ✅ **COMPLETE** — 9 WOs merged + OTA boot gate + channel floor model | Session 2fdb967a / [distillation](./pr-14-ota-production/distillation/context_bridge.md) |
 | [pr-15-web-testing](./pr-15-web-testing/PROJECT.md) | Web Portal Testing Infrastructure (Mock Server + Playwright + Build Gate) | ✅ **MERGED** `f03972e` — 48 tests | Session 97274580 |

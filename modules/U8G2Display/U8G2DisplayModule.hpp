@@ -61,7 +61,7 @@
  *   IWebContributor (tab: "App", order: 30):
  *   - registerRoutes():     Register display REST API routes (/api/display/*)
  *   - getTabName():         Return "App" for portal tab
- *   - getTabOrder():        Return 30 for portal tab ordering
+ *   - getTabOrder():        Return 50 for portal tab ordering
  *
  *   IMCPContributor:
  *   - registerMCPTools():   Register display_status/display_control MCP tools
@@ -353,15 +353,27 @@ public:
 
     /**
      * @brief Get the UI tab name for this contributor.
-     * @return "App"
+     * @return "Display"
      */
-    const char* getTabName() const override { return "App"; }
+    const char* getTabName() const override { return "Display"; }
 
     /**
      * @brief Get the tab display order.
      * @return 30 — Display tab appears before mid-range tabs.
      */
-    int getTabOrder() const override { return 30; }
+    int getTabOrder() const override { return 50; }
+
+    /**
+     * @brief Return the Settings sub-pill stub for registration by Application.
+     * @return Pointer to the Settings IWebContributor stub.
+     */
+    IWebContributor* settingsTabStub()   { return &_settingsTabStub;   }
+
+    /**
+     * @brief Return the Screenshot sub-pill stub for registration by Application.
+     * @return Pointer to the Screenshot IWebContributor stub.
+     */
+    IWebContributor* screenshotTabStub() { return &_screenshotTabStub; }
 
     // -------------------------------------------------------------------------
     // IMCPContributor — MCP display tools
@@ -447,6 +459,31 @@ public:
     DisplayInfo getDisplayInfo();
 
 private:
+    // -------------------------------------------------------------------------
+    // Sub-tab navigation stubs — provide "Settings" and "Screenshot" child tab
+    // entries under the "Display" parent in /api/tabs. They carry no routes;
+    // all REST routes remain registered by the main module via registerRoutes().
+    // Owned as members; exposed via settingsTabStub() / screenshotTabStub()
+    // for registration by Application::begin().
+    // -------------------------------------------------------------------------
+
+    struct SettingsTabStub : public IWebContributor {
+        void        registerRoutes(AsyncWebServer& /*server*/) override {}
+        const char* getTabName()   const override { return "Settings"; }
+        const char* getParentTab() const override { return "Display";  }
+        int         getTabOrder()  const override { return 10;         }
+    };
+
+    struct ScreenshotTabStub : public IWebContributor {
+        void        registerRoutes(AsyncWebServer& /*server*/) override {}
+        const char* getTabName()   const override { return "Screenshot"; }
+        const char* getParentTab() const override { return "Display";    }
+        int         getTabOrder()  const override { return 20;           }
+    };
+
+    SettingsTabStub    _settingsTabStub;    ///< Nav stub: Settings sub-pill under Display
+    ScreenshotTabStub  _screenshotTabStub;  ///< Nav stub: Screenshot sub-pill under Display
+
     // -------------------------------------------------------------------------
     // Private carousel engine methods
     // -------------------------------------------------------------------------
