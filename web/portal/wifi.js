@@ -154,11 +154,11 @@
       <article class="info-drawer">
         <details id="wifi-diag-drawer">
           <summary class="info-summary">
-            Network Diagnostics
             <span id="wifi-diag-dot" style="
               width:8px; height:8px; border-radius:50%; background:var(--border,#dee2e6);
-              display:inline-block; margin-left:auto; margin-right:0.5rem;
+              display:inline-block; margin-right:0.5rem; flex-shrink:0;
             "></span>
+            Network Diagnostics
           </summary>
           <div class="info-drawer-content">
             <table id="wifi-diag-table" style="width:100%; border-collapse:collapse; margin:0.5rem 0;">
