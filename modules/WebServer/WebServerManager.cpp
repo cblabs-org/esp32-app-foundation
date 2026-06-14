@@ -130,111 +130,127 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors,
     // --- Setup routing for static files served from PROGMEM (hardware only) ---
 #ifndef NATIVE_BUILD
     // Heap-guarded portal HTML route — the largest single response
-    activeServer->on("/", HTTP_GET, [](AsyncWebServerRequest* request) {
+    activeServer->on("/", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
         // --- Heap guard check ---
         int current = activeHighMemRequests.load();
         if (current >= MAX_CONCURRENT_HIGH_MEM ||
             heap_caps_get_largest_free_block(MALLOC_CAP_8BIT) < HEAP_GUARD_MIN_BLOCK_BYTES) {
-            request->send(503, "application/json", "{\"error\":\"Low memory — retry\"}");
-            return;
+            return response->send(503, "application/json", "{\"error\":\"Low memory — retry\"}");
         }
         activeHighMemRequests++;
 
-        AsyncWebServerResponse *response = request->beginResponse(200, "text/html", index_html_gz, index_html_gz_len);
+        response->setContent(index_html_gz, index_html_gz_len);
+        response->setContentType("text/html");
         response->addHeader("Content-Encoding", "gzip");
-        request->send(response);
+        esp_err_t err = response->send();
 
         activeHighMemRequests--;
+        return err;
     });
     
-    activeServer->on("/app.css", HTTP_GET, [](AsyncWebServerRequest* request) {
-        AsyncWebServerResponse *response = request->beginResponse(200, "text/css", app_css_gz, app_css_gz_len);
+    activeServer->on("/app.css", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
+        response->setContent(app_css_gz, app_css_gz_len);
+        response->setContentType("text/css");
         response->addHeader("Content-Encoding", "gzip");
-        request->send(response);
+        return response->send();
     });
 
-    activeServer->on("/app.js", HTTP_GET, [](AsyncWebServerRequest* request) {
-        AsyncWebServerResponse *response = request->beginResponse(200, "application/javascript", app_js_gz, app_js_gz_len);
+    activeServer->on("/app.js", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
+        response->setContent(app_js_gz, app_js_gz_len);
+        response->setContentType("application/javascript");
         response->addHeader("Content-Encoding", "gzip");
-        request->send(response);
+        return response->send();
     });
 
-    activeServer->on("/system.js", HTTP_GET, [](AsyncWebServerRequest* request) {
-        AsyncWebServerResponse *response = request->beginResponse(200, "application/javascript", system_js_gz, system_js_gz_len);
+    activeServer->on("/system.js", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
+        response->setContent(system_js_gz, system_js_gz_len);
+        response->setContentType("application/javascript");
         response->addHeader("Content-Encoding", "gzip");
-        request->send(response);
+        return response->send();
     });
 
-    activeServer->on("/time.js", HTTP_GET, [](AsyncWebServerRequest* request) {
-        AsyncWebServerResponse *response = request->beginResponse(200, "application/javascript", time_js_gz, time_js_gz_len);
+    activeServer->on("/time.js", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
+        response->setContent(time_js_gz, time_js_gz_len);
+        response->setContentType("application/javascript");
         response->addHeader("Content-Encoding", "gzip");
-        request->send(response);
+        return response->send();
     });
 
-    activeServer->on("/wifi.js", HTTP_GET, [](AsyncWebServerRequest* request) {
-        AsyncWebServerResponse *response = request->beginResponse(200, "application/javascript", wifi_js_gz, wifi_js_gz_len);
+    activeServer->on("/wifi.js", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
+        response->setContent(wifi_js_gz, wifi_js_gz_len);
+        response->setContentType("application/javascript");
         response->addHeader("Content-Encoding", "gzip");
-        request->send(response);
+        return response->send();
     });
 
-    activeServer->on("/ota.js", HTTP_GET, [](AsyncWebServerRequest* request) {
-        AsyncWebServerResponse *response = request->beginResponse(200, "application/javascript", ota_js_gz, ota_js_gz_len);
+    activeServer->on("/ota.js", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
+        response->setContent(ota_js_gz, ota_js_gz_len);
+        response->setContentType("application/javascript");
         response->addHeader("Content-Encoding", "gzip");
-        request->send(response);
+        return response->send();
     });
 
-    activeServer->on("/utils.js", HTTP_GET, [](AsyncWebServerRequest* request) {
-        AsyncWebServerResponse *response = request->beginResponse(200, "application/javascript", utils_js_gz, utils_js_gz_len);
+    activeServer->on("/utils.js", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
+        response->setContent(utils_js_gz, utils_js_gz_len);
+        response->setContentType("application/javascript");
         response->addHeader("Content-Encoding", "gzip");
-        request->send(response);
+        return response->send();
     });
 
-    activeServer->on("/backup.js", HTTP_GET, [](AsyncWebServerRequest* request) {
-        AsyncWebServerResponse *response = request->beginResponse(200, "application/javascript", backup_js_gz, backup_js_gz_len);
+    activeServer->on("/backup.js", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
+        response->setContent(backup_js_gz, backup_js_gz_len);
+        response->setContentType("application/javascript");
         response->addHeader("Content-Encoding", "gzip");
-        request->send(response);
+        return response->send();
     });
 
-    activeServer->on("/keys.js", HTTP_GET, [](AsyncWebServerRequest* request) {
-        AsyncWebServerResponse *response = request->beginResponse(200, "application/javascript", keys_js_gz, keys_js_gz_len);
+    activeServer->on("/keys.js", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
+        response->setContent(keys_js_gz, keys_js_gz_len);
+        response->setContentType("application/javascript");
         response->addHeader("Content-Encoding", "gzip");
-        request->send(response);
+        return response->send();
     });
 
-    activeServer->on("/mcp.js", HTTP_GET, [](AsyncWebServerRequest* request) {
-        AsyncWebServerResponse *response = request->beginResponse(200, "application/javascript", mcp_js_gz, mcp_js_gz_len);
+    activeServer->on("/mcp.js", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
+        response->setContent(mcp_js_gz, mcp_js_gz_len);
+        response->setContentType("application/javascript");
         response->addHeader("Content-Encoding", "gzip");
-        request->send(response);
+        return response->send();
     });
 
-    activeServer->on("/screenshot.js", HTTP_GET, [](AsyncWebServerRequest* request) {
-        AsyncWebServerResponse *response = request->beginResponse(200, "application/javascript", screenshot_js_gz, screenshot_js_gz_len);
+    activeServer->on("/screenshot.js", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
+        response->setContent(screenshot_js_gz, screenshot_js_gz_len);
+        response->setContentType("application/javascript");
         response->addHeader("Content-Encoding", "gzip");
-        request->send(response);
+        return response->send();
     });
 
-    activeServer->on("/screenshot.html", HTTP_GET, [](AsyncWebServerRequest* request) {
-        AsyncWebServerResponse *response = request->beginResponse(200, "text/html", screenshot_html_gz, screenshot_html_gz_len);
+    activeServer->on("/screenshot.html", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
+        response->setContent(screenshot_html_gz, screenshot_html_gz_len);
+        response->setContentType("text/html");
         response->addHeader("Content-Encoding", "gzip");
-        request->send(response);
+        return response->send();
     });
 
-    activeServer->on("/display.js", HTTP_GET, [](AsyncWebServerRequest* request) {
-        AsyncWebServerResponse *response = request->beginResponse(200, "application/javascript", display_js_gz, display_js_gz_len);
+    activeServer->on("/display.js", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
+        response->setContent(display_js_gz, display_js_gz_len);
+        response->setContentType("application/javascript");
         response->addHeader("Content-Encoding", "gzip");
-        request->send(response);
+        return response->send();
     });
 
-    activeServer->on("/appconfig.js", HTTP_GET, [](AsyncWebServerRequest* request) {
-        AsyncWebServerResponse *response = request->beginResponse(200, "application/javascript", appconfig_js_gz, appconfig_js_gz_len);
+    activeServer->on("/appconfig.js", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
+        response->setContent(appconfig_js_gz, appconfig_js_gz_len);
+        response->setContentType("application/javascript");
         response->addHeader("Content-Encoding", "gzip");
-        request->send(response);
+        return response->send();
     });
 
-    activeServer->on("/auth.js", HTTP_GET, [](AsyncWebServerRequest* request) {
-        AsyncWebServerResponse *response = request->beginResponse(200, "application/javascript", auth_js_gz, auth_js_gz_len);
+    activeServer->on("/auth.js", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
+        response->setContent(auth_js_gz, auth_js_gz_len);
+        response->setContentType("application/javascript");
         response->addHeader("Content-Encoding", "gzip");
-        request->send(response);
+        return response->send();
     });
 #endif
 

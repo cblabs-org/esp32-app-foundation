@@ -31,14 +31,14 @@
 
 // Forward-declare to avoid pulling in full headers in interface-only files.
 // Concrete implementations include the full headers.
-class AsyncWebServer;
+class PsychicHttpServer;
 class AuthManager;
 
 /**
  * @brief Contract for modules that expose REST API routes to the WebServerManager.
  *
  * Implementing modules call server.on() inside registerRoutes() to install
- * their handlers. The WebServerManager passes its AsyncWebServer reference
+ * their handlers. The WebServerManager passes its PsychicHttpServer reference
  * during the begin() phase, before server.begin() is called.
  *
  * Navigation hierarchy:
@@ -54,9 +54,9 @@ public:
 
     /**
      * @brief Register all REST API route handlers with the web server.
-     * @param server Reference to the AsyncWebServer instance.
+     * @param server Reference to the PsychicHttpServer instance.
      */
-    virtual void registerRoutes(AsyncWebServer& server) = 0;
+    virtual void registerRoutes(PsychicHttpServer& server) = 0;
 
     /**
      * @brief Register routes with auth guard support (WO5).
@@ -66,10 +66,10 @@ public:
      * top of each handler lambda. The default implementation falls through
      * to the single-argument registerRoutes() for backward compatibility.
      *
-     * @param server Reference to the AsyncWebServer instance.
+     * @param server Reference to the PsychicHttpServer instance.
      * @param auth   Pointer to the AuthManager (may be nullptr = no guard).
      */
-    virtual void registerRoutes(AsyncWebServer& server, AuthManager* auth) {
+    virtual void registerRoutes(PsychicHttpServer& server, AuthManager* auth) {
         registerRoutes(server); // backward-compatible default
     }
 

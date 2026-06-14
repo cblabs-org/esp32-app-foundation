@@ -50,19 +50,32 @@
 #include <string>
 
 #ifndef NATIVE_BUILD
-#include <ESPAsyncWebServer.h>
+#include <PsychicHttp.h>
+#include <PsychicHttpsServer.h>
 #else
 #include <cstdint>
-// Mock AsyncWebServer for native testing
-class AsyncWebServerResponse {}; // Stub — real class from ESPAsyncWebServer
-class AsyncWebServerRequest {
+#include <string>
+#include <vector>
+
+// Define ESP-IDF error types for native build
+typedef int esp_err_t;
+#ifndef ESP_OK
+#define ESP_OK 0
+#endif
+
+// Mock PsychicHttp for native testing
+class PsychicResponse {};
+class PsychicRequest {
 public:
     void redirect(const char* url) {} // Stub for captive portal redirect
-    void send(int code, const char* contentType, const char* content) {} // Stub for direct responses
-    void send(AsyncWebServerResponse* response) {} // Stub for response object sends
+    PsychicResponse* reply(int code, const char* contentType, const char* content) { return nullptr; } // Stub for direct responses
+    PsychicResponse* reply(const char* content) { return nullptr; } // Stub for direct responses
+    PsychicResponse* send(PsychicResponse* response) { return nullptr; } // Stub for response object sends
+    const char* header(const char* name) { return ""; }
+    bool hasHeader(const char* name) { return false; }
 };
 
-typedef void (*ArRequestHandlerFunction)(AsyncWebServerRequest *request);
+typedef esp_err_t (*PsychicHttpRequestCallback)(PsychicRequest *request, PsychicResponse *response);
 
 #define HTTP_GET     0b00000001
 #define HTTP_POST    0b00000010
@@ -73,27 +86,38 @@ typedef void (*ArRequestHandlerFunction)(AsyncWebServerRequest *request);
 #define HTTP_OPTIONS 0b01000000
 #define HTTP_ANY     0b01111111
 
-class AsyncWebServer {
+class PsychicEndpoint {};
+
+class PsychicHttpServer {
 public:
-    AsyncWebServer(uint16_t port) {}
-    void begin() {}
+    PsychicHttpServer(uint16_t port = 80) {}
+    virtual ~PsychicHttpServer() {}
+    esp_err_t begin() { return ESP_OK; }
     
     struct Route {
         std::string uri;
         int method;
-        ArRequestHandlerFunction handler;
+        PsychicHttpRequestCallback handler;
     };
     std::vector<Route> routes;
 
-    void on(const char* uri, int method, ArRequestHandlerFunction handler) {
+    PsychicEndpoint* on(const char* uri, int method, PsychicHttpRequestCallback handler) {
         routes.push_back({uri, method, handler});
+        return nullptr;
     }
-    void onNotFound(ArRequestHandlerFunction handler) {} // Stub for captive portal
-    static void setMaxBodySize(uint32_t size) {
+    void onNotFound(PsychicHttpRequestCallback handler) {} // Stub for captive portal
+    static void setMaxRequestBodySize(uint32_t size) {
         lastMaxBodySize = size;
     }
     
     static uint32_t lastMaxBodySize;
+};
+
+class PsychicHttpsServer : public PsychicHttpServer {
+public:
+    PsychicHttpsServer() : PsychicHttpServer(443) {}
+    void setCertificate(const char* cert, const char* private_key) {}
+    void setCertificate(const uint8_t* cert, size_t cert_size, const uint8_t* private_key, size_t private_key_size) {}
 };
 #endif
 
@@ -155,15 +179,15 @@ public:
      * Returns the HTTPS server when in TLS mode, otherwise the HTTP server.
      * Contributors and tests use this to inspect registered routes.
      *
-     * @return Reference to the active AsyncWebServer.
+     * @return Reference to the active PsychicHttpServer.
      */
-    AsyncWebServer& getServer();
+    PsychicHttpServer& getServer();
 
 private:
-    AsyncWebServer _httpServer; ///< HTTP server on port 80 (always exists)
+    PsychicHttpServer _httpServer; ///< HTTP server on port 80 (always exists)
 
 #ifndef NATIVE_BUILD
-    AsyncWebServer* _httpsServer = nullptr; ///< HTTPS server on port 443 (heap-allocated in TLS mode)
+    PsychicHttpsServer* _httpsServer = nullptr; ///< HTTPS server on port 443 (heap-allocated in TLS mode)
 #endif
 
     bool         _tlsMode     = false;   ///< True when serving HTTPS on port 443

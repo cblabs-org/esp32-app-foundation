@@ -19,6 +19,9 @@ CONFIG_ESP_MAIN_TASK_STACK_SIZE=8192
 # Enable LittleFS
 CONFIG_LITTLEFS_FOR_IDF_3_2=y
 
+# PsychicHttp / ESP-IDF HTTP server WebSockets
+CONFIG_HTTPD_WS_SUPPORT=y
+
 # Disable Bluetooth to reclaim ~70KB RAM (not needed for this framework)
 CONFIG_BT_ENABLED=n
 
