@@ -205,6 +205,7 @@ bool Application::begin(const FrameworkConfig& config) {
 
 
     // --- Step 15: WebServerManager + MCPServer begin() ---
+    _authManager.setAPMode(_wifiManager.getAPMode());
     _webServerManager.begin(_webContributors, &_authManager, _wifiManager.getAPMode());
 
     // MCP server: pass the ConfigManager reference for config operations,

@@ -252,7 +252,7 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors,
     
     for (auto* contributor : contributors) {
         if (contributor != nullptr) {
-            contributor->registerRoutes(activeServer);
+            contributor->registerRoutes(activeServer, _authManager);
             const char* tabName = contributor->getTabName();
             if (tabName != nullptr) {
                 JsonObject tabObj = tabsArr.add<JsonObject>();

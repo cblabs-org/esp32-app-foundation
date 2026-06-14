@@ -302,6 +302,17 @@ public:
      */
     bool isAuthEnabled() const { return _authEnabled; }
 
+    /**
+     * @brief Set the AP (access point) mode flag.
+     *
+     * When AP mode is active, checkPortalAuth() returns true unconditionally
+     * (open access during physical setup). Called by Application::begin()
+     * after AuthManager::begin() with the WifiManager AP mode state.
+     *
+     * @param apMode true if the device is in AP mode, false otherwise.
+     */
+    void setAPMode(bool apMode) { _apMode = apMode; }
+
 private:
     // -------------------------------------------------------------------------
     // Auth state flags
@@ -310,6 +321,7 @@ private:
     bool _authEnabled  = false; ///< True if password auth enforcement is active
     bool _passwordSet  = false; ///< True if a password hash exists in KeyManager
     bool _certPresent  = false; ///< True if a TLS certificate exists in LittleFS
+    bool _apMode       = false; ///< True when device is in AP mode (WO5: bypasses auth guard)
 
     // -------------------------------------------------------------------------
     // Session token (16-byte; all-zero means no active session)

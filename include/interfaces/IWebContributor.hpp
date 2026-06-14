@@ -29,9 +29,10 @@
 
 #pragma once
 
-// Forward-declare to avoid pulling in the full ESPAsyncWebServer header
-// in interface-only files. Concrete implementations include the full header.
+// Forward-declare to avoid pulling in full headers in interface-only files.
+// Concrete implementations include the full headers.
 class AsyncWebServer;
+class AuthManager;
 
 /**
  * @brief Contract for modules that expose REST API routes to the WebServerManager.
@@ -56,6 +57,21 @@ public:
      * @param server Reference to the AsyncWebServer instance.
      */
     virtual void registerRoutes(AsyncWebServer& server) = 0;
+
+    /**
+     * @brief Register routes with auth guard support (WO5).
+     *
+     * Called by WebServerManager::begin() when an AuthManager is available.
+     * Protected routes should use AUTH_PORTAL_GUARD(auth, request) at the
+     * top of each handler lambda. The default implementation falls through
+     * to the single-argument registerRoutes() for backward compatibility.
+     *
+     * @param server Reference to the AsyncWebServer instance.
+     * @param auth   Pointer to the AuthManager (may be nullptr = no guard).
+     */
+    virtual void registerRoutes(AsyncWebServer& server, AuthManager* auth) {
+        registerRoutes(server); // backward-compatible default
+    }
 
     /**
      * @brief Get the UI tab name for this contributor.
@@ -97,3 +113,22 @@ public:
      */
     virtual const char* getTabIcon() const { return nullptr; }
 };
+
+// ---------------------------------------------------------------------------
+// AUTH_PORTAL_GUARD — convenience macro for contributor route handlers (WO5)
+// ---------------------------------------------------------------------------
+// Usage inside a route lambda:
+//   server.on("/api/foo", HTTP_GET, [this, auth](AsyncWebServerRequest* req) {
+//       AUTH_PORTAL_GUARD(auth, req);
+//       // ... normal handler code ...
+//   });
+//
+// When auth is nullptr (tests, or no auth configured), the guard is a no-op.
+// When auth is non-null and checkPortalAuth() returns false, the macro sends
+// 401 and returns from the lambda. The caller must NOT add any code between
+// AUTH_PORTAL_GUARD and the next handler statement.
+// ---------------------------------------------------------------------------
+#define AUTH_PORTAL_GUARD(auth, request) \
+    do { \
+        if ((auth) && !(auth)->checkPortalAuth(request)) return; \
+    } while(0)

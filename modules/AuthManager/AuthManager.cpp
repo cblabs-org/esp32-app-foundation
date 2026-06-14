@@ -113,14 +113,42 @@ void AuthManager::begin(ConfigManager* configManager, KeyManager* keyManager) {
 // ===========================================================================
 
 /**
- * @brief Check portal authentication — pass-through stub.
+ * @brief Check portal session-cookie authentication (WO5).
  *
- * Returns true unconditionally so that no existing route is blocked
- * before WO5 wires the real session-cookie guard.
+ * Guard logic (evaluated in order — first match wins):
+ *   1. AP mode → open access (physical setup mode, no auth needed)
+ *   2. Auth disabled → open access (no password set)
+ *   3. Valid session cookie → authorised
+ *   4. Otherwise → 401 Unauthorized
+ *
+ * The session cookie format is "esp32_session=<32-hex-chars>" set by the
+ * login handler. _checkSessionCookie() performs constant-time comparison.
+ *
+ * @param request The incoming HTTP request (nullptr in native tests).
+ * @return true if the request is authorised, false if rejected (401 sent).
  */
-bool AuthManager::checkPortalAuth(AsyncWebServerRequest* /*request*/) {
-    // --- WO5 will inspect the session cookie here ---
+bool AuthManager::checkPortalAuth(AsyncWebServerRequest* request) {
+    // --- Gate: AP mode → always open ---
+    if (_apMode) return true;
+
+    // --- Gate: auth disabled → open access ---
+    if (!_authEnabled) return true;
+
+#ifndef NATIVE_BUILD
+    // --- Gate: null request (safety) ---
+    if (!request) return false;
+
+    // --- Gate: valid session cookie ---
+    if (_isSessionActive() && _checkSessionCookie(request)) return true;
+
+    // --- Reject: send 401 ---
+    request->send(401, "application/json", "{\"error\":\"unauthorized\"}");
+    return false;
+#else
+    // Native build: no HTTP cookie methods on mock.
+    // Return true to allow unit tests that don't involve session auth to pass.
     return true;
+#endif
 }
 
 /**
@@ -704,11 +732,11 @@ void AuthManager::registerRoutes(AsyncWebServer& server) {
             char tokenHex[33] = {0};  // 16 bytes → 32 hex chars + null
             _toHex(_sessionToken, 16, tokenHex);
 
-            // Cookie format: esp32_session=<32-hex>; HttpOnly; SameSite=Strict
-            // Secure attribute is intentionally absent until WO4 activates HTTPS.
+            // Cookie format: esp32_session=<32-hex>; HttpOnly; SameSite=Strict; Secure
+            // Secure attribute added in WO5: auth implies TLS is active (WO4).
             char cookie[128] = {0};
             snprintf(cookie, sizeof(cookie),
-                "esp32_session=%s; HttpOnly; SameSite=Strict", tokenHex);
+                "esp32_session=%s; HttpOnly; SameSite=Strict; Secure", tokenHex);
 
             AsyncWebServerResponse* response =
                 request->beginResponse(200, "application/json", "{\"status\":\"ok\"}");
@@ -727,7 +755,7 @@ void AuthManager::registerRoutes(AsyncWebServer& server) {
             AsyncWebServerResponse* response =
                 request->beginResponse(200, "application/json", "{\"status\":\"ok\"}");
             response->addHeader("Set-Cookie",
-                "esp32_session=; HttpOnly; SameSite=Strict; Max-Age=0");
+                "esp32_session=; HttpOnly; SameSite=Strict; Secure; Max-Age=0");
             request->send(response);
         });
 
