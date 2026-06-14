@@ -116,6 +116,16 @@ Both files loaded in `app.js`'s `loadScripts()` array.
 
 ---
 
+## Post-Merge Fixes (on `pr-23-display-tab`)
+
+| Commit | Fix |
+|---|---|
+| `3e35277` | Missing `/display.js` route in WebServerManager — empty Settings pill |
+| `3e35277` | Tab order: App(30) before Display(50) per user request |
+| `564b0b2` | Screenshot: remove emoji icons, Download→outline, pixel colour picker (Amber default) |
+
+---
+
 ## Sequencing
 
 Single WO — all changes are interdependent (splitting `appconfig.js` must happen
@@ -138,3 +148,9 @@ would require touching the same files simultaneously with guaranteed conflicts.
 12. `test/web/tests/navigation.spec.ts` — MOCK_TABS
 13. `test/web/server.js` — `/api/tabs` mock
 14. `test/test_unit/test_u8g2Display/` — any `getTabName()` assertions
+
+---
+
+## Distillation
+
+→ [context_bridge.md](./context_bridge.md) — PA-level strategic decisions, ADRs, and graveyard entries for this project.
