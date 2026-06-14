@@ -73,6 +73,7 @@ predate the formal PA pipeline and are filed retrospectively.
 | OO Expert Review | 2026-06-04 | OO architecture review findings, ConfigManager locked-vector, module compliance scorecard | ✅ **COMPLETE** | [adhoc-oo-expert-review/](./adhoc-oo-expert-review/context_bridge.md) |
 | Screensaver TWDT Crash | 2026-06-07 | Deterministic TWDT crash at 313 s — `vTaskDelay` fix, `setPowerSave(1)`, `localtime_r` thread safety | ✅ **FIXED** — `026354b`, `842a7e5` | [adhoc-screensaver-twdt/](./adhoc-screensaver-twdt/context_bridge.md) |
 | OTA Docs & Boot Hotfix | 2026-06-07 | `build_and_release_process.md`, Wi-Fi gate in `tick()`, `_silentCheck`, channel risk-floor model | ✅ **COMPLETE** | [adhoc-ota-docs-hotfix/](./adhoc-ota-docs-hotfix/context_bridge.md) |
+| Boot & WiFi Bugfixes | 2026-06-11 | PKCS7 padding corruption → AUTH_EXPIRE; WiFi wizard modal never shown in AP mode; `%zu` Newlib nano printf — 3 fixes on `pr-21-ota-task-hardening` | ✅ **FIXED** — `dff3b22`, `a0c91dc` | [adhoc-boot-wifi-bugfixes/](./adhoc-boot-wifi-bugfixes/context_bridge.md) |
 
 ---
 

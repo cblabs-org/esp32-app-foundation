@@ -39,16 +39,15 @@ bytes of `\x06` to the password before it was passed to `WiFi.begin()`.
 
 ## Why It Was Silent
 
-The branch `return paddedLen` logged *nothing*. The success path log
-`"Decryption verified"` was only reached when `unpaddedLen > 0 && unpaddedLen <=
-ciphertextLen` — which was always true because `paddedLen <= ciphertextLen` (since
-`paddedLen = ciphertextLen` in the invalid-padding path). The logs looked clean.
+The branch `return paddedLen` logged *nothing*. The success-path log
+`"Decryption verified"` was reached because `unpaddedLen > 0 && unpaddedLen <=
+ciphertextLen` evaluated true (since `paddedLen == ciphertextLen` in this path).
 
 ## Decision
 
 Return `0` from the invalid-padding branch. The caller already checks `outLen == 0`
-and returns an empty string on error, which triggers "Key not found" fallback
-behaviour — a safe, visible failure rather than a silent corruption.
+and returns an empty string on error — a safe, visible failure rather than silent
+corruption.
 
 ## Commit
 
