@@ -1,6 +1,5 @@
 ---
 description: Workflow for managing the project backlog in .agents/todo/todo.md (todo_list branch). Supports adding items from the current session or synthesising them from another conversation, updating item status, and reviewing the list for PA handoff.
-argument-hint: [add|update|review|add from conversation] "<note>"
 ---
 
 # /todo — Project Backlog Workflow
