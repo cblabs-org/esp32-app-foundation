@@ -28,6 +28,10 @@
 
 #ifndef NATIVE_BUILD
     #include "esp_heap_caps.h"
+    // AuthManager full type needed for isAuthEnabled()/hasCert()/loadCert()
+    // in TLS setup. Guarded so native LDF doesn't scan it, but even if it
+    // does, the transitive DeviceCrypto include now resolves via relative path.
+    #include "../AuthManager/AuthManager.hpp"
 #endif
 
 // Portal PROGMEM assets — hardware only (require Arduino.h for PROGMEM macro)
@@ -135,17 +139,17 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors,
     // Select the active server for route registration
     // TLS mode: routes on HTTPS server; HTTP server becomes redirect-only
     // HTTP-open mode: all routes on the HTTP server (port 80)
-    AsyncWebServer& activeServer = _httpServer; // default
+    AsyncWebServer* activeServer = &_httpServer; // default
 #ifndef NATIVE_BUILD
     if (useTls && _httpsServer) {
-        activeServer = *_httpsServer;
+        activeServer = _httpsServer;
     }
 #endif
 
     // --- Setup routing for static files served from PROGMEM (hardware only) ---
 #ifndef NATIVE_BUILD
     // Heap-guarded portal HTML route — the largest single response
-    activeServer.on("/", HTTP_GET, [](AsyncWebServerRequest* request) {
+    activeServer->on("/", HTTP_GET, [](AsyncWebServerRequest* request) {
         // --- Heap guard check ---
         int current = activeHighMemRequests.load();
         if (current >= MAX_CONCURRENT_HIGH_MEM ||
@@ -162,91 +166,91 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors,
         activeHighMemRequests--;
     });
     
-    activeServer.on("/app.css", HTTP_GET, [](AsyncWebServerRequest* request) {
+    activeServer->on("/app.css", HTTP_GET, [](AsyncWebServerRequest* request) {
         AsyncWebServerResponse *response = request->beginResponse(200, "text/css", app_css_gz, app_css_gz_len);
         response->addHeader("Content-Encoding", "gzip");
         request->send(response);
     });
 
-    activeServer.on("/app.js", HTTP_GET, [](AsyncWebServerRequest* request) {
+    activeServer->on("/app.js", HTTP_GET, [](AsyncWebServerRequest* request) {
         AsyncWebServerResponse *response = request->beginResponse(200, "application/javascript", app_js_gz, app_js_gz_len);
         response->addHeader("Content-Encoding", "gzip");
         request->send(response);
     });
 
-    activeServer.on("/system.js", HTTP_GET, [](AsyncWebServerRequest* request) {
+    activeServer->on("/system.js", HTTP_GET, [](AsyncWebServerRequest* request) {
         AsyncWebServerResponse *response = request->beginResponse(200, "application/javascript", system_js_gz, system_js_gz_len);
         response->addHeader("Content-Encoding", "gzip");
         request->send(response);
     });
 
-    activeServer.on("/time.js", HTTP_GET, [](AsyncWebServerRequest* request) {
+    activeServer->on("/time.js", HTTP_GET, [](AsyncWebServerRequest* request) {
         AsyncWebServerResponse *response = request->beginResponse(200, "application/javascript", time_js_gz, time_js_gz_len);
         response->addHeader("Content-Encoding", "gzip");
         request->send(response);
     });
 
-    activeServer.on("/wifi.js", HTTP_GET, [](AsyncWebServerRequest* request) {
+    activeServer->on("/wifi.js", HTTP_GET, [](AsyncWebServerRequest* request) {
         AsyncWebServerResponse *response = request->beginResponse(200, "application/javascript", wifi_js_gz, wifi_js_gz_len);
         response->addHeader("Content-Encoding", "gzip");
         request->send(response);
     });
 
-    activeServer.on("/ota.js", HTTP_GET, [](AsyncWebServerRequest* request) {
+    activeServer->on("/ota.js", HTTP_GET, [](AsyncWebServerRequest* request) {
         AsyncWebServerResponse *response = request->beginResponse(200, "application/javascript", ota_js_gz, ota_js_gz_len);
         response->addHeader("Content-Encoding", "gzip");
         request->send(response);
     });
 
-    activeServer.on("/utils.js", HTTP_GET, [](AsyncWebServerRequest* request) {
+    activeServer->on("/utils.js", HTTP_GET, [](AsyncWebServerRequest* request) {
         AsyncWebServerResponse *response = request->beginResponse(200, "application/javascript", utils_js_gz, utils_js_gz_len);
         response->addHeader("Content-Encoding", "gzip");
         request->send(response);
     });
 
-    activeServer.on("/backup.js", HTTP_GET, [](AsyncWebServerRequest* request) {
+    activeServer->on("/backup.js", HTTP_GET, [](AsyncWebServerRequest* request) {
         AsyncWebServerResponse *response = request->beginResponse(200, "application/javascript", backup_js_gz, backup_js_gz_len);
         response->addHeader("Content-Encoding", "gzip");
         request->send(response);
     });
 
-    activeServer.on("/keys.js", HTTP_GET, [](AsyncWebServerRequest* request) {
+    activeServer->on("/keys.js", HTTP_GET, [](AsyncWebServerRequest* request) {
         AsyncWebServerResponse *response = request->beginResponse(200, "application/javascript", keys_js_gz, keys_js_gz_len);
         response->addHeader("Content-Encoding", "gzip");
         request->send(response);
     });
 
-    activeServer.on("/mcp.js", HTTP_GET, [](AsyncWebServerRequest* request) {
+    activeServer->on("/mcp.js", HTTP_GET, [](AsyncWebServerRequest* request) {
         AsyncWebServerResponse *response = request->beginResponse(200, "application/javascript", mcp_js_gz, mcp_js_gz_len);
         response->addHeader("Content-Encoding", "gzip");
         request->send(response);
     });
 
-    activeServer.on("/screenshot.js", HTTP_GET, [](AsyncWebServerRequest* request) {
+    activeServer->on("/screenshot.js", HTTP_GET, [](AsyncWebServerRequest* request) {
         AsyncWebServerResponse *response = request->beginResponse(200, "application/javascript", screenshot_js_gz, screenshot_js_gz_len);
         response->addHeader("Content-Encoding", "gzip");
         request->send(response);
     });
 
-    activeServer.on("/screenshot.html", HTTP_GET, [](AsyncWebServerRequest* request) {
+    activeServer->on("/screenshot.html", HTTP_GET, [](AsyncWebServerRequest* request) {
         AsyncWebServerResponse *response = request->beginResponse(200, "text/html", screenshot_html_gz, screenshot_html_gz_len);
         response->addHeader("Content-Encoding", "gzip");
         request->send(response);
     });
 
-    activeServer.on("/display.js", HTTP_GET, [](AsyncWebServerRequest* request) {
+    activeServer->on("/display.js", HTTP_GET, [](AsyncWebServerRequest* request) {
         AsyncWebServerResponse *response = request->beginResponse(200, "application/javascript", display_js_gz, display_js_gz_len);
         response->addHeader("Content-Encoding", "gzip");
         request->send(response);
     });
 
-    activeServer.on("/appconfig.js", HTTP_GET, [](AsyncWebServerRequest* request) {
+    activeServer->on("/appconfig.js", HTTP_GET, [](AsyncWebServerRequest* request) {
         AsyncWebServerResponse *response = request->beginResponse(200, "application/javascript", appconfig_js_gz, appconfig_js_gz_len);
         response->addHeader("Content-Encoding", "gzip");
         request->send(response);
     });
 
-    activeServer.on("/auth.js", HTTP_GET, [](AsyncWebServerRequest* request) {
+    activeServer->on("/auth.js", HTTP_GET, [](AsyncWebServerRequest* request) {
         AsyncWebServerResponse *response = request->beginResponse(200, "application/javascript", auth_js_gz, auth_js_gz_len);
         response->addHeader("Content-Encoding", "gzip");
         request->send(response);
@@ -259,7 +263,7 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors,
     
     for (auto* contributor : contributors) {
         if (contributor != nullptr) {
-            contributor->registerRoutes(activeServer, _authManager);
+            contributor->registerRoutes(*activeServer, _authManager);
             const char* tabName = contributor->getTabName();
             if (tabName != nullptr) {
                 JsonObject tabObj = tabsArr.add<JsonObject>();
@@ -293,14 +297,14 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors,
     serializeJson(tabsDoc, tabsJson);
 
     // --- GET /api/tabs — tab hierarchy for navigation ---
-    activeServer.on("/api/tabs", HTTP_GET, [tabsJson](AsyncWebServerRequest* request) {
+    activeServer->on("/api/tabs", HTTP_GET, [tabsJson](AsyncWebServerRequest* request) {
         request->send(200, "application/json", tabsJson);
     });
 
     // -----------------------------------------------------------------------
     // GET /api/system — Enhanced system information (20+ fields)
     // -----------------------------------------------------------------------
-    activeServer.on("/api/system", HTTP_GET, [](AsyncWebServerRequest* request) {
+    activeServer->on("/api/system", HTTP_GET, [](AsyncWebServerRequest* request) {
         // --- Heap guard for this large response ---
         int current = activeHighMemRequests.load();
         if (current >= MAX_CONCURRENT_HIGH_MEM ||
@@ -387,7 +391,7 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors,
     // GET /api/app — Application metadata (title + version)
     // Uses build-time macros. Consuming apps override APP_TITLE in platformio.ini.
     // -----------------------------------------------------------------------
-    activeServer.on("/api/app", HTTP_GET, [](AsyncWebServerRequest* request) {
+    activeServer->on("/api/app", HTTP_GET, [](AsyncWebServerRequest* request) {
         JsonDocument doc;
         doc["name"]    = APP_TITLE;
         doc["version"] = BUILD_VERSION;
@@ -401,7 +405,7 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors,
     // Sends 200, then schedules esp_restart() after 500ms delay.
     // Body limit: 256 bytes (action-only, minimal body).
     // -----------------------------------------------------------------------
-    activeServer.on("/api/system/restart", HTTP_POST, [](AsyncWebServerRequest* request) {
+    activeServer->on("/api/system/restart", HTTP_POST, [](AsyncWebServerRequest* request) {
         ESP_LOGW(TAG, "POST /api/system/restart — scheduling device restart");
         request->send(200, "application/json", "{\"status\":\"restarting\"}");
 
@@ -416,7 +420,7 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors,
     // Erases /mod/ (module configs) and /etc/ (system configs) directories,
     // sends 200, then schedules restart. Body limit: 256 bytes.
     // -----------------------------------------------------------------------
-    activeServer.on("/api/system/factory-reset", HTTP_POST, [](AsyncWebServerRequest* request) {
+    activeServer->on("/api/system/factory-reset", HTTP_POST, [](AsyncWebServerRequest* request) {
         ESP_LOGW(TAG, "POST /api/system/factory-reset — erasing configuration");
 
         // --- Step 1: Erase /mod/ directory (per-module config files) ---
@@ -456,11 +460,11 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors,
     });
 
 #else
-    activeServer.on("/api/tabs", HTTP_GET, [](AsyncWebServerRequest* request) {});
-    activeServer.on("/api/system", HTTP_GET, [](AsyncWebServerRequest* request) {});
-    activeServer.on("/api/app", HTTP_GET, [](AsyncWebServerRequest* request) {});
-    activeServer.on("/api/system/restart", HTTP_POST, [](AsyncWebServerRequest* request) {});
-    activeServer.on("/api/system/factory-reset", HTTP_POST, [](AsyncWebServerRequest* request) {});
+    activeServer->on("/api/tabs", HTTP_GET, [](AsyncWebServerRequest* request) {});
+    activeServer->on("/api/system", HTTP_GET, [](AsyncWebServerRequest* request) {});
+    activeServer->on("/api/app", HTTP_GET, [](AsyncWebServerRequest* request) {});
+    activeServer->on("/api/system/restart", HTTP_POST, [](AsyncWebServerRequest* request) {});
+    activeServer->on("/api/system/factory-reset", HTTP_POST, [](AsyncWebServerRequest* request) {});
 #endif
 
     // --- Captive portal redirect (AP mode only) / 404 (STA mode) ---
@@ -471,7 +475,7 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors,
     //
     // In STA mode the redirect is harmful — it silently masks missing routes
     // instead of returning a visible 404 error.
-    activeServer.onNotFound([](AsyncWebServerRequest* request) {
+    activeServer->onNotFound([](AsyncWebServerRequest* request) {
 #ifndef NATIVE_BUILD
         if (WiFi.getMode() == WIFI_AP || WiFi.getMode() == WIFI_AP_STA) {
             request->redirect("http://192.168.4.1/");

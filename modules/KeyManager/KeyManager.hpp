@@ -45,7 +45,7 @@
 #include <memory>
 #include <vector>
 #include <ArduinoJson.h>
-#include "DeviceCrypto.hpp"
+#include "../DeviceCrypto/DeviceCrypto.hpp"
 #include "../../include/interfaces/IWebContributor.hpp"
 
 #ifndef NATIVE_BUILD

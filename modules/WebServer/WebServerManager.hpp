@@ -143,6 +143,12 @@ public:
                AuthManager* authManager = nullptr,
                bool apMode = false);
 
+    // Non-copyable, non-movable: AsyncWebServer member is not copy/move-safe.
+    WebServerManager(const WebServerManager&) = delete;
+    WebServerManager& operator=(const WebServerManager&) = delete;
+    WebServerManager(WebServerManager&&) = delete;
+    WebServerManager& operator=(WebServerManager&&) = delete;
+
     /**
      * @brief Get the active web server instance.
      *

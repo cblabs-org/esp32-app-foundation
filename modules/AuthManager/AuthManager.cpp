@@ -44,16 +44,19 @@
 #ifndef NATIVE_BUILD
 // Full ESPAsyncWebServer types are required for registerRoutes() in hardware builds.
 #include <ESPAsyncWebServer.h>
-// mbedTLS: SHA-256 + safer memcmp for password hashing (WO2).
+// mbedTLS: SHA-256 + constant-time comparison for password hashing (WO2).
 #include <mbedtls/md.h>
-#include <mbedtls/ssl.h>
+// mbedtls/constant_time.h lacks extern "C" guards — wrap explicitly.
+extern "C" {
+#include <mbedtls/constant_time.h>
+}
 // mbedTLS: EC key generation + X.509 cert writing (WO3).
+// In mbedTLS 3.x (ESP-IDF 5.x), the x509write_crt API is part of x509_crt.h.
 #include <mbedtls/entropy.h>
 #include <mbedtls/ctr_drbg.h>
 #include <mbedtls/pk.h>
 #include <mbedtls/ecp.h>
 #include <mbedtls/x509_crt.h>
-#include <mbedtls/x509write_crt.h>
 #include <mbedtls/sha256.h>
 #include <esp_random.h>
 // LittleFS for DER cert/key storage (WO3).
@@ -209,9 +212,9 @@ bool AuthManager::checkMcpAuth(AsyncWebServerRequest* request) {
 
     // --- Step 4: Constant-time comparison ---
     if (bearerToken.length() != (int)storedHash.length() ||
-        mbedtls_ssl_safer_memcmp(bearerToken.c_str(),
-                                 storedHash.c_str(),
-                                 storedHash.length()) != 0) {
+        mbedtls_ct_memcmp(bearerToken.c_str(),
+                          storedHash.c_str(),
+                          storedHash.length()) != 0) {
         request->send(401, "application/json", "{\"error\":\"invalid_token\"}");
         return false;
     }
@@ -373,13 +376,11 @@ bool AuthManager::generateAndStoreCert(const char* hostname) {
     mbedtls_ctr_drbg_context ctrDrbg;
     mbedtls_pk_context       key;
     mbedtls_x509write_cert   crt;
-    mbedtls_mpi              serial;
 
     mbedtls_entropy_init(&entropy);
     mbedtls_ctr_drbg_init(&ctrDrbg);
     mbedtls_pk_init(&key);
     mbedtls_x509write_crt_init(&crt);
-    mbedtls_mpi_init(&serial);
 
     // Helper lambda: clean up all contexts and return a result code.
     // Defined here so every early-return path calls a single cleanup.
@@ -388,7 +389,6 @@ bool AuthManager::generateAndStoreCert(const char* hostname) {
         mbedtls_pk_free(&key);
         mbedtls_ctr_drbg_free(&ctrDrbg);
         mbedtls_entropy_free(&entropy);
-        mbedtls_mpi_free(&serial);
         return result;
     };
 
@@ -428,7 +428,8 @@ bool AuthManager::generateAndStoreCert(const char* hostname) {
 
     // --- Step 5: Build X.509v3 certificate ---
     // Serial number = 1 (fixed; unique per device by key uniqueness)
-    mbedtls_mpi_read_string(&serial, 10, "1");
+    // mbedTLS 3.x: use set_serial_raw with a raw byte array instead of MPI.
+    unsigned char serialBytes[] = { 0x01 };
 
     mbedtls_x509write_crt_set_subject_key(&crt, &key);
     mbedtls_x509write_crt_set_issuer_key(&crt, &key);  // Self-signed: issuer = subject
@@ -439,7 +440,7 @@ bool AuthManager::generateAndStoreCert(const char* hostname) {
     mbedtls_x509write_crt_set_subject_name(&crt, dn);
     mbedtls_x509write_crt_set_issuer_name(&crt, dn);
 
-    mbedtls_x509write_crt_set_serial(&crt, &serial);
+    mbedtls_x509write_crt_set_serial_raw(&crt, serialBytes, sizeof(serialBytes));
 
     // Fixed validity: 2020-01-01 → 2040-01-01 (avoids RTC dependency on first boot)
     mbedtls_x509write_crt_set_validity(&crt, "20200101000000", "20400101000000");
@@ -985,8 +986,8 @@ bool AuthManager::_verifyPassword(const char* candidate) const {
 
     // --- Step 4: Constant-time comparison ---
 #ifndef NATIVE_BUILD
-    // mbedTLS provides a constant-time safe_memcmp on hardware
-    int diff = mbedtls_ssl_safer_memcmp(candidateHash, storedHash, 32);
+    // mbedTLS 3.x: mbedtls_ct_memcmp replaces mbedtls_ssl_safer_memcmp
+    int diff = mbedtls_ct_memcmp(candidateHash, storedHash, 32);
 #else
     // Native: use our volatile-accumulator constant-time fallback
     int diff = _safeMemcmp(candidateHash, storedHash, 32);
