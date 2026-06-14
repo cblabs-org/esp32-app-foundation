@@ -935,16 +935,15 @@ input[type="number"]::-webkit-inner-spin-button {
 .btn-icon:hover {
   background: var(--primary-alpha);
 }
-.btn-danger {
+button.danger {
+  background: transparent;
+  color: var(--error);
+  border: 2px solid var(--error);
+}
+button.danger:hover {
   background: var(--error);
   color: #fff;
-  border: none;
-  padding: 10px 20px;
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: 0.95em;
-  transition: opacity 0.15s;
 }
-.btn-danger:hover {
-  opacity: 0.85;
+button.full-width {
+  width: 100%;
 }

@@ -31,7 +31,7 @@
                    'autocomplete="current-password">' +
           '</div>' +
           '<div id="login-error" class="login-error hidden"></div>' +
-          '<button type="submit" id="login-submit" class="btn btn-primary">Unlock</button>' +
+          '<button type="submit" id="login-submit" style="width:100%">Unlock</button>' +
         '</form>' +
       '</div>' +
     '</div>';
@@ -166,22 +166,22 @@
       html +=
         '<div class="section-card">' +
           '<div class="section-header">' +
-            '<h3>Authentication</h3>' +
+            '<h3>&#x1f512; Set Password</h3>' +
           '</div>' +
           '<p class="text-muted">Authentication is currently disabled. Set a password to ' +
              'secure the portal and enable HTTPS.</p>' +
           '<div class="form-group">' +
             '<label for="new-password">New Password</label>' +
-            '<input type="password" id="new-password" class="input" ' +
+            '<input type="password" id="new-password" ' +
                    'placeholder="Choose a password (min 8 chars)" autocomplete="new-password">' +
           '</div>' +
           '<div class="form-group">' +
             '<label for="confirm-password">Confirm Password</label>' +
-            '<input type="password" id="confirm-password" class="input" ' +
+            '<input type="password" id="confirm-password" ' +
                    'placeholder="Confirm password" autocomplete="new-password">' +
           '</div>' +
           '<div id="set-password-error" class="form-error hidden"></div>' +
-          '<button id="set-password-btn" class="btn btn-primary">Enable Authentication</button>' +
+          '<button id="set-password-btn" style="width:100%">Enable Authentication</button>' +
         '</div>';
     } else if (state.enabled) {
       // --- State B: Auth enabled + logged in — full management UI ---
@@ -218,8 +218,8 @@
           '<p class="text-muted">Use this token in your AI agent config to authenticate MCP requests.</p>' +
           '<div class="token-display">' +
             '<code id="mcp-token-value" class="token-masked">••••••••••••••••</code>' +
-            '<button id="reveal-token-btn" class="btn btn-icon" title="Show/hide token">👁</button>' +
-            '<button id="copy-token-btn" class="btn btn-icon" title="Copy to clipboard">📋</button>' +
+            '<button id="reveal-token-btn" class="btn-icon" title="Show/hide token">👁</button>' +
+            '<button id="copy-token-btn" class="btn-icon" title="Copy to clipboard">📋</button>' +
           '</div>' +
         '</div>';
 
@@ -229,24 +229,25 @@
           '<div class="section-header">' +
             '<h3>Change Password</h3>' +
           '</div>' +
+          '<p class="text-muted">Update your portal password. You will remain logged in.</p>' +
           '<div class="form-group">' +
             '<label for="new-password">New Password</label>' +
-            '<input type="password" id="new-password" class="input" ' +
+            '<input type="password" id="new-password" ' +
                    'placeholder="New password (min 8 chars)" autocomplete="new-password">' +
           '</div>' +
           '<div class="form-group">' +
             '<label for="confirm-password">Confirm Password</label>' +
-            '<input type="password" id="confirm-password" class="input" ' +
+            '<input type="password" id="confirm-password" ' +
                    'placeholder="Confirm new password" autocomplete="new-password">' +
           '</div>' +
           '<div id="change-password-error" class="form-error hidden"></div>' +
-          '<button id="change-password-btn" class="btn btn-secondary">Change Password</button>' +
+          '<button id="change-password-btn" class="secondary" style="width:100%">Change Password</button>' +
         '</div>';
 
       // Logout section
       html +=
         '<div class="section-card">' +
-          '<button id="logout-btn" class="btn btn-danger">Log Out</button>' +
+          '<button id="logout-btn" class="outline danger full-width">Log Out</button>' +
         '</div>';
     }
 
@@ -321,7 +322,7 @@
             '<div class="section-card">' +
               '<div class="section-header"><h3>Restart Required</h3></div>' +
               '<p>Authentication has been enabled. The device must restart to activate HTTPS.</p>' +
-              '<button id="restart-now-btn" class="btn btn-primary">Restart Now</button>' +
+              '<button id="restart-now-btn" style="width:100%">Restart Now</button>' +
             '</div>';
           var restartBtn = document.getElementById('restart-now-btn');
           if (restartBtn) {
@@ -504,6 +505,16 @@
   function init() {
     injectOverlay();
     register401Interceptor();
+
+    // Proactive auth guard — block portal before tab content loads
+    fetch('/api/auth/status')
+      .then(function(r) { return r.json(); })
+      .then(function(state) {
+        if (state.enabled && !state.sessionActive) {
+          showLoginOverlay();
+        }
+      })
+      .catch(function() {});
 
     // Listen for tab-changed to render Security tab
     window.addEventListener('tab-changed', function (e) {
