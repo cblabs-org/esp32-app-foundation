@@ -4,6 +4,9 @@
 **Project Name:** `pr-21-ota-task-hardening`  
 **Base Branch:** `main`  
 **Status:** ✅ COMPLETE — both WOs merged into feature branch  
+**Merge commit:** `5f15490` → `main` — pushed `origin/main`  
+**Distillation:** [context_bridge.md](./context_bridge.md) — ADRs, graveyard, branch topology  
+
 **Architect Session:** 8c58afa2-8ca2-4a85-b127-3fb94f785271  
 
 ---
