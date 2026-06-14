@@ -624,31 +624,27 @@ void AuthManager::registerRoutes(AsyncWebServer& server) {
     // --- POST /api/auth/password (body limit 256 bytes) ---
     // Sets the password: generates a fresh salt, computes SHA-256(salt ‖ password),
     // stores both in KeyManager, and saves the updated config.
+    //
+    // ESPAsyncWebServer callback order: body callback (per chunk) → handler.
+    // Body data is accumulated in request->_tempObject and processed in the handler.
     server.on(
         "/api/auth/password", HTTP_POST,
-        // Handler (called after body is collected)
+        // Handler (called AFTER body is fully collected)
         [this](AsyncWebServerRequest* request) {
-            // Body is collected via the body callback below; if we reach here
-            // with no body the request should already have been rejected.
-            request->send(400, "application/json", "{\"error\":\"body_required\"}");
-        },
-        // Upload handler (not used)
-        nullptr,
-        // Body callback
-        [this](AsyncWebServerRequest* request,
-               uint8_t* data, size_t len, size_t index, size_t total) {
-            // --- Guard: reject oversized bodies ---
-            if (total > MAX_BODY_SIZE) {
-                request->send(400, "application/json", "{\"error\":\"body_too_large\"}");
+            // --- Guard: body must have been collected ---
+            if (!request->_tempObject) {
+                request->send(400, "application/json", "{\"error\":\"body_required\"}");
                 return;
             }
 
-            // --- Only process the final chunk (index + len == total) ---
-            if (index + len < total) return;
+            // Take ownership of the heap-allocated body buffer
+            char* body = static_cast<char*>(request->_tempObject);
+            request->_tempObject = nullptr;  // Prevent double-free
 
             // --- Parse JSON body ---
             JsonDocument doc;
-            DeserializationError err = deserializeJson(doc, data, len);
+            DeserializationError err = deserializeJson(doc, body);
+            free(body);  // Done with raw body
             if (err) {
                 request->send(400, "application/json", "{\"error\":\"invalid_json\"}");
                 return;
@@ -713,36 +709,64 @@ void AuthManager::registerRoutes(AsyncWebServer& server) {
             String out;
             serializeJson(resp, out);
             request->send(200, "application/json", out);
+        },
+        // Upload handler (not used)
+        nullptr,
+        // Body callback — accumulate body into request->_tempObject
+        [this](AsyncWebServerRequest* request,
+               uint8_t* data, size_t len, size_t index, size_t total) {
+            // --- Guard: reject oversized bodies ---
+            if (total > MAX_BODY_SIZE) {
+                return;
+            }
+
+            // Allocate buffer on first chunk
+            if (index == 0) {
+                request->_tempObject = malloc(total + 1);
+                if (!request->_tempObject) return;
+            }
+
+            // Copy this chunk into the buffer
+            if (request->_tempObject) {
+                memcpy(static_cast<char*>(request->_tempObject) + index, data, len);
+                // Null-terminate on last chunk
+                if (index + len >= total) {
+                    static_cast<char*>(request->_tempObject)[total] = '\0';
+                }
+            }
         });
 
     // --- POST /api/auth/login (body limit 256 bytes) ---
     // Validates the password and, on success, issues a session cookie.
+    // Same accumulate-in-body / process-in-handler pattern as /api/auth/password.
     server.on(
         "/api/auth/login", HTTP_POST,
-        [this](AsyncWebServerRequest* /*request*/) {
-            // Body is handled via the body callback; reaching here means no body.
-        },
-        nullptr,
-        [this](AsyncWebServerRequest* request,
-               uint8_t* data, size_t len, size_t index, size_t total) {
-            if (total > MAX_BODY_SIZE) {
-                request->send(400, "application/json", "{\"error\":\"body_too_large\"}");
+        // Handler (called AFTER body is fully collected)
+        [this](AsyncWebServerRequest* request) {
+            // --- Guard: body must have been collected ---
+            if (!request->_tempObject) {
+                request->send(400, "application/json", "{\"error\":\"body_required\"}");
                 return;
             }
-            if (index + len < total) return;
+
+            char* body = static_cast<char*>(request->_tempObject);
+            request->_tempObject = nullptr;
 
             // --- No password set: can't authenticate ---
             if (!_passwordSet) {
+                free(body);
                 request->send(401, "application/json", "{\"error\":\"no_password_set\"}");
                 return;
             }
 
             // --- Parse JSON ---
             JsonDocument doc;
-            if (deserializeJson(doc, data, len)) {
+            if (deserializeJson(doc, body)) {
+                free(body);
                 request->send(400, "application/json", "{\"error\":\"invalid_json\"}");
                 return;
             }
+            free(body);
 
             const char* password = doc["password"] | "";
 
@@ -767,6 +791,24 @@ void AuthManager::registerRoutes(AsyncWebServer& server) {
                 request->beginResponse(200, "application/json", "{\"status\":\"ok\"}");
             response->addHeader("Set-Cookie", cookie);
             request->send(response);
+        },
+        nullptr,
+        // Body callback — accumulate body into request->_tempObject
+        [this](AsyncWebServerRequest* request,
+               uint8_t* data, size_t len, size_t index, size_t total) {
+            if (total > MAX_BODY_SIZE) return;
+
+            if (index == 0) {
+                request->_tempObject = malloc(total + 1);
+                if (!request->_tempObject) return;
+            }
+
+            if (request->_tempObject) {
+                memcpy(static_cast<char*>(request->_tempObject) + index, data, len);
+                if (index + len >= total) {
+                    static_cast<char*>(request->_tempObject)[total] = '\0';
+                }
+            }
         });
 
     // --- POST /api/auth/logout ---
