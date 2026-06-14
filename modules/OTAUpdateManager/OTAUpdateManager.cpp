@@ -58,6 +58,8 @@ static const char* TAG = "OTAUpdateManager";
 #include <HTTPClient.h>
 #include <Preferences.h>
 #include "esp_task_wdt.h"
+#include <inttypes.h>
+#include <freertos/idf_additions.h>
 #include "../Application/Application.hpp"
 #include "../../lib/GithubClient/GithubClient.hpp"
 #include "../../lib/OTADownloadEngine/OTADownloadEngine.hpp"
@@ -356,21 +358,40 @@ void OTAUpdateManager::performUpdate() {
     ESP_LOGI(TAG, "Launching OTA update pipeline");
 
 #ifndef NATIVE_BUILD
-    // Launch the download in a FreeRTOS task to avoid blocking tick()
-    BaseType_t result = xTaskCreate(
-        otaTaskWrapper,     // Task function
-        "ota_update",       // Task name
-        16384 * 2,          // Stack size (bytes) — TLS needs 12-16KB minimum + headroom
-        this,               // Parameter — pointer to this instance
-        5,                  // Priority (mid — needs timely TLS handshake)
-        &taskHandle_        // Task handle output
+    // --- Pre-flight: DRAM headroom check ---
+    uint32_t freeDram = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
+    uint32_t required = OTA_TASK_STACK_BYTES + OTA_TASK_DRAM_HEADROOM_BYTES;
+    if (freeDram < required) {
+        ESP_LOGW(TAG,
+            "Low DRAM before OTA task launch — free: %" PRIu32 " B, "
+            "required: %" PRIu32 " B. Attempting PSRAM stack allocation.",
+            freeDram, required);
+    }
+
+    // --- Launch OTA task — stack in PSRAM when available, DRAM otherwise ---
+    // xTaskCreateWithCaps allocates the task stack from memory matching the
+    // supplied MemoryCaps mask. MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT targets
+    // PSRAM on S3/S3-Nano. On boards without PSRAM the allocator falls back
+    // to DRAM transparently (standard ESP-IDF behaviour).
+    BaseType_t result = xTaskCreateWithCaps(
+        otaTaskWrapper,                            // Task function
+        "ota_update",                              // Task name
+        OTA_TASK_STACK_BYTES,                      // Stack size (bytes)
+        this,                                      // Parameter
+        5,                                         // Priority
+        &taskHandle_,                              // Task handle output
+        MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT        // Prefer PSRAM stack
     );
 
     if (result != pdPASS) {
-        ESP_LOGE(TAG, "Failed to create OTA FreeRTOS task");
+        ESP_LOGE(TAG,
+            "Failed to create OTA FreeRTOS task — "
+            "free DRAM: %" PRIu32 " B, stack required: %" PRIu32 " B. "
+            "Device may need reboot to recover heap.",
+            freeDram, OTA_TASK_STACK_BYTES);
         state_ = OTAState::Error;
-        lastOtaError_ = "Failed to create OTA task";
-        publishProgress(0.0f, "Failed to create OTA task", true, false);
+        lastOtaError_ = "Failed to create OTA task (insufficient memory)";
+        publishProgress(0.0f, "Failed to create OTA task (insufficient memory)", true, false);
     }
 #else
     // Native builds cannot run FreeRTOS tasks
@@ -1206,6 +1227,9 @@ void OTAUpdateManager::registerRoutes(AsyncWebServer& server) {
                     resp["autoCheck"]      = this->_autoCheck;
                     resp["updatesEnabled"] = this->_updatesEnabled;
                     resp["checkHour"]      = this->_checkHour;
+                    // OTA task readiness fields — used by portal to render low-memory warning
+                    resp["dram_free_bytes"]  = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
+                    resp["ota_stack_bytes"]  = OTA_TASK_STACK_BYTES;
                     if (this->lastOtaError_) {
                         resp["lastError"] = this->lastOtaError_;
                     }

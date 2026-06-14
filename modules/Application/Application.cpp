@@ -309,6 +309,23 @@ void Application::tick() {
             _eventBus.publish("app.running");
             ESP_LOGI(TAG, "All config gates satisfied — entering RUNNING state");
         }
+#ifndef NATIVE_BUILD
+        // --- WiFi Wizard modal: show once when AP mode becomes active ---
+        // _onEnterConfiguring fires before the WiFi state machine has run, so
+        // AP mode detection must happen here in the tick loop instead.
+        else if (_wifiManager.getAPMode() && !_wifiWizardShown) {
+            const char* apSsid = _wifiManager.getSSID();
+            // In AP mode the SSID is the hostname (portal name), not the stored STA SSID
+            const char* hostname = _wifiManager.getHostname();
+            _display.boards.wifiWizard.configure(
+                (hostname && strlen(hostname) > 0) ? hostname : apSsid,
+                "192.168.4.1"
+            );
+            _display.showModal(&_display.boards.wifiWizard);
+            _wifiWizardShown = true;
+            ESP_LOGI(TAG, "WiFi wizard modal: AP active, showing connection guide");
+        }
+#endif
     }
 
 #ifdef NATIVE_BUILD
@@ -660,6 +677,7 @@ void Application::_onEnterRunning() {
     _display.clearModal();
     _display.showBase(nullptr);  // clear base → carousel becomes visible
     _display.carousel.resume();
+    _wifiWizardShown = false;    // reset so wizard can show again if device re-enters CONFIGURING
 #endif
 }
 

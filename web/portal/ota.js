@@ -76,6 +76,14 @@
     <!-- Card 3: Updates — GitHub check + progress bar -->
     <article>
       <header>Updates</header>
+      <!-- Low-memory advisory — shown when free DRAM < OTA stack threshold -->
+      <div id="ota-low-memory-warning"
+        style="display:none; background:rgba(249,168,37,0.12); border:1px solid var(--warning,#f9a825);
+               border-radius:8px; padding:0.6rem 0.8rem; margin-bottom:0.8rem; font-size:0.82rem;
+               color:var(--warning,#f9a825); line-height:1.4;">
+        ⚠️ <strong>Low memory</strong> — OTA task may fail to start.<br>
+        <span id="ota-low-memory-detail"></span>
+      </div>
       <button id="btn-ota-check" style="width:100%;">Check for Updates</button>
       <div id="ota-check-status" style="margin-top:0.5rem; font-size:0.85rem; text-align:center;"></div>
 
@@ -208,6 +216,24 @@
       }
       if (ota.hasOwnProperty('checkHour')) {
         document.getElementById('ota-check-hour').value = ota.checkHour;
+      }
+
+      // --- Card 3: Low-memory advisory ---
+      const warningEl = document.getElementById('ota-low-memory-warning');
+      const detailEl  = document.getElementById('ota-low-memory-detail');
+      if (warningEl && detailEl && ota.dram_free_bytes !== undefined && ota.ota_stack_bytes !== undefined) {
+        const freeMem   = ota.dram_free_bytes;
+        const required  = ota.ota_stack_bytes;
+        if (freeMem < required) {
+          const freeKB     = Math.round(freeMem / 1024);
+          const requiredKB = Math.round(required / 1024);
+          detailEl.textContent =
+            `Free DRAM: ${freeKB} KB — Required: ${requiredKB} KB.` +
+            ` Device has PSRAM fallback enabled but low DRAM may cause task delays.`;
+          warningEl.style.display = 'block';
+        } else {
+          warningEl.style.display = 'none';
+        }
       }
 
     } catch (error) {

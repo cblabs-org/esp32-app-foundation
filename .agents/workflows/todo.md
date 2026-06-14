@@ -169,6 +169,7 @@ Use existing sections where they fit. Add new sections if genuinely needed.
 | **🔧 Build System** | PlatformIO, CMake, sdkconfig, scripts, build pipeline |
 | **🏗️ Architecture** | Module coupling, FrameworkConfig, OOP patterns, abstractions |
 | **🔄 OTA** | OTA update logic, scheduling, verification, release tooling |
+| **🔒 Security** | Auth, credentials, access control, network exposure |
 | **🌐 Web Portal — UI Consistency** | Styling, component behaviour, state binding |
 | **🗂️ Web Portal — Navigation** | Tab structure, routing, `IWebContributor` registration |
 | **🚀 Release Process** | Versioning, deploy scripts, manual release steps |
