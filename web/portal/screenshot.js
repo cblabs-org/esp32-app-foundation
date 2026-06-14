@@ -13,10 +13,10 @@
     <article>
       <header>Display Screenshot</header>
       <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:0.75rem;">
-        <button id="btn-ss-capture" style="flex:1;">📷 Capture</button>
-        <button id="btn-ss-download" style="flex:1;" disabled>💾 Download PNG</button>
+        <button id="btn-ss-capture" style="flex:1;">Capture</button>
+        <button id="btn-ss-download" class="outline" style="flex:1;" disabled>Download PNG</button>
       </div>
-      <div style="display:flex; align-items:center; gap:8px; margin-bottom:0.75rem;">
+      <div style="display:flex; align-items:center; gap:8px; margin-bottom:0.5rem;">
         <label style="font-size:0.8rem; color:var(--text-muted);">Zoom:</label>
         <button class="btn-ss-zoom" data-zoom="1" style="padding:0.25rem 0.5rem; font-size:0.75rem;">1×</button>
         <button class="btn-ss-zoom active" data-zoom="2" style="padding:0.25rem 0.5rem; font-size:0.75rem;">2×</button>
@@ -25,6 +25,14 @@
         <label style="font-size:0.8rem; color:var(--text-muted);">
           <input type="checkbox" id="ss-auto-refresh" /> Auto (2s)
         </label>
+      </div>
+      <div style="display:flex; align-items:center; gap:8px; margin-bottom:0.75rem;">
+        <label style="font-size:0.8rem; color:var(--text-muted); white-space:nowrap;">Pixel colour:</label>
+        <button class="btn-ss-colour outline" data-colour="#FFB300" style="padding:0.2rem 0.6rem; font-size:0.75rem;">Amber</button>
+        <button class="btn-ss-colour outline" data-colour="#FFFFFF" style="padding:0.2rem 0.6rem; font-size:0.75rem;">White</button>
+        <button class="btn-ss-colour outline" data-colour="#00FF88" style="padding:0.2rem 0.6rem; font-size:0.75rem;">Green</button>
+        <input type="color" id="ss-colour-picker" value="#FFB300"
+          style="width:28px; height:28px; padding:0; border:none; border-radius:4px; cursor:pointer; background:none;" title="Custom colour">
       </div>
       <div id="ss-canvas-wrapper" style="overflow:auto; background:var(--bg); border:1px solid var(--border); border-radius:6px; padding:8px; text-align:center;">
         <canvas id="ss-canvas" style="image-rendering:pixelated;"></canvas>
@@ -41,6 +49,7 @@
   let displayHeight = 0;
   let autoRefreshInterval = null;
   let hasCapture = false;
+  let pixelColour = '#FFB300';  // Default: amber (closest to real OLED)
 
   const canvas = document.getElementById('ss-canvas');
   const ctx = canvas.getContext('2d');
@@ -52,7 +61,7 @@
   // Capture screenshot from device
   // -------------------------------------------------------------------------
   async function captureScreenshot() {
-    captureBtn.textContent = 'Capturing...';
+    captureBtn.textContent = 'Capturing…';
     captureBtn.disabled = true;
 
     try {
@@ -81,7 +90,7 @@
     } catch (error) {
       infoEl.innerHTML = '<span style="color:var(--error);">Capture failed: ' + error.message + '</span>';
     } finally {
-      captureBtn.textContent = '📷 Capture';
+      captureBtn.textContent = 'Capture';
       captureBtn.disabled = false;
     }
   }
@@ -112,7 +121,7 @@
           if (y >= h) break;
 
           if (b & (1 << bit)) {
-            ctx.fillStyle = '#00ff88';
+            ctx.fillStyle = pixelColour;
             ctx.fillRect(x * currentZoom, y * currentZoom, currentZoom, currentZoom);
           }
         }
@@ -138,6 +147,32 @@
       }
     });
   });
+
+  // -------------------------------------------------------------------------
+  // Pixel colour controls
+  // -------------------------------------------------------------------------
+  const colourPicker = document.getElementById('ss-colour-picker');
+
+  function setPixelColour(hex) {
+    pixelColour = hex;
+    colourPicker.value = hex;
+    // Highlight matching preset if any
+    container.querySelectorAll('.btn-ss-colour').forEach(b => {
+      b.classList.toggle('active', b.getAttribute('data-colour').toUpperCase() === hex.toUpperCase());
+    });
+    if (hasCapture) captureScreenshot();
+  }
+
+  // Wire preset buttons
+  container.querySelectorAll('.btn-ss-colour').forEach(btn => {
+    btn.addEventListener('click', () => setPixelColour(btn.getAttribute('data-colour')));
+  });
+
+  // Wire custom colour picker
+  colourPicker.addEventListener('input', (e) => setPixelColour(e.target.value));
+
+  // Set initial active preset (Amber)
+  setPixelColour(pixelColour);
 
   // -------------------------------------------------------------------------
   // Capture button
