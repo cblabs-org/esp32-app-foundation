@@ -499,7 +499,7 @@ article.advanced-drawer > details > summary.advanced-summary {
 }
 
 article.advanced-drawer > details > summary.advanced-summary::after {
-  content: '\u25b6';
+  content: '▶';
   font-size: 0.7rem;
   transition: transform 0.2s;
 }
