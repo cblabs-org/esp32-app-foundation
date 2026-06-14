@@ -7,10 +7,16 @@
  * To view a copy of this license, visit https://creativecommons.org/licenses/by-nc-sa/4.0/
  *
  * Module: modules/AuthManager/AuthManager.cpp
- * Description: Implementation of AuthManager — WO1 skeleton providing config
- *              persistence for three auth-state flags, 501-stub routes for all
- *              /api/auth/... endpoints, and the lock SVG icon for the Security
- *              bottom-nav tab. No cryptography or auth enforcement in this WO.
+ * Description: Implementation of AuthManager — WO1 skeleton + WO3 cert generation.
+ *
+ *              WO1 contribution: config persistence for three auth-state flags,
+ *              501-stub routes for all /api/auth/... endpoints, and the lock SVG
+ *              icon for the Security bottom-nav tab.
+ *
+ *              WO3 contribution: real EC P-256 self-signed certificate generation
+ *              via mbedTLS. The cert and private key are stored in DER format to
+ *              LittleFS (/etc/server.key, /etc/server.crt). Native build provides
+ *              compile-clean stubs that exercise only the flag-update path.
  *
  * Exported Classes:
  * - AuthManager: see AuthManager.hpp
@@ -28,9 +34,22 @@
 // KeyManager is needed for deleteKey() calls in resetConfig().
 #include "../KeyManager/KeyManager.hpp"
 
+// ConfigManager is needed for saveModuleConfig() in generateAndStoreCert().
+#include "../ConfigManager/ConfigManager.hpp"
+
 #ifndef NATIVE_BUILD
 // Full ESPAsyncWebServer types are required for registerRoutes() in hardware builds.
 #include <ESPAsyncWebServer.h>
+
+// mbedTLS headers for EC key generation and X.509 certificate writing.
+// These are hardware-only; the native build uses compile-clean stubs below.
+#include <mbedtls/entropy.h>
+#include <mbedtls/ctr_drbg.h>
+#include <mbedtls/pk.h>
+#include <mbedtls/ecp.h>
+#include <mbedtls/x509_crt.h>
+#include <mbedtls/x509write_crt.h>
+#include <mbedtls/sha256.h>
 #endif
 
 static const char* TAG = "AuthManager";
@@ -62,7 +81,7 @@ static const char* LOCK_ICON_SVG =
 void AuthManager::begin(ConfigManager* configManager, KeyManager* keyManager) {
     _configManager = configManager;
     _keyManager    = keyManager;
-    ESP_LOGI(TAG, "AuthManager initialised (WO1 skeleton — no enforcement)");
+    ESP_LOGI(TAG, "AuthManager initialised (WO3 — cert generation enabled)");
 }
 
 // ---------------------------------------------------------------------------
@@ -92,24 +111,316 @@ bool AuthManager::checkMcpAuth(AsyncWebServerRequest* /*request*/) {
 }
 
 // ---------------------------------------------------------------------------
-// Cert Helpers (WO3 provides real implementation)
+// Cert Helpers — LittleFS I/O (hardware builds only)
 // ---------------------------------------------------------------------------
 
+#ifndef NATIVE_BUILD
+
 /**
- * @brief Stub — always returns false. WO3 provides the mbedTLS implementation.
+ * @brief Write a raw binary buffer to a LittleFS path.
+ *
+ * --- Step 1: Ensure /etc/ directory exists ---
+ * LittleFS does not auto-create parent directories; mkdir is idempotent.
+ *
+ * --- Step 2: Open file for writing (binary) ---
+ * LittleFS.open("wb") truncates any existing file.
+ *
+ * --- Step 3: Write all bytes and close ---
+ * Logs the byte count on success for traceability.
  */
-bool AuthManager::generateAndStoreCert(const char* /*hostname*/) {
-    ESP_LOGW(TAG, "generateAndStoreCert() not implemented in WO1 — returning false");
-    return false;
+bool AuthManager::_saveToLittleFS(const char* path,
+                                   const uint8_t* data, size_t len) const {
+    // --- Step 1: Ensure parent directory exists ---
+    if (!LittleFS.exists("/etc")) {
+        LittleFS.mkdir("/etc");
+    }
+
+    // --- Step 2: Open for binary write ---
+    File file = LittleFS.open(path, "wb");
+    if (!file) {
+        ESP_LOGE(TAG, "_saveToLittleFS: failed to open %s for writing", path);
+        return false;
+    }
+
+    // --- Step 3: Write and close ---
+    size_t written = file.write(data, len);
+    file.close();
+
+    if (written != len) {
+        ESP_LOGE(TAG, "_saveToLittleFS: wrote %u of %u bytes to %s",
+                 (unsigned)written, (unsigned)len, path);
+        return false;
+    }
+
+    ESP_LOGI(TAG, "_saveToLittleFS: wrote %u bytes to %s", (unsigned)len, path);
+    return true;
 }
 
 /**
- * @brief Stub — always returns false. WO3 provides the LittleFS read implementation.
+ * @brief Read a raw binary file from LittleFS into a caller-supplied buffer.
+ *
+ * --- Step 1: Open file for reading ---
+ * Returns false if the file does not exist.
+ *
+ * --- Step 2: Check size fits the buffer ---
+ * Oversized files are rejected to protect against buffer overflows.
+ *
+ * --- Step 3: Read all bytes and report length ---
  */
-bool AuthManager::loadCert(uint8_t** /*certDer*/, size_t* /*certLen*/,
-                            uint8_t** /*keyDer*/,  size_t* /*keyLen*/) const {
-    ESP_LOGW(TAG, "loadCert() not implemented in WO1 — returning false");
+bool AuthManager::_loadFromLittleFS(const char* path,
+                                     uint8_t* buf, size_t bufMax,
+                                     size_t* outLen) const {
+    // --- Step 1: Open for binary read ---
+    File file = LittleFS.open(path, "rb");
+    if (!file) {
+        ESP_LOGE(TAG, "_loadFromLittleFS: failed to open %s", path);
+        return false;
+    }
+
+    // --- Step 2: Bounds check ---
+    size_t fileSize = file.size();
+    if (fileSize > bufMax) {
+        ESP_LOGE(TAG, "_loadFromLittleFS: file %s is %u bytes, buffer is only %u",
+                 path, (unsigned)fileSize, (unsigned)bufMax);
+        file.close();
+        return false;
+    }
+
+    // --- Step 3: Read all bytes ---
+    *outLen = file.read(buf, fileSize);
+    file.close();
+
+    ESP_LOGI(TAG, "_loadFromLittleFS: read %u bytes from %s", (unsigned)*outLen, path);
+    return (*outLen == fileSize);
+}
+
+#else   // NATIVE_BUILD — compile-clean no-ops
+
+bool AuthManager::_saveToLittleFS(const char* /*path*/,
+                                   const uint8_t* /*data*/, size_t /*len*/) const {
+    return false; // No LittleFS in native test environment
+}
+
+bool AuthManager::_loadFromLittleFS(const char* /*path*/,
+                                     uint8_t* /*buf*/, size_t /*bufMax*/,
+                                     size_t* /*outLen*/) const {
+    return false; // No LittleFS in native test environment
+}
+
+#endif  // NATIVE_BUILD
+
+// ---------------------------------------------------------------------------
+// Cert Helpers — Certificate Generation
+// ---------------------------------------------------------------------------
+
+/**
+ * @brief Generate an EC P-256 self-signed certificate and store to LittleFS.
+ *
+ * Hardware path (mbedTLS):
+ * --- Step 1: Initialise all mbedTLS contexts ---
+ * All five contexts must be initialised before any early-return to ensure
+ * the cleanup block can always call the corresponding _free() function safely.
+ *
+ * --- Step 2: Seed the CRTDRBG RNG ---
+ * The personalisation string "auth_cert" (9 bytes) distinguishes this RNG
+ * instance from other mbedTLS uses in the application (e.g. OTA verifier).
+ *
+ * --- Step 3: Generate EC P-256 key pair ---
+ * secp256r1 (NIST P-256) is the standard embedded TLS curve. The key is
+ * generated and stored in a pk_context for direct use in cert signing.
+ *
+ * --- Step 4: Serialise private key to DER ---
+ * mbedtls_pk_write_key_der() writes to the END of the provided buffer and
+ * returns a negative value: the number of bytes written (negated).
+ * The actual data starts at &keyBuf[sizeof(keyBuf) + keyLen].
+ *
+ * --- Step 5: Build X.509v3 certificate ---
+ * Fixed validity window (2020-01-01 to 2040-01-01) avoids RTC dependency.
+ * Serial = 1 (fixed — this cert is self-signed; uniqueness is per-device).
+ * CN set to "<hostname>.local"; issuer = subject (self-signed).
+ *
+ * --- Step 6: Serialise certificate to DER ---
+ * Same end-of-buffer convention as the key DER step above.
+ *
+ * --- Step 7: Save both DER files to LittleFS ---
+ *
+ * --- Step 8: Update state and persist config flag ---
+ *
+ * --- Step 9: Free all mbedTLS contexts ---
+ *
+ * Native path: sets _certPresent = true and calls saveModuleConfig().
+ * Returns true without any crypto or file I/O.
+ */
+bool AuthManager::generateAndStoreCert(const char* hostname) {
+#ifndef NATIVE_BUILD
+    // --- Step 1: Declare and initialise all mbedTLS contexts ---
+    mbedtls_entropy_context  entropy;
+    mbedtls_ctr_drbg_context ctrDrbg;
+    mbedtls_pk_context       key;
+    mbedtls_x509write_cert   crt;
+    mbedtls_mpi              serial;
+
+    mbedtls_entropy_init(&entropy);
+    mbedtls_ctr_drbg_init(&ctrDrbg);
+    mbedtls_pk_init(&key);
+    mbedtls_x509write_crt_init(&crt);
+    mbedtls_mpi_init(&serial);
+
+    // Helper lambda: clean up all contexts and return a result code.
+    // Defined here so every early-return path calls a single cleanup.
+    auto cleanup = [&](bool result) -> bool {
+        mbedtls_x509write_crt_free(&crt);
+        mbedtls_pk_free(&key);
+        mbedtls_ctr_drbg_free(&ctrDrbg);
+        mbedtls_entropy_free(&entropy);
+        mbedtls_mpi_free(&serial);
+        return result;
+    };
+
+    // --- Step 2: Seed the RNG ---
+    // Personalisation string scopes this DRBG to TLS cert generation.
+    int ret = mbedtls_ctr_drbg_seed(&ctrDrbg, mbedtls_entropy_func, &entropy,
+                                     (const unsigned char*)"auth_cert", 9);
+    if (ret != 0) {
+        ESP_LOGE(TAG, "generateAndStoreCert: ctr_drbg_seed failed: -0x%04x", -ret);
+        return cleanup(false);
+    }
+
+    // --- Step 3: Generate EC P-256 key pair ---
+    ret = mbedtls_pk_setup(&key, mbedtls_pk_info_from_type(MBEDTLS_PK_ECKEY));
+    if (ret != 0) {
+        ESP_LOGE(TAG, "generateAndStoreCert: pk_setup failed: -0x%04x", -ret);
+        return cleanup(false);
+    }
+
+    ret = mbedtls_ecp_gen_key(MBEDTLS_ECP_DP_SECP256R1, mbedtls_pk_ec(key),
+                               mbedtls_ctr_drbg_random, &ctrDrbg);
+    if (ret != 0) {
+        ESP_LOGE(TAG, "generateAndStoreCert: ecp_gen_key failed: -0x%04x", -ret);
+        return cleanup(false);
+    }
+
+    // --- Step 4: Serialise private key to DER ---
+    // pk_write_key_der() writes to the END of keyBuf; returns negative byte count.
+    uint8_t keyBuf[256];
+    int keyLen = mbedtls_pk_write_key_der(&key, keyBuf, sizeof(keyBuf));
+    if (keyLen < 0) {
+        ESP_LOGE(TAG, "generateAndStoreCert: pk_write_key_der failed: -0x%04x", -keyLen);
+        return cleanup(false);
+    }
+    // Actual key data is at the end of the buffer: &keyBuf[sizeof(keyBuf) - keyLen]
+    const uint8_t* keyData = &keyBuf[sizeof(keyBuf) - (size_t)keyLen];
+
+    // --- Step 5: Build X.509v3 certificate ---
+    // Serial number = 1 (fixed; unique per device by key uniqueness)
+    mbedtls_mpi_read_string(&serial, 10, "1");
+
+    mbedtls_x509write_crt_set_subject_key(&crt, &key);
+    mbedtls_x509write_crt_set_issuer_key(&crt, &key);  // Self-signed: issuer = subject
+
+    // Build the Distinguished Name string — both subject and issuer are identical
+    char dn[64];
+    snprintf(dn, sizeof(dn), "CN=%s.local", hostname);
+    mbedtls_x509write_crt_set_subject_name(&crt, dn);
+    mbedtls_x509write_crt_set_issuer_name(&crt, dn);
+
+    mbedtls_x509write_crt_set_serial(&crt, &serial);
+
+    // Fixed validity: 2020-01-01 → 2040-01-01 (avoids RTC dependency on first boot)
+    mbedtls_x509write_crt_set_validity(&crt, "20200101000000", "20400101000000");
+
+    mbedtls_x509write_crt_set_md_alg(&crt, MBEDTLS_MD_SHA256);
+    mbedtls_x509write_crt_set_version(&crt, MBEDTLS_X509_CRT_VERSION_3);
+
+    // --- Step 6: Serialise certificate to DER ---
+    // x509write_crt_der() also writes to the END of the buffer; same convention.
+    uint8_t crtBuf[1024];
+    int crtLen = mbedtls_x509write_crt_der(&crt, crtBuf, sizeof(crtBuf),
+                                            mbedtls_ctr_drbg_random, &ctrDrbg);
+    if (crtLen < 0) {
+        ESP_LOGE(TAG, "generateAndStoreCert: x509write_crt_der failed: -0x%04x", -crtLen);
+        return cleanup(false);
+    }
+    const uint8_t* crtData = &crtBuf[sizeof(crtBuf) - (size_t)crtLen];
+
+    // --- Step 7: Save both DER files to LittleFS ---
+    if (!_saveToLittleFS("/etc/server.key", keyData, (size_t)keyLen)) {
+        ESP_LOGE(TAG, "generateAndStoreCert: failed to save private key");
+        return cleanup(false);
+    }
+    if (!_saveToLittleFS("/etc/server.crt", crtData, (size_t)crtLen)) {
+        ESP_LOGE(TAG, "generateAndStoreCert: failed to save certificate");
+        return cleanup(false);
+    }
+
+    // --- Step 8: Update state and persist config flag ---
+    _certPresent = true;
+    if (_configManager != nullptr) {
+        _configManager->saveModuleConfig(this);
+    }
+
+    ESP_LOGI(TAG, "generateAndStoreCert: EC P-256 cert generated for CN=%s.local "
+             "(key=%d bytes, cert=%d bytes)", hostname, keyLen, crtLen);
+
+    // --- Step 9: Free all mbedTLS contexts ---
+    return cleanup(true);
+
+#else   // NATIVE_BUILD — stub: set flag and persist, no crypto or file I/O
+
+    ESP_LOGI(TAG, "generateAndStoreCert: NATIVE_BUILD stub — setting _certPresent=true");
+    _certPresent = true;
+    if (_configManager != nullptr) {
+        _configManager->saveModuleConfig(this);
+    }
+    return true;
+
+#endif  // NATIVE_BUILD
+}
+
+/**
+ * @brief Load DER-encoded certificate and key from LittleFS into static buffers.
+ *
+ * --- Step 1: Read certificate from /etc/server.crt ---
+ * --- Step 2: Read private key from /etc/server.key ---
+ * Both must succeed; failure in either returns false immediately.
+ *
+ * Static buffers are intentionally used (not heap) to avoid fragmentation.
+ * WO4 calls this once at WebServerManager::begin() and doesn't call it again.
+ */
+bool AuthManager::loadCert(uint8_t** certDer, size_t* certLen,
+                            uint8_t** keyDer,  size_t* keyLen) const {
+#ifndef NATIVE_BUILD
+    // Static buffers: 1 KB for the cert, 256 B for the P-256 private key DER
+    static uint8_t certBuf[1024];
+    static uint8_t keyBuf[256];
+    size_t cLen = 0;
+    size_t kLen = 0;
+
+    // --- Step 1: Read certificate ---
+    if (!_loadFromLittleFS("/etc/server.crt", certBuf, sizeof(certBuf), &cLen)) {
+        ESP_LOGE(TAG, "loadCert: failed to read /etc/server.crt");
+        return false;
+    }
+
+    // --- Step 2: Read private key ---
+    if (!_loadFromLittleFS("/etc/server.key", keyBuf, sizeof(keyBuf), &kLen)) {
+        ESP_LOGE(TAG, "loadCert: failed to read /etc/server.key");
+        return false;
+    }
+
+    *certDer = certBuf;  *certLen = cLen;
+    *keyDer  = keyBuf;   *keyLen  = kLen;
+
+    ESP_LOGI(TAG, "loadCert: loaded cert=%u bytes, key=%u bytes",
+             (unsigned)cLen, (unsigned)kLen);
+    return true;
+
+#else   // NATIVE_BUILD — always false; no LittleFS in test environment
+
+    ESP_LOGW(TAG, "loadCert: NATIVE_BUILD — no LittleFS, returning false");
     return false;
+
+#endif  // NATIVE_BUILD
 }
 
 // ---------------------------------------------------------------------------
@@ -240,6 +551,10 @@ void AuthManager::serializeConfig(JsonObject& section) const {
  * WO2 populates "portal_password_hash" and "portal_password_salt" in
  * KeyManager. resetConfig() must remove these so that a factory reset
  * leaves no credential material on-device.
+ *
+ * Note: cert files (/etc/server.key, /etc/server.crt) are NOT deleted.
+ * The cert is inert while _authEnabled = false. If auth is re-enabled,
+ * generateAndStoreCert() overwrites the old cert files.
  */
 void AuthManager::resetConfig() {
     // --- Step 1: Clear in-memory state ---
