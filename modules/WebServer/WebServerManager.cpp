@@ -47,6 +47,7 @@
 #include "portal_assets/screenshot_html.hpp"
 #include "portal_assets/display_js.hpp"
 #include "portal_assets/appconfig_js.hpp"
+#include "portal_assets/auth_js.hpp"
 #endif
 
 #include "platform/LogShim.h"
@@ -241,6 +242,12 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors,
 
     activeServer.on("/appconfig.js", HTTP_GET, [](AsyncWebServerRequest* request) {
         AsyncWebServerResponse *response = request->beginResponse(200, "application/javascript", appconfig_js_gz, appconfig_js_gz_len);
+        response->addHeader("Content-Encoding", "gzip");
+        request->send(response);
+    });
+
+    activeServer.on("/auth.js", HTTP_GET, [](AsyncWebServerRequest* request) {
+        AsyncWebServerResponse *response = request->beginResponse(200, "application/javascript", auth_js_gz, auth_js_gz_len);
         response->addHeader("Content-Encoding", "gzip");
         request->send(response);
     });

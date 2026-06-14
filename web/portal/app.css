@@ -796,3 +796,155 @@ input[type="number"]::-webkit-inner-spin-button {
   -webkit-appearance: none;
   margin: 0;
 }
+
+/* ==========================================================================
+   20. LOGIN OVERLAY (WO7)
+   Full-page overlay shown on 401 responses. Must sit above all content
+   including toast container and bottom nav.
+   ========================================================================== */
+.login-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.3s ease;
+}
+.login-overlay.hidden {
+  display: none;
+}
+.login-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 32px;
+  width: 340px;
+  max-width: 90vw;
+  text-align: center;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+.login-icon {
+  margin-bottom: 16px;
+  color: var(--primary);
+}
+.login-icon svg {
+  width: 48px;
+  height: 48px;
+}
+.login-card h2 {
+  margin: 0 0 4px 0;
+  font-size: 1.4em;
+  color: var(--text);
+}
+.login-subtitle {
+  color: var(--text-muted);
+  margin: 0 0 20px 0;
+  font-size: 0.9em;
+}
+.login-error {
+  color: var(--error);
+  font-size: 0.85em;
+  margin: 8px 0;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: rgba(198, 40, 40, 0.1);
+}
+.login-card .input-group {
+  margin-bottom: 12px;
+}
+.login-card input[type="password"] {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 1em;
+  box-sizing: border-box;
+}
+.login-card input[type="password"]:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-alpha);
+}
+
+/* ==========================================================================
+   21. SECURITY TAB STYLES (WO7)
+   ========================================================================== */
+.form-error {
+  color: var(--error);
+  font-size: 0.85em;
+  margin: 8px 0;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: rgba(198, 40, 40, 0.1);
+}
+.cert-status {
+  padding: 8px 0;
+}
+.badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 0.85em;
+  font-weight: 500;
+}
+.badge-ok {
+  background: rgba(46, 125, 50, 0.12);
+  color: var(--success);
+}
+.badge-warn {
+  background: rgba(249, 168, 37, 0.12);
+  color: var(--warning);
+}
+.token-display {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-top: 8px;
+}
+.token-display code {
+  flex: 1;
+  font-family: 'Courier New', monospace;
+  font-size: 0.9em;
+  word-break: break-all;
+  color: var(--text);
+}
+.token-masked {
+  letter-spacing: 2px;
+  color: var(--text-muted) !important;
+}
+.btn-icon {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 8px;
+  cursor: pointer;
+  font-size: 1.1em;
+  color: var(--text);
+  transition: background 0.15s;
+}
+.btn-icon:hover {
+  background: var(--primary-alpha);
+}
+.btn-danger {
+  background: var(--error);
+  color: #fff;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.95em;
+  transition: opacity 0.15s;
+}
+.btn-danger:hover {
+  opacity: 0.85;
+}

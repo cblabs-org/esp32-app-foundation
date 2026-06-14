@@ -29,6 +29,17 @@ class ApiQueue {
 
     try {
       var response = await fetch(item.url, item.options);
+
+      // --- 401 Auth Interceptor (WO7) ---
+      // When auth is enabled and the session is invalid, show the login overlay
+      // instead of immediately rejecting. The auth module registers an interceptor
+      // that shows the overlay and the user can retry after logging in.
+      if (response.status === 401 && _authInterceptor) {
+        _authInterceptor();
+        item.reject(new Error('HTTP 401'));
+        return;
+      }
+
       if (!response.ok) throw new Error('HTTP ' + response.status);
 
       var contentType = response.headers.get('content-type');
@@ -46,6 +57,17 @@ class ApiQueue {
     }
   }
 }
+
+// Auth interceptor callback — registered by auth.js after it loads
+var _authInterceptor = null;
+/**
+ * @brief Register the 401 auth interceptor callback.
+ * Called by auth.js on load to wire the login overlay into the API queue.
+ * @param {Function} showOverlayFn - Function to show the login overlay.
+ */
+window.registerAuthInterceptor = function(showOverlayFn) {
+  _authInterceptor = showOverlayFn;
+};
 
 // Global instance for all fragments to use
 var api = new ApiQueue();
