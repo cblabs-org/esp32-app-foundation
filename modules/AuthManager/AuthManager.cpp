@@ -42,8 +42,8 @@
 #include "../ConfigManager/ConfigManager.hpp"
 
 #ifndef NATIVE_BUILD
-// Full ESPAsyncWebServer types are required for registerRoutes() in hardware builds.
-#include <ESPAsyncWebServer.h>
+// Full PsychicHttpServer types are required for registerRoutes() in hardware builds.
+#include <PsychicHttp.h>
 // mbedTLS: SHA-256 + constant-time comparison for password hashing (WO2).
 #include <mbedtls/md.h>
 // mbedtls/constant_time.h lacks extern "C" guards — wrap explicitly.
@@ -130,7 +130,7 @@ void AuthManager::begin(ConfigManager* configManager, KeyManager* keyManager) {
  * @param request The incoming HTTP request (nullptr in native tests).
  * @return true if the request is authorised, false if rejected (401 sent).
  */
-bool AuthManager::checkPortalAuth(AsyncWebServerRequest* request) {
+bool AuthManager::checkPortalAuth(PsychicRequest* request, PsychicResponse* response) {
     // --- Gate: AP mode → always open ---
     if (_apMode) return true;
 
@@ -145,7 +145,9 @@ bool AuthManager::checkPortalAuth(AsyncWebServerRequest* request) {
     if (_isSessionActive() && _checkSessionCookie(request)) return true;
 
     // --- Reject: send 401 ---
-    request->send(401, "application/json", "{\"error\":\"unauthorized\"}");
+    if (response) {
+        response->send(401, "application/json", "{\"error\":\"unauthorized\"}");
+    }
     return false;
 #else
     // Native build: no HTTP cookie methods on mock.
@@ -175,24 +177,24 @@ bool AuthManager::checkPortalAuth(AsyncWebServerRequest* request) {
  * @param request The incoming HTTP request (nullptr in native tests).
  * @return true if the request is authorised, false if rejected (401 sent).
  */
-bool AuthManager::checkMcpAuth(AsyncWebServerRequest* request) {
+bool AuthManager::checkMcpAuth(PsychicRequest* request, PsychicResponse* response) {
     // --- Gate: auth disabled → open access ---
     if (!_authEnabled) return true;
 
 #ifndef NATIVE_BUILD
     // --- Gate: null request (safety) ---
-    if (!request) return false;
+    if (!request || !response) return false;
 
     // --- Step 1: Require Authorization header ---
     if (!request->hasHeader("Authorization")) {
-        request->send(401, "application/json", "{\"error\":\"missing_authorization\"}");
+        response->send(401, "application/json", "{\"error\":\"missing_authorization\"}");
         return false;
     }
 
     // --- Step 2: Require Bearer scheme ---
     String authHeader = request->header("Authorization");
     if (!authHeader.startsWith("Bearer ")) {
-        request->send(401, "application/json", "{\"error\":\"invalid_auth_scheme\"}");
+        response->send(401, "application/json", "{\"error\":\"invalid_auth_scheme\"}");
         return false;
     }
 
@@ -206,7 +208,7 @@ bool AuthManager::checkMcpAuth(AsyncWebServerRequest* request) {
         storedHash = _keyManager->getKeyById("portal_password_hash");
     }
     if (storedHash.empty()) {
-        request->send(401, "application/json", "{\"error\":\"no_credentials_set\"}");
+        response->send(401, "application/json", "{\"error\":\"no_credentials_set\"}");
         return false;
     }
 
@@ -215,7 +217,7 @@ bool AuthManager::checkMcpAuth(AsyncWebServerRequest* request) {
         mbedtls_ct_memcmp(bearerToken.c_str(),
                           storedHash.c_str(),
                           storedHash.length()) != 0) {
-        request->send(401, "application/json", "{\"error\":\"invalid_token\"}");
+        response->send(401, "application/json", "{\"error\":\"invalid_token\"}");
         return false;
     }
 
@@ -571,14 +573,14 @@ bool AuthManager::loadCert(uint8_t** certDer, size_t* certLen,
  * Note: The Secure cookie attribute is intentionally omitted until WO4 activates
  * HTTPS. Adding it here would block the login flow over HTTP during development.
  */
-void AuthManager::registerRoutes(AsyncWebServer& server) {
+void AuthManager::registerRoutes(PsychicHttpServer& server) {
 #ifndef NATIVE_BUILD
 
     // --- GET /api/auth/status ---
     // Capture `this` so the lambda always reads live flag values, not a WO1-style
     // snapshot. The session state is dynamic and changes at runtime.
     server.on("/api/auth/status", HTTP_GET,
-        [this](AsyncWebServerRequest* request) {
+        [this](PsychicRequest* request, PsychicResponse* response) {
             JsonDocument doc;
             doc["enabled"]       = _authEnabled;
             doc["sessionActive"] = _isSessionActive();
@@ -586,7 +588,7 @@ void AuthManager::registerRoutes(AsyncWebServer& server) {
             doc["certPresent"]   = _certPresent;
             String out;
             serializeJson(doc, out);
-            request->send(200, "application/json", out);
+            return response->send(200, "application/json", out.c_str());
         });
 
     // --- GET /api/auth/mcp-token (session-gated) ---
@@ -594,23 +596,20 @@ void AuthManager::registerRoutes(AsyncWebServer& server) {
     // The client computes the same value from the password; the server
     // validates by direct string comparison against KeyManager's stored hash.
     server.on("/api/auth/mcp-token", HTTP_GET,
-        [this](AsyncWebServerRequest* request) {
+        [this](PsychicRequest* request, PsychicResponse* response) {
             // --- Step 1: Require an active session ---
             if (!_checkSessionCookie(request)) {
-                request->send(401, "application/json", "{\"error\":\"not_authenticated\"}");
-                return;
+                return response->send(401, "application/json", "{\"error\":\"not_authenticated\"}");
             }
 
             // --- Step 2: Load the stored hash from KeyManager ---
             if (_keyManager == nullptr) {
-                request->send(500, "application/json", "{\"error\":\"key_manager_unavailable\"}");
-                return;
+                return response->send(500, "application/json", "{\"error\":\"key_manager_unavailable\"}");
             }
 
             std::string storedHash = _keyManager->getKeyById("portal_password_hash");
             if (storedHash.empty()) {
-                request->send(404, "application/json", "{\"error\":\"no_password_set\"}");
-                return;
+                return response->send(404, "application/json", "{\"error\":\"no_password_set\"}");
             }
 
             // --- Step 3: Respond with the bearer token (= stored hash hex) ---
@@ -618,212 +617,133 @@ void AuthManager::registerRoutes(AsyncWebServer& server) {
             doc["token"] = storedHash.c_str();
             String out;
             serializeJson(doc, out);
-            request->send(200, "application/json", out);
+            return response->send(200, "application/json", out.c_str());
         });
 
     // --- POST /api/auth/password (body limit 256 bytes) ---
     // Sets the password: generates a fresh salt, computes SHA-256(salt ‖ password),
     // stores both in KeyManager, and saves the updated config.
-    //
-    // ESPAsyncWebServer callback order: body callback (per chunk) → handler.
-    // Body data is accumulated in request->_tempObject and processed in the handler.
-    server.on(
-        "/api/auth/password", HTTP_POST,
-        // Handler (called AFTER body is fully collected)
-        [this](AsyncWebServerRequest* request) {
-            // --- Guard: body must have been collected ---
-            if (!request->_tempObject) {
-                request->send(400, "application/json", "{\"error\":\"body_required\"}");
-                return;
-            }
+    server.on("/api/auth/password", HTTP_POST, [this](PsychicRequest* request, PsychicResponse* response) {
+        if (request->contentLength() > MAX_BODY_SIZE) {
+            return response->send(413, "application/json", "{\"error\":\"payload_too_large\"}");
+        }
+        const char* body = request->bodyCStr();
+        if (!body || strlen(body) == 0) {
+            return response->send(400, "application/json", "{\"error\":\"body_required\"}");
+        }
 
-            // Take ownership of the heap-allocated body buffer
-            char* body = static_cast<char*>(request->_tempObject);
-            request->_tempObject = nullptr;  // Prevent double-free
+        JsonDocument doc;
+        DeserializationError err = deserializeJson(doc, body);
+        if (err) {
+            return response->send(400, "application/json", "{\"error\":\"invalid_json\"}");
+        }
 
-            // --- Parse JSON body ---
-            JsonDocument doc;
-            DeserializationError err = deserializeJson(doc, body);
-            free(body);  // Done with raw body
-            if (err) {
-                request->send(400, "application/json", "{\"error\":\"invalid_json\"}");
-                return;
-            }
+        const char* password = doc["password"] | "";
+        size_t passLen = strlen(password);
 
-            const char* password = doc["password"] | "";
-            size_t passLen = strlen(password);
+        // --- Validate password field ---
+        if (passLen == 0 || passLen > MAX_PASSWORD_LEN) {
+            return response->send(400, "application/json",
+                "{\"error\":\"invalid_password\",\"detail\":\"must be 1-64 characters\"}");
+        }
 
-            // --- Validate password field ---
-            if (passLen == 0 || passLen > MAX_PASSWORD_LEN) {
-                request->send(400, "application/json",
-                    "{\"error\":\"invalid_password\",\"detail\":\"must be 1-64 characters\"}");
-                return;
-            }
+        // --- Require session if password is already set ---
+        if (_passwordSet && !_checkSessionCookie(request)) {
+            return response->send(401, "application/json", "{\"error\":\"not_authenticated\"}");
+        }
 
-            // --- Require session if password is already set ---
-            if (_passwordSet && !_checkSessionCookie(request)) {
-                request->send(401, "application/json", "{\"error\":\"not_authenticated\"}");
-                return;
-            }
+        // --- Perform hash and store ---
+        if (!_setPassword(password)) {
+            return response->send(500, "application/json", "{\"error\":\"storage_failure\"}");
+        }
 
-            // --- Perform hash and store ---
-            if (!_setPassword(password)) {
-                request->send(500, "application/json", "{\"error\":\"storage_failure\"}");
-                return;
-            }
+        // --- Update state flags and persist config ---
+        _authEnabled = true;
+        _passwordSet = true;
+        if (_configManager != nullptr) {
+            _configManager->saveModuleConfig(this);
+        }
 
-            // --- Update state flags and persist config ---
-            _authEnabled = true;
-            _passwordSet = true;
-            if (_configManager != nullptr) {
-                _configManager->saveModuleConfig(this);
-            }
-
-            // --- Trigger TLS cert generation on a dedicated task (WO3) ---
-            // mbedTLS EC P-256 key generation requires deep call stacks (~8KB)
-            // that exceed the async_tcp task's 4KB stack. Offload to a one-shot
-            // FreeRTOS task with 12KB stack; it sets _certPresent on success.
+        // --- Trigger TLS cert generation on a dedicated task (WO3) ---
 #ifndef NATIVE_BUILD
-            xTaskCreate(
-                [](void* param) {
-                    auto* self = static_cast<AuthManager*>(param);
-                    self->generateAndStoreCert("esp32-device");
-                    vTaskDelete(nullptr);
-                },
-                "cert_gen",   // Task name
-                12288,        // Stack depth (12KB — mbedTLS EC needs ~8KB)
-                this,         // Parameter: AuthManager instance
-                1,            // Priority (low — background work)
-                nullptr       // No handle needed (self-deleting)
-            );
+        xTaskCreate(
+            [](void* param) {
+                auto* self = static_cast<AuthManager*>(param);
+                self->generateAndStoreCert("esp32-device");
+                vTaskDelete(nullptr);
+            },
+            "cert_gen",   // Task name
+            12288,        // Stack depth (12KB — mbedTLS EC needs ~8KB)
+            this,         // Parameter: AuthManager instance
+            1,            // Priority (low — background work)
+            nullptr       // No handle needed (self-deleting)
+        );
 #else
-            generateAndStoreCert("esp32-device");
+        generateAndStoreCert("esp32-device");
 #endif
 
-            // --- Respond immediately — cert generates in background ---
-            JsonDocument resp;
-            resp["status"] = "ok";
-            resp["certGenerating"] = true;
-            resp["restartRequired"] = true;
-            resp["reason"] = "restart_for_tls";
-            String out;
-            serializeJson(resp, out);
-            request->send(200, "application/json", out);
-        },
-        // Upload handler (not used)
-        nullptr,
-        // Body callback — accumulate body into request->_tempObject
-        [this](AsyncWebServerRequest* request,
-               uint8_t* data, size_t len, size_t index, size_t total) {
-            // --- Guard: reject oversized bodies ---
-            if (total > MAX_BODY_SIZE) {
-                return;
-            }
-
-            // Allocate buffer on first chunk
-            if (index == 0) {
-                request->_tempObject = malloc(total + 1);
-                if (!request->_tempObject) return;
-            }
-
-            // Copy this chunk into the buffer
-            if (request->_tempObject) {
-                memcpy(static_cast<char*>(request->_tempObject) + index, data, len);
-                // Null-terminate on last chunk
-                if (index + len >= total) {
-                    static_cast<char*>(request->_tempObject)[total] = '\0';
-                }
-            }
-        });
+        // --- Respond immediately — cert generates in background ---
+        JsonDocument resp;
+        resp["status"] = "ok";
+        resp["certGenerating"] = true;
+        resp["restartRequired"] = true;
+        resp["reason"] = "restart_for_tls";
+        String out;
+        serializeJson(resp, out);
+        return response->send(200, "application/json", out.c_str());
+    });
 
     // --- POST /api/auth/login (body limit 256 bytes) ---
     // Validates the password and, on success, issues a session cookie.
-    // Same accumulate-in-body / process-in-handler pattern as /api/auth/password.
-    server.on(
-        "/api/auth/login", HTTP_POST,
-        // Handler (called AFTER body is fully collected)
-        [this](AsyncWebServerRequest* request) {
-            // --- Guard: body must have been collected ---
-            if (!request->_tempObject) {
-                request->send(400, "application/json", "{\"error\":\"body_required\"}");
-                return;
-            }
+    server.on("/api/auth/login", HTTP_POST, [this](PsychicRequest* request, PsychicResponse* response) {
+        if (request->contentLength() > MAX_BODY_SIZE) {
+            return response->send(413, "application/json", "{\"error\":\"payload_too_large\"}");
+        }
+        const char* body = request->bodyCStr();
+        if (!body || strlen(body) == 0) {
+            return response->send(400, "application/json", "{\"error\":\"body_required\"}");
+        }
 
-            char* body = static_cast<char*>(request->_tempObject);
-            request->_tempObject = nullptr;
+        if (!_passwordSet) {
+            return response->send(401, "application/json", "{\"error\":\"no_password_set\"}");
+        }
 
-            // --- No password set: can't authenticate ---
-            if (!_passwordSet) {
-                free(body);
-                request->send(401, "application/json", "{\"error\":\"no_password_set\"}");
-                return;
-            }
+        JsonDocument doc;
+        if (deserializeJson(doc, body)) {
+            return response->send(400, "application/json", "{\"error\":\"invalid_json\"}");
+        }
 
-            // --- Parse JSON ---
-            JsonDocument doc;
-            if (deserializeJson(doc, body)) {
-                free(body);
-                request->send(400, "application/json", "{\"error\":\"invalid_json\"}");
-                return;
-            }
-            free(body);
+        const char* password = doc["password"] | "";
 
-            const char* password = doc["password"] | "";
+        // --- Verify password ---
+        if (!_verifyPassword(password)) {
+            return response->send(401, "application/json", "{\"error\":\"invalid_password\"}");
+        }
 
-            // --- Verify password ---
-            if (!_verifyPassword(password)) {
-                request->send(401, "application/json", "{\"error\":\"invalid_password\"}");
-                return;
-            }
+        // --- Generate session token and build cookie ---
+        _generateSessionToken();
+        char tokenHex[33] = {0};  // 16 bytes → 32 hex chars + null
+        _toHex(_sessionToken, 16, tokenHex);
 
-            // --- Generate session token and build cookie ---
-            _generateSessionToken();
-            char tokenHex[33] = {0};  // 16 bytes → 32 hex chars + null
-            _toHex(_sessionToken, 16, tokenHex);
+        char cookie[128] = {0};
+        snprintf(cookie, sizeof(cookie),
+            "esp32_session=%s; HttpOnly; SameSite=Strict; Secure", tokenHex);
 
-            // Cookie format: esp32_session=<32-hex>; HttpOnly; SameSite=Strict; Secure
-            // Secure attribute added in WO5: auth implies TLS is active (WO4).
-            char cookie[128] = {0};
-            snprintf(cookie, sizeof(cookie),
-                "esp32_session=%s; HttpOnly; SameSite=Strict; Secure", tokenHex);
-
-            AsyncWebServerResponse* response =
-                request->beginResponse(200, "application/json", "{\"status\":\"ok\"}");
-            response->addHeader("Set-Cookie", cookie);
-            request->send(response);
-        },
-        nullptr,
-        // Body callback — accumulate body into request->_tempObject
-        [this](AsyncWebServerRequest* request,
-               uint8_t* data, size_t len, size_t index, size_t total) {
-            if (total > MAX_BODY_SIZE) return;
-
-            if (index == 0) {
-                request->_tempObject = malloc(total + 1);
-                if (!request->_tempObject) return;
-            }
-
-            if (request->_tempObject) {
-                memcpy(static_cast<char*>(request->_tempObject) + index, data, len);
-                if (index + len >= total) {
-                    static_cast<char*>(request->_tempObject)[total] = '\0';
-                }
-            }
-        });
+        response->addHeader("Set-Cookie", cookie);
+        return response->send(200, "application/json", "{\"status\":\"ok\"}");
+    });
 
     // --- POST /api/auth/logout ---
     // Zeroes the session token and clears the client cookie via Max-Age=0.
     server.on("/api/auth/logout", HTTP_POST,
-        [this](AsyncWebServerRequest* request) {
+        [this](PsychicRequest* request, PsychicResponse* response) {
             // --- Invalidate the in-memory session ---
             memset(_sessionToken, 0, sizeof(_sessionToken));
 
             // --- Clear the client cookie ---
-            AsyncWebServerResponse* response =
-                request->beginResponse(200, "application/json", "{\"status\":\"ok\"}");
             response->addHeader("Set-Cookie",
                 "esp32_session=; HttpOnly; SameSite=Strict; Secure; Max-Age=0");
-            request->send(response);
+            return response->send(200, "application/json", "{\"status\":\"ok\"}");
         });
 
 #endif  // NATIVE_BUILD
@@ -1124,7 +1044,7 @@ bool AuthManager::_isSessionActive() const {
  *   - the cookie is not found or the hex is malformed
  *   - the decoded token does not match _sessionToken
  */
-bool AuthManager::_checkSessionCookie(AsyncWebServerRequest* request) const {
+bool AuthManager::_checkSessionCookie(PsychicRequest* request) const {
     if (request == nullptr) return false;
     if (!_isSessionActive()) return false;
 

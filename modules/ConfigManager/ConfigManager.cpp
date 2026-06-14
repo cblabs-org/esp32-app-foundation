@@ -18,7 +18,7 @@
 
 #include "ConfigManager.hpp"
 #ifndef NATIVE_BUILD
-#include <ESPAsyncWebServer.h>
+#include <PsychicHttp.h>
 #endif
 #include <string.h>
 #include "platform/LogShim.h"
@@ -450,64 +450,59 @@ bool ConfigManager::importAllConfig(JsonDocument& inDoc) {
  *
  * @param server Reference to the AsyncWebServer instance.
  */
-void ConfigManager::registerRoutes(AsyncWebServer& server) {
+void ConfigManager::registerRoutes(PsychicHttpServer& server) {
 #ifndef NATIVE_BUILD
     // --- GET /api/config/backup — export all config as downloadable JSON ---
     // IMPORTANT: registered BEFORE /api/config to prevent prefix-match swallowing.
-    server.on("/api/config/backup", HTTP_GET, [this](AsyncWebServerRequest* request) {
+    server.on("/api/config/backup", HTTP_GET, [this](PsychicRequest* request, PsychicResponse* response) {
         JsonDocument doc;
         exportAllConfig(doc);
 
-        // Use AsyncResponseStream to serialize directly to the response without
-        // an intermediate String buffer — critical for embedded memory constraints.
-        AsyncResponseStream* stream = request->beginResponseStream("application/json");
-        stream->addHeader("Content-Disposition",
-            "attachment; filename=\"config-backup.json\"");
-        serializeJson(doc, *stream);
-        request->send(stream);
+        String output;
+        serializeJson(doc, output);
+        response->addHeader("Content-Disposition", "attachment; filename=\"config-backup.json\"");
+        response->send(200, "application/json", output.c_str());
 
-        ESP_LOGI(TAG, "Config backup exported via stream");
+        ESP_LOGI(TAG, "Config backup exported");
+        return ESP_OK;
     });
 
     // --- POST /api/config/restore — upload JSON, validate, import, restart ---
     // IMPORTANT: registered BEFORE /api/config to prevent prefix-match swallowing.
     server.on("/api/config/restore", HTTP_POST,
-        [](AsyncWebServerRequest *request) {},
-        NULL,
-        [this](AsyncWebServerRequest *request, uint8_t *data, size_t len,
-               size_t index, size_t total) {
+        [this](PsychicRequest *request, PsychicResponse* response) {
 
             // --- Body size guard (8KB max) ---
             constexpr size_t MAX_RESTORE_BODY = 8192;
-            if (total > MAX_RESTORE_BODY) {
-                request->send(413, "application/json",
+            if (request->contentLength() > MAX_RESTORE_BODY) {
+                response->send(413, "application/json",
                     "{\"error\":\"Payload too large\",\"max\":8192}");
-                return;
+                return ESP_FAIL;
             }
 
-            // Only process when we have the complete body (index + len == total)
-            // For chunked uploads, accumulate in the final chunk
-            if (index + len != total) {
-                return; // Wait for remaining chunks
+            const char* body = request->bodyCStr();
+            if (!body || strlen(body) == 0) {
+                response->send(400, "application/json", "{\"error\":\"body_required\"}");
+                return ESP_FAIL;
             }
 
             // --- Parse the uploaded JSON ---
             JsonDocument doc;
-            DeserializationError err = deserializeJson(doc, data, len);
+            DeserializationError err = deserializeJson(doc, body);
             if (err) {
                 ESP_LOGE("ConfigManager", "Restore JSON parse failed: %s", err.c_str());
                 String errMsg = "{\"error\":\"Invalid JSON: ";
                 errMsg += err.c_str();
                 errMsg += "\"}";
-                request->send(400, "application/json", errMsg);
-                return;
+                response->send(400, "application/json", errMsg.c_str());
+                return ESP_FAIL;
             }
 
             // --- Validate: must be a JSON object with at least one key ---
             if (!doc.is<JsonObject>() || doc.as<JsonObject>().size() == 0) {
-                request->send(400, "application/json",
+                response->send(400, "application/json",
                     "{\"error\":\"Config must be a non-empty JSON object\"}");
-                return;
+                return ESP_FAIL;
             }
 
             // --- Import the config ---
@@ -519,7 +514,7 @@ void ConfigManager::registerRoutes(AsyncWebServer& server) {
             ESP_LOGI("ConfigManager", "Config restore complete — scheduling restart");
 
             // Send response before restart
-            request->send(200, "application/json",
+            response->send(200, "application/json",
                 "{\"status\":\"ok\",\"msg\":\"Config restored. Restarting...\"}");
 
             // --- Schedule restart (500ms delay for response to flush) ---
@@ -533,13 +528,14 @@ void ConfigManager::registerRoutes(AsyncWebServer& server) {
             if (restartTimer != nullptr) {
                 xTimerStart(restartTimer, 0);
             }
+            return ESP_OK;
         }
     );
 
     // --- GET /api/config — list registered namespaces ---
     // IMPORTANT: registered AFTER specific sub-paths to prevent prefix matching
     // from swallowing /api/config/backup and /api/config/restore requests.
-    server.on("/api/config", HTTP_GET, [this](AsyncWebServerRequest* request) {
+    server.on("/api/config", HTTP_GET, [this](PsychicRequest* request, PsychicResponse* response) {
         JsonDocument doc;
         JsonArray namespaces = doc["namespaces"].to<JsonArray>();
         for (IConfigurable* mod : _modules) {
@@ -549,7 +545,8 @@ void ConfigManager::registerRoutes(AsyncWebServer& server) {
 
         String output;
         serializeJson(doc, output);
-        request->send(200, "application/json", output);
+        response->send(200, "application/json", output.c_str());
+        return ESP_OK;
     });
 #endif
 }

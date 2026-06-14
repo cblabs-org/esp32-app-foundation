@@ -15,7 +15,7 @@
 #include <sstream>
 
 #ifndef NATIVE_BUILD
-#include <ESPAsyncWebServer.h>
+#include <PsychicHttp.h>
 #else
 #include "../WebServer/WebServerManager.hpp"
 #endif
@@ -224,10 +224,10 @@ std::vector<std::string> KeyManager::listKeys() const {
  *
  * @param server Reference to the AsyncWebServer instance.
  */
-void KeyManager::registerRoutes(AsyncWebServer& server) {
+void KeyManager::registerRoutes(PsychicHttpServer& server) {
 #ifndef NATIVE_BUILD
     // --- GET /api/keys — list all stored key IDs ---
-    server.on("/api/keys", HTTP_GET, [this](AsyncWebServerRequest* request) {
+    server.on("/api/keys", HTTP_GET, [this](PsychicRequest* request, PsychicResponse* response) {
         JsonDocument doc;
         JsonArray keysArr = doc.to<JsonArray>();
 
@@ -240,91 +240,79 @@ void KeyManager::registerRoutes(AsyncWebServer& server) {
 
         String output;
         serializeJson(doc, output);
-        request->send(200, "application/json", output);
+        response->send(200, "application/json", output.c_str());
+        return ESP_OK;
     });
 
     // --- POST /api/keys — add or update a key ---
     server.on("/api/keys", HTTP_POST,
-        // Request handler — fires after body handler completes
-        [this](AsyncWebServerRequest* request) {
-            if (!request->_tempObject) {
-                request->send(400, "application/json", "{\"error\":\"Missing body\"}");
-                return;
+        [this](PsychicRequest* request, PsychicResponse* response) {
+            if (request->contentLength() > 1024) {
+                response->send(413, "application/json", "{\"error\":\"Payload too large\"}");
+                return ESP_FAIL;
             }
-            String* bodyStr = static_cast<String*>(request->_tempObject);
+
+            const char* body = request->bodyCStr();
+            if (!body || strlen(body) == 0) {
+                response->send(400, "application/json", "{\"error\":\"Missing body\"}");
+                return ESP_FAIL;
+            }
 
             JsonDocument doc;
-            DeserializationError err = deserializeJson(doc, bodyStr->c_str());
-            delete bodyStr;
-            request->_tempObject = nullptr;
+            DeserializationError err = deserializeJson(doc, body);
 
             if (err) {
-                request->send(400, "application/json", "{\"error\":\"Invalid JSON\"}");
-                return;
+                response->send(400, "application/json", "{\"error\":\"Invalid JSON\"}");
+                return ESP_FAIL;
             }
 
             const char* id = doc["id"] | static_cast<const char*>(nullptr);
             const char* value = doc["value"] | static_cast<const char*>(nullptr);
 
             if (!id || strlen(id) == 0 || !value || strlen(value) == 0) {
-                request->send(400, "application/json", "{\"error\":\"Missing 'id' or 'value'\"}");
-                return;
+                response->send(400, "application/json", "{\"error\":\"Missing 'id' or 'value'\"}");
+                return ESP_FAIL;
             }
 
             // Key name length guard — prevent excessively long identifiers
             if (strlen(id) > 64) {
-                request->send(400, "application/json", "{\"error\":\"Key name too long (max 64 chars)\"}");
-                return;
+                response->send(400, "application/json", "{\"error\":\"Key name too long (max 64 chars)\"}");
+                return ESP_FAIL;
             }
 
             if (addKey(id, value)) {
-                request->send(200, "application/json", "{\"status\":\"ok\"}");
+                response->send(200, "application/json", "{\"status\":\"ok\"}");
             } else {
-                request->send(500, "application/json", "{\"error\":\"Failed to store key\"}");
+                response->send(500, "application/json", "{\"error\":\"Failed to store key\"}");
             }
-        },
-        nullptr,
-        // Body handler — accumulate with 1KB size limit
-        [](AsyncWebServerRequest* request, uint8_t* data, size_t len, size_t index, size_t total) {
-            // --- Per-route body size enforcement (1KB) ---
-            constexpr size_t MAX_BODY_SIZE = 1024;
-            if (total > MAX_BODY_SIZE) {
-                request->send(413, "application/json", "{\"error\":\"Payload too large\"}");
-                return;
-            }
-            if (index == 0) {
-                request->_tempObject = new String();
-            }
-            String* bodyStr = static_cast<String*>(request->_tempObject);
-            for (size_t i = 0; i < len; i++) {
-                *bodyStr += (char)data[i];
-            }
+            return ESP_OK;
         }
     );
 
     // --- DELETE /api/keys?id=xxx — delete a key by ID ---
-    server.on("/api/keys", HTTP_DELETE, [this](AsyncWebServerRequest* request) {
+    server.on("/api/keys", HTTP_DELETE, [this](PsychicRequest* request, PsychicResponse* response) {
         if (!request->hasParam("id")) {
-            request->send(400, "application/json", "{\"error\":\"Missing 'id' parameter\"}");
-            return;
+            response->send(400, "application/json", "{\"error\":\"Missing 'id' parameter\"}");
+            return ESP_FAIL;
         }
 
         String id = request->getParam("id")->value();
         if (id.length() == 0) {
-            request->send(400, "application/json", "{\"error\":\"Empty 'id' parameter\"}");
-            return;
+            response->send(400, "application/json", "{\"error\":\"Empty 'id' parameter\"}");
+            return ESP_FAIL;
         }
 
         if (deleteKey(id.c_str())) {
-            request->send(200, "application/json", "{\"status\":\"ok\"}");
+            response->send(200, "application/json", "{\"status\":\"ok\"}");
         } else {
-            request->send(404, "application/json", "{\"error\":\"Key not found\"}");
+            response->send(404, "application/json", "{\"error\":\"Key not found\"}");
         }
+        return ESP_OK;
     });
 #else
     // Native build: register stub routes for compilation
-    server.on("/api/keys", HTTP_GET, [](AsyncWebServerRequest* request) {});
-    server.on("/api/keys", HTTP_POST, [](AsyncWebServerRequest* request) {});
-    server.on("/api/keys", HTTP_DELETE, [](AsyncWebServerRequest* request) {});
+    server.on("/api/keys", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) { return ESP_OK; });
+    server.on("/api/keys", HTTP_POST, [](PsychicRequest* request, PsychicResponse* response) { return ESP_OK; });
+    server.on("/api/keys", HTTP_DELETE, [](PsychicRequest* request, PsychicResponse* response) { return ESP_OK; });
 #endif
 }

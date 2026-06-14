@@ -43,12 +43,11 @@
 #include "../KeyManager/KeyManager.hpp"
 
 #ifndef NATIVE_BUILD
-#include <FS.h>
+#include <PsychicHttp.h>
 #include <ArduinoJson.h>
 #include <WiFi.h>
 #include <DNSServer.h>
 #include <ESPmDNS.h>
-#include <ESPAsyncWebServer.h>
 #include "esp_wifi.h"
 #else
 unsigned long millis() { return 0; } // Stub
@@ -400,51 +399,36 @@ void WifiManager::setDefaultHostname(const char* hostname) {
  *   POST /api/wifi/connect — save + restart (1KB body limit)
  *   POST /api/wifi/forget  — erase + restart to AP (256B body limit)
  */
-void WifiManager::registerRoutes(AsyncWebServer& server) {
+void WifiManager::registerRoutes(PsychicHttpServer& server) {
 #ifndef NATIVE_BUILD
     // --- GET /api/wifi/status ---
-    server.on("/api/wifi/status", HTTP_GET, [this](AsyncWebServerRequest* request) {
-        this->handleStatus(request);
+    server.on("/api/wifi/status", HTTP_GET, [this](PsychicRequest* request, PsychicResponse* response) {
+        return this->handleStatus(request, response);
     });
 
     // --- GET /api/wifi/scan ---
-    server.on("/api/wifi/scan", HTTP_GET, [this](AsyncWebServerRequest* request) {
-        this->handleScan(request);
+    server.on("/api/wifi/scan", HTTP_GET, [this](PsychicRequest* request, PsychicResponse* response) {
+        return this->handleScan(request, response);
     });
 
     // --- POST /api/wifi/test ---
     server.on("/api/wifi/test", HTTP_POST,
-        [](AsyncWebServerRequest* request) {
-            // Final handler — response is sent in the body handler
-        },
-        NULL,
-        [this](AsyncWebServerRequest* request, uint8_t* data,
-               size_t len, size_t index, size_t total) {
-            this->handleTest(request, data, len, index, total);
+        [this](PsychicRequest* request, PsychicResponse* response) {
+            return this->handleTest(request, response);
         }
     );
 
     // --- POST /api/wifi/connect ---
     server.on("/api/wifi/connect", HTTP_POST,
-        [](AsyncWebServerRequest* request) {
-            // Final handler — response is sent in the body handler
-        },
-        NULL,
-        [this](AsyncWebServerRequest* request, uint8_t* data,
-               size_t len, size_t index, size_t total) {
-            this->handleConnect(request, data, len, index, total);
+        [this](PsychicRequest* request, PsychicResponse* response) {
+            return this->handleConnect(request, response);
         }
     );
 
     // --- POST /api/wifi/forget ---
     server.on("/api/wifi/forget", HTTP_POST,
-        [](AsyncWebServerRequest* request) {
-            // Final handler — response is sent in the body handler
-        },
-        NULL,
-        [this](AsyncWebServerRequest* request, uint8_t* data,
-               size_t len, size_t index, size_t total) {
-            this->handleForget(request, data, len, index, total);
+        [this](PsychicRequest* request, PsychicResponse* response) {
+            return this->handleForget(request, response);
         }
     );
 #endif
@@ -460,7 +444,7 @@ void WifiManager::registerRoutes(AsyncWebServer& server) {
  * Returns comprehensive WiFi status including mode, SSID, IP, RSSI,
  * MAC address, channel, gateway, password existence flag, and AP mode state.
  */
-void WifiManager::handleStatus(AsyncWebServerRequest* request) {
+esp_err_t WifiManager::handleStatus(PsychicRequest* request, PsychicResponse* response) {
 #ifndef NATIVE_BUILD
     this->notifyApiActivity();
 
@@ -487,8 +471,9 @@ void WifiManager::handleStatus(AsyncWebServerRequest* request) {
 
     String output;
     serializeJson(doc, output);
-    request->send(200, "application/json", output);
+    response->send(200, "application/json", output.c_str());
 #endif
+    return ESP_OK;
 }
 
 /**
@@ -501,7 +486,7 @@ void WifiManager::handleStatus(AsyncWebServerRequest* request) {
  *   deduplicated by SSID, capped at MAX_SCAN_RESULTS)
  * - Calls WiFi.scanDelete() after reading results to free memory
  */
-void WifiManager::handleScan(AsyncWebServerRequest* request) {
+esp_err_t WifiManager::handleScan(PsychicRequest* request, PsychicResponse* response) {
 #ifndef NATIVE_BUILD
     this->notifyApiActivity();
 
@@ -511,14 +496,14 @@ void WifiManager::handleScan(AsyncWebServerRequest* request) {
         // --- No scan in progress — start one ---
         ESP_LOGI(TAG, "Starting async WiFi scan...");
         WiFi.scanNetworks(true); // true = async
-        request->send(202, "application/json", "{\"status\":\"scanning\"}");
-        return;
+        response->send(202, "application/json", "{\"status\":\"scanning\"}");
+        return ESP_OK;
     }
 
     if (scanResult == WIFI_SCAN_RUNNING) {
         // --- Scan is still in progress ---
-        request->send(202, "application/json", "{\"status\":\"scanning\"}");
-        return;
+        response->send(202, "application/json", "{\"status\":\"scanning\"}");
+        return ESP_OK;
     }
 
     // --- Scan complete — process results ---
@@ -592,8 +577,9 @@ void WifiManager::handleScan(AsyncWebServerRequest* request) {
 
     String output;
     serializeJson(doc, output);
-    request->send(200, "application/json", output);
+    response->send(200, "application/json", output.c_str());
 #endif
+    return ESP_OK;
 }
 
 /**
@@ -603,33 +589,35 @@ void WifiManager::handleScan(AsyncWebServerRequest* request) {
  * Returns {status:"ok", ip:"x.x.x.x"} on success or {status:"failed"} on failure.
  * Enforces 1KB body size limit — rejects with HTTP 413 if exceeded.
  */
-void WifiManager::handleTest(AsyncWebServerRequest* request, uint8_t* data,
-                              size_t len, size_t index, size_t total) {
+esp_err_t WifiManager::handleTest(PsychicRequest* request, PsychicResponse* response) {
 #ifndef NATIVE_BUILD
     this->notifyApiActivity();
 
     // --- Per-route body size guard (PR-04a/WO1) ---
-    if (total > BODY_LIMIT_WIFI_TEST) {
-        request->send(413, "application/json", "{\"error\":\"Payload too large\"}");
-        return;
+    if (request->contentLength() > BODY_LIMIT_WIFI_TEST) {
+        response->send(413, "application/json", "{\"error\":\"Payload too large\"}");
+        return ESP_FAIL;
     }
 
-    // --- Only process on first/complete chunk ---
-    if (index != 0) return;
+    const char* body = request->bodyCStr();
+    if (!body || strlen(body) == 0) {
+        response->send(400, "application/json", "{\"error\":\"body_required\"}");
+        return ESP_FAIL;
+    }
 
     JsonDocument doc;
-    DeserializationError error = deserializeJson(doc, data, len);
+    DeserializationError error = deserializeJson(doc, body);
     if (error) {
-        request->send(400, "application/json", "{\"status\":\"error\",\"msg\":\"Invalid JSON\"}");
-        return;
+        response->send(400, "application/json", "{\"status\":\"error\",\"msg\":\"Invalid JSON\"}");
+        return ESP_FAIL;
     }
 
     const char* ssid = doc["ssid"] | "";
     const char* pass = doc["pass"] | "";
 
     if (strlen(ssid) == 0) {
-        request->send(400, "application/json", "{\"status\":\"error\",\"msg\":\"Missing SSID\"}");
-        return;
+        response->send(400, "application/json", "{\"status\":\"error\",\"msg\":\"Missing SSID\"}");
+        return ESP_FAIL;
     }
 
     // --- Test connection ---
@@ -642,11 +630,12 @@ void WifiManager::handleTest(AsyncWebServerRequest* request, uint8_t* data,
         resp["ip"]     = ipOut;
         String output;
         serializeJson(resp, output);
-        request->send(200, "application/json", output);
+        response->send(200, "application/json", output.c_str());
     } else {
-        request->send(200, "application/json", "{\"status\":\"failed\"}");
+        response->send(200, "application/json", "{\"status\":\"failed\"}");
     }
 #endif
+    return ESP_OK;
 }
 
 /**
@@ -657,43 +646,46 @@ void WifiManager::handleTest(AsyncWebServerRequest* request, uint8_t* data,
  * so the WiFi stack reconnects with the new credentials.
  * Enforces 1KB body size limit — rejects with HTTP 413 if exceeded.
  */
-void WifiManager::handleConnect(AsyncWebServerRequest* request, uint8_t* data,
-                                 size_t len, size_t index, size_t total) {
+esp_err_t WifiManager::handleConnect(PsychicRequest* request, PsychicResponse* response) {
 #ifndef NATIVE_BUILD
     this->notifyApiActivity();
 
     // --- Per-route body size guard ---
-    if (total > BODY_LIMIT_WIFI_CONNECT) {
-        request->send(413, "application/json", "{\"error\":\"Payload too large\"}");
-        return;
+    if (request->contentLength() > BODY_LIMIT_WIFI_CONNECT) {
+        response->send(413, "application/json", "{\"error\":\"Payload too large\"}");
+        return ESP_FAIL;
     }
 
-    // --- Only process on first/complete chunk ---
-    if (index != 0) return;
+    const char* body = request->bodyCStr();
+    if (!body || strlen(body) == 0) {
+        response->send(400, "application/json", "{\"error\":\"body_required\"}");
+        return ESP_FAIL;
+    }
 
     JsonDocument doc;
-    DeserializationError error = deserializeJson(doc, data, len);
+    DeserializationError error = deserializeJson(doc, body);
     if (error) {
-        request->send(400, "application/json", "{\"status\":\"error\",\"msg\":\"Invalid JSON\"}");
-        return;
+        response->send(400, "application/json", "{\"status\":\"error\",\"msg\":\"Invalid JSON\"}");
+        return ESP_FAIL;
     }
 
     const char* ssid = doc["ssid"] | "";
     const char* pass = doc["pass"] | "";
 
     if (strlen(ssid) == 0) {
-        request->send(400, "application/json", "{\"status\":\"error\",\"msg\":\"Missing SSID\"}");
-        return;
+        response->send(400, "application/json", "{\"status\":\"error\",\"msg\":\"Missing SSID\"}");
+        return ESP_FAIL;
     }
 
     // --- Save credentials and request deferred reconnect ---
     this->updateWiFi(ssid, pass);
 
-    request->send(200, "application/json", "{\"status\":\"ok\",\"msg\":\"Credentials saved. Restarting...\"}");
+    response->send(200, "application/json", "{\"status\":\"ok\",\"msg\":\"Credentials saved. Restarting...\"}");
 
     // --- Schedule deferred restart to apply new credentials ---
     this->scheduleRestart();
 #endif
+    return ESP_OK;
 }
 
 /**
@@ -703,19 +695,15 @@ void WifiManager::handleConnect(AsyncWebServerRequest* request, uint8_t* data,
  * Returns 200 and schedules a deferred restart so the device boots into AP mode.
  * Enforces 256B body size limit — rejects with HTTP 413 if exceeded.
  */
-void WifiManager::handleForget(AsyncWebServerRequest* request, uint8_t* data,
-                                size_t len, size_t index, size_t total) {
+esp_err_t WifiManager::handleForget(PsychicRequest* request, PsychicResponse* response) {
 #ifndef NATIVE_BUILD
     this->notifyApiActivity();
 
     // --- Per-route body size guard ---
-    if (total > BODY_LIMIT_WIFI_FORGET) {
-        request->send(413, "application/json", "{\"error\":\"Payload too large\"}");
-        return;
+    if (request->contentLength() > BODY_LIMIT_WIFI_FORGET) {
+        response->send(413, "application/json", "{\"error\":\"Payload too large\"}");
+        return ESP_FAIL;
     }
-
-    // --- Only process on first/complete chunk ---
-    if (index != 0) return;
 
     ESP_LOGW(TAG, "Forget WiFi requested — erasing credentials...");
 
@@ -735,11 +723,12 @@ void WifiManager::handleForget(AsyncWebServerRequest* request, uint8_t* data,
         ESP_LOGI(TAG, "WiFi config cleared via ConfigManager");
     }
 
-    request->send(200, "application/json", "{\"status\":\"ok\",\"msg\":\"WiFi credentials erased. Restarting to AP mode...\"}");
+    response->send(200, "application/json", "{\"status\":\"ok\",\"msg\":\"WiFi credentials erased. Restarting to AP mode...\"}");
 
     // --- Schedule deferred restart to AP mode ---
     this->scheduleRestart();
 #endif
+    return ESP_OK;
 }
 
 /**

@@ -120,7 +120,7 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors,
     // Select the active server for route registration
     // TLS mode: routes on HTTPS server; HTTP server becomes redirect-only
     // HTTP-open mode: all routes on the HTTP server (port 80)
-    AsyncWebServer* activeServer = &_httpServer; // default
+    PsychicHttpServer* activeServer = &_httpServer; // default
 #ifndef NATIVE_BUILD
     if (useTls && _httpsServer) {
         activeServer = _httpsServer;
@@ -294,20 +294,19 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors,
     serializeJson(tabsDoc, tabsJson);
 
     // --- GET /api/tabs — tab hierarchy for navigation ---
-    activeServer->on("/api/tabs", HTTP_GET, [tabsJson](AsyncWebServerRequest* request) {
-        request->send(200, "application/json", tabsJson);
+    activeServer->on("/api/tabs", HTTP_GET, [tabsJson](PsychicRequest* request, PsychicResponse* response) {
+        return response->send(200, "application/json", tabsJson.c_str());
     });
 
     // -----------------------------------------------------------------------
     // GET /api/system — Enhanced system information (20+ fields)
     // -----------------------------------------------------------------------
-    activeServer->on("/api/system", HTTP_GET, [](AsyncWebServerRequest* request) {
+    activeServer->on("/api/system", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
         // --- Heap guard for this large response ---
         int current = activeHighMemRequests.load();
         if (current >= MAX_CONCURRENT_HIGH_MEM ||
             heap_caps_get_largest_free_block(MALLOC_CAP_8BIT) < HEAP_GUARD_MIN_BLOCK_BYTES) {
-            request->send(503, "application/json", "{\"error\":\"Low memory — retry\"}");
-            return;
+            return response->send(503, "application/json", "{\"error\":\"Low memory — retry\"}");
         }
         activeHighMemRequests++;
 
@@ -379,22 +378,23 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors,
 
         String out;
         serializeJson(doc, out);
-        request->send(200, "application/json", out);
+        esp_err_t err = response->send(200, "application/json", out.c_str());
 
         activeHighMemRequests--;
+        return err;
     });
 
     // -----------------------------------------------------------------------
     // GET /api/app — Application metadata (title + version)
     // Uses build-time macros. Consuming apps override APP_TITLE in platformio.ini.
     // -----------------------------------------------------------------------
-    activeServer->on("/api/app", HTTP_GET, [](AsyncWebServerRequest* request) {
+    activeServer->on("/api/app", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
         JsonDocument doc;
         doc["name"]    = APP_TITLE;
         doc["version"] = BUILD_VERSION;
         String out;
         serializeJson(doc, out);
-        request->send(200, "application/json", out);
+        return response->send(200, "application/json", out.c_str());
     });
 
     // -----------------------------------------------------------------------
@@ -402,14 +402,15 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors,
     // Sends 200, then schedules esp_restart() after 500ms delay.
     // Body limit: 256 bytes (action-only, minimal body).
     // -----------------------------------------------------------------------
-    activeServer->on("/api/system/restart", HTTP_POST, [](AsyncWebServerRequest* request) {
+    activeServer->on("/api/system/restart", HTTP_POST, [](PsychicRequest* request, PsychicResponse* response) {
         ESP_LOGW(TAG, "POST /api/system/restart — scheduling device restart");
-        request->send(200, "application/json", "{\"status\":\"restarting\"}");
+        esp_err_t err = response->send(200, "application/json", "{\"status\":\"restarting\"}");
 
         // Schedule restart after response is flushed (500ms delay)
         // Using a FreeRTOS timer or simple delay loop
         delay(500);
         esp_restart();
+        return err;
     });
 
     // -----------------------------------------------------------------------
@@ -417,7 +418,7 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors,
     // Erases /mod/ (module configs) and /etc/ (system configs) directories,
     // sends 200, then schedules restart. Body limit: 256 bytes.
     // -----------------------------------------------------------------------
-    activeServer->on("/api/system/factory-reset", HTTP_POST, [](AsyncWebServerRequest* request) {
+    activeServer->on("/api/system/factory-reset", HTTP_POST, [](PsychicRequest* request, PsychicResponse* response) {
         ESP_LOGW(TAG, "POST /api/system/factory-reset — erasing configuration");
 
         // --- Step 1: Erase /mod/ directory (per-module config files) ---
@@ -449,19 +450,20 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors,
         }
 
         ESP_LOGW(TAG, "Factory reset complete — scheduling restart");
-        request->send(200, "application/json", "{\"status\":\"factory-reset-complete\"}");
+        esp_err_t err = response->send(200, "application/json", "{\"status\":\"factory-reset-complete\"}");
 
         // Schedule restart after response is flushed
         delay(500);
         esp_restart();
+        return err;
     });
 
 #else
-    activeServer->on("/api/tabs", HTTP_GET, [](AsyncWebServerRequest* request) {});
-    activeServer->on("/api/system", HTTP_GET, [](AsyncWebServerRequest* request) {});
-    activeServer->on("/api/app", HTTP_GET, [](AsyncWebServerRequest* request) {});
-    activeServer->on("/api/system/restart", HTTP_POST, [](AsyncWebServerRequest* request) {});
-    activeServer->on("/api/system/factory-reset", HTTP_POST, [](AsyncWebServerRequest* request) {});
+    activeServer->on("/api/tabs", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) { return ESP_OK; });
+    activeServer->on("/api/system", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) { return ESP_OK; });
+    activeServer->on("/api/app", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) { return ESP_OK; });
+    activeServer->on("/api/system/restart", HTTP_POST, [](PsychicRequest* request, PsychicResponse* response) { return ESP_OK; });
+    activeServer->on("/api/system/factory-reset", HTTP_POST, [](PsychicRequest* request, PsychicResponse* response) { return ESP_OK; });
 #endif
 
     // --- Captive portal redirect (AP mode only) / 404 (STA mode) ---
@@ -472,26 +474,31 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors,
     //
     // In STA mode the redirect is harmful — it silently masks missing routes
     // instead of returning a visible 404 error.
-    activeServer->onNotFound([](AsyncWebServerRequest* request) {
+    activeServer->onNotFound([this](PsychicRequest* request, PsychicResponse* response) {
 #ifndef NATIVE_BUILD
         if (WiFi.getMode() == WIFI_AP || WiFi.getMode() == WIFI_AP_STA) {
-            request->redirect("http://192.168.4.1/");
+            bool useTls = (_authManager && _authManager->isAuthEnabled() && _authManager->hasCert());
+            if (useTls) {
+                return response->redirect("https://192.168.4.1/");
+            } else {
+                return response->redirect("http://192.168.4.1/");
+            }
         } else {
-            request->send(404, "application/json", "{\"error\":\"Not found\"}");
+            return response->send(404, "application/json", "{\"error\":\"Not found\"}");
         }
 #else
-        request->send(404, "application/json", "{\"error\":\"Not found\"}");
+        return response->send(404, "application/json", "{\"error\":\"Not found\"}");
 #endif
     });
 
 #ifndef NATIVE_BUILD
     if (useTls && _httpsServer) {
         // --- Port 80: redirect-only server (all requests → HTTPS) ---
-        _httpServer.onNotFound([](AsyncWebServerRequest* req) {
+        _httpServer.onNotFound([](PsychicRequest* req, PsychicResponse* res) {
             String url = "https://";
             url += req->host();
             url += req->url();
-            req->redirect(url.c_str());
+            return res->redirect(url.c_str());
         });
         _httpServer.begin();
         _httpsServer->begin();
@@ -506,7 +513,7 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors,
              useTls, apMode, contributors.size());
 }
 
-AsyncWebServer& WebServerManager::getServer() {
+PsychicHttpServer& WebServerManager::getServer() {
 #ifndef NATIVE_BUILD
     if (_tlsMode && _httpsServer) return *_httpsServer;
 #endif

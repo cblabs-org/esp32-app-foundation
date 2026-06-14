@@ -462,7 +462,7 @@ private:
     // -------------------------------------------------------------------------
 
     struct AppTabContributor : public IWebContributor {
-        void        registerRoutes(AsyncWebServer& /*server*/) override {}
+        void        registerRoutes(PsychicHttpServer& /*server*/) override {}
         const char* getTabName()  const override { return "App"; }
         int         getTabOrder() const override { return 30;    }
     };

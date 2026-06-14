@@ -100,7 +100,9 @@ class GithubClient;
 class OTADownloadEngine;
 class IOTAVerifier;
 class MbedTLSSignatureVerifier;
-class AsyncWebServerRequest;
+class PsychicRequest;
+class PsychicResponse;
+class PsychicHttpServer;
 
 // ---------------------------------------------------------------------------
 // OTA State Machine
@@ -268,15 +270,10 @@ public:
     // -------------------------------------------------------------------------
 
     /**
-     * @brief Register all REST API route handlers with the web server.
-     *
-     * Registers the legacy OTA routes AND new GitHub-based update routes:
-     *   POST /api/ota { "action": "checkGithub" }  → checkForUpdate() + performUpdate()
-     *   POST /api/ota { "action": "status" }        → returns JSON with state, lastError
-     *
-     * @param server Reference to the AsyncWebServer instance.
+     * @brief Register API routes for OTA update management.
+     * @param server Reference to the PsychicHttpServer instance.
      */
-    void registerRoutes(AsyncWebServer& server) override;
+    void registerRoutes(PsychicHttpServer& server) override;
 
     /**
      * @brief Get the UI tab name for this contributor.
@@ -445,7 +442,7 @@ private:
     void publishProgress(float progress, const char* status, bool complete, bool success);
 
     /**
-     * @brief AsyncWebServer multipart upload handler for POST /api/ota/upload.
+     * @brief PsychicHttp multipart upload handler for POST /api/ota/upload.
      *
      * Invoked per-chunk by ESPAsyncWebServer. Accumulates firmware bytes
      * through MbedTLSSignatureVerifier::update() and collects the signature
@@ -459,8 +456,8 @@ private:
      * @param len      Number of bytes in this chunk.
      * @param final    True when this is the last chunk for this field.
      */
-    void handleSignedUpload(AsyncWebServerRequest* request,
+    esp_err_t handleSignedUpload(PsychicRequest* request,
                             const String& filename,
-                            size_t index, uint8_t* data, size_t len, bool final);
+                            uint64_t index, uint8_t* data, size_t len, bool final);
 };
 

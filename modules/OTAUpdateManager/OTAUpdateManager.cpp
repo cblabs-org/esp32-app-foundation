@@ -50,7 +50,8 @@ static const char* TAG = "OTAUpdateManager";
 // respect the Hollywood Principle — no cross-module includes in headers.
 // ---------------------------------------------------------------------------
 #ifndef NATIVE_BUILD
-#include <ESPAsyncWebServer.h>
+#include <PsychicHttp.h>
+#include <PsychicUploadHandler.h>
 #include <ArduinoJson.h>
 #include <Update.h>
 #include <esp_ota_ops.h>
@@ -953,15 +954,15 @@ void OTAUpdateManager::rollbackFirmware() {
  * @param len      Number of bytes in this chunk.
  * @param final    True when this is the last chunk for this field.
  */
-void OTAUpdateManager::handleSignedUpload(AsyncWebServerRequest* request,
+esp_err_t OTAUpdateManager::handleSignedUpload(PsychicRequest* request,
                                           const String& filename,
-                                          size_t index, uint8_t* data,
+                                          uint64_t index, uint8_t* data,
                                           size_t len, bool final) {
 #ifndef NATIVE_BUILD
     if (app_ == nullptr) {
         ESP_LOGE(TAG, "Signed upload: app_ is null — module not initialized");
-        request->send(500, "application/json", "{\"status\":\"error\",\"msg\":\"OTA module not initialized\"}");
-        return;
+        request->response()->send(500, "application/json", "{\"status\":\"error\",\"msg\":\"OTA module not initialized\"}");
+        return ESP_FAIL;
     }
     const FrameworkConfig& cfg = app_->getConfig();
 
@@ -974,13 +975,13 @@ void OTAUpdateManager::handleSignedUpload(AsyncWebServerRequest* request,
         size_t toCopy = (len < space) ? len : space;
         memcpy(uploadSigBuf_ + uploadSigLen_, data, toCopy);
         uploadSigLen_ += toCopy;
-        return;
+        return ESP_OK;
     }
 
     // ---- Firmware field ----
-    if (filename != "firmware") return; // Unknown field — ignore
+    if (filename != "firmware") return ESP_OK; // Unknown field — ignore
 
-    if (uploadAborted_) return; // Already failed — drain remaining chunks silently
+    if (uploadAborted_) return ESP_FAIL; // Already failed — drain remaining chunks silently
 
     // --- First chunk: reset state and initialise verifier ---
     if (index == 0) {
@@ -999,9 +1000,9 @@ void OTAUpdateManager::handleSignedUpload(AsyncWebServerRequest* request,
                 delete uploadVerifier_;
                 uploadVerifier_ = nullptr;
                 uploadAborted_  = true;
-                request->send(500, "application/json",
+                request->response()->send(500, "application/json",
                               "{\"status\":\"error\",\"msg\":\"Verifier init failed\"}");
-                return;
+                return ESP_FAIL;
             }
         }
 
@@ -1009,18 +1010,18 @@ void OTAUpdateManager::handleSignedUpload(AsyncWebServerRequest* request,
         if (len > 0 && data[0] != 0xE9) {
             ESP_LOGE(TAG, "Signed upload: invalid binary header 0x%02X", data[0]);
             uploadAborted_ = true;
-            request->send(400, "application/json",
+            request->response()->send(400, "application/json",
                           "{\"status\":\"error\",\"msg\":\"Invalid firmware header — not an ESP32 binary\"}");
-            return;
+            return ESP_FAIL;
         }
 
         // Begin the flash update — size is unknown at this point so use OTA_SIZE_UNKNOWN
         if (!Update.begin(UPDATE_SIZE_UNKNOWN)) {
             ESP_LOGE(TAG, "Signed upload: Update.begin() failed");
             uploadAborted_ = true;
-            request->send(500, "application/json",
+            request->response()->send(500, "application/json",
                           "{\"status\":\"error\",\"msg\":\"Update begin failed — insufficient space?\"}");
-            return;
+            return ESP_FAIL;
         }
 
         ESP_LOGI(TAG, "Signed upload: started");
@@ -1038,9 +1039,9 @@ void OTAUpdateManager::handleSignedUpload(AsyncWebServerRequest* request,
         uploadAborted_ = true;
         delete uploadVerifier_;
         uploadVerifier_ = nullptr;
-        request->send(500, "application/json",
+        request->response()->send(500, "application/json",
                       "{\"status\":\"error\",\"msg\":\"Flash write failed\"}");
-        return;
+        return ESP_FAIL;
     }
 
     uploadBinSize_ += len;
@@ -1055,9 +1056,9 @@ void OTAUpdateManager::handleSignedUpload(AsyncWebServerRequest* request,
                 delete uploadVerifier_;
                 uploadVerifier_ = nullptr;
                 uploadAborted_  = true;
-                request->send(400, "application/json",
+                request->response()->send(400, "application/json",
                               "{\"status\":\"error\",\"msg\":\"Signature file required — upload both .bin and .sig\"}");
-                return;
+                return ESP_FAIL;
             }
 
             if (uploadVerifier_ == nullptr ||
@@ -1067,9 +1068,9 @@ void OTAUpdateManager::handleSignedUpload(AsyncWebServerRequest* request,
                 delete uploadVerifier_;
                 uploadVerifier_ = nullptr;
                 uploadAborted_  = true;
-                request->send(403, "application/json",
+                request->response()->send(403, "application/json",
                               "{\"status\":\"error\",\"msg\":\"Signature verification failed — firmware rejected\"}");
-                return;
+                return ESP_FAIL;
             }
 
             ESP_LOGI(TAG, "Signed upload: ECDSA verification PASSED (%u sig bytes, %u firmware bytes)",
@@ -1084,114 +1085,111 @@ void OTAUpdateManager::handleSignedUpload(AsyncWebServerRequest* request,
         if (!Update.end(true /* set boot partition */)) {
             ESP_LOGE(TAG, "Signed upload: Update.end() failed");
             uploadAborted_ = true;
-            request->send(500, "application/json",
+            request->response()->send(500, "application/json",
                           "{\"status\":\"error\",\"msg\":\"Update finalisation failed\"}");
-            return;
+            return ESP_FAIL;
         }
 
         ESP_LOGI(TAG, "Signed upload: complete — rebooting in 500ms");
-        request->send(200, "application/json", "{\"status\":\"ok\",\"msg\":\"Firmware verified and flashed — rebooting\"}");
+        request->response()->send(200, "application/json", "{\"status\":\"ok\",\"msg\":\"Firmware verified and flashed — rebooting\"}");
         delay(500);
         ESP.restart();
     }
+    return ESP_OK;
 #else
     (void)request; (void)filename; (void)index; (void)data; (void)len; (void)final;
+    return ESP_OK;
 #endif
 }
 
-void OTAUpdateManager::registerRoutes(AsyncWebServer& server) {
+void OTAUpdateManager::registerRoutes(PsychicHttpServer& server) {
 #ifndef NATIVE_BUILD
     // --- GET: status endpoint ---
-    server.on("/api/ota", HTTP_GET, [](AsyncWebServerRequest* request) {
+    server.on("/api/ota", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
         JsonDocument doc;
         doc["status"] = "ready";
         String output;
         serializeJson(doc, output);
-        request->send(200, "application/json", output);
+        response->send(200, "application/json", output.c_str());
+        return ESP_OK;
     });
 
     // --- POST: action dispatcher ---
     server.on("/api/ota", HTTP_POST,
-        [](AsyncWebServerRequest *request) {},
-        NULL,
-        [this](AsyncWebServerRequest *request, uint8_t *data, size_t len,
-               size_t index, size_t total) {
+        [this](PsychicRequest *request, PsychicResponse* response) {
+            const char* body = request->bodyCStr();
+            if (!body || strlen(body) == 0) {
+                response->send(400, "application/json", "{\"error\":\"body_required\"}");
+                return ESP_FAIL;
+            }
+
             JsonDocument doc;
-            DeserializationError error = deserializeJson(doc, data, len);
+            DeserializationError error = deserializeJson(doc, body);
             if (!error) {
                 const char* action = doc["action"] | "";
 
                 if (strcmp(action, "rollback") == 0) {
                     const char* confirm = doc["confirm"] | "";
                     if (strcmp(confirm, "ROLLBACK") != 0) {
-                        request->send(403, "application/json",
+                        response->send(403, "application/json",
                                       "{\"status\":\"error\",\"msg\":\"Missing or invalid confirmation token\"}");
-                        return;
+                        return ESP_FAIL;
                     }
-                    request->send(200, "application/json", "{\"status\":\"ok\"}");
+                    response->send(200, "application/json", "{\"status\":\"ok\"}");
                     this->rollbackFirmware();
-                    return;
+                    return ESP_OK;
                 } else if (strcmp(action, "markValid") == 0) {
                     this->markAppValid();
-                    request->send(200, "application/json", "{\"status\":\"ok\"}");
-                    return;
+                    response->send(200, "application/json", "{\"status\":\"ok\"}");
+                    return ESP_OK;
                 } else if (strcmp(action, "checkGithub") == 0) {
                     ESP_LOGI(TAG, "GitHub OTA check triggered via API");
-                    // Reset any previous error state — explicit user action
                     if (this->state_ == OTAState::Error) {
                         this->state_ = OTAState::Idle;
                         this->lastOtaError_ = nullptr;
                     }
-                    // Manual check: always show errors (not a silent auto-check)
                     this->_silentCheck = false;
-                    // Respond immediately — the full check+download runs
-                    // in a background FreeRTOS task. checkForUpdate() blocks
-                    // for 10+ seconds (TLS to api.github.com) and must NOT
-                    // run on the AsyncWebServer request thread.
                     this->performUpdate();
-                    request->send(200, "application/json",
+                    response->send(200, "application/json",
                                   "{\"status\":\"ok\",\"msg\":\"OTA check started\"}");
-                    return;
+                    return ESP_OK;
                 } else if (strcmp(action, "setChannel") == 0) {
                     const char* ch = doc["channel"] | "";
                     if (strlen(ch) > 0 && strlen(ch) < sizeof(this->_channel)) {
                         strlcpy(this->_channel, ch, sizeof(this->_channel));
-                        // Persist via ConfigManager
                         if (this->app_ != nullptr) {
                             this->app_->getConfigManager().saveModuleConfig(this);
                         }
                         ESP_LOGI(TAG, "Channel changed to: %s", this->_channel);
-                        request->send(200, "application/json", "{\"status\":\"ok\"}");
+                        response->send(200, "application/json", "{\"status\":\"ok\"}");
                     } else {
-                        request->send(400, "application/json", "{\"status\":\"error\",\"msg\":\"Invalid channel\"}");
+                        response->send(400, "application/json", "{\"status\":\"error\",\"msg\":\"Invalid channel\"}");
                     }
-                    return;
+                    return ESP_OK;
                 } else if (strcmp(action, "setAutoCheck") == 0) {
                     if (doc["autoCheck"].is<bool>()) {
                         this->_autoCheck = doc["autoCheck"].as<bool>();
-                        // Persist via ConfigManager
                         if (this->app_ != nullptr) {
                             this->app_->getConfigManager().saveModuleConfig(this);
                         }
                         ESP_LOGI(TAG, "Auto-check changed to: %d", (int)this->_autoCheck);
-                        request->send(200, "application/json", "{\"status\":\"ok\"}");
+                        response->send(200, "application/json", "{\"status\":\"ok\"}");
                     } else {
-                        request->send(400, "application/json", "{\"status\":\"error\",\"msg\":\"Missing autoCheck boolean\"}");
+                        response->send(400, "application/json", "{\"status\":\"error\",\"msg\":\"Missing autoCheck boolean\"}");
                     }
-                    return;
+                    return ESP_OK;
                 } else if (strcmp(action, "setUpdatesEnabled") == 0) {
                     if (doc["updatesEnabled"].is<bool>()) {
                         this->_updatesEnabled = doc["updatesEnabled"].as<bool>();
-                        // Persist via ConfigManager
                         if (this->app_ != nullptr) {
                             this->app_->getConfigManager().saveModuleConfig(this);
                         }
                         ESP_LOGI(TAG, "Updates-enabled changed to: %d", (int)this->_updatesEnabled);
-                        request->send(200, "application/json", "{\"status\":\"ok\"}");
+                        response->send(200, "application/json", "{\"status\":\"ok\"}");
                     } else {
-                        request->send(400, "application/json", "{\"status\":\"error\",\"msg\":\"Missing updatesEnabled boolean\"}");
+                        response->send(400, "application/json", "{\"status\":\"error\",\"msg\":\"Missing updatesEnabled boolean\"}");
                     }
-                    return;
+                    return ESP_OK;
                 } else if (strcmp(action, "setCheckHour") == 0) {
                     if (doc["checkHour"].is<int>()) {
                         int h = doc["checkHour"].as<int>();
@@ -1201,14 +1199,14 @@ void OTAUpdateManager::registerRoutes(AsyncWebServer& server) {
                                 this->app_->getConfigManager().saveModuleConfig(this);
                             }
                             ESP_LOGI(TAG, "Check hour changed to: %u", (unsigned)this->_checkHour);
-                            request->send(200, "application/json", "{\"status\":\"ok\"}");
+                            response->send(200, "application/json", "{\"status\":\"ok\"}");
                         } else {
-                            request->send(400, "application/json", "{\"status\":\"error\",\"msg\":\"checkHour must be 0-23\"}");
+                            response->send(400, "application/json", "{\"status\":\"error\",\"msg\":\"checkHour must be 0-23\"}");
                         }
                     } else {
-                        request->send(400, "application/json", "{\"status\":\"error\",\"msg\":\"Missing checkHour integer\"}");
+                        response->send(400, "application/json", "{\"status\":\"error\",\"msg\":\"Missing checkHour integer\"}");
                     }
-                    return;
+                    return ESP_OK;
                 } else if (strcmp(action, "status") == 0) {
                     JsonDocument resp;
                     const char* stateStr = "unknown";
@@ -1227,7 +1225,6 @@ void OTAUpdateManager::registerRoutes(AsyncWebServer& server) {
                     resp["autoCheck"]      = this->_autoCheck;
                     resp["updatesEnabled"] = this->_updatesEnabled;
                     resp["checkHour"]      = this->_checkHour;
-                    // OTA task readiness fields — used by portal to render low-memory warning
                     resp["dram_free_bytes"]  = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
                     resp["ota_stack_bytes"]  = OTA_TASK_STACK_BYTES;
                     if (this->lastOtaError_) {
@@ -1235,30 +1232,32 @@ void OTAUpdateManager::registerRoutes(AsyncWebServer& server) {
                     }
                     String output;
                     serializeJson(resp, output);
-                    request->send(200, "application/json", output);
-                    return;
+                    response->send(200, "application/json", output.c_str());
+                    return ESP_OK;
                 }
             }
-            request->send(400, "application/json",
-                          "{\"status\":\"error\",\"msg\":\"Invalid action\"}");
+            response->send(400, "application/json", "{\"status\":\"error\",\"msg\":\"Invalid action\"}");
+            return ESP_FAIL;
         }
     );
 
     // --- POST /api/ota/upload — signed multipart firmware upload ---
-    // Accepts multipart/form-data with fields:
-    //   "firmware"  — the compiled .bin binary
-    //   "signature" — the detached ECDSA .sig file
-    // Uses ArUploadHandlerFunction (4th arg) for multipart file data.
-    // The handler accumulates firmware bytes through MbedTLSSignatureVerifier
-    // and rejects the flash if the ECDSA signature does not verify.
-    server.on("/api/ota/upload", HTTP_POST,
-        [](AsyncWebServerRequest* request) {
-            // Completion handler — response already sent from handleSignedUpload().
-        },
-        [this](AsyncWebServerRequest* request, const String& filename,
-               size_t index, uint8_t* data, size_t len, bool final) {
-            this->handleSignedUpload(request, filename, index, data, len, final);
-        }
-    );
+    PsychicUploadHandler* otaUploadHandler = new PsychicUploadHandler();
+    otaUploadHandler->onRequest([](PsychicRequest* request, PsychicResponse* response) {
+        // The response is already sent inside handleSignedUpload, or we just return OK here
+        return ESP_OK;
+    });
+#ifdef ARDUINO
+    otaUploadHandler->onUpload([this](PsychicRequest* request, const String& filename,
+                                      uint64_t index, uint8_t* data, size_t len, bool final) {
+        return this->handleSignedUpload(request, filename, index, data, len, final);
+    });
+#else
+    otaUploadHandler->onUpload([this](PsychicRequest* request, const char* filename,
+                                      uint64_t index, uint8_t* data, size_t len, bool final) {
+        return this->handleSignedUpload(request, String(filename), index, data, len, final);
+    });
+#endif
+    server.on("/api/ota/upload", HTTP_POST, otaUploadHandler);
 #endif
 }

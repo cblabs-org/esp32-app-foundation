@@ -128,7 +128,7 @@ public:
 // 401 and returns from the lambda. The caller must NOT add any code between
 // AUTH_PORTAL_GUARD and the next handler statement.
 // ---------------------------------------------------------------------------
-#define AUTH_PORTAL_GUARD(auth, request) \
+#define AUTH_PORTAL_GUARD(auth, request, response) \
     do { \
-        if ((auth) && !(auth)->checkPortalAuth(request)) return; \
+        if ((auth) && !(auth)->checkPortalAuth(request, response)) return ESP_OK; \
     } while(0)

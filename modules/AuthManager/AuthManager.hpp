@@ -75,7 +75,9 @@ class ConfigManager;
 class KeyManager;
 
 // Forward declaration only — full stub is in WebServerManager.hpp
-class AsyncWebServerRequest;
+class PsychicRequest;
+class PsychicResponse;
+class PsychicHttpServer;
 
 /**
  * @brief Security module managing portal and MCP authentication state and TLS certificates.
@@ -131,7 +133,7 @@ public:
      * @param request  Incoming async web server request (may be nullptr in tests).
      * @return true — always passes in WO1 skeleton.
      */
-    bool checkPortalAuth(AsyncWebServerRequest* request);
+    bool checkPortalAuth(PsychicRequest* request, PsychicResponse* response);
 
     /**
      * @brief Check whether the incoming MCP request carries a valid bearer token.
@@ -142,7 +144,7 @@ public:
      * @param request  Incoming async web server request (may be nullptr in tests).
      * @return true — always passes in WO1 skeleton.
      */
-    bool checkMcpAuth(AsyncWebServerRequest* request);
+    bool checkMcpAuth(PsychicRequest* request, PsychicResponse* response);
 
     // -------------------------------------------------------------------------
     // Cert Helpers (WO3 real implementation — mbedTLS + LittleFS)
@@ -212,9 +214,9 @@ public:
      *   POST /api/auth/password → 501 Not Implemented
      *   POST /api/auth/mcp-token → 501 Not Implemented
      *
-     * @param server  Reference to the AsyncWebServer instance.
+     * @param server  Reference to the PsychicHttpServer instance.
      */
-    void registerRoutes(AsyncWebServer& server) override;
+    void registerRoutes(PsychicHttpServer& server) override;
 
     /** @brief Return the Security tab display name. @return "Security" */
     const char* getTabName()   const override { return "Security"; }
@@ -389,7 +391,7 @@ private:
      * @param request  Incoming request (must not be nullptr on hardware paths).
      * @return true if the cookie matches the active session, false otherwise.
      */
-    bool _checkSessionCookie(AsyncWebServerRequest* request) const;
+    bool _checkSessionCookie(PsychicRequest* request) const;
 
     /**
      * @brief Hex-encode a binary buffer into a null-terminated hex string.

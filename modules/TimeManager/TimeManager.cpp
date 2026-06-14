@@ -31,9 +31,8 @@
 static const char* TAG = "TimeManager";
 
 #ifndef NATIVE_BUILD
-#include <esp_sntp.h>
+#include <PsychicHttp.h>
 #include <LittleFS.h>
-#include <ESPAsyncWebServer.h>
 #include <ArduinoJson.h>
 
 // =============================================================================
@@ -238,39 +237,32 @@ void TimeManager::resetConfig() {
  *
  * @param server Reference to the AsyncWebServer instance.
  */
-void TimeManager::registerRoutes(AsyncWebServer& server) {
+void TimeManager::registerRoutes(PsychicHttpServer& server) {
     // --- GET /api/time/config ---
-    server.on("/api/time/config", HTTP_GET, [this](AsyncWebServerRequest* request) {
-        _handleGetConfig(request);
+    server.on("/api/time/config", HTTP_GET, [this](PsychicRequest* request, PsychicResponse* response) {
+        _handleGetConfig(request, response);
+        return ESP_OK;
     });
 
     // --- POST /api/time/config ---
     server.on("/api/time/config", HTTP_POST,
-        // onRequest handler (called after body is fully received)
-        [](AsyncWebServerRequest* request) {},
-        // onUpload handler (not used)
-        nullptr,
-        // onBody handler — receives the JSON payload
-        [this](AsyncWebServerRequest* request, uint8_t* data,
-               size_t len, size_t index, size_t total) {
-            _handlePostConfig(request, data, len, index, total);
+        [this](PsychicRequest* request, PsychicResponse* response) {
+            _handlePostConfig(request, response);
+            return ESP_OK;
         }
     );
 
     // --- GET /api/time/zones ---
-    server.on("/api/time/zones", HTTP_GET, [this](AsyncWebServerRequest* request) {
-        _handleGetZones(request);
+    server.on("/api/time/zones", HTTP_GET, [this](PsychicRequest* request, PsychicResponse* response) {
+        _handleGetZones(request, response);
+        return ESP_OK;
     });
 
     // --- POST /api/time/zones/update ---
-    server.on(
-        "/api/time/zones/update", HTTP_POST,
-        [](AsyncWebServerRequest* request) {
-            // Response is sent from the body handler on final chunk
-        },
-        nullptr, // no upload handler
-        [this](AsyncWebServerRequest* request, uint8_t* data, size_t len, size_t index, size_t total) {
-            _handlePostZonesUpdate(request, data, len, index, total);
+    server.on("/api/time/zones/update", HTTP_POST,
+        [this](PsychicRequest* request, PsychicResponse* response) {
+            _handlePostZonesUpdate(request, response);
+            return ESP_OK;
         }
     );
 
@@ -298,7 +290,7 @@ void TimeManager::registerRoutes(AsyncWebServer& server) {
  *
  * @param request The incoming HTTP request.
  */
-void TimeManager::_handleGetConfig(AsyncWebServerRequest* request) {
+void TimeManager::_handleGetConfig(PsychicRequest* request, PsychicResponse* response) {
     JsonDocument doc;
     doc["timezone"]   = _timezone;
     doc["posix"]      = _posixTz;
@@ -323,9 +315,9 @@ void TimeManager::_handleGetConfig(AsyncWebServerRequest* request) {
         }
     }
 
-    String response;
-    serializeJson(doc, response);
-    request->send(200, "application/json", response);
+    String output;
+    serializeJson(doc, output);
+    response->send(200, "application/json", output.c_str());
 }
 
 /**
@@ -346,15 +338,17 @@ void TimeManager::_handleGetConfig(AsyncWebServerRequest* request) {
  * @param index   Current chunk index.
  * @param total   Total body size.
  */
-void TimeManager::_handlePostConfig(AsyncWebServerRequest* request, uint8_t* data,
-                                     size_t len, size_t index, size_t total) {
-    // Only process when the first (and usually only) chunk arrives
-    if (index != 0) return;
+void TimeManager::_handlePostConfig(PsychicRequest* request, PsychicResponse* response) {
+    const char* body = request->bodyCStr();
+    if (!body || strlen(body) == 0) {
+        response->send(400, "application/json", "{\"error\":\"body_required\"}");
+        return;
+    }
 
     JsonDocument doc;
-    DeserializationError error = deserializeJson(doc, data, len);
+    DeserializationError error = deserializeJson(doc, body);
     if (error) {
-        request->send(400, "application/json", "{\"error\":\"Invalid JSON\"}");
+        response->send(400, "application/json", "{\"error\":\"Invalid JSON\"}");
         return;
     }
 
@@ -394,7 +388,7 @@ void TimeManager::_handlePostConfig(AsyncWebServerRequest* request, uint8_t* dat
     // --- Reinitialise NTP with new servers ---
     _reinitNtp();
 
-    request->send(200, "application/json", "{\"status\":\"ok\"}");
+    response->send(200, "application/json", "{\"status\":\"ok\"}");
 }
 
 /**
@@ -405,13 +399,15 @@ void TimeManager::_handlePostConfig(AsyncWebServerRequest* request, uint8_t* dat
  *
  * @param request The incoming HTTP request.
  */
-void TimeManager::_handleGetZones(AsyncWebServerRequest* request) {
+void TimeManager::_handleGetZones(PsychicRequest* request, PsychicResponse* response) {
     if (!LittleFS.exists("/timezones.json")) {
-        request->send(404, "application/json", "{\"error\":\"Timezone database not found\"}");
+        response->send(404, "application/json", "{\"error\":\"Timezone database not found\"}");
         return;
     }
 
-    request->send(LittleFS, "/timezones.json", "application/json");
+    // Send the file directly using PsychicHttp built-in file serving
+    PsychicFileResponse responseFile(response, LittleFS, "/timezones.json", "application/json");
+    responseFile.send();
 }
 
 /**
@@ -427,45 +423,33 @@ void TimeManager::_handleGetZones(AsyncWebServerRequest* request) {
  * @param index   Current chunk byte offset.
  * @param total   Total body size.
  */
-void TimeManager::_handlePostZonesUpdate(AsyncWebServerRequest* request, uint8_t* data,
-                                          size_t len, size_t index, size_t total) {
+void TimeManager::_handlePostZonesUpdate(PsychicRequest* request, PsychicResponse* response) {
     // --- Guard: reject oversized bodies (32 KB max) ---
+    size_t total = request->contentLength();
     if (total > 32768) {
-        if (index == 0) {
-            request->send(413, "application/json", "{\"error\":\"Body too large (max 32 KB)\"}");
-        }
+        response->send(413, "application/json", "{\"error\":\"Body too large (max 32 KB)\"}");
         return;
     }
 
-    // --- First chunk: open temp file for writing ---
-    if (index == 0) {
-        ESP_LOGI(TAG, "Receiving timezone database update (%zu bytes)", total);
-        File tmp = LittleFS.open("/timezones.tmp", "w");
-        if (!tmp) {
-            request->send(500, "application/json", "{\"error\":\"Failed to open temp file\"}");
-            return;
-        }
-        tmp.write(data, len);
-        tmp.close();
+    const char* body = request->bodyCStr();
+    if (!body || strlen(body) == 0) {
+        response->send(400, "application/json", "{\"error\":\"body_required\"}");
         return;
     }
 
-    // --- Subsequent chunks: append ---
-    File tmp = LittleFS.open("/timezones.tmp", "a");
+    ESP_LOGI(TAG, "Receiving timezone database update (%zu bytes)", total);
+    File tmp = LittleFS.open("/timezones.tmp", "w");
     if (!tmp) {
-        request->send(500, "application/json", "{\"error\":\"Failed to append temp file\"}");
+        response->send(500, "application/json", "{\"error\":\"Failed to open temp file\"}");
         return;
     }
-    tmp.write(data, len);
+    tmp.write((const uint8_t*)body, total);
     tmp.close();
 
-    // --- Final chunk: rename temp → active ---
-    if (index + len >= total) {
-        LittleFS.remove("/timezones.json");
-        LittleFS.rename("/timezones.tmp", "/timezones.json");
-        ESP_LOGI(TAG, "Timezone database updated (%zu bytes)", total);
-        request->send(200, "application/json", "{\"status\":\"ok\"}");
-    }
+    LittleFS.remove("/timezones.json");
+    LittleFS.rename("/timezones.tmp", "/timezones.json");
+    ESP_LOGI(TAG, "Timezone database updated (%zu bytes)", total);
+    response->send(200, "application/json", "{\"status\":\"ok\"}");
 }
 
 // =============================================================================
@@ -557,7 +541,7 @@ void TimeManager::resetConfig() {
 }
 
 // --- IWebContributor stub ---
-void TimeManager::registerRoutes(AsyncWebServer& server) {
+void TimeManager::registerRoutes(PsychicHttpServer& server) {
     // No-op for native build
 }
 

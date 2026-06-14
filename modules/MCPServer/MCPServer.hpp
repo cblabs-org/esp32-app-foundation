@@ -104,7 +104,8 @@
 
     // -----------------------------------------------------------------------
     // Minimal Serial mock — string-buffer class for native compilation
-    // Mirrors the pattern used by webServer.hpp for AsyncWebServer.
+    // Registration hook called by other modules to contribute their tools.
+    // Mirrors the pattern used by WebServer for PsychicHttpServer.
     // -----------------------------------------------------------------------
     class MockSerial : public Print {
     public:
@@ -207,10 +208,10 @@ public:
     // IWebContributor Implementation
     // -----------------------------------------------------------------------
     /**
-     * @brief Register the /api/mcp POST route for JSON-RPC over HTTP.
-     * @param server The AsyncWebServer instance to register routes with.
+     * @brief Registers the REST endpoints required for the Web UI.
+     * @param server The PsychicHttpServer instance to register routes with.
      */
-    void registerRoutes(AsyncWebServer& server) override;
+    void registerRoutes(PsychicHttpServer& server) override;
 
     /**
      * @brief The MCP server exposes a "MCP" UI tab under System.

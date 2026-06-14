@@ -79,7 +79,9 @@ private:
 
 #ifndef NATIVE_BUILD
 class DNSServer;
-class AsyncWebServerRequest;
+class PsychicRequest;
+class PsychicResponse;
+class PsychicHttpServer;
 #else
 class DNSServer {
 public:
@@ -87,7 +89,9 @@ public:
     ~DNSServer() {}
 };
 // Forward declaration only — full stub is in WebServerManager.hpp
-class AsyncWebServerRequest;
+class PsychicRequest;
+class PsychicResponse;
+class PsychicHttpServer;
 #endif
 
 // Forward declarations — avoids circular include with ConfigManager.hpp / KeyManager.hpp
@@ -139,10 +143,10 @@ private:
     // --- RESTful API Handlers (PR-04a/WO1) ---
 
     /**
-     * @brief Handle GET /api/wifi/status — returns connection mode, SSID, IP, RSSI, etc.
+     * @brief Handle GET /api/wifi/status — connection diagnostics
      * @param request The incoming HTTP request.
      */
-    void handleStatus(AsyncWebServerRequest* request);
+    esp_err_t handleStatus(PsychicRequest* request, PsychicResponse* response);
 
     /**
      * @brief Handle GET /api/wifi/scan — triggers async WiFi scan and returns results.
@@ -150,46 +154,31 @@ private:
      *        capped at 15 networks.
      * @param request The incoming HTTP request.
      */
-    void handleScan(AsyncWebServerRequest* request);
+    esp_err_t handleScan(PsychicRequest* request, PsychicResponse* response);
 
     /**
      * @brief Handle POST /api/wifi/test — test credentials without saving.
      *        Accepts {ssid, pass}. Returns {status:"ok", ip:"..."} or {status:"failed"}.
      *        Body limit: 1 KB.
      * @param request The incoming HTTP request.
-     * @param data    Request body data.
-     * @param len     Length of the body data.
-     * @param index   Current chunk index.
-     * @param total   Total body size.
      */
-    void handleTest(AsyncWebServerRequest* request, uint8_t* data,
-                    size_t len, size_t index, size_t total);
+    esp_err_t handleTest(PsychicRequest* request, PsychicResponse* response);
 
     /**
      * @brief Handle POST /api/wifi/connect — save credentials and schedule restart.
      *        Accepts {ssid, pass}. Saves via KeyManager, returns 200, schedules restart.
      *        Body limit: 1 KB.
      * @param request The incoming HTTP request.
-     * @param data    Request body data.
-     * @param len     Length of the body data.
-     * @param index   Current chunk index.
-     * @param total   Total body size.
      */
-    void handleConnect(AsyncWebServerRequest* request, uint8_t* data,
-                       size_t len, size_t index, size_t total);
+    esp_err_t handleConnect(PsychicRequest* request, PsychicResponse* response);
 
     /**
      * @brief Handle POST /api/wifi/forget — erase credentials and restart to AP mode.
      *        Clears KeyManager + config, returns 200, schedules restart.
      *        Body limit: 256 bytes.
      * @param request The incoming HTTP request.
-     * @param data    Request body data.
-     * @param len     Length of the body data.
-     * @param index   Current chunk index.
-     * @param total   Total body size.
      */
-    void handleForget(AsyncWebServerRequest* request, uint8_t* data,
-                      size_t len, size_t index, size_t total);
+    esp_err_t handleForget(PsychicRequest* request, PsychicResponse* response);
 
     /**
      * @brief Schedule a deferred ESP restart (500ms delay).
@@ -259,9 +248,9 @@ public:
 
     /**
      * @brief Register all REST API route handlers with the web server.
-     * @param server Reference to the AsyncWebServer instance.
+     * @param server Reference to the PsychicHttpServer instance.
      */
-    void registerRoutes(AsyncWebServer& server) override;
+    void registerRoutes(PsychicHttpServer& server) override;
 
     /**
      * @brief Get the UI tab name for this contributor.

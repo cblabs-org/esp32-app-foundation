@@ -373,54 +373,55 @@ void MCPServer::_sendError(int code, const char* message, JsonVariantConst id, P
 // IWebContributor Implementation
 // ---------------------------------------------------------------------------
 
-void MCPServer::registerRoutes(AsyncWebServer& server) {
+void MCPServer::registerRoutes(PsychicHttpServer& server) {
 #ifndef NATIVE_BUILD
     // --- POST /api/mcp — JSON-RPC endpoint for MCP tool calls ---
     // NOTE: Serial transport (_processLine) is intentionally NOT guarded —
     // Serial/USB access is physical access and is treated as trusted.
     server.on("/api/mcp", HTTP_POST,
-        [this](AsyncWebServerRequest* request) {
+        [this](PsychicRequest* request, PsychicResponse* response) {
             // --- Guard: bearer token auth (WO6) ---
-            if (_authManager && !_authManager->checkMcpAuth(request)) return;
+            if (_authManager && !_authManager->checkMcpAuth(request, response)) return ESP_FAIL;
             // --- Guard: reject requests when MCP server is disabled ---
             if (!_mcpEnabled) {
-                request->send(503, "application/json", "{\"error\":\"MCP server disabled\"}");
-                return;
+                response->send(503, "application/json", "{\"error\":\"MCP server disabled\"}");
+                return ESP_FAIL;
             }
-            // Request handler fires AFTER body handler completes
-            if (!request->_tempObject) {
-                request->send(400, "application/json", "{\"error\":\"Missing body\"}");
-                return;
-            }
-            String* bodyStr = static_cast<String*>(request->_tempObject);
-            AsyncResponseStream* responseStream = request->beginResponseStream("application/json");
-            this->processRequest(bodyStr->c_str(), *responseStream);
-            request->send(responseStream);
-            delete bodyStr;
-            request->_tempObject = nullptr;
-        },
-        nullptr,
-        [](AsyncWebServerRequest* request, uint8_t* data, size_t len, size_t index, size_t total) {
+
             // --- Per-route body size enforcement (1KB) ---
-            constexpr size_t MAX_BODY_SIZE = 1024;
-            if (total > MAX_BODY_SIZE) {
-                request->send(413, "application/json", "{\"error\":\"Payload too large\"}");
-                return;
+            if (request->contentLength() > 1024) {
+                response->send(413, "application/json", "{\"error\":\"Payload too large\"}");
+                return ESP_FAIL;
             }
-            if (index == 0) {
-                request->_tempObject = new String();
+
+            const char* body = request->bodyCStr();
+            if (!body || strlen(body) == 0) {
+                response->send(400, "application/json", "{\"error\":\"Missing body\"}");
+                return ESP_FAIL;
             }
-            String* bodyStr = static_cast<String*>(request->_tempObject);
-            for (size_t i = 0; i < len; i++) {
-                *bodyStr += (char)data[i];
-            }
+
+            class StringPrinter : public Print {
+            public:
+                String output;
+                size_t write(uint8_t c) override { output += (char)c; return 1; }
+                size_t write(const uint8_t *buffer, size_t size) override {
+                    // Pre-allocate for performance if empty
+                    if (output.length() == 0) output.reserve(size);
+                    for(size_t i = 0; i < size; ++i) { output += (char)buffer[i]; }
+                    return size;
+                }
+            } printer;
+
+            this->processRequest(body, printer);
+            response->send(200, "application/json", printer.output.c_str());
+            return ESP_OK;
         }
     );
 
     // --- GET /api/mcp/status — MCP server status summary ---
-    server.on("/api/mcp/status", HTTP_GET, [this](AsyncWebServerRequest* request) {
+    server.on("/api/mcp/status", HTTP_GET, [this](PsychicRequest* request, PsychicResponse* response) {
         // --- Guard: bearer token auth (WO6) ---
-        if (_authManager && !_authManager->checkMcpAuth(request)) return;
+        if (_authManager && !_authManager->checkMcpAuth(request, response)) return ESP_FAIL;
         JsonDocument doc;
         doc["initialized"] = _initialized;
         doc["enabled"]     = _mcpEnabled;
@@ -428,13 +429,14 @@ void MCPServer::registerRoutes(AsyncWebServer& server) {
         doc["toolCount"]   = _registry.size();
         String output;
         serializeJson(doc, output);
-        request->send(200, "application/json", output);
+        response->send(200, "application/json", output.c_str());
+        return ESP_OK;
     });
 
     // --- GET /api/mcp/config — MCP runtime configuration ---
-    server.on("/api/mcp/config", HTTP_GET, [this](AsyncWebServerRequest* request) {
+    server.on("/api/mcp/config", HTTP_GET, [this](PsychicRequest* request, PsychicResponse* response) {
         // --- Guard: bearer token auth (WO6) ---
-        if (_authManager && !_authManager->checkMcpAuth(request)) return;
+        if (_authManager && !_authManager->checkMcpAuth(request, response)) return ESP_FAIL;
         JsonDocument doc;
         doc["enabled"]     = _mcpEnabled;
         doc["readOnly"]    = _mcpReadOnly;
@@ -443,29 +445,34 @@ void MCPServer::registerRoutes(AsyncWebServer& server) {
         }
         String output;
         serializeJson(doc, output);
-        request->send(200, "application/json", output);
+        response->send(200, "application/json", output.c_str());
+        return ESP_OK;
     });
 
     // --- POST /api/mcp/config — Runtime toggle for enabled/readOnly ---
     server.on("/api/mcp/config", HTTP_POST,
-        [this](AsyncWebServerRequest* request) {
+        [this](PsychicRequest* request, PsychicResponse* response) {
             // --- Guard: bearer token auth (WO6) ---
-            if (_authManager && !_authManager->checkMcpAuth(request)) return;
-            if (!request->_tempObject) {
-                request->send(400, "application/json", "{\"error\":\"Missing body\"}");
-                return;
+            if (_authManager && !_authManager->checkMcpAuth(request, response)) return ESP_FAIL;
+
+            if (request->contentLength() > 512) {
+                response->send(413, "application/json", "{\"error\":\"Payload too large\"}");
+                return ESP_FAIL;
             }
-            String* bodyStr = static_cast<String*>(request->_tempObject);
+
+            const char* body = request->bodyCStr();
+            if (!body || strlen(body) == 0) {
+                response->send(400, "application/json", "{\"error\":\"Missing body\"}");
+                return ESP_FAIL;
+            }
 
             // --- Step 1: Parse the JSON body ---
             JsonDocument inDoc;
-            DeserializationError err = deserializeJson(inDoc, bodyStr->c_str());
-            delete bodyStr;
-            request->_tempObject = nullptr;
+            DeserializationError err = deserializeJson(inDoc, body);
 
             if (err) {
-                request->send(400, "application/json", "{\"error\":\"Invalid JSON\"}");
-                return;
+                response->send(400, "application/json", "{\"error\":\"Invalid JSON\"}");
+                return ESP_FAIL;
             }
 
             // --- Step 2: Apply requested changes ---
@@ -500,29 +507,15 @@ void MCPServer::registerRoutes(AsyncWebServer& server) {
             outDoc["readOnly"] = _mcpReadOnly;
             String output;
             serializeJson(outDoc, output);
-            request->send(200, "application/json", output);
-        },
-        nullptr,
-        [](AsyncWebServerRequest* request, uint8_t* data, size_t len, size_t index, size_t total) {
-            constexpr size_t MAX_BODY_SIZE = 512;
-            if (total > MAX_BODY_SIZE) {
-                request->send(413, "application/json", "{\"error\":\"Payload too large\"}");
-                return;
-            }
-            if (index == 0) {
-                request->_tempObject = new String();
-            }
-            String* bodyStr = static_cast<String*>(request->_tempObject);
-            for (size_t i = 0; i < len; i++) {
-                *bodyStr += (char)data[i];
-            }
+            response->send(200, "application/json", output.c_str());
+            return ESP_OK;
         }
     );
 #else
-    server.on("/api/mcp", HTTP_POST, [](AsyncWebServerRequest* request) {});
-    server.on("/api/mcp/status", HTTP_GET, [](AsyncWebServerRequest* request) {});
-    server.on("/api/mcp/config", HTTP_GET, [](AsyncWebServerRequest* request) {});
-    server.on("/api/mcp/config", HTTP_POST, [](AsyncWebServerRequest* request) {});
+    server.on("/api/mcp", HTTP_POST, [](PsychicRequest* request, PsychicResponse* response) { return ESP_OK; });
+    server.on("/api/mcp/status", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) { return ESP_OK; });
+    server.on("/api/mcp/config", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) { return ESP_OK; });
+    server.on("/api/mcp/config", HTTP_POST, [](PsychicRequest* request, PsychicResponse* response) { return ESP_OK; });
 #endif
 }
 

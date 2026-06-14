@@ -123,9 +123,9 @@ public:
 
     /**
      * @brief Register all REST API route handlers with the web server.
-     * @param server Reference to the AsyncWebServer instance.
+     * @param server Reference to the PsychicHttpServer instance.
      */
-    void registerRoutes(AsyncWebServer& server) override;
+    void registerRoutes(PsychicHttpServer& server) override;
 
     /**
      * @brief Get the UI tab name for this contributor.

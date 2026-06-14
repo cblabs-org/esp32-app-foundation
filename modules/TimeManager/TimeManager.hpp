@@ -58,9 +58,10 @@
 // Forward declaration — avoids circular include with configManager.hpp
 class ConfigManager;
 
-// Forward declaration — full class defined by ESPAsyncWebServer (hardware)
-// or webServer.hpp stub (NATIVE_BUILD)
-class AsyncWebServerRequest;
+// Forward declaration — full class defined by PsychicHttp (hardware)
+class PsychicRequest;
+class PsychicResponse;
+class PsychicHttpServer;
 
 /**
  * @brief Enum representing the current NTP synchronization status
@@ -152,16 +153,10 @@ public:
     // -------------------------------------------------------------------------
 
     /**
-     * @brief Register REST API route handlers for time management.
-     *
-     * Routes:
-     * - GET  /api/time/config  — current timezone, NTP servers, sync status
-     * - POST /api/time/config  — update timezone and NTP servers
-     * - GET  /api/time/zones   — stream IANA-to-POSIX lookup from LittleFS
-     *
-     * @param server Reference to the AsyncWebServer instance.
+     * @brief Register the TimeManager's REST API endpoints.
+     * @param server Reference to the PsychicHttpServer instance.
      */
-    void registerRoutes(AsyncWebServer& server) override;
+    void registerRoutes(PsychicHttpServer& server) override;
 
     /**
      * @brief Get the UI tab name for this contributor.
@@ -285,37 +280,23 @@ private:
 
 #ifndef NATIVE_BUILD
     /**
-     * @brief Handle GET /api/time/config — returns current time configuration.
-     * @param request The incoming HTTP request.
+     * @brief Handler for GET /api/time/config
      */
-    void _handleGetConfig(AsyncWebServerRequest* request);
+    void _handleGetConfig(PsychicRequest* request, PsychicResponse* response);
 
     /**
-     * @brief Handle POST /api/time/config — updates timezone and NTP servers.
-     * @param request The incoming HTTP request.
-     * @param data    Request body data.
-     * @param len     Length of the body data.
-     * @param index   Current chunk index.
-     * @param total   Total body size.
+     * @brief Handler for POST /api/time/config
      */
-    void _handlePostConfig(AsyncWebServerRequest* request, uint8_t* data,
-                           size_t len, size_t index, size_t total);
+    void _handlePostConfig(PsychicRequest* request, PsychicResponse* response);
 
     /**
-     * @brief Handle GET /api/time/zones — streams timezones.json from LittleFS.
-     * @param request The incoming HTTP request.
+     * @brief Handler for GET /api/time/zones
      */
-    void _handleGetZones(AsyncWebServerRequest* request);
+    void _handleGetZones(PsychicRequest* request, PsychicResponse* response);
 
     /**
-     * @brief Handle POST /api/time/zones/update — replaces timezones.json on LittleFS.
-     * @param request The incoming HTTP request.
-     * @param data    Request body data chunk.
-     * @param len     Length of the body data chunk.
-     * @param index   Current chunk byte offset.
-     * @param total   Total body size.
+     * @brief Handler for POST /api/time/zones/update
      */
-    void _handlePostZonesUpdate(AsyncWebServerRequest* request, uint8_t* data,
-                                size_t len, size_t index, size_t total);
+    void _handlePostZonesUpdate(PsychicRequest* request, PsychicResponse* response);
 #endif
 };

@@ -50,8 +50,8 @@
 static const char* TAG = "U8g2Display";
 
 #ifndef NATIVE_BUILD
-#include <Arduino.h>
-#include <ESPAsyncWebServer.h>
+#include <PsychicHttp.h>
+#include <ArduinoJson.h>
 #include "../Application/Application.hpp"
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
@@ -505,13 +505,13 @@ void U8G2DisplayModule::applyConfig(const JsonObject& section) {
     bool screensaverEnabled = section["screensaverEnabled"] | true;
     _screensaver.setEnabled(screensaverEnabled);
 
-    if (section.containsKey("dimTimeout")) {
+    if (!section["dimTimeout"].isNull()) {
         // --- New-style config: independent timeouts ---
         unsigned long dimTimeoutMs   = section["dimTimeout"]   | (unsigned long)150000;
         unsigned long blankTimeoutMs = section["blankTimeout"]  | (unsigned long)300000;
         _screensaver.setDimTimeout(dimTimeoutMs);
         _screensaver.setBlankTimeout(blankTimeoutMs);
-    } else if (section.containsKey("sleepTimeout")) {
+    } else if (!section["sleepTimeout"].isNull()) {
         // --- Migration: derive from legacy sleepTimeout ---
         unsigned long sleepTimeoutMs = section["sleepTimeout"] | (unsigned long)300000;
         _screensaver.setDimTimeout(sleepTimeoutMs / 2);
@@ -703,10 +703,10 @@ uint8_t U8G2DisplayModule::getClockFontSize() const {
  *
  * @param server Reference to the AsyncWebServer instance.
  */
-void U8G2DisplayModule::registerRoutes(AsyncWebServer& server) {
+void U8G2DisplayModule::registerRoutes(PsychicHttpServer& server) {
 #ifndef NATIVE_BUILD
     // --- GET /api/display/status — current display state ---
-    server.on("/api/display/status", HTTP_GET, [this](AsyncWebServerRequest* request) {
+    server.on("/api/display/status", HTTP_GET, [this](PsychicRequest* request, PsychicResponse* response) {
         JsonDocument doc;
         doc["brightness"]          = _brightness;
         doc["flip"]                = _flipScreen;
@@ -724,19 +724,23 @@ void U8G2DisplayModule::registerRoutes(AsyncWebServer& server) {
 
         String output;
         serializeJson(doc, output);
-        request->send(200, "application/json", output);
+        response->send(200, "application/json", output.c_str());
+        return ESP_OK;
     });
 
     // --- POST /api/display/brightness — set brightness level ---
     server.on("/api/display/brightness", HTTP_POST,
-        [](AsyncWebServerRequest *request) {},
-        NULL,
-        [this](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t /*index*/, size_t /*total*/) {
+        [this](PsychicRequest *request, PsychicResponse* response) {
+            const char* body = request->bodyCStr();
+            if (!body || strlen(body) == 0) {
+                response->send(400, "application/json", "{\"error\":\"body_required\"}");
+                return ESP_FAIL;
+            }
             JsonDocument doc;
-            DeserializationError err = deserializeJson(doc, data, len);
+            DeserializationError err = deserializeJson(doc, body);
             if (err || !doc["value"].is<int>()) {
-                request->send(400, "application/json", "{\"error\":\"Invalid JSON or missing 'value'\"}");
-                return;
+                response->send(400, "application/json", "{\"error\":\"Invalid JSON or missing 'value'\"}");
+                return ESP_FAIL;
             }
 
             int value = doc["value"] | 255;
@@ -745,48 +749,54 @@ void U8G2DisplayModule::registerRoutes(AsyncWebServer& server) {
 
             setBrightness((uint8_t)value);
 
-            // Persist via ConfigManager gateway
             if (_configManager != nullptr) {
                 _configManager->saveModuleConfig(this);
             }
 
-            request->send(200, "application/json", "{\"status\":\"ok\"}");
+            response->send(200, "application/json", "{\"status\":\"ok\"}");
+            return ESP_OK;
         }
     );
 
     // --- POST /api/display/flip — toggle screen flip ---
     server.on("/api/display/flip", HTTP_POST,
-        [](AsyncWebServerRequest *request) {},
-        NULL,
-        [this](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t /*index*/, size_t /*total*/) {
+        [this](PsychicRequest *request, PsychicResponse* response) {
+            const char* body = request->bodyCStr();
+            if (!body || strlen(body) == 0) {
+                response->send(400, "application/json", "{\"error\":\"body_required\"}");
+                return ESP_FAIL;
+            }
             JsonDocument doc;
-            DeserializationError err = deserializeJson(doc, data, len);
+            DeserializationError err = deserializeJson(doc, body);
             if (err || !doc["value"].is<bool>()) {
-                request->send(400, "application/json", "{\"error\":\"Invalid JSON or missing 'value'\"}");
-                return;
+                response->send(400, "application/json", "{\"error\":\"Invalid JSON or missing 'value'\"}");
+                return ESP_FAIL;
             }
 
             setFlipScreen(doc["value"] | false);
 
-            // Persist via ConfigManager gateway
             if (_configManager != nullptr) {
                 _configManager->saveModuleConfig(this);
             }
 
-            request->send(200, "application/json", "{\"status\":\"ok\"}");
+            response->send(200, "application/json", "{\"status\":\"ok\"}");
+            return ESP_OK;
         }
     );
 
     // --- POST /api/display/sleep — control screensaver behaviour ---
     server.on("/api/display/sleep", HTTP_POST,
-        [](AsyncWebServerRequest *request) {},
-        NULL,
-        [this](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t /*index*/, size_t /*total*/) {
+        [this](PsychicRequest *request, PsychicResponse* response) {
+            const char* body = request->bodyCStr();
+            if (!body || strlen(body) == 0) {
+                response->send(400, "application/json", "{\"error\":\"body_required\"}");
+                return ESP_FAIL;
+            }
             JsonDocument doc;
-            DeserializationError err = deserializeJson(doc, data, len);
+            DeserializationError err = deserializeJson(doc, body);
             if (err) {
-                request->send(400, "application/json", "{\"error\":\"Invalid JSON\"}");
-                return;
+                response->send(400, "application/json", "{\"error\":\"Invalid JSON\"}");
+                return ESP_FAIL;
             }
 
             bool needsPersist = false;
@@ -831,12 +841,13 @@ void U8G2DisplayModule::registerRoutes(AsyncWebServer& server) {
                 _configManager->saveModuleConfig(this);
             }
 
-            request->send(200, "application/json", "{\"status\":\"ok\"}");
+            response->send(200, "application/json", "{\"status\":\"ok\"}");
+            return ESP_OK;
         }
     );
 
     // --- GET /api/display/boards — list all pool boards ---
-    server.on("/api/display/boards", HTTP_GET, [this](AsyncWebServerRequest* request) {
+    server.on("/api/display/boards", HTTP_GET, [this](PsychicRequest* request, PsychicResponse* response) {
         JsonDocument doc;
         JsonArray boardsArr = doc["boards"].to<JsonArray>();
 
@@ -850,78 +861,84 @@ void U8G2DisplayModule::registerRoutes(AsyncWebServer& server) {
 
         String output;
         serializeJson(doc, output);
-        request->send(200, "application/json", output);
+        response->send(200, "application/json", output.c_str());
+        return ESP_OK;
     });
 
     // --- POST /api/display/clockFontSize — set clock font size ---
     server.on("/api/display/clockFontSize", HTTP_POST,
-        [](AsyncWebServerRequest *request) {},
-        NULL,
-        [this](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t /*index*/, size_t /*total*/) {
+        [this](PsychicRequest *request, PsychicResponse* response) {
+            const char* body = request->bodyCStr();
+            if (!body || strlen(body) == 0) {
+                response->send(400, "application/json", "{\"error\":\"body_required\"}");
+                return ESP_FAIL;
+            }
             JsonDocument doc;
-            DeserializationError err = deserializeJson(doc, data, len);
+            DeserializationError err = deserializeJson(doc, body);
             if (err || !doc["value"].is<int>()) {
-                request->send(400, "application/json", "{\"error\":\"Invalid JSON or missing 'value'\"}");
-                return;
+                response->send(400, "application/json", "{\"error\":\"Invalid JSON or missing 'value'\"}");
+                return ESP_FAIL;
             }
 
             int value = doc["value"] | 2;
             setClockFontSize((uint8_t)value);
 
-            // Persist via ConfigManager gateway
             if (_configManager != nullptr) {
                 _configManager->saveModuleConfig(this);
             }
 
-            request->send(200, "application/json", "{\"status\":\"ok\"}");
+            response->send(200, "application/json", "{\"status\":\"ok\"}");
+            return ESP_OK;
         }
     );
 
     // --- POST /api/display/show — force a specific board by index ---
     server.on("/api/display/show", HTTP_POST,
-        [](AsyncWebServerRequest *request) {},
-        NULL,
-        [this](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t /*index*/, size_t /*total*/) {
+        [this](PsychicRequest *request, PsychicResponse* response) {
+            const char* body = request->bodyCStr();
+            if (!body || strlen(body) == 0) {
+                response->send(400, "application/json", "{\"error\":\"body_required\"}");
+                return ESP_FAIL;
+            }
             JsonDocument doc;
-            DeserializationError err = deserializeJson(doc, data, len);
+            DeserializationError err = deserializeJson(doc, body);
             if (err || !doc["index"].is<int>()) {
-                request->send(400, "application/json", "{\"error\":\"Invalid JSON or missing 'index'\"}");
-                return;
+                response->send(400, "application/json", "{\"error\":\"Invalid JSON or missing 'index'\"}");
+                return ESP_FAIL;
             }
 
             int idx = doc["index"] | 0;
             if (idx < 0 || idx >= _carousel.boardCount()) {
-                request->send(400, "application/json", "{\"error\":\"Index out of range\"}");
-                return;
+                response->send(400, "application/json", "{\"error\":\"Index out of range\"}");
+                return ESP_FAIL;
             }
 
             _carousel.show(_carousel.getBoard(idx), millis());
-            request->send(200, "application/json", "{\"status\":\"ok\"}");
+            response->send(200, "application/json", "{\"status\":\"ok\"}");
+            return ESP_OK;
         }
     );
 
     // --- GET /api/display/screenshot — raw framebuffer capture ---
-    server.on("/api/display/screenshot", HTTP_GET, [this](AsyncWebServerRequest* request) {
+    server.on("/api/display/screenshot", HTTP_GET, [this](PsychicRequest* request, PsychicResponse* response) {
         uint8_t* buf = _u8g2.getBufferPtr();
         if (buf == nullptr) {
-            request->send(500, "application/json", "{\"error\":\"Framebuffer unavailable\"}");
-            return;
+            response->send(500, "application/json", "{\"error\":\"Framebuffer unavailable\"}");
+            return ESP_FAIL;
         }
 
         // U8G2 buffer: 8 pixels per tile row × tileWidth × tileHeight
         size_t bufferSize = 8 * _u8g2.getBufferTileWidth() * _u8g2.getBufferTileHeight();
 
-        AsyncWebServerResponse* response = request->beginResponse(
-            200, "application/octet-stream", buf, bufferSize
-        );
-        // Prevent caching so each capture is fresh
         response->addHeader("Cache-Control", "no-cache, no-store, must-revalidate");
         response->addHeader("Pragma", "no-cache");
         response->addHeader("Expires", "0");
         // Pass display geometry so the JS client can render correctly
-        response->addHeader("X-Display-Width", String(_displayWidth));
-        response->addHeader("X-Display-Height", String(_displayHeight));
-        request->send(response);
+        response->addHeader("X-Display-Width", String(_displayWidth).c_str());
+        response->addHeader("X-Display-Height", String(_displayHeight).c_str());
+
+        response->send(200, "application/octet-stream", buf, bufferSize);
+        return ESP_OK;
     });
 #endif
 }

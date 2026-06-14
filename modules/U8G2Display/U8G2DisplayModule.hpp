@@ -342,14 +342,10 @@ public:
     // -------------------------------------------------------------------------
 
     /**
-     * @brief Register display REST API routes with the web server.
-     *
-     * Registers endpoints under /api/display/ for status, brightness,
-     * flip, sleep, board listing, and board selection.
-     *
-     * @param server Reference to the AsyncWebServer instance.
+     * @brief Register the module's REST API routes with the web server.
+     * @param server Reference to the PsychicHttpServer instance.
      */
-    void registerRoutes(AsyncWebServer& server) override;
+    void registerRoutes(PsychicHttpServer& server) override;
 
     /**
      * @brief Get the UI tab name for this contributor.
@@ -468,14 +464,14 @@ private:
     // -------------------------------------------------------------------------
 
     struct SettingsTabStub : public IWebContributor {
-        void        registerRoutes(AsyncWebServer& /*server*/) override {}
+        void        registerRoutes(PsychicHttpServer& /*server*/) override {}
         const char* getTabName()   const override { return "Settings"; }
         const char* getParentTab() const override { return "Display";  }
         int         getTabOrder()  const override { return 10;         }
     };
 
     struct ScreenshotTabStub : public IWebContributor {
-        void        registerRoutes(AsyncWebServer& /*server*/) override {}
+        void        registerRoutes(PsychicHttpServer& /*server*/) override {}
         const char* getTabName()   const override { return "Screenshot"; }
         const char* getParentTab() const override { return "Display";    }
         int         getTabOrder()  const override { return 20;           }
