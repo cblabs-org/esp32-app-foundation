@@ -5,14 +5,17 @@ import { test, expect, Page } from '@playwright/test';
 // ---------------------------------------------------------------------------
 
 const MOCK_TABS = [
-  { name: 'WiFi',   id: 'wifi',   parent: null,     order: 0   },
-  { name: 'System', id: 'system', parent: null,     order: 100 },
-  { name: 'Status', id: 'system', parent: 'System', order: 0   },
-  { name: 'Keys',   id: 'keys',   parent: 'System', order: 1   },
-  { name: 'MCP',    id: 'mcp',    parent: 'System', order: 2   },
-  { name: 'Backup', id: 'backup', parent: 'System', order: 3   },
-  { name: 'OTA',    id: 'ota',    parent: 'System', order: 4   },
-  { name: 'App',    id: 'app',    parent: null,     order: 50  },
+  { name: 'WiFi',       id: 'wifi',       parent: null,      order: 0   },
+  { name: 'System',     id: 'system',     parent: null,      order: 100 },
+  { name: 'Status',     id: 'system',     parent: 'System',  order: 0   },
+  { name: 'Keys',       id: 'keys',       parent: 'System',  order: 1   },
+  { name: 'MCP',        id: 'mcp',        parent: 'System',  order: 2   },
+  { name: 'Backup',     id: 'backup',     parent: 'System',  order: 3   },
+  { name: 'OTA',        id: 'ota',        parent: 'System',  order: 4   },
+  { name: 'Display',    id: 'display',    parent: null,      order: 30  },
+  { name: 'Settings',   id: 'settings',   parent: 'Display', order: 10  },
+  { name: 'Screenshot', id: 'screenshot', parent: 'Display', order: 20  },
+  { name: 'App',        id: 'app',        parent: null,      order: 40  },
 ];
 
 const MOCK_SYSTEM = {
@@ -80,10 +83,11 @@ async function bootPortal(page: Page, displayOverrides?: Partial<typeof MOCK_DIS
   await page.locator('#bottom-nav .tab-link.active').waitFor();
 }
 
-/** Navigate to the App/Display tab by clicking the nav link. */
+/** Navigate to the Display top-level tab and wait for the Settings sub-pill to render. */
 async function navigateToDisplayTab(page: Page) {
-  await page.locator('#bottom-nav .tab-link[data-target="tab-app"]').click();
-  // Wait for tab content to render
+  // Click the Display top-level tab
+  await page.locator('#bottom-nav .tab-link[data-target="tab-display"]').click();
+  // Wait for the Settings sub-pill content to render
   await page.locator('#display-brightness').waitFor({ state: 'visible' });
 }
 
@@ -211,9 +215,14 @@ test.describe('Display Settings Tab', () => {
     expect(body.action).toBe('sleep');
   });
 
-  // ── Clock Font Size ─────────────────────────────────────────────
+  // ── Clock Font Size (now in App tab) ────────────────────────────
 
   test('clock font selector sends POST to /api/display/clockFontSize', async ({ page }) => {
+    // Clock font is in the App tab (appconfig.js), not the Display/Settings sub-pill
+    await page.locator('#bottom-nav .tab-link[data-target="tab-app"]').click();
+    // Wait for the App tab container to become active (content rendered by appconfig.js)
+    await page.locator('#tab-app.active').waitFor({ state: 'attached' });
+
     const requestPromise = page.waitForRequest(req =>
       req.url().includes('/api/display/clockFontSize') && req.method() === 'POST'
     );

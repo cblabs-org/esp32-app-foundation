@@ -111,14 +111,6 @@
       </div>
     </article>
 
-    <article>
-      <a href="/screenshot.html" style="display:flex; align-items:center; gap:8px; padding:0.25rem 0; color:var(--primary); text-decoration:none; font-size:0.85rem;">
-        📷 Display Screenshot Tool
-        <span style="flex:1;"></span>
-        <span style="font-size:0.75rem; color:var(--text-muted);">→</span>
-      </a>
-    </article>
-
     <article style="border-color: var(--error); background: rgba(198, 40, 40, 0.04);">
       <header style="color: var(--error);">Danger Zone</header>
       <div style="display: flex; gap: 10px; margin-top: 0.5rem;">
