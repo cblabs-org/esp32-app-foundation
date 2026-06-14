@@ -151,29 +151,21 @@
       "></div>
 
       <!-- Network Diagnostics Drawer -->
-      <div id="wifi-diag-drawer" style="
-        border:1px solid var(--border,#dee2e6); border-radius:10px; overflow:hidden;
-        margin-bottom:0.75rem;
-      ">
-        <div id="wifi-diag-trigger" style="
-          display:flex; justify-content:space-between; align-items:center;
-          padding:0.6rem 0.75rem; cursor:pointer; font-size:0.85rem; font-weight:600;
-          user-select:none;
-        ">
-          <span>▸ Network Diagnostics</span>
-          <span id="wifi-diag-dot" style="
-            width:8px; height:8px; border-radius:50%; background:var(--border,#dee2e6);
-            display:inline-block;
-          "></span>
-        </div>
-        <div id="wifi-diag-content" style="
-          max-height:0; overflow:hidden; transition:max-height 0.3s ease;
-          padding:0 0.75rem; font-size:0.8rem;
-        ">
-          <table id="wifi-diag-table" style="width:100%; border-collapse:collapse; margin:0.5rem 0;">
-          </table>
-        </div>
-      </div>
+      <article class="info-drawer">
+        <details id="wifi-diag-drawer">
+          <summary class="info-summary">
+            Network Diagnostics
+            <span id="wifi-diag-dot" style="
+              width:8px; height:8px; border-radius:50%; background:var(--border,#dee2e6);
+              display:inline-block; margin-left:auto; margin-right:0.5rem;
+            "></span>
+          </summary>
+          <div class="info-drawer-content">
+            <table id="wifi-diag-table" style="width:100%; border-collapse:collapse; margin:0.5rem 0;">
+            </table>
+          </div>
+        </details>
+      </article>
 
       <!-- Forget Button -->
       <button type="button" id="wifi-forget-btn" style="
@@ -224,8 +216,6 @@
   const testBtn       = document.getElementById('wifi-test-btn');
   const saveBtn       = document.getElementById('wifi-save-btn');
   const resultEl      = document.getElementById('wifi-action-result');
-  const diagTrigger   = document.getElementById('wifi-diag-trigger');
-  const diagContent   = document.getElementById('wifi-diag-content');
   const diagTable     = document.getElementById('wifi-diag-table');
   const diagDot       = document.getElementById('wifi-diag-dot');
   const forgetBtn     = document.getElementById('wifi-forget-btn');
@@ -329,12 +319,7 @@
     }
   }
 
-  let diagOpen = false;
-  diagTrigger.addEventListener('click', () => {
-    diagOpen = !diagOpen;
-    diagContent.style.maxHeight = diagOpen ? '300px' : '0';
-    diagTrigger.querySelector('span').textContent = diagOpen ? '▾ Network Diagnostics' : '▸ Network Diagnostics';
-  });
+  // Native <details> handles open/close — no JS toggle needed.
 
   // ==========================================================================
   // Network Scanning

@@ -381,44 +381,10 @@ button.secondary {
 }
 
 /* ==========================================================================
-   9. DRAWER COMPONENT
+   9. DRAWER COMPONENT (RETIRED)
+   Legacy JS-driven .drawer / .drawer-trigger pattern — no longer used.
+   All drawers now use native <details>/<summary> (sections 9c and 9d).
    ========================================================================== */
-.drawer {
-  border-top: 1px solid var(--border);
-  margin-top: 1.5rem;
-}
-
-.drawer-trigger {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1rem 0;
-  cursor: pointer;
-  font-weight: 700;
-  font-size: 0.9rem;
-  color: var(--text-muted);
-}
-
-.drawer-content {
-  max-height: 0;
-  overflow: hidden;
-  transition: max-height 0.3s ease-out;
-}
-
-.drawer.active .drawer-content {
-  max-height: 2000px;
-  padding-bottom: 1rem;
-}
-
-.drawer-trigger::after {
-  content: '▼';
-  font-size: 0.7rem;
-  transition: transform 0.3s;
-}
-
-.drawer.active .drawer-trigger::after {
-  transform: rotate(180deg);
-}
 
 /* ==========================================================================
    9b. TOGGLE SWITCH COMPONENT
@@ -508,9 +474,86 @@ article.advanced-drawer > details[open] > summary.advanced-summary::after {
   transform: rotate(90deg);
 }
 
+/* Keyboard focus ring */
+article.advanced-drawer > details > summary.advanced-summary:focus-visible {
+  outline: 2px solid var(--warning, #f9a825);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
 /* Remove default marker on all browsers */
 article.advanced-drawer > details > summary.advanced-summary::-webkit-details-marker {
   display: none;
+}
+
+/* Respect reduced-motion preference */
+@media (prefers-reduced-motion: reduce) {
+  article.advanced-drawer > details > summary.advanced-summary::after {
+    transition: none;
+  }
+}
+
+/* ==========================================================================
+   9d. INFO DRAWER COMPONENT
+   Neutral collapsible section for diagnostic/supplementary content.
+   Same <details>/<summary> structure as .advanced-drawer but without
+   warning colouring — used for informational expansions (e.g. WiFi
+   diagnostics) that are not a danger zone.
+   ========================================================================== */
+
+article.info-drawer {
+  border: 1px solid var(--border, #dee2e6);
+  border-radius: 10px;
+  overflow: hidden;
+  margin-bottom: 0.75rem;
+}
+
+article.info-drawer > details > summary.info-summary {
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: var(--text-muted, #6c757d);
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.6rem 0.75rem;
+  user-select: none;
+}
+
+article.info-drawer > details > summary.info-summary::after {
+  content: '▶';
+  font-size: 0.65rem;
+  transition: transform 0.2s;
+  opacity: 0.5;
+}
+
+article.info-drawer > details[open] > summary.info-summary::after {
+  transform: rotate(90deg);
+}
+
+/* Keyboard focus ring */
+article.info-drawer > details > summary.info-summary:focus-visible {
+  outline: 2px solid var(--border, #dee2e6);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* Remove default marker on all browsers */
+article.info-drawer > details > summary.info-summary::-webkit-details-marker {
+  display: none;
+}
+
+article.info-drawer > details > .info-drawer-content {
+  padding: 0 0.75rem 0.5rem;
+  font-size: 0.8rem;
+}
+
+/* Respect reduced-motion preference */
+@media (prefers-reduced-motion: reduce) {
+  article.info-drawer > details > summary.info-summary::after {
+    transition: none;
+  }
 }
 
 /* ==========================================================================
