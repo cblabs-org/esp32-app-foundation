@@ -22,6 +22,7 @@
 #include "interfaces/IMCPContributor.hpp"
 #include "../WifiManager/WifiManager.hpp"
 #include "../WebServer/WebServerManager.hpp"
+#include "../AuthManager/AuthManager.hpp"
 #include <ConfigManager.hpp>
 
 // ---------------------------------------------------------------------------
@@ -45,10 +46,11 @@ static const char* TAG = "MCPServer";
  * @brief Collect tools from all IMCPContributor modules and mark the server
  *        as initialised so tick() begins processing.
  */
-void MCPServer::begin(const std::vector<IMCPContributor*>& contributors, ConfigManager* configManager, TimeManager* timeManager, WifiManager* wifiManager) {
+void MCPServer::begin(const std::vector<IMCPContributor*>& contributors, ConfigManager* configManager, TimeManager* timeManager, WifiManager* wifiManager, AuthManager* authManager) {
     // --- Step 0: Cache dependencies for runtime config persistence ---
     _configManager = configManager;
     _wifiManager = wifiManager;
+    _authManager = authManager;
 
     // --- Step 1: Register built-in foundation tools ---
     // These are always available regardless of which app uses the framework.
@@ -374,8 +376,12 @@ void MCPServer::_sendError(int code, const char* message, JsonVariantConst id, P
 void MCPServer::registerRoutes(AsyncWebServer& server) {
 #ifndef NATIVE_BUILD
     // --- POST /api/mcp — JSON-RPC endpoint for MCP tool calls ---
+    // NOTE: Serial transport (_processLine) is intentionally NOT guarded —
+    // Serial/USB access is physical access and is treated as trusted.
     server.on("/api/mcp", HTTP_POST,
         [this](AsyncWebServerRequest* request) {
+            // --- Guard: bearer token auth (WO6) ---
+            if (_authManager && !_authManager->checkMcpAuth(request)) return;
             // --- Guard: reject requests when MCP server is disabled ---
             if (!_mcpEnabled) {
                 request->send(503, "application/json", "{\"error\":\"MCP server disabled\"}");
@@ -413,6 +419,8 @@ void MCPServer::registerRoutes(AsyncWebServer& server) {
 
     // --- GET /api/mcp/status — MCP server status summary ---
     server.on("/api/mcp/status", HTTP_GET, [this](AsyncWebServerRequest* request) {
+        // --- Guard: bearer token auth (WO6) ---
+        if (_authManager && !_authManager->checkMcpAuth(request)) return;
         JsonDocument doc;
         doc["initialized"] = _initialized;
         doc["enabled"]     = _mcpEnabled;
@@ -425,6 +433,8 @@ void MCPServer::registerRoutes(AsyncWebServer& server) {
 
     // --- GET /api/mcp/config — MCP runtime configuration ---
     server.on("/api/mcp/config", HTTP_GET, [this](AsyncWebServerRequest* request) {
+        // --- Guard: bearer token auth (WO6) ---
+        if (_authManager && !_authManager->checkMcpAuth(request)) return;
         JsonDocument doc;
         doc["enabled"]     = _mcpEnabled;
         doc["readOnly"]    = _mcpReadOnly;
@@ -439,6 +449,8 @@ void MCPServer::registerRoutes(AsyncWebServer& server) {
     // --- POST /api/mcp/config — Runtime toggle for enabled/readOnly ---
     server.on("/api/mcp/config", HTTP_POST,
         [this](AsyncWebServerRequest* request) {
+            // --- Guard: bearer token auth (WO6) ---
+            if (_authManager && !_authManager->checkMcpAuth(request)) return;
             if (!request->_tempObject) {
                 request->send(400, "application/json", "{\"error\":\"Missing body\"}");
                 return;

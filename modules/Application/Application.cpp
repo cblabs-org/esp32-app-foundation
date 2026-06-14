@@ -209,7 +209,7 @@ bool Application::begin(const FrameworkConfig& config) {
 
     // MCP server: pass the ConfigManager reference for config operations,
     // plus TimeManager (built-in time tools) and WifiManager (status hostname).
-    _mcpServer.begin(_mcpContributors, &_configManager, &_timeManager, &_wifiManager);
+    _mcpServer.begin(_mcpContributors, &_configManager, &_timeManager, &_wifiManager, &_authManager);
     _statusReporter->reportStatus("Web portal starting...", 0.90f);
 
     // --- Phase 2: Complete display integration ---

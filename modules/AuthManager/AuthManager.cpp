@@ -124,14 +124,77 @@ bool AuthManager::checkPortalAuth(AsyncWebServerRequest* /*request*/) {
 }
 
 /**
- * @brief Check MCP bearer-token authentication — pass-through stub.
+ * @brief Check MCP bearer-token authentication.
  *
- * Returns true unconditionally so that the MCP server remains accessible
- * before WO6 wires the real bearer-token validator.
+ * When auth is disabled (_authEnabled = false), returns true unconditionally
+ * so that open-mode devices remain fully accessible.
+ *
+ * When auth is enabled, validates the Authorization header:
+ *   1. Header must be present
+ *   2. Scheme must be "Bearer"
+ *   3. Token must match the stored password hash (constant-time compare)
+ *
+ * The bearer token IS the hex SHA-256 password hash — the same value
+ * returned by GET /api/auth/mcp-token. This avoids introducing a second
+ * credential and leverages the existing KeyManager storage.
+ *
+ * Serial/USB transport (_processLine) is intentionally NOT guarded —
+ * physical Serial access is treated as trusted.
+ *
+ * @param request The incoming HTTP request (nullptr in native tests).
+ * @return true if the request is authorised, false if rejected (401 sent).
  */
-bool AuthManager::checkMcpAuth(AsyncWebServerRequest* /*request*/) {
-    // --- WO6 will validate the Authorization header here ---
+bool AuthManager::checkMcpAuth(AsyncWebServerRequest* request) {
+    // --- Gate: auth disabled → open access ---
+    if (!_authEnabled) return true;
+
+#ifndef NATIVE_BUILD
+    // --- Gate: null request (safety) ---
+    if (!request) return false;
+
+    // --- Step 1: Require Authorization header ---
+    if (!request->hasHeader("Authorization")) {
+        request->send(401, "application/json", "{\"error\":\"missing_authorization\"}");
+        return false;
+    }
+
+    // --- Step 2: Require Bearer scheme ---
+    String authHeader = request->header("Authorization");
+    if (!authHeader.startsWith("Bearer ")) {
+        request->send(401, "application/json", "{\"error\":\"invalid_auth_scheme\"}");
+        return false;
+    }
+
+    // --- Step 3: Extract and validate bearer token ---
+    String bearerToken = authHeader.substring(7);
+    bearerToken.trim();
+
+    // Load the stored password hash (this IS the expected bearer token)
+    std::string storedHash;
+    if (_keyManager) {
+        storedHash = _keyManager->getKeyById("portal_password_hash");
+    }
+    if (storedHash.empty()) {
+        request->send(401, "application/json", "{\"error\":\"no_credentials_set\"}");
+        return false;
+    }
+
+    // --- Step 4: Constant-time comparison ---
+    if (bearerToken.length() != (int)storedHash.length() ||
+        mbedtls_ssl_safer_memcmp(bearerToken.c_str(),
+                                 storedHash.c_str(),
+                                 storedHash.length()) != 0) {
+        request->send(401, "application/json", "{\"error\":\"invalid_token\"}");
+        return false;
+    }
+
     return true;
+#else
+    // Native build: no HTTP header methods available on mock.
+    // Return true to allow tests that don't involve HTTP auth to pass.
+    // MCP bearer token tests are hardware-integration scope.
+    return true;
+#endif
 }
 
 // ---------------------------------------------------------------------------
