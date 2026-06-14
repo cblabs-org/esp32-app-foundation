@@ -20,8 +20,8 @@
  *              centralised gateway for all module configuration I/O.
  *
  *              Core domain services (WifiManager, OTAUpdateManager,
- *              TimeManager, KeyManager) are also Application-owned members,
- *              wired into the boot sequence and registered with ConfigManager
+ *              TimeManager, KeyManager, AuthManager) are also Application-owned
+ *              members, wired into the boot sequence and registered with ConfigManager
  *              and the tick/web contributor vectors where applicable.
  *
  * Exported Classes:
@@ -39,6 +39,7 @@
  *   - getOtaManager():           Access the OTAUpdateManager domain service
  *   - getTimeManager():          Access the TimeManager domain service
  *   - getKeyManager():           Access the KeyManager domain service
+ *   - getAuthManager():          Access the AuthManager security service
  *   - getState():                Query the current AppState lifecycle phase
  *   - getMCPServer():            Access the MCP JSON-RPC server instance
  *   - registerConfigGate():      Add an IConfigGate prerequisite for RUNNING entry
@@ -68,6 +69,7 @@
 #include "../TimeManager/TimeManager.hpp"
 #include "../TimeManager/TimeConfigGate.hpp"
 #include "../KeyManager/KeyManager.hpp"
+#include "../AuthManager/AuthManager.hpp"
 #include "../../lib/DeviceCrypto/DeviceCrypto.hpp"
 
 // Display subsystem (hardware only — SPI/U8G2 headers unavailable in native builds)
@@ -293,6 +295,12 @@ public:
     KeyManager& getKeyManager();
 
     /**
+     * @brief Get the application's AuthManager instance.
+     * @return Reference to the AuthManager security service.
+     */
+    AuthManager& getAuthManager();
+
+    /**
      * @brief Get the application's FrameworkConfig (read-only).
      * @return Const reference to the stored FrameworkConfig.
      */
@@ -440,6 +448,7 @@ private:
     // Core domain services
     DeviceCrypto _deviceCrypto;         ///< Hardware-bound AES-256 crypto service
     KeyManager _keyManager;             ///< Encrypted credential registry
+    AuthManager _authManager;           ///< Portal + MCP authentication manager (WO1 skeleton)
     WifiManager _wifiManager;           ///< WiFi connection state machine
     WifiConfigGate _wifiGate{_wifiManager}; ///< Built-in WiFi STA config gate
     OTAUpdateManager* _otaManager = nullptr;  ///< OTA firmware update orchestrator (heap, fwd-declared)

@@ -208,6 +208,12 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors) 
                     tabObj["parent"] = parentTab;
                 }
                 tabObj["order"] = contributor->getTabOrder();
+                // Include SVG icon string when the contributor declares one.
+                // nullptr return means "use the generic grid icon" (app.js default).
+                const char* icon = contributor->getTabIcon();
+                if (icon != nullptr) {
+                    tabObj["icon"] = icon;
+                }
             }
         }
     }

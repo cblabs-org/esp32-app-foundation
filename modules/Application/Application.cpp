@@ -129,6 +129,8 @@ bool Application::begin(const FrameworkConfig& config) {
     // WifiManager: inject ConfigManager and KeyManager dependencies, then register.
     // TimeManager: inject ConfigManager dependency, then register.
     // MCPServer: registered directly.
+    // AuthManager: inject ConfigManager and KeyManager, then register. Must be
+    //   registered before beginAll() so that persisted auth flags are loaded on boot.
     // OTAUpdateManager: heap-allocated here (header is forward-declared to avoid
     //   LDF circular-include issues). Registered with ConfigManager BEFORE beginAll()
     //   so that OTA channel/autoCheck config is loaded from /mod/ota.json on boot.
@@ -138,6 +140,8 @@ bool Application::begin(const FrameworkConfig& config) {
     _configManager.registerModule(&_mcpServer);
     _timeManager.setConfigManager(&_configManager);
     _configManager.registerModule(&_timeManager);
+    _authManager.begin(&_configManager, &_keyManager);
+    _configManager.registerModule(&_authManager);
     _otaManager = new OTAUpdateManager();
     _configManager.registerModule(_otaManager);
 #ifndef NATIVE_BUILD
@@ -177,6 +181,7 @@ bool Application::begin(const FrameworkConfig& config) {
     _statusReporter->reportStatus("Update service ready", 0.80f);
 
     // --- Step 14: Register core web contributors and tickables ---
+    _webContributors.push_back(&_authManager);   // Security tab — registered first (order: 5)
     _webContributors.push_back(&_wifiManager);
     _webContributors.push_back(&_timeManager);
     _webContributors.push_back(&_configManager);
@@ -506,6 +511,10 @@ TimeConfigGate& Application::getTimeGate() {
 
 KeyManager& Application::getKeyManager() {
     return _keyManager;
+}
+
+AuthManager& Application::getAuthManager() {
+    return _authManager;
 }
 
 const FrameworkConfig& Application::getConfig() const {

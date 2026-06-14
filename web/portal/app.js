@@ -184,12 +184,19 @@ document.addEventListener('DOMContentLoaded', function() {
     // Find the System tab link to insert app tabs before it
     var systemLink = bottomNav.querySelector('[data-target="tab-system"]');
 
+    // Generic grid icon used for app-contributed tabs that declare no custom icon.
+    // Tabs that return a non-null icon string from getTabIcon() use it instead.
+    var DEFAULT_GENERIC_ICON =
+      '<rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>' +
+      '<line x1="3" y1="9" x2="21" y2="9"/>' +
+      '<line x1="9" y1="21" x2="9" y2="9"/>';
+
     for (var i = 0; i < topLevelTabs.length; i++) {
       var tab = topLevelTabs[i];
       var tabId = 'tab-' + tab.name.toLowerCase().replace(/\s+/g, '-');
 
-      // Skip WiFi and System — they're already in HTML
-      if (tabId === 'tab-wifi' || tabId === 'tab-system') continue;
+      // Skip WiFi, System, and Security — they're already hardcoded in HTML
+      if (tabId === 'tab-wifi' || tabId === 'tab-system' || tabId === 'tab-security') continue;
 
       // Create tab content div if it doesn't exist
       if (!document.getElementById(tabId)) {
@@ -199,19 +206,19 @@ document.addEventListener('DOMContentLoaded', function() {
         document.querySelector('.tab-content-container').appendChild(div);
       }
 
+      // Use the contributor's declared SVG icon if available; fall back to the
+      // generic grid icon for contributors that do not implement getTabIcon().
+      var iconInner = tab.icon || DEFAULT_GENERIC_ICON;
+
       // Create nav link
       var link = document.createElement('a');
       link.href = '#';
       link.className = 'tab-link';
       link.setAttribute('data-target', tabId);
       link.setAttribute('data-injected', 'true');
-      link.innerHTML = '<span class="icon">' +
-        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
-          '<rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>' +
-          '<line x1="3" y1="9" x2="21" y2="9"/>' +
-          '<line x1="9" y1="21" x2="9" y2="9"/>' +
-        '</svg>' +
-        '</span>' + tab.name.toUpperCase();
+      link.innerHTML = '<span class="icon"><svg viewBox="0 0 24 24" fill="none" ' +
+        'stroke="currentColor" stroke-width="2" stroke-linecap="round" ' +
+        'stroke-linejoin="round">' + iconInner + '</svg></span>' + tab.name.toUpperCase();
 
       // Insert before System tab
       if (systemLink) {
@@ -404,7 +411,8 @@ document.addEventListener('DOMContentLoaded', function() {
       'mcp.js',
       'screenshot.js',
       'display.js',
-      'appconfig.js'
+      'appconfig.js',
+      'auth.js'
     ];
 
     var loaded = 0;

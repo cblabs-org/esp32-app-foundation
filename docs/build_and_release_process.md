@@ -392,24 +392,54 @@ The device firmware verifies the ECDSA signature before writing a single byte. A
 
 ---
 
-## 11. CI-Assisted Workflow (Optional)
+## 11. CI-Assisted Workflow (Not Currently Used)
 
-GitHub Actions (`.github/workflows/build.yml`) builds unsigned binaries on every tag push. This is useful for reproducible builds on a clean environment but is **not required** — the local workflow above is self-contained.
+> [!NOTE]
+> The `build.yml` GitHub Actions workflow has been removed from this repository.
+> The local build and sign workflow (see §9) is the canonical release path.
 
-If you use CI:
+`scripts/deploy_release.py` retains a `--run-id` mode that can download unsigned
+binaries from a GitHub Actions run and sign them locally. This mode exists for
+scenarios where a CI-assisted workflow makes sense.
 
-1. Push a tag — Actions builds both targets and uploads unsigned `.bin` artifacts
-2. Find the workflow run ID: `gh run list --limit 5`
-3. Download, sign and publish:
+### When to reinstate CI builds
+
+Consider reintroducing a `build.yml` workflow if:
+
+- **A dedicated release operator** handles signing but does not have a full
+  PlatformIO development environment. CI builds the binary; the operator only
+  needs `openssl`, `gh`, and the private key to sign and publish.
+- **Compliance or audit requirements** demand that release binaries are built
+  on a clean, reproducible, third-party environment rather than a developer
+  workstation.
+- **Build times become prohibitive locally** and offloading the compile step to
+  GitHub's runners becomes worthwhile.
+
+### Why it was removed
+
+Because every release must be **signed locally** (the private key never leaves
+the developer's machine), the signing step already requires a local PlatformIO
+environment to be present. Building locally with `--local --build` is therefore
+simpler, faster, and has one fewer step than the CI-download-then-sign path.
+
+### How to reinstate it
+
+Restore `build.yml` with a trigger on `v*-beta*` and `v[0-9]*.[0-9]*.[0-9]*`
+tags (excluding `dev` tags, which are internal build markers and should not
+trigger CI). Then use `--run-id` instead of `--local` in the deploy command:
 
 ```bash
+# Find the Actions run ID after the tag push triggers a build
+gh run list --limit 5
+
+# Download CI artifacts, sign locally, and publish
 python3 scripts/deploy_release.py \
     --tag v1.2.3 \
     --run-id <ACTIONS_RUN_ID> \
     --private-key private_key.pem
 ```
 
-The `--run-id` path downloads the unsigned CI artifacts, then signs them locally exactly as the `--local` path does. The private key never leaves your machine either way.
+The private key never leaves your machine either way.
 
 ---
 

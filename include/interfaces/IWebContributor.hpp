@@ -24,6 +24,7 @@
  *   - getTabName():     Return the UI tab display name (or nullptr)
  *   - getParentTab():   Return the parent tab name for sub-navigation (or nullptr)
  *   - getTabOrder():    Return integer sort order within the same navigation level
+ *   - getTabIcon():     Return the SVG inner content for the bottom-nav icon (or nullptr)
  */
 
 #pragma once
@@ -82,4 +83,17 @@ public:
      * @return Integer sort order (lower = first).
      */
     virtual int getTabOrder() const { return 100; }
+
+    /**
+     * @brief Return the inner SVG content string for this tab's bottom-nav icon.
+     *
+     * Return nullptr to use the generic grid icon injected by app.js for
+     * dynamically contributed tabs. When non-null, the string is included in
+     * the /api/tabs response as the "icon" field and used by app.js to render
+     * the icon. Only the SVG body is returned (path/circle/rect elements);
+     * the outer <svg viewBox="0 0 24 24" ...> wrapper is added by the client.
+     *
+     * @return SVG inner content string, or nullptr for the generic icon.
+     */
+    virtual const char* getTabIcon() const { return nullptr; }
 };

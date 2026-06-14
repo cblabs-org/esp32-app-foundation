@@ -62,6 +62,11 @@
         <!-- Populated by appconfig.js -->
       </div>
 
+      <!-- Security tab (top-level, contributed by AuthManager) -->
+      <div id="tab-security" class="tab-content">
+        <!-- Populated by auth.js -->
+      </div>
+
       <!-- System tab (top-level parent, framework) -->
       <div id="tab-system" class="tab-content">
       </div>
@@ -94,6 +99,18 @@
     <!-- App tabs are injected dynamically by app.js.                        -->
     <!-- ================================================================== -->
     <nav class="bottom-nav" id="bottom-nav">
+      <!-- Security tab (order: 5) — hardcoded with lock icon; auth.js populates content -->
+      <a href="#" class="tab-link" data-target="tab-security">
+        <span class="icon">
+          <!-- Feather-icons padlock SVG -->
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+          </svg>
+        </span>
+        SECURITY
+      </a>
       <a href="#" class="tab-link active" data-target="tab-wifi">
         <span class="icon">
           <!-- WiFi arcs SVG -->
