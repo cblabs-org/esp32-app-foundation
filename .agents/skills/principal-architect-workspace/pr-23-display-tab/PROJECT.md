@@ -1,7 +1,7 @@
 ---
 id: pr-23
 title: "Module-Owned Display Tab + App Tab Separation"
-status: "🔄 WIP — WO1 active"
+status: "✅ COMPLETE — WO1 merged `c1bde82`, 525/525 native + 61/61 Playwright"
 branch: "pr-23-display-tab"
 depends_on: []
 ---
@@ -112,7 +112,7 @@ Both files loaded in `app.js`'s `loadScripts()` array.
 
 ## Work Order Ledger
 
-- **[ ] [wo1-display-tab](wo1-display-tab/WORKORDER.md):** Full implementation — C++ stubs, AppTabContributor, JS split, index.html, system.js link removal, all tests
+- **[x] [wo1-display-tab](wo1-display-tab/WORKORDER.md):** Full implementation — C++ stubs, AppTabContributor, JS split, index.html, system.js link removal, all tests — `c1bde82`
 
 ---
 
