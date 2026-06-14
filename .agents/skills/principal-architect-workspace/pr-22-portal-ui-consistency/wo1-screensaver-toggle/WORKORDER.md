@@ -193,3 +193,36 @@ invoke the `@distillery` skill passing
 `.agents/skills/principal-architect-workspace/pr-22-portal-ui-consistency/wo1-screensaver-toggle/`
 as the target directory. Append a status update to this WORKORDER.md file, then
 terminate your session.
+
+---
+
+## Status Update — 2026-06-14T10:09:30Z
+
+**Status: COMPLETE ✅**
+
+**Executed by:** Worker agent `ce65b937-77a7-4ea7-9e40-a74ed3aa9dc4`
+**Approved by:** Principal Architect `5177dae5-bdb0-409e-9692-efe1b983e4dd`
+**Branch:** `pr-22-portal-ui-consistency/wo1-screensaver-toggle`
+**Commit:** `f276ddd`
+
+### Acceptance Criteria
+
+- [x] Both flip and screensaver-enable toggles visually reflect their checked state
+- [x] No inline `background` override on `.toggle-slider` spans in `appconfig.js`
+- [x] Dynamic `<style>` injection removed from `appconfig.js`
+- [x] Canonical toggle CSS lives in `app.css` (section 9b)
+- [x] `#display-font-group label:has(input:checked)` rule preserved in `app.css`
+- [x] `npx playwright test tests/display.spec.ts` — **13/13 passed**
+- [x] `npx playwright test` — **61/61 passed, 0 regressions**
+
+### Stash Audit
+
+`setClockFont` found at line 91 of `modules/U8G2Display/boards/ScreensaverBoard.hpp` — stash is already incorporated into `main`. No stash apply was performed.
+
+### Distillery Output
+
+Context packaged in:
+- `context_bridge.md`
+- `sessions.md`
+- `context_artifacts/adr_toggle_css_strategy.md`
+- `context_artifacts/adr_dynamic_style_removal.md`
