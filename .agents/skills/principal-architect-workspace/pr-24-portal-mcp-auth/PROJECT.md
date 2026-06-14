@@ -31,6 +31,7 @@ exposes the credential to LAN sniffing; both layers are delivered together.
 | [WO6](./wo6-mcp-guard/WORKORDER.md) | `pr-24-portal-mcp-auth/wo6-mcp-guard` | MCP server bearer token auth | ⬜ QUEUED |
 | [WO7](./wo7-portal-ui/WORKORDER.md) | `pr-24-portal-mcp-auth/wo7-portal-ui` | Security top-level tab + login overlay | ⬜ QUEUED |
 | [WO8](./wo8-integration/WORKORDER.md) | `pr-24-portal-mcp-auth/wo8-integration` | Integration + hardware verification | ⬜ QUEUED |
+| [WO9](./wo9-psychichttp-migration/WORKORDER.md) | `pr-24-portal-mcp-auth/wo9-psychichttp-migration` | Replace ESPAsyncWebServer with PsychicHttp for native TLS support | 🔄 WIP |
 
 ---
 
