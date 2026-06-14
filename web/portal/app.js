@@ -403,6 +403,7 @@ document.addEventListener('DOMContentLoaded', function() {
       'keys.js',
       'mcp.js',
       'screenshot.js',
+      'display.js',
       'appconfig.js'
     ];
 

@@ -11,7 +11,7 @@ by Principal Architects under the ESP32 App Foundation program.
 **Chief Architect Session:** f4e779d9-4aa1-46e2-8115-e1e8edc4fa42
 **Program Plan:** [PROGRAM-PLAN.md](./esp32-app-foundation/PROGRAM-PLAN.md)
 **Chief Architect Distillation:** [context_bridge.md](./esp32-app-foundation/context_bridge.md) — ADRs, rejected approaches, program sequencing decisions
-**Status:** PR-01 through PR-20 delivered — PR-10, PR-11, PR-12 in progress/planning
+**Status:** PR-01 through PR-22 delivered — PR-23 active
 
 ---
 

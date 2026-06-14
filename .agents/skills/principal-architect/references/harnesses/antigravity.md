@@ -21,7 +21,24 @@ Key parameters to set on every Work Order spawn:
 | `TypeName` | `"self"` | Inherits full harness config; gives the worker all necessary tools. |
 | `Role` | `"Execution Worker"` | Human-readable identity for the worker in the subagent list. |
 | `Prompt` | bridge prompt from Step 4 | The full WORKORDER bridge prompt. |
-| `Workspace` | **`"branch"`** | **Always set this.** Gives each worker an isolated git worktree, preventing state collisions between parallel or serial workers. Without this, workers inherit your workspace and may clobber each other's staged changes. |
+| `Workspace` | See decision table below | **Do not default to `"branch"` — read the decision table.** |
+
+### `Workspace` Mode Decision
+
+> [!CAUTION]
+> **`"branch"` creates an isolated worktree at a path outside the user's permitted
+> directory** (e.g. inside `~/.gemini/antigravity/brain/.../worktrees/`). The subagent
+> will have **no permissions** for that path and will prompt the user for approval on
+> every single file read or write. This defeats the purpose of autonomous execution.
+
+| Scenario | Use | Rationale |
+|---|---|---|
+| **Single serialised worker** (most PRs — one WO at a time) | **`"inherit"`** | Worker operates in the same directory as the PA, which is already permitted. The branch is already checked out before spawning. No permission prompts. |
+| **Truly parallel workers** on different branches simultaneously | **`"branch"`** | Gives each worker its own isolated worktree so they cannot clobber each other's staged changes. Only viable when the user has explicitly granted permissions to the worktree root path, or is prepared to approve access on first spawn. |
+
+**The standard PA workflow (one WO at a time, branch pre-checked-out) always uses `"inherit"`.**
+Use `"branch"` only when you have confirmed the user's permission grants cover the worktree path,
+or when the user has explicitly requested parallel execution and accepted the permission prompts.
 
 ### Async / Auto-Wake Behaviour
 

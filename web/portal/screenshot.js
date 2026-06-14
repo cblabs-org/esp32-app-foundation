@@ -1,5 +1,5 @@
 // web/portal/screenshot.js
-// System → Screenshot sub-pill — Live display framebuffer capture.
+// Display → Screenshot sub-pill — Live display framebuffer capture.
 // Captures raw U8G2 buffer, renders to canvas, supports zoom and download.
 
 (function() {
