@@ -455,7 +455,7 @@ private:
     struct AppTabContributor : public IWebContributor {
         void        registerRoutes(AsyncWebServer& /*server*/) override {}
         const char* getTabName()  const override { return "App"; }
-        int         getTabOrder() const override { return 40;    }
+        int         getTabOrder() const override { return 30;    }
     };
     AppTabContributor _appTabContributor;  ///< Contributes "App" top-level nav tab
 

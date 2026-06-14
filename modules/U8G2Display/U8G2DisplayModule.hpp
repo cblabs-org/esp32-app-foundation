@@ -61,7 +61,7 @@
  *   IWebContributor (tab: "App", order: 30):
  *   - registerRoutes():     Register display REST API routes (/api/display/*)
  *   - getTabName():         Return "App" for portal tab
- *   - getTabOrder():        Return 30 for portal tab ordering
+ *   - getTabOrder():        Return 50 for portal tab ordering
  *
  *   IMCPContributor:
  *   - registerMCPTools():   Register display_status/display_control MCP tools
@@ -361,7 +361,7 @@ public:
      * @brief Get the tab display order.
      * @return 30 — Display tab appears before mid-range tabs.
      */
-    int getTabOrder() const override { return 30; }
+    int getTabOrder() const override { return 50; }
 
     /**
      * @brief Return the Settings sub-pill stub for registration by Application.
