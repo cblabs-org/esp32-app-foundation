@@ -371,30 +371,44 @@ bool AuthManager::_loadFromLittleFS(const char* /*path*/,
  */
 bool AuthManager::generateAndStoreCert(const char* hostname) {
 #ifndef NATIVE_BUILD
-    // --- Step 1: Declare and initialise all mbedTLS contexts ---
-    mbedtls_entropy_context  entropy;
-    mbedtls_ctr_drbg_context ctrDrbg;
-    mbedtls_pk_context       key;
-    mbedtls_x509write_cert   crt;
+    // --- Step 1: Heap-allocate all mbedTLS contexts and buffers ---
+    // These are placed on the heap because this function may be called from
+    // an HTTP request handler running on the async_tcp task (4KB stack).
+    // The mbedTLS contexts + DER buffers collectively need ~4-6KB of stack
+    // which would overflow the task stack.
+    auto* entropy = new (std::nothrow) mbedtls_entropy_context;
+    auto* ctrDrbg = new (std::nothrow) mbedtls_ctr_drbg_context;
+    auto* key     = new (std::nothrow) mbedtls_pk_context;
+    auto* crt     = new (std::nothrow) mbedtls_x509write_cert;
+    auto* keyBuf  = new (std::nothrow) uint8_t[256];
+    auto* crtBuf  = new (std::nothrow) uint8_t[1024];
 
-    mbedtls_entropy_init(&entropy);
-    mbedtls_ctr_drbg_init(&ctrDrbg);
-    mbedtls_pk_init(&key);
-    mbedtls_x509write_crt_init(&crt);
+    if (!entropy || !ctrDrbg || !key || !crt || !keyBuf || !crtBuf) {
+        ESP_LOGE(TAG, "generateAndStoreCert: heap allocation failed");
+        delete entropy; delete ctrDrbg; delete key; delete crt;
+        delete[] keyBuf; delete[] crtBuf;
+        return false;
+    }
 
-    // Helper lambda: clean up all contexts and return a result code.
-    // Defined here so every early-return path calls a single cleanup.
+    mbedtls_entropy_init(entropy);
+    mbedtls_ctr_drbg_init(ctrDrbg);
+    mbedtls_pk_init(key);
+    mbedtls_x509write_crt_init(crt);
+
+    // Helper lambda: clean up all heap-allocated contexts and return a result.
     auto cleanup = [&](bool result) -> bool {
-        mbedtls_x509write_crt_free(&crt);
-        mbedtls_pk_free(&key);
-        mbedtls_ctr_drbg_free(&ctrDrbg);
-        mbedtls_entropy_free(&entropy);
+        mbedtls_x509write_crt_free(crt);
+        mbedtls_pk_free(key);
+        mbedtls_ctr_drbg_free(ctrDrbg);
+        mbedtls_entropy_free(entropy);
+        delete entropy; delete ctrDrbg; delete key; delete crt;
+        delete[] keyBuf; delete[] crtBuf;
         return result;
     };
 
     // --- Step 2: Seed the RNG ---
     // Personalisation string scopes this DRBG to TLS cert generation.
-    int ret = mbedtls_ctr_drbg_seed(&ctrDrbg, mbedtls_entropy_func, &entropy,
+    int ret = mbedtls_ctr_drbg_seed(ctrDrbg, mbedtls_entropy_func, entropy,
                                      (const unsigned char*)"auth_cert", 9);
     if (ret != 0) {
         ESP_LOGE(TAG, "generateAndStoreCert: ctr_drbg_seed failed: -0x%04x", -ret);
@@ -402,14 +416,14 @@ bool AuthManager::generateAndStoreCert(const char* hostname) {
     }
 
     // --- Step 3: Generate EC P-256 key pair ---
-    ret = mbedtls_pk_setup(&key, mbedtls_pk_info_from_type(MBEDTLS_PK_ECKEY));
+    ret = mbedtls_pk_setup(key, mbedtls_pk_info_from_type(MBEDTLS_PK_ECKEY));
     if (ret != 0) {
         ESP_LOGE(TAG, "generateAndStoreCert: pk_setup failed: -0x%04x", -ret);
         return cleanup(false);
     }
 
-    ret = mbedtls_ecp_gen_key(MBEDTLS_ECP_DP_SECP256R1, mbedtls_pk_ec(key),
-                               mbedtls_ctr_drbg_random, &ctrDrbg);
+    ret = mbedtls_ecp_gen_key(MBEDTLS_ECP_DP_SECP256R1, mbedtls_pk_ec(*key),
+                               mbedtls_ctr_drbg_random, ctrDrbg);
     if (ret != 0) {
         ESP_LOGE(TAG, "generateAndStoreCert: ecp_gen_key failed: -0x%04x", -ret);
         return cleanup(false);
@@ -417,47 +431,45 @@ bool AuthManager::generateAndStoreCert(const char* hostname) {
 
     // --- Step 4: Serialise private key to DER ---
     // pk_write_key_der() writes to the END of keyBuf; returns negative byte count.
-    uint8_t keyBuf[256];
-    int keyLen = mbedtls_pk_write_key_der(&key, keyBuf, sizeof(keyBuf));
+    int keyLen = mbedtls_pk_write_key_der(key, keyBuf, 256);
     if (keyLen < 0) {
         ESP_LOGE(TAG, "generateAndStoreCert: pk_write_key_der failed: -0x%04x", -keyLen);
         return cleanup(false);
     }
-    // Actual key data is at the end of the buffer: &keyBuf[sizeof(keyBuf) - keyLen]
-    const uint8_t* keyData = &keyBuf[sizeof(keyBuf) - (size_t)keyLen];
+    // Actual key data is at the end of the buffer: &keyBuf[256 - keyLen]
+    const uint8_t* keyData = &keyBuf[256 - (size_t)keyLen];
 
     // --- Step 5: Build X.509v3 certificate ---
     // Serial number = 1 (fixed; unique per device by key uniqueness)
     // mbedTLS 3.x: use set_serial_raw with a raw byte array instead of MPI.
     unsigned char serialBytes[] = { 0x01 };
 
-    mbedtls_x509write_crt_set_subject_key(&crt, &key);
-    mbedtls_x509write_crt_set_issuer_key(&crt, &key);  // Self-signed: issuer = subject
+    mbedtls_x509write_crt_set_subject_key(crt, key);
+    mbedtls_x509write_crt_set_issuer_key(crt, key);  // Self-signed: issuer = subject
 
     // Build the Distinguished Name string — both subject and issuer are identical
     char dn[64];
     snprintf(dn, sizeof(dn), "CN=%s.local", hostname);
-    mbedtls_x509write_crt_set_subject_name(&crt, dn);
-    mbedtls_x509write_crt_set_issuer_name(&crt, dn);
+    mbedtls_x509write_crt_set_subject_name(crt, dn);
+    mbedtls_x509write_crt_set_issuer_name(crt, dn);
 
-    mbedtls_x509write_crt_set_serial_raw(&crt, serialBytes, sizeof(serialBytes));
+    mbedtls_x509write_crt_set_serial_raw(crt, serialBytes, sizeof(serialBytes));
 
     // Fixed validity: 2020-01-01 → 2040-01-01 (avoids RTC dependency on first boot)
-    mbedtls_x509write_crt_set_validity(&crt, "20200101000000", "20400101000000");
+    mbedtls_x509write_crt_set_validity(crt, "20200101000000", "20400101000000");
 
-    mbedtls_x509write_crt_set_md_alg(&crt, MBEDTLS_MD_SHA256);
-    mbedtls_x509write_crt_set_version(&crt, MBEDTLS_X509_CRT_VERSION_3);
+    mbedtls_x509write_crt_set_md_alg(crt, MBEDTLS_MD_SHA256);
+    mbedtls_x509write_crt_set_version(crt, MBEDTLS_X509_CRT_VERSION_3);
 
     // --- Step 6: Serialise certificate to DER ---
     // x509write_crt_der() also writes to the END of the buffer; same convention.
-    uint8_t crtBuf[1024];
-    int crtLen = mbedtls_x509write_crt_der(&crt, crtBuf, sizeof(crtBuf),
-                                            mbedtls_ctr_drbg_random, &ctrDrbg);
+    int crtLen = mbedtls_x509write_crt_der(crt, crtBuf, 1024,
+                                            mbedtls_ctr_drbg_random, ctrDrbg);
     if (crtLen < 0) {
         ESP_LOGE(TAG, "generateAndStoreCert: x509write_crt_der failed: -0x%04x", -crtLen);
         return cleanup(false);
     }
-    const uint8_t* crtData = &crtBuf[sizeof(crtBuf) - (size_t)crtLen];
+    const uint8_t* crtData = &crtBuf[1024 - (size_t)crtLen];
 
     // --- Step 7: Save both DER files to LittleFS ---
     if (!_saveToLittleFS("/etc/server.key", keyData, (size_t)keyLen)) {
@@ -671,21 +683,33 @@ void AuthManager::registerRoutes(AsyncWebServer& server) {
                 _configManager->saveModuleConfig(this);
             }
 
-            // --- Trigger TLS cert generation (WO3) ---
-            // A self-signed EC P-256 cert is generated on first password set.
-            // Uses a fixed CN of "esp32-device" — AuthManager has no WiFiManager
-            // dependency, and browsers bypass CN warnings for self-signed certs.
-            // generateAndStoreCert() sets _certPresent=true on success.
+            // --- Trigger TLS cert generation on a dedicated task (WO3) ---
+            // mbedTLS EC P-256 key generation requires deep call stacks (~8KB)
+            // that exceed the async_tcp task's 4KB stack. Offload to a one-shot
+            // FreeRTOS task with 12KB stack; it sets _certPresent on success.
+#ifndef NATIVE_BUILD
+            xTaskCreate(
+                [](void* param) {
+                    auto* self = static_cast<AuthManager*>(param);
+                    self->generateAndStoreCert("esp32-device");
+                    vTaskDelete(nullptr);
+                },
+                "cert_gen",   // Task name
+                12288,        // Stack depth (12KB — mbedTLS EC needs ~8KB)
+                this,         // Parameter: AuthManager instance
+                1,            // Priority (low — background work)
+                nullptr       // No handle needed (self-deleting)
+            );
+#else
             generateAndStoreCert("esp32-device");
+#endif
 
-            // --- Respond — cert present means full HTTPS stack is ready ---
+            // --- Respond immediately — cert generates in background ---
             JsonDocument resp;
             resp["status"] = "ok";
-            if (!hasCert()) {
-                // Cert generation failed or is deferred; TLS not yet active.
-                resp["restartRequired"] = false;
-                resp["reason"]          = "cert_generation_failed";
-            }
+            resp["certGenerating"] = true;
+            resp["restartRequired"] = true;
+            resp["reason"] = "restart_for_tls";
             String out;
             serializeJson(resp, out);
             request->send(200, "application/json", out);
