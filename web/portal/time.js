@@ -34,15 +34,9 @@
       </div>
     </article>
 
-    <article>
-      <header style="display:flex; justify-content:space-between; align-items:center;">
-        <span>Advanced</span>
-        <button id="btn-time-advanced-toggle"
-                style="background:transparent; border:none; color:var(--primary); cursor:pointer; font-size:0.8rem; padding:0;">
-          ▶ Show
-        </button>
-      </header>
-      <div id="time-advanced-section" style="display:none;">
+    <article class="advanced-drawer">
+      <details>
+        <summary class="advanced-summary">Advanced</summary>
         <p style="font-weight:600; margin-bottom:0.25rem; font-size:0.85rem;">NTP Servers</p>
         <div id="time-ntp-section">
           <p style="color: var(--text-muted);">Loading...</p>
@@ -71,25 +65,13 @@
                 style="margin-top:0.75rem; width:100%; background:var(--card-bg); color:var(--primary); border:1px solid var(--primary);">
           ↻ Update Timezone Database
         </button>
-      </div>
+      </details>
     </article>
 
     <div style="display:flex; gap:10px; margin-top:0.5rem;">
       <button id="btn-time-save" style="flex:1;">Save Configuration</button>
     </div>
   `;
-
-  // -------------------------------------------------------------------------
-  // Advanced section toggle
-  // -------------------------------------------------------------------------
-  const advancedToggle = document.getElementById('btn-time-advanced-toggle');
-  const advancedSection = document.getElementById('time-advanced-section');
-
-  advancedToggle.addEventListener('click', () => {
-    const visible = advancedSection.style.display !== 'none';
-    advancedSection.style.display = visible ? 'none' : 'block';
-    advancedToggle.textContent = visible ? '▶ Show' : '▼ Hide';
-  });
 
   // -------------------------------------------------------------------------
   // Helper: Sync status indicator HTML

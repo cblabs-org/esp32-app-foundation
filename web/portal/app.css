@@ -475,6 +475,45 @@ button.secondary {
 }
 
 /* ==========================================================================
+   9c. ADVANCED DRAWER COMPONENT
+   Reusable yellow collapsible card for advanced/expert controls.
+   Collapsed by default; user must explicitly open.
+   ========================================================================== */
+
+article.advanced-drawer {
+  border-color: var(--warning, #f9a825);
+  background: rgba(249, 168, 37, 0.04);
+}
+
+article.advanced-drawer > details > summary.advanced-summary {
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: var(--warning, #f9a825);
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.25rem 0 0.75rem;
+  user-select: none;
+}
+
+article.advanced-drawer > details > summary.advanced-summary::after {
+  content: '\u25b6';
+  font-size: 0.7rem;
+  transition: transform 0.2s;
+}
+
+article.advanced-drawer > details[open] > summary.advanced-summary::after {
+  transform: rotate(90deg);
+}
+
+/* Remove default marker on all browsers */
+article.advanced-drawer > details > summary.advanced-summary::-webkit-details-marker {
+  display: none;
+}
+
+/* ==========================================================================
    10. STATUS DOTS & BADGES
    ========================================================================== */
 .status-badge {
