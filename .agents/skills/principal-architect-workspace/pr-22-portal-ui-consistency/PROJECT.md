@@ -1,6 +1,6 @@
 # PR-22 — Web Portal UI Consistency
 
-**Status:** 🔄 WIP — WO1 merged (`881b311`), WO2 in progress
+**Status:** ✅ **COMPLETE** — WO1 `881b311` + WO2 `1ea3ed0` merged; 61/61 tests ✅
 **Base branch:** `main`
 **Feature branch:** `pr-22-portal-ui-consistency/wo1-screensaver-toggle` (WO1) → `pr-22-portal-ui-consistency/wo2-advanced-drawers` (WO2)
 **Session:** 5177dae5-bdb0-409e-9692-efe1b983e4dd
@@ -24,7 +24,7 @@ Two UI consistency issues in the web portal, grouped into one PR:
 ## Work Order Ledger
 
 - **[x] [wo1-screensaver-toggle](wo1-screensaver-toggle/WORKORDER.md):** Fix toggle CSS — MERGED `881b311` — 13/13 display tests + 61/61 full suite ✅
-- **[ ] [wo2-advanced-drawers](wo2-advanced-drawers/WORKORDER.md):** Advanced drawer CSS component, migrate OTA + Time — full suite
+- **[x] [wo2-advanced-drawers](wo2-advanced-drawers/WORKORDER.md):** Advanced drawer CSS component, migrate OTA + Time — MERGED `1ea3ed0` — 61/61 full suite ✅
 
 ---
 
