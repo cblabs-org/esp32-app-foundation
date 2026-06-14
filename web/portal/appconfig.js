@@ -53,7 +53,7 @@
             '<input type="checkbox" id="display-flip" style="opacity:0; width:0; height:0;">' +
             '<span class="toggle-slider" style="' +
               'position:absolute; cursor:pointer; top:0; left:0; right:0; bottom:0;' +
-              'background:var(--border, #dee2e6); border-radius:26px; transition:0.3s;' +
+              'border-radius:26px; transition:0.3s;' +
             '"></span>' +
           '</label>' +
         '</div>' +
@@ -82,7 +82,7 @@
             '<input type="checkbox" id="display-screensaver-enabled" checked style="opacity:0; width:0; height:0;">' +
             '<span class="toggle-slider" style="' +
               'position:absolute; cursor:pointer; top:0; left:0; right:0; bottom:0;' +
-              'background:var(--border, #dee2e6); border-radius:26px; transition:0.3s;' +
+              'border-radius:26px; transition:0.3s;' +
             '"></span>' +
           '</label>' +
         '</div>' +
@@ -150,27 +150,6 @@
           '</label>' +
         '</div>' +
       '</article>';
-
-    // --- Inject toggle switch styles (scoped, idempotent) ---
-    if (!document.getElementById('display-toggle-styles')) {
-      var style = document.createElement('style');
-      style.id = 'display-toggle-styles';
-      style.textContent =
-        '.toggle-switch input:checked + .toggle-slider { background: var(--primary, #2196F3); }' +
-        '.toggle-switch .toggle-slider::before {' +
-          'content: ""; position: absolute; height: 20px; width: 20px;' +
-          'left: 3px; bottom: 3px; background: white; border-radius: 50%;' +
-          'transition: 0.3s;' +
-        '}' +
-        '.toggle-switch input:checked + .toggle-slider::before {' +
-          'transform: translateX(22px);' +
-        '}' +
-        '#display-font-group label:has(input:checked) {' +
-          'border-color: var(--primary, #2196F3); background: rgba(33,150,243,0.08);' +
-          'color: var(--primary, #2196F3);' +
-        '}';
-      document.head.appendChild(style);
-    }
 
     // --- Grab DOM references ---
     brightnessSlider  = document.getElementById('display-brightness');

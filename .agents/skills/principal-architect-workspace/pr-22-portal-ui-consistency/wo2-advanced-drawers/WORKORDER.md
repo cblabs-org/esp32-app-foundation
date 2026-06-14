@@ -217,3 +217,42 @@ invoke the `@distillery` skill passing
 `.agents/skills/principal-architect-workspace/pr-22-portal-ui-consistency/wo2-advanced-drawers/`
 as the target directory. Append a status update to this WORKORDER.md file, then
 terminate your session.
+
+---
+
+## ✅ Status Update — COMPLETED 2026-06-14
+
+**Executed by:** Execution Worker (session `70a30087-2f15-43ba-971c-ee2d7a3e5819`)
+**PA Approval:** Received 2026-06-14T10:16:05Z
+
+### Acceptance Criteria — Final State
+
+- [x] `.advanced-drawer` CSS defined in `app.css` (section 9c)
+- [x] OTA Advanced card uses `<article class="advanced-drawer"><details>...` — collapsed by default
+- [x] Time Advanced section uses `<article class="advanced-drawer"><details>...` — collapsed by default
+- [x] Bespoke JS toggle in `time.js` removed
+- [x] No inline `border-color: var(--warning)` or `color: var(--warning)` on Advanced elements (all via CSS class)
+- [x] `npx playwright test` — **61/61 passed** (including 2 test fixes for newly-collapsed content)
+
+### Test Fixes Required
+
+`test/web/tests/ota.spec.ts` — 2 tests updated:
+1. `manual upload — requires .bin + .sig, FormData POST to /api/ota/upload`
+2. `rollback button requires ROLLBACK confirmation prompt`
+
+Fix: `await page.locator('#tab-ota article.advanced-drawer details').evaluate((el) => { el.open = true; })` added after `bootAndNavigateToOta(page)` in each test. Scoped to `#tab-ota` because all tabs render into DOM simultaneously and both OTA and Time now have `.advanced-drawer` elements.
+
+### Commits
+
+| SHA | Message |
+|-----|---------|
+| `4cbf31b` | `feat(portal): standardise Advanced sections as collapsible yellow drawers` |
+| `17dfaea` | `test(ota): open Advanced drawer before interacting with hidden elements` |
+
+### Distillery Output
+
+Packaged to: `.agents/skills/principal-architect-workspace/pr-22-portal-ui-consistency/wo2-advanced-drawers/`
+- `context_bridge.md`
+- `sessions.md`
+- `context_artifacts/adr_advanced_drawer_pattern.md`
+- `context_artifacts/graveyard_test_locator_failures.md`

@@ -99,8 +99,9 @@
     </article>
 
     <!-- Card 4: Advanced — manual upload + rollback -->
-    <article style="border-color: var(--warning, #f9a825); background: rgba(249, 168, 37, 0.04);">
-      <header style="color: var(--warning, #f9a825);">Advanced</header>
+    <article class="advanced-drawer">
+      <details>
+        <summary class="advanced-summary">Advanced</summary>
 
       <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:0.8rem;">
         Upload a signed firmware binary directly. Both the compiled <code>.bin</code>
@@ -147,6 +148,7 @@
           Rollback to Previous
         </button>
       </div>
+        </details>
     </article>
   `;
 

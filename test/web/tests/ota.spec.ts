@@ -118,6 +118,10 @@ test.describe('OTA Update Sub-pill', () => {
 
     await bootAndNavigateToOta(page);
 
+    // Open the Advanced drawer (collapsed by default since WO2)
+    // Scope to #tab-ota to avoid ambiguity with other tabs' advanced drawers
+    await page.locator('#tab-ota article.advanced-drawer details').evaluate((el: HTMLDetailsElement) => { el.open = true; });
+
     // Button should be disabled until both files selected
     const uploadBtn = page.locator('#btn-ota-upload');
     await expect(uploadBtn).toBeDisabled();
@@ -163,6 +167,10 @@ test.describe('OTA Update Sub-pill', () => {
     });
 
     await bootAndNavigateToOta(page);
+
+    // Open the Advanced drawer (collapsed by default since WO2)
+    // Scope to #tab-ota to avoid ambiguity with other tabs' advanced drawers
+    await page.locator('#tab-ota article.advanced-drawer details').evaluate((el: HTMLDetailsElement) => { el.open = true; });
 
     const rollbackBtn = page.locator('#btn-ota-rollback');
     await expect(rollbackBtn).toContainText('Rollback to Previous');

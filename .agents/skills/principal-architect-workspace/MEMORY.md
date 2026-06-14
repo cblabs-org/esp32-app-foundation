@@ -58,6 +58,7 @@ predate the formal PA pipeline and are filed retrospectively.
 | [pr-19-sdkconfig-layering](./pr-19-sdkconfig-layering/PROJECT.md) | sdkconfig Architecture — Base+Delta Layering (fix PSRAM regression, eliminate ~90% duplication, add build guard) | ✅ **COMPLETE** — 2 WOs merged, ready for PR submission | Session 34de947b |
 | [pr-20-config-refactor](./pr-20-config-refactor/PROJECT.md) | FrameworkConfig Refactor + appconfig.js Clarity (5 runtime defaults → module `resetConfig()`; FrameworkConfig = 3 OTA secrets) | ✅ **COMPLETE & VERIFIED** — 3 WOs done (native 525/525 + esp32 build green); stack pushed `wo1→wo2a→wo2b`, main not pushed, no PRs (user holding) · [distillation](./pr-20-config-refactor/context_bridge.md) | Current Session |
 | [pr-21-ota-task-hardening](./pr-21-ota-task-hardening/PROJECT.md) | OTA Task Creation Hardening (heap guard + PSRAM stack alloc + portal low-memory warning) | ✅ **COMPLETE** — 2 WOs merged (`a58d046` + `4d8aff6`), ready for PR submission | Session 8c58afa2 |
+| [pr-22-portal-ui-consistency](./pr-22-portal-ui-consistency/PROJECT.md) | Web Portal UI Consistency (screensaver toggle fix + Advanced drawer standardisation) | ✅ **COMPLETE** — 2 WOs merged, 61/61 tests · [distillation](./pr-22-portal-ui-consistency/wo2-advanced-drawers/context_bridge.md) | Session 5177dae5 |
 
 ---
 
