@@ -141,6 +141,7 @@ class IMCPContributor;
 class ConfigManager;
 class TimeManager;
 class WifiManager;
+class AuthManager;
 
 /**
  * @brief MCP JSON-RPC 2.0 server with Serial line-delimited transport.
@@ -161,8 +162,12 @@ public:
      * @param timeManager   Optional pointer to the TimeManager for built-in time tools.
      * @param wifiManager   Optional pointer to the WifiManager — single source of truth
      *                      for the device hostname shown on the status endpoint.
+     * @param authManager   Optional pointer to the AuthManager for bearer token
+     *                      authentication on HTTP MCP routes. When non-null and auth
+     *                      is enabled, all HTTP /api/mcp/* requests require a valid
+     *                      Authorization: Bearer header. Serial transport is exempt.
      */
-    void begin(const std::vector<IMCPContributor*>& contributors, ConfigManager* configManager = nullptr, TimeManager* timeManager = nullptr, WifiManager* wifiManager = nullptr);
+    void begin(const std::vector<IMCPContributor*>& contributors, ConfigManager* configManager = nullptr, TimeManager* timeManager = nullptr, WifiManager* wifiManager = nullptr, AuthManager* authManager = nullptr);
 
     /**
      * @brief Process a single JSON-RPC request and write the response to the provided stream.
@@ -276,6 +281,7 @@ private:
     bool            _mcpReadOnly = false;         ///< Guard: if true, mutating tools return error
     ConfigManager*  _configManager = nullptr;     ///< Cached for runtime config persistence
     WifiManager*    _wifiManager = nullptr;       ///< Cached reference for status endpoint hostname (single source of truth)
+    AuthManager*    _authManager = nullptr;       ///< Cached for bearer token auth on HTTP routes (WO6); nullptr = no auth
 
     /**
      * @brief Parse a complete JSON-RPC line and route to the appropriate handler.
