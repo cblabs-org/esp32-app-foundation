@@ -98,6 +98,11 @@ bool GithubClient::getLatestRelease() {
         return false;
     }
 
+    // Read full response body first — stream parsing is fragile on ESP32 TLS
+    // (WiFiClientSecure can time out mid-read causing IncompleteInput errors)
+    String payload = http.getString();
+    http.end();
+
     // Filter document to reduce memory footprint
     JsonDocument filter;
     filter["tag_name"] = true;
@@ -106,12 +111,11 @@ bool GithubClient::getLatestRelease() {
     filter["assets"][0]["url"] = true;
 
     JsonDocument doc;
-    DeserializationError error = deserializeJson(doc, http.getStream(), DeserializationOption::Filter(filter));
+    DeserializationError error = deserializeJson(doc, payload, DeserializationOption::Filter(filter));
 
     if (error) {
-        snprintf(lastErrorMsg, sizeof(lastErrorMsg), "JSON parse failed: %s", error.c_str());
-        LOG_SECURE("GITHUB", "JSON Parse Error: %s", error.c_str());
-        http.end();
+        snprintf(lastErrorMsg, sizeof(lastErrorMsg), "JSON parse failed: %s (payload %d bytes)", error.c_str(), payload.length());
+        LOG_SECURE("GITHUB", "JSON Parse Error: %s (payload %d bytes)", error.c_str(), payload.length());
         return false;
     }
 
@@ -215,6 +219,7 @@ bool GithubClient::getLatestReleaseForChannel(const char* channel) {
     static constexpr int MAX_PAGES    = 20;
     static constexpr int PER_PAGE     = 1;
     bool stopScanning = false;
+    int parseFailures = 0;
 
     for (int page = 1; page <= MAX_PAGES && !stopScanning; ++page) {
         // Build paginated URL
@@ -245,6 +250,10 @@ bool GithubClient::getLatestReleaseForChannel(const char* channel) {
             break;  // Graceful degradation: return best found so far
         }
 
+        // Read full response body — stream parsing is fragile on ESP32 TLS
+        String payload = pageHttp.getString();
+        pageHttp.end();
+
         // Parse page — array filter for minimal memory usage
         JsonDocument filter;
         filter[0]["tag_name"]   = true;
@@ -254,12 +263,13 @@ bool GithubClient::getLatestReleaseForChannel(const char* channel) {
         filter[0]["assets"][0]["url"]  = true;
 
         JsonDocument doc;
-        DeserializationError error = deserializeJson(doc, pageHttp.getStream(),
+        DeserializationError error = deserializeJson(doc, payload,
                                                       DeserializationOption::Filter(filter));
-        pageHttp.end();
 
         if (error) {
-            LOG_SECURE("GITHUB", "Page %d JSON error: %s — stopping scan", page, error.c_str());
+            LOG_SECURE("GITHUB", "Page %d JSON error: %s (payload %d bytes) — stopping scan",
+                       page, error.c_str(), payload.length());
+            parseFailures++;
             break;  // Graceful degradation
         }
 
@@ -324,8 +334,14 @@ bool GithubClient::getLatestReleaseForChannel(const char* channel) {
 
     // --- Step 3: Commit the best candidate to member fields ---
     if (bestTag.isEmpty()) {
-        snprintf(lastErrorMsg, sizeof(lastErrorMsg),
-                 "No release found at or above channel floor '%s'", channel);
+        if (parseFailures > 0) {
+            snprintf(lastErrorMsg, sizeof(lastErrorMsg),
+                     "GitHub API responses could not be parsed (%d page(s) failed — possible network/memory issue)",
+                     parseFailures);
+        } else {
+            snprintf(lastErrorMsg, sizeof(lastErrorMsg),
+                     "No release found at or above channel floor '%s'", channel);
+        }
         LOG_SECURE("GITHUB", "%s", lastErrorMsg);
         return false;
     }
