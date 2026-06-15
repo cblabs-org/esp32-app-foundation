@@ -273,7 +273,7 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors,
     
     for (auto* contributor : contributors) {
         if (contributor != nullptr) {
-            contributor->registerRoutes(*activeServer, _authManager);
+            contributor->registerRoutes(*activeServer);
             const char* tabName = contributor->getTabName();
             if (tabName != nullptr) {
                 JsonObject tabObj = tabsArr.add<JsonObject>();
@@ -516,6 +516,50 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors,
         ESP_LOGI(TAG, "HTTPS server configured for port 443; HTTP redirect configured for port 80");
     }
 #endif
+    // -----------------------------------------------------------------------
+    // Global Auth Middleware — framework-level portal authentication guard
+    // -----------------------------------------------------------------------
+    // Registered AFTER all routes so the middleware chain intercepts every
+    // request. Non-API paths (static assets, HTML, JS, CSS) pass through.
+    // Whitelisted public API paths pass through. /api/mcp paths are excluded
+    // because MCPServer handles its own auth via checkMcpAuth().
+    // Everything else under /api/ must pass checkPortalAuth().
+    // -----------------------------------------------------------------------
+#ifndef NATIVE_BUILD
+    if (_authManager) {
+        AuthManager* authMgr = _authManager;
+        activeServer->addMiddleware([authMgr](PsychicRequest* request,
+                                              PsychicResponse* response,
+                                              PsychicMiddlewareNext next) -> esp_err_t {
+            String path = request->uri();
+
+            // --- Pass through: non-API paths (static assets, HTML, etc.) ---
+            if (!path.startsWith("/api/")) {
+                return next();
+            }
+
+            // --- Pass through: whitelisted public API paths ---
+            if (path.startsWith("/api/auth/status") ||
+                path.startsWith("/api/auth/login")  ||
+                path.startsWith("/api/auth/password") ||
+                path.startsWith("/api/system")       ||
+                path.startsWith("/api/tabs")         ||
+                path.startsWith("/api/app")          ||
+                path.startsWith("/api/mcp")) {
+                return next();
+            }
+
+            // --- Enforce portal auth on all other /api/ paths ---
+            if (!authMgr->checkPortalAuth(request, response)) {
+                return ESP_OK;  // 401 already sent by checkPortalAuth()
+            }
+
+            return next();
+        });
+        ESP_LOGI(TAG, "Global auth middleware registered");
+    }
+#endif
+
     ESP_LOGI(TAG, "WebServer configured (TLS=%d, AP=%d), registered %u contributors",
              useTls, apMode, (unsigned)contributors.size());
 }

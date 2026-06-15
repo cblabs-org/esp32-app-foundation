@@ -56,6 +56,7 @@
 #include <cstdint>
 #include <string>
 #include <vector>
+#include <functional>
 
 // Define ESP-IDF error types for native build
 typedef int esp_err_t;
@@ -78,12 +79,14 @@ class PsychicRequest {
 public:
     const char* host() { return ""; }
     const char* url() { return ""; }
+    const char* uri() { return ""; }
     const char* header(const char* name) { return ""; }
     bool hasHeader(const char* name) { return false; }
 };
 
-#include <functional>
 typedef std::function<esp_err_t(PsychicRequest *request, PsychicResponse *response)> PsychicHttpRequestCallback;
+typedef std::function<esp_err_t()> PsychicMiddlewareNext;
+typedef std::function<esp_err_t(PsychicRequest*, PsychicResponse*, PsychicMiddlewareNext)> PsychicMiddlewareCallback;
 
 #define HTTP_GET     0b00000001
 #define HTTP_POST    0b00000010
@@ -114,6 +117,7 @@ public:
         return nullptr;
     }
     void onNotFound(PsychicHttpRequestCallback handler) {} // Stub for captive portal
+    void addMiddleware(PsychicMiddlewareCallback fn) {}    // Stub for global auth middleware
     static void setMaxRequestBodySize(uint32_t size) {
         lastMaxBodySize = size;
     }

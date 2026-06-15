@@ -54,24 +54,14 @@ public:
 
     /**
      * @brief Register all REST API route handlers with the web server.
+     *
+     * Auth enforcement for /api/ paths is handled centrally by the global
+     * auth middleware in WebServerManager. Individual route handlers do NOT
+     * need to call checkPortalAuth() or use AUTH_PORTAL_GUARD.
+     *
      * @param server Reference to the PsychicHttpServer instance.
      */
     virtual void registerRoutes(PsychicHttpServer& server) = 0;
-
-    /**
-     * @brief Register routes with auth guard support (WO5).
-     *
-     * Called by WebServerManager::begin() when an AuthManager is available.
-     * Protected routes should use AUTH_PORTAL_GUARD(auth, request) at the
-     * top of each handler lambda. The default implementation falls through
-     * to the single-argument registerRoutes() for backward compatibility.
-     *
-     * @param server Reference to the PsychicHttpServer instance.
-     * @param auth   Pointer to the AuthManager (may be nullptr = no guard).
-     */
-    virtual void registerRoutes(PsychicHttpServer& server, AuthManager* auth) {
-        registerRoutes(server); // backward-compatible default
-    }
 
     /**
      * @brief Get the UI tab name for this contributor.
@@ -113,22 +103,3 @@ public:
      */
     virtual const char* getTabIcon() const { return nullptr; }
 };
-
-// ---------------------------------------------------------------------------
-// AUTH_PORTAL_GUARD — convenience macro for contributor route handlers (WO5)
-// ---------------------------------------------------------------------------
-// Usage inside a route lambda:
-//   server.on("/api/foo", HTTP_GET, [this, auth](AsyncWebServerRequest* req) {
-//       AUTH_PORTAL_GUARD(auth, req);
-//       // ... normal handler code ...
-//   });
-//
-// When auth is nullptr (tests, or no auth configured), the guard is a no-op.
-// When auth is non-null and checkPortalAuth() returns false, the macro sends
-// 401 and returns from the lambda. The caller must NOT add any code between
-// AUTH_PORTAL_GUARD and the next handler statement.
-// ---------------------------------------------------------------------------
-#define AUTH_PORTAL_GUARD(auth, request, response) \
-    do { \
-        if ((auth) && !(auth)->checkPortalAuth(request, response)) return ESP_OK; \
-    } while(0)

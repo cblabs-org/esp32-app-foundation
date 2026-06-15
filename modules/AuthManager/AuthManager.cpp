@@ -667,12 +667,9 @@ void AuthManager::registerRoutes(PsychicHttpServer& server) {
     // validates by direct string comparison against KeyManager's stored hash.
     server.on("/api/auth/mcp-token", HTTP_GET,
         [this](PsychicRequest* request, PsychicResponse* response) {
-            // --- Step 1: Require an active session ---
-            if (!_checkSessionCookie(request)) {
-                return response->send(401, "application/json", "{\"error\":\"not_authenticated\"}");
-            }
+            // Auth guard is handled by the global auth middleware.
 
-            // --- Step 2: Load the stored hash from KeyManager ---
+            // --- Step 1: Load the stored hash from KeyManager ---
             if (_keyManager == nullptr) {
                 return response->send(500, "application/json", "{\"error\":\"key_manager_unavailable\"}");
             }
@@ -682,7 +679,7 @@ void AuthManager::registerRoutes(PsychicHttpServer& server) {
                 return response->send(404, "application/json", "{\"error\":\"no_password_set\"}");
             }
 
-            // --- Step 3: Respond with the bearer token (= stored hash hex) ---
+            // --- Step 2: Respond with the bearer token (= stored hash hex) ---
             JsonDocument doc;
             doc["token"] = storedHash.c_str();
             String out;
@@ -690,22 +687,27 @@ void AuthManager::registerRoutes(PsychicHttpServer& server) {
             return response->send(200, "application/json", out.c_str());
         });
 
-    // --- POST /api/auth/cert/generate ---
     server.on("/api/auth/cert/generate", HTTP_POST, [this](PsychicRequest* request, PsychicResponse* response) {
-        if (!_checkSessionCookie(request)) {
-            return response->send(401, "application/json", "{\"error\":\"not_authenticated\"}");
+        // Auth guard is handled by the global auth middleware.
+
+        // --- Concurrency guard: prevent overlapping cert generation ---
+        bool expected = false;
+        if (!_certGenRunning.compare_exchange_strong(expected, true)) {
+            return response->send(409, "application/json", "{\"error\":\"cert_generation_in_progress\"}");
         }
 #ifndef NATIVE_BUILD
         xTaskCreate(
             [](void* param) {
                 auto* self = static_cast<AuthManager*>(param);
                 self->generateAndStoreCert("esp32-device");
+                self->_certGenRunning.store(false);
                 vTaskDelete(nullptr);
             },
             "cert_gen", 12288, this, 1, nullptr
         );
 #else
         generateAndStoreCert("esp32-device");
+        _certGenRunning.store(false);
 #endif
         JsonDocument resp;
         resp["status"] = "ok";
@@ -717,9 +719,7 @@ void AuthManager::registerRoutes(PsychicHttpServer& server) {
 
     // --- POST /api/auth/cert/upload ---
     server.on("/api/auth/cert/upload", HTTP_POST, [this](PsychicRequest* request, PsychicResponse* response) {
-        if (!_checkSessionCookie(request)) {
-            return response->send(401, "application/json", "{\"error\":\"not_authenticated\"}");
-        }
+        // Auth guard is handled by the global auth middleware.
         if (request->contentLength() > 8192) {
             return response->send(413, "application/json", "{\"error\":\"payload_too_large\"}");
         }
@@ -740,8 +740,14 @@ void AuthManager::registerRoutes(PsychicHttpServer& server) {
 
 #ifndef NATIVE_BUILD
         size_t cert_len = 0, key_len = 0;
-        unsigned char *cert_der = new unsigned char[4096];
-        unsigned char *key_der = new unsigned char[2048];
+        unsigned char *cert_der = new (std::nothrow) unsigned char[4096];
+        unsigned char *key_der  = new (std::nothrow) unsigned char[2048];
+
+        if (!cert_der || !key_der) {
+            delete[] cert_der;
+            delete[] key_der;
+            return response->send(500, "application/json", "{\"error\":\"out_of_memory\"}");
+        }
         
         int r1 = mbedtls_base64_decode(cert_der, 4096, &cert_len, (const unsigned char*)cert_b64, strlen(cert_b64));
         int r2 = mbedtls_base64_decode(key_der, 2048, &key_len, (const unsigned char*)key_b64, strlen(key_b64));
@@ -772,9 +778,7 @@ void AuthManager::registerRoutes(PsychicHttpServer& server) {
 
     // --- POST /api/auth/config ---
     server.on("/api/auth/config", HTTP_POST, [this](PsychicRequest* request, PsychicResponse* response) {
-        if (!_checkSessionCookie(request)) {
-            return response->send(401, "application/json", "{\"error\":\"not_authenticated\"}");
-        }
+        // Auth guard is handled by the global auth middleware.
         if (request->contentLength() > MAX_BODY_SIZE) {
             return response->send(413, "application/json", "{\"error\":\"payload_too_large\"}");
         }
@@ -843,23 +847,30 @@ void AuthManager::registerRoutes(PsychicHttpServer& server) {
             _configManager->saveModuleConfig(this);
         }
 
-        // --- Trigger TLS cert generation on a dedicated task (WO3) ---
+        // --- Concurrency guard: prevent overlapping cert generation ---
+        bool expected = false;
+        if (!_certGenRunning.compare_exchange_strong(expected, true)) {
+            ESP_LOGW(TAG, "Cert generation already in progress, skipping");
+        } else {
 #ifndef NATIVE_BUILD
-        xTaskCreate(
-            [](void* param) {
-                auto* self = static_cast<AuthManager*>(param);
-                self->generateAndStoreCert("esp32-device");
-                vTaskDelete(nullptr);
-            },
-            "cert_gen",   // Task name
-            12288,        // Stack depth (12KB — mbedTLS EC needs ~8KB)
-            this,         // Parameter: AuthManager instance
-            1,            // Priority (low — background work)
-            nullptr       // No handle needed (self-deleting)
-        );
+            xTaskCreate(
+                [](void* param) {
+                    auto* self = static_cast<AuthManager*>(param);
+                    self->generateAndStoreCert("esp32-device");
+                    self->_certGenRunning.store(false);
+                    vTaskDelete(nullptr);
+                },
+                "cert_gen",   // Task name
+                12288,        // Stack depth (12KB — mbedTLS EC needs ~8KB)
+                this,         // Parameter: AuthManager instance
+                1,            // Priority (low — background work)
+                nullptr       // No handle needed (self-deleting)
+            );
 #else
-        generateAndStoreCert("esp32-device");
+            generateAndStoreCert("esp32-device");
+            _certGenRunning.store(false);
 #endif
+        }
 
         // --- Respond immediately — cert generates in background ---
         JsonDocument resp;

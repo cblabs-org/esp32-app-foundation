@@ -62,6 +62,7 @@
 
 #include <stdint.h>
 #include <cstring>
+#include <atomic>
 
 #include "../../include/interfaces/IWebContributor.hpp"
 #include "../../include/interfaces/IConfigurable.hpp"
@@ -330,6 +331,12 @@ private:
     bool _certPresent  = false; ///< True if a TLS certificate exists in LittleFS
     bool _apMode       = false; ///< True when device is in AP mode (WO5: bypasses auth guard)
     bool _tlsApMode    = false; ///< True if TLS should be enforced even in AP mode
+
+    // -------------------------------------------------------------------------
+    // Cert generation concurrency guard
+    // -------------------------------------------------------------------------
+
+    std::atomic<bool> _certGenRunning{false}; ///< True while a cert_gen task is executing
 
     // -------------------------------------------------------------------------
     // Session token (16-byte; all-zero means no active session)
