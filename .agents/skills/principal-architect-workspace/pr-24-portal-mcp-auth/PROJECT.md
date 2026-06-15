@@ -105,3 +105,8 @@ platformio.ini                         (no new lib needed — ESP32Async already
 - [ ] OTA confirmed unaffected by auth
 - [ ] MEMORY.md updated with PR-24 COMPLETE entry
 - [ ] Todo item "Add password protection to the web portal and MCP server" marked `[x]`
+
+---
+
+## Session Distillation
+- [Context Bridge](./context_bridge.md)
