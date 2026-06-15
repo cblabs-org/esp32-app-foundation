@@ -133,7 +133,7 @@ public:
      *   beta   → beta + rc + stable
      *   dev    → dev + beta + rc + stable
      *
-     * A single /releases request is made; the highest SemVer version among
+     * A paginated scan of /releases is made; the highest SemVer version among
      * all releases that meet the floor is returned. This means a beta
      * subscriber automatically receives v0.0.7 stable when it is ahead of
      * the latest v0.0.6-beta.x with no manual channel change required.

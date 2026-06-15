@@ -277,7 +277,7 @@ bool OTAUpdateManager::checkForUpdate() {
     }
 
     state_ = OTAState::Checking;
-    ESP_LOGI(TAG, "Checking GitHub for firmware updates...");
+    ESP_LOGI(TAG, "Checking for updates — local: %s, channel: '%s'", BUILD_VERSION, _channel);
 
 #ifndef NATIVE_BUILD
     // Create GithubClient with repo and optional token from config
@@ -292,10 +292,12 @@ bool OTAUpdateManager::checkForUpdate() {
         return false;
     }
 
-    ESP_LOGI(TAG, "Latest release: %s (%d assets)", github.releaseId.c_str(), github.releaseAssets);
+    ESP_LOGI(TAG, "Best release for '%s' channel: %s (%d assets)",
+             _channel, github.releaseId.c_str(), github.releaseAssets);
 
     // --- SemVer comparison: local build version vs. remote release tag ---
-    FirmwareVersion local = { VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH, Channel::STABLE, 0 };
+    FirmwareVersion local = { VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH,
+                              static_cast<Channel>(VERSION_CHANNEL), VERSION_PRE_NUM };
     FirmwareVersion remote = parseVersionTag(github.releaseId.c_str());
 
     // Normal case: remote > local → update available
@@ -323,7 +325,8 @@ bool OTAUpdateManager::checkForUpdate() {
     // Update lastCheckedChannel
     strlcpy(_lastCheckedChannel, _channel, sizeof(_lastCheckedChannel));
 
-    ESP_LOGI(TAG, "No update available — local version is current or newer");
+    ESP_LOGI(TAG, "No update available — local %s is current or newer than remote %s (channel='%s')",
+             BUILD_VERSION, github.releaseId.c_str(), _channel);
     state_ = OTAState::Idle;
     return false;
 #else
@@ -355,7 +358,7 @@ void OTAUpdateManager::performUpdate() {
         return;
     }
 
-    state_ = OTAState::Downloading;
+    state_ = OTAState::Checking;
     ESP_LOGI(TAG, "Launching OTA update pipeline");
 
 #ifndef NATIVE_BUILD
@@ -369,11 +372,12 @@ void OTAUpdateManager::performUpdate() {
             freeDram, required);
     }
 
-    // --- Launch OTA task — stack in PSRAM when available, DRAM otherwise ---
-    // xTaskCreateWithCaps allocates the task stack from memory matching the
-    // supplied MemoryCaps mask. MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT targets
-    // PSRAM on S3/S3-Nano. On boards without PSRAM the allocator falls back
-    // to DRAM transparently (standard ESP-IDF behaviour).
+    // --- Launch OTA task — stack MUST be in DRAM (not PSRAM) ---
+    // The OTA pipeline performs SPI flash writes (Update.begin/write/end,
+    // ConfigManifest::save, NVS operations). ESP-IDF asserts when flash ops
+    // run on a PSRAM-stack task because disabling the SPI cache makes the
+    // PSRAM-resident stack inaccessible. 32 KiB DRAM is feasible given the
+    // device's ~240 KiB free internal RAM at this point.
     BaseType_t result = xTaskCreateWithCaps(
         otaTaskWrapper,                            // Task function
         "ota_update",                              // Task name
@@ -381,7 +385,7 @@ void OTAUpdateManager::performUpdate() {
         this,                                      // Parameter
         5,                                         // Priority
         &taskHandle_,                              // Task handle output
-        MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT        // Prefer PSRAM stack
+        MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT      // DRAM stack (SPI flash safe)
     );
 
     if (result != pdPASS) {
@@ -456,7 +460,8 @@ void OTAUpdateManager::performUpdateTask() {
     // --- Step 1: Check GitHub for releases ---
     GithubClient github(cfg.otaGithubRepo,
                         cfg.otaGithubToken ? cfg.otaGithubToken : "");
-    ESP_LOGI(TAG, "Querying GitHub for latest release of %s", cfg.otaGithubRepo);
+    ESP_LOGI(TAG, "Querying GitHub for latest release — repo: %s, channel: '%s', local: %s",
+             cfg.otaGithubRepo, _channel, BUILD_VERSION);
 
     if (!github.getLatestReleaseForChannel(_channel)) {
         ESP_LOGE(TAG, "GitHub release query failed: %s", github.getLastError());
@@ -476,25 +481,27 @@ void OTAUpdateManager::performUpdateTask() {
         return;
     }
 
-    ESP_LOGI(TAG, "Found release: %s with %d assets",
-             github.releaseId.c_str(), github.releaseAssets);
+    ESP_LOGI(TAG, "Best release for '%s' channel: %s (%d assets)",
+             _channel, github.releaseId.c_str(), github.releaseAssets);
 
     // --- Version guard: only proceed if remote > local ---
-    FirmwareVersion local = { VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH, Channel::STABLE, 0 };
+    FirmwareVersion local = { VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH,
+                              static_cast<Channel>(VERSION_CHANNEL), VERSION_PRE_NUM };
     FirmwareVersion remote = parseVersionTag(github.releaseId.c_str());
 
     if (!(remote > local)) {
-        ESP_LOGI(TAG, "No update needed — local %d.%d.%d is current or newer than remote %s",
-                 VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH, github.releaseId.c_str());
+        ESP_LOGI(TAG, "No update needed — local %s is current or newer than remote %s (channel='%s')",
+                 BUILD_VERSION, github.releaseId.c_str(), _channel);
         // No publishProgress — don't show the OTA screen for a no-op check
         state_ = OTAState::Idle;
         return;
     }
 
-    ESP_LOGI(TAG, "Update available: %s > %d.%d.%d — proceeding with download",
-             github.releaseId.c_str(), VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH);
+    ESP_LOGI(TAG, "Update available: %s > %s (channel='%s') — proceeding with download",
+             github.releaseId.c_str(), BUILD_VERSION, _channel);
 
-    // Only now show the OTA screen — a download will actually happen
+    // Only now transition to Downloading — a download will actually happen
+    state_ = OTAState::Downloading;
     publishProgress(0.0f, "Update found — preparing download...", false, false);
 
     // --- Step 2: Find firmware and signature assets (manifest-aware) ---
@@ -763,6 +770,7 @@ void OTAUpdateManager::performUpdateTask() {
  */
 void OTAUpdateManager::publishProgress(float progress, const char* status,
                                         bool complete, bool success) {
+    lastProgress_ = progress;
     OTAProgressEvent event;
     event.progress = progress;
     event.status   = status;
@@ -1219,7 +1227,7 @@ void OTAUpdateManager::registerRoutes(PsychicHttpServer& server) {
                         case OTAState::Error:       stateStr = "error"; break;
                     }
                     resp["state"]          = stateStr;
-                    resp["version"]        = String(VERSION_MAJOR) + "." + String(VERSION_MINOR) + "." + String(VERSION_PATCH);
+                    resp["version"]        = BUILD_VERSION;
                     resp["channel"]        = this->_channel;
                     resp["boardId"]        = BOARD_ID;
                     resp["autoCheck"]      = this->_autoCheck;
@@ -1227,6 +1235,7 @@ void OTAUpdateManager::registerRoutes(PsychicHttpServer& server) {
                     resp["checkHour"]      = this->_checkHour;
                     resp["dram_free_bytes"]  = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
                     resp["ota_stack_bytes"]  = OTA_TASK_STACK_BYTES;
+                    resp["progress"]         = this->lastProgress_;
                     if (this->lastOtaError_) {
                         resp["lastError"] = this->lastOtaError_;
                     }

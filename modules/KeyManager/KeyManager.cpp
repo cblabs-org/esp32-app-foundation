@@ -144,7 +144,7 @@ std::string KeyManager::getKeyById(const char* id) const {
         return "";
     }
 
-    if (!doc.containsKey(id)) {
+    if (!doc[id].is<JsonVariant>()) {
         ESP_LOGW(TAG, "Key not found: %s", id);
         return "";
     }
@@ -183,7 +183,7 @@ bool KeyManager::deleteKey(const char* id) {
         return false;
     }
 
-    if (!doc.containsKey(id)) {
+    if (!doc[id].is<JsonVariant>()) {
         ESP_LOGW(TAG, "Key not found to delete: %s", id);
         return false;
     }
@@ -281,7 +281,7 @@ bool KeyManager::isExclusive(const char* id) const {
 
     JsonDocument doc;
     if (!loadRegistry(doc)) return false;
-    if (!doc.containsKey(id)) return false;
+    if (!doc[id].is<JsonVariant>()) return false;
 
     JsonVariant entry = doc[id];
     if (!entry.is<JsonObject>()) return false;
