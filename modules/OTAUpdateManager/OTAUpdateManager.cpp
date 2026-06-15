@@ -660,9 +660,13 @@ void OTAUpdateManager::performUpdateTask() {
     }
 
     // --- Snapshot config manifest: Active → Previous before download ---
+    // NOTE: We only update the in-memory snapshot here. We intentionally do NOT
+    // call save() because this task's stack lives in PSRAM (MALLOC_CAP_SPIRAM),
+    // and LittleFS writes trigger SPI flash operations that assert-fail when the
+    // current task's stack is on the SPI bus. The manifest will be persisted
+    // when the firmware is blessed after a successful OTA reboot (main thread).
     app_->getConfigManager().getManifest().snapshotActiveToPrevious();
-    app_->getConfigManager().getManifest().save();
-    ESP_LOGI(TAG, "Config manifest: Active → Previous snapshot saved");
+    ESP_LOGI(TAG, "Config manifest: Active → Previous snapshot taken (in-memory, save deferred)");
 
     // --- Step 3: Initialize the verifier (if public key configured) ---
     MbedTLSSignatureVerifier verifier;
