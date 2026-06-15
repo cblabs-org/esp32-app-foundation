@@ -63,6 +63,9 @@
 #include <string>
 #include <cstddef>  // for size_t
 #include <stdint.h>
+
+typedef int esp_err_t;
+
 // Stub String class for NATIVE_BUILD tests
 #ifndef STRING_STUB_DEFINED
 #define STRING_STUB_DEFINED

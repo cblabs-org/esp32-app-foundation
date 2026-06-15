@@ -120,7 +120,7 @@ TEST_F(OtaUpdateManagerTest, WriteStream_OnNative_ReturnsZero) {
 
 /// registerRoutes() should not crash on native.
 TEST_F(OtaUpdateManagerTest, RegisterRoutes_NoCrash) {
-    AsyncWebServer server(80);
+    PsychicHttpServer server(80);
     manager.registerRoutes(server);
     SUCCEED();
 }

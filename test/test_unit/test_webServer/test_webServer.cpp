@@ -6,7 +6,7 @@
 class MockContributor : public IWebContributor {
 public:
     bool registered = false;
-    void registerRoutes(AsyncWebServer& server) override {
+    void registerRoutes(PsychicHttpServer& server) override {
         registered = true;
     }
 };
@@ -24,7 +24,7 @@ TEST(WebServerManagerTest, InitializationAndDispatch) {
     EXPECT_TRUE(c2.registered);
     
 #ifdef NATIVE_BUILD
-    EXPECT_EQ(AsyncWebServer::lastMaxBodySize, 4096);
+    EXPECT_EQ(PsychicHttpServer::lastMaxBodySize, 4096);
     
     // Check if new endpoints are registered
     bool tabsRegistered = false;
@@ -43,7 +43,7 @@ public:
     const char* tabName = nullptr;
     TabMockContributor(const char* name) : tabName(name) {}
     
-    void registerRoutes(AsyncWebServer& server) override {
+    void registerRoutes(PsychicHttpServer& server) override {
         registered = true;
     }
     const char* getTabName() const override {
@@ -97,7 +97,7 @@ TEST(WebServerManagerTest, ThreeContributorsRegistration) {
 TEST(WebServerManagerTest, GetServerReturnsValidRef) {
     WebServerManager manager;
     manager.begin({});
-    AsyncWebServer& server = manager.getServer();
+    PsychicHttpServer& server = manager.getServer();
     
 #ifdef NATIVE_BUILD
     EXPECT_GE(server.routes.size(), 2);
@@ -148,8 +148,8 @@ TEST(WebServerManagerTest, ContributorWithoutTabName) {
 TEST(WebServerManagerTest, POSTBodySizeCap) {
 #ifdef NATIVE_BUILD
     // This is tested in InitializationAndDispatch but added as dedicated test
-    // Assuming AsyncWebServer::lastMaxBodySize was meant to be set or will fail if not
-    EXPECT_EQ(AsyncWebServer::lastMaxBodySize, 4096);
+    // Assuming PsychicHttpServer::lastMaxBodySize was meant to be set or will fail if not
+    EXPECT_EQ(PsychicHttpServer::lastMaxBodySize, 4096);
 #endif
 }
 
@@ -170,7 +170,7 @@ TEST(WebServerManagerTest, RouteHandlerInvocation) {
         if (route.uri == "/api/tabs" && route.handler != nullptr) {
             handlerCallable = true;
             // Invoking it with nullptr as request
-            route.handler(nullptr);
+            route.handler(nullptr, nullptr);
         }
     }
     EXPECT_TRUE(handlerCallable);
@@ -178,14 +178,14 @@ TEST(WebServerManagerTest, RouteHandlerInvocation) {
 }
 TEST(WebServerManagerTest, GetServer_ReturnsSameInstance) {
     WebServerManager manager;
-    AsyncWebServer& server1 = manager.getServer();
-    AsyncWebServer& server2 = manager.getServer();
+    PsychicHttpServer& server1 = manager.getServer();
+    PsychicHttpServer& server2 = manager.getServer();
     EXPECT_EQ(&server1, &server2);
 }
 
 int main(int argc, char** argv) {
 #ifdef NATIVE_BUILD
-    AsyncWebServer::lastMaxBodySize = 4096;
+    PsychicHttpServer::lastMaxBodySize = 4096;
 #endif
     ::testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();

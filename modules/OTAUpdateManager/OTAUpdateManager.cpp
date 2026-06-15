@@ -804,7 +804,7 @@ const char* OTAUpdateManager::getLastOtaError() const {
  */
 bool OTAUpdateManager::beginUpdate(size_t size, const char* expectedMD5) {
     ESP_LOGI(TAG, "Beginning OTA update: size=%u, MD5=%s",
-             size, expectedMD5 ? expectedMD5 : "(none)");
+             (unsigned)size, expectedMD5 ? expectedMD5 : "(none)");
 #ifndef NATIVE_BUILD
     // --- Step 1: Initialize the Update library ---
     if (!Update.begin(size)) {

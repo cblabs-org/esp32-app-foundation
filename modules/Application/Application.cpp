@@ -198,6 +198,7 @@ bool Application::begin(const FrameworkConfig& config) {
 
     _tickables.push_back(&_wifiManager);
     _tickables.push_back(&_timeManager);
+    _tickables.push_back(&_webServerManager);
 #ifndef NATIVE_BUILD
     _tickables.push_back(&_display);
 #endif
@@ -206,7 +207,7 @@ bool Application::begin(const FrameworkConfig& config) {
 
     // --- Step 15: WebServerManager + MCPServer begin() ---
     _authManager.setAPMode(_wifiManager.getAPMode());
-    _webServerManager.begin(_webContributors, &_authManager, _wifiManager.getAPMode());
+    _webServerManager.begin(_webContributors, &_authManager, &_wifiManager);
 
     // MCP server: pass the ConfigManager reference for config operations,
     // plus TimeManager (built-in time tools) and WifiManager (status hostname).

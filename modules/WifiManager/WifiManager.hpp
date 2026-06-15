@@ -54,6 +54,12 @@
 #include <Arduino.h>
 #else
 #include <string>
+
+typedef int esp_err_t;
+#ifndef ESP_OK
+#define ESP_OK 0
+#endif
+
 // Stub String class for NATIVE_BUILD tests
 #ifndef STRING_STUB_DEFINED
 #define STRING_STUB_DEFINED

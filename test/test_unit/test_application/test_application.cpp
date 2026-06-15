@@ -100,10 +100,10 @@ public:
 /** @brief Minimal IWebContributor mock. */
 class MockWebContributor : public IWebContributor {
 public:
-    // AsyncWebServer is forward-declared in IWebContributor.hpp; the mock
+    // PsychicHttpServer is forward-declared in IWebContributor.hpp; the mock
     // accepts the reference signature but never dereferences the pointer so
-    // no linker dependency on ESPAsyncWebServer is introduced.
-    void registerRoutes(AsyncWebServer& /*server*/) override {}
+    // no linker dependency on ESPPsychicHttpServer is introduced.
+    void registerRoutes(PsychicHttpServer& /*server*/) override {}
 };
 
 /** @brief Minimal IMCPContributor mock that registers a named test tool. */

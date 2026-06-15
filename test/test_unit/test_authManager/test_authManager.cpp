@@ -271,7 +271,7 @@ TEST_F(AuthManagerTest, test_tab_icon_not_null) {
  */
 TEST_F(AuthManagerTest, test_check_portal_auth_open) {
     // No session, no auth enforcement — guard must pass
-    EXPECT_TRUE(auth.checkPortalAuth(nullptr));
+    EXPECT_TRUE(auth.checkPortalAuth(nullptr, nullptr));
 }
 
 /**
@@ -281,7 +281,7 @@ TEST_F(AuthManagerTest, test_check_portal_auth_open) {
  * token check path (WO6).
  */
 TEST_F(AuthManagerTest, test_check_mcp_auth_open) {
-    EXPECT_TRUE(auth.checkMcpAuth(nullptr));
+    EXPECT_TRUE(auth.checkMcpAuth(nullptr, nullptr));
 }
 
 // ===========================================================================

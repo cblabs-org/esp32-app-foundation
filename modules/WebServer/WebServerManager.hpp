@@ -64,18 +64,26 @@ typedef int esp_err_t;
 #endif
 
 // Mock PsychicHttp for native testing
-class PsychicResponse {};
+class PsychicResponse {
+public:
+    esp_err_t send(int code, const char* contentType, const char* content) { return ESP_OK; }
+    esp_err_t send() { return ESP_OK; }
+    void setContent(const uint8_t* content, size_t len) {}
+    void setContentType(const char* type) {}
+    void addHeader(const char* name, const char* value) {}
+    esp_err_t redirect(const char* url) { return ESP_OK; }
+};
+
 class PsychicRequest {
 public:
-    void redirect(const char* url) {} // Stub for captive portal redirect
-    PsychicResponse* reply(int code, const char* contentType, const char* content) { return nullptr; } // Stub for direct responses
-    PsychicResponse* reply(const char* content) { return nullptr; } // Stub for direct responses
-    PsychicResponse* send(PsychicResponse* response) { return nullptr; } // Stub for response object sends
+    const char* host() { return ""; }
+    const char* url() { return ""; }
     const char* header(const char* name) { return ""; }
     bool hasHeader(const char* name) { return false; }
 };
 
-typedef esp_err_t (*PsychicHttpRequestCallback)(PsychicRequest *request, PsychicResponse *response);
+#include <functional>
+typedef std::function<esp_err_t(PsychicRequest *request, PsychicResponse *response)> PsychicHttpRequestCallback;
 
 #define HTTP_GET     0b00000001
 #define HTTP_POST    0b00000010
@@ -122,9 +130,11 @@ public:
 #endif
 
 #include "interfaces/IWebContributor.hpp"
+#include "interfaces/ITickable.hpp"
 
 // Forward declaration — avoids pulling AuthManager.hpp into every translation unit
 class AuthManager;
+class WifiManager;
 
 /**
  * @brief Manages the web server lifecycle and IWebContributor dispatch.
@@ -136,7 +146,7 @@ class AuthManager;
  * - HTTP-open mode: all routes on port 80 via _httpServer (pre-PR-24 behavior)
  * - TLS mode: all routes on port 443 via _httpsServer + redirect on port 80
  */
-class WebServerManager {
+class WebServerManager : public ITickable {
 public:
     /**
      * @brief Construct the WebServerManager with HTTP server on port 80.
@@ -165,7 +175,9 @@ public:
      */
     void begin(const std::vector<IWebContributor*>& contributors,
                AuthManager* authManager = nullptr,
-               bool apMode = false);
+               WifiManager* wifiManager = nullptr);
+
+    void tick() override;
 
     // Non-copyable, non-movable: AsyncWebServer member is not copy/move-safe.
     WebServerManager(const WebServerManager&) = delete;
@@ -192,4 +204,6 @@ private:
 
     bool         _tlsMode     = false;   ///< True when serving HTTPS on port 443
     AuthManager* _authManager = nullptr; ///< Stored for WO5 route guards (nullable)
+    WifiManager* _wifiManager = nullptr; ///< Required to check network ready state
+    bool         _serverStarted = false; ///< True if the underlying servers have been started
 };

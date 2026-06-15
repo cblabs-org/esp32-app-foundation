@@ -33,6 +33,7 @@
     // does, the transitive DeviceCrypto include now resolves via relative path.
     #include "../AuthManager/AuthManager.hpp"
 #endif
+#include "../WifiManager/WifiManager.hpp"
 
 // Portal PROGMEM assets — hardware only (require Arduino.h for PROGMEM macro)
 #ifndef NATIVE_BUILD
@@ -84,7 +85,7 @@ constexpr int  MAX_CONCURRENT_HIGH_MEM      = 1;      // Max concurrent high-mem
 constexpr int  HEAP_GUARD_MIN_BLOCK_BYTES   = 20000;  // Minimum largest free block (bytes)
 
 #ifdef NATIVE_BUILD
-uint32_t AsyncWebServer::lastMaxBodySize = 0;
+uint32_t PsychicHttpServer::lastMaxBodySize = 0;
 #endif
 
 WebServerManager::WebServerManager() : _httpServer(80) {
@@ -100,8 +101,10 @@ WebServerManager::~WebServerManager() {
 }
 
 void WebServerManager::begin(const std::vector<IWebContributor*>& contributors,
-                             AuthManager* authManager, bool apMode) {
+                             AuthManager* authManager, WifiManager* wifiManager) {
     _authManager = authManager;
+    _wifiManager = wifiManager;
+    bool apMode = _wifiManager ? _wifiManager->getAPMode() : false;
     ESP_LOGI(TAG, "Initializing WebServerManager (apMode=%d)", apMode);
 
     // --- TLS mode decision ---
@@ -126,6 +129,7 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors,
         activeServer = _httpsServer;
     }
 #endif
+    _tlsMode = useTls;
 
     // --- Setup routing for static files served from PROGMEM (hardware only) ---
 #ifndef NATIVE_BUILD
@@ -500,17 +504,28 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors,
             url += req->url();
             return res->redirect(url.c_str());
         });
-        _httpServer.begin();
-        _httpsServer->begin();
-        ESP_LOGI(TAG, "HTTPS server started on port 443; HTTP redirect on port 80");
-    } else {
-        _httpServer.begin();
+        ESP_LOGI(TAG, "HTTPS server configured for port 443; HTTP redirect configured for port 80");
     }
-#else
-    _httpServer.begin();
 #endif
-    ESP_LOGI(TAG, "WebServer started (TLS=%d, AP=%d), registered %zu contributors",
-             useTls, apMode, contributors.size());
+    ESP_LOGI(TAG, "WebServer configured (TLS=%d, AP=%d), registered %u contributors",
+             useTls, apMode, (unsigned)contributors.size());
+}
+
+void WebServerManager::tick() {
+    if (!_serverStarted && _wifiManager && _wifiManager->isReady()) {
+        _httpServer.begin();
+#ifndef NATIVE_BUILD
+        if (_tlsMode && _httpsServer) {
+            _httpsServer->begin();
+            ESP_LOGI(TAG, "HTTPS server started on port 443; HTTP redirect on port 80");
+        } else {
+            ESP_LOGI(TAG, "HTTP server started on port 80");
+        }
+#else
+        ESP_LOGI(TAG, "HTTP server started on port 80");
+#endif
+        _serverStarted = true;
+    }
 }
 
 PsychicHttpServer& WebServerManager::getServer() {
