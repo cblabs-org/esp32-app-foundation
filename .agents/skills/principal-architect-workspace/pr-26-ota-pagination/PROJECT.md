@@ -27,3 +27,9 @@ All WOs are serialised (WO1 → WO2 → WO3 → WO4). No file overlap between WO
 | WO2 | `modules/OTAUpdateManager/OTAUpdateManager.cpp` |
 | WO3 | `modules/OTAUpdateManager/OTAUpdateManager.cpp`, `platformio.ini` |
 | WO4 | `modules/OTAUpdateManager/OTAUpdateManager.hpp`, `modules/OTAUpdateManager/OTAUpdateManager.cpp`, `web/portal/ota.js` |
+
+---
+
+## Distillation
+- [Distillation Context Bridge](./context_bridge.md)
+
