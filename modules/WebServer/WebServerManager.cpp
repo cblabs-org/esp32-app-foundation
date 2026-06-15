@@ -114,7 +114,7 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors,
     // Until then, all routes are served on HTTP port 80.
     bool useTls = false;
 #ifndef NATIVE_BUILD
-    if (!apMode && authManager && authManager->isAuthEnabled() && authManager->hasCert()) {
+    if ((!apMode || (authManager && authManager->isApTlsEnabled())) && authManager && authManager->isAuthEnabled() && authManager->hasCert()) {
         uint8_t *certDer = nullptr, *keyDer = nullptr;
         size_t certLen = 0, keyLen = 0;
 

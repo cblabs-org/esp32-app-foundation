@@ -237,6 +237,31 @@
       }
       html += '</div>';
 
+      // Advanced TLS Settings section
+      html +=
+        '<div class="section-card">' +
+          '<div class="section-header">' +
+            '<h3>Advanced TLS Settings</h3>' +
+          '</div>' +
+          '<div class="form-group checkbox-group">' +
+            '<input type="checkbox" id="tls-ap-mode-chk" ' + (state.tlsApMode ? 'checked' : '') + '>' +
+            '<label for="tls-ap-mode-chk">Enable TLS in AP Mode</label>' +
+          '</div>' +
+          '<button id="regen-cert-btn" class="secondary" style="width:100%; margin-bottom:1rem;">Force Regenerate Certificate</button>' +
+          '<h4>Upload Custom Certificate</h4>' +
+          '<p class="text-muted">Upload a CA-signed PEM certificate.</p>' +
+          '<div class="form-group">' +
+            '<label>Certificate (PEM)</label>' +
+            '<textarea id="upload-cert-pem" rows="4" placeholder="-----BEGIN CERTIFICATE-----..."></textarea>' +
+          '</div>' +
+          '<div class="form-group">' +
+            '<label>Private Key (PEM)</label>' +
+            '<textarea id="upload-key-pem" rows="4" placeholder="-----BEGIN PRIVATE KEY-----..."></textarea>' +
+          '</div>' +
+          '<div id="upload-cert-error" class="form-error hidden"></div>' +
+          '<button id="upload-cert-btn" style="width:100%;">Upload Certificate</button>' +
+        '</div>';
+
       // MCP Bearer Token section
       html +=
         '<div class="section-card">' +
@@ -315,6 +340,22 @@
     var copyBtn = document.getElementById('copy-token-btn');
     if (copyBtn) {
       copyBtn.addEventListener('click', function () { copyToken(); });
+    }
+
+    // --- Advanced TLS Settings ---
+    var tlsApChk = document.getElementById('tls-ap-mode-chk');
+    if (tlsApChk) {
+      tlsApChk.addEventListener('change', function () { handleTlsApModeChange(tlsApChk.checked); });
+    }
+    
+    var regenBtn = document.getElementById('regen-cert-btn');
+    if (regenBtn) {
+      regenBtn.addEventListener('click', function () { handleRegenCert(); });
+    }
+    
+    var uploadBtn = document.getElementById('upload-cert-btn');
+    if (uploadBtn) {
+      uploadBtn.addEventListener('click', function () { handleUploadCert(); });
     }
   }
 
@@ -425,6 +466,88 @@
   }
   function hideFormError(el) {
     if (el) { el.textContent = ''; el.classList.add('hidden'); }
+  }
+
+  // =========================================================================
+  // 3.5. Advanced TLS Handlers
+  // =========================================================================
+
+  function handleTlsApModeChange(enabled) {
+    window.apiFetch('/api/auth/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tls_ap_mode: enabled })
+    }).then(function(data) {
+      if (window.showToast) window.showToast('Config saved' + (data.restartRequired ? ' - restart required' : ''), 'success');
+    }).catch(function(err) {
+      if (window.showToast) window.showToast('Failed to save config', 'error');
+    });
+  }
+
+  function handleRegenCert() {
+    var btn = document.getElementById('regen-cert-btn');
+    btn.disabled = true;
+    btn.textContent = 'Regenerating...';
+    window.apiFetch('/api/auth/cert/generate', { method: 'POST' })
+      .then(function (data) {
+        if (data.restartRequired) {
+          if (window.showToast) window.showToast('Certificate regenerated! Restarting...', 'success', 8000);
+          setTimeout(function() {
+            window.apiFetch('/api/system/restart', { method: 'POST' }).catch(function(){});
+          }, 1000);
+        }
+      })
+      .catch(function (err) {
+        if (window.showToast) window.showToast('Failed to regenerate: ' + err.message, 'error');
+        btn.disabled = false;
+        btn.textContent = 'Force Regenerate Certificate';
+      });
+  }
+
+  function stripPem(pemText) {
+    return pemText.replace(/-----BEGIN[^-]+-----/g, '')
+                  .replace(/-----END[^-]+-----/g, '')
+                  .replace(/\s+/g, '');
+  }
+
+  function handleUploadCert() {
+    var certEl = document.getElementById('upload-cert-pem');
+    var keyEl  = document.getElementById('upload-key-pem');
+    var errEl  = document.getElementById('upload-cert-error');
+    var btn    = document.getElementById('upload-cert-btn');
+
+    var certPem = certEl ? certEl.value : '';
+    var keyPem  = keyEl ? keyEl.value : '';
+
+    if (!certPem || !keyPem) {
+      showFormError(errEl, 'Both Certificate and Private Key are required.');
+      return;
+    }
+
+    var certB64 = stripPem(certPem);
+    var keyB64  = stripPem(keyPem);
+
+    btn.disabled = true;
+    btn.textContent = 'Uploading...';
+
+    window.apiFetch('/api/auth/cert/upload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cert_der: certB64, key_der: keyB64 })
+    })
+    .then(function (data) {
+      if (data.restartRequired) {
+        if (window.showToast) window.showToast('Certificate uploaded! Restarting...', 'success', 8000);
+        setTimeout(function() {
+            window.apiFetch('/api/system/restart', { method: 'POST' }).catch(function(){});
+        }, 1000);
+      }
+    })
+    .catch(function (err) {
+      showFormError(errEl, 'Upload failed: ' + err.message);
+      btn.disabled = false;
+      btn.textContent = 'Upload Certificate';
+    });
   }
 
   // =========================================================================

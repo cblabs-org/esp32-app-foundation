@@ -42,6 +42,10 @@
 #include "../ConfigManager/ConfigManager.hpp"
 
 #ifndef NATIVE_BUILD
+#include <mbedtls/asn1write.h>
+#include <mbedtls/oid.h>
+#include <mbedtls/base64.h>
+#include <WiFi.h>
 // Full PsychicHttpServer types are required for registerRoutes() in hardware builds.
 #include <PsychicHttp.h>
 // mbedTLS: SHA-256 + constant-time comparison for password hashing (WO2).
@@ -463,6 +467,68 @@ bool AuthManager::generateAndStoreCert(const char* hostname) {
     mbedtls_x509write_crt_set_md_alg(crt, MBEDTLS_MD_SHA256);
     mbedtls_x509write_crt_set_version(crt, MBEDTLS_X509_CRT_VERSION_3);
 
+    // --- Subject Alternative Name (SAN) ---
+    {
+        unsigned char san_buf[128];
+        unsigned char *p = san_buf + sizeof(san_buf);
+        size_t san_len = 0;
+        int san_res;
+
+        // IP address (if applicable)
+        IPAddress ipAddr;
+        bool hasIp = false;
+        if (WiFi.getMode() == WIFI_AP || WiFi.getMode() == WIFI_AP_STA) {
+            ipAddr = WiFi.softAPIP();
+            if (ipAddr[0] != 0) hasIp = true;
+        } else if (WiFi.getMode() == WIFI_STA) {
+            ipAddr = WiFi.localIP();
+            if (ipAddr[0] != 0) hasIp = true;
+        }
+
+        if (hasIp) {
+            unsigned char ip_bytes[4] = { ipAddr[0], ipAddr[1], ipAddr[2], ipAddr[3] };
+            san_res = mbedtls_asn1_write_raw_buffer(&p, san_buf, ip_bytes, 4);
+            if (san_res < 0) return cleanup(false);
+            san_len += san_res;
+            
+            san_res = mbedtls_asn1_write_len(&p, san_buf, 4);
+            if (san_res < 0) return cleanup(false);
+            san_len += san_res;
+            
+            san_res = mbedtls_asn1_write_tag(&p, san_buf, MBEDTLS_ASN1_CONTEXT_SPECIFIC | 7);
+            if (san_res < 0) return cleanup(false);
+            san_len += san_res;
+        }
+
+        // DNS name
+        char dns_name[64];
+        snprintf(dns_name, sizeof(dns_name), "%s.local", hostname);
+        size_t dns_name_len = strlen(dns_name);
+        
+        san_res = mbedtls_asn1_write_raw_buffer(&p, san_buf, (const unsigned char*)dns_name, dns_name_len);
+        if (san_res < 0) return cleanup(false);
+        san_len += san_res;
+        
+        san_res = mbedtls_asn1_write_len(&p, san_buf, dns_name_len);
+        if (san_res < 0) return cleanup(false);
+        san_len += san_res;
+        
+        san_res = mbedtls_asn1_write_tag(&p, san_buf, MBEDTLS_ASN1_CONTEXT_SPECIFIC | 2);
+        if (san_res < 0) return cleanup(false);
+        san_len += san_res;
+        
+        // SEQUENCE
+        san_res = mbedtls_asn1_write_len(&p, san_buf, san_len);
+        if (san_res < 0) return cleanup(false);
+        san_len += san_res;
+        
+        san_res = mbedtls_asn1_write_tag(&p, san_buf, MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE);
+        if (san_res < 0) return cleanup(false);
+        san_len += san_res;
+        
+        mbedtls_x509write_crt_set_extension(crt, MBEDTLS_OID_SUBJECT_ALT_NAME, MBEDTLS_OID_SIZE(MBEDTLS_OID_SUBJECT_ALT_NAME), 0, p, san_len);
+    }
+
     // --- Step 6: Serialise certificate to DER ---
     // x509write_crt_der() also writes to the END of the buffer; same convention.
     int crtLen = mbedtls_x509write_crt_der(crt, crtBuf, 1024,
@@ -586,6 +652,7 @@ void AuthManager::registerRoutes(PsychicHttpServer& server) {
             doc["sessionActive"] = _isSessionActive();
             doc["passwordSet"]   = _passwordSet;
             doc["certPresent"]   = _certPresent;
+            doc["tlsApMode"]     = _tlsApMode;
             String out;
             serializeJson(doc, out);
             return response->send(200, "application/json", out.c_str());
@@ -619,6 +686,115 @@ void AuthManager::registerRoutes(PsychicHttpServer& server) {
             serializeJson(doc, out);
             return response->send(200, "application/json", out.c_str());
         });
+
+    // --- POST /api/auth/cert/generate ---
+    server.on("/api/auth/cert/generate", HTTP_POST, [this](PsychicRequest* request, PsychicResponse* response) {
+        if (!_checkSessionCookie(request)) {
+            return response->send(401, "application/json", "{\"error\":\"not_authenticated\"}");
+        }
+#ifndef NATIVE_BUILD
+        xTaskCreate(
+            [](void* param) {
+                auto* self = static_cast<AuthManager*>(param);
+                self->generateAndStoreCert("esp32-device");
+                vTaskDelete(nullptr);
+            },
+            "cert_gen", 12288, this, 1, nullptr
+        );
+#else
+        generateAndStoreCert("esp32-device");
+#endif
+        JsonDocument resp;
+        resp["status"] = "ok";
+        resp["restartRequired"] = true;
+        String out;
+        serializeJson(resp, out);
+        return response->send(200, "application/json", out.c_str());
+    });
+
+    // --- POST /api/auth/cert/upload ---
+    server.on("/api/auth/cert/upload", HTTP_POST, [this](PsychicRequest* request, PsychicResponse* response) {
+        if (!_checkSessionCookie(request)) {
+            return response->send(401, "application/json", "{\"error\":\"not_authenticated\"}");
+        }
+        if (request->contentLength() > 8192) {
+            return response->send(413, "application/json", "{\"error\":\"payload_too_large\"}");
+        }
+        const char* body = request->bodyCStr();
+        if (!body || strlen(body) == 0) {
+            return response->send(400, "application/json", "{\"error\":\"body_required\"}");
+        }
+        JsonDocument doc;
+        DeserializationError err = deserializeJson(doc, body);
+        if (err) {
+            return response->send(400, "application/json", "{\"error\":\"invalid_json\"}");
+        }
+        const char* cert_b64 = doc["cert_der"] | "";
+        const char* key_b64 = doc["key_der"] | "";
+        if (strlen(cert_b64) == 0 || strlen(key_b64) == 0) {
+            return response->send(400, "application/json", "{\"error\":\"missing_cert_or_key\"}");
+        }
+
+#ifndef NATIVE_BUILD
+        size_t cert_len = 0, key_len = 0;
+        unsigned char *cert_der = new unsigned char[4096];
+        unsigned char *key_der = new unsigned char[2048];
+        
+        int r1 = mbedtls_base64_decode(cert_der, 4096, &cert_len, (const unsigned char*)cert_b64, strlen(cert_b64));
+        int r2 = mbedtls_base64_decode(key_der, 2048, &key_len, (const unsigned char*)key_b64, strlen(key_b64));
+        
+        bool success = false;
+        if (r1 == 0 && r2 == 0) {
+            if (_saveToLittleFS("/etc/server.key", key_der, key_len) &&
+                _saveToLittleFS("/etc/server.crt", cert_der, cert_len)) {
+                _certPresent = true;
+                if (_configManager) _configManager->saveModuleConfig(this);
+                success = true;
+            }
+        }
+        delete[] cert_der;
+        delete[] key_der;
+        
+        if (!success) {
+            return response->send(500, "application/json", "{\"error\":\"failed_to_store_cert\"}");
+        }
+#endif
+        JsonDocument resp;
+        resp["status"] = "ok";
+        resp["restartRequired"] = true;
+        String out;
+        serializeJson(resp, out);
+        return response->send(200, "application/json", out.c_str());
+    });
+
+    // --- POST /api/auth/config ---
+    server.on("/api/auth/config", HTTP_POST, [this](PsychicRequest* request, PsychicResponse* response) {
+        if (!_checkSessionCookie(request)) {
+            return response->send(401, "application/json", "{\"error\":\"not_authenticated\"}");
+        }
+        if (request->contentLength() > MAX_BODY_SIZE) {
+            return response->send(413, "application/json", "{\"error\":\"payload_too_large\"}");
+        }
+        const char* body = request->bodyCStr();
+        if (!body || strlen(body) == 0) return response->send(400, "application/json", "{\"error\":\"body_required\"}");
+        
+        JsonDocument doc;
+        if (deserializeJson(doc, body)) {
+            return response->send(400, "application/json", "{\"error\":\"invalid_json\"}");
+        }
+        
+        if (doc.containsKey("tls_ap_mode")) {
+            _tlsApMode = doc["tls_ap_mode"].as<bool>();
+            if (_configManager) _configManager->saveModuleConfig(this);
+        }
+        
+        JsonDocument resp;
+        resp["status"] = "ok";
+        resp["restartRequired"] = true;
+        String out;
+        serializeJson(resp, out);
+        return response->send(200, "application/json", out.c_str());
+    });
 
     // --- POST /api/auth/password (body limit 256 bytes) ---
     // Sets the password: generates a fresh salt, computes SHA-256(salt ‖ password),
@@ -784,6 +960,7 @@ void AuthManager::applyConfig(const JsonObject& section) {
     _authEnabled = section["enabled"]     | false;
     _passwordSet = section["passwordSet"] | false;
     _certPresent = section["certPresent"] | false;
+    _tlsApMode   = section["tls_ap_mode"] | false;
 
     ESP_LOGI(TAG, "Auth config applied — enabled=%s passwordSet=%s certPresent=%s",
              _authEnabled ? "true" : "false",
@@ -801,6 +978,7 @@ void AuthManager::serializeConfig(JsonObject& section) const {
     section["enabled"]     = _authEnabled;
     section["passwordSet"] = _passwordSet;
     section["certPresent"] = _certPresent;
+    section["tls_ap_mode"] = _tlsApMode;
 }
 
 /**
@@ -823,6 +1001,7 @@ void AuthManager::resetConfig() {
     _authEnabled = false;
     _passwordSet = false;
     _certPresent = false;
+    _tlsApMode   = false;
     memset(_sessionToken, 0, sizeof(_sessionToken));
 
     // --- Step 2: Purge KeyManager credential entries ---

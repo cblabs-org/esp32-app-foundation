@@ -315,6 +315,11 @@ public:
      */
     void setAPMode(bool apMode) { _apMode = apMode; }
 
+    /**
+     * @brief Query whether TLS is enabled in AP mode.
+     */
+    bool isApTlsEnabled() const { return _tlsApMode; }
+
 private:
     // -------------------------------------------------------------------------
     // Auth state flags
@@ -324,6 +329,7 @@ private:
     bool _passwordSet  = false; ///< True if a password hash exists in KeyManager
     bool _certPresent  = false; ///< True if a TLS certificate exists in LittleFS
     bool _apMode       = false; ///< True when device is in AP mode (WO5: bypasses auth guard)
+    bool _tlsApMode    = false; ///< True if TLS should be enforced even in AP mode
 
     // -------------------------------------------------------------------------
     // Session token (16-byte; all-zero means no active session)
