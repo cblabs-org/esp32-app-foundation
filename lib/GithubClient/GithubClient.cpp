@@ -17,6 +17,7 @@
 #include <WiFiClientSecure.h>
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
+#include <esp_heap_caps.h>
 #endif
 
 // Sectigo Public Server Authentication Root E46
@@ -98,9 +99,26 @@ bool GithubClient::getLatestRelease() {
         return false;
     }
 
-    // Read full response body first — stream parsing is fragile on ESP32 TLS
-    // (WiFiClientSecure can time out mid-read causing IncompleteInput errors)
-    String payload = http.getString();
+    // Read full response body into PSRAM — stream parsing is fragile on ESP32
+    // TLS (WiFiClientSecure can time out mid-read causing IncompleteInput).
+    // Using PSRAM instead of getString() avoids consuming scarce DRAM heap.
+    int contentLen = http.getSize();
+    if (contentLen <= 0) contentLen = 16384;  // Fallback if no Content-Length
+
+    char* buf = (char*)heap_caps_malloc(contentLen + 1, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (!buf) {
+        // PSRAM unavailable (e.g. ESP32-dev) — fall back to DRAM
+        buf = (char*)malloc(contentLen + 1);
+    }
+    if (!buf) {
+        ESP_LOGE("GITHUB", "Failed to allocate %d bytes for response (no PSRAM or DRAM)", contentLen + 1);
+        http.end();
+        snprintf(lastErrorMsg, sizeof(lastErrorMsg), "Alloc failed (%d bytes)", contentLen + 1);
+        return false;
+    }
+
+    int bytesRead = http.getStream().readBytes(buf, contentLen);
+    buf[bytesRead] = '\0';
     http.end();
 
     // Filter document to reduce memory footprint
@@ -111,11 +129,12 @@ bool GithubClient::getLatestRelease() {
     filter["assets"][0]["url"] = true;
 
     JsonDocument doc;
-    DeserializationError error = deserializeJson(doc, payload, DeserializationOption::Filter(filter));
+    DeserializationError error = deserializeJson(doc, buf, DeserializationOption::Filter(filter));
+    free(buf);
 
     if (error) {
-        snprintf(lastErrorMsg, sizeof(lastErrorMsg), "JSON parse failed: %s (payload %d bytes)", error.c_str(), payload.length());
-        LOG_SECURE("GITHUB", "JSON Parse Error: %s (payload %d bytes)", error.c_str(), payload.length());
+        snprintf(lastErrorMsg, sizeof(lastErrorMsg), "JSON parse failed: %s (%d bytes read)", error.c_str(), bytesRead);
+        LOG_SECURE("GITHUB", "JSON Parse Error: %s (%d bytes read)", error.c_str(), bytesRead);
         return false;
     }
 
@@ -250,8 +269,24 @@ bool GithubClient::getLatestReleaseForChannel(const char* channel) {
             break;  // Graceful degradation: return best found so far
         }
 
-        // Read full response body — stream parsing is fragile on ESP32 TLS
-        String payload = pageHttp.getString();
+        // Read full response body into PSRAM — avoids DRAM-hungry getString()
+        int contentLen = pageHttp.getSize();
+        if (contentLen <= 0) contentLen = 16384;
+
+        char* buf = (char*)heap_caps_malloc(contentLen + 1, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+        if (!buf) {
+            // PSRAM unavailable — fall back to DRAM
+            buf = (char*)malloc(contentLen + 1);
+        }
+        if (!buf) {
+            ESP_LOGE("GITHUB", "Page %d: alloc failed (%d bytes)", page, contentLen + 1);
+            pageHttp.end();
+            parseFailures++;
+            break;
+        }
+
+        int bytesRead = pageHttp.getStream().readBytes(buf, contentLen);
+        buf[bytesRead] = '\0';
         pageHttp.end();
 
         // Parse page — array filter for minimal memory usage
@@ -263,12 +298,13 @@ bool GithubClient::getLatestReleaseForChannel(const char* channel) {
         filter[0]["assets"][0]["url"]  = true;
 
         JsonDocument doc;
-        DeserializationError error = deserializeJson(doc, payload,
+        DeserializationError error = deserializeJson(doc, buf,
                                                       DeserializationOption::Filter(filter));
+        free(buf);
 
         if (error) {
-            LOG_SECURE("GITHUB", "Page %d JSON error: %s (payload %d bytes) — stopping scan",
-                       page, error.c_str(), payload.length());
+            LOG_SECURE("GITHUB", "Page %d JSON error: %s (%d bytes read) — stopping scan",
+                       page, error.c_str(), bytesRead);
             parseFailures++;
             break;  // Graceful degradation
         }

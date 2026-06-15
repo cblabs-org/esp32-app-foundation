@@ -343,7 +343,10 @@ OTAError OTADownloadEngine::downloadAndFlash(WiFiClient& client, const String& b
 
     // --- Step 9: Chunked streaming write with verifier accumulation ---
     size_t totalWritten = 0;
-    uint8_t buf[kChunkSize];
+    // Static buffer — keeps 1 KB off the task stack. Safe because only one
+    // OTA download runs at a time. Located in BSS (DRAM), not PSRAM, so it
+    // remains accessible during SPI flash write operations.
+    static uint8_t buf[kChunkSize];
 
     while (totalWritten < static_cast<size_t>(contentLen)) {
         size_t remaining = static_cast<size_t>(contentLen) - totalWritten;
