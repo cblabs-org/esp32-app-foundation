@@ -32,7 +32,7 @@ public:
  *
  * Implementations must be non-blocking and complete within 10ms.
  */
-void MyApp::tick() {
+void MyApp::tick(uint32_t currentMillis) {
     // Application-specific non-blocking logic goes here
 }
 

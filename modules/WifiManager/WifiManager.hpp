@@ -248,7 +248,7 @@ public:
     /**
      * @brief Periodic maintenance tick for the WiFi state machine.
      */
-    void tick() override;
+    void tick(uint32_t currentMillis) override;
 
     // --- IWebContributor Interface ---
 

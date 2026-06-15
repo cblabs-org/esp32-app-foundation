@@ -47,6 +47,8 @@
 
 #pragma once
 #include <vector>
+#include <type_traits>
+#include "platform/LogShim.h"
 #include "AppState.hpp"
 #include "FrameworkConfig.hpp"
 #include "interfaces/ITickable.hpp"
@@ -169,6 +171,35 @@ public:
     // -------------------------------------------------------------------------
     // Module Registration (Tier 1 — pre-lock only)
     // -------------------------------------------------------------------------
+
+    /**
+     * @brief Universal module registration — auto-detects all framework interfaces.
+     *
+     * Uses compile-time if constexpr to check which interfaces T implements,
+     * and registers the module with every applicable subsystem in a single call.
+     * This is the primary, recommended registration API for both framework
+     * internals and downstream application modules.
+     *
+     * @tparam T  Concrete module type (deduced from pointer).
+     * @param module  Pointer to the module instance. Must not be null.
+     * @return true if at least one interface was detected and registered.
+     */
+    template<typename T>
+    bool registerModule(T* module) {
+        if (!module) return false;
+        bool any = false;
+        if constexpr (std::is_base_of_v<ITickable, T>)        { registerTickable(module);              any = true; }
+        if constexpr (std::is_base_of_v<IConfigurable, T>)    { _configManager.registerModule(module); any = true; }
+        if constexpr (std::is_base_of_v<IWebContributor, T>)  { registerWebContributor(module);        any = true; }
+        if constexpr (std::is_base_of_v<IMCPContributor, T>)  { registerMcpContributor(module);        any = true; }
+        if constexpr (std::is_base_of_v<IDataSource, T>)      { registerDataSource(module);            any = true; }
+        if constexpr (std::is_base_of_v<IConfigGate, T>)      { registerConfigGate(module);            any = true; }
+        if constexpr (std::is_base_of_v<IStatusReporter, T>)  { registerStatusReporter(module);        any = true; }
+        if (!any) {
+            ESP_LOGW("Application", "registerModule: type implements no known framework interface");
+        }
+        return any;
+    }
 
     /**
      * @brief Register a module that participates in the Application tick loop.

@@ -571,7 +571,7 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors,
              useTls, apMode, (unsigned)contributors.size());
 }
 
-void WebServerManager::tick() {
+void WebServerManager::tick(uint32_t currentMillis) {
     if (!_serverStarted && _wifiManager && _wifiManager->isReady()) {
         _httpServer.begin();
 #ifndef NATIVE_BUILD

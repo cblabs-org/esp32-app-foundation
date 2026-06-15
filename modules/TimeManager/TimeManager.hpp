@@ -106,7 +106,7 @@ public:
      * Handles the NTP state machine: polls SNTP status until synced,
      * then periodically re-syncs every RESYNC_INTERVAL_MS.
      */
-    void tick() override;
+    void tick(uint32_t currentMillis) override;
 
     // -------------------------------------------------------------------------
     // IConfigurable Interface (ConfigManager Gateway)

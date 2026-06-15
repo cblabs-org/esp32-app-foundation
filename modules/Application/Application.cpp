@@ -125,28 +125,32 @@ bool Application::begin(const FrameworkConfig& config) {
     _keyManager.begin(&_deviceCrypto);
     _statusReporter->reportStatus("Security services ready", 0.20f);
 
-    // --- Step 7: ConfigManager — register all framework IConfigurable modules ---
-    // WifiManager: inject ConfigManager and KeyManager dependencies, then register.
-    // TimeManager: inject ConfigManager dependency, then register.
-    // MCPServer: registered directly.
-    // AuthManager: inject ConfigManager and KeyManager, then register. Must be
-    //   registered before beginAll() so that persisted auth flags are loaded on boot.
-    // OTAUpdateManager: heap-allocated here (header is forward-declared to avoid
-    //   LDF circular-include issues). Registered with ConfigManager BEFORE beginAll()
-    //   so that OTA channel/autoCheck config is loaded from /mod/ota.json on boot.
+    // --- Step 7: Inject dependencies and register framework modules ---
+    // Dependency injection wires up core services before registration or boot.
     _wifiManager.setConfigManager(&_configManager);
     _wifiManager.setKeyManager(&_keyManager);
-    _configManager.registerModule(&_wifiManager);
-    _configManager.registerModule(&_mcpServer);
     _timeManager.setConfigManager(&_configManager);
-    _configManager.registerModule(&_timeManager);
     _authManager.begin(&_configManager, &_keyManager);
-    _configManager.registerModule(&_authManager);
     _otaManager = new OTAUpdateManager();
-    _configManager.registerModule(_otaManager);
+
+    // --- Module registration (auto-detects all interfaces per module) ---
+    registerModule(&_wifiManager);        // ITickable + IConfigurable + IWebContributor
+    registerModule(&_timeManager);        // ITickable + IConfigurable + IWebContributor
+    registerModule(&_authManager);        // IConfigurable + IWebContributor
+    registerModule(&_configManager);      // IWebContributor
+    registerModule(&_keyManager);         // IWebContributor
+    registerModule(&_mcpServer);          // IConfigurable + IWebContributor
+    registerModule(_otaManager);          // ITickable + IConfigurable + IWebContributor
+    registerModule(&_webServerManager);   // ITickable
+    registerModule(&_appTabContributor);  // IWebContributor
+
 #ifndef NATIVE_BUILD
-    _configManager.registerModule(&_display);
+    registerModule(&_display);                    // ITickable + IStatusReporter + IConfigurable + IWebContributor + IMCPContributor
+    registerModule(_display.settingsTabStub());   // IWebContributor
+    registerModule(_display.screenshotTabStub()); // IWebContributor
 #endif
+
+    registerModule(&_wifiGate);           // IConfigGate
 
     // --- Step 8: ConfigManager.beginAll() — load all persisted config ---
     // Iterates the registry, loads each module's namespace file from
@@ -180,30 +184,7 @@ bool Application::begin(const FrameworkConfig& config) {
     _otaManager->begin(*this);
     _statusReporter->reportStatus("Update service ready", 0.80f);
 
-    // --- Step 14: Register core web contributors and tickables ---
-    _webContributors.push_back(&_authManager);   // Security tab — registered first (order: 5)
-    _webContributors.push_back(&_wifiManager);
-    _webContributors.push_back(&_timeManager);
-    _webContributors.push_back(&_configManager);
-    _webContributors.push_back(&_keyManager);
-    _webContributors.push_back(_otaManager);
-    _webContributors.push_back(&_mcpServer);
-    _webContributors.push_back(&_appTabContributor);
-#ifndef NATIVE_BUILD
-    _webContributors.push_back(&_display);
-    _webContributors.push_back(_display.settingsTabStub());
-    _webContributors.push_back(_display.screenshotTabStub());
-    _mcpContributors.push_back(&_display);
-#endif
-
-    _tickables.push_back(&_wifiManager);
-    _tickables.push_back(&_timeManager);
-    _tickables.push_back(&_webServerManager);
-#ifndef NATIVE_BUILD
-    _tickables.push_back(&_display);
-#endif
-    _tickables.push_back(_otaManager); // Boot auto-check + daily scheduled check
-
+    // --- Step 14: (Merged into Step 7 module registration) ---
 
     // --- Step 15: WebServerManager + MCPServer begin() ---
     _authManager.setAPMode(_wifiManager.getAPMode());
@@ -225,8 +206,7 @@ bool Application::begin(const FrameworkConfig& config) {
     _mcpServer.setDisplayInfo(_display.getDisplayInfo());
 #endif
 
-    // --- Step 16: Register built-in WiFi config gate ---
-    _configGates.push_back(&_wifiGate);
+    // --- Step 16: (Merged into Step 7 module registration) ---
 
     // --- Step 17: Lock all registration vectors ---
     // No further registrations are permitted after this point.
@@ -281,9 +261,15 @@ void Application::tick() {
     // Guard: do not tick during boot phases
     if (_state != AppState::Configuring && _state != AppState::Running) return;
 
+#ifndef NATIVE_BUILD
+    uint32_t currentMillis = millis();
+#else
+    uint32_t currentMillis = 0;  // Native builds use test-injected time
+#endif
+
     // --- RUNNING: throttled gate regression check ---
     if (_state == AppState::Running) {
-        unsigned long now = millis();
+        unsigned long now = currentMillis;
         if ((now - _lastGateCheckMs) >= GATE_CHECK_INTERVAL_MS) {
             _lastGateCheckMs = now;
             for (uint8_t i = 0; i < _configGates.size(); i++) {
@@ -345,7 +331,7 @@ void Application::tick() {
 
     // Dispatch to all registered tickables in registration order
     for (auto* module : _tickables) {
-        module->tick();
+        module->tick(currentMillis);
     }
 
     // MCP server: poll Serial for incoming JSON-RPC requests

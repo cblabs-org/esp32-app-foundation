@@ -44,7 +44,7 @@ class MockTickable : public ITickable {
 public:
     int tickCount = 0; ///< Incremented once per tick() dispatch
 
-    void tick() override { tickCount++; }
+    void tick(uint32_t currentMillis) override { tickCount++; }
 };
 
 /**
@@ -812,6 +812,39 @@ TEST_F(GateDependencyOrderingTest, ChainedDeps_ResolveCorrectly) {
     EXPECT_TRUE(gateA.isSatisfied());
     EXPECT_TRUE(gateB.isSatisfied());
     EXPECT_TRUE(gateC.isSatisfied());
+}
+
+// =============================================================================
+// Test Group: registerModule<T> universal registration
+// =============================================================================
+
+class MultiModule : public ITickable, public IWebContributor {
+public:
+    void tick(uint32_t currentMillis) override { tickCount++; (void)currentMillis; }
+    void registerRoutes(PsychicHttpServer& /*server*/) override {}
+    int tickCount = 0;
+};
+
+class DummyModule {
+public:
+    int value = 0;
+};
+
+TEST_F(ApplicationLockTest, RegisterModule_DetectsAndRegistersMultipleInterfaces) {
+    MultiModule mod;
+    bool result = app.registerModule(&mod);
+    EXPECT_TRUE(result);
+
+    lockApp(); // Advances state to RUNNING
+
+    app.tick();
+    EXPECT_EQ(mod.tickCount, 1);
+}
+
+TEST_F(ApplicationLockTest, RegisterModule_FailsForUnknownInterface) {
+    DummyModule mod;
+    bool result = app.registerModule(&mod);
+    EXPECT_FALSE(result);
 }
 
 // =============================================================================

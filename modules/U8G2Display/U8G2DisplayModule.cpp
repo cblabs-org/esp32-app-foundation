@@ -224,10 +224,10 @@ void U8G2DisplayModule::begin(EventBus* eventBus) {
  *   4. Determine visible board (Modal → Base → Screensaver → Carousel)
  *   5. Render visible board
  */
-void U8G2DisplayModule::tick() {
+void U8G2DisplayModule::tick(uint32_t currentMillis) {
     // --- 1. Tick Screensaver ---
 #ifndef NATIVE_BUILD
-    unsigned long currentMs = millis();
+    unsigned long currentMs = currentMillis;
     bool wasBlanked = _screensaver.isBlanked();
     _screensaver.tick(currentMs, _u8g2, _brightness);
     bool isBlanked = _screensaver.isBlanked();
@@ -280,14 +280,14 @@ void U8G2DisplayModule::tick() {
 
     // --- 5. Tick + render the visible board (frame-rate limited) ---
 #ifndef NATIVE_BUILD
-    visible->tick(millis());
-    unsigned long now = millis();
+    visible->tick(currentMillis);
+    unsigned long now = currentMillis;
     if ((now - _lastRenderMs) >= _targetFrameIntervalMs) {
         _renderCurrentBoard();
         _lastRenderMs = now;
     }
 #else
-    visible->tick(0);
+    visible->tick(currentMillis);
     _renderCurrentBoard();
 #endif
 }

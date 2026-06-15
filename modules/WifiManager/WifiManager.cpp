@@ -212,7 +212,7 @@ void WifiManager::begin() {
 /**
  * @brief Periodic maintenance tick for the WiFi state machine.
  */
-void WifiManager::tick() {
+void WifiManager::tick(uint32_t currentMillis) {
 #ifndef NATIVE_BUILD
     // --- Handle deferred restart (set by connect/forget handlers) ---
     if (_restartRequested) {
@@ -225,7 +225,7 @@ void WifiManager::tick() {
 
     switch (currentState) {
         case WiFiState::Init: {
-            unsigned long elapsed = millis() - stateTimer;
+            unsigned long elapsed = currentMillis - stateTimer;
             if (elapsed > 2000) {
                 ESP_LOGI(TAG, "Init complete (waited %lums). SSID='%s' len=%d",
                          elapsed, wifiSsid, (int)strlen(wifiSsid));
@@ -254,7 +254,7 @@ void WifiManager::tick() {
                 wifiDisconnectTimer = 0; // Reset downtime tracker
                 updateMyUrl();
                 transitionTo(WiFiState::Ready);
-            } else if (millis() - stateTimer > 15000) { // 15 second timeout for STA
+            } else if (currentMillis - stateTimer > 15000) { // 15 second timeout for STA
                 ESP_LOGW(TAG, "WiFi connection timed out. Falling back to AP.");
                 WiFi.disconnect(true); // Ensure clean slate
                 transitionTo(WiFiState::ApStarting);
@@ -278,7 +278,7 @@ void WifiManager::tick() {
                 dnsServer = std::make_unique<DNSServer>();
                 dnsServer->start(53, "*", apIP);
                 ESP_LOGI(TAG, "Access Point '%s' is online. IP: %s", portalName, apIP.toString().c_str());
-                lastApiRequestTime = millis(); // Reset AP timeout timer
+                lastApiRequestTime = currentMillis; // Reset AP timeout timer
             }
             
             transitionTo(WiFiState::Ready);
@@ -310,23 +310,23 @@ void WifiManager::tick() {
             if (!isAPMode && WiFi.status() != WL_CONNECTED) {
                 // If this is the first tick since disconnection, start the timer
                 if (wifiDisconnectTimer == 0) {
-                    wifiDisconnectTimer = millis();
+                    wifiDisconnectTimer = currentMillis;
                 }
 
                 // Wait 10 seconds before attempting to recycle the connection
-                if (millis() - stateTimer > 10000) {
+                if (currentMillis - stateTimer > 10000) {
                     ESP_LOGW(TAG, "Primary connection lost. Retrying...");
                     transitionTo(WiFiState::Init);
                 }
             } else if (isAPMode) {
                 // AP Mode 1-hour inactivity timeout (pragmatic interim; see WO10 notes)
-                if (millis() - lastApiRequestTime > 3600000) {
+                if (currentMillis - lastApiRequestTime > 3600000) {
                     ESP_LOGW(TAG, "AP Mode inactive for 1 hour. Shutting down AP to save power.");
                     transitionTo(WiFiState::Shutdown);
                 }
             } else {
                 // Reset timer if we are connected or in AP mode
-                stateTimer = millis();
+                stateTimer = currentMillis;
                 if (WiFi.status() == WL_CONNECTED) {
                     wifiDisconnectTimer = 0;
                 }

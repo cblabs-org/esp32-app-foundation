@@ -69,14 +69,14 @@ void TimeManager::begin() {
  * 2. Periodic re-sync: after RESYNC_INTERVAL_MS, resets status to IN_PROGRESS
  *    and re-polls. This corrects clock drift over long uptimes.
  */
-void TimeManager::tick() {
+void TimeManager::tick(uint32_t currentMillis) {
     // --- Phase 1: Waiting for initial or re-sync ---
     if (_syncStatus == TimeSyncStatus::IN_PROGRESS) {
         sntp_sync_status_t syncStatus = sntp_get_sync_status();
 
         if (syncStatus == SNTP_SYNC_STATUS_COMPLETED) {
             _syncStatus = TimeSyncStatus::SYNCED;
-            _lastSyncTime = millis();
+            _lastSyncTime = currentMillis;
             ESP_LOGI(TAG, "NTP time synchronization complete");
         }
         return;
@@ -84,7 +84,7 @@ void TimeManager::tick() {
 
     // --- Phase 2: Check if periodic re-sync is due ---
     if (_syncStatus == TimeSyncStatus::SYNCED && _lastSyncTime > 0) {
-        unsigned long now = millis();
+        unsigned long now = currentMillis;
         if ((now - _lastSyncTime) >= RESYNC_INTERVAL_MS) {
             ESP_LOGI(TAG, "Periodic NTP re-sync triggered (interval: %luh)",
                      RESYNC_INTERVAL_MS / 3600000UL);
@@ -480,7 +480,7 @@ void TimeManager::begin() {
     _syncStatus = TimeSyncStatus::SYNCED;
 }
 
-void TimeManager::tick() {
+void TimeManager::tick(uint32_t currentMillis) {
     // No-op for native build
 }
 

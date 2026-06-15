@@ -35,6 +35,8 @@ public:
      * @brief Periodic update hook called by the Application hub on every loop iteration.
      *
      * Implementations must be non-blocking and complete within 10ms.
+     *
+     * @param currentMillis  Milliseconds since boot, captured once per Application::tick() loop.
      */
-    virtual void tick() = 0;
+    virtual void tick(uint32_t currentMillis) = 0;
 };

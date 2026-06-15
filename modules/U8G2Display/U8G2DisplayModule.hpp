@@ -208,7 +208,7 @@ public:
      * timer, advances the carousel if the rotation interval has elapsed, and
      * renders the current board into the U8G2 display buffer.
      */
-    void tick() override;
+    void tick(uint32_t currentMillis) override;
 
     // -------------------------------------------------------------------------
     // Layer Management

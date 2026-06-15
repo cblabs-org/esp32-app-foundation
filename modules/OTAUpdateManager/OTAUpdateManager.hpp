@@ -200,7 +200,7 @@ public:
     void begin(Application& app);
 
     // --- ITickable ---
-    void tick() override;
+    void tick(uint32_t currentMillis) override;
 
     /**
      * @brief Check GitHub for a newer firmware version. Non-blocking.

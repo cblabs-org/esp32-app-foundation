@@ -148,14 +148,14 @@ protected:
 
 /** tick() with no boards must not crash. */
 TEST_F(CarouselEvictionTest, Tick_EmptyPool_DoesNotCrash) {
-    EXPECT_NO_FATAL_FAILURE(display.tick());
+    EXPECT_NO_FATAL_FAILURE(display.tick(0));
 }
 
 /** tick() with boards must not crash in native build. */
 TEST_F(CarouselEvictionTest, Tick_WithBoards_DoesNotCrash) {
     CarouselMockBoard board;
     display.carousel.add(&board);
-    EXPECT_NO_FATAL_FAILURE(display.tick());
+    EXPECT_NO_FATAL_FAILURE(display.tick(0));
 }
 
 /** boardCount tracks additions correctly. */

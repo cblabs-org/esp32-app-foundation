@@ -39,7 +39,7 @@ public:
      *
      * Implementations must be non-blocking and complete within 10ms.
      */
-    void tick() override;
+    void tick(uint32_t currentMillis) override;
 
     /**
      * @brief Registers module-specific routes with the provided AsyncWebServer.

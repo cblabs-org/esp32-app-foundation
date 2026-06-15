@@ -181,7 +181,7 @@ public:
                AuthManager* authManager = nullptr,
                WifiManager* wifiManager = nullptr);
 
-    void tick() override;
+    void tick(uint32_t currentMillis) override;
 
     // Non-copyable, non-movable: AsyncWebServer member is not copy/move-safe.
     WebServerManager(const WebServerManager&) = delete;

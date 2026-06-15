@@ -46,13 +46,13 @@ TEST_F(TimeManagerTest, SetTimezone) {
 // tick() after begin
 TEST_F(TimeManagerTest, TickAfterBegin) {
     timeManager.begin();
-    timeManager.tick();
+    timeManager.tick(0);
     SUCCEED();
 }
 
 // tick() before begin
 TEST_F(TimeManagerTest, TickBeforeBegin) {
-    timeManager.tick();
+    timeManager.tick(0);
     SUCCEED();
 }
 

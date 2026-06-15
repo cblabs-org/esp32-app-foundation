@@ -212,7 +212,7 @@ void OTAUpdateManager::begin(Application& app) {
  *   matches _checkHour and autoCheck is enabled. Requires NTP sync
  *   (time() > 1 000 000) and an active Wi-Fi connection.
  */
-void OTAUpdateManager::tick() {
+void OTAUpdateManager::tick(uint32_t currentMillis) {
     if (!_autoCheck || state_ != OTAState::Idle) return;
 
 #ifndef NATIVE_BUILD
