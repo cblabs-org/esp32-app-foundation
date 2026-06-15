@@ -296,7 +296,8 @@ bool OTAUpdateManager::checkForUpdate() {
              _channel, github.releaseId.c_str(), github.releaseAssets);
 
     // --- SemVer comparison: local build version vs. remote release tag ---
-    FirmwareVersion local = { VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH, Channel::STABLE, 0 };
+    FirmwareVersion local = { VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH,
+                              static_cast<Channel>(VERSION_CHANNEL), VERSION_PRE_NUM };
     FirmwareVersion remote = parseVersionTag(github.releaseId.c_str());
 
     // Normal case: remote > local → update available
@@ -483,7 +484,8 @@ void OTAUpdateManager::performUpdateTask() {
              _channel, github.releaseId.c_str(), github.releaseAssets);
 
     // --- Version guard: only proceed if remote > local ---
-    FirmwareVersion local = { VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH, Channel::STABLE, 0 };
+    FirmwareVersion local = { VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH,
+                              static_cast<Channel>(VERSION_CHANNEL), VERSION_PRE_NUM };
     FirmwareVersion remote = parseVersionTag(github.releaseId.c_str());
 
     if (!(remote > local)) {
