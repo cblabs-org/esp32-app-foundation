@@ -358,7 +358,7 @@ void OTAUpdateManager::performUpdate() {
         return;
     }
 
-    state_ = OTAState::Downloading;
+    state_ = OTAState::Checking;
     ESP_LOGI(TAG, "Launching OTA update pipeline");
 
 #ifndef NATIVE_BUILD
@@ -499,7 +499,8 @@ void OTAUpdateManager::performUpdateTask() {
     ESP_LOGI(TAG, "Update available: %s > %s (channel='%s') — proceeding with download",
              github.releaseId.c_str(), BUILD_VERSION, _channel);
 
-    // Only now show the OTA screen — a download will actually happen
+    // Only now transition to Downloading — a download will actually happen
+    state_ = OTAState::Downloading;
     publishProgress(0.0f, "Update found — preparing download...", false, false);
 
     // --- Step 2: Find firmware and signature assets (manifest-aware) ---
