@@ -8,7 +8,7 @@ artifacts:
 
 # Executive Summary
 
-We have fully implemented the changes under PR-26 to resolve OTA update issues and align the web portal progress bar. All 4 work orders (WO1 to WO4) have been completed, verified, and merged.
+We have fully implemented the changes under PR-26 to resolve OTA update issues, align the web portal progress bar, and successfully verified versioning rules with a new `v0.0.9-dev.1` tag and compilation. All 5 work orders (WO1 to WO5) have been completed, verified, and merged.
 
 # Next Steps
 
