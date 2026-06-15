@@ -524,6 +524,10 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors,
     // Whitelisted public API paths pass through. /api/mcp paths are excluded
     // because MCPServer handles its own auth via checkMcpAuth().
     // Everything else under /api/ must pass checkPortalAuth().
+    //
+    // NOTE: /api/system uses EXACT match (==), not prefix match, because
+    // /api/system/restart and /api/system/factory-reset are destructive
+    // endpoints that MUST require authentication.
     // -----------------------------------------------------------------------
 #ifndef NATIVE_BUILD
     if (_authManager) {
@@ -539,10 +543,13 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors,
             }
 
             // --- Pass through: whitelisted public API paths ---
+            // SECURITY: /api/system uses exact match to prevent
+            //           /api/system/restart and /api/system/factory-reset
+            //           from bypassing authentication.
             if (path.startsWith("/api/auth/status") ||
                 path.startsWith("/api/auth/login")  ||
                 path.startsWith("/api/auth/password") ||
-                path.startsWith("/api/system")       ||
+                path == "/api/system"                ||
                 path.startsWith("/api/tabs")         ||
                 path.startsWith("/api/app")          ||
                 path.startsWith("/api/mcp")) {

@@ -42,6 +42,8 @@ class ApiQueue {
           response = retryResponse;
         } catch (authErr) {
           item.reject(authErr);
+          this.isProcessing = false;
+          setTimeout(() => this.processNext(), 0);
           return;
         }
       }
@@ -472,7 +474,7 @@ document.addEventListener('DOMContentLoaded', function() {
   loadScripts(function() {
     // Scripts are loaded — now safe to build tabs and dispatch tab-changed
     loadTabs();
+    loadAppInfo();
+    checkApMode();
   });
-  loadAppInfo();
-  checkApMode();
 });

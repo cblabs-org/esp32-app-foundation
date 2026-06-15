@@ -639,8 +639,10 @@ bool AuthManager::loadCert(uint8_t** certDer, size_t* certLen,
  * Body parsing for POST /api/auth/password and POST /api/auth/login is handled
  * via ESPAsyncWebServer's body callback with a 256-byte size limit.
  *
- * Note: The Secure cookie attribute is intentionally omitted until WO4 activates
- * HTTPS. Adding it here would block the login flow over HTTP during development.
+ * Note: The Secure cookie attribute is conditionally applied — it is only
+ * set when hasCert() returns true (indicating the server is running in TLS
+ * mode). Without this guard, browsers silently refuse to send Secure-flagged
+ * cookies over plain HTTP, causing a login loop.
  */
 void AuthManager::registerRoutes(PsychicHttpServer& server) {
 #ifndef NATIVE_BUILD
@@ -915,9 +917,17 @@ void AuthManager::registerRoutes(PsychicHttpServer& server) {
         char tokenHex[33] = {0};  // 16 bytes → 32 hex chars + null
         _toHex(_sessionToken, 16, tokenHex);
 
+        // Only set the Secure flag when TLS is active; browsers silently
+        // refuse to send Secure-flagged cookies over plain HTTP, which
+        // causes a login loop.
         char cookie[128] = {0};
-        snprintf(cookie, sizeof(cookie),
-            "esp32_session=%s; HttpOnly; SameSite=Strict; Secure", tokenHex);
+        if (hasCert()) {
+            snprintf(cookie, sizeof(cookie),
+                "esp32_session=%s; Path=/; HttpOnly; SameSite=Strict; Secure", tokenHex);
+        } else {
+            snprintf(cookie, sizeof(cookie),
+                "esp32_session=%s; Path=/; HttpOnly; SameSite=Strict", tokenHex);
+        }
 
         response->addHeader("Set-Cookie", cookie);
         return response->send(200, "application/json", "{\"status\":\"ok\"}");
@@ -930,9 +940,14 @@ void AuthManager::registerRoutes(PsychicHttpServer& server) {
             // --- Invalidate the in-memory session ---
             memset(_sessionToken, 0, sizeof(_sessionToken));
 
-            // --- Clear the client cookie ---
-            response->addHeader("Set-Cookie",
-                "esp32_session=; HttpOnly; SameSite=Strict; Secure; Max-Age=0");
+            // --- Clear the client cookie (match Secure flag to login) ---
+            if (hasCert()) {
+                response->addHeader("Set-Cookie",
+                    "esp32_session=; Path=/; HttpOnly; SameSite=Strict; Secure; Max-Age=0");
+            } else {
+                response->addHeader("Set-Cookie",
+                    "esp32_session=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0");
+            }
             return response->send(200, "application/json", "{\"status\":\"ok\"}");
         });
 

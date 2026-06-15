@@ -189,119 +189,157 @@
   function renderSecurityContent(container, state) {
     var html = '';
 
+    // Eye toggle SVG (reused across password fields)
+    var eyeSvgOpen = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" ' +
+      'stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+      '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>' +
+      '<circle cx="12" cy="12" r="3"></circle></svg>';
+
     if (!state.enabled && !state.passwordSet) {
       // --- State A: No password set — show "Set Password" form ---
       html +=
         '<article>' +
-          '<header>&#x1f512; Set Password</header>' +
-          '<p class="text-muted" style="font-size:0.8rem; margin:0.25rem 0 0.75rem 0;">Authentication is currently disabled. Set a password to ' +
-             'secure the portal and enable HTTPS.</p>' +
-          '<label for="new-password">New Password' +
+          '<header>Set Password</header>' +
+          '<p style="font-size:0.8rem; color:var(--text-muted); margin:0.25rem 0 0.75rem 0;">' +
+            'Authentication is currently disabled. Setting a password will:' +
+          '</p>' +
+          '<ul style="font-size:0.8rem; color:var(--text-muted); margin:0 0 0.75rem 1.25rem; padding:0; line-height:1.6;">' +
+            '<li>Enable portal authentication (login required on every visit)</li>' +
+            '<li>Generate a self-signed TLS certificate and enable HTTPS</li>' +
+            '<li>Create an MCP bearer token for AI agent access</li>' +
+            '<li>Restart the device to activate HTTPS</li>' +
+          '</ul>' +
+          '<p style="font-size:0.8rem; color:var(--text-muted); margin:0 0 0.75rem 0;">' +
+            '<strong>Browser note:</strong> After restart, your browser will show a security warning ' +
+            'for the self-signed certificate. You will need to click "Advanced" \u2192 "Proceed" to access the portal. ' +
+            'This is expected and safe for local network use.' +
+          '</p>' +
+          '<label for="new-password" style="font-size:0.85rem;">New Password</label>' +
+          '<div style="position:relative; margin-bottom:0.75rem;">' +
             '<input type="password" id="new-password" ' +
-                   'placeholder="Choose a password (min 8 chars)" autocomplete="new-password">' +
-          '</label>' +
-          '<label for="confirm-password">Confirm Password' +
-            '<input type="password" id="confirm-password" ' +
-                   'placeholder="Confirm password" autocomplete="new-password">' +
-          '</label>' +
+                   'placeholder="Choose a password (min 8 chars)" autocomplete="new-password" ' +
+                   'style="width:100%; box-sizing:border-box; padding-right:2.5rem;">' +
+            '<button type="button" id="eye-new-pw" title="Toggle visibility" style="' +
+              'position:absolute; right:8px; top:50%; transform:translateY(-50%);' +
+              'background:none; border:none; cursor:pointer; padding:4px;' +
+              'color:var(--text-muted); display:flex; align-items:center;">' +
+              eyeSvgOpen +
+            '</button>' +
+          '</div>' +
+          '<label for="confirm-password" style="font-size:0.85rem;">Confirm Password</label>' +
+          '<input type="password" id="confirm-password" ' +
+                 'placeholder="Confirm password" autocomplete="new-password" ' +
+                 'style="width:100%; box-sizing:border-box; margin-bottom:0.75rem;">' +
           '<div id="set-password-error" class="form-error hidden"></div>' +
-          '<button id="set-password-btn" class="full-width">Enable Authentication</button>' +
+          '<button id="set-password-btn" style="width:100%;">Enable Authentication</button>' +
         '</article>';
     } else if (state.enabled) {
       // --- State B: Auth enabled + logged in — full management UI ---
 
-      // Cert status section
+      // 1. Change Password
       html +=
         '<article>' +
-          '<header>TLS Certificate</header>';
-      if (state.certPresent) {
-        html +=
-          '<div class="cert-status">' +
-            '<span class="badge badge-ok">✓ Self-signed certificate active</span>' +
-            (state.certSubject
-              ? '<p class="text-muted" style="font-size:0.8rem; margin:0.25rem 0 0.75rem 0;">Subject: ' + escapeHtml(state.certSubject) + '</p>'
-              : '') +
-          '</div>';
-      } else {
-        html +=
-          '<div class="cert-status">' +
-            '<span class="badge badge-warn">⚠ No certificate present</span>' +
-            '<p class="text-muted" style="font-size:0.8rem; margin:0.25rem 0 0.75rem 0;">A certificate will be generated when you set a password.</p>' +
-          '</div>';
-      }
-      html += '</article>';
+          '<header>Change Password</header>' +
+          '<p style="font-size:0.8rem; color:var(--text-muted); margin:0.25rem 0 0.75rem 0;">' +
+            'Changing your password will also regenerate the MCP bearer token. ' +
+            'Any AI agents using the current token will need to be reconfigured. ' +
+            'Your browser session will remain active.' +
+          '</p>' +
+          '<label for="new-password" style="font-size:0.85rem;">New Password</label>' +
+          '<div style="position:relative; margin-bottom:0.75rem;">' +
+            '<input type="password" id="new-password" ' +
+                   'placeholder="New password (min 8 chars)" autocomplete="new-password" ' +
+                   'style="width:100%; box-sizing:border-box; padding-right:2.5rem;">' +
+            '<button type="button" id="eye-new-pw" title="Toggle visibility" style="' +
+              'position:absolute; right:8px; top:50%; transform:translateY(-50%);' +
+              'background:none; border:none; cursor:pointer; padding:4px;' +
+              'color:var(--text-muted); display:flex; align-items:center;">' +
+              eyeSvgOpen +
+            '</button>' +
+          '</div>' +
+          '<label for="confirm-password" style="font-size:0.85rem;">Confirm Password</label>' +
+          '<input type="password" id="confirm-password" ' +
+                 'placeholder="Confirm new password" autocomplete="new-password" ' +
+                 'style="width:100%; box-sizing:border-box; margin-bottom:0.75rem;">' +
+          '<div id="change-password-error" class="form-error hidden"></div>' +
+          '<button id="change-password-btn" class="secondary" style="width:100%;">Change Password</button>' +
+        '</article>';
 
-      // Advanced TLS Settings section
+      // 2. MCP Bearer Token
+      html +=
+        '<article>' +
+          '<header>MCP Bearer Token</header>' +
+          '<p style="font-size:0.8rem; color:var(--text-muted); margin:0.25rem 0 0.75rem 0;">' +
+            'Use this token in your AI agent config to authenticate MCP requests. ' +
+            'The token is derived from your password \u2014 changing your password will invalidate it.' +
+          '</p>' +
+          '<div class="token-display">' +
+            '<code id="mcp-token-value" class="token-masked">\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022</code>' +
+            '<button id="reveal-token-btn" class="btn-icon" title="Show/hide token">\ud83d\udc41</button>' +
+            '<button id="copy-token-btn" class="btn-icon" title="Copy to clipboard">\ud83d\udccb</button>' +
+          '</div>' +
+        '</article>';
+
+      // 3. TLS Settings — cert status above-the-fold + advanced drawer
       html +=
         '<article class="advanced-drawer">' +
+          '<div class="status-badge" style="margin-bottom:0.75rem;">';
+
+      if (state.certPresent) {
+        html +=
+            '<span class="dot green"></span>' +
+            '<span>Self-signed certificate active</span>';
+      } else {
+        html +=
+            '<span class="dot yellow"></span>' +
+            '<span>No certificate present \u2014 one will be generated on next restart</span>';
+      }
+
+      html +=
+          '</div>' +
           '<details>' +
             '<summary class="advanced-summary">Advanced TLS Settings</summary>' +
-            '<p class="text-muted" style="font-size:0.8rem; margin:0.25rem 0 0.75rem 0;">' +
+            '<p style="font-size:0.8rem; color:var(--text-muted); margin:0.25rem 0 0.75rem 0;">' +
               'These settings are for advanced users who need to customise the TLS certificate used by the device.' +
             '</p>' +
-            '<p class="text-muted" style="font-size:0.8rem; margin:0.25rem 0 0.75rem 0;">' +
+            '<p style="font-size:0.8rem; color:var(--text-muted); margin:0.25rem 0 0.75rem 0;">' +
               'Enabling TLS in AP mode requires a properly signed CA certificate. Self-signed certificates will cause mobile devices to silently reject the captive portal connection, making setup impossible.' +
             '</p>' +
             '<div style="display:flex; justify-content:space-between; align-items:center; padding:0.6rem 0;">' +
               '<span style="font-weight:600; font-size:0.9rem;">Enable TLS in AP Mode</span>' +
-              '<label class="toggle-switch" style="position:relative; width:48px; height:26px; flex-shrink:0;">' +
-                '<input type="checkbox" id="tls-ap-mode-chk" ' + (state.tlsApMode ? 'checked' : '') +
-                       ' style="opacity:0; width:0; height:0;">' +
+              '<label class="toggle-switch">' +
+                '<input type="checkbox" id="tls-ap-mode-chk"' + (state.tlsApMode ? ' checked' : '') + '>' +
                 '<span class="toggle-slider"></span>' +
               '</label>' +
             '</div>' +
-            '<button id="regen-cert-btn" class="secondary full-width">Force Regenerate Certificate</button>' +
-            '<p class="text-muted" style="font-size:0.8rem; margin:0.25rem 0 0.75rem 0;">' +
-              'To generate a PEM certificate and key, you can use OpenSSL:<br>' +
-              '<code>openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -keyout key.pem -out cert.pem -days 3650 -nodes -subj \'/CN=esp32-device.local\'</code><br>' +
+            '<button id="regen-cert-btn" class="secondary" style="width:100%;">Force Regenerate Certificate</button>' +
+            '<p style="font-size:0.8rem; color:var(--text-muted); margin:0.75rem 0 0.75rem 0;">' +
+              'To generate a PEM certificate and key, you can use OpenSSL:' +
+            '</p>' +
+            '<pre style="font-size:0.7rem; background:var(--bg); border:1px solid var(--border); border-radius:8px; padding:0.75rem; overflow-x:auto; margin:0 0 0.75rem 0; white-space:pre-wrap; word-break:break-all;">' +
+              'openssl req -x509 -newkey ec \\\n  -pkeyopt ec_paramgen_curve:prime256v1 \\\n  -keyout key.pem -out cert.pem \\\n  -days 3650 -nodes \\\n  -subj \'/CN=esp32-device.local\'' +
+            '</pre>' +
+            '<p style="font-size:0.8rem; color:var(--text-muted); margin:0 0 0.75rem 0;">' +
               'For the captive portal to work with TLS, you need a certificate signed by a trusted Certificate Authority (e.g., Let\'s Encrypt). Self-signed certificates will not work for captive portal detection.' +
             '</p>' +
-            '<p style="font-weight:600; font-size:0.85rem; margin:1rem 0 0.5rem 0;">Upload Custom Certificate</p>' +
-            '<p class="text-muted" style="font-size:0.8rem; margin:0.25rem 0 0.75rem 0;">Upload a CA-signed PEM certificate.</p>' +
-            '<label>Certificate (PEM)' +
-              '<textarea id="upload-cert-pem" rows="4" placeholder="-----BEGIN CERTIFICATE-----..."></textarea>' +
-            '</label>' +
-            '<label>Private Key (PEM)' +
-              '<textarea id="upload-key-pem" rows="4" placeholder="-----BEGIN PRIVATE KEY-----..."></textarea>' +
-            '</label>' +
+            '<hr style="border:none; border-top:1px solid var(--border); margin:1rem 0;">' +
+            '<p style="font-weight:600; font-size:0.85rem; margin:0 0 0.5rem 0;">Upload Custom Certificate</p>' +
+            '<p style="font-size:0.8rem; color:var(--text-muted); margin:0 0 0.75rem 0;">Upload a CA-signed PEM certificate and private key.</p>' +
+            '<label for="upload-cert-pem" style="font-size:0.85rem;">Certificate (PEM)</label>' +
+            '<textarea id="upload-cert-pem" rows="4" placeholder="-----BEGIN CERTIFICATE-----..." ' +
+              'style="width:100%; box-sizing:border-box; margin-bottom:0.75rem;"></textarea>' +
+            '<label for="upload-key-pem" style="font-size:0.85rem;">Private Key (PEM)</label>' +
+            '<textarea id="upload-key-pem" rows="4" placeholder="-----BEGIN PRIVATE KEY-----..." ' +
+              'style="width:100%; box-sizing:border-box; margin-bottom:0.75rem;"></textarea>' +
             '<div id="upload-cert-error" class="form-error hidden"></div>' +
-            '<button id="upload-cert-btn" class="full-width">Upload Certificate</button>' +
+            '<button id="upload-cert-btn" style="width:100%;">Upload Certificate</button>' +
           '</details>' +
         '</article>';
 
-      // MCP Bearer Token section
+      // 4. Log Out
       html +=
         '<article>' +
-          '<header>MCP Bearer Token</header>' +
-          '<p class="text-muted" style="font-size:0.8rem; margin:0.25rem 0 0.75rem 0;">Use this token in your AI agent config to authenticate MCP requests.</p>' +
-          '<div class="token-display">' +
-            '<code id="mcp-token-value" class="token-masked">••••••••••••••••</code>' +
-            '<button id="reveal-token-btn" class="btn-icon" title="Show/hide token">👁</button>' +
-            '<button id="copy-token-btn" class="btn-icon" title="Copy to clipboard">📋</button>' +
-          '</div>' +
-        '</article>';
-
-      // Change Password section
-      html +=
-        '<article>' +
-          '<header>Change Password</header>' +
-          '<p class="text-muted" style="font-size:0.8rem; margin:0.25rem 0 0.75rem 0;">Update your portal password. You will remain logged in.</p>' +
-          '<label for="new-password">New Password' +
-            '<input type="password" id="new-password" ' +
-                   'placeholder="New password (min 8 chars)" autocomplete="new-password">' +
-          '</label>' +
-          '<label for="confirm-password">Confirm Password' +
-            '<input type="password" id="confirm-password" ' +
-                   'placeholder="Confirm new password" autocomplete="new-password">' +
-          '</label>' +
-          '<div id="change-password-error" class="form-error hidden"></div>' +
-          '<button id="change-password-btn" class="secondary full-width">Change Password</button>' +
-        '</article>';
-
-      // Logout section
-      html +=
-        '<article>' +
-          '<button id="logout-btn" class="outline danger full-width">Log Out</button>' +
+          '<button id="logout-btn" class="danger" style="width:100%;">Log Out</button>' +
         '</article>';
     }
 
@@ -357,6 +395,24 @@
     var uploadBtn = document.getElementById('upload-cert-btn');
     if (uploadBtn) {
       uploadBtn.addEventListener('click', function () { handleUploadCert(); });
+    }
+
+    // --- Password eye toggle (matches WiFi tab pattern) ---
+    var eyeBtn = document.getElementById('eye-new-pw');
+    var pwInput = document.getElementById('new-password');
+    if (eyeBtn && pwInput) {
+      eyeBtn.addEventListener('click', function () {
+        var isPassword = pwInput.type === 'password';
+        pwInput.type = isPassword ? 'text' : 'password';
+        var svg = eyeBtn.querySelector('svg');
+        if (svg) {
+          if (isPassword) {
+            svg.innerHTML = '<path d="M2 2l20 20"></path><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>';
+          } else {
+            svg.innerHTML = '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle>';
+          }
+        }
+      });
     }
   }
 
