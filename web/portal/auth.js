@@ -651,12 +651,17 @@
     window.apiFetch('/api/auth/mcp-token')
       .then(function (data) {
         fetchedToken = data.token || '(unavailable)';
-        codeEl.textContent = fetchedToken;
-        codeEl.classList.remove('token-masked');
+        // Re-query DOM element — auth-login may have re-rendered the tab
+        var el = document.getElementById('mcp-token-value');
+        if (el) {
+          el.textContent = fetchedToken;
+          el.classList.remove('token-masked');
+        }
         tokenRevealed = true;
       })
       .catch(function () {
-        codeEl.textContent = '(failed to load)';
+        var el = document.getElementById('mcp-token-value');
+        if (el) el.textContent = '(failed to load)';
       });
   }
 
