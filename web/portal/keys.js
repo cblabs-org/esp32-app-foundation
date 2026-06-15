@@ -53,19 +53,27 @@
 
       let html = '';
       for (const key of keys) {
-        const isManaged = (key.id === 'wifi_password');
+        const isExclusive = key.exclusive === true;
+        const managedBy = key.managedBy || null;
         const maskDots = '••••••••';
 
         html += '<div style="display:flex; justify-content:space-between; align-items:center; padding:0.5rem 0; border-bottom:1px solid var(--border);">';
         html += '<div>';
         html += '<strong style="font-size:0.9rem;">' + escapeHtml(key.id) + '</strong>';
         html += '<span style="margin-left:0.5rem; color:var(--text-muted); font-size:0.8rem;">' + maskDots + '</span>';
-        if (isManaged) {
-          html += '<br><span style="font-size:0.7rem; color:var(--primary);">🔒 Managed by WiFi tab</span>';
+
+        // Ownership badge: 🔒 for exclusive, 🔗 for attributed non-exclusive
+        if (isExclusive && managedBy) {
+          html += '<br><span style="font-size:0.7rem; color:var(--primary);">🔒 Managed by ' +
+                  escapeHtml(managedBy) + '</span>';
+        } else if (managedBy) {
+          html += '<br><span style="font-size:0.7rem; color:var(--text-muted);">🔗 Used by ' +
+                  escapeHtml(managedBy) + '</span>';
         }
         html += '</div>';
 
-        if (!isManaged) {
+        // Delete button hidden for exclusive keys
+        if (!isExclusive) {
           html += '<button class="btn-key-delete" data-id="' + escapeHtml(key.id) + '" ';
           html += 'style="background:transparent; color:var(--error); border:1px solid var(--error); padding:0.25rem 0.5rem; font-size:0.75rem; cursor:pointer; border-radius:4px;">';
           html += '🗑 Delete</button>';
@@ -161,7 +169,11 @@
       statusEl.innerHTML = '<span style="color:#2e7d32;">Key saved successfully.</span>';
       loadKeys();
     } catch (error) {
-      statusEl.innerHTML = '<span style="color:var(--error);">Failed to save key.</span>';
+      if (error && error.message && error.message.indexOf('403') !== -1) {
+        statusEl.innerHTML = '<span style="color:var(--error);">This key is managed by a module and cannot be overwritten.</span>';
+      } else {
+        statusEl.innerHTML = '<span style="color:var(--error);">Failed to save key.</span>';
+      }
     } finally {
       addBtn.disabled = false;
       addBtn.textContent = 'Add Key';

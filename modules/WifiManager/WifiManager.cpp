@@ -763,7 +763,7 @@ void WifiManager::updateWiFi(const char* ssid, const char* pass) {
 
         // Persist password via KeyManager (AES-256 encrypted)
         if (_keyManager != nullptr) {
-            if (_keyManager->addKey("wifi_password", pass)) {
+            if (_keyManager->addKey("wifi_password", pass, "WiFi", true)) {
                 ESP_LOGI(TAG, "WiFi password persisted via KeyManager");
             } else {
                 ESP_LOGE(TAG, "CRITICAL: Failed to persist WiFi password!");

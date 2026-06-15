@@ -9,27 +9,33 @@
  * Module: modules/KeyManager/KeyManager.hpp
  * Description: Kernel service that provides an encrypted registry for storing
  *              and retrieving sensitive credentials (e.g. API keys).
+ *              Each key entry carries optional ownership metadata
+ *              (managedBy / exclusive) so the REST API and portal UI
+ *              can enforce write-protection for module-managed keys.
  *              Implements IWebContributor for REST API routes under
  *              System → Keys sub-pill. Exposes GET/POST/DELETE /api/keys
  *              endpoints; GET never returns plaintext values.
  *
  * Exported Functions/Classes:
+ * - KeyInfo: [Struct] Metadata descriptor returned by listKeysWithMetadata().
  * - KeyManager: [Class] Service provider for secure credential storage.
  *
  *   Lifecycle:
- *   - begin():           Initializes the KeyManager with a dependency-injected DeviceCrypto instance.
+ *   - begin():                Initializes the KeyManager with a dependency-injected DeviceCrypto instance.
  *
  *   Credential Registry:
- *   - addKey():           Encrypts and stores a credential securely.
- *   - getKeyById():       Retrieves and decrypts a credential.
- *   - deleteKey():        Removes a credential from the registry.
- *   - listKeys():         Returns a list of stored key IDs (no values).
+ *   - addKey():               Encrypts and stores a credential with optional ownership metadata.
+ *   - getKeyById():           Retrieves and decrypts a credential.
+ *   - deleteKey():            Removes a credential from the registry.
+ *   - listKeys():             Returns a list of stored key IDs (no values).
+ *   - listKeysWithMetadata(): Returns KeyInfo structs with id, hasValue, managedBy, exclusive.
+ *   - isExclusive():          Checks whether a key is exclusively owned by a module.
  *
  *   IWebContributor (tab: "Keys", parent: "System", order: 20):
- *   - registerRoutes():   Register REST API routes
- *   - getTabName():       Return "Keys" for portal tab
- *   - getParentTab():     Return "System" for navigation hierarchy
- *   - getTabOrder():      Return 20 for pill ordering
+ *   - registerRoutes():       Register REST API routes
+ *   - getTabName():           Return "Keys" for portal tab
+ *   - getParentTab():         Return "System" for navigation hierarchy
+ *   - getTabOrder():          Return 20 for pill ordering
  */
 
 #pragma once
@@ -55,11 +61,27 @@
 #endif
 
 /**
+ * @brief Metadata descriptor for a single key entry.
+ *
+ * Returned by KeyManager::listKeysWithMetadata() for the GET /api/keys
+ * response.  Contains the key ID, whether a value exists, and optional
+ * ownership attributes (managedBy / exclusive).
+ */
+struct KeyInfo {
+    std::string id;        ///< Unique key identifier.
+    bool hasValue;         ///< True if an encrypted value is stored.
+    std::string managedBy; ///< Owning module name (empty if user-created).
+    bool exclusive;        ///< True if the key is write-protected by its owner.
+};
+
+/**
  * @brief Kernel service providing an encrypted registry for credentials.
  *
  * Implements IWebContributor to register REST API routes for managing keys
  * via the web portal. The "Keys" pill appears under the System tab at order 20.
- * GET /api/keys returns key IDs only (never plaintext values).
+ * GET /api/keys returns key metadata (never plaintext values).  Keys may
+ * carry ownership metadata (managedBy / exclusive) so the API can enforce
+ * write-protection for module-managed entries.
  */
 class KeyManager : public IWebContributor {
 private:
@@ -93,9 +115,12 @@ public:
      * @brief Encrypts and stores a new credential in the registry.
      * @param id The unique identifier for the key.
      * @param secret The plaintext credential to store.
+     * @param managedBy Optional owning module name (e.g. "WiFi", "Security").
+     * @param exclusive If true, the key is write-protected via the REST API.
      * @return true if successfully stored, false on failure.
      */
-    bool addKey(const char* id, const char* secret);
+    bool addKey(const char* id, const char* secret,
+                const char* managedBy = nullptr, bool exclusive = false);
 
     /**
      * @brief Retrieves and decrypts a credential from the registry.
@@ -116,6 +141,23 @@ public:
      * @return Vector of key ID strings.
      */
     std::vector<std::string> listKeys() const;
+
+    /**
+     * @brief List all stored keys with full ownership metadata.
+     *
+     * Used by the GET /api/keys endpoint to provide the portal UI with
+     * managedBy / exclusive attributes for badge rendering.
+     *
+     * @return Vector of KeyInfo structs (empty if registry is empty or unreadable).
+     */
+    std::vector<KeyInfo> listKeysWithMetadata() const;
+
+    /**
+     * @brief Check whether a key is exclusively owned by a module.
+     * @param id The unique identifier for the key.
+     * @return true if the key exists and has exclusive=true, false otherwise.
+     */
+    bool isExclusive(const char* id) const;
 
     // -------------------------------------------------------------------------
     // IWebContributor Interface

@@ -1088,8 +1088,8 @@ bool AuthManager::_setPassword(const char* password) {
     _toHex(salt, 16, saltHex);
     _toHex(hash, 32, hashHex);
 
-    bool saltOk = _keyManager->addKey("portal_password_salt", saltHex);
-    bool hashOk = _keyManager->addKey("portal_password_hash", hashHex);
+    bool saltOk = _keyManager->addKey("portal_password_salt", saltHex, "Security", true);
+    bool hashOk = _keyManager->addKey("portal_password_hash", hashHex, "Security", true);
 
     if (!saltOk || !hashOk) {
         ESP_LOGE(TAG, "_setPassword: KeyManager write failed (salt=%d hash=%d)",

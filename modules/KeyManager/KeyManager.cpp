@@ -88,7 +88,8 @@ bool KeyManager::saveRegistry(const JsonDocument& doc) const {
     return true;
 }
 
-bool KeyManager::addKey(const char* id, const char* secret) {
+bool KeyManager::addKey(const char* id, const char* secret,
+                        const char* managedBy, bool exclusive) {
     if (!id || strlen(id) == 0 || !secret || strlen(secret) == 0) {
         ESP_LOGE(TAG, "Invalid ID or Secret.");
         return false;
@@ -110,7 +111,15 @@ bool KeyManager::addKey(const char* id, const char* secret) {
         return false;
     }
 
-    doc[id] = encrypted.get();
+    // Write nested object: {"value": "...", "managedBy": "...", "exclusive": true}
+    JsonObject entry = doc[id].to<JsonObject>();
+    entry["value"] = encrypted.get();
+    if (managedBy && strlen(managedBy) > 0) {
+        entry["managedBy"] = managedBy;
+        if (exclusive) {
+            entry["exclusive"] = true;
+        }
+    }
 
     if (!saveRegistry(doc)) {
         return false;
@@ -140,7 +149,17 @@ std::string KeyManager::getKeyById(const char* id) const {
         return "";
     }
 
-    const char* ciphertext = doc[id];
+    // Read ciphertext from nested object format: {"value": "..."}
+    JsonVariant entry = doc[id];
+    const char* ciphertext = entry.is<JsonObject>()
+        ? entry["value"].as<const char*>()
+        : entry.as<const char*>();
+
+    if (!ciphertext || strlen(ciphertext) == 0) {
+        ESP_LOGE(TAG, "No ciphertext found for id: %s", id);
+        return "";
+    }
+
     size_t outLen = 0;
     std::unique_ptr<char[]> decrypted = _crypto->decrypt(ciphertext, strlen(ciphertext), &outLen);
     
@@ -180,14 +199,15 @@ bool KeyManager::deleteKey(const char* id) {
 }
 
 // =============================================================================
-// Key Listing
+// Key Listing & Metadata Queries
 // =============================================================================
 
 /**
  * @brief List all stored key IDs without exposing plaintext values.
  *
  * Loads the registry and iterates over all key-value pairs, extracting
- * only the key names. This is used by the GET /api/keys endpoint.
+ * only the key names. Retained for backward compatibility with modules
+ * that only need IDs.
  *
  * @return Vector of key ID strings (empty if registry is empty or unreadable).
  */
@@ -203,6 +223,69 @@ std::vector<std::string> KeyManager::listKeys() const {
         ids.push_back(std::string(pair.key().c_str()));
     }
     return ids;
+}
+
+/**
+ * @brief List all stored keys with full ownership metadata.
+ *
+ * Iterates the registry extracting id, hasValue, managedBy, and exclusive
+ * for each entry.  Used by the GET /api/keys REST handler to populate
+ * the portal Keys tab with badge and protection information.
+ *
+ * @return Vector of KeyInfo structs (empty if registry is empty or unreadable).
+ */
+std::vector<KeyInfo> KeyManager::listKeysWithMetadata() const {
+    std::vector<KeyInfo> result;
+    JsonDocument doc;
+    if (!loadRegistry(doc)) {
+        return result;
+    }
+
+    JsonObject obj = doc.as<JsonObject>();
+    for (JsonPair pair : obj) {
+        KeyInfo info;
+        info.id = std::string(pair.key().c_str());
+
+        JsonVariant entry = pair.value();
+        if (entry.is<JsonObject>()) {
+            // Nested format: {"value": "...", "managedBy": "...", "exclusive": true}
+            const char* val = entry["value"] | static_cast<const char*>(nullptr);
+            info.hasValue = (val != nullptr && strlen(val) > 0);
+            const char* mb = entry["managedBy"] | static_cast<const char*>(nullptr);
+            info.managedBy = mb ? std::string(mb) : "";
+            info.exclusive = entry["exclusive"] | false;
+        } else {
+            // Flat legacy string (shouldn't occur with no migration, but safe)
+            info.hasValue = true;
+            info.managedBy = "";
+            info.exclusive = false;
+        }
+
+        result.push_back(info);
+    }
+    return result;
+}
+
+/**
+ * @brief Check whether a key is exclusively owned by a module.
+ *
+ * Loads the registry and inspects the exclusive flag on the entry.
+ * Used by POST and DELETE REST handlers to reject writes to
+ * module-managed keys with 403.
+ *
+ * @param id The unique identifier for the key.
+ * @return true if the key exists and has exclusive=true, false otherwise.
+ */
+bool KeyManager::isExclusive(const char* id) const {
+    if (!id || strlen(id) == 0) return false;
+
+    JsonDocument doc;
+    if (!loadRegistry(doc)) return false;
+    if (!doc.containsKey(id)) return false;
+
+    JsonVariant entry = doc[id];
+    if (!entry.is<JsonObject>()) return false;
+    return entry["exclusive"] | false;
 }
 
 // =============================================================================
@@ -226,16 +309,22 @@ std::vector<std::string> KeyManager::listKeys() const {
  */
 void KeyManager::registerRoutes(PsychicHttpServer& server) {
 #ifndef NATIVE_BUILD
-    // --- GET /api/keys — list all stored key IDs ---
+    // --- GET /api/keys — list all stored keys with ownership metadata ---
     server.on("/api/keys", HTTP_GET, [this](PsychicRequest* request, PsychicResponse* response) {
         JsonDocument doc;
         JsonArray keysArr = doc.to<JsonArray>();
 
-        std::vector<std::string> ids = listKeys();
-        for (const auto& id : ids) {
+        std::vector<KeyInfo> keys = listKeysWithMetadata();
+        for (const auto& ki : keys) {
             JsonObject entry = keysArr.add<JsonObject>();
-            entry["id"] = id;
-            entry["hasValue"] = true; // All stored keys have a value
+            entry["id"] = ki.id;
+            entry["hasValue"] = ki.hasValue;
+            if (!ki.managedBy.empty()) {
+                entry["managedBy"] = ki.managedBy;
+            }
+            if (ki.exclusive) {
+                entry["exclusive"] = true;
+            }
         }
 
         String output;
@@ -280,6 +369,13 @@ void KeyManager::registerRoutes(PsychicHttpServer& server) {
                 return ESP_FAIL;
             }
 
+            // Reject writes to exclusively-managed keys
+            if (isExclusive(id)) {
+                response->send(403, "application/json",
+                    "{\"error\":\"Key is exclusively managed by its owning module\"}");
+                return ESP_FAIL;
+            }
+
             if (addKey(id, value)) {
                 response->send(200, "application/json", "{\"status\":\"ok\"}");
             } else {
@@ -299,6 +395,13 @@ void KeyManager::registerRoutes(PsychicHttpServer& server) {
         String id = request->getParam("id")->value();
         if (id.length() == 0) {
             response->send(400, "application/json", "{\"error\":\"Empty 'id' parameter\"}");
+            return ESP_FAIL;
+        }
+
+        // Reject deletion of exclusively-managed keys
+        if (isExclusive(id.c_str())) {
+            response->send(403, "application/json",
+                "{\"error\":\"Key is exclusively managed by its owning module\"}");
             return ESP_FAIL;
         }
 

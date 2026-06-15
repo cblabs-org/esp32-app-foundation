@@ -55,6 +55,10 @@ protected:
     }
 };
 
+// =============================================================================
+// Original Tests (updated for nested JSON format)
+// =============================================================================
+
 TEST_F(KeyManagerTest, AddAndRetrieveKey) {
     EXPECT_TRUE(keyManager.addKey("api_token", "super_secret_token"));
     
@@ -111,6 +115,126 @@ TEST_F(KeyManagerTest, DeleteKeyNullptr) {
 
 TEST_F(KeyManagerTest, DeleteKeyNonExistent) {
     EXPECT_FALSE(keyManager.deleteKey("no-such-key"));
+}
+
+// =============================================================================
+// Ownership Metadata Tests
+// =============================================================================
+
+TEST_F(KeyManagerTest, AddKeyWithMetadata_RoundTrip) {
+    // Store a key with ownership metadata
+    EXPECT_TRUE(keyManager.addKey("wifi_password", "my_secret_pass", "WiFi", true));
+
+    // Value should still decrypt correctly
+    std::string retrieved = keyManager.getKeyById("wifi_password");
+    EXPECT_EQ(retrieved, "my_secret_pass");
+}
+
+TEST_F(KeyManagerTest, AddKeyWithMetadata_IsExclusive) {
+    EXPECT_TRUE(keyManager.addKey("wifi_password", "pass123", "WiFi", true));
+
+    EXPECT_TRUE(keyManager.isExclusive("wifi_password"));
+}
+
+TEST_F(KeyManagerTest, AddKeyWithoutMetadata_NotExclusive) {
+    EXPECT_TRUE(keyManager.addKey("api_token", "secret123"));
+
+    EXPECT_FALSE(keyManager.isExclusive("api_token"));
+}
+
+TEST_F(KeyManagerTest, IsExclusive_NonExistentKey) {
+    EXPECT_FALSE(keyManager.isExclusive("does_not_exist"));
+}
+
+TEST_F(KeyManagerTest, IsExclusive_NullKey) {
+    EXPECT_FALSE(keyManager.isExclusive(nullptr));
+}
+
+TEST_F(KeyManagerTest, IsExclusive_EmptyKey) {
+    EXPECT_FALSE(keyManager.isExclusive(""));
+}
+
+TEST_F(KeyManagerTest, AddKeyWithManagedByButNotExclusive) {
+    // managedBy set but exclusive=false — should not be exclusive
+    EXPECT_TRUE(keyManager.addKey("shared_key", "val", "SomeModule", false));
+
+    EXPECT_FALSE(keyManager.isExclusive("shared_key"));
+}
+
+TEST_F(KeyManagerTest, ListKeysWithMetadata_MixedKeys) {
+    // Add a mix of managed and unmanaged keys
+    EXPECT_TRUE(keyManager.addKey("wifi_password", "pass1", "WiFi", true));
+    EXPECT_TRUE(keyManager.addKey("portal_hash", "hash1", "Security", true));
+    EXPECT_TRUE(keyManager.addKey("user_api_key", "key1"));
+
+    auto keys = keyManager.listKeysWithMetadata();
+    EXPECT_EQ(keys.size(), 3u);
+
+    // Find each key and verify metadata
+    bool foundWifi = false, foundHash = false, foundUser = false;
+    for (const auto& k : keys) {
+        if (k.id == "wifi_password") {
+            foundWifi = true;
+            EXPECT_TRUE(k.hasValue);
+            EXPECT_EQ(k.managedBy, "WiFi");
+            EXPECT_TRUE(k.exclusive);
+        } else if (k.id == "portal_hash") {
+            foundHash = true;
+            EXPECT_TRUE(k.hasValue);
+            EXPECT_EQ(k.managedBy, "Security");
+            EXPECT_TRUE(k.exclusive);
+        } else if (k.id == "user_api_key") {
+            foundUser = true;
+            EXPECT_TRUE(k.hasValue);
+            EXPECT_EQ(k.managedBy, "");
+            EXPECT_FALSE(k.exclusive);
+        }
+    }
+    EXPECT_TRUE(foundWifi);
+    EXPECT_TRUE(foundHash);
+    EXPECT_TRUE(foundUser);
+}
+
+TEST_F(KeyManagerTest, ListKeysWithMetadata_EmptyRegistry) {
+    auto keys = keyManager.listKeysWithMetadata();
+    EXPECT_TRUE(keys.empty());
+}
+
+TEST_F(KeyManagerTest, ListKeysWithMetadata_AttributedNonExclusive) {
+    // managedBy set but not exclusive — should have managedBy but not exclusive
+    EXPECT_TRUE(keyManager.addKey("shared_key", "val", "Analytics", false));
+
+    auto keys = keyManager.listKeysWithMetadata();
+    ASSERT_EQ(keys.size(), 1u);
+    EXPECT_EQ(keys[0].id, "shared_key");
+    EXPECT_EQ(keys[0].managedBy, "Analytics");
+    EXPECT_FALSE(keys[0].exclusive);
+}
+
+TEST_F(KeyManagerTest, OverwriteKey_PreservesNewMetadata) {
+    // First write without metadata
+    EXPECT_TRUE(keyManager.addKey("evolving_key", "v1"));
+    EXPECT_FALSE(keyManager.isExclusive("evolving_key"));
+
+    // Overwrite with metadata
+    EXPECT_TRUE(keyManager.addKey("evolving_key", "v2", "Module", true));
+    EXPECT_TRUE(keyManager.isExclusive("evolving_key"));
+    EXPECT_EQ(keyManager.getKeyById("evolving_key"), "v2");
+}
+
+TEST_F(KeyManagerTest, MetadataPersistsAcrossInstances) {
+    EXPECT_TRUE(keyManager.addKey("persistent_managed", "secret", "WiFi", true));
+
+    KeyManager newInstance;
+    newInstance.begin(&mockCrypto);
+
+    EXPECT_TRUE(newInstance.isExclusive("persistent_managed"));
+    EXPECT_EQ(newInstance.getKeyById("persistent_managed"), "secret");
+
+    auto keys = newInstance.listKeysWithMetadata();
+    ASSERT_EQ(keys.size(), 1u);
+    EXPECT_EQ(keys[0].managedBy, "WiFi");
+    EXPECT_TRUE(keys[0].exclusive);
 }
 
 int main(int argc, char** argv) {

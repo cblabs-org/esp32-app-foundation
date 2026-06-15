@@ -37,9 +37,9 @@ const MOCK_WIFI_STATUS = {
 };
 
 const MOCK_KEYS = [
-  { id: 'weather_key'   },
-  { id: 'wifi_password'  },
-  { id: 'api_token'      },
+  { id: 'weather_key',   hasValue: true },
+  { id: 'wifi_password', hasValue: true, managedBy: 'WiFi', exclusive: true },
+  { id: 'api_token',     hasValue: true },
 ];
 
 // ---------------------------------------------------------------------------
@@ -93,8 +93,8 @@ test.describe('Key Vault Sub-pill', () => {
     const keysList = page.locator('#keys-list');
     await expect(keysList).toContainText('wifi_password');
 
-    // Should show "Managed by WiFi tab" badge
-    await expect(keysList).toContainText('Managed by WiFi tab');
+    // Should show "Managed by WiFi" badge
+    await expect(keysList).toContainText('Managed by WiFi');
 
     // wifi_password should NOT have a delete button
     const wifiDeleteBtn = keysList.locator('.btn-key-delete[data-id="wifi_password"]');
