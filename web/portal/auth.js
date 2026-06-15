@@ -180,9 +180,9 @@
       .catch(function (err) {
         // On 401, the overlay will show — leave tab blank
         container.innerHTML =
-          '<div class="section-card">' +
-            '<p class="text-muted">Unable to load security status.</p>' +
-          '</div>';
+          '<article>' +
+            '<p class="text-muted" style="font-size:0.8rem; margin:0.25rem 0 0.75rem 0;">Unable to load security status.</p>' +
+          '</article>';
       });
   }
 
@@ -192,116 +192,106 @@
     if (!state.enabled && !state.passwordSet) {
       // --- State A: No password set — show "Set Password" form ---
       html +=
-        '<div class="section-card">' +
-          '<div class="section-header">' +
-            '<h3>&#x1f512; Set Password</h3>' +
-          '</div>' +
-          '<p class="text-muted">Authentication is currently disabled. Set a password to ' +
+        '<article>' +
+          '<header>&#x1f512; Set Password</header>' +
+          '<p class="text-muted" style="font-size:0.8rem; margin:0.25rem 0 0.75rem 0;">Authentication is currently disabled. Set a password to ' +
              'secure the portal and enable HTTPS.</p>' +
-          '<div class="form-group">' +
-            '<label for="new-password">New Password</label>' +
+          '<label for="new-password">New Password' +
             '<input type="password" id="new-password" ' +
                    'placeholder="Choose a password (min 8 chars)" autocomplete="new-password">' +
-          '</div>' +
-          '<div class="form-group">' +
-            '<label for="confirm-password">Confirm Password</label>' +
+          '</label>' +
+          '<label for="confirm-password">Confirm Password' +
             '<input type="password" id="confirm-password" ' +
                    'placeholder="Confirm password" autocomplete="new-password">' +
-          '</div>' +
+          '</label>' +
           '<div id="set-password-error" class="form-error hidden"></div>' +
-          '<button id="set-password-btn" style="width:100%">Enable Authentication</button>' +
-        '</div>';
+          '<button id="set-password-btn" class="full-width">Enable Authentication</button>' +
+        '</article>';
     } else if (state.enabled) {
       // --- State B: Auth enabled + logged in — full management UI ---
 
       // Cert status section
       html +=
-        '<div class="section-card">' +
-          '<div class="section-header">' +
-            '<h3>TLS Certificate</h3>' +
-          '</div>';
+        '<article>' +
+          '<header>TLS Certificate</header>';
       if (state.certPresent) {
         html +=
           '<div class="cert-status">' +
             '<span class="badge badge-ok">✓ Self-signed certificate active</span>' +
             (state.certSubject
-              ? '<p class="text-muted">Subject: ' + escapeHtml(state.certSubject) + '</p>'
+              ? '<p class="text-muted" style="font-size:0.8rem; margin:0.25rem 0 0.75rem 0;">Subject: ' + escapeHtml(state.certSubject) + '</p>'
               : '') +
           '</div>';
       } else {
         html +=
           '<div class="cert-status">' +
             '<span class="badge badge-warn">⚠ No certificate present</span>' +
-            '<p class="text-muted">A certificate will be generated when you set a password.</p>' +
+            '<p class="text-muted" style="font-size:0.8rem; margin:0.25rem 0 0.75rem 0;">A certificate will be generated when you set a password.</p>' +
           '</div>';
       }
-      html += '</div>';
+      html += '</article>';
 
       // Advanced TLS Settings section
       html +=
-        '<div class="section-card">' +
-          '<div class="section-header">' +
-            '<h3>Advanced TLS Settings</h3>' +
-          '</div>' +
-          '<div class="form-group checkbox-group">' +
-            '<input type="checkbox" id="tls-ap-mode-chk" ' + (state.tlsApMode ? 'checked' : '') + '>' +
-            '<label for="tls-ap-mode-chk">Enable TLS in AP Mode</label>' +
-          '</div>' +
-          '<button id="regen-cert-btn" class="secondary" style="width:100%; margin-bottom:1rem;">Force Regenerate Certificate</button>' +
-          '<h4>Upload Custom Certificate</h4>' +
-          '<p class="text-muted">Upload a CA-signed PEM certificate.</p>' +
-          '<div class="form-group">' +
-            '<label>Certificate (PEM)</label>' +
-            '<textarea id="upload-cert-pem" rows="4" placeholder="-----BEGIN CERTIFICATE-----..."></textarea>' +
-          '</div>' +
-          '<div class="form-group">' +
-            '<label>Private Key (PEM)</label>' +
-            '<textarea id="upload-key-pem" rows="4" placeholder="-----BEGIN PRIVATE KEY-----..."></textarea>' +
-          '</div>' +
-          '<div id="upload-cert-error" class="form-error hidden"></div>' +
-          '<button id="upload-cert-btn" style="width:100%;">Upload Certificate</button>' +
-        '</div>';
+        '<article class="advanced-drawer">' +
+          '<details>' +
+            '<summary class="advanced-summary">Advanced TLS Settings</summary>' +
+            '<div style="display:flex; justify-content:space-between; align-items:center; padding:0.6rem 0;">' +
+              '<span style="font-weight:600; font-size:0.9rem;">Enable TLS in AP Mode</span>' +
+              '<label class="toggle-switch" style="position:relative; width:48px; height:26px; flex-shrink:0;">' +
+                '<input type="checkbox" id="tls-ap-mode-chk" ' + (state.tlsApMode ? 'checked' : '') +
+                       ' style="opacity:0; width:0; height:0;">' +
+                '<span class="toggle-slider"></span>' +
+              '</label>' +
+            '</div>' +
+            '<button id="regen-cert-btn" class="secondary full-width">Force Regenerate Certificate</button>' +
+            '<p style="font-weight:600; font-size:0.85rem; margin:1rem 0 0.5rem 0;">Upload Custom Certificate</p>' +
+            '<p class="text-muted" style="font-size:0.8rem; margin:0.25rem 0 0.75rem 0;">Upload a CA-signed PEM certificate.</p>' +
+            '<label>Certificate (PEM)' +
+              '<textarea id="upload-cert-pem" rows="4" placeholder="-----BEGIN CERTIFICATE-----..."></textarea>' +
+            '</label>' +
+            '<label>Private Key (PEM)' +
+              '<textarea id="upload-key-pem" rows="4" placeholder="-----BEGIN PRIVATE KEY-----..."></textarea>' +
+            '</label>' +
+            '<div id="upload-cert-error" class="form-error hidden"></div>' +
+            '<button id="upload-cert-btn" class="full-width">Upload Certificate</button>' +
+          '</details>' +
+        '</article>';
 
       // MCP Bearer Token section
       html +=
-        '<div class="section-card">' +
-          '<div class="section-header">' +
-            '<h3>MCP Bearer Token</h3>' +
-          '</div>' +
-          '<p class="text-muted">Use this token in your AI agent config to authenticate MCP requests.</p>' +
+        '<article>' +
+          '<header>MCP Bearer Token</header>' +
+          '<p class="text-muted" style="font-size:0.8rem; margin:0.25rem 0 0.75rem 0;">Use this token in your AI agent config to authenticate MCP requests.</p>' +
           '<div class="token-display">' +
             '<code id="mcp-token-value" class="token-masked">••••••••••••••••</code>' +
             '<button id="reveal-token-btn" class="btn-icon" title="Show/hide token">👁</button>' +
             '<button id="copy-token-btn" class="btn-icon" title="Copy to clipboard">📋</button>' +
           '</div>' +
-        '</div>';
+        '</article>';
 
       // Change Password section
       html +=
-        '<div class="section-card">' +
-          '<div class="section-header">' +
-            '<h3>Change Password</h3>' +
-          '</div>' +
-          '<p class="text-muted">Update your portal password. You will remain logged in.</p>' +
-          '<div class="form-group">' +
-            '<label for="new-password">New Password</label>' +
+        '<article>' +
+          '<header>Change Password</header>' +
+          '<p class="text-muted" style="font-size:0.8rem; margin:0.25rem 0 0.75rem 0;">Update your portal password. You will remain logged in.</p>' +
+          '<label for="new-password">New Password' +
             '<input type="password" id="new-password" ' +
                    'placeholder="New password (min 8 chars)" autocomplete="new-password">' +
-          '</div>' +
-          '<div class="form-group">' +
-            '<label for="confirm-password">Confirm Password</label>' +
+          '</label>' +
+          '<label for="confirm-password">Confirm Password' +
             '<input type="password" id="confirm-password" ' +
                    'placeholder="Confirm new password" autocomplete="new-password">' +
-          '</div>' +
+          '</label>' +
           '<div id="change-password-error" class="form-error hidden"></div>' +
-          '<button id="change-password-btn" class="secondary" style="width:100%">Change Password</button>' +
-        '</div>';
+          '<button id="change-password-btn" class="secondary full-width">Change Password</button>' +
+        '</article>';
 
       // Logout section
       html +=
-        '<div class="section-card">' +
+        '<article>' +
           '<button id="logout-btn" class="outline danger full-width">Log Out</button>' +
-        '</div>';
+        '</article>';
     }
 
     container.innerHTML = html;
@@ -388,11 +378,11 @@
         var container = document.getElementById('tab-security');
         if (container) {
           container.innerHTML =
-            '<div class="section-card">' +
-              '<div class="section-header"><h3>Restart Required</h3></div>' +
+            '<article>' +
+              '<header>Restart Required</header>' +
               '<p>Authentication has been enabled. The device must restart to activate HTTPS.</p>' +
-              '<button id="restart-now-btn" style="width:100%">Restart Now</button>' +
-            '</div>';
+              '<button id="restart-now-btn" class="full-width">Restart Now</button>' +
+            '</article>';
           var restartBtn = document.getElementById('restart-now-btn');
           if (restartBtn) {
             restartBtn.addEventListener('click', function () {
