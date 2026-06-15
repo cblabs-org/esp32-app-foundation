@@ -76,6 +76,7 @@ bool GithubClient::getLatestRelease() {
 
     HTTPClient http;
     http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
+    http.useHTTP10(true);
     http.begin(client, apiGetLatestRelease);
     http.addHeader("User-Agent", "esp32/1.0");
     http.addHeader("X-GitHub-Api-Version", "2022-11-28");
@@ -183,101 +184,145 @@ bool GithubClient::getLatestReleaseForChannel(const char* channel) {
     Channel floor = stringToChannel(channel);
 
 #ifndef NATIVE_BUILD
-    WiFiClientSecure client;
-    client.setCACert(githubRootCACert);
-    client.setTimeout(10000);
+    // --- Step 1: Fetch stable baseline via /releases/latest ---
+    // This populates member fields with the latest stable release.
+    bool hasStableBaseline = getLatestRelease();
 
-    HTTPClient http;
-    http.begin(client, apiGetReleases);
-    http.addHeader("User-Agent", "esp32/1.0");
-    http.addHeader("X-GitHub-Api-Version", "2022-11-28");
-    http.addHeader("Accept", "application/vnd.github+json");
-    if (accessToken.length() > 0) {
-        http.addHeader("Authorization", "Bearer " + accessToken);
+    if (hasStableBaseline) {
+        LOG_SECURE("GITHUB", "Stable baseline: %s", releaseId.c_str());
+    } else {
+        LOG_SECURE("GITHUB", "No stable baseline found — scanning all releases");
     }
 
-    LOG_SECURE("GITHUB", "Requesting releases (floor='%s') from %s", channel, apiGetReleases.c_str());
-    int httpCode = http.GET();
-
-    if (httpCode != HTTP_CODE_OK) {
-        snprintf(lastErrorMsg, sizeof(lastErrorMsg), "HTTP request failed, error: %d", httpCode);
-        if (httpCode > 0) {
-            String payload = http.getString();
-            LOG_SECURE("GITHUB", "HTTP Response code: %d, payload: %s", httpCode, payload.c_str());
-        }
-        http.end();
-        return false;
-    }
-
-    JsonDocument filter;
-    filter[0]["tag_name"] = true;
-    filter[0]["name"] = true;
-    filter[0]["prerelease"] = true;
-    filter[0]["assets"][0]["name"] = true;
-    filter[0]["assets"][0]["url"] = true;
-
-    JsonDocument doc;
-    DeserializationError error = deserializeJson(doc, http.getStream(), DeserializationOption::Filter(filter));
-    http.end();
-
-    if (error) {
-        snprintf(lastErrorMsg, sizeof(lastErrorMsg), "JSON parse failed: %s", error.c_str());
-        LOG_SECURE("GITHUB", "JSON Parse Error: %s", error.c_str());
-        return false;
-    }
-
-    // --- Single-pass scan: find the highest SemVer release within the floor ---
-    // Track best candidate in local state; commit to member fields only at end.
-    String bestTag;
-    String bestDescription;
+    // Track best candidate found so far.
+    // If stable baseline exists, it is the starting best candidate.
+    String bestTag         = hasStableBaseline ? releaseId : "";
+    String bestDescription = hasStableBaseline ? releaseDescription : "";
+    bool   bestIsPre       = false;
+    int    bestAssetCount  = hasStableBaseline ? releaseAssets : 0;
     String bestAssetName[MAX_RELEASE_ASSETS];
     String bestAssetURL[MAX_RELEASE_ASSETS];
-    int    bestAssetCount = 0;
-    bool   bestIsPre      = false;
-    FirmwareVersion bestVer = {};  // zero-initialised — effectively -infinity
-
-    JsonArray releases = doc.as<JsonArray>();
-    for (JsonObject release : releases) {
-        bool isPre          = release["prerelease"] | false;
-        const char* tagName = release["tag_name"] | "";
-        if (tagName[0] == '\0') continue;
-
-        // Determine whether this release meets the subscriber's floor.
-        bool accepted = false;
-        if (!isPre) {
-            // GitHub non-prerelease == stable: always accepted by non-stable subscribers.
-            accepted = true;
-        } else {
-            // Pre-release: parse the tag and compare its channel against the floor.
-            FirmwareVersion candidate = parseVersionTag(tagName);
-            accepted = (static_cast<uint8_t>(candidate.channel) >= static_cast<uint8_t>(floor));
-        }
-
-        if (!accepted) continue;
-
-        FirmwareVersion candidate = parseVersionTag(tagName);
-        if (bestTag.isEmpty() || candidate > bestVer) {
-            bestVer         = candidate;
-            bestTag         = tagName;
-            bestDescription = release["name"] | "";
-            bestIsPre       = isPre;
-            bestAssetCount  = 0;
-
-            JsonArray assetsArray = release["assets"].as<JsonArray>();
-            for (JsonObject asset : assetsArray) {
-                if (bestAssetCount >= MAX_RELEASE_ASSETS) break;
-                String name = asset["name"] | "";
-                String url  = asset["url"]  | "";
-                if (name.length() > 0 && url.length() > 0) {
-                    bestAssetName[bestAssetCount] = name;
-                    bestAssetURL[bestAssetCount]  = url;
-                    bestAssetCount++;
-                }
-            }
-            LOG_SECURE("GITHUB", "New best candidate: %s (isPre=%d)", tagName, (int)isPre);
+    FirmwareVersion bestVer = {};
+    if (hasStableBaseline) {
+        bestVer = parseVersionTag(releaseId.c_str());
+        for (int i = 0; i < bestAssetCount; ++i) {
+            bestAssetName[i] = releaseAssetName[i];
+            bestAssetURL[i]  = releaseAssetURL[i];
         }
     }
 
+    // --- Step 2: Paginated scan of /releases?per_page=5&page=N ---
+    static constexpr int MAX_PAGES    = 10;
+    static constexpr int PER_PAGE     = 5;
+    bool stopScanning = false;
+
+    for (int page = 1; page <= MAX_PAGES && !stopScanning; ++page) {
+        // Build paginated URL
+        String pageUrl = apiGetReleases + "?per_page=" + String(PER_PAGE) + "&page=" + String(page);
+        LOG_SECURE("GITHUB", "Requesting releases page %d (floor='%s')", page, channel);
+
+        // Fresh TLS connection for each page
+        WiFiClientSecure pageClient;
+        pageClient.setCACert(githubRootCACert);
+        pageClient.setTimeout(15000);
+
+        HTTPClient pageHttp;
+        pageHttp.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
+        pageHttp.useHTTP10(true);
+        pageHttp.begin(pageClient, pageUrl);
+        pageHttp.addHeader("User-Agent", "esp32/1.0");
+        pageHttp.addHeader("X-GitHub-Api-Version", "2022-11-28");
+        pageHttp.addHeader("Accept", "application/vnd.github+json");
+        if (accessToken.length() > 0) {
+            pageHttp.addHeader("Authorization", "Bearer " + accessToken);
+        }
+        pageHttp.setTimeout(15000);
+
+        int httpCode = pageHttp.GET();
+        if (httpCode != HTTP_CODE_OK) {
+            LOG_SECURE("GITHUB", "Page %d HTTP error %d — stopping scan", page, httpCode);
+            pageHttp.end();
+            break;  // Graceful degradation: return best found so far
+        }
+
+        // Parse page — array filter for minimal memory usage
+        JsonDocument filter;
+        filter[0]["tag_name"]   = true;
+        filter[0]["name"]      = true;
+        filter[0]["prerelease"] = true;
+        filter[0]["assets"][0]["name"] = true;
+        filter[0]["assets"][0]["url"]  = true;
+
+        JsonDocument doc;
+        DeserializationError error = deserializeJson(doc, pageHttp.getStream(),
+                                                      DeserializationOption::Filter(filter));
+        pageHttp.end();
+
+        if (error) {
+            LOG_SECURE("GITHUB", "Page %d JSON error: %s — stopping scan", page, error.c_str());
+            break;  // Graceful degradation
+        }
+
+        JsonArray releases = doc.as<JsonArray>();
+
+        // EXIT 3: Empty page — no more releases
+        if (releases.size() == 0) {
+            LOG_SECURE("GITHUB", "Empty page %d — stopping scan", page);
+            break;
+        }
+
+        for (JsonObject release : releases) {
+            const char* tagName = release["tag_name"] | "";
+            if (tagName[0] == '\0') continue;
+
+            bool isPre = release["prerelease"] | false;
+
+            // EXIT 1: Hit a stable release — we already have the latest stable
+            // from Step 1. Everything after this is older. Stop scanning.
+            if (!isPre) {
+                LOG_SECURE("GITHUB", "Hit stable %s in scan — stopping (page %d)", tagName, page);
+                stopScanning = true;
+                break;
+            }
+
+            // Pre-release: check if it meets the subscriber's floor
+            FirmwareVersion candidate = parseVersionTag(tagName);
+            bool accepted = (static_cast<uint8_t>(candidate.channel) >= static_cast<uint8_t>(floor));
+
+            if (!accepted) {
+                LOG_SECURE("GITHUB", "Skipping %s — does not meet floor '%s'", tagName, channel);
+                continue;
+            }
+
+            // EXIT 2: Found an acceptable prerelease that beats best candidate.
+            // Since releases are newest-first, the first acceptable prerelease
+            // is the winner — nothing later can beat it.
+            if (bestTag.isEmpty() || candidate > bestVer) {
+                LOG_SECURE("GITHUB", "Found acceptable prerelease %s — stopping", tagName);
+                bestVer         = candidate;
+                bestTag         = tagName;
+                bestDescription = release["name"] | "";
+                bestIsPre       = true;
+                bestAssetCount  = 0;
+
+                JsonArray assetsArray = release["assets"].as<JsonArray>();
+                for (JsonObject asset : assetsArray) {
+                    if (bestAssetCount >= MAX_RELEASE_ASSETS) break;
+                    String name = asset["name"] | "";
+                    String url  = asset["url"]  | "";
+                    if (name.length() > 0 && url.length() > 0) {
+                        bestAssetName[bestAssetCount] = name;
+                        bestAssetURL[bestAssetCount]  = url;
+                        bestAssetCount++;
+                    }
+                }
+                stopScanning = true;
+                break;
+            }
+        }
+    }
+
+    // --- Step 3: Commit the best candidate to member fields ---
     if (bestTag.isEmpty()) {
         snprintf(lastErrorMsg, sizeof(lastErrorMsg),
                  "No release found at or above channel floor '%s'", channel);
@@ -285,7 +330,6 @@ bool GithubClient::getLatestReleaseForChannel(const char* channel) {
         return false;
     }
 
-    // Commit the winner to member fields
     releaseId          = bestTag;
     releaseDescription = bestDescription;
     isPreRelease       = bestIsPre;
