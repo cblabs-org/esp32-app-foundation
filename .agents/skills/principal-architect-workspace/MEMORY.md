@@ -60,7 +60,7 @@ predate the formal PA pipeline and are filed retrospectively.
 | [pr-20-config-refactor](./pr-20-config-refactor/PROJECT.md) | FrameworkConfig Refactor + appconfig.js Clarity (5 runtime defaults → module `resetConfig()`; FrameworkConfig = 3 OTA secrets) | ✅ **COMPLETE & VERIFIED** — 3 WOs done (native 525/525 + esp32 build green); stack pushed `wo1→wo2a→wo2b`, main not pushed, no PRs (user holding) · [distillation](./pr-20-config-refactor/context_bridge.md) | Current Session |
 | [pr-21-ota-task-hardening](./pr-21-ota-task-hardening/PROJECT.md) | OTA Task Creation Hardening (heap guard + PSRAM stack alloc + portal low-memory warning) | ✅ **COMPLETE** — 2 WOs merged (`a58d046` + `4d8aff6`), ready for PR submission | Session 8c58afa2 |
 | [pr-22-portal-ui-consistency](./pr-22-portal-ui-consistency/PROJECT.md) | Web Portal UI Consistency (screensaver toggle fix + Advanced drawer standardisation + full drawer unification) | ✅ **COMPLETE** — 3 WOs merged to `main` `18ecb3d`, 61/61 tests · [distillation](./pr-22-portal-ui-consistency/context_bridge.md) | Session 5177dae5 |
-| [pr-24-portal-mcp-auth](./pr-24-portal-mcp-auth/PROJECT.md) | Web Portal + MCP Server Authentication + TLS (AuthManager, EC P-256 self-signed cert, session cookie, bearer token, Security top-level tab) | 🔄 **WIP** — WO1 in progress · branch `pr-24/wo1-auth-manager` | Session 948393bc |
+| [pr-24-portal-mcp-auth](./pr-24-portal-mcp-auth/PROJECT.md) | Web Portal + MCP Server Authentication + TLS (AuthManager, EC P-256 self-signed cert, session cookie, bearer token, Security top-level tab) | ✅ **COMPLETE** — All 12 WOs merged (`5fe96e7`), 525+ native tests passing, OTA unchanged · [distillation](./pr-24-portal-mcp-auth/context_bridge.md) | Session 948393bc |
 
 ---
 
