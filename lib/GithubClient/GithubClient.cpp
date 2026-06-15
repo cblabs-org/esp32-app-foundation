@@ -211,9 +211,9 @@ bool GithubClient::getLatestReleaseForChannel(const char* channel) {
         }
     }
 
-    // --- Step 2: Paginated scan of /releases?per_page=5&page=N ---
-    static constexpr int MAX_PAGES    = 10;
-    static constexpr int PER_PAGE     = 5;
+    // --- Step 2: Paginated scan of /releases?per_page=1&page=N ---
+    static constexpr int MAX_PAGES    = 20;
+    static constexpr int PER_PAGE     = 1;
     bool stopScanning = false;
 
     for (int page = 1; page <= MAX_PAGES && !stopScanning; ++page) {
