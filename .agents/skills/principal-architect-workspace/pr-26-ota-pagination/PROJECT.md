@@ -2,7 +2,7 @@
 
 **PR Branch:** `pr-26-ota-pagination`
 **Base:** `main`
-**Status:** 🔄 **IN PROGRESS**
+**Status:** ✅ **COMPLETE**
 
 ## Objective
 
@@ -13,7 +13,7 @@ Fix the broken beta/dev channel OTA update flow: paginate release scanning, fix 
 - **[x] [wo1-paginated-scanner](wo1-paginated-scanner/WORKORDER.md):** Rewrite `getLatestReleaseForChannel()` with paginated scan + 3 early-exit conditions
 - **[x] [wo2-ota-logging](wo2-ota-logging/WORKORDER.md):** Update all OTA log lines to include channel and BUILD_VERSION; fix status API version string
 - **[x] [wo3-local-version-channel](wo3-local-version-channel/WORKORDER.md):** Replace hardcoded `Channel::STABLE` with `VERSION_CHANNEL`/`VERSION_PRE_NUM` build flags
-- **[ ] [wo4-portal-progress](wo4-portal-progress/WORKORDER.md):** Expose real download progress to web portal via status API
+- **[x] [wo4-portal-progress](wo4-portal-progress/WORKORDER.md):** Expose real download progress to web portal via status API
 
 ## Serialisation
 

@@ -768,6 +768,7 @@ void OTAUpdateManager::performUpdateTask() {
  */
 void OTAUpdateManager::publishProgress(float progress, const char* status,
                                         bool complete, bool success) {
+    lastProgress_ = progress;
     OTAProgressEvent event;
     event.progress = progress;
     event.status   = status;
@@ -1232,6 +1233,7 @@ void OTAUpdateManager::registerRoutes(PsychicHttpServer& server) {
                     resp["checkHour"]      = this->_checkHour;
                     resp["dram_free_bytes"]  = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
                     resp["ota_stack_bytes"]  = OTA_TASK_STACK_BYTES;
+                    resp["progress"]         = this->lastProgress_;
                     if (this->lastOtaError_) {
                         resp["lastError"] = this->lastOtaError_;
                     }

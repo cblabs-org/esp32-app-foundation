@@ -336,16 +336,17 @@
 
       // --- States that show the progress bar ---
       wrapper.style.display = 'block';
-      let pct = 0, label = state, barColor = 'var(--primary)';
+      let pct = Math.round((response.progress || 0) * 100);
+      let label = state, barColor = 'var(--primary)';
 
       switch (state) {
         case 'downloading':
-          pct = 50; label = 'Downloading firmware...';
+          label = 'Downloading firmware...';
           statusEl.style.color = 'var(--primary)';
           statusEl.textContent = 'Update found — downloading...';
           break;
         case 'verifying':
-          pct = 85; label = 'Verifying signature...';
+          label = 'Verifying signature...';
           statusEl.style.color = 'var(--primary)';
           statusEl.textContent = 'Verifying signature...';
           break;

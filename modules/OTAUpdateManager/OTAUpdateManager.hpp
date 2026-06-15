@@ -396,6 +396,7 @@ private:
     Application*  app_          = nullptr;             // Composition root reference
     OTAState      state_        = OTAState::Idle;      // Current state machine state
     const char*   lastOtaError_ = nullptr;             // Last error string from download engine
+    float         lastProgress_ = 0.0f;                // Last progress fraction for API polling
 
 #ifndef NATIVE_BUILD
     TaskHandle_t  taskHandle_   = nullptr;             // FreeRTOS task handle for download
