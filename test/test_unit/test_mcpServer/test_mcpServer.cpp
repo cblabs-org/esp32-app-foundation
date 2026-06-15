@@ -543,7 +543,7 @@ TEST(McpSecurityTest, ReadOnlyAllowsReadTool) {
     ASSERT_FALSE(err);
 
     EXPECT_EQ(doc["id"].as<int>(), 11);
-    EXPECT_FALSE(doc.containsKey("error")) << "Read-only tool should succeed in read-only mode";
+    EXPECT_FALSE(doc["error"].is<JsonVariant>()) << "Read-only tool should succeed in read-only mode";
 }
 
 /** In read-write mode, calling a mutating tool must succeed. */
@@ -562,7 +562,7 @@ TEST(McpSecurityTest, ReadWriteAllowsMutatingTool) {
     ASSERT_FALSE(err);
 
     EXPECT_EQ(doc["id"].as<int>(), 12);
-    EXPECT_FALSE(doc.containsKey("error")) << "Mutating tool should succeed in read-write mode";
+    EXPECT_FALSE(doc["error"].is<JsonVariant>()) << "Mutating tool should succeed in read-write mode";
 }
 
 /** tools/list response must include mutatesState for each tool. */

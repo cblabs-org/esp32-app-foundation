@@ -169,8 +169,8 @@ TEST_F(WifiManagerTest, SerializeConfig_ProducesExpectedKeys) {
     JsonObject section = doc.to<JsonObject>();
     wifiManager.serializeConfig(section);
 
-    EXPECT_TRUE(section.containsKey("ssid"));
-    EXPECT_TRUE(section.containsKey("hostname"));
+    EXPECT_TRUE(section["ssid"].is<JsonVariant>());
+    EXPECT_TRUE(section["hostname"].is<JsonVariant>());
     EXPECT_STREQ("MySSID", section["ssid"].as<const char*>());
 }
 

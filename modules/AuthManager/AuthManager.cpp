@@ -792,7 +792,7 @@ void AuthManager::registerRoutes(PsychicHttpServer& server) {
             return response->send(400, "application/json", "{\"error\":\"invalid_json\"}");
         }
         
-        if (doc.containsKey("tls_ap_mode")) {
+        if (doc["tls_ap_mode"].is<JsonVariant>()) {
             _tlsApMode = doc["tls_ap_mode"].as<bool>();
             if (_configManager) _configManager->saveModuleConfig(this);
         }

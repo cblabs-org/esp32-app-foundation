@@ -71,12 +71,12 @@ TEST_F(ConfigTest, SerializeConfig_ProducesExpectedKeys) {
 
     display.serializeConfig(section);
 
-    EXPECT_TRUE(section.containsKey("brightness"));
-    EXPECT_TRUE(section.containsKey("flip"));
-    EXPECT_TRUE(section.containsKey("screensaverEnabled"));
-    EXPECT_TRUE(section.containsKey("dimTimeout"));
-    EXPECT_TRUE(section.containsKey("blankTimeout"));
-    EXPECT_TRUE(section.containsKey("rotationInterval"));
+    EXPECT_TRUE(section["brightness"].is<JsonVariant>());
+    EXPECT_TRUE(section["flip"].is<JsonVariant>());
+    EXPECT_TRUE(section["screensaverEnabled"].is<JsonVariant>());
+    EXPECT_TRUE(section["dimTimeout"].is<JsonVariant>());
+    EXPECT_TRUE(section["blankTimeout"].is<JsonVariant>());
+    EXPECT_TRUE(section["rotationInterval"].is<JsonVariant>());
 }
 
 /** resetConfig must not crash. */
@@ -98,8 +98,8 @@ TEST_F(ConfigTest, ResetConfig_ThenSerializeConfig_ProducesKeys) {
     JsonDocument doc;
     JsonObject section = doc.to<JsonObject>();
     display.serializeConfig(section);
-    EXPECT_TRUE(section.containsKey("brightness"));
-    EXPECT_TRUE(section.containsKey("flip"));
+    EXPECT_TRUE(section["brightness"].is<JsonVariant>());
+    EXPECT_TRUE(section["flip"].is<JsonVariant>());
 }
 
 /** Roundtrip: serialize → apply → serialize must produce consistent values. */
@@ -143,7 +143,7 @@ TEST_F(ConfigTest, Migration_SleepTimeout_ConvertsToDimAndBlank) {
     EXPECT_EQ(30000UL, section2["dimTimeout"].as<unsigned long>());
     EXPECT_EQ(60000UL, section2["blankTimeout"].as<unsigned long>());
     // Migration should NOT emit the old key
-    EXPECT_FALSE(section2.containsKey("sleepTimeout"));
+    EXPECT_FALSE(section2["sleepTimeout"].is<JsonVariant>());
 }
 
 // =============================================================================

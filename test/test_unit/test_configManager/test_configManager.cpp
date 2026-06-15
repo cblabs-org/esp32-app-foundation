@@ -111,7 +111,7 @@ public:
         migrateCalled = true;
         lastFromVersion = fromVersion;
         // Migration: rename old_value → value
-        if (section.containsKey("old_value")) {
+        if (section["old_value"].is<JsonVariant>()) {
             section["value"] = section["old_value"];
             section.remove("old_value");
         }
@@ -340,8 +340,8 @@ TEST_F(ConfigManagerTest, ExportAllConfig_ProducesNamespaceSections) {
     JsonDocument outDoc;
     configManager.exportAllConfig(outDoc);
 
-    EXPECT_TRUE(outDoc.containsKey("testmod"));
-    EXPECT_TRUE(outDoc.containsKey("modB"));
+    EXPECT_TRUE(outDoc["testmod"].is<JsonVariant>());
+    EXPECT_TRUE(outDoc["modB"].is<JsonVariant>());
     EXPECT_EQ(outDoc["testmod"]["setting1"].as<int>(), 88);
     EXPECT_STREQ(outDoc["modB"]["name"].as<const char*>(), "exported");
 }
@@ -402,7 +402,7 @@ TEST_F(ConfigManagerTest, ExportAllConfig_ContainsMetaKey) {
     configManager.exportAllConfig(outDoc);
 
     // _meta must be present and must be a JSON object
-    ASSERT_TRUE(outDoc.containsKey("_meta"));
+    ASSERT_TRUE(outDoc["_meta"].is<JsonVariant>());
     JsonObject meta = outDoc["_meta"].as<JsonObject>();
     EXPECT_FALSE(meta.isNull());
 
@@ -457,7 +457,7 @@ TEST_F(ConfigManagerTest, ExportAllConfig_OtaNamespacePresent) {
     JsonDocument outDoc;
     configManager.exportAllConfig(outDoc);
 
-    ASSERT_TRUE(outDoc.containsKey("ota"));
+    ASSERT_TRUE(outDoc["ota"].is<JsonVariant>());
     EXPECT_STREQ(outDoc["ota"]["channel"].as<const char*>(), "stable");
     EXPECT_TRUE(outDoc["ota"]["autoCheck"].as<bool>());
 }
