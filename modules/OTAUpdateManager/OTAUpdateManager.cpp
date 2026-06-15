@@ -372,11 +372,12 @@ void OTAUpdateManager::performUpdate() {
             freeDram, required);
     }
 
-    // --- Launch OTA task — stack in PSRAM when available, DRAM otherwise ---
-    // xTaskCreateWithCaps allocates the task stack from memory matching the
-    // supplied MemoryCaps mask. MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT targets
-    // PSRAM on S3/S3-Nano. On boards without PSRAM the allocator falls back
-    // to DRAM transparently (standard ESP-IDF behaviour).
+    // --- Launch OTA task — stack MUST be in DRAM (not PSRAM) ---
+    // The OTA pipeline performs SPI flash writes (Update.begin/write/end,
+    // ConfigManifest::save, NVS operations). ESP-IDF asserts when flash ops
+    // run on a PSRAM-stack task because disabling the SPI cache makes the
+    // PSRAM-resident stack inaccessible. 32 KiB DRAM is feasible given the
+    // device's ~240 KiB free internal RAM at this point.
     BaseType_t result = xTaskCreateWithCaps(
         otaTaskWrapper,                            // Task function
         "ota_update",                              // Task name
@@ -384,7 +385,7 @@ void OTAUpdateManager::performUpdate() {
         this,                                      // Parameter
         5,                                         // Priority
         &taskHandle_,                              // Task handle output
-        MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT        // Prefer PSRAM stack
+        MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT      // DRAM stack (SPI flash safe)
     );
 
     if (result != pdPASS) {
@@ -660,13 +661,9 @@ void OTAUpdateManager::performUpdateTask() {
     }
 
     // --- Snapshot config manifest: Active → Previous before download ---
-    // NOTE: We only update the in-memory snapshot here. We intentionally do NOT
-    // call save() because this task's stack lives in PSRAM (MALLOC_CAP_SPIRAM),
-    // and LittleFS writes trigger SPI flash operations that assert-fail when the
-    // current task's stack is on the SPI bus. The manifest will be persisted
-    // when the firmware is blessed after a successful OTA reboot (main thread).
     app_->getConfigManager().getManifest().snapshotActiveToPrevious();
-    ESP_LOGI(TAG, "Config manifest: Active → Previous snapshot taken (in-memory, save deferred)");
+    app_->getConfigManager().getManifest().save();
+    ESP_LOGI(TAG, "Config manifest: Active → Previous snapshot saved");
 
     // --- Step 3: Initialize the verifier (if public key configured) ---
     MbedTLSSignatureVerifier verifier;
