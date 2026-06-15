@@ -115,8 +115,17 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors,
     bool useTls = false;
 #ifndef NATIVE_BUILD
     if (!apMode && authManager && authManager->isAuthEnabled() && authManager->hasCert()) {
-        ESP_LOGI(TAG, "Auth enabled with TLS cert present — HTTPS pending "
-                 "PsychicHttp migration (PR-25); serving HTTP on port 80");
+        uint8_t *certDer = nullptr, *keyDer = nullptr;
+        size_t certLen = 0, keyLen = 0;
+
+        if (authManager->loadCert(&certDer, &certLen, &keyDer, &keyLen)) {
+            ESP_LOGI(TAG, "Auth enabled with TLS cert present — enabling HTTPS on port 443");
+            useTls = true;
+            _httpsServer = new PsychicHttpsServer();
+            _httpsServer->setCertificate(certDer, certLen, keyDer, keyLen);
+        } else {
+            ESP_LOGE(TAG, "Failed to load cert from storage, falling back to HTTP");
+        }
     }
 #endif
 

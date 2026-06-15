@@ -32,6 +32,7 @@
           '</div>' +
           '<div id="login-error" class="login-error hidden"></div>' +
           '<button type="submit" id="login-submit" style="width:100%">Unlock</button>' +
+          '<button type="button" id="login-cancel" class="secondary" style="width:100%; margin-top:0.5rem">Cancel</button>' +
         '</form>' +
       '</div>' +
     '</div>';
@@ -49,17 +50,39 @@
       e.preventDefault();
       doLogin();
     });
+
+    var cancelBtn = document.getElementById('login-cancel');
+    if (cancelBtn) {
+      cancelBtn.addEventListener('click', function () {
+        hideLoginOverlay();
+        if (currentLoginReject) {
+          currentLoginReject(new Error("Login cancelled"));
+          currentLoginResolve = null;
+          currentLoginReject = null;
+        }
+      });
+    }
   }
 
+  var currentLoginResolve = null;
+  var currentLoginReject = null;
+
   function showLoginOverlay() {
-    var overlay = document.getElementById('login-overlay');
-    if (overlay) {
-      overlay.classList.remove('hidden');
-      var pwField = document.getElementById('login-password');
-      if (pwField) { pwField.value = ''; pwField.focus(); }
-      var errDiv = document.getElementById('login-error');
-      if (errDiv) { errDiv.classList.add('hidden'); errDiv.textContent = ''; }
-    }
+    return new Promise(function(resolve, reject) {
+      currentLoginResolve = resolve;
+      currentLoginReject = reject;
+
+      var overlay = document.getElementById('login-overlay');
+      if (overlay) {
+        overlay.classList.remove('hidden');
+        var pwField = document.getElementById('login-password');
+        if (pwField) { pwField.value = ''; pwField.focus(); }
+        var errDiv = document.getElementById('login-error');
+        if (errDiv) { errDiv.classList.add('hidden'); errDiv.textContent = ''; }
+      } else {
+        reject(new Error("Login overlay not found"));
+      }
+    });
   }
 
   function hideLoginOverlay() {
@@ -100,6 +123,11 @@
         // Dispatch event so active tab can refresh
         window.dispatchEvent(new CustomEvent('auth-login'));
         if (window.showToast) window.showToast('Logged in successfully', 'success');
+        if (currentLoginResolve) {
+          currentLoginResolve();
+          currentLoginResolve = null;
+          currentLoginReject = null;
+        }
       } else {
         return resp.json().then(function (data) {
           if (errDiv) {

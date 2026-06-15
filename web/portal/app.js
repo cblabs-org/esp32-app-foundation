@@ -35,9 +35,15 @@ class ApiQueue {
       // instead of immediately rejecting. The auth module registers an interceptor
       // that shows the overlay and the user can retry after logging in.
       if (response.status === 401 && _authInterceptor) {
-        _authInterceptor();
-        item.reject(new Error('HTTP 401'));
-        return;
+        try {
+          await _authInterceptor();
+          var retryResponse = await fetch(item.url, item.options);
+          if (!retryResponse.ok) throw new Error('HTTP ' + retryResponse.status);
+          response = retryResponse;
+        } catch (authErr) {
+          item.reject(authErr);
+          return;
+        }
       }
 
       if (!response.ok) throw new Error('HTTP ' + response.status);
