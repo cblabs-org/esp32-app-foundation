@@ -236,6 +236,12 @@
         '<article class="advanced-drawer">' +
           '<details>' +
             '<summary class="advanced-summary">Advanced TLS Settings</summary>' +
+            '<p class="text-muted" style="font-size:0.8rem; margin:0.25rem 0 0.75rem 0;">' +
+              'These settings are for advanced users who need to customise the TLS certificate used by the device.' +
+            '</p>' +
+            '<p class="text-muted" style="font-size:0.8rem; margin:0.25rem 0 0.75rem 0;">' +
+              'Enabling TLS in AP mode requires a properly signed CA certificate. Self-signed certificates will cause mobile devices to silently reject the captive portal connection, making setup impossible.' +
+            '</p>' +
             '<div style="display:flex; justify-content:space-between; align-items:center; padding:0.6rem 0;">' +
               '<span style="font-weight:600; font-size:0.9rem;">Enable TLS in AP Mode</span>' +
               '<label class="toggle-switch" style="position:relative; width:48px; height:26px; flex-shrink:0;">' +
@@ -245,6 +251,11 @@
               '</label>' +
             '</div>' +
             '<button id="regen-cert-btn" class="secondary full-width">Force Regenerate Certificate</button>' +
+            '<p class="text-muted" style="font-size:0.8rem; margin:0.25rem 0 0.75rem 0;">' +
+              'To generate a PEM certificate and key, you can use OpenSSL:<br>' +
+              '<code>openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -keyout key.pem -out cert.pem -days 3650 -nodes -subj \'/CN=esp32-device.local\'</code><br>' +
+              'For the captive portal to work with TLS, you need a certificate signed by a trusted Certificate Authority (e.g., Let\'s Encrypt). Self-signed certificates will not work for captive portal detection.' +
+            '</p>' +
             '<p style="font-weight:600; font-size:0.85rem; margin:1rem 0 0.5rem 0;">Upload Custom Certificate</p>' +
             '<p class="text-muted" style="font-size:0.8rem; margin:0.25rem 0 0.75rem 0;">Upload a CA-signed PEM certificate.</p>' +
             '<label>Certificate (PEM)' +

@@ -189,6 +189,9 @@ bool AuthManager::checkMcpAuth(PsychicRequest* request, PsychicResponse* respons
     // --- Gate: null request (safety) ---
     if (!request || !response) return false;
 
+    // --- Gate: valid session cookie (portal browser access) ---
+    if (_isSessionActive() && _checkSessionCookie(request)) return true;
+
     // --- Step 1: Require Authorization header ---
     if (!request->hasHeader("Authorization")) {
         response->send(401, "application/json", "{\"error\":\"missing_authorization\"}");

@@ -10,11 +10,14 @@ import json
 import argparse
 import urllib.request
 import urllib.error
+import ssl
+import os
 
 
-def mcp_request(ip, tool_name, arguments=None):
+def mcp_request(ip, tool_name, arguments=None, token=None):
     """Send a JSON-RPC 2.0 tools/call request to the device MCP server."""
-    url = f"http://{ip}/api/mcp"
+    protocol = "https" if token else "http"
+    url = f"{protocol}://{ip}/api/mcp"
     payload = {
         "jsonrpc": "2.0",
         "method": "tools/call",
@@ -22,11 +25,15 @@ def mcp_request(ip, tool_name, arguments=None):
         "id": 1
     }
     data = json.dumps(payload).encode("utf-8")
-    req = urllib.request.Request(url, data=data,
-                                headers={"Content-Type": "application/json"},
-                                method="POST")
+    headers = {"Content-Type": "application/json"}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+        
+    req = urllib.request.Request(url, data=data, headers=headers, method="POST")
+    ctx = ssl._create_unverified_context() if token else None
+    
     try:
-        with urllib.request.urlopen(req, timeout=5) as resp:
+        with urllib.request.urlopen(req, timeout=5, context=ctx) as resp:
             body = json.loads(resp.read().decode("utf-8"))
     except urllib.error.URLError as e:
         return {"error": f"Connection failed: {e}"}
@@ -40,12 +47,16 @@ def mcp_request(ip, tool_name, arguments=None):
         return {"raw": text if "text" in dir() else str(body)}
 
 
-def http_get_json(ip, path):
+def http_get_json(ip, path, token=None):
     """Simple GET returning parsed JSON."""
     try:
-        url = f"http://{ip}{path}"
+        protocol = "https" if token else "http"
+        url = f"{protocol}://{ip}{path}"
         req = urllib.request.Request(url)
-        with urllib.request.urlopen(req, timeout=5) as resp:
+        if token:
+            req.add_header("Authorization", f"Bearer {token}")
+        ctx = ssl._create_unverified_context() if token else None
+        with urllib.request.urlopen(req, timeout=5, context=ctx) as resp:
             return json.loads(resp.read().decode("utf-8"))
     except Exception as e:
         return {"error": str(e)}
@@ -65,7 +76,7 @@ def pct(value, total):
     return f"{value * 100 / total:.0f}%"
 
 
-def run_diagnostics(ip):
+def run_diagnostics(ip, token=None):
     sep = "=" * 50
     print(f"\n{sep}")
     print(f"  DEVICE DIAGNOSTICS: {ip}")
@@ -73,7 +84,7 @@ def run_diagnostics(ip):
 
     # --- 1. MCP Server Status ---
     print(">>> MCP SERVER STATUS")
-    status = http_get_json(ip, "/api/mcp/status")
+    status = http_get_json(ip, "/api/mcp/status", token)
     if "error" in status:
         print(f"    [FAIL] {status['error']}\n")
     else:
@@ -88,7 +99,7 @@ def run_diagnostics(ip):
 
     # --- 2. System Info ---
     print(">>> SYSTEM INFO (system_info)")
-    info = mcp_request(ip, "system_info")
+    info = mcp_request(ip, "system_info", token=token)
     if "error" in info:
         print(f"    [FAIL] {info['error']}\n")
     elif "raw" in info:
@@ -151,7 +162,7 @@ def run_diagnostics(ip):
 
     # --- 3. Device Configuration ---
     print(">>> DEVICE CONFIGURATION (get_config)")
-    config = mcp_request(ip, "get_config")
+    config = mcp_request(ip, "get_config", token=token)
     if "error" in config:
         print(f"    [FAIL] {config['error']}\n")
     elif "raw" in config:
@@ -168,7 +179,7 @@ def run_diagnostics(ip):
 
     # --- 4. Registered Tools ---
     print(">>> REGISTERED TOOLS (list_tools)")
-    tools_resp = mcp_request(ip, "list_tools")
+    tools_resp = mcp_request(ip, "list_tools", token=token)
     if "error" in tools_resp:
         print(f"    [FAIL] {tools_resp['error']}\n")
     elif "raw" in tools_resp:
@@ -184,5 +195,6 @@ def run_diagnostics(ip):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="ESP32 App Foundation — Device Diagnostics")
     parser.add_argument("ip", help="Device IP address")
+    parser.add_argument("--token", help="Bearer token for TLS authentication")
     args = parser.parse_args()
-    run_diagnostics(args.ip)
+    run_diagnostics(args.ip, args.token)
