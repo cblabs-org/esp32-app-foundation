@@ -34,7 +34,7 @@ exposes the credential to LAN sniffing; both layers are delivered together.
 | [WO9](./wo9-psychichttp-migration/WORKORDER.md) | `pr-24-portal-mcp-auth/wo9-psychichttp-migration` | Replace ESPAsyncWebServer with PsychicHttp for native TLS support | ✅ MERGED |
 | [WO10](./wo10-psychichttp-boot-fix/WORKORDER.md) | `pr-24-portal-mcp-auth/wo10-psychichttp-boot-fix` | Refactor WebServerManager to defer boot until network is ready | ✅ MERGED |
 | [WO11](./wo11-tls-ui-fixes/WORKORDER.md) | `pr-24-portal-mcp-auth/wo11-tls-ui-fixes` | Enable TLS in STA mode and fix UI Auth Promise | ✅ MERGED |
-| [WO12](./wo12-advanced-tls-cert/WORKORDER.md) | `pr-24-portal-mcp-auth/wo12-advanced-tls-cert` | Add SAN to cert, add manual cert upload, toggle AP TLS | 🔄 WIP |
+| [WO12](./wo12-advanced-tls-cert/WORKORDER.md) | `pr-24-portal-mcp-auth/wo12-advanced-tls-cert` | Add SAN to cert, add manual cert upload, toggle AP TLS | ✅ MERGED |
 
 ---
 
