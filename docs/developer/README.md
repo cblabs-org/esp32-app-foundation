@@ -27,6 +27,8 @@ Once you are building or shipping an application, read these for production read
 
 10. [Performance & Optimization](performance-guide.md) — RAM/flash budgeting, heap management, TLS memory costs, PSRAM usage, and profiling techniques.
 11. [Embedded Safety](embedded-safety.md) — Thread safety rules, memory allocation constraints, power management, and the design graveyard (10 rejected approaches with full rationale).
+12. [Security](security.md) — Threat model, hardware encryption, credential storage, TLS tradeoffs, web portal authentication, and OTA firmware integrity.
+13. [MCP Server](mcp-server.md) — The Model Context Protocol server, tool registration via `IMCPContributor`, built-in tools, and HTTP JSON-RPC transport.
 
 ## Quick Reference
 
