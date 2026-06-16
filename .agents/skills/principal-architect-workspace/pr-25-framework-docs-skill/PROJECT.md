@@ -2,7 +2,7 @@
 
 **Branch:** `pr-25-framework-docs-skill`
 **Base:** `main`
-**Status:** 📋 PLANNING — Work Orders written, awaiting user approval to execute
+**Status:** ✅ **COMPLETE** — merged to `main` `e3388d1`, pushed to remote
 **Design Document:** [pr25_design.md](../../../../.gemini/antigravity/brain/5ad94103-1cd2-41df-9eec-19be9c51778c/pr25_design.md)
 
 ---

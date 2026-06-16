@@ -62,7 +62,7 @@ predate the formal PA pipeline and are filed retrospectively.
 | [pr-22-portal-ui-consistency](./pr-22-portal-ui-consistency/PROJECT.md) | Web Portal UI Consistency (screensaver toggle fix + Advanced drawer standardisation + full drawer unification) | ✅ **COMPLETE** — 3 WOs merged to `main` `18ecb3d`, 61/61 tests · [distillation](./pr-22-portal-ui-consistency/context_bridge.md) | Session 5177dae5 |
 | [pr-24-portal-mcp-auth](./pr-24-portal-mcp-auth/PROJECT.md) | Web Portal + MCP Server Authentication + TLS (AuthManager, EC P-256 self-signed cert, session cookie, bearer token, Security top-level tab) | ✅ **COMPLETE** — All 12 WOs merged (`5fe96e7`), 525+ native tests passing, OTA unchanged · [distillation](./pr-24-portal-mcp-auth/context_bridge.md) | Session 948393bc |
 | [pr-26-ota-pagination](./pr-26-ota-pagination/PROJECT.md) | OTA Paginated Release Scanner + Memory Safety (pagination, PSRAM buffers, BSS chunk, deprecation cleanup, v0.0.9-beta.4 verified) | ✅ **MERGED** to main | Session dce01ce5 / [distillation](./pr-26-ota-pagination/context_bridge.md) |
-| [pr-25-framework-docs-skill](./pr-25-framework-docs-skill/PROJECT.md) | Framework Developer Docs + Extensibility Refinements (registerModule, ITickable signature, EventBus vector, template expansion, 5 dev guides, AI skill) | 📋 **PLANNING** — 6 WOs written, awaiting user approval | Session 5ad94103 |
+| [pr-25-framework-docs-skill](./pr-25-framework-docs-skill/PROJECT.md) | Framework Developer Docs + Extensibility Refinements (registerModule, ITickable signature, EventBus vector, template expansion, 5 dev guides, AI skill) | ✅ **MERGED** `e3388d1` — 51-file skill + 12 human docs + compliance audit guide | Session 5ad94103 |
 
 ---
 
