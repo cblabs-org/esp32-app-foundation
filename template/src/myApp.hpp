@@ -19,37 +19,66 @@
 
 #pragma once
 
+#include <cstdint>
+#include <ArduinoJson.h>
 #include "interfaces/ITickable.hpp"
+#include "interfaces/IConfigurable.hpp"
 #include "interfaces/IWebContributor.hpp"
+#include "interfaces/IMCPContributor.hpp"
+#include "interfaces/IConfigGate.hpp"
 
-class AsyncWebServer;
+class PsychicHttpServer;
+class MCPServer;
+class MCPToolRegistry;
 
 /**
  * @brief Main application class implementing specific business logic.
  *
- * Participates in the Application tick loop and contributes web routes.
+ * Participates in the Application tick loop, participates in the ConfigManager,
+ * contributes Web UI tabs and routes, contributes MCP tools, and exposes a config gate.
  */
-class MyApp : public ITickable, public IWebContributor {
+class MyApp : public ITickable,
+              public IConfigurable,
+              public IWebContributor,
+              public IMCPContributor,
+              public IConfigGate {
 public:
     MyApp() = default;
     ~MyApp() override = default;
 
-    /**
-     * @brief Periodic update hook called by the Application hub on every loop iteration.
-     *
-     * Implementations must be non-blocking and complete within 10ms.
-     */
+    // ITickable
     void tick(uint32_t currentMillis) override;
 
-    /**
-     * @brief Registers module-specific routes with the provided AsyncWebServer.
-     * @param server The AsyncWebServer reference.
-     */
-    void registerRoutes(AsyncWebServer& server) override;
+    // IConfigurable
+    const char* getConfigNamespace() const override;
+    int getSchemaVersion() const override;
+    void applyConfig(const JsonObject& config) override;
+    void serializeConfig(JsonObject& config) const override;
+    void resetConfig() override;
 
-    /**
-     * @brief Get the UI tab name for this contributor.
-     * @return String name of the tab.
-     */
+    // IWebContributor
+    void registerRoutes(PsychicHttpServer& server) override;
     const char* getTabName() const override;
+    int getTabOrder() const override;
+
+    // IMCPContributor
+    void registerMCPTools(MCPToolRegistry& registry) override;
+    void registerMcpTools(MCPServer& mcp);
+
+    // IConfigGate
+    const char* getGateName() const override;
+    bool isSatisfied() const override;
+    const char* gateName() const;
+    bool isOpen() const;
+
+private:
+    // Configuration state (persisted via IConfigurable)
+    int _refreshIntervalMs = 5000;     // Example configurable parameter
+    bool _featureEnabled = true;        // Example boolean toggle
+
+    // Config gate state
+    bool _gateOpen = false;
+
+    // Tick timing
+    uint32_t _lastActionMs = 0;
 };

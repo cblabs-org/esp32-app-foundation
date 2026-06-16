@@ -1,4 +1,10 @@
-# ESP32 App Foundation — sdkconfig.defaults (esp32dev)
+# ESP32 App Foundation — sdkconfig.defaults (shared base, all boards)
+#
+# This is the canonical base configuration shared by all hardware environments.
+# Board-specific delta files layer on top via board_build.cmake_extra_args in
+# platformio.ini. Settings here apply to ALL boards unless overridden.
+#
+# Layering order (later wins): sdkconfig.defaults → sdkconfig.defaults.<board>
 # Arduino framework autostart — enables the Arduino core's app_main() wrapper
 # which calls setup() then drives the loop() task. Without this, ESP-IDF's
 # app_startup.c has an undefined reference to app_main().
@@ -13,12 +19,135 @@ CONFIG_ESP_MAIN_TASK_STACK_SIZE=8192
 # Enable LittleFS
 CONFIG_LITTLEFS_FOR_IDF_3_2=y
 
+# PsychicHttp / ESP-IDF HTTP server WebSockets
+CONFIG_HTTPD_WS_SUPPORT=y
+
 # Disable Bluetooth to reclaim ~70KB RAM (not needed for this framework)
 CONFIG_BT_ENABLED=n
 
-# HTTPS/TLS — mbedTLS heap-friendly settings
-CONFIG_MBEDTLS_SSL_IN_CONTENT_LEN=8192
+# HTTPS/TLS — mbedTLS settings
+# Input buffer MUST be 16384 to accept full TLS records from CDNs (GitHub objects.githubusercontent.com)
+CONFIG_MBEDTLS_SSL_IN_CONTENT_LEN=16384
 CONFIG_MBEDTLS_SSL_OUT_CONTENT_LEN=4096
 
 # FreeRTOS tick rate
 CONFIG_FREERTOS_HZ=1000
+
+# --- PR-10: Disable unused ESP-IDF components to reduce binary size ---
+
+# WiFi Provisioning — framework uses its own wifiManager with captive portal.
+# NOTE: No Kconfig toggle exists to fully disable wifi_provisioning in Arduino+ESP-IDF.
+# The component compiles but the linker GC strips unused symbols.
+CONFIG_ESP_WIFI_SOFTAP_SUPPORT=y
+
+# SPIFFS — framework uses LittleFS exclusively.
+# NOTE: CONFIG_SPIFFS_MAX_PARTITIONS has Kconfig min=1; cannot be set to 0.
+# The SPIFFS library compiles but is unused; linker GC handles dead code.
+
+# FatFS — no SD card support in framework.
+# NOTE: CONFIG_FATFS_VOLUME_COUNT has Kconfig min=1; cannot be set to 0.
+# The FatFS library compiles but is unused; linker GC handles dead code.
+
+# ESP Console — UART enabled here for esp32dev boot diagnostics and ESP_LOG* output.
+# Board delta files may override this (e.g., S3 Nano uses USB-JTAG; see sdkconfig.defaults.esp32s3nano).
+# WARNING: disabling UART on esp32dev will silence ALL serial output including boot logs.
+CONFIG_ESP_CONSOLE_UART_DEFAULT=y
+
+# PPP/Modem — no cellular modem hardware
+CONFIG_LWIP_PPP_SUPPORT=n
+
+# libsodium — all crypto handled by mbedTLS (OTA signature verification, etc.)
+CONFIG_LIBSODIUM_USE_MBEDTLS_SHA=n
+
+# --- PR-10 WO2: Compiler & linker optimization for size ---
+
+# Switch from -Og (debug) to -Os (optimize for size)
+CONFIG_COMPILER_OPTIMIZATION_SIZE=y
+
+# Newlib nano — smaller printf/scanf (~25-50KB savings)
+CONFIG_NEWLIB_NANO_FORMAT=y
+
+# Strip VERBOSE and DEBUG log strings at compile time
+CONFIG_LOG_MAXIMUM_LEVEL=3
+
+# Use silent assertions — saves flash from assertion message strings
+CONFIG_COMPILER_OPTIMIZATION_ASSERTIONS_SILENT=y
+
+# --- PR-10 WO3: mbedTLS cipher pruning & LWIP optimization ---
+
+# Disable unused symmetric ciphers (framework only uses AES)
+CONFIG_MBEDTLS_DES_C=n
+CONFIG_MBEDTLS_BLOWFISH_C=n
+CONFIG_MBEDTLS_XTEA_C=n
+CONFIG_MBEDTLS_CAMELLIA_C=n
+CONFIG_MBEDTLS_RC4_DISABLED=y
+
+# Disable DHE key exchange (use ECDHE instead for TLS)
+CONFIG_MBEDTLS_KEY_EXCHANGE_DHE_RSA=n
+CONFIG_MBEDTLS_KEY_EXCHANGE_DHE_PSK=n
+CONFIG_MBEDTLS_KEY_EXCHANGE_RSA_PSK=n
+# PSK MUST be enabled — Arduino's ssl_client.cpp wraps ALL SSL functions
+# (ssl_init, start_ssl_client, etc.) inside #if MBEDTLS_KEY_EXCHANGE_SOME_PSK_ENABLED.
+# Disabling all PSK modes compiles out the entire SSL backend, breaking WiFiClientSecure.
+CONFIG_MBEDTLS_PSK_MODES=y
+CONFIG_MBEDTLS_KEY_EXCHANGE_PSK=y
+CONFIG_MBEDTLS_KEY_EXCHANGE_ECDHE_PSK=y
+
+# Disable RIPEMD-160 (framework uses SHA-256 and MD5 only)
+CONFIG_MBEDTLS_RIPEMD160_C=n
+
+# Disable IPv6 — framework is IPv4-only
+# NOTE: PsychicHttp hardcodes `sockaddr_in6` in PsychicClient.cpp, so we MUST enable IPv6
+CONFIG_LWIP_IPV6=y
+
+# TCP window sizing for OTA downloads — the default 5760 (4×MSS) is too small.
+# During Update.write() flash operations (~20-200ms), the ESP32 can't ACK data.
+# A 5.7KB window fills in one packet, the server stalls, and drops the connection.
+CONFIG_LWIP_TCP_WND_DEFAULT=32768
+CONFIG_LWIP_TCP_SND_BUF_DEFAULT=16384
+CONFIG_LWIP_TCP_RECVMBOX_SIZE=12
+
+# --- PR-10 WO4: Final sweep ---
+
+# Remove ESP error code-to-string lookup table (~3-8KB of string constants)
+CONFIG_ESP_ERR_TO_NAME_LOOKUP=n
+
+# Disable ChaCha20-Poly1305 cipher suite (framework uses AES-based TLS)
+CONFIG_MBEDTLS_CHACHA20_C=n
+CONFIG_MBEDTLS_POLY1305_C=n
+CONFIG_MBEDTLS_CHACHAPOLY_C=n
+
+# Disable unused ECC curves — keep secp256r1 (P-256) and secp384r1 (P-384)
+# P-384 is required by GitHub's Sectigo Root E46 CA certificate (since 2026)
+CONFIG_MBEDTLS_ECP_DP_SECP192R1_ENABLED=n
+CONFIG_MBEDTLS_ECP_DP_SECP224R1_ENABLED=n
+CONFIG_MBEDTLS_ECP_DP_SECP384R1_ENABLED=y
+CONFIG_MBEDTLS_ECP_DP_SECP521R1_ENABLED=n
+CONFIG_MBEDTLS_ECP_DP_BP256R1_ENABLED=n
+CONFIG_MBEDTLS_ECP_DP_BP384R1_ENABLED=n
+CONFIG_MBEDTLS_ECP_DP_BP512R1_ENABLED=n
+CONFIG_MBEDTLS_ECP_DP_SECP192K1_ENABLED=n
+CONFIG_MBEDTLS_ECP_DP_SECP224K1_ENABLED=n
+CONFIG_MBEDTLS_ECP_DP_SECP256K1_ENABLED=n
+CONFIG_MBEDTLS_ECP_DP_CURVE25519_ENABLED=y
+
+# Disable WPS (WiFi Protected Setup — not used)
+CONFIG_ESP_WIFI_ENABLE_WPS=n
+
+# --- PR-14: OTA production hardening ---
+
+# Task watchdog panic — triggers reboot on hung OTA downloads,
+# enabling auto-rollback via the bootloader if the firmware
+# has not yet been blessed by markAppValid().
+CONFIG_ESP_TASK_WDT_PANIC=y
+CONFIG_MBEDTLS_ECP_DP_SECP256R1_ENABLED=y
+
+# --- PR-24: Self-signed TLS certificate generation ---
+# Required by AuthManager::generateAndStoreCert() (WO3) for X.509 cert writing.
+# MBEDTLS_X509_CREATE_C is the base; MBEDTLS_X509_CRT_WRITE_C adds cert writing.
+CONFIG_MBEDTLS_X509_CRT_WRITE_C=y
+CONFIG_MBEDTLS_X509_CREATE_C=y
+CONFIG_MBEDTLS_PEM_WRITE_C=y
+
+# Enable ESP-IDF HTTPS Server (required by PsychicHttpsServer)
+CONFIG_ESP_HTTPS_SERVER_ENABLE=y

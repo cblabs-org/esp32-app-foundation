@@ -8,12 +8,13 @@ All features in the App Foundation should be packaged as distinct **Modules**. W
 
 ### 1. Identify Your Module Interface
 Depending on what your module needs to do, you should implement one or more of the core interfaces from `include/interfaces/`:
-- **`ITickable`:** For modules that require periodic execution. Implement `tick()` to execute non-blocking logic. Must complete within 10ms.
-- **`iConfigurable`:** For modules that load or persist configuration to LittleFS.
+- **`ITickable`:** For modules that require periodic execution. Implement `tick(uint32_t currentMillis)` to execute non-blocking logic. Must complete within 10ms.
+- **`IConfigurable`:** For modules that load or persist configuration to LittleFS. Exposes serialization and schema versioning hooks.
 - **`IWebContributor`:** For modules that register REST API endpoints.
-- **`IMcpContributor`:** For modules that expose functions via the MCP JSON-RPC protocol.
-- **`iDataSource`:** For background data-fetching workers managed by the `DataManager`.
+- **`IMCPContributor`:** For modules that expose functions via the MCP JSON-RPC protocol.
+- **`IDataSource`:** For background data-fetching workers managed by the `DataManager`.
 - **`IStatusReporter`:** For display adapters that render boot-phase status overlays.
+- **`IConfigGate`:** For configuration prerequisites that must be met before transition to RUNNING.
 
 ### 2. Implementing the Interface
 Create your class in the appropriate directory (`lib/` for generic features, or your project's local `src/` directory for app-specific logic). 
@@ -26,9 +27,9 @@ Create your class in the appropriate directory (`lib/` for generic features, or 
 
 class MyLogicModule : public ITickable {
 public:
-    void tick() override {
+    void tick(uint32_t currentMillis) override {
         // Non-blocking loop logic here
-        // E.g., check millis() to perform a task every 1000ms
+        // E.g., check currentMillis to perform a task periodically
     }
 };
 ```
@@ -37,15 +38,15 @@ public:
 Modules must be registered with the `Application` instance during the boot phase, BEFORE `app.begin()` is called. 
 
 ```cpp
-#include "application/Application.hpp"
+#include "AppFoundation.h"
 #include "MyLogicModule.hpp"
 
 Application app;
 MyLogicModule myLogic;
 
 void setup() {
-    // Register the module so it receives tick() events
-    app.registerTickable(&myLogic);
+    // Register the module using the universal registration API
+    app.registerModule(&myLogic);
     
     FrameworkConfig config;
     // populate config ...

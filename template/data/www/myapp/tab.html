@@ -1,0 +1,21 @@
+<!-- MyApp tab content fragment -->
+<!-- Loaded by the SPA shell (app.js) when the user clicks the MyApp tab -->
+<div class="tab-content" id="myapp-tab">
+    <h2>My Application</h2>
+    <div class="card">
+        <h3>Status</h3>
+        <div id="myapp-status">Loading...</div>
+    </div>
+    <div class="card">
+        <h3>Configuration</h3>
+        <label>
+            Refresh Interval (ms):
+            <input type="number" id="myapp-refresh-ms" value="5000" min="1000" max="60000">
+        </label>
+        <label>
+            <input type="checkbox" id="myapp-enabled" checked>
+            Feature Enabled
+        </label>
+        <button id="myapp-save-btn">Save</button>
+    </div>
+</div>

@@ -16,7 +16,9 @@
  */
 
 #include "AppFoundation.h"
+#ifndef NATIVE_BUILD
 #include <Arduino.h>
+#endif
 #include "myApp.hpp"
 
 Application app;
@@ -28,11 +30,12 @@ MyApp myApp;
  * Sets up the Application hub and registers custom modules.
  */
 void setup() {
+#ifndef NATIVE_BUILD
     Serial.begin(115200);
+#endif
 
     // Register user application modules
-    app.registerTickable(&myApp);
-    app.registerWebContributor(&myApp);
+    app.registerModule(&myApp);  // Auto-registers for tick, config, web, MCP, config gate
 
     // Prepare Framework config
     FrameworkConfig config;
