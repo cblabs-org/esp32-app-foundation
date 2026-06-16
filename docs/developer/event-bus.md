@@ -90,12 +90,12 @@ The framework core modules publish several system events that custom modules can
 | :--- | :--- | :--- | :--- | :--- |
 | `ApplicationEvents::SYSTEM_HEAP` | `"system.heap"` | [Application](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/modules/Application/Application.hpp) | `const uint32_t*` | Emitted periodically containing the current free heap memory in bytes. |
 | `ApplicationEvents::APP_RUNNING` | `"app.running"` | [Application](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/modules/Application/Application.hpp) | `nullptr` | Emitted when all configuration gates are satisfied and the system enters the RUNNING state. |
-| `ApplicationEvents::APP_CONFIGURING` | `"app.configuring"` | [Application](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/modules/Application/Application.hpp) | `const AppConfiguringPayload*` | Emitted when entering the CONFIGURING state, detailing the blocked gate (see [AppConfiguringPayload.hpp](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/include/events/AppConfiguringPayload.hpp)). |
-| `OTAUpdateManagerEvents::OTA_PROGRESS` | `"ota.progress"` | [OTAUpdateManager](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/modules/OTAUpdateManager/OTAUpdateManager.hpp) | `const OTAProgressEvent*` | Emitted during an active firmware download to report progress, status, and completion state. |
+| `ApplicationEvents::APP_CONFIGURING` | `"app.configuring"` | [Application](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/modules/Application/Application.hpp) | `const AppConfiguringPayload*` | Emitted when entering the CONFIGURING state. Payload contains `gateName`, `helpText`, and `isRegression` flag (see [AppConfiguringPayload.hpp](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/include/events/AppConfiguringPayload.hpp)). |
+| `OTAUpdateManagerEvents::OTA_PROGRESS` | `"ota.progress"` | [OTAUpdateManager](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/modules/OTAUpdateManager/OTAUpdateManager.hpp) | `const OTAProgressEvent*` | Emitted during an active firmware download. Payload contains `progress` (0.0–1.0), `status` string, `complete` flag, and `success` flag. |
 | `U8G2DisplayEvents::DISPLAY_SLEEP` | `"display.sleep"` | [U8G2DisplayModule](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/modules/U8G2Display/U8G2DisplayModule.hpp) | `nullptr` | Published when the screen saver kicks in and the display shuts down to prevent OLED burn-in. |
 | `U8G2DisplayEvents::DISPLAY_WAKE` | `"display.wake"` | [U8G2DisplayModule](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/modules/U8G2Display/U8G2DisplayModule.hpp) | `nullptr` | Published when user interaction wakes the screen back up. |
-| `U8G2DisplayEvents::DISPLAY_BOARD_CHANGED` | `"display.board.changed"` | [U8G2DisplayModule](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/modules/U8G2Display/U8G2DisplayModule.hpp) | `const DisplayBoardChangedPayload*` | Emitted when the visible board on the U8G2 carousel changes. |
-| `U8G2DisplayEvents::DISPLAY_MESSAGE` | `"display.message"` | *Any Module* | `const DisplayMessagePayload*` | Subscribed to by the display module. Any module can publish to this topic to display a scrolling message overlay. |
+| `U8G2DisplayEvents::DISPLAY_BOARD_CHANGED` | `"display.board.changed"` | [U8G2DisplayModule](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/modules/U8G2Display/U8G2DisplayModule.hpp) | `const DisplayBoardChangedPayload*` | Emitted when the visible board on the U8G2 carousel changes. Payload contains `boardName` and `boardIndex`. |
+| `U8G2DisplayEvents::DISPLAY_MESSAGE` | `"display.message"` | *Any Module* | `const DisplayMessagePayload*` | Subscribed to by the display module. Any module can publish to this topic to display a scrolling message overlay. Payload contains `message` and `durationMs`. |
 
 ---
 
@@ -195,3 +195,55 @@ void OtherModule::handleFeature(const FeatureTriggeredPayload& data) {
              data.mode, data.durationMs);
 }
 ```
+
+---
+
+## 7. GRAVE-05: Why `std::function` Was Rejected
+
+You will notice that `EventCallback` is a C-style function pointer rather than a `std::function<void(const char*, const void*, void*)>`. This is a deliberate architectural decision documented in **GRAVE-05**.
+
+`std::function` uses **type erasure**, which frequently allocates memory on the heap. In an embedded environment like the ESP32, heavy heap fragmentation from dynamic callback allocations leads to out-of-memory panics during steady-state execution.
+
+> [!IMPORTANT]
+> **Static function pointers only.** The `EventBus` will never accept `std::function`, lambdas with captures, or `std::bind` results. This is a permanent constraint, not a temporary limitation.
+
+To bridge the gap between a static callback and an instance method, use the `ctx` parameter pattern:
+
+```cpp
+// In MyModule.h — declare a static callback
+static void onHeapReport(const char* topic, const void* payload, void* ctx);
+
+// In MyModule.cpp — subscribe, passing 'this' as context
+void MyModule::begin() {
+    app.getEventBus().subscribe("system.heap", MyModule::onHeapReport, this);
+}
+
+// The static callback casts ctx back to the instance pointer
+void MyModule::onHeapReport(const char* topic, const void* payload, void* ctx) {
+    auto* self = static_cast<MyModule*>(ctx);
+    const auto* freeHeap = static_cast<const uint32_t*>(payload);
+    self->_lastHeapValue = *freeHeap;
+}
+```
+
+This pattern provides full object-oriented dispatch with zero heap allocation overhead.
+
+---
+
+## 8. Custom Topic Conventions
+
+Module-owned topics use a `<module>.<event>` dot-separated format to prevent naming collisions across independent modules:
+
+- **Correct:** `sensor.reading_ready`, `weather.updated`, `alarm.triggered`
+- **Incorrect:** `reading_ready`, `weather`, `update`
+
+Always define topics as `constexpr` string constants inside a `<ModuleName>Events` namespace:
+
+```cpp
+namespace WeatherEvents {
+    constexpr const char* UPDATED = "weather.updated";
+    constexpr const char* FORECAST_READY = "weather.forecast_ready";
+}
+```
+
+Payload structs should be defined in the publisher's header file so subscribers can cast the `void*` payload correctly. Keep payload structs small — they are allocated on the publisher's stack.

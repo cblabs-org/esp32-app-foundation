@@ -7,14 +7,18 @@
  * To view a copy of this license, visit https://creativecommons.org/licenses/by-nc-sa/4.0/
  *
  * Module: template/src/myApp.hpp
- * Description: Main application module for the template skeleton. Implements ITickable
- *              and IWebContributor for periodic execution and REST API routing.
+ * Description: Main application module for the template skeleton. Implements
+ *              ITickable, IConfigurable, IWebContributor, IMCPContributor,
+ *              and IConfigGate to demonstrate all primary extension points.
  *
  * Exported Classes:
  * - MyApp: Main application logic container.
- *   - tick(): Periodic update hook called by the Application hub.
- *   - registerRoutes(): Registers custom REST endpoints with the web server.
- *   - getTabName(): Retrieves the UI tab name for this module.
+ *   - tick():              Periodic update hook called by the Application hub.
+ *   - applyConfig():       Loads persisted settings from ConfigManager.
+ *   - registerRoutes():    Registers custom REST endpoints with the web server.
+ *   - getTabName():        Retrieves the UI tab name for this module.
+ *   - registerMCPTools():  Exposes tools to the MCP server.
+ *   - getGateName():       Returns the human-readable gate name.
  */
 
 #pragma once
@@ -30,6 +34,7 @@
 class PsychicHttpServer;
 class MCPServer;
 class MCPToolRegistry;
+class ConfigManager;
 
 /**
  * @brief Main application class implementing specific business logic.
@@ -68,17 +73,21 @@ public:
     // IConfigGate
     const char* getGateName() const override;
     bool isSatisfied() const override;
-    const char* gateName() const;
-    bool isOpen() const;
+
+    /// @brief Wire the ConfigManager pointer for save operations.
+    void setConfigManager(ConfigManager* cm) { _configManager = cm; }
 
 private:
     // Configuration state (persisted via IConfigurable)
-    int _refreshIntervalMs = 5000;     // Example configurable parameter
-    bool _featureEnabled = true;        // Example boolean toggle
+    int _refreshIntervalMs = 5000;     ///< Example configurable parameter
+    bool _featureEnabled = true;       ///< Example boolean toggle
 
     // Config gate state
     bool _gateOpen = false;
 
     // Tick timing
     uint32_t _lastActionMs = 0;
+
+    // Dependencies
+    ConfigManager* _configManager = nullptr; ///< Pointer to ConfigManager for save operations
 };

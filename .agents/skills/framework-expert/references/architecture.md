@@ -4,36 +4,32 @@
 
 The framework decouples code into three distinct layers to ensure hardware/software independence and enable host-based testing.
 
-*   **Framework Kernel (`modules/`):** Central reusable infrastructure (e.g., `Application`, `ConfigManager`, `EventBus`, `WifiManager`, `WebServerManager`). It has zero dependencies on application-specific code.
-*   **Interfaces (`include/interfaces/`):** Pure virtual C++ class contracts (e.g., `ITickable`). This is the only coupling point between Kernel and Application.
+*   **Framework Kernel (`modules/`):** Central reusable infrastructure (e.g., `Application`, `ConfigManager`, `EventBus`, `WifiManager`). Zero dependencies on application code.
+*   **Interfaces (`include/interfaces/`):** Pure virtual C++ class contracts. This is the only coupling point between Kernel and Application.
 *   **Your App (`template/src/`):** Implements interfaces to inject custom behavior.
 
-## Single Include Façade
-All downstream code should use a single header include to access the framework:
-```cpp
-#include "AppFoundation.h"
-```
+### ADR-04: The Hollywood Principle
+The framework strictly enforces Inversion of Control. "Don't call us, we'll call you." Application modules should not orchestrate the boot sequence or poll the system state. Instead, they register via `app.registerModule()`, and the framework calls their lifecycle methods (`tick`, `applyConfig`, `render`).
 
-## Universal Module Registration
-The framework uses C++ compile-time type introspection (`if constexpr` and `std::is_base_of_v`) to detect which interfaces a class implements. Calling `app.registerModule(&module)` automatically registers the module with all matching subsystems.
+## Static Scope Requirement (ADR-16)
+
+**CRITICAL:** All module instances MUST be declared in static or global scope.
 
 ```cpp
-// Execute in setup()
-app.registerModule(&myAppModule);
+// ✅ CORRECT: Global or static allocation
+static MySensorModule sensorModule;
+
+void setup() {
+    app.registerModule(&sensorModule);
+}
+
+// ❌ WRONG: Stack allocation leads to dangling pointer
+void setup() {
+    MySensorModule sensorModule; // Destroyed when setup() returns
+    app.registerModule(&sensorModule); 
+} // Crash when framework calls sensorModule.tick()
 ```
-
-## Extension Interfaces
-
-| Interface | Purpose | Key Callback |
-| :--- | :--- | :--- |
-| `ITickable` | Periodic, non-blocking tick-loop logic | `tick(uint32_t currentMillis)` |
-| `IConfigurable` | Central config persistence (JSON) | `applyConfig(const JsonObject&)` |
-| `IWebContributor` | Web routes & bottom-nav UI tab addition | `registerRoutes(PsychicHttpServer&)` |
-| `IMCPContributor` | Local Model Context Protocol JSON-RPC tools | `registerMCPTools(MCPToolRegistry&)` |
-| `IConfigGate` | Blocks boot-to-RUNNING transition | `isSatisfied()` |
-| `IDataSource` | Background data fetch task | `fetchUpdate()` |
-| `IStatusReporter` | Progress status reporting during boot | `reportStatus(const char*, float)` |
-| `IDisplayBoard` | Telemetry pane in monochrome display | `render(U8G2&)` |
+The ESP32 lacks a Memory Management Unit (MMU) to trap dangling pointer access cleanly. Stack-allocated modules will silently corrupt memory or cause hard faults when the framework tries to invoke them.
 
 ## Application Lifecycle & Boot Phases
 
@@ -41,27 +37,27 @@ The system transitions: `BOOT` $\rightarrow$ `CONFIGURING` $\leftrightarrow$ `RU
 
 ### 1. BOOT Phase
 Executed synchronously inside `app.begin(config)`:
-1.  **EventBus** initialized.
-2.  **LittleFS** mounted.
-3.  **DeviceCrypto** & **KeyManager** initialize keys.
-4.  **ConfigManager** loads and applies configs.
-5.  **WifiManager**, **TimeManager**, **DataManager**, and **OTAUpdateManager** start.
-6.  REST routes and MCP tools registered.
-7.  Registry **compacted and locked**.
-8.  Firmware self-test checks boot partition.
-9.  `IConfigGate` gates evaluated.
+1.  **EventBus** & **LittleFS** initialized.
+2.  **DeviceCrypto** & **KeyManager** initialize keys.
+3.  **ConfigManager** loads configs from LittleFS.
+4.  **WifiManager**, **TimeManager**, **DataManager**, and **OTAUpdateManager** start.
+5.  REST routes and MCP tools registered.
+6.  Registry **compacted and locked** (Registration closes).
+7.  Firmware self-test checks boot partition.
+8.  `IConfigGate` gates evaluated.
 
 ### 2. CONFIGURING Phase
 Entered if any `IConfigGate::isSatisfied()` returns `false` (e.g., station credentials missing).
-*   Ticks are still dispatched; WiFi/local captive portal remain active.
+*   Ticks are dispatched; WiFi AP/Captive Portal active.
 *   Framework polls gates; transitions to `RUNNING` when all are satisfied.
 
 ### 3. RUNNING Phase
 Entered once all configuration gates are satisfied.
 *   Ticks dispatched to all `ITickable` modules.
-*   Gates are checked every 5 seconds. If a gate remains unsatisfied beyond its `getRegressionToleranceMs()`, the system regresses to `CONFIGURING`.
+*   **Tick Budget (ADR-17):** Modules MUST complete their `tick()` within 10ms. The Task Watchdog Timer (TWDT) will panic and reboot the ESP32 if the main loop blocks for more than 5 seconds. Lengthy operations must be deferred to FreeRTOS tasks (e.g., `IDataSource`) or broken into state machines.
+*   Gates are checked every 5 seconds. If a gate regresses beyond its `getRegressionToleranceMs()`, the system reverts to `CONFIGURING`.
 
 ## LittleFS Directory Layout
 *   `/mod/<namespace>.json`: Central config file for `IConfigurable` namespace.
 *   `/www/`: Root directory for the Single Page Application (SPA) web portal.
-*   `/www/<namespace>/tab.html` & `/www/<namespace>/tab.js`: Dynamic UI fragments loaded by the SPA shell.
+*   `/www/<namespace>/tab.html` & `/www/<namespace>/tab.js`: Dynamic UI fragments.

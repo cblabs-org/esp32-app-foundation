@@ -34,6 +34,12 @@ To use the ESP32 App Foundation in your project, we recommend adding it as a Git
 3. **Initialize Your Application**:
    In your `main.cpp`, instantiate the `Application` and register your modules via `registerTickable()`, `registerConfigurable()`, etc., before calling `begin()`.
 
+## Documentation
+
+This project uses a dual-documentation strategy:
+- **For Human Developers**: See `docs/developer/` for step-by-step tutorials, architectural motivation, and full walkthroughs.
+- **For AI Agents**: Load the `framework-expert` skill via MCP or read `.agents/skills/framework-expert/SKILL.md`. The AI skill contains a highly compressed, token-efficient, progressively-disclosed reference tree optimized for agentic context windows.
+
 ## Directory Structure
 
 - `include/`: Global interface contracts (`ITickable.hpp`, `IWebContributor.hpp`, etc.).

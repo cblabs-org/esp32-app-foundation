@@ -27,6 +27,8 @@ Use this decision table to guide your implementation:
 | Expose JSON-RPC commands to external clients / agents | **`IMCPContributor`** | `registerMCPTools()` |
 | Block entering the `RUNNING` state until configured | **`IConfigGate`** | `isSatisfied()` |
 | Poll remote servers periodically in the background | **`IDataSource`** | `fetchUpdate()` |
+| Render a telemetry pane on the OLED display carousel | **`IDisplayBoard`** | `render(U8G2&)`, `getBoardName()` |
+| Report boot-phase progress and fatal errors to the display | **`IStatusReporter`** | `reportStatus()`, `reportError()` |
 
 ---
 
@@ -37,13 +39,7 @@ The template module `MyApp` implements five different interfaces using multiple 
 ```cpp
 #pragma once
 
-#include <cstdint>
-#include <ArduinoJson.h>
-#include "interfaces/ITickable.hpp"
-#include "interfaces/IConfigurable.hpp"
-#include "interfaces/IWebContributor.hpp"
-#include "interfaces/IMCPContributor.hpp"
-#include "interfaces/IConfigGate.hpp"
+#include "AppFoundation.h"
 
 class PsychicHttpServer;
 class MCPServer;
@@ -101,6 +97,7 @@ private:
 ```
 
 ### Key Highlights:
+- **Single Include:** Use `#include "AppFoundation.h"` instead of including individual interface headers. `AppFoundation.h` transitively includes all interfaces, `FrameworkConfig`, and the `Application` hub.
 - **Forward Declarations:** Use forward declarations (e.g. `class PsychicHttpServer;`) in your header file instead of full `#include` statements to reduce compile times and prevent circular dependency loops.
 - **Interfaces Inheritance:** Standard multiple inheritance is used to implement multiple interfaces.
 - **`override` Keyword:** Always mark inherited virtual functions with `override` to allow the compiler to detect signature mismatches.
@@ -198,12 +195,14 @@ When writing custom modules for the ESP32 App Foundation, you must adhere to the
 - [ ] **Adhere to the 10ms Budget:** Profile your `tick()` callback to ensure it returns within 10ms.
 - [ ] **Namespace Configs:** Keep your configuration keys short and group them under a unique, lowercase namespace (e.g., `wifi`, `clock`, `myapp`).
 - [ ] **Follow House-Style Documentation:** Add standard file header comment blocks and document your public methods using Doxygen-style markup.
+- [ ] **Static Scope Only (ADR-16):** Modules MUST be declared at global or static scope, not stack-allocated in `setup()`. The ESP32 has no MMU — stack-allocated modules will silently corrupt memory or cause hard faults when the framework invokes them after `setup()` returns.
 
 ---
 
 ## 6. Common Mistakes to Avoid
 
-1. **Forgetting to check the `_locked` state:** Trying to register a module after `app.begin()` has been called will fail. All registrations must occur in `setup()` before boot starts.
-2. **Exposing hardware code in native builds:** Failing to wrap `#include <Wire.h>` or hardware-dependent drivers in `#ifndef NATIVE_BUILD` will cause host test builds to fail to compile.
-3. **Implicit memory leaks in `tick()`:** Doing `JsonObject obj = doc.to<JsonObject>()` repeatedly inside `tick()` without clearing memory can lead to out-of-memory crashes.
-4. **Duplicate registrations:** Calling `app.registerTickable(&myModule)` AND `app.registerModule(&myModule)` is redundant. The universal `registerModule()` call does all the work.
+1. **Late registration panics the device:** Calling `app.registerModule()` after `app.begin()` has been called will trigger a **fatal panic**. The registration registry is compacted and locked during boot — late registration is unconditionally forbidden. All registrations must occur in `setup()` before `app.begin()` is invoked.
+2. **Stack-allocating modules (no MMU on ESP32):** Declaring a module as a local variable inside `setup()` creates a dangling pointer. The ESP32 has no MMU to trap this — it will silently corrupt memory or hard-fault when the framework calls the module's `tick()`. Always declare modules at global or `static` scope.
+3. **Exposing hardware code in native builds:** Failing to wrap `#include <Wire.h>` or hardware-dependent drivers in `#ifndef NATIVE_BUILD` will cause host test builds to fail to compile.
+4. **Implicit memory leaks in `tick()`:** Doing `JsonObject obj = doc.to<JsonObject>()` repeatedly inside `tick()` without clearing memory can lead to out-of-memory crashes.
+5. **Duplicate registrations:** Calling `app.registerTickable(&myModule)` AND `app.registerModule(&myModule)` is redundant. The universal `registerModule()` call does all the work.

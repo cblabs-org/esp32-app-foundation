@@ -50,6 +50,9 @@ void MyApp::applyConfig(const JsonObject& config) {
 }
 ```
 
+> [!TIP]
+> The ArduinoJson v7 `|` operator provides a safe fallback value when a key is missing or `null`. Always prefer `config["key"] | defaultValue` over `.as<T>()`, which can crash on missing keys.
+
 ### 4. `serializeConfig(JsonObject& section) const`
 Called when the framework needs to save the configuration (e.g. after a web portal change). The module writes its variables to the mutable JSON object. ConfigManager handles writing the `_v` field and saving the file to flash.
 ```cpp
@@ -157,6 +160,19 @@ The framework distinguishes between persistent runtime configuration and compile
 > 
 > All other framework and application configurations (WiFi settings, timezone, display brightness, custom parameters) must be handled through the `ConfigManager` + `IConfigurable` persistence model.
 
+The actual `FrameworkConfig` struct contains only OTA-related secrets:
+
+```cpp
+struct FrameworkConfig {
+    const char* otaPublicKey  = nullptr;  // PEM-encoded RSA public key for OTA verification
+    const char* otaGithubRepo = nullptr;  // GitHub "owner/repo" for OTA releases
+    const char* otaGithubToken = nullptr; // Optional GitHub token for private repos
+};
+```
+
+> [!WARNING]
+> Do NOT add module-specific settings to `FrameworkConfig`. That struct is reserved for core framework boot-time secrets. Modules manage their own runtime configuration via `IConfigurable`.
+
 ---
 
 ## 7. Saving Configuration at Runtime
@@ -178,3 +194,58 @@ void MyApp::handleConfigChange(int newInterval, bool enabled) {
 }
 ```
 `saveModuleConfig()` will dynamically allocate a `JsonDocument`, call your `serializeConfig()` method to populate the fields, append the correct metadata version `_v`, and write the file securely to LittleFS.
+
+> [!WARNING]
+> **Flash Wear:** Flash memory has a limited write endurance (~100K cycles per sector). Modules should batch configuration changes where possible and only call `saveModuleConfig()` when a user explicitly alters a setting. Do NOT call it on every `tick()` cycle.
+
+---
+
+## 8. ConfigManifest: Three-Tier Backup
+
+Flash corruption is a serious risk on ESP32 devices, especially if power is lost during a write operation. The framework mitigates this via a three-tier `ConfigManifest` backup rotation.
+
+When the `ConfigManager` writes to disk, it does not simply overwrite `manifest.json`. It follows a safe rotation pattern:
+
+| Tier | File | Purpose |
+| :--- | :--- | :--- |
+| **Active** | `manifest.json` | Current configuration, loaded during normal boot. |
+| **Previous** | `manifest.prev.json` | Snapshot of the prior Active file, taken before each new write. |
+| **Golden** | `manifest.golden.json` | Blessed configuration — copied from Active after a successful boot (WiFi connected, tick loop reached without panic). |
+
+### Recovery Sequence
+
+If the `ConfigManager` fails to load the Active manifest (e.g. JSON parse errors, missing file, or corruption):
+
+```mermaid
+flowchart TD
+    A["Load manifest.json"] -->|Success| B["Boot continues"]
+    A -->|Fail| C["Load manifest.prev.json"]
+    C -->|Success| B
+    C -->|Fail| D["Load manifest.golden.json"]
+    D -->|Success| B
+    D -->|Fail| E["Alert user, proceed with defaults"]
+```
+
+### Golden Blessing Condition
+
+The Active manifest is promoted to Golden (`manifest.golden.json`) only when the device successfully:
+1. Boots and mounts the filesystem.
+2. Connects to WiFi in station mode.
+3. Reaches the `tick()` loop without panicking.
+
+This ensures the Golden backup always represents a known-good, validated configuration state.
+
+---
+
+## 9. Bulk Export & Import
+
+The `ConfigManager` provides bulk operations for full-device configuration backup and restore:
+
+```cpp
+void exportAllConfig(JsonDocument& outDoc);
+bool importAllConfig(JsonDocument& inDoc);
+```
+
+- **`exportAllConfig()`**: Iterates through all registered `IConfigurable` modules, calling their `serializeConfig()` methods to build a complete JSON tree. Used by the Web Portal to generate a downloadable backup of the device state. Each module's config is nested under its namespace key, with a `_meta` envelope containing device metadata.
+
+- **`importAllConfig()`**: Parses an incoming JSON document, routes the appropriate JSON object to each registered module's `applyConfig()` method, and immediately persists the new state via `saveModuleConfig()`. Unknown top-level keys (e.g. `_meta`) that do not match any registered module namespace are silently skipped.

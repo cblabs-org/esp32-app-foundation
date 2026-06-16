@@ -3,12 +3,28 @@ name: framework-expert
 description: >
   Answers questions about building applications on the ESP32 App Foundation.
   Trigger on: "how do I create a module", "register a module", "registerModule",
-  "ITickable", "IConfigurable", "IWebContributor", "IMCPContributor",
+  "build an app on the foundation", "weather station", "sensor dashboard", "IoT device",
+  "why does registration fail after begin", "is it safe to allocate in tick",
+  "ITickable", "IConfigurable", "IWebContributor", "IMCPContributor", "IOTAVerifier",
   "IConfigGate", "IDataSource", "EventBus", "ConfigManager", "web portal tab",
+  "display board", "carousel", "screensaver", "replace the display", "use a TFT", "different screen", "e-ink display",
+  "hierarchical object model", "sub-object API", "Domain Meaning Test",
+  "orchestrator anti-pattern", "service module", "module vs library",
+  "global state", "dependency injection", "SOLID principles",
+  "thread safety on ESP32", "why not use std::function",
+  "TLS memory", "heap usage", "PSRAM", "out of memory", "running low on RAM",
+  "firmware too large", "flash partition", "reduce binary size",
+  "performance optimisation", "profiling ESP32", "OTA verification", "firmware signing",
   "config system", "extension point", "framework architecture", "AppFoundation.h",
-  "tick function", "boot sequence", "LittleFS layout", "FrameworkConfig".
+  "tick function", "boot sequence", "LittleFS layout", "FrameworkConfig",
+  "DeviceCrypto", "KeyManager", "AuthManager", "JWT", "credential storage",
+  "setInsecure", "SECURITY_VERSION", "anti-rollback".
   Also trigger when an agent is working on code that extends the framework
-  and needs guidance on interface contracts or registration patterns.
+  and needs guidance on interface contracts, patterns, performance, or embedded safety.
+  Also trigger on: "audit", "compliance", "tech debt", "code review",
+  "scan for violations", "check compliance", "naming conventions",
+  "std::nothrow", "bare new", "std::function", "WiFiClientSecure",
+  "TWDT", "watchdog", "task stack size", "private_key.pem".
 ---
 
 # Framework Expert
@@ -17,7 +33,7 @@ Senior developer assistant specializing in building applications, creating modul
 
 ## Overview
 
-The ESP32 App Foundation is a decoupled, contract-based framework for ESP32 devices. Downstream applications inject custom behavior by implementing one or more pure virtual C++ interfaces and registering them. 
+The ESP32 App Foundation is a decoupled, contract-based framework for ESP32 devices. Downstream applications inject custom behavior by implementing one or more pure virtual C++ interfaces and registering them.
 
 All application code interacts with the framework via the single facade include:
 ```cpp
@@ -32,7 +48,7 @@ app.registerModule(&myModule);
 ## Quick Answers
 
 ### How do I register a module?
-Call `app.registerModule(&myModule);` inside `setup()`. The framework uses compile-time type introspection to auto-register it with all implemented subsystems.
+Call `app.registerModule(&myModule);` inside `setup()`. The framework uses compile-time type introspection to auto-register it. See `references/registration.md` for rules and lifecycle details.
 
 ### What include do I use?
 Always use `#include "AppFoundation.h"`. Do not couple directly to internal framework header paths.
@@ -41,32 +57,38 @@ Always use `#include "AppFoundation.h"`. Do not couple directly to internal fram
 
 | Interface Class | Purpose | Key Callback |
 | :--- | :--- | :--- |
-| [ITickable](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/include/interfaces/ITickable.hpp) | Runs periodic, non-blocking logic in the main tick loop. | `tick(uint32_t currentMillis)` |
-| [IConfigurable](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/include/interfaces/IConfigurable.hpp) | Persists and loads module settings via `ConfigManager` gateway. | `applyConfig(const JsonObject&)` |
-| [IWebContributor](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/include/interfaces/IWebContributor.hpp) | Exposes REST API endpoints and appends navigation tabs. | `registerRoutes(PsychicHttpServer&)` |
-| [IMCPContributor](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/include/interfaces/IMCPContributor.hpp) | Registers JSON-RPC tools with the local Model Context Protocol. | `registerMCPTools(MCPToolRegistry&)` |
-| [IConfigGate](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/include/interfaces/IConfigGate.hpp) | Blocks transition to RUNNING state until requirements are satisfied. | `isSatisfied()` |
-| [IDataSource](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/include/interfaces/IDataSource.hpp) | Scheduled background data fetch worker managed by `DataManager`. | `fetchUpdate()` |
-| [IStatusReporter](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/include/interfaces/IStatusReporter.hpp) | Displays boot-phase progress status and unrecoverable errors. | `reportStatus(const char*, float)` |
-| [IDisplayBoard](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/include/interfaces/IDisplayBoard.hpp) | Renders a telemetry pane inside the monochrome display carousel. | `render(U8G2&)` |
+| `ITickable` | Runs periodic, non-blocking logic in the main tick loop. | `tick(uint32_t)` |
+| `IConfigurable` | Persists and loads module settings via `ConfigManager` gateway. | `applyConfig(const JsonObject&)` |
+| `IWebContributor` | Exposes REST API endpoints and appends navigation tabs. | `registerRoutes(PsychicHttpServer&)` |
+| `IMCPContributor` | Registers JSON-RPC tools with the local Model Context Protocol. | `registerMCPTools(MCPToolRegistry&)` |
+| `IConfigGate` | Blocks transition to RUNNING state until requirements are satisfied. | `isSatisfied()` |
+| `IDataSource` | Scheduled background data fetch worker managed by `DataManager`. | `fetchUpdate()` |
+| `IStatusReporter` | Displays boot-phase progress status and unrecoverable errors. | `reportStatus(const char*, float)` |
+| `IDisplayBoard` | Renders a telemetry pane inside the monochrome display carousel. | `render(U8G2&)` |
+| `IOTAVerifier` | Streaming cryptographic firmware verification for OTA updates. | `verify()` |
 
 ## Detailed References
 
-Based on your query, load and read the corresponding reference file:
+This skill uses a progressive disclosure model. Based on your query, load and read the corresponding reference file or directory:
 
 | Topic | Read |
 |---|---|
-| Framework architecture, boot lifecycle, 3-tier model | [architecture.md](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/.agents/skills/framework-expert/references/architecture.md) |
-| Creating a new module, interface selection, registration | [creating-a-module.md](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/.agents/skills/framework-expert/references/creating-a-module.md) |
-| IConfigurable, schema versioning, config persistence | [config-system.md](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/.agents/skills/framework-expert/references/config-system.md) |
-| IWebContributor, REST routes, web portal JS fragments | [web-portal.md](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/.agents/skills/framework-expert/references/web-portal.md) |
-| EventBus, topics, subscribe/publish patterns | [event-bus.md](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/.agents/skills/framework-expert/references/event-bus.md) |
+| **App Developer Quickstart** (Building a new IoT app) | `guides/app-developer-quickstart.md` |
+| **Module Developer Guide** (Adding a kernel module) | `guides/module-developer-guide.md` |
+| **Compliance Audit** (Systematic codebase review against all principles) | `guides/compliance-audit.md` |
+| **Interface Contracts** (Full API, rules, lifecycle for each interface) | `interfaces/` (One file per interface) |
+| **Architecture & Boot** (Lifecycle, 3-tier model, LittleFS) | `references/architecture.md` |
+| **Registration System** (registerModule, compact-and-lock) | `references/registration.md` |
+| **Build System** (PlatformIO, version injection, LittleFS) | `references/build-system.md` |
+| **Display System** (Carousel, custom boards, replacing U8G2) | `systems/display/` |
+| **Config System** (Persistence, FrameworkConfig, ConfigManifest) | `systems/config/` |
+| **Event Bus** (Topics, pub/sub, custom topics) | `systems/event-bus/` |
+| **Web Portal** (SPA, routes, HTML/JS fragments, security) | `systems/web-portal/` |
+| **Security** (TLS tradeoffs, credentials, OTA security, portal auth) | `security/` |
+| **Coding Patterns** (Service Module Pattern, HOM, SOLID, modules vs libs) | `coding-patterns/` |
+| **Performance** (PSRAM, flash size, heap, profiling) | `performance/` |
+| **Embedded Safety** (Thread safety, memory rules, power, rejected approaches)| `embedded-safety/` |
 
 ## When to Read the Full Docs
 
-The reference files above are optimized distillations containing syntax rules, APIs, and key facts. If you need step-by-step tutorials, walkthroughs, or architectural motivation, read the complete developer guides under `docs/developer/`:
-- [Architecture Overview](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/docs/developer/architecture-overview.md)
-- [Creating a Module](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/docs/developer/creating-a-module.md)
-- [Configuration System](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/docs/developer/config-system.md)
-- [Extending the Web Portal](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/docs/developer/extending-the-web-portal.md)
-- [Event Bus Guide](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/docs/developer/event-bus.md)
+These references are optimized distillations for AI agents. If the human developer needs step-by-step tutorials, walkthroughs, or architectural motivation, direct them to the complete developer guides under `docs/developer/`.

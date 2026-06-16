@@ -129,9 +129,42 @@ You simply call:
 app.registerModule(&myModule);
 ```
 
+### Two-Tier Vector Model & `_compactAndLock()` Lifecycle
+
+The framework stores registered modules in `std::vector` containers (one per interface type). To prevent heap fragmentation during steady-state execution, the registration system enforces a strict three-phase lifecycle:
+
+```mermaid
+stateDiagram-v2
+    [*] --> RegistrationWindow : setup()
+    RegistrationWindow --> CompactAndLock : app.begin()
+    CompactAndLock --> RuntimeRejection : _compactAndLock()
+    RuntimeRejection --> [*]
+```
+
+1. **Phase 1 — Registration Window:** During `setup()`, modules are pushed into vectors via `app.registerModule()`. Vectors may reallocate and temporarily fragment the heap — this is acceptable because it occurs before long-lived runtime objects are created.
+
+2. **Phase 2 — Compact and Lock:** Inside `app.begin()`, the framework calls `_compactAndLock()`. This method iterates through every internal vector, calls `shrink_to_fit()` to release unused capacity back to the heap, and sets `_locked = true`.
+
+3. **Phase 3 — Runtime Rejection:** Any attempt to call `app.registerModule()` after `app.begin()` has been invoked will instantly trigger a **fatal panic**. Late registration is forbidden because pushing to a locked vector could cause a heap reallocation during steady-state execution.
+
+> [!CAUTION]
+> **Late registration causes a fatal panic.** All modules MUST be registered in `setup()` before calling `app.begin()`. If a module should be conditionally inactive, register it unconditionally and have its `tick()` return early based on internal state.
+
 ---
 
-## 5. Subsystem Extension Interfaces
+## 5. ADR Rationale
+
+Several architectural decisions underpin the framework design. These are documented as Architecture Decision Records (ADRs):
+
+| ADR | Title | Summary |
+| :--- | :--- | :--- |
+| ADR-04 | Hollywood Principle | "Don't call us, we'll call you." Application modules never orchestrate boot or poll system state. They register via `app.registerModule()` and the framework calls their lifecycle methods (`tick`, `applyConfig`, `render`). |
+| ADR-16 | Static Scope | All module instances MUST be declared at global or static scope. The ESP32 lacks an MMU — stack-allocated modules will silently corrupt memory or cause hard faults when the framework invokes them after `setup()` returns. |
+| ADR-17 | Tick Budget | Modules MUST complete their `tick()` within **10ms**. The Task Watchdog Timer (TWDT) will panic and reboot the ESP32 if the main loop blocks for more than **5 seconds**. Lengthy operations must be deferred to FreeRTOS tasks (e.g., via `IDataSource`). |
+
+---
+
+## 6. Subsystem Extension Interfaces
 
 Application modules interact with framework subsystems by implementing one or more of these interfaces:
 
@@ -145,12 +178,13 @@ Application modules interact with framework subsystems by implementing one or mo
 | [IDataSource](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/include/interfaces/IDataSource.hpp) | Scheduled background data fetch worker managed by `DataManager`. | `fetchUpdate()` |
 | [IStatusReporter](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/include/interfaces/IStatusReporter.hpp) | Displays boot-phase progress status and unrecoverable errors. | `reportStatus(const char*, float)` |
 | [IDisplayBoard](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/include/interfaces/IDisplayBoard.hpp) | Renders a telemetry pane inside the monochrome display carousel. | `render(U8G2&)` |
+| [IOTAVerifier](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/include/interfaces/IOTAVerifier.hpp) | Streaming cryptographic firmware verification for OTA updates. | `verify(const uint8_t*, size_t)` |
 
 For detailed information on implementing these interfaces, see the [Extension Points & Interfaces](../design_specification.md#6-extension-points--interfaces) section in the Design Specification.
 
 ---
 
-## 6. The Application Lifecycle
+## 7. The Application Lifecycle
 
 The application operates in three main states: `BOOT` $\rightarrow$ `CONFIGURING` $\leftrightarrow$ `RUNNING`.
 
@@ -184,12 +218,13 @@ Entered if any registered `IConfigGate` (such as the default `WifiConfigGate` if
 Entered once all configuration gates are satisfied.
 - The framework dispatches ticks to all registered `ITickable` modules.
 - A throttled check (every 5 seconds) polls gates for regression. If an actionable gate remains unsatisfied beyond its declared `getRegressionToleranceMs()` threshold, the framework regresses the system back to the `CONFIGURING` state.
+- `getRegressionToleranceMs()` returns a `uint32_t` duration in milliseconds (default: 30 seconds). Return `0` for immediate regression. Return `UINT32_MAX` to **never regress** — the module handles recovery internally. For example, the built-in `TimeConfigGate` uses `UINT32_MAX` to prevent NTP timeouts from forcing a re-configuration cycle.
 
 For more details on the boot phases and state transitions, refer to the [Application Lifecycle](../design_specification.md#9-application-lifecycle) section in the Design Specification.
 
 ---
 
-## 7. LittleFS Directory Layout
+## 8. LittleFS Directory Layout
 
 All persistent files are stored in the flash memory via LittleFS. The framework expects a strict structure:
 - **`/mod/<namespace>.json`**: Stored configuration file for each registered `IConfigurable` module (e.g. `/mod/wifi.json`, `/mod/myapp.json`).
@@ -198,7 +233,7 @@ All persistent files are stored in the flash memory via LittleFS. The framework 
 
 ---
 
-## 8. EventBus Overview
+## 9. EventBus Overview
 
 The framework provides a synchronous, in-memory publish-subscribe [EventBus](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/modules/EventBus/EventBus.hpp) to enable decoupled communication between modules. Modules subscribe to string-based topic channels using static function callbacks and publish events containing optional pointer payloads. 
 

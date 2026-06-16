@@ -8,16 +8,22 @@
  *
  * Module: template/src/myApp.cpp
  * Description: Implementation of the MyApp class for the template skeleton.
+ *              Demonstrates all 5 primary extension points: ITickable,
+ *              IConfigurable, IWebContributor, IMCPContributor, and IConfigGate.
  *
  * Exported Functions/Classes:
  * - MyApp: Main application logic container.
- *   - tick(): Periodic update hook.
- *   - registerRoutes(): Web route registration.
- *   - getTabName(): UI tab name provider.
+ *   - tick():              Periodic update hook.
+ *   - applyConfig():       Loads persisted settings from ConfigManager.
+ *   - registerRoutes():    Web route registration.
+ *   - getTabName():        UI tab name provider.
+ *   - registerMCPTools():  Exposes tools to the MCP server.
+ *   - getGateName():       Returns the human-readable gate name.
  */
 
 #include "myApp.hpp"
 #include "MCPToolRegistry.hpp"
+#include "ConfigManager.hpp"
 
 #ifndef NATIVE_BUILD
 #include <PsychicHttp.h>
@@ -105,6 +111,11 @@ void MyApp::registerRoutes(PsychicHttpServer& server) {
             _featureEnabled = doc["enabled"].as<bool>();
         }
 
+        // Persist the updated config to LittleFS
+        if (_configManager) {
+            _configManager->saveModuleConfig(this);
+        }
+
         return response->send(200, "application/json", "{\"status\":\"saved\"}");
     });
 }
@@ -150,17 +161,9 @@ void MyApp::registerMcpTools(MCPServer& mcp) {
 // -----------------------------------------------------------------------------
 
 const char* MyApp::getGateName() const {
-    return gateName();
-}
-
-bool MyApp::isSatisfied() const {
-    return isOpen();
-}
-
-const char* MyApp::gateName() const {
     return "MyApp Ready";
 }
 
-bool MyApp::isOpen() const {
+bool MyApp::isSatisfied() const {
     return _gateOpen;
 }
