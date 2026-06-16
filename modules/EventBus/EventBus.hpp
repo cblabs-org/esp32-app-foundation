@@ -22,9 +22,8 @@
 
 #include <stdint.h>
 #include <stddef.h>
-
-#define EVENT_BUS_MAX_SUBSCRIBERS 32
-#define EVENT_BUS_MAX_TOPIC_LENGTH 64
+#include <vector>
+#include <string>
 
 /**
  * @brief Type definition for an event callback.
@@ -38,7 +37,7 @@ typedef void (*EventCallback)(const char* topic, const void* payload, void* ctx)
  * @brief Structure to hold a single subscription record.
  */
 struct Subscription {
-    char topic[EVENT_BUS_MAX_TOPIC_LENGTH]; // Topic string
+    std::string topic;                      // Topic string
     EventCallback callback;                 // Callback function
     void* ctx;                              // User context
     bool active;                            // Is this slot active?
@@ -49,7 +48,7 @@ struct Subscription {
  */
 class EventBus {
 private:
-    Subscription _subscribers[EVENT_BUS_MAX_SUBSCRIBERS];
+    std::vector<Subscription> _subscribers;
 
 public:
     /**

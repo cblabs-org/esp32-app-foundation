@@ -26,7 +26,7 @@ protected:
 
 struct TestContext {
     int callCount;
-    char lastTopic[EVENT_BUS_MAX_TOPIC_LENGTH];
+    std::string lastTopic;
     int lastPayloadValue;
 };
 
@@ -34,7 +34,7 @@ void testCallback(const char* topic, const void* payload, void* ctx) {
     if (ctx) {
         TestContext* tc = static_cast<TestContext*>(ctx);
         tc->callCount++;
-        strncpy(tc->lastTopic, topic, sizeof(tc->lastTopic) - 1);
+        tc->lastTopic = topic ? topic : "";
         if (payload) {
             tc->lastPayloadValue = *static_cast<const int*>(payload);
         }
@@ -56,7 +56,7 @@ TEST_F(EventBusTest, SingleSubscriptionAndDispatch) {
     int count = bus.publish("sys/status", &val);
     EXPECT_EQ(count, 1);
     EXPECT_EQ(ctx.callCount, 1);
-    EXPECT_STREQ(ctx.lastTopic, "sys/status");
+    EXPECT_EQ(ctx.lastTopic, "sys/status");
     EXPECT_EQ(ctx.lastPayloadValue, 123);
 }
 
@@ -91,17 +91,16 @@ TEST_F(EventBusTest, UnsubscribeRemovesSubscriber) {
 TEST_F(EventBusTest, SubscribeLimitsOverflow) {
     TestContext ctx = {0, "", 0};
     
-    for (int i = 0; i < EVENT_BUS_MAX_SUBSCRIBERS; i++) {
+    // Verify we can subscribe past the old limit of 32 (e.g. 50 times)
+    const int numSubs = 50;
+    for (int i = 0; i < numSubs; i++) {
         EXPECT_TRUE(bus.subscribe("sys/overflow", testCallback, &ctx));
     }
-
-    // Next one should fail
-    EXPECT_FALSE(bus.subscribe("sys/overflow", testCallback, &ctx));
     
     int val = 1;
     int count = bus.publish("sys/overflow", &val);
-    EXPECT_EQ(count, EVENT_BUS_MAX_SUBSCRIBERS);
-    EXPECT_EQ(ctx.callCount, EVENT_BUS_MAX_SUBSCRIBERS);
+    EXPECT_EQ(count, numSubs);
+    EXPECT_EQ(ctx.callCount, numSubs);
 }
 
 TEST_F(EventBusTest, PublishToUnrelatedTopic) {
@@ -121,7 +120,12 @@ TEST_F(EventBusTest, InvalidTopicSubscription) {
     char longTopic[100];
     memset(longTopic, 'a', sizeof(longTopic));
     longTopic[sizeof(longTopic)-1] = '\0';
-    EXPECT_FALSE(bus.subscribe(longTopic, testCallback, &ctx));
+    // Now allowed due to vector migration (no max topic length ceiling)
+    EXPECT_TRUE(bus.subscribe(longTopic, testCallback, &ctx));
+    
+    int val = 42;
+    EXPECT_EQ(bus.publish(longTopic, &val), 1);
+    EXPECT_EQ(ctx.callCount, 1);
 }
 
 TEST_F(EventBusTest, UnsubscribeNonExistent) {
@@ -157,14 +161,14 @@ TEST_F(EventBusTest, MultipleTopicsSameCallback) {
     int count1 = bus.publish("topic/one", &val1);
     EXPECT_EQ(count1, 1);
     EXPECT_EQ(ctx.callCount, 1);
-    EXPECT_STREQ(ctx.lastTopic, "topic/one");
+    EXPECT_EQ(ctx.lastTopic, "topic/one");
     EXPECT_EQ(ctx.lastPayloadValue, 100);
 
     int val2 = 200;
     int count2 = bus.publish("topic/two", &val2);
     EXPECT_EQ(count2, 1);
     EXPECT_EQ(ctx.callCount, 2);
-    EXPECT_STREQ(ctx.lastTopic, "topic/two");
+    EXPECT_EQ(ctx.lastTopic, "topic/two");
     EXPECT_EQ(ctx.lastPayloadValue, 200);
 }
 

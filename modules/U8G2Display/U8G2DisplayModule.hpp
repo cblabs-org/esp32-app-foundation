@@ -146,6 +146,28 @@ struct DisplayBoardChangedPayload {
 };
 
 // ---------------------------------------------------------------------------
+// Display Events
+// ---------------------------------------------------------------------------
+
+namespace U8G2DisplayEvents {
+    /// @brief Published when display enters sleep mode.
+    /// Payload: nullptr
+    constexpr const char* DISPLAY_SLEEP = "display.sleep";
+
+    /// @brief Published when display wakes up.
+    /// Payload: nullptr
+    constexpr const char* DISPLAY_WAKE = "display.wake";
+
+    /// @brief Published when active screen/board changes.
+    /// Payload: const DisplayBoardChangedPayload* (or nullptr)
+    constexpr const char* DISPLAY_BOARD_CHANGED = "display.board.changed";
+
+    /// @brief Subscribed to by the display to show scroll messages.
+    /// Payload: const DisplayMessagePayload*
+    constexpr const char* DISPLAY_MESSAGE = "display.message";
+}
+
+// ---------------------------------------------------------------------------
 // Default U8G2 driver type — apps override this via build_flags
 // e.g. -DU8G2_DISPLAY_TYPE=U8G2_SSD1322_NHD_256X64_F_4W_HW_SPI
 // ---------------------------------------------------------------------------

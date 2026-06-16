@@ -85,6 +85,24 @@
 // Full include deferred to Application.cpp; member held via unique_ptr.
 class OTAUpdateManager;
 
+// ---------------------------------------------------------------------------
+// Application Events
+// ---------------------------------------------------------------------------
+
+namespace ApplicationEvents {
+    /// @brief Published periodically to report current memory heap usage.
+    /// Payload: const uint32_t* (free heap bytes)
+    constexpr const char* SYSTEM_HEAP = "system.heap";
+
+    /// @brief Published when the system transition to RUNNING state finishes.
+    /// Payload: nullptr
+    constexpr const char* APP_RUNNING = "app.running";
+
+    /// @brief Published when entering or updating CONFIGURING state.
+    /// Payload: const AppConfiguringPayload*
+    constexpr const char* APP_CONFIGURING = "app.configuring";
+}
+
 /**
  * @brief Composition root for the ESP32 App Foundation framework.
  *

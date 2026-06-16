@@ -23,13 +23,8 @@
 static const char* TAG = "EventBus";
 
 void EventBus::begin() {
-    ESP_LOGI(TAG, "Initializing EventBus (max_subscribers=%d)", EVENT_BUS_MAX_SUBSCRIBERS);
-    for (int i = 0; i < EVENT_BUS_MAX_SUBSCRIBERS; i++) {
-        _subscribers[i].active = false;
-        _subscribers[i].topic[0] = '\0';
-        _subscribers[i].callback = nullptr;
-        _subscribers[i].ctx = nullptr;
-    }
+    ESP_LOGI(TAG, "Initializing EventBus");
+    _subscribers.clear();
 }
 
 bool EventBus::subscribe(const char* topic, EventCallback callback, void* ctx) {
@@ -39,28 +34,14 @@ bool EventBus::subscribe(const char* topic, EventCallback callback, void* ctx) {
     }
 
     size_t topicLen = strlen(topic);
-    if (topicLen == 0 || topicLen >= EVENT_BUS_MAX_TOPIC_LENGTH) {
-        ESP_LOGW(TAG, "subscribe() failed: topic length invalid (len=%zu, max=%d)", topicLen, EVENT_BUS_MAX_TOPIC_LENGTH);
+    if (topicLen == 0) {
+        ESP_LOGW(TAG, "subscribe() failed: topic is empty");
         return false;
     }
 
-    // --- Step 1: Find an empty slot ---
-    // Look for the first inactive subscription slot to store the new subscription
-    for (int i = 0; i < EVENT_BUS_MAX_SUBSCRIBERS; i++) {
-        if (!_subscribers[i].active) {
-            strncpy(_subscribers[i].topic, topic, EVENT_BUS_MAX_TOPIC_LENGTH - 1);
-            _subscribers[i].topic[EVENT_BUS_MAX_TOPIC_LENGTH - 1] = '\0';
-            _subscribers[i].callback = callback;
-            _subscribers[i].ctx = ctx;
-            _subscribers[i].active = true;
-            ESP_LOGD(TAG, "Subscribed to topic: %s", topic);
-            return true;
-        }
-    }
-
-    // No empty slot found
-    ESP_LOGW(TAG, "Subscribe failed for topic '%s': no free slot", topic);
-    return false;
+    _subscribers.push_back({std::string(topic), callback, ctx, true});
+    ESP_LOGD(TAG, "Subscribed to topic: %s", topic);
+    return true;
 }
 
 bool EventBus::unsubscribe(const char* topic, EventCallback callback, void* ctx) {
@@ -69,16 +50,13 @@ bool EventBus::unsubscribe(const char* topic, EventCallback callback, void* ctx)
         return false;
     }
 
-    for (int i = 0; i < EVENT_BUS_MAX_SUBSCRIBERS; i++) {
-        if (_subscribers[i].active) {
-            if (strncmp(_subscribers[i].topic, topic, EVENT_BUS_MAX_TOPIC_LENGTH) == 0 &&
-                _subscribers[i].callback == callback &&
-                _subscribers[i].ctx == ctx) {
+    for (auto it = _subscribers.begin(); it != _subscribers.end(); ++it) {
+        if (it->active) {
+            if (it->topic == topic &&
+                it->callback == callback &&
+                it->ctx == ctx) {
                 
-                _subscribers[i].active = false;
-                _subscribers[i].topic[0] = '\0';
-                _subscribers[i].callback = nullptr;
-                _subscribers[i].ctx = nullptr;
+                _subscribers.erase(it);
                 return true;
             }
         }
@@ -98,13 +76,13 @@ int EventBus::publish(const char* topic, const void* payload) {
     // --- Step 1: Iterate over subscribers and dispatch ---
     // The publish is synchronous, meaning each callback is executed before returning.
     // Payloads are only valid for the duration of the callback.
-    for (int i = 0; i < EVENT_BUS_MAX_SUBSCRIBERS; i++) {
-        if (_subscribers[i].active) {
-            if (strncmp(_subscribers[i].topic, topic, EVENT_BUS_MAX_TOPIC_LENGTH) == 0) {
-                // Dispatch event to subscriber
-                _subscribers[i].callback(topic, payload, _subscribers[i].ctx);
-                count++;
-            }
+    // We iterate over a copy of the subscribers to ensure safety if a callback unsubscribes itself.
+    std::vector<Subscription> targets = _subscribers;
+    for (const auto& sub : targets) {
+        if (sub.active && sub.topic == topic) {
+            // Dispatch event to subscriber
+            sub.callback(topic, payload, sub.ctx);
+            count++;
         }
     }
 

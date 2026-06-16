@@ -146,6 +146,16 @@ struct OTAProgressEvent {
 };
 
 // ---------------------------------------------------------------------------
+// OTA Events
+// ---------------------------------------------------------------------------
+
+namespace OTAUpdateManagerEvents {
+    /// @brief Published during OTA progress updates.
+    /// Payload: const OTAProgressEvent*
+    constexpr const char* OTA_PROGRESS = "ota.progress";
+}
+
+// ---------------------------------------------------------------------------
 // OTA Task Sizing Constants
 // ---------------------------------------------------------------------------
 

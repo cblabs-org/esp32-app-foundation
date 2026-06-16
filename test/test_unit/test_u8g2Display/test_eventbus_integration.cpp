@@ -19,6 +19,7 @@
 #include <gtest/gtest.h>
 #include "U8G2DisplayModule.hpp"
 #include "EventBus.hpp"
+#include "OTAUpdateManager.hpp"
 
 // =============================================================================
 // Test Group: Payload struct validation
@@ -112,7 +113,7 @@ protected:
 TEST_F(EventBusIntegrationTest, OtaProgress_Publish_DelegatesToBoard) {
     // Manually subscribe the static callback
     // The callback signature matches EventCallback typedef
-    bus.subscribe("ota.progress",
+    bus.subscribe(OTAUpdateManagerEvents::OTA_PROGRESS,
         [](const char* topic, const void* payload, void* ctx) {
             // Simulate what _onOtaProgress does
             auto* self = static_cast<U8G2DisplayModule*>(ctx);
@@ -135,7 +136,7 @@ TEST_F(EventBusIntegrationTest, OtaProgress_Publish_DelegatesToBoard) {
     payload.complete = false;
     payload.success = false;
 
-    int delivered = bus.publish("ota.progress", &payload);
+    int delivered = bus.publish(OTAUpdateManagerEvents::OTA_PROGRESS, &payload);
     EXPECT_EQ(delivered, 1);
 
     // Verify the OTA board is now active
@@ -144,7 +145,7 @@ TEST_F(EventBusIntegrationTest, OtaProgress_Publish_DelegatesToBoard) {
 
 /** Publish OTA complete(success) — board should expire. */
 TEST_F(EventBusIntegrationTest, OtaProgress_Complete_Success_BoardExpires) {
-    bus.subscribe("ota.progress",
+    bus.subscribe(OTAUpdateManagerEvents::OTA_PROGRESS,
         [](const char* topic, const void* payload, void* ctx) {
             auto* self = static_cast<U8G2DisplayModule*>(ctx);
             if (payload == nullptr || self == nullptr) return;
@@ -164,13 +165,13 @@ TEST_F(EventBusIntegrationTest, OtaProgress_Complete_Success_BoardExpires) {
     payload.complete = true;
     payload.success = true;
 
-    bus.publish("ota.progress", &payload);
+    bus.publish(OTAUpdateManagerEvents::OTA_PROGRESS, &payload);
     EXPECT_TRUE(display.boards.otaProgress.isExpired());
 }
 
 /** Publish display.message — boot board should activate. */
 TEST_F(EventBusIntegrationTest, DisplayMessage_Publish_ShowsMessage) {
-    bus.subscribe("display.message",
+    bus.subscribe(U8G2DisplayEvents::DISPLAY_MESSAGE,
         [](const char* topic, const void* payload, void* ctx) {
             auto* self = static_cast<U8G2DisplayModule*>(ctx);
             if (payload == nullptr || self == nullptr) return;
@@ -184,7 +185,7 @@ TEST_F(EventBusIntegrationTest, DisplayMessage_Publish_ShowsMessage) {
     payload.message = "Update available";
     payload.durationMs = 3000;
 
-    int delivered = bus.publish("display.message", &payload);
+    int delivered = bus.publish(U8G2DisplayEvents::DISPLAY_MESSAGE, &payload);
     EXPECT_EQ(delivered, 1);
 
     // Boot board should be active (used as message overlay)
@@ -200,6 +201,6 @@ TEST_F(EventBusIntegrationTest, Publish_NoSubscribers_ReturnsZero) {
     payload.complete = false;
     payload.success = false;
 
-    int delivered = bus.publish("ota.progress", &payload);
+    int delivered = bus.publish(OTAUpdateManagerEvents::OTA_PROGRESS, &payload);
     EXPECT_EQ(delivered, 0);
 }

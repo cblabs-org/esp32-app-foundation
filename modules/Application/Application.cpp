@@ -226,7 +226,7 @@ bool Application::begin(const FrameworkConfig& config) {
     // --- Step 18: Publish system heap event + heap report ---
 #ifndef NATIVE_BUILD
     uint32_t freeHeap = heap_caps_get_free_size(MALLOC_CAP_8BIT);
-    _eventBus.publish("system.heap", &freeHeap);
+    _eventBus.publish(ApplicationEvents::SYSTEM_HEAP, &freeHeap);
 #endif
     _reportHeap();
 
@@ -302,7 +302,7 @@ void Application::tick() {
             setState(AppState::Running);
             _dataManager.setAppRunning(true);
             _onEnterRunning();
-            _eventBus.publish("app.running");
+            _eventBus.publish(ApplicationEvents::APP_RUNNING);
             ESP_LOGI(TAG, "All config gates satisfied — entering RUNNING state");
         }
 #ifndef NATIVE_BUILD
@@ -641,7 +641,7 @@ void Application::_publishConfiguringEvent(bool isRegression) {
         payload.gateName = gate->getGateName();
         payload.helpText = gate->getHelpText();
         payload.isRegression = isRegression;
-        _eventBus.publish("app.configuring", &payload);
+        _eventBus.publish(ApplicationEvents::APP_CONFIGURING, &payload);
         ESP_LOGI(TAG, "Config gate unsatisfied: %s%s", gate->getGateName(),
                  isRegression ? " (regression)" : "");
         return;

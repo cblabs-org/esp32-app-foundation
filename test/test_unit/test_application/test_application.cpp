@@ -664,7 +664,7 @@ TEST_F(GateDependencyOrderingTest, GateWithUnmetDep_IsSkipped) {
     EXPECT_EQ(app.getState(), AppState::Configuring);
 
     // Subscribe AFTER begin() to capture the next event
-    app.getEventBus().subscribe("app.configuring", &GateDependencyOrderingTest::onConfiguring, this);
+    app.getEventBus().subscribe(ApplicationEvents::APP_CONFIGURING, &GateDependencyOrderingTest::onConfiguring, this);
 
     // Satisfy Timezone — now API should become actionable (its dep Timezone is met)
     tzGate.setSatisfied(true);
@@ -780,7 +780,7 @@ TEST_F(GateDependencyOrderingTest, ChainedDeps_ResolveCorrectly) {
     EXPECT_EQ(app.getState(), AppState::Configuring);
 
     // Subscribe AFTER begin() for EventBus capture
-    app.getEventBus().subscribe("app.configuring", &GateDependencyOrderingTest::onConfiguring, this);
+    app.getEventBus().subscribe(ApplicationEvents::APP_CONFIGURING, &GateDependencyOrderingTest::onConfiguring, this);
 
     // Verify B depends on A, C depends on B
     uint8_t bDepCount = 0, cDepCount = 0;

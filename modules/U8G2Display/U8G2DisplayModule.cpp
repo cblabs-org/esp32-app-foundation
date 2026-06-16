@@ -53,6 +53,7 @@ static const char* TAG = "U8g2Display";
 #include <PsychicHttp.h>
 #include <ArduinoJson.h>
 #include "../Application/Application.hpp"
+#include "../OTAUpdateManager/OTAUpdateManager.hpp"
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
   #if defined(DISPLAY_SPI_SCK) && defined(DISPLAY_SPI_MISO) && defined(DISPLAY_SPI_MOSI)
@@ -188,8 +189,8 @@ void U8G2DisplayModule::begin(EventBus* eventBus) {
 #ifndef NATIVE_BUILD
     if (_eventBus != nullptr) {
         ESP_LOGI(TAG, "Subscribing to EventBus topics: ota.progress, display.message");
-        _eventBus->subscribe("ota.progress", _onOtaProgress, this);
-        _eventBus->subscribe("display.message", _onDisplayMessage, this);
+        _eventBus->subscribe(OTAUpdateManagerEvents::OTA_PROGRESS, _onOtaProgress, this);
+        _eventBus->subscribe(U8G2DisplayEvents::DISPLAY_MESSAGE, _onDisplayMessage, this);
     }
 #endif
 
@@ -233,7 +234,7 @@ void U8G2DisplayModule::tick(uint32_t currentMillis) {
     bool isBlanked = _screensaver.isBlanked();
 
     if (wasBlanked != isBlanked && _eventBus != nullptr) {
-        _eventBus->publish(isBlanked ? "display.sleep" : "display.wake");
+        _eventBus->publish(isBlanked ? U8G2DisplayEvents::DISPLAY_SLEEP : U8G2DisplayEvents::DISPLAY_WAKE);
     }
     
     // If sleeping, skip carousel and rendering.
@@ -304,7 +305,7 @@ void U8G2DisplayModule::showBase(IDisplayBoard* board) {
     
     // Only fire event if the visible board actually changed
     if (previousBoard != visibleBoard() && _eventBus != nullptr) {
-        _eventBus->publish("display.board.changed");
+        _eventBus->publish(U8G2DisplayEvents::DISPLAY_BOARD_CHANGED);
     }
 }
 

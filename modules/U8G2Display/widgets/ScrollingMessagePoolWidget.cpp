@@ -56,7 +56,7 @@ ScrollingMessagePoolWidget::ScrollingMessagePoolWidget(int _x, int _y, int _w, i
  */
 void ScrollingMessagePoolWidget::begin(EventBus& bus) {
     eventBus = &bus;
-    bus.subscribe("display.message", _onMessage, this);
+    bus.subscribe(U8G2DisplayEvents::DISPLAY_MESSAGE, _onMessage, this);
 }
 
 /**

@@ -779,7 +779,7 @@ void OTAUpdateManager::publishProgress(float progress, const char* status,
 
 #ifndef NATIVE_BUILD
     if (app_ != nullptr) {
-        app_->getEventBus().publish("ota.progress", &event);
+        app_->getEventBus().publish(OTAUpdateManagerEvents::OTA_PROGRESS, &event);
     }
 #endif
     ESP_LOGD(TAG, "OTA progress: %.1f%% — %s (complete=%d, success=%d)",
