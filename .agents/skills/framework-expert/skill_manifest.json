@@ -1,0 +1,15 @@
+{
+  "name": "framework-expert",
+  "version": "1.0.0",
+  "created": "2026-06-15",
+  "lastUpdated": "2026-06-15",
+  "sourceDocsVersion": "PR-25",
+  "references": [
+    "references/architecture.md",
+    "references/creating-a-module.md",
+    "references/config-system.md",
+    "references/web-portal.md",
+    "references/event-bus.md",
+    "references/KEEPING-CURRENT.md"
+  ]
+}
