@@ -2,7 +2,7 @@
 
 **Branch:** `pr-27-security-mcp-docs`
 **Base:** `main`
-**Status:** 🔄 **IN PROGRESS** — WO1 executing
+**Status:** ✅ **COMPLETE** — merged to `main` `c1b6391`, pushed to remote
 **Session:** 5ad94103
 
 ---
