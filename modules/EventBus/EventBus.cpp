@@ -20,7 +20,7 @@
 #include "platform/LogShim.h"
 #include <string.h>
 
-static const char* TAG = "EventBus";
+static constexpr const char* TAG = "EventBus";
 
 void EventBus::begin() {
     ESP_LOGI(TAG, "Initializing EventBus");

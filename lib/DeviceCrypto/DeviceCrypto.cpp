@@ -14,7 +14,7 @@
 #include "platform/LogShim.h"
 #include <string.h>
 
-static const char* TAG = "DeviceCrypto";
+static constexpr const char* TAG = "DeviceCrypto";
 
 #ifndef NATIVE_BUILD
 #include <Preferences.h>

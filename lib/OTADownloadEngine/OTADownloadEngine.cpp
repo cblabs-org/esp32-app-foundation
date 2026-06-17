@@ -32,7 +32,7 @@
 #include "OTADownloadEngine.hpp"
 #include "platform/LogShim.h"
 
-static const char* TAG = "OTAEngine";
+static constexpr const char* TAG = "OTADownloadEngine";
 
 // =============================================================================
 // Common implementations (both hardware and native)

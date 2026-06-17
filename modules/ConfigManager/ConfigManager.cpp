@@ -31,7 +31,7 @@
 #include <cstdio>
 #endif
 
-static const char* TAG = "ConfigManager";
+static constexpr const char* TAG = "ConfigManager";
 
 // =============================================================================
 // Path Helper

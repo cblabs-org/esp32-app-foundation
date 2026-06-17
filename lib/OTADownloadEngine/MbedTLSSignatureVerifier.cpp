@@ -28,7 +28,7 @@
 
 #include <cstring>
 
-static const char* TAG = "OTAVerifier";
+static constexpr const char* TAG = "MbedTLSSignatureVerifier";
 
 // =============================================================================
 // Hardware build — full mbedtls implementation

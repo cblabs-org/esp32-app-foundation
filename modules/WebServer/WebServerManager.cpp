@@ -74,7 +74,7 @@
     #include <atomic>
 #endif
 
-static const char* TAG = "WebServerManager";
+static constexpr const char* TAG = "WebServerManager";
 
 // ---------------------------------------------------------------------------
 // Heap guard — protects portal HTML + large responses from concurrent

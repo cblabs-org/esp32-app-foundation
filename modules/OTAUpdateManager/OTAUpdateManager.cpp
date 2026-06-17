@@ -41,7 +41,7 @@
 #include "OTAUpdateManager.hpp"
 #include "platform/LogShim.h"
 
-static const char* TAG = "OTAUpdateManager";
+static constexpr const char* TAG = "OTAUpdateManager";
 
 // ---------------------------------------------------------------------------
 // Platform-conditional includes

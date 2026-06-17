@@ -50,7 +50,7 @@
 
 #include "platform/LogShim.h"
 
-static const char* TAG = "Application";
+static constexpr const char* TAG = "Application";
 
 // Destructor — clean up heap-allocated OTAUpdateManager
 Application::~Application() {

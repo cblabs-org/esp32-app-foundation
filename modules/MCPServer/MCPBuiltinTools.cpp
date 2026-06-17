@@ -45,7 +45,7 @@
 
 #include "platform/LogShim.h"
 
-static const char* TAG = "McpBuiltinTools";
+static constexpr const char* TAG = "MCPBuiltinTools";
 
 // File-scope display info — updated via setDisplayInfo() for late-binding.
 // The capture_display lambda reads from this directly (no by-value capture).

@@ -28,7 +28,7 @@
 
 #include <cstring>
 
-static const char* TAG = "TimeManager";
+static constexpr const char* TAG = "TimeManager";
 
 #ifndef NATIVE_BUILD
 #include <PsychicHttp.h>

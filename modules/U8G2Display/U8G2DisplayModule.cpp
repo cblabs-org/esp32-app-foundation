@@ -47,7 +47,7 @@
 #include "platform/LogShim.h"
 #include <cstring>
 
-static const char* TAG = "U8g2Display";
+static constexpr const char* TAG = "U8G2DisplayModule";
 
 #ifndef NATIVE_BUILD
 #include <PsychicHttp.h>

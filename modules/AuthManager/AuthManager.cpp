@@ -73,7 +73,7 @@ extern "C" {
 #include <cstddef>
 #endif
 
-static const char* TAG = "AuthManager";
+static constexpr const char* TAG = "AuthManager";
 
 // ---------------------------------------------------------------------------
 // Password length limits

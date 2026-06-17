@@ -26,7 +26,7 @@
 #include <sstream>
 #endif
 
-static const char* TAG = "ConfigManifest";
+static constexpr const char* TAG = "ConfigManifest";
 
 /// Manifest file path on LittleFS (hardware) or working directory (native).
 #ifndef NATIVE_BUILD

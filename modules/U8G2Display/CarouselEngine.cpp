@@ -21,7 +21,7 @@
 #include "CarouselEngine.hpp"
 #include "platform/LogShim.h"
 
-static const char* TAG = "CarouselEngine";
+static constexpr const char* TAG = "CarouselEngine";
 
 // =============================================================================
 // Collection mutators

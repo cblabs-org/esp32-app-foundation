@@ -29,7 +29,7 @@
 class U8G2 {};
 #endif
 
-static const char* TAG = "ScreensaverCtrl";
+static constexpr const char* TAG = "ScreensaverController";
 
 /**
  * @brief Enable or disable the screensaver.

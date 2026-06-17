@@ -31,7 +31,7 @@
 // ---------------------------------------------------------------------------
 #include "platform/LogShim.h"
 
-static const char* TAG = "MCPServer";
+static constexpr const char* TAG = "MCPServer";
 
 #ifdef NATIVE_BUILD
     // Instantiate the mock Serial object for the native build linker

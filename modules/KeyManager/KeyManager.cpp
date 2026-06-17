@@ -22,7 +22,7 @@
 
 #include "platform/LogShim.h"
 
-static const char* TAG = "KeyManager";
+static constexpr const char* TAG = "KeyManager";
 
 void KeyManager::begin(DeviceCrypto* crypto) {
     _crypto = crypto;

@@ -11,7 +11,7 @@
 #include "MD5Utils.hpp"
 #include "platform/LogShim.h"
 
-static const char* TAG = "MD5Utils";
+static constexpr const char* TAG = "MD5Utils";
 
 #ifndef PIO_UNIT_TESTING
 #include <LittleFS.h>

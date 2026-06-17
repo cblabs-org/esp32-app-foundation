@@ -57,7 +57,7 @@ void delay(unsigned long ms) {}      // Stub
 #include "platform/LogShim.h"
 #include "../Logger/Logger.hpp"
 
-static const char* TAG = "WIFI_MGR";
+static constexpr const char* TAG = "WifiManager";
 
 // --- Per-Route Body Size Limits (PR-04a/WO1) ---
 static constexpr size_t BODY_LIMIT_WIFI_TEST    = 1024; // 1 KB for test/connect

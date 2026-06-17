@@ -14,7 +14,7 @@
 #include "platform/LogShim.h"
 #include <algorithm>
 
-static const char* TAG = "DataManager";
+static constexpr const char* TAG = "DataManager";
 
 #ifndef NATIVE_BUILD
 #include <Arduino.h>
