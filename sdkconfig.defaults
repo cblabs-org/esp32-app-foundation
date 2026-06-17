@@ -151,3 +151,49 @@ CONFIG_MBEDTLS_PEM_WRITE_C=y
 
 # Enable ESP-IDF HTTPS Server (required by PsychicHttpsServer)
 CONFIG_ESP_HTTPS_SERVER_ENABLE=y
+
+# --- PR-28 H-05: NVS Encryption — DEFERRED (research complete) ---
+#
+# Goal: Encrypt the NVS partition to protect the DeviceCrypto master key
+# (the AES-256 key-encryption-key for KeyManager's LittleFS credential store)
+# at rest.
+#
+# Status: DEFERRED — enabling NVS encryption exceeds sdkconfig-only changes.
+# The research below captures what a future work order must address.
+#
+# Two key-protection schemes exist in ESP-IDF:
+#
+#   1. HMAC-based (CONFIG_NVS_SEC_KEY_PROTECT_USING_HMAC)
+#      - Derives NVS encryption keys from an HMAC key stored in eFuse.
+#      - Does NOT require full flash encryption.
+#      - Only available on chips WITH an HMAC peripheral: ESP32-S3, C3, C6.
+#      - NOT available on the original ESP32 (esp32dev) — no HMAC hardware.
+#      - Requires: nvs_sec_provider component dependency (CMakeLists.txt),
+#        HMAC key burned into eFuse, CONFIG_NVS_SEC_HMAC_EFUSE_KEY_ID set.
+#
+#   2. Flash-encryption-based (CONFIG_NVS_SEC_KEY_PROTECT_USING_FLASH_ENC)
+#      - Stores NVS encryption keys in an nvs_keys partition protected by
+#        hardware flash encryption.
+#      - Requires CONFIG_FLASH_ENCRYPTION_ENABLED=y (eFuse burning, one-way
+#        on production devices — risk of bricking if misconfigured).
+#      - Requires an nvs_keys partition (type: data, subtype: nvs_keys) added
+#        to both partition tables (partitions.esp32dev.csv, partitions.esp32s3nano.csv).
+#      - This is the ONLY option available for the original ESP32 (esp32dev).
+#
+# Why this cannot be a sdkconfig-only change:
+#   - Partition tables must be modified to add nvs_keys partitions.
+#   - The nvs_sec_provider component must be added to CMakeLists.txt for HMAC.
+#   - eFuse keys must be burned on physical hardware (one-time, irreversible).
+#   - Enabling triggers a factory reset — existing NVS data becomes unreadable.
+#   - The Arduino framework's nvs_flash_init() compatibility with NVS encryption
+#     requires verification (may need nvs_flash_secure_init() code changes).
+#
+# Future WO checklist:
+#   [ ] Add nvs_keys partition to both partition table CSVs
+#   [ ] Add nvs_sec_provider to component requirements (HMAC path)
+#   [ ] Verify Arduino Preferences API works transparently with encrypted NVS
+#   [ ] For esp32s3nano: use HMAC scheme (preferred — no full flash-enc needed)
+#   [ ] For esp32dev: evaluate whether to enable full flash encryption or
+#       accept unencrypted NVS on the legacy board
+#   [ ] Burn HMAC/flash-enc keys on test hardware and validate factory reset flow
+#   [ ] Test DeviceCrypto master key generation + retrieval with encrypted NVS

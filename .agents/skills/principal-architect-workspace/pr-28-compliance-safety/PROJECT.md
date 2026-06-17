@@ -37,23 +37,27 @@ code defect — deferred for separate evaluation.
 | **[ ] [wo7-application-ptr](wo7-application-ptr/WORKORDER.md)** | QUEUED | Remove `Application*` from OTAUpdateManager (narrow DI) + delete orphaned IBoardLayout | architect | C-03, M-14 |
 | **[ ] [wo8-naming](wo8-naming/WORKORDER.md)** | QUEUED | Naming convention normalisation (OTA trailing `_` → leading `_`, WifiManager add `_` prefix) | standard | M-02, M-03 |
 | **[ ] [wo9-remaining](wo9-remaining/WORKORDER.md)** | QUEUED | Manifest `setCaCert`, FrameworkConfig `const&` + SRP, WifiManager delay audit | standard | H-07, M-04, M-11, M-13 |
+| **[ ] [wo10-nvs-encryption](wo10-nvs-encryption/WORKORDER.md)** | QUEUED | Enable NVS encryption for DeviceCrypto master key at rest (**runs last — requires factory reset**) | standard | H-05 |
 
 ### Execution Order & Dependencies
 
 ```
-WO1 (bare new)  ──→ WO2 (task safety)  ──→ WO3 (TAG)  ──→ WO4 (facade)
-                                                              │
-WO5 (std::function) ──→ WO6 (String migration)               │
-                                                              │
-WO7 (Application*) ──→ WO8 (naming) ──→ WO9 (remaining) ─────┘
+WO1 (bare new) → WO2 (task safety) → WO3 (TAG) → WO4 (facade)
+  → WO5 (std::function) → WO6 (String) → WO7 (Application*)
+  → WO8 (naming) → WO9 (remaining)
+  → [FLASH VERIFY on esp32s3nano]
+  → WO10 (NVS encryption — factory reset, build-only verification)
 ```
 
-WO1–4 are safety/mechanical and should run first. WO5–6 are API-level changes.
+WO1–4 are safety/mechanical and run first. WO5–6 are API-level changes.
 WO7–9 are architectural/naming. The ordering ensures:
 - WO8 (naming) runs after WO7 (Application* refactor) because OTA member
   renames must happen on the post-refactored code.
 - WO6 (String) runs after WO5 (std::function) because both touch MCPServer.
-- WO9 (remaining) runs last as it touches miscellaneous files.
+- WO9 (remaining) runs last before flash verification.
+- **WO10 (NVS encryption) runs after flash verification** because enabling
+  it requires a factory reset — device loses all stored state. Build-only
+  verification after WO10.
 
 ### Concurrency Analysis
 
