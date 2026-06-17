@@ -86,7 +86,7 @@ protected:
         if (paramSetup) paramSetup(params);
 
         JsonObject result = resultDoc.to<JsonObject>();
-        tool->handler(params, result);
+        tool->handler(tool->context, params, result);
         return resultDoc;
     }
 };

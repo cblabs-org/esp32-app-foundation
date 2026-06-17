@@ -43,7 +43,7 @@ TEST(McpToolRegistryTest, StartsEmpty) {
 TEST(McpToolRegistryTest, AddToolIncreasesSize) {
     MCPToolRegistry registry;
     registry.addTool("test_tool", "A test tool",
-        [](JsonObject& params, JsonObject& result) {
+        [](void* /*ctx*/, JsonObject& params, JsonObject& result) {
             (void)params;
             result["ok"] = true;
         }
@@ -55,7 +55,7 @@ TEST(McpToolRegistryTest, AddToolIncreasesSize) {
 TEST(McpToolRegistryTest, FindRegisteredTool) {
     MCPToolRegistry registry;
     registry.addTool("my_tool", "My tool",
-        [](JsonObject& params, JsonObject& result) {
+        [](void* /*ctx*/, JsonObject& params, JsonObject& result) {
             (void)params;
             result["ok"] = true;
         }
@@ -77,11 +77,12 @@ TEST(McpToolRegistryTest, ToolHandlerExecutes) {
 
     bool handlerCalled = false;
     registry.addTool("flag_tool", "Sets a flag",
-        [&handlerCalled](JsonObject& params, JsonObject& result) {
+        [](void* ctx, JsonObject& params, JsonObject& result) {
             (void)params;
-            handlerCalled = true;
+            *static_cast<bool*>(ctx) = true;
             result["executed"] = true;
-        }
+        },
+        &handlerCalled
     );
 
     const MCPToolEntry* tool = registry.findTool("flag_tool");
@@ -92,7 +93,7 @@ TEST(McpToolRegistryTest, ToolHandlerExecutes) {
     JsonObject args = argsDoc.to<JsonObject>();
     JsonDocument resultDoc;
     JsonObject resultObj = resultDoc.to<JsonObject>();
-    tool->handler(args, resultObj);
+    tool->handler(tool->context, args, resultObj);
 
     EXPECT_TRUE(handlerCalled);
     EXPECT_TRUE(resultObj["executed"].as<bool>());
@@ -101,7 +102,7 @@ TEST(McpToolRegistryTest, ToolHandlerExecutes) {
 /** Adding multiple tools must make all of them findable. */
 TEST(McpToolRegistryTest, MultipleToolsRegistered) {
     MCPToolRegistry registry;
-    auto noop = [](JsonObject& p, JsonObject& r) { (void)p; (void)r; };
+    auto noop = [](void* /*ctx*/, JsonObject& p, JsonObject& r) { (void)p; (void)r; };
 
     registry.addTool("tool_a", "Tool A", noop);
     registry.addTool("tool_b", "Tool B", noop);
@@ -116,7 +117,7 @@ TEST(McpToolRegistryTest, MultipleToolsRegistered) {
 /** getTools() must return a vector whose size matches size(). */
 TEST(McpToolRegistryTest, GetToolsReturnsAll) {
     MCPToolRegistry registry;
-    auto noop = [](JsonObject& p, JsonObject& r) { (void)p; (void)r; };
+    auto noop = [](void* /*ctx*/, JsonObject& p, JsonObject& r) { (void)p; (void)r; };
 
     registry.addTool("x", "X", noop);
     registry.addTool("y", "Y", noop);
@@ -196,7 +197,7 @@ TEST(McpBuiltinToolsTest, SystemInfoReturnsData) {
     JsonObject args = argsDoc.to<JsonObject>();
     JsonDocument resultDoc;
     JsonObject resultObj = resultDoc.to<JsonObject>();
-    tool->handler(args, resultObj);
+    tool->handler(tool->context, args, resultObj);
 
     // Must contain firmware_version (the BUILD_VERSION macro)
     EXPECT_TRUE(resultObj["firmware_version"].is<const char*>());
@@ -215,7 +216,7 @@ TEST(McpBuiltinToolsTest, GetConfigWithoutManager) {
     JsonObject args = argsDoc.to<JsonObject>();
     JsonDocument resultDoc;
     JsonObject resultObj = resultDoc.to<JsonObject>();
-    tool->handler(args, resultObj);
+    tool->handler(tool->context, args, resultObj);
 
     EXPECT_TRUE(resultObj["error"].is<const char*>());
     EXPECT_TRUE(resultObj["isError"].as<bool>());
@@ -233,7 +234,7 @@ TEST(McpBuiltinToolsTest, CaptureDisplayWithoutDisplay) {
     JsonObject args = argsDoc.to<JsonObject>();
     JsonDocument resultDoc;
     JsonObject resultObj = resultDoc.to<JsonObject>();
-    tool->handler(args, resultObj);
+    tool->handler(tool->context, args, resultObj);
 
     EXPECT_TRUE(resultObj["error"].is<const char*>());
     EXPECT_STREQ(resultObj["error"].as<const char*>(), "No display registered");
@@ -261,7 +262,7 @@ TEST(McpBuiltinToolsTest, CaptureDisplayWithDisplay) {
     JsonObject args = argsDoc.to<JsonObject>();
     JsonDocument resultDoc;
     JsonObject resultObj = resultDoc.to<JsonObject>();
-    tool->handler(args, resultObj);
+    tool->handler(tool->context, args, resultObj);
 
     // Must contain format, width, height, and data fields
     EXPECT_STREQ(resultObj["format"].as<const char*>(), "xbm");
@@ -446,7 +447,7 @@ TEST(McpServerTest, ContributorToolCallable) {
     public:
         void registerMCPTools(MCPToolRegistry& registry) override {
             registry.addTool("echo_test", "Echo test tool",
-                [](JsonObject& params, JsonObject& result) {
+                [](void* /*ctx*/, JsonObject& params, JsonObject& result) {
                     (void)params;
                     result["echo"] = "hello";
                 }

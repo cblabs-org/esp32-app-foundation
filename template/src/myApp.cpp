@@ -142,12 +142,14 @@ void MyApp::registerMCPTools(MCPToolRegistry& registry) {
     registry.addTool(
         "myapp_status",
         "Get status and configuration of MyApp",
-        [this](JsonObject& params, JsonObject& result) {
+        [](void* ctx, JsonObject& params, JsonObject& result) {
+            auto* self = static_cast<MyApp*>(ctx);
             (void)params;
-            result["refreshMs"] = _refreshIntervalMs;
-            result["enabled"] = _featureEnabled;
-            result["gateOpen"] = _gateOpen;
+            result["refreshMs"] = self->_refreshIntervalMs;
+            result["enabled"] = self->_featureEnabled;
+            result["gateOpen"] = self->_gateOpen;
         },
+        this,  // context: MyApp*
         false // mutatesState = false
     );
 }

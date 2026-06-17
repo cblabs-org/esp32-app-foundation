@@ -308,7 +308,7 @@ void MCPServer::_handleToolsCall(const JsonDocument& req, Print& out) {
     JsonDocument resultDoc;
     JsonObject resultObj = resultDoc.to<JsonObject>();
 
-    tool->handler(argsObj, resultObj);
+    tool->handler(tool->context, argsObj, resultObj);
 
     // --- Step 5: Check if handler flagged an error ---
     bool isError = resultObj["isError"].is<bool>() && resultObj["isError"].as<bool>();

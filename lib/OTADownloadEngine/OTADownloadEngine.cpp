@@ -43,7 +43,8 @@ static constexpr const char* TAG = "OTADownloadEngine";
  */
 OTADownloadEngine::OTADownloadEngine()
     : verifier_(nullptr)
-    , progressCb_()
+    , progressCb_(nullptr)
+    , progressCtx_(nullptr)
     , httpTimeout_(8000)
     , lastError_(OTAError::None)
 {
@@ -61,8 +62,9 @@ void OTADownloadEngine::setVerifier(IOTAVerifier* verifier) {
  * @brief Set the progress callback invoked after each chunk is written.
  * @param cb Callback receiving (bytesWritten, totalSize).
  */
-void OTADownloadEngine::setProgressCallback(OTAProgressCallback cb) {
+void OTADownloadEngine::setProgressCallback(OTAProgressCallback cb, void* context) {
     progressCb_ = cb;
+    progressCtx_ = context;
 }
 
 /**
@@ -336,7 +338,7 @@ OTAError OTADownloadEngine::downloadAndFlash(WiFiClient& client, const String& b
 
     // --- Step 8: Report initial progress ---
     if (progressCb_) {
-        progressCb_(0, static_cast<size_t>(contentLen));
+        progressCb_(progressCtx_, 0, static_cast<size_t>(contentLen));
     }
 
     ESP_LOGI(TAG, "Streaming firmware (%d bytes) in %u-byte chunks...", contentLen, (unsigned)kChunkSize);
@@ -399,7 +401,7 @@ OTAError OTADownloadEngine::downloadAndFlash(WiFiClient& client, const String& b
 
         // Report progress
         if (progressCb_) {
-            progressCb_(totalWritten, static_cast<size_t>(contentLen));
+            progressCb_(progressCtx_, totalWritten, static_cast<size_t>(contentLen));
         }
 
         // Debug milestone logging at 25% intervals

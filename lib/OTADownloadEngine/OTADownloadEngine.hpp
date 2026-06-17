@@ -38,7 +38,7 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <functional>
+
 
 #ifndef NATIVE_BUILD
     #include <Arduino.h>
@@ -100,10 +100,15 @@
 
 /**
  * @brief Callback type for reporting OTA download progress.
+ *
+ * Static function pointer — replaces std::function to avoid hidden heap
+ * allocations from lambda captures (GRAVE-05 compliance).
+ *
+ * @param context      Opaque pointer forwarded from setProgressCallback().
  * @param bytesWritten Number of bytes written so far.
  * @param totalSize    Total firmware size in bytes.
  */
-using OTAProgressCallback = std::function<void(size_t bytesWritten, size_t totalSize)>;
+using OTAProgressCallback = void(*)(void* context, size_t bytesWritten, size_t totalSize);
 
 /**
  * @brief GitHub-aware OTA firmware download engine.
@@ -130,9 +135,10 @@ public:
 
     /**
      * @brief Set the progress callback invoked after each chunk is written.
-     * @param cb Callback receiving (bytesWritten, totalSize).
+     * @param cb      Static function pointer receiving (context, bytesWritten, totalSize).
+     * @param context Opaque pointer forwarded to the callback as its first argument.
      */
-    void setProgressCallback(OTAProgressCallback cb);
+    void setProgressCallback(OTAProgressCallback cb, void* context = nullptr);
 
     /**
      * @brief Set the HTTP client timeout in milliseconds.
@@ -188,7 +194,8 @@ public:
 
 private:
     IOTAVerifier*        verifier_    = nullptr;  // Optional verifier (not owned)
-    OTAProgressCallback  progressCb_;             // Progress notification callback
+    OTAProgressCallback  progressCb_  = nullptr;  // Progress notification callback
+    void*                progressCtx_ = nullptr;  // Opaque context for progressCb_
     int                  httpTimeout_ = 8000;     // HTTP client timeout in ms
     OTAError             lastError_   = OTAError::None; // Most recent error
 

@@ -969,38 +969,40 @@ void U8G2DisplayModule::registerMCPTools(MCPToolRegistry& registry) {
     registry.addTool(
         "display_status",
         "Get current display state including brightness, active board, screensaver status, and timeout configuration",
-        [this](JsonObject& params, JsonObject& result) {
+        [](void* ctx, JsonObject& params, JsonObject& result) {
+            auto* self = static_cast<U8G2DisplayModule*>(ctx);
             (void)params;
 
-            result["brightness"] = _brightness;
-            result["flip"]       = _flipScreen;
+            result["brightness"] = self->_brightness;
+            result["flip"]       = self->_flipScreen;
 
             // --- Active board name ---
-            IDisplayBoard* active = visibleBoard();
+            IDisplayBoard* active = self->visibleBoard();
             result["activeBoard"] = (active != nullptr) ? active->getBoardName() : "none";
 
             // --- Screensaver sub-object ---
             JsonObject ss = result["screensaver"].to<JsonObject>();
-            ss["enabled"]      = _screensaver.isEnabled();
+            ss["enabled"]      = self->_screensaver.isEnabled();
 
             // Map three-state screensaver: blanked > dimmed > active
-            if (_screensaver.isBlanked()) {
+            if (self->_screensaver.isBlanked()) {
                 ss["state"] = "blanked";
-            } else if (_screensaver.isDimmed()) {
+            } else if (self->_screensaver.isDimmed()) {
                 ss["state"] = "dimmed";
             } else {
                 ss["state"] = "active";
             }
 
-            ss["dimTimeout"]   = _screensaver.getDimTimeout();
-            ss["blankTimeout"] = _screensaver.getBlankTimeout();
+            ss["dimTimeout"]   = self->_screensaver.getDimTimeout();
+            ss["blankTimeout"] = self->_screensaver.getBlankTimeout();
 
             // --- Carousel sub-object ---
             JsonObject car = result["carousel"].to<JsonObject>();
-            car["boardCount"]        = _carousel.boardCount();
-            car["rotationInterval"]  = _carousel.getInterval();
-            car["suspended"]         = _carousel.isSuspended();
+            car["boardCount"]        = self->_carousel.boardCount();
+            car["rotationInterval"]  = self->_carousel.getInterval();
+            car["suspended"]         = self->_carousel.isSuspended();
         },
+        this,  // context: U8G2DisplayModule*
         /* mutatesState = */ false
     );
 
@@ -1041,16 +1043,17 @@ void U8G2DisplayModule::registerMCPTools(MCPToolRegistry& registry) {
         "display_control",
         "Control display settings: wake/sleep, enable/disable screensaver, set brightness and timeouts",
         controlSchema,
-        [this](JsonObject& params, JsonObject& result) {
+        [](void* ctx, JsonObject& params, JsonObject& result) {
+            auto* self = static_cast<U8G2DisplayModule*>(ctx);
             bool needsPersist = false;
 
             // --- Handle immediate action (wake / sleep) ---
             if (params["action"].is<const char*>()) {
                 const char* action = params["action"].as<const char*>();
                 if (strcmp(action, "wake") == 0) {
-                    resetActivity();
+                    self->resetActivity();
                 } else if (strcmp(action, "sleep") == 0) {
-                    _screensaver.forceTimeout();
+                    self->_screensaver.forceTimeout();
                 }
             }
 
@@ -1059,37 +1062,38 @@ void U8G2DisplayModule::registerMCPTools(MCPToolRegistry& registry) {
                 int val = params["brightness"].as<int>();
                 if (val < 0) val = 0;
                 if (val > 255) val = 255;
-                setBrightness(static_cast<uint8_t>(val));
+                self->setBrightness(static_cast<uint8_t>(val));
                 needsPersist = true;
             }
 
             // --- Handle screensaver enabled toggle ---
             if (params["screensaverEnabled"].is<bool>()) {
-                _screensaver.setEnabled(params["screensaverEnabled"].as<bool>());
+                self->_screensaver.setEnabled(params["screensaverEnabled"].as<bool>());
                 needsPersist = true;
             }
 
             // --- Handle dim timeout ---
             if (params["dimTimeout"].is<int>()) {
-                _screensaver.setDimTimeout(
+                self->_screensaver.setDimTimeout(
                     static_cast<unsigned long>(params["dimTimeout"].as<int>()));
                 needsPersist = true;
             }
 
             // --- Handle blank timeout ---
             if (params["blankTimeout"].is<int>()) {
-                _screensaver.setBlankTimeout(
+                self->_screensaver.setBlankTimeout(
                     static_cast<unsigned long>(params["blankTimeout"].as<int>()));
                 needsPersist = true;
             }
 
             // --- Persist configuration if any setting was changed ---
-            if (needsPersist && _configManager != nullptr) {
-                _configManager->saveModuleConfig(this);
+            if (needsPersist && self->_configManager != nullptr) {
+                self->_configManager->saveModuleConfig(self);
             }
 
             result["status"] = "ok";
         },
+        this,  // context: U8G2DisplayModule*
         /* mutatesState = */ true
     );
 

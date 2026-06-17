@@ -28,19 +28,33 @@
 #pragma once
 
 #include <ArduinoJson.h>
-#include <functional>
 #include <string>
 #include <vector>
+
+/**
+ * @brief Static function pointer type for MCP tool handlers.
+ *
+ * Replaces std::function to avoid hidden heap allocations from lambda
+ * captures exceeding the Small Buffer Optimisation threshold (GRAVE-05).
+ * The context pointer carries any state the handler needs (typically a
+ * module's `this` pointer, passed through as an opaque void*).
+ *
+ * @param context Opaque pointer passed through from MCPToolEntry::context.
+ * @param params  JSON object containing the tool's input parameters.
+ * @param result  JSON object to populate with the tool's output.
+ */
+using MCPToolHandler = void(*)(void* context, JsonObject& params, JsonObject& result);
 
 /**
  * @brief Descriptor for a single MCP tool: name, schema, and handler callback.
  */
 struct MCPToolEntry {
-    std::string name;                                                     ///< Tool identifier
-    std::string description;                                              ///< Human-readable description
-    JsonDocument inputSchema;                                             ///< JSON Schema for params
-    std::function<void(JsonObject& params, JsonObject& result)> handler;  ///< Execution callback
-    bool mutatesState = false;                                            ///< Whether the tool modifies state
+    std::string name;              ///< Tool identifier
+    std::string description;       ///< Human-readable description
+    JsonDocument inputSchema;      ///< JSON Schema for params
+    MCPToolHandler handler;        ///< Static function pointer (never null after registration)
+    void* context = nullptr;       ///< Opaque context for the handler
+    bool mutatesState = false;     ///< Whether the tool modifies state
 };
 
 /**
@@ -55,11 +69,14 @@ public:
      *
      * @param name        Unique tool identifier.
      * @param description Human-readable description of the tool.
-     * @param handler     Callback invoked on tools/call dispatch.
+     * @param handler     Static function pointer invoked on tools/call dispatch.
+     * @param context     Opaque pointer forwarded to the handler as its first argument.
+     * @param mutatesState Whether the tool modifies device state.
      */
     void addTool(const char* name,
                  const char* description,
-                 std::function<void(JsonObject& params, JsonObject& result)> handler,
+                 MCPToolHandler handler,
+                 void* context = nullptr,
                  bool mutatesState = false);
 
     /**
@@ -67,12 +84,15 @@ public:
      * @param name        Unique tool identifier.
      * @param description Human-readable description of the tool.
      * @param inputSchema JSON Schema document describing accepted parameters.
-     * @param handler     Callback invoked on tools/call dispatch.
+     * @param handler     Static function pointer invoked on tools/call dispatch.
+     * @param context     Opaque pointer forwarded to the handler as its first argument.
+     * @param mutatesState Whether the tool modifies device state.
      */
     void addTool(const char* name,
                  const char* description,
                  const JsonDocument& inputSchema,
-                 std::function<void(JsonObject& params, JsonObject& result)> handler,
+                 MCPToolHandler handler,
+                 void* context = nullptr,
                  bool mutatesState = false);
 
     /**

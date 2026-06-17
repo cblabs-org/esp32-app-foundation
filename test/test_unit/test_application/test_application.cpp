@@ -116,7 +116,7 @@ public:
         registry.addTool(
             "mock_mcp_tool",
             "A mock MCP tool for testing",
-            [](JsonObject& params, JsonObject& result) {
+            [](void* /*ctx*/, JsonObject& params, JsonObject& result) {
                 (void)params;
                 result["test"] = true;
             }

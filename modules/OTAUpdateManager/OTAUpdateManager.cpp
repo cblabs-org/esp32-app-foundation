@@ -719,17 +719,18 @@ void OTAUpdateManager::performUpdateTask() {
 
     // Set progress callback to forward to EventBus
     // Download progress maps to 2%-100% range (0%-2% covers API/manifest/sig phases)
-    engine.setProgressCallback([this](size_t bytesWritten, size_t totalSize) {
+    engine.setProgressCallback([](void* ctx, size_t bytesWritten, size_t totalSize) {
+        auto* self = static_cast<OTAUpdateManager*>(ctx);
         float rawProgress = (totalSize > 0)
             ? static_cast<float>(bytesWritten) / static_cast<float>(totalSize)
             : 0.0f;
         float progress = 0.02f + (rawProgress * 0.98f); // 2% .. 100%
-        publishProgress(progress, "Downloading firmware...", false, false);
+        self->publishProgress(progress, "Downloading firmware...", false, false);
         // Feed the Task Watchdog during firmware download — each progress
         // callback fires every ~4KB, keeping the WDT alive through multi-MB
         // transfers and TLS renegotiations.
         esp_task_wdt_reset();
-    });
+    }, this);
     ESP_LOGI(TAG, "Download engine configured");
 
     // --- Step 6: Fetch signature file (if .sig URL available) ---

@@ -50,6 +50,10 @@
 #include <string>
 
 #ifndef NATIVE_BUILD
+// NOTE: PsychicHttpRequestCallback, PsychicMiddlewareNext, and
+// PsychicMiddlewareCallback are std::function typedefs defined by the
+// PsychicHttp library. These are an external constraint and cannot be
+// replaced without forking the library. (Audit ref: H-01 / GRAVE-05)
 #include <PsychicHttp.h>
 #include <PsychicHttpsServer.h>
 #else

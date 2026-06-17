@@ -95,6 +95,23 @@ std::string base64Encode(const uint8_t* data, size_t len) {
 #endif
 
 // ---------------------------------------------------------------------------
+// File-scope context for built-in tools
+// ---------------------------------------------------------------------------
+// Multiple built-in tools need access to ConfigManager, TimeManager, and/or
+// the MCPToolRegistry. Rather than using capturing lambdas (which require
+// std::function and heap allocation), we store these pointers in a file-scope
+// struct and pass its address as the void* context to each handler.
+
+/** @brief Bundles all dependency pointers used by built-in tool handlers. */
+struct BuiltinToolsContext {
+    ConfigManager*  configManager = nullptr;
+    TimeManager*    timeManager   = nullptr;
+    MCPToolRegistry* registry    = nullptr;
+};
+
+static BuiltinToolsContext s_builtinCtx;
+
+// ---------------------------------------------------------------------------
 // Built-in tool registration
 // ---------------------------------------------------------------------------
 
@@ -103,13 +120,19 @@ void mcpBuiltinTools::registerAll(MCPToolRegistry& registry,
                                   const DisplayInfo* displayInfo,
                                   TimeManager* timeManager) {
 
+    // Populate the file-scope context struct
+    s_builtinCtx.configManager = configManager;
+    s_builtinCtx.timeManager   = timeManager;
+    s_builtinCtx.registry      = &registry;
+
     // -----------------------------------------------------------------
     // Tool 1: system_info — Device system telemetry
     // -----------------------------------------------------------------
     registry.addTool(
         "system_info",
         "Get device system information including heap, storage, WiFi, time, uptime, chip info, and firmware version",
-        [timeManager](JsonObject& params, JsonObject& result) {
+        [](void* ctx, JsonObject& params, JsonObject& result) {
+            auto* c = static_cast<BuiltinToolsContext*>(ctx);
             (void)params; // No input parameters required
             #ifndef NATIVE_BUILD
                 // --- Internal DRAM metrics (always present on all ESP32 variants) ---
@@ -171,20 +194,20 @@ void mcpBuiltinTools::registerAll(MCPToolRegistry& registry,
                 }
 
                 // --- Time info (NTP sync status, timezone, local time) ---
-                if (timeManager != nullptr) {
-                    result["time_configured"] = timeManager->isConfigured();
-                    result["time_synced"]     = timeManager->isTimeSet();
-                    result["time_timezone"]   = timeManager->getTimezone();
-                    result["time_posix"]      = timeManager->getPosixTz();
+                if (c->timeManager != nullptr) {
+                    result["time_configured"] = c->timeManager->isConfigured();
+                    result["time_synced"]     = c->timeManager->isTimeSet();
+                    result["time_timezone"]   = c->timeManager->getTimezone();
+                    result["time_posix"]      = c->timeManager->getPosixTz();
 
                     const char* syncStr = "UNSYNCED";
-                    if (timeManager->getSyncStatus() == TimeSyncStatus::SYNCED) syncStr = "SYNCED";
-                    else if (timeManager->getSyncStatus() == TimeSyncStatus::IN_PROGRESS) syncStr = "IN_PROGRESS";
+                    if (c->timeManager->getSyncStatus() == TimeSyncStatus::SYNCED) syncStr = "SYNCED";
+                    else if (c->timeManager->getSyncStatus() == TimeSyncStatus::IN_PROGRESS) syncStr = "IN_PROGRESS";
                     result["time_sync_status"] = syncStr;
 
-                    if (timeManager->isTimeSet()) {
+                    if (c->timeManager->isTimeSet()) {
                         struct tm timeinfo;
-                        if (timeManager->getLocalTime(&timeinfo)) {
+                        if (c->timeManager->getLocalTime(&timeinfo)) {
                             char buf[32];
                             strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%S", &timeinfo);
                             result["time_local"] = buf;
@@ -192,6 +215,7 @@ void mcpBuiltinTools::registerAll(MCPToolRegistry& registry,
                     }
                 }
             #else
+                (void)c; // Suppress unused-variable warning on native build
                 // Native build stubs — no hardware telemetry available
                 result["heap_free"]          = 0;
                 result["heap_total"]         = 0;
@@ -224,7 +248,8 @@ void mcpBuiltinTools::registerAll(MCPToolRegistry& registry,
                 result["time_sync_status"]   = "UNSYNCED";
             #endif
             result["firmware_version"] = BUILD_VERSION;
-        }
+        },
+        &s_builtinCtx  // context: BuiltinToolsContext*
     );
 
     // -----------------------------------------------------------------
@@ -233,9 +258,10 @@ void mcpBuiltinTools::registerAll(MCPToolRegistry& registry,
     registry.addTool(
         "get_config",
         "Get the current system configuration for all registered modules",
-        [configManager](JsonObject& params, JsonObject& result) {
+        [](void* ctx, JsonObject& params, JsonObject& result) {
+            auto* c = static_cast<BuiltinToolsContext*>(ctx);
             (void)params; // No input parameters required
-            if (configManager == nullptr) {
+            if (c->configManager == nullptr) {
                 result["error"] = "ConfigManager not available";
                 result["isError"] = true;
                 return;
@@ -243,13 +269,14 @@ void mcpBuiltinTools::registerAll(MCPToolRegistry& registry,
 
             // Export all module configs into the result object
             JsonDocument exportDoc;
-            configManager->exportAllConfig(exportDoc);
+            c->configManager->exportAllConfig(exportDoc);
 
             // Copy each namespace section into the result
             for (JsonPair kv : exportDoc.as<JsonObject>()) {
                 result[kv.key()] = kv.value();
             }
-        }
+        },
+        &s_builtinCtx  // context: BuiltinToolsContext*
     );
 
     // -----------------------------------------------------------------
@@ -269,8 +296,9 @@ void mcpBuiltinTools::registerAll(MCPToolRegistry& registry,
         "set_config",
         "Update system configuration fields by namespace",
         setConfigSchema,
-        [configManager](JsonObject& params, JsonObject& result) {
-            if (configManager == nullptr) {
+        [](void* ctx, JsonObject& params, JsonObject& result) {
+            auto* c = static_cast<BuiltinToolsContext*>(ctx);
+            if (c->configManager == nullptr) {
                 result["error"] = "ConfigManager not available";
                 result["isError"] = true;
                 return;
@@ -289,18 +317,19 @@ void mcpBuiltinTools::registerAll(MCPToolRegistry& registry,
                 importDoc[kv.key()] = kv.value();
             }
 
-            bool success = configManager->importAllConfig(importDoc);
+            bool success = c->configManager->importAllConfig(importDoc);
             ESP_LOGI(TAG, "Configuration updated via MCP");
 
             result["status"] = success ? "updated" : "partial_failure";
 
             // Return the updated config for confirmation
             JsonDocument exportDoc;
-            configManager->exportAllConfig(exportDoc);
+            c->configManager->exportAllConfig(exportDoc);
             for (JsonPair kv : exportDoc.as<JsonObject>()) {
                 result[kv.key()] = kv.value();
             }
         },
+        &s_builtinCtx,  // context: BuiltinToolsContext*
         true  // mutatesState — writes config via ConfigManager
     );
 
@@ -310,7 +339,7 @@ void mcpBuiltinTools::registerAll(MCPToolRegistry& registry,
     registry.addTool(
         "reboot",
         "Restart the ESP32 device",
-        [](JsonObject& params, JsonObject& result) {
+        [](void* /*ctx*/, JsonObject& params, JsonObject& result) {
             (void)params; // No input parameters required
             result["status"]  = "rebooting";
             result["message"] = "Device will restart in 1 second";
@@ -326,6 +355,7 @@ void mcpBuiltinTools::registerAll(MCPToolRegistry& registry,
                 ESP_LOGI(TAG, "Reboot requested via MCP (native build — no-op)");
             #endif
         },
+        nullptr,  // context: not needed
         true  // mutatesState — restarts the device
     );
 
@@ -346,7 +376,7 @@ void mcpBuiltinTools::registerAll(MCPToolRegistry& registry,
         "get_logs",
         "Get recent log entries from the device log buffer",
         getLogsSchema,
-        [](JsonObject& params, JsonObject& result) {
+        [](void* /*ctx*/, JsonObject& params, JsonObject& result) {
             // v1 stub — the full ring-buffer logger is a future enhancement.
             // When implemented, this will read the last N entries from a
             // circular log buffer and return them as a JSON array.
@@ -360,31 +390,29 @@ void mcpBuiltinTools::registerAll(MCPToolRegistry& registry,
     // -----------------------------------------------------------------
     // Tool 6: list_tools — Enumerate all registered MCP tools
     // -----------------------------------------------------------------
-    // Capture a pointer to the registry so the lambda can read back all
-    // tools at call time (after all contributors have been registered).
-    MCPToolRegistry* registryPtr = &registry;
-
     registry.addTool(
         "list_tools",
         "List all registered MCP tools with their descriptions and schemas",
-        [registryPtr](JsonObject& params, JsonObject& result) {
+        [](void* ctx, JsonObject& params, JsonObject& result) {
+            auto* c = static_cast<BuiltinToolsContext*>(ctx);
             (void)params; // No input parameters required
             JsonArray toolsArray = result["tools"].to<JsonArray>();
 
-            for (const auto& tool : registryPtr->getTools()) {
+            for (const auto& tool : c->registry->getTools()) {
                 JsonObject toolObj     = toolsArray.add<JsonObject>();
                 toolObj["name"]        = tool.name;
                 toolObj["description"] = tool.description;
             }
 
-            result["count"] = registryPtr->size();
-        }
+            result["count"] = c->registry->size();
+        },
+        &s_builtinCtx  // context: BuiltinToolsContext*
     );
 
     // -----------------------------------------------------------------
     // Tool 7: capture_display — Capture the display framebuffer as base64
     // -----------------------------------------------------------------
-    // The display info is stored at file scope (s_displayInfo) so the lambda
+    // The display info is stored at file scope (s_displayInfo) so the handler
     // can read it via pointer. Late-binding via setDisplayInfo() is supported
     // for displays that initialise after MCPServer::begin().
     if (displayInfo != nullptr) {
@@ -394,7 +422,7 @@ void mcpBuiltinTools::registerAll(MCPToolRegistry& registry,
     registry.addTool(
         "capture_display",
         "Capture the current display buffer as a base64-encoded image",
-        [](JsonObject& params, JsonObject& result) {
+        [](void* /*ctx*/, JsonObject& params, JsonObject& result) {
             (void)params; // No input parameters required
 
             // --- Guard: no display registered ---

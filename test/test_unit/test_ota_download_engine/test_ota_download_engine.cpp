@@ -98,11 +98,11 @@ TEST_F(OtaDownloadEngineTest, SetVerifier_StoresPointer) {
  */
 TEST_F(OtaDownloadEngineTest, SetProgressCallback_StoresCallback) {
     bool called = false;
-    engine.setProgressCallback([&called](size_t written, size_t total) {
+    engine.setProgressCallback([](void* ctx, size_t written, size_t total) {
         (void)written;
         (void)total;
-        called = true;
-    });
+        *static_cast<bool*>(ctx) = true;
+    }, &called);
     // Callback is stored but not invoked until downloadAndFlash runs
     EXPECT_FALSE(called);
 }
