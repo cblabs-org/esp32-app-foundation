@@ -65,6 +65,7 @@ extern "C" {
 #include <esp_random.h>
 // LittleFS for DER cert/key storage (WO3).
 #include <LittleFS.h>
+#include <freertos/idf_additions.h>
 #else
 // Native test build: portable fallbacks for hardware-specific APIs.
 #include <random>
@@ -698,15 +699,27 @@ void AuthManager::registerRoutes(PsychicHttpServer& server) {
             return response->send(409, "application/json", "{\"error\":\"cert_generation_in_progress\"}");
         }
 #ifndef NATIVE_BUILD
-        xTaskCreate(
+        // cert_gen is a short-lived, self-deleting task — TWDT registration
+        // is intentionally skipped because the task runs once and exits.
+        // DRAM stack is required for mbedTLS EC key generation.
+        BaseType_t certResult = xTaskCreateWithCaps(
             [](void* param) {
                 auto* self = static_cast<AuthManager*>(param);
                 self->generateAndStoreCert("esp32-device");
                 self->_certGenRunning.store(false);
                 vTaskDelete(nullptr);
             },
-            "cert_gen", 12288, this, 1, nullptr
+            "cert_gen",
+            12288,
+            this,
+            1,
+            nullptr,
+            MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT
         );
+        if (certResult != pdPASS) {
+            ESP_LOGE(TAG, "Failed to create cert_gen task");
+            _certGenRunning.store(false);  // Reset guard so future attempts aren't blocked
+        }
 #else
         generateAndStoreCert("esp32-device");
         _certGenRunning.store(false);
@@ -855,19 +868,27 @@ void AuthManager::registerRoutes(PsychicHttpServer& server) {
             ESP_LOGW(TAG, "Cert generation already in progress, skipping");
         } else {
 #ifndef NATIVE_BUILD
-            xTaskCreate(
+            // cert_gen is a short-lived, self-deleting task — TWDT registration
+            // is intentionally skipped because the task runs once and exits.
+            // DRAM stack is required for mbedTLS EC key generation.
+            BaseType_t certResult = xTaskCreateWithCaps(
                 [](void* param) {
                     auto* self = static_cast<AuthManager*>(param);
                     self->generateAndStoreCert("esp32-device");
                     self->_certGenRunning.store(false);
                     vTaskDelete(nullptr);
                 },
-                "cert_gen",   // Task name
-                12288,        // Stack depth (12KB — mbedTLS EC needs ~8KB)
-                this,         // Parameter: AuthManager instance
-                1,            // Priority (low — background work)
-                nullptr       // No handle needed (self-deleting)
+                "cert_gen",
+                12288,
+                this,
+                1,
+                nullptr,
+                MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT
             );
+            if (certResult != pdPASS) {
+                ESP_LOGE(TAG, "Failed to create cert_gen task");
+                _certGenRunning.store(false);  // Reset guard so future attempts aren't blocked
+            }
 #else
             generateAndStoreCert("esp32-device");
             _certGenRunning.store(false);

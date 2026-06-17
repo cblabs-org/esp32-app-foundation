@@ -18,6 +18,8 @@ static const char* TAG = "DataManager";
 
 #ifndef NATIVE_BUILD
 #include <Arduino.h>
+#include "esp_task_wdt.h"
+#include <freertos/idf_additions.h>
 #endif
 
 /**
@@ -58,10 +60,23 @@ DataManager::~DataManager() {
 
 void DataManager::begin() {
 #ifndef NATIVE_BUILD
-    // Implement a FreeRTOS task with STACK_SIZE >= 8KB
-    // Priority 5 is generally suitable for background data fetchers, adjust if needed
-    ESP_LOGI(TAG, "Creating worker task (stack=8192, priority=5, core=any)");
-    xTaskCreate(workerTaskLoop, "DataManager", 8192, this, 5, &workerTask);
+    // Create worker task with 12KB DRAM stack — safe for TLS-heavy data sources.
+    // DRAM (not PSRAM) is required because SPI flash operations (used by some
+    // data sources) assert when the task stack is in PSRAM.
+    ESP_LOGI(TAG, "Creating worker task (stack=12288, priority=5, core=any, DRAM)");
+    BaseType_t result = xTaskCreateWithCaps(
+        workerTaskLoop,
+        "DataManager",
+        12288,                                    // 12KB — safe for TLS
+        this,
+        5,
+        &workerTask,
+        MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT     // DRAM stack
+    );
+    if (result != pdPASS) {
+        ESP_LOGE(TAG, "Failed to create DataManager worker task");
+        workerTask = nullptr;
+    }
 #endif
 }
 
@@ -123,12 +138,24 @@ void DataManager::setAppRunning(bool running) {
 
 void DataManager::workerTaskLoop(void* param) {
     DataManager* manager = static_cast<DataManager*>(param);
+
+#ifndef NATIVE_BUILD
+    // Register with Task Watchdog Timer — this is a long-running worker loop
+    // that must feed the watchdog periodically to avoid triggering a reset.
+    esp_task_wdt_add(NULL);
+#endif
+
     while (true) {
         manager->executeLoop();
 #ifndef NATIVE_BUILD
+        // Feed the watchdog after each fetch cycle
+        esp_task_wdt_reset();
         vTaskDelay(pdMS_TO_TICKS(100)); // sleep between loop checks to avoid starving other tasks
 #endif
     }
+
+    // Note: This loop never exits under normal operation. If it ever did,
+    // we would call esp_task_wdt_delete(NULL) before vTaskDelete.
 }
 
 void DataManager::executeLoop() {
