@@ -215,7 +215,7 @@ void OTAUpdateManager::begin(Application& app) {
  *   (time() > 1 000 000) and an active Wi-Fi connection.
  */
 void OTAUpdateManager::tick(uint32_t currentMillis) {
-    if (!_autoCheck || state_ != OTAState::Idle) return;
+    if (!_autoCheck || _state != OTAState::Idle) return;
 
 #ifndef NATIVE_BUILD
     // Gate: do not attempt any network operation until Wi-Fi is confirmed up.
@@ -267,7 +267,7 @@ bool OTAUpdateManager::checkForUpdate() {
     }
 
     // Guard: must be in Idle state
-    if (state_ != OTAState::Idle) {
+    if (_state != OTAState::Idle) {
         ESP_LOGW(TAG, "checkForUpdate() called while state != Idle — returning false");
         return false;
     }
@@ -278,7 +278,7 @@ bool OTAUpdateManager::checkForUpdate() {
         return false;
     }
 
-    state_ = OTAState::Checking;
+    _state = OTAState::Checking;
     ESP_LOGI(TAG, "Checking for updates — local: %s, channel: '%s'", BUILD_VERSION, _channel);
 
 #ifndef NATIVE_BUILD
@@ -290,7 +290,7 @@ bool OTAUpdateManager::checkForUpdate() {
     bool success = github.getLatestReleaseForChannel(_channel);
     if (!success) {
         ESP_LOGE(TAG, "GitHub release check failed: %s", github.getLastError());
-        state_ = OTAState::Idle;
+        _state = OTAState::Idle;
         return false;
     }
 
@@ -306,7 +306,7 @@ bool OTAUpdateManager::checkForUpdate() {
     if (remote > local) {
         ESP_LOGI(TAG, "Update available: remote version is newer");
         strlcpy(_lastCheckedChannel, _channel, sizeof(_lastCheckedChannel));
-        state_ = OTAState::Idle;
+        _state = OTAState::Idle;
         return true;
     }
 
@@ -320,7 +320,7 @@ bool OTAUpdateManager::checkForUpdate() {
         if (_configManager != nullptr) {
             _configManager->saveModuleConfig(this);
         }
-        state_ = OTAState::Idle;
+        _state = OTAState::Idle;
         return true;  // Signal update available even if remote <= local
     }
 
@@ -329,11 +329,11 @@ bool OTAUpdateManager::checkForUpdate() {
 
     ESP_LOGI(TAG, "No update available — local %s is current or newer than remote %s (channel='%s')",
              BUILD_VERSION, github.releaseId.c_str(), _channel);
-    state_ = OTAState::Idle;
+    _state = OTAState::Idle;
     return false;
 #else
     // Native builds cannot perform real GitHub checks
-    state_ = OTAState::Idle;
+    _state = OTAState::Idle;
     return false;
 #endif
 }
@@ -349,18 +349,18 @@ void OTAUpdateManager::performUpdate() {
     // Guard: must be initialized
     if (_config == nullptr) {
         ESP_LOGE(TAG, "performUpdate() called before begin()");
-        state_ = OTAState::Error;
-        lastOtaError_ = "OTA manager not initialized";
+        _state = OTAState::Error;
+        _lastOtaError = "OTA manager not initialized";
         return;
     }
 
     // Guard: must be in Idle state
-    if (state_ != OTAState::Idle) {
+    if (_state != OTAState::Idle) {
         ESP_LOGW(TAG, "performUpdate() called while state != Idle — ignoring");
         return;
     }
 
-    state_ = OTAState::Checking;
+    _state = OTAState::Checking;
     ESP_LOGI(TAG, "Launching OTA update pipeline");
 
 #ifndef NATIVE_BUILD
@@ -386,7 +386,7 @@ void OTAUpdateManager::performUpdate() {
         OTA_TASK_STACK_BYTES,                      // Stack size (bytes)
         this,                                      // Parameter
         5,                                         // Priority
-        &taskHandle_,                              // Task handle output
+        &_taskHandle,                              // Task handle output
         MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT      // DRAM stack (SPI flash safe)
     );
 
@@ -396,15 +396,15 @@ void OTAUpdateManager::performUpdate() {
             "free DRAM: %" PRIu32 " B, stack required: %" PRIu32 " B. "
             "Device may need reboot to recover heap.",
             freeDram, OTA_TASK_STACK_BYTES);
-        state_ = OTAState::Error;
-        lastOtaError_ = "Failed to create OTA task (insufficient memory)";
+        _state = OTAState::Error;
+        _lastOtaError = "Failed to create OTA task (insufficient memory)";
         publishProgress(0.0f, "Failed to create OTA task (insufficient memory)", true, false);
     }
 #else
     // Native builds cannot run FreeRTOS tasks
     ESP_LOGW(TAG, "performUpdate() — no FreeRTOS on native build, setting Error");
-    state_ = OTAState::Error;
-    lastOtaError_ = "FreeRTOS not available on native build";
+    _state = OTAState::Error;
+    _lastOtaError = "FreeRTOS not available on native build";
 #endif
 }
 
@@ -446,8 +446,8 @@ void OTAUpdateManager::performUpdateTask() {
     if (!_updatesEnabled) {
         ESP_LOGW(TAG, "Firmware updates are disabled in config");
         publishProgress(0.0f, "Firmware updates disabled", true, false);
-        state_ = OTAState::Error;
-        lastOtaError_ = "Firmware updates disabled";
+        _state = OTAState::Error;
+        _lastOtaError = "Firmware updates disabled";
         esp_task_wdt_delete(NULL);
         return;
     }
@@ -456,8 +456,8 @@ void OTAUpdateManager::performUpdateTask() {
     if (cfg.otaGithubRepo == nullptr) {
         ESP_LOGE(TAG, "No otaGithubRepo configured");
         publishProgress(0.0f, "No GitHub repo configured", true, false);
-        state_ = OTAState::Error;
-        lastOtaError_ = "No GitHub repo configured";
+        _state = OTAState::Error;
+        _lastOtaError = "No GitHub repo configured";
         esp_task_wdt_delete(NULL);
         return;
     }
@@ -476,11 +476,11 @@ void OTAUpdateManager::performUpdateTask() {
         if (!_silentCheck) {
             static char ghErrBuf[128];
             snprintf(ghErrBuf, sizeof(ghErrBuf), "GitHub query: %s", github.getLastError());
-            lastOtaError_ = ghErrBuf;
+            _lastOtaError = ghErrBuf;
             publishProgress(0.0f, "GitHub query failed", true, false);
-            state_ = OTAState::Error;
+            _state = OTAState::Error;
         } else {
-            state_ = OTAState::Idle;
+            _state = OTAState::Idle;
         }
         _silentCheck = false;
         esp_task_wdt_delete(NULL);
@@ -499,7 +499,7 @@ void OTAUpdateManager::performUpdateTask() {
         ESP_LOGI(TAG, "No update needed — local %s is current or newer than remote %s (channel='%s')",
                  BUILD_VERSION, github.releaseId.c_str(), _channel);
         // No publishProgress — don't show the OTA screen for a no-op check
-        state_ = OTAState::Idle;
+        _state = OTAState::Idle;
         esp_task_wdt_delete(NULL);
         return;
     }
@@ -508,7 +508,7 @@ void OTAUpdateManager::performUpdateTask() {
              github.releaseId.c_str(), BUILD_VERSION, _channel);
 
     // Only now transition to Downloading — a download will actually happen
-    state_ = OTAState::Downloading;
+    _state = OTAState::Downloading;
     publishProgress(0.0f, "Update found — preparing download...", false, false);
 
     // --- Step 2: Find firmware and signature assets (manifest-aware) ---
@@ -534,8 +534,8 @@ void OTAUpdateManager::performUpdateTask() {
         if (!manifestClient) {
             ESP_LOGE(TAG, "Failed to allocate WiFiClientSecure for manifest fetch");
             publishProgress(0.0f, "Memory allocation failed", true, false);
-            state_ = OTAState::Error;
-            lastOtaError_ = "Manifest client allocation failed";
+            _state = OTAState::Error;
+            _lastOtaError = "Manifest client allocation failed";
             esp_task_wdt_delete(NULL);
             return;
         }
@@ -548,8 +548,8 @@ void OTAUpdateManager::performUpdateTask() {
         if (!http.begin(*manifestClient, String(manifestUrl.c_str()))) {
             ESP_LOGE(TAG, "HTTPClient.begin() failed for manifest URL");
             publishProgress(0.0f, "Manifest download failed", true, false);
-            state_ = OTAState::Error;
-            lastOtaError_ = "Manifest HTTP begin failed";
+            _state = OTAState::Error;
+            _lastOtaError = "Manifest HTTP begin failed";
             esp_task_wdt_delete(NULL);
             return;
         }
@@ -564,8 +564,8 @@ void OTAUpdateManager::performUpdateTask() {
             ESP_LOGE(TAG, "Manifest download HTTP %d", httpCode);
             http.end();
             publishProgress(0.0f, "Manifest download failed", true, false);
-            state_ = OTAState::Error;
-            lastOtaError_ = "Manifest download HTTP error";
+            _state = OTAState::Error;
+            _lastOtaError = "Manifest download HTTP error";
             esp_task_wdt_delete(NULL);
             return;
         }
@@ -576,8 +576,8 @@ void OTAUpdateManager::performUpdateTask() {
             ESP_LOGE(TAG, "Manifest payload size invalid: %d", payloadLen);
             http.end();
             publishProgress(0.0f, "Manifest too large or empty", true, false);
-            state_ = OTAState::Error;
-            lastOtaError_ = "Manifest payload size invalid";
+            _state = OTAState::Error;
+            _lastOtaError = "Manifest payload size invalid";
             esp_task_wdt_delete(NULL);
             return;
         }
@@ -594,8 +594,8 @@ void OTAUpdateManager::performUpdateTask() {
         if (!parseManifest(manifestBuf, bytesRead, manifest)) {
             ESP_LOGE(TAG, "Failed to parse manifest.json");
             publishProgress(0.0f, "Manifest parse failed", true, false);
-            state_ = OTAState::Error;
-            lastOtaError_ = "Manifest JSON parse failed";
+            _state = OTAState::Error;
+            _lastOtaError = "Manifest JSON parse failed";
             esp_task_wdt_delete(NULL);
             return;
         }
@@ -605,8 +605,8 @@ void OTAUpdateManager::performUpdateTask() {
         if (boardAsset == nullptr) {
             ESP_LOGE(TAG, "No firmware for board '%s' in manifest", BOARD_ID);
             publishProgress(0.0f, "No firmware for this board in manifest", true, false);
-            state_ = OTAState::Error;
-            lastOtaError_ = "No firmware for this board in manifest";
+            _state = OTAState::Error;
+            _lastOtaError = "No firmware for this board in manifest";
             esp_task_wdt_delete(NULL);
             return;
         }
@@ -660,8 +660,8 @@ void OTAUpdateManager::performUpdateTask() {
     if (binUrl.empty()) {
         ESP_LOGE(TAG, "No .bin asset found in release %s", github.releaseId.c_str());
         publishProgress(0.0f, "No firmware binary in release", true, false);
-        state_ = OTAState::Error;
-        lastOtaError_ = "No firmware binary found in release";
+        _state = OTAState::Error;
+        _lastOtaError = "No firmware binary found in release";
         esp_task_wdt_delete(NULL);
         return;
     }
@@ -669,8 +669,8 @@ void OTAUpdateManager::performUpdateTask() {
     if (sigUrl.empty() && cfg.otaPublicKey != nullptr) {
         ESP_LOGE(TAG, "SECURITY ABORT: No .sig asset found but otaPublicKey is configured — refusing unsigned firmware");
         publishProgress(0.0f, "Missing signature — update rejected", true, false);
-        state_ = OTAState::Error;
-        lastOtaError_ = "Missing .sig file — update rejected (fail-closed)";
+        _state = OTAState::Error;
+        _lastOtaError = "Missing .sig file — update rejected (fail-closed)";
         esp_task_wdt_delete(NULL);
         return;
     }
@@ -685,18 +685,18 @@ void OTAUpdateManager::performUpdateTask() {
     bool verifierReady = false;
 
     if (cfg.otaPublicKey != nullptr) {
-        state_ = OTAState::Verifying;
+        _state = OTAState::Verifying;
         if (!verifier.begin(cfg.otaPublicKey)) {
             ESP_LOGE(TAG, "Failed to initialize MbedTLS verifier with public key");
             publishProgress(0.0f, "Verifier initialization failed", true, false);
-            state_ = OTAState::Error;
-            lastOtaError_ = "Verifier initialization failed";
+            _state = OTAState::Error;
+            _lastOtaError = "Verifier initialization failed";
             esp_task_wdt_delete(NULL);
             return;
         }
         verifierReady = true;
         ESP_LOGI(TAG, "Verifier initialized with public key");
-        state_ = OTAState::Downloading;
+        _state = OTAState::Downloading;
     }
 
     // --- Step 4: Create WiFiClientSecure on the heap ---
@@ -704,8 +704,8 @@ void OTAUpdateManager::performUpdateTask() {
     if (!client) {
         ESP_LOGE(TAG, "Failed to allocate WiFiClientSecure on heap");
         publishProgress(0.0f, "Memory allocation failed", true, false);
-        state_ = OTAState::Error;
-        lastOtaError_ = "WiFiClientSecure heap allocation failed";
+        _state = OTAState::Error;
+        _lastOtaError = "WiFiClientSecure heap allocation failed";
         esp_task_wdt_delete(NULL);
         return;
     }
@@ -745,8 +745,8 @@ void OTAUpdateManager::performUpdateTask() {
         if (sigLen == 0 && cfg.otaPublicKey != nullptr) {
             ESP_LOGE(TAG, "SECURITY ABORT: Signature fetch returned 0 bytes — refusing update");
             publishProgress(0.0f, "Signature fetch failed — update rejected", true, false);
-            state_ = OTAState::Error;
-            lastOtaError_ = "Signature empty — update rejected (fail-closed)";
+            _state = OTAState::Error;
+            _lastOtaError = "Signature empty — update rejected (fail-closed)";
             esp_task_wdt_delete(NULL);
             return;
         } else if (sigLen > 0) {
@@ -760,10 +760,10 @@ void OTAUpdateManager::performUpdateTask() {
     OTAError result = engine.downloadAndFlash(*client, String(binUrl.c_str()), String(token.c_str()), sigBuf, sigLen);
 
     if (result != OTAError::None) {
-        lastOtaError_ = engine.getLastErrorString();
-        ESP_LOGE(TAG, "OTA download failed: %s", lastOtaError_);
-        publishProgress(0.0f, lastOtaError_, true, false);
-        state_ = OTAState::Error;
+        _lastOtaError = engine.getLastErrorString();
+        ESP_LOGE(TAG, "OTA download failed: %s", _lastOtaError);
+        publishProgress(0.0f, _lastOtaError, true, false);
+        _state = OTAState::Error;
         esp_task_wdt_delete(NULL);
         return;
     }
@@ -771,7 +771,7 @@ void OTAUpdateManager::performUpdateTask() {
     ESP_LOGI(TAG, "Firmware downloaded and verified successfully");
 
     // --- Step 8: Finalize ---
-    state_ = OTAState::Complete;
+    _state = OTAState::Complete;
     publishProgress(1.0f, "Update complete — rebooting...", true, true);
     ESP_LOGI(TAG, "OTA update complete — rebooting in 2 seconds");
 
@@ -781,8 +781,8 @@ void OTAUpdateManager::performUpdateTask() {
 #else
     // Native builds: no-op (should not be called)
     ESP_LOGW(TAG, "performUpdateTask() called on native build — no-op");
-    state_ = OTAState::Error;
-    lastOtaError_ = "Cannot perform OTA on native build";
+    _state = OTAState::Error;
+    _lastOtaError = "Cannot perform OTA on native build";
 #endif
 }
 
@@ -795,7 +795,7 @@ void OTAUpdateManager::performUpdateTask() {
  */
 void OTAUpdateManager::publishProgress(float progress, const char* status,
                                         bool complete, bool success) {
-    lastProgress_ = progress;
+    _lastProgress = progress;
     OTAProgressEvent event;
     event.progress = progress;
     event.status   = status;
@@ -815,14 +815,14 @@ void OTAUpdateManager::publishProgress(float progress, const char* status,
  * @brief Get the current OTA state machine state.
  */
 OTAState OTAUpdateManager::getState() const {
-    return state_;
+    return _state;
 }
 
 /**
  * @brief Get the last OTA error string.
  */
 const char* OTAUpdateManager::getLastOtaError() const {
-    return lastOtaError_;
+    return _lastOtaError;
 }
 
 // ---------------------------------------------------------------------------
@@ -852,7 +852,7 @@ bool OTAUpdateManager::beginUpdate(size_t size, const char* expectedMD5) {
         Update.setMD5(expectedMD5);
     }
 
-    expectedSize_ = size;
+    _expectedSize = size;
     return true;
 #else
     return false;
@@ -999,40 +999,40 @@ esp_err_t OTAUpdateManager::handleSignedUpload(PsychicRequest* request,
     }
     const FrameworkConfig& cfg = *_config;
 
-    // ---- Signature field: collect bytes into uploadSigBuf_ ----
+    // ---- Signature field: collect bytes into _uploadSigBuf ----
     if (filename == "signature") {
         if (index == 0) {
-            uploadSigLen_ = 0; // Reset on first chunk
+            _uploadSigLen = 0; // Reset on first chunk
         }
-        size_t space = sizeof(uploadSigBuf_) - uploadSigLen_;
+        size_t space = sizeof(_uploadSigBuf) - _uploadSigLen;
         size_t toCopy = (len < space) ? len : space;
-        memcpy(uploadSigBuf_ + uploadSigLen_, data, toCopy);
-        uploadSigLen_ += toCopy;
+        memcpy(_uploadSigBuf + _uploadSigLen, data, toCopy);
+        _uploadSigLen += toCopy;
         return ESP_OK;
     }
 
     // ---- Firmware field ----
     if (filename != "firmware") return ESP_OK; // Unknown field — ignore
 
-    if (uploadAborted_) return ESP_FAIL; // Already failed — drain remaining chunks silently
+    if (_uploadAborted) return ESP_FAIL; // Already failed — drain remaining chunks silently
 
     // --- First chunk: reset state and initialise verifier ---
     if (index == 0) {
-        uploadAborted_  = false;
-        uploadBinSize_  = 0;
+        _uploadAborted  = false;
+        _uploadBinSize  = 0;
 
         // Clean up any previous verifier
-        delete uploadVerifier_;
-        uploadVerifier_ = nullptr;
+        delete _uploadVerifier;
+        _uploadVerifier = nullptr;
 
         // Initialise MbedTLS verifier if a public key is configured
         if (cfg.otaPublicKey != nullptr) {
-            uploadVerifier_ = new (std::nothrow) MbedTLSSignatureVerifier();
-            if (!uploadVerifier_ || !uploadVerifier_->begin(cfg.otaPublicKey)) {
+            _uploadVerifier = new (std::nothrow) MbedTLSSignatureVerifier();
+            if (!_uploadVerifier || !_uploadVerifier->begin(cfg.otaPublicKey)) {
                 ESP_LOGE(TAG, "Signed upload: verifier init failed");
-                delete uploadVerifier_;
-                uploadVerifier_ = nullptr;
-                uploadAborted_  = true;
+                delete _uploadVerifier;
+                _uploadVerifier = nullptr;
+                _uploadAborted  = true;
                 request->response()->send(500, "application/json",
                               "{\"status\":\"error\",\"msg\":\"Verifier init failed\"}");
                 return ESP_FAIL;
@@ -1042,7 +1042,7 @@ esp_err_t OTAUpdateManager::handleSignedUpload(PsychicRequest* request,
         // Validate ESP32 binary magic byte
         if (len > 0 && data[0] != 0xE9) {
             ESP_LOGE(TAG, "Signed upload: invalid binary header 0x%02X", data[0]);
-            uploadAborted_ = true;
+            _uploadAborted = true;
             request->response()->send(400, "application/json",
                           "{\"status\":\"error\",\"msg\":\"Invalid firmware header — not an ESP32 binary\"}");
             return ESP_FAIL;
@@ -1051,7 +1051,7 @@ esp_err_t OTAUpdateManager::handleSignedUpload(PsychicRequest* request,
         // Begin the flash update — size is unknown at this point so use OTA_SIZE_UNKNOWN
         if (!Update.begin(UPDATE_SIZE_UNKNOWN)) {
             ESP_LOGE(TAG, "Signed upload: Update.begin() failed");
-            uploadAborted_ = true;
+            _uploadAborted = true;
             request->response()->send(500, "application/json",
                           "{\"status\":\"error\",\"msg\":\"Update begin failed — insufficient space?\"}");
             return ESP_FAIL;
@@ -1061,63 +1061,63 @@ esp_err_t OTAUpdateManager::handleSignedUpload(PsychicRequest* request,
     }
 
     // --- Accumulate firmware bytes into verifier and flash ---
-    if (uploadVerifier_ != nullptr) {
-        uploadVerifier_->update(data, len);
+    if (_uploadVerifier != nullptr) {
+        _uploadVerifier->update(data, len);
     }
 
     if (Update.write(data, len) != len) {
         ESP_LOGE(TAG, "Signed upload: Update.write() failed at offset %u",
-                 (unsigned)uploadBinSize_);
+                 (unsigned)_uploadBinSize);
         Update.abort();
-        uploadAborted_ = true;
-        delete uploadVerifier_;
-        uploadVerifier_ = nullptr;
+        _uploadAborted = true;
+        delete _uploadVerifier;
+        _uploadVerifier = nullptr;
         request->response()->send(500, "application/json",
                       "{\"status\":\"error\",\"msg\":\"Flash write failed\"}");
         return ESP_FAIL;
     }
 
-    uploadBinSize_ += len;
+    _uploadBinSize += len;
 
     // --- Final chunk: verify signature then finalise ---
     if (final) {
         // Fail-closed: public key configured → signature is mandatory
         if (cfg.otaPublicKey != nullptr) {
-            if (uploadSigLen_ == 0) {
+            if (_uploadSigLen == 0) {
                 ESP_LOGE(TAG, "Signed upload: SECURITY ABORT — no signature provided");
                 Update.abort();
-                delete uploadVerifier_;
-                uploadVerifier_ = nullptr;
-                uploadAborted_  = true;
+                delete _uploadVerifier;
+                _uploadVerifier = nullptr;
+                _uploadAborted  = true;
                 request->response()->send(400, "application/json",
                               "{\"status\":\"error\",\"msg\":\"Signature file required — upload both .bin and .sig\"}");
                 return ESP_FAIL;
             }
 
-            if (uploadVerifier_ == nullptr ||
-                !uploadVerifier_->verify(uploadSigBuf_, uploadSigLen_)) {
+            if (_uploadVerifier == nullptr ||
+                !_uploadVerifier->verify(_uploadSigBuf, _uploadSigLen)) {
                 ESP_LOGE(TAG, "Signed upload: ECDSA verification FAILED");
                 Update.abort();
-                delete uploadVerifier_;
-                uploadVerifier_ = nullptr;
-                uploadAborted_  = true;
+                delete _uploadVerifier;
+                _uploadVerifier = nullptr;
+                _uploadAborted  = true;
                 request->response()->send(403, "application/json",
                               "{\"status\":\"error\",\"msg\":\"Signature verification failed — firmware rejected\"}");
                 return ESP_FAIL;
             }
 
             ESP_LOGI(TAG, "Signed upload: ECDSA verification PASSED (%u sig bytes, %u firmware bytes)",
-                     (unsigned)uploadSigLen_, (unsigned)uploadBinSize_);
+                     (unsigned)_uploadSigLen, (unsigned)_uploadBinSize);
         } else {
             ESP_LOGW(TAG, "Signed upload: no public key configured — signature check SKIPPED");
         }
 
-        delete uploadVerifier_;
-        uploadVerifier_ = nullptr;
+        delete _uploadVerifier;
+        _uploadVerifier = nullptr;
 
         if (!Update.end(true /* set boot partition */)) {
             ESP_LOGE(TAG, "Signed upload: Update.end() failed");
-            uploadAborted_ = true;
+            _uploadAborted = true;
             request->response()->send(500, "application/json",
                           "{\"status\":\"error\",\"msg\":\"Update finalisation failed\"}");
             return ESP_FAIL;
@@ -1177,9 +1177,9 @@ void OTAUpdateManager::registerRoutes(PsychicHttpServer& server) {
                     return ESP_OK;
                 } else if (strcmp(action, "checkGithub") == 0) {
                     ESP_LOGI(TAG, "GitHub OTA check triggered via API");
-                    if (this->state_ == OTAState::Error) {
-                        this->state_ = OTAState::Idle;
-                        this->lastOtaError_ = nullptr;
+                    if (this->_state == OTAState::Error) {
+                        this->_state = OTAState::Idle;
+                        this->_lastOtaError = nullptr;
                     }
                     this->_silentCheck = false;
                     this->performUpdate();
@@ -1243,7 +1243,7 @@ void OTAUpdateManager::registerRoutes(PsychicHttpServer& server) {
                 } else if (strcmp(action, "status") == 0) {
                     JsonDocument resp;
                     const char* stateStr = "unknown";
-                    switch (this->state_) {
+                    switch (this->_state) {
                         case OTAState::Idle:        stateStr = "idle"; break;
                         case OTAState::Checking:    stateStr = "checking"; break;
                         case OTAState::Downloading: stateStr = "downloading"; break;
@@ -1260,9 +1260,9 @@ void OTAUpdateManager::registerRoutes(PsychicHttpServer& server) {
                     resp["checkHour"]      = this->_checkHour;
                     resp["dram_free_bytes"]  = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
                     resp["ota_stack_bytes"]  = OTA_TASK_STACK_BYTES;
-                    resp["progress"]         = this->lastProgress_;
-                    if (this->lastOtaError_) {
-                        resp["lastError"] = this->lastOtaError_;
+                    resp["progress"]         = this->_lastProgress;
+                    if (this->_lastOtaError) {
+                        resp["lastError"] = this->_lastOtaError;
                     }
                     std::string output;
                     serializeJson(resp, output);

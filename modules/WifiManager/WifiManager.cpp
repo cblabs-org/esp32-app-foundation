@@ -89,25 +89,25 @@ static size_t strlcpy(char *dst, const char *src, size_t siz) {
 #endif
 #endif
 
-WifiManager::WifiManager() : wifiDisconnectTimer(0) {
-    memset(wifiSsid, 0, sizeof(wifiSsid));
-    memset(wifiPass, 0, sizeof(wifiPass));
-    memset(currentHostname, 0, sizeof(currentHostname));
+WifiManager::WifiManager() : _wifiDisconnectTimer(0) {
+    memset(_wifiSsid, 0, sizeof(_wifiSsid));
+    memset(_wifiPass, 0, sizeof(_wifiPass));
+    memset(_currentHostname, 0, sizeof(_currentHostname));
     strlcpy(_defaultHostname, "esp32-device", sizeof(_defaultHostname));
-    strlcpy(myUrl, "http://0.0.0.0", sizeof(myUrl));
+    strlcpy(_myUrl, "http://0.0.0.0", sizeof(_myUrl));
 }
 
 WifiManager::~WifiManager() {
-    // std::unique_ptr automatically handles deallocation of dnsServer
+    // std::unique_ptr automatically handles deallocation of _dnsServer
 }
 
 /**
  * @brief transitionTo helper to log and reset timers.
  */
 void WifiManager::transitionTo(WiFiState newState) {
-    currentState = newState;
+    _currentState = newState;
 #ifndef NATIVE_BUILD
-    stateTimer = millis();
+    _stateTimer = millis();
 #endif
 }
 
@@ -127,17 +127,17 @@ void WifiManager::transitionTo(WiFiState newState) {
 void WifiManager::applyConfig(const JsonObject& section) {
     // --- Read SSID ---
     if (section["ssid"].is<const char*>()) {
-        strlcpy(wifiSsid, section["ssid"], sizeof(wifiSsid));
-        if (strlen(wifiSsid) > 0) {
-            ESP_LOGI(TAG, "Config applied — SSID: %s", wifiSsid);
+        strlcpy(_wifiSsid, section["ssid"], sizeof(_wifiSsid));
+        if (strlen(_wifiSsid) > 0) {
+            ESP_LOGI(TAG, "Config applied — SSID: %s", _wifiSsid);
         }
     }
 
     // --- Read hostname ---
     if (section["hostname"].is<const char*>()) {
-        strlcpy(currentHostname, section["hostname"], sizeof(currentHostname));
-        if (strlen(currentHostname) > 0) {
-            ESP_LOGI(TAG, "Config applied — Hostname: %s", currentHostname);
+        strlcpy(_currentHostname, section["hostname"], sizeof(_currentHostname));
+        if (strlen(_currentHostname) > 0) {
+            ESP_LOGI(TAG, "Config applied — Hostname: %s", _currentHostname);
         }
     }
 
@@ -145,7 +145,7 @@ void WifiManager::applyConfig(const JsonObject& section) {
     if (_keyManager != nullptr) {
         std::string storedPass = _keyManager->getKeyById("wifi_password");
         if (!storedPass.empty()) {
-            strlcpy(wifiPass, storedPass.c_str(), sizeof(wifiPass));
+            strlcpy(_wifiPass, storedPass.c_str(), sizeof(_wifiPass));
             ESP_LOGI(TAG, "Config applied — password retrieved from KeyManager");
         }
     } else {
@@ -162,8 +162,8 @@ void WifiManager::applyConfig(const JsonObject& section) {
  * @param section Mutable JSON object to write config into.
  */
 void WifiManager::serializeConfig(JsonObject& section) const {
-    section["ssid"] = wifiSsid;
-    section["hostname"] = currentHostname;
+    section["ssid"] = _wifiSsid;
+    section["hostname"] = _currentHostname;
     // Password deliberately excluded — managed by KeyManager
 }
 
@@ -174,9 +174,9 @@ void WifiManager::serializeConfig(JsonObject& section) const {
  * or the framework fallback "esp32-device" if the app never called it).
  */
 void WifiManager::resetConfig() {
-    memset(wifiSsid, 0, sizeof(wifiSsid));
-    memset(wifiPass, 0, sizeof(wifiPass));
-    strlcpy(currentHostname, _defaultHostname, sizeof(currentHostname));
+    memset(_wifiSsid, 0, sizeof(_wifiSsid));
+    memset(_wifiPass, 0, sizeof(_wifiPass));
+    strlcpy(_currentHostname, _defaultHostname, sizeof(_currentHostname));
 #ifndef NATIVE_BUILD
     WiFi.disconnect(true, true);
     esp_wifi_restore();
@@ -198,7 +198,7 @@ void WifiManager::begin() {
     // Config is already loaded by ConfigManager::beginAll() calling applyConfig()
 
 #ifndef NATIVE_BUILD
-    lastApiRequestTime = millis();
+    _lastApiRequestTime = millis();
     // Prepare for tick-based init
     WiFi.persistent(false);
     WiFi.disconnect(true, true);
@@ -206,7 +206,7 @@ void WifiManager::begin() {
 #endif
     
     transitionTo(WiFiState::Init);
-    ESP_LOGI(TAG, "WiFi Manager initialized in NON-BLOCKING mode. Hostname: %s", currentHostname);
+    ESP_LOGI(TAG, "WiFi Manager initialized in NON-BLOCKING mode. Hostname: %s", _currentHostname);
 }
 
 /**
@@ -223,21 +223,21 @@ void WifiManager::tick(uint32_t currentMillis) {
         return; // Unreachable, but makes intent clear
     }
 
-    switch (currentState) {
+    switch (_currentState) {
         case WiFiState::Init: {
-            unsigned long elapsed = currentMillis - stateTimer;
+            unsigned long elapsed = currentMillis - _stateTimer;
             if (elapsed > 2000) {
                 ESP_LOGI(TAG, "Init complete (waited %lums). SSID='%s' len=%d",
-                         elapsed, wifiSsid, (int)strlen(wifiSsid));
-                if (strlen(wifiSsid) > 0) {
-                    ESP_LOGI(TAG, "Connecting to %s...", wifiSsid);
+                         elapsed, _wifiSsid, (int)strlen(_wifiSsid));
+                if (strlen(_wifiSsid) > 0) {
+                    ESP_LOGI(TAG, "Connecting to %s...", _wifiSsid);
                     WiFi.mode(WIFI_STA);
                     WiFi.setSleep(WIFI_PS_NONE);
-                    if (strlen(currentHostname) > 0) {
-                        WiFi.setHostname(currentHostname);
+                    if (strlen(_currentHostname) > 0) {
+                        WiFi.setHostname(_currentHostname);
                     }
-                    WiFi.begin(wifiSsid, wifiPass);
-                    connectionRetries = 0;
+                    WiFi.begin(_wifiSsid, _wifiPass);
+                    _connectionRetries = 0;
                     transitionTo(WiFiState::StaConnecting);
                 } else {
                     ESP_LOGW(TAG, "No credentials found. Falling back to AP mode.");
@@ -250,11 +250,11 @@ void WifiManager::tick(uint32_t currentMillis) {
         case WiFiState::StaConnecting:
             if (WiFi.status() == WL_CONNECTED) {
                 ESP_LOGI(TAG, "Connected successfully. IP: %s", WiFi.localIP().toString().c_str());
-                isAPMode = false;
-                wifiDisconnectTimer = 0; // Reset downtime tracker
+                _isAPMode = false;
+                _wifiDisconnectTimer = 0; // Reset downtime tracker
                 updateMyUrl();
                 transitionTo(WiFiState::Ready);
-            } else if (currentMillis - stateTimer > 15000) { // 15 second timeout for STA
+            } else if (currentMillis - _stateTimer > 15000) { // 15 second timeout for STA
                 ESP_LOGW(TAG, "WiFi connection timed out. Falling back to AP.");
                 WiFi.disconnect(true); // Ensure clean slate
                 transitionTo(WiFiState::ApStarting);
@@ -263,22 +263,22 @@ void WifiManager::tick(uint32_t currentMillis) {
 
         case WiFiState::ApStarting:
             ESP_LOGI(TAG, "Starting Access Point setup (Captive Portal)...");
-            isAPMode = true;
+            _isAPMode = true;
             WiFi.mode(WIFI_AP);
             
             {
                 IPAddress apIP(192, 168, 4, 1);
                 WiFi.softAPConfig(apIP, apIP, IPAddress(255, 255, 255, 0));
                 
-                const char* portalName = (strlen(currentHostname) > 0) ? currentHostname : "ESP32-Setup";
+                const char* portalName = (strlen(_currentHostname) > 0) ? _currentHostname : "ESP32-Setup";
                 bool apResult = WiFi.softAP(portalName);
                 ESP_LOGI(TAG, "softAP('%s') returned %s", portalName, apResult ? "true" : "FALSE");
                 
                 // Start DNS Hijacker
-                dnsServer = std::make_unique<DNSServer>();
-                dnsServer->start(53, "*", apIP);
+                _dnsServer = std::make_unique<DNSServer>();
+                _dnsServer->start(53, "*", apIP);
                 ESP_LOGI(TAG, "Access Point '%s' is online. IP: %s", portalName, apIP.toString().c_str());
-                lastApiRequestTime = currentMillis; // Reset AP timeout timer
+                _lastApiRequestTime = currentMillis; // Reset AP timeout timer
             }
             
             transitionTo(WiFiState::Ready);
@@ -289,13 +289,13 @@ void WifiManager::tick(uint32_t currentMillis) {
             if (_reconnectRequested) {
                 _reconnectRequested = false;
                 ESP_LOGI(TAG, "Executing deferred reconnect with new credentials...");
-                if (isAPMode) {
-                    if (dnsServer) {
-                        dnsServer->stop();
-                        dnsServer.reset();
+                if (_isAPMode) {
+                    if (_dnsServer) {
+                        _dnsServer->stop();
+                        _dnsServer.reset();
                     }
                     WiFi.softAPdisconnect(true);
-                    isAPMode = false;
+                    _isAPMode = false;
                 }
                 WiFi.disconnect(true);
                 WiFi.mode(WIFI_OFF);
@@ -307,40 +307,40 @@ void WifiManager::tick(uint32_t currentMillis) {
             processDNS();
             
             // Reconnection logic: If we're in STA mode and lost connection
-            if (!isAPMode && WiFi.status() != WL_CONNECTED) {
+            if (!_isAPMode && WiFi.status() != WL_CONNECTED) {
                 // If this is the first tick since disconnection, start the timer
-                if (wifiDisconnectTimer == 0) {
-                    wifiDisconnectTimer = currentMillis;
+                if (_wifiDisconnectTimer == 0) {
+                    _wifiDisconnectTimer = currentMillis;
                 }
 
                 // Wait 10 seconds before attempting to recycle the connection
-                if (currentMillis - stateTimer > 10000) {
+                if (currentMillis - _stateTimer > 10000) {
                     ESP_LOGW(TAG, "Primary connection lost. Retrying...");
                     transitionTo(WiFiState::Init);
                 }
-            } else if (isAPMode) {
+            } else if (_isAPMode) {
                 // AP Mode 1-hour inactivity timeout (pragmatic interim; see WO10 notes)
-                if (currentMillis - lastApiRequestTime > 3600000) {
+                if (currentMillis - _lastApiRequestTime > 3600000) {
                     ESP_LOGW(TAG, "AP Mode inactive for 1 hour. Shutting down AP to save power.");
                     transitionTo(WiFiState::Shutdown);
                 }
             } else {
                 // Reset timer if we are connected or in AP mode
-                stateTimer = currentMillis;
+                _stateTimer = currentMillis;
                 if (WiFi.status() == WL_CONNECTED) {
-                    wifiDisconnectTimer = 0;
+                    _wifiDisconnectTimer = 0;
                 }
             }
             break;
 
         case WiFiState::Shutdown:
-            if (isAPMode) {
-                isAPMode = false;
+            if (_isAPMode) {
+                _isAPMode = false;
                 WiFi.softAPdisconnect(true);
                 WiFi.mode(WIFI_OFF);
-                if (dnsServer != nullptr) {
-                    dnsServer->stop();
-                    dnsServer.reset();
+                if (_dnsServer != nullptr) {
+                    _dnsServer->stop();
+                    _dnsServer.reset();
                 }
                 ESP_LOGI(TAG, "WiFi AP has been shut down.");
             }
@@ -354,8 +354,8 @@ void WifiManager::tick(uint32_t currentMillis) {
  */
 void WifiManager::processDNS() {
 #ifndef NATIVE_BUILD
-    if (isAPMode && dnsServer != nullptr) {
-        dnsServer->processNextRequest();
+    if (_isAPMode && _dnsServer != nullptr) {
+        _dnsServer->processNextRequest();
     }
 #endif
 }
@@ -365,7 +365,7 @@ void WifiManager::processDNS() {
  */
 void WifiManager::notifyApiActivity() {
 #ifndef NATIVE_BUILD
-    lastApiRequestTime = millis();
+    _lastApiRequestTime = millis();
 #endif
 }
 
@@ -456,12 +456,12 @@ esp_err_t WifiManager::handleStatus(PsychicRequest* request, PsychicResponse* re
     doc["mac"]        = WiFi.macAddress();
 
     // --- STA-mode specific fields ---
-    if (!isAPMode && WiFi.status() == WL_CONNECTED) {
+    if (!_isAPMode && WiFi.status() == WL_CONNECTED) {
         doc["mode"]    = "STA";
         doc["rssi"]    = WiFi.RSSI();
         doc["channel"] = WiFi.channel();
         doc["gateway"] = WiFi.gatewayIP().toString();
-    } else if (isAPMode) {
+    } else if (_isAPMode) {
         doc["mode"]    = "AP";
         doc["ip"]      = WiFi.softAPIP().toString();
         doc["channel"] = 1; // Default AP channel
@@ -708,8 +708,8 @@ esp_err_t WifiManager::handleForget(PsychicRequest* request, PsychicResponse* re
     ESP_LOGW(TAG, "Forget WiFi requested — erasing credentials...");
 
     // --- Clear in-memory credentials ---
-    memset(wifiSsid, 0, sizeof(wifiSsid));
-    memset(wifiPass, 0, sizeof(wifiPass));
+    memset(_wifiSsid, 0, sizeof(_wifiSsid));
+    memset(_wifiPass, 0, sizeof(_wifiPass));
 
     // --- Delete encrypted password from KeyManager ---
     if (_keyManager != nullptr) {
@@ -756,10 +756,10 @@ void WifiManager::scheduleRestart() {
  * handler (AsyncWebServer runs on the same connection being torn down).
  */
 void WifiManager::updateWiFi(const char* ssid, const char* pass) {
-    if (ssid != nullptr) strlcpy(wifiSsid, ssid, sizeof(wifiSsid));
+    if (ssid != nullptr) strlcpy(_wifiSsid, ssid, sizeof(_wifiSsid));
     if (pass != nullptr && strlen(pass) > 0) {
-        strlcpy(wifiPass, pass, sizeof(wifiPass));
-        Logger::registerSecret(std::string(wifiPass));
+        strlcpy(_wifiPass, pass, sizeof(_wifiPass));
+        Logger::registerSecret(std::string(_wifiPass));
 
         // Persist password via KeyManager (AES-256 encrypted)
         if (_keyManager != nullptr) {
@@ -794,10 +794,10 @@ bool WifiManager::testConnection(const char* ssid, const char* pass, std::string
     const char* realPass = pass;
     if (pass != nullptr && strlen(pass) == 0) {
         ESP_LOGI(TAG, "WIFI_TEST: Using stored credentials for test.");
-        realPass = wifiPass;
+        realPass = _wifiPass;
     }
 
-    if (WiFi.status() == WL_CONNECTED && strcmp(WiFi.SSID().c_str(), ssid) == 0 && strcmp(realPass, wifiPass) == 0) {
+    if (WiFi.status() == WL_CONNECTED && strcmp(WiFi.SSID().c_str(), ssid) == 0 && strcmp(realPass, _wifiPass) == 0) {
         ipOut = WiFi.localIP().toString().c_str();
         ESP_LOGI(TAG, "WIFI_TEST: Already connected to this network. IP: %s", ipOut.c_str());
         return true;
@@ -820,10 +820,10 @@ bool WifiManager::testConnection(const char* ssid, const char* pass, std::string
         return true;
     } else {
         ESP_LOGW(TAG, "WIFI_TEST: Failed. Reconnecting to primary credentials.");
-        if (strlen(wifiSsid) > 0) {
+        if (strlen(_wifiSsid) > 0) {
             WiFi.disconnect(true);
             delay(100);
-            WiFi.begin(wifiSsid, wifiPass);
+            WiFi.begin(_wifiSsid, _wifiPass);
         }
         return false;
     }
@@ -839,7 +839,7 @@ bool WifiManager::testConnection(const char* ssid, const char* pass, std::string
 void WifiManager::updateMyUrl() {
 #ifndef NATIVE_BUILD
     IPAddress ip = WiFi.localIP();
-    snprintf(myUrl, sizeof(myUrl), "http://%u.%u.%u.%u", ip[0], ip[1], ip[2], ip[3]);
+    snprintf(_myUrl, sizeof(_myUrl), "http://%u.%u.%u.%u", ip[0], ip[1], ip[2], ip[3]);
 #endif
 }
 
@@ -848,11 +848,11 @@ void WifiManager::updateMyUrl() {
  */
 bool WifiManager::isWifiPersistentError() const {
 #ifndef NATIVE_BUILD
-    if (isAPMode || (WiFi.status() == WL_CONNECTED)) return false;
-    if (wifiDisconnectTimer == 0) return false;
+    if (_isAPMode || (WiFi.status() == WL_CONNECTED)) return false;
+    if (_wifiDisconnectTimer == 0) return false;
     
     // Over 3 minutes of continuous disconnection
-    return (millis() - wifiDisconnectTimer > 180000);
+    return (millis() - _wifiDisconnectTimer > 180000);
 #else
     return false;
 #endif

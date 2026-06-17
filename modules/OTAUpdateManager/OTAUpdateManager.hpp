@@ -392,16 +392,16 @@ private:
     // -------------------------------------------------------------------------
     // Legacy state
     // -------------------------------------------------------------------------
-    size_t expectedSize_ = 0;  // Tracks the total expected size for direct uploads
+    size_t _expectedSize = 0;  // Tracks the total expected size for direct uploads
 
     // -------------------------------------------------------------------------
     // Signed web-upload state (per-request, reset at upload start)
     // -------------------------------------------------------------------------
-    uint8_t  uploadSigBuf_[512] = {};   ///< Buffer for the .sig bytes from multipart upload
-    size_t   uploadSigLen_   = 0;        ///< Number of valid bytes in uploadSigBuf_
-    size_t   uploadBinSize_  = 0;        ///< Total firmware bytes received so far
-    bool     uploadAborted_  = false;    ///< Set true when a security check fails mid-upload
-    MbedTLSSignatureVerifier* uploadVerifier_ = nullptr; ///< Heap-allocated per upload, freed after use
+    uint8_t  _uploadSigBuf[512] = {};   ///< Buffer for the .sig bytes from multipart upload
+    size_t   _uploadSigLen   = 0;        ///< Number of valid bytes in _uploadSigBuf
+    size_t   _uploadBinSize  = 0;        ///< Total firmware bytes received so far
+    bool     _uploadAborted  = false;    ///< Set true when a security check fails mid-upload
+    MbedTLSSignatureVerifier* _uploadVerifier = nullptr; ///< Heap-allocated per upload, freed after use
 
     // -------------------------------------------------------------------------
     // Narrow stored refs — Transient Service Locator (ADR-39)
@@ -414,14 +414,14 @@ private:
     // -------------------------------------------------------------------------
     // Orchestrator state
     // -------------------------------------------------------------------------
-    OTAState      state_        = OTAState::Idle;      // Current state machine state
-    const char*   lastOtaError_ = nullptr;             // Last error string from download engine
-    float         lastProgress_ = 0.0f;                // Last progress fraction for API polling
+    OTAState      _state        = OTAState::Idle;      // Current state machine state
+    const char*   _lastOtaError = nullptr;             // Last error string from download engine
+    float         _lastProgress = 0.0f;                // Last progress fraction for API polling
 
 #ifndef NATIVE_BUILD
-    TaskHandle_t  taskHandle_   = nullptr;             // FreeRTOS task handle for download
+    TaskHandle_t  _taskHandle   = nullptr;             // FreeRTOS task handle for download
 #else
-    void*         taskHandle_   = nullptr;             // Stub for native builds
+    void*         _taskHandle   = nullptr;             // Stub for native builds
 #endif
 
     // -------------------------------------------------------------------------

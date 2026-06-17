@@ -123,17 +123,17 @@ private:
         Shutdown          // Explicitly disabled
     };
 
-    char wifiSsid[33];
-    char wifiPass[65];
-    char currentHostname[33];
+    char _wifiSsid[33];
+    char _wifiPass[65];
+    char _currentHostname[33];
     char _defaultHostname[33];               ///< App-supplied factory default hostname (set via setDefaultHostname)
-    bool isAPMode = false;
-    WiFiState currentState = WiFiState::Init;
-    unsigned long stateTimer = 0;
-    int connectionRetries = 0;
-    unsigned long wifiDisconnectTimer = 0; ///< Continuous downtime counter (ms)
-    char myUrl[24];                        ///< Formatted string URL for local IP
-    unsigned long lastApiRequestTime = 0;  ///< Last time an API request was received
+    bool _isAPMode = false;
+    WiFiState _currentState = WiFiState::Init;
+    unsigned long _stateTimer = 0;
+    int _connectionRetries = 0;
+    unsigned long _wifiDisconnectTimer = 0; ///< Continuous downtime counter (ms)
+    char _myUrl[24];                        ///< Formatted string URL for local IP
+    unsigned long _lastApiRequestTime = 0;  ///< Last time an API request was received
 
     bool _reconnectRequested = false;        ///< Deferred reconnect flag (set by updateWiFi, acted on by tick)
     bool _restartRequested = false;          ///< Deferred restart flag (set by connect/forget, acted on by tick)
@@ -141,7 +141,7 @@ private:
     ConfigManager* _configManager = nullptr; ///< Pointer to ConfigManager for save operations
     KeyManager* _keyManager = nullptr;       ///< Pointer to KeyManager for encrypted password storage
 
-    std::unique_ptr<DNSServer> dnsServer;
+    std::unique_ptr<DNSServer> _dnsServer;
 
     void transitionTo(WiFiState newState);
     void processDNS();
@@ -299,7 +299,7 @@ public:
      * @brief Returns the current effective hostname (persisted value or factory default).
      * @return Current hostname string.
      */
-    const char* getHostname() const { return currentHostname; }
+    const char* getHostname() const { return _currentHostname; }
 
     /**
      * @brief Record that an API request was received to keep AP mode alive.
@@ -323,25 +323,25 @@ public:
      * @brief Returns true if currently operating in Setup/AP Mode.
      * @return true if AP mode is active
      */
-    bool getAPMode() const { return isAPMode; }
+    bool getAPMode() const { return _isAPMode; }
 
     /**
      * @brief Returns true if WiFi is ready (either STA connected or AP active).
      * @return true if ready
      */
-    bool isReady() const { return currentState == WiFiState::Ready; }
+    bool isReady() const { return _currentState == WiFiState::Ready; }
 
     /**
      * @brief Returns the current stored SSID.
      * @return current SSID
      */
-    const char* getSSID() const { return wifiSsid; }
+    const char* getSSID() const { return _wifiSsid; }
 
     /**
      * @brief Returns true if a password is set.
      * @return true if a password exists
      */
-    bool hasPassword() const { return strlen(wifiPass) > 0; }
+    bool hasPassword() const { return strlen(_wifiPass) > 0; }
 
     /**
      * @brief Test a WiFi connection without permanently changing stored credentials.
@@ -361,7 +361,7 @@ public:
      * @brief Returns the internal URL string for the Web GUI.
      * @return Formatted URL
      */
-    const char* getMyUrl() const { return myUrl; }
+    const char* getMyUrl() const { return _myUrl; }
 
     /**
      * @brief Returns true if WiFi has been disconnected for a prolonged period
