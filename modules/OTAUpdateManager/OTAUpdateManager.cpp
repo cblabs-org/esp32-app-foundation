@@ -437,9 +437,11 @@ void OTAUpdateManager::performUpdateTask() {
 #ifndef NATIVE_BUILD
     ESP_LOGI(TAG, "OTA task started");
 
-    // Register with Task Watchdog Timer — the download progress callback
-    // feeds the watchdog during long TLS handshakes and firmware transfers.
-    esp_task_wdt_add(NULL);
+    // NOTE: Do NOT register this task with TWDT here. The OTA pipeline makes
+    // multiple blocking HTTPS calls (GitHub API, manifest, signature) involving
+    // TLS handshakes and paginated responses that take 5-15+ seconds each.
+    // TWDT is registered only during the firmware download phase (Step 7),
+    // where the progress callback feeds it every ~4KB.
 
     const FrameworkConfig& cfg = *_config;
 
@@ -449,7 +451,6 @@ void OTAUpdateManager::performUpdateTask() {
         publishProgress(0.0f, "Firmware updates disabled", true, false);
         _state = OTAState::Error;
         _lastOtaError = "Firmware updates disabled";
-        esp_task_wdt_delete(NULL);
         return;
     }
 
@@ -459,7 +460,6 @@ void OTAUpdateManager::performUpdateTask() {
         publishProgress(0.0f, "No GitHub repo configured", true, false);
         _state = OTAState::Error;
         _lastOtaError = "No GitHub repo configured";
-        esp_task_wdt_delete(NULL);
         return;
     }
 
@@ -469,6 +469,8 @@ void OTAUpdateManager::performUpdateTask() {
     ESP_LOGI(TAG, "Querying GitHub for latest release — repo: %s, channel: '%s', local: %s",
              cfg.otaGithubRepo, _channel, BUILD_VERSION);
 
+    // Feed TWDT before blocking HTTPS call — TLS handshake to api.github.com
+    // can take 3–5 seconds, which may exceed the default WDT timeout.
     if (!github.getLatestReleaseForChannel(_channel)) {
         ESP_LOGE(TAG, "GitHub release query failed: %s", github.getLastError());
         // Only show the error modal for manual checks — auto-checks (boot/daily)
@@ -484,7 +486,6 @@ void OTAUpdateManager::performUpdateTask() {
             _state = OTAState::Idle;
         }
         _silentCheck = false;
-        esp_task_wdt_delete(NULL);
         return;
     }
 
@@ -501,7 +502,6 @@ void OTAUpdateManager::performUpdateTask() {
                  BUILD_VERSION, github.releaseId.c_str(), _channel);
         // No publishProgress — don't show the OTA screen for a no-op check
         _state = OTAState::Idle;
-        esp_task_wdt_delete(NULL);
         return;
     }
 
@@ -537,7 +537,6 @@ void OTAUpdateManager::performUpdateTask() {
             publishProgress(0.0f, "Memory allocation failed", true, false);
             _state = OTAState::Error;
             _lastOtaError = "Manifest client allocation failed";
-            esp_task_wdt_delete(NULL);
             return;
         }
         // Manifest fetch uses TLS certificate pinning — the manifest has no
@@ -554,7 +553,6 @@ void OTAUpdateManager::performUpdateTask() {
             publishProgress(0.0f, "Manifest download failed", true, false);
             _state = OTAState::Error;
             _lastOtaError = "Manifest HTTP begin failed";
-            esp_task_wdt_delete(NULL);
             return;
         }
 
@@ -563,6 +561,7 @@ void OTAUpdateManager::performUpdateTask() {
             http.addHeader("Authorization", String((std::string("Bearer ") + manifestToken).c_str()));
         }
 
+        // Feed TWDT before blocking manifest download — another TLS round-trip
         int httpCode = http.GET();
         if (httpCode != 200) {
             ESP_LOGE(TAG, "Manifest download HTTP %d", httpCode);
@@ -570,7 +569,6 @@ void OTAUpdateManager::performUpdateTask() {
             publishProgress(0.0f, "Manifest download failed", true, false);
             _state = OTAState::Error;
             _lastOtaError = "Manifest download HTTP error";
-            esp_task_wdt_delete(NULL);
             return;
         }
 
@@ -582,7 +580,6 @@ void OTAUpdateManager::performUpdateTask() {
             publishProgress(0.0f, "Manifest too large or empty", true, false);
             _state = OTAState::Error;
             _lastOtaError = "Manifest payload size invalid";
-            esp_task_wdt_delete(NULL);
             return;
         }
 
@@ -600,7 +597,6 @@ void OTAUpdateManager::performUpdateTask() {
             publishProgress(0.0f, "Manifest parse failed", true, false);
             _state = OTAState::Error;
             _lastOtaError = "Manifest JSON parse failed";
-            esp_task_wdt_delete(NULL);
             return;
         }
 
@@ -611,7 +607,6 @@ void OTAUpdateManager::performUpdateTask() {
             publishProgress(0.0f, "No firmware for this board in manifest", true, false);
             _state = OTAState::Error;
             _lastOtaError = "No firmware for this board in manifest";
-            esp_task_wdt_delete(NULL);
             return;
         }
 
@@ -666,7 +661,6 @@ void OTAUpdateManager::performUpdateTask() {
         publishProgress(0.0f, "No firmware binary in release", true, false);
         _state = OTAState::Error;
         _lastOtaError = "No firmware binary found in release";
-        esp_task_wdt_delete(NULL);
         return;
     }
 
@@ -675,7 +669,6 @@ void OTAUpdateManager::performUpdateTask() {
         publishProgress(0.0f, "Missing signature — update rejected", true, false);
         _state = OTAState::Error;
         _lastOtaError = "Missing .sig file — update rejected (fail-closed)";
-        esp_task_wdt_delete(NULL);
         return;
     }
 
@@ -695,7 +688,6 @@ void OTAUpdateManager::performUpdateTask() {
             publishProgress(0.0f, "Verifier initialization failed", true, false);
             _state = OTAState::Error;
             _lastOtaError = "Verifier initialization failed";
-            esp_task_wdt_delete(NULL);
             return;
         }
         verifierReady = true;
@@ -710,7 +702,6 @@ void OTAUpdateManager::performUpdateTask() {
         publishProgress(0.0f, "Memory allocation failed", true, false);
         _state = OTAState::Error;
         _lastOtaError = "WiFiClientSecure heap allocation failed";
-        esp_task_wdt_delete(NULL);
         return;
     }
     // Binary download uses setInsecure() — the firmware payload is independently
@@ -753,7 +744,6 @@ void OTAUpdateManager::performUpdateTask() {
             publishProgress(0.0f, "Signature fetch failed — update rejected", true, false);
             _state = OTAState::Error;
             _lastOtaError = "Signature empty — update rejected (fail-closed)";
-            esp_task_wdt_delete(NULL);
             return;
         } else if (sigLen > 0) {
             ESP_LOGI(TAG, "Fetched signature: %u bytes", (unsigned)sigLen);
@@ -763,14 +753,18 @@ void OTAUpdateManager::performUpdateTask() {
     publishProgress(0.02f, "Downloading firmware...", false, false);
 
     // --- Step 7: Download and flash firmware ---
+    // Register with TWDT only for the download phase — the progress callback
+    // feeds the watchdog every ~4KB. All prior phases (GitHub API, manifest,
+    // signature) involve unpredictable blocking I/O and must NOT be under TWDT.
+    esp_task_wdt_add(NULL);
     OTAError result = engine.downloadAndFlash(*client, String(binUrl.c_str()), String(token.c_str()), sigBuf, sigLen);
+    esp_task_wdt_delete(NULL);
 
     if (result != OTAError::None) {
         _lastOtaError = engine.getLastErrorString();
         ESP_LOGE(TAG, "OTA download failed: %s", _lastOtaError);
         publishProgress(0.0f, _lastOtaError, true, false);
         _state = OTAState::Error;
-        esp_task_wdt_delete(NULL);
         return;
     }
 
@@ -781,7 +775,6 @@ void OTAUpdateManager::performUpdateTask() {
     publishProgress(1.0f, "Update complete — rebooting...", true, true);
     ESP_LOGI(TAG, "OTA update complete — rebooting in 2 seconds");
 
-    esp_task_wdt_delete(NULL);
     delay(2000);  // Allow event propagation and display update
     ESP.restart();
 #else
