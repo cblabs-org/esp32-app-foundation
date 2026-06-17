@@ -98,16 +98,18 @@ void MCPServer::tick() {
 #ifndef NATIVE_BUILD
     // --- Hardware: read characters from Serial until newline ---
     static constexpr int kMaxBytesPerTick = 2048;
+    static constexpr size_t kMaxInputLen = 8192;
     int bytesRead = 0;
     while (Serial.available() && bytesRead < kMaxBytesPerTick) {
         char c = Serial.read();
         bytesRead++;
         if (c == '\n') {
             _processLine(_inputBuffer.c_str());
-            _inputBuffer = "";
-        } else {
+            _inputBuffer.clear();
+        } else if (_inputBuffer.size() < kMaxInputLen) {
             _inputBuffer += c;
         }
+        // else: silently drop characters beyond kMaxInputLen
     }
 #endif
     // Native: no-op — tests call processLineForTest() or _processLine() directly
