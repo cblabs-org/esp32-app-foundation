@@ -191,12 +191,14 @@ void OTAUpdateManager::resetConfig() {
 /**
  * @brief Initialize the OTA manager with dependencies from the Application.
  *
- * Stores the Application reference for later access to EventBus, config,
- * and other framework services.
+ * Extracts narrow references to the 3 services this module actually uses,
+ * then discards the Application reference (Transient Service Locator, ADR-39).
  */
 void OTAUpdateManager::begin(Application& app) {
-    app_ = &app;
-    ESP_LOGI(TAG, "OTA manager initialized with Application reference");
+    _config        = &app.getConfig();
+    _configManager = &app.getConfigManager();
+    _eventBus      = &app.getEventBus();
+    ESP_LOGI(TAG, "OTA manager initialized (narrow refs extracted)");
 }
 
 /**
@@ -259,7 +261,7 @@ void OTAUpdateManager::tick(uint32_t currentMillis) {
  */
 bool OTAUpdateManager::checkForUpdate() {
     // Guard: must be initialized
-    if (app_ == nullptr) {
+    if (_config == nullptr) {
         ESP_LOGE(TAG, "checkForUpdate() called before begin() — returning false");
         return false;
     }
@@ -271,7 +273,7 @@ bool OTAUpdateManager::checkForUpdate() {
     }
 
     // Guard: must have a configured GitHub repo
-    if (app_->getConfig().otaGithubRepo == nullptr) {
+    if (_config->otaGithubRepo == nullptr) {
         ESP_LOGW(TAG, "checkForUpdate() — no otaGithubRepo configured — returning false");
         return false;
     }
@@ -281,7 +283,7 @@ bool OTAUpdateManager::checkForUpdate() {
 
 #ifndef NATIVE_BUILD
     // Create GithubClient with repo and optional token from config
-    const FrameworkConfig& cfg = app_->getConfig();
+    const FrameworkConfig& cfg = *_config;
     GithubClient github(cfg.otaGithubRepo,
                         cfg.otaGithubToken ? cfg.otaGithubToken : "");
 
@@ -315,8 +317,8 @@ bool OTAUpdateManager::checkForUpdate() {
                  _lastCheckedChannel, _channel);
         strlcpy(_lastCheckedChannel, _channel, sizeof(_lastCheckedChannel));
         // Save the channel change to config
-        if (app_ != nullptr) {
-            app_->getConfigManager().saveModuleConfig(this);
+        if (_configManager != nullptr) {
+            _configManager->saveModuleConfig(this);
         }
         state_ = OTAState::Idle;
         return true;  // Signal update available even if remote <= local
@@ -345,7 +347,7 @@ bool OTAUpdateManager::checkForUpdate() {
  */
 void OTAUpdateManager::performUpdate() {
     // Guard: must be initialized
-    if (app_ == nullptr) {
+    if (_config == nullptr) {
         ESP_LOGE(TAG, "performUpdate() called before begin()");
         state_ = OTAState::Error;
         lastOtaError_ = "OTA manager not initialized";
@@ -438,7 +440,7 @@ void OTAUpdateManager::performUpdateTask() {
     // feeds the watchdog during long TLS handshakes and firmware transfers.
     esp_task_wdt_add(NULL);
 
-    const FrameworkConfig& cfg = app_->getConfig();
+    const FrameworkConfig& cfg = *_config;
 
     // --- Guard: firmware updates must be enabled (persisted OTA config) ---
     if (!_updatesEnabled) {
@@ -674,8 +676,8 @@ void OTAUpdateManager::performUpdateTask() {
     }
 
     // --- Snapshot config manifest: Active → Previous before download ---
-    app_->getConfigManager().getManifest().snapshotActiveToPrevious();
-    app_->getConfigManager().getManifest().save();
+    _configManager->getManifest().snapshotActiveToPrevious();
+    _configManager->getManifest().save();
     ESP_LOGI(TAG, "Config manifest: Active → Previous snapshot saved");
 
     // --- Step 3: Initialize the verifier (if public key configured) ---
@@ -801,8 +803,8 @@ void OTAUpdateManager::publishProgress(float progress, const char* status,
     event.success  = success;
 
 #ifndef NATIVE_BUILD
-    if (app_ != nullptr) {
-        app_->getEventBus().publish(OTAUpdateManagerEvents::OTA_PROGRESS, &event);
+    if (_eventBus != nullptr) {
+        _eventBus->publish(OTAUpdateManagerEvents::OTA_PROGRESS, &event);
     }
 #endif
     ESP_LOGD(TAG, "OTA progress: %.1f%% — %s (complete=%d, success=%d)",
@@ -897,9 +899,9 @@ void OTAUpdateManager::markAppValid() {
     esp_ota_mark_app_valid_cancel_rollback();
 #endif
     // Snapshot config manifest: Active → Golden after firmware blessing
-    if (app_ != nullptr) {
-        app_->getConfigManager().getManifest().snapshotActiveToGolden();
-        app_->getConfigManager().getManifest().save();
+    if (_configManager != nullptr) {
+        _configManager->getManifest().snapshotActiveToGolden();
+        _configManager->getManifest().save();
         ESP_LOGI(TAG, "Config manifest: Active → Golden snapshot saved (firmware blessed)");
     }
 #endif
@@ -990,12 +992,12 @@ esp_err_t OTAUpdateManager::handleSignedUpload(PsychicRequest* request,
                                           uint64_t index, uint8_t* data,
                                           size_t len, bool final) {
 #ifndef NATIVE_BUILD
-    if (app_ == nullptr) {
-        ESP_LOGE(TAG, "Signed upload: app_ is null — module not initialized");
+    if (_config == nullptr) {
+        ESP_LOGE(TAG, "Signed upload: module not initialized (begin() not called)");
         request->response()->send(500, "application/json", "{\"status\":\"error\",\"msg\":\"OTA module not initialized\"}");
         return ESP_FAIL;
     }
-    const FrameworkConfig& cfg = app_->getConfig();
+    const FrameworkConfig& cfg = *_config;
 
     // ---- Signature field: collect bytes into uploadSigBuf_ ----
     if (filename == "signature") {
@@ -1188,8 +1190,8 @@ void OTAUpdateManager::registerRoutes(PsychicHttpServer& server) {
                     const char* ch = doc["channel"] | "";
                     if (strlen(ch) > 0 && strlen(ch) < sizeof(this->_channel)) {
                         strlcpy(this->_channel, ch, sizeof(this->_channel));
-                        if (this->app_ != nullptr) {
-                            this->app_->getConfigManager().saveModuleConfig(this);
+                        if (_configManager != nullptr) {
+                            _configManager->saveModuleConfig(this);
                         }
                         ESP_LOGI(TAG, "Channel changed to: %s", this->_channel);
                         response->send(200, "application/json", "{\"status\":\"ok\"}");
@@ -1200,8 +1202,8 @@ void OTAUpdateManager::registerRoutes(PsychicHttpServer& server) {
                 } else if (strcmp(action, "setAutoCheck") == 0) {
                     if (doc["autoCheck"].is<bool>()) {
                         this->_autoCheck = doc["autoCheck"].as<bool>();
-                        if (this->app_ != nullptr) {
-                            this->app_->getConfigManager().saveModuleConfig(this);
+                        if (_configManager != nullptr) {
+                            _configManager->saveModuleConfig(this);
                         }
                         ESP_LOGI(TAG, "Auto-check changed to: %d", (int)this->_autoCheck);
                         response->send(200, "application/json", "{\"status\":\"ok\"}");
@@ -1212,8 +1214,8 @@ void OTAUpdateManager::registerRoutes(PsychicHttpServer& server) {
                 } else if (strcmp(action, "setUpdatesEnabled") == 0) {
                     if (doc["updatesEnabled"].is<bool>()) {
                         this->_updatesEnabled = doc["updatesEnabled"].as<bool>();
-                        if (this->app_ != nullptr) {
-                            this->app_->getConfigManager().saveModuleConfig(this);
+                        if (_configManager != nullptr) {
+                            _configManager->saveModuleConfig(this);
                         }
                         ESP_LOGI(TAG, "Updates-enabled changed to: %d", (int)this->_updatesEnabled);
                         response->send(200, "application/json", "{\"status\":\"ok\"}");
@@ -1226,8 +1228,8 @@ void OTAUpdateManager::registerRoutes(PsychicHttpServer& server) {
                         int h = doc["checkHour"].as<int>();
                         if (h >= 0 && h <= 23) {
                             this->_checkHour = static_cast<uint8_t>(h);
-                            if (this->app_ != nullptr) {
-                                this->app_->getConfigManager().saveModuleConfig(this);
+                            if (_configManager != nullptr) {
+                                _configManager->saveModuleConfig(this);
                             }
                             ESP_LOGI(TAG, "Check hour changed to: %u", (unsigned)this->_checkHour);
                             response->send(200, "application/json", "{\"status\":\"ok\"}");

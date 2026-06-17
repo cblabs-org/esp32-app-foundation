@@ -8,7 +8,7 @@
  *
  * Module: test/test_unit/test_u8g2Display/test_widgets_primitives.cpp
  * Description: GoogleTest unit-test suite for the widget primitives layer:
- *              IGfxWidget, IBoardLayout, TextAlign, and AppFonts. Validates
+ *              IGfxWidget, TextAlign, and AppFonts. Validates
  *              construction, visibility, geometry, and enum value contracts.
  *              All tests execute on the native GoogleTest runner (NATIVE_BUILD).
  *
@@ -19,7 +19,6 @@
 #include <gtest/gtest.h>
 #include "widgets/IGfxWidget.hpp"
 #include "widgets/DrawingPrimitives.hpp"
-#include "boards/interfaces/IBoardLayout.hpp"
 #include "fonts/Fonts.hpp"
 
 // =============================================================================
@@ -33,18 +32,6 @@
 class TestWidget : public IGfxWidget {
 public:
     using IGfxWidget::IGfxWidget; // Inherit constructors
-
-    void tick(uint32_t /*currentMillis*/) override {}
-    void render(U8G2& /*display*/) override {}
-};
-
-/**
- * @brief Minimal concrete layout for testing IBoardLayout's non-virtual API.
- *        tick() and render() are trivial no-ops.
- */
-class TestLayout : public IBoardLayout {
-public:
-    using IBoardLayout::IBoardLayout; // Inherit constructors
 
     void tick(uint32_t /*currentMillis*/) override {}
     void render(U8G2& /*display*/) override {}
@@ -116,25 +103,8 @@ TEST_F(IGfxWidgetTest, RenderAnimationUpdate_DefaultNoOp_DoesNotCrash) {
 }
 
 // =============================================================================
-// Test Group: IBoardLayout
+// Test Group: IBoardLayout (REMOVED — IBoardLayout deleted per ADR-39/WO7)
 // =============================================================================
-
-class IBoardLayoutTest : public ::testing::Test {
-protected:
-    TestLayout layout{nullptr}; ///< Layout with nullptr Application (valid in tests)
-};
-
-/** A concrete layout subclass can be instantiated with nullptr Application. */
-TEST_F(IBoardLayoutTest, Construction_WithNullApp_DoesNotCrash) {
-    EXPECT_NO_FATAL_FAILURE(TestLayout testLayout(nullptr));
-}
-
-/** renderAnimationUpdate default no-op must be callable without crashing. */
-TEST_F(IBoardLayoutTest, RenderAnimationUpdate_DefaultNoOp_DoesNotCrash) {
-    U8G2* nullDisplay = nullptr;
-    // The default implementation is an empty body — should not dereference display
-    EXPECT_NO_FATAL_FAILURE(layout.renderAnimationUpdate(*nullDisplay, 0));
-}
 
 // =============================================================================
 // Test Group: TextAlign Enum

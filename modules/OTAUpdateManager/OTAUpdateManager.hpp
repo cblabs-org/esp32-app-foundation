@@ -98,6 +98,8 @@ class Stream {};
 // Forward declarations — Hollywood Principle: never include other module headers
 // ---------------------------------------------------------------------------
 class Application;
+struct FrameworkConfig;
+class ConfigManager;
 class EventBus;
 class GithubClient;
 class OTADownloadEngine;
@@ -402,9 +404,16 @@ private:
     MbedTLSSignatureVerifier* uploadVerifier_ = nullptr; ///< Heap-allocated per upload, freed after use
 
     // -------------------------------------------------------------------------
+    // Narrow stored refs — Transient Service Locator (ADR-39)
+    // Application& is used only in begin() to extract these; never stored.
+    // -------------------------------------------------------------------------
+    const FrameworkConfig* _config        = nullptr;   ///< OTA secrets and repo config
+    ConfigManager*         _configManager = nullptr;   ///< Config persistence + manifest
+    EventBus*              _eventBus      = nullptr;   ///< Progress event publishing
+
+    // -------------------------------------------------------------------------
     // Orchestrator state
     // -------------------------------------------------------------------------
-    Application*  app_          = nullptr;             // Composition root reference
     OTAState      state_        = OTAState::Idle;      // Current state machine state
     const char*   lastOtaError_ = nullptr;             // Last error string from download engine
     float         lastProgress_ = 0.0f;                // Last progress fraction for API polling
