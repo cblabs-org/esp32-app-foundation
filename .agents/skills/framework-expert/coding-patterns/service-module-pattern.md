@@ -32,9 +32,24 @@ Use this audit table to evaluate a module's coupling:
 | Message bus (publishing/subscribing) | ✅ Acceptable — reactive/notifying, not orchestrating |
 | Own configuration/persistence interface | ✅ Acceptable — self-management |
 | Web/API contributor interface | ✅ Acceptable — exposing own endpoints |
-| Application hub or god-object reference | ⚠️ Smell — why does it need the whole application? |
+| `Application&` in `begin()` only (transient) | ✅ Acceptable — Transient Service Locator (ADR-39) |
+| Narrow stored refs extracted from `Application` | ✅ Acceptable — explicit, testable dependencies |
+| `Application*` stored as a member | ❌ **Violation** — use the Transient Service Locator pattern instead |
 | System / application state enum | ⚠️ Smell — should not know about app phases |
 | Sibling module's concrete class | ❌ Orchestrator Anti-Pattern — tight coupling |
 | Unrelated business domain services | ❌ Orchestrator Anti-Pattern — wrong layer |
 
-*(Note: The `OTAUpdateManager` currently still holds an `Application` reference. This is a known technical debt item slated for a future refactor, making it the sole remaining violation of this pattern in the core framework).*
+### Enforcement: No Stored `Application*`
+
+The single most important coupling rule is: **modules must never store
+`Application*` or `Application&` as a class member.** If a module uses
+`Application&` in `begin()`, it must extract and store only the narrow
+service references it needs (see ADR-39 / Transient Service Locator Pattern
+in `overview.md`).
+
+To verify compliance:
+```bash
+# Should return zero hits in module headers:
+grep -rn "Application\*" modules/ --include="*.hpp"
+```
+

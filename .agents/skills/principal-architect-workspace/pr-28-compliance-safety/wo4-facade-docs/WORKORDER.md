@@ -77,9 +77,12 @@ executing the checklist below.
 
 # Verification
 
-1. `pio run -e native` — compiles cleanly
-2. `pio run -e esp32dev` — compiles cleanly
-3. `pio test -e native` — all tests pass
+Use the PlatformIO MCP server tools (not the CLI directly):
+1. `build_project` with `environment: "native"` — compiles cleanly
+2. `build_project` with `environment: "esp32dev"` — compiles cleanly
+3. `run_tests` with `environment: "native"` — all tests pass
+
+If any build fails, use `agent_build_diagnose` for structured error analysis.
 
 **CRITICAL:** Before distilling or committing, you MUST ask the user if they are
 happy. Only after approval should you invoke the `@distillery` skill.

@@ -46,11 +46,50 @@ The framework avoids `extern` global state and mutable global singletons. Module
 
 Modules must never instantiate complex services internally or fetch them from a global singleton.
 
-### Dependency Injection Depth
+### The Transient Service Locator Pattern (ADR-39)
 
-Inject the narrowest dependency that satisfies the contract:
-- If a module only needs to publish events → inject `EventBus*`.
-- If a module only needs hostname data → inject `WifiManager*`.
-- Do NOT inject `Application*` when a narrower dependency suffices.
+Framework modules receive `Application&` as a **transient service locator** in
+`begin()`. The module extracts and stores narrow references to the specific
+services it needs, then discards the `Application` reference. The `Application`
+object is **never stored as a member**.
 
-The narrower the injection, the easier the module is to test on `env:native` (fewer mocks required) and the more explicit its dependency graph becomes.
+```cpp
+// Header — forward-declare Application, store narrow deps
+class Application;  // Forward declaration only — no #include
+
+class OTAUpdateManager {
+public:
+    void begin(Application& app);   // Standardised signature
+private:
+    const FrameworkConfig* _config        = nullptr;   // ← narrow stored ref
+    ConfigManager*         _configManager = nullptr;   // ← narrow stored ref
+    EventBus*              _eventBus      = nullptr;   // ← narrow stored ref
+    // NO Application* member — ever
+};
+```
+
+```cpp
+// .cpp — only place Application.hpp is included
+#include "Application.hpp"
+
+void OTAUpdateManager::begin(Application& app) {
+    _config        = &app.getConfig();
+    _configManager = &app.getConfigManager();
+    _eventBus      = &app.getEventBus();
+    // app is transient — used here, never stored
+}
+```
+
+**Rules:**
+1. `begin(Application& app)` is the standard module bootstrap signature.
+2. Inside `begin()`, extract only the services the module actually needs.
+3. **Never** store `Application*` or `Application&` as a class member.
+4. `#include "Application.hpp"` must appear only in the `.cpp`, never in the `.hpp`.
+5. The stored private members serve as the self-documenting dependency list.
+
+**Rationale:** This gives the benefits of a standardised signature (uniform
+wiring, cheap dependency additions) while preserving narrow coupling (modules
+have no ongoing access to the god-object). The private members document the
+real dependency set, and confining `#include "Application.hpp"` to the `.cpp`
+prevents header-level coupling.
+

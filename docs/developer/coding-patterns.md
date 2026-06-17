@@ -99,21 +99,52 @@ The framework strictly avoids global state and `extern` instances. Instead, depe
 - **Constructor Injection:** For mandatory dependencies required for the object to be in a valid state.
 - **`begin()` Injection:** For framework-level dependencies (like the `EventBus` or `ConfigManager`) that are resolved during the application bootstrap phase.
 
+#### The Transient Service Locator Pattern (ADR-39)
+
+Framework modules receive `Application&` as a **transient service locator** in `begin()`. The module uses `Application&` to extract and store narrow references to only the specific services it needs. The `Application` reference is **never stored** — it is used once during wiring and discarded.
+
 ```cpp
-// ✅ Correct: Dependencies injected via begin()
+// ✅ Correct: Transient Service Locator — standardised begin(), narrow stored refs
+// In the header:
+class Application;  // Forward declaration only — no #include
+
 class MyModule : public ITickable {
 public:
-    void begin(EventBus& bus) {
-        _bus = &bus;
-        _bus->subscribe("app.running", onAppRunning, this);
-    }
+    void begin(Application& app);   // Standardised signature
 private:
-    EventBus* _bus = nullptr;
+    EventBus*      _bus  = nullptr;   // ← narrow stored ref
+    ConfigManager* _cfg  = nullptr;   // ← narrow stored ref
+    // NO Application* member
+};
+
+// In the .cpp:
+#include "Application.hpp"   // Only #include'd in .cpp, never in .hpp
+
+void MyModule::begin(Application& app) {
+    _bus = &app.getEventBus();
+    _cfg = &app.getConfigManager();
+    _bus->subscribe("app.running", onAppRunning, this);
+}
+```
+
+```cpp
+// ❌ Wrong: Storing Application* as a member
+class MyModule {
+    Application* _app = nullptr;  // NEVER do this
+    void begin(Application& app) { _app = &app; }
+    void tick(uint32_t ms) { _app->getEventBus().publish(...); }  // Ongoing coupling
 };
 
 // ❌ Wrong: Global state access
 extern EventBus globalBus;  // Never do this
 ```
+
+**Key rules:**
+1. `begin(Application& app)` is the standard module bootstrap signature.
+2. Inside `begin()`, extract only the services the module actually needs.
+3. **Never** store `Application*` or `Application&` as a class member.
+4. `#include "Application.hpp"` must appear only in the `.cpp`, never in the `.hpp`.
+5. The stored private members serve as the self-documenting dependency list.
 
 ---
 
