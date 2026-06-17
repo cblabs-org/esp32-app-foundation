@@ -52,8 +52,23 @@ public:
     virtual void render(U8G2& u8g2) = 0;
 
     /**
-     * @brief Query whether this board has expired and should be removed.
-     * @return true if the u8g2Display module should evict this board from the pool.
+     * @brief Check whether this board should be evicted from the carousel.
+     *
+     * The CarouselEngine calls this method after each render cycle to decide
+     * whether to keep this board in rotation or remove it.
+     *
+     * Contract:
+     * - **Permanent boards** (e.g., status dashboards, sensor readouts):
+     *   MUST return `false` — they are never evicted.
+     * - **Transient boards** (e.g., notification overlays, progress bars):
+     *   MUST return `true` once their display duration has elapsed.
+     * - **Conditional boards** (e.g., error boards that auto-dismiss):
+     *   MUST return `true` when their dismissal condition is met.
+     *
+     * Implementations MUST NOT perform side effects in this method — it is
+     * a pure query. The actual removal is handled by the CarouselEngine.
+     *
+     * @return true if this board should be removed from the carousel.
      */
     virtual bool isExpired() const = 0;
 

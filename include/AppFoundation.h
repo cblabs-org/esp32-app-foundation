@@ -23,6 +23,8 @@
  * - IWebContributor:   Interface — REST route registration contract
  * - IMCPContributor:   Interface — MCP tool registration contract
  * - IDisplayBoard:     Interface — U8G2 carousel board render contract
+ * - IConfigGate:      Interface — config-ready gating contract
+ * - IOTAVerifier:     Interface — OTA firmware signature verification contract
  * - UpdateStatus:      Enum — data fetch result codes
  * - PriorityTier:      Enum — DataManager scheduling tier
  */
@@ -44,6 +46,8 @@
 #include "interfaces/IWebContributor.hpp"
 #include "interfaces/IMCPContributor.hpp"
 #include "interfaces/IDisplayBoard.hpp"
+#include "interfaces/IConfigGate.hpp"
+#include "interfaces/IOTAVerifier.hpp"
 
 // Application hub
 #include "../modules/Application/Application.hpp"
