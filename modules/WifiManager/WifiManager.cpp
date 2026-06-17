@@ -218,7 +218,10 @@ void WifiManager::tick(uint32_t currentMillis) {
     if (_restartRequested) {
         _restartRequested = false;
         ESP_LOGI(TAG, "Executing deferred restart...");
-        delay(500); // Allow HTTP response to flush
+        // Allow HTTP response to flush to the client before WiFi reconnect.
+        // Without this delay, the client receives a connection reset because
+        // esp_restart() tears down the TCP stack before the response is sent.
+        delay(500);
         esp_restart();
         return; // Unreachable, but makes intent clear
     }
@@ -804,12 +807,21 @@ bool WifiManager::testConnection(const char* ssid, const char* pass, std::string
     }
 
     WiFi.disconnect(true);
-    delay(200); 
+    // HARDWARE SETTLING: ESP32 WiFi stack requires ~200ms between disconnect()
+    // and subsequent begin() to release the radio hardware. Without this delay,
+    // WiFi.begin() can silently fail or connect to the wrong BSSID. Verified
+    // empirically on ESP32-S3; the ESP-IDF WiFi driver does not guarantee
+    // immediate readiness after disconnect(true).
+    delay(200);
 
     WiFi.begin(ssid, realPass);
     
     int retries = 0;
     while (WiFi.status() != WL_CONNECTED && retries < 20) {
+        // BLOCKING POLL: testConnection() is intentionally synchronous — it
+        // blocks the calling context (web handler) until the connection result
+        // is known. 500ms × 20 iterations = 10s max wait, matching typical
+        // WPA2 association + DHCP time.
         delay(500);
         retries++;
     }
@@ -822,6 +834,10 @@ bool WifiManager::testConnection(const char* ssid, const char* pass, std::string
         ESP_LOGW(TAG, "WIFI_TEST: Failed. Reconnecting to primary credentials.");
         if (strlen(_wifiSsid) > 0) {
             WiFi.disconnect(true);
+            // HARDWARE SETTLING: Short delay after disconnect() before
+            // reconnecting to the primary network. 100ms is sufficient here
+            // because the radio is transitioning to a known-good configuration
+            // (the stored STA credentials) rather than a new network.
             delay(100);
             WiFi.begin(_wifiSsid, _wifiPass);
         }

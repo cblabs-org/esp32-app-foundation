@@ -453,6 +453,11 @@ private:
 
     AppState       _state   = AppState::Boot;    ///< Current lifecycle phase
     bool           _locked  = false;             ///< True once _compactAndLock() has been called
+    // Note on const-correctness (M-04): _config cannot be declared const because
+    // Application::begin() assigns it post-construction. Const-correctness is
+    // enforced through the public API: begin() accepts const FrameworkConfig&,
+    // and getConfig() returns const FrameworkConfig&. No method mutates _config
+    // after begin() completes.
     FrameworkConfig _config;                     ///< Cached framework configuration
 
     // Module registry vectors (two-tier model)

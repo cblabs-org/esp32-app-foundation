@@ -63,6 +63,7 @@ static constexpr const char* TAG = "OTAUpdateManager";
 #include <freertos/idf_additions.h>
 #include "../Application/Application.hpp"
 #include "../../lib/GithubClient/GithubClient.hpp"
+#include "../../lib/GithubClient/github_root_ca.h"
 #include "../../lib/OTADownloadEngine/OTADownloadEngine.hpp"
 #include "../../lib/OTADownloadEngine/MbedTLSSignatureVerifier.hpp"
 #include "../../lib/SemVer/SemVer.hpp"
@@ -539,7 +540,10 @@ void OTAUpdateManager::performUpdateTask() {
             esp_task_wdt_delete(NULL);
             return;
         }
-        manifestClient->setInsecure();
+        // Manifest fetch uses TLS certificate pinning — the manifest has no
+        // independent integrity verification, so transport security is the only
+        // defence against MITM/downgrade attacks.
+        manifestClient->setCACert(GITHUB_ROOT_CA_CERT);
 
         HTTPClient http;
         http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
@@ -709,7 +713,9 @@ void OTAUpdateManager::performUpdateTask() {
         esp_task_wdt_delete(NULL);
         return;
     }
-    // GitHub CDN redirects use different certs than the API — use insecure
+    // Binary download uses setInsecure() — the firmware payload is independently
+    // verified via MbedTLSSignatureVerifier (RSA-2048 signature). Transport
+    // security is redundant. GitHub CDN redirects use different certs than the API.
     client->setInsecure();
     ESP_LOGI(TAG, "WiFiClientSecure allocated on heap");
 
