@@ -131,7 +131,11 @@ bool Application::begin(const FrameworkConfig& config) {
     _wifiManager.setKeyManager(&_keyManager);
     _timeManager.setConfigManager(&_configManager);
     _authManager.begin(&_configManager, &_keyManager);
-    _otaManager = new OTAUpdateManager();
+    _otaManager = new (std::nothrow) OTAUpdateManager();
+    if (_otaManager == nullptr) {
+        ESP_LOGE(TAG, "Failed to allocate OTAUpdateManager");
+        return false;
+    }
 
     // --- Module registration (auto-detects all interfaces per module) ---
     registerModule(&_wifiManager);        // ITickable + IConfigurable + IWebContributor

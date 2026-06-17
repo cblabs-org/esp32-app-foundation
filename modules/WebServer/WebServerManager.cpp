@@ -121,8 +121,13 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors,
         if (authManager->loadCert(&certDer, &certLen, &keyDer, &keyLen)) {
             ESP_LOGI(TAG, "Auth enabled with TLS cert present — enabling HTTPS on port 443");
             useTls = true;
-            _httpsServer = new PsychicHttpsServer();
-            _httpsServer->setCertificate(certDer, certLen, keyDer, keyLen);
+            _httpsServer = new (std::nothrow) PsychicHttpsServer();
+            if (_httpsServer == nullptr) {
+                ESP_LOGE(TAG, "Failed to allocate PsychicHttpsServer, falling back to HTTP");
+                useTls = false;
+            } else {
+                _httpsServer->setCertificate(certDer, certLen, keyDer, keyLen);
+            }
         } else {
             ESP_LOGE(TAG, "Failed to load cert from storage, falling back to HTTP");
         }

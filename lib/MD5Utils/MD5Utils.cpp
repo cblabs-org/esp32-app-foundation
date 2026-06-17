@@ -85,7 +85,11 @@ String MD5Utils::base64ToHex(String base64Hash) {
         return String();
     }
 
-    uint8_t* binaryData = new uint8_t[binarySize];
+    uint8_t* binaryData = new (std::nothrow) uint8_t[binarySize];
+    if (binaryData == nullptr) {
+        ESP_LOGE(TAG, "Failed to allocate binary data buffer (%d bytes)", binarySize);
+        return String();
+    }
     int index = 0, buffer = 0, bits = 0;
     
     for (int i = 0; i < len; i++) {

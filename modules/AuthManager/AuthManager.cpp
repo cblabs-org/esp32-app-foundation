@@ -1100,7 +1100,11 @@ bool AuthManager::_setPassword(const char* password) {
     // Native: concatenate salt ‖ password and hash with portable SHA-256
     {
         size_t totalLen = 16 + passLen;
-        uint8_t* combined = new uint8_t[totalLen];
+        uint8_t* combined = new (std::nothrow) uint8_t[totalLen];
+        if (combined == nullptr) {
+            ESP_LOGE(TAG, "Failed to allocate combined buffer (%zu bytes)", totalLen);
+            return false;
+        }
         memcpy(combined, salt, 16);
         memcpy(combined + 16, (const uint8_t*)password, passLen);
         _sha256Native(combined, totalLen, hash);
@@ -1170,7 +1174,11 @@ bool AuthManager::_verifyPassword(const char* candidate) const {
 #else
     {
         size_t totalLen = 16 + candLen;
-        uint8_t* combined = new uint8_t[totalLen];
+        uint8_t* combined = new (std::nothrow) uint8_t[totalLen];
+        if (combined == nullptr) {
+            ESP_LOGE(TAG, "Failed to allocate combined buffer (%zu bytes)", totalLen);
+            return false;
+        }
         memcpy(combined, salt, 16);
         memcpy(combined + 16, (const uint8_t*)candidate, candLen);
         _sha256Native(combined, totalLen, candidateHash);
@@ -1418,7 +1426,11 @@ void AuthManager::_sha256Native(const uint8_t* data, size_t len, uint8_t* out) {
     while (padLen % 64 != 56) padLen++;
     padLen += 8;  // Append 64-bit message length field
 
-    uint8_t* msg = new uint8_t[padLen]();
+    uint8_t* msg = new (std::nothrow) uint8_t[padLen]();
+    if (msg == nullptr) {
+        ESP_LOGE(TAG, "Failed to allocate padding buffer (%zu bytes)", padLen);
+        return;
+    }
     memcpy(msg, data, len);
     msg[len] = 0x80;  // Append bit '1' as byte 0x80
 

@@ -1251,7 +1251,11 @@ void OTAUpdateManager::registerRoutes(PsychicHttpServer& server) {
     );
 
     // --- POST /api/ota/upload — signed multipart firmware upload ---
-    PsychicUploadHandler* otaUploadHandler = new PsychicUploadHandler();
+    PsychicUploadHandler* otaUploadHandler = new (std::nothrow) PsychicUploadHandler();
+    if (otaUploadHandler == nullptr) {
+        ESP_LOGE(TAG, "Failed to allocate PsychicUploadHandler");
+        return;
+    }
     otaUploadHandler->onRequest([](PsychicRequest* request, PsychicResponse* response) {
         // The response is already sent inside handleSignedUpload, or we just return OK here
         return ESP_OK;
