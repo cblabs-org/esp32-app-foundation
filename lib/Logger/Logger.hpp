@@ -61,6 +61,7 @@ private:
 #endif
 #endif
 #include <vector>
+#include <string>
 
 #include "platform/LogShim.h"
 
@@ -76,6 +77,8 @@ public:
      * @param secret The plaintext string that should not appear in the logs.
      */
     static void registerSecret(const String& secret);
+    static void registerSecret(const std::string& secret);
+    static void registerSecret(const char* secret);
 
     /**
      * @brief Logs a message securely, replacing any registered secrets with asterisks.

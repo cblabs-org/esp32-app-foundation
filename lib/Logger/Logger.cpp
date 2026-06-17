@@ -11,6 +11,14 @@ void Logger::registerSecret(const String& secret) {
     secrets.push_back(secret);
 }
 
+void Logger::registerSecret(const std::string& secret) {
+    registerSecret(String(secret.c_str()));
+}
+
+void Logger::registerSecret(const char* secret) {
+    if (secret) registerSecret(std::string(secret));
+}
+
 void Logger::logSecure(const char* tag, const char* format, ...) {
     char buffer[512];
     va_list args;

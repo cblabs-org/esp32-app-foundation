@@ -169,7 +169,7 @@ std::string KeyManager::getKeyById(const char* id) const {
     }
 
     std::string result(decrypted.get(), outLen);
-    Logger::registerSecret(String(result.c_str()));
+    Logger::registerSecret(std::string(result.c_str()));
     return result;
 }
 
@@ -327,7 +327,7 @@ void KeyManager::registerRoutes(PsychicHttpServer& server) {
             }
         }
 
-        String output;
+        std::string output;
         serializeJson(doc, output);
         response->send(200, "application/json", output.c_str());
         return ESP_OK;
@@ -392,8 +392,8 @@ void KeyManager::registerRoutes(PsychicHttpServer& server) {
             return ESP_FAIL;
         }
 
-        String id = request->getParam("id")->value();
-        if (id.length() == 0) {
+        std::string id = request->getParam("id")->value().c_str();
+        if (id.empty()) {
             response->send(400, "application/json", "{\"error\":\"Empty 'id' parameter\"}");
             return ESP_FAIL;
         }

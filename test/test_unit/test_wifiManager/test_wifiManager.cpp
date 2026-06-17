@@ -76,7 +76,7 @@ TEST_F(WifiManagerTest, ResetConfig) {
 
 // testConnection()
 TEST_F(WifiManagerTest, TestConnection) {
-    String ipOut;
+    std::string ipOut;
     bool result = wifiManager.testConnection("MySSID", "MyPass", ipOut);
     EXPECT_TRUE(result);
     EXPECT_STREQ("192.168.1.100", ipOut.c_str());

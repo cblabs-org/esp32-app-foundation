@@ -469,7 +469,7 @@ esp_err_t WifiManager::handleStatus(PsychicRequest* request, PsychicResponse* re
         doc["mode"]    = "DISCONNECTED";
     }
 
-    String output;
+    std::string output;
     serializeJson(doc, output);
     response->send(200, "application/json", output.c_str());
 #endif
@@ -515,7 +515,7 @@ esp_err_t WifiManager::handleScan(PsychicRequest* request, PsychicResponse* resp
     // --- Build deduplicated, RSSI-sorted list ---
     // Use a simple O(n²) dedup since scan results are small (typically <30)
     struct ScanEntry {
-        String ssid;
+        std::string ssid;
         int32_t rssi;
         bool secure;
         uint8_t channel;
@@ -526,8 +526,8 @@ esp_err_t WifiManager::handleScan(PsychicRequest* request, PsychicResponse* resp
     int entryCount = 0;
 
     for (int i = 0; i < scanResult && entryCount < MAX_SCAN_RESULTS; i++) {
-        String ssid = WiFi.SSID(i);
-        if (ssid.length() == 0) continue; // Skip hidden networks with no SSID
+        std::string ssid = WiFi.SSID(i).c_str();
+        if (ssid.empty()) continue; // Skip hidden networks with no SSID
 
         // --- Dedup: keep strongest RSSI per SSID ---
         bool found = false;
@@ -575,7 +575,7 @@ esp_err_t WifiManager::handleScan(PsychicRequest* request, PsychicResponse* resp
     // --- Free scan memory ---
     WiFi.scanDelete();
 
-    String output;
+    std::string output;
     serializeJson(doc, output);
     response->send(200, "application/json", output.c_str());
 #endif
@@ -621,14 +621,14 @@ esp_err_t WifiManager::handleTest(PsychicRequest* request, PsychicResponse* resp
     }
 
     // --- Test connection ---
-    String ipOut;
+    std::string ipOut;
     bool success = this->testConnection(ssid, pass, ipOut);
 
     if (success) {
         JsonDocument resp;
         resp["status"] = "ok";
         resp["ip"]     = ipOut;
-        String output;
+        std::string output;
         serializeJson(resp, output);
         response->send(200, "application/json", output.c_str());
     } else {
@@ -759,7 +759,7 @@ void WifiManager::updateWiFi(const char* ssid, const char* pass) {
     if (ssid != nullptr) strlcpy(wifiSsid, ssid, sizeof(wifiSsid));
     if (pass != nullptr && strlen(pass) > 0) {
         strlcpy(wifiPass, pass, sizeof(wifiPass));
-        Logger::registerSecret(String(wifiPass));
+        Logger::registerSecret(std::string(wifiPass));
 
         // Persist password via KeyManager (AES-256 encrypted)
         if (_keyManager != nullptr) {
@@ -788,7 +788,7 @@ void WifiManager::updateWiFi(const char* ssid, const char* pass) {
 /**
  * @brief Test a WiFi connection without permanently changing stored credentials.
  */
-bool WifiManager::testConnection(const char* ssid, const char* pass, String& ipOut) {
+bool WifiManager::testConnection(const char* ssid, const char* pass, std::string& ipOut) {
     ESP_LOGI(TAG, "WIFI_TEST: Starting connection test...");
 #ifndef NATIVE_BUILD
     const char* realPass = pass;

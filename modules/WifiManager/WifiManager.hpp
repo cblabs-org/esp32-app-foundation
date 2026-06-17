@@ -347,10 +347,10 @@ public:
      * @brief Test a WiFi connection without permanently changing stored credentials.
      * @param ssid SSID to test
      * @param pass Password to test (can be empty to use current)
-     * @param ipOut String to store IP on success
+     * @param ipOut std::string to store IP on success
      * @return true on success
      */
-    bool testConnection(const char* ssid, const char* pass, String& ipOut);
+    bool testConnection(const char* ssid, const char* pass, std::string& ipOut);
 
     /**
      * @brief Update the internal URL string for the Web GUI based on current IP.

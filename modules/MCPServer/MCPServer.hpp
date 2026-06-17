@@ -276,7 +276,7 @@ public:
 private:
     MCPToolRegistry _registry;                    ///< Registered tool collection
     MCPToolRegistry* _registryPtr = nullptr;      ///< Pointer for list_tools lambda capture
-    String          _inputBuffer;                 ///< Accumulator for incoming Serial bytes
+    std::string     _inputBuffer;                 ///< Accumulator for incoming Serial bytes
     bool            _initialized = false;         ///< Guard: begin() must be called first
     bool            _mcpEnabled  = true;          ///< Master on/off switch — false disables all processing
     bool            _mcpReadOnly = false;         ///< Guard: if true, mutating tools return error

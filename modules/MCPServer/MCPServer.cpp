@@ -402,7 +402,7 @@ void MCPServer::registerRoutes(PsychicHttpServer& server) {
 
             class StringPrinter : public Print {
             public:
-                String output;
+                std::string output;
                 size_t write(uint8_t c) override { output += (char)c; return 1; }
                 size_t write(const uint8_t *buffer, size_t size) override {
                     // Pre-allocate for performance if empty
@@ -427,7 +427,7 @@ void MCPServer::registerRoutes(PsychicHttpServer& server) {
         doc["enabled"]     = _mcpEnabled;
         doc["readOnly"]    = _mcpReadOnly;
         doc["toolCount"]   = _registry.size();
-        String output;
+        std::string output;
         serializeJson(doc, output);
         response->send(200, "application/json", output.c_str());
         return ESP_OK;
@@ -443,7 +443,7 @@ void MCPServer::registerRoutes(PsychicHttpServer& server) {
         if (_wifiManager) {
             doc["hostname"] = _wifiManager->getHostname();
         }
-        String output;
+        std::string output;
         serializeJson(doc, output);
         response->send(200, "application/json", output.c_str());
         return ESP_OK;
@@ -505,7 +505,7 @@ void MCPServer::registerRoutes(PsychicHttpServer& server) {
             JsonDocument outDoc;
             outDoc["enabled"]  = _mcpEnabled;
             outDoc["readOnly"] = _mcpReadOnly;
-            String output;
+            std::string output;
             serializeJson(outDoc, output);
             response->send(200, "application/json", output.c_str());
             return ESP_OK;

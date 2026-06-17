@@ -510,21 +510,21 @@ void OTAUpdateManager::performUpdateTask() {
     publishProgress(0.0f, "Update found — preparing download...", false, false);
 
     // --- Step 2: Find firmware and signature assets (manifest-aware) ---
-    String binUrl = "";
-    String sigUrl = "";
-    String binName = "";
+    std::string binUrl;
+    std::string sigUrl;
+    std::string binName;
 
     // Check if this release contains a manifest.json
-    String manifestUrl = "";
+    std::string manifestUrl;
     for (int i = 0; i < github.releaseAssets; i++) {
         if (strcmp(github.releaseAssetName[i].c_str(), "manifest.json") == 0) {
-            manifestUrl = github.releaseAssetURL[i];
+            manifestUrl = github.releaseAssetURL[i].c_str();
             ESP_LOGI(TAG, "Found manifest.json asset");
             break;
         }
     }
 
-    if (!manifestUrl.isEmpty()) {
+    if (!manifestUrl.empty()) {
         // --- Manifest path: download and parse manifest.json ---
         ESP_LOGI(TAG, "Downloading manifest.json for board '%s'", BOARD_ID);
 
@@ -541,9 +541,9 @@ void OTAUpdateManager::performUpdateTask() {
 
         HTTPClient http;
         http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
-        String manifestToken = cfg.otaGithubToken ? cfg.otaGithubToken : "";
+        std::string manifestToken = cfg.otaGithubToken ? cfg.otaGithubToken : "";
 
-        if (!http.begin(*manifestClient, manifestUrl)) {
+        if (!http.begin(*manifestClient, String(manifestUrl.c_str()))) {
             ESP_LOGE(TAG, "HTTPClient.begin() failed for manifest URL");
             publishProgress(0.0f, "Manifest download failed", true, false);
             state_ = OTAState::Error;
@@ -553,8 +553,8 @@ void OTAUpdateManager::performUpdateTask() {
         }
 
         http.addHeader("Accept", "application/octet-stream");
-        if (!manifestToken.isEmpty()) {
-            http.addHeader("Authorization", String("Bearer ") + manifestToken);
+        if (!manifestToken.empty()) {
+            http.addHeader("Authorization", String((std::string("Bearer ") + manifestToken).c_str()));
         }
 
         int httpCode = http.GET();
@@ -615,12 +615,12 @@ void OTAUpdateManager::performUpdateTask() {
         // Match manifest filenames to release asset URLs
         for (int i = 0; i < github.releaseAssets; i++) {
             if (strcmp(github.releaseAssetName[i].c_str(), boardAsset->firmware) == 0) {
-                binUrl = github.releaseAssetURL[i];
-                binName = github.releaseAssetName[i];
+                binUrl = github.releaseAssetURL[i].c_str();
+                binName = github.releaseAssetName[i].c_str();
                 ESP_LOGI(TAG, "Matched firmware binary URL: %s", binName.c_str());
             }
             if (strcmp(github.releaseAssetName[i].c_str(), boardAsset->signature) == 0) {
-                sigUrl = github.releaseAssetURL[i];
+                sigUrl = github.releaseAssetURL[i].c_str();
                 ESP_LOGI(TAG, "Matched signature file URL: %s", github.releaseAssetName[i].c_str());
             }
         }
@@ -629,8 +629,8 @@ void OTAUpdateManager::performUpdateTask() {
         ESP_LOGW(TAG, "No manifest.json found — using legacy asset search");
 
         for (int i = 0; i < github.releaseAssets; i++) {
-            const String& name = github.releaseAssetName[i];
-            int nameLen = name.length();
+            const std::string name = github.releaseAssetName[i].c_str();
+            int nameLen = (int)name.length();
 
             // Check for .bin extension
             if (nameLen > 4 &&
@@ -638,7 +638,7 @@ void OTAUpdateManager::performUpdateTask() {
                 name[nameLen - 3] == 'b' &&
                 name[nameLen - 2] == 'i' &&
                 name[nameLen - 1] == 'n') {
-                binUrl = github.releaseAssetURL[i];
+                binUrl = github.releaseAssetURL[i].c_str();
                 binName = name;
                 ESP_LOGI(TAG, "Found firmware binary: %s", name.c_str());
             }
@@ -649,13 +649,13 @@ void OTAUpdateManager::performUpdateTask() {
                 name[nameLen - 3] == 's' &&
                 name[nameLen - 2] == 'i' &&
                 name[nameLen - 1] == 'g') {
-                sigUrl = github.releaseAssetURL[i];
+                sigUrl = github.releaseAssetURL[i].c_str();
                 ESP_LOGI(TAG, "Found signature file: %s", name.c_str());
             }
         }
     }
 
-    if (binUrl.isEmpty()) {
+    if (binUrl.empty()) {
         ESP_LOGE(TAG, "No .bin asset found in release %s", github.releaseId.c_str());
         publishProgress(0.0f, "No firmware binary in release", true, false);
         state_ = OTAState::Error;
@@ -664,7 +664,7 @@ void OTAUpdateManager::performUpdateTask() {
         return;
     }
 
-    if (sigUrl.isEmpty() && cfg.otaPublicKey != nullptr) {
+    if (sigUrl.empty() && cfg.otaPublicKey != nullptr) {
         ESP_LOGE(TAG, "SECURITY ABORT: No .sig asset found but otaPublicKey is configured — refusing unsigned firmware");
         publishProgress(0.0f, "Missing signature — update rejected", true, false);
         state_ = OTAState::Error;
@@ -736,10 +736,10 @@ void OTAUpdateManager::performUpdateTask() {
     // --- Step 6: Fetch signature file (if .sig URL available) ---
     uint8_t sigBuf[512];
     size_t sigLen = 0;
-    String token = cfg.otaGithubToken ? cfg.otaGithubToken : "";
+    std::string token = cfg.otaGithubToken ? cfg.otaGithubToken : "";
 
-    if (!sigUrl.isEmpty()) {
-        sigLen = engine.fetchSignature(*client, sigUrl, token, sigBuf, sizeof(sigBuf));
+    if (!sigUrl.empty()) {
+        sigLen = engine.fetchSignature(*client, String(sigUrl.c_str()), String(token.c_str()), sigBuf, sizeof(sigBuf));
         if (sigLen == 0 && cfg.otaPublicKey != nullptr) {
             ESP_LOGE(TAG, "SECURITY ABORT: Signature fetch returned 0 bytes — refusing update");
             publishProgress(0.0f, "Signature fetch failed — update rejected", true, false);
@@ -755,7 +755,7 @@ void OTAUpdateManager::performUpdateTask() {
     publishProgress(0.02f, "Downloading firmware...", false, false);
 
     // --- Step 7: Download and flash firmware ---
-    OTAError result = engine.downloadAndFlash(*client, binUrl, token, sigBuf, sigLen);
+    OTAError result = engine.downloadAndFlash(*client, String(binUrl.c_str()), String(token.c_str()), sigBuf, sigLen);
 
     if (result != OTAError::None) {
         lastOtaError_ = engine.getLastErrorString();
@@ -1139,7 +1139,7 @@ void OTAUpdateManager::registerRoutes(PsychicHttpServer& server) {
     server.on("/api/ota", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
         JsonDocument doc;
         doc["status"] = "ready";
-        String output;
+        std::string output;
         serializeJson(doc, output);
         response->send(200, "application/json", output.c_str());
         return ESP_OK;
@@ -1262,7 +1262,7 @@ void OTAUpdateManager::registerRoutes(PsychicHttpServer& server) {
                     if (this->lastOtaError_) {
                         resp["lastError"] = this->lastOtaError_;
                     }
-                    String output;
+                    std::string output;
                     serializeJson(resp, output);
                     response->send(200, "application/json", output.c_str());
                     return ESP_OK;
@@ -1284,6 +1284,7 @@ void OTAUpdateManager::registerRoutes(PsychicHttpServer& server) {
         return ESP_OK;
     });
 #ifdef ARDUINO
+    // EXTERNAL CONSTRAINT: PsychicHttp API requires const String& in onUpload callback signature
     otaUploadHandler->onUpload([this](PsychicRequest* request, const String& filename,
                                       uint64_t index, uint8_t* data, size_t len, bool final) {
         return this->handleSignedUpload(request, filename, index, data, len, final);

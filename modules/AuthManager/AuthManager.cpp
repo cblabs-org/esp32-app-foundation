@@ -200,15 +200,17 @@ bool AuthManager::checkMcpAuth(PsychicRequest* request, PsychicResponse* respons
     }
 
     // --- Step 2: Require Bearer scheme ---
-    String authHeader = request->header("Authorization");
-    if (!authHeader.startsWith("Bearer ")) {
+    std::string authHeader = request->header("Authorization").c_str();
+    if (authHeader.rfind("Bearer ", 0) != 0) {
         response->send(401, "application/json", "{\"error\":\"invalid_auth_scheme\"}");
         return false;
     }
 
     // --- Step 3: Extract and validate bearer token ---
-    String bearerToken = authHeader.substring(7);
-    bearerToken.trim();
+    std::string bearerToken = authHeader.substr(7);
+    // Trim trailing whitespace (std::string has no .trim())
+    while (!bearerToken.empty() && isspace(static_cast<unsigned char>(bearerToken.back())))
+        bearerToken.pop_back();
 
     // Load the stored password hash (this IS the expected bearer token)
     std::string storedHash;
@@ -659,7 +661,7 @@ void AuthManager::registerRoutes(PsychicHttpServer& server) {
             doc["passwordSet"]   = _passwordSet;
             doc["certPresent"]   = _certPresent;
             doc["tlsApMode"]     = _tlsApMode;
-            String out;
+            std::string out;
             serializeJson(doc, out);
             return response->send(200, "application/json", out.c_str());
         });
@@ -685,7 +687,7 @@ void AuthManager::registerRoutes(PsychicHttpServer& server) {
             // --- Step 2: Respond with the bearer token (= stored hash hex) ---
             JsonDocument doc;
             doc["token"] = storedHash.c_str();
-            String out;
+            std::string out;
             serializeJson(doc, out);
             return response->send(200, "application/json", out.c_str());
         });
@@ -727,7 +729,7 @@ void AuthManager::registerRoutes(PsychicHttpServer& server) {
         JsonDocument resp;
         resp["status"] = "ok";
         resp["restartRequired"] = true;
-        String out;
+        std::string out;
         serializeJson(resp, out);
         return response->send(200, "application/json", out.c_str());
     });
@@ -786,7 +788,7 @@ void AuthManager::registerRoutes(PsychicHttpServer& server) {
         JsonDocument resp;
         resp["status"] = "ok";
         resp["restartRequired"] = true;
-        String out;
+        std::string out;
         serializeJson(resp, out);
         return response->send(200, "application/json", out.c_str());
     });
@@ -813,7 +815,7 @@ void AuthManager::registerRoutes(PsychicHttpServer& server) {
         JsonDocument resp;
         resp["status"] = "ok";
         resp["restartRequired"] = true;
-        String out;
+        std::string out;
         serializeJson(resp, out);
         return response->send(200, "application/json", out.c_str());
     });
@@ -901,7 +903,7 @@ void AuthManager::registerRoutes(PsychicHttpServer& server) {
         resp["certGenerating"] = true;
         resp["restartRequired"] = true;
         resp["reason"] = "restart_for_tls";
-        String out;
+        std::string out;
         serializeJson(resp, out);
         return response->send(200, "application/json", out.c_str());
     });
@@ -1288,19 +1290,19 @@ bool AuthManager::_checkSessionCookie(PsychicRequest* request) const {
 #ifndef NATIVE_BUILD
     // --- Extract the Cookie header ---
     if (!request->hasHeader("Cookie")) return false;
-    String cookieHeader = request->header("Cookie");
+    std::string cookieHeader = request->header("Cookie").c_str();
 
     // --- Find the esp32_session= token ---
     static const char* COOKIE_NAME = "esp32_session=";
-    int pos = cookieHeader.indexOf(COOKIE_NAME);
-    if (pos < 0) return false;
+    size_t pos = cookieHeader.find(COOKIE_NAME);
+    if (pos == std::string::npos) return false;
 
     // Advance past the "esp32_session=" prefix
-    pos += (int)strlen(COOKIE_NAME);
+    pos += strlen(COOKIE_NAME);
 
     // Extract exactly 32 hex characters
-    if (pos + 32 > (int)cookieHeader.length()) return false;
-    String tokenHex = cookieHeader.substring(pos, pos + 32);
+    if (pos + 32 > cookieHeader.length()) return false;
+    std::string tokenHex = cookieHeader.substr(pos, 32);
 
     // --- Decode hex → binary ---
     uint8_t tokenBytes[16] = {0};

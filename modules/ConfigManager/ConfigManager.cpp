@@ -458,7 +458,7 @@ void ConfigManager::registerRoutes(PsychicHttpServer& server) {
         JsonDocument doc;
         exportAllConfig(doc);
 
-        String output;
+        std::string output;
         serializeJson(doc, output);
         response->addHeader("Content-Disposition", "attachment; filename=\"config-backup.json\"");
         response->send(200, "application/json", output.c_str());
@@ -491,7 +491,7 @@ void ConfigManager::registerRoutes(PsychicHttpServer& server) {
             DeserializationError err = deserializeJson(doc, body);
             if (err) {
                 ESP_LOGE("ConfigManager", "Restore JSON parse failed: %s", err.c_str());
-                String errMsg = "{\"error\":\"Invalid JSON: ";
+                std::string errMsg = "{\"error\":\"Invalid JSON: ";
                 errMsg += err.c_str();
                 errMsg += "\"}";
                 response->send(400, "application/json", errMsg.c_str());
@@ -543,7 +543,7 @@ void ConfigManager::registerRoutes(PsychicHttpServer& server) {
         }
         doc["count"] = (int)_modules.size();
 
-        String output;
+        std::string output;
         serializeJson(doc, output);
         response->send(200, "application/json", output.c_str());
         return ESP_OK;
