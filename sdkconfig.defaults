@@ -221,10 +221,11 @@ CONFIG_MBEDTLS_CERTIFICATE_BUNDLE_DEFAULT_NONE=y
 
 # Disable unused TLS features:
 # - Renegotiation: security anti-pattern, unnecessary for IoT client/server
-# - ALPN: only needed for HTTP/2 (not used)
+# - ALPN: Arduino ssl_client.cpp calls mbedtls_ssl_conf_alpn_protocols()
+#   unconditionally (no #ifdef guard) — MUST remain enabled or build fails.
+CONFIG_MBEDTLS_SSL_ALPN=y
 # - Session tickets: marginal reconnect speedup, not worth the code size
 #   for short-lived OTA/API connections
 CONFIG_MBEDTLS_SSL_RENEGOTIATION=n
-CONFIG_MBEDTLS_SSL_ALPN=n
 CONFIG_MBEDTLS_CLIENT_SSL_SESSION_TICKETS=n
 CONFIG_MBEDTLS_SERVER_SSL_SESSION_TICKETS=n
