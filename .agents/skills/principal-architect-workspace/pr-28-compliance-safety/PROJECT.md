@@ -108,3 +108,9 @@ test updates if existing tests reference changed APIs.
 | `include/interfaces/IDisplayBoard.hpp` | | | | ✏️ | | | | | |
 | `include/FrameworkConfig.hpp` | | | | | | | | | ✏️ |
 | `modules/U8G2Display/boards/interfaces/IBoardLayout.hpp` | | | | | | | ✏️ | | |
+
+---
+
+## Distillation
+
+Session distillation: [context_bridge.md](./context_bridge.md)
