@@ -74,7 +74,10 @@ git tag v0.1.4-dev.2 && git push origin v0.1.4-dev.2
 **Rules:**
 - `PATCH` should be the *next* unreleased patch number (i.e. current stable patch + 1).
 - `PRE_NUM` starts at 1 and increments with each functionally-distinct build.
-- Dev tags are **never** promoted to GitHub Releases — they are build markers only.
+- Dev tags ARE published as GitHub pre-releases via `deploy_release.py` so that
+  devices on the `dev` OTA channel can receive in-flight builds.
+- Agents MAY run `deploy_release.py` for `dev` tags autonomously (same autonomy
+  as tag creation). Beta/stable deploys still require user approval.
 
 ---
 
@@ -208,5 +211,6 @@ User says "promote to stable" →
 | Create `stable` tag           | ❌ No          | Yes                    |
 | Increment `PATCH`             | ❌ No          | Yes                    |
 | Increment `MINOR` or `MAJOR`  | ❌ No          | Yes                    |
-| Run `deploy_release.py`       | ❌ No          | Yes                    |
+| Run `deploy_release.py` (dev) | ✅ Yes         | No                     |
+| Run `deploy_release.py` (β/stable) | ❌ No    | Yes                    |
 | Move/force-push a tag         | ❌ No          | Yes (state in plan)    |
