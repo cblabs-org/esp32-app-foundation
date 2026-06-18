@@ -124,11 +124,11 @@ to stable under any circumstances.
 **How to tag:**
 ```bash
 git tag v0.1.4 && git push origin v0.1.4
-python3 scripts/deploy_release.py --tag v0.1.4 --local --build --private-key private_key.pem
+python3 scripts/deploy_release.py --local --build --private-key private_key.pem
 ```
 
 **Rules:**
-- Stable tags must point at HEAD at build time (`deploy_release.py` enforces this).
+- Stable tags must point at HEAD at build time (`deploy_release.py` verifies this).
 - Stable GitHub Releases are NOT marked as pre-release.
 - A new stable tag supersedes all beta and dev tags for that patch.
 
@@ -150,9 +150,10 @@ implementation plan and let the user confirm.
 
 ## Tag Hygiene Rules
 
-1. **Tag before build** — when deploying a release, `deploy_release.py`'s
-   `ensure_tag_on_head()` must be called before any PlatformIO build step so
-   `inject_version.py` picks up the correct tag.
+1. **Tag before build** — when deploying a release, `deploy_release.py`
+   auto-discovers the SemVer tag on HEAD via `discover_tag_on_head()`. The
+   tag must exist before the build step so `inject_version.py` picks up the
+   correct version.
 
 2. **One canonical version per build** — if multiple SemVer tags exist on
    HEAD, `inject_version.py` selects the highest. Agents should avoid creating
@@ -191,11 +192,11 @@ PR merged →
 User says "cut a beta" →
   → Confirm PATCH number (increment from last beta/stable patch).
   → Confirm PRE_NUM (1 unless a beta already exists for this patch).
-  → Tag and push, then run deploy_release.py.
+  → Tag and push, then run deploy_release.py (it auto-discovers the tag).
 
 User says "promote to stable" →
   → Confirm the tag matches the last beta for that patch (drop the suffix).
-  → Run deploy_release.py with the stable tag.
+  → Run deploy_release.py (it auto-discovers the stable tag from HEAD).
   → This is a human-gated action — do not initiate unless explicitly instructed.
 ```
 
