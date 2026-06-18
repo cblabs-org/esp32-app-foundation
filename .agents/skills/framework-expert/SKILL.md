@@ -87,6 +87,7 @@ This skill uses a progressive disclosure model. Based on your query, load and re
 | **Security** (TLS tradeoffs, credentials, OTA security, portal auth) | `security/` |
 | **Coding Patterns** (Service Module Pattern, HOM, SOLID, modules vs libs) | `coding-patterns/` |
 | **Performance** (PSRAM, flash size, heap, profiling) | `performance/` |
+| **TLS Memory Optimization** (sdkconfig tuning, measured results, cert bundles) | `performance/tls-memory-optimization.md` |
 | **Embedded Safety** (Thread safety, memory rules, power, rejected approaches)| `embedded-safety/` |
 
 ## When to Read the Full Docs

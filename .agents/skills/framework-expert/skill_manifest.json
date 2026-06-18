@@ -2,8 +2,8 @@
   "name": "framework-expert",
   "version": "2.0.0",
   "created": "2026-06-15",
-  "lastUpdated": "2026-06-16",
-  "sourceDocsVersion": "PR-25",
+  "lastUpdated": "2026-06-18",
+  "sourceDocsVersion": "PR-29",
   "references": [
     "SKILL.md",
     "KEEPING-CURRENT.md",
@@ -50,6 +50,7 @@
     "performance/psram.md",
     "performance/flash-size.md",
     "performance/profiling.md",
+    "performance/tls-memory-optimization.md",
     "embedded-safety/thread-safety.md",
     "embedded-safety/memory-rules.md",
     "embedded-safety/power-management.md",
