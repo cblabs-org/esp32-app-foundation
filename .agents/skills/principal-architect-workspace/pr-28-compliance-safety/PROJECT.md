@@ -28,16 +28,18 @@ code defect — deferred for separate evaluation.
 
 | WO | Status | Topic | Complexity | Audit IDs |
 |----|--------|-------|------------|-----------|
-| **[ ] [wo1-bare-new-nothrow](wo1-bare-new-nothrow/WORKORDER.md)** | QUEUED | Replace 7 bare `new` with `new (std::nothrow)` + nullptr guards | mechanical | C-01 |
-| **[ ] [wo2-task-safety](wo2-task-safety/WORKORDER.md)** | QUEUED | FreeRTOS task hardening (TWDT, stack sizing, DRAM caps, return checks) | standard | C-02, H-06, M-07, M-08, M-12 |
-| **[ ] [wo3-tag-constexpr](wo3-tag-constexpr/WORKORDER.md)** | QUEUED | TAG `constexpr` upgrade + value corrections (20+ files) | mechanical | H-03, H-04 |
-| **[ ] [wo4-facade-docs](wo4-facade-docs/WORKORDER.md)** | QUEUED | Facade completeness + `isExpired()` contract doc | mechanical | M-01, M-10 |
-| **[ ] [wo5-std-function](wo5-std-function/WORKORDER.md)** | QUEUED | Eradicate `std::function` from MCPToolRegistry + OTADownloadEngine | architect | H-01 |
-| **[ ] [wo6-arduino-string](wo6-arduino-string/WORKORDER.md)** | QUEUED | Arduino `String` → `std::string` migration across all modules | standard | H-02, M-09 |
-| **[ ] [wo7-application-ptr](wo7-application-ptr/WORKORDER.md)** | QUEUED | Remove `Application*` from OTAUpdateManager (narrow DI) + delete orphaned IBoardLayout | architect | C-03, M-14 |
-| **[ ] [wo8-naming](wo8-naming/WORKORDER.md)** | QUEUED | Naming convention normalisation (OTA trailing `_` → leading `_`, WifiManager add `_` prefix) | standard | M-02, M-03 |
-| **[ ] [wo9-remaining](wo9-remaining/WORKORDER.md)** | QUEUED | Manifest `setCaCert`, FrameworkConfig `const&` + SRP, WifiManager delay audit | standard | H-07, M-04, M-11, M-13 |
-| **[ ] [wo10-nvs-encryption](wo10-nvs-encryption/WORKORDER.md)** | QUEUED | Enable NVS encryption for DeviceCrypto master key at rest (**runs last — requires factory reset**) | standard | H-05 |
+| **[x] [wo1-bare-new-nothrow](wo1-bare-new-nothrow/WORKORDER.md)** | ✅ DONE | Replace 7 bare `new` with `new (std::nothrow)` + nullptr guards | mechanical | C-01 |
+| **[x] [wo2-task-safety](wo2-task-safety/WORKORDER.md)** | ✅ DONE | FreeRTOS task hardening (TWDT, stack sizing, DRAM caps, return checks) | standard | C-02, H-06, M-07, M-08, M-12 |
+| **[x] [wo3-tag-constexpr](wo3-tag-constexpr/WORKORDER.md)** | ✅ DONE | TAG `constexpr` upgrade + value corrections (20+ files) | mechanical | H-03, H-04 |
+| **[x] [wo4-facade-docs](wo4-facade-docs/WORKORDER.md)** | ✅ DONE | Facade completeness + `isExpired()` contract doc | mechanical | M-01, M-10 |
+| **[x] [wo5-std-function](wo5-std-function/WORKORDER.md)** | ✅ DONE | Eradicate `std::function` from MCPToolRegistry + OTADownloadEngine | architect | H-01 |
+| **[x] [wo6-arduino-string](wo6-arduino-string/WORKORDER.md)** | ✅ DONE (modules/) | Arduino `String` → `std::string` migration across all modules | standard | H-02, M-09 |
+| **[x] [wo7-application-ptr](wo7-application-ptr/WORKORDER.md)** | ✅ DONE | Remove `Application*` from OTAUpdateManager (narrow DI) + delete orphaned IBoardLayout | architect | C-03, M-14 |
+| **[x] [wo8-naming](wo8-naming/WORKORDER.md)** | ✅ DONE | Naming convention normalisation (OTA trailing `_` → leading `_`, WifiManager add `_` prefix) | standard | M-02, M-03 |
+| **[x] [wo9-remaining](wo9-remaining/WORKORDER.md)** | ✅ DONE | Manifest `setCaCert`, FrameworkConfig `const&` + SRP, WifiManager delay audit | standard | H-07, M-04, M-11, M-13 |
+| ~~wo10-nvs-encryption~~ | ❌ DEFERRED | NVS encryption deferred — not implementing unless going to wide production | standard | H-05 |
+| **[x] [wo10-embedded-fixes](wo10-embedded-fixes/WORKORDER.md)** | ✅ DONE | GithubClient WiFiClientSecure → DRAM heap alloc, OTA stack hardening, safety comments | standard | H-MEM-01, EMB-01–05, EMB-08 |
+| **[x] [wo11-string-migration](wo11-string-migration/WORKORDER.md)** | ✅ DONE | Arduino `String` → `std::string` for authored lib/ APIs (GithubClient, OTADownloadEngine, MD5Utils, Logger) | standard | H-MEM-02 |
 
 ### Execution Order & Dependencies
 
