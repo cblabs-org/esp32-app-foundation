@@ -32,11 +32,12 @@ include/.DS_Store
 test/tmp/*
 !test/tmp/.gitkeep
 
-# OTA signing artifacts
-private_key.pem
-public_key.pem
+# OTA signing artifacts and crypto keys
+*.pem
+*.key
 *.sig
 *.sha256
+*.env
 
 # OTA release staging directory
 release/

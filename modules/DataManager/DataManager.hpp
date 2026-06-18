@@ -86,7 +86,7 @@ public:
      * @param timeMs The simulated current time in milliseconds
      */
 #ifdef NATIVE_BUILD
-    void setSimulatedTimeMs(uint32_t timeMs) { simulatedTimeMs = timeMs; }
+    void setSimulatedTimeMs(uint32_t timeMs) { _simulatedTimeMs = timeMs; }
 #endif
 
 private:
@@ -96,12 +96,12 @@ private:
         bool priorityRequested;
     };
 
-    std::vector<SourceRecord> registry;
-    SemaphoreHandle_t registryMutex;
-    TaskHandle_t workerTask;
+    std::vector<SourceRecord> _registry;
+    SemaphoreHandle_t _registryMutex;
+    TaskHandle_t _workerTask;
     std::atomic<bool> _appRunning{false};
 #ifdef NATIVE_BUILD
-    uint32_t simulatedTimeMs = 0;
+    uint32_t _simulatedTimeMs = 0;
 #endif
 
     static void workerTaskLoop(void* param);

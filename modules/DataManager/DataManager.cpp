@@ -41,19 +41,19 @@ private:
     SemaphoreHandle_t mutex;
 };
 
-DataManager::DataManager() : registryMutex(nullptr), workerTask(nullptr) {
+DataManager::DataManager() : _registryMutex(nullptr), _workerTask(nullptr) {
 #ifndef NATIVE_BUILD
-    registryMutex = xSemaphoreCreateMutex();
+    _registryMutex = xSemaphoreCreateMutex();
 #endif
 }
 
 DataManager::~DataManager() {
 #ifndef NATIVE_BUILD
-    if (workerTask) {
-        vTaskDelete(workerTask);
+    if (_workerTask) {
+        vTaskDelete(_workerTask);
     }
-    if (registryMutex) {
-        vSemaphoreDelete(registryMutex);
+    if (_registryMutex) {
+        vSemaphoreDelete(_registryMutex);
     }
 #endif
 }
@@ -70,21 +70,21 @@ void DataManager::begin() {
         12288,                                    // 12KB — safe for TLS
         this,
         5,
-        &workerTask,
+        &_workerTask,
         MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT     // DRAM stack
     );
     if (result != pdPASS) {
         ESP_LOGE(TAG, "Failed to create DataManager worker task");
-        workerTask = nullptr;
+        _workerTask = nullptr;
     }
 #endif
 }
 
 void DataManager::registerSource(IDataSource* source) {
     if (!source) return;
-    MutexLock lock(registryMutex);
+    MutexLock lock(_registryMutex);
     
-    for (const auto& r : registry) {
+    for (const auto& r : _registry) {
         if (r.source == source) return;
     }
     
@@ -93,26 +93,26 @@ void DataManager::registerSource(IDataSource* source) {
     record.lastFetchTimeMs = 0; // Set to 0 so it fetches immediately upon registration
     record.priorityRequested = false;
     
-    registry.push_back(record);
+    _registry.push_back(record);
     ESP_LOGI(TAG, "Registered source: %s", source->getSourceName());
 }
 
 void DataManager::unregisterSource(IDataSource* source) {
     if (!source) return;
     ESP_LOGI(TAG, "Unregistering source: %s", source->getSourceName());
-    MutexLock lock(registryMutex);
+    MutexLock lock(_registryMutex);
     
-    registry.erase(std::remove_if(registry.begin(), registry.end(),
+    _registry.erase(std::remove_if(_registry.begin(), _registry.end(),
         [source](const SourceRecord& r) { return r.source == source; }),
-        registry.end());
+        _registry.end());
 }
 
 void DataManager::requestPriorityFetch(IDataSource* source) {
     if (!source) return;
     ESP_LOGI(TAG, "Priority fetch requested for source: %s", source->getSourceName());
-    MutexLock lock(registryMutex);
+    MutexLock lock(_registryMutex);
     
-    for (auto& r : registry) {
+    for (auto& r : _registry) {
         if (r.source == source) {
             r.priorityRequested = true;
             break;
@@ -124,7 +124,7 @@ uint32_t DataManager::getCurrentTimeMs() const {
 #ifndef NATIVE_BUILD
     return millis();
 #else
-    return simulatedTimeMs;
+    return _simulatedTimeMs;
 #endif
 }
 
@@ -161,16 +161,16 @@ void DataManager::workerTaskLoop(void* param) {
 void DataManager::executeLoop() {
     if (!_appRunning.load()) return;
 
-    MutexLock lock(registryMutex);
-    if (registry.empty()) return;
+    MutexLock lock(_registryMutex);
+    if (_registry.empty()) return;
 
     uint32_t now = getCurrentTimeMs();
     int bestIndex = -1;
     bool foundPriority = false;
     PriorityTier bestTier = PriorityTier::Low;
     
-    for (size_t i = 0; i < registry.size(); ++i) {
-        auto& r = registry[i];
+    for (size_t i = 0; i < _registry.size(); ++i) {
+        auto& r = _registry[i];
         
         // Handle explicit priority requests
         if (r.priorityRequested) {
@@ -192,7 +192,7 @@ void DataManager::executeLoop() {
     }
 
     if (bestIndex != -1) {
-        auto& r = registry[bestIndex];
+        auto& r = _registry[bestIndex];
         r.priorityRequested = false;
         
         // Extract the target source before releasing the lock
@@ -201,7 +201,7 @@ void DataManager::executeLoop() {
         
 #ifndef NATIVE_BUILD
         // Unlock mutex during fetch to prevent holding the lock during potentially long network calls
-        if (registryMutex) xSemaphoreGive(registryMutex);
+        if (_registryMutex) xSemaphoreGive(_registryMutex);
 #endif
         
         // --- Execute the fetch cycle ---
@@ -213,11 +213,11 @@ void DataManager::executeLoop() {
         
 #ifndef NATIVE_BUILD
         // Re-acquire mutex to update state
-        if (registryMutex) xSemaphoreTake(registryMutex, portMAX_DELAY);
+        if (_registryMutex) xSemaphoreTake(_registryMutex, portMAX_DELAY);
 #endif
         
         // Ensure source is still registered before updating tracking data
-        for (auto& r2 : registry) {
+        for (auto& r2 : _registry) {
             if (r2.source == fetchTarget) {
                 r2.lastFetchTimeMs = getCurrentTimeMs();
                 break;
