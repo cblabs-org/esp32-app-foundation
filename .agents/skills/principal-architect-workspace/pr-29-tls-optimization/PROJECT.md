@@ -2,7 +2,7 @@
 
 **Branch:** `pr-29-tls-optimization`
 **Base:** `main`
-**Status:** 🔄 WIP — WO3 in progress
+**Status:** ✅ COMPLETE — All 3 WOs merged, ready for PR submission
 **Implementation Plan:** [implementation_plan.md](../../../../.gemini/antigravity/brain/07cb3857-55da-4085-b60a-2fecec6a6dec/implementation_plan.md)
 **Analysis:** [tls_optimization_analysis.md](../../../../.gemini/antigravity/brain/07cb3857-55da-4085-b60a-2fecec6a6dec/tls_optimization_analysis.md)
 
@@ -22,7 +22,7 @@ All changes are config-only — zero source code modifications.
 |---|---|---|---|---|
 | **[x] [wo1-sdkconfig-changes](wo1-sdkconfig-changes/WORKORDER.md)** | Apply TLS optimisation settings to `sdkconfig.defaults` | `mechanical` | ✅ MERGED `268218c` | none |
 | **[x] [wo2-build-test-measure](wo2-build-test-measure/WORKORDER.md)** | Build esp32s3nano, measure heap/flash before & after, run OTA + HTTPS portal + GitHub API regression tests | `standard` | ✅ MERGED `5e000e5` — [RESULTS](wo2-build-test-measure/RESULTS.md) | WO1 |
-| **[ ] [wo3-skill-documentation](wo3-skill-documentation/WORKORDER.md)** | Write `tls-memory-optimization.md` reference, update framework-expert SKILL.md | `standard` | 🔄 IN PROGRESS | WO2 |
+| **[x] [wo3-skill-documentation](wo3-skill-documentation/WORKORDER.md)** | Write `tls-memory-optimization.md` reference, update framework-expert SKILL.md | `standard` | ✅ MERGED `9366eef` | WO2 |
 
 ### Sequencing
 
