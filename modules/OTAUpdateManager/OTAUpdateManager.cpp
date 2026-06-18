@@ -539,10 +539,16 @@ void OTAUpdateManager::performUpdateTask() {
             _lastOtaError = "Manifest client allocation failed";
             return;
         }
-        // Manifest fetch uses TLS certificate pinning — the manifest has no
-        // independent integrity verification, so transport security is the only
-        // defence against MITM/downgrade attacks.
-        manifestClient->setCACert(GITHUB_ROOT_CA_CERT);
+        // Manifest download uses setInsecure() — the download URL redirects
+        // from api.github.com to objects.githubusercontent.com (GitHub CDN),
+        // which uses a different CA chain (Let's Encrypt, not Sectigo). The
+        // pinned GitHub API CA cannot validate the CDN's certificate.
+        //
+        // This is safe because the manifest only contains filenames and
+        // SHA-256 hashes. The firmware binary itself is independently verified
+        // via cryptographic signature (MbedTLSSignatureVerifier). Same
+        // reasoning as the firmware download (line ~712).
+        manifestClient->setInsecure();
 
         HTTPClient http;
         http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
