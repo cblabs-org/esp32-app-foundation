@@ -15,6 +15,9 @@ artifacts:
 
 Completed WO1–WO3 of the TLS memory optimization PR: applied 7 mbedTLS sdkconfig settings, measured +18.8 KB free heap (+12.7%) and +54 KB heap_min_free (+62.7%) on ESP32-S3 NanoS3, documented everything in the framework-expert skill. Discovered during live OTA testing that the GitHub CDN uses a different CA (Let's Encrypt) than the API (Sectigo), breaking manifest downloads when cert bundle is NONE. Applied a temporary `setInsecure()` fix for the manifest; WO4 (dual-CA pinning with graceful fallback) is written and handed off to the OTA architect.
 
+> [!WARNING]
+> **PR numbering error:** This work is labelled PR-29 throughout (branch name, commits, work orders, MEMORY.md registry) but should be **PR-27**. The branch, commits, and all references need renumbering. The user has asked the next architect to clean this up.
+
 ## Next Steps
 
 1. **OTA architect picks up WO4**: Work order at `.agents/skills/principal-architect-workspace/pr-29-tls-optimization/wo4-ota-ca-pinning/WORKORDER.md`. Creates `ota_root_cas.h` (Sectigo E46 + ISRG Root X1), updates OTAUpdateManager with CA-first + `setInsecure()` fallback, tests OTA end-to-end.
