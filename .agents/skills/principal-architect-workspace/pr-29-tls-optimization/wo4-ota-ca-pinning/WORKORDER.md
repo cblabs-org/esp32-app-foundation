@@ -27,6 +27,7 @@ Read and follow `.agents/rules/03-versioning.md`. This includes new functionalit
 
 - You **MAY** create new files in `lib/GithubClient/`
 - You **MAY** modify `modules/OTAUpdateManager/OTAUpdateManager.cpp`
+- You **MAY** modify `lib/GithubClient/GithubClient.cpp` (for API fallback logic)
 - You **MAY** modify `lib/GithubClient/github_root_ca.h` (if consolidating)
 - Do **NOT** modify `sdkconfig.defaults`, `platformio.ini`, or partition tables
 - Do **NOT** create any branches or make git commits (the PA will handle this)
@@ -46,6 +47,12 @@ The CDN uses a different CA chain than the API:
 ```
 *.github.io → R12 (Let's Encrypt) → ISRG Root X1
 ```
+
+> **CA rotation risk:** GitHub has historically rotated CDN providers (Fastly,
+> Cloudflare, Let's Encrypt). The ISRG Root X1 is correct as of June 2026, but
+> may change. The graceful fallback to `setInsecure()` specifically protects
+> against this — OTA degrades to unverified transport but remains functional,
+> and the next firmware update ships the corrected cert.
 
 The firmware download's `setInsecure()` is acceptable because `MbedTLSSignatureVerifier`
 provides cryptographic integrity. But the manifest has no independent verification,
@@ -84,6 +91,12 @@ so we want cert validation as defense-in-depth.
   //
   // WiFiClientSecure::setCACert() passes this to mbedtls_x509_crt_parse(),
   // which handles multiple PEM certificates in a single buffer.
+  //
+  // If either CA rotates, OTA falls back to setInsecure() with a warning log.
+  // The firmware cryptographic signature (MbedTLSSignatureVerifier) is the
+  // mandatory trust anchor — transport cert validation is defense-in-depth.
+  // Update these PEMs when rotation is detected, and the next firmware OTA
+  // will ship the corrected certs.
   static const char OTA_ROOT_CA_BUNDLE[] =
       "-----BEGIN CERTIFICATE-----\n"
       "...Sectigo E46...\n"
@@ -105,7 +118,13 @@ so we want cert validation as defense-in-depth.
 - [ ] **2b.** Update the manifest download TLS setup (~line 542-545) to:
   1. First try `setCACert(OTA_ROOT_CA_BUNDLE)`
   2. Attempt connection
-  3. If connection fails, log a warning and retry with `setInsecure()`
+  3. If connection fails, **destroy the WiFiClientSecure and create a fresh one**
+     with `setInsecure()`, then retry
+
+  **CRITICAL**: After a failed TLS handshake, the mbedTLS context inside
+  `WiFiClientSecure` is in a dirty state. You **cannot** simply call
+  `setInsecure()` on the same client and retry — the internal session state
+  is unreliable. You must `delete` the old client and `new` a fresh one.
 
   Implementation pattern:
   ```cpp
@@ -119,12 +138,25 @@ so we want cert validation as defense-in-depth.
 
   int httpCode = http.GET();
   if (httpCode < 0) {
-      // CA validation may have failed — retry with insecure fallback
+      // CA validation may have failed — create a fresh client and retry insecure
       ESP_LOGW(TAG, "Manifest fetch failed with pinned CA (err=%d) "
                     "— retrying without cert validation "
                     "(firmware signature is the trust anchor)", httpCode);
       http.end();
+
+      // Feed TWDT before retry — TLS handshake can be slow
+      esp_task_wdt_reset();
+
+      // MUST create a fresh WiFiClientSecure — the failed handshake leaves
+      // the mbedTLS context in a dirty state that cannot be reconfigured.
+      delete manifestClient;
+      manifestClient = new (std::nothrow) WiFiClientSecure();
+      if (!manifestClient) {
+          ESP_LOGE(TAG, "Failed to allocate WiFiClientSecure for insecure retry");
+          // ... handle OOM — return/break as appropriate ...
+      }
       manifestClient->setInsecure();
+
       if (!http.begin(*manifestClient, String(manifestUrl.c_str()))) {
           // ... error handling ...
       }
@@ -136,16 +168,34 @@ so we want cert validation as defense-in-depth.
   then calls `http.GET()`. Preserve that flow. The fallback retry must re-do the
   full `begin() → addHeader() → GET()` sequence.
 
-  **IMPORTANT**: Feed the TWDT before the retry attempt (add `esp_task_wdt_reset()`).
+  **IMPORTANT**: Ensure the `delete manifestClient` is safe in the enclosing
+  scope — if there's a later `delete` or smart pointer managing this client,
+  update the pointer so the later cleanup doesn't double-free.
 
-### Step 3: Update GithubClient API connection
+### Step 3: Update GithubClient API connection with fallback
 
-- [ ] **3a.** In `lib/GithubClient/GithubClient.cpp`, update the `#include` and
-  the `setCACert()` call to use `OTA_ROOT_CA_BUNDLE` instead of `GITHUB_ROOT_CA_CERT`.
-  This is a minor change — the bundle contains the Sectigo cert so API connections
-  still validate. The benefit is a single CA source for all OTA paths.
+- [ ] **3a.** In `lib/GithubClient/GithubClient.cpp`, update the `#include` to
+  use `ota_root_cas.h` instead of `github_root_ca.h`.
 
-- [ ] **3b.** If `github_root_ca.h` is no longer referenced anywhere after this
+- [ ] **3b.** Add the **same try-CA / fallback-insecure pattern** to the API
+  connection in `GithubClient.cpp`. The API leg currently uses `setCaCert()` with
+  no fallback — if Sectigo rotates (the pinned cert expires 2038, but rotation
+  could happen earlier), the device cannot even check for updates.
+
+  Apply the same pattern as Step 2b:
+  1. `setCaCert(OTA_ROOT_CA_BUNDLE)` and attempt connection
+  2. If TLS handshake fails, `delete` the client, create a fresh `WiFiClientSecure`
+     with `setInsecure()`, and retry
+  3. Log a warning on fallback
+
+  **PAT exposure note:** The `Authorization: token <PAT>` header is sent over this
+  connection. On the insecure fallback path, the PAT traverses an unverified TLS
+  channel. This is acceptable because the PAT is a fine-grained, read-only,
+  single-repo token with negligible blast radius — it is effectively public
+  (anyone with the firmware has it or can extract it). The alternative — hard
+  failure with no OTA — is worse.
+
+- [ ] **3c.** If `github_root_ca.h` is no longer referenced anywhere after this
   change, do NOT delete it yet — just add a comment noting it's superseded by
   `ota_root_cas.h`. The PA will handle cleanup.
 
