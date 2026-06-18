@@ -740,7 +740,7 @@ void OTAUpdateManager::performUpdateTask() {
     std::string token = cfg.otaGithubToken ? cfg.otaGithubToken : "";
 
     if (!sigUrl.empty()) {
-        sigLen = engine.fetchSignature(*client, String(sigUrl.c_str()), String(token.c_str()), sigBuf, sizeof(sigBuf));
+        sigLen = engine.fetchSignature(*client, sigUrl, token, sigBuf, sizeof(sigBuf));
         if (sigLen == 0 && cfg.otaPublicKey != nullptr) {
             ESP_LOGE(TAG, "SECURITY ABORT: Signature fetch returned 0 bytes — refusing update");
             publishProgress(0.0f, "Signature fetch failed — update rejected", true, false);
@@ -759,7 +759,7 @@ void OTAUpdateManager::performUpdateTask() {
     // feeds the watchdog every ~4KB. All prior phases (GitHub API, manifest,
     // signature) involve unpredictable blocking I/O and must NOT be under TWDT.
     esp_task_wdt_add(NULL);
-    OTAError result = engine.downloadAndFlash(*client, String(binUrl.c_str()), String(token.c_str()), sigBuf, sigLen);
+    OTAError result = engine.downloadAndFlash(*client, binUrl, token, sigBuf, sigLen);
     esp_task_wdt_delete(NULL);
 
     if (result != OTAError::None) {

@@ -173,8 +173,8 @@ TEST_F(OtaDownloadEngineTest, OtaErrorToString_None_ReturnsSuccess) {
 TEST_F(OtaDownloadEngineTest, FetchSignature_NativeStub_ReturnsZero) {
     WiFiClient stubClient;
     uint8_t sigBuf[256] = {};
-    String url("https://example.com/firmware.bin.sig");
-    String token("");
+    std::string url("https://example.com/firmware.bin.sig");
+    std::string token("");
 
     size_t result = engine.fetchSignature(stubClient, url, token, sigBuf, sizeof(sigBuf));
     EXPECT_EQ(result, 0u);
@@ -186,8 +186,8 @@ TEST_F(OtaDownloadEngineTest, FetchSignature_NativeStub_ReturnsZero) {
 TEST_F(OtaDownloadEngineTest, DownloadAndFlash_NativeStub_ReturnsError) {
     WiFiClient stubClient;
     uint8_t sigBuf[256] = {};
-    String url("https://example.com/firmware.bin");
-    String token("");
+    std::string url("https://example.com/firmware.bin");
+    std::string token("");
 
     OTAError result = engine.downloadAndFlash(stubClient, url, token, sigBuf, sizeof(sigBuf));
     EXPECT_NE(result, OTAError::None);

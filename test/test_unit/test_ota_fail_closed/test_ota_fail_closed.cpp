@@ -101,8 +101,8 @@ TEST_F(OTAFailClosedTest, SignatureVerifyFailed_IsDistinct) {
 TEST_F(OTAFailClosedTest, NativeStub_ReturnsHttpConnectionFailed) {
     WiFiClient stubClient;
     uint8_t sigBuf[64] = {};
-    String url("https://example.com/firmware.bin");
-    String token("");
+    std::string url("https://example.com/firmware.bin");
+    std::string token("");
 
     OTAError result = engine.downloadAndFlash(stubClient, url, token, sigBuf, sizeof(sigBuf));
     EXPECT_EQ(result, OTAError::HttpConnectionFailed);

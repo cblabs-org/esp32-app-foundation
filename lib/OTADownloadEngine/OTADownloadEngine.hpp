@@ -38,6 +38,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <string>
 
 
 #ifndef NATIVE_BUILD
@@ -51,42 +52,6 @@
     class HTTPClient;
 #else
     // --- Native build stubs ---
-    #include <string>
-    #ifndef STRING_STUB_DEFINED
-    #define STRING_STUB_DEFINED
-    class String {
-    public:
-        String() {}
-        String(const char* s) : _str(s ? s : "") {}
-        String(const std::string& s) : _str(s) {}
-        String(int value, int base) {
-            if (base == 16) {
-                char buf[20];
-                snprintf(buf, sizeof(buf), "%x", value);
-                _str = buf;
-            } else {
-                _str = std::to_string(value);
-            }
-        }
-        const char* c_str() const { return _str.c_str(); }
-        bool isEmpty() const { return _str.empty(); }
-        size_t length() const { return _str.length(); }
-        char operator[](unsigned int i) const { return _str[i]; }
-        String& operator+=(char c) { _str += c; return *this; }
-        String& operator+=(const String& s) { _str += s._str; return *this; }
-        friend String operator+(const char* lhs, const String& rhs) {
-            return String(lhs) + rhs;
-        }
-        String operator+(const String& rhs) const {
-            String result;
-            result._str = _str + rhs._str;
-            return result;
-        }
-        operator std::string() const { return _str; }
-    private:
-        std::string _str;
-    };
-    #endif
 
     // Minimal WiFiClient stub for native compilation
     class WiFiClient {
@@ -159,8 +124,8 @@ public:
      * @param sigBufSize Size of the output buffer.
      * @return Number of bytes read, or 0 on failure.
      */
-    size_t fetchSignature(WiFiClient& client, const String& sigUrl,
-                          const String& token, uint8_t* sigBuf, size_t sigBufSize);
+    size_t fetchSignature(WiFiClient& client, const std::string& sigUrl,
+                          const std::string& token, uint8_t* sigBuf, size_t sigBufSize);
 
     /**
      * @brief Download, verify, and flash the firmware binary.
@@ -177,8 +142,8 @@ public:
      * @param sigLen  Length of the signature.
      * @return OTAError::None on success, specific error otherwise.
      */
-    OTAError downloadAndFlash(WiFiClient& client, const String& binUrl,
-                              const String& token, const uint8_t* sigBuf, size_t sigLen);
+    OTAError downloadAndFlash(WiFiClient& client, const std::string& binUrl,
+                              const std::string& token, const uint8_t* sigBuf, size_t sigLen);
 
     /**
      * @brief Get the last error code.
@@ -216,5 +181,5 @@ private:
      * @return HTTP status code on success, or -1 on redirect exhaustion/failure.
      */
     int followRedirects(WiFiClient& client, HTTPClient& http,
-                        const String& url, const String& token);
+                        const std::string& url, const std::string& token);
 };

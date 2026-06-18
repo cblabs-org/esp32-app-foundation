@@ -121,12 +121,12 @@ const char* OTADownloadEngine::getLastErrorString() const {
  * @return HTTP status code on success, or -1 on redirect exhaustion/failure.
  */
 int OTADownloadEngine::followRedirects(WiFiClient& client, HTTPClient& http,
-                                        const String& url, const String& token) {
-    String currentUrl = url;
+                                        const std::string& url, const std::string& token) {
+    std::string currentUrl = url;
 
     for (int hop = 0; hop < kMaxRedirects; hop++) {
         // --- Begin HTTP request for this hop ---
-        if (!http.begin(client, currentUrl)) {
+        if (!http.begin(client, String(currentUrl.c_str()))) {
             ESP_LOGE(TAG, "http.begin() failed for URL: %s", currentUrl.c_str());
             return -1;
         }
@@ -138,8 +138,8 @@ int OTADownloadEngine::followRedirects(WiFiClient& client, HTTPClient& http,
         http.setUserAgent("ESP32-http-Update");
         http.addHeader("Cache-Control", "no-cache");
         http.addHeader("Accept", "application/octet-stream");
-        if (token.length() > 0) {
-            http.addHeader("Authorization", "Bearer " + token);
+        if (!token.empty()) {
+            http.addHeader("Authorization", String(("Bearer " + token).c_str()));
         }
         http.addHeader("X-GitHub-Api-Version", "2022-11-28");
 
@@ -157,7 +157,7 @@ int OTADownloadEngine::followRedirects(WiFiClient& client, HTTPClient& http,
             }
 
             ESP_LOGD(TAG, "Redirect hop %d/%d → %s", hop + 1, kMaxRedirects, newUrl.c_str());
-            currentUrl = newUrl;
+            currentUrl = newUrl.c_str();
             continue;
         }
 
@@ -183,8 +183,8 @@ int OTADownloadEngine::followRedirects(WiFiClient& client, HTTPClient& http,
  * @param sigBufSize Size of the output buffer.
  * @return Number of bytes read, or 0 on failure.
  */
-size_t OTADownloadEngine::fetchSignature(WiFiClient& client, const String& sigUrl,
-                                          const String& token, uint8_t* sigBuf, size_t sigBufSize) {
+size_t OTADownloadEngine::fetchSignature(WiFiClient& client, const std::string& sigUrl,
+                                          const std::string& token, uint8_t* sigBuf, size_t sigBufSize) {
     ESP_LOGI(TAG, "Fetching signature from: %s", sigUrl.c_str());
     HTTPClient http;
 
@@ -245,8 +245,8 @@ size_t OTADownloadEngine::fetchSignature(WiFiClient& client, const String& sigUr
  * @param sigLen  Length of the signature.
  * @return OTAError::None on success, specific error otherwise.
  */
-OTAError OTADownloadEngine::downloadAndFlash(WiFiClient& client, const String& binUrl,
-                                              const String& token, const uint8_t* sigBuf, size_t sigLen) {
+OTAError OTADownloadEngine::downloadAndFlash(WiFiClient& client, const std::string& binUrl,
+                                              const std::string& token, const uint8_t* sigBuf, size_t sigLen) {
     ESP_LOGI(TAG, "Beginning firmware download from: %s", binUrl.c_str());
     HTTPClient http;
 
@@ -459,7 +459,7 @@ OTAError OTADownloadEngine::downloadAndFlash(WiFiClient& client, const String& b
  * @return Always returns -1 (failure).
  */
 int OTADownloadEngine::followRedirects(WiFiClient& client, HTTPClient& http,
-                                        const String& url, const String& token) {
+                                        const std::string& url, const std::string& token) {
     (void)client; (void)http; (void)url; (void)token;
     ESP_LOGD(TAG, "followRedirects() stub — native build");
     return -1;
@@ -469,8 +469,8 @@ int OTADownloadEngine::followRedirects(WiFiClient& client, HTTPClient& http,
  * @brief Native stub — signature fetch is not available without hardware.
  * @return Always returns 0 (no bytes read).
  */
-size_t OTADownloadEngine::fetchSignature(WiFiClient& client, const String& sigUrl,
-                                          const String& token, uint8_t* sigBuf, size_t sigBufSize) {
+size_t OTADownloadEngine::fetchSignature(WiFiClient& client, const std::string& sigUrl,
+                                          const std::string& token, uint8_t* sigBuf, size_t sigBufSize) {
     (void)client; (void)sigUrl; (void)token; (void)sigBuf; (void)sigBufSize;
     ESP_LOGD(TAG, "fetchSignature() stub — native build");
     lastError_ = OTAError::HttpConnectionFailed;
@@ -481,8 +481,8 @@ size_t OTADownloadEngine::fetchSignature(WiFiClient& client, const String& sigUr
  * @brief Native stub — download and flash is not available without hardware.
  * @return Always returns OTAError::HttpConnectionFailed.
  */
-OTAError OTADownloadEngine::downloadAndFlash(WiFiClient& client, const String& binUrl,
-                                              const String& token, const uint8_t* sigBuf, size_t sigLen) {
+OTAError OTADownloadEngine::downloadAndFlash(WiFiClient& client, const std::string& binUrl,
+                                              const std::string& token, const uint8_t* sigBuf, size_t sigLen) {
     (void)client; (void)binUrl; (void)token; (void)sigBuf; (void)sigLen;
     ESP_LOGD(TAG, "downloadAndFlash() stub — native build");
     lastError_ = OTAError::HttpConnectionFailed;

@@ -27,14 +27,14 @@
 
 const char* GithubClient::githubRootCACert = GITHUB_ROOT_CA_CERT;
 
-GithubClient::GithubClient(const String& repository, const String& token) {
+GithubClient::GithubClient(const std::string& repository, const std::string& token) {
     repository_ = repository;
-    if (repository.length() > 0) {
-        apiGetLatestRelease = "https://" + String(apiHost) + "/repos/" + repository + "/releases/latest";
-        apiGetReleases      = "https://" + String(apiHost) + "/repos/" + repository + "/releases";
+    if (!repository.empty()) {
+        apiGetLatestRelease = std::string("https://") + apiHost + "/repos/" + repository + "/releases/latest";
+        apiGetReleases      = std::string("https://") + apiHost + "/repos/" + repository + "/releases";
     }
     accessToken = token;
-    if (accessToken.length() > 0) {
+    if (!accessToken.empty()) {
         Logger::registerSecret(accessToken);
     }
     releaseAssets = 0;
@@ -64,12 +64,12 @@ bool GithubClient::getLatestRelease() {
     HTTPClient http;
     http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
     http.useHTTP10(true);
-    http.begin(*client, apiGetLatestRelease);
+    http.begin(*client, String(apiGetLatestRelease.c_str()));
     http.addHeader("User-Agent", "esp32/1.0");
     http.addHeader("X-GitHub-Api-Version", "2022-11-28");
     http.addHeader("Accept", "application/vnd.github+json");
-    if (accessToken.length() > 0) {
-        http.addHeader("Authorization", "Bearer " + accessToken);
+    if (!accessToken.empty()) {
+        http.addHeader("Authorization", String(("Bearer " + accessToken).c_str()));
     }
 
     LOG_SECURE("GITHUB", "Requesting latest release from %s", apiGetLatestRelease.c_str());
@@ -135,7 +135,7 @@ bool GithubClient::getLatestRelease() {
         if (releaseAssets >= MAX_RELEASE_ASSETS) break;
         releaseAssetName[releaseAssets] = asset["name"] | "";
         releaseAssetURL[releaseAssets] = asset["url"] | "";
-        if (releaseAssetName[releaseAssets].length() > 0 && releaseAssetURL[releaseAssets].length() > 0) {
+        if (!releaseAssetName[releaseAssets].empty() && !releaseAssetURL[releaseAssets].empty()) {
             releaseAssets++;
         }
     }
@@ -208,12 +208,12 @@ bool GithubClient::getLatestReleaseForChannel(const char* channel) {
 
     // Track best candidate found so far.
     // If stable baseline exists, it is the starting best candidate.
-    String bestTag         = hasStableBaseline ? releaseId : "";
-    String bestDescription = hasStableBaseline ? releaseDescription : "";
+    std::string bestTag         = hasStableBaseline ? releaseId : "";
+    std::string bestDescription = hasStableBaseline ? releaseDescription : "";
     bool   bestIsPre       = false;
     int    bestAssetCount  = hasStableBaseline ? releaseAssets : 0;
-    String bestAssetName[MAX_RELEASE_ASSETS];
-    String bestAssetURL[MAX_RELEASE_ASSETS];
+    std::string bestAssetName[MAX_RELEASE_ASSETS];
+    std::string bestAssetURL[MAX_RELEASE_ASSETS];
     FirmwareVersion bestVer = {};
     if (hasStableBaseline) {
         bestVer = parseVersionTag(releaseId.c_str());
@@ -231,7 +231,7 @@ bool GithubClient::getLatestReleaseForChannel(const char* channel) {
 
     for (int page = 1; page <= MAX_PAGES && !stopScanning; ++page) {
         // Build paginated URL
-        String pageUrl = apiGetReleases + "?per_page=" + String(PER_PAGE) + "&page=" + String(page);
+        std::string pageUrl = apiGetReleases + "?per_page=" + std::to_string(PER_PAGE) + "&page=" + std::to_string(page);
         LOG_SECURE("GITHUB", "Requesting releases page %d (floor='%s')", page, channel);
 
         // Heap-allocated TLS client — reuses allocation across pages.
@@ -248,12 +248,12 @@ bool GithubClient::getLatestReleaseForChannel(const char* channel) {
         HTTPClient pageHttp;
         pageHttp.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
         pageHttp.useHTTP10(true);
-        pageHttp.begin(*pageClient, pageUrl);
+        pageHttp.begin(*pageClient, String(pageUrl.c_str()));
         pageHttp.addHeader("User-Agent", "esp32/1.0");
         pageHttp.addHeader("X-GitHub-Api-Version", "2022-11-28");
         pageHttp.addHeader("Accept", "application/vnd.github+json");
-        if (accessToken.length() > 0) {
-            pageHttp.addHeader("Authorization", "Bearer " + accessToken);
+        if (!accessToken.empty()) {
+            pageHttp.addHeader("Authorization", String(("Bearer " + accessToken).c_str()));
         }
         pageHttp.setTimeout(15000);
 
@@ -341,7 +341,7 @@ bool GithubClient::getLatestReleaseForChannel(const char* channel) {
             // EXIT 2: Found an acceptable prerelease that beats best candidate.
             // Since releases are newest-first, the first acceptable prerelease
             // is the winner — nothing later can beat it.
-            if (bestTag.isEmpty() || candidate > bestVer) {
+            if (bestTag.empty() || candidate > bestVer) {
                 LOG_SECURE("GITHUB", "Found acceptable prerelease %s — stopping", tagName);
                 bestVer         = candidate;
                 bestTag         = tagName;
@@ -352,9 +352,9 @@ bool GithubClient::getLatestReleaseForChannel(const char* channel) {
                 JsonArray assetsArray = release["assets"].as<JsonArray>();
                 for (JsonObject asset : assetsArray) {
                     if (bestAssetCount >= MAX_RELEASE_ASSETS) break;
-                    String name = asset["name"] | "";
-                    String url  = asset["url"]  | "";
-                    if (name.length() > 0 && url.length() > 0) {
+                    std::string name = asset["name"] | "";
+                    std::string url  = asset["url"]  | "";
+                    if (!name.empty() && !url.empty()) {
                         bestAssetName[bestAssetCount] = name;
                         bestAssetURL[bestAssetCount]  = url;
                         bestAssetCount++;
@@ -367,7 +367,7 @@ bool GithubClient::getLatestReleaseForChannel(const char* channel) {
     }
 
     // --- Step 3: Commit the best candidate to member fields ---
-    if (bestTag.isEmpty()) {
+    if (bestTag.empty()) {
         if (parseFailures > 0) {
             snprintf(lastErrorMsg, sizeof(lastErrorMsg),
                      "GitHub API responses could not be parsed (%d page(s) failed — possible network/memory issue)",
@@ -396,7 +396,7 @@ bool GithubClient::getLatestReleaseForChannel(const char* channel) {
 #else
     // Mock for native unit tests — return a plausible prerelease for the channel
     // so tests exercising the risk-floor path get a testable result.
-    releaseId          = String("v0.0.6-") + String(channel) + String(".1");
+    releaseId          = std::string("v0.0.6-") + channel + ".1";
     releaseDescription = "Mock Pre-Release";
     releaseAssets      = 1;
     releaseAssetName[0] = "firmware.bin";

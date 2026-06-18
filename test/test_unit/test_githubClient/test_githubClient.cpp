@@ -21,7 +21,7 @@ TEST_F(GithubClientTest, GetLastErrorInitial) {
 
 TEST_F(GithubClientTest, ReleaseIdInitialState) {
     GithubClient client("owner/repo");
-    EXPECT_TRUE(client.releaseId.length() == 0);
+    EXPECT_TRUE(client.releaseId.empty());
 }
 
 TEST_F(GithubClientTest, ReleaseAssetsInitialState) {

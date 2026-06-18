@@ -23,12 +23,12 @@ static constexpr const char* TAG = "MD5Utils";
  * @param filePath The absolute path to the file on LittleFS (e.g. "/webgui.html").
  * @return A 32-character hexadecimal MD5 string, or empty if the file cannot be read.
  */
-String MD5Utils::calculateFileMD5(const char* filePath) {
+std::string MD5Utils::calculateFileMD5(const char* filePath) {
 #ifndef PIO_UNIT_TESTING
     File file = LittleFS.open(filePath, "r");
     if (!file || file.isDirectory()) {
         ESP_LOGW(TAG, "calculateFileMD5: cannot open file '%s'", filePath);
-        return String();
+        return std::string();
     }
 
     mbedtls_md5_context ctx;
@@ -53,10 +53,10 @@ String MD5Utils::calculateFileMD5(const char* filePath) {
     }
     hexString[32] = '\0';
 
-    return String(hexString);
+    return std::string(hexString);
 #else
     // Mock implementation for native testing
-    return String("d41d8cd98f00b204e9800998ecf8427e"); // MD5 of empty string
+    return std::string("d41d8cd98f00b204e9800998ecf8427e"); // MD5 of empty string
 #endif
 }
 
@@ -65,16 +65,16 @@ String MD5Utils::calculateFileMD5(const char* filePath) {
  * @param base64Hash The base64 encoded string.
  * @return A 32-character hexadecimal MD5 string.
  */
-String MD5Utils::base64ToHex(String base64Hash) {
+std::string MD5Utils::base64ToHex(const std::string& base64Hash) {
     const char base64Table[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     int base64Value[256];
     for (int i = 0; i < 256; i++) base64Value[i] = -1;
     for (int i = 0; i < 64; i++) base64Value[(int)base64Table[i]] = i;
 
-    int len = base64Hash.length();
+    int len = (int)base64Hash.length();
     if (len == 0) {
         ESP_LOGW(TAG, "base64ToHex: empty input string");
-        return String();
+        return std::string();
     }
 
     int padding = (base64Hash[len - 1] == '=') + ((len > 1 && base64Hash[len - 2] == '=') ? 1 : 0);
@@ -82,13 +82,13 @@ String MD5Utils::base64ToHex(String base64Hash) {
     
     if (binarySize <= 0) {
         ESP_LOGW(TAG, "base64ToHex: invalid binary size after decode");
-        return String();
+        return std::string();
     }
 
     uint8_t* binaryData = new (std::nothrow) uint8_t[binarySize];
     if (binaryData == nullptr) {
         ESP_LOGE(TAG, "Failed to allocate binary data buffer (%d bytes)", binarySize);
-        return String();
+        return std::string();
     }
     int index = 0, buffer = 0, bits = 0;
     
@@ -98,7 +98,7 @@ String MD5Utils::base64ToHex(String base64Hash) {
         if (value == -1) {
             ESP_LOGW(TAG, "base64ToHex: invalid base64 character at position %d", i);
             delete[] binaryData;
-            return String();
+            return std::string();
         }
         buffer = (buffer << 6) | value;
         bits += 6;
@@ -110,10 +110,12 @@ String MD5Utils::base64ToHex(String base64Hash) {
         }
     }
 
-    String hexHash = "";
+    std::string hexHash;
+    hexHash.reserve(index * 2);
     for (int i = 0; i < index; i++) {
-        if (binaryData[i] < 16) hexHash += '0';
-        hexHash += String(binaryData[i], HEX);
+        char hexBuf[3];
+        snprintf(hexBuf, sizeof(hexBuf), "%02x", binaryData[i]);
+        hexHash += hexBuf;
     }
 
     delete[] binaryData;

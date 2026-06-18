@@ -18,50 +18,12 @@
 #ifndef GITHUB_CLIENT_HPP
 #define GITHUB_CLIENT_HPP
 
-#ifndef NATIVE_BUILD
-#include <Arduino.h>
-#else
 #include <string>
 #include <cstdint>
 #include <cstddef>
-#ifndef HEX
-#define HEX 16
-#endif
-// Provide String stub if not already available
-#ifndef STRING_STUB_DEFINED
-#define STRING_STUB_DEFINED
-class String {
-public:
-    String() {}
-    String(const char* s) : _str(s ? s : "") {}
-    String(const std::string& s) : _str(s) {}
-    String(int value, int base) {
-        if (base == 16) {
-            char buf[20];
-            snprintf(buf, sizeof(buf), "%x", value);
-            _str = buf;
-        } else {
-            _str = std::to_string(value);
-        }
-    }
-    const char* c_str() const { return _str.c_str(); }
-    bool isEmpty() const { return _str.empty(); }
-    int length() const { return _str.length(); }
-    String operator+(const char* s) const { return String(_str + s); }
-    String operator+(const String& s) const { return String(_str + s._str); }
-    bool operator==(const String& other) const { return _str == other._str; }
-    bool operator==(const char* s) const { return _str == s; }
-    char operator[](int i) const { return _str[i]; }
-    String& operator+=(char c) { _str += c; return *this; }
-    String& operator+=(const String& s) { _str += s._str; return *this; }
-    friend String operator+(const char* lhs, const String& rhs) {
-        return String(lhs) + rhs;
-    }
-    operator std::string() const { return _str; }
-private:
-    std::string _str;
-};
-#endif
+
+#ifndef NATIVE_BUILD
+#include <Arduino.h>
 #endif
 
 // ---------------------------------------------------------------------------
@@ -90,21 +52,21 @@ static constexpr int MAX_RELEASE_ASSETS = (MAX_OTA_BOARDS * ASSETS_PER_BOARD) + 
 class GithubClient {
 private:
     const char* apiHost = "api.github.com";
-    String apiGetLatestRelease;
-    String apiGetReleases;
-    String accessToken;
-    String repository_;
+    std::string apiGetLatestRelease;
+    std::string apiGetReleases;
+    std::string accessToken;
+    std::string repository_;
     char lastErrorMsg[128];
 
     // Global Root CA for GitHub API (ISRG Root X1 or DigiCert)
     static const char* githubRootCACert;
 
 public:
-    String releaseId;
-    String releaseDescription;
+    std::string releaseId;
+    std::string releaseDescription;
     int releaseAssets;
-    String releaseAssetURL[MAX_RELEASE_ASSETS];
-    String releaseAssetName[MAX_RELEASE_ASSETS];
+    std::string releaseAssetURL[MAX_RELEASE_ASSETS];
+    std::string releaseAssetName[MAX_RELEASE_ASSETS];
     bool isPreRelease;  ///< Set by the release query methods
 
     /**
@@ -112,7 +74,7 @@ public:
      * @param repository The repository in "owner/repo" format.
      * @param token Optional GitHub personal access token.
      */
-    GithubClient(const String& repository, const String& token = "");
+    GithubClient(const std::string& repository, const std::string& token = "");
 
     ~GithubClient() = default;
 

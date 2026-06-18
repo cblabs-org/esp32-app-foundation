@@ -88,7 +88,7 @@ public:
     static void logSecure(const char* tag, const char* format, ...);
 
 private:
-    static std::vector<String> secrets; ///< Registry of sensitive strings
+    static std::vector<std::string> secrets; ///< Registry of sensitive strings
 
     /**
      * @brief Scans a char buffer and replaces any registered secrets with asterisks in-place.
