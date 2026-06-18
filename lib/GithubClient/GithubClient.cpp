@@ -12,6 +12,7 @@
 #include "../Logger/Logger.hpp"
 #include "../SemVer/SemVer.hpp"
 #include <string.h>
+#include <memory>
 
 #ifndef NATIVE_BUILD
 #include <WiFiClientSecure.h>
@@ -52,14 +53,18 @@ bool GithubClient::getLatestRelease() {
     isPreRelease = false;
 
 #ifndef NATIVE_BUILD
-    WiFiClientSecure client;
-    client.setCACert(githubRootCACert);
-    client.setTimeout(15000);
+    auto client = std::unique_ptr<WiFiClientSecure>(new (std::nothrow) WiFiClientSecure());
+    if (!client) {
+        ESP_LOGE("GITHUB", "Failed to allocate WiFiClientSecure for release query");
+        return false;
+    }
+    client->setCACert(githubRootCACert);
+    client->setTimeout(15000);
 
     HTTPClient http;
     http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
     http.useHTTP10(true);
-    http.begin(client, apiGetLatestRelease);
+    http.begin(*client, apiGetLatestRelease);
     http.addHeader("User-Agent", "esp32/1.0");
     http.addHeader("X-GitHub-Api-Version", "2022-11-28");
     http.addHeader("Accept", "application/vnd.github+json");
@@ -86,6 +91,9 @@ bool GithubClient::getLatestRelease() {
     int contentLen = http.getSize();
     if (contentLen <= 0) contentLen = 16384;  // Fallback if no Content-Length
 
+    // SAFETY: PSRAM buffer is allocated and freed within this function scope.
+    // It MUST be freed before any flash write operation begins (called from
+    // OTA task where PSRAM and flash share the SPI bus).
     char* buf = (char*)heap_caps_malloc(contentLen + 1, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     if (!buf) {
         // PSRAM unavailable (e.g. ESP32-dev) — fall back to DRAM
@@ -226,15 +234,21 @@ bool GithubClient::getLatestReleaseForChannel(const char* channel) {
         String pageUrl = apiGetReleases + "?per_page=" + String(PER_PAGE) + "&page=" + String(page);
         LOG_SECURE("GITHUB", "Requesting releases page %d (floor='%s')", page, channel);
 
-        // Fresh TLS connection for each page
-        WiFiClientSecure pageClient;
-        pageClient.setCACert(githubRootCACert);
-        pageClient.setTimeout(15000);
+        // Heap-allocated TLS client — reuses allocation across pages.
+        // DRAM-first (std::nothrow) because this runs on the OTA task
+        // where PSRAM is unsafe during flash writes.
+        auto pageClient = std::unique_ptr<WiFiClientSecure>(new (std::nothrow) WiFiClientSecure());
+        if (!pageClient) {
+            ESP_LOGE("GITHUB", "Failed to allocate WiFiClientSecure for page %d", page);
+            break;
+        }
+        pageClient->setCACert(githubRootCACert);
+        pageClient->setTimeout(15000);
 
         HTTPClient pageHttp;
         pageHttp.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
         pageHttp.useHTTP10(true);
-        pageHttp.begin(pageClient, pageUrl);
+        pageHttp.begin(*pageClient, pageUrl);
         pageHttp.addHeader("User-Agent", "esp32/1.0");
         pageHttp.addHeader("X-GitHub-Api-Version", "2022-11-28");
         pageHttp.addHeader("Accept", "application/vnd.github+json");
@@ -254,6 +268,9 @@ bool GithubClient::getLatestReleaseForChannel(const char* channel) {
         int contentLen = pageHttp.getSize();
         if (contentLen <= 0) contentLen = 16384;
 
+        // SAFETY: PSRAM buffer is allocated and freed within this function scope.
+        // It MUST be freed before any flash write operation begins (called from
+        // OTA task where PSRAM and flash share the SPI bus).
         char* buf = (char*)heap_caps_malloc(contentLen + 1, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
         if (!buf) {
             // PSRAM unavailable — fall back to DRAM

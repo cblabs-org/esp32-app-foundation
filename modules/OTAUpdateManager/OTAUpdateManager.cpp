@@ -572,7 +572,9 @@ void OTAUpdateManager::performUpdateTask() {
             return;
         }
 
-        char manifestBuf[2048];
+        // Static buffer — only one OTA pipeline runs at a time (enforced by _state guard).
+        // Saves 2 KB of stack headroom on the 16 KB OTA task.
+        static char manifestBuf[2048];
         int payloadLen = http.getSize();
         if (payloadLen <= 0 || payloadLen >= (int)sizeof(manifestBuf)) {
             ESP_LOGE(TAG, "Manifest payload size invalid: %d", payloadLen);
@@ -775,7 +777,14 @@ void OTAUpdateManager::performUpdateTask() {
     publishProgress(1.0f, "Update complete — rebooting...", true, true);
     ESP_LOGI(TAG, "OTA update complete — rebooting in 2 seconds");
 
+    // SAFETY: TWDT was deregistered at line ~761. This delay is safe only
+    // because we are outside TWDT scope. Do not move TWDT deregistration
+    // below this point.
     delay(2000);  // Allow event propagation and display update
+
+    ESP_LOGI(TAG, "OTA task stack high-water mark: %u bytes free",
+             static_cast<unsigned>(uxTaskGetStackHighWaterMark(nullptr) * sizeof(StackType_t)));
+
     ESP.restart();
 #else
     // Native builds: no-op (should not be called)

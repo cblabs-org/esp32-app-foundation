@@ -221,6 +221,11 @@ public:
      * queries the latest release, and compares release IDs. On native builds,
      * always returns false.
      *
+     * @warning This method makes blocking HTTPS calls. It MUST only be called
+     *          from the OTA FreeRTOS task — never from the main loop tick().
+     *          Calling from tick() will violate the 10ms tick budget and may
+     *          trigger the Task Watchdog Timer.
+     *
      * @return true if a new version is available, false otherwise.
      */
     bool checkForUpdate();
