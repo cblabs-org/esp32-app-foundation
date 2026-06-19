@@ -2,7 +2,7 @@
 
 **Branch:** `pr-32-ota-docs-deeplinks`
 **Base:** `main`
-**Status:** 🔄 **IN PROGRESS**
+**Status:** ✅ **COMPLETE** — merged to `main` `768f380`, pushed to remote
 **Session:** 5ad94103
 
 ---
