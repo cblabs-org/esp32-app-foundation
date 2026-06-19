@@ -229,6 +229,54 @@ Avoid tearing down and re-establishing TLS connections on every fetch cycle. Eac
 2. Reuse the connection across fetch cycles where the server supports HTTP keep-alive.
 3. Only reconnect when the connection drops or the server closes it.
 
+### TLS Memory Optimization
+
+The framework's `sdkconfig.defaults` includes mbedTLS tuning (introduced in PR-29) that significantly reduces TLS heap consumption. These are pure `sdkconfig` changes — zero source code modifications.
+
+#### Key sdkconfig Settings
+
+| Setting | Effect | Savings |
+| :--- | :--- | :--- |
+| `CONFIG_MBEDTLS_DYNAMIC_BUFFER=y` | TX/RX buffers allocated on-demand, freed when idle | ~16–20 KB per idle connection |
+| `CONFIG_MBEDTLS_SSL_KEEP_PEER_CERTIFICATE=n` | Discards peer cert after handshake verification | ~2–3 KB per connection |
+| `CONFIG_MBEDTLS_CERTIFICATE_BUNDLE_DEFAULT_NONE=y` | Disables built-in Mozilla CA bundle (framework uses `setCACert()`) | Reduces flash footprint |
+| `CONFIG_MBEDTLS_SSL_RENEGOTIATION=n` | Disables TLS renegotiation (security anti-pattern) | Code size reduction |
+| `CONFIG_MBEDTLS_CLIENT_SSL_SESSION_TICKETS=n` | Disables session tickets (marginal benefit for short-lived connections) | Code size reduction |
+
+> [!IMPORTANT]
+> The 16 KB RX buffer (`CONFIG_MBEDTLS_SSL_IN_CONTENT_LEN=16384`) **cannot be reduced**. CDNs (Fastly, Cloudflare) send full-size TLS records. A smaller buffer causes `MBEDTLS_ERR_SSL_BUFFER_TOO_SMALL` failures.
+
+#### Measured Results (ESP32-S3 NanoS3)
+
+| Metric | Before Optimization | After Optimization | Delta |
+| :--- | :--- | :--- | :--- |
+| Idle free heap | 148,683 B | 167,495 B | **+18,812 (+12.7%)** |
+| Minimum free heap | 86,063 B | 140,035 B | **+53,972 (+62.7%)** |
+| Largest free block | 71,680 B | 90,112 B | **+18,432 (+25.7%)** |
+
+After a full CA-validated TLS handshake + GitHub API call, `heap_min_free` never dropped below **124 KB** (vs 86 KB pre-optimization).
+
+#### Certificate Bundle Modes
+
+The framework defaults to `DEFAULT_NONE` because its own connections don't need the bundle (`GithubClient` pins its CA; OTA uses `setInsecure()` with payload verification). Downstream apps that need to connect to arbitrary HTTPS servers should re-enable the bundle:
+
+| Mode | CAs Included | Flash Cost |
+| :--- | :--- | :--- |
+| `DEFAULT_NONE` | None (framework default) | Minimal |
+| `DEFAULT_CMN` | ~35 most common CAs | ~15 KB |
+| `DEFAULT_FULL` | ~130 CAs (full Mozilla set) | ~60 KB |
+
+Override in your board-specific `sdkconfig.defaults.*`:
+
+```ini
+# Re-enable the "Most Common" bundle
+CONFIG_MBEDTLS_CERTIFICATE_BUNDLE_DEFAULT_NONE=n
+CONFIG_MBEDTLS_CERTIFICATE_BUNDLE_DEFAULT_CMN=y
+```
+
+> [!WARNING]
+> Setting `DEFAULT_NONE` while keeping `CONFIG_MBEDTLS_CERTIFICATE_BUNDLE=y` preserves the bundle API — downstream code can still call `esp_crt_bundle_attach()`. It only removes the default CA certificates. If you disable the bundle entirely (`CONFIG_MBEDTLS_CERTIFICATE_BUNDLE=n`), any code calling the bundle API will fail to link.
+
 ---
 
 ## 5. PSRAM

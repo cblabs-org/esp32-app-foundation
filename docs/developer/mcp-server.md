@@ -61,6 +61,8 @@ The framework auto-detects `IMCPContributor` during module registration. If your
 
 ### Example Implementation
 
+Tool handlers are **static function pointers** (not `std::function` — see GRAVE-05). Module state is passed through the opaque `void* context` parameter and recovered via `static_cast`. See `template/src/myApp.cpp` for the canonical example.
+
 ```cpp
 class WeatherModule : public ITickable, public IMCPContributor {
 public:
@@ -68,23 +70,28 @@ public:
         registry.addTool(
             "get_weather",
             "Get the current weather reading from the sensor",
-            [this](JsonObject& params, JsonObject& result) {
-                result["temperature"] = _lastTemperature;
-                result["humidity"]    = _lastHumidity;
+            [](void* ctx, JsonObject& params, JsonObject& result) {
+                auto* self = static_cast<WeatherModule*>(ctx);
+                (void)params;
+                result["temperature"] = self->_lastTemperature;
+                result["humidity"]    = self->_lastHumidity;
                 result["unit"]        = "celsius";
-            }
+            },
+            this   // context: WeatherModule*
         );
 
         registry.addTool(
             "set_weather_interval",
             "Set the weather polling interval in seconds",
-            [this](JsonObject& params, JsonObject& result) {
+            [](void* ctx, JsonObject& params, JsonObject& result) {
+                auto* self = static_cast<WeatherModule*>(ctx);
                 int interval = params["seconds"] | 60;
-                _pollIntervalMs = interval * 1000;
+                self->_pollIntervalMs = interval * 1000;
                 result["status"] = "ok";
                 result["interval_seconds"] = interval;
             },
-            true  // mutatesState = true
+            this,  // context: WeatherModule*
+            true   // mutatesState = true
         );
     }
 
@@ -103,7 +110,8 @@ Tools are registered via `MCPToolRegistry::addTool()`. There are two overloads:
 ```cpp
 void addTool(const char* name,
              const char* description,
-             std::function<void(JsonObject& params, JsonObject& result)> handler,
+             MCPToolHandler handler,
+             void* context = nullptr,
              bool mutatesState = false);
 ```
 
@@ -115,18 +123,29 @@ Creates a default empty schema: `{ "type": "object", "properties": {} }`.
 void addTool(const char* name,
              const char* description,
              const JsonDocument& inputSchema,
-             std::function<void(JsonObject& params, JsonObject& result)> handler,
+             MCPToolHandler handler,
+             void* context = nullptr,
              bool mutatesState = false);
 ```
 
 Allows you to define a JSON Schema for the tool's input parameters, which is returned to clients via `tools/list`.
 
-### Handler Signature
+### Handler Type
 
-The handler receives two `JsonObject` references:
+`MCPToolHandler` is a static function pointer defined in `MCPToolRegistry.hpp`:
 
+```cpp
+using MCPToolHandler = void(*)(void* context, JsonObject& params, JsonObject& result);
+```
+
+The handler receives three arguments:
+
+- **`context`** — Opaque pointer passed through from `addTool()`. Typically the module's `this` pointer, recovered via `static_cast`.
 - **`params`** — Input parameters from the JSON-RPC request. Access values with ArduinoJson syntax (e.g., `params["key"] | defaultValue`).
 - **`result`** — Output object. Populate this with the tool's return values. The MCP server wraps this in the standard JSON-RPC response envelope.
+
+> [!IMPORTANT]
+> `std::function` and capturing lambdas are **not used** for MCP handlers (GRAVE-05). Lambda captures that exceed the Small Buffer Optimisation threshold cause hidden heap allocations. Use non-capturing lambdas with the `void* context` pattern instead.
 
 ### The `mutatesState` Parameter
 

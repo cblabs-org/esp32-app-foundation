@@ -8,13 +8,20 @@
 
 ## For App Developers (Building ON the Framework)
 
-Start here: [Developer Guide](developer/README.md) — tutorials, interface contracts, and module authoring guidelines.
+Start here: [Developer Guide](developer/README.md) — tutorials, interface
+contracts, and module authoring guidelines.
 
 ## Framework References
 
-- [Design Specification](design_specification.md) — architectural blueprint, subsystem details, and design decisions (ADRs)
-- [OTA Developer Guide](OTADeveloperGuide.md) — OTA update system configuration, signing keys, and rollback details
-- [Build and Release Process](build_and_release_process.md) — step-by-step guide to compiling, testing, tagging, and publishing firmware
-- [Security Evaluation Report](security-evaluation-report.md) — evaluation of firmware encryption, secure boot, credential storage, and OTA security
-- [Comparative Analysis Report](comparative_analysis_report.md) — comparison of framework features and architectural choices against alternatives
-- [Embedded Best Practices Assessment](embedded-best-practices-assessment.md) — review of code standards, RTOS usage, and power optimization
+- [Design Specification](design_specification.md) — architectural blueprint,
+  38 ADRs, subsystem details, and design decisions
+- [OTA Developer Guide](OTADeveloperGuide.md) — OTA state machine, release
+  channels, manifest format, and deployment procedures
+
+## Historical Archives
+
+Point-in-time assessments from early development. Kept for provenance.
+
+- [Security Evaluation Report](archive/security-evaluation-report.md) — v0.1.0 audit (2026-06-01)
+- [Embedded Best Practices Assessment](archive/embedded-best-practices-assessment.md) — initial review (2026-05-31)
+- [Comparative Analysis Report](archive/comparative_analysis_report.md) — T1/T2 agent comparison

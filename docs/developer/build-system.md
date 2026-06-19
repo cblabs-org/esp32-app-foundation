@@ -264,7 +264,7 @@ The full release lifecycle is:
 
 1. **Tag** — create a SemVer git tag (see [Versioning Policy](../../.agents/rules/03-versioning.md))
 2. **Build** — compile firmware for all hardware environments
-3. **Sign** — sign firmware binaries with your ECDSA private key
+3. **Sign** — sign firmware binaries with your RSA-2048 private key
 4. **Deploy** — create a GitHub Release with signed binaries and manifest
 
 The [deploy_release.py](../../scripts/deploy_release.py) script handles steps 2–4:
@@ -280,5 +280,38 @@ python3 scripts/deploy_release.py \
 python3 scripts/deploy_release.py \
     --tag v0.1.4 --local --private-key private_key.pem --dry-run
 ```
+
+### CI-Assisted Workflow (Optional)
+
+> [!NOTE]
+> The `build.yml` GitHub Actions workflow has been removed from this repository.
+> The local build and sign workflow (see above) is the canonical release path.
+
+`scripts/deploy_release.py` retains a `--run-id` mode that can download unsigned binaries from a GitHub Actions run and sign them locally.
+
+**When to reinstate CI builds:**
+
+1. A dedicated release operator handles signing but does not have a full PlatformIO development environment.
+2. Compliance or audit requirements demand that release binaries are built on a clean, reproducible, third-party environment.
+3. Build times become prohibitive locally and offloading to GitHub runners becomes worthwhile.
+
+**Why it was removed:** Because every release must be signed locally (the private key never leaves the developer's machine), the signing step already requires a local environment. Building locally with `--local --build` is simpler, faster, and has one fewer step.
+
+**How to use `--run-id` mode:**
+
+Restore `build.yml` with a trigger on `v*-beta*` and `v[0-9]*.[0-9]*.[0-9]*` tags (excluding `dev` tags). Then:
+
+```bash
+# Find the Actions run ID after the tag push triggers a build
+gh run list --limit 5
+
+# Download CI artifacts, sign locally, and publish
+python3 scripts/deploy_release.py \
+    --tag v1.2.3 \
+    --run-id <ACTIONS_RUN_ID> \
+    --private-key private_key.pem
+```
+
+The private key never leaves your machine either way.
 
 For the full OTA update lifecycle — including signature verification, multi-architecture support, and the post-reboot self-test — see the [OTA Developer Guide](../OTADeveloperGuide.md).

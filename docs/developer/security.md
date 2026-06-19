@@ -213,7 +213,57 @@ When the device is in AP (Access Point) mode — typically during initial physic
 
 ---
 
-## 7. OTA Firmware Security
+## 7. Personal Access Tokens (PATs)
+
+GitHub Personal Access Tokens authenticate OTA update requests against private release repositories. Token security is critical because the PAT is compiled into the firmware binary and shipped to devices.
+
+### Scope Requirements
+
+- **Token type:** Fine-grained Personal Access Token (not classic).
+- **Repository access:** Scoped to a **single** repository only.
+- **Permissions:** `Contents: Read-only` — no write, no account-level access.
+- **Expiration:** No expiration. Deployed devices may be offline for months; an expired PAT permanently bricks OTA capability.
+
+Fine-grained tokens are strictly superior to classic tokens because they enforce single-repository scope. Classic tokens grant access to **all** user repositories.
+
+### Blast Radius
+
+If an attacker extracts the PAT from a firmware binary (e.g., flash dump):
+
+| Action | Possible? |
+|---|---|
+| Read repository contents (source + releases) | Yes |
+| Write/push to repository | No |
+| Access other repositories | No |
+| Access user account settings | No |
+
+### Split-Repo Model
+
+GitHub does not offer a "releases-only" read permission — `Contents: Read` exposes source code. To mitigate this, publish OTA releases to a **separate repository**:
+
+| Strategy | PAT in firmware? | Source exposed if PAT extracted? |
+|---|---|---|
+| Single private repo | Yes | **Yes** |
+| Separate **public** releases repo | **No** (no PAT needed) | N/A |
+| Separate **private** releases repo | Yes | **No** — PAT scoped to releases repo only |
+
+```cpp
+// Point the firmware at the releases repo, not the source repo
+config.otaGithubRepo  = "owner/my-firmware-releases";
+config.otaGithubToken = OTA_GITHUB_TOKEN;  // PAT scoped to releases repo
+```
+
+### Credential Storage
+
+PATs are stored encrypted via [`KeyManager`](#4-credential-storage-keymanager) under a module-managed key (e.g., `"github_pat"`). The token value is compiled into the firmware binary via a gitignored header (`otaSecrets.hpp`). See the [OTA Developer Guide](../OTADeveloperGuide.md) for the full deployment workflow.
+
+### Certificate Bundle Configuration
+
+The framework defaults to `CERTIFICATE_BUNDLE_DEFAULT_NONE` (no built-in Mozilla CA bundle). For GitHub API calls, `GithubClient` uses explicit CA pinning via `setCACert()`. If your downstream app needs to connect to arbitrary HTTPS servers, re-enable the bundle in your board-specific `sdkconfig.defaults.*` file — see [TLS Memory Optimization](#tls-memory-optimization) in the Performance Guide.
+
+---
+
+## 8. OTA Firmware Security
 
 The framework implements a multi-layer OTA security model: cryptographic signature verification, anti-rollback protection, and transport-layer considerations.
 
@@ -310,9 +360,64 @@ struct FrameworkConfig {
 
 A downstream application populates this struct in `main.cpp` and passes it to `Application::begin()`.
 
+### Key Rotation
+
+Key rotation requires a **two-step transitional release** because of an inherent ordering constraint:
+
+- Devices in the field verify OTA downloads using the **old public key** embedded in their running firmware.
+- A binary signed with the **new private key** will be rejected by those devices.
+- Therefore you must use the **old private key** to sign one final transitional release that ships the **new public key** embedded in firmware — only then can you switch to signing with the new key.
+
+#### Step-by-step rotation procedure
+
+**Step 1 — Generate the new key pair**
+
+```bash
+rm private_key.pem public_key.pem          # remove old keys
+./scripts/generate_keys.sh                  # generate new pair (new passphrase)
+```
+
+**Step 2 — Embed the new public key in firmware**
+
+```bash
+xxd -i public_key.pem > include/publicKey.hpp
+```
+
+**Step 3 — Build the transitional release**
+
+This firmware contains the **new public key** but must be **signed with the old private key**. You must still have your old `private_key.pem` (or a backup of it) at this point:
+
+```bash
+git tag v1.2.4-transition                   # or whatever your next version is
+git push origin v1.2.4-transition
+python3 scripts/deploy_release.py \
+    --tag v1.2.4-transition \
+    --local --build \
+    --private-key old_private_key.pem        # sign with OLD key
+```
+
+**Step 4 — Deploy the transitional release to all devices**
+
+All devices in the field must install the transitional release via OTA. Once they do, they carry the new public key. Monitor adoption before proceeding.
+
+**Step 5 — Switch to the new key for all future releases**
+
+```bash
+python3 scripts/deploy_release.py \
+    --tag v1.3.0 \
+    --local --build \
+    --private-key private_key.pem            # sign with NEW key from here on
+```
+
+> [!WARNING]
+> Any device that misses the transitional release will still carry the old public key and will be unable to accept OTA updates signed with the new private key. Those devices must be **manually re-flashed via USB**. Ensure maximum fleet adoption of the transitional release before discarding the old private key.
+
+> [!CAUTION]
+> Keep a secure backup of the **old** private key until you are confident all deployed devices have received the transitional update. After that, the old key can be permanently deleted.
+
 ---
 
-## 8. The Central Tension
+## 9. The Central Tension
 
 Every security layer costs RAM and flash on a device with ~320KB SRAM:
 
@@ -327,7 +432,7 @@ Security decisions in this framework are always **resource-aware tradeoffs**, no
 
 ---
 
-## 9. Security Audit Checklist
+## 10. Security Audit Checklist
 
 When auditing security in a downstream application, check these patterns:
 
