@@ -320,6 +320,11 @@ def parse_args() -> argparse.Namespace:
              "Defaults to the current repo's origin.",
     )
     parser.add_argument(
+        "--sign-only",
+        action="store_true",
+        help="Stage, sign, hash, and generate manifest — but skip GitHub release creation",
+    )
+    parser.add_argument(
         "--dry-run",
         action="store_true",
         help="Print commands without executing them",
@@ -356,9 +361,12 @@ def main() -> None:
     sign_firmware(args.private_key, args.dry_run)
     generate_hashes(args.dry_run)
     generate_manifest(args.tag, args.dry_run)
-    create_release(args.tag, args.dry_run, target_repo=args.repo)
 
-    print("\n✅ Release deployed successfully!")
+    if args.sign_only:
+        print(f"\n✅ Signed binaries ready in {ARTIFACTS_DIR}/")
+    else:
+        create_release(args.tag, args.dry_run, target_repo=args.repo)
+        print("\n✅ Release deployed successfully!")
 
 
 if __name__ == "__main__":

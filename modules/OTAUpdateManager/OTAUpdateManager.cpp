@@ -1029,31 +1029,44 @@ void OTAUpdateManager::rollbackFirmware() {
  * @param final    True when this is the last chunk for this field.
  */
 esp_err_t OTAUpdateManager::handleSignedUpload(PsychicRequest* request,
-                                          const String& filename,
-                                          uint64_t index, uint8_t* data,
-                                          size_t len, bool final) {
+                                           const String& filename,
+                                           uint64_t index, uint8_t* data,
+                                           size_t len, bool final) {
 #ifndef NATIVE_BUILD
     if (_config == nullptr) {
-        ESP_LOGE(TAG, "Signed upload: module not initialized (begin() not called)");
-        request->response()->send(500, "application/json", "{\"status\":\"error\",\"msg\":\"OTA module not initialized\"}");
+        ESP_LOGE(TAG, "Upload: module not initialized (begin() not called)");
         return ESP_FAIL;
     }
     const FrameworkConfig& cfg = *_config;
 
+    // --- Identify field by file extension ---
+    // NOTE: PsychicHTTP's MultipartProcessor passes the actual filename from
+    // Content-Disposition (e.g. "firmware-esp32dev.bin"), NOT the form field
+    // name ("firmware" / "signature"). Match on extension.
+    const bool isSigField = filename.endsWith(".sig");
+    const bool isBinField = filename.endsWith(".bin");
+
     // ---- Signature field: collect bytes into _uploadSigBuf ----
-    if (filename == "signature") {
+    if (isSigField) {
         if (index == 0) {
-            _uploadSigLen = 0; // Reset on first chunk
+            _uploadSigLen = 0;
+            ESP_LOGI(TAG, "Upload: receiving signature file '%s'", filename.c_str());
         }
         size_t space = sizeof(_uploadSigBuf) - _uploadSigLen;
         size_t toCopy = (len < space) ? len : space;
         memcpy(_uploadSigBuf + _uploadSigLen, data, toCopy);
         _uploadSigLen += toCopy;
+        if (final) {
+            ESP_LOGI(TAG, "Upload: signature received — %u bytes", (unsigned)_uploadSigLen);
+        }
         return ESP_OK;
     }
 
     // ---- Firmware field ----
-    if (filename != "firmware") return ESP_OK; // Unknown field — ignore
+    if (!isBinField) {
+        ESP_LOGW(TAG, "Upload: ignoring unknown field '%s'", filename.c_str());
+        return ESP_OK;
+    }
 
     if (_uploadAborted) return ESP_FAIL; // Already failed — drain remaining chunks silently
 
@@ -1061,6 +1074,8 @@ esp_err_t OTAUpdateManager::handleSignedUpload(PsychicRequest* request,
     if (index == 0) {
         _uploadAborted  = false;
         _uploadBinSize  = 0;
+
+        ESP_LOGI(TAG, "Upload: receiving firmware '%s'", filename.c_str());
 
         // Clean up any previous verifier
         delete _uploadVerifier;
@@ -1070,35 +1085,30 @@ esp_err_t OTAUpdateManager::handleSignedUpload(PsychicRequest* request,
         if (cfg.otaPublicKey != nullptr) {
             _uploadVerifier = new (std::nothrow) MbedTLSSignatureVerifier();
             if (!_uploadVerifier || !_uploadVerifier->begin(cfg.otaPublicKey)) {
-                ESP_LOGE(TAG, "Signed upload: verifier init failed");
+                ESP_LOGE(TAG, "Upload: verifier init failed");
                 delete _uploadVerifier;
                 _uploadVerifier = nullptr;
                 _uploadAborted  = true;
-                request->response()->send(500, "application/json",
-                              "{\"status\":\"error\",\"msg\":\"Verifier init failed\"}");
                 return ESP_FAIL;
             }
+            ESP_LOGI(TAG, "Upload: signature verifier initialized");
         }
 
         // Validate ESP32 binary magic byte
         if (len > 0 && data[0] != 0xE9) {
-            ESP_LOGE(TAG, "Signed upload: invalid binary header 0x%02X", data[0]);
+            ESP_LOGE(TAG, "Upload: invalid binary header 0x%02X (expected 0xE9)", data[0]);
             _uploadAborted = true;
-            request->response()->send(400, "application/json",
-                          "{\"status\":\"error\",\"msg\":\"Invalid firmware header — not an ESP32 binary\"}");
             return ESP_FAIL;
         }
 
         // Begin the flash update — size is unknown at this point so use OTA_SIZE_UNKNOWN
         if (!Update.begin(UPDATE_SIZE_UNKNOWN)) {
-            ESP_LOGE(TAG, "Signed upload: Update.begin() failed");
+            ESP_LOGE(TAG, "Upload: Update.begin() failed");
             _uploadAborted = true;
-            request->response()->send(500, "application/json",
-                          "{\"status\":\"error\",\"msg\":\"Update begin failed — insufficient space?\"}");
             return ESP_FAIL;
         }
 
-        ESP_LOGI(TAG, "Signed upload: started");
+        ESP_LOGI(TAG, "Upload: flash write started (OTA partition ready)");
     }
 
     // --- Accumulate firmware bytes into verifier and flash ---
@@ -1107,71 +1117,118 @@ esp_err_t OTAUpdateManager::handleSignedUpload(PsychicRequest* request,
     }
 
     if (Update.write(data, len) != len) {
-        ESP_LOGE(TAG, "Signed upload: Update.write() failed at offset %u",
+        ESP_LOGE(TAG, "Upload: flash write failed at offset %u",
                  (unsigned)_uploadBinSize);
         Update.abort();
         _uploadAborted = true;
         delete _uploadVerifier;
         _uploadVerifier = nullptr;
-        request->response()->send(500, "application/json",
-                      "{\"status\":\"error\",\"msg\":\"Flash write failed\"}");
         return ESP_FAIL;
     }
 
     _uploadBinSize += len;
 
-    // --- Final chunk: verify signature then finalise ---
+    // Log progress every 128 KB
+    if ((_uploadBinSize % (128 * 1024)) < len) {
+        ESP_LOGI(TAG, "Upload: %u KB written to flash", (unsigned)(_uploadBinSize / 1024));
+    }
+
+    // --- Final firmware chunk: just log, verification deferred to onRequest ---
     if (final) {
-        // Fail-closed: public key configured → signature is mandatory
-        if (cfg.otaPublicKey != nullptr) {
-            if (_uploadSigLen == 0) {
-                ESP_LOGE(TAG, "Signed upload: SECURITY ABORT — no signature provided");
-                Update.abort();
-                delete _uploadVerifier;
-                _uploadVerifier = nullptr;
-                _uploadAborted  = true;
-                request->response()->send(400, "application/json",
-                              "{\"status\":\"error\",\"msg\":\"Signature file required — upload both .bin and .sig\"}");
-                return ESP_FAIL;
-            }
-
-            if (_uploadVerifier == nullptr ||
-                !_uploadVerifier->verify(_uploadSigBuf, _uploadSigLen)) {
-                ESP_LOGE(TAG, "Signed upload: ECDSA verification FAILED");
-                Update.abort();
-                delete _uploadVerifier;
-                _uploadVerifier = nullptr;
-                _uploadAborted  = true;
-                request->response()->send(403, "application/json",
-                              "{\"status\":\"error\",\"msg\":\"Signature verification failed — firmware rejected\"}");
-                return ESP_FAIL;
-            }
-
-            ESP_LOGI(TAG, "Signed upload: ECDSA verification PASSED (%u sig bytes, %u firmware bytes)",
-                     (unsigned)_uploadSigLen, (unsigned)_uploadBinSize);
-        } else {
-            ESP_LOGW(TAG, "Signed upload: no public key configured — signature check SKIPPED");
-        }
-
-        delete _uploadVerifier;
-        _uploadVerifier = nullptr;
-
-        if (!Update.end(true /* set boot partition */)) {
-            ESP_LOGE(TAG, "Signed upload: Update.end() failed");
-            _uploadAborted = true;
-            request->response()->send(500, "application/json",
-                          "{\"status\":\"error\",\"msg\":\"Update finalisation failed\"}");
-            return ESP_FAIL;
-        }
-
-        ESP_LOGI(TAG, "Signed upload: complete — rebooting in 500ms");
-        request->response()->send(200, "application/json", "{\"status\":\"ok\",\"msg\":\"Firmware verified and flashed — rebooting\"}");
-        delay(500);
-        ESP.restart();
+        ESP_LOGI(TAG, "Upload: firmware transfer complete — %u bytes received", (unsigned)_uploadBinSize);
     }
     return ESP_OK;
 #else
     (void)request; (void)filename; (void)index; (void)data; (void)len; (void)final;
+    return ESP_OK;
+#endif
+}
+
+// =============================================================================
+// Signed Upload Finalisation — called by onRequest after ALL multipart fields
+// =============================================================================
+/**
+ * @brief Verify signature and finalise the OTA update after all multipart
+ *        fields have been received.
+ *
+ * PsychicHTTP's onRequest callback fires after the multipart parser has
+ * processed every field. This guarantees that both the .bin and .sig data
+ * are available before we attempt verification.
+ *
+ * @param response  The PsychicResponse to send the result on.
+ * @return ESP_OK on success, ESP_FAIL on any error.
+ */
+esp_err_t OTAUpdateManager::finaliseSignedUpload(PsychicResponse* response) {
+#ifndef NATIVE_BUILD
+    // If the upload was already aborted during chunk processing, report it
+    if (_uploadAborted) {
+        ESP_LOGE(TAG, "Upload: finalisation skipped — upload was aborted during transfer");
+        Update.abort();
+        delete _uploadVerifier;
+        _uploadVerifier = nullptr;
+        response->send(500, "application/json",
+                      "{\"status\":\"error\",\"msg\":\"Upload failed during transfer — check serial log\"}");
+        return ESP_FAIL;
+    }
+
+    // No firmware received at all
+    if (_uploadBinSize == 0) {
+        ESP_LOGE(TAG, "Upload: no firmware data received");
+        response->send(400, "application/json",
+                      "{\"status\":\"error\",\"msg\":\"No firmware binary received\"}");
+        return ESP_FAIL;
+    }
+
+    const FrameworkConfig& cfg = *_config;
+
+    // Fail-closed: public key configured → signature is mandatory
+    if (cfg.otaPublicKey != nullptr) {
+        if (_uploadSigLen == 0) {
+            ESP_LOGE(TAG, "Upload: SECURITY ABORT — no signature provided");
+            Update.abort();
+            delete _uploadVerifier;
+            _uploadVerifier = nullptr;
+            response->send(400, "application/json",
+                          "{\"status\":\"error\",\"msg\":\"Signature file required — upload both .bin and .sig\"}");
+            return ESP_FAIL;
+        }
+
+        ESP_LOGI(TAG, "Upload: verifying ECDSA signature (%u sig bytes, %u firmware bytes)...",
+                 (unsigned)_uploadSigLen, (unsigned)_uploadBinSize);
+
+        if (_uploadVerifier == nullptr ||
+            !_uploadVerifier->verify(_uploadSigBuf, _uploadSigLen)) {
+            ESP_LOGE(TAG, "Upload: ECDSA verification FAILED — firmware rejected");
+            Update.abort();
+            delete _uploadVerifier;
+            _uploadVerifier = nullptr;
+            response->send(403, "application/json",
+                          "{\"status\":\"error\",\"msg\":\"Signature verification failed — firmware rejected\"}");
+            return ESP_FAIL;
+        }
+
+        ESP_LOGI(TAG, "Upload: ECDSA verification PASSED ✓");
+    } else {
+        ESP_LOGW(TAG, "Upload: no public key configured — signature check SKIPPED");
+    }
+
+    delete _uploadVerifier;
+    _uploadVerifier = nullptr;
+
+    if (!Update.end(true /* set boot partition */)) {
+        ESP_LOGE(TAG, "Upload: Update.end() failed — firmware not applied");
+        response->send(500, "application/json",
+                      "{\"status\":\"error\",\"msg\":\"Update finalisation failed\"}");
+        return ESP_FAIL;
+    }
+
+    ESP_LOGI(TAG, "Upload: firmware flashed successfully — rebooting in 500ms");
+    response->send(200, "application/json", "{\"status\":\"ok\",\"msg\":\"Firmware verified and flashed — rebooting\"}");
+    delay(500);
+    ESP.restart();
+    return ESP_OK; // unreachable but keeps compiler happy
+#else
+    (void)response;
     return ESP_OK;
 #endif
 }
@@ -1322,9 +1379,10 @@ void OTAUpdateManager::registerRoutes(PsychicHttpServer& server) {
         ESP_LOGE(TAG, "Failed to allocate PsychicUploadHandler");
         return;
     }
-    otaUploadHandler->onRequest([](PsychicRequest* request, PsychicResponse* response) {
-        // The response is already sent inside handleSignedUpload, or we just return OK here
-        return ESP_OK;
+    otaUploadHandler->onRequest([this](PsychicRequest* request, PsychicResponse* response) {
+        // Called after ALL multipart fields have been processed.
+        // Verify the signature and finalise the OTA update here.
+        return this->finaliseSignedUpload(response);
     });
 #ifdef ARDUINO
     // EXTERNAL CONSTRAINT: PsychicHttp API requires const String& in onUpload callback signature

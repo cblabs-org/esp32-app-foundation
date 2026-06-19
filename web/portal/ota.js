@@ -141,6 +141,15 @@
                border:1px solid var(--border); margin-bottom:0.8rem; cursor:not-allowed;">
         Upload Firmware
       </button>
+      <div id="ota-upload-progress-wrapper" style="display:none; margin-bottom:0.8rem;">
+        <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:4px;">
+          <span id="ota-upload-progress-label" style="font-size:0.75rem; color:var(--text-muted);">Uploading...</span>
+          <span id="ota-upload-progress-pct" style="font-size:0.75rem; font-weight:600; color:var(--primary);">0%</span>
+        </div>
+        <div style="background:var(--bg); border-radius:6px; height:10px; overflow:hidden; border:1px solid var(--border);">
+          <div id="ota-upload-progress-bar" style="width:0%; height:100%; background:var(--primary); border-radius:6px; transition:width 0.3s ease;"></div>
+        </div>
+      </div>
       <div id="ota-upload-status" style="font-size:0.8rem; text-align:center; margin-bottom:0.8rem;"></div>
 
       <div style="border-top:1px solid var(--warning, #f9a825); padding-top:0.8rem;">
@@ -514,13 +523,18 @@
 
   // -------------------------------------------------------------------------
   // Card 4: Signed firmware upload — POST /api/ota/upload (multipart)
-  // Sends both "firmware" (.bin) and "signature" (.sig) fields.
+  // Uses XMLHttpRequest directly (bypasses ApiQueue) for upload progress tracking.
   // Firmware is rejected server-side if ECDSA verification fails.
   // -------------------------------------------------------------------------
-  document.getElementById('btn-ota-upload').addEventListener('click', async () => {
-    const binInput = document.getElementById('ota-file-bin');
-    const sigInput = document.getElementById('ota-file-sig');
-    const statusEl = document.getElementById('ota-upload-status');
+  document.getElementById('btn-ota-upload').addEventListener('click', () => {
+    const binInput  = document.getElementById('ota-file-bin');
+    const sigInput  = document.getElementById('ota-file-sig');
+    const statusEl  = document.getElementById('ota-upload-status');
+    const wrapper   = document.getElementById('ota-upload-progress-wrapper');
+    const barEl     = document.getElementById('ota-upload-progress-bar');
+    const pctEl     = document.getElementById('ota-upload-progress-pct');
+    const labelEl   = document.getElementById('ota-upload-progress-label');
+    const uploadBtn = document.getElementById('btn-ota-upload');
 
     if (!binInput.files[0] || !sigInput.files[0]) {
       statusEl.style.color = 'var(--error)';
@@ -528,28 +542,95 @@
       return;
     }
 
+    // Disable button during upload
+    uploadBtn.disabled = true;
+    uploadBtn.style.cursor = 'not-allowed';
+
     const formData = new FormData();
-    formData.append('firmware',   binInput.files[0]);
     formData.append('signature',  sigInput.files[0]);
+    formData.append('firmware',   binInput.files[0]);
 
+    // Show progress bar
+    wrapper.style.display = 'block';
+    barEl.style.width = '0%';
+    barEl.style.background = 'var(--primary)';
+    pctEl.textContent = '0%';
+    labelEl.textContent = 'Uploading firmware...';
     statusEl.style.color = 'var(--primary)';
-    statusEl.textContent = 'Uploading and verifying signature... Please do not disconnect.';
+    statusEl.textContent = '';
 
-    try {
-      const result = await window.apiFetch('/api/ota/upload', { method: 'POST', body: formData });
-      statusEl.style.color = 'var(--success)';
-      statusEl.textContent = result.msg || 'Firmware verified and flashed — rebooting.';
-      binInput.value = '';
-      sigInput.value = '';
-      document.getElementById('ota-file-bin-name').textContent = 'No file selected';
-      document.getElementById('ota-file-sig-name').textContent = 'No file selected';
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', '/api/ota/upload', true);
+    xhr.timeout = 120000; // 120 second timeout
+
+    // --- Upload progress ---
+    xhr.upload.onprogress = function(e) {
+      if (e.lengthComputable) {
+        const pct = Math.round((e.loaded / e.total) * 100);
+        barEl.style.width = pct + '%';
+        pctEl.textContent = pct + '%';
+        const kb = Math.round(e.loaded / 1024);
+        const totalKb = Math.round(e.total / 1024);
+        labelEl.textContent = 'Uploading... ' + kb + ' / ' + totalKb + ' KB';
+      }
+    };
+
+    // --- Upload complete (sent) — now waiting for server verification ---
+    xhr.upload.onload = function() {
+      barEl.style.width = '100%';
+      pctEl.textContent = '100%';
+      labelEl.textContent = 'Verifying signature & writing to flash...';
+      barEl.style.background = 'var(--warning, #f9a825)';
+      statusEl.style.color = 'var(--text-muted)';
+      statusEl.textContent = 'Please do not disconnect.';
+    };
+
+    // --- Server response ---
+    xhr.onload = function() {
+      var result;
+      try { result = JSON.parse(xhr.responseText); } catch(e) { result = {}; }
+
+      if (xhr.status >= 200 && xhr.status < 300) {
+        barEl.style.background = 'var(--success)';
+        labelEl.textContent = 'Complete!';
+        statusEl.style.color = 'var(--success)';
+        statusEl.textContent = result.msg || 'Firmware verified and flashed — rebooting.';
+        binInput.value = '';
+        sigInput.value = '';
+        document.getElementById('ota-file-bin-name').textContent = 'No file selected';
+        document.getElementById('ota-file-sig-name').textContent = 'No file selected';
+      } else {
+        barEl.style.background = 'var(--error)';
+        labelEl.textContent = 'Failed';
+        statusEl.style.color = 'var(--error)';
+        statusEl.textContent = result.msg || ('HTTP ' + xhr.status + ' — upload rejected.');
+      }
+      uploadBtn.disabled = false;
+      uploadBtn.style.cursor = '';
       refreshUploadButton();
-    } catch (error) {
+    };
+
+    // --- Network error ---
+    xhr.onerror = function() {
+      barEl.style.background = 'var(--error)';
+      labelEl.textContent = 'Network error';
       statusEl.style.color = 'var(--error)';
-      // Surface the server's error message if available
-      const msg = (error && error.msg) ? error.msg : 'Upload failed — signature may be invalid or file corrupt.';
-      statusEl.textContent = msg;
-    }
+      statusEl.textContent = 'Upload failed — check device connection.';
+      uploadBtn.disabled = false;
+      uploadBtn.style.cursor = '';
+    };
+
+    // --- Timeout ---
+    xhr.ontimeout = function() {
+      barEl.style.background = 'var(--error)';
+      labelEl.textContent = 'Timeout';
+      statusEl.style.color = 'var(--error)';
+      statusEl.textContent = 'Upload timed out after 120 seconds.';
+      uploadBtn.disabled = false;
+      uploadBtn.style.cursor = '';
+    };
+
+    xhr.send(formData);
   });
 
   // -------------------------------------------------------------------------

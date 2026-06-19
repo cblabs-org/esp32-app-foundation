@@ -488,5 +488,11 @@ private:
     esp_err_t handleSignedUpload(PsychicRequest* request,
                             const String& filename,
                             uint64_t index, uint8_t* data, size_t len, bool final);
+
+    /**
+     * @brief Verify signature and finalise OTA after all multipart fields received.
+     * @param response  The response object to send the result on.
+     */
+    esp_err_t finaliseSignedUpload(PsychicResponse* response);
 };
 
