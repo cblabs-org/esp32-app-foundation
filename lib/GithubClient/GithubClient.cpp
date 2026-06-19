@@ -138,7 +138,26 @@ bool GithubClient::getLatestRelease() {
         return false;
     }
 
-    int bytesRead = http.getStream().readBytes(buf, contentLen);
+    int bytesRead = 0;
+    auto streamClient = http.getStreamPtr();
+    uint32_t startMs = millis();
+    while ((streamClient->connected() || streamClient->available()) && bytesRead < contentLen) {
+        int avail = streamClient->available();
+        if (avail > 0) {
+            int toRead = (contentLen - bytesRead > avail) ? avail : (contentLen - bytesRead);
+            int c = streamClient->read((uint8_t*)&buf[bytesRead], toRead);
+            if (c > 0) {
+                bytesRead += c;
+                startMs = millis();
+            }
+        } else {
+            if (millis() - startMs > 15000) {
+                ESP_LOGW("GITHUB", "Read timeout (fast path)");
+                break;
+            }
+            delay(10);
+        }
+    }
     buf[bytesRead] = '\0';
     http.end();
 
@@ -345,7 +364,26 @@ bool GithubClient::getLatestReleaseForChannel(const char* channel) {
             break;
         }
 
-        int bytesRead = pageHttp.getStream().readBytes(buf, contentLen);
+        int bytesRead = 0;
+        auto streamClient = pageHttp.getStreamPtr();
+        uint32_t startMs = millis();
+        while ((streamClient->connected() || streamClient->available()) && bytesRead < contentLen) {
+            int avail = streamClient->available();
+            if (avail > 0) {
+                int toRead = (contentLen - bytesRead > avail) ? avail : (contentLen - bytesRead);
+                int c = streamClient->read((uint8_t*)&buf[bytesRead], toRead);
+                if (c > 0) {
+                    bytesRead += c;
+                    startMs = millis();
+                }
+            } else {
+                if (millis() - startMs > 15000) {
+                    ESP_LOGW("GITHUB", "Read timeout on page %d", page);
+                    break;
+                }
+                delay(10);
+            }
+        }
         buf[bytesRead] = '\0';
         pageHttp.end();
 
