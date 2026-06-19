@@ -26,9 +26,9 @@ The user is NOT gadec — gadec is a separate author (Brian).
   hand-rolled `base64ToHex` function with `mbedtls_base64_decode()`. Rename
   `calculateFileMD5` local variables to diverge from gadec naming. Verify
   native + esp32 builds pass. ✅ Merged `308bbab`
-- **[ ] [wo3-credits-tab](wo3-credits-tab/WORKORDER.md):** Add a new top-level
+- **[x] [wo3-credits-tab](wo3-credits-tab/WORKORDER.md):** Add a new top-level
   Credits tab to the web portal listing all open-source dependencies with
-  licence + links. Stylised © icon. New `credits.js` fragment + routes.
+  licence + links. Stylised © icon. New `credits.js` fragment + routes. ✅ Merged `b3c98cd`
 
 ---
 

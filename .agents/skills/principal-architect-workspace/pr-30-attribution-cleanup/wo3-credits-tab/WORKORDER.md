@@ -218,3 +218,18 @@ HTML.
    no server logic to test)
 3. Manual: load the portal in a browser, confirm the Credits tab appears in the
    bottom nav with the © icon, and displays the dependency list with working links
+
+---
+
+## Execution Status
+
+| Field | Value |
+|---|---|
+| **Status** | ✅ Complete |
+| **Executed by** | Worker subagent (`bf3f33b1-4282-4297-b7d2-21c722d6a7d7`) |
+| **Date** | 2026-06-19 |
+| **Branch** | `pr-30-attribution-cleanup-wo3-credits-tab` |
+| **Build** | `esp32dev` SUCCESS (44.39s) |
+| **Tests** | `native` 560/560 PASSED (23.04s) |
+| **Step 6** | Skipped per self-correction (hardcoded HTML tab) |
+| **Extra fix** | Added `tab-credits` to `buildBottomNav()` skip list |
