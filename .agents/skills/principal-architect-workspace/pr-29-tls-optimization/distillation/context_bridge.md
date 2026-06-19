@@ -1,47 +1,59 @@
 ---
-title: "PR-29 TLS Memory Optimization — Principal Architect Session"
-distilled_at: 2026-06-18T17:00:00Z
+title: "PR-29 TLS Optimization — Final Distillation (Session 2)"
+distilled_at: 2026-06-19T10:15:00Z
 original_plan_id: pr-29-tls-optimization
 artifacts:
   - context_artifacts/adr_tls_optimization.md
   - context_artifacts/adr_ota_ca_pinning.md
+  - context_artifacts/adr_cert_bundle_fix.md
+  - context_artifacts/adr_ap_scan_fix.md
   - context_artifacts/graveyard_build_failures.md
   - context_artifacts/state_branch_and_tags.md
 ---
 
-# Context Bridge — PR-29 TLS Memory Optimization
+# Context Bridge — PR-29 TLS Memory Optimization (Final)
 
 ## Executive Summary
 
-Completed WO1–WO3 of the TLS memory optimization PR: applied 7 mbedTLS sdkconfig settings, measured +18.8 KB free heap (+12.7%) and +54 KB heap_min_free (+62.7%) on ESP32-S3 NanoS3, documented everything in the framework-expert skill. Discovered during live OTA testing that the GitHub CDN uses a different CA (Let's Encrypt) than the API (Sectigo), breaking manifest downloads when cert bundle is NONE. Applied a temporary `setInsecure()` fix for the manifest; WO4 (dual-CA pinning with graceful fallback) is written and handed off to the OTA architect.
+**Session 1** (07cb3857): Applied 7 mbedTLS sdkconfig optimizations, measured +18.8 KB free heap, documented in framework-expert skill. Discovered GitHub CDN CA mismatch. Created WO4–WO10 for remaining work.
 
-> [!WARNING]
-> **PR numbering error:** This work is labelled PR-29 throughout (branch name, commits, work orders, MEMORY.md registry) but should be **PR-27**. The branch, commits, and all references need renumbering. The user has asked the next architect to clean this up.
+**Session 2** (d5f9f607): Fixed critical build failure caused by `CERTIFICATE_BUNDLE=n` breaking cmake's `target_add_binary_data()`. Switched to `DEFAULT_CMN` bundle. Fixed AP shutdown during WiFi scan (driver mode-switch bug). Fixed `_lastApiRequestTime` volatile race. Verified OTA end-to-end with `v0.0.11-dev.7`. Merged to `main` (`aec9808`).
 
-## Next Steps
+## What Was Accomplished (Session 2)
 
-1. **OTA architect picks up WO4**: Work order at `.agents/skills/principal-architect-workspace/pr-29-tls-optimization/wo4-ota-ca-pinning/WORKORDER.md`. Creates `ota_root_cas.h` (Sectigo E46 + ISRG Root X1), updates OTAUpdateManager with CA-first + `setInsecure()` fallback, tests OTA end-to-end.
+1. **Build system fix**: `CERTIFICATE_BUNDLE=n` → `DEFAULT_CMN` in `sdkconfig.defaults`. Removed `gen_cert_asm.py` workaround.
+2. **AP scan fix**: `WiFi.scanNetworks(true)` in AP mode now explicitly manages mode (AP → AP_STA → scan → AP). Prevents AP teardown.
+3. **Thread safety**: `_lastApiRequestTime` marked `volatile` for cross-thread visibility.
+4. **TLS documentation**: Updated `tls-tradeoffs.md` with cert bundle configuration guide, developer instructions for removing bundles.
+5. **OTA verified**: Full cycle — deploy `v0.0.11-dev.7` to GitHub, device downloads over TLS, signature verified, firmware blessed, running.
+6. **Stack merged**: `pr-29-tls-optimization` → `main` (`aec9808` → `18798d0`)
 
-2. **Deploy dev.10 as GitHub release**: Tag `v0.0.10-dev.10` is on HEAD (`5415b48`) but not yet deployed as a GitHub Release. Run:
-   ```bash
-   cd /Users/mcneillm/Documents/Projects/esp32-app-foundation
-   unset GITHUB_TOKEN
-   python3 scripts/deploy_release.py --local --build --private-key private_key.pem
-   ```
-   (Requires user passphrase for signing.)
+## Remaining Work (Not in PR-29 scope)
 
-3. **After WO4 merges**: Deploy `dev.11` with the dual-CA pinning, trigger OTA from the device (running `dev.10`) to validate the full pinned-CA OTA path.
+These items from the original WO list were **not addressed** in this session and should be tracked separately:
 
-4. **Merge to main**: Once WO4 is verified, merge `pr-29-tls-optimization` → `main`. User decides whether to cut a beta.
+- **WO5** (deploy repo flag) — deploy script flag for split repos
+- **WO7** (build channel fix) — `BUILD_CHANNEL` injection via `inject_version.py`
+- **WO8** (security tab TLS split) — separate password/auth from TLS in portal
+- **WO9** (password restart fix) — device fails to restart when setting password
+- **WO10** (MCP key UI bugs) — bearer key display issues when password is set
 
-5. **Update framework-expert skill**: WO4 should update `performance/tls-memory-optimization.md` with the dual-CA bundle details, fallback logic, and the CDN CA discovery.
+These are tracked in `.agents/todo/todo.md` (items under 🔒 Security).
 
 > [!WARNING]
 > Do NOT read the detailed artifacts below unless your current task explicitly requires the deep context. If needed, use your read tool on `context_artifacts/[filename]`.
 
 ## Deep Context Menu
 
-- `context_artifacts/adr_tls_optimization.md` — Architecture decisions for mbedTLS tuning (dynamic buffers, cert bundle NONE, peer cert, ALPN constraint)
-- `context_artifacts/adr_ota_ca_pinning.md` — Why dual-CA pinning with fallback, storage options evaluated (NVS/LittleFS/compiled), partition safety during OTA
+- `context_artifacts/adr_tls_optimization.md` — Architecture decisions for mbedTLS tuning (dynamic buffers, cert bundle, peer cert, ALPN)
+- `context_artifacts/adr_ota_ca_pinning.md` — Why dual-CA pinning with fallback, CDN CA discovery
+- `context_artifacts/adr_cert_bundle_fix.md` — **[NEW]** Why CERTIFICATE_BUNDLE=n breaks cmake and DEFAULT_CMN is the right tradeoff
+- `context_artifacts/adr_ap_scan_fix.md` — **[NEW]** WiFi.scanNetworks() tears down AP in AP-only mode; explicit mode management fix
 - `context_artifacts/graveyard_build_failures.md` — ALPN compile guard, serial port locking, CDN cert mismatch, JSON IncompleteInput
-- `context_artifacts/state_branch_and_tags.md` — Exact branch topology, tag locations, commit hashes, device state
+- `context_artifacts/state_branch_and_tags.md` — Branch topology, tags, commit hashes (outdated — see merged state below)
+
+## Final State
+
+- **Branch**: `pr-29-tls-optimization` merged to `main` at `18798d0`
+- **Tag**: `v0.0.11-dev.7` — verified running on esp32dev device
+- **Device**: `192.168.20.215`, OTA channel `dev`, heap 205 KB free

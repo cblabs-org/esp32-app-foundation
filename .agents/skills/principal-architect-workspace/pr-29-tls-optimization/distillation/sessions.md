@@ -1,7 +1,6 @@
-# Sessions Registry
+# PR-29 Session Registry
 
-| Session ID | Date | Agent | Summary |
-|---|---|---|---|
-| `07cb3857-55da-4085-b60a-2fecec6a6dec` | 2026-06-18 | Principal Architect | WO1–WO3 execution, OTA CA discovery, WO4 handoff |
-| `e02cd739-ee9c-46d2-8146-38c4381b1971` | 2026-06-18 | WO2 Execution Worker | Build, flash, measure heap on ESP32-S3 NanoS3 |
-| `2ce95a4b-1a5e-404e-80ef-4e3387da79f5` | 2026-06-18 | WO3 Execution Worker | Framework-expert skill documentation |
+| Session ID | Date | Scope |
+|---|---|---|
+| `07cb3857` | 2026-06-16 to 2026-06-18 | WO1–WO3 (sdkconfig tuning, build/test/measure, skill docs), WO4 handoff (OTA CA pinning), CDN CA discovery |
+| `d5f9f607` | 2026-06-19 | Build system fix (DEFAULT_CMN), AP scan fix, volatile race, TLS docs, OTA e2e verified, merged to main |
