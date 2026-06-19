@@ -2,7 +2,7 @@
 
 **Branch:** `pr-31-docs-cleanup`
 **Base:** `main`
-**Status:** 🔄 **IN PROGRESS** — WO1 executing
+**Status:** ✅ **COMPLETE** — merged to `main` `640eb4f`, pushed to remote
 **Session:** 5ad94103
 
 ---
