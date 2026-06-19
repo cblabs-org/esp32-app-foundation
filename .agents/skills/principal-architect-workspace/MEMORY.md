@@ -66,9 +66,10 @@ predate the formal PA pipeline and are filed retrospectively.
 | [pr-28-compliance-safety](./pr-28-compliance-safety/PROJECT.md) | Compliance Safety Quick-Wins + Architecture Review Follow-Up (bare new→nothrow, TWDT, task DRAM caps, TAG constexpr, facade, std::function elimination, String→std::string, ADR-39, WiFiClientSecure heap alloc, embedded safety) | ✅ **MERGED** `7c623f7` — 11 WOs complete, 562 tests passing, v0.0.10-dev.8 on device | Session bd5ee383 |
 | [pr-27-security-mcp-docs](./pr-27-security-mcp-docs/PROJECT.md) | Security & MCP Server Developer Documentation (security.md, mcp-server.md, README index update) | ✅ **MERGED** `c1b6391` — security.md (338 lines) + mcp-server.md (283 lines) | Session 5ad94103 |
 | [pr-29-tls-optimization](./pr-29-tls-optimization/PROJECT.md) | TLS Memory Optimization (cert bundle fix, AP scan fix, volatile race, OTA CA pinning, docs) | ✅ **MERGED** `aec9808` — v0.0.11-dev.7 verified on device · [distillation](./pr-29-tls-optimization/distillation/context_bridge.md) | Session 07cb3857 / d5f9f607 |
-| [pr-30-attribution-cleanup](./pr-30-attribution-cleanup/PROJECT.md) | Attribution Cleanup & Provenance Remediation (remove departures-board refs, rewrite MD5Utils base64ToHex with mbedtls, fix Gadec copyright) | 📋 **PLANNING** — 2 WOs defined, awaiting user approval | Session 87bf8a4b |
+| [pr-30-attribution-cleanup](./pr-30-attribution-cleanup/PROJECT.md) | Attribution Cleanup & Provenance Remediation (remove departures-board refs, rewrite MD5Utils base64ToHex with mbedtls, fix Gadec copyright) | ✅ **COMPLETE** | Session 87bf8a4b |
 | [pr-31-docs-cleanup](./pr-31-docs-cleanup/PROJECT.md) | Legacy Docs Cleanup (archive 3 reports, merge & retire build guide, fix stale MCP API, add PAT + TLS optimization sections, update indexes) | ✅ **MERGED** `640eb4f` — 9 files, +234/-521 | Session 5ad94103 |
 | [pr-32-ota-docs-deeplinks](./pr-32-ota-docs-deeplinks/PROJECT.md) | OTA Guide Migration + Design Spec Deep Links (OTA→developer tree, skill OTA system tree, 64 deep links in design spec) | ✅ **MERGED** `5deb8c5` — 3 WOs, OTA migrated, 64 deep links · [distillation](./pr-32-ota-docs-deeplinks/distillation/context_bridge.md) | Session 5ad94103 |
+| [pr-33-portal-ux-consistency](./pr-33-portal-ux-consistency/PROJECT.md) | Web Portal UX Consistency — Reboot Overlays & Save Policies (universal reboot overlay component, reconnection polling, context-aware messages, save policy formalisation, Playwright tests) | 📋 **PLANNING** — 3 WOs defined, awaiting user approval | Current Session |
 
 ---
 
@@ -94,3 +95,5 @@ predate the formal PA pipeline and are filed retrospectively.
 ---
 
 *Updated: 2026-06-07 — context_archives migrated into PA workspace; pr-14 marked COMPLETE*
+| [pr-34-mcp-tools](./pr-34-mcp-tools/PROJECT.md) | Module-Specific MCP Tools (domain-specific JSON-RPC tools for Wifi, OTA, Display, Config) | 📋 **PLANNING** — 4 WOs defined, ready for execution workers | Current Session |
+| [pr-35-weather-station](./pr-35-weather-station/PROJECT.md) | Weather Station & Home Assistant Module (esp-mqtt wrapper, HOM entities, Web Portal, U8G2 composable widgets) | 📋 **PLANNING** — 4 WOs defined, ready for execution workers | Current Session |
