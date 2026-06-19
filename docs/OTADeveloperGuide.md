@@ -121,9 +121,9 @@ executes the following pipeline:
 5. **Fail-closed check** — reject missing/empty `.sig` when public key is
    configured (see [§5. Signature Verification](#5-signature-verification))
 6. **Config snapshot** — `snapshotActiveToPrevious()` (see
-   [§8. Config Lifecycle](#8-config-lifecycle))
+   [§9. Config Lifecycle](#9-config-lifecycle))
 7. **Init verifier** — load the RSA public key into `MbedTLSSignatureVerifier`
-8. **Allocate HTTPS client** — `WiFiClientSecure` on the heap (per §14.3)
+8. **Allocate HTTPS client** — `WiFiClientSecure` on the heap (per §15.3)
 9. **Create download engine** — configure `OTADownloadEngine`
 10. **Fetch `.sig`** — download the detached signature file
 11. **Download and flash** — stream firmware in 1024-byte chunks, feeding the
@@ -297,9 +297,55 @@ To rotate keys:
 
 ---
 
-## 7. Multi-Architecture Support
+## 7. Private Repository & PAT Configuration
 
-### 7.1 Manifest Schema
+If your OTA releases are hosted in a **private** GitHub repository, devices need a
+Personal Access Token (PAT) to authenticate API requests. This section covers
+token creation, repository layout options, and the `deploy_release.py --repo` flag.
+
+### 7.1 PAT Creation Walkthrough
+
+1. Go to **GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens**
+2. Click **Generate new token**
+3. Set **Token name** (e.g., `ota_update_token`)
+4. Set **Expiration** to **No expiration**
+5. Under **Repository access**, select **Only select repositories** → choose your OTA repo
+6. Under **Repository permissions**, set **Contents** to **Read-only**
+7. Leave all other permissions at **No access**
+8. Click **Generate token** and copy the token immediately
+
+> **Warning:** Treat the PAT like a private key. Never commit it to git. Store it
+> in a separate `otaSecrets.hpp` header that is listed in `.gitignore`.
+
+### 7.2 Repository Configuration
+
+| Setup | `config.otaGithubRepo` | `otaSecrets.hpp` | `deploy_release.py` |
+|---|---|---|---|
+| Single private repo | `"owner/repo"` | Include PAT | (default) |
+| Split releases repo | `"owner/releases-repo"` | Include PAT | `--repo owner/releases-repo` |
+| Public repo | `"owner/public-repo"` | Omit (`nullptr`) | (default) |
+
+**Split releases repo** is recommended for blast-radius reduction: your source
+code repo and your firmware releases repo are separate. Devices only need
+read access to the releases repo.
+
+### 7.3 Deploy Script `--repo` Usage
+
+When using a split releases repo, pass `--repo` to `deploy_release.py` so the
+GitHub Release is created in the correct repository:
+
+```bash
+python scripts/deploy_release.py --tag v1.0.0 --private-key private_key.pem --local --repo owner/releases-repo
+```
+
+The `--repo` flag is passed through to `gh release create` and `gh release upload`.
+If omitted, the script defaults to the current repository's `origin` remote.
+
+---
+
+## 8. Multi-Architecture Support
+
+### 8.1 Manifest Schema
 
 Each release includes a `manifest.json` that maps board IDs to firmware assets:
 
@@ -327,7 +373,7 @@ Each release includes a `manifest.json` that maps board IDs to firmware assets:
 }
 ```
 
-### 7.2 Board ID Injection
+### 8.2 Board ID Injection
 
 Each PlatformIO environment defines a `BOARD_ID` macro:
 
@@ -346,7 +392,7 @@ build_flags =
 The orchestrator calls `findAssetForBoard(manifest, BOARD_ID)` to resolve the
 correct firmware binary for the running board.
 
-### 7.3 Legacy Fallback
+### 8.3 Legacy Fallback
 
 If no `manifest.json` is present in a release (pre-manifest releases), the
 orchestrator falls back to a linear scan of release assets, matching by `.bin`
@@ -355,9 +401,9 @@ releases that don't include a manifest.
 
 ---
 
-## 8. Config Lifecycle
+## 9. Config Lifecycle
 
-### 8.1 Three-Tier Model
+### 9.1 Three-Tier Model
 
 The `ConfigManifest` library manages configuration versioning across OTA updates:
 
@@ -367,7 +413,7 @@ The `ConfigManifest` library manages configuration versioning across OTA updates
 | **Previous** | Config state before the last OTA download | `snapshotActiveToPrevious()` — called before OTA download |
 | **Golden** | Last-known-good config (firmware blessed) | `snapshotActiveToGolden()` — called from `markAppValid()` |
 
-### 8.2 OTA Integration Points
+### 9.2 OTA Integration Points
 
 ```
   OTA Download Triggered
@@ -388,16 +434,16 @@ The `ConfigManifest` library manages configuration versioning across OTA updates
   snapshotActiveToGolden() + save()
 ```
 
-### 8.3 Config Persistence
+### 9.3 Config Persistence
 
 Config manifest is persisted at `/config_manifest.json` on LittleFS. Per-module
 configs are at `/mod/<namespace>.json`.
 
 ---
 
-## 9. Anti-Rollback
+## 10. Anti-Rollback
 
-### 9.1 Security Version Counter
+### 10.1 Security Version Counter
 
 The application-layer anti-rollback mechanism uses an NVS counter to prevent
 downgrade past security-critical firmware boundaries.
@@ -407,7 +453,7 @@ downgrade past security-critical firmware boundaries.
 - NVS storage — `Preferences` namespace `"ota_security"`, key `"sec_ver"`
 - Manifest field — `securityVersion` in `manifest.json`
 
-### 9.2 When to Increment
+### 10.2 When to Increment
 
 Increment `SECURITY_VERSION` when a release contains a security fix that must
 not be rolled back past. For example:
@@ -424,7 +470,7 @@ build_flags = -DSECURITY_VERSION=2
 > devices update past this barrier, they cannot be rolled back to any firmware
 > with a lower security version — even via the web portal rollback button.
 
-### 9.3 Check Logic
+### 10.3 Check Logic
 
 `checkSecurityVersion()` (called from `markAppValid()`):
 - `SECURITY_VERSION > stored` → NVS updated to new value
@@ -433,9 +479,9 @@ build_flags = -DSECURITY_VERSION=2
 
 ---
 
-## 10. CI/CD Pipeline
+## 11. CI/CD Pipeline
 
-### 10.1 Stage 1: GitHub Actions (CI)
+### 11.1 Stage 1: GitHub Actions (CI)
 
 The `.github/workflows/build.yml` workflow:
 
@@ -447,7 +493,7 @@ The `.github/workflows/build.yml` workflow:
    - Generate `firmware-<board>.bin.sha256`
    - Upload as GitHub Actions artifact
 
-### 10.2 Stage 2: Local Release
+### 11.2 Stage 2: Local Release
 
 Run `scripts/deploy_release.py` on your local machine:
 
@@ -462,7 +508,7 @@ This script:
 4. Creates GitHub Release: `gh release create <tag>`
 5. Uploads all assets: `.bin`, `.bin.sig`, `.bin.sha256`, `manifest.json`
 
-### 10.3 Why Sign Locally?
+### 11.3 Why Sign Locally?
 
 The private key must **never** be stored in GitHub Secrets or any remote system.
 The CI pipeline produces unsigned artifacts; the human operator signs them with
@@ -470,7 +516,7 @@ the locally-held private key before publishing the release.
 
 ---
 
-## 11. REST API Reference
+## 12. REST API Reference
 
 | Method | Route | Body | Description |
 |--------|-------|------|-------------|
@@ -509,9 +555,9 @@ curl -X POST http://<device-ip>/api/ota \
 
 ---
 
-## 12. EventBus Integration
+## 13. EventBus Integration
 
-### 12.1 Progress Events
+### 13.1 Progress Events
 
 Subscribe to `"ota.progress"` for real-time update status:
 
@@ -525,7 +571,7 @@ app.getEventBus().subscribe("ota.progress", [](const void* payload) {
 });
 ```
 
-### 12.2 Event Payload
+### 13.2 Event Payload
 
 ```cpp
 struct OTAProgressEvent {
@@ -543,9 +589,9 @@ Events are published:
 
 ---
 
-## 13. Safety Mechanisms
+## 14. Safety Mechanisms
 
-### 13.1 Auto-Rollback (Bootloader)
+### 14.1 Auto-Rollback (Bootloader)
 
 **Prerequisite:** `CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y` in
 `sdkconfig.defaults`.
@@ -553,7 +599,7 @@ Events are published:
 If the new firmware crashes or hangs during boot before `markAppValid()` is
 called, the ESP-IDF bootloader automatically reverts to the previous partition.
 
-### 13.2 Task Watchdog (TWDT)
+### 14.2 Task Watchdog (TWDT)
 
 The OTA FreeRTOS task subscribes to the Task Watchdog Timer:
 
@@ -568,7 +614,7 @@ With `CONFIG_ESP_TASK_WDT_PANIC=y`, a TWDT timeout triggers:
 
 No human intervention required.
 
-### 13.3 Closed Safety Loop
+### 14.3 Closed Safety Loop
 
 The combination of auto-rollback and task watchdog creates a closed safety loop:
 
@@ -591,7 +637,7 @@ Bad firmware flashed
 
 ---
 
-## 14. FrameworkConfig Reference
+## 15. FrameworkConfig Reference
 
 `FrameworkConfig` carries only the compile-time secrets the framework cannot
 know. The master update kill-switch is now a persisted OTA module setting
@@ -616,7 +662,7 @@ and daily scheduling is handled by `checkHour`.
 
 ---
 
-## 15. Troubleshooting
+## 16. Troubleshooting
 
 ### Common Issues
 
@@ -654,7 +700,7 @@ and daily scheduling is handled by `checkHour`.
 
 ---
 
-## 16. Security Checklist
+## 17. Security Checklist
 
 Before deploying to production, verify:
 

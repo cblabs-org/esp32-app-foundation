@@ -141,6 +141,8 @@ bool Application::begin(const FrameworkConfig& config) {
     registerModule(&_wifiManager);        // ITickable + IConfigurable + IWebContributor
     registerModule(&_timeManager);        // ITickable + IConfigurable + IWebContributor
     registerModule(&_authManager);        // IConfigurable + IWebContributor
+    registerModule(_authManager.passwordTabStub());  // IWebContributor (sub-pill)
+    registerModule(_authManager.tlsTabStub());       // IWebContributor (sub-pill)
     registerModule(&_configManager);      // IWebContributor
     registerModule(&_keyManager);         // IWebContributor
     registerModule(&_mcpServer);          // IConfigurable + IWebContributor

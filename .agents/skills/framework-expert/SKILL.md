@@ -25,6 +25,12 @@ description: >
   "scan for violations", "check compliance", "naming conventions",
   "std::nothrow", "bare new", "std::function", "WiFiClientSecure",
   "TWDT", "watchdog", "task stack size", "private_key.pem".
+  Also trigger on: "PAT", "personal access token", "OTA token",
+  "releases repo", "split repo", "CA fallback", "dirty TLS context",
+  "CA rotation", "NVS encryption", "tlsEnabled", "TLS toggle".
+  Also trigger on: "version", "versioning", "semver", "dev tag",
+  "beta tag", "stable tag", "inject_version", "deploy_release",
+  "build gate", "tag before build", "version bump".
 ---
 
 # Framework Expert
@@ -85,9 +91,11 @@ This skill uses a progressive disclosure model. Based on your query, load and re
 | **Event Bus** (Topics, pub/sub, custom topics) | `systems/event-bus/` |
 | **Web Portal** (SPA, routes, HTML/JS fragments, security) | `systems/web-portal/` |
 | **Security** (TLS tradeoffs, credentials, OTA security, portal auth) | `security/` |
+| **PAT & Repository Config** (Token creation, repo split, blast radius) | `security/pat-management.md` |
 | **Coding Patterns** (Service Module Pattern, HOM, SOLID, modules vs libs) | `coding-patterns/` |
 | **Performance** (PSRAM, flash size, heap, profiling) | `performance/` |
 | **TLS Memory Optimization** (sdkconfig tuning, measured results, cert bundles) | `performance/tls-memory-optimization.md` |
+| **Versioning Policy** (SemVer tags, dev/beta/stable tiers, build gate) | Read `.agents/rules/03-versioning.md` (build gate) and `docs/developer/versioning-policy.md` (full reference) |
 | **Embedded Safety** (Thread safety, memory rules, power, rejected approaches)| `embedded-safety/` |
 
 ## When to Read the Full Docs

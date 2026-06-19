@@ -19,13 +19,14 @@
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
 #include <esp_heap_caps.h>
+#include <esp_task_wdt.h>
 #endif
 
-// GitHub root CA certificate — shared across GithubClient and OTAUpdateManager.
-// Defined in github_root_ca.h to avoid duplication.
-#include "github_root_ca.h"
+// OTA root CA bundle — shared across GithubClient and OTAUpdateManager.
+// Defined in ota_root_cas.h (Sectigo E46 + ISRG Root X1).
+#include "ota_root_cas.h"
 
-const char* GithubClient::githubRootCACert = GITHUB_ROOT_CA_CERT;
+const char* GithubClient::githubRootCACert = OTA_ROOT_CA_BUNDLE;
 
 GithubClient::GithubClient(const std::string& repository, const std::string& token) {
     repository_ = repository;
@@ -64,7 +65,10 @@ bool GithubClient::getLatestRelease() {
     HTTPClient http;
     http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
     http.useHTTP10(true);
-    http.begin(*client, String(apiGetLatestRelease.c_str()));
+    if (!http.begin(*client, String(apiGetLatestRelease.c_str()))) {
+        ESP_LOGE("GITHUB", "HTTP begin failed for latest release");
+        return false;
+    }
     http.addHeader("User-Agent", "esp32/1.0");
     http.addHeader("X-GitHub-Api-Version", "2022-11-28");
     http.addHeader("Accept", "application/vnd.github+json");
@@ -74,6 +78,34 @@ bool GithubClient::getLatestRelease() {
 
     LOG_SECURE("GITHUB", "Requesting latest release from %s", apiGetLatestRelease.c_str());
     int httpCode = http.GET();
+
+    if (httpCode < 0) {
+        ESP_LOGW("GITHUB", "Latest release query failed with pinned CA (err=%d) — retrying insecure", httpCode);
+        http.end();
+
+        esp_task_wdt_reset();
+
+        client.reset(new (std::nothrow) WiFiClientSecure());
+        if (!client) {
+            ESP_LOGE("GITHUB", "Failed to allocate WiFiClientSecure for latest release insecure retry");
+            return false;
+        }
+        client->setInsecure();
+        client->setTimeout(15000);
+
+        if (!http.begin(*client, String(apiGetLatestRelease.c_str()))) {
+            ESP_LOGE("GITHUB", "HTTP begin failed for latest release retry");
+            return false;
+        }
+        http.addHeader("User-Agent", "esp32/1.0");
+        http.addHeader("X-GitHub-Api-Version", "2022-11-28");
+        http.addHeader("Accept", "application/vnd.github+json");
+        if (!accessToken.empty()) {
+            http.addHeader("Authorization", String(("Bearer " + accessToken).c_str()));
+        }
+
+        httpCode = http.GET();
+    }
 
     if (httpCode != HTTP_CODE_OK) {
         snprintf(lastErrorMsg, sizeof(lastErrorMsg), "HTTP request failed, error: %d", httpCode);
@@ -140,7 +172,6 @@ bool GithubClient::getLatestRelease() {
         }
     }
 
-    http.end();
     strcpy(lastErrorMsg, "SUCCESS");
     return true;
 #else
@@ -248,7 +279,10 @@ bool GithubClient::getLatestReleaseForChannel(const char* channel) {
         HTTPClient pageHttp;
         pageHttp.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
         pageHttp.useHTTP10(true);
-        pageHttp.begin(*pageClient, String(pageUrl.c_str()));
+        if (!pageHttp.begin(*pageClient, String(pageUrl.c_str()))) {
+            ESP_LOGE("GITHUB", "Page %d: HTTP begin failed", page);
+            break;
+        }
         pageHttp.addHeader("User-Agent", "esp32/1.0");
         pageHttp.addHeader("X-GitHub-Api-Version", "2022-11-28");
         pageHttp.addHeader("Accept", "application/vnd.github+json");
@@ -258,6 +292,34 @@ bool GithubClient::getLatestReleaseForChannel(const char* channel) {
         pageHttp.setTimeout(15000);
 
         int httpCode = pageHttp.GET();
+        if (httpCode < 0) {
+            ESP_LOGW("GITHUB", "Page %d query failed with pinned CA (err=%d) — retrying insecure", page, httpCode);
+            pageHttp.end();
+
+            esp_task_wdt_reset();
+
+            pageClient.reset(new (std::nothrow) WiFiClientSecure());
+            if (!pageClient) {
+                ESP_LOGE("GITHUB", "Failed to allocate WiFiClientSecure for page %d insecure retry", page);
+                break;
+            }
+            pageClient->setInsecure();
+            pageClient->setTimeout(15000);
+
+            if (!pageHttp.begin(*pageClient, String(pageUrl.c_str()))) {
+                ESP_LOGE("GITHUB", "Page %d: HTTP begin failed for retry", page);
+                break;
+            }
+            pageHttp.addHeader("User-Agent", "esp32/1.0");
+            pageHttp.addHeader("X-GitHub-Api-Version", "2022-11-28");
+            pageHttp.addHeader("Accept", "application/vnd.github+json");
+            if (!accessToken.empty()) {
+                pageHttp.addHeader("Authorization", String(("Bearer " + accessToken).c_str()));
+            }
+            pageHttp.setTimeout(15000);
+
+            httpCode = pageHttp.GET();
+        }
         if (httpCode != HTTP_CODE_OK) {
             LOG_SECURE("GITHUB", "Page %d HTTP error %d — stopping scan", page, httpCode);
             pageHttp.end();

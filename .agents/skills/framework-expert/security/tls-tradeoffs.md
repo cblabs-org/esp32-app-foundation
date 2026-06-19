@@ -32,19 +32,49 @@ Constrained devices should limit the allowed cipher suites to faster, more memor
 ## When to Use TLS
 
 ### External API Calls (Always TLS)
-Connections to external services (GitHub API, cloud backends) MUST use TLS. The `GithubClient` uses `setCACert()` to pin the GitHub root CA certificate for maximum security — both the primary API client and the paginated-fetch client pin the same root CA.
+Connections to external services (GitHub API, cloud backends) MUST use TLS. The `GithubClient` uses `setCACert(OTA_ROOT_CA_BUNDLE)` to pin a dual-CA bundle (Sectigo E46 for `api.github.com`, ISRG Root X1 for GitHub CDN) — both the primary API client and the paginated-fetch client pin the same bundle. On TLS handshake failure (e.g. CA rotation), the client falls back to `setInsecure()` with a fresh `WiFiClientSecure` allocation. See [OTA Security](ota-security.md) for details.
 
 ### Local Web Portal (Tradeoff)
 The Web Portal serves on the local network. TLS for the local portal:
 - **Pro:** Prevents credential sniffing on shared WiFi. When `AuthManager` has a generated EC P-256 self-signed certificate, `WebServerManager` can serve HTTPS on port 443 with HTTP→HTTPS redirect on port 80.
 - **Con:** Costs ~40KB heap for the HTTPS server, plus self-signed certs trigger browser warnings.
-- **Framework default:** HTTP (no TLS) for the local portal when no certificate has been generated. Authentication is handled via session cookies (`esp32_session=<hex>; HttpOnly; SameSite=Strict`).
+- **Config flag:** TLS is controlled by a dedicated `_tlsEnabled` config flag in `AuthManager`, independent of whether authentication itself is enabled. This means auth can be on without TLS (local trusted network) or TLS can be enabled without auth (encryption-only mode). The flag is persisted in the `auth` config section as `tlsEnabled` and defaults to `false`.
+- **Framework default:** HTTP (no TLS) for the local portal when `tlsEnabled` is `false` or no certificate has been generated. Authentication is handled via session cookies (`esp32_session=<hex>; HttpOnly; SameSite=Strict`).
 
 ### `setInsecure()` — When It's Acceptable
 `setInsecure()` disables TLS certificate verification (the connection is still encrypted, but the server's identity is not verified).
 
-- **Acceptable:** When payload integrity is verified independently. The OTA pipeline uses `setInsecure()` in two places — for manifest downloads and for firmware binary downloads — because the firmware binary is cryptographically signed via `MbedTLSSignatureVerifier`. Transport security is redundant with payload verification.
-- **NOT acceptable:** When transmitting credentials or when the server's identity matters (e.g., `GithubClient` API calls that return release metadata for version comparison — these use `setCACert()` with the pinned GitHub root CA).
+- **Current usage — fallback, not default:** The OTA pipeline and `GithubClient` now use a **CA-pinned-with-fallback** pattern. The primary connection attempt uses `setCACert(OTA_ROOT_CA_BUNDLE)` for full certificate verification. `setInsecure()` is only used as a **fallback** when the TLS handshake fails (indicating a likely CA rotation by the server). See [OTA Security — Transport Security](ota-security.md#transport-security-for-ota-downloads) for the full pattern.
+- **Acceptable as a fallback:** Because the firmware binary is cryptographically signed via `MbedTLSSignatureVerifier`, a degraded (unverified) transport does not compromise payload integrity. The signature is the mandatory trust anchor.
+- **Acceptable as the primary path:** For the firmware **binary download** only — the `.bin` payload from GitHub CDN uses `setInsecure()` directly (not as a fallback) because the payload has independent Ed25519 / RSA-2048 signature verification, and CDN edge certificates rotate frequently.
+- **NOT acceptable:** When transmitting credentials or when the server's identity matters (e.g., login endpoints, cloud API calls where metadata integrity drives decisions).
+
+### Fresh `WiFiClientSecure` on TLS Retry
+
+**Coding pattern rule:** After a failed TLS handshake, the mbedTLS context inside `WiFiClientSecure` is left in a dirty state. You **cannot** call `setInsecure()` (or `setCACert()` with different parameters) on the same client object — the internal state is not properly reset, leading to undefined behaviour or silent connection failures.
+
+The correct pattern is to **destroy the old client and allocate a fresh one**:
+
+```cpp
+// After http.GET() returns < 0 (TLS handshake failure):
+http.end();
+esp_task_wdt_reset();  // Feed watchdog — TLS retries are slow
+
+// MUST allocate fresh — dirty mbedTLS context cannot be reconfigured
+client.reset(new (std::nothrow) WiFiClientSecure());
+if (!client) { /* handle allocation failure */ }
+client->setInsecure();  // Now safe on a clean context
+
+http.begin(*client, url);
+httpCode = http.GET();
+```
+
+This pattern applies everywhere TLS retry logic is used in the codebase:
+- `OTAUpdateManager::performUpdateTask()` — manifest fetch retry
+- `GithubClient::getLatestRelease()` — API metadata retry
+- `GithubClient::getReleaseAssets()` — paginated asset fetch retry
+
+**Key detail:** Use `std::unique_ptr::reset()` with `new (std::nothrow)` to handle the allocation safely. Always check for `nullptr` — heap may be exhausted after a failed TLS handshake consumed and released memory, leaving fragmentation.
 
 ## Concurrent Connection Budget
 

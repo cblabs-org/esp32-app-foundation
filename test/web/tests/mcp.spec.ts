@@ -53,6 +53,8 @@ const MOCK_MCP_RPC_TOOLS = {
   },
 };
 
+const MOCK_AUTH_STATUS = { enabled: false, passwordSet: false, sessionActive: false };
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -76,6 +78,7 @@ async function bootAndNavigateToMcp(
     return route.fulfill({ json: mcpConfig });
   });
   await page.route('**/api/mcp', route => route.fulfill({ json: mcpRpc }));
+  await page.route('**/api/auth/status', route => route.fulfill({ json: MOCK_AUTH_STATUS }));
 
   await page.goto('/');
   await page.waitForFunction(() => (window as any).apiFetch !== undefined);
@@ -132,6 +135,7 @@ test.describe('MCP Controls Sub-pill', () => {
       return route.fulfill({ json: MOCK_MCP_CONFIG });
     });
     await page.route('**/api/mcp', route => route.fulfill({ json: MOCK_MCP_RPC_TOOLS }));
+    await page.route('**/api/auth/status', route => route.fulfill({ json: MOCK_AUTH_STATUS }));
 
     await page.goto('/');
     await page.waitForFunction(() => (window as any).apiFetch !== undefined);

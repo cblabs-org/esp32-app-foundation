@@ -28,6 +28,7 @@
 
 #ifndef NATIVE_BUILD
     #include "esp_heap_caps.h"
+    #include "esp_task_wdt.h"
     // AuthManager full type needed for isAuthEnabled()/hasCert()/loadCert()
     // in TLS setup. Guarded so native LDF doesn't scan it, but even if it
     // does, the transitive DeviceCrypto include now resolves via relative path.
@@ -114,12 +115,12 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors,
     // Until then, all routes are served on HTTP port 80.
     bool useTls = false;
 #ifndef NATIVE_BUILD
-    if ((!apMode || (authManager && authManager->isApTlsEnabled())) && authManager && authManager->isAuthEnabled() && authManager->hasCert()) {
+    if ((!apMode || (authManager && authManager->isApTlsEnabled())) && authManager && authManager->isTlsEnabled() && authManager->hasCert()) {
         uint8_t *certDer = nullptr, *keyDer = nullptr;
         size_t certLen = 0, keyLen = 0;
 
         if (authManager->loadCert(&certDer, &certLen, &keyDer, &keyLen)) {
-            ESP_LOGI(TAG, "Auth enabled with TLS cert present — enabling HTTPS on port 443");
+            ESP_LOGI(TAG, "TLS enabled with TLS cert present — enabling HTTPS on port 443");
             useTls = true;
             _httpsServer = new (std::nothrow) PsychicHttpsServer();
             if (_httpsServer == nullptr) {
@@ -420,14 +421,10 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors,
     // Sends 200, then schedules esp_restart() after 500ms delay.
     // Body limit: 256 bytes (action-only, minimal body).
     // -----------------------------------------------------------------------
-    activeServer->on("/api/system/restart", HTTP_POST, [](PsychicRequest* request, PsychicResponse* response) {
+    activeServer->on("/api/system/restart", HTTP_POST, [this](PsychicRequest* request, PsychicResponse* response) {
         ESP_LOGW(TAG, "POST /api/system/restart — scheduling device restart");
         esp_err_t err = response->send(200, "application/json", "{\"status\":\"restarting\"}");
-
-        // Schedule restart after response is flushed (500ms delay)
-        // Using a FreeRTOS timer or simple delay loop
-        delay(500);
-        esp_restart();
+        _restartRequested = true;
         return err;
     });
 
@@ -480,7 +477,11 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors,
     activeServer->on("/api/tabs", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) { return ESP_OK; });
     activeServer->on("/api/system", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) { return ESP_OK; });
     activeServer->on("/api/app", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) { return ESP_OK; });
-    activeServer->on("/api/system/restart", HTTP_POST, [](PsychicRequest* request, PsychicResponse* response) { return ESP_OK; });
+    activeServer->on("/api/system/restart", HTTP_POST, [this](PsychicRequest* request, PsychicResponse* response) {
+        esp_err_t err = response->send(200, "application/json", "{\"status\":\"restarting\"}");
+        _restartRequested = true;
+        return err;
+    });
     activeServer->on("/api/system/factory-reset", HTTP_POST, [](PsychicRequest* request, PsychicResponse* response) { return ESP_OK; });
 #endif
 
@@ -570,6 +571,24 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors,
         });
         ESP_LOGI(TAG, "Global auth middleware registered");
     }
+
+    // -----------------------------------------------------------------------
+    // Middleware 2: Cache-Control for API responses
+    //
+    // Browsers may heuristically cache GET responses that lack explicit
+    // Cache-Control headers. For dynamic API endpoints this causes stale
+    // data — e.g. /api/auth/status cached before login is served after
+    // login, missing the mcpToken field. Prevent this globally.
+    // -----------------------------------------------------------------------
+    activeServer->addMiddleware([](PsychicRequest* request,
+                                   PsychicResponse* response,
+                                   PsychicMiddlewareNext next) -> esp_err_t {
+        String path = request->uri();
+        if (path.startsWith("/api/")) {
+            response->addHeader("Cache-Control", "no-store");
+        }
+        return next();
+    });
 #endif
 
     ESP_LOGI(TAG, "WebServer configured (TLS=%d, AP=%d), registered %u contributors",
@@ -590,6 +609,29 @@ void WebServerManager::tick(uint32_t currentMillis) {
         ESP_LOGI(TAG, "HTTP server started on port 80");
 #endif
         _serverStarted = true;
+    }
+
+    if (_restartRequested) {
+        ESP_LOGI(TAG, "Restart requested. Checking certificate generation status...");
+#ifndef NATIVE_BUILD
+        if (_authManager) {
+            uint32_t startMs = millis();
+            while (_authManager->isCertGenerating() && (millis() - startMs < 10000)) {
+                esp_task_wdt_reset();
+                delay(100);
+            }
+        }
+        ESP_LOGI(TAG, "Ending web servers...");
+        if (_httpsServer) {
+            _httpsServer->end();
+        }
+        _httpServer.end();
+        delay(200);
+        ESP_LOGW(TAG, "Calling esp_restart() now");
+        esp_restart();
+#else
+        _restartRequested = false;
+#endif
     }
 }
 
