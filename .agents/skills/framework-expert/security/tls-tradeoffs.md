@@ -86,6 +86,79 @@ Each concurrent TLS connection costs 20-50KB of heap. On a device with ~320KB SR
 
 The OTA FreeRTOS task stack MUST reside in DRAM (not PSRAM) because the OTA pipeline performs SPI flash writes. ESP-IDF asserts when flash operations run on a PSRAM-stack task because disabling the SPI cache makes the PSRAM-resident stack inaccessible. The framework uses `xTaskCreateWithCaps()` with `MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT` to enforce this.
 
+## Certificate Bundle Configuration
+
+The ESP-IDF mbedTLS certificate bundle embeds a set of trusted root CAs into the firmware at build time. This enables `WiFiClientSecure` and ESP-IDF HTTP clients to verify server certificates against the Mozilla root store without manually pinning individual CAs.
+
+### Bundle Options
+
+| sdkconfig Setting | Flash Cost | Coverage | Use Case |
+|-------------------|-----------|----------|----------|
+| `CONFIG_MBEDTLS_CERTIFICATE_BUNDLE_DEFAULT_FULL` | ~62 KB | All Mozilla root CAs | Maximum compatibility — connect to any public HTTPS server |
+| `CONFIG_MBEDTLS_CERTIFICATE_BUNDLE_DEFAULT_CMN` | ~16 KB | ~41 most common CAs (~99% of public servers) | **Framework default** — best balance of coverage and size |
+| `CONFIG_MBEDTLS_CERTIFICATE_BUNDLE=n` | 0 KB | None — must pin individual CAs | Flash-constrained apps that only connect to known servers |
+
+### Framework Default: CMN
+
+The framework ships with `DEFAULT_CMN` enabled. At ~16 KB, it provides broad TLS coverage with negligible flash cost. Downstream developers can connect to arbitrary HTTPS endpoints without additional configuration.
+
+Security-critical paths (like OTA firmware downloads via `GithubClient`) additionally pin specific CA certificates in code — this is belt-and-suspenders security on top of the bundle.
+
+### Disabling the Bundle (Flash-Constrained Apps)
+
+If a downstream app needs to reclaim the ~16 KB or only connects to known servers with pinned CAs, disable the bundle in the board-specific delta sdkconfig:
+
+1. **Add to `sdkconfig.defaults.<board>`:**
+   ```ini
+   CONFIG_MBEDTLS_CERTIFICATE_BUNDLE=n
+   ```
+
+2. **Add the no-op stub header** to `include/esp_crt_bundle.h`:
+   ```c
+   #ifndef _ESP_CRT_BUNDLE_H_
+   #define _ESP_CRT_BUNDLE_H_
+   #include <stdint.h>
+   #include <stddef.h>
+   #include "esp_err.h"
+   #ifdef __cplusplus
+   extern "C" {
+   #endif
+   static inline esp_err_t esp_crt_bundle_attach(void *conf) { return ESP_OK; }
+   static inline void esp_crt_bundle_detach(void *conf) {}
+   static inline esp_err_t esp_crt_bundle_set(const uint8_t *x509_bundle, size_t bundle_size) { return ESP_OK; }
+   static inline bool esp_crt_bundle_in_use(const void *ca_chain) { return false; }
+   #ifdef __cplusplus
+   }
+   #endif
+   #endif
+   ```
+   This stub is required because the Arduino `NetworkClientSecure` library references these symbols unconditionally. A reference copy is at `docs/developer/examples/esp_crt_bundle.h.stub`.
+
+3. **Pin CAs per connection** using `setCACert()`. See `GithubClient`'s `ota_root_cas.h` for the reference pattern.
+
+### Known Issue: `DEFAULT_NONE` cmake Bug
+
+> **WARNING:** Do NOT use `CONFIG_MBEDTLS_CERTIFICATE_BUNDLE_DEFAULT_NONE=y` without a custom bundle. This triggers a bug in ESP-IDF's mbedTLS `CMakeLists.txt`:
+>
+> 1. The `crt_paths` list stays empty (no DEFAULT_FULL or DEFAULT_CMN paths appended).
+> 2. `gen_crt_bundle.py` runs with `--input` but no files — the output bundle is never created.
+> 3. `data_file_embed_asm.cmake` tries to `file(READ)` the missing bundle file → cmake error.
+> 4. This cmake error prevents **ALL** `target_add_binary_data()` `.S` files from being generated — including those for unrelated managed components (`esp_insights`, `esp_rainmaker`).
+> 5. SCons proceeds anyway, finds compile targets but no source files → build failure.
+>
+> Use `CERTIFICATE_BUNDLE=n` (disables the feature entirely) or `DEFAULT_CMN`/`DEFAULT_FULL` (generates a valid bundle).
+
+### Bundle vs Pinned CAs vs `setInsecure()` — Decision Tree
+
+| Question | Answer | Recommendation |
+|----------|--------|----------------|
+| Connecting to arbitrary public HTTPS servers? | Yes | Use the bundle (`DEFAULT_CMN` or `DEFAULT_FULL`) |
+| Connecting to a known server with a stable CA? | Yes | Pin the CA cert via `setCACert()` — more secure, no bundle needed |
+| Need maximum security for a specific connection? | Yes | Pin the CA **and** use the bundle — belt-and-suspenders |
+| Flash headroom < 20 KB? | Yes | Disable bundle (`=n`), pin all CAs manually |
+| Server's CA might rotate? | Yes | Use the bundle — it updates with ESP-IDF. Pinned certs require firmware updates |
+| Downloading firmware that has independent signature verification? | Yes | `setInsecure()` fallback is acceptable (see above) |
+
 ## See Also
 - [Security Overview](overview.md) — Layered security model
 - [Credential Storage](credential-storage.md) — DeviceCrypto and KeyManager

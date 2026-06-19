@@ -28,6 +28,10 @@ description: >
   Also trigger on: "PAT", "personal access token", "OTA token",
   "releases repo", "split repo", "CA fallback", "dirty TLS context",
   "CA rotation", "NVS encryption", "tlsEnabled", "TLS toggle".
+  Also trigger on: "certificate bundle", "cert bundle", "CERTIFICATE_BUNDLE",
+  "DEFAULT_CMN", "DEFAULT_FULL", "DEFAULT_NONE", "x509_crt_bundle",
+  "gen_crt_bundle", "crt.S not found", "data_file_embed_asm",
+  "setCACert", "esp_crt_bundle", "disable TLS bundle".
   Also trigger on: "version", "versioning", "semver", "dev tag",
   "beta tag", "stable tag", "inject_version", "deploy_release",
   "build gate", "tag before build", "version bump".
@@ -95,6 +99,7 @@ This skill uses a progressive disclosure model. Based on your query, load and re
 | **Coding Patterns** (Service Module Pattern, HOM, SOLID, modules vs libs) | `coding-patterns/` |
 | **Performance** (PSRAM, flash size, heap, profiling) | `performance/` |
 | **TLS Memory Optimization** (sdkconfig tuning, measured results, cert bundles) | `performance/tls-memory-optimization.md` |
+| **Certificate Bundle Config** (CMN/FULL/none, disable guide, DEFAULT_NONE bug) | `security/tls-tradeoffs.md` § Certificate Bundle Configuration |
 | **Versioning Policy** (SemVer tags, dev/beta/stable tiers, build gate) | Read `.agents/rules/03-versioning.md` (build gate) and `docs/developer/versioning-policy.md` (full reference) |
 | **Embedded Safety** (Thread safety, memory rules, power, rejected approaches)| `embedded-safety/` |
 

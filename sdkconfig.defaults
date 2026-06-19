@@ -210,13 +210,17 @@ CONFIG_MBEDTLS_DYNAMIC_BUFFER=y
 # The cert is only needed during the handshake — saves ~2-3 KB per connection.
 CONFIG_MBEDTLS_SSL_KEEP_PEER_CERTIFICATE=n
 
-# Certificate bundle: NONE — the framework's own connections don't use the
-# bundle (GithubClient pins its CA cert, OTA uses setInsecure()).
-# Downstream apps that need broader TLS coverage can override to CMN or FULL
-# in their board-specific sdkconfig.defaults.* delta file.
-# Disable default certificate bundle to save flash/RAM and avoid PlatformIO build issues.
-# Downstream apps can enable it and select a bundle in their board-specific delta files.
-CONFIG_MBEDTLS_CERTIFICATE_BUNDLE=n
+# Certificate bundle: include the "most common" CAs by default.
+# This provides broad TLS coverage (~99% of public servers) at ~16 KB
+# flash cost — negligible given available headroom in the app partition.
+# Options for board-specific delta sdkconfig overrides:
+#   DEFAULT_FULL (~62 KB) — all Mozilla CAs, maximum compatibility
+#   DEFAULT_CMN (~16 KB)  — most common CAs, recommended (this default)
+#   CERTIFICATE_BUNDLE=n  — no bundle, manual CA pinning only (saves ~16 KB)
+# WARNING: Do NOT use DEFAULT_NONE=y — it triggers a cmake bug in ESP-IDF
+# that prevents ALL managed component .S assembly files from being generated.
+CONFIG_MBEDTLS_CERTIFICATE_BUNDLE=y
+CONFIG_MBEDTLS_CERTIFICATE_BUNDLE_DEFAULT_CMN=y
 
 # Disable unused TLS features:
 # - Renegotiation: security anti-pattern, unnecessary for IoT client/server
@@ -229,8 +233,3 @@ CONFIG_MBEDTLS_SSL_RENEGOTIATION=n
 CONFIG_MBEDTLS_CLIENT_SSL_SESSION_TICKETS=n
 CONFIG_MBEDTLS_SERVER_SSL_SESSION_TICKETS=n
 
-# Disable ESP Insights (not used, and its HTTPS transport requires
-# an embedded server cert that breaks the build)
-CONFIG_ESP_INSIGHTS_ENABLED=n
-CONFIG_ESP_INSIGHTS_TRANSPORT_HTTPS=n
-CONFIG_ESP_INSIGHTS_TRANSPORT_MQTT=n
