@@ -94,6 +94,7 @@ This skill uses a progressive disclosure model. Based on your query, load and re
 | **Config System** (Persistence, FrameworkConfig, ConfigManifest) | `systems/config/` |
 | **Event Bus** (Topics, pub/sub, custom topics) | `systems/event-bus/` |
 | **Web Portal** (SPA, routes, HTML/JS fragments, security) | `systems/web-portal/` |
+| **OTA Update System** (State machine, channels, config lifecycle, deploy) | `systems/ota/` |
 | **Security** (TLS tradeoffs, credentials, OTA security, portal auth) | `security/` |
 | **PAT & Repository Config** (Token creation, repo split, blast radius) | `security/pat-management.md` |
 | **Coding Patterns** (Service Module Pattern, HOM, SOLID, modules vs libs) | `coding-patterns/` |

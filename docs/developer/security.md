@@ -255,7 +255,7 @@ config.otaGithubToken = OTA_GITHUB_TOKEN;  // PAT scoped to releases repo
 
 ### Credential Storage
 
-PATs are stored encrypted via [`KeyManager`](#4-credential-storage-keymanager) under a module-managed key (e.g., `"github_pat"`). The token value is compiled into the firmware binary via a gitignored header (`otaSecrets.hpp`). See the [OTA Developer Guide](../OTADeveloperGuide.md) for the full deployment workflow.
+PATs are stored encrypted via [`KeyManager`](#4-credential-storage-keymanager) under a module-managed key (e.g., `"github_pat"`). The token value is compiled into the firmware binary via a gitignored header (`otaSecrets.hpp`). See the [OTA Update System](ota-update-system.md) for the full deployment workflow.
 
 ### Certificate Bundle Configuration
 
@@ -414,6 +414,9 @@ python3 scripts/deploy_release.py \
 
 > [!CAUTION]
 > Keep a secure backup of the **old** private key until you are confident all deployed devices have received the transitional update. After that, the old key can be permanently deleted.
+
+> For the full OTA lifecycle (state machine, release channels, config snapshots,
+> error codes), see [OTA Update System](ota-update-system.md).
 
 ---
 

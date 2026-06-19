@@ -314,4 +314,4 @@ python3 scripts/deploy_release.py \
 
 The private key never leaves your machine either way.
 
-For the full OTA update lifecycle — including signature verification, multi-architecture support, and the post-reboot self-test — see the [OTA Developer Guide](../OTADeveloperGuide.md).
+For the full OTA update lifecycle — including signature verification, multi-architecture support, and the post-reboot self-test — see the [OTA Update System](ota-update-system.md).

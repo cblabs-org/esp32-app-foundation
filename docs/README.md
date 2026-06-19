@@ -15,8 +15,6 @@ contracts, and module authoring guidelines.
 
 - [Design Specification](design_specification.md) — architectural blueprint,
   38 ADRs, subsystem details, and design decisions
-- [OTA Developer Guide](OTADeveloperGuide.md) — OTA state machine, release
-  channels, manifest format, and deployment procedures
 
 ## Historical Archives
 

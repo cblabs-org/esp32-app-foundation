@@ -1,8 +1,8 @@
-# OTA Developer Guide
+# OTA Update System
 
-> **Audience:** Downstream application developers who consume the ESP32 App
-> Foundation framework and need to configure, test, and operate the OTA firmware
-> update system.
+> ESP32 App Foundation (c) 2026 CB Labs
+>
+> The complete OTA update lifecycle — state machine, release channels, signature verification, config snapshots, error codes, and deployment procedures.
 
 ---
 
@@ -211,36 +211,10 @@ release always sorts higher than any pre-release of the same major.minor.patch.
 
 ## 5. Signature Verification
 
-### 5.1 Fail-Closed Mode (Production)
+The framework uses RSA-2048 streaming signature verification via the `IOTAVerifier` interface. When `FrameworkConfig.otaPublicKey` is configured, the pipeline is **fail-closed** — unsigned or mis-signed firmware is always rejected. When the public key is `nullptr`, verification is skipped (development only).
 
-When `FrameworkConfig.otaPublicKey` is configured (non-null):
-
-- **No `.sig` asset in release** → update aborted immediately
-- **Empty `.sig` file** → update aborted immediately
-- **Signature mismatch** → `OTAError::SignatureVerifyFailed`
-
-There is **no code path** that accepts unsigned firmware when a public key is
-present.
-
-### 5.2 Degraded Mode (Development)
-
-When `otaPublicKey` is `nullptr`:
-
-- Signature verification is skipped entirely
-- A warning is logged at `ESP_LOGW` level
-- This mode is for development only — **never deploy to production without a key**
-
-### 5.3 Verification Pipeline
-
-```
-begin(publicKeyPem)    →  Load RSA key, init SHA-256 context
-update(chunk, length)  →  Feed each downloaded chunk into SHA-256
-verify(signature, len) →  Compare final digest against .sig file
-```
-
-The `MbedTLSSignatureVerifier` uses `mbedtls_pk_context` for key parsing and
-`mbedtls_md_context_t` for digest accumulation. RAII lifecycle ensures
-`mbedtls_pk_free()` + `mbedtls_sha256_free()` are called even on error paths.
+> For detailed coverage of signature verification, anti-rollback, key rotation,
+> and the DRAM task constraint, see [Security § OTA Firmware Security](security.md#8-ota-firmware-security).
 
 ---
 
@@ -283,17 +257,9 @@ config.otaPublicKey = OTA_PUBLIC_KEY;
 
 ### 6.3 Key Rotation
 
-To rotate keys:
+Key rotation requires a two-step transitional release: ship a firmware signed with the **old** key that embeds the **new** public key, then switch to signing with the new key.
 
-1. Generate a new key pair: `bash scripts/generate_keys.sh`
-2. Release a **transitional firmware** signed with the **old** key that embeds
-   the **new** public key
-3. Once all devices have updated, future releases are signed with the new
-   private key
-
-> **Warning:** If you lose the private key, devices running firmware with the
-> corresponding public key can never receive signed OTA updates. Always back up
-> your private key securely.
+> For the full step-by-step rotation procedure and security warnings, see [Security § Key Rotation](security.md#key-rotation).
 
 ---
 
@@ -443,39 +409,13 @@ configs are at `/mod/<namespace>.json`.
 
 ## 10. Anti-Rollback
 
-### 10.1 Security Version Counter
-
-The application-layer anti-rollback mechanism uses an NVS counter to prevent
-downgrade past security-critical firmware boundaries.
-
-**Components:**
-- `SECURITY_VERSION` macro — defined in `platformio.ini` `build_flags`
-- NVS storage — `Preferences` namespace `"ota_security"`, key `"sec_ver"`
-- Manifest field — `securityVersion` in `manifest.json`
-
-### 10.2 When to Increment
-
-Increment `SECURITY_VERSION` when a release contains a security fix that must
-not be rolled back past. For example:
-
-```ini
-# Before security fix
-build_flags = -DSECURITY_VERSION=1
-
-# After security fix
-build_flags = -DSECURITY_VERSION=2
-```
+The framework implements a software-based anti-rollback counter using the `SECURITY_VERSION` compile-time macro and an NVS monotonic counter. Increment `SECURITY_VERSION` in `platformio.ini` `build_flags` when a release contains a security fix that must not be rolled back past.
 
 > **Warning:** Incrementing `SECURITY_VERSION` is a **one-way operation**. Once
 > devices update past this barrier, they cannot be rolled back to any firmware
 > with a lower security version — even via the web portal rollback button.
 
-### 10.3 Check Logic
-
-`checkSecurityVersion()` (called from `markAppValid()`):
-- `SECURITY_VERSION > stored` → NVS updated to new value
-- `SECURITY_VERSION < stored` → firmware below security floor (prevented by
-  orchestrator checking manifest's `securityVersion` before download)
+> For the full anti-rollback implementation details and check logic, see [Security § Anti-Rollback Protection](security.md#anti-rollback-protection).
 
 ---
 
@@ -702,13 +642,13 @@ and daily scheduling is handled by `checkHour`.
 
 ## 17. Security Checklist
 
-Before deploying to production, verify:
+Before deploying to production, verify the OTA security posture:
 
 - [ ] `FrameworkConfig.otaPublicKey` is set to your PEM-encoded RSA public key
-- [ ] Private key is stored securely and **never** committed to git
 - [ ] `SECURITY_VERSION` is set in all PlatformIO environments
-- [ ] `CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y` in `sdkconfig.defaults`
-- [ ] `CONFIG_ESP_TASK_WDT_PANIC=y` in `sdkconfig.defaults`
 - [ ] `manifest.json` is generated and uploaded with each release
 - [ ] All `.bin` assets have corresponding `.bin.sig` files
 - [ ] The `deploy_release.py` script is used for signing (not CI)
+
+> For the full security audit checklist (private key handling, bootloader rollback,
+> TWDT panic, NVS encryption), see [Security § Security Audit Checklist](security.md#10-security-audit-checklist).
