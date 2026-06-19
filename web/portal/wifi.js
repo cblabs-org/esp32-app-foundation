@@ -175,27 +175,8 @@
         font-size:0.85rem; font-weight:600; border-radius:10px;
         cursor:pointer; transition:all 0.2s;
       ">Forget Network</button>
-    </article>
-
-    <!-- Restarting Overlay -->
-    <div id="wifi-restart-overlay" style="
-      display:none; position:fixed; inset:0; z-index:9999;
-      background:rgba(0,0,0,0.7); backdrop-filter:blur(4px);
-      flex-direction:column; align-items:center; justify-content:center;
-      color:white; font-size:1.1rem; gap:1rem;
-    ">
-      <div style="
-        width:40px; height:40px; border:3px solid rgba(255,255,255,0.3);
-        border-top-color:white; border-radius:50%;
-        animation: wifi-spin 0.8s linear infinite;
-      "></div>
-      <div>Restarting device...</div>
-      <div style="font-size:0.8rem; opacity:0.7;">Please reconnect to the device network.</div>
-    </div>
-    <style>
-      @keyframes wifi-spin { to { transform: rotate(360deg); } }
-    </style>
   `;
+
 
   // ==========================================================================
   // DOM References
@@ -219,7 +200,7 @@
   const diagTable     = document.getElementById('wifi-diag-table');
   const diagDot       = document.getElementById('wifi-diag-dot');
   const forgetBtn     = document.getElementById('wifi-forget-btn');
-  const restartOverlay= document.getElementById('wifi-restart-overlay');
+
 
   // ==========================================================================
   // Status Fetch
@@ -540,8 +521,8 @@
         body: JSON.stringify({ ssid, pass })
       });
 
-      // --- Show restart overlay ---
-      restartOverlay.style.display = 'flex';
+      // --- Show reboot overlay ---
+      window.showRebootOverlay('Connecting to WiFi…', 'The device will restart to connect to the new network.');
 
     } catch (err) {
       resultEl.textContent = '✗ Failed to save. Try again.';
@@ -581,8 +562,8 @@
         body: '{}'
       });
 
-      // --- Show restart overlay ---
-      restartOverlay.style.display = 'flex';
+      // --- Show reboot overlay ---
+      window.showRebootOverlay('Restarting device…', 'WiFi credentials have been erased. The device will restart.');
 
     } catch (err) {
       resultEl.textContent = '✗ Forget failed. Try again.';

@@ -294,6 +294,7 @@
       } catch (e) {
         // Expected — device restarts, connection drops
       }
+      window.showRebootOverlay('Restarting device…', 'The device will be back online shortly.');
     }
   });
 
@@ -329,6 +330,7 @@
     } catch (e) {
       // Expected — device restarts, connection drops
     }
+    window.showRebootOverlay('Factory reset in progress…', 'All settings will be erased. The device will restart with defaults.');
   });
 
   // -------------------------------------------------------------------------

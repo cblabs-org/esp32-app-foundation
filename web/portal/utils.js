@@ -186,4 +186,76 @@
     '</div>';
   };
 
+  // ===========================================================================
+  // Universal Reboot Overlay
+  // ===========================================================================
+
+  /**
+   * @brief Inject the reboot overlay DOM element (once).
+   *        Called automatically on first use.
+   */
+  function ensureRebootOverlay() {
+    if (document.getElementById('reboot-overlay')) return;
+    var overlay = document.createElement('div');
+    overlay.id = 'reboot-overlay';
+    overlay.className = 'reboot-overlay';
+    overlay.innerHTML =
+      '<div class="reboot-spinner"></div>' +
+      '<div class="reboot-msg">Restarting device…</div>' +
+      '<div class="reboot-sub">Please wait for the device to come back online.</div>';
+    document.body.appendChild(overlay);
+  }
+
+  /**
+   * @brief Show the universal reboot overlay with a context-aware message.
+   *        Starts reconnection polling that auto-reloads when the device
+   *        responds.
+   * @param {string} message - Primary status message (e.g. "Applying TLS settings…").
+   * @param {string} subMessage - Secondary explanation text.
+   */
+  window.showRebootOverlay = function(message, subMessage) {
+    ensureRebootOverlay();
+    var overlay = document.getElementById('reboot-overlay');
+    if (!overlay) return;
+
+    var msgEl = overlay.querySelector('.reboot-msg');
+    var subEl = overlay.querySelector('.reboot-sub');
+    if (msgEl) msgEl.textContent = message || 'Restarting device…';
+    if (subEl) subEl.textContent = subMessage || 'Please wait for the device to come back online.';
+
+    overlay.classList.add('visible');
+
+    // Start reconnection polling after a brief delay (give device time to begin restart)
+    if (window._rebootPollTimer) clearInterval(window._rebootPollTimer);
+    setTimeout(function() {
+      window._rebootPollTimer = setInterval(function() {
+        fetch('/api/app', { method: 'GET', cache: 'no-store' })
+          .then(function(resp) {
+            if (resp.ok) {
+              clearInterval(window._rebootPollTimer);
+              window._rebootPollTimer = null;
+              window.location.reload();
+            }
+          })
+          .catch(function() {
+            // Device still rebooting — keep polling
+          });
+      }, 2000);
+    }, 3000);
+  };
+
+  /**
+   * @brief Hide the reboot overlay and stop reconnection polling.
+   *        Normally not needed (page reloads on reconnection), but
+   *        available for error recovery.
+   */
+  window.hideRebootOverlay = function() {
+    var overlay = document.getElementById('reboot-overlay');
+    if (overlay) overlay.classList.remove('visible');
+    if (window._rebootPollTimer) {
+      clearInterval(window._rebootPollTimer);
+      window._rebootPollTimer = null;
+    }
+  };
+
 })();

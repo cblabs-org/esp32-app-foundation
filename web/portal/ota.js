@@ -69,7 +69,6 @@
           <option value="beta">Beta</option>
           <option value="dev">Dev</option>
         </select>
-        <div id="ota-settings-status" style="margin-top:0.4rem; font-size:0.8rem; text-align:center;"></div>
       </div>
     </article>
 
@@ -366,6 +365,7 @@
           checkInFlight = false;
           statusEl.style.color = 'var(--success)';
           statusEl.textContent = 'Update complete! Device is rebooting.';
+          window.showRebootOverlay('Applying firmware update…', 'The device will restart with the new firmware.');
           break;
         case 'error':
           pct = 100; label = 'Error: ' + (response.lastError || 'Unknown error');
@@ -395,19 +395,15 @@
   // -------------------------------------------------------------------------
   document.getElementById('ota-channel').addEventListener('change', async (e) => {
     const channel  = e.target.value;
-    const statusEl = document.getElementById('ota-settings-status');
     try {
       await window.apiFetch('/api/ota', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'setChannel', channel })
       });
-      statusEl.style.color = 'var(--success)';
-      statusEl.textContent = 'Channel set to ' + channel;
-      setTimeout(() => { statusEl.textContent = ''; }, 3000);
+      window.showToast('Channel set to ' + channel, 'success');
     } catch (error) {
-      statusEl.style.color = 'var(--error)';
-      statusEl.textContent = 'Failed to set channel.';
+      window.showToast('Failed to set channel.', 'error');
     }
   });
 
@@ -418,7 +414,6 @@
   if (updatesEnabledEl) {
     updatesEnabledEl.addEventListener('change', async (e) => {
       const enabled  = e.target.checked;
-      const statusEl = document.getElementById('ota-settings-status');
 
       // Optimistic UI update
       setToggleState(updatesEnabledEl, enabled);
@@ -429,12 +424,9 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ action: 'setUpdatesEnabled', updatesEnabled: enabled })
         });
-        statusEl.style.color = 'var(--success)';
-        statusEl.textContent = 'Firmware updates ' + (enabled ? 'enabled' : 'disabled');
-        setTimeout(() => { statusEl.textContent = ''; }, 3000);
+        window.showToast('Firmware updates ' + (enabled ? 'enabled' : 'disabled'), 'success');
       } catch (error) {
-        statusEl.style.color = 'var(--error)';
-        statusEl.textContent = 'Failed to save setting.';
+        window.showToast('Failed to save setting.', 'error');
         setToggleState(updatesEnabledEl, !enabled); // Revert on failure
       }
     });
@@ -447,7 +439,6 @@
   if (autoCheckEl) {
     autoCheckEl.addEventListener('change', async (e) => {
       const enabled  = e.target.checked;
-      const statusEl = document.getElementById('ota-settings-status');
 
       // Optimistic UI update
       setToggleState(autoCheckEl, enabled);
@@ -458,12 +449,9 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ action: 'setAutoCheck', autoCheck: enabled })
         });
-        statusEl.style.color = 'var(--success)';
-        statusEl.textContent = 'Auto-check ' + (enabled ? 'enabled' : 'disabled');
-        setTimeout(() => { statusEl.textContent = ''; }, 3000);
+        window.showToast('Auto-check ' + (enabled ? 'enabled' : 'disabled'), 'success');
       } catch (error) {
-        statusEl.style.color = 'var(--error)';
-        statusEl.textContent = 'Failed to save setting.';
+        window.showToast('Failed to save setting.', 'error');
         setToggleState(autoCheckEl, !enabled); // Revert on failure
       }
     });
@@ -476,19 +464,15 @@
   if (checkHourEl) {
     checkHourEl.addEventListener('change', async (e) => {
       const hour     = parseInt(e.target.value, 10);
-      const statusEl = document.getElementById('ota-settings-status');
       try {
         await window.apiFetch('/api/ota', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ action: 'setCheckHour', checkHour: hour })
         });
-        statusEl.style.color = 'var(--success)';
-        statusEl.textContent = `Daily check set to ${String(hour).padStart(2, '0')}:00`;
-        setTimeout(() => { statusEl.textContent = ''; }, 3000);
+        window.showToast('Daily check set to ' + String(hour).padStart(2, '0') + ':00', 'success');
       } catch (error) {
-        statusEl.style.color = 'var(--error)';
-        statusEl.textContent = 'Failed to save setting.';
+        window.showToast('Failed to save setting.', 'error');
       }
     });
   }
@@ -599,6 +583,7 @@
         sigInput.value = '';
         document.getElementById('ota-file-bin-name').textContent = 'No file selected';
         document.getElementById('ota-file-sig-name').textContent = 'No file selected';
+        window.showRebootOverlay('Applying firmware update…', 'The device will restart with the new firmware.');
       } else {
         barEl.style.background = 'var(--error)';
         labelEl.textContent = 'Failed';
@@ -653,6 +638,7 @@
     } catch (error) {
       // Expected — device reboots, connection drops
     }
+    window.showRebootOverlay('Rolling back firmware…', 'The device will restart with the previous firmware version.');
   });
 
   // -------------------------------------------------------------------------

@@ -137,8 +137,8 @@ test.describe('Key Vault Sub-pill', () => {
     // Click Add Key
     await page.locator('#btn-keys-add').click();
 
-    // Should show success status
-    await expect(page.locator('#keys-add-status')).toContainText('saved successfully');
+    // Should show success toast (WO1 migrated from inline #keys-add-status to showToast)
+    await expect(page.locator('.toast')).toContainText('Key saved successfully');
 
     // The new key should appear in the refreshed list
     await expect(page.locator('#keys-list')).toContainText('new_api_key');

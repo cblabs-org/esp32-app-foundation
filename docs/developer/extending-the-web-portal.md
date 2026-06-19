@@ -207,10 +207,10 @@ Wire up event listeners and fetch data from your API endpoints:
             });
             if (!response.ok) throw new Error('Failed to save config');
             
-            alert('Configuration saved successfully');
+            window.showToast('Configuration saved.', 'success');
             loadStatus(); // Reload values
         } catch (err) {
-            alert('Save failed: ' + err.message);
+            window.showToast('Save failed: ' + err.message, 'error');
         }
     }
 
@@ -235,7 +235,38 @@ Wire up event listeners and fetch data from your API endpoints:
 
 ---
 
-## 6. POST Safety (ADR-15)
+## 6. Save & Reboot Policy
+
+When adding settings to your tab, follow the framework's standard save policy to ensure UX consistency across all portal tabs.
+
+### The Four Tiers
+
+| Tier | Name | When to Use | UI Pattern |
+|------|------|-------------|------------|
+| **Instant** | Single-field settings that take effect immediately (no reboot) | Auto-save on each change + `showToast()` feedback |
+| **Batched** | Multiple related fields that should be committed atomically | Explicit "Save" button + `showToast()` feedback |
+| **Disruptive** | Settings that require a device reboot to take effect | Auto-save or button + `showRebootOverlay()` |
+| **Destructive** | Irreversible actions (reset, delete, erase) | `armButton()` or typed confirmation + `showRebootOverlay()` |
+
+> [!IMPORTANT]
+> **Every save must produce user feedback.** A silent save (no toast, no overlay) is a policy violation. Use `window.showToast()` for transient feedback and `window.showRebootOverlay()` for reboot paths.
+
+### Shared Utility Functions
+
+The framework provides these global functions in `utils.js` (loaded before all tab scripts):
+
+- **`window.showToast(message, type, duration)`** — Slide-in toast notification. Types: `'success'`, `'error'`, `'warning'`, `'info'`.
+- **`window.armButton(button, action, timeout)`** — Armed confirmation pattern. First click arms the button, second click within timeout executes the action.
+- **`window.showRebootOverlay(message, subMessage)`** — Full-screen overlay with spinner and reconnection polling. Auto-reloads the page when the device comes back online.
+- **`window.apiFetch(url, options)`** — Serialised fetch wrapper. **Always use this instead of raw `fetch()`** — it queues requests to protect ESP32 socket pools.
+
+### Decision Rule
+
+> Auto-save is the default. Only use an explicit "Save" button when the user is editing **multiple related fields** that should be committed atomically.
+
+---
+
+## 7. POST Safety (ADR-15)
 
 Handling POST requests on the ESP32 requires strict safety constraints due to RAM limitations. **ADR-15** governs all incoming POST body handling.
 
@@ -271,7 +302,7 @@ server.on("/api/myapp/config", HTTP_POST, [this](PsychicRequest* request, Psychi
 
 ---
 
-## 7. The Tab Registry Contract: `/api/tabs`
+## 8. The Tab Registry Contract: `/api/tabs`
 
 The main web page generates the navigation interface by querying `/api/tabs` on load. 
 
@@ -304,7 +335,7 @@ When the client SPA sees this array, it:
 
 ---
 
-## 8. Authentication & Security
+## 9. Authentication & Security
 
 The framework's web portal uses JSON Web Tokens (JWT) for API endpoint security. When the `AuthManager` is enabled, downstream modules get authentication enforcement for free — no per-route auth code is required.
 

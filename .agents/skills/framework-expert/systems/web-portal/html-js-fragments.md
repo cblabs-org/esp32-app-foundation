@@ -57,8 +57,12 @@ The SPA provides a global `App` object that exposes utility functions (like API 
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
-            }).then(() => App.showToast('Saved!', 'success'));
+            }).then(() => window.showToast('Saved!', 'success'));
         });
     });
 })();
 ```
+
+## Save Policy
+
+All settings must follow the framework's four-tier save policy. See [Save Policy](save-policy.md) for the full specification and code examples.

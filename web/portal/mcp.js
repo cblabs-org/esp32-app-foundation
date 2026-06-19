@@ -104,6 +104,7 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
       });
+      window.showToast('MCP setting saved.', 'success');
     } catch (error) {
       console.error('Failed to update MCP config:', error);
       // Reload to restore correct state

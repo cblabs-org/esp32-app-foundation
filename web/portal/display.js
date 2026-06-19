@@ -188,6 +188,7 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
+      window.showToast('Setting saved.', 'success');
     } catch (err) {
       window.showToast('Failed to save setting.', 'error');
     }

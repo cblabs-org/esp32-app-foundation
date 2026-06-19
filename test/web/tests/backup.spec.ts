@@ -135,11 +135,15 @@ test.describe('Backup & Restore Sub-pill', () => {
     // Verify filename shows
     await expect(page.locator('#backup-file-name')).toContainText('config-backup.json');
 
-    // Click Upload & Restore
+    // Click Upload & Restore — first click arms the button
     await page.locator('#btn-backup-restore').click();
 
-    // Should show success
-    await expect(page.locator('#backup-restore-status')).toContainText('restored');
+    // Second click confirms the armed action
+    await page.locator('#btn-backup-restore').click();
+
+    // Should show the reboot overlay (armButton gate + showRebootOverlay)
+    await expect(page.locator('#reboot-overlay')).toHaveClass(/visible/);
+    await expect(page.locator('.reboot-msg')).toContainText('Restoring configuration');
     expect(restorePosted).toBe(true);
   });
 

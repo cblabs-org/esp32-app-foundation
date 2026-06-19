@@ -3,7 +3,7 @@
   "version": "2.0.0",
   "created": "2026-06-15",
   "lastUpdated": "2026-06-18",
-  "sourceDocsVersion": "PR-29",
+  "sourceDocsVersion": "PR-33",
   "references": [
     "SKILL.md",
     "KEEPING-CURRENT.md",
@@ -35,6 +35,8 @@
     "systems/web-portal/overview.md",
     "systems/web-portal/routes.md",
     "systems/web-portal/html-js-fragments.md",
+    "systems/web-portal/save-policy.md",
+    "systems/web-portal/shared-utilities.md",
     "security/overview.md",
     "security/tls-tradeoffs.md",
     "security/credential-storage.md",

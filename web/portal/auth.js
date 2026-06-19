@@ -158,51 +158,6 @@
     }
   }
 
-  function showReconnecting() {
-    var overlay = document.getElementById('auth-reconnect-overlay');
-    if (!overlay) {
-      overlay = document.createElement('div');
-      overlay.id = 'auth-reconnect-overlay';
-      overlay.style.position = 'fixed';
-      overlay.style.inset = '0';
-      overlay.style.zIndex = '9999';
-      overlay.style.background = 'rgba(0,0,0,0.8)';
-      overlay.style.backdropFilter = 'blur(4px)';
-      overlay.style.display = 'flex';
-      overlay.style.flexDirection = 'column';
-      overlay.style.alignItems = 'center';
-      overlay.style.justifyContent = 'center';
-      overlay.style.color = 'white';
-      overlay.style.fontSize = '1.2rem';
-      overlay.style.gap = '1.5rem';
-
-      var spinner = document.createElement('div');
-      spinner.style.width = '40px';
-      spinner.style.height = '40px';
-      spinner.style.border = '3px solid rgba(255,255,255,0.3)';
-      spinner.style.borderTopColor = 'white';
-      spinner.style.borderRadius = '50%';
-      
-      var style = document.createElement('style');
-      style.innerHTML = '@keyframes auth-spin { to { transform: rotate(360deg); } }';
-      document.head.appendChild(style);
-      spinner.style.animation = 'auth-spin 0.8s linear infinite';
-
-      var text = document.createElement('div');
-      text.textContent = 'Reconnecting to device...';
-
-      var subtext = document.createElement('div');
-      subtext.style.fontSize = '0.9rem';
-      subtext.style.opacity = '0.7';
-      subtext.textContent = 'Waiting for the device to reboot and establish secure connection.';
-
-      overlay.appendChild(spinner);
-      overlay.appendChild(text);
-      overlay.appendChild(subtext);
-      document.body.appendChild(overlay);
-    }
-    overlay.style.display = 'flex';
-  }
 
   // =========================================================================
   // 2. Security Tab Content (Password + TLS Pills)
@@ -533,7 +488,7 @@
           } catch (e) {
             // Expected — device restarts, connection drops
           }
-          showReconnecting();
+          window.showRebootOverlay('Setting up security…', 'The device will restart to enable HTTPS.');
         }, 2000);
       } else {
         if (window.showToast) window.showToast('Password set successfully', 'success');
@@ -650,7 +605,7 @@
           } catch (e) {
             // Expected — device restarts, connection drops
           }
-          showReconnecting();
+          window.showRebootOverlay('Applying TLS settings…', 'The device will restart to apply the new TLS configuration.');
         }, 2000);
       } else {
         if (window.showToast) window.showToast('TLS setting updated', 'success');
@@ -680,7 +635,7 @@
             } catch (e) {
               // Expected
             }
-            showReconnecting();
+            window.showRebootOverlay('Regenerating certificate…', 'The device will restart with a new self-signed certificate.');
           }, 2000);
         }
       })
@@ -731,7 +686,7 @@
             } catch (e) {
               // Expected
             }
-            showReconnecting();
+            window.showRebootOverlay('Installing certificate…', 'The device will restart with the new certificate.');
         }, 2000);
       }
     })

@@ -148,55 +148,61 @@
   // -------------------------------------------------------------------------
   // Restore Config — POST /api/config/restore with uploaded JSON
   // -------------------------------------------------------------------------
-  document.getElementById('btn-backup-restore').addEventListener('click', async () => {
+  document.getElementById('btn-backup-restore').addEventListener('click', function() {
+    const restoreBtn = document.getElementById('btn-backup-restore');
     const fileInput = document.getElementById('backup-restore-file');
     const statusEl = document.getElementById('backup-restore-status');
 
+    // Validate file is selected BEFORE arming
     if (!fileInput.files.length) {
       statusEl.style.color = 'var(--error)';
       statusEl.textContent = 'Please select a .json file first.';
       return;
     }
 
-    const file = fileInput.files[0];
+    window.armButton(restoreBtn, async function() {
+      const file = fileInput.files[0];
 
-    // Validate file size (client-side check — server enforces 16 KB too)
-    if (file.size > 16384) {
-      statusEl.style.color = 'var(--error)';
-      statusEl.textContent = 'File too large (max 16 KB).';
-      return;
-    }
-
-    statusEl.style.color = 'var(--primary)';
-    statusEl.textContent = 'Uploading and restoring...';
-
-    try {
-      // Read the file as text and validate JSON before sending
-      const text   = await file.text();
-      const parsed = JSON.parse(text); // Validate JSON syntax
-
-      // Strip _meta before posting — belt-and-braces even though the server
-      // already ignores it
-      const payload = { ...parsed };
-      delete payload._meta;
-
-      await window.apiFetch('/api/config/restore', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-
-      statusEl.style.color = 'var(--success)';
-      statusEl.textContent = 'Config restored! Device is restarting...';
-      fileInput.value = '';
-    } catch (error) {
-      statusEl.style.color = 'var(--error)';
-      if (error instanceof SyntaxError) {
-        statusEl.textContent = 'Invalid JSON file.';
-      } else {
-        statusEl.textContent = 'Restore failed. Check file and connection.';
+      // Validate file size (client-side check — server enforces 16 KB too)
+      if (file.size > 16384) {
+        statusEl.style.color = 'var(--error)';
+        statusEl.textContent = 'File too large (max 16 KB).';
+        return;
       }
-    }
+
+      statusEl.style.color = 'var(--primary)';
+      statusEl.textContent = 'Uploading and restoring...';
+
+      try {
+        // Read the file as text and validate JSON before sending
+        const text   = await file.text();
+        const parsed = JSON.parse(text); // Validate JSON syntax
+
+        // Strip _meta before posting — belt-and-braces even though the server
+        // already ignores it
+        const payload = { ...parsed };
+        delete payload._meta;
+
+        await window.apiFetch('/api/config/restore', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        fileInput.value = '';
+        window.showRebootOverlay(
+          'Restoring configuration…',
+          'All settings will be overwritten. The device will restart.'
+        );
+      } catch (error) {
+        statusEl.style.color = 'var(--error)';
+        if (error instanceof SyntaxError) {
+          statusEl.textContent = 'Invalid JSON file.';
+        } else {
+          statusEl.textContent = 'Restore failed. Check file and connection.';
+        }
+      }
+    });
   });
 
   // -------------------------------------------------------------------------

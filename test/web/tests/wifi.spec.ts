@@ -183,7 +183,7 @@ test.describe('WiFi Settings Tab', () => {
     // Second click — confirm
     await forgetBtn.click();
 
-    // The restart overlay should appear (device "restarts" after forget)
-    await expect(page.locator('#wifi-restart-overlay')).toBeVisible();
+    // The universal reboot overlay should appear (device "restarts" after forget)
+    await expect(page.locator('#reboot-overlay')).toHaveClass(/visible/);
   });
 });

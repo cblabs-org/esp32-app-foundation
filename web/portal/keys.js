@@ -166,13 +166,13 @@
 
       nameInput.value = '';
       valueInput.value = '';
-      statusEl.innerHTML = '<span style="color:#2e7d32;">Key saved successfully.</span>';
+      window.showToast('Key saved successfully.', 'success');
       loadKeys();
     } catch (error) {
       if (error && error.message && error.message.indexOf('403') !== -1) {
-        statusEl.innerHTML = '<span style="color:var(--error);">This key is managed by a module and cannot be overwritten.</span>';
+        window.showToast('This key is managed by a module and cannot be overwritten.', 'error');
       } else {
-        statusEl.innerHTML = '<span style="color:var(--error);">Failed to save key.</span>';
+        window.showToast('Failed to save key.', 'error');
       }
     } finally {
       addBtn.disabled = false;
