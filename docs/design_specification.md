@@ -86,6 +86,8 @@ display) demonstrates the class of application this framework targets.
 
 ## 2. Design Principles
 
+> 📖 **Developer Guide:** [Coding Patterns](developer/coding-patterns.md) — Hollywood Principle, Composition over Inheritance, SOLID, Service Module Pattern.
+
 ### 2.1 The Hollywood Principle — "Don't Call Us, We'll Call You"
 
 The framework owns `setup()` and `loop()`. Application code never writes these
@@ -213,6 +215,8 @@ multiple concerns into a single "systemManager" is explicitly prohibited.
 
 ## 3. System Architecture Overview
 
+> 📖 **Developer Guide:** [Architecture Overview](developer/architecture-overview.md) — tutorials on the 3-tier model, boot sequence, and interface contracts.
+
 ### 3.1 Three-Tier Model
 
 ```
@@ -296,6 +300,8 @@ inside `begin()`.
 
 ## 4. Framework Kernel
 
+> 📖 **Developer Guide:** [Architecture Overview](developer/architecture-overview.md) — kernel components, lifecycle ownership, and core service wiring.
+
 The kernel is always present. No app can opt out of kernel services.
 
 ### 4.1 Kernel Components
@@ -342,6 +348,8 @@ their own config files — see each module's IConfigurable section.
 ---
 
 ## 5. Module System
+
+> 📖 **Developer Guide:** [Creating a Module](developer/creating-a-module.md) — step-by-step module implementation tutorial.
 
 ### 5.1 What Is a Module
 
@@ -425,6 +433,8 @@ void MyApp::begin() {
 ---
 
 ## 6. Extension Points & Interfaces
+
+> 📖 **Developer Guide:** [Creating a Module](developer/creating-a-module.md) — interface catalog and implementation examples.
 
 All interfaces live in the framework kernel under `include/interfaces/` and are the
 only cross-tier dependency.
@@ -548,6 +558,8 @@ The `McpServer` calls `registerMcpTools()` on all contributors during init.
 ---
 
 ## 7. Display Architecture
+
+> 📖 **Developer Guide:** [Using Optional Modules](developer/using-optional-modules.md) — display subsystem, carousel, custom boards, and screensaver.
 
 ### 7.1 Design Decision: Module Variants, Not a Unified Driver Interface
 
@@ -863,6 +875,8 @@ inactivity timer without needing application state.
 
 ## 8. Configuration Architecture
 
+> 📖 **Developer Guide:** [Configuration System](developer/config-system.md) — saving, migrating, and restoring module settings.
+
 ### 8.1 Separation of Concerns
 
 Configuration is split across multiple JSON files on LittleFS, organised under
@@ -945,6 +959,8 @@ StaticJsonDocument<512> doc;  // v6 legacy — use JsonDocument instead
 
 ## 9. Application Lifecycle
 
+> 📖 **Developer Guide:** [Architecture Overview](developer/architecture-overview.md) — boot sequence, tick loop, and state transitions.
+
 ### 9.1 Boot State Machine
 
 ```
@@ -1007,6 +1023,8 @@ Under `NATIVE_BUILD`, `tick()` also calls `_dataManager.processNext()` synchrono
 ---
 
 ## 10. Web Portal Architecture
+
+> 📖 **Developer Guide:** [Extending the Web Portal](developer/extending-the-web-portal.md) — custom tabs, REST endpoints, and JWT authentication.
 
 ### 10.1 Base Portal
 
@@ -1121,6 +1139,8 @@ All API endpoints follow REST conventions:
 
 ## 11. Inter-Module Communication
 
+> 📖 **Developer Guide:** [Event Bus](developer/event-bus.md) — decoupled, event-driven cross-module communication.
+
 ### 11.1 The Core Rule
 
 **Modules never call each other directly.** All inter-module communication
@@ -1203,6 +1223,8 @@ otaManager.setProgressCallback([&display](int pct) {
 ---
 
 ## 11A. Logging & Observability Architecture
+
+> 📖 **Developer Guide:** *Developer guide planned.*
 
 ### 11A.1 Design Principles
 
@@ -1366,6 +1388,8 @@ points:
 
 ## 12. Repository & Build Architecture
 
+> 📖 **Developer Guide:** [Build System](developer/build-system.md) — PlatformIO environments, version injection, partitions, and LittleFS.
+
 ### 12.1 Repository Topology
 
 The framework is a **monorepo** — kernel, optional modules, scripts, template,
@@ -1511,6 +1535,8 @@ The framework provides `.github/workflows/ci.yml`:
 
 ## 13. Security Architecture
 
+> 📖 **Developer Guide:** [Security](developer/security.md) — threat model, hardware encryption, credential storage, and TLS tradeoffs.
+
 ### 13.1 DeviceCrypto
 
 The framework includes a hardware-backed cryptographic engine (`DeviceCrypto`)
@@ -1539,6 +1565,8 @@ and is handled by a dedicated `KeyManager` kernel component:
   encrypted via DeviceCrypto before writing to flash
 
 ### 13.3 OTA Production System
+
+> 📖 **Developer Guide:** [OTA Update System](developer/ota-update-system.md) — complete OTA lifecycle, state machine, release channels, and deployment procedures.
 
 The framework provides a complete, production-grade OTA firmware update pipeline:
 semantic version comparison → channel-aware release discovery → multi-architecture
@@ -2081,6 +2109,10 @@ The OTA tab in the web portal (parent: "System", order: 50) provides:
 
 ## 14. Resource Budget & Constraints
 
+> 📖 **Developer Guides:**
+> - [Performance & Optimization](developer/performance-guide.md) — heap budgeting, PSRAM, flash size, TLS memory costs
+> - [Embedded Safety](developer/embedded-safety.md) — memory rules, thread safety, DRAM constraints
+
 ### 14.1 Target Hardware & Partition Layout
 
 | Parameter | esp32dev (4MB) | esp32s3nano (8MB+) |
@@ -2471,6 +2503,10 @@ Component Manager entirely).
 
 ## 15. Module Authoring Guide
 
+> 📖 **Developer Guides:**
+> - [Creating a Module](developer/creating-a-module.md) — step-by-step module implementation tutorial
+> - [Coding Patterns](developer/coding-patterns.md) — SOLID principles, Service Module Pattern, style guide
+
 ### 15.1 Creating a New Module
 
 A minimal module that participates in the framework tick loop:
@@ -2550,6 +2586,8 @@ void MyModule::loadConfig() {
 ---
 
 ## 16. Testing Architecture
+
+> 📖 **Developer Guide:** [Build System](developer/build-system.md) — testing tiers, native tests, and CI integration.
 
 ### 16.1 Three Testing Tiers
 
