@@ -68,7 +68,7 @@ predate the formal PA pipeline and are filed retrospectively.
 | [pr-29-tls-optimization](./pr-29-tls-optimization/PROJECT.md) | TLS Memory Optimization (cert bundle fix, AP scan fix, volatile race, OTA CA pinning, docs) | ✅ **MERGED** `aec9808` — v0.0.11-dev.7 verified on device · [distillation](./pr-29-tls-optimization/distillation/context_bridge.md) | Session 07cb3857 / d5f9f607 |
 | [pr-30-attribution-cleanup](./pr-30-attribution-cleanup/PROJECT.md) | Attribution Cleanup & Provenance Remediation (remove departures-board refs, rewrite MD5Utils base64ToHex with mbedtls, fix Gadec copyright) | 📋 **PLANNING** — 2 WOs defined, awaiting user approval | Session 87bf8a4b |
 | [pr-31-docs-cleanup](./pr-31-docs-cleanup/PROJECT.md) | Legacy Docs Cleanup (archive 3 reports, merge & retire build guide, fix stale MCP API, add PAT + TLS optimization sections, update indexes) | ✅ **MERGED** `640eb4f` — 9 files, +234/-521 | Session 5ad94103 |
-| [pr-32-ota-docs-deeplinks](./pr-32-ota-docs-deeplinks/PROJECT.md) | OTA Guide Migration + Design Spec Deep Links (OTA→developer tree, skill OTA system tree, 17 deep links in design spec) | ✅ **MERGED** `768f380` — 13 files, +578/-79 | Session 5ad94103 |
+| [pr-32-ota-docs-deeplinks](./pr-32-ota-docs-deeplinks/PROJECT.md) | OTA Guide Migration + Design Spec Deep Links (OTA→developer tree, skill OTA system tree, 64 deep links in design spec) | ✅ **MERGED** `5deb8c5` — 3 WOs, OTA migrated, 64 deep links | Session 5ad94103 |
 
 ---
 
