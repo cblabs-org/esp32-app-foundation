@@ -1,9 +1,10 @@
 // web/portal/auth.js
-// Security tab UI + global login overlay — PR-24 / WO7.
+// Security tab UI + global login overlay.
 //
 // 1. Login Overlay — injected into <body> on load, shown on 401 responses
-// 2. Security Tab  — renders password management, cert status, MCP token
-// 3. Auth State    — fetches /api/auth/status for current auth state
+// 2. Password Pill — renders password set/change + logout
+// 3. TLS Pill      — renders TLS toggle, cert status, advanced settings
+// 4. Auth State    — fetches /api/auth/status for current auth state
 
 (function () {
   'use strict';
@@ -157,17 +158,63 @@
     }
   }
 
+  function showReconnecting() {
+    var overlay = document.getElementById('auth-reconnect-overlay');
+    if (!overlay) {
+      overlay = document.createElement('div');
+      overlay.id = 'auth-reconnect-overlay';
+      overlay.style.position = 'fixed';
+      overlay.style.inset = '0';
+      overlay.style.zIndex = '9999';
+      overlay.style.background = 'rgba(0,0,0,0.8)';
+      overlay.style.backdropFilter = 'blur(4px)';
+      overlay.style.display = 'flex';
+      overlay.style.flexDirection = 'column';
+      overlay.style.alignItems = 'center';
+      overlay.style.justifyContent = 'center';
+      overlay.style.color = 'white';
+      overlay.style.fontSize = '1.2rem';
+      overlay.style.gap = '1.5rem';
+
+      var spinner = document.createElement('div');
+      spinner.style.width = '40px';
+      spinner.style.height = '40px';
+      spinner.style.border = '3px solid rgba(255,255,255,0.3)';
+      spinner.style.borderTopColor = 'white';
+      spinner.style.borderRadius = '50%';
+      
+      var style = document.createElement('style');
+      style.innerHTML = '@keyframes auth-spin { to { transform: rotate(360deg); } }';
+      document.head.appendChild(style);
+      spinner.style.animation = 'auth-spin 0.8s linear infinite';
+
+      var text = document.createElement('div');
+      text.textContent = 'Reconnecting to device...';
+
+      var subtext = document.createElement('div');
+      subtext.style.fontSize = '0.9rem';
+      subtext.style.opacity = '0.7';
+      subtext.textContent = 'Waiting for the device to reboot and establish secure connection.';
+
+      overlay.appendChild(spinner);
+      overlay.appendChild(text);
+      overlay.appendChild(subtext);
+      document.body.appendChild(overlay);
+    }
+    overlay.style.display = 'flex';
+  }
+
   // =========================================================================
-  // 2. Security Tab Content
+  // 2. Security Tab Content (Password + TLS Pills)
   // =========================================================================
 
   var cachedAuthState = null;
 
   /**
-   * @brief Render Security tab based on auth state from /api/auth/status.
+   * @brief Render Password pill based on auth state from /api/auth/status.
    */
-  function renderSecurityTab() {
-    var container = document.getElementById('tab-security');
+  function renderPasswordTab() {
+    var container = document.getElementById('tab-password');
     if (!container) return;
 
     // Fetch fresh auth state
@@ -175,7 +222,7 @@
       ('/api/auth/status')
       .then(function (state) {
         cachedAuthState = state;
-        renderSecurityContent(container, state);
+        renderPasswordContent(container, state);
       })
       .catch(function (err) {
         // On 401, the overlay will show — leave tab blank
@@ -186,7 +233,37 @@
       });
   }
 
-  function renderSecurityContent(container, state) {
+  /**
+   * @brief Render TLS pill based on auth state from /api/auth/status.
+   */
+  function renderTlsTab() {
+    var container = document.getElementById('tab-tls');
+    if (!container) return;
+
+    var render = function (state) {
+      renderTlsContent(container, state);
+    };
+
+    if (cachedAuthState) {
+      render(cachedAuthState);
+      return;
+    }
+
+    (window.apiFetch || function (u) { return fetch(u).then(function (r) { return r.json(); }); })
+      ('/api/auth/status')
+      .then(function (state) {
+        cachedAuthState = state;
+        render(state);
+      })
+      .catch(function (err) {
+        container.innerHTML =
+          '<article>' +
+            '<p class="text-muted" style="font-size:0.8rem; margin:0.25rem 0 0.75rem 0;">Unable to load TLS status.</p>' +
+          '</article>';
+      });
+  }
+
+  function renderPasswordContent(container, state) {
     var html = '';
 
     // Eye toggle SVG (reused across password fields)
@@ -195,113 +272,123 @@
       '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>' +
       '<circle cx="12" cy="12" r="3"></circle></svg>';
 
-    if (!state.enabled && !state.passwordSet) {
-      // --- State A: No password set — show "Set Password" form ---
+    // --- Credentials article ---
+    html += '<article>';
+    html += '<header>Credentials</header>';
+
+    if (!state.passwordSet) {
+      html +=
+        '<p style="font-size:0.8rem; color:var(--text-muted); margin:0.25rem 0 0.75rem 0;">' +
+          'Authentication is currently disabled. Setting a password will protect your device portal and enable AI agent access.' +
+        '</p>' +
+        '<label for="new-password" style="font-size:0.85rem;">New Password</label>' +
+        '<div style="position:relative; margin-bottom:0.75rem;">' +
+          '<input type="password" id="new-password" ' +
+                 'placeholder="Choose a password (min 8 chars)" autocomplete="new-password" ' +
+                 'style="width:100%; box-sizing:border-box; padding-right:2.5rem;">' +
+          '<button type="button" id="eye-new-pw" title="Toggle visibility" style="' +
+            'position:absolute; right:8px; top:50%; transform:translateY(-50%);' +
+            'background:none; border:none; cursor:pointer; padding:4px;' +
+            'color:var(--text-muted); display:flex; align-items:center;">' +
+            eyeSvgOpen +
+          '</button>' +
+        '</div>' +
+        '<label for="confirm-password" style="font-size:0.85rem;">Confirm Password</label>' +
+        '<input type="password" id="confirm-password" ' +
+               'placeholder="Confirm password" autocomplete="new-password" ' +
+               'style="width:100%; box-sizing:border-box; margin-bottom:0.75rem;">' +
+        '<div id="set-password-error" class="form-error hidden"></div>' +
+        '<button id="set-password-btn" style="width:100%;">Set Password</button>';
+    } else {
+      html +=
+        '<p style="font-size:0.8rem; color:var(--text-muted); margin:0.25rem 0 0.75rem 0;">' +
+          'Manage your device access credentials.' +
+        '</p>' +
+        '<div class="status-badge" style="margin-bottom:0.75rem; font-size:0.85rem; display:flex; align-items:center;">' +
+          '<span class="dot green" style="margin-right:0.5rem;"></span>' +
+          '<span>Password Set</span>' +
+        '</div>' +
+        '<h4 style="font-size:0.85rem; font-weight:600; margin:0 0 0.5rem 0;">Change Password</h4>' +
+            '<label for="current-password" style="font-size:0.85rem;">Current Password</label>' +
+            '<input type="password" id="current-password" ' +
+                   'placeholder="Current password" autocomplete="current-password" ' +
+                   'style="width:100%; box-sizing:border-box; margin-bottom:0.75rem;">' +
+            '<label for="new-password" style="font-size:0.85rem;">New Password</label>' +
+            '<div style="position:relative; margin-bottom:0.75rem;">' +
+              '<input type="password" id="new-password" ' +
+                     'placeholder="New password (min 8 chars)" autocomplete="new-password" ' +
+                     'style="width:100%; box-sizing:border-box; padding-right:2.5rem;">' +
+              '<button type="button" id="eye-new-pw" title="Toggle visibility" style="' +
+                'position:absolute; right:8px; top:50%; transform:translateY(-50%);' +
+                'background:none; border:none; cursor:pointer; padding:4px;' +
+                'color:var(--text-muted); display:flex; align-items:center;">' +
+                eyeSvgOpen +
+              '</button>' +
+            '</div>' +
+            '<label for="confirm-password" style="font-size:0.85rem;">Confirm Password</label>' +
+            '<input type="password" id="confirm-password" ' +
+                   'placeholder="Confirm new password" autocomplete="new-password" ' +
+                   'style="width:100%; box-sizing:border-box; margin-bottom:0.75rem;">' +
+            '<div id="change-password-error" class="form-error hidden"></div>' +
+            '<button id="change-password-btn" class="secondary" style="width:100%;">Change Password</button>';
+    }
+    html += '</article>';
+
+    // --- Logout article ---
+    if (state.passwordSet) {
       html +=
         '<article>' +
-          '<header>Set Password</header>' +
-          '<p style="font-size:0.8rem; color:var(--text-muted); margin:0.25rem 0 0.75rem 0;">' +
-            'Authentication is currently disabled. Setting a password will:' +
-          '</p>' +
-          '<ul style="font-size:0.8rem; color:var(--text-muted); margin:0 0 0.75rem 1.25rem; padding:0; line-height:1.6;">' +
-            '<li>Enable portal authentication (login required on every visit)</li>' +
-            '<li>Generate a self-signed TLS certificate and enable HTTPS</li>' +
-            '<li>Create an MCP bearer token for AI agent access</li>' +
-            '<li>Restart the device to activate HTTPS</li>' +
-          '</ul>' +
-          '<p style="font-size:0.8rem; color:var(--text-muted); margin:0 0 0.75rem 0;">' +
-            '<strong>Browser note:</strong> After restart, your browser will show a security warning ' +
-            'for the self-signed certificate. You will need to click "Advanced" \u2192 "Proceed" to access the portal. ' +
-            'This is expected and safe for local network use.' +
-          '</p>' +
-          '<label for="new-password" style="font-size:0.85rem;">New Password</label>' +
-          '<div style="position:relative; margin-bottom:0.75rem;">' +
-            '<input type="password" id="new-password" ' +
-                   'placeholder="Choose a password (min 8 chars)" autocomplete="new-password" ' +
-                   'style="width:100%; box-sizing:border-box; padding-right:2.5rem;">' +
-            '<button type="button" id="eye-new-pw" title="Toggle visibility" style="' +
-              'position:absolute; right:8px; top:50%; transform:translateY(-50%);' +
-              'background:none; border:none; cursor:pointer; padding:4px;' +
-              'color:var(--text-muted); display:flex; align-items:center;">' +
-              eyeSvgOpen +
-            '</button>' +
-          '</div>' +
-          '<label for="confirm-password" style="font-size:0.85rem;">Confirm Password</label>' +
-          '<input type="password" id="confirm-password" ' +
-                 'placeholder="Confirm password" autocomplete="new-password" ' +
-                 'style="width:100%; box-sizing:border-box; margin-bottom:0.75rem;">' +
-          '<div id="set-password-error" class="form-error hidden"></div>' +
-          '<button id="set-password-btn" style="width:100%;">Enable Authentication</button>' +
+          '<button id="logout-btn" class="danger" style="width:100%;">Log Out</button>' +
         '</article>';
-    } else if (state.enabled) {
-      // --- State B: Auth enabled + logged in — full management UI ---
+    }
 
-      // 1. Change Password
-      html +=
-        '<article>' +
-          '<header>Change Password</header>' +
-          '<p style="font-size:0.8rem; color:var(--text-muted); margin:0.25rem 0 0.75rem 0;">' +
-            'Changing your password will also regenerate the MCP bearer token. ' +
-            'Any AI agents using the current token will need to be reconfigured. ' +
-            'Your browser session will remain active.' +
-          '</p>' +
-          '<label for="new-password" style="font-size:0.85rem;">New Password</label>' +
-          '<div style="position:relative; margin-bottom:0.75rem;">' +
-            '<input type="password" id="new-password" ' +
-                   'placeholder="New password (min 8 chars)" autocomplete="new-password" ' +
-                   'style="width:100%; box-sizing:border-box; padding-right:2.5rem;">' +
-            '<button type="button" id="eye-new-pw" title="Toggle visibility" style="' +
-              'position:absolute; right:8px; top:50%; transform:translateY(-50%);' +
-              'background:none; border:none; cursor:pointer; padding:4px;' +
-              'color:var(--text-muted); display:flex; align-items:center;">' +
-              eyeSvgOpen +
-            '</button>' +
-          '</div>' +
-          '<label for="confirm-password" style="font-size:0.85rem;">Confirm Password</label>' +
-          '<input type="password" id="confirm-password" ' +
-                 'placeholder="Confirm new password" autocomplete="new-password" ' +
-                 'style="width:100%; box-sizing:border-box; margin-bottom:0.75rem;">' +
-          '<div id="change-password-error" class="form-error hidden"></div>' +
-          '<button id="change-password-btn" class="secondary" style="width:100%;">Change Password</button>' +
-        '</article>';
+    container.innerHTML = html;
+    wirePasswordHandlers(state);
+  }
 
-      // 2. MCP Bearer Token
-      html +=
-        '<article>' +
-          '<header>MCP Bearer Token</header>' +
-          '<p style="font-size:0.8rem; color:var(--text-muted); margin:0.25rem 0 0.75rem 0;">' +
-            'Use this token in your AI agent config to authenticate MCP requests. ' +
-            'The token is derived from your password \u2014 changing your password will invalidate it.' +
-          '</p>' +
-          '<div class="token-display">' +
-            '<code id="mcp-token-value" class="token-masked">\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022</code>' +
-            '<button id="reveal-token-btn" class="btn-icon" title="Show/hide token">\ud83d\udc41</button>' +
-            '<button id="copy-token-btn" class="btn-icon" title="Copy to clipboard">\ud83d\udccb</button>' +
-          '</div>' +
-        '</article>';
+  function renderTlsContent(container, state) {
+    var html = '';
 
-      // 3. TLS Settings — cert status above-the-fold + advanced drawer
-      html +=
-        '<article class="advanced-drawer">' +
-          '<div class="status-badge" style="margin-bottom:0.75rem;">';
+    // --- TLS / HTTPS article ---
+    html += '<article>';
+    html += '<header>TLS / HTTPS</header>';
+    html += '<p style="font-size:0.8rem; color:var(--text-muted); margin:0.25rem 0 0.75rem 0;">' +
+              'Configure secure HTTPS access to the device portal and MCP server.' +
+            '</p>';
 
-      if (state.certPresent) {
-        html +=
-            '<span class="dot green"></span>' +
-            '<span>Self-signed certificate active</span>';
-      } else {
-        html +=
-            '<span class="dot yellow"></span>' +
-            '<span>No certificate present \u2014 one will be generated on next restart</span>';
-      }
+    // Memory overhead warning
+    html += '<div style="font-size:0.8rem; color:var(--warning); border:1px solid var(--border); border-radius:8px; padding:0.5rem 0.75rem; margin-bottom:1rem; background:rgba(255,193,7,0.05);">' +
+              '&#9888; <strong>Memory Overhead:</strong> Enabling TLS/HTTPS requires ~30-40 KB of additional DRAM. On low-RAM devices (such as ESP32 without PSRAM), this can prevent OTA updates from succeeding.' +
+            '</div>';
 
-      html +=
-          '</div>' +
-          '<details>' +
-            '<summary class="advanced-summary">Advanced TLS Settings</summary>' +
-            '<p style="font-size:0.8rem; color:var(--text-muted); margin:0.25rem 0 0.75rem 0;">' +
-              'These settings are for advanced users who need to customise the TLS certificate used by the device.' +
-            '</p>' +
+    // On/off toggle switch for TLS
+    html += '<div style="display:flex; justify-content:space-between; align-items:center; padding:0.6rem 0; border-bottom:1px solid var(--border); margin-bottom:1rem;">' +
+              '<span style="font-weight:600; font-size:0.9rem;">Enable TLS (HTTPS)</span>' +
+              '<label class="toggle-switch">' +
+                '<input type="checkbox" id="tls-enabled-chk"' + (state.tlsEnabled ? ' checked' : '') + '>' +
+                '<span class="toggle-slider"></span>' +
+              '</label>' +
+            '</div>';
+
+    // Cert status badge & controls
+    html += '<div class="status-badge" style="margin-bottom:0.75rem; font-size:0.85rem; display:flex; align-items:center;">';
+    if (state.certPresent) {
+      html += '<span class="dot green" style="margin-right:0.5rem;"></span>' +
+              '<span>Certificate Present &amp; Active</span>';
+    } else {
+      html += '<span class="dot yellow" style="margin-right:0.5rem;"></span>' +
+              '<span>No Certificate Generated</span>';
+    }
+    html += '</div>';
+
+    html += '</article>';
+
+    // --- Advanced drawer article ---
+    html +=
+      '<article class="advanced-drawer">' +
+        '<details>' +
+          '<summary class="advanced-summary">Advanced</summary>' +
+          '<div style="margin-top:0.5rem;">' +
             '<p style="font-size:0.8rem; color:var(--text-muted); margin:0.25rem 0 0.75rem 0;">' +
               'Enabling TLS in AP mode requires a properly signed CA certificate. Self-signed certificates will cause mobile devices to silently reject the captive portal connection, making setup impossible.' +
             '</p>' +
@@ -312,7 +399,6 @@
                 '<span class="toggle-slider"></span>' +
               '</label>' +
             '</div>' +
-            '<button id="regen-cert-btn" class="secondary" style="width:100%;">Force Regenerate Certificate</button>' +
             '<p style="font-size:0.8rem; color:var(--text-muted); margin:0.75rem 0 0.75rem 0;">' +
               'To generate a PEM certificate and key, you can use OpenSSL:' +
             '</p>' +
@@ -322,6 +408,13 @@
             '<p style="font-size:0.8rem; color:var(--text-muted); margin:0 0 0.75rem 0;">' +
               'For the captive portal to work with TLS, you need a certificate signed by a trusted Certificate Authority (e.g., Let\'s Encrypt). Self-signed certificates will not work for captive portal detection.' +
             '</p>' +
+            '<hr style="border:none; border-top:1px solid var(--border); margin:1rem 0;">' +
+            '<p style="font-weight:600; font-size:0.85rem; margin:0 0 0.5rem 0;">Self-Signed Certificate</p>' +
+            (state.tlsEnabled ?
+              '<button id="regen-cert-btn" class="secondary" style="width:100%; margin-bottom:1rem;">' +
+                (state.certPresent ? 'Force Regenerate Certificate' : 'Generate Certificate') +
+              '</button>'
+            : '') +
             '<hr style="border:none; border-top:1px solid var(--border); margin:1rem 0;">' +
             '<p style="font-weight:600; font-size:0.85rem; margin:0 0 0.5rem 0;">Upload Custom Certificate</p>' +
             '<p style="font-size:0.8rem; color:var(--text-muted); margin:0 0 0.75rem 0;">Upload a CA-signed PEM certificate and private key.</p>' +
@@ -333,24 +426,18 @@
               'style="width:100%; box-sizing:border-box; margin-bottom:0.75rem;"></textarea>' +
             '<div id="upload-cert-error" class="form-error hidden"></div>' +
             '<button id="upload-cert-btn" style="width:100%;">Upload Certificate</button>' +
-          '</details>' +
-        '</article>';
-
-      // 4. Log Out
-      html +=
-        '<article>' +
-          '<button id="logout-btn" class="danger" style="width:100%;">Log Out</button>' +
-        '</article>';
-    }
+          '</div>' +
+        '</details>' +
+      '</article>';
 
     container.innerHTML = html;
-    wireSecurityHandlers(state);
+    wireTlsHandlers(state);
   }
 
   /**
-   * @brief Wire event handlers for the Security tab buttons.
+   * @brief Wire event handlers for the Password pill buttons.
    */
-  function wireSecurityHandlers(state) {
+  function wirePasswordHandlers(state) {
     // --- Set Password button ---
     var setBtn = document.getElementById('set-password-btn');
     if (setBtn) {
@@ -369,34 +456,6 @@
       logoutBtn.addEventListener('click', function () { handleLogout(); });
     }
 
-    // --- Reveal token ---
-    var revealBtn = document.getElementById('reveal-token-btn');
-    if (revealBtn) {
-      revealBtn.addEventListener('click', function () { toggleTokenReveal(); });
-    }
-
-    // --- Copy token ---
-    var copyBtn = document.getElementById('copy-token-btn');
-    if (copyBtn) {
-      copyBtn.addEventListener('click', function () { copyToken(); });
-    }
-
-    // --- Advanced TLS Settings ---
-    var tlsApChk = document.getElementById('tls-ap-mode-chk');
-    if (tlsApChk) {
-      tlsApChk.addEventListener('change', function () { handleTlsApModeChange(tlsApChk.checked); });
-    }
-    
-    var regenBtn = document.getElementById('regen-cert-btn');
-    if (regenBtn) {
-      regenBtn.addEventListener('click', function () { handleRegenCert(); });
-    }
-    
-    var uploadBtn = document.getElementById('upload-cert-btn');
-    if (uploadBtn) {
-      uploadBtn.addEventListener('click', function () { handleUploadCert(); });
-    }
-
     // --- Password eye toggle (matches WiFi tab pattern) ---
     var eyeBtn = document.getElementById('eye-new-pw');
     var pwInput = document.getElementById('new-password');
@@ -413,6 +472,33 @@
           }
         }
       });
+    }
+  }
+
+  /**
+   * @brief Wire event handlers for the TLS pill buttons.
+   */
+  function wireTlsHandlers(state) {
+    // --- TLS Switch Toggle ---
+    var tlsChk = document.getElementById('tls-enabled-chk');
+    if (tlsChk) {
+      tlsChk.addEventListener('change', function () { handleTlsChange(tlsChk.checked); });
+    }
+
+    // --- Advanced TLS Settings ---
+    var tlsApChk = document.getElementById('tls-ap-mode-chk');
+    if (tlsApChk) {
+      tlsApChk.addEventListener('change', function () { handleTlsApModeChange(tlsApChk.checked); });
+    }
+    
+    var regenBtn = document.getElementById('regen-cert-btn');
+    if (regenBtn) {
+      regenBtn.addEventListener('click', function () { handleRegenCert(); });
+    }
+    
+    var uploadBtn = document.getElementById('upload-cert-btn');
+    if (uploadBtn) {
+      uploadBtn.addEventListener('click', function () { handleUploadCert(); });
     }
   }
 
@@ -441,26 +527,17 @@
         if (window.showToast) {
           window.showToast('Password set! Device will restart to enable HTTPS.', 'success', 8000);
         }
-        // Show restart prompt
-        var container = document.getElementById('tab-security');
-        if (container) {
-          container.innerHTML =
-            '<article>' +
-              '<header>Restart Required</header>' +
-              '<p>Authentication has been enabled. The device must restart to activate HTTPS.</p>' +
-              '<button id="restart-now-btn" class="full-width">Restart Now</button>' +
-            '</article>';
-          var restartBtn = document.getElementById('restart-now-btn');
-          if (restartBtn) {
-            restartBtn.addEventListener('click', function () {
-              window.apiFetch('/api/system/restart', { method: 'POST' })
-                .catch(function () {}); // Device restarts, connection drops
-            });
+        setTimeout(async function () {
+          try {
+            await window.apiFetch('/api/system/restart', { method: 'POST' });
+          } catch (e) {
+            // Expected — device restarts, connection drops
           }
-        }
+          showReconnecting();
+        }, 2000);
       } else {
         if (window.showToast) window.showToast('Password set successfully', 'success');
-        renderSecurityTab();
+        renderPasswordTab();
       }
     })
     .catch(function (err) {
@@ -468,15 +545,21 @@
     })
     .finally(function () {
       btn.disabled = false;
-      btn.textContent = 'Enable Authentication';
+      btn.textContent = 'Set Password';
     });
   }
 
   function handleChangePassword() {
-    var pw1   = document.getElementById('new-password');
-    var pw2   = document.getElementById('confirm-password');
-    var errEl = document.getElementById('change-password-error');
-    var btn   = document.getElementById('change-password-btn');
+    var currentPw = document.getElementById('current-password');
+    var pw1       = document.getElementById('new-password');
+    var pw2       = document.getElementById('confirm-password');
+    var errEl     = document.getElementById('change-password-error');
+    var btn       = document.getElementById('change-password-btn');
+
+    if (!currentPw || !currentPw.value) {
+      showFormError(errEl, 'Current password is required');
+      return;
+    }
 
     if (!validatePasswords(pw1, pw2, errEl)) return;
 
@@ -486,15 +569,21 @@
     window.apiFetch('/api/auth/password', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ password: pw1.value })
+      body: JSON.stringify({ currentPassword: currentPw.value, password: pw1.value })
     })
     .then(function () {
       if (window.showToast) window.showToast('Password changed successfully', 'success');
+      currentPw.value = '';
       pw1.value = '';
       pw2.value = '';
     })
     .catch(function (err) {
-      showFormError(errEl, 'Failed to change password: ' + err.message);
+      var msg = err && err.message ? err.message : String(err);
+      if (msg.indexOf('wrong_password') !== -1) {
+        showFormError(errEl, 'Current password is incorrect');
+      } else {
+        showFormError(errEl, 'Failed to change password: ' + msg);
+      }
     })
     .finally(function () {
       btn.disabled = false;
@@ -541,6 +630,42 @@
     });
   }
 
+  function handleTlsChange(enabled) {
+    var chk = document.getElementById('tls-enabled-chk');
+    if (chk) chk.disabled = true;
+
+    window.apiFetch('/api/auth/tls', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled: enabled })
+    })
+    .then(function (data) {
+      if (data.restartRequired) {
+        if (window.showToast) {
+          window.showToast('TLS setting updated! Device will restart to apply.', 'success', 8000);
+        }
+        setTimeout(async function () {
+          try {
+            await window.apiFetch('/api/system/restart', { method: 'POST' });
+          } catch (e) {
+            // Expected — device restarts, connection drops
+          }
+          showReconnecting();
+        }, 2000);
+      } else {
+        if (window.showToast) window.showToast('TLS setting updated', 'success');
+        renderTlsTab();
+      }
+    })
+    .catch(function (err) {
+      if (window.showToast) window.showToast('Failed to update TLS: ' + err.message, 'error');
+      if (chk) {
+        chk.disabled = false;
+        chk.checked = !enabled; // revert
+      }
+    });
+  }
+
   function handleRegenCert() {
     var btn = document.getElementById('regen-cert-btn');
     btn.disabled = true;
@@ -549,9 +674,14 @@
       .then(function (data) {
         if (data.restartRequired) {
           if (window.showToast) window.showToast('Certificate regenerated! Restarting...', 'success', 8000);
-          setTimeout(function() {
-            window.apiFetch('/api/system/restart', { method: 'POST' }).catch(function(){});
-          }, 1000);
+          setTimeout(async function() {
+            try {
+              await window.apiFetch('/api/system/restart', { method: 'POST' });
+            } catch (e) {
+              // Expected
+            }
+            showReconnecting();
+          }, 2000);
         }
       })
       .catch(function (err) {
@@ -595,9 +725,14 @@
     .then(function (data) {
       if (data.restartRequired) {
         if (window.showToast) window.showToast('Certificate uploaded! Restarting...', 'success', 8000);
-        setTimeout(function() {
-            window.apiFetch('/api/system/restart', { method: 'POST' }).catch(function(){});
-        }, 1000);
+        setTimeout(async function() {
+            try {
+              await window.apiFetch('/api/system/restart', { method: 'POST' });
+            } catch (e) {
+              // Expected
+            }
+            showReconnecting();
+        }, 2000);
       }
     })
     .catch(function (err) {
@@ -623,79 +758,7 @@
   }
 
   // =========================================================================
-  // 5. MCP Token Reveal / Copy
-  // =========================================================================
-
-  var tokenRevealed = false;
-  var fetchedToken  = null;
-
-  function toggleTokenReveal() {
-    var codeEl = document.getElementById('mcp-token-value');
-    if (!codeEl) return;
-
-    if (tokenRevealed) {
-      codeEl.textContent = '••••••••••••••••';
-      codeEl.classList.add('token-masked');
-      tokenRevealed = false;
-      return;
-    }
-
-    // Fetch the actual token
-    if (fetchedToken) {
-      codeEl.textContent = fetchedToken;
-      codeEl.classList.remove('token-masked');
-      tokenRevealed = true;
-      return;
-    }
-
-    window.apiFetch('/api/auth/mcp-token')
-      .then(function (data) {
-        fetchedToken = data.token || '(unavailable)';
-        // Re-query DOM element — auth-login may have re-rendered the tab
-        var el = document.getElementById('mcp-token-value');
-        if (el) {
-          el.textContent = fetchedToken;
-          el.classList.remove('token-masked');
-        }
-        tokenRevealed = true;
-      })
-      .catch(function () {
-        var el = document.getElementById('mcp-token-value');
-        if (el) el.textContent = '(failed to load)';
-      });
-  }
-
-  function copyToken() {
-    var codeEl = document.getElementById('mcp-token-value');
-    if (!codeEl) return;
-
-    // If token not yet fetched, fetch first then copy
-    var doCopy = function (text) {
-      navigator.clipboard.writeText(text)
-        .then(function () {
-          if (window.showToast) window.showToast('Token copied to clipboard', 'success');
-        })
-        .catch(function () {
-          if (window.showToast) window.showToast('Copy failed — try manually', 'error');
-        });
-    };
-
-    if (fetchedToken) {
-      doCopy(fetchedToken);
-    } else {
-      window.apiFetch('/api/auth/mcp-token')
-        .then(function (data) {
-          fetchedToken = data.token || '';
-          doCopy(fetchedToken);
-        })
-        .catch(function () {
-          if (window.showToast) window.showToast('Failed to fetch token', 'error');
-        });
-    }
-  }
-
-  // =========================================================================
-  // 6. Utility
+  // 5. Utility
   // =========================================================================
 
   function escapeHtml(str) {
@@ -705,7 +768,7 @@
   }
 
   // =========================================================================
-  // 7. Initialization
+  // 6. Initialization
   // =========================================================================
 
   // Wait for DOM ready
@@ -720,27 +783,35 @@
     register401Interceptor();
 
     // Proactive auth guard — block portal before tab content loads
+    // Uses sessionValid (checks THIS browser's cookie) rather than
+    // sessionActive (only checks if the server has any session at all).
     fetch('/api/auth/status')
       .then(function(r) { return r.json(); })
       .then(function(state) {
-        if (state.enabled && !state.sessionActive) {
+        if (state.enabled && !state.sessionValid) {
           showLoginOverlay();
         }
       })
       .catch(function() {});
 
-    // Listen for tab-changed to render Security tab
+    // Listen for tab-changed to render Password and TLS pills
     window.addEventListener('tab-changed', function (e) {
-      if (e.detail === 'tab-security') {
-        renderSecurityTab();
+      if (e.detail === 'tab-password') {
+        renderPasswordTab();
+      } else if (e.detail === 'tab-tls') {
+        renderTlsTab();
       }
     });
 
-    // Re-render Security tab on successful login
+    // Re-render pills on successful login
     window.addEventListener('auth-login', function () {
-      var container = document.getElementById('tab-security');
-      if (container && container.offsetParent !== null) {
-        renderSecurityTab();
+      var pwContainer = document.getElementById('tab-password');
+      if (pwContainer && pwContainer.offsetParent !== null) {
+        renderPasswordTab();
+      }
+      var tlsContainer = document.getElementById('tab-tls');
+      if (tlsContainer && tlsContainer.offsetParent !== null) {
+        renderTlsTab();
       }
     });
   }

@@ -1,0 +1,41 @@
+/*
+ * ESP32 App Foundation (c) 2026 CB Labs
+ *
+ * https://github.com/matthewmcneill/esp32-app-foundation
+ *
+ * Stub for esp_crt_bundle.h when CONFIG_MBEDTLS_CERTIFICATE_BUNDLE=n.
+ * This prevents compilation and linker errors in the Arduino NetworkClientSecure library.
+ */
+
+#ifndef _ESP_CRT_BUNDLE_H_
+#define _ESP_CRT_BUNDLE_H_
+
+#include <stdint.h>
+#include <stddef.h>
+#include "esp_err.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+static inline esp_err_t esp_crt_bundle_attach(void *conf) {
+    return ESP_OK;
+}
+
+static inline void esp_crt_bundle_detach(void *conf) {
+    // No-op
+}
+
+static inline esp_err_t esp_crt_bundle_set(const uint8_t *x509_bundle, size_t bundle_size) {
+    return ESP_OK;
+}
+
+static inline bool esp_crt_bundle_in_use(const void *ca_chain) {
+    return false;
+}
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif // _ESP_CRT_BUNDLE_H_

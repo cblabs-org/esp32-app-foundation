@@ -43,12 +43,14 @@
  *   - hasCert():                Returns _certPresent flag state.
  *   - loadCert():               Load DER cert+key from LittleFS into static buffers.
  *
- *   IWebContributor (tab: "Security", order: 5, top-level):
+ *   IWebContributor (tab: "Security", order: 5, top-level parent):
  *   - registerRoutes():         Registers all /api/auth/... route handlers (WO2 real impl).
  *   - getTabName():             Returns "Security".
  *   - getParentTab():           Returns nullptr (top-level tab).
  *   - getTabOrder():            Returns 5 (first in bottom nav, emphasises security).
  *   - getTabIcon():             Returns lock SVG inner content (feather-icons style).
+ *   - passwordTabStub():        Returns inner IWebContributor for "Password" sub-pill.
+ *   - tlsTabStub():             Returns inner IWebContributor for "TLS" sub-pill.
  *
  *   IConfigurable (namespace: "auth", schema v1):
  *   - getConfigNamespace():     Returns "auth".
@@ -178,6 +180,12 @@ public:
     bool hasCert() const { return _certPresent; }
 
     /**
+     * @brief Query whether certificate generation is actively running in the background.
+     * @return true if _certGenRunning flag is true, false otherwise.
+     */
+    bool isCertGenerating() const { return _certGenRunning.load(); }
+
+    /**
      * @brief Load the DER-encoded certificate and key from LittleFS.
      *
      * Reads /etc/server.crt and /etc/server.key into static buffers and
@@ -246,6 +254,32 @@ public:
     const char* getTabIcon() const override;
 
     // -------------------------------------------------------------------------
+    // Sub-pill navigation stubs
+    // -------------------------------------------------------------------------
+
+    /**
+     * @brief Return the Password sub-pill tab stub for registration.
+     *
+     * Provides a "Password" child tab entry under the "Security" parent in
+     * /api/tabs. Carries no routes — all REST routes remain registered by
+     * the main AuthManager via registerRoutes().
+     *
+     * @return Pointer to the internal PasswordTabStub IWebContributor.
+     */
+    IWebContributor* passwordTabStub() { return &_passwordTabStub; }
+
+    /**
+     * @brief Return the TLS sub-pill tab stub for registration.
+     *
+     * Provides a "TLS" child tab entry under the "Security" parent in
+     * /api/tabs. Carries no routes — all REST routes remain registered by
+     * the main AuthManager via registerRoutes().
+     *
+     * @return Pointer to the internal TlsTabStub IWebContributor.
+     */
+    IWebContributor* tlsTabStub() { return &_tlsTabStub; }
+
+    // -------------------------------------------------------------------------
     // IConfigurable (namespace: "auth", schema v1)
     // -------------------------------------------------------------------------
 
@@ -306,6 +340,12 @@ public:
     bool isAuthEnabled() const { return _authEnabled; }
 
     /**
+     * @brief Query whether TLS/HTTPS is enabled.
+     * @return true if TLS is enabled, false otherwise.
+     */
+    bool isTlsEnabled() const { return _tlsEnabled; }
+
+    /**
      * @brief Set the AP (access point) mode flag.
      *
      * When AP mode is active, checkPortalAuth() returns true unconditionally
@@ -327,6 +367,7 @@ private:
     // -------------------------------------------------------------------------
 
     bool _authEnabled  = false; ///< True if password auth enforcement is active
+    bool _tlsEnabled   = false; ///< True if TLS/HTTPS is enabled
     bool _passwordSet  = false; ///< True if a password hash exists in KeyManager
     bool _certPresent  = false; ///< True if a TLS certificate exists in LittleFS
     bool _apMode       = false; ///< True when device is in AP mode (WO5: bypasses auth guard)
@@ -462,6 +503,31 @@ private:
     // -------------------------------------------------------------------------
     friend class AuthManagerAccessor;
 #endif
+    // -------------------------------------------------------------------------
+    // Sub-tab navigation stubs — provide "Password" and "TLS" child tab
+    // entries under the "Security" parent in /api/tabs. They carry no routes;
+    // all REST routes remain registered by the main module via registerRoutes().
+    // Owned as members; exposed via passwordTabStub() / tlsTabStub()
+    // for registration by Application::begin().
+    // -------------------------------------------------------------------------
+
+    struct PasswordTabStub : public IWebContributor {
+        void        registerRoutes(PsychicHttpServer& /*server*/) override {}
+        const char* getTabName()   const override { return "Password"; }
+        const char* getParentTab() const override { return "Security"; }
+        int         getTabOrder()  const override { return 10;         }
+    };
+
+    struct TlsTabStub : public IWebContributor {
+        void        registerRoutes(PsychicHttpServer& /*server*/) override {}
+        const char* getTabName()   const override { return "TLS"; }
+        const char* getParentTab() const override { return "Security"; }
+        int         getTabOrder()  const override { return 20;         }
+    };
+
+    PasswordTabStub _passwordTabStub; ///< Nav stub: Password sub-pill under Security
+    TlsTabStub      _tlsTabStub;      ///< Nav stub: TLS sub-pill under Security
+
     // LittleFS helpers (hardware builds only — no-ops in NATIVE_BUILD)
     // -------------------------------------------------------------------------
 

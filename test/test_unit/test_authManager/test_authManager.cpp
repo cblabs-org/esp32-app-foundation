@@ -163,6 +163,7 @@ TEST_F(AuthManagerTest, test_serialize_defaults) {
     auth.serializeConfig(section);
 
     EXPECT_FALSE(section["enabled"].as<bool>());
+    EXPECT_FALSE(section["tlsEnabled"].as<bool>());
     EXPECT_FALSE(section["passwordSet"].as<bool>());
     EXPECT_FALSE(section["certPresent"].as<bool>());
 }
@@ -178,6 +179,7 @@ TEST_F(AuthManagerTest, test_apply_config_roundtrip) {
     JsonDocument srcDoc;
     JsonObject srcSection = srcDoc.to<JsonObject>();
     srcSection["enabled"]     = true;
+    srcSection["tlsEnabled"]  = true;
     srcSection["passwordSet"] = true;
     srcSection["certPresent"] = false;
 
@@ -190,6 +192,7 @@ TEST_F(AuthManagerTest, test_apply_config_roundtrip) {
 
     // --- Assert: values round-trip cleanly ---
     EXPECT_TRUE(dstSection["enabled"].as<bool>());
+    EXPECT_TRUE(dstSection["tlsEnabled"].as<bool>());
     EXPECT_TRUE(dstSection["passwordSet"].as<bool>());
     EXPECT_FALSE(dstSection["certPresent"].as<bool>());
 }
@@ -210,6 +213,7 @@ TEST_F(AuthManagerTest, test_reset_config) {
     JsonDocument doc;
     JsonObject section = doc.to<JsonObject>();
     section["enabled"]     = true;
+    section["tlsEnabled"]  = true;
     section["passwordSet"] = true;
     section["certPresent"] = true;
     auth.applyConfig(section);
@@ -223,8 +227,22 @@ TEST_F(AuthManagerTest, test_reset_config) {
     auth.serializeConfig(outSection);
 
     EXPECT_FALSE(outSection["enabled"].as<bool>());
+    EXPECT_FALSE(outSection["tlsEnabled"].as<bool>());
     EXPECT_FALSE(outSection["passwordSet"].as<bool>());
     EXPECT_FALSE(outSection["certPresent"].as<bool>());
+}
+
+TEST_F(AuthManagerTest, test_tls_enabled_by_default) {
+    EXPECT_FALSE(auth.isTlsEnabled());
+}
+
+TEST_F(AuthManagerTest, test_apply_config_sets_tls_enabled) {
+    JsonDocument doc;
+    JsonObject section = doc.to<JsonObject>();
+    section["tlsEnabled"] = true;
+    
+    auth.applyConfig(section);
+    EXPECT_TRUE(auth.isTlsEnabled());
 }
 
 // ===========================================================================

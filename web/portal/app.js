@@ -190,6 +190,15 @@ document.addEventListener('DOMContentLoaded', function() {
       childTabs[key].sort(function(a, b) { return (a.order || 100) - (b.order || 100); });
     }
 
+    // Warn about orphaned child tabs (parent not registered)
+    var topNames = topLevelTabs.map(function(t) { return t.name; });
+    for (var key in childTabs) {
+      if (topNames.indexOf(key) === -1) {
+        console.warn('[app] Orphaned child tabs — no parent "' + key +
+          '" registered:', childTabs[key].map(function(t) { return t.name; }));
+      }
+    }
+
     // Build bottom nav for any app-contributed top-level tabs
     buildBottomNav();
 

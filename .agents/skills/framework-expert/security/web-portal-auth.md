@@ -84,13 +84,17 @@ The framework does not implement explicit CORS headers. The Web Portal is a same
 
 ## TLS for the Portal
 
-`AuthManager` can generate an EC P-256 self-signed certificate via `generateAndStoreCert()`, stored as DER-encoded files at `/etc/server.key` and `/etc/server.crt`. When a certificate is present and auth is enabled, `WebServerManager` can serve HTTPS on port 443 with automatic HTTP→HTTPS redirect on port 80.
+`AuthManager` can generate an EC P-256 self-signed certificate via `generateAndStoreCert()`, stored as DER-encoded files at `/etc/server.key` and `/etc/server.crt`. When TLS is enabled (`isTlsEnabled()`) and a certificate is present (`hasCert()`), `WebServerManager` serves HTTPS on port 443 with automatic HTTP→HTTPS redirect on port 80. TLS is controlled independently from authentication via the `_tlsEnabled` flag, persisted under the `tlsEnabled` key in the auth config namespace. The `POST /api/auth/tls` endpoint allows toggling TLS on or off.
 
 Certificate details:
 - **Algorithm:** EC secp256r1 (P-256)
 - **Subject CN:** `<hostname>.local`
 - **Static buffers:** Certificate loaded into a 1024-byte static buffer, key into a 256-byte static buffer (avoids heap fragmentation).
 - **Generation is async:** Uses an `std::atomic<bool>` concurrency guard (`_certGenRunning`) to prevent concurrent generation.
+
+> **Note:** The `GET /api/auth/status` response now includes `tlsEnabled` in the JSON payload, reflecting the current state of the `_tlsEnabled` flag.
+
+> **Cookie security:** The `Secure` flag on session cookies is conditioned on `isTlsEnabled() && hasCert()` (not `isAuthEnabled()`). This ensures the `Secure` attribute is only set when the connection is actually served over HTTPS.
 
 ## See Also
 - [Security Overview](overview.md) — Layered security model

@@ -260,13 +260,15 @@ def generate_manifest(tag: str, dry_run: bool) -> None:
     )
 
 
-def create_release(tag: str, dry_run: bool) -> None:
+def create_release(tag: str, dry_run: bool, target_repo: str = None) -> None:
     """Create a GitHub Release and upload all assets."""
     print("\n--- Step 4: Create GitHub Release ---")
     channel = parse_channel(tag)
     release_cmd = ["gh", "release", "create", tag, "--title", tag, "--generate-notes"]
     if channel != "stable":
         release_cmd.append("--prerelease")
+    if target_repo:
+        release_cmd.extend(["--repo", target_repo])
     run(release_cmd, dry_run=dry_run)
 
     print("\n--- Step 5: Upload release assets ---")
@@ -279,7 +281,11 @@ def create_release(tag: str, dry_run: bool) -> None:
         print("ERROR: No assets found to upload", file=sys.stderr)
         sys.exit(1)
 
-    run(["gh", "release", "upload", tag] + assets, dry_run=dry_run)
+    upload_cmd = ["gh", "release", "upload", tag]
+    if target_repo:
+        upload_cmd.extend(["--repo", target_repo])
+    upload_cmd.extend(assets)
+    run(upload_cmd, dry_run=dry_run)
 
 
 def parse_args() -> argparse.Namespace:
@@ -308,6 +314,12 @@ def parse_args() -> argparse.Namespace:
         help="(Local mode only) Run 'pio run' for all boards before staging",
     )
     parser.add_argument(
+        "--repo",
+        help="Target GitHub repo for the release (owner/repo format, "
+             "e.g. 'matthewmcneill/esp32-firmware-releases'). "
+             "Defaults to the current repo's origin.",
+    )
+    parser.add_argument(
         "--dry-run",
         action="store_true",
         help="Print commands without executing them",
@@ -328,6 +340,8 @@ def main() -> None:
     print(f"  Mode:        {mode}")
     print(f"  Private key: {args.private_key}")
     print(f"  Dry-run:     {args.dry_run}")
+    if args.repo:
+        print(f"  Target repo: {args.repo}")
 
     check_prerequisites(args.private_key, need_pio=args.build)
     ensure_tag_on_head(args.tag, args.dry_run)
@@ -342,7 +356,7 @@ def main() -> None:
     sign_firmware(args.private_key, args.dry_run)
     generate_hashes(args.dry_run)
     generate_manifest(args.tag, args.dry_run)
-    create_release(args.tag, args.dry_run)
+    create_release(args.tag, args.dry_run, target_repo=args.repo)
 
     print("\n✅ Release deployed successfully!")
 

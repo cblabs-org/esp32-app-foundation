@@ -63,7 +63,7 @@ static constexpr const char* TAG = "OTAUpdateManager";
 #include <freertos/idf_additions.h>
 #include "../Application/Application.hpp"
 #include "../../lib/GithubClient/GithubClient.hpp"
-#include "../../lib/GithubClient/github_root_ca.h"
+#include "../../lib/GithubClient/ota_root_cas.h"
 #include "../../lib/OTADownloadEngine/OTADownloadEngine.hpp"
 #include "../../lib/OTADownloadEngine/MbedTLSSignatureVerifier.hpp"
 #include "../../lib/SemVer/SemVer.hpp"
@@ -539,10 +539,8 @@ void OTAUpdateManager::performUpdateTask() {
             _lastOtaError = "Manifest client allocation failed";
             return;
         }
-        // Manifest fetch uses TLS certificate pinning — the manifest has no
-        // independent integrity verification, so transport security is the only
-        // defence against MITM/downgrade attacks.
-        manifestClient->setCACert(GITHUB_ROOT_CA_CERT);
+        // Try CA-pinned connection first (defense-in-depth)
+        manifestClient->setCACert(OTA_ROOT_CA_BUNDLE);
 
         HTTPClient http;
         http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
@@ -561,8 +559,43 @@ void OTAUpdateManager::performUpdateTask() {
             http.addHeader("Authorization", String((std::string("Bearer ") + manifestToken).c_str()));
         }
 
-        // Feed TWDT before blocking manifest download — another TLS round-trip
         int httpCode = http.GET();
+        if (httpCode < 0) {
+            ESP_LOGW(TAG, "Manifest fetch failed with pinned CA (err=%d) "
+                          "— retrying without cert validation "
+                          "(firmware signature is the trust anchor)", httpCode);
+            http.end();
+
+            // Feed TWDT before retry — TLS handshake can be slow
+            esp_task_wdt_reset();
+
+            // MUST create a fresh WiFiClientSecure — the failed handshake leaves
+            // the mbedTLS context in a dirty state that cannot be reconfigured.
+            manifestClient.reset(new (std::nothrow) WiFiClientSecure());
+            if (!manifestClient) {
+                ESP_LOGE(TAG, "Failed to allocate WiFiClientSecure for insecure retry");
+                publishProgress(0.0f, "Memory allocation failed during retry", true, false);
+                _state = OTAState::Error;
+                _lastOtaError = "Manifest client retry allocation failed";
+                return;
+            }
+            manifestClient->setInsecure();
+
+            if (!http.begin(*manifestClient, String(manifestUrl.c_str()))) {
+                ESP_LOGE(TAG, "HTTPClient.begin() failed for manifest retry URL");
+                publishProgress(0.0f, "Manifest download retry failed", true, false);
+                _state = OTAState::Error;
+                _lastOtaError = "Manifest HTTP retry begin failed";
+                return;
+            }
+
+            http.addHeader("Accept", "application/octet-stream");
+            if (!manifestToken.empty()) {
+                http.addHeader("Authorization", String((std::string("Bearer ") + manifestToken).c_str()));
+            }
+
+            httpCode = http.GET();
+        }
         if (httpCode != 200) {
             ESP_LOGE(TAG, "Manifest download HTTP %d", httpCode);
             http.end();

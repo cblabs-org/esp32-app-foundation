@@ -1,7 +1,8 @@
 // web/portal/mcp.js
 // System → MCP sub-pill — MCP server runtime controls and tool inventory.
 // Provides interactive toggles for enabled/readOnly with config persistence,
-// a tool list with mutatesState badges, and protocol info.
+// a tool list with mutatesState badges, authentication token display,
+// and protocol info.
 
 (function() {
   const container = document.getElementById('tab-mcp');
@@ -22,6 +23,13 @@
       <header>Registered Tools</header>
       <div id="mcp-tools-list">
         <p style="color: var(--text-muted);">Loading...</p>
+      </div>
+    </article>
+
+    <article>
+      <h3>Authentication</h3>
+      <div id="mcp-auth-section">
+        <p style="font-size:0.8rem; color:var(--text-muted);">Loading...</p>
       </div>
     </article>
 
@@ -140,6 +148,182 @@
   }
 
   // -------------------------------------------------------------------------
+  // MCP Authentication — Bearer token display
+  // -------------------------------------------------------------------------
+
+  let tokenRevealed = false;
+  let fetchedToken  = null;
+
+  /**
+   * @brief Fetch auth status and render the bearer token section.
+   */
+  async function loadMcpAuth() {
+    const section = document.getElementById('mcp-auth-section');
+    if (!section) return;
+
+    try {
+      const state = await (window.apiFetch || function (u) { return fetch(u).then(function (r) { return r.json(); }); })
+        ('/api/auth/status');
+
+      // Reset token state on re-render
+      tokenRevealed = false;
+      fetchedToken = null;
+
+      if (state.passwordSet) {
+        section.innerHTML =
+          '<p style="font-weight:600; font-size:0.85rem; margin:0 0 0.25rem 0;">Bearer Token</p>' +
+          '<p style="font-size:0.8rem; color:var(--text-muted); margin:0 0 0.5rem 0;">' +
+            'Use this token in your AI agent\'s Authorization: Bearer header.' +
+          '</p>' +
+          '<div class="token-display">' +
+            '<code id="mcp-token-value" class="token-masked">&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;</code>' +
+            '<button id="reveal-token-btn" class="btn-icon" title="Show/hide token">' +
+              '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+                '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>' +
+                '<circle cx="12" cy="12" r="3"></circle>' +
+              '</svg>' +
+            '</button>' +
+            '<button id="copy-token-btn" class="btn-icon" title="Copy to clipboard">' +
+              '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+                '<path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>' +
+                '<rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>' +
+              '</svg>' +
+            '</button>' +
+          '</div>';
+
+        // Wire token button handlers
+        var revealBtn = document.getElementById('reveal-token-btn');
+        if (revealBtn) {
+          revealBtn.addEventListener('click', function () { toggleTokenReveal(); });
+        }
+        var copyBtn = document.getElementById('copy-token-btn');
+        if (copyBtn) {
+          copyBtn.addEventListener('click', function () { copyToken(); });
+        }
+      } else {
+        section.innerHTML =
+          '<p style="font-size:0.8rem; color:var(--warning);">' +
+            'Set a password in the Security tab to generate an MCP bearer token.' +
+          '</p>';
+      }
+    } catch (err) {
+      section.innerHTML =
+        '<p style="font-size:0.8rem; color:var(--text-muted);">Unable to load auth status.</p>';
+    }
+  }
+
+  /**
+   * @brief Toggle visibility of the MCP bearer token.
+   */
+  function toggleTokenReveal() {
+    var codeEl = document.getElementById('mcp-token-value');
+    if (!codeEl) return;
+    var revealBtn = document.getElementById('reveal-token-btn');
+    var svg = revealBtn ? revealBtn.querySelector('svg') : null;
+
+    var setEyeIcon = function(revealed) {
+      if (svg) {
+        if (revealed) {
+          svg.innerHTML = '<path d="M2 2l20 20"></path><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>';
+        } else {
+          svg.innerHTML = '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle>';
+        }
+      }
+    };
+
+    if (tokenRevealed) {
+      codeEl.textContent = '••••••••••••••••';
+      codeEl.classList.add('token-masked');
+      tokenRevealed = false;
+      setEyeIcon(false);
+      return;
+    }
+
+    // Fetch the actual token
+    if (fetchedToken) {
+      codeEl.textContent = fetchedToken;
+      codeEl.classList.remove('token-masked');
+      tokenRevealed = true;
+      setEyeIcon(true);
+      return;
+    }
+
+    window.apiFetch('/api/auth/mcp-token', { credentials: 'same-origin' })
+      .then(function (data) {
+        fetchedToken = data.token || '(unavailable)';
+        // Re-query DOM element — auth-login may have re-rendered the tab
+        var el = document.getElementById('mcp-token-value');
+        if (el) {
+          el.textContent = fetchedToken;
+          el.classList.remove('token-masked');
+        }
+        tokenRevealed = true;
+        setEyeIcon(true);
+      })
+      .catch(function (err) {
+        var el = document.getElementById('mcp-token-value');
+        if (el) el.textContent = '(failed to load)';
+        var errorMsg = err && err.message ? err.message : err;
+        if (window.showToast) {
+          window.showToast('Failed to fetch MCP token: ' + errorMsg, 'error');
+        }
+      });
+  }
+
+  /**
+   * @brief Copy the MCP bearer token to clipboard.
+   */
+  function copyToken() {
+    var codeEl = document.getElementById('mcp-token-value');
+    if (!codeEl) return;
+    var copyBtn = document.getElementById('copy-token-btn');
+    var svg = copyBtn ? copyBtn.querySelector('svg') : null;
+
+    var setCheckIcon = function (checked) {
+      if (svg) {
+        if (checked) {
+          // Feather check icon
+          svg.innerHTML = '<polyline points="20 6 9 17 4 12"></polyline>';
+        } else {
+          // Feather clipboard icon
+          svg.innerHTML = '<path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>' +
+                          '<rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>';
+        }
+      }
+    };
+
+    var doCopy = function (text) {
+      navigator.clipboard.writeText(text)
+        .then(function () {
+          if (window.showToast) window.showToast('Token copied to clipboard', 'success');
+          setCheckIcon(true);
+          setTimeout(function () {
+            setCheckIcon(false);
+          }, 1500);
+        })
+        .catch(function () {
+          if (window.showToast) window.showToast('Copy failed — try manually', 'error');
+        });
+    };
+
+    if (fetchedToken) {
+      doCopy(fetchedToken);
+    } else {
+      window.apiFetch('/api/auth/mcp-token', { credentials: 'same-origin' })
+        .then(function (data) {
+          fetchedToken = data.token || '';
+          doCopy(fetchedToken);
+        })
+        .catch(function (err) {
+          var errorMsg = err && err.message ? err.message : err;
+          if (window.showToast) {
+            window.showToast('Failed to fetch token: ' + errorMsg, 'error');
+          }
+        });
+    }
+  }
+
+  // -------------------------------------------------------------------------
   // Fetch and render MCP status, config, and tool list
   // -------------------------------------------------------------------------
   async function loadMcpInfo() {
@@ -199,6 +383,9 @@
         document.getElementById('mcp-tools-list').innerHTML =
           '<p style="color:var(--text-muted); font-size:0.85rem;">Tool list unavailable (server may be disabled).</p>';
       }
+
+      // --- Authentication section ---
+      loadMcpAuth();
 
     } catch (error) {
       document.getElementById('mcp-controls').innerHTML =

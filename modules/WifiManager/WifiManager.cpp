@@ -497,6 +497,12 @@ esp_err_t WifiManager::handleScan(PsychicRequest* request, PsychicResponse* resp
 
     if (scanResult == WIFI_SCAN_FAILED) {
         // --- No scan in progress — start one ---
+        if (_isAPMode) {
+            // Must switch to AP+STA so the STA radio can scan without
+            // tearing down the AP.  Plain WiFi.scanNetworks(true) in
+            // AP-only mode causes the driver to drop to STA on completion.
+            WiFi.mode(WIFI_AP_STA);
+        }
         ESP_LOGI(TAG, "Starting async WiFi scan...");
         WiFi.scanNetworks(true); // true = async
         response->send(202, "application/json", "{\"status\":\"scanning\"}");
@@ -577,6 +583,13 @@ esp_err_t WifiManager::handleScan(PsychicRequest* request, PsychicResponse* resp
 
     // --- Free scan memory ---
     WiFi.scanDelete();
+
+    // Restore AP-only mode after scan completes.  The AP+STA switch in
+    // the scan-start path keeps the AP alive during the scan, but we
+    // don't want the STA radio burning power when there's no connection.
+    if (_isAPMode) {
+        WiFi.mode(WIFI_AP);
+    }
 
     std::string output;
     serializeJson(doc, output);

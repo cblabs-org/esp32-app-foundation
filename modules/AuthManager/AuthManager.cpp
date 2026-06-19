@@ -657,7 +657,10 @@ void AuthManager::registerRoutes(PsychicHttpServer& server) {
         [this](PsychicRequest* request, PsychicResponse* response) {
             JsonDocument doc;
             doc["enabled"]       = _authEnabled;
+            doc["tlsEnabled"]    = _tlsEnabled;
             doc["sessionActive"] = _isSessionActive();
+            // sessionValid: true only if THIS client's cookie matches
+            doc["sessionValid"]  = _isSessionActive() && _checkSessionCookie(request);
             doc["passwordSet"]   = _passwordSet;
             doc["certPresent"]   = _certPresent;
             doc["tlsApMode"]     = _tlsApMode;
@@ -665,6 +668,75 @@ void AuthManager::registerRoutes(PsychicHttpServer& server) {
             serializeJson(doc, out);
             return response->send(200, "application/json", out.c_str());
         });
+
+    // --- POST /api/auth/tls ---
+    server.on("/api/auth/tls", HTTP_POST, [this](PsychicRequest* request, PsychicResponse* response) {
+        if (request->contentLength() > MAX_BODY_SIZE) {
+            return response->send(413, "application/json", "{\"error\":\"payload_too_large\"}");
+        }
+        const char* body = request->bodyCStr();
+        if (!body || strlen(body) == 0) {
+            return response->send(400, "application/json", "{\"error\":\"body_required\"}");
+        }
+
+        JsonDocument doc;
+        DeserializationError err = deserializeJson(doc, body);
+        if (err) {
+            return response->send(400, "application/json", "{\"error\":\"invalid_json\"}");
+        }
+
+        if (!doc["enabled"].is<JsonVariant>()) {
+            return response->send(400, "application/json", "{\"error\":\"enabled_field_required\"}");
+        }
+
+        bool targetTls = doc["enabled"].as<bool>();
+        bool changed = (targetTls != _tlsEnabled);
+
+        if (changed) {
+            _tlsEnabled = targetTls;
+            
+            if (_tlsEnabled && !_certPresent) {
+                // Trigger cert generation in background
+                bool expected = false;
+                if (_certGenRunning.compare_exchange_strong(expected, true)) {
+#ifndef NATIVE_BUILD
+                    BaseType_t certResult = xTaskCreateWithCaps(
+                        [](void* param) {
+                            auto* self = static_cast<AuthManager*>(param);
+                            self->generateAndStoreCert("esp32-device");
+                            self->_certGenRunning.store(false);
+                            vTaskDelete(nullptr);
+                        },
+                        "cert_gen",
+                        12288,
+                        this,
+                        1,
+                        nullptr,
+                        MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT
+                    );
+                    if (certResult != pdPASS) {
+                        ESP_LOGE(TAG, "Failed to create cert_gen task");
+                        _certGenRunning.store(false);
+                    }
+#else
+                    generateAndStoreCert("esp32-device");
+                    _certGenRunning.store(false);
+#endif
+                }
+            }
+
+            if (_configManager != nullptr) {
+                _configManager->saveModuleConfig(this);
+            }
+        }
+
+        JsonDocument resp;
+        resp["status"] = "ok";
+        resp["restartRequired"] = changed;
+        std::string out;
+        serializeJson(resp, out);
+        return response->send(200, "application/json", out.c_str());
+    });
 
     // --- GET /api/auth/mcp-token (session-gated) ---
     // Returns the stored password hash, which equals the MCP bearer token.
@@ -852,6 +924,19 @@ void AuthManager::registerRoutes(PsychicHttpServer& server) {
             return response->send(401, "application/json", "{\"error\":\"not_authenticated\"}");
         }
 
+        // --- Verify current password if changing (not initial set) ---
+        if (_passwordSet) {
+            const char* currentPw = doc["currentPassword"] | "";
+            if (strlen(currentPw) == 0) {
+                return response->send(400, "application/json",
+                    "{\"error\":\"current_password_required\",\"detail\":\"must provide currentPassword when changing\"}");
+            }
+            if (!_verifyPassword(currentPw)) {
+                return response->send(403, "application/json",
+                    "{\"error\":\"wrong_password\",\"detail\":\"current password is incorrect\"}");
+            }
+        }
+
         // --- Perform hash and store ---
         if (!_setPassword(password)) {
             return response->send(500, "application/json", "{\"error\":\"storage_failure\"}");
@@ -864,45 +949,9 @@ void AuthManager::registerRoutes(PsychicHttpServer& server) {
             _configManager->saveModuleConfig(this);
         }
 
-        // --- Concurrency guard: prevent overlapping cert generation ---
-        bool expected = false;
-        if (!_certGenRunning.compare_exchange_strong(expected, true)) {
-            ESP_LOGW(TAG, "Cert generation already in progress, skipping");
-        } else {
-#ifndef NATIVE_BUILD
-            // cert_gen is a short-lived, self-deleting task — TWDT registration
-            // is intentionally skipped because the task runs once and exits.
-            // DRAM stack is required for mbedTLS EC key generation.
-            BaseType_t certResult = xTaskCreateWithCaps(
-                [](void* param) {
-                    auto* self = static_cast<AuthManager*>(param);
-                    self->generateAndStoreCert("esp32-device");
-                    self->_certGenRunning.store(false);
-                    vTaskDelete(nullptr);
-                },
-                "cert_gen",
-                12288,
-                this,
-                1,
-                nullptr,
-                MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT
-            );
-            if (certResult != pdPASS) {
-                ESP_LOGE(TAG, "Failed to create cert_gen task");
-                _certGenRunning.store(false);  // Reset guard so future attempts aren't blocked
-            }
-#else
-            generateAndStoreCert("esp32-device");
-            _certGenRunning.store(false);
-#endif
-        }
-
-        // --- Respond immediately — cert generates in background ---
         JsonDocument resp;
         resp["status"] = "ok";
-        resp["certGenerating"] = true;
-        resp["restartRequired"] = true;
-        resp["reason"] = "restart_for_tls";
+        resp["restartRequired"] = false;
         std::string out;
         serializeJson(resp, out);
         return response->send(200, "application/json", out.c_str());
@@ -944,10 +993,20 @@ void AuthManager::registerRoutes(PsychicHttpServer& server) {
         // refuse to send Secure-flagged cookies over plain HTTP, which
         // causes a login loop.
         char cookie[128] = {0};
-        if (hasCert()) {
+        // Expire the OPPOSITE Secure-variant to prevent stale cookies
+        // from accumulating when TLS is toggled. Browsers may keep both
+        // a Secure and non-Secure cookie with the same name; the stale
+        // one sent first causes auth failures after device reboots.
+        if (isTlsEnabled() && hasCert()) {
+            // Setting Secure cookie — expire any stale non-Secure cookie
+            response->addHeader("Set-Cookie",
+                "esp32_session=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0");
             snprintf(cookie, sizeof(cookie),
                 "esp32_session=%s; Path=/; HttpOnly; SameSite=Strict; Secure", tokenHex);
         } else {
+            // Setting non-Secure cookie — expire any stale Secure cookie
+            response->addHeader("Set-Cookie",
+                "esp32_session=; Path=/; HttpOnly; SameSite=Strict; Secure; Max-Age=0");
             snprintf(cookie, sizeof(cookie),
                 "esp32_session=%s; Path=/; HttpOnly; SameSite=Strict", tokenHex);
         }
@@ -963,14 +1022,12 @@ void AuthManager::registerRoutes(PsychicHttpServer& server) {
             // --- Invalidate the in-memory session ---
             memset(_sessionToken, 0, sizeof(_sessionToken));
 
-            // --- Clear the client cookie (match Secure flag to login) ---
-            if (hasCert()) {
-                response->addHeader("Set-Cookie",
-                    "esp32_session=; Path=/; HttpOnly; SameSite=Strict; Secure; Max-Age=0");
-            } else {
-                response->addHeader("Set-Cookie",
-                    "esp32_session=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0");
-            }
+            // --- Clear the client cookie — expire BOTH variants to handle
+            // TLS toggle history (same approach as login). ---
+            response->addHeader("Set-Cookie",
+                "esp32_session=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0");
+            response->addHeader("Set-Cookie",
+                "esp32_session=; Path=/; HttpOnly; SameSite=Strict; Secure; Max-Age=0");
             return response->send(200, "application/json", "{\"status\":\"ok\"}");
         });
 
@@ -1010,12 +1067,14 @@ const char* AuthManager::getTabIcon() const {
 void AuthManager::applyConfig(const JsonObject& section) {
     // --- Read flags; default to false if key is absent ---
     _authEnabled = section["enabled"]     | false;
+    _tlsEnabled  = section["tlsEnabled"]  | false;
     _passwordSet = section["passwordSet"] | false;
     _certPresent = section["certPresent"] | false;
     _tlsApMode   = section["tls_ap_mode"] | false;
 
-    ESP_LOGI(TAG, "Auth config applied — enabled=%s passwordSet=%s certPresent=%s",
+    ESP_LOGI(TAG, "Auth config applied — enabled=%s tlsEnabled=%s passwordSet=%s certPresent=%s",
              _authEnabled ? "true" : "false",
+             _tlsEnabled ? "true" : "false",
              _passwordSet ? "true" : "false",
              _certPresent ? "true" : "false");
 }
@@ -1028,6 +1087,7 @@ void AuthManager::applyConfig(const JsonObject& section) {
  */
 void AuthManager::serializeConfig(JsonObject& section) const {
     section["enabled"]     = _authEnabled;
+    section["tlsEnabled"]  = _tlsEnabled;
     section["passwordSet"] = _passwordSet;
     section["certPresent"] = _certPresent;
     section["tls_ap_mode"] = _tlsApMode;
@@ -1051,6 +1111,7 @@ void AuthManager::serializeConfig(JsonObject& section) const {
 void AuthManager::resetConfig() {
     // --- Step 1: Clear in-memory state ---
     _authEnabled = false;
+    _tlsEnabled  = false;
     _passwordSet = false;
     _certPresent = false;
     _tlsApMode   = false;

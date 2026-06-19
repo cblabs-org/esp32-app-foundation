@@ -54,14 +54,102 @@ void OTAUpdateManager::checkSecurityVersion() {
 
 ## Transport Security for OTA Downloads
 
-The OTA download uses `setInsecure()` (TLS encryption without certificate verification). This is an intentional tradeoff:
+The OTA pipeline uses a **CA-pinned-with-fallback** pattern for metadata and manifest fetches, and intentional `setInsecure()` for binary downloads. Firmware signature verification is the mandatory trust anchor; transport security is defense-in-depth.
 
-- **Why acceptable:** The downloaded firmware is cryptographically signed. The `MbedTLSSignatureVerifier` provides payload integrity independent of transport security. Even if an attacker performed a MITM attack on the download, the tampered firmware would fail signature verification.
-- **Why not CA-pinned:** CA certificates expire, and the device may operate for years without firmware updates. A pinned cert that expires would permanently brick OTA capability. The `GithubClient` (used for release metadata) DOES pin the GitHub root CA via `setCACert()` because metadata integrity matters for version comparison.
+### Dual-CA Bundle (`ota_root_cas.h`)
 
-The `setInsecure()` usage appears in two places in the OTA pipeline:
-1. **Manifest download** — fetching `manifest.json` for board-specific asset selection.
-2. **Firmware binary download** — fetching the `.bin` file from GitHub CDN (which uses different certs than the GitHub API).
+The file `lib/GithubClient/ota_root_cas.h` defines `OTA_ROOT_CA_BUNDLE`, a concatenated PEM buffer containing two root CAs:
+
+| Root CA | Covers | Expiry |
+|---|---|---|
+| Sectigo Public Server Authentication Root E46 | `api.github.com` (GitHub API) | 2038-01-18 |
+| ISRG Root X1 (Let's Encrypt) | `objects.githubusercontent.com` (GitHub CDN) | 2035-06-04 |
+
+`WiFiClientSecure::setCACert()` parses all PEM certificates in the buffer, so a single call loads both roots. Both `GithubClient` (API metadata) and `OTAUpdateManager` (manifest download) use this bundle via `setCACert(OTA_ROOT_CA_BUNDLE)`.
+
+### CA-Pinned-with-Fallback Pattern
+
+The pattern is applied identically in three places: `GithubClient::getLatestRelease()`, `GithubClient::getReleaseAssets()` (paginated), and `OTAUpdateManager::performUpdateTask()` (manifest fetch). The sequence is:
+
+1. Allocate a fresh `WiFiClientSecure` via `new (std::nothrow)`.
+2. Call `setCACert(OTA_ROOT_CA_BUNDLE)` — attempt a fully verified TLS connection.
+3. Perform the HTTP GET.
+4. **If `httpCode < 0`** (TLS handshake failure — likely a CA rotation):
+   a. `http.end()` and `esp_task_wdt_reset()` (feed the watchdog — TLS retries are slow).
+   b. **Delete the old client and allocate a fresh one** via `unique_ptr::reset(new (std::nothrow) WiFiClientSecure())`. This is mandatory — see *Fresh WiFiClientSecure on TLS Retry* below.
+   c. Call `setInsecure()` on the new client — encrypted but unverified.
+   d. Retry the HTTP GET.
+5. Proceed with the response (or fail if the retry also fails).
+
+### Fresh WiFiClientSecure on TLS Retry
+
+After a failed TLS handshake, the mbedTLS context inside `WiFiClientSecure` is left in a **dirty state**. Calling `setInsecure()` on the same object does not properly reset internal state, causing undefined behaviour or silent failures. The code **must** destroy the old client and allocate a fresh one before retrying:
+
+```cpp
+// WRONG — dirty mbedTLS context, setInsecure() ignored:
+// client->setInsecure();
+
+// CORRECT — fresh allocation:
+manifestClient.reset(new (std::nothrow) WiFiClientSecure());
+manifestClient->setInsecure();
+```
+
+This pattern appears in `OTAUpdateManager.cpp` (line ~574), `GithubClient.cpp` (lines ~88, ~301).
+
+### Self-Healing Property
+
+The fallback path creates a self-healing cycle: if the bundled CAs become stale (e.g. GitHub rotates its issuing chain), the device degrades to `setInsecure()` for that session but still successfully downloads and applies the firmware update. The updated firmware can ship with corrected CAs in a new `ota_root_cas.h`, restoring full CA verification on the next boot. The device is never bricked by a CA rotation.
+
+### Binary Download: Intentional `setInsecure()`
+
+The firmware **binary download** (the `.bin` payload from GitHub CDN) intentionally uses `setInsecure()` directly — it does **not** attempt CA-pinning first:
+
+```cpp
+// OTAUpdateManager.cpp, line ~745
+client->setInsecure();
+```
+
+This is by design:
+- The binary payload has an **independent Ed25519 / RSA-2048 signature** verified by `MbedTLSSignatureVerifier`. Transport-level MITM is fully mitigated by payload verification.
+- GitHub CDN redirects (`objects.githubusercontent.com`) pass through edge servers with different and frequently rotating certificates. CA-pinning the CDN provides no meaningful additional security and risks unnecessary fallback churn.
+- The firmware signature is the **mandatory trust anchor**; transport security is defense-in-depth only.
+
+## NVS Encryption Analysis
+
+The framework stores the `DeviceCrypto` master key in NVS (Non-Volatile Storage). The question of whether NVS should be encrypted has three tiers of protection:
+
+### Tier 1: Key Partition (Default — No eFuses)
+
+ESP-IDF supports NVS encryption using a key stored in a dedicated `nvs_key` flash partition. However, this key itself lives on flash in plaintext — an attacker with physical access can extract both the NVS data and the decryption key. This tier protects against casual flash dumps but **not** against targeted physical extraction.
+
+**Protection level:** Low. Raises the bar slightly but does not fundamentally change the threat model.
+
+### Tier 1.5: HMAC-Based Key Derivation (ESP32-S3 Only)
+
+On ESP32-S3, the NVS encryption key can be derived from an HMAC key burned into eFuse. This uses one eFuse block and provides genuine protection — the key never exists in readable flash, only the hardware can derive it. However:
+- Requires **ESP32-S3** (not available on ESP32 or ESP32-C3).
+- Makes the NVS data **board-specific** — a factory-reset or chip replacement loses the data.
+- Consumes 1 of the limited eFuse key blocks.
+
+**Protection level:** Good. Real protection against physical extraction, but S3-only and adds deployment complexity.
+
+### Tier 2: Full Flash Encryption (eFuse-Based)
+
+ESP-IDF flash encryption encrypts the entire flash contents (including NVS) using keys burned into eFuses. This provides full protection against physical extraction but:
+- Burns **multiple eFuse blocks** (irreversible on production boards in Release mode).
+- Changes the development workflow significantly — JTAG debugging is disabled, firmware must be pre-encrypted before flashing, serial flash is restricted.
+- Development Mode allows limited re-flashing but is not recommended for production.
+
+**Protection level:** High. Full protection, but fundamentally changes the dev/deploy workflow.
+
+### Decision: None Currently Warranted
+
+The current threat model does not warrant NVS encryption:
+- The only sensitive material in NVS is the `DeviceCrypto` master key (used for local credential encryption).
+- The threat is **physical extraction** — an attacker must have hands-on access to the device.
+- The devices are consumer IoT (weather stations, sensor dashboards), not high-value targets.
+- Adding flash encryption would significantly increase deployment complexity for all users of the framework.
+- If the threat model changes (e.g. devices storing cloud API keys for paid services), Tier 1.5 (HMAC on S3) would be the recommended first step.
 
 ## Upload Security (Web Portal)
 

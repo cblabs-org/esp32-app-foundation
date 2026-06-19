@@ -65,6 +65,8 @@ predate the formal PA pipeline and are filed retrospectively.
 | [pr-25-framework-docs-skill](./pr-25-framework-docs-skill/PROJECT.md) | Framework Developer Docs + Extensibility Refinements (registerModule, ITickable signature, EventBus vector, template expansion, 5 dev guides, AI skill) | ✅ **MERGED** `e3388d1` — 51-file skill + 12 human docs + compliance audit guide | Session 5ad94103 |
 | [pr-28-compliance-safety](./pr-28-compliance-safety/PROJECT.md) | Compliance Safety Quick-Wins + Architecture Review Follow-Up (bare new→nothrow, TWDT, task DRAM caps, TAG constexpr, facade, std::function elimination, String→std::string, ADR-39, WiFiClientSecure heap alloc, embedded safety) | ✅ **MERGED** `7c623f7` — 11 WOs complete, 562 tests passing, v0.0.10-dev.8 on device | Session bd5ee383 |
 | [pr-27-security-mcp-docs](./pr-27-security-mcp-docs/PROJECT.md) | Security & MCP Server Developer Documentation (security.md, mcp-server.md, README index update) | ✅ **MERGED** `c1b6391` — security.md (338 lines) + mcp-server.md (283 lines) | Session 5ad94103 |
+| [pr-29-tls-optimization](./pr-29-tls-optimization/PROJECT.md) | TLS Memory Optimization (mbedTLS sdkconfig tuning — dynamic buffers, cert bundle NONE, feature pruning) | 🔄 **WIP** — WO1 in progress | Session 07cb3857 |
+| [pr-30-attribution-cleanup](./pr-30-attribution-cleanup/PROJECT.md) | Attribution Cleanup & Provenance Remediation (remove departures-board refs, rewrite MD5Utils base64ToHex with mbedtls, fix Gadec copyright) | 📋 **PLANNING** — 2 WOs defined, awaiting user approval | Session 87bf8a4b |
 
 ---
 

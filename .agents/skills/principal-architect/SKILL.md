@@ -68,8 +68,9 @@ Below the frontmatter, the WORKORDER MUST contain:
 - **Role Definition:** `You are an expert senior software engineer and execution-focused worker agent. You are NOT the Principal Architect. Do not make high-level architectural decisions, do not branch, and do not plan. Your task is strictly limited to executing the checklist below.`
 - **Objective:** 1-2 sentence core intent.
 - **Strict Boundary Box:** Explicit rules on what the agent should NOT touch.
+- **Tooling Constraints:** Before drafting, self-inspect your environment's available MCP servers. If relevant build, test, or lint tools exist, explicitly name them here and instruct the worker to use those specific MCP tools rather than raw CLI commands.
 - **Line-Item Instructions:** Checkboxes detailing the exact files to modify.
-- **Verification Requirement:** The worker must verify it compiles/runs. **CRITICAL:** Before distilling or committing, the worker MUST ask the user if they are happy. Only *after* approval should the worker invoke the `@distillery` skill to package the state and drop control.
+- **Verification Requirement:** The worker must verify it compiles/runs according to the Tooling Constraints. **CRITICAL:** Before distilling or committing, the worker MUST ask the user if they are happy. Only *after* approval should the worker invoke the `@distillery` skill to package the state and drop control.
 
 ### 4. Worker Sub-Agent Spawning
 After writing the Handoff Document (`WORKORDER.md`), you must seamlessly spawn a worker agent to execute it natively. Do not ask the user to copy/paste prompts.

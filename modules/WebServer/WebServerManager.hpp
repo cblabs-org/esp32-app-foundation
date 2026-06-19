@@ -214,4 +214,5 @@ private:
     AuthManager* _authManager = nullptr; ///< Stored for WO5 route guards (nullable)
     WifiManager* _wifiManager = nullptr; ///< Required to check network ready state
     bool         _serverStarted = false; ///< True if the underlying servers have been started
+    std::atomic<bool> _restartRequested{false}; ///< True if a device restart has been requested
 };
