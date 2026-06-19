@@ -19,9 +19,9 @@ The user is NOT gadec — gadec is a separate author (Brian).
 
 ## Work Order Ledger
 
-- **[ ] [wo1-comment-cleanup](wo1-comment-cleanup/WORKORDER.md):** Remove all
+- **[x] [wo1-comment-cleanup](wo1-comment-cleanup/WORKORDER.md):** Remove all
   `departures-board` / `gadec` references from shipped source files. Fix the
-  Gadec copyright header on test_main.cpp. 9 edits across 7 files.
+  Gadec copyright header on test_main.cpp. 9 edits across 7 files. ✅ Merged `5cde008`
 - **[ ] [wo2-md5utils-rewrite](wo2-md5utils-rewrite/WORKORDER.md):** Replace the
   hand-rolled `base64ToHex` function with `mbedtls_base64_decode()`. Rename
   `calculateFileMD5` local variables to diverge from gadec naming. Verify

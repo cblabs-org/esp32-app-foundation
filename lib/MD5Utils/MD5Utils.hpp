@@ -10,7 +10,7 @@
  * Exported Functions/Classes:
  * - MD5Utils: [Class] Wrapper class for MD5 generation operations.
  *   - calculateFileMD5(): Calculates the MD5 hash of a specified file on the LittleFS system.
- *   - base64ToHex(): Converts a base64 encoded MD5 hash into a hex string.
+ *   - base64ToHex(): Converts a base64 encoded hash into a hex string.
  */
 
 #ifndef MD5_UTILS_HPP
@@ -40,9 +40,9 @@ public:
     std::string calculateFileMD5(const char* filePath);
 
     /**
-     * @brief Converts a base64 encoded MD5 hash (such as those from GitHub headers) into a hex string.
+     * @brief Converts a base64 encoded hash into a hex string.
      * @param base64Hash The base64 encoded string.
-     * @return A 32-character hexadecimal MD5 string.
+     * @return A hexadecimal string representation of the decoded bytes.
      */
     std::string base64ToHex(const std::string& base64Hash);
 };

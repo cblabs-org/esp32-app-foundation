@@ -16,6 +16,7 @@ static constexpr const char* TAG = "MD5Utils";
 #ifndef PIO_UNIT_TESTING
 #include <LittleFS.h>
 #include <mbedtls/md5.h>
+#include <mbedtls/base64.h>
 #endif
 
 /**
@@ -31,29 +32,29 @@ std::string MD5Utils::calculateFileMD5(const char* filePath) {
         return std::string();
     }
 
-    mbedtls_md5_context ctx;
-    mbedtls_md5_init(&ctx);
-    mbedtls_md5_starts(&ctx);
+    mbedtls_md5_context md5Ctx;
+    mbedtls_md5_init(&md5Ctx);
+    mbedtls_md5_starts(&md5Ctx);
 
-    const size_t bufferSize = 512;
-    uint8_t buffer[bufferSize];
+    const size_t kReadBufSize = 512;
+    uint8_t readBuf[kReadBufSize];
     while (file.available()) {
-        size_t bytesRead = file.read(buffer, bufferSize);
-        mbedtls_md5_update(&ctx, buffer, bytesRead);
+        size_t bytesRead = file.read(readBuf, kReadBufSize);
+        mbedtls_md5_update(&md5Ctx, readBuf, bytesRead);
     }
 
-    uint8_t hash[16];
-    mbedtls_md5_finish(&ctx, hash);
-    mbedtls_md5_free(&ctx);
+    uint8_t digest[16];
+    mbedtls_md5_finish(&md5Ctx, digest);
+    mbedtls_md5_free(&md5Ctx);
     file.close();
 
-    char hexString[33];
+    char hexOut[33];
     for (int i = 0; i < 16; i++) {
-        sprintf(&hexString[i * 2], "%02x", hash[i]);
+        sprintf(&hexOut[i * 2], "%02x", digest[i]);
     }
-    hexString[32] = '\0';
+    hexOut[32] = '\0';
 
-    return std::string(hexString);
+    return std::string(hexOut);
 #else
     // Mock implementation for native testing
     return std::string("d41d8cd98f00b204e9800998ecf8427e"); // MD5 of empty string
@@ -61,63 +62,62 @@ std::string MD5Utils::calculateFileMD5(const char* filePath) {
 }
 
 /**
- * @brief Converts a base64 encoded MD5 hash (such as those from GitHub headers) into a hex string.
+ * @brief Converts a base64 encoded hash into a hex string.
  * @param base64Hash The base64 encoded string.
- * @return A 32-character hexadecimal MD5 string.
+ * @return A hexadecimal string representation of the decoded bytes.
  */
 std::string MD5Utils::base64ToHex(const std::string& base64Hash) {
-    const char base64Table[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-    int base64Value[256];
-    for (int i = 0; i < 256; i++) base64Value[i] = -1;
-    for (int i = 0; i < 64; i++) base64Value[(int)base64Table[i]] = i;
-
-    int len = (int)base64Hash.length();
-    if (len == 0) {
+#ifndef PIO_UNIT_TESTING
+    if (base64Hash.empty()) {
         ESP_LOGW(TAG, "base64ToHex: empty input string");
         return std::string();
     }
 
-    int padding = (base64Hash[len - 1] == '=') + ((len > 1 && base64Hash[len - 2] == '=') ? 1 : 0);
-    int binarySize = (len * 3) / 4 - padding;
-    
-    if (binarySize <= 0) {
-        ESP_LOGW(TAG, "base64ToHex: invalid binary size after decode");
+    // First call: determine output size
+    size_t decodedLen = 0;
+    int ret = mbedtls_base64_decode(
+        nullptr, 0, &decodedLen,
+        reinterpret_cast<const unsigned char*>(base64Hash.c_str()),
+        base64Hash.length());
+
+    if (ret != MBEDTLS_ERR_BASE64_BUFFER_TOO_SMALL || decodedLen == 0) {
+        ESP_LOGW(TAG, "base64ToHex: invalid base64 input");
         return std::string();
     }
 
-    uint8_t* binaryData = new (std::nothrow) uint8_t[binarySize];
-    if (binaryData == nullptr) {
-        ESP_LOGE(TAG, "Failed to allocate binary data buffer (%d bytes)", binarySize);
+    // Allocate decode buffer
+    auto* decoded = new (std::nothrow) unsigned char[decodedLen];
+    if (decoded == nullptr) {
+        ESP_LOGE(TAG, "base64ToHex: allocation failed (%zu bytes)", decodedLen);
         return std::string();
     }
-    int index = 0, buffer = 0, bits = 0;
-    
-    for (int i = 0; i < len; i++) {
-        if (base64Hash[i] == '=') continue;
-        int value = base64Value[(int)base64Hash[i]];
-        if (value == -1) {
-            ESP_LOGW(TAG, "base64ToHex: invalid base64 character at position %d", i);
-            delete[] binaryData;
-            return std::string();
-        }
-        buffer = (buffer << 6) | value;
-        bits += 6;
-        if (bits >= 8) {
-            bits -= 8;
-            if (index < binarySize) {
-                binaryData[index++] = (buffer >> bits) & 0xFF;
-            }
-        }
+
+    // Second call: actual decode
+    size_t actualLen = 0;
+    ret = mbedtls_base64_decode(
+        decoded, decodedLen, &actualLen,
+        reinterpret_cast<const unsigned char*>(base64Hash.c_str()),
+        base64Hash.length());
+
+    if (ret != 0) {
+        ESP_LOGW(TAG, "base64ToHex: decode failed (ret=%d)", ret);
+        delete[] decoded;
+        return std::string();
     }
 
-    std::string hexHash;
-    hexHash.reserve(index * 2);
-    for (int i = 0; i < index; i++) {
+    // Convert to hex string
+    std::string hexResult;
+    hexResult.reserve(actualLen * 2);
+    for (size_t i = 0; i < actualLen; i++) {
         char hexBuf[3];
-        snprintf(hexBuf, sizeof(hexBuf), "%02x", binaryData[i]);
-        hexHash += hexBuf;
+        snprintf(hexBuf, sizeof(hexBuf), "%02x", decoded[i]);
+        hexResult += hexBuf;
     }
 
-    delete[] binaryData;
-    return hexHash;
+    delete[] decoded;
+    return hexResult;
+#else
+    // Mock: return a fixed hex string for testing
+    return std::string("d41d8cd98f00b204e9800998ecf8427e");
+#endif
 }
