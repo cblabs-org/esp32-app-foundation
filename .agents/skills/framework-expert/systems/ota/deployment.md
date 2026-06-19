@@ -34,6 +34,9 @@ Events are published at each major pipeline step and on every download progress 
 
 The `scripts/deploy_release.py` script handles building, signing, and publishing:
 
+> [!WARNING]
+> **Agent Execution Rule:** NEVER execute `deploy_release.py` directly using terminal tools. The script requires the private key passphrase, which `openssl` will prompt for interactively. Because background tasks cannot provide interactive standard input, the process will hang indefinitely. **Always** output the exact CLI command in a markdown code block and instruct the user to run it in their own terminal.
+
 ```bash
 python3 scripts/deploy_release.py \
     --tag v1.0.0 \
@@ -47,6 +50,15 @@ The script:
 3. Generates `manifest.json` via `scripts/generate_manifest.py`
 4. Creates GitHub Release: `gh release create <tag>`
 5. Uploads all assets: `.bin`, `.bin.sig`, `.bin.sha256`, `manifest.json`
+
+### Floating Tags (O(1) OTA Polling)
+
+To prevent GitHub API pagination and memory exhaustion, the OTA engine uses **floating tags** (`latest-dev`, `latest-beta`, `latest-rc`, `latest-stable`) to look up updates in exactly two HTTP requests.
+
+The `deploy_release.py` script automatically force-pushes these floating tags to the latest commit of that channel and creates a GitHub Release attached to it.
+
+> [!IMPORTANT]
+> **SemVer via Release Title (Design Constraint)**: Because the GitHub API returns the literal string (e.g. `latest-dev`) in the `tag_name` field of a floating release, the ESP32 cannot parse its semantic version directly from the tag. To avoid downloading the `manifest.json` asset (which costs time and memory), the deploy script explicitly sets the GitHub Release title (`name` field) to the exact semantic version (e.g., `--title v0.0.11-dev.13`). `GithubClient` detects floating tags via a `"latest-"` prefix check and reads the SemVer from the `name` field instead of `tag_name`. **This is a critical contract between `deploy_release.py` and `GithubClient.cpp` — do not change the release title format without updating both.**
 
 ### Split-Repo Deployment
 

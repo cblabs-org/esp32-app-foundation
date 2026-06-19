@@ -57,11 +57,11 @@ When `performUpdate()` is called, a FreeRTOS task (8KB stack, priority 1) execut
 
 | Channel | Tag Convention | Behaviour |
 |---|---|---|
-| `stable` | `v3.1.0` (no suffix) | Delegates to `getLatestRelease()` (GitHub "latest" endpoint) |
-| `beta` | `v3.2.0-beta.1` | Queries all releases, finds first pre-release with `beta` in tag |
-| `dev` | `v3.2.0-dev.3` | Queries all releases, finds first pre-release with `dev` in tag |
+| `stable` | `v3.1.0` (no suffix) | Fetches `/releases/latest` (GitHub "latest" endpoint — stable only) |
+| `beta` | `v3.2.0-beta.1` | Fetches `/releases/latest` (stable baseline) + `/releases/tags/latest-beta` (floating tag) |
+| `dev` | `v3.2.0-dev.3` | Fetches `/releases/latest` (stable baseline) + `/releases/tags/latest-dev` (floating tag) |
 
-The active channel is persisted as an `IConfigurable` field in `/mod/ota.json`. When the channel changes, `checkForUpdate()` detects `_channel != _lastCheckedChannel` and signals "update available" even if the remote version is numerically lower (implicit downgrade).
+Pre-release channels use **floating tags** (`latest-dev`, `latest-beta`, etc.) for O(1) polling — exactly two HTTP requests regardless of release count. The `deploy_release.py` script force-moves these tags on each deployment. See `systems/ota/deployment.md` § Floating Tags for the full design constraint (the release `name` field carries the SemVer).
 
 ### SemVer Comparison
 

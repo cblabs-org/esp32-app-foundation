@@ -75,13 +75,13 @@ def check_prerequisites(private_key: str, need_pio: bool) -> None:
         sys.exit(1)
 
 
-def run(cmd: list[str], dry_run: bool = False, **kwargs) -> subprocess.CompletedProcess:
+def run(cmd: list[str], dry_run: bool = False, check: bool = True, **kwargs) -> subprocess.CompletedProcess:
     """Run a command, or print it in dry-run mode."""
     if dry_run:
         print(f"  [DRY-RUN] {' '.join(cmd)}")
         return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
     print(f"  $ {' '.join(cmd)}")
-    result = subprocess.run(cmd, check=True, **kwargs)
+    result = subprocess.run(cmd, check=check, **kwargs)
     return result
 
 
@@ -269,7 +269,7 @@ def create_release(tag: str, dry_run: bool, target_repo: str = None) -> None:
         release_cmd.append("--prerelease")
     if target_repo:
         release_cmd.extend(["--repo", target_repo])
-    run(release_cmd, dry_run=dry_run)
+    run(release_cmd, dry_run=dry_run, check=False)
 
     print("\n--- Step 5: Upload release assets ---")
     asset_patterns = ["*.bin", "*.bin.sig", "*.bin.sha256", "manifest.json"]
@@ -281,11 +281,37 @@ def create_release(tag: str, dry_run: bool, target_repo: str = None) -> None:
         print("ERROR: No assets found to upload", file=sys.stderr)
         sys.exit(1)
 
-    upload_cmd = ["gh", "release", "upload", tag]
+    upload_cmd = ["gh", "release", "upload", tag, "--clobber"]
     if target_repo:
         upload_cmd.extend(["--repo", target_repo])
     upload_cmd.extend(assets)
     run(upload_cmd, dry_run=dry_run)
+
+    print(f"\n--- Step 6: Update floating tag (latest-{channel}) ---")
+    floating_tag = f"latest-{channel}"
+    
+    # Ignore errors if the release/tag doesn't exist yet
+    delete_cmd = ["gh", "release", "delete", floating_tag, "-y", "--cleanup-tag"]
+    if target_repo:
+        delete_cmd.extend(["--repo", target_repo])
+    run(delete_cmd, dry_run=dry_run, check=False, stderr=subprocess.DEVNULL)
+    
+    # CRITICAL CONTRACT: The --title MUST be the exact semantic version tag (e.g. v0.0.11-dev.13).
+    # GithubClient.cpp on the ESP32 parses the SemVer from the release "name" (title) field
+    # because the tag_name field contains the unparseable "latest-{channel}" string.
+    # Changing this title format will silently break OTA version detection on all devices.
+    floating_release_cmd = ["gh", "release", "create", floating_tag, "--title", tag, "--notes", f"Alias for {tag}"]
+    if channel != "stable":
+        floating_release_cmd.append("--prerelease")
+    if target_repo:
+        floating_release_cmd.extend(["--repo", target_repo])
+    run(floating_release_cmd, dry_run=dry_run)
+    
+    floating_upload_cmd = ["gh", "release", "upload", floating_tag, "--clobber"]
+    if target_repo:
+        floating_upload_cmd.extend(["--repo", target_repo])
+    floating_upload_cmd.extend(assets)
+    run(floating_upload_cmd, dry_run=dry_run)
 
 
 def parse_args() -> argparse.Namespace:

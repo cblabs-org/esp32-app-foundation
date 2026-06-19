@@ -156,9 +156,38 @@ automatically reverts to the previous firmware partition on reboot.
 
 | Channel | Tag Convention | `getLatestReleaseForChannel()` Behaviour |
 |---------|----------------|------------------------------------------|
-| `stable` | `v3.1.0` (no suffix) | Delegates to `getLatestRelease()` (GitHub "latest" endpoint) |
-| `beta` | `v3.2.0-beta.1` | Queries all releases, finds first pre-release with `beta` in tag |
-| `dev` | `v3.2.0-dev.3` | Queries all releases, finds first pre-release with `dev` in tag |
+| `stable` | `v3.1.0` (no suffix) | Fetches `/releases/latest` (GitHub "latest" endpoint — stable only) |
+| `beta` | `v3.2.0-beta.1` | Fetches `/releases/latest` (stable baseline) + `/releases/tags/latest-beta` (floating tag) |
+| `dev` | `v3.2.0-dev.3` | Fetches `/releases/latest` (stable baseline) + `/releases/tags/latest-dev` (floating tag) |
+
+### 4.1.1 Floating Tags (O(1) OTA Polling)
+
+To avoid GitHub API pagination and the associated memory exhaustion on the
+ESP32, pre-release channels use **floating tags** (`latest-dev`, `latest-beta`,
+`latest-rc`, `latest-stable`). These are lightweight GitHub Releases whose
+underlying Git tag is force-moved to the latest commit of that channel by
+`deploy_release.py`.
+
+The device performs exactly **two HTTP requests** regardless of how many
+releases exist in the repository:
+
+1. `GET /releases/latest` — stable baseline (always the highest non-prerelease).
+2. `GET /releases/tags/latest-{channel}` — floating tag for the subscribed channel.
+
+The higher SemVer of the two candidates wins.
+
+> **Design constraint — Release title carries the version:**
+> Because the `tag_name` field of a floating release is literally `"latest-dev"`
+> (not a parseable SemVer string), the deploy script sets the GitHub Release
+> **title** (`name` field) to the exact semantic version tag (e.g.,
+> `v0.0.11-dev.13`). `GithubClient` detects floating tags via a `"latest-"`
+> prefix check and reads the SemVer from the `name` field instead of
+> `tag_name`. This avoids downloading the `manifest.json` asset just to
+> determine the version, saving both time and heap memory.
+>
+> **This is a critical contract between `deploy_release.py` and
+> `GithubClient.cpp` — do not change the release title format without
+> updating both.**
 
 ### 4.2 Channel Configuration
 

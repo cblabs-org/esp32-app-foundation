@@ -28,8 +28,9 @@
 | Create `dev` tag              | ✅ Yes         | No                     |
 | Create `beta` / `stable` tag  | ❌ No          | Yes                    |
 | Increment `PATCH`/`MINOR`/`MAJOR` | ❌ No     | Yes                    |
-| Run `deploy_release.py` (dev) | ✅ Yes         | No                     |
-| Run `deploy_release.py` (β/stable) | ❌ No    | Yes                    |
+| Run `deploy_release.py` (any) | ❌ No*          | Yes (User runs CLI)    |
+
+* **Agents MUST NEVER execute `deploy_release.py` directly.** The private key requires an interactive passphrase, which causes background agent tasks to hang indefinitely on `openssl`. Always output the exact CLI command and ask the user to run it in their terminal.
 
 ## Full Policy Reference
 

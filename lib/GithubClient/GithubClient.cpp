@@ -181,6 +181,11 @@ bool GithubClient::getLatestRelease() {
     releaseId = doc["tag_name"] | "";
     releaseDescription = doc["name"] | "";
 
+    // If the baseline is a floating tag (e.g. latest-stable), parse SemVer from the title instead
+    if (strncmp(releaseId.c_str(), "latest-", 7) == 0 && !releaseDescription.empty()) {
+        releaseId = releaseDescription;
+    }
+
     JsonArray assetsArray = doc["assets"].as<JsonArray>();
     for (JsonObject asset : assetsArray) {
         if (releaseAssets >= MAX_RELEASE_ASSETS) break;
@@ -272,210 +277,137 @@ bool GithubClient::getLatestReleaseForChannel(const char* channel) {
             bestAssetURL[i]  = releaseAssetURL[i];
         }
     }
+    // --- Step 2: Fetch floating tag for requested channel ---
+    // If the channel is STABLE, we already have it from Step 1.
+    if (floor != Channel::STABLE) {
+        std::string tagUrl = std::string(apiGetReleases.c_str()) + "/tags/latest-" + std::string(channel);
+        LOG_SECURE("GITHUB", "Fetching floating tag: %s", tagUrl.c_str());
 
-    // --- Step 2: Paginated scan of /releases?per_page=1&page=N ---
-    static constexpr int MAX_PAGES    = 20;
-    static constexpr int PER_PAGE     = 1;
-    bool stopScanning = false;
-    int parseFailures = 0;
-
-    for (int page = 1; page <= MAX_PAGES && !stopScanning; ++page) {
-        // Build paginated URL
-        std::string pageUrl = apiGetReleases + "?per_page=" + std::to_string(PER_PAGE) + "&page=" + std::to_string(page);
-        LOG_SECURE("GITHUB", "Requesting releases page %d (floor='%s')", page, channel);
-
-        // Heap-allocated TLS client — reuses allocation across pages.
-        // DRAM-first (std::nothrow) because this runs on the OTA task
-        // where PSRAM is unsafe during flash writes.
         auto pageClient = std::unique_ptr<WiFiClientSecure>(new (std::nothrow) WiFiClientSecure());
-        if (!pageClient) {
-            ESP_LOGE("GITHUB", "Failed to allocate WiFiClientSecure for page %d", page);
-            break;
-        }
-        pageClient->setCACert(githubRootCACert);
-        pageClient->setTimeout(15000);
-
-        HTTPClient pageHttp;
-        pageHttp.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
-        pageHttp.useHTTP10(true);
-        if (!pageHttp.begin(*pageClient, String(pageUrl.c_str()))) {
-            ESP_LOGE("GITHUB", "Page %d: HTTP begin failed", page);
-            break;
-        }
-        pageHttp.addHeader("User-Agent", "esp32/1.0");
-        pageHttp.addHeader("X-GitHub-Api-Version", "2022-11-28");
-        pageHttp.addHeader("Accept", "application/vnd.github+json");
-        if (!accessToken.empty()) {
-            pageHttp.addHeader("Authorization", String(("Bearer " + accessToken).c_str()));
-        }
-        pageHttp.setTimeout(15000);
-
-        int httpCode = pageHttp.GET();
-        if (httpCode < 0) {
-            ESP_LOGW("GITHUB", "Page %d query failed with pinned CA (err=%d) — retrying insecure", page, httpCode);
-            pageHttp.end();
-
-            esp_task_wdt_reset();
-
-            pageClient.reset(new (std::nothrow) WiFiClientSecure());
-            if (!pageClient) {
-                ESP_LOGE("GITHUB", "Failed to allocate WiFiClientSecure for page %d insecure retry", page);
-                break;
-            }
-            pageClient->setInsecure();
+        if (pageClient) {
+            pageClient->setCACert(githubRootCACert);
             pageClient->setTimeout(15000);
 
-            if (!pageHttp.begin(*pageClient, String(pageUrl.c_str()))) {
-                ESP_LOGE("GITHUB", "Page %d: HTTP begin failed for retry", page);
-                break;
-            }
-            pageHttp.addHeader("User-Agent", "esp32/1.0");
-            pageHttp.addHeader("X-GitHub-Api-Version", "2022-11-28");
-            pageHttp.addHeader("Accept", "application/vnd.github+json");
-            if (!accessToken.empty()) {
-                pageHttp.addHeader("Authorization", String(("Bearer " + accessToken).c_str()));
-            }
-            pageHttp.setTimeout(15000);
+            HTTPClient pageHttp;
+            pageHttp.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
+            pageHttp.useHTTP10(true);
 
-            httpCode = pageHttp.GET();
-        }
-        if (httpCode != HTTP_CODE_OK) {
-            LOG_SECURE("GITHUB", "Page %d HTTP error %d — stopping scan", page, httpCode);
-            pageHttp.end();
-            break;  // Graceful degradation: return best found so far
-        }
-
-        // Read full response body into PSRAM — avoids DRAM-hungry getString()
-        int contentLen = pageHttp.getSize();
-        if (contentLen <= 0) contentLen = 16384;
-
-        // SAFETY: PSRAM buffer is allocated and freed within this function scope.
-        // It MUST be freed before any flash write operation begins (called from
-        // OTA task where PSRAM and flash share the SPI bus).
-        char* buf = (char*)heap_caps_malloc(contentLen + 1, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-        if (!buf) {
-            // PSRAM unavailable — fall back to DRAM
-            buf = (char*)malloc(contentLen + 1);
-        }
-        if (!buf) {
-            ESP_LOGE("GITHUB", "Page %d: alloc failed (%d bytes)", page, contentLen + 1);
-            pageHttp.end();
-            parseFailures++;
-            break;
-        }
-
-        int bytesRead = 0;
-        auto streamClient = pageHttp.getStreamPtr();
-        uint32_t startMs = millis();
-        while ((streamClient->connected() || streamClient->available()) && bytesRead < contentLen) {
-            int avail = streamClient->available();
-            if (avail > 0) {
-                int toRead = (contentLen - bytesRead > avail) ? avail : (contentLen - bytesRead);
-                int c = streamClient->read((uint8_t*)&buf[bytesRead], toRead);
-                if (c > 0) {
-                    bytesRead += c;
-                    startMs = millis();
+            if (pageHttp.begin(*pageClient, String(tagUrl.c_str()))) {
+                pageHttp.addHeader("User-Agent", "esp32/1.0");
+                pageHttp.addHeader("X-GitHub-Api-Version", "2022-11-28");
+                pageHttp.addHeader("Accept", "application/vnd.github+json");
+                if (!accessToken.empty()) {
+                    pageHttp.addHeader("Authorization", String(("Bearer " + accessToken).c_str()));
                 }
-            } else {
-                if (millis() - startMs > 15000) {
-                    ESP_LOGW("GITHUB", "Read timeout on page %d", page);
-                    break;
-                }
-                delay(10);
-            }
-        }
-        buf[bytesRead] = '\0';
-        pageHttp.end();
+                pageHttp.setTimeout(15000);
 
-        // Parse page — array filter for minimal memory usage
-        JsonDocument filter;
-        filter[0]["tag_name"]   = true;
-        filter[0]["name"]      = true;
-        filter[0]["prerelease"] = true;
-        filter[0]["assets"][0]["name"] = true;
-        filter[0]["assets"][0]["url"]  = true;
-
-        JsonDocument doc;
-        DeserializationError error = deserializeJson(doc, buf,
-                                                      DeserializationOption::Filter(filter));
-        free(buf);
-
-        if (error) {
-            LOG_SECURE("GITHUB", "Page %d JSON error: %s (%d bytes read) — stopping scan",
-                       page, error.c_str(), bytesRead);
-            parseFailures++;
-            break;  // Graceful degradation
-        }
-
-        JsonArray releases = doc.as<JsonArray>();
-
-        // EXIT 3: Empty page — no more releases
-        if (releases.size() == 0) {
-            LOG_SECURE("GITHUB", "Empty page %d — stopping scan", page);
-            break;
-        }
-
-        for (JsonObject release : releases) {
-            const char* tagName = release["tag_name"] | "";
-            if (tagName[0] == '\0') continue;
-
-            bool isPre = release["prerelease"] | false;
-
-            // EXIT 1: Hit a stable release — we already have the latest stable
-            // from Step 1. Everything after this is older. Stop scanning.
-            if (!isPre) {
-                LOG_SECURE("GITHUB", "Hit stable %s in scan — stopping (page %d)", tagName, page);
-                stopScanning = true;
-                break;
-            }
-
-            // Pre-release: check if it meets the subscriber's floor
-            FirmwareVersion candidate = parseVersionTag(tagName);
-            bool accepted = (static_cast<uint8_t>(candidate.channel) >= static_cast<uint8_t>(floor));
-
-            if (!accepted) {
-                LOG_SECURE("GITHUB", "Skipping %s — does not meet floor '%s'", tagName, channel);
-                continue;
-            }
-
-            // EXIT 2: Found an acceptable prerelease that beats best candidate.
-            // Since releases are newest-first, the first acceptable prerelease
-            // is the winner — nothing later can beat it.
-            if (bestTag.empty() || candidate > bestVer) {
-                LOG_SECURE("GITHUB", "Found acceptable prerelease %s — stopping", tagName);
-                bestVer         = candidate;
-                bestTag         = tagName;
-                bestDescription = release["name"] | "";
-                bestIsPre       = true;
-                bestAssetCount  = 0;
-
-                JsonArray assetsArray = release["assets"].as<JsonArray>();
-                for (JsonObject asset : assetsArray) {
-                    if (bestAssetCount >= MAX_RELEASE_ASSETS) break;
-                    std::string name = asset["name"] | "";
-                    std::string url  = asset["url"]  | "";
-                    if (!name.empty() && !url.empty()) {
-                        bestAssetName[bestAssetCount] = name;
-                        bestAssetURL[bestAssetCount]  = url;
-                        bestAssetCount++;
+                int httpCode = pageHttp.GET();
+                if (httpCode < 0) {
+                    ESP_LOGW("GITHUB", "Tag fetch failed with pinned CA (err=%d) — retrying insecure", httpCode);
+                    pageHttp.end();
+                    pageClient.reset(new (std::nothrow) WiFiClientSecure());
+                    if (pageClient) {
+                        pageClient->setInsecure();
+                        pageClient->setTimeout(15000);
+                        if (pageHttp.begin(*pageClient, String(tagUrl.c_str()))) {
+                            pageHttp.addHeader("User-Agent", "esp32/1.0");
+                            pageHttp.addHeader("X-GitHub-Api-Version", "2022-11-28");
+                            pageHttp.addHeader("Accept", "application/vnd.github+json");
+                            if (!accessToken.empty()) {
+                                pageHttp.addHeader("Authorization", String(("Bearer " + accessToken).c_str()));
+                            }
+                            pageHttp.setTimeout(15000);
+                            httpCode = pageHttp.GET();
+                        }
                     }
                 }
-                stopScanning = true;
-                break;
+
+                if (httpCode == HTTP_CODE_OK) {
+                    int contentLen = pageHttp.getSize();
+                    if (contentLen <= 0) contentLen = 8192; // One release is small
+
+                    char* buf = (char*)heap_caps_malloc(contentLen + 1, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+                    if (!buf) buf = (char*)malloc(contentLen + 1);
+
+                    if (buf) {
+                        int bytesRead = 0;
+                        auto streamClient = pageHttp.getStreamPtr();
+                        uint32_t startMs = millis();
+                        while ((streamClient->connected() || streamClient->available()) && bytesRead < contentLen) {
+                            int avail = streamClient->available();
+                            if (avail > 0) {
+                                int toRead = (contentLen - bytesRead > avail) ? avail : (contentLen - bytesRead);
+                                int c = streamClient->read((uint8_t*)&buf[bytesRead], toRead);
+                                if (c > 0) {
+                                    bytesRead += c;
+                                    startMs = millis();
+                                }
+                            } else {
+                                if (millis() - startMs > 15000) break;
+                                delay(10);
+                            }
+                        }
+                        buf[bytesRead] = '\0';
+
+                        JsonDocument filter;
+                        filter["tag_name"]   = true;
+                        filter["name"]      = true;
+                        filter["prerelease"] = true;
+                        filter["assets"][0]["name"] = true;
+                        filter["assets"][0]["url"]  = true;
+
+                        JsonDocument doc;
+                        DeserializationError error = deserializeJson(doc, buf, DeserializationOption::Filter(filter));
+                        free(buf);
+
+                        if (!error) {
+                            const char* tagName = doc["tag_name"] | "";
+                            const char* releaseName = doc["name"] | "";
+                            
+                            // If this is a floating tag, the actual semantic version is stored in the release title
+                            if (strncmp(tagName, "latest-", 7) == 0 && releaseName[0] != '\0') {
+                                tagName = releaseName;
+                            }
+
+                            if (tagName[0] != '\0') {
+                                FirmwareVersion candidate = parseVersionTag(tagName);
+                                if (bestTag.empty() || candidate > bestVer) {
+                                    LOG_SECURE("GITHUB", "Found newer release via floating tag: %s", tagName);
+                                    bestVer         = candidate;
+                                    bestTag         = tagName;
+                                    bestDescription = doc["name"] | "";
+                                    bestIsPre       = doc["prerelease"] | false;
+                                    bestAssetCount  = 0;
+
+                                    JsonArray assetsArray = doc["assets"].as<JsonArray>();
+                                    for (JsonObject asset : assetsArray) {
+                                        if (bestAssetCount >= MAX_RELEASE_ASSETS) break;
+                                        std::string name = asset["name"] | "";
+                                        std::string url  = asset["url"]  | "";
+                                        if (!name.empty() && !url.empty()) {
+                                            bestAssetName[bestAssetCount] = name;
+                                            bestAssetURL[bestAssetCount]  = url;
+                                            bestAssetCount++;
+                                        }
+                                    }
+                                }
+                            }
+                        } else {
+                            LOG_SECURE("GITHUB", "JSON parse error on floating tag: %s", error.c_str());
+                        }
+                    }
+                } else {
+                    LOG_SECURE("GITHUB", "Floating tag fetch returned HTTP %d (tag might not exist yet)", httpCode);
+                }
+                pageHttp.end();
             }
         }
     }
 
     // --- Step 3: Commit the best candidate to member fields ---
     if (bestTag.empty()) {
-        if (parseFailures > 0) {
-            snprintf(lastErrorMsg, sizeof(lastErrorMsg),
-                     "GitHub API responses could not be parsed (%d page(s) failed — possible network/memory issue)",
-                     parseFailures);
-        } else {
-            snprintf(lastErrorMsg, sizeof(lastErrorMsg),
-                     "No release found at or above channel floor '%s'", channel);
-        }
+        snprintf(lastErrorMsg, sizeof(lastErrorMsg),
+                 "No release found at or above channel floor '%s'", channel);
         LOG_SECURE("GITHUB", "%s", lastErrorMsg);
         return false;
     }

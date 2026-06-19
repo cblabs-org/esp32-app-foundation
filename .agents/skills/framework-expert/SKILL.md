@@ -33,7 +33,8 @@ description: >
   "gen_crt_bundle", "crt.S not found", "data_file_embed_asm",
   "setCACert", "esp_crt_bundle", "disable TLS bundle".
   Also trigger on: "version", "versioning", "semver", "dev tag",
-  "beta tag", "stable tag", "inject_version", "deploy_release",
+  "beta tag", "stable tag", "floating tag", "latest-dev", "latest-stable",
+  "O(1) polling", "inject_version", "deploy_release",
   "build gate", "tag before build", "version bump".
 ---
 
