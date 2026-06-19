@@ -175,3 +175,29 @@ With:
 3. Manual review: confirm no `base64Table`, `base64Value`, or hand-rolled
    decode loop remains in MD5Utils.cpp
 4. `grep -n "departures\|gadec\|base64Table\|base64Value" lib/MD5Utils/*` — zero hits
+
+---
+
+## Status Update
+
+| Field | Value |
+|---|---|
+| **Status** | ✅ **COMPLETE** |
+| **Completed** | 2026-06-19T17:50:00Z |
+| **Session ID** | `70a45b24-7f69-490c-9e49-2c59dedfd5b7` |
+| **Branch** | `pr-30-attribution-cleanup-wo2-md5utils-rewrite` |
+
+### Files Modified
+- `lib/MD5Utils/MD5Utils.cpp` — rewritten `base64ToHex` with `mbedtls_base64_decode()`, renamed `calculateFileMD5` locals, added `mbedtls/base64.h` include
+- `lib/MD5Utils/MD5Utils.hpp` — removed "MD5 hash" and "GitHub headers" from documentation
+- `test/test_unit/test_md5Utils/test_md5Utils.cpp` — guarded `base64ToHex` tests out of native builds (boundary expanded by caller)
+
+### Verification Results
+- `pio run -e esp32dev` — ✅ SUCCESS
+- `pio test -e native` — ✅ 560/560 passed
+- Provenance grep — ✅ zero hits for `departures`, `gadec`, `base64Table`, `base64Value`
+
+### Notes
+- Initial `#ifdef PIO_UNIT_TESTING` early-return guard was insufficient; restructured to `#ifndef`/`#else`/`#endif` to prevent compiler from parsing mbedtls symbols in native builds.
+- Boundary box expanded by caller to include test file modification after the prescribed mock broke 4 existing tests.
+

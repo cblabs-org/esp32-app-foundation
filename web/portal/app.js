@@ -235,7 +235,7 @@ document.addEventListener('DOMContentLoaded', function() {
       var tabId = 'tab-' + tab.name.toLowerCase().replace(/\s+/g, '-');
 
       // Skip WiFi, System, and Security — they're already hardcoded in HTML
-      if (tabId === 'tab-wifi' || tabId === 'tab-system' || tabId === 'tab-security') continue;
+      if (tabId === 'tab-wifi' || tabId === 'tab-system' || tabId === 'tab-security' || tabId === 'tab-credits') continue;
 
       // Create tab content div if it doesn't exist
       if (!document.getElementById(tabId)) {
@@ -451,7 +451,8 @@ document.addEventListener('DOMContentLoaded', function() {
       'screenshot.js',
       'display.js',
       'appconfig.js',
-      'auth.js'
+      'auth.js',
+      'credits.js'
     ];
 
     var loaded = 0;

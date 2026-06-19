@@ -22,10 +22,10 @@ The user is NOT gadec — gadec is a separate author (Brian).
 - **[x] [wo1-comment-cleanup](wo1-comment-cleanup/WORKORDER.md):** Remove all
   `departures-board` / `gadec` references from shipped source files. Fix the
   Gadec copyright header on test_main.cpp. 9 edits across 7 files. ✅ Merged `5cde008`
-- **[ ] [wo2-md5utils-rewrite](wo2-md5utils-rewrite/WORKORDER.md):** Replace the
+- **[x] [wo2-md5utils-rewrite](wo2-md5utils-rewrite/WORKORDER.md):** Replace the
   hand-rolled `base64ToHex` function with `mbedtls_base64_decode()`. Rename
   `calculateFileMD5` local variables to diverge from gadec naming. Verify
-  native + esp32 builds pass.
+  native + esp32 builds pass. ✅ Merged `308bbab`
 - **[ ] [wo3-credits-tab](wo3-credits-tab/WORKORDER.md):** Add a new top-level
   Credits tab to the web portal listing all open-source dependencies with
   licence + links. Stylised © icon. New `credits.js` fragment + routes.

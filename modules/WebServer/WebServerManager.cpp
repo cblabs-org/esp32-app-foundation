@@ -54,6 +54,7 @@
 #include "portal_assets/display_js.hpp"
 #include "portal_assets/appconfig_js.hpp"
 #include "portal_assets/auth_js.hpp"
+#include "portal_assets/credits_js.hpp"
 #endif
 
 #include "platform/LogShim.h"
@@ -267,6 +268,13 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors,
 
     activeServer->on("/auth.js", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
         response->setContent(auth_js_gz, auth_js_gz_len);
+        response->setContentType("application/javascript");
+        response->addHeader("Content-Encoding", "gzip");
+        return response->send();
+    });
+
+    activeServer->on("/credits.js", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
+        response->setContent(credits_js_gz, credits_js_gz_len);
         response->setContentType("application/javascript");
         response->addHeader("Content-Encoding", "gzip");
         return response->send();
