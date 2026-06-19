@@ -90,11 +90,15 @@ display) demonstrates the class of application this framework targets.
 
 ### 2.1 The Hollywood Principle — "Don't Call Us, We'll Call You"
 
+> 📖 See [Coding Patterns § Hollywood Principle](developer/coding-patterns.md) and [Architecture Overview § The Hollywood Principle](developer/architecture-overview.md#2-the-hollywood-principle) for implementation guidance.
+
 The framework owns `setup()` and `loop()`. Application code never writes these
 directly. The framework calls application code at defined extension points.
 This is what makes it an application *framework* rather than a library collection.
 
 ### 2.2 Composition Over Inheritance
+
+> 📖 See [Coding Patterns § SOLID Principles](developer/coding-patterns.md#2-solid-principles-in-the-framework) for interface composition patterns.
 
 Application modules register with the framework via interfaces. There is no
 `BaseApp` class that apps inherit from. The `Application` hub owns registered
@@ -115,6 +119,8 @@ by calling `Application.register*()` methods. This is enforced at the include-gr
 level — the CI workflow verifies no kernel header imports a module header.
 
 ### 2.5 Boot-Phase Allocation — Not Static, Not Unconstrained
+
+> 📖 See [Embedded Safety § Memory Rules](developer/embedded-safety.md#1-memory-rules) and [Architecture Overview § Two-Tier Vector Model](developer/architecture-overview.md#two-tier-vector-model--_compactandlock-lifecycle) for implementation details.
 
 The embedded instinct to "prefer static over dynamic" targets *runtime* heap
 fragmentation — the real enemy is repeated alloc/free cycles during `tick()`
@@ -148,6 +154,8 @@ timezone, OTA settings). Every default can be overridden via config or compile-t
 `#define`. Apps should work out-of-the-box on first flash.
 
 ### 2.7 Convention Over Configuration
+
+> 📖 See [Configuration System](developer/config-system.md) for the config file ownership model and directory conventions.
 
 Standard directory layout, standard module naming, and standard interface contracts
 mean the framework "just works" when conventions are followed. Developers only
@@ -186,6 +194,8 @@ a Linux-inspired layout so that file ownership is immediately self-evident:
 
 ### 2.8 Native Build Portability
 
+> 📖 See [Build System](developer/build-system.md#native-environment) and [Creating a Module § NATIVE_BUILD Compilation Guards](developer/creating-a-module.md#native_build-compilation-guards) for guard patterns.
+
 All framework code must compile on both ESP32 hardware targets and host CPU
 (x86_64/arm64) for native GoogleTest execution. This is a non-negotiable
 cross-cutting concern that affects every module.
@@ -208,6 +218,8 @@ cross-cutting concern that affects every module.
 
 ### 2.9 No Monolithic Services
 
+> 📖 See [Coding Patterns § Service Module Pattern](developer/coding-patterns.md#4-service-module-pattern-smp) for the correct inversion.
+
 Each kernel concern lives in a distinct, self-contained service module. Bundling
 multiple concerns into a single "systemManager" is explicitly prohibited.
 
@@ -218,6 +230,8 @@ multiple concerns into a single "systemManager" is explicitly prohibited.
 > 📖 **Developer Guide:** [Architecture Overview](developer/architecture-overview.md) — tutorials on the 3-tier model, boot sequence, and interface contracts.
 
 ### 3.1 Three-Tier Model
+
+> 📖 See [Architecture Overview § The 3-Tier Model](developer/architecture-overview.md#1-the-3-tier-model) for a tutorial walkthrough.
 
 ```
 ┌─────────────────────────────────────────────────────────┐
@@ -256,6 +270,8 @@ under `modules/`. Apps consume the framework via git submodule.
 
 ### 3.2 `Application` as the System Hub
 
+> 📖 See [Architecture Overview](developer/architecture-overview.md) for DI hub wiring and service accessors.
+
 `Application` is the single composition root and the central name for the framework's
 DI hub. It:
 - Owns all kernel services as member variables (deterministic lifetime, avoids heap):
@@ -277,6 +293,8 @@ an `Application*` pointer at setup and uses it to access services — it never
 constructs kernel services directly.
 
 ### 3.3 Entry Point Contract
+
+> 📖 See [Creating a Module § Module Registration](developer/creating-a-module.md#4-module-registration) for the setup pattern.
 
 The framework owns `setup()` and `loop()`. The `src/main.cpp` contains only:
 
@@ -353,6 +371,8 @@ their own config files — see each module's IConfigurable section.
 
 ### 5.1 What Is a Module
 
+> 📖 See [Creating a Module](developer/creating-a-module.md) for the step-by-step implementation tutorial.
+
 A module is an optional unit of functionality that:
 1. Implements one or more framework interfaces (`ITickable`, `iConfigurable`,
    `iDataSource`, `IStatusReporter`, `IWebContributor`, `IMcpContributor`)
@@ -384,6 +404,8 @@ All modules live under `modules/` in the monorepo alongside kernel modules.
 > concept of display boards or carousel routing.
 
 ### 5.3 Adding a Module to an App
+
+> 📖 See [Creating a Module § Module Registration](developer/creating-a-module.md#4-module-registration) for the registration pattern.
 
 Apps consume the framework via **git submodule**:
 
@@ -454,6 +476,8 @@ them. This is required for native build portability.
 
 ### 6.2 `ITickable`
 
+> 📖 See [Creating a Module § The Tick Loop](developer/creating-a-module.md#3-implementing-the-module-logic) for implementation tutorial.
+
 ```cpp
 class ITickable {
 public:
@@ -467,6 +491,8 @@ Modules use this for polling, state transitions, and heartbeat operations.
 
 ### 6.3 `iConfigurable`
 
+> 📖 See [Configuration System § The IConfigurable Interface](developer/config-system.md#2-the-iconfigurable-interface) for the full method contract.
+
 ```cpp
 class iConfigurable {
 public:
@@ -479,6 +505,8 @@ Registered via `app.registerConfigConsumer(iConfigurable*)`. Called on
 boot after config load and after any web portal config update.
 
 ### 6.4 `iDataSource`
+
+> 📖 See [Scheduling Data Fetches § The IDataSource Interface](developer/scheduling-data-fetches.md#1-the-idatasource-interface) for method signatures and scheduling tiers.
 
 ```cpp
 class iDataSource {
@@ -502,6 +530,8 @@ operations must ONLY occur inside this method.
 
 ### 6.5 `IStatusReporter`
 
+> 📖 See [Creating a Module § Choosing Your Interfaces](developer/creating-a-module.md#1-choosing-your-interfaces) for when to use `IStatusReporter`.
+
 The framework-level abstraction for cross-module status display. Any module can
 report status without depending on a concrete display implementation.
 
@@ -521,10 +551,14 @@ module is present, a `NullStatusReporter` (private nested class within
 
 ### 6.6 `IDisplayBoard` (Display Module Interface)
 
+> 📖 See [Using Optional Modules § The IDisplayBoard Interface](developer/using-optional-modules.md#the-idisplayboard-interface) for the board contract.
+
 See Section 7. This interface is defined by the display module, not the kernel.
 App display boards implement it and register with the display module directly.
 
 ### 6.7 `IWebContributor`
+
+> 📖 See [Extending the Web Portal § The IWebContributor Interface](developer/extending-the-web-portal.md#1-the-iwebcontributor-interface) for the full method walkthrough.
 
 ```cpp
 class IWebContributor {
@@ -542,6 +576,8 @@ web portal calls `registerRoutes()` on all contributors during `webServer.init()
 `GET /api/tabs` response.
 
 ### 6.8 `IMcpContributor`
+
+> 📖 See [MCP Server § Implementing IMCPContributor](developer/mcp-server.md#3-implementing-imcpcontributor) for tool registration examples.
 
 ```cpp
 class IMcpContributor {
@@ -608,6 +644,8 @@ ensuring predictable lifetime and zero heap fragmentation.
 
 ### 7.3 `IDisplayBoard` (U8G2 Variant)
 
+> 📖 See [Using Optional Modules § The IDisplayBoard Interface](developer/using-optional-modules.md#the-idisplayboard-interface) for the full interface contract.
+
 ```cpp
 class IDisplayBoard {
 public:
@@ -638,6 +676,8 @@ an **asymmetric expiry model** — different board types have different lifecycl
   is fulfilled.
 
 ### 7.4 Board Registration
+
+> 📖 See [Using Optional Modules § Sub-Object Registration](developer/using-optional-modules.md#sub-object-registration) for the registration pattern.
 
 ```cpp
 // In app setup — registering a custom board with the U8G2 display module
@@ -676,6 +716,8 @@ Activity tracking: `_lastActivityMs` updated on user interaction; sleep triggere
 after configurable timeout.
 
 ### 7.7 Widget Toolkit Architecture
+
+> 📖 See [Using Optional Modules § Display Module — Worked Example](developer/using-optional-modules.md#3-display-module--worked-example) for widget usage in practice.
 
 The widget toolkit provides composable UI building blocks for U8G2 displays.
 All widget files live within `modules/u8g2Display/widgets/`, fonts in
@@ -879,6 +921,8 @@ inactivity timer without needing application state.
 
 ### 8.1 Separation of Concerns
 
+> 📖 See [Configuration System § Config File Ownership Model](developer/config-system.md#1-config-file-ownership-model) for the ownership rules.
+
 Configuration is split across multiple JSON files on LittleFS, organised under
 the directory convention defined in §2.7:
 
@@ -900,6 +944,8 @@ the directory convention defined in §2.7:
 
 ### 8.2 Config Versioning & Schema Migration
 
+> 📖 See [Configuration System § Schema Versioning & Migrations](developer/config-system.md#4-schema-versioning--migrations) for the migration contract.
+
 Each config file includes a `configVersion` integer field. On load, the owning
 module:
 1. Reads the stored version
@@ -908,6 +954,8 @@ module:
 4. Writes the updated config with the current version
 
 ### 8.3 App Config Extension Pattern
+
+> 📖 See [Configuration System § Saving Configuration at Runtime](developer/config-system.md#7-saving-configuration-at-runtime) for the save/load pattern.
 
 The application defines its own struct and manages serialisation:
 
@@ -942,6 +990,8 @@ an EventBus-dispatched reload — **no device reboot required**.
 
 ### 8.5 JSON Memory Safety
 
+> 📖 See [Embedded Safety § StaticJsonDocument for POST Body Parsing](developer/embedded-safety.md#rule-4-staticjsondocument-for-post-body-parsing-adr-15) for memory-safe JSON patterns.
+
 **`DynamicJsonDocument` is banned project-wide.** The framework uses ArduinoJson
 v7, which replaces `StaticJsonDocument<N>` and `DynamicJsonDocument` with a
 unified `JsonDocument` type. All JSON operations use the v7 API:
@@ -963,6 +1013,8 @@ StaticJsonDocument<512> doc;  // v6 legacy — use JsonDocument instead
 
 ### 9.1 Boot State Machine
 
+> 📖 See [Architecture Overview § The Application Lifecycle](developer/architecture-overview.md#7-the-application-lifecycle) for the boot phase walkthrough.
+
 ```
 BOOTING
   │  (crypto init, display init, splash)
@@ -982,6 +1034,8 @@ BOOTING
 ```
 
 ### 9.2 `begin()` Sequence (Framework-Managed)
+
+> 📖 See [Architecture Overview § BOOT Phase](developer/architecture-overview.md#1-boot-phase) for the deterministic boot order.
 
 The framework executes boot in this deterministic order:
 
@@ -1007,6 +1061,8 @@ The framework executes boot in this deterministic order:
 Progress is reported to `IStatusReporter` at each step (visible on display if present).
 
 ### 9.3 `tick()` Sequence (Every Loop)
+
+> 📖 See [Creating a Module § The Tick Loop](developer/creating-a-module.md#the-tick-loop--injected-time) for tick implementation guidance.
 
 1. Check deferred config reload flag → reload + notify if pending
 2. WiFiManager tick (connection state machine)
@@ -1037,6 +1093,8 @@ The SPA shell (HTML/CSS/JS) is framework-owned and serves:
 
 ### 10.2 App Tab Extension
 
+> 📖 See [Extending the Web Portal § End-to-End Pattern](developer/extending-the-web-portal.md#2-end-to-end-pattern-c-to-dom) for the full tab registration walkthrough.
+
 Modules register additional tabs via `IWebContributor`:
 
 ```cpp
@@ -1054,6 +1112,8 @@ The portal shell fetches `/api/tabs` on load and dynamically builds the navigati
 Each tab's content is fetched from its registered endpoint.
 
 ### 10.3 POST Body Handling
+
+> 📖 See [Extending the Web Portal § POST Safety (ADR-15)](developer/extending-the-web-portal.md#6-post-safety-adr-15) for body cap and parsing rules.
 
 POST requests use ESPAsyncWebServer's multi-argument `server.on` with a chunk
 body callback:
@@ -1074,6 +1134,8 @@ with `deserializeJson(doc, data, len)`.
 > library version used. All body validation must be manual.
 
 ### 10.4 Static Asset Organisation
+
+> 📖 See [Extending the Web Portal § The HTML Fragment Pattern](developer/extending-the-web-portal.md#3-the-html-fragment-pattern) for LittleFS asset conventions.
 
 The portal uses a **hybrid asset model**:
 - **Framework SPA shell** — compiled into PROGMEM as gzip-compressed `const uint8_t[]`
@@ -1148,6 +1210,8 @@ uses one of three framework-mediated mechanisms:
 
 ### 11.2 EventBus (Synchronous Publish/Subscribe)
 
+> 📖 See [Event Bus § EventBus C++ API](developer/event-bus.md#1-eventbus-c-api) for the full API reference and subscription patterns.
+
 The `EventBus` is the primary mechanism for decoupled cross-module communication.
 Modules publish events by string topic; any number of subscribers receive them
 without the publisher knowing who (if anyone) is listening.
@@ -1204,6 +1268,8 @@ system boards or overlay widgets. If no display is present, the `NullStatusRepor
 (private nested class in `Application`) no-ops silently.
 
 ### 11.4 Callbacks / std::function (Point-to-Point)
+
+> 📖 See [Coding Patterns § Anti-Pattern 3: std::function Heap Fragmentation](developer/coding-patterns.md#anti-pattern-3-stdfunction-heap-fragmentation-grave-05) for why `std::function` is rejected.
 
 For tight coupling between two known kernel components (e.g., OTA manager → display),
 the framework uses typed callbacks registered at setup. This pattern is **only**
@@ -1392,6 +1458,8 @@ points:
 
 ### 12.1 Repository Topology
 
+> 📖 See [Build System § PlatformIO Environments](developer/build-system.md#1-platformio-environments) for the project structure walkthrough.
+
 The framework is a **monorepo** — kernel, optional modules, scripts, template,
 and documentation all live in a single repository.
 
@@ -1494,6 +1562,8 @@ when ready to adopt a new framework version.
 
 ### 12.4 Build Scripts
 
+> 📖 See [Build System § The Release Pipeline](developer/build-system.md#7-the-release-pipeline) for script usage in the release workflow.
+
 Build scripts ship in the framework repo under `scripts/`.
 
 | Script | Type | Purpose |
@@ -1539,6 +1609,8 @@ The framework provides `.github/workflows/ci.yml`:
 
 ### 13.1 DeviceCrypto
 
+> 📖 See [Security § Hardware Encryption (DeviceCrypto)](developer/security.md#3-hardware-encryption-devicecrypto) for the API and usage rules.
+
 The framework includes a hardware-backed cryptographic engine (`DeviceCrypto`)
 that derives a unique device key from the ESP32's hardware MAC/eFuse and uses it
 for symmetric encryption of sensitive configuration values (API tokens, passwords).
@@ -1550,6 +1622,8 @@ for symmetric encryption of sensitive configuration values (API tokens, password
   (not standard C++ library crypto)
 
 ### 13.2 KeyManager & API Key Registry
+
+> 📖 See [Security § Credential Storage (KeyManager)](developer/security.md#4-credential-storage-keymanager) for the CRUD API and storage architecture.
 
 Key and credential management is a distinct concern from configuration persistence
 and is handled by a dedicated `KeyManager` kernel component:
@@ -2092,11 +2166,15 @@ The OTA tab in the web portal (parent: "System", order: 50) provides:
 
 ### 13.4 Web Portal Security
 
+> 📖 See [Security § Web Portal & MCP Authentication](developer/security.md#6-web-portal--mcp-authentication) for the auth middleware flow.
+
 - The portal is only accessible on the local network (no cloud dependency)
 - No authentication is implemented by default (local network trust model)
 - Future: optional HTTP Basic Auth configurable via `FrameworkConfig`
 
 ### 13.5 MCP Security
+
+> 📖 See [Security § Web Portal & MCP Authentication](developer/security.md#6-web-portal--mcp-authentication) and [MCP Server § Configuration Persistence](developer/mcp-server.md#7-configuration-persistence) for read-only mode details.
 
 - `FrameworkConfig.mcpReadOnly` toggle (default `false`)
 - Each tool in `McpToolEntry` has a `bool mutatesState` metadata field (default `false`)
@@ -2130,6 +2208,8 @@ The OTA tab in the web portal (parent: "System", order: 50) provides:
 
 ### 14.2 Framework Kernel Budget
 
+> 📖 See [Performance & Optimization § RAM Budgeting](developer/performance-guide.md#2-ram-budgeting) for budgeting targets and measurement.
+
 The kernel (without any optional modules) should target:
 
 | Resource | Budget | Notes |
@@ -2139,6 +2219,8 @@ The kernel (without any optional modules) should target:
 | Heap at boot | > 120KB free | Required for WiFi stack + async web server |
 
 ### 14.3 Key Memory Rules
+
+> 📖 See [Embedded Safety § Memory Rules](developer/embedded-safety.md#1-memory-rules) for the full rule set with examples.
 
 - `WiFiClientSecure`, `HTTPClient` must NEVER be allocated on the stack in HTTPS
   operations — always heap via `std::unique_ptr<WiFiClientSecure>(new (std::nothrow) WiFiClientSecure())`
@@ -2192,6 +2274,8 @@ app.getEventBus().publish("system.heap", &heapPayload);
 The web portal's System tab consumes this directly.
 
 ### 14.5 Boot-Phase Allocation Pattern (Reference Implementation)
+
+> 📖 See [Embedded Safety § Memory Rules](developer/embedded-safety.md#1-memory-rules) and [Architecture Overview § Two-Tier Vector Model](developer/architecture-overview.md#two-tier-vector-model--_compactandlock-lifecycle) for the allocation discipline.
 
 This section documents how the two-tier vector model is implemented inside the
 `Application` hub. It is the normative reference for any contributor implementing
@@ -2509,6 +2593,8 @@ Component Manager entirely).
 
 ### 15.1 Creating a New Module
 
+> 📖 See [Creating a Module](developer/creating-a-module.md) for the complete step-by-step tutorial.
+
 A minimal module that participates in the framework tick loop:
 
 **`myModule.hpp`**
@@ -2544,6 +2630,8 @@ void MyApp::begin() {
 
 ### 15.2 Module Config File Pattern
 
+> 📖 See [Configuration System § Config File Ownership Model](developer/config-system.md#1-config-file-ownership-model) for the directory and naming conventions.
+
 All modules store config under `/mod/<modulename>.json`:
 
 ```cpp
@@ -2562,6 +2650,8 @@ void MyModule::loadConfig() {
 ```
 
 ### 15.3 Module Checklist
+
+> 📖 See [Creating a Module § Developer Checklist & Best Practices](developer/creating-a-module.md#5-developer-checklist--best-practices) for the interactive checklist.
 
 - [ ] Implements required interfaces (at minimum `ITickable`)
 - [ ] Uses `app.getStatusReporter()` for user-visible status
@@ -2599,6 +2689,8 @@ void MyModule::loadConfig() {
 
 ### 16.2 `NATIVE_BUILD` Guard Pattern
 
+> 📖 See [Creating a Module § NATIVE_BUILD Compilation Guards](developer/creating-a-module.md#native_build-compilation-guards) and [Build System § Native Environment](developer/build-system.md#native-environment) for guard strategies.
+
 All modules must compile on native (host CPU) for Tier 1 testing. The `NATIVE_BUILD`
 preprocessor define (set by `[env:native]`) controls hardware-specific code:
 
@@ -2633,6 +2725,8 @@ While littering the codebase with `#ifndef NATIVE_BUILD` guards may feel like a 
 - `McpServer::_processLine()` — direct JSON-RPC dispatch without Serial
 
 ### 16.3 Mock Strategy
+
+> 📖 See [Build System § Building and Testing](developer/build-system.md#4-building-and-testing) for test execution and mock patterns.
 
 - `MockDeviceCrypto` subclass for `encrypt()`/`decrypt()` virtual methods
 - `AsyncWebServer` dummy class in `webServer.hpp` (canonical mock — never define
