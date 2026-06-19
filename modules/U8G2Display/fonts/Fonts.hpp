@@ -13,7 +13,7 @@
  *              for generic embedded UIs.
  *
  *              Apps can define custom font arrays in their own fonts.cpp using
- *              the departures-board pattern:
+ *              the recommended pattern:
  *                1. Declare extern arrays in an app-specific fonts header.
  *                2. Define the byte arrays in a single fonts.cpp to respect ODR.
  *

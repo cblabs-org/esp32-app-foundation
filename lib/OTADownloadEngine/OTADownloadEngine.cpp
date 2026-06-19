@@ -131,7 +131,7 @@ int OTADownloadEngine::followRedirects(WiFiClient& client, HTTPClient& http,
             return -1;
         }
 
-        // Configure headers matching departures-board GitHub asset protocol
+        // Configure headers for GitHub release asset API
         http.useHTTP10(true);
         http.setTimeout(httpTimeout_);
         http.setFollowRedirects(HTTPC_DISABLE_FOLLOW_REDIRECTS);
@@ -314,7 +314,7 @@ OTAError OTADownloadEngine::downloadAndFlash(WiFiClient& client, const std::stri
     // --- Step 5: Verify ESP32 binary header ---
     WiFiClient* tcp = http.getStreamPtr();
     tcp->setTimeout(15000); // 15s — generous for flash write stalls and TLS record gaps
-    delay(200); // Brief delay to ensure stream buffer is populated (per departures-board pattern)
+    delay(200); // Brief delay to ensure stream buffer is populated
 
     if (tcp->peek() != 0xE9) {
         ESP_LOGE(TAG, "Binary header invalid — expected 0xE9, got 0x%02X", tcp->peek());

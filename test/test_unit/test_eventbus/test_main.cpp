@@ -1,11 +1,5 @@
 /*
- * Departures Board (c) 2025-2026 Gadec Software
- * Refactored for v3.0 by Matt McNeill 2026 CB Labs
- *
- * https://github.com/gadec-uk/departures-board
- *
- * This work is licensed under Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International.
- * To view a copy of this license, visit https://creativecommons.org/licenses/by-nc-sa/4.0/
+ * ESP32 App Foundation (c) 2026 CB Labs
  *
  * Module: test/test_unit/test_eventbus/test_main.cpp
  * Description: GoogleTest suite for EventBus module.

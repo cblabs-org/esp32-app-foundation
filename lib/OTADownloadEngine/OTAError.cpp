@@ -21,7 +21,7 @@
  * @brief Convert an OTAError value to a human-readable C-string.
  *
  * Uses a switch statement to map every enum value to a descriptive message.
- * Style matches the departures-board's getLastErrorString() output format.
+ * Each enum value maps to a concise descriptive message.
  *
  * @param err The error code to translate.
  * @return Null-terminated string describing the error. Never returns nullptr.

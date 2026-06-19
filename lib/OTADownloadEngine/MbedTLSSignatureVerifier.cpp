@@ -48,9 +48,8 @@ MbedTLSSignatureVerifier::~MbedTLSSignatureVerifier() {
 /**
  * @brief Parse the PEM public key and initialise the SHA-256 digest context.
  *
- * Unlike the departures-board reference (which reads a hardcoded global key),
- * this version accepts the key as a parameter for runtime injection via
- * FrameworkConfig.
+ * The key is accepted as a parameter for runtime injection via
+ * FrameworkConfig, rather than using a hardcoded global.
  */
 bool MbedTLSSignatureVerifier::begin(const char* publicKeyPem) {
     // --- Guard: reject null or empty key material ---

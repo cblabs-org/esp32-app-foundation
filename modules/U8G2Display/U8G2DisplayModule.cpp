@@ -107,7 +107,7 @@ void U8G2DisplayModule::bootstrapHardware() {
     _u8g2.begin();
 
     // --- Step 3: Configure draw mode ---
-    // These calls match the departures-board's proven init sequence.
+    // Standard U8G2 SPI display initialisation sequence.
     // setDrawColor(1) is critical — without it the display may draw
     // black-on-black (invisible) on some SSD13xx controllers.
     _u8g2.setDrawColor(1);
