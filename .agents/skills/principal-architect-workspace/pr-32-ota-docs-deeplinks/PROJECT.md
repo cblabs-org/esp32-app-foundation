@@ -2,7 +2,7 @@
 
 **Branch:** `pr-32-ota-docs-deeplinks`
 **Base:** `main`
-**Status:** ✅ **COMPLETE** — merged to `main` `768f380`, pushed to remote
+**Status:** ✅ **COMPLETE** — merged to `main` `5deb8c5`, pushed to remote · [distillation](./distillation/context_bridge.md)
 **Session:** 5ad94103
 
 ---
