@@ -14,32 +14,61 @@ public:
 };
 ```
 
+Auto-discovery: `Application::registerModule()` uses `std::is_base_of_v<IMCPContributor, T>` at compile time to detect and register contributors. No manual wiring needed.
+
 ## Registering Tools
 
-Use the `registry.addTool()` method to expose functionality.
+Use the `registry.addTool()` method. The handler signature is a **stateless function pointer** with a `void* context` parameter — never use `std::function` or capturing lambdas (GRAVE-05 heap allocation risk).
 
 ```cpp
 void MyModule::registerMCPTools(MCPToolRegistry& registry) {
-    registry.addTool(
-        "reboot_device",
-        "Restart the ESP32. Will disconnect the current session.",
-        true, // mutatesState
-        [this](const JsonObject& params) -> String {
-            // Initiate reboot
-            this->triggerReboot();
-            return "Reboot sequence initiated.";
-        }
-    );
+#ifndef NATIVE_BUILD
+    // Read-only tool
+    registry.addTool("my_get_status",
+        "Get current status of MyModule",
+        [](void* ctx, JsonObject& args, JsonObject& result) {
+            auto* self = static_cast<MyModule*>(ctx);
+            result["value"] = self->getValue();
+            result["active"] = self->isActive();
+        }, this, false);  // mutatesState = false
+
+    // Mutating tool
+    registry.addTool("my_reset",
+        "Reset MyModule to default state",
+        [](void* ctx, JsonObject& args, JsonObject& result) {
+            auto* self = static_cast<MyModule*>(ctx);
+            self->reset();
+            result["success"] = true;
+        }, this, true);   // mutatesState = true
+
+    ESP_LOGI(TAG, "Registered MCP tools: my_get_status, my_reset");
+#endif
 }
 ```
 
-## The `mutatesState` Parameter
+### `addTool` Signature
 
-The third parameter to `addTool()` is a boolean indicating whether the tool modifies device state.
+```cpp
+void addTool(
+    const char* name,           // Tool name (snake_case, unique)
+    const char* description,    // Human-readable description for agents
+    MCPToolHandler handler,     // void(*)(void*, JsonObject&, JsonObject&)
+    void* context = nullptr,    // Passed as first arg to handler (typically `this`)
+    bool mutatesState = false   // true → blocked in read-only mode
+);
+```
 
-> [!IMPORTANT]
-> Contributors MUST declare `mutatesState = true` on any tool that writes data, changes configuration, controls hardware, or triggers actions. 
+An overload accepting a `JsonDocument` schema parameter is available for tools with explicit parameter definitions (see `display_control` for an example).
 
-When the MCP server is put into **Read-Only Mode** (e.g., via the physical switch or a security policy), the `MCPServer` engine automatically intercepts and blocks any tool call where `mutatesState == true`, returning JSON-RPC error `-32000` (Server error). The module handler is never invoked.
+## Rules
 
-Tools that purely query data (e.g., `get_status`, `read_telemetry`) should set `mutatesState = false` to remain accessible in read-only mode.
+1. **Stateless lambdas only** — capture-less `[](void* ctx, ...)` that decay to function pointers. No `std::function`, no heap captures.
+2. **`void* context`** — pass `this`; cast back with `static_cast<MyModule*>(ctx)` inside the handler.
+3. **`mutatesState` flag** — set `true` for any tool that writes data, changes config, controls hardware, or triggers actions. Read-only mode automatically blocks these with JSON-RPC error `-32000`.
+4. **`#ifndef NATIVE_BUILD`** guard — if the tool uses hardware APIs not available in native test builds.
+5. **Naming** — use `module_verb` pattern (e.g., `wifi_get_status`, `ota_check_now`, `config_factory_reset`).
+6. **Logging** — end `registerMCPTools()` with an `ESP_LOGI` listing all registered tool names.
+
+## Verifying on Device
+
+After flashing, call `list_tools` via the device MCP server to confirm your tools appear. See `systems/mcp-server/overview.md` for the JSON-RPC protocol and device interaction scripts.

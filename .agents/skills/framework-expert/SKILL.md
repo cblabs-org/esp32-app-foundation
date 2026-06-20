@@ -36,6 +36,11 @@ description: >
   "beta tag", "stable tag", "floating tag", "latest-dev", "latest-stable",
   "O(1) polling", "inject_version", "deploy_release",
   "build gate", "tag before build", "version bump".
+  Also trigger on: "MCP server", "MCP tool", "device MCP", "list_tools",
+  "device diagnostics", "device IP", "system_info", "capture_display",
+  "wifi_get_status", "ota_get_status", "display_status",
+  "config_factory_reset", "readOnly mode", "JSON-RPC", "call a tool on the device",
+  "talk to the device", "query the device", "device telemetry".
 ---
 
 # Framework Expert
@@ -96,6 +101,7 @@ This skill uses a progressive disclosure model. Based on your query, load and re
 | **Event Bus** (Topics, pub/sub, custom topics) | `systems/event-bus/` |
 | **Web Portal** (SPA, routes, HTML/JS fragments, security) | `systems/web-portal/` |
 | **OTA Update System** (State machine, channels, config lifecycle, deploy) | `systems/ota/` |
+| **MCP Server** (Device interaction, JSON-RPC protocol, tool discovery, scripts) | `systems/mcp-server/` |
 | **Security** (TLS tradeoffs, credentials, OTA security, portal auth) | `security/` |
 | **PAT & Repository Config** (Token creation, repo split, blast radius) | `security/pat-management.md` |
 | **Coding Patterns** (Service Module Pattern, HOM, SOLID, modules vs libs) | `coding-patterns/` |
