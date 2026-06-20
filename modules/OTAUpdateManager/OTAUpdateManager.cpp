@@ -64,7 +64,7 @@ static constexpr const char* TAG = "OTAUpdateManager";
 #include <freertos/idf_additions.h>
 #include "../Application/Application.hpp"
 
-#include "../../lib/GithubClient/ota_root_cas.h"
+#include "../../lib/OTACerts/OTACerts.h"
 #include "../../lib/OTADownloadEngine/OTADownloadEngine.hpp"
 #include "../../lib/OTADownloadEngine/MbedTLSSignatureVerifier.hpp"
 #include "../../lib/SemVer/SemVer.hpp"
@@ -716,7 +716,7 @@ static bool downloadRawFile_(const char* url, const char* token,
         ESP_LOGE(TAG, "downloadRawFile_: WiFiClientSecure allocation failed");
         return false;
     }
-    client->setCACert(OTA_ROOT_CA_BUNDLE);
+    client->setCACert(OTA_CA_BUNDLE);
 
     HTTPClient http;
     http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
@@ -832,7 +832,7 @@ bool OTAUpdateManager::fetchAndVerifyManifest_(OTAManifest& manifest) {
     // Static buffer — only one OTA pipeline runs at a time (enforced by _state guard).
     // Saves stack headroom on the 16 KB OTA task.
     static char manifestBuf[4096];
-    uint8_t sigBuf[256];
+    uint8_t sigBuf[257];  // 256-byte ECDSA sig + 1 for null terminator appended by downloadRawFile_()
 
     for (int i = 0; i < urlCount; ++i) {
         const char* manifestUrl = urls[i];
