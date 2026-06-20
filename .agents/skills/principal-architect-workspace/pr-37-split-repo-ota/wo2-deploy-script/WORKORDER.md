@@ -152,17 +152,52 @@ Step 2 (floating tags) is deleted entirely.
 
 - [ ] The `main()` function should now:
   1. Resolve tag
-  2. Check prerequisites
-  3. Ensure tag on HEAD
-  4. Collect/build binaries
-  5. Sign firmware (interactive passphrase — print command in dry-run)
-  6. Generate hashes
-  7. Create release on `--repo` (GitHub Release with firmware assets)
-  8. `update_manifest()` — merge into git-managed manifest + sign + push
+  2. **Pre-flight gates** (see §6.5)
+  3. Check prerequisites
+  4. Ensure tag on HEAD
+  5. Collect/build binaries (**with clean** when `--build`)
+  6. Sign firmware (interactive passphrase — print command in dry-run)
+  7. Generate hashes
+  8. Create release on `--repo` (GitHub Release with firmware assets)
+  9. `update_manifest()` — merge into git-managed manifest + sign + push
 
 - [ ] The base_url for firmware download URLs should be constructed as:
   ```python
   base_url = f"https://github.com/{repo_slug}/releases/download/{tag}"
+  ```
+
+### 6.5. Add pre-flight safety gates (learned from live testing)
+
+These gates were discovered during live OTA testing and prevent version mismatches
+that cause the device to reject otherwise valid firmware:
+
+- [ ] **Gate 1 — Clean working tree:** Run `git status --porcelain` and abort if output is
+  non-empty. A dirty tree causes ESP-IDF to append `-dirty` to `esp_app_desc_t.version`
+  via `git describe --dirty`, which will never match the manifest version.
+  ```python
+  result = subprocess.run(["git", "status", "--porcelain"], capture_output=True, text=True)
+  if result.stdout.strip():
+      sys.exit("ERROR: Working tree is dirty. Commit or stash changes before deploying.")
+  ```
+
+- [ ] **Gate 2 — Tag describes HEAD:** Run `git describe --tags --exact-match HEAD` and
+  verify the output matches the `--tag` argument. When multiple tags point at HEAD,
+  `git describe` may pick a different one, causing `esp_app_desc_t.version` to diverge
+  from the manifest version.
+  ```python
+  result = subprocess.run(["git", "describe", "--tags", "--exact-match", "HEAD"], ...)
+  if result.stdout.strip() != tag:
+      sys.exit(f"ERROR: git describe returns '{result.stdout.strip()}', expected '{tag}'")
+  ```
+
+- [ ] **Gate 3 — Clean build with `--build`:** When `--build` is specified, run
+  `pio run -t clean` before `pio run`. ESP-IDF's CMake caches `PROJECT_VER` across
+  incremental builds, so a stale `esp_app_desc_t.version` can survive a rebuild
+  if the sources haven't changed.
+  ```python
+  if args.build:
+      subprocess.run(["pio", "run", "-e", env, "-t", "clean"], check=True)
+      subprocess.run(["pio", "run", "-e", env], check=True)
   ```
 
 ### 7. Verify
