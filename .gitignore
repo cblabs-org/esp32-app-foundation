@@ -57,4 +57,3 @@ include/otaSecrets.hpp
 .agents/settings.local.json
 .DS_Store
 tmp/
-version.txt
