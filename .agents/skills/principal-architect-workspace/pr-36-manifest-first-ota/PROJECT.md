@@ -158,7 +158,7 @@ Gate 3: Binary version header  → prevents flashing wrong version (esp_app_desc
 
 ## Work Order Ledger
 
-- **[ ] [wo1-manifest-v2-schema](wo1-manifest-v2-schema/WORKORDER.md):** New manifest v2 schema — struct redesign, multi-channel parser, URL fields, `generate_manifest.py` v2 output
+- **[x] [wo1-manifest-v2-schema](wo1-manifest-v2-schema/WORKORDER.md):** New manifest v2 schema — merged `b1757e9`
 - **[ ] [wo2-manifest-fetcher](wo2-manifest-fetcher/WORKORDER.md):** Manifest + sig download, signature verification, URL fallback (learned → compiled-in)
 - **[ ] [wo3-ota-pipeline-rewire](wo3-ota-pipeline-rewire/WORKORDER.md):** Rewire `performUpdateTask()` — manifest-first flow, direct channel lookup (no risk-floor on device), `FrameworkConfig` migration
 - **[ ] [wo4-deploy-script](wo4-deploy-script/WORKORDER.md):** Update `deploy_release.py` — v2 manifest generation, manifest signing, risk-floor channel scanning, fixed `ota-manifest` release upload
