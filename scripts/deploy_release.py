@@ -682,21 +682,36 @@ def parse_args() -> argparse.Namespace:
 
 
 def resolve_tag(explicit_tag: str = None) -> str:
-    """Return the release tag — from --tag or auto-detected from HEAD."""
+    """Return the release tag — from --tag or auto-detected from HEAD.
+
+    When multiple tags point at HEAD, the highest SemVer tag wins.
+    """
     if explicit_tag:
         return explicit_tag
     try:
         result = subprocess.run(
-            ["git", "describe", "--tags", "--exact-match", "HEAD"],
+            ["git", "tag", "--points-at", "HEAD"],
             capture_output=True, text=True, check=True, timeout=5,
         )
-        tag = result.stdout.strip()
-        if tag:
-            print(f"Auto-detected tag from HEAD: {tag}")
+        tags = [t.strip() for t in result.stdout.strip().splitlines() if t.strip()]
+        # Filter to SemVer tags only
+        semver_tags = []
+        for t in tags:
+            try:
+                semver_tags.append((FirmwareVersion(t), t))
+            except ValueError:
+                continue
+        if semver_tags:
+            semver_tags.sort(key=lambda x: x[0], reverse=True)
+            tag = semver_tags[0][1]
+            if len(semver_tags) > 1:
+                print(f"Multiple tags on HEAD: {[t for _, t in semver_tags]} — using highest: {tag}")
+            else:
+                print(f"Auto-detected tag from HEAD: {tag}")
             return tag
     except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError):
         pass
-    print("ERROR: No --tag provided and HEAD has no exact tag. "
+    print("ERROR: No --tag provided and HEAD has no exact SemVer tag. "
           "Tag your commit first (e.g. 'git tag v1.0.0') or pass --tag explicitly.",
           file=sys.stderr)
     sys.exit(1)
