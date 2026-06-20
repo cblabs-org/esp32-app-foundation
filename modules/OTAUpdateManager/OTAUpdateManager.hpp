@@ -8,6 +8,8 @@
  *
  * Module: modules/OTAUpdateManager/OTAUpdateManager.hpp
  * Description: Full OTA orchestrator for firmware updates via GitHub releases.
+ *              Implements IMCPContributor to expose ota_get_status,
+ *              ota_check_now, and ota_trigger_update MCP tools.
  *              Wires the OTADownloadEngine (redirect-aware download + flash),
  *              IOTAVerifier (cryptographic signature verification via MbedTLS),
  *              and GithubClient (release metadata queries) into a single,
@@ -38,6 +40,9 @@
  *   - endUpdate():            Finalize the direct OTA update
  *   - markAppValid():         Bless the running firmware, cancelling auto-rollback
  *   - rollbackFirmware():     Revert to the previous firmware partition and reboot
+ *
+ *   IMCPContributor:
+ *   - registerMCPTools():     Register ota_get_status, ota_check_now, ota_trigger_update
  *
  *   IWebContributor (tab: "OTA", parent: "System", order: 50):
  *   - registerRoutes():       Register REST API routes
@@ -93,11 +98,13 @@ class Stream {};
 #include "../../include/interfaces/IWebContributor.hpp"
 #include "../../include/interfaces/IConfigurable.hpp"
 #include "../../include/interfaces/ITickable.hpp"
+#include "../../include/interfaces/IMCPContributor.hpp"
 
 // ---------------------------------------------------------------------------
 // Forward declarations — Hollywood Principle: never include other module headers
 // ---------------------------------------------------------------------------
 class Application;
+class MCPToolRegistry;
 struct FrameworkConfig;
 class ConfigManager;
 class EventBus;
@@ -190,7 +197,7 @@ static constexpr uint32_t OTA_TASK_DRAM_HEADROOM_BYTES = 8192;
  *   - lastCheckedChannel (char[16]): Last channel used for an update check
  *   - updatesEnabled     (bool):     Master kill-switch for applying firmware updates
  */
-class OTAUpdateManager : public IWebContributor, public IConfigurable, public ITickable {
+class OTAUpdateManager : public IWebContributor, public IConfigurable, public ITickable, public IMCPContributor {
 public:
     /**
      * @brief Default constructor.
@@ -285,6 +292,20 @@ public:
      * @brief Triggers a rollback to the previous firmware partition and reboots.
      */
     void rollbackFirmware();
+
+    // -------------------------------------------------------------------------
+    // IMCPContributor Interface
+    // -------------------------------------------------------------------------
+
+    /**
+     * @brief Register OTA-specific MCP tools with the MCPToolRegistry.
+     *
+     * Registers: ota_get_status (read-only), ota_check_now (mutating),
+     * and ota_trigger_update (mutating).
+     *
+     * @param registry The MCPToolRegistry to register tools with.
+     */
+    void registerMCPTools(MCPToolRegistry& registry) override;
 
     // -------------------------------------------------------------------------
     // IWebContributor Interface

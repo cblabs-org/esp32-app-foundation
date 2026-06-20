@@ -146,7 +146,7 @@ bool Application::begin(const FrameworkConfig& config) {
     registerModule(&_configManager);      // IWebContributor
     registerModule(&_keyManager);         // IWebContributor
     registerModule(&_mcpServer);          // IConfigurable + IWebContributor
-    registerModule(_otaManager);          // ITickable + IConfigurable + IWebContributor
+    registerModule(_otaManager);          // ITickable + IConfigurable + IWebContributor + IMCPContributor
     registerModule(&_webServerManager);   // ITickable
     registerModule(&_appTabContributor);  // IWebContributor
 

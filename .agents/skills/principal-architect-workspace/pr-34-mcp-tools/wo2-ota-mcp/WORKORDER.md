@@ -28,3 +28,26 @@ Use the `platformio` MCP tools (`build_project`, `run_tests`) to compile and ver
 
 # Verification Requirement
 Compile the project using the PlatformIO MCP `build_project` tool to verify your changes. **CRITICAL:** Before distilling or committing, you MUST ask the user if they are happy. Only *after* approval should you invoke the `@distillery` skill to package the state and drop control.
+
+---
+
+# Execution Status
+
+| Field | Value |
+|---|---|
+| **Status** | ✅ COMPLETE |
+| **Worker Session** | `cb4b0b66-0ec6-4724-8772-4bc9ed63a84b` |
+| **Completed** | 2026-06-20T07:36:00+01:00 |
+| **Build Result** | SUCCESS (47.6s, esp32dev) |
+| **Iterations** | 0 (first-attempt success) |
+
+## Checklist (all items verified)
+
+- [x] In `modules/OTAUpdateManager/OTAUpdateManager.hpp`, add `public IMCPContributor` to the class inheritance.
+- [x] Add `#include <interfaces/IMCPContributor.hpp>` if necessary.
+- [x] Declare `void registerMCPTools(MCPToolRegistry& registry) override;` in the public section.
+- [x] In `modules/OTAUpdateManager/OTAUpdateManager.cpp`, implement `registerMCPTools(MCPToolRegistry& registry)`.
+- [x] Register `ota_get_status` (`mutatesState = false`) — returns state, version, channel, last_check_ms.
+- [x] Register `ota_check_now` (`mutatesState = true`) — forces GitHub check, returns update_available + latest_version.
+- [x] Register `ota_trigger_update` (`mutatesState = true`) — accepts optional version, returns status.
+

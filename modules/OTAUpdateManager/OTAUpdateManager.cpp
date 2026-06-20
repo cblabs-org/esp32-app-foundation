@@ -29,6 +29,7 @@
  *   - markAppValid():       Bless the running firmware
  *   - rollbackFirmware():   Revert to the previous firmware partition
  *   - handleSignedUpload():  Multipart upload handler with ECDSA verification
+ *   - registerMCPTools():     Register ota_get_status, ota_check_now, ota_trigger_update MCP tools
  *   - registerRoutes():     Register REST API route handlers
  *   - getConfigNamespace(): Return "ota" (IConfigurable)
  *   - getSchemaVersion():   Return 4 (IConfigurable)
@@ -68,6 +69,7 @@ static constexpr const char* TAG = "OTAUpdateManager";
 #include "../../lib/OTADownloadEngine/MbedTLSSignatureVerifier.hpp"
 #include "../../lib/SemVer/SemVer.hpp"
 #include "../../lib/OTAManifest/OTAManifest.hpp"
+#include "../../modules/MCPServer/MCPToolRegistry.hpp"
 #else
 #include <ArduinoJson.h>
 #include "../Application/Application.hpp"
@@ -1397,5 +1399,108 @@ void OTAUpdateManager::registerRoutes(PsychicHttpServer& server) {
     });
 #endif
     server.on("/api/ota/upload", HTTP_POST, otaUploadHandler);
+#endif
+}
+
+// =============================================================================
+// IMCPContributor Implementation
+// =============================================================================
+
+/**
+ * @brief Convert OTAState enum to a human-readable string.
+ *
+ * Used by ota_get_status MCP tool. Defined as a file-local helper to avoid
+ * polluting the class interface.
+ *
+ * @param state The OTAState value to convert.
+ * @return Null-terminated C-string label.
+ */
+static const char* otaStateToString(OTAState state) {
+    switch (state) {
+        case OTAState::Idle:        return "Idle";
+        case OTAState::Checking:    return "Checking";
+        case OTAState::Downloading: return "Downloading";
+        case OTAState::Verifying:   return "Verifying";
+        case OTAState::Complete:    return "Complete";
+        case OTAState::Error:       return "Error";
+        default:                    return "Unknown";
+    }
+}
+
+void OTAUpdateManager::registerMCPTools(MCPToolRegistry& registry) {
+#ifndef NATIVE_BUILD
+    // --- ota_get_status: read-only status snapshot ---
+    registry.addTool("ota_get_status", "Get OTA update manager status, firmware version, channel, and timing",
+        [](void* context, JsonObject& args, JsonObject& result) {
+            OTAUpdateManager* self = static_cast<OTAUpdateManager*>(context);
+            result["state"]         = otaStateToString(self->_state);
+            result["version"]       = BUILD_VERSION;
+            result["channel"]       = self->_channel;
+            result["last_check_ms"] = (self->_lastCheckDay > 0)
+                                     ? static_cast<long>(self->_lastCheckDay * 86400UL * 1000UL)
+                                     : 0;
+            result["auto_check"]     = self->_autoCheck;
+            result["updates_enabled"] = self->_updatesEnabled;
+            if (self->_lastOtaError) {
+                result["last_error"] = self->_lastOtaError;
+            }
+        }, this, false);
+
+    // --- ota_check_now: force a GitHub release check ---
+    registry.addTool("ota_check_now", "Force an immediate OTA update check against GitHub releases",
+        [](void* context, JsonObject& args, JsonObject& result) {
+            OTAUpdateManager* self = static_cast<OTAUpdateManager*>(context);
+
+            // Reset error state if stuck — allows re-check after transient failure
+            if (self->_state == OTAState::Error) {
+                self->_state = OTAState::Idle;
+                self->_lastOtaError = nullptr;
+            }
+
+            if (self->_state != OTAState::Idle) {
+                result["update_available"] = false;
+                result["latest_version"]   = "";
+                result["error"]            = "OTA pipeline is busy";
+                return;
+            }
+
+            bool available = self->checkForUpdate();
+            result["update_available"] = available;
+            result["latest_version"]   = BUILD_VERSION;  // Local version (remote not stored)
+        }, this, true);
+
+    // --- ota_trigger_update: begin the full OTA pipeline ---
+    {
+        JsonDocument schema;
+        JsonObject props = schema["properties"].to<JsonObject>();
+        props["version"]["type"] = "string";
+        props["version"]["description"] = "Optional target version string (reserved for future use)";
+        schema["type"] = "object";
+
+        registry.addTool("ota_trigger_update",
+            "Trigger the full OTA download, verify, and flash pipeline",
+            schema,
+            [](void* context, JsonObject& args, JsonObject& result) {
+                OTAUpdateManager* self = static_cast<OTAUpdateManager*>(context);
+
+                // Reset error state if stuck
+                if (self->_state == OTAState::Error) {
+                    self->_state = OTAState::Idle;
+                    self->_lastOtaError = nullptr;
+                }
+
+                if (self->_state != OTAState::Idle) {
+                    result["status"] = "OTA pipeline is busy";
+                    return;
+                }
+
+                // Note: 'version' param accepted but not consumed yet.
+                // The pipeline always targets the latest release for the
+                // configured channel. Version-pinned OTA is a future feature.
+                self->_silentCheck = false;
+                self->performUpdate();
+                result["status"] = "Update initiated";
+            }, this, true);
+    }
 #endif
 }
