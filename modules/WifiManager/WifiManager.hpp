@@ -82,6 +82,7 @@ private:
 #include "../../include/interfaces/ITickable.hpp"
 #include "../../include/interfaces/IConfigurable.hpp"
 #include "../../include/interfaces/IWebContributor.hpp"
+#include "../../include/interfaces/IMCPContributor.hpp"
 
 #ifndef NATIVE_BUILD
 class DNSServer;
@@ -108,9 +109,10 @@ class KeyManager;
 /**
  * @brief Class managing WiFi connectivity and configuration.
  *        Implements ITickable for state machine, IConfigurable for persistent config
- *        (via ConfigManager gateway), and IWebContributor for REST API endpoints.
+ *        (via ConfigManager gateway), IWebContributor for REST API endpoints,
+ *        and IMCPContributor for MCP tools.
  */
-class WifiManager : public ITickable, public IConfigurable, public IWebContributor {
+class WifiManager : public ITickable, public IConfigurable, public IWebContributor, public IMCPContributor {
 private:
     /**
      * @brief High-level states for the WiFi connection state machine.
@@ -269,6 +271,14 @@ public:
      * @return 10
      */
     int getTabOrder() const override { return 10; }
+
+    // --- IMCPContributor Interface ---
+
+    /**
+     * @brief Register MCP tools for WiFi management
+     * @param registry Reference to the tool registry
+     */
+    void registerMCPTools(MCPToolRegistry& registry) override;
 
     // --- Custom Methods ---
 

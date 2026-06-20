@@ -28,3 +28,15 @@ Use the `platformio` MCP tools (`build_project`, `run_tests`) to compile and ver
 
 # Verification Requirement
 Compile the project using the PlatformIO MCP `build_project` tool to verify your changes. **CRITICAL:** Before distilling or committing, you MUST ask the user if they are happy. Only *after* approval should you invoke the `@distillery` skill to package the state and drop control.
+
+# Status Update
+**Date:** 2026-06-20
+**Status:** COMPLETE
+**Notes:** 
+- Successfully implemented `IMCPContributor` on `WifiManager`.
+- Registered `wifi_get_status`, `wifi_scan_networks`, and `wifi_forget`.
+- Addressed stateless lambda requirements for `MCPToolRegistry` to avoid heap allocations.
+- AP-mode specific handling applied to `wifi_get_status` to ensure correct metrics.
+- Added `IMCPContributor` to the module registration comment in `Application.cpp`.
+- Compilation successfully verified using `platformio build_project` MCP tool.
+- Distillery payload successfully extracted to `context_artifacts/`.

@@ -41,6 +41,7 @@
 #include "WifiManager.hpp"
 #include "../ConfigManager/ConfigManager.hpp"
 #include "../KeyManager/KeyManager.hpp"
+#include "../MCPServer/MCPToolRegistry.hpp"
 
 #ifndef NATIVE_BUILD
 #include <PsychicHttp.h>
@@ -434,6 +435,79 @@ void WifiManager::registerRoutes(PsychicHttpServer& server) {
             return this->handleForget(request, response);
         }
     );
+#endif
+}
+
+// =============================================================================
+// IMCPContributor Implementation
+// =============================================================================
+
+void WifiManager::registerMCPTools(MCPToolRegistry& registry) {
+#ifndef NATIVE_BUILD
+    registry.addTool("wifi_get_status", "Get current WiFi connection status and diagnostics",
+        [](void* context, JsonObject& args, JsonObject& result) {
+            WifiManager* self = static_cast<WifiManager*>(context);
+            if (self->_isAPMode) {
+                result["connected"] = false;
+                result["ip"] = WiFi.softAPIP().toString();
+                result["gateway"] = "";
+                result["subnet"] = "";
+                result["rssi"] = 0;
+                result["bssid"] = "";
+                result["ap_mode"] = true;
+            } else {
+                result["connected"] = (WiFi.status() == WL_CONNECTED);
+                result["ip"] = WiFi.localIP().toString();
+                result["gateway"] = WiFi.gatewayIP().toString();
+                result["subnet"] = WiFi.subnetMask().toString();
+                result["rssi"] = WiFi.RSSI();
+                result["bssid"] = WiFi.BSSIDstr();
+                result["ap_mode"] = false;
+            }
+        }, this, false);
+
+    registry.addTool("wifi_scan_networks", "Force a WiFi scan and return discovered networks",
+        [](void* context, JsonObject& args, JsonObject& result) {
+            WifiManager* self = static_cast<WifiManager*>(context);
+            if (self->_isAPMode) {
+                WiFi.mode(WIFI_AP_STA);
+            }
+            int16_t count = WiFi.scanNetworks(false);
+            if (count < 0) {
+                result["error"] = "Scan failed";
+            } else {
+                JsonArray networks = result["networks"].to<JsonArray>();
+                for (int16_t i = 0; i < count && i < MAX_SCAN_RESULTS; ++i) {
+                    JsonObject net = networks.add<JsonObject>();
+                    net["ssid"] = WiFi.SSID(i);
+                    net["rssi"] = WiFi.RSSI(i);
+                    net["secure"] = (WiFi.encryptionType(i) != WIFI_AUTH_OPEN);
+                }
+                WiFi.scanDelete();
+            }
+            if (self->_isAPMode) {
+                WiFi.mode(WIFI_AP);
+            }
+        }, this, true);
+
+    registry.addTool("wifi_forget", "Erase WiFi credentials and restart to AP mode",
+        [](void* context, JsonObject& args, JsonObject& result) {
+            WifiManager* self = static_cast<WifiManager*>(context);
+            memset(self->_wifiSsid, 0, sizeof(self->_wifiSsid));
+            memset(self->_wifiPass, 0, sizeof(self->_wifiPass));
+
+            if (self->_keyManager != nullptr) {
+                self->_keyManager->deleteKey("wifi_password");
+            }
+
+            if (self->_configManager != nullptr) {
+                self->_configManager->saveModuleConfig(self);
+            }
+
+            WiFi.disconnect(true, true);
+            self->scheduleRestart();
+            result["success"] = true;
+        }, this, true);
 #endif
 }
 
