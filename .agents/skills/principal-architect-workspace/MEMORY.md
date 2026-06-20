@@ -70,6 +70,8 @@ predate the formal PA pipeline and are filed retrospectively.
 | [pr-31-docs-cleanup](./pr-31-docs-cleanup/PROJECT.md) | Legacy Docs Cleanup (archive 3 reports, merge & retire build guide, fix stale MCP API, add PAT + TLS optimization sections, update indexes) | ✅ **MERGED** `640eb4f` — 9 files, +234/-521 | Session 5ad94103 |
 | [pr-32-ota-docs-deeplinks](./pr-32-ota-docs-deeplinks/PROJECT.md) | OTA Guide Migration + Design Spec Deep Links (OTA→developer tree, skill OTA system tree, 64 deep links in design spec) | ✅ **MERGED** `5deb8c5` — 3 WOs, OTA migrated, 64 deep links · [distillation](./pr-32-ota-docs-deeplinks/distillation/context_bridge.md) | Session 5ad94103 |
 | [pr-33-portal-ux-consistency](./pr-33-portal-ux-consistency/PROJECT.md) | Web Portal UX Consistency — Reboot Overlays & Save Policies (universal reboot overlay component, reconnection polling, context-aware messages, save policy formalisation, Playwright tests) | 📋 **PLANNING** — 3 WOs defined, awaiting user approval | Current Session |
+| [pr-34-mcp-tools](./pr-34-mcp-tools/PROJECT.md) | Module-Specific MCP Tools (domain-specific JSON-RPC tools for Wifi, OTA, Display, Config) | ✅ **COMPLETE** — 8 new tools, hardware-verified `v0.0.11-dev.15`, [distilled](./pr-34-mcp-tools/context_bridge.md) | 2026-06-20 |
+| [pr-35-weather-station](./pr-35-weather-station/PROJECT.md) | Weather Station & Home Assistant Module (esp-mqtt wrapper, HOM entities, Web Portal, U8G2 composable widgets) | 📋 **PLANNING** — 5 WOs defined (WO0–WO4), ready for execution workers | Current Session |
 
 ---
 
@@ -92,8 +94,155 @@ predate the formal PA pipeline and are filed retrospectively.
 
 - [TimeManager Upgrade Port](./pr-time-manager-upgrade/PROJECT.md)
 
+
 ---
 
-*Updated: 2026-06-07 — context_archives migrated into PA workspace; pr-14 marked COMPLETE*
-| [pr-34-mcp-tools](./pr-34-mcp-tools/PROJECT.md) | Module-Specific MCP Tools (domain-specific JSON-RPC tools for Wifi, OTA, Display, Config) | ✅ **COMPLETE** — 8 new tools, hardware-verified `v0.0.11-dev.15`, [distilled](./pr-34-mcp-tools/context_bridge.md) | 2026-06-20 |
-| [pr-35-weather-station](./pr-35-weather-station/PROJECT.md) | Weather Station & Home Assistant Module (esp-mqtt wrapper, HOM entities, Web Portal, U8G2 composable widgets) | 📋 **PLANNING** — 5 WOs defined (WO0–WO4), ready for execution workers | Current Session |
+## Subsystem Index
+
+Cross-reference of projects by topic area. Use this to find all history,
+decisions, and rejected approaches related to a given subsystem — rather than
+scanning the entire Projects Registry chronologically.
+
+> [!TIP]
+> When starting work on a subsystem, read the PROJECT.md and context_bridge.md
+> files linked below to load the full design history before writing any code.
+> When adding a new project to the Projects Registry, also tag it in the
+> relevant subsystem rows below.
+
+---
+
+### OTA (Over-the-Air Updates)
+
+| Project | Scope | Key Artefacts |
+|---|---|---|
+| [pr-09](./pr-09-ota-security/PROJECT.md) | Verifier + download engine + manager upgrade | PROJECT.md |
+| [pr-14](./pr-14-ota-production/PROJECT.md) | SemVer, channels, multi-arch, rollback, config lifecycle, CI/CD | [distillation](./pr-14-ota-production/distillation/context_bridge.md) |
+| [pr-21](./pr-21-ota-task-hardening/PROJECT.md) | Heap guard, PSRAM stack alloc, portal low-memory warning | PROJECT.md |
+| [pr-26](./pr-26-ota-pagination/PROJECT.md) | Paginated release scanner, PSRAM buffers, BSS chunk, deprecation cleanup | [distillation](./pr-26-ota-pagination/context_bridge.md) |
+| [pr-34](./pr-34-mcp-tools/PROJECT.md) | `ota_get_status`, `ota_check_now`, `ota_trigger_update` MCP tools + `last_check_ms` fix | [distillation](./pr-34-mcp-tools/context_bridge.md) |
+| [adhoc-ota-docs-hotfix](./adhoc-ota-docs-hotfix/context_bridge.md) | `build_and_release_process.md`, Wi-Fi gate, `_silentCheck`, channel risk-floor | context_bridge |
+
+### Display & UI
+
+| Project | Scope | Key Artefacts |
+|---|---|---|
+| [pr-05](./pr-05-display-module/PROJECT.md) | U8G2 module, carousel engine, board slot pool, system boards | PROJECT.md |
+| [pr-05a](./pr-05a-widget-toolkit/PROJECT.md) | Composable widget system — iGfxWidget, drawingPrimitives, U8g2StateSaver | PROJECT.md |
+| [pr-13](./pr-13-test-app/PROJECT.md) | DiagnosticsBoard + display lifecycle fixes | PROJECT.md |
+| [pr-17](./pr-17-display-refactor/PROJECT.md) | CarouselEngine, BoardCatalog, ScreensaverController, remove Application* coupling | PROJECT.md |
+| [pr-18](./pr-18-screensaver-settings/PROJECT.md) | Screensaver config, MCP tools, web portal Display tab | PROJECT.md |
+| [pr-23](./pr-23-display-tab/PROJECT.md) | Module-owned Display bottom-nav tab, Settings + Screenshot sub-pills | PROJECT.md |
+| [adhoc-screensaver-twdt](./adhoc-screensaver-twdt/context_bridge.md) | TWDT crash at 313 s — `vTaskDelay` fix, `setPowerSave(1)`, `localtime_r` thread safety | context_bridge |
+
+### Web Portal
+
+| Project | Scope | Key Artefacts |
+|---|---|---|
+| [pr-04](./esp32-app-foundation/PROGRAM-PLAN.md#pr-04) | Base SPA + API layer (ESPAsyncWebServer + REST) | PROGRAM-PLAN §PR-04 |
+| [pr-08](./pr-08-mcp-web-transport/PROJECT.md) | MCP HTTP web transport | PROJECT.md |
+| [pr-15](./pr-15-web-testing/PROJECT.md) | Mock server + Playwright + build gate | PROJECT.md |
+| [pr-16](./pr-16-backup-overhaul/PROJECT.md) | Backup route fix, `_meta` envelope, streaming response | PROJECT.md |
+| [pr-22](./pr-22-portal-ui-consistency/PROJECT.md) | Screensaver toggle fix, Advanced drawer standardisation | [distillation](./pr-22-portal-ui-consistency/context_bridge.md) |
+| [pr-23](./pr-23-display-tab/PROJECT.md) | Display tab JS migration, Settings + Screenshot sub-pills | PROJECT.md |
+| [pr-24](./pr-24-portal-mcp-auth/PROJECT.md) | AuthManager, session cookie, Security top-level tab | [distillation](./pr-24-portal-mcp-auth/context_bridge.md) |
+| [adhoc-app-tab-rules-bug](./adhoc-app-tab-rules-bug/context_bridge.md) | App tab config wiring (clock font size) | context_bridge |
+
+### Config System
+
+| Project | Scope | Key Artefacts |
+|---|---|---|
+| pr-02 WO2 | ConfigManager — LittleFS `etc/config.json`, versioning, `requestReload()` | [PROGRAM-PLAN §PR-02](./esp32-app-foundation/PROGRAM-PLAN.md#pr-02) |
+| [pr-11](./pr-11-config-gateway/PROJECT.md) | ConfigManager-as-Gateway, iConfigurable redesign, migration orchestration | PROJECT.md |
+| [pr-16](./pr-16-backup-overhaul/PROJECT.md) | Backup route, `_meta` envelope, OTA IConfigurable, streaming | PROJECT.md |
+| [pr-20](./pr-20-config-refactor/PROJECT.md) | FrameworkConfig refactor — 5 runtime defaults → module `resetConfig()`; FrameworkConfig = 3 OTA secrets | [distillation](./pr-20-config-refactor/context_bridge.md) |
+| [pr-34](./pr-34-mcp-tools/PROJECT.md) | `config_get_schema_version`, `config_factory_reset` MCP tools | [distillation](./pr-34-mcp-tools/context_bridge.md) |
+| [adhoc-app-tab-rules-bug](./adhoc-app-tab-rules-bug/context_bridge.md) | `appconfig.js` scope unclear, stash pending | context_bridge |
+
+### Security, Authentication & TLS
+
+| Project | Scope | Key Artefacts |
+|---|---|---|
+| [pr-09](./pr-09-ota-security/PROJECT.md) | OTA verifier + download engine security | PROJECT.md |
+| [pr-24](./pr-24-portal-mcp-auth/PROJECT.md) | AuthManager, EC P-256 self-signed cert, session cookie, bearer token, Security tab | [distillation](./pr-24-portal-mcp-auth/context_bridge.md) |
+| [pr-27](./pr-27-security-mcp-docs/PROJECT.md) | `security.md` + `mcp-server.md` developer documentation | PROJECT.md |
+| [pr-28](./pr-28-compliance-safety/PROJECT.md) | bare new→nothrow, TWDT, task DRAM caps, `std::function` elimination, `WiFiClientSecure` heap alloc | PROJECT.md |
+| [pr-29](./pr-29-tls-optimization/PROJECT.md) | mbedTLS sdkconfig tuning — dynamic buffers, cert bundle NONE, feature pruning | PROJECT.md |
+| [adhoc-boot-wifi-bugfixes](./adhoc-boot-wifi-bugfixes/context_bridge.md) | PKCS7 padding corruption → AUTH_EXPIRE | context_bridge |
+
+### MCP Server
+
+| Project | Scope | Key Artefacts |
+|---|---|---|
+| [pr-05b](./pr-05b-mcp-server/PROJECT.md) | JSON-RPC server, IMcpContributor, Serial transport, foundation tools | PROJECT.md |
+| [pr-08](./pr-08-mcp-web-transport/PROJECT.md) | HTTP web transport for MCP | PROJECT.md |
+| [pr-18](./pr-18-screensaver-settings/PROJECT.md) | Screensaver MCP tools | PROJECT.md |
+| [pr-24](./pr-24-portal-mcp-auth/PROJECT.md) | MCP bearer token auth + TLS | [distillation](./pr-24-portal-mcp-auth/context_bridge.md) |
+| [pr-27](./pr-27-security-mcp-docs/PROJECT.md) | `mcp-server.md` developer docs | PROJECT.md |
+| [pr-34](./pr-34-mcp-tools/PROJECT.md) | 8 module-contributed tools (WiFi, OTA, Config, Display), `last_check_ms` fix, skill updates | [distillation](./pr-34-mcp-tools/context_bridge.md) |
+
+### Architecture & Framework Design
+
+| Project | Scope | Key Artefacts |
+|---|---|---|
+| [pr-00 genesis](./pr-00-genesis/PROJECT.md) | 17 ADRs, design spec, rejected approaches | [WO1 bridge](./pr-00-genesis/wo1-architecture-design/context_bridge.md), [WO2 bridge](./pr-00-genesis/wo2-framework-selection/context_bridge.md) |
+| [pr-01](./pr-01-kernel-interfaces/PROJECT.md) | Application hub, two-tier vector, interfaces | PROJECT.md |
+| [pr-12](./pr-12-state-machine/PROJECT.md) | Boot → Configure ↔ Running, ConfiguringStatusBoard | PROJECT.md |
+| [pr-17](./pr-17-display-refactor/PROJECT.md) | CarouselEngine OO refactoring, remove Application* coupling | PROJECT.md |
+| [pr-25](./pr-25-framework-docs-skill/PROJECT.md) | Extensibility refinements, registerModule, ITickable signature | PROJECT.md |
+| [adhoc-oo-expert-review](./adhoc-oo-expert-review/context_bridge.md) | OO architecture review, ConfigManager locked-vector, compliance scorecard | context_bridge |
+| [Chief Architect](./esp32-app-foundation/context_bridge.md) | Program-level ADRs, sequencing decisions | [ADRs](./esp32-app-foundation/context_artifacts/adr_program_decisions.md), [Graveyard](./esp32-app-foundation/context_artifacts/graveyard_rejected_approaches.md) |
+
+### Memory & Performance
+
+| Project | Scope | Key Artefacts |
+|---|---|---|
+| [pr-10](./pr-10-firmware-optimization/PROJECT.md) | sdkconfig + compiler + library audit for firmware size | PROJECT.md |
+| [pr-21](./pr-21-ota-task-hardening/PROJECT.md) | Heap guard, PSRAM stack alloc | PROJECT.md |
+| [pr-26](./pr-26-ota-pagination/PROJECT.md) | PSRAM buffers, BSS chunk allocation | [distillation](./pr-26-ota-pagination/context_bridge.md) |
+| [pr-29](./pr-29-tls-optimization/PROJECT.md) | mbedTLS dynamic buffers, cert bundle NONE | PROJECT.md |
+
+### Build, CI & sdkconfig
+
+| Project | Scope | Key Artefacts |
+|---|---|---|
+| [pr-06](./pr-06-build-infra/PROJECT.md) | Build scripts, PlatformIO, CI workflows | PROJECT.md |
+| [pr-10](./pr-10-firmware-optimization/PROJECT.md) | Firmware size optimization | PROJECT.md |
+| [pr-19](./pr-19-sdkconfig-layering/PROJECT.md) | Base+delta layering, fix PSRAM regression, build guard | PROJECT.md |
+
+### Testing Infrastructure
+
+| Project | Scope | Key Artefacts |
+|---|---|---|
+| [pr-05c](./pr-05c-test-hardening/PROJECT.md) | Coverage expansion across all modules | PROJECT.md |
+| [pr-13](./pr-13-test-app/PROJECT.md) | Foundation test app, DiagnosticsBoard | PROJECT.md |
+| [pr-15](./pr-15-web-testing/PROJECT.md) | Mock server + Playwright + build gate | PROJECT.md |
+
+### WiFi & Networking
+
+| Project | Scope | Key Artefacts |
+|---|---|---|
+| pr-02 WO4 | WiFi + captive portal, AppState transitions | [PROGRAM-PLAN §PR-02](./esp32-app-foundation/PROGRAM-PLAN.md#pr-02) |
+| [pr-34](./pr-34-mcp-tools/PROJECT.md) | `wifi_get_status`, `wifi_scan_networks`, `wifi_forget` MCP tools | [distillation](./pr-34-mcp-tools/context_bridge.md) |
+| [adhoc-boot-wifi-bugfixes](./adhoc-boot-wifi-bugfixes/context_bridge.md) | PKCS7 padding → AUTH_EXPIRE; WiFi wizard modal; `%zu` Newlib nano printf | context_bridge |
+
+### Crypto & Key Management
+
+| Project | Scope | Key Artefacts |
+|---|---|---|
+| pr-02 WO1/WO3 | deviceCrypto (AES-256, MAC key derivation) + keyManager (encrypted registry) | [PROGRAM-PLAN §PR-02](./esp32-app-foundation/PROGRAM-PLAN.md#pr-02) |
+| [pr-03](./esp32-app-foundation/PROGRAM-PLAN.md#pr-03) | KeyManager as part of Data Infrastructure | PROGRAM-PLAN §PR-03 |
+
+### Documentation & Developer Experience
+
+| Project | Scope | Key Artefacts |
+|---|---|---|
+| [pr-07](./pr-07-template-repo/PROJECT.md) | App template repository | PROJECT.md |
+| [pr-25](./pr-25-framework-docs-skill/PROJECT.md) | 51-file skill + 12 human docs + compliance audit guide | PROJECT.md |
+| [pr-27](./pr-27-security-mcp-docs/PROJECT.md) | `security.md` (338 lines) + `mcp-server.md` (283 lines) | PROJECT.md |
+| [pr-34](./pr-34-mcp-tools/PROJECT.md) | `device-mcp-client` skill rewrite + `framework-expert` MCP system docs | [distillation](./pr-34-mcp-tools/context_bridge.md) |
+| [adhoc-ota-docs-hotfix](./adhoc-ota-docs-hotfix/context_bridge.md) | `build_and_release_process.md` | context_bridge |
+
+---
+
+*Updated: 2026-06-20 — ported Subsystem Index from bisect workspace; added PR-34 to OTA, MCP Server, Config, WiFi, Docs subsystems*
+
