@@ -49,3 +49,12 @@ Read the project plan for the full URL resilience design and verification rules:
 
 # Verification Requirement
 Compile the project using the PlatformIO MCP `build_project` tool. The method won't be called yet (WO3 wires it), but it must compile cleanly. **CRITICAL:** Before distilling or committing, you MUST ask the user if they are happy. Only *after* approval should you invoke the `@distillery` skill to package the state and drop control.
+
+# Status Update
+
+**Status:** ✅ COMPLETE — 2026-06-20T11:30:00Z
+**Commit:** `928466e` on branch `pr-36-manifest-first-ota-wo2-manifest-fetcher`
+**Build:** esp32dev ✅ | esp32s3nano ✅
+**Session:** `6db97e3f-4513-413e-a1df-e6194eb1b11f`
+
+All checklist items implemented. `fetchAndVerifyManifest_()` compiles cleanly but is not yet wired into the pipeline (WO3). Legacy pipeline shims applied to resolve pre-existing v1→v2 compile errors. Distillery output saved to `context_bridge.md` + `context_artifacts/`.
