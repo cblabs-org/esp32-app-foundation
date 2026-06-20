@@ -11,4 +11,9 @@
 
 ## Summary
 
-**8 new MCP tools** added across 3 modules (WifiManager, OTAUpdateManager, ConfigManager). 1 module (U8G2DisplayModule) already satisfied. All builds verified green on `esp32dev` and/or `esp32s3nano`.
+**8 new MCP tools** added across 3 modules (WifiManager, OTAUpdateManager, ConfigManager). 1 module (U8G2DisplayModule) already satisfied. All builds verified green on `esp32dev` and/or `esp32s3nano`. Hardware-verified on device at `v0.0.11-dev.15` — 9/9 read-only tools passing.
+
+## Distillation
+
+Full architect distillation: [context_bridge.md](./context_bridge.md)
+
