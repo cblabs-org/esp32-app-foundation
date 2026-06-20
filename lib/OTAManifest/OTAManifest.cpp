@@ -7,14 +7,19 @@
  * To view a copy of this license, visit https://creativecommons.org/licenses/by-nc-sa/4.0/
  *
  * Library: lib/OTAManifest/OTAManifest.cpp
- * Description: Implementation of the multi-architecture OTA manifest parser.
- *              Uses ArduinoJson to deserialise manifest.json and populates
- *              stack-allocated OTAManifest/OTAAsset structs. No heap allocation
- *              beyond ArduinoJson's own document pool.
+ * Description: Implementation of the multi-channel OTA manifest parser (v2).
+ *              Uses ArduinoJson to deserialise the v2 manifest.json schema
+ *              and populates stack-allocated OTAManifest/OTAChannel/OTAAsset
+ *              structs. No heap allocation beyond ArduinoJson's own document
+ *              pool.
+ *
+ *              The v2 manifest with 4 channels × 4 boards requires approximately
+ *              4 KB. The JsonDocument should be sized to at least 4096 bytes.
  *
  * Exported Functions:
- * - parseManifest():     Deserialise raw JSON into an OTAManifest struct
- * - findAssetForBoard(): Linear scan for a board-matching asset
+ * - parseManifest():     Deserialise raw JSON into an OTAManifest struct (v2 schema)
+ * - findChannel():       Linear scan for a channel-matching entry
+ * - findAssetForBoard(): Linear scan for a board-matching asset within a channel
  */
 
 #include "OTAManifest.hpp"
@@ -22,11 +27,14 @@
 #include <cstring>
 
 /**
- * @brief Parse a raw JSON buffer into an OTAManifest struct.
+ * @brief Parse a raw JSON buffer into an OTAManifest struct (v2 schema).
  *
- * Allocates a JsonDocument on the stack (~1024 bytes). Iterates the
- * "assets" array and copies up to kMaxBoards entries into the output
- * struct using strlcpy for safe null-terminated string copies.
+ * Allocates a JsonDocument on the stack. Reads top-level fields
+ * (manifestVersion, manifestUrl), then iterates the "channels" object.
+ * Each channel key becomes an OTAChannel entry with version,
+ * securityVersion, channel name, and its assets array. Copies up to
+ * kMaxChannels channels and kMaxBoards assets per channel using strlcpy
+ * for safe null-terminated string copies.
  *
  * @param json    Pointer to the raw JSON buffer.
  * @param jsonLen Length of the JSON buffer in bytes.
@@ -43,63 +51,104 @@ bool parseManifest(const char* json, size_t jsonLen, OTAManifest& out) {
         return false;
     }
 
-    // --- Copy top-level fields ---
-    const char* version = doc["version"] | "";
-    strlcpy(out.version, version, sizeof(out.version));
+    // --- Top-level fields ---
+    out.manifestVersion = doc["manifestVersion"] | 0u;
 
-    const char* channel = doc["channel"] | "";
-    strlcpy(out.channel, channel, sizeof(out.channel));
+    const char* manifestUrl = doc["manifestUrl"] | "";
+    strlcpy(out.manifestUrl, manifestUrl, sizeof(out.manifestUrl));
 
-    out.securityVersion = doc["securityVersion"] | 0u;
-
-    // --- Iterate assets array ---
-    JsonArray assets = doc["assets"];
-    if (assets.isNull()) {
-        // No assets key or null — valid manifest with zero assets
-        out.assetCount = 0;
+    // --- Iterate channels object ---
+    JsonObject channels = doc["channels"];
+    if (channels.isNull()) {
+        // No channels key or null — valid manifest with zero channels
+        out.channelCount = 0;
         return true;
     }
 
-    uint8_t count = 0;
-    for (JsonObject asset : assets) {
-        if (count >= kMaxBoards) {
-            break;  // Silently cap at kMaxBoards — no overflow
+    uint8_t channelIdx = 0;
+    for (JsonPair kv : channels) {
+        if (channelIdx >= kMaxChannels) {
+            break;  // Silently cap at kMaxChannels — no overflow
         }
 
-        OTAAsset& entry = out.assets[count];
+        OTAChannel& ch = out.channels[channelIdx];
 
-        const char* board     = asset["board"]     | "";
-        const char* firmware  = asset["firmware"]  | "";
-        const char* signature = asset["signature"] | "";
-        const char* sha256    = asset["sha256"]    | "";
+        // Channel name comes from the JSON object key
+        strlcpy(ch.name, kv.key().c_str(), sizeof(ch.name));
 
-        strlcpy(entry.board,     board,     sizeof(entry.board));
-        strlcpy(entry.firmware,  firmware,  sizeof(entry.firmware));
-        strlcpy(entry.signature, signature, sizeof(entry.signature));
-        strlcpy(entry.sha256,    sha256,    sizeof(entry.sha256));
+        JsonObject channelObj = kv.value();
 
-        entry.size = asset["size"] | 0u;
+        const char* version = channelObj["version"] | "";
+        strlcpy(ch.version, version, sizeof(ch.version));
 
-        count++;
+        ch.securityVersion = channelObj["securityVersion"] | 0u;
+
+        // --- Iterate assets array within this channel ---
+        JsonArray assets = channelObj["assets"];
+        uint8_t assetIdx = 0;
+        if (!assets.isNull()) {
+            for (JsonObject asset : assets) {
+                if (assetIdx >= kMaxBoards) {
+                    break;  // Silently cap at kMaxBoards — no overflow
+                }
+
+                OTAAsset& entry = ch.assets[assetIdx];
+
+                const char* board        = asset["board"]        | "";
+                const char* firmwareUrl  = asset["firmwareUrl"]  | "";
+                const char* signatureUrl = asset["signatureUrl"] | "";
+                const char* sha256       = asset["sha256"]       | "";
+
+                strlcpy(entry.board,        board,        sizeof(entry.board));
+                strlcpy(entry.firmwareUrl,   firmwareUrl,  sizeof(entry.firmwareUrl));
+                strlcpy(entry.signatureUrl,  signatureUrl, sizeof(entry.signatureUrl));
+                strlcpy(entry.sha256,        sha256,       sizeof(entry.sha256));
+
+                entry.size = asset["size"] | 0u;
+
+                assetIdx++;
+            }
+        }
+        ch.assetCount = assetIdx;
+
+        channelIdx++;
     }
 
-    out.assetCount = count;
+    out.channelCount = channelIdx;
     return true;
 }
 
 /**
- * @brief Find the asset entry matching a given board ID.
+ * @brief Find the channel entry matching a given channel name.
  *
- * Linear scan through the manifest's populated asset entries.
+ * Linear scan through the manifest's populated channel entries.
  *
  * @param manifest Reference to a parsed OTAManifest.
- * @param boardId  Null-terminated board identifier to match.
+ * @param channelName Null-terminated channel name to match.
+ * @return Pointer to the matching OTAChannel, or nullptr if not found.
+ */
+const OTAChannel* findChannel(const OTAManifest& manifest, const char* channelName) {
+    for (uint8_t i = 0; i < manifest.channelCount; i++) {
+        if (strcmp(manifest.channels[i].name, channelName) == 0) {
+            return &manifest.channels[i];
+        }
+    }
+    return nullptr;
+}
+
+/**
+ * @brief Find the asset entry matching a given board ID within a channel.
+ *
+ * Linear scan through the channel's populated asset entries.
+ *
+ * @param channel Reference to a parsed OTAChannel.
+ * @param boardId Null-terminated board identifier to match.
  * @return Pointer to the matching OTAAsset, or nullptr if not found.
  */
-const OTAAsset* findAssetForBoard(const OTAManifest& manifest, const char* boardId) {
-    for (uint8_t i = 0; i < manifest.assetCount; i++) {
-        if (strcmp(manifest.assets[i].board, boardId) == 0) {
-            return &manifest.assets[i];
+const OTAAsset* findAssetForBoard(const OTAChannel& channel, const char* boardId) {
+    for (uint8_t i = 0; i < channel.assetCount; i++) {
+        if (strcmp(channel.assets[i].board, boardId) == 0) {
+            return &channel.assets[i];
         }
     }
     return nullptr;

@@ -7,17 +7,20 @@
  * To view a copy of this license, visit https://creativecommons.org/licenses/by-nc-sa/4.0/
  *
  * Library: lib/OTAManifest/OTAManifest.hpp
- * Description: Multi-architecture OTA manifest parser. Defines the schema for
- *              manifest.json files shipped alongside GitHub Release assets.
- *              Each manifest maps board IDs to their firmware binary, signature
- *              file, size, and SHA-256 hash. All storage is stack-allocated
- *              using fixed-size char arrays — no heap, no Arduino String.
+ * Description: Multi-channel OTA manifest parser (v2 schema). Defines the
+ *              schema for manifest.json containing absolute download URLs
+ *              for all release channels. Each channel maps board IDs to
+ *              their firmware URL, signature URL, size, and SHA-256 hash.
+ *              All storage is stack-allocated using fixed-size char arrays —
+ *              no heap, no Arduino String.
  *
  * Exported Symbols:
- * - OTAAsset:           Per-board firmware asset descriptor (board, firmware, signature, size, sha256)
- * - OTAManifest:        Top-level manifest with version, channel, securityVersion, and asset array
+ * - OTAAsset:           Per-board firmware asset descriptor (board, firmwareUrl, signatureUrl, size, sha256)
+ * - OTAChannel:         Per-channel release descriptor (version, name, securityVersion, assets)
+ * - OTAManifest:        Top-level manifest with manifestVersion, manifestUrl, and channel array
  * - parseManifest():    Parse raw JSON into an OTAManifest struct
- * - findAssetForBoard(): Linear scan for a board-matching asset in a parsed manifest
+ * - findChannel():      Linear scan for a channel-matching entry in a parsed manifest
+ * - findAssetForBoard(): Linear scan for a board-matching asset in a parsed channel
  */
 
 #pragma once
@@ -29,11 +32,12 @@
 // Constants
 // ---------------------------------------------------------------------------
 
-static constexpr size_t kMaxBoards        = 4;    ///< Maximum number of board entries in a manifest
-static constexpr size_t kMaxFilenameLen   = 64;   ///< Maximum length for firmware/signature filenames
-static constexpr size_t kMaxBoardIdLen    = 24;   ///< Maximum length for board ID strings
-static constexpr size_t kMaxSha256Len     = 65;   ///< SHA-256 hex string length (64 hex chars + null)
-static constexpr size_t kMaxVersionTagLen = 32;   ///< Maximum length for version tag strings
+static constexpr size_t kMaxBoards        = 4;     ///< Maximum number of board entries per channel
+static constexpr size_t kMaxChannels      = 4;     ///< Maximum number of channels (dev, beta, rc, stable)
+static constexpr size_t kMaxUrlLen        = 256;   ///< Maximum length for absolute URL fields
+static constexpr size_t kMaxBoardIdLen    = 24;    ///< Maximum length for board ID strings
+static constexpr size_t kMaxSha256Len     = 65;    ///< SHA-256 hex string length (64 hex chars + null)
+static constexpr size_t kMaxVersionTagLen = 32;    ///< Maximum length for version tag strings
 
 // ---------------------------------------------------------------------------
 // OTAAsset — per-board firmware asset descriptor
@@ -42,35 +46,57 @@ static constexpr size_t kMaxVersionTagLen = 32;   ///< Maximum length for versio
 /**
  * @brief Describes a single firmware asset for a specific board.
  *
- * Maps a board identifier to its firmware binary filename, signature
- * filename, binary size, and SHA-256 checksum. All fields are fixed-size
- * char arrays for stack allocation.
+ * Maps a board identifier to its firmware binary URL, signature URL,
+ * binary size, and SHA-256 checksum. All fields are fixed-size char
+ * arrays for stack allocation. URLs are absolute — no URL construction
+ * needed on-device.
  */
 struct OTAAsset {
     char     board[kMaxBoardIdLen];       ///< Board identifier (e.g. "esp32dev")
-    char     firmware[kMaxFilenameLen];   ///< Firmware binary filename (e.g. "firmware-esp32dev.bin")
-    char     signature[kMaxFilenameLen];  ///< Signature filename (e.g. "firmware-esp32dev.bin.sig")
+    char     firmwareUrl[kMaxUrlLen];     ///< Absolute firmware binary URL
+    char     signatureUrl[kMaxUrlLen];    ///< Absolute firmware signature URL
     uint32_t size;                        ///< Firmware binary size in bytes
     char     sha256[kMaxSha256Len];       ///< SHA-256 hex digest of the firmware binary
 };
 
 // ---------------------------------------------------------------------------
-// OTAManifest — top-level manifest container
+// OTAChannel — per-channel release descriptor
 // ---------------------------------------------------------------------------
 
 /**
- * @brief Top-level manifest describing all firmware assets in a GitHub Release.
+ * @brief Describes a single release channel within the manifest.
  *
- * Parsed from the manifest.json asset in a release. Contains the release
- * version tag, channel, security version counter, and an array of per-board
- * OTAAsset entries.
+ * Each channel (e.g. "stable", "dev", "beta", "rc") contains its own
+ * version tag, security version counter, and an array of per-board
+ * OTAAsset entries. The channel name is copied from the JSON object key.
  */
-struct OTAManifest {
-    char     version[kMaxVersionTagLen];  ///< Release version tag (e.g. "v3.1.0")
-    char     channel[16];                 ///< Release channel (e.g. "stable", "beta")
+struct OTAChannel {
+    char     version[kMaxVersionTagLen];  ///< Release version tag for this channel (e.g. "v3.1.0")
+    char     name[16];                    ///< Channel name (e.g. "stable", "dev", "beta", "rc")
     uint32_t securityVersion;             ///< Anti-rollback security version counter
     OTAAsset assets[kMaxBoards];          ///< Per-board asset descriptors
     uint8_t  assetCount;                  ///< Number of valid entries in the assets array
+};
+
+// ---------------------------------------------------------------------------
+// OTAManifest — top-level manifest container (v2)
+// ---------------------------------------------------------------------------
+
+/**
+ * @brief Top-level manifest describing all firmware channels and assets.
+ *
+ * Parsed from the v2 manifest.json. Contains the schema version, a
+ * self-referencing manifest URL (for future migration), and an array
+ * of OTAChannel entries keyed by channel name.
+ *
+ * Buffer sizing: the v2 manifest with 4 channels × 4 boards requires
+ * approximately 4 KB. The static parse buffer should be at least 4096 bytes.
+ */
+struct OTAManifest {
+    uint8_t    manifestVersion;           ///< Schema version (currently 1)
+    char       manifestUrl[kMaxUrlLen];   ///< Self-referencing URL for future migration
+    OTAChannel channels[kMaxChannels];    ///< Per-channel release descriptors
+    uint8_t    channelCount;              ///< Number of valid entries in the channels array
 };
 
 // ---------------------------------------------------------------------------
@@ -78,11 +104,15 @@ struct OTAManifest {
 // ---------------------------------------------------------------------------
 
 /**
- * @brief Parse a raw JSON buffer into an OTAManifest struct.
+ * @brief Parse a raw JSON buffer into an OTAManifest struct (v2 schema).
  *
- * Uses ArduinoJson internally (dependency hidden from the header). Copies
- * all string fields with strlcpy to ensure null termination. If the JSON
- * contains more than kMaxBoards assets, only the first kMaxBoards are stored.
+ * Uses ArduinoJson internally (dependency hidden from the header). Parses
+ * the v2 manifest structure: reads manifestVersion, manifestUrl, then
+ * iterates the "channels" object (keyed by channel name). For each channel,
+ * populates an OTAChannel entry with version, securityVersion, and assets.
+ * Copies all string fields with strlcpy to ensure null termination. If the
+ * JSON contains more than kMaxChannels channels or kMaxBoards assets per
+ * channel, excess entries are silently capped.
  *
  * @param json    Pointer to the raw JSON character buffer.
  * @param jsonLen Length of the JSON buffer in bytes.
@@ -92,13 +122,25 @@ struct OTAManifest {
 bool parseManifest(const char* json, size_t jsonLen, OTAManifest& out);
 
 /**
- * @brief Find the asset entry matching a given board ID.
+ * @brief Find the channel entry matching a given channel name.
  *
- * Performs a linear scan of the manifest's assets array, comparing each
- * entry's board field to the provided boardId using strcmp().
+ * Performs a linear scan of the manifest's channels array, comparing each
+ * entry's name field to the provided channelName using strcmp().
  *
  * @param manifest Reference to a parsed OTAManifest.
- * @param boardId  Null-terminated board identifier string to search for.
- * @return Pointer to the matching OTAAsset within the manifest, or nullptr if not found.
+ * @param channelName Null-terminated channel name string to search for.
+ * @return Pointer to the matching OTAChannel within the manifest, or nullptr if not found.
  */
-const OTAAsset* findAssetForBoard(const OTAManifest& manifest, const char* boardId);
+const OTAChannel* findChannel(const OTAManifest& manifest, const char* channelName);
+
+/**
+ * @brief Find the asset entry matching a given board ID within a channel.
+ *
+ * Performs a linear scan of the channel's assets array, comparing each
+ * entry's board field to the provided boardId using strcmp().
+ *
+ * @param channel  Reference to a parsed OTAChannel.
+ * @param boardId  Null-terminated board identifier string to search for.
+ * @return Pointer to the matching OTAAsset within the channel, or nullptr if not found.
+ */
+const OTAAsset* findAssetForBoard(const OTAChannel& channel, const char* boardId);
