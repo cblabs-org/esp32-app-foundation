@@ -17,9 +17,9 @@ To enable production OTA in your downstream application:
 2. **Configure `FrameworkConfig`** in your `main.cpp`:
    ```cpp
    FrameworkConfig config;
-   config.otaGithubRepo  = "your-org/your-repo";
+   config.otaManifestUrl = "https://github.com/your-org/your-repo/releases/download/ota-manifest/manifest.json";
    config.otaPublicKey   = YOUR_PUBLIC_KEY_PEM;  // extern const char[]
-   config.otaGithubToken = nullptr;              // or a PAT for private repos
+   config.otaToken       = nullptr;              // or a PAT/bearer token for private repos
    ```
 3. **Set the `SECURITY_VERSION`** in `platformio.ini` `build_flags`:
    ```ini
@@ -77,14 +77,13 @@ it never creates its own network client.
 
 | Component | Location | Role |
 |-----------|----------|------|
-| `OTAUpdateManager` | `modules/otaUpdateManager/` | Orchestrator — state machine, FreeRTOS task, REST API, EventBus |
+| `OTAUpdateManager` | `modules/OTAUpdateManager/` | Orchestrator — state machine, FreeRTOS task, REST API, EventBus |
 | `OTADownloadEngine` | `lib/OTADownloadEngine/` | Binary download, flash write, signature integration |
 | `IOTAVerifier` | `include/interfaces/` | Verification interface (three-step: begin/update/verify) |
 | `MbedTLSSignatureVerifier` | `lib/OTADownloadEngine/` | RSA+SHA256 verification via mbedtls |
 | `SemVer` | `lib/SemVer/` | Firmware version parsing, packed 32-bit comparison |
-| `OTAManifest` | `lib/OTAManifest/` | Multi-architecture manifest parser |
+| `OTAManifest` | `lib/OTAManifest/` | Multi-channel manifest parser (v2 schema) |
 | `ConfigManifest` | `lib/ConfigManifest/` | Three-Tier config lifecycle (Active/Previous/Golden) |
-| `GithubClient` | `lib/GithubClient/` | GitHub API client for release queries |
 
 ---
 
@@ -101,7 +100,7 @@ Any  ──→ Error                          (on failure)
 | State | Description |
 |-------|-------------|
 | `Idle` | Ready to accept a check or update |
-| `Checking` | Querying GitHub for latest release metadata |
+| `Checking` | Fetching and verifying the signed manifest |
 | `Downloading` | FreeRTOS task running the download pipeline |
 | `Verifying` | Signature verification in progress |
 | `Complete` | Update finalised — waiting for reboot |
@@ -112,28 +111,38 @@ Any  ──→ Error                          (on failure)
 When `performUpdate()` is called, a FreeRTOS task (8KB stack, priority 1)
 executes the following pipeline:
 
-1. **Guard checks** — firmware updates enabled? GitHub repo configured?
-2. **Query GitHub** — `GithubClient::getLatestReleaseForChannel(_channel)`
-3. **Download manifest** — parse `manifest.json` from release assets (or fall
-   back to legacy asset scan for pre-manifest releases)
-4. **Board matching** — `findAssetForBoard(manifest, BOARD_ID)` resolves the
-   correct firmware binary for this board
-5. **Fail-closed check** — reject missing/empty `.sig` when public key is
-   configured (see [§5. Signature Verification](#5-signature-verification))
+1. **Guard checks** — firmware updates enabled? `otaManifestUrl` configured?
+2. **Fetch manifest** — download `manifest.json` from the learned URL (or
+   fall back to the compiled-in URL; see [§4.1.2](#412-manifest-url-resilience))
+3. **Verify manifest signature** (Gate 1) — download `manifest.json.sig`,
+   verify the detached ECDSA signature. If verification fails on the learned
+   URL, fall back to the compiled-in URL. If both fail, abort (fail-closed).
+4. **Parse manifest** — extract the channel entry for the device's configured
+   channel. Select the asset matching `BOARD_ID`.
+5. **Version comparison** — compare the manifest channel version against the
+   running firmware version. If no update, stop here (2 HTTP requests total).
 6. **Config snapshot** — `snapshotActiveToPrevious()` (see
    [§9. Config Lifecycle](#9-config-lifecycle))
 7. **Init verifier** — load the RSA public key into `MbedTLSSignatureVerifier`
-8. **Allocate HTTPS client** — `WiFiClientSecure` on the heap (per §15.3)
+8. **Allocate HTTPS client** — `WiFiClientSecure` on the heap
 9. **Create download engine** — configure `OTADownloadEngine`
-10. **Fetch `.sig`** — download the detached signature file
-11. **Download and flash** — read the first 1KB chunk, validate the ESP32
-    magic byte (`0xE9`) and the `esp_app_desc_t` embedded version string
-    against the expected release version. If the binary version doesn't
-    match, abort before any flash writes occur (safety gate). Then stream
-    the remaining firmware in 1024-byte chunks, feeding the verifier and
-    the task watchdog.
+10. **Fetch `.sig`** (Gate 2) — download the firmware signature file from the
+    absolute URL in the manifest
+11. **Download and flash** — download firmware from the absolute URL in the
+    manifest. Read the first 1KB chunk, validate the ESP32 magic byte
+    (`0xE9`) and the `esp_app_desc_t` embedded version string against the
+    expected release version (Gate 3). If the binary version doesn't match,
+    abort before any flash writes occur. Then stream the remaining firmware
+    in 1024-byte chunks, feeding the verifier and the task watchdog.
 12. **Finalise and reboot** — 2-second delay for EventBus event propagation,
     then `esp_restart()`
+
+**Request count summary:**
+
+| Outcome | HTTP Requests |
+|---------|---------------|
+| No update available | 2 (manifest + manifest signature) |
+| Update available | 4 (manifest + manifest sig + firmware + firmware sig) |
 
 ### 3.3 Post-Reboot Self-Test
 
@@ -154,46 +163,92 @@ automatically reverts to the previous firmware partition on reboot.
 
 ---
 
-## 4. Release Channels
+## 4. Release Channels & Manifest-First Discovery
 
-### 4.1 Available Channels
+### 4.1 Release Discovery (Manifest-First)
 
-| Channel | Tag Convention | `getLatestReleaseForChannel()` Behaviour |
-|---------|----------------|------------------------------------------|
-| `stable` | `v3.1.0` (no suffix) | Fetches `/releases/latest` (GitHub "latest" endpoint — stable only) |
-| `beta` | `v3.2.0-beta.1` | Fetches `/releases/latest` (stable baseline) + `/releases/tags/latest-beta` (floating tag) |
-| `dev` | `v3.2.0-dev.3` | Fetches `/releases/latest` (stable baseline) + `/releases/tags/latest-dev` (floating tag) |
+The OTA system uses a **manifest-first** architecture. A single signed
+`manifest.json` is the sole entry point for all OTA operations. The manifest
+covers all channels, contains absolute download URLs, and is self-describing
+(including its own URL for future migration). This eliminates `GithubClient`
+from the OTA path and makes the system fully portable to any hosting provider.
 
-### 4.1.1 Floating Tags (O(1) OTA Polling)
+**Discovery flow:**
+```
+OTAUpdateManager  → GET manifest.json                 (~3 KB, any host)
+                  → GET manifest.json.sig              (~256 bytes)
+                  → verify signature → parse → select channel
+                  → compare version → stop (if no update)
+                  → GET {firmware URL from manifest}    (direct, any host)
+                  → GET {firmware.sig URL from manifest} (direct, any host)
+                  → verify firmware signature → validate binary header → flash
+```
 
-To avoid GitHub API pagination and the associated memory exhaustion on the
-ESP32, pre-release channels use **floating tags** (`latest-dev`, `latest-beta`,
-`latest-rc`, `latest-stable`). These are lightweight GitHub Releases whose
-underlying Git tag is force-moved to the latest commit of that channel by
-`deploy_release.py`.
+| Channel | Tag Convention | Manifest Behaviour |
+|---------|----------------|--------------------|
+| `stable` | `v3.1.0` (no suffix) | `channels.stable` entry in manifest |
+| `beta` | `v3.2.0-beta.1` | `channels.beta` entry in manifest |
+| `dev` | `v3.2.0-dev.3` | `channels.dev` entry in manifest |
 
-The device performs exactly **two HTTP requests** regardless of how many
-releases exist in the repository:
+The deploy script (`deploy_release.py`) scans all releases and constructs
+the manifest with the best available version for each channel, ensuring a
+consistent risk floor. The device simply reads its configured channel from
+the manifest — no scanning, no GitHub API pagination, no floating tags.
 
-1. `GET /releases/latest` — stable baseline (always the highest non-prerelease).
-2. `GET /releases/tags/latest-{channel}` — floating tag for the subscribed channel.
+### 4.1.1 Manifest Signing
 
-The higher SemVer of the two candidates wins.
+The manifest is signed with the same ECDSA key used for firmware binaries:
 
-**Version resolution for floating tags:**
-Because the `tag_name` field of a floating release is literally `"latest-dev"`
-(not a parseable SemVer string), `GithubClient` detects floating tags via a
-`"latest-"` prefix check and defers version resolution to `OTAUpdateManager`.
-The manager downloads the `manifest.json` asset (~500 bytes) to extract the
-build-authoritative version string before comparing against the local firmware.
-This costs one extra HTTPS request (~3–5s with TLS) but eliminates any fragile
-cross-component contract on the GitHub Release title format.
+```
+manifest.json         (~3 KB)   — the manifest itself
+manifest.json.sig     (~256 B)  — detached ECDSA signature
+```
 
-> **Defence-in-depth:** After version comparison passes, the
-> `OTADownloadEngine` independently validates the `esp_app_desc_t.version`
-> field embedded in the first 1KB of the downloaded binary against the
-> expected version before any flash partition writes occur
-> (`BinaryVersionMismatch` error code -16).
+**Threat model — why signing is required:**
+
+| Attack | Without signing | With signing |
+|---|---|---|
+| Point firmware URLs to malicious binary | ✅ Caught by firmware sig | ✅ Caught by manifest sig |
+| Redirect `manifestUrl` to attacker server | ❌ **Persistent device capture** | ✅ Caught by manifest sig |
+| Suppress updates (version = current) | ❌ Silent denial of service | ✅ Caught by manifest sig |
+| Downgrade `securityVersion` | ❌ Weakens anti-rollback | ✅ Caught by manifest sig |
+
+The `manifestUrl` field is a control-plane redirect — an attacker who can
+inject a new URL captures the device's OTA channel permanently. Manifest
+signing is the gate that prevents this.
+
+**Verification rule:** Verify manifest signature FIRST, then parse. If
+verification fails:
+1. Do not trust any field from the response
+2. If this was the learned URL → fall back to the compiled-in URL
+3. If this was the compiled-in URL → abort the check (fail-closed)
+
+### 4.1.2 Manifest URL Resilience
+
+The device maintains **two** manifest URLs:
+
+1. **Compiled-in URL** — set at build time in `FrameworkConfig.otaManifestUrl`,
+   never overwritten, survives factory reset
+2. **Learned URL** — stored in OTA module config (`learnedManifestUrl` in
+   `/mod/ota.json`), updated from the `manifestUrl` field in a **verified**
+   manifest response only
+
+**Check order:** Try learned URL first → fall back to compiled-in URL. The
+compiled-in URL is an unkillable safety net.
+
+### 4.1.3 Defence-in-Depth
+
+Three independent safety gates, each catching different failure modes:
+
+```
+Gate 1: Manifest signature     → prevents tampered URLs, versions, redirects
+Gate 2: Firmware signature     → prevents tampered/malicious binaries
+Gate 3: Binary version header  → prevents flashing wrong version (esp_app_desc_t check)
+```
+
+> **Note:** Gate 3 validates the `esp_app_desc_t.version` field embedded in
+> the first 1KB of the downloaded binary against the expected version before
+> any flash partition writes occur (`BinaryVersionMismatch` error code -16).
 
 ### 4.2 Channel Configuration
 
@@ -201,10 +256,13 @@ The active channel is persisted as an `IConfigurable` field in `/mod/ota.json`:
 
 ```json
 {
-  "schema": 2,
+  "schema": 5,
   "channel": "stable",
   "autoCheck": true,
-  "lastCheckedChannel": "stable"
+  "updatesEnabled": true,
+  "checkHour": 3,
+  "lastCheckedChannel": "stable",
+  "learnedManifestUrl": ""
 }
 ```
 
@@ -301,8 +359,9 @@ Key rotation requires a two-step transitional release: ship a firmware signed wi
 ## 7. Private Repository & PAT Configuration
 
 If your OTA releases are hosted in a **private** GitHub repository, devices need a
-Personal Access Token (PAT) to authenticate API requests. This section covers
-token creation, repository layout options, and the `deploy_release.py --repo` flag.
+Personal Access Token (PAT) to authenticate manifest and asset downloads. This
+section covers token creation, repository layout options, and the
+`deploy_release.py --repo` flag.
 
 ### 7.1 PAT Creation Walkthrough
 
@@ -320,11 +379,11 @@ token creation, repository layout options, and the `deploy_release.py --repo` fl
 
 ### 7.2 Repository Configuration
 
-| Setup | `config.otaGithubRepo` | `otaSecrets.hpp` | `deploy_release.py` |
+| Setup | `config.otaManifestUrl` | `otaSecrets.hpp` | `deploy_release.py` |
 |---|---|---|---|
-| Single private repo | `"owner/repo"` | Include PAT | (default) |
-| Split releases repo | `"owner/releases-repo"` | Include PAT | `--repo owner/releases-repo` |
-| Public repo | `"owner/public-repo"` | Omit (`nullptr`) | (default) |
+| Single private repo | `"https://github.com/owner/repo/releases/download/ota-manifest/manifest.json"` | Include PAT via `config.otaToken` | (default) |
+| Split releases repo | `"https://github.com/owner/releases-repo/releases/download/ota-manifest/manifest.json"` | Include PAT via `config.otaToken` | `--repo owner/releases-repo` |
+| Public repo | `"https://github.com/owner/public-repo/releases/download/ota-manifest/manifest.json"` | Omit (`nullptr`) | (default) |
 
 **Split releases repo** is recommended for blast-radius reduction: your source
 code repo and your firmware releases repo are separate. Devices only need
@@ -346,33 +405,51 @@ If omitted, the script defaults to the current repository's `origin` remote.
 
 ## 8. Multi-Architecture Support
 
-### 8.1 Manifest Schema
+### 8.1 Manifest Schema (v2)
 
-Each release includes a `manifest.json` that maps board IDs to firmware assets:
+The manifest uses a multi-channel schema with absolute asset URLs. A single
+manifest covers all channels and all boards:
 
 ```json
 {
-  "version": "v3.1.0",
-  "channel": "stable",
-  "securityVersion": 1,
-  "assets": [
-    {
-      "board": "esp32dev",
-      "firmware": "firmware-esp32dev.bin",
-      "signature": "firmware-esp32dev.bin.sig",
-      "size": 1048576,
-      "sha256": "abc123..."
+  "manifestVersion": 1,
+  "manifestUrl": "https://github.com/.../releases/download/ota-manifest/manifest.json",
+  "channels": {
+    "stable": {
+      "version": "v1.0.0",
+      "securityVersion": 1,
+      "assets": [
+        {
+          "board": "esp32dev",
+          "firmware": "https://github.com/.../releases/download/v1.0.0/firmware-esp32dev.bin",
+          "signature": "https://github.com/.../releases/download/v1.0.0/firmware-esp32dev.bin.sig",
+          "size": 1341651,
+          "sha256": "abc123..."
+        }
+      ]
     },
-    {
-      "board": "esp32s3nano",
-      "firmware": "firmware-esp32s3nano.bin",
-      "signature": "firmware-esp32s3nano.bin.sig",
-      "size": 1097152,
-      "sha256": "def456..."
+    "dev": {
+      "version": "v1.1.0-dev.3",
+      "securityVersion": 1,
+      "assets": [
+        {
+          "board": "esp32dev",
+          "firmware": "https://github.com/.../releases/download/v1.1.0-dev.3/firmware-esp32dev.bin",
+          "signature": "https://github.com/.../releases/download/v1.1.0-dev.3/firmware-esp32dev.bin.sig",
+          "size": 1345000,
+          "sha256": "def456..."
+        }
+      ]
     }
-  ]
+  }
 }
 ```
+
+**Key properties:**
+- `manifestVersion: 1` — integer schema version, consistent with `IConfigurable::getSchemaVersion()` convention
+- `manifestUrl` — self-referencing URL; device stores this for future migration (see [§4.1.2](#412-manifest-url-resilience))
+- `channels` — keyed by channel name, each containing version + per-board assets
+- Asset URLs are **absolute** — no GitHub URL construction needed on-device
 
 ### 8.2 Board ID Injection
 
@@ -390,15 +467,9 @@ build_flags =
     -DSECURITY_VERSION=1
 ```
 
-The orchestrator calls `findAssetForBoard(manifest, BOARD_ID)` to resolve the
-correct firmware binary for the running board.
-
-### 8.3 Legacy Fallback
-
-If no `manifest.json` is present in a release (pre-manifest releases), the
-orchestrator falls back to a linear scan of release assets, matching by `.bin`
-and `.sig` file extensions. This ensures backward compatibility with older
-releases that don't include a manifest.
+The orchestrator calls `findAssetForBoard(channelEntry, BOARD_ID)` to resolve
+the correct firmware binary for the running board from the manifest's channel
+assets.
 
 ---
 
@@ -479,9 +550,14 @@ python scripts/deploy_release.py --tag v1.0.0
 This script:
 1. Downloads CI artifacts: `gh run download <run-id>`
 2. Signs each board's firmware: `openssl dgst -sha256 -sign private_key.pem`
-3. Generates `manifest.json`: `python scripts/generate_manifest.py`
-4. Creates GitHub Release: `gh release create <tag>`
-5. Uploads all assets: `.bin`, `.bin.sig`, `.bin.sha256`, `manifest.json`
+3. Generates `manifest.json` (v2 multi-channel schema) with absolute asset URLs
+4. Signs the manifest: `openssl dgst -sha256 -sign private_key.pem manifest.json`
+5. Creates the versioned GitHub Release: `gh release create <tag>`
+6. Uploads versioned assets: `.bin`, `.bin.sig`, `.bin.sha256`
+7. Uploads/updates the `ota-manifest` fixed release with `manifest.json` + `manifest.json.sig`
+
+The manifest is hosted at a fixed release tag (`ota-manifest`) so the device
+always fetches from the same URL regardless of which version is latest.
 
 ### 11.3 Why Sign Locally?
 
@@ -621,11 +697,11 @@ and daily scheduling is handled by `checkHour`.
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `otaPublicKey` | `const char*` | `nullptr` | PEM-encoded RSA public key |
-| `otaGithubRepo` | `const char*` | `nullptr` | Repository in `"owner/repo"` format |
-| `otaGithubToken` | `const char*` | `nullptr` | GitHub PAT for private repos |
+| `otaPublicKey` | `const char*` | `nullptr` | PEM-encoded RSA public key (for manifest + firmware sig verification) |
+| `otaManifestUrl` | `const char*` | `nullptr` | Compiled-in manifest URL — unkillable fallback for manifest-first OTA |
+| `otaToken` | `const char*` | `nullptr` | Optional bearer token for authenticated manifest/asset downloads |
 
-### IConfigurable Fields (persisted in `/mod/ota.json`)
+### IConfigurable Fields (persisted in `/mod/ota.json`, schema version 5)
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
@@ -634,6 +710,7 @@ and daily scheduling is handled by `checkHour`.
 | `updatesEnabled` | `bool` | `true` | Master kill-switch for applying firmware updates |
 | `checkHour` | `uint8_t` | `3` | Hour (0–23) for the daily scheduled check |
 | `lastCheckedChannel` | `char[16]` | `""` | Implicit downgrade detection |
+| `learnedManifestUrl` | `char[256]` | `""` | Learned manifest URL — updated from verified manifest responses |
 
 ---
 
@@ -681,10 +758,13 @@ and daily scheduling is handled by `checkHour`.
 Before deploying to production, verify the OTA security posture:
 
 - [ ] `FrameworkConfig.otaPublicKey` is set to your PEM-encoded RSA public key
+- [ ] `FrameworkConfig.otaManifestUrl` points to your `ota-manifest` release
 - [ ] `SECURITY_VERSION` is set in all PlatformIO environments
-- [ ] `manifest.json` is generated and uploaded with each release
+- [ ] `manifest.json` is signed and uploaded to the `ota-manifest` release on every deploy
+- [ ] `manifest.json.sig` (detached signature) accompanies the manifest
 - [ ] All `.bin` assets have corresponding `.bin.sig` files
 - [ ] The `deploy_release.py` script is used for signing (not CI)
+- [ ] All three defence-in-depth gates are active (manifest sig → firmware sig → binary version header)
 
 > For the full security audit checklist (private key handling, bootloader rollback,
 > TWDT panic, NVS encryption), see [Security § Security Audit Checklist](security.md#10-security-audit-checklist).

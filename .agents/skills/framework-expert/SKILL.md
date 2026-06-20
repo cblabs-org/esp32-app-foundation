@@ -33,9 +33,12 @@ description: >
   "gen_crt_bundle", "crt.S not found", "data_file_embed_asm",
   "setCACert", "esp_crt_bundle", "disable TLS bundle".
   Also trigger on: "version", "versioning", "semver", "dev tag",
-  "beta tag", "stable tag", "floating tag", "latest-dev", "latest-stable",
-  "O(1) polling", "inject_version", "deploy_release",
+  "beta tag", "stable tag", "inject_version", "deploy_release",
   "build gate", "tag before build", "version bump".
+  Also trigger on: "manifest signing", "manifest-first", "otaManifestUrl",
+  "ota-manifest release", "manifest.json.sig", "signed manifest",
+  "manifest URL resilience", "learned URL", "compiled-in URL",
+  "defence-in-depth", "manifest schema v2", "multi-channel manifest".
   Also trigger on: "MCP server", "MCP tool", "device MCP", "list_tools",
   "device diagnostics", "device IP", "system_info", "capture_display",
   "wifi_get_status", "ota_get_status", "display_status",
