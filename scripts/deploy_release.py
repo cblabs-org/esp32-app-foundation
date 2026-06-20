@@ -738,7 +738,6 @@ def main() -> None:
     sign_firmware(args.private_key, args.dry_run)
     generate_hashes(args.dry_run)
     generate_manifest(args.tag, base_url, manifest_url, args.dry_run)
-    sign_manifest(args.private_key, os.path.join(ARTIFACTS_DIR, "manifest.json"), args.dry_run)
 
     if args.sign_only:
         print(f"\n✅ Signed binaries + manifest ready in {ARTIFACTS_DIR}/")
