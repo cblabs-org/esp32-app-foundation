@@ -72,7 +72,8 @@ predate the formal PA pipeline and are filed retrospectively.
 | [pr-33-portal-ux-consistency](./pr-33-portal-ux-consistency/PROJECT.md) | Web Portal UX Consistency — Reboot Overlays & Save Policies (universal reboot overlay component, reconnection polling, context-aware messages, save policy formalisation, Playwright tests) | 📋 **PLANNING** — 3 WOs defined, awaiting user approval | Current Session |
 | [pr-34-mcp-tools](./pr-34-mcp-tools/PROJECT.md) | Module-Specific MCP Tools (domain-specific JSON-RPC tools for Wifi, OTA, Display, Config) | ✅ **COMPLETE** — 8 new tools, hardware-verified `v0.0.11-dev.15`, [distilled](./pr-34-mcp-tools/context_bridge.md) | 2026-06-20 |
 | [pr-35-weather-station](./pr-35-weather-station/PROJECT.md) | Weather Station & Home Assistant Module (esp-mqtt wrapper, HOM entities, Web Portal, U8G2 composable widgets) | 📋 **PLANNING** — 5 WOs defined (WO0–WO4), ready for execution workers | Current Session |
-| [pr-36-manifest-first-ota](./pr-36-manifest-first-ota/PROJECT.md) | Manifest-First OTA Architecture (signed manifest, multi-channel, absolute URLs, URL resilience, GithubClient removal) | 📋 **PLANNED** — 6 WOs defined (WO1–WO6), awaiting user approval | Current Session |
+| [pr-36-manifest-first-ota](./pr-36-manifest-first-ota/PROJECT.md) | Manifest-First OTA Architecture (signed manifest, multi-channel, absolute URLs, URL resilience, GithubClient removal) | 🔄 **WIP** — 6 WOs merged on branch, integration testing blocked by private-repo auth | Session d5f9f607 |
+| [pr-37-split-repo-ota](./pr-37-split-repo-ota/PROJECT.md) | Split-Repo OTA with Git-Managed Manifest (public releases repo, delete GithubClient, migrate CA certs, eliminate PAT, git-managed manifest) | 📋 **PLANNED** — 3 WOs defined (WO1–WO3), awaiting user approval | Current Session |
 
 ---
 
@@ -121,6 +122,8 @@ scanning the entire Projects Registry chronologically.
 | [pr-21](./pr-21-ota-task-hardening/PROJECT.md) | Heap guard, PSRAM stack alloc, portal low-memory warning | PROJECT.md |
 | [pr-26](./pr-26-ota-pagination/PROJECT.md) | Paginated release scanner, PSRAM buffers, BSS chunk, deprecation cleanup | [distillation](./pr-26-ota-pagination/context_bridge.md) |
 | [pr-34](./pr-34-mcp-tools/PROJECT.md) | `ota_get_status`, `ota_check_now`, `ota_trigger_update` MCP tools + `last_check_ms` fix | [distillation](./pr-34-mcp-tools/context_bridge.md) |
+| [pr-36](./pr-36-manifest-first-ota/PROJECT.md) | Manifest-first architecture, signed manifest, multi-channel, absolute URLs, URL resilience | PROJECT.md |
+| [pr-37](./pr-37-split-repo-ota/PROJECT.md) | Split-repo OTA — public releases repo, git-managed manifest, delete GithubClient, eliminate PAT | PROJECT.md |
 | [adhoc-ota-docs-hotfix](./adhoc-ota-docs-hotfix/context_bridge.md) | `build_and_release_process.md`, Wi-Fi gate, `_silentCheck`, channel risk-floor | context_bridge |
 
 ### Display & UI

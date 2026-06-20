@@ -1,0 +1,5 @@
+{
+  "name": "OTACerts",
+  "version": "1.0.0",
+  "description": "Root CA certificates for OTA HTTPS connections"
+}

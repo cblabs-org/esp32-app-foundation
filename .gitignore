@@ -42,6 +42,9 @@ test/tmp/*
 # OTA release staging directory
 release/
 
+# Releases repo (nested clone of esp32-app-foundation-releases)
+releases/
+
 # Legacy release artifacts in root (pre-cleanup)
 manifest.json
 
@@ -53,3 +56,4 @@ include/otaSecrets.hpp
 # Harness-local files that resolve into .agents via the .claude symlink
 .agents/settings.local.json
 .DS_Store
+tmp/
