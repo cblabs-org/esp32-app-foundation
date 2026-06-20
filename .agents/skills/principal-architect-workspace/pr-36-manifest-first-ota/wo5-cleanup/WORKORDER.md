@@ -46,3 +46,40 @@ Use the `platformio` MCP tools (`build_project`) to compile and verify your code
 
 # Verification Requirement
 Compile the project using the PlatformIO MCP `build_project` tool for both `esp32dev` and `esp32s3nano`. Verify no warnings about unused includes or declarations. **CRITICAL:** Before distilling or committing, you MUST ask the user if they are happy. Only *after* approval should you invoke the `@distillery` skill to package the state and drop control.
+
+---
+
+# Execution Status
+
+**Status:** ✅ COMPLETE  
+**Commit:** `5f44fb5` — `chore: remove GithubClient from OTA path — dead code cleanup`  
+**Branch:** `pr-36-manifest-first-ota-wo5-cleanup`  
+**Date:** 2026-06-20  
+**Net delta:** 2 files changed, 26 insertions, 234 deletions
+
+## Checklist Results
+
+### OTAUpdateManager.cpp
+- [x] Removed `#include "../../lib/GithubClient/GithubClient.hpp"`
+- [x] Removed `#if 0` block in `checkForUpdate()` (~53 lines of GithubClient code)
+- [x] Removed `#if 0` block with `downloadAndParseManifestVersion_()` (~135 lines)
+- [x] All `github.releaseId`, `github.releaseAssets`, `otaGithubRepo`, `otaGithubToken` refs gone
+- [x] No floating tag detection code found (`latest-` grep: zero hits)
+- [x] Kept `ota_root_cas.h` include — still required by live `downloadRawFile_()` using `OTA_ROOT_CA_BUNDLE`
+
+### OTAUpdateManager.hpp
+- [x] Removed `class GithubClient;` forward declaration
+- [x] Removed `#if 0` block with `downloadAndParseManifestVersion_()` declaration
+
+### Codebase Verification
+- [x] `GithubClient` refs outside `lib/GithubClient/` and `test/`: only `ota_root_cas.h` include (needed)
+- [x] `otaGithubRepo`: zero matches
+- [x] `otaGithubToken`: zero matches
+
+### FrameworkConfig.hpp
+- [x] `otaGithubRepo`: confirmed removed (WO3)
+- [x] `otaGithubToken`: confirmed renamed to `otaToken` (WO3)
+
+### Build Verification
+- [x] `esp32dev`: SUCCESS — zero warnings
+- [x] `esp32s3nano`: SUCCESS — zero warnings

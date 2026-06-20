@@ -162,7 +162,7 @@ Gate 3: Binary version header  → prevents flashing wrong version (esp_app_desc
 - **[x] [wo2-manifest-fetcher](wo2-manifest-fetcher/WORKORDER.md):** Manifest fetcher + sig verification — merged `928466e`
 - **[x] [wo3-ota-pipeline-rewire](wo3-ota-pipeline-rewire/WORKORDER.md):** OTA pipeline rewire — merged `337effe`
 - **[x] [wo4-deploy-script](wo4-deploy-script/WORKORDER.md):** Deploy script v2 — merged `9c265ff`
-- **[ ] [wo5-cleanup](wo5-cleanup/WORKORDER.md):** Remove `GithubClient` from OTA path, remove floating tag code, dead code removal
+- **[x] [wo5-cleanup](wo5-cleanup/WORKORDER.md):** Dead code cleanup — merged `5f44fb5` (−234 lines)
 - **[ ] [wo6-docs-and-skill](wo6-docs-and-skill/WORKORDER.md):** Update `ota-update-system.md`, `deployment.md`, and `/framework-expert` skill systems
 
 ## Serialisation
