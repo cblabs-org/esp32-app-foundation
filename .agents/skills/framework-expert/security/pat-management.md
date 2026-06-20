@@ -53,14 +53,14 @@ Three deployment patterns are available, offering increasing levels of source-co
 
 The simplest setup. Source code and OTA releases live in the same private repository. The PAT compiled into firmware grants read access to both.
 
-**When to use:** Acceptable when source-code exposure is tolerable (e.g., the code is not commercially sensitive, or the threat model does not include firmware reverse-engineering).
+**When to use:** Acceptable when source-code exposure is tolerable (e.g., the code is not commercially sensitive, or the threat model does not include firmware reverse-engineering). Note: the `/releases/download/` URLs used by manifest assets require the repo to be **public** for unauthenticated access. If the repo must stay private, use Option C or the GitHub API URL approach.
 
 **Configuration:**
 
 ```cpp
 // main.cpp
-config.otaGithubRepo = "owner/my-firmware";
-config.otaGithubToken = OTA_GITHUB_TOKEN;  // from otaSecrets.hpp
+config.otaManifestUrl = "https://raw.githubusercontent.com/owner/my-firmware/main/manifest.json";
+config.otaToken = OTA_GITHUB_TOKEN;  // from otaSecrets.hpp
 ```
 
 ```ini
@@ -83,8 +83,8 @@ Source code stays in a private repo. OTA releases are published to a **public** 
 
 ```cpp
 // main.cpp
-config.otaGithubRepo = "owner/my-firmware-releases";
-config.otaGithubToken = nullptr;  // no token needed for public repos
+config.otaManifestUrl = "https://raw.githubusercontent.com/owner/my-firmware-releases/main/manifest.json";
+config.otaToken = nullptr;  // no token needed for public repos
 ```
 
 ```bash
@@ -107,9 +107,11 @@ Source code stays in a private repo. OTA releases are published to a **separate 
 
 ```cpp
 // main.cpp
-config.otaGithubRepo = "owner/my-firmware-releases";
-config.otaGithubToken = OTA_GITHUB_TOKEN;  // PAT scoped to releases repo only
+config.otaManifestUrl = "https://raw.githubusercontent.com/owner/my-firmware-releases/main/manifest.json";
+config.otaToken = OTA_GITHUB_TOKEN;  // PAT scoped to releases repo only
 ```
+
+Note: For private repos, `raw.githubusercontent.com` does accept token auth (unlike `/releases/download/`).
 
 ```ini
 # otaSecrets.hpp (gitignored) — PAT for the releases repo, NOT the source repo
@@ -150,7 +152,7 @@ Compiling the PAT into the binary is the only practical approach. The fine-grain
 
 ### D7: Why OTA Repo Is Configurable
 
-`FrameworkConfig.otaGithubRepo` is a runtime-configurable field rather than a build-time constant because:
+`FrameworkConfig.otaManifestUrl` is a runtime-configurable field rather than a build-time constant because:
 
 - It enables the split-repo pattern (Options B/C above) without requiring firmware source changes beyond `main.cpp`.
 - `deploy_release.py --repo` mirrors this on the tooling side — releases can be published to any repo.

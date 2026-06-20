@@ -7,15 +7,15 @@
  * To view a copy of this license, visit https://creativecommons.org/licenses/by-nc-sa/4.0/
  *
  * Module: modules/OTAUpdateManager/OTAUpdateManager.hpp
- * Description: Full OTA orchestrator for firmware updates via GitHub releases.
- *              Implements IMCPContributor to expose ota_get_status,
+ * Description: Full OTA orchestrator for firmware updates via manifest-first
+ *              pipeline. Implements IMCPContributor to expose ota_get_status,
  *              ota_check_now, and ota_trigger_update MCP tools.
  *              Wires the OTADownloadEngine (redirect-aware download + flash),
  *              IOTAVerifier (cryptographic signature verification via MbedTLS),
- *              and GithubClient (release metadata queries) into a single,
+ *              and manifest-based release channel resolution into a single,
  *              event-driven pipeline. Supports both direct web-upload OTA
- *              (legacy beginUpdate/writeStream/endUpdate) and the new
- *              GitHub-based checkForUpdate/performUpdate workflow.
+ *              (legacy beginUpdate/writeStream/endUpdate) and the manifest-first
+ *              checkForUpdate/performUpdate workflow.
  *
  *              Download runs in a FreeRTOS task to respect the tick() ≤ 10ms
  *              constraint. Progress events are published to the EventBus on
@@ -29,7 +29,7 @@
  *
  *   Orchestrator API:
  *   - begin():                Initialize with Application dependencies
- *   - checkForUpdate():       Query GitHub for a newer firmware release
+ *   - checkForUpdate():       Check for a newer firmware version via manifest
  *   - performUpdate():        Launch the full download→verify→flash pipeline in a FreeRTOS task
  *   - getState():             Query the current OTA state machine state
  *   - getLastOtaError():      Retrieve the last OTA error string
@@ -50,9 +50,9 @@
  *   - getParentTab():         Return "System" for navigation hierarchy
  *   - getTabOrder():          Return 50 for pill ordering
  *
- *   IConfigurable (namespace: "ota", schema v4):
+ *   IConfigurable (namespace: "ota", schema v5):
  *   - getConfigNamespace():   Return "ota"
- *   - getSchemaVersion():     Return 4
+ *   - getSchemaVersion():     Return 5
  *   - applyConfig():          Apply OTA config from JSON section
  *   - serializeConfig():      Serialize OTA config to JSON section
  *   - migrateConfig():        Migrate from older schema version
@@ -106,9 +106,10 @@ class Stream {};
 class Application;
 class MCPToolRegistry;
 struct FrameworkConfig;
+struct OTAManifest;
 class ConfigManager;
 class EventBus;
-class GithubClient;
+
 class OTADownloadEngine;
 class IOTAVerifier;
 class MbedTLSSignatureVerifier;
@@ -191,11 +192,12 @@ static constexpr uint32_t OTA_TASK_DRAM_HEADROOM_BYTES = 8192;
  * from release check through download, verification, flash, and reboot.
  * Also retains the legacy direct-upload path for web-based OTA.
  *
- * IConfigurable fields (namespace: "ota", schema version: 4):
- *   - channel            (char[16]): OTA release channel ("stable", "beta", "dev")
- *   - autoCheck          (bool):     Whether to auto-check for updates on boot
- *   - lastCheckedChannel (char[16]): Last channel used for an update check
- *   - updatesEnabled     (bool):     Master kill-switch for applying firmware updates
+ * IConfigurable fields (namespace: "ota", schema version: 5):
+ *   - channel            (char[16]):  OTA release channel ("stable", "beta", "dev")
+ *   - autoCheck          (bool):      Whether to auto-check for updates on boot
+ *   - lastCheckedChannel (char[16]):  Last channel used for an update check
+ *   - updatesEnabled     (bool):      Master kill-switch for applying firmware updates
+ *   - learnedManifestUrl (char[256]): Learned manifest URL from last verified manifest
  */
 class OTAUpdateManager : public IWebContributor, public IConfigurable, public ITickable, public IMCPContributor {
 public:
@@ -222,16 +224,13 @@ public:
     void tick(uint32_t currentMillis) override;
 
     /**
-     * @brief Check GitHub for a newer firmware version. Non-blocking.
+     * @brief Check for a newer firmware version. Non-blocking.
      *
-     * Creates a GithubClient with the repo and token from FrameworkConfig,
-     * queries the latest release, and compares release IDs. On native builds,
-     * always returns false.
-     *
-     * @warning This method makes blocking HTTPS calls. It MUST only be called
-     *          from the OTA FreeRTOS task — never from the main loop tick().
-     *          Calling from tick() will violate the 10ms tick budget and may
-     *          trigger the Task Watchdog Timer.
+     * Validates preconditions (initialized, Idle state, manifest URL) and
+     * transitions to Checking state. The full manifest-first check is
+     * performed by performUpdateTask(); this standalone method is retained
+     * for the MCP ota_check_now tool and returns false on both native and
+     * hardware until a lightweight manifest-only check is wired.
      *
      * @return true if a new version is available, false otherwise.
      */
@@ -356,7 +355,7 @@ public:
 
     /**
      * @brief Return the current schema version for the OTA config format.
-     * @return 2 — adds lastCheckedChannel for implicit downgrade detection.
+     * @return 5 — adds learnedManifestUrl for manifest URL resilience.
      */
     int getSchemaVersion() const override;
 
@@ -409,6 +408,7 @@ private:
     bool    _updatesEnabled         = true;  ///< Master kill-switch for applying firmware updates
     char    _lastCheckedChannel[16] = "";
     uint8_t _checkHour              = 3;   ///< Hour (0-23) at which daily auto-check fires
+    char    learnedManifestUrl_[256] = ""; ///< Learned manifest URL (persisted via IConfigurable)
 
     // Scheduling state (not persisted — reset on each boot)
     uint32_t _lastCheckDay   = 0;     ///< Unix day of last scheduled check (seconds/86400)
@@ -464,9 +464,10 @@ private:
     /**
      * @brief Instance method running the full OTA pipeline inside the FreeRTOS task.
      *
-     * Steps: GitHub check → find .bin/.sig assets → init verifier → allocate
-     * WiFiClientSecure → configure engine → fetch signature → download & flash
-     * → finalize → reboot.
+     * Steps: Manifest fetch + verify → channel lookup → SemVer compare →
+     * board asset lookup → snapshot config manifest → init verifier →
+     * allocate WiFiClientSecure → configure engine → fetch signature →
+     * download & flash → finalize → reboot.
      */
     void performUpdateTask();
 
@@ -491,6 +492,25 @@ private:
      * @param success  True if OTA succeeded.
      */
     void publishProgress(float progress, const char* status, bool complete, bool success);
+
+    /**
+     * @brief Fetch manifest.json + manifest.json.sig, verify signature, and parse.
+     *
+     * URL fallback: tries the learned URL first (if non-empty), then the
+     * compiled-in URL (_config->otaManifestUrl). For each URL:
+     *   1. Download manifest.json into a static 4096-byte buffer
+     *   2. Download manifest.json.sig into a 256-byte signature buffer
+     *   3. Verify the signature using MbedTLSSignatureVerifier
+     *   4. Parse the manifest into the output struct
+     * If the verified manifest contains a manifestUrl that differs from the
+     * current learned URL, update learnedManifestUrl_ and persist via config.
+     *
+     * @param manifest [out] Parsed OTAManifest struct (populated on success).
+     * @return true on success, false on failure (error state set internally).
+     */
+    bool fetchAndVerifyManifest_(OTAManifest& manifest);
+
+
 
     /**
      * @brief PsychicHttp multipart upload handler for POST /api/ota/upload.

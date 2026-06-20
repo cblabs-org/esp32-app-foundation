@@ -3,8 +3,10 @@
 ESP32 App Foundation (c) 2026 CB Labs
 
 Script: scripts/deploy_release.py
-Description: Signs firmware binaries, generates a manifest.json, creates a
-             GitHub Release, and uploads all release assets.
+Description: Signs firmware binaries, creates a versioned GitHub Release with
+             all release assets, then updates the git-managed OTA manifest
+             (manifest.json committed to the target repo). Supports both
+             single-repo and split-repo models via --repo and --releases-dir.
 
              Two source modes:
                CI mode (default): Downloads unsigned binaries from a GitHub
@@ -46,11 +48,13 @@ Prerequisites:
 
 import argparse
 import glob
+import json
 import os
 import re
 import shutil
 import subprocess
 import sys
+
 
 # Board list matching the CI matrix
 BOARDS = ["esp32dev", "esp32s3nano"]
@@ -58,6 +62,76 @@ BOARDS = ["esp32dev", "esp32s3nano"]
 # Release staging directory
 ARTIFACTS_DIR = "./release"
 
+
+
+# Channel stability ordering: dev(0) < beta(1) < rc(2) < stable(3)
+CHANNEL_ORDER = {"dev": 0, "beta": 1, "rc": 2, "stable": 3}
+
+
+# ---------------------------------------------------------------------------
+#  SemVer comparison (mirrors firmware FirmwareVersion logic)
+# ---------------------------------------------------------------------------
+
+_SEMVER_RE = re.compile(
+    r"^[vV]?(\d+)\.(\d+)\.(\d+)(?:-(dev|beta|rc)(?:\.(\d+))?)?$"
+)
+
+
+class FirmwareVersion:
+    """Comparable SemVer representation matching the firmware's SemVer logic.
+
+    Channel ordering: dev(0) < beta(1) < rc(2) < stable(3).
+    A stable version (no pre-release suffix) always beats a pre-release
+    version with the same major.minor.patch.
+    """
+
+    def __init__(self, version_str: str):
+        m = _SEMVER_RE.match(version_str.strip())
+        if not m:
+            raise ValueError(f"Invalid SemVer: {version_str!r}")
+        self.major = int(m.group(1))
+        self.minor = int(m.group(2))
+        self.patch = int(m.group(3))
+        chan_str = m.group(4)  # None for stable
+        self.channel = CHANNEL_ORDER.get(chan_str, 3)  # 3 = stable
+        self.pre_num = int(m.group(5)) if m.group(5) else 0
+        self.raw = version_str.strip()
+
+    def _sort_key(self):
+        return (self.major, self.minor, self.patch, self.channel, self.pre_num)
+
+    def __lt__(self, other):
+        return self._sort_key() < other._sort_key()
+
+    def __le__(self, other):
+        return self._sort_key() <= other._sort_key()
+
+    def __gt__(self, other):
+        return self._sort_key() > other._sort_key()
+
+    def __ge__(self, other):
+        return self._sort_key() >= other._sort_key()
+
+    def __eq__(self, other):
+        return self._sort_key() == other._sort_key()
+
+    def __repr__(self):
+        return f"FirmwareVersion({self.raw!r})"
+
+
+def channel_stability_floor(channel_name: str) -> int:
+    """Return the numeric stability floor for a channel name.
+
+    A device on channel X should receive an update if the candidate version's
+    stability is >= the channel floor.  This means a stable release is always
+    a valid candidate for dev/beta/rc channels.
+    """
+    return CHANNEL_ORDER.get(channel_name, 0)
+
+
+# ---------------------------------------------------------------------------
+#  Utilities
+# ---------------------------------------------------------------------------
 
 def check_prerequisites(private_key: str, need_pio: bool) -> None:
     """Verify that required tools and files are available."""
@@ -95,6 +169,26 @@ def parse_channel(tag: str) -> str:
         return "stable"
     return m.group(1) or "stable"
 
+
+def get_repo_slug(target_repo: str = None) -> str:
+    """Return the repo slug (owner/repo) — from --repo or git remote."""
+    if target_repo:
+        return target_repo
+    try:
+        result = subprocess.run(
+            ["gh", "repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner"],
+            capture_output=True, text=True, check=True, timeout=10,
+        )
+        return result.stdout.strip()
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError):
+        print("WARNING: Could not determine repo slug — manifest URLs may be incorrect",
+              file=sys.stderr)
+        return "UNKNOWN/REPO"
+
+
+# ---------------------------------------------------------------------------
+#  Pipeline steps
+# ---------------------------------------------------------------------------
 
 def ensure_tag_on_head(tag: str, dry_run: bool) -> None:
     """Ensure the given tag points at HEAD, creating or moving it as needed.
@@ -161,9 +255,15 @@ def ensure_tag_on_head(tag: str, dry_run: bool) -> None:
 
 
 def build_firmware(dry_run: bool) -> None:
-    """Build firmware for all boards with PlatformIO."""
-    print("\n--- Step 0: Build firmware (local) ---")
+    """Build firmware for all boards with PlatformIO.
+
+    Runs a clean build (``pio run -t clean`` then ``pio run``) to prevent
+    ESP-IDF's CMake cache from retaining a stale PROJECT_VER in
+    ``esp_app_desc_t.version`` across incremental rebuilds.
+    """
+    print("\n--- Step 0: Build firmware (local, clean) ---")
     for board in BOARDS:
+        run(["pio", "run", "-e", board, "-t", "clean"], dry_run=dry_run)
         run(["pio", "run", "-e", board], dry_run=dry_run)
 
 
@@ -239,29 +339,98 @@ def generate_hashes(dry_run: bool) -> None:
             print(f"  [DRY-RUN] sha256sum {bin_file} > {sha_file}")
 
 
-def generate_manifest(tag: str, dry_run: bool) -> None:
-    """Generate the OTA manifest.json."""
-    print("\n--- Step 3b: Generate manifest.json ---")
-    channel = parse_channel(tag)
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    manifest_script = os.path.join(script_dir, "generate_manifest.py")
+def preflight_gates(tag: str, dry_run: bool) -> None:
+    """Run pre-flight safety gates before build/deploy.
 
-    run(
-        [
-            sys.executable, manifest_script,
-            "--version", tag,
-            "--channel", channel,
-            "--security-version", "1",
-            "--boards", ",".join(BOARDS),
-            "--firmware-dir", ARTIFACTS_DIR,
-            "--output", os.path.join(ARTIFACTS_DIR, "manifest.json"),
-        ],
-        dry_run=dry_run,
+    Gate 1 — Clean working tree: Abort if the working tree is dirty.
+             ESP-IDF appends '-dirty' to esp_app_desc_t.version via
+             ``git describe --dirty``, which will never match the manifest.
+
+    Gate 2 — Tag describes HEAD: Verify ``git describe --tags --exact-match HEAD``
+             matches the --tag argument. Multiple tags on HEAD can cause
+             git describe to pick a different one.
+
+    In dry-run mode gates are advisory (the tag may not exist yet).
+    """
+    print("\n--- Pre-flight safety gates ---")
+
+    # Gate 1: Clean working tree
+    print("  Gate 1: Checking for clean working tree...")
+    result = subprocess.run(
+        ["git", "status", "--porcelain"],
+        capture_output=True, text=True, timeout=10,
     )
+    if result.stdout.strip():
+        if dry_run:
+            print("  ⚠ WARNING: Working tree is dirty (would abort in live mode)")
+        else:
+            print("ERROR: Working tree is dirty. Commit or stash changes before deploying.",
+                  file=sys.stderr)
+            print(f"  Dirty files:\n{result.stdout}", file=sys.stderr)
+            sys.exit(1)
+    else:
+        print("  ✓ Working tree is clean")
+
+    # Gate 2: Tag describes HEAD
+    print(f"  Gate 2: Verifying git describe matches '{tag}'...")
+    result = subprocess.run(
+        ["git", "describe", "--tags", "--exact-match", "HEAD"],
+        capture_output=True, text=True,
+    )
+    if result.returncode != 0:
+        if dry_run:
+            print(f"  ⚠ WARNING: HEAD has no exact tag (would abort in live mode)")
+        else:
+            print(f"ERROR: HEAD has no exact tag. Expected '{tag}' to be on HEAD.\n"
+                  f"       Create the tag first: git tag {tag}",
+                  file=sys.stderr)
+            sys.exit(1)
+    else:
+        described_tag = result.stdout.strip()
+        if described_tag != tag:
+            if dry_run:
+                print(f"  ⚠ WARNING: git describe returns '{described_tag}', "
+                      f"expected '{tag}' (would abort in live mode)")
+            else:
+                print(f"ERROR: git describe returns '{described_tag}', expected '{tag}'.\n"
+                      f"       Multiple tags on HEAD? Remove the stale one or use --tag.",
+                      file=sys.stderr)
+                sys.exit(1)
+        else:
+            print(f"  ✓ git describe confirms '{tag}' on HEAD")
+
+
+def resolve_releases_dir(explicit_dir: str = None) -> str:
+    """Resolve the local git checkout directory for the manifest.
+
+    Resolution order:
+        1. Explicit --releases-dir value
+        2. ./releases/ subdirectory (if it exists and contains .git)
+        3. Current directory '.' (single-repo model)
+
+    Returns:
+        Absolute path to the releases directory.
+    """
+    if explicit_dir:
+        path = os.path.abspath(explicit_dir)
+        if not os.path.isdir(path):
+            print(f"ERROR: --releases-dir does not exist: {path}", file=sys.stderr)
+            sys.exit(1)
+        print(f"  Releases dir (explicit): {path}")
+        return path
+
+    releases_subdir = os.path.abspath("./releases")
+    if os.path.isdir(releases_subdir) and os.path.isdir(os.path.join(releases_subdir, ".git")):
+        print(f"  Releases dir (auto-detected): {releases_subdir}")
+        return releases_subdir
+
+    cwd = os.path.abspath(".")
+    print(f"  Releases dir (current directory): {cwd}")
+    return cwd
 
 
 def create_release(tag: str, dry_run: bool, target_repo: str = None) -> None:
-    """Create a GitHub Release and upload all assets."""
+    """Create a versioned GitHub Release and upload all assets."""
     print("\n--- Step 4: Create GitHub Release ---")
     channel = parse_channel(tag)
     release_cmd = ["gh", "release", "create", tag, "--title", tag, "--generate-notes"]
@@ -272,7 +441,7 @@ def create_release(tag: str, dry_run: bool, target_repo: str = None) -> None:
     run(release_cmd, dry_run=dry_run, check=False)
 
     print("\n--- Step 5: Upload release assets ---")
-    asset_patterns = ["*.bin", "*.bin.sig", "*.bin.sha256", "manifest.json"]
+    asset_patterns = ["*.bin", "*.bin.sig", "*.bin.sha256"]
     assets = []
     for pattern in asset_patterns:
         assets.extend(glob.glob(os.path.join(ARTIFACTS_DIR, pattern)))
@@ -287,40 +456,188 @@ def create_release(tag: str, dry_run: bool, target_repo: str = None) -> None:
     upload_cmd.extend(assets)
     run(upload_cmd, dry_run=dry_run)
 
-    print(f"\n--- Step 6: Update floating tag (latest-{channel}) ---")
-    floating_tag = f"latest-{channel}"
-    
-    # Ignore errors if the release/tag doesn't exist yet
-    delete_cmd = ["gh", "release", "delete", floating_tag, "-y", "--cleanup-tag"]
-    if target_repo:
-        delete_cmd.extend(["--repo", target_repo])
-    run(delete_cmd, dry_run=dry_run, check=False, stderr=subprocess.DEVNULL)
-    
-    # CRITICAL CONTRACT: The --title MUST be the exact semantic version tag (e.g. v0.0.11-dev.13).
-    # GithubClient.cpp on the ESP32 parses the SemVer from the release "name" (title) field
-    # because the tag_name field contains the unparseable "latest-{channel}" string.
-    # Changing this title format will silently break OTA version detection on all devices.
-    floating_release_cmd = ["gh", "release", "create", floating_tag, "--title", tag, "--notes", f"Alias for {tag}"]
-    if channel != "stable":
-        floating_release_cmd.append("--prerelease")
-    if target_repo:
-        floating_release_cmd.extend(["--repo", target_repo])
-    run(floating_release_cmd, dry_run=dry_run)
-    
-    floating_upload_cmd = ["gh", "release", "upload", floating_tag, "--clobber"]
-    if target_repo:
-        floating_upload_cmd.extend(["--repo", target_repo])
-    floating_upload_cmd.extend(assets)
-    run(floating_upload_cmd, dry_run=dry_run)
+
+def apply_risk_floor(manifest: dict, new_version_str: str) -> dict:
+    """Apply risk-floor scanning across all channels in the manifest.
+
+    For each channel, ensure its version is the best available for that
+    stability floor. A stable release is valid for ALL channels. A dev
+    release is only valid for the dev channel.
+
+    Example: deploying v1.0.0 (stable) — if dev channel has v0.0.9-dev.5,
+    update dev to v1.0.0 because stable >= dev floor and v1.0.0 > v0.0.9-dev.5.
+
+    The new version's assets are copied to any channel that gets upgraded.
+
+    Args:
+        manifest: The full manifest dict (with all channel entries).
+        new_version_str: The version being deployed (e.g. "v1.0.0").
+
+    Returns:
+        Updated manifest dict with risk-floor adjustments applied.
+    """
+    try:
+        new_ver = FirmwareVersion(new_version_str)
+    except ValueError:
+        print(f"  WARNING: Cannot parse '{new_version_str}' for risk-floor scan — skipping",
+              file=sys.stderr)
+        return manifest
+
+    new_stability = new_ver.channel  # 0=dev, 1=beta, 2=rc, 3=stable
+    channels = manifest.get("channels", {})
+
+    # Find the channel entry for the new version (to copy its assets)
+    new_channel_name = parse_channel(new_version_str)
+    new_entry = channels.get(new_channel_name, {})
+
+    for ch_name, ch_entry in channels.items():
+        ch_floor = channel_stability_floor(ch_name)
+
+        # The new version is eligible for this channel if its stability >= the floor
+        if new_stability < ch_floor:
+            continue
+
+        try:
+            existing_ver = FirmwareVersion(ch_entry.get("version", "v0.0.0"))
+        except ValueError:
+            continue
+
+        if new_ver > existing_ver:
+            print(f"  Risk-floor: upgrading '{ch_name}' from {existing_ver.raw} → {new_ver.raw}")
+            ch_entry["version"] = new_ver.raw
+            # Copy assets from the new entry if available
+            if "assets" in new_entry:
+                ch_entry["assets"] = new_entry["assets"]
+            if "securityVersion" in new_entry:
+                ch_entry["securityVersion"] = new_entry["securityVersion"]
+
+    manifest["channels"] = channels
+    return manifest
+
+
+def update_manifest(tag: str, repo_slug: str, private_key: str,
+                    releases_dir: str, dry_run: bool) -> None:
+    """Update the git-managed OTA manifest and push to origin.
+
+    Flow:
+        1. Pull latest from origin/main
+        2. Read existing manifest.json (or start fresh)
+        3. Merge new channel entry (version + constructed URLs)
+        4. Apply risk-floor scanning
+        5. Set manifestUrl (raw.githubusercontent.com)
+        6. Write manifest.json
+        7. Sign manifest.json
+        8. Commit and push
+
+    Args:
+        tag: Version tag being deployed (e.g. v3.1.0).
+        repo_slug: Target repo slug (owner/repo) for URL construction.
+        private_key: Path to the ECDSA private key.
+        releases_dir: Local git checkout of the releases repo.
+        dry_run: If True, print commands without executing.
+    """
+    print("\n--- Step 6: Update git-managed manifest ---")
+
+    channel = parse_channel(tag)
+    base_url = f"https://github.com/{repo_slug}/releases/download/{tag}"
+    manifest_url = f"https://raw.githubusercontent.com/{repo_slug}/main/manifest.json"
+    manifest_path = os.path.join(releases_dir, "manifest.json")
+    sig_path = os.path.join(releases_dir, "manifest.json.sig")
+
+    # 6a. Pull latest
+    print("  Pulling latest from origin/main...")
+    run(["git", "-C", releases_dir, "pull", "--ff-only", "origin", "main"],
+        dry_run=dry_run, check=False)
+
+    # 6b. Read existing manifest
+    print("  Reading existing manifest...")
+    if os.path.isfile(manifest_path):
+        try:
+            with open(manifest_path, "r") as f:
+                manifest = json.load(f)
+            print(f"  Loaded existing manifest ({len(manifest.get('channels', {}))} channels)")
+        except (json.JSONDecodeError, IOError) as e:
+            print(f"  WARNING: Could not read manifest: {e} — starting fresh",
+                  file=sys.stderr)
+            manifest = {"manifestVersion": 1, "channels": {}}
+    else:
+        print("  No existing manifest — creating from scratch")
+        manifest = {"manifestVersion": 1, "channels": {}}
+
+    # 6c. Merge new channel entry
+    print(f"  Merging channel '{channel}' with version '{tag}'...")
+    manifest["channels"][channel] = {
+        "version": tag,
+        "securityVersion": 1,
+        "assets": [
+            {
+                "board": board,
+                "firmwareUrl": f"{base_url}/firmware-{board}.bin",
+                "signatureUrl": f"{base_url}/firmware-{board}.bin.sig",
+            }
+            for board in BOARDS
+        ],
+    }
+
+    # 6d. Apply risk-floor scanning
+    print("  Applying risk-floor scanning...")
+    manifest = apply_risk_floor(manifest, tag)
+    print("  Risk-floor scan complete")
+
+    # 6e. Set manifestUrl
+    manifest["manifestUrl"] = manifest_url
+
+    # 6f. Write manifest
+    print(f"  Writing manifest to {manifest_path}...")
+    if not dry_run:
+        with open(manifest_path, "w") as f:
+            json.dump(manifest, f, indent=2)
+            f.write("\n")
+    else:
+        print(f"  [DRY-RUN] Would write manifest to {manifest_path}")
+        print(f"  Manifest preview:\n{json.dumps(manifest, indent=2)}")
+
+    # 6g. Sign manifest
+    print("  Signing manifest...")
+    run(
+        ["openssl", "dgst", "-sha256", "-sign", private_key,
+         "-out", sig_path, manifest_path],
+        dry_run=dry_run,
+    )
+
+    # 6h. Commit and push
+    print("  Committing and pushing manifest...")
+    run(["git", "-C", releases_dir, "add", "manifest.json", "manifest.json.sig"],
+        dry_run=dry_run)
+    run(["git", "-C", releases_dir, "commit", "-m",
+         f"chore: update manifest for {tag}"],
+        dry_run=dry_run)
+    run(["git", "-C", releases_dir, "push", "origin", "main"],
+        dry_run=dry_run)
+
+    # 6i. Summary
+    print(f"\n  ✅ Manifest updated and pushed")
+    print(f"  Manifest URL: {manifest_url}")
+    if not dry_run:
+        result = subprocess.run(
+            ["git", "-C", releases_dir, "rev-parse", "HEAD"],
+            capture_output=True, text=True,
+        )
+        if result.returncode == 0:
+            print(f"  Commit: {result.stdout.strip()[:12]}")
+
+
+
 
 
 def parse_args() -> argparse.Namespace:
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser(
-        description="Sign firmware binaries and create a GitHub Release",
+        description="Sign firmware binaries, generate signed manifest, and create a GitHub Release",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    parser.add_argument("--tag", required=True, help="Git tag for the release (e.g. v3.1.0)")
+    parser.add_argument("--tag", help="Git tag for the release (e.g. v3.1.0). "
+                                      "If omitted, auto-detected from the tag on HEAD.")
     parser.add_argument("--private-key", required=True, help="Path to ECDSA private key")
 
     source = parser.add_mutually_exclusive_group(required=True)
@@ -341,14 +658,22 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--repo",
-        help="Target GitHub repo for the release (owner/repo format, "
-             "e.g. 'matthewmcneill/esp32-firmware-releases'). "
-             "Defaults to the current repo's origin.",
+        help="Target GitHub repo for releases AND the manifest (owner/repo "
+             "format, e.g. 'matthewmcneill/esp32-firmware-releases'). "
+             "In single-repo mode (default), this is the current repo's origin. "
+             "In split-repo mode, pass the public releases repo.",
+    )
+    parser.add_argument(
+        "--releases-dir",
+        help="Local path to the git checkout of the target repo (where "
+             "manifest.json is committed). Defaults: (1) explicit value, "
+             "(2) ./releases/ if it exists with .git, (3) current directory.",
     )
     parser.add_argument(
         "--sign-only",
         action="store_true",
-        help="Stage, sign, hash, and generate manifest — but skip GitHub release creation",
+        help="Stage, sign, and hash firmware — but skip GitHub release "
+             "creation and manifest update",
     )
     parser.add_argument(
         "--dry-run",
@@ -356,6 +681,42 @@ def parse_args() -> argparse.Namespace:
         help="Print commands without executing them",
     )
     return parser.parse_args()
+
+
+def resolve_tag(explicit_tag: str = None) -> str:
+    """Return the release tag — from --tag or auto-detected from HEAD.
+
+    When multiple tags point at HEAD, the highest SemVer tag wins.
+    """
+    if explicit_tag:
+        return explicit_tag
+    try:
+        result = subprocess.run(
+            ["git", "tag", "--points-at", "HEAD"],
+            capture_output=True, text=True, check=True, timeout=5,
+        )
+        tags = [t.strip() for t in result.stdout.strip().splitlines() if t.strip()]
+        # Filter to SemVer tags only
+        semver_tags = []
+        for t in tags:
+            try:
+                semver_tags.append((FirmwareVersion(t), t))
+            except ValueError:
+                continue
+        if semver_tags:
+            semver_tags.sort(key=lambda x: x[0], reverse=True)
+            tag = semver_tags[0][1]
+            if len(semver_tags) > 1:
+                print(f"Multiple tags on HEAD: {[t for _, t in semver_tags]} — using highest: {tag}")
+            else:
+                print(f"Auto-detected tag from HEAD: {tag}")
+            return tag
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError):
+        pass
+    print("ERROR: No --tag provided and HEAD has no exact SemVer tag. "
+          "Tag your commit first (e.g. 'git tag v1.0.0') or pass --tag explicitly.",
+          file=sys.stderr)
+    sys.exit(1)
 
 
 def main() -> None:
@@ -366,13 +727,18 @@ def main() -> None:
         print("ERROR: --build is only valid with --local", file=sys.stderr)
         sys.exit(1)
 
+    args.tag = resolve_tag(args.tag)
+
     mode = "local" if args.local else f"CI (run {args.run_id})"
+    repo_slug = get_repo_slug(args.repo)
     print(f"=== Deploy Release: {args.tag} ===")
     print(f"  Mode:        {mode}")
     print(f"  Private key: {args.private_key}")
+    print(f"  Target repo: {repo_slug}")
     print(f"  Dry-run:     {args.dry_run}")
-    if args.repo:
-        print(f"  Target repo: {args.repo}")
+
+    # Pre-flight safety gates (before build/deploy)
+    preflight_gates(args.tag, args.dry_run)
 
     check_prerequisites(args.private_key, need_pio=args.build)
     ensure_tag_on_head(args.tag, args.dry_run)
@@ -386,12 +752,22 @@ def main() -> None:
 
     sign_firmware(args.private_key, args.dry_run)
     generate_hashes(args.dry_run)
-    generate_manifest(args.tag, args.dry_run)
 
     if args.sign_only:
-        print(f"\n✅ Signed binaries ready in {ARTIFACTS_DIR}/")
+        print(f"\n✅ Signed binaries + hashes ready in {ARTIFACTS_DIR}/")
     else:
         create_release(args.tag, args.dry_run, target_repo=args.repo)
+
+        # Update git-managed manifest
+        releases_dir = resolve_releases_dir(args.releases_dir)
+        update_manifest(
+            tag=args.tag,
+            repo_slug=repo_slug,
+            private_key=args.private_key,
+            releases_dir=releases_dir,
+            dry_run=args.dry_run,
+        )
+
         print("\n✅ Release deployed successfully!")
 
 

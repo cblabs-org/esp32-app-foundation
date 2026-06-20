@@ -6,11 +6,14 @@
  * This work is licensed under Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International.
  * To view a copy of this license, visit https://creativecommons.org/licenses/by-nc-sa/4.0/
  *
- * Module: lib/GithubClient/ota_root_cas.h
- * Description: Combined root CA bundle for secure OTA and GitHub API connections.
+ * Module: lib/OTACerts/OTACerts.h
+ * Description: Combined root CA bundle for secure OTA connections.
  *
- *              - Sectigo Public Server Authentication Root E46: Used for api.github.com
- *              - ISRG Root X1 (Let's Encrypt): Used for objects.githubusercontent.com (GitHub CDN)
+ *              - Sectigo Public Server Authentication Root E46: Used for
+ *                github.com (firmware release asset downloads)
+ *              - ISRG Root X1 (Let's Encrypt): Used for
+ *                raw.githubusercontent.com (manifest) and
+ *                objects.githubusercontent.com (CDN redirect target)
  *
  *              WiFiClientSecure::setCACert() parses all PEM certificates present in
  *              a single concatenated buffer.
@@ -23,7 +26,7 @@
 #pragma once
 
 // Combined root CA bundle for OTA connections.
-static const char OTA_ROOT_CA_BUNDLE[] =
+static const char OTA_CA_BUNDLE[] =
     "-----BEGIN CERTIFICATE-----\n"
     "MIIDRjCCAsugAwIBAgIQGp6v7G3o4ZtcGTFBto2Q3TAKBggqhkjOPQQDAzCBiDEL\n"
     "MAkGA1UEBhMCVVMxEzARBgNVBAgTCk5ldyBKZXJzZXkxFDASBgNVBAcTC0plcnNl\n"

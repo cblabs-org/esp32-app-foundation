@@ -1,6 +1,6 @@
 # OTA Deployment
 
-Covers the REST API for device-side OTA operations, the `deploy_release.py` release workflow, multi-board manifest format, and error code reference.
+Covers the REST API for device-side OTA operations, the `deploy_release.py` release workflow, manifest-first discovery, manifest signing, and error code reference.
 
 ## REST API Reference
 
@@ -38,27 +38,71 @@ The `scripts/deploy_release.py` script handles building, signing, and publishing
 > **Agent Execution Rule:** NEVER execute `deploy_release.py` directly using terminal tools. The script requires the private key passphrase, which `openssl` will prompt for interactively. Because background tasks cannot provide interactive standard input, the process will hang indefinitely. **Always** output the exact CLI command in a markdown code block and instruct the user to run it in their own terminal.
 
 ```bash
-python3 scripts/deploy_release.py \
-    --tag v1.0.0 \
-    --local --build \
-    --private-key private_key.pem
+python3 scripts/deploy_release.py --private-key private_key.pem --local
 ```
+
+`--tag` is auto-detected from the git tag on HEAD. Pass it explicitly only if HEAD has multiple tags or you need to override.
 
 The script:
 1. Builds firmware for all hardware environments (`pio run -e <board>`)
 2. Signs each board's firmware: `openssl dgst -sha256 -sign private_key.pem`
-3. Generates `manifest.json` via `scripts/generate_manifest.py`
-4. Creates GitHub Release: `gh release create <tag>`
-5. Uploads all assets: `.bin`, `.bin.sig`, `.bin.sha256`, `manifest.json`
+3. Generates `manifest.json` (v2 multi-channel schema) with absolute asset URLs via `scripts/generate_manifest.py`
+4. Signs the manifest: `openssl dgst -sha256 -sign private_key.pem manifest.json`
+5. Creates the versioned GitHub Release: `gh release create <tag>`
+6. Uploads versioned assets: `.bin`, `.bin.sig`, `.bin.sha256`
+7. Uploads/updates the `manifest-latest` fixed release with `manifest.json` + `manifest.json.sig`
 
-### Floating Tags (O(1) OTA Polling)
+### The `manifest-latest` Fixed Release
 
-To prevent GitHub API pagination and memory exhaustion, the OTA engine uses **floating tags** (`latest-dev`, `latest-beta`, `latest-rc`, `latest-stable`) to look up updates in exactly two HTTP requests.
+Instead of floating tags (`latest-dev`, `latest-beta`, etc.), the deploy script
+uploads the manifest and its detached signature to a single **fixed release tag**
+called `manifest-latest`. The device always fetches from the same URL:
 
-The `deploy_release.py` script automatically force-pushes these floating tags to the latest commit of that channel and creates a GitHub Release attached to it.
+```
+https://github.com/{repo}/releases/download/manifest-latest/manifest.json
+https://github.com/{repo}/releases/download/manifest-latest/manifest.json.sig
+```
 
-> [!IMPORTANT]
-> **SemVer via Release Title (Design Constraint)**: Because the GitHub API returns the literal string (e.g. `latest-dev`) in the `tag_name` field of a floating release, the ESP32 cannot parse its semantic version directly from the tag. To avoid downloading the `manifest.json` asset (which costs time and memory), the deploy script explicitly sets the GitHub Release title (`name` field) to the exact semantic version (e.g., `--title v0.0.11-dev.13`). `GithubClient` detects floating tags via a `"latest-"` prefix check and reads the SemVer from the `name` field instead of `tag_name`. **This is a critical contract between `deploy_release.py` and `GithubClient.cpp` — do not change the release title format without updating both.**
+This approach:
+- Eliminates GitHub API pagination and memory exhaustion on the ESP32
+- Removes `GithubClient` from the OTA path entirely
+- Makes the OTA system portable to any HTTP hosting provider
+- Provides a stable URL that never changes between releases
+
+### Manifest Signing
+
+The manifest is signed with the same ECDSA key used for firmware binaries.
+The detached signature (`manifest.json.sig`) is verified on-device before
+the manifest content is trusted.
+
+**Why:** The `manifestUrl` field inside the manifest is a control-plane
+redirect. An attacker who can inject a new URL captures the device's OTA
+channel permanently. Manifest signing prevents this.
+
+**Verification rule:** Verify manifest signature FIRST, then parse. If
+verification fails:
+1. Do not trust any field from the response
+2. If this was the learned URL → fall back to the compiled-in URL
+3. If this was the compiled-in URL → abort the check (fail-closed)
+
+### Defence-in-Depth Gates
+
+Three independent safety gates, each catching different failure modes:
+
+```
+Gate 1: Manifest signature     → prevents tampered URLs, versions, redirects
+Gate 2: Firmware signature     → prevents tampered/malicious binaries
+Gate 3: Binary version header  → prevents flashing wrong version (esp_app_desc_t check)
+```
+
+### `--legacy-floating-tags` Flag
+
+The deploy script supports a `--legacy-floating-tags` flag for backward
+compatibility with devices running firmware older than the manifest-first
+migration. When set, the script will also create/update the old-style
+floating tag releases (`latest-dev`, `latest-beta`, etc.) in addition to
+the `manifest-latest` release. This allows mixed fleets to co-exist during
+a rollout transition.
 
 ### Split-Repo Deployment
 
@@ -69,30 +113,53 @@ python3 scripts/deploy_release.py --tag v1.0.0 --local --build \
     --private-key private_key.pem --repo owner/releases-repo
 ```
 
-## Multi-Board Manifest Format
+## Manifest Schema (v2)
 
-Each release includes a `manifest.json` that maps board IDs to firmware assets:
+A single manifest covers all channels and all boards with absolute asset URLs:
 
 ```json
 {
-  "version": "v3.1.0",
-  "channel": "stable",
-  "securityVersion": 1,
-  "assets": [
-    {
-      "board": "esp32dev",
-      "firmware": "firmware-esp32dev.bin",
-      "signature": "firmware-esp32dev.bin.sig",
-      "size": 1048576,
-      "sha256": "abc123..."
+  "manifestVersion": 1,
+  "manifestUrl": "https://github.com/.../releases/download/manifest-latest/manifest.json",
+  "channels": {
+    "stable": {
+      "version": "v1.0.0",
+      "securityVersion": 1,
+      "assets": [
+        {
+          "board": "esp32dev",
+          "firmwareUrl": "https://github.com/.../releases/download/v1.0.0/firmware-esp32dev.bin",
+          "signatureUrl": "https://github.com/.../releases/download/v1.0.0/firmware-esp32dev.bin.sig",
+          "size": 1341651,
+          "sha256": "abc123..."
+        }
+      ]
+    },
+    "dev": {
+      "version": "v1.1.0-dev.3",
+      "securityVersion": 1,
+      "assets": [...]
     }
-  ]
+  }
 }
 ```
 
-Board IDs are injected at compile time via `BOARD_ID` in `platformio.ini` `build_flags`. The orchestrator calls `findAssetForBoard(manifest, BOARD_ID)` to resolve the correct firmware binary.
+**Key properties:**
+- `manifestVersion: 1` — integer schema version
+- `manifestUrl` — self-referencing URL; device stores this as the learned URL for future migration
+- `channels` — keyed by channel name, each containing version + per-board assets
+- Asset URLs are **absolute** — no GitHub URL construction needed on-device
 
-**Legacy fallback:** If no `manifest.json` is present (pre-manifest releases), the orchestrator falls back to a linear asset scan matching by `.bin` and `.sig` file extensions.
+Board IDs are injected at compile time via `BOARD_ID` in `platformio.ini` `build_flags`. The orchestrator calls `findAssetForBoard(channelEntry, BOARD_ID)` to resolve the correct firmware binary.
+
+## Manifest URL Resilience
+
+The device maintains **two** manifest URLs:
+
+1. **Compiled-in URL** — set at build time in `FrameworkConfig.otaManifestUrl`, never overwritten, survives factory reset
+2. **Learned URL** — stored in OTA module config (`learnedManifestUrl` in `/mod/ota.json`), updated from the `manifestUrl` field in a **verified** manifest response only
+
+**Check order:** Try learned URL first → fall back to compiled-in URL. The compiled-in URL is an unkillable safety net.
 
 ## Error Codes
 
@@ -114,6 +181,7 @@ Board IDs are injected at compile time via `BOARD_ID` in `platformio.ini` `build
 | `UpdateWriteFailed` | -13 | Incomplete chunk write |
 | `UpdateEndFailed` | -14 | `Update.end()` returned false |
 | `StreamReadTimeout` | -15 | Download stream timed out |
+| `BinaryVersionMismatch` | -16 | Binary's embedded version doesn't match expected |
 
 ## Cross-References
 

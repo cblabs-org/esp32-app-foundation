@@ -46,6 +46,7 @@ enum class OTAError : int8_t {
     UpdateWriteFailed       = -13,  // Update.write() wrote fewer bytes than expected
     UpdateEndFailed         = -14,  // Update.end() returned false
     StreamReadTimeout       = -15,  // Stream read timed out during chunked download
+    BinaryVersionMismatch   = -16,  // Binary's embedded version doesn't match expected
 };
 
 /**

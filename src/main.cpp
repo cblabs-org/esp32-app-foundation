@@ -20,10 +20,6 @@
 #include "AppFoundation.h"
 #include "publicKey.hpp"
 
-#if __has_include("otaSecrets.hpp")
-#include "otaSecrets.hpp"
-#endif
-
 #ifndef NATIVE_BUILD
     #include <Arduino.h>
 #endif
@@ -44,12 +40,8 @@ static Application app;  ///< Single framework hub instance
  */
 void setup() {
     FrameworkConfig config;
-    config.otaGithubRepo = "matthewmcneill/esp32-app-foundation";
+    config.otaManifestUrl = "https://raw.githubusercontent.com/matthewmcneill/esp32-app-foundation-releases/main/manifest.json";
     config.otaPublicKey = (const char*)public_key_pem;
-
-    #ifdef OTA_GITHUB_TOKEN
-    config.otaGithubToken = OTA_GITHUB_TOKEN;
-    #endif
 
     // App names its hostname default — WiFiManager owns the persisted value
     // and falls back to this on factory reset (resetConfig()).
