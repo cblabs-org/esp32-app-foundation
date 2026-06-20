@@ -50,7 +50,7 @@
  *   - getParentTab():         Return "System" for navigation hierarchy
  *   - getTabOrder():          Return 50 for pill ordering
  *
- *   IConfigurable (namespace: "ota", schema v4):
+ *   IConfigurable (namespace: "ota", schema v5):
  *   - getConfigNamespace():   Return "ota"
  *   - getSchemaVersion():     Return 4
  *   - applyConfig():          Apply OTA config from JSON section
@@ -192,11 +192,12 @@ static constexpr uint32_t OTA_TASK_DRAM_HEADROOM_BYTES = 8192;
  * from release check through download, verification, flash, and reboot.
  * Also retains the legacy direct-upload path for web-based OTA.
  *
- * IConfigurable fields (namespace: "ota", schema version: 4):
- *   - channel            (char[16]): OTA release channel ("stable", "beta", "dev")
- *   - autoCheck          (bool):     Whether to auto-check for updates on boot
- *   - lastCheckedChannel (char[16]): Last channel used for an update check
- *   - updatesEnabled     (bool):     Master kill-switch for applying firmware updates
+ * IConfigurable fields (namespace: "ota", schema version: 5):
+ *   - channel            (char[16]):  OTA release channel ("stable", "beta", "dev")
+ *   - autoCheck          (bool):      Whether to auto-check for updates on boot
+ *   - lastCheckedChannel (char[16]):  Last channel used for an update check
+ *   - updatesEnabled     (bool):      Master kill-switch for applying firmware updates
+ *   - learnedManifestUrl (char[256]): Learned manifest URL from last verified manifest
  */
 class OTAUpdateManager : public IWebContributor, public IConfigurable, public ITickable, public IMCPContributor {
 public:
@@ -357,7 +358,7 @@ public:
 
     /**
      * @brief Return the current schema version for the OTA config format.
-     * @return 2 — adds lastCheckedChannel for implicit downgrade detection.
+     * @return 5 — adds learnedManifestUrl for manifest URL resilience.
      */
     int getSchemaVersion() const override;
 
@@ -410,6 +411,7 @@ private:
     bool    _updatesEnabled         = true;  ///< Master kill-switch for applying firmware updates
     char    _lastCheckedChannel[16] = "";
     uint8_t _checkHour              = 3;   ///< Hour (0-23) at which daily auto-check fires
+    char    learnedManifestUrl_[256] = ""; ///< Learned manifest URL (persisted via IConfigurable)
 
     // Scheduling state (not persisted — reset on each boot)
     uint32_t _lastCheckDay   = 0;     ///< Unix day of last scheduled check (seconds/86400)
@@ -494,6 +496,24 @@ private:
     void publishProgress(float progress, const char* status, bool complete, bool success);
 
     /**
+     * @brief Fetch manifest.json + manifest.json.sig, verify signature, and parse.
+     *
+     * URL fallback: tries the learned URL first (if non-empty), then the
+     * compiled-in URL (_config->otaManifestUrl). For each URL:
+     *   1. Download manifest.json into a static 4096-byte buffer
+     *   2. Download manifest.json.sig into a 256-byte signature buffer
+     *   3. Verify the signature using MbedTLSSignatureVerifier
+     *   4. Parse the manifest into the output struct
+     * If the verified manifest contains a manifestUrl that differs from the
+     * current learned URL, update learnedManifestUrl_ and persist via config.
+     *
+     * @param manifest [out] Parsed OTAManifest struct (populated on success).
+     * @return true on success, false on failure (error state set internally).
+     */
+    bool fetchAndVerifyManifest_(OTAManifest& manifest);
+
+#if 0  // Superseded by fetchAndVerifyManifest_() — retained for reference until WO5 cleanup
+    /**
      * @brief Download and parse manifest.json, returning the version string.
      *
      * Encapsulates the HTTPS download (with CA-pinned retry → insecure
@@ -511,6 +531,7 @@ private:
         const std::string& manifestUrl,
         const FrameworkConfig& cfg,
         OTAManifest& manifest);
+#endif
 
     /**
      * @brief PsychicHttp multipart upload handler for POST /api/ota/upload.

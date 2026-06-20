@@ -53,7 +53,8 @@
  * downstream code cannot mutate it after boot.
  */
 struct FrameworkConfig {
-    const char* otaPublicKey  = nullptr;           ///< PEM-encoded RSA public key for OTA signature verification (nullptr = skip)
-    const char* otaGithubRepo = nullptr;           ///< GitHub repository in "owner/repo" format for OTA releases
+    const char* otaPublicKey   = nullptr;          ///< PEM-encoded RSA public key for OTA signature verification (nullptr = skip)
+    const char* otaManifestUrl = nullptr;          ///< Compiled-in manifest URL (unkillable fallback). WO3 replaces otaGithubRepo with this.
+    const char* otaGithubRepo  = nullptr;          ///< GitHub repository in "owner/repo" format for OTA releases (legacy — WO3 removes)
     const char* otaGithubToken = nullptr;          ///< Optional GitHub access token for private repos
 };
