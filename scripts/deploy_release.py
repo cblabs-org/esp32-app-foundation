@@ -62,8 +62,8 @@ BOARDS = ["esp32dev", "esp32s3nano"]
 # Release staging directory
 ARTIFACTS_DIR = "./release"
 
-# Fixed release tag for the OTA manifest
-OTA_MANIFEST_TAG = "ota-manifest"
+# Floating tag for the OTA manifest (device fetches from this fixed URL)
+OTA_MANIFEST_TAG = "manifest-latest"
 
 # Channel stability ordering: dev(0) < beta(1) < rc(2) < stable(3)
 CHANNEL_ORDER = {"dev": 0, "beta": 1, "rc": 2, "stable": 3}
@@ -395,7 +395,7 @@ def create_release(tag: str, dry_run: bool, target_repo: str = None) -> None:
     run(release_cmd, dry_run=dry_run, check=False)
 
     print("\n--- Step 5: Upload release assets ---")
-    asset_patterns = ["*.bin", "*.bin.sig", "*.bin.sha256", "manifest.json", "manifest.json.sig"]
+    asset_patterns = ["*.bin", "*.bin.sig", "*.bin.sha256"]
     assets = []
     for pattern in asset_patterns:
         assets.extend(glob.glob(os.path.join(ARTIFACTS_DIR, pattern)))

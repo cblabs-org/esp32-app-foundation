@@ -44,7 +44,7 @@ static Application app;  ///< Single framework hub instance
  */
 void setup() {
     FrameworkConfig config;
-    config.otaManifestUrl = "https://github.com/matthewmcneill/esp32-app-foundation/releases/download/ota-manifest/manifest.json";
+    config.otaManifestUrl = "https://github.com/matthewmcneill/esp32-app-foundation/releases/download/manifest-latest/manifest.json";
     config.otaPublicKey = (const char*)public_key_pem;
 
     #ifdef OTA_GITHUB_TOKEN

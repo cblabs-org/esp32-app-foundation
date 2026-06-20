@@ -50,17 +50,17 @@ The script:
 4. Signs the manifest: `openssl dgst -sha256 -sign private_key.pem manifest.json`
 5. Creates the versioned GitHub Release: `gh release create <tag>`
 6. Uploads versioned assets: `.bin`, `.bin.sig`, `.bin.sha256`
-7. Uploads/updates the `ota-manifest` fixed release with `manifest.json` + `manifest.json.sig`
+7. Uploads/updates the `manifest-latest` fixed release with `manifest.json` + `manifest.json.sig`
 
-### The `ota-manifest` Fixed Release
+### The `manifest-latest` Fixed Release
 
 Instead of floating tags (`latest-dev`, `latest-beta`, etc.), the deploy script
 uploads the manifest and its detached signature to a single **fixed release tag**
-called `ota-manifest`. The device always fetches from the same URL:
+called `manifest-latest`. The device always fetches from the same URL:
 
 ```
-https://github.com/{repo}/releases/download/ota-manifest/manifest.json
-https://github.com/{repo}/releases/download/ota-manifest/manifest.json.sig
+https://github.com/{repo}/releases/download/manifest-latest/manifest.json
+https://github.com/{repo}/releases/download/manifest-latest/manifest.json.sig
 ```
 
 This approach:
@@ -101,7 +101,7 @@ The deploy script supports a `--legacy-floating-tags` flag for backward
 compatibility with devices running firmware older than the manifest-first
 migration. When set, the script will also create/update the old-style
 floating tag releases (`latest-dev`, `latest-beta`, etc.) in addition to
-the `ota-manifest` release. This allows mixed fleets to co-exist during
+the `manifest-latest` release. This allows mixed fleets to co-exist during
 a rollout transition.
 
 ### Split-Repo Deployment
@@ -120,7 +120,7 @@ A single manifest covers all channels and all boards with absolute asset URLs:
 ```json
 {
   "manifestVersion": 1,
-  "manifestUrl": "https://github.com/.../releases/download/ota-manifest/manifest.json",
+  "manifestUrl": "https://github.com/.../releases/download/manifest-latest/manifest.json",
   "channels": {
     "stable": {
       "version": "v1.0.0",

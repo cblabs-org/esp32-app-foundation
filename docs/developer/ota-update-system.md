@@ -17,7 +17,7 @@ To enable production OTA in your downstream application:
 2. **Configure `FrameworkConfig`** in your `main.cpp`:
    ```cpp
    FrameworkConfig config;
-   config.otaManifestUrl = "https://github.com/your-org/your-repo/releases/download/ota-manifest/manifest.json";
+   config.otaManifestUrl = "https://github.com/your-org/your-repo/releases/download/manifest-latest/manifest.json";
    config.otaPublicKey   = YOUR_PUBLIC_KEY_PEM;  // extern const char[]
    config.otaToken       = nullptr;              // or a PAT/bearer token for private repos
    ```
@@ -381,9 +381,9 @@ section covers token creation, repository layout options, and the
 
 | Setup | `config.otaManifestUrl` | `otaSecrets.hpp` | `deploy_release.py` |
 |---|---|---|---|
-| Single private repo | `"https://github.com/owner/repo/releases/download/ota-manifest/manifest.json"` | Include PAT via `config.otaToken` | (default) |
-| Split releases repo | `"https://github.com/owner/releases-repo/releases/download/ota-manifest/manifest.json"` | Include PAT via `config.otaToken` | `--repo owner/releases-repo` |
-| Public repo | `"https://github.com/owner/public-repo/releases/download/ota-manifest/manifest.json"` | Omit (`nullptr`) | (default) |
+| Single private repo | `"https://github.com/owner/repo/releases/download/manifest-latest/manifest.json"` | Include PAT via `config.otaToken` | (default) |
+| Split releases repo | `"https://github.com/owner/releases-repo/releases/download/manifest-latest/manifest.json"` | Include PAT via `config.otaToken` | `--repo owner/releases-repo` |
+| Public repo | `"https://github.com/owner/public-repo/releases/download/manifest-latest/manifest.json"` | Omit (`nullptr`) | (default) |
 
 **Split releases repo** is recommended for blast-radius reduction: your source
 code repo and your firmware releases repo are separate. Devices only need
@@ -413,7 +413,7 @@ manifest covers all channels and all boards:
 ```json
 {
   "manifestVersion": 1,
-  "manifestUrl": "https://github.com/.../releases/download/ota-manifest/manifest.json",
+  "manifestUrl": "https://github.com/.../releases/download/manifest-latest/manifest.json",
   "channels": {
     "stable": {
       "version": "v1.0.0",
@@ -554,9 +554,9 @@ This script:
 4. Signs the manifest: `openssl dgst -sha256 -sign private_key.pem manifest.json`
 5. Creates the versioned GitHub Release: `gh release create <tag>`
 6. Uploads versioned assets: `.bin`, `.bin.sig`, `.bin.sha256`
-7. Uploads/updates the `ota-manifest` fixed release with `manifest.json` + `manifest.json.sig`
+7. Uploads/updates the `manifest-latest` fixed release with `manifest.json` + `manifest.json.sig`
 
-The manifest is hosted at a fixed release tag (`ota-manifest`) so the device
+The manifest is hosted at a fixed release tag (`manifest-latest`) so the device
 always fetches from the same URL regardless of which version is latest.
 
 ### 11.3 Why Sign Locally?
@@ -758,9 +758,9 @@ and daily scheduling is handled by `checkHour`.
 Before deploying to production, verify the OTA security posture:
 
 - [ ] `FrameworkConfig.otaPublicKey` is set to your PEM-encoded RSA public key
-- [ ] `FrameworkConfig.otaManifestUrl` points to your `ota-manifest` release
+- [ ] `FrameworkConfig.otaManifestUrl` points to your `manifest-latest` release
 - [ ] `SECURITY_VERSION` is set in all PlatformIO environments
-- [ ] `manifest.json` is signed and uploaded to the `ota-manifest` release on every deploy
+- [ ] `manifest.json` is signed and uploaded to the `manifest-latest` release on every deploy
 - [ ] `manifest.json.sig` (detached signature) accompanies the manifest
 - [ ] All `.bin` assets have corresponding `.bin.sig` files
 - [ ] The `deploy_release.py` script is used for signing (not CI)

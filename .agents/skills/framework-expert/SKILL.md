@@ -36,7 +36,7 @@ description: >
   "beta tag", "stable tag", "inject_version", "deploy_release",
   "build gate", "tag before build", "version bump".
   Also trigger on: "manifest signing", "manifest-first", "otaManifestUrl",
-  "ota-manifest release", "manifest.json.sig", "signed manifest",
+  "manifest-latest release", "manifest.json.sig", "signed manifest",
   "manifest URL resilience", "learned URL", "compiled-in URL",
   "defence-in-depth", "manifest schema v2", "multi-channel manifest".
   Also trigger on: "MCP server", "MCP tool", "device MCP", "list_tools",
