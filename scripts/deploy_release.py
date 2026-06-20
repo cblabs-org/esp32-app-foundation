@@ -636,7 +636,8 @@ def parse_args() -> argparse.Namespace:
         description="Sign firmware binaries, generate signed manifest, and create a GitHub Release",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    parser.add_argument("--tag", required=True, help="Git tag for the release (e.g. v3.1.0)")
+    parser.add_argument("--tag", help="Git tag for the release (e.g. v3.1.0). "
+                                      "If omitted, auto-detected from the tag on HEAD.")
     parser.add_argument("--private-key", required=True, help="Path to ECDSA private key")
 
     source = parser.add_mutually_exclusive_group(required=True)
@@ -680,6 +681,27 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def resolve_tag(explicit_tag: str = None) -> str:
+    """Return the release tag — from --tag or auto-detected from HEAD."""
+    if explicit_tag:
+        return explicit_tag
+    try:
+        result = subprocess.run(
+            ["git", "describe", "--tags", "--exact-match", "HEAD"],
+            capture_output=True, text=True, check=True, timeout=5,
+        )
+        tag = result.stdout.strip()
+        if tag:
+            print(f"Auto-detected tag from HEAD: {tag}")
+            return tag
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError):
+        pass
+    print("ERROR: No --tag provided and HEAD has no exact tag. "
+          "Tag your commit first (e.g. 'git tag v1.0.0') or pass --tag explicitly.",
+          file=sys.stderr)
+    sys.exit(1)
+
+
 def main() -> None:
     """Entry point."""
     args = parse_args()
@@ -687,6 +709,8 @@ def main() -> None:
     if args.build and args.run_id:
         print("ERROR: --build is only valid with --local", file=sys.stderr)
         sys.exit(1)
+
+    args.tag = resolve_tag(args.tag)
 
     mode = "local" if args.local else f"CI (run {args.run_id})"
     print(f"=== Deploy Release: {args.tag} ===")

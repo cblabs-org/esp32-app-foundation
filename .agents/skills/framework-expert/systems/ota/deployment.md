@@ -38,11 +38,10 @@ The `scripts/deploy_release.py` script handles building, signing, and publishing
 > **Agent Execution Rule:** NEVER execute `deploy_release.py` directly using terminal tools. The script requires the private key passphrase, which `openssl` will prompt for interactively. Because background tasks cannot provide interactive standard input, the process will hang indefinitely. **Always** output the exact CLI command in a markdown code block and instruct the user to run it in their own terminal.
 
 ```bash
-python3 scripts/deploy_release.py \
-    --tag v1.0.0 \
-    --local --build \
-    --private-key private_key.pem
+python3 scripts/deploy_release.py --private-key private_key.pem --local
 ```
+
+`--tag` is auto-detected from the git tag on HEAD. Pass it explicitly only if HEAD has multiple tags or you need to override.
 
 The script:
 1. Builds firmware for all hardware environments (`pio run -e <board>`)
