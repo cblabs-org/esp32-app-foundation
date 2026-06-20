@@ -395,14 +395,21 @@ OTAError OTADownloadEngine::downloadAndFlash(WiFiClient& client, const std::stri
             memcpy(binaryVersion, appDesc->version, sizeof(binaryVersion));
             binaryVersion[sizeof(binaryVersion) - 1] = '\0';
 
-            if (strncmp(binaryVersion, expectedVersion_, sizeof(binaryVersion)) != 0) {
+            // Strip leading 'v'/'V' — ESP-IDF's PROJECT_VER (from git tags)
+            // often includes it, but expectedVersion_ already has it stripped.
+            const char* cmpVersion = binaryVersion;
+            if (cmpVersion[0] == 'v' || cmpVersion[0] == 'V') {
+                cmpVersion++;
+            }
+
+            if (strncmp(cmpVersion, expectedVersion_, sizeof(binaryVersion)) != 0) {
                 ESP_LOGE(TAG, "SAFETY ABORT: Binary version mismatch — binary contains '%s', expected '%s'",
-                         binaryVersion, expectedVersion_);
+                         cmpVersion, expectedVersion_);
                 http.end();
                 lastError_ = OTAError::BinaryVersionMismatch;
                 return lastError_;
             }
-            ESP_LOGI(TAG, "Binary version validated: '%s' matches expected", binaryVersion);
+            ESP_LOGI(TAG, "Binary version validated: '%s' matches expected", cmpVersion);
         }
     } else if (expectedVersion_[0] != '\0') {
         ESP_LOGW(TAG, "First chunk too small for app descriptor (%d bytes) — skipping version check",
