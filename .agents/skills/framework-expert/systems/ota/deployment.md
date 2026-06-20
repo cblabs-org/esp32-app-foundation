@@ -128,8 +128,8 @@ A single manifest covers all channels and all boards with absolute asset URLs:
       "assets": [
         {
           "board": "esp32dev",
-          "firmware": "https://github.com/.../releases/download/v1.0.0/firmware-esp32dev.bin",
-          "signature": "https://github.com/.../releases/download/v1.0.0/firmware-esp32dev.bin.sig",
+          "firmwareUrl": "https://github.com/.../releases/download/v1.0.0/firmware-esp32dev.bin",
+          "signatureUrl": "https://github.com/.../releases/download/v1.0.0/firmware-esp32dev.bin.sig",
           "size": 1341651,
           "sha256": "abc123..."
         }

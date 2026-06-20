@@ -52,7 +52,7 @@
  *
  *   IConfigurable (namespace: "ota", schema v5):
  *   - getConfigNamespace():   Return "ota"
- *   - getSchemaVersion():     Return 4
+ *   - getSchemaVersion():     Return 5
  *   - applyConfig():          Apply OTA config from JSON section
  *   - serializeConfig():      Serialize OTA config to JSON section
  *   - migrateConfig():        Migrate from older schema version

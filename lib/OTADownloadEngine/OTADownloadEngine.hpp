@@ -7,7 +7,7 @@
  * To view a copy of this license, visit https://creativecommons.org/licenses/by-nc-sa/4.0/
  *
  * Module: lib/OTADownloadEngine/OTADownloadEngine.hpp
- * Description: GitHub-aware OTA firmware download engine. Handles the complete
+ * Description: OTA firmware download engine. Handles the complete
  *              download→verify→flash pipeline: redirect-aware HTTP fetching,
  *              .sig signature file retrieval, ESP32 binary header validation,
  *              partition space checks, chunked streaming writes through the
@@ -21,11 +21,11 @@
  *
  * Exported Functions/Classes:
  * - OTAProgressCallback: Function type for download progress notifications
- * - OTADownloadEngine: Download engine class for GitHub firmware OTA
+ * - OTADownloadEngine: Download engine class for OTA firmware updates
  *   - setVerifier():         Inject an IOTAVerifier for cryptographic checks
  *   - setProgressCallback(): Register a progress notification callback
  *   - setHttpTimeout():      Configure HTTP client timeout (default 8000ms)
- *   - fetchSignature():      Download .sig file following GitHub redirects
+ *   - fetchSignature():      Download .sig file following HTTP redirects
  *   - downloadAndFlash():    Download, verify, and flash a firmware binary
  *   - getLastError():        Retrieve the last OTAError code
  *   - getLastErrorString():  Retrieve a human-readable error description
@@ -76,9 +76,9 @@
 using OTAProgressCallback = void(*)(void* context, size_t bytesWritten, size_t totalSize);
 
 /**
- * @brief GitHub-aware OTA firmware download engine.
+ * @brief OTA firmware download engine.
  *
- * Handles redirect-following HTTP fetches from GitHub release assets,
+ * Handles redirect-following HTTP fetches from release asset URLs,
  * .sig signature file retrieval, ESP32 binary header verification (0xE9),
  * partition space validation, chunked streaming flash writes, and
  * IOTAVerifier-based cryptographic signature verification.
@@ -129,11 +129,11 @@ public:
      * @brief Download the signature file from the given URL, following redirects.
      *
      * Performs a redirect-aware HTTP GET (up to kMaxRedirects hops) to fetch
-     * the detached .sig file from a GitHub release asset URL.
+     * the detached .sig file from a release asset URL.
      *
      * @param client     Active WiFiClient (secure or insecure), provided by caller.
-     * @param sigUrl     URL of the .sig file (GitHub API asset URL).
-     * @param token      Optional GitHub access token for private repos.
+     * @param sigUrl     URL of the .sig file (HTTPS asset URL).
+     * @param token      Optional access token for private release repos.
      * @param sigBuf     Output buffer for the raw signature bytes.
      * @param sigBufSize Size of the output buffer.
      * @return Number of bytes read, or 0 on failure.
@@ -150,8 +150,8 @@ public:
      * per-chunk verifier accumulation → signature verification → Update.end().
      *
      * @param client  Active WiFiClient (secure or insecure), provided by caller.
-     * @param binUrl  URL of the .bin file (GitHub API asset URL).
-     * @param token   Optional GitHub access token for private repos.
+     * @param binUrl  URL of the .bin file (HTTPS asset URL).
+     * @param token   Optional access token for private release repos.
      * @param sigBuf  Previously-fetched signature bytes (from fetchSignature).
      * @param sigLen  Length of the signature.
      * @return OTAError::None on success, specific error otherwise.
@@ -192,7 +192,7 @@ private:
      * @param client Active WiFiClient reference.
      * @param http   HTTPClient instance to use for requests.
      * @param url    Initial URL to fetch.
-     * @param token  Optional GitHub access token.
+     * @param token  Optional access token.
      * @return HTTP status code on success, or -1 on redirect exhaustion/failure.
      */
     int followRedirects(WiFiClient& client, HTTPClient& http,

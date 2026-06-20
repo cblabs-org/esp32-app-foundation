@@ -108,7 +108,7 @@ Any  ──→ Error                          (on failure)
 
 ### 3.2 Pipeline Steps
 
-When `performUpdate()` is called, a FreeRTOS task (8KB stack, priority 1)
+When `performUpdate()` is called, a FreeRTOS task (16KB stack (OTA_TASK_STACK_BYTES = 16384), priority 5)
 executes the following pipeline:
 
 1. **Guard checks** — firmware updates enabled? `otaManifestUrl` configured?
@@ -421,8 +421,8 @@ manifest covers all channels and all boards:
       "assets": [
         {
           "board": "esp32dev",
-          "firmware": "https://github.com/.../releases/download/v1.0.0/firmware-esp32dev.bin",
-          "signature": "https://github.com/.../releases/download/v1.0.0/firmware-esp32dev.bin.sig",
+          "firmwareUrl": "https://github.com/.../releases/download/v1.0.0/firmware-esp32dev.bin",
+          "signatureUrl": "https://github.com/.../releases/download/v1.0.0/firmware-esp32dev.bin.sig",
           "size": 1341651,
           "sha256": "abc123..."
         }
@@ -434,8 +434,8 @@ manifest covers all channels and all boards:
       "assets": [
         {
           "board": "esp32dev",
-          "firmware": "https://github.com/.../releases/download/v1.1.0-dev.3/firmware-esp32dev.bin",
-          "signature": "https://github.com/.../releases/download/v1.1.0-dev.3/firmware-esp32dev.bin.sig",
+          "firmwareUrl": "https://github.com/.../releases/download/v1.1.0-dev.3/firmware-esp32dev.bin",
+          "signatureUrl": "https://github.com/.../releases/download/v1.1.0-dev.3/firmware-esp32dev.bin.sig",
           "size": 1345000,
           "sha256": "def456..."
         }

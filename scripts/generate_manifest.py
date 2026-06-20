@@ -77,8 +77,8 @@ def build_channel_entry(
     version: str,
     security_version: int,
     boards: list[str],
-    firmware_dir: str,
     base_url: str,
+    firmware_dir: str = None,
 ) -> dict:
     """Build a single channel entry with absolute asset URLs.
 
@@ -86,8 +86,11 @@ def build_channel_entry(
         version: Release version tag for this channel.
         security_version: Anti-rollback security version counter.
         boards: List of board identifiers (e.g. ["esp32dev", "esp32s3nano"]).
-        firmware_dir: Local directory containing firmware-{board}.bin files.
         base_url: URL prefix for firmware/signature download URLs.
+        firmware_dir: Local directory containing firmware-{board}.bin files.
+                      When None, size and sha256 are omitted from assets
+                      (the device never reads these fields — ECDSA signature
+                      provides integrity verification).
 
     Returns:
         Channel entry dict with version, securityVersion, and assets array.
@@ -98,24 +101,23 @@ def build_channel_entry(
     assets = []
     for board in boards:
         bin_name = f"firmware-{board}.bin"
-        bin_path = os.path.join(firmware_dir, bin_name)
 
-        if not os.path.isfile(bin_path):
-            print(f"ERROR: firmware binary not found: {bin_path}", file=sys.stderr)
-            sys.exit(1)
+        asset = {
+            "board": board,
+            "firmwareUrl": f"{base_url}/{bin_name}",
+            "signatureUrl": f"{base_url}/{bin_name}.sig",
+        }
 
-        size = os.path.getsize(bin_path)
-        sha256 = sha256_file(bin_path)
+        # Include size and sha256 only when firmware binaries are available
+        if firmware_dir is not None:
+            bin_path = os.path.join(firmware_dir, bin_name)
+            if not os.path.isfile(bin_path):
+                print(f"ERROR: firmware binary not found: {bin_path}", file=sys.stderr)
+                sys.exit(1)
+            asset["size"] = os.path.getsize(bin_path)
+            asset["sha256"] = sha256_file(bin_path)
 
-        assets.append(
-            {
-                "board": board,
-                "firmwareUrl": f"{base_url}/{bin_name}",
-                "signatureUrl": f"{base_url}/{bin_name}.sig",
-                "size": size,
-                "sha256": sha256,
-            }
-        )
+        assets.append(asset)
 
     return {
         "version": version,
@@ -267,11 +269,18 @@ def main() -> None:
             sys.exit(1)
 
         n = len(channels)
-        if len(versions) != n or len(sec_versions) != n or len(firmware_dirs) != n or len(base_urls) != n:
+        if len(versions) != n or len(sec_versions) != n or len(base_urls) != n:
             print(
                 f"ERROR: --channels ({n}) must have matching count for "
                 f"--versions ({len(versions)}), --security-versions ({len(sec_versions)}), "
-                f"--firmware-dirs ({len(firmware_dirs)}), --base-urls ({len(base_urls)})",
+                f"--base-urls ({len(base_urls)})",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        if firmware_dirs and len(firmware_dirs) != n:
+            print(
+                f"ERROR: --firmware-dirs ({len(firmware_dirs)}) must match "
+                f"--channels ({n}) count when provided",
                 file=sys.stderr,
             )
             sys.exit(1)
@@ -281,16 +290,16 @@ def main() -> None:
                 version=versions[i],
                 security_version=int(sec_versions[i]),
                 boards=boards,
-                firmware_dir=firmware_dirs[i],
                 base_url=base_urls[i],
+                firmware_dir=firmware_dirs[i] if firmware_dirs else None,
             )
 
     elif args.channel:
         # --- Single-channel mode ---
-        if not all([args.version, args.security_version is not None, args.boards, args.firmware_dir, args.base_url]):
+        if not all([args.version, args.security_version is not None, args.boards, args.base_url]):
             print(
                 "ERROR: single-channel mode requires --version, --channel, "
-                "--security-version, --boards, --firmware-dir, and --base-url",
+                "--security-version, --boards, and --base-url",
                 file=sys.stderr,
             )
             sys.exit(1)
@@ -304,8 +313,8 @@ def main() -> None:
             version=args.version,
             security_version=args.security_version,
             boards=boards,
-            firmware_dir=args.firmware_dir,
             base_url=args.base_url,
+            firmware_dir=args.firmware_dir,
         )
 
     else:

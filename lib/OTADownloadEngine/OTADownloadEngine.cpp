@@ -8,7 +8,7 @@
  *
  * Module: lib/OTADownloadEngine/OTADownloadEngine.cpp
  * Description: Implementation of the OTA Download Engine — redirect-aware
- *              GitHub binary downloader with signature fetch, ESP32 header
+ *              OTA binary downloader with signature fetch, ESP32 header
  *              verification, partition validation, chunked streaming flash
  *              writes, and IOTAVerifier cryptographic verification.
  *
@@ -133,8 +133,8 @@ void OTADownloadEngine::setExpectedVersion(const char* version) {
  * @brief Follow HTTP redirects and return the final response code.
  *
  * Loops up to kMaxRedirects times. Each iteration opens a new HTTP request
- * with GitHub-appropriate headers (User-Agent, Cache-Control, Accept,
- * Authorization, X-GitHub-Api-Version) and disables auto-redirect to
+ * with download headers (User-Agent, Cache-Control, Accept,
+ * Authorization) and disables auto-redirect to
  * manually follow 301/302/307/308 responses via the Location header.
  *
  * Uses HTTP/1.0 to avoid chunked transfer encoding complications on
@@ -167,7 +167,7 @@ int OTADownloadEngine::followRedirects(WiFiClient& client, HTTPClient& http,
         if (!token.empty()) {
             http.addHeader("Authorization", String(("Bearer " + token).c_str()));
         }
-        http.addHeader("X-GitHub-Api-Version", "2022-11-28");
+
 
         int code = http.GET();
 
