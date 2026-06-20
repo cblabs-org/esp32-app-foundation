@@ -95,5 +95,5 @@ predate the formal PA pipeline and are filed retrospectively.
 ---
 
 *Updated: 2026-06-07 — context_archives migrated into PA workspace; pr-14 marked COMPLETE*
-| [pr-34-mcp-tools](./pr-34-mcp-tools/PROJECT.md) | Module-Specific MCP Tools (domain-specific JSON-RPC tools for Wifi, OTA, Display, Config) | 📋 **PLANNING** — 4 WOs defined, ready for execution workers | Current Session |
+| [pr-34-mcp-tools](./pr-34-mcp-tools/PROJECT.md) | Module-Specific MCP Tools (domain-specific JSON-RPC tools for Wifi, OTA, Display, Config) | ✅ **COMPLETE** — 4 WOs done (8 new tools), all builds green | Current Session |
 | [pr-35-weather-station](./pr-35-weather-station/PROJECT.md) | Weather Station & Home Assistant Module (esp-mqtt wrapper, HOM entities, Web Portal, U8G2 composable widgets) | 📋 **PLANNING** — 4 WOs defined, ready for execution workers | Current Session |

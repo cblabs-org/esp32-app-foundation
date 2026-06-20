@@ -4,7 +4,11 @@
 
 ## Work Order Ledger
 
-- **[ ] [wo1-wifi-mcp](wo1-wifi-mcp/WORKORDER.md):** Implement `wifi_get_status`, `wifi_scan_networks`, and `wifi_forget`.
-- **[ ] [wo2-ota-mcp](wo2-ota-mcp/WORKORDER.md):** Implement `ota_get_status`, `ota_check_now`, and `ota_trigger_update`.
-- **[ ] [wo3-display-mcp](wo3-display-mcp/WORKORDER.md):** Implement `display_get_state`, `display_get_active_board`, and `display_set_screensaver`.
-- **[ ] [wo4-config-mcp](wo4-config-mcp/WORKORDER.md):** Implement `config_get_schema_version` and `config_factory_reset`.
+- **[x] [wo1-wifi-mcp](wo1-wifi-mcp/WORKORDER.md):** `wifi_get_status`, `wifi_scan_networks`, `wifi_forget` — merged `e9086d7`
+- **[x] [wo2-ota-mcp](wo2-ota-mcp/WORKORDER.md):** `ota_get_status`, `ota_check_now`, `ota_trigger_update` — merged `1e12428`
+- **[x] [wo3-display-mcp](wo3-display-mcp/WORKORDER.md):** Already Satisfied — existing `display_status`/`display_control` conform to architecture. `capture_display` tech debt documented.
+- **[x] [wo4-config-mcp](wo4-config-mcp/WORKORDER.md):** `config_get_schema_version`, `config_factory_reset` — merged `6bf6953`
+
+## Summary
+
+**8 new MCP tools** added across 3 modules (WifiManager, OTAUpdateManager, ConfigManager). 1 module (U8G2DisplayModule) already satisfied. All builds verified green on `esp32dev` and/or `esp32s3nano`.
