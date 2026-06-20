@@ -282,6 +282,7 @@ bool OTAUpdateManager::checkForUpdate() {
     }
 
     _state = OTAState::Checking;
+    _lastCheckMillis = millis();
     ESP_LOGI(TAG, "Checking for updates — local: %s, channel: '%s'", BUILD_VERSION, _channel);
 
 #ifndef NATIVE_BUILD
@@ -466,6 +467,7 @@ void OTAUpdateManager::performUpdateTask() {
     }
 
     // --- Step 1: Check GitHub for releases ---
+    _lastCheckMillis = millis();
     GithubClient github(cfg.otaGithubRepo,
                         cfg.otaGithubToken ? cfg.otaGithubToken : "");
     ESP_LOGI(TAG, "Querying GitHub for latest release — repo: %s, channel: '%s', local: %s",
@@ -1436,9 +1438,9 @@ void OTAUpdateManager::registerMCPTools(MCPToolRegistry& registry) {
             result["state"]         = otaStateToString(self->_state);
             result["version"]       = BUILD_VERSION;
             result["channel"]       = self->_channel;
-            result["last_check_ms"] = (self->_lastCheckDay > 0)
-                                     ? static_cast<long>(self->_lastCheckDay * 86400UL * 1000UL)
-                                     : 0;
+            result["last_check_ms"] = (self->_lastCheckMillis > 0)
+                                     ? static_cast<long>(millis() - self->_lastCheckMillis)
+                                     : -1;
             result["auto_check"]     = self->_autoCheck;
             result["updates_enabled"] = self->_updatesEnabled;
             if (self->_lastOtaError) {
