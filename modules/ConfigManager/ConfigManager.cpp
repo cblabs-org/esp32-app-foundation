@@ -22,6 +22,7 @@
 #endif
 #include <string.h>
 #include "platform/LogShim.h"
+#include "MCPToolRegistry.hpp"
 
 #ifndef NATIVE_BUILD
 // (no additional hardware-only includes needed)
@@ -551,3 +552,79 @@ void ConfigManager::registerRoutes(PsychicHttpServer& server) {
 #endif
 }
 
+
+// =============================================================================
+// IMCPContributor — MCP Tool Registration
+// =============================================================================
+
+/**
+ * @brief Register ConfigManager-specific MCP tools.
+ *
+ * Two complementary tools are registered:
+ *   - config_get_schema_version (read-only): Returns the system-level config
+ *     backup schema version. This is the envelope version used by
+ *     exportAllConfig() / importAllConfig(), NOT individual module _v values.
+ *   - config_factory_reset (mutating): Removes all persisted module config
+ *     files from the /mod/ directory and schedules a device reboot. On restart,
+ *     loadModuleConfig() will find no files and call resetConfig() on each
+ *     module, restoring factory defaults.
+ *
+ * Both tools are guarded by #ifndef NATIVE_BUILD — no hardware APIs are
+ * available in the native test environment.
+ *
+ * @param registry The MCPToolRegistry to register tools with.
+ */
+void ConfigManager::registerMCPTools(MCPToolRegistry& registry) {
+#ifndef NATIVE_BUILD
+    // --- config_get_schema_version: read-only system config schema version ---
+    registry.addTool("config_get_schema_version",
+        "Get the system-level config backup schema version",
+        [](void* /*context*/, JsonObject& args, JsonObject& result) {
+            (void)args; // No input parameters
+            // This is the envelope version used by exportAllConfig()/importAllConfig(),
+            // matching the backup_version field in the _meta envelope.
+            result["version"] = 1;
+        }, nullptr, false);
+
+    // --- config_factory_reset: wipe all config and reboot ---
+    registry.addTool("config_factory_reset",
+        "Wipe all persisted module configuration and reboot to factory defaults. "
+        "WARNING: This is destructive and cannot be undone.",
+        [](void* context, JsonObject& args, JsonObject& result) {
+            (void)args; // No input parameters
+            ConfigManager* self = static_cast<ConfigManager*>(context);
+
+            ESP_LOGW(TAG, "Factory reset requested via MCP — wiping all config files");
+
+            // Delete every registered module's config file from /mod/
+            for (IConfigurable* mod : self->_modules) {
+                char path[48];
+                getConfigPath(mod->getConfigNamespace(), path, sizeof(path));
+                if (LittleFS.exists(path)) {
+                    LittleFS.remove(path);
+                    ESP_LOGI(TAG, "Removed config file: %s", path);
+                }
+            }
+
+            // Also remove the config manifest file
+            if (LittleFS.exists("/config_manifest.json")) {
+                LittleFS.remove("/config_manifest.json");
+                ESP_LOGI(TAG, "Removed config manifest file");
+            }
+
+            result["success"] = true;
+            result["message"] = "Config wiped, restarting";
+
+            // Schedule restart (500ms delay for response to flush)
+            TimerHandle_t restartTimer = xTimerCreate(
+                "cfg_factory_rst", pdMS_TO_TICKS(500), pdFALSE, nullptr,
+                [](TimerHandle_t t) {
+                    ESP.restart();
+                }
+            );
+            if (restartTimer != nullptr) {
+                xTimerStart(restartTimer, 0);
+            }
+        }, this, true);
+#endif
+}

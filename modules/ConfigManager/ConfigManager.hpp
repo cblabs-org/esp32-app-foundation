@@ -38,6 +38,10 @@
  *   - getTabName():          Return "Backup" for portal tab
  *   - getParentTab():        Return "System" for navigation hierarchy
  *   - getTabOrder():         Return 40 for pill ordering
+ *
+ *   IMCPContributor:
+ *   - registerMCPTools():    Register config_get_schema_version and
+ *                            config_factory_reset MCP tools
  */
 
 #pragma once
@@ -58,6 +62,7 @@
 #include <ArduinoJson.h>
 #include "../../include/interfaces/IConfigurable.hpp"
 #include "../../include/interfaces/IWebContributor.hpp"
+#include "../../include/interfaces/IMCPContributor.hpp"
 #include "../../lib/ConfigManifest/ConfigManifest.hpp"
 
 /**
@@ -70,7 +75,7 @@
  * migrations if needed, and calls applyConfig(). Individual modules call
  * saveModuleConfig() when they need to persist changes.
  */
-class ConfigManager : public IWebContributor {
+class ConfigManager : public IWebContributor, public IMCPContributor {
 public:
     ConfigManager() = default;
 
@@ -182,6 +187,23 @@ public:
      * @return 40 — positioned after Keys (20) and MCP (30) in the pill bar.
      */
     int getTabOrder() const override { return 40; }
+
+    // -------------------------------------------------------------------------
+    // IMCPContributor Interface
+    // -------------------------------------------------------------------------
+
+    /**
+     * @brief Register ConfigManager-specific MCP tools.
+     *
+     * Registers:
+     *   - config_get_schema_version (read-only): Returns the system-level config
+     *     schema version used in backup/restore envelopes.
+     *   - config_factory_reset (mutating): Wipes all persisted module config
+     *     files from LittleFS and schedules a device reboot.
+     *
+     * @param registry The MCPToolRegistry to register tools with.
+     */
+    void registerMCPTools(MCPToolRegistry& registry) override;
 
 private:
     // -------------------------------------------------------------------------

@@ -143,7 +143,7 @@ bool Application::begin(const FrameworkConfig& config) {
     registerModule(&_authManager);        // IConfigurable + IWebContributor
     registerModule(_authManager.passwordTabStub());  // IWebContributor (sub-pill)
     registerModule(_authManager.tlsTabStub());       // IWebContributor (sub-pill)
-    registerModule(&_configManager);      // IWebContributor
+    registerModule(&_configManager);      // IWebContributor + IMCPContributor
     registerModule(&_keyManager);         // IWebContributor
     registerModule(&_mcpServer);          // IConfigurable + IWebContributor
     registerModule(_otaManager);          // ITickable + IConfigurable + IWebContributor + IMCPContributor
