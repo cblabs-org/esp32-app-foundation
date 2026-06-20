@@ -52,3 +52,15 @@ Read the project plan for the full manifest schema and hosting design:
 
 # Verification Requirement
 Run the script with `--dry-run` and verify the generated commands are correct. **CRITICAL:** Before distilling or committing, you MUST ask the user if they are happy. Only *after* approval should you invoke the `@distillery` skill to package the state and drop control.
+
+---
+
+# Status Update
+
+**Status:** ✅ COMPLETE
+**Commit:** `9c265ff` on `pr-36-manifest-first-ota-wo4-deploy-script`
+**Date:** 2026-06-20
+**Agent:** WO4 worker (conversation `3ee36ddc-bf1e-402e-ace6-febc05f506ff`)
+
+## Summary
+All checklist items implemented and verified via dry-run and unit tests. Manifest signing, risk-floor scanning, `--merge-into` merge, and `ota-manifest` release upload all operational. Floating tags moved behind `--legacy-floating-tags` (default: off) with `DeprecationWarning`.
