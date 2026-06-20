@@ -252,5 +252,10 @@ def inject_version():
 
     env.Replace(BUILD_FLAGS=filtered)
 
+    # Also set PROJECT_VER for ESP-IDF — this controls esp_app_desc_t.version
+    # in the binary header. Without this, ESP-IDF defaults to `git describe --dirty`
+    # which can diverge from BUILD_VERSION and cause OTA version mismatch.
+    env.Append(CPPDEFINES=[("PROJECT_VER", f'\\"{full_version_str}\\"')])
+
 
 inject_version()
