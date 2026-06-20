@@ -7,15 +7,15 @@
  * To view a copy of this license, visit https://creativecommons.org/licenses/by-nc-sa/4.0/
  *
  * Module: modules/OTAUpdateManager/OTAUpdateManager.hpp
- * Description: Full OTA orchestrator for firmware updates via GitHub releases.
- *              Implements IMCPContributor to expose ota_get_status,
+ * Description: Full OTA orchestrator for firmware updates via manifest-first
+ *              pipeline. Implements IMCPContributor to expose ota_get_status,
  *              ota_check_now, and ota_trigger_update MCP tools.
  *              Wires the OTADownloadEngine (redirect-aware download + flash),
  *              IOTAVerifier (cryptographic signature verification via MbedTLS),
- *              and GithubClient (release metadata queries) into a single,
+ *              and manifest-based release channel resolution into a single,
  *              event-driven pipeline. Supports both direct web-upload OTA
- *              (legacy beginUpdate/writeStream/endUpdate) and the new
- *              GitHub-based checkForUpdate/performUpdate workflow.
+ *              (legacy beginUpdate/writeStream/endUpdate) and the manifest-first
+ *              checkForUpdate/performUpdate workflow.
  *
  *              Download runs in a FreeRTOS task to respect the tick() ≤ 10ms
  *              constraint. Progress events are published to the EventBus on
@@ -29,7 +29,7 @@
  *
  *   Orchestrator API:
  *   - begin():                Initialize with Application dependencies
- *   - checkForUpdate():       Query GitHub for a newer firmware release
+ *   - checkForUpdate():       Check for a newer firmware version via manifest
  *   - performUpdate():        Launch the full download→verify→flash pipeline in a FreeRTOS task
  *   - getState():             Query the current OTA state machine state
  *   - getLastOtaError():      Retrieve the last OTA error string
@@ -109,7 +109,7 @@ struct FrameworkConfig;
 struct OTAManifest;
 class ConfigManager;
 class EventBus;
-class GithubClient;
+
 class OTADownloadEngine;
 class IOTAVerifier;
 class MbedTLSSignatureVerifier;
@@ -224,16 +224,13 @@ public:
     void tick(uint32_t currentMillis) override;
 
     /**
-     * @brief Check GitHub for a newer firmware version. Non-blocking.
+     * @brief Check for a newer firmware version. Non-blocking.
      *
-     * Creates a GithubClient with the repo and token from FrameworkConfig,
-     * queries the latest release, and compares release IDs. On native builds,
-     * always returns false.
-     *
-     * @warning This method makes blocking HTTPS calls. It MUST only be called
-     *          from the OTA FreeRTOS task — never from the main loop tick().
-     *          Calling from tick() will violate the 10ms tick budget and may
-     *          trigger the Task Watchdog Timer.
+     * Validates preconditions (initialized, Idle state, manifest URL) and
+     * transitions to Checking state. The full manifest-first check is
+     * performed by performUpdateTask(); this standalone method is retained
+     * for the MCP ota_check_now tool and returns false on both native and
+     * hardware until a lightweight manifest-only check is wired.
      *
      * @return true if a new version is available, false otherwise.
      */
@@ -467,9 +464,10 @@ private:
     /**
      * @brief Instance method running the full OTA pipeline inside the FreeRTOS task.
      *
-     * Steps: GitHub check → find .bin/.sig assets → init verifier → allocate
-     * WiFiClientSecure → configure engine → fetch signature → download & flash
-     * → finalize → reboot.
+     * Steps: Manifest fetch + verify → channel lookup → SemVer compare →
+     * board asset lookup → snapshot config manifest → init verifier →
+     * allocate WiFiClientSecure → configure engine → fetch signature →
+     * download & flash → finalize → reboot.
      */
     void performUpdateTask();
 
@@ -512,26 +510,7 @@ private:
      */
     bool fetchAndVerifyManifest_(OTAManifest& manifest);
 
-#if 0  // Superseded by fetchAndVerifyManifest_() — retained for reference until WO5 cleanup
-    /**
-     * @brief Download and parse manifest.json, returning the version string.
-     *
-     * Encapsulates the HTTPS download (with CA-pinned retry → insecure
-     * fallback), buffered read, and JSON parse of a manifest.json release
-     * asset. On success, populates @p manifest and returns the manifest's
-     * version field. On failure, sets _state, _lastOtaError, and
-     * publishes a progress event, then returns an empty string.
-     *
-     * @param manifestUrl  GitHub API asset URL for manifest.json.
-     * @param cfg          Current FrameworkConfig for the OTA token.
-     * @param manifest     [out] Parsed OTAManifest struct (populated on success).
-     * @return Version string from the manifest, or empty string on failure.
-     */
-    std::string downloadAndParseManifestVersion_(
-        const std::string& manifestUrl,
-        const FrameworkConfig& cfg,
-        OTAManifest& manifest);
-#endif
+
 
     /**
      * @brief PsychicHttp multipart upload handler for POST /api/ota/upload.
