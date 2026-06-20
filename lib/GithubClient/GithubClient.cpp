@@ -181,11 +181,6 @@ bool GithubClient::getLatestRelease() {
     releaseId = doc["tag_name"] | "";
     releaseDescription = doc["name"] | "";
 
-    // If the baseline is a floating tag (e.g. latest-stable), parse SemVer from the title instead
-    if (strncmp(releaseId.c_str(), "latest-", 7) == 0 && !releaseDescription.empty()) {
-        releaseId = releaseDescription;
-    }
-
     JsonArray assetsArray = doc["assets"].as<JsonArray>();
     for (JsonObject asset : assetsArray) {
         if (releaseAssets >= MAX_RELEASE_ASSETS) break;
@@ -362,23 +357,36 @@ bool GithubClient::getLatestReleaseForChannel(const char* channel) {
 
                         if (!error) {
                             const char* tagName = doc["tag_name"] | "";
-                            const char* releaseName = doc["name"] | "";
-                            
-                            // If this is a floating tag, the actual semantic version is stored in the release title
-                            if (strncmp(tagName, "latest-", 7) == 0 && releaseName[0] != '\0') {
-                                tagName = releaseName;
-                            }
+
+                            // Floating tags (e.g. "latest-dev") don't contain a
+                            // parseable SemVer — accept unconditionally and let
+                            // OTAUpdateManager resolve the real version from the
+                            // manifest.json asset before the comparison.
+                            bool isFloating = (strncmp(tagName, "latest-", 7) == 0);
 
                             if (tagName[0] != '\0') {
-                                FirmwareVersion candidate = parseVersionTag(tagName);
-                                if (bestTag.empty() || candidate > bestVer) {
-                                    LOG_SECURE("GITHUB", "Found newer release via floating tag: %s", tagName);
-                                    bestVer         = candidate;
+                                if (isFloating) {
+                                    // Floating tag: skip SemVer comparison, accept as candidate
+                                    LOG_SECURE("GITHUB", "Floating tag found: %s (version deferred to manifest)", tagName);
                                     bestTag         = tagName;
-                                    bestDescription = doc["name"] | "";
-                                    bestIsPre       = doc["prerelease"] | false;
-                                    bestAssetCount  = 0;
+                                    bestVer         = {};  // Zero — comparison deferred
+                                } else {
+                                    FirmwareVersion candidate = parseVersionTag(tagName);
+                                    if (bestTag.empty() || candidate > bestVer) {
+                                        LOG_SECURE("GITHUB", "Found newer release via tag: %s", tagName);
+                                        bestVer         = candidate;
+                                        bestTag         = tagName;
+                                    } else {
+                                        // Not newer — skip asset parsing
+                                        goto skipAssets;
+                                    }
+                                }
 
+                                bestDescription = doc["name"] | "";
+                                bestIsPre       = doc["prerelease"] | false;
+                                bestAssetCount  = 0;
+
+                                {
                                     JsonArray assetsArray = doc["assets"].as<JsonArray>();
                                     for (JsonObject asset : assetsArray) {
                                         if (bestAssetCount >= MAX_RELEASE_ASSETS) break;
@@ -392,6 +400,7 @@ bool GithubClient::getLatestReleaseForChannel(const char* channel) {
                                     }
                                 }
                             }
+                            skipAssets: ;
                         } else {
                             LOG_SECURE("GITHUB", "JSON parse error on floating tag: %s", error.c_str());
                         }

@@ -57,8 +57,10 @@ To prevent GitHub API pagination and memory exhaustion, the OTA engine uses **fl
 
 The `deploy_release.py` script automatically force-pushes these floating tags to the latest commit of that channel and creates a GitHub Release attached to it.
 
-> [!IMPORTANT]
-> **SemVer via Release Title (Design Constraint)**: Because the GitHub API returns the literal string (e.g. `latest-dev`) in the `tag_name` field of a floating release, the ESP32 cannot parse its semantic version directly from the tag. To avoid downloading the `manifest.json` asset (which costs time and memory), the deploy script explicitly sets the GitHub Release title (`name` field) to the exact semantic version (e.g., `--title v0.0.11-dev.13`). `GithubClient` detects floating tags via a `"latest-"` prefix check and reads the SemVer from the `name` field instead of `tag_name`. **This is a critical contract between `deploy_release.py` and `GithubClient.cpp` — do not change the release title format without updating both.**
+**Version Resolution:** Because the GitHub API returns the literal string (e.g. `latest-dev`) in the `tag_name` field of a floating release, the ESP32 cannot parse its semantic version directly from the tag. `GithubClient` detects floating tags via a `"latest-"` prefix check and defers version resolution to `OTAUpdateManager`, which downloads the `manifest.json` asset (~500 bytes) to extract the build-authoritative version string. This costs one extra HTTP request (~3–5s with TLS) but eliminates the fragile cross-component title contract that was previously used.
+
+> [!NOTE]
+> **Defence-in-depth:** Even after the manifest version is resolved, the pre-flash binary version validation gate (see OTADownloadEngine) independently verifies that the `esp_app_desc_t.version` field in the downloaded binary matches the expected version before any flash writes occur.
 
 ### Split-Repo Deployment
 
@@ -114,6 +116,7 @@ Board IDs are injected at compile time via `BOARD_ID` in `platformio.ini` `build
 | `UpdateWriteFailed` | -13 | Incomplete chunk write |
 | `UpdateEndFailed` | -14 | `Update.end()` returned false |
 | `StreamReadTimeout` | -15 | Download stream timed out |
+| `BinaryVersionMismatch` | -16 | Binary's embedded version doesn't match expected |
 
 ## Cross-References
 

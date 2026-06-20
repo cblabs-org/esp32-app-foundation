@@ -296,10 +296,9 @@ def create_release(tag: str, dry_run: bool, target_repo: str = None) -> None:
         delete_cmd.extend(["--repo", target_repo])
     run(delete_cmd, dry_run=dry_run, check=False, stderr=subprocess.DEVNULL)
     
-    # CRITICAL CONTRACT: The --title MUST be the exact semantic version tag (e.g. v0.0.11-dev.13).
-    # GithubClient.cpp on the ESP32 parses the SemVer from the release "name" (title) field
-    # because the tag_name field contains the unparseable "latest-{channel}" string.
-    # Changing this title format will silently break OTA version detection on all devices.
+    # Set the title to the exact semantic version for human readability in the GitHub UI.
+    # NOTE: This is NOT a critical contract. The ESP32 OTA engine resolves the version
+    # from manifest.json (not the release title). The title is purely cosmetic.
     floating_release_cmd = ["gh", "release", "create", floating_tag, "--title", tag, "--notes", f"Alias for {tag}"]
     if channel != "stable":
         floating_release_cmd.append("--prerelease")

@@ -44,6 +44,7 @@ const char* otaErrorToString(OTAError err) {
         case OTAError::UpdateWriteFailed:       return "Update.write() failed";
         case OTAError::UpdateEndFailed:         return "Update.end() failed";
         case OTAError::StreamReadTimeout:       return "Stream read timeout or disconnect";
+        case OTAError::BinaryVersionMismatch:   return "Binary version mismatch — expected version not found in firmware";
     }
     return "Unknown OTA error";
 }

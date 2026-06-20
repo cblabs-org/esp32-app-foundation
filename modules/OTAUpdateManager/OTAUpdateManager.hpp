@@ -106,6 +106,7 @@ class Stream {};
 class Application;
 class MCPToolRegistry;
 struct FrameworkConfig;
+struct OTAManifest;
 class ConfigManager;
 class EventBus;
 class GithubClient;
@@ -491,6 +492,25 @@ private:
      * @param success  True if OTA succeeded.
      */
     void publishProgress(float progress, const char* status, bool complete, bool success);
+
+    /**
+     * @brief Download and parse manifest.json, returning the version string.
+     *
+     * Encapsulates the HTTPS download (with CA-pinned retry → insecure
+     * fallback), buffered read, and JSON parse of a manifest.json release
+     * asset. On success, populates @p manifest and returns the manifest's
+     * version field. On failure, sets _state, _lastOtaError, and
+     * publishes a progress event, then returns an empty string.
+     *
+     * @param manifestUrl  GitHub API asset URL for manifest.json.
+     * @param cfg          Current FrameworkConfig for the OTA token.
+     * @param manifest     [out] Parsed OTAManifest struct (populated on success).
+     * @return Version string from the manifest, or empty string on failure.
+     */
+    std::string downloadAndParseManifestVersion_(
+        const std::string& manifestUrl,
+        const FrameworkConfig& cfg,
+        OTAManifest& manifest);
 
     /**
      * @brief PsychicHttp multipart upload handler for POST /api/ota/upload.

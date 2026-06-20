@@ -112,6 +112,20 @@ public:
     void setHttpTimeout(int timeoutMs);
 
     /**
+     * @brief Set the expected firmware version for pre-flash validation.
+     *
+     * If set, downloadAndFlash() will read the esp_app_desc_t from the
+     * first chunk of the binary and compare its version field against
+     * this string. On mismatch, the download is aborted before any
+     * flash writes occur.
+     *
+     * @param version  The expected BUILD_VERSION string (e.g. "v0.0.11-dev.13").
+     *                 A leading 'v' or 'V' is automatically stripped.
+     *                 Pass nullptr or empty string to disable the check.
+     */
+    void setExpectedVersion(const char* version);
+
+    /**
      * @brief Download the signature file from the given URL, following redirects.
      *
      * Performs a redirect-aware HTTP GET (up to kMaxRedirects hops) to fetch
@@ -163,6 +177,7 @@ private:
     void*                progressCtx_ = nullptr;  // Opaque context for progressCb_
     int                  httpTimeout_ = 8000;     // HTTP client timeout in ms
     OTAError             lastError_   = OTAError::None; // Most recent error
+    char                 expectedVersion_[32] = {};     // Expected version for pre-flash validation
 
     static constexpr int kMaxRedirects = 5;       // Maximum redirect hops before failure
     static constexpr size_t kChunkSize = 1024;    // Streaming read/write buffer size

@@ -91,6 +91,30 @@ const char* OTADownloadEngine::getLastErrorString() const {
     return otaErrorToString(lastError_);
 }
 
+/**
+ * @brief Set the expected firmware version for pre-flash validation.
+ *
+ * Stores the version string (stripping any leading 'v'/'V' prefix) into
+ * the fixed-size expectedVersion_ buffer. When set, downloadAndFlash()
+ * will validate the binary's esp_app_desc_t.version field against this
+ * string before any flash writes occur.
+ *
+ * @param version  Expected version string, or nullptr/empty to disable.
+ */
+void OTADownloadEngine::setExpectedVersion(const char* version) {
+    if (version && version[0] != '\0') {
+        // Strip leading 'v' or 'V' — BUILD_VERSION omits it
+        const char* v = version;
+        if (v[0] == 'v' || v[0] == 'V') {
+            v++;
+        }
+        strncpy(expectedVersion_, v, sizeof(expectedVersion_) - 1);
+        expectedVersion_[sizeof(expectedVersion_) - 1] = '\0';
+    } else {
+        expectedVersion_[0] = '\0';
+    }
+}
+
 
 #ifndef NATIVE_BUILD
 // =============================================================================
@@ -98,6 +122,8 @@ const char* OTADownloadEngine::getLastErrorString() const {
 // =============================================================================
 
 #include <WiFiClient.h>
+#include <esp_app_format.h>
+#include <esp_app_desc.h>
 #include <HTTPClient.h>
 #include <Update.h>
 #include <Esp.h>
@@ -311,16 +337,76 @@ OTAError OTADownloadEngine::downloadAndFlash(WiFiClient& client, const std::stri
 
     ESP_LOGI(TAG, "Partition space OK: %d free, %d needed", freeSpace, contentLen);
 
-    // --- Step 5: Verify ESP32 binary header ---
+    // --- Step 5: Read first chunk and validate binary header ---
     WiFiClient* tcp = http.getStreamPtr();
     tcp->setTimeout(15000); // 15s — generous for flash write stalls and TLS record gaps
     delay(200); // Brief delay to ensure stream buffer is populated
 
-    if (tcp->peek() != 0xE9) {
-        ESP_LOGE(TAG, "Binary header invalid — expected 0xE9, got 0x%02X", tcp->peek());
+    // Static buffer — keeps 1 KB off the task stack. Safe because only one
+    // OTA download runs at a time. Located in BSS (DRAM), not PSRAM, so it
+    // remains accessible during SPI flash write operations.
+    static uint8_t buf[kChunkSize];
+
+    // Read the first chunk — contains the image header + app descriptor
+    int firstChunkLen = 0;
+    unsigned long readDeadline = millis() + 15000;
+    while (firstChunkLen == 0 && millis() < readDeadline) {
+        if (tcp->available()) {
+            size_t bytesToRead = (static_cast<size_t>(contentLen) < kChunkSize)
+                ? static_cast<size_t>(contentLen) : kChunkSize;
+            firstChunkLen = tcp->readBytes(buf, bytesToRead);
+        } else {
+            delay(10);
+        }
+    }
+
+    if (firstChunkLen <= 0) {
+        ESP_LOGE(TAG, "Failed to read first chunk — stream timeout");
+        http.end();
+        lastError_ = OTAError::StreamReadTimeout;
+        return lastError_;
+    }
+
+    // --- Step 5a: Validate ESP32 binary magic byte ---
+    if (buf[0] != 0xE9) {
+        ESP_LOGE(TAG, "Binary header invalid — expected 0xE9, got 0x%02X", buf[0]);
         http.end();
         lastError_ = OTAError::BinaryHeaderInvalid;
         return lastError_;
+    }
+
+    // --- Step 5b: Pre-flash binary version validation (safety gate) ---
+    // The esp_app_desc_t sits at byte offset 32 (after esp_image_header_t +
+    // esp_image_segment_header_t) and is 256 bytes. Total: 288 bytes needed.
+    // kChunkSize is 1024, so this is always available in the first chunk.
+    static constexpr size_t kAppDescOffset = sizeof(esp_image_header_t) + sizeof(esp_image_segment_header_t);
+
+    if (expectedVersion_[0] != '\0' &&
+        static_cast<size_t>(firstChunkLen) >= kAppDescOffset + sizeof(esp_app_desc_t)) {
+
+        const auto* appDesc = reinterpret_cast<const esp_app_desc_t*>(buf + kAppDescOffset);
+
+        if (appDesc->magic_word != ESP_APP_DESC_MAGIC_WORD) {
+            ESP_LOGW(TAG, "App descriptor magic word invalid (0x%08X) — skipping version check",
+                     (unsigned)appDesc->magic_word);
+        } else {
+            // Null-terminate safely for comparison (version field is char[32])
+            char binaryVersion[32];
+            memcpy(binaryVersion, appDesc->version, sizeof(binaryVersion));
+            binaryVersion[sizeof(binaryVersion) - 1] = '\0';
+
+            if (strncmp(binaryVersion, expectedVersion_, sizeof(binaryVersion)) != 0) {
+                ESP_LOGE(TAG, "SAFETY ABORT: Binary version mismatch — binary contains '%s', expected '%s'",
+                         binaryVersion, expectedVersion_);
+                http.end();
+                lastError_ = OTAError::BinaryVersionMismatch;
+                return lastError_;
+            }
+            ESP_LOGI(TAG, "Binary version validated: '%s' matches expected", binaryVersion);
+        }
+    } else if (expectedVersion_[0] != '\0') {
+        ESP_LOGW(TAG, "First chunk too small for app descriptor (%d bytes) — skipping version check",
+                 firstChunkLen);
     }
 
     // --- Step 6: Begin Update ---
@@ -343,13 +429,25 @@ OTAError OTADownloadEngine::downloadAndFlash(WiFiClient& client, const std::stri
 
     ESP_LOGI(TAG, "Streaming firmware (%d bytes) in %u-byte chunks...", contentLen, (unsigned)kChunkSize);
 
-    // --- Step 9: Chunked streaming write with verifier accumulation ---
-    size_t totalWritten = 0;
-    // Static buffer — keeps 1 KB off the task stack. Safe because only one
-    // OTA download runs at a time. Located in BSS (DRAM), not PSRAM, so it
-    // remains accessible during SPI flash write operations.
-    static uint8_t buf[kChunkSize];
+    // --- Step 8b: Write the already-buffered first chunk ---
+    if (verifier_ != nullptr) {
+        verifier_->update(buf, firstChunkLen);
+    }
+    if (Update.write(buf, firstChunkLen) != static_cast<size_t>(firstChunkLen)) {
+        ESP_LOGE(TAG, "Update.write() failed on first chunk");
+        Update.abort();
+        http.end();
+        lastError_ = OTAError::UpdateWriteFailed;
+        return lastError_;
+    }
 
+    size_t totalWritten = static_cast<size_t>(firstChunkLen);
+
+    if (progressCb_) {
+        progressCb_(progressCtx_, totalWritten, static_cast<size_t>(contentLen));
+    }
+
+    // --- Step 9: Chunked streaming write for remaining data ---
     while (totalWritten < static_cast<size_t>(contentLen)) {
         size_t remaining = static_cast<size_t>(contentLen) - totalWritten;
         size_t bytesToRead = (remaining < kChunkSize) ? remaining : kChunkSize;
@@ -357,7 +455,7 @@ OTAError OTADownloadEngine::downloadAndFlash(WiFiClient& client, const std::stri
         // Wait for data with retry — TLS record boundaries can cause
         // brief gaps where no decrypted data is immediately available
         int bytesRead = 0;
-        unsigned long readDeadline = millis() + 15000; // 15s hard deadline
+        readDeadline = millis() + 15000; // 15s hard deadline
 
         while (bytesRead == 0 && millis() < readDeadline) {
             if (tcp->available()) {

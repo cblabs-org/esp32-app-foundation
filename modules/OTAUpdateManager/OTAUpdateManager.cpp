@@ -496,21 +496,74 @@ void OTAUpdateManager::performUpdateTask() {
     ESP_LOGI(TAG, "Best release for '%s' channel: %s (%d assets)",
              _channel, github.releaseId.c_str(), github.releaseAssets);
 
+    // --- Step 1b: Find manifest.json in the release assets ---
+    std::string manifestUrl;
+    for (int i = 0; i < github.releaseAssets; i++) {
+        if (strcmp(github.releaseAssetName[i].c_str(), "manifest.json") == 0) {
+            manifestUrl = github.releaseAssetURL[i].c_str();
+            ESP_LOGI(TAG, "Found manifest.json asset");
+            break;
+        }
+    }
+
+    // --- Step 1c: Resolve the authoritative version string ---
+    // For floating tags (e.g. "latest-dev"), the tag_name is not a parseable
+    // SemVer. Download the manifest.json to get the build-authoritative version.
+    // For regular releases, the tag_name IS the version (e.g. "v0.0.11-dev.14").
+    std::string resolvedVersion = github.releaseId;
+    bool manifestParsed = false;
+    OTAManifest manifest{};
+
+    if (strncmp(github.releaseId.c_str(), "latest-", 7) == 0) {
+        if (manifestUrl.empty()) {
+            ESP_LOGE(TAG, "Floating tag '%s' has no manifest.json — cannot determine version",
+                     github.releaseId.c_str());
+            if (!_silentCheck) {
+                publishProgress(0.0f, "No manifest in floating tag release", true, false);
+                _state = OTAState::Error;
+                _lastOtaError = "No manifest.json in floating tag release";
+            } else {
+                _state = OTAState::Idle;
+            }
+            _silentCheck = false;
+            return;
+        }
+
+        // Download manifest.json to extract the authoritative version
+        ESP_LOGI(TAG, "Floating tag detected — downloading manifest.json for version resolution");
+        std::string manifestVersion = downloadAndParseManifestVersion_(
+            manifestUrl, cfg, manifest);
+
+        if (manifestVersion.empty()) {
+            // downloadAndParseManifestVersion_ already set error state
+            return;
+        }
+
+        resolvedVersion = manifestVersion;
+        manifestParsed = true;
+        ESP_LOGI(TAG, "Manifest version resolved: %s (from floating tag '%s')",
+                 resolvedVersion.c_str(), github.releaseId.c_str());
+    }
+
     // --- Version guard: only proceed if remote > local ---
     FirmwareVersion local = { VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH,
                               static_cast<Channel>(VERSION_CHANNEL), VERSION_PRE_NUM };
-    FirmwareVersion remote = parseVersionTag(github.releaseId.c_str());
+    FirmwareVersion remote = parseVersionTag(resolvedVersion.c_str());
 
     if (!(remote > local)) {
         ESP_LOGI(TAG, "No update needed — local %s is current or newer than remote %s (channel='%s')",
-                 BUILD_VERSION, github.releaseId.c_str(), _channel);
+                 BUILD_VERSION, resolvedVersion.c_str(), _channel);
         // No publishProgress — don't show the OTA screen for a no-op check
         _state = OTAState::Idle;
         return;
     }
 
     ESP_LOGI(TAG, "Update available: %s > %s (channel='%s') — proceeding with download",
-             github.releaseId.c_str(), BUILD_VERSION, _channel);
+             resolvedVersion.c_str(), BUILD_VERSION, _channel);
+
+    // Update releaseId to the resolved version for downstream consumers
+    // (e.g. setExpectedVersion, log messages, portal display)
+    github.releaseId = resolvedVersion;
 
     // Only now transition to Downloading — a download will actually happen
     _state = OTAState::Downloading;
@@ -521,122 +574,23 @@ void OTAUpdateManager::performUpdateTask() {
     std::string sigUrl;
     std::string binName;
 
-    // Check if this release contains a manifest.json
-    std::string manifestUrl;
-    for (int i = 0; i < github.releaseAssets; i++) {
-        if (strcmp(github.releaseAssetName[i].c_str(), "manifest.json") == 0) {
-            manifestUrl = github.releaseAssetURL[i].c_str();
-            ESP_LOGI(TAG, "Found manifest.json asset");
-            break;
-        }
-    }
-
     if (!manifestUrl.empty()) {
         // --- Manifest path: download and parse manifest.json ---
-        ESP_LOGI(TAG, "Downloading manifest.json for board '%s'", BOARD_ID);
 
-        std::unique_ptr<WiFiClientSecure> manifestClient(new (std::nothrow) WiFiClientSecure());
-        if (!manifestClient) {
-            ESP_LOGE(TAG, "Failed to allocate WiFiClientSecure for manifest fetch");
-            publishProgress(0.0f, "Memory allocation failed", true, false);
-            _state = OTAState::Error;
-            _lastOtaError = "Manifest client allocation failed";
-            return;
-        }
-        // Try CA-pinned connection first (defense-in-depth)
-        manifestClient->setCACert(OTA_ROOT_CA_BUNDLE);
+        if (!manifestParsed) {
+            // Manifest was not already downloaded for version resolution (non-floating tag path)
+            ESP_LOGI(TAG, "Downloading manifest.json for board '%s'", BOARD_ID);
 
-        HTTPClient http;
-        http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
-        std::string manifestToken = cfg.otaGithubToken ? cfg.otaGithubToken : "";
+            std::string manifestVersion = downloadAndParseManifestVersion_(
+                manifestUrl, cfg, manifest);
 
-        if (!http.begin(*manifestClient, String(manifestUrl.c_str()))) {
-            ESP_LOGE(TAG, "HTTPClient.begin() failed for manifest URL");
-            publishProgress(0.0f, "Manifest download failed", true, false);
-            _state = OTAState::Error;
-            _lastOtaError = "Manifest HTTP begin failed";
-            return;
-        }
-
-        http.addHeader("Accept", "application/octet-stream");
-        if (!manifestToken.empty()) {
-            http.addHeader("Authorization", String((std::string("Bearer ") + manifestToken).c_str()));
-        }
-
-        int httpCode = http.GET();
-        if (httpCode < 0) {
-            ESP_LOGW(TAG, "Manifest fetch failed with pinned CA (err=%d) "
-                          "— retrying without cert validation "
-                          "(firmware signature is the trust anchor)", httpCode);
-            http.end();
-
-            // Feed TWDT before retry — TLS handshake can be slow
-            esp_task_wdt_reset();
-
-            // MUST create a fresh WiFiClientSecure — the failed handshake leaves
-            // the mbedTLS context in a dirty state that cannot be reconfigured.
-            manifestClient.reset(new (std::nothrow) WiFiClientSecure());
-            if (!manifestClient) {
-                ESP_LOGE(TAG, "Failed to allocate WiFiClientSecure for insecure retry");
-                publishProgress(0.0f, "Memory allocation failed during retry", true, false);
-                _state = OTAState::Error;
-                _lastOtaError = "Manifest client retry allocation failed";
+            if (manifestVersion.empty()) {
+                // downloadAndParseManifestVersion_ already set error state
                 return;
             }
-            manifestClient->setInsecure();
-
-            if (!http.begin(*manifestClient, String(manifestUrl.c_str()))) {
-                ESP_LOGE(TAG, "HTTPClient.begin() failed for manifest retry URL");
-                publishProgress(0.0f, "Manifest download retry failed", true, false);
-                _state = OTAState::Error;
-                _lastOtaError = "Manifest HTTP retry begin failed";
-                return;
-            }
-
-            http.addHeader("Accept", "application/octet-stream");
-            if (!manifestToken.empty()) {
-                http.addHeader("Authorization", String((std::string("Bearer ") + manifestToken).c_str()));
-            }
-
-            httpCode = http.GET();
-        }
-        if (httpCode != 200) {
-            ESP_LOGE(TAG, "Manifest download HTTP %d", httpCode);
-            http.end();
-            publishProgress(0.0f, "Manifest download failed", true, false);
-            _state = OTAState::Error;
-            _lastOtaError = "Manifest download HTTP error";
-            return;
-        }
-
-        // Static buffer — only one OTA pipeline runs at a time (enforced by _state guard).
-        // Saves 2 KB of stack headroom on the 16 KB OTA task.
-        static char manifestBuf[2048];
-        int payloadLen = http.getSize();
-        if (payloadLen <= 0 || payloadLen >= (int)sizeof(manifestBuf)) {
-            ESP_LOGE(TAG, "Manifest payload size invalid: %d", payloadLen);
-            http.end();
-            publishProgress(0.0f, "Manifest too large or empty", true, false);
-            _state = OTAState::Error;
-            _lastOtaError = "Manifest payload size invalid";
-            return;
-        }
-
-        WiFiClient* stream = http.getStreamPtr();
-        int bytesRead = stream->readBytes(manifestBuf, payloadLen);
-        manifestBuf[bytesRead] = '\0';
-        http.end();
-
-        ESP_LOGI(TAG, "Manifest downloaded: %d bytes", bytesRead);
-
-        // Parse the manifest
-        OTAManifest manifest;
-        if (!parseManifest(manifestBuf, bytesRead, manifest)) {
-            ESP_LOGE(TAG, "Failed to parse manifest.json");
-            publishProgress(0.0f, "Manifest parse failed", true, false);
-            _state = OTAState::Error;
-            _lastOtaError = "Manifest JSON parse failed";
-            return;
+            manifestParsed = true;
+        } else {
+            ESP_LOGI(TAG, "Reusing manifest already parsed during version resolution");
         }
 
         // Find the asset matching this board
@@ -792,6 +746,13 @@ void OTAUpdateManager::performUpdateTask() {
     publishProgress(0.02f, "Downloading firmware...", false, false);
 
     // --- Step 7: Download and flash firmware ---
+    // Set expected version for pre-flash binary validation safety gate.
+    // github.releaseId contains the SemVer string (e.g. "v0.0.11-dev.14")
+    // obtained from the release metadata. The engine strips the leading 'v'
+    // and compares against the esp_app_desc_t.version field in the first
+    // chunk of the downloaded binary before any flash writes occur.
+    engine.setExpectedVersion(github.releaseId.c_str());
+
     // Register with TWDT only for the download phase — the progress callback
     // feeds the watchdog every ~4KB. All prior phases (GitHub API, manifest,
     // signature) involve unpredictable blocking I/O and must NOT be under TWDT.
@@ -854,6 +815,136 @@ void OTAUpdateManager::publishProgress(float progress, const char* status,
 #endif
     ESP_LOGD(TAG, "OTA progress: %.1f%% — %s (complete=%d, success=%d)",
              progress * 100.0f, status, complete, success);
+}
+
+/**
+ * @brief Download manifest.json and parse it, returning the version string.
+ *
+ * Handles the full HTTPS download (CA-pinned → insecure fallback), buffered
+ * read, and JSON deserialization. On success, populates the manifest struct
+ * and returns the version string. On failure, sets OTA error state and
+ * returns an empty string.
+ */
+std::string OTAUpdateManager::downloadAndParseManifestVersion_(
+    const std::string& manifestUrl,
+    const FrameworkConfig& cfg,
+    OTAManifest& manifest) {
+
+#ifndef NATIVE_BUILD
+    std::unique_ptr<WiFiClientSecure> manifestClient(new (std::nothrow) WiFiClientSecure());
+    if (!manifestClient) {
+        ESP_LOGE(TAG, "Failed to allocate WiFiClientSecure for manifest fetch");
+        publishProgress(0.0f, "Memory allocation failed", true, false);
+        _state = OTAState::Error;
+        _lastOtaError = "Manifest client allocation failed";
+        return "";
+    }
+    // Try CA-pinned connection first (defense-in-depth)
+    manifestClient->setCACert(OTA_ROOT_CA_BUNDLE);
+
+    HTTPClient http;
+    http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
+    std::string manifestToken = cfg.otaGithubToken ? cfg.otaGithubToken : "";
+
+    if (!http.begin(*manifestClient, String(manifestUrl.c_str()))) {
+        ESP_LOGE(TAG, "HTTPClient.begin() failed for manifest URL");
+        publishProgress(0.0f, "Manifest download failed", true, false);
+        _state = OTAState::Error;
+        _lastOtaError = "Manifest HTTP begin failed";
+        return "";
+    }
+
+    http.addHeader("Accept", "application/octet-stream");
+    if (!manifestToken.empty()) {
+        http.addHeader("Authorization", String((std::string("Bearer ") + manifestToken).c_str()));
+    }
+
+    int httpCode = http.GET();
+    if (httpCode < 0) {
+        ESP_LOGW(TAG, "Manifest fetch failed with pinned CA (err=%d) "
+                      "— retrying without cert validation "
+                      "(firmware signature is the trust anchor)", httpCode);
+        http.end();
+
+        // Feed TWDT before retry — TLS handshake can be slow
+        esp_task_wdt_reset();
+
+        // MUST create a fresh WiFiClientSecure — the failed handshake leaves
+        // the mbedTLS context in a dirty state that cannot be reconfigured.
+        manifestClient.reset(new (std::nothrow) WiFiClientSecure());
+        if (!manifestClient) {
+            ESP_LOGE(TAG, "Failed to allocate WiFiClientSecure for insecure retry");
+            publishProgress(0.0f, "Memory allocation failed during retry", true, false);
+            _state = OTAState::Error;
+            _lastOtaError = "Manifest client retry allocation failed";
+            return "";
+        }
+        manifestClient->setInsecure();
+
+        if (!http.begin(*manifestClient, String(manifestUrl.c_str()))) {
+            ESP_LOGE(TAG, "HTTPClient.begin() failed for manifest retry URL");
+            publishProgress(0.0f, "Manifest download retry failed", true, false);
+            _state = OTAState::Error;
+            _lastOtaError = "Manifest HTTP retry begin failed";
+            return "";
+        }
+
+        http.addHeader("Accept", "application/octet-stream");
+        if (!manifestToken.empty()) {
+            http.addHeader("Authorization", String((std::string("Bearer ") + manifestToken).c_str()));
+        }
+
+        httpCode = http.GET();
+    }
+    if (httpCode != 200) {
+        ESP_LOGE(TAG, "Manifest download HTTP %d", httpCode);
+        http.end();
+        publishProgress(0.0f, "Manifest download failed", true, false);
+        _state = OTAState::Error;
+        _lastOtaError = "Manifest download HTTP error";
+        return "";
+    }
+
+    // Static buffer — only one OTA pipeline runs at a time (enforced by _state guard).
+    // Saves 2 KB of stack headroom on the 16 KB OTA task.
+    static char manifestBuf[2048];
+    int payloadLen = http.getSize();
+    if (payloadLen <= 0 || payloadLen >= (int)sizeof(manifestBuf)) {
+        ESP_LOGE(TAG, "Manifest payload size invalid: %d", payloadLen);
+        http.end();
+        publishProgress(0.0f, "Manifest too large or empty", true, false);
+        _state = OTAState::Error;
+        _lastOtaError = "Manifest payload size invalid";
+        return "";
+    }
+
+    WiFiClient* stream = http.getStreamPtr();
+    int bytesRead = stream->readBytes(manifestBuf, payloadLen);
+    manifestBuf[bytesRead] = '\0';
+    http.end();
+
+    ESP_LOGI(TAG, "Manifest downloaded: %d bytes", bytesRead);
+
+    // Parse the manifest
+    if (!parseManifest(manifestBuf, bytesRead, manifest)) {
+        ESP_LOGE(TAG, "Failed to parse manifest.json");
+        publishProgress(0.0f, "Manifest parse failed", true, false);
+        _state = OTAState::Error;
+        _lastOtaError = "Manifest JSON parse failed";
+        return "";
+    }
+
+    ESP_LOGI(TAG, "Manifest parsed: version='%s' channel='%s' assets=%d",
+             manifest.version, manifest.channel, manifest.assetCount);
+
+    return std::string(manifest.version);
+#else
+    // Native build stub — no WiFi, no HTTPS
+    (void)manifestUrl;
+    (void)cfg;
+    (void)manifest;
+    return "";
+#endif
 }
 
 /**

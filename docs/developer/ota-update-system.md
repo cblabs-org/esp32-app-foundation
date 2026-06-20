@@ -126,8 +126,12 @@ executes the following pipeline:
 8. **Allocate HTTPS client** — `WiFiClientSecure` on the heap (per §15.3)
 9. **Create download engine** — configure `OTADownloadEngine`
 10. **Fetch `.sig`** — download the detached signature file
-11. **Download and flash** — stream firmware in 1024-byte chunks, feeding the
-    verifier and the task watchdog
+11. **Download and flash** — read the first 1KB chunk, validate the ESP32
+    magic byte (`0xE9`) and the `esp_app_desc_t` embedded version string
+    against the expected release version. If the binary version doesn't
+    match, abort before any flash writes occur (safety gate). Then stream
+    the remaining firmware in 1024-byte chunks, feeding the verifier and
+    the task watchdog.
 12. **Finalise and reboot** — 2-second delay for EventBus event propagation,
     then `esp_restart()`
 
@@ -176,18 +180,20 @@ releases exist in the repository:
 
 The higher SemVer of the two candidates wins.
 
-> **Design constraint — Release title carries the version:**
-> Because the `tag_name` field of a floating release is literally `"latest-dev"`
-> (not a parseable SemVer string), the deploy script sets the GitHub Release
-> **title** (`name` field) to the exact semantic version tag (e.g.,
-> `v0.0.11-dev.13`). `GithubClient` detects floating tags via a `"latest-"`
-> prefix check and reads the SemVer from the `name` field instead of
-> `tag_name`. This avoids downloading the `manifest.json` asset just to
-> determine the version, saving both time and heap memory.
->
-> **This is a critical contract between `deploy_release.py` and
-> `GithubClient.cpp` — do not change the release title format without
-> updating both.**
+**Version resolution for floating tags:**
+Because the `tag_name` field of a floating release is literally `"latest-dev"`
+(not a parseable SemVer string), `GithubClient` detects floating tags via a
+`"latest-"` prefix check and defers version resolution to `OTAUpdateManager`.
+The manager downloads the `manifest.json` asset (~500 bytes) to extract the
+build-authoritative version string before comparing against the local firmware.
+This costs one extra HTTPS request (~3–5s with TLS) but eliminates any fragile
+cross-component contract on the GitHub Release title format.
+
+> **Defence-in-depth:** After version comparison passes, the
+> `OTADownloadEngine` independently validates the `esp_app_desc_t.version`
+> field embedded in the first 1KB of the downloaded binary against the
+> expected version before any flash partition writes occur
+> (`BinaryVersionMismatch` error code -16).
 
 ### 4.2 Channel Configuration
 
@@ -666,6 +672,7 @@ and daily scheduling is handled by `checkHour`.
 | `UpdateWriteFailed` | -13 | Incomplete chunk write |
 | `UpdateEndFailed` | -14 | `Update.end()` returned false |
 | `StreamReadTimeout` | -15 | Download stream timed out |
+| `BinaryVersionMismatch` | -16 | Binary's embedded version doesn't match expected |
 
 ---
 
