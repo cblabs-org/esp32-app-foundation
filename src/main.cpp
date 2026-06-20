@@ -44,11 +44,11 @@ static Application app;  ///< Single framework hub instance
  */
 void setup() {
     FrameworkConfig config;
-    config.otaGithubRepo = "matthewmcneill/esp32-app-foundation";
+    config.otaManifestUrl = "https://github.com/matthewmcneill/esp32-app-foundation/releases/download/ota-manifest/manifest.json";
     config.otaPublicKey = (const char*)public_key_pem;
 
     #ifdef OTA_GITHUB_TOKEN
-    config.otaGithubToken = OTA_GITHUB_TOKEN;
+    config.otaToken = OTA_GITHUB_TOKEN;
     #endif
 
     // App names its hostname default — WiFiManager owns the persisted value

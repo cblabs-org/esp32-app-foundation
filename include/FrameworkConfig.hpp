@@ -15,9 +15,9 @@
  *
  * Exported Classes:
  * - FrameworkConfig: Plain-old-data configuration struct
- *   - otaPublicKey:  PEM-encoded RSA public key for OTA signature verification
- *   - otaGithubRepo: GitHub repository in "owner/repo" format for OTA releases
- *   - otaGithubToken: Optional GitHub access token for private repos
+ *   - otaPublicKey:    PEM-encoded RSA public key for OTA signature verification
+ *   - otaManifestUrl:  Compiled-in manifest URL (unkillable fallback for OTA)
+ *   - otaToken:        Optional bearer token for private release hosting
  *
  * Note: The OTA enable/disable toggle (`updatesEnabled`) is now a persisted
  *       OTAUpdateManager module config field, not a boot-time framework field.
@@ -28,7 +28,7 @@
 /**
  * @brief Boot-time framework configuration.
  *
- * Currently holds OTA-specific secrets (public key, GitHub repo, token).
+ * Currently holds OTA-specific secrets (public key, manifest URL, token).
  * Named "FrameworkConfig" rather than "OTAConfig" because it is the
  * framework's boot-time configuration entry point — additional non-OTA
  * framework settings may be added here in future (e.g., device name,
@@ -54,7 +54,6 @@
  */
 struct FrameworkConfig {
     const char* otaPublicKey   = nullptr;          ///< PEM-encoded RSA public key for OTA signature verification (nullptr = skip)
-    const char* otaManifestUrl = nullptr;          ///< Compiled-in manifest URL (unkillable fallback). WO3 replaces otaGithubRepo with this.
-    const char* otaGithubRepo  = nullptr;          ///< GitHub repository in "owner/repo" format for OTA releases (legacy — WO3 removes)
-    const char* otaGithubToken = nullptr;          ///< Optional GitHub access token for private repos
+    const char* otaManifestUrl = nullptr;          ///< Compiled-in manifest URL — unkillable fallback for manifest-first OTA
+    const char* otaToken       = nullptr;          ///< Optional bearer token for authenticated manifest/asset downloads
 };

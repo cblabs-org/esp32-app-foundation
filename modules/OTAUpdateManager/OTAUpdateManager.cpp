@@ -264,11 +264,14 @@ void OTAUpdateManager::tick(uint32_t currentMillis) {
 }
 
 /**
- * @brief Check GitHub for a newer firmware version.
+ * @brief Check for a newer firmware version.
  *
- * Guards: must be in Idle state and have a configured otaGithubRepo.
- * On hardware: creates a GithubClient, queries the latest release, and
- * returns true if a new release is available. On native: always returns false.
+ * Guards: must be in Idle state and have a configured otaManifestUrl.
+ * On native: always returns false.
+ *
+ * Note: The GithubClient-based implementation is superseded by the
+ * manifest-first flow in performUpdateTask(). This standalone check
+ * is retained for the MCP ota_check_now tool. Full rewire is WO5 scope.
  */
 bool OTAUpdateManager::checkForUpdate() {
     // Guard: must be initialized
@@ -283,9 +286,9 @@ bool OTAUpdateManager::checkForUpdate() {
         return false;
     }
 
-    // Guard: must have a configured GitHub repo
-    if (_config->otaGithubRepo == nullptr) {
-        ESP_LOGW(TAG, "checkForUpdate() — no otaGithubRepo configured — returning false");
+    // Guard: must have a configured manifest URL
+    if (_config->otaManifestUrl == nullptr) {
+        ESP_LOGW(TAG, "checkForUpdate() — no otaManifestUrl configured — returning false");
         return false;
     }
 
@@ -294,6 +297,7 @@ bool OTAUpdateManager::checkForUpdate() {
     ESP_LOGI(TAG, "Checking for updates — local: %s, channel: '%s'", BUILD_VERSION, _channel);
 
 #ifndef NATIVE_BUILD
+#if 0  // Superseded by manifest-first flow — retained for reference until WO5 cleanup
     // Create GithubClient with repo and optional token from config
     const FrameworkConfig& cfg = *_config;
     GithubClient github(cfg.otaGithubRepo,
@@ -343,8 +347,16 @@ bool OTAUpdateManager::checkForUpdate() {
              BUILD_VERSION, github.releaseId.c_str(), _channel);
     _state = OTAState::Idle;
     return false;
+#endif  // #if 0 — legacy GithubClient check (WO5 cleanup)
+
+    // Manifest-first check is performed by performUpdateTask(). This method
+    // returns false on hardware until WO5 wires a lightweight manifest-only
+    // version check here.
+    ESP_LOGW(TAG, "checkForUpdate() — GithubClient path disabled (WO3); use performUpdate() for manifest-first check");
+    _state = OTAState::Idle;
+    return false;
 #else
-    // Native builds cannot perform real GitHub checks
+    // Native builds cannot perform real update checks
     _state = OTAState::Idle;
     return false;
 #endif
@@ -434,25 +446,28 @@ void OTAUpdateManager::otaTaskWrapper(void* param) {
 /**
  * @brief Execute the full OTA pipeline inside the FreeRTOS task.
  *
- * Steps:
- *   1. Check GitHub for releases
- *   2. Find .bin and .sig assets
- *   3. Initialize the verifier (if public key configured)
- *   4. Create WiFiClientSecure on the heap
- *   5. Create OTADownloadEngine and configure
- *   6. Fetch signature file
- *   7. Download and flash firmware
- *   8. Finalize and reboot
+ * Manifest-first flow (WO3 rewire):
+ *   1. Fetch + verify manifest via fetchAndVerifyManifest_()
+ *   2. Channel lookup via findChannel()
+ *   3. SemVer version comparison
+ *   4. Board asset lookup via findAssetForBoard()
+ *   5. Snapshot config manifest (Active → Previous)
+ *   6. Initialize the verifier (if public key configured)
+ *   7. Create WiFiClientSecure on the heap
+ *   8. Create OTADownloadEngine and configure
+ *   9. Fetch signature file via asset URL
+ *  10. Download and flash firmware via asset URL
+ *  11. Finalize and reboot
  */
 void OTAUpdateManager::performUpdateTask() {
 #ifndef NATIVE_BUILD
-    ESP_LOGI(TAG, "OTA task started");
+    ESP_LOGI(TAG, "OTA task started (manifest-first flow)");
 
     // NOTE: Do NOT register this task with TWDT here. The OTA pipeline makes
-    // multiple blocking HTTPS calls (GitHub API, manifest, signature) involving
-    // TLS handshakes and paginated responses that take 5-15+ seconds each.
-    // TWDT is registered only during the firmware download phase (Step 7),
-    // where the progress callback feeds it every ~4KB.
+    // multiple blocking HTTPS calls (manifest, signature, firmware) involving
+    // TLS handshakes that take 5-15+ seconds each. TWDT is registered only
+    // during the firmware download phase (Step 10), where the progress
+    // callback feeds it every ~4KB.
 
     const FrameworkConfig& cfg = *_config;
 
@@ -465,184 +480,113 @@ void OTAUpdateManager::performUpdateTask() {
         return;
     }
 
-    // --- Guard: GitHub repo must be configured ---
-    if (cfg.otaGithubRepo == nullptr) {
-        ESP_LOGE(TAG, "No otaGithubRepo configured");
-        publishProgress(0.0f, "No GitHub repo configured", true, false);
+    // --- Guard: manifest URL must be configured ---
+    if (cfg.otaManifestUrl == nullptr) {
+        ESP_LOGE(TAG, "No otaManifestUrl configured");
+        publishProgress(0.0f, "No manifest URL configured", true, false);
         _state = OTAState::Error;
-        _lastOtaError = "No GitHub repo configured";
+        _lastOtaError = "No manifest URL configured";
         return;
     }
 
-    // --- Step 1: Check GitHub for releases ---
+    // --- Step 1: Fetch, verify, and parse the manifest ---
     _lastCheckMillis = millis();
-    GithubClient github(cfg.otaGithubRepo,
-                        cfg.otaGithubToken ? cfg.otaGithubToken : "");
-    ESP_LOGI(TAG, "Querying GitHub for latest release — repo: %s, channel: '%s', local: %s",
-             cfg.otaGithubRepo, _channel, BUILD_VERSION);
+    ESP_LOGI(TAG, "Fetching manifest — channel: '%s', local: %s", _channel, BUILD_VERSION);
 
-    // Feed TWDT before blocking HTTPS call — TLS handshake to api.github.com
-    // can take 3–5 seconds, which may exceed the default WDT timeout.
-    if (!github.getLatestReleaseForChannel(_channel)) {
-        ESP_LOGE(TAG, "GitHub release query failed: %s", github.getLastError());
-        // Only show the error modal for manual checks — auto-checks (boot/daily)
-        // run while network may be marginal; a transient failure must not pop
-        // up a 'Firmware Update Failed' modal unprompted.
+    OTAManifest manifest{};
+    if (!fetchAndVerifyManifest_(manifest)) {
+        // fetchAndVerifyManifest_ already sets _state, _lastOtaError, and
+        // publishes a progress event on failure.
         if (!_silentCheck) {
-            static char ghErrBuf[128];
-            snprintf(ghErrBuf, sizeof(ghErrBuf), "GitHub query: %s", github.getLastError());
-            _lastOtaError = ghErrBuf;
-            publishProgress(0.0f, "GitHub query failed", true, false);
-            _state = OTAState::Error;
+            // Error state already set by fetchAndVerifyManifest_
         } else {
+            // Silent check: suppress error modal, return to idle
             _state = OTAState::Idle;
+            _lastOtaError = nullptr;
         }
         _silentCheck = false;
         return;
     }
 
-    ESP_LOGI(TAG, "Best release for '%s' channel: %s (%d assets)",
-             _channel, github.releaseId.c_str(), github.releaseAssets);
-
-    // --- Step 1b: Find manifest.json in the release assets ---
-    std::string manifestUrl;
-    for (int i = 0; i < github.releaseAssets; i++) {
-        if (strcmp(github.releaseAssetName[i].c_str(), "manifest.json") == 0) {
-            manifestUrl = github.releaseAssetURL[i].c_str();
-            ESP_LOGI(TAG, "Found manifest.json asset");
-            break;
+    // --- Step 2: Channel lookup — direct, no risk-floor scanning ---
+    // The deploy script (WO4) ensures each channel entry in the manifest
+    // already contains the best available version for that risk floor.
+    const OTAChannel* channel = findChannel(manifest, _channel);
+    if (channel == nullptr) {
+        ESP_LOGW(TAG, "Channel '%s' not found in manifest (channels=%d) — no update for this channel",
+                 _channel, manifest.channelCount);
+        // Fail-closed: if the manifest doesn't contain our channel, do not
+        // attempt any update. This is not an error — it just means no release
+        // has been published for this channel yet.
+        if (!_silentCheck) {
+            // Not an error condition — just no update available
         }
+        _state = OTAState::Idle;
+        _silentCheck = false;
+        return;
     }
 
-    // --- Step 1c: Resolve the authoritative version string ---
-    // For floating tags (e.g. "latest-dev"), the tag_name is not a parseable
-    // SemVer. Download the manifest.json to get the build-authoritative version.
-    // For regular releases, the tag_name IS the version (e.g. "v0.0.11-dev.14").
-    std::string resolvedVersion = github.releaseId;
-    bool manifestParsed = false;
-    OTAManifest manifest{};
+    ESP_LOGI(TAG, "Channel '%s' found — manifest version: %s, securityVersion: %u",
+             _channel, channel->version, (unsigned)channel->securityVersion);
 
-    if (strncmp(github.releaseId.c_str(), "latest-", 7) == 0) {
-        if (manifestUrl.empty()) {
-            ESP_LOGE(TAG, "Floating tag '%s' has no manifest.json — cannot determine version",
-                     github.releaseId.c_str());
-            if (!_silentCheck) {
-                publishProgress(0.0f, "No manifest in floating tag release", true, false);
-                _state = OTAState::Error;
-                _lastOtaError = "No manifest.json in floating tag release";
-            } else {
-                _state = OTAState::Idle;
+    // --- Step 3: SemVer comparison — only proceed if remote > local ---
+    FirmwareVersion local = { VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH,
+                              static_cast<Channel>(VERSION_CHANNEL), VERSION_PRE_NUM };
+    FirmwareVersion remote = parseVersionTag(channel->version);
+
+    if (!(remote > local)) {
+        // Check for implicit downgrade: channel changed since last check
+        // e.g., switched from beta to stable — allow "downgrade" to the latest stable
+        if (strcmp(_channel, _lastCheckedChannel) != 0 && _lastCheckedChannel[0] != '\0') {
+            ESP_LOGI(TAG, "Channel changed ('%s' → '%s') — allowing implicit version change",
+                     _lastCheckedChannel, _channel);
+            strlcpy(_lastCheckedChannel, _channel, sizeof(_lastCheckedChannel));
+            if (_configManager != nullptr) {
+                _configManager->saveModuleConfig(this);
             }
+            // Fall through to download — channel switch is an implicit update
+        } else {
+            ESP_LOGI(TAG, "No update needed — local %s is current or newer than remote %s (channel='%s')",
+                     BUILD_VERSION, channel->version, _channel);
+            strlcpy(_lastCheckedChannel, _channel, sizeof(_lastCheckedChannel));
+            _state = OTAState::Idle;
             _silentCheck = false;
             return;
         }
+    } else {
+        ESP_LOGI(TAG, "Update available: %s > %s (channel='%s') — proceeding",
+                 channel->version, BUILD_VERSION, _channel);
+    }
 
-        // Legacy downloadAndParseManifestVersion_() is superseded — WO3 rewires
-        // this path to use fetchAndVerifyManifest_().
-        ESP_LOGE(TAG, "Floating tag detected but legacy manifest download is disabled (WO2) — aborting");
-        if (!_silentCheck) {
-            publishProgress(0.0f, "Legacy manifest path disabled", true, false);
-            _state = OTAState::Error;
-            _lastOtaError = "Legacy manifest download path disabled (pending WO3 rewire)";
-        } else {
-            _state = OTAState::Idle;
-        }
+    // Update lastCheckedChannel
+    strlcpy(_lastCheckedChannel, _channel, sizeof(_lastCheckedChannel));
+
+    // --- Step 4: Board asset lookup ---
+    const OTAAsset* asset = findAssetForBoard(*channel, BOARD_ID);
+    if (asset == nullptr) {
+        ESP_LOGE(TAG, "No asset for board '%s' in channel '%s' (assets=%d)",
+                 BOARD_ID, _channel, channel->assetCount);
+        publishProgress(0.0f, "No firmware for this board", true, false);
+        _state = OTAState::Error;
+        _lastOtaError = "No firmware asset for this board in manifest";
         _silentCheck = false;
         return;
     }
 
-    // --- Version guard: only proceed if remote > local ---
-    FirmwareVersion local = { VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH,
-                              static_cast<Channel>(VERSION_CHANNEL), VERSION_PRE_NUM };
-    FirmwareVersion remote = parseVersionTag(resolvedVersion.c_str());
-
-    if (!(remote > local)) {
-        ESP_LOGI(TAG, "No update needed — local %s is current or newer than remote %s (channel='%s')",
-                 BUILD_VERSION, resolvedVersion.c_str(), _channel);
-        // No publishProgress — don't show the OTA screen for a no-op check
-        _state = OTAState::Idle;
-        return;
-    }
-
-    ESP_LOGI(TAG, "Update available: %s > %s (channel='%s') — proceeding with download",
-             resolvedVersion.c_str(), BUILD_VERSION, _channel);
-
-    // Update releaseId to the resolved version for downstream consumers
-    // (e.g. setExpectedVersion, log messages, portal display)
-    github.releaseId = resolvedVersion;
+    ESP_LOGI(TAG, "Asset resolved — board: '%s', firmware: %s, signature: %s, size: %u",
+             asset->board, asset->firmwareUrl, asset->signatureUrl, (unsigned)asset->size);
 
     // Only now transition to Downloading — a download will actually happen
     _state = OTAState::Downloading;
     publishProgress(0.0f, "Update found — preparing download...", false, false);
+    _silentCheck = false;
 
-    // --- Step 2: Find firmware and signature assets (manifest-aware) ---
-    std::string binUrl;
-    std::string sigUrl;
-    std::string binName;
-
-    if (!manifestUrl.empty()) {
-        // --- Manifest path: WO3 rewires this to use fetchAndVerifyManifest_() ---
-        // Legacy downloadAndParseManifestVersion_() is superseded. For now, the
-        // manifest-based asset lookup is disabled until WO3 wires the new fetcher.
-        ESP_LOGE(TAG, "Manifest-based asset lookup disabled (WO2) — use legacy asset search");
-
-        // Fall through to legacy asset search below
-        manifestUrl.clear();
-    }
-
-    {
-        // --- Legacy fallback: no manifest.json found ---
-        ESP_LOGW(TAG, "No manifest.json found — using legacy asset search");
-
-        for (int i = 0; i < github.releaseAssets; i++) {
-            const std::string name = github.releaseAssetName[i].c_str();
-            int nameLen = (int)name.length();
-
-            // Check for .bin extension
-            if (nameLen > 4 &&
-                name[nameLen - 4] == '.' &&
-                name[nameLen - 3] == 'b' &&
-                name[nameLen - 2] == 'i' &&
-                name[nameLen - 1] == 'n') {
-                binUrl = github.releaseAssetURL[i].c_str();
-                binName = name;
-                ESP_LOGI(TAG, "Found firmware binary: %s", name.c_str());
-            }
-
-            // Check for .sig extension
-            if (nameLen > 4 &&
-                name[nameLen - 4] == '.' &&
-                name[nameLen - 3] == 's' &&
-                name[nameLen - 2] == 'i' &&
-                name[nameLen - 1] == 'g') {
-                sigUrl = github.releaseAssetURL[i].c_str();
-                ESP_LOGI(TAG, "Found signature file: %s", name.c_str());
-            }
-        }
-    }
-
-    if (binUrl.empty()) {
-        ESP_LOGE(TAG, "No .bin asset found in release %s", github.releaseId.c_str());
-        publishProgress(0.0f, "No firmware binary in release", true, false);
-        _state = OTAState::Error;
-        _lastOtaError = "No firmware binary found in release";
-        return;
-    }
-
-    if (sigUrl.empty() && cfg.otaPublicKey != nullptr) {
-        ESP_LOGE(TAG, "SECURITY ABORT: No .sig asset found but otaPublicKey is configured — refusing unsigned firmware");
-        publishProgress(0.0f, "Missing signature — update rejected", true, false);
-        _state = OTAState::Error;
-        _lastOtaError = "Missing .sig file — update rejected (fail-closed)";
-        return;
-    }
-
-    // --- Snapshot config manifest: Active → Previous before download ---
+    // --- Step 5: Snapshot config manifest: Active → Previous before download ---
     _configManager->getManifest().snapshotActiveToPrevious();
     _configManager->getManifest().save();
     ESP_LOGI(TAG, "Config manifest: Active → Previous snapshot saved");
 
-    // --- Step 3: Initialize the verifier (if public key configured) ---
+    // --- Step 6: Initialize the verifier (if public key configured) ---
     MbedTLSSignatureVerifier verifier;
     bool verifierReady = false;
 
@@ -660,7 +604,7 @@ void OTAUpdateManager::performUpdateTask() {
         _state = OTAState::Downloading;
     }
 
-    // --- Step 4: Create WiFiClientSecure on the heap ---
+    // --- Step 7: Create WiFiClientSecure on the heap ---
     std::unique_ptr<WiFiClientSecure> client(new (std::nothrow) WiFiClientSecure());
     if (!client) {
         ESP_LOGE(TAG, "Failed to allocate WiFiClientSecure on heap");
@@ -675,14 +619,14 @@ void OTAUpdateManager::performUpdateTask() {
     client->setInsecure();
     ESP_LOGI(TAG, "WiFiClientSecure allocated on heap");
 
-    // --- Step 5: Create OTADownloadEngine and configure ---
+    // --- Step 8: Create OTADownloadEngine and configure ---
     OTADownloadEngine engine;
     if (verifierReady) {
         engine.setVerifier(&verifier);
     }
 
     // Set progress callback to forward to EventBus
-    // Download progress maps to 2%-100% range (0%-2% covers API/manifest/sig phases)
+    // Download progress maps to 2%-100% range (0%-2% covers manifest/sig phases)
     engine.setProgressCallback([](void* ctx, size_t bytesWritten, size_t totalSize) {
         auto* self = static_cast<OTAUpdateManager*>(ctx);
         float rawProgress = (totalSize > 0)
@@ -697,13 +641,14 @@ void OTAUpdateManager::performUpdateTask() {
     }, this);
     ESP_LOGI(TAG, "Download engine configured");
 
-    // --- Step 6: Fetch signature file (if .sig URL available) ---
+    // --- Step 9: Fetch signature file using manifest asset URL ---
     uint8_t sigBuf[512];
     size_t sigLen = 0;
-    std::string token = cfg.otaGithubToken ? cfg.otaGithubToken : "";
+    std::string token = cfg.otaToken ? cfg.otaToken : "";
 
-    if (!sigUrl.empty()) {
-        sigLen = engine.fetchSignature(*client, sigUrl, token, sigBuf, sizeof(sigBuf));
+    if (asset->signatureUrl[0] != '\0') {
+        std::string sigUrlStr(asset->signatureUrl);
+        sigLen = engine.fetchSignature(*client, sigUrlStr, token, sigBuf, sizeof(sigBuf));
         if (sigLen == 0 && cfg.otaPublicKey != nullptr) {
             ESP_LOGE(TAG, "SECURITY ABORT: Signature fetch returned 0 bytes — refusing update");
             publishProgress(0.0f, "Signature fetch failed — update rejected", true, false);
@@ -711,25 +656,33 @@ void OTAUpdateManager::performUpdateTask() {
             _lastOtaError = "Signature empty — update rejected (fail-closed)";
             return;
         } else if (sigLen > 0) {
-            ESP_LOGI(TAG, "Fetched signature: %u bytes", (unsigned)sigLen);
+            ESP_LOGI(TAG, "Fetched firmware signature: %u bytes", (unsigned)sigLen);
         }
+    } else if (cfg.otaPublicKey != nullptr) {
+        ESP_LOGE(TAG, "SECURITY ABORT: No signature URL in manifest but otaPublicKey is configured — refusing unsigned firmware");
+        publishProgress(0.0f, "Missing signature URL — update rejected", true, false);
+        _state = OTAState::Error;
+        _lastOtaError = "No signature URL in manifest — update rejected (fail-closed)";
+        return;
     }
 
     publishProgress(0.02f, "Downloading firmware...", false, false);
 
-    // --- Step 7: Download and flash firmware ---
+    // --- Step 10: Download and flash firmware using manifest asset URL ---
     // Set expected version for pre-flash binary validation safety gate.
-    // github.releaseId contains the SemVer string (e.g. "v0.0.11-dev.14")
-    // obtained from the release metadata. The engine strips the leading 'v'
-    // and compares against the esp_app_desc_t.version field in the first
-    // chunk of the downloaded binary before any flash writes occur.
-    engine.setExpectedVersion(github.releaseId.c_str());
+    // channel->version contains the SemVer string (e.g. "v0.0.11-dev.14")
+    // from the signed manifest. The engine strips the leading 'v' and
+    // compares against the esp_app_desc_t.version field in the first chunk
+    // of the downloaded binary before any flash writes occur.
+    engine.setExpectedVersion(channel->version);
+
+    std::string binUrlStr(asset->firmwareUrl);
 
     // Register with TWDT only for the download phase — the progress callback
-    // feeds the watchdog every ~4KB. All prior phases (GitHub API, manifest,
-    // signature) involve unpredictable blocking I/O and must NOT be under TWDT.
+    // feeds the watchdog every ~4KB. All prior phases (manifest, signature)
+    // involve unpredictable blocking I/O and must NOT be under TWDT.
     esp_task_wdt_add(NULL);
-    OTAError result = engine.downloadAndFlash(*client, binUrl, token, sigBuf, sigLen);
+    OTAError result = engine.downloadAndFlash(*client, binUrlStr, token, sigBuf, sigLen);
     esp_task_wdt_delete(NULL);
 
     if (result != OTAError::None) {
@@ -742,14 +695,13 @@ void OTAUpdateManager::performUpdateTask() {
 
     ESP_LOGI(TAG, "Firmware downloaded and verified successfully");
 
-    // --- Step 8: Finalize ---
+    // --- Step 11: Finalize ---
     _state = OTAState::Complete;
     publishProgress(1.0f, "Update complete — rebooting...", true, true);
     ESP_LOGI(TAG, "OTA update complete — rebooting in 2 seconds");
 
-    // SAFETY: TWDT was deregistered at line ~761. This delay is safe only
-    // because we are outside TWDT scope. Do not move TWDT deregistration
-    // below this point.
+    // SAFETY: TWDT was deregistered above. This delay is safe only because
+    // we are outside TWDT scope. Do not move TWDT deregistration below.
     delay(2000);  // Allow event propagation and display update
 
     ESP_LOGI(TAG, "OTA task stack high-water mark: %u bytes free",
@@ -906,7 +858,7 @@ static bool downloadRawFile_(const char* url, const char* token,
 bool OTAUpdateManager::fetchAndVerifyManifest_(OTAManifest& manifest) {
 #ifndef NATIVE_BUILD
     const FrameworkConfig& cfg = *_config;
-    const char* token = cfg.otaGithubToken ? cfg.otaGithubToken : "";
+    const char* token = cfg.otaToken ? cfg.otaToken : "";
 
     // --- Build URL attempt list (learned first, compiled-in second) ---
     const char* urls[2] = { nullptr, nullptr };
