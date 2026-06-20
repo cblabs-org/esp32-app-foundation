@@ -3,8 +3,10 @@
 ESP32 App Foundation (c) 2026 CB Labs
 
 Script: scripts/deploy_release.py
-Description: Signs firmware binaries, generates a manifest.json, creates a
-             GitHub Release, and uploads all release assets.
+Description: Signs firmware binaries, generates and signs a v2 manifest.json,
+             creates a versioned GitHub Release, and uploads all release assets.
+             After the versioned release, updates the fixed ``ota-manifest``
+             release with a merged, signed manifest covering all channels.
 
              Two source modes:
                CI mode (default): Downloads unsigned binaries from a GitHub
@@ -46,11 +48,13 @@ Prerequisites:
 
 import argparse
 import glob
+import json
 import os
 import re
 import shutil
 import subprocess
 import sys
+import warnings
 
 # Board list matching the CI matrix
 BOARDS = ["esp32dev", "esp32s3nano"]
@@ -58,6 +62,77 @@ BOARDS = ["esp32dev", "esp32s3nano"]
 # Release staging directory
 ARTIFACTS_DIR = "./release"
 
+# Fixed release tag for the OTA manifest
+OTA_MANIFEST_TAG = "ota-manifest"
+
+# Channel stability ordering: dev(0) < beta(1) < rc(2) < stable(3)
+CHANNEL_ORDER = {"dev": 0, "beta": 1, "rc": 2, "stable": 3}
+
+
+# ---------------------------------------------------------------------------
+#  SemVer comparison (mirrors firmware FirmwareVersion logic)
+# ---------------------------------------------------------------------------
+
+_SEMVER_RE = re.compile(
+    r"^[vV]?(\d+)\.(\d+)\.(\d+)(?:-(dev|beta|rc)(?:\.(\d+))?)?$"
+)
+
+
+class FirmwareVersion:
+    """Comparable SemVer representation matching the firmware's SemVer logic.
+
+    Channel ordering: dev(0) < beta(1) < rc(2) < stable(3).
+    A stable version (no pre-release suffix) always beats a pre-release
+    version with the same major.minor.patch.
+    """
+
+    def __init__(self, version_str: str):
+        m = _SEMVER_RE.match(version_str.strip())
+        if not m:
+            raise ValueError(f"Invalid SemVer: {version_str!r}")
+        self.major = int(m.group(1))
+        self.minor = int(m.group(2))
+        self.patch = int(m.group(3))
+        chan_str = m.group(4)  # None for stable
+        self.channel = CHANNEL_ORDER.get(chan_str, 3)  # 3 = stable
+        self.pre_num = int(m.group(5)) if m.group(5) else 0
+        self.raw = version_str.strip()
+
+    def _sort_key(self):
+        return (self.major, self.minor, self.patch, self.channel, self.pre_num)
+
+    def __lt__(self, other):
+        return self._sort_key() < other._sort_key()
+
+    def __le__(self, other):
+        return self._sort_key() <= other._sort_key()
+
+    def __gt__(self, other):
+        return self._sort_key() > other._sort_key()
+
+    def __ge__(self, other):
+        return self._sort_key() >= other._sort_key()
+
+    def __eq__(self, other):
+        return self._sort_key() == other._sort_key()
+
+    def __repr__(self):
+        return f"FirmwareVersion({self.raw!r})"
+
+
+def channel_stability_floor(channel_name: str) -> int:
+    """Return the numeric stability floor for a channel name.
+
+    A device on channel X should receive an update if the candidate version's
+    stability is >= the channel floor.  This means a stable release is always
+    a valid candidate for dev/beta/rc channels.
+    """
+    return CHANNEL_ORDER.get(channel_name, 0)
+
+
+# ---------------------------------------------------------------------------
+#  Utilities
+# ---------------------------------------------------------------------------
 
 def check_prerequisites(private_key: str, need_pio: bool) -> None:
     """Verify that required tools and files are available."""
@@ -95,6 +170,26 @@ def parse_channel(tag: str) -> str:
         return "stable"
     return m.group(1) or "stable"
 
+
+def get_repo_slug(target_repo: str = None) -> str:
+    """Return the repo slug (owner/repo) — from --repo or git remote."""
+    if target_repo:
+        return target_repo
+    try:
+        result = subprocess.run(
+            ["gh", "repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner"],
+            capture_output=True, text=True, check=True, timeout=10,
+        )
+        return result.stdout.strip()
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError):
+        print("WARNING: Could not determine repo slug — manifest URLs may be incorrect",
+              file=sys.stderr)
+        return "UNKNOWN/REPO"
+
+
+# ---------------------------------------------------------------------------
+#  Pipeline steps
+# ---------------------------------------------------------------------------
 
 def ensure_tag_on_head(tag: str, dry_run: bool) -> None:
     """Ensure the given tag points at HEAD, creating or moving it as needed.
@@ -239,29 +334,57 @@ def generate_hashes(dry_run: bool) -> None:
             print(f"  [DRY-RUN] sha256sum {bin_file} > {sha_file}")
 
 
-def generate_manifest(tag: str, dry_run: bool) -> None:
-    """Generate the OTA manifest.json."""
+def generate_manifest(tag: str, base_url: str, manifest_url: str,
+                      dry_run: bool, merge_into: str = None) -> None:
+    """Generate the OTA manifest.json for this release's channel.
+
+    Args:
+        tag: Version tag (e.g. v3.1.0).
+        base_url: Absolute URL prefix for firmware/signature assets.
+        manifest_url: Self-referencing manifest URL.
+        dry_run: If True, print commands without executing.
+        merge_into: Path to existing manifest to merge into, or None.
+    """
     print("\n--- Step 3b: Generate manifest.json ---")
     channel = parse_channel(tag)
     script_dir = os.path.dirname(os.path.abspath(__file__))
     manifest_script = os.path.join(script_dir, "generate_manifest.py")
 
+    cmd = [
+        sys.executable, manifest_script,
+        "--version", tag,
+        "--channel", channel,
+        "--security-version", "1",
+        "--boards", ",".join(BOARDS),
+        "--firmware-dir", ARTIFACTS_DIR,
+        "--base-url", base_url,
+        "--manifest-url", manifest_url,
+        "--output", os.path.join(ARTIFACTS_DIR, "manifest.json"),
+    ]
+    if merge_into:
+        cmd.extend(["--merge-into", merge_into])
+
+    run(cmd, dry_run=dry_run)
+
+
+def sign_manifest(private_key: str, manifest_path: str, dry_run: bool) -> None:
+    """Sign the manifest.json with the private key (detached ECDSA signature).
+
+    Args:
+        private_key: Path to the ECDSA private key file.
+        manifest_path: Path to the manifest.json to sign.
+        dry_run: If True, print the command without executing.
+    """
+    print("\n--- Step 3c: Sign manifest.json ---")
+    sig_path = manifest_path + ".sig"
     run(
-        [
-            sys.executable, manifest_script,
-            "--version", tag,
-            "--channel", channel,
-            "--security-version", "1",
-            "--boards", ",".join(BOARDS),
-            "--firmware-dir", ARTIFACTS_DIR,
-            "--output", os.path.join(ARTIFACTS_DIR, "manifest.json"),
-        ],
+        ["openssl", "dgst", "-sha256", "-sign", private_key, "-out", sig_path, manifest_path],
         dry_run=dry_run,
     )
 
 
 def create_release(tag: str, dry_run: bool, target_repo: str = None) -> None:
-    """Create a GitHub Release and upload all assets."""
+    """Create a versioned GitHub Release and upload all assets."""
     print("\n--- Step 4: Create GitHub Release ---")
     channel = parse_channel(tag)
     release_cmd = ["gh", "release", "create", tag, "--title", tag, "--generate-notes"]
@@ -272,7 +395,7 @@ def create_release(tag: str, dry_run: bool, target_repo: str = None) -> None:
     run(release_cmd, dry_run=dry_run, check=False)
 
     print("\n--- Step 5: Upload release assets ---")
-    asset_patterns = ["*.bin", "*.bin.sig", "*.bin.sha256", "manifest.json"]
+    asset_patterns = ["*.bin", "*.bin.sig", "*.bin.sha256", "manifest.json", "manifest.json.sig"]
     assets = []
     for pattern in asset_patterns:
         assets.extend(glob.glob(os.path.join(ARTIFACTS_DIR, pattern)))
@@ -287,15 +410,205 @@ def create_release(tag: str, dry_run: bool, target_repo: str = None) -> None:
     upload_cmd.extend(assets)
     run(upload_cmd, dry_run=dry_run)
 
-    print(f"\n--- Step 6: Update floating tag (latest-{channel}) ---")
+
+def apply_risk_floor(manifest: dict, new_version_str: str) -> dict:
+    """Apply risk-floor scanning across all channels in the manifest.
+
+    For each channel, ensure its version is the best available for that
+    stability floor. A stable release is valid for ALL channels. A dev
+    release is only valid for the dev channel.
+
+    Example: deploying v1.0.0 (stable) — if dev channel has v0.0.9-dev.5,
+    update dev to v1.0.0 because stable >= dev floor and v1.0.0 > v0.0.9-dev.5.
+
+    The new version's assets are copied to any channel that gets upgraded.
+
+    Args:
+        manifest: The full manifest dict (with all channel entries).
+        new_version_str: The version being deployed (e.g. "v1.0.0").
+
+    Returns:
+        Updated manifest dict with risk-floor adjustments applied.
+    """
+    try:
+        new_ver = FirmwareVersion(new_version_str)
+    except ValueError:
+        print(f"  WARNING: Cannot parse '{new_version_str}' for risk-floor scan — skipping",
+              file=sys.stderr)
+        return manifest
+
+    new_stability = new_ver.channel  # 0=dev, 1=beta, 2=rc, 3=stable
+    channels = manifest.get("channels", {})
+
+    # Find the channel entry for the new version (to copy its assets)
+    new_channel_name = parse_channel(new_version_str)
+    new_entry = channels.get(new_channel_name, {})
+
+    for ch_name, ch_entry in channels.items():
+        ch_floor = channel_stability_floor(ch_name)
+
+        # The new version is eligible for this channel if its stability >= the floor
+        if new_stability < ch_floor:
+            continue
+
+        try:
+            existing_ver = FirmwareVersion(ch_entry.get("version", "v0.0.0"))
+        except ValueError:
+            continue
+
+        if new_ver > existing_ver:
+            print(f"  Risk-floor: upgrading '{ch_name}' from {existing_ver.raw} → {new_ver.raw}")
+            ch_entry["version"] = new_ver.raw
+            # Copy assets from the new entry if available
+            if "assets" in new_entry:
+                ch_entry["assets"] = new_entry["assets"]
+            if "securityVersion" in new_entry:
+                ch_entry["securityVersion"] = new_entry["securityVersion"]
+
+    manifest["channels"] = channels
+    return manifest
+
+
+def update_ota_manifest_release(tag: str, private_key: str, dry_run: bool,
+                                 target_repo: str = None) -> None:
+    """Download existing manifest, merge new channel, apply risk-floor, sign, upload.
+
+    This creates/updates the fixed ``ota-manifest`` GitHub Release which serves
+    as the canonical source for the v2 OTA manifest.
+
+    Args:
+        tag: The version tag being deployed (e.g. v3.1.0).
+        private_key: Path to the ECDSA private key.
+        dry_run: If True, print commands without executing.
+        target_repo: Target repo slug (owner/repo), or None for current repo.
+    """
+    print("\n--- Step 6: Update OTA manifest release ---")
+
+    repo_slug = get_repo_slug(target_repo)
+    base_url = f"https://github.com/{repo_slug}/releases/download/{tag}"
+    manifest_url = f"https://github.com/{repo_slug}/releases/download/{OTA_MANIFEST_TAG}/manifest.json"
+    manifest_dir = os.path.join(ARTIFACTS_DIR, "ota-manifest-staging")
+    os.makedirs(manifest_dir, exist_ok=True)
+    existing_manifest_path = os.path.join(manifest_dir, "manifest.json")
+    final_manifest_path = os.path.join(manifest_dir, "manifest.json")
+    final_sig_path = os.path.join(manifest_dir, "manifest.json.sig")
+
+    # 6a. Download existing manifest from ota-manifest release (if it exists)
+    print("  Downloading existing manifest from ota-manifest release...")
+    download_cmd = [
+        "gh", "release", "download", OTA_MANIFEST_TAG,
+        "--pattern", "manifest.json",
+        "--dir", manifest_dir,
+        "--clobber",
+    ]
+    if target_repo:
+        download_cmd.extend(["--repo", target_repo])
+    result = run(download_cmd, dry_run=dry_run, check=False,
+                 capture_output=True if not dry_run else False)
+
+    if dry_run:
+        print("  [DRY-RUN] Would download existing manifest or start fresh")
+    elif result.returncode != 0:
+        print("  No existing ota-manifest release found — will create from scratch")
+        # Write an empty manifest skeleton so generate_manifest.py --merge-into works
+        with open(existing_manifest_path, "w") as f:
+            json.dump({"manifestVersion": 1, "manifestUrl": manifest_url, "channels": {}}, f)
+
+    # 6b. Call generate_manifest.py with --merge-into
+    print("  Generating merged manifest...")
+    channel = parse_channel(tag)
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    manifest_script = os.path.join(script_dir, "generate_manifest.py")
+
+    gen_cmd = [
+        sys.executable, manifest_script,
+        "--version", tag,
+        "--channel", channel,
+        "--security-version", "1",
+        "--boards", ",".join(BOARDS),
+        "--firmware-dir", ARTIFACTS_DIR,
+        "--base-url", base_url,
+        "--manifest-url", manifest_url,
+        "--merge-into", existing_manifest_path,
+        "--output", final_manifest_path,
+    ]
+    run(gen_cmd, dry_run=dry_run)
+
+    # 6c. Risk-floor scanning
+    print("  Applying risk-floor scanning...")
+    if not dry_run:
+        try:
+            with open(final_manifest_path, "r") as f:
+                manifest = json.load(f)
+            manifest = apply_risk_floor(manifest, tag)
+            with open(final_manifest_path, "w") as f:
+                json.dump(manifest, f, indent=2)
+                f.write("\n")
+            print("  Risk-floor scan complete")
+        except (FileNotFoundError, json.JSONDecodeError) as e:
+            print(f"  WARNING: Risk-floor scan failed: {e}", file=sys.stderr)
+    else:
+        print("  [DRY-RUN] Would apply risk-floor scanning across all channels")
+
+    # 6d. Sign the merged manifest
+    print("  Signing merged manifest...")
+    run(
+        ["openssl", "dgst", "-sha256", "-sign", private_key, "-out", final_sig_path, final_manifest_path],
+        dry_run=dry_run,
+    )
+
+    # 6e. Ensure ota-manifest release exists
+    print("  Ensuring ota-manifest release exists...")
+    create_cmd = [
+        "gh", "release", "create", OTA_MANIFEST_TAG,
+        "--title", "OTA Manifest",
+        "--notes", "Fixed release holding the signed OTA manifest. Updated on every deploy.",
+    ]
+    if target_repo:
+        create_cmd.extend(["--repo", target_repo])
+    run(create_cmd, dry_run=dry_run, check=False)
+
+    # 6f. Upload manifest + signature
+    print("  Uploading manifest.json + manifest.json.sig to ota-manifest release...")
+    upload_cmd = [
+        "gh", "release", "upload", OTA_MANIFEST_TAG, "--clobber",
+        final_manifest_path, final_sig_path,
+    ]
+    if target_repo:
+        upload_cmd.extend(["--repo", target_repo])
+    run(upload_cmd, dry_run=dry_run)
+
+
+def update_floating_tags(tag: str, dry_run: bool, target_repo: str = None) -> None:
+    """Create/update floating tag releases (LEGACY — deprecated).
+
+    This replicates the pre-v2 behaviour of creating ``latest-{channel}``
+    releases that point to the same assets. In the v2 architecture the
+    ``ota-manifest`` release replaces this mechanism entirely.
+
+    .. deprecated::
+        Use ``--legacy-floating-tags`` only during the migration period.
+        This flag and all floating-tag code will be removed in a future release.
+    """
+    warnings.warn(
+        "Floating tags (latest-{channel}) are DEPRECATED. "
+        "The v2 OTA manifest (ota-manifest release) replaces this mechanism. "
+        "Remove --legacy-floating-tags once all devices are on v2.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+
+    channel = parse_channel(tag)
     floating_tag = f"latest-{channel}"
-    
+
+    print(f"\n--- Step 7 (LEGACY): Update floating tag ({floating_tag}) ---")
+
     # Ignore errors if the release/tag doesn't exist yet
     delete_cmd = ["gh", "release", "delete", floating_tag, "-y", "--cleanup-tag"]
     if target_repo:
         delete_cmd.extend(["--repo", target_repo])
     run(delete_cmd, dry_run=dry_run, check=False, stderr=subprocess.DEVNULL)
-    
+
     # Set the title to the exact semantic version for human readability in the GitHub UI.
     # NOTE: This is NOT a critical contract. The ESP32 OTA engine resolves the version
     # from manifest.json (not the release title). The title is purely cosmetic.
@@ -305,7 +618,11 @@ def create_release(tag: str, dry_run: bool, target_repo: str = None) -> None:
     if target_repo:
         floating_release_cmd.extend(["--repo", target_repo])
     run(floating_release_cmd, dry_run=dry_run)
-    
+
+    assets = []
+    for pattern in ["*.bin", "*.bin.sig", "*.bin.sha256", "manifest.json", "manifest.json.sig"]:
+        assets.extend(glob.glob(os.path.join(ARTIFACTS_DIR, pattern)))
+
     floating_upload_cmd = ["gh", "release", "upload", floating_tag, "--clobber"]
     if target_repo:
         floating_upload_cmd.extend(["--repo", target_repo])
@@ -316,7 +633,7 @@ def create_release(tag: str, dry_run: bool, target_repo: str = None) -> None:
 def parse_args() -> argparse.Namespace:
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser(
-        description="Sign firmware binaries and create a GitHub Release",
+        description="Sign firmware binaries, generate signed manifest, and create a GitHub Release",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("--tag", required=True, help="Git tag for the release (e.g. v3.1.0)")
@@ -350,6 +667,12 @@ def parse_args() -> argparse.Namespace:
         help="Stage, sign, hash, and generate manifest — but skip GitHub release creation",
     )
     parser.add_argument(
+        "--legacy-floating-tags",
+        action="store_true",
+        help="(DEPRECATED) Also create latest-{channel} floating tag releases. "
+             "The v2 ota-manifest release replaces this mechanism.",
+    )
+    parser.add_argument(
         "--dry-run",
         action="store_true",
         help="Print commands without executing them",
@@ -376,6 +699,11 @@ def main() -> None:
     check_prerequisites(args.private_key, need_pio=args.build)
     ensure_tag_on_head(args.tag, args.dry_run)
 
+    # Compute URLs for manifest generation
+    repo_slug = get_repo_slug(args.repo)
+    base_url = f"https://github.com/{repo_slug}/releases/download/{args.tag}"
+    manifest_url = f"https://github.com/{repo_slug}/releases/download/{OTA_MANIFEST_TAG}/manifest.json"
+
     if args.local:
         if args.build:
             build_firmware(args.dry_run)
@@ -385,12 +713,19 @@ def main() -> None:
 
     sign_firmware(args.private_key, args.dry_run)
     generate_hashes(args.dry_run)
-    generate_manifest(args.tag, args.dry_run)
+    generate_manifest(args.tag, base_url, manifest_url, args.dry_run)
+    sign_manifest(args.private_key, os.path.join(ARTIFACTS_DIR, "manifest.json"), args.dry_run)
 
     if args.sign_only:
-        print(f"\n✅ Signed binaries ready in {ARTIFACTS_DIR}/")
+        print(f"\n✅ Signed binaries + manifest ready in {ARTIFACTS_DIR}/")
     else:
         create_release(args.tag, args.dry_run, target_repo=args.repo)
+        update_ota_manifest_release(args.tag, args.private_key, args.dry_run,
+                                     target_repo=args.repo)
+
+        if args.legacy_floating_tags:
+            update_floating_tags(args.tag, args.dry_run, target_repo=args.repo)
+
         print("\n✅ Release deployed successfully!")
 
 

@@ -42,6 +42,18 @@ Usage:
         --manifest-url https://github.com/owner/repo/releases/download/ota-manifest/manifest.json \
         --output manifest.json
 
+    # Merge into an existing manifest (incremental multi-channel build):
+    python3 scripts/generate_manifest.py \
+        --version v3.2.0-dev.1 \
+        --channel dev \
+        --security-version 1 \
+        --boards esp32dev,esp32s3nano \
+        --firmware-dir ./release/ \
+        --base-url https://github.com/owner/repo/releases/download/v3.2.0-dev.1 \
+        --manifest-url https://github.com/owner/repo/releases/download/ota-manifest/manifest.json \
+        --merge-into manifest.json \
+        --output manifest.json
+
 Prerequisites: Python 3.8+
 """
 
@@ -153,6 +165,13 @@ def parse_args() -> argparse.Namespace:
         "--output",
         default=None,
         help="Output file path (default: stdout)",
+    )
+    parser.add_argument(
+        "--merge-into",
+        default=None,
+        help="Path to an existing manifest.json. If provided, the new channel "
+             "entry is merged into the existing manifest instead of creating "
+             "from scratch. Missing file is treated as an empty manifest.",
     )
 
     # --- Single-channel convenience args ---
@@ -295,6 +314,25 @@ def main() -> None:
             file=sys.stderr,
         )
         sys.exit(1)
+
+    # If --merge-into is specified, load the existing manifest as a base
+    if args.merge_into:
+        try:
+            with open(args.merge_into, "r") as f:
+                existing = json.load(f)
+            print(f"Loaded existing manifest from {args.merge_into}", file=sys.stderr)
+        except FileNotFoundError:
+            print(f"No existing manifest at {args.merge_into} — starting fresh", file=sys.stderr)
+            existing = {}
+        except json.JSONDecodeError as e:
+            print(f"WARNING: Could not parse {args.merge_into}: {e} — starting fresh",
+                  file=sys.stderr)
+            existing = {}
+
+        # Merge: preserve existing channels, overlay new ones
+        existing_channels = existing.get("channels", {})
+        existing_channels.update(channel_entries)
+        channel_entries = existing_channels
 
     manifest = build_manifest(
         manifest_url=args.manifest_url,
