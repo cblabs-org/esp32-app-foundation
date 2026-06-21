@@ -9,7 +9,7 @@ This project replaces the framework's baseline configuration with a rich, canoni
 ## Work Orders
 
 - **[x] [wo0-portal-prep](wo0-portal-prep/WORKORDER.md):** Rename `template/` → `sample-app/`, relocate Credits tab to header ℹ️ icon modal, enable `esp-mqtt` in sdkconfig, gate `AppTabContributor`. **[MERGED]**
-- **[ ] [wo1-home-assistant](wo1-home-assistant/WORKORDER.md):** Build the `HomeAssistantModule` (esp-mqtt wrapper, HOM entities, LWT, reconnect sync, Web Portal tab, MCP tools, unit tests).
+- **[x] [wo1-home-assistant](wo1-home-assistant/WORKORDER.md):** Build the `HomeAssistantModule` (esp-mqtt wrapper, HOM entities, LWT, reconnect sync, Web Portal tab, MCP tools, unit tests). **[MERGED]**
 - **[ ] [wo2-weather-module](wo2-weather-module/WORKORDER.md):** Build the `WeatherModule` (OpenWeatherMap JSON polling, KeyManager, HASensor registry, "Weather" portal tab with sub-pills).
 - **[ ] [wo3-widgets-app](wo3-widgets-app/WORKORDER.md):** Build U8G2 widgets (`WeatherWidget`, `WeatherClockBoard`), wire DI and `CarouselEngine` in `main.cpp`.
 - **[ ] [wo4-ha-entity-parity](wo4-ha-entity-parity/WORKORDER.md):** Expand the entity catalog to full parity with `arduino_ha` (Lights, Climate, Fans, Covers, etc.).
