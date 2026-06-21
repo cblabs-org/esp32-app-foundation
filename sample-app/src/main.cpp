@@ -19,10 +19,12 @@
 #ifndef NATIVE_BUILD
 #include <Arduino.h>
 #endif
-#include "myApp.hpp"
+#include "HomeAssistantModule.hpp"
+#include "WeatherModule.hpp"
 
 Application app;
-MyApp myApp;
+HomeAssistantModule haModule;
+WeatherModule weatherModule;
 
 /**
  * @brief Arduino framework initialization.
@@ -34,8 +36,21 @@ void setup() {
     Serial.begin(115200);
 #endif
 
+    app.disableDefaultAppTab();
+
+    // Wire up HomeAssistantModule
+    haModule.setKeyManager(&app.getKeyManager());
+    haModule.setEventBus(&app.getEventBus());
+
+    // Wire up WeatherModule
+    weatherModule.setHomeAssistant(&haModule);
+    weatherModule.setKeyManager(&app.getKeyManager());
+    weatherModule.setEventBus(&app.getEventBus());
+    weatherModule.setConfigManager(&app.getConfigManager());
+
     // Register user application modules
-    app.registerModule(&myApp);  // Auto-registers for tick, config, web, MCP, config gate
+    app.registerModule(&haModule);
+    app.registerModule(&weatherModule);
 
     // Prepare Framework config
     FrameworkConfig config;
@@ -43,7 +58,7 @@ void setup() {
     // App names its hostname default — WiFiManager owns the persisted value
     // and falls back to this on factory reset (resetConfig()). Must be set
     // before app.begin().
-    app.getWifiManager().setDefaultHostname("ESP32-App");
+    app.getWifiManager().setDefaultHostname("WeatherStation");
 
     // Begin framework
     app.begin(config);
