@@ -21,10 +21,12 @@
 #endif
 #include "HomeAssistantModule.hpp"
 #include "WeatherModule.hpp"
+#include "WeatherClockBoard.hpp"
 
 Application app;
 HomeAssistantModule haModule;
 WeatherModule weatherModule;
+WeatherClockBoard weatherClockBoard(&weatherModule);
 
 /**
  * @brief Arduino framework initialization.
@@ -59,6 +61,10 @@ void setup() {
     // and falls back to this on factory reset (resetConfig()). Must be set
     // before app.begin().
     app.getWifiManager().setDefaultHostname("WeatherStation");
+
+#ifndef NATIVE_BUILD
+    app.getDisplay().carousel.add(&weatherClockBoard);
+#endif
 
     // Begin framework
     app.begin(config);

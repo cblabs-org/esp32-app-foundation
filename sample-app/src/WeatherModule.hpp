@@ -50,6 +50,10 @@ public:
     void setEventBus(EventBus* eb) { _eventBus = eb; }
     void setConfigManager(ConfigManager* cm) { _configManager = cm; }
 
+    const std::string& getTemperature() const { return _tempStr; }
+    const std::string& getWindSpeed() const { return _windStr; }
+    const std::string& getCondition() const { return _condStr; }
+
     // ITickable
     void tick(uint32_t currentMillis) override;
 
