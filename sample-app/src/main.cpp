@@ -6,8 +6,8 @@
  * This work is licensed under Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International.
  * To view a copy of this license, visit https://creativecommons.org/licenses/by-nc-sa/4.0/
  *
- * Module: template/src/main.cpp
- * Description: Main entry point for the ESP32 App Foundation template application.
+ * Module: sample-app/src/main.cpp
+ * Description: Main entry point for the ESP32 App Foundation sample application.
  *              Instantiates the framework hub and the specific user application.
  *
  * Exported Functions/Classes:

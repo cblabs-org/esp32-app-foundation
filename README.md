@@ -44,5 +44,5 @@ This project uses a dual-documentation strategy:
 
 - `include/`: Global interface contracts (`ITickable.hpp`, `IWebContributor.hpp`, etc.).
 - `modules/`: The core `Application` composition root and background services.
-- `template/`: Boilerplate code for stamping out new downstream projects.
+- `sample-app/`: Boilerplate code for stamping out new downstream projects.
 - `lib/`: First-party reusable components.

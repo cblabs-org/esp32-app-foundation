@@ -148,7 +148,9 @@ bool Application::begin(const FrameworkConfig& config) {
     registerModule(&_mcpServer);          // IConfigurable + IWebContributor
     registerModule(_otaManager);          // ITickable + IConfigurable + IWebContributor + IMCPContributor
     registerModule(&_webServerManager);   // ITickable
-    registerModule(&_appTabContributor);  // IWebContributor
+    if (_enableDefaultAppTab) {
+        registerModule(&_appTabContributor);  // IWebContributor
+    }
 
 #ifndef NATIVE_BUILD
     registerModule(&_display);                    // ITickable + IStatusReporter + IConfigurable + IWebContributor + IMCPContributor

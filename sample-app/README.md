@@ -1,10 +1,10 @@
-# ESP32 App Foundation Template
+# ESP32 App Foundation Sample App
 
-This directory contains a complete, functional template project to help you get started building a new application on top of the ESP32 App Foundation framework.
+This directory contains a complete, functional sample project to help you get started building a new application on top of the ESP32 App Foundation framework.
 
 ## Getting Started
 
-To use this template for your own project, we recommend treating the ESP32 App Foundation as a Git submodule.
+To use this sample app for your own project, we recommend treating the ESP32 App Foundation as a Git submodule.
 
 1. **Create your project repository:**
    ```bash
@@ -19,10 +19,10 @@ To use this template for your own project, we recommend treating the ESP32 App F
    git submodule update --init --recursive
    ```
 
-3. **Copy the template files into your project root:**
+3. **Copy the sample app files into your project root:**
    ```bash
-   cp -r lib/esp32-app-foundation/template/* ./
-   cp -r lib/esp32-app-foundation/template/.* ./ 2>/dev/null || true
+   cp -r lib/esp32-app-foundation/sample-app/* ./
+   cp -r lib/esp32-app-foundation/sample-app/.* ./ 2>/dev/null || true
    ```
 
 4. **Update `platformio.ini`:**

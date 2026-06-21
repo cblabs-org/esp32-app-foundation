@@ -6,8 +6,8 @@
  * This work is licensed under Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International.
  * To view a copy of this license, visit https://creativecommons.org/licenses/by-nc-sa/4.0/
  *
- * Module: template/src/myApp.hpp
- * Description: Main application module for the template skeleton. Implements
+ * Module: sample-app/src/myApp.hpp
+ * Description: Main application module for the sample skeleton. Implements
  *              ITickable, IConfigurable, IWebContributor, IMCPContributor,
  *              and IConfigGate to demonstrate all primary extension points.
  *

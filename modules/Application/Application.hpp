@@ -132,6 +132,13 @@ public:
     // -------------------------------------------------------------------------
 
     /**
+     * @brief Prevent the framework from rendering the default "App" bottom-nav tab.
+     * Use this if your application registers its own top-level navigation tab.
+     * Must be called before `begin()`.
+     */
+    void disableDefaultAppTab() { _enableDefaultAppTab = false; }
+
+    /**
      * @brief Execute the full framework boot sequence.
      *
      * Ordered steps:
@@ -521,6 +528,7 @@ private:
         int         getTabOrder() const override { return 30;    }
     };
     AppTabContributor _appTabContributor;  ///< Contributes "App" top-level nav tab
+    bool _enableDefaultAppTab = true;      ///< Guard for default App tab registration
 
     // Display subsystem (hardware only)
 #ifndef NATIVE_BUILD
