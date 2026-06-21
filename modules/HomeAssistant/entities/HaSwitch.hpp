@@ -29,7 +29,7 @@ public:
 
     bool isCommandable() const override { return true; }
 
-    void handleCommand(const std::string& payload) override {
+    void handleCommand(const std::string& topic, const std::string& payload) override {
         if (payload == "ON" || payload == "on") {
             _state = "ON";
             if (_commandCallback) _commandCallback(true);

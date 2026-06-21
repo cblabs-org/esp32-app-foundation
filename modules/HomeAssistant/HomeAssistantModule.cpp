@@ -88,9 +88,11 @@ std::string HomeAssistantModule::getEntityCommandTopic(IHaEntity* entity) const 
 }
 
 void HomeAssistantModule::generateDiscoveryJson(IHaEntity* entity, JsonObject& payload) const {
-    entity->buildDiscoveryPayload(payload);
     payload["unique_id"] = _macPrefix + "_" + entity->getObjectId();
-    payload["state_topic"] = getEntityStateTopic(entity);
+    
+    if (entity->hasState()) {
+        payload["state_topic"] = getEntityStateTopic(entity);
+    }
     
     if (entity->isCommandable()) {
         payload["command_topic"] = getEntityCommandTopic(entity);
@@ -105,6 +107,9 @@ void HomeAssistantModule::generateDiscoveryJson(IHaEntity* entity, JsonObject& p
     device["name"] = "ESP32 Device (" + _macPrefix + ")";
     device["manufacturer"] = "CB Labs";
     device["model"] = "App Foundation";
+
+    // Call buildDiscoveryPayload after base topics are set so the entity can use them
+    entity->buildDiscoveryPayload(payload);
 }
 
 void HomeAssistantModule::publishDiscovery() {
@@ -125,7 +130,9 @@ void HomeAssistantModule::publishDiscovery() {
 void HomeAssistantModule::publishAllStates() {
     if (!_mqttConnected) return;
     for (auto* entity : _entities) {
-        publishState(entity);
+        if (entity->hasState()) {
+            publishState(entity);
+        }
     }
 }
 
@@ -207,6 +214,7 @@ void HomeAssistantModule::mqttEventHandler(void* handler_args, esp_event_base_t 
                 if (entity->isCommandable()) {
                     std::string cmdTopic = self->getEntityCommandTopic(entity);
                     esp_mqtt_client_subscribe(self->_mqttClient, cmdTopic.c_str(), 1);
+                    esp_mqtt_client_subscribe(self->_mqttClient, (cmdTopic + "/#").c_str(), 1);
                 }
             }
             break;
@@ -218,8 +226,11 @@ void HomeAssistantModule::mqttEventHandler(void* handler_args, esp_event_base_t 
             std::string topic(event->topic, event->topic_len);
             std::string payload(event->data, event->data_len);
             for (auto* entity : self->_entities) {
-                if (entity->isCommandable() && topic == self->getEntityCommandTopic(entity)) {
-                    entity->handleCommand(payload);
+                if (entity->isCommandable()) {
+                    std::string cmdTopic = self->getEntityCommandTopic(entity);
+                    if (topic == cmdTopic || topic.find(cmdTopic + "/") == 0) {
+                        entity->handleCommand(topic, payload);
+                    }
                 }
             }
             break;
@@ -338,7 +349,8 @@ void HomeAssistantModule::registerMCPTools(MCPToolRegistry& registry) {
             std::string payload = args["payload"].as<std::string>();
             for (auto* entity : self->_entities) {
                 if (entity->getObjectId() == entityId && entity->isCommandable()) {
-                    entity->handleCommand(payload);
+                    std::string cmdTopic = self->getEntityCommandTopic(entity);
+                    entity->handleCommand(cmdTopic, payload); // Using base topic for service calls
                     self->publishState(entity); // Immediately publish new state
                     result["success"] = true;
                     return;

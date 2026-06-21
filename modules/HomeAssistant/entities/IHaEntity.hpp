@@ -19,8 +19,11 @@ public:
     // Provide current state (string)
     virtual std::string getState() const = 0;
 
+    // Returns true if this entity has a state to report
+    virtual bool hasState() const { return true; }
+
     // Handle inbound command (e.g., for switch)
-    virtual void handleCommand(const std::string& payload) {}
+    virtual void handleCommand(const std::string& topic, const std::string& payload) {}
     
     // Returns true if this entity accepts commands
     virtual bool isCommandable() const { return false; }
