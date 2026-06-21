@@ -113,81 +113,86 @@ void WeatherModule::registerRoutes(PsychicHttpServer& server) {
     server.on("/weather.js", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
         const char* js = R"rawliteral(
 (function() {
-    let loaded = false;
-    window.addEventListener('tab-changed', function(e) {
-        if (e.detail === 'tab-weather' && !loaded) {
-            loaded = true;
-            const container = document.getElementById('tab-weather');
-            if (!container) return;
-            container.innerHTML = `
-<div class="card">
-    <h2>Weather Configuration</h2>
-    
-    <div class="form-group">
-        <label for="weather-lat">Latitude</label>
+    var container = document.getElementById('tab-weather');
+    if (!container) return;
+
+    // 1. Render scaffold immediately
+    container.innerHTML = `
+<article>
+    <header>Weather Configuration</header>
+    <label>Latitude
         <input type="number" step="any" id="weather-lat">
-    </div>
-    <div class="form-group">
-        <label for="weather-lon">Longitude</label>
+    </label>
+    <label>Longitude
         <input type="number" step="any" id="weather-lon">
-    </div>
-    <div class="form-group">
-        <label for="weather-interval">Polling Interval (ms)</label>
+    </label>
+    <label>Polling Interval (ms)
         <input type="number" id="weather-interval">
-    </div>
-    <div class="form-group">
-        <label for="weather-apikey">API Key</label>
-        <p class="help-text">Obtain a free API key from <a href="https://openweathermap.org/" target="_blank">OpenWeatherMap</a>.</p>
+    </label>
+    <label>API Key
+        <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:0.5rem; font-weight:400;">
+            Obtain a free API key from <a href="https://openweathermap.org/" target="_blank">OpenWeatherMap</a>.
+        </p>
         <input type="password" id="weather-apikey" placeholder="Leave blank to keep existing key">
         <small id="weather-key-status"></small>
-    </div>
-    <button id="weather-save-btn" class="btn btn-primary">Save Settings</button>
-</div>
-            `;
-            
-            const latInput = document.getElementById('weather-lat');
-            const lonInput = document.getElementById('weather-lon');
-            const intervalInput = document.getElementById('weather-interval');
-            const apikeyInput = document.getElementById('weather-apikey');
-            const keyStatus = document.getElementById('weather-key-status');
-            const saveBtn = document.getElementById('weather-save-btn');
+    </label>
+    <button id="weather-save-btn">Save Settings</button>
+</article>
+    `;
 
-            fetch('/api/weather/config')
-                .then(res => res.json())
-                .then(data => {
-                    latInput.value = data.lat;
-                    lonInput.value = data.lon;
-                    intervalInput.value = data.interval;
-                    if (data.hasApiKey) {
-                        keyStatus.textContent = "API Key is currently set.";
-                        keyStatus.style.color = "green";
-                    } else {
-                        keyStatus.textContent = "No API Key configured.";
-                        keyStatus.style.color = "red";
-                    }
-                });
+    // 2. Wire event listeners
+    var latInput = document.getElementById('weather-lat');
+    var lonInput = document.getElementById('weather-lon');
+    var intervalInput = document.getElementById('weather-interval');
+    var apikeyInput = document.getElementById('weather-apikey');
+    var keyStatus = document.getElementById('weather-key-status');
+    var saveBtn = document.getElementById('weather-save-btn');
 
-            saveBtn.addEventListener('click', function() {
-                const payload = {
-                    lat: parseFloat(latInput.value),
-                    lon: parseFloat(lonInput.value),
-                    interval: parseInt(intervalInput.value, 10),
-                    apiKey: apikeyInput.value
-                };
-                
-                fetch('/api/weather/config', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                }).then(() => {
-                    window.showToast('Weather Settings Saved!', 'success');
-                    apikeyInput.value = '';
-                }).catch(() => {
-                    window.showToast('Failed to save settings', 'error');
-                });
-            });
-        }
+    saveBtn.addEventListener('click', function() {
+        var payload = {
+            lat: parseFloat(latInput.value),
+            lon: parseFloat(lonInput.value),
+            interval: parseInt(intervalInput.value, 10),
+            apiKey: apikeyInput.value
+        };
+
+        window.apiFetch('/api/weather/config', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        }).then(function() {
+            window.showToast('Weather Settings Saved!', 'success');
+            apikeyInput.value = '';
+        }).catch(function() {
+            window.showToast('Failed to save settings', 'error');
+        });
     });
+
+    // 3. Data loading function
+    function loadData() {
+        window.apiFetch('/api/weather/config')
+            .then(function(data) {
+                latInput.value = data.lat;
+                lonInput.value = data.lon;
+                intervalInput.value = data.interval;
+                if (data.hasApiKey) {
+                    keyStatus.textContent = "API Key is currently set.";
+                    keyStatus.style.color = "var(--success)";
+                } else {
+                    keyStatus.textContent = "No API Key configured.";
+                    keyStatus.style.color = "var(--error)";
+                }
+            })
+            .catch(function(err) {
+                console.error('Failed to load weather config', err);
+            });
+    }
+
+    // 4. Load on activation + already-active check
+    window.addEventListener('tab-changed', function(e) {
+        if (e.detail === 'tab-weather') loadData();
+    });
+    if (container.classList.contains('active')) loadData();
 })();
 )rawliteral";
         response->setContentType("application/javascript");
