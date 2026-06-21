@@ -48,6 +48,7 @@
 #pragma once
 #include <vector>
 #include <string>
+#include <atomic>
 
 #ifndef NATIVE_BUILD
 // NOTE: PsychicHttpRequestCallback, PsychicMiddlewareNext, and
@@ -61,6 +62,7 @@
 #include <string>
 #include <vector>
 #include <functional>
+#include <atomic>
 
 // Define ESP-IDF error types for native build
 typedef int esp_err_t;

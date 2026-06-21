@@ -453,7 +453,8 @@ document.addEventListener('DOMContentLoaded', function() {
       'appconfig.js',
       'auth.js',
       'credits.js',
-      'homeassistant.js'
+      'homeassistant.js',
+      'weather.js'
     ];
 
     var loaded = 0;

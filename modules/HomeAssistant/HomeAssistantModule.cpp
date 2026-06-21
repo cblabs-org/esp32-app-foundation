@@ -154,7 +154,7 @@ void HomeAssistantModule::connectMqtt() {
 
     std::string pass;
     if (_keyManager) {
-        pass = _keyManager->getKeyById(_mqttPassId);
+        pass = _keyManager->getKeyById(_mqttPassId.c_str());
         if (!pass.empty()) {
             mqtt_cfg.credentials.authentication.password = pass.c_str();
         }
@@ -162,7 +162,7 @@ void HomeAssistantModule::connectMqtt() {
 
     std::string cert;
     if (_keyManager && _mqttUri.find("mqtts://") == 0) {
-        cert = _keyManager->getKeyById(_tlsCertId);
+        cert = _keyManager->getKeyById(_tlsCertId.c_str());
         if (!cert.empty()) {
             mqtt_cfg.broker.verification.certificate = cert.c_str();
         }
@@ -296,7 +296,7 @@ void HomeAssistantModule::registerRoutes(PsychicHttpServer& server) {
     });
 
     server.on("/api/homeassistant/config", HTTP_POST, [this](PsychicRequest* request, PsychicResponse* response) {
-        if (!request->hasBody()) return response->send(400, "text/plain", "Missing body");
+        if (request->body().length() == 0) return response->send(400, "text/plain", "Missing body");
         JsonDocument doc;
         if (deserializeJson(doc, request->body()) != DeserializationError::Ok) {
             return response->send(400, "text/plain", "Invalid JSON");
@@ -316,7 +316,7 @@ void HomeAssistantModule::registerRoutes(PsychicHttpServer& server) {
     });
 
     server.on("/api/homeassistant/cert", HTTP_POST, [this](PsychicRequest* request, PsychicResponse* response) {
-        if (!request->hasBody()) return response->send(400, "text/plain", "Missing body");
+        if (request->body().length() == 0) return response->send(400, "text/plain", "Missing body");
         if (_keyManager) {
             _keyManager->addKey(_tlsCertId.c_str(), request->body().c_str(), "HomeAssistant", true);
             connectMqtt();

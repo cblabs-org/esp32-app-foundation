@@ -110,8 +110,16 @@ void WeatherModule::registerRoutes(PsychicHttpServer& server) {
         return response->send(200, "application/json", "{\"status\":\"saved\"}");
     });
 
-    server.on("/api/weather/tab.html", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
-        const char* html = R"rawliteral(
+    server.on("/weather.js", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
+        const char* js = R"rawliteral(
+(function() {
+    let loaded = false;
+    window.addEventListener('tab-changed', function(e) {
+        if (e.detail === 'tab-weather' && !loaded) {
+            loaded = true;
+            const container = document.getElementById('tab-weather');
+            if (!container) return;
+            container.innerHTML = `
 <div class="card">
     <h2>Weather Configuration</h2>
     
@@ -135,57 +143,55 @@ void WeatherModule::registerRoutes(PsychicHttpServer& server) {
     </div>
     <button id="weather-save-btn" class="btn btn-primary">Save Settings</button>
 </div>
-
-<script>
-(function() {
-    const tabId = 'weather';
-    App.onTabLoaded(tabId, function() {
-        const latInput = document.getElementById('weather-lat');
-        const lonInput = document.getElementById('weather-lon');
-        const intervalInput = document.getElementById('weather-interval');
-        const apikeyInput = document.getElementById('weather-apikey');
-        const keyStatus = document.getElementById('weather-key-status');
-        const saveBtn = document.getElementById('weather-save-btn');
-
-        fetch('/api/weather/config')
-            .then(res => res.json())
-            .then(data => {
-                latInput.value = data.lat;
-                lonInput.value = data.lon;
-                intervalInput.value = data.interval;
-                if (data.hasApiKey) {
-                    keyStatus.textContent = "API Key is currently set.";
-                    keyStatus.style.color = "green";
-                } else {
-                    keyStatus.textContent = "No API Key configured.";
-                    keyStatus.style.color = "red";
-                }
-            });
-
-        saveBtn.addEventListener('click', function() {
-            const payload = {
-                lat: parseFloat(latInput.value),
-                lon: parseFloat(lonInput.value),
-                interval: parseInt(intervalInput.value, 10),
-                apiKey: apikeyInput.value
-            };
+            `;
             
-            fetch('/api/weather/config', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            }).then(() => {
-                window.showToast('Weather Settings Saved!', 'success');
-                apikeyInput.value = '';
-            }).catch(() => {
-                window.showToast('Failed to save settings', 'error');
+            const latInput = document.getElementById('weather-lat');
+            const lonInput = document.getElementById('weather-lon');
+            const intervalInput = document.getElementById('weather-interval');
+            const apikeyInput = document.getElementById('weather-apikey');
+            const keyStatus = document.getElementById('weather-key-status');
+            const saveBtn = document.getElementById('weather-save-btn');
+
+            fetch('/api/weather/config')
+                .then(res => res.json())
+                .then(data => {
+                    latInput.value = data.lat;
+                    lonInput.value = data.lon;
+                    intervalInput.value = data.interval;
+                    if (data.hasApiKey) {
+                        keyStatus.textContent = "API Key is currently set.";
+                        keyStatus.style.color = "green";
+                    } else {
+                        keyStatus.textContent = "No API Key configured.";
+                        keyStatus.style.color = "red";
+                    }
+                });
+
+            saveBtn.addEventListener('click', function() {
+                const payload = {
+                    lat: parseFloat(latInput.value),
+                    lon: parseFloat(lonInput.value),
+                    interval: parseInt(intervalInput.value, 10),
+                    apiKey: apikeyInput.value
+                };
+                
+                fetch('/api/weather/config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                }).then(() => {
+                    window.showToast('Weather Settings Saved!', 'success');
+                    apikeyInput.value = '';
+                }).catch(() => {
+                    window.showToast('Failed to save settings', 'error');
+                });
             });
-        });
+        }
     });
 })();
-</script>
 )rawliteral";
-        return response->send(200, "text/html", html);
+        response->setContentType("application/javascript");
+        return response->send(js);
     });
 }
 #else
