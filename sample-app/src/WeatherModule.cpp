@@ -128,6 +128,10 @@ void WeatherModule::registerRoutes(PsychicHttpServer& server) {
             container.innerHTML = `
 <article>
     <header>Weather Configuration</header>
+    <div style="background:var(--primary-alpha); border-left:4px solid var(--primary); padding:1rem; border-radius:8px; font-size:0.85rem; color:var(--text); margin-bottom:1.2rem; line-height:1.4;">
+        Configure the weather data source. You need a free API key from
+        <a href="https://openweathermap.org/appid" target="_blank" style="color:var(--primary); font-weight:700; text-decoration:none;">OpenWeatherMap</a>.
+    </div>
     <label>Latitude
         <input type="number" step="any" id="weather-lat">
     </label>
@@ -138,11 +142,11 @@ void WeatherModule::registerRoutes(PsychicHttpServer& server) {
         <input type="number" id="weather-interval">
     </label>
     <label>API Key
-        <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:0.5rem; font-weight:400;">
-            Obtain a free API key from <a href="https://openweathermap.org/" target="_blank">OpenWeatherMap</a>.
-        </p>
         <input type="password" id="weather-apikey" placeholder="Leave blank to keep existing key">
-        <small id="weather-key-status"></small>
+        <div class="status-badge" id="weather-key-status" style="margin-top:0.5rem;">
+            <div class="dot grey" id="weather-key-dot"></div>
+            <span id="weather-key-text" style="font-size:0.75rem; text-transform:uppercase; letter-spacing:0.5px;">Checking...</span>
+        </div>
     </label>
     <button id="weather-save-btn">Save Settings</button>
 </article>
@@ -182,13 +186,12 @@ void WeatherModule::registerRoutes(PsychicHttpServer& server) {
                 document.getElementById('weather-lat').value = data.lat;
                 document.getElementById('weather-lon').value = data.lon;
                 document.getElementById('weather-interval').value = data.interval;
-                var keyStatus = document.getElementById('weather-key-status');
                 if (data.hasApiKey) {
-                    keyStatus.textContent = "API Key is currently set.";
-                    keyStatus.style.color = "var(--success)";
+                    document.getElementById('weather-key-dot').className = 'dot green';
+                    document.getElementById('weather-key-text').textContent = 'Key Configured';
                 } else {
-                    keyStatus.textContent = "No API Key configured.";
-                    keyStatus.style.color = "var(--error)";
+                    document.getElementById('weather-key-dot').className = 'dot red';
+                    document.getElementById('weather-key-text').textContent = 'No Key Set';
                 }
             })
             .catch(function(err) {

@@ -18,6 +18,14 @@
       container.innerHTML = `
         <article>
           <header>Home Assistant MQTT</header>
+          <div class="status-badge" id="ha-mqtt-status" style="margin-bottom:1rem;">
+            <div class="dot grey" id="ha-mqtt-dot"></div>
+            <span id="ha-mqtt-text" style="text-transform:uppercase; font-size:0.75rem; letter-spacing:1px;">Checking...</span>
+          </div>
+          <div style="background:var(--primary-alpha); border-left:4px solid var(--primary); padding:1rem; border-radius:8px; font-size:0.85rem; color:var(--text); margin-bottom:1.2rem; line-height:1.4;">
+            Configure the <strong>MQTT broker</strong> connection for Home Assistant auto-discovery.
+            Entities registered by your application will appear automatically in Home Assistant.
+          </div>
           <label>MQTT Broker URI
             <input type="text" id="ha-uri" placeholder="mqtts://broker.hivemq.com:8883" />
           </label>
@@ -25,7 +33,12 @@
             <input type="text" id="ha-user" placeholder="username" />
           </label>
           <label>Password (Optional)
-            <input type="password" id="ha-pass" placeholder="Leave blank to keep existing" />
+            <div class="password-input-wrapper">
+              <input type="password" id="ha-pass" placeholder="Leave blank to keep existing" />
+              <button type="button" class="eye-btn" id="ha-pass-eye" title="Toggle Visibility">
+                <svg id="ha-eye-icon" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+              </button>
+            </div>
           </label>
           <button type="button" id="ha-save-btn">Save Settings</button>
         </article>
@@ -45,6 +58,7 @@
       // 2. Wire event listeners
       const saveBtn = document.getElementById('ha-save-btn');
       const certBtn = document.getElementById('ha-cert-btn');
+      const eyeBtn  = document.getElementById('ha-pass-eye');
 
       saveBtn.addEventListener('click', async () => {
         saveBtn.disabled = true;
@@ -97,6 +111,18 @@
           certBtn.disabled = false;
         }
       });
+
+      eyeBtn.addEventListener('click', () => {
+        const passInput = document.getElementById('ha-pass');
+        const isPassword = passInput.type === 'password';
+        passInput.type = isPassword ? 'text' : 'password';
+        const icon = document.getElementById('ha-eye-icon');
+        if (isPassword) {
+          icon.innerHTML = '<path d="M2 2l20 20"></path><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>';
+        } else {
+          icon.innerHTML = '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle>';
+        }
+      });
     }
 
     // 3. Load data on every activation
@@ -112,6 +138,17 @@
       if (data.uri) uriInput.value = data.uri;
       if (data.user) userInput.value = data.user;
       if (data.passExists) passInput.placeholder = '•••••••• (Saved)';
+
+      // Update MQTT connection status badge
+      const mqttDot = document.getElementById('ha-mqtt-dot');
+      const mqttText = document.getElementById('ha-mqtt-text');
+      if (data.connected) {
+        mqttDot.className = 'dot green';
+        mqttText.textContent = 'Connected';
+      } else {
+        mqttDot.className = 'dot red';
+        mqttText.textContent = 'Disconnected';
+      }
     } catch (err) {
       console.error('Failed to load HA config', err);
     }
