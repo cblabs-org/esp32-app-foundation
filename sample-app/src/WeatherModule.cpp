@@ -113,11 +113,19 @@ void WeatherModule::registerRoutes(PsychicHttpServer& server) {
     server.on("/weather.js", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
         const char* js = R"rawliteral(
 (function() {
-    var container = document.getElementById('tab-weather');
-    if (!container) return;
+    var initialized = false;
 
-    // 1. Render scaffold immediately
-    container.innerHTML = `
+    window.addEventListener('tab-changed', function(e) {
+        if (e.detail !== 'tab-weather') return;
+
+        var container = document.getElementById('tab-weather');
+        if (!container) return;
+
+        if (!initialized) {
+            initialized = true;
+
+            // 1. Render scaffold on first activation
+            container.innerHTML = `
 <article>
     <header>Weather Configuration</header>
     <label>Latitude
@@ -138,43 +146,43 @@ void WeatherModule::registerRoutes(PsychicHttpServer& server) {
     </label>
     <button id="weather-save-btn">Save Settings</button>
 </article>
-    `;
+            `;
 
-    // 2. Wire event listeners
-    var latInput = document.getElementById('weather-lat');
-    var lonInput = document.getElementById('weather-lon');
-    var intervalInput = document.getElementById('weather-interval');
-    var apikeyInput = document.getElementById('weather-apikey');
-    var keyStatus = document.getElementById('weather-key-status');
-    var saveBtn = document.getElementById('weather-save-btn');
+            // 2. Wire event listeners
+            var saveBtn = document.getElementById('weather-save-btn');
 
-    saveBtn.addEventListener('click', function() {
-        var payload = {
-            lat: parseFloat(latInput.value),
-            lon: parseFloat(lonInput.value),
-            interval: parseInt(intervalInput.value, 10),
-            apiKey: apikeyInput.value
-        };
+            saveBtn.addEventListener('click', function() {
+                var payload = {
+                    lat: parseFloat(document.getElementById('weather-lat').value),
+                    lon: parseFloat(document.getElementById('weather-lon').value),
+                    interval: parseInt(document.getElementById('weather-interval').value, 10),
+                    apiKey: document.getElementById('weather-apikey').value
+                };
 
-        window.apiFetch('/api/weather/config', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        }).then(function() {
-            window.showToast('Weather Settings Saved!', 'success');
-            apikeyInput.value = '';
-        }).catch(function() {
-            window.showToast('Failed to save settings', 'error');
-        });
+                window.apiFetch('/api/weather/config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                }).then(function() {
+                    window.showToast('Weather Settings Saved!', 'success');
+                    document.getElementById('weather-apikey').value = '';
+                }).catch(function() {
+                    window.showToast('Failed to save settings', 'error');
+                });
+            });
+        }
+
+        // 3. Load data on every activation
+        loadData();
     });
 
-    // 3. Data loading function
     function loadData() {
         window.apiFetch('/api/weather/config')
             .then(function(data) {
-                latInput.value = data.lat;
-                lonInput.value = data.lon;
-                intervalInput.value = data.interval;
+                document.getElementById('weather-lat').value = data.lat;
+                document.getElementById('weather-lon').value = data.lon;
+                document.getElementById('weather-interval').value = data.interval;
+                var keyStatus = document.getElementById('weather-key-status');
                 if (data.hasApiKey) {
                     keyStatus.textContent = "API Key is currently set.";
                     keyStatus.style.color = "var(--success)";
@@ -187,12 +195,6 @@ void WeatherModule::registerRoutes(PsychicHttpServer& server) {
                 console.error('Failed to load weather config', err);
             });
     }
-
-    // 4. Load on activation + already-active check
-    window.addEventListener('tab-changed', function(e) {
-        if (e.detail === 'tab-weather') loadData();
-    });
-    if (container.classList.contains('active')) loadData();
 })();
 )rawliteral";
         response->setContentType("application/javascript");
