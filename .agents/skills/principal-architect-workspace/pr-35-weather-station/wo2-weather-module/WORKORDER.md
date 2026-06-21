@@ -20,19 +20,22 @@ Build the `WeatherModule` for the sample app that fetches OpenWeatherMap data an
 - Read the framework-expert skill at `.agents/skills/framework-expert/SKILL.md` for house style and coding conventions.
 
 ## Line-Item Instructions
-- [ ] **1.** Create `sample-app/src/WeatherModule.hpp` and `.cpp`.
-- [ ] **2.** Implement `ITickable`, `IConfigurable`, `IWebContributor`.
-- [ ] **3.** Contribute a **"Weather" top-level tab** (replacing the generic "App" tab) with sub-pills:
+- [x] **1.** Create `sample-app/src/WeatherModule.hpp` and `.cpp`.
+- [x] **2.** Implement `ITickable`, `IConfigurable`, `IWebContributor`.
+- [x] **3.** Contribute a **"Weather" top-level tab** (replacing the generic "App" tab) with sub-pills:
   - **Settings**: Latitude, Longitude, Polling Interval.
   - **API Key**: Instructions for obtaining an OpenWeatherMap key + secure input via `KeyManager`.
-- [ ] **4.** Instantiate `HaSensor` objects for Temperature, Wind Speed, and Weather Condition.
-- [ ] **5.** Register the sensors with the injected `HomeAssistantModule*` (received via `setHomeAssistant()`).
-- [ ] **6.** Fetch JSON data from OpenWeatherMap using the API key securely retrieved from `KeyManager`.
+- [x] **4.** Instantiate `HaSensor` objects for Temperature, Wind Speed, and Weather Condition.
+- [x] **5.** Register the sensors with the injected `HomeAssistantModule*` (received via `setHomeAssistant()`).
+- [x] **6.** Fetch JSON data from OpenWeatherMap using the API key securely retrieved from `KeyManager`.
   - **Non-blocking Fetch:** Use the `IDataSource` pattern to ensure the JSON fetch does not block the 10ms tick budget.
   - **Clean-room Provenance:** Write the parsing logic completely from scratch using `JsonStreamingParser` (do not copy Gadec UK code).
-- [ ] **7.** Publish states to the `HaSensor` objects to sync with Home Assistant.
-- [ ] **8.** Broadcast a `weather.updated` event to the `EventBus` for local displays.
+- [x] **7.** Publish states to the `HaSensor` objects to sync with Home Assistant.
+- [x] **8.** Broadcast a `weather.updated` event to the `EventBus` for local displays.
 
 ## Verification Requirement
 1. Run `build_project` via the PlatformIO MCP server for the `esp32s3nano` environment to verify compilation.
 2. **CRITICAL:** Before distilling or committing, STOP and send a message back to the Principal Architect confirming results. Only after approval should you invoke the `@distillery` skill.
+
+## Status Update
+- **2026-06-21:** WO2 completed by Antigravity worker agent. All checklist items implemented, compilation verified, and distillery packaging generated.
