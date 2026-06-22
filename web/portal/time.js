@@ -108,7 +108,7 @@
   }
 
   // -------------------------------------------------------------------------
-  // Fetch timezone zones (lazy, cached)
+  // Fetch timezone zones (lazy, cached, auto-populated)
   // -------------------------------------------------------------------------
   async function fetchZones() {
     if (zonesCache) return zonesCache;
@@ -116,7 +116,39 @@
       zonesCache = await window.apiFetch('/api/time/zones');
       return zonesCache;
     } catch (err) {
+      // If 404 (no database on device), auto-fetch from GitHub
+      if (err.message && err.message.indexOf('404') !== -1) {
+        console.log('No timezone database on device — auto-fetching from GitHub');
+        var fetched = await autoFetchZones();
+        if (fetched) return fetched;
+      }
       console.error('Failed to fetch timezone zones:', err);
+      return null;
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Auto-fetch timezone database from GitHub and save to device
+  // -------------------------------------------------------------------------
+  async function autoFetchZones() {
+    try {
+      var ghResponse = await fetch(
+        'https://raw.githubusercontent.com/nayarsystems/posix_tz_db/master/zones.json'
+      );
+      if (!ghResponse.ok) throw new Error('GitHub HTTP ' + ghResponse.status);
+      var newZones = await ghResponse.json();
+
+      await window.apiFetch('/api/time/zones/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newZones)
+      });
+
+      zonesCache = newZones;
+      window.showToast('Timezone database loaded (' + Object.keys(newZones).length + ' zones).', 'success');
+      return newZones;
+    } catch (err) {
+      console.error('Auto-fetch timezone database failed:', err);
       return null;
     }
   }
@@ -345,26 +377,14 @@
     updateBtn.textContent = 'Downloading…';
 
     try {
-      // Fetch latest zones.json from GitHub
-      const response = await fetch(
-        'https://raw.githubusercontent.com/nayarsystems/posix_tz_db/master/zones.json'
-      );
-      if (!response.ok) throw new Error('HTTP ' + response.status);
-      const newZones = await response.json();
-
-      updateBtn.textContent = 'Uploading to device…';
-
-      // POST the new zones to the device
-      await window.apiFetch('/api/time/zones/update', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newZones)
-      });
-
-      // Invalidate cache and reload
-      zonesCache = null;
-      window.showToast('Timezone database updated (' + Object.keys(newZones).length + ' zones).', 'success');
-      loadTimeConfig();
+      const newZones = await autoFetchZones();
+      if (newZones) {
+        // Invalidate cache and reload
+        zonesCache = null;
+        loadTimeConfig();
+      } else {
+        throw new Error('autoFetchZones failed');
+      }
     } catch (error) {
       window.showToast('Failed to update timezone database.', 'error');
     } finally {

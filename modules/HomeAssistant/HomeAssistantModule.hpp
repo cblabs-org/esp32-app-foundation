@@ -32,9 +32,9 @@ private:
     std::string _macPrefix;
     std::string _lwtTopic;
 
-    bool _wifiConnected = false;
+
     std::atomic<bool> _mqttConnected{false};
-    bool _needsStateSync = false;
+    std::atomic<bool> _needsStateSync{false};
 
     static void onWifiConnected(const char* topic, const void* payload, void* ctx);
     static void onWifiDisconnected(const char* topic, const void* payload, void* ctx);

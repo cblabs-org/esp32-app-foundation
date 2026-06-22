@@ -2,6 +2,7 @@
 #ifndef NATIVE_BUILD
 #include <esp_log.h>
 #include <esp_mac.h>
+#include <WiFi.h>
 #endif
 
 #ifndef NATIVE_BUILD
@@ -44,13 +45,11 @@ void HomeAssistantModule::setEventBus(EventBus* eb) {
 
 void HomeAssistantModule::onWifiConnected(const char* topic, const void* payload, void* ctx) {
     auto* self = static_cast<HomeAssistantModule*>(ctx);
-    self->_wifiConnected = true;
     self->connectMqtt();
 }
 
 void HomeAssistantModule::onWifiDisconnected(const char* topic, const void* payload, void* ctx) {
     auto* self = static_cast<HomeAssistantModule*>(ctx);
-    self->_wifiConnected = false;
     self->disconnectMqtt();
 }
 
@@ -139,7 +138,13 @@ void HomeAssistantModule::publishAllStates() {
 
 void HomeAssistantModule::connectMqtt() {
 #ifndef NATIVE_BUILD
-    if (!_wifiConnected || _mqttUri.empty()) return;
+    ESP_LOGI(TAG, "connectMqtt: called");
+
+    if (WiFi.status() != WL_CONNECTED || _mqttUri.empty()) {
+        ESP_LOGW(TAG, "connectMqtt: skipping — wifiStatus=%d, uri empty=%d",
+                 WiFi.status(), _mqttUri.empty());
+        return;
+    }
 
     if (_mqttClient != nullptr) {
         esp_mqtt_client_destroy(_mqttClient);
@@ -177,13 +182,18 @@ void HomeAssistantModule::connectMqtt() {
 
     _mqttClient = esp_mqtt_client_init(&mqtt_cfg);
     if (_mqttClient) {
+        ESP_LOGI(TAG, "connectMqtt: client created, starting — broker=%s, user=%s",
+                 _mqttUri.c_str(), _mqttUser.empty() ? "(none)" : _mqttUser.c_str());
         esp_mqtt_client_register_event(_mqttClient, MQTT_EVENT_ANY, mqttEventHandler, this);
         esp_mqtt_client_start(_mqttClient);
+    } else {
+        ESP_LOGW(TAG, "connectMqtt: esp_mqtt_client_init returned NULL");
     }
 #endif
 }
 
 void HomeAssistantModule::disconnectMqtt() {
+    ESP_LOGI(TAG, "disconnectMqtt: called (client=%s)", _mqttClient ? "active" : "null");
 #ifndef NATIVE_BUILD
     if (_mqttClient) {
         // Publish offline LWT gracefully before disconnect
@@ -208,7 +218,7 @@ void HomeAssistantModule::mqttEventHandler(void* handler_args, esp_event_base_t 
             // Publish online status to LWT topic
             esp_mqtt_client_publish(self->_mqttClient, self->_lwtTopic.c_str(), "online", 0, 1, 1);
             self->publishDiscovery();
-            self->_needsStateSync = true;
+            self->_needsStateSync.store(true);
             
             // Subscribe to command topics
             for (auto* entity : self->_entities) {
@@ -243,8 +253,8 @@ void HomeAssistantModule::mqttEventHandler(void* handler_args, esp_event_base_t 
 #endif
 
 void HomeAssistantModule::tick(uint32_t currentMillis) {
-    if (_needsStateSync) {
-        _needsStateSync = false;
+    if (_needsStateSync.load()) {
+        _needsStateSync.store(false);
         publishAllStates();
     }
 }
@@ -254,9 +264,11 @@ void HomeAssistantModule::applyConfig(const JsonObject& section) {
     if (section["user"].is<const char*>()) _mqttUser = section["user"].as<std::string>();
     
     // Pass and Cert are managed by KeyManager.
-    if (_wifiConnected && !_mqttUri.empty()) {
+#ifndef NATIVE_BUILD
+    if (WiFi.status() == WL_CONNECTED && !_mqttUri.empty()) {
         connectMqtt(); // reconnect with new settings
     }
+#endif
 }
 
 void HomeAssistantModule::serializeConfig(JsonObject& section) const {

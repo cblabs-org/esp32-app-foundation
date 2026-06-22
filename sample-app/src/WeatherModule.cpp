@@ -61,18 +61,21 @@ void WeatherModule::applyConfig(const JsonObject& config) {
     _lat = config["lat"] | 0.0;
     _lon = config["lon"] | 0.0;
     _pollingIntervalMs = config["interval"] | 600000;
+    _units = config["units"] | "metric";
 }
 
 void WeatherModule::serializeConfig(JsonObject& config) const {
     config["lat"] = _lat;
     config["lon"] = _lon;
     config["interval"] = _pollingIntervalMs;
+    config["units"] = _units;
 }
 
 void WeatherModule::resetConfig() {
     _lat = 0.0;
     _lon = 0.0;
     _pollingIntervalMs = 600000;
+    _units = "metric";
 }
 
 #ifndef NATIVE_BUILD
@@ -82,6 +85,7 @@ void WeatherModule::registerRoutes(PsychicHttpServer& server) {
         doc["lat"] = _lat;
         doc["lon"] = _lon;
         doc["interval"] = _pollingIntervalMs;
+        doc["units"] = _units;
         
         bool hasApiKey = false;
         if (_keyManager && !_keyManager->getKeyById("owm_api_key").empty()) {
@@ -109,6 +113,7 @@ void WeatherModule::registerRoutes(PsychicHttpServer& server) {
         if (doc["lat"].is<double>()) _lat = doc["lat"].as<double>();
         if (doc["lon"].is<double>()) _lon = doc["lon"].as<double>();
         if (doc["interval"].is<uint32_t>()) _pollingIntervalMs = doc["interval"].as<uint32_t>();
+        if (doc["units"].is<const char*>()) _units = doc["units"].as<const char*>();
 
         if (doc["apiKey"].is<const char*>() && _keyManager) {
             const char* apiKey = doc["apiKey"].as<const char*>();
@@ -124,10 +129,41 @@ void WeatherModule::registerRoutes(PsychicHttpServer& server) {
         return response->send(200, "application/json", "{\"status\":\"saved\"}");
     });
 
+    server.on("/api/weather/status", HTTP_GET, [this](PsychicRequest* request, PsychicResponse* response) {
+        JsonDocument doc;
+        doc["hasData"] = hasData();
+        doc["units"] = _units;
+        
+        if (hasData()) {
+            doc["temperature"] = getTemperature();
+            doc["feelsLike"] = getFeelsLike();
+            doc["condition"] = getCondition();
+            doc["icon"] = getIcon();
+            doc["humidity"] = getHumidity();
+            doc["pressure"] = getPressure();
+            doc["windSpeed"] = getWindSpeed();
+            doc["windDeg"] = getWindDeg();
+            doc["visibility"] = getVisibility();
+            doc["clouds"] = getClouds();
+            doc["city"] = getCityName();
+            doc["country"] = getCountry();
+            doc["sunrise"] = getSunrise();
+            doc["sunset"] = getSunset();
+            doc["tempMin"] = getTempMin();
+            doc["tempMax"] = getTempMax();
+        }
+
+        String output;
+        serializeJson(doc, output);
+        return response->send(200, "application/json", output.c_str());
+    });
+
     server.on("/weather.js", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
         const char* js = R"rawliteral(
 (function() {
     var initialized = false;
+    var userIsTypingKey = false;
+    var hasExistingKey = false;
 
     window.addEventListener('tab-changed', function(e) {
         if (e.detail !== 'tab-weather') return;
@@ -138,10 +174,43 @@ void WeatherModule::registerRoutes(PsychicHttpServer& server) {
         if (!initialized) {
             initialized = true;
 
-            // 1. Render scaffold on first activation
             container.innerHTML = `
 <article>
     <header>Weather Configuration</header>
+    
+    <!-- Weather Summary -->
+    <div id="weather-summary-card" style="
+        display:flex; flex-direction:column; gap:0.75rem; padding:1rem;
+        background:var(--card-bg, #f8f9fa); border-radius:12px;
+        margin-bottom:1.2rem; display:none;
+    ">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+            <div style="display:flex; flex-direction:column;">
+                <div style="font-size:0.85rem; color:var(--text-muted); font-weight:600; text-transform:uppercase; letter-spacing:0.5px;">Current Conditions</div>
+                <div id="weather-sum-location" style="font-weight:600; font-size:1.1rem; margin-top:0.25rem;">--</div>
+                <div id="weather-sum-cond" style="color:var(--text-muted); font-size:0.9rem;">--</div>
+            </div>
+            <img id="weather-sum-icon" src="" style="width:50px; height:50px; display:none; background:rgba(0,0,0,0.05); border-radius:50%;">
+        </div>
+        <div style="display:flex; align-items:baseline; gap:0.5rem;">
+            <span id="weather-sum-temp" style="font-size:2.5rem; font-weight:700; line-height:1;">--</span>
+            <span id="weather-sum-feels" style="color:var(--text-muted); font-size:0.9rem;">Feels like --</span>
+        </div>
+        <div style="display:flex; gap:1rem; margin-top:0.5rem; font-size:0.85rem; color:var(--text-muted); flex-wrap:wrap;">
+            <span>💧 <span id="weather-sum-hum">--</span></span>
+            <span>🌬️ <span id="weather-sum-wind">--</span></span>
+            <span>⏱️ <span id="weather-sum-pres">--</span></span>
+        </div>
+    </div>
+    
+    <div id="weather-summary-empty" style="
+        padding:1rem; text-align:center; color:var(--text-muted); font-size:0.85rem;
+        background:var(--card-bg, #f8f9fa); border-radius:12px; margin-bottom:1.2rem;
+    ">
+        No weather data yet. Please configure below.
+    </div>
+
+    <!-- Config Form -->
     <div style="background:var(--primary-alpha); border-left:4px solid var(--primary); padding:1rem; border-radius:8px; font-size:0.85rem; color:var(--text); margin-bottom:1.2rem; line-height:1.4;">
         Configure the weather data source. You need a free API key from
         <a href="https://openweathermap.org/appid" target="_blank" style="color:var(--primary); font-weight:700; text-decoration:none;">OpenWeatherMap</a>.
@@ -152,30 +221,103 @@ void WeatherModule::registerRoutes(PsychicHttpServer& server) {
     <label>Longitude
         <input type="number" step="any" id="weather-lon">
     </label>
+    <label>Units
+        <select id="weather-units">
+            <option value="metric">Metric (°C, m/s)</option>
+            <option value="imperial">Imperial (°F, mph)</option>
+        </select>
+    </label>
     <label>Polling Interval (ms)
         <input type="number" id="weather-interval">
     </label>
+    
     <label>API Key
-        <input type="password" id="weather-apikey" placeholder="Leave blank to keep existing key">
-        <div class="status-badge" id="weather-key-status" style="margin-top:0.5rem;">
+        <div style="position:relative; margin-bottom:0.25rem;">
+            <input type="password" id="weather-apikey" placeholder="Enter API Key"
+                autocomplete="new-password" style="width:100%; box-sizing:border-box; padding-right:2.5rem; margin-top:0;">
+            <button type="button" id="weather-eye-btn" title="Toggle visibility" style="
+                position:absolute; right:8px; top:50%; transform:translateY(-50%);
+                background:none; border:none; cursor:pointer; padding:4px;
+                color:var(--text-muted,#6c757d); display:flex; align-items:center; opacity:0.3; pointer-events:none;
+            ">
+                <svg id="weather-eye-icon" width="20" height="20" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                    <circle cx="12" cy="12" r="3"></circle>
+                </svg>
+            </button>
+        </div>
+        <div class="status-badge" id="weather-key-status" style="margin-top:0.5rem; margin-bottom:1rem;">
             <div class="dot grey" id="weather-key-dot"></div>
             <span id="weather-key-text" style="font-size:0.75rem; text-transform:uppercase; letter-spacing:0.5px;">Checking...</span>
         </div>
     </label>
+    
     <button id="weather-save-btn">Save Settings</button>
+</article>
+
+<article class="info-drawer" style="margin-top: 1rem;">
+    <details id="weather-diag-drawer">
+        <summary class="info-summary">
+            <span id="weather-diag-dot" style="
+                width:8px; height:8px; border-radius:50%; background:var(--border,#dee2e6);
+                display:inline-block; margin-right:0.5rem; flex-shrink:0;
+            "></span>
+            Weather Diagnostics
+        </summary>
+        <div class="info-drawer-content">
+            <table id="weather-diag-table" style="width:100%; border-collapse:collapse; margin:0.5rem 0;">
+                <tr><td style="color:var(--text-muted);font-size:0.85rem;text-align:center;">No data available</td></tr>
+            </table>
+        </div>
+    </details>
 </article>
             `;
 
             // 2. Wire event listeners
             var saveBtn = document.getElementById('weather-save-btn');
+            var apiKeyInput = document.getElementById('weather-apikey');
+            var eyeBtn = document.getElementById('weather-eye-btn');
+
+            apiKeyInput.addEventListener('input', function() {
+                if (apiKeyInput.value.length > 0) {
+                    userIsTypingKey = true;
+                    eyeBtn.style.opacity = '1';
+                    eyeBtn.style.pointerEvents = 'auto';
+                } else {
+                    userIsTypingKey = false;
+                    if (hasExistingKey) {
+                        apiKeyInput.placeholder = '●●●●●●●● (saved)';
+                        eyeBtn.style.opacity = '0.3';
+                        eyeBtn.style.pointerEvents = 'none';
+                        apiKeyInput.type = 'password';
+                    }
+                }
+            });
+
+            eyeBtn.addEventListener('click', function() {
+                if (!userIsTypingKey) return;
+                var isPassword = apiKeyInput.type === 'password';
+                apiKeyInput.type = isPassword ? 'text' : 'password';
+                var icon = document.getElementById('weather-eye-icon');
+                if (isPassword) {
+                    icon.innerHTML = '<path d="M2 2l20 20"></path><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>';
+                } else {
+                    icon.innerHTML = '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle>';
+                }
+            });
 
             saveBtn.addEventListener('click', function() {
                 var payload = {
                     lat: parseFloat(document.getElementById('weather-lat').value),
                     lon: parseFloat(document.getElementById('weather-lon').value),
                     interval: parseInt(document.getElementById('weather-interval').value, 10),
-                    apiKey: document.getElementById('weather-apikey').value
+                    units: document.getElementById('weather-units').value
                 };
+                
+                if (userIsTypingKey) {
+                    payload.apiKey = apiKeyInput.value;
+                }
 
                 window.apiFetch('/api/weather/config', {
                     method: 'POST',
@@ -183,7 +325,18 @@ void WeatherModule::registerRoutes(PsychicHttpServer& server) {
                     body: JSON.stringify(payload)
                 }).then(function() {
                     window.showToast('Weather Settings Saved!', 'success');
-                    document.getElementById('weather-apikey').value = '';
+                    if (userIsTypingKey && apiKeyInput.value.length > 0) {
+                        hasExistingKey = true;
+                    }
+                    userIsTypingKey = false;
+                    apiKeyInput.value = '';
+                    if (hasExistingKey) {
+                        apiKeyInput.placeholder = '●●●●●●●● (saved)';
+                        apiKeyInput.type = 'password';
+                        eyeBtn.style.opacity = '0.3';
+                        eyeBtn.style.pointerEvents = 'none';
+                    }
+                    loadData();
                 }).catch(function() {
                     window.showToast('Failed to save settings', 'error');
                 });
@@ -194,22 +347,110 @@ void WeatherModule::registerRoutes(PsychicHttpServer& server) {
         loadData();
     });
 
+    function formatTime(unix) {
+        if (!unix) return '--';
+        var d = new Date(unix * 1000);
+        return d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+    }
+
     function loadData() {
         window.apiFetch('/api/weather/config')
             .then(function(data) {
                 document.getElementById('weather-lat').value = data.lat;
                 document.getElementById('weather-lon').value = data.lon;
                 document.getElementById('weather-interval').value = data.interval;
+                if (data.units) document.getElementById('weather-units').value = data.units;
+                
+                hasExistingKey = data.hasApiKey;
+                var apiKeyInput = document.getElementById('weather-apikey');
+                var eyeBtn = document.getElementById('weather-eye-btn');
+                
                 if (data.hasApiKey) {
                     document.getElementById('weather-key-dot').className = 'dot green';
                     document.getElementById('weather-key-text').textContent = 'Key Configured';
+                    if (!userIsTypingKey) {
+                        apiKeyInput.placeholder = '●●●●●●●● (saved)';
+                        eyeBtn.style.opacity = '0.3';
+                        eyeBtn.style.pointerEvents = 'none';
+                    }
                 } else {
                     document.getElementById('weather-key-dot').className = 'dot red';
                     document.getElementById('weather-key-text').textContent = 'No Key Set';
+                    if (!userIsTypingKey) {
+                        apiKeyInput.placeholder = 'Enter API Key';
+                    }
                 }
             })
             .catch(function(err) {
                 console.error('Failed to load weather config', err);
+            });
+
+        window.apiFetch('/api/weather/status')
+            .then(function(data) {
+                var sumCard = document.getElementById('weather-summary-card');
+                var sumEmpty = document.getElementById('weather-summary-empty');
+                var diagTable = document.getElementById('weather-diag-table');
+                var diagDot = document.getElementById('weather-diag-dot');
+
+                if (data.hasData) {
+                    sumCard.style.display = 'flex';
+                    sumEmpty.style.display = 'none';
+                    diagDot.style.background = 'var(--success, #2e7d32)';
+
+                    var tempUnit = data.units === 'imperial' ? '°F' : '°C';
+                    var speedUnit = data.units === 'imperial' ? 'mph' : 'm/s';
+
+                    // Summary Card
+                    document.getElementById('weather-sum-location').textContent = (data.city || 'Unknown') + (data.country ? ', ' + data.country : '');
+                    document.getElementById('weather-sum-cond').textContent = data.condition || '--';
+                    document.getElementById('weather-sum-temp').textContent = (data.temperature !== undefined ? data.temperature.toFixed(1) : '--') + tempUnit;
+                    document.getElementById('weather-sum-feels').textContent = 'Feels like ' + (data.feelsLike !== undefined ? data.feelsLike.toFixed(1) : '--') + tempUnit;
+                    document.getElementById('weather-sum-hum').textContent = (data.humidity || '--') + '%';
+                    document.getElementById('weather-sum-wind').textContent = (data.windSpeed !== undefined ? data.windSpeed.toFixed(1) : '--') + ' ' + speedUnit;
+                    document.getElementById('weather-sum-pres').textContent = (data.pressure || '--') + ' hPa';
+                    
+                    var iconEl = document.getElementById('weather-sum-icon');
+                    if (data.icon) {
+                        iconEl.src = 'https://openweathermap.org/img/wn/' + data.icon + '@2x.png';
+                        iconEl.style.display = 'block';
+                    }
+
+                    // Diagnostics Drawer
+                    var rows = [
+                        ['Temperature', data.temperature !== undefined ? data.temperature + tempUnit : '--'],
+                        ['Feels Like', data.feelsLike !== undefined ? data.feelsLike + tempUnit : '--'],
+                        ['Temp Min/Max', (data.tempMin !== undefined ? data.tempMin + tempUnit : '--') + ' / ' + (data.tempMax !== undefined ? data.tempMax + tempUnit : '--')],
+                        ['Condition', data.condition || '--'],
+                        ['Icon Code', data.icon || '--'],
+                        ['Humidity', data.humidity !== undefined ? data.humidity + '%' : '--'],
+                        ['Pressure', data.pressure !== undefined ? data.pressure + ' hPa' : '--'],
+                        ['Visibility', data.visibility !== undefined ? data.visibility + ' m' : '--'],
+                        ['Cloud Cover', data.clouds !== undefined ? data.clouds + '%' : '--'],
+                        ['Wind Speed', data.windSpeed !== undefined ? data.windSpeed + ' ' + speedUnit : '--'],
+                        ['Wind Direction', data.windDeg !== undefined ? data.windDeg + '°' : '--'],
+                        ['City', data.city || '--'],
+                        ['Country', data.country || '--'],
+                        ['Sunrise', formatTime(data.sunrise)],
+                        ['Sunset', formatTime(data.sunset)],
+                        ['Units', data.units || '--']
+                    ];
+
+                    diagTable.innerHTML = rows.map(r => 
+                        '<tr style="border-bottom:1px solid var(--border,#dee2e6);">' +
+                        '<td style="padding:4px 8px 4px 0; font-weight:600; white-space:nowrap; font-size:0.85rem;">' + r[0] + '</td>' +
+                        '<td style="padding:4px 0; color:var(--text-muted,#6c757d); font-size:0.85rem;">' + r[1] + '</td>' +
+                        '</tr>'
+                    ).join('');
+
+                } else {
+                    sumCard.style.display = 'none';
+                    sumEmpty.style.display = 'block';
+                    diagDot.style.background = 'var(--border, #dee2e6)';
+                    diagTable.innerHTML = '<tr><td style="color:var(--text-muted);font-size:0.85rem;text-align:center;">No data available</td></tr>';
+                }
+            })
+            .catch(function(err) {
+                console.error('Failed to load weather status', err);
             });
     }
 })();
@@ -231,8 +472,8 @@ UpdateStatus WeatherModule::fetchUpdate() {
     if (_lat == 0.0 && _lon == 0.0) return UpdateStatus::NoChange;
 
     char url[256];
-    snprintf(url, sizeof(url), "https://api.openweathermap.org/data/2.5/weather?lat=%f&lon=%f&appid=%s&units=metric",
-             _lat, _lon, apiKey.c_str());
+    snprintf(url, sizeof(url), "https://api.openweathermap.org/data/2.5/weather?lat=%f&lon=%f&appid=%s&units=%s",
+             _lat, _lon, apiKey.c_str(), _units.c_str());
 
     // M2: Use ESP-IDF built-in certificate bundle instead of setInsecure().
     // WiFiClientSecure's sslclient is protected, so we use a thin subclass
@@ -294,6 +535,19 @@ void WeatherModule::startDocument() {
     _parsedTemp = "";
     _parsedWind = "";
     _parsedCond = "";
+    _parsedHumidity = "";
+    _parsedPressure = "";
+    _parsedFeelsLike = "";
+    _parsedTempMin = "";
+    _parsedTempMax = "";
+    _parsedVisibility = "";
+    _parsedWindDeg = "";
+    _parsedClouds = "";
+    _parsedCityName = "";
+    _parsedCountry = "";
+    _parsedSunrise = "";
+    _parsedSunset = "";
+    _parsedIcon = "";
     _weatherArrayDepth = 0;
 }
 
@@ -316,10 +570,38 @@ void WeatherModule::key(String key) {
 void WeatherModule::value(String value) {
     if (_currentKey == "temp" && _parsedTemp.empty()) {
         _parsedTemp = value.c_str();
+    } else if (_currentKey == "feels_like" && _parsedFeelsLike.empty()) {
+        _parsedFeelsLike = value.c_str();
+    } else if (_currentKey == "temp_min" && _parsedTempMin.empty()) {
+        _parsedTempMin = value.c_str();
+    } else if (_currentKey == "temp_max" && _parsedTempMax.empty()) {
+        _parsedTempMax = value.c_str();
+    } else if (_currentKey == "pressure" && _parsedPressure.empty()) {
+        _parsedPressure = value.c_str();
+    } else if (_currentKey == "humidity" && _parsedHumidity.empty()) {
+        _parsedHumidity = value.c_str();
+    } else if (_currentKey == "visibility" && _parsedVisibility.empty()) {
+        _parsedVisibility = value.c_str();
     } else if (_currentKey == "speed" && _parsedWind.empty()) {
         _parsedWind = value.c_str();
-    } else if (_currentKey == "main" && _weatherArrayDepth > 0 && _parsedCond.empty()) {
-        _parsedCond = value.c_str();
+    } else if (_currentKey == "deg" && _parsedWindDeg.empty()) {
+        _parsedWindDeg = value.c_str();
+    } else if (_currentKey == "all" && _parsedClouds.empty()) {
+        _parsedClouds = value.c_str();
+    } else if (_currentKey == "name" && _parsedCityName.empty()) {
+        _parsedCityName = value.c_str();
+    } else if (_currentKey == "country" && _parsedCountry.empty()) {
+        _parsedCountry = value.c_str();
+    } else if (_currentKey == "sunrise" && _parsedSunrise.empty()) {
+        _parsedSunrise = value.c_str();
+    } else if (_currentKey == "sunset" && _parsedSunset.empty()) {
+        _parsedSunset = value.c_str();
+    } else if (_weatherArrayDepth > 0) {
+        if (_currentKey == "main" && _parsedCond.empty()) {
+            _parsedCond = value.c_str();
+        } else if (_currentKey == "icon" && _parsedIcon.empty()) {
+            _parsedIcon = value.c_str();
+        }
     }
 }
 
@@ -348,23 +630,45 @@ void WeatherModule::endDocument() {
         if (_ha) _ha->publishState(&_windSensor);
         updated = true;
     }
-    if (!_parsedCond.empty()) {
-        // H3: Write condition string under mutex protection
+    if (!_parsedHumidity.empty()) _humidity.store(std::atoi(_parsedHumidity.c_str()), std::memory_order_release);
+    if (!_parsedPressure.empty()) _pressure.store(std::atoi(_parsedPressure.c_str()), std::memory_order_release);
+    if (!_parsedFeelsLike.empty()) _feelsLike.store(std::strtof(_parsedFeelsLike.c_str(), nullptr), std::memory_order_release);
+    if (!_parsedTempMin.empty()) _tempMin.store(std::strtof(_parsedTempMin.c_str(), nullptr), std::memory_order_release);
+    if (!_parsedTempMax.empty()) _tempMax.store(std::strtof(_parsedTempMax.c_str(), nullptr), std::memory_order_release);
+    if (!_parsedVisibility.empty()) _visibility.store(std::atoi(_parsedVisibility.c_str()), std::memory_order_release);
+    if (!_parsedWindDeg.empty()) _windDeg.store(std::atoi(_parsedWindDeg.c_str()), std::memory_order_release);
+    if (!_parsedClouds.empty()) _clouds.store(std::atoi(_parsedClouds.c_str()), std::memory_order_release);
+    if (!_parsedSunrise.empty()) _sunrise.store(std::strtoul(_parsedSunrise.c_str(), nullptr, 10), std::memory_order_release);
+    if (!_parsedSunset.empty()) _sunset.store(std::strtoul(_parsedSunset.c_str(), nullptr, 10), std::memory_order_release);
+
+    if (!_parsedCond.empty() || !_parsedIcon.empty() || !_parsedCityName.empty() || !_parsedCountry.empty()) {
+        // H3: Write string buffers under mutex protection
 #ifndef NATIVE_BUILD
         if (xSemaphoreTake(_dataMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
-            strlcpy(_condition, _parsedCond.c_str(), sizeof(_condition));
+            if (!_parsedCond.empty()) strlcpy(_condition, _parsedCond.c_str(), sizeof(_condition));
+            if (!_parsedIcon.empty()) strlcpy(_icon, _parsedIcon.c_str(), sizeof(_icon));
+            if (!_parsedCityName.empty()) strlcpy(_cityName, _parsedCityName.c_str(), sizeof(_cityName));
+            if (!_parsedCountry.empty()) strlcpy(_country, _parsedCountry.c_str(), sizeof(_country));
             xSemaphoreGive(_dataMutex);
         }
 #else
-        strlcpy(_condition, _parsedCond.c_str(), sizeof(_condition));
+        if (!_parsedCond.empty()) strlcpy(_condition, _parsedCond.c_str(), sizeof(_condition));
+        if (!_parsedIcon.empty()) strlcpy(_icon, _parsedIcon.c_str(), sizeof(_icon));
+        if (!_parsedCityName.empty()) strlcpy(_cityName, _parsedCityName.c_str(), sizeof(_cityName));
+        if (!_parsedCountry.empty()) strlcpy(_country, _parsedCountry.c_str(), sizeof(_country));
 #endif
 
-        _condSensor.setState(_parsedCond);
-        if (_ha) _ha->publishState(&_condSensor);
+        if (!_parsedCond.empty()) {
+            _condSensor.setState(_parsedCond);
+            if (_ha) _ha->publishState(&_condSensor);
+        }
         updated = true;
     }
 
-    if (updated && _eventBus) {
-        _eventBus->publish("weather.updated");
+    if (updated) {
+        _hasData.store(true, std::memory_order_release);
+        if (_eventBus) {
+            _eventBus->publish("weather.updated");
+        }
     }
 }

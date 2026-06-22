@@ -117,6 +117,8 @@ bool Application::begin(const FrameworkConfig& config) {
     // --- Step 5: Store FrameworkConfig internally ---
     _config = config;
     ESP_LOGI(TAG, "FrameworkConfig stored");
+    ESP_LOGW("DEBUG", "Application::begin input config.otaManifestUrl: %s", config.otaManifestUrl ? config.otaManifestUrl : "NULL");
+    ESP_LOGW("DEBUG", "Application::begin stored _config.otaManifestUrl: %s", _config.otaManifestUrl ? _config.otaManifestUrl : "NULL");
     _statusReporter->reportStatus("Configuration defaults loaded", 0.15f);
 
     // --- Step 6: DeviceCrypto + KeyManager ---
@@ -129,6 +131,7 @@ bool Application::begin(const FrameworkConfig& config) {
     // Dependency injection wires up core services before registration or boot.
     _wifiManager.setConfigManager(&_configManager);
     _wifiManager.setKeyManager(&_keyManager);
+    _wifiManager.setEventBus(&_eventBus);
     _timeManager.setConfigManager(&_configManager);
     _authManager.begin(&_configManager, &_keyManager);
     _otaManager = new (std::nothrow) OTAUpdateManager();

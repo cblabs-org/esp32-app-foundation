@@ -104,6 +104,18 @@ class PsychicHttpServer;
 // Forward declarations — avoids circular include with ConfigManager.hpp / KeyManager.hpp
 class ConfigManager;
 class KeyManager;
+class EventBus;
+
+/**
+ * @brief Well-known EventBus topic constants for WiFi state changes.
+ *
+ * Published by WifiManager when STA connectivity changes. Subscribers
+ * (e.g. HomeAssistantModule) can react to real-time WiFi events.
+ */
+namespace WifiEvents {
+    static constexpr const char* WIFI_CONNECTED    = "wifi.connected";
+    static constexpr const char* WIFI_DISCONNECTED = "wifi.disconnected";
+}
 
 
 /**
@@ -142,6 +154,7 @@ private:
 
     ConfigManager* _configManager = nullptr; ///< Pointer to ConfigManager for save operations
     KeyManager* _keyManager = nullptr;       ///< Pointer to KeyManager for encrypted password storage
+    EventBus* _eventBus = nullptr;           ///< Pointer to EventBus for publishing wifi state events
 
     std::unique_ptr<DNSServer> _dnsServer;
 
@@ -293,6 +306,12 @@ public:
      * @param km Pointer to the KeyManager instance.
      */
     void setKeyManager(KeyManager* km) { _keyManager = km; }
+
+    /**
+     * @brief Wire the EventBus pointer for publishing wifi state events.
+     * @param eb Pointer to the EventBus instance.
+     */
+    void setEventBus(EventBus* eb) { _eventBus = eb; }
 
     /**
      * @brief Set the app-supplied factory default hostname.

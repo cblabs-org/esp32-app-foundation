@@ -210,6 +210,7 @@ void OTAUpdateManager::begin(Application& app) {
     _configManager = &app.getConfigManager();
     _eventBus      = &app.getEventBus();
     ESP_LOGI(TAG, "OTA manager initialized (narrow refs extracted)");
+    ESP_LOGW("DEBUG", "OTAUpdateManager::begin _config->otaManifestUrl: %s", _config->otaManifestUrl ? _config->otaManifestUrl : "NULL");
 }
 
 /**
@@ -428,6 +429,7 @@ void OTAUpdateManager::performUpdateTask() {
     }
 
     // --- Guard: manifest URL must be configured ---
+    ESP_LOGW("DEBUG", "performUpdateTask cfg.otaManifestUrl: %s", cfg.otaManifestUrl ? cfg.otaManifestUrl : "NULL");
     if (cfg.otaManifestUrl == nullptr) {
         ESP_LOGE(TAG, "No otaManifestUrl configured");
         publishProgress(0.0f, "No manifest URL configured", true, false);

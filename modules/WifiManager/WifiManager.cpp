@@ -42,6 +42,7 @@
 #include "../ConfigManager/ConfigManager.hpp"
 #include "../KeyManager/KeyManager.hpp"
 #include "../MCPServer/MCPToolRegistry.hpp"
+#include "../EventBus/EventBus.hpp"
 
 #ifndef NATIVE_BUILD
 #include <PsychicHttp.h>
@@ -257,6 +258,9 @@ void WifiManager::tick(uint32_t currentMillis) {
                 _isAPMode = false;
                 _wifiDisconnectTimer = 0; // Reset downtime tracker
                 updateMyUrl();
+                if (_eventBus) {
+                    _eventBus->publish(WifiEvents::WIFI_CONNECTED);
+                }
                 transitionTo(WiFiState::Ready);
             } else if (currentMillis - _stateTimer > 15000) { // 15 second timeout for STA
                 ESP_LOGW(TAG, "WiFi connection timed out. Falling back to AP.");
@@ -315,6 +319,9 @@ void WifiManager::tick(uint32_t currentMillis) {
                 // If this is the first tick since disconnection, start the timer
                 if (_wifiDisconnectTimer == 0) {
                     _wifiDisconnectTimer = currentMillis;
+                    if (_eventBus) {
+                        _eventBus->publish(WifiEvents::WIFI_DISCONNECTED);
+                    }
                 }
 
                 // Wait 10 seconds before attempting to recycle the connection
