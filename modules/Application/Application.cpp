@@ -129,6 +129,7 @@ bool Application::begin(const FrameworkConfig& config) {
     // Dependency injection wires up core services before registration or boot.
     _wifiManager.setConfigManager(&_configManager);
     _wifiManager.setKeyManager(&_keyManager);
+    _wifiManager.setEventBus(&_eventBus);
     _timeManager.setConfigManager(&_configManager);
     _authManager.begin(&_configManager, &_keyManager);
     _otaManager = new (std::nothrow) OTAUpdateManager();
@@ -186,6 +187,9 @@ bool Application::begin(const FrameworkConfig& config) {
 
     // --- Step 12: DataManager — background data workers ---
     _dataManager.begin();
+    for (IDataSource* source : _dataSources) {
+        _dataManager.registerSource(source);
+    }
     _statusReporter->reportStatus("Data services ready", 0.70f);
 
     // --- Step 13: OTA — wire Application dependency (allocated in Step 7) ---
