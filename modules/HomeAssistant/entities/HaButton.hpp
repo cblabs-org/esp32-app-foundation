@@ -1,6 +1,5 @@
 #pragma once
 #include "IHaEntity.hpp"
-#include <functional>
 
 class HaButton : public IHaEntity {
 private:
@@ -8,14 +7,22 @@ private:
     const char* _name;
     const char* _deviceClass = nullptr;
     const char* _icon = nullptr;
-    std::function<void()> _commandCallback;
+
+    using CommandFn = void(*)(void* ctx);
+    CommandFn _commandCallback = nullptr;
+    void* _commandCtx = nullptr;
+
 public:
     HaButton(const char* objectId, const char* name)
         : _objectId(objectId), _name(name) {}
 
     void setDeviceClass(const char* deviceClass) { _deviceClass = deviceClass; }
     void setIcon(const char* icon) { _icon = icon; }
-    void setCommandCallback(std::function<void()> cb) { _commandCallback = cb; }
+
+    void onCommand(CommandFn callback, void* ctx = nullptr) {
+        _commandCallback = callback;
+        _commandCtx = ctx;
+    }
 
     std::string getObjectId() const override { return _objectId; }
     const char* getEntityType() const override { return "button"; }
@@ -32,7 +39,7 @@ public:
 
     void handleCommand(const std::string& topic, const std::string& payload) override {
         if (payload == "PRESS") {
-            if (_commandCallback) _commandCallback();
+            if (_commandCallback) _commandCallback(_commandCtx);
         }
     }
 };

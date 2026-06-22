@@ -1,6 +1,5 @@
 #pragma once
 #include "IHaEntity.hpp"
-#include <functional>
 #include <vector>
 
 class HaSelect : public IHaEntity {
@@ -11,7 +10,9 @@ private:
     std::vector<std::string> _options;
     std::string _state;
     
-    std::function<void(const char* option)> _commandCallback;
+    using CommandFn = void(*)(const char* option, void* ctx);
+    CommandFn _commandCallback = nullptr;
+    void* _commandCtx = nullptr;
 
 public:
     HaSelect(const char* objectId, const char* name)
@@ -19,7 +20,11 @@ public:
 
     void setDeviceClass(const char* deviceClass) { _deviceClass = deviceClass; }
     void addOption(const char* option) { _options.push_back(option); }
-    void setCommandCallback(std::function<void(const char*)> cb) { _commandCallback = cb; }
+
+    void onCommand(CommandFn callback, void* ctx = nullptr) {
+        _commandCallback = callback;
+        _commandCtx = ctx;
+    }
 
     void setState(const char* state) { _state = state; }
 
@@ -40,6 +45,6 @@ public:
 
     void handleCommand(const std::string& topic, const std::string& payload) override {
         _state = payload;
-        if (_commandCallback) _commandCallback(_state.c_str());
+        if (_commandCallback) _commandCallback(_state.c_str(), _commandCtx);
     }
 };

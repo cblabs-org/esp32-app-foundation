@@ -4,6 +4,7 @@
 #include "entities/IHaEntity.hpp"
 #include <vector>
 #include <string>
+#include <atomic>
 #include <ArduinoJson.h>
 
 #ifndef NATIVE_BUILD
@@ -29,7 +30,7 @@ private:
     std::string _lwtTopic;
 
     bool _wifiConnected = false;
-    bool _mqttConnected = false;
+    std::atomic<bool> _mqttConnected{false};
     bool _needsStateSync = false;
 
     static void onWifiConnected(const char* topic, const void* payload, void* ctx);

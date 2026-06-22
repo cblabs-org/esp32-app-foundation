@@ -1,6 +1,5 @@
 #pragma once
 #include "IHaEntity.hpp"
-#include <functional>
 
 class HaLight : public IHaEntity {
 private:
@@ -15,7 +14,9 @@ private:
     bool _supportsColor = false;
     bool _supportsEffect = false;
     
-    std::function<void(bool state, uint8_t brightness, uint8_t r, uint8_t g, uint8_t b, const char* effect)> _commandCallback;
+    using CommandFn = void(*)(bool state, uint8_t brightness, uint8_t r, uint8_t g, uint8_t b, const char* effect, void* ctx);
+    CommandFn _commandCallback = nullptr;
+    void* _commandCtx = nullptr;
 
 public:
     HaLight(const char* objectId, const char* name)
@@ -25,7 +26,10 @@ public:
     void setSupportsColor(bool supports) { _supportsColor = supports; }
     void setSupportsEffect(bool supports) { _supportsEffect = supports; }
 
-    void setCommandCallback(std::function<void(bool, uint8_t, uint8_t, uint8_t, uint8_t, const char*)> cb) { _commandCallback = cb; }
+    void onCommand(CommandFn callback, void* ctx = nullptr) {
+        _commandCallback = callback;
+        _commandCtx = ctx;
+    }
 
     void setState(bool state, uint8_t brightness = 255, uint8_t r = 255, uint8_t g = 255, uint8_t b = 255, const char* effect = nullptr) {
         _state = state;
@@ -94,7 +98,7 @@ public:
                 _effect = doc["effect"].as<std::string>();
             }
             if (_commandCallback) {
-                _commandCallback(_state, _brightness, _color[0], _color[1], _color[2], _effect.empty() ? nullptr : _effect.c_str());
+                _commandCallback(_state, _brightness, _color[0], _color[1], _color[2], _effect.empty() ? nullptr : _effect.c_str(), _commandCtx);
             }
         }
     }

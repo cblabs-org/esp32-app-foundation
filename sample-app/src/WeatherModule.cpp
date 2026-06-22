@@ -6,35 +6,49 @@
 #include <PsychicHttp.h>
 #include <WiFiClientSecure.h>
 #include <HTTPClient.h>
+
+// M2: Forward-declare the Arduino ESP32 ssl_client function we need.
+// Including ssl_client.h directly pulls in mbedTLS internal headers
+// that conflict with the ESP-IDF build.
+struct sslclient_context;
+void attach_ssl_certificate_bundle(sslclient_context *ssl_client, bool att);
 #endif
 
 WeatherModule::WeatherModule() {
-    _tempSensor = new HaSensor("weather_temp", "Temperature");
-    _tempSensor->setDeviceClass("temperature");
-    _tempSensor->setStateClass("measurement");
-    _tempSensor->setUnitOfMeasurement("°C");
+    // H2: Sensors are now direct members — configure via dot access
+    _tempSensor.setDeviceClass("temperature");
+    _tempSensor.setStateClass("measurement");
+    _tempSensor.setUnitOfMeasurement("°C");
 
-    _windSensor = new HaSensor("weather_wind", "Wind Speed");
-    _windSensor->setDeviceClass("wind_speed");
-    _windSensor->setStateClass("measurement");
-    _windSensor->setUnitOfMeasurement("m/s");
+    _windSensor.setDeviceClass("wind_speed");
+    _windSensor.setStateClass("measurement");
+    _windSensor.setUnitOfMeasurement("m/s");
 
-    _condSensor = new HaSensor("weather_condition", "Weather Condition");
     // Generic text sensor for weather condition, no special device class
+
+#ifndef NATIVE_BUILD
+    // H3: Create mutex for thread-safe condition string access
+    _dataMutex = xSemaphoreCreateMutex();
+#endif
 }
 
 WeatherModule::~WeatherModule() {
-    delete _tempSensor;
-    delete _windSensor;
-    delete _condSensor;
+    // H2: No delete needed — sensors are direct members
+#ifndef NATIVE_BUILD
+    if (_dataMutex) {
+        vSemaphoreDelete(_dataMutex);
+        _dataMutex = nullptr;
+    }
+#endif
 }
 
 void WeatherModule::setHomeAssistant(HomeAssistantModule* ha) {
     _ha = ha;
     if (_ha) {
-        _ha->addEntity(_tempSensor);
-        _ha->addEntity(_windSensor);
-        _ha->addEntity(_condSensor);
+        // H2: Pass address of member objects instead of pointers
+        _ha->addEntity(&_tempSensor);
+        _ha->addEntity(&_windSensor);
+        _ha->addEntity(&_condSensor);
     }
 }
 
@@ -220,8 +234,18 @@ UpdateStatus WeatherModule::fetchUpdate() {
     snprintf(url, sizeof(url), "https://api.openweathermap.org/data/2.5/weather?lat=%f&lon=%f&appid=%s&units=metric",
              _lat, _lon, apiKey.c_str());
 
-    WiFiClientSecure client;
-    client.setInsecure(); // Or configure bundle if required
+    // M2: Use ESP-IDF built-in certificate bundle instead of setInsecure().
+    // WiFiClientSecure's sslclient is protected, so we use a thin subclass
+    // to access it. This enables the DEFAULT_CMN bundle (~16 KB, ~99% of
+    // public CAs) without providing a custom bundle via setCACertBundle().
+    struct SecureClient : public WiFiClientSecure {
+        void useDefaultCertBundle() {
+            attach_ssl_certificate_bundle(sslclient.get(), true);
+            _use_ca_bundle = true;
+        }
+    };
+    SecureClient client;
+    client.useDefaultCertBundle();
 
     HTTPClient http;
     if (!http.begin(client, url)) {
@@ -254,7 +278,8 @@ UpdateStatus WeatherModule::fetchUpdate() {
                 len -= c;
             }
         }
-        delay(1);
+        // M1: Use vTaskDelay instead of delay() in FreeRTOS task context
+        vTaskDelay(pdMS_TO_TICKS(1));
     }
 
     http.end();
@@ -266,9 +291,9 @@ UpdateStatus WeatherModule::fetchUpdate() {
 
 void WeatherModule::startDocument() {
     _currentKey = "";
-    _tempStr = "";
-    _windStr = "";
-    _condStr = "";
+    _parsedTemp = "";
+    _parsedWind = "";
+    _parsedCond = "";
     _weatherArrayDepth = 0;
 }
 
@@ -289,31 +314,53 @@ void WeatherModule::key(String key) {
 }
 
 void WeatherModule::value(String value) {
-    if (_currentKey == "temp" && _tempStr.empty()) {
-        _tempStr = value.c_str();
-    } else if (_currentKey == "speed" && _windStr.empty()) {
-        _windStr = value.c_str();
-    } else if (_currentKey == "main" && _weatherArrayDepth > 0 && _condStr.empty()) {
-        _condStr = value.c_str();
+    if (_currentKey == "temp" && _parsedTemp.empty()) {
+        _parsedTemp = value.c_str();
+    } else if (_currentKey == "speed" && _parsedWind.empty()) {
+        _parsedWind = value.c_str();
+    } else if (_currentKey == "main" && _weatherArrayDepth > 0 && _parsedCond.empty()) {
+        _parsedCond = value.c_str();
     }
 }
 
 void WeatherModule::endDocument() {
     bool updated = false;
 
-    if (!_tempStr.empty() && _tempSensor) {
-        _tempSensor->setState(_tempStr);
-        if (_ha) _ha->publishState(_tempSensor);
+    if (!_parsedTemp.empty()) {
+        float temp = std::strtof(_parsedTemp.c_str(), nullptr);
+        // H3: Store via atomic for thread-safe cross-task access
+        _temperature.store(temp, std::memory_order_release);
+
+        // Publish numeric value as string state to HA sensor
+        char buf[16];
+        snprintf(buf, sizeof(buf), "%.1f", temp);
+        _tempSensor.setState(buf);
+        if (_ha) _ha->publishState(&_tempSensor);
         updated = true;
     }
-    if (!_windStr.empty() && _windSensor) {
-        _windSensor->setState(_windStr);
-        if (_ha) _ha->publishState(_windSensor);
+    if (!_parsedWind.empty()) {
+        float wind = std::strtof(_parsedWind.c_str(), nullptr);
+        _windSpeed.store(wind, std::memory_order_release);
+
+        char buf[16];
+        snprintf(buf, sizeof(buf), "%.1f", wind);
+        _windSensor.setState(buf);
+        if (_ha) _ha->publishState(&_windSensor);
         updated = true;
     }
-    if (!_condStr.empty() && _condSensor) {
-        _condSensor->setState(_condStr);
-        if (_ha) _ha->publishState(_condSensor);
+    if (!_parsedCond.empty()) {
+        // H3: Write condition string under mutex protection
+#ifndef NATIVE_BUILD
+        if (xSemaphoreTake(_dataMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
+            strlcpy(_condition, _parsedCond.c_str(), sizeof(_condition));
+            xSemaphoreGive(_dataMutex);
+        }
+#else
+        strlcpy(_condition, _parsedCond.c_str(), sizeof(_condition));
+#endif
+
+        _condSensor.setState(_parsedCond);
+        if (_ha) _ha->publishState(&_condSensor);
         updated = true;
     }
 

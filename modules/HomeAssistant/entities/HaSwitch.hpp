@@ -1,19 +1,24 @@
 #pragma once
 #include "IHaEntity.hpp"
-#include <string>
-#include <functional>
 
 class HaSwitch : public IHaEntity {
 private:
-    std::string _objectId;
-    std::string _name;
+    const char* _objectId;
+    const char* _name;
     std::string _state; // "ON" or "OFF"
-    std::function<void(bool)> _commandCallback;
+
+    using CommandFn = void(*)(bool state, void* ctx);
+    CommandFn _commandCallback = nullptr;
+    void* _commandCtx = nullptr;
+
 public:
-    HaSwitch(const std::string& objectId, const std::string& name) 
+    HaSwitch(const char* objectId, const char* name) 
         : _objectId(objectId), _name(name), _state("OFF") {}
 
-    void setCommandCallback(std::function<void(bool)> cb) { _commandCallback = cb; }
+    void onCommand(CommandFn callback, void* ctx = nullptr) {
+        _commandCallback = callback;
+        _commandCtx = ctx;
+    }
     
     void setState(bool state) { _state = state ? "ON" : "OFF"; }
 
@@ -32,10 +37,10 @@ public:
     void handleCommand(const std::string& topic, const std::string& payload) override {
         if (payload == "ON" || payload == "on") {
             _state = "ON";
-            if (_commandCallback) _commandCallback(true);
+            if (_commandCallback) _commandCallback(true, _commandCtx);
         } else if (payload == "OFF" || payload == "off") {
             _state = "OFF";
-            if (_commandCallback) _commandCallback(false);
+            if (_commandCallback) _commandCallback(false, _commandCtx);
         }
     }
 };

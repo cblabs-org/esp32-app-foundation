@@ -1,6 +1,5 @@
 #pragma once
 #include "IHaEntity.hpp"
-#include <functional>
 
 class HaFan : public IHaEntity {
 private:
@@ -10,13 +9,18 @@ private:
     uint8_t _percentage = 0;
     bool _oscillating = false;
     
-    std::function<void(bool state, uint8_t percentage, bool oscillating)> _commandCallback;
+    using CommandFn = void(*)(bool state, uint8_t speed, void* ctx);
+    CommandFn _commandCallback = nullptr;
+    void* _commandCtx = nullptr;
 
 public:
     HaFan(const char* objectId, const char* name)
         : _objectId(objectId), _name(name) {}
 
-    void setCommandCallback(std::function<void(bool, uint8_t, bool)> cb) { _commandCallback = cb; }
+    void onCommand(CommandFn callback, void* ctx = nullptr) {
+        _commandCallback = callback;
+        _commandCtx = ctx;
+    }
 
     void setState(bool state, uint8_t percentage = 0, bool oscillating = false) {
         _state = state;
@@ -67,7 +71,7 @@ public:
             _state = (payload == "ON" || payload == "on");
         }
         if (_commandCallback) {
-            _commandCallback(_state, _percentage, _oscillating);
+            _commandCallback(_state, _percentage, _commandCtx);
         }
     }
 };

@@ -301,7 +301,7 @@ void HomeAssistantModule::registerRoutes(PsychicHttpServer& server) {
         doc["user"] = _mqttUser;
         doc["passExists"] = (_keyManager && !_keyManager->getKeyById(_mqttPassId.c_str()).empty());
         doc["certExists"] = (_keyManager && !_keyManager->getKeyById(_tlsCertId.c_str()).empty());
-        doc["connected"] = _mqttConnected;
+        doc["connected"] = _mqttConnected.load();
         std::string output;
         serializeJson(doc, output);
         return response->send(200, "application/json", output.c_str());

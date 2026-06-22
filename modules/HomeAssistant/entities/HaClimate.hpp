@@ -1,6 +1,5 @@
 #pragma once
 #include "IHaEntity.hpp"
-#include <functional>
 
 class HaClimate : public IHaEntity {
 private:
@@ -10,13 +9,18 @@ private:
     float _targetTemp = 20.0f;
     float _currentTemp = 20.0f;
     
-    std::function<void(const char* mode, float targetTemp)> _commandCallback;
+    using CommandFn = void(*)(const char* mode, float targetTemp, void* ctx);
+    CommandFn _commandCallback = nullptr;
+    void* _commandCtx = nullptr;
 
 public:
     HaClimate(const char* objectId, const char* name)
         : _objectId(objectId), _name(name) {}
 
-    void setCommandCallback(std::function<void(const char*, float)> cb) { _commandCallback = cb; }
+    void onCommand(CommandFn callback, void* ctx = nullptr) {
+        _commandCallback = callback;
+        _commandCtx = ctx;
+    }
 
     void setState(const char* mode, float targetTemp, float currentTemp) {
         _mode = mode;
@@ -69,7 +73,7 @@ public:
             _targetTemp = std::stof(payload);
         }
         if (_commandCallback) {
-            _commandCallback(_mode.c_str(), _targetTemp);
+            _commandCallback(_mode.c_str(), _targetTemp, _commandCtx);
         }
     }
 };

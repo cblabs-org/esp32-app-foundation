@@ -7,12 +7,15 @@ WeatherClockBoard::WeatherClockBoard(WeatherModule* weatherModule)
 
 void WeatherClockBoard::render(U8G2& u8g2) {
     // Clear buffer is handled by the CarouselEngine
-    // Get weather data
+    // Get weather data — H3: getters now return float/string safely across threads
     std::string tempStr;
     std::string condStr;
 
     if (_weatherModule) {
-        tempStr = _weatherModule->getTemperature();
+        // Convert float to display string
+        char buf[16];
+        snprintf(buf, sizeof(buf), "%.1f", _weatherModule->getTemperature());
+        tempStr = buf;
         condStr = _weatherModule->getCondition();
     }
 

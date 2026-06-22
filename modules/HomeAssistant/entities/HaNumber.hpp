@@ -1,6 +1,5 @@
 #pragma once
 #include "IHaEntity.hpp"
-#include <functional>
 
 class HaNumber : public IHaEntity {
 private:
@@ -12,7 +11,9 @@ private:
     float _step = 1.0f;
     float _state = 0.0f;
     
-    std::function<void(float value)> _commandCallback;
+    using CommandFn = void(*)(float value, void* ctx);
+    CommandFn _commandCallback = nullptr;
+    void* _commandCtx = nullptr;
 
 public:
     HaNumber(const char* objectId, const char* name)
@@ -22,7 +23,11 @@ public:
     void setMin(float min) { _min = min; }
     void setMax(float max) { _max = max; }
     void setStep(float step) { _step = step; }
-    void setCommandCallback(std::function<void(float)> cb) { _commandCallback = cb; }
+
+    void onCommand(CommandFn callback, void* ctx = nullptr) {
+        _commandCallback = callback;
+        _commandCtx = ctx;
+    }
 
     void setState(float state) { _state = state; }
 
@@ -46,6 +51,6 @@ public:
 
     void handleCommand(const std::string& topic, const std::string& payload) override {
         _state = std::stof(payload);
-        if (_commandCallback) _commandCallback(_state);
+        if (_commandCallback) _commandCallback(_state, _commandCtx);
     }
 };

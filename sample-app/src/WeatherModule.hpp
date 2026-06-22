@@ -3,15 +3,14 @@
 #include "AppFoundation.h"
 #include "HomeAssistantModule.hpp"
 #include "entities/HaSensor.hpp"
-#include "KeyManager.hpp"
-#include "EventBus.hpp"
-#include "interfaces/ITickable.hpp"
-#include "interfaces/IConfigurable.hpp"
-#include "interfaces/IWebContributor.hpp"
-#include "interfaces/IDataSource.hpp"
 #include <JsonStreamingParser.h>
 #include <JsonListener.h>
+#include <atomic>
 #include <string>
+
+#ifndef NATIVE_BUILD
+#include <freertos/semphr.h>
+#endif
 
 class ConfigManager;
 
@@ -30,15 +29,27 @@ private:
     double _lon = 0.0;
     uint32_t _pollingIntervalMs = 600000;
 
-    HaSensor* _tempSensor = nullptr;
-    HaSensor* _windSensor = nullptr;
-    HaSensor* _condSensor = nullptr;
+    // H2: Static member allocation — no bare new
+    HaSensor _tempSensor{"weather_temp", "Temperature"};
+    HaSensor _windSensor{"weather_wind", "Wind Speed"};
+    HaSensor _condSensor{"weather_condition", "Weather Condition"};
 
-    // JsonListener state
+    // H3: Thread-safe data exchange between fetchUpdate() task and main task.
+    // Temperature and wind are simple floats — use std::atomic for lock-free
+    // cross-thread reads. Condition is a variable-length string — use a
+    // fixed char buffer protected by a FreeRTOS mutex.
+    std::atomic<float> _temperature{0.0f};
+    std::atomic<float> _windSpeed{0.0f};
+    char _condition[32] = "";
+#ifndef NATIVE_BUILD
+    SemaphoreHandle_t _dataMutex = nullptr;
+#endif
+
+    // JsonListener state (used only within fetchUpdate task — single-threaded)
     std::string _currentKey;
-    std::string _tempStr;
-    std::string _windStr;
-    std::string _condStr;
+    std::string _parsedTemp;
+    std::string _parsedWind;
+    std::string _parsedCond;
     int _weatherArrayDepth = 0;
 
 public:
@@ -50,9 +61,22 @@ public:
     void setEventBus(EventBus* eb) { _eventBus = eb; }
     void setConfigManager(ConfigManager* cm) { _configManager = cm; }
 
-    const std::string& getTemperature() const { return _tempStr; }
-    const std::string& getWindSpeed() const { return _windStr; }
-    const std::string& getCondition() const { return _condStr; }
+    // H3: Thread-safe getters. Temperature and wind return float via atomic
+    // load. Condition returns a copy under mutex protection.
+    float getTemperature() const { return _temperature.load(std::memory_order_acquire); }
+    float getWindSpeed() const { return _windSpeed.load(std::memory_order_acquire); }
+    std::string getCondition() const {
+        std::string result;
+#ifndef NATIVE_BUILD
+        if (xSemaphoreTake(_dataMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
+            result = _condition;
+            xSemaphoreGive(_dataMutex);
+        }
+#else
+        result = _condition;
+#endif
+        return result;
+    }
 
     // ITickable
     void tick(uint32_t currentMillis) override;

@@ -1,6 +1,5 @@
 #pragma once
 #include "IHaEntity.hpp"
-#include <functional>
 
 class HaCover : public IHaEntity {
 private:
@@ -10,16 +9,20 @@ private:
     std::string _state = "closed";
     uint8_t _position = 0;
     
-    std::function<void(const char* command)> _commandCallback;
-    std::function<void(uint8_t position)> _positionCallback;
+    using CommandFn = void(*)(const char* command, uint8_t position, void* ctx);
+    CommandFn _commandCallback = nullptr;
+    void* _commandCtx = nullptr;
 
 public:
     HaCover(const char* objectId, const char* name)
         : _objectId(objectId), _name(name) {}
 
     void setDeviceClass(const char* deviceClass) { _deviceClass = deviceClass; }
-    void setCommandCallback(std::function<void(const char*)> cb) { _commandCallback = cb; }
-    void setPositionCallback(std::function<void(uint8_t)> cb) { _positionCallback = cb; }
+
+    void onCommand(CommandFn callback, void* ctx = nullptr) {
+        _commandCallback = callback;
+        _commandCtx = ctx;
+    }
 
     void setState(const char* state, uint8_t position) {
         _state = state; // "open", "closed", "opening", "closing", "stopped"
@@ -56,9 +59,9 @@ public:
     void handleCommand(const std::string& topic, const std::string& payload) override {
         if (topic.find("/position") != std::string::npos) {
             _position = std::stoi(payload);
-            if (_positionCallback) _positionCallback(_position);
+            if (_commandCallback) _commandCallback(nullptr, _position, _commandCtx);
         } else {
-            if (_commandCallback) _commandCallback(payload.c_str());
+            if (_commandCallback) _commandCallback(payload.c_str(), _position, _commandCtx);
         }
     }
 };
