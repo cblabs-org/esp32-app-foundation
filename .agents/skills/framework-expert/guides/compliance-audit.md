@@ -30,6 +30,8 @@ These are the principle combinations that catch the most violations. When you fi
 - **When you find TLS usage** → check the task stack size AND whether concurrent connections are bounded (budget: 2 max).
 - **When you find credential handling** → verify it goes through `KeyManager`, not raw NVS or plaintext LittleFS.
 
+| TLS Security | `setInsecure()` used in reference/sample application connecting to a public API. Reference apps must demonstrate proper TLS verification — use `esp_crt_bundle_attach()` for public APIs or `KeyManager` for user-provided CA certs. `setInsecure()` is only acceptable for local network connections (e.g., self-signed MQTT broker on LAN) with an explicit comment justifying the choice. |
+
 ### Naming × Consistency
 - **When you find one naming violation** → scan ALL members of that module. Naming violations cluster — a module with one `suffix_` member usually has many.
 - **When you find a TAG definition** → check if it uses `constexpr` and matches the class name.

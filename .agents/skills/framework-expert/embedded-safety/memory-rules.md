@@ -35,3 +35,25 @@ When parsing incoming Web Portal POST requests or processing small MQTT payloads
 ## 5. SBO Threshold for `std::function`
 
 Be aware of the Small Buffer Optimization (SBO) limit of `std::function` (typically 16-32 bytes). Capturing too many variables in a lambda assigned to a `std::function` will force a hidden heap allocation. See GRAVE-05 in [Rejected Approaches](rejected-approaches.md).
+
+## 6. `std::function` as Stored Callback Members
+
+Do not store `std::function` as a class member variable for callbacks in any module, entity, or service class. Use a static function pointer with a `void*` context parameter instead.
+
+The same SBO (Small Buffer Optimization) heap fragmentation risk that rejected `std::function` for EventBus (GRAVE-05) applies equally to:
+- Entity command callbacks (e.g., `HaSwitch::onCommand()`)
+- Timer callbacks
+- Any stored callable that persists beyond a single function scope
+
+**Pattern:**
+```cpp
+// ❌ WRONG — hidden heap allocation
+std::function<void(bool)> _callback;
+
+// ✅ CORRECT — zero-cost, deterministic
+using CommandFn = void(*)(bool state, void* ctx);
+CommandFn _callback = nullptr;
+void* _callbackCtx = nullptr;
+```
+
+Temporary `std::function` usage (e.g., passed as a parameter and invoked immediately, not stored) is acceptable when the scope is bounded.

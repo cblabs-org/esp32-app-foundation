@@ -9,6 +9,7 @@ The framework's architecture is shaped by past failures. These designs were test
 ## 2. `std::function` EventBus (GRAVE-05)
 - **Concept:** Passing lambdas or `std::function` to the EventBus for callbacks.
 - **Why Rejected:** Capturing lambdas exceed the SBO (Small Buffer Optimization) threshold, causing hidden, continuous heap allocations and catastrophic fragmentation. Static function pointers are used instead.
+- **Scope Note:** This rejection applies to ALL stored `std::function` callback members, not just EventBus — including entity command callbacks, timer callbacks, and any stored callable that persists beyond a single function scope. See [memory-rules.md § 6](memory-rules.md) for the generalised rule and correct pattern.
 
 ## 3. Dynamic Board Factory
 - **Concept:** Instantiating `IDisplayBoard` objects on the fly when their display time arrives.

@@ -43,6 +43,18 @@ Determines scheduling grouping:
 > [!CAUTION]
 > You must ensure thread safety when sharing data between `fetchUpdate()` (the FreeRTOS task) and other framework interfaces like `IWebContributor` or `ITickable` (the main task). Use `std::atomic`, mutexes, or `EventBus` payloads to cross thread boundaries safely.
 
+> [!WARNING]
+> **Streaming parser callbacks run on the background task.** If your `IDataSource`
+> implementation also implements a streaming parser callback interface (e.g.,
+> `JsonListener`), the parser callbacks (`key()`, `value()`, `endDocument()`) will
+> execute inside `fetchUpdate()` on the DataManager's background task. Any class
+> members written by these callbacks and read by main-thread interfaces (`ITickable`,
+> `IWebContributor`, `IDisplayBoard`) require thread-safe access patterns.
+>
+> For numeric values, use `std::atomic<float>` or `std::atomic<int>`. For strings,
+> use a fixed `char[]` buffer protected by a FreeRTOS mutex (`xSemaphoreCreateMutex()`).
+> See [thread-safety.md](../embedded-safety/thread-safety.md) for recommended approaches.
+
 **ADR-14 (WiFiClientSecure placement)**: `WiFiClientSecure` objects allocate massive internal state (MbedTLS context). Do NOT place them as class members, or you will bloat the global heap. Always instantiate them locally within `fetchUpdate()` so they are allocated on the FreeRTOS task stack, and destroyed when the function returns.
 
 ```cpp

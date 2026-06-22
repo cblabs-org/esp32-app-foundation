@@ -123,6 +123,27 @@ app.getEventBus().publish("weather.updated", &data);
 ```
 *System Guide:* [`../systems/event-bus/custom-topics.md`](../systems/event-bus/custom-topics.md)
 
+## Include Discipline
+
+Your application modules should include exactly **one** framework header:
+
+```cpp
+#include "AppFoundation.h"
+```
+
+**DO NOT:**
+- Include individual interface headers (`interfaces/ITickable.hpp`, `interfaces/IWebContributor.hpp`)
+- Include internal module headers (`KeyManager.hpp`, `EventBus.hpp`, `ConfigManager.hpp`)
+- Use relative paths to framework headers (`../../include/AppFoundation.h`)
+- Include headers that `AppFoundation.h` already re-exports
+
+The `AppFoundation.h` facade re-exports all public interfaces, type definitions, and
+module access patterns. Direct includes create coupling to internal header paths that
+will break if the framework reorganizes its directory structure.
+
+**Kernel modules** (inside `modules/`) may need internal headers — this rule applies
+to **application-layer** code (your `src/` directory and sample apps).
+
 ## What to Read Next
 
 Once your prototype is working, review these deep dives before shipping:
