@@ -1,5 +1,6 @@
 #include "WeatherModule.hpp"
 #include "ConfigManager.hpp"
+#include "DataManager.hpp"
 #include <ArduinoJson.h>
 
 #ifndef NATIVE_BUILD
@@ -126,12 +127,17 @@ void WeatherModule::registerRoutes(PsychicHttpServer& server) {
             _configManager->saveModuleConfig(this);
         }
 
+        if (_dataManager) {
+            _dataManager->requestPriorityFetch(this);
+        }
+
         return response->send(200, "application/json", "{\"status\":\"saved\"}");
     });
 
     server.on("/api/weather/status", HTTP_GET, [this](PsychicRequest* request, PsychicResponse* response) {
         JsonDocument doc;
         doc["hasData"] = hasData();
+        doc["status"] = static_cast<int>(_lastFetchStatus.load(std::memory_order_acquire));
         doc["units"] = _units;
         
         if (hasData()) {
@@ -336,7 +342,14 @@ void WeatherModule::registerRoutes(PsychicHttpServer& server) {
                         eyeBtn.style.opacity = '0.3';
                         eyeBtn.style.pointerEvents = 'none';
                     }
+                    
+                    // The backend will trigger an immediate background fetch.
+                    // Let's poll for the status a few times over the next few seconds to
+                    // quickly update the UI once the fetch completes.
                     loadData();
+                    setTimeout(loadData, 1000);
+                    setTimeout(loadData, 2500);
+                    setTimeout(loadData, 5000);
                 }).catch(function() {
                     window.showToast('Failed to save settings', 'error');
                 });
@@ -447,6 +460,15 @@ void WeatherModule::registerRoutes(PsychicHttpServer& server) {
                     sumEmpty.style.display = 'block';
                     diagDot.style.background = 'var(--border, #dee2e6)';
                     diagTable.innerHTML = '<tr><td style="color:var(--text-muted);font-size:0.85rem;text-align:center;">No data available</td></tr>';
+
+                    var errMsg = 'No weather data yet. Please configure below.';
+                    if (data.status === 2) errMsg = 'Rate limited by OpenWeatherMap API.';
+                    else if (data.status === 3) errMsg = 'Network error fetching weather data.';
+                    else if (data.status === 4) errMsg = 'Error parsing weather data.';
+                    else if (data.status === 5) errMsg = 'Invalid API Key. Please check your credentials.';
+                    else if (data.status === 1) errMsg = 'No change in weather data or location not set.';
+                    
+                    document.querySelector('#weather-summary-empty p').textContent = errMsg;
                 }
             })
             .catch(function(err) {
@@ -468,8 +490,14 @@ void WeatherModule::registerRoutes(PsychicHttpServer& server) {
 UpdateStatus WeatherModule::fetchUpdate() {
 #ifndef NATIVE_BUILD
     std::string apiKey = _keyManager ? _keyManager->getKeyById("owm_api_key") : "";
-    if (apiKey.empty()) return UpdateStatus::AuthError;
-    if (_lat == 0.0 && _lon == 0.0) return UpdateStatus::NoChange;
+    if (apiKey.empty()) {
+        _lastFetchStatus.store(UpdateStatus::AuthError, std::memory_order_release);
+        return UpdateStatus::AuthError;
+    }
+    if (_lat == 0.0 && _lon == 0.0) {
+        _lastFetchStatus.store(UpdateStatus::NoChange, std::memory_order_release);
+        return UpdateStatus::NoChange;
+    }
 
     char url[256];
     snprintf(url, sizeof(url), "https://api.openweathermap.org/data/2.5/weather?lat=%f&lon=%f&appid=%s&units=%s",
@@ -490,15 +518,18 @@ UpdateStatus WeatherModule::fetchUpdate() {
 
     HTTPClient http;
     if (!http.begin(client, url)) {
+        _lastFetchStatus.store(UpdateStatus::FetchError, std::memory_order_release);
         return UpdateStatus::FetchError;
     }
 
     int httpCode = http.GET();
     if (httpCode != HTTP_CODE_OK) {
         http.end();
-        if (httpCode == 401 || httpCode == 403) return UpdateStatus::AuthError;
-        if (httpCode == 429) return UpdateStatus::RateLimited;
-        return UpdateStatus::FetchError;
+        UpdateStatus err = UpdateStatus::FetchError;
+        if (httpCode == 401 || httpCode == 403) err = UpdateStatus::AuthError;
+        else if (httpCode == 429) err = UpdateStatus::RateLimited;
+        _lastFetchStatus.store(err, std::memory_order_release);
+        return err;
     }
 
     WiFiClient* stream = http.getStreamPtr();
@@ -524,8 +555,10 @@ UpdateStatus WeatherModule::fetchUpdate() {
     }
 
     http.end();
+    _lastFetchStatus.store(UpdateStatus::Success, std::memory_order_release);
     return UpdateStatus::Success;
 #else
+    _lastFetchStatus.store(UpdateStatus::Success, std::memory_order_release);
     return UpdateStatus::Success;
 #endif
 }

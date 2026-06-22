@@ -13,6 +13,7 @@
 #endif
 
 class ConfigManager;
+class DataManager;
 
 class WeatherModule : public ITickable, 
                       public IConfigurable, 
@@ -24,6 +25,7 @@ private:
     KeyManager* _keyManager = nullptr;
     EventBus* _eventBus = nullptr;
     ConfigManager* _configManager = nullptr;
+    DataManager* _dataManager = nullptr;
 
     double _lat = 0.0;
     double _lon = 0.0;
@@ -41,6 +43,7 @@ private:
     // cross-thread reads. Condition is a variable-length string — use a
     // fixed char buffer protected by a FreeRTOS mutex.
     std::atomic<bool> _hasData{false};
+    std::atomic<UpdateStatus> _lastFetchStatus{UpdateStatus::NoChange};
     std::atomic<float> _temperature{0.0f};
     std::atomic<float> _windSpeed{0.0f};
     std::atomic<int> _humidity{0};
@@ -90,6 +93,7 @@ public:
     void setKeyManager(KeyManager* km) { _keyManager = km; }
     void setEventBus(EventBus* eb) { _eventBus = eb; }
     void setConfigManager(ConfigManager* cm) { _configManager = cm; }
+    void setDataManager(DataManager* dm) { _dataManager = dm; }
 
     // H3: Thread-safe getters. Temperature and wind return float via atomic
     // load. Condition returns a copy under mutex protection.
