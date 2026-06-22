@@ -274,6 +274,18 @@ void HomeAssistantModule::resetConfig() {
 }
 
 
+/**
+ * @brief Return SVG inner content for the Home Assistant bottom-nav icon.
+ *
+ * Uses a Feather-style "home" house icon (24×24 viewBox).
+ * Only the inner SVG body is returned; the outer <svg> wrapper is
+ * added by app.js.
+ */
+const char* HomeAssistantModule::getTabIcon() const {
+    return "<path d=\"M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z\"/>"
+           "<polyline points=\"9 22 9 12 15 12 15 22\"/>";
+}
+
 void HomeAssistantModule::registerRoutes(PsychicHttpServer& server) {
 #ifndef NATIVE_BUILD
     server.on("/homeassistant.js", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {

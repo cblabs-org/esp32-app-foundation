@@ -76,6 +76,7 @@ public:
     const char* getTabName() const override { return "Home Assistant"; }
     const char* getParentTab() const override { return nullptr; }
     int getTabOrder() const override { return 40; }
+    const char* getTabIcon() const override;
 
     // IMCPContributor
     void registerMCPTools(MCPToolRegistry& registry) override;

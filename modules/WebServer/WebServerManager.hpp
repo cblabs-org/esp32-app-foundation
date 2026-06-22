@@ -217,4 +217,17 @@ private:
     WifiManager* _wifiManager = nullptr; ///< Required to check network ready state
     bool         _serverStarted = false; ///< True if the underlying servers have been started
     std::atomic<bool> _restartRequested{false}; ///< True if a device restart has been requested
+    const char*  _appName = nullptr;     ///< Runtime-settable app name for /api/app response
+
+public:
+    /**
+     * @brief Set the application name returned by /api/app.
+     *
+     * When non-null this overrides the compile-time APP_TITLE macro in the
+     * /api/app JSON response, allowing downstream apps to brand the portal
+     * at runtime via Application::setAppName().
+     *
+     * @param name  Pointer to a string with static lifetime.
+     */
+    void setAppName(const char* name) { _appName = name; }
 };

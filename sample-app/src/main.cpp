@@ -39,6 +39,7 @@ void setup() {
 #endif
 
     app.disableDefaultAppTab();
+    app.setAppName("Weather Station");
 
     // Wire up HomeAssistantModule
     haModule.setKeyManager(&app.getKeyManager());

@@ -413,11 +413,14 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors,
 
     // -----------------------------------------------------------------------
     // GET /api/app — Application metadata (title + version)
-    // Uses build-time macros. Consuming apps override APP_TITLE in platformio.ini.
+    // Runtime appName (via Application::setAppName) overrides the compile-time
+    // APP_TITLE macro. Consuming apps call app.setAppName("My App") to brand
+    // the portal title without modifying platformio.ini build flags.
     // -----------------------------------------------------------------------
-    activeServer->on("/api/app", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
+    const char* appTitle = _appName ? _appName : APP_TITLE;
+    activeServer->on("/api/app", HTTP_GET, [appTitle](PsychicRequest* request, PsychicResponse* response) {
         JsonDocument doc;
-        doc["name"]    = APP_TITLE;
+        doc["name"]    = appTitle;
         doc["version"] = BUILD_VERSION;
         String out;
         serializeJson(doc, out);
