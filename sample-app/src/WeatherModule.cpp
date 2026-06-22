@@ -468,7 +468,7 @@ void WeatherModule::registerRoutes(PsychicHttpServer& server) {
                     else if (data.status === 5) errMsg = 'Invalid API Key. Please check your credentials.';
                     else if (data.status === 1) errMsg = 'No change in weather data or location not set.';
                     
-                    document.querySelector('#weather-summary-empty p').textContent = errMsg;
+                    document.querySelector('#weather-summary-empty').textContent = errMsg;
                 }
             })
             .catch(function(err) {
@@ -503,26 +503,36 @@ UpdateStatus WeatherModule::fetchUpdate() {
     snprintf(url, sizeof(url), "https://api.openweathermap.org/data/2.5/weather?lat=%f&lon=%f&appid=%s&units=%s",
              _lat, _lon, apiKey.c_str(), _units.c_str());
 
+    ESP_LOGI("WeatherModule", "Fetching weather from OWM: lat=%f, lon=%f", _lat, _lon);
+
     // M2: Use ESP-IDF built-in certificate bundle instead of setInsecure().
-    // WiFiClientSecure's sslclient is protected, so we use a thin subclass
-    // to access it. This enables the DEFAULT_CMN bundle (~16 KB, ~99% of
-    // public CAs) without providing a custom bundle via setCACertBundle().
     struct SecureClient : public WiFiClientSecure {
         void useDefaultCertBundle() {
             attach_ssl_certificate_bundle(sslclient.get(), true);
             _use_ca_bundle = true;
         }
     };
-    SecureClient client;
-    client.useDefaultCertBundle();
+    
+    std::unique_ptr<SecureClient> client(new (std::nothrow) SecureClient());
+    if (!client) {
+        ESP_LOGE("WeatherModule", "Failed to allocate SecureClient");
+        _lastFetchStatus.store(UpdateStatus::FetchError, std::memory_order_release);
+        return UpdateStatus::FetchError;
+    }
+    client->useDefaultCertBundle();
 
     HTTPClient http;
-    if (!http.begin(client, url)) {
+    ESP_LOGI("WeatherModule", "Starting HTTP connection...");
+    if (!http.begin(*client, url)) {
+        ESP_LOGE("WeatherModule", "HTTP begin failed");
         _lastFetchStatus.store(UpdateStatus::FetchError, std::memory_order_release);
         return UpdateStatus::FetchError;
     }
 
+    ESP_LOGI("WeatherModule", "Executing GET request...");
     int httpCode = http.GET();
+    ESP_LOGI("WeatherModule", "HTTP GET returned code: %d", httpCode);
+    
     if (httpCode != HTTP_CODE_OK) {
         http.end();
         UpdateStatus err = UpdateStatus::FetchError;
@@ -539,6 +549,7 @@ UpdateStatus WeatherModule::fetchUpdate() {
     int len = http.getSize();
     uint8_t buff[128] = { 0 };
 
+    ESP_LOGI("WeatherModule", "Streaming and parsing %d bytes...", len);
     while (http.connected() && (len > 0 || len == -1)) {
         size_t size = stream->available();
         if (size) {
@@ -555,6 +566,7 @@ UpdateStatus WeatherModule::fetchUpdate() {
     }
 
     http.end();
+    ESP_LOGI("WeatherModule", "Fetch and parse complete");
     _lastFetchStatus.store(UpdateStatus::Success, std::memory_order_release);
     return UpdateStatus::Success;
 #else
