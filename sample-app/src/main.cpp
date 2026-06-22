@@ -44,6 +44,7 @@ void setup() {
     // Wire up HomeAssistantModule
     haModule.setKeyManager(&app.getKeyManager());
     haModule.setEventBus(&app.getEventBus());
+    haModule.setConfigManager(&app.getConfigManager());
 
     // Wire up WeatherModule
     weatherModule.setHomeAssistant(&haModule);

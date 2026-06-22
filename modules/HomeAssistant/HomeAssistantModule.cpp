@@ -10,6 +10,7 @@
 #endif
 
 #include "../MCPServer/MCPToolRegistry.hpp"
+#include "../ConfigManager/ConfigManager.hpp"
 
 #include "platform/LogShim.h"
 #include "../Logger/Logger.hpp"
@@ -277,13 +278,12 @@ void HomeAssistantModule::resetConfig() {
 /**
  * @brief Return SVG inner content for the Home Assistant bottom-nav icon.
  *
- * Uses a Feather-style "home" house icon (24×24 viewBox).
- * Only the inner SVG body is returned; the outer <svg> wrapper is
- * added by app.js.
+ * Uses the official Home Assistant logo: a house silhouette with a
+ * centred dot (24×24 viewBox). Only the inner SVG body is returned;
+ * the outer <svg> wrapper is added by app.js.
  */
 const char* HomeAssistantModule::getTabIcon() const {
-    return "<path d=\"M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z\"/>"
-           "<polyline points=\"9 22 9 12 15 12 15 22\"/>";
+    return "<path d=\"M12 2.5L2 12h3v8h14v-8h3L12 2.5zm0 15.5a2 2 0 1 1 0-4 2 2 0 0 1 0 4z\"/>";
 }
 
 void HomeAssistantModule::registerRoutes(PsychicHttpServer& server) {
@@ -324,6 +324,7 @@ void HomeAssistantModule::registerRoutes(PsychicHttpServer& server) {
         }
         
         connectMqtt(); // Apply settings
+        if (_configManager) _configManager->saveModuleConfig(this);
         return response->send(200, "application/json", "{\"success\":true}");
     });
 

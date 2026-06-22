@@ -5,10 +5,42 @@
 (function() {
   let initialized = false;
 
-  window.addEventListener('tab-changed', (e) => {
-    if (e.detail !== 'tab-home-assistant') return;
+  /**
+   * @brief Normalize a user-entered MQTT broker URI.
+   *
+   * Auto-prepends mqtt:// for bare IPs/domains, appends default ports
+   * (:1883 for mqtt://, :8883 for mqtts://), and warns when mqtts://
+   * requires a TLS certificate.
+   *
+   * @param {string} raw - The raw user input.
+   * @return {string} Normalized URI string.
+   */
+  function normalizeUri(raw) {
+    if (!raw) return raw;
+    raw = raw.trim();
 
-    const container = document.getElementById('tab-home-assistant');
+    // If no protocol prefix, prepend mqtt://
+    if (!/^mqtts?:\/\//.test(raw)) {
+      raw = 'mqtt://' + raw;
+    }
+
+    // If no port specified, append default port
+    // Match host (IP or domain) without a trailing :port before end-of-string
+    if (!/:(\d+)$/.test(raw)) {
+      if (/^mqtts:\/\//.test(raw)) {
+        raw += ':8883';
+      } else {
+        raw += ':1883';
+      }
+    }
+
+    return raw;
+  }
+
+  window.addEventListener('tab-changed', (e) => {
+    if (e.detail !== 'tab-ha') return;
+
+    const container = document.getElementById('tab-ha');
     if (!container) return;
 
     if (!initialized) {
@@ -27,7 +59,7 @@
             Entities registered by your application will appear automatically in Home Assistant.
           </div>
           <label>MQTT Broker URI
-            <input type="text" id="ha-uri" placeholder="mqtts://broker.hivemq.com:8883" />
+            <input type="text" id="ha-uri" placeholder="mqtt://192.168.1.100:1883" />
           </label>
           <label>Username (Optional)
             <input type="text" id="ha-user" placeholder="username" />
@@ -66,8 +98,17 @@
         const userInput = document.getElementById('ha-user');
         const passInput = document.getElementById('ha-pass');
 
+        // Normalize the URI before saving
+        const normalizedUri = normalizeUri(uriInput.value.trim());
+        uriInput.value = normalizedUri; // Show user what was actually saved
+
+        // Warn if mqtts:// requires a TLS certificate
+        if (normalizedUri && /^mqtts:\/\//.test(normalizedUri)) {
+          window.showToast('mqtts:// requires a TLS certificate — upload one below.', 'warning');
+        }
+
         const payload = {
-          uri: uriInput.value.trim(),
+          uri: normalizedUri,
           user: userInput.value.trim()
         };
         if (passInput.value.trim()) payload.password = passInput.value.trim();

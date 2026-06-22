@@ -7,6 +7,8 @@
 #include <atomic>
 #include <ArduinoJson.h>
 
+class ConfigManager;
+
 #ifndef NATIVE_BUILD
 #include <mqtt_client.h>
 #else
@@ -22,6 +24,7 @@ private:
     
     KeyManager* _keyManager = nullptr;
     EventBus* _eventBus = nullptr;
+    ConfigManager* _configManager = nullptr;
 
     esp_mqtt_client_handle_t _mqttClient = nullptr;
     std::vector<IHaEntity*> _entities;
@@ -50,6 +53,7 @@ public:
     ~HomeAssistantModule() override;
 
     void setKeyManager(KeyManager* km) { _keyManager = km; }
+    void setConfigManager(ConfigManager* cm) { _configManager = cm; }
     void setEventBus(EventBus* eb);
     
     void addEntity(IHaEntity* entity);
@@ -74,7 +78,7 @@ public:
 
     // IWebContributor
     void registerRoutes(PsychicHttpServer& server) override;
-    const char* getTabName() const override { return "Home Assistant"; }
+    const char* getTabName() const override { return "HA"; }
     const char* getParentTab() const override { return nullptr; }
     int getTabOrder() const override { return 40; }
     const char* getTabIcon() const override;
