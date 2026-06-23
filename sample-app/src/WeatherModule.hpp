@@ -36,7 +36,7 @@ private:
     // H2: Static member allocation — no bare new
     HaSensor _tempSensor{"weather_temp", "Temperature"};
     HaSensor _windSensor{"weather_wind", "Wind Speed"};
-    HaSensor _condSensor{"weather_condition", "Weather Condition"};
+    HaSensor _condSensor{"weather_condition", "Condition"};
 
     // H3: Thread-safe data exchange between fetchUpdate() task and main task.
     // Temperature and wind are simple floats — use std::atomic for lock-free

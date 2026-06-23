@@ -26,6 +26,7 @@ WeatherModule::WeatherModule() {
     _windSensor.setUnitOfMeasurement("m/s");
 
     // Generic text sensor for weather condition, no special device class
+    _condSensor.setIcon("mdi:weather-partly-cloudy");
 
 #ifndef NATIVE_BUILD
     // H3: Create mutex for thread-safe condition string access

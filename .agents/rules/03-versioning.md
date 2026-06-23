@@ -1,17 +1,29 @@
 # Versioning Policy — SemVer Tag Governance
 
 > [!CAUTION]
-> **BUILD GATE — read this before every build.**
+> **FLASH GATE — read this before every firmware upload.**
 >
-> If you are about to build firmware that includes **any** new functionality:
+> Building for compilation testing is fine without tagging.
+> But **before flashing to hardware**, if the firmware includes **any** new
+> functionality since the last tag:
 > 1. Check the current highest tag: `git describe --tags --abbrev=0`
 > 2. Increment the dev PRE_NUM: `git tag v0.X.Y-dev.(N+1) && git push origin v0.X.Y-dev.(N+1)`
-> 3. **Then** build. `inject_version.py` reads the tag at compile time — if you
->    build first and tag after, the firmware ships with the wrong version.
+> 3. Rebuild (so `inject_version.py` picks up the new tag at compile time)
+> 4. **Then** flash.
 >
 > This is **autonomous** — `dev` tags do not require user approval.
-> Skip this step **only** if the build contains NO new functionality.
-> **Never build first and tag after.**
+> Skip this step **only** if the firmware contains NO new functionality.
+>
+> **The sequence is: Tag → Build → Flash. Never flash an untagged build.**
+
+### Pre-flash checklist
+
+Before calling `upload_firmware`, `agent_flash_monitor_verify`, or any
+esptool/OTA upload command, stop and verify:
+
+- [ ] Does this firmware contain new functionality since the last `dev` tag?
+- [ ] If yes: have I tagged, pushed, **and rebuilt** so the version is baked in?
+- [ ] `curl /api/system` after boot — does `firmware_version` match the new tag?
 
 ---
 

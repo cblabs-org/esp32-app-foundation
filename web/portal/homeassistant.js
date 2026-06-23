@@ -91,12 +91,29 @@
       const saveBtn = document.getElementById('ha-save-btn');
       const certBtn = document.getElementById('ha-cert-btn');
       const eyeBtn  = document.getElementById('ha-pass-eye');
+      const uriInput = document.getElementById('ha-uri');
+      const certInput = document.getElementById('ha-cert');
+
+      uriInput.addEventListener('blur', () => {
+        uriInput.value = normalizeUri(uriInput.value);
+        certInput.required = /^mqtts:\/\//.test(uriInput.value);
+      });
 
       saveBtn.addEventListener('click', async () => {
         saveBtn.disabled = true;
-        const uriInput  = document.getElementById('ha-uri');
         const userInput = document.getElementById('ha-user');
         const passInput = document.getElementById('ha-pass');
+        const uriInput = document.getElementById('ha-uri');
+
+        // Optimistic UI update
+        const mqttDot = document.getElementById('ha-mqtt-dot');
+        const mqttText = document.getElementById('ha-mqtt-text');
+        const badge = document.getElementById('ha-mqtt-status');
+        if (mqttDot && mqttText) {
+          mqttDot.className = 'dot yellow pulse';
+          mqttText.textContent = 'Connecting...';
+          mqttText.style.color = '';
+        }
 
         // Normalize the URI before saving
         const normalizedUri = normalizeUri(uriInput.value.trim());
@@ -122,6 +139,17 @@
           window.showToast('Settings saved.', 'success');
           passInput.value = '';
           passInput.placeholder = '•••••••• (Saved)';
+
+          // Poll API until state settles (max 30 seconds)
+          let attempts = 0;
+          const pollInterval = setInterval(async () => {
+            attempts++;
+            await loadData();
+            const text = document.getElementById('ha-mqtt-text').textContent;
+            if (text !== 'Connecting...' || attempts >= 30) {
+              clearInterval(pollInterval);
+            }
+          }, 1000);
         } catch (err) {
           window.showToast('Error: ' + err.message, 'error');
         } finally {
@@ -176,19 +204,36 @@
       const uriInput  = document.getElementById('ha-uri');
       const userInput = document.getElementById('ha-user');
       const passInput = document.getElementById('ha-pass');
-      if (data.uri) uriInput.value = data.uri;
+      if (data.uri) {
+        uriInput.value = data.uri;
+        const certInput = document.getElementById('ha-cert');
+        if (certInput) certInput.required = /^mqtts:\/\//.test(data.uri);
+      }
       if (data.user) userInput.value = data.user;
       if (data.passExists) passInput.placeholder = '•••••••• (Saved)';
 
       // Update MQTT connection status badge
       const mqttDot = document.getElementById('ha-mqtt-dot');
       const mqttText = document.getElementById('ha-mqtt-text');
+      const badge = document.getElementById('ha-mqtt-status');
+
+      const statusMsg = data.status_msg || (data.connected ? 'Connected' : 'Disconnected');
+      mqttText.textContent = statusMsg;
+
+      // Clear any previous text colors
+      mqttText.style.color = '';
+
       if (data.connected) {
         mqttDot.className = 'dot green';
-        mqttText.textContent = 'Connected';
       } else {
-        mqttDot.className = 'dot red';
-        mqttText.textContent = 'Disconnected';
+        if (statusMsg.startsWith('Connection Refused') || statusMsg.startsWith('Connection Failed')) {
+          mqttDot.className = 'dot red';
+          mqttText.style.color = 'var(--error)';
+        } else if (statusMsg === 'Connecting...') {
+          mqttDot.className = 'dot yellow pulse';
+        } else {
+          mqttDot.className = 'dot red';
+        }
       }
     } catch (err) {
       console.error('Failed to load HA config', err);

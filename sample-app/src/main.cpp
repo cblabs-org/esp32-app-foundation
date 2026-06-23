@@ -45,12 +45,15 @@ void setup() {
     haModule.setKeyManager(&app.getKeyManager());
     haModule.setEventBus(&app.getEventBus());
     haModule.setConfigManager(&app.getConfigManager());
+    haModule.setAppName(app.getAppName());
+    haModule.setAppVersion(BUILD_VERSION);
 
     // Wire up WeatherModule
     weatherModule.setHomeAssistant(&haModule);
     weatherModule.setKeyManager(&app.getKeyManager());
     weatherModule.setEventBus(&app.getEventBus());
     weatherModule.setConfigManager(&app.getConfigManager());
+    weatherModule.setDataManager(&app.getDataManager());
 
     // Register user application modules
     app.registerModule(&haModule);

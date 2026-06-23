@@ -24,7 +24,6 @@ static constexpr const char* TAG = "EventBus";
 
 void EventBus::begin() {
     ESP_LOGI(TAG, "Initializing EventBus");
-    _subscribers.clear();
 }
 
 bool EventBus::subscribe(const char* topic, EventCallback callback, void* ctx) {

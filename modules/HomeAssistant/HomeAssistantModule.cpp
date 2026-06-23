@@ -44,6 +44,7 @@ void HomeAssistantModule::setEventBus(EventBus* eb) {
 }
 
 void HomeAssistantModule::onWifiConnected(const char* topic, const void* payload, void* ctx) {
+    ESP_LOGI("HomeAssistant", "onWifiConnected: event received! topic=%s", topic);
     auto* self = static_cast<HomeAssistantModule*>(ctx);
     self->connectMqtt();
 }
@@ -104,9 +105,13 @@ void HomeAssistantModule::generateDiscoveryJson(IHaEntity* entity, JsonObject& p
 
     JsonObject device = payload["device"].to<JsonObject>();
     device["identifiers"].add(_macPrefix);
-    device["name"] = "ESP32 Device (" + _macPrefix + ")";
+    device["name"] = _appName.empty() ? "ESP32 Device (" + _macPrefix + ")" : _appName;
     device["manufacturer"] = "CB Labs";
-    device["model"] = "App Foundation";
+    device["model"] = _appName.empty() ? "App Foundation" : _appName;
+    
+    if (!_appVersion.empty()) {
+        device["sw_version"] = _appVersion;
+    }
 
     // Call buildDiscoveryPayload after base topics are set so the entity can use them
     entity->buildDiscoveryPayload(payload);
@@ -153,24 +158,23 @@ void HomeAssistantModule::connectMqtt() {
 
     esp_mqtt_client_config_t mqtt_cfg = {};
     mqtt_cfg.broker.address.uri = _mqttUri.c_str();
+    mqtt_cfg.network.timeout_ms = 8000;
 
     if (!_mqttUser.empty()) {
         mqtt_cfg.credentials.username = _mqttUser.c_str();
     }
 
-    std::string pass;
     if (_keyManager) {
-        pass = _keyManager->getKeyById(_mqttPassId.c_str());
-        if (!pass.empty()) {
-            mqtt_cfg.credentials.authentication.password = pass.c_str();
+        _mqttPassCache = _keyManager->getKeyById(_mqttPassId.c_str());
+        if (!_mqttPassCache.empty()) {
+            mqtt_cfg.credentials.authentication.password = _mqttPassCache.c_str();
         }
     }
 
-    std::string cert;
     if (_keyManager && _mqttUri.find("mqtts://") == 0) {
-        cert = _keyManager->getKeyById(_tlsCertId.c_str());
-        if (!cert.empty()) {
-            mqtt_cfg.broker.verification.certificate = cert.c_str();
+        _tlsCertCache = _keyManager->getKeyById(_tlsCertId.c_str());
+        if (!_tlsCertCache.empty()) {
+            mqtt_cfg.broker.verification.certificate = _tlsCertCache.c_str();
         }
     }
 
@@ -182,6 +186,7 @@ void HomeAssistantModule::connectMqtt() {
 
     _mqttClient = esp_mqtt_client_init(&mqtt_cfg);
     if (_mqttClient) {
+        _mqttStatusMsg = "Connecting...";
         ESP_LOGI(TAG, "connectMqtt: client created, starting — broker=%s, user=%s",
                  _mqttUri.c_str(), _mqttUser.empty() ? "(none)" : _mqttUser.c_str());
         esp_mqtt_client_register_event(_mqttClient, MQTT_EVENT_ANY, mqttEventHandler, this);
@@ -215,6 +220,7 @@ void HomeAssistantModule::mqttEventHandler(void* handler_args, esp_event_base_t 
         case MQTT_EVENT_CONNECTED:
             ESP_LOGI(TAG, "MQTT Connected");
             self->_mqttConnected = true;
+            self->_mqttStatusMsg = "Connected";
             // Publish online status to LWT topic
             esp_mqtt_client_publish(self->_mqttClient, self->_lwtTopic.c_str(), "online", 0, 1, 1);
             self->publishDiscovery();
@@ -232,6 +238,29 @@ void HomeAssistantModule::mqttEventHandler(void* handler_args, esp_event_base_t 
         case MQTT_EVENT_DISCONNECTED:
             ESP_LOGI(TAG, "MQTT Disconnected");
             self->_mqttConnected = false;
+            if (self->_mqttStatusMsg.find("Connection Refused") == std::string::npos && 
+                self->_mqttStatusMsg.find("Connection Failed") == std::string::npos) {
+                self->_mqttStatusMsg = "Disconnected";
+            }
+            break;
+        case MQTT_EVENT_ERROR:
+            if (event->error_handle) {
+                int code = event->error_handle->connect_return_code;
+                int type = event->error_handle->error_type;
+                ESP_LOGE(TAG, "MQTT_EVENT_ERROR: error_type=%d connect_return_code=%d", type, code);
+                if (code == 1) self->_mqttStatusMsg = "Connection Refused: Unacceptable Protocol Version";
+                else if (code == 2) self->_mqttStatusMsg = "Connection Refused: Identifier Rejected";
+                else if (code == 3) self->_mqttStatusMsg = "Connection Refused: Server Unavailable";
+                else if (code == 4) self->_mqttStatusMsg = "Connection Refused: Bad Username or Password";
+                else if (code == 5) self->_mqttStatusMsg = "Connection Refused: Not Authorized";
+                else if (code != 0) self->_mqttStatusMsg = "Connection Failed (Code: " + std::to_string(code) + ")";
+                else if (type == 1) self->_mqttStatusMsg = "Connection Failed: Network Error (Host Unreachable)";
+                else if (type == 2) self->_mqttStatusMsg = "Connection Failed: Network Error (Connection Refused)";
+                else self->_mqttStatusMsg = "Connection Failed: Unknown Error";
+            } else {
+                ESP_LOGE(TAG, "MQTT_EVENT_ERROR: (no error_handle)");
+                self->_mqttStatusMsg = "Connection Failed: Internal Error";
+            }
             break;
         case MQTT_EVENT_DATA: {
             std::string topic(event->topic, event->topic_len);
@@ -295,7 +324,7 @@ void HomeAssistantModule::resetConfig() {
  * the outer <svg> wrapper is added by app.js.
  */
 const char* HomeAssistantModule::getTabIcon() const {
-    return "<path d=\"M12 2.5L2 12h3v8h14v-8h3L12 2.5zm0 15.5a2 2 0 1 1 0-4 2 2 0 0 1 0 4z\"/>";
+    return "<svg width=\"24\" height=\"24\" viewBox=\"60 61 280 276\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"><path d=\"M320 301.762C320 310.012 313.25 316.762 305 316.762H95C86.75 316.762 80 310.012 80 301.762V211.762C80 203.512 84.77 191.993 90.61 186.153L189.39 87.3725C195.22 81.5425 204.77 81.5425 210.6 87.3725L309.39 186.162C315.22 191.992 320 203.522 320 211.772V301.772V301.762Z\" fill=\"#F2F4F9\"/><path d=\"M309.39 186.153L210.61 87.3725C204.78 81.5425 195.23 81.5425 189.4 87.3725L90.61 186.153C84.78 191.983 80 203.512 80 211.762V301.762C80 310.012 86.75 316.762 95 316.762H187.27L146.64 276.132C144.55 276.852 142.32 277.262 140 277.262C119.5 256.762 140 236.262 160.5 256.762C160.5 259.092 160.09 261.322 159.37 263.412L191 295.042V179.162C184.2 175.822 179.5 168.842 179.5 160.772C179.5 149.472 188.7 140.272 200 140.272C211.3 140.272 220.5 149.472 220.5 160.772C220.5 168.842 215.8 175.822 209 179.162V260.432L240.46 228.972C239.84 227.012 239.5 224.932 239.5 222.772C239.5 211.472 248.7 202.272 260 202.272C271.3 202.272 280.5 211.472 280.5 222.772C280.5 234.072 271.3 243.272 260 243.272C257.5 243.272 255.12 242.802 252.91 241.982L209 285.892V316.772H305C313.25 316.772 320 310.022 320 301.772V211.772C320 203.522 315.23 192.002 309.39 186.162V186.153Z\" fill=\"#18BCF2\"/></svg>";
 }
 
 void HomeAssistantModule::registerRoutes(PsychicHttpServer& server) {
@@ -314,6 +343,7 @@ void HomeAssistantModule::registerRoutes(PsychicHttpServer& server) {
         doc["passExists"] = (_keyManager && !_keyManager->getKeyById(_mqttPassId.c_str()).empty());
         doc["certExists"] = (_keyManager && !_keyManager->getKeyById(_tlsCertId.c_str()).empty());
         doc["connected"] = _mqttConnected.load();
+        doc["status_msg"] = _mqttStatusMsg;
         std::string output;
         serializeJson(doc, output);
         return response->send(200, "application/json", output.c_str());

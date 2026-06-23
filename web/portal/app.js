@@ -248,6 +248,10 @@ document.addEventListener('DOMContentLoaded', function() {
       // Use the contributor's declared SVG icon if available; fall back to the
       // generic grid icon for contributors that do not implement getTabIcon().
       var iconInner = tab.icon || DEFAULT_GENERIC_ICON;
+      var svgHTML = iconInner;
+      if (iconInner.trim().indexOf('<svg') !== 0) {
+          svgHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + iconInner + '</svg>';
+      }
 
       // Create nav link
       var link = document.createElement('a');
@@ -255,9 +259,7 @@ document.addEventListener('DOMContentLoaded', function() {
       link.className = 'tab-link';
       link.setAttribute('data-target', tabId);
       link.setAttribute('data-injected', 'true');
-      link.innerHTML = '<span class="icon"><svg viewBox="0 0 24 24" fill="none" ' +
-        'stroke="currentColor" stroke-width="2" stroke-linecap="round" ' +
-        'stroke-linejoin="round">' + iconInner + '</svg></span>' + tab.name.toUpperCase();
+      link.innerHTML = '<span class="icon">' + svgHTML + '</span>' + tab.name.toUpperCase();
 
       // Insert before System tab
       if (systemLink) {

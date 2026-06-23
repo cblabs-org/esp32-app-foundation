@@ -428,8 +428,12 @@ void OTAUpdateManager::performUpdateTask() {
     }
 
     // --- Guard: manifest URL must be configured ---
+    ESP_LOGE("DEBUG", "performUpdateTask _config addr: %p", (void*)_config);
+    if (_config) {
+        ESP_LOGE("DEBUG", "performUpdateTask otaManifestUrl addr: %p", (void*)_config->otaManifestUrl);
+    }
     if (cfg.otaManifestUrl == nullptr) {
-        ESP_LOGE(TAG, "No otaManifestUrl configured");
+        ESP_LOGE(TAG, "No manifest URL configured");
         publishProgress(0.0f, "No manifest URL configured", true, false);
         _state = OTAState::Error;
         _lastOtaError = "No manifest URL configured";
@@ -1521,6 +1525,36 @@ void OTAUpdateManager::registerMCPTools(MCPToolRegistry& registry) {
             if (self->_lastOtaError) {
                 result["last_error"] = self->_lastOtaError;
             }
+            // === DEBUG: Pointer chain investigation ===
+            char buf[32];
+            // 1. OTAUpdateManager::_config pointer (should point to Application::_config)
+            snprintf(buf, sizeof(buf), "%p", (void*)self->_config);
+            result["dbg_ota_config_ptr"] = buf;
+            if (self->_config) {
+                // 2. _config->otaManifestUrl pointer value
+                snprintf(buf, sizeof(buf), "%p", (void*)self->_config->otaManifestUrl);
+                result["dbg_manifestUrl_ptr"] = buf;
+                // 3. _config->otaManifestUrl string value
+                result["dbg_manifestUrl_val"] = self->_config->otaManifestUrl
+                    ? self->_config->otaManifestUrl : "(nullptr)";
+                // 4. _config->otaPublicKey pointer value
+                snprintf(buf, sizeof(buf), "%p", (void*)self->_config->otaPublicKey);
+                result["dbg_publicKey_ptr"] = buf;
+                // 5. _config->otaToken pointer value
+                snprintf(buf, sizeof(buf), "%p", (void*)self->_config->otaToken);
+                result["dbg_token_ptr"] = buf;
+                // 6. Dump the raw bytes of the FrameworkConfig struct
+                const uint8_t* raw = reinterpret_cast<const uint8_t*>(self->_config);
+                char hexdump[128];
+                int pos = 0;
+                for (size_t i = 0; i < sizeof(FrameworkConfig) && pos < 120; i++) {
+                    pos += snprintf(hexdump + pos, sizeof(hexdump) - pos, "%02X ", raw[i]);
+                }
+                result["dbg_config_hexdump"] = hexdump;
+            }
+            // 7. learnedManifestUrl
+            result["dbg_learnedUrl"] = self->learnedManifestUrl_[0] != '\0'
+                ? self->learnedManifestUrl_ : "(empty)";
         }, this, false);
 
     // --- ota_check_now: force a GitHub release check ---

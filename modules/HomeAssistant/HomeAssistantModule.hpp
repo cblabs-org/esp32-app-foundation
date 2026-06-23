@@ -21,6 +21,8 @@ private:
     std::string _mqttUser;
     std::string _tlsCertId = "ha_tls_cert";
     std::string _mqttPassId = "ha_mqtt_pass";
+    std::string _mqttPassCache;
+    std::string _tlsCertCache;
     
     KeyManager* _keyManager = nullptr;
     EventBus* _eventBus = nullptr;
@@ -31,10 +33,13 @@ private:
 
     std::string _macPrefix;
     std::string _lwtTopic;
+    std::string _appName;
+    std::string _appVersion;
 
 
     std::atomic<bool> _mqttConnected{false};
     std::atomic<bool> _needsStateSync{false};
+    std::string _mqttStatusMsg = "Disconnected";
 
     static void onWifiConnected(const char* topic, const void* payload, void* ctx);
     static void onWifiDisconnected(const char* topic, const void* payload, void* ctx);
@@ -54,6 +59,8 @@ public:
 
     void setKeyManager(KeyManager* km) { _keyManager = km; }
     void setConfigManager(ConfigManager* cm) { _configManager = cm; }
+    void setAppName(const std::string& appName) { _appName = appName; }
+    void setAppVersion(const std::string& appVersion) { _appVersion = appVersion; }
     void setEventBus(EventBus* eb);
     
     void addEntity(IHaEntity* entity);
