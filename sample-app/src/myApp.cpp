@@ -6,8 +6,8 @@
  * This work is licensed under Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International.
  * To view a copy of this license, visit https://creativecommons.org/licenses/by-nc-sa/4.0/
  *
- * Module: template/src/myApp.cpp
- * Description: Implementation of the MyApp class for the template skeleton.
+ * Module: sample-app/src/myApp.cpp
+ * Description: Implementation of the MyApp class for the sample skeleton.
  *              Demonstrates all 5 primary extension points: ITickable,
  *              IConfigurable, IWebContributor, IMCPContributor, and IConfigGate.
  *

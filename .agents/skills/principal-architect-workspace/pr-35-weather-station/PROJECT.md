@@ -8,8 +8,12 @@ This project replaces the framework's baseline configuration with a rich, canoni
 
 ## Work Orders
 
-- **[ ] [wo0-portal-prep](wo0-portal-prep/WORKORDER.md):** Rename `template/` → `sample-app/`, relocate Credits tab to header ℹ️ icon modal, enable `esp-mqtt` in sdkconfig, gate `AppTabContributor`.
-- **[ ] [wo1-home-assistant](wo1-home-assistant/WORKORDER.md):** Build the `HomeAssistantModule` (esp-mqtt wrapper, HOM entities, LWT, reconnect sync, Web Portal tab, MCP tools, unit tests).
-- **[ ] [wo2-weather-module](wo2-weather-module/WORKORDER.md):** Build the `WeatherModule` (OpenWeatherMap JSON polling, KeyManager, HASensor registry, "Weather" portal tab with sub-pills).
-- **[ ] [wo3-widgets-app](wo3-widgets-app/WORKORDER.md):** Build U8G2 widgets (`WeatherWidget`, `WeatherClockBoard`), wire DI and `CarouselEngine` in `main.cpp`.
-- **[ ] [wo4-ha-entity-parity](wo4-ha-entity-parity/WORKORDER.md):** Expand the entity catalog to full parity with `arduino_ha` (Lights, Climate, Fans, Covers, etc.).
+- **[x] [wo0-portal-prep](wo0-portal-prep/WORKORDER.md):** Rename `template/` → `sample-app/`, relocate Credits tab to header ℹ️ icon modal, enable `esp-mqtt` in sdkconfig, gate `AppTabContributor`. **[MERGED]**
+- **[x] [wo1-home-assistant](wo1-home-assistant/WORKORDER.md):** Build the `HomeAssistantModule` (esp-mqtt wrapper, HOM entities, LWT, reconnect sync, Web Portal tab, MCP tools, unit tests). **[MERGED]**
+- **[x] [wo2-weather-module](wo2-weather-module/WORKORDER.md):** Build the `WeatherModule` (OpenWeatherMap JSON polling, KeyManager, HASensor registry, "Weather" portal tab with sub-pills). **[MERGED]**
+- **[x] [wo3-widgets-app](wo3-widgets-app/WORKORDER.md):** Build U8G2 widgets (`WeatherWidget`, `WeatherClockBoard`), wire DI and `CarouselEngine` in `main.cpp`. **[MERGED]**
+- **[x] [wo4-ha-entity-parity](wo4-ha-entity-parity/WORKORDER.md):** Expand the entity catalog to full parity with `arduino_ha` (Lights, Climate, Fans, Covers, etc.). **[MERGED]**
+- **[x] [wo5-hardware-validation](wo5-hardware-validation/WORKORDER.md):** Hardware validation of the Weather Station PR using strictly MCP PlatformIO tools and Device MCP JSON-RPC endpoints. **[COMPLETED]**
+- **[x] [wo6-portal-debugging](wo6-portal-debugging/WORKORDER.md):** Rigorous debugging of the Home Assistant and Weather portal tabs (DOM event lifecycle and Module payload architecture). **[COMPLETED]**
+
+**Distilled Architecture:** [./context_bridge.md](./context_bridge.md)

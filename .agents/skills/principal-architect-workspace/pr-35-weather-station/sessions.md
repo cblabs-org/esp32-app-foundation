@@ -1,0 +1,3 @@
+- `be9f2248-18c8-4cdf-883a-0b8576e203a9` (Principal Architect Session)
+- `a19f9431-ba44-4f32-a9e6-9ac2ad93d548` (WO5 Hardware Validation Worker)
+- `86151697-626c-4ff6-8b39-7cb0a7032bc5` (WO6 UI Debugging Worker)

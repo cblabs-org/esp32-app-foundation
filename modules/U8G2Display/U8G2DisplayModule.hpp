@@ -382,6 +382,12 @@ public:
     int getTabOrder() const override { return 50; }
 
     /**
+     * @brief Return SVG inner content for the Display bottom-nav icon.
+     * @return Feather-style "monitor" icon SVG body string.
+     */
+    const char* getTabIcon() const override;
+
+    /**
      * @brief Return the Settings sub-pill stub for registration by Application.
      * @return Pointer to the Settings IWebContributor stub.
      */

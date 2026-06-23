@@ -697,6 +697,19 @@ uint8_t U8G2DisplayModule::getClockFontSize() const {
 // =============================================================================
 
 /**
+ * @brief Return SVG inner content for the Display bottom-nav icon.
+ *
+ * Uses a Feather-style "monitor" icon (24×24 viewBox).
+ * Only the inner SVG body is returned; the outer <svg> wrapper is
+ * added by app.js.
+ */
+const char* U8G2DisplayModule::getTabIcon() const {
+    return "<rect x=\"2\" y=\"3\" width=\"20\" height=\"14\" rx=\"2\" ry=\"2\"/>"
+           "<line x1=\"8\" y1=\"21\" x2=\"16\" y2=\"21\"/>"
+           "<line x1=\"12\" y1=\"17\" x2=\"12\" y2=\"21\"/>";
+}
+
+/**
  * @brief Register display REST API routes with the web server.
  *
  * All route handler bodies are guarded by #ifndef NATIVE_BUILD since

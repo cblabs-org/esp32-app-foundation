@@ -1,49 +1,19 @@
 ---
 name: framework-expert
 description: >
-  Answers questions about building applications on the ESP32 App Foundation.
-  Trigger on: "how do I create a module", "register a module", "registerModule",
-  "build an app on the foundation", "weather station", "sensor dashboard", "IoT device",
-  "why does registration fail after begin", "is it safe to allocate in tick",
-  "ITickable", "IConfigurable", "IWebContributor", "IMCPContributor", "IOTAVerifier",
-  "IConfigGate", "IDataSource", "EventBus", "ConfigManager", "web portal tab",
-  "display board", "carousel", "screensaver", "replace the display", "use a TFT", "different screen", "e-ink display",
-  "hierarchical object model", "sub-object API", "Domain Meaning Test",
-  "orchestrator anti-pattern", "service module", "module vs library",
-  "global state", "dependency injection", "SOLID principles",
-  "thread safety on ESP32", "why not use std::function",
-  "TLS memory", "heap usage", "PSRAM", "out of memory", "running low on RAM",
-  "firmware too large", "flash partition", "reduce binary size",
-  "performance optimisation", "profiling ESP32", "OTA verification", "firmware signing",
-  "config system", "extension point", "framework architecture", "AppFoundation.h",
-  "tick function", "boot sequence", "LittleFS layout", "FrameworkConfig",
-  "DeviceCrypto", "KeyManager", "AuthManager", "JWT", "credential storage",
-  "setInsecure", "SECURITY_VERSION", "anti-rollback".
-  Also trigger when an agent is working on code that extends the framework
-  and needs guidance on interface contracts, patterns, performance, or embedded safety.
-  Also trigger on: "audit", "compliance", "tech debt", "code review",
-  "scan for violations", "check compliance", "naming conventions",
-  "std::nothrow", "bare new", "std::function", "WiFiClientSecure",
-  "TWDT", "watchdog", "task stack size", "private_key.pem".
-  Also trigger on: "PAT", "personal access token", "OTA token",
-  "releases repo", "split repo", "CA fallback", "dirty TLS context",
-  "CA rotation", "NVS encryption", "tlsEnabled", "TLS toggle".
-  Also trigger on: "certificate bundle", "cert bundle", "CERTIFICATE_BUNDLE",
-  "DEFAULT_CMN", "DEFAULT_FULL", "DEFAULT_NONE", "x509_crt_bundle",
-  "gen_crt_bundle", "crt.S not found", "data_file_embed_asm",
-  "setCACert", "esp_crt_bundle", "disable TLS bundle".
-  Also trigger on: "version", "versioning", "semver", "dev tag",
-  "beta tag", "stable tag", "inject_version", "deploy_release",
-  "build gate", "tag before build", "version bump".
-  Also trigger on: "manifest signing", "manifest-first", "otaManifestUrl",
-  "manifest-latest release", "manifest.json.sig", "signed manifest",
-  "manifest URL resilience", "learned URL", "compiled-in URL",
-  "defence-in-depth", "manifest schema v2", "multi-channel manifest".
-  Also trigger on: "MCP server", "MCP tool", "device MCP", "list_tools",
-  "device diagnostics", "device IP", "system_info", "capture_display",
-  "wifi_get_status", "ota_get_status", "display_status",
-  "config_factory_reset", "readOnly mode", "JSON-RPC", "call a tool on the device",
-  "talk to the device", "query the device", "device telemetry".
+  Building apps, creating modules, extending, and auditing code on the ESP32 App
+  Foundation framework. Covers module interfaces (registerModule, AppFoundation.h,
+  ITickable, IConfigurable, IWebContributor, IMCPContributor, IConfigGate,
+  IDataSource, IDisplayBoard, IOTAVerifier); core systems (EventBus, ConfigManager,
+  FrameworkConfig, LittleFS, web portal, display carousel, OTA verification, MCP
+  server/device tools); coding patterns (Service Module Pattern, hierarchical object
+  model, orchestrator anti-pattern, Domain Meaning Test, SOLID); embedded
+  safety/performance (thread safety, std::function, std::nothrow, TWDT/watchdog,
+  heap/PSRAM, TLS memory, flash size); and security (DeviceCrypto, KeyManager,
+  AuthManager, JWT, setInsecure, certificate bundles/esp_crt_bundle/DEFAULT_NONE,
+  PAT/OTA tokens, otaManifestUrl, SECURITY_VERSION/anti-rollback, inject_version).
+  Trigger when extending the framework or reviewing code against its interfaces,
+  patterns, performance, or safety rules.
 ---
 
 # Framework Expert
@@ -117,3 +87,59 @@ This skill uses a progressive disclosure model. Based on your query, load and re
 ## When to Read the Full Docs
 
 These references are optimized distillations for AI agents. If the human developer needs step-by-step tutorials, walkthroughs, or architectural motivation, direct them to the complete developer guides under `docs/developer/`.
+
+## Trigger Reference
+
+> The `description` frontmatter is intentionally lean — it is loaded into every
+> session and is what selects this skill. This section is the exhaustive
+> vocabulary catalogue; it is read only *after* the skill is invoked, so it
+> carries no per-session cost and is never truncated. Use it to confirm scope
+> and to recognise the full range of phrasings this skill covers.
+
+- **Getting started / app building**: "how do I create a module", "register a module",
+  "registerModule", "build an app on the foundation", "weather station",
+  "sensor dashboard", "IoT device", "why does registration fail after begin",
+  "is it safe to allocate in tick".
+- **Interfaces**: "ITickable", "IConfigurable", "IWebContributor", "IMCPContributor",
+  "IOTAVerifier", "IConfigGate", "IDataSource", "IStatusReporter", "IDisplayBoard".
+- **Core systems**: "EventBus", "ConfigManager", "FrameworkConfig", "config system",
+  "extension point", "framework architecture", "AppFoundation.h", "tick function",
+  "boot sequence", "LittleFS layout".
+- **Display**: "display board", "carousel", "screensaver", "replace the display",
+  "use a TFT", "different screen", "e-ink display".
+- **Coding patterns / architecture**: "hierarchical object model", "sub-object API",
+  "Domain Meaning Test", "orchestrator anti-pattern", "service module",
+  "module vs library", "global state", "dependency injection", "SOLID principles".
+- **Embedded safety**: "thread safety on ESP32", "why not use std::function",
+  "std::nothrow", "bare new", "std::function", "WiFiClientSecure", "TWDT",
+  "watchdog", "task stack size".
+- **Performance**: "TLS memory", "heap usage", "PSRAM", "out of memory",
+  "running low on RAM", "firmware too large", "flash partition",
+  "reduce binary size", "performance optimisation", "profiling ESP32".
+- **Audit / compliance**: "audit", "compliance", "tech debt", "code review",
+  "scan for violations", "check compliance", "naming conventions".
+- **Security & credentials**: "DeviceCrypto", "KeyManager", "AuthManager", "JWT",
+  "credential storage", "setInsecure", "SECURITY_VERSION", "anti-rollback",
+  "private_key.pem".
+- **PAT & repository config**: "PAT", "personal access token", "OTA token",
+  "releases repo", "split repo", "CA fallback", "dirty TLS context", "CA rotation",
+  "NVS encryption", "tlsEnabled", "TLS toggle".
+- **Certificate bundle**: "certificate bundle", "cert bundle", "CERTIFICATE_BUNDLE",
+  "DEFAULT_CMN", "DEFAULT_FULL", "DEFAULT_NONE", "x509_crt_bundle", "gen_crt_bundle",
+  "crt.S not found", "data_file_embed_asm", "setCACert", "esp_crt_bundle",
+  "disable TLS bundle".
+- **Versioning**: "version", "versioning", "semver", "dev tag", "beta tag",
+  "stable tag", "inject_version", "deploy_release", "build gate", "tag before build",
+  "version bump".
+- **OTA manifest**: "manifest signing", "manifest-first", "otaManifestUrl",
+  "manifest-latest release", "manifest.json.sig", "signed manifest",
+  "manifest URL resilience", "learned URL", "compiled-in URL", "defence-in-depth",
+  "manifest schema v2", "multi-channel manifest", "OTA verification", "firmware signing".
+- **MCP server / device interaction**: "MCP server", "MCP tool", "device MCP",
+  "list_tools", "device diagnostics", "device IP", "system_info", "capture_display",
+  "wifi_get_status", "ota_get_status", "display_status", "config_factory_reset",
+  "readOnly mode", "JSON-RPC", "call a tool on the device", "talk to the device",
+  "query the device", "device telemetry".
+
+Also trigger when an agent is working on code that extends the framework and needs
+guidance on interface contracts, patterns, performance, or embedded safety.

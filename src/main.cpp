@@ -47,6 +47,8 @@ void setup() {
     // and falls back to this on factory reset (resetConfig()).
     app.getWifiManager().setDefaultHostname("esp32-foundation");
 
+    ESP_LOGW("DEBUG", "main.cpp config.otaManifestUrl: %s", config.otaManifestUrl ? config.otaManifestUrl : "NULL");
+
     if (!app.begin(config)) {
 #ifndef NATIVE_BUILD
         delay(5000);

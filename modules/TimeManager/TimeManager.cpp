@@ -405,9 +405,26 @@ void TimeManager::_handleGetZones(PsychicRequest* request, PsychicResponse* resp
         return;
     }
 
-    // Send the file directly using PsychicHttp built-in file serving
-    PsychicFileResponse responseFile(response, LittleFS, "/timezones.json", "application/json");
-    responseFile.send();
+    File f = LittleFS.open("/timezones.json", "r");
+    if (!f) {
+        response->send(500, "application/json", "{\"error\":\"Failed to open timezone database\"}");
+        return;
+    }
+
+    size_t sz = f.size();
+    char* buf = (char*)malloc(sz + 1);
+    if (!buf) {
+        f.close();
+        response->send(500, "application/json", "{\"error\":\"Out of memory\"}");
+        return;
+    }
+
+    f.readBytes(buf, sz);
+    buf[sz] = '\0';
+    f.close();
+
+    response->send(200, "application/json", buf);
+    free(buf);
 }
 
 /**
@@ -437,18 +454,19 @@ void TimeManager::_handlePostZonesUpdate(PsychicRequest* request, PsychicRespons
         return;
     }
 
-    ESP_LOGI(TAG, "Receiving timezone database update (%zu bytes)", total);
+    size_t bodyLen = strlen(body);
+    ESP_LOGI(TAG, "Receiving timezone database update (%zu bytes)", bodyLen);
     File tmp = LittleFS.open("/timezones.tmp", "w");
     if (!tmp) {
         response->send(500, "application/json", "{\"error\":\"Failed to open temp file\"}");
         return;
     }
-    tmp.write((const uint8_t*)body, total);
+    tmp.write((const uint8_t*)body, bodyLen);
     tmp.close();
 
     LittleFS.remove("/timezones.json");
     LittleFS.rename("/timezones.tmp", "/timezones.json");
-    ESP_LOGI(TAG, "Timezone database updated (%zu bytes)", total);
+    ESP_LOGI(TAG, "Timezone database updated (%zu bytes)", bodyLen);
     response->send(200, "application/json", "{\"status\":\"ok\"}");
 }
 

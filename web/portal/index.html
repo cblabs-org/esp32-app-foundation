@@ -14,16 +14,25 @@
     <!-- ================================================================== -->
     <header class="top-bar">
       <h2 id="portal-title">Device Portal</h2>
-      <div class="theme-toggle" id="theme-toggle">
-        <button class="theme-btn" data-theme="auto" title="Auto (System)">
-          <svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+      <div style="display: flex; gap: 8px; align-items: center;">
+        <button class="theme-btn" id="credits-btn" title="Credits & Info">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="12" y1="16" x2="12" y2="12"/>
+            <line x1="12" y1="8" x2="12.01" y2="8"/>
+          </svg>
         </button>
-        <button class="theme-btn" data-theme="light" title="Light">
-          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
-        </button>
-        <button class="theme-btn" data-theme="dark" title="Dark">
-          <svg viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
-        </button>
+        <div class="theme-toggle" id="theme-toggle">
+          <button class="theme-btn" data-theme="auto" title="Auto (System)">
+            <svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+          </button>
+          <button class="theme-btn" data-theme="light" title="Light">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+          </button>
+          <button class="theme-btn" data-theme="dark" title="Dark">
+            <svg viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+          </button>
+        </div>
       </div>
     </header>
 
@@ -93,9 +102,6 @@
       <div id="tab-ota" class="tab-content">
         <!-- Populated by ota.js -->
       </div>
-      <div id="tab-credits" class="tab-content">
-        <!-- Populated by credits.js -->
-      </div>
     </div>
 
     <!-- Toast notification container -->
@@ -141,22 +147,37 @@
         </span>
         SYSTEM
       </a>
-      <a href="#" class="tab-link" data-target="tab-credits">
-        <span class="icon">
-          <!-- Copyright / Credits SVG (Feather-icon style) -->
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
-               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="10"/>
-            <path d="M14.83 14.83a4 4 0 1 1 0-5.66"/>
-          </svg>
-        </span>
-        CREDITS
-      </a>
       <!-- App-contributed tabs are injected here by app.js -->
     </nav>
   </div>
 
   <!-- Load app.js — this bootstraps everything else -->
   <script src="app.js"></script>
+
+  <!-- Credits Modal -->
+  <dialog id="credits-dialog">
+    <div style="position:relative;">
+      <button id="credits-close" style="position:absolute; top:8px; right:8px; background:none; border:none; color:inherit; cursor:pointer; padding:4px;" title="Close">
+        <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+      <div id="tab-credits">
+        <!-- Populated by credits.js -->
+      </div>
+    </div>
+  </dialog>
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      var btn = document.getElementById('credits-btn');
+      var dialog = document.getElementById('credits-dialog');
+      var closeBtn = document.getElementById('credits-close');
+      if (btn && dialog && closeBtn) {
+        btn.addEventListener('click', function() { dialog.showModal(); });
+        closeBtn.addEventListener('click', function() { dialog.close(); });
+        dialog.addEventListener('click', function(e) {
+          if (e.target === dialog) dialog.close();
+        });
+      }
+    });
+  </script>
 </body>
 </html>
