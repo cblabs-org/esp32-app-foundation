@@ -466,6 +466,18 @@ public:
     void setClockFontSize(uint8_t size);
 
     /**
+     * @brief Get the current display brightness level.
+     * @return Brightness level (0–255).
+     */
+    uint8_t getBrightness() const { return _brightness; }
+
+    /**
+     * @brief Get the current screen flip state.
+     * @return True if the display is flipped 180 degrees.
+     */
+    bool getFlipScreen() const { return _flipScreen; }
+
+    /**
      * @brief Get the current clock font size.
      * @return Font size level (1=small, 2=medium, 3=large).
      */

@@ -19,6 +19,7 @@
  */
 
 #pragma once
+#include <cstdint>
 
 /**
  * @brief Contract for any component participating in the Application tick loop.

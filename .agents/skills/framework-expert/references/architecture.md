@@ -6,7 +6,7 @@ The framework decouples code into three distinct layers to ensure hardware/softw
 
 *   **Framework Kernel (`modules/`):** Central reusable infrastructure (e.g., `Application`, `ConfigManager`, `EventBus`, `WifiManager`). Zero dependencies on application code.
 *   **Interfaces (`include/interfaces/`):** Pure virtual C++ class contracts. This is the only coupling point between Kernel and Application.
-*   **Your App (`template/src/`):** Implements interfaces to inject custom behavior.
+*   **Your App (`your-project/src/` — see `sample-app/` for reference):** Implements interfaces to inject custom behavior.
 
 ### ADR-04: The Hollywood Principle
 The framework strictly enforces Inversion of Control. "Don't call us, we'll call you." Application modules should not orchestrate the boot sequence or poll the system state. Instead, they register via `app.registerModule()`, and the framework calls their lifecycle methods (`tick`, `applyConfig`, `render`).

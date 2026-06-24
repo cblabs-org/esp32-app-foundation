@@ -61,7 +61,7 @@ The framework auto-detects `IMCPContributor` during module registration. If your
 
 ### Example Implementation
 
-Tool handlers are **static function pointers** (not `std::function` — see GRAVE-05). Module state is passed through the opaque `void* context` parameter and recovered via `static_cast`. See `template/src/myApp.cpp` for the canonical example.
+Tool handlers are **static function pointers** (not `std::function` — see GRAVE-05). Module state is passed through the opaque `void* context` parameter and recovered via `static_cast`. See `template-app/src/myApp.cpp` for the canonical example.
 
 ```cpp
 class WeatherModule : public ITickable, public IMCPContributor {

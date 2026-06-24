@@ -12,6 +12,8 @@
 
 #include "../MCPServer/MCPToolRegistry.hpp"
 #include "../ConfigManager/ConfigManager.hpp"
+#include "../KeyManager/KeyManager.hpp"
+#include "../EventBus/EventBus.hpp"
 
 #include "platform/LogShim.h"
 #include "../Logger/Logger.hpp"
@@ -270,6 +272,9 @@ void HomeAssistantModule::mqttEventHandler(void* handler_args, esp_event_base_t 
                     std::string cmdTopic = self->getEntityCommandTopic(entity);
                     if (topic == cmdTopic || topic.find(cmdTopic + "/") == 0) {
                         entity->handleCommand(topic, payload);
+                        // Publish confirmed state back to HA immediately so the
+                        // UI doesn't revert (optimistic mode race condition).
+                        self->publishState(entity);
                     }
                 }
             }

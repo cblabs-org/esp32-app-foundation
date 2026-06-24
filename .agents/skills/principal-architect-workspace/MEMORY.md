@@ -90,6 +90,7 @@ predate the formal PA pipeline and are filed retrospectively.
 | Screensaver TWDT Crash | 2026-06-07 | Deterministic TWDT crash at 313 s — `vTaskDelay` fix, `setPowerSave(1)`, `localtime_r` thread safety | ✅ **FIXED** — `026354b`, `842a7e5` | [adhoc-screensaver-twdt/](./adhoc-screensaver-twdt/context_bridge.md) |
 | OTA Docs & Boot Hotfix | 2026-06-07 | `build_and_release_process.md`, Wi-Fi gate in `tick()`, `_silentCheck`, channel risk-floor model | ✅ **COMPLETE** | [adhoc-ota-docs-hotfix/](./adhoc-ota-docs-hotfix/context_bridge.md) |
 | Boot & WiFi Bugfixes | 2026-06-11 | PKCS7 padding corruption → AUTH_EXPIRE; WiFi wizard modal never shown in AP mode; `%zu` Newlib nano printf — 3 fixes on `pr-21-ota-task-hardening` | ✅ **FIXED** — `dff3b22`, `a0c91dc` | [adhoc-boot-wifi-bugfixes/](./adhoc-boot-wifi-bugfixes/context_bridge.md) |
+| OTA Manifest URL Bug | 2026-06-23 | "No manifest URL configured" root cause (dirty-tree build layout corruption), latent `_silentCheck` gap + redundant URL guard in `performUpdateTask` | ⚠️ **LATENT DEFECTS** — root cause resolved, 2 code fixes pending | [adhoc-ota-manifest-url-bug/](./adhoc-ota-manifest-url-bug/context_bridge.md) |
 
 ---
 
@@ -126,6 +127,7 @@ scanning the entire Projects Registry chronologically.
 | [pr-36](./pr-36-manifest-first-ota/PROJECT.md) | Manifest-first architecture, signed manifest, multi-channel, absolute URLs, URL resilience | PROJECT.md |
 | [pr-37](./pr-37-split-repo-ota/PROJECT.md) | Split-repo OTA — public releases repo, git-managed manifest, delete GithubClient, eliminate PAT, deploy safety gates | [distillation](./pr-37-split-repo-ota/context_bridge.md) |
 | [adhoc-ota-docs-hotfix](./adhoc-ota-docs-hotfix/context_bridge.md) | `build_and_release_process.md`, Wi-Fi gate, `_silentCheck`, channel risk-floor | context_bridge |
+| [adhoc-ota-manifest-url-bug](./adhoc-ota-manifest-url-bug/context_bridge.md) | "No manifest URL configured" dirty-tree debug, `_silentCheck` gap, redundant URL guard in `performUpdateTask` | context_bridge |
 
 ### Display & UI
 

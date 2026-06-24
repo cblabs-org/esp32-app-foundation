@@ -7,9 +7,9 @@
 ---
 
 This tutorial walks through creating a custom application module. We will use the built-in template files as our reference:
-- [myApp.hpp](../../template/src/myApp.hpp)
-- [myApp.cpp](../../template/src/myApp.cpp)
-- [main.cpp](../../template/src/main.cpp)
+- [myApp.hpp](../../template-app/src/myApp.hpp)
+- [myApp.cpp](../../template-app/src/myApp.cpp)
+- [main.cpp](../../template-app/src/main.cpp)
 
 ---
 
@@ -34,7 +34,7 @@ Use this decision table to guide your implementation:
 
 ## 2. Declaring Your Module Class
 
-The template module `MyApp` implements five different interfaces using multiple inheritance. Here is the class declaration from [myApp.hpp](../../template/src/myApp.hpp):
+The template module `MyApp` implements five different interfaces using multiple inheritance. Here is the class declaration from [myApp.hpp](../../template-app/src/myApp.hpp):
 
 ```cpp
 #pragma once
@@ -106,7 +106,7 @@ private:
 
 ## 3. Implementing the Module Logic
 
-Let's examine how each interface is implemented in [myApp.cpp](../../template/src/myApp.cpp).
+Let's examine how each interface is implemented in [myApp.cpp](../../template-app/src/myApp.cpp).
 
 ### The Tick Loop & Injected Time
 The `ITickable::tick()` function is called repeatedly on every main-loop execution. To ensure testability, the current time is captured once at the beginning of the framework tick cycle and passed to you as `currentMillis`. 
@@ -159,7 +159,7 @@ void MyApp::registerRoutes(PsychicHttpServer& server) {
 
 ## 4. Module Registration
 
-Once your module is declared and implemented, wire it into the framework. In your application's entry point, [main.cpp](../../template/src/main.cpp), you instantiate your module and register it using the universal registration API:
+Once your module is declared and implemented, wire it into the framework. In your application's entry point, [main.cpp](../../template-app/src/main.cpp), you instantiate your module and register it using the universal registration API:
 
 ```cpp
 #include "AppFoundation.h"

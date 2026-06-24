@@ -6,7 +6,7 @@
  * This work is licensed under Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International.
  * To view a copy of this license, visit https://creativecommons.org/licenses/by-nc-sa/4.0/
  *
- * Module: sample-app/src/myApp.hpp
+ * Module: template-app/src/myApp.hpp
  * Description: Main application module for the sample skeleton. Implements
  *              ITickable, IConfigurable, IWebContributor, IMCPContributor,
  *              and IConfigGate to demonstrate all primary extension points.
@@ -23,13 +23,7 @@
 
 #pragma once
 
-#include <cstdint>
-#include <ArduinoJson.h>
-#include "interfaces/ITickable.hpp"
-#include "interfaces/IConfigurable.hpp"
-#include "interfaces/IWebContributor.hpp"
-#include "interfaces/IMCPContributor.hpp"
-#include "interfaces/IConfigGate.hpp"
+#include "AppFoundation.h"
 
 class PsychicHttpServer;
 class MCPServer;

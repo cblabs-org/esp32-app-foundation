@@ -16,15 +16,14 @@
  */
 
 #include "AppFoundation.h"
+#include "publicKey.hpp"
 #ifndef NATIVE_BUILD
 #include <Arduino.h>
 #endif
-#include "HomeAssistantModule.hpp"
 #include "WeatherModule.hpp"
 #include "WeatherClockBoard.hpp"
 
 Application app;
-HomeAssistantModule haModule;
 WeatherModule weatherModule;
 WeatherClockBoard weatherClockBoard(&weatherModule);
 
@@ -41,26 +40,16 @@ void setup() {
     app.disableDefaultAppTab();
     app.setAppName("Weather Station");
 
-    // Wire up HomeAssistantModule
-    haModule.setKeyManager(&app.getKeyManager());
-    haModule.setEventBus(&app.getEventBus());
-    haModule.setConfigManager(&app.getConfigManager());
-    haModule.setAppName(app.getAppName());
-    haModule.setAppVersion(BUILD_VERSION);
-
-    // Wire up WeatherModule
-    weatherModule.setHomeAssistant(&haModule);
-    weatherModule.setKeyManager(&app.getKeyManager());
-    weatherModule.setEventBus(&app.getEventBus());
-    weatherModule.setConfigManager(&app.getConfigManager());
-    weatherModule.setDataManager(&app.getDataManager());
+    // ADR-39: Module self-wires from Application via transient service locator
+    weatherModule.begin(app);
 
     // Register user application modules
-    app.registerModule(&haModule);
     app.registerModule(&weatherModule);
 
-    // Prepare Framework config
+    // Prepare Framework config — OTA manifest URL and signing key
     FrameworkConfig config;
+    config.otaManifestUrl = "https://raw.githubusercontent.com/matthewmcneill/esp32-app-foundation-releases/main/manifest.json";
+    config.otaPublicKey = (const char*)public_key_pem;
 
     // App names its hostname default — WiFiManager owns the persisted value
     // and falls back to this on factory reset (resetConfig()). Must be set

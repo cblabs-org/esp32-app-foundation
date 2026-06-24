@@ -80,6 +80,14 @@
     #include "../U8G2Display/boards/DiagnosticsBoard.hpp"
 #endif
 
+// Home Assistant MQTT integration (hardware only — MQTT client unavailable in native builds)
+// Forward-declared here because HomeAssistantModule.hpp includes interfaces that
+// would create a circular chain via AppFoundation.h → Application.hpp.
+// Full HomeAssistantModule.hpp is included in Application.cpp.
+#ifndef NATIVE_BUILD
+    class HomeAssistantModule;
+#endif
+
 // Forward declaration only — OTAUpdateManager.hpp pulls in WiFiClientSecure
 // which causes LDF to discover NetworkClientSecure with missing SSL backend.
 // Full include deferred to Application.cpp; member held via unique_ptr.
@@ -379,6 +387,16 @@ public:
      * @return Reference to the U8G2DisplayModule.
      */
     U8G2DisplayModule& getDisplay();
+
+    /**
+     * @brief Get the application's HomeAssistantModule instance.
+     *
+     * Downstream apps can use this to add custom HA entities to the
+     * framework-owned module. The module is dormant until MQTT is configured.
+     *
+     * @return Reference to the HomeAssistantModule.
+     */
+    HomeAssistantModule& getHomeAssistant() { return *_haModule; }
 #endif
 
     // -------------------------------------------------------------------------
@@ -522,6 +540,10 @@ private:
     TimeManager _timeManager;           ///< NTP synchronization service
     TimeConfigGate _timeGate{_timeManager}; ///< Optional timezone config gate (downstream opt-in)
 
+    // Heartbeat
+    uint32_t _lastHeartbeatMs = 0;                                    ///< Throttle for periodic heartbeat log
+    static constexpr uint32_t HEARTBEAT_INTERVAL_MS = 30000;          ///< 30-second heartbeat cycle
+
     // -------------------------------------------------------------------------
     // App tab contributor — registers the top-level "App" bottom-nav tab.
     // Application owns this tab; it is not the responsibility of any hardware
@@ -542,5 +564,10 @@ private:
     U8G2DisplayModule _display;                      ///< Display module with carousel engine
     DiagnosticsBoard  _diagnosticsBoard{256, 64};    ///< System telemetry carousel board
     bool _wifiWizardShown = false;                   ///< Guard: WiFi wizard modal pushed this CONFIGURING phase
+#endif
+
+    // Home Assistant integration (hardware only)
+#ifndef NATIVE_BUILD
+    HomeAssistantModule* _haModule = nullptr;   ///< Framework-owned HA MQTT service (heap, fwd-declared)
 #endif
 };

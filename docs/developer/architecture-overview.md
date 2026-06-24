@@ -19,7 +19,7 @@ The framework decouples code into three clean layers to ensure hardware and soft
 ```mermaid
 graph TD
     subgraph App Layer
-        App[Your App: template/src/]
+        App[Your App: your-project/src/]
     end
     subgraph Interface Layer
         Ints[Interfaces: include/interfaces/]
@@ -34,7 +34,7 @@ graph TD
 
 1. **Framework Kernel (`modules/`):** Contains core, reusable infrastructure modules like `Application`, `ConfigManager`, `EventBus`, `WifiManager`, and `WebServerManager`. The kernel does not contain application-specific logic and knows nothing about downstream code.
 2. **Interfaces (`include/interfaces/`):** A collection of pure virtual C++ class contracts (e.g., [ITickable](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/include/interfaces/ITickable.hpp)). They are the only coupling point between the framework and your application.
-3. **Your App (`template/src/` or downstream repo):** Implements one or more interfaces to inject custom behavior (logic, config, web pages) into the framework's execution flow.
+3. **Your App (`your-project/src/` — see `sample-app/` for reference):** Implements one or more interfaces to inject custom behavior (logic, config, web pages) into the framework's execution flow.
 
 ---
 
@@ -42,7 +42,7 @@ graph TD
 
 The framework owns `setup()` and `loop()`. Downstream applications never write these functions directly. Instead, they register custom modules with the framework hub, which calls back into your code at defined lifecycle stages.
 
-Here is the entire entry point from [main.cpp](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/template/src/main.cpp) showing this pattern:
+Here is the entire entry point from [main.cpp](../../sample-app/src/main.cpp) showing this pattern:
 
 ```cpp
 #include "AppFoundation.h"

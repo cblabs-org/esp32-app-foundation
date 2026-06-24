@@ -1,6 +1,8 @@
 #include "WeatherModule.hpp"
+#include "Application.hpp"
 #include "ConfigManager.hpp"
 #include "DataManager.hpp"
+#include "MCPToolRegistry.hpp"
 #include <ArduinoJson.h>
 
 #ifndef NATIVE_BUILD
@@ -44,14 +46,18 @@ WeatherModule::~WeatherModule() {
 #endif
 }
 
-void WeatherModule::setHomeAssistant(HomeAssistantModule* ha) {
-    _ha = ha;
-    if (_ha) {
-        // H2: Pass address of member objects instead of pointers
-        _ha->addEntity(&_tempSensor);
-        _ha->addEntity(&_windSensor);
-        _ha->addEntity(&_condSensor);
-    }
+void WeatherModule::begin(Application& app) {
+    // ADR-39: Transient Service Locator — extract narrow refs, never store Application&
+    _ha            = &app.getHomeAssistant();
+    _keyManager    = &app.getKeyManager();
+    _eventBus      = &app.getEventBus();
+    _configManager = &app.getConfigManager();
+    _dataManager   = &app.getDataManager();
+
+    // Register HA entities now that the HomeAssistant reference is wired
+    _ha->addEntity(&_tempSensor);
+    _ha->addEntity(&_windSensor);
+    _ha->addEntity(&_condSensor);
 }
 
 void WeatherModule::tick(uint32_t currentMillis) {
@@ -239,19 +245,11 @@ void WeatherModule::registerRoutes(PsychicHttpServer& server) {
     </label>
     
     <label>API Key
-        <div style="position:relative; margin-bottom:0.25rem;">
+        <div class="password-input-wrapper">
             <input type="password" id="weather-apikey" placeholder="Enter API Key"
-                autocomplete="new-password" style="width:100%; box-sizing:border-box; padding-right:2.5rem; margin-top:0;">
-            <button type="button" id="weather-eye-btn" title="Toggle visibility" style="
-                position:absolute; right:8px; top:50%; transform:translateY(-50%);
-                background:none; border:none; cursor:pointer; padding:4px;
-                color:var(--text-muted,#6c757d); display:flex; align-items:center; opacity:0.3; pointer-events:none;
-            ">
-                <svg id="weather-eye-icon" width="20" height="20" viewBox="0 0 24 24" fill="none"
-                    stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                    <circle cx="12" cy="12" r="3"></circle>
-                </svg>
+                autocomplete="new-password">
+            <button type="button" class="eye-btn" id="weather-eye-btn" title="Toggle visibility">
+                <svg id="weather-eye-icon" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
             </button>
         </div>
         <div class="status-badge" id="weather-key-status" style="margin-top:0.5rem; margin-bottom:1rem;">
@@ -717,4 +715,54 @@ void WeatherModule::endDocument() {
             _eventBus->publish("weather.updated");
         }
     }
+}
+
+// -----------------------------------------------------------------------------
+// IMCPContributor Implementation
+// -----------------------------------------------------------------------------
+
+void WeatherModule::registerMCPTools(MCPToolRegistry& registry) {
+    registry.addTool(
+        "weather_status",
+        "Get current weather data including temperature, condition, humidity, "
+        "wind speed, pressure, and location",
+        [](void* ctx, JsonObject& params, JsonObject& result) {
+            auto* self = static_cast<WeatherModule*>(ctx);
+            (void)params;
+            result["hasData"] = self->hasData();
+            if (self->hasData()) {
+                result["temperature"] = self->getTemperature();
+                result["feelsLike"] = self->getFeelsLike();
+                result["condition"] = self->getCondition();
+                result["humidity"] = self->getHumidity();
+                result["pressure"] = self->getPressure();
+                result["windSpeed"] = self->getWindSpeed();
+                result["windDeg"] = self->getWindDeg();
+                result["visibility"] = self->getVisibility();
+                result["clouds"] = self->getClouds();
+                result["city"] = self->getCityName();
+                result["country"] = self->getCountry();
+            }
+            result["units"] = self->_units;
+        },
+        this,
+        false  // mutatesState = false (read-only)
+    );
+}
+
+// -----------------------------------------------------------------------------
+// IConfigGate Implementation
+// -----------------------------------------------------------------------------
+
+const char* WeatherModule::getGateName() const {
+    return "Weather API Key";
+}
+
+bool WeatherModule::isSatisfied() const {
+    if (!_keyManager) return true;  // No KeyManager wired — don't block boot
+    return !_keyManager->getKeyById("owm_api_key").empty();
+}
+
+const char* WeatherModule::getHelpText() const {
+    return "Enter your OpenWeatherMap API key via the Weather tab";
 }

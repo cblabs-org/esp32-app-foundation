@@ -437,8 +437,6 @@ private:
     const FrameworkConfig* _config        = nullptr;   ///< OTA secrets and repo config
     ConfigManager*         _configManager = nullptr;   ///< Config persistence + manifest
     EventBus*              _eventBus      = nullptr;   ///< Progress event publishing
-    
-    const char* DEBUG_url_in_ota_begin = nullptr;
 
     // -------------------------------------------------------------------------
     // Orchestrator state

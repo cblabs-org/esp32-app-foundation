@@ -1,6 +1,13 @@
 #pragma once
 
-#include "../../include/AppFoundation.h"
+// Targeted interface includes — avoids the AppFoundation.h → Application.hpp
+// → U8G2DisplayModule.hpp include chain (which requires U8G2-specific widget
+// include paths not available in this module's compilation unit).
+#include "../../include/build_version.h"
+#include "../../include/interfaces/ITickable.hpp"
+#include "../../include/interfaces/IConfigurable.hpp"
+#include "../../include/interfaces/IWebContributor.hpp"
+#include "../../include/interfaces/IMCPContributor.hpp"
 #include "entities/IHaEntity.hpp"
 #include <vector>
 #include <string>
@@ -8,6 +15,8 @@
 #include <ArduinoJson.h>
 
 class ConfigManager;
+class KeyManager;
+class EventBus;
 
 #ifndef NATIVE_BUILD
 #include <mqtt_client.h>

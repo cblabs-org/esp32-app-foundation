@@ -12,13 +12,17 @@
 #include <freertos/semphr.h>
 #endif
 
+class Application;
 class ConfigManager;
 class DataManager;
+class MCPToolRegistry;
 
 class WeatherModule : public ITickable, 
                       public IConfigurable, 
                       public IWebContributor, 
                       public IDataSource, 
+                      public IMCPContributor,
+                      public IConfigGate,
                       public JsonListener {
 private:
     HomeAssistantModule* _ha = nullptr;
@@ -89,11 +93,7 @@ public:
     WeatherModule();
     ~WeatherModule() override;
 
-    void setHomeAssistant(HomeAssistantModule* ha);
-    void setKeyManager(KeyManager* km) { _keyManager = km; }
-    void setEventBus(EventBus* eb) { _eventBus = eb; }
-    void setConfigManager(ConfigManager* cm) { _configManager = cm; }
-    void setDataManager(DataManager* dm) { _dataManager = dm; }
+    void begin(Application& app);
 
     // H3: Thread-safe getters. Temperature and wind return float via atomic
     // load. Condition returns a copy under mutex protection.
@@ -182,6 +182,14 @@ public:
     uint32_t getUpdateIntervalMs() const override { return _pollingIntervalMs; }
     const char* getSourceName() const override { return "OpenWeatherMap"; }
     PriorityTier getPriorityTier() const override { return PriorityTier::Normal; }
+
+    // IMCPContributor
+    void registerMCPTools(MCPToolRegistry& registry) override;
+
+    // IConfigGate
+    const char* getGateName() const override;
+    bool isSatisfied() const override;
+    const char* getHelpText() const override;
 
     // JsonListener
     void whitespace(char c) override {}

@@ -60,7 +60,7 @@ const char* getTabIcon() const override {
 When a user clicks your tab, the web portal loads your HTML/JS code from LittleFS and interacts with the REST endpoints registered in C++.
 
 ### C++ Web API Routes (Backend)
-Here is the route registration from the template file [myApp.cpp](../../template/src/myApp.cpp). It registers a GET route to retrieve status, and a POST route to update settings:
+Here is the route registration from the template file [myApp.cpp](../../template-app/src/myApp.cpp). It registers a GET route to retrieve status, and a POST route to update settings:
 
 ```cpp
 #ifndef NATIVE_BUILD
@@ -276,7 +276,7 @@ The framework enforces a hard limit of **4096 bytes** on incoming POST bodies. T
 
 ### Mandatory Stack-Allocated JSON Parsing
 
-When parsing JSON from a POST body, you **MUST** use `StaticJsonDocument` allocated on the stack. **Never** use `DynamicJsonDocument` (heap-allocated) for incoming request parsing — concurrent requests will fragment the heap and cause panics.
+When parsing JSON from a POST body, you **MUST** use `JsonDocument` with a size-capped input. **Never** allocate unbounded JSON buffers for incoming request parsing — concurrent requests will fragment the heap and cause panics.
 
 ```cpp
 server.on("/api/myapp/config", HTTP_POST, [this](PsychicRequest* request, PsychicResponse* response) {
@@ -285,8 +285,8 @@ server.on("/api/myapp/config", HTTP_POST, [this](PsychicRequest* request, Psychi
         return response->send(400, "application/json", "{\"error\":\"body_required\"}");
     }
 
-    // ADR-15: MUST use StaticJsonDocument (stack allocation)
-    StaticJsonDocument<1024> doc;
+    // ADR-15: MUST use JsonDocument with capped input
+    JsonDocument doc;
     DeserializationError error = deserializeJson(doc, body);
     if (error) {
         return response->send(400, "application/json", "{\"error\":\"Invalid JSON\"}");
@@ -298,7 +298,7 @@ server.on("/api/myapp/config", HTTP_POST, [this](PsychicRequest* request, Psychi
 ```
 
 > [!WARNING]
-> Using `DynamicJsonDocument` or `JsonDocument` (which heap-allocates in ArduinoJson v7) in route handlers is **unsafe** under concurrent load. Stick to `StaticJsonDocument` with a size that fits within the 4096-byte body cap. A `StaticJsonDocument<1024>` is usually sufficient for configuration payloads.
+> In ArduinoJson v7, `StaticJsonDocument` and `DynamicJsonDocument` are removed — use `JsonDocument` instead. Keep POST bodies within the 4096-byte cap enforced by PsychicHttp to bound memory usage under concurrent load.
 
 ---
 

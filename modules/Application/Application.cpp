@@ -30,6 +30,12 @@
 #include "../../include/events/AppConfiguringPayload.hpp"
 #include "../OTAUpdateManager/OTAUpdateManager.hpp"
 
+// Full include for HomeAssistantModule (forward-declared in Application.hpp
+// to break the circular AppFoundation.h → Application.hpp include chain).
+#ifndef NATIVE_BUILD
+    #include "../HomeAssistant/HomeAssistantModule.hpp"
+#endif
+
 // ---------------------------------------------------------------------------
 // Platform-conditional includes
 // ESP-IDF / Arduino headers are excluded from the native GoogleTest build.
@@ -52,10 +58,14 @@
 
 static constexpr const char* TAG = "Application";
 
-// Destructor — clean up heap-allocated OTAUpdateManager
+// Destructor — clean up heap-allocated modules
 Application::~Application() {
     delete _otaManager;
     _otaManager = nullptr;
+#ifndef NATIVE_BUILD
+    delete _haModule;
+    _haModule = nullptr;
+#endif
 }
 
 // ---------------------------------------------------------------------------
@@ -132,6 +142,22 @@ bool Application::begin(const FrameworkConfig& config) {
     _wifiManager.setEventBus(&_eventBus);
     _timeManager.setConfigManager(&_configManager);
     _authManager.begin(&_configManager, &_keyManager);
+
+    // --- Step 7a: HomeAssistant module wiring ---
+    // Allocate and wire the framework-owned HA MQTT service. The module ships
+    // with zero default entities — apps add their own via getHomeAssistant().
+#ifndef NATIVE_BUILD
+    _haModule = new (std::nothrow) HomeAssistantModule();
+    if (_haModule == nullptr) {
+        ESP_LOGE(TAG, "Failed to allocate HomeAssistantModule");
+        return false;
+    }
+    _haModule->setKeyManager(&_keyManager);
+    _haModule->setEventBus(&_eventBus);
+    _haModule->setConfigManager(&_configManager);
+    _haModule->setAppName(getAppName());
+    _haModule->setAppVersion(BUILD_VERSION);
+#endif
     _otaManager = new (std::nothrow) OTAUpdateManager();
     if (_otaManager == nullptr) {
         ESP_LOGE(TAG, "Failed to allocate OTAUpdateManager");
@@ -149,6 +175,9 @@ bool Application::begin(const FrameworkConfig& config) {
     registerModule(&_mcpServer);          // IConfigurable + IWebContributor
     registerModule(_otaManager);          // ITickable + IConfigurable + IWebContributor + IMCPContributor
     registerModule(&_webServerManager);   // ITickable
+#ifndef NATIVE_BUILD
+    registerModule(_haModule);           // ITickable + IConfigurable + IWebContributor + IMCPContributor
+#endif
     if (_enableDefaultAppTab) {
         registerModule(&_appTabContributor);  // IWebContributor
     }
@@ -349,6 +378,16 @@ void Application::tick() {
 
     // MCP server: poll Serial for incoming JSON-RPC requests
     _mcpServer.tick();
+
+    // Periodic heartbeat — free heap + uptime every 30s
+#ifndef NATIVE_BUILD
+    if (currentMillis - _lastHeartbeatMs >= HEARTBEAT_INTERVAL_MS) {
+        _lastHeartbeatMs = currentMillis;
+        uint32_t freeHeap = heap_caps_get_free_size(MALLOC_CAP_8BIT);
+        uint32_t uptimeSec = currentMillis / 1000;
+        ESP_LOGI(TAG, "♥ uptime=%lus  free_heap=%luB", (unsigned long)uptimeSec, (unsigned long)freeHeap);
+    }
+#endif
 }
 
 /**
@@ -599,6 +638,7 @@ void Application::_reportHeap() {
     ESP_LOGI(TAG, "Heap report skipped (NATIVE_BUILD)");
 #endif
 }
+
 
 // ---------------------------------------------------------------------------
 // Config Gate Helpers
