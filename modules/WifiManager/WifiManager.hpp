@@ -60,21 +60,8 @@ typedef int esp_err_t;
 #define ESP_OK 0
 #endif
 
-// Stub String class for NATIVE_BUILD tests
-#ifndef STRING_STUB_DEFINED
-#define STRING_STUB_DEFINED
-class String {
-public:
-    String(const char* s) : str(s) {}
-    String(const std::string& s) : str(s) {}
-    String() {}
-    const char* c_str() const { return str.c_str(); }
-    String operator+(const char* s) const { return String(str + s); }
-    String operator+(const String& s) const { return String(str + s.str); }
-private:
-    std::string str;
-};
-#endif
+// Consolidated String stub for NATIVE_BUILD
+#include "../../include/platform/NativeBuildStubs.hpp"
 #endif
 
 #include <memory>

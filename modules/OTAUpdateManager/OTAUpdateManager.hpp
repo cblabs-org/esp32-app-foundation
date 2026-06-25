@@ -71,26 +71,8 @@
 
 typedef int esp_err_t;
 
-// Stub String class for NATIVE_BUILD tests
-#ifndef STRING_STUB_DEFINED
-#define STRING_STUB_DEFINED
-class String {
-public:
-    String(const char* s) : str(s ? s : "") {}
-    String(const std::string& s) : str(s) {}
-    String() {}
-    const char* c_str() const { return str.c_str(); }
-    bool isEmpty() const { return str.empty(); }
-    int length() const { return (int)str.size(); }
-    char operator[](int i) const { return str[i]; }
-    bool operator==(const char* s) const { return str == s; }
-    bool operator==(const String& s) const { return str == s.str; }
-    String operator+(const char* s) const { return String(str + s); }
-    String operator+(const String& s) const { return String(str + s.str); }
-private:
-    std::string str;
-};
-#endif
+// Consolidated String stub for NATIVE_BUILD
+#include "../../include/platform/NativeBuildStubs.hpp"
 // Minimal Stream stub for NATIVE_BUILD
 class Stream {};
 #endif
@@ -408,7 +390,7 @@ private:
     bool    _updatesEnabled         = true;  ///< Master kill-switch for applying firmware updates
     char    _lastCheckedChannel[16] = "";
     uint8_t _checkHour              = 3;   ///< Hour (0-23) at which daily auto-check fires
-    char    learnedManifestUrl_[256] = ""; ///< Learned manifest URL (persisted via IConfigurable)
+    char    _learnedManifestUrl[256] = ""; ///< Learned manifest URL (persisted via IConfigurable)
 
     // Scheduling state (not persisted — reset on each boot)
     uint32_t _lastCheckDay   = 0;     ///< Unix day of last scheduled check (seconds/86400)
@@ -503,7 +485,7 @@ private:
      *   3. Verify the signature using MbedTLSSignatureVerifier
      *   4. Parse the manifest into the output struct
      * If the verified manifest contains a manifestUrl that differs from the
-     * current learned URL, update learnedManifestUrl_ and persist via config.
+     * current learned URL, update _learnedManifestUrl and persist via config.
      *
      * @param manifest [out] Parsed OTAManifest struct (populated on success).
      * @return true on success, false on failure (error state set internally).

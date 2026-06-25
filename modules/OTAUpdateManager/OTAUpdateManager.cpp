@@ -130,9 +130,9 @@ void OTAUpdateManager::applyConfig(const JsonObject& section) {
     _checkHour = section["checkHour"] | (uint8_t)3;
     if (_checkHour > 23) _checkHour = 3; // Clamp invalid values
     const char* lmu = section["learnedManifestUrl"] | "";
-    strlcpy(learnedManifestUrl_, lmu, sizeof(learnedManifestUrl_));
+    strlcpy(_learnedManifestUrl, lmu, sizeof(_learnedManifestUrl));
     ESP_LOGI(TAG, "Config applied — channel='%s' autoCheck=%d updatesEnabled=%d checkHour=%u lastCheckedChannel='%s' learnedManifestUrl='%s'",
-             _channel, (int)_autoCheck, (int)_updatesEnabled, (unsigned)_checkHour, _lastCheckedChannel, learnedManifestUrl_);
+             _channel, (int)_autoCheck, (int)_updatesEnabled, (unsigned)_checkHour, _lastCheckedChannel, _learnedManifestUrl);
 }
 
 /**
@@ -150,7 +150,7 @@ void OTAUpdateManager::serializeConfig(JsonObject& section) const {
     section["updatesEnabled"]     = _updatesEnabled;
     section["lastCheckedChannel"] = _lastCheckedChannel;
     section["checkHour"]          = _checkHour;
-    section["learnedManifestUrl"] = learnedManifestUrl_;
+    section["learnedManifestUrl"] = _learnedManifestUrl;
 }
 
 /**
@@ -195,7 +195,7 @@ void OTAUpdateManager::resetConfig() {
     _updatesEnabled = true;
     _lastCheckedChannel[0] = '\0';
     _checkHour = 3;
-    learnedManifestUrl_[0] = '\0';
+    _learnedManifestUrl[0] = '\0';
     ESP_LOGI(TAG, "Config reset to defaults — channel='stable' autoCheck=true updatesEnabled=true checkHour=3 learnedManifestUrl=''");
 }
 
@@ -289,7 +289,7 @@ bool OTAUpdateManager::checkForUpdate() {
     }
 
     // Guard: must have at least one manifest URL source (compiled-in or learned)
-    if (_config->otaManifestUrl == nullptr && learnedManifestUrl_[0] == '\0') {
+    if (_config->otaManifestUrl == nullptr && _learnedManifestUrl[0] == '\0') {
         ESP_LOGW(TAG, "checkForUpdate() — no manifest URL configured (compiled-in or learned) — returning false");
         return false;
     }
@@ -432,7 +432,7 @@ void OTAUpdateManager::performUpdateTask() {
     // --- Guard: at least one manifest URL must be available ---
     // Check both compiled-in URL and learned URL. fetchAndVerifyManifest_
     // handles the fallback logic; we only reject if neither source exists.
-    if (cfg.otaManifestUrl == nullptr && learnedManifestUrl_[0] == '\0') {
+    if (cfg.otaManifestUrl == nullptr && _learnedManifestUrl[0] == '\0') {
         if (_silentCheck) {
             // Boot/scheduled checks: suppress error, return to idle
             _state = OTAState::Idle;
@@ -797,7 +797,7 @@ static bool downloadRawFile_(const char* url, const char* token,
  * @brief Fetch manifest.json + manifest.json.sig, verify signature, and parse.
  *
  * Implements the URL fallback mechanism:
- *   1. If learnedManifestUrl_ is non-empty, try it first.
+ *   1. If _learnedManifestUrl is non-empty, try it first.
  *   2. Fall back to the compiled-in URL (_config->otaManifestUrl).
  *
  * For each URL attempt:
@@ -810,7 +810,7 @@ static bool downloadRawFile_(const char* url, const char* token,
  *   e. On fail → log warning, try next URL.
  *
  * After successful verification: if manifest.manifestUrl differs from
- * the current learnedManifestUrl_, update and persist via config save.
+ * the current _learnedManifestUrl, update and persist via config save.
  */
 bool OTAUpdateManager::fetchAndVerifyManifest_(OTAManifest& manifest) {
 #ifndef NATIVE_BUILD
@@ -821,8 +821,8 @@ bool OTAUpdateManager::fetchAndVerifyManifest_(OTAManifest& manifest) {
     const char* urls[2] = { nullptr, nullptr };
     int urlCount = 0;
 
-    if (learnedManifestUrl_[0] != '\0') {
-        urls[urlCount++] = learnedManifestUrl_;
+    if (_learnedManifestUrl[0] != '\0') {
+        urls[urlCount++] = _learnedManifestUrl;
     }
     if (cfg.otaManifestUrl != nullptr && cfg.otaManifestUrl[0] != '\0') {
         // Only add compiled-in URL if it differs from the learned URL
@@ -846,7 +846,7 @@ bool OTAUpdateManager::fetchAndVerifyManifest_(OTAManifest& manifest) {
 
     for (int i = 0; i < urlCount; ++i) {
         const char* manifestUrl = urls[i];
-        bool isLearnedUrl = (i == 0 && learnedManifestUrl_[0] != '\0');
+        bool isLearnedUrl = (i == 0 && _learnedManifestUrl[0] != '\0');
 
         ESP_LOGI(TAG, "fetchAndVerifyManifest_: attempting URL %d/%d (%s) — %s",
                  i + 1, urlCount, isLearnedUrl ? "learned" : "compiled-in", manifestUrl);
@@ -902,16 +902,16 @@ bool OTAUpdateManager::fetchAndVerifyManifest_(OTAManifest& manifest) {
                  manifest.manifestVersion, manifest.channelCount);
 
         // --- Log fallback if learned URL failed but compiled-in succeeded ---
-        if (i > 0 && learnedManifestUrl_[0] != '\0') {
+        if (i > 0 && _learnedManifestUrl[0] != '\0') {
             ESP_LOGW(TAG, "fetchAndVerifyManifest_: learned URL failed, fell back to compiled-in URL");
         }
 
         // --- Update learned URL if manifest contains a new manifestUrl ---
         if (manifest.manifestUrl[0] != '\0' &&
-            strcmp(manifest.manifestUrl, learnedManifestUrl_) != 0) {
+            strcmp(manifest.manifestUrl, _learnedManifestUrl) != 0) {
             ESP_LOGI(TAG, "fetchAndVerifyManifest_: updating learned URL '%s' → '%s'",
-                     learnedManifestUrl_, manifest.manifestUrl);
-            strlcpy(learnedManifestUrl_, manifest.manifestUrl, sizeof(learnedManifestUrl_));
+                     _learnedManifestUrl, manifest.manifestUrl);
+            strlcpy(_learnedManifestUrl, manifest.manifestUrl, sizeof(_learnedManifestUrl));
 
             // Persist the updated learned URL via config save
             if (_configManager != nullptr) {
