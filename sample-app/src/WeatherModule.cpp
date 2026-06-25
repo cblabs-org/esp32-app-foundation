@@ -1,5 +1,10 @@
 /*
- * ESP32 App Foundation — Sample Application
+ * ESP32 App Foundation (c) 2026 CB Labs
+ *
+ * https://github.com/matthewmcneill/esp32-app-foundation
+ *
+ * This work is licensed under Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International.
+ * To view a copy of this license, visit https://creativecommons.org/licenses/by-nc-sa/4.0/
  *
  * Module: sample-app/src/WeatherModule.cpp
  * Description: Implementation of the WeatherModule — a comprehensive sample
@@ -37,6 +42,13 @@ struct sslclient_context;
 void attach_ssl_certificate_bundle(sslclient_context *ssl_client, bool att);
 #endif
 
+/**
+ * @brief Constructs the WeatherModule.
+ *
+ * Configures Home Assistant sensor metadata (device class, state class,
+ * unit of measurement, icon) for temperature, wind speed, and condition
+ * entities. Creates the FreeRTOS mutex used for thread-safe string field access.
+ */
 WeatherModule::WeatherModule() {
 #ifndef NATIVE_BUILD
     // H2: Sensors are now direct members — configure via dot access
@@ -56,6 +68,12 @@ WeatherModule::WeatherModule() {
 #endif
 }
 
+/**
+ * @brief Destroys the WeatherModule.
+ *
+ * Releases the FreeRTOS mutex. HA sensor entities are direct members
+ * and do not require manual deletion (H2).
+ */
 WeatherModule::~WeatherModule() {
     // H2: No delete needed — sensors are direct members
 #ifndef NATIVE_BUILD
@@ -66,6 +84,15 @@ WeatherModule::~WeatherModule() {
 #endif
 }
 
+/**
+ * @brief Wires framework service references via the ADR-39 transient service locator pattern.
+ *
+ * Extracts narrow references to KeyManager, EventBus, ConfigManager, and DataManager
+ * from the Application object. The Application reference itself is NOT stored —
+ * only the individual service pointers are retained.
+ *
+ * @param app  The Application instance providing service accessors.
+ */
 void WeatherModule::begin(Application& app) {
     // ADR-39: Transient Service Locator — extract narrow refs, never store Application&
     _keyManager    = &app.getKeyManager();
@@ -79,6 +106,15 @@ void WeatherModule::begin(Application& app) {
 }
 
 #ifndef NATIVE_BUILD
+/**
+ * @brief Registers HA sensor entities with the HomeAssistant module.
+ *
+ * Must be called after app.begin() because the HA module is not available
+ * during WeatherModule::begin(). Registers temperature, wind speed, and
+ * condition sensors for automatic MQTT discovery and state publishing.
+ *
+ * @param ha  Reference to the initialised HomeAssistantModule.
+ */
 void WeatherModule::wireHomeAssistant(HomeAssistantModule& ha) {
     _ha = &ha;
     _ha->addEntity(&_tempSensor);
@@ -87,11 +123,27 @@ void WeatherModule::wireHomeAssistant(HomeAssistantModule& ha) {
 }
 #endif
 
+/**
+ * @brief Periodic update hook — intentionally empty.
+ *
+ * Background fetching is handled by IDataSource via DataManager.
+ * This tick exists only to satisfy the ITickable interface contract.
+ *
+ * @param currentMillis  Current system uptime in milliseconds (unused).
+ */
 void WeatherModule::tick(uint32_t currentMillis) {
     // Fast, non-blocking tick. Background fetching is handled by IDataSource in DataManager.
     (void)currentMillis;
 }
 
+/**
+ * @brief Loads configuration from a persisted JSON object.
+ *
+ * Reads latitude, longitude, polling interval, and temperature units from
+ * the JSON config. Uses ArduinoJson's pipe-default syntax for safe defaults.
+ *
+ * @param config  JSON object containing lat, lon, interval, and units fields.
+ */
 void WeatherModule::applyConfig(const JsonObject& config) {
     _lat = config["lat"] | 0.0;
     _lon = config["lon"] | 0.0;
@@ -99,6 +151,14 @@ void WeatherModule::applyConfig(const JsonObject& config) {
     _units = config["units"] | "metric";
 }
 
+/**
+ * @brief Serializes current configuration to a JSON object for persistence.
+ *
+ * Writes the current lat, lon, interval, and units values to the provided
+ * JSON object. Called by ConfigManager during save operations.
+ *
+ * @param config  JSON object to populate with current config field values.
+ */
 void WeatherModule::serializeConfig(JsonObject& config) const {
     config["lat"] = _lat;
     config["lon"] = _lon;
@@ -106,6 +166,12 @@ void WeatherModule::serializeConfig(JsonObject& config) const {
     config["units"] = _units;
 }
 
+/**
+ * @brief Restores all configuration fields to factory defaults.
+ *
+ * Resets latitude and longitude to 0.0, polling interval to 600000ms (10 min),
+ * and units to "metric".
+ */
 void WeatherModule::resetConfig() {
     _lat = 0.0;
     _lon = 0.0;
@@ -114,6 +180,17 @@ void WeatherModule::resetConfig() {
 }
 
 #ifndef NATIVE_BUILD
+/**
+ * @brief Registers REST API routes and serves the portal JavaScript.
+ *
+ * Routes registered:
+ * - GET  /api/weather/config  — returns current config + API key status
+ * - POST /api/weather/config  — updates config, saves, triggers priority fetch
+ * - GET  /api/weather/status  — returns all current weather data fields
+ * - GET  /weather.js          — serves the portal tab JavaScript
+ *
+ * @param server  Reference to the PsychicHttpServer instance.
+ */
 void WeatherModule::registerRoutes(PsychicHttpServer& server) {
     server.on("/api/weather/config", HTTP_GET, [this](PsychicRequest* request, PsychicResponse* response) {
         JsonDocument doc;
@@ -512,13 +589,26 @@ void WeatherModule::registerRoutes(PsychicHttpServer& server) {
     });
 }
 #else
+/** @brief No-op stub for native builds — routes require PsychicHttp hardware server. */
 void WeatherModule::registerRoutes(PsychicHttpServer& server) {
     (void)server;
 }
 #endif
 
+/**
+ * @brief Executes an HTTPS GET to the OpenWeatherMap API with streaming JSON parse.
+ *
+ * Runs on the DataManager background task. Uses WiFiClientSecure with the
+ * ESP-IDF certificate bundle for TLS verification. The response is streamed
+ * through JsonStreamingParser to avoid buffering the entire payload in RAM.
+ *
+ * @return UpdateStatus indicating success, error type, or rate limiting.
+ */
 UpdateStatus WeatherModule::fetchUpdate() {
 #ifndef NATIVE_BUILD
+    // --- Step 1: Validate credentials (API key check) ---
+    // Retrieve the OWM API key from KeyManager. If absent, return AuthError
+    // immediately — no point making a network request without credentials.
     std::string apiKey = _keyManager ? _keyManager->getKeyById("owm_api_key") : "";
     if (apiKey.empty()) {
         _lastFetchStatus.store(UpdateStatus::AuthError, std::memory_order_release);
@@ -529,6 +619,10 @@ UpdateStatus WeatherModule::fetchUpdate() {
         return UpdateStatus::NoChange;
     }
 
+    // --- Step 2: Build URL and allocate TLS client ---
+    // Construct the OWM API URL with lat/lon/key/units parameters.
+    // Allocate a WiFiClientSecure with the ESP-IDF built-in certificate bundle
+    // for TLS verification (M2 — never use setInsecure()).
     char url[256];
     snprintf(url, sizeof(url), "https://api.openweathermap.org/data/2.5/weather?lat=%f&lon=%f&appid=%s&units=%s",
              _lat, _lon, apiKey.c_str(), _units.c_str());
@@ -551,6 +645,9 @@ UpdateStatus WeatherModule::fetchUpdate() {
     }
     client->useDefaultCertBundle();
 
+    // --- Step 3: Execute HTTP GET request ---
+    // Open the connection, send GET, and check the response code.
+    // Map HTTP error codes to appropriate UpdateStatus values.
     HTTPClient http;
     ESP_LOGI("WeatherModule", "Starting HTTP connection...");
     if (!http.begin(*client, url)) {
@@ -572,6 +669,10 @@ UpdateStatus WeatherModule::fetchUpdate() {
         return err;
     }
 
+    // --- Step 4: Stream and parse JSON response ---
+    // Read the response body in 128-byte chunks to avoid heap exhaustion.
+    // Each byte is fed to the JsonStreamingParser, which calls our
+    // JsonListener callbacks (key(), value(), endDocument()) as it parses.
     WiFiClient* stream = http.getStreamPtr();
     JsonStreamingParser parser;
     parser.setListener(this);
@@ -595,6 +696,9 @@ UpdateStatus WeatherModule::fetchUpdate() {
         vTaskDelay(pdMS_TO_TICKS(1));
     }
 
+    // --- Step 5: Cleanup and return status ---
+    // Close the HTTP connection and report success. The parsed data is now
+    // available via the thread-safe getters (populated by endDocument()).
     http.end();
     ESP_LOGI("WeatherModule", "Fetch and parse complete");
     _lastFetchStatus.store(UpdateStatus::Success, std::memory_order_release);
@@ -605,6 +709,12 @@ UpdateStatus WeatherModule::fetchUpdate() {
 #endif
 }
 
+/**
+ * @brief Zeros all parser scratch buffers at the start of a new JSON document.
+ *
+ * Called by the JsonStreamingParser when a new document begins. Resets all
+ * scratch buffers to empty strings and the weather array depth to zero.
+ */
 // F19: Parser scratch buffers are now fixed char[] — zero-fill on new document
 void WeatherModule::startDocument() {
     _currentKey[0] = '\0';
@@ -629,22 +739,49 @@ void WeatherModule::startDocument() {
 
 // JsonListener methods that use Arduino String type — hardware only
 #ifndef NATIVE_BUILD
+/**
+ * @brief Increments the weather array depth tracker on array entry.
+ *
+ * Tracks when the parser enters the "weather" JSON array so that nested
+ * values (condition "main" and "icon") can be correctly scoped.
+ */
 void WeatherModule::startArray() {
     if (strcmp(_currentKey, "weather") == 0) {
         _weatherArrayDepth++;
     }
 }
 
+/**
+ * @brief Decrements the weather array depth tracker on array exit.
+ */
 void WeatherModule::endArray() {
     if (_weatherArrayDepth > 0) {
         _weatherArrayDepth--;
     }
 }
 
+/**
+ * @brief Records the current JSON key for subsequent value dispatch.
+ *
+ * Copies the key string into the _currentKey scratch buffer so that the
+ * next value() call can dispatch the value to the correct field.
+ *
+ * @param key  The JSON key string from the streaming parser.
+ */
 void WeatherModule::key(String key) {
     strlcpy(_currentKey, key.c_str(), sizeof(_currentKey));
 }
 
+/**
+ * @brief Dispatches a JSON value to the appropriate scratch buffer based on the current key.
+ *
+ * Uses strlcpy into fixed char[] buffers (F19 — no std::string heap allocation).
+ * Only writes to a buffer if it is still empty (first-write-wins) to handle
+ * duplicate keys in nested objects (e.g., "main" appears in both the weather
+ * array and the top-level response).
+ *
+ * @param value  The JSON value string from the streaming parser.
+ */
 // F19: Use strlcpy into fixed char[] buffers — no std::string heap allocation
 void WeatherModule::value(String value) {
     if (strcmp(_currentKey, "temp") == 0 && _parsedTemp[0] == '\0') {
@@ -685,9 +822,19 @@ void WeatherModule::value(String value) {
 }
 #endif  // NATIVE_BUILD
 
+/**
+ * @brief Parses scratch buffers into typed atomic/mutex-protected fields.
+ *
+ * Called when the JSON streaming parser completes the document. Converts string
+ * scratch buffers to numeric types (strtof/atoi), writes them to atomic fields
+ * for thread-safe cross-task access, copies string fields under mutex protection,
+ * publishes HA sensor states, and fires the "weather.updated" EventBus notification.
+ */
 void WeatherModule::endDocument() {
     bool updated = false;
 
+    // --- Step 1: Parse scratch buffers to typed values ---
+    // Convert string scratch buffers to numeric types using strtof/atoi.
     // F19: char[] buffers — use strtof/atoi directly (no .c_str() needed)
     if (_parsedTemp[0] != '\0') {
         float temp = std::strtof(_parsedTemp, nullptr);
@@ -726,6 +873,8 @@ void WeatherModule::endDocument() {
     if (_parsedSunrise[0] != '\0') _sunrise.store(std::strtoul(_parsedSunrise, nullptr, 10), std::memory_order_release);
     if (_parsedSunset[0] != '\0') _sunset.store(std::strtoul(_parsedSunset, nullptr, 10), std::memory_order_release);
 
+    // --- Step 2: Write to atomic/mutex-protected fields ---
+    // String fields require mutex protection for thread-safe cross-task access.
     if (_parsedCond[0] != '\0' || _parsedIcon[0] != '\0' || _parsedCityName[0] != '\0' || _parsedCountry[0] != '\0') {
         // H3: Write string buffers under mutex protection
 #ifndef NATIVE_BUILD
@@ -752,6 +901,9 @@ void WeatherModule::endDocument() {
         updated = true;
     }
 
+    // --- Step 3: Publish EventBus notification + HA state ---
+    // Notify subscribers that weather data has been updated. The display
+    // carousel listens for this event to trigger board refreshes.
     if (updated) {
         _hasData.store(true, std::memory_order_release);
         if (_eventBus) {
@@ -764,6 +916,15 @@ void WeatherModule::endDocument() {
 // IMCPContributor Implementation
 // -----------------------------------------------------------------------------
 
+/**
+ * @brief Registers the "weather_status" read-only MCP tool.
+ *
+ * The tool returns all current weather data fields including temperature,
+ * condition, humidity, wind, pressure, visibility, clouds, and location
+ * information. Uses public getters to ensure thread-safe access (F09).
+ *
+ * @param registry  Reference to the MCPToolRegistry for tool registration.
+ */
 void WeatherModule::registerMCPTools(MCPToolRegistry& registry) {
     registry.addTool(
         "weather_status",
@@ -798,15 +959,31 @@ void WeatherModule::registerMCPTools(MCPToolRegistry& registry) {
 // IConfigGate Implementation
 // -----------------------------------------------------------------------------
 
+/**
+ * @brief Returns the boot-gate display name: "Weather API Key".
+ * @return A C-string identifying this configuration gate.
+ */
 const char* WeatherModule::getGateName() const {
     return "Weather API Key";
 }
 
+/**
+ * @brief Returns true when the OWM API key is configured in KeyManager.
+ *
+ * If no KeyManager is wired (e.g., in test scenarios), returns true to
+ * avoid blocking the boot sequence unnecessarily.
+ *
+ * @return true if the API key exists or KeyManager is unavailable.
+ */
 bool WeatherModule::isSatisfied() const {
     if (!_keyManager) return true;  // No KeyManager wired — don't block boot
     return !_keyManager->getKeyById("owm_api_key").empty();
 }
 
+/**
+ * @brief Returns user-facing guidance text for configuring the API key.
+ * @return A C-string with instructions directing the user to the Weather portal tab.
+ */
 const char* WeatherModule::getHelpText() const {
     return "Enter your OpenWeatherMap API key via the Weather tab";
 }

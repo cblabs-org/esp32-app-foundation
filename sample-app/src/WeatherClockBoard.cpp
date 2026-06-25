@@ -1,5 +1,10 @@
 /*
- * ESP32 App Foundation — Sample Application
+ * ESP32 App Foundation (c) 2026 CB Labs
+ *
+ * https://github.com/matthewmcneill/esp32-app-foundation
+ *
+ * This work is licensed under Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International.
+ * To view a copy of this license, visit https://creativecommons.org/licenses/by-nc-sa/4.0/
  *
  * Module: sample-app/src/WeatherClockBoard.cpp
  * Description: IDisplayBoard render implementation for the weather station.
@@ -8,17 +13,40 @@
  *
  * Implementation Notes:
  * - render() reads data from WeatherModule's thread-safe getters
- * - EventBus subscription registered in constructor (F04 demo)
+ * - EventBus subscription registered via wireEventBus() (F04 demo)
  */
 
 #include "WeatherClockBoard.hpp"
 #include "platform/LogShim.h"
 
+/**
+ * @brief Constructs the WeatherClockBoard with a pointer to the weather data source.
+ *
+ * EventBus wiring is deferred to wireEventBus() to avoid the C++ static
+ * initialisation order fiasco — Application members may not be ready at
+ * file-scope construction time.
+ *
+ * @param weatherModule  Pointer to the WeatherModule providing thread-safe data getters.
+ */
 WeatherClockBoard::WeatherClockBoard(WeatherModule* weatherModule)
     : _weatherModule(weatherModule) {
     // EventBus wiring is deferred to wireEventBus() — see comment there.
 }
 
+/**
+ * @brief Wires the EventBus subscription for weather.updated events.
+ *
+ * Uses a static function pointer + void* ctx (not std::function) per framework
+ * convention (GRAVE-05). The EventBus stores the raw function pointer and
+ * context, then invokes callback(topic, payload, ctx) whenever the matching
+ * topic is published.
+ *
+ * Called from setup() rather than the constructor because file-scope
+ * construction happens before Application members are initialized
+ * (C++ static init order fiasco).
+ *
+ * @param eventBus  Reference to the Application's EventBus instance.
+ */
 void WeatherClockBoard::wireEventBus(EventBus& eventBus) {
     // F04: Demonstrate EventBus subscription pattern.
     // Uses static function pointer + void* ctx (not std::function)
@@ -33,6 +61,20 @@ void WeatherClockBoard::wireEventBus(EventBus& eventBus) {
     _eventBus->subscribe("weather.updated", onWeatherUpdated, this);
 }
 
+/**
+ * @brief Static EventBus callback — logs weather.updated events.
+ *
+ * Casts the void* context back to WeatherClockBoard*. Thread-safety: this
+ * callback is invoked synchronously by the publisher (WeatherModule::endDocument,
+ * running on the DataManager background task). For a display board, the carousel
+ * engine handles refresh timing, so no work is needed here beyond demonstrating
+ * the subscription pattern. In a more complex scenario, you would set an atomic
+ * flag here and handle the work in the next tick()/render() call.
+ *
+ * @param topic  The event topic string (expected: "weather.updated").
+ * @param data   Event payload pointer (unused).
+ * @param ctx    Opaque context pointer — cast back to WeatherClockBoard*.
+ */
 // F04: Static callback — EventBus requires a captureless function pointer.
 // Cast void* context back to concrete type to access members.
 // Thread-safety: this callback is invoked synchronously by the publisher
@@ -49,6 +91,16 @@ void WeatherClockBoard::onWeatherUpdated(const char* topic, const void* data, vo
     ESP_LOGD("WeatherClockBoard", "Received weather.updated event");
 }
 
+/**
+ * @brief Renders the weather display using WeatherWidget::draw().
+ *
+ * Reads the current temperature and condition from WeatherModule's thread-safe
+ * getters (H3: atomic loads and mutex-protected string copies), formats the
+ * temperature as a display string using snprintf into a stack buffer (F10),
+ * and delegates the actual drawing to WeatherWidget::draw().
+ *
+ * @param u8g2  Reference to the U8G2 display driver instance.
+ */
 void WeatherClockBoard::render(U8G2& u8g2) {
     // Clear buffer is handled by the CarouselEngine
     // Get weather data — H3: getters now return float/string safely across threads

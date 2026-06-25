@@ -1,5 +1,10 @@
 /*
- * ESP32 App Foundation — Sample Application
+ * ESP32 App Foundation (c) 2026 CB Labs
+ *
+ * https://github.com/matthewmcneill/esp32-app-foundation
+ *
+ * This work is licensed under Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International.
+ * To view a copy of this license, visit https://creativecommons.org/licenses/by-nc-sa/4.0/
  *
  * Module: sample-app/src/WeatherModule.hpp
  * Description: Weather station module demonstrating 6 framework interfaces:
@@ -13,10 +18,74 @@
  *
  * Exported Classes:
  * - WeatherModule: Full-featured framework module (6 interfaces + JsonListener)
- *   - begin(Application&):  ADR-39 transient service locator pattern
- *   - getTemperature():     Thread-safe atomic getter
- *   - getCondition():       Thread-safe mutex-protected getter
- *   - getUnits():           Config accessor for units string
+ *
+ *   Lifecycle:
+ *   - WeatherModule():          Constructor — configures HA sensor metadata, creates mutex
+ *   - ~WeatherModule():         Destructor — releases FreeRTOS mutex
+ *   - begin():                  ADR-39 transient service locator wiring  [ITickable lifecycle]
+ *   - wireHomeAssistant():      Deferred HA entity registration (post app.begin())
+ *
+ *   Data Accessors:
+ *   - hasData():                Returns true once first successful parse completes
+ *   - getTemperature():         Thread-safe atomic getter — current temp (float)
+ *   - getWindSpeed():           Thread-safe atomic getter — wind speed (float)
+ *   - getHumidity():            Thread-safe atomic getter — relative humidity (int %)
+ *   - getPressure():            Thread-safe atomic getter — barometric pressure (int hPa)
+ *   - getFeelsLike():           Thread-safe atomic getter — apparent temperature (float)
+ *   - getTempMin():             Thread-safe atomic getter — daily minimum (float)
+ *   - getTempMax():             Thread-safe atomic getter — daily maximum (float)
+ *   - getVisibility():          Thread-safe atomic getter — visibility distance (int m)
+ *   - getWindDeg():             Thread-safe atomic getter — wind direction (int degrees)
+ *   - getClouds():              Thread-safe atomic getter — cloud coverage (int %)
+ *   - getSunrise():             Thread-safe atomic getter — sunrise UTC epoch (uint32_t)
+ *   - getSunset():              Thread-safe atomic getter — sunset UTC epoch (uint32_t)
+ *   - getUnits():               Config accessor for units string ("metric"/"imperial")
+ *   - getCondition():           Thread-safe mutex-protected getter — weather condition
+ *   - getIcon():                Thread-safe mutex-protected getter — OWM icon code
+ *   - getCityName():            Thread-safe mutex-protected getter — location city name
+ *   - getCountry():             Thread-safe mutex-protected getter — location country code
+ *
+ *   ITickable:
+ *   - tick():                   Periodic update hook (intentionally empty — delegates to DataManager)
+ *
+ *   IConfigurable ("weather"):
+ *   - getConfigNamespace():     Returns "weather" — LittleFS config partition key
+ *   - getSchemaVersion():       Returns 1 — config migration version
+ *   - applyConfig():            Loads lat/lon/interval/units from persisted JSON
+ *   - serializeConfig():        Writes current config fields to JSON for persistence
+ *   - resetConfig():            Restores factory defaults for all config fields
+ *
+ *   IWebContributor:
+ *   - registerRoutes():         Registers /api/weather/config (GET/POST), /api/weather/status, /weather.js
+ *   - getTabName():             Returns "Weather" — portal tab label
+ *   - getParentTab():           Returns nullptr — top-level tab
+ *   - getTabOrder():            Returns 50 — mid-priority tab position
+ *   - getTabIcon():             Returns SVG path for cloud icon
+ *
+ *   IDataSource:
+ *   - fetchUpdate():            Executes HTTPS GET to OpenWeatherMap with streaming JSON parse
+ *   - getUpdateIntervalMs():    Returns configured polling interval (default 600000ms / 10min)
+ *   - getSourceName():          Returns "OpenWeatherMap" — data source identifier
+ *   - getPriorityTier():        Returns PriorityTier::Normal — standard fetch scheduling
+ *
+ *   IMCPContributor:
+ *   - registerMCPTools():       Registers "weather_status" read-only MCP tool
+ *
+ *   IConfigGate:
+ *   - getGateName():            Returns "Weather API Key" — boot-gate display name
+ *   - isSatisfied():            Returns true when OWM API key is configured in KeyManager
+ *   - getHelpText():            Returns user-facing guidance for configuring the API key
+ *
+ *   JsonListener (hardware only):
+ *   - startDocument():          Zeros all parser scratch buffers
+ *   - key():                    Records current JSON key for value dispatch
+ *   - value():                  Dispatches JSON value to appropriate scratch buffer
+ *   - startArray():             Tracks entry into the "weather" array
+ *   - endArray():               Tracks exit from the "weather" array
+ *   - endDocument():            Parses scratch buffers → atomic/mutex fields, publishes events
+ *   - startObject():            No-op (required by JsonListener interface)
+ *   - endObject():              No-op (required by JsonListener interface)
+ *   - whitespace():             No-op (required by JsonListener interface)
  */
 
 #pragma once
@@ -44,6 +113,11 @@
 
 class Application;
 
+// NOTE: This module is intentionally monolithic to demonstrate all framework
+// interfaces in a single cohesive class. In production, consider separating
+// the HTTP client, JSON parser, and config management into distinct modules
+// following the Single Responsibility Principle.
+
 class WeatherModule : public ITickable, 
                       public IConfigurable, 
                       public IWebContributor, 
@@ -56,105 +130,153 @@ class WeatherModule : public ITickable,
                       {
 private:
 #ifndef NATIVE_BUILD
-    HomeAssistantModule* _ha = nullptr;
+    HomeAssistantModule* _ha = nullptr;       ///< Home Assistant module for entity publishing
 #endif
-    KeyManager* _keyManager = nullptr;
-    EventBus* _eventBus = nullptr;
-    ConfigManager* _configManager = nullptr;
-    DataManager* _dataManager = nullptr;
+    KeyManager* _keyManager = nullptr;        ///< Secure credential storage (API keys)
+    EventBus* _eventBus = nullptr;            ///< Pub/sub event bus for "weather.updated" events
+    ConfigManager* _configManager = nullptr;  ///< Persisted config load/save via LittleFS
+    DataManager* _dataManager = nullptr;      ///< Background fetch scheduler for IDataSource
 
-    double _lat = 0.0;
-    double _lon = 0.0;
-    uint32_t _pollingIntervalMs = 600000;
+    double _lat = 0.0;                        ///< Configured latitude for weather query
+    double _lon = 0.0;                        ///< Configured longitude for weather query
+    uint32_t _pollingIntervalMs = 600000;     ///< Fetch interval in ms (default: 10 minutes)
 
-    std::string _units = "metric";
+    std::string _units = "metric";            ///< Temperature units: "metric" (°C) or "imperial" (°F)
 
 #ifndef NATIVE_BUILD
     // H2: Static member allocation — no bare new
-    HaSensor _tempSensor{"weather_temp", "Temperature"};
-    HaSensor _windSensor{"weather_wind", "Wind Speed"};
-    HaSensor _condSensor{"weather_condition", "Condition"};
+    HaSensor _tempSensor{"weather_temp", "Temperature"};   ///< HA sensor entity for temperature
+    HaSensor _windSensor{"weather_wind", "Wind Speed"};    ///< HA sensor entity for wind speed
+    HaSensor _condSensor{"weather_condition", "Condition"};///< HA sensor entity for condition text
 #endif
 
     // H3: Thread-safe data exchange between fetchUpdate() task and main task.
     // Temperature and wind are simple floats — use std::atomic for lock-free
     // cross-thread reads. Condition is a variable-length string — use a
     // fixed char buffer protected by a FreeRTOS mutex.
-    std::atomic<bool> _hasData{false};
-    std::atomic<UpdateStatus> _lastFetchStatus{UpdateStatus::NoChange};
-    std::atomic<float> _temperature{0.0f};
-    std::atomic<float> _windSpeed{0.0f};
-    std::atomic<int> _humidity{0};
-    std::atomic<int> _pressure{0};
-    std::atomic<float> _feelsLike{0.0f};
-    std::atomic<float> _tempMin{0.0f};
-    std::atomic<float> _tempMax{0.0f};
-    std::atomic<int> _visibility{0};
-    std::atomic<int> _windDeg{0};
-    std::atomic<int> _clouds{0};
-    std::atomic<uint32_t> _sunrise{0};
-    std::atomic<uint32_t> _sunset{0};
+    std::atomic<bool> _hasData{false};                     ///< True after first successful parse
+    std::atomic<UpdateStatus> _lastFetchStatus{UpdateStatus::NoChange}; ///< Last fetch result code
+    std::atomic<float> _temperature{0.0f};                 ///< Current temperature (atomic)
+    std::atomic<float> _windSpeed{0.0f};                   ///< Current wind speed (atomic)
+    std::atomic<int> _humidity{0};                         ///< Relative humidity % (atomic)
+    std::atomic<int> _pressure{0};                         ///< Barometric pressure hPa (atomic)
+    std::atomic<float> _feelsLike{0.0f};                   ///< Apparent temperature (atomic)
+    std::atomic<float> _tempMin{0.0f};                     ///< Daily minimum temperature (atomic)
+    std::atomic<float> _tempMax{0.0f};                     ///< Daily maximum temperature (atomic)
+    std::atomic<int> _visibility{0};                       ///< Visibility distance in metres (atomic)
+    std::atomic<int> _windDeg{0};                          ///< Wind direction in degrees (atomic)
+    std::atomic<int> _clouds{0};                           ///< Cloud coverage % (atomic)
+    std::atomic<uint32_t> _sunrise{0};                     ///< Sunrise UTC epoch (atomic)
+    std::atomic<uint32_t> _sunset{0};                      ///< Sunset UTC epoch (atomic)
     
-    char _condition[32] = "";
-    char _icon[16] = "";
-    char _cityName[64] = "";
-    char _country[8] = "";
+    char _condition[32] = "";                 ///< Weather condition string (mutex-protected)
+    char _icon[16] = "";                      ///< OWM icon code (mutex-protected)
+    char _cityName[64] = "";                  ///< Location city name (mutex-protected)
+    char _country[8] = "";                    ///< Location country code (mutex-protected)
 #ifndef NATIVE_BUILD
-    SemaphoreHandle_t _dataMutex = nullptr;
+    SemaphoreHandle_t _dataMutex = nullptr;   ///< FreeRTOS mutex guarding string field writes
 #endif
 
     // F19: JsonListener scratch buffers — fixed char[] instead of std::string.
     // Used only within fetchUpdate() task context (single-threaded).
     // Sizes match the expected max field lengths from the OWM JSON response.
-    char _currentKey[32] = "";
-    char _parsedTemp[16] = "";
-    char _parsedWind[16] = "";
-    char _parsedCond[32] = "";
-    char _parsedHumidity[8] = "";
-    char _parsedPressure[8] = "";
-    char _parsedFeelsLike[16] = "";
-    char _parsedTempMin[16] = "";
-    char _parsedTempMax[16] = "";
-    char _parsedVisibility[8] = "";
-    char _parsedWindDeg[8] = "";
-    char _parsedClouds[8] = "";
-    char _parsedCityName[64] = "";
-    char _parsedCountry[8] = "";
-    char _parsedSunrise[16] = "";
-    char _parsedSunset[16] = "";
-    char _parsedIcon[8] = "";
-    int _weatherArrayDepth = 0;
+    char _currentKey[32] = "";                ///< Current JSON key during streaming parse
+    char _parsedTemp[16] = "";                ///< Scratch: parsed temperature value
+    char _parsedWind[16] = "";                ///< Scratch: parsed wind speed value
+    char _parsedCond[32] = "";                ///< Scratch: parsed weather condition
+    char _parsedHumidity[8] = "";             ///< Scratch: parsed humidity value
+    char _parsedPressure[8] = "";             ///< Scratch: parsed pressure value
+    char _parsedFeelsLike[16] = "";           ///< Scratch: parsed feels-like temperature
+    char _parsedTempMin[16] = "";             ///< Scratch: parsed daily minimum temperature
+    char _parsedTempMax[16] = "";             ///< Scratch: parsed daily maximum temperature
+    char _parsedVisibility[8] = "";           ///< Scratch: parsed visibility value
+    char _parsedWindDeg[8] = "";              ///< Scratch: parsed wind direction
+    char _parsedClouds[8] = "";               ///< Scratch: parsed cloud coverage
+    char _parsedCityName[64] = "";            ///< Scratch: parsed city name
+    char _parsedCountry[8] = "";              ///< Scratch: parsed country code
+    char _parsedSunrise[16] = "";             ///< Scratch: parsed sunrise epoch
+    char _parsedSunset[16] = "";              ///< Scratch: parsed sunset epoch
+    char _parsedIcon[8] = "";                 ///< Scratch: parsed OWM icon code
+    int _weatherArrayDepth = 0;               ///< Nesting depth tracker for "weather" JSON array
 
 public:
+    /** @brief Constructs the WeatherModule — configures HA sensor metadata and creates the data mutex. */
     WeatherModule();
+
+    /** @brief Destroys the WeatherModule — releases the FreeRTOS mutex. */
     ~WeatherModule() override;
 
+    /**
+     * @brief Wires framework service references via the ADR-39 transient service locator pattern.
+     *
+     * Extracts narrow references to KeyManager, EventBus, ConfigManager, and DataManager
+     * from the Application object. Does NOT store the Application reference itself.
+     *
+     * @param app  The Application instance providing service accessors.
+     */
     void begin(Application& app);
 
     // Deferred HA wiring — call after app.begin() when _haModule is allocated
 #ifndef NATIVE_BUILD
+    /**
+     * @brief Registers HA sensor entities with the HomeAssistant module.
+     *
+     * Must be called after app.begin() because the HA module is not available
+     * during WeatherModule::begin().
+     *
+     * @param ha  Reference to the initialised HomeAssistantModule.
+     */
     void wireHomeAssistant(HomeAssistantModule& ha);
 #endif
 
-    // H3: Thread-safe getters. Temperature and wind return float via atomic
-    // load. Condition returns a copy under mutex protection.
+    // --- Data Accessors (H3: Thread-safe getters) ---
+
+    /** @brief Returns true once the first successful weather parse has completed. */
     bool hasData() const { return _hasData.load(std::memory_order_acquire); }
+
+    /** @brief Returns the current temperature via atomic load. */
     float getTemperature() const { return _temperature.load(std::memory_order_acquire); }
+
+    /** @brief Returns the current wind speed via atomic load. */
     float getWindSpeed() const { return _windSpeed.load(std::memory_order_acquire); }
+
+    /** @brief Returns the current relative humidity percentage via atomic load. */
     int getHumidity() const { return _humidity.load(std::memory_order_acquire); }
+
+    /** @brief Returns the current barometric pressure in hPa via atomic load. */
     int getPressure() const { return _pressure.load(std::memory_order_acquire); }
+
+    /** @brief Returns the current apparent ("feels like") temperature via atomic load. */
     float getFeelsLike() const { return _feelsLike.load(std::memory_order_acquire); }
+
+    /** @brief Returns the daily minimum temperature via atomic load. */
     float getTempMin() const { return _tempMin.load(std::memory_order_acquire); }
+
+    /** @brief Returns the daily maximum temperature via atomic load. */
     float getTempMax() const { return _tempMax.load(std::memory_order_acquire); }
+
+    /** @brief Returns the visibility distance in metres via atomic load. */
     int getVisibility() const { return _visibility.load(std::memory_order_acquire); }
+
+    /** @brief Returns the wind direction in degrees via atomic load. */
     int getWindDeg() const { return _windDeg.load(std::memory_order_acquire); }
+
+    /** @brief Returns the cloud coverage percentage via atomic load. */
     int getClouds() const { return _clouds.load(std::memory_order_acquire); }
+
+    /** @brief Returns the sunrise time as a UTC epoch timestamp via atomic load. */
     uint32_t getSunrise() const { return _sunrise.load(std::memory_order_acquire); }
+
+    /** @brief Returns the sunset time as a UTC epoch timestamp via atomic load. */
     uint32_t getSunset() const { return _sunset.load(std::memory_order_acquire); }
 
-    // F09: Public getter for units — avoids direct private member access in MCP handler
+    /** @brief Returns the configured temperature units string ("metric" or "imperial"). */
     const std::string& getUnits() const { return _units; }
 
+    /**
+     * @brief Returns the current weather condition string under mutex protection.
+     * @return A copy of the condition string, or empty string if mutex acquisition fails.
+     */
     std::string getCondition() const {
         std::string result;
 #ifndef NATIVE_BUILD
@@ -167,6 +289,11 @@ public:
 #endif
         return result;
     }
+
+    /**
+     * @brief Returns the OWM weather icon code under mutex protection.
+     * @return A copy of the icon code string, or empty string if mutex acquisition fails.
+     */
     std::string getIcon() const {
         std::string result;
 #ifndef NATIVE_BUILD
@@ -179,6 +306,11 @@ public:
 #endif
         return result;
     }
+
+    /**
+     * @brief Returns the weather location city name under mutex protection.
+     * @return A copy of the city name string, or empty string if mutex acquisition fails.
+     */
     std::string getCityName() const {
         std::string result;
 #ifndef NATIVE_BUILD
@@ -191,6 +323,11 @@ public:
 #endif
         return result;
     }
+
+    /**
+     * @brief Returns the weather location country code under mutex protection.
+     * @return A copy of the country code string, or empty string if mutex acquisition fails.
+     */
     std::string getCountry() const {
         std::string result;
 #ifndef NATIVE_BUILD
@@ -204,51 +341,156 @@ public:
         return result;
     }
 
-    // ITickable
+    // --- ITickable ---
+
+    /**
+     * @brief Periodic update hook — intentionally empty.
+     *
+     * Background fetching is handled by IDataSource via DataManager.
+     * This tick exists only to satisfy the ITickable interface contract.
+     *
+     * @param currentMillis  Current system uptime in milliseconds (unused).
+     */
     void tick(uint32_t currentMillis) override;
 
-    // IConfigurable
+    // --- IConfigurable ("weather") ---
+
+    /** @brief Returns the config namespace key: "weather". */
     const char* getConfigNamespace() const override { return "weather"; }
+
+    /** @brief Returns the config schema version: 1. */
     int getSchemaVersion() const override { return 1; }
+
+    /**
+     * @brief Loads configuration from a persisted JSON object.
+     * @param config  JSON object containing lat, lon, interval, and units fields.
+     */
     void applyConfig(const JsonObject& config) override;
+
+    /**
+     * @brief Serializes current configuration to a JSON object for persistence.
+     * @param config  JSON object to populate with lat, lon, interval, and units fields.
+     */
     void serializeConfig(JsonObject& config) const override;
+
+    /** @brief Restores all configuration fields to factory defaults. */
     void resetConfig() override;
 
-    // IWebContributor
+    // --- IWebContributor ---
+
+    /**
+     * @brief Registers REST API routes and serves the portal JavaScript.
+     *
+     * Routes: GET/POST /api/weather/config, GET /api/weather/status, GET /weather.js
+     *
+     * @param server  Reference to the PsychicHttpServer instance.
+     */
     void registerRoutes(PsychicHttpServer& server) override;
+
+    /** @brief Returns the portal tab label: "Weather". */
     const char* getTabName() const override { return "Weather"; }
+
+    /** @brief Returns nullptr — this is a top-level tab with no parent. */
     const char* getParentTab() const override { return nullptr; }
+
+    /** @brief Returns the tab display order: 50 (mid-priority). */
     int getTabOrder() const override { return 50; }
+
+    /** @brief Returns the SVG path data for the cloud weather icon. */
     const char* getTabIcon() const override { return "<path d=\"M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z\"/>"; }
 
-    // IDataSource
+    // --- IDataSource ---
+
+    /**
+     * @brief Executes an HTTPS GET to the OpenWeatherMap API with streaming JSON parse.
+     *
+     * Runs on the DataManager background task. Uses WiFiClientSecure with the
+     * ESP-IDF certificate bundle for TLS verification. Parsed values are stored
+     * in atomic/mutex-protected fields for thread-safe access.
+     *
+     * @return UpdateStatus indicating success, error type, or rate limiting.
+     */
     UpdateStatus fetchUpdate() override;
+
+    /** @brief Returns the configured polling interval in milliseconds (default: 600000ms / 10min). */
     uint32_t getUpdateIntervalMs() const override { return _pollingIntervalMs; }
+
+    /** @brief Returns the data source identifier: "OpenWeatherMap". */
     const char* getSourceName() const override { return "OpenWeatherMap"; }
+
+    /** @brief Returns PriorityTier::Normal — standard fetch scheduling priority. */
     PriorityTier getPriorityTier() const override { return PriorityTier::Normal; }
 
-    // IMCPContributor
+    // --- IMCPContributor ---
+
+    /**
+     * @brief Registers the "weather_status" read-only MCP tool.
+     *
+     * The tool returns all current weather data fields including temperature,
+     * condition, humidity, wind, pressure, and location.
+     *
+     * @param registry  Reference to the MCPToolRegistry for tool registration.
+     */
     void registerMCPTools(MCPToolRegistry& registry) override;
 
-    // IConfigGate
+    // --- IConfigGate ---
+
+    /** @brief Returns the boot-gate display name: "Weather API Key". */
     const char* getGateName() const override;
+
+    /** @brief Returns true when the OWM API key is configured in KeyManager. */
     bool isSatisfied() const override;
+
+    /** @brief Returns user-facing guidance text for configuring the API key. */
     const char* getHelpText() const override;
 
-    // JsonListener (hardware only — parser library unavailable in native builds)
+    // --- JsonListener (hardware only — parser library unavailable in native builds) ---
 #ifndef NATIVE_BUILD
+    /** @brief No-op — required by JsonListener interface. */
     void whitespace(char c) override {}
+
+    /** @brief Zeros all parser scratch buffers at the start of a new JSON document. */
     void startDocument() override;
+
+    /**
+     * @brief Records the current JSON key for subsequent value dispatch.
+     * @param key  The JSON key string from the streaming parser.
+     */
     void key(String key) override;
+
+    /**
+     * @brief Dispatches a JSON value to the appropriate scratch buffer based on the current key.
+     * @param value  The JSON value string from the streaming parser.
+     */
     void value(String value) override;
+
+    /** @brief Decrements the weather array depth tracker on array exit. */
     void endArray() override;
+
+    /** @brief No-op — required by JsonListener interface. */
     void endObject() override {}
+
+    /**
+     * @brief Parses scratch buffers into typed atomic/mutex-protected fields.
+     *
+     * Converts string scratch buffers to numeric types, writes to atomic fields,
+     * copies string fields under mutex protection, publishes HA sensor states,
+     * and fires the "weather.updated" EventBus notification.
+     */
     void endDocument() override;
+
+    /** @brief Increments the weather array depth tracker on array entry. */
     void startArray() override;
+
+    /** @brief No-op — required by JsonListener interface. */
     void startObject() override {}
 #else
     // Native-build stubs for parser methods (called only in tests)
+
+    /** @brief Zeros all parser scratch buffers (native stub). */
     void startDocument();
+
+    /** @brief Parses scratch buffers into typed fields (native stub). */
     void endDocument();
 #endif
 };
