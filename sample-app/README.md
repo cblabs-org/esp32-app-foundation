@@ -1,25 +1,26 @@
 # Weather Station — ESP32 App Foundation Sample App
 
 A complete, real-world weather station built on the ESP32 App Foundation
-framework. This sample demonstrates how to use six framework interfaces to
+framework. This sample demonstrates how to use seven framework interfaces to
 build a production-quality embedded application.
 
 ## What This Sample Demonstrates
 
-| Interface         | Purpose in Sample                                  |
-|-------------------|----------------------------------------------------|
-| `ITickable`       | Non-blocking tick loop (delegates work to DataManager) |
-| `IConfigurable`   | Persistent config with namespace, versioning, and round-trip serialization |
-| `IWebContributor` | Custom REST API + embedded JavaScript portal tab   |
-| `IDataSource`     | Background HTTP fetch from OpenWeatherMap API       |
-| `IMCPContributor` | MCP tool registration for AI/device interaction     |
-| `IConfigGate`     | Boot-time API key validation gate                   |
+| Interface         | Implementation    | Purpose in Sample                                  |
+|-------------------|-------------------|-----------------------------------------------------|
+| `ITickable`       | WeatherModule     | Non-blocking tick loop (delegates work to DataManager) |
+| `IConfigurable`   | WeatherModule     | Persistent config with namespace, versioning, and round-trip serialization |
+| `IWebContributor` | WeatherModule     | Custom REST API + embedded JavaScript portal tab   |
+| `IDataSource`     | WeatherModule     | Background HTTP fetch from OpenWeatherMap API       |
+| `IMCPContributor` | WeatherModule     | MCP tool registration for AI/device interaction     |
+| `IConfigGate`     | WeatherModule     | Boot-time API key validation gate                   |
+| `IDisplayBoard`   | WeatherBoard      | Renders weather data on the OLED carousel           |
 
 ### Key Patterns Illustrated
 
 - **ADR-39 Service Locator**: `WeatherModule::begin(Application&)` extracts narrow
   service refs and never stores the Application reference.
-- **EventBus Static Callback**: `WeatherClockBoard` subscribes to `weather.updated`
+- **EventBus Static Callback**: `WeatherBoard` subscribes to `weather.updated`
   using a static function pointer + `void* ctx` — the framework-required pattern
   (no `std::function`).
 - **Thread Safety**: `std::atomic` for numeric fields, FreeRTOS mutex for
@@ -35,8 +36,8 @@ build a production-quality embedded application.
 sample-app/
 ├── src/
 │   ├── main.cpp              — Entry point: file-scope instances, setup/loop
-│   ├── WeatherModule.hpp/cpp — 6-interface module (the core sample)
-│   ├── WeatherClockBoard.hpp/cpp — IDisplayBoard + EventBus subscription
+│   ├── WeatherModule.hpp/cpp — 7-interface module (the core sample)
+│   ├── WeatherBoard.hpp/cpp  — IDisplayBoard + EventBus subscription
 │   └── WeatherWidget.hpp/cpp — Static U8G2 rendering utility
 ├── test/
 │   └── test_unit/test_weather/ — GoogleTest unit tests

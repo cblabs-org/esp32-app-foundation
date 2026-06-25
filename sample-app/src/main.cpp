@@ -22,7 +22,7 @@
 #endif
 #include "WeatherModule.hpp"
 #ifndef NATIVE_BUILD
-#include "WeatherClockBoard.hpp"
+#include "WeatherBoard.hpp"
 #endif
 
 // ADR-16: File-scope static instances avoid stack-based corruption.
@@ -32,7 +32,7 @@ WeatherModule weatherModule;
 #ifndef NATIVE_BUILD
 // F04: EventBus wiring deferred to setup() — at file scope, Application
 // members may not be fully initialized (static init order fiasco).
-WeatherClockBoard weatherClockBoard(&weatherModule);
+WeatherBoard weatherBoard(&weatherModule);
 #endif
 
 /**
@@ -57,6 +57,7 @@ void setup() {
     weatherModule.begin(app);
 
     // Register user application modules
+    // registerModule() auto-detects IConfigGate — no separate registration needed
     app.registerModule(&weatherModule);
 
     // Prepare Framework config — OTA manifest URL and signing key
@@ -70,11 +71,14 @@ void setup() {
     app.getWifiManager().setDefaultHostname("WeatherStation");
 
 #ifndef NATIVE_BUILD
-    app.getDisplay().carousel.add(&weatherClockBoard);
+    // IDisplayBoard carousel registration is manual — registerModule() does not
+    // auto-detect display boards because the display module is optional and may
+    // not be present.
+    app.getDisplay().carousel.add(&weatherBoard);
     // F04: Wire EventBus subscription now that Application is fully constructed.
     // Cannot do this at file scope — static init order makes getEventBus() unsafe.
     // Uses static function pointer (not lambda) per framework convention (GRAVE-05).
-    weatherClockBoard.wireEventBus(app.getEventBus());
+    weatherBoard.wireEventBus(app.getEventBus());
 #endif
 
     // Begin framework — this allocates framework-owned modules like

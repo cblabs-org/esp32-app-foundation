@@ -23,18 +23,19 @@
  * @brief Renders a weather UI element on a U8G2 display.
  *
  * Draws a weather condition icon from the U8G2 open-iconic weather font,
- * the temperature with a "°C" suffix, and the condition text below.
- * Icon selection maps condition strings to glyph codes:
+ * the temperature with the caller-provided unit suffix, and the condition
+ * text below. Icon selection maps condition strings to glyph codes:
  * - "Clouds" → 0x0040, "Rain"/"Drizzle" → 0x0043, "Thunderstorm" → 0x0044,
  *   "Snow" → 0x0046, default (Clear) → 0x0041.
  *
- * @param display  Reference to the U8G2 display driver instance.
- * @param x        Horizontal pixel offset for the weather icon.
- * @param y        Vertical pixel offset for the weather icon baseline.
- * @param tempStr  Formatted temperature string (e.g., "21.5").
- * @param condStr  Weather condition string (e.g., "Clouds", "Rain", "Clear").
+ * @param display   Reference to the U8G2 display driver instance.
+ * @param x         Horizontal pixel offset for the weather icon.
+ * @param y         Vertical pixel offset for the weather icon baseline.
+ * @param tempStr   Formatted temperature string (e.g., "21.5").
+ * @param condStr   Weather condition string (e.g., "Clouds", "Rain", "Clear").
+ * @param units     Unit suffix to display after the temperature (e.g., "°C", "°F").
  */
-void WeatherWidget::draw(U8G2& display, int x, int y, const std::string& tempStr, const std::string& condStr) {
+void WeatherWidget::draw(U8G2& display, int x, int y, const std::string& tempStr, const std::string& condStr, const char* units) {
     // Draw an icon based on the condition
     display.setFont(u8g2_font_open_iconic_weather_4x_t);
     uint16_t icon = 0x0041; // Default to sun
@@ -55,7 +56,7 @@ void WeatherWidget::draw(U8G2& display, int x, int y, const std::string& tempStr
     // Layout assumes 256×64 SSD1322 OLED — adjust offsets for different displays (F20)
     display.setFont(u8g2_font_helvB14_tf);
     char text[24];
-    snprintf(text, sizeof(text), "%s °C", tempStr.empty() ? "--" : tempStr.c_str());
+    snprintf(text, sizeof(text), "%s %s", tempStr.empty() ? "--" : tempStr.c_str(), units);
     display.setCursor(x + 40, y - 8);
     display.print(text);
     

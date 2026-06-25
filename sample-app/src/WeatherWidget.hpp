@@ -27,14 +27,15 @@ public:
      * @brief Renders a weather UI element on a U8G2 display.
      *
      * Draws a weather condition icon (from the U8G2 open-iconic weather font),
-     * the temperature with a degree symbol, and the condition text. Icon
-     * selection is based on the condition string (e.g., "Clouds", "Rain").
+     * the temperature with the provided unit suffix, and the condition text.
+     * Icon selection is based on the condition string (e.g., "Clouds", "Rain").
      *
-     * @param display  Reference to the U8G2 display driver instance.
-     * @param x        Horizontal pixel offset for the weather icon.
-     * @param y        Vertical pixel offset for the weather icon baseline.
-     * @param tempStr  Formatted temperature string (e.g., "21.5").
-     * @param condStr  Weather condition string (e.g., "Clouds", "Rain", "Clear").
+     * @param display   Reference to the U8G2 display driver instance.
+     * @param x         Horizontal pixel offset for the weather icon.
+     * @param y         Vertical pixel offset for the weather icon baseline.
+     * @param tempStr   Formatted temperature string (e.g., "21.5").
+     * @param condStr   Weather condition string (e.g., "Clouds", "Rain", "Clear").
+     * @param units     Unit suffix to display after the temperature (e.g., "°C", "°F").
      */
-    static void draw(U8G2& display, int x, int y, const std::string& tempStr, const std::string& condStr);
+    static void draw(U8G2& display, int x, int y, const std::string& tempStr, const std::string& condStr, const char* units = "°C");
 };

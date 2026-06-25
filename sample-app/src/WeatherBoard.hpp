@@ -6,26 +6,26 @@
  * This work is licensed under Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International.
  * To view a copy of this license, visit https://creativecommons.org/licenses/by-nc-sa/4.0/
  *
- * Module: sample-app/src/WeatherClockBoard.hpp
+ * Module: sample-app/src/WeatherBoard.hpp
  * Description: Display board implementation for the weather station carousel.
  *              Renders current temperature and condition using WeatherWidget
  *              and demonstrates EventBus subscription (F04) with static
  *              function pointer + void* ctx callback pattern.
  *
  * Exported Classes:
- * - WeatherClockBoard: IDisplayBoard for weather + clock overlay
+ * - WeatherBoard: IDisplayBoard for weather data overlay
  *
  *   Lifecycle:
- *   - WeatherClockBoard():      Stores WeatherModule pointer; defers EventBus wiring
- *   - wireEventBus():           Deferred EventBus subscription (post-Application init)
+ *   - WeatherBoard():            Stores WeatherModule pointer; defers EventBus wiring
+ *   - wireEventBus():            Deferred EventBus subscription (post-Application init)
  *
  *   IDisplayBoard:
- *   - render():                 Draws weather widget via WeatherWidget::draw()
- *   - getBoardName():           Returns "WeatherClock" — carousel board identifier
- *   - isExpired():              Returns false — permanent (non-expiring) board
+ *   - render():                  Draws weather widget via WeatherWidget::draw()
+ *   - getBoardName():            Returns "Weather" — carousel board identifier
+ *   - isExpired():               Returns false — permanent (non-expiring) board
  *
  *   Internal:
- *   - onWeatherUpdated():       Static EventBus callback — logs weather.updated events
+ *   - onWeatherUpdated():        Static EventBus callback — logs weather.updated events
  */
 
 #pragma once
@@ -35,7 +35,7 @@
 #include "WeatherWidget.hpp"
 #include <U8g2lib.h>
 
-class WeatherClockBoard : public IDisplayBoard {
+class WeatherBoard : public IDisplayBoard {
 private:
     WeatherModule* _weatherModule;          ///< Source of thread-safe weather data for rendering
     EventBus* _eventBus = nullptr;          ///< F04: EventBus ref for subscription demo
@@ -49,16 +49,16 @@ private:
      *
      * @param topic  The event topic string (expected: "weather.updated").
      * @param data   Event payload pointer (unused — weather data accessed via getters).
-     * @param ctx    Opaque context pointer — cast back to WeatherClockBoard*.
+     * @param ctx    Opaque context pointer — cast back to WeatherBoard*.
      */
     static void onWeatherUpdated(const char* topic, const void* data, void* ctx);
 
 public:
     /**
-     * @brief Constructs the WeatherClockBoard with a pointer to the weather data source.
+     * @brief Constructs the WeatherBoard with a pointer to the weather data source.
      * @param weatherModule  Pointer to the WeatherModule providing thread-safe data getters.
      */
-    explicit WeatherClockBoard(WeatherModule* weatherModule);
+    explicit WeatherBoard(WeatherModule* weatherModule);
 
     /**
      * @brief Wires the EventBus subscription for weather.updated events.
@@ -71,8 +71,8 @@ public:
      */
     void wireEventBus(EventBus& eventBus);
 
-    /** @brief Returns the carousel board identifier: "WeatherClock". */
-    const char* getBoardName() const override { return "WeatherClock"; }
+    /** @brief Returns the carousel board identifier: "Weather". */
+    const char* getBoardName() const override { return "Weather"; }
 
     /** @brief Returns false — this is a permanent board that never expires. */
     bool isExpired() const override { return false; } // Permanent board

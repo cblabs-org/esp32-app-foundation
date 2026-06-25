@@ -270,7 +270,13 @@ public:
     /** @brief Returns the sunset time as a UTC epoch timestamp via atomic load. */
     uint32_t getSunset() const { return _sunset.load(std::memory_order_acquire); }
 
-    /** @brief Returns the configured temperature units string ("metric" or "imperial"). */
+    /**
+     * @brief Returns the configured temperature units string ("metric" or "imperial").
+     *
+     * Returns by value. Config writes (applyConfig) and data reads (fetchUpdate)
+     * may race on _units, but SSO guarantees atomicity for short strings like
+     * "metric"/"imperial".
+     */
     const std::string& getUnits() const { return _units; }
 
     /**

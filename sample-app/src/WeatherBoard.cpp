@@ -6,7 +6,7 @@
  * This work is licensed under Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International.
  * To view a copy of this license, visit https://creativecommons.org/licenses/by-nc-sa/4.0/
  *
- * Module: sample-app/src/WeatherClockBoard.cpp
+ * Module: sample-app/src/WeatherBoard.cpp
  * Description: IDisplayBoard render implementation for the weather station.
  *              Demonstrates thread-safe data access via atomic/mutex getters
  *              and EventBus subscription with static function pointer callback.
@@ -16,11 +16,11 @@
  * - EventBus subscription registered via wireEventBus() (F04 demo)
  */
 
-#include "WeatherClockBoard.hpp"
+#include "WeatherBoard.hpp"
 #include "platform/LogShim.h"
 
 /**
- * @brief Constructs the WeatherClockBoard with a pointer to the weather data source.
+ * @brief Constructs the WeatherBoard with a pointer to the weather data source.
  *
  * EventBus wiring is deferred to wireEventBus() to avoid the C++ static
  * initialisation order fiasco — Application members may not be ready at
@@ -28,7 +28,7 @@
  *
  * @param weatherModule  Pointer to the WeatherModule providing thread-safe data getters.
  */
-WeatherClockBoard::WeatherClockBoard(WeatherModule* weatherModule)
+WeatherBoard::WeatherBoard(WeatherModule* weatherModule)
     : _weatherModule(weatherModule) {
     // EventBus wiring is deferred to wireEventBus() — see comment there.
 }
@@ -47,7 +47,7 @@ WeatherClockBoard::WeatherClockBoard(WeatherModule* weatherModule)
  *
  * @param eventBus  Reference to the Application's EventBus instance.
  */
-void WeatherClockBoard::wireEventBus(EventBus& eventBus) {
+void WeatherBoard::wireEventBus(EventBus& eventBus) {
     // F04: Demonstrate EventBus subscription pattern.
     // Uses static function pointer + void* ctx (not std::function)
     // per framework convention (GRAVE-05). The EventBus stores the raw
@@ -64,7 +64,7 @@ void WeatherClockBoard::wireEventBus(EventBus& eventBus) {
 /**
  * @brief Static EventBus callback — logs weather.updated events.
  *
- * Casts the void* context back to WeatherClockBoard*. Thread-safety: this
+ * Casts the void* context back to WeatherBoard*. Thread-safety: this
  * callback is invoked synchronously by the publisher (WeatherModule::endDocument,
  * running on the DataManager background task). For a display board, the carousel
  * engine handles refresh timing, so no work is needed here beyond demonstrating
@@ -73,7 +73,7 @@ void WeatherClockBoard::wireEventBus(EventBus& eventBus) {
  *
  * @param topic  The event topic string (expected: "weather.updated").
  * @param data   Event payload pointer (unused).
- * @param ctx    Opaque context pointer — cast back to WeatherClockBoard*.
+ * @param ctx    Opaque context pointer — cast back to WeatherBoard*.
  */
 // F04: Static callback — EventBus requires a captureless function pointer.
 // Cast void* context back to concrete type to access members.
@@ -83,12 +83,12 @@ void WeatherClockBoard::wireEventBus(EventBus& eventBus) {
 // so no work is needed here beyond demonstrating the subscription pattern.
 // In a more complex scenario, you would set an atomic flag here and
 // handle the work in the next tick()/render() call.
-void WeatherClockBoard::onWeatherUpdated(const char* topic, const void* data, void* ctx) {
+void WeatherBoard::onWeatherUpdated(const char* topic, const void* data, void* ctx) {
     (void)topic;
     (void)data;
-    auto* self = static_cast<WeatherClockBoard*>(ctx);
+    auto* self = static_cast<WeatherBoard*>(ctx);
     (void)self; // Available for future use — e.g. self->_needsRedraw.store(true)
-    ESP_LOGD("WeatherClockBoard", "Received weather.updated event");
+    ESP_LOGD("WeatherBoard", "Received weather.updated event");
 }
 
 /**
@@ -101,13 +101,20 @@ void WeatherClockBoard::onWeatherUpdated(const char* topic, const void* data, vo
  *
  * @param u8g2  Reference to the U8G2 display driver instance.
  */
-void WeatherClockBoard::render(U8G2& u8g2) {
+void WeatherBoard::render(U8G2& u8g2) {
     // Clear buffer is handled by the CarouselEngine
     // Get weather data — H3: getters now return float/string safely across threads
     std::string tempStr;
     std::string condStr;
 
+    // Determine the display unit suffix from the configured units
+    const char* unitSuffix = "°C";
     if (_weatherModule) {
+        std::string units = _weatherModule->getUnits();
+        if (units == "imperial") {
+            unitSuffix = "°F";
+        }
+
         // Convert float to display string
         char buf[16];
         snprintf(buf, sizeof(buf), "%.1f", _weatherModule->getTemperature());
@@ -115,6 +122,6 @@ void WeatherClockBoard::render(U8G2& u8g2) {
         condStr = _weatherModule->getCondition();
     }
 
-    // Draw the Weather Widget
-    WeatherWidget::draw(u8g2, 10, 40, tempStr, condStr);
+    // Draw the Weather Widget with the correct unit suffix
+    WeatherWidget::draw(u8g2, 10, 40, tempStr, condStr, unitSuffix);
 }

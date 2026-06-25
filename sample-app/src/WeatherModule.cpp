@@ -627,7 +627,7 @@ UpdateStatus WeatherModule::fetchUpdate() {
     snprintf(url, sizeof(url), "https://api.openweathermap.org/data/2.5/weather?lat=%f&lon=%f&appid=%s&units=%s",
              _lat, _lon, apiKey.c_str(), _units.c_str());
 
-    ESP_LOGI("WeatherModule", "Fetching weather from OWM: lat=%f, lon=%f", _lat, _lon);
+    ESP_LOGI("WeatherModule", "Fetching weather from OWM: lat=%f, lon=%f, units=%s", _lat, _lon, _units.c_str());
 
     // M2: Use ESP-IDF built-in certificate bundle instead of setInsecure().
     struct SecureClient : public WiFiClientSecure {
@@ -681,7 +681,22 @@ UpdateStatus WeatherModule::fetchUpdate() {
     uint8_t buff[128] = { 0 };
 
     ESP_LOGI("WeatherModule", "Streaming and parsing %d bytes...", len);
+
+    // Absolute timeout guard — prevents indefinite blocking if the server
+    // stalls mid-stream (e.g. keeps the connection open but stops sending data).
+    const uint32_t streamStartMs = millis();
+    const uint32_t kStreamTimeoutMs = 30000; // 30 seconds
+
     while (http.connected() && (len > 0 || len == -1)) {
+        // Check absolute timeout
+        if ((millis() - streamStartMs) > kStreamTimeoutMs) {
+            ESP_LOGE("WeatherModule", "Stream timeout after %lu ms — aborting parse",
+                     (unsigned long)kStreamTimeoutMs);
+            http.end();
+            _lastFetchStatus.store(UpdateStatus::FetchError, std::memory_order_release);
+            return UpdateStatus::FetchError;
+        }
+
         size_t size = stream->available();
         if (size) {
             int c = stream->readBytes(buff, ((size > sizeof(buff)) ? sizeof(buff) : size));
