@@ -75,6 +75,7 @@ predate the formal PA pipeline and are filed retrospectively.
 | [pr-36-manifest-first-ota](./pr-36-manifest-first-ota/PROJECT.md) | Manifest-First OTA Architecture (signed manifest, multi-channel, absolute URLs, URL resilience, GithubClient removal) | 🔄 **WIP** — 6 WOs merged on branch, integration testing blocked by private-repo auth | Session d5f9f607 |
 | [pr-37-split-repo-ota](./pr-37-split-repo-ota/PROJECT.md) | Split-Repo OTA with Git-Managed Manifest (public releases repo, delete GithubClient, migrate CA certs, eliminate PAT, git-managed manifest) | ✅ **COMPLETE** — 3 WOs merged, OTA verified dev.7→dev.8→dev.9, `manifest-latest` deleted · [distillation](./pr-37-split-repo-ota/context_bridge.md) | Session cd0abc58 |
 | [pr-38-portal-remediation](./pr-38-portal-remediation/PROJECT.md) | Portal UX Remediation (PR-35 deep review P1–P12: CSS/JS fixes, information depth, branding/icons) | 🔄 **WIP** — WO1 in progress | Current Session |
+| [pr-39-sample-app-remediation](./pr-39-sample-app-remediation/PROJECT.md) | Sample App Remediation (24 fix items: include discipline, house style, EventBus demo, real tests, README, runtime crash fixes) | ✅ **MERGED** `6676c34` — 15/15 tests, device verified | Session 9d8dc741 |
 
 ---
 
