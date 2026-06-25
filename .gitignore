@@ -58,3 +58,6 @@ include/otaSecrets.hpp
 .DS_Store
 tmp/
 scripts/__pycache__/
+sample-app/myenv/
+sample-app/*.log
+sample-app/sdkconfig.*
