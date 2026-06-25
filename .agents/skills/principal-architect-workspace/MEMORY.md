@@ -76,6 +76,7 @@ predate the formal PA pipeline and are filed retrospectively.
 | [pr-37-split-repo-ota](./pr-37-split-repo-ota/PROJECT.md) | Split-Repo OTA with Git-Managed Manifest (public releases repo, delete GithubClient, migrate CA certs, eliminate PAT, git-managed manifest) | ✅ **COMPLETE** — 3 WOs merged, OTA verified dev.7→dev.8→dev.9, `manifest-latest` deleted · [distillation](./pr-37-split-repo-ota/context_bridge.md) | Session cd0abc58 |
 | [pr-38-portal-remediation](./pr-38-portal-remediation/PROJECT.md) | Portal UX Remediation (PR-35 deep review P1–P12: CSS/JS fixes, information depth, branding/icons) | 🔄 **WIP** — WO1 in progress | Current Session |
 | [pr-39-sample-app-remediation](./pr-39-sample-app-remediation/PROJECT.md) | Sample App Remediation (24 fix items: include discipline, house style, EventBus demo, real tests, README, runtime crash fixes) | ✅ **MERGED** `6676c34` — 15/15 tests, device verified | Session 9d8dc741 |
+| [pr-40-docs-excellence](./pr-40-docs-excellence/PROJECT.md) | Documentation Excellence — 10/10 Compliance (template-app rename+Doxygen, sample-app full Doxygen+interface-grouped+functional fixes, HomeAssistant+publicKey docs, lib header attribution, module path casing, String stub consolidation, OTA naming) | 📋 **PLANNING** — 7 WOs defined, awaiting execution | Current Session |
 
 ---
 
@@ -249,6 +250,8 @@ scanning the entire Projects Registry chronologically.
 | [pr-27](./pr-27-security-mcp-docs/PROJECT.md) | `security.md` (338 lines) + `mcp-server.md` (283 lines) | PROJECT.md |
 | [pr-34](./pr-34-mcp-tools/PROJECT.md) | `device-mcp-client` skill rewrite + `framework-expert` MCP system docs | [distillation](./pr-34-mcp-tools/context_bridge.md) |
 | [adhoc-ota-docs-hotfix](./adhoc-ota-docs-hotfix/context_bridge.md) | `build_and_release_process.md` | context_bridge |
+| [pr-39](./pr-39-sample-app-remediation/PROJECT.md) | Sample app remediation — build parity, includes, EventBus, house style, tests | PROJECT.md |
+| [pr-40](./pr-40-docs-excellence/PROJECT.md) | Documentation Excellence — 10/10 compliance across template-app, sample-app, framework modules | PROJECT.md |
 
 ---
 
