@@ -6,7 +6,7 @@
  * This work is licensed under Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International.
  * To view a copy of this license, visit https://creativecommons.org/licenses/by-nc-sa/4.0/
  *
- * Module: modules/mcpServer/mcpServer.cpp
+ * Module: modules/MCPServer/MCPServer.cpp
  * Description: Implementation of the MCP JSON-RPC 2.0 server. Reads
  *              line-delimited JSON from Serial on hardware, parses each line
  *              into a JsonDocument, and dispatches to the appropriate handler

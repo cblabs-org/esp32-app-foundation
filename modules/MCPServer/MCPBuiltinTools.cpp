@@ -6,7 +6,7 @@
  * This work is licensed under Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International.
  * To view a copy of this license, visit https://creativecommons.org/licenses/by-nc-sa/4.0/
  *
- * Module: modules/mcpServer/mcpBuiltinTools.cpp
+ * Module: modules/MCPServer/MCPBuiltinTools.cpp
  * Description: Implementation of all foundation-level MCP tools that are always
  *              available in the framework. Registers 7 tools into the MCPToolRegistry:
  *                - system_info:      Device heap, uptime, chip info, firmware version
