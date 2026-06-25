@@ -73,6 +73,8 @@ static constexpr const char* TAG = "OTAUpdateManager";
 #else
 #include <ArduinoJson.h>
 #include "../Application/Application.hpp"
+unsigned long millis() __attribute__((weak));
+unsigned long millis() { return 0; } // Native-build stub
 #endif
 
 // ---------------------------------------------------------------------------

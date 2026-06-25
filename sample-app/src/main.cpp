@@ -21,11 +21,19 @@
 #include <Arduino.h>
 #endif
 #include "WeatherModule.hpp"
+#ifndef NATIVE_BUILD
 #include "WeatherClockBoard.hpp"
+#endif
 
+// ADR-16: File-scope static instances avoid stack-based corruption.
+// All module instances must be declared at file scope before setup().
 Application app;
 WeatherModule weatherModule;
+#ifndef NATIVE_BUILD
+// F04: EventBus wiring deferred to setup() — at file scope, Application
+// members may not be fully initialized (static init order fiasco).
 WeatherClockBoard weatherClockBoard(&weatherModule);
+#endif
 
 /**
  * @brief Arduino framework initialization.
@@ -40,7 +48,12 @@ void setup() {
     app.disableDefaultAppTab();
     app.setAppName("Weather Station");
 
-    // ADR-39: Module self-wires from Application via transient service locator
+    // ADR-39: Module self-wires from Application via transient service locator.
+    // F08: begin() is called BEFORE registerModule() because the module needs
+    // its service references (KeyManager, EventBus, etc.) wired before the
+    // framework calls lifecycle methods (e.g., loadConfig via IConfigurable)
+    // during app.begin(). Registration only adds the module to the framework's
+    // internal vectors — it doesn't trigger any lifecycle callbacks.
     weatherModule.begin(app);
 
     // Register user application modules
@@ -58,10 +71,21 @@ void setup() {
 
 #ifndef NATIVE_BUILD
     app.getDisplay().carousel.add(&weatherClockBoard);
+    // F04: Wire EventBus subscription now that Application is fully constructed.
+    // Cannot do this at file scope — static init order makes getEventBus() unsafe.
+    // Uses static function pointer (not lambda) per framework convention (GRAVE-05).
+    weatherClockBoard.wireEventBus(app.getEventBus());
 #endif
 
-    // Begin framework
+    // Begin framework — this allocates framework-owned modules like
+    // HomeAssistantModule on the heap. Must happen before HA wiring.
     app.begin(config);
+
+    // Post-begin wiring: HomeAssistantModule is only available after app.begin()
+    // allocated it (it's a heap-owned pointer, nullptr before begin).
+#ifndef NATIVE_BUILD
+    weatherModule.wireHomeAssistant(app.getHomeAssistant());
+#endif
 }
 
 /**

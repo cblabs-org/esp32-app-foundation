@@ -1,31 +1,63 @@
+/*
+ * ESP32 App Foundation — Sample Application
+ *
+ * Module: sample-app/src/WeatherModule.hpp
+ * Description: Weather station module demonstrating 6 framework interfaces:
+ *              ITickable, IConfigurable, IWebContributor, IDataSource,
+ *              IMCPContributor, and IConfigGate. Fetches current weather from
+ *              the OpenWeatherMap API using streaming JSON parsing.
+ *
+ *              Thread Safety: Numeric fields use std::atomic for lock-free
+ *              cross-thread reads. String fields use fixed char[] buffers
+ *              protected by a FreeRTOS mutex.
+ *
+ * Exported Classes:
+ * - WeatherModule: Full-featured framework module (6 interfaces + JsonListener)
+ *   - begin(Application&):  ADR-39 transient service locator pattern
+ *   - getTemperature():     Thread-safe atomic getter
+ *   - getCondition():       Thread-safe mutex-protected getter
+ *   - getUnits():           Config accessor for units string
+ */
+
 #pragma once
 
 #include "AppFoundation.h"
+
+// F06: HomeAssistantModule is NOT re-exported by AppFoundation.h —
+// Application.hpp only forward-declares it (guarded by NATIVE_BUILD).
+// Direct include is required here for the HomeAssistantModule* member
+// and HaSensor value-member types.
+#ifndef NATIVE_BUILD
 #include "HomeAssistantModule.hpp"
 #include "entities/HaSensor.hpp"
-#include <JsonStreamingParser.h>
-#include <JsonListener.h>
+#endif
+
 #include <atomic>
 #include <string>
+#include <cstdlib>
 
 #ifndef NATIVE_BUILD
+#include <JsonStreamingParser.h>
+#include <JsonListener.h>
 #include <freertos/semphr.h>
 #endif
 
 class Application;
-class ConfigManager;
-class DataManager;
-class MCPToolRegistry;
 
 class WeatherModule : public ITickable, 
                       public IConfigurable, 
                       public IWebContributor, 
                       public IDataSource, 
                       public IMCPContributor,
-                      public IConfigGate,
-                      public JsonListener {
+                      public IConfigGate
+#ifndef NATIVE_BUILD
+                      , public JsonListener
+#endif
+                      {
 private:
+#ifndef NATIVE_BUILD
     HomeAssistantModule* _ha = nullptr;
+#endif
     KeyManager* _keyManager = nullptr;
     EventBus* _eventBus = nullptr;
     ConfigManager* _configManager = nullptr;
@@ -37,10 +69,12 @@ private:
 
     std::string _units = "metric";
 
+#ifndef NATIVE_BUILD
     // H2: Static member allocation — no bare new
     HaSensor _tempSensor{"weather_temp", "Temperature"};
     HaSensor _windSensor{"weather_wind", "Wind Speed"};
     HaSensor _condSensor{"weather_condition", "Condition"};
+#endif
 
     // H3: Thread-safe data exchange between fetchUpdate() task and main task.
     // Temperature and wind are simple floats — use std::atomic for lock-free
@@ -69,24 +103,26 @@ private:
     SemaphoreHandle_t _dataMutex = nullptr;
 #endif
 
-    // JsonListener state (used only within fetchUpdate task — single-threaded)
-    std::string _currentKey;
-    std::string _parsedTemp;
-    std::string _parsedWind;
-    std::string _parsedCond;
-    std::string _parsedHumidity;
-    std::string _parsedPressure;
-    std::string _parsedFeelsLike;
-    std::string _parsedTempMin;
-    std::string _parsedTempMax;
-    std::string _parsedVisibility;
-    std::string _parsedWindDeg;
-    std::string _parsedClouds;
-    std::string _parsedCityName;
-    std::string _parsedCountry;
-    std::string _parsedSunrise;
-    std::string _parsedSunset;
-    std::string _parsedIcon;
+    // F19: JsonListener scratch buffers — fixed char[] instead of std::string.
+    // Used only within fetchUpdate() task context (single-threaded).
+    // Sizes match the expected max field lengths from the OWM JSON response.
+    char _currentKey[32] = "";
+    char _parsedTemp[16] = "";
+    char _parsedWind[16] = "";
+    char _parsedCond[32] = "";
+    char _parsedHumidity[8] = "";
+    char _parsedPressure[8] = "";
+    char _parsedFeelsLike[16] = "";
+    char _parsedTempMin[16] = "";
+    char _parsedTempMax[16] = "";
+    char _parsedVisibility[8] = "";
+    char _parsedWindDeg[8] = "";
+    char _parsedClouds[8] = "";
+    char _parsedCityName[64] = "";
+    char _parsedCountry[8] = "";
+    char _parsedSunrise[16] = "";
+    char _parsedSunset[16] = "";
+    char _parsedIcon[8] = "";
     int _weatherArrayDepth = 0;
 
 public:
@@ -94,6 +130,11 @@ public:
     ~WeatherModule() override;
 
     void begin(Application& app);
+
+    // Deferred HA wiring — call after app.begin() when _haModule is allocated
+#ifndef NATIVE_BUILD
+    void wireHomeAssistant(HomeAssistantModule& ha);
+#endif
 
     // H3: Thread-safe getters. Temperature and wind return float via atomic
     // load. Condition returns a copy under mutex protection.
@@ -110,6 +151,9 @@ public:
     int getClouds() const { return _clouds.load(std::memory_order_acquire); }
     uint32_t getSunrise() const { return _sunrise.load(std::memory_order_acquire); }
     uint32_t getSunset() const { return _sunset.load(std::memory_order_acquire); }
+
+    // F09: Public getter for units — avoids direct private member access in MCP handler
+    const std::string& getUnits() const { return _units; }
 
     std::string getCondition() const {
         std::string result;
@@ -191,7 +235,8 @@ public:
     bool isSatisfied() const override;
     const char* getHelpText() const override;
 
-    // JsonListener
+    // JsonListener (hardware only — parser library unavailable in native builds)
+#ifndef NATIVE_BUILD
     void whitespace(char c) override {}
     void startDocument() override;
     void key(String key) override;
@@ -201,4 +246,9 @@ public:
     void endDocument() override;
     void startArray() override;
     void startObject() override {}
+#else
+    // Native-build stubs for parser methods (called only in tests)
+    void startDocument();
+    void endDocument();
+#endif
 };

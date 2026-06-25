@@ -1,7 +1,27 @@
+/*
+ * ESP32 App Foundation — Sample Application
+ *
+ * Module: sample-app/src/WeatherModule.cpp
+ * Description: Implementation of the WeatherModule — a comprehensive sample
+ *              demonstrating ITickable, IConfigurable, IWebContributor,
+ *              IDataSource, IMCPContributor, and IConfigGate interfaces.
+ *
+ *              Fetches weather data from the OpenWeatherMap API via
+ *              streaming JSON parsing (JsonStreamingParser) on the
+ *              DataManager background task, then stores parsed fields
+ *              thread-safely for display rendering and REST/MCP queries.
+ *
+ * Implementation Notes:
+ * - F07: Uses AppFoundation.h facade; MCPToolRegistry.hpp is the only
+ *   direct kernel include (not re-exported by the facade)
+ * - F12: REST handlers use stack-allocated char[] buffers (no Arduino String)
+ * - F19: JSON parser scratch fields are fixed char[] (no std::string)
+ */
+
 #include "WeatherModule.hpp"
-#include "Application.hpp"
-#include "ConfigManager.hpp"
-#include "DataManager.hpp"
+// F07: Application.hpp, ConfigManager.hpp, DataManager.hpp are transitively
+// provided by AppFoundation.h → Application.hpp. Only MCPToolRegistry needs
+// a direct include because IMCPContributor.hpp only forward-declares it.
 #include "MCPToolRegistry.hpp"
 #include <ArduinoJson.h>
 
@@ -18,6 +38,7 @@ void attach_ssl_certificate_bundle(sslclient_context *ssl_client, bool att);
 #endif
 
 WeatherModule::WeatherModule() {
+#ifndef NATIVE_BUILD
     // H2: Sensors are now direct members — configure via dot access
     _tempSensor.setDeviceClass("temperature");
     _tempSensor.setStateClass("measurement");
@@ -30,7 +51,6 @@ WeatherModule::WeatherModule() {
     // Generic text sensor for weather condition, no special device class
     _condSensor.setIcon("mdi:weather-partly-cloudy");
 
-#ifndef NATIVE_BUILD
     // H3: Create mutex for thread-safe condition string access
     _dataMutex = xSemaphoreCreateMutex();
 #endif
@@ -48,17 +68,24 @@ WeatherModule::~WeatherModule() {
 
 void WeatherModule::begin(Application& app) {
     // ADR-39: Transient Service Locator — extract narrow refs, never store Application&
-    _ha            = &app.getHomeAssistant();
     _keyManager    = &app.getKeyManager();
     _eventBus      = &app.getEventBus();
     _configManager = &app.getConfigManager();
     _dataManager   = &app.getDataManager();
 
-    // Register HA entities now that the HomeAssistant reference is wired
+    // NOTE: HomeAssistant is NOT available here — _haModule is nullptr
+    // until app.begin() allocates it. HA entity registration is deferred
+    // to wireHomeAssistant(), called from main.cpp after app.begin().
+}
+
+#ifndef NATIVE_BUILD
+void WeatherModule::wireHomeAssistant(HomeAssistantModule& ha) {
+    _ha = &ha;
     _ha->addEntity(&_tempSensor);
     _ha->addEntity(&_windSensor);
     _ha->addEntity(&_condSensor);
 }
+#endif
 
 void WeatherModule::tick(uint32_t currentMillis) {
     // Fast, non-blocking tick. Background fetching is handled by IDataSource in DataManager.
@@ -101,9 +128,11 @@ void WeatherModule::registerRoutes(PsychicHttpServer& server) {
         }
         doc["hasApiKey"] = hasApiKey;
 
-        String output;
-        serializeJson(doc, output);
-        return response->send(200, "application/json", output.c_str());
+        // F12: Use stack buffer instead of Arduino String to avoid heap fragmentation
+        char buf[256];
+        size_t len = serializeJson(doc, buf, sizeof(buf));
+        (void)len;
+        return response->send(200, "application/json", buf);
     });
 
     server.on("/api/weather/config", HTTP_POST, [this](PsychicRequest* request, PsychicResponse* response) {
@@ -166,9 +195,11 @@ void WeatherModule::registerRoutes(PsychicHttpServer& server) {
             doc["tempMax"] = getTempMax();
         }
 
-        String output;
-        serializeJson(doc, output);
-        return response->send(200, "application/json", output.c_str());
+        // F12: Stack buffer — status payload can be larger than config
+        char buf[1024];
+        size_t len = serializeJson(doc, buf, sizeof(buf));
+        (void)len;
+        return response->send(200, "application/json", buf);
     });
 
     server.on("/weather.js", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
@@ -574,29 +605,32 @@ UpdateStatus WeatherModule::fetchUpdate() {
 #endif
 }
 
+// F19: Parser scratch buffers are now fixed char[] — zero-fill on new document
 void WeatherModule::startDocument() {
-    _currentKey = "";
-    _parsedTemp = "";
-    _parsedWind = "";
-    _parsedCond = "";
-    _parsedHumidity = "";
-    _parsedPressure = "";
-    _parsedFeelsLike = "";
-    _parsedTempMin = "";
-    _parsedTempMax = "";
-    _parsedVisibility = "";
-    _parsedWindDeg = "";
-    _parsedClouds = "";
-    _parsedCityName = "";
-    _parsedCountry = "";
-    _parsedSunrise = "";
-    _parsedSunset = "";
-    _parsedIcon = "";
+    _currentKey[0] = '\0';
+    _parsedTemp[0] = '\0';
+    _parsedWind[0] = '\0';
+    _parsedCond[0] = '\0';
+    _parsedHumidity[0] = '\0';
+    _parsedPressure[0] = '\0';
+    _parsedFeelsLike[0] = '\0';
+    _parsedTempMin[0] = '\0';
+    _parsedTempMax[0] = '\0';
+    _parsedVisibility[0] = '\0';
+    _parsedWindDeg[0] = '\0';
+    _parsedClouds[0] = '\0';
+    _parsedCityName[0] = '\0';
+    _parsedCountry[0] = '\0';
+    _parsedSunrise[0] = '\0';
+    _parsedSunset[0] = '\0';
+    _parsedIcon[0] = '\0';
     _weatherArrayDepth = 0;
 }
 
+// JsonListener methods that use Arduino String type — hardware only
+#ifndef NATIVE_BUILD
 void WeatherModule::startArray() {
-    if (_currentKey == "weather") {
+    if (strcmp(_currentKey, "weather") == 0) {
         _weatherArrayDepth++;
     }
 }
@@ -608,104 +642,113 @@ void WeatherModule::endArray() {
 }
 
 void WeatherModule::key(String key) {
-    _currentKey = key.c_str();
+    strlcpy(_currentKey, key.c_str(), sizeof(_currentKey));
 }
 
+// F19: Use strlcpy into fixed char[] buffers — no std::string heap allocation
 void WeatherModule::value(String value) {
-    if (_currentKey == "temp" && _parsedTemp.empty()) {
-        _parsedTemp = value.c_str();
-    } else if (_currentKey == "feels_like" && _parsedFeelsLike.empty()) {
-        _parsedFeelsLike = value.c_str();
-    } else if (_currentKey == "temp_min" && _parsedTempMin.empty()) {
-        _parsedTempMin = value.c_str();
-    } else if (_currentKey == "temp_max" && _parsedTempMax.empty()) {
-        _parsedTempMax = value.c_str();
-    } else if (_currentKey == "pressure" && _parsedPressure.empty()) {
-        _parsedPressure = value.c_str();
-    } else if (_currentKey == "humidity" && _parsedHumidity.empty()) {
-        _parsedHumidity = value.c_str();
-    } else if (_currentKey == "visibility" && _parsedVisibility.empty()) {
-        _parsedVisibility = value.c_str();
-    } else if (_currentKey == "speed" && _parsedWind.empty()) {
-        _parsedWind = value.c_str();
-    } else if (_currentKey == "deg" && _parsedWindDeg.empty()) {
-        _parsedWindDeg = value.c_str();
-    } else if (_currentKey == "all" && _parsedClouds.empty()) {
-        _parsedClouds = value.c_str();
-    } else if (_currentKey == "name" && _parsedCityName.empty()) {
-        _parsedCityName = value.c_str();
-    } else if (_currentKey == "country" && _parsedCountry.empty()) {
-        _parsedCountry = value.c_str();
-    } else if (_currentKey == "sunrise" && _parsedSunrise.empty()) {
-        _parsedSunrise = value.c_str();
-    } else if (_currentKey == "sunset" && _parsedSunset.empty()) {
-        _parsedSunset = value.c_str();
+    if (strcmp(_currentKey, "temp") == 0 && _parsedTemp[0] == '\0') {
+        strlcpy(_parsedTemp, value.c_str(), sizeof(_parsedTemp));
+    } else if (strcmp(_currentKey, "feels_like") == 0 && _parsedFeelsLike[0] == '\0') {
+        strlcpy(_parsedFeelsLike, value.c_str(), sizeof(_parsedFeelsLike));
+    } else if (strcmp(_currentKey, "temp_min") == 0 && _parsedTempMin[0] == '\0') {
+        strlcpy(_parsedTempMin, value.c_str(), sizeof(_parsedTempMin));
+    } else if (strcmp(_currentKey, "temp_max") == 0 && _parsedTempMax[0] == '\0') {
+        strlcpy(_parsedTempMax, value.c_str(), sizeof(_parsedTempMax));
+    } else if (strcmp(_currentKey, "pressure") == 0 && _parsedPressure[0] == '\0') {
+        strlcpy(_parsedPressure, value.c_str(), sizeof(_parsedPressure));
+    } else if (strcmp(_currentKey, "humidity") == 0 && _parsedHumidity[0] == '\0') {
+        strlcpy(_parsedHumidity, value.c_str(), sizeof(_parsedHumidity));
+    } else if (strcmp(_currentKey, "visibility") == 0 && _parsedVisibility[0] == '\0') {
+        strlcpy(_parsedVisibility, value.c_str(), sizeof(_parsedVisibility));
+    } else if (strcmp(_currentKey, "speed") == 0 && _parsedWind[0] == '\0') {
+        strlcpy(_parsedWind, value.c_str(), sizeof(_parsedWind));
+    } else if (strcmp(_currentKey, "deg") == 0 && _parsedWindDeg[0] == '\0') {
+        strlcpy(_parsedWindDeg, value.c_str(), sizeof(_parsedWindDeg));
+    } else if (strcmp(_currentKey, "all") == 0 && _parsedClouds[0] == '\0') {
+        strlcpy(_parsedClouds, value.c_str(), sizeof(_parsedClouds));
+    } else if (strcmp(_currentKey, "name") == 0 && _parsedCityName[0] == '\0') {
+        strlcpy(_parsedCityName, value.c_str(), sizeof(_parsedCityName));
+    } else if (strcmp(_currentKey, "country") == 0 && _parsedCountry[0] == '\0') {
+        strlcpy(_parsedCountry, value.c_str(), sizeof(_parsedCountry));
+    } else if (strcmp(_currentKey, "sunrise") == 0 && _parsedSunrise[0] == '\0') {
+        strlcpy(_parsedSunrise, value.c_str(), sizeof(_parsedSunrise));
+    } else if (strcmp(_currentKey, "sunset") == 0 && _parsedSunset[0] == '\0') {
+        strlcpy(_parsedSunset, value.c_str(), sizeof(_parsedSunset));
     } else if (_weatherArrayDepth > 0) {
-        if (_currentKey == "main" && _parsedCond.empty()) {
-            _parsedCond = value.c_str();
-        } else if (_currentKey == "icon" && _parsedIcon.empty()) {
-            _parsedIcon = value.c_str();
+        if (strcmp(_currentKey, "main") == 0 && _parsedCond[0] == '\0') {
+            strlcpy(_parsedCond, value.c_str(), sizeof(_parsedCond));
+        } else if (strcmp(_currentKey, "icon") == 0 && _parsedIcon[0] == '\0') {
+            strlcpy(_parsedIcon, value.c_str(), sizeof(_parsedIcon));
         }
     }
 }
+#endif  // NATIVE_BUILD
 
 void WeatherModule::endDocument() {
     bool updated = false;
 
-    if (!_parsedTemp.empty()) {
-        float temp = std::strtof(_parsedTemp.c_str(), nullptr);
+    // F19: char[] buffers — use strtof/atoi directly (no .c_str() needed)
+    if (_parsedTemp[0] != '\0') {
+        float temp = std::strtof(_parsedTemp, nullptr);
         // H3: Store via atomic for thread-safe cross-task access
         _temperature.store(temp, std::memory_order_release);
 
+#ifndef NATIVE_BUILD
         // Publish numeric value as string state to HA sensor
         char buf[16];
         snprintf(buf, sizeof(buf), "%.1f", temp);
         _tempSensor.setState(buf);
         if (_ha) _ha->publishState(&_tempSensor);
+#endif
         updated = true;
     }
-    if (!_parsedWind.empty()) {
-        float wind = std::strtof(_parsedWind.c_str(), nullptr);
+    if (_parsedWind[0] != '\0') {
+        float wind = std::strtof(_parsedWind, nullptr);
         _windSpeed.store(wind, std::memory_order_release);
 
+#ifndef NATIVE_BUILD
         char buf[16];
         snprintf(buf, sizeof(buf), "%.1f", wind);
         _windSensor.setState(buf);
         if (_ha) _ha->publishState(&_windSensor);
+#endif
         updated = true;
     }
-    if (!_parsedHumidity.empty()) _humidity.store(std::atoi(_parsedHumidity.c_str()), std::memory_order_release);
-    if (!_parsedPressure.empty()) _pressure.store(std::atoi(_parsedPressure.c_str()), std::memory_order_release);
-    if (!_parsedFeelsLike.empty()) _feelsLike.store(std::strtof(_parsedFeelsLike.c_str(), nullptr), std::memory_order_release);
-    if (!_parsedTempMin.empty()) _tempMin.store(std::strtof(_parsedTempMin.c_str(), nullptr), std::memory_order_release);
-    if (!_parsedTempMax.empty()) _tempMax.store(std::strtof(_parsedTempMax.c_str(), nullptr), std::memory_order_release);
-    if (!_parsedVisibility.empty()) _visibility.store(std::atoi(_parsedVisibility.c_str()), std::memory_order_release);
-    if (!_parsedWindDeg.empty()) _windDeg.store(std::atoi(_parsedWindDeg.c_str()), std::memory_order_release);
-    if (!_parsedClouds.empty()) _clouds.store(std::atoi(_parsedClouds.c_str()), std::memory_order_release);
-    if (!_parsedSunrise.empty()) _sunrise.store(std::strtoul(_parsedSunrise.c_str(), nullptr, 10), std::memory_order_release);
-    if (!_parsedSunset.empty()) _sunset.store(std::strtoul(_parsedSunset.c_str(), nullptr, 10), std::memory_order_release);
+    if (_parsedHumidity[0] != '\0') _humidity.store(std::atoi(_parsedHumidity), std::memory_order_release);
+    if (_parsedPressure[0] != '\0') _pressure.store(std::atoi(_parsedPressure), std::memory_order_release);
+    if (_parsedFeelsLike[0] != '\0') _feelsLike.store(std::strtof(_parsedFeelsLike, nullptr), std::memory_order_release);
+    if (_parsedTempMin[0] != '\0') _tempMin.store(std::strtof(_parsedTempMin, nullptr), std::memory_order_release);
+    if (_parsedTempMax[0] != '\0') _tempMax.store(std::strtof(_parsedTempMax, nullptr), std::memory_order_release);
+    if (_parsedVisibility[0] != '\0') _visibility.store(std::atoi(_parsedVisibility), std::memory_order_release);
+    if (_parsedWindDeg[0] != '\0') _windDeg.store(std::atoi(_parsedWindDeg), std::memory_order_release);
+    if (_parsedClouds[0] != '\0') _clouds.store(std::atoi(_parsedClouds), std::memory_order_release);
+    if (_parsedSunrise[0] != '\0') _sunrise.store(std::strtoul(_parsedSunrise, nullptr, 10), std::memory_order_release);
+    if (_parsedSunset[0] != '\0') _sunset.store(std::strtoul(_parsedSunset, nullptr, 10), std::memory_order_release);
 
-    if (!_parsedCond.empty() || !_parsedIcon.empty() || !_parsedCityName.empty() || !_parsedCountry.empty()) {
+    if (_parsedCond[0] != '\0' || _parsedIcon[0] != '\0' || _parsedCityName[0] != '\0' || _parsedCountry[0] != '\0') {
         // H3: Write string buffers under mutex protection
 #ifndef NATIVE_BUILD
         if (xSemaphoreTake(_dataMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
-            if (!_parsedCond.empty()) strlcpy(_condition, _parsedCond.c_str(), sizeof(_condition));
-            if (!_parsedIcon.empty()) strlcpy(_icon, _parsedIcon.c_str(), sizeof(_icon));
-            if (!_parsedCityName.empty()) strlcpy(_cityName, _parsedCityName.c_str(), sizeof(_cityName));
-            if (!_parsedCountry.empty()) strlcpy(_country, _parsedCountry.c_str(), sizeof(_country));
+            if (_parsedCond[0] != '\0') strlcpy(_condition, _parsedCond, sizeof(_condition));
+            if (_parsedIcon[0] != '\0') strlcpy(_icon, _parsedIcon, sizeof(_icon));
+            if (_parsedCityName[0] != '\0') strlcpy(_cityName, _parsedCityName, sizeof(_cityName));
+            if (_parsedCountry[0] != '\0') strlcpy(_country, _parsedCountry, sizeof(_country));
             xSemaphoreGive(_dataMutex);
         }
 #else
-        if (!_parsedCond.empty()) strlcpy(_condition, _parsedCond.c_str(), sizeof(_condition));
-        if (!_parsedIcon.empty()) strlcpy(_icon, _parsedIcon.c_str(), sizeof(_icon));
-        if (!_parsedCityName.empty()) strlcpy(_cityName, _parsedCityName.c_str(), sizeof(_cityName));
-        if (!_parsedCountry.empty()) strlcpy(_country, _parsedCountry.c_str(), sizeof(_country));
+        if (_parsedCond[0] != '\0') strlcpy(_condition, _parsedCond, sizeof(_condition));
+        if (_parsedIcon[0] != '\0') strlcpy(_icon, _parsedIcon, sizeof(_icon));
+        if (_parsedCityName[0] != '\0') strlcpy(_cityName, _parsedCityName, sizeof(_cityName));
+        if (_parsedCountry[0] != '\0') strlcpy(_country, _parsedCountry, sizeof(_country));
 #endif
 
-        if (!_parsedCond.empty()) {
+#ifndef NATIVE_BUILD
+        if (_parsedCond[0] != '\0') {
             _condSensor.setState(_parsedCond);
             if (_ha) _ha->publishState(&_condSensor);
         }
+#endif
         updated = true;
     }
 
@@ -743,7 +786,8 @@ void WeatherModule::registerMCPTools(MCPToolRegistry& registry) {
                 result["city"] = self->getCityName();
                 result["country"] = self->getCountry();
             }
-            result["units"] = self->_units;
+            // F09: Use public getter instead of direct private member access
+            result["units"] = self->getUnits();
         },
         this,
         false  // mutatesState = false (read-only)
