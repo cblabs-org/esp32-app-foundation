@@ -20,10 +20,10 @@
 #ifndef NATIVE_BUILD
 #include <Arduino.h>
 #endif
-#include "myApp.hpp"
+#include "MyApp.hpp"
 
-Application app;
-MyApp myApp;
+Application app;   ///< Framework hub instance
+MyApp myApp;       ///< Application module instance
 
 /**
  * @brief Arduino framework initialization.
@@ -35,6 +35,7 @@ void setup() {
     Serial.begin(115200);
 #endif
 
+    // TODO: Change "My Application" to your app name
     app.setAppName("My Application");
 
     // Wire up dependencies the module needs
@@ -44,7 +45,8 @@ void setup() {
     app.registerModule(&myApp);
 
     // Begin framework (no OTA config in this minimal template)
-    app.begin();
+    FrameworkConfig config;
+    app.begin(config);
 }
 
 /**

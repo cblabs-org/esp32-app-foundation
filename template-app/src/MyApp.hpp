@@ -1,0 +1,166 @@
+/*
+ * ESP32 App Foundation (c) 2026 CB Labs
+ *
+ * https://github.com/matthewmcneill/esp32-app-foundation
+ *
+ * This work is licensed under Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International.
+ * To view a copy of this license, visit https://creativecommons.org/licenses/by-nc-sa/4.0/
+ *
+ * Module: template-app/src/MyApp.hpp
+ * Description: Main application module for the template skeleton. Implements
+ *              ITickable, IConfigurable, IWebContributor, IMCPContributor,
+ *              and IConfigGate to demonstrate all five primary extension points.
+ *
+ * Exported Classes:
+ * - MyApp: Template application module demonstrating 5 primary framework interfaces.
+ *
+ *   Own API:
+ *   - setConfigManager():    Wire the ConfigManager pointer for save operations.
+ *
+ *   ITickable:
+ *   - tick():                Periodic update hook called by the Application hub.
+ *
+ *   IConfigurable ("myapp"):
+ *   - getConfigNamespace():  Returns the config namespace identifier.
+ *   - getSchemaVersion():    Returns the current schema version.
+ *   - applyConfig():         Loads persisted settings from ConfigManager.
+ *   - serializeConfig():     Serializes current configuration to JSON.
+ *   - resetConfig():         Restores factory defaults.
+ *
+ *   IWebContributor:
+ *   - registerRoutes():      Registers custom REST endpoints with the web server.
+ *   - getTabName():          Returns the UI tab name for this module.
+ *   - getTabOrder():         Returns the tab sort order.
+ *
+ *   IMCPContributor:
+ *   - registerMCPTools():    Exposes tools to the MCP server.
+ *
+ *   IConfigGate:
+ *   - getGateName():         Returns the human-readable gate name.
+ *   - isSatisfied():         Checks if the gate condition is met.
+ */
+
+#pragma once
+
+#include "AppFoundation.h"
+
+class PsychicHttpServer;
+class MCPToolRegistry;
+class ConfigManager;
+
+// TODO: Rename this class to match your application
+/**
+ * @brief Main application class implementing specific business logic.
+ *
+ * Participates in the Application tick loop, participates in the ConfigManager,
+ * contributes Web UI tabs and routes, contributes MCP tools, and exposes a config gate.
+ */
+class MyApp : public ITickable,
+              public IConfigurable,
+              public IWebContributor,
+              public IMCPContributor,
+              public IConfigGate {
+public:
+    /** @brief Default constructor. */
+    MyApp() = default;
+
+    /** @brief Virtual destructor. */
+    ~MyApp() override = default;
+
+    // --- ITickable ---
+
+    /** @brief Periodic update hook called by the Application hub on every loop iteration.
+     *  @param currentMillis Current system time in milliseconds.
+     */
+    void tick(uint32_t currentMillis) override;
+
+    // --- IConfigurable ---
+
+    /** @brief Returns the config namespace identifier.
+     *  @return Namespace string used to locate the persisted config file.
+     */
+    const char* getConfigNamespace() const override;
+
+    /** @brief Returns the current schema version for config migration.
+     *  @return Integer schema version.
+     */
+    int getSchemaVersion() const override;
+
+    /** @brief Loads persisted settings from ConfigManager.
+     *  @param config JSON object containing the persisted key-value pairs.
+     */
+    void applyConfig(const JsonObject& config) override;
+
+    /** @brief Serializes current configuration to a JSON object for persistence.
+     *  @param config JSON object to populate with current settings.
+     */
+    void serializeConfig(JsonObject& config) const override;
+
+    /** @brief Restores all configuration values to factory defaults. */
+    void resetConfig() override;
+
+    // --- IWebContributor ---
+
+    /** @brief Registers custom REST endpoints with the web server.
+     *  @param server Reference to the PsychicHttpServer instance.
+     */
+    void registerRoutes(PsychicHttpServer& server) override;
+
+    /** @brief Returns the UI tab name for this module.
+     *  @return Tab display name string.
+     */
+    const char* getTabName() const override;
+
+    /** @brief Returns the tab sort order (lower values appear first).
+     *  @return Integer sort order.
+     */
+    int getTabOrder() const override;
+
+    // Optional overrides — uncomment to customize:
+    // const char* getParentTab() const override { return "System"; }
+    // const char* getTabIcon() const override { return "⚙️"; }
+    // const char* getHelpText() const override { return "Help text for this tab"; }
+
+    // --- IMCPContributor ---
+
+    /** @brief Exposes tools to the MCP server for AI agent interaction.
+     *  @param registry Reference to the MCPToolRegistry for tool registration.
+     */
+    void registerMCPTools(MCPToolRegistry& registry) override;
+
+    // --- IConfigGate ---
+    // The framework blocks transition from CONFIGURING to RUNNING state until
+    // all gates report isSatisfied() == true. In a real app, check API key
+    // readiness, hardware initialization, etc.
+
+    /** @brief Returns the human-readable gate name for status reporting.
+     *  @return Gate name string.
+     */
+    const char* getGateName() const override;
+
+    /** @brief Checks if the gate condition is met.
+     *  @return true if the gate is satisfied and the app may proceed.
+     */
+    bool isSatisfied() const override;
+
+    // --- Own API ---
+
+    /** @brief Wire the ConfigManager pointer for save operations.
+     *  @param cm Pointer to the framework ConfigManager instance.
+     */
+    void setConfigManager(ConfigManager* cm) { _configManager = cm; }
+
+private:
+    // Configuration state (persisted via IConfigurable)
+    int _refreshIntervalMs = 5000;     ///< Example configurable parameter
+    bool _featureEnabled = true;       ///< Example boolean toggle
+
+    // Config gate state
+    bool _gateOpen = false;
+
+    // Tick timing
+    uint32_t _lastActionMs = 0;
+
+    // Dependencies
+    ConfigManager* _configManager = nullptr; ///< Pointer to ConfigManager for save operations
+};
