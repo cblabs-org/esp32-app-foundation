@@ -13,13 +13,13 @@
 
 ## Work Order Ledger
 
-- **[ ] [wo1-template-fixes](wo1-template-fixes/WORKORDER.md):** Standard — Template-app critical fixes: rename myApp→MyApp, remove legacy dead code, Doxygen on all methods, interface-grouped exports, TODO markers, README update
-- **[ ] [wo2-sample-doxygen](wo2-sample-doxygen/WORKORDER.md):** Standard — Sample-app full Doxygen + interface-grouped headers on all 6 source files
-- **[ ] [wo3-sample-functional](wo3-sample-functional/WORKORDER.md):** Standard — Sample-app functional fixes: IConfigGate registration, WeatherWidget units, streaming timeout, README fix, platformio.ini comments
-- **[ ] [wo4-ha-publickey-docs](wo4-ha-publickey-docs/WORKORDER.md):** Standard — HomeAssistant module + 11 entities + publicKey.hpp full house-style documentation
-- **[ ] [wo5-lib-path-fixes](wo5-lib-path-fixes/WORKORDER.md):** Mechanical — Lib header attribution fixes (3 files) + module path casing fixes (5 .cpp files)
-- **[ ] [wo6-stub-consolidation](wo6-stub-consolidation/WORKORDER.md):** Standard — String stub consolidation into shared NativeBuildStubs.hpp + OTA `learnedManifestUrl_` rename
-- **[ ] [wo7-audit](wo7-audit/WORKORDER.md):** Standard — Final compliance audit: re-read all modified files, score against 5-criteria checklist, build verification (main + sample + template + native tests)
+- **[x] [wo1-template-fixes](wo1-template-fixes/WORKORDER.md):** Standard — Template-app critical fixes: rename myApp→MyApp, remove legacy dead code, Doxygen on all methods, interface-grouped exports, TODO markers, README update
+- **[x] [wo2-sample-doxygen](wo2-sample-doxygen/WORKORDER.md):** Standard — Sample-app full Doxygen + interface-grouped headers on all 6 source files
+- **[x] [wo3-sample-functional](wo3-sample-functional/WORKORDER.md):** Standard — Sample-app functional fixes: IConfigGate verification, WeatherWidget units, streaming timeout, README fix, platformio.ini comments, WeatherBoard rename
+- **[x] [wo4-ha-publickey-docs](wo4-ha-publickey-docs/WORKORDER.md):** Standard — HomeAssistant module + 11 entities + publicKey.hpp full house-style documentation
+- **[x] [wo5-lib-path-fixes](wo5-lib-path-fixes/WORKORDER.md):** Mechanical — Lib header attribution fixes (3 files) + module path casing fixes (5 .cpp files)
+- **[x] [wo6-stub-consolidation](wo6-stub-consolidation/WORKORDER.md):** Standard — String stub consolidation into shared NativeBuildStubs.hpp + OTA `learnedManifestUrl_` rename
+- **[/] [wo7-audit](wo7-audit/WORKORDER.md):** Standard — Final compliance audit: re-read all modified files, score against 5-criteria checklist, build verification (main + sample + template + native tests)
 
 ## Execution Order
 
@@ -31,10 +31,10 @@ WO1 → WO2 → WO3 → WO4 → WO5 → WO6 → WO7 (strictly serialized)
 
 | WO | Status | Branch | Commit |
 |----|--------|--------|--------|
-| WO1 | Queued | — | — |
-| WO2 | Queued | — | — |
-| WO3 | Queued | — | — |
-| WO4 | Queued | — | — |
-| WO5 | Queued | — | — |
-| WO6 | Queued | — | — |
-| WO7 | Queued | — | — |
+| WO1 | ✅ Merged | `pr-40-docs-excellence-wo1-template-fixes` | `e709d01` |
+| WO2 | ✅ Merged | `pr-40-docs-excellence-wo2-sample-doxygen` | `5fe0626` |
+| WO3 | ✅ Merged | `pr-40-docs-excellence-wo3-sample-functional` | `bf36c04` |
+| WO4 | ✅ Merged | `pr-40-docs-excellence-wo4-ha-publickey-docs` | `dd9e497` |
+| WO5 | ✅ Merged | `pr-40-docs-excellence-wo5-lib-path-fixes` | `f0cc1a6` |
+| WO6 | ✅ Merged | `pr-40-docs-excellence-wo6-stub-consolidation` | `ed863b8` |
+| WO7 | 🔄 In Progress | `pr-40-docs-excellence-wo7-audit` | — |
