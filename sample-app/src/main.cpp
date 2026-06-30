@@ -16,7 +16,6 @@
  */
 
 #include "AppFoundation.h"
-#include "publicKey.hpp"
 #ifndef NATIVE_BUILD
 #include <Arduino.h>
 #endif
@@ -60,10 +59,16 @@ void setup() {
     // registerModule() auto-detects IConfigGate — no separate registration needed
     app.registerModule(&weatherModule);
 
-    // Prepare Framework config — OTA manifest URL and signing key
+    // Prepare Framework config — OTA
+    // TODO: Set up OTA for your app:
+    //   1. Create a releases repo (e.g. your-org/weather-station-releases)
+    //   2. Generate a signing keypair:  openssl genrsa -out private_key.pem 2048
+    //   3. Extract the public key:      openssl rsa -in private_key.pem -pubout -out public_key.pem
+    //   4. Convert to a header:         xxd -i public_key.pem > include/publicKey.hpp
+    //   5. Set the manifest URL and public key below
     FrameworkConfig config;
-    config.otaManifestUrl = "https://raw.githubusercontent.com/matthewmcneill/esp32-app-foundation-releases/main/manifest.json";
-    config.otaPublicKey = (const char*)public_key_pem;
+    // config.otaManifestUrl = "https://raw.githubusercontent.com/YOUR_ORG/YOUR_APP-releases/main/manifest.json";
+    // config.otaPublicKey = (const char*)public_key_pem;
 
     // App names its hostname default — WiFiManager owns the persisted value
     // and falls back to this on factory reset (resetConfig()). Must be set

@@ -13,3 +13,6 @@ sdkconfig.*
 !sdkconfig.defaults
 !sdkconfig.defaults.*
 dependencies.lock
+
+# Framework data files (copied at build time by merge_framework_data.py)
+data/timezones.json

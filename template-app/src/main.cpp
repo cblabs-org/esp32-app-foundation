@@ -44,7 +44,16 @@ void setup() {
     // Register — compile-time introspection detects all 5 interfaces
     app.registerModule(&myApp);
 
-    // Begin framework (no OTA config in this minimal template)
+    // Begin framework — OTA is disabled by default in this template.
+    // To enable OTA updates for your app:
+    //   1. Create a releases repo (e.g. your-org/my-app-releases)
+    //   2. Generate a signing keypair:  openssl genrsa -out private_key.pem 2048
+    //   3. Extract the public key:      openssl rsa -in private_key.pem -pubout -out public_key.pem
+    //   4. Convert to a header:         xxd -i public_key.pem > include/publicKey.hpp
+    //   5. Uncomment and configure:
+    //      #include "publicKey.hpp"
+    //      config.otaManifestUrl = "https://raw.githubusercontent.com/YOUR_ORG/YOUR_APP-releases/main/manifest.json";
+    //      config.otaPublicKey = (const char*)public_key_pem;
     FrameworkConfig config;
     app.begin(config);
 }
