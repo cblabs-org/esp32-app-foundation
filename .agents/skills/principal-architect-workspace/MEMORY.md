@@ -72,7 +72,7 @@ predate the formal PA pipeline and are filed retrospectively.
 | [pr-33-portal-ux-consistency](./pr-33-portal-ux-consistency/PROJECT.md) | Web Portal UX Consistency — Reboot Overlays & Save Policies (universal reboot overlay component, reconnection polling, context-aware messages, save policy formalisation, Playwright tests) | 📋 **PLANNING** — 3 WOs defined, awaiting user approval | Current Session |
 | [pr-34-mcp-tools](./pr-34-mcp-tools/PROJECT.md) | Module-Specific MCP Tools (domain-specific JSON-RPC tools for Wifi, OTA, Display, Config) | ✅ **COMPLETE** — 8 new tools, hardware-verified `v0.0.11-dev.15`, [distilled](./pr-34-mcp-tools/context_bridge.md) | 2026-06-20 |
 | [pr-35-weather-station](./pr-35-weather-station/PROJECT.md) | Weather Station & Home Assistant Module (esp-mqtt wrapper, HOM entities, Web Portal, U8G2 composable widgets) | 📋 **PLANNING** — 5 WOs defined (WO0–WO4), ready for execution workers | Current Session |
-| [pr-36-manifest-first-ota](./pr-36-manifest-first-ota/PROJECT.md) | Manifest-First OTA Architecture (signed manifest, multi-channel, absolute URLs, URL resilience, GithubClient removal) | 🔄 **WIP** — 6 WOs merged on branch, integration testing blocked by private-repo auth | Session d5f9f607 |
+| [pr-36-manifest-first-ota](./pr-36-manifest-first-ota/PROJECT.md) | Manifest-First OTA Architecture (signed manifest, multi-channel, absolute URLs, URL resilience, GithubClient removal) | 🔄 **WIP** — 6 WOs merged on branch, integration testing blocked by private-repo auth · [floating-tags distillation](./pr-36-manifest-first-ota/distillation-floating-tags/context_bridge.md) · [integration-testing distillation](./pr-36-manifest-first-ota/distillation-integration-testing/context_bridge.md) | Session d5f9f607 |
 | [pr-37-split-repo-ota](./pr-37-split-repo-ota/PROJECT.md) | Split-Repo OTA with Git-Managed Manifest (public releases repo, delete GithubClient, migrate CA certs, eliminate PAT, git-managed manifest) | ✅ **COMPLETE** — 3 WOs merged, OTA verified dev.7→dev.8→dev.9, `manifest-latest` deleted · [distillation](./pr-37-split-repo-ota/context_bridge.md) | Session cd0abc58 |
 | [pr-38-portal-remediation](./pr-38-portal-remediation/PROJECT.md) | Portal UX Remediation (PR-35 deep review P1–P12: CSS/JS fixes, information depth, branding/icons) | 🔄 **WIP** — WO1 in progress | Current Session |
 | [pr-39-sample-app-remediation](./pr-39-sample-app-remediation/PROJECT.md) | Sample App Remediation (24 fix items: include discipline, house style, EventBus demo, real tests, README, runtime crash fixes) | ✅ **MERGED** `6676c34` — 15/15 tests, device verified | Session 9d8dc741 |
@@ -83,7 +83,7 @@ predate the formal PA pipeline and are filed retrospectively.
 ## Ad-Hoc Work (Not Formally Tracked as PRs)
 
 > [!NOTE]
-> All session distillations now live here. `context_archives/` at the repo root is **deprecated** — do not create new archives there. The canonical location for all distillations is inside this workspace, either under the relevant `pr-*/` project or a new `adhoc-*/` directory.
+> All session distillations live here. The former `context_archives/` directory at the repo root has been **deleted** — all its contents were migrated into this workspace (2026-06-30). The canonical location for all distillations is inside this workspace, either under the relevant `pr-*/` project or a new `adhoc-*/` directory.
 
 | Archive | Date | Topic | Status | Link |
 |---------|------|-------|--------|------|
@@ -93,6 +93,8 @@ predate the formal PA pipeline and are filed retrospectively.
 | OTA Docs & Boot Hotfix | 2026-06-07 | `build_and_release_process.md`, Wi-Fi gate in `tick()`, `_silentCheck`, channel risk-floor model | ✅ **COMPLETE** | [adhoc-ota-docs-hotfix/](./adhoc-ota-docs-hotfix/context_bridge.md) |
 | Boot & WiFi Bugfixes | 2026-06-11 | PKCS7 padding corruption → AUTH_EXPIRE; WiFi wizard modal never shown in AP mode; `%zu` Newlib nano printf — 3 fixes on `pr-21-ota-task-hardening` | ✅ **FIXED** — `dff3b22`, `a0c91dc` | [adhoc-boot-wifi-bugfixes/](./adhoc-boot-wifi-bugfixes/context_bridge.md) |
 | OTA Manifest URL Bug | 2026-06-23 | "No manifest URL configured" root cause (dirty-tree build layout corruption), latent `_silentCheck` gap + redundant URL guard in `performUpdateTask` | ⚠️ **LATENT DEFECTS** — root cause resolved, 2 code fixes pending | [adhoc-ota-manifest-url-bug/](./adhoc-ota-manifest-url-bug/context_bridge.md) |
+| OTA Upload Fix | 2026-06-19 | PsychicHTTP multipart filename matching + upload verification lifecycle | ✅ **COMPLETE** | [adhoc-ota-upload-fix/](./adhoc-ota-upload-fix/context_bridge.md) |
+| Sub-App Pipeline Alignment | 2026-06-30 | `merge_framework_data.py`, portalBuilder addition, OTA repo separation, esp32s3nano for template-app | ✅ **COMPLETE** — `78654f6`, `ff38bff` | [adhoc-sub-app-pipeline/](./adhoc-sub-app-pipeline/context_bridge.md) |
 
 ---
 
@@ -217,6 +219,7 @@ scanning the entire Projects Registry chronologically.
 | [pr-06](./pr-06-build-infra/PROJECT.md) | Build scripts, PlatformIO, CI workflows | PROJECT.md |
 | [pr-10](./pr-10-firmware-optimization/PROJECT.md) | Firmware size optimization | PROJECT.md |
 | [pr-19](./pr-19-sdkconfig-layering/PROJECT.md) | Base+delta layering, fix PSRAM regression, build guard | PROJECT.md |
+| [adhoc-sub-app-pipeline](./adhoc-sub-app-pipeline/context_bridge.md) | `merge_framework_data.py`, portalBuilder, OTA separation, esp32s3nano template | context_bridge |
 
 ### Testing Infrastructure
 
@@ -255,5 +258,5 @@ scanning the entire Projects Registry chronologically.
 
 ---
 
-*Updated: 2026-06-20 — PR-37 complete (split-repo OTA, 3 WOs, deploy safety gates, OTA verified dev.7→dev.9); supersedes 2 context_archives*
+*Updated: 2026-06-30 — Migrated all `context_archives/` into PA workspace (4 distillations → pr-36 + 2 adhoc); added sub-app pipeline alignment*
 
