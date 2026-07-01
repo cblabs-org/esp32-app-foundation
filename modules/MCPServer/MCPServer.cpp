@@ -33,10 +33,7 @@
 
 static constexpr const char* TAG = "MCPServer";
 
-#ifdef NATIVE_BUILD
-    // Instantiate the mock Serial object for the native build linker
-    MockSerial Serial;
-#endif
+    // Serial is now instantiated in test/stubs/platform/Arduino.h for native builds
 
 // ---------------------------------------------------------------------------
 // Lifecycle
@@ -95,7 +92,6 @@ void MCPServer::setDisplayInfo(const DisplayInfo& info) {
 void MCPServer::tick() {
     if (!_initialized || !_mcpEnabled) return;
 
-#ifndef NATIVE_BUILD
     // --- Hardware: read characters from Serial until newline ---
     static constexpr int kMaxBytesPerTick = 2048;
     static constexpr size_t kMaxInputLen = 8192;
@@ -111,18 +107,14 @@ void MCPServer::tick() {
         }
         // else: silently drop characters beyond kMaxInputLen
     }
-#endif
-    // Native: no-op — tests call processLineForTest() or _processLine() directly
 }
 
-#ifdef NATIVE_BUILD
 /**
  * @brief Test harness entry point: feed a raw JSON-RPC line for processing.
  */
 void MCPServer::processLineForTest(const char* line) {
     _processLine(line);
 }
-#endif
 
 // ---------------------------------------------------------------------------
 // JSON-RPC Dispatch
@@ -376,7 +368,6 @@ void MCPServer::_sendError(int code, const char* message, JsonVariantConst id, P
 // ---------------------------------------------------------------------------
 
 void MCPServer::registerRoutes(PsychicHttpServer& server) {
-#ifndef NATIVE_BUILD
     // --- POST /api/mcp — JSON-RPC endpoint for MCP tool calls ---
     // NOTE: Serial transport (_processLine) is intentionally NOT guarded —
     // Serial/USB access is physical access and is treated as trusted.
@@ -513,12 +504,6 @@ void MCPServer::registerRoutes(PsychicHttpServer& server) {
             return ESP_OK;
         }
     );
-#else
-    server.on("/api/mcp", HTTP_POST, [](PsychicRequest* request, PsychicResponse* response) { return ESP_OK; });
-    server.on("/api/mcp/status", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) { return ESP_OK; });
-    server.on("/api/mcp/config", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) { return ESP_OK; });
-    server.on("/api/mcp/config", HTTP_POST, [](PsychicRequest* request, PsychicResponse* response) { return ESP_OK; });
-#endif
 }
 
 // ---------------------------------------------------------------------------

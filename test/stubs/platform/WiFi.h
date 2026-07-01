@@ -3,6 +3,7 @@
 
 #define WIFI_STA 1
 #define WIFI_AP 2
+#define WIFI_AP_STA 3
 
 class WiFiClass {
 public:
@@ -12,7 +13,10 @@ public:
     int status() { return WL_DISCONNECTED; }
     IPAddress localIP() { return IPAddress(0, 0, 0, 0); }
     IPAddress softAPIP() { return IPAddress(0, 0, 0, 0); }
-    String macAddress() { return "AA:BB:CC:DD:EE:FF"; }
+    std::string macAddress() { return "AA:BB:CC:DD:EE:FF"; }
+    std::string softAPmacAddress() { return "AA:BB:CC:DD:EE:FF"; }
+    std::string SSID() { return "TEST_SSID"; }
+    std::string softAPSSID() { return "TEST_AP_SSID"; }
     void setHostname(const char* hostname) { (void)hostname; }
     bool softAP(const char* ssid, const char* passphrase = nullptr, int channel = 1, int ssid_hidden = 0, int max_connection = 4) { return true; }
     int32_t RSSI() { return -50; }

@@ -31,7 +31,6 @@
 // Platform-conditional includes & logging shims
 // Matches the Application.cpp pattern: ESP-IDF logs on hardware, printf on native.
 // ---------------------------------------------------------------------------
-#ifndef NATIVE_BUILD
     #include <Arduino.h>
     #include "esp_system.h"
     #include "esp_heap_caps.h"
@@ -41,7 +40,6 @@
     #include <LittleFS.h>
     #include <WiFi.h>
     #include <base64.h>
-#endif
 
 #include "platform/LogShim.h"
 
@@ -55,44 +53,7 @@ static DisplayInfo s_displayInfo;
 // Base64 lookup table (hardware uses the ESP32 base64 library; native needs
 // a minimal inline implementation to avoid external dependencies).
 // ---------------------------------------------------------------------------
-#ifdef NATIVE_BUILD
-namespace {
 
-// Standard Base64 alphabet
-static const char kBase64Chars[] =
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-
-/**
- * @brief Encode a byte array to Base64 (native build only).
- *
- * On hardware the ESP32 base64 library is used instead. This minimal
- * implementation avoids pulling in any additional native dependencies.
- *
- * @param data  Pointer to the raw byte array.
- * @param len   Length of the byte array.
- * @return Base64-encoded std::string.
- */
-std::string base64Encode(const uint8_t* data, size_t len) {
-    std::string result;
-    result.reserve(((len + 2) / 3) * 4); // Pre-allocate to avoid reallocation
-
-    for (size_t i = 0; i < len; i += 3) {
-        // --- Pack up to 3 input bytes into a 24-bit value ---
-        uint32_t n = static_cast<uint32_t>(data[i]) << 16;
-        if (i + 1 < len) n |= static_cast<uint32_t>(data[i + 1]) << 8;
-        if (i + 2 < len) n |= static_cast<uint32_t>(data[i + 2]);
-
-        // --- Extract 4 six-bit groups from the 24-bit value ---
-        result += kBase64Chars[(n >> 18) & 0x3F];
-        result += kBase64Chars[(n >> 12) & 0x3F];
-        result += (i + 1 < len) ? kBase64Chars[(n >> 6) & 0x3F] : '=';
-        result += (i + 2 < len) ? kBase64Chars[n & 0x3F] : '=';
-    }
-    return result;
-}
-
-} // anonymous namespace
-#endif
 
 // ---------------------------------------------------------------------------
 // File-scope context for built-in tools
@@ -134,7 +95,6 @@ void mcpBuiltinTools::registerAll(MCPToolRegistry& registry,
         [](void* ctx, JsonObject& params, JsonObject& result) {
             auto* c = static_cast<BuiltinToolsContext*>(ctx);
             (void)params; // No input parameters required
-            #ifndef NATIVE_BUILD
                 // --- Internal DRAM metrics (always present on all ESP32 variants) ---
                 result["heap_free"]          = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
                 result["heap_total"]         = heap_caps_get_total_size(MALLOC_CAP_INTERNAL);
@@ -214,39 +174,6 @@ void mcpBuiltinTools::registerAll(MCPToolRegistry& registry,
                         }
                     }
                 }
-            #else
-                (void)c; // Suppress unused-variable warning on native build
-                // Native build stubs — no hardware telemetry available
-                result["heap_free"]          = 0;
-                result["heap_total"]         = 0;
-                result["heap_min_free"]      = 0;
-                result["heap_max_alloc"]     = 0;
-                result["psram_free"]         = 0;
-                result["psram_total"]        = 0;
-                result["heap_default_free"]  = 0;
-                result["heap_default_total"] = 0;
-                result["storage_used"]       = 0;
-                result["storage_total"]      = 0;
-                result["chip_temp"]          = 0.0;
-                result["uptime_seconds"]     = 0;
-                result["build_serial"]       = __DATE__ " " __TIME__;
-                result["sdk_version"]        = "native";
-                result["chip_model"]         = "native";
-                result["chip_revision"]      = 0;
-                result["chip_cores"]         = 0;
-                result["flash_size"]         = 0;
-                result["ap_mode"]            = false;
-                result["wifi_ssid"]          = "";
-                result["wifi_ip"]            = "0.0.0.0";
-                result["wifi_mac"]           = "";
-                result["wifi_rssi"]          = 0;
-                result["partition"]          = "native";
-                result["time_configured"]    = false;
-                result["time_synced"]        = false;
-                result["time_timezone"]      = "";
-                result["time_posix"]         = "";
-                result["time_sync_status"]   = "UNSYNCED";
-            #endif
             result["firmware_version"] = BUILD_VERSION;
         },
         &s_builtinCtx  // context: BuiltinToolsContext*
@@ -344,16 +271,12 @@ void mcpBuiltinTools::registerAll(MCPToolRegistry& registry,
             result["status"]  = "rebooting";
             result["message"] = "Device will restart in 1 second";
 
-            #ifndef NATIVE_BUILD
                 // Flush the JSON-RPC response before restarting.
                 // The serial output is written synchronously, so by the
                 // time we reach here the response has already been serialized.
                 ESP_LOGI(TAG, "Reboot requested via MCP — restarting in 1s");
                 delay(1000);
                 esp_restart();
-            #else
-                ESP_LOGI(TAG, "Reboot requested via MCP (native build — no-op)");
-            #endif
         },
         nullptr,  // context: not needed
         true  // mutatesState — restarts the device
@@ -433,7 +356,6 @@ void mcpBuiltinTools::registerAll(MCPToolRegistry& registry,
             }
 
             // --- Encode framebuffer to base64 ---
-            #ifndef NATIVE_BUILD
                 // Hardware: use the ESP32 base64 library with chunked encoding
                 // to avoid a single massive heap allocation. Process 48-byte
                 // chunks (48 divides cleanly by 3 for base64 padding alignment).
@@ -447,11 +369,6 @@ void mcpBuiltinTools::registerAll(MCPToolRegistry& registry,
                     b64 += b64Chunk.c_str();
                     offset += chunk;
                 }
-            #else
-                // Native build: use the inline base64 encoder
-                std::string b64 = base64Encode(s_displayInfo.framebuffer,
-                                               s_displayInfo.framebufferSize);
-            #endif
 
             result["format"] = "xbm";
             result["width"]  = s_displayInfo.width;

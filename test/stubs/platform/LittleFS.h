@@ -56,5 +56,7 @@ public:
         std::error_code ec;
         return std::filesystem::create_directories("test/tmp" + std::string(path), ec);
     }
+    size_t usedBytes() { return 50000; }
+    size_t totalBytes() { return 150000; }
 };
 inline FSClass LittleFS;

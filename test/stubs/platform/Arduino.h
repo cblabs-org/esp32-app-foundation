@@ -1,6 +1,7 @@
 #pragma once
 #include <cstdint>
 #include <string>
+#include <cstring>
 
 #ifndef PROGMEM
 #define PROGMEM
@@ -41,23 +42,50 @@ private:
 };
 #endif
 
-inline unsigned long millis() { return 0; }
 inline void delay(uint32_t ms) { (void)ms; }
+inline float temperatureRead() { return 42.0f; }
 
 class Print {
 public:
-    virtual ~Print() {}
-    virtual size_t write(uint8_t) = 0;
+    virtual ~Print() = default;
+    virtual size_t write(uint8_t c) = 0;
+    virtual size_t write(const uint8_t* buf, size_t size) {
+        size_t n = 0;
+        for (size_t i = 0; i < size; ++i) n += write(buf[i]);
+        return n;
+    }
+    size_t print(const char* s) {
+        return write(reinterpret_cast<const uint8_t*>(s), strlen(s));
+    }
+    size_t println(const char* s) {
+        size_t n = print(s);
+        n += write('\n');
+        return n;
+    }
+    size_t println() { return write('\n'); }
 };
 
-class SerialClass : public Print {
+class MockSerial : public Print {
 public:
-    void begin(unsigned long baud) { (void)baud; }
+    size_t write(uint8_t c) override {
+        _output += static_cast<char>(c);
+        return 1;
+    }
     int available() { return 0; }
     int read() { return -1; }
-    size_t write(uint8_t c) override { return 1; }
+    void begin(unsigned long) {}
+
+    std::string flush() {
+        std::string out = std::move(_output);
+        _output.clear();
+        return out;
+    }
+    const std::string& getOutput() const { return _output; }
+
+private:
+    std::string _output;
 };
-inline SerialClass Serial;
+inline MockSerial Serial;
 
 #define WL_CONNECTED 3
 #define WL_DISCONNECTED 6
@@ -68,12 +96,15 @@ public:
     IPAddress(uint8_t first_octet, uint8_t second_octet, uint8_t third_octet, uint8_t fourth_octet) {
         _addr = first_octet | (second_octet << 8) | (third_octet << 16) | (fourth_octet << 24);
     }
-    String toString() const { return "0.0.0.0"; }
+    std::string toString() const { return "0.0.0.0"; }
 private:
     uint32_t _addr;
 };
 
 #ifndef ESP_OK
 #define ESP_OK 0
+#endif
+#ifndef ESP_FAIL
+#define ESP_FAIL -1
 #endif
 typedef int esp_err_t;

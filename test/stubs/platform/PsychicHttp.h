@@ -25,6 +25,8 @@ public:
     const char* header(const char* name) { return ""; }
     bool hasHeader(const char* name) { return false; }
     std::string body() { return std::string(); }
+    size_t contentLength() { return 0; }
+    const char* bodyCStr() { return ""; }
 };
 
 typedef std::function<esp_err_t(PsychicRequest *request, PsychicResponse *response)> PsychicHttpRequestCallback;

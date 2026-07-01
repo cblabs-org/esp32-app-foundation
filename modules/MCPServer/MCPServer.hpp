@@ -46,71 +46,7 @@
 #include <vector>
 #include <string>
 
-#ifndef NATIVE_BUILD
-    #include <Arduino.h>
-#else
-    #include <cstdio>
-    #include <cstdint>
-    #include <cstring>
-
-    // -----------------------------------------------------------------------
-    // Minimal Print base class mock for native builds
-    // Mirrors the Arduino Print interface used by the JSON-RPC response path.
-    // -----------------------------------------------------------------------
-    class Print {
-    public:
-        virtual ~Print() = default;
-        virtual size_t write(uint8_t c) = 0;
-        virtual size_t write(const uint8_t* buf, size_t size) {
-            size_t n = 0;
-            for (size_t i = 0; i < size; ++i) n += write(buf[i]);
-            return n;
-        }
-        size_t print(const char* s) {
-            return write(reinterpret_cast<const uint8_t*>(s), strlen(s));
-        }
-        size_t println(const char* s) {
-            size_t n = print(s);
-            n += write('\n');
-            return n;
-        }
-        size_t println() { return write('\n'); }
-    };
-
-    // -----------------------------------------------------------------------
-    // Consolidated String stub for native builds
-    // -----------------------------------------------------------------------
-    #include "../../include/platform/NativeBuildStubs.hpp"
-
-    // -----------------------------------------------------------------------
-    // Minimal Serial mock — string-buffer class for native compilation
-    // Registration hook called by other modules to contribute their tools.
-    // Mirrors the pattern used by WebServer for PsychicHttpServer.
-    // -----------------------------------------------------------------------
-    class MockSerial : public Print {
-    public:
-        size_t write(uint8_t c) override {
-            _output += static_cast<char>(c);
-            return 1;
-        }
-        int available() { return 0; }  // No-op in native — tests call _processLine directly
-        int read() { return -1; }
-        void begin(unsigned long) {}
-
-        /// @brief Retrieve and clear the accumulated output buffer.
-        std::string flush() {
-            std::string out = std::move(_output);
-            _output.clear();
-            return out;
-        }
-        const std::string& getOutput() const { return _output; }
-
-    private:
-        std::string _output; ///< Accumulated serial output for test inspection
-    };
-
-    extern MockSerial Serial; // Defined in mcpServer.cpp
-#endif
+#include <Arduino.h>
 
 #include "MCPToolRegistry.hpp"
 #include "MCPBuiltinTools.hpp"
@@ -245,13 +181,11 @@ public:
      */
     void resetConfig() override;
 
-#ifdef NATIVE_BUILD
     /**
      * @brief Expose _processLine for native unit tests.
      * @param line The raw JSON-RPC request string.
      */
     void processLineForTest(const char* line);
-#endif
 
 private:
     MCPToolRegistry _registry;                    ///< Registered tool collection
