@@ -15,6 +15,8 @@ typedef int esp_err_t;
 class PsychicResponse {
 public:
     esp_err_t send(int code, const char* contentType, const char* content) { return ESP_OK; }
+    esp_err_t send(const char* content) { return ESP_OK; }
+    esp_err_t send(const String& content) { return ESP_OK; }
     esp_err_t send() { return ESP_OK; }
     void setContent(const uint8_t* content, size_t len) {}
     void setContentType(const char* type) {}
