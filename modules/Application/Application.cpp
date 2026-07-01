@@ -30,11 +30,6 @@
 #include "../../include/events/AppConfiguringPayload.hpp"
 #include "../OTAUpdateManager/OTAUpdateManager.hpp"
 
-// Full include for HomeAssistantModule (forward-declared in Application.hpp
-// to break the circular AppFoundation.h → Application.hpp include chain).
-#ifndef NATIVE_BUILD
-    #include "../HomeAssistant/HomeAssistantModule.hpp"
-#endif
 
 // ---------------------------------------------------------------------------
 // Platform-conditional includes
@@ -62,10 +57,6 @@ static constexpr const char* TAG = "Application";
 Application::~Application() {
     delete _otaManager;
     _otaManager = nullptr;
-#ifndef NATIVE_BUILD
-    delete _haModule;
-    _haModule = nullptr;
-#endif
 }
 
 // ---------------------------------------------------------------------------
@@ -144,19 +135,14 @@ bool Application::begin(const FrameworkConfig& config) {
     _authManager.begin(&_configManager, &_keyManager);
 
     // --- Step 7a: HomeAssistant module wiring ---
-    // Allocate and wire the framework-owned HA MQTT service. The module ships
+    // Wire the framework-owned HA MQTT service. The module ships
     // with zero default entities — apps add their own via getHomeAssistant().
 #ifndef NATIVE_BUILD
-    _haModule = new (std::nothrow) HomeAssistantModule();
-    if (_haModule == nullptr) {
-        ESP_LOGE(TAG, "Failed to allocate HomeAssistantModule");
-        return false;
-    }
-    _haModule->setKeyManager(&_keyManager);
-    _haModule->setEventBus(&_eventBus);
-    _haModule->setConfigManager(&_configManager);
-    _haModule->setAppName(getAppName());
-    _haModule->setAppVersion(BUILD_VERSION);
+    _haModule.setKeyManager(&_keyManager);
+    _haModule.setEventBus(&_eventBus);
+    _haModule.setConfigManager(&_configManager);
+    _haModule.setAppName(getAppName());
+    _haModule.setAppVersion(BUILD_VERSION);
 #endif
     _otaManager = new (std::nothrow) OTAUpdateManager();
     if (_otaManager == nullptr) {
@@ -176,7 +162,7 @@ bool Application::begin(const FrameworkConfig& config) {
     registerModule(_otaManager);          // ITickable + IConfigurable + IWebContributor + IMCPContributor
     registerModule(&_webServerManager);   // ITickable
 #ifndef NATIVE_BUILD
-    registerModule(_haModule);           // ITickable + IConfigurable + IWebContributor + IMCPContributor
+    registerModule(&_haModule);          // ITickable + IConfigurable + IWebContributor + IMCPContributor
 #endif
     if (_enableDefaultAppTab) {
         registerModule(&_appTabContributor);  // IWebContributor

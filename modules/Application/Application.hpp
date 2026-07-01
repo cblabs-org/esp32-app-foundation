@@ -81,11 +81,8 @@
 #endif
 
 // Home Assistant MQTT integration (hardware only — MQTT client unavailable in native builds)
-// Forward-declared here because HomeAssistantModule.hpp includes interfaces that
-// would create a circular chain via AppFoundation.h → Application.hpp.
-// Full HomeAssistantModule.hpp is included in Application.cpp.
 #ifndef NATIVE_BUILD
-    class HomeAssistantModule;
+    #include "../HomeAssistant/HomeAssistantModule.hpp"
 #endif
 
 // Forward declaration only — OTAUpdateManager.hpp pulls in WiFiClientSecure
@@ -396,7 +393,7 @@ public:
      *
      * @return Reference to the HomeAssistantModule.
      */
-    HomeAssistantModule& getHomeAssistant() { return *_haModule; }
+    HomeAssistantModule& getHomeAssistant() { return _haModule; }
 #endif
 
     // -------------------------------------------------------------------------
@@ -568,6 +565,6 @@ private:
 
     // Home Assistant integration (hardware only)
 #ifndef NATIVE_BUILD
-    HomeAssistantModule* _haModule = nullptr;   ///< Framework-owned HA MQTT service (heap, fwd-declared)
+    HomeAssistantModule _haModule;              ///< Framework-owned HA MQTT service
 #endif
 };

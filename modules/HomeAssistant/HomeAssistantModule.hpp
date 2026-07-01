@@ -55,9 +55,7 @@
  */
 #pragma once
 
-// Targeted interface includes — avoids the AppFoundation.h → Application.hpp
-// → U8G2DisplayModule.hpp include chain (which requires U8G2-specific widget
-// include paths not available in this module's compilation unit).
+// Interface includes
 #include "../../include/build_version.h"
 #include "../../include/interfaces/ITickable.hpp"
 #include "../../include/interfaces/IConfigurable.hpp"
