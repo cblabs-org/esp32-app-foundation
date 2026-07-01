@@ -75,25 +75,8 @@ TEST_F(OtaUpdateManagerTest, CheckForUpdate_NoRepo_ReturnsFalse) {
 // Legacy API Tests
 // ---------------------------------------------------------------------------
 
-/// Legacy beginUpdate() should return false on native builds.
-TEST_F(OtaUpdateManagerTest, BeginUpdate_OnNative_ReturnsFalse) {
-    EXPECT_FALSE(manager.beginUpdate(1024, "abc123"));
-}
-
-/// Legacy endUpdate() should return false on native builds.
-TEST_F(OtaUpdateManagerTest, EndUpdate_OnNative_ReturnsFalse) {
-    EXPECT_FALSE(manager.endUpdate());
-}
-
-/// beginUpdate with nullptr MD5 should return false on native.
-TEST_F(OtaUpdateManagerTest, BeginUpdate_NullptrMD5_ReturnsFalse) {
-    EXPECT_FALSE(manager.beginUpdate(1024, nullptr));
-}
-
-/// beginUpdate with zero size should return false on native.
-TEST_F(OtaUpdateManagerTest, BeginUpdate_ZeroSize_ReturnsFalse) {
-    EXPECT_FALSE(manager.beginUpdate(0, "abc"));
-}
+// Legacy beginUpdate() tests were removed because the #ifndef NATIVE_BUILD guards
+// were removed in PR-41, so they now execute the real stubbed update logic.
 
 /// markAppValid() should not crash.
 TEST_F(OtaUpdateManagerTest, MarkAppValid_NoCrash) {

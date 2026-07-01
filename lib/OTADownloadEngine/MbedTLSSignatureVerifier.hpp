@@ -28,10 +28,8 @@
 
 #include "../../include/interfaces/IOTAVerifier.hpp"
 
-#ifndef NATIVE_BUILD
     #include <mbedtls/md.h>
     #include <mbedtls/pk.h>
-#endif
 
 /**
  * @brief IOTAVerifier implementation using mbedtls for SHA-256 hashing
@@ -73,9 +71,7 @@ public:
     bool verify(const uint8_t* signature, size_t signatureLength) override;
 
 private:
-#ifndef NATIVE_BUILD
     mbedtls_pk_context   pk_;     // Public key context
     mbedtls_md_context_t md_ctx_; // Message digest (SHA-256) context
-#endif
     bool initialized_ = false;    // Guard: true only after successful begin()
 };

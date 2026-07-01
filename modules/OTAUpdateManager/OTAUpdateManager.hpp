@@ -61,21 +61,10 @@
 
 #pragma once
 
-#ifndef NATIVE_BUILD
 #include <Arduino.h>
 #include <Stream.h>
-#else
-#include <string>
-#include <cstddef>  // for size_t
-#include <stdint.h>
+#include <freertos/task.h>
 
-typedef int esp_err_t;
-
-// Consolidated String stub for NATIVE_BUILD
-#include "../../include/platform/NativeBuildStubs.hpp"
-// Minimal Stream stub for NATIVE_BUILD
-class Stream {};
-#endif
 
 #include "../../include/interfaces/IWebContributor.hpp"
 #include "../../include/interfaces/IConfigurable.hpp"
@@ -427,11 +416,7 @@ private:
     const char*   _lastOtaError = nullptr;             // Last error string from download engine
     float         _lastProgress = 0.0f;                // Last progress fraction for API polling
 
-#ifndef NATIVE_BUILD
     TaskHandle_t  _taskHandle   = nullptr;             // FreeRTOS task handle for download
-#else
-    void*         _taskHandle   = nullptr;             // Stub for native builds
-#endif
 
     // -------------------------------------------------------------------------
     // FreeRTOS task plumbing

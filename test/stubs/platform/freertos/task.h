@@ -23,3 +23,8 @@ inline int xTaskCreateWithCaps(TaskFunction_t pxTaskCode, const char* const pcNa
 
 inline void vTaskDelete(TaskHandle_t xTaskToDelete) {}
 inline void vTaskDelay(uint32_t xTicksToDelay) { throw StubTaskYieldException(); }
+
+
+typedef uint32_t StackType_t;
+inline uint32_t uxTaskGetStackHighWaterMark(TaskHandle_t xTask) { return 1000; }
+

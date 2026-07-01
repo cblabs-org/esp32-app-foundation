@@ -55,6 +55,7 @@ typedef std::function<esp_err_t(PsychicRequest*, PsychicResponse*, PsychicMiddle
 #define HTTP_ANY     0b01111111
 
 class PsychicEndpoint {};
+class PsychicHandler {};
 
 class PsychicHttpServer {
 public:
@@ -72,6 +73,9 @@ public:
 
     PsychicEndpoint* on(const char* uri, int method, PsychicHttpRequestCallback handler) {
         routes.push_back({uri, method, handler});
+        return nullptr;
+    }
+    PsychicEndpoint* on(const char* uri, int method, PsychicHandler* handler) {
         return nullptr;
     }
     void onNotFound(PsychicHttpRequestCallback handler) {} // Stub for captive portal

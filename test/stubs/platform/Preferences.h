@@ -6,6 +6,9 @@
 
 class Preferences {
 public:
+    uint32_t getUInt(const char* key, uint32_t defaultValue = 0) { return defaultValue; }
+    size_t putUInt(const char* key, uint32_t value) { return 4; }
+
     bool begin(const char* name, bool readOnly = false) { return true; }
     void end() {}
     size_t putBytes(const char* key, const void* value, size_t len) {
@@ -36,6 +39,9 @@ public:
     bool isKey(const char* key) {
         return _map.find(key) != _map.end();
     }
+
+
 private:
     std::map<std::string, std::vector<uint8_t>> _map;
 };
+

@@ -41,27 +41,14 @@
 #include <string>
 
 
-#ifndef NATIVE_BUILD
     #include <Arduino.h>
     // WiFiClient is a typedef for NetworkClient in the ESP32 Arduino framework.
     // Forward-declare the real class and replicate the typedef to avoid pulling
     // the full WiFi library into the LDF dependency graph from this header.
-    class NetworkClient;
+    #include <WiFiClient.h>
     typedef NetworkClient WiFiClient;
     // Forward declaration only — heavy HTTPClient header included in .cpp
     class HTTPClient;
-#else
-    // --- Native build stubs ---
-
-    // Minimal WiFiClient stub for native compilation
-    class WiFiClient {
-    public:
-        virtual ~WiFiClient() = default;
-    };
-
-    // Minimal HTTPClient stub for native compilation
-    class HTTPClient {};
-#endif
 
 /**
  * @brief Callback type for reporting OTA download progress.

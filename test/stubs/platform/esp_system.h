@@ -10,5 +10,8 @@ public:
     const char* getSdkVersion() { return "v1.0.0-stub"; }
     uint32_t getFlashChipSize() { return 4194304; }
     void restart() {}
+
+    int getFreeSketchSpace() { return 1000000; }
+
 };
 inline ESPClass ESP;

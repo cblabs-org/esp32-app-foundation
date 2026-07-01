@@ -33,7 +33,6 @@ static constexpr const char* TAG = "MbedTLSSignatureVerifier";
 // =============================================================================
 // Hardware build — full mbedtls implementation
 // =============================================================================
-#ifndef NATIVE_BUILD
 
 MbedTLSSignatureVerifier::MbedTLSSignatureVerifier() {
     mbedtls_pk_init(&pk_);
@@ -122,34 +121,3 @@ bool MbedTLSSignatureVerifier::verify(const uint8_t* signature, size_t signature
 // =============================================================================
 // Native build — stub implementations for interface contract testing
 // =============================================================================
-#else
-
-MbedTLSSignatureVerifier::MbedTLSSignatureVerifier() = default;
-
-MbedTLSSignatureVerifier::~MbedTLSSignatureVerifier() = default;
-
-bool MbedTLSSignatureVerifier::begin(const char* publicKeyPem) {
-    // Stub: reject null/empty keys (contract enforcement), otherwise no-op
-    if (publicKeyPem == nullptr || publicKeyPem[0] == '\0') {
-        ESP_LOGE(TAG, "begin() called with null or empty public key (native stub)");
-        return false;
-    }
-    // Native stubs cannot actually parse keys — always return false
-    initialized_ = false;
-    return false;
-}
-
-void MbedTLSSignatureVerifier::update(const uint8_t* data, size_t length) {
-    // Stub: no-op (initialized_ is always false in native builds)
-    (void)data;
-    (void)length;
-}
-
-bool MbedTLSSignatureVerifier::verify(const uint8_t* signature, size_t signatureLength) {
-    // Stub: always returns false — crypto not available in native builds
-    (void)signature;
-    (void)signatureLength;
-    return false;
-}
-
-#endif // NATIVE_BUILD

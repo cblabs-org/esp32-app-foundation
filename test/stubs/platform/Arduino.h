@@ -1,3 +1,5 @@
+#include "esp_heap_caps.h"
+#include "freertos/task.h"
 #pragma once
 #include <cstdint>
 #include <string>
@@ -11,6 +13,8 @@
 #ifndef STRING_STUB_DEFINED
 #define STRING_STUB_DEFINED
 class String {
+public:
+    bool endsWith(const char* suffix) const { return false; }
 public:
     String() {}
     String(const char* s) : _str(s ? s : "") {}

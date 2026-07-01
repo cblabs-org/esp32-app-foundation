@@ -94,19 +94,8 @@ TEST_F(OTAFailClosedTest, SignatureVerifyFailed_IsDistinct) {
     EXPECT_EQ(static_cast<int>(OTAError::SignatureFetchFailed), -10);
 }
 
-/**
- * @brief Verify the native stub returns HttpConnectionFailed, proving the stub
- *        compiles and the interface contract holds.
- */
-TEST_F(OTAFailClosedTest, NativeStub_ReturnsHttpConnectionFailed) {
-    WiFiClient stubClient;
-    uint8_t sigBuf[64] = {};
-    std::string url("https://example.com/firmware.bin");
-    std::string token("");
-
-    OTAError result = engine.downloadAndFlash(stubClient, url, token, sigBuf, sizeof(sigBuf));
-    EXPECT_EQ(result, OTAError::HttpConnectionFailed);
-}
+// NativeStub_ReturnsHttpConnectionFailed test was removed as part of PR-41
+// because the native stub guards were removed, so the real implementation now runs.
 
 // =============================================================================
 // Tests: shouldAbortOnMissingSig() helper

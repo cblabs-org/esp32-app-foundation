@@ -50,7 +50,6 @@ static constexpr const char* TAG = "OTAUpdateManager";
 // Module includes go in the .cpp ONLY (behind NATIVE_BUILD guard) to
 // respect the Hollywood Principle — no cross-module includes in headers.
 // ---------------------------------------------------------------------------
-#ifndef NATIVE_BUILD
 #include <PsychicHttp.h>
 #include <PsychicUploadHandler.h>
 #include <ArduinoJson.h>
@@ -70,10 +69,6 @@ static constexpr const char* TAG = "OTAUpdateManager";
 #include "../../lib/SemVer/SemVer.hpp"
 #include "../../lib/OTAManifest/OTAManifest.hpp"
 #include "../../modules/MCPServer/MCPToolRegistry.hpp"
-#else
-#include <ArduinoJson.h>
-#include "../Application/Application.hpp"
-#endif
 
 // ---------------------------------------------------------------------------
 // Global instance — REMOVED (Application now owns _otaManager)
@@ -228,13 +223,11 @@ void OTAUpdateManager::begin(Application& app) {
 void OTAUpdateManager::tick(uint32_t currentMillis) {
     if (!_autoCheck || _state != OTAState::Idle) return;
 
-#ifndef NATIVE_BUILD
     // Gate: do not attempt any network operation until Wi-Fi is confirmed up.
     // This prevents the boot check from racing the TLS/DNS stack during the
     // first few seconds after association, and prevents the daily check from
     // firing during a temporary network outage.
     if (WiFi.status() != WL_CONNECTED) return;
-#endif
 
     // --- Boot check: fire once, after Wi-Fi is confirmed connected ---
     if (!_hasBootChecked) {
@@ -245,7 +238,6 @@ void OTAUpdateManager::tick(uint32_t currentMillis) {
         return;
     }
 
-#ifndef NATIVE_BUILD
     // --- Daily scheduled check at _checkHour ---
     time_t now = time(nullptr);
     if (now < 1000000UL) return; // NTP not yet synced
@@ -260,7 +252,6 @@ void OTAUpdateManager::tick(uint32_t currentMillis) {
         ESP_LOGI(TAG, "Auto-check: daily trigger at hour %u", (unsigned)_checkHour);
         performUpdate();
     }
-#endif
 }
 
 /**
@@ -296,17 +287,11 @@ bool OTAUpdateManager::checkForUpdate() {
     _lastCheckMillis = millis();
     ESP_LOGI(TAG, "Checking for updates — local: %s, channel: '%s'", BUILD_VERSION, _channel);
 
-#ifndef NATIVE_BUILD
     // Manifest-first check is performed by performUpdateTask(). This method
     // returns false until a lightweight manifest-only version check is wired.
     ESP_LOGW(TAG, "checkForUpdate() — use performUpdate() for manifest-first check");
     _state = OTAState::Idle;
     return false;
-#else
-    // Native builds cannot perform real update checks
-    _state = OTAState::Idle;
-    return false;
-#endif
 }
 
 /**
@@ -334,7 +319,6 @@ void OTAUpdateManager::performUpdate() {
     _state = OTAState::Checking;
     ESP_LOGI(TAG, "Launching OTA update pipeline");
 
-#ifndef NATIVE_BUILD
     // --- Pre-flight: DRAM headroom check ---
     uint32_t freeDram = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
     uint32_t required = OTA_TASK_STACK_BYTES + OTA_TASK_DRAM_HEADROOM_BYTES;
@@ -371,12 +355,6 @@ void OTAUpdateManager::performUpdate() {
         _lastOtaError = "Failed to create OTA task (insufficient memory)";
         publishProgress(0.0f, "Failed to create OTA task (insufficient memory)", true, false);
     }
-#else
-    // Native builds cannot run FreeRTOS tasks
-    ESP_LOGW(TAG, "performUpdate() — no FreeRTOS on native build, setting Error");
-    _state = OTAState::Error;
-    _lastOtaError = "FreeRTOS not available on native build";
-#endif
 }
 
 /**
@@ -385,9 +363,7 @@ void OTAUpdateManager::performUpdate() {
 void OTAUpdateManager::otaTaskWrapper(void* param) {
     auto* self = static_cast<OTAUpdateManager*>(param);
     self->performUpdateTask();
-#ifndef NATIVE_BUILD
     vTaskDelete(nullptr);
-#endif
 }
 
 /**
@@ -407,7 +383,6 @@ void OTAUpdateManager::otaTaskWrapper(void* param) {
  *  11. Finalize and reboot
  */
 void OTAUpdateManager::performUpdateTask() {
-#ifndef NATIVE_BUILD
     ESP_LOGI(TAG, "OTA task started (manifest-first flow)");
 
     // NOTE: Do NOT register this task with TWDT here. The OTA pipeline makes
@@ -663,12 +638,6 @@ void OTAUpdateManager::performUpdateTask() {
              static_cast<unsigned>(uxTaskGetStackHighWaterMark(nullptr) * sizeof(StackType_t)));
 
     ESP.restart();
-#else
-    // Native builds: no-op (should not be called)
-    ESP_LOGW(TAG, "performUpdateTask() called on native build — no-op");
-    _state = OTAState::Error;
-    _lastOtaError = "Cannot perform OTA on native build";
-#endif
 }
 
 /**
@@ -687,11 +656,9 @@ void OTAUpdateManager::publishProgress(float progress, const char* status,
     event.complete = complete;
     event.success  = success;
 
-#ifndef NATIVE_BUILD
     if (_eventBus != nullptr) {
         _eventBus->publish(OTAUpdateManagerEvents::OTA_PROGRESS, &event);
     }
-#endif
     ESP_LOGD(TAG, "OTA progress: %.1f%% — %s (complete=%d, success=%d)",
              progress * 100.0f, status, complete, success);
 }
@@ -715,7 +682,6 @@ void OTAUpdateManager::publishProgress(float progress, const char* status,
  * @param outLen  [out] Number of bytes written into buf on success.
  * @return true on success, false on any network or sizing error.
  */
-#ifndef NATIVE_BUILD
 static bool downloadRawFile_(const char* url, const char* token,
                              char* buf, size_t bufSize, size_t& outLen) {
     // --- Allocate WiFiClientSecure with CA-pinned certs ---
@@ -789,7 +755,6 @@ static bool downloadRawFile_(const char* url, const char* token,
     ESP_LOGI(TAG, "downloadRawFile_: fetched %d bytes from %s", bytesRead, url);
     return true;
 }
-#endif  // NATIVE_BUILD
 
 /**
  * @brief Fetch manifest.json + manifest.json.sig, verify signature, and parse.
@@ -811,7 +776,6 @@ static bool downloadRawFile_(const char* url, const char* token,
  * the current _learnedManifestUrl, update and persist via config save.
  */
 bool OTAUpdateManager::fetchAndVerifyManifest_(OTAManifest& manifest) {
-#ifndef NATIVE_BUILD
     const FrameworkConfig& cfg = *_config;
     const char* token = cfg.otaToken ? cfg.otaToken : "";
 
@@ -928,13 +892,6 @@ bool OTAUpdateManager::fetchAndVerifyManifest_(OTAManifest& manifest) {
     publishProgress(0.0f, "Manifest fetch failed", true, false);
     return false;
 
-#else
-    // Native build stub — no WiFi, no HTTPS
-    (void)manifest;
-    _state = OTAState::Error;
-    _lastOtaError = "Cannot fetch manifest on native build";
-    return false;
-#endif
 }
 
 
@@ -966,7 +923,6 @@ const char* OTAUpdateManager::getLastOtaError() const {
 bool OTAUpdateManager::beginUpdate(size_t size, const char* expectedMD5) {
     ESP_LOGI(TAG, "Beginning OTA update: size=%u, MD5=%s",
              (unsigned)size, expectedMD5 ? expectedMD5 : "(none)");
-#ifndef NATIVE_BUILD
     // --- Step 1: Initialize the Update library ---
     if (!Update.begin(size)) {
         ESP_LOGE(TAG, "Update.begin() failed for size %u", (unsigned)size);
@@ -982,38 +938,27 @@ bool OTAUpdateManager::beginUpdate(size_t size, const char* expectedMD5) {
 
     _expectedSize = size;
     return true;
-#else
-    return false;
-#endif
 }
 
 /**
  * @brief Writes data from the provided stream directly into the OTA partition.
  */
 size_t OTAUpdateManager::writeStream(Stream& dataStream) {
-#ifndef NATIVE_BUILD
     size_t written = Update.writeStream(dataStream);
     ESP_LOGD(TAG, "writeStream: %u bytes written", (unsigned)written);
     return written;
-#else
-    return 0;
-#endif
 }
 
 /**
  * @brief Finalizes the OTA update. Checks that total bytes and MD5 match.
  */
 bool OTAUpdateManager::endUpdate() {
-#ifndef NATIVE_BUILD
     if (Update.end()) {
         ESP_LOGI(TAG, "OTA update finalized successfully");
         return true;
     }
     ESP_LOGE(TAG, "OTA update finalization failed");
     return false;
-#else
-    return false;
-#endif
 }
 
 /**
@@ -1021,7 +966,6 @@ bool OTAUpdateManager::endUpdate() {
  */
 void OTAUpdateManager::markAppValid() {
     ESP_LOGI(TAG, "Marking firmware as valid (blessing app)");
-#ifndef NATIVE_BUILD
     checkSecurityVersion();
 #ifdef CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE
     esp_ota_mark_app_valid_cancel_rollback();
@@ -1032,7 +976,6 @@ void OTAUpdateManager::markAppValid() {
         _configManager->getManifest().save();
         ESP_LOGI(TAG, "Config manifest: Active → Golden snapshot saved (firmware blessed)");
     }
-#endif
 }
 
 /**
@@ -1044,7 +987,6 @@ void OTAUpdateManager::markAppValid() {
  * rollback protection at the application layer.
  */
 void OTAUpdateManager::checkSecurityVersion() {
-#ifndef NATIVE_BUILD
     Preferences prefs;
     prefs.begin("ota_security", false);
     uint32_t stored = prefs.getUInt("sec_ver", 0);
@@ -1056,7 +998,6 @@ void OTAUpdateManager::checkSecurityVersion() {
         ESP_LOGD(TAG, "Security version OK: stored=%u compiled=%u", stored, (uint32_t)SECURITY_VERSION);
     }
     prefs.end();
-#endif
 }
 
 /**
@@ -1064,14 +1005,12 @@ void OTAUpdateManager::checkSecurityVersion() {
  */
 void OTAUpdateManager::rollbackFirmware() {
     ESP_LOGW(TAG, "Firmware rollback triggered");
-#ifndef NATIVE_BUILD
     const esp_partition_t* updatePartition = esp_ota_get_next_update_partition(NULL);
 
     if (updatePartition) {
         esp_ota_set_boot_partition(updatePartition);
         ESP.restart();
     }
-#endif
 }
 
 // ---------------------------------------------------------------------------
@@ -1119,7 +1058,6 @@ esp_err_t OTAUpdateManager::handleSignedUpload(PsychicRequest* request,
                                            const String& filename,
                                            uint64_t index, uint8_t* data,
                                            size_t len, bool final) {
-#ifndef NATIVE_BUILD
     if (_config == nullptr) {
         ESP_LOGE(TAG, "Upload: module not initialized (begin() not called)");
         return ESP_FAIL;
@@ -1225,10 +1163,6 @@ esp_err_t OTAUpdateManager::handleSignedUpload(PsychicRequest* request,
         ESP_LOGI(TAG, "Upload: firmware transfer complete — %u bytes received", (unsigned)_uploadBinSize);
     }
     return ESP_OK;
-#else
-    (void)request; (void)filename; (void)index; (void)data; (void)len; (void)final;
-    return ESP_OK;
-#endif
 }
 
 // =============================================================================
@@ -1246,7 +1180,6 @@ esp_err_t OTAUpdateManager::handleSignedUpload(PsychicRequest* request,
  * @return ESP_OK on success, ESP_FAIL on any error.
  */
 esp_err_t OTAUpdateManager::finaliseSignedUpload(PsychicResponse* response) {
-#ifndef NATIVE_BUILD
     // If the upload was already aborted during chunk processing, report it
     if (_uploadAborted) {
         ESP_LOGE(TAG, "Upload: finalisation skipped — upload was aborted during transfer");
@@ -1314,14 +1247,9 @@ esp_err_t OTAUpdateManager::finaliseSignedUpload(PsychicResponse* response) {
     delay(500);
     ESP.restart();
     return ESP_OK; // unreachable but keeps compiler happy
-#else
-    (void)response;
-    return ESP_OK;
-#endif
 }
 
 void OTAUpdateManager::registerRoutes(PsychicHttpServer& server) {
-#ifndef NATIVE_BUILD
     // --- GET: status endpoint ---
     server.on("/api/ota", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
         JsonDocument doc;
@@ -1484,7 +1412,6 @@ void OTAUpdateManager::registerRoutes(PsychicHttpServer& server) {
     });
 #endif
     server.on("/api/ota/upload", HTTP_POST, otaUploadHandler);
-#endif
 }
 
 // =============================================================================
@@ -1513,7 +1440,6 @@ static const char* otaStateToString(OTAState state) {
 }
 
 void OTAUpdateManager::registerMCPTools(MCPToolRegistry& registry) {
-#ifndef NATIVE_BUILD
     // --- ota_get_status: read-only status snapshot ---
     registry.addTool("ota_get_status", "Get OTA update manager status, firmware version, channel, and timing",
         [](void* context, JsonObject& args, JsonObject& result) {
@@ -1587,5 +1513,4 @@ void OTAUpdateManager::registerMCPTools(MCPToolRegistry& registry) {
                 result["status"] = "Update initiated";
             }, this, true);
     }
-#endif
 }

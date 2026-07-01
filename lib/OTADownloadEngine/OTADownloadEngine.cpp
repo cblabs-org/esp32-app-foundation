@@ -116,7 +116,6 @@ void OTADownloadEngine::setExpectedVersion(const char* version) {
 }
 
 
-#ifndef NATIVE_BUILD
 // =============================================================================
 // Hardware implementation — full OTA download engine
 // =============================================================================
@@ -554,44 +553,3 @@ OTAError OTADownloadEngine::downloadAndFlash(WiFiClient& client, const std::stri
 }
 
 
-#else
-// =============================================================================
-// Native build stubs — minimal implementations for unit test compilation
-// =============================================================================
-
-/**
- * @brief Native stub — redirect following is not available without hardware.
- * @return Always returns -1 (failure).
- */
-int OTADownloadEngine::followRedirects(WiFiClient& client, HTTPClient& http,
-                                        const std::string& url, const std::string& token) {
-    (void)client; (void)http; (void)url; (void)token;
-    ESP_LOGD(TAG, "followRedirects() stub — native build");
-    return -1;
-}
-
-/**
- * @brief Native stub — signature fetch is not available without hardware.
- * @return Always returns 0 (no bytes read).
- */
-size_t OTADownloadEngine::fetchSignature(WiFiClient& client, const std::string& sigUrl,
-                                          const std::string& token, uint8_t* sigBuf, size_t sigBufSize) {
-    (void)client; (void)sigUrl; (void)token; (void)sigBuf; (void)sigBufSize;
-    ESP_LOGD(TAG, "fetchSignature() stub — native build");
-    lastError_ = OTAError::HttpConnectionFailed;
-    return 0;
-}
-
-/**
- * @brief Native stub — download and flash is not available without hardware.
- * @return Always returns OTAError::HttpConnectionFailed.
- */
-OTAError OTADownloadEngine::downloadAndFlash(WiFiClient& client, const std::string& binUrl,
-                                              const std::string& token, const uint8_t* sigBuf, size_t sigLen) {
-    (void)client; (void)binUrl; (void)token; (void)sigBuf; (void)sigLen;
-    ESP_LOGD(TAG, "downloadAndFlash() stub — native build");
-    lastError_ = OTAError::HttpConnectionFailed;
-    return lastError_;
-}
-
-#endif // NATIVE_BUILD
