@@ -16,11 +16,7 @@
 #include <fstream>
 #include <sstream>
 
-#ifndef NATIVE_BUILD
 #include <PsychicHttp.h>
-#else
-#include "../WebServer/WebServerManager.hpp"
-#endif
 
 #include "platform/LogShim.h"
 
@@ -32,7 +28,6 @@ void KeyManager::begin(DeviceCrypto* crypto) {
 }
 
 bool KeyManager::loadRegistry(JsonDocument& doc) const {
-#ifndef NATIVE_BUILD
     if (!LittleFS.exists(KEY_MANAGER_PATH)) {
         return true; // Empty registry is valid initially
     }
@@ -43,18 +38,6 @@ bool KeyManager::loadRegistry(JsonDocument& doc) const {
     }
     DeserializationError error = deserializeJson(doc, file);
     file.close();
-#else
-    std::ifstream file(KEY_MANAGER_PATH);
-    if (!file.is_open()) {
-        return true; // Empty registry
-    }
-    std::string jsonStr((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
-    if (jsonStr.empty()) {
-        return true; // Empty file is valid
-    }
-    DeserializationError error = deserializeJson(doc, jsonStr);
-    file.close();
-#endif
 
     if (error) {
         ESP_LOGE(TAG, "Failed to parse registry: %s", error.c_str());
@@ -64,7 +47,6 @@ bool KeyManager::loadRegistry(JsonDocument& doc) const {
 }
 
 bool KeyManager::saveRegistry(const JsonDocument& doc) const {
-#ifndef NATIVE_BUILD
     // Ensure parent directory exists (fresh filesystem won't have /etc/)
     if (!LittleFS.exists("/etc")) {
         LittleFS.mkdir("/etc");
@@ -76,17 +58,6 @@ bool KeyManager::saveRegistry(const JsonDocument& doc) const {
     }
     serializeJson(doc, file);
     file.close();
-#else
-    std::ofstream file(KEY_MANAGER_PATH);
-    if (!file.is_open()) {
-        ESP_LOGE(TAG, "Failed to open local registry file for writing.");
-        return false;
-    }
-    std::string jsonStr;
-    serializeJson(doc, jsonStr);
-    file << jsonStr;
-    file.close();
-#endif
     return true;
 }
 
@@ -310,7 +281,6 @@ bool KeyManager::isExclusive(const char* id) const {
  * @param server Reference to the AsyncWebServer instance.
  */
 void KeyManager::registerRoutes(PsychicHttpServer& server) {
-#ifndef NATIVE_BUILD
     // --- GET /api/keys — list all stored keys with ownership metadata ---
     server.on("/api/keys", HTTP_GET, [this](PsychicRequest* request, PsychicResponse* response) {
         JsonDocument doc;
@@ -414,10 +384,4 @@ void KeyManager::registerRoutes(PsychicHttpServer& server) {
         }
         return ESP_OK;
     });
-#else
-    // Native build: register stub routes for compilation
-    server.on("/api/keys", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) { return ESP_OK; });
-    server.on("/api/keys", HTTP_POST, [](PsychicRequest* request, PsychicResponse* response) { return ESP_OK; });
-    server.on("/api/keys", HTTP_DELETE, [](PsychicRequest* request, PsychicResponse* response) { return ESP_OK; });
-#endif
 }

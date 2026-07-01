@@ -15,6 +15,11 @@ public:
     esp_err_t redirect(const char* url) { return ESP_OK; }
 };
 
+class PsychicWebParameter {
+public:
+    String value() { return ""; }
+};
+
 #include "Arduino.h"
 
 class PsychicRequest {
@@ -27,6 +32,8 @@ public:
     std::string body() { return std::string(); }
     size_t contentLength() { return 0; }
     const char* bodyCStr() { return ""; }
+    bool hasParam(const char* name) { return false; }
+    PsychicWebParameter* getParam(const char* name) { static PsychicWebParameter p; return &p; }
 };
 
 typedef std::function<esp_err_t(PsychicRequest *request, PsychicResponse *response)> PsychicHttpRequestCallback;

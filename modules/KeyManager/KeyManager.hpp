@@ -40,13 +40,10 @@
 
 #pragma once
 
-#ifndef NATIVE_BUILD
 #include <Arduino.h>
 #include <LittleFS.h>
-#else
 #include <string>
 #include <stdint.h>
-#endif
 
 #include <memory>
 #include <vector>
@@ -54,11 +51,7 @@
 #include "../DeviceCrypto/DeviceCrypto.hpp"
 #include "../../include/interfaces/IWebContributor.hpp"
 
-#ifndef NATIVE_BUILD
 #define KEY_MANAGER_PATH "/etc/keys.json"
-#else
-#define KEY_MANAGER_PATH "etc_keys.json"
-#endif
 
 /**
  * @brief Metadata descriptor for a single key entry.

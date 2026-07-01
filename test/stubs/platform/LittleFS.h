@@ -25,6 +25,16 @@ public:
         _fs.read(reinterpret_cast<char*>(buf), size);
         return _fs.gcount();
     }
+    int read() {
+        if (!_isOpen) return -1;
+        int c = _fs.get();
+        return _fs.eof() ? -1 : c;
+    }
+    size_t write(uint8_t c) {
+        if (!_isOpen) return 0;
+        _fs.put(c);
+        return 1;
+    }
     size_t readBytes(char* buf, size_t size) {
         if (!_isOpen) return 0;
         _fs.read(buf, size);

@@ -46,12 +46,12 @@ protected:
     MockDeviceCrypto mockCrypto;
 
     void SetUp() override {
-        remove(KEY_MANAGER_PATH);
+        LittleFS.remove(KEY_MANAGER_PATH);
         keyManager.begin(&mockCrypto);
     }
 
     void TearDown() override {
-        remove(KEY_MANAGER_PATH);
+        LittleFS.remove(KEY_MANAGER_PATH);
     }
 };
 
