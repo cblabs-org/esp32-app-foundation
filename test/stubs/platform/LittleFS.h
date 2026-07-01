@@ -51,6 +51,13 @@ public:
     void println(const char* s) { if (_isOpen) _fs << s << "\n"; }
     void close() { if (_isOpen) { _fs.close(); _isOpen = false; } }
     operator bool() const { return _isOpen; }
+    bool isDirectory() const { return false; }
+    File openNextFile() { return File(); }
+    const char* name() const {
+        size_t pos = _path.find_last_of('/');
+        if (pos != std::string::npos) return _path.c_str() + pos + 1;
+        return _path.c_str();
+    }
 private:
     std::fstream _fs;
     bool _isOpen = false;

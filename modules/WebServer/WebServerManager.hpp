@@ -50,96 +50,13 @@
 #include <string>
 #include <atomic>
 
-#ifndef NATIVE_BUILD
 // NOTE: PsychicHttpRequestCallback, PsychicMiddlewareNext, and
 // PsychicMiddlewareCallback are std::function typedefs defined by the
 // PsychicHttp library. These are an external constraint and cannot be
 // replaced without forking the library. (Audit ref: H-01 / GRAVE-05)
 #include <PsychicHttp.h>
 #include <PsychicHttpsServer.h>
-#else
-#include <cstdint>
-#include <string>
-#include <vector>
-#include <functional>
-#include <atomic>
 
-// Define ESP-IDF error types for native build
-typedef int esp_err_t;
-#ifndef ESP_OK
-#define ESP_OK 0
-#endif
-
-// Mock PsychicHttp for native testing
-class PsychicResponse {
-public:
-    esp_err_t send(int code, const char* contentType, const char* content) { return ESP_OK; }
-    esp_err_t send() { return ESP_OK; }
-    void setContent(const uint8_t* content, size_t len) {}
-    void setContentType(const char* type) {}
-    void addHeader(const char* name, const char* value) {}
-    esp_err_t redirect(const char* url) { return ESP_OK; }
-};
-
-class PsychicRequest {
-public:
-    const char* host() { return ""; }
-    const char* url() { return ""; }
-    const char* uri() { return ""; }
-    const char* header(const char* name) { return ""; }
-    bool hasHeader(const char* name) { return false; }
-    size_t contentLength() { return 0; }
-    const char* bodyCStr() { return ""; }
-};
-
-typedef std::function<esp_err_t(PsychicRequest *request, PsychicResponse *response)> PsychicHttpRequestCallback;
-typedef std::function<esp_err_t()> PsychicMiddlewareNext;
-typedef std::function<esp_err_t(PsychicRequest*, PsychicResponse*, PsychicMiddlewareNext)> PsychicMiddlewareCallback;
-
-#define HTTP_GET     0b00000001
-#define HTTP_POST    0b00000010
-#define HTTP_DELETE  0b00000100
-#define HTTP_PUT     0b00001000
-#define HTTP_PATCH   0b00010000
-#define HTTP_HEAD    0b00100000
-#define HTTP_OPTIONS 0b01000000
-#define HTTP_ANY     0b01111111
-
-class PsychicEndpoint {};
-
-class PsychicHttpServer {
-public:
-    PsychicHttpServer(uint16_t port = 80) {}
-    virtual ~PsychicHttpServer() {}
-    esp_err_t begin() { return ESP_OK; }
-    
-    struct Route {
-        std::string uri;
-        int method;
-        PsychicHttpRequestCallback handler;
-    };
-    std::vector<Route> routes;
-
-    PsychicEndpoint* on(const char* uri, int method, PsychicHttpRequestCallback handler) {
-        routes.push_back({uri, method, handler});
-        return nullptr;
-    }
-    void onNotFound(PsychicHttpRequestCallback handler) {} // Stub for captive portal
-    void addMiddleware(PsychicMiddlewareCallback fn) {}    // Stub for global auth middleware
-    static void setMaxRequestBodySize(uint32_t size) {
-        lastMaxBodySize = size;
-    }
-    
-    static uint32_t lastMaxBodySize;
-};
-
-class PsychicHttpsServer : public PsychicHttpServer {
-public:
-    PsychicHttpsServer() : PsychicHttpServer(443) {}
-    void setCertificate(const char* cert, const char* private_key) {}
-    void setCertificate(const uint8_t* cert, size_t cert_size, const uint8_t* private_key, size_t private_key_size) {}
-};
-#endif
 
 #include "interfaces/IWebContributor.hpp"
 #include "interfaces/ITickable.hpp"
@@ -210,9 +127,7 @@ public:
 private:
     PsychicHttpServer _httpServer; ///< HTTP server on port 80 (always exists)
 
-#ifndef NATIVE_BUILD
     PsychicHttpsServer* _httpsServer = nullptr; ///< HTTPS server on port 443 (heap-allocated in TLS mode)
-#endif
 
     bool         _tlsMode     = false;   ///< True when serving HTTPS on port 443
     AuthManager* _authManager = nullptr; ///< Stored for WO5 route guards (nullable)

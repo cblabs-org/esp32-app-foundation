@@ -3,7 +3,14 @@
 #include <string>
 #include <vector>
 #include <functional>
-#include "esp_system.h" // For esp_err_t and ESP_OK
+#include "Arduino.h"
+#include "esp_system.h"
+
+// Define ESP-IDF error types for native build
+typedef int esp_err_t;
+#ifndef ESP_OK
+#define ESP_OK 0
+#endif
 
 class PsychicResponse {
 public:
@@ -19,8 +26,6 @@ class PsychicWebParameter {
 public:
     String value() { return ""; }
 };
-
-#include "Arduino.h"
 
 class PsychicRequest {
 public:
@@ -56,6 +61,7 @@ public:
     PsychicHttpServer(uint16_t port = 80) {}
     virtual ~PsychicHttpServer() {}
     esp_err_t begin() { return ESP_OK; }
+    void end() {}
 
     struct Route {
         std::string uri;

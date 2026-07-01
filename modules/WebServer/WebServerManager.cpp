@@ -26,18 +26,15 @@
 #include "WebServerManager.hpp"
 #include <ArduinoJson.h>
 
-#ifndef NATIVE_BUILD
     #include "esp_heap_caps.h"
     #include "esp_task_wdt.h"
     // AuthManager full type needed for isAuthEnabled()/hasCert()/loadCert()
     // in TLS setup. Guarded so native LDF doesn't scan it, but even if it
     // does, the transitive DeviceCrypto include now resolves via relative path.
     #include "../AuthManager/AuthManager.hpp"
-#endif
 #include "../WifiManager/WifiManager.hpp"
 
 // Portal PROGMEM assets — hardware only (require Arduino.h for PROGMEM macro)
-#ifndef NATIVE_BUILD
 #include "portal_assets/index_html.hpp"
 #include "portal_assets/app_css.hpp"
 #include "portal_assets/app_js.hpp"
@@ -55,14 +52,12 @@
 #include "portal_assets/appconfig_js.hpp"
 #include "portal_assets/auth_js.hpp"
 #include "portal_assets/credits_js.hpp"
-#endif
 
 #include "platform/LogShim.h"
 
 // ---------------------------------------------------------------------------
 // Platform-conditional includes for heap/system APIs
 // ---------------------------------------------------------------------------
-#ifndef NATIVE_BUILD
     #include <Arduino.h>
     #include "esp_system.h"
     #include "esp_chip_info.h"
@@ -72,9 +67,6 @@
     #include <LittleFS.h>
     #include <WiFi.h>
     #include <atomic>
-#else
-    #include <atomic>
-#endif
 
 static constexpr const char* TAG = "WebServerManager";
 
@@ -86,20 +78,15 @@ static std::atomic<int> activeHighMemRequests{0};
 constexpr int  MAX_CONCURRENT_HIGH_MEM      = 1;      // Max concurrent high-memory requests
 constexpr int  HEAP_GUARD_MIN_BLOCK_BYTES   = 20000;  // Minimum largest free block (bytes)
 
-#ifdef NATIVE_BUILD
-uint32_t PsychicHttpServer::lastMaxBodySize = 0;
-#endif
 
 WebServerManager::WebServerManager() : _httpServer(80) {
 }
 
 WebServerManager::~WebServerManager() {
-#ifndef NATIVE_BUILD
     if (_httpsServer) {
         delete _httpsServer;
         _httpsServer = nullptr;
     }
-#endif
 }
 
 void WebServerManager::begin(const std::vector<IWebContributor*>& contributors,
@@ -115,7 +102,6 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors,
     // migration (PR-25) which wraps ESP-IDF's esp_https_server with native HTTPS.
     // Until then, all routes are served on HTTP port 80.
     bool useTls = false;
-#ifndef NATIVE_BUILD
     if ((!apMode || (authManager && authManager->isApTlsEnabled())) && authManager && authManager->isTlsEnabled() && authManager->hasCert()) {
         uint8_t *certDer = nullptr, *keyDer = nullptr;
         size_t certLen = 0, keyLen = 0;
@@ -134,21 +120,17 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors,
             ESP_LOGE(TAG, "Failed to load cert from storage, falling back to HTTP");
         }
     }
-#endif
 
     // Select the active server for route registration
     // TLS mode: routes on HTTPS server; HTTP server becomes redirect-only
     // HTTP-open mode: all routes on the HTTP server (port 80)
     PsychicHttpServer* activeServer = &_httpServer; // default
-#ifndef NATIVE_BUILD
     if (useTls && _httpsServer) {
         activeServer = _httpsServer;
     }
-#endif
     _tlsMode = useTls;
 
     // --- Setup routing for static files served from PROGMEM (hardware only) ---
-#ifndef NATIVE_BUILD
     // Heap-guarded portal HTML route — the largest single response
     activeServer->on("/", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
         // --- Heap guard check ---
@@ -279,7 +261,6 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors,
         response->addHeader("Content-Encoding", "gzip");
         return response->send();
     });
-#endif
 
     // --- Register all IWebContributor routes and build tabs array ---
     JsonDocument tabsDoc;
@@ -316,7 +297,6 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors,
     statusTab["parent"] = "System";
     statusTab["order"]  = 10;
 
-#ifndef NATIVE_BUILD
     String tabsJson;
     serializeJson(tabsDoc, tabsJson);
 
@@ -484,17 +464,6 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors,
         return err;
     });
 
-#else
-    activeServer->on("/api/tabs", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) { return ESP_OK; });
-    activeServer->on("/api/system", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) { return ESP_OK; });
-    activeServer->on("/api/app", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) { return ESP_OK; });
-    activeServer->on("/api/system/restart", HTTP_POST, [this](PsychicRequest* request, PsychicResponse* response) {
-        esp_err_t err = response->send(200, "application/json", "{\"status\":\"restarting\"}");
-        _restartRequested = true;
-        return err;
-    });
-    activeServer->on("/api/system/factory-reset", HTTP_POST, [](PsychicRequest* request, PsychicResponse* response) { return ESP_OK; });
-#endif
 
     // --- Captive portal redirect (AP mode only) / 404 (STA mode) ---
     // When in AP mode, the DNS server resolves ALL domains to 192.168.4.1.
@@ -505,7 +474,6 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors,
     // In STA mode the redirect is harmful — it silently masks missing routes
     // instead of returning a visible 404 error.
     activeServer->onNotFound([this](PsychicRequest* request, PsychicResponse* response) {
-#ifndef NATIVE_BUILD
         if (WiFi.getMode() == WIFI_AP || WiFi.getMode() == WIFI_AP_STA) {
             bool useTls = (_authManager && _authManager->isAuthEnabled() && _authManager->hasCert());
             if (useTls) {
@@ -516,12 +484,8 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors,
         } else {
             return response->send(404, "application/json", "{\"error\":\"Not found\"}");
         }
-#else
-        return response->send(404, "application/json", "{\"error\":\"Not found\"}");
-#endif
     });
 
-#ifndef NATIVE_BUILD
     if (useTls && _httpsServer) {
         // --- Port 80: redirect-only server (all requests → HTTPS) ---
         _httpServer.onNotFound([](PsychicRequest* req, PsychicResponse* res) {
@@ -532,7 +496,6 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors,
         });
         ESP_LOGI(TAG, "HTTPS server configured for port 443; HTTP redirect configured for port 80");
     }
-#endif
     // -----------------------------------------------------------------------
     // Global Auth Middleware — framework-level portal authentication guard
     // -----------------------------------------------------------------------
@@ -546,7 +509,6 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors,
     // /api/system/restart and /api/system/factory-reset are destructive
     // endpoints that MUST require authentication.
     // -----------------------------------------------------------------------
-#ifndef NATIVE_BUILD
     if (_authManager) {
         AuthManager* authMgr = _authManager;
         activeServer->addMiddleware([authMgr](PsychicRequest* request,
@@ -600,7 +562,6 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors,
         }
         return next();
     });
-#endif
 
     ESP_LOGI(TAG, "WebServer configured (TLS=%d, AP=%d), registered %u contributors",
              useTls, apMode, (unsigned)contributors.size());
@@ -609,22 +570,17 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors,
 void WebServerManager::tick(uint32_t currentMillis) {
     if (!_serverStarted && _wifiManager && _wifiManager->isReady()) {
         _httpServer.begin();
-#ifndef NATIVE_BUILD
         if (_tlsMode && _httpsServer) {
             _httpsServer->begin();
             ESP_LOGI(TAG, "HTTPS server started on port 443; HTTP redirect on port 80");
         } else {
             ESP_LOGI(TAG, "HTTP server started on port 80");
         }
-#else
-        ESP_LOGI(TAG, "HTTP server started on port 80");
-#endif
         _serverStarted = true;
     }
 
     if (_restartRequested) {
         ESP_LOGI(TAG, "Restart requested. Checking certificate generation status...");
-#ifndef NATIVE_BUILD
         if (_authManager) {
             uint32_t startMs = millis();
             while (_authManager->isCertGenerating() && (millis() - startMs < 10000)) {
@@ -640,15 +596,10 @@ void WebServerManager::tick(uint32_t currentMillis) {
         delay(200);
         ESP_LOGW(TAG, "Calling esp_restart() now");
         esp_restart();
-#else
-        _restartRequested = false;
-#endif
     }
 }
 
 PsychicHttpServer& WebServerManager::getServer() {
-#ifndef NATIVE_BUILD
     if (_tlsMode && _httpsServer) return *_httpsServer;
-#endif
     return _httpServer;
 }
