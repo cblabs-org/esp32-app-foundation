@@ -46,7 +46,7 @@ identically in both native and hardware environments — only the include path d
 | **[x] [WO14 — U8G2 Display Subsystem](wo14-display/WORKORDER.md)** | Remove display NATIVE_BUILD guards | ✅ Merged | standard | ~15 display files — switch to PlatformIO `lib_ignore` source filtering |
 | **[x] [WO15 — Production Code Cleanup](wo15-cleanup/WORKORDER.md)** | Final cleanup pass | ✅ Merged | standard | Remove `NATIVE_BUILD` flag, delete NativeBuildStubs.hpp, clean platform shims, update LogShim |
 | **[x] [WO16 — Full Test Verification](wo16-testing/WORKORDER.md)** | Comprehensive test suite | ✅ Merged | standard | Run all native tests, hardware build, flash + verify |
-| **[ ] [WO17 — Documentation Updates](wo17-documentation/WORKORDER.md)** | Update developer docs | ⬜ Not started | mechanical | Update testing guide, architecture docs, README, framework-expert skill |
+| **[x] [WO17 — Documentation Updates](wo17-documentation/WORKORDER.md)** | Update developer docs | ✅ Merged | mechanical | Update testing guide, architecture docs, README, framework-expert skill |
 
 ---
 
