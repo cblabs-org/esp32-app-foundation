@@ -25,11 +25,9 @@
 #include <cstring>
 #include <cstdio>
 
-#ifndef NATIVE_BUILD
 #include <Arduino.h>
 #include <U8g2lib.h>
 #include "fonts/Fonts.hpp"
-#endif
 
 // =============================================================================
 // Public API
@@ -68,9 +66,7 @@ void OTAProgressBoard::setComplete(bool success) {
 
     if (_failed) {
         _statusLabel.setText("FAILED");
-#ifndef NATIVE_BUILD
         _failedAtMs = millis();
-#endif
     }
 }
 
@@ -103,7 +99,6 @@ void OTAProgressBoard::reset() {
  * @param u8g2 Reference to the active U8G2 driver instance.
  */
 void OTAProgressBoard::render(U8G2& u8g2) {
-#ifndef NATIVE_BUILD
     _titleLabel.setFont(AppFonts::defaultMedium());
     _titleLabel.setText("Firmware Update");
     _titleLabel.setAlignment(1); // CENTER
@@ -115,9 +110,6 @@ void OTAProgressBoard::render(U8G2& u8g2) {
     _statusLabel.setFont(AppFonts::defaultSmall());
     _statusLabel.setAlignment(1); // CENTER
     _statusLabel.render(u8g2);
-#else
-    (void)u8g2; // Suppress unused parameter warning in native builds
-#endif
 }
 
 /**
@@ -130,11 +122,7 @@ bool OTAProgressBoard::isExpired() const {
     if (!_failed)   return true;   // Success → dismiss immediately
 
     // Failure → dismiss after timeout so the user has time to read the error
-#ifndef NATIVE_BUILD
     return (millis() - _failedAtMs) >= kFailureTimeoutMs;
-#else
-    return false;  // Native: failure persists (no millis() — assume timeout not yet elapsed)
-#endif
 }
 
 /**

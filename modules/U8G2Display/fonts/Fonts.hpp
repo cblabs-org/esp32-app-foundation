@@ -36,7 +36,6 @@
  */
 namespace AppFonts {
 
-#ifndef NATIVE_BUILD
     #include <U8g2lib.h>
 
     /** @brief Small text — U8G2 Helvetica 8pt regular. */
@@ -54,22 +53,5 @@ namespace AppFonts {
     /** @brief Icon font — U8G2 Open Iconic Embedded 2x. */
     inline const uint8_t* defaultIcon()   { return u8g2_font_open_iconic_embedded_2x_t; }
 
-#else
-    /** @brief Small text — returns nullptr in native builds. */
-    inline const uint8_t* defaultSmall()  { return nullptr; }
-
-    /** @brief Medium text — returns nullptr in native builds. */
-    inline const uint8_t* defaultMedium() { return nullptr; }
-
-    /** @brief Large text — returns nullptr in native builds. */
-    inline const uint8_t* defaultLarge()  { return nullptr; }
-
-    /** @brief Clock displays — returns nullptr in native builds. */
-    inline const uint8_t* defaultClock()  { return nullptr; }
-
-    /** @brief Icon font — returns nullptr in native builds. */
-    inline const uint8_t* defaultIcon()   { return nullptr; }
-
-#endif // NATIVE_BUILD
 
 } // namespace AppFonts

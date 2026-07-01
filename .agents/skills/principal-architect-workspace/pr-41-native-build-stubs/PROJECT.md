@@ -42,7 +42,7 @@ identically in both native and hardware environments — only the include path d
 | **[x] [WO10 — Application Module](wo10-application/WORKORDER.md)** | Migrate Application module | ✅ Merged | architect | `Application.hpp/.cpp` — remove ~14 guards (depends on WO2-WO9) |
 | **[x] [WO11 — DeviceCrypto Library](wo11-devicecrypto/WORKORDER.md)** | Migrate DeviceCrypto library | ✅ Merged | architect | `DeviceCrypto.hpp/.cpp` — remove ~7 guards, mbedTLS/NVS stubs |
 | **[x] [WO12 — AuthManager Module](wo12-authmanager/WORKORDER.md)** | Migrate AuthManager module | ✅ Merged | architect | `AuthManager.hpp/.cpp` — remove ~14 guards, mbedTLS/LittleFS/PsychicHttp |
-| **[ ] [WO13 — OTA Subsystem](wo13-ota/WORKORDER.md)** | Migrate OTA modules | ⬜ Not started | architect | `OTAUpdateManager`, `OTADownloadEngine`, `MbedTLSSignatureVerifier` — remove ~22 guards |
+| **[x] [WO13 — OTA Subsystem](wo13-ota/WORKORDER.md)** | Migrate OTA modules | ✅ Merged | architect | `OTAUpdateManager`, `OTADownloadEngine`, `MbedTLSSignatureVerifier` — remove ~22 guards |
 | **[ ] [WO14 — U8G2 Display Subsystem](wo14-display/WORKORDER.md)** | Remove display NATIVE_BUILD guards | ⬜ Not started | standard | ~15 display files — switch to PlatformIO `lib_ignore` source filtering |
 | **[ ] [WO15 — Production Code Cleanup](wo15-cleanup/WORKORDER.md)** | Final cleanup pass | ⬜ Not started | standard | Remove `NATIVE_BUILD` flag, delete NativeBuildStubs.hpp, clean platform shims, update LogShim |
 | **[ ] [WO16 — Full Test Verification](wo16-testing/WORKORDER.md)** | Comprehensive test suite | ⬜ Not started | standard | Run all native tests, hardware build, flash + verify |

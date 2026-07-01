@@ -23,12 +23,10 @@
 
 #include "ScreensaverBoard.hpp"
 
-#ifndef NATIVE_BUILD
 #include <Arduino.h>
 #include <U8g2lib.h>
 #include <ctime>
 #include "fonts/Fonts.hpp"
-#endif
 
 #include <cstdio>
 
@@ -86,7 +84,6 @@ bool ScreensaverBoard::isActive() const {
  * @param u8g2 Reference to the active U8G2 driver instance.
  */
 void ScreensaverBoard::render(U8G2& u8g2) {
-#ifndef NATIVE_BUILD
     int displayWidth  = u8g2.getDisplayWidth();
     int displayHeight = u8g2.getDisplayHeight();
 
@@ -144,9 +141,6 @@ void ScreensaverBoard::render(U8G2& u8g2) {
             _yDir = -1;
         }
     }
-#else
-    (void)u8g2; // Suppress unused parameter warning in native builds
-#endif
 }
 
 /**

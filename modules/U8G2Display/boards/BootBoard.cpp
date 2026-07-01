@@ -25,12 +25,10 @@
 #include <cstring>
 #include <cstdio>
 
-#ifndef NATIVE_BUILD
 #include <Arduino.h>
 #include <U8g2lib.h>
 #include "fonts/Fonts.hpp"
 #include "gfx/cblabs_logo.h"
-#endif
 
 // =============================================================================
 // Construction
@@ -49,7 +47,6 @@
  */
 BootBoard::BootBoard(uint16_t displayWidth, uint16_t displayHeight)
     : _titleLabel(0, 0, static_cast<int>(displayWidth), -1),
-#ifndef NATIVE_BUILD
       _logoImage(
           (static_cast<int>(displayWidth) - cblabs_logo_width) / 2,  // centred X
           18,                                                          // Y below title
@@ -57,9 +54,6 @@ BootBoard::BootBoard(uint16_t displayWidth, uint16_t displayHeight)
           cblabs_logo_height,
           cblabs_logo_bits
       ),
-#else
-      _logoImage(0, 16, 110, 32, nullptr),
-#endif
       _versionLabel(0, 50, static_cast<int>(displayWidth), -1),
       _statusLabel(0, 24, static_cast<int>(displayWidth), -1),
       _progressBar(16, 38, static_cast<int>(displayWidth) - 32, 16, nullptr)
@@ -79,9 +73,7 @@ void BootBoard::activate(const char* version) {
     _active = true;
     _phase  = Phase::Splash;
 
-#ifndef NATIVE_BUILD
     _splashStartMs = millis();
-#endif
 
     // --- Safe-copy version string ---
     if (version != nullptr) {
@@ -99,10 +91,8 @@ void BootBoard::activate(const char* version) {
     _versionLabel.setText(versionLine);
     _versionLabel.setAlignment(1); // CENTER
 
-#ifndef NATIVE_BUILD
     _titleLabel.setFont(AppFonts::defaultLarge());
     _versionLabel.setFont(AppFonts::defaultSmall());
-#endif
 }
 
 /**
@@ -120,7 +110,6 @@ void BootBoard::setStatus(const char* message, float progress) {
 
     // --- Transition to Loading phase if splash has expired ---
     if (_phase == Phase::Splash) {
-#ifndef NATIVE_BUILD
         unsigned long elapsed = millis() - _splashStartMs;
         if (elapsed < _splashDurationMs) {
             // Splash still showing — buffer the status but don't transition yet.
@@ -130,7 +119,6 @@ void BootBoard::setStatus(const char* message, float progress) {
             }
             return;
         }
-#endif
         // Timer elapsed — transition to loading
         _phase = Phase::Loading;
     }
@@ -140,9 +128,7 @@ void BootBoard::setStatus(const char* message, float progress) {
         _statusLabel.setText(message);
         _statusLabel.setAlignment(1); // CENTER
 
-#ifndef NATIVE_BUILD
         _statusLabel.setFont(AppFonts::defaultSmall());
-#endif
     }
 
     if (progress >= 0.0f) {
@@ -174,7 +160,6 @@ void BootBoard::setComplete() {
  * @param u8g2 Reference to the active U8G2 driver instance.
  */
 void BootBoard::render(U8G2& u8g2) {
-#ifndef NATIVE_BUILD
     // --- Always render the persistent title ---
     _titleLabel.render(u8g2);
 
@@ -197,9 +182,6 @@ void BootBoard::render(U8G2& u8g2) {
         _progressBar.setFont(AppFonts::defaultSmall());
         _progressBar.render(u8g2);
     }
-#else
-    (void)u8g2; // Suppress unused parameter warning in native builds
-#endif
 }
 
 /**

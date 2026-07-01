@@ -49,7 +49,6 @@
 
 static constexpr const char* TAG = "U8G2DisplayModule";
 
-#ifndef NATIVE_BUILD
 #include <PsychicHttp.h>
 #include <ArduinoJson.h>
 #include "../Application/Application.hpp"
@@ -59,7 +58,6 @@ static constexpr const char* TAG = "U8G2DisplayModule";
   #if defined(DISPLAY_SPI_SCK) && defined(DISPLAY_SPI_MISO) && defined(DISPLAY_SPI_MOSI)
   #include <SPI.h>
   #endif
-#endif
 
 // Include EventBus directly — it is native-safe (no Arduino.h dependency).
 #include "../EventBus/EventBus.hpp"
@@ -82,7 +80,6 @@ static constexpr const char* TAG = "U8G2DisplayModule";
  * is available. Call begin(app) after app.begin() to complete integration.
  */
 void U8G2DisplayModule::bootstrapHardware() {
-#ifndef NATIVE_BUILD
     // --- Step 1: Initialize SPI bus ---
     // If explicit SPI pins are defined, secure the SPI bus before U8G2 init.
     // CRITICAL: On ESP32-S3, the default Arduino pin mapping can collide with
@@ -145,7 +142,6 @@ void U8G2DisplayModule::bootstrapHardware() {
         _u8g2.setContrast(_brightness);
         delay(kHoldDurationMs);
     }
-#endif
 
     // --- Step 5: Enter bootstrap mode ---
     // reportStatus() will render inline until begin(app) exits bootstrap mode.
@@ -170,7 +166,6 @@ void U8G2DisplayModule::begin(EventBus* eventBus) {
 
     // --- Step 1: Initialize hardware (skip if already bootstrapped) ---
     if (!_bootstrapMode) {
-#ifndef NATIVE_BUILD
       #if defined(DISPLAY_SPI_SCK) && defined(DISPLAY_SPI_MISO) && defined(DISPLAY_SPI_MOSI)
         SPI.begin(DISPLAY_SPI_SCK, DISPLAY_SPI_MISO, DISPLAY_SPI_MOSI, -1);
       #endif
@@ -179,20 +174,17 @@ void U8G2DisplayModule::begin(EventBus* eventBus) {
         _u8g2.begin();
         _u8g2.setContrast(_brightness);
         _u8g2.setFlipMode(_flipScreen ? 1 : 0);
-#endif
     } else {
         ESP_LOGI(TAG, "Hardware already bootstrapped — skipping SPI/U8G2 init");
     }
 
     // --- Step 2: Subscribe to EventBus topics ---
     // Guarded: getEventBus() requires Application.hpp (unavailable in native)
-#ifndef NATIVE_BUILD
     if (_eventBus != nullptr) {
         ESP_LOGI(TAG, "Subscribing to EventBus topics: ota.progress, display.message");
         _eventBus->subscribe(OTAUpdateManagerEvents::OTA_PROGRESS, _onOtaProgress, this);
         _eventBus->subscribe(U8G2DisplayEvents::DISPLAY_MESSAGE, _onDisplayMessage, this);
     }
-#endif
 
     // --- Step 3: Activate boot splash (skip if bootstrapped — already shown) ---
     if (!_bootstrapMode) {
@@ -206,10 +198,8 @@ void U8G2DisplayModule::begin(EventBus* eventBus) {
     _lastBootProgress = 0.0f;
 
     // --- Step 6: Start the inactivity timer
-#ifndef NATIVE_BUILD
     resetActivity();
     _lastRenderMs   = millis();
-#endif
 
     ESP_LOGI(TAG, "Display module fully initialized — tick-driven rendering active");
 }
@@ -227,7 +217,6 @@ void U8G2DisplayModule::begin(EventBus* eventBus) {
  */
 void U8G2DisplayModule::tick(uint32_t currentMillis) {
     // --- 1. Tick Screensaver ---
-#ifndef NATIVE_BUILD
     unsigned long currentMs = currentMillis;
     bool wasBlanked = _screensaver.isBlanked();
     _screensaver.tick(currentMs, _u8g2, _brightness);
@@ -245,7 +234,6 @@ void U8G2DisplayModule::tick(uint32_t currentMillis) {
         vTaskDelay(pdMS_TO_TICKS(_targetFrameIntervalMs));
         return;
     }
-#endif
 
     // --- 2. Auto-clear expired modals ---
     if (_modal != nullptr && _modal->isExpired()) {
@@ -253,9 +241,7 @@ void U8G2DisplayModule::tick(uint32_t currentMillis) {
     }
 
     // --- 3. Tick Carousel ---
-#ifndef NATIVE_BUILD
     _carousel.tick(currentMs);
-#endif
 
     // --- 4. Determine visible board ---
     // Priority: Modal (highest) → Base → Screensaver (idle) → Carousel (lowest)
@@ -280,17 +266,12 @@ void U8G2DisplayModule::tick(uint32_t currentMillis) {
     }
 
     // --- 5. Tick + render the visible board (frame-rate limited) ---
-#ifndef NATIVE_BUILD
     visible->tick(currentMillis);
     unsigned long now = currentMillis;
     if ((now - _lastRenderMs) >= _targetFrameIntervalMs) {
         _renderCurrentBoard();
         _lastRenderMs = now;
     }
-#else
-    visible->tick(currentMillis);
-    _renderCurrentBoard();
-#endif
 }
 
 void U8G2DisplayModule::showBase(IDisplayBoard* board) {
@@ -340,9 +321,7 @@ void U8G2DisplayModule::clearModal() {
     if (_modal != nullptr) {
         _modal->onDeactivate();
         _modal = nullptr;
-#ifndef NATIVE_BUILD
         _u8g2.setContrast(_brightness);
-#endif
     }
 }
 
@@ -407,7 +386,6 @@ void U8G2DisplayModule::reportStatus(const char* message, float progress) {
         // --- Inline blocking animation during boot ---
         // Smoothly interpolate progress bar from previous to new value.
         // ~10 frames × 15ms = 150ms per milestone for premium boot UX.
-#ifndef NATIVE_BUILD
         float delta = progress - _lastBootProgress;
         if (delta > 0.005f) {
             const int kSteps = 10;
@@ -422,9 +400,6 @@ void U8G2DisplayModule::reportStatus(const char* message, float progress) {
             _bootBoard.setStatus(message, progress);
             _renderCurrentBoard();
         }
-#else
-        _bootBoard.setStatus(message, progress);
-#endif
         _lastBootProgress = progress;
     } else {
         // --- Normal mode: update state, tick() renders ---
@@ -534,10 +509,8 @@ void U8G2DisplayModule::applyConfig(const JsonObject& section) {
     _screensaverBoard.setClockFont(font);
 
     // --- Apply hardware settings ---
-#ifndef NATIVE_BUILD
     _u8g2.setContrast(_brightness);
     _u8g2.setFlipMode(_flipScreen ? 1 : 0);
-#endif
 
     ESP_LOGI(TAG, "Config applied (brightness=%d, flip=%d, screensaver=%d, dim=%lu, blank=%lu)",
              _brightness, _flipScreen, screensaverEnabled,
@@ -585,10 +558,8 @@ void U8G2DisplayModule::resetConfig() {
     _clockFontSize      = 2;
 
     // --- Apply hardware settings ---
-#ifndef NATIVE_BUILD
     _u8g2.setContrast(_brightness);
     _u8g2.setFlipMode(_flipScreen ? 1 : 0);
-#endif
 }
 
 // =============================================================================
@@ -605,12 +576,10 @@ void U8G2DisplayModule::resetConfig() {
  */
 DisplayInfo U8G2DisplayModule::getDisplayInfo() {
     DisplayInfo info;
-#ifndef NATIVE_BUILD
     info.framebuffer     = _u8g2.getBufferPtr();
     info.framebufferSize = 8u * _u8g2.getBufferTileHeight() * _u8g2.getBufferTileWidth();
     info.width           = _displayWidth;
     info.height          = _displayHeight;
-#endif
     return info;
 }
 
@@ -624,9 +593,7 @@ DisplayInfo U8G2DisplayModule::getDisplayInfo() {
  */
 void U8G2DisplayModule::setBrightness(uint8_t brightness) {
     _brightness = brightness;
-#ifndef NATIVE_BUILD
     _u8g2.setContrast(_brightness);
-#endif
 }
 
 /**
@@ -635,9 +602,7 @@ void U8G2DisplayModule::setBrightness(uint8_t brightness) {
  */
 void U8G2DisplayModule::setFlipScreen(bool flip) {
     _flipScreen = flip;
-#ifndef NATIVE_BUILD
     _u8g2.setFlipMode(_flipScreen ? 1 : 0);
-#endif
 }
 
 /**
@@ -718,7 +683,6 @@ const char* U8G2DisplayModule::getTabIcon() const {
  * @param server Reference to the AsyncWebServer instance.
  */
 void U8G2DisplayModule::registerRoutes(PsychicHttpServer& server) {
-#ifndef NATIVE_BUILD
     // --- GET /api/display/status — current display state ---
     server.on("/api/display/status", HTTP_GET, [this](PsychicRequest* request, PsychicResponse* response) {
         JsonDocument doc;
@@ -954,7 +918,6 @@ void U8G2DisplayModule::registerRoutes(PsychicHttpServer& server) {
         response->send(200, "application/octet-stream", buf, bufferSize);
         return ESP_OK;
     });
-#endif
 }
 
 // =============================================================================
@@ -1185,7 +1148,6 @@ void U8G2DisplayModule::_onDisplayMessage(const char* /*topic*/, const void* pay
  * Uses clearBuffer() → render() → sendBuffer() inside NATIVE_BUILD guard.
  */
 void U8G2DisplayModule::_renderCurrentBoard() {
-#ifndef NATIVE_BUILD
     // --- Determine which board to render ---
     // Priority: Modal → Base → Screensaver (idle) → Carousel
     IDisplayBoard* boardToRender = nullptr;
@@ -1209,5 +1171,4 @@ void U8G2DisplayModule::_renderCurrentBoard() {
     boardToRender->render(_u8g2);
     _u8g2.sendBuffer();
     vTaskDelay(1);  // Yield to IDLE task + WiFi stack after SPI transfer
-#endif
 }

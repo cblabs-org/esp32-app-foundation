@@ -96,10 +96,8 @@
 #include "../../include/types/DisplayInfo.hpp"
 
 // --- Hardware-only includes (excluded from native GoogleTest builds) ---
-#ifndef NATIVE_BUILD
 #include <U8g2lib.h>
 #include <ArduinoJson.h>
-#endif
 
 // --- Forward declarations ---
 class EventBus;
@@ -171,10 +169,8 @@ namespace U8G2DisplayEvents {
 // Default U8G2 driver type — apps override this via build_flags
 // e.g. -DU8G2_DISPLAY_TYPE=U8G2_SSD1322_NHD_256X64_F_4W_HW_SPI
 // ---------------------------------------------------------------------------
-#ifndef NATIVE_BUILD
 #ifndef U8G2_DISPLAY_TYPE
 #define U8G2_DISPLAY_TYPE U8G2_SSD1306_128X64_NONAME_F_HW_I2C
-#endif
 #endif
 
 /**
@@ -562,7 +558,6 @@ private:
     // SPI displays: define DISPLAY_CS_PIN, DISPLAY_DC_PIN (required),
     //               DISPLAY_RST_PIN (optional, defaults to U8X8_PIN_NONE).
     // I2C displays: no pin defines needed (U8G2 uses Arduino defaults).
-#ifndef NATIVE_BUILD
   #ifdef DISPLAY_CS_PIN
     #ifndef DISPLAY_RST_PIN
     #define DISPLAY_RST_PIN U8X8_PIN_NONE
@@ -578,12 +573,6 @@ private:
     // and _u8g2 is declared above so it is fully constructed first.
     const uint16_t _displayWidth  = _u8g2.getDisplayWidth();
     const uint16_t _displayHeight = _u8g2.getDisplayHeight();
-#else
-    // --- Native build defaults (no U8G2 hardware driver) ---
-    // Match the primary hardware target (SSD1322 256×64) for test consistency.
-    const uint16_t _displayWidth  = 256;
-    const uint16_t _displayHeight = 64;
-#endif
 
     EventBus* _eventBus = nullptr;                 ///< Cached reference to EventBus (for publishing events)
     ConfigManager* _configManager = nullptr;       ///< Cached reference to ConfigManager (for saving config)

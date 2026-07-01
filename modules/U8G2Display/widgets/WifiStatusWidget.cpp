@@ -24,9 +24,7 @@
 #include "WifiStatusWidget.hpp"
 #include <cstring>
 
-#ifndef NATIVE_BUILD
 #include <WiFi.h>
-#endif
 
 // =============================================================================
 // Constructor — always available (state initialisation only)
@@ -56,7 +54,6 @@ WifiStatusWidget::WifiStatusWidget(int _x, int _y)
 void WifiStatusWidget::tick(uint32_t currentMillis) {
     if (!isVisible) return;
 
-#ifndef NATIVE_BUILD
     bool currentlyConnected = (WiFi.status() == WL_CONNECTED);
 
     if (currentlyConnected) {
@@ -78,13 +75,11 @@ void WifiStatusWidget::tick(uint32_t currentMillis) {
             blinkState = true;
         }
     }
-#endif // NATIVE_BUILD
 }
 
 // =============================================================================
 // Hardware-only methods — require U8G2 and WiFi drivers
 // =============================================================================
-#ifndef NATIVE_BUILD
 
 #include "DrawingPrimitives.hpp"
 #include "fonts/Fonts.hpp"
@@ -191,12 +186,3 @@ void WifiStatusWidget::renderAnimationUpdate(U8G2& display, uint32_t currentMill
     }
 }
 
-#else
-
-// Native build stubs — rendering is never called in unit tests
-void WifiStatusWidget::render(U8G2& /*display*/) {}
-void WifiStatusWidget::renderAnimationUpdate(U8G2& /*display*/, uint32_t /*currentMillis*/) {}
-
-int WifiStatusWidget::getRssiCategory() { return -1; }
-
-#endif // NATIVE_BUILD

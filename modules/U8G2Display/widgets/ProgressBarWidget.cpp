@@ -126,7 +126,6 @@ void ProgressBarWidget::tick(uint32_t currentMillis) {
 // =============================================================================
 // Rendering — requires U8G2 hardware driver
 // =============================================================================
-#ifndef NATIVE_BUILD
 
 #include "DrawingPrimitives.hpp"
 
@@ -215,10 +214,3 @@ void ProgressBarWidget::renderAnimationUpdate(U8G2& display, uint32_t currentMil
     }
 }
 
-#else
-
-// Native build stubs — rendering is never called in unit tests
-void ProgressBarWidget::render(U8G2& /*display*/) {}
-void ProgressBarWidget::renderAnimationUpdate(U8G2& /*display*/, uint32_t /*currentMillis*/) {}
-
-#endif // NATIVE_BUILD

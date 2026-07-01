@@ -117,7 +117,6 @@ void ScrollingTextWidget::tick(uint32_t currentMillis) {
 // =============================================================================
 // Rendering — requires U8G2 hardware driver
 // =============================================================================
-#ifndef NATIVE_BUILD
 
 #include "DrawingPrimitives.hpp"
 
@@ -212,10 +211,3 @@ void ScrollingTextWidget::renderAnimationUpdate(U8G2& display, uint32_t currentM
     }
 }
 
-#else
-
-// Native build stubs — rendering is never called in unit tests
-void ScrollingTextWidget::render(U8G2& /*display*/) {}
-void ScrollingTextWidget::renderAnimationUpdate(U8G2& /*display*/, uint32_t /*currentMillis*/) {}
-
-#endif // NATIVE_BUILD

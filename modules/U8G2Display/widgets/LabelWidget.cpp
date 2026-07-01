@@ -85,7 +85,6 @@ void LabelWidget::tick(uint32_t currentMillis) {
 // =============================================================================
 // Rendering — requires U8G2 hardware driver
 // =============================================================================
-#ifndef NATIVE_BUILD
 
 #include "DrawingPrimitives.hpp"
 
@@ -118,9 +117,3 @@ void LabelWidget::render(U8G2& display) {
              static_cast<TextAlign>(alignment), isTruncated, nullptr, yOffset);
 }
 
-#else
-
-// Native build stub — render() is never called in unit tests
-void LabelWidget::render(U8G2& /*display*/) {}
-
-#endif // NATIVE_BUILD

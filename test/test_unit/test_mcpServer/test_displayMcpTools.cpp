@@ -20,6 +20,7 @@
  * - (GoogleTest fixtures — discovered automatically by gtest_main)
  */
 
+#ifdef HAS_DISPLAY
 #include <gtest/gtest.h>
 #include <ArduinoJson.h>
 #include "MCPToolRegistry.hpp"
@@ -369,3 +370,4 @@ TEST_F(DisplayMcpToolsTest, Control_SleepAction_DoesNotCrash) {
     });
     EXPECT_STREQ(result["status"].as<const char*>(), "ok");
 }
+#endif

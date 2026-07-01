@@ -85,7 +85,6 @@ void ClockWidget::tick(uint32_t currentMillis) {
 // =============================================================================
 // Rendering — requires U8G2 hardware driver and TimeManager
 // =============================================================================
-#ifndef NATIVE_BUILD
 
 #include "DrawingPrimitives.hpp"
 #include <TimeManager.hpp>
@@ -238,10 +237,3 @@ void ClockWidget::renderAnimationUpdate(U8G2& display, uint32_t currentMillis) {
     }
 }
 
-#else
-
-// Native build stubs — rendering is never called in unit tests
-void ClockWidget::render(U8G2& /*display*/) {}
-void ClockWidget::renderAnimationUpdate(U8G2& /*display*/, uint32_t /*currentMillis*/) {}
-
-#endif // NATIVE_BUILD

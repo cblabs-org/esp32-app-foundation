@@ -18,9 +18,7 @@
 
 #include "ImageWidget.hpp"
 
-#ifndef NATIVE_BUILD
 #include <U8g2lib.h>
-#endif
 
 /**
  * @brief Initialize the static image widget.
@@ -45,7 +43,6 @@ void ImageWidget::tick(uint32_t currentMillis) {
 // =============================================================================
 // Rendering — requires U8G2 hardware driver
 // =============================================================================
-#ifndef NATIVE_BUILD
 
 /**
  * @brief Renders the XBM image to the display buffer.
@@ -58,9 +55,3 @@ void ImageWidget::render(U8G2& display) {
     }
 }
 
-#else
-
-// Native build stub — render() is never called in unit tests
-void ImageWidget::render(U8G2& /*display*/) {}
-
-#endif // NATIVE_BUILD

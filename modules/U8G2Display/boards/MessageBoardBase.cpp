@@ -20,9 +20,7 @@
 
 #include "MessageBoardBase.hpp"
 
-#ifndef NATIVE_BUILD
 #include <U8g2lib.h>
-#endif
 
 // =============================================================================
 // Public API
@@ -44,11 +42,7 @@ void MessageBoardBase::dismiss() {
  * @param u8g2 Reference to the active U8G2 driver instance.
  */
 void MessageBoardBase::render(U8G2& u8g2) {
-#ifndef NATIVE_BUILD
     _msgWidget.render(u8g2);
-#else
-    (void)u8g2; // Suppress unused parameter warning in native builds
-#endif
 }
 
 /**

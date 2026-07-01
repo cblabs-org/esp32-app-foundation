@@ -22,9 +22,7 @@
 #include <cstdint>
 #include <cstddef>
 
-#ifndef NATIVE_BUILD
 #include <Arduino.h>
-#endif
 
 /**
  * @brief Wrapper class for MD5 generation operations.

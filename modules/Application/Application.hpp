@@ -74,9 +74,11 @@
 #include "../AuthManager/AuthManager.hpp"
 #include "../../lib/DeviceCrypto/DeviceCrypto.hpp"
 
+#ifdef HAS_DISPLAY
 // Display subsystem (hardware only — SPI/U8G2 headers unavailable in native builds)
 #include "../U8G2Display/U8G2DisplayModule.hpp"
 #include "../U8G2Display/boards/DiagnosticsBoard.hpp"
+#endif
 
 // Home Assistant MQTT integration (hardware only — MQTT client unavailable in native builds)
 #include "../HomeAssistant/HomeAssistantModule.hpp"
@@ -369,6 +371,7 @@ public:
      */
     const FrameworkConfig& getConfig() const;
 
+#ifdef HAS_DISPLAY
     /**
      * @brief Get the application's display module instance.
      *
@@ -379,6 +382,7 @@ public:
      * @return Reference to the U8G2DisplayModule.
      */
     U8G2DisplayModule& getDisplay();
+#endif
 
     /**
      * @brief Get the application's HomeAssistantModule instance.
@@ -550,10 +554,12 @@ private:
     bool _enableDefaultAppTab = true;      ///< Guard for default App tab registration
     const char* _appName = nullptr;        ///< Runtime-settable application name for portal title
 
+#ifdef HAS_DISPLAY
     // Display subsystem (hardware only)
     U8G2DisplayModule _display;                      ///< Display module with carousel engine
     DiagnosticsBoard  _diagnosticsBoard{256, 64};    ///< System telemetry carousel board
     bool _wifiWizardShown = false;                   ///< Guard: WiFi wizard modal pushed this CONFIGURING phase
+#endif
 
     // Home Assistant integration (hardware only)
     HomeAssistantModule _haModule;              ///< Framework-owned HA MQTT service

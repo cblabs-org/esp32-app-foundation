@@ -23,11 +23,7 @@
 #include "ScreensaverController.hpp"
 #include "platform/LogShim.h"
 
-#ifndef NATIVE_BUILD
 #include <U8g2lib.h>
-#else
-class U8G2 {};
-#endif
 
 static constexpr const char* TAG = "ScreensaverController";
 
@@ -84,11 +80,7 @@ void ScreensaverController::setBoard(ScreensaverBoard* board) {
  * restores full brightness.
  */
 void ScreensaverController::resetActivity() {
-#ifndef NATIVE_BUILD
     _lastActivityMs = millis();
-#else
-    _lastActivityMs = 0;
-#endif
     _diagLogged = false;
     
     if (_dimmed || _blanked) {
@@ -103,12 +95,8 @@ void ScreensaverController::resetActivity() {
  * threshold is already exceeded.
  */
 void ScreensaverController::forceTimeout() {
-#ifndef NATIVE_BUILD
     // Set last activity far in the past to trigger timeout on next tick
     _lastActivityMs = millis() - (_blankTimeoutMs + 1);
-#else
-    _lastActivityMs = 0;
-#endif
 }
 
 /** @brief Returns true if the screensaver is in any non-active state (dimmed or blanked). */
@@ -179,10 +167,8 @@ void ScreensaverController::tick(unsigned long currentMs, U8G2& display, uint8_t
  * @brief Transition to dim state — lower contrast and activate the screensaver board.
  */
 void ScreensaverController::_dim(U8G2& display) {
-#ifndef NATIVE_BUILD
     ESP_LOGI(TAG, "Display dimmed (inactivity)");
     display.setContrast(_dimLevel);
-#endif
     _dimmed = true;
     
     if (_board) {
@@ -203,11 +189,7 @@ void ScreensaverController::_blank(U8G2& display) {
     // loop after blanking starving IDLE1 — not the SPI command itself.
     // The vTaskDelay(33ms) in U8G2DisplayModule::tick() fixes that.
     ESP_LOGI(TAG, "Display blanked (entering power save)");
-#ifndef NATIVE_BUILD
     display.setPowerSave(1);
-#else
-    (void)display;
-#endif
     _blanked = true;
 }
 
@@ -217,11 +199,9 @@ void ScreensaverController::_blank(U8G2& display) {
  * @brief Wake from any screensaver state — restore brightness and deactivate the board.
  */
 void ScreensaverController::_wake(U8G2& display, uint8_t activeBrightness) {
-#ifndef NATIVE_BUILD
     ESP_LOGI(TAG, "Display waking from sleep");
     display.setPowerSave(0);  // Wake from hardware sleep before restoring contrast
     display.setContrast(activeBrightness);
-#endif
     _dimmed = false;
     _blanked = false;
 

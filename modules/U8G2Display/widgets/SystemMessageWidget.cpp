@@ -72,7 +72,6 @@ void SystemMessageWidget::setMessage(const char* newTitle,
 // =============================================================================
 // Rendering — requires U8G2 hardware driver
 // =============================================================================
-#ifndef NATIVE_BUILD
 
 #include "DrawingPrimitives.hpp"
 #include "fonts/Fonts.hpp"
@@ -105,9 +104,3 @@ void SystemMessageWidget::render(U8G2& display) {
     }
 }
 
-#else
-
-// Native build stub — rendering is never called in unit tests
-void SystemMessageWidget::render(U8G2& /*display*/) {}
-
-#endif // NATIVE_BUILD

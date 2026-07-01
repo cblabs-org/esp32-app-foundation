@@ -27,11 +27,9 @@
 #include <cstring>
 #include <cstdio>
 
-#ifndef NATIVE_BUILD
 #include <Arduino.h>
 #include <U8g2lib.h>
 #include "fonts/Fonts.hpp"
-#endif
 
 // =============================================================================
 // Construction
@@ -108,7 +106,6 @@ void ConfiguringStatusBoard::dismiss() {
  * @param u8g2 Reference to the active U8G2 driver instance.
  */
 void ConfiguringStatusBoard::render(U8G2& u8g2) {
-#ifndef NATIVE_BUILD
     // --- 1. Draw header (centred, bold) ---
     _headerLabel.setFont(AppFonts::defaultLarge());
     _headerLabel.render(u8g2);
@@ -183,9 +180,6 @@ void ConfiguringStatusBoard::render(U8G2& u8g2) {
         if (footerX < 0) footerX = 0;
         u8g2.drawStr(footerX, _displayHeight - 2, footerBuf);
     }
-#else
-    (void)u8g2; // Suppress unused parameter warning in native builds
-#endif
 }
 
 /**

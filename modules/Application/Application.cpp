@@ -71,11 +71,13 @@ Application::~Application() {
  * @return true on success; false if a fatal error prevents normal operation.
  */
 bool Application::begin(const FrameworkConfig& config) {
+#ifdef HAS_DISPLAY
     // --- Phase 1: Bootstrap display hardware (zero framework deps) ---
     // SPI + U8G2 init, boot splash rendered immediately.
     // Must happen before any reportStatus() calls so the boot splash is visible.
     _display.bootstrapHardware();
     _statusReporter = &_display;  // Route all boot progress to the display
+#endif
 
     // --- Step 1: Boot banner ---
     // Print the firmware version so the first log line is always identifiable.
@@ -153,9 +155,11 @@ bool Application::begin(const FrameworkConfig& config) {
         registerModule(&_appTabContributor);  // IWebContributor
     }
 
+#ifdef HAS_DISPLAY
     registerModule(&_display);                    // ITickable + IStatusReporter + IConfigurable + IWebContributor + IMCPContributor
     registerModule(_display.settingsTabStub());   // IWebContributor
     registerModule(_display.screenshotTabStub()); // IWebContributor
+#endif
 
     registerModule(&_wifiGate);           // IConfigGate
 
@@ -206,6 +210,7 @@ bool Application::begin(const FrameworkConfig& config) {
     _mcpServer.begin(_mcpContributors, &_configManager, &_timeManager, &_wifiManager, &_authManager);
     _statusReporter->reportStatus("Web portal starting...", 0.90f);
 
+#ifdef HAS_DISPLAY
     // --- Phase 2: Complete display integration ---
     // EventBus subscriptions, config persistence, carousel board registration,
     // MCP framebuffer binding. Exits bootstrap mode — tick() handles rendering.
@@ -214,6 +219,7 @@ bool Application::begin(const FrameworkConfig& config) {
     _diagnosticsBoard.configure(&_wifiManager);
     _display.carousel.add(&_diagnosticsBoard);
     _mcpServer.setDisplayInfo(_display.getDisplayInfo());
+#endif
 
     // --- Step 16: (Merged into Step 7 module registration) ---
 
@@ -306,6 +312,7 @@ void Application::tick() {
             _eventBus.publish(ApplicationEvents::APP_RUNNING);
             ESP_LOGI(TAG, "All config gates satisfied — entering RUNNING state");
         }
+#ifdef HAS_DISPLAY
         // --- WiFi Wizard modal: show once when AP mode becomes active ---
         // _onEnterConfiguring fires before the WiFi state machine has run, so
         // AP mode detection must happen here in the tick loop instead.
@@ -321,6 +328,7 @@ void Application::tick() {
             _wifiWizardShown = true;
             ESP_LOGI(TAG, "WiFi wizard modal: AP active, showing connection guide");
         }
+#endif
     }
 
     // In native builds, drive DataManager synchronously for tests
@@ -660,8 +668,10 @@ void Application::_publishConfiguringEvent(bool isRegression) {
  * about AppState. Application drives it.
  */
 void Application::_onEnterConfiguring(bool /*isRegression*/) {
+#ifdef HAS_DISPLAY
     _display.carousel.suspend();
     _display.showBase(&_display.boards.configuringStatus);
+#endif
 }
 
 /**
@@ -671,19 +681,23 @@ void Application::_onEnterConfiguring(bool /*isRegression*/) {
  * visible layer again, then resumes automatic rotation.
  */
 void Application::_onEnterRunning() {
+#ifdef HAS_DISPLAY
     _display.clearModal();
     _display.showBase(nullptr);  // clear base → carousel becomes visible
     _display.carousel.resume();
     _wifiWizardShown = false;    // reset so wizard can show again if device re-enters CONFIGURING
+#endif
 }
 
 // ---------------------------------------------------------------------------
 // Display accessor
 // ---------------------------------------------------------------------------
 
+#ifdef HAS_DISPLAY
 /**
  * @brief Get the application's display module instance.
  */
 U8G2DisplayModule& Application::getDisplay() {
     return _display;
 }
+#endif

@@ -48,7 +48,6 @@ enum class TextAlign : uint8_t {
 // =============================================================================
 // Hardware-only declarations — requires U8G2 driver
 // =============================================================================
-#ifndef NATIVE_BUILD
 
 #include <U8g2lib.h>
 
@@ -139,6 +138,5 @@ void drawText(U8G2& display, const char* message, int x, int y,
 void drawTriangle(U8G2& display, int x0, int y0, int x1, int y1,
                   int x2, int y2, bool isFilled = true);
 
-#endif // NATIVE_BUILD
 
 #endif // DRAWING_PRIMITIVES_HPP

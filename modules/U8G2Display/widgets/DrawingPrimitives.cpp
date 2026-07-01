@@ -19,7 +19,6 @@
  * - drawTriangle(): Geometric primitive drawing (filled or wireframe).
  */
 
-#ifndef NATIVE_BUILD
 
 #include "DrawingPrimitives.hpp"
 #include <cstring>
@@ -204,4 +203,3 @@ void drawTriangle(U8G2& display, int x0, int y0, int x1, int y1,
     }
 }
 
-#endif // NATIVE_BUILD

@@ -25,11 +25,9 @@
 #include "fonts/Fonts.hpp"
 #include <cstdio>
 
-#ifndef NATIVE_BUILD
 #include <Arduino.h>
 #include <WiFi.h>
 #include "esp_heap_caps.h"
-#endif
 
 // =============================================================================
 // Construction
@@ -87,13 +85,11 @@ void DiagnosticsBoard::configure(WifiManager* wifiManager) {
     _row3.setAlignment(0);  // LEFT
     _row4.setAlignment(0);  // LEFT
 
-#ifndef NATIVE_BUILD
     // --- Assign fonts (hardware only — fonts return nullptr in native) ---
     _row1.setFont(AppFonts::defaultLarge());
     _row2.setFont(AppFonts::defaultSmall());
     _row3.setFont(AppFonts::defaultSmall());
     _row4.setFont(AppFonts::defaultSmall());
-#endif
 }
 
 /**
@@ -117,7 +113,6 @@ void DiagnosticsBoard::tick(uint32_t currentMillis) {
     if (currentMillis - _lastRefreshMs < REFRESH_INTERVAL_MS) return;
     _lastRefreshMs = currentMillis;
 
-#ifndef NATIVE_BUILD
     // --- Row 2: WiFi SSID + IP ---
     if (WiFi.isConnected()) {
         snprintf(_wifiLine, sizeof(_wifiLine), "%s \xB7 %s",
@@ -142,7 +137,6 @@ void DiagnosticsBoard::tick(uint32_t currentMillis) {
     snprintf(_heapLine, sizeof(_heapLine), "Heap: %luKB  v%s",
              (unsigned long)freeHeapKB, BUILD_VERSION);
     _row4.setText(_heapLine);
-#endif
 }
 
 /**
@@ -154,14 +148,10 @@ void DiagnosticsBoard::tick(uint32_t currentMillis) {
  * @param u8g2 Reference to the active U8G2 driver instance.
  */
 void DiagnosticsBoard::render(U8G2& u8g2) {
-#ifndef NATIVE_BUILD
     _row1.render(u8g2);
     _row2.render(u8g2);
     _row3.render(u8g2);
     _row4.render(u8g2);
-#else
-    (void)u8g2;  // Suppress unused parameter warning in native builds
-#endif
 }
 
 /**
