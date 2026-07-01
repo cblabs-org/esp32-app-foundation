@@ -54,3 +54,12 @@ Remove all `#ifdef NATIVE_BUILD` / `#ifndef NATIVE_BUILD` guards from the OTA su
 ## Verification Requirement
 
 **CRITICAL:** Before distilling or committing, you MUST ask the user if they are happy.
+
+## Status Update
+- Work Order 13 is fully completed.
+- Stripped all `NATIVE_BUILD` guards from `OTAUpdateManager`, `OTADownloadEngine`, and `MbedTLSSignatureVerifier`.
+- Created robust mocks in `test/stubs/platform/` to intercept FreeRTOS task primitives, `PsychicHttp` handler logic, and `esp_ota_ops.h` partitioning APIs.
+- Obsolete tests that asserted legacy fail-safe bypasses on native were purged from `test_otaUpdateManager` and `test_ota_fail_closed`.
+- Native build environment compiled and executed tests with **570/570 passing tests**.
+- ESP32S3 hardware build compiled and linked successfully without regression.
+- Work is fully committed to the current branch.
