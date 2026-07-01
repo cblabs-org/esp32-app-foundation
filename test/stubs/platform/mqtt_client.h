@@ -34,22 +34,41 @@ typedef struct {
     int qos;
     bool dup;
     int session_present;
-    esp_err_t error_handle;
+    struct {
+        int error_type;
+        int connect_return_code;
+    }* error_handle;
 } esp_mqtt_event_t;
 
 typedef esp_mqtt_event_t* esp_mqtt_event_handle_t;
 
 typedef struct {
     struct {
-        const char* uri;
+        struct {
+            const char* uri;
+        } address;
+        struct {
+            const char* certificate;
+        } verification;
     } broker;
     struct {
         const char* username;
-        const char* password;
+        struct {
+            const char* password;
+        } authentication;
     } credentials;
     struct {
         int disable_auto_reconnect;
+        int timeout_ms;
     } network;
+    struct {
+        struct {
+            const char* topic;
+            const char* msg;
+            int qos;
+            int retain;
+        } last_will;
+    } session;
 } esp_mqtt_client_config_t;
 
 typedef void* esp_mqtt_client_handle_t;

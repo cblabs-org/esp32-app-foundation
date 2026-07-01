@@ -15,6 +15,8 @@ public:
     esp_err_t redirect(const char* url) { return ESP_OK; }
 };
 
+#include "Arduino.h"
+
 class PsychicRequest {
 public:
     const char* host() { return ""; }
@@ -22,6 +24,7 @@ public:
     const char* uri() { return ""; }
     const char* header(const char* name) { return ""; }
     bool hasHeader(const char* name) { return false; }
+    std::string body() { return std::string(); }
 };
 
 typedef std::function<esp_err_t(PsychicRequest *request, PsychicResponse *response)> PsychicHttpRequestCallback;

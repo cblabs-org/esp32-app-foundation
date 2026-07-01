@@ -71,11 +71,7 @@ class ConfigManager;
 class KeyManager;
 class EventBus;
 
-#ifndef NATIVE_BUILD
 #include <mqtt_client.h>
-#else
-typedef void* esp_mqtt_client_handle_t;
-#endif
 
 /**
  * @brief MQTT integration module for Home Assistant auto-discovery.
@@ -117,7 +113,6 @@ private:
     /** @brief EventBus callback: disconnects MQTT when wifi goes down. */
     static void onWifiDisconnected(const char* topic, const void* payload, void* ctx);
 
-#ifndef NATIVE_BUILD
     /**
      * @brief ESP-MQTT event handler callback for all MQTT events.
      *
@@ -126,7 +121,6 @@ private:
      * inbound commands to matching entities).
      */
     static void mqttEventHandler(void* handler_args, esp_event_base_t base, int32_t event_id, void* event_data);
-#endif
 
     /** @brief Configures and starts the ESP-MQTT client with current settings. */
     void connectMqtt();

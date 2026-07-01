@@ -22,7 +22,7 @@ TEST(HomeAssistantEntitiesTest, BinarySensorDiscovery) {
     
     EXPECT_STREQ("Front Door", payload["name"].as<const char*>());
     EXPECT_STREQ("door", payload["device_class"].as<const char*>());
-    EXPECT_STREQ("homeassistant/binary_sensor/native_mac/door/state", payload["state_topic"].as<const char*>());
+    EXPECT_STREQ("homeassistant/binary_sensor/aabbccddeeff/door/state", payload["state_topic"].as<const char*>());
 }
 
 TEST(HomeAssistantEntitiesTest, ButtonDiscovery) {
@@ -36,7 +36,7 @@ TEST(HomeAssistantEntitiesTest, ButtonDiscovery) {
     
     EXPECT_STREQ("Reboot Device", payload["name"].as<const char*>());
     EXPECT_STREQ("restart", payload["device_class"].as<const char*>());
-    EXPECT_STREQ("homeassistant/button/native_mac/reboot/set", payload["command_topic"].as<const char*>());
+    EXPECT_STREQ("homeassistant/button/aabbccddeeff/reboot/set", payload["command_topic"].as<const char*>());
     EXPECT_FALSE(payload.containsKey("state_topic"));
 }
 
@@ -66,8 +66,8 @@ TEST(HomeAssistantEntitiesTest, FanDiscovery) {
     ha.generateDiscoveryJson(&fan, payload);
     
     EXPECT_STREQ("Bedroom Fan", payload["name"].as<const char*>());
-    EXPECT_STREQ("homeassistant/fan/native_mac/bedroom/set/percentage", payload["percentage_command_topic"].as<const char*>());
-    EXPECT_STREQ("homeassistant/fan/native_mac/bedroom/state", payload["percentage_state_topic"].as<const char*>());
+    EXPECT_STREQ("homeassistant/fan/aabbccddeeff/bedroom/set/percentage", payload["percentage_command_topic"].as<const char*>());
+    EXPECT_STREQ("homeassistant/fan/aabbccddeeff/bedroom/state", payload["percentage_state_topic"].as<const char*>());
     EXPECT_STREQ("{{ value_json.percentage }}", payload["percentage_value_template"].as<const char*>());
 }
 
@@ -80,8 +80,8 @@ TEST(HomeAssistantEntitiesTest, ClimateDiscovery) {
     ha.generateDiscoveryJson(&climate, payload);
     
     EXPECT_STREQ("Living Room Thermostat", payload["name"].as<const char*>());
-    EXPECT_STREQ("homeassistant/climate/native_mac/thermostat/set/mode", payload["mode_command_topic"].as<const char*>());
-    EXPECT_STREQ("homeassistant/climate/native_mac/thermostat/set/temp", payload["temperature_command_topic"].as<const char*>());
+    EXPECT_STREQ("homeassistant/climate/aabbccddeeff/thermostat/set/mode", payload["mode_command_topic"].as<const char*>());
+    EXPECT_STREQ("homeassistant/climate/aabbccddeeff/thermostat/set/temp", payload["temperature_command_topic"].as<const char*>());
     EXPECT_STREQ("auto", payload["modes"][0].as<const char*>());
 }
 
@@ -96,8 +96,8 @@ TEST(HomeAssistantEntitiesTest, CoverDiscovery) {
     
     EXPECT_STREQ("Living Room Blinds", payload["name"].as<const char*>());
     EXPECT_STREQ("blind", payload["device_class"].as<const char*>());
-    EXPECT_STREQ("homeassistant/cover/native_mac/blinds/set", payload["command_topic"].as<const char*>());
-    EXPECT_STREQ("homeassistant/cover/native_mac/blinds/set/position", payload["set_position_topic"].as<const char*>());
+    EXPECT_STREQ("homeassistant/cover/aabbccddeeff/blinds/set", payload["command_topic"].as<const char*>());
+    EXPECT_STREQ("homeassistant/cover/aabbccddeeff/blinds/set/position", payload["set_position_topic"].as<const char*>());
 }
 
 TEST(HomeAssistantEntitiesTest, NumberDiscovery) {
@@ -143,7 +143,7 @@ TEST(HomeAssistantEntitiesTest, DeviceTriggerDiscovery) {
     EXPECT_STREQ("trigger", payload["automation_type"].as<const char*>());
     EXPECT_STREQ("button_short_press", payload["type"].as<const char*>());
     EXPECT_STREQ("button_1", payload["subtype"].as<const char*>());
-    EXPECT_STREQ("homeassistant/device_automation/native_mac/btn1/state", payload["topic"].as<const char*>());
+    EXPECT_STREQ("homeassistant/device_automation/aabbccddeeff/btn1/state", payload["topic"].as<const char*>());
     EXPECT_FALSE(payload.containsKey("state_topic"));
 }
 

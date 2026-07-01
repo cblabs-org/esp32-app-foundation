@@ -30,7 +30,7 @@ identically in both native and hardware environments — only the include path d
 
 | WO | Branch Topic | Status | Complexity | Scope |
 |----|-------------|--------|------------|-------|
-| **[ ] [WO1 — Stub Library Foundation](wo1-stub-library/WORKORDER.md)** | Create stub header library | ⬜ Not started | standard | ~18 new stub headers in `test/stubs/platform/`, platformio.ini changes |
+| **[x] [WO1 — Stub Library Foundation](wo1-stub-library/WORKORDER.md)** | Create stub header library | ✅ Merged | standard | ~18 new stub headers in `test/stubs/platform/`, platformio.ini changes |
 | **[ ] [WO2 — HomeAssistant Module](wo2-homeassistant/WORKORDER.md)** | Migrate HomeAssistant module | ⬜ Not started | standard | `HomeAssistantModule.hpp/.cpp` — remove ~11 guards |
 | **[ ] [WO3 — MCPServer Module](wo3-mcpserver/WORKORDER.md)** | Migrate MCPServer module | ⬜ Not started | standard | `MCPServer.hpp/.cpp`, `MCPBuiltinTools.cpp` — remove ~7 guards, relocate MockSerial/Print |
 | **[ ] [WO4 — DataManager Module](wo4-datamanager/WORKORDER.md)** | Migrate DataManager module | ⬜ Not started | standard | `DataManager.hpp/.cpp` — remove ~9 FreeRTOS guards |

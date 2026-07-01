@@ -14,16 +14,12 @@
  *              web portal REST endpoints and MCP tools.
  */
 #include "HomeAssistantModule.hpp"
-#ifndef NATIVE_BUILD
 #include <esp_log.h>
 #include <esp_mac.h>
 #include <WiFi.h>
-#endif
 
-#ifndef NATIVE_BUILD
 #include <PsychicHttp.h>
 #include "../../include/portal_assets/homeassistant_js.hpp"
-#endif
 
 #include "../MCPServer/MCPToolRegistry.hpp"
 #include "../ConfigManager/ConfigManager.hpp"
@@ -42,16 +38,12 @@ static constexpr const char* TAG = "HomeAssistant";
  * hex string for use as a unique device identifier in MQTT topics.
  */
 HomeAssistantModule::HomeAssistantModule() {
-#ifndef NATIVE_BUILD
     // --- Step 1: Read device MAC address ---
     uint8_t mac[6];
     esp_read_mac(mac, ESP_MAC_WIFI_STA);
     char macStr[13];
     snprintf(macStr, sizeof(macStr), "%02x%02x%02x%02x%02x%02x", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
     _macPrefix = macStr;
-#else
-    _macPrefix = "native_mac";
-#endif
     // --- Step 2: Derive LWT topic from MAC prefix ---
     _lwtTopic = "homeassistant/status/" + _macPrefix;
 }
@@ -118,9 +110,7 @@ void HomeAssistantModule::addEntity(IHaEntity* entity) {
         std::string payloadStr;
         serializeJson(doc, payloadStr);
         std::string topic = "homeassistant/" + std::string(entity->getEntityType()) + "/" + _macPrefix + "/" + entity->getObjectId() + "/config";
-#ifndef NATIVE_BUILD
         esp_mqtt_client_publish(_mqttClient, topic.c_str(), payloadStr.c_str(), 0, 1, 1);
-#endif
         publishState(entity);
     }
 }
@@ -137,9 +127,7 @@ void HomeAssistantModule::publishState(IHaEntity* entity) {
     if (!_mqttConnected) return;
     std::string topic = getEntityStateTopic(entity);
     std::string state = entity->getState();
-#ifndef NATIVE_BUILD
     esp_mqtt_client_publish(_mqttClient, topic.c_str(), state.c_str(), 0, 1, 1); // QoS 1, Retain 1
-#endif
 }
 
 /**
@@ -219,9 +207,7 @@ void HomeAssistantModule::publishDiscovery() {
         std::string payloadStr;
         serializeJson(doc, payloadStr);
         std::string topic = "homeassistant/" + std::string(entity->getEntityType()) + "/" + _macPrefix + "/" + entity->getObjectId() + "/config";
-#ifndef NATIVE_BUILD
         esp_mqtt_client_publish(_mqttClient, topic.c_str(), payloadStr.c_str(), 0, 1, 1);
-#endif
     }
 }
 
@@ -248,7 +234,6 @@ void HomeAssistantModule::publishAllStates() {
  * Registers the event handler and starts the client.
  */
 void HomeAssistantModule::connectMqtt() {
-#ifndef NATIVE_BUILD
     ESP_LOGI(TAG, "connectMqtt: called");
 
     // --- Step 1: Guard — require wifi and a configured broker URI ---
@@ -306,7 +291,6 @@ void HomeAssistantModule::connectMqtt() {
     } else {
         ESP_LOGW(TAG, "connectMqtt: esp_mqtt_client_init returned NULL");
     }
-#endif
 }
 
 /**
@@ -317,7 +301,6 @@ void HomeAssistantModule::connectMqtt() {
  */
 void HomeAssistantModule::disconnectMqtt() {
     ESP_LOGI(TAG, "disconnectMqtt: called (client=%s)", _mqttClient ? "active" : "null");
-#ifndef NATIVE_BUILD
     if (_mqttClient) {
         // Publish offline LWT gracefully before disconnect
         esp_mqtt_client_publish(_mqttClient, _lwtTopic.c_str(), "offline", 0, 1, 1);
@@ -325,11 +308,9 @@ void HomeAssistantModule::disconnectMqtt() {
         esp_mqtt_client_destroy(_mqttClient);
         _mqttClient = nullptr;
     }
-#endif
     _mqttConnected = false;
 }
 
-#ifndef NATIVE_BUILD
 /**
  * @brief ESP-MQTT event handler callback for all MQTT events.
  *
@@ -415,7 +396,6 @@ void HomeAssistantModule::mqttEventHandler(void* handler_args, esp_event_base_t 
             break;
     }
 }
-#endif
 
 /**
  * @brief Publishes pending state sync after MQTT reconnection.
@@ -445,11 +425,9 @@ void HomeAssistantModule::applyConfig(const JsonObject& section) {
     if (section["user"].is<const char*>()) _mqttUser = section["user"].as<std::string>();
     
     // Pass and Cert are managed by KeyManager.
-#ifndef NATIVE_BUILD
     if (WiFi.status() == WL_CONNECTED && !_mqttUri.empty()) {
         connectMqtt(); // reconnect with new settings
     }
-#endif
 }
 
 /**
@@ -501,7 +479,6 @@ const char* HomeAssistantModule::getTabIcon() const {
  * @param server Reference to the PsychicHttpServer instance.
  */
 void HomeAssistantModule::registerRoutes(PsychicHttpServer& server) {
-#ifndef NATIVE_BUILD
     // --- Route 1: Serve compressed portal JavaScript ---
     server.on("/homeassistant.js", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
         response->setContent(homeassistant_js_gz, homeassistant_js_gz_len);
@@ -556,7 +533,6 @@ void HomeAssistantModule::registerRoutes(PsychicHttpServer& server) {
         }
         return response->send(500, "text/plain", "No KeyManager");
     });
-#endif
 }
 
 /**
@@ -569,7 +545,6 @@ void HomeAssistantModule::registerRoutes(PsychicHttpServer& server) {
  * @param registry Reference to the MCPToolRegistry.
  */
 void HomeAssistantModule::registerMCPTools(MCPToolRegistry& registry) {
-#ifndef NATIVE_BUILD
     registry.addTool("ha_get_state", "Get the current state of a Home Assistant entity",
         [](void* context, JsonObject& args, JsonObject& result) {
             auto* self = static_cast<HomeAssistantModule*>(context);
@@ -599,5 +574,4 @@ void HomeAssistantModule::registerMCPTools(MCPToolRegistry& registry) {
             }
             result["error"] = "Entity not found or not commandable";
         }, this, true);
-#endif
 }

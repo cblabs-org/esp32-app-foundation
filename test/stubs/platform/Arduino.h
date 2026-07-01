@@ -2,6 +2,10 @@
 #include <cstdint>
 #include <string>
 
+#ifndef PROGMEM
+#define PROGMEM
+#endif
+
 // String class migrated from NativeBuildStubs.hpp
 #ifndef STRING_STUB_DEFINED
 #define STRING_STUB_DEFINED
