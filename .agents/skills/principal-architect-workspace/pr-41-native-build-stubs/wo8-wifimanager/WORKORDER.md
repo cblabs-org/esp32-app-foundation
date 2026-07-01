@@ -40,3 +40,11 @@ Remove all `#ifdef NATIVE_BUILD` / `#ifndef NATIVE_BUILD` guards from the WifiMa
 ## Verification Requirement
 
 **CRITICAL:** Before distilling or committing, you MUST ask the user if they are happy.
+
+## Status
+✅ **COMPLETED (2026-07-01)**
+- All `#ifdef NATIVE_BUILD` guards removed from `WifiManager.cpp` and `WifiManager.hpp`.
+- `Arduino.h` and `WiFi.h` stubs expanded to support needed mock methods without conflicting with other components.
+- Verified 575/575 tests pass via `pio test -e native`.
+- Verified target build succeeds via `pio run -e esp32s3nano`.
+- Changes committed and session distilled into `context_artifacts/`.
