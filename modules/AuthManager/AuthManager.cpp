@@ -650,7 +650,7 @@ void AuthManager::registerRoutes(PsychicHttpServer& server) {
                             auto* self = static_cast<AuthManager*>(param);
                             self->generateAndStoreCert("esp32-device");
                             self->_certGenRunning.store(false);
-                            vTaskDelete(nullptr);
+                            vTaskDeleteWithCaps(nullptr);
                         },
                         "cert_gen",
                         12288,
@@ -721,7 +721,7 @@ void AuthManager::registerRoutes(PsychicHttpServer& server) {
                 auto* self = static_cast<AuthManager*>(param);
                 self->generateAndStoreCert("esp32-device");
                 self->_certGenRunning.store(false);
-                vTaskDelete(nullptr);
+                vTaskDeleteWithCaps(nullptr);
             },
             "cert_gen",
             12288,

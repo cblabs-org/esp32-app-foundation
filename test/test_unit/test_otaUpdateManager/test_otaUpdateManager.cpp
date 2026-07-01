@@ -49,13 +49,16 @@ TEST_F(OtaUpdateManagerTest, GetLastOtaError_Default_ReturnsNull) {
     EXPECT_EQ(nullptr, manager.getLastOtaError());
 }
 
-/// performUpdate() after begin() but on native should set Error (no FreeRTOS).
-TEST_F(OtaUpdateManagerTest, PerformUpdate_OnNative_SetsError) {
+/// performUpdate() after begin() transitions state to Checking and notifies
+/// the persistent worker task. On native the worker runs synchronously via the
+/// xTaskCreateWithCaps stub but exits at ulTaskNotifyTake before running the
+/// pipeline — so state stays at Checking (not Error) after performUpdate().
+TEST_F(OtaUpdateManagerTest, PerformUpdate_AfterBegin_TransitionsToChecking) {
     Application app;
     manager.begin(app);
     manager.performUpdate();
-    EXPECT_EQ(OTAState::Error, manager.getState());
-    EXPECT_NE(nullptr, manager.getLastOtaError());
+    EXPECT_EQ(OTAState::Checking, manager.getState());
+    EXPECT_EQ(nullptr, manager.getLastOtaError());
 }
 
 /// checkForUpdate() after begin() with no repo should return false.
