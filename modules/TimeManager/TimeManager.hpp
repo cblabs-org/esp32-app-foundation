@@ -41,15 +41,9 @@
 
 #pragma once
 
-#ifndef NATIVE_BUILD
 #include <Arduino.h>
 #include <time.h>
 #include <esp_sntp.h>
-#else
-#include <string>
-#include <stdint.h>
-#include <time.h>
-#endif
 
 #include "../../include/interfaces/ITickable.hpp"
 #include "../../include/interfaces/IConfigurable.hpp"
@@ -278,7 +272,6 @@ private:
      */
     void _reinitNtp();
 
-#ifndef NATIVE_BUILD
     /**
      * @brief Handler for GET /api/time/config
      */
@@ -298,5 +291,4 @@ private:
      * @brief Handler for POST /api/time/zones/update
      */
     void _handlePostZonesUpdate(PsychicRequest* request, PsychicResponse* response);
-#endif
 };

@@ -14,6 +14,7 @@ TEST_F(TimeManagerTest, InitialState) {
 // begin() sets synced
 TEST_F(TimeManagerTest, BeginSetsSynced) {
     timeManager.begin();
+    timeManager.tick(0);
     EXPECT_TRUE(timeManager.isTimeSet());
 }
 
@@ -27,6 +28,7 @@ TEST_F(TimeManagerTest, GetLocalTimeBeforeBegin) {
 // getLocalTime() after begin
 TEST_F(TimeManagerTest, GetLocalTimeAfterBegin) {
     timeManager.begin();
+    timeManager.tick(0);
     struct tm timeinfo;
     EXPECT_TRUE(timeManager.getLocalTime(&timeinfo));
 }
@@ -69,6 +71,7 @@ TEST_F(TimeManagerTest, ResetConfigSeedsDefaultPosixTimezone) {
     timeManager.resetConfig();
     EXPECT_STREQ("GMT0", timeManager.getPosixTz());
     timeManager.begin();
+    timeManager.tick(0);
     EXPECT_TRUE(timeManager.isTimeSet());
 }
 

@@ -37,6 +37,8 @@ public:
     bool operator==(const char* s) const { return _str == s; }
     char operator[](int i) const { return _str[i]; }
     operator std::string() const { return _str; }
+    size_t write(uint8_t c) { _str += static_cast<char>(c); return 1; }
+    size_t write(const uint8_t* buf, size_t size) { _str.append(reinterpret_cast<const char*>(buf), size); return size; }
 private:
     std::string _str;
 };

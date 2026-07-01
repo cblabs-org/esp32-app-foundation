@@ -30,7 +30,6 @@
 
 static constexpr const char* TAG = "TimeManager";
 
-#ifndef NATIVE_BUILD
 #include <PsychicHttp.h>
 #include <LittleFS.h>
 #include <ArduinoJson.h>
@@ -487,85 +486,3 @@ void TimeManager::_reinitNtp() {
     configTzTime(_posixTz, _ntpServer1, _ntpServer2, _ntpServer3);
     _syncStatus = TimeSyncStatus::IN_PROGRESS;
 }
-
-#else
-// =============================================================================
-// Mock implementation for NATIVE_BUILD testing
-// =============================================================================
-
-void TimeManager::begin() {
-    setTimezone(_posixTz);
-    _syncStatus = TimeSyncStatus::SYNCED;
-}
-
-void TimeManager::tick(uint32_t currentMillis) {
-    // No-op for native build
-}
-
-void TimeManager::setTimezone(const char* timezone) {
-    // Mock setting timezone
-}
-
-bool TimeManager::getLocalTime(struct tm* timeinfo) {
-    if (timeinfo == nullptr) return false;
-    time_t now = time(nullptr);
-    // Use standard localtime for mock
-    struct tm* ti = localtime(&now);
-    if (ti) {
-        *timeinfo = *ti;
-        return true;
-    }
-    return false;
-}
-
-bool TimeManager::isTimeSet() const {
-    return _syncStatus == TimeSyncStatus::SYNCED;
-}
-
-// --- IConfigurable stubs ---
-void TimeManager::applyConfig(const JsonObject& section) {
-    if (section["timezone"].is<const char*>()) {
-        strncpy(_timezone, section["timezone"].as<const char*>(), sizeof(_timezone) - 1);
-        _timezone[sizeof(_timezone) - 1] = '\0';
-    }
-    if (section["posix"].is<const char*>()) {
-        strncpy(_posixTz, section["posix"].as<const char*>(), sizeof(_posixTz) - 1);
-        _posixTz[sizeof(_posixTz) - 1] = '\0';
-    }
-    _configured = true;
-
-    // --- Notify ConfigManager of the active timezone for _meta envelope ---
-    if (_configManager != nullptr && strlen(_timezone) > 0) {
-        _configManager->setMetaTimezone(_timezone);
-    }
-}
-
-void TimeManager::serializeConfig(JsonObject& section) const {
-    section["timezone"]   = _timezone;
-    section["posix"]      = _posixTz;
-    section["ntpServer1"] = _ntpServer1;
-    section["ntpServer2"] = _ntpServer2;
-    section["ntpServer3"] = _ntpServer3;
-}
-
-void TimeManager::resetConfig() {
-    memset(_timezone, 0, sizeof(_timezone));
-    memset(_posixTz, 0, sizeof(_posixTz));
-    strncpy(_posixTz, "GMT0", sizeof(_posixTz) - 1);
-    strncpy(_ntpServer1, "pool.ntp.org", sizeof(_ntpServer1) - 1);
-    strncpy(_ntpServer2, "time.nist.gov", sizeof(_ntpServer2) - 1);
-    strncpy(_ntpServer3, "time.windows.com", sizeof(_ntpServer3) - 1);
-    _configured = false;
-}
-
-// --- IWebContributor stub ---
-void TimeManager::registerRoutes(PsychicHttpServer& server) {
-    // No-op for native build
-}
-
-// --- Private helper stub ---
-void TimeManager::_reinitNtp() {
-    _syncStatus = TimeSyncStatus::SYNCED;
-}
-
-#endif

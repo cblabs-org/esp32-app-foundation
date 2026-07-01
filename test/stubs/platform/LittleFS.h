@@ -7,7 +7,7 @@
 class File {
 public:
     File() {}
-    File(const std::string& path, const char* mode) {
+    File(const std::string& path, const char* mode) : _path(path) {
         std::ios_base::openmode open_mode = std::ios_base::in | std::ios_base::out;
         if (mode && mode[0] == 'w') open_mode = std::ios_base::out | std::ios_base::trunc;
         if (mode && mode[0] == 'a') open_mode = std::ios_base::out | std::ios_base::app;
@@ -25,9 +25,16 @@ public:
         _fs.read(reinterpret_cast<char*>(buf), size);
         return _fs.gcount();
     }
+    size_t readBytes(char* buf, size_t size) {
+        if (!_isOpen) return 0;
+        _fs.read(buf, size);
+        return _fs.gcount();
+    }
     size_t size() const {
         if (!_isOpen) return 0;
-        return 0; // Simplified for stub
+        std::error_code ec;
+        auto s = std::filesystem::file_size(_path, ec);
+        return ec ? 0 : s;
     }
     String readString() { return ""; }
     void print(const char* s) { if (_isOpen) _fs << s; }
@@ -37,6 +44,7 @@ public:
 private:
     std::fstream _fs;
     bool _isOpen = false;
+    std::string _path;
 };
 
 class FSClass {
@@ -55,6 +63,11 @@ public:
     bool mkdir(const char* path) {
         std::error_code ec;
         return std::filesystem::create_directories("test/tmp" + std::string(path), ec);
+    }
+    bool rename(const char* pathFrom, const char* pathTo) {
+        std::error_code ec;
+        std::filesystem::rename("test/tmp" + std::string(pathFrom), "test/tmp" + std::string(pathTo), ec);
+        return !ec;
     }
     size_t usedBytes() { return 50000; }
     size_t totalBytes() { return 150000; }
