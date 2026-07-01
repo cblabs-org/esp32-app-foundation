@@ -41,3 +41,6 @@ Remove all `#ifdef NATIVE_BUILD` / `#ifndef NATIVE_BUILD` guards from the DataMa
 ## Verification Requirement
 
 **CRITICAL:** Before distilling or committing, you MUST ask the user if they are happy.
+
+## Status Update - Completed
+DataManager module has been unified. NATIVE_BUILD guards are removed. FreeRTOS stubs have been updated to support synchronous loop execution via C++ exceptions in vTaskDelay. Both native and esp32s3nano tests passed and changes have been committed.

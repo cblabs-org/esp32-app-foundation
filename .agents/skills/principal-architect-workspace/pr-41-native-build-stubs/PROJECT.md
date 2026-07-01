@@ -31,11 +31,11 @@ identically in both native and hardware environments — only the include path d
 | WO | Branch Topic | Status | Complexity | Scope |
 |----|-------------|--------|------------|-------|
 | **[x] [WO1 — Stub Library Foundation](wo1-stub-library/WORKORDER.md)** | Create stub header library | ✅ Merged | standard | ~18 new stub headers in `test/stubs/platform/`, platformio.ini changes |
-| **[ ] [WO2 — HomeAssistant Module](wo2-homeassistant/WORKORDER.md)** | Migrate HomeAssistant module | ⬜ Not started | standard | `HomeAssistantModule.hpp/.cpp` — remove ~11 guards |
-| **[ ] [WO3 — MCPServer Module](wo3-mcpserver/WORKORDER.md)** | Migrate MCPServer module | ⬜ Not started | standard | `MCPServer.hpp/.cpp`, `MCPBuiltinTools.cpp` — remove ~7 guards, relocate MockSerial/Print |
-| **[ ] [WO4 — DataManager Module](wo4-datamanager/WORKORDER.md)** | Migrate DataManager module | ⬜ Not started | standard | `DataManager.hpp/.cpp` — remove ~9 FreeRTOS guards |
-| **[ ] [WO5 — TimeManager Module](wo5-timemanager/WORKORDER.md)** | Migrate TimeManager module | ⬜ Not started | mechanical | `TimeManager.hpp/.cpp` — remove ~3 guards |
-| **[ ] [WO6 — KeyManager Module](wo6-keymanager/WORKORDER.md)** | Migrate KeyManager module | ⬜ Not started | standard | `KeyManager.hpp/.cpp` — remove ~5 guards |
+| **[x] [WO2 — HomeAssistant Module](wo2-homeassistant/WORKORDER.md)** | Migrate HomeAssistant module | ✅ Merged | standard | `HomeAssistantModule.hpp/.cpp` — remove ~11 guards |
+| **[x] [WO3 — MCPServer Module](wo3-mcpserver/WORKORDER.md)** | Migrate MCPServer module | ✅ Merged | standard | `MCPServer.hpp/.cpp`, `MCPBuiltinTools.cpp` — remove ~7 guards, relocate MockSerial/Print |
+| **[x] [WO4 — DataManager Module](wo4-datamanager/WORKORDER.md)** | Migrate DataManager module | ✅ Merged | standard | `DataManager.hpp/.cpp` — remove ~9 FreeRTOS guards |
+| **[x] [WO5 — TimeManager Module](wo5-timemanager/WORKORDER.md)** | Migrate TimeManager module | ✅ Merged | mechanical | `TimeManager.hpp/.cpp` — remove ~3 guards |
+| **[x] [WO6 — KeyManager Module](wo6-keymanager/WORKORDER.md)** | Migrate KeyManager module | ✅ Merged | standard | `KeyManager.hpp/.cpp` — remove ~5 guards |
 | **[ ] [WO7 — ConfigManager Module](wo7-configmanager/WORKORDER.md)** | Migrate ConfigManager + ConfigManifest | ⬜ Not started | standard | `ConfigManager.hpp/.cpp`, `ConfigManifest.cpp` — remove ~11 guards, LittleFS fstream bridge |
 | **[ ] [WO8 — WifiManager Module](wo8-wifimanager/WORKORDER.md)** | Migrate WifiManager module | ⬜ Not started | standard | `WifiManager.hpp/.cpp` — remove ~19 guards |
 | **[ ] [WO9 — WebServer Module](wo9-webserver/WORKORDER.md)** | Migrate WebServer module | ⬜ Not started | standard | `WebServerManager.hpp/.cpp` — remove ~15 guards, relocate PsychicHttp mocks |

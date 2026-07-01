@@ -48,16 +48,12 @@
 
 #include <vector>
 
-#ifndef NATIVE_BUILD
 #include <Arduino.h>
 #include <LittleFS.h>
 #include <WiFi.h>    // WiFi.macAddress() for _meta envelope
 #include <time.h>    // time(), gmtime_r(), strftime() for _meta datetime
-#else
-#include <string>
-#include <stdint.h>
-#include <ctime>     // time(), gmtime_r(), strftime() — native build
-#endif
+#include <freertos/FreeRTOS.h>
+#include <freertos/timers.h>
 
 #include <ArduinoJson.h>
 #include "../../include/interfaces/IConfigurable.hpp"

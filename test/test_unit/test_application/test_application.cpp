@@ -425,8 +425,8 @@ TEST_F(ApplicationBeginTest, Begin_CallsApplyConfigOnRegisteredModules) {
     app.getConfigManager().registerModule(&confB);
 
     // Clean up any leftover files from prior runs
-    remove("test/tmp/mod_mockA.json");
-    remove("test/tmp/mod_mockB.json");
+    remove("test/tmp/mod/mockA.json");
+    remove("test/tmp/mod/mockB.json");
 
     FrameworkConfig cfg;
     app.begin(cfg);
@@ -438,8 +438,8 @@ TEST_F(ApplicationBeginTest, Begin_CallsApplyConfigOnRegisteredModules) {
     EXPECT_TRUE(confB.resetConfigCalled);
 
     // Cleanup
-    remove("test/tmp/mod_mockA.json");
-    remove("test/tmp/mod_mockB.json");
+    remove("test/tmp/mod/mockA.json");
+    remove("test/tmp/mod/mockB.json");
 }
 
 /**
@@ -506,7 +506,7 @@ TEST_F(ConfigManagerGatewayTest, RegisterModule_AfterBeginAll_ReturnsFalse) {
     EXPECT_FALSE(cm.registerModule(&confB));
 
     // Cleanup
-    remove("test/tmp/mod_lockTestA.json");
+    remove("test/tmp/mod/lockTestA.json");
 }
 
 // =============================================================================
@@ -556,7 +556,7 @@ TEST_F(ApplicationDomainServiceTest, GetKeyManager_ReturnsReference) {
  */
 TEST_F(ApplicationDomainServiceTest, AfterBegin_WifiManagerRegisteredWithConfigManager) {
     // Clean up any leftover files
-    remove("test/tmp/mod_wifi.json");
+    remove("test/tmp/mod/wifi.json");
 
     FrameworkConfig cfg;
     app.begin(cfg);
@@ -567,7 +567,7 @@ TEST_F(ApplicationDomainServiceTest, AfterBegin_WifiManagerRegisteredWithConfigM
     EXPECT_EQ(app.getState(), AppState::Configuring);
 
     // Cleanup
-    remove("test/tmp/mod_wifi.json");
+    remove("test/tmp/mod/wifi.json");
 }
 
 // =============================================================================

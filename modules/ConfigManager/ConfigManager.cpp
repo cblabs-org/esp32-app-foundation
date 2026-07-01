@@ -17,20 +17,10 @@
  */
 
 #include "ConfigManager.hpp"
-#ifndef NATIVE_BUILD
 #include <PsychicHttp.h>
-#endif
 #include <string.h>
 #include "platform/LogShim.h"
 #include "MCPToolRegistry.hpp"
-
-#ifndef NATIVE_BUILD
-// (no additional hardware-only includes needed)
-#else
-#include <fstream>
-#include <sstream>
-#include <cstdio>
-#endif
 
 static constexpr const char* TAG = "ConfigManager";
 
@@ -49,11 +39,7 @@ static constexpr const char* TAG = "ConfigManager";
  * @param size Buffer size in bytes.
  */
 void ConfigManager::getConfigPath(const char* ns, char* buf, size_t size) {
-#ifndef NATIVE_BUILD
     snprintf(buf, size, "/mod/%s.json", ns);
-#else
-    snprintf(buf, size, "test/tmp/mod_%s.json", ns);
-#endif
 }
 
 /**
@@ -152,7 +138,6 @@ void ConfigManager::loadModuleConfig(IConfigurable* module) {
     JsonDocument doc;
     bool fileExists = false;
 
-#ifndef NATIVE_BUILD
     if (LittleFS.exists(path)) {
         File file = LittleFS.open(path, "r");
         if (file) {
@@ -169,24 +154,6 @@ void ConfigManager::loadModuleConfig(IConfigurable* module) {
             ESP_LOGW(TAG, "Failed to open %s for reading", path);
         }
     }
-#else
-    std::ifstream file(path);
-    if (file.is_open()) {
-        std::stringstream buffer;
-        buffer << file.rdbuf();
-        std::string jsonStr = buffer.str();
-        file.close();
-
-        DeserializationError err = deserializeJson(doc, jsonStr);
-        if (err) {
-            ESP_LOGE(TAG, "Failed to parse %s: %s — applying defaults", path, err.c_str());
-            module->resetConfig();
-            saveModuleConfig(module);
-            return;
-        }
-        fileExists = true;
-    }
-#endif
 
     if (!fileExists) {
         // No config file — apply defaults and create the file
@@ -258,7 +225,6 @@ bool ConfigManager::saveModuleConfig(IConfigurable* module) {
     doc["_v"] = module->getSchemaVersion();
 
     // --- Write to file ---
-#ifndef NATIVE_BUILD
     // Ensure the /mod/ directory exists
     if (!LittleFS.exists("/mod")) {
         LittleFS.mkdir("/mod");
@@ -277,17 +243,6 @@ bool ConfigManager::saveModuleConfig(IConfigurable* module) {
         return false;
     }
     file.close();
-#else
-    std::ofstream file(path);
-    if (!file.is_open()) {
-        ESP_LOGE(TAG, "Failed to open %s for writing", path);
-        return false;
-    }
-    std::string jsonStr;
-    serializeJson(doc, jsonStr);
-    file << jsonStr;
-    file.close();
-#endif
 
     ESP_LOGI(TAG, "Config saved for '%s'", ns);
     return true;
@@ -320,7 +275,6 @@ void ConfigManager::buildBackupMeta(JsonObject& meta) {
     meta["firmware_version"] = "unknown";
 #endif
 
-#ifndef NATIVE_BUILD
     meta["device_id"]   = WiFi.macAddress();
     meta["device_type"] = ESP.getChipModel();
 
@@ -337,11 +291,6 @@ void ConfigManager::buildBackupMeta(JsonObject& meta) {
     } else {
         meta["datetime"] = "unknown";
     }
-#else
-    meta["device_id"]   = "00:00:00:00:00:00";
-    meta["device_type"] = "native";
-    meta["datetime"]    = "unknown";
-#endif
 
     // TODO: call setMetaTimezone() from TimeManager::applyConfig() to propagate
     //       the configured timezone into the backup envelope.
@@ -452,7 +401,6 @@ bool ConfigManager::importAllConfig(JsonDocument& inDoc) {
  * @param server Reference to the AsyncWebServer instance.
  */
 void ConfigManager::registerRoutes(PsychicHttpServer& server) {
-#ifndef NATIVE_BUILD
     // --- GET /api/config/backup — export all config as downloadable JSON ---
     // IMPORTANT: registered BEFORE /api/config to prevent prefix-match swallowing.
     server.on("/api/config/backup", HTTP_GET, [this](PsychicRequest* request, PsychicResponse* response) {
@@ -549,7 +497,6 @@ void ConfigManager::registerRoutes(PsychicHttpServer& server) {
         response->send(200, "application/json", output.c_str());
         return ESP_OK;
     });
-#endif
 }
 
 
@@ -575,7 +522,6 @@ void ConfigManager::registerRoutes(PsychicHttpServer& server) {
  * @param registry The MCPToolRegistry to register tools with.
  */
 void ConfigManager::registerMCPTools(MCPToolRegistry& registry) {
-#ifndef NATIVE_BUILD
     // --- config_get_schema_version: read-only system config schema version ---
     registry.addTool("config_get_schema_version",
         "Get the system-level config backup schema version",
@@ -626,5 +572,4 @@ void ConfigManager::registerMCPTools(MCPToolRegistry& registry) {
                 xTimerStart(restartTimer, 0);
             }
         }, this, true);
-#endif
 }

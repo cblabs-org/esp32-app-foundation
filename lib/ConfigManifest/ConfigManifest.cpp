@@ -19,21 +19,12 @@
 #include <ArduinoJson.h>
 #include "platform/LogShim.h"
 
-#ifndef NATIVE_BUILD
 #include <LittleFS.h>
-#else
-#include <fstream>
-#include <sstream>
-#endif
 
 static constexpr const char* TAG = "ConfigManifest";
 
 /// Manifest file path on LittleFS (hardware) or working directory (native).
-#ifndef NATIVE_BUILD
 static constexpr const char* kManifestPath = "/config_manifest.json";
-#else
-static constexpr const char* kManifestPath = "test/tmp/config_manifest.json";
-#endif
 
 // =============================================================================
 // Persistence
@@ -54,7 +45,6 @@ bool ConfigManifest::load() {
 
     JsonDocument doc;
 
-#ifndef NATIVE_BUILD
     if (!LittleFS.exists(kManifestPath)) {
         ESP_LOGI(TAG, "Manifest file not found — first boot, starting empty");
         return true;
@@ -73,24 +63,6 @@ bool ConfigManifest::load() {
         ESP_LOGE(TAG, "Failed to parse %s: %s", kManifestPath, err.c_str());
         return false;
     }
-#else
-    std::ifstream file(kManifestPath);
-    if (!file.is_open()) {
-        ESP_LOGI(TAG, "Manifest file not found — first boot, starting empty");
-        return true;
-    }
-
-    std::stringstream buffer;
-    buffer << file.rdbuf();
-    std::string jsonStr = buffer.str();
-    file.close();
-
-    DeserializationError err = deserializeJson(doc, jsonStr);
-    if (err) {
-        ESP_LOGE(TAG, "Failed to parse %s: %s", kManifestPath, err.c_str());
-        return false;
-    }
-#endif
 
     // Parse the "modules" array
     JsonArray modules = doc["modules"].as<JsonArray>();
@@ -141,7 +113,6 @@ bool ConfigManifest::save() const {
         entry["golden"]   = slot.goldenVersion;
     }
 
-#ifndef NATIVE_BUILD
     File file = LittleFS.open(kManifestPath, "w");
     if (!file) {
         ESP_LOGE(TAG, "Failed to open %s for writing", kManifestPath);
@@ -154,17 +125,6 @@ bool ConfigManifest::save() const {
         return false;
     }
     file.close();
-#else
-    std::ofstream file(kManifestPath);
-    if (!file.is_open()) {
-        ESP_LOGE(TAG, "Failed to open %s for writing", kManifestPath);
-        return false;
-    }
-    std::string jsonStr;
-    serializeJson(doc, jsonStr);
-    file << jsonStr;
-    file.close();
-#endif
 
     ESP_LOGI(TAG, "Manifest saved with %d module slot(s)", (int)_slotCount);
     return true;
