@@ -24,14 +24,18 @@ Remove all `#ifdef NATIVE_BUILD` / `#ifndef NATIVE_BUILD` guards from the Device
 
 ## Line-Item Instructions
 
-- [ ] **`DeviceCrypto.hpp`** — Remove guard around `<Arduino.h>` vs `<stdint.h>`, `<stddef.h>`. Include `<Arduino.h>` unconditionally (stub provides types).
-- [ ] **`DeviceCrypto.cpp`** — Remove all guards:
+- [x] **`DeviceCrypto.hpp`** — Remove guard around `<Arduino.h>` vs `<stdint.h>`, `<stddef.h>`. Include `<Arduino.h>` unconditionally (stub provides types).
+- [x] **`DeviceCrypto.cpp`** — Remove all guards:
   - Include guard for `<Preferences.h>`, mbedTLS headers, `<esp_random.h>`, `<esp_mac.h>` vs `<stdlib.h>`, `<time.h>`
   - `begin()`: remove guard around NVS + MAC + mbedTLS key derivation vs `srand/rand` mock key generation
   - `encrypt()` / `decrypt()`: remove guard around AES-256-CBC implementation vs mock return values
-- [ ] **mbedTLS stubs**: The AES and MD (SHA) stubs need enough structure for the code to compile. Since tests use `MockDeviceCrypto` with virtual overrides, the stub implementations are never actually called in tests. They just need to link. Ensure the mbedTLS stub types (`mbedtls_aes_context`, `mbedtls_md_context_t`, etc.) are defined and functions return `0` (success) or appropriate error codes.
-- [ ] **Verify**: `pio test -e native` and `pio run -e esp32s3nano`
+- [x] **mbedTLS stubs**: The AES and MD (SHA) stubs need enough structure for the code to compile. Since tests use `MockDeviceCrypto` with virtual overrides, the stub implementations are never actually called in tests. They just need to link. Ensure the mbedTLS stub types (`mbedtls_aes_context`, `mbedtls_md_context_t`, etc.) are defined and functions return `0` (success) or appropriate error codes.
+- [x] **Verify**: `pio test -e native` and `pio run -e esp32s3nano`
 
 ## Verification Requirement
 
 **CRITICAL:** Before distilling or committing, you MUST ask the user if they are happy.
+
+## Status Update
+- **Status:** COMPLETED
+- **Details:** Refactored DeviceCrypto to remove NATIVE_BUILD guards. Validated both `native` tests and `esp32s3nano` builds. Changes have been committed and distilled.
