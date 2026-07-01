@@ -32,17 +32,15 @@
 
 
 // ---------------------------------------------------------------------------
-// Platform-conditional includes
-// ESP-IDF / Arduino headers are excluded from the native GoogleTest build.
 // ---------------------------------------------------------------------------
-#ifndef NATIVE_BUILD
-    #include <Arduino.h>          // Serial, millis(), etc.
-    #include <LittleFS.h>         // LittleFS.begin()
-    #include "esp_system.h"       // esp_restart()
-    #include "esp_heap_caps.h"    // heap_caps_get_free_size(), heap_caps_get_minimum_free_size()
-#else
-    #include <cstdlib>            // For native-build stubs
-#endif
+// Core Includes
+// ---------------------------------------------------------------------------
+#include <inttypes.h>         // PRIu32
+#include <Arduino.h>          // Serial, millis(), etc.
+#include <LittleFS.h>         // LittleFS.begin()
+#include "esp_system.h"       // esp_restart()
+#include "esp_heap_caps.h"    // heap_caps_get_free_size(), heap_caps_get_minimum_free_size()
+#include <cstdlib>            // For native-build stubs
 
 #include <cstring>                // memset()
 
@@ -76,10 +74,8 @@ bool Application::begin(const FrameworkConfig& config) {
     // --- Phase 1: Bootstrap display hardware (zero framework deps) ---
     // SPI + U8G2 init, boot splash rendered immediately.
     // Must happen before any reportStatus() calls so the boot splash is visible.
-#ifndef NATIVE_BUILD
     _display.bootstrapHardware();
     _statusReporter = &_display;  // Route all boot progress to the display
-#endif
 
     // --- Step 1: Boot banner ---
     // Print the firmware version so the first log line is always identifiable.
@@ -98,7 +94,6 @@ bool Application::begin(const FrameworkConfig& config) {
     // --- Step 4: Mount LittleFS ---
     // Foundation for all persistence. Only available on hardware;
     // in NATIVE_BUILD we skip this.
-#ifndef NATIVE_BUILD
     if (!LittleFS.begin(true, "/littlefs", 10, "littlefs")) {
         // formatOnFail = true: first-boot will auto-format, subsequent failures
         // indicate a hardware fault — abort and return false.
@@ -108,9 +103,6 @@ bool Application::begin(const FrameworkConfig& config) {
     }
     ESP_LOGI(TAG, "LittleFS mounted successfully");
     _statusReporter->reportStatus("Filesystem mounted", 0.10f);
-#else
-    ESP_LOGI(TAG, "LittleFS mount skipped (NATIVE_BUILD)");
-#endif
 
     // --- Step 5: Store FrameworkConfig internally ---
     _config = config;
@@ -134,13 +126,11 @@ bool Application::begin(const FrameworkConfig& config) {
     // --- Step 7a: HomeAssistant module wiring ---
     // Wire the framework-owned HA MQTT service. The module ships
     // with zero default entities — apps add their own via getHomeAssistant().
-#ifndef NATIVE_BUILD
     _haModule.setKeyManager(&_keyManager);
     _haModule.setEventBus(&_eventBus);
     _haModule.setConfigManager(&_configManager);
     _haModule.setAppName(getAppName());
     _haModule.setAppVersion(BUILD_VERSION);
-#endif
     _otaManager = new (std::nothrow) OTAUpdateManager();
     if (_otaManager == nullptr) {
         ESP_LOGE(TAG, "Failed to allocate OTAUpdateManager");
@@ -158,18 +148,14 @@ bool Application::begin(const FrameworkConfig& config) {
     registerModule(&_mcpServer);          // IConfigurable + IWebContributor
     registerModule(_otaManager);          // ITickable + IConfigurable + IWebContributor + IMCPContributor
     registerModule(&_webServerManager);   // ITickable
-#ifndef NATIVE_BUILD
     registerModule(&_haModule);          // ITickable + IConfigurable + IWebContributor + IMCPContributor
-#endif
     if (_enableDefaultAppTab) {
         registerModule(&_appTabContributor);  // IWebContributor
     }
 
-#ifndef NATIVE_BUILD
     registerModule(&_display);                    // ITickable + IStatusReporter + IConfigurable + IWebContributor + IMCPContributor
     registerModule(_display.settingsTabStub());   // IWebContributor
     registerModule(_display.screenshotTabStub()); // IWebContributor
-#endif
 
     registerModule(&_wifiGate);           // IConfigGate
 
@@ -223,13 +209,11 @@ bool Application::begin(const FrameworkConfig& config) {
     // --- Phase 2: Complete display integration ---
     // EventBus subscriptions, config persistence, carousel board registration,
     // MCP framebuffer binding. Exits bootstrap mode — tick() handles rendering.
-#ifndef NATIVE_BUILD
     _display.begin(&_eventBus);
     _display.setConfigManager(&_configManager);
     _diagnosticsBoard.configure(&_wifiManager);
     _display.carousel.add(&_diagnosticsBoard);
     _mcpServer.setDisplayInfo(_display.getDisplayInfo());
-#endif
 
     // --- Step 16: (Merged into Step 7 module registration) ---
 
@@ -243,16 +227,12 @@ bool Application::begin(const FrameworkConfig& config) {
     // automatically reverts to the previous partition. This barrier covers:
     // display bootstrap, EventBus, LittleFS, Crypto, Config, WiFi, Time,
     // Data, OTA, Web, display integration, and registry lock.
-#ifndef NATIVE_BUILD
     _otaManager->markAppValid();
     ESP_LOGI(TAG, "✅ Firmware self-test PASSED — partition blessed");
-#endif
 
     // --- Step 18: Publish system heap event + heap report ---
-#ifndef NATIVE_BUILD
     uint32_t freeHeap = heap_caps_get_free_size(MALLOC_CAP_8BIT);
     _eventBus.publish(ApplicationEvents::SYSTEM_HEAP, &freeHeap);
-#endif
     _reportHeap();
 
     // --- Step 19: Clear boot status ---
@@ -286,11 +266,7 @@ void Application::tick() {
     // Guard: do not tick during boot phases
     if (_state != AppState::Configuring && _state != AppState::Running) return;
 
-#ifndef NATIVE_BUILD
     uint32_t currentMillis = millis();
-#else
-    uint32_t currentMillis = 0;  // Native builds use test-injected time
-#endif
 
     // --- RUNNING: throttled gate regression check ---
     if (_state == AppState::Running) {
@@ -330,7 +306,6 @@ void Application::tick() {
             _eventBus.publish(ApplicationEvents::APP_RUNNING);
             ESP_LOGI(TAG, "All config gates satisfied — entering RUNNING state");
         }
-#ifndef NATIVE_BUILD
         // --- WiFi Wizard modal: show once when AP mode becomes active ---
         // _onEnterConfiguring fires before the WiFi state machine has run, so
         // AP mode detection must happen here in the tick loop instead.
@@ -346,13 +321,10 @@ void Application::tick() {
             _wifiWizardShown = true;
             ESP_LOGI(TAG, "WiFi wizard modal: AP active, showing connection guide");
         }
-#endif
     }
 
-#ifdef NATIVE_BUILD
     // In native builds, drive DataManager synchronously for tests
     _dataManager.processNext();
-#endif
 
     // Dispatch to all registered tickables in registration order
     for (auto* module : _tickables) {
@@ -363,14 +335,12 @@ void Application::tick() {
     _mcpServer.tick();
 
     // Periodic heartbeat — free heap + uptime every 30s
-#ifndef NATIVE_BUILD
     if (currentMillis - _lastHeartbeatMs >= HEARTBEAT_INTERVAL_MS) {
         _lastHeartbeatMs = currentMillis;
         uint32_t freeHeap = heap_caps_get_free_size(MALLOC_CAP_8BIT);
         uint32_t uptimeSec = currentMillis / 1000;
         ESP_LOGI(TAG, "♥ uptime=%lus  free_heap=%luB", (unsigned long)uptimeSec, (unsigned long)freeHeap);
     }
-#endif
 }
 
 /**
@@ -382,9 +352,7 @@ void Application::tick() {
 void Application::softReset() {
     ESP_LOGW(TAG, "Application::softReset() triggered — restarting device");
 
-#ifndef NATIVE_BUILD
     esp_restart(); // Hardware restart — this call never returns
-#endif
     // In NATIVE_BUILD: function returns normally (no-op for test verification)
 }
 
@@ -610,16 +578,12 @@ void Application::_compactAndLock() {
  * Wrapped in NATIVE_BUILD guard to keep the native test build self-contained.
  */
 void Application::_reportHeap() {
-#ifndef NATIVE_BUILD
     // heap_caps_get_free_size returns available bytes in a specific memory region.
     uint32_t freeHeap    = heap_caps_get_free_size(MALLOC_CAP_8BIT);      // Current free bytes
     uint32_t minFreeHeap = heap_caps_get_minimum_free_size(MALLOC_CAP_8BIT); // Historical low-watermark
 
     ESP_LOGI(TAG, "Heap report — free: %" PRIu32 " B  min-free: %" PRIu32 " B",
              freeHeap, minFreeHeap);
-#else
-    ESP_LOGI(TAG, "Heap report skipped (NATIVE_BUILD)");
-#endif
 }
 
 
@@ -696,10 +660,8 @@ void Application::_publishConfiguringEvent(bool isRegression) {
  * about AppState. Application drives it.
  */
 void Application::_onEnterConfiguring(bool /*isRegression*/) {
-#ifndef NATIVE_BUILD
     _display.carousel.suspend();
     _display.showBase(&_display.boards.configuringStatus);
-#endif
 }
 
 /**
@@ -709,23 +671,19 @@ void Application::_onEnterConfiguring(bool /*isRegression*/) {
  * visible layer again, then resumes automatic rotation.
  */
 void Application::_onEnterRunning() {
-#ifndef NATIVE_BUILD
     _display.clearModal();
     _display.showBase(nullptr);  // clear base → carousel becomes visible
     _display.carousel.resume();
     _wifiWizardShown = false;    // reset so wizard can show again if device re-enters CONFIGURING
-#endif
 }
 
 // ---------------------------------------------------------------------------
 // Display accessor
 // ---------------------------------------------------------------------------
 
-#ifndef NATIVE_BUILD
 /**
  * @brief Get the application's display module instance.
  */
 U8G2DisplayModule& Application::getDisplay() {
     return _display;
 }
-#endif

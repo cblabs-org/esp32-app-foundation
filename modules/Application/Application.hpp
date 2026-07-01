@@ -75,15 +75,11 @@
 #include "../../lib/DeviceCrypto/DeviceCrypto.hpp"
 
 // Display subsystem (hardware only — SPI/U8G2 headers unavailable in native builds)
-#ifndef NATIVE_BUILD
-    #include "../U8G2Display/U8G2DisplayModule.hpp"
-    #include "../U8G2Display/boards/DiagnosticsBoard.hpp"
-#endif
+#include "../U8G2Display/U8G2DisplayModule.hpp"
+#include "../U8G2Display/boards/DiagnosticsBoard.hpp"
 
 // Home Assistant MQTT integration (hardware only — MQTT client unavailable in native builds)
-#ifndef NATIVE_BUILD
-    #include "../HomeAssistant/HomeAssistantModule.hpp"
-#endif
+#include "../HomeAssistant/HomeAssistantModule.hpp"
 
 // Forward declaration only — OTAUpdateManager.hpp pulls in WiFiClientSecure
 // which causes LDF to discover NetworkClientSecure with missing SSL backend.
@@ -373,7 +369,6 @@ public:
      */
     const FrameworkConfig& getConfig() const;
 
-#ifndef NATIVE_BUILD
     /**
      * @brief Get the application's display module instance.
      *
@@ -394,7 +389,6 @@ public:
      * @return Reference to the HomeAssistantModule.
      */
     HomeAssistantModule& getHomeAssistant() { return _haModule; }
-#endif
 
     // -------------------------------------------------------------------------
     // State Accessors
@@ -557,14 +551,10 @@ private:
     const char* _appName = nullptr;        ///< Runtime-settable application name for portal title
 
     // Display subsystem (hardware only)
-#ifndef NATIVE_BUILD
     U8G2DisplayModule _display;                      ///< Display module with carousel engine
     DiagnosticsBoard  _diagnosticsBoard{256, 64};    ///< System telemetry carousel board
     bool _wifiWizardShown = false;                   ///< Guard: WiFi wizard modal pushed this CONFIGURING phase
-#endif
 
     // Home Assistant integration (hardware only)
-#ifndef NATIVE_BUILD
     HomeAssistantModule _haModule;              ///< Framework-owned HA MQTT service
-#endif
 };
