@@ -69,9 +69,7 @@
 #include "../../include/interfaces/IWebContributor.hpp"
 #include "../../include/interfaces/IConfigurable.hpp"
 
-#ifndef NATIVE_BUILD
 #include <LittleFS.h>
-#endif
 
 // Forward declarations — avoids circular includes with ConfigManager/KeyManager
 class ConfigManager;
@@ -466,31 +464,7 @@ private:
      */
     static bool _fromHex(const char* hex, uint8_t* out, size_t len);
 
-    /**
-     * @brief Constant-time memory comparison to mitigate timing side-channels.
-     *
-     * Accumulates XOR differences across all bytes so the comparison time
-     * is independent of the position of the first mismatch.
-     *
-     * @param a    First buffer.
-     * @param b    Second buffer.
-     * @param len  Number of bytes to compare.
-     * @return 0 if buffers are identical, non-zero if they differ.
-     */
-    static int _safeMemcmp(const uint8_t* a, const uint8_t* b, size_t len);
 
-    /**
-     * @brief Portable SHA-256 implementation used in native (test) builds.
-     *
-     * On native, mbedTLS is not linked. This pure-C++ implementation is
-     * compiled in when NATIVE_BUILD is defined and provides the same
-     * SHA-256(salt ‖ password) digest as the mbedTLS path on hardware.
-     *
-     * @param data  Input byte stream.
-     * @param len   Length of input in bytes.
-     * @param out   Output buffer; must be exactly 32 bytes.
-     */
-    static void _sha256Native(const uint8_t* data, size_t len, uint8_t* out);
 
 #ifdef UNIT_TEST
     // -------------------------------------------------------------------------

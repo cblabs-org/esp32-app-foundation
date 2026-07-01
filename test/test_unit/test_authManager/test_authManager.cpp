@@ -646,6 +646,9 @@ TEST_F(AuthManagerTest, test_generate_cert_sets_flag) {
  * WO4 hardware tests will verify successful loading on real firmware.
  */
 TEST_F(AuthManagerTest, test_load_cert_fails_without_files) {
+    LittleFS.remove("/etc/server.crt");
+    LittleFS.remove("/etc/server.key");
+
     uint8_t* certDer = nullptr;
     size_t   certLen = 0;
     uint8_t* keyDer  = nullptr;

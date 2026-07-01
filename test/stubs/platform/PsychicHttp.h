@@ -29,10 +29,10 @@ public:
 
 class PsychicRequest {
 public:
-    const char* host() { return ""; }
-    const char* url() { return ""; }
-    const char* uri() { return ""; }
-    const char* header(const char* name) { return ""; }
+    String host() { return String(""); }
+    String url() { return String(""); }
+    String uri() { return String(""); }
+    String header(const char* name) { return String(""); }
     bool hasHeader(const char* name) { return false; }
     std::string body() { return std::string(); }
     size_t contentLength() { return 0; }
