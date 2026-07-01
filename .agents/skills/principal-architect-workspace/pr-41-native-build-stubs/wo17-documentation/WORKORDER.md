@@ -61,3 +61,7 @@ Update all developer documentation to reflect the new stub-header testing archit
 ## Verification Requirement
 
 **CRITICAL:** Before distilling or committing, you MUST ask the user if they are happy.
+
+## Status Update
+- **Status**: Completed
+- **Details**: Updated documentation to describe the stub-header architecture. Removed `#ifndef NATIVE_BUILD` references from `framework-expert` and `house-style-docs` skills. Created ADR. Changes committed to git branch. Distilled context artifacts to `wo17-documentation/`.
