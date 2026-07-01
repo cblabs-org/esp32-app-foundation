@@ -38,7 +38,7 @@ identically in both native and hardware environments — only the include path d
 | **[x] [WO6 — KeyManager Module](wo6-keymanager/WORKORDER.md)** | Migrate KeyManager module | ✅ Merged | standard | `KeyManager.hpp/.cpp` — remove ~5 guards |
 | **[x] [WO7 — ConfigManager Module](wo7-configmanager/WORKORDER.md)** | Migrate ConfigManager + ConfigManifest | ✅ Merged | standard | `ConfigManager.hpp/.cpp`, `ConfigManifest.cpp` — remove ~11 guards, LittleFS fstream bridge |
 | **[x] [WO8 — WifiManager Module](wo8-wifimanager/WORKORDER.md)** | Migrate WifiManager module | ✅ Merged | standard | `WifiManager.hpp/.cpp` — remove ~19 guards |
-| **[ ] [WO9 — WebServer Module](wo9-webserver/WORKORDER.md)** | Migrate WebServer module | ⬜ Not started | standard | `WebServerManager.hpp/.cpp` — remove ~15 guards, relocate PsychicHttp mocks |
+| **[x] [WO9 — WebServer Module](wo9-webserver/WORKORDER.md)** | Migrate WebServer module | ✅ Merged | standard | `WebServerManager.hpp/.cpp` — remove ~15 guards, relocate PsychicHttp mocks |
 | **[ ] [WO10 — Application Module](wo10-application/WORKORDER.md)** | Migrate Application module | ⬜ Not started | architect | `Application.hpp/.cpp` — remove ~14 guards (depends on WO2-WO9) |
 | **[ ] [WO11 — DeviceCrypto Library](wo11-devicecrypto/WORKORDER.md)** | Migrate DeviceCrypto library | ⬜ Not started | architect | `DeviceCrypto.hpp/.cpp` — remove ~7 guards, mbedTLS/NVS stubs |
 | **[ ] [WO12 — AuthManager Module](wo12-authmanager/WORKORDER.md)** | Migrate AuthManager module | ⬜ Not started | architect | `AuthManager.hpp/.cpp` — remove ~14 guards, mbedTLS/LittleFS/PsychicHttp |
