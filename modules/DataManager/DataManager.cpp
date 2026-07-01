@@ -16,11 +16,10 @@
 
 static constexpr const char* TAG = "DataManager";
 
-#ifndef NATIVE_BUILD
 #include <Arduino.h>
 #include "esp_task_wdt.h"
+#include "esp_heap_caps.h"
 #include <freertos/idf_additions.h>
-#endif
 
 /**
  * @brief Helper class to handle mutex locking safely within scopes (RAII).
@@ -28,38 +27,29 @@ static constexpr const char* TAG = "DataManager";
 class MutexLock {
 public:
     MutexLock(SemaphoreHandle_t mtx) : mutex(mtx) {
-#ifndef NATIVE_BUILD
         if (mutex) xSemaphoreTake(mutex, portMAX_DELAY);
-#endif
     }
     ~MutexLock() {
-#ifndef NATIVE_BUILD
         if (mutex) xSemaphoreGive(mutex);
-#endif
     }
 private:
     SemaphoreHandle_t mutex;
 };
 
 DataManager::DataManager() : _registryMutex(nullptr), _workerTask(nullptr) {
-#ifndef NATIVE_BUILD
     _registryMutex = xSemaphoreCreateMutex();
-#endif
 }
 
 DataManager::~DataManager() {
-#ifndef NATIVE_BUILD
     if (_workerTask) {
         vTaskDelete(_workerTask);
     }
     if (_registryMutex) {
         vSemaphoreDelete(_registryMutex);
     }
-#endif
 }
 
 void DataManager::begin() {
-#ifndef NATIVE_BUILD
     // Create worker task with 12KB DRAM stack — safe for TLS-heavy data sources.
     // DRAM (not PSRAM) is required because SPI flash operations (used by some
     // data sources) assert when the task stack is in PSRAM.
@@ -77,7 +67,6 @@ void DataManager::begin() {
         ESP_LOGE(TAG, "Failed to create DataManager worker task");
         _workerTask = nullptr;
     }
-#endif
 }
 
 void DataManager::registerSource(IDataSource* source) {
@@ -121,11 +110,10 @@ void DataManager::requestPriorityFetch(IDataSource* source) {
 }
 
 uint32_t DataManager::getCurrentTimeMs() const {
-#ifndef NATIVE_BUILD
+    if (_simulatedTimeMs > 0) {
+        return _simulatedTimeMs;
+    }
     return millis();
-#else
-    return _simulatedTimeMs;
-#endif
 }
 
 void DataManager::processNext() {
@@ -139,19 +127,15 @@ void DataManager::setAppRunning(bool running) {
 void DataManager::workerTaskLoop(void* param) {
     DataManager* manager = static_cast<DataManager*>(param);
 
-#ifndef NATIVE_BUILD
     // Register with Task Watchdog Timer — this is a long-running worker loop
     // that must feed the watchdog periodically to avoid triggering a reset.
     esp_task_wdt_add(NULL);
-#endif
 
     while (true) {
         manager->executeLoop();
-#ifndef NATIVE_BUILD
         // Feed the watchdog after each fetch cycle
         esp_task_wdt_reset();
         vTaskDelay(pdMS_TO_TICKS(100)); // sleep between loop checks to avoid starving other tasks
-#endif
     }
 
     // Note: This loop never exits under normal operation. If it ever did,
@@ -199,10 +183,8 @@ void DataManager::executeLoop() {
         IDataSource* fetchTarget = r.source;
         ESP_LOGD(TAG, "Selected source for fetch: %s", fetchTarget->getSourceName());
         
-#ifndef NATIVE_BUILD
         // Unlock mutex during fetch to prevent holding the lock during potentially long network calls
         if (_registryMutex) xSemaphoreGive(_registryMutex);
-#endif
         
         // --- Execute the fetch cycle ---
         UpdateStatus result = fetchTarget->fetchUpdate();
@@ -211,10 +193,8 @@ void DataManager::executeLoop() {
                      fetchTarget->getSourceName(), static_cast<int>(result));
         }
         
-#ifndef NATIVE_BUILD
         // Re-acquire mutex to update state
         if (_registryMutex) xSemaphoreTake(_registryMutex, portMAX_DELAY);
-#endif
         
         // Ensure source is still registered before updating tracking data
         for (auto& r2 : _registry) {

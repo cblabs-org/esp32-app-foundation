@@ -25,14 +25,9 @@
 #include <atomic>
 #include "interfaces/IDataSource.hpp"
 
-#ifndef NATIVE_BUILD
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <freertos/semphr.h>
-#else
-typedef void* TaskHandle_t;
-typedef void* SemaphoreHandle_t;
-#endif
 
 /**
  * @brief Singleton-style manager class handling the dynamic schedule-driven background fetch queue.
@@ -85,9 +80,7 @@ public:
      * @brief Test helper to override current time in native builds
      * @param timeMs The simulated current time in milliseconds
      */
-#ifdef NATIVE_BUILD
     void setSimulatedTimeMs(uint32_t timeMs) { _simulatedTimeMs = timeMs; }
-#endif
 
 private:
     struct SourceRecord {
@@ -100,9 +93,7 @@ private:
     SemaphoreHandle_t _registryMutex;
     TaskHandle_t _workerTask;
     std::atomic<bool> _appRunning{false};
-#ifdef NATIVE_BUILD
     uint32_t _simulatedTimeMs = 0;
-#endif
 
     static void workerTaskLoop(void* param);
     void executeLoop();
