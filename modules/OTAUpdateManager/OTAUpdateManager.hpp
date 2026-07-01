@@ -17,9 +17,13 @@
  *              (legacy beginUpdate/writeStream/endUpdate) and the manifest-first
  *              checkForUpdate/performUpdate workflow.
  *
- *              Download runs in a FreeRTOS task to respect the tick() ≤ 10ms
- *              constraint. Progress events are published to the EventBus on
- *              the "ota.progress" topic using OTAProgressEvent, which is
+ *              Download runs in a persistent FreeRTOS task created once in
+ *              begin() and reused for every check via TaskNotify. This
+ *              eliminates the per-cycle 16 KB DRAM leak that occurred when a
+ *              one-shot task was created with xTaskCreateWithCaps but deleted
+ *              with vTaskDelete (which cannot free caps-allocated stacks).
+ *              Progress events are published to the EventBus on the
+ *              "ota.progress" topic using OTAProgressEvent, which is
  *              layout-compatible with OTAProgressPayload in u8g2DisplayModule.
  *
  * Exported Classes:
@@ -176,6 +180,15 @@ public:
      * @brief Default constructor.
      */
     OTAUpdateManager();
+
+    /**
+     * @brief Destructor — deletes the persistent OTA worker task.
+     *
+     * Calls vTaskDeleteWithCaps() to correctly free the DRAM-caps-allocated
+     * task stack created in begin(). Safe to call if begin() was never called
+     * (_taskHandle is nullptr).
+     */
+    ~OTAUpdateManager();
 
     // -------------------------------------------------------------------------
     // New Orchestrator API
@@ -423,10 +436,23 @@ private:
     // -------------------------------------------------------------------------
 
     /**
-     * @brief Static FreeRTOS task function — delegates to performUpdateTask().
+     * @brief Persistent FreeRTOS task loop — blocks on TaskNotify between checks.
+     *
+     * Created once in begin() and kept alive for the device lifetime. Each
+     * call to performUpdate() wakes this task via xTaskNotifyGive(). The task
+     * then runs performUpdateTask() and returns to blocking sleep.
+     *
      * @param param Pointer to the OTAUpdateManager instance.
      */
-    static void otaTaskWrapper(void* param);
+    static void otaTaskLoop(void* param);
+
+    /**
+     * @brief Null out _taskHandle.
+     *
+     * Called from the destructor before vTaskDeleteWithCaps() to ensure the
+     * handle cannot be reused after the task is gone.
+     */
+    void clearTaskHandle_();
 
     /**
      * @brief Instance method running the full OTA pipeline inside the FreeRTOS task.

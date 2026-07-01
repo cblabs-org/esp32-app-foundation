@@ -10,16 +10,20 @@
  * Description: Implementation of the full OTA orchestrator. Preserves all legacy
  *              direct-upload functionality (beginUpdate/writeStream/endUpdate) and
  *              adds the manifest-first checkForUpdate/performUpdate pipeline with
- *              FreeRTOS task offloading, IOTAVerifier-based cryptographic signature
- *              verification, and EventBus progress publishing.
+ *              a persistent FreeRTOS worker task (created once in begin(), reused
+ *              via TaskNotify for every OTA check), IOTAVerifier-based cryptographic
+ *              signature verification, and EventBus progress publishing.
+ *              This eliminates the per-cycle 16 KB DRAM leak present in the prior
+ *              one-shot task pattern, where xTaskCreateWithCaps + vTaskDelete
+ *              (wrong API) leaked the DRAM-caps stack on every OTA check.
  *
  * Exported Classes:
  * - OTAUpdateManager: [Class implementation]
  *   - begin():              Store Application reference for dependency access
  *   - checkForUpdate():     Check for new firmware via manifest-first flow
- *   - performUpdate():      Launch the download→verify→flash FreeRTOS task
+ *   - performUpdate():      Notify the persistent OTA worker task via xTaskNotifyGive
  *   - performUpdateTask():  Execute the full OTA pipeline (runs in task context)
- *   - otaTaskWrapper():     Static entry point for FreeRTOS xTaskCreate
+ *   - otaTaskLoop():        Persistent FreeRTOS task entry (blocks on ulTaskNotifyTake)
  *   - publishProgress():    Publish OTAProgressEvent to the EventBus
  *   - getState():           Return the current OTA state machine state
  *   - getLastOtaError():    Return the last error string
@@ -79,6 +83,22 @@ static constexpr const char* TAG = "OTAUpdateManager";
 // ---------------------------------------------------------------------------
 
 OTAUpdateManager::OTAUpdateManager() {}
+
+/**
+ * @brief Destructor — deletes the persistent OTA worker task.
+ *
+ * vTaskDeleteWithCaps() is the correct paired destructor for tasks created
+ * with xTaskCreateWithCaps(). vTaskDelete() cannot free caps-allocated stacks
+ * and would leak 16 KB of DRAM. Safe if begin() was never called (_taskHandle
+ * will be nullptr and the guard skips the delete).
+ */
+OTAUpdateManager::~OTAUpdateManager() {
+    if (_taskHandle != nullptr) {
+        TaskHandle_t handle = _taskHandle;
+        clearTaskHandle_();                 // null the member first (no dangling access)
+        vTaskDeleteWithCaps(handle);        // free the caps-allocated DRAM stack
+    }
+}
 
 // ---------------------------------------------------------------------------
 // IConfigurable Implementation
@@ -204,7 +224,37 @@ void OTAUpdateManager::begin(Application& app) {
     _config        = &app.getConfig();
     _configManager = &app.getConfigManager();
     _eventBus      = &app.getEventBus();
-    ESP_LOGI(TAG, "OTA manager initialized (narrow refs extracted)");
+
+    // --- Create the persistent OTA worker task (once per device lifetime) ---
+    // Stack MUST be in DRAM (MALLOC_CAP_INTERNAL) because the OTA pipeline
+    // performs SPI flash writes. PSRAM-stack tasks are unsafe for flash I/O
+    // (the SPI cache is disabled during flash ops, making PSRAM inaccessible).
+    // Pre-flight DRAM check: task creation here — where memory is most abundant
+    // — is far safer than dynamic allocation on every performUpdate() call.
+    uint32_t freeDram = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
+    ESP_LOGI(TAG, "Creating OTA worker task (stack=%" PRIu32 " B, free DRAM=%" PRIu32 " B)",
+             OTA_TASK_STACK_BYTES, freeDram);
+
+    BaseType_t result = xTaskCreateWithCaps(
+        otaTaskLoop,
+        "ota_worker",
+        OTA_TASK_STACK_BYTES,
+        this,
+        5,
+        &_taskHandle,
+        MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT
+    );
+
+    if (result != pdPASS) {
+        ESP_LOGE(TAG,
+            "Failed to create OTA worker task — "
+            "free DRAM: %" PRIu32 " B, stack required: %" PRIu32 " B. "
+            "OTA checks will not be available until reboot.",
+            freeDram, OTA_TASK_STACK_BYTES);
+        _taskHandle = nullptr;
+    } else {
+        ESP_LOGI(TAG, "OTA worker task created (persistent, DRAM stack)");
+    }
 }
 
 /**
@@ -302,7 +352,7 @@ bool OTAUpdateManager::checkForUpdate() {
  * builds, sets state to Error (no FreeRTOS available).
  */
 void OTAUpdateManager::performUpdate() {
-    // Guard: must be initialized
+    // Guard: must be initialized (begin() creates the worker task)
     if (_config == nullptr) {
         ESP_LOGE(TAG, "performUpdate() called before begin()");
         _state = OTAState::Error;
@@ -316,54 +366,54 @@ void OTAUpdateManager::performUpdate() {
         return;
     }
 
-    _state = OTAState::Checking;
-    ESP_LOGI(TAG, "Launching OTA update pipeline");
-
-    // --- Pre-flight: DRAM headroom check ---
-    uint32_t freeDram = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
-    uint32_t required = OTA_TASK_STACK_BYTES + OTA_TASK_DRAM_HEADROOM_BYTES;
-    if (freeDram < required) {
-        ESP_LOGW(TAG,
-            "Low DRAM before OTA task launch — free: %" PRIu32 " B, "
-            "required: %" PRIu32 " B. Attempting PSRAM stack allocation.",
-            freeDram, required);
+    // Guard: worker task must be running (begin() may have failed to create it)
+    if (_taskHandle == nullptr) {
+        ESP_LOGE(TAG, "OTA worker task unavailable — begin() not called or task creation failed");
+        _state = OTAState::Error;
+        _lastOtaError = "OTA worker task unavailable";
+        publishProgress(0.0f, "OTA worker task unavailable", true, false);
+        return;
     }
 
-    // --- Launch OTA task — stack MUST be in DRAM (not PSRAM) ---
-    // The OTA pipeline performs SPI flash writes (Update.begin/write/end,
-    // ConfigManifest::save, NVS operations). ESP-IDF asserts when flash ops
-    // run on a PSRAM-stack task because disabling the SPI cache makes the
-    // PSRAM-resident stack inaccessible. 32 KiB DRAM is feasible given the
-    // device's ~240 KiB free internal RAM at this point.
-    BaseType_t result = xTaskCreateWithCaps(
-        otaTaskWrapper,                            // Task function
-        "ota_update",                              // Task name
-        OTA_TASK_STACK_BYTES,                      // Stack size (bytes)
-        this,                                      // Parameter
-        5,                                         // Priority
-        &_taskHandle,                              // Task handle output
-        MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT      // DRAM stack (SPI flash safe)
-    );
+    // Transition state first (before notify, so the task sees Checking on wake)
+    _state = OTAState::Checking;
+    ESP_LOGI(TAG, "Notifying OTA worker task to begin pipeline");
 
-    if (result != pdPASS) {
-        ESP_LOGE(TAG,
-            "Failed to create OTA FreeRTOS task — "
-            "free DRAM: %" PRIu32 " B, stack required: %" PRIu32 " B. "
-            "Device may need reboot to recover heap.",
-            freeDram, OTA_TASK_STACK_BYTES);
-        _state = OTAState::Error;
-        _lastOtaError = "Failed to create OTA task (insufficient memory)";
-        publishProgress(0.0f, "Failed to create OTA task (insufficient memory)", true, false);
+    // Wake the persistent worker task — zero allocation, returns immediately.
+    // The task was created with xTaskCreateWithCaps(MALLOC_CAP_INTERNAL) in
+    // begin(). Its DRAM stack is reused for every OTA check; no per-cycle
+    // heap allocation occurs here.
+    xTaskNotifyGive(_taskHandle);
+}
+
+/**
+ * @brief Persistent FreeRTOS task loop — blocks on TaskNotify between OTA checks.
+ *
+ * Runs for the lifetime of the device. Each performUpdate() call wakes this
+ * task via xTaskNotifyGive(). After performUpdateTask() completes (or the
+ * pipeline reaches reboot), the loop returns to blocking sleep, ready for
+ * the next check. No memory is allocated or freed per cycle.
+ *
+ * Deletion: only from ~OTAUpdateManager() via vTaskDeleteWithCaps(_taskHandle).
+ * vTaskDelete() must NOT be called here — it cannot free caps-allocated stacks.
+ */
+void OTAUpdateManager::otaTaskLoop(void* param) {
+    auto* self = static_cast<OTAUpdateManager*>(param);
+    for (;;) {
+        // Block until performUpdate() sends a notification
+        ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+        self->performUpdateTask();
     }
 }
 
 /**
- * @brief Static FreeRTOS task wrapper. Delegates to performUpdateTask().
+ * @brief Null out _taskHandle.
+ *
+ * Called from the destructor immediately before vTaskDeleteWithCaps() to
+ * ensure the stale handle cannot be read after deletion.
  */
-void OTAUpdateManager::otaTaskWrapper(void* param) {
-    auto* self = static_cast<OTAUpdateManager*>(param);
-    self->performUpdateTask();
-    vTaskDelete(nullptr);
+void OTAUpdateManager::clearTaskHandle_() {
+    _taskHandle = nullptr;
 }
 
 /**
