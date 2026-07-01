@@ -622,7 +622,7 @@ TEST_F(AuthManagerAccessorTest, test_hex_decode_invalid) {
 /**
  * @brief generateAndStoreCert() must set _certPresent to true and return true.
  *
- * In NATIVE_BUILD, no mbedTLS or LittleFS calls are made; the function
+ * In native builds, no mbedTLS or LittleFS calls are made; the function
  * sets the flag and calls saveModuleConfig(). Verifies hasCert() and
  * serializeConfig() reflect the new state.
  */
@@ -641,7 +641,7 @@ TEST_F(AuthManagerTest, test_generate_cert_sets_flag) {
 }
 
 /**
- * @brief loadCert() must return false in NATIVE_BUILD (no LittleFS available).
+ * @brief loadCert() must return false in native builds (no LittleFS available).
  *
  * WO4 hardware tests will verify successful loading on real firmware.
  */
@@ -683,9 +683,7 @@ TEST_F(AuthManagerTest, test_reset_does_not_depend_on_cert) {
 // Main entry point
 // ===========================================================================
 
-#if defined(NATIVE_BUILD)
 int main(int argc, char **argv) {
     ::testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();
 }
-#endif

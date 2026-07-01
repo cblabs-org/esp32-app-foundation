@@ -12,7 +12,7 @@
  *              dispatch, saveModuleConfig, exportAllConfig, importAllConfig,
  *              schema version migration, and error handling.
  *
- *              All tests execute on the native GoogleTest runner (NATIVE_BUILD).
+ *              All tests execute on the native GoogleTest runner (native builds).
  *              Config files are written as "test/tmp/mod/<ns>.json" in the working directory.
  *
  * Exported Functions:

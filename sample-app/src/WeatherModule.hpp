@@ -93,23 +93,19 @@
 #include "AppFoundation.h"
 
 // F06: HomeAssistantModule is NOT re-exported by AppFoundation.h —
-// Application.hpp only forward-declares it (guarded by NATIVE_BUILD).
+// Application.hpp only forward-declares it (using native test stubs).
 // Direct include is required here for the HomeAssistantModule* member
 // and HaSensor value-member types.
-#ifndef NATIVE_BUILD
 #include "HomeAssistantModule.hpp"
 #include "entities/HaSensor.hpp"
-#endif
 
 #include <atomic>
 #include <string>
 #include <cstdlib>
 
-#ifndef NATIVE_BUILD
 #include <JsonStreamingParser.h>
 #include <JsonListener.h>
 #include <freertos/semphr.h>
-#endif
 
 class Application;
 
@@ -124,14 +120,10 @@ class WeatherModule : public ITickable,
                       public IDataSource, 
                       public IMCPContributor,
                       public IConfigGate
-#ifndef NATIVE_BUILD
                       , public JsonListener
-#endif
                       {
 private:
-#ifndef NATIVE_BUILD
     HomeAssistantModule* _ha = nullptr;       ///< Home Assistant module for entity publishing
-#endif
     KeyManager* _keyManager = nullptr;        ///< Secure credential storage (API keys)
     EventBus* _eventBus = nullptr;            ///< Pub/sub event bus for "weather.updated" events
     ConfigManager* _configManager = nullptr;  ///< Persisted config load/save via LittleFS
@@ -143,12 +135,10 @@ private:
 
     std::string _units = "metric";            ///< Temperature units: "metric" (°C) or "imperial" (°F)
 
-#ifndef NATIVE_BUILD
     // H2: Static member allocation — no bare new
     HaSensor _tempSensor{"weather_temp", "Temperature"};   ///< HA sensor entity for temperature
     HaSensor _windSensor{"weather_wind", "Wind Speed"};    ///< HA sensor entity for wind speed
     HaSensor _condSensor{"weather_condition", "Condition"};///< HA sensor entity for condition text
-#endif
 
     // H3: Thread-safe data exchange between fetchUpdate() task and main task.
     // Temperature and wind are simple floats — use std::atomic for lock-free
@@ -173,9 +163,7 @@ private:
     char _icon[16] = "";                      ///< OWM icon code (mutex-protected)
     char _cityName[64] = "";                  ///< Location city name (mutex-protected)
     char _country[8] = "";                    ///< Location country code (mutex-protected)
-#ifndef NATIVE_BUILD
     SemaphoreHandle_t _dataMutex = nullptr;   ///< FreeRTOS mutex guarding string field writes
-#endif
 
     // F19: JsonListener scratch buffers — fixed char[] instead of std::string.
     // Used only within fetchUpdate() task context (single-threaded).
@@ -217,7 +205,6 @@ public:
     void begin(Application& app);
 
     // Deferred HA wiring — call after app.begin() when _haModule is allocated
-#ifndef NATIVE_BUILD
     /**
      * @brief Registers HA sensor entities with the HomeAssistant module.
      *
@@ -227,7 +214,6 @@ public:
      * @param ha  Reference to the initialised HomeAssistantModule.
      */
     void wireHomeAssistant(HomeAssistantModule& ha);
-#endif
 
     // --- Data Accessors (H3: Thread-safe getters) ---
 
@@ -285,14 +271,10 @@ public:
      */
     std::string getCondition() const {
         std::string result;
-#ifndef NATIVE_BUILD
         if (xSemaphoreTake(_dataMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
             result = _condition;
             xSemaphoreGive(_dataMutex);
         }
-#else
-        result = _condition;
-#endif
         return result;
     }
 
@@ -302,14 +284,10 @@ public:
      */
     std::string getIcon() const {
         std::string result;
-#ifndef NATIVE_BUILD
         if (xSemaphoreTake(_dataMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
             result = _icon;
             xSemaphoreGive(_dataMutex);
         }
-#else
-        result = _icon;
-#endif
         return result;
     }
 
@@ -319,14 +297,10 @@ public:
      */
     std::string getCityName() const {
         std::string result;
-#ifndef NATIVE_BUILD
         if (xSemaphoreTake(_dataMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
             result = _cityName;
             xSemaphoreGive(_dataMutex);
         }
-#else
-        result = _cityName;
-#endif
         return result;
     }
 
@@ -336,14 +310,10 @@ public:
      */
     std::string getCountry() const {
         std::string result;
-#ifndef NATIVE_BUILD
         if (xSemaphoreTake(_dataMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
             result = _country;
             xSemaphoreGive(_dataMutex);
         }
-#else
-        result = _country;
-#endif
         return result;
     }
 
@@ -451,7 +421,6 @@ public:
     const char* getHelpText() const override;
 
     // --- JsonListener (hardware only — parser library unavailable in native builds) ---
-#ifndef NATIVE_BUILD
     /** @brief No-op — required by JsonListener interface. */
     void whitespace(char c) override {}
 
@@ -490,13 +459,4 @@ public:
 
     /** @brief No-op — required by JsonListener interface. */
     void startObject() override {}
-#else
-    // Native-build stubs for parser methods (called only in tests)
-
-    /** @brief Zeros all parser scratch buffers (native stub). */
-    void startDocument();
-
-    /** @brief Parses scratch buffers into typed fields (native stub). */
-    void endDocument();
-#endif
 };

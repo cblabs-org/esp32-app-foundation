@@ -28,7 +28,7 @@
  * - Application: Framework composition root and module registry
  *   - begin():                   Run the full boot sequence; returns false on fatal error
  *   - tick():                    Dispatch to all registered ITickable modules (RUNNING guard)
- *   - softReset():               Log reason and trigger esp_restart() (NATIVE_BUILD guarded)
+ *   - softReset():               Log reason and trigger esp_restart() 
  *   - registerTickable():        Add an ITickable module to the tick dispatch vector
  *   - registerStatusReporter():  Set (or replace) the single IStatusReporter adapter
  *   - registerWebContributor():  Add an IWebContributor module to the route-registration vector
@@ -154,7 +154,7 @@ public:
      *   1. Log boot banner with BUILD_VERSION
      *   2. Set state to BOOT
      *   3. EventBus.begin() — first service, zero deps, enables boot-time events
-     *   4. Mount LittleFS (hardware only; stubbed in NATIVE_BUILD)
+     *   4. Mount LittleFS (hardware only; stubbed in native builds)
      *   5. Store FrameworkConfig fields internally
      *   6. DeviceCrypto.begin() + KeyManager.begin()
      *   7. ConfigManager — register framework IConfigurable modules (WifiManager)
@@ -196,7 +196,7 @@ public:
     /**
      * @brief Log the soft-reset reason and restart the device.
      *
-     * On hardware this calls esp_restart() (wrapped in NATIVE_BUILD guard).
+     * On hardware this calls esp_restart() .
      * In native GoogleTest builds the call is a no-op so tests can verify
      * that the method does not throw or crash.
      */
@@ -450,7 +450,7 @@ private:
     /**
      * @brief Log the current free-heap and minimum free-heap figures.
      *
-     * Hardware only (wrapped in NATIVE_BUILD guard).
+     * Hardware only .
      */
     void _reportHeap();
 
@@ -504,7 +504,7 @@ private:
     /**
      * @brief Silent fallback reporter used when no display is registered.
      *
-     * In NATIVE_BUILD, no hardware display is available, so the null reporter
+     * In native builds, no hardware display is available, so the null reporter
      * absorbs all reportStatus/reportError/clearStatus calls silently.
      * On hardware, _statusReporter is reassigned to &_display in begin().
      */

@@ -10,7 +10,7 @@
  * Description: Implementation of the real-time clock drawing logic.
  *              Formats time strings from TimeManager, applies font metrics
  *              for right-aligned digit columns, and manages 1Hz colon blink.
- *              All TimeManager calls are guarded for NATIVE_BUILD.
+ *              All TimeManager calls are using native test stubs.
  *
  * Exported Functions/Classes:
  * - ClockWidget: [Class implementation]

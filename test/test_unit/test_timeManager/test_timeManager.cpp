@@ -75,9 +75,7 @@ TEST_F(TimeManagerTest, ResetConfigSeedsDefaultPosixTimezone) {
     EXPECT_TRUE(timeManager.isTimeSet());
 }
 
-#if defined(NATIVE_BUILD)
 int main(int argc, char **argv) {
     ::testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();
 }
-#endif

@@ -12,7 +12,7 @@
  *              tool handlers via the MCPToolRegistry. Built-in foundation tools
  *              are registered first via mcpBuiltinTools::registerAll(), then
  *              contributor tools are collected from IMCPContributor modules.
- *              On hardware, tick() reads characters from Serial; in NATIVE_BUILD,
+ *              On hardware, tick() reads characters from Serial; in native builds,
  *              a mock Serial class is provided so the module compiles for the
  *              native test runner.
  *
@@ -97,7 +97,7 @@ public:
      * @brief Poll Serial for incoming data and dispatch complete lines.
      *
      * On hardware: reads available characters, accumulates a line buffer,
-     * and dispatches on newline. In NATIVE_BUILD: no-op (tests call
+     * and dispatches on newline. In native builds: no-op (tests call
      * _processLine directly via the test harness).
      */
     void tick();

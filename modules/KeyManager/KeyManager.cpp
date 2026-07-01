@@ -270,7 +270,7 @@ bool KeyManager::isExclusive(const char* id) const {
  *
  * Registers three endpoints under /api/keys for CRUD operations on the
  * encrypted key vault. All route handler bodies are guarded by
- * #ifndef NATIVE_BUILD since ESPAsyncWebServer is unavailable in the
+ * since ESPAsyncWebServer is unavailable in the
  * native GoogleTest runner.
  *
  * Routes:

@@ -12,9 +12,9 @@
  *              geometric primitives. Includes the U8G2StateSaver RAII scope guard
  *              for safe display state management.
  *
- *              The TextAlign enum is always available (including NATIVE_BUILD).
+ *              The TextAlign enum is always available (including native builds).
  *              All other declarations require the U8G2 hardware driver and are
- *              guarded behind #ifndef NATIVE_BUILD.
+ *              using native test stubs.
  *
  * Exported Functions/Classes:
  * - TextAlign: [Enum] Text justification options (Left, Center, Right).
@@ -37,7 +37,7 @@
 
 /**
  * @brief Text alignment options for consolidated drawing primitives.
- *        Always available, including in NATIVE_BUILD for test validation.
+ *        Always available, including in native builds for test validation.
  */
 enum class TextAlign : uint8_t {
     Left   = 0,

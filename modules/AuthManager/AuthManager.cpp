@@ -26,7 +26,7 @@
  */
 
 #include "AuthManager.hpp"
-// In NATIVE_BUILD, all server.on() calls are inside #ifndef NATIVE_BUILD blocks,
+// In native builds, all server.on() calls are using native test stubs,
 // so AsyncWebServer only needs a forward declaration — which IWebContributor.hpp
 // already provides. In hardware builds ESPAsyncWebServer.h is pulled in
 // transitively via the Arduino framework. No explicit web server include needed.

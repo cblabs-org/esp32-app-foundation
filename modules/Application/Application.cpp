@@ -9,7 +9,7 @@
  * Module: modules/application/Application.cpp
  * Description: Implementation of the Application composition root.
  *              All ESP-IDF API calls (esp_restart, heap APIs, LittleFS.begin)
- *              are wrapped in #ifndef NATIVE_BUILD guards so the GoogleTest
+ *              are wrapped in #ifndef native test stubs so the GoogleTest
  *              native runner can compile and execute the class without hardware
  *              headers. The two-tier vector model is enforced by _compactAndLock().
  *
@@ -95,7 +95,7 @@ bool Application::begin(const FrameworkConfig& config) {
 
     // --- Step 4: Mount LittleFS ---
     // Foundation for all persistence. Only available on hardware;
-    // in NATIVE_BUILD we skip this.
+    // in native builds we skip this.
     if (!LittleFS.begin(true, "/littlefs", 10, "littlefs")) {
         // formatOnFail = true: first-boot will auto-format, subsequent failures
         // indicate a hardware fault — abort and return false.
@@ -354,14 +354,14 @@ void Application::tick() {
 /**
  * @brief Log the soft-reset reason and restart the device.
  *
- * esp_restart() is wrapped in NATIVE_BUILD so the GoogleTest suite can call
+ * esp_restart() is wrapped in native builds so the GoogleTest suite can call
  * softReset() and verify it completes without crashing the test process.
  */
 void Application::softReset() {
     ESP_LOGW(TAG, "Application::softReset() triggered — restarting device");
 
     esp_restart(); // Hardware restart — this call never returns
-    // In NATIVE_BUILD: function returns normally (no-op for test verification)
+    // In native builds: function returns normally (no-op for test verification)
 }
 
 // ---------------------------------------------------------------------------
@@ -583,7 +583,7 @@ void Application::_compactAndLock() {
  * @brief Log the current free-heap and minimum free-heap figures.
  *
  * Uses the ESP-IDF heap_caps API which is only available on hardware.
- * Wrapped in NATIVE_BUILD guard to keep the native test build self-contained.
+ * Using native test stubs to keep the native test build self-contained.
  */
 void Application::_reportHeap() {
     // heap_caps_get_free_size returns available bytes in a specific memory region.

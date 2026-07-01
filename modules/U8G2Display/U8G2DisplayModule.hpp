@@ -524,7 +524,7 @@ private:
      * @brief Render the current board into the U8G2 display buffer.
      *
      * Calls clearBuffer() → board->render(u8g2) → sendBuffer() inside
-     * a NATIVE_BUILD guard. No-op on the native test runner.
+     * a native test stub. No-op on the native test runner.
      */
     void _renderCurrentBoard();
 

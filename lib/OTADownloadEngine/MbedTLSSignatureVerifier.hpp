@@ -13,7 +13,7 @@
  *              detached RSA/ECDSA signature using a PEM-encoded public key.
  *
  *              On hardware builds (ESP-IDF), the full mbedtls implementation
- *              is used. On native builds (NATIVE_BUILD), stub implementations
+ *              is used. On native builds (native builds), stub implementations
  *              are provided that compile cleanly but return failure, allowing
  *              interface contract tests to run without crypto dependencies.
  *

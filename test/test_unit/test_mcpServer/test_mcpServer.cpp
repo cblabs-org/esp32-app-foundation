@@ -15,7 +15,7 @@
  *              integration (registerMcpContributor pre/post lock, null guard).
  *
  *              All tests execute on the native GoogleTest runner (no hardware
- *              required). NATIVE_BUILD is defined by the [env:native]
+ *              required). native builds is defined by the [env:native]
  *              environment in platformio.ini.
  *
  * Exported Functions:

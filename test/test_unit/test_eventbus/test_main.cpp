@@ -199,9 +199,7 @@ TEST_F(EventBusTest, Unsubscribe_WithNullptrTopic_ReturnsFalse) {
     EXPECT_FALSE(bus.unsubscribe(nullptr, testCallback, &ctx));
 }
 
-#if defined(NATIVE_BUILD)
 int main(int argc, char **argv) {
     ::testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();
 }
-#endif

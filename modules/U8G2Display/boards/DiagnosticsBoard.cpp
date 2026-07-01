@@ -96,7 +96,7 @@ void DiagnosticsBoard::configure(WifiManager* wifiManager) {
  * @brief Refresh telemetry data at ~1-second intervals.
  *
  * Throttled to REFRESH_INTERVAL_MS (1000ms) to avoid unnecessary formatting.
- * All hardware API calls (WiFi, millis, heap_caps) are guarded with NATIVE_BUILD.
+ * All hardware API calls (WiFi, millis, heap_caps) are using native test stubs.
  *
  * Formatted rows:
  *   Row 2: "<SSID> • <IP>" or "WiFi: Not connected"

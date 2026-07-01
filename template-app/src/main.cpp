@@ -17,9 +17,7 @@
  */
 
 #include "AppFoundation.h"
-#ifndef NATIVE_BUILD
 #include <Arduino.h>
-#endif
 #include "MyApp.hpp"
 
 Application app;   ///< Framework hub instance
@@ -31,9 +29,7 @@ MyApp myApp;       ///< Application module instance
  * Sets up the Application hub and registers the skeleton module.
  */
 void setup() {
-#ifndef NATIVE_BUILD
     Serial.begin(115200);
-#endif
 
     // TODO: Change "My Application" to your app name
     app.setAppName("My Application");

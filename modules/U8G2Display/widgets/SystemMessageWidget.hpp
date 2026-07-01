@@ -10,7 +10,7 @@
  * Description: Full-screen modal widget for system alerts and diagnostics.
  *              Renders a centred title line followed by up to three detail lines.
  *              Uses foundation AppFonts for font selection. All rendering is
- *              guarded behind #ifndef NATIVE_BUILD for native test compatibility.
+ *              using native test stubs for native test compatibility.
  *
  * Exported Classes:
  * - SystemMessageWidget: [Class] Multi-line system notification widget.

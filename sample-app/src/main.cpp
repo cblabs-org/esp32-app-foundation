@@ -16,23 +16,17 @@
  */
 
 #include "AppFoundation.h"
-#ifndef NATIVE_BUILD
 #include <Arduino.h>
-#endif
 #include "WeatherModule.hpp"
-#ifndef NATIVE_BUILD
 #include "WeatherBoard.hpp"
-#endif
 
 // ADR-16: File-scope static instances avoid stack-based corruption.
 // All module instances must be declared at file scope before setup().
 Application app;
 WeatherModule weatherModule;
-#ifndef NATIVE_BUILD
 // F04: EventBus wiring deferred to setup() — at file scope, Application
 // members may not be fully initialized (static init order fiasco).
 WeatherBoard weatherBoard(&weatherModule);
-#endif
 
 /**
  * @brief Arduino framework initialization.
@@ -40,9 +34,7 @@ WeatherBoard weatherBoard(&weatherModule);
  * Sets up the Application hub and registers custom modules.
  */
 void setup() {
-#ifndef NATIVE_BUILD
     Serial.begin(115200);
-#endif
 
     app.disableDefaultAppTab();
     app.setAppName("Weather Station");
@@ -75,7 +67,6 @@ void setup() {
     // before app.begin().
     app.getWifiManager().setDefaultHostname("WeatherStation");
 
-#ifndef NATIVE_BUILD
     // IDisplayBoard carousel registration is manual — registerModule() does not
     // auto-detect display boards because the display module is optional and may
     // not be present.
@@ -84,7 +75,6 @@ void setup() {
     // Cannot do this at file scope — static init order makes getEventBus() unsafe.
     // Uses static function pointer (not lambda) per framework convention (GRAVE-05).
     weatherBoard.wireEventBus(app.getEventBus());
-#endif
 
     // Begin framework — this allocates framework-owned modules like
     // HomeAssistantModule on the heap. Must happen before HA wiring.
@@ -92,9 +82,7 @@ void setup() {
 
     // Post-begin wiring: HomeAssistantModule is only available after app.begin()
     // allocated it (it's a heap-owned pointer, nullptr before begin).
-#ifndef NATIVE_BUILD
     weatherModule.wireHomeAssistant(app.getHomeAssistant());
-#endif
 }
 
 /**

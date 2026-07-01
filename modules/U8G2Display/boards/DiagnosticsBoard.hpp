@@ -10,7 +10,7 @@
  * Description: System telemetry carousel board displaying live device stats:
  *              hostname (bold, centred), WiFi SSID + IP, uptime, and heap/version.
  *              Refreshes telemetry data at 1-second intervals via tick().
- *              All hardware-specific code is guarded with NATIVE_BUILD.
+ *              All hardware-specific code is using native test stubs.
  *
  *              Dependencies are injected as a narrow WifiManager pointer
  *              rather than a full Application reference — the board only needs
@@ -78,7 +78,7 @@ public:
      * @brief Refresh telemetry data at ~1-second intervals.
      *
      * Formats WiFi status, uptime, and heap stats into label buffers.
-     * All hardware API calls are guarded with #ifndef NATIVE_BUILD.
+     * All hardware API calls are guarded with #ifndef native builds.
      *
      * @param currentMillis Current system time in milliseconds.
      */

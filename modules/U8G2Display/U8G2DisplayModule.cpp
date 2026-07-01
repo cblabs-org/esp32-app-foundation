@@ -677,7 +677,7 @@ const char* U8G2DisplayModule::getTabIcon() const {
 /**
  * @brief Register display REST API routes with the web server.
  *
- * All route handler bodies are guarded by #ifndef NATIVE_BUILD since
+ * All route handler bodies are using native test stubs since
  * ESPAsyncWebServer is unavailable in the native GoogleTest runner.
  *
  * @param server Reference to the AsyncWebServer instance.
@@ -1145,7 +1145,7 @@ void U8G2DisplayModule::_onDisplayMessage(const char* /*topic*/, const void* pay
 /**
  * @brief Render the current board into the U8G2 display buffer.
  *
- * Uses clearBuffer() → render() → sendBuffer() inside NATIVE_BUILD guard.
+ * Uses clearBuffer() → render() → sendBuffer() inside native test stub.
  */
 void U8G2DisplayModule::_renderCurrentBoard() {
     // --- Determine which board to render ---

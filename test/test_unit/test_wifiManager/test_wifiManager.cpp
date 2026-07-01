@@ -187,10 +187,8 @@ TEST_F(WifiManagerTest, SerializeApplyRoundtrip_Consistent) {
     EXPECT_STREQ("RoundtripSSID", wm2.getSSID());
 }
 
-#if defined(NATIVE_BUILD)
 int main(int argc, char **argv) {
     ::testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();
 }
-#endif
 

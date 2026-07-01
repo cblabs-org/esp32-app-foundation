@@ -23,7 +23,6 @@ TEST(WebServerManagerTest, InitializationAndDispatch) {
     EXPECT_TRUE(c1.registered);
     EXPECT_TRUE(c2.registered);
     
-#ifdef NATIVE_BUILD
     EXPECT_EQ(PsychicHttpServer::lastMaxBodySize, 4096);
     
     // Check if new endpoints are registered
@@ -35,7 +34,6 @@ TEST(WebServerManagerTest, InitializationAndDispatch) {
     }
     EXPECT_TRUE(tabsRegistered);
     EXPECT_TRUE(systemRegistered);
-#endif
 }
 class TabMockContributor : public IWebContributor {
 public:
@@ -60,13 +58,11 @@ TEST(WebServerManagerTest, BeginWithEmptyContributors) {
     WebServerManager manager;
     manager.begin({});
     
-#ifdef NATIVE_BUILD
     bool tabsRegistered = false;
     for (const auto& route : manager.getServer().routes) {
         if (route.uri == "/api/tabs") tabsRegistered = true;
     }
     EXPECT_TRUE(tabsRegistered);
-#endif
 }
 
 TEST(WebServerManagerTest, BeginWithNullptrInList) {
@@ -99,16 +95,13 @@ TEST(WebServerManagerTest, GetServerReturnsValidRef) {
     manager.begin({});
     PsychicHttpServer& server = manager.getServer();
     
-#ifdef NATIVE_BUILD
     EXPECT_GE(server.routes.size(), 2);
-#endif
 }
 
 TEST(WebServerManagerTest, RoutesCountAfterBegin) {
     WebServerManager manager;
     manager.begin({});
     
-#ifdef NATIVE_BUILD
     bool tabsRegistered = false;
     bool systemRegistered = false;
     for (const auto& route : manager.getServer().routes) {
@@ -117,14 +110,12 @@ TEST(WebServerManagerTest, RoutesCountAfterBegin) {
     }
     EXPECT_TRUE(tabsRegistered);
     EXPECT_TRUE(systemRegistered);
-#endif
 }
 
 TEST(WebServerManagerTest, RouteMethodVerification) {
     WebServerManager manager;
     manager.begin({});
     
-#ifdef NATIVE_BUILD
     bool tabsIsGet = false;
     for (const auto& route : manager.getServer().routes) {
         if (route.uri == "/api/tabs" && route.method == HTTP_GET) {
@@ -132,7 +123,6 @@ TEST(WebServerManagerTest, RouteMethodVerification) {
         }
     }
     EXPECT_TRUE(tabsIsGet);
-#endif
 }
 
 TEST(WebServerManagerTest, ContributorWithTabName) {
@@ -146,11 +136,9 @@ TEST(WebServerManagerTest, ContributorWithoutTabName) {
 }
 
 TEST(WebServerManagerTest, POSTBodySizeCap) {
-#ifdef NATIVE_BUILD
     // This is tested in InitializationAndDispatch but added as dedicated test
     // Assuming PsychicHttpServer::lastMaxBodySize was meant to be set or will fail if not
     EXPECT_EQ(PsychicHttpServer::lastMaxBodySize, 4096);
-#endif
 }
 
 TEST(WebServerManagerTest, MultipleBeginCalls) {
@@ -164,7 +152,6 @@ TEST(WebServerManagerTest, RouteHandlerInvocation) {
     WebServerManager manager;
     manager.begin({});
     
-#ifdef NATIVE_BUILD
     bool handlerCallable = false;
     for (const auto& route : manager.getServer().routes) {
         if (route.uri == "/api/tabs" && route.handler != nullptr) {
@@ -174,7 +161,6 @@ TEST(WebServerManagerTest, RouteHandlerInvocation) {
         }
     }
     EXPECT_TRUE(handlerCallable);
-#endif
 }
 TEST(WebServerManagerTest, GetServer_ReturnsSameInstance) {
     WebServerManager manager;
@@ -184,9 +170,7 @@ TEST(WebServerManagerTest, GetServer_ReturnsSameInstance) {
 }
 
 int main(int argc, char** argv) {
-#ifdef NATIVE_BUILD
     PsychicHttpServer::lastMaxBodySize = 4096;
-#endif
     ::testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();
 }

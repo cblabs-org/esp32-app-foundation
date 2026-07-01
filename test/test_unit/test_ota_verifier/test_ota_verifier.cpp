@@ -9,7 +9,7 @@
  * Module: test/test_unit/test_ota_verifier/test_ota_verifier.cpp
  * Description: Native unit tests for the IOTAVerifier interface contract.
  *              Exercises the MbedTLSSignatureVerifier stub implementation
- *              under NATIVE_BUILD to validate defensive guards: null key
+ *              under native builds to validate defensive guards: null key
  *              rejection, empty key rejection, verify-without-begin, and
  *              update-without-begin safety.
  *
@@ -28,7 +28,7 @@
  * @brief Test fixture for IOTAVerifier interface contract tests.
  *
  * Each test creates a fresh MbedTLSSignatureVerifier instance to ensure
- * clean state isolation. Under NATIVE_BUILD, the stub implementation
+ * clean state isolation. Under native builds, the stub implementation
  * returns false from begin() for any key (no crypto available), which
  * is the expected behaviour for these contract tests.
  */

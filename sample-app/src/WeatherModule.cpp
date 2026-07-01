@@ -30,7 +30,6 @@
 #include "MCPToolRegistry.hpp"
 #include <ArduinoJson.h>
 
-#ifndef NATIVE_BUILD
 #include <PsychicHttp.h>
 #include <WiFiClientSecure.h>
 #include <HTTPClient.h>
@@ -40,7 +39,6 @@
 // that conflict with the ESP-IDF build.
 struct sslclient_context;
 void attach_ssl_certificate_bundle(sslclient_context *ssl_client, bool att);
-#endif
 
 /**
  * @brief Constructs the WeatherModule.
@@ -50,7 +48,6 @@ void attach_ssl_certificate_bundle(sslclient_context *ssl_client, bool att);
  * entities. Creates the FreeRTOS mutex used for thread-safe string field access.
  */
 WeatherModule::WeatherModule() {
-#ifndef NATIVE_BUILD
     // H2: Sensors are now direct members — configure via dot access
     _tempSensor.setDeviceClass("temperature");
     _tempSensor.setStateClass("measurement");
@@ -65,7 +62,6 @@ WeatherModule::WeatherModule() {
 
     // H3: Create mutex for thread-safe condition string access
     _dataMutex = xSemaphoreCreateMutex();
-#endif
 }
 
 /**
@@ -76,12 +72,10 @@ WeatherModule::WeatherModule() {
  */
 WeatherModule::~WeatherModule() {
     // H2: No delete needed — sensors are direct members
-#ifndef NATIVE_BUILD
     if (_dataMutex) {
         vSemaphoreDelete(_dataMutex);
         _dataMutex = nullptr;
     }
-#endif
 }
 
 /**
@@ -105,7 +99,6 @@ void WeatherModule::begin(Application& app) {
     // to wireHomeAssistant(), called from main.cpp after app.begin().
 }
 
-#ifndef NATIVE_BUILD
 /**
  * @brief Registers HA sensor entities with the HomeAssistant module.
  *
@@ -121,7 +114,6 @@ void WeatherModule::wireHomeAssistant(HomeAssistantModule& ha) {
     _ha->addEntity(&_windSensor);
     _ha->addEntity(&_condSensor);
 }
-#endif
 
 /**
  * @brief Periodic update hook — intentionally empty.
@@ -179,7 +171,6 @@ void WeatherModule::resetConfig() {
     _units = "metric";
 }
 
-#ifndef NATIVE_BUILD
 /**
  * @brief Registers REST API routes and serves the portal JavaScript.
  *
@@ -588,12 +579,6 @@ void WeatherModule::registerRoutes(PsychicHttpServer& server) {
         return response->send(js);
     });
 }
-#else
-/** @brief No-op stub for native builds — routes require PsychicHttp hardware server. */
-void WeatherModule::registerRoutes(PsychicHttpServer& server) {
-    (void)server;
-}
-#endif
 
 /**
  * @brief Executes an HTTPS GET to the OpenWeatherMap API with streaming JSON parse.
@@ -605,7 +590,6 @@ void WeatherModule::registerRoutes(PsychicHttpServer& server) {
  * @return UpdateStatus indicating success, error type, or rate limiting.
  */
 UpdateStatus WeatherModule::fetchUpdate() {
-#ifndef NATIVE_BUILD
     // --- Step 1: Validate credentials (API key check) ---
     // Retrieve the OWM API key from KeyManager. If absent, return AuthError
     // immediately — no point making a network request without credentials.
@@ -718,10 +702,6 @@ UpdateStatus WeatherModule::fetchUpdate() {
     ESP_LOGI("WeatherModule", "Fetch and parse complete");
     _lastFetchStatus.store(UpdateStatus::Success, std::memory_order_release);
     return UpdateStatus::Success;
-#else
-    _lastFetchStatus.store(UpdateStatus::Success, std::memory_order_release);
-    return UpdateStatus::Success;
-#endif
 }
 
 /**
@@ -753,7 +733,6 @@ void WeatherModule::startDocument() {
 }
 
 // JsonListener methods that use Arduino String type — hardware only
-#ifndef NATIVE_BUILD
 /**
  * @brief Increments the weather array depth tracker on array entry.
  *
@@ -835,7 +814,6 @@ void WeatherModule::value(String value) {
         }
     }
 }
-#endif  // NATIVE_BUILD
 
 /**
  * @brief Parses scratch buffers into typed atomic/mutex-protected fields.
@@ -856,25 +834,21 @@ void WeatherModule::endDocument() {
         // H3: Store via atomic for thread-safe cross-task access
         _temperature.store(temp, std::memory_order_release);
 
-#ifndef NATIVE_BUILD
         // Publish numeric value as string state to HA sensor
         char buf[16];
         snprintf(buf, sizeof(buf), "%.1f", temp);
         _tempSensor.setState(buf);
         if (_ha) _ha->publishState(&_tempSensor);
-#endif
         updated = true;
     }
     if (_parsedWind[0] != '\0') {
         float wind = std::strtof(_parsedWind, nullptr);
         _windSpeed.store(wind, std::memory_order_release);
 
-#ifndef NATIVE_BUILD
         char buf[16];
         snprintf(buf, sizeof(buf), "%.1f", wind);
         _windSensor.setState(buf);
         if (_ha) _ha->publishState(&_windSensor);
-#endif
         updated = true;
     }
     if (_parsedHumidity[0] != '\0') _humidity.store(std::atoi(_parsedHumidity), std::memory_order_release);
@@ -892,7 +866,6 @@ void WeatherModule::endDocument() {
     // String fields require mutex protection for thread-safe cross-task access.
     if (_parsedCond[0] != '\0' || _parsedIcon[0] != '\0' || _parsedCityName[0] != '\0' || _parsedCountry[0] != '\0') {
         // H3: Write string buffers under mutex protection
-#ifndef NATIVE_BUILD
         if (xSemaphoreTake(_dataMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
             if (_parsedCond[0] != '\0') strlcpy(_condition, _parsedCond, sizeof(_condition));
             if (_parsedIcon[0] != '\0') strlcpy(_icon, _parsedIcon, sizeof(_icon));
@@ -900,19 +873,11 @@ void WeatherModule::endDocument() {
             if (_parsedCountry[0] != '\0') strlcpy(_country, _parsedCountry, sizeof(_country));
             xSemaphoreGive(_dataMutex);
         }
-#else
-        if (_parsedCond[0] != '\0') strlcpy(_condition, _parsedCond, sizeof(_condition));
-        if (_parsedIcon[0] != '\0') strlcpy(_icon, _parsedIcon, sizeof(_icon));
-        if (_parsedCityName[0] != '\0') strlcpy(_cityName, _parsedCityName, sizeof(_cityName));
-        if (_parsedCountry[0] != '\0') strlcpy(_country, _parsedCountry, sizeof(_country));
-#endif
 
-#ifndef NATIVE_BUILD
         if (_parsedCond[0] != '\0') {
             _condSensor.setState(_parsedCond);
             if (_ha) _ha->publishState(&_condSensor);
         }
-#endif
         updated = true;
     }
 

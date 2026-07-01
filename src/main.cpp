@@ -20,9 +20,7 @@
 #include "AppFoundation.h"
 #include "publicKey.hpp"
 
-#ifndef NATIVE_BUILD
     #include <Arduino.h>
-#endif
 
 // ---------------------------------------------------------------------------
 // Static instance
@@ -48,10 +46,8 @@ void setup() {
     app.getWifiManager().setDefaultHostname("esp32-foundation");
 
     if (!app.begin(config)) {
-#ifndef NATIVE_BUILD
         delay(5000);
         app.softReset();
-#endif
     }
 }
 

@@ -11,7 +11,7 @@
  *              LabelWidget, ScrollingTextWidget, ClockWidget, ProgressBarWidget,
  *              and ImageWidget. Validates construction, state management, text
  *              handling, animation math, and safety invariants.
- *              All tests execute on the native GoogleTest runner (NATIVE_BUILD).
+ *              All tests execute on the native GoogleTest runner (native builds).
  *
  * Exported Functions:
  * - (Linked into test_main.cpp GoogleTest entry point)

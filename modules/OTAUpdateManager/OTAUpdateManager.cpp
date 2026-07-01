@@ -47,7 +47,7 @@ static constexpr const char* TAG = "OTAUpdateManager";
 // ---------------------------------------------------------------------------
 // Platform-conditional includes
 // Hardware headers are excluded from the native GoogleTest build.
-// Module includes go in the .cpp ONLY (behind NATIVE_BUILD guard) to
+// Module includes go in the .cpp ONLY (behind native test stub) to
 // respect the Hollywood Principle — no cross-module includes in headers.
 // ---------------------------------------------------------------------------
 #include <PsychicHttp.h>

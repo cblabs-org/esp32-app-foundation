@@ -44,9 +44,7 @@
 #include "MCPToolRegistry.hpp"
 #include "ConfigManager.hpp"
 
-#ifndef NATIVE_BUILD
 #include <PsychicHttp.h>
-#endif
 
 // =============================================================================
 // ITickable Implementation
@@ -131,7 +129,6 @@ void MyApp::resetConfig() {
 // IWebContributor Implementation
 // =============================================================================
 
-#ifndef NATIVE_BUILD
 /**
  * @brief Registers custom REST endpoints with the web server.
  *
@@ -181,16 +178,6 @@ void MyApp::registerRoutes(PsychicHttpServer& server) {
         return response->send(200, "application/json", "{\"status\":\"saved\"}");
     });
 }
-#else
-/**
- * @brief Stub registerRoutes for native build (no HTTP server available).
- * @param server Reference to the PsychicHttpServer instance (unused).
- */
-void MyApp::registerRoutes(PsychicHttpServer& server) {
-    // No-op for native build
-    (void)server;
-}
-#endif
 
 /**
  * @brief Returns the UI tab name for this module.

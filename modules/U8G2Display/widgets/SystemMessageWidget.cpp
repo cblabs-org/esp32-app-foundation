@@ -10,7 +10,7 @@
  * Description: Implementation of the full-screen system alert widget.
  *              Renders a centred title (AppFonts::defaultLarge) followed by
  *              up to three detail lines (AppFonts::defaultSmall). All U8G2
- *              rendering is guarded behind #ifndef NATIVE_BUILD.
+ *              rendering is using native test stubs.
  *
  * Exported Functions/Classes:
  * - SystemMessageWidget: [Class implementation]

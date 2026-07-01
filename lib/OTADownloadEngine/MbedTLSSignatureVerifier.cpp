@@ -10,7 +10,7 @@
  * Description: Implementation of the MbedTLSSignatureVerifier class.
  *              On hardware (ESP-IDF): full mbedtls SHA-256 hashing and
  *              public-key signature verification.
- *              On native (NATIVE_BUILD): stub implementations that compile
+ *              On native (native builds): stub implementations that compile
  *              cleanly but return false, enabling interface contract tests
  *              without crypto dependencies.
  *

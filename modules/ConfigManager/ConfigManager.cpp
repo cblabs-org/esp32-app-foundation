@@ -258,8 +258,8 @@ bool ConfigManager::saveModuleConfig(IConfigurable* module) {
  * Writes standard metadata fields into the provided JsonObject:
  *   - backup_version: always 1
  *   - firmware_version: from FIRMWARE_VERSION build define (or "unknown")
- *   - device_id: chip MAC address (or "00:00:00:00:00:00" on NATIVE_BUILD)
- *   - device_type: chip model string (or "native" on NATIVE_BUILD)
+ *   - device_id: chip MAC address (or "00:00:00:00:00:00" in native builds)
+ *   - device_type: chip model string (or "native" in native builds)
  *   - datetime: ISO-8601 UTC string if system clock is set, else "unknown"
  *   - timezone: TZ string registered via setMetaTimezone(), else "UTC"
  *   - module_count: number of registered IConfigurable modules
@@ -516,7 +516,7 @@ void ConfigManager::registerRoutes(PsychicHttpServer& server) {
  *     loadModuleConfig() will find no files and call resetConfig() on each
  *     module, restoring factory defaults.
  *
- * Both tools are guarded by #ifndef NATIVE_BUILD — no hardware APIs are
+ * Both tools are using native test stubs — no hardware APIs are
  * available in the native test environment.
  *
  * @param registry The MCPToolRegistry to register tools with.

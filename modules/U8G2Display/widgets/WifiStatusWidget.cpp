@@ -12,7 +12,7 @@
  *              connection state and signal strength. Renders ascending signal
  *              bars (1-4 rectangles) when connected or a blinking "!" icon
  *              when disconnected. All WiFi and U8G2 calls are fully guarded
- *              behind #ifndef NATIVE_BUILD.
+ *              behind #ifndef native builds.
  *
  * Exported Functions/Classes:
  * - WifiStatusWidget: [Class implementation]
@@ -48,7 +48,7 @@ WifiStatusWidget::WifiStatusWidget(int _x, int _y)
 
 /**
  * @brief Monitor WiFi connection state transitions and manage blink timer.
- *        On hardware: queries WiFi.status(). On NATIVE_BUILD: no-op.
+ *        On hardware: queries WiFi.status(). On native builds: no-op.
  * @param currentMillis System uptime in milliseconds.
  */
 void WifiStatusWidget::tick(uint32_t currentMillis) {

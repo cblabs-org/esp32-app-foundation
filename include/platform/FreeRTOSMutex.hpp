@@ -32,7 +32,6 @@
 
 #pragma once
 
-#ifndef NATIVE_BUILD
 
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
@@ -66,26 +65,3 @@ public:
     void unlock() { xSemaphoreGive(_handle); }
 };
 
-#else
-
-/**
- * @brief No-op mutex for native (GoogleTest) builds.
- *
- * Provides the same Lockable interface so std::lock_guard compiles,
- * but performs no synchronization (native tests are single-threaded).
- */
-class FreeRTOSMutex {
-public:
-    FreeRTOSMutex() = default;
-    ~FreeRTOSMutex() = default;
-
-    FreeRTOSMutex(const FreeRTOSMutex&) = delete;
-    FreeRTOSMutex& operator=(const FreeRTOSMutex&) = delete;
-    FreeRTOSMutex(FreeRTOSMutex&&) = delete;
-    FreeRTOSMutex& operator=(FreeRTOSMutex&&) = delete;
-
-    void lock()   {}
-    void unlock() {}
-};
-
-#endif

@@ -18,7 +18,7 @@
  *              through Application::getConfigManager().
  *
  *              All tests execute on the native GoogleTest runner (no hardware
- *              required). NATIVE_BUILD is defined by the [env:native] environment
+ *              required). native builds is defined by the [env:native] environment
  *              in platformio.ini.
  *
  * Exported Functions:
@@ -205,7 +205,7 @@ TEST_F(ApplicationRegistrationTest, RegisterMcpContributor_Nullptr_ReturnsFalse)
 // =============================================================================
 
 /**
- * Helper: access the private _compactAndLock() method via begin() in NATIVE_BUILD.
+ * Helper: access the private _compactAndLock() method via begin() in native builds.
  *
  * In the native build, begin() completes without hardware I/O and calls
  * _compactAndLock() internally as part of the boot sequence. This is the
@@ -218,7 +218,7 @@ protected:
     /**
      * @brief Advance app to RUNNING state so the vector is locked.
      *
-     * Uses default FrameworkConfig (all safe defaults). In NATIVE_BUILD
+     * Uses default FrameworkConfig (all safe defaults). In native builds
      * the LittleFS mount is skipped, so begin() always returns true.
      */
     void lockApp() {
@@ -226,7 +226,7 @@ protected:
         bool result = app.begin(cfg);
         // Tolerate begin() returning false in any environment; what matters
         // is that _compactAndLock() was called (which it always is before
-        // the potential early-return on LittleFS failure — in NATIVE_BUILD
+        // the potential early-return on LittleFS failure — in native builds
         // there is no early return, so this always reaches RUNNING).
         (void)result;
     }
@@ -355,7 +355,7 @@ TEST_F(ApplicationStateTest, InitialState_IsBoot) {
 }
 
 /**
- * After a successful begin(), state must be CONFIGURING in NATIVE_BUILD.
+ * After a successful begin(), state must be CONFIGURING in native builds.
  * The WiFi config gate requires isReady() && !isAPMode(), which cannot be
  * satisfied without real WiFi hardware. On real hardware, the gate would
  * be satisfied during tick() once WiFi connects.
@@ -385,7 +385,7 @@ protected:
 };
 
 /**
- * softReset() must complete without crashing the test process in NATIVE_BUILD.
+ * softReset() must complete without crashing the test process in native builds.
  * esp_restart() is stubbed out, so the method is a log-and-return no-op.
  */
 TEST_F(ApplicationSoftResetTest, SoftReset_NativeBuild_DoesNotCrash) {
@@ -414,7 +414,7 @@ protected:
 
 /**
  * begin() must trigger ConfigManager::beginAll() which calls applyConfig()
- * on all registered IConfigurable modules. In NATIVE_BUILD, with no config
+ * on all registered IConfigurable modules. In native builds, with no config
  * files on disk, modules get resetConfig() + applyConfig() via defaults.
  */
 TEST_F(ApplicationBeginTest, Begin_CallsApplyConfigOnRegisteredModules) {
@@ -431,7 +431,7 @@ TEST_F(ApplicationBeginTest, Begin_CallsApplyConfigOnRegisteredModules) {
     FrameworkConfig cfg;
     app.begin(cfg);
 
-    // In NATIVE_BUILD with no file on disk, loadModuleConfig() calls
+    // In native builds with no file on disk, loadModuleConfig() calls
     // resetConfig() then saveModuleConfig(). The applyConfig is NOT called
     // in the "file not found" path — resetConfig() IS called instead.
     EXPECT_TRUE(confA.resetConfigCalled);
@@ -443,7 +443,7 @@ TEST_F(ApplicationBeginTest, Begin_CallsApplyConfigOnRegisteredModules) {
 }
 
 /**
- * begin() in NATIVE_BUILD must return true (LittleFS stub succeeds).
+ * begin() in native builds must return true (LittleFS stub succeeds).
  */
 TEST_F(ApplicationBeginTest, Begin_NativeBuild_ReturnsTrue) {
     FrameworkConfig cfg;
@@ -561,7 +561,7 @@ TEST_F(ApplicationDomainServiceTest, AfterBegin_WifiManagerRegisteredWithConfigM
     FrameworkConfig cfg;
     app.begin(cfg);
 
-    // In NATIVE_BUILD, WiFi gate cannot be satisfied (no hardware), so
+    // In native builds, WiFi gate cannot be satisfied (no hardware), so
     // the app enters CONFIGURING rather than RUNNING. This validates that
     // the WiFi module was registered and the gate system is working.
     EXPECT_EQ(app.getState(), AppState::Configuring);

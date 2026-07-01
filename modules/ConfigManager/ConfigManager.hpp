@@ -223,7 +223,7 @@ private:
      * Writes backup_version, firmware_version, device_id, device_type,
      * datetime, timezone, and module_count into the provided JsonObject.
      * Hardware values (MAC, chip model, clock) are only available outside
-     * NATIVE_BUILD; safe defaults are used in the native test environment.
+     * native builds; safe defaults are used in the native test environment.
      *
      * @param meta Mutable reference to the target JsonObject.
      */
@@ -232,7 +232,7 @@ private:
     /**
      * @brief Format the config file path for a given namespace.
      *
-     * Writes "/mod/<ns>.json" (hardware) or "mod_<ns>.json" (NATIVE_BUILD)
+     * Writes "/mod/<ns>.json" (hardware) or "mod_<ns>.json" (native builds)
      * into the provided buffer.
      *
      * @param ns   Namespace string (e.g. "wifi").

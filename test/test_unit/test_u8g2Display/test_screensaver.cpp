@@ -20,7 +20,7 @@
 
 // =============================================================================
 // Stub U8G2 for native builds (already provided by the ScreensaverController.cpp
-// NATIVE_BUILD guard, but we need it visible here for passing to tick())
+// native test stub, but we need it visible here for passing to tick())
 // =============================================================================
 
 // U8G2 is forward-declared in the header; define the stub here so we can

@@ -162,7 +162,7 @@ public:
      * On successful generation, _certPresent is set to true and
      * _configManager->saveModuleConfig(this) is called to persist the flag.
      *
-     * In NATIVE_BUILD, sets _certPresent = true and calls saveModuleConfig(),
+     * In native builds, sets _certPresent = true and calls saveModuleConfig(),
      * then returns true — no file I/O or mbedTLS operations are performed.
      *
      * @param hostname  Hostname for the certificate CN (e.g. "esp32").
@@ -193,7 +193,7 @@ public:
      * Caller must NOT free the returned pointers — they point into static
      * storage valid for the lifetime of the application.
      *
-     * In NATIVE_BUILD, always returns false (no LittleFS available).
+     * In native builds, always returns false (no LittleFS available).
      *
      * @param certDer  Output: pointer to the DER-encoded certificate buffer.
      * @param certLen  Output: byte length of the certificate.
@@ -502,7 +502,7 @@ private:
     PasswordTabStub _passwordTabStub; ///< Nav stub: Password sub-pill under Security
     TlsTabStub      _tlsTabStub;      ///< Nav stub: TLS sub-pill under Security
 
-    // LittleFS helpers (hardware builds only — no-ops in NATIVE_BUILD)
+    // LittleFS helpers (hardware builds only — no-ops in native builds)
     // -------------------------------------------------------------------------
 
     /**

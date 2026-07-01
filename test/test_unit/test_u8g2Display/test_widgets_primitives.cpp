@@ -10,7 +10,7 @@
  * Description: GoogleTest unit-test suite for the widget primitives layer:
  *              IGfxWidget, TextAlign, and AppFonts. Validates
  *              construction, visibility, geometry, and enum value contracts.
- *              All tests execute on the native GoogleTest runner (NATIVE_BUILD).
+ *              All tests execute on the native GoogleTest runner (native builds).
  *
  * Exported Functions:
  * - (Linked into test_main.cpp GoogleTest entry point)
@@ -126,10 +126,10 @@ TEST(TextAlignTest, RIGHT_EqualsTwo) {
 }
 
 // =============================================================================
-// Test Group: Font Management (NATIVE_BUILD)
+// Test Group: Font Management (native builds)
 // =============================================================================
 
-/** In NATIVE_BUILD, all font accessors must return nullptr. */
+/** In native builds, all font accessors must return nullptr. */
 TEST(AppFontsNativeTest, DefaultSmall_ReturnsNullptr) {
     EXPECT_EQ(AppFonts::defaultSmall(), nullptr);
 }

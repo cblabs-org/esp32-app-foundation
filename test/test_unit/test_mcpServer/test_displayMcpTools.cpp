@@ -12,7 +12,7 @@
  *              display_status (read-safe) and display_control (mutating) tools,
  *              and that both tools produce correct JSON responses for various inputs.
  *
- *              Tests use a live U8G2DisplayModule instance (in NATIVE_BUILD mode)
+ *              Tests use a live U8G2DisplayModule instance (in native builds mode)
  *              and a standalone MCPToolRegistry — no MCPServer or Application wiring
  *              is needed.
  *

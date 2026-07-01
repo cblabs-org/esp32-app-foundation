@@ -12,16 +12,12 @@
 #include <gtest/gtest.h>
 
 // Include the real Application header (Application now owns OTAUpdateManager)
-#ifdef NATIVE_BUILD
 #include "../../../modules/Application/Application.hpp"
-#endif
 
 #include "../../../modules/OTAUpdateManager/OTAUpdateManager.hpp"
 #include <ArduinoJson.h>
 
-#ifdef NATIVE_BUILD
 #include "../../../modules/WebServer/WebServerManager.hpp"
-#endif
 
 class OtaUpdateManagerTest : public ::testing::Test {
 protected:
@@ -75,7 +71,7 @@ TEST_F(OtaUpdateManagerTest, CheckForUpdate_NoRepo_ReturnsFalse) {
 // Legacy API Tests
 // ---------------------------------------------------------------------------
 
-// Legacy beginUpdate() tests were removed because the #ifndef NATIVE_BUILD guards
+// Legacy beginUpdate() tests were removed because the #ifndef native test stubs
 // were removed in PR-41, so they now execute the real stubbed update logic.
 
 /// markAppValid() should not crash.
@@ -163,9 +159,7 @@ TEST_F(OtaUpdateManagerTest, ApplyConfig_MissingUpdatesEnabled_DefaultsTrue) {
     EXPECT_TRUE(out["updatesEnabled"].as<bool>());
 }
 
-#if defined(NATIVE_BUILD)
 int main(int argc, char **argv) {
     ::testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();
 }
-#endif

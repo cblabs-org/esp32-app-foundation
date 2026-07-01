@@ -11,7 +11,7 @@
  *              connection state and RSSI signal strength, rendering ascending
  *              signal bars (1-4) when connected or a blinking disconnection
  *              icon when offline. Uses direct Arduino WiFi.status() / WiFi.RSSI()
- *              calls, all guarded with NATIVE_BUILD preprocessor guards.
+ *              calls, all using native test stubs.
  *
  * Exported Classes:
  * - WifiStatusWidget: [Class] WiFi status indicator extending IGfxWidget.
