@@ -46,6 +46,7 @@ private:
 
 inline void delay(uint32_t ms) { (void)ms; }
 inline float temperatureRead() { return 42.0f; }
+inline unsigned long millis() { return 0; }
 
 class Print {
 public:
@@ -98,7 +99,15 @@ public:
     IPAddress(uint8_t first_octet, uint8_t second_octet, uint8_t third_octet, uint8_t fourth_octet) {
         _addr = first_octet | (second_octet << 8) | (third_octet << 16) | (fourth_octet << 24);
     }
-    std::string toString() const { return "0.0.0.0"; }
+    std::string toString() const {
+        return std::to_string(_addr & 0xFF) + "." + 
+               std::to_string((_addr >> 8) & 0xFF) + "." + 
+               std::to_string((_addr >> 16) & 0xFF) + "." + 
+               std::to_string((_addr >> 24) & 0xFF);
+    }
+    uint8_t operator[](int index) const {
+        return (_addr >> (index * 8)) & 0xFF;
+    }
 private:
     uint32_t _addr;
 };

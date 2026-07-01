@@ -4,23 +4,40 @@
 #define WIFI_STA 1
 #define WIFI_AP 2
 #define WIFI_AP_STA 3
+#define WIFI_OFF 0
+#define WIFI_PS_NONE 0
+#define WIFI_AUTH_OPEN 0
+#define WIFI_SCAN_FAILED -1
+#define WIFI_SCAN_RUNNING -2
 
 class WiFiClass {
 public:
-    void begin() {}
+    void persistent(bool) {}
+    void setSleep(int) {}
+    void begin(const char* ssid = nullptr, const char* pass = nullptr) { (void)ssid; (void)pass; }
     void disconnect(bool wifioff = false, bool eraseap = false) { (void)wifioff; (void)eraseap; }
     void mode(int m) { (void)m; }
-    int status() { return WL_DISCONNECTED; }
-    IPAddress localIP() { return IPAddress(0, 0, 0, 0); }
+    int status() { return WL_CONNECTED; }
+    IPAddress localIP() { return IPAddress(192, 168, 1, 100); }
     IPAddress softAPIP() { return IPAddress(0, 0, 0, 0); }
     std::string macAddress() { return "AA:BB:CC:DD:EE:FF"; }
     std::string softAPmacAddress() { return "AA:BB:CC:DD:EE:FF"; }
-    std::string SSID() { return "TEST_SSID"; }
+    std::string SSID(int i = 0) { (void)i; return "TEST_SSID"; }
     std::string softAPSSID() { return "TEST_AP_SSID"; }
     void setHostname(const char* hostname) { (void)hostname; }
     bool softAP(const char* ssid, const char* passphrase = nullptr, int channel = 1, int ssid_hidden = 0, int max_connection = 4) { return true; }
-    int32_t RSSI() { return -50; }
+    bool softAPConfig(IPAddress local_ip, IPAddress gateway, IPAddress subnet) { return true; }
+    bool softAPdisconnect(bool wifioff = false) { return true; }
+    int32_t RSSI(int i = 0) { (void)i; return -50; }
     int16_t scanNetworks(bool async = false, bool show_hidden = false, bool passive = false, uint32_t max_ms_per_chan = 300, uint8_t channel = 0) { return 0; }
+    void scanDelete() {}
+    int16_t scanComplete() { return 0; }
+    int encryptionType(int i) { (void)i; return WIFI_AUTH_OPEN; }
+    int channel() { return 1; }
+    int channel(int i) { (void)i; return 1; }
     int getMode() { return WIFI_STA; }
+    IPAddress gatewayIP() { return IPAddress(192, 168, 1, 1); }
+    IPAddress subnetMask() { return IPAddress(255, 255, 255, 0); }
+    std::string BSSIDstr() { return "AA:BB:CC:DD:EE:FF"; }
 };
 inline WiFiClass WiFi;

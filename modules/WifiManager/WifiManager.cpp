@@ -44,17 +44,11 @@
 #include "../MCPServer/MCPToolRegistry.hpp"
 #include "../EventBus/EventBus.hpp"
 
-#ifndef NATIVE_BUILD
 #include <PsychicHttp.h>
 #include <ArduinoJson.h>
 #include <WiFi.h>
 #include <DNSServer.h>
-#include <ESPmDNS.h>
 #include "esp_wifi.h"
-#else
-unsigned long millis() { return 0; } // Stub
-void delay(unsigned long ms) {}      // Stub
-#endif
 
 #include "platform/LogShim.h"
 #include "../Logger/Logger.hpp"
@@ -68,28 +62,6 @@ static constexpr size_t BODY_LIMIT_WIFI_FORGET  = 256;  // 256 B for forget
 
 // --- Maximum networks returned by scan ---
 static constexpr int MAX_SCAN_RESULTS = 15;
-
-#ifdef NATIVE_BUILD
-// A simple fallback for strlcpy in native testing environment if not available.
-// macOS has strlcpy natively, but just to be safe if Linux is used:
-#if !defined(__APPLE__) && !defined(__FreeBSD__)
-static size_t strlcpy(char *dst, const char *src, size_t siz) {
-    char *d = dst;
-    const char *s = src;
-    size_t n = siz;
-    if (n != 0) {
-        while (--n != 0) {
-            if ((*d++ = *s++) == '\0') break;
-        }
-    }
-    if (n == 0) {
-        if (siz != 0) *d = '\0';
-        while (*s++) ;
-    }
-    return (s - src - 1);
-}
-#endif
-#endif
 
 WifiManager::WifiManager() : _wifiDisconnectTimer(0) {
     memset(_wifiSsid, 0, sizeof(_wifiSsid));
@@ -108,9 +80,7 @@ WifiManager::~WifiManager() {
  */
 void WifiManager::transitionTo(WiFiState newState) {
     _currentState = newState;
-#ifndef NATIVE_BUILD
     _stateTimer = millis();
-#endif
 }
 
 // =============================================================================
@@ -179,10 +149,8 @@ void WifiManager::resetConfig() {
     memset(_wifiSsid, 0, sizeof(_wifiSsid));
     memset(_wifiPass, 0, sizeof(_wifiPass));
     strlcpy(_currentHostname, _defaultHostname, sizeof(_currentHostname));
-#ifndef NATIVE_BUILD
     WiFi.disconnect(true, true);
     esp_wifi_restore();
-#endif
     ESP_LOGI(TAG, "WiFi settings erased and restored to factory defaults.");
 }
 
@@ -199,13 +167,11 @@ void WifiManager::resetConfig() {
 void WifiManager::begin() {
     // Config is already loaded by ConfigManager::beginAll() calling applyConfig()
 
-#ifndef NATIVE_BUILD
     _lastApiRequestTime = millis();
     // Prepare for tick-based init
     WiFi.persistent(false);
     WiFi.disconnect(true, true);
     WiFi.mode(WIFI_OFF);
-#endif
     
     transitionTo(WiFiState::Init);
     ESP_LOGI(TAG, "WiFi Manager initialized in NON-BLOCKING mode. Hostname: %s", _currentHostname);
@@ -215,7 +181,6 @@ void WifiManager::begin() {
  * @brief Periodic maintenance tick for the WiFi state machine.
  */
 void WifiManager::tick(uint32_t currentMillis) {
-#ifndef NATIVE_BUILD
     // --- Handle deferred restart (set by connect/forget handlers) ---
     if (_restartRequested) {
         _restartRequested = false;
@@ -361,27 +326,22 @@ void WifiManager::tick(uint32_t currentMillis) {
             }
             break;
     }
-#endif
 }
 
 /**
  * @brief Handles DNS requests when in AP mode.
  */
 void WifiManager::processDNS() {
-#ifndef NATIVE_BUILD
     if (_isAPMode && _dnsServer != nullptr) {
         _dnsServer->processNextRequest();
     }
-#endif
 }
 
 /**
  * @brief Record that an API request was received.
  */
 void WifiManager::notifyApiActivity() {
-#ifndef NATIVE_BUILD
     _lastApiRequestTime = millis();
-#endif
 }
 
 /**
@@ -415,7 +375,6 @@ void WifiManager::setDefaultHostname(const char* hostname) {
  *   POST /api/wifi/forget  — erase + restart to AP (256B body limit)
  */
 void WifiManager::registerRoutes(PsychicHttpServer& server) {
-#ifndef NATIVE_BUILD
     // --- GET /api/wifi/status ---
     server.on("/api/wifi/status", HTTP_GET, [this](PsychicRequest* request, PsychicResponse* response) {
         return this->handleStatus(request, response);
@@ -446,7 +405,6 @@ void WifiManager::registerRoutes(PsychicHttpServer& server) {
             return this->handleForget(request, response);
         }
     );
-#endif
 }
 
 // =============================================================================
@@ -454,7 +412,6 @@ void WifiManager::registerRoutes(PsychicHttpServer& server) {
 // =============================================================================
 
 void WifiManager::registerMCPTools(MCPToolRegistry& registry) {
-#ifndef NATIVE_BUILD
     registry.addTool("wifi_get_status", "Get current WiFi connection status and diagnostics",
         [](void* context, JsonObject& args, JsonObject& result) {
             WifiManager* self = static_cast<WifiManager*>(context);
@@ -519,7 +476,6 @@ void WifiManager::registerMCPTools(MCPToolRegistry& registry) {
             self->scheduleRestart();
             result["success"] = true;
         }, this, true);
-#endif
 }
 
 // =============================================================================
@@ -533,7 +489,6 @@ void WifiManager::registerMCPTools(MCPToolRegistry& registry) {
  * MAC address, channel, gateway, password existence flag, and AP mode state.
  */
 esp_err_t WifiManager::handleStatus(PsychicRequest* request, PsychicResponse* response) {
-#ifndef NATIVE_BUILD
     this->notifyApiActivity();
 
     JsonDocument doc;
@@ -560,7 +515,6 @@ esp_err_t WifiManager::handleStatus(PsychicRequest* request, PsychicResponse* re
     std::string output;
     serializeJson(doc, output);
     response->send(200, "application/json", output.c_str());
-#endif
     return ESP_OK;
 }
 
@@ -575,7 +529,6 @@ esp_err_t WifiManager::handleStatus(PsychicRequest* request, PsychicResponse* re
  * - Calls WiFi.scanDelete() after reading results to free memory
  */
 esp_err_t WifiManager::handleScan(PsychicRequest* request, PsychicResponse* response) {
-#ifndef NATIVE_BUILD
     this->notifyApiActivity();
 
     int16_t scanResult = WiFi.scanComplete();
@@ -679,7 +632,6 @@ esp_err_t WifiManager::handleScan(PsychicRequest* request, PsychicResponse* resp
     std::string output;
     serializeJson(doc, output);
     response->send(200, "application/json", output.c_str());
-#endif
     return ESP_OK;
 }
 
@@ -691,7 +643,6 @@ esp_err_t WifiManager::handleScan(PsychicRequest* request, PsychicResponse* resp
  * Enforces 1KB body size limit — rejects with HTTP 413 if exceeded.
  */
 esp_err_t WifiManager::handleTest(PsychicRequest* request, PsychicResponse* response) {
-#ifndef NATIVE_BUILD
     this->notifyApiActivity();
 
     // --- Per-route body size guard (PR-04a/WO1) ---
@@ -735,7 +686,6 @@ esp_err_t WifiManager::handleTest(PsychicRequest* request, PsychicResponse* resp
     } else {
         response->send(200, "application/json", "{\"status\":\"failed\"}");
     }
-#endif
     return ESP_OK;
 }
 
@@ -748,7 +698,6 @@ esp_err_t WifiManager::handleTest(PsychicRequest* request, PsychicResponse* resp
  * Enforces 1KB body size limit — rejects with HTTP 413 if exceeded.
  */
 esp_err_t WifiManager::handleConnect(PsychicRequest* request, PsychicResponse* response) {
-#ifndef NATIVE_BUILD
     this->notifyApiActivity();
 
     // --- Per-route body size guard ---
@@ -785,7 +734,6 @@ esp_err_t WifiManager::handleConnect(PsychicRequest* request, PsychicResponse* r
 
     // --- Schedule deferred restart to apply new credentials ---
     this->scheduleRestart();
-#endif
     return ESP_OK;
 }
 
@@ -797,7 +745,6 @@ esp_err_t WifiManager::handleConnect(PsychicRequest* request, PsychicResponse* r
  * Enforces 256B body size limit — rejects with HTTP 413 if exceeded.
  */
 esp_err_t WifiManager::handleForget(PsychicRequest* request, PsychicResponse* response) {
-#ifndef NATIVE_BUILD
     this->notifyApiActivity();
 
     // --- Per-route body size guard ---
@@ -828,7 +775,6 @@ esp_err_t WifiManager::handleForget(PsychicRequest* request, PsychicResponse* re
 
     // --- Schedule deferred restart to AP mode ---
     this->scheduleRestart();
-#endif
     return ESP_OK;
 }
 
@@ -891,7 +837,6 @@ void WifiManager::updateWiFi(const char* ssid, const char* pass) {
  */
 bool WifiManager::testConnection(const char* ssid, const char* pass, std::string& ipOut) {
     ESP_LOGI(TAG, "WIFI_TEST: Starting connection test...");
-#ifndef NATIVE_BUILD
     const char* realPass = pass;
     if (pass != nullptr && strlen(pass) == 0) {
         ESP_LOGI(TAG, "WIFI_TEST: Using stored credentials for test.");
@@ -941,33 +886,23 @@ bool WifiManager::testConnection(const char* ssid, const char* pass, std::string
         }
         return false;
     }
-#else
-    ipOut = "192.168.1.100";
-    return true;
-#endif
 }
 
 /**
  * @brief Update the internal URL string for the Web GUI.
  */
 void WifiManager::updateMyUrl() {
-#ifndef NATIVE_BUILD
     IPAddress ip = WiFi.localIP();
     snprintf(_myUrl, sizeof(_myUrl), "http://%u.%u.%u.%u", ip[0], ip[1], ip[2], ip[3]);
-#endif
 }
 
 /**
  * @brief Returns true if WiFi has been disconnected for longer than the timeout period (3 minutes).
  */
 bool WifiManager::isWifiPersistentError() const {
-#ifndef NATIVE_BUILD
     if (_isAPMode || (WiFi.status() == WL_CONNECTED)) return false;
     if (_wifiDisconnectTimer == 0) return false;
     
     // Over 3 minutes of continuous disconnection
     return (millis() - _wifiDisconnectTimer > 180000);
-#else
-    return false;
-#endif
 }

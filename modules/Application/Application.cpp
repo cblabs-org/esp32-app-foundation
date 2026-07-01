@@ -42,9 +42,6 @@
     #include "esp_heap_caps.h"    // heap_caps_get_free_size(), heap_caps_get_minimum_free_size()
 #else
     #include <cstdlib>            // For native-build stubs
-    // millis() stub — returns 0 in native builds; sufficient for compilation
-    // and basic test execution. Regression logic won't trigger (always time=0).
-    static unsigned long millis() { return 0; }
 #endif
 
 #include <cstring>                // memset()
