@@ -22,7 +22,6 @@ Use the `registry.addTool()` method. The handler signature is a **stateless func
 
 ```cpp
 void MyModule::registerMCPTools(MCPToolRegistry& registry) {
-#ifndef NATIVE_BUILD
     // Read-only tool
     registry.addTool("my_get_status",
         "Get current status of MyModule",
@@ -42,7 +41,6 @@ void MyModule::registerMCPTools(MCPToolRegistry& registry) {
         }, this, true);   // mutatesState = true
 
     ESP_LOGI(TAG, "Registered MCP tools: my_get_status, my_reset");
-#endif
 }
 ```
 
@@ -65,7 +63,7 @@ An overload accepting a `JsonDocument` schema parameter is available for tools w
 1. **Stateless lambdas only** — capture-less `[](void* ctx, ...)` that decay to function pointers. No `std::function`, no heap captures.
 2. **`void* context`** — pass `this`; cast back with `static_cast<MyModule*>(ctx)` inside the handler.
 3. **`mutatesState` flag** — set `true` for any tool that writes data, changes config, controls hardware, or triggers actions. Read-only mode automatically blocks these with JSON-RPC error `-32000`.
-4. **`#ifndef NATIVE_BUILD`** guard — if the tool uses hardware APIs not available in native test builds.
+4. **Stub Headers** — If the tool uses hardware APIs, ensure a stub is provided in `test/stubs/platform/` so native tests can compile without inline guards.
 5. **Naming** — use `module_verb` pattern (e.g., `wifi_get_status`, `ota_check_now`, `config_factory_reset`).
 6. **Logging** — end `registerMCPTools()` with an `ESP_LOGI` listing all registered tool names.
 

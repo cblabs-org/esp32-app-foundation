@@ -61,7 +61,7 @@ test_filter           = test_unit/*
 ```
 
 Key differences from hardware environments:
-- **`-DNATIVE_BUILD`** — enables compilation guards that exclude hardware-specific code (see [Using Optional Modules](using-optional-modules.md) for the `#ifndef NATIVE_BUILD` guard pattern)
+- **Stub-Header Architecture** — `-I test/stubs/platform` is added to the include path. This resolves ESP-IDF and Arduino hardware dependencies to local mock implementations, allowing tests to run on the host CPU without inline `#ifdef NATIVE_BUILD` guards. See the [Testing Architecture](testing.md) guide for details.
 - **`-DUNIT_TEST`** — signals the test context to framework code
 - **Static version flags** — version is hardcoded because `inject_version.py` is not run for the native environment (no git tag lookup needed at test time)
 - **GoogleTest** — uses the `googletest` test framework with tests filtered to `test_unit/*`

@@ -48,12 +48,8 @@ void MyModule::registerRoutes(PsychicHttpServer& server) {
 - **`getTabOrder()`**: Controls display order within the level. Lower is first.
 - **`getTabIcon()`**: Return the SVG inner content (e.g., `<path d="..." />`) for the bottom-nav icon. Return `nullptr` to use a generic grid icon.
 
-## Native Build Stubs
+## Native Testing Stubs
 
-If your module is tested on the host via `NATIVE_BUILD`, you must stub out PsychicHttp references, as it relies on ESP-IDF network stacks.
+PsychicHttp and PsychicHttpsServer are mocked via the framework's **Stub-Header Architecture** in `test/stubs/platform/`.
 
-```cpp
-#ifndef NATIVE_BUILD
-    server.on("/api/...", ...);
-#endif
-```
+Because the build system maps `#include <PsychicHttp.h>` to the local mock during `env:native` builds, you do **not** need to wrap your `server.on()` declarations in `#ifndef NATIVE_BUILD` guards.

@@ -51,5 +51,5 @@ Things that audits consistently miss:
 1. **Sub-interfaces in `boards/interfaces/`** — these are not top-level modules but still contain DI patterns
 2. **Committed secrets** — check the repo root for `.pem`, `.key`, `.env` files that shouldn't be tracked
 3. **Facade completeness** — `AppFoundation.h` should include ALL documented interfaces
-4. **NATIVE_BUILD stubs** — `#ifdef NATIVE_BUILD` blocks may use different patterns than device code; both should comply
+4. **Test stubs** — Code in `test/stubs/platform/` may use mock abstractions but must still comply with naming conventions
 5. **Task stack sizes** — the default 4-8KB is often insufficient for TLS; verify with `uxTaskGetStackHighWaterMark()`

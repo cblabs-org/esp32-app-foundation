@@ -152,7 +152,20 @@ stateDiagram-v2
 
 ---
 
-## 5. ADR Rationale
+## 5. Platform Abstraction Strategy
+
+The framework is designed to be fully testable on the host machine without hardware. To achieve this, it relies on a **Stub-Header Architecture** rather than littering production code with `#ifdef NATIVE_BUILD` guards.
+
+Key principles of this strategy:
+- **No Runtime Cost**: Stubs are compile-time only. Production builds link directly against the true ESP-IDF or Arduino headers.
+- **No Inline Guards**: Production code remains clean and free of `#ifdef` preprocessor directives.
+- **API Mirroring**: Stub headers (`test/stubs/platform/`) mirror the exact API surface of ESP-IDF and Arduino functions. During native test builds (`env:native`), the include path priority ensures the compiler resolves `#include <esp_system.h>` to the stub implementation.
+
+For more details on how to write or update test stubs, see the [Testing Architecture](testing.md) guide.
+
+---
+
+## 6. ADR Rationale
 
 Several architectural decisions underpin the framework design. These are documented as Architecture Decision Records (ADRs):
 
@@ -164,7 +177,7 @@ Several architectural decisions underpin the framework design. These are documen
 
 ---
 
-## 6. Subsystem Extension Interfaces
+## 7. Subsystem Extension Interfaces
 
 Application modules interact with framework subsystems by implementing one or more of these interfaces:
 
@@ -184,7 +197,7 @@ For detailed information on implementing these interfaces, see the [Extension Po
 
 ---
 
-## 7. The Application Lifecycle
+## 8. The Application Lifecycle
 
 The application operates in three main states: `BOOT` $\rightarrow$ `CONFIGURING` $\leftrightarrow$ `RUNNING`.
 
@@ -224,7 +237,7 @@ For more details on the boot phases and state transitions, refer to the [Applica
 
 ---
 
-## 8. LittleFS Directory Layout
+## 9. LittleFS Directory Layout
 
 All persistent files are stored in the flash memory via LittleFS. The framework expects a strict structure:
 - **`/mod/<namespace>.json`**: Stored configuration file for each registered `IConfigurable` module (e.g. `/mod/wifi.json`, `/mod/myapp.json`).
@@ -233,7 +246,7 @@ All persistent files are stored in the flash memory via LittleFS. The framework 
 
 ---
 
-## 9. EventBus Overview
+## 10. EventBus Overview
 
 The framework provides a synchronous, in-memory publish-subscribe [EventBus](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/modules/EventBus/EventBus.hpp) to enable decoupled communication between modules. Modules subscribe to string-based topic channels using static function callbacks and publish events containing optional pointer payloads. 
 

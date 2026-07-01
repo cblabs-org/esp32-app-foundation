@@ -26,22 +26,15 @@ The framework uses a two-tier vector strategy to fight heap fragmentation:
 3. Call `shrink_to_fit()` and **lock** the structure for the remainder of the uptime.
 - *Read More:* [Heap Management](../performance/heap-management.md)
 
-## 4. `NATIVE_BUILD` Guards and Integration Testing
+## 4. Integration Testing & Stub Headers
 
-Core framework modules must compile both on the ESP32 and in the native testing environment (`env:native`).
-- Wrap hardware-specific code (e.g., `WiFi.h`, `LittleFS.h`) in `#ifndef NATIVE_BUILD`.
-- Provide mock implementations or safe stubs in the `#else` block.
+Core framework modules must compile both on the ESP32 and in the native testing environment (`env:native`). The framework uses a **Stub-Header Architecture** to accomplish this.
+
+- **Do NOT** use inline `#ifdef NATIVE_BUILD` guards to wrap hardware-specific code like `WiFi.h` or `LittleFS.h`.
+- The native environment uses include-path priority to resolve `#include <WiFi.h>` to a local mock stub in `test/stubs/platform/WiFi.h`.
+- If you use a new ESP-IDF API, you must provide a mock implementation in the `test/stubs/platform/` directory.
+- Exception: Pure display code can be wrapped in `#ifdef HAS_DISPLAY`.
 - All new core features must include corresponding unit tests in `test/test_native/`.
-
-```cpp
-#ifndef NATIVE_BUILD
-#include <WiFi.h>
-#else
-// Stub or mock for native tests
-struct WiFiStub { bool isConnected() { return true; } };
-extern WiFiStub WiFi;
-#endif
-```
 
 ## 5. Adding EventBus Topics
 
@@ -61,7 +54,7 @@ If your module exposes debugging state, consider implementing `IMCPContributor`.
 ## 7. Testing Contracts
 
 ### Native Compilation (Mandatory)
-All core modules MUST compile on `env:native`. Wrap hardware-specific code in `#ifndef NATIVE_BUILD` guards and provide stub/mock implementations.
+All core modules MUST compile on `env:native`. Use the stub-header architecture in `test/stubs/platform/` instead of inline `#ifndef NATIVE_BUILD` guards.
 
 ### Unit Tests (Expected for Core Modules)
 Core framework modules should have unit tests in `test/test_native/`. Tests run on the host machine without hardware, exercising logic, state machines, and edge cases.

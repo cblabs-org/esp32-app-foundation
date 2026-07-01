@@ -18,7 +18,7 @@ pio test -e native
 
 | Flag | Source | Purpose |
 |:---|:---|:---|
-| `-DNATIVE_BUILD` | `native` env | Enables compilation guards for host builds |
+| `-I test/stubs/platform` | `native` env | Injects mock stub headers for native testing |
 | `-DUNIT_TEST` | `native` env | Signals test context |
 | `-DBOARD_ID=\"...\"` | Per-env | OTA manifest board matching |
 | `-DSECURITY_VERSION=N` | `base_esp32` | Anti-rollback counter |

@@ -242,21 +242,13 @@ The following are exempt from the naming conventions above:
 | **Third-party / SDK mock stubs** | Must match upstream header names for compatibility | `Arduino.h`, `WiFi.h`, `HTTPClient.h` |
 | **PlatformIO structural dirs** | Framework-mandated names | `src/`, `lib/`, `include/`, `test/`, `modules/` |
 
-### NATIVE_BUILD Mock Stubs
+### Platform Test Stubs
 
-When providing mock/stub class definitions under `#ifdef NATIVE_BUILD`, define the stub in **exactly one** header file and use forward declarations everywhere else. This prevents redefinition errors when include order changes.
+Hardware and framework APIs are mocked using the **Stub-Header Architecture** in `test/stubs/platform/`.
 
-```cpp
-// In WebServerManager.hpp (authoritative stub location)
-#ifdef NATIVE_BUILD
-class AsyncWebServerRequest { /* stub */ };
-#endif
-
-// In WifiManager.hpp (consumer — forward declare only)
-#ifdef NATIVE_BUILD
-class AsyncWebServerRequest;  // Defined in WebServerManager.hpp
-#endif
-```
+- **Never** use `#ifdef NATIVE_BUILD` to mock classes in your module headers.
+- **Always** create a matching header file (e.g., `test/stubs/platform/WiFi.h`) that provides the minimum necessary definitions for the compiler to resolve your API calls.
+- Stubs are selected at compile-time via include path priority during `env:native` builds.
 
 ### Git Case-Sensitivity on macOS
 
