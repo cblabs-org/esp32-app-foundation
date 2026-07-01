@@ -53,3 +53,8 @@ Remove all `#ifdef NATIVE_BUILD` / `#ifndef NATIVE_BUILD` guards from ConfigMana
 ## Verification Requirement
 
 **CRITICAL:** Before distilling or committing, you MUST ask the user if they are happy.
+
+## Status Update
+- **Status**: COMPLETE
+- **Details**: `#ifdef NATIVE_BUILD` guards were fully removed from `ConfigManager` and `ConfigManifest`. Required FreeRTOS headers and definitions were added to the stub environment. Path mismatch in tests (`test_configManager.cpp` and `test_application.cpp`) was resolved by correctly provisioning directory paths (`test/tmp/mod`) and updating references.
+- **Verification**: `pio test -e native` passes 100%. `pio run -e esp32s3nano` builds successfully. Changes committed. Context bridged and distilled.

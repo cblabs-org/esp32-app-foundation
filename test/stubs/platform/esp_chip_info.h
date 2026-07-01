@@ -15,4 +15,3 @@ inline void esp_chip_info(esp_chip_info_t* out_info) {
     }
 }
 
-inline unsigned long millis() { return 0; }

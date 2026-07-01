@@ -50,19 +50,7 @@
 
 #pragma once
 
-#ifndef NATIVE_BUILD
 #include <Arduino.h>
-#else
-#include <string>
-
-typedef int esp_err_t;
-#ifndef ESP_OK
-#define ESP_OK 0
-#endif
-
-// Consolidated String stub for NATIVE_BUILD
-#include "../../include/platform/NativeBuildStubs.hpp"
-#endif
 
 #include <memory>
 #include <cstring>
@@ -71,22 +59,10 @@ typedef int esp_err_t;
 #include "../../include/interfaces/IWebContributor.hpp"
 #include "../../include/interfaces/IMCPContributor.hpp"
 
-#ifndef NATIVE_BUILD
 class DNSServer;
 class PsychicRequest;
 class PsychicResponse;
 class PsychicHttpServer;
-#else
-class DNSServer {
-public:
-    DNSServer() {}
-    ~DNSServer() {}
-};
-// Forward declaration only — full stub is in WebServerManager.hpp
-class PsychicRequest;
-class PsychicResponse;
-class PsychicHttpServer;
-#endif
 
 // Forward declarations — avoids circular include with ConfigManager.hpp / KeyManager.hpp
 class ConfigManager;

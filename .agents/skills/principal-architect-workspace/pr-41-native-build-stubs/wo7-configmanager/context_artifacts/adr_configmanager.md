@@ -1,0 +1,5 @@
+# ConfigManager Architecture Decision Record
+- **Decision**: Removed `#ifdef NATIVE_BUILD` guards from `ConfigManager.hpp`, `ConfigManager.cpp`, and `ConfigManifest.cpp`.
+- **Reasoning**: The production code now fully trusts the LittleFS interface to handle all filesystem operations. When compiling for `native`, `test/stubs/platform/LittleFS.h` correctly maps hardware paths (e.g., `/mod/dummy.json`) to the host path (e.g., `test/tmp/mod/dummy.json`). This ensures the module code does not leak environment-specific translation logic, adhering to the framework pattern where modules rely on common stubs.
+- **Consequences**: `ConfigManager` testing now successfully leverages standard OS-level filesystem commands without requiring internal `#ifdef`s.
+- **Dependencies Added**: Included `freertos/FreeRTOS.h` and `freertos/timers.h` in `ConfigManager.hpp` for `native` builds. Also updated `test_configManager.cpp` and `test_application.cpp` to correctly provision the subdirectories (`test/tmp/mod`) and match the stub path semantics (`test/tmp/mod/<ns>.json`).
