@@ -11,7 +11,7 @@ by Principal Architects under the ESP32 App Foundation program.
 **Chief Architect Session:** f4e779d9-4aa1-46e2-8115-e1e8edc4fa42
 **Program Plan:** [PROGRAM-PLAN.md](./esp32-app-foundation/PROGRAM-PLAN.md)
 **Chief Architect Distillation:** [context_bridge.md](./esp32-app-foundation/context_bridge.md) — ADRs, rejected approaches, program sequencing decisions
-**Status:** PR-01 through PR-23 delivered — PR-24 active
+**Status:** PR-01 through PR-40 delivered
 
 ---
 
@@ -36,8 +36,9 @@ predate the formal PA pipeline and are filed retrospectively.
 | [pr-00-genesis](./pr-00-genesis/PROJECT.md) | Genesis — Architecture Design & Framework Selection (Retrospective) | ✅ **COMPLETE** | Pre-pipeline |
 | [pr-01-kernel-interfaces](./pr-01-kernel-interfaces/PROJECT.md) | Framework Kernel & Core Interfaces | ✅ **MERGED** `a2b1666` | Session 30aaf023 |
 | [pr-02-kernel-services](./pr-02-kernel-services/PROJECT.md) | Kernel Services (WiFi, Config, Crypto, OTA, Time, Logger) | ✅ **MERGED** — all 6 WOs complete, WiFi HW verified | Session 30aaf023 |
-| [pr-03-data-infra](./esp32-app-foundation/PROGRAM-PLAN.md#pr-03) | Data Infrastructure (DataManager, EventBus, KeyManager) | QUEUED | — |
-| [pr-04-web-portal](./esp32-app-foundation/PROGRAM-PLAN.md#pr-04) | Web Portal (Base SPA + API layer) | QUEUED | — |
+| [pr-03-data-infra](./pr-03-data-infra/PROJECT.md) | Data Infrastructure (DataManager, EventBus, KeyManager) | ✅ **MERGED** — all 3 WOs complete · [distillation](./pr-03-data-infra/context_bridge.md) | Session bf9712b |
+| [pr-04-web-portal](./pr-04-web-portal/PROJECT.md) | Web Portal (Base SPA + API layer) | ✅ **MERGED** — all 4 WOs complete · [distillation](./pr-04-web-portal/context_bridge.md) | Session 0dcf1b8 |
+| [pr-04a-portal-enhancement](./pr-04a-portal-enhancement/PROJECT.md) | Portal Enhancement (WiFi scan UX, system diagnostics, backup/restore, UI polish) | ✅ **MERGED** `63946bb` · [distillation](./pr-04a-portal-enhancement/context_bridge.md) | Session 63946bb |
 | [pr-05-display-module](./pr-05-display-module/PROJECT.md) | U8G2 Display Module (Optional Module Catalog Seed) | ✅ **COMPLETE** | Session 93b19420 |
 | [pr-05a-widget-toolkit](./pr-05a-widget-toolkit/PROJECT.md) | Widget Toolkit (Composable UI for U8G2 displays) | ✅ **COMPLETE** | Session 21161294 |
 | [pr-05b-mcp-server](./pr-05b-mcp-server/PROJECT.md) | MCP Server (JSON-RPC device telemetry + control) | ✅ **COMPLETE** | Session 0ef5f49d |
@@ -46,15 +47,15 @@ predate the formal PA pipeline and are filed retrospectively.
 | [pr-07-template-repo](./pr-07-template-repo/PROJECT.md) | App Template Repository | ✅ **COMPLETE** | Session 60edc6be |
 | [pr-08-mcp-web-transport](./pr-08-mcp-web-transport/PROJECT.md) | MCP HTTP Web Transport | ✅ **COMPLETE** | — |
 | [pr-09-ota-security](./pr-09-ota-security/PROJECT.md) | OTA Security Pipeline (Verifier + Download Engine + Manager Upgrade) | ✅ **COMPLETE** | Session 8f4f1c2a |
-| [pr-10-firmware-optimization](./pr-10-firmware-optimization/PROJECT.md) | Firmware Size Optimization (sdkconfig + compiler + library audit) | 🔄 **WIP** — WO1 queued | Session unknown |
-| [pr-11-config-gateway](./pr-11-config-gateway/PROJECT.md) | ConfigManager-as-Gateway Refactoring (iConfigurable redesign + migration orchestration) | ✅ **WO1 MERGED** `2c0b840` — ready for PR submission | Current Session |
-| [pr-12-state-machine](./pr-12-state-machine/PROJECT.md) | State Machine Redesign (Boot → Configure ↔ Running, regression tolerance, ConfiguringStatusBoard) | 📋 **PLANNING** — 6 WOs defined, awaiting user approval | Current Session |
+| [pr-10-firmware-optimization](./pr-10-firmware-optimization/PROJECT.md) | Firmware Size Optimization (sdkconfig + compiler + library audit) — 1,056KB → 831KB (−21.4%) | ✅ **MERGED** `62caa0b` | Session 62caa0b |
+| [pr-11-config-gateway](./pr-11-config-gateway/PROJECT.md) | ConfigManager-as-Gateway Refactoring (iConfigurable redesign + migration orchestration) | ✅ **MERGED** `2c0b840` | Session 30aaf023 |
+| [pr-12-state-machine](./pr-12-state-machine/PROJECT.md) | State Machine Redesign (Boot → Configure ↔ Running, regression tolerance, ConfiguringStatusBoard) — 14 WOs executed | ✅ **MERGED** — WO1 through WO14 complete | Session multiple |
 | [pr-23-display-tab](./pr-23-display-tab/PROJECT.md) | Module-Owned Display Bottom-Nav Tab (rename "App"→"Display", Settings + Screenshot sub-pills, JS migration, test updates) | ✅ **COMPLETE** — WO1 merged `c1bde82`, 525/525 native + 61/61 Playwright | Session 8ed575fc |
 | [pr-13-test-app](./pr-13-test-app/PROJECT.md) | Foundation Test App (DiagnosticsBoard + Display Lifecycle Fixes) | ✅ **COMPLETE** `c92d3ea` | Session 4cc5a22f |
 | [pr-14-ota-production](./pr-14-ota-production/PROJECT.md) | OTA Production System (SemVer, channels, multi-arch, rollback wiring, config lifecycle, CI/CD) | ✅ **COMPLETE** — 9 WOs merged + OTA boot gate + channel floor model | Session 2fdb967a / [distillation](./pr-14-ota-production/distillation/context_bridge.md) |
 | [pr-15-web-testing](./pr-15-web-testing/PROJECT.md) | Web Portal Testing Infrastructure (Mock Server + Playwright + Build Gate) | ✅ **MERGED** `f03972e` — 48 tests | Session 97274580 |
-| [pr-16-backup-overhaul](./pr-16-backup-overhaul/PROJECT.md) | Backup System Overhaul (Route fix, `_meta` envelope, OTA IConfigurable, streaming response) | 🔄 **WIP** — WO1 in progress | Session f6e289ed |
-| [pr-17-display-refactor](./pr-17-display-refactor/PROJECT.md) | Display Module OO Refactoring (CarouselEngine, BoardCatalog, ScreensaverController, remove Application* coupling) | 📋 **PLANNING** — 5 WOs defined, awaiting user approval | Session 0735b228 |
+| [pr-16-backup-overhaul](./pr-16-backup-overhaul/PROJECT.md) | Backup System Overhaul (Route fix, `_meta` envelope, OTA IConfigurable, streaming response) | ✅ **MERGED** `4d48d36` · [distillation](./pr-16-backup-overhaul/context_bridge.md) | Session f6e289ed |
+| [pr-17-display-refactor](./pr-17-display-refactor/PROJECT.md) | Display Module OO Refactoring (CarouselEngine, BoardCatalog, ScreensaverController, remove Application* coupling) | ✅ **COMPLETE** — WO4 executed (absorbed WO1–3 + WO5 scope), merged to main `3912244` · [distillation](./pr-17-display-refactor/distillation/context_bridge.md) | Session 65275116 |
 | [pr-18-screensaver-settings](./pr-18-screensaver-settings/PROJECT.md) | Screensaver & Display Settings (config expansion, MCP tools, web portal Display tab) | ✅ **COMPLETE** — 3 WOs merged, 60 new tests | Session a1c50fdf |
 | [pr-19-sdkconfig-layering](./pr-19-sdkconfig-layering/PROJECT.md) | sdkconfig Architecture — Base+Delta Layering (fix PSRAM regression, eliminate ~90% duplication, add build guard) | ✅ **COMPLETE** — 2 WOs merged, ready for PR submission | Session 34de947b |
 | [pr-20-config-refactor](./pr-20-config-refactor/PROJECT.md) | FrameworkConfig Refactor + appconfig.js Clarity (5 runtime defaults → module `resetConfig()`; FrameworkConfig = 3 OTA secrets) | ✅ **COMPLETE & VERIFIED** — 3 WOs done (native 525/525 + esp32 build green); stack pushed `wo1→wo2a→wo2b`, main not pushed, no PRs (user holding) · [distillation](./pr-20-config-refactor/context_bridge.md) | Current Session |
@@ -66,17 +67,18 @@ predate the formal PA pipeline and are filed retrospectively.
 | [pr-28-compliance-safety](./pr-28-compliance-safety/PROJECT.md) | Compliance Safety Quick-Wins + Architecture Review Follow-Up (bare new→nothrow, TWDT, task DRAM caps, TAG constexpr, facade, std::function elimination, String→std::string, ADR-39, WiFiClientSecure heap alloc, embedded safety) | ✅ **MERGED** `7c623f7` — 11 WOs complete, 562 tests passing, v0.0.10-dev.8 on device | Session bd5ee383 |
 | [pr-27-security-mcp-docs](./pr-27-security-mcp-docs/PROJECT.md) | Security & MCP Server Developer Documentation (security.md, mcp-server.md, README index update) | ✅ **MERGED** `c1b6391` — security.md (338 lines) + mcp-server.md (283 lines) | Session 5ad94103 |
 | [pr-29-tls-optimization](./pr-29-tls-optimization/PROJECT.md) | TLS Memory Optimization (cert bundle fix, AP scan fix, volatile race, OTA CA pinning, docs) | ✅ **MERGED** `aec9808` — v0.0.11-dev.7 verified on device · [distillation](./pr-29-tls-optimization/distillation/context_bridge.md) | Session 07cb3857 / d5f9f607 |
-| [pr-30-attribution-cleanup](./pr-30-attribution-cleanup/PROJECT.md) | Attribution Cleanup & Provenance Remediation (remove departures-board refs, rewrite MD5Utils base64ToHex with mbedtls, fix Gadec copyright) | ✅ **COMPLETE** | Session 87bf8a4b |
+| [pr-30-attribution-cleanup](./pr-30-attribution-cleanup/PROJECT.md) | Attribution Cleanup & Provenance Remediation (remove departures-board refs, rewrite MD5Utils base64ToHex with mbedtls, fix Gadec copyright) | ✅ **MERGED** `5cde008` | Session 87bf8a4b |
 | [pr-31-docs-cleanup](./pr-31-docs-cleanup/PROJECT.md) | Legacy Docs Cleanup (archive 3 reports, merge & retire build guide, fix stale MCP API, add PAT + TLS optimization sections, update indexes) | ✅ **MERGED** `640eb4f` — 9 files, +234/-521 | Session 5ad94103 |
 | [pr-32-ota-docs-deeplinks](./pr-32-ota-docs-deeplinks/PROJECT.md) | OTA Guide Migration + Design Spec Deep Links (OTA→developer tree, skill OTA system tree, 64 deep links in design spec) | ✅ **MERGED** `5deb8c5` — 3 WOs, OTA migrated, 64 deep links · [distillation](./pr-32-ota-docs-deeplinks/distillation/context_bridge.md) | Session 5ad94103 |
-| [pr-33-portal-ux-consistency](./pr-33-portal-ux-consistency/PROJECT.md) | Web Portal UX Consistency — Reboot Overlays & Save Policies (universal reboot overlay component, reconnection polling, context-aware messages, save policy formalisation, Playwright tests) | 📋 **PLANNING** — 3 WOs defined, awaiting user approval | Current Session |
-| [pr-34-mcp-tools](./pr-34-mcp-tools/PROJECT.md) | Module-Specific MCP Tools (domain-specific JSON-RPC tools for Wifi, OTA, Display, Config) | ✅ **COMPLETE** — 8 new tools, hardware-verified `v0.0.11-dev.15`, [distilled](./pr-34-mcp-tools/context_bridge.md) | 2026-06-20 |
-| [pr-35-weather-station](./pr-35-weather-station/PROJECT.md) | Weather Station & Home Assistant Module (esp-mqtt wrapper, HOM entities, Web Portal, U8G2 composable widgets) | 📋 **PLANNING** — 5 WOs defined (WO0–WO4), ready for execution workers | Current Session |
-| [pr-36-manifest-first-ota](./pr-36-manifest-first-ota/PROJECT.md) | Manifest-First OTA Architecture (signed manifest, multi-channel, absolute URLs, URL resilience, GithubClient removal) | 🔄 **WIP** — 6 WOs merged on branch, integration testing blocked by private-repo auth · [floating-tags distillation](./pr-36-manifest-first-ota/distillation-floating-tags/context_bridge.md) · [integration-testing distillation](./pr-36-manifest-first-ota/distillation-integration-testing/context_bridge.md) | Session d5f9f607 |
-| [pr-37-split-repo-ota](./pr-37-split-repo-ota/PROJECT.md) | Split-Repo OTA with Git-Managed Manifest (public releases repo, delete GithubClient, migrate CA certs, eliminate PAT, git-managed manifest) | ✅ **COMPLETE** — 3 WOs merged, OTA verified dev.7→dev.8→dev.9, `manifest-latest` deleted · [distillation](./pr-37-split-repo-ota/context_bridge.md) | Session cd0abc58 |
-| [pr-38-portal-remediation](./pr-38-portal-remediation/PROJECT.md) | Portal UX Remediation (PR-35 deep review P1–P12: CSS/JS fixes, information depth, branding/icons) | 🔄 **WIP** — WO1 in progress | Current Session |
+| [pr-33-portal-ux-consistency](./pr-33-portal-ux-consistency/PROJECT.md) | Web Portal UX Consistency — Reboot Overlays & Save Policies (universal reboot overlay component, reconnection polling, context-aware messages, save policy formalisation, Playwright tests) | ✅ **MERGED** `e52aa0f` | Session e52aa0f |
+| [pr-34-mcp-tools](./pr-34-mcp-tools/PROJECT.md) | Module-Specific MCP Tools (domain-specific JSON-RPC tools for Wifi, OTA, Display, Config) | ✅ **MERGED** — 8 new tools, hardware-verified `v0.0.11-dev.15` · [distillation](./pr-34-mcp-tools/context_bridge.md) | 2026-06-20 |
+| [pr-35-weather-station](./pr-35-weather-station/PROJECT.md) | Weather Station & Home Assistant Module (esp-mqtt wrapper, HOM entities, Web Portal, U8G2 composable widgets, RAII thread safety) | ✅ **MERGED** `b928225` — WO0–WO4 complete, device verified `v0.0.12-dev.25` | Session d5f9f607 |
+| [pr-36-manifest-first-ota](./pr-36-manifest-first-ota/PROJECT.md) | Manifest-First OTA Architecture (signed manifest, multi-channel, absolute URLs, URL resilience, GithubClient removal) | ✅ **COMPLETE** — 6 WOs on branch; continued as PR-37 (split-repo approach) · [floating-tags distillation](./pr-36-manifest-first-ota/distillation-floating-tags/context_bridge.md) · [integration-testing distillation](./pr-36-manifest-first-ota/distillation-integration-testing/context_bridge.md) | Session d5f9f607 |
+| [pr-37-split-repo-ota](./pr-37-split-repo-ota/PROJECT.md) | Split-Repo OTA with Git-Managed Manifest — continuation of PR-36 (public releases repo, delete GithubClient, migrate CA certs, eliminate PAT, git-managed manifest) | ✅ **MERGED** `6c4ea7d` — 3 WOs merged, OTA verified dev.7→dev.8→dev.9, `manifest-latest` deleted · [distillation](./pr-37-split-repo-ota/context_bridge.md) | Session cd0abc58 |
+| [pr-38-portal-remediation](./pr-38-portal-remediation/PROJECT.md) | Portal UX Remediation (PR-35 deep review: CSS/JS fixes, information depth, branding/icons, C++ hardening, skill gap docs) | ✅ **COMPLETE** — 5 WOs done · [distillation](./pr-38-portal-remediation/context_bridge.md) | Session 67356e63 |
 | [pr-39-sample-app-remediation](./pr-39-sample-app-remediation/PROJECT.md) | Sample App Remediation (24 fix items: include discipline, house style, EventBus demo, real tests, README, runtime crash fixes) | ✅ **MERGED** `6676c34` — 15/15 tests, device verified | Session 9d8dc741 |
 | [pr-40-docs-excellence](./pr-40-docs-excellence/PROJECT.md) | Documentation Excellence — 10/10 Compliance (template-app rename+Doxygen, sample-app full Doxygen+interface-grouped+functional fixes, HomeAssistant+publicKey docs, lib header attribution, module path casing, String stub consolidation, OTA naming) | ✅ **COMPLETE** — 7 WOs merged, 37/37 files compliant, 590/590 tests · [distillation](./pr-40-docs-excellence/context_bridge.md) | Session 463e0a3c |
+| [pr-41-native-build-stubs](./pr-41-native-build-stubs/PROJECT.md) | Eliminate Inline NATIVE_BUILD Guards — Stub Header Architecture (replace 283 preprocessor guards across 45+ files with stub header library in `test/stubs/platform/`) | ⬜ **NOT STARTED** — 17 WOs planned | Session 2cb65aa9 |
 
 ---
 
@@ -95,12 +97,8 @@ predate the formal PA pipeline and are filed retrospectively.
 | OTA Manifest URL Bug | 2026-06-23 | "No manifest URL configured" root cause (dirty-tree build layout corruption), latent `_silentCheck` gap + redundant URL guard in `performUpdateTask` | ⚠️ **LATENT DEFECTS** — root cause resolved, 2 code fixes pending | [adhoc-ota-manifest-url-bug/](./adhoc-ota-manifest-url-bug/context_bridge.md) |
 | OTA Upload Fix | 2026-06-19 | PsychicHTTP multipart filename matching + upload verification lifecycle | ✅ **COMPLETE** | [adhoc-ota-upload-fix/](./adhoc-ota-upload-fix/context_bridge.md) |
 | Sub-App Pipeline Alignment | 2026-06-30 | `merge_framework_data.py`, portalBuilder addition, OTA repo separation, esp32s3nano for template-app | ✅ **COMPLETE** — `78654f6`, `ff38bff` | [adhoc-sub-app-pipeline/](./adhoc-sub-app-pipeline/context_bridge.md) |
-
----
-
-## TimeManager Upgrade
-
-- [TimeManager Upgrade Port](./pr-time-manager-upgrade/PROJECT.md)
+| TimeManager Upgrade | 2026-06-02 | Surgical PascalCase port bypassing case-insensitive git merge conflicts | ✅ **MERGED & FLASHED** | [pr-time-manager-upgrade/](./pr-time-manager-upgrade/context_bridge.md) |
+| Framework-Expert Skill Restructure | 2026-06-15 | 13-WO restructure of the `framework-expert` skill — 8 domains, security section, compliance audit guide (part of PR-25) | ✅ **MERGED** `e3388d1` | [skill-framework-expert-restructure/](./skill-framework-expert-restructure/PROJECT.md) |
 
 
 ---
@@ -140,22 +138,26 @@ scanning the entire Projects Registry chronologically.
 | [pr-05](./pr-05-display-module/PROJECT.md) | U8G2 module, carousel engine, board slot pool, system boards | PROJECT.md |
 | [pr-05a](./pr-05a-widget-toolkit/PROJECT.md) | Composable widget system — iGfxWidget, drawingPrimitives, U8g2StateSaver | PROJECT.md |
 | [pr-13](./pr-13-test-app/PROJECT.md) | DiagnosticsBoard + display lifecycle fixes | PROJECT.md |
-| [pr-17](./pr-17-display-refactor/PROJECT.md) | CarouselEngine, BoardCatalog, ScreensaverController, remove Application* coupling | PROJECT.md |
+| [pr-17](./pr-17-display-refactor/PROJECT.md) | CarouselEngine, BoardCatalog, ScreensaverController, remove Application* coupling | [distillation](./pr-17-display-refactor/distillation/context_bridge.md) |
 | [pr-18](./pr-18-screensaver-settings/PROJECT.md) | Screensaver config, MCP tools, web portal Display tab | PROJECT.md |
 | [pr-23](./pr-23-display-tab/PROJECT.md) | Module-owned Display bottom-nav tab, Settings + Screenshot sub-pills | PROJECT.md |
+| [pr-35](./pr-35-weather-station/PROJECT.md) | WeatherBoard, StatusBoard updates, composable widgets | PROJECT.md |
 | [adhoc-screensaver-twdt](./adhoc-screensaver-twdt/context_bridge.md) | TWDT crash at 313 s — `vTaskDelay` fix, `setPowerSave(1)`, `localtime_r` thread safety | context_bridge |
 
 ### Web Portal
 
 | Project | Scope | Key Artefacts |
 |---|---|---|
-| [pr-04](./esp32-app-foundation/PROGRAM-PLAN.md#pr-04) | Base SPA + API layer (ESPAsyncWebServer + REST) | PROGRAM-PLAN §PR-04 |
+| [pr-04](./pr-04-web-portal/PROJECT.md) | Base SPA + API layer (PsychicHTTP + REST) | [distillation](./pr-04-web-portal/context_bridge.md) |
+| [pr-04a](./pr-04a-portal-enhancement/PROJECT.md) | WiFi scan UX, system diagnostics, backup/restore, UI polish | [distillation](./pr-04a-portal-enhancement/context_bridge.md) |
 | [pr-08](./pr-08-mcp-web-transport/PROJECT.md) | MCP HTTP web transport | PROJECT.md |
 | [pr-15](./pr-15-web-testing/PROJECT.md) | Mock server + Playwright + build gate | PROJECT.md |
-| [pr-16](./pr-16-backup-overhaul/PROJECT.md) | Backup route fix, `_meta` envelope, streaming response | PROJECT.md |
+| [pr-16](./pr-16-backup-overhaul/PROJECT.md) | Backup route fix, `_meta` envelope, streaming response | [distillation](./pr-16-backup-overhaul/context_bridge.md) |
 | [pr-22](./pr-22-portal-ui-consistency/PROJECT.md) | Screensaver toggle fix, Advanced drawer standardisation | [distillation](./pr-22-portal-ui-consistency/context_bridge.md) |
 | [pr-23](./pr-23-display-tab/PROJECT.md) | Display tab JS migration, Settings + Screenshot sub-pills | PROJECT.md |
 | [pr-24](./pr-24-portal-mcp-auth/PROJECT.md) | AuthManager, session cookie, Security top-level tab | [distillation](./pr-24-portal-mcp-auth/context_bridge.md) |
+| [pr-33](./pr-33-portal-ux-consistency/PROJECT.md) | Reboot overlays, save-policy toasts, backup confirmation gate | PROJECT.md |
+| [pr-38](./pr-38-portal-remediation/PROJECT.md) | Portal UX remediation — CSS/JS fixes, information depth, branding | [distillation](./pr-38-portal-remediation/context_bridge.md) |
 | [adhoc-app-tab-rules-bug](./adhoc-app-tab-rules-bug/context_bridge.md) | App tab config wiring (clock font size) | context_bridge |
 
 ### Config System
@@ -198,8 +200,9 @@ scanning the entire Projects Registry chronologically.
 | [pr-00 genesis](./pr-00-genesis/PROJECT.md) | 17 ADRs, design spec, rejected approaches | [WO1 bridge](./pr-00-genesis/wo1-architecture-design/context_bridge.md), [WO2 bridge](./pr-00-genesis/wo2-framework-selection/context_bridge.md) |
 | [pr-01](./pr-01-kernel-interfaces/PROJECT.md) | Application hub, two-tier vector, interfaces | PROJECT.md |
 | [pr-12](./pr-12-state-machine/PROJECT.md) | Boot → Configure ↔ Running, ConfiguringStatusBoard | PROJECT.md |
-| [pr-17](./pr-17-display-refactor/PROJECT.md) | CarouselEngine OO refactoring, remove Application* coupling | PROJECT.md |
+| [pr-17](./pr-17-display-refactor/PROJECT.md) | CarouselEngine OO refactoring, remove Application* coupling | [distillation](./pr-17-display-refactor/distillation/context_bridge.md) |
 | [pr-25](./pr-25-framework-docs-skill/PROJECT.md) | Extensibility refinements, registerModule, ITickable signature | PROJECT.md |
+| [pr-28](./pr-28-compliance-safety/PROJECT.md) | `std::function` elimination, `String→std::string` migration, ADR-39 | PROJECT.md |
 | [adhoc-oo-expert-review](./adhoc-oo-expert-review/context_bridge.md) | OO architecture review, ConfigManager locked-vector, compliance scorecard | context_bridge |
 | [Chief Architect](./esp32-app-foundation/context_bridge.md) | Program-level ADRs, sequencing decisions | [ADRs](./esp32-app-foundation/context_artifacts/adr_program_decisions.md), [Graveyard](./esp32-app-foundation/context_artifacts/graveyard_rejected_approaches.md) |
 
@@ -228,6 +231,8 @@ scanning the entire Projects Registry chronologically.
 | [pr-05c](./pr-05c-test-hardening/PROJECT.md) | Coverage expansion across all modules | PROJECT.md |
 | [pr-13](./pr-13-test-app/PROJECT.md) | Foundation test app, DiagnosticsBoard | PROJECT.md |
 | [pr-15](./pr-15-web-testing/PROJECT.md) | Mock server + Playwright + build gate | PROJECT.md |
+| [pr-39](./pr-39-sample-app-remediation/PROJECT.md) | Sample app remediation — EventBus demo, real tests, 15/15 passing | PROJECT.md |
+| [pr-40](./pr-40-docs-excellence/PROJECT.md) | 590/590 test compliance verification across all modules | [distillation](./pr-40-docs-excellence/context_bridge.md) |
 
 ### WiFi & Networking
 
@@ -242,7 +247,7 @@ scanning the entire Projects Registry chronologically.
 | Project | Scope | Key Artefacts |
 |---|---|---|
 | pr-02 WO1/WO3 | deviceCrypto (AES-256, MAC key derivation) + keyManager (encrypted registry) | [PROGRAM-PLAN §PR-02](./esp32-app-foundation/PROGRAM-PLAN.md#pr-02) |
-| [pr-03](./esp32-app-foundation/PROGRAM-PLAN.md#pr-03) | KeyManager as part of Data Infrastructure | PROGRAM-PLAN §PR-03 |
+| [pr-03](./pr-03-data-infra/PROJECT.md) | KeyManager as part of Data Infrastructure | [distillation](./pr-03-data-infra/context_bridge.md) |
 
 ### Documentation & Developer Experience
 
@@ -251,12 +256,21 @@ scanning the entire Projects Registry chronologically.
 | [pr-07](./pr-07-template-repo/PROJECT.md) | App template repository | PROJECT.md |
 | [pr-25](./pr-25-framework-docs-skill/PROJECT.md) | 51-file skill + 12 human docs + compliance audit guide | PROJECT.md |
 | [pr-27](./pr-27-security-mcp-docs/PROJECT.md) | `security.md` (338 lines) + `mcp-server.md` (283 lines) | PROJECT.md |
+| [pr-31](./pr-31-docs-cleanup/PROJECT.md) | Legacy docs cleanup — archive reports, retire build guide, fix stale APIs | PROJECT.md |
+| [pr-32](./pr-32-ota-docs-deeplinks/PROJECT.md) | OTA guide migration + design spec deep links (64 links) | [distillation](./pr-32-ota-docs-deeplinks/distillation/context_bridge.md) |
 | [pr-34](./pr-34-mcp-tools/PROJECT.md) | `device-mcp-client` skill rewrite + `framework-expert` MCP system docs | [distillation](./pr-34-mcp-tools/context_bridge.md) |
 | [adhoc-ota-docs-hotfix](./adhoc-ota-docs-hotfix/context_bridge.md) | `build_and_release_process.md` | context_bridge |
 | [pr-39](./pr-39-sample-app-remediation/PROJECT.md) | Sample app remediation — build parity, includes, EventBus, house style, tests | PROJECT.md |
-| [pr-40](./pr-40-docs-excellence/PROJECT.md) | Documentation Excellence — 10/10 compliance across template-app, sample-app, framework modules | PROJECT.md |
+| [pr-40](./pr-40-docs-excellence/PROJECT.md) | Documentation Excellence — 10/10 compliance across template-app, sample-app, framework modules | [distillation](./pr-40-docs-excellence/context_bridge.md) |
+
+### Home Assistant & Weather
+
+| Project | Scope | Key Artefacts |
+|---|---|---|
+| [pr-35](./pr-35-weather-station/PROJECT.md) | Weather Station module, esp-mqtt wrapper, HomeAssistant module, HA entities, Web Portal weather tab, RAII thread safety | PROJECT.md |
+| [pr-38](./pr-38-portal-remediation/PROJECT.md) | HA metadata ADR, RAII mutex ADR (from PR-35 review) | [distillation](./pr-38-portal-remediation/context_bridge.md) |
 
 ---
 
-*Updated: 2026-06-30 — Migrated all `context_archives/` into PA workspace (4 distillations → pr-36 + 2 adhoc); added sub-app pipeline alignment*
+*Updated: 2026-06-30 — Full audit: corrected 12 stale statuses (PR-03/04/10/11/12/16/17/30/33/35/36/38), added PR-04a + TimeManager + skill-restructure, refreshed subsystem index, added Home Assistant & Weather subsystem*
 
