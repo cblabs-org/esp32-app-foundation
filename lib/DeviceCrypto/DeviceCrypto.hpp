@@ -20,12 +20,7 @@
 #ifndef DEVICE_CRYPTO_HPP
 #define DEVICE_CRYPTO_HPP
 
-#ifndef NATIVE_BUILD
 #include <Arduino.h>
-#else
-#include <stdint.h>
-#include <stddef.h>
-#endif
 #include <memory>
 
 /**

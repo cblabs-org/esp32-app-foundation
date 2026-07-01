@@ -16,25 +16,18 @@
 
 static constexpr const char* TAG = "DeviceCrypto";
 
-#ifndef NATIVE_BUILD
 #include <Preferences.h>
 #include <mbedtls/aes.h>
 #include <mbedtls/base64.h>
 #include <mbedtls/md.h>
 #include <esp_random.h>
 #include <esp_mac.h>
-#else
-// Mock includes for native testing
-#include <stdlib.h>
-#include <time.h>
-#endif
 
 /**
  * @brief Mounts the NVS partition to extract the master encryption key.
  *        If no key is configured, uses hardware MAC key derivation to generate and save one.
  */
 void DeviceCrypto::begin() {
-#ifndef NATIVE_BUILD
     // --- Step 1: Open Secure Persistence ---
     Preferences prefs;
     prefs.begin("secrets", false);
@@ -64,14 +57,6 @@ void DeviceCrypto::begin() {
         LOG_SECURE("CRYPTO", "Mounted existing persistent AES Master Key.");
     }
     prefs.end();
-#else
-    // Mock implementation for native testing
-    srand(time(NULL));
-    for (int i = 0; i < 32; i++) {
-        aesKey[i] = (uint8_t)(rand() % 256);
-    }
-    LOG_SECURE("CRYPTO", "[MOCK] Generated new 256-bit AES Hardware Key.");
-#endif
     keyLoaded = true;
 }
 
@@ -124,7 +109,6 @@ std::unique_ptr<char[]> DeviceCrypto::encrypt(const char* plaintext, size_t inpu
 
     LOG_SECURE("CRYPTO", "Executing AES-256-CBC Encryption. Plaintext payload size: %u bytes", (unsigned)inputLen);
 
-#ifndef NATIVE_BUILD
     size_t paddedLen = inputLen + (16 - (inputLen % 16));
     size_t totalLen = 16 + paddedLen;
     uint8_t* buffer = (uint8_t*)malloc(totalLen);
@@ -179,19 +163,6 @@ std::unique_ptr<char[]> DeviceCrypto::encrypt(const char* plaintext, size_t inpu
     
     free(buffer);
     return result;
-#else
-    // Mock implementation returning dummy Base64 string for native testing
-    const char* mockResult = "TW9ja0VuY3J5cHRlZEJhc2U2NA==";
-    size_t mockLen = strlen(mockResult);
-    char* b64Buffer = new (std::nothrow) char[mockLen + 1];
-    if (b64Buffer) {
-        strcpy(b64Buffer, mockResult);
-        if (outLen) *outLen = mockLen;
-        return std::unique_ptr<char[]>(b64Buffer);
-    }
-    if (outLen) *outLen = 0;
-    return std::unique_ptr<char[]>();
-#endif
 }
 
 /**
@@ -210,7 +181,6 @@ std::unique_ptr<char[]> DeviceCrypto::decrypt(const char* ciphertext, size_t inp
     
     LOG_SECURE("CRYPTO", "Decoding inbound Base64 Ciphertext. Payload size: %u bytes", (unsigned)inputLen);
 
-#ifndef NATIVE_BUILD
     size_t decOutLen = 0;
     mbedtls_base64_decode(nullptr, 0, &decOutLen, (const unsigned char*)ciphertext, inputLen);
     
@@ -274,17 +244,4 @@ std::unique_ptr<char[]> DeviceCrypto::decrypt(const char* ciphertext, size_t inp
     
     free(buffer);
     return result;
-#else
-    // Mock implementation returning dummy plaintext string for native testing
-    const char* mockResult = "MockDecryptedString";
-    size_t mockLen = strlen(mockResult);
-    char* plaintextBuf = new (std::nothrow) char[mockLen + 1];
-    if (plaintextBuf) {
-        strcpy(plaintextBuf, mockResult);
-        if (outLen) *outLen = mockLen;
-        return std::unique_ptr<char[]>(plaintextBuf);
-    }
-    if (outLen) *outLen = 0;
-    return std::unique_ptr<char[]>();
-#endif
 }

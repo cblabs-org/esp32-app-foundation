@@ -21,6 +21,12 @@ public:
         }
         return 0;
     }
+    size_t getBytesLength(const char* key) {
+        if (_map.find(key) != _map.end()) {
+            return _map[key].size();
+        }
+        return 0;
+    }
     size_t putString(const char* key, const char* value) {
         return putBytes(key, value, strlen(value) + 1);
     }
