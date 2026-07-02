@@ -12,6 +12,9 @@ description: >
   heap/PSRAM, TLS memory, flash size); and security (DeviceCrypto, KeyManager,
   AuthManager, JWT, setInsecure, certificate bundles/esp_crt_bundle/DEFAULT_NONE,
   PAT/OTA tokens, otaManifestUrl, SECURITY_VERSION/anti-rollback, inject_version).
+  Also handles bootstrapping a new project from scratch: blank folder, clone the
+  framework, scaffold new app, new ESP32 project, start from scratch, set up the
+  framework, I don't have the repo yet, bootstrap.
   Trigger when extending the framework or reviewing code against its interfaces,
   patterns, performance, or safety rules.
 ---
@@ -62,6 +65,7 @@ This skill uses a progressive disclosure model. Based on your query, load and re
 
 | Topic | Read |
 |---|---|
+| **Bootstrap** (blank folder → first build) | `guides/bootstrap.md` |
 | **App Developer Quickstart** (Building a new IoT app) | `guides/app-developer-quickstart.md` |
 | **Module Developer Guide** (Adding a kernel module) | `guides/module-developer-guide.md` |
 | **Compliance Audit** (Systematic codebase review against all principles) | `guides/compliance-audit.md` |
@@ -100,6 +104,10 @@ These references are optimized distillations for AI agents. If the human develop
   "registerModule", "build an app on the foundation", "weather station",
   "sensor dashboard", "IoT device", "why does registration fail after begin",
   "is it safe to allocate in tick".
+- **Bootstrap / new project setup**: "blank folder", "start from scratch",
+  "new ESP32 project", "clone the framework", "scaffold", "bootstrap",
+  "I don't have the repo yet", "set up a new app", "set up the framework",
+  "generate starter code", "initialise project".
 - **Interfaces**: "ITickable", "IConfigurable", "IWebContributor", "IMCPContributor",
   "IOTAVerifier", "IConfigGate", "IDataSource", "IStatusReporter", "IDisplayBoard".
 - **Core systems**: "EventBus", "ConfigManager", "FrameworkConfig", "config system",
