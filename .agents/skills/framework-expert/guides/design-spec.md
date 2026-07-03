@@ -176,19 +176,27 @@ Review the loaded content against the Concept Summary and identify any
 > - [e.g.] You mentioned API keys — these need to go through IConfigurable +
 >   DeviceCrypto, not hardcoded in source."
 
-Resolve conflicts conversationally before proceeding to Phase 4.
+Resolve conflicts conversationally before proceeding to Phase 4. If a conflict
+cannot be resolved at design time (e.g. a hardware or schedule constraint the
+user cannot work around right now), do not block — note it as a **high-priority
+item in Section 12 (Open Questions)** and continue to spec generation.
 
 ---
 
 ## Phase 4 — Spec Generation
 
-Create `docs/design-spec.md` in the project root (create the `docs/` directory
-if it does not exist). If a `docs/design-spec.md` already exists, offer to
-update it rather than replace it.
+Create `docs/design-spec.md` in the project root. If the directory does not
+exist yet, create it first:
+```bash
+mkdir -p docs/
+```
+If a `docs/design-spec.md` already exists, offer to update it rather than
+replace it.
 
-Write the document using the structure below. Every section should be
-substantive — populated with real content from the conversation and the loaded
-references, not placeholder text.
+Write the following as **plain markdown** directly to `docs/design-spec.md`.
+Do not wrap it in a code block or add any preamble — the file should start
+at `# <AppName>`. Every section should be substantive — populated with real
+content from the conversation and the loaded references, not placeholder text.
 
 ---
 
@@ -263,10 +271,19 @@ the developer must observe (tick budget, static scope, thread safety rules).>
 <Rationale + board name + what it renders>
 
 ### IConfigGate _(if selected)_
-<Rationale + what it blocks on>
+<Rationale + what it blocks on + how the gate resolves>
 
 ### IOTAVerifier _(if selected)_
-<Rationale + signing scheme>
+<Rationale + signing scheme + what the verifier checks>
+
+### IMCPContributor _(if selected)_
+<Rationale + what JSON-RPC tools it registers + tool naming conventions>
+
+### IStatusReporter _(if selected)_
+<Rationale + what boot-phase status messages it reports + error conditions it signals>
+
+> **Add a section for any other interface selected in Section 4 that is not
+> listed above.**
 
 ---
 

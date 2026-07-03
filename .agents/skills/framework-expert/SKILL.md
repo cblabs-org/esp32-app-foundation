@@ -1,25 +1,24 @@
 ---
 name: framework-expert
 description: >
-  Building apps, creating modules, extending, and auditing code on the ESP32 App
-  Foundation framework. Covers module interfaces (registerModule, AppFoundation.h,
-  ITickable, IConfigurable, IWebContributor, IMCPContributor, IConfigGate,
-  IDataSource, IDisplayBoard, IOTAVerifier); core systems (EventBus, ConfigManager,
-  FrameworkConfig, LittleFS, web portal, display carousel, OTA verification, MCP
-  server/device tools); coding patterns (Service Module Pattern, hierarchical object
-  model, orchestrator anti-pattern, Domain Meaning Test, SOLID); embedded
-  safety/performance (thread safety, std::function, std::nothrow, TWDT/watchdog,
-  heap/PSRAM, TLS memory, flash size); and security (DeviceCrypto, KeyManager,
-  AuthManager, JWT, setInsecure, certificate bundles/esp_crt_bundle/DEFAULT_NONE,
-  PAT/OTA tokens, otaManifestUrl, SECURITY_VERSION/anti-rollback, inject_version).
-  Also handles bootstrapping a new project from scratch: blank folder, clone the
-  framework, scaffold new app, new ESP32 project, start from scratch, set up the
-  framework, I don't have the repo yet, bootstrap.
-  Also handles guided application design: design specification, design spec,
-  application design, help me design, create a design doc, spec out my project,
-  design before coding, application architecture document.
-  Trigger when extending the framework or reviewing code against its interfaces,
-  patterns, performance, or safety rules.
+  Expert assistant for the ESP32 App Foundation firmware framework. Use this
+  skill for ANY of these scenarios — even when the user doesn't say "framework"
+  explicitly: (1) Starting from scratch — blank folder, new ESP32 project,
+  clone the framework, bootstrap, scaffold a new app, I don't have the repo yet,
+  set up the framework, generate starter code. (2) Designing an app — design
+  specification, design spec, application design, help me design my app, create
+  a design doc, spec out my project, design before coding, application
+  architecture document. (3) Building and extending — registerModule,
+  AppFoundation.h, ITickable, IConfigurable, IWebContributor, IMCPContributor,
+  IConfigGate, IDataSource, IDisplayBoard, IOTAVerifier, EventBus, ConfigManager,
+  LittleFS, web portal, display carousel, OTA verification, MCP server/device
+  tools. (4) Patterns and safety — Service Module Pattern, orchestrator
+  anti-pattern, Domain Meaning Test, SOLID, thread safety, std::function, TWDT,
+  watchdog, heap, PSRAM, TLS memory, flash size. (5) Security — DeviceCrypto,
+  KeyManager, AuthManager, JWT, setInsecure, certificate bundles, esp_crt_bundle,
+  DEFAULT_NONE, PAT, OTA tokens, SECURITY_VERSION, anti-rollback, inject_version.
+  Trigger whenever context includes ESP32, IoT firmware, sensor dashboard,
+  embedded C++, or AppFoundation — even if those exact words aren't used.
 ---
 
 # Framework Expert

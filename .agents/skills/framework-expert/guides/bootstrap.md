@@ -302,6 +302,12 @@ name and look up `<pio_board_id>` from the PlatformIO registry.
 > `framework/platformio.ini`. If no display, omit the U8g2 lib_dep and the
 > display flags.
 
+> **`inject_version.py` path note:** The script reads git tags via `git describe`,
+> which traverses up the directory tree correctly from any subdirectory. It should
+> work when invoked from the project root. If the first build fails with a script
+> error, inspect `framework/scripts/inject_version.py` for any `__file__`-relative
+> path assumptions and adjust accordingly.
+
 ---
 
 ### File 2 — `src/main.cpp`
@@ -445,10 +451,13 @@ After displaying the handoff message above, append this soft invitation:
 ```
 💡 Want to think through your application design before writing code?
    Say "help me design my app" and I'll guide you through a structured
-   design session — exploring your use case, surfacing ESP32 constraints,
-   and producing a design spec saved to docs/design-spec.md.
-   (Takes about 10–15 minutes and can save a lot of rework later.
-   Easy to skip if you'd rather dive straight in.)
+   design session — exploring your app's purpose, users, and data flow in
+   depth, then surfacing ESP32 constraints and producing a design spec
+   saved to docs/design-spec.md.
+   (This is different from the questions above: elucidation picked your
+   interfaces; the design session explores your concept and why it exists.)
+   Takes about 10–15 minutes and can save a lot of rework later.
+   Easy to skip if you'd rather dive straight in.
 ```
 
 ---
