@@ -438,6 +438,21 @@ Next steps:
 
 ---
 
+### Design spec invitation
+
+After displaying the handoff message above, append this soft invitation:
+
+```
+💡 Want to think through your application design before writing code?
+   Say "help me design my app" and I'll guide you through a structured
+   design session — exploring your use case, surfacing ESP32 constraints,
+   and producing a design spec saved to docs/design-spec.md.
+   (Takes about 10–15 minutes and can save a lot of rework later.
+   Easy to skip if you'd rather dive straight in.)
+```
+
+---
+
 ## Known Boards Registry
 
 This table is the canonical source for the elucidation board question. Add

@@ -15,6 +15,9 @@ description: >
   Also handles bootstrapping a new project from scratch: blank folder, clone the
   framework, scaffold new app, new ESP32 project, start from scratch, set up the
   framework, I don't have the repo yet, bootstrap.
+  Also handles guided application design: design specification, design spec,
+  application design, help me design, create a design doc, spec out my project,
+  design before coding, application architecture document.
   Trigger when extending the framework or reviewing code against its interfaces,
   patterns, performance, or safety rules.
 ---
@@ -66,6 +69,7 @@ This skill uses a progressive disclosure model. Based on your query, load and re
 | Topic | Read |
 |---|---|
 | **Bootstrap** (blank folder → first build) | `guides/bootstrap.md` |
+| **Design Spec** (guided app design → `docs/design-spec.md`) | `guides/design-spec.md` |
 | **App Developer Quickstart** (Building a new IoT app) | `guides/app-developer-quickstart.md` |
 | **Module Developer Guide** (Adding a kernel module) | `guides/module-developer-guide.md` |
 | **Compliance Audit** (Systematic codebase review against all principles) | `guides/compliance-audit.md` |
@@ -108,6 +112,11 @@ These references are optimized distillations for AI agents. If the human develop
   "new ESP32 project", "clone the framework", "scaffold", "bootstrap",
   "I don't have the repo yet", "set up a new app", "set up the framework",
   "generate starter code", "initialise project".
+- **Design specification**: "design spec", "design specification",
+  "application design", "help me design my app", "create a design doc",
+  "spec out my project", "architecture document", "design before coding",
+  "what should my app look like", "help me think through my app",
+  "application architecture", "design session".
 - **Interfaces**: "ITickable", "IConfigurable", "IWebContributor", "IMCPContributor",
   "IOTAVerifier", "IConfigGate", "IDataSource", "IStatusReporter", "IDisplayBoard".
 - **Core systems**: "EventBus", "ConfigManager", "FrameworkConfig", "config system",

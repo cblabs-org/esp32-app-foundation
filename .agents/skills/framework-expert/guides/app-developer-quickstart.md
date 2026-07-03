@@ -150,3 +150,16 @@ Once your prototype is working, review these deep dives before shipping:
 - **[Performance & Optimization](../performance/overview.md)**: Ensure your app fits within the constrained ESP32 heap.
 - **[Replacing the Display](../systems/display/replacing-the-display.md)**: Using TFTs or e-ink instead of OLED.
 - **[Coding Patterns & Style Guide](../coding-patterns/overview.md)**: Ensure your app structure aligns with the framework's house style.
+
+## Want a Structured Design Spec?
+
+If you'd like to document your application design before locking in your
+implementation — covering component breakdown, interface rationale, data flow,
+constraints, and open questions — say **"create a design spec"** or
+**"help me design my app"**.
+
+The skill will guide you through a structured design session and produce a
+`docs/design-spec.md` artefact for your project, informed by the full depth
+of the framework's reference library. This is especially useful before
+implementing `IDataSource`, `IWebContributor`, or OTA support, where getting
+the design right up front saves significant rework.

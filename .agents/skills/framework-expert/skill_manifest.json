@@ -1,13 +1,14 @@
 {
   "name": "framework-expert",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "created": "2026-06-15",
-  "lastUpdated": "2026-07-02",
+  "lastUpdated": "2026-07-03",
   "sourceDocsVersion": "PR-33",
   "references": [
     "SKILL.md",
     "KEEPING-CURRENT.md",
     "guides/bootstrap.md",
+    "guides/design-spec.md",
     "guides/app-developer-quickstart.md",
     "guides/module-developer-guide.md",
     "interfaces/tickable.md",
