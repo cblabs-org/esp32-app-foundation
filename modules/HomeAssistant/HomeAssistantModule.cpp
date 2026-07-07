@@ -19,7 +19,7 @@
 #include <WiFi.h>
 
 #include <PsychicHttp.h>
-#include "../../include/portal_assets/homeassistant_js.hpp"
+#include "portal_assets/homeassistant_js.hpp"
 
 #include "../MCPServer/MCPToolRegistry.hpp"
 #include "../ConfigManager/ConfigManager.hpp"
@@ -224,6 +224,18 @@ void HomeAssistantModule::publishAllStates() {
             publishState(entity);
         }
     }
+}
+
+/**
+ * @brief Re-publishes HA MQTT discovery config payloads for all registered entities.
+ *
+ * Public entry point for consumers that need to re-announce entity metadata
+ * at runtime (e.g. after a channel rename changes an entity's friendly name).
+ * Delegates to the private publishDiscovery() which carries its own connectivity
+ * guard — this is a no-op when MQTT is not connected.
+ */
+void HomeAssistantModule::republishDiscovery() {
+    publishDiscovery();
 }
 
 /**

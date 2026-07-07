@@ -262,11 +262,17 @@ build_flags           =
     -I include
     -I framework/include
 build_unflags         = -std=gnu++11
-lib_compat_mode       = strict
+; NOTE: lib_compat_mode must be 'off' for display builds — U8G2Display uses
+; SPI.h without declaring it as a dependency in its library.json, which causes
+; a compile failure under 'strict'. Use 'off' here; the missing dep is benign.
+lib_compat_mode       = off
 lib_extra_dirs        =
     framework/modules
     framework/lib
-extra_scripts         = pre:framework/scripts/inject_version.py
+extra_scripts         =
+    pre:framework/scripts/sync_sdkconfig.py
+    pre:framework/scripts/inject_version.py
+    pre:framework/scripts/portalBuilder.py
 
 ; ---------------------------------------------------------------------------
 ; <board_env> — <Board human name>
@@ -296,6 +302,20 @@ lib_deps              =
 
 For any other board: set `<board_env>` to a snake_case version of the board
 name and look up `<pio_board_id>` from the PlatformIO registry.
+
+> **S3 PSRAM (ESP32-S3-Nano and variants):** Add these flags when targeting boards
+> with QSPI PSRAM:
+> ```ini
+> board_build.arduino.memory_type = qio_opi
+> build_flags =
+>     ${env:base_esp32.build_flags}
+>     -DBOARD_ID=\"esp32s3nano\"
+>     -DBOARD_HAS_PSRAM
+>     -mfix-esp32-psram-cache-issue
+>     <display_flags_if_applicable>
+> ```
+> Without `qio_opi` and `-DBOARD_HAS_PSRAM` the S3's PSRAM will not be
+> accessible and the build may fail or behave unexpectedly at runtime.
 
 > **Display flags:** If Q3 selected a display, copy the appropriate
 > `-DU8G2_DISPLAY_TYPE` and pin flags from the matching environment block in
@@ -470,4 +490,4 @@ new confirmed entries here when supporting additional ESP32 variants.
 | Board name (user-facing) | PlatformIO `board` ID | Flash | PSRAM | Notes |
 |:---|:---|:---|:---|:---|
 | ESP32-WROOM-32 (generic) | `esp32dev` | 4 MB | Optional | Most common dev board |
-| Waveshare ESP32-S3-Nano | `um_nanos3` | 8 MB | 8 MB QSPI | Requires `board_build.arduino.memory_type = qio_opi` |
+| Waveshare ESP32-S3-Nano | `um_nanos3` | 8 MB | 8 MB QSPI | Requires `board_build.arduino.memory_type = qio_opi`, `-DBOARD_HAS_PSRAM`, `-mfix-esp32-psram-cache-issue` |

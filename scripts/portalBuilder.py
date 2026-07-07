@@ -5,8 +5,34 @@ import gzip
 
 def build_web_portal():
     print("Building web portal assets...")
-    web_dir = "web/portal"
-    out_dir = "include/portal_assets"
+
+    # Resolve the framework root regardless of execution context.
+    #
+    # When run as a PlatformIO pre: extra_script, SCons executes this file via
+    # exec() so __file__ is not defined. Instead we locate ourselves by scanning
+    # env.GetProjectOption("extra_scripts") for the registered path that contains
+    # "portalBuilder". PlatformIO resolves that path relative to the project root
+    # at ini-parse time, so os.path.abspath() gives us the absolute script path
+    # and therefore the framework root (two directories up from scripts/).
+    #
+    # Fallback: when invoked directly as `python3 scripts/portalBuilder.py` (e.g.
+    # for local testing) __file__ *is* defined and we use it instead.
+    try:
+        _scripts = env.GetProjectOption("extra_scripts")
+        _own = next((s for s in _scripts if "portalBuilder" in s), None)
+        if _own:
+            # Strip leading "pre:" / "post:" prefix if present
+            _own = _own.split(":", 1)[-1].strip()
+            _FW = os.path.dirname(os.path.dirname(os.path.abspath(_own)))
+        else:
+            # Fallback: derive from PROJECT_DIR (works for in-tree builds)
+            _FW = env.subst("$PROJECT_DIR")
+    except NameError:
+        # Direct Python invocation — __file__ is available
+        _FW = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+    web_dir = os.path.join(_FW, "web/portal")
+    out_dir = os.path.join(_FW, "include/portal_assets")
     
     if not os.path.exists(out_dir):
         os.makedirs(out_dir)
