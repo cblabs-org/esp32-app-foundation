@@ -25,6 +25,8 @@
  *   - setEventBus():       Injects EventBus and subscribes to wifi events
  *   - addEntity():         Registers an IHaEntity for discovery and state publishing
  *   - publishState():      Publishes current state of a single entity via MQTT
+ *   - republishDiscovery(): Re-publishes all entity discovery payloads on demand
+ *                          (no-op if MQTT is not connected)
  *
  *   ITickable:
  *   - tick():              Publishes pending state sync after MQTT reconnection
@@ -174,6 +176,17 @@ public:
      * @param entity Pointer to the entity whose state to publish.
      */
     void publishState(IHaEntity* entity);
+
+    /**
+     * @brief Re-publishes HA MQTT discovery config payloads for all registered entities.
+     *
+     * Useful when entity metadata changes at runtime (e.g. a channel rename changes
+     * an entity's friendly name) and the new discovery payload must be re-announced
+     * without waiting for the next MQTT reconnect.
+     *
+     * This is a no-op if MQTT is not currently connected.
+     */
+    void republishDiscovery();
 
     /** @brief Returns the device MAC address prefix string. */
     std::string getMacPrefix() const { return _macPrefix; }

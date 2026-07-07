@@ -227,6 +227,18 @@ void HomeAssistantModule::publishAllStates() {
 }
 
 /**
+ * @brief Re-publishes HA MQTT discovery config payloads for all registered entities.
+ *
+ * Public entry point for consumers that need to re-announce entity metadata
+ * at runtime (e.g. after a channel rename changes an entity's friendly name).
+ * Delegates to the private publishDiscovery() which carries its own connectivity
+ * guard — this is a no-op when MQTT is not connected.
+ */
+void HomeAssistantModule::republishDiscovery() {
+    publishDiscovery();
+}
+
+/**
  * @brief Configures and starts the ESP-MQTT client with current settings.
  *
  * Guards against missing wifi or empty URI. Configures broker address,
