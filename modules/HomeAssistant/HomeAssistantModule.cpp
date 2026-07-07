@@ -19,7 +19,7 @@
 #include <WiFi.h>
 
 #include <PsychicHttp.h>
-#include "../../include/portal_assets/homeassistant_js.hpp"
+#include "portal_assets/homeassistant_js.hpp"
 
 #include "../MCPServer/MCPToolRegistry.hpp"
 #include "../ConfigManager/ConfigManager.hpp"
