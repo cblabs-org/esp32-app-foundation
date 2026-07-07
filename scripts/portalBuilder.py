@@ -5,8 +5,12 @@ import gzip
 
 def build_web_portal():
     print("Building web portal assets...")
-    web_dir = "web/portal"
-    out_dir = "include/portal_assets"
+    # Anchor to the framework root (two levels up from this script's location)
+    # so paths are correct whether cwd is the framework root or an out-of-tree
+    # app root that references this script as a pre: extra_script.
+    _FW = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    web_dir = os.path.join(_FW, "web/portal")
+    out_dir = os.path.join(_FW, "include/portal_assets")
     
     if not os.path.exists(out_dir):
         os.makedirs(out_dir)
