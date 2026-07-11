@@ -20,8 +20,8 @@ out-of-tree — raise it here.
 
 | Label | Use when |
 |-------|----------|
-| `upstream-issue` | Found by a downstream consumer (not internally) |
-| `found-by:<program>` | Name of the consumer program that found it |
+| `upstream-issue` | Found by a downstream consumer (not found internally) |
+| `found-by:<program>` | Slug of the consumer program that found it. Create the label on the repo if it does not exist yet (e.g. `found-by:power-monitor`, `found-by:energy-dashboard`). |
 | `backfill` | Historical — filed after the fix was already merged |
 
 ---
@@ -31,7 +31,8 @@ out-of-tree — raise it here.
 ### Check your identity
 
 ```bash
-gh auth status   # must show: account matthewmcneill, Active account: true
+gh auth status
+# Confirm you are logged in as the framework repo owner before filing.
 ```
 
 File under the **repo owner's identity only**. Never under a third-party account.
@@ -61,14 +62,21 @@ Optional, but concrete enough to act on.
 Found by: <program>, <PR or session>
 ```
 
-### Quick-file example
+### Filing example
 
 ```bash
+# Create the found-by label for your consumer program if it doesn't exist yet:
+gh label create "found-by:<program>" \
+  --repo matthewmcneill/esp32-app-foundation \
+  --color "a855f7" \
+  --description "Reported by the <Program> consumer"
+
+# Then file the issue:
 gh issue create \
   --repo matthewmcneill/esp32-app-foundation \
-  --title "[U8G2Display] Explicit SPI pins silently ignored when MISO undefined" \
+  --title "[Module] Description" \
   --body-file issue-body.md \
-  --label "P2-correctness,upstream-issue,found-by:power-monitor"
+  --label "P2-correctness,upstream-issue,found-by:<program>"
 ```
 
 ---
@@ -89,12 +97,13 @@ If a bug was fixed before a GitHub issue was filed:
 3. Immediately close with reason **completed**.
 
 ```bash
-NUM=$(gh issue create --title "..." --body "..." \
-  --label "P1-blocker,upstream-issue,found-by:power-monitor,backfill" \
-  --json number --jq '.number')
+NUM=$(gh issue create --title "..." --body-file body.md \
+  --label "P1-blocker,upstream-issue,found-by:<program>,backfill" \
+  --repo matthewmcneill/esp32-app-foundation | grep -oE '[0-9]+$')
 
-gh issue close "$NUM" --reason completed \
-  --comment "Resolved in commit \`<SHA>\`, merged 2026-07-08."
+gh issue close "$NUM" --repo matthewmcneill/esp32-app-foundation \
+  --reason completed \
+  --comment "Resolved in commit \`<SHA>\`, merged <date>."
 ```
 
 ---

@@ -6,8 +6,8 @@
 
 # Issue Management Process
 
-GitHub Issues on `matthewmcneill/esp32-app-foundation` are the **canonical
-system of record** for all framework defects. This document tells you everything
+GitHub Issues on **`matthewmcneill/esp32-app-foundation`** are the canonical
+system of record for all framework defects. This document tells you everything
 you need to raise, track, link, and close a framework issue.
 
 ---
@@ -42,10 +42,12 @@ applicable attribution/meta labels.
 | Label | When to use |
 |-------|-------------|
 | `upstream-issue` | Issue was surfaced by a downstream consumer (not found internally) |
-| `found-by:power-monitor` | Found by the Power Monitor consumer program |
+| `found-by:<your-program-name>` | Replace `<your-program-name>` with the slug of the consumer program you are working in (e.g. `found-by:power-monitor`, `found-by:energy-dashboard`). Create the label on the repo if it does not exist yet. |
 | `backfill` | Historical issue filed after the fix was already merged; close immediately |
 
-New consumer programs get their own `found-by:<program>` label when they onboard.
+> **Important for agents:** The `found-by:` label must match the consumer program
+> you are currently working in. Do not copy a label from an example or from a
+> previous issue without checking it matches your context.
 
 ---
 
@@ -53,11 +55,13 @@ New consumer programs get their own `found-by:<program>` label when they onboard
 
 ### Identity rule
 
-File under the **repo owner's GitHub identity** using the repo owner's `gh` CLI
-session. Verify first:
+File under the **repo owner's GitHub identity**. Before filing, confirm your
+`gh` session is authenticated as the repo owner:
 
 ```bash
-gh auth status   # must show: account matthewmcneill, Active account: true
+gh auth status
+# Confirm: Active account: true, and the account is the framework repo owner.
+# Do NOT proceed if you are logged in as a different user.
 ```
 
 Never file under a third-party identity.
@@ -91,7 +95,7 @@ Examples:
 
 ## Consumer context
 <!-- Which consumer program found this, if applicable. -->
-Found by: <program name>, <PR or session context>
+Found by: <your-program-name>, <PR or session context>
 ```
 
 ### Filing command
@@ -100,8 +104,18 @@ Found by: <program name>, <PR or session context>
 gh issue create \
   --repo matthewmcneill/esp32-app-foundation \
   --title "[Module] Description" \
-  --body "$(cat /path/to/body.md)" \
-  --label "P2-correctness,upstream-issue,found-by:power-monitor"
+  --body-file issue-body.md \
+  --label "P2-correctness,upstream-issue,found-by:<your-program-name>"
+```
+
+Replace `found-by:<your-program-name>` with the label for your consumer program.
+If the label does not exist on the repo yet, create it first:
+
+```bash
+gh label create "found-by:<your-program-name>" \
+  --repo matthewmcneill/esp32-app-foundation \
+  --color "a855f7" \
+  --description "Reported by the <Your Program> consumer"
 ```
 
 ---
@@ -153,20 +167,19 @@ retrospectively from a PR or audit):
 3. In the body, include: `**Resolved in:** commit \`<SHA>\`` (or PR #M).
 4. **Immediately close** the issue with reason "completed".
 
-This preserves the history and allows consumers to link their audit pointers to
-a real issue number, without leaving a ghost open issue on the board.
+This preserves history and lets consumers link their audit pointers to a real
+issue number without leaving a ghost open issue on the board.
 
 ```bash
-# Create and immediately close a backfill issue
-ISSUE=$(gh issue create \
+# Create a backfill issue and immediately close it
+NUM=$(gh issue create \
   --repo matthewmcneill/esp32-app-foundation \
   --title "[Module] Description" \
-  --body "..." \
-  --label "P1-blocker,upstream-issue,found-by:power-monitor,backfill" \
-  --json number --jq '.number')
+  --body-file body.md \
+  --label "P1-blocker,upstream-issue,found-by:<your-program-name>,backfill" | grep -oE '[0-9]+$')
 
-gh issue close "$ISSUE" \
+gh issue close "$NUM" \
   --repo matthewmcneill/esp32-app-foundation \
   --reason completed \
-  --comment "Resolved in commit \`<SHA>\` (merged in framework PR #M, 2026-07-08)."
+  --comment "Resolved in commit \`<SHA>\` (merged in PR #M, <date>)."
 ```
