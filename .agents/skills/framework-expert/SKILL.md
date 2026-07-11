@@ -159,3 +159,9 @@ These references are optimized distillations for AI agents. If the human develop
 
 Also trigger when an agent is working on code that extends the framework and needs
 guidance on interface contracts, patterns, performance, or embedded safety.
+
+- **Issue management**: "raise a framework issue", "file a GitHub issue", "report a bug",
+  "framework defect", "upstream issue", "consumer found a bug", "backfill issue",
+  "P1-blocker", "P2-correctness", "P3-docs-dx", "found-by", "issue tracker",
+  "consumer pointer", "audit pointer", "framework issue template".
+  → Read `references/issue-management.md` for the full process.
