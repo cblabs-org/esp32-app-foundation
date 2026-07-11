@@ -25,6 +25,12 @@ description: >
 
 Senior developer assistant specializing in building applications, creating modules, and extending the ESP32 App Foundation framework.
 
+## Installation
+
+If you are setting up this skill in a new project, see
+`harness-adapters/README.md` for harness-specific installation instructions
+(Antigravity, Claude Code).
+
 ## Overview
 
 The ESP32 App Foundation is a decoupled, contract-based framework for ESP32 devices. Downstream applications inject custom behavior by implementing one or more pure virtual C++ interfaces and registering them.
