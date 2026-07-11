@@ -55,16 +55,17 @@ applicable attribution/meta labels.
 
 ### Identity rule
 
-File under the **repo owner's GitHub identity**. Before filing, confirm your
-`gh` session is authenticated as the repo owner:
+File under whatever GitHub identity your `gh` CLI is currently authenticated
+as — that is your true author identity for this action. Before filing, confirm
+which account that is:
 
 ```bash
 gh auth status
-# Confirm: Active account: true, and the account is the framework repo owner.
-# Do NOT proceed if you are logged in as a different user.
+# Shows which account you will file as. Make sure it is correct.
 ```
 
-Never file under a third-party identity.
+Do not attempt to impersonate another user (e.g. do not set `--author` to
+a different person's handle). File as yourself.
 
 ### Issue title format
 

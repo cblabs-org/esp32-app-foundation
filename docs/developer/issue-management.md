@@ -32,10 +32,11 @@ out-of-tree — raise it here.
 
 ```bash
 gh auth status
-# Confirm you are logged in as the framework repo owner before filing.
+# Shows which account you will file as. Make sure it is correct.
 ```
 
-File under the **repo owner's identity only**. Never under a third-party account.
+File as your actual authenticated identity. Do not attempt to impersonate
+another user.
 
 ### Title format
 
