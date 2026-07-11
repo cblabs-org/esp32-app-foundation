@@ -55,9 +55,14 @@ static constexpr const char* TAG = "U8G2DisplayModule";
 #include "../OTAUpdateManager/OTAUpdateManager.hpp"
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
-  #if defined(DISPLAY_SPI_SCK) && defined(DISPLAY_SPI_MISO) && defined(DISPLAY_SPI_MOSI)
+// SPI.h is required whenever explicit SCK+MOSI pins are provided, even on
+// write-only displays where MISO is physically absent.
+#if defined(DISPLAY_SPI_SCK) && defined(DISPLAY_SPI_MOSI)
   #include <SPI.h>
+  #ifndef DISPLAY_SPI_MISO
+    #define DISPLAY_SPI_MISO -1  // write-only display: no MISO pin
   #endif
+#endif
 
 // Include EventBus directly — it is native-safe (no Arduino.h dependency).
 #include "../EventBus/EventBus.hpp"
@@ -81,10 +86,13 @@ static constexpr const char* TAG = "U8G2DisplayModule";
  */
 void U8G2DisplayModule::bootstrapHardware() {
     // --- Step 1: Initialize SPI bus ---
-    // If explicit SPI pins are defined, secure the SPI bus before U8G2 init.
+    // If explicit SCK+MOSI pins are defined, secure the SPI bus before U8G2
+    // init. Write-only displays (e.g. SSD1322) may omit MISO; it defaults to
+    // -1 via the file-scope #define above, which is the correct "no MISO"
+    // value for SPI.begin().
     // CRITICAL: On ESP32-S3, the default Arduino pin mapping can collide with
     // the internal Flash/PSRAM bus. Explicit pins prevent watchdog crashes.
-  #if defined(DISPLAY_SPI_SCK) && defined(DISPLAY_SPI_MISO) && defined(DISPLAY_SPI_MOSI)
+  #if defined(DISPLAY_SPI_SCK) && defined(DISPLAY_SPI_MOSI)
     ESP_LOGI(TAG, "Bootstrap: SPI.begin(SCK=%d, MISO=%d, MOSI=%d)",
              DISPLAY_SPI_SCK, DISPLAY_SPI_MISO, DISPLAY_SPI_MOSI);
     SPI.begin(DISPLAY_SPI_SCK, DISPLAY_SPI_MISO, DISPLAY_SPI_MOSI, -1);
@@ -166,7 +174,7 @@ void U8G2DisplayModule::begin(EventBus* eventBus) {
 
     // --- Step 1: Initialize hardware (skip if already bootstrapped) ---
     if (!_bootstrapMode) {
-      #if defined(DISPLAY_SPI_SCK) && defined(DISPLAY_SPI_MISO) && defined(DISPLAY_SPI_MOSI)
+      #if defined(DISPLAY_SPI_SCK) && defined(DISPLAY_SPI_MOSI)
         SPI.begin(DISPLAY_SPI_SCK, DISPLAY_SPI_MISO, DISPLAY_SPI_MOSI, -1);
       #endif
 

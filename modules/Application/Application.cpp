@@ -96,7 +96,7 @@ bool Application::begin(const FrameworkConfig& config) {
     // --- Step 4: Mount LittleFS ---
     // Foundation for all persistence. Only available on hardware;
     // in native builds we skip this.
-    if (!LittleFS.begin(true, "/littlefs", 10, "littlefs")) {
+    if (!LittleFS.begin(true, "/littlefs", 10, "storage")) {
         // formatOnFail = true: first-boot will auto-format, subsequent failures
         // indicate a hardware fault — abort and return false.
         ESP_LOGE(TAG, "LittleFS mount failed — cannot continue boot");
