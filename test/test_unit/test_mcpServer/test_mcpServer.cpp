@@ -476,6 +476,70 @@ TEST(McpServerTest, ContributorToolCallable) {
     EXPECT_FALSE(doc["result"]["isError"].as<bool>());
 }
 
+/**
+ * Regression test for Issue #13: tool arguments must pass through the JSON-RPC
+ * dispatch path to the handler.
+ *
+ * Before the fix, `_handleToolsCall` received `const JsonDocument& req` and
+ * checked `req["params"]["arguments"].is<JsonObject>()`.  Because the subscript
+ * on a const document yields a `JsonVariantConst`, ArduinoJson 7's
+ * `Converter<JsonObject>::checkJson()` unconditionally returns false — the
+ * arguments object was never copied, so every handler received an empty
+ * `JsonObject`.  The fix changes the check to `is<JsonObjectConst>()`.
+ *
+ * This test will FAIL without the fix and pass with it.
+ */
+TEST(McpServerTest, ToolCallArgumentsReachHandler) {
+    // Register a tool that reads a specific argument and echoes it into result
+    class ArgEchoContributor : public IMCPContributor {
+    public:
+        void registerMCPTools(MCPToolRegistry& registry) override {
+            registry.addTool("arg_echo", "Echoes the 'value' argument back",
+                [](void* /*ctx*/, JsonObject& params, JsonObject& result) {
+                    // Read the "value" key sent by the client
+                    if (params["value"].is<int>()) {
+                        result["received"] = params["value"].as<int>();
+                    } else {
+                        // Signal that the argument was NOT received
+                        result["received"]  = -1;
+                        result["isError"]   = true;
+                    }
+                }
+            );
+        }
+    };
+
+    ArgEchoContributor contributor;
+    std::vector<IMCPContributor*> contributors = { &contributor };
+
+    MCPServer server;
+    server.begin(contributors, nullptr);
+
+    // Dispatch with a populated arguments object
+    std::string response = processAndCapture(server,
+        R"({"jsonrpc":"2.0","id":42,"method":"tools/call",)"
+        R"("params":{"name":"arg_echo","arguments":{"value":99}}})");
+
+    JsonDocument doc;
+    DeserializationError err = deserializeJson(doc, response);
+    ASSERT_FALSE(err) << "Response JSON parse error: " << err.c_str();
+
+    EXPECT_EQ(doc["id"].as<int>(), 42);
+
+    // Parse the inner text payload
+    const char* innerText = doc["result"]["content"][0]["text"].as<const char*>();
+    ASSERT_NE(innerText, nullptr) << "Expected content[0].text in response";
+
+    JsonDocument inner;
+    ASSERT_FALSE(deserializeJson(inner, innerText))
+        << "Inner result JSON parse error";
+
+    // The handler must have received value=99; -1 means args were dropped
+    EXPECT_EQ(inner["received"].as<int>(), 99)
+        << "Handler received wrong value — arguments were likely dropped "
+           "(regression: Issue #13, is<JsonObjectConst>() fix)";
+}
+
 // =============================================================================
 // Test Group 4: Mutation Tagging & Security
 // =============================================================================
