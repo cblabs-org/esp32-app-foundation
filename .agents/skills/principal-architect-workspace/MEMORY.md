@@ -99,6 +99,7 @@ predate the formal PA pipeline and are filed retrospectively.
 | Sub-App Pipeline Alignment | 2026-06-30 | `merge_framework_data.py`, portalBuilder addition, OTA repo separation, esp32s3nano for template-app | ✅ **COMPLETE** — `78654f6`, `ff38bff` | [adhoc-sub-app-pipeline/](./adhoc-sub-app-pipeline/context_bridge.md) |
 | TimeManager Upgrade | 2026-06-02 | Surgical PascalCase port bypassing case-insensitive git merge conflicts | ✅ **MERGED & FLASHED** | [pr-time-manager-upgrade/](./pr-time-manager-upgrade/context_bridge.md) |
 | Framework-Expert Skill Restructure | 2026-06-15 | 13-WO restructure of the `framework-expert` skill — 8 domains, security section, compliance audit guide (part of PR-25) | ✅ **MERGED** `e3388d1` | [skill-framework-expert-restructure/](./skill-framework-expert-restructure/PROJECT.md) |
+| Issue #13 — MCP Args Dropped | 2026-07-18 | ArduinoJson 7 const-variant bug: `is<JsonObject>()` → `is<JsonObjectConst>()` in `_handleToolsCall`; regression test + doc guard; 361 tests + 6 firmware builds verified | ✅ **MERGED** `ced3aba` (GitHub PR #14) | [adhoc-issue-13-mcp-args/](./adhoc-issue-13-mcp-args/context_bridge.md) |
 
 
 ---
@@ -192,6 +193,7 @@ scanning the entire Projects Registry chronologically.
 | [pr-24](./pr-24-portal-mcp-auth/PROJECT.md) | MCP bearer token auth + TLS | [distillation](./pr-24-portal-mcp-auth/context_bridge.md) |
 | [pr-27](./pr-27-security-mcp-docs/PROJECT.md) | `mcp-server.md` developer docs | PROJECT.md |
 | [pr-34](./pr-34-mcp-tools/PROJECT.md) | 8 module-contributed tools (WiFi, OTA, Config, Display), `last_check_ms` fix, skill updates | [distillation](./pr-34-mcp-tools/context_bridge.md) |
+| [adhoc-issue-13-mcp-args](./adhoc-issue-13-mcp-args/context_bridge.md) | ArduinoJson 7 const-variant bug — `is<JsonObjectConst>()` fix, regression test, doc guard (GitHub PR #14) | [distillation](./adhoc-issue-13-mcp-args/context_bridge.md) |
 
 ### Architecture & Framework Design
 
@@ -272,5 +274,5 @@ scanning the entire Projects Registry chronologically.
 
 ---
 
-*Updated: 2026-06-30 — Full audit: corrected 12 stale statuses (PR-03/04/10/11/12/16/17/30/33/35/36/38), added PR-04a + TimeManager + skill-restructure, refreshed subsystem index, added Home Assistant & Weather subsystem*
+*Updated: 2026-07-18 — Added adhoc-issue-13-mcp-args (ArduinoJson 7 const-variant hotfix, GitHub PR #14, merged `ced3aba`)*
 
