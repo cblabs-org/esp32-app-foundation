@@ -289,9 +289,14 @@ void MCPServer::_handleToolsCall(const JsonDocument& req, Print& out) {
     }
 
     // --- Step 3: Prepare arguments object ---
-    // If params.arguments is missing, create an empty object
+    // If params.arguments is missing, create an empty object.
+    // IMPORTANT: use is<JsonObjectConst>() — NOT is<JsonObject>() — because req is a
+    // const JsonDocument&.  Subscripting a const document yields a JsonVariantConst, and
+    // ArduinoJson 7's Converter<JsonObject>::checkJson() requires a mutable JsonVariant;
+    // on a const variant it silently returns false (compile-clean, runtime-always-wrong).
+    // argsDoc.set(JsonVariantConst) correctly deep-copies the arguments.
     JsonDocument argsDoc;
-    if (req["params"]["arguments"].is<JsonObject>()) {
+    if (req["params"]["arguments"].is<JsonObjectConst>()) {
         argsDoc.set(req["params"]["arguments"]);
     } else {
         argsDoc.to<JsonObject>();

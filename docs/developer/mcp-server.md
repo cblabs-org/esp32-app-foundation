@@ -144,6 +144,15 @@ The handler receives three arguments:
 - **`params`** — Input parameters from the JSON-RPC request. Access values with ArduinoJson syntax (e.g., `params["key"] | defaultValue`).
 - **`result`** — Output object. Populate this with the tool's return values. The MCP server wraps this in the standard JSON-RPC response envelope.
 
+> [!WARNING]
+> **ArduinoJson 7 const-variant pitfall (Issue #13).** Inside `_handleToolsCall` the
+> incoming request is a `const JsonDocument&`. Subscripting a const document yields a
+> `JsonVariantConst`, and `is<JsonObject>()` / `is<JsonArray>()` silently return `false`
+> for const variants — the mutable-type converters require a non-const `JsonVariant`.
+> Always use `is<JsonObjectConst>()` / `is<JsonArrayConst>()` when the source is const.
+> This does **not** affect handler code: `params` is passed as a mutable `JsonObject&`,
+> so normal `params["key"].is<JsonObject>()` checks in handlers are correct.
+
 > [!IMPORTANT]
 > `std::function` and capturing lambdas are **not used** for MCP handlers (GRAVE-05). Lambda captures that exceed the Small Buffer Optimisation threshold cause hidden heap allocations. Use non-capturing lambdas with the `void* context` pattern instead.
 
