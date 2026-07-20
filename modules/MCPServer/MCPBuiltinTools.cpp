@@ -344,7 +344,7 @@ void mcpBuiltinTools::registerAll(MCPToolRegistry& registry,
 
     registry.addTool(
         "capture_display",
-        "Capture the current display buffer as a base64-encoded image",
+        "Capture the current display buffer as a base64-encoded U8G2 tile-format monochrome framebuffer",
         [](void* /*ctx*/, JsonObject& params, JsonObject& result) {
             (void)params; // No input parameters required
 
@@ -370,7 +370,7 @@ void mcpBuiltinTools::registerAll(MCPToolRegistry& registry,
                     offset += chunk;
                 }
 
-            result["format"] = "xbm";
+            result["format"] = "u8g2-tile";
             result["width"]  = s_displayInfo.width;
             result["height"] = s_displayInfo.height;
             result["data"]   = b64;
