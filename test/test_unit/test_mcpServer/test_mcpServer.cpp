@@ -265,7 +265,7 @@ TEST(McpBuiltinToolsTest, CaptureDisplayWithDisplay) {
     tool->handler(tool->context, args, resultObj);
 
     // Must contain format, width, height, and data fields
-    EXPECT_STREQ(resultObj["format"].as<const char*>(), "xbm");
+    EXPECT_STREQ(resultObj["format"].as<const char*>(), "u8g2-tile");
     EXPECT_EQ(resultObj["width"].as<int>(), 16);
     EXPECT_EQ(resultObj["height"].as<int>(), 2);
     EXPECT_TRUE(resultObj["data"].is<const char*>());
