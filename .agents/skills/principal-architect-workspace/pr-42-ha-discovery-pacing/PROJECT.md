@@ -22,3 +22,5 @@ Fix for GitHub Issue #16: `[HomeAssistant] Discovery burst floods esp-mqtt outbo
 | 2026-07-20 | **User approved implementation plan** — proceeding with execution |
 | 2026-07-20 | WO1 executed: code changes, build verified (esp32dev SUCCESS), 361/361 native tests |
 | 2026-07-20 | **PR [#17](https://github.com/matthewmcneill/esp32-app-foundation/pull/17) created** — `866353f` |
+| 2026-07-20 | Sample-app + template-app verified (esp32dev SUCCESS) |
+| 2026-07-20 | **MERGED** — Issue #16 closed |
