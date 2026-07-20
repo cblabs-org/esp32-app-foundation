@@ -67,6 +67,7 @@
     #include <LittleFS.h>
     #include <WiFi.h>
     #include <atomic>
+#include <algorithm>
 
 static constexpr const char* TAG = "WebServerManager";
 
@@ -77,6 +78,10 @@ static constexpr const char* TAG = "WebServerManager";
 static std::atomic<int> activeHighMemRequests{0};
 constexpr int  MAX_CONCURRENT_HIGH_MEM      = 1;      // Max concurrent high-memory requests
 constexpr int  HEAP_GUARD_MIN_BLOCK_BYTES   = 20000;  // Minimum largest free block (bytes)
+
+/// ADR-15: Default maximum POST/PUT body size for routes that do not
+/// declare a custom limit via IWebContributor::getMaxPostBody().
+static constexpr size_t DEFAULT_MAX_POST_BODY = 4096;
 
 
 WebServerManager::WebServerManager() : _httpServer(80) {
@@ -292,6 +297,27 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors,
             }
         }
     }
+
+    // Build body-limit lookup from contributor-declared limits.
+    // Static so the middleware lambda can capture a pointer to it.
+    struct BodyLimitEntry {
+        const char* prefix;
+        size_t      maxBody;
+    };
+    static std::vector<BodyLimitEntry> s_bodyLimits;
+    s_bodyLimits.clear();
+    for (auto* contributor : contributors) {
+        if (contributor == nullptr) continue;
+        const char* prefix = contributor->getApiPrefix();
+        if (prefix != nullptr) {
+            s_bodyLimits.push_back({prefix, contributor->getMaxPostBody()});
+        }
+    }
+    // Sort by prefix length descending for longest-prefix-first matching
+    std::sort(s_bodyLimits.begin(), s_bodyLimits.end(),
+        [](const BodyLimitEntry& a, const BodyLimitEntry& b) {
+            return strlen(a.prefix) > strlen(b.prefix);
+        });
     
     // Inject the "Status" sub-pill — WebServerManager hosts /api/system
     // but is not itself an IWebContributor, so add it manually.
@@ -566,6 +592,49 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors,
         }
         return next();
     });
+
+    // -----------------------------------------------------------------------
+    // Global POST/PUT Body-Size Middleware — ADR-15 enforcement
+    // -----------------------------------------------------------------------
+    // Each IWebContributor declares its own max body size via getMaxPostBody()
+    // and its API path prefix via getApiPrefix(). The middleware matches the
+    // incoming URI against the registry (longest prefix first) and enforces
+    // the contributor's declared limit. Unmatched paths get DEFAULT_MAX_POST_BODY.
+    //
+    // NOTE: PsychicHttp may buffer the body before this middleware runs.
+    // The contentLength() check protects against well-behaved clients but
+    // cannot prevent OOM from a malicious client lying about Content-Length.
+    // This is the same constraint existing per-route guards have.
+    // -----------------------------------------------------------------------
+    activeServer->addMiddleware([](PsychicRequest* request,
+                                   PsychicResponse* response,
+                                   PsychicMiddlewareNext next) -> esp_err_t {
+        if (request->method() == HTTP_POST || request->method() == HTTP_PUT) {
+            String path = request->uri();
+            size_t limit = DEFAULT_MAX_POST_BODY;
+
+            // Longest-prefix-first lookup
+            for (const auto& entry : s_bodyLimits) {
+                if (path.startsWith(entry.prefix)) {
+                    limit = entry.maxBody;
+                    break;
+                }
+            }
+
+            if (request->contentLength() > limit) {
+                // Build JSON response with the specific limit for debuggability
+                char body[64];
+                snprintf(body, sizeof(body),
+                    "{\"error\":\"Payload too large\",\"max\":%u}",
+                    (unsigned)limit);
+                response->send(413, "application/json", body);
+                return ESP_OK;  // ESP_OK so PsychicHttp flushes the response
+            }
+        }
+        return next();
+    });
+    ESP_LOGI(TAG, "Global body-size middleware registered (default=%u, %u overrides)",
+             DEFAULT_MAX_POST_BODY, s_bodyLimits.size());
 
     ESP_LOGI(TAG, "WebServer configured (TLS=%d, AP=%d), registered %u contributors",
              useTls, apMode, (unsigned)contributors.size());

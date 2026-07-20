@@ -196,6 +196,18 @@ public:
      */
     int getTabOrder() const override { return 40; }
 
+    /**
+     * @brief Return the API path prefix for body-size middleware matching.
+     * @return "/api/config"
+     */
+    const char* getApiPrefix() const override { return "/api/config"; }
+
+    /**
+     * @brief Maximum POST body size for config routes (8 KiB for restore payloads).
+     * @return 8192
+     */
+    size_t getMaxPostBody() const override { return 8192; }
+
     // -------------------------------------------------------------------------
     // IMCPContributor Interface
     // -------------------------------------------------------------------------

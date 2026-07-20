@@ -147,6 +147,18 @@ public:
      */
     int getTabOrder() const override { return 30; }
 
+    /**
+     * @brief Return the API path prefix for body-size middleware matching.
+     * @return "/api/mcp"
+     */
+    const char* getApiPrefix() const override { return "/api/mcp"; }
+
+    /**
+     * @brief Maximum POST body size for MCP routes (8 KiB for JSON-RPC payloads).
+     * @return 8192
+     */
+    size_t getMaxPostBody() const override { return 8192; }
+
     // -----------------------------------------------------------------------
     // IConfigurable Implementation
     // -----------------------------------------------------------------------

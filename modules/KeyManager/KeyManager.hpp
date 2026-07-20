@@ -179,4 +179,10 @@ public:
      * @return 20 — Keys pill appears after Status (10).
      */
     int getTabOrder() const override { return 20; }
+
+    /**
+     * @brief Return the API path prefix for body-size middleware matching.
+     * @return "/api/keys"
+     */
+    const char* getApiPrefix() const override { return "/api/keys"; }
 };

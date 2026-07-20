@@ -31,7 +31,20 @@ void MyModule::registerRoutes(PsychicHttpServer* server) {
 Handling POST requests (which carry a JSON body) requires strict safety constraints on the ESP32 due to RAM limitations. This is governed by **ADR-15**.
 
 **ADR-15 Rules:**
-1. **4096 Byte Cap**: The framework enforces a hard limit of 4096 bytes on incoming POST bodies. Larger bodies will be rejected by the server before the handler is invoked.
+1. **Provider-Declared Body Limits**: The framework enforces POST/PUT body
+   size limits via global middleware in `WebServerManager`. Each
+   `IWebContributor` declares its own limit by overriding `getMaxPostBody()`
+   (default: 4096 bytes, the ADR-15 standard). The middleware matches
+   incoming requests to the contributor's `getApiPrefix()` and enforces
+   the declared limit, rejecting oversized bodies with HTTP 413 before
+   the handler is invoked.
+
+   To allow larger payloads, override both methods in your contributor:
+   ```cpp
+   const char* getApiPrefix() const override { return "/api/mymodule"; }
+   size_t getMaxPostBody() const override { return 8192; }
+   ```
+
 2. **StaticJsonDocument**: Handlers MUST parse incoming JSON using `StaticJsonDocument` allocated on the stack (e.g., `StaticJsonDocument<1024>`). You MUST NOT use `DynamicJsonDocument` in route handlers, as concurrent requests will fragment the heap and cause panics.
 
 ```cpp
@@ -57,4 +70,4 @@ void MyModule::registerRoutes(PsychicHttpServer* server) {
 }
 ```
 
-By strictly adhering to stack-allocated JSON documents and enforcing body size caps, the web server remains stable even under heavy load or malicious input.
+By strictly adhering to stack-allocated JSON documents and enforcing body size caps via the global middleware, the web server remains stable even under heavy load or malicious input.

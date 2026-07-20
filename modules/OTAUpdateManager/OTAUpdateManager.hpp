@@ -327,6 +327,12 @@ public:
      */
     int getTabOrder() const override { return 50; }
 
+    /**
+     * @brief Return the API path prefix for body-size middleware matching.
+     * @return "/api/ota"
+     */
+    const char* getApiPrefix() const override { return "/api/ota"; }
+
     // -------------------------------------------------------------------------
     // IConfigurable Interface
     // -------------------------------------------------------------------------

@@ -242,6 +242,18 @@ public:
     int getTabOrder() const override { return 5; }
 
     /**
+     * @brief Return the API path prefix for body-size middleware matching.
+     * @return "/api/auth"
+     */
+    const char* getApiPrefix() const override { return "/api/auth"; }
+
+    /**
+     * @brief Maximum POST body size for auth routes (8 KiB for cert upload payloads).
+     * @return 8192
+     */
+    size_t getMaxPostBody() const override { return 8192; }
+
+    /**
      * @brief Return the feather-icons lock SVG inner content for the bottom-nav icon.
      *
      * The returned string contains two <path> elements (no outer <svg> tag).
