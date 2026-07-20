@@ -61,6 +61,9 @@
  *   - getParentTab():           Returns nullptr — top-level tab
  *   - getTabOrder():            Returns 50 — mid-priority tab position
  *   - getTabIcon():             Returns SVG path for cloud icon
+ *   - getTabScript():           Returns "/weather.js" dynamic script loading [NEW]
+ *   - getApiPrefix():           Returns "/api/weather" for body-size middleware [NEW]
+ *   - getMaxPostBody():         Returns 4096 (ADR-15 default) [NEW]
  *
  *   IDataSource:
  *   - fetchUpdate():            Executes HTTPS GET to OpenWeatherMap with streaming JSON parse
@@ -375,8 +378,14 @@ public:
     /** @brief Returns the SVG path data for the cloud weather icon. */
     const char* getTabIcon() const override { return "<path d=\"M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z\"/>"; }
 
-    /** @brief Returns the route path for the weather tab's JavaScript file. */
+    /** @brief Returns the route path for the Weather tab's JavaScript file. */
     const char* getTabScript() const override { return "/weather.js"; }
+
+    /** @brief Returns the API path prefix for body-size middleware matching. */
+    const char* getApiPrefix() const override { return "/api/weather"; }
+
+    /** @brief Returns the maximum POST/PUT body size for weather routes (ADR-15 default). */
+    size_t getMaxPostBody() const override { return 4096; }
 
     // --- IDataSource ---
 

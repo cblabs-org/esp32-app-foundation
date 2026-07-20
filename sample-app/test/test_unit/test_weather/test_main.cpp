@@ -188,6 +188,9 @@ TEST_F(WeatherModuleTest, TabMetadata) {
     EXPECT_EQ(module.getParentTab(), nullptr);
     EXPECT_EQ(module.getTabOrder(), 50);
     EXPECT_NE(module.getTabIcon(), nullptr);
+    EXPECT_STREQ(module.getTabScript(), "/weather.js");
+    EXPECT_STREQ(module.getApiPrefix(), "/api/weather");
+    EXPECT_EQ(module.getMaxPostBody(), 4096u);
 }
 
 int main(int argc, char **argv) {
