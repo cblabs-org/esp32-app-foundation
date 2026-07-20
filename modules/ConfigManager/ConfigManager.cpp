@@ -372,7 +372,26 @@ bool ConfigManager::importAllConfig(JsonDocument& inDoc) {
         }
 
         JsonObject section = inDoc[ns].as<JsonObject>();
-        mod->applyConfig(section);
+
+        // Deep-merge incoming partial section over current state so that
+        // applyConfig() always receives a COMPLETE section — preventing
+        // modules that reset-then-load from losing omitted keys.
+        // NOTE: Array values are replaced wholesale (ArduinoJson semantics)
+        // — element-level merge requires JSON Patch (deferred to follow-up).
+        // TODO: A _configMutex protecting serializeConfig/applyConfig pairs
+        // would close the pre-existing thread-safety window between the HTTP
+        // task (MCP handler) and the main loop. Scoped as a follow-up.
+        JsonDocument cur;
+        JsonObject curSec = cur.to<JsonObject>();
+        mod->serializeConfig(curSec);        // snapshot current state
+
+        // Merge: incoming keys overwrite current; current keys not in
+        // incoming are preserved.
+        for (JsonPair kv : section) {
+            curSec[kv.key()] = kv.value();
+        }
+
+        mod->applyConfig(curSec);            // module sees complete section
 
         if (!saveModuleConfig(mod)) {
             ESP_LOGE(TAG, "Failed to save imported config for '%s'", ns);
@@ -381,6 +400,16 @@ bool ConfigManager::importAllConfig(JsonDocument& inDoc) {
     }
 
     return allOk;
+}
+
+bool ConfigManager::exportNamespaceConfig(const char* ns, JsonObject& outSection) const {
+    for (const auto* mod : _modules) {
+        if (strcmp(mod->getConfigNamespace(), ns) == 0) {
+            mod->serializeConfig(outSection);
+            return true;
+        }
+    }
+    return false;
 }
 
 

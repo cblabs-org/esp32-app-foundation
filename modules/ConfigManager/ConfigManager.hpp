@@ -134,6 +134,18 @@ public:
     bool importAllConfig(JsonDocument& inDoc);
 
     /**
+     * @brief Export a single module's configuration by namespace.
+     *
+     * Iterates the internal module list and calls serializeConfig() on the
+     * matching module. Callers do not need access to the module list.
+     *
+     * @param ns        Namespace string to match (e.g. "wifi", "pm_channels").
+     * @param outSection Mutable JSON object to serialize into.
+     * @return true if namespace was found, false otherwise.
+     */
+    bool exportNamespaceConfig(const char* ns, JsonObject& outSection) const;
+
+    /**
      * @brief Register the current timezone string for inclusion in backup _meta.
      *
      * Intended to be called from TimeManager::applyConfig() after the timezone
