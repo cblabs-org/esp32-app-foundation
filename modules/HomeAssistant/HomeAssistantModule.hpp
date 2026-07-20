@@ -25,11 +25,13 @@
  *   - setEventBus():       Injects EventBus and subscribes to wifi events
  *   - addEntity():         Registers an IHaEntity for discovery and state publishing
  *   - publishState():      Publishes current state of a single entity via MQTT
- *   - republishDiscovery(): Re-publishes all entity discovery payloads on demand
- *                          (no-op if MQTT is not connected)
+ *   - republishDiscovery(): Kicks off a paced re-publish of all entity discovery
+ *                          payloads (no-op if MQTT is not connected)
+ *   - isDiscoveryDrainActive(): Returns true while paced discovery drain is active
  *
  *   ITickable:
- *   - tick():              Publishes pending state sync after MQTT reconnection
+ *   - tick():              Drives paced discovery and state-sync drains after
+ *                          MQTT reconnection (bounded chunk per tick)
  *
  *   IConfigurable ("homeassistant"):
  *   - getConfigNamespace(): Returns "homeassistant"
@@ -106,8 +108,15 @@ private:
 
 
     std::atomic<bool> _mqttConnected{false};            ///< Thread-safe MQTT connection state flag
-    std::atomic<bool> _needsStateSync{false};           ///< Flag set on connect to trigger state re-publish in tick()
     std::string _mqttStatusMsg = "Disconnected";        ///< Human-readable MQTT status for the web portal
+
+    // --- Paced Discovery / State Publishing (Issue #16) ---
+    static constexpr size_t DISCOVERY_CHUNK_SIZE = 5;   ///< Max discovery payloads published per tick
+    static constexpr size_t STATE_CHUNK_SIZE = 10;      ///< Max state publishes per tick
+    bool _discoveryPending{false};                      ///< True while discovery drain is in progress
+    size_t _discoveryIndex{0};                          ///< Next entity index to publish discovery for
+    bool _stateSyncPending{false};                      ///< True while state-sync drain is in progress
+    size_t _stateSyncIndex{0};                          ///< Next entity index to sync state for
 
     /** @brief EventBus callback: initiates MQTT connection when wifi comes up. */
     static void onWifiConnected(const char* topic, const void* payload, void* ctx);
@@ -130,11 +139,7 @@ private:
     /** @brief Gracefully publishes offline LWT and destroys the MQTT client. */
     void disconnectMqtt();
 
-    /** @brief Publishes HA MQTT discovery config payloads for all registered entities. */
-    void publishDiscovery();
 
-    /** @brief Publishes current state for all registered entities that have state. */
-    void publishAllStates();
 
 public:
     /** @brief Constructs the module and derives the MAC-based device prefix. */
@@ -167,6 +172,10 @@ public:
      * If MQTT is already connected, immediately publishes discovery
      * config and current state for this entity.
      *
+     * @note Calling this while a paced discovery drain is in progress
+     *       will log a warning — the new entity may be missed until
+     *       the next reconnect or republishDiscovery() call.
+     *
      * @param entity Pointer to the IHaEntity to register (caller retains ownership).
      */
     void addEntity(IHaEntity* entity);
@@ -178,15 +187,27 @@ public:
     void publishState(IHaEntity* entity);
 
     /**
-     * @brief Re-publishes HA MQTT discovery config payloads for all registered entities.
+     * @brief Kicks off a paced re-publish of all entity discovery payloads.
      *
-     * Useful when entity metadata changes at runtime (e.g. a channel rename changes
-     * an entity's friendly name) and the new discovery payload must be re-announced
-     * without waiting for the next MQTT reconnect.
+     * Useful when entity metadata changes at runtime (e.g. a channel rename
+     * changes an entity's friendly name) and the new discovery payload must
+     * be re-announced without waiting for the next MQTT reconnect.
+     *
+     * The drain completes asynchronously over subsequent tick() calls.
+     * Use isDiscoveryDrainActive() to check completion, or subscribe to
+     * the "ha.discovery.complete" EventBus topic for notification.
      *
      * This is a no-op if MQTT is not currently connected.
      */
     void republishDiscovery();
+
+    /**
+     * @brief Returns true while a paced discovery or state-sync drain is active.
+     *
+     * Useful for diagnostics and verification: consumers can poll this to
+     * determine when all entities have been announced to Home Assistant.
+     */
+    bool isDiscoveryDrainActive() const { return _discoveryPending || _stateSyncPending; }
 
     /** @brief Returns the device MAC address prefix string. */
     std::string getMacPrefix() const { return _macPrefix; }
@@ -218,7 +239,13 @@ public:
     // ITickable
 
     /**
-     * @brief Publishes all entity states if a state sync is pending after reconnection.
+     * @brief Drives paced discovery and state-sync drains after MQTT reconnection.
+     *
+     * Phase 1: Publishes up to DISCOVERY_CHUNK_SIZE discovery payloads per tick.
+     * Phase 2: After discovery completes, publishes up to STATE_CHUNK_SIZE
+     *          state values per tick. Publishes "ha.discovery.complete" to the
+     *          EventBus when both phases finish.
+     *
      * @param currentMillis Current uptime in milliseconds.
      */
     void tick(uint32_t currentMillis) override;

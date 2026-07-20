@@ -69,6 +69,9 @@ typedef struct {
             int retain;
         } last_will;
     } session;
+    struct {
+        size_t limit;               ///< Max outbox size in bytes (0 = unlimited)
+    } outbox;
 } esp_mqtt_client_config_t;
 
 typedef void* esp_mqtt_client_handle_t;
