@@ -31,6 +31,8 @@
  *   - registerRoutes():      Registers custom REST endpoints with the web server.
  *   - getTabName():          Returns the UI tab name for this module.
  *   - getTabOrder():         Returns the tab sort order.
+ *   - getApiPrefix():        API path prefix for body-size middleware [NEW]
+ *   - getMaxPostBody():      Max POST/PUT body size (default: 4096) [NEW]
  *
  *   IMCPContributor:
  *   - registerMCPTools():    Exposes tools to the MCP server.
@@ -126,7 +128,7 @@ void MyApp::resetConfig() {
 }
 
 // =============================================================================
-// IWebContributor Implementation
+// IWebContributor Implementation (including getApiPrefix & getMaxPostBody)
 // =============================================================================
 
 /**

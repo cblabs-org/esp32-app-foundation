@@ -12,6 +12,15 @@ typedef int esp_err_t;
 #define ESP_OK 0
 #endif
 
+#define HTTP_GET     0b00000001
+#define HTTP_POST    0b00000010
+#define HTTP_DELETE  0b00000100
+#define HTTP_PUT     0b00001000
+#define HTTP_PATCH   0b00010000
+#define HTTP_HEAD    0b00100000
+#define HTTP_OPTIONS 0b01000000
+#define HTTP_ANY     0b01111111
+
 class PsychicResponse {
 public:
     esp_err_t send(int code, const char* contentType, const char* content) { return ESP_OK; }
@@ -39,6 +48,7 @@ public:
     std::string body() { return std::string(); }
     size_t contentLength() { return 0; }
     const char* bodyCStr() { return ""; }
+    int method() { return HTTP_GET; }
     bool hasParam(const char* name) { return false; }
     PsychicWebParameter* getParam(const char* name) { static PsychicWebParameter p; return &p; }
 };
@@ -46,15 +56,6 @@ public:
 typedef std::function<esp_err_t(PsychicRequest *request, PsychicResponse *response)> PsychicHttpRequestCallback;
 typedef std::function<esp_err_t()> PsychicMiddlewareNext;
 typedef std::function<esp_err_t(PsychicRequest*, PsychicResponse*, PsychicMiddlewareNext)> PsychicMiddlewareCallback;
-
-#define HTTP_GET     0b00000001
-#define HTTP_POST    0b00000010
-#define HTTP_DELETE  0b00000100
-#define HTTP_PUT     0b00001000
-#define HTTP_PATCH   0b00010000
-#define HTTP_HEAD    0b00100000
-#define HTTP_OPTIONS 0b01000000
-#define HTTP_ANY     0b01111111
 
 class PsychicEndpoint {};
 class PsychicHandler {};

@@ -48,6 +48,11 @@ public:
 private:
     std::string _str;
 };
+
+template <typename T>
+inline void convertToJson(const String& src, T dst) {
+    dst.set(src.c_str());
+}
 #endif
 
 inline void delay(uint32_t ms) { (void)ms; }

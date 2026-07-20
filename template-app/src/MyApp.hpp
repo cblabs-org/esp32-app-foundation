@@ -31,6 +31,8 @@
  *   - registerRoutes():      Registers custom REST endpoints with the web server.
  *   - getTabName():          Returns the UI tab name for this module.
  *   - getTabOrder():         Returns the tab sort order.
+ *   - getApiPrefix():        API path prefix for body-size middleware [NEW]
+ *   - getMaxPostBody():      Max POST/PUT body size (default: 4096) [NEW]
  *
  *   IMCPContributor:
  *   - registerMCPTools():    Exposes tools to the MCP server.
@@ -120,6 +122,17 @@ public:
     // const char* getParentTab() const override { return "System"; }
     // const char* getTabIcon() const override { return "⚙️"; }
     // const char* getHelpText() const override { return "Help text for this tab"; }
+    // const char* getTabScript() const override { return "/myapp.js"; }
+
+    /** @brief Returns the API path prefix for body-size middleware matching.
+     *  @return API prefix string.
+     */
+    const char* getApiPrefix() const override { return "/api/myapp"; }
+
+    /** @brief Returns the maximum POST/PUT body size for this module's routes.
+     *  @return Maximum body size in bytes (ADR-15 default: 4096).
+     */
+    size_t getMaxPostBody() const override { return 4096; }
 
     // --- IMCPContributor ---
 

@@ -62,3 +62,11 @@ void setup() {
 void loop() {
     app.tick();
 }
+
+#if defined(UNIT_TEST) && !defined(PIO_UNIT_TESTING)
+int main(int argc, char** argv) {
+    (void)argc;
+    (void)argv;
+    return 0;
+}
+#endif
