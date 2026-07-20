@@ -285,6 +285,10 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors,
                 if (icon != nullptr) {
                     tabObj["icon"] = icon;
                 }
+                const char* script = contributor->getTabScript();
+                if (script != nullptr && script[0] == '/') {
+                    tabObj["script"] = script;
+                }
             }
         }
     }

@@ -375,6 +375,9 @@ public:
     /** @brief Returns the SVG path data for the cloud weather icon. */
     const char* getTabIcon() const override { return "<path d=\"M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z\"/>"; }
 
+    /** @brief Returns the route path for the weather tab's JavaScript file. */
+    const char* getTabScript() const override { return "/weather.js"; }
+
     // --- IDataSource ---
 
     /**

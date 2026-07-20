@@ -25,6 +25,7 @@
  *   - getParentTab():   Return the parent tab name for sub-navigation (or nullptr)
  *   - getTabOrder():    Return integer sort order within the same navigation level
  *   - getTabIcon():     Return the SVG inner content for the bottom-nav icon (or nullptr)
+ *   - getTabScript():   Return the route path for this tab's JavaScript file (or nullptr)
  */
 
 #pragma once
@@ -102,4 +103,22 @@ public:
      * @return SVG inner content string, or nullptr for the generic icon.
      */
     virtual const char* getTabIcon() const { return nullptr; }
+
+    /**
+     * @brief Return the route path for this tab's JavaScript file.
+     *
+     * Return nullptr if this contributor has no tab script (default).
+     * When non-null, the path is included in the /api/tabs response
+     * as the "script" field and loaded dynamically by the SPA.
+     *
+     * The path MUST start with '/' (same-origin only). Paths not
+     * starting with '/' are silently ignored by WebServerManager.
+     *
+     * NOTE: Tab scripts are served unauthenticated (same as all static
+     * assets). Do not embed sensitive data — fetch it from authenticated
+     * /api/ endpoints instead.
+     *
+     * @return Route path string (e.g. "/weather.js"), or nullptr.
+     */
+    virtual const char* getTabScript() const { return nullptr; }
 };
