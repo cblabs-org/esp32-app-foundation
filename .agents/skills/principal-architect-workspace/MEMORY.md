@@ -79,6 +79,7 @@ predate the formal PA pipeline and are filed retrospectively.
 | [pr-39-sample-app-remediation](./pr-39-sample-app-remediation/PROJECT.md) | Sample App Remediation (24 fix items: include discipline, house style, EventBus demo, real tests, README, runtime crash fixes) | ✅ **MERGED** `6676c34` — 15/15 tests, device verified | Session 9d8dc741 |
 | [pr-40-docs-excellence](./pr-40-docs-excellence/PROJECT.md) | Documentation Excellence — 10/10 Compliance (template-app rename+Doxygen, sample-app full Doxygen+interface-grouped+functional fixes, HomeAssistant+publicKey docs, lib header attribution, module path casing, String stub consolidation, OTA naming) | ✅ **COMPLETE** — 7 WOs merged, 37/37 files compliant, 590/590 tests · [distillation](./pr-40-docs-excellence/context_bridge.md) | Session 463e0a3c |
 | [pr-41-native-build-stubs](./pr-41-native-build-stubs/PROJECT.md) | Eliminate Inline NATIVE_BUILD Guards — Stub Header Architecture (replace 283 preprocessor guards across 45+ files with stub header library in `test/stubs/platform/`) | ⬜ **NOT STARTED** — 17 WOs planned | Session 2cb65aa9 |
+| [pr-42-ha-discovery-pacing](./pr-42-ha-discovery-pacing/PROJECT.md) | Issue #16: HA Discovery Pacing (tick-driven chunked publish, outbox limit, drain-completion signal) | ✅ **COMPLETE** `866353f` — PR [#17](https://github.com/matthewmcneill/esp32-app-foundation/pull/17), 361/361 tests · [distillation](./pr-42-ha-discovery-pacing/context_bridge.md) | Session bb03d6e6 |
 
 ---
 
@@ -216,6 +217,7 @@ scanning the entire Projects Registry chronologically.
 | [pr-21](./pr-21-ota-task-hardening/PROJECT.md) | Heap guard, PSRAM stack alloc | PROJECT.md |
 | [pr-26](./pr-26-ota-pagination/PROJECT.md) | PSRAM buffers, BSS chunk allocation | [distillation](./pr-26-ota-pagination/context_bridge.md) |
 | [pr-29](./pr-29-tls-optimization/PROJECT.md) | mbedTLS dynamic buffers, cert bundle NONE | PROJECT.md |
+| [pr-42](./pr-42-ha-discovery-pacing/PROJECT.md) | Issue #16: Paced MQTT discovery to prevent outbox saturation / heap exhaustion | PROJECT.md |
 
 ### Build, CI & sdkconfig
 
@@ -271,8 +273,9 @@ scanning the entire Projects Registry chronologically.
 |---|---|---|
 | [pr-35](./pr-35-weather-station/PROJECT.md) | Weather Station module, esp-mqtt wrapper, HomeAssistant module, HA entities, Web Portal weather tab, RAII thread safety | PROJECT.md |
 | [pr-38](./pr-38-portal-remediation/PROJECT.md) | HA metadata ADR, RAII mutex ADR (from PR-35 review) | [distillation](./pr-38-portal-remediation/context_bridge.md) |
+| [pr-42](./pr-42-ha-discovery-pacing/PROJECT.md) | Issue #16: Paced discovery/state publish, outbox limit, drain-completion signal | PROJECT.md |
 
 ---
 
-*Updated: 2026-07-18 — Added adhoc-issue-13-mcp-args (ArduinoJson 7 const-variant hotfix, GitHub PR #14, merged `ced3aba`)*
+*Updated: 2026-07-20 — Added pr-42-ha-discovery-pacing (Issue #16: tick-driven discovery chunking, outbox limit, drain-completion signal)*
 

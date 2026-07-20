@@ -97,10 +97,16 @@ void HomeAssistantModule::onWifiDisconnected(const char* topic, const void* payl
  *
  * Adds the entity to the internal registry. If MQTT is already connected,
  * immediately publishes its discovery config and current state.
+ * Logs a warning if a paced discovery drain is currently in progress,
+ * as the new entity may be missed until the next reconnect.
  *
  * @param entity Pointer to the IHaEntity to register (caller retains ownership).
  */
 void HomeAssistantModule::addEntity(IHaEntity* entity) {
+    if (_discoveryPending) {
+        ESP_LOGW(TAG, "addEntity called during active discovery drain — entity '%s' may be missed",
+                 entity->getObjectId().c_str());
+    }
     _entities.push_back(entity);
     if (_mqttConnected) {
         // If already connected, publish its discovery and state immediately
@@ -193,49 +199,15 @@ void HomeAssistantModule::generateDiscoveryJson(IHaEntity* entity, JsonObject& p
 }
 
 /**
- * @brief Publishes HA MQTT discovery config payloads for all registered entities.
+ * @brief Kicks off a paced re-publish of all entity discovery payloads.
  *
- * Iterates all entities and publishes retained discovery messages to
- * their respective config topics.
- */
-void HomeAssistantModule::publishDiscovery() {
-    if (!_mqttConnected) return;
-    for (auto* entity : _entities) {
-        JsonDocument doc;
-        JsonObject payload = doc.to<JsonObject>();
-        generateDiscoveryJson(entity, payload);
-        std::string payloadStr;
-        serializeJson(doc, payloadStr);
-        std::string topic = "homeassistant/" + std::string(entity->getEntityType()) + "/" + _macPrefix + "/" + entity->getObjectId() + "/config";
-        esp_mqtt_client_publish(_mqttClient, topic.c_str(), payloadStr.c_str(), 0, 1, 1);
-    }
-}
-
-/**
- * @brief Publishes current state for all registered entities that have state.
- *
- * Called after MQTT reconnection to synchronise Home Assistant with
- * the device's current entity states.
- */
-void HomeAssistantModule::publishAllStates() {
-    if (!_mqttConnected) return;
-    for (auto* entity : _entities) {
-        if (entity->hasState()) {
-            publishState(entity);
-        }
-    }
-}
-
-/**
- * @brief Re-publishes HA MQTT discovery config payloads for all registered entities.
- *
- * Public entry point for consumers that need to re-announce entity metadata
- * at runtime (e.g. after a channel rename changes an entity's friendly name).
- * Delegates to the private publishDiscovery() which carries its own connectivity
- * guard — this is a no-op when MQTT is not connected.
+ * Sets the discovery-pending flag so that tick() will drain discovery
+ * payloads in bounded chunks. This is a no-op if MQTT is not connected.
  */
 void HomeAssistantModule::republishDiscovery() {
-    publishDiscovery();
+    if (!_mqttConnected) return;
+    _discoveryPending = true;
+    _discoveryIndex = 0;
 }
 
 /**
@@ -265,6 +237,7 @@ void HomeAssistantModule::connectMqtt() {
     esp_mqtt_client_config_t mqtt_cfg = {};
     mqtt_cfg.broker.address.uri = _mqttUri.c_str();
     mqtt_cfg.network.timeout_ms = 8000;
+    mqtt_cfg.outbox.limit = 8192;  // 8KB — prevents unbounded heap growth (Issue #16)
 
     // --- Step 4: Apply credentials from KeyManager ---
     if (!_mqttUser.empty()) {
@@ -327,8 +300,8 @@ void HomeAssistantModule::disconnectMqtt() {
  * @brief ESP-MQTT event handler callback for all MQTT events.
  *
  * Handles the full event lifecycle:
- * - CONNECTED:    publishes online LWT, discovery, flags state sync, subscribes to commands
- * - DISCONNECTED: clears connection flag, preserves error status messages
+ * - CONNECTED:    publishes online LWT, kicks paced discovery drain, subscribes commands
+ * - DISCONNECTED: clears connection flag, cancels pending drains
  * - ERROR:        decodes MQTT return codes into human-readable status messages
  * - DATA:         dispatches inbound commands to matching commandable entities
  *
@@ -348,10 +321,13 @@ void HomeAssistantModule::mqttEventHandler(void* handler_args, esp_event_base_t 
             self->_mqttStatusMsg = "Connected";
             // Publish online status to LWT topic
             esp_mqtt_client_publish(self->_mqttClient, self->_lwtTopic.c_str(), "online", 0, 1, 1);
-            self->publishDiscovery();
-            self->_needsStateSync.store(true);
+            // --- Kick paced discovery drain (Issue #16) ---
+            // Discovery payloads are published in bounded chunks via tick()
+            // instead of flooding the outbox in one burst.
+            self->_discoveryPending = true;
+            self->_discoveryIndex = 0;
             
-            // Subscribe to command topics
+            // Subscribe to command topics (lightweight — no outbox pressure)
             for (auto* entity : self->_entities) {
                 if (entity->isCommandable()) {
                     std::string cmdTopic = self->getEntityCommandTopic(entity);
@@ -363,6 +339,9 @@ void HomeAssistantModule::mqttEventHandler(void* handler_args, esp_event_base_t 
         case MQTT_EVENT_DISCONNECTED:
             ESP_LOGI(TAG, "MQTT Disconnected");
             self->_mqttConnected = false;
+            // Cancel any in-progress drains
+            self->_discoveryPending = false;
+            self->_stateSyncPending = false;
             if (self->_mqttStatusMsg.find("Connection Refused") == std::string::npos && 
                 self->_mqttStatusMsg.find("Connection Failed") == std::string::npos) {
                 self->_mqttStatusMsg = "Disconnected";
@@ -410,17 +389,87 @@ void HomeAssistantModule::mqttEventHandler(void* handler_args, esp_event_base_t 
 }
 
 /**
- * @brief Publishes pending state sync after MQTT reconnection.
+ * @brief Drives paced discovery and state-sync drains after MQTT reconnection.
  *
- * Checks the _needsStateSync atomic flag (set by the MQTT event handler
- * on connect) and publishes all entity states if set.
+ * Two-phase state machine (Issue #16):
+ * - Phase 1: Publishes up to DISCOVERY_CHUNK_SIZE discovery payloads per tick.
+ *   On publish failure (ret < 0), pauses and retries next tick.
+ * - Phase 2: After discovery completes, publishes up to STATE_CHUNK_SIZE
+ *   state values per tick with the same back-pressure handling.
+ *
+ * Publishes "ha.discovery.complete" to the EventBus when both phases finish.
+ *
+ * Note: During the paced drain, consumers may publish states for entities
+ * whose discovery has not yet reached HA. HA drops states for unknown
+ * entities and self-heals at the next state publish (≤30 s).
  *
  * @param currentMillis Current uptime in milliseconds (unused).
  */
 void HomeAssistantModule::tick(uint32_t currentMillis) {
-    if (_needsStateSync.load()) {
-        _needsStateSync.store(false);
-        publishAllStates();
+    if (!_mqttConnected) return;
+
+    // --- Phase 1: Paced discovery publish ---
+    if (_discoveryPending) {
+        size_t published = 0;
+        while (_discoveryIndex < _entities.size() && published < DISCOVERY_CHUNK_SIZE) {
+            auto* entity = _entities[_discoveryIndex];
+            JsonDocument doc;
+            JsonObject payload = doc.to<JsonObject>();
+            generateDiscoveryJson(entity, payload);
+            std::string payloadStr;
+            serializeJson(doc, payloadStr);
+            std::string topic = "homeassistant/" + std::string(entity->getEntityType())
+                              + "/" + _macPrefix + "/" + entity->getObjectId() + "/config";
+            int ret = esp_mqtt_client_publish(_mqttClient, topic.c_str(),
+                                             payloadStr.c_str(), 0, 1, 1);
+            if (ret < 0) {
+                ESP_LOGW(TAG, "Discovery publish failed (ret=%d, entity=%s), will retry next tick",
+                         ret, entity->getObjectId().c_str());
+                break;  // Pause — retry this entity next tick
+            }
+            _discoveryIndex++;
+            published++;
+        }
+
+        if (_discoveryIndex >= _entities.size()) {
+            ESP_LOGI(TAG, "Discovery drain complete: %u entities published",
+                     (unsigned)_entities.size());
+            _discoveryPending = false;
+            _stateSyncPending = true;
+            _stateSyncIndex = 0;
+        }
+        return;  // Don't overlap discovery and state sync in the same tick
+    }
+
+    // --- Phase 2: Paced state sync ---
+    if (_stateSyncPending) {
+        size_t published = 0;
+        while (_stateSyncIndex < _entities.size() && published < STATE_CHUNK_SIZE) {
+            auto* entity = _entities[_stateSyncIndex];
+            if (entity->hasState()) {
+                std::string topic = getEntityStateTopic(entity);
+                std::string state = entity->getState();
+                int ret = esp_mqtt_client_publish(_mqttClient, topic.c_str(),
+                                                 state.c_str(), 0, 1, 1);
+                if (ret < 0) {
+                    ESP_LOGW(TAG, "State sync failed (ret=%d, entity=%s), will retry next tick",
+                             ret, entity->getObjectId().c_str());
+                    break;  // Pause — retry next tick
+                }
+                published++;
+            }
+            _stateSyncIndex++;
+        }
+
+        if (_stateSyncIndex >= _entities.size()) {
+            ESP_LOGI(TAG, "State sync complete: %u entities synced",
+                     (unsigned)_entities.size());
+            _stateSyncPending = false;
+            // Notify consumers that the full discovery + state drain has finished
+            if (_eventBus) {
+                _eventBus->publish("ha.discovery.complete", nullptr);
+            }
+        }
     }
 }
 
