@@ -1,68 +1,107 @@
-# HTML and JS Fragments
+# Portal Tab JavaScript Structure
 
-The web portal relies on injecting raw HTML and JavaScript fragments into the DOM. This architecture imposes specific requirements on how modules write their frontend code.
+Because the web portal does not load external HTML fragments, each tab's entire user interface is constructed dynamically using JavaScript. Each tab module provides a script that writes its own markup and handles events.
 
-## `tab.html` Structure
+## C++ Script Registration and Delivery
 
-The HTML fragment is injected directly into a container `div` within the SPA skeleton.
+The tab's JavaScript file is stored as a raw-string literal in C++ and served via an HTTP GET route registered in `registerRoutes()`.
 
-**Rules for HTML fragments:**
-1. **No Wrapping Tags**: Do NOT include `<html>`, `<head>`, or `<body>` tags. The fragment should only contain the content elements (e.g., `<div>`, `<h2>`, `<form>`).
-2. **ID Scoping**: Prefix all element IDs with your module name to avoid collisions with other tabs (e.g., use `id="weather-save-btn"` instead of `id="save-btn"`).
+For example, in `WeatherModule.cpp`:
 
-```html
-<!-- Example tab.html -->
-<div class="card">
-    <h2>Weather Configuration</h2>
-    <div class="form-group">
-        <label for="weather-threshold">Alert Threshold</label>
-        <input type="number" id="weather-threshold">
-    </div>
-    <button id="weather-save-btn" class="btn btn-primary">Save</button>
-</div>
+```cpp
+void WeatherModule::registerRoutes(PsychicHttpServer& server) {
+    // Serve the JavaScript file
+    server.on("/weather.js", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
+        const char* js = R"rawliteral(
+(function() {
+    var initialized = false;
+
+    window.addEventListener('tab-changed', function(e) {
+        if (e.detail !== 'tab-weather') return;
+
+        var container = document.getElementById('tab-weather');
+        if (!container) return;
+
+        if (!initialized) {
+            initialized = true;
+            container.innerHTML = `
+                <article>
+                    <header>Weather Configuration</header>
+                    <form id="weather-form">
+                        <label for="weather-lat">Latitude</label>
+                        <input type="text" id="weather-lat">
+                        <button type="submit" id="weather-save-btn">Save</button>
+                    </form>
+                </article>
+            `;
+            // Bind events here
+        }
+    });
+})();
+        )rawliteral";
+        return response->send(200, "application/javascript", js);
+    });
+}
 ```
 
-## `tab.js` IIFE Pattern
+The route path (e.g. `/weather.js`) is declared in C++ by overriding `getTabScript()`:
 
-When the SPA loads a tab, it evaluates the associated JavaScript fragment. To prevent variable pollution in the global window scope and ensure clean teardown, all tab JavaScript MUST be wrapped in an Immediately Invoked Function Expression (IIFE).
+```cpp
+const char* getTabScript() const override { return "/weather.js"; }
+```
 
-The SPA provides a global `App` object that exposes utility functions (like API fetching and toast notifications) and lifecycle hooks.
+## The `tab-changed` Event Contract
 
-**Rules for JS fragments:**
-1. **IIFE Wrapper**: Wrap all code in `(function() { ... })();`.
-2. **DOM Injection Lifecycle**: Register a callback with `App.onTabLoaded(tabId, callback)` to ensure your script only binds event listeners *after* your HTML fragment has been injected into the DOM.
+The frontend framework (`app.js`) creates a container `div` for each tab inside the DOM, and dispatches a `tab-changed` event whenever the active tab changes. Tab scripts must listen to this event to render their UI and bind event listeners.
+
+* **Target Container ID**: Derives from the tab display name: `'tab-' + name.toLowerCase().replace(/\s+/g, '-')`.
+* **Event Listener**: The script must filter events by checking `e.detail` against its target container ID.
+* **Initialization Guard**: Use an initialization flag to ensure the HTML skeleton is only injected once.
 
 ```javascript
-// Example tab.js
+window.addEventListener('tab-changed', function(e) {
+    if (e.detail !== 'tab-weather') return; // Filter events
+
+    var container = document.getElementById('tab-weather');
+    if (!container) return;
+
+    if (!initialized) {
+        initialized = true;
+        // 1. Inject DOM markup
+        container.innerHTML = `...`;
+        
+        // 2. Query elements and bind listeners
+        var saveBtn = document.getElementById('weather-save-btn');
+        // ...
+    }
+});
+```
+
+## IIFE Wrapper Guidance
+
+To prevent variables, constants, and helper functions from leaking into the global scope and colliding with other tabs, all tab JavaScript code **MUST** be enclosed within an Immediately Invoked Function Expression (IIFE):
+
+```javascript
 (function() {
-    const tabId = 'weather';
-
-    App.onTabLoaded(tabId, function() {
-        // The HTML is now in the DOM. Safe to query elements.
-        const saveBtn = document.getElementById('weather-save-btn');
-        const thresholdInput = document.getElementById('weather-threshold');
-
-        // Load initial data
-        fetch('/api/weather')
-            .then(res => res.json())
-            .then(data => {
-                thresholdInput.value = data.threshold;
-            });
-
-        // Bind events
-        saveBtn.addEventListener('click', function() {
-            const payload = { threshold: parseFloat(thresholdInput.value) };
-            
-            fetch('/api/weather/config', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            }).then(() => window.showToast('Saved!', 'success'));
-        });
-    });
+    // Tab-scoped variables and functions
+    var initialized = false;
+    // ...
 })();
 ```
 
-## Save Policy
+## ID Scoping & Prefixing Rules
 
-All settings must follow the framework's four-tier save policy. See [Save Policy](save-policy.md) for the full specification and code examples.
+Although each tab renders into its own container, all tabs share the same DOM document. To avoid collision bugs and styling issues:
+1. **Prefix all element IDs**: Prefix IDs with the tab's identifier (e.g., use `id="weather-save-btn"` instead of `id="save-btn"`).
+2. **Limit query selectors**: When querying elements, search within the tab's container instead of `document` (e.g., use `container.querySelector('#weather-save-btn')` or `document.getElementById('weather-save-btn')` with a prefixed ID).
+
+## Security & Authentication Note
+
+> [!WARNING]
+> Tab scripts are served **unauthenticated**, similar to other static assets (e.g., `index.html`, `app.js`).
+> Do **NOT** embed credentials, API keys, or private system data directly inside the raw JavaScript string.
+> All sensitive configuration and state data must be fetched at runtime via authenticated `/api/` REST endpoints (using `window.apiFetch()`).
+
+## Persistence & Save Policy
+
+All configuration modifications made within the UI should follow the framework's strict four-tier save policy. This guarantees a consistent user experience with appropriate user feedback (toasts or reboot overlays) for every action. Refer to the [Save Policy](save-policy.md) documentation for full implementation patterns.
