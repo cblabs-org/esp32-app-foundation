@@ -942,6 +942,51 @@ TEST_F(WriteOrderingTest, PatchThenSave_VersionsShared) {
     EXPECT_STREQ(readDoc["label"].as<const char*>(), "saved_after_patch");
 }
 
+// 5. Stale-skip branch — artificially advance _lastPersistedVersion to prove
+//    the skip logic actually works. Without this test, inverting the comparison
+//    or deleting the _lastPersistedVersion assignment would go undetected.
+//    Uses the write path to bump versions, then patches a DIFFERENT value but
+//    checks that shouldSkipWrite() would reject a stale version.
+TEST_F(WriteOrderingTest, StaleSkip_OlderVersionDoesNotOverwrite) {
+    // beginAll() saves each module once (no file → reset → save), so
+    // patchmod starts at version 1. Two explicit saves bring it to 3.
+    patchMod.label = "first";
+    EXPECT_TRUE(configManager.saveModuleConfig(&patchMod));  // version 2
+    patchMod.label = "second";
+    EXPECT_TRUE(configManager.saveModuleConfig(&patchMod));  // version 3, persisted = 3
+
+    // Verify file has "second"
+    {
+        std::ifstream file("test/tmp/mod/patchmod.json");
+        ASSERT_TRUE(file.is_open());
+        std::string jsonStr((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+        file.close();
+        JsonDocument readDoc;
+        deserializeJson(readDoc, jsonStr);
+        EXPECT_STREQ(readDoc["label"].as<const char*>(), "second");
+    }
+
+    // Now test the stale-skip predicate directly.
+    // This is the branch that carries the whole fix — without it, inverting
+    // the comparison or deleting the _lastPersistedVersion assignment would
+    // go undetected.
+    int idx = 0;  // patchMod is registered first (slot 0)
+
+    // Version 1 is stale (persisted is 3) → should skip
+    EXPECT_TRUE(configManager.shouldSkipWrite(idx, 1));
+    // Version 2 is also stale → should skip
+    EXPECT_TRUE(configManager.shouldSkipWrite(idx, 2));
+
+    // Same version as persisted → should NOT skip (not strictly less)
+    EXPECT_FALSE(configManager.shouldSkipWrite(idx, 3));
+    // Newer version → should NOT skip
+    EXPECT_FALSE(configManager.shouldSkipWrite(idx, 4));
+
+    // Invalid index → should NOT skip (fail open)
+    EXPECT_FALSE(configManager.shouldSkipWrite(-1, 1));
+    EXPECT_FALSE(configManager.shouldSkipWrite(99, 1));
+}
+
 // =============================================================================
 // GoogleTest main entry point
 // =============================================================================

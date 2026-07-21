@@ -124,6 +124,10 @@ void ConfigManager::beginAll() {
     _locked = true;
     _modules.shrink_to_fit();
 
+    // Size the write-ordering vectors (Issue #32) now that the registry is final
+    _configVersion.assign(_modules.size(), 0);
+    _lastPersistedVersion.assign(_modules.size(), 0);
+
     ESP_LOGI(TAG, "beginAll() — loading config for %d module(s)", (int)_modules.size());
 
     // Load the Three-Tier config manifest (no-op on first boot)
@@ -237,6 +241,51 @@ bool ConfigManager::serializeModuleToDoc(IConfigurable* module, JsonDocument& ou
 }
 
 // =============================================================================
+// Write Ordering Helpers (Issue #32)
+// =============================================================================
+
+/**
+ * @brief Find the index of a module by namespace in _modules.
+ *
+ * Linear scan is acceptable — module count is bounded (~10–15) and this
+ * is only called on the write path, not in tick().
+ *
+ * @param ns Namespace string to find.
+ * @return Index into _modules, or -1 if not found.
+ */
+int ConfigManager::moduleIndex(const char* ns) const {
+    // Version vectors are sized at beginAll(). Before that, return -1
+    // so callers skip version tracking (saves during loadModuleConfig are fine).
+    if (_configVersion.empty()) return -1;
+    for (size_t i = 0; i < _modules.size(); ++i) {
+        if (strcmp(_modules[i]->getConfigNamespace(), ns) == 0) {
+            return static_cast<int>(i);
+        }
+    }
+    return -1;
+}
+
+/**
+ * @brief Check whether a write should be skipped because a newer
+ *        snapshot has already been persisted.
+ *
+ * Returns true if _lastPersistedVersion[idx] is strictly greater than
+ * myVersion, meaning a newer serialisation already reached flash. This
+ * is correct (not a compromise) because both writers serialise the
+ * module's complete state — the newer document is a superset.
+ *
+ * @param idx       Module index (from moduleIndex()).
+ * @param myVersion Version assigned at serialize time.
+ * @return true if the write should be skipped (stale).
+ */
+bool ConfigManager::shouldSkipWrite(int idx, uint32_t myVersion) const {
+    if (idx < 0 || static_cast<size_t>(idx) >= _lastPersistedVersion.size()) {
+        return false;  // unknown index — don't skip (fail open)
+    }
+    return myVersion < _lastPersistedVersion[idx];
+}
+
+// =============================================================================
 // Save
 // =============================================================================
 
@@ -257,6 +306,7 @@ bool ConfigManager::saveModuleConfig(IConfigurable* module) {
     }
 
     const char* ns = module->getConfigNamespace();
+    int idx = moduleIndex(ns);
     char path[48];
     getConfigPath(ns, path, sizeof(path));
     ESP_LOGI(TAG, "Saving config for '%s' to %s", ns, path);
@@ -272,7 +322,7 @@ bool ConfigManager::saveModuleConfig(IConfigurable* module) {
     }
     serializeModuleToDoc(module, doc);
     // Assign monotonic version under _configMutex (Issue #32 write ordering)
-    myVersion = ++_configVersion[ns];
+    if (idx >= 0) myVersion = ++_configVersion[idx];
     if (_configMutex != nullptr) {
         xSemaphoreGive(_configMutex);
     }
@@ -287,10 +337,10 @@ bool ConfigManager::saveModuleConfig(IConfigurable* module) {
     // Freshness check: skip write if a newer snapshot already reached flash.
     // This is correct (not a compromise) because both writers serialise the
     // module's complete state — the newer document is a superset of ours.
-    // Counter is per-namespace to avoid cross-namespace interference (Issue #32).
-    if (myVersion < _lastPersistedVersion[ns]) {
+    // Counter is per-module-slot to avoid cross-namespace interference (Issue #32).
+    if (idx >= 0 && shouldSkipWrite(idx, myVersion)) {
         ESP_LOGI(TAG, "saveModuleConfig() — skipping stale write for '%s' (v%u < v%u)",
-                 ns, myVersion, _lastPersistedVersion[ns]);
+                 ns, myVersion, _lastPersistedVersion[idx]);
         if (_persistMutex != nullptr) xSemaphoreGive(_persistMutex);
         return true;  // not an error: newer state is already on disk
     }
@@ -308,7 +358,7 @@ bool ConfigManager::saveModuleConfig(IConfigurable* module) {
         return false;
     }
     file.close();
-    _lastPersistedVersion[ns] = myVersion;
+    if (idx >= 0) _lastPersistedVersion[idx] = myVersion;
     if (_persistMutex != nullptr) xSemaphoreGive(_persistMutex);
 
     ESP_LOGI(TAG, "Config saved for '%s'", ns);
@@ -566,7 +616,9 @@ bool ConfigManager::patchNamespaceConfig(const char* ns, JsonArrayConst ops,
     JsonDocument postDoc;
     serializeModuleToDoc(mod, postDoc);
     // Assign monotonic version under _configMutex (Issue #32 write ordering)
-    uint32_t myVersion = ++_configVersion[ns];
+    int idx = moduleIndex(ns);
+    uint32_t myVersion = 0;
+    if (idx >= 0) myVersion = ++_configVersion[idx];
 
     if (_configMutex != nullptr) xSemaphoreGive(_configMutex);
 
@@ -600,9 +652,9 @@ bool ConfigManager::patchNamespaceConfig(const char* ns, JsonArrayConst ops,
         }
     }
     // Freshness check: skip write if a newer snapshot already reached flash (Issue #32)
-    if (myVersion < _lastPersistedVersion[ns]) {
+    if (idx >= 0 && shouldSkipWrite(idx, myVersion)) {
         ESP_LOGI(TAG, "patchNamespaceConfig — skipping stale write for '%s' (v%u < v%u)",
-                 ns, myVersion, _lastPersistedVersion[ns]);
+                 ns, myVersion, _lastPersistedVersion[idx]);
         if (_persistMutex != nullptr) xSemaphoreGive(_persistMutex);
         result.applied = true;
         result.opsApplied = i;
@@ -628,7 +680,7 @@ bool ConfigManager::patchNamespaceConfig(const char* ns, JsonArrayConst ops,
         return false;
     }
     file.close();
-    _lastPersistedVersion[ns] = myVersion;
+    if (idx >= 0) _lastPersistedVersion[idx] = myVersion;
     if (_persistMutex != nullptr) xSemaphoreGive(_persistMutex);
 
     result.applied = true;

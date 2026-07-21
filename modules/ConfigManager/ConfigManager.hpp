@@ -55,7 +55,6 @@
 #pragma once
 
 #include <vector>
-#include <map>
 
 #include <Arduino.h>
 #include <LittleFS.h>
@@ -254,6 +253,24 @@ public:
      */
     void registerMCPTools(MCPToolRegistry& registry) override;
 
+    // -------------------------------------------------------------------------
+    // Write Ordering (Issue #32)
+    // -------------------------------------------------------------------------
+
+    /**
+     * @brief Check whether a write should be skipped because a newer
+     *        snapshot has already been persisted.
+     *
+     * Extracted as a public testable predicate so the stale-skip branch
+     * can be verified without a concurrency harness. Pure const query
+     * with no side effects.
+     *
+     * @param idx       Module index (from internal moduleIndex()).
+     * @param myVersion Version assigned at serialize time.
+     * @return true if the write should be skipped (stale).
+     */
+    bool shouldSkipWrite(int idx, uint32_t myVersion) const;
+
 private:
     // -------------------------------------------------------------------------
     // Private helpers
@@ -310,8 +327,12 @@ private:
     // Checked under _persistMutex at write time: if a newer version already
     // reached flash, the stale write is skipped (not an error — the newer
     // document is a superset of the stale one).
-    std::map<std::string, uint32_t> _configVersion;         ///< Next version to assign per namespace
-    std::map<std::string, uint32_t> _lastPersistedVersion;  ///< Most recent version written to flash per namespace
+    // Indexed by position in _modules (not by string key) to avoid heap
+    // allocations. Sized at beginAll() when the registry is locked.
+    std::vector<uint32_t> _configVersion;         ///< Next version to assign per module slot
+    std::vector<uint32_t> _lastPersistedVersion;  ///< Most recent version written to flash per module slot
+
+    int moduleIndex(const char* ns) const;
 
     /**
      * @brief Serialize a module's current config into a JsonDocument.
