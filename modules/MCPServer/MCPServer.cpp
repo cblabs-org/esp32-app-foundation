@@ -386,11 +386,6 @@ void MCPServer::registerRoutes(PsychicHttpServer& server) {
                 return ESP_FAIL;
             }
 
-            // --- Per-route body size enforcement (1KB) ---
-            if (request->contentLength() > 1024) {
-                response->send(413, "application/json", "{\"error\":\"Payload too large\"}");
-                return ESP_FAIL;
-            }
 
             const char* body = request->bodyCStr();
             if (!body || strlen(body) == 0) {
@@ -453,9 +448,10 @@ void MCPServer::registerRoutes(PsychicHttpServer& server) {
             // --- Guard: bearer token auth (WO6) ---
             if (_authManager && !_authManager->checkMcpAuth(request, response)) return ESP_FAIL;
 
+            // Intentionally tighter than getMaxPostBody() — this route toggles two booleans, max ~50 bytes
             if (request->contentLength() > 512) {
                 response->send(413, "application/json", "{\"error\":\"Payload too large\"}");
-                return ESP_FAIL;
+                return ESP_OK;
             }
 
             const char* body = request->bodyCStr();

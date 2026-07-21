@@ -495,10 +495,11 @@ document.addEventListener('DOMContentLoaded', function() {
   // Fetch /api/tabs once, extract declared scripts, load all scripts
   // (built-in + declared), then build the nav from the cached tabs response.
   window.apiFetch('/api/tabs').then(function(tabs) {
-    // Extract declared script URLs, filtering out null/undefined entries
+    // Extract declared script URLs, filtering out null/undefined and duplicates
     var tabScripts = tabs
       .map(function(t) { return t.script; })
-      .filter(function(s) { return s != null; });
+      .filter(function(s) { return s != null; })
+      .filter(function(s, i, arr) { return arr.indexOf(s) === i; });
 
     loadScripts(tabScripts, function() {
       // Scripts are loaded — now safe to build tabs and dispatch tab-changed

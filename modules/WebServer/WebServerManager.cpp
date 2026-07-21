@@ -313,8 +313,25 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors,
             s_bodyLimits.push_back({prefix, contributor->getMaxPostBody()});
         }
     }
+    // Detect duplicate prefixes — take smallest limit (fail-safe) and warn
+    for (size_t i = 0; i < s_bodyLimits.size(); ++i) {
+        for (size_t j = i + 1; j < s_bodyLimits.size(); ) {
+            if (strcmp(s_bodyLimits[i].prefix, s_bodyLimits[j].prefix) == 0) {
+                size_t keep = std::min(s_bodyLimits[i].maxBody, s_bodyLimits[j].maxBody);
+                ESP_LOGW(TAG, "Duplicate body-limit prefix '%s' (%u vs %u) — using %u (smallest)",
+                         s_bodyLimits[i].prefix,
+                         (unsigned)s_bodyLimits[i].maxBody,
+                         (unsigned)s_bodyLimits[j].maxBody,
+                         (unsigned)keep);
+                s_bodyLimits[i].maxBody = keep;
+                s_bodyLimits.erase(s_bodyLimits.begin() + j);
+            } else {
+                ++j;
+            }
+        }
+    }
     // Sort by prefix length descending for longest-prefix-first matching
-    std::sort(s_bodyLimits.begin(), s_bodyLimits.end(),
+    std::stable_sort(s_bodyLimits.begin(), s_bodyLimits.end(),
         [](const BodyLimitEntry& a, const BodyLimitEntry& b) {
             return strlen(a.prefix) > strlen(b.prefix);
         });
