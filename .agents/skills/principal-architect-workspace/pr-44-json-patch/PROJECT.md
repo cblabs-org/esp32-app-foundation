@@ -15,8 +15,8 @@ All design decisions were agreed in [Issue #28 comment thread](https://github.co
 
 ## Work Order Ledger
 
-- **[ ] [wo1-patch-engine](wo1-patch-engine/WORKORDER.md):** JSON Pointer resolver, patch engine, ConfigManager `patchNamespaceConfig()`, mutex, `saveModuleConfig()` refactor
-- **[ ] [wo2-mcp-tool](wo2-mcp-tool/WORKORDER.md):** `patch_config` MCP tool registration in `MCPBuiltinTools.cpp`
-- **[ ] [wo3-unit-tests](wo3-unit-tests/WORKORDER.md):** 11+ test cases per Issue #28 §11, standalone `JsonPatch` tests
-- **[ ] [wo4-docs](wo4-docs/WORKORDER.md):** Framework-expert skill docs update
-- **[ ] [wo5-build-verification](wo5-build-verification/WORKORDER.md):** 3×3 build matrix + native tests
+- **[x] [wo1-patch-engine](wo1-patch-engine/WORKORDER.md):** JSON Pointer resolver, patch engine, ConfigManager `patchNamespaceConfig()`, mutex, `saveModuleConfig()` refactor
+- **[x] [wo2-mcp-tool](wo2-mcp-tool/WORKORDER.md):** `patch_config` MCP tool registration in `MCPBuiltinTools.cpp`
+- **[x] [wo3-unit-tests](wo3-unit-tests/WORKORDER.md):** 39 test cases (30 standalone + 10 integration) — 401/401 passing
+- **[x] [wo4-docs](wo4-docs/WORKORDER.md):** Framework-expert skill docs update
+- **[x] [wo5-build-verification](wo5-build-verification/WORKORDER.md):** 3×3 build matrix — 416/416 tests, all firmware green
