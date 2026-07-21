@@ -1,0 +1,1 @@
+- `8de7675e-ba83-4873-b5c3-a8d6b4eb9497` - Worker Agent implementing exponential backoff
