@@ -42,7 +42,8 @@ static constexpr const char* TAG = "ConfigManager";
  * from the HTTP task (MCP / REST handlers) and the main loop.
  */
 ConfigManager::ConfigManager()
-    : _configMutex(xSemaphoreCreateMutex())
+    : _configMutex(xSemaphoreCreateMutex()),
+      _persistMutex(xSemaphoreCreateMutex())
 {
 }
 
@@ -273,19 +274,28 @@ bool ConfigManager::saveModuleConfig(IConfigurable* module) {
         xSemaphoreGive(_configMutex);
     }
 
-    // Persist outside lock
+    // Persist outside lock — guarded by _persistMutex for write ordering
+    if (_persistMutex != nullptr) {
+        if (xSemaphoreTake(_persistMutex, pdMS_TO_TICKS(50)) != pdTRUE) {
+            ESP_LOGW(TAG, "saveModuleConfig() — persist mutex timeout for '%s'", ns);
+            return false;
+        }
+    }
     if (!LittleFS.exists("/mod")) { LittleFS.mkdir("/mod"); }
     File file = LittleFS.open(path, "w");
     if (!file) {
         ESP_LOGE(TAG, "Failed to open %s for writing", path);
+        if (_persistMutex != nullptr) xSemaphoreGive(_persistMutex);
         return false;
     }
     if (serializeJson(doc, file) == 0) {
         ESP_LOGE(TAG, "Failed to write config to %s", path);
         file.close();
+        if (_persistMutex != nullptr) xSemaphoreGive(_persistMutex);
         return false;
     }
     file.close();
+    if (_persistMutex != nullptr) xSemaphoreGive(_persistMutex);
 
     ESP_LOGI(TAG, "Config saved for '%s'", ns);
     return true;
@@ -546,52 +556,54 @@ bool ConfigManager::patchNamespaceConfig(const char* ns, JsonArrayConst ops,
 
     // 5. Extract stored values for patched paths (outside lock)
     if (storedValues != nullptr) {
-        JsonObject postRoot = postDoc.as<JsonObject>();
+        JsonVariantConst postRoot = postDoc.as<JsonObjectConst>();
         JsonObject stored = storedValues->to<JsonObject>();
         for (JsonObjectConst op : ops) {
             const char* opPath = op["path"] | "";
-            // Walk the post-apply document to find the stored value at this path
-            JsonVariant val = postRoot;
-            // Simple pointer walk for value extraction
-            char ptrCopy[128];
-            strncpy(ptrCopy, opPath, sizeof(ptrCopy) - 1);
-            ptrCopy[sizeof(ptrCopy) - 1] = '\0';
-            char* token = strtok(ptrCopy + 1, "/");  // skip leading '/'
-            while (token != nullptr && !val.isNull()) {
-                // Check if token is numeric (array index)
-                char* end;
-                long idx = strtol(token, &end, 10);
-                if (*end == '\0' && val.is<JsonArrayConst>()) {
-                    val = val[static_cast<size_t>(idx)];
-                } else {
-                    val = val[token];
-                }
-                token = strtok(nullptr, "/");
-            }
-            if (!val.isNull()) {
+            const char* opType = op["op"] | "";
+            // Only extract stored values for mutating ops (not test)
+            if (strcmp(opType, "test") == 0) continue;
+            JsonVariantConst val;
+            if (JsonPatch::resolveValue(postRoot, opPath, val)) {
                 stored[opPath] = val;
             }
         }
     }
 
-    // 6. Persist outside lock — reuse the serialised document
+    // 6. Persist outside lock — guarded by _persistMutex for write ordering
     const char* modNs = mod->getConfigNamespace();
     char filePath[48];
     getConfigPath(modNs, filePath, sizeof(filePath));
+    if (_persistMutex != nullptr) {
+        if (xSemaphoreTake(_persistMutex, pdMS_TO_TICKS(50)) != pdTRUE) {
+            ESP_LOGW(TAG, "patchNamespaceConfig — persist mutex timeout for '%s'", ns);
+            // Applied in RAM but can't persist — will revert on reboot
+            result.error = JsonPatch::Error::PERSIST_FAILED;
+            result.applied = true;
+            return false;
+        }
+    }
     if (!LittleFS.exists("/mod")) { LittleFS.mkdir("/mod"); }
     File file = LittleFS.open(filePath, "w");
     if (!file) {
         ESP_LOGE(TAG, "patchNamespaceConfig — failed to open %s for writing", filePath);
-        result.applied = false;
+        if (_persistMutex != nullptr) xSemaphoreGive(_persistMutex);
+        // Applied in RAM but flash write failed — will revert on reboot
+        result.error = JsonPatch::Error::PERSIST_FAILED;
+        result.applied = true;
         return false;
     }
     if (serializeJson(postDoc, file) == 0) {
         ESP_LOGE(TAG, "patchNamespaceConfig — failed to write %s", filePath);
         file.close();
-        result.applied = false;
+        if (_persistMutex != nullptr) xSemaphoreGive(_persistMutex);
+        // Applied in RAM but flash write failed — will revert on reboot
+        result.error = JsonPatch::Error::PERSIST_FAILED;
+        result.applied = true;
         return false;
     }
     file.close();
+    if (_persistMutex != nullptr) xSemaphoreGive(_persistMutex);
 
     result.applied = true;
     result.opsApplied = i;

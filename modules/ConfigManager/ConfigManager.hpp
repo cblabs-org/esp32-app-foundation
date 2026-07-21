@@ -302,6 +302,7 @@ private:
     char _metaTimezone[64] = {};           ///< Timezone string for backup _meta envelope (default: "UTC")
     ConfigManifest _manifest;              ///< Three-Tier config lifecycle manifest (Active/Previous/Golden)
     SemaphoreHandle_t _configMutex = nullptr;  ///< Protects serialize/applyConfig pairs
+    SemaphoreHandle_t _persistMutex = nullptr;  ///< Serialises flash writes (file I/O ordering)
 
     /**
      * @brief Serialize a module's current config into a JsonDocument.

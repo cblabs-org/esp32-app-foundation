@@ -43,6 +43,8 @@ public:
     static constexpr int MAX_TOKEN_LEN = 32;
     /// Maximum ops per patch request
     static constexpr int MAX_PATCH_OPS = 32;
+    /// Maximum total JSON Pointer string length (derived from MAX_DEPTH * (MAX_TOKEN_LEN + 1) + 1)
+    static constexpr int MAX_POINTER_LEN = MAX_DEPTH * (MAX_TOKEN_LEN + 1) + 2;
 
     /// Error codes for patch operations
     enum class Error : uint8_t {
@@ -51,17 +53,20 @@ public:
         PATH_NOT_FOUND,        // target path does not exist (for replace/test/remove)
         INDEX_OUT_OF_RANGE,    // array index >= size
         ARRAY_REMOVE_BLOCKED,  // remove on array index not supported in v1
+        ARRAY_INSERT_BLOCKED,  // indexed array insert not supported in v1
         TEST_FAILED,           // test op value mismatch
         UNKNOWN_OP,            // unrecognised op string
         TOO_MANY_OPS,          // ops array exceeds MAX_PATCH_OPS
         MUTEX_TIMEOUT,         // could not acquire config mutex
+        PERSIST_FAILED,        // ops applied in RAM but flash write failed
+        MISSING_VALUE,         // op requires 'value' field but it was absent
     };
 
     /// Result of a patch operation
     struct PatchResult {
         Error  error    = Error::OK;
         int    opIndex  = -1;       // which op failed (-1 = N/A)
-        char   path[128] = {};      // path of failed op (for error reporting)
+        char   path[MAX_POINTER_LEN] = {};  // path of failed op
         bool   applied  = false;    // true only if ALL ops succeeded and were persisted
         int    opsApplied = 0;      // count of ops successfully applied
     };
@@ -91,6 +96,18 @@ public:
      */
     static Error validatePointer(const char* ptr);
 
+    /**
+     * @brief Resolve a JSON Pointer to its value in a document.
+     *
+     * Uses the same pointer resolver and unescaping as applyOne().
+     *
+     * @param root  The root variant to walk from.
+     * @param ptr   Null-terminated JSON Pointer string.
+     * @param out   Output: the resolved value.
+     * @return true if the path resolved successfully.
+     */
+    static bool resolveValue(JsonVariantConst root, const char* ptr, JsonVariantConst& out);
+
 private:
     /**
      * @brief Resolve a JSON Pointer to its parent variant and final token.
@@ -115,4 +132,7 @@ private:
      * @param token Null-terminated token string to unescape.
      */
     static void unescapeToken(char* token);
+
+    /// Strict RFC 6901 array index check: digits only, no leading zeros
+    static bool isStrictIndex(const char* token);
 };

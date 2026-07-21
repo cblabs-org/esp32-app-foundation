@@ -219,7 +219,7 @@ TEST(JsonPatchAdd, ArrayAppendWithDash_ElementAppended) {
     EXPECT_EQ(doc["arr"][2].as<int>(), 3);
 }
 
-TEST(JsonPatchAdd, ArrayAtValidIndex_ElementInserted) {
+TEST(JsonPatchAdd, ArrayAtValidIndex_ArrayInsertBlocked) {
     JsonDocument doc;
     JsonArray arr = doc["arr"].to<JsonArray>();
     arr.add("a");
@@ -233,10 +233,7 @@ TEST(JsonPatchAdd, ArrayAtValidIndex_ElementInserted) {
     auto op = makeOp(opDoc, "add", "/arr/1", valDoc);
 
     char failPath[128] = {};
-    EXPECT_EQ(JsonPatch::applyOne(root, op, failPath, sizeof(failPath)), JsonPatch::Error::OK);
-    EXPECT_EQ(doc["arr"].as<JsonArray>().size(), 4u);
-    EXPECT_STREQ(doc["arr"][1].as<const char*>(), "inserted");
-    EXPECT_STREQ(doc["arr"][2].as<const char*>(), "b");
+    EXPECT_EQ(JsonPatch::applyOne(root, op, failPath, sizeof(failPath)), JsonPatch::Error::ARRAY_INSERT_BLOCKED);
 }
 
 TEST(JsonPatchAdd, ArrayBeyondSize_IndexOutOfRange) {
@@ -452,6 +449,118 @@ TEST(JsonPatchEscaping, KeyContainingTilde0Literally_Tilde01Resolves) {
     char failPath[128] = {};
     EXPECT_EQ(JsonPatch::applyOne(root, op, failPath, sizeof(failPath)), JsonPatch::Error::OK);
     EXPECT_STREQ(doc["p~0q"].as<const char*>(), "updated");
+}
+
+// =============================================================================
+// Test Group: Missing 'value' field (Finding 4)
+// =============================================================================
+
+TEST(JsonPatchMissingValue, AddWithoutValue_MissingValue) {
+    JsonDocument doc;
+    doc["name"] = "test";
+    JsonObject root = doc.as<JsonObject>();
+
+    JsonDocument opDoc;
+    auto op = makeOp(opDoc, "add", "/newkey");
+
+    char failPath[128] = {};
+    EXPECT_EQ(JsonPatch::applyOne(root, op, failPath, sizeof(failPath)), JsonPatch::Error::MISSING_VALUE);
+}
+
+TEST(JsonPatchMissingValue, ReplaceWithoutValue_MissingValue) {
+    JsonDocument doc;
+    doc["name"] = "test";
+    JsonObject root = doc.as<JsonObject>();
+
+    JsonDocument opDoc;
+    auto op = makeOp(opDoc, "replace", "/name");
+
+    char failPath[128] = {};
+    EXPECT_EQ(JsonPatch::applyOne(root, op, failPath, sizeof(failPath)), JsonPatch::Error::MISSING_VALUE);
+}
+
+TEST(JsonPatchMissingValue, TestWithoutValue_MissingValue) {
+    JsonDocument doc;
+    doc["name"] = "test";
+    JsonObject root = doc.as<JsonObject>();
+
+    JsonDocument opDoc;
+    auto op = makeOp(opDoc, "test", "/name");
+
+    char failPath[128] = {};
+    EXPECT_EQ(JsonPatch::applyOne(root, op, failPath, sizeof(failPath)), JsonPatch::Error::MISSING_VALUE);
+}
+
+// =============================================================================
+// Test Group: Strict RFC 6901 array index (Finding 7)
+// =============================================================================
+
+TEST(JsonPatchStrictIndex, LeadingZeroArrayIndex_PathNotFound) {
+    // Leading-zero index "05" is invalid per RFC 6901 — resolveParent should
+    // treat it as an object key (not a number), so path resolution fails.
+    JsonDocument doc;
+    JsonArray arr = doc["arr"].to<JsonArray>();
+    for (int i = 0; i < 10; ++i) arr.add(i * 10);
+    JsonObject root = doc.as<JsonObject>();
+
+    JsonDocument opDoc;
+    JsonDocument valDoc;
+    valDoc.set(999);
+    auto op = makeOp(opDoc, "replace", "/arr/05", valDoc);
+
+    char failPath[128] = {};
+    EXPECT_EQ(JsonPatch::applyOne(root, op, failPath, sizeof(failPath)), JsonPatch::Error::PATH_NOT_FOUND);
+}
+
+// =============================================================================
+// Test Group: resolveValue() (Finding 5)
+// =============================================================================
+
+TEST(JsonPatchResolveValue, EscapedPath_Tilde1AndTilde0) {
+    // Test resolveValue with keys containing '/' and '~'
+    JsonDocument doc;
+    JsonObject root = doc.to<JsonObject>();
+    root["a/b"] = 42;     // key contains '/'
+    root["x~y"] = "tilde"; // key contains '~'
+
+    JsonVariantConst out;
+
+    // "a/b" is addressed as "/a~1b"
+    EXPECT_TRUE(JsonPatch::resolveValue(doc.as<JsonVariantConst>(), "/a~1b", out));
+    EXPECT_EQ(out.as<int>(), 42);
+
+    // "x~y" is addressed as "/x~0y"
+    EXPECT_TRUE(JsonPatch::resolveValue(doc.as<JsonVariantConst>(), "/x~0y", out));
+    EXPECT_STREQ(out.as<const char*>(), "tilde");
+}
+
+TEST(JsonPatchResolveValue, NestedPath_Resolves) {
+    JsonDocument doc;
+    doc["a"]["b"]["c"] = 99;
+
+    JsonVariantConst out;
+    EXPECT_TRUE(JsonPatch::resolveValue(doc.as<JsonVariantConst>(), "/a/b/c", out));
+    EXPECT_EQ(out.as<int>(), 99);
+}
+
+TEST(JsonPatchResolveValue, ArrayIndex_Resolves) {
+    JsonDocument doc;
+    JsonArray arr = doc["arr"].to<JsonArray>();
+    arr.add(10);
+    arr.add(20);
+    arr.add(30);
+
+    JsonVariantConst out;
+    EXPECT_TRUE(JsonPatch::resolveValue(doc.as<JsonVariantConst>(), "/arr/1", out));
+    EXPECT_EQ(out.as<int>(), 20);
+}
+
+TEST(JsonPatchResolveValue, NonExistentPath_ReturnsFalse) {
+    JsonDocument doc;
+    doc["a"] = 1;
+
+    JsonVariantConst out;
+    EXPECT_FALSE(JsonPatch::resolveValue(doc.as<JsonVariantConst>(), "/missing", out));
 }
 
 // NOTE: GoogleTest main() entry point is in test_configManager.cpp.

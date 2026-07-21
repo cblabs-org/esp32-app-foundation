@@ -48,6 +48,14 @@ JsonPatch::Error JsonPatch::validatePointer(const char* ptr) {
     }
 
     size_t len = strlen(ptr);
+
+    // Total length must fit in our working buffer
+    if (len >= static_cast<size_t>(MAX_POINTER_LEN)) {
+        ESP_LOGW(TAG, "validatePointer — pointer length %d exceeds MAX_POINTER_LEN %d",
+                 (int)len, MAX_POINTER_LEN);
+        return Error::INVALID_POINTER;
+    }
+
     if (len > 1 && ptr[len - 1] == '/') {
         ESP_LOGW(TAG, "validatePointer — trailing '/' not allowed");
         return Error::INVALID_POINTER;
@@ -148,7 +156,7 @@ void JsonPatch::unescapeToken(char* token) {
 bool JsonPatch::resolveParent(JsonVariant root, const char* ptr,
                               JsonVariant& parent, char* lastToken, size_t lastTokenCap) {
     // Work with a mutable copy for tokenisation
-    char buf[192];
+    char buf[MAX_POINTER_LEN];
     size_t ptrLen = strlen(ptr);
     if (ptrLen >= sizeof(buf)) return false;
     memcpy(buf, ptr, ptrLen + 1);
@@ -185,9 +193,8 @@ bool JsonPatch::resolveParent(JsonVariant root, const char* ptr,
         const char* tok = tokens[i];
 
         // Check if this token is a numeric array index
-        char* end;
-        long idx = strtol(tok, &end, 10);
-        if (*end == '\0' && tok[0] != '\0' && current.is<JsonArrayConst>()) {
+        if (isStrictIndex(tok) && current.is<JsonArrayConst>()) {
+            long idx = atoi(tok);
             // Numeric index into array
             if (idx < 0 || static_cast<size_t>(idx) >= current.as<JsonArray>().size()) {
                 return false;
@@ -254,6 +261,14 @@ JsonPatch::Error JsonPatch::applyOne(JsonObject& doc, JsonObjectConst op,
         return valErr;
     }
 
+    // RFC 6902 requires 'value' for replace, add, test
+    if (strcmp(opStr, "replace") == 0 || strcmp(opStr, "add") == 0 || strcmp(opStr, "test") == 0) {
+        if (!op["value"].is<JsonVariantConst>()) {
+            ESP_LOGW(TAG, "applyOne — missing 'value' field for op '%s'", opStr);
+            return Error::MISSING_VALUE;
+        }
+    }
+
     // Copy path into failedPath early (overwritten on success is fine)
     if (failedPath && pathCap > 0) {
         strncpy(failedPath, path, pathCap - 1);
@@ -276,24 +291,27 @@ JsonPatch::Error JsonPatch::applyOne(JsonObject& doc, JsonObjectConst op,
         // Target must exist
         if (parent.is<JsonObject>()) {
             JsonObject parentObj = parent.as<JsonObject>();
+            // NOTE: ArduinoJson's isNull() returns true for both absent keys and keys
+            // holding a literal JSON null value. This means a key explicitly set to null
+            // cannot be replaced — it is treated as non-existent. This is deliberate for
+            // config use (null config values are semantically equivalent to absent).
             if (!parentObj[lastToken].is<JsonVariant>() || parentObj[lastToken].isNull()) {
                 ESP_LOGW(TAG, "replace — target does not exist: %s", path);
                 return Error::PATH_NOT_FOUND;
             }
             parentObj[lastToken] = op["value"];
         } else if (parent.is<JsonArray>()) {
-            char* end;
-            long idx = strtol(lastToken, &end, 10);
-            if (*end != '\0') {
+            if (!isStrictIndex(lastToken)) {
                 ESP_LOGW(TAG, "replace — non-numeric array index: %s", lastToken);
                 return Error::PATH_NOT_FOUND;
             }
+            size_t idx = static_cast<size_t>(atoi(lastToken));
             JsonArray arr = parent.as<JsonArray>();
-            if (idx < 0 || static_cast<size_t>(idx) >= arr.size()) {
-                ESP_LOGW(TAG, "replace — index %ld out of range (size=%d)", idx, (int)arr.size());
+            if (idx >= arr.size()) {
+                ESP_LOGW(TAG, "replace — index %zu out of range (size=%d)", idx, (int)arr.size());
                 return Error::INDEX_OUT_OF_RANGE;
             }
-            arr[static_cast<size_t>(idx)] = op["value"];
+            arr[idx] = op["value"];
         } else {
             ESP_LOGW(TAG, "replace — parent is neither object nor array: %s", path);
             return Error::PATH_NOT_FOUND;
@@ -321,24 +339,10 @@ JsonPatch::Error JsonPatch::applyOne(JsonObject& doc, JsonObjectConst op,
                 // Append to array
                 arr.add(op["value"]);
             } else {
-                // Numeric index — insert at position
-                char* end;
-                long idx = strtol(lastToken, &end, 10);
-                if (*end != '\0') {
-                    ESP_LOGW(TAG, "add — non-numeric array index: %s", lastToken);
-                    return Error::PATH_NOT_FOUND;
-                }
-                if (idx < 0 || static_cast<size_t>(idx) > arr.size()) {
-                    ESP_LOGW(TAG, "add — index %ld out of range (size=%d)", idx, (int)arr.size());
-                    return Error::INDEX_OUT_OF_RANGE;
-                }
-                // ArduinoJson doesn't have a direct insert; shift elements manually
-                // Add a null at the end first, then shift right from the insertion point
-                arr.add(nullptr);
-                for (size_t j = arr.size() - 1; j > static_cast<size_t>(idx); --j) {
-                    arr[j] = arr[j - 1];
-                }
-                arr[static_cast<size_t>(idx)] = op["value"];
+                // Indexed array insert blocked in v1 — same shift hazard as remove.
+                // Config arrays are fixed-extent; only append via "-" is supported.
+                ESP_LOGW(TAG, "add — indexed array insert not supported: %s", path);
+                return Error::ARRAY_INSERT_BLOCKED;
             }
         } else {
             ESP_LOGW(TAG, "add — parent is neither object nor array: %s", path);
@@ -360,30 +364,37 @@ JsonPatch::Error JsonPatch::applyOne(JsonObject& doc, JsonObjectConst op,
         JsonVariant target;
         if (parent.is<JsonObject>()) {
             JsonObject parentObj = parent.as<JsonObject>();
+            // NOTE: ArduinoJson's isNull() returns true for both absent keys and keys
+            // holding a literal JSON null value. This means a key explicitly set to null
+            // cannot be tested — it is treated as non-existent. This is deliberate for
+            // config use (null config values are semantically equivalent to absent).
             if (!parentObj[lastToken].is<JsonVariant>() || parentObj[lastToken].isNull()) {
                 ESP_LOGW(TAG, "test — target does not exist: %s", path);
                 return Error::PATH_NOT_FOUND;
             }
             target = parentObj[lastToken];
         } else if (parent.is<JsonArray>()) {
-            char* end;
-            long idx = strtol(lastToken, &end, 10);
-            if (*end != '\0') {
+            if (!isStrictIndex(lastToken)) {
                 ESP_LOGW(TAG, "test — non-numeric array index: %s", lastToken);
                 return Error::PATH_NOT_FOUND;
             }
+            size_t idx = static_cast<size_t>(atoi(lastToken));
             JsonArray arr = parent.as<JsonArray>();
-            if (idx < 0 || static_cast<size_t>(idx) >= arr.size()) {
-                ESP_LOGW(TAG, "test — index %ld out of range (size=%d)", idx, (int)arr.size());
+            if (idx >= arr.size()) {
+                ESP_LOGW(TAG, "test — index %zu out of range (size=%d)", idx, (int)arr.size());
                 return Error::INDEX_OUT_OF_RANGE;
             }
-            target = arr[static_cast<size_t>(idx)];
+            target = arr[idx];
         } else {
             ESP_LOGW(TAG, "test — parent is neither object nor array: %s", path);
             return Error::PATH_NOT_FOUND;
         }
 
         // Compare target value against op["value"]
+        // NOTE: ArduinoJson's comparison coerces across numeric types, so
+        // test with integer 5 matches stored 5.0. This is more forgiving than
+        // RFC 6902's strict equality requirement, but appropriate for config
+        // CAS operations where numeric precision is rarely the concern.
         JsonVariantConst expected = op["value"];
         if (target != expected) {
             ESP_LOGW(TAG, "test — value mismatch at %s", path);
@@ -410,6 +421,10 @@ JsonPatch::Error JsonPatch::applyOne(JsonObject& doc, JsonObjectConst op,
 
         if (parent.is<JsonObject>()) {
             JsonObject parentObj = parent.as<JsonObject>();
+            // NOTE: ArduinoJson's isNull() returns true for both absent keys and keys
+            // holding a literal JSON null value. This means a key explicitly set to null
+            // cannot be removed — it is treated as non-existent. This is deliberate for
+            // config use (null config values are semantically equivalent to absent).
             if (!parentObj[lastToken].is<JsonVariant>() || parentObj[lastToken].isNull()) {
                 ESP_LOGW(TAG, "remove — key does not exist: %s", path);
                 return Error::PATH_NOT_FOUND;
@@ -427,4 +442,81 @@ JsonPatch::Error JsonPatch::applyOne(JsonObject& doc, JsonObjectConst op,
     // -------------------------------------------------------------------------
     ESP_LOGW(TAG, "applyOne — unknown op: '%s'", opStr);
     return Error::UNKNOWN_OP;
+}
+
+// =============================================================================
+// Strict RFC 6901 Array Index Check
+// =============================================================================
+
+/**
+ * @brief Check if a token is a valid RFC 6901 array index.
+ *
+ * Valid indices are strings of digits with no leading zeros (except "0" itself).
+ * This replaces the previous strtol-based checks for stricter RFC compliance.
+ *
+ * @param token Null-terminated token string.
+ * @return true if the token is a valid array index.
+ */
+bool JsonPatch::isStrictIndex(const char* token) {
+    if (token == nullptr || token[0] == '\0') return false;
+    // Leading zero only valid for "0" itself
+    if (token[0] == '0' && token[1] != '\0') return false;
+    for (const char* p = token; *p; ++p) {
+        if (*p < '0' || *p > '9') return false;
+    }
+    return true;
+}
+
+// =============================================================================
+// Value Resolution (read-only pointer walk)
+// =============================================================================
+
+/**
+ * @brief Resolve a JSON Pointer to its value in a document.
+ *
+ * Uses the same pointer unescaping logic as applyOne()/resolveParent() but
+ * operates on a const document. Intended for extracting stored values from
+ * a post-apply snapshot.
+ *
+ * @param root  The root variant to walk from.
+ * @param ptr   Null-terminated JSON Pointer string.
+ * @param out   Output: the resolved value.
+ * @return true if the path resolved successfully.
+ */
+bool JsonPatch::resolveValue(JsonVariantConst root, const char* ptr, JsonVariantConst& out) {
+    if (ptr == nullptr || ptr[0] != '/') return false;
+
+    char buf[MAX_POINTER_LEN];
+    size_t ptrLen = strlen(ptr);
+    if (ptrLen >= sizeof(buf)) return false;
+    memcpy(buf, ptr, ptrLen + 1);
+
+    JsonVariantConst current = root;
+    char* p = buf + 1;  // skip leading '/'
+    while (*p) {
+        char* token = p;
+        char* slash = strchr(p, '/');
+        if (slash) {
+            *slash = '\0';
+            p = slash + 1;
+        } else {
+            p = p + strlen(p);
+        }
+        unescapeToken(token);
+
+        if (current.is<JsonArrayConst>()) {
+            // Strict RFC 6901 numeric index
+            if (!isStrictIndex(token)) return false;
+            size_t idx = static_cast<size_t>(atoi(token));
+            if (idx >= current.as<JsonArrayConst>().size()) return false;
+            current = current[idx];
+        } else if (current.is<JsonObjectConst>()) {
+            current = current[token];
+        } else {
+            return false;
+        }
+        if (current.isNull()) return false;
+    }
+    out = current;
+    return true;
 }

@@ -362,6 +362,8 @@ void mcpBuiltinTools::registerAll(MCPToolRegistry& registry,
                         errMsg = "Array index out of range"; break;
                     case JsonPatch::Error::ARRAY_REMOVE_BLOCKED:
                         errMsg = "Remove on array index not supported (use replace with sentinel)"; break;
+                    case JsonPatch::Error::ARRAY_INSERT_BLOCKED:
+                        errMsg = "Indexed array insert not supported (use '-' to append)"; break;
                     case JsonPatch::Error::TEST_FAILED:
                         errMsg = "Test op failed — value mismatch (batch aborted)"; break;
                     case JsonPatch::Error::UNKNOWN_OP:
@@ -370,13 +372,17 @@ void mcpBuiltinTools::registerAll(MCPToolRegistry& registry,
                         errMsg = "Too many ops (max 32)"; break;
                     case JsonPatch::Error::MUTEX_TIMEOUT:
                         errMsg = "Config mutex busy — try again"; break;
+                    case JsonPatch::Error::PERSIST_FAILED:
+                        errMsg = "Applied in memory but flash write failed — will revert on reboot"; break;
+                    case JsonPatch::Error::MISSING_VALUE:
+                        errMsg = "Missing 'value' field (required for replace, add, test)"; break;
                     default:
                         break;
                 }
                 result["error"]     = errMsg;
                 result["failed_op"] = patchResult.opIndex;
                 result["path"]      = patchResult.path;
-                result["applied"]   = false;
+                result["applied"]   = patchResult.applied;  // true for PERSIST_FAILED (applied in RAM)
                 result["isError"]   = true;
             }
         },
