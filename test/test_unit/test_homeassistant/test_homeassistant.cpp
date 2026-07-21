@@ -237,6 +237,30 @@ TEST_F(HomeAssistantBackoffTest, SkipCountTrackedThroughCompletion) {
     EXPECT_EQ(ha._entitiesSkipped, 0);
 }
 
+TEST_F(HomeAssistantBackoffTest, RepublishAfterDrainDoesNotFalseStall) {
+    // Complete the initial drain successfully
+    mock_mqtt_publish_return_value = 0;
+    ha.tick(2000);   // 5 entities
+    ha.tick(2100);   // 1 entity → discovery done, state sync starts
+    ha.tick(2200);   // state sync complete
+    EXPECT_FALSE(ha.isDiscoveryDrainActive());
+
+    // Advance time well past DRAIN_STALL_TIMEOUT_MS relative to original drainStartMs
+    uint32_t republishTime = 1000 + 60000;  // 60s after original drain start
+    
+    // Trigger republish (e.g. channel label edit) — resetDrainState() must reset drainStartMs
+    ha.republishDiscovery();
+    EXPECT_TRUE(ha._discoveryPending);
+    
+    // First tick of the new drain — should NOT fire stall
+    mock_mqtt_publish_return_value = -1;  // Force a failure so we enter the stall-check path
+    ha.tick(republishTime);
+    
+    EXPECT_FALSE(stallEventReceived);
+    EXPECT_FALSE(ha._drainStallReported);
+    EXPECT_EQ(ha._entitiesSkipped, 0);
+}
+
 int main(int argc, char **argv) {
     ::testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();

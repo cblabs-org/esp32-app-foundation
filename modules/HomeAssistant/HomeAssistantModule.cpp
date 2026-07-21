@@ -209,7 +209,24 @@ void HomeAssistantModule::generateDiscoveryJson(IHaEntity* entity, JsonObject& p
 void HomeAssistantModule::republishDiscovery() {
     if (!_mqttConnected) return;
     _discoveryPending = true;
+    resetDrainState();
+}
+
+/**
+ * @brief Resets all drain-related state for a fresh discovery cycle.
+ *
+ * Called from both MQTT_EVENT_CONNECTED and republishDiscovery() to ensure
+ * consistent initialization. Extracting into a helper prevents the two
+ * paths from drifting — the bug that caused false stall events on republish
+ * (Issue #34 review).
+ */
+void HomeAssistantModule::resetDrainState() {
     _discoveryIndex = 0;
+    _retryIntervalMs = 0;
+    _lastRetryAttemptMs = 0;
+    _drainStartMs = millis();
+    _drainStallReported = false;
+    _entitiesSkipped = 0;
 }
 
 /**
@@ -327,12 +344,7 @@ void HomeAssistantModule::mqttEventHandler(void* handler_args, esp_event_base_t 
             // Discovery payloads are published in bounded chunks via tick()
             // instead of flooding the outbox in one burst.
             self->_discoveryPending = true;
-            self->_discoveryIndex = 0;
-            self->_retryIntervalMs = 0;
-            self->_lastRetryAttemptMs = 0;
-            self->_drainStartMs = millis();
-            self->_drainStallReported = false;
-            self->_entitiesSkipped = 0;
+            self->resetDrainState();
             
             // Subscribe to command topics (lightweight — no outbox pressure)
             for (auto* entity : self->_entities) {

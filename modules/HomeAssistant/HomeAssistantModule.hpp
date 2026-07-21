@@ -129,6 +129,14 @@ private:
     bool     _drainStallReported{false};     ///< One-shot flag: stall event already published this drain
     size_t   _entitiesSkipped{0};           ///< Running count of entities skipped in current drain
 
+    /**
+     * @brief Resets all drain-related state for a fresh discovery cycle.
+     *
+     * Called from both MQTT_EVENT_CONNECTED and republishDiscovery() to ensure
+     * consistent initialization and prevent path drift.
+     */
+    void resetDrainState();
+
     /** @brief EventBus callback: initiates MQTT connection when wifi comes up. */
     static void onWifiConnected(const char* topic, const void* payload, void* ctx);
 
