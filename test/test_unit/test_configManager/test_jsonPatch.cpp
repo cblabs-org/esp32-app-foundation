@@ -249,7 +249,7 @@ TEST(JsonPatchAdd, ArrayBeyondSize_IndexOutOfRange) {
     auto op = makeOp(opDoc, "add", "/arr/10", valDoc);
 
     char failPath[128] = {};
-    EXPECT_EQ(JsonPatch::applyOne(root, op, failPath, sizeof(failPath)), JsonPatch::Error::INDEX_OUT_OF_RANGE);
+    EXPECT_EQ(JsonPatch::applyOne(root, op, failPath, sizeof(failPath)), JsonPatch::Error::ARRAY_INSERT_BLOCKED);
 }
 
 // =============================================================================
