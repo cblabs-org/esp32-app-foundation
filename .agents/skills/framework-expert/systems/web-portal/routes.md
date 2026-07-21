@@ -71,3 +71,16 @@ void MyModule::registerRoutes(PsychicHttpServer* server) {
 ```
 
 By strictly adhering to stack-allocated JSON documents and enforcing body size caps via the global middleware, the web server remains stable even under heavy load or malicious input.
+
+## Built-in MCP Tool Endpoints
+
+For AI agent interaction, the framework provides built-in JSON-RPC 2.0 MCP tools mapped alongside REST endpoints:
+
+- `system_info`: Device telemetry (heap, PSRAM, storage, WiFi, uptime).
+- `get_config`: Read all module configurations.
+- `set_config`: Update full configuration by namespace (`{"config":{"wifi":{...}}}`).
+- `patch_config`: Apply RFC 6902 JSON Patch ops to a single config namespace.
+- `reboot`: Restart the device with a 1-second flush delay.
+- `get_logs`: Read buffered log entries.
+- `list_tools`: Enumerate all registered MCP tools and schemas.
+- `capture_display`: Capture monochrome/RGB display framebuffer.

@@ -30,6 +30,7 @@
     "systems/display/screensaver.md",
     "systems/config/overview.md",
     "systems/config/persistence.md",
+    "systems/config/config-manager.md",
     "systems/config/framework-config.md",
     "systems/event-bus/overview.md",
     "systems/event-bus/framework-topics.md",

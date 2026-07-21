@@ -14,6 +14,7 @@ Registered by `MCPBuiltinTools` — framework-level, available on every device:
 | `system_info` | Device telemetry: heap, PSRAM, storage, WiFi, temp, chip, partition, uptime, firmware | No |
 | `get_config` | Read all module configs (display, wifi, mcp, ota, etc.) | No |
 | `set_config` | Update config by namespace: `{"config":{"wifi":{"ssid":"X"}}}` | **Yes** |
+| `patch_config` | Apply RFC 6902 JSON Patch ops to a config namespace | **Yes** |
 | `reboot` | Restart device (1s delay for response flush) | **Yes** |
 | `get_logs` | Log buffer (placeholder — ring-buffer logger planned) | No |
 | `list_tools` | Enumerate all registered tools with descriptions and schemas | No |
