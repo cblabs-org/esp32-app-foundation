@@ -134,6 +134,10 @@ public:
      * The prefix is matched using startsWith() — e.g. returning "/api/mcp"
      * matches "/api/mcp", "/api/mcp/config", etc.
      *
+     * The returned string must have static storage duration (compile-time
+     * string literal). Do not return String::c_str() or heap-allocated
+     * memory — the pointer is stored for the process lifetime.
+     *
      * @return API path prefix string (e.g. "/api/mcp"), or nullptr.
      */
     virtual const char* getApiPrefix() const { return nullptr; }
