@@ -12,6 +12,13 @@
  *              handles schema versioning and migration, and provides bulk
  *              export/import for backup/restore.
  *
+ *              Thread safety: a FreeRTOS mutex protects the
+ *              serialize→applyConfig window against concurrent access
+ *              from the HTTP task (MCP / REST) and the main loop.
+ *
+ *              JSON Patch (RFC 6902 subset): patchNamespaceConfig() provides
+ *              element-level config addressing for the MCP config_patch tool.
+ *
  * Exported Functions/Classes:
  * - ConfigManager: see ConfigManager.hpp
  */
@@ -23,6 +30,22 @@
 #include "MCPToolRegistry.hpp"
 
 static constexpr const char* TAG = "ConfigManager";
+
+// =============================================================================
+// Constructor
+// =============================================================================
+
+/**
+ * @brief Construct ConfigManager and create the config mutex.
+ *
+ * The mutex protects serialize/applyConfig pairs against concurrent access
+ * from the HTTP task (MCP / REST handlers) and the main loop.
+ */
+ConfigManager::ConfigManager()
+    : _configMutex(xSemaphoreCreateMutex()),
+      _persistMutex(xSemaphoreCreateMutex())
+{
+}
 
 // =============================================================================
 // Path Helper
@@ -193,15 +216,36 @@ void ConfigManager::loadModuleConfig(IConfigurable* module) {
 }
 
 // =============================================================================
+// Serialize Helper
+// =============================================================================
+
+/**
+ * @brief Serialize a module's current config into a JsonDocument.
+ *
+ * Extracted from saveModuleConfig() so the serialize step can run
+ * under mutex while the persist step runs outside it.
+ *
+ * @param module Pointer to the IConfigurable module.
+ * @param outDoc Output JsonDocument to serialize into (cleared first via to<>).
+ * @return true on success.
+ */
+bool ConfigManager::serializeModuleToDoc(IConfigurable* module, JsonDocument& outDoc) {
+    JsonObject root = outDoc.to<JsonObject>();
+    module->serializeConfig(root);
+    outDoc["_v"] = module->getSchemaVersion();
+    return true;
+}
+
+// =============================================================================
 // Save
 // =============================================================================
 
 /**
  * @brief Persist a single module's current configuration to its namespace file.
  *
- * Creates a JsonDocument (~256 bytes), calls serializeConfig() to populate it,
- * sets the _v field, and writes directly to the file stream (no intermediate
- * String buffer — critical for embedded memory constraints).
+ * Serializes under the config mutex (if available), then persists to flash
+ * outside the lock. No intermediate String buffer — writes directly to the
+ * file stream (critical for embedded memory constraints).
  *
  * @param module Pointer to the IConfigurable module to save.
  * @return true if successfully saved; false on error.
@@ -215,34 +259,57 @@ bool ConfigManager::saveModuleConfig(IConfigurable* module) {
     const char* ns = module->getConfigNamespace();
     char path[48];
     getConfigPath(ns, path, sizeof(path));
-
     ESP_LOGI(TAG, "Saving config for '%s' to %s", ns, path);
 
-    // --- Build the JSON document ---
+    // Serialize under mutex (if available), persist outside
     JsonDocument doc;
-    JsonObject root = doc.to<JsonObject>();
-    module->serializeConfig(root);
-    doc["_v"] = module->getSchemaVersion();
-
-    // --- Write to file ---
-    // Ensure the /mod/ directory exists
-    if (!LittleFS.exists("/mod")) {
-        LittleFS.mkdir("/mod");
+    uint32_t myVersion = 0;
+    if (_configMutex != nullptr) {
+        if (xSemaphoreTake(_configMutex, pdMS_TO_TICKS(50)) != pdTRUE) {
+            ESP_LOGW(TAG, "saveModuleConfig() — mutex timeout for '%s'", ns);
+            return false;
+        }
+    }
+    serializeModuleToDoc(module, doc);
+    // Assign monotonic version under _configMutex (Issue #32 write ordering)
+    myVersion = ++_configVersion[ns];
+    if (_configMutex != nullptr) {
+        xSemaphoreGive(_configMutex);
     }
 
+    // Persist outside lock — guarded by _persistMutex for write ordering
+    if (_persistMutex != nullptr) {
+        if (xSemaphoreTake(_persistMutex, pdMS_TO_TICKS(50)) != pdTRUE) {
+            ESP_LOGW(TAG, "saveModuleConfig() — persist mutex timeout for '%s'", ns);
+            return false;
+        }
+    }
+    // Freshness check: skip write if a newer snapshot already reached flash.
+    // This is correct (not a compromise) because both writers serialise the
+    // module's complete state — the newer document is a superset of ours.
+    // Counter is per-namespace to avoid cross-namespace interference (Issue #32).
+    if (myVersion < _lastPersistedVersion[ns]) {
+        ESP_LOGI(TAG, "saveModuleConfig() — skipping stale write for '%s' (v%u < v%u)",
+                 ns, myVersion, _lastPersistedVersion[ns]);
+        if (_persistMutex != nullptr) xSemaphoreGive(_persistMutex);
+        return true;  // not an error: newer state is already on disk
+    }
+    if (!LittleFS.exists("/mod")) { LittleFS.mkdir("/mod"); }
     File file = LittleFS.open(path, "w");
     if (!file) {
         ESP_LOGE(TAG, "Failed to open %s for writing", path);
+        if (_persistMutex != nullptr) xSemaphoreGive(_persistMutex);
         return false;
     }
-
-    // CRITICAL: serialize directly to File stream — no intermediate String
     if (serializeJson(doc, file) == 0) {
         ESP_LOGE(TAG, "Failed to write config to %s", path);
         file.close();
+        if (_persistMutex != nullptr) xSemaphoreGive(_persistMutex);
         return false;
     }
     file.close();
+    _lastPersistedVersion[ns] = myVersion;
+    if (_persistMutex != nullptr) xSemaphoreGive(_persistMutex);
 
     ESP_LOGI(TAG, "Config saved for '%s'", ns);
     return true;
@@ -377,10 +444,15 @@ bool ConfigManager::importAllConfig(JsonDocument& inDoc) {
         // applyConfig() always receives a COMPLETE section — preventing
         // modules that reset-then-load from losing omitted keys.
         // NOTE: Array values are replaced wholesale (ArduinoJson semantics)
-        // — element-level merge requires JSON Patch (deferred to follow-up).
-        // TODO: A _configMutex protecting serializeConfig/applyConfig pairs
-        // would close the pre-existing thread-safety window between the HTTP
-        // task (MCP handler) and the main loop. Scoped as a follow-up.
+        // — element-level merge requires JSON Patch (patchNamespaceConfig).
+        if (_configMutex != nullptr) {
+            if (xSemaphoreTake(_configMutex, pdMS_TO_TICKS(50)) != pdTRUE) {
+                ESP_LOGW(TAG, "importAllConfig() — mutex timeout for '%s'", ns);
+                allOk = false;
+                continue;
+            }
+        }
+
         JsonDocument cur;
         JsonObject curSec = cur.to<JsonObject>();
         mod->serializeConfig(curSec);        // snapshot current state
@@ -393,6 +465,11 @@ bool ConfigManager::importAllConfig(JsonDocument& inDoc) {
 
         mod->applyConfig(curSec);            // module sees complete section
 
+        if (_configMutex != nullptr) {
+            xSemaphoreGive(_configMutex);
+        }
+
+        // saveModuleConfig persists outside lock via its own refactored path
         if (!saveModuleConfig(mod)) {
             ESP_LOGE(TAG, "Failed to save imported config for '%s'", ns);
             allOk = false;
@@ -410,6 +487,154 @@ bool ConfigManager::exportNamespaceConfig(const char* ns, JsonObject& outSection
         }
     }
     return false;
+}
+
+// =============================================================================
+// JSON Patch — Element-Level Config Addressing
+// =============================================================================
+
+/**
+ * @brief Apply RFC 6902 JSON Patch ops to a single namespace.
+ *
+ * Atomic: either ALL ops succeed and are persisted, or NONE are.
+ * The config mutex is held during the snapshot→apply→serialize
+ * window; flash I/O happens outside the lock.
+ *
+ * Sequence: snapshot → apply ops → applyConfig() → serializeModuleToDoc()
+ * (all under mutex) → persist outside lock.
+ *
+ * @param ns   Namespace to patch (e.g. "pm_channels").
+ * @param ops  Array of RFC 6902 op objects.
+ * @param result Output: error details and stored values.
+ * @param storedValues Optional: if non-null, receives the post-clamp
+ *                     values for each patched path.
+ * @return true if all ops applied successfully.
+ */
+bool ConfigManager::patchNamespaceConfig(const char* ns, JsonArrayConst ops,
+                                         JsonPatch::PatchResult& result,
+                                         JsonDocument* storedValues) {
+    // Find module by namespace
+    IConfigurable* mod = nullptr;
+    for (auto* m : _modules) {
+        if (strcmp(m->getConfigNamespace(), ns) == 0) { mod = m; break; }
+    }
+    if (!mod) {
+        result.error = JsonPatch::Error::PATH_NOT_FOUND;
+        result.applied = false;
+        snprintf(result.path, sizeof(result.path), "(namespace '%s' not found)", ns);
+        return false;
+    }
+
+    if (static_cast<int>(ops.size()) > JsonPatch::MAX_PATCH_OPS) {
+        result.error = JsonPatch::Error::TOO_MANY_OPS;
+        result.applied = false;
+        return false;
+    }
+
+    // Acquire mutex
+    if (_configMutex != nullptr) {
+        if (xSemaphoreTake(_configMutex, pdMS_TO_TICKS(50)) != pdTRUE) {
+            result.error = JsonPatch::Error::MUTEX_TIMEOUT;
+            result.applied = false;
+            return false;
+        }
+    }
+
+    // 1. Snapshot current state
+    JsonDocument cur;
+    JsonObject sec = cur.to<JsonObject>();
+    mod->serializeConfig(sec);
+
+    // 2. Apply every op to the scratch copy
+    int i = 0;
+    for (JsonObjectConst op : ops) {
+        JsonPatch::Error err = JsonPatch::applyOne(sec, op, result.path, sizeof(result.path));
+        if (err != JsonPatch::Error::OK) {
+            result.error = err;
+            result.opIndex = i;
+            result.applied = false;
+            if (_configMutex != nullptr) xSemaphoreGive(_configMutex);
+            return false;
+        }
+        ++i;
+    }
+
+    // 3. Commit — module ingests, clamps, normalises
+    mod->applyConfig(sec);
+
+    // 4. Serialize post-apply state (for response + persist) — still under lock
+    JsonDocument postDoc;
+    serializeModuleToDoc(mod, postDoc);
+    // Assign monotonic version under _configMutex (Issue #32 write ordering)
+    uint32_t myVersion = ++_configVersion[ns];
+
+    if (_configMutex != nullptr) xSemaphoreGive(_configMutex);
+
+    // 5. Extract stored values for patched paths (outside lock)
+    if (storedValues != nullptr) {
+        JsonVariantConst postRoot = postDoc.as<JsonObjectConst>();
+        JsonObject stored = storedValues->to<JsonObject>();
+        for (JsonObjectConst op : ops) {
+            const char* opPath = op["path"] | "";
+            const char* opType = op["op"] | "";
+            // Only extract stored values for mutating ops (not test)
+            if (strcmp(opType, "test") == 0) continue;
+            JsonVariantConst val;
+            if (JsonPatch::resolveValue(postRoot, opPath, val)) {
+                stored[opPath] = val;
+            }
+        }
+    }
+
+    // 6. Persist outside lock — guarded by _persistMutex for write ordering
+    const char* modNs = mod->getConfigNamespace();
+    char filePath[48];
+    getConfigPath(modNs, filePath, sizeof(filePath));
+    if (_persistMutex != nullptr) {
+        if (xSemaphoreTake(_persistMutex, pdMS_TO_TICKS(50)) != pdTRUE) {
+            ESP_LOGW(TAG, "patchNamespaceConfig — persist mutex timeout for '%s'", ns);
+            // Applied in RAM but can't persist — will revert on reboot
+            result.error = JsonPatch::Error::PERSIST_FAILED;
+            result.applied = true;
+            return false;
+        }
+    }
+    // Freshness check: skip write if a newer snapshot already reached flash (Issue #32)
+    if (myVersion < _lastPersistedVersion[ns]) {
+        ESP_LOGI(TAG, "patchNamespaceConfig — skipping stale write for '%s' (v%u < v%u)",
+                 ns, myVersion, _lastPersistedVersion[ns]);
+        if (_persistMutex != nullptr) xSemaphoreGive(_persistMutex);
+        result.applied = true;
+        result.opsApplied = i;
+        return true;  // not an error: newer state is already on disk
+    }
+    if (!LittleFS.exists("/mod")) { LittleFS.mkdir("/mod"); }
+    File file = LittleFS.open(filePath, "w");
+    if (!file) {
+        ESP_LOGE(TAG, "patchNamespaceConfig — failed to open %s for writing", filePath);
+        if (_persistMutex != nullptr) xSemaphoreGive(_persistMutex);
+        // Applied in RAM but flash write failed — will revert on reboot
+        result.error = JsonPatch::Error::PERSIST_FAILED;
+        result.applied = true;
+        return false;
+    }
+    if (serializeJson(postDoc, file) == 0) {
+        ESP_LOGE(TAG, "patchNamespaceConfig — failed to write %s", filePath);
+        file.close();
+        if (_persistMutex != nullptr) xSemaphoreGive(_persistMutex);
+        // Applied in RAM but flash write failed — will revert on reboot
+        result.error = JsonPatch::Error::PERSIST_FAILED;
+        result.applied = true;
+        return false;
+    }
+    file.close();
+    _lastPersistedVersion[ns] = myVersion;
+    if (_persistMutex != nullptr) xSemaphoreGive(_persistMutex);
+
+    result.applied = true;
+    result.opsApplied = i;
+    ESP_LOGI(TAG, "Patched '%s': %d ops applied", ns, i);
+    return true;
 }
 
 
