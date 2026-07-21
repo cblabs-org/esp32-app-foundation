@@ -12,6 +12,13 @@
  *              handles schema versioning via self-describing _v fields,
  *              orchestrates migration on boot, and provides bulk export/import.
  *
+ *              Thread safety: a FreeRTOS mutex protects the
+ *              serialize→applyConfig window against concurrent access
+ *              from the HTTP task (MCP / REST) and the main loop.
+ *
+ *              JSON Patch (RFC 6902 subset): patchNamespaceConfig() provides
+ *              element-level config addressing for the MCP config_patch tool.
+ *
  *              Config files are stored at /mod/<namespace>.json (one per module).
  *              Modules provide serialise/deserialise callbacks; they never touch
  *              LittleFS directly.
@@ -27,6 +34,7 @@
  *   - registerModule():      Register an IConfigurable module in the gateway
  *   - beginAll():            Load and apply config for all registered modules
  *   - saveModuleConfig():    Persist a single module's config to its namespace file
+ *   - patchNamespaceConfig(): Apply RFC 6902 JSON Patch ops to a single namespace
  *   - exportAllConfig():     Export all module configs into a master JSON document
  *                            (includes _meta as first key)
  *   - importAllConfig():     Import configs from a master JSON document
@@ -54,12 +62,14 @@
 #include <time.h>    // time(), gmtime_r(), strftime() for _meta datetime
 #include <freertos/FreeRTOS.h>
 #include <freertos/timers.h>
+#include <freertos/semphr.h>
 
 #include <ArduinoJson.h>
 #include "../../include/interfaces/IConfigurable.hpp"
 #include "../../include/interfaces/IWebContributor.hpp"
 #include "../../include/interfaces/IMCPContributor.hpp"
 #include "../../lib/ConfigManifest/ConfigManifest.hpp"
+#include "JsonPatch.hpp"
 
 /**
  * @brief Centralised configuration gateway that owns all config file I/O.
@@ -73,7 +83,7 @@
  */
 class ConfigManager : public IWebContributor, public IMCPContributor {
 public:
-    ConfigManager() = default;
+    ConfigManager();
 
     // -------------------------------------------------------------------------
     // Module Registry
@@ -108,6 +118,24 @@ public:
      * @return true if successfully saved; false on error.
      */
     bool saveModuleConfig(IConfigurable* module);
+
+    /**
+     * @brief Apply RFC 6902 JSON Patch ops to a single namespace.
+     *
+     * Atomic: either ALL ops succeed and are persisted, or NONE are.
+     * The config mutex is held during the snapshot→apply→serialize
+     * window; flash I/O happens outside the lock.
+     *
+     * @param ns   Namespace to patch (e.g. "pm_channels").
+     * @param ops  Array of RFC 6902 op objects.
+     * @param result Output: error details and stored values.
+     * @param storedValues Optional: if non-null, receives the post-clamp
+     *                     values for each patched path.
+     * @return true if all ops applied successfully.
+     */
+    bool patchNamespaceConfig(const char* ns, JsonArrayConst ops,
+                              JsonPatch::PatchResult& result,
+                              JsonDocument* storedValues = nullptr);
 
     /**
      * @brief Export all registered module configs into a master JSON document.
@@ -273,5 +301,18 @@ private:
     bool _locked = false;                  ///< True after beginAll() — post-lock registration is rejected
     char _metaTimezone[64] = {};           ///< Timezone string for backup _meta envelope (default: "UTC")
     ConfigManifest _manifest;              ///< Three-Tier config lifecycle manifest (Active/Previous/Golden)
+    SemaphoreHandle_t _configMutex = nullptr;  ///< Protects serialize/applyConfig pairs
+
+    /**
+     * @brief Serialize a module's current config into a JsonDocument.
+     *
+     * Extracted from saveModuleConfig() so the serialize step can run
+     * under mutex while the persist step runs outside it.
+     *
+     * @param module Pointer to the IConfigurable module.
+     * @param outDoc Output JsonDocument to serialize into.
+     * @return true on success.
+     */
+    bool serializeModuleToDoc(IConfigurable* module, JsonDocument& outDoc);
 
 };
