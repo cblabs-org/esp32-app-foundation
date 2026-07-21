@@ -795,6 +795,154 @@ TEST_F(PatchIntegrationTest, StoredValues_ContainsPostClampValues) {
 }
 
 // =============================================================================
+// Test Group 9: Write Ordering (Issue #32)
+// =============================================================================
+
+/**
+ * @brief Second mock module for cross-namespace independence test.
+ *
+ * Must be a DIFFERENT namespace than PatchableModule ("patchmod") to verify
+ * that version counters are per-namespace, not global.
+ */
+class SecondModule : public IConfigurable {
+public:
+    std::string value = "initial";
+
+    const char* getConfigNamespace() const override { return "second"; }
+    int getSchemaVersion() const override { return 1; }
+
+    void applyConfig(const JsonObject& section) override {
+        value = section["value"] | "initial";
+    }
+
+    void serializeConfig(JsonObject& section) const override {
+        section["value"] = value.c_str();
+    }
+
+    void resetConfig() override {
+        value = "initial";
+    }
+};
+
+class WriteOrderingTest : public ::testing::Test {
+protected:
+    ConfigManager configManager;
+    PatchableModule patchMod;
+    SecondModule secondMod;
+
+    void SetUp() override {
+        std::error_code ec;
+        std::filesystem::create_directories("test/tmp/mod", ec);
+        remove("test/tmp/mod/patchmod.json");
+        remove("test/tmp/mod/second.json");
+        remove("test/tmp/config_manifest.json");
+
+        configManager.registerModule(&patchMod);
+        configManager.registerModule(&secondMod);
+        configManager.beginAll();
+    }
+
+    void TearDown() override {
+        remove("test/tmp/mod/patchmod.json");
+        remove("test/tmp/mod/second.json");
+        remove("test/tmp/config_manifest.json");
+    }
+};
+
+// 1. Fresh write — normal sequential writes both persist and versions advance
+TEST_F(WriteOrderingTest, FreshWrite_BothPersist) {
+    // First save
+    patchMod.label = "v1";
+    EXPECT_TRUE(configManager.saveModuleConfig(&patchMod));
+
+    // Second save
+    patchMod.label = "v2";
+    EXPECT_TRUE(configManager.saveModuleConfig(&patchMod));
+
+    // Read back from file — should contain v2
+    std::ifstream file("test/tmp/mod/patchmod.json");
+    ASSERT_TRUE(file.is_open());
+    std::string jsonStr((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    file.close();
+
+    JsonDocument readDoc;
+    deserializeJson(readDoc, jsonStr);
+    EXPECT_STREQ(readDoc["label"].as<const char*>(), "v2");
+}
+
+// 2. Monotonicity — N sequential writes yield N file writes and correct final state
+TEST_F(WriteOrderingTest, Monotonicity_SequentialWritesAllPersist) {
+    for (int i = 0; i < 5; ++i) {
+        patchMod.label = "write_" + std::to_string(i);
+        EXPECT_TRUE(configManager.saveModuleConfig(&patchMod));
+    }
+
+    // File should contain the last write
+    std::ifstream file("test/tmp/mod/patchmod.json");
+    ASSERT_TRUE(file.is_open());
+    std::string jsonStr((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    file.close();
+
+    JsonDocument readDoc;
+    deserializeJson(readDoc, jsonStr);
+    EXPECT_STREQ(readDoc["label"].as<const char*>(), "write_4");
+}
+
+// 3. Cross-namespace independence — bumping version for one namespace
+//    does NOT prevent writes to a different namespace.
+//    This is THE guard for the per-namespace trap described in Issue #32.
+TEST_F(WriteOrderingTest, CrossNamespace_IndependentVersions) {
+    // Write patchmod several times to bump its version
+    for (int i = 0; i < 5; ++i) {
+        patchMod.label = "bump_" + std::to_string(i);
+        EXPECT_TRUE(configManager.saveModuleConfig(&patchMod));
+    }
+
+    // Now write secondMod — this MUST succeed despite patchmod having
+    // a high version counter. With a global counter, this would be skipped.
+    secondMod.value = "independent";
+    EXPECT_TRUE(configManager.saveModuleConfig(&secondMod));
+
+    // Verify second.json has the correct value
+    std::ifstream file("test/tmp/mod/second.json");
+    ASSERT_TRUE(file.is_open());
+    std::string jsonStr((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    file.close();
+
+    JsonDocument readDoc;
+    deserializeJson(readDoc, jsonStr);
+    EXPECT_STREQ(readDoc["value"].as<const char*>(), "independent");
+}
+
+// 4. Patch then save — version counters shared correctly between
+//    patchNamespaceConfig() and saveModuleConfig()
+TEST_F(WriteOrderingTest, PatchThenSave_VersionsShared) {
+    // Patch first
+    JsonDocument opsDoc;
+    JsonArray ops = opsDoc.to<JsonArray>();
+    JsonObject op = ops.add<JsonObject>();
+    op["op"] = "replace"; op["path"] = "/label"; op["value"] = "patched";
+
+    JsonPatch::PatchResult result;
+    EXPECT_TRUE(configManager.patchNamespaceConfig("patchmod", ops, result));
+    EXPECT_TRUE(result.applied);
+
+    // Then save — should still work (higher version)
+    patchMod.label = "saved_after_patch";
+    EXPECT_TRUE(configManager.saveModuleConfig(&patchMod));
+
+    // File should contain the save (latest)
+    std::ifstream file("test/tmp/mod/patchmod.json");
+    ASSERT_TRUE(file.is_open());
+    std::string jsonStr((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    file.close();
+
+    JsonDocument readDoc;
+    deserializeJson(readDoc, jsonStr);
+    EXPECT_STREQ(readDoc["label"].as<const char*>(), "saved_after_patch");
+}
+
+// =============================================================================
 // GoogleTest main entry point
 // =============================================================================
 

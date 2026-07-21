@@ -263,6 +263,7 @@ bool ConfigManager::saveModuleConfig(IConfigurable* module) {
 
     // Serialize under mutex (if available), persist outside
     JsonDocument doc;
+    uint32_t myVersion = 0;
     if (_configMutex != nullptr) {
         if (xSemaphoreTake(_configMutex, pdMS_TO_TICKS(50)) != pdTRUE) {
             ESP_LOGW(TAG, "saveModuleConfig() — mutex timeout for '%s'", ns);
@@ -270,6 +271,8 @@ bool ConfigManager::saveModuleConfig(IConfigurable* module) {
         }
     }
     serializeModuleToDoc(module, doc);
+    // Assign monotonic version under _configMutex (Issue #32 write ordering)
+    myVersion = ++_configVersion[ns];
     if (_configMutex != nullptr) {
         xSemaphoreGive(_configMutex);
     }
@@ -280,6 +283,16 @@ bool ConfigManager::saveModuleConfig(IConfigurable* module) {
             ESP_LOGW(TAG, "saveModuleConfig() — persist mutex timeout for '%s'", ns);
             return false;
         }
+    }
+    // Freshness check: skip write if a newer snapshot already reached flash.
+    // This is correct (not a compromise) because both writers serialise the
+    // module's complete state — the newer document is a superset of ours.
+    // Counter is per-namespace to avoid cross-namespace interference (Issue #32).
+    if (myVersion < _lastPersistedVersion[ns]) {
+        ESP_LOGI(TAG, "saveModuleConfig() — skipping stale write for '%s' (v%u < v%u)",
+                 ns, myVersion, _lastPersistedVersion[ns]);
+        if (_persistMutex != nullptr) xSemaphoreGive(_persistMutex);
+        return true;  // not an error: newer state is already on disk
     }
     if (!LittleFS.exists("/mod")) { LittleFS.mkdir("/mod"); }
     File file = LittleFS.open(path, "w");
@@ -295,6 +308,7 @@ bool ConfigManager::saveModuleConfig(IConfigurable* module) {
         return false;
     }
     file.close();
+    _lastPersistedVersion[ns] = myVersion;
     if (_persistMutex != nullptr) xSemaphoreGive(_persistMutex);
 
     ESP_LOGI(TAG, "Config saved for '%s'", ns);
@@ -551,6 +565,8 @@ bool ConfigManager::patchNamespaceConfig(const char* ns, JsonArrayConst ops,
     // 4. Serialize post-apply state (for response + persist) — still under lock
     JsonDocument postDoc;
     serializeModuleToDoc(mod, postDoc);
+    // Assign monotonic version under _configMutex (Issue #32 write ordering)
+    uint32_t myVersion = ++_configVersion[ns];
 
     if (_configMutex != nullptr) xSemaphoreGive(_configMutex);
 
@@ -583,6 +599,15 @@ bool ConfigManager::patchNamespaceConfig(const char* ns, JsonArrayConst ops,
             return false;
         }
     }
+    // Freshness check: skip write if a newer snapshot already reached flash (Issue #32)
+    if (myVersion < _lastPersistedVersion[ns]) {
+        ESP_LOGI(TAG, "patchNamespaceConfig — skipping stale write for '%s' (v%u < v%u)",
+                 ns, myVersion, _lastPersistedVersion[ns]);
+        if (_persistMutex != nullptr) xSemaphoreGive(_persistMutex);
+        result.applied = true;
+        result.opsApplied = i;
+        return true;  // not an error: newer state is already on disk
+    }
     if (!LittleFS.exists("/mod")) { LittleFS.mkdir("/mod"); }
     File file = LittleFS.open(filePath, "w");
     if (!file) {
@@ -603,6 +628,7 @@ bool ConfigManager::patchNamespaceConfig(const char* ns, JsonArrayConst ops,
         return false;
     }
     file.close();
+    _lastPersistedVersion[ns] = myVersion;
     if (_persistMutex != nullptr) xSemaphoreGive(_persistMutex);
 
     result.applied = true;

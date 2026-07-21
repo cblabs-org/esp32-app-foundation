@@ -55,6 +55,7 @@
 #pragma once
 
 #include <vector>
+#include <map>
 
 #include <Arduino.h>
 #include <LittleFS.h>
@@ -303,6 +304,14 @@ private:
     ConfigManifest _manifest;              ///< Three-Tier config lifecycle manifest (Active/Previous/Golden)
     SemaphoreHandle_t _configMutex = nullptr;  ///< Protects serialize/applyConfig pairs
     SemaphoreHandle_t _persistMutex = nullptr;  ///< Serialises flash writes (file I/O ordering)
+
+    // --- Per-namespace write ordering (Issue #32) ---
+    // Monotonic version counter assigned under _configMutex at serialize time.
+    // Checked under _persistMutex at write time: if a newer version already
+    // reached flash, the stale write is skipped (not an error — the newer
+    // document is a superset of the stale one).
+    std::map<std::string, uint32_t> _configVersion;         ///< Next version to assign per namespace
+    std::map<std::string, uint32_t> _lastPersistedVersion;  ///< Most recent version written to flash per namespace
 
     /**
      * @brief Serialize a module's current config into a JsonDocument.
