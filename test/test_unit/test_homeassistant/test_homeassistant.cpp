@@ -1,3 +1,6 @@
+#define MOCK_MQTT_PUBLISH_RETURN_VALUE_DEFINED
+int mock_mqtt_publish_return_value = 0;
+
 #include <gtest/gtest.h>
 #include <ArduinoJson.h>
 
@@ -10,8 +13,6 @@
 #include "../../../modules/EventBus/EventBus.hpp"
 #include "../../../modules/KeyManager/KeyManager.hpp"
 #include "../../../modules/WifiManager/WifiManager.hpp"
-
-int mock_mqtt_publish_return_value = 0;
 
 class HomeAssistantTest : public ::testing::Test {
 protected:

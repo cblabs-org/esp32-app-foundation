@@ -80,7 +80,9 @@ inline esp_mqtt_client_handle_t esp_mqtt_client_init(const esp_mqtt_client_confi
 inline esp_err_t esp_mqtt_client_start(esp_mqtt_client_handle_t client) { return ESP_OK; }
 inline esp_err_t esp_mqtt_client_stop(esp_mqtt_client_handle_t client) { return ESP_OK; }
 inline esp_err_t esp_mqtt_client_destroy(esp_mqtt_client_handle_t client) { return ESP_OK; }
-extern int mock_mqtt_publish_return_value;
+#ifndef MOCK_MQTT_PUBLISH_RETURN_VALUE_DEFINED
+inline int mock_mqtt_publish_return_value = 0;
+#endif
 inline int esp_mqtt_client_publish(esp_mqtt_client_handle_t client, const char* topic, const char* data, int len, int qos, int retain) { return mock_mqtt_publish_return_value; }
 inline int esp_mqtt_client_subscribe(esp_mqtt_client_handle_t client, const char* topic, int qos) { return 0; }
 

@@ -1,3 +1,6 @@
+#define MOCK_MQTT_PUBLISH_RETURN_VALUE_DEFINED
+int mock_mqtt_publish_return_value = 0;
+
 #include <gtest/gtest.h>
 #include <ArduinoJson.h>
 #include "../../../modules/HomeAssistant/HomeAssistantModule.hpp"
@@ -10,8 +13,6 @@
 #include "../../../modules/HomeAssistant/entities/HaNumber.hpp"
 #include "../../../modules/HomeAssistant/entities/HaSelect.hpp"
 #include "../../../modules/HomeAssistant/entities/HaDeviceTrigger.hpp"
-
-int mock_mqtt_publish_return_value = 0;
 
 TEST(HomeAssistantEntitiesTest, BinarySensorDiscovery) {
     HomeAssistantModule ha;
