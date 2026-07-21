@@ -11,6 +11,8 @@
 #include "../../../modules/HomeAssistant/entities/HaSelect.hpp"
 #include "../../../modules/HomeAssistant/entities/HaDeviceTrigger.hpp"
 
+int mock_mqtt_publish_return_value = 0;
+
 TEST(HomeAssistantEntitiesTest, BinarySensorDiscovery) {
     HomeAssistantModule ha;
     HaBinarySensor sensor("door", "Front Door");
