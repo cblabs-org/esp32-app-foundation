@@ -8,10 +8,11 @@
  *
  * Module: modules/MCPServer/MCPBuiltinTools.cpp
  * Description: Implementation of all foundation-level MCP tools that are always
- *              available in the framework. Registers 7 tools into the MCPToolRegistry:
+ *              available in the framework. Registers 8 tools into the MCPToolRegistry:
  *                - system_info:      Device heap, uptime, chip info, firmware version
  *                - get_config:       Read all module configs via gateway export
  *                - set_config:       Update module configs via gateway import
+ *                - patch_config:     Apply RFC 6902 JSON Patch ops to a single config namespace
  *                - reboot:           Restart the ESP32 device
  *                - get_logs:         Placeholder for future log ring-buffer
  *                - list_tools:       Enumerate all registered MCP tools
@@ -24,6 +25,7 @@
 #include "MCPBuiltinTools.hpp"
 #include "MCPToolRegistry.hpp"
 #include <ConfigManager.hpp>
+#include "../../modules/ConfigManager/JsonPatch.hpp"
 #include "../TimeManager/TimeManager.hpp"
 #include <ArduinoJson.h>
 
@@ -282,7 +284,108 @@ void mcpBuiltinTools::registerAll(MCPToolRegistry& registry,
     );
 
     // -----------------------------------------------------------------
-    // Tool 4: reboot — Restart the ESP32 device
+    // Tool 4: patch_config — Apply RFC 6902 JSON Patch to a namespace
+    // -----------------------------------------------------------------
+
+    // Build the input schema — namespace string + ops array
+    JsonDocument patchConfigSchema;
+    patchConfigSchema["type"] = "object";
+    JsonObject patchProps = patchConfigSchema["properties"].to<JsonObject>();
+
+    JsonObject patchNsParam = patchProps["namespace"].to<JsonObject>();
+    patchNsParam["type"]        = "string";
+    patchNsParam["description"] = "Config namespace to patch (e.g. \"wifi\", \"pm_channels\")";
+
+    JsonObject patchOpsParam = patchProps["ops"].to<JsonObject>();
+    patchOpsParam["type"]        = "array";
+    patchOpsParam["description"] = "Array of RFC 6902 JSON Patch ops. Each op: {\"op\": \"replace\"|\"add\"|\"test\"|\"remove\", \"path\": \"/json/pointer\", \"value\": ...}. Max 32 ops. Atomic: all succeed or none are applied.";
+    JsonObject patchOpsItems = patchOpsParam["items"].to<JsonObject>();
+    patchOpsItems["type"] = "object";
+
+    JsonArray patchRequired = patchConfigSchema["required"].to<JsonArray>();
+    patchRequired.add("namespace");
+    patchRequired.add("ops");
+
+    registry.addTool(
+        "patch_config",
+        "Apply RFC 6902 JSON Patch ops to a single config namespace. Atomic: all ops succeed or none are applied. Returns stored (post-validation) values for patched paths.",
+        patchConfigSchema,
+        [](void* ctx, JsonObject& params, JsonObject& result) {
+            auto* c = static_cast<BuiltinToolsContext*>(ctx);
+            if (c->configManager == nullptr) {
+                result["error"] = "ConfigManager not available";
+                result["isError"] = true;
+                return;
+            }
+
+            // Validate namespace parameter
+            if (!params["namespace"].is<const char*>()) {
+                result["error"] = "Missing or invalid 'namespace' string parameter";
+                result["isError"] = true;
+                return;
+            }
+
+            // Validate ops parameter
+            if (!params["ops"].is<JsonArray>()) {
+                result["error"] = "Missing or invalid 'ops' array parameter";
+                result["isError"] = true;
+                return;
+            }
+
+            const char* ns = params["namespace"].as<const char*>();
+            JsonArrayConst ops = params["ops"].as<JsonArrayConst>();
+
+            JsonPatch::PatchResult patchResult;
+            JsonDocument storedDoc;
+
+            bool ok = c->configManager->patchNamespaceConfig(ns, ops, patchResult, &storedDoc);
+
+            if (ok) {
+                result["status"]      = "patched";
+                result["namespace"]   = ns;
+                result["ops_applied"] = patchResult.opsApplied;
+
+                // Copy stored (post-validation) values into result
+                JsonObject storedObj = result["results"].to<JsonObject>();
+                for (JsonPair kv : storedDoc.as<JsonObject>()) {
+                    storedObj[kv.key()] = kv.value();
+                }
+            } else {
+                // Map error enum to human-readable message
+                const char* errMsg = "Unknown error";
+                switch (patchResult.error) {
+                    case JsonPatch::Error::INVALID_POINTER:
+                        errMsg = "Invalid JSON Pointer"; break;
+                    case JsonPatch::Error::PATH_NOT_FOUND:
+                        errMsg = "Path not found"; break;
+                    case JsonPatch::Error::INDEX_OUT_OF_RANGE:
+                        errMsg = "Array index out of range"; break;
+                    case JsonPatch::Error::ARRAY_REMOVE_BLOCKED:
+                        errMsg = "Remove on array index not supported (use replace with sentinel)"; break;
+                    case JsonPatch::Error::TEST_FAILED:
+                        errMsg = "Test op failed — value mismatch (batch aborted)"; break;
+                    case JsonPatch::Error::UNKNOWN_OP:
+                        errMsg = "Unknown op (supported: replace, add, test, remove)"; break;
+                    case JsonPatch::Error::TOO_MANY_OPS:
+                        errMsg = "Too many ops (max 32)"; break;
+                    case JsonPatch::Error::MUTEX_TIMEOUT:
+                        errMsg = "Config mutex busy — try again"; break;
+                    default:
+                        break;
+                }
+                result["error"]     = errMsg;
+                result["failed_op"] = patchResult.opIndex;
+                result["path"]      = patchResult.path;
+                result["applied"]   = false;
+                result["isError"]   = true;
+            }
+        },
+        &s_builtinCtx,  // context: BuiltinToolsContext*
+        true  // mutatesState — writes config via ConfigManager
+    );
+
+    // -----------------------------------------------------------------
+    // Tool 5: reboot — Restart the ESP32 device
     // -----------------------------------------------------------------
     registry.addTool(
         "reboot",
@@ -304,7 +407,7 @@ void mcpBuiltinTools::registerAll(MCPToolRegistry& registry,
     );
 
     // -----------------------------------------------------------------
-    // Tool 5: get_logs — Placeholder for future log ring-buffer
+    // Tool 6: get_logs — Placeholder for future log ring-buffer
     // -----------------------------------------------------------------
 
     // Build input schema with optional 'count' parameter
@@ -332,7 +435,7 @@ void mcpBuiltinTools::registerAll(MCPToolRegistry& registry,
     );
 
     // -----------------------------------------------------------------
-    // Tool 6: list_tools — Enumerate all registered MCP tools
+    // Tool 7: list_tools — Enumerate all registered MCP tools
     // -----------------------------------------------------------------
     registry.addTool(
         "list_tools",
@@ -354,7 +457,7 @@ void mcpBuiltinTools::registerAll(MCPToolRegistry& registry,
     );
 
     // -----------------------------------------------------------------
-    // Tool 7: capture_display — Capture the display framebuffer as base64
+    // Tool 8: capture_display — Capture the display framebuffer as base64
     // -----------------------------------------------------------------
     // The display info is stored at file scope (s_displayInfo) so the handler
     // can read it via pointer. Late-binding via setDisplayInfo() is supported
