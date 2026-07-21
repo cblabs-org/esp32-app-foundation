@@ -170,6 +170,12 @@ public:
      */
     int getTabOrder() const override { return 15; }
 
+    /**
+     * @brief Return the API path prefix for body-size middleware matching.
+     * @return "/api/time"
+     */
+    const char* getApiPrefix() const override { return "/api/time"; }
+
     // -------------------------------------------------------------------------
     // Time Query API
     // -------------------------------------------------------------------------

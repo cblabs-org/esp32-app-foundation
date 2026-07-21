@@ -162,9 +162,9 @@ document.addEventListener('DOMContentLoaded', function() {
   /**
    * @brief Fetch the tab hierarchy and build navigation.
    */
-  async function loadTabs() {
+  async function loadTabs(prefetchedTabs) {
     try {
-      tabHierarchy = await window.apiFetch('/api/tabs');
+      tabHierarchy = prefetchedTabs || await window.apiFetch('/api/tabs');
     } catch (err) {
       console.warn('Failed to fetch /api/tabs, using defaults');
       tabHierarchy = [];
@@ -437,10 +437,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
   /**
    * @brief Load fragment scripts sequentially. utils.js is loaded first,
-   *        then all tab fragment scripts. Calls the callback when all done.
+   *        then all built-in tab fragment scripts, followed by any extra
+   *        scripts discovered from the /api/tabs response (tab contributor
+   *        scripts). Calls the callback when all done.
+   * @param {Array} extraScripts - Additional script URLs (e.g. from /api/tabs).
    * @param {Function} onComplete - Called after all scripts have loaded.
    */
-  function loadScripts(onComplete) {
+  function loadScripts(extraScripts, onComplete) {
     var scripts = [
       'utils.js',
       'wifi.js',
@@ -455,9 +458,13 @@ document.addEventListener('DOMContentLoaded', function() {
       'appconfig.js',
       'auth.js',
       'credits.js',
-      'homeassistant.js',
-      'weather.js'
+      'homeassistant.js'
     ];
+
+    // Append dynamically-discovered tab scripts (absolute paths like /weather.js)
+    if (extraScripts && extraScripts.length > 0) {
+      scripts = scripts.concat(extraScripts);
+    }
 
     var loaded = 0;
     function loadNext() {
@@ -485,10 +492,26 @@ document.addEventListener('DOMContentLoaded', function() {
   // 8. Boot Sequence
   // =========================================================================
 
-  loadScripts(function() {
-    // Scripts are loaded — now safe to build tabs and dispatch tab-changed
-    loadTabs();
-    loadAppInfo();
-    checkApMode();
+  // Fetch /api/tabs once, extract declared scripts, load all scripts
+  // (built-in + declared), then build the nav from the cached tabs response.
+  window.apiFetch('/api/tabs').then(function(tabs) {
+    // Extract declared script URLs, filtering out null/undefined entries
+    var tabScripts = tabs
+      .map(function(t) { return t.script; })
+      .filter(function(s) { return s != null; });
+
+    loadScripts(tabScripts, function() {
+      // Scripts are loaded — now safe to build tabs and dispatch tab-changed
+      loadTabs(tabs);
+      loadAppInfo();
+      checkApMode();
+    });
+  }).catch(function(err) {
+    console.warn('Failed to fetch /api/tabs during boot, loading without tab scripts');
+    loadScripts([], function() {
+      loadTabs();
+      loadAppInfo();
+      checkApMode();
+    });
   });
 });

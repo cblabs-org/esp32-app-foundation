@@ -290,6 +290,12 @@ public:
     /** @brief Returns tab display order 40. */
     int getTabOrder() const override { return 40; }
 
+    /**
+     * @brief Return the API path prefix for body-size middleware matching.
+     * @return "/api/homeassistant"
+     */
+    const char* getApiPrefix() const override { return "/api/homeassistant"; }
+
     /** @brief Returns SVG inner content for the Home Assistant logo icon. */
     const char* getTabIcon() const override;
 

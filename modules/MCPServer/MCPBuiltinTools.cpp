@@ -180,21 +180,43 @@ void mcpBuiltinTools::registerAll(MCPToolRegistry& registry,
     );
 
     // -----------------------------------------------------------------
-    // Tool 2: get_config — Read current system configuration (all modules)
+    // Tool 2: get_config — Read system configuration (all or single ns)
     // -----------------------------------------------------------------
+
+    // Build the input schema — optional 'namespace' filter
+    JsonDocument getConfigSchema;
+    getConfigSchema["type"] = "object";
+    JsonObject getProps = getConfigSchema["properties"].to<JsonObject>();
+
+    JsonObject nsParam = getProps["namespace"].to<JsonObject>();
+    nsParam["type"]        = "string";
+    nsParam["description"] = "Optional namespace to query a single module (e.g. \"wifi\"). Omit to return all namespaces.";
+
     registry.addTool(
         "get_config",
-        "Get the current system configuration for all registered modules",
+        "Get system configuration. Optionally pass 'namespace' to read a single module's config instead of all modules.",
+        getConfigSchema,
         [](void* ctx, JsonObject& params, JsonObject& result) {
             auto* c = static_cast<BuiltinToolsContext*>(ctx);
-            (void)params; // No input parameters required
             if (c->configManager == nullptr) {
                 result["error"] = "ConfigManager not available";
                 result["isError"] = true;
                 return;
             }
 
-            // Export all module configs into the result object
+            // Namespace-scoped query
+            if (params["namespace"].is<const char*>()) {
+                const char* ns = params["namespace"].as<const char*>();
+                JsonObject nsSec = result[ns].to<JsonObject>();
+                if (!c->configManager->exportNamespaceConfig(ns, nsSec)) {
+                    result.remove(ns);
+                    result["error"]   = String("Unknown namespace: ") + ns;
+                    result["isError"] = true;
+                }
+                return;
+            }
+
+            // All-namespace export (existing behaviour)
             JsonDocument exportDoc;
             c->configManager->exportAllConfig(exportDoc);
 
@@ -221,7 +243,7 @@ void mcpBuiltinTools::registerAll(MCPToolRegistry& registry,
 
     registry.addTool(
         "set_config",
-        "Update system configuration fields by namespace",
+        "Update system configuration fields by namespace. Returns {status, updated_namespaces} — does NOT echo the full config.",
         setConfigSchema,
         [](void* ctx, JsonObject& params, JsonObject& result) {
             auto* c = static_cast<BuiltinToolsContext*>(ctx);
@@ -249,11 +271,10 @@ void mcpBuiltinTools::registerAll(MCPToolRegistry& registry,
 
             result["status"] = success ? "updated" : "partial_failure";
 
-            // Return the updated config for confirmation
-            JsonDocument exportDoc;
-            c->configManager->exportAllConfig(exportDoc);
-            for (JsonPair kv : exportDoc.as<JsonObject>()) {
-                result[kv.key()] = kv.value();
+            // Report which namespaces were updated, not the entire config
+            JsonObject updated = result["updated_namespaces"].to<JsonObject>();
+            for (JsonPair kv : configObj) {
+                updated[kv.key()] = true;
             }
         },
         &s_builtinCtx,  // context: BuiltinToolsContext*
@@ -344,7 +365,7 @@ void mcpBuiltinTools::registerAll(MCPToolRegistry& registry,
 
     registry.addTool(
         "capture_display",
-        "Capture the current display buffer as a base64-encoded image",
+        "Capture the current display buffer as a base64-encoded U8G2 tile-format monochrome framebuffer",
         [](void* /*ctx*/, JsonObject& params, JsonObject& result) {
             (void)params; // No input parameters required
 
@@ -370,7 +391,7 @@ void mcpBuiltinTools::registerAll(MCPToolRegistry& registry,
                     offset += chunk;
                 }
 
-            result["format"] = "xbm";
+            result["format"] = "u8g2-tile";
             result["width"]  = s_displayInfo.width;
             result["height"] = s_displayInfo.height;
             result["data"]   = b64;

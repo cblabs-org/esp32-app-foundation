@@ -4,8 +4,8 @@ Captures the ESP32 U8G2 monochrome display buffer via the Device MCP Server
 and saves it as a PNG image.
 
 The MCP server exposes capture_display at /api/mcp (JSON-RPC 2.0).
-The response contains an XBM-format buffer (base64-encoded) along with
-width, height, and format metadata.
+The response contains a U8G2 tile-format monochrome framebuffer (base64-encoded)
+along with width, height, and format metadata.
 """
 import sys
 import json
@@ -112,7 +112,7 @@ def capture_u8g2(ip_address, output_path):
 
         width = display_data.get('width', 256)
         height = display_data.get('height', 64)
-        fmt = display_data.get('format', 'xbm')
+        fmt = display_data.get('format', 'u8g2-tile')
         b64_str = display_data['data']
     except Exception as e:
         print(f"ERROR: Failed to parse MCP response. Response snippet: {res_body[:200]}", file=sys.stderr)
@@ -125,10 +125,12 @@ def capture_u8g2(ip_address, output_path):
     print(f"Decoded binary framebuffer size: {buffer_len} bytes")
     print(f"Dimensions: {width}x{height}, Format: {fmt}")
 
-    if fmt == "xbm":
+    if fmt == "xbm-rowmajor":
         img = decode_xbm_monochrome(raw_buffer, width, height)
     else:
-        # Fallback to legacy tile-based U8G2 decoding
+        # U8G2 tile format — default for all U8G2 monochrome displays.
+        # Handles both the new "u8g2-tile" discriminator and the legacy
+        # "xbm" value from pre-fix firmware.
         img = decode_u8g2_monochrome(raw_buffer, width, height)
 
     img.save(output_path)

@@ -20,11 +20,14 @@
  *
  * Exported Classes:
  * - IWebContributor: Abstract base for modules exposing REST endpoints
- *   - registerRoutes(): Register all routes with the provided AsyncWebServer
- *   - getTabName():     Return the UI tab display name (or nullptr)
- *   - getParentTab():   Return the parent tab name for sub-navigation (or nullptr)
- *   - getTabOrder():    Return integer sort order within the same navigation level
- *   - getTabIcon():     Return the SVG inner content for the bottom-nav icon (or nullptr)
+ *   - registerRoutes():  Register all routes with the provided AsyncWebServer
+ *   - getTabName():      Return the UI tab display name (or nullptr)
+ *   - getParentTab():    Return the parent tab name for sub-navigation (or nullptr)
+ *   - getTabOrder():     Return integer sort order within the same navigation level
+ *   - getTabIcon():      Return the SVG inner content for the bottom-nav icon (or nullptr)
+ *   - getTabScript():    Return the route path for this tab's JavaScript file (or nullptr)
+ *   - getApiPrefix():    Return the API path prefix for body-size middleware matching (or nullptr)
+ *   - getMaxPostBody():  Return the max POST/PUT body size in bytes (default: 4096, ADR-15)
  */
 
 #pragma once
@@ -102,4 +105,47 @@ public:
      * @return SVG inner content string, or nullptr for the generic icon.
      */
     virtual const char* getTabIcon() const { return nullptr; }
+
+    /**
+     * @brief Return the route path for this tab's JavaScript file.
+     *
+     * Return nullptr if this contributor has no tab script (default).
+     * When non-null, the path is included in the /api/tabs response
+     * as the "script" field and loaded dynamically by the SPA.
+     *
+     * The path MUST start with '/' (same-origin only). Paths not
+     * starting with '/' are silently ignored by WebServerManager.
+     *
+     * NOTE: Tab scripts are served unauthenticated (same as all static
+     * assets). Do not embed sensitive data — fetch it from authenticated
+     * /api/ endpoints instead.
+     *
+     * @return Route path string (e.g. "/weather.js"), or nullptr.
+     */
+    virtual const char* getTabScript() const { return nullptr; }
+
+    /**
+     * @brief Return the API path prefix for this contributor's routes.
+     *
+     * Used by the global body-size middleware to match incoming requests
+     * to the correct body limit. Return nullptr if this contributor does
+     * not register any POST/PUT routes (default).
+     *
+     * The prefix is matched using startsWith() — e.g. returning "/api/mcp"
+     * matches "/api/mcp", "/api/mcp/config", etc.
+     *
+     * @return API path prefix string (e.g. "/api/mcp"), or nullptr.
+     */
+    virtual const char* getApiPrefix() const { return nullptr; }
+
+    /**
+     * @brief Maximum POST/PUT body size this contributor's routes accept.
+     *
+     * The global body-size middleware in WebServerManager enforces this
+     * limit for all routes matching this contributor's getApiPrefix().
+     * Override to allow larger or smaller payloads than the ADR-15 default.
+     *
+     * @return Maximum body size in bytes. Default: 4096 (ADR-15).
+     */
+    virtual size_t getMaxPostBody() const { return 4096; }
 };

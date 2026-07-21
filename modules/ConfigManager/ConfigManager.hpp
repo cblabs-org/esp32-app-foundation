@@ -134,6 +134,18 @@ public:
     bool importAllConfig(JsonDocument& inDoc);
 
     /**
+     * @brief Export a single module's configuration by namespace.
+     *
+     * Iterates the internal module list and calls serializeConfig() on the
+     * matching module. Callers do not need access to the module list.
+     *
+     * @param ns        Namespace string to match (e.g. "wifi", "pm_channels").
+     * @param outSection Mutable JSON object to serialize into.
+     * @return true if namespace was found, false otherwise.
+     */
+    bool exportNamespaceConfig(const char* ns, JsonObject& outSection) const;
+
+    /**
      * @brief Register the current timezone string for inclusion in backup _meta.
      *
      * Intended to be called from TimeManager::applyConfig() after the timezone
@@ -183,6 +195,18 @@ public:
      * @return 40 — positioned after Keys (20) and MCP (30) in the pill bar.
      */
     int getTabOrder() const override { return 40; }
+
+    /**
+     * @brief Return the API path prefix for body-size middleware matching.
+     * @return "/api/config"
+     */
+    const char* getApiPrefix() const override { return "/api/config"; }
+
+    /**
+     * @brief Maximum POST body size for config routes (8 KiB for restore payloads).
+     * @return 8192
+     */
+    size_t getMaxPostBody() const override { return 8192; }
 
     // -------------------------------------------------------------------------
     // IMCPContributor Interface

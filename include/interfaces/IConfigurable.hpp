@@ -66,9 +66,11 @@ public:
     /**
      * @brief Apply configuration values from a parsed JSON object.
      *
-     * Called by ConfigManager during beginAll() after loading and optionally
-     * migrating the module's config file. The module reads its fields from
-     * the provided section and applies them to internal state.
+     * Called by ConfigManager during beginAll() and importAllConfig(). The
+     * section always contains a COMPLETE configuration — during import,
+     * ConfigManager merges partial input over the module's current state
+     * before calling this method. Implementations may safely assume all
+     * expected keys are present.
      *
      * @param section Read-only reference to the JSON object containing config keys.
      */

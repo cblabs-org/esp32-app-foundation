@@ -248,6 +248,18 @@ public:
      */
     int getTabOrder() const override { return 10; }
 
+    /**
+     * @brief Return the API path prefix for body-size middleware matching.
+     * @return "/api/wifi"
+     */
+    const char* getApiPrefix() const override { return "/api/wifi"; }
+
+    /**
+     * @brief Maximum POST body size for WiFi routes (1 KiB — credentials are small).
+     * @return 1024
+     */
+    size_t getMaxPostBody() const override { return 1024; }
+
     // --- IMCPContributor Interface ---
 
     /**

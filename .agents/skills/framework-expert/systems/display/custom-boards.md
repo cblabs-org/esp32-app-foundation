@@ -6,11 +6,12 @@ Creating a custom board is the standard way a module projects its data onto the 
 
 A board's lifecycle is strictly managed by the `CarouselEngine`:
 
-1. **Registration**: `CarouselEngine::addBoard()` is called. The engine adds the pointer to its internal pool.
-2. **Evaluation**: On rotation, the engine calls `shouldDisplay()`. If `true`, the board is selected.
-3. **Activation**: The engine calls `onShow()`. This is the board's cue to reset internal animations, start expensive data fetching, or prepare its layout.
-4. **Rendering Loop**: While active, the engine calls `draw(U8G2& u8g2)` on every display tick. The board must execute drawing commands quickly.
-5. **Deactivation**: When the display duration expires or the user manually rotates the carousel, the engine calls `onHide()`. The board should stop animations and release temporary resources.
+1. **Registration**: The board is registered into the carousel pool via `carousel.add()`.
+2. **Activation**: When the board becomes active, the engine calls `onActivate()`. This is the board's cue to reset animation state, reset scroll positions, or trigger a data refresh.
+3. **Tick**: On every frame tick while active, `tick(uint32_t currentMillis)` is called for timing and animations.
+4. **Rendering Loop**: The engine calls `render(U8G2& u8g2)` during the U8G2 draw loop to render the full-screen frame.
+5. **Deactivation**: When transitioning away, `onDeactivate()` is called. The board should pause animations or snapshot state.
+6. **Expiry**: After rendering, `isExpired()` is polled. If it returns `true`, the board is evicted from the carousel. Permanent boards return `false`.
 
 ## Creating a Telemetry Pane
 
@@ -18,34 +19,42 @@ Here is a template for creating a standard telemetry pane:
 
 ```cpp
 #pragma once
-#include "framework/interfaces/IDisplayBoard.h"
+#include "interfaces/IDisplayBoard.hpp"
 #include <U8g2lib.h>
 
 class TelemetryBoard : public IDisplayBoard {
 private:
     float _lastTemp = 0.0f;
     uint32_t _frameCount = 0;
+    uint32_t _lastTick = 0;
+    int _scrollPos = 0;
 
 public:
-    const char* getName() const override { return "Telemetry"; }
+    const char* getBoardName() const override { return "Telemetry"; }
     
-    // Only display if we have valid data
-    bool shouldDisplay() const override { return _lastTemp > 0.0f; }
+    // Permanent board — return false so it is not evicted from carousel
+    bool isExpired() const override { return false; }
     
-    // Show for 5 seconds
-    uint32_t getDisplayDurationMs() const override { return 5000; }
-    
-    void onShow() override {
+    void onActivate() override {
         _frameCount = 0;
+        _scrollPos = 0;
+        _lastTick = 0;
     }
     
-    void onHide() override {
+    void onDeactivate() override {
         // Cleanup if needed
     }
     
-    void draw(U8G2& display) override {
+    void tick(uint32_t currentMillis) override {
+        if (currentMillis - _lastTick > 100) {
+            _scrollPos++;
+            _lastTick = currentMillis;
+        }
+    }
+    
+    void render(U8G2& display) override {
         display.setFont(u8g2_font_helvB14_tf);
-        display.setCursor(0, 20);
+        display.setCursor(0, 20 - _scrollPos);
         display.print("Temp: ");
         display.print(_lastTemp);
         display.print(" C");
@@ -68,4 +77,4 @@ The framework includes several standard system boards you can reference:
 - `NetworkStatusBoard`: Displays the current IP address, SSID, and MQTT connection state.
 - `OtaProgressBoard`: While technically an overlay rather than a carousel board, it demonstrates high-priority drawing mechanics.
 
-When designing custom boards, always ensure your `draw()` routine is non-blocking. Avoid `delay()` or heavy computation, as this will stall the entire rendering pipeline and degrade the device's perceived responsiveness.
+When designing custom boards, always ensure your `render()` routine is non-blocking. Avoid `delay()` or heavy computation, as this will stall the entire rendering pipeline and degrade the device's perceived responsiveness.

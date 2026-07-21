@@ -6,8 +6,8 @@ The `CarouselEngine` manages the rotation of multiple UI "boards" (panes) on the
 
 The engine exposes a simple API for board management:
 
-- `void addBoard(IDisplayBoard* board)`: Registers a new board to the carousel pool.
-- `void removeBoard(IDisplayBoard* board)`: Unregisters a board.
+- `void add(IDisplayBoard* board)`: Registers a new board to the carousel pool.
+- `bool remove(IDisplayBoard* board)`: Unregisters a board from the pool.
 - `void nextBoard()`: Instantly advances to the next board.
 - `void previousBoard()`: Instantly returns to the previous board.
 - `void pause()`: Halts auto-rotation.
@@ -19,27 +19,29 @@ Modules that implement [`IDisplayBoard`](../../interfaces/display-board.md) can 
 
 ```cpp
 void MyModule::begin() {
-    // Assuming app->getDisplay() returns an interface exposing the carousel
-    app->getDisplay()->getCarousel()->addBoard(this);
+    // Register with the display's carousel engine
+    app.getDisplay().carousel.add(&_myBoard);
 }
 ```
 
-The pool stores pointers to the boards. The engine iterates over this pool sequentially. If a board returns `false` from `board->shouldDisplay()`, the engine skips it and immediately queries the next board.
+The pool stores pointers to the boards. The engine iterates over this pool sequentially.
 
 ## Rotation Timing
 
-Auto-rotation is driven by the framework's main `tick()` loop. The `CarouselEngine` tracks the active time of the current board.
+Auto-rotation is driven by the framework's main loop calling `tick(currentMs)` on the `CarouselEngine`.
 
-1. **Duration Request**: When a board becomes active, the engine queries `board->getDisplayDurationMs()`.
-2. **Tick Evaluation**: On every tick, the engine compares the elapsed time against the requested duration.
-3. **Transition**: If the duration is exceeded, the engine calls `board->onHide()` on the active board, selects the next valid board, calls `nextBoard->onShow()`, and resets the timer.
+1. **Rotation Interval**: The carousel rotates between boards at a fixed interval, which can be customized via `setInterval(unsigned long ms)`. The default interval is 8 seconds.
+2. **Tick Evaluation**: On every tick, the engine evaluates whether the rotation interval has elapsed.
+3. **Transition**: When the interval elapses, the engine calls `onDeactivate()` on the active board, advances to the next board, calls `onActivate()` on the newly active board, and resets the rotation timer.
 
-### Indefinite Display
+### Board Eviction (Expiry)
 
-If a board returns `0` from `getDisplayDurationMs()`, the carousel auto-rotation pauses while that board is active. It will not rotate until triggered manually (e.g., via physical button press calling `nextBoard()`) or until the board signals it is ready to yield (if implemented via an event mechanism).
+During rotation, the engine evaluates if any boards in the pool are expired by polling `isExpired()`.
+- **Permanent boards**: Return `false` and remain in the pool rotation indefinitely.
+- **Transient boards**: Return `true` when their display condition or duration is complete. The engine evicts them from the pool during the rotation step.
 
 ## System vs User Boards
 
 The carousel treats all boards equally. However, system-level boards (like the `NetworkStatusBoard`) are typically registered early by the `Application` bootstrap sequence. Module boards are appended later.
 
-Because boards are queried dynamically via `shouldDisplay()`, a module can implement "alert" boards that only show when a specific condition is met, seamlessly entering and exiting the rotation pool.
+Because boards can be dynamically added and removed, a module can register temporary notification or alert boards when an event occurs, and let them auto-evict by returning `true` from `isExpired()`.
