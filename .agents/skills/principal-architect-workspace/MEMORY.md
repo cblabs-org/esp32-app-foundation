@@ -80,6 +80,7 @@ predate the formal PA pipeline and are filed retrospectively.
 | [pr-40-docs-excellence](./pr-40-docs-excellence/PROJECT.md) | Documentation Excellence — 10/10 Compliance (template-app rename+Doxygen, sample-app full Doxygen+interface-grouped+functional fixes, HomeAssistant+publicKey docs, lib header attribution, module path casing, String stub consolidation, OTA naming) | ✅ **COMPLETE** — 7 WOs merged, 37/37 files compliant, 590/590 tests · [distillation](./pr-40-docs-excellence/context_bridge.md) | Session 463e0a3c |
 | [pr-41-native-build-stubs](./pr-41-native-build-stubs/PROJECT.md) | Eliminate Inline NATIVE_BUILD Guards — Stub Header Architecture (replace 283 preprocessor guards across 45+ files with stub header library in `test/stubs/platform/`) | ⬜ **NOT STARTED** — 17 WOs planned | Session 2cb65aa9 |
 | [pr-42-ha-discovery-pacing](./pr-42-ha-discovery-pacing/PROJECT.md) | Issue #16: HA Discovery Pacing (tick-driven chunked publish, outbox limit, drain-completion signal) | ✅ **MERGED** PR [#17](https://github.com/matthewmcneill/esp32-app-foundation/pull/17), 361/361 tests · [distillation](./pr-42-ha-discovery-pacing/context_bridge.md) | Session bb03d6e6 |
+| [pr-44-json-patch](./pr-44-json-patch/PROJECT.md) | Issue #28: RFC 6902 JSON Patch for ConfigManager — element-level config writes, config mutex, saveModuleConfig split | ✅ **COMPLETE** PR [#30](https://github.com/matthewmcneill/esp32-app-foundation/pull/30), 416/416 tests | Session 3f6fb84f |
 
 ---
 
