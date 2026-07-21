@@ -113,10 +113,29 @@ private:
     // --- Paced Discovery / State Publishing (Issue #16) ---
     static constexpr size_t DISCOVERY_CHUNK_SIZE = 5;   ///< Max discovery payloads published per tick
     static constexpr size_t STATE_CHUNK_SIZE = 10;      ///< Max state publishes per tick
+    
+    // --- Retry Backoff (Issue #34) ---
+    static constexpr uint32_t RETRY_BASE_MS          = 200;    ///< Initial backoff interval after first publish failure
+    static constexpr uint32_t RETRY_CAP_MS            = 5000;   ///< Max backoff interval — skip entity on next failure at cap
+    static constexpr uint32_t DRAIN_STALL_TIMEOUT_MS  = 30000;  ///< Publish health signal after this many ms of stalled drain
     bool _discoveryPending{false};                      ///< True while discovery drain is in progress
     size_t _discoveryIndex{0};                          ///< Next entity index to publish discovery for
     bool _stateSyncPending{false};                      ///< True while state-sync drain is in progress
     size_t _stateSyncIndex{0};                          ///< Next entity index to sync state for
+
+    uint32_t _retryIntervalMs{0};            ///< Current exponential backoff interval (0 = no active backoff)
+    uint32_t _lastRetryAttemptMs{0};         ///< Timestamp of last failed publish attempt
+    uint32_t _drainStartMs{0};              ///< Timestamp when current drain cycle began
+    bool     _drainStallReported{false};     ///< One-shot flag: stall event already published this drain
+    size_t   _entitiesSkipped{0};           ///< Running count of entities skipped in current drain
+
+    /**
+     * @brief Resets all drain-related state for a fresh discovery cycle.
+     *
+     * Called from both MQTT_EVENT_CONNECTED and republishDiscovery() to ensure
+     * consistent initialization and prevent path drift.
+     */
+    void resetDrainState();
 
     /** @brief EventBus callback: initiates MQTT connection when wifi comes up. */
     static void onWifiConnected(const char* topic, const void* payload, void* ctx);

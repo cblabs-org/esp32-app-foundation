@@ -17,6 +17,8 @@
 #include <esp_log.h>
 #include <esp_mac.h>
 #include <WiFi.h>
+#include <algorithm>
+#include <Arduino.h>
 
 #include <PsychicHttp.h>
 #include "portal_assets/homeassistant_js.hpp"
@@ -207,7 +209,24 @@ void HomeAssistantModule::generateDiscoveryJson(IHaEntity* entity, JsonObject& p
 void HomeAssistantModule::republishDiscovery() {
     if (!_mqttConnected) return;
     _discoveryPending = true;
+    resetDrainState();
+}
+
+/**
+ * @brief Resets all drain-related state for a fresh discovery cycle.
+ *
+ * Called from both MQTT_EVENT_CONNECTED and republishDiscovery() to ensure
+ * consistent initialization. Extracting into a helper prevents the two
+ * paths from drifting — the bug that caused false stall events on republish
+ * (Issue #34 review).
+ */
+void HomeAssistantModule::resetDrainState() {
     _discoveryIndex = 0;
+    _retryIntervalMs = 0;
+    _lastRetryAttemptMs = 0;
+    _drainStartMs = millis();
+    _drainStallReported = false;
+    _entitiesSkipped = 0;
 }
 
 /**
@@ -325,7 +344,7 @@ void HomeAssistantModule::mqttEventHandler(void* handler_args, esp_event_base_t 
             // Discovery payloads are published in bounded chunks via tick()
             // instead of flooding the outbox in one burst.
             self->_discoveryPending = true;
-            self->_discoveryIndex = 0;
+            self->resetDrainState();
             
             // Subscribe to command topics (lightweight — no outbox pressure)
             for (auto* entity : self->_entities) {
@@ -393,9 +412,15 @@ void HomeAssistantModule::mqttEventHandler(void* handler_args, esp_event_base_t 
  *
  * Two-phase state machine (Issue #16):
  * - Phase 1: Publishes up to DISCOVERY_CHUNK_SIZE discovery payloads per tick.
- *   On publish failure (ret < 0), pauses and retries next tick.
+ *   On publish failure (ret < 0), pauses and retries with an exponential backoff
+ *   (200ms base, 5s cap). If the cap is reached, the failing entity is skipped
+ *   and recorded in `_entitiesSkipped` (skip-on-cap behaviour).
  * - Phase 2: After discovery completes, publishes up to STATE_CHUNK_SIZE
- *   state values per tick with the same back-pressure handling.
+ *   state values per tick with the same backoff and skip-on-cap handling.
+ *
+ * Drain stall detection is active during the entire process: if the drain exceeds
+ * 30 seconds without completing, a health signal `ha.discovery.stalled` is published
+ * to the EventBus.
  *
  * Publishes "ha.discovery.complete" to the EventBus when both phases finish.
  *
@@ -410,6 +435,22 @@ void HomeAssistantModule::tick(uint32_t currentMillis) {
 
     // --- Phase 1: Paced discovery publish ---
     if (_discoveryPending) {
+        // --- Backoff gate: skip this tick if still in backoff window ---
+        if (_retryIntervalMs > 0 && (currentMillis - _lastRetryAttemptMs) < _retryIntervalMs) {
+            return;  // Still backing off — wait
+        }
+
+        // --- Drain stall detection (Issue #34) ---
+        if (!_drainStallReported && _drainStartMs > 0
+            && (currentMillis - _drainStartMs) > DRAIN_STALL_TIMEOUT_MS) {
+            ESP_LOGE(TAG, "Discovery drain stalled: %u/%u entities after %lu ms",
+                     (unsigned)_discoveryIndex, (unsigned)_entities.size(),
+                     (unsigned long)(currentMillis - _drainStartMs));
+            if (_eventBus) _eventBus->publish("ha.discovery.stalled", nullptr);
+            _drainStallReported = true;
+            _mqttStatusMsg = "Discovery Stalled";
+        }
+
         size_t published = 0;
         while (_discoveryIndex < _entities.size() && published < DISCOVERY_CHUNK_SIZE) {
             auto* entity = _entities[_discoveryIndex];
@@ -423,26 +464,60 @@ void HomeAssistantModule::tick(uint32_t currentMillis) {
             int ret = esp_mqtt_client_publish(_mqttClient, topic.c_str(),
                                              payloadStr.c_str(), 0, 1, 1);
             if (ret < 0) {
-                ESP_LOGW(TAG, "Discovery publish failed (ret=%d, entity=%s), will retry next tick",
-                         ret, entity->getObjectId().c_str());
-                break;  // Pause — retry this entity next tick
+                _lastRetryAttemptMs = currentMillis;
+
+                if (_retryIntervalMs == 0) {
+                    // First failure on this entity — start backoff
+                    _retryIntervalMs = RETRY_BASE_MS;
+                } else if (_retryIntervalMs >= RETRY_CAP_MS) {
+                    // Already at cap — skip this entity
+                    ESP_LOGE(TAG, "Discovery publish failed at backoff cap for '%s' — skipping",
+                             entity->getObjectId().c_str());
+                    _discoveryIndex++;
+                    _retryIntervalMs = 0;  // Reset backoff for next entity
+                    _entitiesSkipped++;
+                    continue;  // Try next entity in this chunk
+                } else {
+                    // Exponential increase, clamped to cap
+                    _retryIntervalMs = std::min(_retryIntervalMs * 2, RETRY_CAP_MS);
+                }
+
+                ESP_LOGW(TAG, "Discovery publish failed (ret=%d, entity=%s), backoff %u ms",
+                         ret, entity->getObjectId().c_str(), (unsigned)_retryIntervalMs);
+                break;  // Pause — backoff before retry
             }
+            // Success — reset backoff
+            _retryIntervalMs = 0;
             _discoveryIndex++;
             published++;
         }
 
         if (_discoveryIndex >= _entities.size()) {
-            ESP_LOGI(TAG, "Discovery drain complete: %u entities published",
-                     (unsigned)_entities.size());
+            if (_entitiesSkipped > 0) {
+                ESP_LOGW(TAG, "Discovery drain complete: %u entities published, %u skipped",
+                         (unsigned)(_entities.size() - _entitiesSkipped),
+                         (unsigned)_entitiesSkipped);
+            } else {
+                ESP_LOGI(TAG, "Discovery drain complete: %u entities published",
+                         (unsigned)_entities.size());
+            }
             _discoveryPending = false;
             _stateSyncPending = true;
             _stateSyncIndex = 0;
+            // Reset backoff state for Phase 2 but preserve _entitiesSkipped for diagnostics
+            _retryIntervalMs = 0;
+            _lastRetryAttemptMs = 0;
         }
         return;  // Don't overlap discovery and state sync in the same tick
     }
 
     // --- Phase 2: Paced state sync ---
     if (_stateSyncPending) {
+        // --- Backoff gate: skip this tick if still in backoff window ---
+        if (_retryIntervalMs > 0 && (currentMillis - _lastRetryAttemptMs) < _retryIntervalMs) {
+            return;  // Still backing off — wait
+        }
+
         size_t published = 0;
         while (_stateSyncIndex < _entities.size() && published < STATE_CHUNK_SIZE) {
             auto* entity = _entities[_stateSyncIndex];
@@ -452,18 +527,42 @@ void HomeAssistantModule::tick(uint32_t currentMillis) {
                 int ret = esp_mqtt_client_publish(_mqttClient, topic.c_str(),
                                                  state.c_str(), 0, 1, 1);
                 if (ret < 0) {
-                    ESP_LOGW(TAG, "State sync failed (ret=%d, entity=%s), will retry next tick",
-                             ret, entity->getObjectId().c_str());
+                    _lastRetryAttemptMs = currentMillis;
+
+                    if (_retryIntervalMs == 0) {
+                        _retryIntervalMs = RETRY_BASE_MS;
+                    } else if (_retryIntervalMs >= RETRY_CAP_MS) {
+                        ESP_LOGE(TAG, "State sync publish failed at backoff cap for '%s' — skipping",
+                                 entity->getObjectId().c_str());
+                        _stateSyncIndex++;
+                        _retryIntervalMs = 0;
+                        _entitiesSkipped++;
+                        continue;
+                    } else {
+                        _retryIntervalMs = std::min(_retryIntervalMs * 2, RETRY_CAP_MS);
+                    }
+
+                    ESP_LOGW(TAG, "State sync failed (ret=%d, entity=%s), backoff %u ms",
+                             ret, entity->getObjectId().c_str(), (unsigned)_retryIntervalMs);
                     break;  // Pause — retry next tick
                 }
+                // Success — reset backoff
+                _retryIntervalMs = 0;
                 published++;
             }
             _stateSyncIndex++;
         }
 
         if (_stateSyncIndex >= _entities.size()) {
-            ESP_LOGI(TAG, "State sync complete: %u entities synced",
-                     (unsigned)_entities.size());
+            if (_entitiesSkipped > 0) {
+                ESP_LOGW(TAG, "State sync complete: %u entities synced, %u skipped",
+                         (unsigned)(_entities.size() - _entitiesSkipped),
+                         (unsigned)_entitiesSkipped);
+            } else {
+                ESP_LOGI(TAG, "State sync complete: %u entities synced",
+                         (unsigned)_entities.size());
+            }
+            _entitiesSkipped = 0; // Reset after overall drain is complete
             _stateSyncPending = false;
             // Notify consumers that the full discovery + state drain has finished
             if (_eventBus) {
@@ -557,6 +656,9 @@ void HomeAssistantModule::registerRoutes(PsychicHttpServer& server) {
         doc["certExists"] = (_keyManager && !_keyManager->getKeyById(_tlsCertId.c_str()).empty());
         doc["connected"] = _mqttConnected.load();
         doc["status_msg"] = _mqttStatusMsg;
+        doc["discoveryStalled"] = _drainStallReported;
+        doc["entitiesSkipped"] = _entitiesSkipped;
+        doc["discoveryActive"] = _discoveryPending || _stateSyncPending;
         std::string output;
         serializeJson(doc, output);
         return response->send(200, "application/json", output.c_str());
@@ -606,6 +708,16 @@ void HomeAssistantModule::registerRoutes(PsychicHttpServer& server) {
  * @param registry Reference to the MCPToolRegistry.
  */
 void HomeAssistantModule::registerMCPTools(MCPToolRegistry& registry) {
+    registry.addTool("ha_get_discovery_status", "Get the status of the Home Assistant discovery drain",
+        [](void* context, JsonObject& args, JsonObject& result) {
+            auto* self = static_cast<HomeAssistantModule*>(context);
+            result["discoveryActive"] = self->_discoveryPending || self->_stateSyncPending;
+            result["discoveryStalled"] = self->_drainStallReported;
+            result["entitiesSkipped"] = self->_entitiesSkipped;
+            result["entitiesTotal"] = self->_entities.size();
+            result["discoveryIndex"] = self->_discoveryIndex;
+        }, this, false);
+
     registry.addTool("ha_get_state", "Get the current state of a Home Assistant entity",
         [](void* context, JsonObject& args, JsonObject& result) {
             auto* self = static_cast<HomeAssistantModule*>(context);
