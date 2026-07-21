@@ -34,14 +34,14 @@ const MIME_TYPES = {
 const MOCK_TABS = [
   { name: 'WiFi',       id: 'wifi',       parent: null,      order: 0   },
   { name: 'System',     id: 'system',     parent: null,      order: 100 },
-  { name: 'Status',     id: 'system',     parent: 'system',  order: 0   },
-  { name: 'Keys',       id: 'keys',       parent: 'system',  order: 1   },
-  { name: 'MCP',        id: 'mcp',        parent: 'system',  order: 2   },
-  { name: 'Backup',     id: 'backup',     parent: 'system',  order: 3   },
-  { name: 'OTA',        id: 'ota',        parent: 'system',  order: 4   },
+  { name: 'Status',     id: 'system',     parent: 'System',  order: 0   },
+  { name: 'Keys',       id: 'keys',       parent: 'System',  order: 1   },
+  { name: 'MCP',        id: 'mcp',        parent: 'System',  order: 2   },
+  { name: 'Backup',     id: 'backup',     parent: 'System',  order: 3   },
+  { name: 'OTA',        id: 'ota',        parent: 'System',  order: 4   },
   { name: 'Display',    id: 'display',    parent: null,      order: 30  },
-  { name: 'Settings',   id: 'settings',   parent: 'display', order: 10  },
-  { name: 'Screenshot', id: 'screenshot', parent: 'display', order: 20  },
+  { name: 'Settings',   id: 'settings',   parent: 'Display', order: 10  },
+  { name: 'Screenshot', id: 'screenshot', parent: 'Display', order: 20  },
   { name: 'App',        id: 'app',        parent: null,      order: 40  },
 ];
 

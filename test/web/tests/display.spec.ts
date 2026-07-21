@@ -80,7 +80,7 @@ async function bootPortal(page: Page, displayOverrides?: Partial<typeof MOCK_DIS
 
   await page.goto('/');
   await page.waitForFunction(() => (window as any).apiFetch !== undefined);
-  await page.locator('#bottom-nav .tab-link.active').waitFor();
+  await expect(page.locator('#portal-title')).not.toHaveText('Device Portal');
 }
 
 /** Navigate to the Display top-level tab and wait for the Settings sub-pill to render. */

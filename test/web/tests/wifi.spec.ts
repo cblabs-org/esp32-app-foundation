@@ -63,7 +63,7 @@ async function bootPortal(page: Page) {
 
   await page.goto('/');
   await page.waitForFunction(() => (window as any).apiFetch !== undefined);
-  await page.locator('#bottom-nav .tab-link.active').waitFor();
+  await expect(page.locator('#portal-title')).not.toHaveText('Device Portal');
   // WiFi tab is active by default, so it auto-fetches status & starts scan
 }
 
