@@ -484,6 +484,317 @@ TEST_F(ConfigManagerTest, GetTabOrder_Returns40) {
 }
 
 // =============================================================================
+// Mock IConfigurable: PatchableModule — array-bearing config with clamping
+// =============================================================================
+
+/**
+ * @brief Mock module with array config for JSON Patch integration tests.
+ *
+ * Serializes config with label, enabled, and channels array. The applyConfig()
+ * method clamps `label` to 20 characters to test §7 (module validation stays
+ * authoritative — the module's clamp must survive the patch roundtrip).
+ */
+class PatchableModule : public IConfigurable {
+public:
+    static constexpr int MAX_LABEL_LEN = 20;
+
+    std::string label = "default";
+    bool enabled = true;
+
+    struct Channel {
+        std::string name;
+        std::string type;
+    };
+    std::vector<Channel> channels = {
+        {"ch0", "voltage"},
+        {"ch1", "current"},
+        {"ch2", "voltage"}
+    };
+
+    const char* getConfigNamespace() const override { return "patchmod"; }
+    int getSchemaVersion() const override { return 1; }
+
+    void applyConfig(const JsonObject& section) override {
+        const char* lbl = section["label"] | "default";
+        label = std::string(lbl).substr(0, MAX_LABEL_LEN);  // clamp
+
+        enabled = section["enabled"] | true;
+
+        if (section["channels"].is<JsonArrayConst>()) {
+            channels.clear();
+            for (JsonObjectConst ch : section["channels"].as<JsonArrayConst>()) {
+                Channel c;
+                c.name = ch["name"] | "";
+                c.type = ch["type"] | "";
+                channels.push_back(c);
+            }
+        }
+    }
+
+    void serializeConfig(JsonObject& section) const override {
+        section["label"] = label.c_str();
+        section["enabled"] = enabled;
+        JsonArray arr = section["channels"].to<JsonArray>();
+        for (const auto& ch : channels) {
+            JsonObject obj = arr.add<JsonObject>();
+            obj["name"] = ch.name.c_str();
+            obj["type"] = ch.type.c_str();
+        }
+    }
+
+    void resetConfig() override {
+        label = "default";
+        enabled = true;
+        channels = {{"ch0", "voltage"}, {"ch1", "current"}, {"ch2", "voltage"}};
+    }
+};
+
+// =============================================================================
+// Test Group 8: patchNamespaceConfig() Integration
+// =============================================================================
+
+class PatchIntegrationTest : public ::testing::Test {
+protected:
+    ConfigManager configManager;
+    PatchableModule patchMod;
+
+    void SetUp() override {
+        std::error_code ec;
+        std::filesystem::create_directories("test/tmp/mod", ec);
+        remove("test/tmp/mod/patchmod.json");
+        remove("test/tmp/config_manifest.json");
+
+        configManager.registerModule(&patchMod);
+        configManager.beginAll();
+    }
+
+    void TearDown() override {
+        remove("test/tmp/mod/patchmod.json");
+        remove("test/tmp/config_manifest.json");
+    }
+
+    /** @brief Serialize the module's current config to a JSON string for comparison. */
+    std::string snapshotConfig() const {
+        JsonDocument doc;
+        JsonObject root = doc.to<JsonObject>();
+        patchMod.serializeConfig(root);
+        std::string out;
+        serializeJson(doc, out);
+        return out;
+    }
+};
+
+// 1. Mid-batch failure — ops 0-2 valid, op 3 invalid path → rollback
+TEST_F(PatchIntegrationTest, MidBatchFailure_NamespaceBytesIdentical) {
+    std::string before = snapshotConfig();
+
+    JsonDocument opsDoc;
+    JsonArray ops = opsDoc.to<JsonArray>();
+    // Op 0: valid replace
+    JsonObject op0 = ops.add<JsonObject>();
+    op0["op"] = "replace"; op0["path"] = "/label"; op0["value"] = "op0";
+    // Op 1: valid replace
+    JsonObject op1 = ops.add<JsonObject>();
+    op1["op"] = "replace"; op1["path"] = "/enabled"; op1["value"] = false;
+    // Op 2: valid replace on array element name
+    JsonObject op2 = ops.add<JsonObject>();
+    op2["op"] = "replace"; op2["path"] = "/channels/0/name"; op2["value"] = "ch0_patched";
+    // Op 3: invalid path (non-existent)
+    JsonObject op3 = ops.add<JsonObject>();
+    op3["op"] = "replace"; op3["path"] = "/nonexistent/deep/path"; op3["value"] = "fail";
+
+    JsonPatch::PatchResult result;
+    bool ok = configManager.patchNamespaceConfig("patchmod", ops, result);
+
+    EXPECT_FALSE(ok);
+    EXPECT_EQ(result.error, JsonPatch::Error::PATH_NOT_FOUND);
+    EXPECT_EQ(result.opIndex, 3);
+
+    // Config must be byte-identical to before (atomicity)
+    std::string after = snapshotConfig();
+    EXPECT_EQ(before, after);
+}
+
+// 2. Atomic test-and-replace — test matches, replace succeeds
+TEST_F(PatchIntegrationTest, AtomicTestAndReplace_Succeeds) {
+    JsonDocument opsDoc;
+    JsonArray ops = opsDoc.to<JsonArray>();
+    JsonObject testOp = ops.add<JsonObject>();
+    testOp["op"] = "test"; testOp["path"] = "/label"; testOp["value"] = "default";
+    JsonObject replOp = ops.add<JsonObject>();
+    replOp["op"] = "replace"; replOp["path"] = "/label"; replOp["value"] = "new_label";
+
+    JsonPatch::PatchResult result;
+    bool ok = configManager.patchNamespaceConfig("patchmod", ops, result);
+
+    EXPECT_TRUE(ok);
+    EXPECT_TRUE(result.applied);
+    EXPECT_EQ(patchMod.label, "new_label");
+}
+
+// 3. Test mismatch aborts batch — nothing changed
+TEST_F(PatchIntegrationTest, TestMismatch_AbortsBatch) {
+    std::string before = snapshotConfig();
+
+    JsonDocument opsDoc;
+    JsonArray ops = opsDoc.to<JsonArray>();
+    JsonObject testOp = ops.add<JsonObject>();
+    testOp["op"] = "test"; testOp["path"] = "/label"; testOp["value"] = "wrong";
+    JsonObject replOp = ops.add<JsonObject>();
+    replOp["op"] = "replace"; replOp["path"] = "/label"; replOp["value"] = "should_not_happen";
+
+    JsonPatch::PatchResult result;
+    bool ok = configManager.patchNamespaceConfig("patchmod", ops, result);
+
+    EXPECT_FALSE(ok);
+    EXPECT_EQ(result.error, JsonPatch::Error::TEST_FAILED);
+    EXPECT_EQ(result.opIndex, 0);
+
+    std::string after = snapshotConfig();
+    EXPECT_EQ(before, after);
+}
+
+// 4. Module clamping (§7) — over-length label is clamped by module
+TEST_F(PatchIntegrationTest, ModuleClamping_OverLengthLabel_Clamped) {
+    // Create a label longer than PatchableModule::MAX_LABEL_LEN (20)
+    std::string longLabel(30, 'X');
+
+    JsonDocument opsDoc;
+    JsonArray ops = opsDoc.to<JsonArray>();
+    JsonObject op = ops.add<JsonObject>();
+    op["op"] = "replace"; op["path"] = "/label"; op["value"] = longLabel;
+
+    JsonPatch::PatchResult result;
+    bool ok = configManager.patchNamespaceConfig("patchmod", ops, result);
+
+    EXPECT_TRUE(ok);
+    EXPECT_TRUE(result.applied);
+    // Module must have clamped to 20 characters
+    EXPECT_EQ(patchMod.label.length(), static_cast<size_t>(PatchableModule::MAX_LABEL_LEN));
+    EXPECT_EQ(patchMod.label, std::string(20, 'X'));
+}
+
+// 5. Single flash write — patch multiple fields → file has all changes
+TEST_F(PatchIntegrationTest, SingleFlashWrite_MultipleFields_AllPersisted) {
+    JsonDocument opsDoc;
+    JsonArray ops = opsDoc.to<JsonArray>();
+
+    JsonObject op1 = ops.add<JsonObject>();
+    op1["op"] = "replace"; op1["path"] = "/label"; op1["value"] = "patched";
+    JsonObject op2 = ops.add<JsonObject>();
+    op2["op"] = "replace"; op2["path"] = "/enabled"; op2["value"] = false;
+
+    JsonPatch::PatchResult result;
+    bool ok = configManager.patchNamespaceConfig("patchmod", ops, result);
+    EXPECT_TRUE(ok);
+
+    // Read the persisted file and verify both fields
+    std::ifstream file("test/tmp/mod/patchmod.json");
+    ASSERT_TRUE(file.is_open());
+    std::string jsonStr((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    file.close();
+
+    JsonDocument readDoc;
+    DeserializationError err = deserializeJson(readDoc, jsonStr);
+    EXPECT_EQ(err, DeserializationError::Ok);
+    EXPECT_STREQ(readDoc["label"].as<const char*>(), "patched");
+    EXPECT_FALSE(readDoc["enabled"].as<bool>());
+}
+
+// 6. Unknown namespace → error
+TEST_F(PatchIntegrationTest, UnknownNamespace_ReturnsError) {
+    JsonDocument opsDoc;
+    JsonArray ops = opsDoc.to<JsonArray>();
+    JsonObject op = ops.add<JsonObject>();
+    op["op"] = "replace"; op["path"] = "/label"; op["value"] = "test";
+
+    JsonPatch::PatchResult result;
+    bool ok = configManager.patchNamespaceConfig("nonexistent_ns", ops, result);
+
+    EXPECT_FALSE(ok);
+    EXPECT_EQ(result.error, JsonPatch::Error::PATH_NOT_FOUND);
+    EXPECT_FALSE(result.applied);
+}
+
+// 7. Too many ops → TOO_MANY_OPS error
+TEST_F(PatchIntegrationTest, TooManyOps_ReturnsTooManyOps) {
+    JsonDocument opsDoc;
+    JsonArray ops = opsDoc.to<JsonArray>();
+    // Add MAX_PATCH_OPS + 1 ops
+    for (int i = 0; i <= JsonPatch::MAX_PATCH_OPS; ++i) {
+        JsonObject op = ops.add<JsonObject>();
+        op["op"] = "replace"; op["path"] = "/label"; op["value"] = "x";
+    }
+
+    JsonPatch::PatchResult result;
+    bool ok = configManager.patchNamespaceConfig("patchmod", ops, result);
+
+    EXPECT_FALSE(ok);
+    EXPECT_EQ(result.error, JsonPatch::Error::TOO_MANY_OPS);
+    EXPECT_FALSE(result.applied);
+}
+
+// 8. Replace array element — /channels/1/name → value changes, others untouched
+TEST_F(PatchIntegrationTest, ReplaceArrayElement_OthersUntouched) {
+    JsonDocument opsDoc;
+    JsonArray ops = opsDoc.to<JsonArray>();
+    JsonObject op = ops.add<JsonObject>();
+    op["op"] = "replace"; op["path"] = "/channels/1/name"; op["value"] = "ch1_patched";
+
+    JsonPatch::PatchResult result;
+    bool ok = configManager.patchNamespaceConfig("patchmod", ops, result);
+
+    EXPECT_TRUE(ok);
+    EXPECT_EQ(patchMod.channels[1].name, "ch1_patched");
+    // Other channels untouched
+    EXPECT_EQ(patchMod.channels[0].name, "ch0");
+    EXPECT_EQ(patchMod.channels[0].type, "voltage");
+    EXPECT_EQ(patchMod.channels[2].name, "ch2");
+    EXPECT_EQ(patchMod.channels[2].type, "voltage");
+}
+
+// 9. Remove on array index → ARRAY_REMOVE_BLOCKED
+TEST_F(PatchIntegrationTest, RemoveArrayIndex_ArrayRemoveBlocked) {
+    JsonDocument opsDoc;
+    JsonArray ops = opsDoc.to<JsonArray>();
+    JsonObject op = ops.add<JsonObject>();
+    op["op"] = "remove"; op["path"] = "/channels/1";
+
+    JsonPatch::PatchResult result;
+    bool ok = configManager.patchNamespaceConfig("patchmod", ops, result);
+
+    EXPECT_FALSE(ok);
+    EXPECT_EQ(result.error, JsonPatch::Error::ARRAY_REMOVE_BLOCKED);
+}
+
+// 10. Stored values returned — verify post-clamp values for patched paths
+TEST_F(PatchIntegrationTest, StoredValues_ContainsPostClampValues) {
+    // Patch with an over-length label so clamping is visible
+    std::string longLabel(30, 'Z');
+
+    JsonDocument opsDoc;
+    JsonArray ops = opsDoc.to<JsonArray>();
+    JsonObject op1 = ops.add<JsonObject>();
+    op1["op"] = "replace"; op1["path"] = "/label"; op1["value"] = longLabel;
+    JsonObject op2 = ops.add<JsonObject>();
+    op2["op"] = "replace"; op2["path"] = "/enabled"; op2["value"] = false;
+
+    JsonPatch::PatchResult result;
+    JsonDocument storedDoc;
+    bool ok = configManager.patchNamespaceConfig("patchmod", ops, result, &storedDoc);
+
+    EXPECT_TRUE(ok);
+
+    // Stored values should contain the post-clamp label (20 chars, not 30)
+    const char* storedLabel = storedDoc["/label"].as<const char*>();
+    ASSERT_NE(storedLabel, nullptr);
+    EXPECT_EQ(strlen(storedLabel), static_cast<size_t>(PatchableModule::MAX_LABEL_LEN));
+
+    // Enabled should be present too
+    EXPECT_FALSE(storedDoc["/enabled"].as<bool>());
+}
+
+// =============================================================================
 // GoogleTest main entry point
 // =============================================================================
 
