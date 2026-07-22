@@ -48,6 +48,15 @@
 
 static constexpr const char* TAG = "Application";
 
+// --- PSRAM configuration guard (Issue #36) ---
+// BOARD_HAS_PSRAM is an Arduino-layer hint set in platformio.ini build_flags.
+// It does NOT enable the ESP-IDF SPIRAM driver — CONFIG_SPIRAM=y in sdkconfig
+// is required for that. Catch the misconfiguration at compile time.
+#if defined(BOARD_HAS_PSRAM) && !defined(CONFIG_SPIRAM)
+  #error "BOARD_HAS_PSRAM is defined but CONFIG_SPIRAM is not enabled in sdkconfig. " \
+         "PSRAM will be silently disabled. Add CONFIG_SPIRAM=y to your sdkconfig.defaults."
+#endif
+
 // Destructor — clean up heap-allocated modules
 Application::~Application() {
     delete _otaManager;
@@ -82,6 +91,16 @@ bool Application::begin(const FrameworkConfig& config) {
     // --- Step 1: Boot banner ---
     // Print the firmware version so the first log line is always identifiable.
     ESP_LOGI(TAG, "ESP32 App Foundation v%s — booting", BUILD_VERSION);
+
+#if defined(BOARD_HAS_PSRAM)
+    // Runtime PSRAM initialization check (Issue #36)
+    // Catches the case where CONFIG_SPIRAM is set but PSRAM physically
+    // failed to initialize (e.g., hardware fault, timing issue).
+    if (heap_caps_get_total_size(MALLOC_CAP_SPIRAM) == 0) {
+        ESP_LOGE(TAG, "PSRAM expected (BOARD_HAS_PSRAM) but none detected! "
+                      "Check CONFIG_SPIRAM=y and PSRAM hardware.");
+    }
+#endif
 
     // --- Step 2: Enter BOOT state ---
     setState(AppState::Boot);
