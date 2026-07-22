@@ -25,7 +25,7 @@ Fix all 4 open P2-correctness issues reported by the power-monitor consumer prog
 
 - **[x] [wo1-child-tabs](wo1-child-tabs/WORKORDER.md):** Issue #37 — Create content divs for child (sub-pill) tabs in `buildBottomNav()` so they render instead of showing blank — `1e9f855`
 - **[x] [wo2-apifetch-error-body](wo2-apifetch-error-body/WORKORDER.md):** Issue #31 — Preserve structured JSON error body on non-2xx responses in `apiFetch` + fix doc inaccuracies — `079f5c6`
-- **[ ] [wo3-psram-guard](wo3-psram-guard/WORKORDER.md):** Issue #36 — Add compile-time + runtime PSRAM guards, remove inert S3 flag, update docs
+- **[x] [wo3-psram-guard](wo3-psram-guard/WORKORDER.md):** Issue #36 — Add compile-time + runtime PSRAM guards, remove inert S3 flag, update docs — `73b5b7f`
 - **[ ] [wo4-arduinojson-docs](wo4-arduinojson-docs/WORKORDER.md):** Issue #29 — Replace all `StaticJsonDocument`/`DynamicJsonDocument` references across 14+ doc files with ArduinoJson 7 guidance
 
 ## Dependency Graph
