@@ -13,11 +13,29 @@ Serialised `fetch()` wrapper. Queues requests through `ApiQueue` to prevent ESP3
 | `url` | `string` | Yes | The API endpoint URL (e.g., `/api/mymodule/config`) |
 | `options` | `object` | No | Standard `fetch()` options (`method`, `headers`, `body`, etc.) |
 
-**Returns:** `Promise<Response>` — same as native `fetch()`.
+**Returns:** `Promise<object|string>` — on success, resolves with the parsed JSON object (if the response `Content-Type` is `application/json`) or a text string (for all other content types). Callers do **not** need to call `.json()` or `.text()` — the body is already parsed.
+
+**Throws:** `Error` on non-2xx responses, with the following shape:
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `err.message` | `string` | `'HTTP ' + status` (e.g., `'HTTP 403'`) |
+| `err.status` | `number` | The numeric HTTP status code |
+| `err.body` | `object\|string\|null` | Parsed JSON error body (if `Content-Type` is `application/json`), text string, or `null` if the body was unreadable/empty |
 
 ```javascript
-const response = await window.apiFetch('/api/mymodule/status');
-const data = await response.json();
+// Success — data is already parsed (no .json() call needed)
+const data = await window.apiFetch('/api/mymodule/status');
+console.log(data.someField);
+
+// Error handling — structured error body available on catch
+try {
+  await window.apiFetch('/api/mymodule/config', { method: 'POST', body: payload });
+} catch (err) {
+  console.error('Status:', err.status);       // e.g. 400
+  console.error('Body:', err.body);           // e.g. { error: "invalid field" }
+  window.showToast(err.body?.error || err.message, 'error');
+}
 ```
 
 ## User Feedback

@@ -38,7 +38,19 @@ class ApiQueue {
         try {
           await _authInterceptor();
           var retryResponse = await fetch(item.url, item.options);
-          if (!retryResponse.ok) throw new Error('HTTP ' + retryResponse.status);
+          if (!retryResponse.ok) {
+            var retryErr = new Error('HTTP ' + retryResponse.status);
+            retryErr.status = retryResponse.status;
+            try {
+              var rct = retryResponse.headers.get('content-type');
+              retryErr.body = (rct && rct.indexOf('application/json') !== -1)
+                ? await retryResponse.json()
+                : await retryResponse.text();
+            } catch (e) {
+              retryErr.body = null;
+            }
+            throw retryErr;
+          }
           response = retryResponse;
         } catch (authErr) {
           item.reject(authErr);
@@ -48,7 +60,19 @@ class ApiQueue {
         }
       }
 
-      if (!response.ok) throw new Error('HTTP ' + response.status);
+      if (!response.ok) {
+        var err = new Error('HTTP ' + response.status);
+        err.status = response.status;
+        try {
+          var ct = response.headers.get('content-type');
+          err.body = (ct && ct.indexOf('application/json') !== -1)
+            ? await response.json()
+            : await response.text();
+        } catch (e) {
+          err.body = null;  // body unreadable/empty — not fatal
+        }
+        throw err;
+      }
 
       var contentType = response.headers.get('content-type');
       if (contentType && contentType.indexOf('application/json') !== -1) {
