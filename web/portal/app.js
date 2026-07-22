@@ -269,6 +269,22 @@ document.addEventListener('DOMContentLoaded', function() {
       }
     }
 
+    // --- Create content containers for child (sub-pill) tabs ---
+    // Without these, child tab fragments have no target div and render blank.
+    // (Fixes GitHub Issue #37)
+    for (var p in childTabs) {
+      for (var j = 0; j < childTabs[p].length; j++) {
+        var child = childTabs[p][j];
+        var childId = 'tab-' + child.name.toLowerCase().replace(/\s+/g, '-');
+        if (!document.getElementById(childId)) {
+          var cdiv = document.createElement('div');
+          cdiv.id = childId;
+          cdiv.className = 'tab-content';
+          document.querySelector('.tab-content-container').appendChild(cdiv);
+        }
+      }
+    }
+
     // Bind click handlers to ALL nav links (including injected ones)
     bottomNav.querySelectorAll('.tab-link').forEach(function(link) {
       link.addEventListener('click', function(e) {
