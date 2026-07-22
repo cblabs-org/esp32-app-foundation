@@ -149,7 +149,7 @@ Both builds correctly implement the Application hub as a **composition root** us
 | Heap reporting | ✅ `heap_caps_get_free_size` + min watermark | ✅ `ESP.getFreeHeap()` (less detailed) |
 | EventBus allocation | ✅ Fixed 32-slot array (`Subscription[]`) | ✅ Fixed 32-slot array |
 | No dynamic alloc in tick | ✅ Verified | ✅ Verified |
-| `StaticJsonDocument` vs `DynamicJsonDocument` | ⚠️ Mixed v6/v7 API in ConfigManager | ✅ ArduinoJson v7 used throughout |
+| `StaticJsonDocument` vs `DynamicJsonDocument` | ⚠️ Mixed v6/v7 API in ConfigManager | ✅ ArduinoJson v7 used throughout | [Note: ArduinoJson 7 replaced both with `JsonDocument` — see D33]
 | Stack vs heap objects | ✅ Static `Application app` in main.cpp | ✅ Template follows same pattern |
 
 ### 3.2 RTOS Patterns

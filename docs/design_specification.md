@@ -990,7 +990,7 @@ an EventBus-dispatched reload — **no device reboot required**.
 
 ### 8.5 JSON Memory Safety
 
-> 📖 See [Embedded Safety § StaticJsonDocument for POST Body Parsing](developer/embedded-safety.md#rule-4-staticjsondocument-for-post-body-parsing-adr-15) for memory-safe JSON patterns.
+> 📖 See [Embedded Safety § Bounded JsonDocument for POST Body Parsing](developer/embedded-safety.md#rule-4-bounded-jsondocument-for-post-body-parsing-adr-15) for memory-safe JSON patterns.
 
 **`DynamicJsonDocument` is banned project-wide.** The framework uses ArduinoJson
 v7, which replaces `StaticJsonDocument<N>` and `DynamicJsonDocument` with a

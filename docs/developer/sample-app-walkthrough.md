@@ -802,4 +802,4 @@ Continue with the deep-dive guides in order:
 | 5 | `references/architecture.md` | App code at `template/src/` | Directory is now `sample-app/src/` | 🟡 Stale path |
 | 6 | SKILL.md interface table | Correct `registerRoutes` name | But the quickstart example contradicts this | 🟡 Internal inconsistency |
 | 7 | Sample app `myApp.hpp` | Includes individual interface headers | Skill says "always use `#include "AppFoundation.h"`" | 🟡 Code violates own advice |
-| 8 | `extending-the-web-portal.md` | `StaticJsonDocument<1024>` | ArduinoJson v7 uses `JsonDocument` (no size template) | 🟡 Stale API version |
+| 8 | `extending-the-web-portal.md` | `StaticJsonDocument<1024>` | ✅ Fixed — uses `JsonDocument` (ArduinoJson v7) | ✅ Resolved |

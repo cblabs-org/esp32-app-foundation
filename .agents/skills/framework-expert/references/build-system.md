@@ -81,3 +81,16 @@ Steps: ensure tag on HEAD → build (optional) → collect binaries → sign →
 
 `framework = arduino, espidf` — enables Arduino APIs alongside ESP-IDF primitives (FreeRTOS, mbedTLS).
 SDK config via `sdkconfig.defaults` files, synchronized by `sync_sdkconfig.py` pre-build script.
+
+## PSRAM Configuration
+
+Boards with PSRAM (e.g., ESP32-S3-Nano) require **two** correctly-configured layers:
+
+| Layer | Where | Purpose |
+|:---|:---|:---|
+| `-DBOARD_HAS_PSRAM` | `platformio.ini` `build_flags` | Arduino-layer hint — tells application code that PSRAM is expected |
+| `CONFIG_SPIRAM=y` | `sdkconfig.defaults.*` | ESP-IDF driver master switch — actually enables the SPIRAM hardware driver |
+
+**`BOARD_HAS_PSRAM` alone does NOT enable PSRAM.** It is a build flag consumed by application code. The ESP-IDF SPIRAM driver is controlled exclusively by `CONFIG_SPIRAM=y` in the sdkconfig. Sub-options like `CONFIG_SPIRAM_MODE_OCT`, `CONFIG_SPIRAM_SPEED_80M`, and `CONFIG_SPIRAM_MEMTEST` are all inert without the `CONFIG_SPIRAM=y` master switch.
+
+A compile-time guard in `Application.cpp` will `#error` if `BOARD_HAS_PSRAM` is defined without `CONFIG_SPIRAM`, catching the misconfiguration before the firmware is built. A runtime check in `Application::begin()` also logs an error if PSRAM hardware fails to initialise despite correct configuration.

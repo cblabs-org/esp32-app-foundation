@@ -27,7 +27,7 @@ Routes are registered directly against the `PsychicHttpServer`.
 ```cpp
 void MyModule::registerRoutes(PsychicHttpServer& server) {
     server.on("/api/my-module/status", HTTP_GET, [this](PsychicRequest* request) {
-        StaticJsonDocument<256> doc; // Or JsonDocument in v7
+        JsonDocument doc;
         doc["status"] = "ok";
         doc["uptime"] = _uptime;
         

@@ -26,11 +26,14 @@ Choose the right string type based on execution context:
 
 **Why `std::string` over Arduino `String`:** Both perform heap allocation, but `std::string` offers Small String Optimization (SSO — strings ≤~22 chars use no heap), deterministic RAII destruction, and no copy-on-write surprises. It does NOT avoid heap allocation for larger strings — use `const char*` or `char[]` in performance-critical paths.
 
-## 4. `StaticJsonDocument` for POSTs (ADR-15)
+## 4. Bounded `JsonDocument` for POSTs (ADR-15)
+
+ArduinoJson 7 removed `StaticJsonDocument` and `DynamicJsonDocument`, replacing both with a single elastic `JsonDocument` type.
 
 When parsing incoming Web Portal POST requests or processing small MQTT payloads:
-- **Rule:** Use `StaticJsonDocument<N>` instead of `DynamicJsonDocument`.
-- **Why:** `StaticJsonDocument` allocates on the stack. Because POST bodies are capped (typically at 4096 bytes via the web server configuration), a correctly sized `StaticJsonDocument` guarantees no heap fragmentation and safe, deterministic parsing. See [Web Portal Routes](../systems/web-portal/routes.md).
+- **Rule:** Use `JsonDocument doc;` — no template size parameter is needed.
+- **Why:** The primary allocation-bounding mechanism is the body-size middleware (`getMaxPostBody()`), which caps the incoming body *before* it reaches the handler. A `JsonDocument` fed a body that is already bounded by the middleware cannot over-allocate. As defense-in-depth, you may also pass a max length to the parser (`deserializeJson(doc, body, maxLen)`) or set `DeserializationOption::NestingLimit`.
+- See [Web Portal Routes](../systems/web-portal/routes.md).
 
 ## 5. SBO Threshold for `std::function`
 

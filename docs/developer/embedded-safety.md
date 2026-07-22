@@ -24,7 +24,7 @@ Code inside an [ITickable::tick()](file:///Users/mcneillm/Documents/Projects/esp
 - `new` / `malloc` / `calloc`
 - `std::vector::push_back()` (unless capacity was pre-reserved)
 - Arduino `String` concatenation (`+=`, `+`)
-- `DynamicJsonDocument` construction
+- `DynamicJsonDocument` construction (removed in ArduinoJson 7 — use `JsonDocument`)
 - `std::string` construction or concatenation
 
 **Correct pattern — pre-allocate during `begin()`:**
@@ -33,14 +33,14 @@ Code inside an [ITickable::tick()](file:///Users/mcneillm/Documents/Projects/esp
 class SensorModule : public ITickable {
     // ✅ Pre-allocated at construction — no runtime allocation
     char _formatBuffer[128];
-    StaticJsonDocument<256> _doc;
+    JsonDocument _doc;
 
     void tick(uint32_t currentMillis) override {
         // Use pre-allocated buffers for all string operations
         snprintf(_formatBuffer, sizeof(_formatBuffer),
                  "Temperature: %.1f°C", _temperature);
 
-        // Use StaticJsonDocument for stack-allocated parsing
+        // Use JsonDocument for JSON construction
         _doc.clear();
         _doc["temp"] = _temperature;
     }
@@ -101,14 +101,16 @@ char message[64];
 snprintf(message, sizeof(message), "Sensor %d: %.2f", sensorId, value);
 ```
 
-### Rule 4: `StaticJsonDocument` for POST Body Parsing (ADR-15)
+### Rule 4: Bounded `JsonDocument` for POST Body Parsing (ADR-15)
 
-When parsing incoming Web Portal POST requests or small MQTT payloads:
+ArduinoJson 7 removed `StaticJsonDocument` and `DynamicJsonDocument`, replacing both with a single elastic `JsonDocument` type.
+
+When parsing incoming Web Portal POST requests or small MQTT payloads, the primary allocation-bounding mechanism is the body-size middleware (`getMaxPostBody()`), which caps the incoming body *before* it reaches the handler. A `JsonDocument` fed a body that is already bounded by the middleware cannot over-allocate.
 
 ```cpp
-// ✅ Stack-allocated JSON parsing — no heap fragmentation
+// ✅ ArduinoJson v7 — bounded by getMaxPostBody() middleware
 void handlePost(PsychicRequest* request) {
-    StaticJsonDocument<512> doc;  // Fixed-size, on the stack
+    JsonDocument doc;
     DeserializationError err = deserializeJson(doc, request->body());
     if (err) {
         ESP_LOGE(TAG, "JSON parse failed: %s", err.c_str());
@@ -117,15 +119,12 @@ void handlePost(PsychicRequest* request) {
     const char* name = doc["name"] | "default";
     int value = doc["value"] | 0;
 }
-
-// ❌ DynamicJsonDocument — heap-allocated
-void handlePost(PsychicRequest* request) {
-    DynamicJsonDocument doc(512);  // Heap allocation!
-    // ...
-}
 ```
 
-POST bodies are capped at ~4096 bytes by the web server configuration, so a correctly sized `StaticJsonDocument` guarantees safe, deterministic parsing.
+> [!NOTE]
+> As defense-in-depth, you may also pass a max length to the parser (`deserializeJson(doc, body, maxLen)`) or set `DeserializationOption::NestingLimit`.
+
+POST bodies are capped at the contributor's declared `getMaxPostBody()` limit (default: 4096 bytes) by the global middleware in `WebServerManager`, so the parse is bounded by the declared limit rather than by the document type.
 
 ### Rule 5: SBO Threshold for `std::function`
 

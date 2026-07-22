@@ -24,11 +24,11 @@ The framework publishes real-time heap telemetry via the EventBus:
 
 ## Anti-Fragmentation Rules
 
-**Goal:** Prevent heap **fragmentation from repeated alloc/free cycles**, not ban all transient memory use. Fixed-size stack allocations (`StaticJsonDocument`, `char buf[N]`) and pre-allocated containers are safe in `tick()`.
+**Goal:** Prevent heap **fragmentation from repeated alloc/free cycles**, not ban all transient memory use. Fixed-size stack allocations (`char buf[N]`) and pre-allocated containers are safe in `tick()`. `JsonDocument` used in request handlers is safe because `getMaxPostBody()` caps input size before parsing.
 
-**Avoid in `tick()`:** `new`, `malloc`, `push_back` (may reallocate), Arduino `String` concatenation, `DynamicJsonDocument`.
+**Avoid in `tick()`:** `new`, `malloc`, `push_back` (may reallocate), Arduino `String` concatenation.
 
-**Safe in `tick()`:** `StaticJsonDocument<N>`, stack-allocated `char[]` buffers, pre-allocated `std::vector` (populated at boot, read-only at runtime).
+**Safe in `tick()`:** Stack-allocated `char[]` buffers, pre-allocated `std::vector` (populated at boot, read-only at runtime). `JsonDocument` is safe in request handlers (not `tick()`) when input is bounded by `getMaxPostBody()`.
 
 *Full rules:* See [Memory Rules](../embedded-safety/memory-rules.md).
 
