@@ -76,7 +76,7 @@ Favour static allocation wherever possible. Static memory is reserved at compile
 // ✅ Static allocation — visible in build logs
 class MyModule : public ITickable {
     char _buffer[256];            // Compile-time reservation
-    StaticJsonDocument<512> _doc; // Stack-allocated JSON document
+    JsonDocument _doc;                // ArduinoJson v7 unified type
 };
 
 // ❌ Dynamic allocation — hidden until runtime

@@ -15,7 +15,7 @@ GET requests are straightforward. You receive a request object and return a resp
 ```cpp
 void MyModule::registerRoutes(PsychicHttpServer* server) {
     server->on("/api/weather", HTTP_GET, [](PsychicRequest* request) {
-        StaticJsonDocument<256> doc;
+        JsonDocument doc;
         doc["temp"] = 22.5;
         doc["humidity"] = 45;
         
@@ -45,7 +45,7 @@ Handling POST requests (which carry a JSON body) requires strict safety constrai
    size_t getMaxPostBody() const override { return 8192; }
    ```
 
-2. **StaticJsonDocument**: Handlers MUST parse incoming JSON using `StaticJsonDocument` allocated on the stack (e.g., `StaticJsonDocument<1024>`). You MUST NOT use `DynamicJsonDocument` in route handlers, as concurrent requests will fragment the heap and cause panics.
+2. **`JsonDocument` (ArduinoJson v7)**: ArduinoJson 7 removed `StaticJsonDocument` and `DynamicJsonDocument`, replacing both with a single elastic `JsonDocument`. Handlers MUST parse incoming JSON using `JsonDocument doc;` (no template size parameter). Because the middleware already caps the body to the contributor's declared `getMaxPostBody()` limit, a `JsonDocument` fed a bounded body cannot over-allocate. As defense-in-depth, you may also pass a max length to the parser (`deserializeJson(doc, body, maxLen)`).
 
 ```cpp
 void MyModule::registerRoutes(PsychicHttpServer* server) {
@@ -54,8 +54,8 @@ void MyModule::registerRoutes(PsychicHttpServer* server) {
             return request->reply(400, "text/plain", "Missing body");
         }
         
-        // ADR-15: Stack allocation
-        StaticJsonDocument<512> doc;
+        // ADR-15: Bounded by getMaxPostBody() middleware
+        JsonDocument doc;
         DeserializationError error = deserializeJson(doc, request->body());
         
         if (error) {
@@ -70,7 +70,7 @@ void MyModule::registerRoutes(PsychicHttpServer* server) {
 }
 ```
 
-By strictly adhering to stack-allocated JSON documents and enforcing body size caps via the global middleware, the web server remains stable even under heavy load or malicious input.
+By using `JsonDocument` with body size caps enforced via the global middleware (`getMaxPostBody()`), the web server remains stable even under heavy load or malicious input.
 
 ## Built-in MCP Tool Endpoints
 
