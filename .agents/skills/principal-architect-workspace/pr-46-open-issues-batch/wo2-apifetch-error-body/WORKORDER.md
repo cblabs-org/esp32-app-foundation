@@ -100,3 +100,16 @@ After completing all checklist items:
 2. **STOP and ask the user** if they are happy with the changes.
 3. Only after user approval: commit your changes with message `fix(portal): preserve error body in apiFetch on non-2xx (Issue #31)`, then invoke the `@distillery` skill to package the state, passing `.agents/skills/principal-architect-workspace/pr-46-open-issues-batch/wo2-apifetch-error-body/` as the target directory.
 4. Append a status update to this WORKORDER.md and send a completion message to the PA.
+
+## Status Log
+
+| Date | Event |
+|------|-------|
+| 2026-07-22 | Worker began execution — read code, verified provenance |
+| 2026-07-22 | Fixed both throw sites in `ApiQueue.processNext()` (main + auth retry) |
+| 2026-07-22 | Updated `shared-utilities.md` — corrected return type, usage example, added error shape docs |
+| 2026-07-22 | 69/69 Playwright tests passing — zero regressions |
+| 2026-07-22 | PA approved — committed as `079f5c6` |
+| 2026-07-22 | Distillery packaged — `context_bridge.md`, `sessions.md`, 2 context artifacts |
+| 2026-07-22 | **WO2 COMPLETE** |
+

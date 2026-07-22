@@ -72,3 +72,15 @@ After completing all checklist items:
 2. **STOP and ask the user** if they are happy with the changes.
 3. Only after user approval: commit your changes with message `fix(portal): create content divs for child tabs (Issue #37)`, then invoke the `@distillery` skill to package the state, passing `.agents/skills/principal-architect-workspace/pr-46-open-issues-batch/wo1-child-tabs/` as the target directory.
 4. Append a status update to this WORKORDER.md and send a completion message to the PA.
+
+## Status Log
+
+| Date | Event |
+|---|---|
+| 2026-07-22 | Worker agent read WORKORDER, verified provenance via PROJECT.md |
+| 2026-07-22 | Implemented child-tab content-div loop in `buildBottomNav()` (16 lines added to `web/portal/app.js`) |
+| 2026-07-22 | Playwright tests: **69/69 passed** — no regressions |
+| 2026-07-22 | Manual verification: confirmed `childId` derivation matches `buildPillBar()`, `activateTopTab()`, `activateSubPill()` |
+| 2026-07-22 | PA approved — committed as `1e9f855` on `open-issues-batch/wo1-child-tabs` |
+| 2026-07-22 | Distillery packaged: `context_bridge.md`, `sessions.md`, `context_artifacts/adr_child_tab_divs.md` |
+| 2026-07-22 | **WO1 COMPLETE** ✅ |
