@@ -3,7 +3,7 @@
 **Parent Program:** esp32-app-foundation  
 **Base Branch:** `main`  
 **Stack Tip:** `open-issues-batch/wo4-arduinojson-docs` (when complete)  
-**GitHub PR:** TBD — will be submitted as a stack
+**GitHub PR:** [#38](https://github.com/matthewmcneill/esp32-app-foundation/pull/38)
 
 ## Objective
 
@@ -19,7 +19,8 @@ Fix all 4 open P2-correctness issues reported by the power-monitor consumer prog
 |------|-------|
 | 2026-07-22 | PA investigated all 4 open issues, validated root causes against source code |
 | 2026-07-22 | User approved decomposition and resolved all open questions |
-| 2026-07-22 | Execution started — WO1 spawned |
+| 2026-07-22 | Execution started — WO1→WO2→WO3→WO4 serialized |
+| 2026-07-22 | All 4 WOs complete. PR [#38](https://github.com/matthewmcneill/esp32-app-foundation/pull/38) opened |
 
 ## Work Order Ledger
 

@@ -82,7 +82,7 @@ predate the formal PA pipeline and are filed retrospectively.
 | [pr-42-ha-discovery-pacing](./pr-42-ha-discovery-pacing/PROJECT.md) | Issue #16: HA Discovery Pacing (tick-driven chunked publish, outbox limit, drain-completion signal) | ✅ **MERGED** PR [#17](https://github.com/matthewmcneill/esp32-app-foundation/pull/17), 361/361 tests · [distillation](./pr-42-ha-discovery-pacing/context_bridge.md) | Session bb03d6e6 |
 | [pr-44-json-patch](./pr-44-json-patch/PROJECT.md) | Issue #28: RFC 6902 JSON Patch for ConfigManager — element-level config writes, config mutex, saveModuleConfig split | ✅ **COMPLETE** PR [#30](https://github.com/matthewmcneill/esp32-app-foundation/pull/30), 416/416 tests | Session 3f6fb84f |
 | [pr-45-ha-retry-backoff](./pr-45-ha-retry-backoff/PROJECT.md) | Issue #34: HA Discovery Retry Backoff (exponential backoff 200ms→5s cap, skip-on-cap, drain stall detection, health signals on EventBus/web API/MCP/portal) | ✅ **COMPLETE** `e5b7978` — WO1 merged, 8 new backoff tests · [distillation](./pr-45-ha-retry-backoff/wo1-backoff-fix/context_bridge.md) | Session 000a3e6b |
-| [pr-46-open-issues-batch](./pr-46-open-issues-batch/PROJECT.md) | Issues #29, #31, #36, #37: Open Issues Batch (child tabs blank, apiFetch error body, PSRAM guard, ArduinoJson docs) | 🚧 **IN PROGRESS** — WO1 spawned | Session 2db00816 |
+| [pr-46-open-issues-batch](./pr-46-open-issues-batch/PROJECT.md) | Issues #29, #31, #36, #37: Open Issues Batch (child tabs blank, apiFetch error body, PSRAM guard, ArduinoJson docs) | ✅ **COMPLETE** PR [#38](https://github.com/matthewmcneill/esp32-app-foundation/pull/38), 423/423 native + 69/69 web tests | Session 2db00816 |
 
 ---
 
