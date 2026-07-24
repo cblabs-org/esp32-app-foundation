@@ -22,6 +22,7 @@
 #include <cstdio>
 #include <PsychicHttp.h>
 #include "esp_heap_caps.h"
+#include "esp_log.h"
 
 // -----------------------------------------------------------------------------
 // Weak Symbol Declaration & Default Implementation for SquareLine Studio (D8)
@@ -170,7 +171,8 @@ void LVGLDisplayModule::begin(EventBus* eventBus) {
 // -----------------------------------------------------------------------------
 
 void LVGLDisplayModule::tick(uint32_t now) {
-    if (_lastTickMs == 0) {
+    if (!_tickInitialized) {
+        _tickInitialized = true;
         _lastTickMs = now;
         _screensaver.tick(now, _adapter, _brightness, _eventBus);
         return;
@@ -196,8 +198,37 @@ void LVGLDisplayModule::tick(uint32_t now) {
         return;
     }
 
+    // Drain pending cross-thread events
+    if (_pendingOtaComplete.exchange(false)) {
+        _pauseRendering.store(false);
+        if (_pendingOtaSuccess.load()) {
+            restorePriorScreen();
+        } else {
+            showError("OTA FAILED", _pendingOtaStatus[0] ? _pendingOtaStatus : "Update failed");
+        }
+        resetActivity();
+    } else if (_pendingOtaUpdate.exchange(false)) {
+        showOtaProgress(_pendingOtaProgress.load(), _pendingOtaStatus[0] ? _pendingOtaStatus : "Updating...");
+        resetActivity();
+    }
+
+    if (_pendingError.exchange(false)) {
+        showError(_pendingErrorTitle[0] ? _pendingErrorTitle : "SYSTEM ERROR", _pendingErrorMessage);
+        resetActivity();
+    }
+
+    if (_pendingMessage.exchange(false)) {
+        if (_bootstrapMode) {
+            reportStatus(_pendingMessageText, -1.0f);
+        } else {
+            ESP_LOGI("LVGLDisplay", "Message: %s", _pendingMessageText);
+            // TODO: Add transient notification overlay widget in a future PR
+        }
+        resetActivity();
+    }
+
     // Defense-in-depth: if OTA flash write in progress, advance tick clock but skip timer handler
-    if (_pauseRendering) {
+    if (_pauseRendering.load()) {
         lv_tick_inc(elapsed);
         return;
     }
@@ -222,7 +253,7 @@ void LVGLDisplayModule::reportError(const char* errorMessage) {
 }
 
 void LVGLDisplayModule::clearStatus() {
-    _pauseRendering = false;
+    _pauseRendering.store(false);
     restorePriorScreen();
 }
 
@@ -289,7 +320,7 @@ void LVGLDisplayModule::showOtaProgress(float progress, const char* status) {
 }
 
 void LVGLDisplayModule::restorePriorScreen() {
-    _pauseRendering = false;
+    _pauseRendering.store(false);
     if (_inSystemScreen && _priorScreen != nullptr) {
         lv_scr_load_anim(_priorScreen, LV_SCR_LOAD_ANIM_FADE_IN, 200, 0, false);
         _priorScreen = nullptr;
@@ -446,18 +477,25 @@ void LVGLDisplayModule::_onOtaProgress(const char* /*topic*/, const void* payloa
 
     const auto* ota = static_cast<const OTAProgressPayload*>(payload);
     if (ota->complete) {
-        self->_pauseRendering = false;
-        if (ota->success) {
-            self->restorePriorScreen();
+        self->_pendingOtaSuccess.store(ota->success);
+        if (ota->status) {
+            strncpy(self->_pendingOtaStatus, ota->status, sizeof(self->_pendingOtaStatus) - 1);
+            self->_pendingOtaStatus[sizeof(self->_pendingOtaStatus) - 1] = '\0';
         } else {
-            self->showError("OTA FAILED", ota->status ? ota->status : "Update failed");
+            self->_pendingOtaStatus[0] = '\0';
         }
+        self->_pendingOtaComplete.store(true);
     } else {
-        self->_pauseRendering = true;
-        self->showOtaProgress(ota->progress, ota->status ? ota->status : "Updating...");
-        lv_timer_handler();
+        self->_pauseRendering.store(true);
+        self->_pendingOtaProgress.store(ota->progress);
+        if (ota->status) {
+            strncpy(self->_pendingOtaStatus, ota->status, sizeof(self->_pendingOtaStatus) - 1);
+            self->_pendingOtaStatus[sizeof(self->_pendingOtaStatus) - 1] = '\0';
+        } else {
+            self->_pendingOtaStatus[0] = '\0';
+        }
+        self->_pendingOtaUpdate.store(true);
     }
-    self->resetActivity();
 }
 
 void LVGLDisplayModule::_onDisplayMessage(const char* /*topic*/, const void* payload, void* ctx) {
@@ -466,9 +504,10 @@ void LVGLDisplayModule::_onDisplayMessage(const char* /*topic*/, const void* pay
 
     const auto* msg = static_cast<const DisplayMessagePayload*>(payload);
     if (msg->message != nullptr) {
-        self->reportStatus(msg->message, -1.0f);
+        strncpy(self->_pendingMessageText, msg->message, sizeof(self->_pendingMessageText) - 1);
+        self->_pendingMessageText[sizeof(self->_pendingMessageText) - 1] = '\0';
+        self->_pendingMessage.store(true);
     }
-    self->resetActivity();
 }
 
 void LVGLDisplayModule::_onSystemError(const char* /*topic*/, const void* payload, void* ctx) {
@@ -477,12 +516,17 @@ void LVGLDisplayModule::_onSystemError(const char* /*topic*/, const void* payloa
 
     const auto* err = static_cast<const SystemErrorPayload*>(payload);
     if (err->message != nullptr) {
-        self->showError(err->title ? err->title : "SYSTEM ERROR", err->message);
-    } else {
-        const char* msgStr = static_cast<const char*>(payload);
-        self->showError("SYSTEM ERROR", msgStr);
+        strncpy(self->_pendingErrorMessage, err->message, sizeof(self->_pendingErrorMessage) - 1);
+        self->_pendingErrorMessage[sizeof(self->_pendingErrorMessage) - 1] = '\0';
+        
+        if (err->title != nullptr) {
+            strncpy(self->_pendingErrorTitle, err->title, sizeof(self->_pendingErrorTitle) - 1);
+            self->_pendingErrorTitle[sizeof(self->_pendingErrorTitle) - 1] = '\0';
+        } else {
+            self->_pendingErrorTitle[0] = '\0';
+        }
+        self->_pendingError.store(true);
     }
-    self->resetActivity();
 }
 
 // -----------------------------------------------------------------------------
@@ -517,7 +561,19 @@ bool LVGLDisplayModule::captureSnapshot(uint8_t*& outBuffer, size_t& outSize, ui
         return false;
     }
 
-    memset(outBuffer, 0, outSize);
+    lv_obj_t* screen = lv_screen_active();
+    bool snapshot_taken = false;
+    if (screen != nullptr) {
+        lv_image_dsc_t dsc = {0};
+        lv_result_t res = lv_snapshot_take_to_buf(screen, LV_COLOR_FORMAT_RGB565, &dsc, outBuffer, outSize);
+        if (res == LV_RESULT_OK) {
+            snapshot_taken = true;
+        }
+    }
+
+    if (!snapshot_taken) {
+        memset(outBuffer, 0, outSize);
+    }
 
     return true;
 }
@@ -854,7 +910,7 @@ void LVGLDisplayModule::registerMCPTools(MCPToolRegistry& registry) {
     // --- Tool 3: capture_display (read-only) ---
     registry.addTool(
         "capture_display",
-        "Capture the current display framebuffer as a base64-encoded RGB565 image",
+        "Capture a screenshot of the current display as base64-encoded RGB565 data",
         [](void* ctx, JsonObject& params, JsonObject& result) {
             auto* self = static_cast<LVGLDisplayModule*>(ctx);
             (void)params;
@@ -865,12 +921,16 @@ void LVGLDisplayModule::registerMCPTools(MCPToolRegistry& registry) {
             uint16_t h = 0;
 
             if (!self->captureSnapshot(buf, size, w, h) || buf == nullptr) {
-                result["error"]   = "Framebuffer unavailable";
-                result["isError"] = true;
+                result["error"] = "Failed to allocate snapshot buffer";
                 return;
             }
 
-            std::string b64;
+            result["width"] = w;
+            result["height"] = h;
+            result["format"] = "RGB565";
+            
+            // Note: ~150 KB transient PSRAM allocation for base64 encoding (48-byte chunks, 48 % 3 == 0)
+            String b64 = "";
             size_t offset = 0;
             while (offset < size) {
                 size_t chunk = (size - offset > 48) ? 48 : (size - offset);

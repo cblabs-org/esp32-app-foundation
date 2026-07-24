@@ -41,6 +41,9 @@
    HAL SETTINGS
  *====================*/
 
+/* Enable snapshot capture (WO12) */
+#define LV_USE_SNAPSHOT 1
+
 /* Default display refresh period in milliseconds (~30 FPS default) */
 #define LV_DISPLAY_DEF_REFR_PERIOD 33
 

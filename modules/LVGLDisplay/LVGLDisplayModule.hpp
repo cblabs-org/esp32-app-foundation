@@ -42,6 +42,7 @@
 
 #include <cstdint>
 #include <cstddef>
+#include <atomic>
 #include <ArduinoJson.h>
 #include "interfaces/ITickable.hpp"
 #include "interfaces/IConfigurable.hpp"
@@ -376,13 +377,26 @@ private:
     lv_group_t*   _group = nullptr;            ///< Widget focus group for encoder/keypad
 
     uint32_t _lastTickMs = 0;                  ///< Timestamp of last tick() execution
+    bool     _tickInitialized = false;         ///< Sentinel for first tick
     void*    _buf1 = nullptr;                  ///< Primary draw buffer allocation
     void*    _buf2 = nullptr;                  ///< Secondary draw buffer allocation
     size_t   _bufSize = 0;                     ///< Allocated size per draw buffer in bytes
     bool     _buffersConfigured = false;       ///< True if draw buffers have been configured (replaces LVGL 8 lv_display_get_buf_1)
     bool     _bootstrapMode = false;           ///< True while in Phase 1 bootstrap mode
-    bool     _pauseRendering = false;          ///< Pause rendering flag during OTA flash writes
+    std::atomic<bool> _pauseRendering{false};  ///< Pause rendering flag during OTA flash writes
     uint32_t _lastIndevInactiveMs = 0;         ///< Inactivity tracking timestamp
+
+    // --- Thread-safe pending state ---
+    std::atomic<bool> _pendingOtaUpdate{false};
+    std::atomic<float> _pendingOtaProgress{0.0f};
+    char _pendingOtaStatus[64] = {};
+    std::atomic<bool> _pendingOtaComplete{false};
+    std::atomic<bool> _pendingOtaSuccess{false};
+    std::atomic<bool> _pendingError{false};
+    char _pendingErrorTitle[32] = {};
+    char _pendingErrorMessage[128] = {};
+    std::atomic<bool> _pendingMessage{false};
+    char _pendingMessageText[128] = {};
 
     // --- System Screens & Assets ---
     const lv_image_dsc_t* _bootLogo = nullptr;

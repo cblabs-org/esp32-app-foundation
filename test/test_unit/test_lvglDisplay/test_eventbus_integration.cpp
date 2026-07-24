@@ -84,11 +84,6 @@ TEST_F(LVGLEventBusIntegrationTest, SubscribesToSystemError_PayloadStruct) {
     EXPECT_GT(count, 0);
 }
 
-TEST_F(LVGLEventBusIntegrationTest, SubscribesToSystemError_StringPayload) {
-    const char* errorMsg = "Low Voltage Warning";
-    int count = eventBus.publish(LVGLDisplayEvents::SYSTEM_ERROR, errorMsg);
-    EXPECT_GT(count, 0);
-}
 
 TEST_F(LVGLEventBusIntegrationTest, ScreensaverPublishesSleepAndWakeEvents) {
     bool sleepReceived = false;

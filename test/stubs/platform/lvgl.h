@@ -677,4 +677,12 @@ inline void lv_img_set_src(lv_obj_t* obj, const void* src) {
     lv_image_set_src(obj, src);
 }
 
+// Snapshot API
+#define LV_USE_SNAPSHOT 1
+inline lv_result_t lv_snapshot_take_to_buf(lv_obj_t* obj, lv_color_format_t cf, lv_image_dsc_t* dsc, void* buf, uint32_t buf_size) {
+    (void)obj; (void)cf; (void)dsc;
+    memset(buf, 0, buf_size);
+    return LV_RESULT_OK;
+}
+
 #endif  // TEST_STUBS_PLATFORM_LVGL_H_
