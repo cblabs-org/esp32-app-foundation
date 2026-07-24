@@ -2,6 +2,10 @@
   "name": "LVGLDisplay",
   "version": "0.1.0",
   "description": "Generic LVGL v9 display module with pluggable hardware adapters",
+  "dependencies": {
+    "bblanchon/ArduinoJson": "^7.4.3",
+    "lvgl/lvgl": "^9.5.0"
+  },
   "build": {
     "flags": ["-I../../include"]
   }

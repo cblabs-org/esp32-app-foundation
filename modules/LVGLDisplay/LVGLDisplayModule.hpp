@@ -10,6 +10,8 @@
  * Description: Generic LVGL v9 colour-TFT display module core. Manages LVGL
  *              lifecycle, draw buffer allocation, tick updates, and input device
  *              focus groups via constructor-injected ILVGLHardwareAdapter.
+ *              Implements IConfigurable via ConfigManager gateway for persistent
+ *              display settings (namespace: "display", schema version: 1).
  *
  * Exported Classes:
  * - LVGLDisplayModule: Generic LVGL display service module
@@ -22,6 +24,26 @@
  *
  *   ITickable:
  *   - tick():               Advances LVGL tick clock and calls lv_timer_handler()
+ *
+ *   IConfigurable (namespace: "display", schema v1):
+ *   - getConfigNamespace(): Return "display"
+ *   - getSchemaVersion():   Return 1
+ *   - applyConfig():        Apply display settings from JSON section
+ *   - serializeConfig():    Serialize display settings to JSON section
+ *   - resetConfig():        Restore factory defaults
+ *
+ *   Runtime Setters / Getters:
+ *   - setConfigManager():   Set ConfigManager reference for saving config
+ *   - setBrightness():      Set backlight brightness and update adapter (0–255)
+ *   - getBrightness():      Get current brightness level
+ *   - setRotation():        Set display rotation (0, 90, 180, 270 degrees)
+ *   - getRotation():        Get current display rotation in degrees
+ *   - setScreensaverEnabled(): Enable/disable inactivity screensaver
+ *   - getScreensaverEnabled(): Get screensaver enabled state
+ *   - setDimTimeout():      Set dim timeout in milliseconds
+ *   - getDimTimeout():      Get dim timeout in milliseconds
+ *   - setBlankTimeout():    Set blank timeout in milliseconds
+ *   - getBlankTimeout():    Get blank timeout in milliseconds
  *
  *   Accessors:
  *   - getDisplay():         Return underlying lv_display_t pointer
@@ -36,28 +58,31 @@
 
 #include <cstdint>
 #include <cstddef>
+#include <ArduinoJson.h>
 #include "interfaces/ITickable.hpp"
+#include "interfaces/IConfigurable.hpp"
 #include "interfaces/ILVGLHardwareAdapter.hpp"
 #include "interfaces/ILVGLSystemScreens.hpp"
 #include "lvgl.h"
 
 // Forward declarations
 class EventBus;
+class ConfigManager;
 
-// TODO: WO4 adds IConfigurable
 // TODO: WO5 adds IStatusReporter
 // TODO: WO6 adds EventBus subscriptions & screensaver
 // TODO: WO7 adds IWebContributor
 // TODO: WO8 adds IMCPContributor
 
 /**
- * @brief Generic LVGL v9 display module implementing ITickable.
+ * @brief Generic LVGL v9 display module implementing ITickable and IConfigurable.
  *
  * Handles LVGL lifecycle (lv_init, lv_tick_inc, lv_timer_handler), draw buffer
  * allocation, input device discovery, and focus group management. Delegates
  * display and input initialization to an ILVGLHardwareAdapter instance.
+ * Implements IConfigurable via ConfigManager gateway (namespace: "display").
  */
-class LVGLDisplayModule : public ITickable {
+class LVGLDisplayModule : public ITickable, public IConfigurable {
 public:
     // -------------------------------------------------------------------------
     // Lifecycle
@@ -114,6 +139,121 @@ public:
     void tick(uint32_t now) override;
 
     // -------------------------------------------------------------------------
+    // IConfigurable — ConfigManager gateway (namespace: "display")
+    // -------------------------------------------------------------------------
+
+    /**
+     * @brief Return the config namespace for display settings.
+     * @return "display"
+     */
+    const char* getConfigNamespace() const override { return "display"; }
+
+    /**
+     * @brief Return the current schema version for LVGL display config.
+     * @return 1
+     */
+    int getSchemaVersion() const override { return 1; }
+
+    /**
+     * @brief Apply display settings from a parsed JSON section.
+     *
+     * Reads brightness (0–255), rotation (0/90/180/270), screensaverEnabled,
+     * dimTimeout, and blankTimeout from the JSON object and applies them to
+     * internal state and hardware. Also handles legacy sleepTimeout migration.
+     *
+     * @param section Read-only JSON object containing display config keys.
+     */
+    void applyConfig(const JsonObject& section) override;
+
+    /**
+     * @brief Serialize current display settings into a JSON section.
+     *
+     * Writes brightness, rotation, screensaverEnabled, dimTimeout, and
+     * blankTimeout to the JSON object.
+     *
+     * @param section Mutable JSON object to write config into.
+     */
+    void serializeConfig(JsonObject& section) const override;
+
+    /**
+     * @brief Reset display settings to factory defaults.
+     *
+     * Sets: brightness=255, rotation=0, screensaverEnabled=true,
+     * dimTimeout=150000ms, blankTimeout=300000ms. Applies settings to hardware.
+     */
+    void resetConfig() override;
+
+    // -------------------------------------------------------------------------
+    // Runtime Setters & Getters
+    // -------------------------------------------------------------------------
+
+    /**
+     * @brief Set the ConfigManager reference for saving configuration.
+     * @param cm Pointer to ConfigManager instance.
+     */
+    void setConfigManager(ConfigManager* cm) { _configManager = cm; }
+
+    /**
+     * @brief Set the display backlight brightness and update hardware adapter.
+     * @param brightness Brightness level (0–255).
+     */
+    void setBrightness(uint8_t brightness);
+
+    /**
+     * @brief Get the current backlight brightness level.
+     * @return Brightness level (0–255).
+     */
+    uint8_t getBrightness() const { return _brightness; }
+
+    /**
+     * @brief Set the display rotation in degrees and update LVGL display if active.
+     * @param degrees Rotation angle in degrees (0, 90, 180, 270).
+     */
+    void setRotation(uint16_t degrees);
+
+    /**
+     * @brief Get the current display rotation in degrees.
+     * @return Rotation in degrees (0, 90, 180, 270).
+     */
+    uint16_t getRotation() const { return _rotation; }
+
+    /**
+     * @brief Enable or disable the inactivity screensaver.
+     * @param enabled True to enable screensaver.
+     */
+    void setScreensaverEnabled(bool enabled);
+
+    /**
+     * @brief Check if the inactivity screensaver is enabled.
+     * @return True if screensaver is enabled.
+     */
+    bool getScreensaverEnabled() const { return _screensaverEnabled; }
+
+    /**
+     * @brief Set the inactivity dim timeout in milliseconds.
+     * @param timeoutMs Dim timeout in milliseconds.
+     */
+    void setDimTimeout(unsigned long timeoutMs);
+
+    /**
+     * @brief Get the inactivity dim timeout in milliseconds.
+     * @return Dim timeout in milliseconds.
+     */
+    unsigned long getDimTimeout() const { return _dimTimeoutMs; }
+
+    /**
+     * @brief Set the inactivity blank timeout in milliseconds.
+     * @param timeoutMs Blank timeout in milliseconds.
+     */
+    void setBlankTimeout(unsigned long timeoutMs);
+
+    /**
+     * @brief Get the inactivity blank timeout in milliseconds.
+     * @return Blank timeout in milliseconds.
+     */
+    unsigned long getBlankTimeout() const { return _blankTimeoutMs; }
+
+    // -------------------------------------------------------------------------
     // Accessors
     // -------------------------------------------------------------------------
 
@@ -138,6 +278,7 @@ public:
 private:
     ILVGLHardwareAdapter& _adapter;            ///< Injected hardware adapter
     ILVGLSystemScreens*   _screens = nullptr;  ///< Optional system screens provider
+    ConfigManager*        _configManager = nullptr; ///< Cached ConfigManager reference
 
     lv_display_t* _display = nullptr;          ///< LVGL display instance handle
     lv_indev_t*   _touchInDev = nullptr;       ///< Touch pointer input device
@@ -150,4 +291,12 @@ private:
     void*    _buf2 = nullptr;                  ///< Secondary draw buffer allocation
     size_t   _bufSize = 0;                     ///< Allocated size per draw buffer in bytes
     bool     _bootstrapMode = false;           ///< True while in Phase 1 bootstrap mode
+
+    // --- Configuration state ---
+    uint8_t       _brightness = 255;          ///< Backlight brightness level (0–255)
+    uint16_t      _rotation = 0;              ///< Display rotation in degrees (0, 90, 180, 270)
+    bool          _screensaverEnabled = true; ///< Inactivity screensaver enabled flag
+    unsigned long _dimTimeoutMs = 150000;     ///< Inactivity dim timeout in ms (default 2.5 min)
+    unsigned long _blankTimeoutMs = 300000;   ///< Inactivity blank timeout in ms (default 5 min)
 };
+

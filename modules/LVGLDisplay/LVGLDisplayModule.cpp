@@ -110,6 +110,16 @@ void LVGLDisplayModule::bootstrapHardware() {
     }
 
     _bootstrapMode = true;
+
+    // --- Step 5: Apply Hardware Brightness & Rotation ---
+    _adapter.setBrightness(_brightness);
+    if (_rotation != 0) {
+        lv_display_rotation_t rotEnum = LV_DISPLAY_ROTATION_0;
+        if (_rotation == 90) rotEnum = LV_DISPLAY_ROTATION_90;
+        else if (_rotation == 180) rotEnum = LV_DISPLAY_ROTATION_180;
+        else if (_rotation == 270) rotEnum = LV_DISPLAY_ROTATION_270;
+        lv_display_set_rotation(_display, rotEnum);
+    }
 }
 
 void LVGLDisplayModule::begin(EventBus* eventBus) {
@@ -125,7 +135,6 @@ void LVGLDisplayModule::begin(EventBus* eventBus) {
         ui_init();
     }
 
-    // TODO: WO4 adds IConfigurable persistence
     // TODO: WO5 adds IStatusReporter system screens
     // TODO: WO6 adds EventBus subscriptions (ota.progress, display.message, system.error)
     // TODO: WO7 adds IWebContributor REST API and portal tab
@@ -150,3 +159,123 @@ void LVGLDisplayModule::tick(uint32_t now) {
     lv_tick_inc(elapsed);
     lv_timer_handler();
 }
+
+// -----------------------------------------------------------------------------
+// IConfigurable — ConfigManager Gateway (namespace: "display")
+// -----------------------------------------------------------------------------
+
+void LVGLDisplayModule::applyConfig(const JsonObject& section) {
+    if (!section["brightness"].isNull()) {
+        int b = section["brightness"].as<int>();
+        if (b < 0) b = 0;
+        if (b > 255) b = 255;
+        _brightness = static_cast<uint8_t>(b);
+    } else {
+        _brightness = 255;
+    }
+
+    if (!section["rotation"].isNull()) {
+        int r = section["rotation"].as<int>();
+        if (r == 90 || r == 1) {
+            _rotation = 90;
+        } else if (r == 180 || r == 2) {
+            _rotation = 180;
+        } else if (r == 270 || r == 3) {
+            _rotation = 270;
+        } else {
+            _rotation = 0;
+        }
+    } else {
+        _rotation = 0;
+    }
+
+    _screensaverEnabled = section["screensaverEnabled"] | true;
+
+    if (!section["dimTimeout"].isNull()) {
+        _dimTimeoutMs   = section["dimTimeout"]   | 150000UL;
+        _blankTimeoutMs = section["blankTimeout"] | 300000UL;
+    } else if (!section["sleepTimeout"].isNull()) {
+        unsigned long st = section["sleepTimeout"] | 300000UL;
+        _dimTimeoutMs   = st / 2;
+        _blankTimeoutMs = st;
+    } else {
+        _dimTimeoutMs   = 150000UL;
+        _blankTimeoutMs = 300000UL;
+    }
+
+    _adapter.setBrightness(_brightness);
+
+    if (_display != nullptr) {
+        lv_display_rotation_t rotEnum = LV_DISPLAY_ROTATION_0;
+        if (_rotation == 90) rotEnum = LV_DISPLAY_ROTATION_90;
+        else if (_rotation == 180) rotEnum = LV_DISPLAY_ROTATION_180;
+        else if (_rotation == 270) rotEnum = LV_DISPLAY_ROTATION_270;
+
+        lv_display_set_rotation(_display, rotEnum);
+    }
+}
+
+void LVGLDisplayModule::serializeConfig(JsonObject& section) const {
+    section["brightness"]         = _brightness;
+    section["rotation"]           = _rotation;
+    section["screensaverEnabled"] = _screensaverEnabled;
+    section["dimTimeout"]         = _dimTimeoutMs;
+    section["blankTimeout"]       = _blankTimeoutMs;
+}
+
+void LVGLDisplayModule::resetConfig() {
+    _brightness         = 255;
+    _rotation           = 0;
+    _screensaverEnabled = true;
+    _dimTimeoutMs       = 150000;
+    _blankTimeoutMs     = 300000;
+
+    _adapter.setBrightness(_brightness);
+
+    if (_display != nullptr) {
+        lv_display_set_rotation(_display, LV_DISPLAY_ROTATION_0);
+    }
+}
+
+// -----------------------------------------------------------------------------
+// Runtime Setters
+// -----------------------------------------------------------------------------
+
+void LVGLDisplayModule::setBrightness(uint8_t brightness) {
+    _brightness = brightness;
+    _adapter.setBrightness(_brightness);
+}
+
+void LVGLDisplayModule::setRotation(uint16_t degrees) {
+    if (degrees == 90 || degrees == 1) {
+        _rotation = 90;
+    } else if (degrees == 180 || degrees == 2) {
+        _rotation = 180;
+    } else if (degrees == 270 || degrees == 3) {
+        _rotation = 270;
+    } else {
+        _rotation = 0;
+    }
+
+    if (_display != nullptr) {
+        lv_display_rotation_t rotEnum = LV_DISPLAY_ROTATION_0;
+        if (_rotation == 90) rotEnum = LV_DISPLAY_ROTATION_90;
+        else if (_rotation == 180) rotEnum = LV_DISPLAY_ROTATION_180;
+        else if (_rotation == 270) rotEnum = LV_DISPLAY_ROTATION_270;
+
+        lv_display_set_rotation(_display, rotEnum);
+    }
+}
+
+void LVGLDisplayModule::setScreensaverEnabled(bool enabled) {
+    _screensaverEnabled = enabled;
+}
+
+void LVGLDisplayModule::setDimTimeout(unsigned long timeoutMs) {
+    _dimTimeoutMs = timeoutMs;
+}
+
+void LVGLDisplayModule::setBlankTimeout(unsigned long timeoutMs) {
+    _blankTimeoutMs = timeoutMs;
+}
+
