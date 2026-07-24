@@ -27,6 +27,14 @@
 // ---------------------------------------------------------------------------
 static Application app;  ///< Single framework hub instance
 
+#ifdef HAS_LVGL_DISPLAY
+#include "LVGLDisplayModule.hpp"
+#include "CrowPanel128Adapter.hpp"
+
+static CrowPanel128Adapter displayAdapter;
+static LVGLDisplayModule lvglDisplay(displayAdapter);
+#endif
+
 /**
  * @brief Arduino setup() — framework entry point.
  *
@@ -44,6 +52,10 @@ void setup() {
     // App names its hostname default — WiFiManager owns the persisted value
     // and falls back to this on factory reset (resetConfig()).
     app.getWifiManager().setDefaultHostname("esp32-foundation");
+
+#ifdef HAS_LVGL_DISPLAY
+    app.registerModule(&lvglDisplay);
+#endif
 
     if (!app.begin(config)) {
         delay(5000);
