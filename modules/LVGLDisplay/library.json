@@ -1,0 +1,8 @@
+{
+  "name": "LVGLDisplay",
+  "version": "0.1.0",
+  "description": "Generic LVGL v9 display module with pluggable hardware adapters",
+  "build": {
+    "flags": ["-I../../include"]
+  }
+}
