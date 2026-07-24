@@ -7,8 +7,8 @@
 > and UI management; downstream users provide a small hardware adapter for their
 > specific display, touch, and input peripherals.
 
-**Status:** Draft — Exploration  
-**Last Updated:** 2026-07-23  
+**Status:** Approved & Implemented (PR-47)  
+**Last Updated:** 2026-07-24  
 **Reference Hardware:** Elecrow CrowPanel 1.28" ESP32-S3 HMI Rotary Display
 
 ---
@@ -711,7 +711,11 @@ LVGL supports four input device types via the `lv_indev_t` system:
 > encoders show GPIOs 19/18/8. These do **not** match the CrowPanel 1.28" HMI
 > PCB. Always use the factory-verified pins (45/42/41).
 
-### 7.5 Encoder Implementation — ISR Quadrature Decoding
+### 7.5 Encoder Implementation — PCNT Hardware & ISR Fallback
+
+> [!NOTE]
+> **Implementation Note (OQ-4 Amendment):**
+> On microcontrollers equipped with hardware Pulse Count (PCNT) peripherals (such as ESP32-S3), the primary implementation uses `ESP32Encoder` to offload quadrature decoding to silicon with hardware debouncing. This eliminates interrupts from the hot path entirely. The software ISR pattern detailed below is retained as the documented fallback architecture for MCUs without hardware PCNT (e.g., ESP32-S2 adapters).
 
 Testing the CrowPanel 1.28" with the factory firmware reveals noticeably poor
 encoder pickup — fast rotation drops many steps, and direction detection is
@@ -1063,6 +1067,12 @@ my-app/src/
 
 ### 12.1 Environment Definition
 
+> [!IMPORTANT]
+> **Implementation Amendments (PR-47 Decisions):**
+> 1. **Module-Local `lv_conf.h`**: Rather than polluting the repository root and setting `-DLV_CONF_INCLUDE_SIMPLE`, the configuration file is located at `modules/LVGLDisplay/lv_conf.h` and passed via `-DLV_CONF_PATH="modules/LVGLDisplay/lv_conf.h"`.
+> 2. **Partition Scheme (D9)**: LVGL display targets strictly require **≥16 MB Flash memory**. The build reuses `board_build.partitions = partitions.esp32s3nano.csv` (dual 4 MB OTA app slots + 3.75 MB `storage`).
+> 3. **Assets in Binary**: Graphics assets are compiled into the firmware binary (`rodata` in app partition), riding firmware OTA updates without modifying or corrupting LittleFS configuration (cross-referencing framework issue #40).
+
 ```ini
 [env:crowpanel-128-rotary]
 platform = espressif32
@@ -1074,10 +1084,11 @@ board_build.flash_mode = qio
 board_build.arduino.memory_type = qio_opi
 board_build.psram_type = opi
 board_upload.flash_size = 16MB
+board_build.partitions = partitions.esp32s3nano.csv
 build_flags =
     -DBOARD_HAS_PSRAM
     -DHAS_LVGL_DISPLAY=1
-    -DLV_CONF_INCLUDE_SIMPLE
+    -DLV_CONF_PATH="modules/LVGLDisplay/lv_conf.h"
     -DCONFIG_ARDUINO_LOOP_STACK_SIZE=16384
     ; GC9A01 pin definitions — verified against factory source code
     -DLCD_SPI_SCLK=10
@@ -1098,9 +1109,8 @@ build_flags =
     -DAUX_I2C_SCL=39
 lib_deps =
     lvgl/lvgl @ ^9.5.0
-    ; Display/touch driver — choose one:
-    ; Option A: esp_lcd via IDF component (recommended)
-    ; Option B: lovyan03/LovyanGFX (alternative)
+    lovyan03/LovyanGFX @ ^1.2.0
+    madhephaestus/ESP32Encoder @ ^0.11.7
 ```
 
 ### 12.2 LVGL Configuration (`lv_conf.h`)

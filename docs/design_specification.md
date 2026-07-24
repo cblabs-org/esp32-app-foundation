@@ -387,9 +387,9 @@ All modules live under `modules/` in the monorepo alongside kernel modules.
 
 | Module | Interfaces | Config File | Notes |
 |---|---|---|---|
-| `u8g2Display` | `ITickable`, `IStatusReporter`, `iConfigurable` | `/mod/display.json` | Monochrome OLED/LCD + widget toolkit |
-| `tft-display` | `ITickable`, `IStatusReporter`, `iConfigurable` | `/mod/display.json` | Colour TFT/touch (future) |
-| `mqtt-client` | `ITickable`, `iConfigurable` | `/mod/mqtt.json` | (future) |
+| `u8g2Display` | `ITickable`, `IStatusReporter`, `IConfigurable` | ConfigManager (`display`) | Monochrome OLED/LCD + widget toolkit |
+| `LVGLDisplay` | `ITickable`, `IConfigurable`, `IStatusReporter`, `IWebContributor`, `IMCPContributor` | ConfigManager (`display`) | Full-colour TFT using LVGL v9.5 + pluggable `ILVGLHardwareAdapter` (see [Design Spec](lvgl-display-design.md)) |
+| `mqtt-client` | `ITickable`, `IConfigurable` | `/mod/mqtt.json` | (future) |
 | `homeassistant` | `ITickable`, `iConfigurable` | `/mod/ha.json` | (future) |
 | `weather-client` | `iDataSource`, `iConfigurable` | `/mod/weather.json` | (future) |
 | `rss-client` | `iDataSource`, `iConfigurable` | `/mod/rss.json` | (future) |
@@ -613,7 +613,7 @@ TFT colour displays implement is architecturally problematic:
 | Module | Technology | Use Case |
 |---|---|---|
 | `u8g2Display` | U8G2 library | Monochrome OLED/LCD (SSD1322, SH1106, SSD1306, etc.) |
-| `tft-display` | LovyanGFX | Colour TFT with touch (ILI9341, ST7789, etc.) — future |
+| `LVGLDisplay` | LVGL v9.5 + `ILVGLHardwareAdapter` | Colour TFT with touch/encoder (e.g. CrowPanel 1.28", strictly requires ≥16 MB flash D9) — see [LVGL Display Design](lvgl-display-design.md) |
 
 Each module provides its own board interface and carousel management. App display
 boards are written natively for their target display technology.

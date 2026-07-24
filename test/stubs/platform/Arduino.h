@@ -19,7 +19,7 @@ public:
     String() {}
     String(const char* s) : _str(s ? s : "") {}
     String(const std::string& s) : _str(s) {}
-    String(int value, int base) {
+    String(int value, int base = 10) {
         if (base == 16) {
             char buf[20];
             snprintf(buf, sizeof(buf), "%x", value);

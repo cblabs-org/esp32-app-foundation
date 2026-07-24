@@ -269,3 +269,36 @@ test.describe('Display Settings Tab', () => {
     await expect(page.locator('#display-screensaver-status')).toHaveText('Disabled');
   });
 });
+
+test.describe('Display Screenshot Tab', () => {
+  test.beforeEach(async ({ page }) => {
+    await bootPortal(page);
+    await page.route('**/api/display/screenshot', route => {
+      const dummyBuffer = Buffer.alloc(240 * 240 * 2);
+      route.fulfill({
+        status: 200,
+        contentType: 'application/octet-stream',
+        headers: {
+          'X-Display-Width': '240',
+          'X-Display-Height': '240',
+          'X-Display-Format': 'RGB565',
+        },
+        body: dummyBuffer,
+      });
+    });
+  });
+
+  test('navigates to Screenshot tab and triggers capture', async ({ page }) => {
+    await page.locator('#bottom-nav .tab-link[data-target="tab-display"]').click();
+    await page.locator('#pill-bar .pill-btn[data-target="tab-screenshot"]').click();
+
+    await page.locator('#btn-ss-capture').waitFor({ state: 'visible' });
+    await expect(page.locator('#ss-canvas')).toBeVisible();
+
+    const requestPromise = page.waitForRequest(req => req.url().includes('/api/display/screenshot'));
+    await page.locator('#btn-ss-capture').click();
+    const req = await requestPromise;
+    expect(req.url()).toContain('/api/display/screenshot');
+  });
+});
+

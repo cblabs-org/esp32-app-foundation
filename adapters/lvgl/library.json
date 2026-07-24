@@ -1,0 +1,8 @@
+{
+  "name": "LVGL_Adapters",
+  "version": "1.0.0",
+  "description": "Hardware adapters for LVGL",
+  "dependencies": {
+    "lvgl": "^9.5.0"
+  }
+}
