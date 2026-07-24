@@ -31,6 +31,12 @@ typedef int lv_result_t;
 #define LV_RESULT_OK 0
 #define LV_RESULT_INVALID -1
 
+typedef enum {
+    LV_DISPLAY_RENDER_MODE_PARTIAL = 0,
+    LV_DISPLAY_RENDER_MODE_DIRECT = 1,
+    LV_DISPLAY_RENDER_MODE_FULL = 2
+} lv_display_render_mode_t;
+
 // --- Opaque Handle Structs ---
 struct lv_display_t {
     void* user_data = nullptr;
@@ -38,6 +44,10 @@ struct lv_display_t {
     int32_t ver_res = 240;
     uint8_t brightness = 255;
     uint8_t rotation = 0;
+    void* buf1 = nullptr;
+    void* buf2 = nullptr;
+    uint32_t buf_size = 0;
+    lv_display_render_mode_t render_mode = LV_DISPLAY_RENDER_MODE_PARTIAL;
 };
 
 struct lv_indev_t {
@@ -133,12 +143,6 @@ typedef enum {
     LV_COLOR_FORMAT_ARGB8888 = 0x15,
     LV_COLOR_FORMAT_NATIVE = LV_COLOR_FORMAT_RGB565
 } lv_color_format_t;
-
-typedef enum {
-    LV_DISPLAY_RENDER_MODE_PARTIAL = 0,
-    LV_DISPLAY_RENDER_MODE_DIRECT = 1,
-    LV_DISPLAY_RENDER_MODE_FULL = 2
-} lv_display_render_mode_t;
 
 typedef enum {
     LV_DISPLAY_ROTATION_0 = 0,
@@ -357,7 +361,20 @@ inline void lv_display_delete(lv_display_t* disp) {
 }
 
 inline void lv_display_set_buffers(lv_display_t* disp, void* buf1, void* buf2, uint32_t buf_size, lv_display_render_mode_t render_mode) {
-    (void)disp; (void)buf1; (void)buf2; (void)buf_size; (void)render_mode;
+    if (disp) {
+        disp->buf1 = buf1;
+        disp->buf2 = buf2;
+        disp->buf_size = buf_size;
+        disp->render_mode = render_mode;
+    }
+}
+
+inline void* lv_display_get_buf_1(lv_display_t* disp) {
+    return disp ? disp->buf1 : nullptr;
+}
+
+inline void* lv_display_get_buf_2(lv_display_t* disp) {
+    return disp ? disp->buf2 : nullptr;
 }
 
 inline void lv_display_set_flush_cb(lv_display_t* disp, lv_display_flush_cb_t flush_cb) {
