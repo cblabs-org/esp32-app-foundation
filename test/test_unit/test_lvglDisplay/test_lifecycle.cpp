@@ -78,7 +78,9 @@ TEST_F(LVGLDisplayLifecycleTest, BufferAllocationDefaultModuleAllocated) {
     EXPECT_EQ(disp->buf_size, expectedSize);
 }
 
-TEST_F(LVGLDisplayLifecycleTest, BufferAllocationOQ7PreConfiguredRespected) {
+TEST_F(LVGLDisplayLifecycleTest, BufferAllocationOQ7ModuleAlwaysAllocates) {
+    // OQ-7: With _buffersConfigured flag (LVGL v9 fix), the module always
+    // allocates its own draw buffers. Adapter pre-configuration is overridden.
     adapter.preConfigureBuffers = true;
 
     LVGLDisplayModule module(adapter);
@@ -87,9 +89,9 @@ TEST_F(LVGLDisplayLifecycleTest, BufferAllocationOQ7PreConfiguredRespected) {
     lv_display_t* disp = module.getDisplay();
     ASSERT_NE(disp, nullptr);
 
-    // Verify adapter pre-configured buffer size of 5760 is preserved
-    EXPECT_NE(lv_display_get_buf_1(disp), nullptr);
-    EXPECT_EQ(disp->buf_size, 5760u);
+    // Module allocates its own buffers based on width * lineCount * sizeof(lv_color_t)
+    size_t expectedSize = 240 * 24 * sizeof(lv_color_t);
+    EXPECT_EQ(disp->buf_size, expectedSize);
 }
 
 // -----------------------------------------------------------------------------
