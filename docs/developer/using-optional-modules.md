@@ -251,6 +251,19 @@ public:
 
 When the `ScreensaverController` transitions state, it iterates through all registered `IScreensaverAware` objects, notifying them of the change. This allows modules to pause expensive I2C sensor polling or other unnecessary work when the screen is off.
 
+### 3.4 LVGL Display Module (Colour TFT & Hardware Adapters)
+
+For full-colour TFT screens, the framework provides [LVGLDisplayModule](../../modules/LVGLDisplay/README.md) as a peer to `U8G2DisplayModule`. Powered by LVGL v9.5, it separates generic display lifecycle and framework interface implementation from board-specific hardware drivers using the [`ILVGLHardwareAdapter`](../../include/interfaces/ILVGLHardwareAdapter.hpp) pattern.
+
+#### Architecture Highlights
+
+- **5 Framework Interfaces**: Implements `ITickable`, `IConfigurable`, `IStatusReporter`, `IWebContributor`, and `IMCPContributor`.
+- **Hardware Isolation**: Display controllers, touch sensors, encoders, and backlight PWM are implemented in hardware adapters (such as the reference [`CrowPanel128Adapter`](../../adapters/lvgl/CrowPanel128Adapter.hpp)).
+- **Two-Stage Boot Splash (D8)**: Displays a Stage-1 compiled-in boot logo during Phase 1 (`bootstrapHardware()`) before LittleFS or ConfigManager mount, and handsoff to SquareLine Studio UI via `ui_init()`.
+- **Asset Storage & 16 MB Requirement (D9)**: UI graphics and fonts are compiled directly into the binary (`rodata`), ensuring asset updates flow through standard firmware OTA without touching LittleFS config. Requires a minimum of **16 MB Flash memory** (`partitions.esp32s3nano.csv`).
+
+For full details, see the [LVGLDisplayModule README](../../modules/LVGLDisplay/README.md) and [Adapter Authoring Guide](../../adapters/lvgl/README.md).
+
 ---
 
 ## 4. Adding Your Own Optional Module

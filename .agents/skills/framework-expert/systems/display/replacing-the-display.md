@@ -6,9 +6,12 @@ The App Foundation uses U8G2 by default, but it is architected to allow the comp
 
 Early designs considered an `IDisplayDriver` interface that would abstract drawing primitives (e.g., `drawLine`, `drawText`). This approach was explicitly rejected in **ADR-02**. 
 
-The rationale: Drawing paradigms between monochromatic OLEDs (U8G2), full-color TFTs (TFT_eSPI), and e-ink displays (GxEPD) are fundamentally incompatible. Abstraction layers either become heavily bloated "god interfaces" or restrict developers to the lowest common denominator. 
+The rationale: Drawing paradigms between monochromatic OLEDs (U8G2), full-color TFTs (LVGL/TFT_eSPI), and e-ink displays (GxEPD) are fundamentally incompatible. Abstraction layers either become heavily bloated "god interfaces" or restrict developers to the lowest common denominator. 
 
-Instead, the framework embraces native types. If you use U8G2, your boards receive a `U8G2&` reference. If you swap to TFT_eSPI, you must rewrite your boards to accept a `TFT_eSPI&` reference. The framework does not attempt to cross-compile UI code between different screen technologies.
+Instead, the framework embraces native types. If you use U8G2, your boards receive a `U8G2&` reference. If you use the official full-colour TFT module ([`LVGLDisplayModule`](lvgl-display.md)), UI screens use native LVGL `lv_obj_t*` widgets. The framework does not attempt to cross-compile UI code between different screen technologies.
+
+> [!TIP]
+> Before building a custom display manager for full-colour TFTs, check [`LVGLDisplayModule`](lvgl-display.md) and [`ILVGLHardwareAdapter`](../../include/interfaces/ILVGLHardwareAdapter.hpp). You can support new TFT panel hardware simply by writing a lightweight hardware adapter rather than replacing the display manager.
 
 ## How to Swap U8G2 for TFT/E-Ink/Headless
 

@@ -24,6 +24,7 @@
     "references/registration.md",
     "references/build-system.md",
     "systems/display/overview.md",
+    "systems/display/lvgl-display.md",
     "systems/display/carousel.md",
     "systems/display/custom-boards.md",
     "systems/display/replacing-the-display.md",
