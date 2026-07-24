@@ -677,8 +677,45 @@ inline void lv_img_set_src(lv_obj_t* obj, const void* src) {
     lv_image_set_src(obj, src);
 }
 
+// Draw buffer (lv_draw_buf_t) — minimal stub for snapshot API
+struct lv_draw_buf_t {
+    uint32_t width;
+    uint32_t height;
+    lv_color_format_t cf;
+    uint32_t stride;
+    void* data;
+    uint32_t data_size;
+};
+
+inline uint8_t lv_color_format_get_size(lv_color_format_t cf) {
+    if (cf == LV_COLOR_FORMAT_RGB565) return 2;
+    if (cf == LV_COLOR_FORMAT_RGB888) return 3;
+    return 4;
+}
+
+inline lv_result_t lv_draw_buf_init(lv_draw_buf_t* draw_buf, uint32_t w, uint32_t h, lv_color_format_t cf, uint32_t stride, void* data, uint32_t data_size) {
+    if (draw_buf == nullptr) return LV_RESULT_INVALID;
+    draw_buf->width = w;
+    draw_buf->height = h;
+    draw_buf->cf = cf;
+    draw_buf->stride = stride;
+    draw_buf->data = data;
+    draw_buf->data_size = data_size;
+    return LV_RESULT_OK;
+}
+
 // Snapshot API
 #define LV_USE_SNAPSHOT 1
+
+// Non-deprecated snapshot API (LVGL ≥9.2)
+inline lv_result_t lv_snapshot_take_to_draw_buf(lv_obj_t* obj, lv_color_format_t cf, lv_draw_buf_t* draw_buf) {
+    (void)obj; (void)cf;
+    if (draw_buf == nullptr || draw_buf->data == nullptr) return LV_RESULT_INVALID;
+    memset(draw_buf->data, 0, draw_buf->data_size);
+    return LV_RESULT_OK;
+}
+
+// Deprecated compat stub (kept for any legacy test references)
 inline lv_result_t lv_snapshot_take_to_buf(lv_obj_t* obj, lv_color_format_t cf, lv_image_dsc_t* dsc, void* buf, uint32_t buf_size) {
     (void)obj; (void)cf; (void)dsc;
     memset(buf, 0, buf_size);

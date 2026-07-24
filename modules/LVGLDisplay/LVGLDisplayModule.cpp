@@ -198,8 +198,14 @@ void LVGLDisplayModule::tick(uint32_t now) {
         return;
     }
 
-    // Drain pending cross-thread events
-    if (_pendingOtaComplete.exchange(false)) {
+    // Drain pending cross-thread events.
+    // OTA complete and update are checked independently (not else-if) so that
+    // a completion arriving in the same tick as a progress update is never
+    // deferred — the completion always wins and the stale progress is discarded.
+    bool otaComplete = _pendingOtaComplete.exchange(false);
+    bool otaUpdate   = _pendingOtaUpdate.exchange(false);
+
+    if (otaComplete) {
         _pauseRendering.store(false);
         if (_pendingOtaSuccess.load()) {
             restorePriorScreen();
@@ -207,7 +213,7 @@ void LVGLDisplayModule::tick(uint32_t now) {
             showError("OTA FAILED", _pendingOtaStatus[0] ? _pendingOtaStatus : "Update failed");
         }
         resetActivity();
-    } else if (_pendingOtaUpdate.exchange(false)) {
+    } else if (otaUpdate) {
         showOtaProgress(_pendingOtaProgress.load(), _pendingOtaStatus[0] ? _pendingOtaStatus : "Updating...");
         resetActivity();
     }
@@ -564,8 +570,13 @@ bool LVGLDisplayModule::captureSnapshot(uint8_t*& outBuffer, size_t& outSize, ui
     lv_obj_t* screen = lv_screen_active();
     bool snapshot_taken = false;
     if (screen != nullptr) {
-        lv_image_dsc_t dsc = {0};
-        lv_result_t res = lv_snapshot_take_to_buf(screen, LV_COLOR_FORMAT_RGB565, &dsc, outBuffer, outSize);
+        // Use the non-deprecated lv_snapshot_take_to_draw_buf API (LVGL ≥9.2).
+        // Wrap our raw PSRAM buffer in an lv_draw_buf_t so the snapshot renderer
+        // can write directly into it without a separate allocation.
+        lv_draw_buf_t draw_buf;
+        uint32_t stride = (uint32_t)outWidth * (uint32_t)lv_color_format_get_size(LV_COLOR_FORMAT_RGB565);
+        lv_draw_buf_init(&draw_buf, outWidth, outHeight, LV_COLOR_FORMAT_RGB565, stride, outBuffer, outSize);
+        lv_result_t res = lv_snapshot_take_to_draw_buf(screen, LV_COLOR_FORMAT_RGB565, &draw_buf);
         if (res == LV_RESULT_OK) {
             snapshot_taken = true;
         }

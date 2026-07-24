@@ -83,10 +83,17 @@ struct DisplayMessagePayload {
 
 #ifndef SYSTEM_ERROR_PAYLOAD_DEFINED
 #define SYSTEM_ERROR_PAYLOAD_DEFINED
+/**
+ * @brief Payload for LVGLDisplayEvents::SYSTEM_ERROR EventBus topic.
+ *
+ * Publishers MUST use this struct. Raw `const char*` payloads are not
+ * supported — the handler will dereference the pointer as a
+ * SystemErrorPayload and silently corrupt if it is not one.
+ */
 struct SystemErrorPayload {
-    const char* title;   // Error title string
-    const char* message; // Error description string
-    int code;            // Numeric error code (optional)
+    const char* title;   // Error title string (nullptr → "SYSTEM ERROR")
+    const char* message; // Error description string (nullptr → ignored)
+    int code;            // Numeric error code (optional, informational)
 };
 #endif
 
