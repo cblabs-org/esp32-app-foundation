@@ -77,7 +77,7 @@ void LVGLDisplayModule::bootstrapHardware() {
     }
 
     // --- Step 3: Draw Buffer Management (OQ-7) ---
-    if (lv_display_get_buf_1(_display) == nullptr) {
+    if (!_buffersConfigured) {
         uint16_t width = _adapter.getScreenWidth();
         uint16_t lineCount = _adapter.getBufferLineCount();
         _bufSize = static_cast<size_t>(width) * lineCount * sizeof(lv_color_t);
@@ -98,6 +98,7 @@ void LVGLDisplayModule::bootstrapHardware() {
                 _bufSize = 0;
             } else {
                 lv_display_set_buffers(_display, _buf1, _buf2, _bufSize, LV_DISPLAY_RENDER_MODE_PARTIAL);
+                _buffersConfigured = true;
             }
         }
     }

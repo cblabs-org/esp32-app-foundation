@@ -72,7 +72,4 @@
 /* Set default font pointer */
 #define LV_FONT_DEFAULT &lv_font_montserrat_14
 
-/* Polyfill for LVGLDisplayModule checking if buffers are set */
-#define lv_display_get_buf_1(disp) (NULL)
-
 #endif /* LV_CONF_H */
