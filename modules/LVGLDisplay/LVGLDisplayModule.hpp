@@ -47,6 +47,7 @@
 #include "interfaces/IConfigurable.hpp"
 #include "interfaces/IStatusReporter.hpp"
 #include "interfaces/IWebContributor.hpp"
+#include "interfaces/IMCPContributor.hpp"
 #include "interfaces/ILVGLHardwareAdapter.hpp"
 #include "interfaces/ILVGLSystemScreens.hpp"
 #include "assets/boot_logo.h"
@@ -59,6 +60,7 @@
 // Forward declarations
 class EventBus;
 class ConfigManager;
+class MCPToolRegistry;
 
 #ifndef OTA_PROGRESS_PAYLOAD_DEFINED
 #define OTA_PROGRESS_PAYLOAD_DEFINED
@@ -94,16 +96,13 @@ namespace LVGLDisplayEvents {
     constexpr const char* SYSTEM_ERROR = "system.error";
 }
 
-// TODO: WO7 adds IWebContributor
-// TODO: WO8 adds IMCPContributor
-
 /**
- * @brief Generic LVGL v9 display module implementing ITickable, IConfigurable, and IStatusReporter.
+ * @brief Generic LVGL v9 display module implementing ITickable, IConfigurable, IStatusReporter, IWebContributor, and IMCPContributor.
  *
  * Handles LVGL lifecycle (lv_init, lv_tick_inc, lv_timer_handler), draw buffer
  * allocation, input device discovery, focus group management, and framework system screens.
  */
-class LVGLDisplayModule : public ITickable, public IConfigurable, public IStatusReporter, public IWebContributor {
+class LVGLDisplayModule : public ITickable, public IConfigurable, public IStatusReporter, public IWebContributor, public IMCPContributor {
 public:
     // -------------------------------------------------------------------------
     // Lifecycle
@@ -264,6 +263,22 @@ public:
 
     IWebContributor* settingsTabStub() { return &_settingsTabStub; }
     IWebContributor* screenshotTabStub() { return &_screenshotTabStub; }
+
+    // -------------------------------------------------------------------------
+    // IMCPContributor — MCP display tools
+    // -------------------------------------------------------------------------
+
+    /**
+     * @brief Register display_status, display_control, and capture_display MCP tools.
+     *
+     * display_status (read-safe) returns brightness, rotation, screensaver state,
+     * resolution, and active screen info. display_control (mutating) supports
+     * wake/sleep, brightness, rotation, screensaver toggle, and timeouts.
+     * capture_display (read-safe) returns a base64-encoded RGB565 snapshot.
+     *
+     * @param registry The MCPToolRegistry to register tools with.
+     */
+    void registerMCPTools(MCPToolRegistry& registry) override;
 
     // -------------------------------------------------------------------------
     // Display Snapshot Capture Primitive (OQ-6)

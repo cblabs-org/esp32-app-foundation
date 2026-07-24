@@ -17,6 +17,8 @@
 #include "EventBus.hpp"
 #include "OTAUpdateManager.hpp"
 #include "ConfigManager.hpp"
+#include "MCPToolRegistry.hpp"
+#include <base64.h>
 #include <cstdio>
 #include <PsychicHttp.h>
 #include "esp_heap_caps.h"
@@ -705,5 +707,188 @@ void LVGLDisplayModule::registerRoutes(PsychicHttpServer& server) {
         return ESP_OK;
     });
 }
+
+// =============================================================================
+// IMCPContributor — MCP display tools
+// =============================================================================
+
+/**
+ * @brief Register display_status, display_control, and capture_display MCP tools.
+ *
+ * @param registry The MCPToolRegistry to register tools with.
+ */
+void LVGLDisplayModule::registerMCPTools(MCPToolRegistry& registry) {
+    // --- Tool 1: display_status (read-only) ---
+    registry.addTool(
+        "display_status",
+        "Get current display state including brightness, rotation, screensaver status, and resolution",
+        [](void* ctx, JsonObject& params, JsonObject& result) {
+            auto* self = static_cast<LVGLDisplayModule*>(ctx);
+            (void)params;
+
+            result["brightness"]         = self->_brightness;
+            result["rotation"]           = self->_rotation;
+            result["screensaverEnabled"] = self->_screensaverEnabled;
+
+            // --- Screensaver sub-object ---
+            JsonObject ss = result["screensaver"].to<JsonObject>();
+            ss["enabled"] = self->_screensaverEnabled;
+            if (self->_screensaver.isBlanked()) {
+                ss["state"] = "blanked";
+            } else if (self->_screensaver.isDimmed()) {
+                ss["state"] = "dimmed";
+            } else {
+                ss["state"] = "active";
+            }
+            ss["dimTimeout"]   = self->_dimTimeoutMs;
+            ss["blankTimeout"] = self->_blankTimeoutMs;
+
+            // --- Resolution sub-object ---
+            JsonObject res = result["resolution"].to<JsonObject>();
+            if (self->_display != nullptr) {
+                res["width"]  = static_cast<int>(lv_display_get_horizontal_resolution(self->_display));
+                res["height"] = static_cast<int>(lv_display_get_vertical_resolution(self->_display));
+            } else {
+                res["width"]  = static_cast<int>(self->_adapter.getScreenWidth());
+                res["height"] = static_cast<int>(self->_adapter.getScreenHeight());
+            }
+
+            // --- Active screen info ---
+            if (self->_inSystemScreen) {
+                result["activeScreen"] = "system";
+            } else if (self->_screensaver.isBlanked() || self->_screensaver.isDimmed()) {
+                result["activeScreen"] = "screensaver";
+            } else {
+                result["activeScreen"] = "application";
+            }
+        },
+        this,
+        /* mutatesState = */ false
+    );
+
+    // --- Tool 2: display_control (write, mutates state) ---
+    JsonDocument controlSchema;
+    controlSchema["type"] = "object";
+    JsonObject props = controlSchema["properties"].to<JsonObject>();
+
+    props["action"]["type"]        = "string";
+    props["action"]["description"] = "Immediate action: 'wake' to reset inactivity, 'sleep' to force screensaver";
+    JsonArray actionEnum = props["action"]["enum"].to<JsonArray>();
+    actionEnum.add("wake");
+    actionEnum.add("sleep");
+
+    props["brightness"]["type"]        = "integer";
+    props["brightness"]["description"] = "Display brightness level (0-255)";
+    props["brightness"]["minimum"]     = 0;
+    props["brightness"]["maximum"]     = 255;
+
+    props["rotation"]["type"]        = "integer";
+    props["rotation"]["description"] = "Display rotation in degrees (0, 90, 180, 270)";
+
+    props["screensaverEnabled"]["type"]        = "boolean";
+    props["screensaverEnabled"]["description"] = "Enable or disable the screensaver";
+
+    props["dimTimeout"]["type"]        = "integer";
+    props["dimTimeout"]["description"] = "Milliseconds of inactivity before dimming";
+
+    props["blankTimeout"]["type"]        = "integer";
+    props["blankTimeout"]["description"] = "Milliseconds of inactivity before blanking";
+
+    registry.addTool(
+        "display_control",
+        "Control display settings: wake/sleep, enable/disable screensaver, set brightness, rotation, and timeouts",
+        controlSchema,
+        [](void* ctx, JsonObject& params, JsonObject& result) {
+            auto* self = static_cast<LVGLDisplayModule*>(ctx);
+            bool needsPersist = false;
+
+            if (params["action"].is<const char*>()) {
+                const char* action = params["action"].as<const char*>();
+                if (strcmp(action, "wake") == 0) {
+                    self->resetActivity();
+                } else if (strcmp(action, "sleep") == 0) {
+                    self->_screensaver.forceTimeout();
+                }
+            }
+
+            if (params["brightness"].is<int>()) {
+                int val = params["brightness"].as<int>();
+                if (val < 0) val = 0;
+                if (val > 255) val = 255;
+                self->setBrightness(static_cast<uint8_t>(val));
+                needsPersist = true;
+            }
+
+            if (params["rotation"].is<int>()) {
+                int val = params["rotation"].as<int>();
+                self->setRotation(static_cast<uint16_t>(val));
+                needsPersist = true;
+            }
+
+            if (params["screensaverEnabled"].is<bool>()) {
+                self->setScreensaverEnabled(params["screensaverEnabled"].as<bool>());
+                needsPersist = true;
+            }
+
+            if (params["dimTimeout"].is<int>()) {
+                self->setDimTimeout(static_cast<unsigned long>(params["dimTimeout"].as<int>()));
+                needsPersist = true;
+            }
+
+            if (params["blankTimeout"].is<int>()) {
+                self->setBlankTimeout(static_cast<unsigned long>(params["blankTimeout"].as<int>()));
+                needsPersist = true;
+            }
+
+            if (needsPersist && self->_configManager != nullptr) {
+                self->_configManager->saveModuleConfig(self);
+            }
+
+            result["status"] = "ok";
+        },
+        this,
+        /* mutatesState = */ true
+    );
+
+    // --- Tool 3: capture_display (read-only) ---
+    registry.addTool(
+        "capture_display",
+        "Capture the current display framebuffer as a base64-encoded RGB565 image",
+        [](void* ctx, JsonObject& params, JsonObject& result) {
+            auto* self = static_cast<LVGLDisplayModule*>(ctx);
+            (void)params;
+
+            uint8_t* buf = nullptr;
+            size_t size = 0;
+            uint16_t w = 0;
+            uint16_t h = 0;
+
+            if (!self->captureSnapshot(buf, size, w, h) || buf == nullptr) {
+                result["error"]   = "Framebuffer unavailable";
+                result["isError"] = true;
+                return;
+            }
+
+            std::string b64;
+            size_t offset = 0;
+            while (offset < size) {
+                size_t chunk = (size - offset > 48) ? 48 : (size - offset);
+                String b64Chunk = base64::encode(&buf[offset], chunk);
+                b64 += b64Chunk.c_str();
+                offset += chunk;
+            }
+
+            result["format"] = "RGB565";
+            result["width"]  = w;
+            result["height"] = h;
+            result["data"]   = b64;
+
+            self->freeSnapshot(buf);
+        },
+        this,
+        /* mutatesState = */ false
+    );
+}
+
 
 
