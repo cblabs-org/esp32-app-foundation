@@ -81,6 +81,11 @@ struct lv_anim_t {
     void* user_data = nullptr;
 };
 
+typedef enum {
+    LV_ANIM_OFF = 0,
+    LV_ANIM_ON = 1
+} lv_anim_enable_t;
+
 struct lv_event_t {
     void* target = nullptr;
     void* current_target = nullptr;
@@ -499,29 +504,37 @@ inline void lv_obj_clean(lv_obj_t* obj) {
     (void)obj;
 }
 
-inline void lv_scr_load(lv_obj_t* scr) {
-    (void)scr;
-}
-
-inline void lv_screen_load(lv_obj_t* scr) {
-    (void)scr;
-}
-
-inline void lv_scr_load_anim(lv_obj_t* scr, lv_scr_load_anim_t anim_type, uint32_t time, uint32_t delay, bool auto_del) {
-    (void)scr; (void)anim_type; (void)time; (void)delay; (void)auto_del;
-}
-
-inline void lv_screen_load_anim(lv_obj_t* scr, lv_screen_load_anim_t anim_type, uint32_t time, uint32_t delay, bool auto_del) {
-    (void)scr; (void)anim_type; (void)time; (void)delay; (void)auto_del;
+inline static lv_obj_t** get_active_screen_ptr() {
+    static lv_obj_t default_scr;
+    static lv_obj_t* active = &default_scr;
+    return &active;
 }
 
 inline lv_obj_t* lv_screen_active(void) {
-    static lv_obj_t active_scr;
-    return &active_scr;
+    return *get_active_screen_ptr();
 }
 
 inline lv_obj_t* lv_scr_act(void) {
     return lv_screen_active();
+}
+
+inline void lv_scr_load(lv_obj_t* scr) {
+    if (scr) {
+        *get_active_screen_ptr() = scr;
+    }
+}
+
+inline void lv_screen_load(lv_obj_t* scr) {
+    lv_scr_load(scr);
+}
+
+inline void lv_scr_load_anim(lv_obj_t* scr, lv_scr_load_anim_t anim_type, uint32_t time, uint32_t delay, bool auto_del) {
+    (void)anim_type; (void)time; (void)delay; (void)auto_del;
+    lv_scr_load(scr);
+}
+
+inline void lv_screen_load_anim(lv_obj_t* scr, lv_screen_load_anim_t anim_type, uint32_t time, uint32_t delay, bool auto_del) {
+    lv_scr_load_anim(scr, anim_type, time, delay, auto_del);
 }
 
 inline void lv_obj_set_size(lv_obj_t* obj, int32_t w, int32_t h) {

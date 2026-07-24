@@ -7,6 +7,15 @@
     "lvgl/lvgl": "^9.5.0"
   },
   "build": {
-    "flags": ["-I../../include"]
+    "flags": [
+      "-I.",
+      "-I../../include"
+    ],
+    "srcFilter": [
+      "+<*>",
+      "+<screens/*>",
+      "+<assets/*.cpp>",
+      "-<assets/*.c>"
+    ]
   }
 }

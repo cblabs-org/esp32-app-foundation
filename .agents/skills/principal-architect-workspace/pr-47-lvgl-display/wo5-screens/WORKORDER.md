@@ -37,18 +37,31 @@ Add `IStatusReporter` and the framework-driven system screens (boot, error, OTA 
 `platformio` MCP tools (`build_project`, `run_tests`) via `pio-manager` — never raw `pio`. `house-style-docs`. Heed `.agents/rules/`.
 
 ## Line-Item Instructions
-- [ ] `modules/LVGLDisplay/screens/BootScreen.{hpp,cpp}`, `ErrorScreen.{hpp,cpp}`, `OTAProgressScreen.{hpp,cpp}` — built-in LVGL screens (labels/arc/bar), no filesystem assets.
-- [ ] `modules/LVGLDisplay/assets/boot_logo.{c,h}` — a compiled-in default `lv_image_dsc_t` (small RGB565). Document the app-override mechanism (ctor `const lv_image_dsc_t*` and/or weak symbol).
-- [ ] Add `public IStatusReporter` to `LVGLDisplayModule`; implement `reportStatus(const char*, float)` to drive the boot/status screen during boot.
-- [ ] Implement `showBoot()` (Stage-1 compiled-in logo in `bootstrapHardware()`), `showError(code,msg)`, `showOtaProgress(pct,phase)` — each preferring the `ILVGLSystemScreens` provider, else the built-in screen; use `lv_scr_load_anim()` for transitions and restore the prior screen after OTA/error clears.
-- [ ] `test/test_unit/test_lvglDisplay/test_screens.cpp`: built-in screens created; provider path used when non-null and fallback when null; boot logo defaults + override; prior-screen restore after OTA/error.
+- [x] `modules/LVGLDisplay/screens/BootScreen.{hpp,cpp}`, `ErrorScreen.{hpp,cpp}`, `OTAProgressScreen.{hpp,cpp}` — built-in LVGL screens (labels/arc/bar), no filesystem assets.
+- [x] `modules/LVGLDisplay/assets/boot_logo.{c,h}` / `boot_logo.cpp` — a compiled-in default `lv_image_dsc_t` (small RGB565). Documented the app-override mechanism (ctor `const lv_image_dsc_t*` and setter `setBootLogo()`).
+- [x] Add `public IStatusReporter` to `LVGLDisplayModule`; implement `reportStatus(const char*, float)` to drive the boot/status screen during boot.
+- [x] Implement `showBoot()` (Stage-1 compiled-in logo in `bootstrapHardware()`), `showError(code,msg)`, `showOtaProgress(pct,phase)` — each preferring the `ILVGLSystemScreens` provider, else the built-in screen; use `lv_scr_load_anim()` for transitions and restore the prior screen after OTA/error clears.
+- [x] `test/test_unit/test_lvglDisplay/test_screens.cpp`: built-in screens created; provider path used when non-null and fallback when null; boot logo defaults + override; prior-screen restore after OTA/error.
 
 ## Verification Requirement
-- [ ] `run_tests` (native) — screen tests pass, full suite green.
-- [ ] `build_project` `env:esp32s3nano` green.
+- [x] `run_tests` (native) — 459/459 native unit tests pass.
+- [x] `build_project` `env:esp32s3nano` green.
 
 ## Completion Protocol
 1. Validate, then **STOP and message the Principal Architect** with results and the screen-show API you exposed (WO6 will call it). Surface out-of-boundary findings; do not file issues.
 2. **Do not distill until the human approves.**
 3. On approval: `@distillery` with target `.agents/skills/principal-architect-workspace/pr-47-lvgl-display/wo5-screens/`.
 4. Append a status update to this `WORKORDER.md` and terminate.
+
+## Status Update (2026-07-24)
+- **Status:** Completed
+- **Changes implemented:**
+  - Implemented `BootScreen`, `ErrorScreen`, and `OTAProgressScreen` native LVGL widget containers (`modules/LVGLDisplay/screens/`).
+  - Added compiled-in RGB565 logo asset `cb_labs_boot_logo` in `modules/LVGLDisplay/assets/boot_logo.h` & `boot_logo.cpp`. Supported logo override via constructor param and `setBootLogo()`.
+  - Derived `LVGLDisplayModule` from `IStatusReporter` and implemented `reportStatus()`, `reportError()`, `clearStatus()`.
+  - Exposed screen navigation API: `showBoot()`, `showError(title, message)`, `showError(code, message)`, `showOtaProgress(progress, status)`, and `restorePriorScreen()`.
+  - Wired `ILVGLSystemScreens` provider selection with built-in screen fallback.
+  - Added unit test suite `test_screens.cpp` covering built-in screens lifecycle, Stage 1 boot splash, logo overrides, `IStatusReporter` methods, provider vs built-in fallbacks, and prior screen restoration.
+- **Verification:**
+  - `run_tests` (`env:native`): 459/459 test cases succeeded (100% pass).
+  - `build_project` (`env:esp32s3nano`): Succeeded (RAM: 56,020 B, Flash: 1,346,511 B).

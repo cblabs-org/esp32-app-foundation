@@ -8,50 +8,34 @@
  *
  * Module: modules/LVGLDisplay/LVGLDisplayModule.hpp
  * Description: Generic LVGL v9 colour-TFT display module core. Manages LVGL
- *              lifecycle, draw buffer allocation, tick updates, and input device
- *              focus groups via constructor-injected ILVGLHardwareAdapter.
- *              Implements IConfigurable via ConfigManager gateway for persistent
- *              display settings (namespace: "display", schema version: 1).
+ *              lifecycle, draw buffer allocation, tick updates, input device
+ *              focus groups, system screens, and two-stage boot splash.
+ *              Implements IConfigurable via ConfigManager gateway (namespace "display")
+ *              and IStatusReporter for boot status updates.
  *
  * Exported Classes:
  * - LVGLDisplayModule: Generic LVGL display service module
  *
  *   Lifecycle:
- *   - LVGLDisplayModule(): Constructor taking adapter reference and optional system screens
+ *   - LVGLDisplayModule(): Constructor taking adapter reference, optional system screens, and boot logo
  *   - ~LVGLDisplayModule(): Destructor freeing allocated draw buffers and handles
- *   - bootstrapHardware(): Phase 1 hardware initialization and buffer setup
+ *   - bootstrapHardware(): Phase 1 hardware initialization, buffer setup, and Stage-1 boot splash
  *   - begin():              Phase 2 framework integration and ui_init hook
  *
  *   ITickable:
  *   - tick():               Advances LVGL tick clock and calls lv_timer_handler()
  *
- *   IConfigurable (namespace: "display", schema v1):
- *   - getConfigNamespace(): Return "display"
- *   - getSchemaVersion():   Return 1
- *   - applyConfig():        Apply display settings from JSON section
- *   - serializeConfig():    Serialize display settings to JSON section
- *   - resetConfig():        Restore factory defaults
+ *   IStatusReporter:
+ *   - reportStatus():       Update status message and progress bar on boot screen
+ *   - reportError():        Display system error screen
+ *   - clearStatus():        Clear status overlay and restore prior screen
  *
- *   Runtime Setters / Getters:
- *   - setConfigManager():   Set ConfigManager reference for saving config
- *   - setBrightness():      Set backlight brightness and update adapter (0–255)
- *   - getBrightness():      Get current brightness level
- *   - setRotation():        Set display rotation (0, 90, 180, 270 degrees)
- *   - getRotation():        Get current display rotation in degrees
- *   - setScreensaverEnabled(): Enable/disable inactivity screensaver
- *   - getScreensaverEnabled(): Get screensaver enabled state
- *   - setDimTimeout():      Set dim timeout in milliseconds
- *   - getDimTimeout():      Get dim timeout in milliseconds
- *   - setBlankTimeout():    Set blank timeout in milliseconds
- *   - getBlankTimeout():    Get blank timeout in milliseconds
- *
- *   Accessors:
- *   - getDisplay():         Return underlying lv_display_t pointer
- *   - getTouchInput():      Return touch input device pointer (or nullptr)
- *   - getEncoderInput():    Return encoder input device pointer (or nullptr)
- *   - getKeypadInput():     Return keypad input device pointer (or nullptr)
- *   - getGroup():           Return widget focus group pointer (or nullptr)
- *   - isBootstrapMode():    Return true if in Phase 1 bootstrap mode
+ *   Screen Management API:
+ *   - showBoot():           Show Stage-1 boot splash / status progress screen
+ *   - showError():          Show error screen (prefers ILVGLSystemScreens provider, falls back to built-in)
+ *   - showOtaProgress():    Show OTA progress screen (prefers provider, falls back to built-in)
+ *   - restorePriorScreen(): Restore screen active before error/OTA display
+ *   - setBootLogo():        Set custom Stage-1 boot logo image descriptor
  */
 
 #pragma once
@@ -61,28 +45,30 @@
 #include <ArduinoJson.h>
 #include "interfaces/ITickable.hpp"
 #include "interfaces/IConfigurable.hpp"
+#include "interfaces/IStatusReporter.hpp"
 #include "interfaces/ILVGLHardwareAdapter.hpp"
 #include "interfaces/ILVGLSystemScreens.hpp"
+#include "assets/boot_logo.h"
+#include "screens/BootScreen.hpp"
+#include "screens/ErrorScreen.hpp"
+#include "screens/OTAProgressScreen.hpp"
 #include "lvgl.h"
 
 // Forward declarations
 class EventBus;
 class ConfigManager;
 
-// TODO: WO5 adds IStatusReporter
 // TODO: WO6 adds EventBus subscriptions & screensaver
 // TODO: WO7 adds IWebContributor
 // TODO: WO8 adds IMCPContributor
 
 /**
- * @brief Generic LVGL v9 display module implementing ITickable and IConfigurable.
+ * @brief Generic LVGL v9 display module implementing ITickable, IConfigurable, and IStatusReporter.
  *
  * Handles LVGL lifecycle (lv_init, lv_tick_inc, lv_timer_handler), draw buffer
- * allocation, input device discovery, and focus group management. Delegates
- * display and input initialization to an ILVGLHardwareAdapter instance.
- * Implements IConfigurable via ConfigManager gateway (namespace: "display").
+ * allocation, input device discovery, focus group management, and framework system screens.
  */
-class LVGLDisplayModule : public ITickable, public IConfigurable {
+class LVGLDisplayModule : public ITickable, public IConfigurable, public IStatusReporter {
 public:
     // -------------------------------------------------------------------------
     // Lifecycle
@@ -93,8 +79,11 @@ public:
      *
      * @param adapter Reference to concrete ILVGLHardwareAdapter implementation.
      * @param screens Optional pointer to ILVGLSystemScreens provider (default nullptr).
+     * @param bootLogo Optional pointer to compiled-in lv_image_dsc_t for Stage 1 boot splash (defaults to cb_labs_boot_logo).
      */
-    explicit LVGLDisplayModule(ILVGLHardwareAdapter& adapter, ILVGLSystemScreens* screens = nullptr);
+    explicit LVGLDisplayModule(ILVGLHardwareAdapter& adapter,
+                               ILVGLSystemScreens* screens = nullptr,
+                               const lv_image_dsc_t* bootLogo = nullptr);
 
     /**
      * @brief Destructor. Cleans up draw buffers and LVGL handles.
@@ -106,11 +95,11 @@ public:
     LVGLDisplayModule& operator=(const LVGLDisplayModule&) = delete;
 
     /**
-     * @brief Phase 1: Bootstrap display hardware and LVGL runtime.
+     * @brief Phase 1: Bootstrap display hardware, LVGL runtime, and Stage-1 boot splash.
      *
      * Calls lv_init(), requests display handle from adapter, allocates partial
-     * draw buffers in internal SRAM via DMA if not pre-configured (OQ-7), and
-     * binds optional input devices (touch, encoder, keypad) to an lv_group_t.
+     * draw buffers in internal SRAM via DMA if not pre-configured, binds optional
+     * input devices, and loads Stage-1 boot splash.
      */
     void bootstrapHardware();
 
@@ -139,141 +128,120 @@ public:
     void tick(uint32_t now) override;
 
     // -------------------------------------------------------------------------
-    // IConfigurable — ConfigManager gateway (namespace: "display")
+    // IStatusReporter
     // -------------------------------------------------------------------------
 
     /**
-     * @brief Return the config namespace for display settings.
-     * @return "display"
+     * @brief Update status message and progress bar on boot screen.
+     *
+     * @param message  Null-terminated status string.
+     * @param progress Fractional progress in [0.0, 1.0]; negative = indeterminate.
      */
+    void reportStatus(const char* message, float progress = -1.0f) override;
+
+    /**
+     * @brief Report a fatal system error and display error screen.
+     *
+     * @param errorMessage Null-terminated error description text.
+     */
+    void reportError(const char* errorMessage) override;
+
+    /**
+     * @brief Remove active status/system screen overlay and restore prior screen.
+     */
+    void clearStatus() override;
+
+    // -------------------------------------------------------------------------
+    // System Screen Management API
+    // -------------------------------------------------------------------------
+
+    /**
+     * @brief Display Stage-1 boot splash / progress screen.
+     */
+    void showBoot();
+
+    /**
+     * @brief Display system error screen.
+     *
+     * Uses ILVGLSystemScreens provider if non-null and supplying an error screen,
+     * otherwise falls back to built-in ErrorScreen.
+     *
+     * @param title   Error title string.
+     * @param message Error description string.
+     */
+    void showError(const char* title, const char* message);
+
+    /**
+     * @brief Display system error screen with numeric error code.
+     *
+     * @param code    Numeric error code.
+     * @param message Error description string.
+     */
+    void showError(int code, const char* message);
+
+    /**
+     * @brief Display OTA firmware update progress screen.
+     *
+     * Uses ILVGLSystemScreens provider if non-null and supplying an OTA screen,
+     * otherwise falls back to built-in OTAProgressScreen.
+     *
+     * @param progress Fractional progress ratio in [0.0, 1.0].
+     * @param status   Status phase text string.
+     */
+    void showOtaProgress(float progress, const char* status);
+
+    /**
+     * @brief Restore screen active prior to error or OTA display.
+     */
+    void restorePriorScreen();
+
+    /**
+     * @brief Override compiled-in Stage-1 boot logo.
+     *
+     * @param bootLogo Pointer to compiled-in lv_image_dsc_t asset.
+     */
+    void setBootLogo(const lv_image_dsc_t* bootLogo);
+
+    // -------------------------------------------------------------------------
+    // IConfigurable — ConfigManager gateway (namespace: "display")
+    // -------------------------------------------------------------------------
+
     const char* getConfigNamespace() const override { return "display"; }
-
-    /**
-     * @brief Return the current schema version for LVGL display config.
-     * @return 1
-     */
     int getSchemaVersion() const override { return 1; }
-
-    /**
-     * @brief Apply display settings from a parsed JSON section.
-     *
-     * Reads brightness (0–255), rotation (0/90/180/270), screensaverEnabled,
-     * dimTimeout, and blankTimeout from the JSON object and applies them to
-     * internal state and hardware. Also handles legacy sleepTimeout migration.
-     *
-     * @param section Read-only JSON object containing display config keys.
-     */
     void applyConfig(const JsonObject& section) override;
-
-    /**
-     * @brief Serialize current display settings into a JSON section.
-     *
-     * Writes brightness, rotation, screensaverEnabled, dimTimeout, and
-     * blankTimeout to the JSON object.
-     *
-     * @param section Mutable JSON object to write config into.
-     */
     void serializeConfig(JsonObject& section) const override;
-
-    /**
-     * @brief Reset display settings to factory defaults.
-     *
-     * Sets: brightness=255, rotation=0, screensaverEnabled=true,
-     * dimTimeout=150000ms, blankTimeout=300000ms. Applies settings to hardware.
-     */
     void resetConfig() override;
 
     // -------------------------------------------------------------------------
     // Runtime Setters & Getters
     // -------------------------------------------------------------------------
 
-    /**
-     * @brief Set the ConfigManager reference for saving configuration.
-     * @param cm Pointer to ConfigManager instance.
-     */
     void setConfigManager(ConfigManager* cm) { _configManager = cm; }
-
-    /**
-     * @brief Set the display backlight brightness and update hardware adapter.
-     * @param brightness Brightness level (0–255).
-     */
     void setBrightness(uint8_t brightness);
-
-    /**
-     * @brief Get the current backlight brightness level.
-     * @return Brightness level (0–255).
-     */
     uint8_t getBrightness() const { return _brightness; }
-
-    /**
-     * @brief Set the display rotation in degrees and update LVGL display if active.
-     * @param degrees Rotation angle in degrees (0, 90, 180, 270).
-     */
     void setRotation(uint16_t degrees);
-
-    /**
-     * @brief Get the current display rotation in degrees.
-     * @return Rotation in degrees (0, 90, 180, 270).
-     */
     uint16_t getRotation() const { return _rotation; }
-
-    /**
-     * @brief Enable or disable the inactivity screensaver.
-     * @param enabled True to enable screensaver.
-     */
     void setScreensaverEnabled(bool enabled);
-
-    /**
-     * @brief Check if the inactivity screensaver is enabled.
-     * @return True if screensaver is enabled.
-     */
     bool getScreensaverEnabled() const { return _screensaverEnabled; }
-
-    /**
-     * @brief Set the inactivity dim timeout in milliseconds.
-     * @param timeoutMs Dim timeout in milliseconds.
-     */
     void setDimTimeout(unsigned long timeoutMs);
-
-    /**
-     * @brief Get the inactivity dim timeout in milliseconds.
-     * @return Dim timeout in milliseconds.
-     */
     unsigned long getDimTimeout() const { return _dimTimeoutMs; }
-
-    /**
-     * @brief Set the inactivity blank timeout in milliseconds.
-     * @param timeoutMs Blank timeout in milliseconds.
-     */
     void setBlankTimeout(unsigned long timeoutMs);
-
-    /**
-     * @brief Get the inactivity blank timeout in milliseconds.
-     * @return Blank timeout in milliseconds.
-     */
     unsigned long getBlankTimeout() const { return _blankTimeoutMs; }
 
     // -------------------------------------------------------------------------
     // Accessors
     // -------------------------------------------------------------------------
 
-    /** @brief Get the underlying LVGL display pointer. */
     lv_display_t* getDisplay() const { return _display; }
-
-    /** @brief Get the touch input device pointer, or nullptr if unavailable. */
     lv_indev_t* getTouchInput() const { return _touchInDev; }
-
-    /** @brief Get the encoder input device pointer, or nullptr if unavailable. */
     lv_indev_t* getEncoderInput() const { return _encoderInDev; }
-
-    /** @brief Get the keypad input device pointer, or nullptr if unavailable. */
     lv_indev_t* getKeypadInput() const { return _keypadInDev; }
-
-    /** @brief Get the input focus group pointer, or nullptr if no encoder/keypad. */
     lv_group_t* getGroup() const { return _group; }
-
-    /** @brief Check if module is currently in Phase 1 bootstrap mode. */
     bool isBootstrapMode() const { return _bootstrapMode; }
+
+    BootScreen& getBootScreen() { return _builtInBootScreen; }
+    ErrorScreen& getErrorScreen() { return _builtInErrorScreen; }
+    OTAProgressScreen& getOtaScreen() { return _builtInOtaScreen; }
 
 private:
     ILVGLHardwareAdapter& _adapter;            ///< Injected hardware adapter
@@ -292,6 +260,14 @@ private:
     size_t   _bufSize = 0;                     ///< Allocated size per draw buffer in bytes
     bool     _bootstrapMode = false;           ///< True while in Phase 1 bootstrap mode
 
+    // --- System Screens & Assets ---
+    const lv_image_dsc_t* _bootLogo = nullptr;
+    BootScreen            _builtInBootScreen;
+    ErrorScreen           _builtInErrorScreen;
+    OTAProgressScreen     _builtInOtaScreen;
+    lv_obj_t*             _priorScreen = nullptr;
+    bool                  _inSystemScreen = false;
+
     // --- Configuration state ---
     uint8_t       _brightness = 255;          ///< Backlight brightness level (0–255)
     uint16_t      _rotation = 0;              ///< Display rotation in degrees (0, 90, 180, 270)
@@ -299,4 +275,3 @@ private:
     unsigned long _dimTimeoutMs = 150000;     ///< Inactivity dim timeout in ms (default 2.5 min)
     unsigned long _blankTimeoutMs = 300000;   ///< Inactivity blank timeout in ms (default 5 min)
 };
-

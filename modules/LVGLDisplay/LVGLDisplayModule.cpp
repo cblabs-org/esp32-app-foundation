@@ -9,10 +9,12 @@
  * Module: modules/LVGLDisplay/LVGLDisplayModule.cpp
  * Description: Generic LVGL v9 colour-TFT display module core implementation.
  *              Manages LVGL lifecycle (lv_init, lv_tick_inc, lv_timer_handler),
- *              DMA partial draw buffer allocation, input device discovery, and focus group wiring.
+ *              DMA partial draw buffer allocation, input device discovery, focus group wiring,
+ *              system screens, and IStatusReporter integration.
  */
 
 #include "LVGLDisplayModule.hpp"
+#include <cstdio>
 #include "esp_heap_caps.h"
 
 // -----------------------------------------------------------------------------
@@ -26,8 +28,13 @@ extern "C" __attribute__((weak)) void ui_init(void) {
 // Lifecycle
 // -----------------------------------------------------------------------------
 
-LVGLDisplayModule::LVGLDisplayModule(ILVGLHardwareAdapter& adapter, ILVGLSystemScreens* screens)
-    : _adapter(adapter), _screens(screens) {
+LVGLDisplayModule::LVGLDisplayModule(ILVGLHardwareAdapter& adapter,
+                                     ILVGLSystemScreens* screens,
+                                     const lv_image_dsc_t* bootLogo)
+    : _adapter(adapter),
+      _screens(screens),
+      _bootLogo(bootLogo ? bootLogo : &cb_labs_boot_logo),
+      _builtInBootScreen(_bootLogo) {
 }
 
 LVGLDisplayModule::~LVGLDisplayModule() {
@@ -64,8 +71,6 @@ void LVGLDisplayModule::bootstrapHardware() {
     }
 
     // --- Step 3: Draw Buffer Management (OQ-7) ---
-    // Module allocates partial double buffers in SRAM by default using getBufferLineCount().
-    // If the adapter pre-configured buffers (lv_display_get_buf_1 != nullptr), respect it and skip.
     if (lv_display_get_buf_1(_display) == nullptr) {
         uint16_t width = _adapter.getScreenWidth();
         uint16_t lineCount = _adapter.getBufferLineCount();
@@ -76,7 +81,6 @@ void LVGLDisplayModule::bootstrapHardware() {
             _buf2 = heap_caps_malloc(_bufSize, MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA);
 
             if (_buf1 == nullptr || _buf2 == nullptr) {
-                // Graceful degrade: free partial allocations on failure
                 if (_buf1 != nullptr) {
                     heap_caps_free(_buf1);
                     _buf1 = nullptr;
@@ -111,7 +115,10 @@ void LVGLDisplayModule::bootstrapHardware() {
 
     _bootstrapMode = true;
 
-    // --- Step 5: Apply Hardware Brightness & Rotation ---
+    // --- Step 5: Stage-1 Boot Splash ---
+    showBoot();
+
+    // --- Step 6: Apply Hardware Brightness & Rotation ---
     _adapter.setBrightness(_brightness);
     if (_rotation != 0) {
         lv_display_rotation_t rotEnum = LV_DISPLAY_ROTATION_0;
@@ -135,11 +142,6 @@ void LVGLDisplayModule::begin(EventBus* eventBus) {
         ui_init();
     }
 
-    // TODO: WO5 adds IStatusReporter system screens
-    // TODO: WO6 adds EventBus subscriptions (ota.progress, display.message, system.error)
-    // TODO: WO7 adds IWebContributor REST API and portal tab
-    // TODO: WO8 adds IMCPContributor MCP tools
-
     _bootstrapMode = false;
 }
 
@@ -158,6 +160,100 @@ void LVGLDisplayModule::tick(uint32_t now) {
 
     lv_tick_inc(elapsed);
     lv_timer_handler();
+}
+
+// -----------------------------------------------------------------------------
+// IStatusReporter
+// -----------------------------------------------------------------------------
+
+void LVGLDisplayModule::reportStatus(const char* message, float progress) {
+    _builtInBootScreen.setStatus(message, progress);
+    if (lv_screen_active() != _builtInBootScreen.getScreen()) {
+        showBoot();
+    }
+}
+
+void LVGLDisplayModule::reportError(const char* errorMessage) {
+    showError("FATAL ERROR", errorMessage);
+}
+
+void LVGLDisplayModule::clearStatus() {
+    restorePriorScreen();
+}
+
+// -----------------------------------------------------------------------------
+// System Screen Management API
+// -----------------------------------------------------------------------------
+
+void LVGLDisplayModule::showBoot() {
+    _builtInBootScreen.init(_bootLogo);
+    lv_obj_t* bootScr = _builtInBootScreen.getScreen();
+    if (bootScr != nullptr) {
+        lv_scr_load_anim(bootScr, LV_SCR_LOAD_ANIM_FADE_IN, 200, 0, false);
+    }
+}
+
+void LVGLDisplayModule::showError(const char* title, const char* message) {
+    if (!_inSystemScreen) {
+        _priorScreen = lv_screen_active();
+        _inSystemScreen = true;
+    }
+
+    if (_screens != nullptr) {
+        _screens->onError(title, message);
+        lv_obj_t* customScr = _screens->errorScreen();
+        if (customScr != nullptr) {
+            lv_scr_load_anim(customScr, LV_SCR_LOAD_ANIM_FADE_IN, 200, 0, false);
+            return;
+        }
+    }
+
+    _builtInErrorScreen.setError(title, message);
+    lv_obj_t* errScr = _builtInErrorScreen.getScreen();
+    if (errScr != nullptr) {
+        lv_scr_load_anim(errScr, LV_SCR_LOAD_ANIM_FADE_IN, 200, 0, false);
+    }
+}
+
+void LVGLDisplayModule::showError(int code, const char* message) {
+    char titleBuf[32];
+    snprintf(titleBuf, sizeof(titleBuf), "ERROR %d", code);
+    showError(titleBuf, message);
+}
+
+void LVGLDisplayModule::showOtaProgress(float progress, const char* status) {
+    if (!_inSystemScreen) {
+        _priorScreen = lv_screen_active();
+        _inSystemScreen = true;
+    }
+
+    if (_screens != nullptr) {
+        _screens->onOtaProgress(progress, status);
+        lv_obj_t* customScr = _screens->otaScreen();
+        if (customScr != nullptr) {
+            lv_scr_load_anim(customScr, LV_SCR_LOAD_ANIM_FADE_IN, 200, 0, false);
+            return;
+        }
+    }
+
+    _builtInOtaScreen.setProgress(progress, status);
+    lv_obj_t* otaScr = _builtInOtaScreen.getScreen();
+    if (otaScr != nullptr) {
+        lv_scr_load_anim(otaScr, LV_SCR_LOAD_ANIM_FADE_IN, 200, 0, false);
+    }
+}
+
+void LVGLDisplayModule::restorePriorScreen() {
+    if (_inSystemScreen && _priorScreen != nullptr) {
+        lv_scr_load_anim(_priorScreen, LV_SCR_LOAD_ANIM_FADE_IN, 200, 0, false);
+        _priorScreen = nullptr;
+    }
+    _inSystemScreen = false;
+}
+
+void LVGLDisplayModule::setBootLogo(const lv_image_dsc_t* bootLogo) {
+    _bootLogo = bootLogo ? bootLogo : &cb_labs_boot_logo;
+    _builtInBootScreen.setBootLogo(_bootLogo);
 }
 
 // -----------------------------------------------------------------------------
@@ -278,4 +374,3 @@ void LVGLDisplayModule::setDimTimeout(unsigned long timeoutMs) {
 void LVGLDisplayModule::setBlankTimeout(unsigned long timeoutMs) {
     _blankTimeoutMs = timeoutMs;
 }
-
