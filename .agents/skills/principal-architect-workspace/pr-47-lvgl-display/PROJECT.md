@@ -377,3 +377,10 @@ This project is authored so a **fresh PA session** can execute it:
 | 2026-07-24 | **All 11 detailed WORKORDERs drafted** — `wo1-foundation` … `wo11-docs`, each with frontmatter (complexity tiers), role/boundary boxes, `platformio` MCP tooling constraints, line-item checklists, verification gates, and provenance/authorization blocks. Folders created under this project. No branches, no source edits, no worker spawns. |
 | 2026-07-24 | **User approved implementation plan.** Q1: merge `docs/lvgl-display-design` to `main` → done (`d86628b`). Q2: 2-hour time-box for WO9 `esp_lcd` spike → confirmed. PA review (session `7961241b`): 5 minor amendments recommended, all accepted. Design doc merged to `main` as pre-flight. |
 | 2026-07-24 | PA recovered workspace files from dropped stash (`480a8b2`), committed on `lvgl-display/wo1-foundation` (`f3e3fc4`). Spawning WO1 worker. |
+| 2026-07-24 | **WO1–WO9 + WO11 executed successfully.** 487/487 native tests, 70/70 Playwright, all 3 hardware builds green. WO10 (hardware bringup) deferred — tagged `v0.0.12-dev.28`, firmware built, awaiting physical CrowPanel. |
+| 2026-07-24 | **PR #41 opened as draft** (`lvgl-display/wo11-docs` → `main`). 66 files, 6,356 insertions. |
+| 2026-07-24 | **Code review received** (PR #41 comment). 2 merge blockers: (1) EventBus callbacks call LVGL off main thread — data race with OTA task, (2) `captureSnapshot()` returns all-zero buffer. 3 should-fix: atomics, U8g2 bloat, draw buffer size. 4 minor. |
+| 2026-07-24 | **Review response posted.** Accepted #1, #2, #3, #4, all minor. Pushed back on #5 (buffer size 40 → keep, measure in WO10). Confirmed #7 (auth middleware). Deferred #6 (encoder detent) and #8 (flush DMA) to WO10. |
+| 2026-07-24 | **Reviewer confirmed all dispositions.** #5 pushback accepted with condition (measure heap in WO10, record number). No remaining disagreements. #1 and #2 are the only merge blockers. |
+| 2026-07-24 | **User approved WO12 remediation plan.** PA drafted `wo12-review-fixes/WORKORDER.md` (standard complexity). Spawning WO12 worker. |
+
