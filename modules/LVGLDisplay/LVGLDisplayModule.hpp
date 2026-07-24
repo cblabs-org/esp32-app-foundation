@@ -46,6 +46,7 @@
 #include "interfaces/ITickable.hpp"
 #include "interfaces/IConfigurable.hpp"
 #include "interfaces/IStatusReporter.hpp"
+#include "interfaces/IWebContributor.hpp"
 #include "interfaces/ILVGLHardwareAdapter.hpp"
 #include "interfaces/ILVGLSystemScreens.hpp"
 #include "assets/boot_logo.h"
@@ -102,7 +103,7 @@ namespace LVGLDisplayEvents {
  * Handles LVGL lifecycle (lv_init, lv_tick_inc, lv_timer_handler), draw buffer
  * allocation, input device discovery, focus group management, and framework system screens.
  */
-class LVGLDisplayModule : public ITickable, public IConfigurable, public IStatusReporter {
+class LVGLDisplayModule : public ITickable, public IConfigurable, public IStatusReporter, public IWebContributor {
 public:
     // -------------------------------------------------------------------------
     // Lifecycle
@@ -252,6 +253,47 @@ public:
     void resetConfig() override;
 
     // -------------------------------------------------------------------------
+    // IWebContributor — Display REST API and portal tab
+    // -------------------------------------------------------------------------
+
+    void registerRoutes(PsychicHttpServer& server) override;
+    const char* getTabName() const override { return "Display"; }
+    int getTabOrder() const override { return 50; }
+    const char* getApiPrefix() const override { return "/api/display"; }
+    const char* getTabIcon() const override;
+
+    IWebContributor* settingsTabStub() { return &_settingsTabStub; }
+    IWebContributor* screenshotTabStub() { return &_screenshotTabStub; }
+
+    // -------------------------------------------------------------------------
+    // Display Snapshot Capture Primitive (OQ-6)
+    // -------------------------------------------------------------------------
+
+    /**
+     * @brief Capture a transient full-screen RGB565 snapshot of the display.
+     *
+     * Allocates a full-frame RGB565 buffer in PSRAM (or SRAM fallback), renders
+     * the currently active LVGL screen into it, and populates outBuffer, outSize,
+     * outWidth, and outHeight.
+     *
+     * The caller owns the returned buffer and MUST free it using freeSnapshot()
+     * when finished.
+     *
+     * @param outBuffer Output reference receiving pointer to allocated RGB565 buffer.
+     * @param outSize Output reference receiving size of buffer in bytes.
+     * @param outWidth Output reference receiving display width in pixels.
+     * @param outHeight Output reference receiving display height in pixels.
+     * @return true if snapshot was successfully captured, false on allocation error.
+     */
+    bool captureSnapshot(uint8_t*& outBuffer, size_t& outSize, uint16_t& outWidth, uint16_t& outHeight);
+
+    /**
+     * @brief Free a snapshot buffer allocated by captureSnapshot().
+     * @param buffer Pointer to buffer returned by captureSnapshot().
+     */
+    void freeSnapshot(uint8_t* buffer);
+
+    // -------------------------------------------------------------------------
     // Runtime Setters & Getters
     // -------------------------------------------------------------------------
 
@@ -286,6 +328,23 @@ public:
     const ScreensaverController& getScreensaver() const { return _screensaver; }
 
 private:
+    struct SettingsTabStub : public IWebContributor {
+        void registerRoutes(PsychicHttpServer& /*server*/) override {}
+        const char* getTabName() const override { return "Settings"; }
+        const char* getParentTab() const override { return "Display"; }
+        int getTabOrder() const override { return 10; }
+    };
+
+    struct ScreenshotTabStub : public IWebContributor {
+        void registerRoutes(PsychicHttpServer& /*server*/) override {}
+        const char* getTabName() const override { return "Screenshot"; }
+        const char* getParentTab() const override { return "Display"; }
+        int getTabOrder() const override { return 20; }
+    };
+
+    SettingsTabStub _settingsTabStub;
+    ScreenshotTabStub _screenshotTabStub;
+
     static void _onOtaProgress(const char* topic, const void* payload, void* ctx);
     static void _onDisplayMessage(const char* topic, const void* payload, void* ctx);
     static void _onSystemError(const char* topic, const void* payload, void* ctx);

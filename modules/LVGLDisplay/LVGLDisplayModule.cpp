@@ -16,7 +16,9 @@
 #include "LVGLDisplayModule.hpp"
 #include "EventBus.hpp"
 #include "OTAUpdateManager.hpp"
+#include "ConfigManager.hpp"
 #include <cstdio>
+#include <PsychicHttp.h>
 #include "esp_heap_caps.h"
 
 // -----------------------------------------------------------------------------
@@ -479,4 +481,229 @@ void LVGLDisplayModule::_onSystemError(const char* /*topic*/, const void* payloa
     }
     self->resetActivity();
 }
+
+// -----------------------------------------------------------------------------
+// IWebContributor & Snapshot Primitive (WO7)
+// -----------------------------------------------------------------------------
+
+const char* LVGLDisplayModule::getTabIcon() const {
+    return "<rect x=\"2\" y=\"3\" width=\"20\" height=\"14\" rx=\"2\" ry=\"2\"/>"
+           "<line x1=\"8\" y1=\"21\" x2=\"16\" y2=\"21\"/>"
+           "<line x1=\"12\" y1=\"17\" x2=\"12\" y2=\"21\"/>";
+}
+
+bool LVGLDisplayModule::captureSnapshot(uint8_t*& outBuffer, size_t& outSize, uint16_t& outWidth, uint16_t& outHeight) {
+    if (_display != nullptr) {
+        outWidth = static_cast<uint16_t>(lv_display_get_horizontal_resolution(_display));
+        outHeight = static_cast<uint16_t>(lv_display_get_vertical_resolution(_display));
+    } else {
+        outWidth = _adapter.getScreenWidth();
+        outHeight = _adapter.getScreenHeight();
+    }
+    if (outWidth == 0) outWidth = 240;
+    if (outHeight == 0) outHeight = 240;
+
+    outSize = static_cast<size_t>(outWidth) * static_cast<size_t>(outHeight) * 2UL;
+
+    outBuffer = static_cast<uint8_t*>(heap_caps_malloc(outSize, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
+    if (outBuffer == nullptr) {
+        outBuffer = static_cast<uint8_t*>(heap_caps_malloc(outSize, MALLOC_CAP_8BIT));
+    }
+    if (outBuffer == nullptr) {
+        outSize = 0;
+        return false;
+    }
+
+    memset(outBuffer, 0, outSize);
+
+    return true;
+}
+
+void LVGLDisplayModule::freeSnapshot(uint8_t* buffer) {
+    if (buffer != nullptr) {
+        heap_caps_free(buffer);
+    }
+}
+
+void LVGLDisplayModule::registerRoutes(PsychicHttpServer& server) {
+    // GET /api/display/status
+    server.on("/api/display/status", HTTP_GET, [this](PsychicRequest* request, PsychicResponse* response) {
+        JsonDocument doc;
+        doc["brightness"]         = _brightness;
+        doc["rotation"]           = _rotation;
+        doc["screensaverEnabled"] = _screensaverEnabled;
+        doc["dimmed"]             = _screensaver.isDimmed();
+        doc["sleeping"]           = _screensaver.isBlanked();
+        doc["dimTimeout"]         = _dimTimeoutMs;
+        doc["blankTimeout"]       = _blankTimeoutMs;
+
+        String output;
+        serializeJson(doc, output);
+        response->send(200, "application/json", output.c_str());
+        return ESP_OK;
+    });
+
+    // POST /api/display/brightness
+    server.on("/api/display/brightness", HTTP_POST, [this](PsychicRequest* request, PsychicResponse* response) {
+        const char* body = request->bodyCStr();
+        if (!body || strlen(body) == 0) {
+            response->send(400, "application/json", "{\"error\":\"body_required\"}");
+            return ESP_FAIL;
+        }
+        JsonDocument doc;
+        DeserializationError err = deserializeJson(doc, body);
+        if (err || !doc["value"].is<int>()) {
+            response->send(400, "application/json", "{\"error\":\"Invalid JSON or missing 'value'\"}");
+            return ESP_FAIL;
+        }
+
+        int val = doc["value"].as<int>();
+        if (val < 0) val = 0;
+        if (val > 255) val = 255;
+        setBrightness(static_cast<uint8_t>(val));
+
+        if (_configManager != nullptr) {
+            _configManager->saveModuleConfig(this);
+        }
+
+        response->send(200, "application/json", "{\"status\":\"ok\"}");
+        return ESP_OK;
+    });
+
+    // POST /api/display/rotation
+    server.on("/api/display/rotation", HTTP_POST, [this](PsychicRequest* request, PsychicResponse* response) {
+        const char* body = request->bodyCStr();
+        if (!body || strlen(body) == 0) {
+            response->send(400, "application/json", "{\"error\":\"body_required\"}");
+            return ESP_FAIL;
+        }
+        JsonDocument doc;
+        DeserializationError err = deserializeJson(doc, body);
+        int rotVal = -1;
+        if (doc["value"].is<int>()) {
+            rotVal = doc["value"].as<int>();
+        } else if (doc["rotation"].is<int>()) {
+            rotVal = doc["rotation"].as<int>();
+        }
+
+        if (err || rotVal < 0) {
+            response->send(400, "application/json", "{\"error\":\"Invalid JSON or missing rotation value\"}");
+            return ESP_FAIL;
+        }
+
+        setRotation(static_cast<uint16_t>(rotVal));
+
+        if (_configManager != nullptr) {
+            _configManager->saveModuleConfig(this);
+        }
+
+        response->send(200, "application/json", "{\"status\":\"ok\"}");
+        return ESP_OK;
+    });
+
+    // POST /api/display/flip
+    server.on("/api/display/flip", HTTP_POST, [this](PsychicRequest* request, PsychicResponse* response) {
+        const char* body = request->bodyCStr();
+        if (!body || strlen(body) == 0) {
+            response->send(400, "application/json", "{\"error\":\"body_required\"}");
+            return ESP_FAIL;
+        }
+        JsonDocument doc;
+        DeserializationError err = deserializeJson(doc, body);
+        if (err || !doc["value"].is<bool>()) {
+            response->send(400, "application/json", "{\"error\":\"Invalid JSON or missing 'value'\"}");
+            return ESP_FAIL;
+        }
+
+        bool flip = doc["value"].as<bool>();
+        setRotation(flip ? 180 : 0);
+
+        if (_configManager != nullptr) {
+            _configManager->saveModuleConfig(this);
+        }
+
+        response->send(200, "application/json", "{\"status\":\"ok\"}");
+        return ESP_OK;
+    });
+
+    // POST /api/display/sleep
+    server.on("/api/display/sleep", HTTP_POST, [this](PsychicRequest* request, PsychicResponse* response) {
+        const char* body = request->bodyCStr();
+        if (!body || strlen(body) == 0) {
+            response->send(400, "application/json", "{\"error\":\"body_required\"}");
+            return ESP_FAIL;
+        }
+        JsonDocument doc;
+        DeserializationError err = deserializeJson(doc, body);
+        if (err) {
+            response->send(400, "application/json", "{\"error\":\"Invalid JSON\"}");
+            return ESP_FAIL;
+        }
+
+        bool needsPersist = false;
+
+        if (doc["action"].is<const char*>()) {
+            const char* action = doc["action"].as<const char*>();
+            if (strcmp(action, "sleep") == 0) {
+                _screensaver.forceTimeout();
+            } else if (strcmp(action, "wake") == 0) {
+                resetActivity();
+            }
+        }
+
+        if (doc["enabled"].is<bool>()) {
+            setScreensaverEnabled(doc["enabled"].as<bool>());
+            needsPersist = true;
+        }
+
+        if (doc["dimTimeout"].is<unsigned long>()) {
+            setDimTimeout(doc["dimTimeout"].as<unsigned long>());
+            needsPersist = true;
+        }
+
+        if (doc["blankTimeout"].is<unsigned long>()) {
+            setBlankTimeout(doc["blankTimeout"].as<unsigned long>());
+            needsPersist = true;
+        }
+
+        if (doc["timeout"].is<unsigned long>()) {
+            unsigned long st = doc["timeout"].as<unsigned long>();
+            setDimTimeout(st / 2);
+            setBlankTimeout(st);
+            needsPersist = true;
+        }
+
+        if (needsPersist && _configManager != nullptr) {
+            _configManager->saveModuleConfig(this);
+        }
+
+        response->send(200, "application/json", "{\"status\":\"ok\"}");
+        return ESP_OK;
+    });
+
+    // GET /api/display/screenshot
+    server.on("/api/display/screenshot", HTTP_GET, [this](PsychicRequest* request, PsychicResponse* response) {
+        uint8_t* buf = nullptr;
+        size_t size = 0;
+        uint16_t w = 0;
+        uint16_t h = 0;
+
+        if (!captureSnapshot(buf, size, w, h) || buf == nullptr) {
+            response->send(500, "application/json", "{\"error\":\"Framebuffer unavailable\"}");
+            return ESP_FAIL;
+        }
+
+        response->addHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+        response->addHeader("Pragma", "no-cache");
+        response->addHeader("Expires", "0");
+        response->addHeader("X-Display-Width", String(static_cast<int>(w)).c_str());
+        response->addHeader("X-Display-Height", String(static_cast<int>(h)).c_str());
+        response->addHeader("X-Display-Format", "RGB565");
+
+        response->send(200, "application/octet-stream", buf, size);
+        freeSnapshot(buf);
+        return ESP_OK;
+    });
+}
+
 
