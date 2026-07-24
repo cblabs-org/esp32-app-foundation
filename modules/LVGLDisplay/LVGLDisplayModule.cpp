@@ -925,25 +925,38 @@ void LVGLDisplayModule::registerMCPTools(MCPToolRegistry& registry) {
                 return;
             }
 
-            result["width"] = w;
-            result["height"] = h;
-            result["format"] = "RGB565";
-            
-            // Note: ~150 KB transient PSRAM allocation for base64 encoding (48-byte chunks, 48 % 3 == 0)
-            String b64 = "";
+            // Base64-encode the RGB565 framebuffer.
+            // Pre-allocate output buffer: base64 expands 3 bytes → 4 chars, plus padding.
+            // ~153 KB for a 240×240 RGB565 frame. Transient PSRAM allocation.
+            size_t b64Len = ((size + 2) / 3) * 4;
+            char* b64Buf = static_cast<char*>(heap_caps_malloc(b64Len + 1, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
+            if (b64Buf == nullptr) {
+                b64Buf = static_cast<char*>(malloc(b64Len + 1));
+            }
+            if (b64Buf == nullptr) {
+                self->freeSnapshot(buf);
+                result["error"] = "Failed to allocate base64 buffer";
+                return;
+            }
+
+            size_t outPos = 0;
             size_t offset = 0;
             while (offset < size) {
                 size_t chunk = (size - offset > 48) ? 48 : (size - offset);
                 String b64Chunk = base64::encode(&buf[offset], chunk);
-                b64 += b64Chunk.c_str();
+                size_t chunkLen = b64Chunk.length();
+                memcpy(b64Buf + outPos, b64Chunk.c_str(), chunkLen);
+                outPos += chunkLen;
                 offset += chunk;
             }
+            b64Buf[outPos] = '\0';
 
             result["format"] = "RGB565";
             result["width"]  = w;
             result["height"] = h;
-            result["data"]   = b64;
+            result["data"]   = b64Buf;
 
+            free(b64Buf);
             self->freeSnapshot(buf);
         },
         this,
