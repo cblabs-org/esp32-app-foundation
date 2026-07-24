@@ -83,6 +83,7 @@ predate the formal PA pipeline and are filed retrospectively.
 | [pr-44-json-patch](./pr-44-json-patch/PROJECT.md) | Issue #28: RFC 6902 JSON Patch for ConfigManager — element-level config writes, config mutex, saveModuleConfig split | ✅ **COMPLETE** PR [#30](https://github.com/matthewmcneill/esp32-app-foundation/pull/30), 416/416 tests | Session 3f6fb84f |
 | [pr-45-ha-retry-backoff](./pr-45-ha-retry-backoff/PROJECT.md) | Issue #34: HA Discovery Retry Backoff (exponential backoff 200ms→5s cap, skip-on-cap, drain stall detection, health signals on EventBus/web API/MCP/portal) | ✅ **COMPLETE** `e5b7978` — WO1 merged, 8 new backoff tests · [distillation](./pr-45-ha-retry-backoff/wo1-backoff-fix/context_bridge.md) | Session 000a3e6b |
 | [pr-46-open-issues-batch](./pr-46-open-issues-batch/PROJECT.md) | Issues #29, #31, #36, #37: Open Issues Batch (child tabs blank, apiFetch error body, PSRAM guard, ArduinoJson docs) | ✅ **COMPLETE** PR [#38](https://github.com/matthewmcneill/esp32-app-foundation/pull/38), 423/423 native + 69/69 web tests | Session 2db00816 |
+| [pr-47-lvgl-display](./pr-47-lvgl-display/PROJECT.md) | LVGL Display Module — generic LVGL v9 colour-TFT module + pluggable `ILVGLHardwareAdapter`, reference `CrowPanel128Adapter` (GC9A01/CST816D/rotary encoder) | 🟡 **PLANNED** — 11-WORKORDER stacked plan fully drafted (D1–D9), 2 framework issues spun off (#39, #40), awaiting user implementation approval | Current Session |
 
 ---
 
@@ -147,6 +148,7 @@ scanning the entire Projects Registry chronologically.
 | [pr-18](./pr-18-screensaver-settings/PROJECT.md) | Screensaver config, MCP tools, web portal Display tab | PROJECT.md |
 | [pr-23](./pr-23-display-tab/PROJECT.md) | Module-owned Display bottom-nav tab, Settings + Screenshot sub-pills | PROJECT.md |
 | [pr-35](./pr-35-weather-station/PROJECT.md) | WeatherBoard, StatusBoard updates, composable widgets | PROJECT.md |
+| [pr-47](./pr-47-lvgl-display/PROJECT.md) | LVGL v9 colour-TFT module (generic) + `ILVGLHardwareAdapter` + CrowPanel 1.28" reference adapter — peer to U8G2, partial SRAM buffers, esp_lcd | PROJECT.md (design) |
 | [adhoc-screensaver-twdt](./adhoc-screensaver-twdt/context_bridge.md) | TWDT crash at 313 s — `vTaskDelay` fix, `setPowerSave(1)`, `localtime_r` thread safety | context_bridge |
 
 ### Web Portal
@@ -280,5 +282,5 @@ scanning the entire Projects Registry chronologically.
 
 ---
 
-*Updated: 2026-07-20 — Added pr-42-ha-discovery-pacing (Issue #16: tick-driven discovery chunking, outbox limit, drain-completion signal)*
+*Updated: 2026-07-24 — Added pr-47-lvgl-display (design phase: generic LVGL v9 module + pluggable hardware adapters, 11-WO stacked plan awaiting review)*
 
