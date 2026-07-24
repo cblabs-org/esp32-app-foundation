@@ -10,10 +10,12 @@
  * Description: Generic LVGL v9 colour-TFT display module core implementation.
  *              Manages LVGL lifecycle (lv_init, lv_tick_inc, lv_timer_handler),
  *              DMA partial draw buffer allocation, input device discovery, focus group wiring,
- *              system screens, and IStatusReporter integration.
+ *              system screens, ScreensaverController, and EventBus subscriptions.
  */
 
 #include "LVGLDisplayModule.hpp"
+#include "EventBus.hpp"
+#include "OTAUpdateManager.hpp"
 #include <cstdio>
 #include "esp_heap_caps.h"
 
@@ -130,12 +132,24 @@ void LVGLDisplayModule::bootstrapHardware() {
 }
 
 void LVGLDisplayModule::begin(EventBus* eventBus) {
-    (void)eventBus;
+    _eventBus = eventBus;
 
     // Phase 1 fallback: ensure bootstrapHardware() ran
     if (_display == nullptr) {
         bootstrapHardware();
     }
+
+    // Subscribe to EventBus topics
+    if (_eventBus != nullptr) {
+        _eventBus->subscribe(OTAUpdateManagerEvents::OTA_PROGRESS, _onOtaProgress, this);
+        _eventBus->subscribe(LVGLDisplayEvents::DISPLAY_MESSAGE, _onDisplayMessage, this);
+        _eventBus->subscribe(LVGLDisplayEvents::SYSTEM_ERROR, _onSystemError, this);
+    }
+
+    // Sync screensaver settings
+    _screensaver.setEnabled(_screensaverEnabled);
+    _screensaver.setDimTimeout(_dimTimeoutMs);
+    _screensaver.setBlankTimeout(_blankTimeoutMs);
 
     // Execute weak ui_init() hook if defined by application
     if (ui_init != nullptr) {
@@ -143,6 +157,7 @@ void LVGLDisplayModule::begin(EventBus* eventBus) {
     }
 
     _bootstrapMode = false;
+    resetActivity();
 }
 
 // -----------------------------------------------------------------------------
@@ -152,11 +167,35 @@ void LVGLDisplayModule::begin(EventBus* eventBus) {
 void LVGLDisplayModule::tick(uint32_t now) {
     if (_lastTickMs == 0) {
         _lastTickMs = now;
+        _screensaver.tick(now, _adapter, _brightness, _eventBus);
         return;
     }
 
     uint32_t elapsed = now - _lastTickMs;
     _lastTickMs = now;
+
+    // Check LVGL input activity
+    if (_display != nullptr) {
+        uint32_t indevInactive = lv_display_get_inactive_time(_display);
+        if (indevInactive < _lastIndevInactiveMs) {
+            resetActivity();
+        }
+        _lastIndevInactiveMs = indevInactive;
+    }
+
+    // Tick Screensaver state machine
+    _screensaver.tick(now, _adapter, _brightness, _eventBus);
+
+    // If blanked, skip LVGL timer processing
+    if (_screensaver.isBlanked()) {
+        return;
+    }
+
+    // Defense-in-depth: if OTA flash write in progress, advance tick clock but skip timer handler
+    if (_pauseRendering) {
+        lv_tick_inc(elapsed);
+        return;
+    }
 
     lv_tick_inc(elapsed);
     lv_timer_handler();
@@ -178,6 +217,7 @@ void LVGLDisplayModule::reportError(const char* errorMessage) {
 }
 
 void LVGLDisplayModule::clearStatus() {
+    _pauseRendering = false;
     restorePriorScreen();
 }
 
@@ -244,6 +284,7 @@ void LVGLDisplayModule::showOtaProgress(float progress, const char* status) {
 }
 
 void LVGLDisplayModule::restorePriorScreen() {
+    _pauseRendering = false;
     if (_inSystemScreen && _priorScreen != nullptr) {
         lv_scr_load_anim(_priorScreen, LV_SCR_LOAD_ANIM_FADE_IN, 200, 0, false);
         _priorScreen = nullptr;
@@ -254,6 +295,10 @@ void LVGLDisplayModule::restorePriorScreen() {
 void LVGLDisplayModule::setBootLogo(const lv_image_dsc_t* bootLogo) {
     _bootLogo = bootLogo ? bootLogo : &cb_labs_boot_logo;
     _builtInBootScreen.setBootLogo(_bootLogo);
+}
+
+void LVGLDisplayModule::resetActivity() {
+    _screensaver.resetActivity();
 }
 
 // -----------------------------------------------------------------------------
@@ -299,6 +344,10 @@ void LVGLDisplayModule::applyConfig(const JsonObject& section) {
         _blankTimeoutMs = 300000UL;
     }
 
+    _screensaver.setEnabled(_screensaverEnabled);
+    _screensaver.setDimTimeout(_dimTimeoutMs);
+    _screensaver.setBlankTimeout(_blankTimeoutMs);
+
     _adapter.setBrightness(_brightness);
 
     if (_display != nullptr) {
@@ -325,6 +374,10 @@ void LVGLDisplayModule::resetConfig() {
     _screensaverEnabled = true;
     _dimTimeoutMs       = 150000;
     _blankTimeoutMs     = 300000;
+
+    _screensaver.setEnabled(true);
+    _screensaver.setDimTimeout(150000);
+    _screensaver.setBlankTimeout(300000);
 
     _adapter.setBrightness(_brightness);
 
@@ -365,12 +418,65 @@ void LVGLDisplayModule::setRotation(uint16_t degrees) {
 
 void LVGLDisplayModule::setScreensaverEnabled(bool enabled) {
     _screensaverEnabled = enabled;
+    _screensaver.setEnabled(enabled);
 }
 
 void LVGLDisplayModule::setDimTimeout(unsigned long timeoutMs) {
     _dimTimeoutMs = timeoutMs;
+    _screensaver.setDimTimeout(timeoutMs);
 }
 
 void LVGLDisplayModule::setBlankTimeout(unsigned long timeoutMs) {
     _blankTimeoutMs = timeoutMs;
+    _screensaver.setBlankTimeout(timeoutMs);
 }
+
+// -----------------------------------------------------------------------------
+// Static EventBus Callbacks
+// -----------------------------------------------------------------------------
+
+void LVGLDisplayModule::_onOtaProgress(const char* /*topic*/, const void* payload, void* ctx) {
+    auto* self = static_cast<LVGLDisplayModule*>(ctx);
+    if (payload == nullptr || self == nullptr) return;
+
+    const auto* ota = static_cast<const OTAProgressPayload*>(payload);
+    if (ota->complete) {
+        self->_pauseRendering = false;
+        if (ota->success) {
+            self->restorePriorScreen();
+        } else {
+            self->showError("OTA FAILED", ota->status ? ota->status : "Update failed");
+        }
+    } else {
+        self->_pauseRendering = true;
+        self->showOtaProgress(ota->progress, ota->status ? ota->status : "Updating...");
+        lv_timer_handler();
+    }
+    self->resetActivity();
+}
+
+void LVGLDisplayModule::_onDisplayMessage(const char* /*topic*/, const void* payload, void* ctx) {
+    auto* self = static_cast<LVGLDisplayModule*>(ctx);
+    if (payload == nullptr || self == nullptr) return;
+
+    const auto* msg = static_cast<const DisplayMessagePayload*>(payload);
+    if (msg->message != nullptr) {
+        self->reportStatus(msg->message, -1.0f);
+    }
+    self->resetActivity();
+}
+
+void LVGLDisplayModule::_onSystemError(const char* /*topic*/, const void* payload, void* ctx) {
+    auto* self = static_cast<LVGLDisplayModule*>(ctx);
+    if (payload == nullptr || self == nullptr) return;
+
+    const auto* err = static_cast<const SystemErrorPayload*>(payload);
+    if (err->message != nullptr) {
+        self->showError(err->title ? err->title : "SYSTEM ERROR", err->message);
+    } else {
+        const char* msgStr = static_cast<const char*>(payload);
+        self->showError("SYSTEM ERROR", msgStr);
+    }
+    self->resetActivity();
+}
+

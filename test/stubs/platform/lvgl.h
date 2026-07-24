@@ -418,6 +418,16 @@ inline void lv_display_set_user_data(lv_display_t* disp, void* user_data) {
     if (disp) disp->user_data = user_data;
 }
 
+inline uint32_t lv_display_get_inactive_time(const lv_display_t* disp) {
+    (void)disp;
+    return 0;
+}
+
+inline void lv_display_trigger_activity(lv_display_t* disp) {
+    (void)disp;
+}
+
+
 inline void* lv_display_get_user_data(lv_display_t* disp) {
     return disp ? disp->user_data : nullptr;
 }

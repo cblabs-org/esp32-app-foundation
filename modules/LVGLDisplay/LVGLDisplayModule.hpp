@@ -52,13 +52,47 @@
 #include "screens/BootScreen.hpp"
 #include "screens/ErrorScreen.hpp"
 #include "screens/OTAProgressScreen.hpp"
+#include "ScreensaverController.hpp"
 #include "lvgl.h"
 
 // Forward declarations
 class EventBus;
 class ConfigManager;
 
-// TODO: WO6 adds EventBus subscriptions & screensaver
+#ifndef OTA_PROGRESS_PAYLOAD_DEFINED
+#define OTA_PROGRESS_PAYLOAD_DEFINED
+struct OTAProgressPayload {
+    float progress;       // 0.0 to 1.0 download fraction
+    const char* status;   // Status message (e.g. "Downloading...")
+    bool complete;        // True when OTA cycle is finished
+    bool success;         // True if OTA succeeded (only valid when complete)
+};
+#endif
+
+#ifndef DISPLAY_MESSAGE_PAYLOAD_DEFINED
+#define DISPLAY_MESSAGE_PAYLOAD_DEFINED
+struct DisplayMessagePayload {
+    const char* message;       // Text to display
+    unsigned long durationMs;  // How long to display (0 = until cleared)
+};
+#endif
+
+#ifndef SYSTEM_ERROR_PAYLOAD_DEFINED
+#define SYSTEM_ERROR_PAYLOAD_DEFINED
+struct SystemErrorPayload {
+    const char* title;   // Error title string
+    const char* message; // Error description string
+    int code;            // Numeric error code (optional)
+};
+#endif
+
+namespace LVGLDisplayEvents {
+    constexpr const char* DISPLAY_SLEEP = "display.sleep";
+    constexpr const char* DISPLAY_WAKE = "display.wake";
+    constexpr const char* DISPLAY_MESSAGE = "display.message";
+    constexpr const char* SYSTEM_ERROR = "system.error";
+}
+
 // TODO: WO7 adds IWebContributor
 // TODO: WO8 adds IMCPContributor
 
@@ -107,7 +141,7 @@ public:
      * @brief Phase 2: Complete framework integration.
      *
      * Ensures Phase 1 bootstrapHardware() has run, calls optional weak ui_init()
-     * hook if defined by application, and exits bootstrap mode.
+     * hook if defined by application, subscribes to EventBus topics, and exits bootstrap mode.
      *
      * @param eventBus Pointer to framework EventBus instance.
      */
@@ -121,7 +155,7 @@ public:
      * @brief Periodic main-loop update tick.
      *
      * Advances LVGL internal tick counter via lv_tick_inc() based on elapsed time,
-     * then executes pending LVGL tasks via lv_timer_handler().
+     * ticks screensaver controller, and executes pending LVGL tasks via lv_timer_handler().
      *
      * @param now Current timestamp in milliseconds.
      */
@@ -202,6 +236,11 @@ public:
      */
     void setBootLogo(const lv_image_dsc_t* bootLogo);
 
+    /**
+     * @brief Reset inactivity timer and wake screensaver if dimmed or blanked.
+     */
+    void resetActivity();
+
     // -------------------------------------------------------------------------
     // IConfigurable — ConfigManager gateway (namespace: "display")
     // -------------------------------------------------------------------------
@@ -238,15 +277,23 @@ public:
     lv_indev_t* getKeypadInput() const { return _keypadInDev; }
     lv_group_t* getGroup() const { return _group; }
     bool isBootstrapMode() const { return _bootstrapMode; }
+    EventBus* getEventBus() const { return _eventBus; }
 
     BootScreen& getBootScreen() { return _builtInBootScreen; }
     ErrorScreen& getErrorScreen() { return _builtInErrorScreen; }
     OTAProgressScreen& getOtaScreen() { return _builtInOtaScreen; }
+    ScreensaverController& getScreensaver() { return _screensaver; }
+    const ScreensaverController& getScreensaver() const { return _screensaver; }
 
 private:
+    static void _onOtaProgress(const char* topic, const void* payload, void* ctx);
+    static void _onDisplayMessage(const char* topic, const void* payload, void* ctx);
+    static void _onSystemError(const char* topic, const void* payload, void* ctx);
+
     ILVGLHardwareAdapter& _adapter;            ///< Injected hardware adapter
     ILVGLSystemScreens*   _screens = nullptr;  ///< Optional system screens provider
     ConfigManager*        _configManager = nullptr; ///< Cached ConfigManager reference
+    EventBus*             _eventBus = nullptr; ///< Framework EventBus reference
 
     lv_display_t* _display = nullptr;          ///< LVGL display instance handle
     lv_indev_t*   _touchInDev = nullptr;       ///< Touch pointer input device
@@ -259,6 +306,8 @@ private:
     void*    _buf2 = nullptr;                  ///< Secondary draw buffer allocation
     size_t   _bufSize = 0;                     ///< Allocated size per draw buffer in bytes
     bool     _bootstrapMode = false;           ///< True while in Phase 1 bootstrap mode
+    bool     _pauseRendering = false;          ///< Pause rendering flag during OTA flash writes
+    uint32_t _lastIndevInactiveMs = 0;         ///< Inactivity tracking timestamp
 
     // --- System Screens & Assets ---
     const lv_image_dsc_t* _bootLogo = nullptr;
@@ -269,9 +318,11 @@ private:
     bool                  _inSystemScreen = false;
 
     // --- Configuration state ---
-    uint8_t       _brightness = 255;          ///< Backlight brightness level (0–255)
-    uint16_t      _rotation = 0;              ///< Display rotation in degrees (0, 90, 180, 270)
-    bool          _screensaverEnabled = true; ///< Inactivity screensaver enabled flag
-    unsigned long _dimTimeoutMs = 150000;     ///< Inactivity dim timeout in ms (default 2.5 min)
-    unsigned long _blankTimeoutMs = 300000;   ///< Inactivity blank timeout in ms (default 5 min)
+    uint8_t               _brightness = 255;          ///< Backlight brightness level (0–255)
+    uint16_t              _rotation = 0;              ///< Display rotation in degrees (0, 90, 180, 270)
+    bool                  _screensaverEnabled = true; ///< Inactivity screensaver enabled flag
+    unsigned long         _dimTimeoutMs = 150000;     ///< Inactivity dim timeout in ms (default 2.5 min)
+    unsigned long         _blankTimeoutMs = 300000;   ///< Inactivity blank timeout in ms (default 5 min)
+    ScreensaverController _screensaver;               ///< Screensaver state machine
 };
+

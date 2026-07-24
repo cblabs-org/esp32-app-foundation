@@ -34,18 +34,31 @@ Wire the module to the EventBus (subscribe to system events, publish sleep/wake)
 `platformio` MCP tools (`build_project`, `run_tests`) via `pio-manager` — never raw `pio`. `house-style-docs`. Heed `.agents/rules/` (thread safety, no blocking in tick).
 
 ## Line-Item Instructions
-- [ ] In `begin(EventBus*)`, subscribe to `ota.progress` (→ `showOtaProgress`, optionally pause rendering), `display.message` (→ transient overlay/notification), `system.error` (→ `showError`). Store the EventBus pointer for publishing.
-- [ ] Implement a screensaver controller (new files under `modules/LVGLDisplay/` or a nested class, mirroring `ScreensaverController`): Active → Dimmed (reduce brightness via `_adapter.setBrightness`) → Blanked (brightness 0 / `display.sleep` published), waking on input activity (`display.wake` published). Timeouts come from WO4 config.
-- [ ] Drive the controller from `tick()` (activity check + state transitions) — non-blocking.
-- [ ] Defense-in-depth: on `ota.progress`, pause/limit `lv_timer_handler` heavy work during flash writes per §14.1.
-- [ ] Tests: `test/test_unit/test_lvglDisplay/test_eventbus_integration.cpp` and `test_screensaver.cpp` (mirror U8G2's) — subscriptions react correctly; 3-state transitions at configured timeouts; sleep/wake published; brightness delegated to mock adapter.
+- [x] In `begin(EventBus*)`, subscribe to `ota.progress` (→ `showOtaProgress`, optionally pause rendering), `display.message` (→ transient overlay/notification), `system.error` (→ `showError`). Store the EventBus pointer for publishing.
+- [x] Implement a screensaver controller (new files under `modules/LVGLDisplay/` or a nested class, mirroring `ScreensaverController`): Active → Dimmed (reduce brightness via `_adapter.setBrightness`) → Blanked (brightness 0 / `display.sleep` published), waking on input activity (`display.wake` published). Timeouts come from WO4 config.
+- [x] Drive the controller from `tick()` (activity check + state transitions) — non-blocking.
+- [x] Defense-in-depth: on `ota.progress`, pause/limit `lv_timer_handler` heavy work during flash writes per §14.1.
+- [x] Tests: `test/test_unit/test_lvglDisplay/test_eventbus_integration.cpp` and `test_screensaver.cpp` (mirror U8G2's) — subscriptions react correctly; 3-state transitions at configured timeouts; sleep/wake published; brightness delegated to mock adapter.
 
 ## Verification Requirement
-- [ ] `run_tests` (native) — new tests pass, full suite green.
-- [ ] `build_project` `env:esp32s3nano` green.
+- [x] `run_tests` (native) — new tests pass, full suite green (480/480 native test cases passed).
+- [x] `build_project` `env:esp32s3nano` green (RAM: 56,020 bytes, Flash: 1,346,511 bytes).
 
 ## Completion Protocol
 1. Validate, then **STOP and message the Principal Architect** with results. Surface out-of-boundary findings; do not file issues.
 2. **Do not distill until the human approves.**
 3. On approval: `@distillery` with target `.agents/skills/principal-architect-workspace/pr-47-lvgl-display/wo6-eventbus-screensaver/`.
 4. Append a status update to this `WORKORDER.md` and terminate.
+
+---
+
+## Status Update
+- **Date:** 2026-07-24
+- **Status:** Completed
+- **Summary:**
+  - Implemented 3-state `ScreensaverController` (`Active` → `Dimmed` → `Blanked`) under `modules/LVGLDisplay/ScreensaverController.{hpp,cpp}`.
+  - Integrated EventBus subscriptions (`ota.progress`, `display.message`, `system.error`) and publications (`display.sleep`, `display.wake`) in `LVGLDisplayModule`.
+  - Added OTA flash-write rendering pause defense-in-depth (§14.1).
+  - Added unit test suites `test_screensaver.cpp` and `test_eventbus_integration.cpp` under `test/test_unit/test_lvglDisplay/`.
+  - Verified: Native unit tests 480/480 green; `esp32s3nano` build green.
+
