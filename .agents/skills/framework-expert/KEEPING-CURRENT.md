@@ -9,7 +9,7 @@ Update this skill's references when:
 - New EventBus topics are added by framework modules
 - The boot lifecycle phases change
 - The web portal SPA shell contract changes
-- ADRs are added that establish new architectural rules
+- ADRs are added that establish new architectural rules (see `references/contribution-protocol.md` § ADR Guidance for when ADRs are required)
 - New sub-systems are added (e.g., config, display, event-bus, web-portal)
 
 ## How to Update

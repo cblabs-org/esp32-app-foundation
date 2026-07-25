@@ -84,6 +84,7 @@ predate the formal PA pipeline and are filed retrospectively.
 | [pr-45-ha-retry-backoff](./pr-45-ha-retry-backoff/PROJECT.md) | Issue #34: HA Discovery Retry Backoff (exponential backoff 200ms→5s cap, skip-on-cap, drain stall detection, health signals on EventBus/web API/MCP/portal) | ✅ **COMPLETE** `e5b7978` — WO1 merged, 8 new backoff tests · [distillation](./pr-45-ha-retry-backoff/wo1-backoff-fix/context_bridge.md) | Session 000a3e6b |
 | [pr-46-open-issues-batch](./pr-46-open-issues-batch/PROJECT.md) | Issues #29, #31, #36, #37: Open Issues Batch (child tabs blank, apiFetch error body, PSRAM guard, ArduinoJson docs) | ✅ **COMPLETE** PR [#38](https://github.com/matthewmcneill/esp32-app-foundation/pull/38), 423/423 native + 69/69 web tests | Session 2db00816 |
 | [pr-47-lvgl-display](./pr-47-lvgl-display/PROJECT.md) | LVGL Display Module — generic LVGL v9 colour-TFT module + pluggable `ILVGLHardwareAdapter`, reference `CrowPanel128Adapter` (GC9A01/CST816D/rotary encoder) | 🟡 **PLANNED** — 11-WORKORDER stacked plan fully drafted (D1–D9), 2 framework issues spun off (#39, #40), awaiting user implementation approval | Current Session |
+| [pr-48-contribution-protocol](./pr-48-contribution-protocol/PROJECT.md) | Issue #43: Contribution Protocol for framework-expert skill (contribution-protocol.md, P4-enhancement tier, SKILL.md discovery wiring, CONTRIBUTING.md repoint, manifest reconciliation 57→70) | ✅ **COMPLETE** PR [#44](https://github.com/matthewmcneill/esp32-app-foundation/pull/44) | Session 351c9d2d |
 
 ---
 

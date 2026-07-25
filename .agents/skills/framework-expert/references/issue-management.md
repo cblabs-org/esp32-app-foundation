@@ -36,6 +36,7 @@ applicable attribution/meta labels.
 | `P1-blocker` | Prevents a clean build for any consumer |
 | `P2-correctness` | Breaks a supported workflow or produces silently wrong behaviour |
 | `P3-docs-dx` | Confusing docs, misleading comments, cosmetic build warnings |
+| `P4-enhancement` | New capability or improvement — not a defect |
 
 ### Attribution / meta (apply all that fit)
 
@@ -184,3 +185,11 @@ gh issue close "$NUM" \
   --reason completed \
   --comment "Resolved in commit \`<SHA>\` (merged in PR #M, <date>)."
 ```
+
+---
+
+## Related
+
+- **Contributing a fix or proposing a new capability →** [`contribution-protocol.md`](./contribution-protocol.md)
+- **File an issue when you cannot or should not act; follow the contribution protocol when you can.**
+

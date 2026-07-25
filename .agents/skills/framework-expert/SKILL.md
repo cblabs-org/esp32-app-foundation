@@ -78,6 +78,8 @@ This skill uses a progressive disclosure model. Based on your query, load and re
 | **App Developer Quickstart** (Building a new IoT app) | `guides/app-developer-quickstart.md` |
 | **Module Developer Guide** (Adding a kernel module) | `guides/module-developer-guide.md` |
 | **Compliance Audit** (Systematic codebase review against all principles) | `guides/compliance-audit.md` |
+| **Filing and triaging framework issues** | `references/issue-management.md` |
+| **Contributing changes or proposing new capabilities** | `references/contribution-protocol.md` |
 | **Interface Contracts** (Full API, rules, lifecycle for each interface) | `interfaces/` (One file per interface) |
 | **Architecture & Boot** (Lifecycle, 3-tier model, LittleFS) | `references/architecture.md` |
 | **Registration System** (registerModule, compact-and-lock) | `references/registration.md` |
@@ -170,4 +172,9 @@ guidance on interface contracts, patterns, performance, or embedded safety.
   "framework defect", "upstream issue", "consumer found a bug", "backfill issue",
   "P1-blocker", "P2-correctness", "P3-docs-dx", "found-by", "issue tracker",
   "consumer pointer", "audit pointer", "framework issue template".
-  → Read `references/issue-management.md` for the full process.
+
+- **Contributing & proposals**: "raise a PR", "submit a fix", "contribute to the
+  framework", "open a pull request", "upstream a change", "patch the framework",
+  "propose a feature", "suggest an improvement", "new framework capability",
+  "write an ADR", "architectural decision", "enhancement proposal", "contribution protocol".
+  → Read `references/contribution-protocol.md` for the full process.
