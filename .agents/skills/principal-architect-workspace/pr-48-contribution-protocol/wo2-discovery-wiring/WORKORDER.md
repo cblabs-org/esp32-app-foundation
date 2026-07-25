@@ -26,6 +26,16 @@ Wire the contribution protocol (created in WO1) into the skill's discovery layer
 - Use `view_file` to read existing files before editing.
 - Use `replace_file_content` / `multi_replace_file_content` for edits.
 
+# Status Update
+
+- [x] Update SKILL.md Routing Table
+- [x] Update SKILL.md Trigger Vocabulary
+- [x] Update KEEPING-CURRENT.md
+- [x] Repoint Root CONTRIBUTING.md
+- [x] Refresh skill_manifest.json (reconciled by human user to include all files)
+
+**Completed on 2026-07-25.**
+
 # Context Files to Read First
 
 1. `.agents/skills/framework-expert/SKILL.md` — the file you're editing (routing table + triggers)

@@ -2,7 +2,7 @@
 
 **Issue:** [#43 — No contribution protocol](https://github.com/matthewmcneill/esp32-app-foundation/issues/43)
 **Base branch:** `main`
-**Status:** 🟢 APPROVED — executing WO1
+**Status:** ✅ COMPLETE — both WOs merged, ready for PR submission
 
 ## Objective
 
@@ -21,8 +21,8 @@ consumer wanting to upstream a change has no documented route.
 
 ## Work Order Ledger
 
-- **[ ] [wo1-protocol-doc](wo1-protocol-doc/WORKORDER.md):** Create `references/contribution-protocol.md` (the core deliverable) + add `P4-enhancement` severity tier to `issue-management.md` + cross-link the two documents.
-- **[ ] [wo2-discovery-wiring](wo2-discovery-wiring/WORKORDER.md):** Wire discovery into SKILL.md (routing table + trigger vocabulary) + repoint root `CONTRIBUTING.md` + update `KEEPING-CURRENT.md` ADR guidance + refresh `skill_manifest.json`.
+- **[x] [wo1-protocol-doc](wo1-protocol-doc/WORKORDER.md):** Create `references/contribution-protocol.md` (the core deliverable) + add `P4-enhancement` severity tier to `issue-management.md` + cross-link the two documents. — `1bc78e7`
+- **[x] [wo2-discovery-wiring](wo2-discovery-wiring/WORKORDER.md):** Wire discovery into SKILL.md (routing table + trigger vocabulary) + repoint root `CONTRIBUTING.md` + update `KEEPING-CURRENT.md` ADR guidance + refresh `skill_manifest.json`. — `b5a7ca2`
 
 ## Concurrency Analysis
 
@@ -35,3 +35,4 @@ file WO1 creates). **Serialise: WO1 → WO2.**
 |------|-------|
 | 2026-07-25 | Project created. Decomposition drafted, awaiting user approval. |
 | 2026-07-25 | **User approved decomposition.** Proceeding with WO1 execution. |
+| 2026-07-25 | WO1 complete (`1bc78e7`). WO2 complete (`b5a7ca2`). Manifest reconciled (57→70). Ready for PR submission. |
