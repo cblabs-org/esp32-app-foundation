@@ -10,7 +10,8 @@
  * Description: GoogleTest unit-test suite for the U8G2DisplayModule carousel
  *              engine. Validates runtime collection (add/remove/clear/contains),
  *              visibleBoard state, expired board
- *              eviction, carousel wrap-around, and show() overrides.
+ *              eviction, carousel wrap-around, show() overrides, and the
+ *              canAdvance() bounded-hold defer/force-rotation behaviour.
  *
  * Exported Functions:
  * - (GoogleTest fixtures — discovered automatically by gtest_main)
@@ -27,6 +28,7 @@
 class CarouselMockBoard : public IDisplayBoard {
 public:
     bool expired = false;           ///< Controls isExpired() return value
+    bool advanceAllowed = true;     ///< Controls canAdvance() return value
     int renderCount = 0;            ///< Tracks how many times render() is called
     const char* name = "MockBoard"; ///< Board name for diagnostics
 
@@ -40,10 +42,27 @@ public:
         return expired;
     }
 
+    /** @brief Return the hold state configured by the test. */
+    bool canAdvance() const override {
+        return advanceAllowed;
+    }
+
     /** @brief Return the board name. */
     const char* getBoardName() const override {
         return name;
     }
+};
+
+/**
+ * @brief Minimal IDisplayBoard mock that deliberately does NOT override
+ *        canAdvance(), used to prove the IDisplayBoard base-class default
+ *        (rotates freely) is unaffected by the hold feature.
+ */
+class DefaultAdvanceMockBoard : public IDisplayBoard {
+public:
+    void render(U8G2& /*u8g2*/) override {}
+    bool isExpired() const override { return false; }
+    const char* getBoardName() const override { return "DefaultAdvanceMockBoard"; }
 };
 
 // =============================================================================
@@ -260,4 +279,88 @@ TEST_F(CarouselCollectionTest, Add_Duplicate_IsIgnored) {
 TEST_F(CarouselCollectionTest, Add_Nullptr_IsIgnored) {
     display.carousel.add(nullptr);
     EXPECT_EQ(display.carousel.boardCount(), 0);
+}
+
+// =============================================================================
+// Test Group: canAdvance() bounded hold
+// =============================================================================
+
+class CarouselCanAdvanceTest : public ::testing::Test {
+protected:
+    U8G2DisplayModule display;
+};
+
+/** While the active board's canAdvance() returns false, rotation is deferred. */
+TEST_F(CarouselCanAdvanceTest, Hold_CanAdvanceFalse_DefersRotation) {
+    CarouselMockBoard boardA;
+    CarouselMockBoard boardB;
+    boardA.advanceAllowed = false;
+    display.carousel.add(&boardA);
+    display.carousel.add(&boardB);
+    display.carousel.setInterval(1000);
+
+    display.tick(1000);  // interval elapsed, but boardA holds
+    EXPECT_EQ(display.carousel.currentBoard(), &boardA);
+}
+
+/** Once the held board's canAdvance() returns true, rotation proceeds. */
+TEST_F(CarouselCanAdvanceTest, Hold_Released_Rotates) {
+    CarouselMockBoard boardA;
+    CarouselMockBoard boardB;
+    boardA.advanceAllowed = false;
+    display.carousel.add(&boardA);
+    display.carousel.add(&boardB);
+    display.carousel.setInterval(1000);
+
+    display.tick(1000);  // holds
+    EXPECT_EQ(display.carousel.currentBoard(), &boardA);
+
+    boardA.advanceAllowed = true;
+    display.tick(1500);  // hold released — rotates on next tick
+    EXPECT_EQ(display.carousel.currentBoard(), &boardB);
+}
+
+/** A board that never releases its hold is forced to rotate once _maxHoldMs is exceeded. */
+TEST_F(CarouselCanAdvanceTest, Hold_ExceedsMaxHold_ForcesRotation) {
+    CarouselMockBoard boardA;
+    CarouselMockBoard boardB;
+    boardA.advanceAllowed = false;  // never releases
+    display.carousel.add(&boardA);
+    display.carousel.add(&boardB);
+    display.carousel.setInterval(1000);
+    display.carousel.setMaxHoldMs(500);
+
+    display.tick(1000);  // held for interval only — within bound (<= 1500)
+    EXPECT_EQ(display.carousel.currentBoard(), &boardA);
+
+    display.tick(1600);  // held 1600ms > interval(1000) + maxHold(500) — forced rotation
+    EXPECT_EQ(display.carousel.currentBoard(), &boardB);
+}
+
+/** Expired boards are still evicted from the pool while the active board holds. */
+TEST_F(CarouselCanAdvanceTest, Hold_ExpiredBoardStillEvictedDuringHold) {
+    CarouselMockBoard boardA;  // active, holding
+    CarouselMockBoard boardB;  // will expire
+    boardA.advanceAllowed = false;
+    boardB.expired = true;
+    display.carousel.add(&boardA);
+    display.carousel.add(&boardB);
+    display.carousel.setInterval(1000);
+
+    display.tick(1000);  // boardA holds; boardB must still be evicted
+
+    EXPECT_EQ(display.carousel.boardCount(), 1);
+    EXPECT_EQ(display.carousel.currentBoard(), &boardA);
+}
+
+/** A board that does not override canAdvance() rotates exactly as before. */
+TEST_F(CarouselCanAdvanceTest, DefaultBoard_NoOverride_RotatesNormally) {
+    DefaultAdvanceMockBoard boardA;
+    DefaultAdvanceMockBoard boardB;
+    display.carousel.add(&boardA);
+    display.carousel.add(&boardB);
+    display.carousel.setInterval(1000);
+
+    display.tick(1000);
+    EXPECT_EQ(display.carousel.currentBoard(), &boardB);
 }
