@@ -15,7 +15,8 @@
  * Exported Functions:
  *   - add(), remove(), clear(), contains()
  *   - boardCount(), getBoard(), currentBoard(), activeIndex()
- *   - show(), suspend(), resume(), setInterval(), getInterval(), tick()
+ *   - show(), nextBoard(), previousBoard()
+ *   - suspend(), resume(), setInterval(), getInterval(), tick()
  */
 
 #include "CarouselEngine.hpp"
@@ -125,16 +126,59 @@ int CarouselEngine::activeIndex() const {
 // Rotation control
 // =============================================================================
 
-/** @brief Force-show a specific pool board and reset the rotation timer. */
+/** @brief Force-show a specific pool board and reset the rotation timer.
+ *         Fires lifecycle hooks when the visible board actually changes. */
 void CarouselEngine::show(IDisplayBoard* board, unsigned long currentMs) {
     if (board == nullptr) return;
 
     for (size_t i = 0; i < _pool.size(); ++i) {
         if (_pool[i] == board) {
+            IDisplayBoard* outgoing = currentBoard();
             _activeIndex = static_cast<int>(i);
             _lastRotationMs = currentMs;
+            if (outgoing != board) {
+                if (outgoing != nullptr) outgoing->onDeactivate();
+                board->onActivate();
+            }
             break;
         }
+    }
+}
+
+/**
+ * @brief Advance to the next board (user-initiated, bypasses canAdvance()).
+ *
+ * Fires onDeactivate() on the outgoing board and onActivate() on the incoming
+ * board when the visible board actually changes.  Resets the rotation timer.
+ */
+void CarouselEngine::nextBoard(unsigned long currentMs) {
+    if (_pool.empty()) return;
+    IDisplayBoard* outgoing = currentBoard();
+    _activeIndex = (_activeIndex + 1) % static_cast<int>(_pool.size());
+    _lastRotationMs = currentMs;
+    IDisplayBoard* incoming = currentBoard();
+    if (outgoing != incoming) {
+        if (outgoing != nullptr) outgoing->onDeactivate();
+        if (incoming != nullptr) incoming->onActivate();
+    }
+}
+
+/**
+ * @brief Return to the previous board (user-initiated, bypasses canAdvance()).
+ *
+ * Fires onDeactivate() on the outgoing board and onActivate() on the incoming
+ * board when the visible board actually changes.  Resets the rotation timer.
+ */
+void CarouselEngine::previousBoard(unsigned long currentMs) {
+    if (_pool.empty()) return;
+    IDisplayBoard* outgoing = currentBoard();
+    _activeIndex = (_activeIndex - 1 + static_cast<int>(_pool.size()))
+                   % static_cast<int>(_pool.size());
+    _lastRotationMs = currentMs;
+    IDisplayBoard* incoming = currentBoard();
+    if (outgoing != incoming) {
+        if (outgoing != nullptr) outgoing->onDeactivate();
+        if (incoming != nullptr) incoming->onActivate();
     }
 }
 
@@ -252,6 +296,8 @@ bool CarouselEngine::_evictExpired() {
 void CarouselEngine::_advance() {
     if (_pool.empty()) return;
 
+    IDisplayBoard* outgoing = currentBoard();
+
     bool activeRemoved = _evictExpired();
 
     if (_pool.empty()) return;
@@ -261,5 +307,12 @@ void CarouselEngine::_advance() {
     // into its slot, so advancing would skip it.
     if (!activeRemoved) {
         _activeIndex = (_activeIndex + 1) % _pool.size();
+    }
+
+    // Fire lifecycle hooks if the visible board actually changed
+    IDisplayBoard* incoming = currentBoard();
+    if (outgoing != incoming) {
+        if (outgoing != nullptr) outgoing->onDeactivate();
+        if (incoming != nullptr) incoming->onActivate();
     }
 }

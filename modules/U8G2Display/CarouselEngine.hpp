@@ -45,6 +45,8 @@
  *   - currentBoard(): Return the currently active board
  *   - activeIndex(): Return the index of the active board
  *   - show(): Force-show a specific pool board (reset rotation timer)
+ *   - nextBoard(): Advance to the next board (user-initiated, bypasses hold)
+ *   - previousBoard(): Return to the previous board (user-initiated, bypasses hold)
  *   - suspend(): Pause automatic rotation (timer frozen)
  *   - resume(): Resume automatic rotation from current board
  *   - setInterval(): Set the rotation interval in milliseconds
@@ -137,12 +139,36 @@ public:
     /**
      * @brief Force-show a specific pool board and reset the rotation timer.
      *
-     * If the board is not in the pool, this call is a no-op.
+     * If the board is not in the pool, this call is a no-op.  Fires
+     * onDeactivate() on the outgoing board and onActivate() on the incoming
+     * board when the visible board actually changes.  Bypasses canAdvance().
      *
      * @param board Pointer to the board to show.
      * @param currentMs Current time in milliseconds.
      */
     void show(IDisplayBoard* board, unsigned long currentMs);
+
+    /**
+     * @brief Advance to the next board, bypassing canAdvance() hold.
+     *
+     * Intended for user-initiated navigation (button press, EventBus handler).
+     * Fires onDeactivate()/onActivate() lifecycle hooks and resets the
+     * rotation timer so the full interval elapses before the next auto-advance.
+     *
+     * @param currentMs Current time in milliseconds.
+     */
+    void nextBoard(unsigned long currentMs);
+
+    /**
+     * @brief Return to the previous board, bypassing canAdvance() hold.
+     *
+     * Intended for user-initiated navigation (button press, EventBus handler).
+     * Fires onDeactivate()/onActivate() lifecycle hooks and resets the
+     * rotation timer so the full interval elapses before the next auto-advance.
+     *
+     * @param currentMs Current time in milliseconds.
+     */
+    void previousBoard(unsigned long currentMs);
 
     /**
      * @brief Pause automatic rotation (timer frozen).

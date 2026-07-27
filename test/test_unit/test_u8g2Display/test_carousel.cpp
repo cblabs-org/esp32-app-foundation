@@ -9,9 +9,11 @@
  * Module: test/test_unit/test_u8g2Display/test_carousel.cpp
  * Description: GoogleTest unit-test suite for the U8G2DisplayModule carousel
  *              engine. Validates runtime collection (add/remove/clear/contains),
- *              visibleBoard state, expired board
- *              eviction, carousel wrap-around, show() overrides, and the
- *              canAdvance() bounded-hold defer/force-rotation behaviour.
+ *              visibleBoard state, expired board eviction, carousel wrap-around,
+ *              show() overrides, canAdvance() bounded-hold defer/force-rotation,
+ *              nextBoard()/previousBoard() manual navigation, rotation timing,
+ *              suspend/resume, and lifecycle hook (onActivate/onDeactivate)
+ *              delivery on board transitions.
  *
  * Exported Functions:
  * - (GoogleTest fixtures — discovered automatically by gtest_main)
@@ -30,6 +32,8 @@ public:
     bool expired = false;           ///< Controls isExpired() return value
     bool advanceAllowed = true;     ///< Controls canAdvance() return value
     int renderCount = 0;            ///< Tracks how many times render() is called
+    int activateCount = 0;          ///< Tracks how many times onActivate() is called
+    int deactivateCount = 0;        ///< Tracks how many times onDeactivate() is called
     const char* name = "MockBoard"; ///< Board name for diagnostics
 
     /** @brief Render stub — increments counter. */
@@ -51,6 +55,12 @@ public:
     const char* getBoardName() const override {
         return name;
     }
+
+    /** @brief Track activation lifecycle. */
+    void onActivate() override { activateCount++; }
+
+    /** @brief Track deactivation lifecycle. */
+    void onDeactivate() override { deactivateCount++; }
 };
 
 /**
@@ -363,4 +373,229 @@ TEST_F(CarouselCanAdvanceTest, DefaultBoard_NoOverride_RotatesNormally) {
 
     display.tick(1000);
     EXPECT_EQ(display.carousel.currentBoard(), &boardB);
+}
+
+// =============================================================================
+// Test Group: Rotation timing (pre-existing coverage gap)
+// =============================================================================
+
+class CarouselRotationTimingTest : public ::testing::Test {
+protected:
+    U8G2DisplayModule display;
+};
+
+/** Ticking before interval has elapsed must NOT advance the carousel. */
+TEST_F(CarouselRotationTimingTest, Tick_IntervalNotElapsed_NoRotation) {
+    CarouselMockBoard boardA;
+    CarouselMockBoard boardB;
+    display.carousel.add(&boardA);
+    display.carousel.add(&boardB);
+    display.carousel.setInterval(5000);
+
+    display.tick(4999);  // 1 ms short
+    EXPECT_EQ(display.carousel.currentBoard(), &boardA);
+}
+
+/** Ticking at or past the interval must advance the carousel. */
+TEST_F(CarouselRotationTimingTest, Tick_IntervalElapsed_Rotates) {
+    CarouselMockBoard boardA;
+    CarouselMockBoard boardB;
+    display.carousel.add(&boardA);
+    display.carousel.add(&boardB);
+    display.carousel.setInterval(5000);
+
+    display.tick(5000);  // exactly at interval
+    EXPECT_EQ(display.carousel.currentBoard(), &boardB);
+}
+
+// =============================================================================
+// Test Group: Suspend / Resume (pre-existing coverage gap)
+// =============================================================================
+
+class CarouselSuspendResumeTest : public ::testing::Test {
+protected:
+    U8G2DisplayModule display;
+};
+
+/** suspend() must prevent rotation even when interval has elapsed. */
+TEST_F(CarouselSuspendResumeTest, Suspend_PreventsRotation) {
+    CarouselMockBoard boardA;
+    CarouselMockBoard boardB;
+    display.carousel.add(&boardA);
+    display.carousel.add(&boardB);
+    display.carousel.setInterval(1000);
+    display.carousel.suspend();
+
+    display.tick(5000);  // well past interval
+    EXPECT_EQ(display.carousel.currentBoard(), &boardA);
+}
+
+/** resume() after suspend must allow rotation to proceed. */
+TEST_F(CarouselSuspendResumeTest, Resume_AllowsRotation) {
+    CarouselMockBoard boardA;
+    CarouselMockBoard boardB;
+    display.carousel.add(&boardA);
+    display.carousel.add(&boardB);
+    display.carousel.setInterval(1000);
+    display.carousel.suspend();
+
+    display.tick(2000);  // frozen
+    EXPECT_EQ(display.carousel.currentBoard(), &boardA);
+
+    display.carousel.resume();
+    display.tick(3000);  // resumed, interval elapsed since lastRotation=0
+    EXPECT_EQ(display.carousel.currentBoard(), &boardB);
+}
+
+// =============================================================================
+// Test Group: nextBoard() / previousBoard() manual navigation
+// =============================================================================
+
+class CarouselNavigationTest : public ::testing::Test {
+protected:
+    U8G2DisplayModule display;
+};
+
+/** nextBoard() must advance to the next board. */
+TEST_F(CarouselNavigationTest, NextBoard_AdvancesToNext) {
+    CarouselMockBoard boardA;
+    CarouselMockBoard boardB;
+    display.carousel.add(&boardA);
+    display.carousel.add(&boardB);
+
+    display.carousel.nextBoard(0);
+    EXPECT_EQ(display.carousel.currentBoard(), &boardB);
+}
+
+/** nextBoard() at the last board must wrap to the first. */
+TEST_F(CarouselNavigationTest, NextBoard_WrapsAround) {
+    CarouselMockBoard boardA;
+    CarouselMockBoard boardB;
+    display.carousel.add(&boardA);
+    display.carousel.add(&boardB);
+
+    display.carousel.nextBoard(0);  // → boardB
+    display.carousel.nextBoard(0);  // → boardA (wrap)
+    EXPECT_EQ(display.carousel.currentBoard(), &boardA);
+}
+
+/** previousBoard() must return to the previous board. */
+TEST_F(CarouselNavigationTest, PreviousBoard_ReturnsToPrevious) {
+    CarouselMockBoard boardA;
+    CarouselMockBoard boardB;
+    CarouselMockBoard boardC;
+    display.carousel.add(&boardA);
+    display.carousel.add(&boardB);
+    display.carousel.add(&boardC);
+
+    display.carousel.nextBoard(0);  // → boardB
+    display.carousel.previousBoard(0);  // → boardA
+    EXPECT_EQ(display.carousel.currentBoard(), &boardA);
+}
+
+/** previousBoard() at the first board must wrap to the last. */
+TEST_F(CarouselNavigationTest, PreviousBoard_WrapsAround) {
+    CarouselMockBoard boardA;
+    CarouselMockBoard boardB;
+    CarouselMockBoard boardC;
+    display.carousel.add(&boardA);
+    display.carousel.add(&boardB);
+    display.carousel.add(&boardC);
+
+    display.carousel.previousBoard(0);  // → boardC (wrap)
+    EXPECT_EQ(display.carousel.currentBoard(), &boardC);
+}
+
+/** nextBoard() must bypass a canAdvance() hold on the active board. */
+TEST_F(CarouselNavigationTest, NextBoard_BypassesCanAdvanceHold) {
+    CarouselMockBoard boardA;
+    CarouselMockBoard boardB;
+    boardA.advanceAllowed = false;  // holding
+    display.carousel.add(&boardA);
+    display.carousel.add(&boardB);
+
+    display.carousel.nextBoard(0);  // must still advance
+    EXPECT_EQ(display.carousel.currentBoard(), &boardB);
+}
+
+/** nextBoard() must reset the rotation timer so full interval elapses before next auto-rotation. */
+TEST_F(CarouselNavigationTest, NextBoard_ResetsRotationTimer) {
+    CarouselMockBoard boardA;
+    CarouselMockBoard boardB;
+    CarouselMockBoard boardC;
+    display.carousel.add(&boardA);
+    display.carousel.add(&boardB);
+    display.carousel.add(&boardC);
+    display.carousel.setInterval(1000);
+
+    display.carousel.nextBoard(500);  // manual advance at t=500
+    EXPECT_EQ(display.carousel.currentBoard(), &boardB);
+
+    display.tick(1400);  // only 900ms since manual advance — should NOT auto-rotate
+    EXPECT_EQ(display.carousel.currentBoard(), &boardB);
+
+    display.tick(1500);  // 1000ms since manual advance — should auto-rotate
+    EXPECT_EQ(display.carousel.currentBoard(), &boardC);
+}
+
+// =============================================================================
+// Test Group: Lifecycle hooks (onActivate / onDeactivate)
+// =============================================================================
+
+class CarouselLifecycleTest : public ::testing::Test {
+protected:
+    U8G2DisplayModule display;
+};
+
+/** Auto-rotation via _advance() must fire onDeactivate/onActivate. */
+TEST_F(CarouselLifecycleTest, Advance_CallsOnDeactivateAndOnActivate) {
+    CarouselMockBoard boardA;
+    CarouselMockBoard boardB;
+    display.carousel.add(&boardA);
+    display.carousel.add(&boardB);
+    display.carousel.setInterval(1000);
+
+    display.tick(1000);  // boardA → boardB
+
+    EXPECT_EQ(boardA.deactivateCount, 1);
+    EXPECT_EQ(boardB.activateCount, 1);
+}
+
+/** nextBoard() must fire lifecycle hooks. */
+TEST_F(CarouselLifecycleTest, NextBoard_CallsLifecycleHooks) {
+    CarouselMockBoard boardA;
+    CarouselMockBoard boardB;
+    display.carousel.add(&boardA);
+    display.carousel.add(&boardB);
+
+    display.carousel.nextBoard(0);
+
+    EXPECT_EQ(boardA.deactivateCount, 1);
+    EXPECT_EQ(boardB.activateCount, 1);
+}
+
+/** show() to a different board must fire lifecycle hooks. */
+TEST_F(CarouselLifecycleTest, Show_CallsLifecycleHooks) {
+    CarouselMockBoard boardA;
+    CarouselMockBoard boardB;
+    display.carousel.add(&boardA);
+    display.carousel.add(&boardB);
+
+    display.carousel.show(&boardB, 0);
+
+    EXPECT_EQ(boardA.deactivateCount, 1);
+    EXPECT_EQ(boardB.activateCount, 1);
+}
+
+/** show() with the already-active board must NOT fire lifecycle hooks. */
+TEST_F(CarouselLifecycleTest, Show_SameBoard_NoLifecycleHooks) {
+    CarouselMockBoard boardA;
+    CarouselMockBoard boardB;
+    display.carousel.add(&boardA);
+    display.carousel.add(&boardB);
+
+    display.carousel.show(&boardA, 0);  // already active
+
+    EXPECT_EQ(boardA.activateCount, 0);
+    EXPECT_EQ(boardA.deactivateCount, 0);
 }

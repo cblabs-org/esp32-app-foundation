@@ -8,9 +8,10 @@ The engine exposes a simple API for board management:
 
 - `void add(IDisplayBoard* board)`: Registers a new board to the carousel pool.
 - `bool remove(IDisplayBoard* board)`: Unregisters a board from the pool.
-- `void nextBoard()`: Instantly advances to the next board.
-- `void previousBoard()`: Instantly returns to the previous board.
-- `void pause()`: Halts auto-rotation.
+- `void show(IDisplayBoard* board, unsigned long currentMs)`: Force-shows a specific board and resets the rotation timer. Fires lifecycle hooks.
+- `void nextBoard(unsigned long currentMs)`: Advances to the next board. Bypasses `canAdvance()` hold — intended for user-initiated navigation.
+- `void previousBoard(unsigned long currentMs)`: Returns to the previous board. Bypasses `canAdvance()` hold — intended for user-initiated navigation.
+- `void suspend()`: Halts auto-rotation (timer frozen).
 - `void resume()`: Resumes auto-rotation.
 - `void setMaxHoldMs(unsigned long ms)`: Sets the bounded ceiling for `canAdvance()` defers (default 30 000 ms).
 - `unsigned long getMaxHoldMs() const`: Gets the bounded max-hold ceiling.
