@@ -1,8 +1,8 @@
 {
   "name": "framework-expert",
-  "version": "2.2.1",
+  "version": "2.2.2",
   "created": "2026-06-15",
-  "lastUpdated": "2026-07-25",
+  "lastUpdated": "2026-07-27",
   "sourceDocsVersion": "PR-48",
   "references": [
     "SKILL.md",
