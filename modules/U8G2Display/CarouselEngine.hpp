@@ -20,6 +20,12 @@
  *   elapses the engine advances to the next non-expired board, evicting
  *   any boards whose isExpired() returns true.
  *
+ *   Bounded hold: once the interval elapses, if the active board's
+ *   canAdvance() returns false, rotation is deferred (though eviction still
+ *   runs) and re-checked every tick. The hold is capped at
+ *   getInterval() + getMaxHoldMs(); exceeding it forces rotation with a
+ *   logged warning so a board that never releases cannot wedge the display.
+ *
  *   Suspend / Resume: calling suspend() freezes the rotation timer so the
  *   current board remains visible indefinitely.  resume() re-enables
  *   automatic rotation from the current board.
@@ -39,10 +45,14 @@
  *   - currentBoard(): Return the currently active board
  *   - activeIndex(): Return the index of the active board
  *   - show(): Force-show a specific pool board (reset rotation timer)
+ *   - nextBoard(): Advance to the next board (user-initiated, bypasses hold)
+ *   - previousBoard(): Return to the previous board (user-initiated, bypasses hold)
  *   - suspend(): Pause automatic rotation (timer frozen)
  *   - resume(): Resume automatic rotation from current board
  *   - setInterval(): Set the rotation interval in milliseconds
  *   - getInterval(): Get the rotation interval in milliseconds
+ *   - setMaxHoldMs(): Set the bounded max-hold ceiling for canAdvance() defers
+ *   - getMaxHoldMs(): Get the bounded max-hold ceiling
  *   - tick(): Advance carousel if interval elapsed; call each tick
  */
 
@@ -129,12 +139,36 @@ public:
     /**
      * @brief Force-show a specific pool board and reset the rotation timer.
      *
-     * If the board is not in the pool, this call is a no-op.
+     * If the board is not in the pool, this call is a no-op.  Fires
+     * onDeactivate() on the outgoing board and onActivate() on the incoming
+     * board when the visible board actually changes.  Bypasses canAdvance().
      *
      * @param board Pointer to the board to show.
      * @param currentMs Current time in milliseconds.
      */
     void show(IDisplayBoard* board, unsigned long currentMs);
+
+    /**
+     * @brief Advance to the next board, bypassing canAdvance() hold.
+     *
+     * Intended for user-initiated navigation (button press, EventBus handler).
+     * Fires onDeactivate()/onActivate() lifecycle hooks and resets the
+     * rotation timer so the full interval elapses before the next auto-advance.
+     *
+     * @param currentMs Current time in milliseconds.
+     */
+    void nextBoard(unsigned long currentMs);
+
+    /**
+     * @brief Return to the previous board, bypassing canAdvance() hold.
+     *
+     * Intended for user-initiated navigation (button press, EventBus handler).
+     * Fires onDeactivate()/onActivate() lifecycle hooks and resets the
+     * rotation timer so the full interval elapses before the next auto-advance.
+     *
+     * @param currentMs Current time in milliseconds.
+     */
+    void previousBoard(unsigned long currentMs);
 
     /**
      * @brief Pause automatic rotation (timer frozen).
@@ -165,6 +199,25 @@ public:
     unsigned long getInterval() const;
 
     /**
+     * @brief Set the bounded max-hold ceiling for canAdvance() defers.
+     *
+     * Once the rotation interval elapses, if the active board's canAdvance()
+     * returns false, the engine defers rotation for up to this many
+     * additional milliseconds before forcing rotation anyway (logging a
+     * warning). This guarantees a board that never releases its hold cannot
+     * wedge the display permanently.
+     *
+     * @param ms Maximum additional hold time in milliseconds.
+     */
+    void setMaxHoldMs(unsigned long ms);
+
+    /**
+     * @brief Get the bounded max-hold ceiling for canAdvance() defers.
+     * @return Maximum additional hold time in milliseconds.
+     */
+    unsigned long getMaxHoldMs() const;
+
+    /**
      * @brief Advance carousel if interval elapsed; call each tick.
      * @param currentMs Current time in milliseconds.
      */
@@ -175,10 +228,22 @@ private:
     int _activeIndex = 0;                    ///< Index of the currently rendering board
     unsigned long _lastRotationMs = 0;       ///< Timestamp of last carousel rotation
     unsigned long _intervalMs = 8000;        ///< Rotation interval (default 8 seconds)
+    unsigned long _maxHoldMs = 30000;        ///< Bounded max hold beyond the interval (default 30s)
     bool _suspended = false;                 ///< True when automatic rotation is paused
 
     /**
      * @brief Advance to next non-expired board; removes expired boards from pool.
      */
     void _advance();
+
+    /**
+     * @brief Evict expired boards from the pool, keeping _activeIndex stable.
+     *
+     * Extracted from _advance() so eviction can run independently of
+     * rotation — a canAdvance() hold defers rotation but must not defer
+     * eviction of boards whose isExpired() has become true.
+     *
+     * @return true if the board at _activeIndex was itself evicted.
+     */
+    bool _evictExpired();
 };

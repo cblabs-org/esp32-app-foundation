@@ -15,7 +15,8 @@
  * Exported Functions:
  *   - add(), remove(), clear(), contains()
  *   - boardCount(), getBoard(), currentBoard(), activeIndex()
- *   - show(), suspend(), resume(), setInterval(), getInterval(), tick()
+ *   - show(), nextBoard(), previousBoard()
+ *   - suspend(), resume(), setInterval(), getInterval(), tick()
  */
 
 #include "CarouselEngine.hpp"
@@ -125,16 +126,59 @@ int CarouselEngine::activeIndex() const {
 // Rotation control
 // =============================================================================
 
-/** @brief Force-show a specific pool board and reset the rotation timer. */
+/** @brief Force-show a specific pool board and reset the rotation timer.
+ *         Fires lifecycle hooks when the visible board actually changes. */
 void CarouselEngine::show(IDisplayBoard* board, unsigned long currentMs) {
     if (board == nullptr) return;
 
     for (size_t i = 0; i < _pool.size(); ++i) {
         if (_pool[i] == board) {
+            IDisplayBoard* outgoing = currentBoard();
             _activeIndex = static_cast<int>(i);
             _lastRotationMs = currentMs;
+            if (outgoing != board) {
+                if (outgoing != nullptr) outgoing->onDeactivate();
+                board->onActivate();
+            }
             break;
         }
+    }
+}
+
+/**
+ * @brief Advance to the next board (user-initiated, bypasses canAdvance()).
+ *
+ * Fires onDeactivate() on the outgoing board and onActivate() on the incoming
+ * board when the visible board actually changes.  Resets the rotation timer.
+ */
+void CarouselEngine::nextBoard(unsigned long currentMs) {
+    if (_pool.empty()) return;
+    IDisplayBoard* outgoing = currentBoard();
+    _activeIndex = (_activeIndex + 1) % static_cast<int>(_pool.size());
+    _lastRotationMs = currentMs;
+    IDisplayBoard* incoming = currentBoard();
+    if (outgoing != incoming) {
+        if (outgoing != nullptr) outgoing->onDeactivate();
+        if (incoming != nullptr) incoming->onActivate();
+    }
+}
+
+/**
+ * @brief Return to the previous board (user-initiated, bypasses canAdvance()).
+ *
+ * Fires onDeactivate() on the outgoing board and onActivate() on the incoming
+ * board when the visible board actually changes.  Resets the rotation timer.
+ */
+void CarouselEngine::previousBoard(unsigned long currentMs) {
+    if (_pool.empty()) return;
+    IDisplayBoard* outgoing = currentBoard();
+    _activeIndex = (_activeIndex - 1 + static_cast<int>(_pool.size()))
+                   % static_cast<int>(_pool.size());
+    _lastRotationMs = currentMs;
+    IDisplayBoard* incoming = currentBoard();
+    if (outgoing != incoming) {
+        if (outgoing != nullptr) outgoing->onDeactivate();
+        if (incoming != nullptr) incoming->onActivate();
     }
 }
 
@@ -158,12 +202,45 @@ unsigned long CarouselEngine::getInterval() const {
     return _intervalMs;
 }
 
-/** @brief Advance carousel if interval elapsed; call from the main loop each tick. */
+/** @brief Set the bounded max-hold ceiling for canAdvance() defers. */
+void CarouselEngine::setMaxHoldMs(unsigned long ms) {
+    _maxHoldMs = ms;
+}
+
+/** @brief Get the bounded max-hold ceiling for canAdvance() defers. */
+unsigned long CarouselEngine::getMaxHoldMs() const {
+    return _maxHoldMs;
+}
+
+/**
+ * @brief Advance carousel if interval elapsed; call from the main loop each tick.
+ *
+ * Once the interval elapses, the active board is asked whether it may be
+ * advanced away from via canAdvance(). While it returns false, rotation is
+ * deferred (re-checked every tick) — but expired boards are still evicted,
+ * since a hold must not block eviction. The hold is bounded: once it exceeds
+ * getInterval() + getMaxHoldMs(), rotation is forced anyway and a warning is
+ * logged, so a board that never releases cannot wedge the display.
+ */
 void CarouselEngine::tick(unsigned long currentMs) {
-    if (!_suspended && (currentMs - _lastRotationMs) >= _intervalMs) {
-        _advance();
-        _lastRotationMs = currentMs;
+    if (_suspended) return;
+
+    unsigned long heldMs = currentMs - _lastRotationMs;
+    if (heldMs < _intervalMs) return;
+
+    IDisplayBoard* active = currentBoard();
+    if (active != nullptr && !active->canAdvance()) {
+        if (heldMs <= _intervalMs + _maxHoldMs) {
+            // Bounded hold: defer rotation, but eviction still runs.
+            _evictExpired();
+            return;
+        }
+        ESP_LOGW(TAG, "Board '%s' held past max hold (%lu ms) — forcing rotation",
+                 active->getBoardName(), _maxHoldMs);
     }
+
+    _advance();
+    _lastRotationMs = currentMs;
 }
 
 // =============================================================================
@@ -171,21 +248,16 @@ void CarouselEngine::tick(unsigned long currentMs) {
 // =============================================================================
 
 /**
- * @brief Advance to the next non-expired board; evicts expired boards first.
+ * @brief Evict expired boards from the pool; keeps _activeIndex stable.
  *
  * Walks the pool and erases every board whose isExpired() returns true,
  * adjusting _activeIndex so it continues to reference the same board.
- * If the active board itself was removed, the index now points to the
- * board that slid into its slot and we do NOT advance further — this
- * prevents skipping a board.
+ *
+ * @return true if the board at _activeIndex was itself evicted.
  */
-void CarouselEngine::_advance() {
-    if (_pool.empty()) return;
-
-    // Track whether the board at _activeIndex was evicted
+bool CarouselEngine::_evictExpired() {
     bool activeRemoved = false;
 
-    // Remove expired boards
     for (auto it = _pool.begin(); it != _pool.end(); ) {
         if ((*it)->isExpired()) {
             int removedIndex = static_cast<int>(it - _pool.begin());
@@ -209,13 +281,38 @@ void CarouselEngine::_advance() {
 
     if (_pool.empty()) {
         _activeIndex = 0;
-        return;
     }
+
+    return activeRemoved;
+}
+
+/**
+ * @brief Advance to the next non-expired board; evicts expired boards first.
+ *
+ * If the active board itself was removed, the index now points to the
+ * board that slid into its slot and we do NOT advance further — this
+ * prevents skipping a board.
+ */
+void CarouselEngine::_advance() {
+    if (_pool.empty()) return;
+
+    IDisplayBoard* outgoing = currentBoard();
+
+    bool activeRemoved = _evictExpired();
+
+    if (_pool.empty()) return;
 
     // Only advance if the active board was NOT the one removed.
     // When the active board is evicted the next board has already slid
     // into its slot, so advancing would skip it.
     if (!activeRemoved) {
         _activeIndex = (_activeIndex + 1) % _pool.size();
+    }
+
+    // Fire lifecycle hooks if the visible board actually changed
+    IDisplayBoard* incoming = currentBoard();
+    if (outgoing != incoming) {
+        if (outgoing != nullptr) outgoing->onDeactivate();
+        if (incoming != nullptr) incoming->onActivate();
     }
 }

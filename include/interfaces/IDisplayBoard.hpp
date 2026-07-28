@@ -16,6 +16,7 @@
  * - IDisplayBoard: Abstract base for a U8G2 carousel rendering unit
  *   - render(): Draw a full-screen frame to the U8G2 display buffer
  *   - isExpired(): Return true if this board should be evicted from the carousel
+ *   - canAdvance(): Return false to ask the carousel to defer rotation
  *   - getBoardName(): Human-readable name for logging and diagnostics
  *   - onActivate(): Called when this board becomes the active rendering target
  *   - onDeactivate(): Called when this board is no longer the active rendering target
@@ -71,6 +72,31 @@ public:
      * @return true if this board should be removed from the carousel.
      */
     virtual bool isExpired() const = 0;
+
+    /**
+     * @brief Ask whether the carousel may rotate away from this board right now.
+     *
+     * The CarouselEngine consults this once its rotation interval has elapsed,
+     * before advancing to the next board. Returning `false` defers rotation so
+     * an in-flight scroll, page transition, or multi-frame animation can finish
+     * instead of being truncated mid-frame; the engine re-queries on every
+     * subsequent tick and rotates as soon as this returns `true`.
+     *
+     * Contract:
+     * - This is a **pure query** — implementations MUST NOT perform side
+     *   effects (no mutating board state, no reaching into the carousel).
+     * - The hold is **bounded**: the engine will force rotation once the hold
+     *   exceeds `CarouselEngine::getMaxHoldMs()`, regardless of this return
+     *   value, so a board that never releases cannot wedge the display.
+     * - Eviction via `isExpired()` still runs on every tick even while this
+     *   returns `false` — a hold defers rotation, not eviction.
+     *
+     * Default implementation returns `true` (rotates freely), preserving
+     * existing behaviour for boards that don't override it.
+     *
+     * @return false to defer rotation; true to allow it.
+     */
+    virtual bool canAdvance() const { return true; }
 
     /**
      * @brief Return a human-readable name for logging and diagnostics.
