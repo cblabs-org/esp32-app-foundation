@@ -1,0 +1,65 @@
+# PROJECT.md — pr-mk04: Boot Seam (`IBootReporter`) & Display Extraction
+
+**WO branch stack base:** `pr-mk03-module-composition`
+**Depends on:** pr-mk01 (safe EventBus), pr-mk03 (composition) · **Blocks:** pr-mk05 (sequencing)
+**Design refs:** MK-8, MK-9 · **Coordinate with:** hardware-config program (`BOARD_DISPLAY_KIND`)
+**Status:** 📋 **PLANNED — awaiting human approval**
+
+---
+
+## Architectural Overview
+
+The display is the last thing giving the kernel concrete module knowledge. It is
+special for exactly one reason — the **boot splash must run before the EventBus
+and module lifecycle exist**. This Project adds the narrow pre-bus seam
+(`IBootReporter`), extracts the display to a registered Ring-2 module, and moves
+all *post-boot* display behaviour onto the EventBus — after which
+`Application` mentions neither U8G2 nor "display" nor `#ifdef HAS_DISPLAY`.
+
+### Key Design Decisions
+
+| # | Decision | Rationale |
+|---|---|---|
+| BS-01 | Add `IBootReporter : public IStatusReporter` with one `beginEarly()` hook | Capability-named (not `IDisplayStartup`); formalises the existing two-phase bootstrap (MK-8) |
+| BS-02 | Kernel `begin()` step 0 scans the registry for an `IBootReporter`, calls `beginEarly()`, adopts it as reporter | Zero concrete display knowledge in the kernel; `NullStatusReporter` fallback for headless |
+| BS-03 | Boot reporter runs **inside** the rollback barrier; never blesses/persists-as-good early | A bad-OTA `beginEarly()` bug must bootloop → auto-rollback (MK-8) |
+| BS-04 | Move CONFIGURING/RUNNING display behaviour to `APP_CONFIGURING`/`APP_RUNNING` handlers; **delete** kernel `_display.carousel.*` / `showBase` calls | Post-boot behaviour rides the bus (MK-9); removes `#ifdef HAS_DISPLAY` scatter |
+| BS-05 | Display becomes a `registerModule` module (both U8G2 and LVGL implement `IBootReporter`) | Ring-2 decoupling; both display kinds get the boot splash the LVGL path currently skips |
+| BS-06 | Display enable-flag surface coordinated with `BOARD_DISPLAY_KIND` (hardware-config OQ-2) | Avoid duplicating the display-kind selector; may land the flag bridge here and finalise in hardware-config |
+
+## Strict Boundary Box
+
+- Touch the boot-reporter seam, the display module(s), and the kernel's display
+  coupling **only**. **Do not** extract MCP/OTA/Time (mk05).
+- **Do not** introduce a display *drawing* abstraction (ADR-02 stands — seam is
+  lifecycle-only).
+- Preserve boot-splash timing/behaviour as observed today.
+
+## Tooling Constraints
+
+`platformio` MCP tools; verify `native`, `esp32dev` (U8G2), and
+`crowpanel-128-rotary` (LVGL) all build; hardware boot-splash smoke test on at
+least one display target via the `device-mcp-client` / pio-manager flow.
+
+## Proposed Work Order Ledger _(PA to finalise)_
+
+- **[ ] wo1 — `IBootReporter` seam:** interface + kernel registry-scan boot flow +
+  `NullStatusReporter` fallback. `architect`
+- **[ ] wo2 — display extraction:** register display as a module; implement
+  `IBootReporter` on U8G2 + LVGL; delete `#ifdef HAS_DISPLAY`. `architect`
+- **[ ] wo3 — display-on-EventBus:** move CONFIGURING/RUNNING behaviour to event
+  handlers; delete kernel `_display.*` direct calls. `standard`
+- **[ ] wo4 — flag coordination + tests:** `BOARD_DISPLAY_KIND` bridge; boot-splash
+  smoke tests. `standard`
+
+## Verification
+
+All three envs build; boot splash + CONFIGURING board + wizard behave identically
+on U8G2; LVGL now shows a boot splash; `grep` confirms zero `HAS_DISPLAY` /
+`_display.` references in `Application`.
+
+## Status Log
+
+| Date | Entry |
+|---|---|
+| 2026-07-28 | Drafted. Awaiting human approval. Coordinate display-flag surface with hardware-config PA. |

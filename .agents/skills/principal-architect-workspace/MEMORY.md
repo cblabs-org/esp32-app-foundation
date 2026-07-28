@@ -15,6 +15,25 @@ by Principal Architects under the ESP32 App Foundation program.
 
 ---
 
+## Program: microkernel-refactor (📋 PLANNED — awaiting human approval)
+
+**Program:** `microkernel-refactor`
+**Design authority:** [`docs/microkernel-architecture-design.md`](../../../docs/microkernel-architecture-design.md) (MK-1…MK-18, OQ-MK-1…5)
+**Program docs:** [PROGRAM.md](./microkernel-refactor/PROGRAM.md) · [PROGRAM-PLAN.md](./microkernel-refactor/PROGRAM-PLAN.md)
+**Status:** Decomposition drafted (7 Projects). **No branches, no workers spawned** — plan gate: awaiting human approval of the decomposition.
+
+| Project | Scope | Depends on | Status |
+|---|---|---|---|
+| [pr-mk01-eventbus-concurrency](./microkernel-refactor/pr-mk01-eventbus-concurrency/PROJECT.md) | Thread-safe, alloc-free EventBus (MK-11/12) | main | 📋 Planned |
+| [pr-mk02-kernel-hardening](./microkernel-refactor/pr-mk02-kernel-hardening/PROJECT.md) | Tick-budget contract (MK-10) | main (indep.) | 📋 Planned |
+| [pr-mk03-module-composition](./microkernel-refactor/pr-mk03-module-composition/PROJECT.md) | Optionality + composition; extract HA (MK-2/4–7) | pr-mk01 | 📋 Planned |
+| [pr-mk04-boot-seam-display](./microkernel-refactor/pr-mk04-boot-seam-display/PROJECT.md) | `IBootReporter` + display extraction (MK-8/9) | pr-mk01, pr-mk03 | 📋 Planned |
+| [pr-mk05-extract-optionals](./microkernel-refactor/pr-mk05-extract-optionals/PROJECT.md) | Extract MCP/OTA(off)/Time (MK-2/6) | pr-mk03 | 📋 Planned |
+| [pr-mk06-periodic-helper](./microkernel-refactor/pr-mk06-periodic-helper/PROJECT.md) | `Periodic` helper (MK-13) | main (indep.) | 📋 Planned |
+| [pr-mk07-persistence-partitions](./microkernel-refactor/pr-mk07-persistence-partitions/PROJECT.md) | 4-tier persistence + partitions (MK-14–18) | pr-mk05 + hardware-config | 📋 Planned |
+
+---
+
 ## Genesis Archives
 
 Pre-implementation design sessions that produced the architectural blueprint. These
