@@ -51,6 +51,7 @@
 #include "platform/LogShim.h"
 #include "AppState.hpp"
 #include "FrameworkConfig.hpp"
+#include "utils/Periodic.hpp"
 #include "interfaces/ITickable.hpp"
 #include "interfaces/IConfigurable.hpp"
 #include "interfaces/IDataSource.hpp"
@@ -494,10 +495,9 @@ private:
     std::vector<IConfigGate*>       _configGates;     ///< Configuration prerequisite gates
 
     // Regression gate-check members
-    static constexpr uint32_t GATE_CHECK_INTERVAL_MS = 5000; ///< Throttle interval for runtime gate checks
-    unsigned long _lastGateCheckMs = 0;                      ///< Timestamp of last gate regression check
+    Periodic _gateCheckPeriodic{5000};                       ///< Throttle for runtime gate checks (5s)
     static constexpr uint8_t MAX_CONFIG_GATES = 8;           ///< Maximum number of config gates
-    unsigned long _gateFailedSinceMs[MAX_CONFIG_GATES] = {0}; ///< Per-gate unsatisfied-since timestamps
+    Periodic _gateFailedSinceMs[MAX_CONFIG_GATES];           ///< Per-gate unsatisfied-since timestamps
 
     // Single-pointer registrations (no vector needed)
 
@@ -536,8 +536,7 @@ private:
     TimeConfigGate _timeGate{_timeManager}; ///< Optional timezone config gate (downstream opt-in)
 
     // Heartbeat
-    uint32_t _lastHeartbeatMs = 0;                                    ///< Throttle for periodic heartbeat log
-    static constexpr uint32_t HEARTBEAT_INTERVAL_MS = 30000;          ///< 30-second heartbeat cycle
+    Periodic _heartbeatPeriodic{30000};                              ///< Throttle for periodic heartbeat log (30s)
 
     // -------------------------------------------------------------------------
     // App tab contributor — registers the top-level "App" bottom-nav tab.

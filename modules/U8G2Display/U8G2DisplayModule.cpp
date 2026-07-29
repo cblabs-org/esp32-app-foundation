@@ -137,8 +137,7 @@ void U8G2DisplayModule::bootstrapHardware() {
         const unsigned long kFadeDurationMs = 1000;
         const unsigned long kHoldDurationMs = 2000;
         const int kFadeSteps = 250;
-        const unsigned long kStepMs = 4;
-
+        const Periodic _renderTimer{33};                     ///< Timer for frame rate limiting
         for (int i = 1; i <= kFadeSteps; i++) {
             uint8_t level = static_cast<uint8_t>(
                 (static_cast<unsigned long>(_brightness) * i) / kFadeSteps
@@ -207,7 +206,8 @@ void U8G2DisplayModule::begin(EventBus* eventBus) {
 
     // --- Step 6: Start the inactivity timer
     resetActivity();
-    _lastRenderMs   = millis();
+    _renderTimer.setInterval(_targetFrameIntervalMs);
+    _renderTimer.reset(millis());
 
     ESP_LOGI(TAG, "Display module fully initialized — tick-driven rendering active");
 }
@@ -275,10 +275,9 @@ void U8G2DisplayModule::tick(uint32_t currentMillis) {
 
     // --- 5. Tick + render the visible board (frame-rate limited) ---
     visible->tick(currentMillis);
-    unsigned long now = currentMillis;
-    if ((now - _lastRenderMs) >= _targetFrameIntervalMs) {
+    if (_renderTimer.check(currentMillis)) {
         _renderCurrentBoard();
-        _lastRenderMs = now;
+        _renderTimer.reset(currentMillis);
     }
 }
 

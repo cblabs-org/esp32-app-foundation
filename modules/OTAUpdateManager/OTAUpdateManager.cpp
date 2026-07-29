@@ -70,7 +70,8 @@ static constexpr const char* TAG = "OTAUpdateManager";
 #include "../../lib/OTACerts/OTACerts.h"
 #include "../../lib/OTADownloadEngine/OTADownloadEngine.hpp"
 #include "../../lib/OTADownloadEngine/MbedTLSSignatureVerifier.hpp"
-#include "../../lib/SemVer/SemVer.hpp"
+#include "../../include/utils/Periodic.hpp"
+#include "../../include/interfaces/IWebContributor.hpp"
 #include "../../lib/OTAManifest/OTAManifest.hpp"
 #include "../../modules/MCPServer/MCPToolRegistry.hpp"
 
@@ -171,7 +172,7 @@ void OTAUpdateManager::serializeConfig(JsonObject& section) const {
  *
  * Handles v1→v2 migration by adding the lastCheckedChannel field.
  *
- * @param section   Mutable reference to the JSON config section.
+ * @param section   Mutable reference to the target JSON config section.
  * @param fromVersion The stored schema version being migrated from.
  * @return true on success.
  */
@@ -334,7 +335,7 @@ bool OTAUpdateManager::checkForUpdate() {
     }
 
     _state = OTAState::Checking;
-    _lastCheckMillis = millis();
+    _lastCheckTimer.reset(millis());
     ESP_LOGI(TAG, "Checking for updates — local: %s, channel: '%s'", BUILD_VERSION, _channel);
 
     // Manifest-first check is performed by performUpdateTask(). This method
@@ -470,7 +471,7 @@ void OTAUpdateManager::performUpdateTask() {
     }
 
     // --- Step 1: Fetch, verify, and parse the manifest ---
-    _lastCheckMillis = millis();
+    _lastCheckTimer.reset(millis());
     ESP_LOGI(TAG, "Fetching manifest — channel: '%s', local: %s", _channel, BUILD_VERSION);
 
     OTAManifest manifest{};
@@ -1497,8 +1498,8 @@ void OTAUpdateManager::registerMCPTools(MCPToolRegistry& registry) {
             result["state"]         = otaStateToString(self->_state);
             result["version"]       = BUILD_VERSION;
             result["channel"]       = self->_channel;
-            result["last_check_ms"] = (self->_lastCheckMillis > 0)
-                                     ? static_cast<long>(millis() - self->_lastCheckMillis)
+            result["last_check_ms"] = (_lastCheckTimer.getLastFire() > 0)
+                                     ? static_cast<long>(millis() - _lastCheckTimer.getLastFire())
                                      : -1;
             result["auto_check"]     = self->_autoCheck;
             result["updates_enabled"] = self->_updatesEnabled;

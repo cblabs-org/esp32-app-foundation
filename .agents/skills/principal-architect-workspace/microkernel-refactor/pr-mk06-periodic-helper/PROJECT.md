@@ -40,9 +40,9 @@ pass unchanged.
 
 ## Proposed Work Order Ledger _(PA to finalise)_
 
-- **[ ] wo1 — helper + first cohort:** add `Periodic`; migrate the
+- **[x] [wo1-first-cohort](wo1-first-cohort/WORKORDER.md):** add `Periodic`; migrate the
   `Application`/kernel throttles. `standard`
-- **[ ] wo2 — module migration:** migrate remaining module throttle sites.
+- **[x] [wo2-module-migration](wo2-module-migration/WORKORDER.md):** migrate remaining module throttle sites.
   `mechanical`
 
 ## Verification
@@ -56,3 +56,4 @@ behaviour; site count of raw `millis()`-throttles materially reduced.
 |---|---|
 | 2026-07-28 | Drafted. Awaiting human approval. Independent — safe to land early. |
 | 2026-07-29 | Human approved full autonomous execution of the microkernel-refactor program (all 7 projects). Consumer review complete (3/3 endorsed via RFC #48). Approval recorded in `PROGRAM.md` status log. PA spawn authorised. |
+| 2026-07-29 | WOs 1 and 2 complete. Session distilled into [Context Bridge](./context_bridge.md). |

@@ -125,7 +125,7 @@ private:
 
     uint32_t _retryIntervalMs{0};            ///< Current exponential backoff interval (0 = no active backoff)
     uint32_t _lastRetryAttemptMs{0};         ///< Timestamp of last failed publish attempt
-    uint32_t _drainStartMs{0};              ///< Timestamp when current drain cycle began
+    Periodic _drainTimer;                    ///< Timer for drain cycle monitoring
     bool     _drainStallReported{false};     ///< One-shot flag: stall event already published this drain
     size_t   _entitiesSkipped{0};           ///< Running count of entities skipped in current drain
 

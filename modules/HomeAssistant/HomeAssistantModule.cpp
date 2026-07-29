@@ -224,7 +224,8 @@ void HomeAssistantModule::resetDrainState() {
     _discoveryIndex = 0;
     _retryIntervalMs = 0;
     _lastRetryAttemptMs = 0;
-    _drainStartMs = millis();
+    _drainTimer.reset(millis());
+    _drainTimer.setInterval(DRAIN_STALL_TIMEOUT_MS);
     _drainStallReported = false;
     _entitiesSkipped = 0;
 }
@@ -441,11 +442,10 @@ void HomeAssistantModule::tick(uint32_t currentMillis) {
         }
 
         // --- Drain stall detection (Issue #34) ---
-        if (!_drainStallReported && _drainStartMs > 0
-            && (currentMillis - _drainStartMs) > DRAIN_STALL_TIMEOUT_MS) {
-            ESP_LOGE(TAG, "Discovery drain stalled: %u/%u entities after %lu ms",
-                     (unsigned)_discoveryIndex, (unsigned)_entities.size(),
-                     (unsigned long)(currentMillis - _drainStartMs));
+        if (!_drainStallReported && _drainTimer.getInterval() > 0
+            && _drainTimer.check(currentMillis)) {
+            ESP_LOGW(TAG, "MQTT drain stalled. Active for %lums",
+                     (unsigned long)(currentMillis - _drainTimer.getLastFire()));
             if (_eventBus) _eventBus->publish("ha.discovery.stalled", nullptr);
             _drainStallReported = true;
             _mqttStatusMsg = "Discovery Stalled";
