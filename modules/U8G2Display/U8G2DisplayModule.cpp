@@ -137,7 +137,7 @@ void U8G2DisplayModule::bootstrapHardware() {
         const unsigned long kFadeDurationMs = 1000;
         const unsigned long kHoldDurationMs = 2000;
         const int kFadeSteps = 250;
-        const Periodic _renderTimer{33};                     ///< Timer for frame rate limiting
+        const unsigned long kStepMs = kFadeDurationMs / kFadeSteps;
         for (int i = 1; i <= kFadeSteps; i++) {
             uint8_t level = static_cast<uint8_t>(
                 (static_cast<unsigned long>(_brightness) * i) / kFadeSteps

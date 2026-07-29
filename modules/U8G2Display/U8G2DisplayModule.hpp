@@ -95,6 +95,7 @@
 #include "boards/ScreensaverBoard.hpp"
 #include "boards/ConfiguringStatusBoard.hpp"
 #include "../../include/types/DisplayInfo.hpp"
+#include "../../include/utils/Periodic.hpp"
 
 // --- Hardware-only includes (excluded from native GoogleTest builds) ---
 #include <U8g2lib.h>
