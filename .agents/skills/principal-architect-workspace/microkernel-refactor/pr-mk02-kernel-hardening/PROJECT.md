@@ -39,9 +39,9 @@ is absent from the release binary (no size/latency regression).
 
 ## Proposed Work Order Ledger _(PA to finalise)_
 
-- **[ ] wo1 — contract clause + docs:** `ITickable` budget clause; update
+- **[ ] [wo1-contract-docs](wo1-contract-docs/WORKORDER.md):** `ITickable` budget clause; update
   `creating-a-module.md` / performance guide. `mechanical`
-- **[ ] wo2 — debug instrumentation:** guarded tick-duration timing in the
+- **[ ] [wo2-debug-instrumentation](wo2-debug-instrumentation/WORKORDER.md):** guarded tick-duration timing in the
   dispatch loop. `standard`
 
 ## Verification
