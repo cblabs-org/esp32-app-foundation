@@ -4,9 +4,12 @@ int mock_mqtt_publish_return_value = 0;
 #include <gtest/gtest.h>
 #include <ArduinoJson.h>
 
+#ifdef WITH_HOMEASSISTANT
+
 #define private public
 #include "../../../modules/HomeAssistant/HomeAssistantModule.hpp"
 #undef private
+
 
 #include "../../../modules/HomeAssistant/entities/HaSensor.hpp"
 #include "../../../modules/HomeAssistant/entities/HaSwitch.hpp"
@@ -261,7 +264,10 @@ TEST_F(HomeAssistantBackoffTest, RepublishAfterDrainDoesNotFalseStall) {
     EXPECT_EQ(ha._entitiesSkipped, 0);
 }
 
+#endif // WITH_HOMEASSISTANT
+
 int main(int argc, char **argv) {
+
     ::testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();
 }

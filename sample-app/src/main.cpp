@@ -20,6 +20,11 @@
 #include "WeatherModule.hpp"
 #include "WeatherBoard.hpp"
 
+#ifdef WITH_HOMEASSISTANT
+#include "HomeAssistantModule.hpp"
+static HomeAssistantModule haModule;
+#endif
+
 // ADR-16: File-scope static instances avoid stack-based corruption.
 // All module instances must be declared at file scope before setup().
 Application app;
@@ -51,6 +56,15 @@ void setup() {
     // registerModule() auto-detects IConfigGate — no separate registration needed
     app.registerModule(&weatherModule);
 
+#ifdef WITH_HOMEASSISTANT
+    haModule.setKeyManager(&app.getKeyManager());
+    haModule.setEventBus(&app.getEventBus());
+    haModule.setConfigManager(&app.getConfigManager());
+    haModule.setAppName(app.getAppName());
+    haModule.setAppVersion(BUILD_VERSION);
+    app.registerModule(&haModule);
+#endif
+
     // Prepare Framework config — OTA
     // TODO: Set up OTA for your app:
     //   1. Create a releases repo (e.g. your-org/weather-station-releases)
@@ -76,13 +90,12 @@ void setup() {
     // Uses static function pointer (not lambda) per framework convention (GRAVE-05).
     weatherBoard.wireEventBus(app.getEventBus());
 
-    // Begin framework — this allocates framework-owned modules like
-    // HomeAssistantModule on the heap. Must happen before HA wiring.
+    // Begin framework
     app.begin(config);
 
-    // Post-begin wiring: HomeAssistantModule is only available after app.begin()
-    // allocated it (it's a heap-owned pointer, nullptr before begin).
-    weatherModule.wireHomeAssistant(app.getHomeAssistant());
+#ifdef WITH_HOMEASSISTANT
+    weatherModule.wireHomeAssistant(haModule);
+#endif
 }
 
 /**

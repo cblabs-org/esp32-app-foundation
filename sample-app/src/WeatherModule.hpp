@@ -95,12 +95,10 @@
 
 #include "AppFoundation.h"
 
-// F06: HomeAssistantModule is NOT re-exported by AppFoundation.h —
-// Application.hpp only forward-declares it (using native test stubs).
-// Direct include is required here for the HomeAssistantModule* member
-// and HaSensor value-member types.
-#include "HomeAssistantModule.hpp"
-#include "entities/HaSensor.hpp"
+#ifdef WITH_HOMEASSISTANT
+#include "modules/HomeAssistant/HomeAssistantModule.hpp"
+#include "modules/HomeAssistant/entities/HaSensor.hpp"
+#endif
 
 #include <atomic>
 #include <string>
@@ -126,7 +124,9 @@ class WeatherModule : public ITickable,
                       , public JsonListener
                       {
 private:
+#ifdef WITH_HOMEASSISTANT
     HomeAssistantModule* _ha = nullptr;       ///< Home Assistant module for entity publishing
+#endif
     KeyManager* _keyManager = nullptr;        ///< Secure credential storage (API keys)
     EventBus* _eventBus = nullptr;            ///< Pub/sub event bus for "weather.updated" events
     ConfigManager* _configManager = nullptr;  ///< Persisted config load/save via LittleFS
@@ -138,10 +138,12 @@ private:
 
     std::string _units = "metric";            ///< Temperature units: "metric" (°C) or "imperial" (°F)
 
+#ifdef WITH_HOMEASSISTANT
     // H2: Static member allocation — no bare new
     HaSensor _tempSensor{"weather_temp", "Temperature"};   ///< HA sensor entity for temperature
     HaSensor _windSensor{"weather_wind", "Wind Speed"};    ///< HA sensor entity for wind speed
     HaSensor _condSensor{"weather_condition", "Condition"};///< HA sensor entity for condition text
+#endif
 
     // H3: Thread-safe data exchange between fetchUpdate() task and main task.
     // Temperature and wind are simple floats — use std::atomic for lock-free
@@ -216,7 +218,10 @@ public:
      *
      * @param ha  Reference to the initialised HomeAssistantModule.
      */
+#ifdef WITH_HOMEASSISTANT
     void wireHomeAssistant(HomeAssistantModule& ha);
+#endif
+
 
     // --- Data Accessors (H3: Thread-safe getters) ---
 

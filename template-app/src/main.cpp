@@ -20,6 +20,11 @@
 #include <Arduino.h>
 #include "MyApp.hpp"
 
+#ifdef WITH_HOMEASSISTANT
+#include "HomeAssistantModule.hpp"
+static HomeAssistantModule haModule;
+#endif
+
 Application app;   ///< Framework hub instance
 MyApp myApp;       ///< Application module instance
 
@@ -39,6 +44,15 @@ void setup() {
 
     // Register — compile-time introspection detects all 5 interfaces
     app.registerModule(&myApp);
+
+#ifdef WITH_HOMEASSISTANT
+    haModule.setKeyManager(&app.getKeyManager());
+    haModule.setEventBus(&app.getEventBus());
+    haModule.setConfigManager(&app.getConfigManager());
+    haModule.setAppName(app.getAppName());
+    haModule.setAppVersion(BUILD_VERSION);
+    app.registerModule(&haModule);
+#endif
 
     // Begin framework — OTA is disabled by default in this template.
     // To enable OTA updates for your app:

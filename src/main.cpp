@@ -27,6 +27,11 @@
 // ---------------------------------------------------------------------------
 static Application app;  ///< Single framework hub instance
 
+#ifdef WITH_HOMEASSISTANT
+#include "HomeAssistantModule.hpp"
+static HomeAssistantModule haModule;
+#endif
+
 #ifdef HAS_LVGL_DISPLAY
 #include "LVGLDisplayModule.hpp"
 #include "CrowPanel128Adapter.hpp"
@@ -52,6 +57,15 @@ void setup() {
     // App names its hostname default — WiFiManager owns the persisted value
     // and falls back to this on factory reset (resetConfig()).
     app.getWifiManager().setDefaultHostname("esp32-foundation");
+
+#ifdef WITH_HOMEASSISTANT
+    haModule.setKeyManager(&app.getKeyManager());
+    haModule.setEventBus(&app.getEventBus());
+    haModule.setConfigManager(&app.getConfigManager());
+    haModule.setAppName(app.getAppName());
+    haModule.setAppVersion(BUILD_VERSION);
+    app.registerModule(&haModule);
+#endif
 
 #ifdef HAS_LVGL_DISPLAY
     app.registerModule(&lvglDisplay);

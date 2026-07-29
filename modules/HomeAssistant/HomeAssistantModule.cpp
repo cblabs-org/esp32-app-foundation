@@ -14,6 +14,9 @@
  *              web portal REST endpoints and MCP tools.
  */
 #include "HomeAssistantModule.hpp"
+
+#ifdef WITH_HOMEASSISTANT
+
 #include <esp_log.h>
 #include <esp_mac.h>
 #include <WiFi.h>
@@ -748,3 +751,5 @@ void HomeAssistantModule::registerMCPTools(MCPToolRegistry& registry) {
             result["error"] = "Entity not found or not commandable";
         }, this, true);
 }
+
+#endif // WITH_HOMEASSISTANT

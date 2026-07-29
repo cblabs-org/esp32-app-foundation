@@ -144,14 +144,6 @@ bool Application::begin(const FrameworkConfig& config) {
     _timeManager.setConfigManager(&_configManager);
     _authManager.begin(&_configManager, &_keyManager);
 
-    // --- Step 7a: HomeAssistant module wiring ---
-    // Wire the framework-owned HA MQTT service. The module ships
-    // with zero default entities — apps add their own via getHomeAssistant().
-    _haModule.setKeyManager(&_keyManager);
-    _haModule.setEventBus(&_eventBus);
-    _haModule.setConfigManager(&_configManager);
-    _haModule.setAppName(getAppName());
-    _haModule.setAppVersion(BUILD_VERSION);
     _otaManager = new (std::nothrow) OTAUpdateManager();
     if (_otaManager == nullptr) {
         ESP_LOGE(TAG, "Failed to allocate OTAUpdateManager");
@@ -169,7 +161,6 @@ bool Application::begin(const FrameworkConfig& config) {
     registerModule(&_mcpServer);          // IConfigurable + IWebContributor
     registerModule(_otaManager);          // ITickable + IConfigurable + IWebContributor + IMCPContributor
     registerModule(&_webServerManager);   // ITickable
-    registerModule(&_haModule);          // ITickable + IConfigurable + IWebContributor + IMCPContributor
     if (_enableDefaultAppTab) {
         registerModule(&_appTabContributor);  // IWebContributor
     }

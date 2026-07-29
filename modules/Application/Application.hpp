@@ -81,8 +81,6 @@
 #include "../U8G2Display/boards/DiagnosticsBoard.hpp"
 #endif
 
-// Home Assistant MQTT integration (hardware only — MQTT client unavailable in native builds)
-#include "../HomeAssistant/HomeAssistantModule.hpp"
 
 // Forward declaration only — OTAUpdateManager.hpp pulls in WiFiClientSecure
 // which causes LDF to discover NetworkClientSecure with missing SSL backend.
@@ -385,15 +383,6 @@ public:
     U8G2DisplayModule& getDisplay();
 #endif
 
-    /**
-     * @brief Get the application's HomeAssistantModule instance.
-     *
-     * Downstream apps can use this to add custom HA entities to the
-     * framework-owned module. The module is dormant until MQTT is configured.
-     *
-     * @return Reference to the HomeAssistantModule.
-     */
-    HomeAssistantModule& getHomeAssistant() { return _haModule; }
 
     // -------------------------------------------------------------------------
     // State Accessors
@@ -564,6 +553,4 @@ private:
     bool _wifiWizardShown = false;                   ///< Guard: WiFi wizard modal pushed this CONFIGURING phase
 #endif
 
-    // Home Assistant integration (hardware only)
-    HomeAssistantModule _haModule;              ///< Framework-owned HA MQTT service
 };

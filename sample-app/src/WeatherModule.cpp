@@ -108,12 +108,15 @@ void WeatherModule::begin(Application& app) {
  *
  * @param ha  Reference to the initialised HomeAssistantModule.
  */
+#ifdef WITH_HOMEASSISTANT
 void WeatherModule::wireHomeAssistant(HomeAssistantModule& ha) {
     _ha = &ha;
     _ha->addEntity(&_tempSensor);
     _ha->addEntity(&_windSensor);
     _ha->addEntity(&_condSensor);
 }
+#endif
+
 
 /**
  * @brief Periodic update hook — intentionally empty.
@@ -837,8 +840,10 @@ void WeatherModule::endDocument() {
         // Publish numeric value as string state to HA sensor
         char buf[16];
         snprintf(buf, sizeof(buf), "%.1f", temp);
+#ifdef WITH_HOMEASSISTANT
         _tempSensor.setState(buf);
         if (_ha) _ha->publishState(&_tempSensor);
+#endif
         updated = true;
     }
     if (_parsedWind[0] != '\0') {
@@ -847,8 +852,10 @@ void WeatherModule::endDocument() {
 
         char buf[16];
         snprintf(buf, sizeof(buf), "%.1f", wind);
+#ifdef WITH_HOMEASSISTANT
         _windSensor.setState(buf);
         if (_ha) _ha->publishState(&_windSensor);
+#endif
         updated = true;
     }
     if (_parsedHumidity[0] != '\0') _humidity.store(std::atoi(_parsedHumidity), std::memory_order_release);
@@ -875,8 +882,10 @@ void WeatherModule::endDocument() {
         }
 
         if (_parsedCond[0] != '\0') {
+#ifdef WITH_HOMEASSISTANT
             _condSensor.setState(_parsedCond);
             if (_ha) _ha->publishState(&_condSensor);
+#endif
         }
         updated = true;
     }
