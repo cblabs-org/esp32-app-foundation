@@ -25,6 +25,8 @@ primitives + Ring-1 Core services; every optional enters through `registerModule
 | EO-04 | `Application` stops owning MCP/OTA/Time as members and stops `#include`-ing them | Ring-2 kernel decoupling (MK-1) |
 | EO-05 | **Confirm OQ-MK-1:** Ring-1 Core (WebServer, Auth, WiFi, Config, Key, Crypto, DataManager, EventBus) remains owned + registered, no flag | Mandatory platform services are not extracted |
 | EO-06 | Handle cross-service wiring the kernel did for these (e.g. OTA↔ConfigManager manifest snapshot, MCP built-in tools needing Time/WiFi) via injection at composition, not kernel ownership | Preserve behaviour without re-coupling |
+| EO-07 | **Expose OTA's event-topic contract (`OTA_PROGRESS` + payload) on the facade, but keep it `WITH_OTA`-gated** (MK-6a) | power-monitor subscribes today via a **deep kernel include** — a coupling defect. Facade access fixes it; the flag-gate keeps an unguarded reference a **clean compile error** (make it legible: "requires `WITH_OTA`"), never a silent no-op. Soft consumers guard with `#ifdef WITH_OTA` |
+| EO-08 | **Guarantee OTA-start→reboot headroom for async event callbacks, or expose a synchronous pre-reboot hook** | Under async dispatch (mk01), power-monitor's `OTA_PROGRESS → energy-flush` subscriber must complete before reboot. Prefer a synchronous pre-reboot hook on OTA |
 
 ## Strict Boundary Box
 
@@ -45,7 +47,9 @@ payoff, MK-6/§8).
 - **[ ] wo1 — extract MCP:** `WITH_MCP`; rewire built-in-tool dependencies at
   composition. `standard`
 - **[ ] wo2 — extract OTA:** `WITH_OTA` (default off); preserve ConfigManifest
-  snapshot wiring + rollback bless. `architect`
+  snapshot wiring + rollback bless; **move `OTA_PROGRESS` topic contract onto the
+  facade, flag-gated with a legible absent-module error (EO-07); add a synchronous
+  pre-reboot hook or documented headroom (EO-08).** `architect`
 - **[ ] wo3 — extract Time:** `WITH_TIME` (default on). `standard`
 - **[ ] wo4 — app templates + tests + size check:** update template/sample apps;
   flag-matrix tests; record flash deltas. `standard`

@@ -4,7 +4,7 @@
 **Tier:** Chief Architect (Tier 1)
 **Design authority:** [`docs/microkernel-architecture-design.md`](../../../../docs/microkernel-architecture-design.md) (decisions `MK-1`…`MK-18`, open questions `OQ-MK-1`…`OQ-MK-5`)
 **Base branch:** `main`
-**Status:** ✅ **APPROVED — decomposition approved, all gating decisions resolved, ready for execution.** Consumer review complete (3/3 endorsed via RFC #48). No branches created yet, no workers spawned.
+**Status:** 🚀 **EXECUTING — PAs spawned for pr-mk01 (critical path), pr-mk02 (independent), pr-mk06 (independent).** Human granted full autonomous execution 2026-07-29.
 
 ---
 
@@ -101,6 +101,7 @@ longer a consumer-unblocking deadline.
 | 2026-07-29 | Consumer RFC #48 reviewed (power-monitor, departures-board, DraytonWiser). Design refinements applied: per-target `config` sizing (MK-18), MK-9 async-ordering contract, MK-6a optional-module-contract-on-facade, OTA pre-reboot hook (EO-08), FW-1 `canAdvance()` carry-forward (BS-07), native sync-stub contract (EB-06); Preset B deferred (no current consumer). **Consumer coordination decided: all downstream consumers wait for program completion — sequencing risk retired, no shim.** |
 | 2026-07-29 | **Pre-flight complete.** `feat/carousel-can-advance` merged to `main`; stashes dropped; design docs + workspace committed (`549843d`); pushed to origin. |
 | 2026-07-29 | **ALL GATING DECISIONS RESOLVED.** OQ-MK-1: Core. OQ-MK-2: 7a (honest `main.cpp`, overrides leaning). OQ-MK-3: `esp_event`. OQ-MK-4: full per-channel golden. OQ-MK-5: per-target sizing (resolved from consumer data). **Decomposition approved. Program status → APPROVED.** |
+| 2026-07-29 | **HUMAN GRANTED FULL AUTONOMOUS EXECUTION.** "You have full approval to proceed autonomously — please record this so sub-agents have the proof." Testing = compile + native test verification; physical device deferred. PAs spawned for pr-mk01 (EventBus, critical path), pr-mk02 (tick budget, independent), pr-mk06 (Periodic, independent). Each PROJECT.md carries the approval record as committed provenance. **Program status → EXECUTING.** |
 
 ## 8. Distillation
 

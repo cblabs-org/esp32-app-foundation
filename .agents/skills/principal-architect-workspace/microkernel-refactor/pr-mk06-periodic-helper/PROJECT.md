@@ -3,7 +3,7 @@
 **WO branch stack base:** `main` (independent side PR)
 **Depends on:** — · **Blocks:** — (land early to reduce rebase churn)
 **Design refs:** MK-13, MK-12 · **Gating decision:** none
-**Status:** 📋 **PLANNED — awaiting human approval**
+**Status:** ✅ **APPROVED — human approved decomposition + full autonomous execution (2026-07-29)**
 
 ---
 
@@ -55,3 +55,4 @@ behaviour; site count of raw `millis()`-throttles materially reduced.
 | Date | Entry |
 |---|---|
 | 2026-07-28 | Drafted. Awaiting human approval. Independent — safe to land early. |
+| 2026-07-29 | Human approved full autonomous execution of the microkernel-refactor program (all 7 projects). Consumer review complete (3/3 endorsed via RFC #48). Approval recorded in `PROGRAM.md` status log. PA spawn authorised. |

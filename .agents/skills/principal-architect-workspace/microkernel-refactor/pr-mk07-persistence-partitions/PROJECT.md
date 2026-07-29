@@ -2,7 +2,7 @@
 
 **WO branch stack base:** `pr-mk05-extract-optionals`
 **Depends on:** pr-mk05 (stable module set) **+ hardware-config program (cross-program)** · **Blocks:** —
-**Design refs:** MK-14, MK-15, MK-16, MK-17, MK-18 · **Gating decisions:** **OQ-MK-4** (per-channel Golden), **OQ-MK-5** (heavy `P` sizing)
+**Design refs:** MK-14, MK-15, MK-16, MK-17, MK-18 · **Gating decisions:** **OQ-MK-4** (per-channel Golden). OQ-MK-5 ✅ resolved (`P` ≈ 10–15 KB). **Preset B implementation deferred** — all three consumers are Preset A (#48); the seam is built, the asset-OTA machinery is a consumer-triggered follow-on
 **Status:** 📋 **PLANNED — awaiting human approval + cross-program coordination**
 
 ---
@@ -22,10 +22,10 @@ with that program's PA.
 |---|---|---|
 | PP-01 | Four tiers: NVS (secrets) / `config` LittleFS partition (`/etc`+`/mod`) / A/B app slots (firmware + compiled-in assets) / disposable `data`/cache | Each matched to data nature (MK-14) |
 | PP-02 | Compiled-in assets in the signed A/B image is the **default** | Inherits rollback + signature verify; portal already does this (MK-16) |
-| PP-03 | Partition layout is a **consumer-selectable preset** (A compiled-in vs B FS-assets-over-OTA) | App developer owns the trade-off; framework ships blessed CSVs (MK-16) |
-| PP-04 | Preset B asset OTA = verify-before-commit (`IOTAVerifier`) + compiled-in fallback | Preserves "unkillable fallback"; no A/B needed for assets (MK-16) |
+| PP-03 | Build the **consumer-selectable preset *seam*** (A compiled-in vs B FS-assets); ship Preset A CSVs now | App developer owns the trade-off; the seam preserves the Preset-B option without building it (MK-16) |
+| PP-04 | **Preset B asset OTA (verify-before-commit + compiled-in fallback) is DEFERRED** — no current consumer (all three are Preset A, #48) | The layout-agnostic seam (PP-05) keeps it addable with no rework; building the asset-OTA machinery now = speculative mechanism. **Trigger:** a consumer's compiled-in assets outgrow the 2× A/B flash cost |
 | PP-05 | Firmware is **layout-agnostic at runtime** — probe partition table, adapt, config-root path abstraction | One image serves every preset (MK-17) |
-| PP-06 | `config` partition sized **1 MB** for worst-case ~5× (Active+Previous+Golden×3 channels) | Immutable layer sized for the future soft feature (MK-18) |
+| PP-06 | `config` partition sized **per-target**: **1 MB** on 16 MB boards, **256 KB** on 4 MB boards | Immutable layer sized for the worst-case soft feature; a fixed 1 MB was rejected as unaffordable on 4 MB esp32dev (departures-board #48). Real `P` ≈ 10–15 KB → 256 KB carries the ~5× peak with headroom (MK-18) |
 | PP-07 | `timezones.json` = re-fetchable cache, not a shipped asset | Disposable tier; device re-pulls (MK-14) |
 | PP-08 | **OQ-MK-4:** align with the per-channel-Golden config lifecycle issue | Sets the multiplier; partition already sized to absorb it |
 
@@ -51,10 +51,12 @@ singleton.
   probe + fallback. `architect`
 - **[ ] wo3 — partition presets:** blessed A/B `partitions.csv` set (coord.
   hardware-config). `standard`
-- **[ ] wo4 — Preset B asset OTA:** verify-before-commit + compiled-in fallback
-  (may defer to a follow-on). `architect`
-- **[ ] wo5 — sizing + lifecycle alignment:** 1 MB `config`; align with
-  per-channel-Golden issue (OQ-MK-4); PowerMonitor `P` check (OQ-MK-5). `standard`
+- **[ ] wo4 — Preset B asset OTA:** ⏸ **DEFERRED — out of this Project's scope**
+  (no current consumer; all three are Preset A, #48). The seam (wo2) keeps it
+  addable later; spin a follow-on Project when the trigger fires. `architect`
+- **[ ] wo5 — sizing + lifecycle alignment:** **per-target `config`** (1 MB on
+  16 MB / 256 KB on 4 MB); align with per-channel-Golden issue (OQ-MK-4).
+  (`P` resolved ≈ 10–15 KB.) `standard`
 
 ## Verification
 

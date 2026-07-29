@@ -26,6 +26,7 @@ all *post-boot* display behaviour onto the EventBus — after which
 | BS-04 | Move CONFIGURING/RUNNING display behaviour to `APP_CONFIGURING`/`APP_RUNNING` handlers; **delete** kernel `_display.carousel.*` / `showBase` calls | Post-boot behaviour rides the bus (MK-9); removes `#ifdef HAS_DISPLAY` scatter |
 | BS-05 | Display becomes a `registerModule` module (both U8G2 and LVGL implement `IBootReporter`) | Ring-2 decoupling; both display kinds get the boot splash the LVGL path currently skips |
 | BS-06 | Display enable-flag surface coordinated with `BOARD_DISPLAY_KIND` (hardware-config OQ-2) | Avoid duplicating the display-kind selector; may land the flag bridge here and finalise in hardware-config |
+| BS-07 | **Preserve `IDisplayBoard::canAdvance()` (FW-1 / #47) through the display rework** | FW-1 (board→engine query) and MK-9 (removes kernel→carousel calls) are orthogonal; **FW-1 should merge first and mk04 must carry `canAdvance()` forward, not drop it** (departures-board consumer review, #48) |
 
 ## Strict Boundary Box
 
@@ -34,6 +35,10 @@ all *post-boot* display behaviour onto the EventBus — after which
 - **Do not** introduce a display *drawing* abstraction (ADR-02 stands — seam is
   lifecycle-only).
 - Preserve boot-splash timing/behaviour as observed today.
+- **Sequencing:** FW-1 (#47, `canAdvance()`) should merge **before** mk04; mk04
+  carries it forward. Add the async transition-ordering caveat (MK-9) to the
+  display's event-handler docs — the bounded post-CONFIGURING carousel lag is
+  accepted; do not reintroduce a kernel→display synchronous call to hide it.
 
 ## Tooling Constraints
 

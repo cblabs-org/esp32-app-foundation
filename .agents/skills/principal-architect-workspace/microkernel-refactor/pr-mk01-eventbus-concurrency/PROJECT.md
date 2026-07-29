@@ -4,7 +4,7 @@
 **Depends on:** — (prerequisite; nothing)
 **Blocks:** pr-mk03 (sequencing), pr-mk04 (display-on-EventBus needs a safe bus)
 **Design refs:** MK-11, MK-12 · **Gating decision:** **OQ-MK-3** (must be resolved before PA kickoff)
-**Status:** 📋 **PLANNED — awaiting human approval**
+**Status:** ✅ **APPROVED — human approved decomposition + full autonomous execution (2026-07-29)**
 
 ---
 
@@ -25,10 +25,11 @@ contract and removes the allocation, **without changing its public interface**
 | # | Decision | Rationale |
 |---|---|---|
 | EB-01 | Keep the `EventBus` interface; change the implementation only | Native GoogleTest build must keep compiling; callers unchanged where possible |
-| EB-02 | **Resolve OQ-MK-3:** back on-target impl with ESP-IDF `esp_event` (preferred) **or** `portMUX` lock + in-place dispatch | `esp_event` is thread-safe, ISR-safe, already linked and used by HomeAssistant — reuse a hardened primitive (MK-12) |
+| EB-02 | **OQ-MK-3 RESOLVED:** back on-target impl with ESP-IDF `esp_event` (delegating to hardened existing libs) | `esp_event` is thread-safe, ISR-safe, already linked and used by HomeAssistant — reuse a hardened primitive (MK-12). All 3 consumers endorsed async dispatch. |
 | EB-03 | Intern topics as hashed `uint32_t`/`const char*` identity | Removes per-publish `std::string` allocation (efficiency mandate) |
 | EB-04 | Publish a written **concurrency contract** (who may publish/subscribe, from which context) | There is none today; the whole IPC premise depends on it |
 | EB-05 | If `esp_event`: document the sync→async dispatch semantic change | Callbacks move to the event-task context; audit subscribers assuming in-caller synchronous dispatch |
+| EB-06 | The **native sync-stub dispatch is a defined, documented contract** | Consumers (departures-board, power-monitor) run native tests over `IDataSource`+bus; the stub's ordering/semantics must be stable and specified, not incidental (#48 meta-review) |
 
 ## Strict Boundary Box (for the PA/workers)
 
@@ -62,3 +63,4 @@ Native suite green; `esp32dev` builds; no new heap allocation per publish
 | Date | Entry |
 |---|---|
 | 2026-07-28 | Drafted. Awaiting human approval + OQ-MK-3 resolution before PA spawn. |
+| 2026-07-29 | **OQ-MK-3 RESOLVED → `esp_event` delegation.** Human approved full autonomous execution of the microkernel-refactor program (all 7 projects). Consumer review complete (3/3 endorsed via RFC #48). Approval recorded in `PROGRAM.md` status log. PA spawn authorised. |
