@@ -42,7 +42,7 @@ mandate in [`PROGRAM-PLAN.md`](./PROGRAM-PLAN.md).
 
 | Project | Scope (MK decisions) | Depends on | Status |
 |---|---|---|---|
-| **[pr-mk01-eventbus-concurrency](./pr-mk01-eventbus-concurrency/PROJECT.md)** | Thread-safe, allocation-free EventBus (MK-11, MK-12) | `main` | 📋 Planned |
+| **[pr-mk01-eventbus-concurrency](./pr-mk01-eventbus-concurrency/PROJECT.md)** | Thread-safe, allocation-free EventBus (MK-11, MK-12) | `main` | ✅ **COMPLETE** — 3 WOs, 491 tests pass, esp32dev builds |
 | **[pr-mk02-kernel-hardening](./pr-mk02-kernel-hardening/PROJECT.md)** | Tick-budget contract + debug instrumentation (MK-10) | `main` (independent) | 📋 Planned |
 | **[pr-mk03-module-composition](./pr-mk03-module-composition/PROJECT.md)** | Optionality axes + composition unit; extract HomeAssistant as proof (MK-2, MK-4–7) | pr-mk01 (sequencing) | 📋 Planned |
 | **[pr-mk04-boot-seam-display](./pr-mk04-boot-seam-display/PROJECT.md)** | `IBootReporter` + display extraction + display-on-EventBus (MK-8, MK-9) | pr-mk01, pr-mk03 | 📋 Planned |
