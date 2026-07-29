@@ -7,20 +7,53 @@
 > build-time facts that surround them).
 
 > [!WARNING]
-> **STATUS: WORK IN PROGRESS — PENDING PRINCIPAL-ARCHITECT SCOPING.**
+> **STATUS: WORK IN PROGRESS — RECONCILED WITH LANDED MICROKERNEL WORK; PENDING PRINCIPAL-ARCHITECT SCOPING.**
 >
 > This document captures architectural decisions reached in design discussion.
-> It is a *complete draft proposal*, not a description of shipped code — nothing
-> here has been built yet. It is **pending decomposition by a `/principal-architect`**
-> into a scoped PR/work-order plan, but **that scoping is not yet authorised** —
-> do not spawn a PA or begin implementation until the user explicitly says so.
+> It is a *complete draft proposal*, not a description of shipped code — the core
+> `board.<id>.h` work here is **not yet built** (`hardware/` does not exist). It is
+> **pending decomposition by a `/principal-architect`** into a scoped PR/work-order
+> plan, but **that scoping is not yet authorised** — do not spawn a PA or begin
+> implementation until the user explicitly says so.
 >
-> One load-bearing question remains open before finalisation: the general
-> **module-optionality** model (see [§7 Open Questions](#7-open-questions), OQ-1),
-> which overlaps with board-level display selection. That question is being worked
-> separately under the **microkernel refactor direction**
-> ([`docs/microkernel-architecture-design.md`](microkernel-architecture-design.md)),
-> and this design should be reconciled against it before PA scoping proceeds.
+> **Blocking dependency now cleared.** The general **module-optionality** question
+> (formerly OQ-1) has been resolved *and shipped* by the microkernel refactor
+> ([`docs/microkernel-architecture-design.md`](microkernel-architecture-design.md),
+> MK-1…MK-18). This document has been reconciled against what actually landed — see
+> [§0 Relationship to the landed microkernel work](#0-relationship-to-the-landed-microkernel-work).
+> The most consequential change: the proposed `BOARD_DISPLAY_KIND` tag is
+> **superseded** by the landed `WITH_DISPLAY_U8G2` / `WITH_DISPLAY_LVGL` availability
+> flags ([HC-6](#hc-6--display-availability-uses-the-landed-with_display_-flags-not-a-bespoke-tag)).
+
+---
+
+## 0. Relationship to the landed microkernel work
+
+The microkernel refactor (MK-1…MK-18) has **shipped** on `feat/microkernel-refactor`.
+It resolved this design's blocking dependency (module optionality) and, in doing
+so, settled several things this document previously left open or proposed
+differently. This section is the reconciliation ledger; the decisions below (§3)
+have been edited to match.
+
+**What MK landed that this design now builds on:**
+
+| Landed (MK) | Effect on this design |
+|---|---|
+| Uniform `WITH_*` availability flags — `WITH_DISPLAY_U8G2`, `WITH_DISPLAY_LVGL`, `WITH_MCP`, `WITH_OTA`, `WITH_TIME`, `WITH_HOMEASSISTANT` (MK-4/5/6) | **Supersedes the proposed `BOARD_DISPLAY_KIND` tag.** Display availability is now expressed exactly like every other optional module. See [HC-6](#hc-6--display-availability-uses-the-landed-with_display_-flags-not-a-bespoke-tag). |
+| Two-axis optionality: Availability (compile flag) × Composition (`registerModule`) (MK-4) | **Resolves OQ-1 and OQ-2.** The enable-flag axis won; there is no separate display-kind enum. |
+| Two *sources* of availability, one composition path — hardware-sourced (board) vs software-policy (app), by the soldering-iron test (MK-5) | Adds a **third lane** to the [HC-8](#hc-8--partitionflash-geometry-stays-toolchain-owned) boundary: module-composition / app-policy flags. |
+| Composition landed as **honest `main.cpp`** with `#ifdef WITH_*` guards (MK-7, option 7a) — no `ModuleComposition` unit | The board contributes its display *pins* and its `WITH_DISPLAY_*` availability; `main.cpp` does the wiring. |
+| `IBootReporter` boot seam + `NullStatusReporter` fallback (MK-8); post-boot display rides EventBus (MK-9) | Reinforces [HC-7](#hc-7--boardnativeh-is-the-null-board): headless / display-absent boots silently for free. |
+| Persistence tiers, partition-preset model (Preset A default), per-target `config` sizing, runtime layout-agnostic mount via **ConfigRoot** (MK-14…MK-18) | Reconciles [HC-10](#hc-10--each-boards-folder-carries-its-own-default-partition-preset) and **strengthens** [HC-8](#hc-8--partitionflash-geometry-stays-toolchain-owned): the firmware already probes partitions at boot, so `board.h` must not encode partition facts. |
+
+**What MK did *not* do — the remaining mandate of this document:**
+
+- The display **pins are still `-DDISPLAY_CS_PIN=…` flags in `platformio.ini`**;
+  MK moved *availability/composition*, not the **pin map**.
+- `hardware/<id>/board.h` as the single authoritative, legible source of
+  compile-time hardware truth ([HC-1](#hc-1--boardidh-is-the-authoritative-source-of-compile-time-hardware-truth)–[HC-5](#hc-5--facade-header--contract-check),
+  [HC-7](#hc-7--boardnativeh-is-the-null-board), [HC-9](#hc-9--pin_unassigned-sentinel-retained-intra-header-not-cross-file))
+  is **unbuilt**. This is the work a PA would scope.
 
 ---
 
@@ -122,6 +155,27 @@ Today `platformio.ini` holds the pin *values*. Under this design it holds only a
 into the header. This deletes the drift-weld (§1.3): with one source per fact,
 there is nothing to reconcile.
 
+**End-state, stated plainly: zero pins remain in `platformio.ini`, and the target
+design contains no cross-file drift detection at all.** A pin exists in exactly
+one place — `board.h`, as a `constexpr` — and our own code reads it there. The
+`static_assert`s retained in [HC-9](#hc-9--pin_unassigned-sentinel-retained-intra-header-not-cross-file)
+are *intra-header* sanity guards (pin-vs-sentinel), **not** a second-copy
+reconciliation. What remains in `.ini` is only *selection* (`BOARD_HEADER`),
+*availability* (`WITH_*`, HC-6), and *toolchain* keys (`board=`, `partitions`,
+`flash_size`, `sdkconfig` — HC-8). None of those are pins. Even the display driver
+*type* (`U8G2_DISPLAY_TYPE`) moves into `board.h` (as a `#define`/`using`), so the
+header is the complete physical description of the board.
+
+**Why single-source is achievable (the one nuance).** It works because every
+current display pin is consumed by *our own wrapper code* (the U8G2 module's
+constructor args, the LVGL adapter) — we control the call site, so a header
+`constexpr` suffices; nothing forces these pins to be preprocessor macros. The
+*only* thing that would break single-source is a third-party library configured
+**exclusively by `-D` build-flag pins** that we do not wrap (e.g. TFT_eSPI's
+`TFT_CS`/`TFT_MOSI` style). No such case exists today. **Rule if one ever arises:
+generate the `-D` from `board.h` at build time (a pre-script), never hand-duplicate
+it** — the header stays the single source; we do not resurrect the weld.
+
 `platformio.ini` legitimately retains **build-system** facts it alone can drive
 (see [HC-8](#hc-8--partitionflash-geometry-stays-toolchain-owned)).
 
@@ -144,7 +198,7 @@ hardware/
   _common/
     sdkconfig.defaults        # shared IDF base — layered UNDER every board
   esp32s3nano/
-    board.h                   # pins, capabilities, display kind  (compiler reads)
+    board.h                   # pins, capabilities, display pin block (compiler reads)
     partitions.csv            # flash geometry                     (toolchain reads)
     sdkconfig.defaults.board  # per-board IDF overlay              (toolchain reads)
   esp32dev/
@@ -196,53 +250,70 @@ then validates it against a **compile-time board contract**:
   default, so we make "which board did this build use?" answerable from the
   build log rather than by reverse-engineering include order.
 
-### HC-6 — Display is capability-gated, not a fixed field set
+### HC-6 — Display availability uses the landed `WITH_DISPLAY_*` flags, not a bespoke tag
 
-The framework already ships **two** peer display subsystems with **disjoint**
-configuration surfaces:
+> [!NOTE]
+> **Superseded-by-MK.** Earlier drafts proposed a `BOARD_DISPLAY_KIND` enum tag.
+> The microkernel refactor instead landed uniform `WITH_*` availability flags for
+> *every* optional module (MK-4/5/6), including the display. `BOARD_DISPLAY_KIND`
+> and `HAS_DISPLAY` were removed (commit *"replace BOARD_DISPLAY_KIND/HAS_DISPLAY
+> with WITH_DISPLAY_U8G2/WITH_DISPLAY_LVGL"*). This design adopts the landed flags.
+
+The framework ships **two** peer display subsystems with **disjoint** pin
+surfaces, and they are mutually exclusive:
 
 | | U8G2Display | LVGLDisplay |
 |---|---|---|
-| Enable flag | `-DHAS_DISPLAY=1` | `-DHAS_LVGL_DISPLAY=1` |
+| Availability flag | `-DWITH_DISPLAY_U8G2` | `-DWITH_DISPLAY_LVGL` |
 | Driver select | `U8G2_DISPLAY_TYPE=…` | `LV_CONF_PATH=…` |
 | Pins | `DISPLAY_CS/DC/SPI_*` (5) | `LCD_SPI_*`, `LCD_CS/DC/RST/BL`, `TOUCH_*`, `ENCODER_*`, `AUX_I2C_*` (14+) |
 
-The `crowpanel-128-rotary` environment even `build_unflags = -DHAS_DISPLAY=1` to
-switch subsystems — the mutual exclusivity is real today.
+The `crowpanel-128-rotary` environment `build_unflags = -DWITH_DISPLAY_U8G2` and
+sets `WITH_DISPLAY_LVGL` — the mutual exclusivity is enforced today.
 
-Therefore a board header **cannot** mandate a fixed display field set (e.g.
-`PIN_DISPLAY_CS`). Instead it declares a **display-kind tag** and provides the
-pin block that kind requires:
+**How this design layers on top of the landed flags:**
 
-```cpp
-#define BOARD_DISPLAY_KIND  DISPLAY_KIND_LVGL   // NONE | U8G2 | LVGL | SIM
-// …followed by the pin block that DISPLAY_KIND_LVGL requires…
-```
-
-- Each **display module owns its own pin contract** (the symbols it reads).
+- **Availability is a `WITH_DISPLAY_*` flag** — the same mechanism as `WITH_MCP`,
+  `WITH_OTA`, etc. There is no separate display-kind enum. The `board.h` header
+  does **not** re-declare a kind; the *presence of the flag* is the selection.
+- **`board.h` supplies the pin block** for whichever display is enabled. Each
+  **display module owns its own pin contract** (the symbols it reads); `board.h`
+  provides the values.
+- **Per MK-5's soldering-iron test, the display flag is a hardware-sourced fact**
+  belonging to the board's configuration — unlike software-policy flags
+  (`WITH_MCP`/`WITH_HOMEASSISTANT`/`WITH_OTA`) which are app choices. Where the
+  board's `WITH_DISPLAY_*` flag physically lives (a per-board build fragment in
+  `hardware/<id>/` vs the env block) is [OQ-2](#7-open-questions).
 - The [HC-5](#hc-5--facade-header--contract-check) contract check is
-  **conditional on `BOARD_DISPLAY_KIND`**: assert the U8G2 symbols only when the
-  kind is U8G2, the LVGL block only when LVGL, nothing when NONE.
-- This keeps faith with **ADR-02**: the tag selects *which native-typed
+  **conditional on the flag**: `#ifdef WITH_DISPLAY_U8G2` → assert the U8G2 pin
+  symbols; `#ifdef WITH_DISPLAY_LVGL` → assert the LVGL block; neither → assert
+  nothing (headless).
+- This keeps faith with **ADR-02**: the flag selects *which native-typed
   pipeline* compiles in; it does not introduce a unified drawing abstraction.
-- "No display" (`DISPLAY_KIND_NONE`) stops being a special case
-  (`HEADLESS_MODE` / `NullDisplayManager`) and becomes just another value of the
-  tag.
-
-> [!NOTE]
-> `BOARD_DISPLAY_KIND` overlaps with the general module-selection question in
-> [§7](#7-open-questions). The relationship between this tag and the
-> `HAS_DISPLAY` / `HAS_LVGL_DISPLAY` enable flags must be settled once the
-> optionality model is decided.
+- **"No display" needs no special macro** — it is simply *neither* `WITH_DISPLAY_*`
+  flag set. Combined with MK-8's `NullStatusReporter`/`IBootReporter` fallback, a
+  headless board boots silently for free (see [HC-7](#hc-7--boardnativeh-is-the-null-board)).
 
 ### HC-7 — `board.native.h` is the "null board"
 
 The host/native build gets a first-class board header that defines every pin as
-`PIN_UNASSIGNED` and `BOARD_DISPLAY_KIND = DISPLAY_KIND_NONE`. This makes the
-board interface **total**: framework code can read `PIN_DISPLAY_CS`,
-`BOARD_DISPLAY_KIND`, etc. *unconditionally* and still compile on the host
-GoogleTest runner — removing `#ifdef NATIVE_BUILD` scatter from consumers. The
-null board is the mechanism, not an afterthought.
+`PIN_UNASSIGNED`, and sets **neither** `WITH_DISPLAY_*` flag (so it is headless by
+construction — [HC-6](#hc-6--display-availability-uses-the-landed-with_display_-flags-not-a-bespoke-tag)).
+This makes the board interface **total**: framework code can read `PIN_DISPLAY_CS`
+and friends *unconditionally* and still compile on the host GoogleTest runner —
+removing `#ifdef NATIVE_BUILD` scatter from consumers. The null board is the
+mechanism, not an afterthought.
+
+This composes cleanly with the landed **MK-8** boot seam: with no display module
+registered, `begin()` finds no `IBootReporter` and the `NullStatusReporter`
+fallback stands — the headless/native path boots silently at zero cost, needing
+no `HEADLESS_MODE` macro.
+
+> [!NOTE]
+> Headless is the native *default*, not a constraint. A native **simulation**
+> build may opt into `WITH_DISPLAY_U8G2` backed by a host framebuffer renderer
+> (see [OQ-5](#7-open-questions)); the null board's `PIN_UNASSIGNED` pins are
+> unaffected because the sim backend never drives real SPI.
 
 ### HC-8 — Partition/flash geometry stays toolchain-owned
 
@@ -253,15 +324,26 @@ compiler. A header cannot drive them.
 
 Absorbing them into `board.h` would therefore **recreate the very drift-weld we
 are removing** — a header-vs-CSV pair reconciled by another assertion. We reject
-that. The boundary is:
+that. Following MK-5, the boundary now has **three lanes**, not two:
 
 - **`board.h`** = compile-time truths the *firmware* reads (pins, capabilities,
-  display kind).
+  display pin block).
 - **`partitions.csv` + `sdkconfig.defaults*`** = build/flash truths the
   *toolchain* reads.
+- **`WITH_*` availability flags + `registerModule` composition** = which modules
+  link in and wire up (MK-4/5). Display's `WITH_DISPLAY_*` is the *hardware-sourced*
+  member of this lane; `WITH_MCP`/`WITH_OTA`/… are the *app-policy* members. This
+  lane is **not** `board.h`'s and must not be folded into it.
 
-Drift between these is mitigated by **co-location** ([HC-4](#hc-4--per-board-directory-hardwareid-co-locating-board-facts)),
-not by false compiler enforcement.
+Drift between the first two lanes is mitigated by **co-location**
+([HC-4](#hc-4--per-board-directory-hardwareid-co-locating-board-facts)), not by
+false compiler enforcement.
+
+**Strengthened by landed MK work.** MK-15/MK-17 shipped a runtime that **probes
+the partition table at boot and adapts** (via the landed `ConfigRoot` utility),
+so one firmware image serves every partition preset. This removes any temptation
+to teach `board.h` about partition geometry: the firmware discovers it at runtime
+rather than being compiled against it.
 
 ### HC-9 — `PIN_UNASSIGNED` sentinel retained (intra-header, not cross-file)
 
@@ -271,21 +353,80 @@ The `PIN_UNASSIGNED = -1` sentinel and `static_assert` guards remain as an
 does not resurrect — the cross-file drift-weld rejected in
 [HC-2](#hc-2--flip-authority-the-header-is-the-source-platformioini-only-selects).
 
-### HC-10 — One partition file per hardware variant; duplicate, do not share
+### HC-10 — Each board's folder carries its own default partition preset
 
 Each `hardware/<id>/` folder carries its **own** `partitions.csv`, even when it
 is byte-identical to another board's. Partition files are **not shared across
-boards.**
+boards** — self-containment over deduplication, consistent with the whole-file
+philosophy of [HC-3](#hc-3--one-file-per-variant-whole-file-override). This
+resolves the earlier cross-folder reach where `esp32s3nano` and
+`crowpanel-128-rotary` referenced the *same* `partitions.esp32s3nano.csv`.
 
-This resolves the earlier observation that `esp32s3nano` and
-`crowpanel-128-rotary` currently reference the *same* `partitions.esp32s3nano.csv`
-(a cross-folder reach keyed to flash class rather than board identity). Rather
-than model a separate "flash-profile" axis, we prefer **self-containment over
-deduplication** — consistent with the whole-file philosophy of
-[HC-3](#hc-3--one-file-per-variant-whole-file-override). The cost (a flash-layout
-change touches N copies) is acceptable because partition layouts change rarely.
-An application may still override a board's `partitions.csv` via the same
-whole-folder override path as `board.h`.
+**Reconciled with the landed partition model (MK-16/MK-18).** MK introduced a
+richer picture than "one file per board":
+
+- **Partition *layout* is a consumer-selectable preset** (Preset A = compiled-in
+  assets, the blessed default; Preset B = FS assets), chosen by *delivery cadence*,
+  and **orthogonal to the board** (MK-16). Preset B has no current consumer and
+  its implementation is deferred.
+- **`config` partition size is per flash-class** — 1 MB on 16 MB targets, 256 KB
+  on 4 MB (MK-18).
+
+This does **not** conflict with HC-10; it *layers* on it. The `hardware/<id>/`
+folder ships the board's **default preset instance** — Preset A, sized for the
+board's flash class per MK-18 — as a concrete, self-contained `partitions.csv`.
+The preset *catalog and policy* live in the microkernel doc (MK-16), not here; the
+board folder simply materialises the right default. An application that needs a
+different preset (e.g. a future Preset B) substitutes its own `partitions.csv` via
+the same whole-folder override path as `board.h`, and the landed runtime probe
+(MK-17 / `ConfigRoot`) adapts without a firmware change.
+
+---
+
+### HC-11 — Downstream apps can define custom boards with zero framework edits
+
+A first-class requirement, not a side-effect: a downstream repo must be able to
+add a board the framework has **never heard of** — someone's custom ESP32 board —
+without editing a single framework source file.
+
+Option A ([OQ-3](#7-open-questions), decided) delivers this because **selection is
+by path, not by a closed enum the framework owns**. There is no
+`enum BoardId { … }` to extend. The facade is generic (`#include BOARD_HEADER`),
+so a downstream author, entirely in their own repo:
+
+1. Writes `hardware/<theirboard>/board.h` (their pin map, satisfying the contract).
+2. Sets `-DBOARD_HEADER=\"hardware/<theirboard>/board.h\"` (+ `-I .`), their
+   `WITH_DISPLAY_*` flag, and their own `board_build.partitions`.
+3. Builds — the framework facade pulls in *their* header.
+
+This is the open/closed principle for boards — the exact analogue of MK-2's
+`registerModule` dogfooding for modules (framework boards use the same door as a
+downstream author's).
+
+**What the framework must ship to guarantee it** (all board-*agnostic*, so they
+need no knowledge of the custom board):
+
+- the **facade** (`board.h`, generic `#include BOARD_HEADER`);
+- the **contract header** (`board_contract.h`) — the ergonomic safety net: it
+  fails with a *clear compile error naming the missing symbol* (e.g.
+  "`WITH_DISPLAY_U8G2` set but `PIN_DISPLAY_CS` undefined"), and checks *symbols*,
+  never board *identity*, so it stays generic;
+- **shared primitives** (`board_pins.h` — `PIN_UNASSIGNED` + helpers) the custom
+  header includes.
+
+All three sit on the framework include dir, already on a consuming app's `-I`.
+
+**Propagation is proven, not hypothetical.** App-env `-D` flags already reach
+framework *library* code today — the current `-DDISPLAY_CS_PIN=…` is set in the
+app env and consumed inside framework `U8G2DisplayModule.cpp`. `BOARD_HEADER`
+rides the same path.
+
+**Boundary caveat (orthogonal).** If the board is *novel silicon* (not custom
+wiring on a known MCU), the author may also need a PlatformIO **board manifest**
+(`boards/<id>.json`) for `board = <id>`. That is standard PlatformIO territory and
+independent of this design: `board.h` owns pins/capabilities/display; the
+PlatformIO board JSON owns MCU/flash/upload. This design neither helps nor blocks
+it.
 
 ---
 
@@ -296,32 +437,40 @@ A board header under this design (details subject to change):
 ```cpp
 // hardware/esp32s3nano/board.h
 #pragma once
-#include "board_kinds.h"   // DISPLAY_KIND_* enum-macros, PIN_UNASSIGNED
+#include "board_pins.h"   // PIN_UNASSIGNED sentinel, shared helpers
 
 // ── Identity & capabilities ────────────────────────────────────────────────
 #define BOARD_NAME          "Waveshare ESP32-S3-Nano"
 constexpr bool BOARD_HAS_PSRAM = true;
 
-// ── Display subsystem ──────────────────────────────────────────────────────
-#define BOARD_DISPLAY_KIND  DISPLAY_KIND_U8G2
+// ── Display pin block ──────────────────────────────────────────────────────
+// Availability is the WITH_DISPLAY_U8G2 flag (HC-6); this header supplies the
+// pins the enabled display module reads. Guarded so the block only compiles for
+// the matching display kind.
+#ifdef WITH_DISPLAY_U8G2
+#define U8G2_DISPLAY_TYPE U8G2_SSD1322_NHD_256X64_F_4W_HW_SPI  // driver type, was a -D flag
 // (ASCII pinout diagram lives here — the legible bring-up reference)
 constexpr int8_t PIN_DISPLAY_CS   = 10;
 constexpr int8_t PIN_DISPLAY_DC   =  9;
 constexpr int8_t PIN_DISPLAY_SCK  = 48;
 constexpr int8_t PIN_DISPLAY_MISO = 47;
 constexpr int8_t PIN_DISPLAY_MOSI = 38;
+#endif
 
 // ── Application peripherals (freeform; app-owned) ──────────────────────────
 // e.g. ADC pod chip-selects, relays, sensor buses …
 ```
 
-And the `platformio.ini` environment collapses toward:
+And the `platformio.ini` environment collapses toward one board selector plus the
+hardware-sourced display flag (see [OQ-2](#7-open-questions) on whether that flag
+moves into a per-board fragment):
 
 ```ini
 [env:esp32s3nano]
 board                  = um_nanos3
 build_flags            = ${env:base_esp32.build_flags}
     -DBOARD_HEADER=\"hardware/esp32s3nano/board.h\"
+    -DWITH_DISPLAY_U8G2                       ; hardware-sourced availability (HC-6/MK-5)
 board_build.partitions = hardware/esp32s3nano/partitions.csv
 ```
 
@@ -359,48 +508,82 @@ considered and set aside in favour of the word the design keeps reaching for.)
 
 ## 7. Open Questions
 
-> [!IMPORTANT]
-> **OQ-1 blocks finalisation of this design.** The user is resolving the general
-> module-optionality model separately; this document should be revisited once it
-> lands.
+> [!NOTE]
+> **OQ-1 is resolved and shipped** by the microkernel refactor; the blocker on
+> this design is cleared. The remaining open questions are internal to the
+> `board.h` design and do not block PA scoping.
 
-- **OQ-1 — General module optionality (blocking).** There is currently no
-  unified way to declare *which optional modules compile in and register* —
-  which display, whether Home Assistant is included, which sensors. Today this is
-  ad-hoc: per-module `-D` enable flags (`HAS_DISPLAY`, `HAS_LVGL_DISPLAY`),
-  `#ifndef NATIVE_BUILD` guards, and manual `registerModule()` calls in
-  `main.cpp`. `BOARD_DISPLAY_KIND` ([HC-6](#hc-6--display-is-capability-gated-not-a-fixed-field-set))
-  is really a *special case* of this larger question. The optionality model needs
-  to be designed before we settle how board headers and module selection
-  interlock. **Deferred to a separate design pass**, being worked under the
-  microkernel refactor direction
-  ([`docs/microkernel-architecture-design.md`](microkernel-architecture-design.md),
-  MK-1…MK-18).
+- **OQ-1 — General module optionality. ✅ RESOLVED (shipped).** The microkernel
+  refactor landed the unified model: one `WITH_*` availability flag per optional
+  module × `registerModule` composition (MK-4/5/6), with two availability
+  *sources* (hardware vs app-policy) feeding one composition path. Display is now
+  a `WITH_DISPLAY_U8G2`/`WITH_DISPLAY_LVGL` flag, mechanically identical to every
+  other optional. See [§0](#0-relationship-to-the-landed-microkernel-work) and
+  [HC-6](#hc-6--display-availability-uses-the-landed-with_display_-flags-not-a-bespoke-tag).
 
-- **OQ-2 — `BOARD_DISPLAY_KIND` vs enable flags.** Should the board header drive
-  `HAS_DISPLAY` / `HAS_LVGL_DISPLAY`, or should those remain independent build
-  toggles? Resolve after OQ-1.
+- **OQ-2 — `BOARD_DISPLAY_KIND` vs enable flags. ✅ RESOLVED.** The enable-flag
+  axis won; `BOARD_DISPLAY_KIND`/`HAS_DISPLAY` were removed in favour of
+  `WITH_DISPLAY_*`. **Residual sub-question (non-blocking):** *where does a board's
+  hardware-sourced `WITH_DISPLAY_*` flag physically live* — a per-board build
+  fragment inside `hardware/<id>/` (co-located with `board.h`, MK-5 clean) vs the
+  `platformio.ini` env block (where it sits today)? Leaning per-board fragment for
+  co-location; confirm during PA scoping.
 
-- **OQ-3 — Override resolution mechanism.** Macro-named path
-  (`-DBOARD_HEADER="…"`, explicit and greppable) vs include-path shadowing
-  (implicit, ordering-sensitive). Currently leaning **macro-named path** for
-  explicitness. Confirm.
+- **OQ-3 — Board selection / override mechanism. ✅ RESOLVED: Option A (macro-named path).**
+  How the facade `board.h` selects a concrete board header, and how an app
+  overrides the framework default (or adds a wholly new board — see
+  [HC-11](#hc-11--downstream-apps-can-define-custom-boards-with-zero-framework-edits)):
 
-- **OQ-4 — Shared bus definitions across variants.** Whole-file duplication
-  ([HC-3](#hc-3--one-file-per-variant-whole-file-override)) is the default for
-  legibility. If duplication becomes painful across many near-identical boards,
-  revisit a *narrow, opt-in* shared-include for bus constants — without
-  reintroducing layered pin override.
+  - **Option A — macro-named path:** facade `#include BOARD_HEADER`; env sets
+    `-DBOARD_HEADER=\"hardware/esp32s3nano/board.h\"`; app overrides by re-pointing
+    the macro.
+  - **Option B — include-path shadowing:** facade `#include "board.h"` (fixed);
+    `-I` search order decides which file wins; app drops its own `board.h` earlier
+    on `-I` (the `FreeRTOSConfig.h` pattern).
 
-- **OQ-5 — Display simulation / WASM backend (`DISPLAY_KIND_SIM`).** A sibling
-  project (`departures-board/tools/layoutsim`) compiled the U8G2 render path to
-  WASM and spooled the framebuffer to a canvas — proving the display *backend* is
-  swappable independently of the physical board. This design reserves a `SIM`
-  value in `BOARD_DISPLAY_KIND` for that, but **the sim itself is explicitly a
-  later layer** and out of scope for the initial board-header work.
+  | | A — macro path | B — `-I` shadow |
+  |---|---|---|
+  | Explicit / greppable | ✅ (in flags + HC-5 echo) | ❌ (buried in `-I` order) |
+  | Footgun-resistant | ✅ named file | ❌ wrong `-I` order → silently wrong board |
+  | Multiple boards coexist | ✅ | ⚠️ one `board.h` per include root |
+  | `#include` syntax | ❌ needs `\"…\"` escaping | ✅ plain |
+  | In-repo precedent | ✅ `LV_CONF_PATH` does exactly this | — |
 
-- **OQ-6 — Migration sequencing.** Order and PR decomposition for moving the
-  three existing environments onto `hardware/<id>/`. Depends on OQ-1/OQ-2.
+  **Decided: Option A.** Consistent with HC-5's anti-silent-fallback thesis
+  (Option B *is* that footgun as the selection mechanism), it mirrors the existing
+  `LV_CONF_PATH=\"…/lv_conf.h\"` pattern already in the repo, and — decisively — it
+  is what makes [HC-11](#hc-11--downstream-apps-can-define-custom-boards-with-zero-framework-edits)
+  (zero-edit downstream custom boards) possible, since selection is by path rather
+  than a closed enum. Sole cost: the `\"…\"` escaping ceremony in `platformio.ini`,
+  already tolerated elsewhere.
+
+- **OQ-4 — Shared bus definitions across variants. ✅ RESOLVED: duplicate.**
+  Start with **full duplication** so every board is a clear, self-contained
+  hardware definition — consistent with the whole-file philosophy of
+  [HC-3](#hc-3--one-file-per-variant-whole-file-override) /
+  [HC-10](#hc-10--each-boards-folder-carries-its-own-default-partition-preset). A
+  *narrow, opt-in* shared-include for bus constants is revisited **only if**
+  duplication later becomes painful across many near-identical boards — never at
+  the cost of reintroducing layered pin override.
+
+- **OQ-5 — Native display simulation (basis for `WITH_DISPLAY_U8G2` on `native`).
+  ⏳ Deferred; path identified.** Reframed: this is **not** a separate
+  `WITH_DISPLAY_SIM` flag. Instead, the sibling `departures-board/tools/layoutsim`
+  work (U8G2 render path compiled for the host, framebuffer spooled to an image)
+  is the **basis for making `WITH_DISPLAY_U8G2` buildable on the `native`
+  environment** for testing and simulation — the same availability flag, backed by
+  a host framebuffer renderer instead of real SPI. Not immediate, but the code
+  exists and could be ported. Consequence: a native *simulation* build opts into
+  `WITH_DISPLAY_U8G2` while board pins stay `PIN_UNASSIGNED`
+  ([HC-7](#hc-7--boardnativeh-is-the-null-board)) — the sim backend never touches
+  the SPI pins, so the null-pin board still holds.
+
+- **OQ-6 — Migration sequencing. ✅ AGREED.** The *remaining* hardware-config work
+  is a **self-contained pin-map migration**: move the display **pin** blocks out of
+  `platformio.ini` into `hardware/<id>/board.h` and stand up the facade + contract
+  check. MK already landed the optionality/composition/partition-runtime layers, so
+  this is no longer entangled with the optionality model. This is the work a PA
+  would decompose.
 
 ---
 
@@ -427,3 +610,7 @@ considered and set aside in favour of the word the design keeps reaching for.)
 | 2026-07-28 | Initial WIP draft. Captures HC-1…HC-9 and OQ-1…OQ-6 from design discussion. Module-optionality (OQ-1) flagged as blocking; deferred pending separate design pass. |
 | 2026-07-28 | Added HC-10 (one partition file per hardware variant — duplicate, do not share). Sharpened HC-4 into the three-class file model (per-board input / shared base / generated output) and gave `sdkconfig.defaults` a `_common/` home. Updated HC-8 boundary and §5 migration notes accordingly. |
 | 2026-07-28 | Marked complete draft, status **PENDING PRINCIPAL-ARCHITECT SCOPING** (not yet authorised). Cross-linked OQ-1 and §8 to the microkernel refactor direction (`docs/microkernel-architecture-design.md`), against which this design must be reconciled before scoping. |
+| 2026-07-29 | **Reconciled with landed microkernel work.** Added §0 reconciliation ledger. HC-6 rewritten: `BOARD_DISPLAY_KIND` **superseded** by the landed `WITH_DISPLAY_U8G2`/`WITH_DISPLAY_LVGL` flags (uniform with all optionals per MK-4/5/6). HC-7 tied to MK-8 `NullStatusReporter` (headless-for-free). HC-8 gains MK-5's third lane (composition/app-policy flags) and MK-15/17 runtime-probe reinforcement. HC-10 reconciled with the MK-16 preset model / MK-18 per-target sizing. §4 illustrative shape and OQ-1…OQ-6 updated: **OQ-1 ✅ resolved+shipped, OQ-2 ✅ resolved** (residual: where the board's `WITH_DISPLAY_*` flag lives). Status: blocker cleared, ready for PA scoping when authorised. |
+| 2026-07-29 | Open-question pass with user. **OQ-4 ✅ resolved (duplicate — self-contained board defs)**; **OQ-6 ✅ agreed (self-contained pin-map migration)**. **OQ-5 reframed**: not a `WITH_DISPLAY_SIM` flag but the basis for building `WITH_DISPLAY_U8G2` on `native` (host-framebuffer renderer, ported from departures-board layoutsim); HC-7 gains a native-sim note. **OQ-3 expanded** with full A/B pros-cons and a recommendation of Option A. |
+| 2026-07-29 | **OQ-3 ✅ decided: Option A (macro-named path).** Added **HC-11** — downstream apps can define wholly custom boards with zero framework edits (path-based selection, no closed board enum; framework ships generic facade + contract + shared primitives; app-env→framework-lib flag propagation proven by today's `-DDISPLAY_CS_PIN`); documents the orthogonal PlatformIO board-JSON boundary. **All open questions now closed** — design ready for PA scoping when authorised. |
+| 2026-07-29 | HC-2 given an explicit **end-state** clarification: zero pins remain in `platformio.ini` and the target design has **no cross-file drift detection** (HC-9 asserts are intra-header sanity, not reconciliation); documented the single third-party-library exception (build-flag-only pins → *generate* the `-D` from `board.h`, never hand-duplicate). Moved `U8G2_DISPLAY_TYPE` into the `board.h` illustrative shape so the header is the complete physical description. |
