@@ -30,9 +30,16 @@
 // ---------------------------------------------------------------------------
 static Application app;  ///< Single framework hub instance
 
+// --- Optional Ring-2 modules (composed explicitly) ---
+
 #ifdef WITH_HOMEASSISTANT
 #include "HomeAssistantModule.hpp"
 static HomeAssistantModule haModule;
+#endif
+
+#ifdef WITH_OTA
+#include "OTAUpdateManager.hpp"
+static OTAUpdateManager otaManager;
 #endif
 
 #ifdef WITH_TIME
@@ -42,12 +49,22 @@ static TimeManager timeManager;
 static TimeConfigGate timeGate{timeManager};
 #endif
 
+#ifdef WITH_MCP
+#include "MCPServer.hpp"
+static MCPServer mcpServer;
+#endif
+
+// --- Display (Ring-2 Optional) ---
 #ifdef WITH_DISPLAY_LVGL
 #include "LVGLDisplayModule.hpp"
 #include "CrowPanel128Adapter.hpp"
-
 static CrowPanel128Adapter displayAdapter;
-static LVGLDisplayModule lvglDisplay(displayAdapter);
+static LVGLDisplayModule displayModule(displayAdapter);
+#elif defined(WITH_DISPLAY_U8G2)
+#include "U8G2DisplayModule.hpp"
+#include "boards/DiagnosticsBoard.hpp"
+static U8G2DisplayModule displayModule;
+static DiagnosticsBoard diagnosticsBoard{256, 64};
 #endif
 
 /**
@@ -68,6 +85,10 @@ void setup() {
     // and falls back to this on factory reset (resetConfig()).
     app.getWifiManager().setDefaultHostname("esp32-foundation");
 
+#ifdef WITH_OTA
+    app.registerModule(&otaManager);
+#endif
+
 #ifdef WITH_TIME
     timeManager.setConfigManager(&app.getConfigManager());
     app.registerModule(&timeManager);
@@ -82,8 +103,14 @@ void setup() {
     app.registerModule(&haModule);
 #endif
 
-#ifdef WITH_DISPLAY_LVGL
-    app.registerModule(&lvglDisplay);
+#if defined(WITH_DISPLAY_U8G2) || defined(WITH_DISPLAY_LVGL)
+    app.registerModule(&displayModule);
+    app.registerModule(displayModule.settingsTabStub());
+    app.registerModule(displayModule.screenshotTabStub());
+#endif
+
+#ifdef WITH_MCP
+    app.registerModule(&mcpServer);
 #endif
 
     if (!app.begin(config)) {
@@ -91,8 +118,34 @@ void setup() {
         app.softReset();
     }
 
+#ifdef WITH_OTA
+    otaManager.begin(app);
+    otaManager.markAppValid();
+#endif
+
 #ifdef WITH_TIME
     timeManager.begin();
+#endif
+
+#ifdef WITH_MCP
+    mcpServer.begin(app.getMcpContributors(), &app.getConfigManager(),
+#ifdef WITH_TIME
+        &timeManager,
+#else
+        nullptr,
+#endif
+        &app.getWifiManager(), &app.getAuthManager());
+#endif
+
+#if defined(WITH_DISPLAY_U8G2) || defined(WITH_DISPLAY_LVGL)
+    displayModule.setConfigManager(&app.getConfigManager());
+#ifdef WITH_DISPLAY_U8G2
+    diagnosticsBoard.configure(&app.getWifiManager());
+    displayModule.carousel.add(&diagnosticsBoard);
+#endif
+#ifdef WITH_MCP
+    mcpServer.setDisplayInfo(displayModule.getDisplayInfo());
+#endif
 #endif
 }
 
