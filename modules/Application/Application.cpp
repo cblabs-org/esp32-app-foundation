@@ -14,9 +14,9 @@
  *              headers. The two-tier vector model is enforced by _compactAndLock().
  *
  *              ConfigManager is now the centralised configuration gateway.
- *              The old _configurables vector and registerConfigurable() are
- *              removed. Modules register with _configManager.registerModule()
- *              and config is loaded via _configManager.beginAll().
+ *              Modules register via registerConfigurable(), which delegates
+ *              to _configManager.registerModule() internally. Config is
+ *              loaded via _configManager.beginAll().
  *
  *              Core domain services (WifiManager, OTAUpdateManager,
  *              TimeManager, KeyManager) are Application-owned members,

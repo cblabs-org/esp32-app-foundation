@@ -20,7 +20,7 @@
  * - (GoogleTest fixtures — discovered automatically by gtest_main)
  */
 
-#ifdef HAS_DISPLAY
+#ifdef WITH_DISPLAY_U8G2
 #include <gtest/gtest.h>
 #include <ArduinoJson.h>
 #include "MCPToolRegistry.hpp"

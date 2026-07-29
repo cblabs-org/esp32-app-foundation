@@ -42,7 +42,7 @@ static TimeManager timeManager;
 static TimeConfigGate timeGate{timeManager};
 #endif
 
-#ifdef HAS_LVGL_DISPLAY
+#ifdef WITH_DISPLAY_LVGL
 #include "LVGLDisplayModule.hpp"
 #include "CrowPanel128Adapter.hpp"
 
@@ -82,7 +82,7 @@ void setup() {
     app.registerModule(&haModule);
 #endif
 
-#ifdef HAS_LVGL_DISPLAY
+#ifdef WITH_DISPLAY_LVGL
     app.registerModule(&lvglDisplay);
 #endif
 
