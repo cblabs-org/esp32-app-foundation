@@ -664,10 +664,6 @@ void Application::_publishConfiguringEvent(bool isRegression) {
  * about AppState. Application drives it.
  */
 void Application::_onEnterConfiguring(bool /*isRegression*/) {
-#ifdef HAS_DISPLAY
-    // _display.carousel.suspend();
-    // _display.showBase(&_display.boards.configuringStatus);
-#endif
 }
 
 /**
@@ -677,12 +673,6 @@ void Application::_onEnterConfiguring(bool /*isRegression*/) {
  * visible layer again, then resumes automatic rotation.
  */
 void Application::_onEnterRunning() {
-#ifdef HAS_DISPLAY
-    // _display.clearModal();
-    // _display.showBase(nullptr);  // clear base → carousel becomes visible
-    // _display.carousel.resume();
-    // _wifiWizardShown = false;    // reset so wizard can show again if device re-enters CONFIGURING
-#endif
 }
 
 // ---------------------------------------------------------------------------

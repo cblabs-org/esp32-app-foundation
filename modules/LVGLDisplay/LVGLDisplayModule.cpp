@@ -18,6 +18,7 @@
 #include "OTAUpdateManager.hpp"
 #include "ConfigManager.hpp"
 #include "MCPToolRegistry.hpp"
+#include "../Application/Application.hpp"
 #include <base64.h>
 #include <cstdio>
 #include <PsychicHttp.h>
@@ -155,6 +156,8 @@ void LVGLDisplayModule::begin(EventBus* eventBus) {
         _eventBus->subscribe(OTAUpdateManagerEvents::OTA_PROGRESS, _onOtaProgress, this);
         _eventBus->subscribe(LVGLDisplayEvents::DISPLAY_MESSAGE, _onDisplayMessage, this);
         _eventBus->subscribe(LVGLDisplayEvents::SYSTEM_ERROR, _onSystemError, this);
+        _eventBus->subscribe(ApplicationEvents::APP_CONFIGURING, _onAppConfiguring, this);
+        _eventBus->subscribe(ApplicationEvents::APP_RUNNING, _onAppRunning, this);
     }
 
     // Sync screensaver settings
@@ -538,6 +541,18 @@ void LVGLDisplayModule::_onSystemError(const char* /*topic*/, const void* payloa
         }
         self->_pendingError.store(true);
     }
+}
+
+void LVGLDisplayModule::_onAppConfiguring(const char* /*topic*/, const void* /*payload*/, void* ctx) {
+    auto* self = static_cast<LVGLDisplayModule*>(ctx);
+    if (self == nullptr) return;
+    ESP_LOGI("LVGLDisplayModule", "App transition → CONFIGURING");
+}
+
+void LVGLDisplayModule::_onAppRunning(const char* /*topic*/, const void* /*payload*/, void* ctx) {
+    auto* self = static_cast<LVGLDisplayModule*>(ctx);
+    if (self == nullptr) return;
+    ESP_LOGI("LVGLDisplayModule", "App transition → RUNNING");
 }
 
 // -----------------------------------------------------------------------------

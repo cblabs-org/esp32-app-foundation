@@ -377,6 +377,8 @@ private:
     static void _onOtaProgress(const char* topic, const void* payload, void* ctx);
     static void _onDisplayMessage(const char* topic, const void* payload, void* ctx);
     static void _onSystemError(const char* topic, const void* payload, void* ctx);
+    static void _onAppConfiguring(const char* topic, const void* payload, void* ctx);
+    static void _onAppRunning(const char* topic, const void* payload, void* ctx);
 
     ILVGLHardwareAdapter& _adapter;            ///< Injected hardware adapter
     ILVGLSystemScreens*   _screens = nullptr;  ///< Optional system screens provider

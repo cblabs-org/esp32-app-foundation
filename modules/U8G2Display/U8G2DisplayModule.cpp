@@ -194,9 +194,11 @@ void U8G2DisplayModule::begin(EventBus* eventBus) {
     // --- Step 2: Subscribe to EventBus topics ---
     // Guarded: getEventBus() requires Application.hpp (unavailable in native)
     if (_eventBus != nullptr) {
-        ESP_LOGI(TAG, "Subscribing to EventBus topics: ota.progress, display.message");
+        ESP_LOGI(TAG, "Subscribing to EventBus topics: ota.progress, display.message, app.configuring, app.running");
         _eventBus->subscribe(OTAUpdateManagerEvents::OTA_PROGRESS, _onOtaProgress, this);
         _eventBus->subscribe(U8G2DisplayEvents::DISPLAY_MESSAGE, _onDisplayMessage, this);
+        _eventBus->subscribe(ApplicationEvents::APP_CONFIGURING, _onAppConfiguring, this);
+        _eventBus->subscribe(ApplicationEvents::APP_RUNNING, _onAppRunning, this);
     }
 
     // --- Step 3: Activate boot splash (skip if bootstrapped — already shown) ---
@@ -1147,6 +1149,38 @@ void U8G2DisplayModule::_onDisplayMessage(const char* /*topic*/, const void* pay
 
     // --- Push boot board as modal overlay ---
     self->showModal(&self->_bootBoard);
+}
+
+/**
+ * @brief Static callback for "app.configuring" EventBus events.
+ *
+ * Suspends carousel rotation and sets the configuring status board as base layer.
+ */
+void U8G2DisplayModule::_onAppConfiguring(const char* /*topic*/, const void* /*payload*/, void* ctx) {
+    auto* self = static_cast<U8G2DisplayModule*>(ctx);
+    if (self == nullptr) {
+        return;
+    }
+
+    self->carousel.suspend();
+    self->showBase(&self->boards.configuringStatus);
+    // TODO: Restore WiFi Wizard modal logic
+}
+
+/**
+ * @brief Static callback for "app.running" EventBus events.
+ *
+ * Clears modal overlays, clears base layer override, and resumes carousel rotation.
+ */
+void U8G2DisplayModule::_onAppRunning(const char* /*topic*/, const void* /*payload*/, void* ctx) {
+    auto* self = static_cast<U8G2DisplayModule*>(ctx);
+    if (self == nullptr) {
+        return;
+    }
+
+    self->clearModal();
+    self->showBase(nullptr);
+    self->carousel.resume();
 }
 
 

@@ -560,6 +560,22 @@ private:
      */
     static void _onDisplayMessage(const char* topic, const void* payload, void* ctx);
 
+    /**
+     * @brief Static callback for "app.configuring" EventBus topic.
+     * @param topic The topic string ("app.configuring").
+     * @param payload Pointer to an AppConfiguringPayload struct (or nullptr).
+     * @param ctx Context pointer (this U8G2DisplayModule instance).
+     */
+    static void _onAppConfiguring(const char* topic, const void* payload, void* ctx);
+
+    /**
+     * @brief Static callback for "app.running" EventBus topic.
+     * @param topic The topic string ("app.running").
+     * @param payload Pointer to nullptr.
+     * @param ctx Context pointer (this U8G2DisplayModule instance).
+     */
+    static void _onAppRunning(const char* topic, const void* payload, void* ctx);
+
 
     // -------------------------------------------------------------------------
     // Member variables
