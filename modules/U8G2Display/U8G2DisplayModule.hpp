@@ -109,18 +109,7 @@ class MCPToolRegistry;
 // EventBus Payload Structs
 // ---------------------------------------------------------------------------
 
-/**
- * @brief EventBus payload for "ota.progress" topic.
- *
- * Published by the OTA manager during firmware update cycles. The display
- * module subscribes and delegates to OTAProgressBoard.
- */
-struct OTAProgressPayload {
-    float progress;       // 0.0 to 1.0 download fraction
-    const char* status;   // Status message (e.g. "Downloading...")
-    bool complete;        // True when OTA cycle is finished
-    bool success;         // True if OTA succeeded (only valid when complete)
-};
+
 
 /**
  * @brief EventBus payload for "display.message" topic.
@@ -550,7 +539,9 @@ private:
      * @param payload Pointer to an OTAProgressPayload struct.
      * @param ctx Context pointer (this U8G2DisplayModule instance).
      */
+#ifdef WITH_OTA
     static void _onOtaProgress(const char* topic, const void* payload, void* ctx);
+#endif
 
     /**
      * @brief Static callback for "display.message" EventBus topic.

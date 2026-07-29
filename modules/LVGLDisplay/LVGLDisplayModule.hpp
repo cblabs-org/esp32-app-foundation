@@ -64,15 +64,7 @@ class EventBus;
 class ConfigManager;
 class MCPToolRegistry;
 
-#ifndef OTA_PROGRESS_PAYLOAD_DEFINED
-#define OTA_PROGRESS_PAYLOAD_DEFINED
-struct OTAProgressPayload {
-    float progress;       // 0.0 to 1.0 download fraction
-    const char* status;   // Status message (e.g. "Downloading...")
-    bool complete;        // True when OTA cycle is finished
-    bool success;         // True if OTA succeeded (only valid when complete)
-};
-#endif
+
 
 #ifndef DISPLAY_MESSAGE_PAYLOAD_DEFINED
 #define DISPLAY_MESSAGE_PAYLOAD_DEFINED
@@ -374,7 +366,9 @@ private:
     SettingsTabStub _settingsTabStub;
     ScreenshotTabStub _screenshotTabStub;
 
+#ifdef WITH_OTA
     static void _onOtaProgress(const char* topic, const void* payload, void* ctx);
+#endif
     static void _onDisplayMessage(const char* topic, const void* payload, void* ctx);
     static void _onSystemError(const char* topic, const void* payload, void* ctx);
     static void _onAppConfiguring(const char* topic, const void* payload, void* ctx);

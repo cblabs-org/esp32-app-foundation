@@ -52,7 +52,7 @@ static constexpr const char* TAG = "U8G2DisplayModule";
 #include <PsychicHttp.h>
 #include <ArduinoJson.h>
 #include "../Application/Application.hpp"
-#include "../OTAUpdateManager/OTAUpdateManager.hpp"
+
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 // SPI.h is required whenever explicit SCK+MOSI pins are provided, even on
@@ -194,8 +194,9 @@ void U8G2DisplayModule::begin(EventBus* eventBus) {
     // --- Step 2: Subscribe to EventBus topics ---
     // Guarded: getEventBus() requires Application.hpp (unavailable in native)
     if (_eventBus != nullptr) {
-        ESP_LOGI(TAG, "Subscribing to EventBus topics: ota.progress, display.message, app.configuring, app.running");
-        _eventBus->subscribe(OTAUpdateManagerEvents::OTA_PROGRESS, _onOtaProgress, this);
+#ifdef WITH_OTA
+        _eventBus->subscribe(ApplicationEvents::OTA_PROGRESS, _onOtaProgress, this);
+#endif
         _eventBus->subscribe(U8G2DisplayEvents::DISPLAY_MESSAGE, _onDisplayMessage, this);
         _eventBus->subscribe(ApplicationEvents::APP_CONFIGURING, _onAppConfiguring, this);
         _eventBus->subscribe(ApplicationEvents::APP_RUNNING, _onAppRunning, this);
@@ -1105,25 +1106,23 @@ void U8G2DisplayModule::registerMCPTools(MCPToolRegistry& registry) {
  * @param payload Pointer to OTAProgressPayload.
  * @param ctx     The U8G2DisplayModule instance (passed during subscribe).
  */
+#ifdef WITH_OTA
 void U8G2DisplayModule::_onOtaProgress(const char* /*topic*/, const void* payload, void* ctx) {
     auto* self = static_cast<U8G2DisplayModule*>(ctx);
-    if (payload == nullptr || self == nullptr) {
-        return;
-    }
+    if (payload == nullptr || self == nullptr) return;
 
-    const auto* ota = static_cast<const OTAProgressPayload*>(payload);
+    const auto* ota = static_cast<const ApplicationEvents::OtaProgressPayload*>(payload);
 
     if (ota->complete) {
-        // --- OTA cycle finished — mark board as complete ---
         self->_otaProgress.setComplete(ota->success);
     } else {
-        // --- OTA in progress — update progress bar ---
         self->_otaProgress.setProgress(ota->progress, ota->status);
     }
 
-    // --- Push OTA board as modal overlay ---
     self->showModal(&self->_otaProgress);
+    self->resetActivity();
 }
+#endif
 
 /**
  * @brief Static callback for "display.message" EventBus events.

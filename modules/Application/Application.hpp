@@ -79,10 +79,6 @@
 
 
 
-// Forward declaration only — OTAUpdateManager.hpp pulls in WiFiClientSecure
-// which causes LDF to discover NetworkClientSecure with missing SSL backend.
-// Full include deferred to Application.cpp; member held via unique_ptr.
-class OTAUpdateManager;
 
 // ---------------------------------------------------------------------------
 // Application Events
@@ -100,6 +96,26 @@ namespace ApplicationEvents {
     /// @brief Published when entering or updating CONFIGURING state.
     /// Payload: const AppConfiguringPayload*
     constexpr const char* APP_CONFIGURING = "app.configuring";
+
+#ifdef WITH_OTA
+    /// @brief Published during OTA progress updates.
+    /// Payload: const OtaProgressPayload*
+    constexpr const char* OTA_PROGRESS = "ota.progress";
+
+    struct OtaProgressPayload {
+        float progress;       // 0.0 to 1.0 download fraction
+        const char* status;   // Human-readable status message
+        bool complete;        // True when OTA cycle is finished
+        bool success;         // True if OTA succeeded (only valid when complete)
+    };
+#else
+    // EO-07: Legible absent-module error for consumers attempting to use OTA without the flag
+    struct OTA_PROGRESS_requires_WITH_OTA {};
+    constexpr OTA_PROGRESS_requires_WITH_OTA OTA_PROGRESS{};
+    
+    struct OtaProgressPayload_requires_WITH_OTA {};
+    typedef OtaProgressPayload_requires_WITH_OTA OtaProgressPayload;
+#endif
 }
 
 /**
@@ -123,7 +139,7 @@ namespace ApplicationEvents {
  */
 class Application {
 public:
-    /// Destructor — cleans up heap-allocated OTAUpdateManager.
+    /// Destructor
     ~Application();
 
     // -------------------------------------------------------------------------
@@ -336,12 +352,6 @@ public:
     WifiManager& getWifiManager();
 
     /**
-     * @brief Get the application's OTAUpdateManager instance.
-     * @return Reference to the OTAUpdateManager.
-     */
-    OTAUpdateManager& getOtaManager();
-
-    /**
      * @brief Get the application's TimeManager instance.
      * @return Reference to the TimeManager.
      */
@@ -517,7 +527,6 @@ private:
     AuthManager _authManager;           ///< Portal + MCP authentication manager (WO1 skeleton)
     WifiManager _wifiManager;           ///< WiFi connection state machine
     WifiConfigGate _wifiGate{_wifiManager}; ///< Built-in WiFi STA config gate
-    OTAUpdateManager* _otaManager = nullptr;  ///< OTA firmware update orchestrator (heap, fwd-declared)
     TimeManager _timeManager;           ///< NTP synchronization service
     TimeConfigGate _timeGate{_timeManager}; ///< Optional timezone config gate (downstream opt-in)
 

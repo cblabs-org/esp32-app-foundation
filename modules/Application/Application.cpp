@@ -28,7 +28,6 @@
 
 #include "Application.hpp"
 #include "../../include/events/AppConfiguringPayload.hpp"
-#include "../OTAUpdateManager/OTAUpdateManager.hpp"
 
 
 // ---------------------------------------------------------------------------
@@ -59,8 +58,6 @@ static constexpr const char* TAG = "Application";
 
 // Destructor — clean up heap-allocated modules
 Application::~Application() {
-    delete _otaManager;
-    _otaManager = nullptr;
 }
 
 // ---------------------------------------------------------------------------
@@ -144,11 +141,7 @@ bool Application::begin(const FrameworkConfig& config) {
     _timeManager.setConfigManager(&_configManager);
     _authManager.begin(&_configManager, &_keyManager);
 
-    _otaManager = new (std::nothrow) OTAUpdateManager();
-    if (_otaManager == nullptr) {
-        ESP_LOGE(TAG, "Failed to allocate OTAUpdateManager");
-        return false;
-    }
+
 
     // --- Module registration (auto-detects all interfaces per module) ---
     registerModule(&_wifiManager);        // ITickable + IConfigurable + IWebContributor + IMCPContributor
@@ -159,7 +152,7 @@ bool Application::begin(const FrameworkConfig& config) {
     registerModule(&_configManager);      // IWebContributor + IMCPContributor
     registerModule(&_keyManager);         // IWebContributor
     registerModule(&_mcpServer);          // IConfigurable + IWebContributor
-    registerModule(_otaManager);          // ITickable + IConfigurable + IWebContributor + IMCPContributor
+
     registerModule(&_webServerManager);   // ITickable
     if (_enableDefaultAppTab) {
         registerModule(&_appTabContributor);  // IWebContributor
@@ -200,9 +193,7 @@ bool Application::begin(const FrameworkConfig& config) {
     }
     _statusReporter->reportStatus("Data services ready", 0.70f);
 
-    // --- Step 13: OTA — wire Application dependency (allocated in Step 7) ---
-    _otaManager->begin(*this);
-    _statusReporter->reportStatus("Update service ready", 0.80f);
+
 
     // --- Step 14: (Merged into Step 7 module registration) ---
 
@@ -226,12 +217,9 @@ bool Application::begin(const FrameworkConfig& config) {
     _statusReporter->reportStatus("Boot complete", 1.0f);
 
     // --- Step 17b: Bless firmware (auto-rollback barrier) ---
-    // If the firmware crashes before reaching this point, the bootloader
-    // automatically reverts to the previous partition. This barrier covers:
-    // display bootstrap, EventBus, LittleFS, Crypto, Config, WiFi, Time,
-    // Data, OTA, Web, display integration, and registry lock.
-    _otaManager->markAppValid();
-    ESP_LOGI(TAG, "✅ Firmware self-test PASSED — partition blessed");
+    // Note: With OTAUpdateManager extracted, consumers must manually bless
+    // the firmware by calling otaManager.markAppValid() after app.begin().
+    ESP_LOGI(TAG, "✅ Firmware self-test PASSED — (app validation delegated to consumer)");
 
     // --- Step 18: Publish system heap event + heap report ---
     _systemHeapPayload = heap_caps_get_free_size(MALLOC_CAP_8BIT);
@@ -493,9 +481,7 @@ WifiManager& Application::getWifiManager() {
     return _wifiManager;
 }
 
-OTAUpdateManager& Application::getOtaManager() {
-    return *_otaManager;
-}
+
 
 TimeManager& Application::getTimeManager() {
     return _timeManager;

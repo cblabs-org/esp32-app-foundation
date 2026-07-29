@@ -25,6 +25,11 @@
 static HomeAssistantModule haModule;
 #endif
 
+#ifdef WITH_OTA
+#include "OTAUpdateManager.hpp"
+static OTAUpdateManager otaManager;
+#endif
+
 // ADR-16: File-scope static instances avoid stack-based corruption.
 // All module instances must be declared at file scope before setup().
 Application app;
@@ -55,6 +60,10 @@ void setup() {
     // Register user application modules
     // registerModule() auto-detects IConfigGate — no separate registration needed
     app.registerModule(&weatherModule);
+
+#ifdef WITH_OTA
+    app.registerModule(&otaManager);
+#endif
 
 #ifdef WITH_HOMEASSISTANT
     haModule.setKeyManager(&app.getKeyManager());
@@ -92,6 +101,11 @@ void setup() {
 
     // Begin framework
     app.begin(config);
+
+#ifdef WITH_OTA
+    otaManager.begin(app);
+    otaManager.markAppValid();
+#endif
 
 #ifdef WITH_HOMEASSISTANT
     weatherModule.wireHomeAssistant(haModule);

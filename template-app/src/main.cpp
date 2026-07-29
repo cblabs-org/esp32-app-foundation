@@ -25,6 +25,11 @@
 static HomeAssistantModule haModule;
 #endif
 
+#ifdef WITH_OTA
+#include "OTAUpdateManager.hpp"
+static OTAUpdateManager otaManager;
+#endif
+
 // --- Display Configuration Bridge ---
 // The hardware-config program will eventually supply BOARD_DISPLAY_KIND.
 // For now, we bridge the PIO environment flags (HAS_DISPLAY / HAS_LVGL_DISPLAY).
@@ -74,6 +79,10 @@ void setup() {
     // Register — compile-time introspection detects all 5 interfaces
     app.registerModule(&myApp);
 
+#ifdef WITH_OTA
+    app.registerModule(&otaManager);
+#endif
+
 #ifdef WITH_HOMEASSISTANT
     haModule.setKeyManager(&app.getKeyManager());
     haModule.setEventBus(&app.getEventBus());
@@ -101,6 +110,11 @@ void setup() {
     //      config.otaPublicKey = (const char*)public_key_pem;
     FrameworkConfig config;
     app.begin(config);
+
+#ifdef WITH_OTA
+    otaManager.begin(app);
+    otaManager.markAppValid();
+#endif
 
 #if BOARD_DISPLAY_KIND != BOARD_DISPLAY_KIND_NONE
     displayModule.setConfigManager(&app.getConfigManager());
