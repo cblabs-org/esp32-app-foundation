@@ -39,9 +39,9 @@ is absent from the release binary (no size/latency regression).
 
 ## Proposed Work Order Ledger _(PA to finalise)_
 
-- **[ ] wo1 — contract clause + docs:** `ITickable` budget clause; update
+- **[x] [wo1-contract-docs](wo1-contract-docs/WORKORDER.md):** `ITickable` budget clause; update
   `creating-a-module.md` / performance guide. `mechanical`
-- **[ ] wo2 — debug instrumentation:** guarded tick-duration timing in the
+- **[x] [wo2-debug-instrumentation](wo2-debug-instrumentation/WORKORDER.md):** guarded tick-duration timing in the
   dispatch loop. `standard`
 
 ## Verification
@@ -55,3 +55,4 @@ deliberately-slow test module; release build unchanged in size.
 |---|---|
 | 2026-07-28 | Drafted. Awaiting human approval. Independent — safe to land early. |
 | 2026-07-29 | Human approved full autonomous execution of the microkernel-refactor program (all 7 projects). Consumer review complete (3/3 endorsed via RFC #48). Approval recorded in `PROGRAM.md` status log. PA spawn authorised. |
+| 2026-07-29 | All WOs completed. See [Context Bridge](./context_bridge.md) for PA distillation. |
