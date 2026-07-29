@@ -32,6 +32,13 @@ static Application app;  ///< Single framework hub instance
 static HomeAssistantModule haModule;
 #endif
 
+#ifdef WITH_TIME
+#include "TimeManager.hpp"
+#include "TimeConfigGate.hpp"
+static TimeManager timeManager;
+static TimeConfigGate timeGate{timeManager};
+#endif
+
 #ifdef HAS_LVGL_DISPLAY
 #include "LVGLDisplayModule.hpp"
 #include "CrowPanel128Adapter.hpp"
@@ -58,6 +65,11 @@ void setup() {
     // and falls back to this on factory reset (resetConfig()).
     app.getWifiManager().setDefaultHostname("esp32-foundation");
 
+#ifdef WITH_TIME
+    timeManager.setConfigManager(&app.getConfigManager());
+    app.registerModule(&timeManager);
+#endif
+
 #ifdef WITH_HOMEASSISTANT
     haModule.setKeyManager(&app.getKeyManager());
     haModule.setEventBus(&app.getEventBus());
@@ -75,6 +87,10 @@ void setup() {
         delay(5000);
         app.softReset();
     }
+
+#ifdef WITH_TIME
+    timeManager.begin();
+#endif
 }
 
 /**

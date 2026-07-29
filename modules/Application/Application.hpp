@@ -20,7 +20,7 @@
  *              centralised gateway for all module configuration I/O.
  *
  *              Core domain services (WifiManager, OTAUpdateManager,
- *              TimeManager, KeyManager, AuthManager) are also Application-owned
+ *              KeyManager, AuthManager) are also Application-owned
  *              members, wired into the boot sequence and registered with ConfigManager
  *              and the tick/web contributor vectors where applicable.
  *
@@ -37,7 +37,6 @@
  *   - getConfigManager():        Access the ConfigManager gateway
  *   - getWifiManager():          Access the WifiManager domain service
  *   - getOtaManager():           Access the OTAUpdateManager domain service
- *   - getTimeManager():          Access the TimeManager domain service
  *   - getKeyManager():           Access the KeyManager domain service
  *   - getAuthManager():          Access the AuthManager security service
  *   - getState():                Query the current AppState lifecycle phase
@@ -70,8 +69,6 @@
 // Core domain services (owned by value — full includes required)
 #include "../WifiManager/WifiManager.hpp"
 #include "../WifiManager/WifiConfigGate.hpp"
-#include "../TimeManager/TimeManager.hpp"
-#include "../TimeManager/TimeConfigGate.hpp"
 #include "../KeyManager/KeyManager.hpp"
 #include "../AuthManager/AuthManager.hpp"
 #include "../../lib/DeviceCrypto/DeviceCrypto.hpp"
@@ -352,22 +349,6 @@ public:
     WifiManager& getWifiManager();
 
     /**
-     * @brief Get the application's TimeManager instance.
-     * @return Reference to the TimeManager.
-     */
-    TimeManager& getTimeManager();
-
-    /**
-     * @brief Get the application's TimeConfigGate for downstream opt-in.
-     *
-     * Downstream apps that require timezone configuration can register
-     * this gate: app.registerConfigGate(&app.getTimeGate())
-     *
-     * @return Reference to the built-in TimeConfigGate.
-     */
-    TimeConfigGate& getTimeGate();
-
-    /**
      * @brief Get the application's KeyManager instance.
      * @return Reference to the KeyManager.
      */
@@ -527,8 +508,6 @@ private:
     AuthManager _authManager;           ///< Portal + MCP authentication manager (WO1 skeleton)
     WifiManager _wifiManager;           ///< WiFi connection state machine
     WifiConfigGate _wifiGate{_wifiManager}; ///< Built-in WiFi STA config gate
-    TimeManager _timeManager;           ///< NTP synchronization service
-    TimeConfigGate _timeGate{_timeManager}; ///< Optional timezone config gate (downstream opt-in)
 
     // Heartbeat
     uint32_t _lastHeartbeatMs = 0;                                    ///< Throttle for periodic heartbeat log

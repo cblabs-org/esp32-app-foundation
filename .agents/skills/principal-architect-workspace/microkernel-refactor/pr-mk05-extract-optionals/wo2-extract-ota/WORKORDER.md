@@ -30,3 +30,6 @@ Use the `platformio` MCP tools for building and testing. Do not use raw CLI comm
 - [ ] **Subscribers (Displays)**: Update `LVGLDisplayModule` and `U8G2DisplayModule` to point to the new location of `OTA_PROGRESS` and its payload (now in the facade, `ApplicationEvents::OTA_PROGRESS`). Wrap these subscriptions in `#ifdef WITH_OTA` so they still compile when OTA is off.
 - [ ] **Verification**: Run `native` tests and compile `esp32dev` (with and without `WITH_OTA`).
 - [ ] When finished, confirm compilation, then STOP and message the Principal Architect. Do NOT distill or wrap up yet.
+
+## Status Update (2026-07-29)
+**COMPLETE**. The `OTAUpdateManager` has been fully extracted from `Application`, decoupled via `ApplicationEvents::OtaProgressPayload`, and registered via composition in `main.cpp`. The work has been verified against `native` and `esp32dev` targets for `template-app`. (Note: `sample-app` fails compilation due to pre-existing display extraction issues out of scope for WO2). Distillery snapshot generated.

@@ -29,6 +29,7 @@ protected:
     }
 };
 
+#ifdef WITH_OTA
 TEST_F(LVGLEventBusIntegrationTest, SubscribesToOtaProgress_UpdatesScreenAndRestores) {
     OTAProgressPayload payload;
     payload.progress = 0.45f;
@@ -36,7 +37,7 @@ TEST_F(LVGLEventBusIntegrationTest, SubscribesToOtaProgress_UpdatesScreenAndRest
     payload.complete = false;
     payload.success = false;
 
-    int count = eventBus.publish(OTAUpdateManagerEvents::OTA_PROGRESS, &payload);
+    int count = eventBus.publish(ApplicationEvents::OTA_PROGRESS, &payload);
     EXPECT_GT(count, 0);
 
     // OTA complete success
@@ -45,7 +46,7 @@ TEST_F(LVGLEventBusIntegrationTest, SubscribesToOtaProgress_UpdatesScreenAndRest
     payload.complete = true;
     payload.success = true;
 
-    count = eventBus.publish(OTAUpdateManagerEvents::OTA_PROGRESS, &payload);
+    count = eventBus.publish(ApplicationEvents::OTA_PROGRESS, &payload);
     EXPECT_GT(count, 0);
 }
 
@@ -56,14 +57,15 @@ TEST_F(LVGLEventBusIntegrationTest, SubscribesToOtaProgress_FailureShowsError) {
     payload.complete = false;
     payload.success = false;
 
-    eventBus.publish(OTAUpdateManagerEvents::OTA_PROGRESS, &payload);
+    eventBus.publish(ApplicationEvents::OTA_PROGRESS, &payload);
 
     payload.complete = true;
     payload.success = false;
     payload.status = "Checksum mismatch";
 
-    eventBus.publish(OTAUpdateManagerEvents::OTA_PROGRESS, &payload);
+    eventBus.publish(ApplicationEvents::OTA_PROGRESS, &payload);
 }
+#endif // WITH_OTA
 
 TEST_F(LVGLEventBusIntegrationTest, SubscribesToDisplayMessage) {
     DisplayMessagePayload payload;

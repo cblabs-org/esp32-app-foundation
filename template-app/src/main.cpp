@@ -30,6 +30,13 @@ static HomeAssistantModule haModule;
 static OTAUpdateManager otaManager;
 #endif
 
+#ifdef WITH_TIME
+#include "TimeManager.hpp"
+#include "TimeConfigGate.hpp"
+static TimeManager timeManager;
+static TimeConfigGate timeGate{timeManager};
+#endif
+
 // --- Display Configuration Bridge ---
 // The hardware-config program will eventually supply BOARD_DISPLAY_KIND.
 // For now, we bridge the PIO environment flags (HAS_DISPLAY / HAS_LVGL_DISPLAY).
@@ -92,6 +99,11 @@ void setup() {
     app.registerModule(&haModule);
 #endif
 
+#ifdef WITH_TIME
+    timeManager.setConfigManager(&app.getConfigManager());
+    app.registerModule(&timeManager);
+#endif
+
 #if BOARD_DISPLAY_KIND != BOARD_DISPLAY_KIND_NONE
     app.registerModule(&displayModule);
     app.registerModule(displayModule.settingsTabStub());
@@ -114,6 +126,10 @@ void setup() {
 #ifdef WITH_OTA
     otaManager.begin(app);
     otaManager.markAppValid();
+#endif
+
+#ifdef WITH_TIME
+    timeManager.begin();
 #endif
 
 #if BOARD_DISPLAY_KIND != BOARD_DISPLAY_KIND_NONE

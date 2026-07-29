@@ -43,6 +43,8 @@
  *   - resetConfig():        Restore OTA config factory defaults (IConfigurable)
  */
 
+#ifdef WITH_OTA
+
 #include "OTAUpdateManager.hpp"
 #include "platform/LogShim.h"
 
@@ -1572,3 +1574,5 @@ void OTAUpdateManager::registerMCPTools(MCPToolRegistry& registry) {
             }, this, true);
     }
 }
+
+#endif // WITH_OTA

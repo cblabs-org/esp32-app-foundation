@@ -30,6 +30,13 @@ static HomeAssistantModule haModule;
 static OTAUpdateManager otaManager;
 #endif
 
+#ifdef WITH_TIME
+#include "TimeManager.hpp"
+#include "TimeConfigGate.hpp"
+static TimeManager timeManager;
+static TimeConfigGate timeGate{timeManager};
+#endif
+
 // ADR-16: File-scope static instances avoid stack-based corruption.
 // All module instances must be declared at file scope before setup().
 Application app;
@@ -74,6 +81,11 @@ void setup() {
     app.registerModule(&haModule);
 #endif
 
+#ifdef WITH_TIME
+    timeManager.setConfigManager(&app.getConfigManager());
+    app.registerModule(&timeManager);
+#endif
+
     // Prepare Framework config — OTA
     // TODO: Set up OTA for your app:
     //   1. Create a releases repo (e.g. your-org/weather-station-releases)
@@ -105,6 +117,10 @@ void setup() {
 #ifdef WITH_OTA
     otaManager.begin(app);
     otaManager.markAppValid();
+#endif
+
+#ifdef WITH_TIME
+    timeManager.begin();
 #endif
 
 #ifdef WITH_HOMEASSISTANT

@@ -65,6 +65,8 @@
 
 #pragma once
 
+#ifdef WITH_OTA
+
 #include <Arduino.h>
 #include <Stream.h>
 #include <freertos/task.h>
@@ -527,4 +529,6 @@ private:
      */
     esp_err_t finaliseSignedUpload(PsychicResponse* response);
 };
+
+#endif // WITH_OTA
 

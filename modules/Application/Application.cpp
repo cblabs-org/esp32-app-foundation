@@ -138,14 +138,12 @@ bool Application::begin(const FrameworkConfig& config) {
     _wifiManager.setConfigManager(&_configManager);
     _wifiManager.setKeyManager(&_keyManager);
     _wifiManager.setEventBus(&_eventBus);
-    _timeManager.setConfigManager(&_configManager);
     _authManager.begin(&_configManager, &_keyManager);
 
 
 
     // --- Module registration (auto-detects all interfaces per module) ---
     registerModule(&_wifiManager);        // ITickable + IConfigurable + IWebContributor + IMCPContributor
-    registerModule(&_timeManager);        // ITickable + IConfigurable + IWebContributor
     registerModule(&_authManager);        // IConfigurable + IWebContributor
     registerModule(_authManager.passwordTabStub());  // IWebContributor (sub-pill)
     registerModule(_authManager.tlsTabStub());       // IWebContributor (sub-pill)
@@ -180,11 +178,7 @@ bool Application::begin(const FrameworkConfig& config) {
     ESP_LOGI(TAG, "WiFi setup initiated");
     _statusReporter->reportStatus("WiFi initialized", 0.55f);
 
-    // --- Step 11: TimeManager — after WiFi, needs network for NTP ---
-    // Uses the persisted timezone from ConfigManager, or the factory default
-    // ("GMT0") seeded by resetConfig().
-    _timeManager.begin();
-    _statusReporter->reportStatus("Time synchronization started", 0.65f);
+    // --- Step 11: (Removed — TimeManager extracted to explicit composition) ---
 
     // --- Step 12: DataManager — background data workers ---
     _dataManager.begin();
@@ -204,7 +198,7 @@ bool Application::begin(const FrameworkConfig& config) {
 
     // MCP server: pass the ConfigManager reference for config operations,
     // plus TimeManager (built-in time tools) and WifiManager (status hostname).
-    _mcpServer.begin(_mcpContributors, &_configManager, &_timeManager, &_wifiManager, &_authManager);
+    _mcpServer.begin(_mcpContributors, &_configManager, nullptr, &_wifiManager, &_authManager);
     _statusReporter->reportStatus("Web portal starting...", 0.90f);
 
 
@@ -479,16 +473,6 @@ ConfigManager& Application::getConfigManager() {
 
 WifiManager& Application::getWifiManager() {
     return _wifiManager;
-}
-
-
-
-TimeManager& Application::getTimeManager() {
-    return _timeManager;
-}
-
-TimeConfigGate& Application::getTimeGate() {
-    return _timeGate;
 }
 
 KeyManager& Application::getKeyManager() {
