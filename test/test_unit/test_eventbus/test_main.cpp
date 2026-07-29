@@ -199,7 +199,77 @@ TEST_F(EventBusTest, Unsubscribe_WithNullptrTopic_ReturnsFalse) {
     EXPECT_FALSE(bus.unsubscribe(nullptr, testCallback, &ctx));
 }
 
+TEST_F(EventBusTest, TopicHashingHelper) {
+    EXPECT_EQ(EventBus::hashTopic(nullptr), 0u);
+    EXPECT_EQ(EventBus::hashTopic(""), 0u);
+    uint32_t h1 = EventBus::hashTopic("sys/status");
+    uint32_t h2 = EventBus::hashTopic("sys/status");
+    uint32_t h3 = EventBus::hashTopic("sys/other");
+    EXPECT_NE(h1, 0u);
+    EXPECT_EQ(h1, h2);
+    EXPECT_NE(h1, h3);
+}
+
+struct ReentrantUnsubContext {
+    EventBus* bus;
+    const char* topic;
+    EventCallback cb;
+    int callCount;
+};
+
+static void selfUnsubCallback(const char* topic, const void* payload, void* ctx) {
+    ReentrantUnsubContext* rctx = static_cast<ReentrantUnsubContext*>(ctx);
+    rctx->callCount++;
+    rctx->bus->unsubscribe(topic, rctx->cb, ctx);
+}
+
+TEST_F(EventBusTest, SelfUnsubscribeDuringDispatch) {
+    ReentrantUnsubContext rctx = { &bus, "sys/reentrant", selfUnsubCallback, 0 };
+    bus.subscribe("sys/reentrant", selfUnsubCallback, &rctx);
+
+    int count1 = bus.publish("sys/reentrant", nullptr);
+    EXPECT_EQ(count1, 1);
+    EXPECT_EQ(rctx.callCount, 1);
+
+    // Second publish should dispatch to 0 subscribers because selfUnsubCallback unsubscribed itself
+    int count2 = bus.publish("sys/reentrant", nullptr);
+    EXPECT_EQ(count2, 0);
+    EXPECT_EQ(rctx.callCount, 1);
+}
+
+struct ReentrantSubContext {
+    EventBus* bus;
+    EventCallback newCb;
+    TestContext* newCtx;
+    int callCount;
+};
+
+static void subDuringDispatchCallback(const char* topic, const void* payload, void* ctx) {
+    ReentrantSubContext* rctx = static_cast<ReentrantSubContext*>(ctx);
+    rctx->callCount++;
+    rctx->bus->subscribe("sys/new", rctx->newCb, rctx->newCtx);
+}
+
+TEST_F(EventBusTest, SubscribeDuringDispatchDoesNotReceiveCurrentEvent) {
+    TestContext newCtx = {0, "", 0};
+    ReentrantSubContext rctx = { &bus, testCallback, &newCtx, 0 };
+
+    bus.subscribe("sys/dispatch", subDuringDispatchCallback, &rctx);
+
+    int count1 = bus.publish("sys/dispatch", nullptr);
+    EXPECT_EQ(count1, 1);
+    EXPECT_EQ(rctx.callCount, 1);
+    EXPECT_EQ(newCtx.callCount, 0);
+
+    // Subsequent publish to "sys/new" should dispatch to the newly subscribed callback
+    int val = 99;
+    int count2 = bus.publish("sys/new", &val);
+    EXPECT_EQ(count2, 1);
+    EXPECT_EQ(newCtx.callCount, 1);
+}
+
 int main(int argc, char **argv) {
     ::testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();
 }
+

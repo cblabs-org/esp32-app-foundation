@@ -18,12 +18,24 @@
 
 #include "EventBus.hpp"
 #include "platform/LogShim.h"
-#include <string.h>
+#include <algorithm>
 
 static constexpr const char* TAG = "EventBus";
 
 void EventBus::begin() {
     ESP_LOGI(TAG, "Initializing EventBus");
+    _subscribers.clear();
+    _dispatchDepth = 0;
+    _needsCleanup = false;
+}
+
+void EventBus::cleanup() {
+    _subscribers.erase(
+        std::remove_if(_subscribers.begin(), _subscribers.end(),
+                       [](const Subscription& s) { return !s.active; }),
+        _subscribers.end()
+    );
+    _needsCleanup = false;
 }
 
 bool EventBus::subscribe(const char* topic, EventCallback callback, void* ctx) {
@@ -32,32 +44,53 @@ bool EventBus::subscribe(const char* topic, EventCallback callback, void* ctx) {
         return false;
     }
 
-    size_t topicLen = strlen(topic);
-    if (topicLen == 0) {
+    if (topic[0] == '\0') {
         ESP_LOGW(TAG, "subscribe() failed: topic is empty");
         return false;
     }
 
-    _subscribers.push_back({std::string(topic), callback, ctx, true});
+    uint32_t topicHash = hashTopic(topic);
+
+    if (_dispatchDepth == 0) {
+        // Reuse an inactive slot if available when not dispatching
+        for (auto& sub : _subscribers) {
+            if (!sub.active) {
+                sub.topicHash = topicHash;
+                sub.callback = callback;
+                sub.ctx = ctx;
+                sub.active = true;
+                ESP_LOGD(TAG, "Subscribed to topic: %s (slot reused)", topic);
+                return true;
+            }
+        }
+    }
+
+    _subscribers.push_back({topicHash, callback, ctx, true});
     ESP_LOGD(TAG, "Subscribed to topic: %s", topic);
     return true;
 }
 
 bool EventBus::unsubscribe(const char* topic, EventCallback callback, void* ctx) {
-    if (topic == nullptr || callback == nullptr) {
-        ESP_LOGD(TAG, "unsubscribe() called with null topic or callback");
+    if (topic == nullptr || callback == nullptr || topic[0] == '\0') {
+        ESP_LOGD(TAG, "unsubscribe() called with invalid topic or callback");
         return false;
     }
 
-    for (auto it = _subscribers.begin(); it != _subscribers.end(); ++it) {
-        if (it->active) {
-            if (it->topic == topic &&
-                it->callback == callback &&
-                it->ctx == ctx) {
-                
-                _subscribers.erase(it);
-                return true;
+    uint32_t topicHash = hashTopic(topic);
+
+    for (size_t i = 0; i < _subscribers.size(); ++i) {
+        if (_subscribers[i].active &&
+            _subscribers[i].topicHash == topicHash &&
+            _subscribers[i].callback == callback &&
+            _subscribers[i].ctx == ctx) {
+
+            if (_dispatchDepth > 0) {
+                _subscribers[i].active = false;
+                _needsCleanup = true;
+            } else {
+                _subscribers.erase(_subscribers.begin() + i);
             }
+            return true;
         }
     }
 
@@ -66,23 +99,25 @@ bool EventBus::unsubscribe(const char* topic, EventCallback callback, void* ctx)
 }
 
 int EventBus::publish(const char* topic, const void* payload) {
-    if (topic == nullptr) {
+    if (topic == nullptr || topic[0] == '\0') {
         return 0;
     }
 
+    uint32_t topicHash = hashTopic(topic);
     int count = 0;
-    
-    // --- Step 1: Iterate over subscribers and dispatch ---
-    // The publish is synchronous, meaning each callback is executed before returning.
-    // Payloads are only valid for the duration of the callback.
-    // We iterate over a copy of the subscribers to ensure safety if a callback unsubscribes itself.
-    std::vector<Subscription> targets = _subscribers;
-    for (const auto& sub : targets) {
-        if (sub.active && sub.topic == topic) {
-            // Dispatch event to subscriber
-            sub.callback(topic, payload, sub.ctx);
+    _dispatchDepth++;
+
+    const size_t initialSize = _subscribers.size();
+    for (size_t i = 0; i < initialSize; ++i) {
+        if (_subscribers[i].active && _subscribers[i].topicHash == topicHash) {
+            _subscribers[i].callback(topic, payload, _subscribers[i].ctx);
             count++;
         }
+    }
+
+    _dispatchDepth--;
+    if (_dispatchDepth == 0 && _needsCleanup) {
+        cleanup();
     }
 
     ESP_LOGD(TAG, "Published topic '%s' to %d subscriber(s)", topic, count);
