@@ -84,6 +84,7 @@
 #include "interfaces/IWebContributor.hpp"
 #include "interfaces/IMCPContributor.hpp"
 #include "interfaces/IDisplayBoard.hpp"
+#include "interfaces/IBootReporter.hpp"
 #include "boards/BootBoard.hpp"
 #include "CarouselEngine.hpp"
 #include "ScreensaverController.hpp"
@@ -188,7 +189,7 @@ namespace U8G2DisplayEvents {
  * Subscribes to EventBus topics "ota.progress" and "display.message" for
  * runtime integration with other framework modules.
  */
-class U8G2DisplayModule : public ITickable, public IStatusReporter, public IConfigurable, public IWebContributor, public IMCPContributor {
+class U8G2DisplayModule : public ITickable, public IConfigurable, public IWebContributor, public IMCPContributor, public IBootReporter {
 public:
     // -------------------------------------------------------------------------
     // Lifecycle
@@ -206,6 +207,11 @@ public:
      * Call begin(app) AFTER app.begin() to complete framework integration.
      */
     void bootstrapHardware();
+
+    /**
+     * @brief IBootReporter phase 1 hook
+     */
+    bool beginEarly() override;
 
     /**
      * @brief Phase 2: Complete framework integration.

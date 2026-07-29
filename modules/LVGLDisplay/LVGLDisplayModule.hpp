@@ -49,6 +49,7 @@
 #include "interfaces/IStatusReporter.hpp"
 #include "interfaces/IWebContributor.hpp"
 #include "interfaces/IMCPContributor.hpp"
+#include "interfaces/IBootReporter.hpp"
 #include "interfaces/ILVGLHardwareAdapter.hpp"
 #include "interfaces/ILVGLSystemScreens.hpp"
 #include "assets/boot_logo.h"
@@ -110,7 +111,7 @@ namespace LVGLDisplayEvents {
  * Handles LVGL lifecycle (lv_init, lv_tick_inc, lv_timer_handler), draw buffer
  * allocation, input device discovery, focus group management, and framework system screens.
  */
-class LVGLDisplayModule : public ITickable, public IConfigurable, public IStatusReporter, public IWebContributor, public IMCPContributor {
+class LVGLDisplayModule : public ITickable, public IConfigurable, public IWebContributor, public IMCPContributor, public IBootReporter {
 public:
     // -------------------------------------------------------------------------
     // Lifecycle
@@ -144,6 +145,11 @@ public:
      * input devices, and loads Stage-1 boot splash.
      */
     void bootstrapHardware();
+
+    /**
+     * @brief IBootReporter phase 1 hook
+     */
+    bool beginEarly() override;
 
     /**
      * @brief Phase 2: Complete framework integration.

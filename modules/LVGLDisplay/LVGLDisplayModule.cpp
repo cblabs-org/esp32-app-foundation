@@ -137,6 +137,11 @@ void LVGLDisplayModule::bootstrapHardware() {
     }
 }
 
+bool LVGLDisplayModule::beginEarly() {
+    bootstrapHardware();
+    return true;
+}
+
 void LVGLDisplayModule::begin(EventBus* eventBus) {
     _eventBus = eventBus;
 

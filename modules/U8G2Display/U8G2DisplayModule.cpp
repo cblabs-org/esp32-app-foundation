@@ -158,6 +158,11 @@ void U8G2DisplayModule::bootstrapHardware() {
     ESP_LOGI(TAG, "Bootstrap: display hardware ready, inline rendering enabled");
 }
 
+bool U8G2DisplayModule::beginEarly() {
+    bootstrapHardware();
+    return true;
+}
+
 /**
  * @brief Phase 2: Complete framework integration.
  *

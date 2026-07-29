@@ -25,6 +25,13 @@
 static HomeAssistantModule haModule;
 #endif
 
+#ifdef HAS_DISPLAY
+#include "U8G2DisplayModule.hpp"
+#include "boards/DiagnosticsBoard.hpp"
+static U8G2DisplayModule displayModule;
+static DiagnosticsBoard diagnosticsBoard{256, 64};
+#endif
+
 Application app;   ///< Framework hub instance
 MyApp myApp;       ///< Application module instance
 
@@ -54,6 +61,12 @@ void setup() {
     app.registerModule(&haModule);
 #endif
 
+#ifdef HAS_DISPLAY
+    app.registerModule(&displayModule);
+    app.registerModule(displayModule.settingsTabStub());
+    app.registerModule(displayModule.screenshotTabStub());
+#endif
+
     // Begin framework — OTA is disabled by default in this template.
     // To enable OTA updates for your app:
     //   1. Create a releases repo (e.g. your-org/my-app-releases)
@@ -66,6 +79,13 @@ void setup() {
     //      config.otaPublicKey = (const char*)public_key_pem;
     FrameworkConfig config;
     app.begin(config);
+
+#ifdef HAS_DISPLAY
+    displayModule.setConfigManager(&app.getConfigManager());
+    diagnosticsBoard.configure(&app.getWifiManager());
+    displayModule.carousel.add(&diagnosticsBoard);
+    app.getMCPServer().setDisplayInfo(displayModule.getDisplayInfo());
+#endif
 }
 
 /**

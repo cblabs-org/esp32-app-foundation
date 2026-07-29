@@ -46,15 +46,15 @@ all *post-boot* display behaviour onto the EventBus — after which
 `crowpanel-128-rotary` (LVGL) all build; hardware boot-splash smoke test on at
 least one display target via the `device-mcp-client` / pio-manager flow.
 
-## Proposed Work Order Ledger _(PA to finalise)_
+## Finalised Work Order Ledger
 
-- **[ ] wo1 — `IBootReporter` seam:** interface + kernel registry-scan boot flow +
+- **[x] [wo1 — `IBootReporter` seam](wo1-iboot-reporter/WORKORDER.md):** interface + kernel registry-scan boot flow +
   `NullStatusReporter` fallback. `architect`
-- **[ ] wo2 — display extraction:** register display as a module; implement
+- **[ ] [wo2 — display extraction](wo2-display-extraction/WORKORDER.md):** register display as a module; implement
   `IBootReporter` on U8G2 + LVGL; delete `#ifdef HAS_DISPLAY`. `architect`
-- **[ ] wo3 — display-on-EventBus:** move CONFIGURING/RUNNING behaviour to event
+- **[ ] [wo3 — display-on-EventBus](wo3-display-on-eventbus/WORKORDER.md):** move CONFIGURING/RUNNING behaviour to event
   handlers; delete kernel `_display.*` direct calls. `standard`
-- **[ ] wo4 — flag coordination + tests:** `BOARD_DISPLAY_KIND` bridge; boot-splash
+- **[ ] [wo4 — flag coordination + tests](wo4-flag-coordination-tests/WORKORDER.md):** `BOARD_DISPLAY_KIND` bridge; boot-splash
   smoke tests. `standard`
 
 ## Verification

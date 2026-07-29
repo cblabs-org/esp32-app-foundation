@@ -76,11 +76,7 @@
 #include "../AuthManager/AuthManager.hpp"
 #include "../../lib/DeviceCrypto/DeviceCrypto.hpp"
 
-#ifdef HAS_DISPLAY
-// Display subsystem (hardware only — SPI/U8G2 headers unavailable in native builds)
-#include "../U8G2Display/U8G2DisplayModule.hpp"
-#include "../U8G2Display/boards/DiagnosticsBoard.hpp"
-#endif
+
 
 
 // Forward declaration only — OTAUpdateManager.hpp pulls in WiFiClientSecure
@@ -379,18 +375,6 @@ public:
      */
     const FrameworkConfig& getConfig() const;
 
-#ifdef HAS_DISPLAY
-    /**
-     * @brief Get the application's display module instance.
-     *
-     * Downstream apps use this to register carousel boards, configure
-     * display settings, or access the sub-object API (carousel, screensaver,
-     * boards).
-     *
-     * @return Reference to the U8G2DisplayModule.
-     */
-    U8G2DisplayModule& getDisplay();
-#endif
 
 
     // -------------------------------------------------------------------------
@@ -556,11 +540,6 @@ private:
     bool _enableDefaultAppTab = true;      ///< Guard for default App tab registration
     const char* _appName = nullptr;        ///< Runtime-settable application name for portal title
 
-#ifdef HAS_DISPLAY
-    // Display subsystem (hardware only)
-    U8G2DisplayModule _display;                      ///< Display module with carousel engine
-    DiagnosticsBoard  _diagnosticsBoard{256, 64};    ///< System telemetry carousel board
-    bool _wifiWizardShown = false;                   ///< Guard: WiFi wizard modal pushed this CONFIGURING phase
-#endif
+
 
 };
