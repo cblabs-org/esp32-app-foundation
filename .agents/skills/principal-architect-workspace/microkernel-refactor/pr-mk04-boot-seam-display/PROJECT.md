@@ -52,9 +52,9 @@ least one display target via the `device-mcp-client` / pio-manager flow.
   `NullStatusReporter` fallback. `architect`
 - **[x] [wo2 — display extraction](wo2-display-extraction/WORKORDER.md):** register display as a module; implement
   `IBootReporter` on U8G2 + LVGL; delete `#ifdef HAS_DISPLAY`. `architect`
-- **[ ] [wo3 — display-on-EventBus](wo3-display-on-eventbus/WORKORDER.md):** move CONFIGURING/RUNNING behaviour to event
+- **[x] [wo3 — display-on-EventBus](wo3-display-on-eventbus/WORKORDER.md):** move CONFIGURING/RUNNING behaviour to event
   handlers; delete kernel `_display.*` direct calls. `standard`
-- **[ ] [wo4 — flag coordination + tests](wo4-flag-coordination-tests/WORKORDER.md):** `BOARD_DISPLAY_KIND` bridge; boot-splash
+- **[x] [wo4 — flag coordination + tests](wo4-flag-coordination-tests/WORKORDER.md):** `BOARD_DISPLAY_KIND` bridge; boot-splash
   smoke tests. `standard`
 
 ## Verification
