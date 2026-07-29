@@ -48,6 +48,7 @@ void attach_ssl_certificate_bundle(sslclient_context *ssl_client, bool att);
  * entities. Creates the FreeRTOS mutex used for thread-safe string field access.
  */
 WeatherModule::WeatherModule() {
+#ifdef WITH_HOMEASSISTANT
     // H2: Sensors are now direct members — configure via dot access
     _tempSensor.setDeviceClass("temperature");
     _tempSensor.setStateClass("measurement");
@@ -59,6 +60,7 @@ WeatherModule::WeatherModule() {
 
     // Generic text sensor for weather condition, no special device class
     _condSensor.setIcon("mdi:weather-partly-cloudy");
+#endif
 
     // H3: Create mutex for thread-safe condition string access
     _dataMutex = xSemaphoreCreateMutex();
