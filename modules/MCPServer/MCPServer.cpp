@@ -23,7 +23,7 @@
 #include "../WifiManager/WifiManager.hpp"
 #include "../WebServer/WebServerManager.hpp"
 #include "../AuthManager/AuthManager.hpp"
-#include <ConfigManager.hpp>
+#include "../ConfigManager/ConfigManager.hpp"
 
 // ---------------------------------------------------------------------------
 // Platform-conditional includes & logging shims
@@ -89,7 +89,7 @@ void MCPServer::setDisplayInfo(const DisplayInfo& info) {
  * can return non-zero indefinitely, which would block the main task without
  * this guard.
  */
-void MCPServer::tick() {
+void MCPServer::tick(uint32_t /*currentMillis*/) {
     if (!_initialized || !_mcpEnabled) return;
 
     // --- Hardware: read characters from Serial until newline ---

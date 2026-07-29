@@ -24,10 +24,19 @@
  */
 
 #include "ConfigManager.hpp"
+#include "ConfigRoot.hpp"
 #include <PsychicHttp.h>
 #include <string.h>
+#include <stdio.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <vector>
+#ifndef ESP_PLATFORM
+#include <filesystem>
+#endif
 #include "platform/LogShim.h"
 #include "MCPToolRegistry.hpp"
+#include "DeviceCrypto.hpp"
 
 static constexpr const char* TAG = "ConfigManager";
 
@@ -62,7 +71,7 @@ ConfigManager::ConfigManager()
  * @param size Buffer size in bytes.
  */
 void ConfigManager::getConfigPath(const char* ns, char* buf, size_t size) {
-    snprintf(buf, size, "/mod/%s.json", ns);
+    ConfigRoot::getModFilePath(ns, buf, size);
 }
 
 /**
@@ -165,11 +174,14 @@ void ConfigManager::loadModuleConfig(IConfigurable* module) {
     JsonDocument doc;
     bool fileExists = false;
 
-    if (LittleFS.exists(path)) {
-        File file = LittleFS.open(path, "r");
+    struct stat st;
+    if (stat(path, &st) == 0) {
+        FILE* file = fopen(path, "r");
         if (file) {
-            DeserializationError err = deserializeJson(doc, file);
-            file.close();
+            std::vector<char> buf(st.st_size);
+            fread(buf.data(), 1, st.st_size, file);
+            fclose(file);
+            DeserializationError err = deserializeJson(doc, buf.data(), st.st_size);
             if (err) {
                 ESP_LOGE(TAG, "Failed to parse %s: %s — applying defaults", path, err.c_str());
                 module->resetConfig();
@@ -344,20 +356,28 @@ bool ConfigManager::saveModuleConfig(IConfigurable* module) {
         if (_persistMutex != nullptr) xSemaphoreGive(_persistMutex);
         return true;  // not an error: newer state is already on disk
     }
-    if (!LittleFS.exists("/mod")) { LittleFS.mkdir("/mod"); }
-    File file = LittleFS.open(path, "w");
+#ifdef ESP_PLATFORM
+    struct stat st;
+    if (stat(ConfigRoot::getModPath(), &st) != 0) { mkdir(ConfigRoot::getModPath(), 0777); }
+#else
+    std::error_code ec;
+    std::filesystem::create_directories(ConfigRoot::getModPath(), ec);
+#endif
+    FILE* file = fopen(path, "w");
     if (!file) {
         ESP_LOGE(TAG, "Failed to open %s for writing", path);
         if (_persistMutex != nullptr) xSemaphoreGive(_persistMutex);
         return false;
     }
-    if (serializeJson(doc, file) == 0) {
+    std::string out;
+    serializeJson(doc, out);
+    if (fwrite(out.c_str(), 1, out.length(), file) != out.length()) {
         ESP_LOGE(TAG, "Failed to write config to %s", path);
-        file.close();
+        fclose(file);
         if (_persistMutex != nullptr) xSemaphoreGive(_persistMutex);
         return false;
     }
-    file.close();
+    fclose(file);
     if (idx >= 0) _lastPersistedVersion[idx] = myVersion;
     if (_persistMutex != nullptr) xSemaphoreGive(_persistMutex);
 
@@ -660,8 +680,14 @@ bool ConfigManager::patchNamespaceConfig(const char* ns, JsonArrayConst ops,
         result.opsApplied = i;
         return true;  // not an error: newer state is already on disk
     }
-    if (!LittleFS.exists("/mod")) { LittleFS.mkdir("/mod"); }
-    File file = LittleFS.open(filePath, "w");
+#ifdef ESP_PLATFORM
+    struct stat st;
+    if (stat(ConfigRoot::getModPath(), &st) != 0) { mkdir(ConfigRoot::getModPath(), 0777); }
+#else
+    std::error_code ec;
+    std::filesystem::create_directories(ConfigRoot::getModPath(), ec);
+#endif
+    FILE* file = fopen(filePath, "w");
     if (!file) {
         ESP_LOGE(TAG, "patchNamespaceConfig — failed to open %s for writing", filePath);
         if (_persistMutex != nullptr) xSemaphoreGive(_persistMutex);
@@ -670,16 +696,18 @@ bool ConfigManager::patchNamespaceConfig(const char* ns, JsonArrayConst ops,
         result.applied = true;
         return false;
     }
-    if (serializeJson(postDoc, file) == 0) {
+    std::string out;
+    serializeJson(postDoc, out);
+    if (fwrite(out.c_str(), 1, out.length(), file) != out.length()) {
         ESP_LOGE(TAG, "patchNamespaceConfig — failed to write %s", filePath);
-        file.close();
+        fclose(file);
         if (_persistMutex != nullptr) xSemaphoreGive(_persistMutex);
         // Applied in RAM but flash write failed — will revert on reboot
         result.error = JsonPatch::Error::PERSIST_FAILED;
         result.applied = true;
         return false;
     }
-    file.close();
+    fclose(file);
     if (idx >= 0) _lastPersistedVersion[idx] = myVersion;
     if (_persistMutex != nullptr) xSemaphoreGive(_persistMutex);
 

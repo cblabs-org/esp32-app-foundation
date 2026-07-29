@@ -8,6 +8,10 @@
 #include <gtest/gtest.h>
 #include "EventBus.hpp"
 #include <string.h>
+#include <thread>
+#include <atomic>
+#include <vector>
+#include <chrono>
 
 class EventBusTest : public ::testing::Test {
 protected:
@@ -199,7 +203,140 @@ TEST_F(EventBusTest, Unsubscribe_WithNullptrTopic_ReturnsFalse) {
     EXPECT_FALSE(bus.unsubscribe(nullptr, testCallback, &ctx));
 }
 
+TEST_F(EventBusTest, TopicHashingHelper) {
+    EXPECT_EQ(EventBus::hashTopic(nullptr), 0u);
+    EXPECT_EQ(EventBus::hashTopic(""), 0u);
+    uint32_t h1 = EventBus::hashTopic("sys/status");
+    uint32_t h2 = EventBus::hashTopic("sys/status");
+    uint32_t h3 = EventBus::hashTopic("sys/other");
+    EXPECT_NE(h1, 0u);
+    EXPECT_EQ(h1, h2);
+    EXPECT_NE(h1, h3);
+}
+
+struct ReentrantUnsubContext {
+    EventBus* bus;
+    const char* topic;
+    EventCallback cb;
+    int callCount;
+};
+
+static void selfUnsubCallback(const char* topic, const void* payload, void* ctx) {
+    ReentrantUnsubContext* rctx = static_cast<ReentrantUnsubContext*>(ctx);
+    rctx->callCount++;
+    rctx->bus->unsubscribe(topic, rctx->cb, ctx);
+}
+
+TEST_F(EventBusTest, SelfUnsubscribeDuringDispatch) {
+    ReentrantUnsubContext rctx = { &bus, "sys/reentrant", selfUnsubCallback, 0 };
+    bus.subscribe("sys/reentrant", selfUnsubCallback, &rctx);
+
+    int count1 = bus.publish("sys/reentrant", nullptr);
+    EXPECT_EQ(count1, 1);
+    EXPECT_EQ(rctx.callCount, 1);
+
+    // Second publish should dispatch to 0 subscribers because selfUnsubCallback unsubscribed itself
+    int count2 = bus.publish("sys/reentrant", nullptr);
+    EXPECT_EQ(count2, 0);
+    EXPECT_EQ(rctx.callCount, 1);
+}
+
+struct ReentrantSubContext {
+    EventBus* bus;
+    EventCallback newCb;
+    TestContext* newCtx;
+    int callCount;
+};
+
+static void subDuringDispatchCallback(const char* topic, const void* payload, void* ctx) {
+    ReentrantSubContext* rctx = static_cast<ReentrantSubContext*>(ctx);
+    rctx->callCount++;
+    rctx->bus->subscribe("sys/new", rctx->newCb, rctx->newCtx);
+}
+
+TEST_F(EventBusTest, SubscribeDuringDispatchDoesNotReceiveCurrentEvent) {
+    TestContext newCtx = {0, "", 0};
+    ReentrantSubContext rctx = { &bus, testCallback, &newCtx, 0 };
+
+    bus.subscribe("sys/dispatch", subDuringDispatchCallback, &rctx);
+
+    int count1 = bus.publish("sys/dispatch", nullptr);
+    EXPECT_EQ(count1, 1);
+    EXPECT_EQ(rctx.callCount, 1);
+    EXPECT_EQ(newCtx.callCount, 0);
+
+    // Subsequent publish to "sys/new" should dispatch to the newly subscribed callback
+    int val = 99;
+    int count2 = bus.publish("sys/new", &val);
+    EXPECT_EQ(count2, 1);
+    EXPECT_EQ(newCtx.callCount, 1);
+}
+
+TEST_F(EventBusTest, CrossTaskPublishSubscribeConcurrency) {
+    constexpr int numPublishers = 4;
+    constexpr int publishesPerThread = 250;
+    std::atomic<int> receivedCount{0};
+
+    auto callback = [](const char* topic, const void* payload, void* ctx) {
+        std::atomic<int>* count = static_cast<std::atomic<int>*>(ctx);
+        (*count)++;
+    };
+
+    bus.subscribe("concurrent/topic", callback, &receivedCount);
+
+    std::vector<std::thread> threads;
+    for (int i = 0; i < numPublishers; ++i) {
+        threads.emplace_back([this]() {
+            for (int j = 0; j < publishesPerThread; ++j) {
+                int val = j;
+                bus.publish("concurrent/topic", &val);
+            }
+        });
+    }
+
+    for (auto& t : threads) {
+        t.join();
+    }
+
+    EXPECT_EQ(receivedCount.load(), numPublishers * publishesPerThread);
+}
+
+TEST_F(EventBusTest, CrossTaskSubscribeUnsubscribeConcurrency) {
+    constexpr int durationMs = 200;
+    std::atomic<bool> stop{false};
+    std::atomic<int> pubCount{0};
+
+    auto dummyCallback = [](const char* topic, const void* payload, void* ctx) {};
+
+    std::thread pubThread([this, &stop, &pubCount]() {
+        while (!stop.load()) {
+            bus.publish("concurrent/dynamic", nullptr);
+            pubCount++;
+            std::this_thread::sleep_for(std::chrono::microseconds(100));
+        }
+    });
+
+    std::thread subThread([this, &stop, dummyCallback]() {
+        int id = 0;
+        while (!stop.load()) {
+            bus.subscribe("concurrent/dynamic", dummyCallback, (void*)(uintptr_t)id);
+            std::this_thread::sleep_for(std::chrono::microseconds(150));
+            bus.unsubscribe("concurrent/dynamic", dummyCallback, (void*)(uintptr_t)id);
+            id++;
+        }
+    });
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(durationMs));
+    stop.store(true);
+
+    pubThread.join();
+    subThread.join();
+
+    EXPECT_GT(pubCount.load(), 0);
+}
+
 int main(int argc, char **argv) {
     ::testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();
 }
+

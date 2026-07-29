@@ -33,7 +33,7 @@ graph TD
 ```
 
 1. **Framework Kernel (`modules/`):** Contains core, reusable infrastructure modules like `Application`, `ConfigManager`, `EventBus`, `WifiManager`, and `WebServerManager`. The kernel does not contain application-specific logic and knows nothing about downstream code.
-2. **Interfaces (`include/interfaces/`):** A collection of pure virtual C++ class contracts (e.g., [ITickable](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/include/interfaces/ITickable.hpp)). They are the only coupling point between the framework and your application.
+2. **Interfaces (`include/interfaces/`):** A collection of pure virtual C++ class contracts (e.g., [ITickable](../../include/interfaces/ITickable.hpp)). They are the only coupling point between the framework and your application.
 3. **Your App (`your-project/src/` — see `sample-app/` for reference):** Implements one or more interfaces to inject custom behavior (logic, config, web pages) into the framework's execution flow.
 
 ---
@@ -81,13 +81,13 @@ void loop() {
 
 ## 3. The Single Include Façade
 
-To prevent application code from coupling directly to internal framework paths, the framework provides a single include header: [AppFoundation.h](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/include/AppFoundation.h).
+To prevent application code from coupling directly to internal framework paths, the framework provides a single include header: [AppFoundation.h](../../include/AppFoundation.h).
 
 This file transitively includes:
-- Structural configurations ([FrameworkConfig.hpp](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/include/FrameworkConfig.hpp))
-- Operational state enums ([AppState.hpp](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/include/AppState.hpp))
+- Structural configurations ([FrameworkConfig.hpp](../../include/FrameworkConfig.hpp))
+- Operational state enums ([AppState.hpp](../../include/AppState.hpp))
 - All extension interfaces from `include/interfaces/`
-- The composition root header ([Application.hpp](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/modules/Application/Application.hpp))
+- The composition root header ([Application.hpp](../../modules/Application/Application.hpp))
 
 Downstream developers only need to include `#include "AppFoundation.h"` at the top of their files.
 
@@ -95,7 +95,7 @@ Downstream developers only need to include `#include "AppFoundation.h"` at the t
 
 ## 4. Compile-Time Interface Detection
 
-The `registerModule<T>()` template in [Application.hpp](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/modules/Application/Application.hpp) uses C++ compile-time type introspection (`if constexpr` and `std::is_base_of_v`) to detect which interfaces a module implements. It automatically registers the module with all matching subsystems in a single call.
+The `registerModule<T>()` template in [Application.hpp](../../modules/Application/Application.hpp) uses C++ compile-time type introspection (`if constexpr` and `std::is_base_of_v`) to detect which interfaces a module implements. It automatically registers the module with all matching subsystems in a single call.
 
 ### How it works under the hood:
 ```cpp
@@ -104,13 +104,13 @@ bool registerModule(T* module) {
     if (!module) return false;
     bool any = false;
     if constexpr (std::is_base_of_v<ITickable, T>)        { registerTickable(module);              any = true; }
-    if constexpr (std::is_base_of_v<IConfigurable, T>)    { _configManager.registerModule(module); any = true; }
+    if constexpr (std::is_base_of_v<IConfigurable, T>)    { registerConfigurable(module);          any = true; }
     if constexpr (std::is_base_of_v<IWebContributor, T>)  { registerWebContributor(module);        any = true; }
     if constexpr (std::is_base_of_v<IMCPContributor, T>)  { registerMcpContributor(module);        any = true; }
     if constexpr (std::is_base_of_v<IDataSource, T>)      { registerDataSource(module);            any = true; }
     if constexpr (std::is_base_of_v<IConfigGate, T>)      { registerConfigGate(module);            any = true; }
     if constexpr (std::is_base_of_v<IStatusReporter, T>)  { registerStatusReporter(module);        any = true; }
-    // ...
+    if constexpr (std::is_base_of_v<IBootReporter, T>)    { registerBootReporter(module);          any = true; }
     return any;
 }
 ```
@@ -183,15 +183,16 @@ Application modules interact with framework subsystems by implementing one or mo
 
 | Interface Class | Purpose | Key Callback |
 | :--- | :--- | :--- |
-| [ITickable](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/include/interfaces/ITickable.hpp) | Runs periodic, non-blocking logic in the main tick loop. | `tick(uint32_t currentMillis)` |
-| [IConfigurable](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/include/interfaces/IConfigurable.hpp) | Persists and loads module settings via `ConfigManager` gateway. | `applyConfig(const JsonObject&)` |
-| [IWebContributor](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/include/interfaces/IWebContributor.hpp) | Exposes REST API endpoints and appends navigation tabs. | `registerRoutes(PsychicHttpServer&)` |
-| [IMCPContributor](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/include/interfaces/IMCPContributor.hpp) | Registers JSON-RPC tools with the local Model Context Protocol. | `registerMCPTools(MCPToolRegistry&)` |
-| [IConfigGate](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/include/interfaces/IConfigGate.hpp) | Blocks transition to RUNNING state until requirements are satisfied. | `isSatisfied()` |
-| [IDataSource](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/include/interfaces/IDataSource.hpp) | Scheduled background data fetch worker managed by `DataManager`. | `fetchUpdate()` |
-| [IStatusReporter](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/include/interfaces/IStatusReporter.hpp) | Displays boot-phase progress status and unrecoverable errors. | `reportStatus(const char*, float)` |
-| [IDisplayBoard](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/include/interfaces/IDisplayBoard.hpp) | Renders a telemetry pane inside the monochrome display carousel. | `render(U8G2&)` |
-| [IOTAVerifier](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/include/interfaces/IOTAVerifier.hpp) | Streaming cryptographic firmware verification for OTA updates. | `verify(const uint8_t*, size_t)` |
+| [ITickable](../../include/interfaces/ITickable.hpp) | Runs periodic, non-blocking logic in the main tick loop. | `tick(uint32_t currentMillis)` |
+| [IConfigurable](../../include/interfaces/IConfigurable.hpp) | Persists and loads module settings via `ConfigManager` gateway. | `applyConfig(const JsonObject&)` |
+| [IWebContributor](../../include/interfaces/IWebContributor.hpp) | Exposes REST API endpoints and appends navigation tabs. | `registerRoutes(PsychicHttpServer&)` |
+| [IMCPContributor](../../include/interfaces/IMCPContributor.hpp) | Registers JSON-RPC tools with the local Model Context Protocol. | `registerMCPTools(MCPToolRegistry&)` |
+| [IConfigGate](../../include/interfaces/IConfigGate.hpp) | Blocks transition to RUNNING state until requirements are satisfied. | `isSatisfied()` |
+| [IDataSource](../../include/interfaces/IDataSource.hpp) | Scheduled background data fetch worker managed by `DataManager`. | `fetchUpdate()` |
+| [IStatusReporter](../../include/interfaces/IStatusReporter.hpp) | Displays boot-phase progress status and unrecoverable errors. | `reportStatus(const char*, float)` |
+| [IBootReporter](../../modules/Application/interfaces/IBootReporter.hpp) | Early hardware initialisation reporter (extends `IStatusReporter`). | `beginEarly()` |
+| [IDisplayBoard](../../include/interfaces/IDisplayBoard.hpp) | Renders a telemetry pane inside the monochrome display carousel. | `render(U8G2&)` |
+| [IOTAVerifier](../../include/interfaces/IOTAVerifier.hpp) | Streaming cryptographic firmware verification for OTA updates. | `verify(const uint8_t*, size_t)` |
 
 For detailed information on implementing these interfaces, see the [Extension Points & Interfaces](../design_specification.md#6-extension-points--interfaces) section in the Design Specification.
 
@@ -237,18 +238,28 @@ For more details on the boot phases and state transitions, refer to the [Applica
 
 ---
 
-## 9. LittleFS Directory Layout
+## 9. Flash Partition & LittleFS Directory Layout
 
-All persistent files are stored in the flash memory via LittleFS. The framework expects a strict structure:
-- **`/mod/<namespace>.json`**: Stored configuration file for each registered `IConfigurable` module (e.g. `/mod/wifi.json`, `/mod/myapp.json`).
-- **`/www/`**: Root directory serving assets for the Single Page Application (SPA) web portal.
-- **`/www/myapp/tab.html`** & **`/www/myapp/tab.js`**: HTML fragment and JavaScript files dynamically fetched by the SPA to render custom tabs.
+The framework uses a **dual-partition** LittleFS layout. The custom partition table ([partitions.esp32dev.csv](../../partitions.esp32dev.csv)) defines two data partitions:
+
+| Partition | Label | Size | Mount Point | Purpose |
+| :--- | :--- | :--- | :--- | :--- |
+| **config** | `config` | 256 KB | `/config` | Module configuration files (`/mod/`) and system keys (`/etc/`). |
+| **storage** | `storage` | 128 KB | `/littlefs` | Static web assets (`/www/`) and other runtime data. |
+
+At boot, `Application::begin()` mounts the `storage` partition first (at `/littlefs`), then attempts to mount the dedicated `config` partition (at `/config`). If the `config` partition is not present (e.g. on boards using a default partition table), the framework falls back to storing configuration under `/littlefs` instead.
+
+### Directory structure
+- **`/config/mod/<namespace>.json`**: Persisted configuration file for each registered `IConfigurable` module (e.g. `/config/mod/wifi.json`, `/config/mod/myapp.json`).
+- **`/config/etc/`**: System-level files such as TLS keys and certificates.
+- **`/littlefs/www/`**: Root directory serving assets for the Single Page Application (SPA) web portal.
+- **`/littlefs/www/myapp/tab.html`** & **`/littlefs/www/myapp/tab.js`**: HTML fragment and JavaScript files dynamically fetched by the SPA to render custom tabs.
 
 ---
 
 ## 10. EventBus Overview
 
-The framework provides a synchronous, in-memory publish-subscribe [EventBus](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/modules/EventBus/EventBus.hpp) to enable decoupled communication between modules. Modules subscribe to string-based topic channels using static function callbacks and publish events containing optional pointer payloads. 
+The framework provides a synchronous, in-memory publish-subscribe [EventBus](../../modules/EventBus/EventBus.hpp) to enable decoupled communication between modules. Modules subscribe to string-based topic channels using static function callbacks and publish events containing optional pointer payloads.
 
 Common framework events include:
 - `system.heap`: Emitted periodically with the free heap size.

@@ -2,29 +2,39 @@
 
 > ESP32 App Foundation (c) 2026 CB Labs
 >
-> Learn how to integrate platform-specific optional modules — hardware displays, sensors, actuators — using the `#ifndef NATIVE_BUILD` guard pattern.
+> Learn how to integrate platform-specific and feature-specific optional modules using the two-axis optionality model and explicit main.cpp composition pattern.
 
 ---
 
-This guide explains how to work with **optional modules**: framework-level or application-level modules that add hardware-specific features not every application needs. Because they depend on hardware SDKs that are unavailable during host-based testing, they require special compilation guards and registration patterns.
+This guide explains how to work with **optional modules**: framework-level or application-level modules that add hardware-specific or feature-specific capabilities not every application needs. Because optional modules may depend on hardware SDKs or optional protocols (such as HomeAssistant MQTT), they follow a clean two-axis optionality model.
 
 For the base module creation pattern, see [Creating a Module](creating-a-module.md).
 
 ---
 
-## 1. What "Optional" Means
+## 1. What "Optional" Means & The Two-Axis Optionality Model
 
-An **optional module** is any module that:
+An **optional module** is any module (framework-level or application-level) that:
 
-- Depends on hardware-specific libraries (SPI drivers, sensor SDKs, display controllers, actuator APIs)
+- Depends on hardware-specific libraries (SPI drivers, sensor SDKs, display controllers) or optional protocols (e.g., HomeAssistant MQTT)
 - Is not required by every downstream application
-- Must be excluded from `native` (GoogleTest) builds to allow host-based unit testing
+- Can be excluded to reduce flash size, save RAM, or enable host-based unit testing (`native`)
+
+### The Two-Axis Optionality Model
+
+The framework governs optionality along two independent axes:
+
+1. **Axis 1: Availability Flag (Compile-Time)** — Governed by preprocessor defines in `platformio.ini` (e.g., `-D WITH_HOMEASSISTANT`, `-D WITH_DISPLAY_U8G2`). When the flag is off, `#ifdef` guards exclude the module's headers and compilation units entirely, preserving binary flash and RAM space.
+2. **Axis 2: Explicit Composition (Registration)** — Framework optional modules (such as `HomeAssistantModule`) are no longer owned or hardcoded inside `Application`. Instead, they are explicitly instantiated and wired in `main.cpp` and registered via `app.registerModule()`, guarded by the feature flag.
+
+This "honest `main.cpp` composition pattern" keeps `Application` decoupled as a core kernel hub, while making all optional dependencies explicit in the application entry point.
 
 Examples in the framework include:
-- **U8G2DisplayModule** — drives a monochrome OLED/LCD display via SPI or I2C
-- Any sensor module that includes `<Wire.h>`, `<SPI.h>`, or vendor-specific drivers
+- **HomeAssistantModule** — MQTT discovery and telemetry reporting (guarded by `WITH_HOMEASSISTANT`)
+- **U8G2DisplayModule** — Monochrome OLED/LCD display driver via SPI/I2C (guarded by `WITH_DISPLAY_U8G2`)
+- **LVGLDisplayModule** — Colour TFT display driver powered by LVGL v9.5 (guarded by `WITH_DISPLAY_LVGL`)
 
-Optional modules are full framework citizens: they implement the same interfaces (`ITickable`, `IConfigurable`, `IWebContributor`, etc.) and are registered with the same `registerModule()` call. The only difference is how they handle hardware dependencies at compile time.
+Optional modules are full framework citizens: they implement the same interfaces (`ITickable`, `IConfigurable`, `IWebContributor`, etc.) and are registered with the same `registerModule()` call.
 
 ---
 
@@ -357,6 +367,41 @@ void setup() {
 ```
 
 > **Important:** The `#include` and global instantiation of the sensor module are *both* guarded. If you only guard the `registerModule()` call but not the `#include`, the native build will still fail because the hardware header is parsed.
+
+### Framework Optional Module Example: HomeAssistantModule
+
+Framework optional modules follow the exact same composition rules as custom modules. Rather than being owned inside `Application`, `HomeAssistantModule` is declared statically at file scope in `main.cpp`, wired with its kernel dependencies, and registered with `app.registerModule()` guarded by `#ifdef WITH_HOMEASSISTANT`:
+
+```cpp
+#include "AppFoundation.h"
+
+static Application app;
+
+#ifdef WITH_HOMEASSISTANT
+#include "HomeAssistantModule.hpp"
+static HomeAssistantModule haModule;
+#endif
+
+void setup() {
+    // Basic framework setup
+    app.getWifiManager().setDefaultHostname("esp32-foundation");
+
+#ifdef WITH_HOMEASSISTANT
+    // Inject core kernel dependencies before registering
+    haModule.setKeyManager(&app.getKeyManager());
+    haModule.setEventBus(&app.getEventBus());
+    haModule.setConfigManager(&app.getConfigManager());
+    haModule.setAppName(app.getAppName());
+    haModule.setAppVersion(BUILD_VERSION);
+
+    // Register the optional module with the framework hub
+    app.registerModule(&haModule);
+#endif
+
+    FrameworkConfig config;
+    app.begin(config);
+}
+```
 
 ### Step 4 — Provide Native Build Stubs or Mocks
 

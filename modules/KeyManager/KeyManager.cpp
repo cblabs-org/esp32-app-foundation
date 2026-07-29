@@ -15,6 +15,13 @@
 #include "../Logger/Logger.hpp"
 #include <fstream>
 #include <sstream>
+#include <sys/stat.h>
+#include <stdio.h>
+#include <unistd.h>
+#include <vector>
+#ifndef ESP_PLATFORM
+#include <filesystem>
+#endif
 
 #include <PsychicHttp.h>
 
@@ -28,16 +35,19 @@ void KeyManager::begin(DeviceCrypto* crypto) {
 }
 
 bool KeyManager::loadRegistry(JsonDocument& doc) const {
-    if (!LittleFS.exists(KEY_MANAGER_PATH)) {
+    struct stat st;
+    if (stat(KEY_MANAGER_PATH, &st) != 0) {
         return true; // Empty registry is valid initially
     }
-    File file = LittleFS.open(KEY_MANAGER_PATH, "r");
+    FILE* file = fopen(KEY_MANAGER_PATH, "r");
     if (!file) {
         ESP_LOGE(TAG, "Failed to open registry for reading.");
         return false;
     }
-    DeserializationError error = deserializeJson(doc, file);
-    file.close();
+    std::vector<char> buf(st.st_size);
+    fread(buf.data(), 1, st.st_size, file);
+    fclose(file);
+    DeserializationError error = deserializeJson(doc, buf.data(), st.st_size);
 
     if (error) {
         ESP_LOGE(TAG, "Failed to parse registry: %s", error.c_str());
@@ -47,17 +57,25 @@ bool KeyManager::loadRegistry(JsonDocument& doc) const {
 }
 
 bool KeyManager::saveRegistry(const JsonDocument& doc) const {
-    // Ensure parent directory exists (fresh filesystem won't have /etc/)
-    if (!LittleFS.exists("/etc")) {
-        LittleFS.mkdir("/etc");
+    // Ensure parent directory exists (fresh filesystem won't have system config dir)
+#ifdef ESP_PLATFORM
+    struct stat st;
+    if (stat(ConfigRoot::getEtcPath(), &st) != 0) {
+        mkdir(ConfigRoot::getEtcPath(), 0777);
     }
-    File file = LittleFS.open(KEY_MANAGER_PATH, "w");
+#else
+    std::error_code ec;
+    std::filesystem::create_directories(ConfigRoot::getEtcPath(), ec);
+#endif
+    FILE* file = fopen(KEY_MANAGER_PATH, "w");
     if (!file) {
         ESP_LOGE(TAG, "Failed to open registry for writing.");
         return false;
     }
-    serializeJson(doc, file);
-    file.close();
+    std::string out;
+    serializeJson(doc, out);
+    fwrite(out.c_str(), 1, out.length(), file);
+    fclose(file);
     return true;
 }
 

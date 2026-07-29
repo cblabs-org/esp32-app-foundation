@@ -15,9 +15,10 @@
 
 #include "LVGLDisplayModule.hpp"
 #include "EventBus.hpp"
-#include "OTAUpdateManager.hpp"
+
 #include "ConfigManager.hpp"
 #include "MCPToolRegistry.hpp"
+#include "../Application/Application.hpp"
 #include <base64.h>
 #include <cstdio>
 #include <PsychicHttp.h>
@@ -137,6 +138,11 @@ void LVGLDisplayModule::bootstrapHardware() {
     }
 }
 
+bool LVGLDisplayModule::beginEarly() {
+    bootstrapHardware();
+    return true;
+}
+
 void LVGLDisplayModule::begin(EventBus* eventBus) {
     _eventBus = eventBus;
 
@@ -147,9 +153,13 @@ void LVGLDisplayModule::begin(EventBus* eventBus) {
 
     // Subscribe to EventBus topics
     if (_eventBus != nullptr) {
-        _eventBus->subscribe(OTAUpdateManagerEvents::OTA_PROGRESS, _onOtaProgress, this);
+#ifdef WITH_OTA
+        _eventBus->subscribe(ApplicationEvents::OTA_PROGRESS, _onOtaProgress, this);
+#endif
         _eventBus->subscribe(LVGLDisplayEvents::DISPLAY_MESSAGE, _onDisplayMessage, this);
         _eventBus->subscribe(LVGLDisplayEvents::SYSTEM_ERROR, _onSystemError, this);
+        _eventBus->subscribe(ApplicationEvents::APP_CONFIGURING, _onAppConfiguring, this);
+        _eventBus->subscribe(ApplicationEvents::APP_RUNNING, _onAppRunning, this);
     }
 
     // Sync screensaver settings
@@ -477,11 +487,12 @@ void LVGLDisplayModule::setBlankTimeout(unsigned long timeoutMs) {
 // Static EventBus Callbacks
 // -----------------------------------------------------------------------------
 
+#ifdef WITH_OTA
 void LVGLDisplayModule::_onOtaProgress(const char* /*topic*/, const void* payload, void* ctx) {
     auto* self = static_cast<LVGLDisplayModule*>(ctx);
     if (payload == nullptr || self == nullptr) return;
 
-    const auto* ota = static_cast<const OTAProgressPayload*>(payload);
+    const auto* ota = static_cast<const ApplicationEvents::OtaProgressPayload*>(payload);
     if (ota->complete) {
         self->_pendingOtaSuccess.store(ota->success);
         if (ota->status) {
@@ -503,6 +514,7 @@ void LVGLDisplayModule::_onOtaProgress(const char* /*topic*/, const void* payloa
         self->_pendingOtaUpdate.store(true);
     }
 }
+#endif
 
 void LVGLDisplayModule::_onDisplayMessage(const char* /*topic*/, const void* payload, void* ctx) {
     auto* self = static_cast<LVGLDisplayModule*>(ctx);
@@ -533,6 +545,18 @@ void LVGLDisplayModule::_onSystemError(const char* /*topic*/, const void* payloa
         }
         self->_pendingError.store(true);
     }
+}
+
+void LVGLDisplayModule::_onAppConfiguring(const char* /*topic*/, const void* /*payload*/, void* ctx) {
+    auto* self = static_cast<LVGLDisplayModule*>(ctx);
+    if (self == nullptr) return;
+    ESP_LOGI("LVGLDisplayModule", "App transition → CONFIGURING");
+}
+
+void LVGLDisplayModule::_onAppRunning(const char* /*topic*/, const void* /*payload*/, void* ctx) {
+    auto* self = static_cast<LVGLDisplayModule*>(ctx);
+    if (self == nullptr) return;
+    ESP_LOGI("LVGLDisplayModule", "App transition → RUNNING");
 }
 
 // -----------------------------------------------------------------------------

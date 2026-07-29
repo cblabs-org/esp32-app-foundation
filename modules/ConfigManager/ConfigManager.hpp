@@ -68,6 +68,7 @@
 #include "../../include/interfaces/IConfigurable.hpp"
 #include "../../include/interfaces/IWebContributor.hpp"
 #include "../../include/interfaces/IMCPContributor.hpp"
+#include "ConfigRoot.hpp"
 #include "../../lib/ConfigManifest/ConfigManifest.hpp"
 #include "JsonPatch.hpp"
 

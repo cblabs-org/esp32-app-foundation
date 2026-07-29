@@ -14,7 +14,8 @@
  *   - begin(): Initialize the event bus
  *   - subscribe(): Subscribe to a topic with a callback and context
  *   - unsubscribe(): Remove a subscription
- *   - publish(): Synchronously dispatch an event payload to all subscribers
+ *   - publish(): Dispatch an event payload to all subscribers (see contract below)
+ *   - hashTopic(): Static helper to hash topic strings to uint32_t
  */
 
 #ifndef EVENT_BUS_HPP
@@ -23,7 +24,52 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <vector>
-#include <string>
+
+/**
+ * @brief Concurrency & Lifecycle Contract for EventBus:
+ *
+ * 1. Execution Context (CRITICAL — differs between native and target):
+ *    - **Native/unit-test builds:** dispatch is synchronous and inline within
+ *      the caller's thread. publish() returns only after all matching
+ *      callbacks have executed.
+ *    - **Target (ESP32/FreeRTOS):** publish() posts to the esp_event default
+ *      event loop via esp_event_post(). Callbacks execute on the **default
+ *      event loop task** — NOT the publisher's task. This means:
+ *        • The publisher and subscriber may run on different tasks.
+ *        • There is NO synchronous ordering guarantee between a publish()
+ *          call returning and the subscriber's callback executing.
+ *        • Subscribers reacting to lifecycle events (e.g. APP_CONFIGURING,
+ *          APP_RUNNING) should treat their reaction as best-effort within
+ *          the next event-loop cycle. Callers MUST NOT assume the subscriber
+ *          has acted by the time publish() returns.
+ *        • The default event loop task has a finite stack (typically 4096
+ *          bytes). Callbacks performing heavy work (large JSON serialization,
+ *          LittleFS flushes, HTTP requests) risk stack overflow and should
+ *          offload to a dedicated task or use a bounded working buffer.
+ *
+ * 2. Blocking Behaviour:
+ *    - publish() uses portMAX_DELAY when posting to the event queue. If the
+ *      default event loop queue is full, the publisher BLOCKS indefinitely
+ *      until a slot becomes available. This is safe for normal event rates
+ *      but could cause watchdog resets under event storms.
+ *
+ * 3. Topic Interning & Allocation Guarantees:
+ *    - Topics are interned to 32-bit FNV-1a hashes (uint32_t) at subscription and publish time.
+ *    - `publish()` incurs ZERO heap allocations on the hot path (in-place vector iteration).
+ *
+ * 4. Re-entrancy & Mutation Safety:
+ *    - Callbacks are executed in-place without duplicating subscriber vectors.
+ *    - Callbacks MAY safely call `subscribe()` or `unsubscribe()` (including self-unsubscription)
+ *      during event dispatch. Soft-deletion (tombstoning) ensures iterator and index stability,
+ *      and inactive slots are compacted after top-level dispatch completes.
+ *    - Subscriptions added during an active `publish()` will not receive the currently dispatched event,
+ *      but will participate in future publications.
+ *
+ * 5. Execution Budget & Payload Lifetime:
+ *    - Callback routines MUST comply with the cooperative tick budget (<= 10 ms per callback).
+ *    - Event payload pointers are valid ONLY for the duration of the callback execution.
+ *      If the subscriber needs data beyond the callback, it must copy the payload.
+ */
 
 /**
  * @brief Type definition for an event callback.
@@ -37,10 +83,15 @@ typedef void (*EventCallback)(const char* topic, const void* payload, void* ctx)
  * @brief Structure to hold a single subscription record.
  */
 struct Subscription {
-    std::string topic;                      // Topic string
+    uint32_t topicHash;                     // Interned topic identity (32-bit FNV-1a hash)
     EventCallback callback;                 // Callback function
     void* ctx;                              // User context
+#ifdef UNIT_TEST
     bool active;                            // Is this slot active?
+#else
+    const char* topicStr;
+    void* instance;
+#endif
 };
 
 /**
@@ -48,11 +99,34 @@ struct Subscription {
  */
 class EventBus {
 private:
+#ifdef UNIT_TEST
     std::vector<Subscription> _subscribers;
+    uint32_t _dispatchDepth = 0;
+    bool _needsCleanup = false;
+
+    void cleanup();
+#else
+    std::vector<Subscription*> _subscribers;
+#endif
 
 public:
     /**
-     * @brief Initialize the event bus, clearing all subscriptions.
+     * @brief Utility function to compute FNV-1a 32-bit hash of a topic string.
+     * @param str Topic string.
+     * @return uint32_t 32-bit hash value, or 0 if string is null or empty.
+     */
+    static inline uint32_t hashTopic(const char* str) {
+        if (!str || str[0] == '\0') return 0;
+        uint32_t hash = 2166136261u;
+        while (*str) {
+            hash ^= static_cast<uint8_t>(*str++);
+            hash *= 16777619u;
+        }
+        return hash;
+    }
+
+    /**
+     * @brief Initialize the event bus, clearing all subscriptions and resetting state.
      */
     void begin();
 
@@ -61,7 +135,7 @@ public:
      * @param topic Topic string to subscribe to (exact match).
      * @param callback Function to call when an event is published.
      * @param ctx User context to pass to the callback.
-     * @return true if subscription succeeded, false if table is full or invalid topic.
+     * @return true if subscription succeeded, false if invalid topic or callback.
      */
     bool subscribe(const char* topic, EventCallback callback, void* ctx = nullptr);
 
@@ -84,3 +158,4 @@ public:
 };
 
 #endif // EVENT_BUS_HPP
+

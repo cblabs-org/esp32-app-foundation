@@ -20,6 +20,41 @@
 #include <Arduino.h>
 #include "MyApp.hpp"
 
+#ifdef WITH_HOMEASSISTANT
+#include "HomeAssistantModule.hpp"
+static HomeAssistantModule haModule;
+#endif
+
+#ifdef WITH_OTA
+#include "OTAUpdateManager.hpp"
+static OTAUpdateManager otaManager;
+#endif
+
+#ifdef WITH_TIME
+#include "TimeManager.hpp"
+#include "TimeConfigGate.hpp"
+static TimeManager timeManager;
+static TimeConfigGate timeGate{timeManager};
+#endif
+
+#ifdef WITH_MCP
+#include "MCPServer.hpp"
+static MCPServer mcpServer;
+#endif
+
+// --- Display (Ring-2 Optional) ---
+#ifdef WITH_DISPLAY_LVGL
+#include "LVGLDisplayModule.hpp"
+#include "adapters/lvgl/CrowPanel128Adapter.hpp"
+static CrowPanel128Adapter displayAdapter;
+static LVGLDisplayModule displayModule(displayAdapter);
+#elif defined(WITH_DISPLAY_U8G2)
+#include "U8G2DisplayModule.hpp"
+#include "boards/DiagnosticsBoard.hpp"
+static U8G2DisplayModule displayModule;
+static DiagnosticsBoard diagnosticsBoard{256, 64};
+#endif
+
 Application app;   ///< Framework hub instance
 MyApp myApp;       ///< Application module instance
 
@@ -40,6 +75,34 @@ void setup() {
     // Register — compile-time introspection detects all 5 interfaces
     app.registerModule(&myApp);
 
+#ifdef WITH_OTA
+    app.registerModule(&otaManager);
+#endif
+
+#ifdef WITH_HOMEASSISTANT
+    haModule.setKeyManager(&app.getKeyManager());
+    haModule.setEventBus(&app.getEventBus());
+    haModule.setConfigManager(&app.getConfigManager());
+    haModule.setAppName(app.getAppName());
+    haModule.setAppVersion(BUILD_VERSION);
+    app.registerModule(&haModule);
+#endif
+
+#ifdef WITH_TIME
+    timeManager.setConfigManager(&app.getConfigManager());
+    app.registerModule(&timeManager);
+#endif
+
+#if defined(WITH_DISPLAY_U8G2) || defined(WITH_DISPLAY_LVGL)
+    app.registerModule(&displayModule);
+    app.registerModule(displayModule.settingsTabStub());
+    app.registerModule(displayModule.screenshotTabStub());
+#endif
+
+#ifdef WITH_MCP
+    app.registerModule(&mcpServer);
+#endif
+
     // Begin framework — OTA is disabled by default in this template.
     // To enable OTA updates for your app:
     //   1. Create a releases repo (e.g. your-org/my-app-releases)
@@ -52,6 +115,36 @@ void setup() {
     //      config.otaPublicKey = (const char*)public_key_pem;
     FrameworkConfig config;
     app.begin(config);
+
+#ifdef WITH_OTA
+    otaManager.begin(app);
+    otaManager.markAppValid();
+#endif
+
+#ifdef WITH_TIME
+    timeManager.begin();
+#endif
+
+#ifdef WITH_MCP
+    mcpServer.begin(app.getMcpContributors(), &app.getConfigManager(), 
+#ifdef WITH_TIME
+        &timeManager,
+#else
+        nullptr,
+#endif
+        &app.getWifiManager(), &app.getAuthManager());
+#endif
+
+#if defined(WITH_DISPLAY_U8G2) || defined(WITH_DISPLAY_LVGL)
+    displayModule.setConfigManager(&app.getConfigManager());
+#ifdef WITH_DISPLAY_U8G2
+    diagnosticsBoard.configure(&app.getWifiManager());
+    displayModule.carousel.add(&diagnosticsBoard);
+#ifdef WITH_MCP
+    mcpServer.setDisplayInfo(displayModule.getDisplayInfo());
+#endif
+#endif
+#endif
 }
 
 /**

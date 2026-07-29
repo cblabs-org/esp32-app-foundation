@@ -44,13 +44,13 @@ Use the `platformio` MCP tools (`build_project`, `run_tests`) — **not** raw `p
 CLI (rule 04). Native test env: `native`. Verify both `native` and at least one
 hardware env (`esp32dev`) compile.
 
-## Proposed Work Order Ledger _(PA to finalise)_
+## Work Order Ledger
 
-- **[ ] wo1 — contract + interning:** define the concurrency contract; replace
+- **[x] [wo1-contract-interning](wo1-contract-interning/WORKORDER.md):** define the concurrency contract; replace
   `std::string` topics with interned identity; in-place dispatch. `standard`
-- **[ ] wo2 — on-target backing:** implement the OQ-MK-3 choice (`esp_event`
+- **[x] [wo2-on-target-backing](wo2-on-target-backing/WORKORDER.md):** implement the OQ-MK-3 choice (`esp_event`
   delegation or `portMUX`) behind the interface; native sync stub. `architect`
-- **[ ] wo3 — caller migration + tests:** migrate publishers/subscribers; add
+- **[x] [wo3-caller-migration](wo3-caller-migration/WORKORDER.md):** migrate publishers/subscribers; add
   concurrency + regression tests. `standard`
 
 ## Verification

@@ -27,6 +27,7 @@
 
 #include <gtest/gtest.h>
 #include <cstdio>
+#include <algorithm>
 #include "Application.hpp"
 #include "OTAUpdateManager.hpp"
 #include "interfaces/IMCPContributor.hpp"
@@ -276,8 +277,8 @@ TEST_F(ApplicationLockTest, PostLock_RegisterMcpContributor_ReturnsFalse) {
 }
 
 /**
- * A MockMcpContributor registered before begin() must have its tool
- * visible in the MCPServer's registry after begin() completes.
+ * A MockMcpContributor registered before begin() must appear
+ * in the getMcpContributors() vector after begin() completes.
  */
 TEST_F(ApplicationLockTest, McpContributor_ToolVisibleAfterBegin) {
     MockMcpContributor contributor;
@@ -285,7 +286,10 @@ TEST_F(ApplicationLockTest, McpContributor_ToolVisibleAfterBegin) {
     lockApp();
 
     EXPECT_TRUE(contributor.registered);
-    EXPECT_NE(app.getMCPServer().getRegistry().findTool("mock_mcp_tool"), nullptr);
+    const auto& contributors = app.getMcpContributors();
+    EXPECT_NE(std::find(contributors.begin(), contributors.end(),
+              static_cast<IMCPContributor*>(&contributor)),
+              contributors.end());
 }
 
 /**
@@ -535,12 +539,6 @@ TEST_F(ApplicationDomainServiceTest, GetOtaManager_ReturnsReference) {
     SUCCEED();
 }
 
-/** getTimeManager() must return a valid reference. */
-TEST_F(ApplicationDomainServiceTest, GetTimeManager_ReturnsReference) {
-    TimeManager& tm = app.getTimeManager();
-    // If this compiles and doesn't crash, the accessor works
-    EXPECT_TRUE(true);
-}
 
 /** getKeyManager() must return a valid reference. */
 TEST_F(ApplicationDomainServiceTest, GetKeyManager_ReturnsReference) {

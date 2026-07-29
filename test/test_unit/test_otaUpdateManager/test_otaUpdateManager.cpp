@@ -11,6 +11,8 @@
 
 #include <gtest/gtest.h>
 
+#ifdef WITH_OTA
+
 // Include the real Application header (Application now owns OTAUpdateManager)
 #include "../../../modules/Application/Application.hpp"
 
@@ -161,6 +163,8 @@ TEST_F(OtaUpdateManagerTest, ApplyConfig_MissingUpdatesEnabled_DefaultsTrue) {
     manager.serializeConfig(out);
     EXPECT_TRUE(out["updatesEnabled"].as<bool>());
 }
+
+#endif // WITH_OTA
 
 int main(int argc, char **argv) {
     ::testing::InitGoogleTest(&argc, argv);

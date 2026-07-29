@@ -52,7 +52,7 @@ static constexpr const char* TAG = "U8G2DisplayModule";
 #include <PsychicHttp.h>
 #include <ArduinoJson.h>
 #include "../Application/Application.hpp"
-#include "../OTAUpdateManager/OTAUpdateManager.hpp"
+
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 // SPI.h is required whenever explicit SCK+MOSI pins are provided, even on
@@ -137,8 +137,7 @@ void U8G2DisplayModule::bootstrapHardware() {
         const unsigned long kFadeDurationMs = 1000;
         const unsigned long kHoldDurationMs = 2000;
         const int kFadeSteps = 250;
-        const unsigned long kStepMs = 4;
-
+        const unsigned long kStepMs = kFadeDurationMs / kFadeSteps;
         for (int i = 1; i <= kFadeSteps; i++) {
             uint8_t level = static_cast<uint8_t>(
                 (static_cast<unsigned long>(_brightness) * i) / kFadeSteps
@@ -156,6 +155,11 @@ void U8G2DisplayModule::bootstrapHardware() {
     _bootstrapMode = true;
     _lastBootProgress = 0.0f;
     ESP_LOGI(TAG, "Bootstrap: display hardware ready, inline rendering enabled");
+}
+
+bool U8G2DisplayModule::beginEarly() {
+    bootstrapHardware();
+    return true;
 }
 
 /**
@@ -189,9 +193,12 @@ void U8G2DisplayModule::begin(EventBus* eventBus) {
     // --- Step 2: Subscribe to EventBus topics ---
     // Guarded: getEventBus() requires Application.hpp (unavailable in native)
     if (_eventBus != nullptr) {
-        ESP_LOGI(TAG, "Subscribing to EventBus topics: ota.progress, display.message");
-        _eventBus->subscribe(OTAUpdateManagerEvents::OTA_PROGRESS, _onOtaProgress, this);
+#ifdef WITH_OTA
+        _eventBus->subscribe(ApplicationEvents::OTA_PROGRESS, _onOtaProgress, this);
+#endif
         _eventBus->subscribe(U8G2DisplayEvents::DISPLAY_MESSAGE, _onDisplayMessage, this);
+        _eventBus->subscribe(ApplicationEvents::APP_CONFIGURING, _onAppConfiguring, this);
+        _eventBus->subscribe(ApplicationEvents::APP_RUNNING, _onAppRunning, this);
     }
 
     // --- Step 3: Activate boot splash (skip if bootstrapped — already shown) ---
@@ -207,7 +214,8 @@ void U8G2DisplayModule::begin(EventBus* eventBus) {
 
     // --- Step 6: Start the inactivity timer
     resetActivity();
-    _lastRenderMs   = millis();
+    _renderTimer.setInterval(_targetFrameIntervalMs);
+    _renderTimer.reset(millis());
 
     ESP_LOGI(TAG, "Display module fully initialized — tick-driven rendering active");
 }
@@ -275,10 +283,9 @@ void U8G2DisplayModule::tick(uint32_t currentMillis) {
 
     // --- 5. Tick + render the visible board (frame-rate limited) ---
     visible->tick(currentMillis);
-    unsigned long now = currentMillis;
-    if ((now - _lastRenderMs) >= _targetFrameIntervalMs) {
+    if (_renderTimer.check(currentMillis)) {
         _renderCurrentBoard();
-        _lastRenderMs = now;
+        _renderTimer.reset(currentMillis);
     }
 }
 
@@ -1098,25 +1105,23 @@ void U8G2DisplayModule::registerMCPTools(MCPToolRegistry& registry) {
  * @param payload Pointer to OTAProgressPayload.
  * @param ctx     The U8G2DisplayModule instance (passed during subscribe).
  */
+#ifdef WITH_OTA
 void U8G2DisplayModule::_onOtaProgress(const char* /*topic*/, const void* payload, void* ctx) {
     auto* self = static_cast<U8G2DisplayModule*>(ctx);
-    if (payload == nullptr || self == nullptr) {
-        return;
-    }
+    if (payload == nullptr || self == nullptr) return;
 
-    const auto* ota = static_cast<const OTAProgressPayload*>(payload);
+    const auto* ota = static_cast<const ApplicationEvents::OtaProgressPayload*>(payload);
 
     if (ota->complete) {
-        // --- OTA cycle finished — mark board as complete ---
         self->_otaProgress.setComplete(ota->success);
     } else {
-        // --- OTA in progress — update progress bar ---
         self->_otaProgress.setProgress(ota->progress, ota->status);
     }
 
-    // --- Push OTA board as modal overlay ---
     self->showModal(&self->_otaProgress);
+    self->resetActivity();
 }
+#endif
 
 /**
  * @brief Static callback for "display.message" EventBus events.
@@ -1142,6 +1147,38 @@ void U8G2DisplayModule::_onDisplayMessage(const char* /*topic*/, const void* pay
 
     // --- Push boot board as modal overlay ---
     self->showModal(&self->_bootBoard);
+}
+
+/**
+ * @brief Static callback for "app.configuring" EventBus events.
+ *
+ * Suspends carousel rotation and sets the configuring status board as base layer.
+ */
+void U8G2DisplayModule::_onAppConfiguring(const char* /*topic*/, const void* /*payload*/, void* ctx) {
+    auto* self = static_cast<U8G2DisplayModule*>(ctx);
+    if (self == nullptr) {
+        return;
+    }
+
+    self->carousel.suspend();
+    self->showBase(&self->boards.configuringStatus);
+    // TODO: Restore WiFi Wizard modal logic
+}
+
+/**
+ * @brief Static callback for "app.running" EventBus events.
+ *
+ * Clears modal overlays, clears base layer override, and resumes carousel rotation.
+ */
+void U8G2DisplayModule::_onAppRunning(const char* /*topic*/, const void* /*payload*/, void* ctx) {
+    auto* self = static_cast<U8G2DisplayModule*>(ctx);
+    if (self == nullptr) {
+        return;
+    }
+
+    self->clearModal();
+    self->showBase(nullptr);
+    self->carousel.resume();
 }
 
 

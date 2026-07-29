@@ -50,6 +50,7 @@
 
 #include "MCPToolRegistry.hpp"
 #include "MCPBuiltinTools.hpp"
+#include "../../include/interfaces/ITickable.hpp"
 #include "../../include/interfaces/IWebContributor.hpp"
 #include "../../include/interfaces/IConfigurable.hpp"
 
@@ -70,7 +71,7 @@ class AuthManager;
  * Also implements IConfigurable (namespace "mcp") so runtime toggle
  * state (enabled/readOnly) persists across reboots via ConfigManager.
  */
-class MCPServer : public IWebContributor, public IConfigurable {
+class MCPServer : public ITickable, public IWebContributor, public IConfigurable {
 public:
     /**
      * @brief Initialise the MCP server: register built-in and contributor tools.
@@ -81,7 +82,7 @@ public:
      *                      for the device hostname shown on the status endpoint.
      * @param authManager   Optional pointer to the AuthManager for bearer token
      *                      authentication on HTTP MCP routes. When non-null and auth
-     *                      is enabled, all HTTP /api/mcp/* requests require a valid
+     *                      is enabled, all HTTP /api/mcp/<endpoint> requests require a valid
      *                      Authorization: Bearer header. Serial transport is exempt.
      */
     void begin(const std::vector<IMCPContributor*>& contributors, ConfigManager* configManager = nullptr, TimeManager* timeManager = nullptr, WifiManager* wifiManager = nullptr, AuthManager* authManager = nullptr);
@@ -100,7 +101,7 @@ public:
      * and dispatches on newline. In native builds: no-op (tests call
      * _processLine directly via the test harness).
      */
-    void tick();
+    void tick(uint32_t currentMillis) override;
 
     /**
      * @brief Access the tool registry (primarily for testing).

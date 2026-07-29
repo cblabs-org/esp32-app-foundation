@@ -42,7 +42,9 @@
 #include "../ConfigManager/ConfigManager.hpp"
 #include "../KeyManager/KeyManager.hpp"
 #include "../MCPServer/MCPToolRegistry.hpp"
+#include "../../include/utils/Periodic.hpp"
 #include "../EventBus/EventBus.hpp"
+#include "../../include/interfaces/ITickable.hpp"
 
 #include <PsychicHttp.h>
 #include <ArduinoJson.h>
@@ -80,7 +82,7 @@ WifiManager::~WifiManager() {
  */
 void WifiManager::transitionTo(WiFiState newState) {
     _currentState = newState;
-    _stateTimer = millis();
+    _stateTimer.reset(millis());
 }
 
 // =============================================================================
@@ -195,10 +197,7 @@ void WifiManager::tick(uint32_t currentMillis) {
 
     switch (_currentState) {
         case WiFiState::Init: {
-            unsigned long elapsed = currentMillis - _stateTimer;
-            if (elapsed > 2000) {
-                ESP_LOGI(TAG, "Init complete (waited %lums). SSID='%s' len=%d",
-                         elapsed, _wifiSsid, (int)strlen(_wifiSsid));
+            if (_stateTimer.check(currentMillis)) {
                 if (strlen(_wifiSsid) > 0) {
                     ESP_LOGI(TAG, "Connecting to %s...", _wifiSsid);
                     WiFi.mode(WIFI_STA);
@@ -221,7 +220,7 @@ void WifiManager::tick(uint32_t currentMillis) {
             if (WiFi.status() == WL_CONNECTED) {
                 ESP_LOGI(TAG, "Connected successfully. IP: %s", WiFi.localIP().toString().c_str());
                 _isAPMode = false;
-                _wifiDisconnectTimer = 0; // Reset downtime tracker
+                _wifiDisconnectTimer.setInterval(0); // Reset downtime tracker
                 updateMyUrl();
                 ESP_LOGI(TAG, "Attempting to publish wifi.connected, _eventBus=%p", _eventBus);
                 if (_eventBus) {
@@ -230,7 +229,7 @@ void WifiManager::tick(uint32_t currentMillis) {
                     ESP_LOGI(TAG, "Published WIFI_CONNECTED to %d subscribers", count);
                 }
                 transitionTo(WiFiState::Ready);
-            } else if (currentMillis - _stateTimer > 15000) { // 15 second timeout for STA
+            } else if (_stateTimer.check(currentMillis) && (currentMillis - _stateTimer.getLastFire() > 15000)) { // 15 second timeout for STA
                 ESP_LOGW(TAG, "WiFi connection timed out. Falling back to AP.");
                 WiFi.disconnect(true); // Ensure clean slate
                 transitionTo(WiFiState::ApStarting);
@@ -285,30 +284,30 @@ void WifiManager::tick(uint32_t currentMillis) {
             // Reconnection logic: If we're in STA mode and lost connection
             if (!_isAPMode && WiFi.status() != WL_CONNECTED) {
                 // If this is the first tick since disconnection, start the timer
-                if (_wifiDisconnectTimer == 0) {
-                    _wifiDisconnectTimer = currentMillis;
+                if (_wifiDisconnectTimer.getInterval() == 0) {
+                    _wifiDisconnectTimer.reset(currentMillis);
+                    _wifiDisconnectTimer.setInterval(1); // Enable tracking
                     ESP_LOGI(TAG, "_eventBus is %p", _eventBus);
-                if (_eventBus) {
+                    if (_eventBus) {
                         _eventBus->publish(WifiEvents::WIFI_DISCONNECTED);
                     }
                 }
 
                 // Wait 10 seconds before attempting to recycle the connection
-                if (currentMillis - _stateTimer > 10000) {
+                if (_wifiDisconnectTimer.check(currentMillis) && (currentMillis - _wifiDisconnectTimer.getLastFire() > 10000)) {
                     ESP_LOGW(TAG, "Primary connection lost. Retrying...");
                     transitionTo(WiFiState::Init);
                 }
             } else if (_isAPMode) {
-                // AP Mode 1-hour inactivity timeout (pragmatic interim; see WO10 notes)
+                // AP Mode 1-hour inactivity timeout
                 if (currentMillis - _lastApiRequestTime > 3600000) {
                     ESP_LOGW(TAG, "AP Mode inactive for 1 hour. Shutting down AP to save power.");
                     transitionTo(WiFiState::Shutdown);
                 }
             } else {
-                // Reset timer if we are connected or in AP mode
-                _stateTimer = currentMillis;
+                // Reset timer if we are connected
                 if (WiFi.status() == WL_CONNECTED) {
-                    _wifiDisconnectTimer = 0;
+                    _wifiDisconnectTimer.setInterval(0); // Reset
                 }
             }
             break;
@@ -901,8 +900,8 @@ void WifiManager::updateMyUrl() {
  */
 bool WifiManager::isWifiPersistentError() const {
     if (_isAPMode || (WiFi.status() == WL_CONNECTED)) return false;
-    if (_wifiDisconnectTimer == 0) return false;
+    if (_wifiDisconnectTimer.getInterval() == 0) return false;
     
     // Over 3 minutes of continuous disconnection
-    return (millis() - _wifiDisconnectTimer > 180000);
+    return (_wifiDisconnectTimer.getInterval() > 0 && (millis() - _wifiDisconnectTimer.getLastFire() > 180000));
 }
