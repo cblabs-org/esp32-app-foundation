@@ -431,9 +431,10 @@ private:
     // -------------------------------------------------------------------------
     // Orchestrator state
     // -------------------------------------------------------------------------
-    OTAState      _state        = OTAState::Idle;      // Current state machine state
-    const char*   _lastOtaError = nullptr;             // Last error string from download engine
-    float         _lastProgress = 0.0f;                // Last progress fraction for API polling
+    OTAState          _state        = OTAState::Idle;      // Current state machine state
+    const char*       _lastOtaError = nullptr;             // Last error string from download engine
+    float             _lastProgress = 0.0f;                // Last progress fraction for API polling
+    OTAProgressEvent  _progressEvent{};                    // Persistent payload for async EventBus progress events
 
     TaskHandle_t  _taskHandle   = nullptr;             // FreeRTOS task handle for download
 

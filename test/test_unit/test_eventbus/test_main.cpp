@@ -8,6 +8,10 @@
 #include <gtest/gtest.h>
 #include "EventBus.hpp"
 #include <string.h>
+#include <thread>
+#include <atomic>
+#include <vector>
+#include <chrono>
 
 class EventBusTest : public ::testing::Test {
 protected:
@@ -266,6 +270,69 @@ TEST_F(EventBusTest, SubscribeDuringDispatchDoesNotReceiveCurrentEvent) {
     int count2 = bus.publish("sys/new", &val);
     EXPECT_EQ(count2, 1);
     EXPECT_EQ(newCtx.callCount, 1);
+}
+
+TEST_F(EventBusTest, CrossTaskPublishSubscribeConcurrency) {
+    constexpr int numPublishers = 4;
+    constexpr int publishesPerThread = 250;
+    std::atomic<int> receivedCount{0};
+
+    auto callback = [](const char* topic, const void* payload, void* ctx) {
+        std::atomic<int>* count = static_cast<std::atomic<int>*>(ctx);
+        (*count)++;
+    };
+
+    bus.subscribe("concurrent/topic", callback, &receivedCount);
+
+    std::vector<std::thread> threads;
+    for (int i = 0; i < numPublishers; ++i) {
+        threads.emplace_back([this]() {
+            for (int j = 0; j < publishesPerThread; ++j) {
+                int val = j;
+                bus.publish("concurrent/topic", &val);
+            }
+        });
+    }
+
+    for (auto& t : threads) {
+        t.join();
+    }
+
+    EXPECT_EQ(receivedCount.load(), numPublishers * publishesPerThread);
+}
+
+TEST_F(EventBusTest, CrossTaskSubscribeUnsubscribeConcurrency) {
+    constexpr int durationMs = 200;
+    std::atomic<bool> stop{false};
+    std::atomic<int> pubCount{0};
+
+    auto dummyCallback = [](const char* topic, const void* payload, void* ctx) {};
+
+    std::thread pubThread([this, &stop, &pubCount]() {
+        while (!stop.load()) {
+            bus.publish("concurrent/dynamic", nullptr);
+            pubCount++;
+            std::this_thread::sleep_for(std::chrono::microseconds(100));
+        }
+    });
+
+    std::thread subThread([this, &stop, dummyCallback]() {
+        int id = 0;
+        while (!stop.load()) {
+            bus.subscribe("concurrent/dynamic", dummyCallback, (void*)(uintptr_t)id);
+            std::this_thread::sleep_for(std::chrono::microseconds(150));
+            bus.unsubscribe("concurrent/dynamic", dummyCallback, (void*)(uintptr_t)id);
+            id++;
+        }
+    });
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(durationMs));
+    stop.store(true);
+
+    pubThread.join();
+    subThread.join();
+
+    EXPECT_GT(pubCount.load(), 0);
 }
 
 int main(int argc, char **argv) {

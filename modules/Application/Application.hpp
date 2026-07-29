@@ -58,6 +58,7 @@
 #include "interfaces/IWebContributor.hpp"
 #include "interfaces/IMCPContributor.hpp"
 #include "interfaces/IConfigGate.hpp"
+#include "../../include/events/AppConfiguringPayload.hpp"
 
 #include "../EventBus/EventBus.hpp"
 #include "../DataManager/DataManager.hpp"
@@ -521,6 +522,8 @@ private:
     // Core infrastructure services
     ConfigManager _configManager;       ///< Centralised config gateway (owned by Application)
     EventBus _eventBus;                 ///< Central event bus
+    uint32_t _systemHeapPayload = 0;    ///< Persistent payload for system.heap event
+    AppConfiguringPayload _configuringPayload{}; ///< Persistent payload for app.configuring event
     DataManager _dataManager;           ///< Background data manager
     WebServerManager _webServerManager; ///< Local HTTP Server
     MCPServer _mcpServer;               ///< MCP JSON-RPC server

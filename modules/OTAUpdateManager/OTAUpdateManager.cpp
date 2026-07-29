@@ -700,14 +700,13 @@ void OTAUpdateManager::performUpdateTask() {
 void OTAUpdateManager::publishProgress(float progress, const char* status,
                                         bool complete, bool success) {
     _lastProgress = progress;
-    OTAProgressEvent event;
-    event.progress = progress;
-    event.status   = status;
-    event.complete = complete;
-    event.success  = success;
+    _progressEvent.progress = progress;
+    _progressEvent.status   = status;
+    _progressEvent.complete = complete;
+    _progressEvent.success  = success;
 
     if (_eventBus != nullptr) {
-        _eventBus->publish(OTAUpdateManagerEvents::OTA_PROGRESS, &event);
+        _eventBus->publish(OTAUpdateManagerEvents::OTA_PROGRESS, &_progressEvent);
     }
     ESP_LOGD(TAG, "OTA progress: %.1f%% — %s (complete=%d, success=%d)",
              progress * 100.0f, status, complete, success);

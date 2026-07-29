@@ -256,8 +256,8 @@ bool Application::begin(const FrameworkConfig& config) {
     ESP_LOGI(TAG, "✅ Firmware self-test PASSED — partition blessed");
 
     // --- Step 18: Publish system heap event + heap report ---
-    uint32_t freeHeap = heap_caps_get_free_size(MALLOC_CAP_8BIT);
-    _eventBus.publish(ApplicationEvents::SYSTEM_HEAP, &freeHeap);
+    _systemHeapPayload = heap_caps_get_free_size(MALLOC_CAP_8BIT);
+    _eventBus.publish(ApplicationEvents::SYSTEM_HEAP, &_systemHeapPayload);
     _reportHeap();
 
     // --- Step 19: Clear boot status ---
@@ -664,11 +664,10 @@ void Application::_publishConfiguringEvent(bool isRegression) {
         if (!depsOk) continue; // Skip — deps not met
 
         // This gate is actionable
-        AppConfiguringPayload payload;
-        payload.gateName = gate->getGateName();
-        payload.helpText = gate->getHelpText();
-        payload.isRegression = isRegression;
-        _eventBus.publish(ApplicationEvents::APP_CONFIGURING, &payload);
+        _configuringPayload.gateName = gate->getGateName();
+        _configuringPayload.helpText = gate->getHelpText();
+        _configuringPayload.isRegression = isRegression;
+        _eventBus.publish(ApplicationEvents::APP_CONFIGURING, &_configuringPayload);
         ESP_LOGI(TAG, "Config gate unsatisfied: %s%s", gate->getGateName(),
                  isRegression ? " (regression)" : "");
         return;
