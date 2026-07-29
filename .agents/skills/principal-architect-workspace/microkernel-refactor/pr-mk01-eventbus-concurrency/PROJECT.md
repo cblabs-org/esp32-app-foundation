@@ -50,7 +50,7 @@ hardware env (`esp32dev`) compile.
   `std::string` topics with interned identity; in-place dispatch. `standard`
 - **[x] [wo2-on-target-backing](wo2-on-target-backing/WORKORDER.md):** implement the OQ-MK-3 choice (`esp_event`
   delegation or `portMUX`) behind the interface; native sync stub. `architect`
-- **[ ] [wo3-caller-migration](wo3-caller-migration/WORKORDER.md):** migrate publishers/subscribers; add
+- **[x] [wo3-caller-migration](wo3-caller-migration/WORKORDER.md):** migrate publishers/subscribers; add
   concurrency + regression tests. `standard`
 
 ## Verification
