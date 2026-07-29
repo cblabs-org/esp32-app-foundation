@@ -50,7 +50,7 @@ payoff, MK-6/§8).
   snapshot wiring + rollback bless; **move `OTA_PROGRESS` topic contract onto the
   facade, flag-gated with a legible absent-module error (EO-07); add a synchronous
   pre-reboot hook or documented headroom (EO-08).** `architect`
-- **[ ] wo3 — extract Time:** `WITH_TIME` (default on). `standard`
+- **[x] wo3 — extract Time:** `WITH_TIME` (default on). `standard`
 - **[ ] wo4 — app templates + tests + size check:** update template/sample apps;
   flag-matrix tests; record flash deltas. `standard`
 
