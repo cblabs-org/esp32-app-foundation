@@ -46,7 +46,7 @@ payoff, MK-6/§8).
 
 - **[ ] wo1 — extract MCP:** `WITH_MCP`; rewire built-in-tool dependencies at
   composition. `standard`
-- **[ ] wo2 — extract OTA:** `WITH_OTA` (default off); preserve ConfigManifest
+- **[x] wo2 — extract OTA:** `WITH_OTA` (default off); preserve ConfigManifest
   snapshot wiring + rollback bless; **move `OTA_PROGRESS` topic contract onto the
   facade, flag-gated with a legible absent-module error (EO-07); add a synchronous
   pre-reboot hook or documented headroom (EO-08).** `architect`
