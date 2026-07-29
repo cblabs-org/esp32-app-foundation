@@ -3,7 +3,7 @@
 **WO branch stack base:** `pr-mk04-boot-seam-display`
 **Depends on:** pr-mk03 (composition) · **Blocks:** pr-mk07 (stable module set)
 **Design refs:** MK-2, MK-6 · **Gating decision:** **OQ-MK-1** (confirm Core stays owned)
-**Status:** 📋 **PLANNED — awaiting human approval**
+**Status:** ✅ **APPROVED — human approved full autonomous execution (2026-07-29)**
 
 ---
 
@@ -23,7 +23,7 @@ primitives + Ring-1 Core services; every optional enters through `registerModule
 | EO-02 | `OTAUpdateManager` → behind `WITH_OTA` (default **off**) | Heaviest optional (TLS + download engine + own task); shipping this fleet-update mechanism is a deliberate policy choice (user decision, MK-6) |
 | EO-03 | `TimeManager` → behind `WITH_TIME` (default **on**) | Lightweight; NTP/TZ commonly wanted; gate already opt-in |
 | EO-04 | `Application` stops owning MCP/OTA/Time as members and stops `#include`-ing them | Ring-2 kernel decoupling (MK-1) |
-| EO-05 | **Confirm OQ-MK-1:** Ring-1 Core (WebServer, Auth, WiFi, Config, Key, Crypto, DataManager, EventBus) remains owned + registered, no flag | Mandatory platform services are not extracted |
+| EO-05 | **OQ-MK-1 RESOLVED → Ring-1 Core** (WebServer, Auth, WiFi, Config, Key, Crypto, DataManager, EventBus) remains owned + registered, no flag | Mandatory platform services are not extracted |
 | EO-06 | Handle cross-service wiring the kernel did for these (e.g. OTA↔ConfigManager manifest snapshot, MCP built-in tools needing Time/WiFi) via injection at composition, not kernel ownership | Preserve behaviour without re-coupling |
 | EO-07 | **Expose OTA's event-topic contract (`OTA_PROGRESS` + payload) on the facade, but keep it `WITH_OTA`-gated** (MK-6a) | power-monitor subscribes today via a **deep kernel include** — a coupling defect. Facade access fixes it; the flag-gate keeps an unguarded reference a **clean compile error** (make it legible: "requires `WITH_OTA`"), never a silent no-op. Soft consumers guard with `#ifdef WITH_OTA` |
 | EO-08 | **Guarantee OTA-start→reboot headroom for async event callbacks, or expose a synchronous pre-reboot hook** | Under async dispatch (mk01), power-monitor's `OTA_PROGRESS → energy-flush` subscriber must complete before reboot. Prefer a synchronous pre-reboot hook on OTA |
@@ -65,3 +65,4 @@ off; template/sample apps boot.
 | Date | Entry |
 |---|---|
 | 2026-07-28 | Drafted. Awaiting human approval. OTA confirmed default-off per user. |
+| 2026-07-29 | Human approved full autonomous execution (provenance `7bdd6d3`). mk01 ✅, mk03 ✅, mk04 ✅. PA spawn authorised. |
