@@ -58,6 +58,7 @@
 #include "../../include/interfaces/IConfigurable.hpp"
 #include "../../include/interfaces/IWebContributor.hpp"
 #include "../../include/interfaces/IMCPContributor.hpp"
+#include "../../include/utils/Periodic.hpp"
 
 class DNSServer;
 class PsychicRequest;

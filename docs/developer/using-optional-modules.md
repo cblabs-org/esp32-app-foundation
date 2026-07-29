@@ -24,15 +24,15 @@ An **optional module** is any module (framework-level or application-level) that
 
 The framework governs optionality along two independent axes:
 
-1. **Axis 1: Availability Flag (Compile-Time)** — Governed by preprocessor defines in `platformio.ini` (e.g., `-D WITH_HOMEASSISTANT`, `-D HAS_LVGL_DISPLAY`). When the flag is off, `#ifdef` guards exclude the module's headers and compilation units entirely, preserving binary flash and RAM space.
+1. **Axis 1: Availability Flag (Compile-Time)** — Governed by preprocessor defines in `platformio.ini` (e.g., `-D WITH_HOMEASSISTANT`, `-D WITH_DISPLAY_U8G2`). When the flag is off, `#ifdef` guards exclude the module's headers and compilation units entirely, preserving binary flash and RAM space.
 2. **Axis 2: Explicit Composition (Registration)** — Framework optional modules (such as `HomeAssistantModule`) are no longer owned or hardcoded inside `Application`. Instead, they are explicitly instantiated and wired in `main.cpp` and registered via `app.registerModule()`, guarded by the feature flag.
 
 This "honest `main.cpp` composition pattern" keeps `Application` decoupled as a core kernel hub, while making all optional dependencies explicit in the application entry point.
 
 Examples in the framework include:
 - **HomeAssistantModule** — MQTT discovery and telemetry reporting (guarded by `WITH_HOMEASSISTANT`)
-- **U8G2DisplayModule** — Monochrome OLED/LCD display driver via SPI/I2C
-- **LVGLDisplayModule** — Colour TFT display driver powered by LVGL v9.5 (guarded by `HAS_LVGL_DISPLAY`)
+- **U8G2DisplayModule** — Monochrome OLED/LCD display driver via SPI/I2C (guarded by `WITH_DISPLAY_U8G2`)
+- **LVGLDisplayModule** — Colour TFT display driver powered by LVGL v9.5 (guarded by `WITH_DISPLAY_LVGL`)
 
 Optional modules are full framework citizens: they implement the same interfaces (`ITickable`, `IConfigurable`, `IWebContributor`, etc.) and are registered with the same `registerModule()` call.
 

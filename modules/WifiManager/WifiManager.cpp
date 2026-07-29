@@ -43,6 +43,7 @@
 #include "../KeyManager/KeyManager.hpp"
 #include "../MCPServer/MCPToolRegistry.hpp"
 #include "../../include/utils/Periodic.hpp"
+#include "../EventBus/EventBus.hpp"
 #include "../../include/interfaces/ITickable.hpp"
 
 #include <PsychicHttp.h>
@@ -899,7 +900,7 @@ void WifiManager::updateMyUrl() {
  */
 bool WifiManager::isWifiPersistentError() const {
     if (_isAPMode || (WiFi.status() == WL_CONNECTED)) return false;
-    if (_wifiDisconnectTimer == 0) return false;
+    if (_wifiDisconnectTimer.getInterval() == 0) return false;
     
     // Over 3 minutes of continuous disconnection
     return (_wifiDisconnectTimer.getInterval() > 0 && (millis() - _wifiDisconnectTimer.getLastFire() > 180000));

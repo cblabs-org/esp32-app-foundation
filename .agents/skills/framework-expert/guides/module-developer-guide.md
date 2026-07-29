@@ -33,7 +33,7 @@ Core framework modules must compile both on the ESP32 and in the native testing 
 - **Do NOT** use inline `#ifdef NATIVE_BUILD` guards to wrap hardware-specific code like `WiFi.h` or `LittleFS.h`.
 - The native environment uses include-path priority to resolve `#include <WiFi.h>` to a local mock stub in `test/stubs/platform/WiFi.h`.
 - If you use a new ESP-IDF API, you must provide a mock implementation in the `test/stubs/platform/` directory.
-- Exception: Pure display code can be wrapped in `#ifdef HAS_DISPLAY`.
+- Exception: Pure display code can be wrapped in `#ifdef WITH_DISPLAY_U8G2` or `#ifdef WITH_DISPLAY_LVGL`.
 - All new core features must include corresponding unit tests in `test/test_native/`.
 
 ## 5. Adding EventBus Topics

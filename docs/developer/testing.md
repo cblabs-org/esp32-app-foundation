@@ -29,13 +29,13 @@ To fix it:
 2. Create a mock header in `test/stubs/platform/` matching that exact name (e.g., `test/stubs/platform/esp_timer.h`).
 3. Provide a minimal implementation of the required functions, macros, or types. If the API is complex, you can define the mock class/function behavior or simply stub a no-op if the test does not require the return value.
 
-## 3. The HAS_DISPLAY Guard Pattern
+## 3. The Display Guard Pattern
 
 There is one exception to the stub-header rule: Display code. 
 
-U8g2 display logic is often too complex and varied to reasonably mock via stub headers. For display-specific modules or code paths, we use the `HAS_DISPLAY` macro pattern.
+U8g2 and LVGL display logic is too complex to reasonably mock via stub headers. For display-specific modules or code paths, we use the `WITH_DISPLAY_U8G2` / `WITH_DISPLAY_LVGL` macro pattern.
 
-If a module exists purely to render to a screen (e.g., `U8G2DisplayModule`), it can be wrapped in `#ifdef HAS_DISPLAY`. This macro is defined in hardware environments but excluded from the native environment, completely compiling out the display code during tests.
+If a module exists purely to render to a screen (e.g., `U8G2DisplayModule`), it can be wrapped in `#ifdef WITH_DISPLAY_U8G2`. These macros are defined in hardware environments but excluded from the native environment, completely compiling out the display code during tests.
 
 ## 4. Running Native Tests
 
