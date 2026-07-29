@@ -30,6 +30,7 @@
  *   - tick():                    Dispatch to all registered ITickable modules (RUNNING guard)
  *   - softReset():               Log reason and trigger esp_restart() 
  *   - registerTickable():        Add an ITickable module to the tick dispatch vector
+ *   - registerConfigurable():    Add an IConfigurable module to the config persistence system
  *   - registerStatusReporter():  Set (or replace) the single IStatusReporter adapter
  *   - registerWebContributor():  Add an IWebContributor module to the route-registration vector
  *   - registerMcpContributor():  Add an IMCPContributor module to the MCP tools vector
@@ -233,7 +234,7 @@ public:
         if (!module) return false;
         bool any = false;
         if constexpr (std::is_base_of_v<ITickable, T>)        { registerTickable(module);              any = true; }
-        if constexpr (std::is_base_of_v<IConfigurable, T>)    { _configManager.registerModule(module); any = true; }
+        if constexpr (std::is_base_of_v<IConfigurable, T>)    { registerConfigurable(module);          any = true; }
         if constexpr (std::is_base_of_v<IWebContributor, T>)  { registerWebContributor(module);        any = true; }
         if constexpr (std::is_base_of_v<IMCPContributor, T>)  { registerMcpContributor(module);        any = true; }
         if constexpr (std::is_base_of_v<IDataSource, T>)      { registerDataSource(module);            any = true; }
@@ -252,6 +253,13 @@ public:
      * @return true if registration succeeded; false if locked or nullptr.
      */
     bool registerTickable(ITickable* module);
+
+    /**
+     * @brief Register a module that participates in config persistence.
+     * @param module  Non-null pointer to the IConfigurable implementation.
+     * @return true if registration succeeded; false if locked or nullptr.
+     */
+    bool registerConfigurable(IConfigurable* module);
 
     /**
      * @brief Register a boot reporter for early hardware init.

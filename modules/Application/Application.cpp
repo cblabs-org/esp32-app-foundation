@@ -401,6 +401,22 @@ bool Application::registerTickable(ITickable* module) {
 }
 
 /**
+ * @brief Register a module that participates in config persistence.
+ */
+bool Application::registerConfigurable(IConfigurable* module) {
+    if (_locked) {
+        ESP_LOGE(TAG, "registerConfigurable() rejected — registration is closed after begin()");
+        return false;
+    }
+    if (module == nullptr) {
+        ESP_LOGE(TAG, "registerConfigurable() rejected — null pointer");
+        return false;
+    }
+    _configManager.registerModule(module);
+    return true;
+}
+
+/**
  * @brief Set (or replace pre-lock) the single status-reporter adapter.
  *
  * Last-write-wins semantics; only one IStatusReporter is active at a time.
