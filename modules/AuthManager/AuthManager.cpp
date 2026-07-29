@@ -40,6 +40,7 @@
 // ConfigManager is needed for saveModuleConfig() in POST /api/auth/password.
 // ConfigManager is needed for saveModuleConfig() in generateAndStoreCert().
 #include "../ConfigManager/ConfigManager.hpp"
+#include "../ConfigManager/ConfigRoot.hpp"
 
 #include <mbedtls/asn1write.h>
 #include <mbedtls/oid.h>
@@ -240,8 +241,8 @@ bool AuthManager::checkMcpAuth(PsychicRequest* request, PsychicResponse* respons
 bool AuthManager::_saveToLittleFS(const char* path,
                                    const uint8_t* data, size_t len) const {
     // --- Step 1: Ensure parent directory exists ---
-    if (!LittleFS.exists("/etc")) {
-        LittleFS.mkdir("/etc");
+    if (!LittleFS.exists(ConfigRoot::getEtcPath())) {
+        LittleFS.mkdir(ConfigRoot::getEtcPath());
     }
 
     // --- Step 2: Open for binary write ---
@@ -510,11 +511,16 @@ bool AuthManager::generateAndStoreCert(const char* hostname) {
     const uint8_t* crtData = &crtBuf[1024 - (size_t)crtLen];
 
     // --- Step 7: Save both DER files to LittleFS ---
-    if (!_saveToLittleFS("/etc/server.key", keyData, (size_t)keyLen)) {
+    char keyPath[64];
+    char crtPath[64];
+    ConfigRoot::getEtcFilePath("server.key", keyPath, sizeof(keyPath));
+    ConfigRoot::getEtcFilePath("server.crt", crtPath, sizeof(crtPath));
+
+    if (!_saveToLittleFS(keyPath, keyData, (size_t)keyLen)) {
         ESP_LOGE(TAG, "generateAndStoreCert: failed to save private key");
         return cleanup(false);
     }
-    if (!_saveToLittleFS("/etc/server.crt", crtData, (size_t)crtLen)) {
+    if (!_saveToLittleFS(crtPath, crtData, (size_t)crtLen)) {
         ESP_LOGE(TAG, "generateAndStoreCert: failed to save certificate");
         return cleanup(false);
     }
@@ -536,8 +542,8 @@ bool AuthManager::generateAndStoreCert(const char* hostname) {
 /**
  * @brief Load DER-encoded certificate and key from LittleFS into static buffers.
  *
- * --- Step 1: Read certificate from /etc/server.crt ---
- * --- Step 2: Read private key from /etc/server.key ---
+ * --- Step 1: Read certificate from system config directory ---
+ * --- Step 2: Read private key from system config directory ---
  * Both must succeed; failure in either returns false immediately.
  *
  * Static buffers are intentionally used (not heap) to avoid fragmentation.
@@ -551,15 +557,20 @@ bool AuthManager::loadCert(uint8_t** certDer, size_t* certLen,
     size_t cLen = 0;
     size_t kLen = 0;
 
+    char crtPath[64];
+    char keyPath[64];
+    ConfigRoot::getEtcFilePath("server.crt", crtPath, sizeof(crtPath));
+    ConfigRoot::getEtcFilePath("server.key", keyPath, sizeof(keyPath));
+
     // --- Step 1: Read certificate ---
-    if (!_loadFromLittleFS("/etc/server.crt", certBuf, sizeof(certBuf), &cLen)) {
-        ESP_LOGE(TAG, "loadCert: failed to read /etc/server.crt");
+    if (!_loadFromLittleFS(crtPath, certBuf, sizeof(certBuf), &cLen)) {
+        ESP_LOGE(TAG, "loadCert: failed to read %s", crtPath);
         return false;
     }
 
     // --- Step 2: Read private key ---
-    if (!_loadFromLittleFS("/etc/server.key", keyBuf, sizeof(keyBuf), &kLen)) {
-        ESP_LOGE(TAG, "loadCert: failed to read /etc/server.key");
+    if (!_loadFromLittleFS(keyPath, keyBuf, sizeof(keyBuf), &kLen)) {
+        ESP_LOGE(TAG, "loadCert: failed to read %s", keyPath);
         return false;
     }
 
@@ -778,8 +789,13 @@ void AuthManager::registerRoutes(PsychicHttpServer& server) {
         
         bool success = false;
         if (r1 == 0 && r2 == 0) {
-            if (_saveToLittleFS("/etc/server.key", key_der, key_len) &&
-                _saveToLittleFS("/etc/server.crt", cert_der, cert_len)) {
+            char keyPath[64];
+            char crtPath[64];
+            ConfigRoot::getEtcFilePath("server.key", keyPath, sizeof(keyPath));
+            ConfigRoot::getEtcFilePath("server.crt", crtPath, sizeof(crtPath));
+
+            if (_saveToLittleFS(keyPath, key_der, key_len) &&
+                _saveToLittleFS(crtPath, cert_der, cert_len)) {
                 _certPresent = true;
                 if (_configManager) _configManager->saveModuleConfig(this);
                 success = true;

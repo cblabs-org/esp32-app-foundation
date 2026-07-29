@@ -50,8 +50,9 @@
 #include <ArduinoJson.h>
 #include "../DeviceCrypto/DeviceCrypto.hpp"
 #include "../../include/interfaces/IWebContributor.hpp"
+#include "../ConfigManager/ConfigRoot.hpp"
 
-#define KEY_MANAGER_PATH "/etc/keys.json"
+#define KEY_MANAGER_PATH (ConfigRoot::getEtcFilePath("keys.json").c_str())
 
 /**
  * @brief Metadata descriptor for a single key entry.

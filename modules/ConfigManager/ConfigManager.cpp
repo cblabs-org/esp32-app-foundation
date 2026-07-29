@@ -24,6 +24,7 @@
  */
 
 #include "ConfigManager.hpp"
+#include "ConfigRoot.hpp"
 #include <PsychicHttp.h>
 #include <string.h>
 #include "platform/LogShim.h"
@@ -62,7 +63,7 @@ ConfigManager::ConfigManager()
  * @param size Buffer size in bytes.
  */
 void ConfigManager::getConfigPath(const char* ns, char* buf, size_t size) {
-    snprintf(buf, size, "/mod/%s.json", ns);
+    ConfigRoot::getModFilePath(ns, buf, size);
 }
 
 /**
@@ -344,7 +345,7 @@ bool ConfigManager::saveModuleConfig(IConfigurable* module) {
         if (_persistMutex != nullptr) xSemaphoreGive(_persistMutex);
         return true;  // not an error: newer state is already on disk
     }
-    if (!LittleFS.exists("/mod")) { LittleFS.mkdir("/mod"); }
+    if (!LittleFS.exists(ConfigRoot::getModPath())) { LittleFS.mkdir(ConfigRoot::getModPath()); }
     File file = LittleFS.open(path, "w");
     if (!file) {
         ESP_LOGE(TAG, "Failed to open %s for writing", path);
@@ -660,7 +661,7 @@ bool ConfigManager::patchNamespaceConfig(const char* ns, JsonArrayConst ops,
         result.opsApplied = i;
         return true;  // not an error: newer state is already on disk
     }
-    if (!LittleFS.exists("/mod")) { LittleFS.mkdir("/mod"); }
+    if (!LittleFS.exists(ConfigRoot::getModPath())) { LittleFS.mkdir(ConfigRoot::getModPath()); }
     File file = LittleFS.open(filePath, "w");
     if (!file) {
         ESP_LOGE(TAG, "patchNamespaceConfig — failed to open %s for writing", filePath);

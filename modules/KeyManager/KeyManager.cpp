@@ -47,9 +47,9 @@ bool KeyManager::loadRegistry(JsonDocument& doc) const {
 }
 
 bool KeyManager::saveRegistry(const JsonDocument& doc) const {
-    // Ensure parent directory exists (fresh filesystem won't have /etc/)
-    if (!LittleFS.exists("/etc")) {
-        LittleFS.mkdir("/etc");
+    // Ensure parent directory exists (fresh filesystem won't have system config dir)
+    if (!LittleFS.exists(ConfigRoot::getEtcPath())) {
+        LittleFS.mkdir(ConfigRoot::getEtcPath());
     }
     File file = LittleFS.open(KEY_MANAGER_PATH, "w");
     if (!file) {

@@ -33,6 +33,7 @@
     // does, the transitive DeviceCrypto include now resolves via relative path.
     #include "../AuthManager/AuthManager.hpp"
 #include "../WifiManager/WifiManager.hpp"
+#include "../ConfigManager/ConfigRoot.hpp"
 
 // Portal PROGMEM assets — hardware only (require Arduino.h for PROGMEM macro)
 #include "portal_assets/index_html.hpp"
@@ -474,12 +475,12 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors,
     activeServer->on("/api/system/factory-reset", HTTP_POST, [](PsychicRequest* request, PsychicResponse* response) {
         ESP_LOGW(TAG, "POST /api/system/factory-reset — erasing configuration");
 
-        // --- Step 1: Erase /mod/ directory (per-module config files) ---
-        File modDir = LittleFS.open("/mod");
+        // --- Step 1: Erase module config directory ---
+        File modDir = LittleFS.open(ConfigRoot::getModPath());
         if (modDir && modDir.isDirectory()) {
             File entry = modDir.openNextFile();
             while (entry) {
-                String path = String("/mod/") + entry.name();
+                String path = String(ConfigRoot::getModPath()) + "/" + entry.name();
                 entry.close();
                 LittleFS.remove(path);
                 ESP_LOGI(TAG, "Removed: %s", path.c_str());
@@ -488,12 +489,12 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors,
             modDir.close();
         }
 
-        // --- Step 2: Erase /etc/ directory (system-level configs) ---
-        File etcDir = LittleFS.open("/etc");
+        // --- Step 2: Erase system config directory ---
+        File etcDir = LittleFS.open(ConfigRoot::getEtcPath());
         if (etcDir && etcDir.isDirectory()) {
             File entry = etcDir.openNextFile();
             while (entry) {
-                String path = String("/etc/") + entry.name();
+                String path = String(ConfigRoot::getEtcPath()) + "/" + entry.name();
                 entry.close();
                 LittleFS.remove(path);
                 ESP_LOGI(TAG, "Removed: %s", path.c_str());
