@@ -58,6 +58,7 @@
 #include "interfaces/IWebContributor.hpp"
 #include "interfaces/IMCPContributor.hpp"
 #include "interfaces/IConfigGate.hpp"
+#include "interfaces/IBootReporter.hpp"
 #include "../../include/events/AppConfiguringPayload.hpp"
 
 #include "../EventBus/EventBus.hpp"
@@ -228,6 +229,7 @@ public:
         if constexpr (std::is_base_of_v<IDataSource, T>)      { registerDataSource(module);            any = true; }
         if constexpr (std::is_base_of_v<IConfigGate, T>)      { registerConfigGate(module);            any = true; }
         if constexpr (std::is_base_of_v<IStatusReporter, T>)  { registerStatusReporter(module);        any = true; }
+        if constexpr (std::is_base_of_v<IBootReporter, T>)    { registerBootReporter(module);          any = true; }
         if (!any) {
             ESP_LOGW("Application", "registerModule: type implements no known framework interface");
         }
@@ -240,6 +242,13 @@ public:
      * @return true if registration succeeded; false if locked or nullptr.
      */
     bool registerTickable(ITickable* module);
+
+    /**
+     * @brief Register a boot reporter for early hardware init.
+     * @param reporter  Non-null pointer to the IBootReporter implementation.
+     * @return true if registration succeeded; false if locked or nullptr.
+     */
+    bool registerBootReporter(IBootReporter* reporter);
 
     /**
      * @brief Set (or replace pre-lock) the single status-reporter adapter.
@@ -507,6 +516,7 @@ private:
 
     NullStatusReporter _nullReporter;                               ///< Fallback status reporter instance
     IStatusReporter* _statusReporter = &_nullReporter;              ///< Display adapter for boot-phase status overlays
+    IBootReporter* _bootReporter = nullptr;                         ///< Boot reporter for early hardware init
 
     // Core infrastructure services
     ConfigManager _configManager;       ///< Centralised config gateway (owned by Application)

@@ -80,13 +80,19 @@ Application::~Application() {
  * @return true on success; false if a fatal error prevents normal operation.
  */
 bool Application::begin(const FrameworkConfig& config) {
+    if (_bootReporter) {
+        _bootReporter->beginEarly();
+        _statusReporter = _bootReporter;
+    } else {
+        _statusReporter = &_nullReporter;
 #ifdef HAS_DISPLAY
-    // --- Phase 1: Bootstrap display hardware (zero framework deps) ---
-    // SPI + U8G2 init, boot splash rendered immediately.
-    // Must happen before any reportStatus() calls so the boot splash is visible.
-    _display.bootstrapHardware();
-    _statusReporter = &_display;  // Route all boot progress to the display
+        // --- Phase 1: Bootstrap display hardware (zero framework deps) ---
+        // SPI + U8G2 init, boot splash rendered immediately.
+        // Must happen before any reportStatus() calls so the boot splash is visible.
+        _display.bootstrapHardware();
+        _statusReporter = &_display;  // Route all boot progress to the display
 #endif
+    }
 
     // --- Step 1: Boot banner ---
     // Print the firmware version so the first log line is always identifiable.
@@ -378,6 +384,22 @@ void Application::softReset() {
 // Module Registration (Tier 1 — pre-lock)
 // All register* methods share the same null-check + locked-check guard.
 // ---------------------------------------------------------------------------
+
+/**
+ * @brief Register a boot reporter for early hardware init.
+ */
+bool Application::registerBootReporter(IBootReporter* reporter) {
+    if (_locked) {
+        ESP_LOGE(TAG, "registerBootReporter() rejected — registration is closed after begin()");
+        return false;
+    }
+    if (reporter == nullptr) {
+        ESP_LOGE(TAG, "registerBootReporter() rejected — null pointer");
+        return false;
+    }
+    _bootReporter = reporter;
+    return true;
+}
 
 /**
  * @brief Register a module that participates in the Application tick loop.
