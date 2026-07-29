@@ -295,19 +295,17 @@ void Application::tick() {
 
     // --- RUNNING: throttled gate regression check ---
     if (_state == AppState::Running) {
-        unsigned long now = currentMillis;
-        if ((now - _lastGateCheckMs) >= GATE_CHECK_INTERVAL_MS) {
-            _lastGateCheckMs = now;
+        if (_gateCheckPeriodic.due(currentMillis)) {
             for (uint8_t i = 0; i < _configGates.size(); i++) {
                 if (!_configGates[i]->isSatisfied()) {
                     uint32_t tolerance = _configGates[i]->getRegressionToleranceMs();
                     if (tolerance == UINT32_MAX) continue; // App handles recovery
 
                     if (_gateFailedSinceMs[i] == 0) {
-                        _gateFailedSinceMs[i] = now; // Start timer
-                    } else if ((now - _gateFailedSinceMs[i]) >= tolerance) {
+                        _gateFailedSinceMs[i] = currentMillis; // Start timer
+                    } else if ((currentMillis - _gateFailedSinceMs[i]) >= tolerance) {
                         ESP_LOGW(TAG, "Gate '%s' unsatisfied for %lums — regressing to CONFIGURING",
-                                 _configGates[i]->getGateName(), (now - _gateFailedSinceMs[i]));
+                                 _configGates[i]->getGateName(), (currentMillis - _gateFailedSinceMs[i]));
                         setState(AppState::Configuring);
                         _dataManager.setAppRunning(false);
                         _publishConfiguringEvent(true); // isRegression = true
@@ -362,8 +360,7 @@ void Application::tick() {
     _mcpServer.tick();
 
     // Periodic heartbeat — free heap + uptime every 30s
-    if (currentMillis - _lastHeartbeatMs >= HEARTBEAT_INTERVAL_MS) {
-        _lastHeartbeatMs = currentMillis;
+    if (_heartbeatPeriodic.due(currentMillis)) {
         uint32_t freeHeap = heap_caps_get_free_size(MALLOC_CAP_8BIT);
         uint32_t uptimeSec = currentMillis / 1000;
         ESP_LOGI(TAG, "♥ uptime=%lus  free_heap=%luB", (unsigned long)uptimeSec, (unsigned long)freeHeap);
