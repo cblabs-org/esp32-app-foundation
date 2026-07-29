@@ -112,7 +112,7 @@ Let's examine how each interface is implemented in [myApp.cpp](../../template-ap
 The `ITickable::tick()` function is called repeatedly on every main-loop execution. To ensure testability, the current time is captured once at the beginning of the framework tick cycle and passed to you as `currentMillis`. 
 
 > [!IMPORTANT]
-> **10ms Execution Budget:** Your `tick()` implementation MUST execute quickly and return in **10 milliseconds or less**. If your module performs blocking operations (like raw socket reads, heavy math, or slow sensor queries), defer them to a FreeRTOS task or use the asynchronous background `DataManager` via `IDataSource`.
+> **10ms Execution Budget:** Your `tick()` implementation MUST execute quickly and return in **10 milliseconds or less** as per the `ITickable` contract. If your module performs blocking operations (like raw socket reads, heavy math, or slow sensor queries), defer them to a FreeRTOS task or use the asynchronous background `DataManager` via `IDataSource`.
 
 Here is the non-blocking timing pattern from the template:
 

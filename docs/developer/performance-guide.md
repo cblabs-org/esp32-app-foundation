@@ -434,21 +434,21 @@ ESP_LOGI(TAG, "Task stack high water mark: %u words (%u bytes)",
 > The returned value is in **words** (4 bytes each on ESP32), not bytes. Multiply by 4 to get the byte count. Check ESP-IDF documentation for your specific port.
 
 ### Measuring Execution Time
-
-Profile `tick()` functions and rendering loops to ensure they stay within the 10ms budget:
-
-```cpp
-#include <esp_timer.h>
-
-int64_t start = esp_timer_get_time();  // Microseconds since boot
-
-// ... code to measure ...
-
-int64_t elapsed = esp_timer_get_time() - start;
-if (elapsed > 10000) {  // 10ms = 10000µs
-    ESP_LOGW(TAG, "tick() exceeded budget: %lld µs", elapsed);
-}
-```
+ 
+ Profile `tick()` functions and rendering loops to ensure they stay within the **mandatory 10ms budget** (as per the `ITickable` contract):
+ 
+ ```cpp
+ #include <esp_timer.h>
+ 
+ int64_t start = esp_timer_get_time();  // Microseconds since boot
+ 
+ // ... code to measure ...
+ 
+ int64_t elapsed = esp_timer_get_time() - start;
+ if (elapsed > 10000) {  // 10ms = 10000µs
+     ESP_LOGW(TAG, "tick() exceeded 10ms budget: %lld µs", elapsed);
+ }
+ ```
 
 ### FreeRTOS Runtime Stats
 

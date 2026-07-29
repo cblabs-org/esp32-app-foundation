@@ -15,7 +15,7 @@
  *
  * Exported Classes:
  * - ITickable: Abstract base defining the tick() contract
- *   - tick(): Called once per Application loop iteration (≤ 10ms budget)
+ *   - tick(): Called once per Application loop iteration (mandatory ≤ 10ms budget)
  */
 
 #pragma once
@@ -35,7 +35,7 @@ public:
     /**
      * @brief Periodic update hook called by the Application hub on every loop iteration.
      *
-     * Implementations must be non-blocking and complete within 10ms.
+     * Implementations must be non-blocking and MUST complete within 10ms.
      *
      * @param currentMillis  Milliseconds since boot, captured once per Application::tick() loop.
      */

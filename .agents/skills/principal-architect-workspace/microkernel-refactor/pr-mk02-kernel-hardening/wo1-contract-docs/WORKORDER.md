@@ -28,3 +28,9 @@ Promote the "≤10 ms per tick()" obligation from a comment to an explicit contr
 2. Run `platformio` MCP tool `run_tests` to ensure tests pass.
 3. Stop and ask the user (me, the Principal Architect) if they are happy with the changes. **Only after approval**, invoke the `@distillery` skill to package the state and drop control, passing `.agents/skills/principal-architect-workspace/microkernel-refactor/pr-mk02-kernel-hardening/wo1-contract-docs/` as the target directory.
 4. Append a status update to this `WORKORDER.md` file and terminate your session.
+
+## Status Update - 2026-07-29
+- [x] ITickable contract updated.
+- [x] Documentation updated.
+- [x] Distilled and packaged.
+- WORKORDER Complete.
