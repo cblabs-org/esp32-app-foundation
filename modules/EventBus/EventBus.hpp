@@ -64,7 +64,12 @@ struct Subscription {
     uint32_t topicHash;                     // Interned topic identity (32-bit FNV-1a hash)
     EventCallback callback;                 // Callback function
     void* ctx;                              // User context
+#ifdef UNIT_TEST
     bool active;                            // Is this slot active?
+#else
+    const char* topicStr;
+    void* instance;
+#endif
 };
 
 /**
@@ -72,11 +77,15 @@ struct Subscription {
  */
 class EventBus {
 private:
+#ifdef UNIT_TEST
     std::vector<Subscription> _subscribers;
     uint32_t _dispatchDepth = 0;
     bool _needsCleanup = false;
 
     void cleanup();
+#else
+    std::vector<Subscription*> _subscribers;
+#endif
 
 public:
     /**
