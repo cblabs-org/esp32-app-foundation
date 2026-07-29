@@ -354,9 +354,22 @@ void Application::tick() {
     _dataManager.processNext();
 
     // Dispatch to all registered tickables in registration order
+#ifndef NDEBUG
+    for (size_t i = 0; i < _tickables.size(); ++i) {
+        auto* module = _tickables[i];
+        uint32_t startMs = millis();
+        module->tick(currentMillis);
+        uint32_t elapsedMs = millis() - startMs;
+        if (elapsedMs > 10) {
+            ESP_LOGW(TAG, "Module [%zu] (%p) tick budget exceeded: %" PRIu32 " ms (budget: 10 ms)",
+                     i, static_cast<const void*>(module), elapsedMs);
+        }
+    }
+#else
     for (auto* module : _tickables) {
         module->tick(currentMillis);
     }
+#endif
 
     // MCP server: poll Serial for incoming JSON-RPC requests
     _mcpServer.tick();

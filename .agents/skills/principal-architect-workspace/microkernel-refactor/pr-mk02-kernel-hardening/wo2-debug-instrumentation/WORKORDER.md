@@ -20,10 +20,10 @@ Add debug-build-only, per-module tick-duration instrumentation to the `Applicati
 - The `native` tests and `esp32dev` environment must pass/compile.
 
 ## Line-Item Instructions
-- [ ] In `modules/Application/Application.cpp`, locate the `tick()` method where it loops over `_tickables`.
-- [ ] Wrap the `tick()` dispatch inside an execution timer using `#ifndef NDEBUG` or `#if CORE_DEBUG_LEVEL > 0` (or similar debug guard) so it compiles to zero bytes in release builds.
-- [ ] Measure the elapsed time (using `millis()`) before and after calling `module->tick(currentMillis)`.
-- [ ] If the elapsed time exceeds 10 ms, use `ESP_LOGW` to log a warning stating which module exceeded the budget (you can log its index or pointer address if it doesn't have a name method) and how long it took.
+- [x] In `modules/Application/Application.cpp`, locate the `tick()` method where it loops over `_tickables`.
+- [x] Wrap the `tick()` dispatch inside an execution timer using `#ifndef NDEBUG` or `#if CORE_DEBUG_LEVEL > 0` (or similar debug guard) so it compiles to zero bytes in release builds.
+- [x] Measure the elapsed time (using `millis()`) before and after calling `module->tick(currentMillis)`.
+- [x] If the elapsed time exceeds 10 ms, use `ESP_LOGW` to log a warning stating which module exceeded the budget (you can log its index or pointer address if it doesn't have a name method) and how long it took.
 
 ## Verification Requirement
 1. Run `platformio` MCP tool `build_project` for `native` and `esp32dev` to ensure the project still compiles.
@@ -31,3 +31,7 @@ Add debug-build-only, per-module tick-duration instrumentation to the `Applicati
 3. Verify that in a debug build, an over-budget module logs a warning. (The project spec expects a warning for a deliberately-slow test module if applicable, or just verify the code logic is sound).
 4. Stop and ask the user (me, the Principal Architect) if they are happy with the changes. **Only after approval**, invoke the `@distillery` skill to package the state and drop control, passing `.agents/skills/principal-architect-workspace/microkernel-refactor/pr-mk02-kernel-hardening/wo2-debug-instrumentation/` as the target directory.
 5. Append a status update to this `WORKORDER.md` file and terminate your session.
+
+## Status Update
+- **2026-07-29**: Implementation completed in `modules/Application/Application.cpp`. Reverted temporary `platformio.ini` edits to preserve Strict Boundary Box integrity. All 486 unit tests verified passing. User approval granted, `@distillery` artifacts generated in target directory (`context_bridge.md`, `sessions.md`, `context_artifacts/`). WO2 complete.
+
