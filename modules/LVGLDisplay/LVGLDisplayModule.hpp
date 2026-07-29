@@ -49,6 +49,7 @@
 #include "interfaces/IStatusReporter.hpp"
 #include "interfaces/IWebContributor.hpp"
 #include "interfaces/IMCPContributor.hpp"
+#include "interfaces/IBootReporter.hpp"
 #include "interfaces/ILVGLHardwareAdapter.hpp"
 #include "interfaces/ILVGLSystemScreens.hpp"
 #include "assets/boot_logo.h"
@@ -63,15 +64,7 @@ class EventBus;
 class ConfigManager;
 class MCPToolRegistry;
 
-#ifndef OTA_PROGRESS_PAYLOAD_DEFINED
-#define OTA_PROGRESS_PAYLOAD_DEFINED
-struct OTAProgressPayload {
-    float progress;       // 0.0 to 1.0 download fraction
-    const char* status;   // Status message (e.g. "Downloading...")
-    bool complete;        // True when OTA cycle is finished
-    bool success;         // True if OTA succeeded (only valid when complete)
-};
-#endif
+
 
 #ifndef DISPLAY_MESSAGE_PAYLOAD_DEFINED
 #define DISPLAY_MESSAGE_PAYLOAD_DEFINED
@@ -110,7 +103,7 @@ namespace LVGLDisplayEvents {
  * Handles LVGL lifecycle (lv_init, lv_tick_inc, lv_timer_handler), draw buffer
  * allocation, input device discovery, focus group management, and framework system screens.
  */
-class LVGLDisplayModule : public ITickable, public IConfigurable, public IStatusReporter, public IWebContributor, public IMCPContributor {
+class LVGLDisplayModule : public ITickable, public IConfigurable, public IWebContributor, public IMCPContributor, public IBootReporter {
 public:
     // -------------------------------------------------------------------------
     // Lifecycle
@@ -144,6 +137,11 @@ public:
      * input devices, and loads Stage-1 boot splash.
      */
     void bootstrapHardware();
+
+    /**
+     * @brief IBootReporter phase 1 hook
+     */
+    bool beginEarly() override;
 
     /**
      * @brief Phase 2: Complete framework integration.
@@ -368,9 +366,13 @@ private:
     SettingsTabStub _settingsTabStub;
     ScreenshotTabStub _screenshotTabStub;
 
+#ifdef WITH_OTA
     static void _onOtaProgress(const char* topic, const void* payload, void* ctx);
+#endif
     static void _onDisplayMessage(const char* topic, const void* payload, void* ctx);
     static void _onSystemError(const char* topic, const void* payload, void* ctx);
+    static void _onAppConfiguring(const char* topic, const void* payload, void* ctx);
+    static void _onAppRunning(const char* topic, const void* payload, void* ctx);
 
     ILVGLHardwareAdapter& _adapter;            ///< Injected hardware adapter
     ILVGLSystemScreens*   _screens = nullptr;  ///< Optional system screens provider

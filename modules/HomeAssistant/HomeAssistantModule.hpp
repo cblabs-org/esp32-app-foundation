@@ -59,6 +59,8 @@
  */
 #pragma once
 
+#ifdef WITH_HOMEASSISTANT
+
 // Interface includes
 #include "../../include/build_version.h"
 #include "../../include/interfaces/ITickable.hpp"
@@ -326,3 +328,5 @@ public:
      */
     void registerMCPTools(MCPToolRegistry& registry) override;
 };
+
+#endif // WITH_HOMEASSISTANT

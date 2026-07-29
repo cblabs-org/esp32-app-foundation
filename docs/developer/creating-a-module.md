@@ -166,7 +166,7 @@ Once your module is declared and implemented, wire it into the framework. In you
 #include "myApp.hpp"
 
 Application app;
-MyApp myApp;  // Stack allocated inside global scope
+MyApp myApp;  // Allocated inside global/static scope
 
 void setup() {
     // Register the module - one call auto-attaches it to:
@@ -182,6 +182,9 @@ void loop() {
     app.tick();
 }
 ```
+
+> [!NOTE]
+> **Unified Composition Model:** Both custom application modules (like `MyApp`) and framework optional modules (like `HomeAssistantModule` or `LVGLDisplayModule`) follow the exact same wiring pattern: they are instantiated at file/static scope in `main.cpp` and passed to `app.registerModule()`. See [Using Optional Modules](using-optional-modules.md) for details on feature-flagged optional modules.
 
 ---
 

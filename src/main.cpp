@@ -20,12 +20,27 @@
 #include "AppFoundation.h"
 #include "publicKey.hpp"
 
-    #include <Arduino.h>
+#include <Arduino.h>
+#ifndef NATIVE_BUILD
+#include <LittleFS.h>
+#endif
 
 // ---------------------------------------------------------------------------
 // Static instance
 // ---------------------------------------------------------------------------
 static Application app;  ///< Single framework hub instance
+
+#ifdef WITH_HOMEASSISTANT
+#include "HomeAssistantModule.hpp"
+static HomeAssistantModule haModule;
+#endif
+
+#ifdef WITH_TIME
+#include "TimeManager.hpp"
+#include "TimeConfigGate.hpp"
+static TimeManager timeManager;
+static TimeConfigGate timeGate{timeManager};
+#endif
 
 #ifdef HAS_LVGL_DISPLAY
 #include "LVGLDisplayModule.hpp"
@@ -53,6 +68,20 @@ void setup() {
     // and falls back to this on factory reset (resetConfig()).
     app.getWifiManager().setDefaultHostname("esp32-foundation");
 
+#ifdef WITH_TIME
+    timeManager.setConfigManager(&app.getConfigManager());
+    app.registerModule(&timeManager);
+#endif
+
+#ifdef WITH_HOMEASSISTANT
+    haModule.setKeyManager(&app.getKeyManager());
+    haModule.setEventBus(&app.getEventBus());
+    haModule.setConfigManager(&app.getConfigManager());
+    haModule.setAppName(app.getAppName());
+    haModule.setAppVersion(BUILD_VERSION);
+    app.registerModule(&haModule);
+#endif
+
 #ifdef HAS_LVGL_DISPLAY
     app.registerModule(&lvglDisplay);
 #endif
@@ -61,6 +90,10 @@ void setup() {
         delay(5000);
         app.softReset();
     }
+
+#ifdef WITH_TIME
+    timeManager.begin();
+#endif
 }
 
 /**

@@ -247,6 +247,29 @@ Two decisions are recorded here as **provisional** and flagged in
   ship this fleet-update mechanism at all is a deliberate policy choice*, not a
   default. See the flash/heap payoff in [§8 Consequences](#8-consequences).
 
+### MK-6a — Optional-module event/contract surfaces live on the facade, but stay flag-gated
+
+Optional modules publish events and expose payload types that consumers need to
+reference (e.g. power-monitor subscribes to `OTA_PROGRESS`). Two rules, from the
+#48 consumer review:
+
+- **On the facade.** An optional module's **event-topic identity and payload
+  contract** are exposed via the public façade (`AppFoundation.h`), *not* buried in
+  the module's internal headers. A consumer must never reach *past the facade with
+  a deep kernel `#include`* to name a topic. (Today `OTA_PROGRESS` forces exactly
+  that — a coupling defect to fix during the refactor.)
+- **Still gated.** The contract remains compiled under the module's `WITH_*` flag.
+  Referencing it **without** the module built in is therefore a **clear, intentional
+  compile error** — *not* a silent no-op. A dead subscription to an absent module
+  is a latent bug; failing fast is correct. A consumer wanting genuinely *soft*
+  dependence guards the subscription with `#ifdef WITH_<MODULE>` — which is honest,
+  because it *acknowledges* the optionality.
+
+The implementing PA should make the gated-absent error **legible** (a
+`static_assert`/message like "OTA events require `WITH_OTA`"), not a bare
+"undeclared identifier." This reconciles the consumer's real need (facade access,
+no deep includes) with fail-fast dependency honesty.
+
 ### MK-7 — Composition is explicit and deterministic; reject static self-registration
 
 Init/tick order is load-bearing (WiFi must precede Time/NTP; a sensor module must
@@ -325,6 +348,19 @@ and **delete the kernel's direct calls.** The kernel publishes; it stops knowing
 what a carousel is. This is *less* code, and it borrows HC-7's null-object
 totality principle (extended from pins to display lifecycle) to remove the
 `#ifdef HAS_DISPLAY` scatter from the kernel.
+
+**Async transition-ordering caveat (consumer review #48, departures-board).**
+Once the kernel *publishes* `APP_CONFIGURING`/`APP_RUNNING` instead of calling the
+display directly, and the bus dispatches asynchronously ([MK-11](#mk-11--eventbus-concurrency--allocation-contract)
+/ `esp_event`), the display may render a few more carousel frames *after* the
+kernel has entered CONFIGURING, until the event task drains — a lifecycle-ordering
+assumption that *used to be synchronous* inside the framework's own display
+handling and is now inherited by consumers. **Contract:** this lag is bounded (one
+event-task drain, cosmetic) and **accepted** — kernel state correctness must never
+depend on the display having reacted by the time the state changed. A consumer
+needing strict pre-transition ordering (e.g. blank the panel *before* CONFIGURING
+work) uses an optional synchronous pre-transition hook exposed by the **display
+module**, never by the kernel.
 
 ---
 
@@ -471,6 +507,26 @@ partition is missing/corrupt/wrong-version. This preserves the "unkillable
 fallback" property, so Preset B moves the durability responsibility from A/B
 duplication to verify-and-fallback rather than abandoning it.
 
+**The preset discriminator is delivery *cadence*, not display kind or asset size
+(#48, DraytonWiser).** A preset is chosen *solely* by whether assets update
+independently of firmware. It is **orthogonal** to display kind (U8G2 vs LVGL) and
+to asset size — asset size affects only the *flash budget* (compiled-in costs 2×
+across the A/B slots), a per-target sizing question, not a preset one. DraytonWiser
+is the proof: LVGL colour-TFT with potentially hundreds of KB of assets, but
+compiled-in and shipped with firmware → **Preset A**.
+
+**Consumer status (#48):** all three current consumers are **Preset A** —
+power-monitor, departures-board, *and* DraytonWiser (a new theme implies new UI
+code, so assets ship with the firmware OTA). **Preset B therefore has no current
+consumer.** The consumer-selectable *seam* is still built (this decision +
+[MK-17](#mk-17--the-firmware-is-partition-layout-agnostic-at-runtime)), preserving
+DraytonWiser's explicitly-requested option to move to B later — but Preset B's
+*implementation* (verify-before-commit asset OTA) is **deferred to a
+consumer-triggered follow-on**; building it with zero consumers is the speculative
+mechanism the efficiency mandate forbids. **Trigger:** if a consumer's compiled-in
+assets grow to where the 2× A/B flash cost becomes painful (DraytonWiser flagged
+~115 KB per full-screen 240×240 RGB565 bitmap), Preset B earns its build.
+
 ### MK-17 — The firmware is partition-layout-agnostic at runtime
 
 Because the app developer selects the layout ([MK-16](#mk-16--compiled-in-assets-is-the-default-partition-layout-is-a-consumer-selectable-profile)),
@@ -506,10 +562,24 @@ Sizing model — multipliers on the realistic heavy-consumer config payload `P`
    on every settings change (`BLOCK_CYCLES=512`, 4 KB blocks); it wants the
    partition comfortably larger than peak live data.
 
-**Decision:** provision a **1 MB `config` partition** — worst-case-safe (covers
-`P` up to ~200 KB at 5×, plus headroom), and cheap: ~6 % of the 16 MB nano. The
-only open input is a sanity-check of real-world `P` against the PowerMonitor
-sibling project (raised on issue #40).
+**Decision:** the `config` partition size is a **per-target parameter** (it fits
+MK-16's consumer-selectable profile — the config partition is part of the chosen
+partition preset), set by flash class:
+
+| Target class | Example boards | `config` partition |
+|---|---|---|
+| **16 MB** | esp32s3nano | **1 MB** |
+| **4 MB** | esp32dev | **256 KB** |
+
+Both are worst-case-safe. Real consumer `P` came back small — power-monitor
+≈ 10–11 KB (dominated by `pm_channels` at max), departures-board single-digit KB
+(see [issue #48](https://github.com/matthewmcneill/esp32-app-foundation/issues/48)) —
+so even the ~5× per-channel-golden peak (~50–75 KB) sits comfortably inside 256 KB
+with several× wear/free-space headroom; 1 MB on 16 MB targets is generous.
+
+A *fixed* 1 MB was **rejected** (departures-board consumer review): on the 4 MB
+esp32dev it would consume ~25 % of total flash and force the A/B app slots below
+the ~1.5–1.875 MB a display + web + OTA + TLS build needs.
 
 ---
 
@@ -572,9 +642,12 @@ Ordered to keep each step shippable and to front-load the prerequisite:
   behind [MK-18](#mk-18--size-the-config-partition-for-the-worst-case-because-it-is-the-immutable-layer)
   and is being raised as its own issue; the 1 MB partition is sized to absorb its
   worst case regardless.
-- **OQ-MK-5 — Heavy-consumer `P`:** sanity-check the realistic maximum config
-  payload against the PowerMonitor sibling project before finalising partition
-  proportions (open on issue #40).
+- **OQ-MK-5 — Heavy-consumer `P`:** ✅ **Resolved** (issue #48 consumer review).
+  Real `P` is small — power-monitor ≈ 10–11 KB, departures-board single-digit KB.
+  Partition sizing set per-target in [MK-18](#mk-18--size-the-config-partition-for-the-worst-case-because-it-is-the-immutable-layer)
+  (1 MB on 16 MB targets, 256 KB on 4 MB). DraytonWiser's *config* `P` still to
+  confirm on #48 but expected in range (its large-asset need is a Preset-B
+  question, not a config-payload one).
 
 ---
 
@@ -601,3 +674,7 @@ Ordered to keep each step shippable and to front-load the prerequisite:
 | Date | Change |
 |---|---|
 | 2026-07-28 | Initial draft. Captures MK-1…MK-18 and OQ-MK-1…OQ-MK-5 from the microkernel design discussion: kernel model, `registerModule` dogfooding, two-axis optionality (resolving hardware-config OQ-1), the `IBootReporter` boot seam, EventBus concurrency/allocation contract, FreeRTOS delegation, and the four-tier persistence + partition-profile model with worst-case `config` sizing. |
+| 2026-07-29 | Refinements: OTA reclassified default-off (MK-6); MK-1 sharpened into the three-ring model (kernel primitives / mandatory core services / optional modules) to reconcile with MK-6. |
+| 2026-07-29 | Consumer review (#48): MK-18 config partition sizing changed from a fixed 1 MB to **per-target** (1 MB on 16 MB / 256 KB on 4 MB) after departures-board flagged the esp32dev flash budget; OQ-MK-5 resolved (real `P` ≈ 10–15 KB). |
+| 2026-07-29 | Consumer review (#48) cont.: MK-9 gains an async transition-ordering clause; new MK-6a (optional-module contracts on the facade but flag-gated → clean compile error when absent, correcting the earlier "compiles regardless" wording). |
+| 2026-07-29 | DraytonWiser #48 answer: **preset discriminator clarified as delivery *cadence*, orthogonal to display kind + asset size** — DraytonWiser (LVGL, compiled-in) is **Preset A**. All three consumers are now Preset A; **Preset B has no current consumer → seam preserved (MK-16/17), implementation deferred** to a consumer-triggered follow-on (trigger documented). |

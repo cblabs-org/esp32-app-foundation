@@ -32,6 +32,7 @@
 // transitively via the Arduino framework. No explicit web server include needed.
 #include <ArduinoJson.h>
 #include <cstring>
+#include "DeviceCrypto.hpp"
 #include "platform/LogShim.h"
 
 // KeyManager is needed for addKey/getKeyById/deleteKey in WO2 crypto helpers.
@@ -40,6 +41,7 @@
 // ConfigManager is needed for saveModuleConfig() in POST /api/auth/password.
 // ConfigManager is needed for saveModuleConfig() in generateAndStoreCert().
 #include "../ConfigManager/ConfigManager.hpp"
+#include "../ConfigManager/ConfigRoot.hpp"
 
 #include <mbedtls/asn1write.h>
 #include <mbedtls/oid.h>
@@ -55,6 +57,7 @@ extern "C" {
 }
 // mbedTLS: EC key generation + X.509 cert writing (WO3).
 // In mbedTLS 3.x (ESP-IDF 5.x), the x509write_crt API is part of x509_crt.h.
+#include <mbedtls/version.h>
 #include <mbedtls/entropy.h>
 #include <mbedtls/ctr_drbg.h>
 #include <mbedtls/pk.h>
@@ -62,8 +65,12 @@ extern "C" {
 #include <mbedtls/x509_crt.h>
 #include <mbedtls/sha256.h>
 #include <esp_random.h>
-// LittleFS for DER cert/key storage (WO3).
-#include <LittleFS.h>
+#include <sys/stat.h>
+#include <stdio.h>
+#include <unistd.h>
+#ifndef ESP_PLATFORM
+#include <filesystem>
+#endif
 #include <freertos/idf_additions.h>
 
 static constexpr const char* TAG = "AuthManager";
@@ -237,31 +244,37 @@ bool AuthManager::checkMcpAuth(PsychicRequest* request, PsychicResponse* respons
  * --- Step 3: Write all bytes and close ---
  * Logs the byte count on success for traceability.
  */
-bool AuthManager::_saveToLittleFS(const char* path,
+bool AuthManager::_saveToFile(const char* path,
                                    const uint8_t* data, size_t len) const {
     // --- Step 1: Ensure parent directory exists ---
-    if (!LittleFS.exists("/etc")) {
-        LittleFS.mkdir("/etc");
+#ifdef ESP_PLATFORM
+    struct stat st;
+    if (stat(ConfigRoot::getEtcPath(), &st) != 0) {
+        mkdir(ConfigRoot::getEtcPath(), 0777);
     }
+#else
+    std::error_code ec;
+    std::filesystem::create_directories(ConfigRoot::getEtcPath(), ec);
+#endif
 
     // --- Step 2: Open for binary write ---
-    File file = LittleFS.open(path, "wb");
+    FILE* file = fopen(path, "wb");
     if (!file) {
-        ESP_LOGE(TAG, "_saveToLittleFS: failed to open %s for writing", path);
+        ESP_LOGE(TAG, "_saveToFile: failed to open %s for writing", path);
         return false;
     }
 
     // --- Step 3: Write and close ---
-    size_t written = file.write(data, len);
-    file.close();
+    size_t written = fwrite(data, 1, len, file);
+    fclose(file);
 
     if (written != len) {
-        ESP_LOGE(TAG, "_saveToLittleFS: wrote %u of %u bytes to %s",
+        ESP_LOGE(TAG, "_saveToFile: wrote %u of %u bytes to %s",
                  (unsigned)written, (unsigned)len, path);
         return false;
     }
 
-    ESP_LOGI(TAG, "_saveToLittleFS: wrote %u bytes to %s", (unsigned)len, path);
+    ESP_LOGI(TAG, "_saveToFile: wrote %u bytes to %s", (unsigned)len, path);
     return true;
 }
 
@@ -276,30 +289,35 @@ bool AuthManager::_saveToLittleFS(const char* path,
  *
  * --- Step 3: Read all bytes and report length ---
  */
-bool AuthManager::_loadFromLittleFS(const char* path,
+bool AuthManager::_loadFromFile(const char* path,
                                      uint8_t* buf, size_t bufMax,
                                      size_t* outLen) const {
     // --- Step 1: Open for binary read ---
-    File file = LittleFS.open(path, "rb");
+    FILE* file = fopen(path, "rb");
     if (!file) {
-        ESP_LOGE(TAG, "_loadFromLittleFS: failed to open %s", path);
+        ESP_LOGE(TAG, "_loadFromFile: failed to open %s", path);
         return false;
     }
 
     // --- Step 2: Bounds check ---
-    size_t fileSize = file.size();
+    fseek(file, 0, SEEK_END);
+    size_t fileSize = ftell(file);
+    fseek(file, 0, SEEK_SET);
+
     if (fileSize > bufMax) {
-        ESP_LOGE(TAG, "_loadFromLittleFS: file %s is %u bytes, buffer is only %u",
+        ESP_LOGE(TAG, "_loadFromFile: file %s is %u bytes, buffer is only %u",
                  path, (unsigned)fileSize, (unsigned)bufMax);
-        file.close();
+        fclose(file);
         return false;
     }
 
     // --- Step 3: Read all bytes ---
-    *outLen = file.read(buf, fileSize);
-    file.close();
+    size_t bytesRead = fread(buf, 1, fileSize, file);
+    fclose(file);
+    if (bytesRead != fileSize) return false;
+    *outLen = bytesRead;
 
-    ESP_LOGI(TAG, "_loadFromLittleFS: read %u bytes from %s", (unsigned)*outLen, path);
+    ESP_LOGI(TAG, "_loadFromFile: read %u bytes from %s", (unsigned)*outLen, path);
     return (*outLen == fileSize);
 }
 
@@ -429,7 +447,15 @@ bool AuthManager::generateAndStoreCert(const char* hostname) {
     mbedtls_x509write_crt_set_subject_name(crt, dn);
     mbedtls_x509write_crt_set_issuer_name(crt, dn);
 
+#if MBEDTLS_VERSION_NUMBER >= 0x03000000
     mbedtls_x509write_crt_set_serial_raw(crt, serialBytes, sizeof(serialBytes));
+#else
+    mbedtls_mpi serial;
+    mbedtls_mpi_init(&serial);
+    mbedtls_mpi_read_binary(&serial, serialBytes, sizeof(serialBytes));
+    mbedtls_x509write_crt_set_serial(crt, &serial);
+    mbedtls_mpi_free(&serial);
+#endif
 
     // Fixed validity: 2020-01-01 → 2040-01-01 (avoids RTC dependency on first boot)
     mbedtls_x509write_crt_set_validity(crt, "20200101000000", "20400101000000");
@@ -510,11 +536,16 @@ bool AuthManager::generateAndStoreCert(const char* hostname) {
     const uint8_t* crtData = &crtBuf[1024 - (size_t)crtLen];
 
     // --- Step 7: Save both DER files to LittleFS ---
-    if (!_saveToLittleFS("/etc/server.key", keyData, (size_t)keyLen)) {
+    char keyPath[64];
+    char crtPath[64];
+    ConfigRoot::getEtcFilePath("server.key", keyPath, sizeof(keyPath));
+    ConfigRoot::getEtcFilePath("server.crt", crtPath, sizeof(crtPath));
+
+    if (!_saveToFile(keyPath, keyData, (size_t)keyLen)) {
         ESP_LOGE(TAG, "generateAndStoreCert: failed to save private key");
         return cleanup(false);
     }
-    if (!_saveToLittleFS("/etc/server.crt", crtData, (size_t)crtLen)) {
+    if (!_saveToFile(crtPath, crtData, (size_t)crtLen)) {
         ESP_LOGE(TAG, "generateAndStoreCert: failed to save certificate");
         return cleanup(false);
     }
@@ -536,8 +567,8 @@ bool AuthManager::generateAndStoreCert(const char* hostname) {
 /**
  * @brief Load DER-encoded certificate and key from LittleFS into static buffers.
  *
- * --- Step 1: Read certificate from /etc/server.crt ---
- * --- Step 2: Read private key from /etc/server.key ---
+ * --- Step 1: Read certificate from system config directory ---
+ * --- Step 2: Read private key from system config directory ---
  * Both must succeed; failure in either returns false immediately.
  *
  * Static buffers are intentionally used (not heap) to avoid fragmentation.
@@ -551,15 +582,20 @@ bool AuthManager::loadCert(uint8_t** certDer, size_t* certLen,
     size_t cLen = 0;
     size_t kLen = 0;
 
+    char crtPath[64];
+    char keyPath[64];
+    ConfigRoot::getEtcFilePath("server.crt", crtPath, sizeof(crtPath));
+    ConfigRoot::getEtcFilePath("server.key", keyPath, sizeof(keyPath));
+
     // --- Step 1: Read certificate ---
-    if (!_loadFromLittleFS("/etc/server.crt", certBuf, sizeof(certBuf), &cLen)) {
-        ESP_LOGE(TAG, "loadCert: failed to read /etc/server.crt");
+    if (!_loadFromFile(crtPath, certBuf, sizeof(certBuf), &cLen)) {
+        ESP_LOGE(TAG, "loadCert: failed to read %s", crtPath);
         return false;
     }
 
     // --- Step 2: Read private key ---
-    if (!_loadFromLittleFS("/etc/server.key", keyBuf, sizeof(keyBuf), &kLen)) {
-        ESP_LOGE(TAG, "loadCert: failed to read /etc/server.key");
+    if (!_loadFromFile(keyPath, keyBuf, sizeof(keyBuf), &kLen)) {
+        ESP_LOGE(TAG, "loadCert: failed to read %s", keyPath);
         return false;
     }
 
@@ -645,19 +681,18 @@ void AuthManager::registerRoutes(PsychicHttpServer& server) {
                 // Trigger cert generation in background
                 bool expected = false;
                 if (_certGenRunning.compare_exchange_strong(expected, true)) {
-                    BaseType_t certResult = xTaskCreateWithCaps(
+                    BaseType_t certResult = xTaskCreate(
                         [](void* param) {
                             auto* self = static_cast<AuthManager*>(param);
                             self->generateAndStoreCert("esp32-device");
                             self->_certGenRunning.store(false);
-                            vTaskDeleteWithCaps(nullptr);
+                            vTaskDelete(nullptr);
                         },
                         "cert_gen",
                         12288,
                         this,
                         1,
-                        nullptr,
-                        MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT
+                        nullptr
                     );
                     if (certResult != pdPASS) {
                         ESP_LOGE(TAG, "Failed to create cert_gen task");
@@ -716,19 +751,18 @@ void AuthManager::registerRoutes(PsychicHttpServer& server) {
         // cert_gen is a short-lived, self-deleting task — TWDT registration
         // is intentionally skipped because the task runs once and exits.
         // DRAM stack is required for mbedTLS EC key generation.
-        BaseType_t certResult = xTaskCreateWithCaps(
+        BaseType_t certResult = xTaskCreate(
             [](void* param) {
                 auto* self = static_cast<AuthManager*>(param);
                 self->generateAndStoreCert("esp32-device");
                 self->_certGenRunning.store(false);
-                vTaskDeleteWithCaps(nullptr);
+                vTaskDelete(nullptr);
             },
             "cert_gen",
             12288,
             this,
             1,
-            nullptr,
-            MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT
+            nullptr
         );
         if (certResult != pdPASS) {
             ESP_LOGE(TAG, "Failed to create cert_gen task");
@@ -778,8 +812,13 @@ void AuthManager::registerRoutes(PsychicHttpServer& server) {
         
         bool success = false;
         if (r1 == 0 && r2 == 0) {
-            if (_saveToLittleFS("/etc/server.key", key_der, key_len) &&
-                _saveToLittleFS("/etc/server.crt", cert_der, cert_len)) {
+            char keyPath[64];
+            char crtPath[64];
+            ConfigRoot::getEtcFilePath("server.key", keyPath, sizeof(keyPath));
+            ConfigRoot::getEtcFilePath("server.crt", crtPath, sizeof(crtPath));
+
+            if (_saveToFile(keyPath, key_der, key_len) &&
+                _saveToFile(crtPath, cert_der, cert_len)) {
                 _certPresent = true;
                 if (_configManager) _configManager->saveModuleConfig(this);
                 success = true;

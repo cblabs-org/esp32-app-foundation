@@ -41,17 +41,16 @@
 #pragma once
 
 #include <Arduino.h>
-#include <LittleFS.h>
 #include <string>
 #include <stdint.h>
-
 #include <memory>
 #include <vector>
 #include <ArduinoJson.h>
 #include "../DeviceCrypto/DeviceCrypto.hpp"
 #include "../../include/interfaces/IWebContributor.hpp"
+#include "../ConfigManager/ConfigRoot.hpp"
 
-#define KEY_MANAGER_PATH "/etc/keys.json"
+#define KEY_MANAGER_PATH (ConfigRoot::getEtcFilePath("keys.json").c_str())
 
 /**
  * @brief Metadata descriptor for a single key entry.

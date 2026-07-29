@@ -20,7 +20,7 @@
  *              centralised gateway for all module configuration I/O.
  *
  *              Core domain services (WifiManager, OTAUpdateManager,
- *              TimeManager, KeyManager, AuthManager) are also Application-owned
+ *              KeyManager, AuthManager) are also Application-owned
  *              members, wired into the boot sequence and registered with ConfigManager
  *              and the tick/web contributor vectors where applicable.
  *
@@ -37,7 +37,6 @@
  *   - getConfigManager():        Access the ConfigManager gateway
  *   - getWifiManager():          Access the WifiManager domain service
  *   - getOtaManager():           Access the OTAUpdateManager domain service
- *   - getTimeManager():          Access the TimeManager domain service
  *   - getKeyManager():           Access the KeyManager domain service
  *   - getAuthManager():          Access the AuthManager security service
  *   - getState():                Query the current AppState lifecycle phase
@@ -59,6 +58,8 @@
 #include "interfaces/IWebContributor.hpp"
 #include "interfaces/IMCPContributor.hpp"
 #include "interfaces/IConfigGate.hpp"
+#include "interfaces/IBootReporter.hpp"
+#include "../../include/events/AppConfiguringPayload.hpp"
 
 #include "../EventBus/EventBus.hpp"
 #include "../DataManager/DataManager.hpp"
@@ -69,25 +70,13 @@
 // Core domain services (owned by value — full includes required)
 #include "../WifiManager/WifiManager.hpp"
 #include "../WifiManager/WifiConfigGate.hpp"
-#include "../TimeManager/TimeManager.hpp"
-#include "../TimeManager/TimeConfigGate.hpp"
 #include "../KeyManager/KeyManager.hpp"
 #include "../AuthManager/AuthManager.hpp"
 #include "../../lib/DeviceCrypto/DeviceCrypto.hpp"
 
-#ifdef HAS_DISPLAY
-// Display subsystem (hardware only — SPI/U8G2 headers unavailable in native builds)
-#include "../U8G2Display/U8G2DisplayModule.hpp"
-#include "../U8G2Display/boards/DiagnosticsBoard.hpp"
-#endif
 
-// Home Assistant MQTT integration (hardware only — MQTT client unavailable in native builds)
-#include "../HomeAssistant/HomeAssistantModule.hpp"
 
-// Forward declaration only — OTAUpdateManager.hpp pulls in WiFiClientSecure
-// which causes LDF to discover NetworkClientSecure with missing SSL backend.
-// Full include deferred to Application.cpp; member held via unique_ptr.
-class OTAUpdateManager;
+
 
 // ---------------------------------------------------------------------------
 // Application Events
@@ -105,6 +94,26 @@ namespace ApplicationEvents {
     /// @brief Published when entering or updating CONFIGURING state.
     /// Payload: const AppConfiguringPayload*
     constexpr const char* APP_CONFIGURING = "app.configuring";
+
+#ifdef WITH_OTA
+    /// @brief Published during OTA progress updates.
+    /// Payload: const OtaProgressPayload*
+    constexpr const char* OTA_PROGRESS = "ota.progress";
+
+    struct OtaProgressPayload {
+        float progress;       // 0.0 to 1.0 download fraction
+        const char* status;   // Human-readable status message
+        bool complete;        // True when OTA cycle is finished
+        bool success;         // True if OTA succeeded (only valid when complete)
+    };
+#else
+    // EO-07: Legible absent-module error for consumers attempting to use OTA without the flag
+    struct OTA_PROGRESS_requires_WITH_OTA {};
+    constexpr OTA_PROGRESS_requires_WITH_OTA OTA_PROGRESS{};
+    
+    struct OtaProgressPayload_requires_WITH_OTA {};
+    typedef OtaProgressPayload_requires_WITH_OTA OtaProgressPayload;
+#endif
 }
 
 /**
@@ -128,7 +137,7 @@ namespace ApplicationEvents {
  */
 class Application {
 public:
-    /// Destructor — cleans up heap-allocated OTAUpdateManager.
+    /// Destructor
     ~Application();
 
     // -------------------------------------------------------------------------
@@ -230,6 +239,7 @@ public:
         if constexpr (std::is_base_of_v<IDataSource, T>)      { registerDataSource(module);            any = true; }
         if constexpr (std::is_base_of_v<IConfigGate, T>)      { registerConfigGate(module);            any = true; }
         if constexpr (std::is_base_of_v<IStatusReporter, T>)  { registerStatusReporter(module);        any = true; }
+        if constexpr (std::is_base_of_v<IBootReporter, T>)    { registerBootReporter(module);          any = true; }
         if (!any) {
             ESP_LOGW("Application", "registerModule: type implements no known framework interface");
         }
@@ -242,6 +252,13 @@ public:
      * @return true if registration succeeded; false if locked or nullptr.
      */
     bool registerTickable(ITickable* module);
+
+    /**
+     * @brief Register a boot reporter for early hardware init.
+     * @param reporter  Non-null pointer to the IBootReporter implementation.
+     * @return true if registration succeeded; false if locked or nullptr.
+     */
+    bool registerBootReporter(IBootReporter* reporter);
 
     /**
      * @brief Set (or replace pre-lock) the single status-reporter adapter.
@@ -333,28 +350,6 @@ public:
     WifiManager& getWifiManager();
 
     /**
-     * @brief Get the application's OTAUpdateManager instance.
-     * @return Reference to the OTAUpdateManager.
-     */
-    OTAUpdateManager& getOtaManager();
-
-    /**
-     * @brief Get the application's TimeManager instance.
-     * @return Reference to the TimeManager.
-     */
-    TimeManager& getTimeManager();
-
-    /**
-     * @brief Get the application's TimeConfigGate for downstream opt-in.
-     *
-     * Downstream apps that require timezone configuration can register
-     * this gate: app.registerConfigGate(&app.getTimeGate())
-     *
-     * @return Reference to the built-in TimeConfigGate.
-     */
-    TimeConfigGate& getTimeGate();
-
-    /**
      * @brief Get the application's KeyManager instance.
      * @return Reference to the KeyManager.
      */
@@ -372,28 +367,7 @@ public:
      */
     const FrameworkConfig& getConfig() const;
 
-#ifdef HAS_DISPLAY
-    /**
-     * @brief Get the application's display module instance.
-     *
-     * Downstream apps use this to register carousel boards, configure
-     * display settings, or access the sub-object API (carousel, screensaver,
-     * boards).
-     *
-     * @return Reference to the U8G2DisplayModule.
-     */
-    U8G2DisplayModule& getDisplay();
-#endif
 
-    /**
-     * @brief Get the application's HomeAssistantModule instance.
-     *
-     * Downstream apps can use this to add custom HA entities to the
-     * framework-owned module. The module is dormant until MQTT is configured.
-     *
-     * @return Reference to the HomeAssistantModule.
-     */
-    HomeAssistantModule& getHomeAssistant() { return _haModule; }
 
     // -------------------------------------------------------------------------
     // State Accessors
@@ -517,10 +491,13 @@ private:
 
     NullStatusReporter _nullReporter;                               ///< Fallback status reporter instance
     IStatusReporter* _statusReporter = &_nullReporter;              ///< Display adapter for boot-phase status overlays
+    IBootReporter* _bootReporter = nullptr;                         ///< Boot reporter for early hardware init
 
     // Core infrastructure services
     ConfigManager _configManager;       ///< Centralised config gateway (owned by Application)
     EventBus _eventBus;                 ///< Central event bus
+    uint32_t _systemHeapPayload = 0;    ///< Persistent payload for system.heap event
+    AppConfiguringPayload _configuringPayload{}; ///< Persistent payload for app.configuring event
     DataManager _dataManager;           ///< Background data manager
     WebServerManager _webServerManager; ///< Local HTTP Server
     MCPServer _mcpServer;               ///< MCP JSON-RPC server
@@ -531,9 +508,6 @@ private:
     AuthManager _authManager;           ///< Portal + MCP authentication manager (WO1 skeleton)
     WifiManager _wifiManager;           ///< WiFi connection state machine
     WifiConfigGate _wifiGate{_wifiManager}; ///< Built-in WiFi STA config gate
-    OTAUpdateManager* _otaManager = nullptr;  ///< OTA firmware update orchestrator (heap, fwd-declared)
-    TimeManager _timeManager;           ///< NTP synchronization service
-    TimeConfigGate _timeGate{_timeManager}; ///< Optional timezone config gate (downstream opt-in)
 
     // Heartbeat
     Periodic _heartbeatPeriodic{30000};                              ///< Throttle for periodic heartbeat log (30s)
@@ -553,13 +527,6 @@ private:
     bool _enableDefaultAppTab = true;      ///< Guard for default App tab registration
     const char* _appName = nullptr;        ///< Runtime-settable application name for portal title
 
-#ifdef HAS_DISPLAY
-    // Display subsystem (hardware only)
-    U8G2DisplayModule _display;                      ///< Display module with carousel engine
-    DiagnosticsBoard  _diagnosticsBoard{256, 64};    ///< System telemetry carousel board
-    bool _wifiWizardShown = false;                   ///< Guard: WiFi wizard modal pushed this CONFIGURING phase
-#endif
 
-    // Home Assistant integration (hardware only)
-    HomeAssistantModule _haModule;              ///< Framework-owned HA MQTT service
+
 };

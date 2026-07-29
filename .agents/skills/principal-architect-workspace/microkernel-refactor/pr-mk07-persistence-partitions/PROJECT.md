@@ -3,7 +3,7 @@
 **WO branch stack base:** `pr-mk05-extract-optionals`
 **Depends on:** pr-mk05 (stable module set) **+ hardware-config program (cross-program)** · **Blocks:** —
 **Design refs:** MK-14, MK-15, MK-16, MK-17, MK-18 · **Gating decisions:** **OQ-MK-4** (per-channel Golden). OQ-MK-5 ✅ resolved (`P` ≈ 10–15 KB). **Preset B implementation deferred** — all three consumers are Preset A (#48); the seam is built, the asset-OTA machinery is a consumer-triggered follow-on
-**Status:** 📋 **PLANNED — awaiting human approval + cross-program coordination**
+**Status:** ✅ **APPROVED — human approved full autonomous execution (2026-07-29)**
 
 ---
 
@@ -43,18 +43,18 @@ with that program's PA.
 (`CONFIG_LITTLEFS_MAX_PARTITIONS=3` already set), **not** the Arduino `LittleFS`
 singleton.
 
-## Proposed Work Order Ledger _(PA to finalise; likely a sub-plan)_
+## Finalised Work Order Ledger
 
-- **[ ] wo1 — config-root abstraction:** route `KeyManager`/`AuthManager`/
-  `ConfigManager` `/etc` paths through one accessor. `standard`
-- **[ ] wo2 — `config` partition + layout-agnostic mount:** dual-mount + boot
+- **[x] [wo1-config-root](wo1-config-root/WORKORDER.md):** route `KeyManager`/`AuthManager`/
+  `ConfigManager` `/etc` and `/mod` paths through one accessor. `standard`
+- **[ ] [wo2-partition-mount](wo2-partition-mount/WORKORDER.md):** `config` partition + layout-agnostic mount: dual-mount + boot
   probe + fallback. `architect`
-- **[ ] wo3 — partition presets:** blessed A/B `partitions.csv` set (coord.
+- **[ ] [wo3-partition-presets](wo3-partition-presets/WORKORDER.md):** partition presets: blessed A/B `partitions.csv` set (coord.
   hardware-config). `standard`
-- **[ ] wo4 — Preset B asset OTA:** ⏸ **DEFERRED — out of this Project's scope**
+- **[ ] [wo4-preset-b-ota](wo4-preset-b-ota/WORKORDER.md):** ⏸ **DEFERRED — out of this Project's scope**
   (no current consumer; all three are Preset A, #48). The seam (wo2) keeps it
   addable later; spin a follow-on Project when the trigger fires. `architect`
-- **[ ] wo5 — sizing + lifecycle alignment:** **per-target `config`** (1 MB on
+- **[ ] [wo5-sizing-lifecycle](wo5-sizing-lifecycle/WORKORDER.md):** sizing + lifecycle alignment: **per-target `config`** (1 MB on
   16 MB / 256 KB on 4 MB); align with per-channel-Golden issue (OQ-MK-4).
   (`P` resolved ≈ 10–15 KB.) `standard`
 
@@ -69,3 +69,4 @@ stub unaffected by the path abstraction.
 | Date | Entry |
 |---|---|
 | 2026-07-28 | Drafted. Awaiting human approval, OQ-MK-4/5, and hardware-config coordination. Sequence last. |
+| 2026-07-29 | Human approved full autonomous execution (provenance `7bdd6d3`). All predecessors complete: mk01 ✅, mk02 ✅, mk03 ✅, mk04 ✅, mk05 ✅, mk06 ✅. **FINAL PROJECT.** PA spawn authorised. |

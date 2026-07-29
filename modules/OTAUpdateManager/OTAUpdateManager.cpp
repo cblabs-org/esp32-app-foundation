@@ -43,6 +43,8 @@
  *   - resetConfig():        Restore OTA config factory defaults (IConfigurable)
  */
 
+#ifdef WITH_OTA
+
 #include "OTAUpdateManager.hpp"
 #include "platform/LogShim.h"
 
@@ -523,7 +525,7 @@ void OTAUpdateManager::performUpdateTask() {
                      _lastCheckedChannel, _channel);
             strlcpy(_lastCheckedChannel, _channel, sizeof(_lastCheckedChannel));
             if (_configManager != nullptr) {
-                _configManager->saveModuleConfig(this);
+                _configManager->saveModuleConfig(static_cast<IConfigurable*>(this));
             }
             // Fall through to download — channel switch is an implicit update
         } else {
@@ -685,6 +687,11 @@ void OTAUpdateManager::performUpdateTask() {
     // we are outside TWDT scope. Do not move TWDT deregistration below.
     delay(2000);  // Allow event propagation and display update
 
+    if (_preRebootHook) {
+        ESP_LOGI(TAG, "Executing pre-reboot hook before restart");
+        _preRebootHook();
+    }
+
     ESP_LOGI(TAG, "OTA task stack high-water mark: %u bytes free",
              static_cast<unsigned>(uxTaskGetStackHighWaterMark(nullptr) * sizeof(StackType_t)));
 
@@ -701,14 +708,13 @@ void OTAUpdateManager::performUpdateTask() {
 void OTAUpdateManager::publishProgress(float progress, const char* status,
                                         bool complete, bool success) {
     _lastProgress = progress;
-    OTAProgressEvent event;
-    event.progress = progress;
-    event.status   = status;
-    event.complete = complete;
-    event.success  = success;
+    _progressEvent.progress = progress;
+    _progressEvent.status   = status;
+    _progressEvent.complete = complete;
+    _progressEvent.success  = success;
 
     if (_eventBus != nullptr) {
-        _eventBus->publish(OTAUpdateManagerEvents::OTA_PROGRESS, &event);
+        _eventBus->publish(ApplicationEvents::OTA_PROGRESS, &_progressEvent);
     }
     ESP_LOGD(TAG, "OTA progress: %.1f%% — %s (complete=%d, success=%d)",
              progress * 100.0f, status, complete, success);
@@ -928,7 +934,7 @@ bool OTAUpdateManager::fetchAndVerifyManifest_(OTAManifest& manifest) {
 
             // Persist the updated learned URL via config save
             if (_configManager != nullptr) {
-                _configManager->saveModuleConfig(this);
+                _configManager->saveModuleConfig(static_cast<IConfigurable*>(this));
                 ESP_LOGI(TAG, "fetchAndVerifyManifest_: persisted updated learned manifest URL");
             }
         }
@@ -1027,6 +1033,10 @@ void OTAUpdateManager::markAppValid() {
         _configManager->getManifest().save();
         ESP_LOGI(TAG, "Config manifest: Active → Golden snapshot saved (firmware blessed)");
     }
+}
+
+void OTAUpdateManager::setPreRebootHook(std::function<void()> hook) {
+    _preRebootHook = std::move(hook);
 }
 
 /**
@@ -1355,7 +1365,7 @@ void OTAUpdateManager::registerRoutes(PsychicHttpServer& server) {
                     if (strlen(ch) > 0 && strlen(ch) < sizeof(this->_channel)) {
                         strlcpy(this->_channel, ch, sizeof(this->_channel));
                         if (_configManager != nullptr) {
-                            _configManager->saveModuleConfig(this);
+                            _configManager->saveModuleConfig(static_cast<IConfigurable*>(this));
                         }
                         ESP_LOGI(TAG, "Channel changed to: %s", this->_channel);
                         response->send(200, "application/json", "{\"status\":\"ok\"}");
@@ -1367,7 +1377,7 @@ void OTAUpdateManager::registerRoutes(PsychicHttpServer& server) {
                     if (doc["autoCheck"].is<bool>()) {
                         this->_autoCheck = doc["autoCheck"].as<bool>();
                         if (_configManager != nullptr) {
-                            _configManager->saveModuleConfig(this);
+                            _configManager->saveModuleConfig(static_cast<IConfigurable*>(this));
                         }
                         ESP_LOGI(TAG, "Auto-check changed to: %d", (int)this->_autoCheck);
                         response->send(200, "application/json", "{\"status\":\"ok\"}");
@@ -1379,7 +1389,7 @@ void OTAUpdateManager::registerRoutes(PsychicHttpServer& server) {
                     if (doc["updatesEnabled"].is<bool>()) {
                         this->_updatesEnabled = doc["updatesEnabled"].as<bool>();
                         if (_configManager != nullptr) {
-                            _configManager->saveModuleConfig(this);
+                            _configManager->saveModuleConfig(static_cast<IConfigurable*>(this));
                         }
                         ESP_LOGI(TAG, "Updates-enabled changed to: %d", (int)this->_updatesEnabled);
                         response->send(200, "application/json", "{\"status\":\"ok\"}");
@@ -1393,7 +1403,7 @@ void OTAUpdateManager::registerRoutes(PsychicHttpServer& server) {
                         if (h >= 0 && h <= 23) {
                             this->_checkHour = static_cast<uint8_t>(h);
                             if (_configManager != nullptr) {
-                                _configManager->saveModuleConfig(this);
+                                _configManager->saveModuleConfig(static_cast<IConfigurable*>(this));
                             }
                             ESP_LOGI(TAG, "Check hour changed to: %u", (unsigned)this->_checkHour);
                             response->send(200, "application/json", "{\"status\":\"ok\"}");
@@ -1565,3 +1575,5 @@ void OTAUpdateManager::registerMCPTools(MCPToolRegistry& registry) {
             }, this, true);
     }
 }
+
+#endif // WITH_OTA

@@ -535,12 +535,6 @@ TEST_F(ApplicationDomainServiceTest, GetOtaManager_ReturnsReference) {
     SUCCEED();
 }
 
-/** getTimeManager() must return a valid reference. */
-TEST_F(ApplicationDomainServiceTest, GetTimeManager_ReturnsReference) {
-    TimeManager& tm = app.getTimeManager();
-    // If this compiles and doesn't crash, the accessor works
-    EXPECT_TRUE(true);
-}
 
 /** getKeyManager() must return a valid reference. */
 TEST_F(ApplicationDomainServiceTest, GetKeyManager_ReturnsReference) {

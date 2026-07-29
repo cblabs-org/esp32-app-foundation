@@ -28,7 +28,6 @@
 
 #include "Application.hpp"
 #include "../../include/events/AppConfiguringPayload.hpp"
-#include "../OTAUpdateManager/OTAUpdateManager.hpp"
 
 
 // ---------------------------------------------------------------------------
@@ -37,7 +36,10 @@
 // ---------------------------------------------------------------------------
 #include <inttypes.h>         // PRIu32
 #include <Arduino.h>          // Serial, millis(), etc.
-#include <LittleFS.h>         // LittleFS.begin()
+#ifndef NATIVE_BUILD
+#include <LittleFS.h>
+#include "esp_partition.h"
+#endif
 #include "esp_system.h"       // esp_restart()
 #include "esp_heap_caps.h"    // heap_caps_get_free_size(), heap_caps_get_minimum_free_size()
 #include <cstdlib>            // For native-build stubs
@@ -45,6 +47,7 @@
 #include <cstring>                // memset()
 
 #include "platform/LogShim.h"
+#include "DeviceCrypto.hpp"
 
 static constexpr const char* TAG = "Application";
 
@@ -59,8 +62,6 @@ static constexpr const char* TAG = "Application";
 
 // Destructor — clean up heap-allocated modules
 Application::~Application() {
-    delete _otaManager;
-    _otaManager = nullptr;
 }
 
 // ---------------------------------------------------------------------------
@@ -80,13 +81,13 @@ Application::~Application() {
  * @return true on success; false if a fatal error prevents normal operation.
  */
 bool Application::begin(const FrameworkConfig& config) {
-#ifdef HAS_DISPLAY
-    // --- Phase 1: Bootstrap display hardware (zero framework deps) ---
-    // SPI + U8G2 init, boot splash rendered immediately.
-    // Must happen before any reportStatus() calls so the boot splash is visible.
-    _display.bootstrapHardware();
-    _statusReporter = &_display;  // Route all boot progress to the display
-#endif
+    if (_bootReporter) {
+        _bootReporter->beginEarly();
+        _statusReporter = _bootReporter;
+    } else {
+        _statusReporter = &_nullReporter;
+
+    }
 
     // --- Step 1: Boot banner ---
     // Print the firmware version so the first log line is always identifiable.
@@ -115,14 +116,35 @@ bool Application::begin(const FrameworkConfig& config) {
     // --- Step 4: Mount LittleFS ---
     // Foundation for all persistence. Only available on hardware;
     // in native builds we skip this.
+#ifndef NATIVE_BUILD
+    const esp_partition_t* config_part = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_SPIFFS, "config");
+
+    // Mount storage partition (default)
     if (!LittleFS.begin(true, "/littlefs", 10, "storage")) {
-        // formatOnFail = true: first-boot will auto-format, subsequent failures
-        // indicate a hardware fault — abort and return false.
         ESP_LOGE(TAG, "LittleFS mount failed — cannot continue boot");
         _statusReporter->reportError("Filesystem mount failed");
         return false;
     }
-    ESP_LOGI(TAG, "LittleFS mounted successfully");
+    ESP_LOGI(TAG, "LittleFS (storage) mounted successfully");
+
+    // We can allocate another LittleFSFS for the config partition
+    static fs::LittleFSFS configFS;
+
+    if (config_part != NULL) {
+        if (configFS.begin(true, "/config", 10, "config")) {
+            ESP_LOGI(TAG, "LittleFS (config) mounted successfully");
+            ConfigRoot::setMountBase("/config");
+        } else {
+            ESP_LOGE(TAG, "LittleFS (config) mount failed, falling back to /littlefs");
+            ConfigRoot::setMountBase("/littlefs");
+        }
+    } else {
+        ESP_LOGI(TAG, "No config partition found, using /littlefs for config");
+        ConfigRoot::setMountBase("/littlefs");
+    }
+#else
+    ConfigRoot::setMountBase("test/tmp/config");
+#endif
     _statusReporter->reportStatus("Filesystem mounted", 0.10f);
 
     // --- Step 5: Store FrameworkConfig internally ---
@@ -141,44 +163,25 @@ bool Application::begin(const FrameworkConfig& config) {
     _wifiManager.setConfigManager(&_configManager);
     _wifiManager.setKeyManager(&_keyManager);
     _wifiManager.setEventBus(&_eventBus);
-    _timeManager.setConfigManager(&_configManager);
     _authManager.begin(&_configManager, &_keyManager);
 
-    // --- Step 7a: HomeAssistant module wiring ---
-    // Wire the framework-owned HA MQTT service. The module ships
-    // with zero default entities — apps add their own via getHomeAssistant().
-    _haModule.setKeyManager(&_keyManager);
-    _haModule.setEventBus(&_eventBus);
-    _haModule.setConfigManager(&_configManager);
-    _haModule.setAppName(getAppName());
-    _haModule.setAppVersion(BUILD_VERSION);
-    _otaManager = new (std::nothrow) OTAUpdateManager();
-    if (_otaManager == nullptr) {
-        ESP_LOGE(TAG, "Failed to allocate OTAUpdateManager");
-        return false;
-    }
+
 
     // --- Module registration (auto-detects all interfaces per module) ---
     registerModule(&_wifiManager);        // ITickable + IConfigurable + IWebContributor + IMCPContributor
-    registerModule(&_timeManager);        // ITickable + IConfigurable + IWebContributor
     registerModule(&_authManager);        // IConfigurable + IWebContributor
     registerModule(_authManager.passwordTabStub());  // IWebContributor (sub-pill)
     registerModule(_authManager.tlsTabStub());       // IWebContributor (sub-pill)
     registerModule(&_configManager);      // IWebContributor + IMCPContributor
     registerModule(&_keyManager);         // IWebContributor
     registerModule(&_mcpServer);          // IConfigurable + IWebContributor
-    registerModule(_otaManager);          // ITickable + IConfigurable + IWebContributor + IMCPContributor
+
     registerModule(&_webServerManager);   // ITickable
-    registerModule(&_haModule);          // ITickable + IConfigurable + IWebContributor + IMCPContributor
     if (_enableDefaultAppTab) {
         registerModule(&_appTabContributor);  // IWebContributor
     }
 
-#ifdef HAS_DISPLAY
-    registerModule(&_display);                    // ITickable + IStatusReporter + IConfigurable + IWebContributor + IMCPContributor
-    registerModule(_display.settingsTabStub());   // IWebContributor
-    registerModule(_display.screenshotTabStub()); // IWebContributor
-#endif
+
 
     registerModule(&_wifiGate);           // IConfigGate
 
@@ -200,11 +203,7 @@ bool Application::begin(const FrameworkConfig& config) {
     ESP_LOGI(TAG, "WiFi setup initiated");
     _statusReporter->reportStatus("WiFi initialized", 0.55f);
 
-    // --- Step 11: TimeManager — after WiFi, needs network for NTP ---
-    // Uses the persisted timezone from ConfigManager, or the factory default
-    // ("GMT0") seeded by resetConfig().
-    _timeManager.begin();
-    _statusReporter->reportStatus("Time synchronization started", 0.65f);
+    // --- Step 11: (Removed — TimeManager extracted to explicit composition) ---
 
     // --- Step 12: DataManager — background data workers ---
     _dataManager.begin();
@@ -213,9 +212,7 @@ bool Application::begin(const FrameworkConfig& config) {
     }
     _statusReporter->reportStatus("Data services ready", 0.70f);
 
-    // --- Step 13: OTA — wire Application dependency (allocated in Step 7) ---
-    _otaManager->begin(*this);
-    _statusReporter->reportStatus("Update service ready", 0.80f);
+
 
     // --- Step 14: (Merged into Step 7 module registration) ---
 
@@ -226,19 +223,10 @@ bool Application::begin(const FrameworkConfig& config) {
 
     // MCP server: pass the ConfigManager reference for config operations,
     // plus TimeManager (built-in time tools) and WifiManager (status hostname).
-    _mcpServer.begin(_mcpContributors, &_configManager, &_timeManager, &_wifiManager, &_authManager);
+    _mcpServer.begin(_mcpContributors, &_configManager, nullptr, &_wifiManager, &_authManager);
     _statusReporter->reportStatus("Web portal starting...", 0.90f);
 
-#ifdef HAS_DISPLAY
-    // --- Phase 2: Complete display integration ---
-    // EventBus subscriptions, config persistence, carousel board registration,
-    // MCP framebuffer binding. Exits bootstrap mode — tick() handles rendering.
-    _display.begin(&_eventBus);
-    _display.setConfigManager(&_configManager);
-    _diagnosticsBoard.configure(&_wifiManager);
-    _display.carousel.add(&_diagnosticsBoard);
-    _mcpServer.setDisplayInfo(_display.getDisplayInfo());
-#endif
+
 
     // --- Step 16: (Merged into Step 7 module registration) ---
 
@@ -248,16 +236,13 @@ bool Application::begin(const FrameworkConfig& config) {
     _statusReporter->reportStatus("Boot complete", 1.0f);
 
     // --- Step 17b: Bless firmware (auto-rollback barrier) ---
-    // If the firmware crashes before reaching this point, the bootloader
-    // automatically reverts to the previous partition. This barrier covers:
-    // display bootstrap, EventBus, LittleFS, Crypto, Config, WiFi, Time,
-    // Data, OTA, Web, display integration, and registry lock.
-    _otaManager->markAppValid();
-    ESP_LOGI(TAG, "✅ Firmware self-test PASSED — partition blessed");
+    // Note: With OTAUpdateManager extracted, consumers must manually bless
+    // the firmware by calling otaManager.markAppValid() after app.begin().
+    ESP_LOGI(TAG, "✅ Firmware self-test PASSED — (app validation delegated to consumer)");
 
     // --- Step 18: Publish system heap event + heap report ---
-    uint32_t freeHeap = heap_caps_get_free_size(MALLOC_CAP_8BIT);
-    _eventBus.publish(ApplicationEvents::SYSTEM_HEAP, &freeHeap);
+    _systemHeapPayload = heap_caps_get_free_size(MALLOC_CAP_8BIT);
+    _eventBus.publish(ApplicationEvents::SYSTEM_HEAP, &_systemHeapPayload);
     _reportHeap();
 
     // --- Step 19: Clear boot status ---
@@ -330,23 +315,7 @@ void Application::tick() {
             _eventBus.publish(ApplicationEvents::APP_RUNNING);
             ESP_LOGI(TAG, "All config gates satisfied — entering RUNNING state");
         }
-#ifdef HAS_DISPLAY
-        // --- WiFi Wizard modal: show once when AP mode becomes active ---
-        // _onEnterConfiguring fires before the WiFi state machine has run, so
-        // AP mode detection must happen here in the tick loop instead.
-        else if (_wifiManager.getAPMode() && !_wifiWizardShown) {
-            const char* apSsid = _wifiManager.getSSID();
-            // In AP mode the SSID is the hostname (portal name), not the stored STA SSID
-            const char* hostname = _wifiManager.getHostname();
-            _display.boards.wifiWizard.configure(
-                (hostname && strlen(hostname) > 0) ? hostname : apSsid,
-                "192.168.4.1"
-            );
-            _display.showModal(&_display.boards.wifiWizard);
-            _wifiWizardShown = true;
-            ESP_LOGI(TAG, "WiFi wizard modal: AP active, showing connection guide");
-        }
-#endif
+
     }
 
     // In native builds, drive DataManager synchronously for tests
@@ -398,6 +367,22 @@ void Application::softReset() {
 // Module Registration (Tier 1 — pre-lock)
 // All register* methods share the same null-check + locked-check guard.
 // ---------------------------------------------------------------------------
+
+/**
+ * @brief Register a boot reporter for early hardware init.
+ */
+bool Application::registerBootReporter(IBootReporter* reporter) {
+    if (_locked) {
+        ESP_LOGE(TAG, "registerBootReporter() rejected — registration is closed after begin()");
+        return false;
+    }
+    if (reporter == nullptr) {
+        ESP_LOGE(TAG, "registerBootReporter() rejected — null pointer");
+        return false;
+    }
+    _bootReporter = reporter;
+    return true;
+}
 
 /**
  * @brief Register a module that participates in the Application tick loop.
@@ -524,18 +509,6 @@ ConfigManager& Application::getConfigManager() {
 
 WifiManager& Application::getWifiManager() {
     return _wifiManager;
-}
-
-OTAUpdateManager& Application::getOtaManager() {
-    return *_otaManager;
-}
-
-TimeManager& Application::getTimeManager() {
-    return _timeManager;
-}
-
-TimeConfigGate& Application::getTimeGate() {
-    return _timeGate;
 }
 
 KeyManager& Application::getKeyManager() {
@@ -675,11 +648,10 @@ void Application::_publishConfiguringEvent(bool isRegression) {
         if (!depsOk) continue; // Skip — deps not met
 
         // This gate is actionable
-        AppConfiguringPayload payload;
-        payload.gateName = gate->getGateName();
-        payload.helpText = gate->getHelpText();
-        payload.isRegression = isRegression;
-        _eventBus.publish(ApplicationEvents::APP_CONFIGURING, &payload);
+        _configuringPayload.gateName = gate->getGateName();
+        _configuringPayload.helpText = gate->getHelpText();
+        _configuringPayload.isRegression = isRegression;
+        _eventBus.publish(ApplicationEvents::APP_CONFIGURING, &_configuringPayload);
         ESP_LOGI(TAG, "Config gate unsatisfied: %s%s", gate->getGateName(),
                  isRegression ? " (regression)" : "");
         return;
@@ -698,10 +670,6 @@ void Application::_publishConfiguringEvent(bool isRegression) {
  * about AppState. Application drives it.
  */
 void Application::_onEnterConfiguring(bool /*isRegression*/) {
-#ifdef HAS_DISPLAY
-    _display.carousel.suspend();
-    _display.showBase(&_display.boards.configuringStatus);
-#endif
 }
 
 /**
@@ -711,23 +679,10 @@ void Application::_onEnterConfiguring(bool /*isRegression*/) {
  * visible layer again, then resumes automatic rotation.
  */
 void Application::_onEnterRunning() {
-#ifdef HAS_DISPLAY
-    _display.clearModal();
-    _display.showBase(nullptr);  // clear base → carousel becomes visible
-    _display.carousel.resume();
-    _wifiWizardShown = false;    // reset so wizard can show again if device re-enters CONFIGURING
-#endif
 }
 
 // ---------------------------------------------------------------------------
 // Display accessor
 // ---------------------------------------------------------------------------
 
-#ifdef HAS_DISPLAY
-/**
- * @brief Get the application's display module instance.
- */
-U8G2DisplayModule& Application::getDisplay() {
-    return _display;
-}
-#endif
+

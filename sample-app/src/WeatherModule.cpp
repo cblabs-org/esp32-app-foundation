@@ -48,6 +48,7 @@ void attach_ssl_certificate_bundle(sslclient_context *ssl_client, bool att);
  * entities. Creates the FreeRTOS mutex used for thread-safe string field access.
  */
 WeatherModule::WeatherModule() {
+#ifdef WITH_HOMEASSISTANT
     // H2: Sensors are now direct members — configure via dot access
     _tempSensor.setDeviceClass("temperature");
     _tempSensor.setStateClass("measurement");
@@ -59,6 +60,7 @@ WeatherModule::WeatherModule() {
 
     // Generic text sensor for weather condition, no special device class
     _condSensor.setIcon("mdi:weather-partly-cloudy");
+#endif
 
     // H3: Create mutex for thread-safe condition string access
     _dataMutex = xSemaphoreCreateMutex();
@@ -108,12 +110,15 @@ void WeatherModule::begin(Application& app) {
  *
  * @param ha  Reference to the initialised HomeAssistantModule.
  */
+#ifdef WITH_HOMEASSISTANT
 void WeatherModule::wireHomeAssistant(HomeAssistantModule& ha) {
     _ha = &ha;
     _ha->addEntity(&_tempSensor);
     _ha->addEntity(&_windSensor);
     _ha->addEntity(&_condSensor);
 }
+#endif
+
 
 /**
  * @brief Periodic update hook — intentionally empty.
@@ -837,8 +842,10 @@ void WeatherModule::endDocument() {
         // Publish numeric value as string state to HA sensor
         char buf[16];
         snprintf(buf, sizeof(buf), "%.1f", temp);
+#ifdef WITH_HOMEASSISTANT
         _tempSensor.setState(buf);
         if (_ha) _ha->publishState(&_tempSensor);
+#endif
         updated = true;
     }
     if (_parsedWind[0] != '\0') {
@@ -847,8 +854,10 @@ void WeatherModule::endDocument() {
 
         char buf[16];
         snprintf(buf, sizeof(buf), "%.1f", wind);
+#ifdef WITH_HOMEASSISTANT
         _windSensor.setState(buf);
         if (_ha) _ha->publishState(&_windSensor);
+#endif
         updated = true;
     }
     if (_parsedHumidity[0] != '\0') _humidity.store(std::atoi(_parsedHumidity), std::memory_order_release);
@@ -875,8 +884,10 @@ void WeatherModule::endDocument() {
         }
 
         if (_parsedCond[0] != '\0') {
+#ifdef WITH_HOMEASSISTANT
             _condSensor.setState(_parsedCond);
             if (_ha) _ha->publishState(&_condSensor);
+#endif
         }
         updated = true;
     }

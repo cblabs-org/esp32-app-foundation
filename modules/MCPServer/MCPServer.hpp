@@ -81,7 +81,7 @@ public:
      *                      for the device hostname shown on the status endpoint.
      * @param authManager   Optional pointer to the AuthManager for bearer token
      *                      authentication on HTTP MCP routes. When non-null and auth
-     *                      is enabled, all HTTP /api/mcp/* requests require a valid
+     *                      is enabled, all HTTP /api/mcp/<endpoint> requests require a valid
      *                      Authorization: Bearer header. Serial transport is exempt.
      */
     void begin(const std::vector<IMCPContributor*>& contributors, ConfigManager* configManager = nullptr, TimeManager* timeManager = nullptr, WifiManager* wifiManager = nullptr, AuthManager* authManager = nullptr);

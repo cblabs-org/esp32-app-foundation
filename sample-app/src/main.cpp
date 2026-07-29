@@ -18,15 +18,61 @@
 #include "AppFoundation.h"
 #include <Arduino.h>
 #include "WeatherModule.hpp"
-#include "WeatherBoard.hpp"
+
+#ifdef WITH_HOMEASSISTANT
+#include "HomeAssistantModule.hpp"
+static HomeAssistantModule haModule;
+#endif
+
+#ifdef WITH_OTA
+#include "OTAUpdateManager.hpp"
+static OTAUpdateManager otaManager;
+#endif
+
+#ifdef WITH_TIME
+#include "TimeManager.hpp"
+#include "TimeConfigGate.hpp"
+static TimeManager timeManager;
+static TimeConfigGate timeGate{timeManager};
+#endif
 
 // ADR-16: File-scope static instances avoid stack-based corruption.
 // All module instances must be declared at file scope before setup().
 Application app;
 WeatherModule weatherModule;
+
+// --- Display Configuration Bridge ---
+// The hardware-config program will eventually supply BOARD_DISPLAY_KIND.
+// For now, we bridge the PIO environment flags (HAS_DISPLAY / HAS_LVGL_DISPLAY).
+#define BOARD_DISPLAY_KIND_NONE 0
+#define BOARD_DISPLAY_KIND_U8G2 1
+#define BOARD_DISPLAY_KIND_LVGL 2
+
+#if defined(HAS_LVGL_DISPLAY)
+    #define BOARD_DISPLAY_KIND BOARD_DISPLAY_KIND_LVGL
+#elif defined(HAS_DISPLAY)
+    #define BOARD_DISPLAY_KIND BOARD_DISPLAY_KIND_U8G2
+#else
+    #define BOARD_DISPLAY_KIND BOARD_DISPLAY_KIND_NONE
+#endif
+
+#if BOARD_DISPLAY_KIND != BOARD_DISPLAY_KIND_NONE
+#include "WeatherBoard.hpp"
+#if BOARD_DISPLAY_KIND == BOARD_DISPLAY_KIND_LVGL
+#include "LVGLDisplayModule.hpp"
+#include "adapters/lvgl/CrowPanel128Adapter.hpp"
+static CrowPanel128Adapter displayAdapter;
+static LVGLDisplayModule displayModule(displayAdapter);
+#elif BOARD_DISPLAY_KIND == BOARD_DISPLAY_KIND_U8G2
+#include "U8G2DisplayModule.hpp"
+#include "boards/DiagnosticsBoard.hpp"
+static U8G2DisplayModule displayModule;
+static DiagnosticsBoard diagnosticsBoard{256, 64};
 // F04: EventBus wiring deferred to setup() — at file scope, Application
 // members may not be fully initialized (static init order fiasco).
-WeatherBoard weatherBoard(&weatherModule);
+static WeatherBoard weatherBoard(&weatherModule);
+#endif
+#endif
 
 /**
  * @brief Arduino framework initialization.
@@ -51,6 +97,30 @@ void setup() {
     // registerModule() auto-detects IConfigGate — no separate registration needed
     app.registerModule(&weatherModule);
 
+#ifdef WITH_OTA
+    app.registerModule(&otaManager);
+#endif
+
+#ifdef WITH_HOMEASSISTANT
+    haModule.setKeyManager(&app.getKeyManager());
+    haModule.setEventBus(&app.getEventBus());
+    haModule.setConfigManager(&app.getConfigManager());
+    haModule.setAppName(app.getAppName());
+    haModule.setAppVersion(BUILD_VERSION);
+    app.registerModule(&haModule);
+#endif
+
+#ifdef WITH_TIME
+    timeManager.setConfigManager(&app.getConfigManager());
+    app.registerModule(&timeManager);
+#endif
+
+#if BOARD_DISPLAY_KIND != BOARD_DISPLAY_KIND_NONE
+    app.registerModule(&displayModule);
+    app.registerModule(displayModule.settingsTabStub());
+    app.registerModule(displayModule.screenshotTabStub());
+#endif
+
     // Prepare Framework config — OTA
     // TODO: Set up OTA for your app:
     //   1. Create a releases repo (e.g. your-org/weather-station-releases)
@@ -67,22 +137,33 @@ void setup() {
     // before app.begin().
     app.getWifiManager().setDefaultHostname("WeatherStation");
 
-    // IDisplayBoard carousel registration is manual — registerModule() does not
-    // auto-detect display boards because the display module is optional and may
-    // not be present.
-    app.getDisplay().carousel.add(&weatherBoard);
+#if BOARD_DISPLAY_KIND != BOARD_DISPLAY_KIND_NONE
+    displayModule.setConfigManager(&app.getConfigManager());
+#if BOARD_DISPLAY_KIND == BOARD_DISPLAY_KIND_U8G2
+    diagnosticsBoard.configure(&app.getWifiManager());
+    displayModule.carousel.add(&diagnosticsBoard);
+    displayModule.carousel.add(&weatherBoard);
     // F04: Wire EventBus subscription now that Application is fully constructed.
-    // Cannot do this at file scope — static init order makes getEventBus() unsafe.
-    // Uses static function pointer (not lambda) per framework convention (GRAVE-05).
     weatherBoard.wireEventBus(app.getEventBus());
+    app.getMCPServer().setDisplayInfo(displayModule.getDisplayInfo());
+#endif
+#endif
 
-    // Begin framework — this allocates framework-owned modules like
-    // HomeAssistantModule on the heap. Must happen before HA wiring.
+    // Begin framework
     app.begin(config);
 
-    // Post-begin wiring: HomeAssistantModule is only available after app.begin()
-    // allocated it (it's a heap-owned pointer, nullptr before begin).
-    weatherModule.wireHomeAssistant(app.getHomeAssistant());
+#ifdef WITH_OTA
+    otaManager.begin(app);
+    otaManager.markAppValid();
+#endif
+
+#ifdef WITH_TIME
+    timeManager.begin();
+#endif
+
+#ifdef WITH_HOMEASSISTANT
+    weatherModule.wireHomeAssistant(haModule);
+#endif
 }
 
 /**

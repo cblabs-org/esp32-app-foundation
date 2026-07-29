@@ -84,6 +84,7 @@
 #include "interfaces/IWebContributor.hpp"
 #include "interfaces/IMCPContributor.hpp"
 #include "interfaces/IDisplayBoard.hpp"
+#include "interfaces/IBootReporter.hpp"
 #include "boards/BootBoard.hpp"
 #include "CarouselEngine.hpp"
 #include "ScreensaverController.hpp"
@@ -108,18 +109,7 @@ class MCPToolRegistry;
 // EventBus Payload Structs
 // ---------------------------------------------------------------------------
 
-/**
- * @brief EventBus payload for "ota.progress" topic.
- *
- * Published by the OTA manager during firmware update cycles. The display
- * module subscribes and delegates to OTAProgressBoard.
- */
-struct OTAProgressPayload {
-    float progress;       // 0.0 to 1.0 download fraction
-    const char* status;   // Status message (e.g. "Downloading...")
-    bool complete;        // True when OTA cycle is finished
-    bool success;         // True if OTA succeeded (only valid when complete)
-};
+
 
 /**
  * @brief EventBus payload for "display.message" topic.
@@ -188,7 +178,7 @@ namespace U8G2DisplayEvents {
  * Subscribes to EventBus topics "ota.progress" and "display.message" for
  * runtime integration with other framework modules.
  */
-class U8G2DisplayModule : public ITickable, public IStatusReporter, public IConfigurable, public IWebContributor, public IMCPContributor {
+class U8G2DisplayModule : public ITickable, public IConfigurable, public IWebContributor, public IMCPContributor, public IBootReporter {
 public:
     // -------------------------------------------------------------------------
     // Lifecycle
@@ -206,6 +196,11 @@ public:
      * Call begin(app) AFTER app.begin() to complete framework integration.
      */
     void bootstrapHardware();
+
+    /**
+     * @brief IBootReporter phase 1 hook
+     */
+    bool beginEarly() override;
 
     /**
      * @brief Phase 2: Complete framework integration.
@@ -544,7 +539,9 @@ private:
      * @param payload Pointer to an OTAProgressPayload struct.
      * @param ctx Context pointer (this U8G2DisplayModule instance).
      */
+#ifdef WITH_OTA
     static void _onOtaProgress(const char* topic, const void* payload, void* ctx);
+#endif
 
     /**
      * @brief Static callback for "display.message" EventBus topic.
@@ -553,6 +550,22 @@ private:
      * @param ctx Context pointer (this U8G2DisplayModule instance).
      */
     static void _onDisplayMessage(const char* topic, const void* payload, void* ctx);
+
+    /**
+     * @brief Static callback for "app.configuring" EventBus topic.
+     * @param topic The topic string ("app.configuring").
+     * @param payload Pointer to an AppConfiguringPayload struct (or nullptr).
+     * @param ctx Context pointer (this U8G2DisplayModule instance).
+     */
+    static void _onAppConfiguring(const char* topic, const void* payload, void* ctx);
+
+    /**
+     * @brief Static callback for "app.running" EventBus topic.
+     * @param topic The topic string ("app.running").
+     * @param payload Pointer to nullptr.
+     * @param ctx Context pointer (this U8G2DisplayModule instance).
+     */
+    static void _onAppRunning(const char* topic, const void* payload, void* ctx);
 
 
     // -------------------------------------------------------------------------

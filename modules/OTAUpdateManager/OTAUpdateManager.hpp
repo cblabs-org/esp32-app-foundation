@@ -65,9 +65,12 @@
 
 #pragma once
 
+#ifdef WITH_OTA
+
 #include <Arduino.h>
 #include <Stream.h>
 #include <freertos/task.h>
+#include <functional>
 
 
 #include "../../include/interfaces/IWebContributor.hpp"
@@ -110,35 +113,16 @@ enum class OTAState : uint8_t {
     Verifying,    // Signature verification in progress
     Complete,     // Update finalized — waiting for reboot
     Error,        // An error occurred
-};
-
-// ---------------------------------------------------------------------------
+};// ---------------------------------------------------------------------------
 // EventBus Payload
 // ---------------------------------------------------------------------------
 
-/**
- * @brief EventBus payload for "ota.progress" topic.
- *
- * Layout-compatible with OTAProgressPayload in U8G2DisplayModule.hpp.
- * The display module's subscriber can safely cast the EventBus payload
- * to either type for rendering OTA progress on-screen.
- */
 struct OTAProgressEvent {
     float progress;       // 0.0 to 1.0 download fraction
     const char* status;   // Human-readable status message
     bool complete;        // True when OTA cycle is finished
     bool success;         // True if OTA succeeded (only valid when complete)
 };
-
-// ---------------------------------------------------------------------------
-// OTA Events
-// ---------------------------------------------------------------------------
-
-namespace OTAUpdateManagerEvents {
-    /// @brief Published during OTA progress updates.
-    /// Payload: const OTAProgressEvent*
-    constexpr const char* OTA_PROGRESS = "ota.progress";
-}
 
 // ---------------------------------------------------------------------------
 // OTA Task Sizing Constants
@@ -275,6 +259,13 @@ public:
      * @brief Triggers a rollback to the previous firmware partition and reboots.
      */
     void rollbackFirmware();
+
+    /**
+     * @brief Set a synchronous pre-reboot hook to be executed before restarting the device.
+     *        Fulfills EO-08 to allow subscribers time to complete their work.
+     * @param hook Function to execute.
+     */
+    void setPreRebootHook(std::function<void()> hook);
 
     // -------------------------------------------------------------------------
     // IMCPContributor Interface
@@ -431,11 +422,13 @@ private:
     // -------------------------------------------------------------------------
     // Orchestrator state
     // -------------------------------------------------------------------------
-    OTAState      _state        = OTAState::Idle;      // Current state machine state
-    const char*   _lastOtaError = nullptr;             // Last error string from download engine
-    float         _lastProgress = 0.0f;                // Last progress fraction for API polling
+    OTAState          _state        = OTAState::Idle;      // Current state machine state
+    const char*       _lastOtaError = nullptr;             // Last error string from download engine
+    float             _lastProgress = 0.0f;                // Last progress fraction for API polling
+    OTAProgressEvent  _progressEvent{};                    // Persistent payload for async EventBus progress events
 
     TaskHandle_t  _taskHandle   = nullptr;             // FreeRTOS task handle for download
+    std::function<void()> _preRebootHook = nullptr;    // Hook to execute before reboot
 
     // -------------------------------------------------------------------------
     // FreeRTOS task plumbing
@@ -536,4 +529,6 @@ private:
      */
     esp_err_t finaliseSignedUpload(PsychicResponse* response);
 };
+
+#endif // WITH_OTA
 

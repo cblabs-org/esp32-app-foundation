@@ -1,4 +1,5 @@
 #include <gtest/gtest.h>
+#include <unistd.h>
 #include "KeyManager.hpp"
 #include "DeviceCrypto.hpp"
 #include <fstream>
@@ -46,12 +47,12 @@ protected:
     MockDeviceCrypto mockCrypto;
 
     void SetUp() override {
-        LittleFS.remove(KEY_MANAGER_PATH);
+        unlink(KEY_MANAGER_PATH);
         keyManager.begin(&mockCrypto);
     }
 
     void TearDown() override {
-        LittleFS.remove(KEY_MANAGER_PATH);
+        unlink(KEY_MANAGER_PATH);
     }
 };
 

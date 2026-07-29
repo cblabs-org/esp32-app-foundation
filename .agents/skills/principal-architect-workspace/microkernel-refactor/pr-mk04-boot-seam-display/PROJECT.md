@@ -3,7 +3,7 @@
 **WO branch stack base:** `pr-mk03-module-composition`
 **Depends on:** pr-mk01 (safe EventBus), pr-mk03 (composition) · **Blocks:** pr-mk05 (sequencing)
 **Design refs:** MK-8, MK-9 · **Coordinate with:** hardware-config program (`BOARD_DISPLAY_KIND`)
-**Status:** 📋 **PLANNED — awaiting human approval**
+**Status:** ✅ **APPROVED — human approved full autonomous execution (2026-07-29)**
 
 ---
 
@@ -46,15 +46,15 @@ all *post-boot* display behaviour onto the EventBus — after which
 `crowpanel-128-rotary` (LVGL) all build; hardware boot-splash smoke test on at
 least one display target via the `device-mcp-client` / pio-manager flow.
 
-## Proposed Work Order Ledger _(PA to finalise)_
+## Finalised Work Order Ledger
 
-- **[ ] wo1 — `IBootReporter` seam:** interface + kernel registry-scan boot flow +
+- **[x] [wo1 — `IBootReporter` seam](wo1-iboot-reporter/WORKORDER.md):** interface + kernel registry-scan boot flow +
   `NullStatusReporter` fallback. `architect`
-- **[ ] wo2 — display extraction:** register display as a module; implement
+- **[x] [wo2 — display extraction](wo2-display-extraction/WORKORDER.md):** register display as a module; implement
   `IBootReporter` on U8G2 + LVGL; delete `#ifdef HAS_DISPLAY`. `architect`
-- **[ ] wo3 — display-on-EventBus:** move CONFIGURING/RUNNING behaviour to event
+- **[x] [wo3 — display-on-EventBus](wo3-display-on-eventbus/WORKORDER.md):** move CONFIGURING/RUNNING behaviour to event
   handlers; delete kernel `_display.*` direct calls. `standard`
-- **[ ] wo4 — flag coordination + tests:** `BOARD_DISPLAY_KIND` bridge; boot-splash
+- **[x] [wo4 — flag coordination + tests](wo4-flag-coordination-tests/WORKORDER.md):** `BOARD_DISPLAY_KIND` bridge; boot-splash
   smoke tests. `standard`
 
 ## Verification
@@ -68,3 +68,4 @@ on U8G2; LVGL now shows a boot splash; `grep` confirms zero `HAS_DISPLAY` /
 | Date | Entry |
 |---|---|
 | 2026-07-28 | Drafted. Awaiting human approval. Coordinate display-flag surface with hardware-config PA. |
+| 2026-07-29 | Human approved full autonomous execution (provenance `7bdd6d3`). mk01 ✅, mk03 ✅. PA spawn authorised. |

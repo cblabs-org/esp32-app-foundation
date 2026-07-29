@@ -24,7 +24,7 @@
 
 #include "MCPBuiltinTools.hpp"
 #include "MCPToolRegistry.hpp"
-#include <ConfigManager.hpp>
+#include "../ConfigManager/ConfigManager.hpp"
 #include "../../modules/ConfigManager/JsonPatch.hpp"
 #include "../TimeManager/TimeManager.hpp"
 #include <ArduinoJson.h>

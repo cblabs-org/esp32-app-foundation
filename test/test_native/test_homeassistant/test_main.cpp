@@ -3,7 +3,11 @@ int mock_mqtt_publish_return_value = 0;
 
 #include <gtest/gtest.h>
 #include <ArduinoJson.h>
+
+#ifdef WITH_HOMEASSISTANT
+
 #include "../../../modules/HomeAssistant/HomeAssistantModule.hpp"
+
 #include "../../../modules/HomeAssistant/entities/HaBinarySensor.hpp"
 #include "../../../modules/HomeAssistant/entities/HaButton.hpp"
 #include "../../../modules/HomeAssistant/entities/HaLight.hpp"
@@ -150,7 +154,10 @@ TEST(HomeAssistantEntitiesTest, DeviceTriggerDiscovery) {
     EXPECT_FALSE(payload.containsKey("state_topic"));
 }
 
+#endif // WITH_HOMEASSISTANT
+
 #include "../../../modules/EventBus/EventBus.hpp"
+
 #include "../../../modules/KeyManager/KeyManager.hpp"
 #include "../../../modules/WifiManager/WifiManager.hpp"
 
