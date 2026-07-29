@@ -40,7 +40,7 @@ pass unchanged.
 
 ## Proposed Work Order Ledger _(PA to finalise)_
 
-- **[ ] [wo1-first-cohort](wo1-first-cohort/WORKORDER.md):** add `Periodic`; migrate the
+- **[x] [wo1-first-cohort](wo1-first-cohort/WORKORDER.md):** add `Periodic`; migrate the
   `Application`/kernel throttles. `standard`
 - **[ ] [wo2-module-migration](wo2-module-migration/WORKORDER.md):** migrate remaining module throttle sites.
   `mechanical`

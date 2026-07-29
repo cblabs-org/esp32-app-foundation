@@ -587,7 +587,7 @@ private:
     CarouselEngine _carousel;                      ///< Manages the rotating pool of display boards
 
     // --- Frame-rate limiting ---
-    unsigned long _lastRenderMs = 0;               ///< Timestamp of last sendBuffer() call
+    Periodic _renderTimer{33};                     ///< Timer for frame rate limiting
     unsigned long _targetFrameIntervalMs = 33;     ///< Minimum ms between renders (default 30 FPS: 1000/30≈33)
 
     // --- Sleep / power management ---

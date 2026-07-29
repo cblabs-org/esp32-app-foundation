@@ -497,7 +497,7 @@ private:
     // Regression gate-check members
     Periodic _gateCheckPeriodic{5000};                       ///< Throttle for runtime gate checks (5s)
     static constexpr uint8_t MAX_CONFIG_GATES = 8;           ///< Maximum number of config gates
-    unsigned long _gateFailedSinceMs[MAX_CONFIG_GATES] = {0}; ///< Per-gate unsatisfied-since timestamps
+    Periodic _gateFailedSinceMs[MAX_CONFIG_GATES];           ///< Per-gate unsatisfied-since timestamps
 
     // Single-pointer registrations (no vector needed)
 

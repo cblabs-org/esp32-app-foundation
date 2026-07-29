@@ -106,11 +106,11 @@ private:
     char _defaultHostname[33];               ///< App-supplied factory default hostname (set via setDefaultHostname)
     bool _isAPMode = false;
     WiFiState _currentState = WiFiState::Init;
-    unsigned long _stateTimer = 0;
+    Periodic _stateTimer;
     int _connectionRetries = 0;
-    unsigned long _wifiDisconnectTimer = 0; ///< Continuous downtime counter (ms)
+    Periodic _wifiDisconnectTimer; ///< Continuous downtime tracker (ms)
     char _myUrl[24];                        ///< Formatted string URL for local IP
-    volatile unsigned long _lastApiRequestTime = 0;  ///< Last time an API request was received (cross-thread)
+    volatile uint32_t _lastApiRequestTime = 0;  ///< Last time an API request was received (cross-thread)
 
     bool _reconnectRequested = false;        ///< Deferred reconnect flag (set by updateWiFi, acted on by tick)
     bool _restartRequested = false;          ///< Deferred restart flag (set by connect/forget, acted on by tick)

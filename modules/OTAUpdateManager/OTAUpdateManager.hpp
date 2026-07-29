@@ -402,7 +402,7 @@ private:
 
     // Scheduling state (not persisted — reset on each boot)
     uint32_t _lastCheckDay   = 0;     ///< Unix day of last scheduled check (seconds/86400)
-    uint32_t _lastCheckMillis = 0;    ///< millis() timestamp of last completed check (any source)
+    Periodic _lastCheckTimer;        ///< Timer for last check monitoring
     bool     _hasBootChecked = false; ///< Set true once the boot auto-check has fired
     bool     _silentCheck    = false; ///< True for auto-checks — suppresses transient error modals
 
