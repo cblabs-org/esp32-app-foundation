@@ -3,7 +3,7 @@
 **WO branch stack base:** `pr-mk03-module-composition`
 **Depends on:** pr-mk01 (safe EventBus), pr-mk03 (composition) · **Blocks:** pr-mk05 (sequencing)
 **Design refs:** MK-8, MK-9 · **Coordinate with:** hardware-config program (`BOARD_DISPLAY_KIND`)
-**Status:** 📋 **PLANNED — awaiting human approval**
+**Status:** ✅ **APPROVED — human approved full autonomous execution (2026-07-29)**
 
 ---
 
@@ -68,3 +68,4 @@ on U8G2; LVGL now shows a boot splash; `grep` confirms zero `HAS_DISPLAY` /
 | Date | Entry |
 |---|---|
 | 2026-07-28 | Drafted. Awaiting human approval. Coordinate display-flag surface with hardware-config PA. |
+| 2026-07-29 | Human approved full autonomous execution (provenance `7bdd6d3`). mk01 ✅, mk03 ✅. PA spawn authorised. |
