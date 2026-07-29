@@ -27,4 +27,8 @@ Use the `platformio` MCP tools for building and testing. Do not use raw CLI comm
   - *After* `app.begin()`, call `timeManager.begin();`.
   - Note: `MCPServer` needs `TimeManager`. So when calling `mcpServer.begin(...)`, you must pass `&timeManager` instead of `&app.getTimeManager()`. Wrap the argument or use `#ifdef WITH_TIME` to conditionally pass it, or just pass `nullptr` if `WITH_TIME` is off.
 - [x] **Verification**: Run `native` tests and compile `esp32dev` (with and without `WITH_TIME`).
-- [ ] When finished, confirm compilation, then STOP and message the Principal Architect. Do NOT distill or wrap up yet.
+- [x] When finished, confirm compilation, then STOP and message the Principal Architect. Do NOT distill or wrap up yet.
+
+## Status Update
+
+- **2026-07-29**: ✅ **COMPLETE**. `TimeManager` and `TimeConfigGate` extracted from `Application` owned members. Explicit composition wired in `template-app/src/main.cpp`, `sample-app/src/main.cpp`, and `src/main.cpp` under `#ifdef WITH_TIME` (default ON). Tested: 449/449 native unit tests passed; `esp32dev` and `esp32s3nano` builds succeeded both with and without `WITH_TIME` (~12.8 KiB flash saved when off). Output distilled to `context_bridge.md`.
