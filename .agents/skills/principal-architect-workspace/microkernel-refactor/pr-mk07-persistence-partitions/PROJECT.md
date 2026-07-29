@@ -3,7 +3,7 @@
 **WO branch stack base:** `pr-mk05-extract-optionals`
 **Depends on:** pr-mk05 (stable module set) **+ hardware-config program (cross-program)** · **Blocks:** —
 **Design refs:** MK-14, MK-15, MK-16, MK-17, MK-18 · **Gating decisions:** **OQ-MK-4** (per-channel Golden). OQ-MK-5 ✅ resolved (`P` ≈ 10–15 KB). **Preset B implementation deferred** — all three consumers are Preset A (#48); the seam is built, the asset-OTA machinery is a consumer-triggered follow-on
-**Status:** 📋 **PLANNED — awaiting human approval + cross-program coordination**
+**Status:** ✅ **APPROVED — human approved full autonomous execution (2026-07-29)**
 
 ---
 
@@ -69,3 +69,4 @@ stub unaffected by the path abstraction.
 | Date | Entry |
 |---|---|
 | 2026-07-28 | Drafted. Awaiting human approval, OQ-MK-4/5, and hardware-config coordination. Sequence last. |
+| 2026-07-29 | Human approved full autonomous execution (provenance `7bdd6d3`). All predecessors complete: mk01 ✅, mk02 ✅, mk03 ✅, mk04 ✅, mk05 ✅, mk06 ✅. **FINAL PROJECT.** PA spawn authorised. |
