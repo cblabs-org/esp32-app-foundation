@@ -4,7 +4,7 @@
 **Tier:** Chief Architect (Tier 1)
 **Design authority:** [`docs/microkernel-architecture-design.md`](../../../../docs/microkernel-architecture-design.md) (decisions `MK-1`…`MK-18`, open questions `OQ-MK-1`…`OQ-MK-5`)
 **Base branch:** `main`
-**Status:** 📋 **PLANNED — awaiting human approval of the decomposition** (plan gate, rules 00/01). No branches created, no workers spawned.
+**Status:** ✅ **APPROVED — decomposition approved, all gating decisions resolved, ready for execution.** Consumer review complete (3/3 endorsed via RFC #48). No branches created yet, no workers spawned.
 
 ---
 
@@ -50,18 +50,18 @@ mandate in [`PROGRAM-PLAN.md`](./PROGRAM-PLAN.md).
 | **[pr-mk06-periodic-helper](./pr-mk06-periodic-helper/PROJECT.md)** | DRY ~87 `millis()` throttles into a loop-context `Periodic` (MK-13) | `main` (independent) | 📋 Planned |
 | **[pr-mk07-persistence-partitions](./pr-mk07-persistence-partitions/PROJECT.md)** | Four-tier persistence + partition profiles + config sizing (MK-14–18) | pr-mk05 **+ hardware-config program (cross-program)** | 📋 Planned |
 
-## 4. Open Decisions Gating Kickoff
+## 4. Resolved Decisions
 
-These are the human's to resolve; the Chief must not spawn the gated Project's
-PA until each is settled (recorded here, then in the Project's `PROJECT.md`).
+All five gating decisions have been resolved by the human (2026-07-29). Recorded
+here and propagated to each Project's `PROJECT.md`.
 
-| Decision | Gates | Leaning |
+| Decision | Resolution | Rationale |
 |---|---|---|
-| **OQ-MK-3** — EventBus: delegate to `esp_event` (async dispatch) vs keep-and-lock synchronous | pr-mk01 | Delegate to `esp_event` (fixes race + allocation by reuse) |
-| **OQ-MK-2** — Composition home: honest `main.cpp` (7a) vs thin `ModuleComposition` unit (7b) | pr-mk03 | 7b |
-| **OQ-MK-1** — WebServer + AuthManager: Core or Optional? | pr-mk03, pr-mk05 (scope) | Core |
-| **OQ-MK-4** — Config lifecycle: full-data retention + per-channel Golden (Stable/Beta/Dev) | pr-mk07 | Yes (raise as its own issue; partition sized for its worst case regardless) |
-| **OQ-MK-5** — Heavy-consumer config payload `P` sizing | pr-mk07 | Pending PowerMonitor input (issue #40) |
+| **OQ-MK-3** — EventBus backing | ✅ **Delegate to `esp_event`** | Reuse hardened existing libs wherever possible. Thread-safe, ISR-safe, alloc-free, already linked. All 3 consumers endorsed async dispatch. |
+| **OQ-MK-2** — Composition home | ✅ **7a — Honest `main.cpp`** *(overrides leaning of 7b)* | Zero magic, fully greppable. Consumer controls their own composition explicitly. |
+| **OQ-MK-1** — WebServer + AuthManager | ✅ **Core (Ring-1)** — always present, no enable flag | AP-mode first-run provisioning is the web portal; headless is the exception. |
+| **OQ-MK-4** — Per-channel Golden config | ✅ **Yes — full implementation** | Per-channel golden (Stable/Beta/Dev) with full config data retention. Partition sizing absorbs the ~5× multiplier. |
+| **OQ-MK-5** — Config payload `P` | ✅ **Resolved** (consumer reviews) | Per-target partition sizing: 1 MB on 16 MB boards, 256 KB on 4 MB boards. Real P: power-monitor ≈ 10–11 KB, departures single-digit KB, DraytonWiser ≈ 2–3 KB. |
 
 ## 5. Cross-Program Dependencies
 
@@ -73,21 +73,34 @@ PA until each is settled (recorded here, then in the Project's `PROJECT.md`).
 - **issue #40** (config/asset partition separation) and the **per-channel-golden
   config issue** (OQ-MK-4, to be filed): both feed **pr-mk07**.
 
-## 6. Pre-Kickoff Branch Safety
+### Consumer coordination (decided, #48)
 
-- Working tree is currently on `feat/carousel-can-advance`, **not** `main`, with
-  the two design docs (`docs/microkernel-architecture-design.md`,
-  `docs/hardware-configuration-design.md`) **untracked**.
-- Before kicking off pr-mk01, the design docs + this program workspace should be
-  committed and the base established on `main`. This is an implementation action
-  requiring the human's explicit go — the Chief does not commit or branch during
-  planning.
+**All downstream consumers (power-monitor, departures-board, DraytonWiser) will
+pause their own migrations and wait for this program to complete, then build once
+against the finished seams.** This retires the sequencing critical-path risk the
+#48 review flagged: **no compatibility shim, no early interface-only headers, no
+intermediate `framework.lock` pins.** Consumers still supply *design input* on the
+RFC now (e.g. DraytonWiser's Preset-B requirements) — that is input, not the start
+of their build, so there is no circular wait. The stack merge order (mk01 → mk03 →
+mk04 → …) still holds for the program's *own* internal correctness, but is no
+longer a consumer-unblocking deadline.
+
+## 6. Pre-Kickoff Branch Safety ✅ COMPLETE
+
+- ✅ `feat/carousel-can-advance` merged to `main` (27 commits, Option A).
+- ✅ Design docs + program workspace committed to `main` (`549843d`).
+- ✅ Both stashes dropped (fully superseded).
+- ✅ `main` pushed to origin. Clean working tree.
+- Base is established on `main` at `549843d`, ready for branch-cutting.
 
 ## 7. Status Log
 
 | Date | Entry |
 |---|---|
 | 2026-07-28 | Program drafted from `docs/microkernel-architecture-design.md`. 7 Projects defined; dependency graph and gating decisions recorded. **Awaiting human approval of the decomposition before any PA/worker is spawned.** |
+| 2026-07-29 | Consumer RFC #48 reviewed (power-monitor, departures-board, DraytonWiser). Design refinements applied: per-target `config` sizing (MK-18), MK-9 async-ordering contract, MK-6a optional-module-contract-on-facade, OTA pre-reboot hook (EO-08), FW-1 `canAdvance()` carry-forward (BS-07), native sync-stub contract (EB-06); Preset B deferred (no current consumer). **Consumer coordination decided: all downstream consumers wait for program completion — sequencing risk retired, no shim.** |
+| 2026-07-29 | **Pre-flight complete.** `feat/carousel-can-advance` merged to `main`; stashes dropped; design docs + workspace committed (`549843d`); pushed to origin. |
+| 2026-07-29 | **ALL GATING DECISIONS RESOLVED.** OQ-MK-1: Core. OQ-MK-2: 7a (honest `main.cpp`, overrides leaning). OQ-MK-3: `esp_event`. OQ-MK-4: full per-channel golden. OQ-MK-5: per-target sizing (resolved from consumer data). **Decomposition approved. Program status → APPROVED.** |
 
 ## 8. Distillation
 
