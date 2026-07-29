@@ -50,7 +50,7 @@ least one display target via the `device-mcp-client` / pio-manager flow.
 
 - **[x] [wo1 — `IBootReporter` seam](wo1-iboot-reporter/WORKORDER.md):** interface + kernel registry-scan boot flow +
   `NullStatusReporter` fallback. `architect`
-- **[ ] [wo2 — display extraction](wo2-display-extraction/WORKORDER.md):** register display as a module; implement
+- **[x] [wo2 — display extraction](wo2-display-extraction/WORKORDER.md):** register display as a module; implement
   `IBootReporter` on U8G2 + LVGL; delete `#ifdef HAS_DISPLAY`. `architect`
 - **[ ] [wo3 — display-on-EventBus](wo3-display-on-eventbus/WORKORDER.md):** move CONFIGURING/RUNNING behaviour to event
   handlers; delete kernel `_display.*` direct calls. `standard`
