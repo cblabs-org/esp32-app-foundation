@@ -27,7 +27,7 @@ Use the `platformio` MCP tools (`build_project`, `run_tests`) — **not** raw `p
 - [x] Add concurrency tests exercising cross-task publish/subscribe (`CrossTaskPublishSubscribeConcurrency`, `CrossTaskSubscribeUnsubscribeConcurrency`) to `test_eventbus`.
 - [x] Verify compilation on `esp32dev` env using `call_mcp_tool` with `platformio` `build_project` (`SUCCESS`).
 - [x] Verify native tests on `native` env using `call_mcp_tool` with `platformio` `run_tests` (All 491 test cases pass).
-- [ ] Ask the user for approval. Only after explicit approval, invoke `@distillery` to package the output targeting `.agents/skills/principal-architect-workspace/microkernel-refactor/pr-mk01-eventbus-concurrency/wo3-caller-migration/`.
+- [x] Ask the user for approval. Only after explicit approval, invoke `@distillery` to package the output targeting `.agents/skills/principal-architect-workspace/microkernel-refactor/pr-mk01-eventbus-concurrency/wo3-caller-migration/`.
 - [x] Append a status update to this `WORKORDER.md` file.
 
 ## Status Update (2026-07-29)
@@ -35,5 +35,7 @@ Use the `platformio` MCP tools (`build_project`, `run_tests`) — **not** raw `p
 - **Concurrency Unit Tests**: Added multi-threaded cross-task `CrossTaskPublishSubscribeConcurrency` and `CrossTaskSubscribeUnsubscribeConcurrency` tests using `std::thread` and `std::atomic` in `test/test_unit/test_eventbus/test_main.cpp`.
 - **Target Compilation**: Verified `esp32dev` firmware build compiles cleanly with `platformio` `build_project`.
 - **Native Test Verification**: Verified all 491 test cases across 25 native test suites pass cleanly with `platformio` `run_tests`.
-- **Awaiting User Approval**: Pending user explicit approval to execute `@distillery` packaging step.
+- **User Approval & Distillation**: Human approved execution report. Executed `@distillery` skill and packaged session artifacts (`context_bridge.md`, `sessions.md`, `context_artifacts/adr_wo3_thread_safe_payloads.md`, `context_artifacts/graveyard_wo3_caller_migration.md`).
+- **Status**: ✅ **COMPLETE**
+
 
