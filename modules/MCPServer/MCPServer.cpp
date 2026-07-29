@@ -89,7 +89,7 @@ void MCPServer::setDisplayInfo(const DisplayInfo& info) {
  * can return non-zero indefinitely, which would block the main task without
  * this guard.
  */
-void MCPServer::tick() {
+void MCPServer::tick(uint32_t /*currentMillis*/) {
     if (!_initialized || !_mcpEnabled) return;
 
     // --- Hardware: read characters from Serial until newline ---

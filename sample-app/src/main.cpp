@@ -36,6 +36,11 @@ static TimeManager timeManager;
 static TimeConfigGate timeGate{timeManager};
 #endif
 
+#ifdef WITH_MCP
+#include "MCPServer.hpp"
+static MCPServer mcpServer;
+#endif
+
 // ADR-16: File-scope static instances avoid stack-based corruption.
 // All module instances must be declared at file scope before setup().
 Application app;
@@ -107,6 +112,10 @@ void setup() {
     app.registerModule(displayModule.screenshotTabStub());
 #endif
 
+#ifdef WITH_MCP
+    app.registerModule(&mcpServer);
+#endif
+
     // Prepare Framework config — OTA
     // TODO: Set up OTA for your app:
     //   1. Create a releases repo (e.g. your-org/weather-station-releases)
@@ -131,7 +140,9 @@ void setup() {
     displayModule.carousel.add(&weatherBoard);
     // F04: Wire EventBus subscription now that Application is fully constructed.
     weatherBoard.wireEventBus(app.getEventBus());
-    app.getMCPServer().setDisplayInfo(displayModule.getDisplayInfo());
+#ifdef WITH_MCP
+    mcpServer.setDisplayInfo(displayModule.getDisplayInfo());
+#endif
 #endif
 #endif
 
@@ -145,6 +156,16 @@ void setup() {
 
 #ifdef WITH_TIME
     timeManager.begin();
+#endif
+
+#ifdef WITH_MCP
+    mcpServer.begin(app.getMcpContributors(), &app.getConfigManager(),
+#ifdef WITH_TIME
+        &timeManager,
+#else
+        nullptr,
+#endif
+        &app.getWifiManager(), &app.getAuthManager());
 #endif
 
 #ifdef WITH_HOMEASSISTANT

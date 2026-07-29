@@ -41,7 +41,7 @@
  *   - getKeyManager():           Access the KeyManager domain service
  *   - getAuthManager():          Access the AuthManager security service
  *   - getState():                Query the current AppState lifecycle phase
- *   - getMCPServer():            Access the MCP JSON-RPC server instance
+ *   - getMcpContributors():      Access registered MCP contributor vector
  *   - registerConfigGate():      Add an IConfigGate prerequisite for RUNNING entry
  */
 
@@ -65,7 +65,6 @@
 #include "../EventBus/EventBus.hpp"
 #include "../DataManager/DataManager.hpp"
 #include "../WebServer/WebServerManager.hpp"
-#include "../MCPServer/MCPServer.hpp"
 #include "../ConfigManager/ConfigManager.hpp"
 
 // Core domain services (owned by value — full includes required)
@@ -336,10 +335,10 @@ public:
     WebServerManager& getWebServerManager();
 
     /**
-     * @brief Get the application's MCPServer instance.
-     * @return Reference to the MCPServer.
+     * @brief Get registered MCP contributors vector.
+     * @return Const reference to the IMCPContributor vector.
      */
-    MCPServer& getMCPServer();
+    const std::vector<IMCPContributor*>& getMcpContributors() const { return _mcpContributors; }
 
     /**
      * @brief Get the application's ConfigManager instance.
@@ -508,7 +507,7 @@ private:
     AppConfiguringPayload _configuringPayload{}; ///< Persistent payload for app.configuring event
     DataManager _dataManager;           ///< Background data manager
     WebServerManager _webServerManager; ///< Local HTTP Server
-    MCPServer _mcpServer;               ///< MCP JSON-RPC server
+
 
     // Core domain services
     DeviceCrypto _deviceCrypto;         ///< Hardware-bound AES-256 crypto service

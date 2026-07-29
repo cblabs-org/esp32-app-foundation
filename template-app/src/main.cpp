@@ -37,6 +37,11 @@ static TimeManager timeManager;
 static TimeConfigGate timeGate{timeManager};
 #endif
 
+#ifdef WITH_MCP
+#include "MCPServer.hpp"
+static MCPServer mcpServer;
+#endif
+
 // --- Display (Ring-2 Optional) ---
 #ifdef WITH_DISPLAY_LVGL
 #include "LVGLDisplayModule.hpp"
@@ -94,6 +99,10 @@ void setup() {
     app.registerModule(displayModule.screenshotTabStub());
 #endif
 
+#ifdef WITH_MCP
+    app.registerModule(&mcpServer);
+#endif
+
     // Begin framework — OTA is disabled by default in this template.
     // To enable OTA updates for your app:
     //   1. Create a releases repo (e.g. your-org/my-app-releases)
@@ -116,12 +125,24 @@ void setup() {
     timeManager.begin();
 #endif
 
+#ifdef WITH_MCP
+    mcpServer.begin(app.getMcpContributors(), &app.getConfigManager(), 
+#ifdef WITH_TIME
+        &timeManager,
+#else
+        nullptr,
+#endif
+        &app.getWifiManager(), &app.getAuthManager());
+#endif
+
 #if defined(WITH_DISPLAY_U8G2) || defined(WITH_DISPLAY_LVGL)
     displayModule.setConfigManager(&app.getConfigManager());
 #ifdef WITH_DISPLAY_U8G2
     diagnosticsBoard.configure(&app.getWifiManager());
     displayModule.carousel.add(&diagnosticsBoard);
-    app.getMCPServer().setDisplayInfo(displayModule.getDisplayInfo());
+#ifdef WITH_MCP
+    mcpServer.setDisplayInfo(displayModule.getDisplayInfo());
+#endif
 #endif
 #endif
 }

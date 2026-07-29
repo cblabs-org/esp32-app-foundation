@@ -174,7 +174,7 @@ bool Application::begin(const FrameworkConfig& config) {
     registerModule(_authManager.tlsTabStub());       // IWebContributor (sub-pill)
     registerModule(&_configManager);      // IWebContributor + IMCPContributor
     registerModule(&_keyManager);         // IWebContributor
-    registerModule(&_mcpServer);          // IConfigurable + IWebContributor
+
 
     registerModule(&_webServerManager);   // ITickable
     if (_enableDefaultAppTab) {
@@ -216,14 +216,10 @@ bool Application::begin(const FrameworkConfig& config) {
 
     // --- Step 14: (Merged into Step 7 module registration) ---
 
-    // --- Step 15: WebServerManager + MCPServer begin() ---
+    // --- Step 15: WebServerManager begin() ---
     _authManager.setAPMode(_wifiManager.getAPMode());
     _webServerManager.setAppName(getAppName());
     _webServerManager.begin(_webContributors, &_authManager, &_wifiManager);
-
-    // MCP server: pass the ConfigManager reference for config operations,
-    // plus TimeManager (built-in time tools) and WifiManager (status hostname).
-    _mcpServer.begin(_mcpContributors, &_configManager, nullptr, &_wifiManager, &_authManager);
     _statusReporter->reportStatus("Web portal starting...", 0.90f);
 
 
@@ -339,8 +335,7 @@ void Application::tick() {
     }
 #endif
 
-    // MCP server: poll Serial for incoming JSON-RPC requests
-    _mcpServer.tick();
+
 
     // Periodic heartbeat — free heap + uptime every 30s
     if (_heartbeatPeriodic.due(currentMillis)) {
@@ -515,9 +510,7 @@ WebServerManager& Application::getWebServerManager() {
     return _webServerManager;
 }
 
-MCPServer& Application::getMCPServer() {
-    return _mcpServer;
-}
+
 
 ConfigManager& Application::getConfigManager() {
     return _configManager;
