@@ -25,11 +25,33 @@
 static HomeAssistantModule haModule;
 #endif
 
-#ifdef HAS_DISPLAY
+// --- Display Configuration Bridge ---
+// The hardware-config program will eventually supply BOARD_DISPLAY_KIND.
+// For now, we bridge the PIO environment flags (HAS_DISPLAY / HAS_LVGL_DISPLAY).
+#define BOARD_DISPLAY_KIND_NONE 0
+#define BOARD_DISPLAY_KIND_U8G2 1
+#define BOARD_DISPLAY_KIND_LVGL 2
+
+#if defined(HAS_LVGL_DISPLAY)
+    #define BOARD_DISPLAY_KIND BOARD_DISPLAY_KIND_LVGL
+#elif defined(HAS_DISPLAY)
+    #define BOARD_DISPLAY_KIND BOARD_DISPLAY_KIND_U8G2
+#else
+    #define BOARD_DISPLAY_KIND BOARD_DISPLAY_KIND_NONE
+#endif
+
+#if BOARD_DISPLAY_KIND != BOARD_DISPLAY_KIND_NONE
+#if BOARD_DISPLAY_KIND == BOARD_DISPLAY_KIND_LVGL
+#include "LVGLDisplayModule.hpp"
+#include "adapters/lvgl/CrowPanel128Adapter.hpp"
+static CrowPanel128Adapter displayAdapter;
+static LVGLDisplayModule displayModule(displayAdapter);
+#elif BOARD_DISPLAY_KIND == BOARD_DISPLAY_KIND_U8G2
 #include "U8G2DisplayModule.hpp"
 #include "boards/DiagnosticsBoard.hpp"
 static U8G2DisplayModule displayModule;
 static DiagnosticsBoard diagnosticsBoard{256, 64};
+#endif
 #endif
 
 Application app;   ///< Framework hub instance
@@ -61,7 +83,7 @@ void setup() {
     app.registerModule(&haModule);
 #endif
 
-#ifdef HAS_DISPLAY
+#if BOARD_DISPLAY_KIND != BOARD_DISPLAY_KIND_NONE
     app.registerModule(&displayModule);
     app.registerModule(displayModule.settingsTabStub());
     app.registerModule(displayModule.screenshotTabStub());
@@ -80,11 +102,13 @@ void setup() {
     FrameworkConfig config;
     app.begin(config);
 
-#ifdef HAS_DISPLAY
+#if BOARD_DISPLAY_KIND != BOARD_DISPLAY_KIND_NONE
     displayModule.setConfigManager(&app.getConfigManager());
+#if BOARD_DISPLAY_KIND == BOARD_DISPLAY_KIND_U8G2
     diagnosticsBoard.configure(&app.getWifiManager());
     displayModule.carousel.add(&diagnosticsBoard);
     app.getMCPServer().setDisplayInfo(displayModule.getDisplayInfo());
+#endif
 #endif
 }
 
