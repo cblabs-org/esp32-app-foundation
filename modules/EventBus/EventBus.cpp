@@ -13,7 +13,7 @@
  * - EventBus::begin(): Initialize the event bus
  * - EventBus::subscribe(): Subscribe to a topic
  * - EventBus::unsubscribe(): Unsubscribe from a topic
- * - EventBus::publish(): Synchronously publish an event
+ * - EventBus::publish(): Dispatch an event (see contract in EventBus.hpp)
  */
 
 #include "EventBus.hpp"

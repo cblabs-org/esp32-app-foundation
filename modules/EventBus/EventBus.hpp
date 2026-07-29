@@ -14,7 +14,7 @@
  *   - begin(): Initialize the event bus
  *   - subscribe(): Subscribe to a topic with a callback and context
  *   - unsubscribe(): Remove a subscription
- *   - publish(): Synchronously dispatch an event payload to all subscribers
+ *   - publish(): Dispatch an event payload to all subscribers (see contract below)
  *   - hashTopic(): Static helper to hash topic strings to uint32_t
  */
 
@@ -27,26 +27,48 @@
 
 /**
  * @brief Concurrency & Lifecycle Contract for EventBus:
- * 
- * 1. Thread Safety & Context:
- *    - In host/native unit testing, dispatch is synchronous and lock-free within the caller thread.
- *    - On target (ESP32/FreeRTOS), publish calls execute synchronously across subscribers, or via esp_event.
- * 
- * 2. Topic Interning & Allocation Guarantees:
+ *
+ * 1. Execution Context (CRITICAL — differs between native and target):
+ *    - **Native/unit-test builds:** dispatch is synchronous and inline within
+ *      the caller's thread. publish() returns only after all matching
+ *      callbacks have executed.
+ *    - **Target (ESP32/FreeRTOS):** publish() posts to the esp_event default
+ *      event loop via esp_event_post(). Callbacks execute on the **default
+ *      event loop task** — NOT the publisher's task. This means:
+ *        • The publisher and subscriber may run on different tasks.
+ *        • There is NO synchronous ordering guarantee between a publish()
+ *          call returning and the subscriber's callback executing.
+ *        • Subscribers reacting to lifecycle events (e.g. APP_CONFIGURING,
+ *          APP_RUNNING) should treat their reaction as best-effort within
+ *          the next event-loop cycle. Callers MUST NOT assume the subscriber
+ *          has acted by the time publish() returns.
+ *        • The default event loop task has a finite stack (typically 4096
+ *          bytes). Callbacks performing heavy work (large JSON serialization,
+ *          LittleFS flushes, HTTP requests) risk stack overflow and should
+ *          offload to a dedicated task or use a bounded working buffer.
+ *
+ * 2. Blocking Behaviour:
+ *    - publish() uses portMAX_DELAY when posting to the event queue. If the
+ *      default event loop queue is full, the publisher BLOCKS indefinitely
+ *      until a slot becomes available. This is safe for normal event rates
+ *      but could cause watchdog resets under event storms.
+ *
+ * 3. Topic Interning & Allocation Guarantees:
  *    - Topics are interned to 32-bit FNV-1a hashes (uint32_t) at subscription and publish time.
  *    - `publish()` incurs ZERO heap allocations on the hot path (in-place vector iteration).
- * 
- * 3. Re-entrancy & Mutation Safety:
+ *
+ * 4. Re-entrancy & Mutation Safety:
  *    - Callbacks are executed in-place without duplicating subscriber vectors.
  *    - Callbacks MAY safely call `subscribe()` or `unsubscribe()` (including self-unsubscription)
  *      during event dispatch. Soft-deletion (tombstoning) ensures iterator and index stability,
  *      and inactive slots are compacted after top-level dispatch completes.
  *    - Subscriptions added during an active `publish()` will not receive the currently dispatched event,
  *      but will participate in future publications.
- * 
- * 4. Execution Budget & Payload Lifetime:
+ *
+ * 5. Execution Budget & Payload Lifetime:
  *    - Callback routines MUST comply with the cooperative tick budget (<= 10 ms per callback).
  *    - Event payload pointers are valid ONLY for the duration of the callback execution.
+ *      If the subscriber needs data beyond the callback, it must copy the payload.
  */
 
 /**
