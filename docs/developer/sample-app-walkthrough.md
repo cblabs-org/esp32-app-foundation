@@ -799,7 +799,7 @@ Continue with the deep-dive guides in order:
 | 2 | `app-developer-quickstart.md` §4 | Uses `req->reply(200, ...)` | Handler takes `(PsychicRequest*, PsychicResponse*)`, uses `response->send()` | 🔴 Breaking — wrong handler signature |
 | 3 | `app-developer-quickstart.md` §5 | Uses `performUpdate()` | Actual method is `fetchUpdate()` | 🔴 Breaking — wrong method name |
 | 4 | `app-developer-quickstart.md` §6 | `CarouselEngine::get().registerBoard()` | Actual: `app.getDisplay().carousel.add(&board)` | 🟡 Misleading API |
-| 5 | `references/architecture.md` | App code at `template/src/` | Directory is now `sample-app/src/` | 🟡 Stale path |
+| 5 | `references/architecture.md` | App code at `template/src/` | ✅ Fixed — now reads `your-project/src/` (see `sample-app/` for reference) | ✅ Resolved |
 | 6 | SKILL.md interface table | Correct `registerRoutes` name | But the quickstart example contradicts this | 🟡 Internal inconsistency |
 | 7 | Sample app `myApp.hpp` | Includes individual interface headers | Skill says "always use `#include "AppFoundation.h"`" | 🟡 Code violates own advice |
 | 8 | `extending-the-web-portal.md` | `StaticJsonDocument<1024>` | ✅ Fixed — uses `JsonDocument` (ArduinoJson v7) | ✅ Resolved |

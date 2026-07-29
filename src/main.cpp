@@ -20,7 +20,10 @@
 #include "AppFoundation.h"
 #include "publicKey.hpp"
 
-    #include <Arduino.h>
+#include <Arduino.h>
+#ifndef NATIVE_BUILD
+#include <LittleFS.h>
+#endif
 
 // ---------------------------------------------------------------------------
 // Static instance

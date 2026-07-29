@@ -13,8 +13,9 @@
  *
  * Exported Classes:
  * - ConfigRoot: Static path accessor utility class
- *   - getEtcPath():       Returns system config directory root ("/etc")
- *   - getModPath():       Returns module config directory root ("/mod")
+ *   - setMountBase():     Sets the detected mount point base
+ *   - getEtcPath():       Returns system config directory root (e.g. "/config/etc")
+ *   - getModPath():       Returns module config directory root (e.g. "/config/mod")
  *   - getEtcFilePath():   Constructs path for file in system config directory
  *   - getModFilePath():   Constructs path for module namespace config file
  */
@@ -35,14 +36,20 @@
 class ConfigRoot {
 public:
     /**
+     * @brief Set the active mount base dynamically (e.g. "/config" or "/littlefs").
+     * @param base The base path.
+     */
+    static void setMountBase(const char* base);
+
+    /**
      * @brief Get the system configuration directory root path.
-     * @return Const string pointer to system config root (default "/etc").
+     * @return Const string pointer to system config root.
      */
     static const char* getEtcPath();
 
     /**
      * @brief Get the module configuration directory root path.
-     * @return Const string pointer to module config root (default "/mod").
+     * @return Const string pointer to module config root.
      */
     static const char* getModPath();
 

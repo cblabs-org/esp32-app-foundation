@@ -41,10 +41,8 @@
 #pragma once
 
 #include <Arduino.h>
-#include <LittleFS.h>
 #include <string>
 #include <stdint.h>
-
 #include <memory>
 #include <vector>
 #include <ArduinoJson.h>

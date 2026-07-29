@@ -62,10 +62,15 @@
     #include <Arduino.h>
     #include "esp_system.h"
     #include "esp_chip_info.h"
+    #include <dirent.h>
+    #include <sys/stat.h>
+    #include <unistd.h>
+#ifndef NATIVE_BUILD
     #include "esp_heap_caps.h"
     #include "esp_partition.h"
     #include "esp_ota_ops.h"
     #include <LittleFS.h>
+#endif
     #include <WiFi.h>
     #include <atomic>
 #include <algorithm>
@@ -382,8 +387,21 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors,
         doc["heap_default_total"]    = heap_caps_get_total_size(MALLOC_CAP_DEFAULT);
 
         // --- Storage metrics (LittleFS) ---
-        doc["storage_used"]   = LittleFS.usedBytes();
-        doc["storage_total"]  = LittleFS.totalBytes();
+        size_t totalBytes = 0, usedBytes = 0;
+#ifndef NATIVE_BUILD
+        totalBytes = LittleFS.totalBytes();
+        usedBytes = LittleFS.usedBytes();
+        if (totalBytes > 0) {
+            doc["storage_used"]   = usedBytes;
+            doc["storage_total"]  = totalBytes;
+        } else {
+            doc["storage_used"]   = 0;
+            doc["storage_total"]  = 0;
+        }
+#else
+        doc["storage_used"]   = 0;
+        doc["storage_total"]  = 0;
+#endif
 
         // --- Temperature (internal sensor) ---
         float chipTemp = 0.0f;
@@ -424,10 +442,12 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors,
         }
 
         // --- Active partition ---
+#ifdef ESP_PLATFORM
         const esp_partition_t* running = esp_ota_get_running_partition();
         if (running != nullptr) {
-            doc["partition"] = running->label;
+            doc["ota_running_partition"] = running->label;
         }
+#endif
 
         doc["status"] = "ok";
 
@@ -475,32 +495,32 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors,
     activeServer->on("/api/system/factory-reset", HTTP_POST, [](PsychicRequest* request, PsychicResponse* response) {
         ESP_LOGW(TAG, "POST /api/system/factory-reset — erasing configuration");
 
-        // --- Step 1: Erase module config directory ---
-        File modDir = LittleFS.open(ConfigRoot::getModPath());
-        if (modDir && modDir.isDirectory()) {
-            File entry = modDir.openNextFile();
-            while (entry) {
-                String path = String(ConfigRoot::getModPath()) + "/" + entry.name();
-                entry.close();
-                LittleFS.remove(path);
-                ESP_LOGI(TAG, "Removed: %s", path.c_str());
-                entry = modDir.openNextFile();
+        // --- Using standard POSIX directory reading ---
+        DIR* modDir = opendir(ConfigRoot::getModPath());
+        if (modDir) {
+            struct dirent* ent;
+            while ((ent = readdir(modDir)) != NULL) {
+                if (ent->d_type == DT_REG) { // is regular file
+                    std::string path = std::string(ConfigRoot::getModPath()) + "/" + ent->d_name;
+                    unlink(path.c_str());
+                    ESP_LOGI(TAG, "Removed: %s", path.c_str());
+                }
             }
-            modDir.close();
+            closedir(modDir);
         }
 
-        // --- Step 2: Erase system config directory ---
-        File etcDir = LittleFS.open(ConfigRoot::getEtcPath());
-        if (etcDir && etcDir.isDirectory()) {
-            File entry = etcDir.openNextFile();
-            while (entry) {
-                String path = String(ConfigRoot::getEtcPath()) + "/" + entry.name();
-                entry.close();
-                LittleFS.remove(path);
-                ESP_LOGI(TAG, "Removed: %s", path.c_str());
-                entry = etcDir.openNextFile();
+        // --- Step 2: Delete config/etc contents (secrets/certs) ---
+        DIR* etcDir = opendir(ConfigRoot::getEtcPath());
+        if (etcDir) {
+            struct dirent* ent;
+            while ((ent = readdir(etcDir)) != NULL) {
+                if (ent->d_type == DT_REG) { // is regular file
+                    std::string path = std::string(ConfigRoot::getEtcPath()) + "/" + ent->d_name;
+                    unlink(path.c_str());
+                    ESP_LOGI(TAG, "Removed: %s", path.c_str());
+                }
             }
-            etcDir.close();
+            closedir(etcDir);
         }
 
         ESP_LOGW(TAG, "Factory reset complete — scheduling restart");
@@ -651,8 +671,8 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors,
         }
         return next();
     });
-    ESP_LOGI(TAG, "Global body-size middleware registered (default=%u, %u overrides)",
-             DEFAULT_MAX_POST_BODY, s_bodyLimits.size());
+    ESP_LOGI(TAG, "Global body-size middleware registered (default=%u, %zu overrides)",
+             (unsigned)DEFAULT_MAX_POST_BODY, (size_t)s_bodyLimits.size());
 
     ESP_LOGI(TAG, "WebServer configured (TLS=%d, AP=%d), registered %u contributors",
              useTls, apMode, (unsigned)contributors.size());

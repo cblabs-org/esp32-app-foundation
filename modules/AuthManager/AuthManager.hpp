@@ -69,7 +69,6 @@
 #include "../../include/interfaces/IWebContributor.hpp"
 #include "../../include/interfaces/IConfigurable.hpp"
 
-#include <LittleFS.h>
 
 // Forward declarations — avoids circular includes with ConfigManager/KeyManager
 class ConfigManager;
@@ -528,7 +527,7 @@ private:
      * @param len   Number of bytes to write.
      * @return true on success, false if open or write fails.
      */
-    bool _saveToLittleFS(const char* path, const uint8_t* data, size_t len) const;
+    bool _saveToFile(const char* path, const uint8_t* data, size_t len) const;
 
     /**
      * @brief Read a raw binary file from LittleFS into a caller-supplied buffer.
@@ -542,7 +541,6 @@ private:
      * @param outLen  Output: actual number of bytes read.
      * @return true on success, false if open fails or file exceeds bufMax.
      */
-    bool _loadFromLittleFS(const char* path, uint8_t* buf, size_t bufMax,
-                           size_t* outLen) const;
+    bool _loadFromFile(const char* path, uint8_t* buf, size_t bufMax,
+                       size_t* outLen = nullptr) const;
 };
-

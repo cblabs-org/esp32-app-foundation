@@ -36,7 +36,10 @@
 // ---------------------------------------------------------------------------
 #include <inttypes.h>         // PRIu32
 #include <Arduino.h>          // Serial, millis(), etc.
-#include <LittleFS.h>         // LittleFS.begin()
+#ifndef NATIVE_BUILD
+#include <LittleFS.h>
+#include "esp_partition.h"
+#endif
 #include "esp_system.h"       // esp_restart()
 #include "esp_heap_caps.h"    // heap_caps_get_free_size(), heap_caps_get_minimum_free_size()
 #include <cstdlib>            // For native-build stubs
@@ -44,6 +47,7 @@
 #include <cstring>                // memset()
 
 #include "platform/LogShim.h"
+#include "DeviceCrypto.hpp"
 
 static constexpr const char* TAG = "Application";
 
@@ -112,14 +116,35 @@ bool Application::begin(const FrameworkConfig& config) {
     // --- Step 4: Mount LittleFS ---
     // Foundation for all persistence. Only available on hardware;
     // in native builds we skip this.
+#ifndef NATIVE_BUILD
+    const esp_partition_t* config_part = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_SPIFFS, "config");
+
+    // Mount storage partition (default)
     if (!LittleFS.begin(true, "/littlefs", 10, "storage")) {
-        // formatOnFail = true: first-boot will auto-format, subsequent failures
-        // indicate a hardware fault — abort and return false.
         ESP_LOGE(TAG, "LittleFS mount failed — cannot continue boot");
         _statusReporter->reportError("Filesystem mount failed");
         return false;
     }
-    ESP_LOGI(TAG, "LittleFS mounted successfully");
+    ESP_LOGI(TAG, "LittleFS (storage) mounted successfully");
+
+    // We can allocate another LittleFSFS for the config partition
+    static fs::LittleFSFS configFS;
+
+    if (config_part != NULL) {
+        if (configFS.begin(true, "/config", 10, "config")) {
+            ESP_LOGI(TAG, "LittleFS (config) mounted successfully");
+            ConfigRoot::setMountBase("/config");
+        } else {
+            ESP_LOGE(TAG, "LittleFS (config) mount failed, falling back to /littlefs");
+            ConfigRoot::setMountBase("/littlefs");
+        }
+    } else {
+        ESP_LOGI(TAG, "No config partition found, using /littlefs for config");
+        ConfigRoot::setMountBase("/littlefs");
+    }
+#else
+    ConfigRoot::setMountBase("test/tmp/config");
+#endif
     _statusReporter->reportStatus("Filesystem mounted", 0.10f);
 
     // --- Step 5: Store FrameworkConfig internally ---

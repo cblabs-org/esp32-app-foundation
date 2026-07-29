@@ -11,13 +11,36 @@
  */
 
 #include "ConfigRoot.hpp"
+#include <string>
+
+static std::string _mountBase = "/littlefs";
+#ifdef ESP_PLATFORM
+static std::string _etcPath = "/littlefs/etc";
+static std::string _modPath = "/littlefs/mod";
+#else
+static std::string _etcPath = "test/tmp/etc";
+static std::string _modPath = "test/tmp/mod";
+#endif
+
+void ConfigRoot::setMountBase(const char* base) {
+    if (base) {
+        _mountBase = base;
+#ifdef ESP_PLATFORM
+        _etcPath = _mountBase + "/etc";
+        _modPath = _mountBase + "/mod";
+#else
+        _etcPath = "test/tmp" + _mountBase + "/etc";
+        _modPath = "test/tmp" + _mountBase + "/mod";
+#endif
+    }
+}
 
 const char* ConfigRoot::getEtcPath() {
-    return "/etc";
+    return _etcPath.c_str();
 }
 
 const char* ConfigRoot::getModPath() {
-    return "/mod";
+    return _modPath.c_str();
 }
 
 void ConfigRoot::getEtcFilePath(const char* filename, char* buf, size_t size) {

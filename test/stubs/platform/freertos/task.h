@@ -31,6 +31,12 @@ inline int xTaskCreateWithCaps(TaskFunction_t pxTaskCode, const char* const pcNa
     return pdPASS;
 }
 
+inline int xTaskCreate(TaskFunction_t pxTaskCode, const char* const pcName,
+                       const configSTACK_DEPTH_TYPE usStackDepth, void* const pvParameters,
+                       uint32_t uxPriority, TaskHandle_t* const pxCreatedTask) {
+    return xTaskCreateWithCaps(pxTaskCode, pcName, usStackDepth, pvParameters, uxPriority, pxCreatedTask, 0);
+}
+
 inline void vTaskDelete(TaskHandle_t xTaskToDelete) {}
 inline void vTaskDelay(uint32_t xTicksToDelay) { throw StubTaskYieldException(); }
 

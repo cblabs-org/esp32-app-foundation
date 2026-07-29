@@ -23,7 +23,7 @@
 #include "../WifiManager/WifiManager.hpp"
 #include "../WebServer/WebServerManager.hpp"
 #include "../AuthManager/AuthManager.hpp"
-#include <ConfigManager.hpp>
+#include "../ConfigManager/ConfigManager.hpp"
 
 // ---------------------------------------------------------------------------
 // Platform-conditional includes & logging shims

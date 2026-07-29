@@ -1,5 +1,11 @@
 # Framework Architecture Reference
 
+> **Scope:** Terse, agent-facing quick reference for the `framework-expert` skill.
+> The canonical human-facing documentation is [`docs/developer/`](../../../../docs/developer/README.md)
+> — start with [`architecture-overview.md`](../../../../docs/developer/architecture-overview.md).
+> The single source of truth for the full design is
+> [`docs/design_specification.md`](../../../../docs/design_specification.md).
+
 ## The 3-Tier Model
 
 The framework decouples code into three distinct layers to ensure hardware/software independence and enable host-based testing.

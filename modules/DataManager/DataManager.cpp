@@ -54,14 +54,13 @@ void DataManager::begin() {
     // DRAM (not PSRAM) is required because SPI flash operations (used by some
     // data sources) assert when the task stack is in PSRAM.
     ESP_LOGI(TAG, "Creating worker task (stack=12288, priority=5, core=any, DRAM)");
-    BaseType_t result = xTaskCreateWithCaps(
+    BaseType_t result = xTaskCreate(
         workerTaskLoop,
         "DataManager",
         12288,                                    // 12KB — safe for TLS
         this,
         5,
-        &_workerTask,
-        MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT     // DRAM stack
+        &_workerTask
     );
     if (result != pdPASS) {
         ESP_LOGE(TAG, "Failed to create DataManager worker task");
