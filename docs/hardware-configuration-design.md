@@ -6,30 +6,30 @@
 > per-board hardware configuration (pins, capabilities, display kind, and the
 > build-time facts that surround them).
 
-> [!WARNING]
-> **STATUS: WORK IN PROGRESS — RECONCILED WITH LANDED MICROKERNEL WORK; PENDING PRINCIPAL-ARCHITECT SCOPING.**
+> [!NOTE]
+> **STATUS: FINALIZED — consumer-reviewed and decomposed; ready for implementation.**
 >
-> This document captures architectural decisions reached in design discussion.
-> It is a *complete draft proposal*, not a description of shipped code — the core
-> `board.<id>.h` work here is **not yet built** (`hardware/` does not exist). It is
-> **pending decomposition by a `/principal-architect`** into a scoped PR/work-order
-> plan, but **that scoping is not yet authorised** — do not spawn a PA or begin
-> implementation until the user explicitly says so.
+> This document is the **design authority for PR-49** (the `board.h` pin-map
+> migration). It has been reconciled with the landed microkernel work (MK-1…MK-18,
+> now on `main`), consumer-reviewed via RFC
+> [#50](https://github.com/matthewmcneill/esp32-app-foundation/issues/50) — **endorsed
+> by all three consumer programs, no blockers** — and decomposed into a 4-Work-Order
+> stack. The core `board.<id>.h` work is **not yet built** (`hardware/` does not
+> exist yet); **execution is gated on the human's go recorded in the PR-49
+> `PROJECT.md` Approval Log**
+> ([`.agents/skills/principal-architect-workspace/pr-49-hardware-config/PROJECT.md`](../.agents/skills/principal-architect-workspace/pr-49-hardware-config/PROJECT.md)),
+> not here.
 >
-> **Blocking dependency now cleared.** The general **module-optionality** question
-> (formerly OQ-1) has been resolved *and shipped* by the microkernel refactor
-> ([`docs/microkernel-architecture-design.md`](microkernel-architecture-design.md),
-> MK-1…MK-18). This document has been reconciled against what actually landed — see
-> [§0 Relationship to the landed microkernel work](#0-relationship-to-the-landed-microkernel-work).
-> The most consequential change: the proposed `BOARD_DISPLAY_KIND` tag is
-> **superseded** by the landed `WITH_DISPLAY_U8G2` / `WITH_DISPLAY_LVGL` availability
-> flags ([HC-6](#hc-6--display-availability-uses-the-landed-with_display_-flags-not-a-bespoke-tag)).
+> The most consequential reconciliation: the proposed `BOARD_DISPLAY_KIND` tag is
+> **superseded** by the landed `WITH_DISPLAY_U8G2` / `WITH_DISPLAY_LVGL` flags
+> ([HC-6](#hc-6--display-availability-uses-the-landed-with_display_-flags-not-a-bespoke-tag));
+> see [§0](#0-relationship-to-the-landed-microkernel-work).
 
 ---
 
 ## 0. Relationship to the landed microkernel work
 
-The microkernel refactor (MK-1…MK-18) has **shipped** on `feat/microkernel-refactor`.
+The microkernel refactor (MK-1…MK-18) has **landed on `main`**.
 It resolved this design's blocking dependency (module optionality) and, in doing
 so, settled several things this document previously left open or proposed
 differently. This section is the reconciliation ledger; the decisions below (§3)
