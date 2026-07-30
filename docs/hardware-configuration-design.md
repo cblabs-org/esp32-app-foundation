@@ -139,10 +139,25 @@ removes the need for it by making the header authoritative.
 
 ### HC-1 — `board.<id>.h` is the authoritative source of compile-time hardware truth
 
-A single per-variant header owns the board's pins, capability flags, and
-display kind. It is rich and self-documenting: ASCII pinout diagram, `constexpr
-int8_t` typed pins grouped by bus, contention/allocation notes. It supersedes
-scattering these facts as `-D` flags.
+A single per-variant header owns the board's pins, capability flags, and display
+pin block. Two documentation elements are **mandatory** — they are the reason
+this design exists (legibility while physically wiring hardware), and a `board.h`
+is **not complete without them**:
+
+1. **An ASCII-art pinout diagram of the physical board** at the top of the file —
+   the board outline with every pin labelled down both sides (GPIO number +
+   signal + connector label), plus a legend. This is the single most useful
+   artefact when wiring a board. The PowerMonitor `pins_esp32s3nano.h` header is
+   the **reference exemplar** to match in style and completeness.
+2. **Pin-priority / allocation notes** — the contention-tier and allocation
+   strategy as structured comments (PowerMonitor's *"CS lines ordered by
+   contention risk, safest first"*: Tier 1 clean GP → Tier 2 sacrifices-I2C →
+   Tier 3 strapping pins). These record *why* a pin was chosen and which pins to
+   consume **last**, which is invaluable when adding peripherals or moving wiring
+   during bring-up.
+
+Beyond these, the header carries `constexpr int8_t` typed pins grouped by bus. It
+supersedes scattering these facts as `-D` flags.
 
 *Rename note:* the file is `board.*.h`, not `pins.*.h`, because its scope is
 wider than pins — it also carries the display kind and capability flags. The
@@ -548,9 +563,9 @@ considered and set aside in favour of the word the design keeps reaching for.)
 > [!NOTE]
 > **OQ-1 is resolved and shipped** by the microkernel refactor; the blocker on
 > this design is cleared. **Consumer review (RFC #50) is complete — all three
-> programs endorsed with no blockers** (see [§8](#8-consumer-review-outcome-rfc-50));
-> OQ-2 is now settled and OQ-7 is the only remaining item (a non-blocking
-> enhancement question). Nothing here blocks PA scoping.
+> programs endorsed with no blockers** (see [§8](#8-consumer-review-outcome-rfc-50)).
+> **All open questions are now resolved** (OQ-7 settled: pin-priority notes are
+> mandatory header documentation). Nothing here blocks PA scoping.
 
 - **OQ-1 — General module optionality. ✅ RESOLVED (shipped).** The microkernel
   refactor landed the unified model: one `WITH_*` availability flag per optional
@@ -645,14 +660,14 @@ considered and set aside in favour of the word the design keeps reaching for.)
   this is no longer entangled with the optionality model. This is the work a PA
   would decompose.
 
-- **OQ-7 — Formalize per-pin risk/capability metadata? ⏳ OPEN (non-blocking; raised by power-monitor, RFC #50).**
-  Power-monitor's allocation carries more than "pin = GPIO": each expansion CS line
-  has a *risk tier* (clean / sacrifices-I2C / strapping-pin-populate-last), today
-  expressed as structured comments + tier ordering. Question for the contract: does
-  `board.h` want a *formal* per-pin annotation for risk/capability, or do comments
-  remain the convention? Not a blocker — the current design carries it as comments;
-  formalization is a possible enhancement to weigh during scoping against the
-  efficiency-mandate "don't add mechanism until a second case forces it" rule.
+- **OQ-7 — Per-pin risk/priority notes. ✅ RESOLVED: mandatory as structured comments.**
+  Per-pin contention/priority notes (power-monitor's tier ordering: clean →
+  sacrifices-I2C → strapping-pin-populate-last) are **required documentation** in
+  every `board.h`, as structured comments alongside the mandatory ASCII pinout —
+  see [HC-1](#hc-1--boardidh-is-the-authoritative-source-of-compile-time-hardware-truth).
+  A *machine-readable* per-pin annotation (parsed by the contract check) is **not**
+  adopted — it is mechanism the efficiency mandate does not yet justify — and
+  remains a possible future enhancement only if a second concrete need appears.
 
 ---
 
@@ -724,3 +739,4 @@ architecture, but must not be lost when the board headers are authored:
 | 2026-07-29 | **OQ-3 ✅ decided: Option A (macro-named path).** Added **HC-11** — downstream apps can define wholly custom boards with zero framework edits (path-based selection, no closed board enum; framework ships generic facade + contract + shared primitives; app-env→framework-lib flag propagation proven by today's `-DDISPLAY_CS_PIN`); documents the orthogonal PlatformIO board-JSON boundary. **All open questions now closed** — design ready for PA scoping when authorised. |
 | 2026-07-29 | HC-2 given an explicit **end-state** clarification: zero pins remain in `platformio.ini` and the target design has **no cross-file drift detection** (HC-9 asserts are intra-header sanity, not reconciliation); documented the single third-party-library exception (build-flag-only pins → *generate* the `-D` from `board.h`, never hand-duplicate). Moved `U8G2_DISPLAY_TYPE` into the `board.h` illustrative shape so the header is the complete physical description. |
 | 2026-07-29 | **Consumer review complete (RFC #50) — all three endorse, no blockers.** Added §8 review-outcome record + consumer implementation notes. Folded in the two must-fixes: HC-6 now *requires* the framework display modules to read pins from `board.h` (kills the `-D` display-pin duplication + power-monitor's weld); **OQ-2 settled** — `WITH_DISPLAY_*` lives in a co-located per-board fragment with an HC-5 cross-check (resolves departures-board's two-selector concern). Added **HC-12** (app-owned peripheral pins; button/NeoPixel), **OQ-7** (formalize per-pin risk metadata — open, non-blocking), and upgraded **OQ-5** (native U8G2 sim co-scheduled with display PRs; departures-board contributes the render core; fixes #46). Renumbered Related Documents → §9. |
+| 2026-07-29 | **HC-1 made the ASCII-art pinout diagram + pin-priority/contention notes MANDATORY** in every `board.h` (per user emphasis — the key bring-up aid; PowerMonitor `pins_esp32s3nano.h` is the reference exemplar). This settles **OQ-7 ✅** toward "required structured comments" (no machine-readable annotation). All open questions now resolved. |
