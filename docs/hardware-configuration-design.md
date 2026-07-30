@@ -9,15 +9,15 @@
 > [!NOTE]
 > **STATUS: FINALIZED — consumer-reviewed and decomposed; ready for implementation.**
 >
-> This document is the **design authority for PR-49** (the `board.h` pin-map
+> This document is the **design authority for PR-51** (the `board.h` pin-map
 > migration). It has been reconciled with the landed microkernel work (MK-1…MK-18,
 > now on `main`), consumer-reviewed via RFC
 > [#50](https://github.com/matthewmcneill/esp32-app-foundation/issues/50) — **endorsed
 > by all three consumer programs, no blockers** — and decomposed into a 4-Work-Order
 > stack. The core `board.<id>.h` work is **not yet built** (`hardware/` does not
-> exist yet); **execution is gated on the human's go recorded in the PR-49
+> exist yet); **execution is gated on the human's go recorded in the PR-51
 > `PROJECT.md` Approval Log**
-> ([`.agents/skills/principal-architect-workspace/pr-49-hardware-config/PROJECT.md`](../.agents/skills/principal-architect-workspace/pr-49-hardware-config/PROJECT.md)),
+> ([`.agents/skills/principal-architect-workspace/pr-51-hardware-config/PROJECT.md`](../.agents/skills/principal-architect-workspace/pr-51-hardware-config/PROJECT.md)),
 > not here.
 >
 > The most consequential reconciliation: the proposed `BOARD_DISPLAY_KIND` tag is

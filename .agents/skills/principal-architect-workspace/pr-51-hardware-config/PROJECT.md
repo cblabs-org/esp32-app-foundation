@@ -1,4 +1,4 @@
-# PR-49 — Hardware Configuration (`board.h` pin-map migration)
+# PR-51 — Hardware Configuration (`board.h` pin-map migration)
 
 > **Principal Architect project.** Decomposition of the hardware-configuration
 > design into a linear stack of Work Orders.

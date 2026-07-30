@@ -1,7 +1,7 @@
-# Bridge Prompt — Implementing Principal Architect: PR-49 Hardware Configuration
+# Bridge Prompt — Implementing Principal Architect: PR-51 Hardware Configuration
 
 > **Paste-to-handoff.** You are taking over as the **implementing Principal
-> Architect** for PR-49 (`board.h` pin-map migration). A separate *designer PA*
+> Architect** for PR-51 (`board.h` pin-map migration). A separate *designer PA*
 > completed the design, consumer review, and full decomposition. Your job is to
 > **execute** the prepared stack — gated by human approval.
 
@@ -94,6 +94,6 @@ module) — serialized, no parallelization.
 
 ## What the designer PA already did (do not redo)
 
-Design doc (HC-1…HC-12), RFC #50 raise + review + close, PR-49 decomposition,
+Design doc (HC-1…HC-12), RFC #50 raise + review + close, PR-51 decomposition,
 all 4 WORKORDERs, this bridge, PA workspace registration. Your scope is **execution
 from WO1 onward, gated on the human's go.**

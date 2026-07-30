@@ -12,7 +12,7 @@ You are NOT the Principal Architect. Do not branch or plan. Execute the checklis
 ## Objective
 Migrate the two consumer apps to the `board.h` selector model, document the new
 system (including the HC-11 zero-edit custom-board path), and run final
-multi-target verification for the whole PR-49 stack.
+multi-target verification for the whole PR-51 stack.
 
 ## Design Authority (read first)
 - `docs/hardware-configuration-design.md` — HC-11 (zero-edit downstream custom boards),
