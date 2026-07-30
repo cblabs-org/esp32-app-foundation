@@ -294,6 +294,23 @@ sets `WITH_DISPLAY_LVGL` — the mutual exclusivity is enforced today.
   flag set. Combined with MK-8's `NullStatusReporter`/`IBootReporter` fallback, a
   headless board boots silently for free (see [HC-7](#hc-7--boardnativeh-is-the-null-board)).
 
+**Consumer must-fix (power-monitor, RFC #50): eliminate the display-pin `-D`
+duplication.** Today the framework's own Ring-2 U8G2/LVGL modules read their pins
+from `-DDISPLAY_*_PIN` flags in `platformio.ini`, which forced power-monitor to
+hold the truth in `board.h` *and* mirror it to the flags, welded by `static_assert`
+(their "D-10" workaround). **This design requires the display modules to read their
+pin block directly from `board.h` `constexpr`s**, deleting both the
+`-DDISPLAY_*_PIN` flags and the weld. This is *in-scope core refactor work*, not
+the rare third-party exception of
+[HC-2](#hc-2--flip-authority-the-header-is-the-source-platformioini-only-selects):
+the framework's own modules are fed pins programmatically (constructor args), so no
+`-D` is needed. The HC-2 "generate the `-D` from `board.h`" fallback applies *only*
+to genuine third-party libraries that cannot be fed pins programmatically —
+DraytonWiser confirmed LovyanGFX and ESP32Encoder are *not* such cases (both accept
+pins via config structs), so **no current consumer needs the fallback**. Deleting
+power-monitor's weld + six `-D` flags is called out as the single biggest win of
+this design for display consumers.
+
 ### HC-7 — `board.native.h` is the "null board"
 
 The host/native build gets a first-class board header that defines every pin as
@@ -430,6 +447,26 @@ it.
 
 ---
 
+### HC-12 — `board.h` holds app-owned peripheral pins, not only framework-consumed ones
+
+Confirmed by RFC #50 (departures-board's mode button, DraytonWiser's NeoPixel ring):
+`board.h` is the home for **every** board GPIO fact, including pins that no
+*framework* module consumes — a physical button read by an *app* module, an
+addressable-LED data pin, an expansion-connector bus. These are legitimate
+`board.h` citizens (they are soldered facts) and may carry a capability flag
+(e.g. `constexpr bool BOARD_HAS_BUTTON = true`).
+
+Placement follows ownership:
+
+- **Stock/shared peripheral** → the framework's stock `hardware/<id>/board.h`.
+- **Downstream-specific peripheral** (Wiser's NeoPixel, an app's extra sensor) →
+  the **downstream board.h override** ([HC-11](#hc-11--downstream-apps-can-define-custom-boards-with-zero-framework-edits)),
+  in the illustrative shape's *freeform app-owned* section — **not** the framework
+  stock header.
+
+A bus that is independent of the display (DraytonWiser's aux-I2C) sits **outside**
+any `#ifdef WITH_DISPLAY_*` guard — it is a board capability, not a display fact.
+
 ## 4. Illustrative Shape (non-normative)
 
 A board header under this design (details subject to change):
@@ -510,8 +547,10 @@ considered and set aside in favour of the word the design keeps reaching for.)
 
 > [!NOTE]
 > **OQ-1 is resolved and shipped** by the microkernel refactor; the blocker on
-> this design is cleared. The remaining open questions are internal to the
-> `board.h` design and do not block PA scoping.
+> this design is cleared. **Consumer review (RFC #50) is complete — all three
+> programs endorsed with no blockers** (see [§8](#8-consumer-review-outcome-rfc-50));
+> OQ-2 is now settled and OQ-7 is the only remaining item (a non-blocking
+> enhancement question). Nothing here blocks PA scoping.
 
 - **OQ-1 — General module optionality. ✅ RESOLVED (shipped).** The microkernel
   refactor landed the unified model: one `WITH_*` availability flag per optional
@@ -521,13 +560,24 @@ considered and set aside in favour of the word the design keeps reaching for.)
   other optional. See [§0](#0-relationship-to-the-landed-microkernel-work) and
   [HC-6](#hc-6--display-availability-uses-the-landed-with_display_-flags-not-a-bespoke-tag).
 
-- **OQ-2 — `BOARD_DISPLAY_KIND` vs enable flags. ✅ RESOLVED.** The enable-flag
-  axis won; `BOARD_DISPLAY_KIND`/`HAS_DISPLAY` were removed in favour of
-  `WITH_DISPLAY_*`. **Residual sub-question (non-blocking):** *where does a board's
-  hardware-sourced `WITH_DISPLAY_*` flag physically live* — a per-board build
-  fragment inside `hardware/<id>/` (co-located with `board.h`, MK-5 clean) vs the
-  `platformio.ini` env block (where it sits today)? Leaning per-board fragment for
-  co-location; confirm during PA scoping.
+- **OQ-2 — `BOARD_DISPLAY_KIND` vs enable flags. ✅ RESOLVED (confirmed by RFC #50).**
+  The enable-flag axis won; `BOARD_DISPLAY_KIND`/`HAS_DISPLAY` were removed in
+  favour of `WITH_DISPLAY_*`. **Residual sub-question now settled:** the board's
+  `WITH_DISPLAY_*` flag lives in a **per-board build fragment co-located in
+  `hardware/<id>/`**, shipped as part of the board definition — *not* declared
+  independently in the app's env. This directly answers departures-board's blocking
+  concern that two independent selectors (a `board.h` kind vs a `platformio.ini`
+  flag) would be a new cross-file drift. Under this resolution the board *folder* is
+  the single origin of both pins (`board.h`) and display availability (the
+  fragment); the app *selects the board*, it does not re-declare the display kind.
+
+  **Why the flag can't simply be a `board.h` `#define` (the layering constraint):**
+  `WITH_DISPLAY_*` gates *library linking* (which module `.cpp` compiles in), a
+  build-system decision made before any header is seen — so it must be a build
+  flag, not a pure header define. Co-location + the [HC-5](#hc-5--facade-header--contract-check)
+  contract check closes the gap: the check `static_assert`s that an enabled
+  `WITH_DISPLAY_*` has its matching `board.h` pin block (and errors on a mismatch),
+  so the fragment and header cannot silently disagree even though they are two files.
 
 - **OQ-3 — Board selection / override mechanism. ✅ RESOLVED: Option A (macro-named path).**
   How the facade `board.h` selects a concrete board header, and how an app
@@ -566,17 +616,27 @@ considered and set aside in favour of the word the design keeps reaching for.)
   duplication later becomes painful across many near-identical boards — never at
   the cost of reintroducing layered pin override.
 
-- **OQ-5 — Native display simulation (basis for `WITH_DISPLAY_U8G2` on `native`).
-  ⏳ Deferred; path identified.** Reframed: this is **not** a separate
-  `WITH_DISPLAY_SIM` flag. Instead, the sibling `departures-board/tools/layoutsim`
-  work (U8G2 render path compiled for the host, framebuffer spooled to an image)
-  is the **basis for making `WITH_DISPLAY_U8G2` buildable on the `native`
-  environment** for testing and simulation — the same availability flag, backed by
-  a host framebuffer renderer instead of real SPI. Not immediate, but the code
-  exists and could be ported. Consequence: a native *simulation* build opts into
-  `WITH_DISPLAY_U8G2` while board pins stay `PIN_UNASSIGNED`
-  ([HC-7](#hc-7--boardnativeh-is-the-null-board)) — the sim backend never touches
-  the SPI pins, so the null-pin board still holds.
+- **OQ-5 — Native display simulation (`WITH_DISPLAY_U8G2` on `native`).
+  ⏳ Co-scheduled with the display PRs; contributor + scope confirmed (RFC #50).**
+  Not a separate `WITH_DISPLAY_SIM` flag: it is making `WITH_DISPLAY_U8G2` buildable
+  on the `native` environment, backed by a host framebuffer renderer instead of real
+  SPI. A native *simulation* build opts into `WITH_DISPLAY_U8G2` while board pins
+  stay `PIN_UNASSIGNED` ([HC-7](#hc-7--boardnativeh-is-the-null-board)) — the sim
+  backend never touches SPI, so the null-pin board still holds.
+
+  **departures-board input (they will contribute it):**
+  - Two targets share a **core** but must not be conflated: their `tools/layoutsim`
+    is *Emscripten → WASM → browser canvas* (a visual authoring/preview tool); the
+    `native`-env sim is a *host binary* (offscreen framebuffer, no browser). The
+    **reusable asset is the U8G2 → in-memory-framebuffer render core + mock data**;
+    the browser harness is a separate delivery.
+  - **This is the structural fix for [#46](https://github.com/matthewmcneill/esp32-app-foundation/issues/46):**
+    CarouselEngine/board tests are `test_ignore`d on `native` today because they pull
+    in `U8G2DisplayModule` (won't host-compile). A native U8G2 backend + HC-7's total
+    null board makes board/layout/widget logic host-unit-testable.
+  - Therefore **not a deferred "later layer"** — departures-board carries it as their
+    migration PR-13 and wants effort aligned so it lands *in time for the display
+    PRs*, not duplicated. The PA should sequence accordingly.
 
 - **OQ-6 — Migration sequencing. ✅ AGREED.** The *remaining* hardware-config work
   is a **self-contained pin-map migration**: move the display **pin** blocks out of
@@ -585,9 +645,58 @@ considered and set aside in favour of the word the design keeps reaching for.)
   this is no longer entangled with the optionality model. This is the work a PA
   would decompose.
 
+- **OQ-7 — Formalize per-pin risk/capability metadata? ⏳ OPEN (non-blocking; raised by power-monitor, RFC #50).**
+  Power-monitor's allocation carries more than "pin = GPIO": each expansion CS line
+  has a *risk tier* (clean / sacrifices-I2C / strapping-pin-populate-last), today
+  expressed as structured comments + tier ordering. Question for the contract: does
+  `board.h` want a *formal* per-pin annotation for risk/capability, or do comments
+  remain the convention? Not a blocker — the current design carries it as comments;
+  formalization is a possible enhancement to weigh during scoping against the
+  efficiency-mandate "don't add mechanism until a second case forces it" rule.
+
 ---
 
-## 8. Related Documents
+## 8. Consumer Review Outcome (RFC #50)
+
+All three consumer programs reviewed the design on
+[issue #50](https://github.com/matthewmcneill/esp32-app-foundation/issues/50) and
+**endorsed the direction with no hard blockers.** Verdicts and the items folded
+back into this document:
+
+| Consumer | Verdict | Key input (now incorporated) |
+|---|---|---|
+| **power-monitor** (U8G2) | Strong endorse — already runs this model ("D-10") | **Must-fix:** kill display-pin `-D` duplication → [HC-6](#hc-6--display-availability-uses-the-landed-with_display_-flags-not-a-bespoke-tag). New **OQ-7** (per-pin risk metadata). Confirmed `WITH_DISPLAY_U8G2`, Preset A, no field devices. |
+| **DraytonWiser** (LVGL) | Approve, no blockers | LVGL board specifics (below); NeoPixel → downstream override ([HC-12](#hc-12--boardh-holds-app-owned-peripheral-pins-not-only-framework-consumed-ones)/[HC-11](#hc-11--downstream-apps-can-define-custom-boards-with-zero-framework-edits)); no third-party `-D`-only pins. |
+| **departures-board** (U8G2) | Endorse | **Blocking (now resolved):** OQ-2 — single source for display kind → resolved in [OQ-2](#7-open-questions). App-read button pin → [HC-12](#hc-12--boardh-holds-app-owned-peripheral-pins-not-only-framework-consumed-ones). Strong +1 on OQ-5 (contributes the render core; fixes #46). |
+
+### Consumer-provided implementation notes (for the PA / workers to fold in)
+
+These are concrete, board-specific facts supplied during review — not new
+architecture, but must not be lost when the board headers are authored:
+
+- **CrowPanel (LVGL) stock `board.h` gaps to fix (DraytonWiser):**
+  - **Add power-enable pins `LCD_PWR_EN1 = 1`, `LCD_PWR_EN2 = 2`** — currently
+    absent from `platformio.ini`; the display will not light without them driven
+    HIGH at init. Capture with a prominent comment.
+  - **`TOUCH_INT` discrepancy:** current `-D` = `0`, verified (MakerGuides) = `5`.
+    Flag for hardware verification during bring-up.
+  - **`TOUCH_RST`:** current `-1`; MakerGuides resets the CST816D via `13`.
+    Document as `PIN_UNASSIGNED` with rationale if LovyanGFX handles it internally,
+    else assign `13`.
+  - **Aux-I2C (`38/39`)** sits *outside* the `WITH_DISPLAY_LVGL` guard (board
+    capability); **NeoPixel (`48`)** is app-peripheral → downstream override.
+- **power-monitor `board.h` (U8G2):** relocate `src/boards/pins_esp32s3nano.h` →
+  `hardware/esp32s3nano/board.h`; 16 pod-CS lines in three risk tiers (clean →
+  I2C-sacrifice pair → strapping pins); delete the `static_assert` display-pin weld
+  once HC-6 lands.
+- **departures-board (U8G2):** two variants (esp32dev CS=26/DC=5/btn=34;
+  s3nano CS=10/DC=9/btn=8), both SSD1322 256×64 on HW SPI; app-read **mode button**
+  pin belongs in `board.h`; ship `hardware/departures-*/board.h` with **co-located
+  `partitions.csv`** (Preset A esp32dev).
+
+---
+
+## 9. Related Documents
 
 - [Microkernel Architecture Design](microkernel-architecture-design.md) — the
   module-optionality direction (MK-1…MK-18) that OQ-1 depends on; this design
@@ -603,7 +712,7 @@ considered and set aside in favour of the word the design keeps reaching for.)
 
 ---
 
-## 9. Changelog
+## 10. Changelog
 
 | Date | Change |
 |---|---|
@@ -614,3 +723,4 @@ considered and set aside in favour of the word the design keeps reaching for.)
 | 2026-07-29 | Open-question pass with user. **OQ-4 ✅ resolved (duplicate — self-contained board defs)**; **OQ-6 ✅ agreed (self-contained pin-map migration)**. **OQ-5 reframed**: not a `WITH_DISPLAY_SIM` flag but the basis for building `WITH_DISPLAY_U8G2` on `native` (host-framebuffer renderer, ported from departures-board layoutsim); HC-7 gains a native-sim note. **OQ-3 expanded** with full A/B pros-cons and a recommendation of Option A. |
 | 2026-07-29 | **OQ-3 ✅ decided: Option A (macro-named path).** Added **HC-11** — downstream apps can define wholly custom boards with zero framework edits (path-based selection, no closed board enum; framework ships generic facade + contract + shared primitives; app-env→framework-lib flag propagation proven by today's `-DDISPLAY_CS_PIN`); documents the orthogonal PlatformIO board-JSON boundary. **All open questions now closed** — design ready for PA scoping when authorised. |
 | 2026-07-29 | HC-2 given an explicit **end-state** clarification: zero pins remain in `platformio.ini` and the target design has **no cross-file drift detection** (HC-9 asserts are intra-header sanity, not reconciliation); documented the single third-party-library exception (build-flag-only pins → *generate* the `-D` from `board.h`, never hand-duplicate). Moved `U8G2_DISPLAY_TYPE` into the `board.h` illustrative shape so the header is the complete physical description. |
+| 2026-07-29 | **Consumer review complete (RFC #50) — all three endorse, no blockers.** Added §8 review-outcome record + consumer implementation notes. Folded in the two must-fixes: HC-6 now *requires* the framework display modules to read pins from `board.h` (kills the `-D` display-pin duplication + power-monitor's weld); **OQ-2 settled** — `WITH_DISPLAY_*` lives in a co-located per-board fragment with an HC-5 cross-check (resolves departures-board's two-selector concern). Added **HC-12** (app-owned peripheral pins; button/NeoPixel), **OQ-7** (formalize per-pin risk metadata — open, non-blocking), and upgraded **OQ-5** (native U8G2 sim co-scheduled with display PRs; departures-board contributes the render core; fixes #46). Renumbered Related Documents → §9. |
