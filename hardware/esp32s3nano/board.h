@@ -13,27 +13,27 @@
  * Physical Form Factor: Arduino Nano-compatible footprint with USB-C CDC
  *
  * ┌─────────────────────────────────────────────────────────────────────────┐
- * │                       WAVESHARE ESP32-S3-NANO                           │
- * │                         (Top View / Pinout)                             │
- * │                                                                         │
- * │    [Signal / Label]  [GPIO#] ┌───────────┐ [GPIO#]  [Signal / Label]    │
- * │    ─────────────────────────┤           ├─────────────────────────    │
- * │    Clean GP          [ G1  ]│ (1)   (30)│[ VIN ]   5V Power           │
- * │    Clean GP          [ G2  ]│ (2)   (29)│[ GND ]   Ground             │
- * │    EN / Reset        [ EN  ]│ (3)   (28)│[ RST ]   Reset Button       │
- * │    Ground            [ GND ]│ (4)   (27)│[ 3V3 ]   3V3 Power Output   │
- * │    Display CS        [ G10 ]│ (5)   (26)│[ G48 ]   SPI SCK  (Display) │
- * │    Display DC        [ G9  ]│ (6)   (25)│[ G47 ]   SPI MISO (Display) │
- * │    Clean GP          [ G8  ]│ (7)   (24)│[ G38 ]   SPI MOSI (Display) │
- * │    Clean GP          [ G7  ]│ (8)   (23)│[ G4  ]   Clean GP           │
- * │    Clean GP          [ G6  ]│ (9)   (22)│[ G3  ]   Clean GP           │
- * │    Clean GP          [ G5  ]│ (10)  (21)│[ G21 ]   Clean GP           │
- * │    Clean GP          [ G11 ]│ (11)  (20)│[ G44 ]   TXD0               │
- * │    Clean GP          [ G12 ]│ (12)  (19)│[ G43 ]   RXD0               │
- * │    Clean GP          [ G13 ]│ (13)  (18)│[ G0  ]   Strapping / Boot   │
- * │    Clean GP          [ G14 ]│ (14)  (17)│[ G45 ]   Strapping / VDD    │
- * │    Clean GP          [ G17 ]│ (15)  (16)│[ G46 ]   Strapping / Log    │
- * │                             └───────────┘                               │
+ * │                         WAVESHARE ESP32-S3-NANO                         │
+ * │                         ┌─────────────────┐                             │
+ * │                         │    USB-C Port   │                             │
+ * │                         ├─────────────────┤                             │
+ * │                         │  ┌───────────┐  │                             │
+ * │  Display SCK ◄ D13 G48 ─┤  │           │  ├─ G47 D12 ◄ Display MISO     │
+ * │                3V3     ─┤  │           │  ├─ G38 D11 ◄ Display MOSI     │
+ * │  Clean GP      B0  G46 ─┤  │           │  ├─ G21 D10   Clean GP         │
+ * │  Clean GP      A0  G1  ─┤  │           │  ├─ G18 D9    Clean GP         │
+ * │  Clean GP      A1  G2  ─┤  │  ESP32-S3 │  ├─ G17 D8    Clean GP         │
+ * │  Clean GP      A2  G3  ─┤  │   Nano    │  ├─ G10 D7  ► Display CS       │
+ * │  Clean GP      A3  G4  ─┤  │           │  ├─ G9  D6  ► Display DC       │
+ * │  Clean GP      A4  G11 ─┤  │           │  ├─ G8  D5    Clean GP         │
+ * │  Clean GP      A5  G12 ─┤  │           │  ├─ G7  D4    Clean GP         │
+ * │  Clean GP      A6  G13 ─┤  │           │  ├─ G6  D3    Clean GP         │
+ * │  Clean GP      A7  G14 ─┤  │           │  ├─ G5  D2    Clean GP         │
+ * │                VBUS    ─┤  │           │  ├─ GND       Ground           │
+ * │  Boot          B1  G0  ─┤  │           │  ├─ RST       Reset            │
+ * │                GND     ─┤  │           │  ├─ G44 D0    UART RXD0        │
+ * │                VIN     ─┤  └───────────┘  ├─ G43 D1    UART TXD0        │
+ * │                         └─────────────────┘                             │
  * └─────────────────────────────────────────────────────────────────────────┘
  *
  * Legend:

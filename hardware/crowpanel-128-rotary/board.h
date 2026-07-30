@@ -14,23 +14,18 @@
  *
  * ┌─────────────────────────────────────────────────────────────────────────┐
  * │               ELECROW CROWPANEL 1.28" HMI ROTARY DISPLAY                │
- * │                         (Top View / Pinout)                             │
+ * │                   (Integrated HMI — No DIP Headers)                     │
  * │                                                                         │
- * │    [Signal / Label] [GPIO#] ┌───────────┐ [GPIO#]  [Signal / Label]     │
- * │    ─────────────────────────┤           ├─────────────────────────      │
- * │    LCD Power EN 1    [ G1  ]│ (1)   (30)│[ 5V  ]   5V Power Rail        │
- * │    LCD Power EN 2    [ G2  ]│ (2)   (29)│[ 3V3 ]   3V3 Power Rail       │
- * │    LCD SPI DC        [ G3  ]│ (3)   (28)│[ GND ]   Ground               │
- * │    Touch I2C SDA     [ G6  ]│ (4)   (27)│[ G46 ]   LCD Backlight PWM    │
- * │    Touch I2C SCL     [ G7  ]│ (5)   (26)│[ G45 ]   Encoder Phase A      │
- * │    LCD SPI CS        [ G9  ]│ (6)   (25)│[ G42 ]   Encoder Phase B      │
- * │    LCD SPI SCLK      [ G10 ]│ (7)   (24)│[ G41 ]   Encoder Switch SW    │
- * │    LCD SPI MOSI      [ G11 ]│ (8)   (23)│[ G39 ]   Aux I2C SCL          │
- * │    LCD Reset         [ G14 ]│ (9)   (22)│[ G38 ]   Aux I2C SDA          │
- * │    Touch INT         [ G0  ]│ (10)  (21)│[ G13 ]   Touch RST (Unused)   │
- * │    Touch INT (Alt)   [ G5  ]│ (11)  (20)│[ G43 ]   UART TXD0            │
- * │    Clean GP / Free   [ G4  ]│ (12)  (19)│[ G44 ]   UART RXD0            │
- * │                             └───────────┘                               │
+ * │  ■ FIXED INTERNAL BUS WIRING                                            │
+ * │    Display (SPI/GC9A01) : SCLK=G10, MOSI=G11, CS=G9, DC=G3, RST=G14     │
+ * │                           BL=G46(PWM), PWR_EN=G1/G2                     │
+ * │    Touch (I2C/CST816D)  : SDA=G6, SCL=G7, INT=G0/G5, RST=G13/Unused     │
+ * │    Rotary Encoder (EC11): PhaseA=G45, PhaseB=G42, Switch=G41            │
+ * │                                                                         │
+ * │  ■ EXTERNAL EXPANSION CONNECTORS                                        │
+ * │    2x UART (4-Pin JST)  : UART0 TX=G43, UART0 RX=G44 (UART1 see schem)  │
+ * │    1x I2C  (4-Pin JST)  : SDA=G38, SCL=G39                              │
+ * │    1x FPC  (12-Pin)     : Breakout of GP pins, power, and I2C/UART      │
  * └─────────────────────────────────────────────────────────────────────────┘
  *
  * Legend:
