@@ -5,58 +5,64 @@
  * Description: Hardware configuration header for ESP32-WROOM-32 Dev Kit (esp32dev).
  *
  * =============================================================================
- * Board Hardware Configuration — ESP32-WROOM-32 Dev Kit (30-pin)
+ * Board Hardware Configuration — WEMOS D1 Mini ESP32 / MH-ET LIVE MiniKit
  * =============================================================================
  *
- * Board Identification: ESP32-WROOM-32 Dev Kit v1
- * MCU Target: ESP32-D0WDQ6 (Dual-core Xtensa LX6, 240MHz, 4MB Flash, No PSRAM)
- * Physical Form Factor: Standard 30-pin DIP NodeMCU-style board
+ * Board Identification: WEMOS D1 Mini ESP32 (MH-ET LIVE MiniKit derivative)
+ * MCU Target: ESP32-WROOM-32 (Dual-core Xtensa LX6, 240MHz, 4MB Flash, No PSRAM)
+ * Physical Form Factor: D1 Mini with double pin rows (inner + outer per side)
  *
- * ┌─────────────────────────────────────────────────────────────────────────┐
- * │                     ESP32-WROOM-32 DEV KIT V1 (DOIT)                    │
- * │                         (Top View / 38-pin)                             │
- * │                                                                         │
- * │    [Signal / Label]  [GPIO#] ┌───────────┐ [GPIO#]  [Signal / Label]    │
- * │    ─────────────────────────┤           ├─────────────────────────    │
- * │    3V3 Power         [ 3V3 ]│ (1)   (38)│[ GND ]   Ground             │
- * │    EN / Reset        [ EN  ]│ (2)   (37)│[ G23 ]   SPI MOSI ◄ Display │
- * │    Sensor VP         [ G36 ]│ (3)   (36)│[ G22 ]   I2C SCL            │
- * │    Sensor VN         [ G39 ]│ (4)   (35)│[ G1  ]   TXD0               │
- * │    Clean GP          [ G34 ]│ (5)   (34)│[ G3  ]   RXD0               │
- * │    Clean GP          [ G35 ]│ (6)   (33)│[ G21 ]   I2C SDA            │
- * │    Clean GP          [ G32 ]│ (7)   (32)│[ NC  ]   Not Connected      │
- * │    Clean GP          [ G33 ]│ (8)   (31)│[ G19 ]   SPI MISO ◄ Display │
- * │    DAC / Clean       [ G25 ]│ (9)   (30)│[ G18 ]   SPI SCK  ◄ Display │
- * │    Display CS ►      [ G26 ]│ (10)  (29)│[ G5  ]   Display DC ◄ Disp  │
- * │    Clean GP          [ G27 ]│ (11)  (28)│[ G17 ]   UART2 TX           │
- * │    Touch / GP        [ G14 ]│ (12)  (27)│[ G16 ]   UART2 RX           │
- * │    Touch / GP        [ G12 ]│ (13)  (26)│[ G4  ]   Clean GP           │
- * │    Touch / GP        [ G13 ]│ (14)  (25)│[ G0  ]   Strapping / Boot   │
- * │    Ground            [ GND ]│ (15)  (24)│[ G2  ]   Strapping / LED    │
- * │    5V Power (VIN)    [ VIN ]│ (16)  (23)│[ G15 ]   Strapping / JTAG   │
- * │    Not Connected     [ NC  ]│ (17)  (22)│[ GND ]   Ground             │
- * │    Not Connected     [ NC  ]│ (18)  (21)│[ NC  ]   Not Connected      │
- * │    Not Connected     [ NC  ]│ (19)  (20)│[ NC  ]   Not Connected      │
- * │                             └───────────┘                               │
- * └─────────────────────────────────────────────────────────────────────────┘
+ * References:
+ *   Pinout & specs : https://www.espboards.dev/esp32/d1-mini32/
+ *   MH-ET LIVE repo: https://github.com/MHEtLive/ESP32-MINI-KIT
+ *   ESP32 GPIO ref : https://randomnerdtutorials.com/esp32-pinout-reference-gpios/
+ *
+ *            outer                                       outer
+ *            row                                         row
+ *              │         ┌─────────────────┐             │
+ *              │         │   Micro-USB     │             │
+ *              │         ├─────────────────┤             │
+ *   ─ ─ ─ ─ ─ ┤  inner  │  ┌───────────┐  │  inner     ├ ─ ─ ─ ─ ─
+ *              │   row   │  │           │  │   row      │
+ *  RST    ── ○ ┤ ○ ──    │  │           │  │    ── ○ ┤ ○ ── G2  (LED)
+ *  G36 A0 ── ○ ┤ ○ ── G21│  │           │  │G3  ── ○ ┤ ○ ── G12
+ *  G39 A3 ── ○ ┤ ○ ── G22│  │  ESP32    │  │G1  ── ○ ┤ ○ ── G13
+ *  G32 A4 ── ○ ┤ ○ ── G5 │  │  WROOM-32 │  │G4  ── ○ ┤ ○ ── G14
+ *  G33 A5 ── ○ ┤ ○ ── G23│  │           │  │G16 ── ○ ┤ ○ ── G15
+ *  G25DAC1── ○ ┤ ○ ── G19│  │           │  │G17 ── ○ ┤ ○ ── G34 A6
+ *  G26DAC2── ○ ┤ ○ ── G18│  │           │  │G0  ── ○ ┤ ○ ── G35 A7
+ *  G27    ── ○ ┤ ○ ──    │  │           │  │    ── ○ ┤ ○ ──
+ *         5V ○ ┤         │  │           │  │         ├ ○ GND
+ *        GND ○ ┤         │  └───────────┘  │         ├ ○ 3V3
+ *              │         └─────────────────┘             │
+ *
+ *  LEFT (outer)  : RST, G36, G39, G32, G33, G25, G26, G27, 5V, GND
+ *  LEFT (inner)  : G21(SDA), G22(SCL), G5(SS◄DispDC), G23(MOSI◄Disp),
+ *                  G19(MISO◄Disp), G18(SCK◄Disp), [NC]
+ *  RIGHT (outer) : G2(LED), G12, G13, G14, G15, G34, G35, [NC], GND, 3V3
+ *  RIGHT (inner) : G3(U0TX), G1(U0RX), G4, G16(U2RX), G17(U2TX),
+ *                  G0(BOOT), [NC]
+ *
+ *  Display wiring (SSD1322 via U8g2 on VSPI inner-row pins):
+ *    CS  = G26 (outer left — DAC2)      MISO = G19 (inner left)
+ *    DC  = G5  (inner left — SS)        MOSI = G23 (inner left)
+ *    SCK = G18 (inner left)             RST  = unassigned
  *
  * Legend:
- *   GND / 5V / 3V3 : Power rails
- *   G#             : ESP32 GPIO number
- *   Clean GP       : Input-only or general-purpose GPIO with no boot strapping risks
- *   Strapping      : Boot-configuration pins (pull state affects boot mode; use last)
+ *   ○ = physical pin header hole   outer = D1 Mini shield-compatible row
+ *   inner = ESP32-bonus GPIO row   A# = ADC1 channel
  *
  * -----------------------------------------------------------------------------
  * Pin-Priority & Allocation Strategy Notes:
  * -----------------------------------------------------------------------------
- * 1. Tier 1 (Clean General Purpose Pins):
- *    - GPIO 26: Allocated for Display CS.
+ * 1. Tier 1 (Clean General Purpose Pins — outer row):
+ *    - GPIO 26: Allocated for Display CS (DAC2 — clean, outer row).
  *    - GPIO 32, 33, 25, 27: Unrestricted GPIOs. Consume for status LEDs/buttons.
  *    - GPIO 34, 35, 36, 39: Input-only pins (no internal pull-up/down). Ideal for ADCs.
  *
- * 2. Tier 2 (Bus Shared & Peripherals):
- *    - GPIO 18 (SCK), 19 (MISO), 23 (MOSI): Dedicated HSPI/VSPI bus for U8G2 display.
- *    - GPIO 5: Display DC signal.
+ * 2. Tier 2 (Bus Shared & Peripherals — inner row):
+ *    - GPIO 18 (SCK), 19 (MISO), 23 (MOSI): Dedicated VSPI bus for U8G2 display.
+ *    - GPIO 5: Display DC signal (also VSPI SS).
  *    - GPIO 21 (SDA), 22 (SCL): I2C bus pins.
  *    - GPIO 16, 17: UART2 RX/TX pins.
  *

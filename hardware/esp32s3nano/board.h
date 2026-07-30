@@ -12,6 +12,11 @@
  * MCU Target: ESP32-S3R8 (Dual-core Xtensa LX7, 240MHz, 8MB Flash, 8MB Octal PSRAM)
  * Physical Form Factor: Arduino Nano-compatible footprint with USB-C CDC
  *
+ * References:
+ *   Waveshare Wiki  : https://www.waveshare.com/wiki/ESP32-S3-Nano
+ *   Product page    : https://www.waveshare.com/esp32-s3-nano.htm
+ *   ESP32-S3 datasheet: https://www.espressif.com/sites/default/files/documentation/esp32-s3_datasheet_en.pdf
+ *
  * ┌─────────────────────────────────────────────────────────────────────────┐
  * │                         WAVESHARE ESP32-S3-NANO                         │
  * │                         ┌─────────────────┐                             │

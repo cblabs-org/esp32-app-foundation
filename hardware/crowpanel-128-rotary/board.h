@@ -12,6 +12,11 @@
  * MCU Target: ESP32-S3 (Dual-core Xtensa LX7, 240MHz, 16MB Flash, 8MB Octal PSRAM)
  * Physical Form Factor: 1.28-inch circular 240x240 LCD display module with rotary encoder
  *
+ * References:
+ *   GitHub (schematic): https://github.com/Elecrow-RD/CrowPanel-1.28inch-HMI-ESP32-Rotary-Display-240-240-IPS-Round-Touch-Knob-Screen
+ *   Elecrow product   : https://www.elecrow.com/esp32-display-1-28-inch-lcd-touch-screen.html
+ *   GC9A01 datasheet  : (in GitHub repo → Datasheet/)
+ *
  * ┌─────────────────────────────────────────────────────────────────────────┐
  * │               ELECROW CROWPANEL 1.28" HMI ROTARY DISPLAY                │
  * │                   (Integrated HMI — No DIP Headers)                     │
