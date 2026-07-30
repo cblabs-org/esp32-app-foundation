@@ -142,9 +142,9 @@ void setup() {
 #ifdef WITH_DISPLAY_U8G2
     diagnosticsBoard.configure(&app.getWifiManager());
     displayModule.carousel.add(&diagnosticsBoard);
-#endif
 #ifdef WITH_MCP
     mcpServer.setDisplayInfo(displayModule.getDisplayInfo());
+#endif
 #endif
 #endif
 }
