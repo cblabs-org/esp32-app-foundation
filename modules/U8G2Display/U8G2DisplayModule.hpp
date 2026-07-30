@@ -98,6 +98,7 @@
 #include "../../include/utils/Periodic.hpp"
 
 // --- Hardware-only includes (excluded from native GoogleTest builds) ---
+#include "board.h"
 #include <U8g2lib.h>
 #include <ArduinoJson.h>
 
@@ -574,17 +575,17 @@ private:
     // -------------------------------------------------------------------------
 
     // --- Hardware driver (excluded from native builds) ---
-    // Pin configuration is injected via build_flags in platformio.ini.
-    // SPI displays: define DISPLAY_CS_PIN, DISPLAY_DC_PIN (required),
-    //               DISPLAY_RST_PIN (optional, defaults to U8X8_PIN_NONE).
+    // Pin configuration is read from board.h (PIN_DISPLAY_* constexprs).
+    // SPI displays: require PIN_DISPLAY_CS, PIN_DISPLAY_DC.
+    // RST is optional (PIN_UNASSIGNED defaults to U8X8_PIN_NONE).
     // I2C displays: no pin defines needed (U8G2 uses Arduino defaults).
-  #ifdef DISPLAY_CS_PIN
-    #ifndef DISPLAY_RST_PIN
-    #define DISPLAY_RST_PIN U8X8_PIN_NONE
-    #endif
-    U8G2_DISPLAY_TYPE _u8g2{U8G2_R0, DISPLAY_CS_PIN, DISPLAY_DC_PIN, DISPLAY_RST_PIN};
-  #else
+  #ifdef WITH_DISPLAY_U8G2
+    #if defined(PIN_DISPLAY_CS) && PIN_IS_VALID(PIN_DISPLAY_CS)
+    U8G2_DISPLAY_TYPE _u8g2{U8G2_R0, PIN_DISPLAY_CS, PIN_DISPLAY_DC,
+                            PIN_IS_VALID(PIN_DISPLAY_RST) ? static_cast<uint8_t>(PIN_DISPLAY_RST) : U8X8_PIN_NONE};
+    #else
     U8G2_DISPLAY_TYPE _u8g2{U8G2_R0};
+    #endif
   #endif
 
     // --- Display geometry pseudo-constants ---

@@ -57,11 +57,8 @@ static constexpr const char* TAG = "U8G2DisplayModule";
 #include <freertos/task.h>
 // SPI.h is required whenever explicit SCK+MOSI pins are provided, even on
 // write-only displays where MISO is physically absent.
-#if defined(DISPLAY_SPI_SCK) && defined(DISPLAY_SPI_MOSI)
+#if defined(PIN_DISPLAY_SCK) && defined(PIN_DISPLAY_MOSI)
   #include <SPI.h>
-  #ifndef DISPLAY_SPI_MISO
-    #define DISPLAY_SPI_MISO -1  // write-only display: no MISO pin
-  #endif
 #endif
 
 // Include EventBus directly — it is native-safe (no Arduino.h dependency).
@@ -86,25 +83,24 @@ static constexpr const char* TAG = "U8G2DisplayModule";
  */
 void U8G2DisplayModule::bootstrapHardware() {
     // --- Step 1: Initialize SPI bus ---
-    // If explicit SCK+MOSI pins are defined, secure the SPI bus before U8G2
-    // init. Write-only displays (e.g. SSD1322) may omit MISO; it defaults to
-    // -1 via the file-scope #define above, which is the correct "no MISO"
-    // value for SPI.begin().
+    // If explicit SCK+MOSI pins are defined in board.h, secure the SPI bus before U8G2
+    // init. Write-only displays (e.g. SSD1322) may set MISO to PIN_UNASSIGNED (-1),
+    // which is the correct "no MISO" value for SPI.begin().
     // CRITICAL: On ESP32-S3, the default Arduino pin mapping can collide with
     // the internal Flash/PSRAM bus. Explicit pins prevent watchdog crashes.
-  #if defined(DISPLAY_SPI_SCK) && defined(DISPLAY_SPI_MOSI)
+  #if defined(PIN_DISPLAY_SCK) && defined(PIN_DISPLAY_MOSI)
     ESP_LOGI(TAG, "Bootstrap: SPI.begin(SCK=%d, MISO=%d, MOSI=%d)",
-             DISPLAY_SPI_SCK, DISPLAY_SPI_MISO, DISPLAY_SPI_MOSI);
-    SPI.begin(DISPLAY_SPI_SCK, DISPLAY_SPI_MISO, DISPLAY_SPI_MOSI, -1);
+             PIN_DISPLAY_SCK, PIN_DISPLAY_MISO, PIN_DISPLAY_MOSI);
+    SPI.begin(PIN_DISPLAY_SCK, PIN_DISPLAY_MISO, PIN_DISPLAY_MOSI, -1);
   #else
     ESP_LOGW(TAG, "Bootstrap: No explicit SPI pins — using Arduino defaults");
     SPI.begin();
   #endif
 
     // --- Step 2: Initialize U8G2 driver ---
-  #ifdef DISPLAY_CS_PIN
+  #if defined(PIN_DISPLAY_CS) && PIN_IS_VALID(PIN_DISPLAY_CS)
     ESP_LOGI(TAG, "Bootstrap: U8G2 init (CS=%d, DC=%d, RST=%d)",
-             DISPLAY_CS_PIN, DISPLAY_DC_PIN, DISPLAY_RST_PIN);
+             PIN_DISPLAY_CS, PIN_DISPLAY_DC, PIN_DISPLAY_RST);
   #else
     ESP_LOGI(TAG, "Bootstrap: U8G2 init (I2C mode, no pin defines)");
   #endif
@@ -178,8 +174,8 @@ void U8G2DisplayModule::begin(EventBus* eventBus) {
 
     // --- Step 1: Initialize hardware (skip if already bootstrapped) ---
     if (!_bootstrapMode) {
-      #if defined(DISPLAY_SPI_SCK) && defined(DISPLAY_SPI_MOSI)
-        SPI.begin(DISPLAY_SPI_SCK, DISPLAY_SPI_MISO, DISPLAY_SPI_MOSI, -1);
+      #if defined(PIN_DISPLAY_SCK) && defined(PIN_DISPLAY_MOSI)
+        SPI.begin(PIN_DISPLAY_SCK, PIN_DISPLAY_MISO, PIN_DISPLAY_MOSI, -1);
       #endif
 
         ESP_LOGI(TAG, "Initializing hardware display driver");

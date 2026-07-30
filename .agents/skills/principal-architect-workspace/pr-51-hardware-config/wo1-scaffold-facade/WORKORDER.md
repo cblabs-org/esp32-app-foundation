@@ -23,27 +23,27 @@ real board's pins** (that is WO2/WO3).
   HC-7 (null board), HC-9 (`PIN_UNASSIGNED`), HC-11 (path selection), OQ-3 (Option A).
 
 ## Line-Item Instructions
-- [ ] Create `hardware/` at repo root and `hardware/_common/`.
-- [ ] `hardware/_common/board_pins.h`: `constexpr int8_t PIN_UNASSIGNED = -1;` plus
+- [x] Create `hardware/` at repo root and `hardware/_common/`.
+- [x] `hardware/_common/board_pins.h`: `constexpr int8_t PIN_UNASSIGNED = -1;` plus
       any shared helper macros. Board headers `#include "board_pins.h"`.
-- [ ] Facade `hardware/board.h`: `#include BOARD_HEADER`, then
+- [x] Facade `hardware/board.h`: `#include BOARD_HEADER`, then
       `#include "board_contract.h"`, then a build-time echo
       (`#pragma message("board: using " ...)`) of the resolved header (HC-5).
-- [ ] `hardware/_common/board_contract.h`: compile-time checks that are
+- [x] `hardware/_common/board_contract.h`: compile-time checks that are
       **conditional on the display flag** — `#ifdef WITH_DISPLAY_U8G2` → `static_assert`
       the U8G2 pin symbols exist; `#ifdef WITH_DISPLAY_LVGL` → the LVGL block; neither
       → nothing (headless). Emit **legible** errors (e.g. "WITH_DISPLAY_U8G2 set but
       PIN_DISPLAY_CS undefined"), not bare "undeclared identifier".
-- [ ] `hardware/native/board.h`: the **null board** — every pin `PIN_UNASSIGNED`,
+- [x] `hardware/native/board.h`: the **null board** — every pin `PIN_UNASSIGNED`,
       no `WITH_DISPLAY_*` flag, headless by construction (HC-7). Include the ASCII/notes
       header per the template below (a "no physical wiring — host build" note is fine).
-- [ ] **`hardware/_TEMPLATE.board.h`** (or a `hardware/README.md` template): a
+- [x] **`hardware/_TEMPLATE.board.h`** (or a `hardware/README.md` template): a
       documented `board.h` authoring skeleton that WO2/WO3 copy, containing BOTH
       mandatory documentation elements as a filled example (see Acceptance Criteria).
-- [ ] Wire the `native` env in `platformio.ini` to the selector:
+- [x] Wire the `native` env in `platformio.ini` to the selector:
       `-DBOARD_HEADER=\"hardware/native/board.h\"` and ensure `hardware/` is on the
       include path (`-I hardware/_common` or equivalent). Do **not** touch other envs.
-- [ ] Add a tiny native compile/unit check that `#include`s `hardware/board.h` and
+- [x] Add a tiny native compile/unit check that `#include`s `hardware/board.h` and
       asserts `PIN_UNASSIGNED == -1` (proves facade + null board + contract compile on host).
 
 ## Mandatory Acceptance Criteria — board.h documentation (HC-1)
@@ -77,3 +77,9 @@ green and the new native check passes. (No hardware envs are affected by this WO
 ## Findings, don't file
 If you discover an out-of-boundary defect or upstream concern, **surface it to the
 PA in your completion report** — do NOT file issues yourself (PA/Chief authority).
+
+---
+
+## Status
+- **2026-07-30 — Completed & Approved.** Implemented scaffold, facade (`hardware/board.h`), contract (`board_contract.h`), null board (`hardware/native/board.h`), and `_TEMPLATE.board.h`. Verified via 358/358 passing tests. User approved and `@distillery` invoked to package artifacts. Work Order 1 is complete.
+

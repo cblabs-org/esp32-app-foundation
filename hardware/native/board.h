@@ -53,7 +53,7 @@
 // ── Identity & capabilities ──────────────────────────────────────────────────
 #define BOARD_NAME          "Host Native (Null Board)"
 #define BOARD_ID_STRING     "native"
-constexpr bool BOARD_HAS_PSRAM = false;
+constexpr bool HAS_PSRAM = false;
 
 // ── Display pin block (Headless by construction) ─────────────────────────────
 // Neither WITH_DISPLAY_U8G2 nor WITH_DISPLAY_LVGL is defined by default.

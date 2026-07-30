@@ -71,7 +71,7 @@
 // ── Identity & capabilities ──────────────────────────────────────────────────
 #define BOARD_NAME          "Template Board Name"
 #define BOARD_ID_STRING     "template"
-constexpr bool BOARD_HAS_PSRAM = false;
+constexpr bool HAS_PSRAM = false;
 
 // ── Display pin block (U8G2 Option Example) ──────────────────────────────────
 #ifdef WITH_DISPLAY_U8G2
