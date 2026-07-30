@@ -31,7 +31,8 @@ Once you are building or shipping an application, read these for production read
 13. [Security](security.md) — Threat model, hardware encryption, credential storage, TLS tradeoffs, web portal authentication, and OTA firmware integrity.
 14. [MCP Server](mcp-server.md) — The Model Context Protocol server, tool registration via `IMCPContributor`, built-in tools, and HTTP JSON-RPC transport.
 15. [OTA Update System](ota-update-system.md) — The complete OTA lifecycle: state machine, release channels, config snapshots, multi-board manifests, error codes, and deployment procedures.
-16. [Reporting Framework Issues](issue-management.md) — How to raise, label, and track defects on the framework repo; the consumer-pointer convention for audit files.
+16. [Custom Board Authoring Guide](custom-boards.md) — Author custom board definitions and pinouts for downstream repos with zero framework edits (HC-11).
+17. [Reporting Framework Issues](issue-management.md) — How to raise, label, and track defects on the framework repo; the consumer-pointer convention for audit files.
 
 ## Quick Reference
 

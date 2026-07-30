@@ -149,7 +149,8 @@ The display driver and geometry pseudo-constants are fully guarded:
 
 ```cpp
 #ifndef NATIVE_BUILD
-    U8G2_DISPLAY_TYPE _u8g2{U8G2_R0, DISPLAY_CS_PIN, DISPLAY_DC_PIN, DISPLAY_RST_PIN};
+    // Pin configuration is read from board.h (PIN_DISPLAY_* symbols)
+    U8G2_DISPLAY_TYPE _u8g2{U8G2_R0, PIN_DISPLAY_CS, PIN_DISPLAY_DC, PIN_DISPLAY_RST};
     const uint16_t _displayWidth  = _u8g2.getDisplayWidth();
     const uint16_t _displayHeight = _u8g2.getDisplayHeight();
 #else
