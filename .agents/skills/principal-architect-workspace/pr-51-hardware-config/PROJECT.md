@@ -12,8 +12,10 @@
 
 ## Status
 
-📦 **FULLY PREPPED — READY FOR IMPLEMENTING PA HANDOFF.**
-**No branches created. No workers spawned. No code written.**
+✅ **ALL WORK ORDERS COMPLETE — READY FOR PR SUBMISSION.**
+All 4 WORKORDERs executed, verified, and committed on the stacked branch chain
+`hwconfig/wo1-scaffold-facade` → `hwconfig/wo2-u8g2-boards` → `hwconfig/wo3-lvgl-board`
+→ `hwconfig/wo4-consumers-docs`. Full 8-target build verification passed (358/358 native tests).
 
 All four `WORKORDER.md` files are authored (WO1–WO4) and this decomposition is
 complete. Prepared by the **designer PA**; execution is handed off to a fresh
@@ -77,7 +79,7 @@ Each WO branches on the previous (no separate feature branch); the tip is the PR
 | 1 | **[wo1-scaffold-facade](wo1-scaffold-facade/WORKORDER.md)** | `hardware/` tree; shared `board_pins.h` (`PIN_UNASSIGNED` + helpers); facade `board.h` (`#include BOARD_HEADER`); `board_contract.h` (conditional symbol checks + `#pragma message` echo); `board.native.h` null board; wire `native` env to the selector; **documented `board.h` authoring template with the mandatory ASCII pinout + pin-priority notes** (see criteria above). Proves the mechanism end-to-end on host. | `main` | standard | ✅ Complete `f5d459a` |
 | 2 | **[wo2-u8g2-boards](wo2-u8g2-boards/WORKORDER.md)** | `hardware/esp32dev/board.h` + `hardware/esp32s3nano/board.h` (U8G2 pin blocks + `U8G2_DISPLAY_TYPE`); refactor `U8G2DisplayModule` to read `PIN_DISPLAY_*` from `board.h`; delete the 5 `-DDISPLAY_*_PIN` flags; co-locate `WITH_DISPLAY_U8G2` fragment + `partitions.csv`; wire both envs to the selector; U8G2 branch of the contract check. | wo1 | standard | ✅ Complete `456897f` |
 | 3 | **[wo3-lvgl-board](wo3-lvgl-board/WORKORDER.md)** | `hardware/crowpanel-128-rotary/board.h` (LVGL block: LCD/touch/encoder/aux-I2C) **+ fix the RFC #50 gaps** (add power-enable pins GPIO 1/2; document `TOUCH_INT` 0→5 and `TOUCH_RST` −1→13 for HW verification; aux-I2C outside the display guard); refactor `CrowPanel128Adapter`/`LVGLDisplayModule` to read pins from `board.h`; delete the 13 `-DLCD/TOUCH/ENCODER_*` flags; co-locate `WITH_DISPLAY_LVGL` fragment + `partitions.csv`; LVGL branch of the contract check. | wo2 | standard | ✅ Complete `d045511` |
-| 4 | **[wo4-consumers-docs](wo4-consumers-docs/WORKORDER.md)** | Migrate `sample-app` + `template-app` `platformio.ini` to the `BOARD_HEADER` selector model; update `docs/developer/hardware-setup.md` + `using-optional-modules.md`; add the HC-11 zero-edit custom-board authoring guide with a worked example; final multi-target build + native test verification. | wo3 | standard | 📋 Planned |
+| 4 | **[wo4-consumers-docs](wo4-consumers-docs/WORKORDER.md)** | Migrate `sample-app` + `template-app` `platformio.ini` to the `BOARD_HEADER` selector model; update `docs/developer/hardware-setup.md` + `using-optional-modules.md`; add the HC-11 zero-edit custom-board authoring guide with a worked example; final multi-target build + native test verification. | wo3 | standard | ✅ Complete `a56ac83` |
 
 **Branch prefix:** `hwconfig/wo{N}-{topic}`.
 
