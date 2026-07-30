@@ -111,6 +111,8 @@ Stacking serializes them cleanly; no parallel-conflict decision is required.
   This authorises **preparation and handoff**, not autonomous branch-cutting by the
   designer PA. Design finalised (HC-1…HC-12, all OQs closed) and RFC #50 consumer
   review closed off.
-- **⏳ PENDING — implementing PA to record human's go-for-execution.** Before cutting
-  the WO1 branch, the implementing PA must present this plan in its session, obtain
-  the human's explicit approval, and append it here verbatim.
+- **2026-07-30 — Execution approved (implementing PA session `951cba1d`).** The human
+  reviewed the full decomposition (4-WO linear stack, serialized, `flash` model workers)
+  and directed: *"Approved to proceed - please operate autonomously to complete this
+  work. When complete please stage a PR for review from the downstream consumers."*
+  **Plan gate satisfied.** Workers may be spawned for WO1→WO4 sequentially.
