@@ -16,20 +16,20 @@
  * │               ELECROW CROWPANEL 1.28" HMI ROTARY DISPLAY                │
  * │                         (Top View / Pinout)                             │
  * │                                                                         │
- * │    [Signal / Label]  [GPIO#] ┌───────────┐ [GPIO#]  [Signal / Label]    │
- * │    ─────────────────────────┤           ├─────────────────────────    │
- * │    LCD Power EN 1    [ G1  ]│ (1)   (30)│[ 5V  ]   5V Power Rail      │
- * │    LCD Power EN 2    [ G2  ]│ (2)   (29)│[ 3V3 ]   3V3 Power Rail     │
- * │    LCD SPI DC        [ G3  ]│ (3)   (28)│[ GND ]   Ground             │
- * │    Touch I2C SDA     [ G6  ]│ (4)   (27)│[ G46 ]   LCD Backlight PWM  │
- * │    Touch I2C SCL     [ G7  ]│ (5)   (26)│[ G45 ]   Encoder Phase A    │
- * │    LCD SPI CS        [ G9  ]│ (6)   (25)│[ G42 ]   Encoder Phase B    │
- * │    LCD SPI SCLK      [ G10 ]│ (7)   (24)│[ G41 ]   Encoder Switch SW  │
- * │    LCD SPI MOSI      [ G11 ]│ (8)   (23)│[ G39 ]   Aux I2C SCL        │
- * │    LCD Reset         [ G14 ]│ (9)   (22)│[ G38 ]   Aux I2C SDA        │
- * │    Touch INT         [ G0  ]│ (10)  (21)│[ G13 ]   Touch RST (Unused) │
- * │    Touch INT (Alt)   [ G5  ]│ (11)  (20)│[ G43 ]   UART TXD0          │
- * │    Clean GP / Free   [ G4  ]│ (12)  (19)│[ G44 ]   UART RXD0          │
+ * │    [Signal / Label] [GPIO#] ┌───────────┐ [GPIO#]  [Signal / Label]     │
+ * │    ─────────────────────────┤           ├─────────────────────────      │
+ * │    LCD Power EN 1    [ G1  ]│ (1)   (30)│[ 5V  ]   5V Power Rail        │
+ * │    LCD Power EN 2    [ G2  ]│ (2)   (29)│[ 3V3 ]   3V3 Power Rail       │
+ * │    LCD SPI DC        [ G3  ]│ (3)   (28)│[ GND ]   Ground               │
+ * │    Touch I2C SDA     [ G6  ]│ (4)   (27)│[ G46 ]   LCD Backlight PWM    │
+ * │    Touch I2C SCL     [ G7  ]│ (5)   (26)│[ G45 ]   Encoder Phase A      │
+ * │    LCD SPI CS        [ G9  ]│ (6)   (25)│[ G42 ]   Encoder Phase B      │
+ * │    LCD SPI SCLK      [ G10 ]│ (7)   (24)│[ G41 ]   Encoder Switch SW    │
+ * │    LCD SPI MOSI      [ G11 ]│ (8)   (23)│[ G39 ]   Aux I2C SCL          │
+ * │    LCD Reset         [ G14 ]│ (9)   (22)│[ G38 ]   Aux I2C SDA          │
+ * │    Touch INT         [ G0  ]│ (10)  (21)│[ G13 ]   Touch RST (Unused)   │
+ * │    Touch INT (Alt)   [ G5  ]│ (11)  (20)│[ G43 ]   UART TXD0            │
+ * │    Clean GP / Free   [ G4  ]│ (12)  (19)│[ G44 ]   UART RXD0            │
  * │                             └───────────┘                               │
  * └─────────────────────────────────────────────────────────────────────────┘
  *
