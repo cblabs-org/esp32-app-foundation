@@ -49,7 +49,7 @@ Read these before implementing:
 
 ### 1. CrowPanel Board — `hardware/crowpanel-128-rotary/board.h`
 
-- [ ] Add `WITH_ENCODER` section (after the LVGL encoder pins section):
+- [x] Add `WITH_ENCODER` section (after the LVGL encoder pins section):
   ```cpp
   // ── Encoder Module configuration (WITH_ENCODER) ────────────────────────────────
   #ifdef WITH_ENCODER
@@ -77,12 +77,12 @@ Read these before implementing:
 
 ### 2. Non-Encoder Boards — `hardware/esp32dev/board.h`, `hardware/esp32s3nano/board.h`
 
-- [ ] These boards have no encoder hardware — do NOT add `WITH_ENCODER` sections
-- [ ] Verify these boards don't reference `EncoderConfig.h`
+- [x] These boards have no encoder hardware — do NOT add `WITH_ENCODER` sections
+- [x] Verify these boards don't reference `EncoderConfig.h`
 
 ### 3. Native Board — `hardware/native/board.h`
 
-- [ ] Add empty `WITH_ENCODER` stub (same pattern as `WITH_BUTTONS`):
+- [x] Add empty `WITH_ENCODER` stub (same pattern as `WITH_BUTTONS`):
   ```cpp
   #ifdef WITH_ENCODER
   #include "EncoderConfig.h"
@@ -96,7 +96,7 @@ Read these before implementing:
 
 ### 4. Template Board — `hardware/_TEMPLATE.board.h`
 
-- [ ] Add `WITH_ENCODER` section with example and documentation comments:
+- [x] Add `WITH_ENCODER` section with example and documentation comments:
   ```cpp
   // ── Encoder configuration (WITH_ENCODER) ──────────────────────────────────────
   // When WITH_ENCODER is enabled, define your rotary encoder hardware descriptors.
@@ -123,13 +123,13 @@ Read these before implementing:
 
 ### 5. Build Flags — `platformio.ini`
 
-- [ ] Add `-DWITH_ENCODER` to the CrowPanel environment's `build_flags` (the environment
+- [x] Add `-DWITH_ENCODER` to the CrowPanel environment's `build_flags` (the environment
       that targets `crowpanel-128-rotary` board)
-- [ ] Do NOT add `WITH_ENCODER` to `env:esp32dev`, `env:esp32s3nano`, or `env:native`
+- [x] Do NOT add `WITH_ENCODER` to `env:esp32dev`, `env:esp32s3nano`, or `env:native`
 
 ### 6. Sample App — `sample-app/src/main.cpp`
 
-- [ ] Add `#ifdef WITH_ENCODER` guarded section:
+- [x] Add `#ifdef WITH_ENCODER` guarded section:
   ```cpp
   #ifdef WITH_ENCODER
   #include "EncoderModule/EncoderModule.hpp"
@@ -138,7 +138,7 @@ Read these before implementing:
   static EncoderModule encoderModule;
   #endif
   ```
-- [ ] In `setup()`, register the encoder module (after ButtonModule, before display):
+- [x] In `setup()`, register the encoder module (after ButtonModule, before display):
   ```cpp
   #ifdef WITH_ENCODER
       for (size_t i = 0; i < BOARD_ENCODER_COUNT; i++) {
@@ -147,7 +147,7 @@ Read these before implementing:
       app.registerModule(&encoderModule);
   #endif
   ```
-- [ ] Add an EventBus subscription demonstrating encoder usage:
+- [x] Add an EventBus subscription demonstrating encoder usage:
   ```cpp
   #ifdef WITH_ENCODER
       app.getEventBus().subscribe("encoder.rotate", [](const char*, const void* data, void*) {
@@ -159,11 +159,11 @@ Read these before implementing:
 
 ## Verification
 
-- [ ] `env:native` builds clean (no WITH_ENCODER, so encoder code not compiled)
-- [ ] `env:esp32dev` builds clean (no WITH_ENCODER)
-- [ ] CrowPanel environment builds clean (WITH_ENCODER enabled)
-- [ ] House-style documentation on all modified sections
-- [ ] No modifications outside the boundary box
+- [x] `env:native` builds clean (no WITH_ENCODER, so encoder code not compiled)
+- [x] `env:esp32dev` builds clean (no WITH_ENCODER)
+- [x] CrowPanel environment builds clean (WITH_ENCODER enabled)
+- [x] House-style documentation on all modified sections
+- [x] No modifications outside the boundary box
 
 **CRITICAL:** Before distilling or committing, you MUST ask the user if they are
 happy. Only after approval should you invoke the `@distillery` skill.

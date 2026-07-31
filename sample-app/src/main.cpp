@@ -46,6 +46,12 @@ static MCPServer mcpServer;
 static ButtonModule buttonModule;
 #endif
 
+#ifdef WITH_ENCODER
+#include "EncoderModule/EncoderModule.hpp"
+#include "board.h"
+static EncoderModule encoderModule;
+#endif
+
 // ADR-16: File-scope static instances avoid stack-based corruption.
 // All module instances must be declared at file scope before setup().
 Application app;
@@ -129,6 +135,14 @@ void setup() {
     app.registerModule(&buttonModule);
 #endif
 
+#ifdef WITH_ENCODER
+    for (size_t i = 0; i < BOARD_ENCODER_COUNT; i++) {
+        encoderModule.addEncoder(BOARD_ENCODERS[i]);
+    }
+    encoderModule.begin(app);
+    app.registerModule(&encoderModule);
+#endif
+
     // Prepare Framework config — OTA
     // TODO: Set up OTA for your app:
     //   1. Create a releases repo (e.g. your-org/weather-station-releases)
@@ -196,6 +210,13 @@ void setup() {
         }
     }, &displayModule);
     #endif
+#endif
+
+#ifdef WITH_ENCODER
+    app.getEventBus().subscribe("encoder.rotate", [](const char*, const void* data, void*) {
+        auto* event = static_cast<const EncoderEvent*>(data);
+        (void)event;
+    });
 #endif
 }
 

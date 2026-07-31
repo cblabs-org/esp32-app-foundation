@@ -190,3 +190,26 @@ constexpr int8_t PIN_AUX_I2C_SCL  = 39;
 //         .adc = { .adcPin = 34, .adcChannel = 6, .minMv = 1600, .maxMv = 2000 } },
 //   };
 
+// ── Encoder configuration (WITH_ENCODER) ──────────────────────────────────────
+// When WITH_ENCODER is enabled, define your rotary encoder hardware descriptors.
+// Each BoardEncoder specifies the quadrature A/B pins, steps-per-detent for the
+// physical encoder model, and optional acceleration parameters.
+//
+// Example (EC11 encoder on GPIO 45/42, 2 steps per detent):
+//
+//   #ifdef WITH_ENCODER
+//   #include "EncoderConfig.h"
+//   static constexpr BoardEncoder BOARD_ENCODERS[] = {
+//       {
+//           .id = "main",
+//           .pinA = 45,
+//           .pinB = 42,
+//           .stepsPerDetent = 2,
+//           .reversed = false,
+//           .accel = { .enabled = true, .deadZoneMs = 200, .shortCutoffMs = 30, .maxMultiplier = 10 },
+//       },
+//   };
+//   static constexpr size_t BOARD_ENCODER_COUNT = sizeof(BOARD_ENCODERS) / sizeof(BOARD_ENCODERS[0]);
+//   #endif // WITH_ENCODER
+
+
