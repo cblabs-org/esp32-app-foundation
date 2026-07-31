@@ -145,3 +145,27 @@ constexpr int8_t PIN_ENCODER_SW   = 41;
 #define PIN_ENCODER_SW PIN_ENCODER_SW
 
 #endif // WITH_DISPLAY_LVGL
+
+// ── Encoder Module configuration (WITH_ENCODER) ────────────────────────────────
+#ifdef WITH_ENCODER
+#include "EncoderConfig.h"
+
+static constexpr BoardEncoder BOARD_ENCODERS[] = {
+    {
+        .id = "main",
+        .pinA = PIN_ENCODER_A,     // GPIO 45
+        .pinB = PIN_ENCODER_B,     // GPIO 42
+        .stepsPerDetent = 2,
+        .reversed = false,
+        .accel = {
+            .enabled = true,
+            .deadZoneMs = 200,
+            .shortCutoffMs = 30,
+            .maxMultiplier = 10,
+        },
+    },
+};
+static constexpr size_t BOARD_ENCODER_COUNT = sizeof(BOARD_ENCODERS) / sizeof(BOARD_ENCODERS[0]);
+
+#endif // WITH_ENCODER
+
