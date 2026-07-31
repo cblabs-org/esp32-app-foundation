@@ -27,24 +27,24 @@ multi-target verification for the whole PR-51 stack.
 - Both reference framework partitions by relative path (moved by WO2/WO3).
 
 ## Line-Item Instructions
-- [ ] `sample-app/platformio.ini`: delete the per-env `-DDISPLAY_*_PIN` +
+- [x] `sample-app/platformio.ini`: delete the per-env `-DDISPLAY_*_PIN` +
       `-DU8G2_DISPLAY_TYPE` blocks; add `-DBOARD_HEADER=\"…/hardware/<id>/board.h\"` and
       point `board_build.partitions` at the moved `hardware/<id>/partitions.csv`. Keep
       `WITH_DISPLAY_U8G2` and `BOARD_ID`. Ensure `hardware/_common` is on the app `-I`.
-- [ ] `template-app/platformio.ini`: same migration.
-- [ ] Confirm `src/main.cpp` (framework template main) needs no pin changes (it uses
+- [x] `template-app/platformio.ini`: same migration.
+- [x] Confirm `src/main.cpp` (framework template main) needs no pin changes (it uses
       `WITH_DISPLAY_*` composition only) — verify, don't edit unless broken.
-- [ ] `docs/developer/hardware-setup.md`: replace the "PlatformIO Environment Reference"
+- [x] `docs/developer/hardware-setup.md`: replace the "PlatformIO Environment Reference"
       `-DDISPLAY_*_PIN` section with the `board.h` model; keep the wiring tables (now
       cross-referenced to each `hardware/<id>/board.h` ASCII pinout).
-- [ ] `docs/developer/using-optional-modules.md`: update display-pin references to the
+- [x] `docs/developer/using-optional-modules.md`: update display-pin references to the
       `board.h` mechanism.
-- [ ] **New: HC-11 custom-board authoring guide** (a section in hardware-setup.md or a
+- [x] **New: HC-11 custom-board authoring guide** (a section in hardware-setup.md or a
       new `docs/developer/custom-boards.md`): a worked example of a downstream repo
       adding `hardware/<myboard>/board.h`, setting `-DBOARD_HEADER`, with **zero framework
       edits** — including the mandatory ASCII pinout + priority notes requirement, and the
       PlatformIO board-JSON boundary note.
-- [ ] Sanity-scan the `framework-expert` skill for board/pin authoring references that
+- [x] Sanity-scan the `framework-expert` skill for board/pin authoring references that
       now need updating; surface a list to the PA (update only if trivially in-scope).
 
 ## Strict Boundary Box — do NOT
@@ -65,3 +65,14 @@ targets. All must compile; native tests must pass.
 
 ## Findings, don't file
 Surface out-of-boundary findings to the PA; do not file issues yourself.
+
+---
+
+## Status Log
+
+- **2026-07-30 — Work Order 4 Executed & Approved.**
+  - `sample-app/platformio.ini` and `template-app/platformio.ini` migrated to `-DBOARD_HEADER=\".../hardware/<id>/board.h\"` and `hardware/<id>/partitions.csv`.
+  - Created [`docs/developer/custom-boards.md`](../../../../docs/developer/custom-boards.md) for zero-edit custom-board authoring (HC-11). Updated developer guides (`hardware-setup.md`, `using-optional-modules.md`, `README.md`).
+  - Full-stack build and test verification passed across all 8 environments (root native 358 tests green, root esp32dev/esp32s3nano/crowpanel-128-rotary, sample-app esp32dev/esp32s3nano, template-app esp32dev/esp32s3nano).
+  - Explicit approval received; distilled artifacts created at `.agents/skills/principal-architect-workspace/pr-51-hardware-config/wo4-consumers-docs/`. WO4 complete.
+

@@ -1,0 +1,21 @@
+# ESP32 App Foundation — sdkconfig.defaults (crowpanel-128-rotary)
+#
+# Delta configuration for the Elecrow CrowPanel 1.28" HMI Rotary (ESP32-S3).
+# Loaded SECOND on top of sdkconfig.defaults (base). Settings here WIN on conflict.
+# Wired via: board_build.cmake_extra_args in platformio.ini [env:crowpanel-128-rotary].
+
+# S3 main task stack — larger than the base (8192) due to PSRAM availability
+CONFIG_ESP_MAIN_TASK_STACK_SIZE=16384
+
+# S3 OPI PSRAM — Waveshare ESP32-S3-Nano has 8MB OPI PSRAM
+CONFIG_SPIRAM=y
+CONFIG_SPIRAM_MODE_OCT=y
+CONFIG_SPIRAM_SPEED_80M=y
+CONFIG_SPIRAM_MEMTEST=y
+
+# S3 has more RAM — larger TLS output buffer than base (4096)
+CONFIG_MBEDTLS_SSL_OUT_CONTENT_LEN=8192
+
+# S3 uses USB-JTAG for serial output — override base UART console setting
+CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y
+CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y

@@ -227,6 +227,7 @@ competency level — this informs web portal UX and config complexity decisions.
 | Property | Value |
 |:---|:---|
 | Board | <Name + PlatformIO board ID> |
+| Custom `board.h` | `hardware/<id>/board.h` (Author your own; do not use stock boards) |
 | Flash | <size> |
 | PSRAM | <size or none> |
 | Display | <type + driver, or none> |

@@ -29,10 +29,10 @@ LVGL pin surface, refactor `CrowPanel128Adapter` to read it, delete the
   TOUCH (~58,63,64), ENCODER (~125,129,152).
 
 ## Line-Item Instructions
-- [ ] `hardware/crowpanel-128-rotary/board.h` from the WO1 template, inside
+- [x] `hardware/crowpanel-128-rotary/board.h` from the WO1 template, inside
       `#ifdef WITH_DISPLAY_LVGL`: `constexpr` `PIN_LCD_SPI_SCLK/MOSI, PIN_LCD_CS/DC/RST/BL`,
       `PIN_TOUCH_SDA/SCL/INT/RST`, `PIN_ENCODER_A/B/SW` (values above).
-- [ ] **Capture the RFC #50 fixes in board.h (documentation-first):**
+- [x] **Capture the RFC #50 fixes in board.h (documentation-first):**
       - Add `PIN_LCD_PWR_EN1 = 1` and `PIN_LCD_PWR_EN2 = 2` with a **prominent comment**:
         "must be driven HIGH at init — display will not light otherwise" (currently
         absent from the build entirely).
@@ -42,15 +42,15 @@ LVGL pin surface, refactor `CrowPanel128Adapter` to read it, delete the
         resets CST816D via GPIO 13; note LovyanGFX may handle internally — needs verify.
       - Place `PIN_AUX_I2C_SDA = 38` / `PIN_AUX_I2C_SCL = 39` **outside** the
         `#ifdef WITH_DISPLAY_LVGL` guard (board capability, not a display fact — HC-12).
-- [ ] Refactor `CrowPanel128Adapter.cpp` (+ header if needed) to `#include "board.h"` and
+- [x] Refactor `CrowPanel128Adapter.cpp` (+ header if needed) to `#include "board.h"` and
       read the `PIN_*` `constexpr`s instead of the `-D` macros. Confirm LovyanGFX /
       ESP32Encoder accept the values programmatically (DraytonWiser confirmed they do).
-- [ ] Delete the 13 `-DLCD/TOUCH/ENCODER_*` flags from the crowpanel env; add
+- [x] Delete the 13 `-DLCD/TOUCH/ENCODER_*` flags from the crowpanel env; add
       `-DBOARD_HEADER=\"hardware/crowpanel-128-rotary/board.h\"`. Keep
       `WITH_DISPLAY_LVGL` + the `build_unflags` U8G2 removal.
-- [ ] `hardware/crowpanel-128-rotary/partitions.csv`: own copy (HC-10 — currently shares
+- [x] `hardware/crowpanel-128-rotary/partitions.csv`: own copy (HC-10 — currently shares
       `partitions.esp32s3nano.csv`); update `board_build.partitions` for this env.
-- [ ] Contract check's LVGL branch passes for this board.
+- [x] Contract check's LVGL branch passes for this board.
 
 ## Mandatory Acceptance Criteria (HC-1) — board.h MUST include:
 1. **ASCII-art pinout diagram** of the CrowPanel (LCD/touch/encoder/aux-I2C buses,
@@ -81,3 +81,19 @@ Use **platformio MCP tools** (`pio-manager` skill). Build targets: `native` (gre
 ## Findings, don't file
 Surface out-of-boundary findings (esp. the touch-pin hardware-verification items) to
 the PA in your report; do not file issues yourself.
+
+---
+
+## Status Update
+
+- **2026-07-30 — Work Order 3 Complete & Approved.**
+  - Authored `hardware/crowpanel-128-rotary/board.h` with HC-1 ASCII-art pinout diagram and pin-priority allocation notes.
+  - Positioned `PIN_AUX_I2C_SDA` and `PIN_AUX_I2C_SCL` outside display guard (HC-12).
+  - Captured RFC #50 power-enable pins (`PIN_LCD_PWR_EN1 = 1`, `PIN_LCD_PWR_EN2 = 2`) with prominent comments.
+  - Documented touch pin hardware verification notes (`PIN_TOUCH_INT = 0` vs `5`, `PIN_TOUCH_RST = -1` vs `13`).
+  - Refactored `CrowPanel128Adapter.cpp` to read pins from `board.h`.
+  - Deleted 13 `-DLCD/TOUCH/ENCODER_*` build flags from `platformio.ini` and set `-DBOARD_HEADER`.
+  - Co-located `hardware/crowpanel-128-rotary/partitions.csv` (HC-10).
+  - `crowpanel-128-rotary` compiles green (`SUCCESS`). All 358 native unit tests pass.
+  - Committed at `d045511`. Distilled to `.agents/skills/principal-architect-workspace/pr-51-hardware-config/wo3-lvgl-board/`.
+

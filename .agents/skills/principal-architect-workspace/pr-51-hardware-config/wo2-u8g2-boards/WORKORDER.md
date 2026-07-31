@@ -30,30 +30,29 @@ the `-DDISPLAY_*_PIN` flags — realising HC-6's must-fix (kill the pin duplicat
   `#ifdef DISPLAY_CS_PIN` guard, `DISPLAY_RST_PIN` default `U8X8_PIN_NONE`).
 
 ## Line-Item Instructions
-- [ ] `hardware/esp32dev/board.h` and `hardware/esp32s3nano/board.h` from the WO1
+- [x] `hardware/esp32dev/board.h` and `hardware/esp32s3nano/board.h` from the WO1
       template: `#define U8G2_DISPLAY_TYPE …`, and `constexpr int8_t PIN_DISPLAY_CS/DC/
       SCK/MISO/MOSI` (+ `PIN_DISPLAY_RST` = `PIN_UNASSIGNED` if none) inside
       `#ifdef WITH_DISPLAY_U8G2`. Values from Current State above.
-- [ ] Refactor `U8G2DisplayModule.cpp` + `.hpp` to `#include "board.h"` and read the
+- [x] Refactor `U8G2DisplayModule.cpp` + `.hpp` to `#include "board.h"` and read the
       `PIN_DISPLAY_*` `constexpr`s instead of the `-DDISPLAY_*_PIN` macros; replace the
       `#ifdef DISPLAY_CS_PIN` presence-guard with `#ifdef WITH_DISPLAY_U8G2`. Keep the
       write-only MISO=-1 and RST-optional behaviour (via `PIN_UNASSIGNED`/`U8X8_PIN_NONE`).
-- [ ] Delete the 5 `-DDISPLAY_*_PIN` flags and the `-DU8G2_DISPLAY_TYPE` flag from the
+- [x] Delete the 5 `-DDISPLAY_*_PIN` flags and the `-DU8G2_DISPLAY_TYPE` flag from the
       esp32dev + esp32s3nano env blocks in root `platformio.ini`; add
       `-DBOARD_HEADER=\"hardware/<id>/board.h\"` to each. Keep `-DWITH_DISPLAY_U8G2`
       (co-locate it per OQ-2 if a per-board fragment mechanism is used; otherwise leave
       in-env with a comment that it is the board's hardware-sourced availability flag).
-- [ ] Move `partitions.esp32dev.csv` → `hardware/esp32dev/partitions.csv` and
+- [x] Move `partitions.esp32dev.csv` → `hardware/esp32dev/partitions.csv` and
       `partitions.esp32s3nano.csv` → `hardware/esp32s3nano/partitions.csv` (HC-10:
       one per board, duplicate not share); update `board_build.partitions` in the root
       esp32dev/esp32s3nano envs. (Consumer-app path refs are WO4.)
-- [ ] Ensure the WO1 contract check's U8G2 branch now passes for both boards.
+- [x] Ensure the WO1 contract check's U8G2 branch now passes for both boards.
 
 ## Mandatory Acceptance Criteria (HC-1) — both board.h files MUST include:
 1. **ASCII-art pinout diagram** (board outline, all pins labelled, legend) — the
    SSD1322 4-wire SPI wiring is the key bring-up aid. Match the PowerMonitor exemplar.
 2. **Pin-priority / allocation notes** (why each pin; which to consume last).
-*This WO is rejected without both.*
 
 ## Strict Boundary Box — do NOT
 - Do NOT touch LVGL / crowpanel / `CrowPanel128Adapter` (WO3).
@@ -73,3 +72,8 @@ Use the **platformio MCP tools** (`pio-manager` skill), not raw `pio`. Build tar
 
 ## Findings, don't file
 Surface any out-of-boundary defect to the PA in your report; do not file issues.
+
+---
+
+## Status Log
+- **2026-07-30 — Completed & Approved.** Authored `hardware/esp32dev/board.h` and `hardware/esp32s3nano/board.h` with mandatory ASCII pinout diagrams and priority notes (HC-1). Refactored `U8G2DisplayModule` to consume `PIN_DISPLAY_*` constexprs from `board.h`. Removed `-DDISPLAY_*_PIN` and `-DU8G2_DISPLAY_TYPE` flags from `platformio.ini`. Co-located partitions to `hardware/<id>/partitions.csv` (HC-10). Verified 358/358 passing tests on `native`, and clean compilation on `esp32dev` and `esp32s3nano`. Approved by PA and `@distillery` invoked to package artifacts. Work Order 2 is complete.

@@ -1,4 +1,5 @@
 #include "CrowPanel128Adapter.hpp"
+#include "board.h"
 #include <Arduino.h>
 
 // -------------------------------------------------------------------------
@@ -14,17 +15,17 @@ LGFX_CrowPanel128::LGFX_CrowPanel128() {
         cfg.spi_3wire  = true;
         cfg.use_lock   = true;
         cfg.dma_channel = SPI_DMA_CH_AUTO;
-        cfg.pin_sclk = LCD_SPI_SCLK;
-        cfg.pin_mosi = LCD_SPI_MOSI;
+        cfg.pin_sclk = PIN_LCD_SPI_SCLK;
+        cfg.pin_mosi = PIN_LCD_SPI_MOSI;
         cfg.pin_miso = -1;
-        cfg.pin_dc   = LCD_DC;
+        cfg.pin_dc   = PIN_LCD_DC;
         _bus_instance.config(cfg);
         _panel_instance.setBus(&_bus_instance);
     }
     {
         auto cfg = _panel_instance.config();
-        cfg.pin_cs           = LCD_CS;
-        cfg.pin_rst          = LCD_RST;
+        cfg.pin_cs           = PIN_LCD_CS;
+        cfg.pin_rst          = PIN_LCD_RST;
         cfg.pin_busy         = -1;
         cfg.panel_width      = 240;
         cfg.panel_height     = 240;
@@ -42,7 +43,7 @@ LGFX_CrowPanel128::LGFX_CrowPanel128() {
     }
     {
         auto cfg = _light_instance.config();
-        cfg.pin_bl = LCD_BL;
+        cfg.pin_bl = PIN_LCD_BL;
         cfg.invert = false;
         cfg.freq   = 44100;
         cfg.pwm_channel = 7;
@@ -55,13 +56,13 @@ LGFX_CrowPanel128::LGFX_CrowPanel128() {
         cfg.x_max      = 239;
         cfg.y_min      = 0;
         cfg.y_max      = 239;
-        cfg.pin_int    = TOUCH_INT;
+        cfg.pin_int    = PIN_TOUCH_INT;
         cfg.bus_shared = false;
         cfg.offset_rotation = 0;
         cfg.i2c_port   = 1;
         cfg.i2c_addr   = 0x15; // CST816D address
-        cfg.pin_sda    = TOUCH_SDA;
-        cfg.pin_scl    = TOUCH_SCL;
+        cfg.pin_sda    = PIN_TOUCH_SDA;
+        cfg.pin_scl    = PIN_TOUCH_SCL;
         cfg.freq       = 400000;
         _touch_instance.config(cfg);
         _panel_instance.setTouch(&_touch_instance);
@@ -122,11 +123,11 @@ void CrowPanel128Adapter::_touchReadCallback(lv_indev_t* indev, lv_indev_data_t*
 lv_indev_t* CrowPanel128Adapter::createEncoderInput() {
     // Setup ESP32Encoder
     ESP32Encoder::useInternalWeakPullResistors = puType::up;
-    _encoder.attachHalfQuad(ENCODER_A, ENCODER_B);
+    _encoder.attachHalfQuad(PIN_ENCODER_A, PIN_ENCODER_B);
     _encoder.clearCount();
     
     // Setup button
-    pinMode(ENCODER_SW, INPUT_PULLUP);
+    pinMode(PIN_ENCODER_SW, INPUT_PULLUP);
     
     lv_indev_t* indev = lv_indev_create();
     lv_indev_set_type(indev, LV_INDEV_TYPE_ENCODER);
@@ -149,9 +150,10 @@ void CrowPanel128Adapter::_encoderReadCallback(lv_indev_t* indev, lv_indev_data_
     }
     
     // Read button
-    if (digitalRead(ENCODER_SW) == LOW) {
+    if (digitalRead(PIN_ENCODER_SW) == LOW) {
         data->state = LV_INDEV_STATE_PRESSED;
     } else {
         data->state = LV_INDEV_STATE_RELEASED;
     }
 }
+

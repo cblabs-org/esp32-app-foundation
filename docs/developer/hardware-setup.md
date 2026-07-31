@@ -7,9 +7,11 @@ using the ESP32 App Foundation framework.
 
 ## Supported Hardware
 
-The framework ships with board definitions for two configurations. Both use the same
-3.12″ SSD1322 OLED display and the same framework code — only the SPI pin assignments
-differ.
+The framework ships with stock board definitions for two configurations, which serve as **reference implementations** for the demo apps. Most real projects will use a custom `board.h`.
+
+**Consumer applications should author their own `board.h`** using `hardware/_TEMPLATE.board.h` as a starting point. This is the normal workflow, not an advanced override. Your board header is the single source of truth for ALL your hardware pin assignments — display, buttons, sensors, LEDs, and anything else your app needs. See the [Custom Board Authoring Guide](custom-boards.md).
+
+The reference boards both use the same 3.12″ SSD1322 OLED display and the same framework code — only the SPI pin assignments differ:
 
 | Board | SoC | Flash | PSRAM | USB |
 |---|---|---|---|---|
@@ -147,30 +149,34 @@ connected to your network, the device will be accessible at `http://<hostname>.l
 ## PlatformIO Environment Reference
 
 Environments are defined in [`platformio.ini`](../../platformio.ini) at the repo root.
-The key display pin definitions:
+Per the single source of compile-time hardware truth model, hardware pin mappings and board capabilities are defined in co-located `hardware/<id>/board.h` headers rather than scattered `-D` flags in `platformio.ini`.
+
+The `platformio.ini` environment acts strictly as a selector pointing to the target board header:
 
 ```ini
 [env:esp32dev]
 board = esp32dev
+board_build.partitions = hardware/esp32dev/partitions.csv
 build_flags =
-    -D DISPLAY_CS_PIN=26
-    -D DISPLAY_DC_PIN=5
-    -D SPI_SCK_PIN=18
-    -D SPI_MISO_PIN=19
-    -D SPI_MOSI_PIN=23
+    ${env:base_esp32.build_flags}
+    -DBOARD_ID=\"esp32dev\"
+    -DBOARD_HEADER=\"hardware/esp32dev/board.h\"
+    -D WITH_DISPLAY_U8G2
 
 [env:esp32s3nano]
-board = esp32s3box
+board = um_nanos3
+board_build.partitions = hardware/esp32s3nano/partitions.csv
 build_flags =
-    -D DISPLAY_CS_PIN=10
-    -D DISPLAY_DC_PIN=9
-    -D SPI_SCK_PIN=48
-    -D SPI_MISO_PIN=47
-    -D SPI_MOSI_PIN=38
+    ${env:base_esp32.build_flags}
+    -DBOARD_ID=\"esp32s3nano\"
+    -DBOARD_HEADER=\"hardware/esp32s3nano/board.h\"
+    -DBOARD_HAS_PSRAM
+    -D WITH_DISPLAY_U8G2
 ```
 
-To add support for a different board, duplicate one of these environments and update
-the pin definitions to match your hardware.
+Each board header (`hardware/esp32dev/board.h`, `hardware/esp32s3nano/board.h`, `hardware/crowpanel-128-rotary/board.h`) includes a complete **ASCII pinout diagram** and **pin allocation priority notes** directly at the top of the header file.
+
+To add a new custom hardware target or downstream board, see the [Custom Board Authoring Guide](custom-boards.md) (zero framework edits required).
 
 ---
 
