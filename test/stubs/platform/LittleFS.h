@@ -90,3 +90,6 @@ public:
     size_t totalBytes() { return 150000; }
 };
 inline FSClass LittleFS;
+namespace fs {
+    using LittleFSFS = FSClass;
+}

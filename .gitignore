@@ -20,6 +20,7 @@ src/CMakeLists.txt
 CMakeLists.txt
 dependencies.lock
 idf_component.yml
+!sample-app/src/idf_component.yml
 
 # Web test infrastructure (test/web/)
 test/web/node_modules/

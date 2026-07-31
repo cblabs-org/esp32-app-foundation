@@ -120,3 +120,13 @@ static_assert(PIN_TOUCH_SDA >= -1 && PIN_TOUCH_SDA <= 48, "PIN_TOUCH_SDA out of 
 static_assert(PIN_ENCODER_A >= -1 && PIN_ENCODER_A <= 48, "PIN_ENCODER_A out of valid GPIO range");
 
 #endif // WITH_DISPLAY_LVGL
+
+
+// ── Button Contract Verification ──────────────────────────────────────────────
+#ifdef WITH_BUTTONS
+
+static_assert(BOARD_BUTTON_COUNT > 0, "WITH_BUTTONS set but BOARD_BUTTONS[] is empty");
+
+#endif // WITH_BUTTONS
+
+
