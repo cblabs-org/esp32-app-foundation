@@ -24,7 +24,7 @@ for decoupled consumption.
 ## Work Order Ledger
 
 - **[/] [wo1-framework-core](wo1-framework-core/WORKORDER.md):** InputConfig.h types, InputModule.hpp/cpp implementation, board_contract.h update, native stubs
-- **[ ] [wo2-board-wiring](wo2-board-wiring/WORKORDER.md):** Board.h descriptors (esp32dev/esp32s3nano/native), main.cpp wiring, platformio.ini flags, idf_component.yml
+- **[x] [wo2-board-wiring](wo2-board-wiring/WORKORDER.md):** Board.h descriptors (esp32dev/esp32s3nano/native), main.cpp wiring, platformio.ini flags, idf_component.yml
 - **[ ] [wo3-tests-docs](wo3-tests-docs/WORKORDER.md):** Unit tests, template board.h update, module README
 
 ## Key Constraints
