@@ -79,7 +79,7 @@
 #include "board_pins.h"
 
 // ── Identity & capabilities ──────────────────────────────────────────────────
-#define BOARD_NAME          "ESP32-WROOM-32 Dev Kit"
+#define BOARD_NAME          "ESP32-WROOM-32 Dev Kit (Reference)"
 #define BOARD_ID_STRING     "esp32dev"
 constexpr bool HAS_PSRAM = false;
 

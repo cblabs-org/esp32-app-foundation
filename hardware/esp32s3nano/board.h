@@ -72,7 +72,7 @@
 #include "board_pins.h"
 
 // ── Identity & capabilities ──────────────────────────────────────────────────
-#define BOARD_NAME          "Waveshare ESP32-S3-Nano"
+#define BOARD_NAME          "Waveshare ESP32-S3-Nano (Reference)"
 #define BOARD_ID_STRING     "esp32s3nano"
 #ifndef BOARD_HAS_PSRAM
 #define BOARD_HAS_PSRAM 1

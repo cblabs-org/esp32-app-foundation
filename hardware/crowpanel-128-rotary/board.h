@@ -73,7 +73,7 @@
 #include "board_pins.h"
 
 // ── Identity & capabilities ──────────────────────────────────────────────────
-#define BOARD_NAME          "Elecrow CrowPanel 1.28 HMI Rotary"
+#define BOARD_NAME          "Elecrow CrowPanel 1.28 HMI Rotary (Reference)"
 #define BOARD_ID_STRING     "crowpanel-128-rotary"
 #ifndef BOARD_HAS_PSRAM
 #define BOARD_HAS_PSRAM 1

@@ -36,12 +36,17 @@
 #error "WITH_DISPLAY_U8G2 set but U8G2_DISPLAY_TYPE undefined"
 #endif
 
+#ifndef PIN_DISPLAY_RST
+#error "WITH_DISPLAY_U8G2 set but PIN_DISPLAY_RST undefined (use PIN_UNASSIGNED if not wired)"
+#endif
+
 // Compile-time assertion that mandatory pin symbols are valid symbols
-static_assert(PIN_DISPLAY_CS == PIN_DISPLAY_CS, "PIN_DISPLAY_CS contract assertion");
-static_assert(PIN_DISPLAY_DC == PIN_DISPLAY_DC, "PIN_DISPLAY_DC contract assertion");
-static_assert(PIN_DISPLAY_SCK == PIN_DISPLAY_SCK, "PIN_DISPLAY_SCK contract assertion");
-static_assert(PIN_DISPLAY_MISO == PIN_DISPLAY_MISO, "PIN_DISPLAY_MISO contract assertion");
-static_assert(PIN_DISPLAY_MOSI == PIN_DISPLAY_MOSI, "PIN_DISPLAY_MOSI contract assertion");
+static_assert(PIN_DISPLAY_CS >= -1 && PIN_DISPLAY_CS <= 48, "PIN_DISPLAY_CS out of valid GPIO range");
+static_assert(PIN_DISPLAY_DC >= -1 && PIN_DISPLAY_DC <= 48, "PIN_DISPLAY_DC out of valid GPIO range");
+static_assert(PIN_DISPLAY_SCK >= -1 && PIN_DISPLAY_SCK <= 48, "PIN_DISPLAY_SCK out of valid GPIO range");
+static_assert(PIN_DISPLAY_MISO >= -1 && PIN_DISPLAY_MISO <= 48, "PIN_DISPLAY_MISO out of valid GPIO range");
+static_assert(PIN_DISPLAY_MOSI >= -1 && PIN_DISPLAY_MOSI <= 48, "PIN_DISPLAY_MOSI out of valid GPIO range");
+static_assert(PIN_DISPLAY_RST >= -1 && PIN_DISPLAY_RST <= 48, "PIN_DISPLAY_RST out of valid GPIO range");
 
 #endif // WITH_DISPLAY_U8G2
 
@@ -109,9 +114,9 @@ static_assert(PIN_DISPLAY_MOSI == PIN_DISPLAY_MOSI, "PIN_DISPLAY_MOSI contract a
 #error "WITH_DISPLAY_LVGL set but PIN_AUX_I2C_SCL undefined"
 #endif
 
-static_assert(PIN_LCD_SPI_SCLK == PIN_LCD_SPI_SCLK, "PIN_LCD_SPI_SCLK contract assertion");
-static_assert(PIN_LCD_CS == PIN_LCD_CS, "PIN_LCD_CS contract assertion");
-static_assert(PIN_TOUCH_SDA == PIN_TOUCH_SDA, "PIN_TOUCH_SDA contract assertion");
-static_assert(PIN_ENCODER_A == PIN_ENCODER_A, "PIN_ENCODER_A contract assertion");
+static_assert(PIN_LCD_SPI_SCLK >= -1 && PIN_LCD_SPI_SCLK <= 48, "PIN_LCD_SPI_SCLK out of valid GPIO range");
+static_assert(PIN_LCD_CS >= -1 && PIN_LCD_CS <= 48, "PIN_LCD_CS out of valid GPIO range");
+static_assert(PIN_TOUCH_SDA >= -1 && PIN_TOUCH_SDA <= 48, "PIN_TOUCH_SDA out of valid GPIO range");
+static_assert(PIN_ENCODER_A >= -1 && PIN_ENCODER_A <= 48, "PIN_ENCODER_A out of valid GPIO range");
 
 #endif // WITH_DISPLAY_LVGL

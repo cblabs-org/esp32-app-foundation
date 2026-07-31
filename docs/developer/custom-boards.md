@@ -53,6 +53,19 @@ Structured comments documenting the allocation strategy and contention risk tier
 
 ---
 
+## Stock vs Custom Board Headers
+
+The framework ships three **stock board headers** (`esp32dev`, `esp32s3nano`, `crowpanel-128-rotary`) as working reference implementations for the sample-app and template-app. These are **not** intended for direct use by consumer applications.
+
+**As a consumer, you should author your own `board.h`** — this is the normal, intended workflow, not an advanced override. Your board header is the single source of truth for all your hardware pin assignments: display wiring, buttons, sensors, LEDs, and any other GPIO your application uses.
+
+The stock headers are useful as:
+- Copy-paste starting points (or use `_TEMPLATE.board.h`)
+- Reference examples of the pattern and conventions
+- Working configurations for the framework's own demo apps
+
+---
+
 ## 4. Worked Example: Authoring a Downstream Custom Board
 
 Here is a step-by-step example of creating a custom board definition for a downstream project (e.g., `hardware/my-custom-board/board.h`).
@@ -110,22 +123,28 @@ Here is a step-by-step example of creating a custom board definition for a downs
 constexpr int8_t PIN_STATUS_LED = 5;
 
 // -----------------------------------------------------------------------------
-// Primary SPI Bus Pins
-// -----------------------------------------------------------------------------
-constexpr int8_t PIN_SPI_SCK  = 48;
-constexpr int8_t PIN_SPI_MISO = 47;
-constexpr int8_t PIN_SPI_MOSI = 38;
-
-// -----------------------------------------------------------------------------
 // Display Pin Mapping (U8G2 SSD1322 SPI OLED)
 // -----------------------------------------------------------------------------
-constexpr int8_t PIN_DISPLAY_CS  = 10;
-constexpr int8_t PIN_DISPLAY_DC  = 9;
-constexpr int8_t PIN_DISPLAY_RST = 21;
-
-// Define U8G2 display driver constructor macro
-#ifndef U8G2_DISPLAY_TYPE
+#ifdef WITH_DISPLAY_U8G2
 #define U8G2_DISPLAY_TYPE U8G2_SSD1322_NHD_256X64_F_4W_HW_SPI
+
+constexpr int8_t PIN_DISPLAY_CS   = 10;
+#define PIN_DISPLAY_CS PIN_DISPLAY_CS
+
+constexpr int8_t PIN_DISPLAY_DC   = 9;
+#define PIN_DISPLAY_DC PIN_DISPLAY_DC
+
+constexpr int8_t PIN_DISPLAY_RST  = 21;
+#define PIN_DISPLAY_RST PIN_DISPLAY_RST
+
+constexpr int8_t PIN_DISPLAY_SCK  = 48;
+#define PIN_DISPLAY_SCK PIN_DISPLAY_SCK
+
+constexpr int8_t PIN_DISPLAY_MISO = 47;
+#define PIN_DISPLAY_MISO PIN_DISPLAY_MISO
+
+constexpr int8_t PIN_DISPLAY_MOSI = 38;
+#define PIN_DISPLAY_MOSI PIN_DISPLAY_MOSI
 #endif
 
 // -----------------------------------------------------------------------------
@@ -134,8 +153,8 @@ constexpr int8_t PIN_DISPLAY_RST = 21;
 constexpr int8_t PIN_I2C_SDA = 6;
 constexpr int8_t PIN_I2C_SCL = 7;
 
-// Include framework contract validation & build echo
-#include "board_contract.h"
+// Contract validation is handled automatically by the facade (hardware/board.h)
+// — do NOT include board_contract.h directly in your board header.
 ```
 
 ### Step 2: Configure `platformio.ini`
@@ -158,6 +177,8 @@ build_flags           =
     -I hardware/_common
     -I hardware/my-custom-board
 ```
+
+> **Note:** The `-I hardware/_common` flag gives your build access to `board_pins.h` and `board_contract.h`, which are framework-owned headers. For PlatformIO library consumers, these headers are also exported via the framework's `library.json` — you only need the explicit `-I` if you're using the framework as a git submodule or local dependency.
 
 ### Step 3: Build and Verify
 

@@ -77,6 +77,10 @@ constexpr bool HAS_PSRAM = false;
 #ifdef WITH_DISPLAY_U8G2
 #define U8G2_DISPLAY_TYPE U8G2_SSD1322_NHD_256X64_F_4W_HW_SPI
 
+// NOTE: Each pin is declared as both a constexpr (for C++ type safety) and a
+// self-referential #define (so the preprocessor contract in board_contract.h
+// can detect missing pins via #ifndef). Do NOT remove the #define lines —
+// they look redundant but are required for the compile-time contract to work.
 constexpr int8_t PIN_DISPLAY_CS   = 26;
 #define PIN_DISPLAY_CS PIN_DISPLAY_CS
 
@@ -91,6 +95,9 @@ constexpr int8_t PIN_DISPLAY_MISO = 19;
 
 constexpr int8_t PIN_DISPLAY_MOSI = 23;
 #define PIN_DISPLAY_MOSI PIN_DISPLAY_MOSI
+
+constexpr int8_t PIN_DISPLAY_RST  = PIN_UNASSIGNED;
+#define PIN_DISPLAY_RST PIN_DISPLAY_RST
 #endif
 
 // ── Display pin block (LVGL Option Example) ──────────────────────────────────
@@ -141,5 +148,11 @@ constexpr int8_t PIN_AUX_I2C_SCL  = 39;
 #define PIN_AUX_I2C_SCL PIN_AUX_I2C_SCL
 #endif
 
-// ── Application / Board-Specific Peripherals (App Owned) ─────────────────────
-// Add custom pin definitions below for board-specific hardware (buttons, LEDs, etc.)
+// ── Application / Board-Specific Peripherals (Consumer Owned) ────────────────
+// Define your app-specific pins here: buttons, status LEDs, sensor enables,
+// motor drivers, etc. These are NOT consumed by the framework — they live in
+// YOUR board.h and are referenced by YOUR application code.
+//
+// Example:
+//   constexpr int8_t PIN_MODE_BUTTON = 34;  // Physical mode select button
+//   constexpr int8_t PIN_STATUS_LED  = 2;   // Onboard LED for status blink
