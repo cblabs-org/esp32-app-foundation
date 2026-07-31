@@ -156,3 +156,31 @@ constexpr int8_t PIN_AUX_I2C_SCL  = 39;
 // Example:
 //   constexpr int8_t PIN_MODE_BUTTON = 34;  // Physical mode select button
 //   constexpr int8_t PIN_STATUS_LED  = 2;   // Onboard LED for status blink
+
+// ── Input configuration (WITH_INPUT) ─────────────────────────────────────────
+// When WITH_INPUT is enabled, define your button/input hardware descriptors here.
+// The InputModule reads these at startup to configure physical inputs.
+//
+// GPIO Example:
+//   #ifdef WITH_INPUT
+//   #include "InputConfig.h"
+//   constexpr int8_t PIN_MODE_BUTTON = 34;
+//   #define PIN_MODE_BUTTON PIN_MODE_BUTTON
+//   constexpr BoardInput BOARD_INPUTS[] = {
+//       { .id = "mode", .type = InputType::GPIO,
+//         .gpio = { .pin = PIN_MODE_BUTTON, .activeLow = true, .powerSave = false } },
+//   };
+//   constexpr size_t BOARD_INPUT_COUNT = sizeof(BOARD_INPUTS) / sizeof(BOARD_INPUTS[0]);
+//   #define BOARD_INPUT_COUNT BOARD_INPUT_COUNT
+//   #endif
+//
+// ADC Ladder Example (multiple buttons on one analog pin):
+//   constexpr BoardInput BOARD_INPUTS[] = {
+//       { .id = "up",     .type = InputType::ADC_LADDER,
+//         .adc = { .adcPin = 34, .adcChannel = 6, .minMv = 0,    .maxMv = 400  } },
+//       { .id = "down",   .type = InputType::ADC_LADDER,
+//         .adc = { .adcPin = 34, .adcChannel = 6, .minMv = 900,  .maxMv = 1300 } },
+//       { .id = "select", .type = InputType::ADC_LADDER,
+//         .adc = { .adcPin = 34, .adcChannel = 6, .minMv = 1600, .maxMv = 2000 } },
+//   };
+

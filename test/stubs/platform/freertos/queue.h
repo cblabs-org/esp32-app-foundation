@@ -16,6 +16,8 @@
 
 typedef void* QueueHandle_t;
 
+inline QueueHandle_t g_lastCreatedQueue = nullptr;
+
 struct NativeQueue {
     size_t length;
     size_t itemSize;
@@ -24,7 +26,8 @@ struct NativeQueue {
 
 inline QueueHandle_t xQueueCreate(size_t uxQueueLength, size_t uxItemSize) {
     auto* q = new NativeQueue{uxQueueLength, uxItemSize, {}};
-    return static_cast<QueueHandle_t>(q);
+    g_lastCreatedQueue = static_cast<QueueHandle_t>(q);
+    return g_lastCreatedQueue;
 }
 
 inline int xQueueSend(QueueHandle_t xQueue, const void* pvItemToQueue, uint32_t xTicksToWait) {
@@ -48,6 +51,9 @@ inline int xQueueReceive(QueueHandle_t xQueue, void* pvBuffer, uint32_t xTicksTo
 
 inline void vQueueDelete(QueueHandle_t xQueue) {
     if (!xQueue) return;
+    if (g_lastCreatedQueue == xQueue) {
+        g_lastCreatedQueue = nullptr;
+    }
     auto* q = static_cast<NativeQueue*>(xQueue);
     delete q;
 }

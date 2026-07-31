@@ -46,7 +46,7 @@
 #include <memory>
 #include <vector>
 #include <ArduinoJson.h>
-#include "../DeviceCrypto/DeviceCrypto.hpp"
+#include "../../lib/DeviceCrypto/DeviceCrypto.hpp"
 #include "../../include/interfaces/IWebContributor.hpp"
 #include "../ConfigManager/ConfigRoot.hpp"
 
