@@ -54,10 +54,11 @@ static EncoderModule encoderModule;
 void setup() {
     // ...
 #ifdef WITH_ENCODER
-    for (size_t i = 0; i < g_boardEncoderCount; i++) {
-        encoderModule.addEncoder(g_boardEncoders[i]);
+    for (size_t i = 0; i < BOARD_ENCODER_COUNT; i++) {
+        encoderModule.addEncoder(BOARD_ENCODERS[i]);
     }
-    app.registerModule(&encoderModule); // Calls begin() & registerMCPTools()
+    encoderModule.begin(app);               // Initialise PCNT hardware & capture EventBus
+    app.registerModule(&encoderModule);      // Register ITickable + IMCPContributor interfaces
 #endif
 }
 ```

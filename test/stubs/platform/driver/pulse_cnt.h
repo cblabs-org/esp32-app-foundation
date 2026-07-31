@@ -68,6 +68,13 @@ inline void stub_pcnt_set_count(int16_t count) {
     g_stub_pcnt_count = count;
 }
 
+// Additive helper for multi-tick tests: simulates hardware accumulating
+// additional pulses between ticks (used with delta-from-previous pattern).
+inline void stub_pcnt_add_count(int16_t delta) {
+    _stub_pcnt_count += delta;
+    g_stub_pcnt_count = _stub_pcnt_count;
+}
+
 inline esp_err_t pcnt_new_unit(const pcnt_unit_config_t *bus_config, pcnt_unit_handle_t *ret_unit) {
     (void)bus_config;
     _stub_pcnt_count = 0;
@@ -152,6 +159,8 @@ inline esp_err_t pcnt_unit_clear_count(pcnt_unit_handle_t unit) {
     (void)unit;
     _stub_pcnt_count = 0;
     g_stub_pcnt_count = 0;
-    _stub_pcnt_reversed = false;
+    // Note: do NOT reset _stub_pcnt_reversed here — the reversed flag is a
+    // channel configuration set by pcnt_channel_set_edge_action() during begin(),
+    // not a counter state. Real hardware clear_count doesn't touch channel config.
     return ESP_OK;
 }
