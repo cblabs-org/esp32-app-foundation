@@ -92,9 +92,12 @@ private:
     // Fractional count remainder across ticks
     int32_t _fractionalAccum = 0;
 
-    // Velocity & diagnostic tracking
-    uint32_t _lastMovementMs = 0;
-    int32_t  _position = 0;
+    // Previous PCNT count for delta-from-previous pattern (avoids pulse loss)
+    int _prevCount = 0;
+
+    // Velocity & diagnostic tracking (atomic — read by MCP tool from web server task)
+    std::atomic<uint32_t> _lastMovementMs{0};
+    std::atomic<int32_t>  _position{0};
 
     // EventBus & ring buffer state
     EventBus*    _bus = nullptr;

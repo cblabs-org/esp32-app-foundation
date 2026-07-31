@@ -226,7 +226,7 @@ TEST_F(EncoderModuleDeltaTest, ConsumeDelta_RAW_And_ACCELERATED_AreIndependent) 
     module2.tick(100);
 
     // Tick 2 fast rotation (elapsed 20ms < cutoff 30ms -> max multiplier 10)
-    stub_pcnt_set_count(4); // 2 detents * 10 = 20 accel detents
+    stub_pcnt_add_count(4); // +4 raw = +2 detents * 10 = 20 accel detents
     module2.tick(120);
 
     // Consume RAW first
@@ -243,13 +243,13 @@ TEST_F(EncoderModuleDeltaTest, ConsumeDelta_RAW_And_ACCELERATED_AreIndependent) 
 }
 
 TEST_F(EncoderModuleDeltaTest, MultipleTicks_Accumulate) {
-    stub_pcnt_set_count(4); // +2 detents
+    stub_pcnt_set_count(4); // absolute 4: delta = 4-0 = +4 raw = +2 detents
     module.tick(100);
 
-    stub_pcnt_set_count(4); // +2 detents
+    stub_pcnt_add_count(4); // absolute 8: delta = 8-4 = +4 raw = +2 detents
     module.tick(110);
 
-    stub_pcnt_set_count(-2); // -1 detent
+    stub_pcnt_add_count(-2); // absolute 6: delta = 6-8 = -2 raw = -1 detent
     module.tick(120);
 
     EXPECT_EQ(module.consumeDelta(EncoderDelta::RAW), 3); // 2 + 2 - 1 = 3
@@ -304,8 +304,8 @@ TEST_F(EncoderModuleDetentTest, FractionalRemainder_CarriesAcrossTicks) {
 
     EXPECT_EQ(module.consumeDelta(EncoderDelta::RAW), 1);
 
-    // Tick 2: 1 raw count -> combined 1 + 1 = 2 raw counts -> 1 detent, remainder 0
-    stub_pcnt_set_count(1);
+    // Tick 2: +1 raw count -> combined remainder 1 + 1 = 2 raw counts -> 1 detent, remainder 0
+    stub_pcnt_add_count(1);
     module.tick(110);
 
     EXPECT_EQ(module.consumeDelta(EncoderDelta::RAW), 1);
@@ -358,7 +358,7 @@ TEST_F(EncoderModuleAccelTest, AccelerationDisabled_ReturnsSameAsRaw) {
     module.tick(100);
 
     // Fast rotation (20ms)
-    stub_pcnt_set_count(4);
+    stub_pcnt_add_count(4);
     module.tick(120);
 
     EXPECT_EQ(module.consumeDelta(EncoderDelta::RAW), 4);
@@ -384,7 +384,7 @@ TEST_F(EncoderModuleAccelTest, SlowRotation_NoMultiplier) {
     module.consumeDelta(EncoderDelta::ACCELERATED);
 
     // Rotation after 300ms (> 200ms deadZoneMs) -> multiplier 1
-    stub_pcnt_set_count(4); // 2 detents
+    stub_pcnt_add_count(4); // +4 raw = +2 detents
     module.tick(400);
 
     EXPECT_EQ(module.consumeDelta(EncoderDelta::RAW), 2);
@@ -410,7 +410,7 @@ TEST_F(EncoderModuleAccelTest, FastRotation_MaxMultiplier) {
     module.consumeDelta(EncoderDelta::ACCELERATED);
 
     // Rotation after 20ms (< 30ms shortCutoffMs) -> multiplier maxMultiplier (10)
-    stub_pcnt_set_count(4); // 2 detents * 10 = 20
+    stub_pcnt_add_count(4); // +4 raw = +2 detents * 10 = 20
     module.tick(120);
 
     EXPECT_EQ(module.consumeDelta(EncoderDelta::RAW), 2);
@@ -438,7 +438,7 @@ TEST_F(EncoderModuleAccelTest, MediumRotation_IntermediateMultiplier) {
     // Elapsed 115ms: deadZone=200, cutoff=30 -> t = (200-115)/(200-30) = 85/170 = 0.5
     // multiplier = 1.0 + 0.5^2 * (10 - 1) = 1.0 + 0.25 * 9 = 3.25
     // 2 detents * 3.25 = 6.5 -> (int32_t)6
-    stub_pcnt_set_count(4); // 2 detents
+    stub_pcnt_add_count(4); // +4 raw = +2 detents
     module.tick(215);
 
     EXPECT_EQ(module.consumeDelta(EncoderDelta::RAW), 2);
@@ -509,7 +509,7 @@ TEST_F(EncoderModuleEventBusTest, EventPayloadDelta_MatchesRawDetents) {
     module.tick(100);
 
     // Tick 2 fast rotation (elapsed 20ms) -> accel is 20, but EventBus payload delta MUST be raw detents (2)
-    stub_pcnt_set_count(4);
+    stub_pcnt_add_count(4);
     module.tick(120);
 
     EXPECT_EQ(capture.callCount, 2);
@@ -520,7 +520,7 @@ TEST_F(EncoderModuleEventBusTest, EventPayloadVelocityMs_IsReasonable) {
     stub_pcnt_set_count(4);
     module.tick(100);
 
-    stub_pcnt_set_count(4);
+    stub_pcnt_add_count(4);
     module.tick(145); // 45ms elapsed
 
     EXPECT_EQ(capture.callCount, 2);

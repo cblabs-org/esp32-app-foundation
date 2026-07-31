@@ -39,6 +39,14 @@ EncoderModule::~EncoderModule() {
 }
 
 void EncoderModule::addEncoder(const BoardEncoder& encoder) {
+    if (_hasEncoder) {
+        ESP_LOGW(TAG, "addEncoder() called multiple times — only one encoder supported per instance, overwriting '%s' with '%s'",
+                 _encoder.id ? _encoder.id : "?", encoder.id ? encoder.id : "?");
+    }
+    if (encoder.stepsPerDetent == 0) {
+        ESP_LOGW(TAG, "BoardEncoder '%s' has stepsPerDetent=0 — encoder will be ignored in tick()",
+                 encoder.id ? encoder.id : "?");
+    }
     _encoder = encoder;
     _hasEncoder = true;
 }
@@ -100,9 +108,12 @@ void EncoderModule::tick(uint32_t currentMillis) {
         return;
     }
 
-    int rawCounts = 0;
-    pcnt_unit_get_count(_pcntUnit, &rawCounts);
-    pcnt_unit_clear_count(_pcntUnit);
+    // Delta-from-previous pattern: never clear the hardware counter.
+    // Clearing would lose pulses arriving between get_count and clear_count.
+    int currentCount = 0;
+    pcnt_unit_get_count(_pcntUnit, &currentCount);
+    int rawCounts = currentCount - _prevCount;
+    _prevCount = currentCount;
 
     _fractionalAccum += rawCounts;
     int32_t detents = _fractionalAccum / static_cast<int32_t>(_encoder.stepsPerDetent);
@@ -112,11 +123,12 @@ void EncoderModule::tick(uint32_t currentMillis) {
         return;
     }
 
-    uint32_t elapsed = (currentMillis >= _lastMovementMs) ? (currentMillis - _lastMovementMs) : 0;
+    uint32_t lastMs = _lastMovementMs.load(std::memory_order_relaxed);
+    uint32_t elapsed = (currentMillis >= lastMs) ? (currentMillis - lastMs) : 0;
 
     int32_t accelDetents = detents;
     const auto& accel = _encoder.accel;
-    if (accel.enabled && _lastMovementMs > 0 && elapsed < accel.deadZoneMs) {
+    if (accel.enabled && lastMs > 0 && elapsed < accel.deadZoneMs) {
         float deadZone = static_cast<float>(accel.deadZoneMs);
         float cutoff = static_cast<float>(accel.shortCutoffMs);
         float currentElapsed = static_cast<float>(elapsed);
@@ -133,27 +145,27 @@ void EncoderModule::tick(uint32_t currentMillis) {
         accelDetents = static_cast<int32_t>(detents * multiplier);
     }
 
-    _rawDelta.fetch_add(detents);
-    _accelDelta.fetch_add(accelDetents);
-    _position += detents;
+    _rawDelta.fetch_add(detents, std::memory_order_relaxed);
+    _accelDelta.fetch_add(accelDetents, std::memory_order_relaxed);
+    _position.fetch_add(detents, std::memory_order_relaxed);
 
     if (_bus) {
         EncoderEvent& evt = _eventRing[_ringHead];
         evt.id = _encoder.id ? _encoder.id : "main";
         evt.delta = detents;
-        evt.velocityMs = (_lastMovementMs > 0 && elapsed <= 65535) ? static_cast<uint16_t>(elapsed) : 65535;
+        evt.velocityMs = (lastMs > 0 && elapsed <= 65535) ? static_cast<uint16_t>(elapsed) : 65535;
         _ringHead = (_ringHead + 1) % EVENT_RING_SIZE;
         _bus->publish("encoder.rotate", &evt);
     }
 
-    _lastMovementMs = currentMillis;
+    _lastMovementMs.store(currentMillis, std::memory_order_relaxed);
 }
 
 int32_t EncoderModule::consumeDelta(EncoderDelta mode) {
     if (mode == EncoderDelta::RAW) {
-        return _rawDelta.exchange(0);
+        return _rawDelta.exchange(0, std::memory_order_relaxed);
     } else {
-        return _accelDelta.exchange(0);
+        return _accelDelta.exchange(0, std::memory_order_relaxed);
     }
 }
 
@@ -178,10 +190,10 @@ void EncoderModule::registerMCPTools(MCPToolRegistry& registry) {
             accelObj["shortCutoffMs"] = self->_encoder.accel.shortCutoffMs;
             accelObj["maxMultiplier"] = self->_encoder.accel.maxMultiplier;
 
-            result["position"] = self->_position;
-            result["lastMovementMs"] = self->_lastMovementMs;
-            result["rawDelta"] = self->_rawDelta.load();
-            result["accelDelta"] = self->_accelDelta.load();
+            result["position"] = self->_position.load(std::memory_order_relaxed);
+            result["lastMovementMs"] = self->_lastMovementMs.load(std::memory_order_relaxed);
+            result["rawDelta"] = self->_rawDelta.load(std::memory_order_relaxed);
+            result["accelDelta"] = self->_accelDelta.load(std::memory_order_relaxed);
         },
         this,
         false

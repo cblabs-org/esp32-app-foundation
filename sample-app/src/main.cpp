@@ -213,9 +213,11 @@ void setup() {
 #endif
 
 #ifdef WITH_ENCODER
+    // Example: log encoder rotation events for debugging
     app.getEventBus().subscribe("encoder.rotate", [](const char*, const void* data, void*) {
         auto* event = static_cast<const EncoderEvent*>(data);
-        (void)event;
+        ESP_LOGI("Encoder", "Rotation: id=%s delta=%ld velocity=%ums",
+                 event->id, (long)event->delta, event->velocityMs);
     });
 #endif
 }
