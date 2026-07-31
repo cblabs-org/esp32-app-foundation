@@ -167,3 +167,14 @@ Read these before implementing:
 
 **CRITICAL:** Before distilling or committing, you MUST ask the user if they are
 happy. Only after approval should you invoke the `@distillery` skill.
+
+## Status Log
+
+- **2026-07-31 — Fully Executed, Approved & Distilled (Session: `14a25786-89de-4c63-8a79-c39a71515049`)**:
+  - Wired `EncoderModule` into `hardware/crowpanel-128-rotary/board.h` (`PIN_ENCODER_A` = GPIO 45, `PIN_ENCODER_B` = GPIO 42).
+  - Added empty `WITH_ENCODER` stub in `hardware/native/board.h` and example documentation in `hardware/_TEMPLATE.board.h`.
+  - Added `-DWITH_ENCODER` flag to `[env:crowpanel-128-rotary]` in `platformio.ini`.
+  - Registered `EncoderModule` and added `encoder.rotate` subscriber in `sample-app/src/main.cpp`.
+  - Verified via `run_tests` (`env:native` — 368/368 test cases passing) and `build_project` (`env:esp32dev` and `env:crowpanel-128-rotary` clean builds).
+  - Approved by parent coordinator (`8ebfdead-0e68-4711-810e-594e04f603f0`). Context artifacts distilled to `.agents/skills/principal-architect-workspace/pr-53-encoder-module/wo2-board-wiring/`.
+

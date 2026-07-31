@@ -59,9 +59,21 @@ typedef enum {
 
 // Test hook allowing unit tests to simulate PCNT count pulses in native builds
 inline int g_stub_pcnt_count = 0;
+inline int16_t _stub_pcnt_count = 0;
+inline bool _stub_pcnt_reversed = false;
+inline uintptr_t _stub_pcnt_next_chan_id = 0x9ABC;
+
+inline void stub_pcnt_set_count(int16_t count) {
+    _stub_pcnt_count = count;
+    g_stub_pcnt_count = count;
+}
 
 inline esp_err_t pcnt_new_unit(const pcnt_unit_config_t *bus_config, pcnt_unit_handle_t *ret_unit) {
     (void)bus_config;
+    _stub_pcnt_count = 0;
+    g_stub_pcnt_count = 0;
+    _stub_pcnt_reversed = false;
+    _stub_pcnt_next_chan_id = 0x9ABC;
     if (ret_unit) *ret_unit = (pcnt_unit_handle_t)0x5678;
     return ESP_OK;
 }
@@ -69,14 +81,19 @@ inline esp_err_t pcnt_new_unit(const pcnt_unit_config_t *bus_config, pcnt_unit_h
 inline esp_err_t pcnt_new_channel(pcnt_unit_handle_t unit, const pcnt_chan_config_t *chan_config, pcnt_channel_handle_t *ret_chan) {
     (void)unit;
     (void)chan_config;
-    if (ret_chan) *ret_chan = (pcnt_channel_handle_t)0x9ABC;
+    if (ret_chan) *ret_chan = (pcnt_channel_handle_t)(_stub_pcnt_next_chan_id++);
     return ESP_OK;
 }
 
 inline esp_err_t pcnt_channel_set_edge_action(pcnt_channel_handle_t chan, pcnt_channel_edge_action_t pos_act, pcnt_channel_edge_action_t neg_act) {
-    (void)chan;
-    (void)pos_act;
     (void)neg_act;
+    if (chan == (pcnt_channel_handle_t)0x9ABC) {
+        if (pos_act == PCNT_CHANNEL_EDGE_ACTION_INCREASE) {
+            _stub_pcnt_reversed = true;
+        } else if (pos_act == PCNT_CHANNEL_EDGE_ACTION_DECREASE) {
+            _stub_pcnt_reversed = false;
+        }
+    }
     return ESP_OK;
 }
 
@@ -126,13 +143,15 @@ inline esp_err_t pcnt_del_unit(pcnt_unit_handle_t unit) {
 inline esp_err_t pcnt_unit_get_count(pcnt_unit_handle_t unit, int *value) {
     (void)unit;
     if (value) {
-        *value = g_stub_pcnt_count;
+        *value = _stub_pcnt_reversed ? -_stub_pcnt_count : _stub_pcnt_count;
     }
     return ESP_OK;
 }
 
 inline esp_err_t pcnt_unit_clear_count(pcnt_unit_handle_t unit) {
     (void)unit;
+    _stub_pcnt_count = 0;
     g_stub_pcnt_count = 0;
+    _stub_pcnt_reversed = false;
     return ESP_OK;
 }

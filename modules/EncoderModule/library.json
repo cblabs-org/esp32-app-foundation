@@ -1,0 +1,12 @@
+{
+  "name": "EncoderModule",
+  "version": "0.1.0",
+  "description": "Pure-service hardware rotary encoder module with PCNT decode and acceleration",
+  "dependencies": {
+    "Application": "*",
+    "bblanchon/ArduinoJson": "^7.4.3"
+  },
+  "build": {
+    "flags": ["-I../../include"]
+  }
+}
