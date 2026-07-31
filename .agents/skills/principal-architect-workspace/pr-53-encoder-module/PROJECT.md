@@ -2,7 +2,7 @@
 
 **Issue:** [#54](https://github.com/matthewmcneill/esp32-app-foundation/issues/54)
 **Base branch:** `main` (after PR-52 ButtonModule is merged)
-**Status:** 🚧 IN PROGRESS
+**Status:** 🟢 PR RAISED — [#56](https://github.com/matthewmcneill/esp32-app-foundation/pull/56)
 **Human approval:** ✅ Granted 2026-07-31 (implementation plan approved in conversation 8ebfdead)
 
 ## Objective
@@ -42,9 +42,9 @@ Issue #54 RFC + 5 review comments resolved. Key decisions documented in
 
 ## Work Order Ledger
 
-- **[ ] [wo1-framework-core](wo1-framework-core/WORKORDER.md):** EncoderConfig.h types, EncoderModule.hpp/cpp, board_contract.h WITH_ENCODER check, native PCNT stubs
-- **[ ] [wo2-board-wiring](wo2-board-wiring/WORKORDER.md):** board.h descriptors (CrowPanel: A=45/B=42, stepsPerDetent=2), main.cpp wiring, WITH_ENCODER build flags
-- **[ ] [wo3-tests-docs](wo3-tests-docs/WORKORDER.md):** Unit tests, _TEMPLATE.board.h encoder examples, module documentation
+- **[x] [wo1-framework-core](wo1-framework-core/WORKORDER.md):** EncoderConfig.h types, EncoderModule.hpp/cpp, board_contract.h WITH_ENCODER check, native PCNT stubs
+- **[x] [wo2-board-wiring](wo2-board-wiring/WORKORDER.md):** board.h descriptors (CrowPanel: A=45/B=42, stepsPerDetent=2), main.cpp wiring, WITH_ENCODER build flags
+- **[x] [wo3-tests-docs](wo3-tests-docs/WORKORDER.md):** Unit tests (25 cases, 392/392 total), README, library.json, PCNT stub enhancement
 
 ## Key Constraints
 
