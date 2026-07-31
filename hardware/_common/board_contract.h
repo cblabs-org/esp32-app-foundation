@@ -130,3 +130,12 @@ static_assert(BOARD_BUTTON_COUNT > 0, "WITH_BUTTONS set but BOARD_BUTTONS[] is e
 #endif // WITH_BUTTONS
 
 
+// ── Encoder Contract Verification ──────────────────────────────────────────────
+#ifdef WITH_ENCODER
+
+static_assert(BOARD_ENCODER_COUNT > 0, "WITH_ENCODER set but BOARD_ENCODERS[] is empty");
+
+#endif // WITH_ENCODER
+
+
+
