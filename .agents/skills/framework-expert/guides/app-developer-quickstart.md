@@ -4,7 +4,11 @@ This guide walks you through building an application (like a weather station or 
 
 > **Before you start**: Read the [Embedded Safety Constraints](../embedded-safety/memory-rules.md) to understand critical rules around memory allocation and thread safety.
 
-## Step 1: The Basic Module Template
+## Step 1: Author Your `board.h`
+
+The framework ships with stock boards (e.g. `esp32dev`, `esp32s3nano`), but these are just **reference implementations**. Consumer applications should always **author their own `board.h`** using `hardware/_TEMPLATE.board.h` as a starting point. This is the normal workflow, not an advanced override. Your custom board header is the single source of truth for all your pins.
+
+## Step 2: The Basic Module Template
 
 Every app starts as a basic module registered with the `Application` instance. There is no base `IModule` class. A module is defined by the interfaces it implements. Start with `ITickable` for periodic logic, then add more interfaces as your module's capabilities grow.
 
@@ -34,7 +38,7 @@ void loop() { app.tick(); }
 ```
 *Read more: [Registration & Boot Sequence](../references/registration.md)*
 
-## Step 2: Adding a Background Loop (`ITickable`)
+## Step 3: Adding a Background Loop (`ITickable`)
 
 To poll sensors or manage state, add `ITickable`.
 
@@ -48,7 +52,7 @@ public:
 ```
 *Reference:* [`../interfaces/tickable.md`](../interfaces/tickable.md)
 
-## Step 3: Saving User Settings (`IConfigurable`)
+## Step 4: Saving User Settings (`IConfigurable`)
 
 If your app needs API keys or preferences, implement `IConfigurable`.
 
@@ -65,7 +69,7 @@ public:
 ```
 *Reference:* [`../interfaces/configurable.md`](../interfaces/configurable.md)
 
-## Step 4: Adding a Web UI (`IWebContributor`)
+## Step 5: Adding a Web UI (`IWebContributor`)
 
 To let users view data or change settings on the portal, add a web tab.
 
@@ -81,7 +85,7 @@ public:
 ```
 *Reference:* [`../interfaces/web-contributor.md`](../interfaces/web-contributor.md)
 
-## Step 5: Background Fetching (`IDataSource`)
+## Step 6: Background Fetching (`IDataSource`)
 
 For slow network requests (like fetching a forecast), use `IDataSource` to offload work to a FreeRTOS background task.
 
@@ -96,7 +100,7 @@ public:
 ```
 *Reference:* [`../interfaces/data-source.md`](../interfaces/data-source.md) | *Thread Safety:* [`../embedded-safety/thread-safety.md`](../embedded-safety/thread-safety.md)
 
-## Step 6: Showing Data on the Screen (`IDisplayBoard`)
+## Step 7: Showing Data on the Screen (`IDisplayBoard`)
 
 To show a slide on the physical display carousel, implement `IDisplayBoard`.
 
@@ -112,7 +116,7 @@ public:
 ```
 *Reference:* [`../interfaces/display-board.md`](../interfaces/display-board.md) | *System Guide:* [`../systems/display/custom-boards.md`](../systems/display/custom-boards.md)
 
-## Step 7: Publishing System Events (`EventBus`)
+## Step 8: Publishing System Events (`EventBus`)
 
 Broadcast your data to other modules (like a screen saver or rules engine) via the EventBus.
 

@@ -88,6 +88,8 @@ pio test -e native        # Run unit tests
 
 ## Building
 
+> **Note on Hardware Configuration:** This sample app uses the framework's stock board headers (e.g. `esp32dev`) as working examples. When building your own consumer app, you should **author your own `board.h`** rather than using the stock boards. Stock boards are just reference implementations. Your custom board header will be the single source of truth for all your pins. See [`docs/developer/custom-boards.md`](../docs/developer/custom-boards.md).
+
 ```bash
 pio run                    # Build all environments
 pio run -e esp32dev        # Build for ESP32-DevKit

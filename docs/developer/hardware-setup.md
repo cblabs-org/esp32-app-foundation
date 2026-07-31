@@ -7,9 +7,11 @@ using the ESP32 App Foundation framework.
 
 ## Supported Hardware
 
-The framework ships with board definitions for two configurations. Both use the same
-3.12″ SSD1322 OLED display and the same framework code — only the SPI pin assignments
-differ.
+The framework ships with stock board definitions for two configurations, which serve as **reference implementations** for the demo apps. Most real projects will use a custom `board.h`.
+
+**Consumer applications should author their own `board.h`** using `hardware/_TEMPLATE.board.h` as a starting point. This is the normal workflow, not an advanced override. Your board header is the single source of truth for ALL your hardware pin assignments — display, buttons, sensors, LEDs, and anything else your app needs. See the [Custom Board Authoring Guide](custom-boards.md).
+
+The reference boards both use the same 3.12″ SSD1322 OLED display and the same framework code — only the SPI pin assignments differ:
 
 | Board | SoC | Flash | PSRAM | USB |
 |---|---|---|---|---|

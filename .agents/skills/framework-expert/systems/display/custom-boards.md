@@ -1,5 +1,6 @@
-# Custom Boards
+# Custom Boards (Display UI)
 
+> **Disambiguation:** This document is about creating a custom `IDisplayBoard` (a UI pane for the display carousel). If you are looking to define hardware pins for your ESP32, consumer applications should **author their own `board.h`** rather than overriding stock framework boards. See the [Custom Board Authoring Guide](../../../../../docs/developer/custom-boards.md) for hardware setup.
 Creating a custom board is the standard way a module projects its data onto the physical display. By implementing the [`IDisplayBoard`](../../interfaces/display-board.md) interface, your module becomes a first-class citizen in the carousel rotation.
 
 ## IDisplayBoard Full Lifecycle
