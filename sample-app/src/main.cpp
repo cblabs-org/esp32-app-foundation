@@ -41,9 +41,9 @@ static TimeConfigGate timeGate{timeManager};
 static MCPServer mcpServer;
 #endif
 
-#ifdef WITH_INPUT
-#include "InputModule.hpp"
-static InputModule inputModule;
+#ifdef WITH_BUTTONS
+#include "ButtonModule.hpp"
+static ButtonModule buttonModule;
 #endif
 
 // ADR-16: File-scope static instances avoid stack-based corruption.
@@ -121,12 +121,12 @@ void setup() {
     app.registerModule(&mcpServer);
 #endif
 
-#ifdef WITH_INPUT
-    for (size_t i = 0; i < BOARD_INPUT_COUNT; i++) {
-        inputModule.addInput(BOARD_INPUTS[i]);
+#ifdef WITH_BUTTONS
+    for (size_t i = 0; i < BOARD_BUTTON_COUNT; i++) {
+        buttonModule.addButton(BOARD_BUTTONS[i]);
     }
-    inputModule.begin(app);
-    app.registerModule(&inputModule);
+    buttonModule.begin(app);
+    app.registerModule(&buttonModule);
 #endif
 
     // Prepare Framework config — OTA
@@ -185,10 +185,10 @@ void setup() {
     weatherModule.wireHomeAssistant(haModule);
 #endif
 
-#ifdef WITH_INPUT
+#ifdef WITH_BUTTONS
     // Advance display carousel on button click
     #ifdef WITH_DISPLAY_U8G2
-    app.getEventBus().subscribe("input.click", [](const char*, const void*, void* ctx) {
+    app.getEventBus().subscribe("button.click", [](const char*, const void*, void* ctx) {
         auto* display = static_cast<U8G2DisplayModule*>(ctx);
         if (display) {
             display->resetActivity();

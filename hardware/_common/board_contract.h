@@ -122,10 +122,11 @@ static_assert(PIN_ENCODER_A >= -1 && PIN_ENCODER_A <= 48, "PIN_ENCODER_A out of 
 #endif // WITH_DISPLAY_LVGL
 
 
-// ── Input Contract Verification ──────────────────────────────────────────────
-#ifdef WITH_INPUT
+// ── Button Contract Verification ──────────────────────────────────────────────
+#ifdef WITH_BUTTONS
 
-static_assert(BOARD_INPUT_COUNT > 0, "WITH_INPUT set but BOARD_INPUTS[] is empty");
+static_assert(BOARD_BUTTON_COUNT > 0, "WITH_BUTTONS set but BOARD_BUTTONS[] is empty");
 
-#endif // WITH_INPUT
+#endif // WITH_BUTTONS
+
 

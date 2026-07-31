@@ -157,30 +157,36 @@ constexpr int8_t PIN_AUX_I2C_SCL  = 39;
 //   constexpr int8_t PIN_MODE_BUTTON = 34;  // Physical mode select button
 //   constexpr int8_t PIN_STATUS_LED  = 2;   // Onboard LED for status blink
 
-// ── Input configuration (WITH_INPUT) ─────────────────────────────────────────
-// When WITH_INPUT is enabled, define your button/input hardware descriptors here.
-// The InputModule reads these at startup to configure physical inputs.
+// ── Button configuration (WITH_BUTTONS) ──────────────────────────────────────
+// When WITH_BUTTONS is enabled, define your button hardware descriptors here.
+// The ButtonModule reads these at startup to configure physical buttons.
+//
+// BOOT button reuse (pin-constrained boards):
+//   The BOOT button (typically GPIO 0) is safe to use as a user input
+//   post-boot. Strapping state only matters at reset. If the user holds
+//   the button during a software reboot, the chip enters download mode
+//   — this is a useful escape hatch, not a defect.
 //
 // GPIO Example:
-//   #ifdef WITH_INPUT
-//   #include "InputConfig.h"
+//   #ifdef WITH_BUTTONS
+//   #include "ButtonConfig.h"
 //   constexpr int8_t PIN_MODE_BUTTON = 34;
 //   #define PIN_MODE_BUTTON PIN_MODE_BUTTON
-//   constexpr BoardInput BOARD_INPUTS[] = {
-//       { .id = "mode", .type = InputType::GPIO,
-//         .gpio = { .pin = PIN_MODE_BUTTON, .activeLow = true, .powerSave = false } },
+//   constexpr BoardButton BOARD_BUTTONS[] = {
+//       { .id = "mode", .type = ButtonType::GPIO,
+//         .gpio = { .pin = PIN_MODE_BUTTON, .activeLow = true, .disablePull = false, .powerSave = false } },
 //   };
-//   constexpr size_t BOARD_INPUT_COUNT = sizeof(BOARD_INPUTS) / sizeof(BOARD_INPUTS[0]);
-//   #define BOARD_INPUT_COUNT BOARD_INPUT_COUNT
+//   constexpr size_t BOARD_BUTTON_COUNT = sizeof(BOARD_BUTTONS) / sizeof(BOARD_BUTTONS[0]);
+//   #define BOARD_BUTTON_COUNT BOARD_BUTTON_COUNT
 //   #endif
 //
 // ADC Ladder Example (multiple buttons on one analog pin):
-//   constexpr BoardInput BOARD_INPUTS[] = {
-//       { .id = "up",     .type = InputType::ADC_LADDER,
+//   constexpr BoardButton BOARD_BUTTONS[] = {
+//       { .id = "up",     .type = ButtonType::ADC_LADDER,
 //         .adc = { .adcPin = 34, .adcChannel = 6, .minMv = 0,    .maxMv = 400  } },
-//       { .id = "down",   .type = InputType::ADC_LADDER,
+//       { .id = "down",   .type = ButtonType::ADC_LADDER,
 //         .adc = { .adcPin = 34, .adcChannel = 6, .minMv = 900,  .maxMv = 1300 } },
-//       { .id = "select", .type = InputType::ADC_LADDER,
+//       { .id = "select", .type = ButtonType::ADC_LADDER,
 //         .adc = { .adcPin = 34, .adcChannel = 6, .minMv = 1600, .maxMv = 2000 } },
 //   };
 

@@ -6,11 +6,11 @@
  * This work is licensed under Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International.
  * To view a copy of this license, visit https://creativecommons.org/licenses/by-nc-sa/4.0/
  *
- * Module: modules/InputModule/InputModule.cpp
- * Description: Implementation of InputModule button event collector and EventBus publisher.
+ * Module: modules/ButtonModule/ButtonModule.cpp
+ * Description: Implementation of ButtonModule button event collector and EventBus publisher.
  */
 
-#include "InputModule.hpp"
+#include "ButtonModule.hpp"
 #include "modules/Application/Application.hpp"
 #include "modules/MCPServer/MCPToolRegistry.hpp"
 #include <map>
@@ -24,9 +24,9 @@
 #include "iot_button.h"
 #endif
 
-InputModule::InputModule() = default;
+ButtonModule::ButtonModule() = default;
 
-InputModule::~InputModule() {
+ButtonModule::~ButtonModule() {
 #ifndef UNIT_TEST
     for (void* handle : _buttonHandles) {
         if (handle) {
@@ -47,29 +47,29 @@ InputModule::~InputModule() {
     }
 }
 
-void InputModule::addInput(const BoardInput& input) {
-    _pendingInputs.push_back(input);
+void ButtonModule::addButton(const BoardButton& button) {
+    _pendingButtons.push_back(button);
 }
 
-void InputModule::begin(Application& app) {
+void ButtonModule::begin(Application& app) {
     _bus = &app.getEventBus();
     if (!_eventQueue) {
-        _eventQueue = xQueueCreate(QUEUE_DEPTH, sizeof(InputEvent));
+        _eventQueue = xQueueCreate(QUEUE_DEPTH, sizeof(ButtonEvent));
     }
 
     // Phase 1: Group ADC ladder inputs by pin, process GPIO & Matrix inputs
-    std::map<int8_t, std::vector<const BoardInput*>> adcGroups;
+    std::map<int8_t, std::vector<const BoardButton*>> adcGroups;
 
-    for (const auto& input : _pendingInputs) {
-        switch (input.type) {
-            case InputType::GPIO:
-                createGpioButton(input);
+    for (const auto& button : _pendingButtons) {
+        switch (button.type) {
+            case ButtonType::GPIO:
+                createGpioButton(button);
                 break;
-            case InputType::ADC_LADDER:
-                adcGroups[input.adc.adcPin].push_back(&input);
+            case ButtonType::ADC_LADDER:
+                adcGroups[button.adc.adcPin].push_back(&button);
                 break;
-            case InputType::MATRIX:
-                createMatrixButton(input);
+            case ButtonType::MATRIX:
+                createMatrixButton(button);
                 break;
         }
     }
@@ -80,12 +80,12 @@ void InputModule::begin(Application& app) {
     }
 }
 
-void InputModule::createGpioButton(const BoardInput& input) {
-    static const InputGesture gestures[] = {
-        InputGesture::CLICK,
-        InputGesture::DOUBLE_CLICK,
-        InputGesture::LONG_PRESS,
-        InputGesture::PRESS_DOWN
+void ButtonModule::createGpioButton(const BoardButton& button) {
+    static const ButtonGesture gestures[] = {
+        ButtonGesture::CLICK,
+        ButtonGesture::DOUBLE_CLICK,
+        ButtonGesture::LONG_PRESS,
+        ButtonGesture::PRESS_DOWN
     };
 
     button_handle_t btn_handle = nullptr;
@@ -93,10 +93,10 @@ void InputModule::createGpioButton(const BoardInput& input) {
 #ifndef UNIT_TEST
     button_config_t btn_cfg = {};
     button_gpio_config_t gpio_cfg = {
-        .gpio_num = input.gpio.pin,
-        .active_level = static_cast<uint8_t>(input.gpio.activeLow ? 0 : 1),
-        .enable_power_save = input.gpio.powerSave,
-        .disable_pull = false
+        .gpio_num = button.gpio.pin,
+        .active_level = static_cast<uint8_t>(button.gpio.activeLow ? 0 : 1),
+        .enable_power_save = button.gpio.powerSave,
+        .disable_pull = button.gpio.disablePull
     };
 
     iot_button_new_gpio_device(&btn_cfg, &gpio_cfg, &btn_handle);
@@ -108,7 +108,7 @@ void InputModule::createGpioButton(const BoardInput& input) {
 
     for (auto gesture : gestures) {
         auto* ctx = new ShimContext{
-            .id = input.id,
+            .id = button.id,
             .gesture = gesture,
             .queue = _eventQueue,
             .droppedCount = 0
@@ -119,10 +119,10 @@ void InputModule::createGpioButton(const BoardInput& input) {
         if (btn_handle) {
             button_event_t evt = BUTTON_SINGLE_CLICK;
             switch (gesture) {
-                case InputGesture::CLICK:        evt = BUTTON_SINGLE_CLICK; break;
-                case InputGesture::DOUBLE_CLICK: evt = BUTTON_DOUBLE_CLICK; break;
-                case InputGesture::LONG_PRESS:   evt = BUTTON_LONG_PRESS_START; break;
-                case InputGesture::PRESS_DOWN:   evt = BUTTON_PRESS_DOWN; break;
+                case ButtonGesture::CLICK:        evt = BUTTON_SINGLE_CLICK; break;
+                case ButtonGesture::DOUBLE_CLICK: evt = BUTTON_DOUBLE_CLICK; break;
+                case ButtonGesture::LONG_PRESS:   evt = BUTTON_LONG_PRESS_START; break;
+                case ButtonGesture::PRESS_DOWN:   evt = BUTTON_PRESS_DOWN; break;
             }
             iot_button_register_cb(btn_handle, evt, nullptr, _buttonShim, ctx);
         }
@@ -130,18 +130,18 @@ void InputModule::createGpioButton(const BoardInput& input) {
     }
 }
 
-void InputModule::createAdcLadder(int8_t pin, const std::vector<const BoardInput*>& buttons) {
-    static const InputGesture gestures[] = {
-        InputGesture::CLICK,
-        InputGesture::DOUBLE_CLICK,
-        InputGesture::LONG_PRESS,
-        InputGesture::PRESS_DOWN
+void ButtonModule::createAdcLadder(int8_t pin, const std::vector<const BoardButton*>& buttons) {
+    static const ButtonGesture gestures[] = {
+        ButtonGesture::CLICK,
+        ButtonGesture::DOUBLE_CLICK,
+        ButtonGesture::LONG_PRESS,
+        ButtonGesture::PRESS_DOWN
     };
 
     uint8_t btnIndex = 0;
-    for (const auto* inputPtr : buttons) {
-        if (!inputPtr) continue;
-        const auto& input = *inputPtr;
+    for (const auto* buttonPtr : buttons) {
+        if (!buttonPtr) continue;
+        const auto& button = *buttonPtr;
         button_handle_t btn_handle = nullptr;
 
 #ifndef UNIT_TEST
@@ -149,10 +149,10 @@ void InputModule::createAdcLadder(int8_t pin, const std::vector<const BoardInput
         button_adc_config_t adc_cfg = {
             .adc_handle = nullptr,
             .unit_id = ADC_UNIT_1,
-            .adc_channel = static_cast<uint8_t>(input.adc.adcChannel),
+            .adc_channel = static_cast<uint8_t>(button.adc.adcChannel),
             .button_index = btnIndex++,
-            .min = input.adc.minMv,
-            .max = input.adc.maxMv
+            .min = button.adc.minMv,
+            .max = button.adc.maxMv
         };
 
         iot_button_new_adc_device(&btn_cfg, &adc_cfg, &btn_handle);
@@ -164,7 +164,7 @@ void InputModule::createAdcLadder(int8_t pin, const std::vector<const BoardInput
 
         for (auto gesture : gestures) {
             auto* ctx = new ShimContext{
-                .id = input.id,
+                .id = button.id,
                 .gesture = gesture,
                 .queue = _eventQueue,
                 .droppedCount = 0
@@ -175,10 +175,10 @@ void InputModule::createAdcLadder(int8_t pin, const std::vector<const BoardInput
             if (btn_handle) {
                 button_event_t evt = BUTTON_SINGLE_CLICK;
                 switch (gesture) {
-                    case InputGesture::CLICK:        evt = BUTTON_SINGLE_CLICK; break;
-                    case InputGesture::DOUBLE_CLICK: evt = BUTTON_DOUBLE_CLICK; break;
-                    case InputGesture::LONG_PRESS:   evt = BUTTON_LONG_PRESS_START; break;
-                    case InputGesture::PRESS_DOWN:   evt = BUTTON_PRESS_DOWN; break;
+                    case ButtonGesture::CLICK:        evt = BUTTON_SINGLE_CLICK; break;
+                    case ButtonGesture::DOUBLE_CLICK: evt = BUTTON_DOUBLE_CLICK; break;
+                    case ButtonGesture::LONG_PRESS:   evt = BUTTON_LONG_PRESS_START; break;
+                    case ButtonGesture::PRESS_DOWN:   evt = BUTTON_PRESS_DOWN; break;
                 }
                 iot_button_register_cb(btn_handle, evt, nullptr, _buttonShim, ctx);
             }
@@ -187,20 +187,20 @@ void InputModule::createAdcLadder(int8_t pin, const std::vector<const BoardInput
     }
 }
 
-void InputModule::createMatrixButton(const BoardInput& input) {
-    static const InputGesture gestures[] = {
-        InputGesture::CLICK,
-        InputGesture::DOUBLE_CLICK,
-        InputGesture::LONG_PRESS,
-        InputGesture::PRESS_DOWN
+void ButtonModule::createMatrixButton(const BoardButton& button) {
+    static const ButtonGesture gestures[] = {
+        ButtonGesture::CLICK,
+        ButtonGesture::DOUBLE_CLICK,
+        ButtonGesture::LONG_PRESS,
+        ButtonGesture::PRESS_DOWN
     };
 
     button_handle_t btn_handle = nullptr;
 
 #ifndef UNIT_TEST
     button_config_t btn_cfg = {};
-    int32_t row_gpios[1] = { input.matrix.rowPin };
-    int32_t col_gpios[1] = { input.matrix.colPin };
+    int32_t row_gpios[1] = { button.matrix.rowPin };
+    int32_t col_gpios[1] = { button.matrix.colPin };
     button_matrix_config_t matrix_cfg = {
         .row_gpios = row_gpios,
         .col_gpios = col_gpios,
@@ -217,7 +217,7 @@ void InputModule::createMatrixButton(const BoardInput& input) {
 
     for (auto gesture : gestures) {
         auto* ctx = new ShimContext{
-            .id = input.id,
+            .id = button.id,
             .gesture = gesture,
             .queue = _eventQueue,
             .droppedCount = 0
@@ -228,10 +228,10 @@ void InputModule::createMatrixButton(const BoardInput& input) {
         if (btn_handle) {
             button_event_t evt = BUTTON_SINGLE_CLICK;
             switch (gesture) {
-                case InputGesture::CLICK:        evt = BUTTON_SINGLE_CLICK; break;
-                case InputGesture::DOUBLE_CLICK: evt = BUTTON_DOUBLE_CLICK; break;
-                case InputGesture::LONG_PRESS:   evt = BUTTON_LONG_PRESS_START; break;
-                case InputGesture::PRESS_DOWN:   evt = BUTTON_PRESS_DOWN; break;
+                case ButtonGesture::CLICK:        evt = BUTTON_SINGLE_CLICK; break;
+                case ButtonGesture::DOUBLE_CLICK: evt = BUTTON_DOUBLE_CLICK; break;
+                case ButtonGesture::LONG_PRESS:   evt = BUTTON_LONG_PRESS_START; break;
+                case ButtonGesture::PRESS_DOWN:   evt = BUTTON_PRESS_DOWN; break;
             }
             iot_button_register_cb(btn_handle, evt, nullptr, _buttonShim, ctx);
         }
@@ -239,19 +239,19 @@ void InputModule::createMatrixButton(const BoardInput& input) {
     }
 }
 
-void InputModule::_buttonShim(void* handle, void* userData) {
+void ButtonModule::_buttonShim(void* handle, void* userData) {
     if (!userData) return;
     auto* ctx = static_cast<ShimContext*>(userData);
     if (!ctx->queue) return;
-    InputEvent evt = { .id = ctx->id, .gesture = ctx->gesture };
+    ButtonEvent evt = { .id = ctx->id, .gesture = ctx->gesture };
     if (xQueueSend(ctx->queue, &evt, 0) != pdTRUE) {
         ctx->droppedCount++;
     }
 }
 
-void InputModule::tick(uint32_t currentMillis) {
+void ButtonModule::tick(uint32_t currentMillis) {
     if (!_eventQueue || !_bus) return;
-    InputEvent evt;
+    ButtonEvent evt;
     int drained = 0;
     while (drained < MAX_EVENTS_PER_TICK &&
            xQueueReceive(_eventQueue, &evt, 0) == pdTRUE) {
@@ -263,31 +263,31 @@ void InputModule::tick(uint32_t currentMillis) {
     }
 }
 
-const char* InputModule::gestureToTopic(InputGesture gesture) {
+const char* ButtonModule::gestureToTopic(ButtonGesture gesture) {
     switch (gesture) {
-        case InputGesture::CLICK:        return "input.click";
-        case InputGesture::DOUBLE_CLICK: return "input.double_click";
-        case InputGesture::LONG_PRESS:   return "input.long_press";
-        case InputGesture::PRESS_DOWN:   return "input.press_down";
-        default:                         return "input.unknown";
+        case ButtonGesture::CLICK:        return "button.click";
+        case ButtonGesture::DOUBLE_CLICK: return "button.double_click";
+        case ButtonGesture::LONG_PRESS:   return "button.long_press";
+        case ButtonGesture::PRESS_DOWN:   return "button.press_down";
+        default:                         return "button.unknown";
     }
 }
 
-void InputModule::registerMCPTools(MCPToolRegistry& registry) {
+void ButtonModule::registerMCPTools(MCPToolRegistry& registry) {
     registry.addTool(
-        "input_status",
-        "Get registered hardware inputs, recent event ring buffer state, and dropped event diagnostics",
+        "button_status",
+        "Get registered hardware buttons, recent event ring buffer state, and dropped event diagnostics",
         [](void* context, JsonObject& args, JsonObject& result) {
-            auto* self = static_cast<InputModule*>(context);
+            auto* self = static_cast<ButtonModule*>(context);
             if (!self) return;
-            JsonArray inputs = result["inputs"].to<JsonArray>();
-            for (const auto& input : self->_pendingInputs) {
-                JsonObject obj = inputs.add<JsonObject>();
-                obj["id"] = input.id ? input.id : "";
-                switch (input.type) {
-                    case InputType::GPIO:       obj["type"] = "GPIO"; break;
-                    case InputType::ADC_LADDER: obj["type"] = "ADC_LADDER"; break;
-                    case InputType::MATRIX:     obj["type"] = "MATRIX"; break;
+            JsonArray buttons = result["buttons"].to<JsonArray>();
+            for (const auto& button : self->_pendingButtons) {
+                JsonObject obj = buttons.add<JsonObject>();
+                obj["id"] = button.id ? button.id : "";
+                switch (button.type) {
+                    case ButtonType::GPIO:       obj["type"] = "GPIO"; break;
+                    case ButtonType::ADC_LADDER: obj["type"] = "ADC_LADDER"; break;
+                    case ButtonType::MATRIX:     obj["type"] = "MATRIX"; break;
                 }
             }
 

@@ -6,17 +6,17 @@
  * This work is licensed under Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International.
  * To view a copy of this license, visit https://creativecommons.org/licenses/by-nc-sa/4.0/
  *
- * Module: modules/InputModule/InputModule.hpp
- * Description: Pure-service input module handling GPIO, ADC ladder, and matrix
+ * Module: modules/ButtonModule/ButtonModule.hpp
+ * Description: Pure-service button module handling GPIO, ADC ladder, and matrix
  *              buttons via Espressif iot_button component. Decoupled from application
  *              logic by publishing button events to EventBus.
  *
  * Exported Classes:
- * - InputModule: Hardware button and gesture manager
- *   - addInput(): Register a BoardInput descriptor prior to begin()
+ * - ButtonModule: Hardware button and gesture manager
+ *   - addButton(): Register a BoardButton descriptor prior to begin()
  *   - begin(): Phase 2 initialization (creates FreeRTOS queue, instantiates button drivers)
  *   - tick(): Main-loop processing hook, drains queue and publishes to EventBus [ITickable]
- *   - registerMCPTools(): Exposes input_status MCP tool for diagnostics [IMCPContributor]
+ *   - registerMCPTools(): Exposes button_status MCP tool for diagnostics [IMCPContributor]
  */
 
 #pragma once
@@ -24,7 +24,7 @@
 #include <vector>
 #include <cstdint>
 #include <cstddef>
-#include "InputConfig.h"
+#include "ButtonConfig.h"
 #include "interfaces/ITickable.hpp"
 #include "interfaces/IMCPContributor.hpp"
 
@@ -40,19 +40,19 @@ class Application;
 class EventBus;
 class MCPToolRegistry;
 
-class InputModule : public ITickable, public IMCPContributor {
+class ButtonModule : public ITickable, public IMCPContributor {
 public:
-    InputModule();
-    ~InputModule() override;
+    ButtonModule();
+    ~ButtonModule() override;
 
     /**
-     * @brief Register a board input descriptor to be initialized at begin().
-     * @param input BoardInput descriptor struct.
+     * @brief Register a board button descriptor to be initialized at begin().
+     * @param button BoardButton descriptor struct.
      */
-    void addInput(const BoardInput& input);
+    void addButton(const BoardButton& button);
 
     /**
-     * @brief Initialize the input module, queue, and button drivers.
+     * @brief Initialize the button module, queue, and button drivers.
      * @param app Reference to Application hub for EventBus locator access.
      */
     void begin(Application& app);
@@ -64,7 +64,7 @@ public:
     void tick(uint32_t currentMillis) override;
 
     /**
-     * @brief Register input module diagnostic tools with MCP registry.
+     * @brief Register button module diagnostic tools with MCP registry.
      * @param registry Target MCPToolRegistry.
      */
     void registerMCPTools(MCPToolRegistry& registry) override;
@@ -74,19 +74,19 @@ private:
     static constexpr int MAX_EVENTS_PER_TICK = 4;
     static constexpr size_t EVENT_RING_SIZE = 8;
 
-    // Pending inputs (collected before begin())
-    std::vector<BoardInput> _pendingInputs;
+    // Pending buttons (collected before begin())
+    std::vector<BoardButton> _pendingButtons;
 
     // Runtime state
     EventBus* _bus = nullptr;
     QueueHandle_t _eventQueue = nullptr;
-    InputEvent _eventRing[EVENT_RING_SIZE];
+    ButtonEvent _eventRing[EVENT_RING_SIZE];
     size_t _ringHead = 0;
 
     // Per-button context for the static shim callback
     struct ShimContext {
         const char* id;
-        InputGesture gesture;
+        ButtonGesture gesture;
         QueueHandle_t queue;
         uint32_t droppedCount;
     };
@@ -97,13 +97,13 @@ private:
     std::vector<void*> _buttonHandles;
 
     // Internal creation helpers
-    void createGpioButton(const BoardInput& input);
-    void createAdcLadder(int8_t pin, const std::vector<const BoardInput*>& buttons);
-    void createMatrixButton(const BoardInput& input);
+    void createGpioButton(const BoardButton& button);
+    void createAdcLadder(int8_t pin, const std::vector<const BoardButton*>& buttons);
+    void createMatrixButton(const BoardButton& button);
 
     // Static shim — plain function pointer (GRAVE-05)
     static void _buttonShim(void* handle, void* userData);
 
     // Gesture → topic mapping
-    static const char* gestureToTopic(InputGesture gesture);
+    static const char* gestureToTopic(ButtonGesture gesture);
 };

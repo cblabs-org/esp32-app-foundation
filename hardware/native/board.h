@@ -74,12 +74,12 @@ constexpr int8_t PIN_DISPLAY_MISO = PIN_UNASSIGNED;
 constexpr int8_t PIN_DISPLAY_MOSI = PIN_UNASSIGNED;
 #define PIN_DISPLAY_MOSI PIN_DISPLAY_MOSI
 
-// ── Input configuration ─────────────────────────────────────────────────────
-#ifdef WITH_INPUT
-#include "InputConfig.h"
+// ── Button configuration ────────────────────────────────────────────────────
+#ifdef WITH_BUTTONS
+#include "ButtonConfig.h"
 
-constexpr BoardInput BOARD_INPUTS[] = {};
-constexpr size_t BOARD_INPUT_COUNT = 0;
-#define BOARD_INPUT_COUNT BOARD_INPUT_COUNT
+constexpr BoardButton BOARD_BUTTONS[] = {};
+constexpr size_t BOARD_BUTTON_COUNT = 0;
+#define BOARD_BUTTON_COUNT BOARD_BUTTON_COUNT
 #endif
 
