@@ -41,6 +41,11 @@ static TimeConfigGate timeGate{timeManager};
 static MCPServer mcpServer;
 #endif
 
+#ifdef WITH_INPUT
+#include "InputModule.hpp"
+static InputModule inputModule;
+#endif
+
 // ADR-16: File-scope static instances avoid stack-based corruption.
 // All module instances must be declared at file scope before setup().
 Application app;
@@ -116,6 +121,14 @@ void setup() {
     app.registerModule(&mcpServer);
 #endif
 
+#ifdef WITH_INPUT
+    for (size_t i = 0; i < BOARD_INPUT_COUNT; i++) {
+        inputModule.addInput(BOARD_INPUTS[i]);
+    }
+    inputModule.begin(app);
+    app.registerModule(&inputModule);
+#endif
+
     // Prepare Framework config — OTA
     // TODO: Set up OTA for your app:
     //   1. Create a releases repo (e.g. your-org/weather-station-releases)
@@ -170,6 +183,19 @@ void setup() {
 
 #ifdef WITH_HOMEASSISTANT
     weatherModule.wireHomeAssistant(haModule);
+#endif
+
+#ifdef WITH_INPUT
+    // Advance display carousel on button click
+    #ifdef WITH_DISPLAY_U8G2
+    app.getEventBus().subscribe("input.click", [](const char*, const void*, void* ctx) {
+        auto* display = static_cast<U8G2DisplayModule*>(ctx);
+        if (display) {
+            display->resetActivity();
+            display->carousel.nextBoard(millis());
+        }
+    }, &displayModule);
+    #endif
 #endif
 }
 

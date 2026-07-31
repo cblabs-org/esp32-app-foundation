@@ -101,3 +101,22 @@ constexpr int8_t PIN_DISPLAY_MOSI = 38;
 constexpr int8_t PIN_DISPLAY_RST  = PIN_UNASSIGNED;
 #define PIN_DISPLAY_RST PIN_DISPLAY_RST
 #endif
+
+// ── Input configuration ─────────────────────────────────────────────────────
+#ifdef WITH_INPUT
+#include "InputConfig.h"
+
+constexpr int8_t PIN_MODE_BUTTON = 8;     // INPUT_PULLUP capable
+#define PIN_MODE_BUTTON PIN_MODE_BUTTON
+
+constexpr BoardInput BOARD_INPUTS[] = {
+    {
+        .id       = "mode",
+        .type     = InputType::GPIO,
+        .gpio     = { .pin = PIN_MODE_BUTTON, .activeLow = true, .powerSave = false }
+    },
+};
+constexpr size_t BOARD_INPUT_COUNT = sizeof(BOARD_INPUTS) / sizeof(BOARD_INPUTS[0]);
+#define BOARD_INPUT_COUNT BOARD_INPUT_COUNT
+#endif
+

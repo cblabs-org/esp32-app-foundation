@@ -1,0 +1,13 @@
+{
+  "name": "InputModule",
+  "version": "0.1.0",
+  "description": "Framework input module handling GPIO, ADC, and Matrix buttons",
+  "dependencies": {
+    "Application": "*",
+    "bblanchon/ArduinoJson": "^7.4.3",
+    "hoeken/PsychicHttp": "^3.0.0"
+  },
+  "build": {
+    "flags": ["-I../../include"]
+  }
+}

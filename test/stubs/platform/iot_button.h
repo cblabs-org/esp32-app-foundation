@@ -62,7 +62,7 @@ inline esp_err_t iot_button_new_gpio_device(const button_config_t *config, const
     return ESP_OK;
 }
 
-inline esp_err_t iot_button_register_cb(button_handle_t btn_handle, button_event_t event, button_cb_t cb, void *usr_data) {
+inline esp_err_t iot_button_register_cb(button_handle_t btn_handle, button_event_t event, void* event_args, button_cb_t cb, void *usr_data) {
     return ESP_OK;
 }
 

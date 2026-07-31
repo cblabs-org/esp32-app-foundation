@@ -17,6 +17,9 @@
 
 #ifndef UNIT_TEST
 #include "iot_button.h"
+#include "button_gpio.h"
+#include "button_adc.h"
+#include "button_matrix.h"
 #else
 #include "iot_button.h"
 #endif
@@ -89,21 +92,14 @@ void InputModule::createGpioButton(const BoardInput& input) {
 
 #ifndef UNIT_TEST
     button_config_t btn_cfg = {};
-    btn_cfg.type = BUTTON_TYPE_GPIO;
-    btn_cfg.gpio_button_config.gpio_num = input.gpio.pin;
-    btn_cfg.gpio_button_config.active_level = input.gpio.activeLow ? 0 : 1;
-    btn_cfg.gpio_button_config.enable_power_save = input.gpio.powerSave;
-
     button_gpio_config_t gpio_cfg = {
         .gpio_num = input.gpio.pin,
         .active_level = static_cast<uint8_t>(input.gpio.activeLow ? 0 : 1),
-        .enable_power_save = input.gpio.powerSave
+        .enable_power_save = input.gpio.powerSave,
+        .disable_pull = false
     };
 
-    esp_err_t err = iot_button_new_gpio_device(&btn_cfg, &gpio_cfg, &btn_handle);
-    if (err != ESP_OK || !btn_handle) {
-        btn_handle = iot_button_create(&btn_cfg);
-    }
+    iot_button_new_gpio_device(&btn_cfg, &gpio_cfg, &btn_handle);
 #endif
 
     if (btn_handle) {
@@ -128,7 +124,7 @@ void InputModule::createGpioButton(const BoardInput& input) {
                 case InputGesture::LONG_PRESS:   evt = BUTTON_LONG_PRESS_START; break;
                 case InputGesture::PRESS_DOWN:   evt = BUTTON_PRESS_DOWN; break;
             }
-            iot_button_register_cb(btn_handle, evt, _buttonShim, ctx);
+            iot_button_register_cb(btn_handle, evt, nullptr, _buttonShim, ctx);
         }
 #endif
     }
@@ -142,6 +138,7 @@ void InputModule::createAdcLadder(int8_t pin, const std::vector<const BoardInput
         InputGesture::PRESS_DOWN
     };
 
+    uint8_t btnIndex = 0;
     for (const auto* inputPtr : buttons) {
         if (!inputPtr) continue;
         const auto& input = *inputPtr;
@@ -149,12 +146,16 @@ void InputModule::createAdcLadder(int8_t pin, const std::vector<const BoardInput
 
 #ifndef UNIT_TEST
         button_config_t btn_cfg = {};
-        btn_cfg.type = BUTTON_TYPE_ADC;
-        btn_cfg.adc_button_config.adc_channel = input.adc.adcChannel;
-        btn_cfg.adc_button_config.min_voltage = input.adc.minMv;
-        btn_cfg.adc_button_config.max_voltage = input.adc.maxMv;
+        button_adc_config_t adc_cfg = {
+            .adc_handle = nullptr,
+            .unit_id = ADC_UNIT_1,
+            .adc_channel = static_cast<uint8_t>(input.adc.adcChannel),
+            .button_index = btnIndex++,
+            .min = input.adc.minMv,
+            .max = input.adc.maxMv
+        };
 
-        btn_handle = iot_button_create(&btn_cfg);
+        iot_button_new_adc_device(&btn_cfg, &adc_cfg, &btn_handle);
 #endif
 
         if (btn_handle) {
@@ -179,7 +180,7 @@ void InputModule::createAdcLadder(int8_t pin, const std::vector<const BoardInput
                     case InputGesture::LONG_PRESS:   evt = BUTTON_LONG_PRESS_START; break;
                     case InputGesture::PRESS_DOWN:   evt = BUTTON_PRESS_DOWN; break;
                 }
-                iot_button_register_cb(btn_handle, evt, _buttonShim, ctx);
+                iot_button_register_cb(btn_handle, evt, nullptr, _buttonShim, ctx);
             }
 #endif
         }
@@ -198,8 +199,16 @@ void InputModule::createMatrixButton(const BoardInput& input) {
 
 #ifndef UNIT_TEST
     button_config_t btn_cfg = {};
-    btn_cfg.type = BUTTON_TYPE_MATRIX;
-    btn_handle = iot_button_create(&btn_cfg);
+    int32_t row_gpios[1] = { input.matrix.rowPin };
+    int32_t col_gpios[1] = { input.matrix.colPin };
+    button_matrix_config_t matrix_cfg = {
+        .row_gpios = row_gpios,
+        .col_gpios = col_gpios,
+        .row_gpio_num = 1,
+        .col_gpio_num = 1
+    };
+    size_t btn_cnt = 1;
+    iot_button_new_matrix_device(&btn_cfg, &matrix_cfg, &btn_handle, &btn_cnt);
 #endif
 
     if (btn_handle) {
@@ -224,7 +233,7 @@ void InputModule::createMatrixButton(const BoardInput& input) {
                 case InputGesture::LONG_PRESS:   evt = BUTTON_LONG_PRESS_START; break;
                 case InputGesture::PRESS_DOWN:   evt = BUTTON_PRESS_DOWN; break;
             }
-            iot_button_register_cb(btn_handle, evt, _buttonShim, ctx);
+            iot_button_register_cb(btn_handle, evt, nullptr, _buttonShim, ctx);
         }
 #endif
     }
