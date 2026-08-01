@@ -190,3 +190,22 @@ constexpr int8_t PIN_AUX_I2C_SCL  = 39;
 //         .adc = { .adcPin = 34, .adcChannel = 6, .minMv = 1600, .maxMv = 2000 } },
 //   };
 
+// ── Custom Boot Branding & Logo Example ───────────────────────────────────────
+// Downstream board authors can optionally define board-level boot branding and
+// logos to pass to U8G2DisplayModule or LVGLDisplayModule in main.cpp.
+// See `docs/developer/custom-branding.md` for full details.
+//
+// Example (U8G2):
+//   #include <types/BootBranding.h>
+//   #include <types/U8G2BootLogo.h>
+//   #include "board_logo_xbm.h"  // Custom XBM byte array (PROGMEM)
+//
+//   static constexpr BootBranding BOARD_BRANDING{ .appTitle = "My Custom Board" };
+//   static constexpr U8G2BootLogo BOARD_BOOT_LOGO{
+//       .width = BOARD_LOGO_WIDTH,
+//       .height = BOARD_LOGO_HEIGHT,
+//       .bits = board_logo_bits
+//   };
+//   // In main.cpp: U8G2DisplayModule displayModule(&BOARD_BRANDING, &BOARD_BOOT_LOGO);
+
+

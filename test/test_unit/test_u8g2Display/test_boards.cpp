@@ -118,6 +118,32 @@ TEST_F(BootBoardTest, SetStatus_DoesNotCauseExpiry) {
     EXPECT_FALSE(board.isExpired());
 }
 
+/** BootBoard construction with custom logo correctly sets image dimensions. */
+TEST_F(BootBoardTest, CustomLogo_SetsLogoDimensions) {
+    static const uint8_t dummyBits[] = {0x00};
+    U8G2BootLogo customLogo{48, 48, dummyBits};
+    BootBoard customBoard{256, 64, &customLogo};
+
+    EXPECT_EQ(customBoard.getLogoWidth(), 48);
+    EXPECT_EQ(customBoard.getLogoHeight(), 48);
+}
+
+/** BootBoard construction with nullptr logo falls back to default logo dimensions. */
+TEST_F(BootBoardTest, NullptrLogo_FallsBackToDefaultLogoDimensions) {
+    BootBoard defaultBoard{256, 64, nullptr};
+
+    EXPECT_EQ(defaultBoard.getLogoWidth(), 110);
+    EXPECT_EQ(defaultBoard.getLogoHeight(), 32);
+}
+
+/** BootBoard construction with custom title sets the correct app title. */
+TEST_F(BootBoardTest, CustomTitle_SetsAppTitle) {
+    BootBoard customTitleBoard{256, 64, nullptr, "Custom App Title"};
+
+    EXPECT_STREQ(customTitleBoard.getAppTitle(), "Custom App Title");
+}
+
+
 // =============================================================================
 // Test Group: WiFiWizardBoard
 // =============================================================================

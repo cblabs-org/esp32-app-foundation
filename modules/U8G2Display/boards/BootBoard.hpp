@@ -104,6 +104,16 @@ public:
      */
     const char* getBoardName() const override;
 
+    /** @brief Get logo widget width (for testing). */
+    int getLogoWidth() const { return _logoImage.getW(); }
+
+    /** @brief Get logo widget height (for testing). */
+    int getLogoHeight() const { return _logoImage.getH(); }
+
+    /** @brief Get custom application title pointer (for testing). */
+    const char* getAppTitle() const { return _appTitle; }
+
+
 private:
     /** @brief Visual phase of the boot board. */
     enum class Phase {

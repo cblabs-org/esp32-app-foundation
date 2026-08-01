@@ -7,7 +7,7 @@ Downstream consumers cannot brand boot/system screens without editing framework 
 
 - **[x] [wo1-shared-types](wo1-shared-types/WORKORDER.md):** Shared Types & U8G2 Interface
 - **[x] [wo2-lvgl-alignment](wo2-lvgl-alignment/WORKORDER.md):** LVGL Alignment + Build Flags
-- **[ ] [wo3-docs-tests](wo3-docs-tests/WORKORDER.md):** Docs & Tests
+- **[x] [wo3-docs-tests](wo3-docs-tests/WORKORDER.md):** Docs & Tests
 
 ## Status Log
 
