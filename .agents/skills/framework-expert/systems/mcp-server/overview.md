@@ -51,6 +51,16 @@ Any module implementing `IMCPContributor` registers tools via `registerMCPTools(
 3. **Enumerate tools** → call `list_tools` to get the full catalog
 4. **Call tools** → use the JSON-RPC 2.0 envelope below
 
+### Recovering the IP When Discovery Fails
+
+If `discovery.py` finds nothing and mDNS / `<hostname>.local` or subnet scans do
+not resolve the device (common on isolated VLANs, captive networks, or right
+after a WiFi change), read the IP directly from the **boot log over serial**:
+start a serial monitor and reset the device — the network stack prints the
+acquired IP during boot (the same value exposed as `wifi_ip` in `system_info`).
+Serial access needs no network and no portal auth, so it is the reliable
+last-resort channel for locating a device that has gone quiet on the network.
+
 ### Calling a Tool
 
 ```bash
