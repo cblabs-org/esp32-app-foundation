@@ -45,18 +45,20 @@
  * @param displayWidth  Display width in pixels.
  * @param displayHeight Display height in pixels.
  */
-BootBoard::BootBoard(uint16_t displayWidth, uint16_t displayHeight)
+BootBoard::BootBoard(uint16_t displayWidth, uint16_t displayHeight,
+                     const U8G2BootLogo* logo, const char* appTitle)
     : _titleLabel(0, 0, static_cast<int>(displayWidth), -1),
       _logoImage(
-          (static_cast<int>(displayWidth) - cblabs_logo_width) / 2,  // centred X
-          18,                                                          // Y below title
-          cblabs_logo_width,
-          cblabs_logo_height,
-          cblabs_logo_bits
+          (static_cast<int>(displayWidth) - (logo ? logo->width : cblabs_logo_width)) / 2,  // centred X
+          18,                                                                               // Y below title
+          (logo ? logo->width : cblabs_logo_width),
+          (logo ? logo->height : cblabs_logo_height),
+          (logo ? logo->bits : cblabs_logo_bits)
       ),
       _versionLabel(0, 50, static_cast<int>(displayWidth), -1),
       _statusLabel(0, 24, static_cast<int>(displayWidth), -1),
-      _progressBar(16, 38, static_cast<int>(displayWidth) - 32, 16, nullptr)
+      _progressBar(16, 38, static_cast<int>(displayWidth) - 32, 16, nullptr),
+      _appTitle(appTitle)
 {
 }
 
@@ -82,7 +84,7 @@ void BootBoard::activate(const char* version) {
     }
 
     // --- Configure title widget (persistent across phases) ---
-    _titleLabel.setText(APP_TITLE);
+    _titleLabel.setText(_appTitle != nullptr ? _appTitle : APP_TITLE);
     _titleLabel.setAlignment(1); // CENTER
 
     // --- Configure version widget (splash only) ---

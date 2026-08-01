@@ -71,6 +71,16 @@ static constexpr const char* TAG = "U8G2DisplayModule";
 // Lifecycle
 // =============================================================================
 
+U8G2DisplayModule::U8G2DisplayModule(const BootBranding* branding,
+                                     const U8G2BootLogo* bootLogo,
+                                     IU8G2SystemScreens* screens)
+    : _branding(branding),
+      _bootLogo(bootLogo),
+      _screens(screens),
+      _bootBoard(_displayWidth, _displayHeight, _bootLogo, _branding ? _branding->appTitle : nullptr)
+{
+}
+
 /**
  * @brief Phase 1: Bootstrap display hardware with zero framework dependencies.
  *
@@ -429,13 +439,16 @@ void U8G2DisplayModule::reportStatus(const char* message, float progress) {
  * @param errorMessage Error description text.
  */
 void U8G2DisplayModule::reportError(const char* errorMessage) {
-    // --- Delegate to ErrorBoard with fatal flag ---
-    _error.showError(errorMessage, true);
+    IDisplayBoard* errBoard = (_screens != nullptr && _screens->errorBoard() != nullptr)
+                              ? _screens->errorBoard()
+                              : &_error;
 
-    // --- Force-show the error board ---
-    showModal(&_error);
+    if (errBoard == &_error) {
+        _error.showError(errorMessage, true);
+    }
 
-    // --- Immediate render in bootstrap mode (no tick loop yet) ---
+    showModal(errBoard);
+
     if (_bootstrapMode) {
         _renderCurrentBoard();
     }
@@ -1108,13 +1121,19 @@ void U8G2DisplayModule::_onOtaProgress(const char* /*topic*/, const void* payloa
 
     const auto* ota = static_cast<const ApplicationEvents::OtaProgressPayload*>(payload);
 
-    if (ota->complete) {
-        self->_otaProgress.setComplete(ota->success);
-    } else {
-        self->_otaProgress.setProgress(ota->progress, ota->status);
+    IDisplayBoard* otaBoard = (self->_screens != nullptr && self->_screens->otaProgressBoard() != nullptr)
+                              ? self->_screens->otaProgressBoard()
+                              : &self->_otaProgress;
+
+    if (otaBoard == &self->_otaProgress) {
+        if (ota->complete) {
+            self->_otaProgress.setComplete(ota->success);
+        } else {
+            self->_otaProgress.setProgress(ota->progress, ota->status);
+        }
     }
 
-    self->showModal(&self->_otaProgress);
+    self->showModal(otaBoard);
     self->resetActivity();
 }
 #endif
@@ -1157,7 +1176,10 @@ void U8G2DisplayModule::_onAppConfiguring(const char* /*topic*/, const void* /*p
     }
 
     self->carousel.suspend();
-    self->showBase(&self->boards.configuringStatus);
+    IDisplayBoard* cfgBoard = (self->_screens != nullptr && self->_screens->configuringBoard() != nullptr)
+                              ? self->_screens->configuringBoard()
+                              : &self->boards.configuringStatus;
+    self->showBase(cfgBoard);
     // TODO: Restore WiFi Wizard modal logic
 }
 

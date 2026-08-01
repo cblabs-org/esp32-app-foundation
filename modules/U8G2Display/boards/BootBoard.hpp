@@ -28,6 +28,7 @@
 #include "widgets/LabelWidget.hpp"
 #include "widgets/ImageWidget.hpp"
 #include "widgets/ProgressBarWidget.hpp"
+#include <types/U8G2BootLogo.h>
 
 #ifndef APP_TITLE
 #define APP_TITLE "ESP32 App Foundation"
@@ -48,11 +49,15 @@
 class BootBoard : public IDisplayBoard {
 public:
     /**
-     * @brief Construct with display dimensions for widget layout.
+     * @brief Construct with display dimensions and optional branding for widget layout.
      * @param displayWidth  Display width in pixels (from U8G2 driver).
      * @param displayHeight Display height in pixels (from U8G2 driver).
+     * @param logo          Optional custom U8G2BootLogo descriptor (nullptr for built-in logo).
+     * @param appTitle      Optional custom application title string (nullptr for APP_TITLE macro).
      */
-    BootBoard(uint16_t displayWidth, uint16_t displayHeight);
+    explicit BootBoard(uint16_t displayWidth, uint16_t displayHeight,
+                       const U8G2BootLogo* logo = nullptr,
+                       const char* appTitle = nullptr);
 
     /**
      * @brief Enter the Splash phase. Starts the splash timer.
@@ -113,6 +118,7 @@ private:
     unsigned long _splashDurationMs = 3000;
     float         _progress     = -1.0f;
     char          _version[32]  = "";
+    const char*   _appTitle     = nullptr;
 
     // --- Persistent widget (both phases) ---
     LabelWidget _titleLabel;           ///< App title — always visible at top

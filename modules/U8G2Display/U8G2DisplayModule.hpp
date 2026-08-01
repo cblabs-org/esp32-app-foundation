@@ -96,6 +96,9 @@
 #include "boards/ConfiguringStatusBoard.hpp"
 #include "../../include/types/DisplayInfo.hpp"
 #include "../../include/utils/Periodic.hpp"
+#include <types/BootBranding.h>
+#include <types/U8G2BootLogo.h>
+#include <interfaces/IU8G2SystemScreens.hpp>
 
 // --- Hardware-only includes (excluded from native GoogleTest builds) ---
 #include "board.h"
@@ -183,8 +186,18 @@ namespace U8G2DisplayEvents {
 class U8G2DisplayModule : public ITickable, public IConfigurable, public IWebContributor, public IMCPContributor, public IBootReporter {
 public:
     // -------------------------------------------------------------------------
-    // Lifecycle
+    // Construction & Lifecycle
     // -------------------------------------------------------------------------
+
+    /**
+     * @brief Construct U8G2DisplayModule with optional branding, boot logo, and custom screens provider.
+     * @param branding  Optional pointer to BootBranding descriptor (app title).
+     * @param bootLogo  Optional pointer to custom U8G2BootLogo XBM logo descriptor.
+     * @param screens   Optional pointer to IU8G2SystemScreens provider.
+     */
+    explicit U8G2DisplayModule(const BootBranding* branding = nullptr,
+                               const U8G2BootLogo* bootLogo = nullptr,
+                               IU8G2SystemScreens* screens = nullptr);
 
     /**
      * @brief Phase 1: Bootstrap display hardware with zero framework dependencies.
@@ -620,6 +633,11 @@ private:
     // --- Bootstrap state ---
     bool  _bootstrapMode    = false;               ///< True between bootstrapHardware() and begin()
     float _lastBootProgress = 0.0f;                ///< Cached progress for smooth inline interpolation
+
+    // --- System screen branding & overrides ---
+    const BootBranding*   _branding = nullptr;     ///< Optional boot branding (app title)
+    const U8G2BootLogo*   _bootLogo = nullptr;     ///< Optional custom boot logo
+    IU8G2SystemScreens*  _screens  = nullptr;     ///< Optional custom system screens provider
 
     // --- Owned system board instances ---
     BootBoard        _bootBoard{_displayWidth, _displayHeight};   ///< Unified boot board (splash + loading phases)
