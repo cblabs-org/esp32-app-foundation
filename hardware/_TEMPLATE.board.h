@@ -17,23 +17,23 @@
  * │                         <BOARD NAME HERE>                               │
  * │                         (Top View / Pinout)                             │
  * │                                                                         │
- * │    [Signal / Label]  [GPIO#] ┌───────────┐ [GPIO#]  [Signal / Label]    │
- * │    ─────────────────────────┤           ├─────────────────────────    │
- * │    3V3 Power         [ 3V3 ]│ (1)   (30)│[ GND ]   Ground             │
- * │    EN / Reset        [ EN  ]│ (2)   (29)│[ G23 ]   SPI MOSI           │
- * │    Sensor VP         [ G36 ]│ (3)   (28)│[ G22 ]   I2C SCL            │
- * │    Sensor VN         [ G39 ]│ (4)   (27)│[ G1  ]   TXD0               │
- * │    Clean GP          [ G34 ]│ (5)   (26)│[ G3  ]   RXD0               │
- * │    Clean GP          [ G35 ]│ (6)   (25)│[ G21 ]   I2C SDA            │
- * │    Clean GP          [ G32 ]│ (7)   (24)│[ G19 ]   SPI MISO           │
- * │    Clean GP          [ G33 ]│ (8)   (23)│[ G18 ]   SPI SCK            │
- * │    DAC / Clean       [ G25 ]│ (9)   (22)│[ G5  ]   Display CS         │
- * │    DAC / Clean       [ G26 ]│ (10)  (21)│[ G17 ]   UART2 TX           │
- * │    Clean GP          [ G27 ]│ (11)  (20)│[ G16 ]   UART2 RX           │
- * │    Touch / GP        [ G14 ]│ (12)  (19)│[ G4  ]   Display DC         │
- * │    Touch / GP        [ G12 ]│ (13)  (18)│[ G0  ]   Strapping / Boot   │
- * │    Ground            [ GND ]│ (14)  (17)│[ G2  ]   Strapping / LED    │
- * │    5V Power          [ 5V  ]│ (15)  (16)│[ G15 ]   Strapping / JTAG   │
+ * │    [Signal / Label] [GPIO#] ┌───────────┐ [GPIO#]  [Signal / Label]     │
+ * │    ─────────────────────────┤           ├─────────────────────────      │
+ * │    3V3 Power         [ 3V3 ]│ (1)   (30)│[ GND ]   Ground               │
+ * │    EN / Reset        [ EN  ]│ (2)   (29)│[ G23 ]   SPI MOSI             │
+ * │    Sensor VP         [ G36 ]│ (3)   (28)│[ G22 ]   I2C SCL              │
+ * │    Sensor VN         [ G39 ]│ (4)   (27)│[ G1  ]   TXD0                 │
+ * │    Clean GP          [ G34 ]│ (5)   (26)│[ G3  ]   RXD0                 │
+ * │    Clean GP          [ G35 ]│ (6)   (25)│[ G21 ]   I2C SDA              │
+ * │    Clean GP          [ G32 ]│ (7)   (24)│[ G19 ]   SPI MISO             │
+ * │    Clean GP          [ G33 ]│ (8)   (23)│[ G18 ]   SPI SCK              │
+ * │    DAC / Clean       [ G25 ]│ (9)   (22)│[ G5  ]   Display CS           │
+ * │    DAC / Clean       [ G26 ]│ (10)  (21)│[ G17 ]   UART2 TX             │
+ * │    Clean GP          [ G27 ]│ (11)  (20)│[ G16 ]   UART2 RX             │
+ * │    Touch / GP        [ G14 ]│ (12)  (19)│[ G4  ]   Display DC           │
+ * │    Touch / GP        [ G12 ]│ (13)  (18)│[ G0  ]   Strapping / Boot     │
+ * │    Ground            [ GND ]│ (14)  (17)│[ G2  ]   Strapping / LED      │
+ * │    5V Power          [ 5V  ]│ (15)  (16)│[ G15 ]   Strapping / JTAG     │
  * │                             └───────────┘                               │
  * └─────────────────────────────────────────────────────────────────────────┘
  *

@@ -132,10 +132,12 @@ TEST_F(EncoderModuleLifecycleTest, AddEncoder_StoresDescriptor) {
     JsonObject result = resultDoc.to<JsonObject>();
 
     entry->handler(entry->context, args, result);
-    EXPECT_STREQ(result["id"], "enc_test");
-    EXPECT_EQ(result["pinA"].as<int8_t>(), 10);
-    EXPECT_EQ(result["pinB"].as<int8_t>(), 11);
-    EXPECT_EQ(result["stepsPerDetent"].as<uint8_t>(), 2);
+    EXPECT_TRUE(result["encoders"].is<JsonArray>());
+    JsonObject enc0 = result["encoders"][0].as<JsonObject>();
+    EXPECT_STREQ(enc0["id"], "enc_test");
+    EXPECT_EQ(enc0["pinA"].as<int8_t>(), 10);
+    EXPECT_EQ(enc0["pinB"].as<int8_t>(), 11);
+    EXPECT_EQ(enc0["stepsPerDetent"].as<uint8_t>(), 2);
 }
 
 TEST_F(EncoderModuleLifecycleTest, Begin_InitialisesBusPointer) {
@@ -567,15 +569,20 @@ TEST_F(EncoderModuleMCPTest, EncoderStatus_ReturnsJSONWithEncoderInfo) {
 
     entry->handler(entry->context, args, result);
 
-    EXPECT_STREQ(result["id"], "main_enc");
-    EXPECT_EQ(result["pinA"].as<int8_t>(), 45);
-    EXPECT_EQ(result["pinB"].as<int8_t>(), 42);
-    EXPECT_EQ(result["stepsPerDetent"].as<uint8_t>(), 2);
-    EXPECT_FALSE(result["reversed"].as<bool>());
-    EXPECT_EQ(result["position"].as<int32_t>(), 2);
-    EXPECT_EQ(result["lastMovementMs"].as<uint32_t>(), 100u);
-    EXPECT_EQ(result["rawDelta"].as<int32_t>(), 2);
-    EXPECT_EQ(result["accelDelta"].as<int32_t>(), 2);
+    EXPECT_TRUE(result["encoders"].is<JsonArray>());
+    JsonArray encoders = result["encoders"].as<JsonArray>();
+    EXPECT_EQ(encoders.size(), 1);
+    JsonObject enc0 = encoders[0].as<JsonObject>();
+
+    EXPECT_STREQ(enc0["id"], "main_enc");
+    EXPECT_EQ(enc0["pinA"].as<int8_t>(), 45);
+    EXPECT_EQ(enc0["pinB"].as<int8_t>(), 42);
+    EXPECT_EQ(enc0["stepsPerDetent"].as<uint8_t>(), 2);
+    EXPECT_FALSE(enc0["reversed"].as<bool>());
+    EXPECT_EQ(enc0["position"].as<int32_t>(), 2);
+    EXPECT_EQ(enc0["lastMovementMs"].as<uint32_t>(), 100u);
+    EXPECT_EQ(enc0["rawDelta"].as<int32_t>(), 2);
+    EXPECT_EQ(enc0["accelDelta"].as<int32_t>(), 2);
 }
 
 TEST_F(EncoderModuleMCPTest, EncoderStatus_ShowsAccelConfig) {
@@ -589,8 +596,10 @@ TEST_F(EncoderModuleMCPTest, EncoderStatus_ShowsAccelConfig) {
 
     entry->handler(entry->context, args, result);
 
-    EXPECT_TRUE(result["accel"].is<JsonObject>());
-    JsonObject accelObj = result["accel"].as<JsonObject>();
+    EXPECT_TRUE(result["encoders"].is<JsonArray>());
+    JsonObject enc0 = result["encoders"][0].as<JsonObject>();
+    EXPECT_TRUE(enc0["accel"].is<JsonObject>());
+    JsonObject accelObj = enc0["accel"].as<JsonObject>();
     EXPECT_TRUE(accelObj["enabled"].as<bool>());
     EXPECT_EQ(accelObj["deadZoneMs"].as<uint16_t>(), 200);
     EXPECT_EQ(accelObj["shortCutoffMs"].as<uint16_t>(), 30);

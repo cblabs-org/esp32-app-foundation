@@ -135,6 +135,13 @@ static_assert(BOARD_BUTTON_COUNT > 0, "WITH_BUTTONS set but BOARD_BUTTONS[] is e
 
 static_assert(BOARD_ENCODER_COUNT > 0, "WITH_ENCODER set but BOARD_ENCODERS[] is empty");
 
+#if __has_include("soc/soc_caps.h")
+#include "soc/soc_caps.h"
+#ifdef SOC_PCNT_UNITS_PER_GROUP
+static_assert(BOARD_ENCODER_COUNT <= SOC_PCNT_UNITS_PER_GROUP, "BOARD_ENCODER_COUNT exceeds available hardware PCNT units");
+#endif
+#endif
+
 #endif // WITH_ENCODER
 
 
