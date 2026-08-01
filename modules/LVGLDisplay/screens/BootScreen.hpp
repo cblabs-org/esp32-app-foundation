@@ -39,7 +39,7 @@ public:
      *
      * @param bootLogo Pointer to compiled-in lv_image_dsc_t (defaults to cb_labs_boot_logo).
      */
-    explicit BootScreen(const lv_image_dsc_t* bootLogo = nullptr);
+    explicit BootScreen(const lv_image_dsc_t* bootLogo = nullptr, const char* appTitle = nullptr);
 
     /**
      * @brief Destructor. Deletes LVGL screen object if created.
@@ -55,7 +55,7 @@ public:
      *
      * @param bootLogo Pointer to compiled-in lv_image_dsc_t (optional override).
      */
-    void init(const lv_image_dsc_t* bootLogo = nullptr);
+    void init(const lv_image_dsc_t* bootLogo = nullptr, const char* appTitle = nullptr);
 
     /**
      * @brief Update boot status message and progress bar.
@@ -73,6 +73,13 @@ public:
     void setBootLogo(const lv_image_dsc_t* bootLogo);
 
     /**
+     * @brief Update the application title displayed on screen.
+     *
+     * @param appTitle Null-terminated title string (or nullptr for default).
+     */
+    void setAppTitle(const char* appTitle);
+
+    /**
      * @brief Get root LVGL screen object pointer.
      * @return lv_obj_t* pointer, or nullptr if not initialized.
      */
@@ -80,8 +87,10 @@ public:
 
 private:
     const lv_image_dsc_t* _bootLogo = nullptr;
+    const char* _appTitle = nullptr;
     lv_obj_t* _screen = nullptr;
     lv_obj_t* _logoImg = nullptr;
+    lv_obj_t* _titleLabel = nullptr;
     lv_obj_t* _statusLabel = nullptr;
     lv_obj_t* _progressBar = nullptr;
 };

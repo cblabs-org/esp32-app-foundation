@@ -50,6 +50,10 @@
 #include <string>
 #include <atomic>
 
+#ifndef APP_TITLE
+#define APP_TITLE "ESP32 App Foundation"
+#endif
+
 // NOTE: PsychicHttpRequestCallback, PsychicMiddlewareNext, and
 // PsychicMiddlewareCallback are std::function typedefs defined by the
 // PsychicHttp library. These are an external constraint and cannot be

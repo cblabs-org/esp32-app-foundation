@@ -52,6 +52,7 @@
 #include "interfaces/IBootReporter.hpp"
 #include "interfaces/ILVGLHardwareAdapter.hpp"
 #include "interfaces/ILVGLSystemScreens.hpp"
+#include <types/BootBranding.h>
 #include "assets/boot_logo.h"
 #include "screens/BootScreen.hpp"
 #include "screens/ErrorScreen.hpp"
@@ -117,8 +118,9 @@ public:
      * @param bootLogo Optional pointer to compiled-in lv_image_dsc_t for Stage 1 boot splash (defaults to cb_labs_boot_logo).
      */
     explicit LVGLDisplayModule(ILVGLHardwareAdapter& adapter,
-                               ILVGLSystemScreens* screens = nullptr,
-                               const lv_image_dsc_t* bootLogo = nullptr);
+                               const BootBranding* branding = nullptr,
+                               const lv_image_dsc_t* bootLogo = nullptr,
+                               ILVGLSystemScreens* screens = nullptr);
 
     /**
      * @brief Destructor. Cleans up draw buffers and LVGL handles.
@@ -375,6 +377,7 @@ private:
     static void _onAppRunning(const char* topic, const void* payload, void* ctx);
 
     ILVGLHardwareAdapter& _adapter;            ///< Injected hardware adapter
+    const BootBranding*   _branding = nullptr; ///< Optional boot branding configuration
     ILVGLSystemScreens*   _screens = nullptr;  ///< Optional system screens provider
     ConfigManager*        _configManager = nullptr; ///< Cached ConfigManager reference
     EventBus*             _eventBus = nullptr; ///< Framework EventBus reference

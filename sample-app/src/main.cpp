@@ -54,16 +54,18 @@ WeatherModule weatherModule;
 // --- Display (Ring-2 Optional) ---
 #if defined(WITH_DISPLAY_LVGL) || defined(WITH_DISPLAY_U8G2)
 #include "WeatherBoard.hpp"
+#include <types/BootBranding.h>
+static constexpr BootBranding branding{"Weather Station"};
 #endif
 #ifdef WITH_DISPLAY_LVGL
 #include "LVGLDisplayModule.hpp"
 #include "adapters/lvgl/CrowPanel128Adapter.hpp"
 static CrowPanel128Adapter displayAdapter;
-static LVGLDisplayModule displayModule(displayAdapter);
+static LVGLDisplayModule displayModule(displayAdapter, &branding);
 #elif defined(WITH_DISPLAY_U8G2)
 #include "U8G2DisplayModule.hpp"
 #include "boards/DiagnosticsBoard.hpp"
-static U8G2DisplayModule displayModule;
+static U8G2DisplayModule displayModule(&branding);
 static DiagnosticsBoard diagnosticsBoard{256, 64};
 // F04: EventBus wiring deferred to setup() — at file scope, Application
 // members may not be fully initialized (static init order fiasco).

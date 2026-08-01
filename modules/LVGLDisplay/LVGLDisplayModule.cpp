@@ -37,12 +37,14 @@ extern "C" __attribute__((weak)) void ui_init(void) {
 // -----------------------------------------------------------------------------
 
 LVGLDisplayModule::LVGLDisplayModule(ILVGLHardwareAdapter& adapter,
-                                     ILVGLSystemScreens* screens,
-                                     const lv_image_dsc_t* bootLogo)
+                                     const BootBranding* branding,
+                                     const lv_image_dsc_t* bootLogo,
+                                     ILVGLSystemScreens* screens)
     : _adapter(adapter),
+      _branding(branding),
       _screens(screens),
       _bootLogo(bootLogo ? bootLogo : &cb_labs_boot_logo),
-      _builtInBootScreen(_bootLogo) {
+      _builtInBootScreen(_bootLogo, _branding ? _branding->appTitle : nullptr) {
 }
 
 LVGLDisplayModule::~LVGLDisplayModule() {
@@ -278,7 +280,7 @@ void LVGLDisplayModule::clearStatus() {
 // -----------------------------------------------------------------------------
 
 void LVGLDisplayModule::showBoot() {
-    _builtInBootScreen.init(_bootLogo);
+    _builtInBootScreen.init(_bootLogo, _branding ? _branding->appTitle : nullptr);
     lv_obj_t* bootScr = _builtInBootScreen.getScreen();
     if (bootScr != nullptr) {
         lv_scr_load_anim(bootScr, LV_SCR_LOAD_ANIM_FADE_IN, 200, 0, false);

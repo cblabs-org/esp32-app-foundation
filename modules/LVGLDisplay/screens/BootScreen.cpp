@@ -16,8 +16,9 @@
 #include "BootScreen.hpp"
 #endif
 
-BootScreen::BootScreen(const lv_image_dsc_t* bootLogo)
-    : _bootLogo(bootLogo ? bootLogo : &cb_labs_boot_logo) {}
+BootScreen::BootScreen(const lv_image_dsc_t* bootLogo, const char* appTitle)
+    : _bootLogo(bootLogo ? bootLogo : &cb_labs_boot_logo),
+      _appTitle(appTitle) {}
 
 BootScreen::~BootScreen() {
     if (_screen) {
@@ -26,11 +27,17 @@ BootScreen::~BootScreen() {
     }
 }
 
-void BootScreen::init(const lv_image_dsc_t* bootLogo) {
+void BootScreen::init(const lv_image_dsc_t* bootLogo, const char* appTitle) {
     if (bootLogo) {
         _bootLogo = bootLogo;
     }
+    if (appTitle) {
+        _appTitle = appTitle;
+    }
     if (_screen) {
+        if (_appTitle && _titleLabel) {
+            lv_label_set_text(_titleLabel, _appTitle);
+        }
         return;
     }
 
@@ -41,12 +48,18 @@ void BootScreen::init(const lv_image_dsc_t* bootLogo) {
     if (_bootLogo) {
         lv_image_set_src(_logoImg, _bootLogo);
     }
-    lv_obj_align(_logoImg, LV_ALIGN_CENTER, 0, -30);
+    lv_obj_align(_logoImg, LV_ALIGN_CENTER, 0, -45);
+
+    _titleLabel = lv_label_create(_screen);
+    lv_label_set_text(_titleLabel, _appTitle ? _appTitle : "ESP32 App Foundation");
+    lv_obj_set_style_text_color(_titleLabel, lv_color_white(), LV_PART_MAIN);
+    lv_obj_set_style_text_font(_titleLabel, &lv_font_montserrat_14, LV_PART_MAIN);
+    lv_obj_align(_titleLabel, LV_ALIGN_CENTER, 0, -10);
 
     _statusLabel = lv_label_create(_screen);
     lv_label_set_text(_statusLabel, "Starting...");
     lv_obj_set_style_text_color(_statusLabel, lv_color_white(), LV_PART_MAIN);
-    lv_obj_align(_statusLabel, LV_ALIGN_CENTER, 0, 15);
+    lv_obj_align(_statusLabel, LV_ALIGN_CENTER, 0, 18);
 
     _progressBar = lv_bar_create(_screen);
     lv_obj_set_size(_progressBar, 160, 8);
@@ -76,5 +89,12 @@ void BootScreen::setBootLogo(const lv_image_dsc_t* bootLogo) {
         if (_logoImg) {
             lv_image_set_src(_logoImg, _bootLogo);
         }
+    }
+}
+
+void BootScreen::setAppTitle(const char* appTitle) {
+    _appTitle = appTitle;
+    if (_titleLabel) {
+        lv_label_set_text(_titleLabel, _appTitle ? _appTitle : "ESP32 App Foundation");
     }
 }

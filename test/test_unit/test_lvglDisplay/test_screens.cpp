@@ -148,7 +148,7 @@ TEST_F(LVGLScreensTest, ProviderScreenWiringAndCallbacks) {
     provider.customOtaScr = lv_obj_create(nullptr);
     provider.customErrorScr = lv_obj_create(nullptr);
 
-    LVGLDisplayModule module(adapter, &provider);
+    LVGLDisplayModule module(adapter, nullptr, nullptr, &provider);
     module.bootstrapHardware();
 
     module.showError("CFG_ERR", "Invalid json");
