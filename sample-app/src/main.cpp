@@ -17,6 +17,7 @@
 
 #include "AppFoundation.h"
 #include <Arduino.h>
+#include <cstring>
 #include "WeatherModule.hpp"
 
 #ifdef WITH_HOMEASSISTANT
@@ -162,10 +163,15 @@ void setup() {
     if (app.getState() == AppState::Configuring) {
         displayModule.carousel.suspend();
         displayModule.showBase(&displayModule.boards.configuringStatus);
-        if (app.getWifiManager().getAPMode()) {
-            displayModule.boards.wifiWizard.configure(
-                app.getWifiManager().getHostname(), "192.168.4.1");
-            displayModule.showModal(&displayModule.boards.wifiWizard);
+
+        // Mirror _onAppConfiguring: show WiFi wizard if WiFi Station gate is the blocker
+        for (auto* gate : app.getConfigGates()) {
+            if (!gate->isSatisfied() && strcmp(gate->getGateName(), "WiFi Station") == 0) {
+                displayModule.boards.wifiWizard.configure(
+                    app.getWifiManager().getHostname(), "192.168.4.1");
+                displayModule.showModal(&displayModule.boards.wifiWizard);
+                break;
+            }
         }
     }
 
