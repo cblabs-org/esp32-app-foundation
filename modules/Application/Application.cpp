@@ -201,6 +201,16 @@ bool Application::begin(const FrameworkConfig& config) {
     // factory default seeded by resetConfig() (from setDefaultHostname()).
     _wifiManager.begin();
     ESP_LOGI(TAG, "WiFi setup initiated");
+
+    // React to async AP mode activation — sync AuthManager so portal API
+    // requests bypass the auth guard (AP mode has no credentials to check).
+    _eventBus.subscribe(WifiEvents::WIFI_AP_STARTED,
+        [](const char* /*topic*/, const void* /*payload*/, void* ctx) {
+            auto* self = static_cast<Application*>(ctx);
+            self->_authManager.setAPMode(true);
+            ESP_LOGI(TAG, "AP mode detected — AuthManager auth bypass enabled");
+        }, this);
+
     _statusReporter->reportStatus("WiFi initialized", 0.55f);
 
     // --- Step 11: (Removed — TimeManager extracted to explicit composition) ---

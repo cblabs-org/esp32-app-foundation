@@ -79,6 +79,7 @@ class EventBus;
 namespace WifiEvents {
     static constexpr const char* WIFI_CONNECTED    = "wifi.connected";
     static constexpr const char* WIFI_DISCONNECTED = "wifi.disconnected";
+    static constexpr const char* WIFI_AP_STARTED   = "wifi.ap_started";
 }
 
 
