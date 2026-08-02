@@ -660,6 +660,7 @@ void Application::_publishConfiguringEvent(bool isRegression) {
         _configuringPayload.gateName = gate->getGateName();
         _configuringPayload.helpText = gate->getHelpText();
         _configuringPayload.isRegression = isRegression;
+        _configuringPayload.hostname = _wifiManager.getHostname();
         _eventBus.publish(ApplicationEvents::APP_CONFIGURING, &_configuringPayload);
         ESP_LOGI(TAG, "Config gate unsatisfied: %s%s", gate->getGateName(),
                  isRegression ? " (regression)" : "");

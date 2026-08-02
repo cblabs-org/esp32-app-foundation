@@ -28,4 +28,5 @@ struct AppConfiguringPayload {
     const char* gateName = nullptr; ///< Name of the unsatisfied gate (e.g. "WiFi Station")
     const char* helpText = nullptr; ///< User-facing guidance for satisfying the gate
     bool isRegression = false;      ///< true if regressed from RUNNING state
+    const char* hostname = nullptr;   ///< Device hostname for WiFi wizard display (AP SSID)
 };

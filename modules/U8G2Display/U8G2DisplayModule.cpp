@@ -44,6 +44,7 @@
  */
 
 #include "U8G2DisplayModule.hpp"
+#include "events/AppConfiguringPayload.hpp"
 #include "platform/LogShim.h"
 #include <cstring>
 
@@ -1169,7 +1170,7 @@ void U8G2DisplayModule::_onDisplayMessage(const char* /*topic*/, const void* pay
  *
  * Suspends carousel rotation and sets the configuring status board as base layer.
  */
-void U8G2DisplayModule::_onAppConfiguring(const char* /*topic*/, const void* /*payload*/, void* ctx) {
+void U8G2DisplayModule::_onAppConfiguring(const char* /*topic*/, const void* payload, void* ctx) {
     auto* self = static_cast<U8G2DisplayModule*>(ctx);
     if (self == nullptr) {
         return;
@@ -1180,7 +1181,23 @@ void U8G2DisplayModule::_onAppConfiguring(const char* /*topic*/, const void* /*p
                               ? self->_screens->configuringBoard()
                               : &self->boards.configuringStatus;
     self->showBase(cfgBoard);
-    // TODO: Restore WiFi Wizard modal logic
+
+    // Push WiFi wizard modal if the blocking gate is WiFi
+    if (payload != nullptr) {
+        auto* p = static_cast<const AppConfiguringPayload*>(payload);
+        if (p->gateName != nullptr && strcmp(p->gateName, "WiFi Station") == 0) {
+            // Resolve wizard board: prefer IU8G2SystemScreens override, fall back to built-in
+            IDisplayBoard* wizardBoard = (self->_screens != nullptr && self->_screens->wifiWizardBoard() != nullptr)
+                                         ? self->_screens->wifiWizardBoard()
+                                         : &self->boards.wifiWizard;
+
+            // Configure built-in board with hostname + IP (custom boards manage their own state)
+            if (wizardBoard == &self->boards.wifiWizard) {
+                self->boards.wifiWizard.configure(p->hostname, "192.168.4.1");
+            }
+            self->showModal(wizardBoard);
+        }
+    }
 }
 
 /**
