@@ -305,7 +305,11 @@ void WifiManager::tick(uint32_t currentMillis) {
                 }
             } else if (_isAPMode) {
                 // AP Mode 1-hour inactivity timeout
-                if (currentMillis - _lastApiRequestTime > 3600000) {
+                // Guard: _lastApiRequestTime may be set by an HTTP handler (via
+                // notifyApiActivity → millis()) AFTER currentMillis was captured
+                // at tick-start, causing unsigned underflow to ~4.3 billion.
+                if (currentMillis > _lastApiRequestTime &&
+                    (currentMillis - _lastApiRequestTime) > 3600000) {
                     ESP_LOGW(TAG, "AP Mode inactive for 1 hour. Shutting down AP to save power.");
                     transitionTo(WiFiState::Shutdown);
                 }
