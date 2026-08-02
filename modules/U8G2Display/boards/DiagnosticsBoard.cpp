@@ -118,6 +118,9 @@ void DiagnosticsBoard::tick(uint32_t currentMillis) {
         snprintf(_wifiLine, sizeof(_wifiLine), "%s \xB7 %s",
                  _wifiManager->getSSID(),
                  WiFi.localIP().toString().c_str());
+    } else if (_wifiManager->getAPMode()) {
+        snprintf(_wifiLine, sizeof(_wifiLine), "AP: %s \xB7 192.168.4.1",
+                 _wifiManager->getHostname());
     } else {
         snprintf(_wifiLine, sizeof(_wifiLine), "WiFi: Not connected");
     }
