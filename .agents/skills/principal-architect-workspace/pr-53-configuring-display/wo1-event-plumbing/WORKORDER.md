@@ -67,8 +67,8 @@ Add after `isRegression`:
     const char* hostname = nullptr;   ///< Device hostname for WiFi wizard display (AP SSID)
 ```
 
-- [ ] Add the `hostname` field with appropriate doc comment
-- [ ] Preserve all existing comments and docstrings
+- [x] Add the `hostname` field with appropriate doc comment
+- [x] Preserve all existing comments and docstrings
 
 ### 2. Populate `hostname` in `_publishConfiguringEvent()`
 
@@ -84,8 +84,8 @@ _configuringPayload.hostname = _wifiManager.getHostname();
 This uses the `_wifiManager` member (Application.hpp L516) and `getHostname()`
 (WifiManager.hpp L307, returns `const char*`).
 
-- [ ] Add hostname population line
-- [ ] Verify it compiles
+- [x] Add hostname population line
+- [x] Verify it compiles
 
 ### 3. Complete WiFi wizard modal in `_onAppConfiguring()`
 
@@ -139,10 +139,10 @@ Reference implementation:
         }
 ```
 
-- [ ] Remove the TODO comment
-- [ ] Add the WiFi wizard modal logic
-- [ ] Add necessary includes (`AppConfiguringPayload.hpp`, `<cstring>`)
-- [ ] Ensure the `payload` parameter name is restored (currently `/*payload*/`)
+- [x] Remove the TODO comment
+- [x] Add the WiFi wizard modal logic
+- [x] Add necessary includes (`AppConfiguringPayload.hpp`, `<cstring>`)
+- [x] Ensure the `payload` parameter name is restored (currently `/*payload*/`)
 
 ## Verification Requirement
 
@@ -151,3 +151,12 @@ Reference implementation:
 3. If either build fails, diagnose and fix within the boundary box
 4. **CRITICAL:** Before distilling or committing, you MUST ask the user if they
    are happy. Only after approval should you invoke the `@distillery` skill.
+
+---
+
+## Status Update
+
+| Date | Status | Details |
+|------|--------|---------|
+| 2026-08-02 | ✅ Complete & Approved | Implementation finished, verified with `esp32s3nano` build and native test suite (368/368 passed). User approval received. Distillation package generated at `.agents/skills/principal-architect-workspace/pr-53-configuring-display/wo1-event-plumbing/`. |
+
