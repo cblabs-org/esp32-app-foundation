@@ -155,16 +155,32 @@ void setup() {
         displayModule.carousel.suspend();
         displayModule.showBase(&displayModule.boards.configuringStatus);
 
-        // Mirror _onAppConfiguring: show WiFi wizard if WiFi Station gate is the blocker
-        for (auto* gate : app.getConfigGates()) {
-            if (!gate->isSatisfied() && strcmp(gate->getGateName(), "WiFi Station") == 0) {
-                displayModule.boards.wifiWizard.configure(
-                    app.getWifiManager().getHostname(), "192.168.4.1");
-                displayModule.showModal(&displayModule.boards.wifiWizard);
-                break;
+        // Only show WiFi wizard if AP mode is already active (no stored creds).
+        // If credentials exist, WiFi is connecting in STA mode — the
+        // configuringStatus board shows "Connecting..." which is correct UX.
+        if (app.getWifiManager().getAPMode()) {
+            for (auto* gate : app.getConfigGates()) {
+                if (!gate->isSatisfied() && strcmp(gate->getGateName(), "WiFi Station") == 0) {
+                    displayModule.boards.wifiWizard.configure(
+                        app.getWifiManager().getHostname(), "192.168.4.1");
+                    displayModule.showModal(&displayModule.boards.wifiWizard);
+                    break;
+                }
             }
         }
     }
+
+    // React to AP mode starting — show WiFi wizard when device falls back to AP
+    static struct { U8G2DisplayModule* dm; WifiManager* wm; } apCtx = {
+        &displayModule, &app.getWifiManager()
+    };
+    app.getEventBus().subscribe(WifiEvents::WIFI_AP_STARTED,
+        [](const char*, const void*, void* ctx) {
+            auto& c = *static_cast<decltype(apCtx)*>(ctx);
+            c.dm->boards.wifiWizard.configure(
+                c.wm->getHostname(), "192.168.4.1");
+            c.dm->showModal(&c.dm->boards.wifiWizard);
+        }, &apCtx);
 
 #ifdef WITH_MCP
     mcpServer.setDisplayInfo(displayModule.getDisplayInfo());
