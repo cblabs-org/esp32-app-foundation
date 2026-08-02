@@ -158,6 +158,7 @@ void setup() {
  */
 void loop() {
     app.tick();
+    delay(1);   // Yield to RTOS idle task — feeds the Task Watchdog Timer (TWDT)
 }
 
 #if defined(UNIT_TEST) && !defined(PIO_UNIT_TESTING)
