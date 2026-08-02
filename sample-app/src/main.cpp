@@ -149,12 +149,26 @@ void setup() {
 
 #if defined(WITH_DISPLAY_U8G2) || defined(WITH_DISPLAY_LVGL)
     displayModule.setConfigManager(&app.getConfigManager());
+    displayModule.begin(&app.getEventBus());
 #ifdef WITH_DISPLAY_U8G2
     diagnosticsBoard.configure(&app.getWifiManager());
+    displayModule.boards.configuringStatus.setGates(&app.getConfigGates());
     displayModule.carousel.add(&diagnosticsBoard);
     displayModule.carousel.add(&weatherBoard);
     // F04: Wire EventBus subscription now that Application is fully constructed.
     weatherBoard.wireEventBus(app.getEventBus());
+
+    // Handle missed initial CONFIGURING event (fires before subscription)
+    if (app.getState() == AppState::Configuring) {
+        displayModule.carousel.suspend();
+        displayModule.showBase(&displayModule.boards.configuringStatus);
+        if (app.getWifiManager().getAPMode()) {
+            displayModule.boards.wifiWizard.configure(
+                app.getWifiManager().getHostname(), "192.168.4.1");
+            displayModule.showModal(&displayModule.boards.wifiWizard);
+        }
+    }
+
 #ifdef WITH_MCP
     mcpServer.setDisplayInfo(displayModule.getDisplayInfo());
 #endif
