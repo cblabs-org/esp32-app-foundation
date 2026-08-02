@@ -1,0 +1,3 @@
+[submodule ".agents/skills/squareline-expert"]
+	path = .agents/skills/squareline-expert
+	url = https://github.com/matthewmcneill/squareline-studio-skill.git
