@@ -194,7 +194,7 @@ bool Application::begin(const FrameworkConfig& config) {
     _statusReporter->reportStatus("Module configuration loaded", 0.35f);
 
     // --- Step 9: (Removed — entire begin() runs under BOOT) ---
-    _statusReporter->reportStatus("Connecting to WiFi...", 0.40f);
+    _statusReporter->reportStatus("Initializing WiFi...", 0.40f);
 
     // --- Step 10: WifiManager.begin() ---
     // Now has persisted SSID/hostname from ConfigManager (step 8), or the
