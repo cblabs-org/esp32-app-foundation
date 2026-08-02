@@ -175,6 +175,7 @@ void WifiManager::begin() {
     WiFi.disconnect(true, true);
     WiFi.mode(WIFI_OFF);
     
+    _stateTimer.setInterval(2000);  // 2s debounce before Init fires (pre-MK: `elapsed > 2000`)
     transitionTo(WiFiState::Init);
     ESP_LOGI(TAG, "WiFi Manager initialized in NON-BLOCKING mode. Hostname: %s", _currentHostname);
 }
@@ -256,6 +257,10 @@ void WifiManager::tick(uint32_t currentMillis) {
                 _lastApiRequestTime = currentMillis; // Reset AP timeout timer
             }
             
+            // Notify subscribers that AP mode is active
+            if (_eventBus) {
+                _eventBus->publish(WifiEvents::WIFI_AP_STARTED);
+            }
             transitionTo(WiFiState::Ready);
             break;
 
@@ -300,7 +305,11 @@ void WifiManager::tick(uint32_t currentMillis) {
                 }
             } else if (_isAPMode) {
                 // AP Mode 1-hour inactivity timeout
-                if (currentMillis - _lastApiRequestTime > 3600000) {
+                // Guard: _lastApiRequestTime may be set by an HTTP handler (via
+                // notifyApiActivity → millis()) AFTER currentMillis was captured
+                // at tick-start, causing unsigned underflow to ~4.3 billion.
+                if (currentMillis > _lastApiRequestTime &&
+                    (currentMillis - _lastApiRequestTime) > 3600000) {
                     ESP_LOGW(TAG, "AP Mode inactive for 1 hour. Shutting down AP to save power.");
                     transitionTo(WiFiState::Shutdown);
                 }
@@ -621,12 +630,10 @@ esp_err_t WifiManager::handleScan(PsychicRequest* request, PsychicResponse* resp
     // --- Free scan memory ---
     WiFi.scanDelete();
 
-    // Restore AP-only mode after scan completes.  The AP+STA switch in
-    // the scan-start path keeps the AP alive during the scan, but we
-    // don't want the STA radio burning power when there's no connection.
-    if (_isAPMode) {
-        WiFi.mode(WIFI_AP);
-    }
+    // NOTE: We intentionally stay in AP_STA mode after scanning.
+    // Switching back to WIFI_AP reinitializes the AP interface and
+    // disconnects all connected clients. The idle STA radio in AP_STA
+    // mode uses negligible extra power.
 
     std::string output;
     serializeJson(doc, output);

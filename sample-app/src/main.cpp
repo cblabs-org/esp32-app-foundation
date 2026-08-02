@@ -17,6 +17,7 @@
 
 #include "AppFoundation.h"
 #include <Arduino.h>
+#include <cstring>
 #include "WeatherModule.hpp"
 
 #ifdef WITH_HOMEASSISTANT
@@ -149,12 +150,45 @@ void setup() {
 
 #if defined(WITH_DISPLAY_U8G2) || defined(WITH_DISPLAY_LVGL)
     displayModule.setConfigManager(&app.getConfigManager());
+    displayModule.begin(&app.getEventBus());
 #ifdef WITH_DISPLAY_U8G2
     diagnosticsBoard.configure(&app.getWifiManager());
+    displayModule.boards.configuringStatus.setGates(&app.getConfigGates());
     displayModule.carousel.add(&diagnosticsBoard);
     displayModule.carousel.add(&weatherBoard);
     // F04: Wire EventBus subscription now that Application is fully constructed.
     weatherBoard.wireEventBus(app.getEventBus());
+
+    // Handle missed initial CONFIGURING event (fires before subscription)
+    if (app.getState() == AppState::Configuring) {
+        displayModule.carousel.suspend();
+        displayModule.showBase(&displayModule.boards.configuringStatus);
+
+        // Only show WiFi wizard if AP mode is already active (no stored creds).
+        if (app.getWifiManager().getAPMode()) {
+            for (auto* gate : app.getConfigGates()) {
+                if (!gate->isSatisfied() && strcmp(gate->getGateName(), "WiFi Station") == 0) {
+                    displayModule.boards.wifiWizard.configure(
+                        app.getWifiManager().getHostname(), "192.168.4.1");
+                    displayModule.showModal(&displayModule.boards.wifiWizard);
+                    break;
+                }
+            }
+        }
+    }
+
+    // React to AP mode starting — show WiFi wizard when device falls back to AP
+    static struct { U8G2DisplayModule* dm; WifiManager* wm; } apCtx = {
+        &displayModule, &app.getWifiManager()
+    };
+    app.getEventBus().subscribe(WifiEvents::WIFI_AP_STARTED,
+        [](const char*, const void*, void* ctx) {
+            auto& c = *static_cast<decltype(apCtx)*>(ctx);
+            c.dm->boards.wifiWizard.configure(
+                c.wm->getHostname(), "192.168.4.1");
+            c.dm->showModal(&c.dm->boards.wifiWizard);
+        }, &apCtx);
+
 #ifdef WITH_MCP
     mcpServer.setDisplayInfo(displayModule.getDisplayInfo());
 #endif

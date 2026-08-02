@@ -194,13 +194,23 @@ bool Application::begin(const FrameworkConfig& config) {
     _statusReporter->reportStatus("Module configuration loaded", 0.35f);
 
     // --- Step 9: (Removed — entire begin() runs under BOOT) ---
-    _statusReporter->reportStatus("Connecting to WiFi...", 0.40f);
+    _statusReporter->reportStatus("Initializing WiFi...", 0.40f);
 
     // --- Step 10: WifiManager.begin() ---
     // Now has persisted SSID/hostname from ConfigManager (step 8), or the
     // factory default seeded by resetConfig() (from setDefaultHostname()).
     _wifiManager.begin();
     ESP_LOGI(TAG, "WiFi setup initiated");
+
+    // React to async AP mode activation — sync AuthManager so portal API
+    // requests bypass the auth guard (AP mode has no credentials to check).
+    _eventBus.subscribe(WifiEvents::WIFI_AP_STARTED,
+        [](const char* /*topic*/, const void* /*payload*/, void* ctx) {
+            auto* self = static_cast<Application*>(ctx);
+            self->_authManager.setAPMode(true);
+            ESP_LOGI(TAG, "AP mode detected — AuthManager auth bypass enabled");
+        }, this);
+
     _statusReporter->reportStatus("WiFi initialized", 0.55f);
 
     // --- Step 11: (Removed — TimeManager extracted to explicit composition) ---
@@ -660,6 +670,7 @@ void Application::_publishConfiguringEvent(bool isRegression) {
         _configuringPayload.gateName = gate->getGateName();
         _configuringPayload.helpText = gate->getHelpText();
         _configuringPayload.isRegression = isRegression;
+        _configuringPayload.hostname = _wifiManager.getHostname();
         _eventBus.publish(ApplicationEvents::APP_CONFIGURING, &_configuringPayload);
         ESP_LOGI(TAG, "Config gate unsatisfied: %s%s", gate->getGateName(),
                  isRegression ? " (regression)" : "");
