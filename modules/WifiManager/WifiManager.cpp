@@ -175,6 +175,7 @@ void WifiManager::begin() {
     WiFi.disconnect(true, true);
     WiFi.mode(WIFI_OFF);
     
+    _stateTimer.setInterval(1000);  // Enable state machine polling (default 0 blocks check())
     transitionTo(WiFiState::Init);
     ESP_LOGI(TAG, "WiFi Manager initialized in NON-BLOCKING mode. Hostname: %s", _currentHostname);
 }
