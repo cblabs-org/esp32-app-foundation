@@ -48,8 +48,8 @@ hostname payload field.
 
 | # | Status | Complexity | Topic | Files |
 |---|--------|-----------|-------|-------|
-| **[ ] [wo1-event-plumbing](wo1-event-plumbing/WORKORDER.md):** | 📋 Planned | standard | Add hostname to payload, populate in publisher, complete WiFi wizard modal in event handler | `AppConfiguringPayload.hpp`, `Application.cpp`, `U8G2DisplayModule.cpp` |
-| **[ ] [wo2-consumer-wiring](wo2-consumer-wiring/WORKORDER.md):** | 📋 Planned | standard | Call `begin()`, bind gates, handle missed initial CONFIGURING event in 3 × main.cpp | `src/main.cpp`, `sample-app/src/main.cpp`, `template-app/src/main.cpp` |
+| **[x] [wo1-event-plumbing](wo1-event-plumbing/WORKORDER.md):** | ✅ Complete `ec7e3d2` | standard | Add hostname to payload, populate in publisher, complete WiFi wizard modal in event handler | `AppConfiguringPayload.hpp`, `Application.cpp`, `U8G2DisplayModule.cpp` |
+| **[x] [wo2-consumer-wiring](wo2-consumer-wiring/WORKORDER.md):** | ✅ Complete `2986f84` | standard | Call `begin()`, bind gates, handle missed initial CONFIGURING event in 3 × main.cpp | `src/main.cpp`, `sample-app/src/main.cpp`, `template-app/src/main.cpp` |
 
 ### Branch Stack
 
@@ -82,3 +82,5 @@ main
 |------|-------|
 | 2026-08-02 | Project created. Research complete. Decomposition drafted (2 WOs). Awaiting human approval. |
 | 2026-08-02 | **User approved decomposition** (2 WOs) + WO1 update to include `IU8G2SystemScreens::wifiWizardBoard()` extensibility fix. Proceeding to execution. |
+| 2026-08-02 | WO1 complete `ec7e3d2` — 368/368 tests, esp32s3nano build green. |
+| 2026-08-02 | WO2 complete `2986f84` — 368/368 tests, esp32s3nano build green. All WOs done. Ready for stack submission. |
