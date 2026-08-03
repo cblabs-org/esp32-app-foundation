@@ -32,7 +32,7 @@ lv_obj_set_align( ui_uiBootFadeOverlay, LV_ALIGN_CENTER );
 lv_obj_remove_flag( ui_uiBootFadeOverlay, LV_OBJ_FLAG_SCROLLABLE );    /// Flags
 
 ui_uiBootLogo = lv_image_create(ui_uiBootScreen);
-lv_image_set_src(ui_uiBootLogo, &ui_img_cblabs_png);
+lv_image_set_src(ui_uiBootLogo, &ui_img_cblabs_320x100_png);
 lv_obj_set_width( ui_uiBootLogo, 232);
 lv_obj_set_height( ui_uiBootLogo, 83);
 lv_obj_set_x( ui_uiBootLogo, 0 );

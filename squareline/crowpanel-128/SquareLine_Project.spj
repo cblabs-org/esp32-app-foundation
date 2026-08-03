@@ -318,7 +318,7 @@
               {
                 "nid": 1020,
                 "strtype": "IMAGE/Asset",
-                "strval": "assets/cblabs.png",
+                "strval": "assets/cblabs_320x100.png",
                 "InheritedType": 5
               },
               {
@@ -5920,7 +5920,7 @@
   },
   "animations": [],
   "selected_theme": "Default",
-  "selected_screen": "GUID83388071-194281S2854998",
+  "selected_screen": "GUID63730339-939098S2055230",
   "info": {
     "name": "SquareLine_Project.spj",
     "depth": 1,
@@ -5949,7 +5949,7 @@
     "separate_screen_save": false,
     "hierarchy_state_save": false,
     "reverse_event_order": false,
-    "backup_cnt": 5,
+    "backup_cnt": 6,
     "autosave_cnt": 0,
     "group_color_cnt": 0,
     "imagebytearrayprefix": "",
