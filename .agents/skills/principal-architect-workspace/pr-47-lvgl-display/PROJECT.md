@@ -216,6 +216,11 @@ Links point to `WORKORDER.md` files **to be drafted in the next phase**.
 - **[ ] [wo11-docs](wo11-docs/WORKORDER.md):** Module README, adapter authoring guide,
   `framework-expert` display-system docs, design-spec §7 cross-reference,
   using-optional-modules entry. — **complexity: mechanical**
+- **[ ] [wo13-sls-wiring](wo13-sls-wiring/WORKORDER.md):** Wire SLS-exported screens
+  (`ui_uiBootScreen`, `ui_uiSystemScreen`, `ui_ui_DiagScreen`) to framework lifecycle
+  via `SLSSystemScreens : ILVGLSystemScreens` implementation. Boot progress bar, error
+  group, WiFi wizard group, OTA progress group, diagnostics screen — all bridged to the
+  module's state machine. Wired in `src/main.cpp`. — **complexity: standard**
 
 ---
 
@@ -383,4 +388,6 @@ This project is authored so a **fresh PA session** can execute it:
 | 2026-07-24 | **Review response posted.** Accepted #1, #2, #3, #4, all minor. Pushed back on #5 (buffer size 40 → keep, measure in WO10). Confirmed #7 (auth middleware). Deferred #6 (encoder detent) and #8 (flush DMA) to WO10. |
 | 2026-07-24 | **Reviewer confirmed all dispositions.** #5 pushback accepted with condition (measure heap in WO10, record number). No remaining disagreements. #1 and #2 are the only merge blockers. |
 | 2026-07-24 | **User approved WO12 remediation plan.** PA drafted `wo12-review-fixes/WORKORDER.md` (standard complexity). Spawning WO12 worker. |
+| 2026-08-02 | **SLS templates integrated.** 4 commits on `sls-templates/crowpanel-128`: SLS project (3 screens), exported UI code, smaller logo (1.76 MB firmware, 42% flash). Native 23/23, crowpanel ✅, esp32dev ❌ (pre-existing toolchain bug). |
+| 2026-08-03 | **WO13 drafted** — wire SLS-exported screens to framework lifecycle via `SLSSystemScreens`. User approved execution (no flashing — hardware not attached). Spawning WO13 worker. |
 
