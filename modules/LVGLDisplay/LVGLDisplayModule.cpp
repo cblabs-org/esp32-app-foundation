@@ -558,10 +558,21 @@ void LVGLDisplayModule::_onAppConfiguring(const char* /*topic*/, const void* pay
     // TODO: Implement LVGL configuring display (follow-up issue)
 }
 
+#if defined(__GNUC__) || defined(__clang__)
+extern "C" {
+    __attribute__((weak)) extern lv_obj_t* ui_ui_DiagScreen;
+}
+#endif
+
 void LVGLDisplayModule::_onAppRunning(const char* /*topic*/, const void* /*payload*/, void* ctx) {
     auto* self = static_cast<LVGLDisplayModule*>(ctx);
     if (self == nullptr) return;
     ESP_LOGI("LVGLDisplayModule", "App transition → RUNNING");
+#if defined(__GNUC__) || defined(__clang__)
+    if (&ui_ui_DiagScreen != nullptr && ui_ui_DiagScreen != nullptr) {
+        lv_scr_load_anim(ui_ui_DiagScreen, LV_SCR_LOAD_ANIM_FADE_IN, 300, 0, false);
+    }
+#endif
 }
 
 // -----------------------------------------------------------------------------
