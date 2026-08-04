@@ -23,6 +23,25 @@
 
 #pragma once
 
+#include <cstdint>
+
+/// Action status for a config gate during the CONFIGURING phase.
+/// Used by Application to populate AppConfiguringPayload and by display
+/// modules to decide whether to show a modal helper or a progress indicator.
+enum class GateActionStatus : uint8_t {
+    Satisfied       = 0,  ///< Gate condition is met — no action needed
+    InProgress      = 1,  ///< Gate is actively working toward satisfaction (e.g., WiFi connecting)
+    NeedsUserAction = 2   ///< Gate requires user intervention (e.g., AP mode, no config)
+};
+
+/// Well-known gate name constants. These are part of the public API —
+/// display modules use string matching for built-in modal dispatch.
+/// Changing a gate name is a breaking change.
+namespace GateNames {
+    static constexpr const char* WIFI_STATION = "WiFi Station";
+    static constexpr const char* TIMEZONE     = "Timezone";
+}
+
 /**
  * @brief Abstract interface for application configuration prerequisites.
  *
@@ -98,6 +117,22 @@ public:
      * @return Tolerance threshold in milliseconds. Default: 30000 (30s).
      */
     virtual uint32_t getRegressionToleranceMs() const { return 30000; } // 30s default
+
+    /// Return the current action status of this gate.
+    ///
+    /// Called every tick() cycle during CONFIGURING (same threading contract
+    /// as isSatisfied() — cheap read, no I/O). The framework uses this to
+    /// decide whether to show a modal helper screen (NeedsUserAction) or
+    /// just the base progress underlay (InProgress).
+    ///
+    /// Default: returns Satisfied if isSatisfied() is true,
+    /// NeedsUserAction otherwise.
+    ///
+    /// @return GateActionStatus reflecting current gate state.
+    virtual GateActionStatus getActionStatus() const {
+        return isSatisfied() ? GateActionStatus::Satisfied
+                             : GateActionStatus::NeedsUserAction;
+    }
 };
 
 // =============================================================================
@@ -135,7 +170,7 @@ public:
  *
  *     // Depend on WiFi being connected first
  *     const char* const* getDependencies(uint8_t& count) const override {
- *         static const char* deps[] = {"WiFi Station"};
+ *         static const char* deps[] = {GateNames::WIFI_STATION};
  *         count = 1;
  *         return deps;
  *     }
@@ -159,6 +194,30 @@ public:
  * Use `getDependencies()` to declare gate ordering. A gate is only "actionable"
  * when all of its dependency gates are already satisfied. This controls the
  * order in which the configuring status board presents gates to the user.
+ *
+ * ## Gate Action Status
+ *
+ * Override `getActionStatus()` to report the gate's current action status:
+ * - `GateActionStatus::Satisfied` — gate condition is met (default when
+ *   `isSatisfied()` returns true)
+ * - `GateActionStatus::InProgress` — gate is actively working toward
+ *   satisfaction (e.g., WiFi connecting with saved credentials)
+ * - `GateActionStatus::NeedsUserAction` — gate requires user intervention
+ *   (e.g., AP mode active, no credentials configured)
+ *
+ * The default implementation returns `Satisfied` when `isSatisfied()` is true
+ * and `NeedsUserAction` otherwise. Override to report `InProgress` for gates
+ * that have an autonomous resolution path (e.g., WiFi connecting).
+ *
+ * Threading contract: same as `isSatisfied()` — called from the main loop
+ * only, must be a cheap read with no I/O.
+ *
+ * ## Gate Name Stability
+ *
+ * Gate names are part of the **public API**. Display modules use string
+ * matching against well-known gate names (e.g., `GateNames::WIFI_STATION`)
+ * for built-in modal dispatch. Changing a gate name is a **breaking change**.
+ * Always use the `GateNames::` constants when declaring dependencies.
  *
  * ## Regression Tolerance
  *

@@ -262,6 +262,9 @@ bool Application::begin(const FrameworkConfig& config) {
         ESP_LOGI(TAG, "Boot sequence complete — all gates satisfied, entering RUNNING state");
     } else {
         setState(AppState::Configuring);
+        // Reset gate-transition tracking for initial CONFIGURING entry
+        _lastPublishedGate = nullptr;
+        _lastPublishedStatus = GateActionStatus::Satisfied;
         _publishConfiguringEvent();
         _onEnterConfiguring(false);
         ESP_LOGI(TAG, "Boot sequence complete — awaiting configuration");
@@ -300,6 +303,9 @@ void Application::tick() {
                                  _configGates[i]->getGateName(), (currentMillis - _gateFailedSinceMs[i].getLastFire()));
                         setState(AppState::Configuring);
                         _dataManager.setAppRunning(false);
+                        // Reset gate-transition tracking for regression entry
+                        _lastPublishedGate = nullptr;
+                        _lastPublishedStatus = GateActionStatus::Satisfied;
                         _publishConfiguringEvent(true); // isRegression = true
                         _onEnterConfiguring(true);
                         for(int j=0; j<MAX_CONFIG_GATES; ++j) _gateFailedSinceMs[j].setInterval(0);
@@ -312,8 +318,37 @@ void Application::tick() {
         }
     }
 
-    // --- CONFIGURING: poll config gates for transition ---
+    // --- CONFIGURING: gate-transition re-publishing + transition check ---
     if (_state == AppState::Configuring) {
+        // Gate-transition re-publishing (500ms throttle)
+        if (_configuringPublishThrottle.due(currentMillis)) {
+            const IConfigGate* actionable = getActionableGate();
+            const char* currentGate = actionable ? actionable->getGateName() : nullptr;
+            GateActionStatus currentStatus = actionable
+                ? actionable->getActionStatus()
+                : GateActionStatus::Satisfied;
+
+            // Re-publish if actionable gate changed OR its status changed
+            bool changed = false;
+            if (currentGate != _lastPublishedGate) {
+                // Pointer comparison first (fast), then string comparison
+                if (_lastPublishedGate == nullptr || currentGate == nullptr ||
+                    strcmp(currentGate, _lastPublishedGate) != 0) {
+                    changed = true;
+                }
+            }
+            if (currentStatus != _lastPublishedStatus) {
+                changed = true;
+            }
+
+            if (changed) {
+                _lastPublishedGate = currentGate;
+                _lastPublishedStatus = currentStatus;
+                _publishConfiguringEvent(false);
+            }
+        }
+
+        // Check if all gates now satisfied
         if (_allGatesSatisfied()) {
             setState(AppState::Running);
             _dataManager.setAppRunning(true);
@@ -635,15 +670,16 @@ bool Application::_allGatesSatisfied() const {
 }
 
 /**
- * @brief Publish an "app.configuring" EventBus event for the first
- *        **actionable** unsatisfied gate.
+ * @brief Find the first actionable unsatisfied gate (all dependencies satisfied).
  *
- * A gate is actionable when it is unsatisfied AND all of its declared
- * dependencies (getDependencies()) are satisfied. Gates whose dependencies
- * are not yet met are silently skipped, ensuring the user sees only the
- * gate they can act on next.
+ * Iterates the registered config gates in registration order, skipping satisfied
+ * gates. For each unsatisfied gate, checks whether all of its declared
+ * dependencies are satisfied by comparing gate names via strcmp().
+ *
+ * @return Pointer to the first actionable gate, or nullptr if all are satisfied
+ *         or no gate has its dependencies met.
  */
-void Application::_publishConfiguringEvent(bool isRegression) {
+const IConfigGate* Application::getActionableGate() const {
     for (const auto* gate : _configGates) {
         if (gate->isSatisfied()) continue;
 
@@ -652,7 +688,6 @@ void Application::_publishConfiguringEvent(bool isRegression) {
         const char* const* deps = gate->getDependencies(depCount);
         bool depsOk = true;
         for (uint8_t d = 0; d < depCount; d++) {
-            // Find the dependency gate by name and check if satisfied
             bool found = false;
             for (const auto* other : _configGates) {
                 if (strcmp(other->getGateName(), deps[d]) == 0) {
@@ -663,19 +698,44 @@ void Application::_publishConfiguringEvent(bool isRegression) {
             }
             if (!found || !depsOk) { depsOk = false; break; }
         }
-
-        if (!depsOk) continue; // Skip — deps not met
-
-        // This gate is actionable
-        _configuringPayload.gateName = gate->getGateName();
-        _configuringPayload.helpText = gate->getHelpText();
-        _configuringPayload.isRegression = isRegression;
-        _configuringPayload.hostname = _wifiManager.getHostname();
-        _eventBus.publish(ApplicationEvents::APP_CONFIGURING, &_configuringPayload);
-        ESP_LOGI(TAG, "Config gate unsatisfied: %s%s", gate->getGateName(),
-                 isRegression ? " (regression)" : "");
-        return;
+        if (depsOk) return gate;
     }
+    return nullptr;
+}
+
+/**
+ * @brief Publish an "app.configuring" EventBus event for the first
+ *        **actionable** unsatisfied gate.
+ *
+ * Uses getActionableGate() to find the first gate whose dependencies are
+ * satisfied, then populates the enriched AppConfiguringPayload with gate
+ * name, help text, action status, hostname, and device IP.
+ */
+void Application::_publishConfiguringEvent(bool isRegression) {
+    const IConfigGate* gate = getActionableGate();
+    if (gate == nullptr) return;
+
+    _configuringPayload.gateName     = gate->getGateName();
+    _configuringPayload.helpText     = gate->getHelpText();
+    _configuringPayload.actionStatus = gate->getActionStatus();
+    _configuringPayload.isRegression = isRegression;
+    _configuringPayload.hostname     = _wifiManager.getHostname();
+
+    // Write device IP into a stable buffer to avoid dangling pointer from
+    // WiFi.localIP().toString().c_str() (returns pointer to a temporary String)
+    if (_wifiManager.getAPMode()) {
+        strncpy(_deviceIPBuf, "192.168.4.1", sizeof(_deviceIPBuf));
+    } else {
+        strncpy(_deviceIPBuf, WiFi.localIP().toString().c_str(), sizeof(_deviceIPBuf));
+    }
+    _deviceIPBuf[sizeof(_deviceIPBuf) - 1] = '\0';
+    _configuringPayload.deviceIP = _deviceIPBuf;
+
+    _eventBus.publish(ApplicationEvents::APP_CONFIGURING, &_configuringPayload);
+    ESP_LOGI(TAG, "Config gate unsatisfied: %s (status=%d)%s",
+             gate->getGateName(),
+             static_cast<int>(gate->getActionStatus()),
+             isRegression ? " (regression)" : "");
 }
 
 // ---------------------------------------------------------------------------

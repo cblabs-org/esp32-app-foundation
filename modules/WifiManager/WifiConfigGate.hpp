@@ -54,10 +54,29 @@ public:
     bool isSatisfied() const override { return _wifi.isReady() && !_wifi.getAPMode(); }
 
     /**
+     * @brief Return the current action status of this gate.
+     *
+     * - Satisfied: WiFi is connected in STA mode
+     * - InProgress: Saved credentials exist, WiFi is attempting to connect
+     * - NeedsUserAction: No credentials configured, or AP mode active (connection failed)
+     *
+     * @return GateActionStatus reflecting current WiFi gate state.
+     */
+    GateActionStatus getActionStatus() const override {
+        if (isSatisfied()) return GateActionStatus::Satisfied;
+        // No saved credentials → user must configure immediately
+        if (strlen(_wifi.getSSID()) == 0) return GateActionStatus::NeedsUserAction;
+        // AP mode active → connection failed, user must act
+        if (_wifi.getAPMode()) return GateActionStatus::NeedsUserAction;
+        // StaConnecting with saved credentials → still trying, no action needed
+        return GateActionStatus::InProgress;
+    }
+
+    /**
      * @brief Return the gate name for logging.
      * @return "WiFi Station"
      */
-    const char* getGateName() const override { return "WiFi Station"; }
+    const char* getGateName() const override { return GateNames::WIFI_STATION; }
 
     /**
      * @brief Return user-facing help text.
@@ -69,4 +88,5 @@ public:
 
 private:
     const WifiManager& _wifi; ///< Reference to WifiManager for AP mode query
+
 };

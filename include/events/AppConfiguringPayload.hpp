@@ -18,15 +18,20 @@
 
 #pragma once
 
+#include "interfaces/IConfigGate.hpp"  // for GateActionStatus
+
 /**
  * @brief Payload for the "app.configuring" EventBus event.
  *
- * Contains the name and help text of the first unsatisfied config gate,
- * allowing display modules to show the appropriate system board.
+ * Contains the name, help text, action status, and connection details of the
+ * first actionable unsatisfied config gate, allowing display modules to show
+ * the appropriate system board or modal helper.
  */
 struct AppConfiguringPayload {
-    const char* gateName = nullptr; ///< Name of the unsatisfied gate (e.g. "WiFi Station")
-    const char* helpText = nullptr; ///< User-facing guidance for satisfying the gate
-    bool isRegression = false;      ///< true if regressed from RUNNING state
-    const char* hostname = nullptr;   ///< Device hostname for WiFi wizard display (AP SSID)
+    const char*      gateName     = nullptr;                          ///< Name of the blocking gate
+    const char*      helpText     = nullptr;                          ///< User-facing guidance text
+    GateActionStatus actionStatus = GateActionStatus::NeedsUserAction; ///< Gate's action status
+    bool             isRegression = false;                            ///< true if regressed from RUNNING
+    const char*      hostname     = nullptr;                          ///< Device hostname (AP SSID)
+    const char*      deviceIP     = nullptr;                          ///< Always-valid device IP for portal URLs
 };
