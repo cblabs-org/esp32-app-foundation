@@ -878,7 +878,7 @@ TEST_F(KeyManagerMcpTest, SystemLockedProtection) {
     JsonDocument delArgsDoc;
     JsonObject delArgs = delArgsDoc.to<JsonObject>();
     delArgs["id"] = "sys_pass";
-    delArgs["owner"] = "Security";
+    delArgs["managedBy"] = "Security";
 
     JsonDocument delResDoc;
     JsonObject delRes = delResDoc.to<JsonObject>();
@@ -952,7 +952,7 @@ TEST_F(KeyManagerMcpTest, ExclusiveOwnerProtection) {
         JsonDocument argsDoc;
         JsonObject args = argsDoc.to<JsonObject>();
         args["id"] = "wifi_pass";
-        args["owner"] = "WiFi";
+        args["managedBy"] = "WiFi";
 
         JsonDocument resDoc;
         JsonObject res = resDoc.to<JsonObject>();

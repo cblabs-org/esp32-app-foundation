@@ -169,6 +169,14 @@ public:
      */
     bool isSystemLocked(const char* id) const;
 
+    /**
+     * @brief Retrieves the metadata for a single key without returning its plaintext value.
+     * @param id The unique identifier for the key.
+     * @param outInfo Reference to a KeyInfo struct to populate.
+     * @return true if the key exists and metadata was populated, false otherwise.
+     */
+    bool getKeyMetadata(const char* id, KeyInfo& outInfo) const;
+
     // -------------------------------------------------------------------------
     // IMCPContributor Interface
     // -------------------------------------------------------------------------
