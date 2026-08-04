@@ -549,10 +549,14 @@ void LVGLDisplayModule::_onSystemError(const char* /*topic*/, const void* payloa
     }
 }
 
-void LVGLDisplayModule::_onAppConfiguring(const char* /*topic*/, const void* /*payload*/, void* ctx) {
+void LVGLDisplayModule::_onAppConfiguring(const char* /*topic*/, const void* payload, void* ctx) {
     auto* self = static_cast<LVGLDisplayModule*>(ctx);
-    if (self == nullptr) return;
-    ESP_LOGI("LVGLDisplayModule", "App transition → CONFIGURING");
+    if (!self || !payload) return;
+    auto* p = static_cast<const AppConfiguringPayload*>(payload);
+    ESP_LOGI("LVGLDisplayModule", "CONFIGURING gate: %s (status=%d)",
+             p->gateName ? p->gateName : "?",
+             static_cast<int>(p->actionStatus));
+    // TODO: Implement LVGL configuring display (follow-up issue)
 }
 
 void LVGLDisplayModule::_onAppRunning(const char* /*topic*/, const void* /*payload*/, void* ctx) {
