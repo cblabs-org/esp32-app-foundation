@@ -44,12 +44,31 @@ public:
     const char* getGateName() const override { return _name; }
     const char* getHelpText() const override { return _help; }
 
+    const char* const* getDependencies(uint8_t& count) const override {
+        count = _depCount;
+        return _deps;
+    }
+
+    GateActionStatus getActionStatus() const override {
+        return _actionStatus;
+    }
+
     void setSatisfied(bool val) { _satisfied = val; }
+
+    void setDependencies(const char* const* deps, uint8_t count) {
+        _deps = deps;
+        _depCount = count;
+    }
+
+    void setActionStatus(GateActionStatus status) { _actionStatus = status; }
 
 private:
     const char* _name;
     const char* _help;
     bool _satisfied;
+    const char* const* _deps = nullptr;
+    uint8_t _depCount = 0;
+    GateActionStatus _actionStatus = GateActionStatus::NeedsUserAction;
 };
 
 // =============================================================================
@@ -477,4 +496,84 @@ TEST_F(ConfiguringStatusBoardTest, EmptyGateVector_ReturnsZeroCounts) {
     board.setGates(&emptyGates);
     EXPECT_EQ(board.getTotalGateCount(), 0);
     EXPECT_EQ(board.getSatisfiedCount(), 0);
+}
+
+/** setActiveGateStatus stores the status value. */
+TEST_F(ConfiguringStatusBoardTest, SetActiveGateStatus_StoresStatus) {
+    board.setActiveGateStatus(GateActionStatus::InProgress);
+    EXPECT_EQ(board.getActiveGateStatus(), GateActionStatus::InProgress);
+
+    board.setActiveGateStatus(GateActionStatus::NeedsUserAction);
+    EXPECT_EQ(board.getActiveGateStatus(), GateActionStatus::NeedsUserAction);
+
+    board.setActiveGateStatus(GateActionStatus::Satisfied);
+    EXPECT_EQ(board.getActiveGateStatus(), GateActionStatus::Satisfied);
+}
+
+/** setConnectionInfo must not crash with valid inputs. */
+TEST_F(ConfiguringStatusBoardTest, SetConnectionInfo_ValidInputs_DoesNotCrash) {
+    EXPECT_NO_FATAL_FAILURE(board.setConnectionInfo("MyNetwork", "http://192.168.1.42"));
+}
+
+/** setConnectionInfo must not crash with nullptr inputs. */
+TEST_F(ConfiguringStatusBoardTest, SetConnectionInfo_NullInputs_DoesNotCrash) {
+    EXPECT_NO_FATAL_FAILURE(board.setConnectionInfo(nullptr, nullptr));
+}
+
+// =============================================================================
+// Test Group: GenericGateHelperBoard
+// =============================================================================
+
+#include "boards/GenericGateHelperBoard.hpp"
+
+class GenericGateHelperBoardTest : public ::testing::Test {
+protected:
+    GenericGateHelperBoard board{256, 64}; ///< Fresh instance for each test
+};
+
+/** getBoardName must return the expected system board identifier. */
+TEST_F(GenericGateHelperBoardTest, GetBoardName_ReturnsCorrectName) {
+    EXPECT_STREQ(board.getBoardName(), "SYS: Gate Helper");
+}
+
+/** isExpired must return false initially (not dismissed). */
+TEST_F(GenericGateHelperBoardTest, IsExpired_Initially_ReturnsFalse) {
+    EXPECT_FALSE(board.isExpired());
+}
+
+/** dismiss must cause isExpired to return true. */
+TEST_F(GenericGateHelperBoardTest, Dismiss_CausesExpiry) {
+    board.dismiss();
+    EXPECT_TRUE(board.isExpired());
+}
+
+/** configure must not crash with valid inputs. */
+TEST_F(GenericGateHelperBoardTest, Configure_ValidInputs_DoesNotCrash) {
+    EXPECT_NO_FATAL_FAILURE(board.configure("Board Config", "Add a departure board", "192.168.1.42"));
+}
+
+/** configure must not crash with nullptr inputs. */
+TEST_F(GenericGateHelperBoardTest, Configure_NullInputs_DoesNotCrash) {
+    EXPECT_NO_FATAL_FAILURE(board.configure(nullptr, nullptr, nullptr));
+}
+
+/** configure must reset dismissed state (board becomes active again). */
+TEST_F(GenericGateHelperBoardTest, Configure_AfterDismiss_ResetsExpiry) {
+    board.dismiss();
+    EXPECT_TRUE(board.isExpired());
+
+    board.configure("Test Gate", "Help text", "10.0.0.1");
+    EXPECT_FALSE(board.isExpired());
+}
+
+/** configure with empty strings must not crash. */
+TEST_F(GenericGateHelperBoardTest, Configure_EmptyStrings_DoesNotCrash) {
+    EXPECT_NO_FATAL_FAILURE(board.configure("", "", ""));
+}
+
+/** Multiple configure calls must not crash (reconfiguration). */
+TEST_F(GenericGateHelperBoardTest, Configure_MultipleCalls_DoesNotCrash) {
+    EXPECT_NO_FATAL_FAILURE(board.configure("Gate A", "Help A", "192.168.1.1"));
+    EXPECT_NO_FATAL_FAILURE(board.configure("Gate B", "Help B", "192.168.1.2"));
+    EXPECT_NO_FATAL_FAILURE(board.configure("Gate C", "Help C", "192.168.1.3"));
 }

@@ -204,3 +204,153 @@ TEST_F(EventBusIntegrationTest, Publish_NoSubscribers_ReturnsZero) {
     int delivered = bus.publish(OTAUpdateManagerEvents::OTA_PROGRESS, &payload);
     EXPECT_EQ(delivered, 0);
 }
+
+// =============================================================================
+// Test Group: Three-Tier _onAppConfiguring Dispatch
+// =============================================================================
+
+#include "events/AppConfiguringPayload.hpp"
+#include "interfaces/IU8G2SystemScreens.hpp"
+
+/**
+ * @brief Dummy custom gate helper board for consumer override testing.
+ */
+class DummyGateHelperBoard : public IDisplayBoard {
+public:
+    void render(U8G2& /*u8g2*/) override {}
+    bool isExpired() const override { return false; }
+    const char* getBoardName() const override { return "Custom Gate Helper"; }
+};
+
+/**
+ * @brief Mock IU8G2SystemScreens that returns a consumer-provided gate helper.
+ */
+class MockScreensWithGateHelper : public IU8G2SystemScreens {
+public:
+    IDisplayBoard* gateHelperBoard(const AppConfiguringPayload* /*payload*/) override {
+        return &_customHelper;
+    }
+    DummyGateHelperBoard _customHelper;
+};
+
+class ThreeTierDispatchTest : public ::testing::Test {
+protected:
+    EventBus bus;
+    void SetUp() override { bus.begin(); }
+};
+
+/**
+ * Tier 1: Consumer override via gateHelperBoard() — should win over built-in and generic.
+ */
+TEST_F(ThreeTierDispatchTest, Tier1_ConsumerOverride_WinsOverBuiltIn) {
+    MockScreensWithGateHelper customScreens;
+    U8G2DisplayModule display(nullptr, nullptr, &customScreens);
+    display.begin(&bus);
+
+    AppConfiguringPayload payload;
+    payload.gateName = "API Keys";
+    payload.helpText = "Enter your API key";
+    payload.actionStatus = GateActionStatus::NeedsUserAction;
+    payload.hostname = "mydevice";
+    payload.deviceIP = "192.168.1.42";
+
+    bus.publish("app.configuring", &payload);
+
+    EXPECT_EQ(display.visibleBoard(), &customScreens._customHelper);
+    EXPECT_STREQ(display.visibleBoard()->getBoardName(), "Custom Gate Helper");
+}
+
+/**
+ * Tier 2: Built-in WiFi wizard for GateNames::WIFI_STATION when no consumer override.
+ */
+TEST_F(ThreeTierDispatchTest, Tier2_WifiStation_ShowsWifiWizard) {
+    U8G2DisplayModule display;
+    display.begin(&bus);
+
+    AppConfiguringPayload payload;
+    payload.gateName = GateNames::WIFI_STATION;
+    payload.helpText = "Connect to WiFi";
+    payload.actionStatus = GateActionStatus::NeedsUserAction;
+    payload.hostname = "esp32-device";
+    payload.deviceIP = "192.168.4.1";
+
+    bus.publish("app.configuring", &payload);
+
+    EXPECT_EQ(display.visibleBoard(), &display.boards.wifiWizard);
+    EXPECT_STREQ(display.visibleBoard()->getBoardName(), "SYS: WiFi Wizard");
+}
+
+/**
+ * Tier 3: Generic fallback for unknown gates with no consumer override.
+ */
+TEST_F(ThreeTierDispatchTest, Tier3_UnknownGate_ShowsGenericHelper) {
+    U8G2DisplayModule display;
+    display.begin(&bus);
+
+    AppConfiguringPayload payload;
+    payload.gateName = "Board Config";
+    payload.helpText = "Add a departure board";
+    payload.actionStatus = GateActionStatus::NeedsUserAction;
+    payload.hostname = "mydevice";
+    payload.deviceIP = "192.168.1.42";
+
+    bus.publish("app.configuring", &payload);
+
+    EXPECT_EQ(display.visibleBoard(), &display.boards.genericHelper);
+    EXPECT_STREQ(display.visibleBoard()->getBoardName(), "SYS: Gate Helper");
+}
+
+/**
+ * clearModal is called on every _onAppConfiguring invocation.
+ * Verify by pushing a modal first, then publishing configuring with InProgress
+ * (which should NOT push a new modal, but should clear the old one).
+ */
+TEST_F(ThreeTierDispatchTest, ClearModal_CalledOnEveryInvocation) {
+    U8G2DisplayModule display;
+    display.begin(&bus);
+
+    // First: push WiFi wizard via NeedsUserAction
+    AppConfiguringPayload payload1;
+    payload1.gateName = GateNames::WIFI_STATION;
+    payload1.helpText = "Connect to WiFi";
+    payload1.actionStatus = GateActionStatus::NeedsUserAction;
+    payload1.hostname = "device";
+    payload1.deviceIP = "192.168.4.1";
+
+    bus.publish("app.configuring", &payload1);
+    EXPECT_EQ(display.visibleBoard(), &display.boards.wifiWizard);
+
+    // Second: publish InProgress — modal should be cleared, no new modal pushed
+    AppConfiguringPayload payload2;
+    payload2.gateName = GateNames::WIFI_STATION;
+    payload2.helpText = "Connecting...";
+    payload2.actionStatus = GateActionStatus::InProgress;
+    payload2.hostname = "device";
+    payload2.deviceIP = "192.168.1.100";
+
+    bus.publish("app.configuring", &payload2);
+
+    // The visible board should now be the base configuring status board (modal cleared)
+    EXPECT_EQ(display.visibleBoard(), &display.boards.configuringStatus);
+}
+
+/**
+ * InProgress action status must NOT show a modal.
+ */
+TEST_F(ThreeTierDispatchTest, InProgress_NoModal) {
+    U8G2DisplayModule display;
+    display.begin(&bus);
+
+    AppConfiguringPayload payload;
+    payload.gateName = GateNames::WIFI_STATION;
+    payload.helpText = "Connecting...";
+    payload.actionStatus = GateActionStatus::InProgress;
+    payload.hostname = "device";
+    payload.deviceIP = "192.168.1.100";
+
+    bus.publish("app.configuring", &payload);
+
+    // Only the base configuring board should be visible (no modal)
+    EXPECT_EQ(display.visibleBoard(), &display.boards.configuringStatus);
+}
+

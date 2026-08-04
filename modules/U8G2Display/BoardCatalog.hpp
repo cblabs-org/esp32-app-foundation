@@ -30,6 +30,7 @@
 
 #include "boards/BootBoard.hpp"
 #include "boards/ConfiguringStatusBoard.hpp"
+#include "boards/GenericGateHelperBoard.hpp"
 #include "boards/WiFiWizardBoard.hpp"
 #include "boards/OTAProgressBoard.hpp"
 #include "boards/ErrorBoard.hpp"
@@ -58,6 +59,7 @@
 struct BoardCatalog {
     BootBoard&              boot;                ///< Boot splash + loading screen (driven via IStatusReporter)
     ConfiguringStatusBoard& configuringStatus;   ///< Gate progress during CONFIGURING phase
+    GenericGateHelperBoard& genericHelper;        ///< Generic fallback helper for config gates
     WiFiWizardBoard&        wifiWizard;           ///< WiFi setup wizard screen
     OTAProgressBoard&       otaProgress;          ///< OTA firmware update progress screen
     ErrorBoard&             error;                ///< Error message display screen
@@ -70,17 +72,20 @@ struct BoardCatalog {
      *
      * @param boot              Reference to the module's owned BootBoard.
      * @param configuringStatus Reference to the module's owned ConfiguringStatusBoard.
+     * @param genericHelper     Reference to the module's owned GenericGateHelperBoard.
      * @param wifiWizard        Reference to the module's owned WiFiWizardBoard.
      * @param otaProgress       Reference to the module's owned OTAProgressBoard.
      * @param error             Reference to the module's owned ErrorBoard.
      */
     BoardCatalog(BootBoard& boot,
                  ConfiguringStatusBoard& configuringStatus,
+                 GenericGateHelperBoard& genericHelper,
                  WiFiWizardBoard& wifiWizard,
                  OTAProgressBoard& otaProgress,
                  ErrorBoard& error)
         : boot(boot)
         , configuringStatus(configuringStatus)
+        , genericHelper(genericHelper)
         , wifiWizard(wifiWizard)
         , otaProgress(otaProgress)
         , error(error) {}

@@ -94,6 +94,7 @@
 #include "boards/ErrorBoard.hpp"
 #include "boards/ScreensaverBoard.hpp"
 #include "boards/ConfiguringStatusBoard.hpp"
+#include "boards/GenericGateHelperBoard.hpp"
 #include "../../include/types/DisplayInfo.hpp"
 #include "../../include/utils/Periodic.hpp"
 #include <types/BootBranding.h>
@@ -646,6 +647,7 @@ private:
     ErrorBoard       _error{_displayWidth, _displayHeight};        ///< Error message display screen
     ScreensaverBoard _screensaverBoard{_displayWidth, _displayHeight};  ///< Inactivity screensaver (burn-in prevention)
     ConfiguringStatusBoard _configuringStatusBoard{_displayWidth, _displayHeight}; ///< Gate progress during CONFIGURING phase
+    GenericGateHelperBoard _genericHelperBoard{_displayWidth, _displayHeight};      ///< Generic fallback helper for config gates
 
 public:
     // -------------------------------------------------------------------------
@@ -659,5 +661,5 @@ public:
     ScreensaverController& screensaver = _screensaver;
 
     /** @brief Board catalog sub-object — named, concrete references to user-surfaced boards (§7.8.4). */
-    BoardCatalog boards{_bootBoard, _configuringStatusBoard, _wifiWizard, _otaProgress, _error};
+    BoardCatalog boards{_bootBoard, _configuringStatusBoard, _genericHelperBoard, _wifiWizard, _otaProgress, _error};
 };

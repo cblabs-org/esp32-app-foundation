@@ -13,6 +13,7 @@
 #pragma once
 
 #include "interfaces/IDisplayBoard.hpp"
+#include "events/AppConfiguringPayload.hpp"
 
 /**
  * @brief Pluggable system screen provider for U8G2 display module.
@@ -38,4 +39,22 @@ public:
 
     /// Custom WiFi wizard board, or nullptr for built-in WiFiWizardBoard.
     virtual IDisplayBoard* wifiWizardBoard()   { return nullptr; }
+
+    /// Custom helper modal for a specific config gate.
+    ///
+    /// Called when a gate's actionStatus is NeedsUserAction. The returned
+    /// board pointer must be non-owning — the board must outlive the display
+    /// module (typically a static or member object of the consumer's
+    /// IU8G2SystemScreens implementation). The same pointer may be returned
+    /// for multiple gates if the board supports reconfiguration.
+    ///
+    /// Return nullptr to use the built-in mapping or generic helpText fallback.
+    ///
+    /// @param payload Full configuring event payload with gate name, help text,
+    ///                action status, hostname, and device IP.
+    /// @return Non-owning pointer to a custom board, or nullptr.
+    virtual IDisplayBoard* gateHelperBoard(const AppConfiguringPayload* payload) {
+        (void)payload;
+        return nullptr;
+    }
 };

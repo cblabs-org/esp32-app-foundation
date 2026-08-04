@@ -8,19 +8,20 @@
  *
  * Module: modules/U8G2Display/boards/configuringStatusBoard.cpp
  * Description: Implementation of the ConfiguringStatusBoard. Renders a centred
- *              header, a single-line gate status label, and a progress bar
- *              matching the boot board's LOADING phase layout during the
- *              CONFIGURING lifecycle phase.
+ *              header, per-gate status rows with prefix indicators, an animated
+ *              progress bar that lerps toward the target percentage, and a
+ *              device IP footer during the CONFIGURING lifecycle phase.
  *
  * Exported Functions:
  * - ConfiguringStatusBoard::ConfiguringStatusBoard(): Layout widgets for display
- * - ConfiguringStatusBoard::setGates():      Bind gate list pointer
- * - ConfiguringStatusBoard::dismiss():       Mark dismissed for expiry
- * - ConfiguringStatusBoard::render():        Draw header, status label, progress bar
- * - ConfiguringStatusBoard::isExpired():     Return dismissed state
- * - ConfiguringStatusBoard::getBoardName():  Return "SYS: Configuring"
- * - ConfiguringStatusBoard::getSatisfiedCount(): Return count of satisfied gates
- * - ConfiguringStatusBoard::getTotalGateCount(): Return total bound gate count
+ * - ConfiguringStatusBoard::setGates():              Bind gate list pointer
+ * - ConfiguringStatusBoard::setActiveGateStatus():   Update current gate action status
+ * - ConfiguringStatusBoard::dismiss():               Mark dismissed for expiry
+ * - ConfiguringStatusBoard::render():                Draw header, status rows, progress bar, footer
+ * - ConfiguringStatusBoard::isExpired():             Return dismissed state
+ * - ConfiguringStatusBoard::getBoardName():          Return "SYS: Configuring"
+ * - ConfiguringStatusBoard::getSatisfiedCount():     Return count of satisfied gates
+ * - ConfiguringStatusBoard::getTotalGateCount():     Return total bound gate count
  */
 
 #include "ConfiguringStatusBoard.hpp"
@@ -38,10 +39,10 @@
 /**
  * @brief Construct the configuring status board, laying out widgets.
  *
- * Layout matches boot board LOADING phase (256x64 example):
+ * Layout (256x64 example):
  *   Row 0-11:  Header "Configuring..." (bold, centred)
- *   Row 24:    Status label — gate name (small, centred)
- *   Row 38-53: Progress bar (X=16, width=dw-32, height=16)
+ *   Rows:      Per-gate status rows (small font, left-aligned with prefix)
+ *   Bottom:    Animated progress bar + device IP footer
  *
  * @param displayWidth  Display width in pixels.
  * @param displayHeight Display height in pixels.
@@ -71,6 +72,14 @@ void ConfiguringStatusBoard::setGates(const std::vector<IConfigGate*>* gates) {
 }
 
 /**
+ * @brief Update the action status of the current actionable gate.
+ * @param status The GateActionStatus for the currently actionable gate.
+ */
+void ConfiguringStatusBoard::setActiveGateStatus(GateActionStatus status) {
+    _activeGateStatus = status;
+}
+
+/**
  * @brief Set network connection info for the footer display.
  * @param network  The WiFi network name (SSID) the device is connected to.
  * @param url      The device URL (e.g., "http://192.168.1.42").
@@ -96,12 +105,14 @@ void ConfiguringStatusBoard::dismiss() {
 /**
  * @brief Render the configuring status screen to the U8G2 display buffer.
  *
- * Layout (matching boot board LOADING phase):
+ * Layout:
  *   1. Header "Configuring..." at Y=0 (bold, centred)
- *   2. Status label at Y=24 showing the first actionable unsatisfied gate
- *      name with a ">" prefix (ASCII-safe)
- *   3. Progress bar at Y=38, X=16, width=dw-32, height=16 showing
- *      (satisfied / total) as percentage
+ *   2. Per-gate status rows with prefix indicators:
+ *      - '*' = satisfied
+ *      - '>' = actionable (NeedsUserAction) — alternates with '~' for InProgress
+ *      - '-' = blocked (dependencies not met)
+ *   3. Animated progress bar (lerps toward target)
+ *   4. Device IP footer
  *
  * @param u8g2 Reference to the active U8G2 driver instance.
  */
@@ -110,19 +121,23 @@ void ConfiguringStatusBoard::render(U8G2& u8g2) {
     _headerLabel.setFont(AppFonts::defaultLarge());
     _headerLabel.render(u8g2);
 
-    // --- 2. Compute gate status and draw status label ---
+    // --- 2. Compute gate status and draw per-gate rows ---
     if (_gates != nullptr && !_gates->empty()) {
         const int gateCount = static_cast<int>(_gates->size());
         int satisfiedCount = 0;
-        const char* activeGateName = nullptr;
+
+        // --- Count satisfied gates and determine actionable gate ---
+        // We compute the actionable gate name from the gate list itself for
+        // the status rows. The _activeGateStatus from the payload controls
+        // the prefix character for the active row.
+        const char* actionableGateName = nullptr;
 
         for (int i = 0; i < gateCount; i++) {
             const IConfigGate* gate = (*_gates)[i];
             if (gate->isSatisfied()) {
                 satisfiedCount++;
-            } else if (activeGateName == nullptr) {
-                // First unsatisfied gate — check if it's actionable
-                // (all dependencies satisfied)
+            } else if (actionableGateName == nullptr) {
+                // Check if this gate's dependencies are all satisfied
                 uint8_t depCount = 0;
                 const char* const* deps = gate->getDependencies(depCount);
                 bool depsOk = true;
@@ -138,27 +153,66 @@ void ConfiguringStatusBoard::render(U8G2& u8g2) {
                     if (!found || !depsOk) { depsOk = false; break; }
                 }
                 if (depsOk) {
-                    activeGateName = gate->getGateName();
+                    actionableGateName = gate->getGateName();
                 }
             }
         }
 
-        // Format status label: "> GateName" or "Waiting..."
-        char statusBuf[64];
-        if (activeGateName != nullptr) {
-            snprintf(statusBuf, sizeof(statusBuf), "> %s", activeGateName);
-        } else {
-            snprintf(statusBuf, sizeof(statusBuf), "Waiting...");
-        }
-        _statusLabel.setText(statusBuf);
-        _statusLabel.setFont(AppFonts::defaultSmall());
-        _statusLabel.render(u8g2);
+        // --- Increment animation frame for InProgress effect ---
+        _animFrame++;
 
-        // --- 3. Draw progress bar ---
-        int percent = (gateCount > 0)
-            ? static_cast<int>((static_cast<float>(satisfiedCount) / gateCount) * 100.0f)
-            : 0;
-        _progressBar.setPercent(percent, 0);
+        // --- Draw per-gate status rows ---
+        u8g2.setFont(AppFonts::defaultSmall());
+        const int rowHeight = 10;
+        const int startY = 16;
+        const int maxRows = (_displayHeight > 48) ? 3 : 2; // Limit visible rows on small displays
+        int rowsDrawn = 0;
+
+        for (int i = 0; i < gateCount && rowsDrawn < maxRows; i++) {
+            const IConfigGate* gate = (*_gates)[i];
+            char rowBuf[64];
+            char prefix;
+
+            if (gate->isSatisfied()) {
+                prefix = '*';
+            } else if (actionableGateName != nullptr &&
+                       strcmp(gate->getGateName(), actionableGateName) == 0) {
+                // Active gate — choose prefix based on action status
+                if (_activeGateStatus == GateActionStatus::InProgress) {
+                    // Alternate between '>' and '~' for animation effect
+                    prefix = (_animFrame % 20 < 10) ? '>' : '~';
+                } else {
+                    prefix = '>';
+                }
+            } else {
+                prefix = '-';
+            }
+
+            snprintf(rowBuf, sizeof(rowBuf), "%c %s", prefix, gate->getGateName());
+
+            int textWidth = u8g2.getStrWidth(rowBuf);
+            int rowX = (_displayWidth - textWidth) / 2;
+            if (rowX < 4) rowX = 4;
+
+            u8g2.drawStr(rowX, startY + (rowsDrawn * rowHeight), rowBuf);
+            rowsDrawn++;
+        }
+
+        // --- 3. Animated progress bar ---
+        _targetPercent = (gateCount > 0)
+            ? (static_cast<float>(satisfiedCount) / gateCount) * 100.0f
+            : 0.0f;
+
+        // Lerp: move _currentPercent toward _targetPercent by 2% per frame
+        if (_currentPercent < _targetPercent) {
+            _currentPercent += 2.0f;
+            if (_currentPercent > _targetPercent) _currentPercent = _targetPercent;
+        } else if (_currentPercent > _targetPercent) {
+            _currentPercent = _targetPercent; // Snap down (gates don't un-satisfy normally)
+        }
+
+        // Position progress bar below gate rows (uses constructed Y=38)
+        _progressBar.setPercent(static_cast<int>(_currentPercent), 0);
         _progressBar.setShowPercentText(false);
         _progressBar.setFont(AppFonts::defaultSmall());
         _progressBar.render(u8g2);
@@ -169,16 +223,20 @@ void ConfiguringStatusBoard::render(U8G2& u8g2) {
         _statusLabel.render(u8g2);
     }
 
-    // --- 4. Draw connection info footer ---
-    if (_networkName[0] != '\0' && _deviceUrl[0] != '\0') {
-        char footerBuf[80];
-        snprintf(footerBuf, sizeof(footerBuf), "%s  %s", _networkName, _deviceUrl);
+    // --- 4. Draw connection info footer (device IP) ---
+    if (_deviceUrl[0] != '\0') {
         u8g2.setFont(AppFonts::defaultSmall());
-        // Centre the footer text at the very bottom
-        int textWidth = u8g2.getStrWidth(footerBuf);
+        int textWidth = u8g2.getStrWidth(_deviceUrl);
         int footerX = (_displayWidth - textWidth) / 2;
         if (footerX < 0) footerX = 0;
-        u8g2.drawStr(footerX, _displayHeight - 2, footerBuf);
+        u8g2.drawStr(footerX, _displayHeight - 2, _deviceUrl);
+    } else if (_networkName[0] != '\0') {
+        // Fallback: show network name if no URL set
+        u8g2.setFont(AppFonts::defaultSmall());
+        int textWidth = u8g2.getStrWidth(_networkName);
+        int footerX = (_displayWidth - textWidth) / 2;
+        if (footerX < 0) footerX = 0;
+        u8g2.drawStr(footerX, _displayHeight - 2, _networkName);
     }
 }
 

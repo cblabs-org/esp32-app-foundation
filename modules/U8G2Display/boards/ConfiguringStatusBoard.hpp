@@ -8,18 +8,18 @@
  *
  * Module: modules/U8G2Display/boards/ConfiguringStatusBoard.hpp
  * Description: System board displayed during the CONFIGURING lifecycle phase.
- *              Renders a single-line layout matching the boot board's LOADING
- *              phase: centred "Configuring..." header, a status label showing
- *              the current gate name, and a progress bar at the same position
- *              as the boot screen (Y=38, X=16, width=dw-32, height=16).
+ *              Renders per-gate status rows with prefix indicators (* = satisfied,
+ *              > = actionable, - = blocked), an animated progress bar that lerps
+ *              toward the target percentage, and a footer with the device IP.
  *
  * Exported Classes:
  * - ConfiguringStatusBoard: Gate-progress display implementing IDisplayBoard
- *   - setGates():      Bind the gate list (vector of IConfigGate pointers)
- *   - dismiss():       Mark the board as dismissed (triggers expiry)
- *   - render():        Draw header, status label, and progress bar to U8G2 buffer
- *   - isExpired():     True when dismiss() has been called
- *   - getBoardName():  Returns "SYS: Configuring"
+ *   - setGates():              Bind the gate list (vector of IConfigGate pointers)
+ *   - setActiveGateStatus():   Update the action status of the current gate
+ *   - dismiss():               Mark the board as dismissed (triggers expiry)
+ *   - render():                Draw header, status rows, and progress bar
+ *   - isExpired():             True when dismiss() has been called
+ *   - getBoardName():          Returns "SYS: Configuring"
  */
 
 #pragma once
@@ -33,14 +33,17 @@
 /**
  * @brief System board showing gate-by-gate progress during the CONFIGURING phase.
  *
- * Visual layout (256x64, matching boot board LOADING phase):
+ * Visual layout (256x64):
  * ```
  * +------------------------------------------+
  * |          Configuring...                   |  <- Header (Y=0, bold, centred)
  * |                                          |
- * |          > WiFi Station                  |  <- Status label (Y=24, centred)
+ * |  * WiFi Station                          |  <- Satisfied gate row
+ * |  > API Keys                              |  <- Actionable gate row
+ * |  - Time Sync                             |  <- Blocked gate row
  * |                                          |
- * |    [==========>              ]            |  <- Progress bar (Y=38, X=16)
+ * |    [===========>              ]           |  <- Animated progress bar
+ * |          http://192.168.1.42             |  <- Footer (device IP)
  * +------------------------------------------+
  * ```
  *
@@ -68,6 +71,17 @@ public:
     void setGates(const std::vector<IConfigGate*>* gates);
 
     /**
+     * @brief Update the action status of the current actionable gate.
+     *
+     * Used by the display module to communicate the gate's action status
+     * from the AppConfiguringPayload. Affects the prefix character for
+     * the active gate row (> for NeedsUserAction, ~ for InProgress).
+     *
+     * @param status The GateActionStatus for the currently actionable gate.
+     */
+    void setActiveGateStatus(GateActionStatus status);
+
+    /**
      * @brief Mark the board as dismissed, causing isExpired() to return true.
      *
      * Called when the app transitions to RUNNING and the configuring board
@@ -78,8 +92,8 @@ public:
     /**
      * @brief Render the configuring status screen to the U8G2 display buffer.
      *
-     * Draws: (1) "Configuring..." header (centred), (2) status label showing
-     * the first unsatisfied actionable gate name, (3) progress bar at Y=38.
+     * Draws: (1) "Configuring..." header (centred), (2) per-gate status rows
+     * with prefix indicators, (3) animated progress bar, (4) device IP footer.
      *
      * @param u8g2 Reference to the active U8G2 driver instance.
      */
@@ -116,12 +130,25 @@ public:
      */
     void setConnectionInfo(const char* network, const char* url);
 
+    /**
+     * @brief Return the current active gate status (for testing).
+     * @return The GateActionStatus set via setActiveGateStatus().
+     */
+    GateActionStatus getActiveGateStatus() const { return _activeGateStatus; }
+
 private:
     uint16_t _displayWidth;                               ///< Display width in pixels
     uint16_t _displayHeight;                              ///< Display height in pixels
     bool     _dismissed = false;                          ///< True after dismiss()
 
     const std::vector<IConfigGate*>* _gates = nullptr;    ///< Non-owning pointer to gate list
+
+    // --- Gate action status ---
+    GateActionStatus _activeGateStatus = GateActionStatus::NeedsUserAction; ///< Current actionable gate status
+
+    // --- Animated progress ---
+    float _currentPercent = 0.0f;                         ///< Current displayed progress (lerped)
+    float _targetPercent  = 0.0f;                         ///< Target progress percentage
 
     // --- Widgets ---
     LabelWidget       _headerLabel;                       ///< "Configuring..." header (centred)
@@ -130,4 +157,8 @@ private:
 
     char _networkName[33] = "";                            ///< Connected WiFi network name
     char _deviceUrl[48] = "";                              ///< Device URL for portal access
+
+    // --- Animation frame counter for InProgress effect ---
+    uint8_t _animFrame = 0;                               ///< Frame counter for > / ~ alternation
 };
+
