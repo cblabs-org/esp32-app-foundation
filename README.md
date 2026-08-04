@@ -11,7 +11,7 @@ not weeks. Web portal, OLED display carousel, Home Assistant integration, OTA up
 full TLS security, and a built-in MCP server that lets AI agents query and control
 your device over JSON-RPC.
 
-[![License: CC BY-NC-SA 4.0](https://img.shields.io/badge/License-CC%20BY--NC--SA%204.0-lightgrey.svg)](https://creativecommons.org/licenses/by-nc-sa/4.0/)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![PlatformIO](https://img.shields.io/badge/PlatformIO-ESP32-orange?logo=platformio)](https://platformio.org)
 [![Framework](https://img.shields.io/badge/Framework-Arduino%20%7C%20ESP--IDF-blue)](https://docs.espressif.com/projects/esp-idf/)
 [![AI Ready](https://img.shields.io/badge/AI%20Ready-MCP%20Server-purple)](docs/developer/README.md)
@@ -400,10 +400,7 @@ architecture and generate compliant implementations.
 
 ## License
 
-[![License: CC BY-NC-SA 4.0](https://img.shields.io/badge/License-CC%20BY--NC--SA%204.0-lightgrey.svg)](https://creativecommons.org/licenses/by-nc-sa/4.0/)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-© 2026 CB Labs. Licensed under
-[Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International](https://creativecommons.org/licenses/by-nc-sa/4.0/).
+© 2026 CB Labs. Licensed under the [Apache License 2.0](https://opensource.org/licenses/Apache-2.0).
 
-You are free to use, adapt, and build on this work for non-commercial purposes, provided
-you give appropriate credit and share any adaptations under the same licence.
