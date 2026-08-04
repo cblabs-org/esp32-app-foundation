@@ -48,6 +48,7 @@
 #include <ArduinoJson.h>
 #include "../../lib/DeviceCrypto/DeviceCrypto.hpp"
 #include "../../include/interfaces/IWebContributor.hpp"
+#include "../../include/interfaces/IMCPContributor.hpp"
 #include "../ConfigManager/ConfigRoot.hpp"
 
 #define KEY_MANAGER_PATH (ConfigRoot::getEtcFilePath("keys.json").c_str())
@@ -56,26 +57,27 @@
  * @brief Metadata descriptor for a single key entry.
  *
  * Returned by KeyManager::listKeysWithMetadata() for the GET /api/keys
- * response.  Contains the key ID, whether a value exists, and optional
- * ownership attributes (managedBy / exclusive).
+ * response. Contains the key ID, whether a value exists, and optional
+ * ownership attributes (managedBy / exclusive / systemLocked).
  */
 struct KeyInfo {
     std::string id;        ///< Unique key identifier.
     bool hasValue;         ///< True if an encrypted value is stored.
     std::string managedBy; ///< Owning module name (empty if user-created).
     bool exclusive;        ///< True if the key is write-protected by its owner.
+    bool systemLocked;     ///< True if the key is system-locked (un-bypassable over MCP/REST).
 };
 
 /**
  * @brief Kernel service providing an encrypted registry for credentials.
  *
  * Implements IWebContributor to register REST API routes for managing keys
- * via the web portal. The "Keys" pill appears under the System tab at order 20.
- * GET /api/keys returns key metadata (never plaintext values).  Keys may
- * carry ownership metadata (managedBy / exclusive) so the API can enforce
- * write-protection for module-managed entries.
+ * via the web portal. Implements IMCPContributor to expose MCP tools over JSON-RPC.
+ * GET /api/keys returns key metadata (never plaintext values). Keys may
+ * carry ownership metadata (managedBy / exclusive / systemLocked) so the API and MCP server
+ * can enforce write-protection for module-managed entries.
  */
-class KeyManager : public IWebContributor {
+class KeyManager : public IWebContributor, public IMCPContributor {
 private:
     DeviceCrypto* _crypto = nullptr; ///< Pointer to injected DeviceCrypto service.
     
@@ -109,10 +111,12 @@ public:
      * @param secret The plaintext credential to store.
      * @param managedBy Optional owning module name (e.g. "WiFi", "Security").
      * @param exclusive If true, the key is write-protected via the REST API.
+     * @param systemLocked If true, the key is un-bypassable over MCP/REST.
      * @return true if successfully stored, false on failure.
      */
     bool addKey(const char* id, const char* secret,
-                const char* managedBy = nullptr, bool exclusive = false);
+                const char* managedBy = nullptr, bool exclusive = false,
+                bool systemLocked = false);
 
     /**
      * @brief Retrieves and decrypts a credential from the registry.
@@ -138,7 +142,7 @@ public:
      * @brief List all stored keys with full ownership metadata.
      *
      * Used by the GET /api/keys endpoint to provide the portal UI with
-     * managedBy / exclusive attributes for badge rendering.
+     * managedBy / exclusive / systemLocked attributes for badge rendering.
      *
      * @return Vector of KeyInfo structs (empty if registry is empty or unreadable).
      */
@@ -150,6 +154,38 @@ public:
      * @return true if the key exists and has exclusive=true, false otherwise.
      */
     bool isExclusive(const char* id) const;
+
+    /**
+     * @brief Get the owner (managedBy module name) of a stored key.
+     * @param id The unique identifier for the key.
+     * @return The managedBy string, or empty string if not set or key not found.
+     */
+    std::string getOwner(const char* id) const;
+
+    /**
+     * @brief Check whether a key is system-locked.
+     * @param id The unique identifier for the key.
+     * @return true if the key exists and has systemLocked=true, false otherwise.
+     */
+    bool isSystemLocked(const char* id) const;
+
+    /**
+     * @brief Retrieves the metadata for a single key without returning its plaintext value.
+     * @param id The unique identifier for the key.
+     * @param outInfo Reference to a KeyInfo struct to populate.
+     * @return true if the key exists and metadata was populated, false otherwise.
+     */
+    bool getKeyMetadata(const char* id, KeyInfo& outInfo) const;
+
+    // -------------------------------------------------------------------------
+    // IMCPContributor Interface
+    // -------------------------------------------------------------------------
+
+    /**
+     * @brief Register key management MCP tools with the tool registry.
+     * @param registry Reference to the MCPToolRegistry.
+     */
+    void registerMCPTools(MCPToolRegistry& registry) override;
 
     // -------------------------------------------------------------------------
     // IWebContributor Interface
