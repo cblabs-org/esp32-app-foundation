@@ -18,10 +18,10 @@ Centralise the CONFIGURING lifecycle display orchestration. Application (Ring-1 
 
 | WO | Topic | Complexity | Dependencies | Status |
 |:---|:------|:-----------|:-------------|:-------|
-| **[ ] [wo1-interface-kernel](wo1-interface-kernel/WORKORDER.md)** | `GateActionStatus` enum, `getActionStatus()` on `IConfigGate`, enriched `AppConfiguringPayload`, gate name constants, `getActionableGate()` helper, gate-transition re-publishing in `Application::tick()` | `standard` | None (base: `main`) | ⬜ NOT STARTED |
-| **[ ] [wo2-u8g2-display](wo2-u8g2-display/WORKORDER.md)** | `ConfiguringStatusBoard` upgrade, `GenericGateHelperBoard`, three-tier modal dispatch in `_onAppConfiguring()`, `IU8G2SystemScreens::gateHelperBoard()` | `standard` | wo1 | ⬜ NOT STARTED |
-| **[ ] [wo3-lvgl-parity](wo3-lvgl-parity/WORKORDER.md)** | `ILVGLSystemScreens` interface additions, `LVGLDisplayModule::_onAppConfiguring()` stub update | `mechanical` | wo2 | ⬜ NOT STARTED |
-| **[ ] [wo4-consumer-cleanup](wo4-consumer-cleanup/WORKORDER.md)** | Delete catch-up blocks + AP-mode subscriptions from all three `main.cpp` files, add `BoardRegistry` WiFi dependency (departures-board consumer) | `mechanical` | wo3 | ⬜ NOT STARTED |
+| **[x] [wo1-interface-kernel](wo1-interface-kernel/WORKORDER.md)** | `GateActionStatus` enum, `getActionStatus()` on `IConfigGate`, enriched `AppConfiguringPayload`, gate name constants, `getActionableGate()` helper, gate-transition re-publishing in `Application::tick()` | `standard` | None (base: `main`) | ✅ COMPLETE |
+| **[x] [wo2-u8g2-display](wo2-u8g2-display/WORKORDER.md)** | `ConfiguringStatusBoard` upgrade, `GenericGateHelperBoard`, three-tier modal dispatch in `_onAppConfiguring()`, `IU8G2SystemScreens::gateHelperBoard()` | `standard` | wo1 | ✅ COMPLETE |
+| **[x] [wo3-lvgl-parity](wo3-lvgl-parity/WORKORDER.md)** | `ILVGLSystemScreens` interface additions, `LVGLDisplayModule::_onAppConfiguring()` stub update | `mechanical` | wo2 | ✅ COMPLETE |
+| **[x] [wo4-consumer-cleanup](wo4-consumer-cleanup/WORKORDER.md)** | Delete catch-up blocks + AP-mode subscriptions from all three `main.cpp` files, add `BoardRegistry` WiFi dependency (departures-board consumer) | `mechanical` | wo3 | ✅ COMPLETE |
 
 ## Concurrency Assessment
 
