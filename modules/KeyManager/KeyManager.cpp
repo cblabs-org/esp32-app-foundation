@@ -13,6 +13,7 @@
 
 #include "KeyManager.hpp"
 #include "../Logger/Logger.hpp"
+#include "../MCPServer/MCPToolRegistry.hpp"
 #include <fstream>
 #include <sstream>
 #include <sys/stat.h>
@@ -80,7 +81,7 @@ bool KeyManager::saveRegistry(const JsonDocument& doc) const {
 }
 
 bool KeyManager::addKey(const char* id, const char* secret,
-                        const char* managedBy, bool exclusive) {
+                        const char* managedBy, bool exclusive, bool systemLocked) {
     if (!id || strlen(id) == 0 || !secret || strlen(secret) == 0) {
         ESP_LOGE(TAG, "Invalid ID or Secret.");
         return false;
@@ -102,7 +103,7 @@ bool KeyManager::addKey(const char* id, const char* secret,
         return false;
     }
 
-    // Write nested object: {"value": "...", "managedBy": "...", "exclusive": true}
+    // Write nested object: {"value": "...", "managedBy": "...", "exclusive": true, "systemLocked": true}
     JsonObject entry = doc[id].to<JsonObject>();
     entry["value"] = encrypted.get();
     if (managedBy && strlen(managedBy) > 0) {
@@ -110,6 +111,9 @@ bool KeyManager::addKey(const char* id, const char* secret,
         if (exclusive) {
             entry["exclusive"] = true;
         }
+    }
+    if (systemLocked) {
+        entry["systemLocked"] = true;
     }
 
     if (!saveRegistry(doc)) {
@@ -239,17 +243,19 @@ std::vector<KeyInfo> KeyManager::listKeysWithMetadata() const {
 
         JsonVariant entry = pair.value();
         if (entry.is<JsonObject>()) {
-            // Nested format: {"value": "...", "managedBy": "...", "exclusive": true}
+            // Nested format: {"value": "...", "managedBy": "...", "exclusive": true, "systemLocked": true}
             const char* val = entry["value"] | static_cast<const char*>(nullptr);
             info.hasValue = (val != nullptr && strlen(val) > 0);
             const char* mb = entry["managedBy"] | static_cast<const char*>(nullptr);
             info.managedBy = mb ? std::string(mb) : "";
             info.exclusive = entry["exclusive"] | false;
+            info.systemLocked = entry["systemLocked"] | false;
         } else {
             // Flat legacy string (shouldn't occur with no migration, but safe)
             info.hasValue = true;
             info.managedBy = "";
             info.exclusive = false;
+            info.systemLocked = false;
         }
 
         result.push_back(info);
@@ -277,6 +283,43 @@ bool KeyManager::isExclusive(const char* id) const {
     JsonVariant entry = doc[id];
     if (!entry.is<JsonObject>()) return false;
     return entry["exclusive"] | false;
+}
+
+/**
+ * @brief Get the owner (managedBy module name) of a stored key.
+ *
+ * @param id The unique identifier for the key.
+ * @return The managedBy string, or empty string if not set or key not found.
+ */
+std::string KeyManager::getOwner(const char* id) const {
+    if (!id || strlen(id) == 0) return "";
+
+    JsonDocument doc;
+    if (!loadRegistry(doc)) return "";
+    if (!doc[id].is<JsonVariant>()) return "";
+
+    JsonVariant entry = doc[id];
+    if (!entry.is<JsonObject>()) return "";
+    const char* mb = entry["managedBy"] | static_cast<const char*>(nullptr);
+    return mb ? std::string(mb) : "";
+}
+
+/**
+ * @brief Check whether a key is system-locked.
+ *
+ * @param id The unique identifier for the key.
+ * @return true if the key exists and has systemLocked=true, false otherwise.
+ */
+bool KeyManager::isSystemLocked(const char* id) const {
+    if (!id || strlen(id) == 0) return false;
+
+    JsonDocument doc;
+    if (!loadRegistry(doc)) return false;
+    if (!doc[id].is<JsonVariant>()) return false;
+
+    JsonVariant entry = doc[id];
+    if (!entry.is<JsonObject>()) return false;
+    return entry["systemLocked"] | false;
 }
 
 // =============================================================================
@@ -314,6 +357,9 @@ void KeyManager::registerRoutes(PsychicHttpServer& server) {
             }
             if (ki.exclusive) {
                 entry["exclusive"] = true;
+            }
+            if (ki.systemLocked) {
+                entry["systemLocked"] = true;
             }
         }
 
@@ -359,8 +405,8 @@ void KeyManager::registerRoutes(PsychicHttpServer& server) {
                 return ESP_FAIL;
             }
 
-            // Reject writes to exclusively-managed keys
-            if (isExclusive(id)) {
+            // Reject writes to exclusively-managed or system-locked keys
+            if (isExclusive(id) || isSystemLocked(id)) {
                 response->send(403, "application/json",
                     "{\"error\":\"Key is exclusively managed by its owning module\"}");
                 return ESP_FAIL;
@@ -388,8 +434,8 @@ void KeyManager::registerRoutes(PsychicHttpServer& server) {
             return ESP_FAIL;
         }
 
-        // Reject deletion of exclusively-managed keys
-        if (isExclusive(id.c_str())) {
+        // Reject deletion of exclusively-managed or system-locked keys
+        if (isExclusive(id.c_str()) || isSystemLocked(id.c_str())) {
             response->send(403, "application/json",
                 "{\"error\":\"Key is exclusively managed by its owning module\"}");
             return ESP_FAIL;
@@ -402,4 +448,220 @@ void KeyManager::registerRoutes(PsychicHttpServer& server) {
         }
         return ESP_OK;
     });
+}
+
+// =============================================================================
+// IMCPContributor — MCP Tool Registration
+// =============================================================================
+
+void KeyManager::registerMCPTools(MCPToolRegistry& registry) {
+    // TODO: Add mutex for thread-safety between HTTP and MCP handlers
+
+    // --- key_list: list all stored key IDs with metadata ---
+    registry.addTool("key_list",
+        "List all stored key IDs with ownership and lock metadata",
+        [](void* context, JsonObject& /*args*/, JsonObject& result) {
+            KeyManager* self = static_cast<KeyManager*>(context);
+            JsonArray keysArr = result["keys"].to<JsonArray>();
+
+            std::vector<KeyInfo> keys = self->listKeysWithMetadata();
+            for (const auto& ki : keys) {
+                JsonObject entry = keysArr.add<JsonObject>();
+                entry["id"] = ki.id;
+                entry["hasValue"] = ki.hasValue;
+                if (!ki.managedBy.empty()) {
+                    entry["managedBy"] = ki.managedBy;
+                }
+                if (ki.exclusive) {
+                    entry["exclusive"] = true;
+                }
+                if (ki.systemLocked) {
+                    entry["systemLocked"] = true;
+                }
+            }
+        }, this, false);
+
+    // --- key_get: retrieve key metadata for a single key (never plaintext) ---
+    {
+        JsonDocument schema;
+        schema["type"] = "object";
+        JsonObject props = schema["properties"].to<JsonObject>();
+        props["id"]["type"] = "string";
+        props["id"]["description"] = "Unique key identifier";
+        JsonArray req = schema["required"].to<JsonArray>();
+        req.add("id");
+
+        registry.addTool("key_get",
+            "Retrieve metadata for a single stored key",
+            schema,
+            [](void* context, JsonObject& args, JsonObject& result) {
+                KeyManager* self = static_cast<KeyManager*>(context);
+                const char* id = args["id"] | static_cast<const char*>(nullptr);
+                if (!id || strlen(id) == 0) {
+                    result["success"] = false;
+                    result["error"] = "Missing or empty 'id' parameter";
+                    return;
+                }
+
+                std::vector<KeyInfo> keys = self->listKeysWithMetadata();
+                const KeyInfo* found = nullptr;
+                for (const auto& ki : keys) {
+                    if (ki.id == id) {
+                        found = &ki;
+                        break;
+                    }
+                }
+
+                if (!found) {
+                    result["success"] = false;
+                    result["error"] = "Key not found";
+                    return;
+                }
+
+                result["success"] = true;
+                result["id"] = found->id;
+                result["hasValue"] = found->hasValue;
+                if (!found->managedBy.empty()) {
+                    result["managedBy"] = found->managedBy;
+                }
+                if (found->exclusive) {
+                    result["exclusive"] = true;
+                }
+                if (found->systemLocked) {
+                    result["systemLocked"] = true;
+                }
+            }, this, false);
+    }
+
+    // --- key_add: add or update an encrypted key ---
+    {
+        JsonDocument schema;
+        schema["type"] = "object";
+        JsonObject props = schema["properties"].to<JsonObject>();
+        props["id"]["type"] = "string";
+        props["id"]["description"] = "Unique key identifier (max 64 chars)";
+        props["value"]["type"] = "string";
+        props["value"]["description"] = "Plaintext credential value to encrypt and store (max 1024 chars)";
+        props["managedBy"]["type"] = "string";
+        props["managedBy"]["description"] = "Optional owning module name (e.g. WiFi, Security)";
+        props["exclusive"]["type"] = "boolean";
+        props["exclusive"]["description"] = "If true, key is write-protected by its owner";
+        props["systemLocked"]["type"] = "boolean";
+        props["systemLocked"]["description"] = "If true, key is system-locked and un-bypassable";
+        JsonArray req = schema["required"].to<JsonArray>();
+        req.add("id");
+        req.add("value");
+
+        registry.addTool("key_add",
+            "Encrypt and store a new key or update an existing key",
+            schema,
+            [](void* context, JsonObject& args, JsonObject& result) {
+                KeyManager* self = static_cast<KeyManager*>(context);
+                const char* id = args["id"] | static_cast<const char*>(nullptr);
+                const char* value = args["value"] | static_cast<const char*>(nullptr);
+
+                if (!id || strlen(id) == 0 || !value || strlen(value) == 0) {
+                    result["success"] = false;
+                    result["error"] = "Missing or empty 'id' or 'value' parameter";
+                    return;
+                }
+
+                if (strlen(id) > 64) {
+                    result["success"] = false;
+                    result["error"] = "Key ID exceeds maximum length of 64 characters";
+                    return;
+                }
+
+                if (strlen(value) > 1024) {
+                    result["success"] = false;
+                    result["error"] = "Key value exceeds maximum length of 1024 characters";
+                    return;
+                }
+
+                if (self->isSystemLocked(id)) {
+                    result["success"] = false;
+                    result["error"] = "Key is system locked and cannot be modified";
+                    return;
+                }
+
+                if (self->isExclusive(id)) {
+                    const char* callerManagedBy = args["managedBy"] | static_cast<const char*>(nullptr);
+                    std::string owner = self->getOwner(id);
+                    if (!callerManagedBy || owner != callerManagedBy) {
+                        result["success"] = false;
+                        result["error"] = "Key is exclusively managed by " + owner;
+                        return;
+                    }
+                }
+
+                const char* managedBy = args["managedBy"] | static_cast<const char*>(nullptr);
+                bool exclusive = args["exclusive"].is<bool>() ? args["exclusive"].as<bool>() : (self->isExclusive(id) || (managedBy && strlen(managedBy) > 0));
+                bool systemLocked = args["systemLocked"].is<bool>() ? args["systemLocked"].as<bool>() : self->isSystemLocked(id);
+
+                if (self->addKey(id, value, managedBy, exclusive, systemLocked)) {
+                    result["success"] = true;
+                } else {
+                    result["success"] = false;
+                    result["error"] = "Failed to store key";
+                }
+            }, this, true);
+    }
+
+    // --- key_delete: delete an encrypted key ---
+    {
+        JsonDocument schema;
+        schema["type"] = "object";
+        JsonObject props = schema["properties"].to<JsonObject>();
+        props["id"]["type"] = "string";
+        props["id"]["description"] = "Unique key identifier (max 64 chars)";
+        props["owner"]["type"] = "string";
+        props["owner"]["description"] = "Owning module name matching getOwner(id) if key is exclusive";
+        props["managedBy"]["type"] = "string";
+        props["managedBy"]["description"] = "Alias for owner";
+        JsonArray req = schema["required"].to<JsonArray>();
+        req.add("id");
+
+        registry.addTool("key_delete",
+            "Delete an encrypted key from the registry",
+            schema,
+            [](void* context, JsonObject& args, JsonObject& result) {
+                KeyManager* self = static_cast<KeyManager*>(context);
+                const char* id = args["id"] | static_cast<const char*>(nullptr);
+
+                if (!id || strlen(id) == 0) {
+                    result["success"] = false;
+                    result["error"] = "Missing or empty 'id' parameter";
+                    return;
+                }
+
+                if (strlen(id) > 64) {
+                    result["success"] = false;
+                    result["error"] = "Key ID exceeds maximum length of 64 characters";
+                    return;
+                }
+
+                if (self->isSystemLocked(id)) {
+                    result["success"] = false;
+                    result["error"] = "Key is system locked and cannot be deleted";
+                    return;
+                }
+
+                if (self->isExclusive(id)) {
+                    const char* callerOwner = args["owner"] | (args["managedBy"] | static_cast<const char*>(nullptr));
+                    std::string owner = self->getOwner(id);
+                    if (!callerOwner || owner != callerOwner) {
+                        result["success"] = false;
+                        result["error"] = "Key is exclusively managed by " + owner;
+                        return;
+                    }
+                }
+
+                if (self->deleteKey(id)) {
+                    result["success"] = true;
+                } else {
+                    result["success"] = false;
+                    result["error"] = "Key not found or delete failed";
+                }
+            }, this, true);
+    }
 }

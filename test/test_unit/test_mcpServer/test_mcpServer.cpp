@@ -28,6 +28,9 @@
 #include "MCPServer.hpp"
 #include "MCPBuiltinTools.hpp"
 #include "interfaces/IMCPContributor.hpp"
+#include "KeyManager.hpp"
+#include "DeviceCrypto.hpp"
+#include <unistd.h>
 
 // =============================================================================
 // Test Group 1: MCPToolRegistry — Core registry mechanics
@@ -728,6 +731,255 @@ TEST(McpConfigTest, SchemaVersionIsOne) {
 }
 
 // =============================================================================
+// Test Group 6: KeyManager MCP Tools — key_list, key_get, key_add, key_delete
+// =============================================================================
+
+class KeyManagerMockDeviceCrypto : public DeviceCrypto {
+public:
+    std::unique_ptr<char[]> encrypt(const char* plaintext, size_t inputLen, size_t* outLen) override {
+        if (!plaintext || inputLen == 0) {
+            if (outLen) *outLen = 0;
+            return nullptr;
+        }
+        std::string enc = "ENC:" + std::string(plaintext, inputLen);
+        if (outLen) *outLen = enc.length();
+        char* buf = new char[enc.length() + 1];
+        strcpy(buf, enc.c_str());
+        return std::unique_ptr<char[]>(buf);
+    }
+
+    std::unique_ptr<char[]> decrypt(const char* ciphertext, size_t inputLen, size_t* outLen) override {
+        if (!ciphertext || inputLen == 0) {
+            if (outLen) *outLen = 0;
+            return nullptr;
+        }
+        std::string ct(ciphertext, inputLen);
+        if (ct.find("ENC:") == 0) {
+            std::string pt = ct.substr(4);
+            if (outLen) *outLen = pt.length();
+            char* buf = new char[pt.length() + 1];
+            strcpy(buf, pt.c_str());
+            return std::unique_ptr<char[]>(buf);
+        }
+        if (outLen) *outLen = 0;
+        return nullptr;
+    }
+};
+
+class KeyManagerMcpTest : public ::testing::Test {
+protected:
+    KeyManager keyManager;
+    KeyManagerMockDeviceCrypto mockCrypto;
+    MCPToolRegistry registry;
+
+    void SetUp() override {
+        unlink(KEY_MANAGER_PATH);
+        keyManager.begin(&mockCrypto);
+        keyManager.registerMCPTools(registry);
+    }
+
+    void TearDown() override {
+        unlink(KEY_MANAGER_PATH);
+    }
+};
+
+TEST_F(KeyManagerMcpTest, ToolRegistration) {
+    EXPECT_NE(registry.findTool("key_list"), nullptr);
+    EXPECT_NE(registry.findTool("key_get"), nullptr);
+    EXPECT_NE(registry.findTool("key_add"), nullptr);
+    EXPECT_NE(registry.findTool("key_delete"), nullptr);
+}
+
+TEST_F(KeyManagerMcpTest, KeyAddAndGet) {
+    const MCPToolEntry* addTool = registry.findTool("key_add");
+    const MCPToolEntry* getTool = registry.findTool("key_get");
+    ASSERT_NE(addTool, nullptr);
+    ASSERT_NE(getTool, nullptr);
+
+    // Call key_add
+    JsonDocument addArgsDoc;
+    JsonObject addArgs = addArgsDoc.to<JsonObject>();
+    addArgs["id"] = "my_token";
+    addArgs["value"] = "secret_val_123";
+
+    JsonDocument addResDoc;
+    JsonObject addRes = addResDoc.to<JsonObject>();
+    addTool->handler(addTool->context, addArgs, addRes);
+
+    EXPECT_TRUE(addRes["success"].as<bool>());
+
+    // Call key_get — verify returns metadata and NEVER returns secret value
+    JsonDocument getArgsDoc;
+    JsonObject getArgs = getArgsDoc.to<JsonObject>();
+    getArgs["id"] = "my_token";
+
+    JsonDocument getResDoc;
+    JsonObject getRes = getResDoc.to<JsonObject>();
+    getTool->handler(getTool->context, getArgs, getRes);
+
+    EXPECT_TRUE(getRes["success"].as<bool>());
+    EXPECT_EQ(getRes["id"].as<std::string>(), "my_token");
+    EXPECT_TRUE(getRes["hasValue"].as<bool>());
+    EXPECT_FALSE(getRes.containsKey("value"));
+}
+
+TEST_F(KeyManagerMcpTest, KeyAddValidation) {
+    const MCPToolEntry* addTool = registry.findTool("key_add");
+    ASSERT_NE(addTool, nullptr);
+
+    // ID > 64 chars
+    std::string longId(65, 'a');
+    JsonDocument addArgsDoc;
+    JsonObject addArgs = addArgsDoc.to<JsonObject>();
+    addArgs["id"] = longId;
+    addArgs["value"] = "valid_val";
+
+    JsonDocument addResDoc;
+    JsonObject addRes = addResDoc.to<JsonObject>();
+    addTool->handler(addTool->context, addArgs, addRes);
+
+    EXPECT_FALSE(addRes["success"].as<bool>());
+
+    // Value > 1024 chars
+    std::string longVal(1025, 'b');
+    JsonDocument addArgsDoc2;
+    JsonObject addArgs2 = addArgsDoc2.to<JsonObject>();
+    addArgs2["id"] = "valid_id";
+    addArgs2["value"] = longVal;
+
+    JsonDocument addResDoc2;
+    JsonObject addRes2 = addResDoc2.to<JsonObject>();
+    addTool->handler(addTool->context, addArgs2, addRes2);
+
+    EXPECT_FALSE(addRes2["success"].as<bool>());
+}
+
+TEST_F(KeyManagerMcpTest, SystemLockedProtection) {
+    // Lock key via KeyManager C++ API
+    EXPECT_TRUE(keyManager.addKey("sys_pass", "secret123", "Security", true, true));
+
+    const MCPToolEntry* addTool = registry.findTool("key_add");
+    const MCPToolEntry* deleteTool = registry.findTool("key_delete");
+
+    // Try key_add override on systemLocked key
+    JsonDocument addArgsDoc;
+    JsonObject addArgs = addArgsDoc.to<JsonObject>();
+    addArgs["id"] = "sys_pass";
+    addArgs["value"] = "new_pass";
+    addArgs["managedBy"] = "Security";
+
+    JsonDocument addResDoc;
+    JsonObject addRes = addResDoc.to<JsonObject>();
+    addTool->handler(addTool->context, addArgs, addRes);
+
+    EXPECT_FALSE(addRes["success"].as<bool>());
+
+    // Try key_delete on systemLocked key
+    JsonDocument delArgsDoc;
+    JsonObject delArgs = delArgsDoc.to<JsonObject>();
+    delArgs["id"] = "sys_pass";
+    delArgs["owner"] = "Security";
+
+    JsonDocument delResDoc;
+    JsonObject delRes = delResDoc.to<JsonObject>();
+    deleteTool->handler(deleteTool->context, delArgs, delRes);
+
+    EXPECT_FALSE(delRes["success"].as<bool>());
+}
+
+TEST_F(KeyManagerMcpTest, ExclusiveOwnerProtection) {
+    // Add exclusive key (not systemLocked)
+    EXPECT_TRUE(keyManager.addKey("wifi_pass", "old_pass", "WiFi", true, false));
+
+    const MCPToolEntry* addTool = registry.findTool("key_add");
+    const MCPToolEntry* deleteTool = registry.findTool("key_delete");
+
+    // 1. key_add without managedBy -> fails
+    {
+        JsonDocument argsDoc;
+        JsonObject args = argsDoc.to<JsonObject>();
+        args["id"] = "wifi_pass";
+        args["value"] = "new_pass";
+
+        JsonDocument resDoc;
+        JsonObject res = resDoc.to<JsonObject>();
+        addTool->handler(addTool->context, args, res);
+        EXPECT_FALSE(res["success"].as<bool>());
+    }
+
+    // 2. key_add with wrong managedBy -> fails
+    {
+        JsonDocument argsDoc;
+        JsonObject args = argsDoc.to<JsonObject>();
+        args["id"] = "wifi_pass";
+        args["value"] = "new_pass";
+        args["managedBy"] = "WrongOwner";
+
+        JsonDocument resDoc;
+        JsonObject res = resDoc.to<JsonObject>();
+        addTool->handler(addTool->context, args, res);
+        EXPECT_FALSE(res["success"].as<bool>());
+    }
+
+    // 3. key_add with correct managedBy -> succeeds
+    {
+        JsonDocument argsDoc;
+        JsonObject args = argsDoc.to<JsonObject>();
+        args["id"] = "wifi_pass";
+        args["value"] = "new_pass";
+        args["managedBy"] = "WiFi";
+
+        JsonDocument resDoc;
+        JsonObject res = resDoc.to<JsonObject>();
+        addTool->handler(addTool->context, args, res);
+        EXPECT_TRUE(res["success"].as<bool>());
+    }
+
+    // 4. key_delete without owner -> fails
+    {
+        JsonDocument argsDoc;
+        JsonObject args = argsDoc.to<JsonObject>();
+        args["id"] = "wifi_pass";
+
+        JsonDocument resDoc;
+        JsonObject res = resDoc.to<JsonObject>();
+        deleteTool->handler(deleteTool->context, args, res);
+        EXPECT_FALSE(res["success"].as<bool>());
+    }
+
+    // 5. key_delete with correct owner -> succeeds
+    {
+        JsonDocument argsDoc;
+        JsonObject args = argsDoc.to<JsonObject>();
+        args["id"] = "wifi_pass";
+        args["owner"] = "WiFi";
+
+        JsonDocument resDoc;
+        JsonObject res = resDoc.to<JsonObject>();
+        deleteTool->handler(deleteTool->context, args, res);
+        EXPECT_TRUE(res["success"].as<bool>());
+    }
+}
+
+TEST_F(KeyManagerMcpTest, KeyListMetadata) {
+    keyManager.addKey("k1", "v1");
+    keyManager.addKey("k2", "v2", "WiFi", true, false);
+    keyManager.addKey("k3", "v3", "Security", true, true);
+
+    const MCPToolEntry* listTool = registry.findTool("key_list");
+    ASSERT_NE(listTool, nullptr);
+
+    JsonDocument argsDoc;
+    JsonObject args = argsDoc.to<JsonObject>();
+    JsonDocument resDoc;
+    JsonObject res = resDoc.to<JsonObject>();
+
+    listTool->handler(listTool->context, args, res);
+    JsonArray keys = res["keys"].as<JsonArray>();
+    EXPECT_EQ(keys.size(), 3u);
+}
+
+// =============================================================================
 // GoogleTest main entry point
 // =============================================================================
 
@@ -735,3 +987,4 @@ int main(int argc, char** argv) {
     ::testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();
 }
+
