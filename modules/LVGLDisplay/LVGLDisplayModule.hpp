@@ -167,6 +167,7 @@ public:
      * @param now Current timestamp in milliseconds.
      */
     void tick(uint32_t now) override;
+    uint32_t getTickBudgetMs() const override { return 33; } ///< Match LV_DISPLAY_DEF_REFR_PERIOD (~30 FPS)
 
     // -------------------------------------------------------------------------
     // IStatusReporter

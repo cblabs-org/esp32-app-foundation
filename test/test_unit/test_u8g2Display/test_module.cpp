@@ -74,3 +74,12 @@ TEST(U8G2DisplayModuleTest, SystemScreens_NullProvider_FallsBackToDefaultBoard) 
     EXPECT_EQ(display.visibleBoard(), &display.boards.error);
     EXPECT_STREQ(display.visibleBoard()->getBoardName(), "SYS: Error");
 }
+
+/**
+ * Test 6: U8G2DisplayModule getTickBudgetMs returns 33 ms (matching ~30 FPS frame rate).
+ */
+TEST(U8G2DisplayModuleTest, GetTickBudgetMs_Returns33) {
+    U8G2DisplayModule display;
+    EXPECT_EQ(display.getTickBudgetMs(), 33u);
+}
+

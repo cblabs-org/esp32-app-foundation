@@ -237,6 +237,7 @@ public:
      * renders the current board into the U8G2 display buffer.
      */
     void tick(uint32_t currentMillis) override;
+    uint32_t getTickBudgetMs() const override { return 33; } ///< Match target frame interval (~30 FPS)
 
     // -------------------------------------------------------------------------
     // Layer Management

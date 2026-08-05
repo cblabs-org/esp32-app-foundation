@@ -367,9 +367,10 @@ void Application::tick() {
         uint32_t startMs = millis();
         module->tick(currentMillis);
         uint32_t elapsedMs = millis() - startMs;
-        if (elapsedMs > 10) {
-            ESP_LOGW(TAG, "Module [%" PRIu32 "] (%p) tick budget exceeded: %" PRIu32 " ms (budget: 10 ms)",
-                     (uint32_t)i, static_cast<const void*>(module), elapsedMs);
+        uint32_t budgetMs = module->getTickBudgetMs();
+        if (elapsedMs > budgetMs) {
+            ESP_LOGW(TAG, "Module [%" PRIu32 "] (%p) tick budget exceeded: %" PRIu32 " ms (budget: %" PRIu32 " ms)",
+                     (uint32_t)i, static_cast<const void*>(module), elapsedMs, budgetMs);
         }
     }
 #else

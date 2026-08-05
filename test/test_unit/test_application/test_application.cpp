@@ -1014,6 +1014,28 @@ TEST_F(GateTransitionRepublishTest, GateNames_MatchExpectedValues) {
 }
 
 // =============================================================================
+// Test Group 10: ITickable per-module budget override (WO1)
+// =============================================================================
+
+class MockCustomBudgetTickable : public ITickable {
+public:
+    uint32_t budget = 33;
+    void tick(uint32_t /*currentMillis*/) override {}
+    uint32_t getTickBudgetMs() const override { return budget; }
+};
+
+TEST_F(ApplicationRegistrationTest, ITickable_DefaultBudget_Returns10) {
+    MockTickable tickable;
+    EXPECT_EQ(tickable.getTickBudgetMs(), 10u);
+}
+
+TEST_F(ApplicationRegistrationTest, ITickable_OverrideBudget_ReturnsConfiguredValue) {
+    MockCustomBudgetTickable tickable;
+    tickable.budget = 50;
+    EXPECT_EQ(tickable.getTickBudgetMs(), 50u);
+}
+
+// =============================================================================
 // GoogleTest main entry point
 // =============================================================================
 
