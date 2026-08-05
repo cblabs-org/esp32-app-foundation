@@ -109,6 +109,7 @@ predate the formal PA pipeline and are filed retrospectively.
 | [pr-52-input-module](./pr-52-input-module/PROJECT.md) | `InputModule` — framework-level button & input handler (`WITH_INPUT`), `iot_button` via `idf_component.yml`, type-tagged `BoardInput` descriptors, queue bridge, EventBus integration. RFC [#52](https://github.com/matthewmcneill/esp32-app-foundation/issues/52) reviewed + approved by downstream consumers. | 🚧 **IN PROGRESS** — 3-WO linear stack, WO1 executing | Session 4f0ddc48 |
 | [pr-53-configuring-display](./pr-53-configuring-display/PROJECT.md) | Issue [#60](https://github.com/matthewmcneill/esp32-app-foundation/issues/60): Wire CONFIGURING lifecycle phase to display subsystem — `displayModule.begin()`, gate binding, WiFi wizard modal, hostname in payload | ✅ **COMPLETE** PR [#61](https://github.com/matthewmcneill/esp32-app-foundation/pull/61), 368/368 tests | Session 60229274 |
 | [pr-54-licensing](./pr-54-licensing/PROJECT.md) | Issue #62: Licensing Clarification (Apache-2.0, SPDX headers, THIRD-PARTY-NOTICES) | ✅ **COMPLETE** — 4-WO stack executed successfully | Current Session |
+| [pr-55-portal-design-system](./pr-55-portal-design-system/PROJECT.md) | Issue [#67](https://github.com/matthewmcneill/esp32-app-foundation/issues/67): Portal Design System — BEM convention ADR, legacy migration, `.card`/`.alert` formalization, ApiQueue priority lanes, 8 new CSS components, card-grid consolidation, signal bars promotion | 📋 **DECOMPOSITION DRAFTED** — 4-WO linear stack; awaiting human approval (plan gate). No branches, no workers. | Current Session |
 
 ---
 
@@ -191,6 +192,7 @@ scanning the entire Projects Registry chronologically.
 | [pr-33](./pr-33-portal-ux-consistency/PROJECT.md) | Reboot overlays, save-policy toasts, backup confirmation gate | PROJECT.md |
 | [pr-38](./pr-38-portal-remediation/PROJECT.md) | Portal UX remediation — CSS/JS fixes, information depth, branding | [distillation](./pr-38-portal-remediation/context_bridge.md) |
 | [adhoc-app-tab-rules-bug](./adhoc-app-tab-rules-bug/context_bridge.md) | App tab config wiring (clock font size) | context_bridge |
+| [pr-55](./pr-55-portal-design-system/PROJECT.md) | Portal Design System — BEM convention, `.card`/`.alert` formalization, ApiQueue priority lanes, component library | PROJECT.md |
 
 ### Config System
 
