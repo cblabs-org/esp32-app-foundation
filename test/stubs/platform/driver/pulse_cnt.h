@@ -27,7 +27,7 @@ typedef struct {
     int low_limit;
     int high_limit;
     struct {
-        uint32_t accumulation: 1;
+        uint32_t accum_count: 1;
     } flags;
 } pcnt_unit_config_t;
 

@@ -1,7 +1,11 @@
 #pragma once
 #include "interfaces/ILVGLHardwareAdapter.hpp"
 #include <LovyanGFX.hpp>
-#include <ESP32Encoder.h>
+#include <atomic>
+
+class EncoderModule;
+class ButtonModule;
+class EventBus;
 
 class LGFX_CrowPanel128 : public lgfx::LGFX_Device {
     lgfx::Panel_GC9A01      _panel_instance;
@@ -17,6 +21,8 @@ public:
     CrowPanel128Adapter();
     ~CrowPanel128Adapter() override;
 
+    void setInputModules(EncoderModule* enc, ButtonModule* btn, EventBus* bus);
+
     lv_display_t* createDisplay() override;
     void setBrightness(uint8_t level) override;
     uint16_t getScreenWidth() const override { return 240; }
@@ -28,9 +34,14 @@ public:
     lv_indev_t* createKeypadInput() override { return nullptr; }
 
 private:
-    LGFX_CrowPanel128 _gfx;
-    ESP32Encoder _encoder;
+    LGFX_CrowPanel128    _gfx;
+    EncoderModule*       _encoderModule = nullptr;
+    ButtonModule*        _buttonModule  = nullptr;
+    EventBus*            _bus           = nullptr;
+    std::atomic<bool>    _buttonPressed{false};
+
     static void _flushCallback(lv_display_t* disp, const lv_area_t* area, uint8_t* px_map);
     static void _touchReadCallback(lv_indev_t* indev, lv_indev_data_t* data);
     static void _encoderReadCallback(lv_indev_t* indev, lv_indev_data_t* data);
+    static void _buttonEventCallback(const char* topic, const void* payload, void* ctx);
 };

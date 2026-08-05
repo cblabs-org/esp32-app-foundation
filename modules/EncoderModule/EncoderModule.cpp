@@ -70,7 +70,7 @@ void EncoderModule::begin(Application& app) {
         pcnt_unit_config_t unit_config = {};
         unit_config.low_limit = -32768;
         unit_config.high_limit = 32767;
-        unit_config.flags.accumulation = 1;
+        unit_config.flags.accum_count = 1;
 
         esp_err_t err = pcnt_new_unit(&unit_config, &state.pcntUnit);
         if (err != ESP_OK) {

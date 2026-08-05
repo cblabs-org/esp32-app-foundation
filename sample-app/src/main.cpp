@@ -47,7 +47,7 @@ static ButtonModule buttonModule;
 #endif
 
 #ifdef WITH_ENCODER
-#include "EncoderModule/EncoderModule.hpp"
+#include "EncoderModule.hpp"
 #include "board.h"
 static EncoderModule encoderModule;
 #endif

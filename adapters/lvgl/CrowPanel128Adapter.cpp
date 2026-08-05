@@ -1,6 +1,10 @@
 #include "CrowPanel128Adapter.hpp"
 #include "board.h"
 #include <Arduino.h>
+#include <cstring>
+#include "EncoderModule.hpp"
+#include "ButtonModule.hpp"
+#include "EventBus.hpp"
 
 // -------------------------------------------------------------------------
 // LGFX Panel Configuration
@@ -74,7 +78,37 @@ LGFX_CrowPanel128::LGFX_CrowPanel128() {
 // CrowPanel128Adapter Implementation
 // -------------------------------------------------------------------------
 CrowPanel128Adapter::CrowPanel128Adapter() {}
-CrowPanel128Adapter::~CrowPanel128Adapter() {}
+
+CrowPanel128Adapter::~CrowPanel128Adapter() {
+    if (_bus) {
+        _bus->unsubscribe("button.press_down", _buttonEventCallback, this);
+        _bus->unsubscribe("button.click", _buttonEventCallback, this);
+        _bus->unsubscribe("button.double_click", _buttonEventCallback, this);
+        _bus->unsubscribe("button.long_press", _buttonEventCallback, this);
+    }
+}
+
+void CrowPanel128Adapter::setInputModules(EncoderModule* enc, ButtonModule* btn, EventBus* bus) {
+    _encoderModule = enc;
+    _buttonModule = btn;
+    _bus = bus;
+    if (_bus) {
+        _bus->subscribe("button.press_down", _buttonEventCallback, this);
+        _bus->subscribe("button.click", _buttonEventCallback, this);
+        _bus->subscribe("button.double_click", _buttonEventCallback, this);
+        _bus->subscribe("button.long_press", _buttonEventCallback, this);
+    }
+}
+
+void CrowPanel128Adapter::_buttonEventCallback(const char* topic, const void* payload, void* ctx) {
+    auto* adapter = static_cast<CrowPanel128Adapter*>(ctx);
+    if (!adapter) return;
+    if (topic && strcmp(topic, "button.press_down") == 0) {
+        adapter->_buttonPressed.store(true);
+    } else {
+        adapter->_buttonPressed.store(false);
+    }
+}
 
 lv_display_t* CrowPanel128Adapter::createDisplay() {
     _gfx.init();
@@ -121,14 +155,6 @@ void CrowPanel128Adapter::_touchReadCallback(lv_indev_t* indev, lv_indev_data_t*
 }
 
 lv_indev_t* CrowPanel128Adapter::createEncoderInput() {
-    // Setup ESP32Encoder
-    ESP32Encoder::useInternalWeakPullResistors = puType::up;
-    _encoder.attachHalfQuad(PIN_ENCODER_A, PIN_ENCODER_B);
-    _encoder.clearCount();
-    
-    // Setup button
-    pinMode(PIN_ENCODER_SW, INPUT_PULLUP);
-    
     lv_indev_t* indev = lv_indev_create();
     lv_indev_set_type(indev, LV_INDEV_TYPE_ENCODER);
     lv_indev_set_user_data(indev, this);
@@ -140,17 +166,15 @@ void CrowPanel128Adapter::_encoderReadCallback(lv_indev_t* indev, lv_indev_data_
     auto* adapter = static_cast<CrowPanel128Adapter*>(lv_indev_get_user_data(indev));
     if (!adapter) return;
     
-    // Read rotation
-    int64_t count = adapter->_encoder.getCount();
-    if (count != 0) {
-        data->enc_diff = count;
-        adapter->_encoder.clearCount();
+    // Read rotation via framework EncoderModule
+    if (adapter->_encoderModule) {
+        data->enc_diff = adapter->_encoderModule->consumeDelta(EncoderDelta::RAW);
     } else {
         data->enc_diff = 0;
     }
     
-    // Read button
-    if (digitalRead(PIN_ENCODER_SW) == LOW) {
+    // Read button cached state from ButtonModule EventBus subscription
+    if (adapter->_buttonPressed.load()) {
         data->state = LV_INDEV_STATE_PRESSED;
     } else {
         data->state = LV_INDEV_STATE_RELEASED;
