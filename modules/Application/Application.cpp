@@ -149,6 +149,12 @@ bool Application::begin(const FrameworkConfig& config) {
 
     // --- Step 5: Store FrameworkConfig internally ---
     _config = config;
+
+    // Apply configurable gate re-publish throttle (F5: review feedback)
+    if (_config.configuringPublishIntervalMs > 0) {
+        _configuringPublishThrottle.setInterval(_config.configuringPublishIntervalMs);
+    }
+
     ESP_LOGI(TAG, "FrameworkConfig stored");
     _statusReporter->reportStatus("Configuration defaults loaded", 0.15f);
 
@@ -262,9 +268,6 @@ bool Application::begin(const FrameworkConfig& config) {
         ESP_LOGI(TAG, "Boot sequence complete — all gates satisfied, entering RUNNING state");
     } else {
         setState(AppState::Configuring);
-        // Reset gate-transition tracking for initial CONFIGURING entry
-        _lastPublishedGate = nullptr;
-        _lastPublishedStatus = GateActionStatus::Satisfied;
         _publishConfiguringEvent();
         _onEnterConfiguring(false);
         ESP_LOGI(TAG, "Boot sequence complete — awaiting configuration");
@@ -303,9 +306,6 @@ void Application::tick() {
                                  _configGates[i]->getGateName(), (currentMillis - _gateFailedSinceMs[i].getLastFire()));
                         setState(AppState::Configuring);
                         _dataManager.setAppRunning(false);
-                        // Reset gate-transition tracking for regression entry
-                        _lastPublishedGate = nullptr;
-                        _lastPublishedStatus = GateActionStatus::Satisfied;
                         _publishConfiguringEvent(true); // isRegression = true
                         _onEnterConfiguring(true);
                         for(int j=0; j<MAX_CONFIG_GATES; ++j) _gateFailedSinceMs[j].setInterval(0);
@@ -714,6 +714,10 @@ const IConfigGate* Application::getActionableGate() const {
 void Application::_publishConfiguringEvent(bool isRegression) {
     const IConfigGate* gate = getActionableGate();
     if (gate == nullptr) return;
+
+    // Stamp tracking state atomically with publish (F1: structural invariant)
+    _lastPublishedGate   = gate->getGateName();
+    _lastPublishedStatus = gate->getActionStatus();
 
     _configuringPayload.gateName     = gate->getGateName();
     _configuringPayload.helpText     = gate->getHelpText();

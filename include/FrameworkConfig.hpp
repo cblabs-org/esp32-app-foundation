@@ -56,4 +56,10 @@ struct FrameworkConfig {
     const char* otaPublicKey   = nullptr;          ///< PEM-encoded RSA public key for OTA signature verification (nullptr = skip)
     const char* otaManifestUrl = nullptr;          ///< Compiled-in manifest URL — unkillable fallback for manifest-first OTA
     const char* otaToken       = nullptr;          ///< Optional bearer token for authenticated manifest/asset downloads
+
+    /// Gate re-publish throttle during CONFIGURING phase (milliseconds).
+    /// Controls how often Application::tick() checks for gate/status changes
+    /// and re-publishes APP_CONFIGURING events. 0 = use default (500ms).
+    /// Lower values give faster display response; higher values reduce overhead.
+    uint16_t configuringPublishIntervalMs = 0;
 };

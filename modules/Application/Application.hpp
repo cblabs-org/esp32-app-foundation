@@ -520,8 +520,10 @@ private:
     // Gate-transition re-publishing state (PR-66)
     const char*      _lastPublishedGate   = nullptr;                     ///< Gate name from last APP_CONFIGURING
     GateActionStatus _lastPublishedStatus = GateActionStatus::Satisfied; ///< Status from last publish
-    Periodic         _configuringPublishThrottle{500};                    ///< 500ms debounce for re-publishing
-    char             _deviceIPBuf[16] = {};                               ///< Stable buffer for deviceIP pointer
+    Periodic         _configuringPublishThrottle{500};                    ///< Gate re-publish debounce (default 500ms, overridable via FrameworkConfig)
+    /// Stable buffer for device IP pointer — IPv4 only (max "255.255.255.255\0" = 16 bytes).
+    /// If IPv6 support is added, increase to INET6_ADDRSTRLEN (46).
+    char             _deviceIPBuf[16] = {};
 
     DataManager _dataManager;           ///< Background data manager
     WebServerManager _webServerManager; ///< Local HTTP Server

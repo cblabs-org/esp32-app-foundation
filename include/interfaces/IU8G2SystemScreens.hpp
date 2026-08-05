@@ -50,6 +50,11 @@ public:
     ///
     /// Return nullptr to use the built-in mapping or generic helpText fallback.
     ///
+    /// The payload pointer references Application::_configuringPayload, a member
+    /// variable valid for the Application's entire lifetime. The payload is stable
+    /// for the duration of the CONFIGURING phase and is updated in-place on each
+    /// re-publish.
+    ///
     /// @param payload Full configuring event payload with gate name, help text,
     ///                action status, hostname, and device IP.
     /// @return Non-owning pointer to a custom board, or nullptr.

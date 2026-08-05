@@ -81,6 +81,11 @@ public:
      * Pattern matches IU8G2SystemScreens::gateHelperBoard() — same opt-in
      * override model with the same ownership semantics.
      *
+     * The payload pointer references Application::_configuringPayload, a member
+     * variable valid for the Application's entire lifetime. The payload is stable
+     * for the duration of the CONFIGURING phase and is updated in-place on each
+     * re-publish.
+     *
      * @param payload  Full configuring event payload with gate name,
      *                 help text, action status, hostname, and device IP.
      * @return Pointer to custom lv_obj_t screen, or nullptr.
