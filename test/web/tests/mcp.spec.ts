@@ -82,7 +82,7 @@ async function bootAndNavigateToMcp(
 
   await page.goto('/');
   await page.waitForFunction(() => (window as any).apiFetch !== undefined);
-  await expect(page.locator('#portal-title')).not.toHaveText('Device Portal');
+  await expect(page.locator('#portal-title')).not.toHaveText('ESP32 App Foundation');
 
   // Navigate to System → MCP
   await page.locator('#bottom-nav [data-target="tab-system"]').click();
@@ -139,7 +139,7 @@ test.describe('MCP Controls Sub-pill', () => {
 
     await page.goto('/');
     await page.waitForFunction(() => (window as any).apiFetch !== undefined);
-    await expect(page.locator('#portal-title')).not.toHaveText('Device Portal');
+    await expect(page.locator('#portal-title')).not.toHaveText('ESP32 App Foundation');
 
     // Navigate to MCP
     await page.locator('#bottom-nav [data-target="tab-system"]').click();

@@ -515,6 +515,8 @@ document.addEventListener('DOMContentLoaded', function() {
       if (data && data.name) {
         portalTitle.textContent = data.name;
         document.title = data.name;
+        var loginTitle = document.getElementById('login-title');
+        if (loginTitle) loginTitle.textContent = data.name;
       }
     } catch (err) {
       console.warn('Failed to fetch /api/app');

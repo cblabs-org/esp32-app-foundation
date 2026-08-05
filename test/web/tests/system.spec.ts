@@ -72,7 +72,7 @@ async function bootAndNavigateToStatus(page: Page, systemData = MOCK_SYSTEM_GREE
 
   await page.goto('/');
   await page.waitForFunction(() => (window as any).apiFetch !== undefined);
-  await expect(page.locator('#portal-title')).not.toHaveText('Device Portal');
+  await expect(page.locator('#portal-title')).not.toHaveText('ESP32 App Foundation');
 
   // Navigate to System tab → pill bar appears
   await page.locator('#bottom-nav [data-target="tab-system"]').click();

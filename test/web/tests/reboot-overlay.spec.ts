@@ -69,7 +69,7 @@ async function bootPortal(page: Page) {
 
   await page.goto('/');
   await page.waitForFunction(() => (window as any).apiFetch !== undefined);
-  await expect(page.locator('#portal-title')).not.toHaveText('Device Portal');
+  await expect(page.locator('#portal-title')).not.toHaveText('ESP32 App Foundation');
 }
 
 /** Navigate from any tab to System → Status sub-pill. */

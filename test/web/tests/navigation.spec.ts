@@ -75,7 +75,7 @@ async function bootPortal(page: Page) {
   await page.goto('/');
   // Wait for the full boot to complete: apiFetch exists AND tab hierarchy loaded
   await page.waitForFunction(() => (window as any).apiFetch !== undefined);
-  await expect(page.locator('#portal-title')).not.toHaveText('Device Portal');
+  await expect(page.locator('#portal-title')).not.toHaveText('ESP32 App Foundation');
 }
 
 // ---------------------------------------------------------------------------

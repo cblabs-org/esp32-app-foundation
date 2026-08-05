@@ -24,7 +24,7 @@
             '<path d="M7 11V7a5 5 0 0 1 10 0v4"/>' +
           '</svg>' +
         '</div>' +
-        '<h2>Device Portal</h2>' +
+        '<h2 id="login-title">ESP32 App Foundation</h2>' +
         '<p class="login-subtitle">Enter your password to continue</p>' +
         '<form id="login-form">' +
           '<div class="input-group">' +
