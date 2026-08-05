@@ -24,6 +24,18 @@ pio test -e native
 | `-DSECURITY_VERSION=N` | `base_esp32` | Anti-rollback counter |
 | `-DBUILD_VERSION=\"...\"` | `inject_version.py` | Full version string |
 
+## Optional-Module Build Flags
+
+Consumers gate optional modules and display drivers via `build_flags` in
+`platformio.ini`:
+
+| Flag | Compiles in | Docs |
+|:---|:---|:---|
+| `WITH_BUTTONS` | `ButtonModule` | `systems/input/button-module.md` |
+| `WITH_ENCODER` | `EncoderModule` | `systems/input/encoder-module.md` |
+| `WITH_DISPLAY_LVGL` | LVGL colour-TFT display module | `systems/display/` |
+| `WITH_DISPLAY_U8G2` | U8G2 monochrome display module | `systems/display/` |
+
 ## Version Injection — `inject_version.py`
 
 Single source of truth. Runs as pre-build hook.

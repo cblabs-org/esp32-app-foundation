@@ -1,9 +1,9 @@
 {
   "name": "framework-expert",
-  "version": "2.2.3",
+  "version": "2.3.0",
   "created": "2026-06-15",
-  "lastUpdated": "2026-08-01",
-  "sourceDocsVersion": "PR-48",
+  "lastUpdated": "2026-08-05",
+  "sourceDocsVersion": "PR-75",
   "references": [
     "SKILL.md",
     "KEEPING-CURRENT.md",
@@ -65,6 +65,9 @@
     "systems/event-bus/custom-topics.md",
     "systems/event-bus/framework-topics.md",
     "systems/event-bus/overview.md",
+    "systems/input/overview.md",
+    "systems/input/button-module.md",
+    "systems/input/encoder-module.md",
     "systems/mcp-server/overview.md",
     "systems/ota/config-lifecycle.md",
     "systems/ota/deployment.md",

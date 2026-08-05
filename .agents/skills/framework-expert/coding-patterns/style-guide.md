@@ -41,7 +41,11 @@ When a class implements interfaces, group the exported methods by the interface 
 
 ```cpp
 /*
- * ESP32 App Foundation (c) 2026
+ * ESP32 App Foundation (c) 2026 CB Labs
+ *
+ * https://github.com/matthewmcneill/esp32-app-foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0
  *
  * Module: modules/MyModule/MyModule.hpp
  * Description: Manages the custom sensor hardware and reports metrics.
