@@ -73,3 +73,8 @@ overlapping-file conflicts across the stack.
   provenance authorising Tier-3 workers to execute their WORKORDERs autonomously
   within their Strict Boundary Boxes.
 - **2026-08-05** — WO1 branch `skill-currency/wo1-encoder-licensing` created off `main`; worker spawned.
+- **2026-08-05** — ✅ **WO1 COMPLETE.** Worker (haiku) executed the 5-file CC→SPDX
+  swap; PA independently verified the diff (5 files, comment-only, zero CC remaining,
+  native build + 417/417 tests green). Committed `c6b7ae1`. Per-WO distillery skipped
+  (mechanical WO); will distill at project wrap-up.
+- **2026-08-05** — WO2 branch `skill-currency/wo2-input-docs` created off WO1; worker spawned.
