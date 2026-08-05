@@ -1,6 +1,6 @@
 <!--
   ESP32 App Foundation (c) 2026 CB Labs
-  Licensed under Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International.
+  SPDX-License-Identifier: Apache-2.0
 
   Module: modules/LVGLDisplay/README.md
   Description: Developer guide and API reference for generic LVGL v9 display module.

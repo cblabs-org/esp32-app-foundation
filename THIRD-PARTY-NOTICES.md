@@ -25,7 +25,7 @@ All third-party dependencies listed below utilize permissive open-source license
 
 | Module / Framework | Source Location | License Type | Description / Usage |
 | :--- | :--- | :--- | :--- |
-| **EventBus** | `modules/EventBus` | Apache-2.0 | Internal decoupled publish-subscribe event system |
+
 | **Arduino-ESP32 / ESP-IDF** | [github.com/espressif/arduino-esp32](https://github.com/espressif/arduino-esp32) | LGPL-2.1 / Apache-2.0 | Base microcontroller framework and SDK |
 
 ---
