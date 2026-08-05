@@ -3,7 +3,7 @@
  *
  * https://github.com/matthewmcneill/esp32-app-foundation
  *
- SPDX-License-Identifier: Apache-2.0
+ * SPDX-License-Identifier: Apache-2.0
  *
  * Module: test/test_unit/test_dataManager/test_main.cpp
  * Description: Native GoogleTest suite for testing the scheduling logic of DataManager.

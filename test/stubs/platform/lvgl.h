@@ -3,7 +3,7 @@
  *
  * https://github.com/matthewmcneill/esp32-app-foundation
  *
- SPDX-License-Identifier: Apache-2.0
+ * SPDX-License-Identifier: Apache-2.0
  *
  * Module: test/stubs/platform/lvgl.h
  * Description: Type-complete, behaviorally inert native build stub header for LVGL v9.

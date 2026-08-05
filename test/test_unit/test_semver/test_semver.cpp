@@ -3,7 +3,7 @@
  *
  * https://github.com/matthewmcneill/esp32-app-foundation
  *
- SPDX-License-Identifier: Apache-2.0
+ * SPDX-License-Identifier: Apache-2.0
  *
  * Test: test/test_unit/test_semver/test_semver.cpp
  * Description: GoogleTest suite for the SemVer 2.0 engine. Validates packing,

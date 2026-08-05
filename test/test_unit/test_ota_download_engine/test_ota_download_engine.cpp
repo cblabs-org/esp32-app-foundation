@@ -3,7 +3,7 @@
  *
  * https://github.com/matthewmcneill/esp32-app-foundation
  *
- SPDX-License-Identifier: Apache-2.0
+ * SPDX-License-Identifier: Apache-2.0
  *
  * Module: test/test_unit/test_ota_download_engine/test_ota_download_engine.cpp
  * Description: Native unit tests for the OTADownloadEngine class and OTAError

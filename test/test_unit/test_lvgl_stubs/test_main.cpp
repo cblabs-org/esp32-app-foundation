@@ -3,7 +3,7 @@
  *
  * https://github.com/matthewmcneill/esp32-app-foundation
  *
- SPDX-License-Identifier: Apache-2.0
+ * SPDX-License-Identifier: Apache-2.0
  *
  * Module: test/test_unit/test_lvgl_stubs/test_main.cpp
  * Description: Main entry point for test_lvgl_stubs test suite.

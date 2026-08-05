@@ -192,7 +192,6 @@ def generate_header(data, output_path):
     lines.append(" * https://github.com/matthewmcneill/esp32-app-foundation")
     lines.append(" *")
     lines.append(" * SPDX-License-Identifier: Apache-2.0")
-    lines.append(" * To view a copy of this license, visit https://creativecommons.org/licenses/by-nc-sa/4.0/")
     lines.append(" *")
     lines.append(f" * Module: {output_path}")
     lines.append(" * Description: Auto-generated display layout constants. Defines display")

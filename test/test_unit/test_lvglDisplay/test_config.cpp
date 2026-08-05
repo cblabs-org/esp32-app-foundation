@@ -3,7 +3,7 @@
  *
  * https://github.com/matthewmcneill/esp32-app-foundation
  *
- SPDX-License-Identifier: Apache-2.0
+ * SPDX-License-Identifier: Apache-2.0
  *
  * Module: test/test_unit/test_lvglDisplay/test_config.cpp
  * Description: GoogleTest unit test suite for LVGLDisplayModule's IConfigurable implementation.

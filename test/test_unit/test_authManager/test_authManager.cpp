@@ -3,7 +3,7 @@
  *
  * https://github.com/matthewmcneill/esp32-app-foundation
  *
- SPDX-License-Identifier: Apache-2.0
+ * SPDX-License-Identifier: Apache-2.0
  *
  * Module: test/test_unit/test_authManager/test_authManager.cpp
  * Description: GoogleTest unit tests for AuthManager covering WO1 and WO2 functionality.

@@ -3,7 +3,7 @@
  *
  * https://github.com/matthewmcneill/esp32-app-foundation
  *
- SPDX-License-Identifier: Apache-2.0
+ * SPDX-License-Identifier: Apache-2.0
  *
  * Module: test/test_unit/test_u8g2Display/test_eventbus_integration.cpp
  * Description: GoogleTest unit-test suite for EventBus payload structs and

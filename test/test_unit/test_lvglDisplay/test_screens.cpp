@@ -3,7 +3,7 @@
  *
  * https://github.com/matthewmcneill/esp32-app-foundation
  *
- SPDX-License-Identifier: Apache-2.0
+ * SPDX-License-Identifier: Apache-2.0
  *
  * Module: test/test_unit/test_lvglDisplay/test_screens.cpp
  * Description: Unit tests for LVGLDisplayModule system screens, Stage-1 boot splash,

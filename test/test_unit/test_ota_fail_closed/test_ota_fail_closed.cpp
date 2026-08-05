@@ -3,7 +3,7 @@
  *
  * https://github.com/matthewmcneill/esp32-app-foundation
  *
- SPDX-License-Identifier: Apache-2.0
+ * SPDX-License-Identifier: Apache-2.0
  *
  * Module: test/test_unit/test_ota_fail_closed/test_ota_fail_closed.cpp
  * Description: GoogleTest suite validating the fail-closed OTA security model.

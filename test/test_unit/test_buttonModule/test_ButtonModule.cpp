@@ -3,7 +3,7 @@
  *
  * https://github.com/matthewmcneill/esp32-app-foundation
  *
- SPDX-License-Identifier: Apache-2.0
+ * SPDX-License-Identifier: Apache-2.0
  *
  * Test: test/test_unit/test_buttonModule/test_ButtonModule.cpp
  * Description: GoogleTest unit-test suite for ButtonModule. Validates ButtonConfig types,
