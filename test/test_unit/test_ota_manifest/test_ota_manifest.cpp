@@ -3,8 +3,7 @@
  *
  * https://github.com/matthewmcneill/esp32-app-foundation
  *
- * This work is licensed under Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International.
- * To view a copy of this license, visit https://creativecommons.org/licenses/by-nc-sa/4.0/
+ * SPDX-License-Identifier: Apache-2.0
  *
  * Test: test/test_unit/test_ota_manifest/test_ota_manifest.cpp
  * Description: GoogleTest suite for the OTAManifest v2 parser. Validates

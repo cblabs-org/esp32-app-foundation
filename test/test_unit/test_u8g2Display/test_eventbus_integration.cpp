@@ -3,8 +3,7 @@
  *
  * https://github.com/matthewmcneill/esp32-app-foundation
  *
- * This work is licensed under Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International.
- * To view a copy of this license, visit https://creativecommons.org/licenses/by-nc-sa/4.0/
+ * SPDX-License-Identifier: Apache-2.0
  *
  * Module: test/test_unit/test_u8g2Display/test_eventbus_integration.cpp
  * Description: GoogleTest unit-test suite for EventBus payload structs and

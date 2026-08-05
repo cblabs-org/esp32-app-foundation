@@ -1,8 +1,7 @@
 /*
  * ESP32 App Foundation (c) 2026
  *
- * This work is licensed under Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International.
- * To view a copy of this license, visit https://creativecommons.org/licenses/by-nc-sa/4.0/
+ * SPDX-License-Identifier: Apache-2.0
  *
  * Module: lib/MD5Utils/md5Utils.cpp
  * Description: Implementation of MD5 calculation and base64-to-hex conversion utilities.
