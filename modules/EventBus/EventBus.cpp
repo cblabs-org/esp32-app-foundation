@@ -21,6 +21,9 @@
 
 static constexpr const char* TAG = "EventBus";
 
+// Track whether we've already created the default event loop
+static bool s_eventLoopCreated = false;
+
 #ifndef UNIT_TEST
 #include "esp_event.h"
 ESP_EVENT_DEFINE_BASE(APP_EVENT_BASE);
@@ -44,14 +47,18 @@ void EventBus::begin() {
     _dispatchDepth = 0;
     _needsCleanup = false;
 #else
-    esp_event_loop_create_default();
-    for (Subscription* sub : _subscribers) {
-        esp_event_handler_instance_unregister(APP_EVENT_BASE, sub->topicHash, (esp_event_handler_instance_t)sub->instance);
-        delete sub;
-    }
-    _subscribers.clear();
+    _ensureEventLoop();
 #endif
 }
+
+#ifndef UNIT_TEST
+void EventBus::_ensureEventLoop() {
+    if (!s_eventLoopCreated) {
+        esp_event_loop_create_default();
+        s_eventLoopCreated = true;
+    }
+}
+#endif
 
 #ifdef UNIT_TEST
 void EventBus::cleanup() {
@@ -100,6 +107,7 @@ bool EventBus::subscribe(const char* topic, EventCallback callback, void* ctx) {
     sub->ctx = ctx;
     sub->topicStr = topic;
     
+    _ensureEventLoop();  // Lazy-create default event loop if subscribe() called before begin()
     esp_event_handler_instance_t instance;
     esp_err_t err = esp_event_handler_instance_register(APP_EVENT_BASE, topicHash, event_trampoline, sub, &instance);
     if (err != ESP_OK) {

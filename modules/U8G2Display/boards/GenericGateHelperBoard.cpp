@@ -3,8 +3,7 @@
  *
  * https://github.com/matthewmcneill/esp32-app-foundation
  *
- * This work is licensed under Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International.
- * To view a copy of this license, visit https://creativecommons.org/licenses/by-nc-sa/4.0/
+ * SPDX-License-Identifier: Apache-2.0
  *
  * Module: modules/U8G2Display/boards/GenericGateHelperBoard.cpp
  * Description: Implementation of the generic gate helper board. Extends
@@ -37,23 +36,33 @@ void GenericGateHelperBoard::configure(const char* gateName, const char* helpTex
     if (gateName != nullptr) {
         strncpy(_gateName, gateName, sizeof(_gateName) - 1);
         _gateName[sizeof(_gateName) - 1] = '\0';
+    } else {
+        _gateName[0] = '\0';
     }
 
     // --- Safe-copy help text ---
     if (helpText != nullptr) {
         strncpy(_helpText, helpText, sizeof(_helpText) - 1);
         _helpText[sizeof(_helpText) - 1] = '\0';
+    } else {
+        _helpText[0] = '\0';
     }
 
     // --- Safe-copy device IP ---
     if (deviceIP != nullptr) {
         strncpy(_deviceIP, deviceIP, sizeof(_deviceIP) - 1);
         _deviceIP[sizeof(_deviceIP) - 1] = '\0';
+    } else {
+        _deviceIP[0] = '\0';
     }
 
     // --- Build formatted URL line ---
     char urlLine[48];
-    snprintf(urlLine, sizeof(urlLine), "http://%s", _deviceIP);
+    if (_deviceIP[0] == '\0') {
+        urlLine[0] = '\0';
+    } else {
+        snprintf(urlLine, sizeof(urlLine), "http://%s", _deviceIP);
+    }
 
     // --- Update inherited widget content (3 lines: title + body + URL) ---
     _msgWidget.setMessage(_gateName, _helpText, urlLine, nullptr);

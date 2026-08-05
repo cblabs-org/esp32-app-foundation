@@ -64,3 +64,7 @@ sample-app/*.log
 sample-app/monitor_out.txt
 pio_monitor.log
 sample-app/sdkconfig.*
+
+# SquareLine Studio working files
+squareline/**/backup/
+squareline/**/cache/

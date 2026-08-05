@@ -56,6 +56,9 @@ Executed synchronously inside `app.begin(config)`:
 Entered if any `IConfigGate::isSatisfied()` returns `false` (e.g., station credentials missing).
 *   Ticks are dispatched; WiFi AP/Captive Portal active.
 *   Framework polls gates; transitions to `RUNNING` when all are satisfied.
+*   Gate-transition re-publishing: Application polls on configurable throttle, re-publishes via `AppConfiguringPayload` when actionable gate or its status changes.
+*   `ConfigGateResolver::findActionableGate()` is the SSOT for dependency-aware gate resolution.
+*   Display modules are pure event-driven reactors consuming `app.configuring` events.
 
 ### 3. RUNNING Phase
 Entered once all configuration gates are satisfied.

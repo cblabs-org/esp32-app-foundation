@@ -34,7 +34,15 @@ The display subsystem interacts with modules via several specialized interfaces:
 - **[`IDisplayBoard`](../../interfaces/display-board.md)**: (U8G2) Allows modules to contribute "boards" (panes/screens) to the `CarouselEngine`.
 - **`IStatusReporter`**: Allows display modules to render framework boot progress and system error screens.
 - **`ILVGLHardwareAdapter`**: Decouples hardware initialization from generic LVGL module logic.
+- **`IU8G2SystemScreens`**: Pluggable provider for custom U8G2 system screens.
 - **`ILVGLSystemScreens`**: Pluggable provider for custom LVGL system screens (boot, error, OTA).
+
+## CONFIGURING Phase Display Orchestration
+
+- **`ConfiguringStatusBoard`**: Always-visible base board showing per-gate status rows with prefix indicators (`*` satisfied, `>` actionable, `~` in-progress, `-` blocked).
+- **Three-tier modal dispatch**: Consumer override (`gateHelperBoard()`) → Built-in WiFi wizard → `GenericGateHelperBoard` fallback.
+- **`IU8G2SystemScreens` extensions**: `configuringBoard()`, `wifiWizardBoard()`, `gateHelperBoard(const AppConfiguringPayload*)`.
+- **`ILVGLSystemScreens` parity**: `configuringScreen()`, `wifiWizardScreen()`, `gateHelperScreen(const AppConfiguringPayload*)`.
 
 ## Application Ownership
 

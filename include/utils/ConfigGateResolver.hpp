@@ -3,8 +3,7 @@
  *
  * https://github.com/matthewmcneill/esp32-app-foundation
  *
- * This work is licensed under Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International.
- * To view a copy of this license, visit https://creativecommons.org/licenses/by-nc-sa/4.0/
+ * SPDX-License-Identifier: Apache-2.0
  *
  * Module: include/utils/ConfigGateResolver.hpp
  * Description: Pure-logic gate resolution utilities. Hardware-free functions
@@ -53,7 +52,7 @@ inline const IConfigGate* findActionableGate(const std::vector<IConfigGate*>& ga
         for (uint8_t d = 0; d < depCount; d++) {
             bool found = false;
             for (const auto* other : gates) {
-                if (strcmp(other->getGateName(), deps[d]) == 0) {
+                if (other->getGateName() && strcmp(other->getGateName(), deps[d]) == 0) {
                     if (!other->isSatisfied()) depsOk = false;
                     found = true;
                     break;
@@ -79,7 +78,8 @@ inline bool shouldRepublish(
     const char* currentGate, GateActionStatus currentStatus,
     const char* lastGate, GateActionStatus lastStatus)
 {
-    // Gate changed?
+    // Fast-path: same pointer implies same gate (static lifetimes).
+    // Falls through to strcmp() when pointers differ but content may match.
     if (currentGate != lastGate) {
         if (lastGate == nullptr || currentGate == nullptr ||
             strcmp(currentGate, lastGate) != 0) {

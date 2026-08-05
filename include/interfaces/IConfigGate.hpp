@@ -75,6 +75,9 @@ public:
     /**
      * @brief Return a human-readable gate name for logging and diagnostics.
      * @return Short identifier, e.g. "WiFi Station", "API Keys", "Board Config".
+     *         The returned pointer MUST have static or application lifetime —
+     *         the framework stores it as a raw const char* for change-detection
+     *         (pointer comparison + strcmp fallback). Dynamic names will dangle.
      */
     virtual const char* getGateName() const = 0;
 

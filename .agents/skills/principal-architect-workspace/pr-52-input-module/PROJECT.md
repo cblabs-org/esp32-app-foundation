@@ -2,7 +2,7 @@
 
 **Issue:** [#52](https://github.com/matthewmcneill/esp32-app-foundation/issues/52)
 **Base branch:** `hwconfig/wo4-consumers-docs` (depends on PR-51 `board.h` infrastructure)
-**Status:** 🚧 IN PROGRESS
+**Status:** ✅ **COMPLETE** — ButtonModule merged (PR #53), EncoderModule recovered + adapter refactored (PR [#75](https://github.com/matthewmcneill/esp32-app-foundation/pull/75))
 **Human approval:** ✅ Granted 2026-07-31 (implementation plan approved in conversation 4f0ddc48)
 
 ## Objective
@@ -23,9 +23,10 @@ for decoupled consumption.
 
 ## Work Order Ledger
 
-- **[/] [wo1-framework-core](wo1-framework-core/WORKORDER.md):** InputConfig.h types, InputModule.hpp/cpp implementation, board_contract.h update, native stubs
+- **[x] [wo1-framework-core](wo1-framework-core/WORKORDER.md):** InputConfig.h types, InputModule.hpp/cpp implementation, board_contract.h update, native stubs
 - **[x] [wo2-board-wiring](wo2-board-wiring/WORKORDER.md):** Board.h descriptors (esp32dev/esp32s3nano/native), main.cpp wiring, platformio.ini flags, idf_component.yml
-- **[ ] [wo3-tests-docs](wo3-tests-docs/WORKORDER.md):** Unit tests, template board.h update, module README
+- **[x] [wo3-tests-docs](wo3-tests-docs/WORKORDER.md):** Unit tests, template board.h update, module README
+- **[x] [encoder-recovery](encoder-recovery/WORKORDER.md):** Recover orphaned EncoderModule (PR #56 lost-merge) + refactor CrowPanel adapter to use framework input modules
 
 ## Key Constraints
 

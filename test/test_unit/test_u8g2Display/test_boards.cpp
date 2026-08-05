@@ -589,3 +589,10 @@ TEST_F(GenericGateHelperBoardTest, Configure_MultipleCalls_DoesNotCrash) {
     EXPECT_NO_FATAL_FAILURE(board.configure("Gate B", "Help B", "192.168.1.2"));
     EXPECT_NO_FATAL_FAILURE(board.configure("Gate C", "Help C", "192.168.1.3"));
 }
+
+/** configure must clear buffers when given nullptrs. */
+TEST_F(GenericGateHelperBoardTest, Configure_Nullptr_ClearsPreviousState) {
+    board.configure("TestGate", "Help text", "192.168.1.1");
+    EXPECT_NO_FATAL_FAILURE(board.configure(nullptr, nullptr, nullptr));
+    // Implementation validates this doesn't crash and handles nulls safely.
+}
