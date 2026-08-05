@@ -78,3 +78,9 @@ overlapping-file conflicts across the stack.
   native build + 417/417 tests green). Committed `c6b7ae1`. Per-WO distillery skipped
   (mechanical WO); will distill at project wrap-up.
 - **2026-08-05** — WO2 branch `skill-currency/wo2-input-docs` created off WO1; worker spawned.
+- **2026-08-05** — ✅ **WO2 COMPLETE.** Worker (sonnet) created `systems/input/`
+  (overview + button-module + encoder-module) and updated framework-topics +
+  mcp-server docs; PA independently reviewed content and spot-checked field names /
+  the CrowPanel `consumeDelta` call / ADR-39 citation against source — all accurate.
+  Committed `41f6270`. Per-WO distillery deferred to project wrap-up.
+- **2026-08-05** — WO3 branch `skill-currency/wo3-skill-hygiene` created off WO2; worker spawned.
