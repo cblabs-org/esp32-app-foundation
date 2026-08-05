@@ -151,6 +151,93 @@ Create an HTML snippet representing your tab UI inside the `/www/<namespace>/tab
 
 ---
 
+## 3.1 CSS Component Reference
+
+The portal design system (`app.css`) provides standard component classes following BEM naming conventions. All components ship with their accessibility contracts defined.
+
+### Card Container (`.card`)
+Structural container for tab content sections.
+```html
+<div class="card">
+    <h3>Section Title</h3>
+    <p>Card content goes here.</p>
+</div>
+```
+
+### Disabled Section State (`[aria-disabled="true"]`)
+Disables interactive cards or sections (e.g., feature-gated via `IConfigGate`). Applies 50% opacity, `pointer-events: none`, and subtle grayscale filter.
+```html
+<div class="card" aria-disabled="true">
+    <h3>Gated Feature</h3>
+    <p>This module is disabled.</p>
+</div>
+```
+- **A11y:** Set `aria-disabled="true"` on the element to communicate the disabled state to screen readers.
+
+### Loading Button State (`button[aria-busy="true"]`)
+Displays a spinning loading indicator inside the button and disables pointer events.
+```html
+<button id="save-btn" aria-busy="true">Saving...</button>
+```
+- **A11y:** Set `aria-busy="true"` dynamically during async operations to announce loading state to screen readers.
+
+### Instruction Callout (`.callout`)
+Accent-bordered callout box for supplementary guidance and information.
+```html
+<aside class="callout" role="note">
+    <p>Note: Changing this setting requires an AP mode reconnect.</p>
+</aside>
+```
+- **A11y:** Use `<aside>` or add `role="note"` when containing supplementary guidance.
+
+### Terminal Log Viewer (`.terminal-log`)
+Green-on-black monospace console for live log streams.
+```html
+<div id="sys-log" class="terminal-log" role="log" aria-live="polite">
+    <div class="terminal-log__line">[INFO] System initialized</div>
+</div>
+```
+- **A11y:** Container MUST include `role="log"` and `aria-live="polite"` for live log updates. Managed automatically by `window.renderTerminalLog()`.
+
+### Dialog Close Button (`.dialog-close-btn`)
+Top-right close button for modal dialogs.
+```html
+<dialog id="settings-dialog">
+    <button class="dialog-close-btn" aria-label="Close" onclick="this.closest('dialog').close()">&times;</button>
+    <div class="card">Dialog Content</div>
+</dialog>
+```
+- **A11y:** Must include `aria-label="Close"` for screen reader accessibility.
+
+### Password Mask Placeholder (`.password-mask`)
+Spaced dots placeholder styling for saved password inputs.
+```html
+<input type="password" class="password-mask" placeholder="••••••••" value="">
+```
+
+### Field Validation Feedback (`.field-feedback`)
+Validation feedback message displayed below input controls. Modifiers: `.field-feedback--error`, `.field-feedback--success`.
+```html
+<label for="wifi-ssid">SSID</label>
+<input type="text" id="wifi-ssid" aria-describedby="ssid-feedback">
+<small id="ssid-feedback" class="field-feedback field-feedback--error">SSID is required.</small>
+```
+- **A11y:** Input element MUST link to the feedback element via `aria-describedby="<id>"`.
+
+### Compact Row (`.compact-row`)
+Flexbox alignment container for inline input and action button pairs.
+```html
+<div class="compact-row">
+    <label>
+        API Key
+        <input type="text" id="api-key">
+    </label>
+    <button id="apply-key-btn">Apply</button>
+</div>
+```
+
+---
+
 ## 4. The JavaScript Fragment Pattern
 
 Immediately after loading the HTML snippet, the SPA shell loads and executes your matching Javascript fragment located at `/www/<namespace>/tab.js`.
@@ -266,6 +353,7 @@ The framework provides these global functions in `utils.js` (loaded before all t
 - **`window.showRebootOverlay(message, subMessage)`** — Full-screen overlay with spinner and reconnection polling. Auto-reloads the page when the device comes back online.
 - **`window.apiFetch(url, options)`** — Serialised fetch wrapper. **Always use this instead of raw `fetch()`** — it queues requests to protect ESP32 socket pools.
 - **`window.apiFetch.enqueueTask(taskFn, delayMs)`** — Enqueue a background task in the low-priority lane, preventing it from blocking UI API requests.
+- **`window.renderTerminalLog(containerId)`** — Initialize a terminal log viewer inside a container element (`role="log"`, `aria-live="polite"`). Returns `{ append(line), clear(), scrollToBottom() }`.
 
 ### Decision Rule
 

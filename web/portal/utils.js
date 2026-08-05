@@ -258,4 +258,43 @@
     }
   };
 
+  // ===========================================================================
+  // Terminal Log Viewer Utility (U3)
+  // ===========================================================================
+
+  /**
+   * @brief Create or initialize a terminal log viewer inside a container element.
+   * @param {string|HTMLElement} containerId - Element ID or HTMLElement.
+   * @returns {Object|null} Controller object `{ append(line), clear(), scrollToBottom() }` or null if container not found.
+   */
+  window.renderTerminalLog = function(containerId) {
+    var container = typeof containerId === 'string'
+      ? document.getElementById(containerId)
+      : containerId;
+
+    if (!container) return null;
+
+    container.setAttribute('role', 'log');
+    container.setAttribute('aria-live', 'polite');
+    container.classList.add('terminal-log');
+
+    var controller = {
+      append: function(line) {
+        var lineEl = document.createElement('div');
+        lineEl.className = 'terminal-log__line';
+        lineEl.innerHTML = window.escapeHtml(line);
+        container.appendChild(lineEl);
+        controller.scrollToBottom();
+      },
+      clear: function() {
+        container.innerHTML = '';
+      },
+      scrollToBottom: function() {
+        container.scrollTop = container.scrollHeight;
+      }
+    };
+
+    return controller;
+  };
+
 })();

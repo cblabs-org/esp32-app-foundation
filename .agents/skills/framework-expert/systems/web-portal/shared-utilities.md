@@ -210,6 +210,30 @@ Generates a RAG-coloured (Red/Amber/Green) progress bar as an HTML string.
 container.innerHTML = window.renderProgressBar('Heap', freeHeap, totalHeap, 'KB');
 ```
 
+### `window.renderTerminalLog(containerId)`
+
+Creates or initializes a terminal log viewer inside a container element. Sets `role="log"` and `aria-live="polite"` on the container and applies the `.terminal-log` CSS class.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `containerId` | `string\|HTMLElement` | Yes | Element ID or HTMLElement |
+
+**Returns:** `object|null` — controller object with log control methods, or `null` if container element is not found.
+
+| Method | Description |
+|--------|-------------|
+| `append(line)` | Creates a `<div class="terminal-log__line">` with HTML-escaped text, appends it, and scrolls to bottom |
+| `clear()` | Empties all log content in the container |
+| `scrollToBottom()` | Scrolls the container to the bottom |
+
+```javascript
+const log = window.renderTerminalLog('sys-log');
+log.append('[INFO] System initialized');
+log.append('[DEBUG] Heap free: 142KB');
+// Clear:
+log.clear();
+```
+
 ## CSS Components
 
 ### `.alert` Component
