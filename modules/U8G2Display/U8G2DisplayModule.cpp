@@ -1201,14 +1201,14 @@ void U8G2DisplayModule::_onAppConfiguring(const char* /*topic*/, const void* pay
     // --- 4. Update configuring status board with gate action status and connection info ---
     self->boards.configuringStatus.setActiveGateStatus(p->actionStatus);
     self->boards.configuringStatus.setActionableGateName(p->gateName);
+    char urlBuf[48] = "";
     if (p->deviceIP != nullptr) {
-        char urlBuf[48];
         snprintf(urlBuf, sizeof(urlBuf), "http://%s", p->deviceIP);
-        self->boards.configuringStatus.setConnectionInfo(
-            p->hostname ? p->hostname : "",
-            urlBuf
-        );
     }
+    self->boards.configuringStatus.setConnectionInfo(
+        p->hostname ? p->hostname : "",
+        p->deviceIP ? urlBuf : ""
+    );
 
     // --- 5. If not NeedsUserAction, no modal needed ---
     if (p->actionStatus != GateActionStatus::NeedsUserAction) {

@@ -333,9 +333,7 @@ void Application::tick() {
                 currentGate, currentStatus, _lastPublishedGate, _lastPublishedStatus);
 
             if (changed) {
-                _lastPublishedGate = currentGate;
-                _lastPublishedStatus = currentStatus;
-                _publishConfiguringEvent(false);
+                _publishConfiguringEvent(false, actionable);
             }
         }
 
@@ -682,8 +680,8 @@ const IConfigGate* Application::getActionableGate() const {
  * satisfied, then populates the enriched AppConfiguringPayload with gate
  * name, help text, action status, hostname, and device IP.
  */
-void Application::_publishConfiguringEvent(bool isRegression) {
-    const IConfigGate* gate = getActionableGate();
+void Application::_publishConfiguringEvent(bool isRegression, const IConfigGate* preResolved) {
+    const IConfigGate* gate = preResolved ? preResolved : getActionableGate();
     if (gate == nullptr) return;
 
     // Stamp tracking state atomically with publish (F1: structural invariant)

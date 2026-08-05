@@ -47,7 +47,7 @@ Targeting the Elecrow CrowPanel 1.28" rotary display (ESP32-S3):
 
 1. **Stage 1 (Pre-Begin Bootstrap)**: Renders a compiled-in boot logo (`cb_labs_boot_logo`) and status progress bar before LittleFS or ConfigManager are mounted.
 2. **Stage 2 (App Handshake)**: Handsoff rendering to the application's SquareLine Studio UI via weak `ui_init()` hook.
-3. **Pluggable Skins**: Custom error/OTA progress screens can be injected via `ILVGLSystemScreens`. If absent, built-in fallback screens (`BootScreen`, `ErrorScreen`, `OTAProgressScreen`) render system states.
+3. **Pluggable Skins**: Custom error/OTA progress screens can be injected via `ILVGLSystemScreens`. If absent, built-in fallback screens (`BootScreen`, `ErrorScreen`, `OTAProgressScreen`) render system states. Note that `ILVGLSystemScreens` now also includes CONFIGURING-phase screen methods: `configuringScreen()`, `wifiWizardScreen()`, `gateHelperScreen(const AppConfiguringPayload*)`. These are currently interface stubs with TODO implementation.
 
 ## Flash Requirements & Asset Strategy (D9)
 

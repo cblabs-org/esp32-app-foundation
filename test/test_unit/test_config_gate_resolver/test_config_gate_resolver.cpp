@@ -3,8 +3,7 @@
  *
  * https://github.com/matthewmcneill/esp32-app-foundation
  *
- * This work is licensed under Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International.
- * To view a copy of this license, visit https://creativecommons.org/licenses/by-nc-sa/4.0/
+ * SPDX-License-Identifier: Apache-2.0
  *
  * Module: test/test_unit/test_config_gate_resolver/test_config_gate_resolver.cpp
  * Description: GoogleTest suite for the ConfigGateResolver pure-logic utility.
@@ -150,6 +149,20 @@ TEST(ConfigGateResolverTest, FindActionableGate_UnknownDep_SkipsGate) {
 
 TEST(ConfigGateResolverTest, FindActionableGate_EmptyVector_ReturnsNullptr) {
     std::vector<IConfigGate*> gates;
+    EXPECT_EQ(ConfigGateResolver::findActionableGate(gates), nullptr);
+}
+
+TEST(ConfigGateResolverTest, FindActionableGate_CyclicDeps_ReturnsNullptr) {
+    MockGate gA("gateA", "Gate A", false);
+    MockGate gB("gateB", "Gate B", false);
+
+    const char* depsA[] = { "gateB" };
+    gA.setDependencies(depsA, 1);
+
+    const char* depsB[] = { "gateA" };
+    gB.setDependencies(depsB, 1);
+
+    std::vector<IConfigGate*> gates = { &gA, &gB };
     EXPECT_EQ(ConfigGateResolver::findActionableGate(gates), nullptr);
 }
 
