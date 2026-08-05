@@ -4,8 +4,7 @@ ESP32 App Foundation (c) 2026 CB Labs
 
 https://github.com/matthewmcneill/esp32-app-foundation
 
-This work is licensed under Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International.
-To view a copy of this license, visit https://creativecommons.org/licenses/by-nc-sa/4.0/
+SPDX-License-Identifier: Apache-2.0
 
 Module: scripts/build_fonts.py
 Description: Standalone Python utility to generate a C++ header file containing
@@ -111,7 +110,7 @@ def generate_header(bdf_files, output_path):
     lines.append(" *")
     lines.append(" * https://github.com/matthewmcneill/esp32-app-foundation")
     lines.append(" *")
-    lines.append(" * This work is licensed under Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International.")
+    lines.append(" * SPDX-License-Identifier: Apache-2.0")
     lines.append(" * To view a copy of this license, visit https://creativecommons.org/licenses/by-nc-sa/4.0/")
     lines.append(" *")
     lines.append(f" * Module: {output_path}")

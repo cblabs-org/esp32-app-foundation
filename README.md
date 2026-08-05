@@ -403,4 +403,5 @@ architecture and generate compliant implementations.
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
 © 2026 CB Labs. Licensed under the [Apache License 2.0](https://opensource.org/licenses/Apache-2.0).
+
 You are free to use, modify, and distribute this software in source or binary form, subject to the terms of the Apache License 2.0.

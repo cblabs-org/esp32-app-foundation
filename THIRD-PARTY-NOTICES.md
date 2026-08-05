@@ -25,11 +25,10 @@ All third-party dependencies listed below utilize permissive open-source license
 
 | Module / Framework | Source Location | License Type | Description / Usage |
 | :--- | :--- | :--- | :--- |
-
 | **Arduino-ESP32 / ESP-IDF** | [github.com/espressif/arduino-esp32](https://github.com/espressif/arduino-esp32) | LGPL-2.1 / Apache-2.0 | Base microcontroller framework and SDK |
 
 ---
 
 ## License Compatibility Statement
 
-All third-party libraries bundled or referenced by `esp32-app-foundation` in `platformio.ini` use OSI-approved, permissive open-source licenses (MIT, BSD-2-Clause, BSD-3-Clause, Apache-2.0, LGPL-2.1). These licenses allow royalty-free use, modification, and distribution in open-source and commercial applications, confirming complete compatibility with the project's **Apache License, Version 2.0**.
+All third-party libraries bundled or referenced by `esp32-app-foundation` in `platformio.ini` use OSI-approved, permissive open-source licenses (MIT, BSD-2-Clause, BSD-3-Clause, Apache-2.0) or weak-copyleft licenses for the underlying SDK (LGPL-2.1). These licenses allow royalty-free use, modification, and distribution in open-source and commercial applications, confirming complete compatibility with the project's **Apache License, Version 2.0**.
