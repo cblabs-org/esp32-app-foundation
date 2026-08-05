@@ -44,12 +44,12 @@ currency plus a mechanical license-header correction.
 - **[x] [wo1-encoder-licensing](wo1-encoder-licensing/WORKORDER.md):** *(mechanical)*
   Replace CC BY-NC-SA headers with Apache-2.0 SPDX in the 5 recovered encoder files
   (source tree). Base: `main`.
-- **[ ] [wo2-input-docs](wo2-input-docs/WORKORDER.md):** *(standard)* Create
+- **[x] [wo2-input-docs](wo2-input-docs/WORKORDER.md):** *(standard)* Create
   `systems/input/` (overview + button-module + encoder-module); add `button.*` and
   `encoder.rotate` to `systems/event-bus/framework-topics.md`; add `button_status`,
   `encoder_status`, and the 4 KeyManager tools to `systems/mcp-server/overview.md`.
   Base: `skill-currency/wo1-encoder-licensing`.
-- **[ ] [wo3-skill-hygiene](wo3-skill-hygiene/WORKORDER.md):** *(standard)* Fix the
+- **[x] [wo3-skill-hygiene](wo3-skill-hygiene/WORKORDER.md):** *(standard)* Fix the
   `style-guide.md` §3 header template; document `WITH_*` build flags in
   `references/build-system.md`; add `systems/input/` routing rows + input/button/encoder
   trigger vocab to `SKILL.md`; bump `skill_manifest.json` (version, lastUpdated,
@@ -84,3 +84,18 @@ overlapping-file conflicts across the stack.
   the CrowPanel `consumeDelta` call / ADR-39 citation against source — all accurate.
   Committed `41f6270`. Per-WO distillery deferred to project wrap-up.
 - **2026-08-05** — WO3 branch `skill-currency/wo3-skill-hygiene` created off WO2; worker spawned.
+- **2026-08-05** — ✅ **WO3 COMPLETE.** Worker (sonnet) fixed the style-guide header
+  template, added the Optional-Module Build Flags table, wired `systems/input/`
+  into SKILL.md routing + triggers, and bumped the manifest (2.3.0, PR-75). PA
+  verified the diff + manifest JSON validity. Committed `a5c7b4b`.
+- **2026-08-05** — ✅ **PROJECT COMPLETE.** 3-WO stack landed locally
+  (`c6b7ae1` → `41f6270` → `a5c7b4b`), not yet pushed. Awaiting user decision on
+  stack submission (external publish gate).
+
+## Surfaced Findings (out-of-scope — for triage)
+
+- **`WITH_BUTTON` typo in `platformio.ini:134`** (found during WO3 verification):
+  the `crowpanel-128-rotary` env sets `-D WITH_BUTTON` (singular) while all source
+  `#ifdef`s check `WITH_BUTTONS` (plural) — `ButtonModule` is silently never
+  compiled into that hardware target. Pre-existing; outside this project's boundary
+  (source config). Surfaced to user for a separate fix/issue decision.
