@@ -3,8 +3,7 @@
  *
  * https://github.com/matthewmcneill/esp32-app-foundation
  *
- * This work is licensed under Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International.
- * To view a copy of this license, visit https://creativecommons.org/licenses/by-nc-sa/4.0/
+ * SPDX-License-Identifier: Apache-2.0
  *
  * Module: modules/U8G2Display/boards/GenericGateHelperBoard.hpp
  * Description: Fallback modal helper board for config gates that have no
@@ -65,6 +64,6 @@ public:
 
 private:
     char _gateName[32]  = "";   ///< Gate name for title (max 31 chars + null). Framework gate names are short by convention.
-    char _helpText[128] = "";   ///< Help text body (max 127 chars + null — room for LVGL-width gates)
+    char _helpText[64]  = "";   ///< Help text body (max 63 chars + null). U8G2-only; LVGL has its own board.
     char _deviceIP[16]  = "";   ///< Device IP address for footer URL
 };

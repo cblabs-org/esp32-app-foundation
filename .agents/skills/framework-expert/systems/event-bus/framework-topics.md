@@ -16,7 +16,7 @@ Here are the 8 framework-published topics, their payload types, and the publishe
 
 ### 3. `app.configuring` (`APP_CONFIGURING`)
 - **Publisher**: `Application`
-- **Payload**: Gate name string (`const char*`)
+- **Payload**: `const AppConfiguringPayload*` — struct containing `gateName`, `helpText`, `actionStatus` (GateActionStatus), `isRegression`, `hostname`, and `deviceIP`. Defined in `include/events/AppConfiguringPayload.hpp`.
 
 ## OTA Subsystem
 

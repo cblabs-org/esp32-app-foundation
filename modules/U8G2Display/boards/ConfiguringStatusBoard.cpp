@@ -95,10 +95,14 @@ void ConfiguringStatusBoard::setConnectionInfo(const char* network, const char* 
     if (network) {
         strncpy(_networkName, network, sizeof(_networkName) - 1);
         _networkName[sizeof(_networkName) - 1] = '\0';
+    } else {
+        _networkName[0] = '\0';
     }
     if (url) {
         strncpy(_deviceUrl, url, sizeof(_deviceUrl) - 1);
         _deviceUrl[sizeof(_deviceUrl) - 1] = '\0';
+    } else {
+        _deviceUrl[0] = '\0';
     }
 }
 

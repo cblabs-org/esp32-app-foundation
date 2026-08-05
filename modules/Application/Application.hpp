@@ -437,7 +437,7 @@ private:
      *        unsatisfied gate, allowing display modules to react.
      * @param isRegression true if this CONFIGURING entry is a regression from RUNNING.
      */
-    void _publishConfiguringEvent(bool isRegression = false);
+    void _publishConfiguringEvent(bool isRegression = false, const IConfigGate* preResolved = nullptr);
 
     /**
      * @brief Log the current free-heap and minimum free-heap figures.
