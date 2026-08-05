@@ -954,7 +954,7 @@ void WeatherModule::registerMCPTools(MCPToolRegistry& registry) {
  * @return A C-string identifying this configuration gate.
  */
 const char* WeatherModule::getGateName() const {
-    return "Weather API Key";
+    return "Weather Setup";
 }
 
 /**
@@ -967,7 +967,9 @@ const char* WeatherModule::getGateName() const {
  */
 bool WeatherModule::isSatisfied() const {
     if (!_keyManager) return true;  // No KeyManager wired — don't block boot
-    return !_keyManager->getKeyById("owm_api_key").empty();
+    bool hasApiKey = !_keyManager->getKeyById("owm_api_key").empty();
+    bool hasLocation = (_lat != 0.0 || _lon != 0.0);
+    return hasApiKey && hasLocation;
 }
 
 /**
@@ -975,5 +977,5 @@ bool WeatherModule::isSatisfied() const {
  * @return A C-string with instructions directing the user to the Weather portal tab.
  */
 const char* WeatherModule::getHelpText() const {
-    return "Enter your OpenWeatherMap API key via the Weather tab";
+    return "Set your API key and location via the Weather tab";
 }
