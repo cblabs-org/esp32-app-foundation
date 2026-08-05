@@ -221,7 +221,7 @@ test.describe('Display Settings Tab', () => {
     // Clock font is in the App tab (appconfig.js), not the Display/Settings sub-pill
     await page.locator('#bottom-nav .tab-link[data-target="tab-app"]').click();
     // Wait for the App tab container to become active (content rendered by appconfig.js)
-    await page.locator('#tab-app.active').waitFor({ state: 'attached' });
+    await page.locator('#tab-app.tab-content--active').waitFor({ state: 'attached' });
 
     const requestPromise = page.waitForRequest(req =>
       req.url().includes('/api/display/clockFontSize') && req.method() === 'POST'

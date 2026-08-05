@@ -73,7 +73,7 @@ async function bootAndNavigateToBackup(page: Page) {
   await page.locator('#bottom-nav [data-target="tab-system"]').click();
   await expect(page.locator('#pill-bar')).toBeVisible();
   await page.locator('#pill-bar .pill-btn[data-target="tab-backup"]').click();
-  await expect(page.locator('#tab-backup')).toHaveClass(/active/);
+  await expect(page.locator('#tab-backup')).toHaveClass(/tab-content--active/);
 }
 
 // ---------------------------------------------------------------------------
@@ -142,7 +142,7 @@ test.describe('Backup & Restore Sub-pill', () => {
     await page.locator('#btn-backup-restore').click();
 
     // Should show the reboot overlay (armButton gate + showRebootOverlay)
-    await expect(page.locator('#reboot-overlay')).toHaveClass(/visible/);
+    await expect(page.locator('#reboot-overlay')).toHaveClass(/reboot-overlay--visible/);
     await expect(page.locator('.reboot-msg')).toContainText('Restoring configuration');
     expect(restorePosted).toBe(true);
   });

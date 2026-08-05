@@ -137,7 +137,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Update toggle buttons
     themeToggle.querySelectorAll('.theme-btn').forEach(function(btn) {
-      btn.classList.toggle('active', btn.getAttribute('data-theme') === mode);
+      btn.classList.toggle('theme-btn--active', btn.getAttribute('data-theme') === mode);
     });
 
     // Determine effective theme
@@ -333,7 +333,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // --- Update bottom nav active state ---
     bottomNav.querySelectorAll('.tab-link').forEach(function(link) {
-      link.classList.toggle('active', link.getAttribute('data-target') === tabId);
+      link.classList.toggle('tab-link--active', link.getAttribute('data-target') === tabId);
     });
 
     // --- Find the parent tab name for this tabId ---
@@ -417,7 +417,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Update pill active state
     pillBar.querySelectorAll('.pill-btn').forEach(function(btn) {
-      btn.classList.toggle('active', btn.getAttribute('data-target') === childId);
+      btn.classList.toggle('pill-btn--active', btn.getAttribute('data-target') === childId);
     });
 
     // Show the child content div
@@ -433,11 +433,11 @@ document.addEventListener('DOMContentLoaded', function() {
    */
   function showContentDiv(targetId) {
     document.querySelectorAll('.tab-content').forEach(function(div) {
-      div.classList.remove('active');
+      div.classList.remove('tab-content--active');
     });
 
     var target = document.getElementById(targetId);
-    if (target) target.classList.add('active');
+    if (target) target.classList.add('tab-content--active');
   }
 
   // =========================================================================

@@ -80,7 +80,7 @@ async function bootAndNavigateToStatus(page: Page, systemData = MOCK_SYSTEM_GREE
 
   // Explicitly click the Status sub-pill (NOT the default due to order:0||100 bug)
   await page.locator('#pill-bar .pill-btn[data-target="tab-status"]').click();
-  await expect(page.locator('#tab-status')).toHaveClass(/active/);
+  await expect(page.locator('#tab-status')).toHaveClass(/tab-content--active/);
 
   // Wait for system data to render
   await expect(page.locator('#sys-device-info')).toContainText('ESP32');

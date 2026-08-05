@@ -77,7 +77,7 @@ async function navigateToStatus(page: Page) {
   await page.locator('#bottom-nav [data-target="tab-system"]').click();
   await expect(page.locator('#pill-bar')).toBeVisible();
   await page.locator('#pill-bar .pill-btn[data-target="tab-status"]').click();
-  await expect(page.locator('#tab-status')).toHaveClass(/active/);
+  await expect(page.locator('#tab-status')).toHaveClass(/tab-content--active/);
   await expect(page.locator('#sys-device-info')).toContainText('ESP32');
 }
 
@@ -89,7 +89,7 @@ async function navigateToTls(page: Page) {
   await page.locator('#bottom-nav [data-target="tab-security"]').click();
   await expect(page.locator('#pill-bar')).toBeVisible();
   await page.locator('#pill-bar .pill-btn[data-target="tab-tls"]').click();
-  await expect(page.locator('#tab-tls')).toHaveClass(/active/);
+  await expect(page.locator('#tab-tls')).toHaveClass(/tab-content--active/);
 }
 
 // ---------------------------------------------------------------------------
@@ -126,7 +126,7 @@ test.describe('Reboot Overlay — Visibility', () => {
     });
 
     const overlay = page.locator('#reboot-overlay');
-    await expect(overlay).toHaveClass(/visible/);
+    await expect(overlay).toHaveClass(/reboot-overlay--visible/);
     await expect(overlay.locator('.reboot-msg')).toHaveText('Test Message');
     await expect(overlay.locator('.reboot-sub')).toHaveText('Test sub-message');
   });
@@ -138,7 +138,7 @@ test.describe('Reboot Overlay — Visibility', () => {
     await page.evaluate(() => {
       (window as any).showRebootOverlay('Temporary', 'Going away');
     });
-    await expect(page.locator('#reboot-overlay')).toHaveClass(/visible/);
+    await expect(page.locator('#reboot-overlay')).toHaveClass(/reboot-overlay--visible/);
 
     await page.evaluate(() => {
       (window as any).hideRebootOverlay();
@@ -146,7 +146,7 @@ test.describe('Reboot Overlay — Visibility', () => {
 
     // The visible class should be removed
     const overlay = page.locator('#reboot-overlay');
-    await expect(overlay).not.toHaveClass(/visible/);
+    await expect(overlay).not.toHaveClass(/reboot-overlay--visible/);
   });
 });
 
@@ -172,7 +172,7 @@ test.describe('Reboot Overlay — WiFi Flow', () => {
 
     // Overlay should appear with WiFi-specific message
     const overlay = page.locator('#reboot-overlay');
-    await expect(overlay).toHaveClass(/visible/);
+    await expect(overlay).toHaveClass(/reboot-overlay--visible/);
     await expect(overlay.locator('.reboot-msg')).toContainText('Connecting to WiFi');
     await expect(overlay.locator('.reboot-sub')).toContainText('restart to connect');
   });
@@ -196,7 +196,7 @@ test.describe('Reboot Overlay — WiFi Flow', () => {
 
     // Overlay should appear with forget/AP-mode message
     const overlay = page.locator('#reboot-overlay');
-    await expect(overlay).toHaveClass(/visible/);
+    await expect(overlay).toHaveClass(/reboot-overlay--visible/);
     await expect(overlay.locator('.reboot-msg')).toContainText('Restarting device');
     await expect(overlay.locator('.reboot-sub')).toContainText('WiFi credentials have been erased');
   });
@@ -227,7 +227,7 @@ test.describe('Reboot Overlay — System Flow', () => {
 
     // Overlay should appear with restart message
     const overlay = page.locator('#reboot-overlay');
-    await expect(overlay).toHaveClass(/visible/);
+    await expect(overlay).toHaveClass(/reboot-overlay--visible/);
     await expect(overlay.locator('.reboot-msg')).toContainText('Restarting device');
     await expect(overlay.locator('.reboot-sub')).toContainText('back online shortly');
   });
@@ -254,7 +254,7 @@ test.describe('Reboot Overlay — System Flow', () => {
 
     // Overlay should appear with factory reset message
     const overlay = page.locator('#reboot-overlay');
-    await expect(overlay).toHaveClass(/visible/);
+    await expect(overlay).toHaveClass(/reboot-overlay--visible/);
     await expect(overlay.locator('.reboot-msg')).toContainText('Factory reset in progress');
     await expect(overlay.locator('.reboot-sub')).toContainText('All settings will be erased');
   });
@@ -294,7 +294,7 @@ test.describe('Reboot Overlay — TLS Flow', () => {
 
     // The overlay appears after a 2s setTimeout — use a longer timeout
     const overlay = page.locator('#reboot-overlay');
-    await expect(overlay).toHaveClass(/visible/, { timeout: 5000 });
+    await expect(overlay).toHaveClass(/reboot-overlay--visible/, { timeout: 5000 });
     await expect(overlay.locator('.reboot-msg')).toContainText('Applying TLS settings');
     await expect(overlay.locator('.reboot-sub')).toContainText('restart to apply the new TLS configuration');
   });

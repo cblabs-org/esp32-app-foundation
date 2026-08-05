@@ -594,7 +594,7 @@
   });
 
   // --- Initial load if tab is already active ---
-  if (container.classList.contains('active')) {
+  if (container.classList.contains('tab-content--active')) {
     fetchStatus();
     startScan();
   }

@@ -23,19 +23,19 @@
     if (!container) return;
 
     var toast = document.createElement('div');
-    toast.className = 'toast toast-' + type;
+    toast.className = 'toast toast--' + type;
     toast.textContent = message;
 
     container.appendChild(toast);
 
     // Trigger slide-in animation
     requestAnimationFrame(function() {
-      toast.classList.add('toast-visible');
+      toast.classList.add('toast--visible');
     });
 
     // Auto-dismiss
     setTimeout(function() {
-      toast.classList.remove('toast-visible');
+      toast.classList.remove('toast--visible');
       toast.addEventListener('transitionend', function() {
         if (toast.parentNode) toast.parentNode.removeChild(toast);
       });
@@ -223,7 +223,7 @@
     if (msgEl) msgEl.textContent = message || 'Restarting device…';
     if (subEl) subEl.textContent = subMessage || 'Please wait for the device to come back online.';
 
-    overlay.classList.add('visible');
+    overlay.classList.add('reboot-overlay--visible');
 
     // Start reconnection polling after a brief delay (give device time to begin restart)
     if (window._rebootPollTimer) clearInterval(window._rebootPollTimer);
@@ -251,7 +251,7 @@
    */
   window.hideRebootOverlay = function() {
     var overlay = document.getElementById('reboot-overlay');
-    if (overlay) overlay.classList.remove('visible');
+    if (overlay) overlay.classList.remove('reboot-overlay--visible');
     if (window._rebootPollTimer) {
       clearInterval(window._rebootPollTimer);
       window._rebootPollTimer = null;

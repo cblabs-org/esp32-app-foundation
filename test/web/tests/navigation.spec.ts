@@ -106,19 +106,19 @@ test.describe('Tab Navigation', () => {
 
   test('tab switching — clicking System shows system content, hides WiFi', async ({ page }) => {
     // WiFi is active by default
-    await expect(page.locator('#tab-wifi')).toHaveClass(/active/);
+    await expect(page.locator('#tab-wifi')).toHaveClass(/tab-content--active/);
 
     // Click System tab
     await page.locator('#bottom-nav [data-target="tab-system"]').click();
 
     // WiFi content should no longer be active
-    await expect(page.locator('#tab-wifi')).not.toHaveClass(/active/);
+    await expect(page.locator('#tab-wifi')).not.toHaveClass(/tab-content--active/);
 
     // The System tab has children, so a child sub-pill should become active
     // Due to portal's order:0||100 bug, Keys (order:1) sorts first, not Status
     await expect(page.locator('#pill-bar')).toBeVisible();
     // At least one child tab-content should be active
-    const activeChild = page.locator('.tab-content.active');
+    const activeChild = page.locator('.tab-content--active');
     await expect(activeChild).toBeVisible();
     // And it should NOT be tab-wifi
     const activeId = await activeChild.getAttribute('id');
@@ -152,15 +152,15 @@ test.describe('Tab Navigation', () => {
     await page.locator('#pill-bar .pill-btn[data-target="tab-status"]').click();
 
     // Status content should be active
-    await expect(page.locator('#tab-status')).toHaveClass(/active/);
+    await expect(page.locator('#tab-status')).toHaveClass(/tab-content--active/);
 
     // The Status pill should be the active one
-    await expect(page.locator('#pill-bar .pill-btn[data-target="tab-status"]')).toHaveClass(/active/);
+    await expect(page.locator('#pill-bar .pill-btn[data-target="tab-status"]')).toHaveClass(/pill-btn--active/);
 
     // Now click Keys — Status should deactivate
     await page.locator('#pill-bar .pill-btn[data-target="tab-keys"]').click();
-    await expect(page.locator('#tab-keys')).toHaveClass(/active/);
-    await expect(page.locator('#tab-status')).not.toHaveClass(/active/);
+    await expect(page.locator('#tab-keys')).toHaveClass(/tab-content--active/);
+    await expect(page.locator('#tab-status')).not.toHaveClass(/tab-content--active/);
   });
 
   test('tab-changed event fires with correct detail', async ({ page }) => {
@@ -190,15 +190,15 @@ test.describe('Tab Navigation', () => {
 
     // Click Status pill explicitly (it may not be the default due to order:0||100 bug)
     await page.locator('#pill-bar .pill-btn[data-target="tab-status"]').click();
-    await expect(page.locator('#tab-status')).toHaveClass(/active/);
+    await expect(page.locator('#tab-status')).toHaveClass(/tab-content--active/);
 
     // Switch to WiFi
     await page.locator('#bottom-nav [data-target="tab-wifi"]').click();
-    await expect(page.locator('#tab-wifi')).toHaveClass(/active/);
+    await expect(page.locator('#tab-wifi')).toHaveClass(/tab-content--active/);
 
     // Switch back to System — Status should still be active (state memory)
     await page.locator('#bottom-nav [data-target="tab-system"]').click();
-    await expect(page.locator('#tab-status')).toHaveClass(/active/);
-    await expect(page.locator('#pill-bar .pill-btn[data-target="tab-status"]')).toHaveClass(/active/);
+    await expect(page.locator('#tab-status')).toHaveClass(/tab-content--active/);
+    await expect(page.locator('#pill-bar .pill-btn[data-target="tab-status"]')).toHaveClass(/pill-btn--active/);
   });
 });

@@ -233,7 +233,7 @@ button.secondary {
 .tab-content-container { width: 100%; }
 
 .tab-content { display: none; }
-.tab-content.active {
+.tab-content--active {
   display: block;
   animation: slideUp 0.3s ease-out;
 }
@@ -292,11 +292,11 @@ button.secondary {
   display: block;
 }
 
-.tab-link.active {
+.tab-link--active {
   color: var(--primary);
 }
 
-.tab-link.active .icon {
+.tab-link--active .icon {
   transform: translateY(-2px);
 }
 
@@ -335,14 +335,14 @@ button.secondary {
   color: var(--primary);
 }
 
-.pill-btn.active {
+.pill-btn--active {
   background: var(--primary);
   color: white;
   border-color: var(--primary);
 }
 
-/* Screenshot pixel colour preset — active state mirrors pill-btn.active */
-.btn-ss-colour.active {
+/* Screenshot pixel colour preset — active state mirrors pill-btn--active */
+.btn-ss-colour--active {
   background: var(--primary);
   color: white;
   border-color: var(--primary);
@@ -375,7 +375,7 @@ button.secondary {
   transition: all 0.2s ease;
 }
 
-.theme-btn.active {
+.theme-btn--active {
   background: var(--bg);
   color: var(--primary);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
@@ -593,17 +593,17 @@ article.info-drawer > details > .info-drawer-content {
   border-radius: 50%;
 }
 
-.dot.green  { background: var(--success); box-shadow: 0 0 8px var(--success); }
-.dot.red    { background: var(--error);   box-shadow: 0 0 8px var(--error); }
-.dot.yellow { background: var(--warning); box-shadow: 0 0 8px var(--warning); }
-.dot.grey   { background: #888;           box-shadow: 0 0 4px #888; }
+.dot--green  { background: var(--success); box-shadow: 0 0 8px var(--success); }
+.dot--red    { background: var(--error);   box-shadow: 0 0 8px var(--error); }
+.dot--yellow { background: var(--warning); box-shadow: 0 0 8px var(--warning); }
+.dot--grey   { background: #888;           box-shadow: 0 0 4px #888; }
 
 @keyframes pulse {
   0% { transform: scale(1); opacity: 1; }
   50% { transform: scale(1.3); opacity: 0.7; }
   100% { transform: scale(1); opacity: 1; }
 }
-.dot.pulse {
+.dot--pulse {
   animation: pulse 1s infinite;
 }
 
@@ -636,9 +636,9 @@ article.info-drawer > details > .info-drawer-content {
 }
 
 /* RAG colour classes */
-.rag-green { color: var(--success); }
-.rag-amber { color: var(--warning); }
-.rag-red   { color: var(--error); }
+.rag--green { color: var(--success); }
+.rag--amber { color: var(--warning); }
+.rag--red   { color: var(--error); }
 
 /* ==========================================================================
    12. TOAST NOTIFICATIONS
@@ -670,15 +670,15 @@ article.info-drawer > details > .info-drawer-content {
   pointer-events: auto;
 }
 
-.toast-visible {
+.toast--visible {
   transform: translateY(0);
   opacity: 1;
 }
 
-.toast-success { background: var(--success); }
-.toast-error   { background: var(--error); }
-.toast-warning { background: #e65100; }
-.toast-info    { background: var(--primary); }
+.toast--success { background: var(--success); }
+.toast--error   { background: var(--error); }
+.toast--warning { background: #e65100; }
+.toast--info    { background: var(--primary); }
 
 /* ==========================================================================
    13. DIAGNOSTIC TABLE
@@ -728,7 +728,7 @@ dialog::backdrop {
 /* ==========================================================================
    15. DELETE BUTTON PATTERN
    ========================================================================== */
-button.btn-delete {
+button.btn--delete {
   display: block;
   width: 100%;
   box-sizing: border-box;
@@ -742,7 +742,7 @@ button.btn-delete {
   transition: all 0.2s;
 }
 
-button.btn-delete:hover {
+button.btn--delete:hover {
   background: var(--error);
   color: white;
 }
@@ -825,7 +825,7 @@ input[type="number"]::-webkit-inner-spin-button {
   justify-content: center;
   transition: opacity 0.3s ease;
 }
-.login-overlay.hidden {
+.login-overlay--hidden {
   display: none;
 }
 .login-card {
@@ -904,11 +904,11 @@ input[type="number"]::-webkit-inner-spin-button {
   font-size: 0.85em;
   font-weight: 500;
 }
-.badge-ok {
+.badge--ok {
   background: rgba(46, 125, 50, 0.12);
   color: var(--success);
 }
-.badge-warn {
+.badge--warn {
   background: rgba(249, 168, 37, 0.12);
   color: var(--warning);
 }
@@ -991,7 +991,7 @@ button.full-width {
   visibility: hidden;
   transition: opacity 0.3s ease, visibility 0.3s ease;
 }
-.reboot-overlay.visible {
+.reboot-overlay--visible {
   opacity: 1;
   visibility: visible;
 }

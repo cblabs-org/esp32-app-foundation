@@ -64,7 +64,7 @@ async function bootAndNavigateToOta(page: Page) {
   await page.locator('#bottom-nav [data-target="tab-system"]').click();
   await expect(page.locator('#pill-bar')).toBeVisible();
   await page.locator('#pill-bar .pill-btn[data-target="tab-ota"]').click();
-  await expect(page.locator('#tab-ota')).toHaveClass(/active/);
+  await expect(page.locator('#tab-ota')).toHaveClass(/tab-content--active/);
 }
 
 // ---------------------------------------------------------------------------

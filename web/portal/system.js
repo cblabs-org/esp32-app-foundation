@@ -253,7 +253,7 @@
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) {
       stopAutoRefresh();
-    } else if (refreshActive || document.getElementById('tab-status').classList.contains('active')) {
+    } else if (refreshActive || document.getElementById('tab-status').classList.contains('tab-content--active')) {
       startAutoRefresh();
     }
   });
@@ -345,7 +345,7 @@
   });
 
   // If the system tab is already active on load, start refresh
-  if (container.classList.contains('active')) {
+  if (container.classList.contains('tab-content--active')) {
     startAutoRefresh();
   }
 })();

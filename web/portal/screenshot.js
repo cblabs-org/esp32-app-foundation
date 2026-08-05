@@ -158,7 +158,7 @@
     colourPicker.value = hex;
     // Highlight matching preset if any
     container.querySelectorAll('.btn-ss-colour').forEach(b => {
-      b.classList.toggle('active', b.getAttribute('data-colour').toUpperCase() === hex.toUpperCase());
+      b.classList.toggle('btn-ss-colour--active', b.getAttribute('data-colour').toUpperCase() === hex.toUpperCase());
     });
     if (hasCapture) captureScreenshot();
   }

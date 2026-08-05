@@ -30,7 +30,7 @@ Adopt BEM (`block--modifier`) as the CSS naming convention for the portal design
 
 ### ADR
 
-- [ ] Create `docs/developer/adr/adr-css-naming-convention.md` with:
+- [x] Create `docs/developer/adr/adr-css-naming-convention.md` with:
   - **Status:** Accepted
   - **Context:** `app.css` has 76 classes across 3+ naming conventions (hyphen-suffix, compound/state, prefixed components). RFC #67 proposes adding 18 new classes. Without a convention, a 4th style would be introduced.
   - **Decision:** Adopt BEM (`block--modifier`) for all CSS classes going forward. Migrate existing non-conforming classes. Element selectors (`article`, `dialog`, `button`) are exempt (they are element resets, not class conventions). Prefixed component names (`.status-badge`, `.info-row`) are already BEM-compatible block names and stay as-is.
@@ -41,31 +41,31 @@ Adopt BEM (`block--modifier`) as the CSS naming convention for the portal design
 Rename the following classes. For each, update **both** the CSS definition and **every** JS/HTML reference:
 
 **Hyphen-suffix → BEM modifier:**
-- [ ] `.badge-ok` → `.badge--ok` (L907)
-- [ ] `.badge-warn` → `.badge--warn` (L911)
-- [ ] `.rag-green` → `.rag--green` (L639)
-- [ ] `.rag-amber` → `.rag--amber` (L640)
-- [ ] `.rag-red` → `.rag--red` (L641)
-- [ ] `.toast-success` → `.toast--success` (L678)
-- [ ] `.toast-error` → `.toast--error` (L679)
-- [ ] `.toast-warning` → `.toast--warning` (L680)
-- [ ] `.toast-info` → `.toast--info` (L681)
-- [ ] `.toast-visible` → `.toast--visible` (L673)
-- [ ] `.btn-delete` → `.btn--delete` (L731)
+- [x] `.badge-ok` → `.badge--ok` (L907)
+- [x] `.badge-warn` → `.badge--warn` (L911)
+- [x] `.rag-green` → `.rag--green` (L639)
+- [x] `.rag-amber` → `.rag--amber` (L640)
+- [x] `.rag-red` → `.rag--red` (L641)
+- [x] `.toast-success` → `.toast--success` (L678)
+- [x] `.toast-error` → `.toast--error` (L679)
+- [x] `.toast-warning` → `.toast--warning` (L680)
+- [x] `.toast-info` → `.toast--info` (L681)
+- [x] `.toast-visible` → `.toast--visible` (L673)
+- [x] `.btn-delete` → `.btn--delete` (L731)
 
 **Compound/state → BEM modifier:**
-- [ ] `.dot.green` → `.dot--green` (L596)
-- [ ] `.dot.red` → `.dot--red` (L597)
-- [ ] `.dot.yellow` → `.dot--yellow` (L598)
-- [ ] `.dot.grey` → `.dot--grey` (L599)
-- [ ] `.dot.pulse` → `.dot--pulse` (L607)
-- [ ] `.tab-content.active` → `.tab-content--active` (L236)
-- [ ] `.tab-link.active` → `.tab-link--active` (L295)
-- [ ] `.pill-btn.active` → `.pill-btn--active` (L338)
-- [ ] `.btn-ss-colour.active` → `.btn-ss-colour--active` (L345)
-- [ ] `.theme-btn.active` → `.theme-btn--active` (L378)
-- [ ] `.login-overlay.hidden` → `.login-overlay--hidden` (L828)
-- [ ] `.reboot-overlay.visible` → `.reboot-overlay--visible` (L994)
+- [x] `.dot.green` → `.dot--green` (L596)
+- [x] `.dot.red` → `.dot--red` (L597)
+- [x] `.dot.yellow` → `.dot--yellow` (L598)
+- [x] `.dot.grey` → `.dot--grey` (L599)
+- [x] `.dot.pulse` → `.dot--pulse` (L607)
+- [x] `.tab-content.active` → `.tab-content--active` (L236)
+- [x] `.tab-link.active` → `.tab-link--active` (L295)
+- [x] `.pill-btn.active` → `.pill-btn--active` (L338)
+- [x] `.btn-ss-colour.active` → `.btn-ss-colour--active` (L345)
+- [x] `.theme-btn.active` → `.theme-btn--active` (L378)
+- [x] `.login-overlay.hidden` → `.login-overlay--hidden` (L828)
+- [x] `.reboot-overlay.visible` → `.reboot-overlay--visible` (L994)
 
 **Important:** For compound selectors like `.dot.green`, the CSS currently uses `.dot.green { ... }` which requires BOTH classes on the element (`<span class="dot green">`). The BEM migration changes this to a single class: `.dot--green { ... }` on `<span class="dot dot--green">`. This means:
 1. The CSS selector changes from `.dot.green` to `.dot--green`
@@ -75,10 +75,10 @@ Rename the following classes. For each, update **both** the CSS definition and *
 ### JS Reference Updates
 
 For each renamed class, `grep` across all `web/portal/*.js` files and update:
-- [ ] `classList.add()` / `classList.remove()` / `classList.toggle()` calls
-- [ ] `querySelector()` / `querySelectorAll()` selectors
-- [ ] String-interpolated class names in template literals (e.g., `class="${...}"`)
-- [ ] `className` property assignments
+- [x] `classList.add()` / `classList.remove()` / `classList.toggle()` calls
+- [x] `querySelector()` / `querySelectorAll()` selectors
+- [x] String-interpolated class names in template literals (e.g., `class="${...}"`)
+- [x] `className` property assignments
 
 Key files likely needing updates:
 - `app.js` — tab navigation (`.tab-link.active`, `.tab-content.active`, `.pill-btn.active`, `.toast-*`, `.reboot-overlay.visible`)
@@ -91,16 +91,16 @@ Key files likely needing updates:
 
 ### HTML Reference Updates
 
-- [ ] Update `web/portal/index.html` — check for any inline class references to renamed classes
+- [x] Update `web/portal/index.html` — check for any inline class references to renamed classes
 
 ### Documentation Updates
 
-- [ ] Update `docs/developer/extending-the-web-portal.md` — update any references to renamed classes in code samples
-- [ ] Update `.agents/skills/framework-expert/systems/web-portal/shared-utilities.md` — update documented class names for toast, reboot overlay, progress bar, etc.
+- [x] Update `docs/developer/extending-the-web-portal.md` — update any references to renamed classes in code samples
+- [x] Update `.agents/skills/framework-expert/systems/web-portal/shared-utilities.md` — update documented class names for toast, reboot overlay, progress bar, etc.
 
 ### Playwright Test Updates
 
-- [ ] Update `test/web/` — find and update any CSS selectors or class name assertions that reference renamed classes
+- [x] Update `test/web/` — find and update any CSS selectors or class name assertions that reference renamed classes
 
 ## Verification Requirement
 
@@ -108,3 +108,12 @@ Key files likely needing updates:
 2. **Playwright tests:** Run the full Playwright test suite (if configured) and report results.
 3. **Build check:** Confirm the portal builder/gzip step still succeeds (if applicable).
 4. **CRITICAL:** Before distilling or committing, ask the user if they are happy with the changes. Only after approval, invoke the `@distillery` skill.
+
+---
+
+## Status Log
+
+| Date | Status | Details |
+|---|---|---|
+| 2026-08-05 | ✅ **Completed & Validated** | Adopted BEM naming convention ADR (`adr-css-naming-convention.md`). Migrated ~24 legacy classes in `app.css` and updated all HTML, JS, and Playwright test references (`70/70 passed`). User approved implementation and distilled memory paging artifacts to `.agents/skills/principal-architect-workspace/pr-55-portal-design-system/wo1-naming-convention/`. |
+

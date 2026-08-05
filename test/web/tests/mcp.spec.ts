@@ -88,7 +88,7 @@ async function bootAndNavigateToMcp(
   await page.locator('#bottom-nav [data-target="tab-system"]').click();
   await expect(page.locator('#pill-bar')).toBeVisible();
   await page.locator('#pill-bar .pill-btn[data-target="tab-mcp"]').click();
-  await expect(page.locator('#tab-mcp')).toHaveClass(/active/);
+  await expect(page.locator('#tab-mcp')).toHaveClass(/tab-content--active/);
 }
 
 // ---------------------------------------------------------------------------

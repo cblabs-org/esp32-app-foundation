@@ -14,7 +14,7 @@
   // =========================================================================
 
   var overlayHTML =
-    '<div id="login-overlay" class="login-overlay hidden">' +
+    '<div id="login-overlay" class="login-overlay login-overlay--hidden">' +
       '<div class="login-card">' +
         '<div class="login-icon">' +
           '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
@@ -75,7 +75,7 @@
 
       var overlay = document.getElementById('login-overlay');
       if (overlay) {
-        overlay.classList.remove('hidden');
+        overlay.classList.remove('login-overlay--hidden');
         var pwField = document.getElementById('login-password');
         if (pwField) { pwField.value = ''; pwField.focus(); }
         var errDiv = document.getElementById('login-error');
@@ -88,7 +88,7 @@
 
   function hideLoginOverlay() {
     var overlay = document.getElementById('login-overlay');
-    if (overlay) overlay.classList.add('hidden');
+    if (overlay) overlay.classList.add('login-overlay--hidden');
   }
 
   /**
@@ -260,7 +260,7 @@
           'Manage your device access credentials.' +
         '</p>' +
         '<div class="status-badge" style="margin-bottom:0.75rem; font-size:0.85rem; display:flex; align-items:center;">' +
-          '<span class="dot green" style="margin-right:0.5rem;"></span>' +
+          '<span class="dot dot--green" style="margin-right:0.5rem;"></span>' +
           '<span>Password Set</span>' +
         '</div>' +
         '<h4 style="font-size:0.85rem; font-weight:600; margin:0 0 0.5rem 0;">Change Password</h4>' +
@@ -328,10 +328,10 @@
     // Cert status badge & controls
     html += '<div class="status-badge" style="margin-bottom:0.75rem; font-size:0.85rem; display:flex; align-items:center;">';
     if (state.certPresent) {
-      html += '<span class="dot green" style="margin-right:0.5rem;"></span>' +
+      html += '<span class="dot dot--green" style="margin-right:0.5rem;"></span>' +
               '<span>Certificate Present &amp; Active</span>';
     } else {
-      html += '<span class="dot yellow" style="margin-right:0.5rem;"></span>' +
+      html += '<span class="dot dot--yellow" style="margin-right:0.5rem;"></span>' +
               '<span>No Certificate Generated</span>';
     }
     html += '</div>';
