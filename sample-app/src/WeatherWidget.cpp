@@ -59,51 +59,56 @@ void WeatherWidget::draw(U8G2& display, int x, int y, const std::string& tempStr
     const char* condDisplay = condStr.empty() ? "No Data" : condStr.c_str();
 
     // --- Compute layout centred on the display ---
-    // Queries display dimensions at runtime so the layout adapts to any
-    // display size (F20), rather than hard-coding for 256×64.
     const int dw = display.getDisplayWidth();
     const int dh = display.getDisplayHeight();
 
-    // Icon metrics: open_iconic_weather_4x glyphs are 32×32
-    const int iconW = 32;
-    const int iconH = 32;
-    const int gap   = 8; // horizontal gap between icon and text column
-
-    // Measure text widths for centring
+    // Measure text metrics
     display.setFont(u8g2_font_helvB14_tf);
     int tempTextW = display.getUTF8Width(text);
-    int tempAscent = display.getMaxCharHeight();
+    int tempAscent = display.getAscent();
+    int tempDescent = display.getDescent();
 
     display.setFont(u8g2_font_helvR08_tf);
     int condTextW  = display.getUTF8Width(condDisplay);
-    int condAscent = display.getMaxCharHeight();
+    int condAscent = display.getAscent();
+    int condDescent = display.getDescent();
 
-    // Text column width is the wider of the two text lines
+    // Measure icon metrics
+    display.setFont(u8g2_font_open_iconic_weather_4x_t);
+    int iconAscent = display.getAscent();
+    int iconDescent = display.getDescent();
+    int iconH = iconAscent - iconDescent;
+    int iconW = 32; // open_iconic 4x glyphs are fixed 32px wide
+
+    // Horizontal Layout
+    int textGap = 4; // Vertical gap between text lines
+    int horizGap = 12; // Gap between icon and text column
     int textColW = (tempTextW > condTextW) ? tempTextW : condTextW;
-
-    // Total content block width and starting X for horizontal centring
-    int totalW = iconW + gap + textColW;
+    int totalW = iconW + horizGap + textColW;
     int startX = (dw - totalW) / 2;
+    int textX = startX + iconW + horizGap;
 
-    // Vertical centring: treat icon height as the content height (text sits
-    // within the icon's vertical span)
-    int startY = (dh - iconH) / 2;
+    // Vertical Layout - Center everything on the display's vertical midpoint
+    int centerY = dh / 2;
+
+    // Center the icon vertically
+    int iconY = centerY - (iconH / 2) + iconAscent; // Icon baseline
+
+    // Center the text block vertically
+    int textBlockH = (tempAscent - tempDescent) + textGap + (condAscent - condDescent);
+    int textTopY = centerY - (textBlockH / 2);
+    int tempY = textTopY + tempAscent; // Temp baseline
+    int condY = tempY - tempDescent + textGap + condAscent; // Cond baseline
 
     // --- Draw icon ---
-    // drawGlyph y coordinate is the baseline; for a 32px glyph the baseline
-    // is at startY + iconH.
     display.setFont(u8g2_font_open_iconic_weather_4x_t);
-    display.drawGlyph(startX, startY + iconH, icon);
+    display.drawGlyph(startX, iconY, icon);
 
-    // --- Draw temperature text (UTF-8 aware for the ° symbol) ---
-    int textX = startX + iconW + gap;
-    // Vertically: place the temperature in the upper portion of the icon span
-    int tempY = startY + (iconH / 2) - 2;
+    // --- Draw temperature text ---
     display.setFont(u8g2_font_helvB14_tf);
     display.drawUTF8(textX, tempY, text);
 
-    // --- Draw condition text below the temperature ---
-    int condY = tempY + condAscent + 4;
+    // --- Draw condition text ---
     display.setFont(u8g2_font_helvR08_tf);
     display.drawUTF8(textX, condY, condDisplay);
 }
