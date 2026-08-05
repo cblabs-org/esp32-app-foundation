@@ -41,8 +41,12 @@ Implement the shared CSS component library and JS utility enhancements proposed 
 |---|---|
 | 2026-08-04 | RFC #67 filed by departures-board migration audit |
 | 2026-08-04 | 3-reviewer analysis complete (owner + agent + design architect) |
-| 2026-08-05 | PA decomposition drafted — 4 WOs |
-| — | **Awaiting human approval of decomposition** |
+| 2026-08-05 | **User approved decomposition** — "please proceed". Open Qs default: Q1 no snapshot tests, Q2 evaluate in WO2, Q3 option C |
+| 2026-08-05 | WO1 ✅ — BEM ADR + 24 class renames, 70/70 Playwright tests |
+| 2026-08-05 | WO2 ✅ — `.card`, `.alert`, ApiQueue priority lanes |
+| 2026-08-05 | WO3 ✅ — 8 CSS primitives + `renderTerminalLog` utility |
+| 2026-08-05 | WO4 ✅ — Card grid, dot sizing, badge, signal bars promotion, 70/70 tests |
+| 2026-08-05 | **All 4 WOs complete** — stack on `pr-55-portal-design-system/wo4-consolidation` |
 
 ---
 
@@ -53,7 +57,7 @@ Implement the shared CSS component library and JS utility enhancements proposed 
 | **[x] [wo1-naming-convention](wo1-naming-convention/WORKORDER.md)** | BEM ADR + legacy class migration | standard | none (bases on `main`) | ✅ Complete — 70/70 tests |
 | **[x] [wo2-debt-repair](wo2-debt-repair/WORKORDER.md)** | Formalize `.card`, `.alert`, ApiQueue priority lanes | architect | wo1 | ✅ Complete |
 | **[x] [wo3-new-primitives](wo3-new-primitives/WORKORDER.md)** | Core new components (#1, #8, #9+U3, #12, #14, #16, #17, #18) | standard | wo2 | ✅ Complete |
-| **[ ] [wo4-consolidation](wo4-consolidation/WORKORDER.md)** | Card grid, dot, badge, list-item, signal bars (#2–7, #11, #15+U2) | standard | wo3 | 📋 Planned |
+| **[x] [wo4-consolidation](wo4-consolidation/WORKORDER.md)** | Card grid, dot, badge, list-item, signal bars (#2–7, #11, #15+U2) | standard | wo3 | ✅ Complete (70/70 tests) |
 
 ### Stacking topology
 

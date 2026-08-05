@@ -126,6 +126,47 @@ article[aria-disabled="true"],
   filter: grayscale(30%);
 }
 
+.card--interactive {
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.card--interactive:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+[data-theme="dark"] .card--interactive:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.card--empty {
+  border: 2px dashed var(--border);
+  background: transparent;
+  opacity: 0.6;
+  text-align: center;
+  cursor: pointer;
+  transition: opacity 0.15s, border-color 0.15s;
+}
+.card--empty:hover {
+  opacity: 1;
+  border-color: var(--primary);
+}
+
+.card-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: 1fr;
+}
+
+.card-grid--2col {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+@media (max-width: 400px) {
+  .card-grid--2col {
+    grid-template-columns: 1fr;
+  }
+}
+
 article header {
   font-weight: 700;
   font-size: 1.1rem;
@@ -616,15 +657,21 @@ article.info-drawer > details > .info-drawer-content {
 }
 
 .dot {
-  width: 10px;
-  height: 10px;
+  width: var(--dot-size, 10px);
+  height: var(--dot-size, 10px);
   border-radius: 50%;
 }
 
-.dot--green  { background: var(--success); box-shadow: 0 0 8px var(--success); }
-.dot--red    { background: var(--error);   box-shadow: 0 0 8px var(--error); }
-.dot--yellow { background: var(--warning); box-shadow: 0 0 8px var(--warning); }
-.dot--grey   { background: #888;           box-shadow: 0 0 4px #888; }
+.dot--green  { background: var(--success); box-shadow: 0 0 calc(var(--dot-size, 10px) * 0.8) var(--success); }
+.dot--red    { background: var(--error);   box-shadow: 0 0 calc(var(--dot-size, 10px) * 0.8) var(--error); }
+.dot--yellow { background: var(--warning); box-shadow: 0 0 calc(var(--dot-size, 10px) * 0.8) var(--warning); }
+.dot--grey   { background: #888;           box-shadow: 0 0 calc(var(--dot-size, 10px) * 0.4) #888; }
+
+.signal-bars {
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+}
 
 @keyframes pulse {
   0% { transform: scale(1); opacity: 1; }
@@ -1033,6 +1080,18 @@ input[type="number"]::-webkit-inner-spin-button {
 .badge--warn {
   background: rgba(249, 168, 37, 0.12);
   color: var(--warning);
+}
+.badge--subtle {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0.15rem 0.5rem;
+  background: rgba(var(--primary-rgb, 33, 150, 243), 0.1);
+  color: var(--primary);
+  border: none;
+}
+[data-theme="dark"] .badge--subtle {
+  background: rgba(var(--primary-rgb, 33, 150, 243), 0.2);
 }
 .token-display {
   display: flex;

@@ -8,39 +8,6 @@
   // Utility Helpers (local to this fragment until utils.js ships in WO4)
   // ==========================================================================
 
-  /**
-   * @brief Convert RSSI dBm to a 0–4 bars scale.
-   * @param {number} rssi - RSSI value in dBm.
-   * @returns {number} 0–4 bar level.
-   */
-  function rssiToBars(rssi) {
-    if (rssi >= -50) return 4;
-    if (rssi >= -60) return 3;
-    if (rssi >= -70) return 2;
-    if (rssi >= -80) return 1;
-    return 0;
-  }
-
-  /**
-   * @brief Render SVG signal bars icon for the given bar level.
-   * @param {number} bars - Number of bars (0–4).
-   * @returns {string} SVG markup.
-   */
-  function signalBarsIcon(bars) {
-    const barData = [
-      { x: 1, h: 4, y: 12 },
-      { x: 5, h: 7, y: 9 },
-      { x: 9, h: 10, y: 6 },
-      { x: 13, h: 13, y: 3 }
-    ];
-    let svg = '<svg width="18" height="16" viewBox="0 0 17 16" style="vertical-align:middle">';
-    barData.forEach((b, i) => {
-      const fill = i < bars ? 'var(--primary, #2196F3)' : 'var(--border, #dee2e6)';
-      svg += `<rect x="${b.x}" y="${b.y}" width="3" height="${b.h}" rx="1" fill="${fill}"/>`;
-    });
-    svg += '</svg>';
-    return svg;
-  }
 
   /**
    * @brief Render an RSSI descriptor string.
@@ -232,8 +199,7 @@
 
       // --- Signal bars (STA only) ---
       if (data.rssi !== undefined) {
-        const bars = rssiToBars(data.rssi);
-        statusSignal.innerHTML = signalBarsIcon(bars) +
+        statusSignal.innerHTML = window.renderSignalBars(data.rssi) +
           ` <span style="font-size:0.75rem;color:var(--text-muted)">${data.rssi} dBm</span>`;
       } else {
         statusSignal.innerHTML = '';
@@ -357,7 +323,6 @@
     }
 
     networkList.innerHTML = networks.map((net, i) => {
-      const bars = rssiToBars(net.rssi);
       const lockIcon = net.secure
         ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;opacity:0.6;"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0110 0v4"></path></svg>'
         : '';
@@ -369,7 +334,7 @@
         ${isActive ? 'background:rgba(33,150,243,0.08);' : ''}
       ">
         <span style="flex:1; font-size:0.85rem; font-weight:${isActive ? '700' : '500'};">${net.ssid}</span>
-        ${signalBarsIcon(bars)}
+        ${window.renderSignalBars(net.rssi)}
         ${lockIcon}
         <span style="font-size:0.7rem; color:var(--text-muted); min-width:45px; text-align:right;">${net.rssi} dB</span>
       </div>`;

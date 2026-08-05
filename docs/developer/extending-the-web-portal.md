@@ -224,9 +224,53 @@ Validation feedback message displayed below input controls. Modifiers: `.field-f
 ```
 - **A11y:** Input element MUST link to the feedback element via `aria-describedby="<id>"`.
 
-### Compact Row (`.compact-row`)
-Flexbox alignment container for inline input and action button pairs.
+### Card Modifiers & Grid System (`.card--interactive`, `.card--empty`, `.card-grid`, `.card-grid--2col`)
+Grid layout and modifier variants for card containers.
 ```html
+<!-- Interactive Card Grid (2-column on desktop, 1-column on mobile <400px) -->
+<div class="card-grid card-grid--2col">
+    <div class="card card--interactive" role="button" tabindex="0">
+        <h3>Device Status</h3>
+        <p>Click to inspect telemetry.</p>
+    </div>
+    <div class="card card--empty" role="button" aria-label="Add new item" tabindex="0">
+        <p>+ Add New Sensor</p>
+    </div>
+</div>
+```
+- **A11y:** Interactive cards MUST use `role="button"` or be wrapped in `<a>`/`<button>` elements with keyboard accessibility (`tabindex="0"` if non-button). Empty state cards acting as "add new" MUST include `aria-label="Add new item"`.
+
+### Status Dot Sizing (`--dot-size`)
+Customizable status dot indicator. Size can be overridden contextually via CSS custom property `--dot-size`.
+```html
+<!-- Default 10px dot -->
+<span class="dot dot--green"></span>
+
+<!-- Small 8px dot inside a container -->
+<div style="--dot-size: 8px;">
+    <span class="dot dot--yellow"></span>
+</div>
+```
+
+### Subtle Badge Modifier (`.badge--subtle`)
+Subtle tinted background badge for minor tags and status metadata.
+```html
+<span class="badge badge--subtle">Experimental</span>
+```
+
+### Info Row vs Compact Row (`.info-row` vs `.compact-row`)
+Row containers are semantically distinct based on data display vs input interactions:
+- **`.info-row`** — Read-only key-value data display (label left, value right, bottom divider).
+- **`.compact-row`** — Interactive input and button pair (label + input left, button right).
+- *Note:* If a third variant for clickable list items is needed (e.g. WiFi scan results), use `.card--interactive` inside a `.card-grid`.
+```html
+<!-- Read-only data display -->
+<div class="info-row">
+    <span>IP Address</span>
+    <span class="text-muted">192.168.1.100</span>
+</div>
+
+<!-- Interactive input + action pair -->
 <div class="compact-row">
     <label>
         API Key
@@ -354,6 +398,7 @@ The framework provides these global functions in `utils.js` (loaded before all t
 - **`window.apiFetch(url, options)`** — Serialised fetch wrapper. **Always use this instead of raw `fetch()`** — it queues requests to protect ESP32 socket pools.
 - **`window.apiFetch.enqueueTask(taskFn, delayMs)`** — Enqueue a background task in the low-priority lane, preventing it from blocking UI API requests.
 - **`window.renderTerminalLog(containerId)`** — Initialize a terminal log viewer inside a container element (`role="log"`, `aria-live="polite"`). Returns `{ append(line), clear(), scrollToBottom() }`.
+- **`window.renderSignalBars(rssi)`** — Generates an inline SVG signal strength icon (0–4 bars) wrapped in a `<span class="signal-bars" aria-label="Signal: N of 4 bars">` container.
 
 ### Decision Rule
 

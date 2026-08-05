@@ -193,6 +193,22 @@ Converts an RSSI value in dBm to a 0–4 bar level for signal strength display.
 const bars = window.rssiToBars(data.rssi);
 ```
 
+### `window.renderSignalBars(rssi)`
+
+Renders an inline SVG signal strength icon (0–4 bars) wrapped in a `<span class="signal-bars">` container.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `rssi` | `number` | Yes | RSSI value in dBm |
+
+**Returns:** `string` — HTML string ready for `innerHTML` injection.
+
+**A11y:** Wrapped container `<span>` includes `aria-label="Signal: N of 4 bars"` for screen readers.
+
+```javascript
+statusSignal.innerHTML = window.renderSignalBars(data.rssi);
+```
+
 ### `window.renderProgressBar(label, value, max, unit)`
 
 Generates a RAG-coloured (Red/Amber/Green) progress bar as an HTML string.
@@ -250,6 +266,24 @@ Use `.alert` to display inline feedback boxes. Available modifier classes are:
 <div class="alert alert--info" role="status">
   Please configure the device before proceeding.
 </div>
+```
+
+### `.dot` Component
+
+Status indicator dot. Custom property `--dot-size` (default `10px`) allows contextual size adjustments. Available modifiers: `.dot--green`, `.dot--red`, `.dot--yellow`, `.dot--grey`, `.dot--pulse`.
+
+```html
+<span class="dot dot--green"></span>
+<div style="--dot-size: 8px;"><span class="dot dot--yellow"></span></div>
+```
+
+### `.badge` Component
+
+Inline badge for status display. Modifiers: `.badge--ok`, `.badge--warn`, `.badge--subtle` (tinted background for minor tags).
+
+```html
+<span class="badge badge--ok">Connected</span>
+<span class="badge badge--subtle">Experimental</span>
 ```
 
 ## Utility

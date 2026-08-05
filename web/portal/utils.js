@@ -129,6 +129,28 @@
   };
 
   /**
+   * @brief Render inline SVG signal bars icon for a given RSSI value.
+   * @param {number} rssi - RSSI value in dBm.
+   * @returns {string} HTML string containing the signal bars SVG inside a container <span>.
+   */
+  window.renderSignalBars = function(rssi) {
+    var bars = window.rssiToBars(rssi);
+    var barData = [
+      { x: 1, h: 4, y: 12 },
+      { x: 5, h: 7, y: 9 },
+      { x: 9, h: 10, y: 6 },
+      { x: 13, h: 13, y: 3 }
+    ];
+    var svg = '<svg width="18" height="16" viewBox="0 0 17 16" style="vertical-align:middle">';
+    barData.forEach(function(b, i) {
+      var fill = i < bars ? 'var(--primary, #2196F3)' : 'var(--border, #dee2e6)';
+      svg += '<rect x="' + b.x + '" y="' + b.y + '" width="3" height="' + b.h + '" rx="1" fill="' + fill + '"/>';
+    });
+    svg += '</svg>';
+    return '<span class="signal-bars" aria-label="Signal: ' + bars + ' of 4 bars">' + svg + '</span>';
+  };
+
+  /**
    * @brief Escape HTML special characters to prevent XSS.
    * @param {string} str - Raw string.
    * @returns {string} Escaped string safe for innerHTML.
