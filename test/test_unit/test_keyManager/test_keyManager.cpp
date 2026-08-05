@@ -238,7 +238,41 @@ TEST_F(KeyManagerTest, MetadataPersistsAcrossInstances) {
     EXPECT_TRUE(keys[0].exclusive);
 }
 
+// =============================================================================
+// SystemLocked & getOwner Tests
+// =============================================================================
+
+TEST_F(KeyManagerTest, SystemLockedKey_StorageAndQuery) {
+    EXPECT_TRUE(keyManager.addKey("wifi_password", "pass123", "WiFi", true, true));
+
+    EXPECT_TRUE(keyManager.isExclusive("wifi_password"));
+    EXPECT_TRUE(keyManager.isSystemLocked("wifi_password"));
+    EXPECT_EQ(keyManager.getOwner("wifi_password"), "WiFi");
+
+    auto keys = keyManager.listKeysWithMetadata();
+    ASSERT_EQ(keys.size(), 1u);
+    EXPECT_TRUE(keys[0].systemLocked);
+    EXPECT_TRUE(keys[0].exclusive);
+    EXPECT_EQ(keys[0].managedBy, "WiFi");
+}
+
+TEST_F(KeyManagerTest, NonSystemLockedKey_IsSystemLockedReturnsFalse) {
+    EXPECT_TRUE(keyManager.addKey("app_key", "val123", "App", true, false));
+
+    EXPECT_TRUE(keyManager.isExclusive("app_key"));
+    EXPECT_FALSE(keyManager.isSystemLocked("app_key"));
+    EXPECT_EQ(keyManager.getOwner("app_key"), "App");
+}
+
+TEST_F(KeyManagerTest, GetOwner_UnmanagedOrNonExistent) {
+    EXPECT_TRUE(keyManager.addKey("unmanaged", "val"));
+    EXPECT_EQ(keyManager.getOwner("unmanaged"), "");
+    EXPECT_EQ(keyManager.getOwner("does_not_exist"), "");
+    EXPECT_FALSE(keyManager.isSystemLocked("does_not_exist"));
+}
+
 int main(int argc, char** argv) {
     ::testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();
 }
+

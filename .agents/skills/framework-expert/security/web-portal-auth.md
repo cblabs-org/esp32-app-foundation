@@ -96,6 +96,27 @@ Certificate details:
 
 > **Cookie security:** The `Secure` flag on session cookies is conditioned on `isTlsEnabled() && hasCert()` (not `isAuthEnabled()`). This ensures the `Secure` attribute is only set when the connection is actually served over HTTPS.
 
+## Operational Safety: Changing Credentials
+
+Changing any device credential — the portal password, the WiFi network, or an
+OTA/PAT bearer token — can lock an agent (or the user) out of the running
+device. A device with an unknown portal password, or one that has silently
+dropped off the network after a WiFi change, may only be recoverable by a
+physical reflash. Before changing a credential, always:
+
+1. **Establish an independent recovery path first, and verify it works.** The
+   serial/USB MCP transport is the canonical fallback: it is intentionally
+   unguarded by portal auth (physical access is trusted — see *Auth for MCP
+   Server* above), so it keeps working even when the portal password is unknown
+   or WiFi is down. Confirm serial MCP access *before* applying the change, not
+   after discovering you are locked out.
+2. **Tell the human the new credential and the recovery path before applying
+   it** — never change a credential silently.
+
+For WiFi specifically, prefer a change path that keeps the device reachable
+(e.g. the AP-mode fallback) rather than committing a single new SSID that, if
+wrong, strands the device on an unreachable network.
+
 ## See Also
 - [Security Overview](overview.md) — Layered security model
 - [Credential Storage](credential-storage.md) — DeviceCrypto and KeyManager backing store
