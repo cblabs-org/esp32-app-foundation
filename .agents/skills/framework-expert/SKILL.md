@@ -85,6 +85,7 @@ This skill uses a progressive disclosure model. Based on your query, load and re
 | **Registration System** (registerModule, compact-and-lock) | `references/registration.md` |
 | **Build System** (PlatformIO, version injection, LittleFS) | `references/build-system.md` |
 | **Display System** (Carousel, custom boards, replacing U8G2) | `systems/display/` |
+| **Input System** (buttons, rotary encoders, gestures) | `systems/input/` |
 | **Config System** (Persistence, FrameworkConfig, ConfigManifest) | `systems/config/` |
 | **Event Bus** (Topics, pub/sub, custom topics) | `systems/event-bus/` |
 | **Web Portal** (SPA, routes, HTML/JS fragments, security) | `systems/web-portal/` |
@@ -131,6 +132,9 @@ These references are optimized distillations for AI agents. If the human develop
   "boot sequence", "LittleFS layout".
 - **Display**: "display board", "carousel", "screensaver", "replace the display",
   "use a TFT", "different screen", "e-ink display".
+- **Input**: "button", "ButtonModule", "WITH_BUTTONS", "rotary encoder",
+  "EncoderModule", "WITH_ENCODER", "PCNT", "quadrature", "gesture",
+  "button.click", "encoder.rotate", "iot_button", "consumeDelta".
 - **Coding patterns / architecture**: "hierarchical object model", "sub-object API",
   "Domain Meaning Test", "orchestrator anti-pattern", "service module",
   "module vs library", "global state", "dependency injection", "SOLID principles".
