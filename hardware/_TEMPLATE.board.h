@@ -17,23 +17,23 @@
  * │                         <BOARD NAME HERE>                               │
  * │                         (Top View / Pinout)                             │
  * │                                                                         │
- * │    [Signal / Label]  [GPIO#] ┌───────────┐ [GPIO#]  [Signal / Label]    │
- * │    ─────────────────────────┤           ├─────────────────────────    │
- * │    3V3 Power         [ 3V3 ]│ (1)   (30)│[ GND ]   Ground             │
- * │    EN / Reset        [ EN  ]│ (2)   (29)│[ G23 ]   SPI MOSI           │
- * │    Sensor VP         [ G36 ]│ (3)   (28)│[ G22 ]   I2C SCL            │
- * │    Sensor VN         [ G39 ]│ (4)   (27)│[ G1  ]   TXD0               │
- * │    Clean GP          [ G34 ]│ (5)   (26)│[ G3  ]   RXD0               │
- * │    Clean GP          [ G35 ]│ (6)   (25)│[ G21 ]   I2C SDA            │
- * │    Clean GP          [ G32 ]│ (7)   (24)│[ G19 ]   SPI MISO           │
- * │    Clean GP          [ G33 ]│ (8)   (23)│[ G18 ]   SPI SCK            │
- * │    DAC / Clean       [ G25 ]│ (9)   (22)│[ G5  ]   Display CS         │
- * │    DAC / Clean       [ G26 ]│ (10)  (21)│[ G17 ]   UART2 TX           │
- * │    Clean GP          [ G27 ]│ (11)  (20)│[ G16 ]   UART2 RX           │
- * │    Touch / GP        [ G14 ]│ (12)  (19)│[ G4  ]   Display DC         │
- * │    Touch / GP        [ G12 ]│ (13)  (18)│[ G0  ]   Strapping / Boot   │
- * │    Ground            [ GND ]│ (14)  (17)│[ G2  ]   Strapping / LED    │
- * │    5V Power          [ 5V  ]│ (15)  (16)│[ G15 ]   Strapping / JTAG   │
+ * │    [Signal / Label] [GPIO#] ┌───────────┐ [GPIO#]  [Signal / Label]     │
+ * │    ─────────────────────────┤           ├─────────────────────────      │
+ * │    3V3 Power         [ 3V3 ]│ (1)   (30)│[ GND ]   Ground               │
+ * │    EN / Reset        [ EN  ]│ (2)   (29)│[ G23 ]   SPI MOSI             │
+ * │    Sensor VP         [ G36 ]│ (3)   (28)│[ G22 ]   I2C SCL              │
+ * │    Sensor VN         [ G39 ]│ (4)   (27)│[ G1  ]   TXD0                 │
+ * │    Clean GP          [ G34 ]│ (5)   (26)│[ G3  ]   RXD0                 │
+ * │    Clean GP          [ G35 ]│ (6)   (25)│[ G21 ]   I2C SDA              │
+ * │    Clean GP          [ G32 ]│ (7)   (24)│[ G19 ]   SPI MISO             │
+ * │    Clean GP          [ G33 ]│ (8)   (23)│[ G18 ]   SPI SCK              │
+ * │    DAC / Clean       [ G25 ]│ (9)   (22)│[ G5  ]   Display CS           │
+ * │    DAC / Clean       [ G26 ]│ (10)  (21)│[ G17 ]   UART2 TX             │
+ * │    Clean GP          [ G27 ]│ (11)  (20)│[ G16 ]   UART2 RX             │
+ * │    Touch / GP        [ G14 ]│ (12)  (19)│[ G4  ]   Display DC           │
+ * │    Touch / GP        [ G12 ]│ (13)  (18)│[ G0  ]   Strapping / Boot     │
+ * │    Ground            [ GND ]│ (14)  (17)│[ G2  ]   Strapping / LED      │
+ * │    5V Power          [ 5V  ]│ (15)  (16)│[ G15 ]   Strapping / JTAG     │
  * │                             └───────────┘                               │
  * └─────────────────────────────────────────────────────────────────────────┘
  *
@@ -207,5 +207,28 @@ constexpr int8_t PIN_AUX_I2C_SCL  = 39;
 //       .bits = board_logo_bits
 //   };
 //   // In main.cpp: U8G2DisplayModule displayModule(&BOARD_BRANDING, &BOARD_BOOT_LOGO);
+
+// ── Encoder configuration (WITH_ENCODER) ──────────────────────────────────────
+// When WITH_ENCODER is enabled, define your rotary encoder hardware descriptors.
+// Each BoardEncoder specifies the quadrature A/B pins, steps-per-detent for the
+// physical encoder model, and optional acceleration parameters.
+//
+// Example (EC11 encoder on GPIO 45/42, 2 steps per detent):
+//
+//   #ifdef WITH_ENCODER
+//   #include "EncoderConfig.h"
+//   static constexpr BoardEncoder BOARD_ENCODERS[] = {
+//       {
+//           .id = "main",
+//           .pinA = 45,
+//           .pinB = 42,
+//           .stepsPerDetent = 2,
+//           .reversed = false,
+//           .accel = { .enabled = true, .deadZoneMs = 200, .shortCutoffMs = 30, .maxMultiplier = 10 },
+//       },
+//   };
+//   static constexpr size_t BOARD_ENCODER_COUNT = sizeof(BOARD_ENCODERS) / sizeof(BOARD_ENCODERS[0]);
+//   #endif // WITH_ENCODER
+
 
 

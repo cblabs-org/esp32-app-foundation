@@ -83,3 +83,11 @@ constexpr size_t BOARD_BUTTON_COUNT = 0;
 #define BOARD_BUTTON_COUNT BOARD_BUTTON_COUNT
 #endif
 
+#ifdef WITH_ENCODER
+#include "EncoderConfig.h"
+// No encoder hardware on native — empty descriptor
+static constexpr BoardEncoder BOARD_ENCODERS[] = {};
+static constexpr size_t BOARD_ENCODER_COUNT = 0;
+#endif // WITH_ENCODER
+
+

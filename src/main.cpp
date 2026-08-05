@@ -54,6 +54,18 @@ static TimeConfigGate timeGate{timeManager};
 static MCPServer mcpServer;
 #endif
 
+#if defined(WITH_BUTTON) || defined(WITH_BUTTONS)
+#include "ButtonModule.hpp"
+#include "board.h"
+static ButtonModule buttonModule;
+#endif
+
+#ifdef WITH_ENCODER
+#include "EncoderModule.hpp"
+#include "board.h"
+static EncoderModule encoderModule;
+#endif
+
 // --- Display (Ring-2 Optional) ---
 #if defined(WITH_DISPLAY_LVGL) || defined(WITH_DISPLAY_U8G2)
 #include <types/BootBranding.h>
@@ -115,6 +127,38 @@ void setup() {
 
 #ifdef WITH_MCP
     app.registerModule(&mcpServer);
+#endif
+
+#if defined(WITH_BUTTON) || defined(WITH_BUTTONS)
+    for (size_t i = 0; i < BOARD_BUTTON_COUNT; i++) {
+        buttonModule.addButton(BOARD_BUTTONS[i]);
+    }
+    buttonModule.begin(app);
+    app.registerModule(&buttonModule);
+#endif
+
+#ifdef WITH_ENCODER
+    for (size_t i = 0; i < BOARD_ENCODER_COUNT; i++) {
+        encoderModule.addEncoder(BOARD_ENCODERS[i]);
+    }
+    encoderModule.begin(app);
+    app.registerModule(&encoderModule);
+#endif
+
+#ifdef WITH_DISPLAY_LVGL
+    displayAdapter.setInputModules(
+#ifdef WITH_ENCODER
+        &encoderModule,
+#else
+        nullptr,
+#endif
+#if defined(WITH_BUTTON) || defined(WITH_BUTTONS)
+        &buttonModule,
+#else
+        nullptr,
+#endif
+        &app.getEventBus()
+    );
 #endif
 
     if (!app.begin(config)) {
