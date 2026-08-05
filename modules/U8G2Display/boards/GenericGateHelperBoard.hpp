@@ -64,7 +64,7 @@ public:
     const char* getBoardName() const override;
 
 private:
-    char _gateName[32]  = "";   ///< Gate name for title display (max 31 chars + null)
-    char _helpText[64]  = "";   ///< Help text body (max 63 chars + null)
+    char _gateName[32]  = "";   ///< Gate name for title (max 31 chars + null). Framework gate names are short by convention.
+    char _helpText[128] = "";   ///< Help text body (max 127 chars + null — room for LVGL-width gates)
     char _deviceIP[16]  = "";   ///< Device IP address for footer URL
 };

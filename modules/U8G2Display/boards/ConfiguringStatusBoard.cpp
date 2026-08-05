@@ -80,6 +80,14 @@ void ConfiguringStatusBoard::setActiveGateStatus(GateActionStatus status) {
 }
 
 /**
+ * @brief Set the authoritative actionable gate name from the Application.
+ * @param gateName Gate name from AppConfiguringPayload::gateName (non-owning).
+ */
+void ConfiguringStatusBoard::setActionableGateName(const char* gateName) {
+    _actionableGateName = gateName;
+}
+
+/**
  * @brief Set network connection info for the footer display.
  * @param network  The WiFi network name (SSID) the device is connected to.
  * @param url      The device URL (e.g., "http://192.168.1.42").
@@ -126,37 +134,15 @@ void ConfiguringStatusBoard::render(U8G2& u8g2) {
         const int gateCount = static_cast<int>(_gates->size());
         int satisfiedCount = 0;
 
-        // --- Count satisfied gates and determine actionable gate ---
-        // We compute the actionable gate name from the gate list itself for
-        // the status rows. The _activeGateStatus from the payload controls
-        // the prefix character for the active row.
-        const char* actionableGateName = nullptr;
-
         for (int i = 0; i < gateCount; i++) {
-            const IConfigGate* gate = (*_gates)[i];
-            if (gate->isSatisfied()) {
+            if ((*_gates)[i]->isSatisfied()) {
                 satisfiedCount++;
-            } else if (actionableGateName == nullptr) {
-                // Check if this gate's dependencies are all satisfied
-                uint8_t depCount = 0;
-                const char* const* deps = gate->getDependencies(depCount);
-                bool depsOk = true;
-                for (uint8_t d = 0; d < depCount; d++) {
-                    bool found = false;
-                    for (int j = 0; j < gateCount; j++) {
-                        if (strcmp((*_gates)[j]->getGateName(), deps[d]) == 0) {
-                            if (!(*_gates)[j]->isSatisfied()) depsOk = false;
-                            found = true;
-                            break;
-                        }
-                    }
-                    if (!found || !depsOk) { depsOk = false; break; }
-                }
-                if (depsOk) {
-                    actionableGateName = gate->getGateName();
-                }
             }
         }
+
+        // Actionable gate name is authoritative — set by _onAppConfiguring
+        // from Application::getActionableGate(). No dependency walk needed (F3: SSOT).
+        const char* actionableGateName = _actionableGateName;
 
         // --- Increment animation frame for InProgress effect ---
         _animFrame++;

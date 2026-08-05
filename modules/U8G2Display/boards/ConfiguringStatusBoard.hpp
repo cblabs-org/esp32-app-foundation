@@ -82,6 +82,17 @@ public:
     void setActiveGateStatus(GateActionStatus status);
 
     /**
+     * @brief Set the authoritative actionable gate name from the Application.
+     *
+     * Called by U8G2DisplayModule::_onAppConfiguring() alongside
+     * setActiveGateStatus(). Eliminates the need for render() to
+     * re-derive the actionable gate by re-walking the dependency graph.
+     *
+     * @param gateName  Gate name from AppConfiguringPayload::gateName (non-owning).
+     */
+    void setActionableGateName(const char* gateName);
+
+    /**
      * @brief Mark the board as dismissed, causing isExpired() to return true.
      *
      * Called when the app transitions to RUNNING and the configuring board
@@ -136,6 +147,9 @@ public:
      */
     GateActionStatus getActiveGateStatus() const { return _activeGateStatus; }
 
+    /** Return the stored actionable gate name (for testing). */
+    const char* getActionableGateName() const { return _actionableGateName; }
+
 private:
     uint16_t _displayWidth;                               ///< Display width in pixels
     uint16_t _displayHeight;                              ///< Display height in pixels
@@ -145,6 +159,7 @@ private:
 
     // --- Gate action status ---
     GateActionStatus _activeGateStatus = GateActionStatus::NeedsUserAction; ///< Current actionable gate status
+    const char* _actionableGateName = nullptr;  ///< Authoritative actionable gate name (from Application via event)
 
     // --- Animated progress ---
     float _currentPercent = 0.0f;                         ///< Current displayed progress (lerped)

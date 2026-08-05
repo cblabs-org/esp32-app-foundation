@@ -510,6 +510,19 @@ TEST_F(ConfiguringStatusBoardTest, SetActiveGateStatus_StoresStatus) {
     EXPECT_EQ(board.getActiveGateStatus(), GateActionStatus::Satisfied);
 }
 
+/** setActionableGateName stores the name for render() comparison. */
+TEST_F(ConfiguringStatusBoardTest, SetActionableGateName_StoresName) {
+    board.setActionableGateName("WiFi Station");
+    EXPECT_STREQ(board.getActionableGateName(), "WiFi Station");
+}
+
+/** setActionableGateName with nullptr is safe. */
+TEST_F(ConfiguringStatusBoardTest, SetActionableGateName_Nullptr_IsSafe) {
+    board.setActionableGateName("Test");
+    board.setActionableGateName(nullptr);
+    EXPECT_EQ(board.getActionableGateName(), nullptr);
+}
+
 /** setConnectionInfo must not crash with valid inputs. */
 TEST_F(ConfiguringStatusBoardTest, SetConnectionInfo_ValidInputs_DoesNotCrash) {
     EXPECT_NO_FATAL_FAILURE(board.setConnectionInfo("MyNetwork", "http://192.168.1.42"));
