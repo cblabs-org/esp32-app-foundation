@@ -29,6 +29,9 @@ Any module implementing `IMCPContributor` registers tools via `registerMCPTools(
 | **OTAUpdateManager** | `ota_get_status` | `ota_check_now`, `ota_trigger_update` |
 | **ConfigManager** | `config_get_schema_version` | `config_factory_reset` |
 | **U8G2DisplayModule** | `display_status` | `display_control` |
+| **ButtonModule** (`WITH_BUTTONS`) | `button_status` | — |
+| **EncoderModule** (`WITH_ENCODER`) | `encoder_status` | — |
+| **KeyManager** | `key_list`, `key_get` | `key_add`, `key_delete` |
 
 **This table grows with every PR.** Downstream applications add their own tools. Always call `list_tools` to discover the actual set.
 
