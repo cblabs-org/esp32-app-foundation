@@ -46,6 +46,7 @@
 #include "events/AppConfiguringPayload.hpp"
 #include "platform/LogShim.h"
 #include <cstring>
+#include <cstdio>
 
 static constexpr const char* TAG = "U8G2DisplayModule";
 
@@ -1167,7 +1168,13 @@ void U8G2DisplayModule::_onDisplayMessage(const char* /*topic*/, const void* pay
 /**
  * @brief Static callback for "app.configuring" EventBus events.
  *
- * Suspends carousel rotation and sets the configuring status board as base layer.
+ * Suspends carousel rotation, sets the configuring status board as base layer,
+ * tears down any previous modal, then applies three-tier modal dispatch:
+ *   Tier 1: Consumer override via IU8G2SystemScreens::gateHelperBoard()
+ *   Tier 2: Built-in WiFi wizard for GateNames::WIFI_STATION
+ *   Tier 3: Generic fallback via GenericGateHelperBoard
+ *
+ * Only shows a modal when actionStatus == NeedsUserAction.
  */
 void U8G2DisplayModule::_onAppConfiguring(const char* /*topic*/, const void* payload, void* ctx) {
     auto* self = static_cast<U8G2DisplayModule*>(ctx);
@@ -1175,28 +1182,74 @@ void U8G2DisplayModule::_onAppConfiguring(const char* /*topic*/, const void* pay
         return;
     }
 
+    // --- 1. Suspend carousel and show base configuring board ---
     self->carousel.suspend();
     IDisplayBoard* cfgBoard = (self->_screens != nullptr && self->_screens->configuringBoard() != nullptr)
                               ? self->_screens->configuringBoard()
                               : &self->boards.configuringStatus;
     self->showBase(cfgBoard);
 
-    // Push WiFi wizard modal if the blocking gate is WiFi
-    if (payload != nullptr) {
-        auto* p = static_cast<const AppConfiguringPayload*>(payload);
-        if (p->gateName != nullptr && strcmp(p->gateName, "WiFi Station") == 0) {
-            // Resolve wizard board: prefer IU8G2SystemScreens override, fall back to built-in
-            IDisplayBoard* wizardBoard = (self->_screens != nullptr && self->_screens->wifiWizardBoard() != nullptr)
-                                         ? self->_screens->wifiWizardBoard()
-                                         : &self->boards.wifiWizard;
+    // --- 2. Always tear down previous modal first ---
+    self->clearModal();
 
-            // Configure built-in board with hostname + IP (custom boards manage their own state)
-            if (wizardBoard == &self->boards.wifiWizard) {
-                self->boards.wifiWizard.configure(p->hostname, "192.168.4.1");
-            }
-            self->showModal(wizardBoard);
-        }
+    // --- 3. Parse payload ---
+    if (payload == nullptr) {
+        return;
     }
+    auto* p = static_cast<const AppConfiguringPayload*>(payload);
+
+    // --- 4. Update configuring status board with gate action status and connection info ---
+    self->boards.configuringStatus.setActiveGateStatus(p->actionStatus);
+    self->boards.configuringStatus.setActionableGateName(p->gateName);
+    if (p->deviceIP != nullptr) {
+        char urlBuf[48];
+        snprintf(urlBuf, sizeof(urlBuf), "http://%s", p->deviceIP);
+        self->boards.configuringStatus.setConnectionInfo(
+            p->hostname ? p->hostname : "",
+            urlBuf
+        );
+    }
+
+    // --- 5. If not NeedsUserAction, no modal needed ---
+    if (p->actionStatus != GateActionStatus::NeedsUserAction) {
+        return;
+    }
+
+    // --- 6. Three-tier modal dispatch ---
+    IDisplayBoard* modalBoard = nullptr;
+
+    // Tier 1: Consumer override via IU8G2SystemScreens
+    if (self->_screens != nullptr) {
+        modalBoard = self->_screens->gateHelperBoard(p);
+    }
+
+    // Tier 2: Built-in WiFi wizard
+    if (modalBoard == nullptr && p->gateName != nullptr &&
+        strcmp(p->gateName, GateNames::WIFI_STATION) == 0) {
+        // Resolve wizard board: prefer IU8G2SystemScreens wifiWizardBoard override
+        IDisplayBoard* wizardBoard = (self->_screens != nullptr && self->_screens->wifiWizardBoard() != nullptr)
+                                     ? self->_screens->wifiWizardBoard()
+                                     : &self->boards.wifiWizard;
+
+        // Configure built-in board with hostname + IP (custom boards manage their own state)
+        if (wizardBoard == &self->boards.wifiWizard) {
+            self->boards.wifiWizard.configure(p->hostname, p->deviceIP ? p->deviceIP : "192.168.4.1");
+        }
+        modalBoard = wizardBoard;
+    }
+
+    // Tier 3: Generic fallback
+    if (modalBoard == nullptr) {
+        self->boards.genericHelper.configure(
+            p->gateName ? p->gateName : "Configuration",
+            p->helpText ? p->helpText : "",
+            p->deviceIP ? p->deviceIP : ""
+        );
+        modalBoard = &self->boards.genericHelper;
+    }
+
+    // --- 7. Push resolved modal ---
+    self->showModal(modalBoard);
 }
 
 /**

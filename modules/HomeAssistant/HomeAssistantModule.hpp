@@ -71,6 +71,7 @@
 #include <string>
 #include <atomic>
 #include <ArduinoJson.h>
+#include "../../include/utils/Periodic.hpp"
 
 class ConfigManager;
 class KeyManager;

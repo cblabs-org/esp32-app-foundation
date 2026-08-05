@@ -110,6 +110,7 @@ predate the formal PA pipeline and are filed retrospectively.
 | [pr-53-configuring-display](./pr-53-configuring-display/PROJECT.md) | Issue [#60](https://github.com/matthewmcneill/esp32-app-foundation/issues/60): Wire CONFIGURING lifecycle phase to display subsystem — `displayModule.begin()`, gate binding, WiFi wizard modal, hostname in payload | ✅ **COMPLETE** PR [#61](https://github.com/matthewmcneill/esp32-app-foundation/pull/61), 368/368 tests | Session 60229274 |
 | [pr-54-licensing](./pr-54-licensing/PROJECT.md) | Issue #62: Licensing Clarification (Apache-2.0, SPDX headers, THIRD-PARTY-NOTICES) | ✅ **COMPLETE** — 4-WO stack executed successfully | Current Session |
 | [pr-55-keymanager-mcp](./pr-55-keymanager-mcp/PROJECT.md) | Issue #63: KeyManager MCP Exposure (systemLocked tier, exclusive owner-matching) | 🚧 **IN PROGRESS** — WO1 drafted, branch active | Current Session |
+| [pr-66-configuring-orchestration](./pr-66-configuring-orchestration/PROJECT.md) | Issue #66/#64: Centralise CONFIGURING display orchestration — `GateActionStatus` enum, gate-transition re-publishing, three-tier modal dispatch, LVGL parity, consumer cleanup | 🚧 **IN PROGRESS** — 7-WO stack, WO5-7 review feedback complete | Current Session |
 | [pr-55-portal-design-system](./pr-55-portal-design-system/PROJECT.md) | Issue [#67](https://github.com/matthewmcneill/esp32-app-foundation/issues/67): Portal Design System — BEM convention ADR, legacy migration, `.card`/`.alert` formalization, ApiQueue priority lanes, 8 new CSS components, card-grid consolidation, signal bars promotion | 📋 **DECOMPOSITION DRAFTED** — 4-WO linear stack; awaiting human approval (plan gate). No branches, no workers. | Current Session |
 
 ---
@@ -177,6 +178,7 @@ scanning the entire Projects Registry chronologically.
 | [pr-35](./pr-35-weather-station/PROJECT.md) | WeatherBoard, StatusBoard updates, composable widgets | PROJECT.md |
 | [pr-47](./pr-47-lvgl-display/PROJECT.md) | LVGL v9 colour-TFT module (generic) + `ILVGLHardwareAdapter` + CrowPanel 1.28" reference adapter — peer to U8G2, partial SRAM buffers, esp_lcd | PROJECT.md (design) |
 | [adhoc-screensaver-twdt](./adhoc-screensaver-twdt/context_bridge.md) | TWDT crash at 313 s — `vTaskDelay` fix, `setPowerSave(1)`, `localtime_r` thread safety | context_bridge |
+| [pr-66](./pr-66-configuring-orchestration/PROJECT.md) | Centralise CONFIGURING display orchestration — GateActionStatus enum, gate re-publishing, three-tier modal dispatch, LVGL parity | PROJECT.md |
 
 ### Web Portal
 

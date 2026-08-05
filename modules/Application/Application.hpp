@@ -395,6 +395,17 @@ public:
      */
     const std::vector<IConfigGate*>& getConfigGates() const { return _configGates; }
 
+    /**
+     * @brief Find the first actionable unsatisfied gate (all dependencies satisfied).
+     *
+     * Returns nullptr if all gates are satisfied or no gate is actionable.
+     * Extracted to eliminate dependency-checking duplication between
+     * Application, ConfiguringStatusBoard, and _publishConfiguringEvent().
+     *
+     * @return Pointer to the first actionable unsatisfied gate, or nullptr.
+     */
+    const IConfigGate* getActionableGate() const;
+
 
 private:
     // -------------------------------------------------------------------------
@@ -504,6 +515,15 @@ private:
     EventBus _eventBus;                 ///< Central event bus
     uint32_t _systemHeapPayload = 0;    ///< Persistent payload for system.heap event
     AppConfiguringPayload _configuringPayload{}; ///< Persistent payload for app.configuring event
+
+    // Gate-transition re-publishing state (PR-66)
+    const char*      _lastPublishedGate   = nullptr;                     ///< Gate name from last APP_CONFIGURING
+    GateActionStatus _lastPublishedStatus = GateActionStatus::Satisfied; ///< Status from last publish
+    Periodic         _configuringPublishThrottle{500};                    ///< Gate re-publish debounce (default 500ms, overridable via FrameworkConfig)
+    /// Stable buffer for device IP pointer — IPv4 only (max "255.255.255.255\0" = 16 bytes).
+    /// If IPv6 support is added, increase to INET6_ADDRSTRLEN (46).
+    char             _deviceIPBuf[16] = {};
+
     DataManager _dataManager;           ///< Background data manager
     WebServerManager _webServerManager; ///< Local HTTP Server
 

@@ -71,7 +71,7 @@ public:
      * @brief Return the gate name for logging and display.
      * @return "Timezone"
      */
-    const char* getGateName() const override { return "Timezone"; }
+    const char* getGateName() const override { return GateNames::TIMEZONE; }
 
     /**
      * @brief Return user-facing help text.
@@ -92,7 +92,7 @@ public:
      * @return Pointer to static array containing "WiFi Station".
      */
     const char* const* getDependencies(uint8_t& count) const override {
-        static const char* deps[] = {"WiFi Station"};
+        static const char* deps[] = {GateNames::WIFI_STATION};
         count = 1;
         return deps;
     }

@@ -27,6 +27,7 @@
 
 #include "Application.hpp"
 #include "../../include/events/AppConfiguringPayload.hpp"
+#include "utils/ConfigGateResolver.hpp"
 
 
 // ---------------------------------------------------------------------------
@@ -148,6 +149,12 @@ bool Application::begin(const FrameworkConfig& config) {
 
     // --- Step 5: Store FrameworkConfig internally ---
     _config = config;
+
+    // Apply configurable gate re-publish throttle (F5: review feedback)
+    if (_config.configuringPublishIntervalMs > 0) {
+        _configuringPublishThrottle.setInterval(_config.configuringPublishIntervalMs);
+    }
+
     ESP_LOGI(TAG, "FrameworkConfig stored");
     _statusReporter->reportStatus("Configuration defaults loaded", 0.15f);
 
@@ -311,8 +318,28 @@ void Application::tick() {
         }
     }
 
-    // --- CONFIGURING: poll config gates for transition ---
+    // --- CONFIGURING: gate-transition re-publishing + transition check ---
     if (_state == AppState::Configuring) {
+        // Gate-transition re-publishing (500ms throttle)
+        if (_configuringPublishThrottle.due(currentMillis)) {
+            const IConfigGate* actionable = getActionableGate();
+            const char* currentGate = actionable ? actionable->getGateName() : nullptr;
+            GateActionStatus currentStatus = actionable
+                ? actionable->getActionStatus()
+                : GateActionStatus::Satisfied;
+
+            // Re-publish if actionable gate changed OR its status changed
+            bool changed = ConfigGateResolver::shouldRepublish(
+                currentGate, currentStatus, _lastPublishedGate, _lastPublishedStatus);
+
+            if (changed) {
+                _lastPublishedGate = currentGate;
+                _lastPublishedStatus = currentStatus;
+                _publishConfiguringEvent(false);
+            }
+        }
+
+        // Check if all gates now satisfied
         if (_allGatesSatisfied()) {
             setState(AppState::Running);
             _dataManager.setAppRunning(true);
@@ -634,47 +661,56 @@ bool Application::_allGatesSatisfied() const {
 }
 
 /**
+ * @brief Find the first actionable unsatisfied gate (all dependencies satisfied).
+ *
+ * Iterates the registered config gates in registration order, skipping satisfied
+ * gates. For each unsatisfied gate, checks whether all of its declared
+ * dependencies are satisfied by comparing gate names via strcmp().
+ *
+ * @return Pointer to the first actionable gate, or nullptr if all are satisfied
+ *         or no gate has its dependencies met.
+ */
+const IConfigGate* Application::getActionableGate() const {
+    return ConfigGateResolver::findActionableGate(_configGates);
+}
+
+/**
  * @brief Publish an "app.configuring" EventBus event for the first
  *        **actionable** unsatisfied gate.
  *
- * A gate is actionable when it is unsatisfied AND all of its declared
- * dependencies (getDependencies()) are satisfied. Gates whose dependencies
- * are not yet met are silently skipped, ensuring the user sees only the
- * gate they can act on next.
+ * Uses getActionableGate() to find the first gate whose dependencies are
+ * satisfied, then populates the enriched AppConfiguringPayload with gate
+ * name, help text, action status, hostname, and device IP.
  */
 void Application::_publishConfiguringEvent(bool isRegression) {
-    for (const auto* gate : _configGates) {
-        if (gate->isSatisfied()) continue;
+    const IConfigGate* gate = getActionableGate();
+    if (gate == nullptr) return;
 
-        // Check if all dependencies are satisfied
-        uint8_t depCount = 0;
-        const char* const* deps = gate->getDependencies(depCount);
-        bool depsOk = true;
-        for (uint8_t d = 0; d < depCount; d++) {
-            // Find the dependency gate by name and check if satisfied
-            bool found = false;
-            for (const auto* other : _configGates) {
-                if (strcmp(other->getGateName(), deps[d]) == 0) {
-                    if (!other->isSatisfied()) depsOk = false;
-                    found = true;
-                    break;
-                }
-            }
-            if (!found || !depsOk) { depsOk = false; break; }
-        }
+    // Stamp tracking state atomically with publish (F1: structural invariant)
+    _lastPublishedGate   = gate->getGateName();
+    _lastPublishedStatus = gate->getActionStatus();
 
-        if (!depsOk) continue; // Skip — deps not met
+    _configuringPayload.gateName     = gate->getGateName();
+    _configuringPayload.helpText     = gate->getHelpText();
+    _configuringPayload.actionStatus = gate->getActionStatus();
+    _configuringPayload.isRegression = isRegression;
+    _configuringPayload.hostname     = _wifiManager.getHostname();
 
-        // This gate is actionable
-        _configuringPayload.gateName = gate->getGateName();
-        _configuringPayload.helpText = gate->getHelpText();
-        _configuringPayload.isRegression = isRegression;
-        _configuringPayload.hostname = _wifiManager.getHostname();
-        _eventBus.publish(ApplicationEvents::APP_CONFIGURING, &_configuringPayload);
-        ESP_LOGI(TAG, "Config gate unsatisfied: %s%s", gate->getGateName(),
-                 isRegression ? " (regression)" : "");
-        return;
+    // Write device IP into a stable buffer to avoid dangling pointer from
+    // WiFi.localIP().toString().c_str() (returns pointer to a temporary String)
+    if (_wifiManager.getAPMode()) {
+        strncpy(_deviceIPBuf, "192.168.4.1", sizeof(_deviceIPBuf));
+    } else {
+        strncpy(_deviceIPBuf, WiFi.localIP().toString().c_str(), sizeof(_deviceIPBuf));
     }
+    _deviceIPBuf[sizeof(_deviceIPBuf) - 1] = '\0';
+    _configuringPayload.deviceIP = _deviceIPBuf;
+
+    _eventBus.publish(ApplicationEvents::APP_CONFIGURING, &_configuringPayload);
+    ESP_LOGI(TAG, "Config gate unsatisfied: %s (status=%d)%s",
+             gate->getGateName(),
+             static_cast<int>(gate->getActionStatus()),
+             isRegression ? " (regression)" : "");
 }
 
 // ---------------------------------------------------------------------------
