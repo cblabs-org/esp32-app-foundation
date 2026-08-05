@@ -28,6 +28,7 @@
 
 #include "Application.hpp"
 #include "../../include/events/AppConfiguringPayload.hpp"
+#include "utils/ConfigGateResolver.hpp"
 
 
 // ---------------------------------------------------------------------------
@@ -329,17 +330,8 @@ void Application::tick() {
                 : GateActionStatus::Satisfied;
 
             // Re-publish if actionable gate changed OR its status changed
-            bool changed = false;
-            if (currentGate != _lastPublishedGate) {
-                // Pointer comparison first (fast), then string comparison
-                if (_lastPublishedGate == nullptr || currentGate == nullptr ||
-                    strcmp(currentGate, _lastPublishedGate) != 0) {
-                    changed = true;
-                }
-            }
-            if (currentStatus != _lastPublishedStatus) {
-                changed = true;
-            }
+            bool changed = ConfigGateResolver::shouldRepublish(
+                currentGate, currentStatus, _lastPublishedGate, _lastPublishedStatus);
 
             if (changed) {
                 _lastPublishedGate = currentGate;
@@ -680,27 +672,7 @@ bool Application::_allGatesSatisfied() const {
  *         or no gate has its dependencies met.
  */
 const IConfigGate* Application::getActionableGate() const {
-    for (const auto* gate : _configGates) {
-        if (gate->isSatisfied()) continue;
-
-        // Check if all dependencies are satisfied
-        uint8_t depCount = 0;
-        const char* const* deps = gate->getDependencies(depCount);
-        bool depsOk = true;
-        for (uint8_t d = 0; d < depCount; d++) {
-            bool found = false;
-            for (const auto* other : _configGates) {
-                if (strcmp(other->getGateName(), deps[d]) == 0) {
-                    if (!other->isSatisfied()) depsOk = false;
-                    found = true;
-                    break;
-                }
-            }
-            if (!found || !depsOk) { depsOk = false; break; }
-        }
-        if (depsOk) return gate;
-    }
-    return nullptr;
+    return ConfigGateResolver::findActionableGate(_configGates);
 }
 
 /**
