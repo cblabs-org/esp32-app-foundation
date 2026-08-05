@@ -169,8 +169,8 @@ static constexpr size_t BOARD_ENCODER_COUNT = sizeof(BOARD_ENCODERS) / sizeof(BO
 
 #endif // WITH_ENCODER
 
-// ── Button Module configuration (WITH_BUTTON / WITH_BUTTONS) ──────────────────
-#if defined(WITH_BUTTON) || defined(WITH_BUTTONS)
+// ── Button Module configuration (WITH_BUTTONS) ───────────────────────────────
+#ifdef WITH_BUTTONS
 #include "ButtonConfig.h"
 
 static constexpr BoardButton BOARD_BUTTONS[] = {
@@ -181,6 +181,5 @@ static constexpr BoardButton BOARD_BUTTONS[] = {
     },
 };
 static constexpr size_t BOARD_BUTTON_COUNT = sizeof(BOARD_BUTTONS) / sizeof(BOARD_BUTTONS[0]);
-#define BOARD_BUTTON_COUNT BOARD_BUTTON_COUNT
-#endif // WITH_BUTTON / WITH_BUTTONS
+#endif // WITH_BUTTONS
 
