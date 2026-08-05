@@ -54,7 +54,7 @@ static TimeConfigGate timeGate{timeManager};
 static MCPServer mcpServer;
 #endif
 
-#if defined(WITH_BUTTON) || defined(WITH_BUTTONS)
+#ifdef WITH_BUTTONS
 #include "ButtonModule.hpp"
 #include "board.h"
 static ButtonModule buttonModule;
@@ -129,7 +129,7 @@ void setup() {
     app.registerModule(&mcpServer);
 #endif
 
-#if defined(WITH_BUTTON) || defined(WITH_BUTTONS)
+#ifdef WITH_BUTTONS
     for (size_t i = 0; i < BOARD_BUTTON_COUNT; i++) {
         buttonModule.addButton(BOARD_BUTTONS[i]);
     }
@@ -152,7 +152,7 @@ void setup() {
 #else
         nullptr,
 #endif
-#if defined(WITH_BUTTON) || defined(WITH_BUTTONS)
+#ifdef WITH_BUTTONS
         &buttonModule,
 #else
         nullptr,
