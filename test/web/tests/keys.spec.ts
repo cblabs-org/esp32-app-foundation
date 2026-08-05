@@ -61,13 +61,13 @@ async function bootAndNavigateToKeys(page: Page, keys = MOCK_KEYS) {
 
   await page.goto('/');
   await page.waitForFunction(() => (window as any).apiFetch !== undefined);
-  await expect(page.locator('#portal-title')).not.toHaveText('Device Portal');
+  await expect(page.locator('#portal-title')).not.toHaveText('ESP32 App Foundation');
 
   // Navigate to System → Keys
   await page.locator('#bottom-nav [data-target="tab-system"]').click();
   await expect(page.locator('#pill-bar')).toBeVisible();
   await page.locator('#pill-bar .pill-btn[data-target="tab-keys"]').click();
-  await expect(page.locator('#tab-keys')).toHaveClass(/active/);
+  await expect(page.locator('#tab-keys')).toHaveClass(/tab-content--active/);
 }
 
 // ---------------------------------------------------------------------------
@@ -121,13 +121,13 @@ test.describe('Key Vault Sub-pill', () => {
 
     await page.goto('/');
     await page.waitForFunction(() => (window as any).apiFetch !== undefined);
-    await expect(page.locator('#portal-title')).not.toHaveText('Device Portal');
+    await expect(page.locator('#portal-title')).not.toHaveText('ESP32 App Foundation');
 
     // Navigate to System → Keys
     await page.locator('#bottom-nav [data-target="tab-system"]').click();
     await expect(page.locator('#pill-bar')).toBeVisible();
     await page.locator('#pill-bar .pill-btn[data-target="tab-keys"]').click();
-    await expect(page.locator('#tab-keys')).toHaveClass(/active/);
+    await expect(page.locator('#tab-keys')).toHaveClass(/tab-content--active/);
     await expect(page.locator('#keys-list')).toContainText('weather_key');
 
     // Fill in new key fields

@@ -110,7 +110,8 @@ body.ap-mode .tab-link:not([data-target="tab-wifi"]):not([data-target="tab-syste
 /* ==========================================================================
    4. FORM ELEMENTS & BUTTONS
    ========================================================================== */
-article {
+/* .card — canonical card container. article selector retained for backward compat. See ADR. */
+article, .card {
   background: var(--card-bg);
   border-radius: 16px;
   padding: 1.25rem;
@@ -118,7 +119,60 @@ article {
   border: 1px solid var(--border);
 }
 
-article header {
+article[aria-disabled="true"],
+.card[aria-disabled="true"] {
+  opacity: 0.5;
+  pointer-events: none;
+  filter: grayscale(30%);
+}
+
+.card--interactive {
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.card--interactive:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+[data-theme="dark"] .card--interactive:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+.card--interactive:focus-visible,
+.card--empty:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.card--empty {
+  border: 2px dashed var(--border);
+  background: transparent;
+  opacity: 0.6;
+  text-align: center;
+  cursor: pointer;
+  transition: opacity 0.15s, border-color 0.15s;
+}
+.card--empty:hover {
+  opacity: 1;
+  border-color: var(--primary);
+}
+
+.card-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: 1fr;
+}
+
+.card-grid--2col {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+@media (max-width: 480px) {
+  .card-grid--2col {
+    grid-template-columns: 1fr;
+  }
+}
+
+article header, .card header {
   font-weight: 700;
   font-size: 1.1rem;
   margin-bottom: 1rem;
@@ -227,13 +281,33 @@ button.secondary {
   pointer-events: none;
 }
 
+/* Password mask placeholder spacing */
+.password-mask::placeholder {
+  letter-spacing: 4px;
+}
+
+/* Field validation feedback */
+.field-feedback {
+  font-size: 0.75rem;
+  margin-top: 0.25rem;
+  display: block;
+}
+
+.field-feedback--error {
+  color: var(--error);
+}
+
+.field-feedback--success {
+  color: var(--success);
+}
+
 /* ==========================================================================
    5. TAB CONTENT & ANIMATIONS
    ========================================================================== */
 .tab-content-container { width: 100%; }
 
 .tab-content { display: none; }
-.tab-content.active {
+.tab-content--active {
   display: block;
   animation: slideUp 0.3s ease-out;
 }
@@ -292,11 +366,11 @@ button.secondary {
   display: block;
 }
 
-.tab-link.active {
+.tab-link--active {
   color: var(--primary);
 }
 
-.tab-link.active .icon {
+.tab-link--active .icon {
   transform: translateY(-2px);
 }
 
@@ -335,14 +409,14 @@ button.secondary {
   color: var(--primary);
 }
 
-.pill-btn.active {
+.pill-btn--active {
   background: var(--primary);
   color: white;
   border-color: var(--primary);
 }
 
-/* Screenshot pixel colour preset — active state mirrors pill-btn.active */
-.btn-ss-colour.active {
+/* Screenshot pixel colour preset — active state mirrors pill-btn--active */
+.btn-ss-colour--active {
   background: var(--primary);
   color: white;
   border-color: var(--primary);
@@ -375,7 +449,7 @@ button.secondary {
   transition: all 0.2s ease;
 }
 
-.theme-btn.active {
+.theme-btn--active {
   background: var(--bg);
   color: var(--primary);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
@@ -588,22 +662,28 @@ article.info-drawer > details > .info-drawer-content {
 }
 
 .dot {
-  width: 10px;
-  height: 10px;
+  width: var(--dot-size, 10px);
+  height: var(--dot-size, 10px);
   border-radius: 50%;
 }
 
-.dot.green  { background: var(--success); box-shadow: 0 0 8px var(--success); }
-.dot.red    { background: var(--error);   box-shadow: 0 0 8px var(--error); }
-.dot.yellow { background: var(--warning); box-shadow: 0 0 8px var(--warning); }
-.dot.grey   { background: #888;           box-shadow: 0 0 4px #888; }
+.dot--green  { background: var(--success); box-shadow: 0 0 calc(var(--dot-size, 10px) * 0.8) var(--success); }
+.dot--red    { background: var(--error);   box-shadow: 0 0 calc(var(--dot-size, 10px) * 0.8) var(--error); }
+.dot--yellow { background: var(--warning); box-shadow: 0 0 calc(var(--dot-size, 10px) * 0.8) var(--warning); }
+.dot--grey   { background: var(--text-muted); box-shadow: 0 0 calc(var(--dot-size, 10px) * 0.4) var(--text-muted); }
+
+.signal-bars {
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+}
 
 @keyframes pulse {
   0% { transform: scale(1); opacity: 1; }
   50% { transform: scale(1.3); opacity: 0.7; }
   100% { transform: scale(1); opacity: 1; }
 }
-.dot.pulse {
+.dot--pulse {
   animation: pulse 1s infinite;
 }
 
@@ -636,9 +716,9 @@ article.info-drawer > details > .info-drawer-content {
 }
 
 /* RAG colour classes */
-.rag-green { color: var(--success); }
-.rag-amber { color: var(--warning); }
-.rag-red   { color: var(--error); }
+.rag--green { color: var(--success); }
+.rag--amber { color: var(--warning); }
+.rag--red   { color: var(--error); }
 
 /* ==========================================================================
    12. TOAST NOTIFICATIONS
@@ -670,15 +750,15 @@ article.info-drawer > details > .info-drawer-content {
   pointer-events: auto;
 }
 
-.toast-visible {
+.toast--visible {
   transform: translateY(0);
   opacity: 1;
 }
 
-.toast-success { background: var(--success); }
-.toast-error   { background: var(--error); }
-.toast-warning { background: #e65100; }
-.toast-info    { background: var(--primary); }
+.toast--success { background: var(--success); }
+.toast--error   { background: var(--error); }
+.toast--warning { background: var(--warning); }
+.toast--info    { background: var(--primary); }
 
 /* ==========================================================================
    13. DIAGNOSTIC TABLE
@@ -708,6 +788,7 @@ article.info-drawer > details > .info-drawer-content {
    14. DIALOG / MODALS
    ========================================================================== */
 dialog {
+  position: relative;
   border: none;
   border-radius: 12px;
   padding: 0;
@@ -725,10 +806,35 @@ dialog::backdrop {
   backdrop-filter: blur(4px);
 }
 
+.dialog-close-btn {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.25rem;
+  min-width: 36px;
+  min-height: 36px;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s;
+}
+
+.dialog-close-btn:hover {
+  color: var(--text);
+}
+.dialog-close-btn:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
 /* ==========================================================================
    15. DELETE BUTTON PATTERN
    ========================================================================== */
-button.btn-delete {
+.btn--delete {
   display: block;
   width: 100%;
   box-sizing: border-box;
@@ -742,7 +848,7 @@ button.btn-delete {
   transition: all 0.2s;
 }
 
-button.btn-delete:hover {
+.btn--delete:hover {
   background: var(--error);
   color: white;
 }
@@ -765,6 +871,32 @@ button.btn-delete:hover {
   vertical-align: middle;
 }
 
+/* Loading button state */
+button[aria-busy="true"] {
+  pointer-events: none;
+  opacity: 0.7;
+  position: relative;
+}
+
+button[aria-busy="true"]::after {
+  content: "";
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  margin-left: 8px;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  vertical-align: middle;
+}
+
+button.outline[aria-busy="true"]::after,
+button.secondary[aria-busy="true"]::after {
+  border-color: rgba(0, 0, 0, 0.2);
+  border-top-color: currentColor;
+}
+
 /* ==========================================================================
    17. MISC UTILITY CLASSES
    ========================================================================== */
@@ -778,6 +910,42 @@ button.btn-delete:hover {
 
 .info-row:last-child { border-bottom: none; }
 .info-row .label { color: var(--text-muted); }
+
+/* Instruction callout */
+.callout {
+  border-left: 4px solid var(--primary);
+  background: var(--primary-alpha);
+  padding: 0.75rem 1rem;
+  border-radius: 0 8px 8px 0;
+  margin-bottom: 1rem;
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+/* Terminal log viewer */
+.terminal-log {
+  --terminal-bg: #1a1a1a;
+  --terminal-fg: #4ade80;
+  background: var(--terminal-bg);
+  color: var(--terminal-fg);
+  font-family: 'Courier New', monospace;
+  font-size: 0.75rem;
+  padding: 0.75rem;
+  border-radius: 8px;
+  max-height: 200px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.terminal-log__line {
+  line-height: 1.4;
+  margin-bottom: 2px;
+}
+
+.terminal-log__line:last-child {
+  margin-bottom: 0;
+}
 
 .compact-row {
   display: flex;
@@ -825,7 +993,7 @@ input[type="number"]::-webkit-inner-spin-button {
   justify-content: center;
   transition: opacity 0.3s ease;
 }
-.login-overlay.hidden {
+.login-overlay--hidden {
   display: none;
 }
 .login-card {
@@ -856,13 +1024,32 @@ input[type="number"]::-webkit-inner-spin-button {
   margin: 0 0 20px 0;
   font-size: 0.9em;
 }
-.login-error {
+.alert {
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  border: 1px solid;
+  font-size: 0.85rem;
+  margin-bottom: 0.75rem;
+}
+.alert--success {
+  background: color-mix(in srgb, var(--success) 10%, transparent);
+  border-color: var(--success);
+  color: var(--success);
+}
+.alert--error {
+  background: color-mix(in srgb, var(--error) 10%, transparent);
+  border-color: var(--error);
   color: var(--error);
-  font-size: 0.85em;
-  margin: 8px 0;
-  padding: 8px 12px;
-  border-radius: 6px;
-  background: rgba(198, 40, 40, 0.1);
+}
+.alert--warning {
+  background: color-mix(in srgb, var(--warning) 10%, transparent);
+  border-color: var(--warning);
+  color: var(--warning);
+}
+.alert--info {
+  background: var(--primary-alpha);
+  border-color: var(--primary);
+  color: var(--primary);
 }
 .login-card .input-group {
   margin-bottom: 12px;
@@ -886,14 +1073,7 @@ input[type="number"]::-webkit-inner-spin-button {
 /* ==========================================================================
    21. SECURITY TAB STYLES (WO7)
    ========================================================================== */
-.form-error {
-  color: var(--error);
-  font-size: 0.85em;
-  margin: 8px 0;
-  padding: 8px 12px;
-  border-radius: 6px;
-  background: rgba(198, 40, 40, 0.1);
-}
+
 .cert-status {
   padding: 8px 0;
 }
@@ -904,13 +1084,22 @@ input[type="number"]::-webkit-inner-spin-button {
   font-size: 0.85em;
   font-weight: 500;
 }
-.badge-ok {
+.badge--ok {
   background: rgba(46, 125, 50, 0.12);
   color: var(--success);
 }
-.badge-warn {
+.badge--warn {
   background: rgba(249, 168, 37, 0.12);
   color: var(--warning);
+}
+.badge--subtle {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0.15rem 0.5rem;
+  background: var(--primary-alpha);
+  color: var(--primary);
+  border: none;
 }
 .token-display {
   display: flex;
@@ -991,7 +1180,7 @@ button.full-width {
   visibility: hidden;
   transition: opacity 0.3s ease, visibility 0.3s ease;
 }
-.reboot-overlay.visible {
+.reboot-overlay--visible {
   opacity: 1;
   visibility: visible;
 }

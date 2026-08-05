@@ -38,6 +38,43 @@ try {
 }
 ```
 
+### `window.apiFetch.enqueueTask(taskFn, delayMs)`
+
+Enqueues a background task in the low-priority lane. UI requests (`window.apiFetch`) will always pre-empt background tasks.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `taskFn`  | `function` | Yes | A function that returns a Promise |
+| `delayMs` | `number`   | No  | Milliseconds to delay *after* this task completes before running the next background task |
+
+**Returns:** `Promise` — resolves or rejects with the result of `taskFn`.
+
+```javascript
+window.apiFetch.enqueueTask(async () => {
+  // Heavy background processing or polling
+  const res = await fetch('/api/background/sync');
+  return res.json();
+}, 1000).then(result => console.log(result));
+```
+
+### `window.apiFetch.clearBackground()`
+
+Clears all pending background tasks and cancels any active delay timer.
+
+```javascript
+window.apiFetch.clearBackground();
+```
+
+### `window.apiFetch.pendingBackground` (Getter)
+
+Returns the current number of pending tasks in the background queue.
+
+```javascript
+if (window.apiFetch.pendingBackground > 0) {
+  console.log("Background tasks are running");
+}
+```
+
 ## User Feedback
 
 ### `window.showToast(message, type, duration)`
@@ -156,6 +193,22 @@ Converts an RSSI value in dBm to a 0–4 bar level for signal strength display.
 const bars = window.rssiToBars(data.rssi);
 ```
 
+### `window.renderSignalBars(rssi)`
+
+Renders an inline SVG signal strength icon (0–4 bars) wrapped in a `<span class="signal-bars">` container.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `rssi` | `number` | Yes | RSSI value in dBm |
+
+**Returns:** `string` — HTML string ready for `innerHTML` injection.
+
+**A11y:** Wrapped container `<span>` includes `aria-label="Signal: N of 4 bars"` for screen readers.
+
+```javascript
+statusSignal.innerHTML = window.renderSignalBars(data.rssi);
+```
+
 ### `window.renderProgressBar(label, value, max, unit)`
 
 Generates a RAG-coloured (Red/Amber/Green) progress bar as an HTML string.
@@ -171,6 +224,66 @@ Generates a RAG-coloured (Red/Amber/Green) progress bar as an HTML string.
 
 ```javascript
 container.innerHTML = window.renderProgressBar('Heap', freeHeap, totalHeap, 'KB');
+```
+
+### `window.renderTerminalLog(containerId)`
+
+Creates or initializes a terminal log viewer inside a container element. Sets `role="log"` and `aria-live="polite"` on the container and applies the `.terminal-log` CSS class.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `containerId` | `string\|HTMLElement` | Yes | Element ID or HTMLElement |
+
+**Returns:** `object|null` — controller object with log control methods, or `null` if container element is not found.
+
+| Method | Description |
+|--------|-------------|
+| `append(line)` | Creates a `<div class="terminal-log__line">` with HTML-escaped text, appends it, and scrolls to bottom |
+| `clear()` | Empties all log content in the container |
+| `scrollToBottom()` | Scrolls the container to the bottom |
+
+```javascript
+const log = window.renderTerminalLog('sys-log');
+log.append('[INFO] System initialized');
+log.append('[DEBUG] Heap free: 142KB');
+// Clear:
+log.clear();
+```
+
+## CSS Components
+
+### `.alert` Component
+
+Use `.alert` to display inline feedback boxes. Available modifier classes are:
+- `.alert--success`
+- `.alert--error`
+- `.alert--warning`
+- `.alert--info`
+
+**Accessibility (A11y):** For dynamic alerts injected by JS, add `role="alert"`. For static ones present on load, use `role="status"`.
+
+```html
+<div class="alert alert--info" role="status">
+  Please configure the device before proceeding.
+</div>
+```
+
+### `.dot` Component
+
+Status indicator dot. Custom property `--dot-size` (default `10px`) allows contextual size adjustments. Available modifiers: `.dot--green`, `.dot--red`, `.dot--yellow`, `.dot--grey`, `.dot--pulse`.
+
+```html
+<span class="dot dot--green"></span>
+<div style="--dot-size: 8px;"><span class="dot dot--yellow"></span></div>
+```
+
+### `.badge` Component
+
+Inline badge for status display. Modifiers: `.badge--ok`, `.badge--warn`, `.badge--subtle` (tinted background for minor tags).
+
+```html
+<span class="badge badge--ok">Connected</span>
+<span class="badge badge--subtle">Experimental</span>
 ```
 
 ## Utility

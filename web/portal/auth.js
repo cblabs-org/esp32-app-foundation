@@ -14,7 +14,7 @@
   // =========================================================================
 
   var overlayHTML =
-    '<div id="login-overlay" class="login-overlay hidden">' +
+    '<div id="login-overlay" class="login-overlay login-overlay--hidden">' +
       '<div class="login-card">' +
         '<div class="login-icon">' +
           '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
@@ -24,14 +24,14 @@
             '<path d="M7 11V7a5 5 0 0 1 10 0v4"/>' +
           '</svg>' +
         '</div>' +
-        '<h2>Device Portal</h2>' +
+        '<h2 id="login-title">ESP32 App Foundation</h2>' +
         '<p class="login-subtitle">Enter your password to continue</p>' +
         '<form id="login-form">' +
           '<div class="input-group">' +
             '<input type="password" id="login-password" placeholder="Password" ' +
                    'autocomplete="current-password">' +
           '</div>' +
-          '<div id="login-error" class="login-error hidden"></div>' +
+          '<div id="login-error" class="alert alert--error hidden"></div>' +
           '<button type="submit" id="login-submit" style="width:100%">Unlock</button>' +
           '<button type="button" id="login-cancel" class="secondary" style="width:100%; margin-top:0.5rem">Cancel</button>' +
         '</form>' +
@@ -75,7 +75,7 @@
 
       var overlay = document.getElementById('login-overlay');
       if (overlay) {
-        overlay.classList.remove('hidden');
+        overlay.classList.remove('login-overlay--hidden');
         var pwField = document.getElementById('login-password');
         if (pwField) { pwField.value = ''; pwField.focus(); }
         var errDiv = document.getElementById('login-error');
@@ -88,7 +88,7 @@
 
   function hideLoginOverlay() {
     var overlay = document.getElementById('login-overlay');
-    if (overlay) overlay.classList.add('hidden');
+    if (overlay) overlay.classList.add('login-overlay--hidden');
   }
 
   /**
@@ -252,7 +252,7 @@
         '<input type="password" id="confirm-password" ' +
                'placeholder="Confirm password" autocomplete="new-password" ' +
                'style="width:100%; box-sizing:border-box; margin-bottom:0.75rem;">' +
-        '<div id="set-password-error" class="form-error hidden"></div>' +
+        '<div id="set-password-error" class="alert alert--error hidden"></div>' +
         '<button id="set-password-btn" style="width:100%;">Set Password</button>';
     } else {
       html +=
@@ -260,7 +260,7 @@
           'Manage your device access credentials.' +
         '</p>' +
         '<div class="status-badge" style="margin-bottom:0.75rem; font-size:0.85rem; display:flex; align-items:center;">' +
-          '<span class="dot green" style="margin-right:0.5rem;"></span>' +
+          '<span class="dot dot--green" style="margin-right:0.5rem;"></span>' +
           '<span>Password Set</span>' +
         '</div>' +
         '<h4 style="font-size:0.85rem; font-weight:600; margin:0 0 0.5rem 0;">Change Password</h4>' +
@@ -284,7 +284,7 @@
             '<input type="password" id="confirm-password" ' +
                    'placeholder="Confirm new password" autocomplete="new-password" ' +
                    'style="width:100%; box-sizing:border-box; margin-bottom:0.75rem;">' +
-            '<div id="change-password-error" class="form-error hidden"></div>' +
+            '<div id="change-password-error" class="alert alert--error hidden"></div>' +
             '<button id="change-password-btn" class="secondary" style="width:100%;">Change Password</button>';
     }
     html += '</article>';
@@ -328,10 +328,10 @@
     // Cert status badge & controls
     html += '<div class="status-badge" style="margin-bottom:0.75rem; font-size:0.85rem; display:flex; align-items:center;">';
     if (state.certPresent) {
-      html += '<span class="dot green" style="margin-right:0.5rem;"></span>' +
+      html += '<span class="dot dot--green" style="margin-right:0.5rem;"></span>' +
               '<span>Certificate Present &amp; Active</span>';
     } else {
-      html += '<span class="dot yellow" style="margin-right:0.5rem;"></span>' +
+      html += '<span class="dot dot--yellow" style="margin-right:0.5rem;"></span>' +
               '<span>No Certificate Generated</span>';
     }
     html += '</div>';
@@ -379,7 +379,7 @@
             '<label for="upload-key-pem" style="font-size:0.85rem;">Private Key (PEM)</label>' +
             '<textarea id="upload-key-pem" rows="4" placeholder="-----BEGIN PRIVATE KEY-----..." ' +
               'style="width:100%; box-sizing:border-box; margin-bottom:0.75rem;"></textarea>' +
-            '<div id="upload-cert-error" class="form-error hidden"></div>' +
+            '<div id="upload-cert-error" class="alert alert--error hidden"></div>' +
             '<button id="upload-cert-btn" style="width:100%;">Upload Certificate</button>' +
           '</div>' +
         '</details>' +

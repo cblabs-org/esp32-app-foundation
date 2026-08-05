@@ -120,6 +120,12 @@ Create an HTML snippet representing your tab UI inside the `/www/<namespace>/tab
 > [!IMPORTANT]
 > **HTML ID Scoping Rule:** All element IDs must be prefixed with your module name to avoid collisions with other tabs loaded into the same SPA DOM. Use `id="myapp-save-btn"` — never `id="save-btn"`. Multiple tabs coexist in a single HTML document, so unprefixed IDs will clash.
 
+> [!TIP]
+> **Canonical Containers:** For structural card containers, use the `.card` class (e.g., `<div class="card">`). The legacy `<article>` tag is still supported for backward compatibility but `.card` is the modern standard.
+
+> [!TIP]
+> **Alerts:** Use the `.alert` component for inline feedback (e.g., `<div class="alert alert--info" role="status">Message</div>`). Modifiers include `--success`, `--error`, `--warning`, and `--info`.
+
 ```html
 <!-- MyApp tab content fragment -->
 <div class="tab-content" id="myapp-tab">
@@ -140,6 +146,137 @@ Create an HTML snippet representing your tab UI inside the `/www/<namespace>/tab
         </label>
         <button id="myapp-save-btn">Save</button>
     </div>
+</div>
+```
+
+---
+
+## 3.1 CSS Component Reference
+
+The portal design system (`app.css`) provides standard component classes following BEM naming conventions. All components ship with their accessibility contracts defined.
+
+### Card Container (`.card`)
+Structural container for tab content sections.
+```html
+<div class="card">
+    <h3>Section Title</h3>
+    <p>Card content goes here.</p>
+</div>
+```
+
+### Disabled Section State (`[aria-disabled="true"]`)
+Disables interactive cards or sections (e.g., feature-gated via `IConfigGate`). Applies 50% opacity, `pointer-events: none`, and subtle grayscale filter.
+```html
+<div class="card" aria-disabled="true">
+    <h3>Gated Feature</h3>
+    <p>This module is disabled.</p>
+</div>
+```
+- **A11y:** Set `aria-disabled="true"` on the element to communicate the disabled state to screen readers.
+
+### Loading Button State (`button[aria-busy="true"]`)
+Displays a spinning loading indicator inside the button and disables pointer events.
+```html
+<button id="save-btn" aria-busy="true">Saving...</button>
+```
+- **A11y:** Set `aria-busy="true"` dynamically during async operations to announce loading state to screen readers.
+
+### Instruction Callout (`.callout`)
+Accent-bordered callout box for supplementary guidance and information.
+```html
+<aside class="callout" role="note">
+    <p>Note: Changing this setting requires an AP mode reconnect.</p>
+</aside>
+```
+- **A11y:** Use `<aside>` or add `role="note"` when containing supplementary guidance.
+
+### Terminal Log Viewer (`.terminal-log`)
+Green-on-black monospace console for live log streams.
+```html
+<div id="sys-log" class="terminal-log" role="log" aria-live="polite">
+    <div class="terminal-log__line">[INFO] System initialized</div>
+</div>
+```
+- **A11y:** Container MUST include `role="log"` and `aria-live="polite"` for live log updates. Managed automatically by `window.renderTerminalLog()`.
+
+### Dialog Close Button (`.dialog-close-btn`)
+Top-right close button for modal dialogs.
+```html
+<dialog id="settings-dialog">
+    <button class="dialog-close-btn" aria-label="Close" onclick="this.closest('dialog').close()">&times;</button>
+    <div class="card">Dialog Content</div>
+</dialog>
+```
+- **A11y:** Must include `aria-label="Close"` for screen reader accessibility.
+
+### Password Mask Placeholder (`.password-mask`)
+Spaced dots placeholder styling for saved password inputs.
+```html
+<input type="password" class="password-mask" placeholder="••••••••" value="">
+```
+
+### Field Validation Feedback (`.field-feedback`)
+Validation feedback message displayed below input controls. Modifiers: `.field-feedback--error`, `.field-feedback--success`.
+```html
+<label for="wifi-ssid">SSID</label>
+<input type="text" id="wifi-ssid" aria-describedby="ssid-feedback">
+<small id="ssid-feedback" class="field-feedback field-feedback--error">SSID is required.</small>
+```
+- **A11y:** Input element MUST link to the feedback element via `aria-describedby="<id>"`.
+
+### Card Modifiers & Grid System (`.card--interactive`, `.card--empty`, `.card-grid`, `.card-grid--2col`)
+Grid layout and modifier variants for card containers.
+```html
+<!-- Interactive Card Grid (2-column on desktop, 1-column on mobile <400px) -->
+<div class="card-grid card-grid--2col">
+    <div class="card card--interactive" role="button" tabindex="0">
+        <h3>Device Status</h3>
+        <p>Click to inspect telemetry.</p>
+    </div>
+    <div class="card card--empty" role="button" aria-label="Add new item" tabindex="0">
+        <p>+ Add New Sensor</p>
+    </div>
+</div>
+```
+- **A11y:** Interactive cards MUST use `role="button"` or be wrapped in `<a>`/`<button>` elements with keyboard accessibility (`tabindex="0"` if non-button). Empty state cards acting as "add new" MUST include `aria-label="Add new item"`.
+
+### Status Dot Sizing (`--dot-size`)
+Customizable status dot indicator. Size can be overridden contextually via CSS custom property `--dot-size`.
+```html
+<!-- Default 10px dot -->
+<span class="dot dot--green"></span>
+
+<!-- Small 8px dot inside a container -->
+<div style="--dot-size: 8px;">
+    <span class="dot dot--yellow"></span>
+</div>
+```
+
+### Subtle Badge Modifier (`.badge--subtle`)
+Subtle tinted background badge for minor tags and status metadata.
+```html
+<span class="badge badge--subtle">Experimental</span>
+```
+
+### Info Row vs Compact Row (`.info-row` vs `.compact-row`)
+Row containers are semantically distinct based on data display vs input interactions:
+- **`.info-row`** — Read-only key-value data display (label left, value right, bottom divider).
+- **`.compact-row`** — Interactive input and button pair (label + input left, button right).
+- *Note:* If a third variant for clickable list items is needed (e.g. WiFi scan results), use `.card--interactive` inside a `.card-grid`.
+```html
+<!-- Read-only data display -->
+<div class="info-row">
+    <span>IP Address</span>
+    <span class="text-muted">192.168.1.100</span>
+</div>
+
+<!-- Interactive input + action pair -->
+<div class="compact-row">
+    <label>
+        API Key
+        <input type="text" id="api-key">
+    </label>
+    <button id="apply-key-btn">Apply</button>
 </div>
 ```
 
@@ -259,6 +396,9 @@ The framework provides these global functions in `utils.js` (loaded before all t
 - **`window.armButton(button, action, timeout)`** — Armed confirmation pattern. First click arms the button, second click within timeout executes the action.
 - **`window.showRebootOverlay(message, subMessage)`** — Full-screen overlay with spinner and reconnection polling. Auto-reloads the page when the device comes back online.
 - **`window.apiFetch(url, options)`** — Serialised fetch wrapper. **Always use this instead of raw `fetch()`** — it queues requests to protect ESP32 socket pools.
+- **`window.apiFetch.enqueueTask(taskFn, delayMs)`** — Enqueue a background task in the low-priority lane, preventing it from blocking UI API requests.
+- **`window.renderTerminalLog(containerId)`** — Initialize a terminal log viewer inside a container element (`role="log"`, `aria-live="polite"`). Returns `{ append(line), clear(), scrollToBottom() }`.
+- **`window.renderSignalBars(rssi)`** — Generates an inline SVG signal strength icon (0–4 bars) wrapped in a `<span class="signal-bars" aria-label="Signal: N of 4 bars">` container.
 
 ### Decision Rule
 

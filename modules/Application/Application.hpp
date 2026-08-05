@@ -153,8 +153,8 @@ public:
     /** @brief Set the application name displayed in the portal title bar. */
     void setAppName(const char* name) { _appName = name; }
 
-    /** @brief Get the application name. Returns "Device Portal" if not set. */
-    const char* getAppName() const { return _appName ? _appName : "Device Portal"; }
+    /** @brief Get the application name. Returns APP_TITLE if not set. */
+    const char* getAppName() const { return _appName ? _appName : APP_TITLE; }
 
     /**
      * @brief Execute the full framework boot sequence.
@@ -551,7 +551,7 @@ private:
     };
     AppTabContributor _appTabContributor;  ///< Contributes "App" top-level nav tab
     bool _enableDefaultAppTab = true;      ///< Guard for default App tab registration
-    const char* _appName = nullptr;        ///< Runtime-settable application name for portal title
+    const char* _appName = nullptr;        ///< Runtime-settable application name (overrides APP_TITLE)
 
 
 

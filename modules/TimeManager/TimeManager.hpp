@@ -175,6 +175,12 @@ public:
      */
     const char* getApiPrefix() const override { return "/api/time"; }
 
+    /**
+     * @brief Maximum POST body size for time routes (32 KiB for timezone database upload).
+     * @return 32768
+     */
+    size_t getMaxPostBody() const override { return 32768; }
+
     // -------------------------------------------------------------------------
     // Time Query API
     // -------------------------------------------------------------------------

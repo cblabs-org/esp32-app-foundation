@@ -118,3 +118,16 @@ All new classes MUST follow the BEM convention established in WO1's ADR.
 2. **JS syntax check:** Ensure `utils.js` parses without errors.
 3. **Grep check:** Verify new class names don't conflict with existing classes.
 4. **CRITICAL:** Before distilling or committing, ask the user if they are happy. Only after approval, invoke the `@distillery` skill.
+
+---
+
+## Status Update
+
+- **Date:** 2026-08-05
+- **Status:** ✅ Complete & Validated
+- **Summary:**
+  - Added CSS primitives to `web/portal/app.css` (`button[aria-busy="true"]`, `.callout`, `.terminal-log`, `.terminal-log__line`, `.dialog-close-btn`, `.password-mask::placeholder`, `.field-feedback`, `article[aria-disabled="true"]`, `.card[aria-disabled="true"]`).
+  - Added `window.renderTerminalLog(containerId)` (U3) utility to `web/portal/utils.js`.
+  - Updated developer documentation in `docs/developer/extending-the-web-portal.md` and `.agents/skills/framework-expert/systems/web-portal/shared-utilities.md`.
+  - Verified CSS brace syntax and JS syntax via `node -c`.
+  - Approved by parent agent and distilled into `context_bridge.md`.

@@ -23,19 +23,19 @@
     if (!container) return;
 
     var toast = document.createElement('div');
-    toast.className = 'toast toast-' + type;
+    toast.className = 'toast toast--' + type;
     toast.textContent = message;
 
     container.appendChild(toast);
 
     // Trigger slide-in animation
     requestAnimationFrame(function() {
-      toast.classList.add('toast-visible');
+      toast.classList.add('toast--visible');
     });
 
     // Auto-dismiss
     setTimeout(function() {
-      toast.classList.remove('toast-visible');
+      toast.classList.remove('toast--visible');
       toast.addEventListener('transitionend', function() {
         if (toast.parentNode) toast.parentNode.removeChild(toast);
       });
@@ -126,6 +126,28 @@
     if (rssi >= -70) return 2;
     if (rssi >= -80) return 1;
     return 0;
+  };
+
+  /**
+   * @brief Render inline SVG signal bars icon for a given RSSI value.
+   * @param {number} rssi - RSSI value in dBm.
+   * @returns {string} HTML string containing the signal bars SVG inside a container <span>.
+   */
+  window.renderSignalBars = function(rssi) {
+    var bars = window.rssiToBars(rssi);
+    var barData = [
+      { x: 1, h: 4, y: 12 },
+      { x: 5, h: 7, y: 9 },
+      { x: 9, h: 10, y: 6 },
+      { x: 13, h: 13, y: 3 }
+    ];
+    var svg = '<svg width="18" height="16" viewBox="0 0 17 16" style="vertical-align:middle">';
+    barData.forEach(function(b, i) {
+      var fill = i < bars ? 'var(--primary, #2196F3)' : 'var(--border, #dee2e6)';
+      svg += '<rect x="' + b.x + '" y="' + b.y + '" width="3" height="' + b.h + '" rx="1" fill="' + fill + '"/>';
+    });
+    svg += '</svg>';
+    return '<span class="signal-bars" aria-label="Signal: ' + bars + ' of 4 bars">' + svg + '</span>';
   };
 
   /**
@@ -223,7 +245,7 @@
     if (msgEl) msgEl.textContent = message || 'Restarting device…';
     if (subEl) subEl.textContent = subMessage || 'Please wait for the device to come back online.';
 
-    overlay.classList.add('visible');
+    overlay.classList.add('reboot-overlay--visible');
 
     // Start reconnection polling after a brief delay (give device time to begin restart)
     if (window._rebootPollTimer) clearInterval(window._rebootPollTimer);
@@ -251,11 +273,50 @@
    */
   window.hideRebootOverlay = function() {
     var overlay = document.getElementById('reboot-overlay');
-    if (overlay) overlay.classList.remove('visible');
+    if (overlay) overlay.classList.remove('reboot-overlay--visible');
     if (window._rebootPollTimer) {
       clearInterval(window._rebootPollTimer);
       window._rebootPollTimer = null;
     }
+  };
+
+  // ===========================================================================
+  // Terminal Log Viewer Utility (U3)
+  // ===========================================================================
+
+  /**
+   * @brief Create or initialize a terminal log viewer inside a container element.
+   * @param {string|HTMLElement} containerId - Element ID or HTMLElement.
+   * @returns {Object|null} Controller object `{ append(line), clear(), scrollToBottom() }` or null if container not found.
+   */
+  window.renderTerminalLog = function(containerId) {
+    var container = typeof containerId === 'string'
+      ? document.getElementById(containerId)
+      : containerId;
+
+    if (!container) return null;
+
+    container.setAttribute('role', 'log');
+    container.setAttribute('aria-live', 'polite');
+    container.classList.add('terminal-log');
+
+    var controller = {
+      append: function(line) {
+        var lineEl = document.createElement('div');
+        lineEl.className = 'terminal-log__line';
+        lineEl.textContent = line;
+        container.appendChild(lineEl);
+        controller.scrollToBottom();
+      },
+      clear: function() {
+        container.innerHTML = '';
+      },
+      scrollToBottom: function() {
+        container.scrollTop = container.scrollHeight;
+      }
+    };
+
+    return controller;
   };
 
 })();

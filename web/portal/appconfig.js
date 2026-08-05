@@ -125,7 +125,7 @@
 
   // Also load if already active on init
   var container = document.getElementById('tab-app');
-  if (container && container.classList.contains('active')) {
+  if (container && container.classList.contains('tab-content--active')) {
     if (!initialized) {
       initAppTab();
     }

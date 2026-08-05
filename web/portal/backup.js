@@ -242,7 +242,7 @@
   });
 
   // Also load if already active on init
-  if (container.classList.contains('active')) {
+  if (container.classList.contains('tab-content--active')) {
     loadModuleList();
   }
 })();

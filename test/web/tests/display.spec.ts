@@ -80,7 +80,7 @@ async function bootPortal(page: Page, displayOverrides?: Partial<typeof MOCK_DIS
 
   await page.goto('/');
   await page.waitForFunction(() => (window as any).apiFetch !== undefined);
-  await expect(page.locator('#portal-title')).not.toHaveText('Device Portal');
+  await expect(page.locator('#portal-title')).not.toHaveText('ESP32 App Foundation');
 }
 
 /** Navigate to the Display top-level tab and wait for the Settings sub-pill to render. */
@@ -221,7 +221,7 @@ test.describe('Display Settings Tab', () => {
     // Clock font is in the App tab (appconfig.js), not the Display/Settings sub-pill
     await page.locator('#bottom-nav .tab-link[data-target="tab-app"]').click();
     // Wait for the App tab container to become active (content rendered by appconfig.js)
-    await page.locator('#tab-app.active').waitFor({ state: 'attached' });
+    await page.locator('#tab-app.tab-content--active').waitFor({ state: 'attached' });
 
     const requestPromise = page.waitForRequest(req =>
       req.url().includes('/api/display/clockFontSize') && req.method() === 'POST'

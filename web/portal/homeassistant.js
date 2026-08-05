@@ -51,7 +51,7 @@
         <article>
           <header>Home Assistant MQTT</header>
           <div class="status-badge" id="ha-mqtt-status" style="margin-bottom:1rem;">
-            <div class="dot grey" id="ha-mqtt-dot"></div>
+            <div class="dot dot--grey" id="ha-mqtt-dot"></div>
             <span id="ha-mqtt-text" style="text-transform:uppercase; font-size:0.75rem; letter-spacing:1px;">Checking...</span>
           </div>
           <div style="background:var(--primary-alpha); border-left:4px solid var(--primary); padding:1rem; border-radius:8px; font-size:0.85rem; color:var(--text); margin-bottom:1.2rem; line-height:1.4;">
@@ -110,7 +110,7 @@
         const mqttText = document.getElementById('ha-mqtt-text');
         const badge = document.getElementById('ha-mqtt-status');
         if (mqttDot && mqttText) {
-          mqttDot.className = 'dot yellow pulse';
+          mqttDot.className = 'dot dot--yellow dot--pulse';
           mqttText.textContent = 'Connecting...';
           mqttText.style.color = '';
         }
@@ -224,15 +224,15 @@
       mqttText.style.color = '';
 
       if (data.connected) {
-        mqttDot.className = 'dot green';
+        mqttDot.className = 'dot dot--green';
       } else {
         if (statusMsg.startsWith('Connection Refused') || statusMsg.startsWith('Connection Failed')) {
-          mqttDot.className = 'dot red';
+          mqttDot.className = 'dot dot--red';
           mqttText.style.color = 'var(--error)';
         } else if (statusMsg === 'Connecting...') {
-          mqttDot.className = 'dot yellow pulse';
+          mqttDot.className = 'dot dot--yellow dot--pulse';
         } else {
-          mqttDot.className = 'dot red';
+          mqttDot.className = 'dot dot--red';
         }
       }
     } catch (err) {

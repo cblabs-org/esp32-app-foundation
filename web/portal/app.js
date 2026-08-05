@@ -9,83 +9,145 @@
  */
 class ApiQueue {
   constructor() {
-    this.queue = [];
+    this.highQueue = [];
+    this.lowQueue = [];
+    this.lowDelayMs = 0;
+    this._delayTimer = null;
     this.isProcessing = false;
   }
 
   async enqueue(url, options) {
     options = options || {};
     return new Promise((resolve, reject) => {
-      this.queue.push({ url, options, resolve, reject });
+      this.highQueue.push({ url, options, resolve, reject });
+      this._cancelDelay();
       this.processNext();
     });
   }
 
+  /**
+   * Enqueue a background task with optional delay before the next task.
+   * @param {Function} taskFn - Function returning a Promise
+   * @param {number} delayMs - Delay in ms after this task before running the next background task
+   * @returns {Promise} Resolves/rejects with the task result
+   */
+  enqueueTask(taskFn, delayMs) {
+    return new Promise((resolve, reject) => {
+      this.lowQueue.push({ taskFn, resolve, reject });
+      if (delayMs !== undefined) this.lowDelayMs = delayMs;
+      this.processNext();
+    });
+  }
+
+  _cancelDelay() {
+    if (this._delayTimer) {
+      clearTimeout(this._delayTimer);
+      this._delayTimer = null;
+    }
+  }
+
+  /**
+   * Clears all pending background tasks and any active delay timer.
+   */
+  clearBackground() {
+    this.lowQueue = [];
+    this._cancelDelay();
+  }
+
+  /**
+   * Returns the number of pending background tasks.
+   */
+  get pendingBackground() {
+    return this.lowQueue.length;
+  }
+
   async processNext() {
-    if (this.isProcessing || this.queue.length === 0) return;
+    if (this.isProcessing) return;
+    if (this.highQueue.length === 0 && this.lowQueue.length === 0) return;
 
     this.isProcessing = true;
-    var item = this.queue.shift();
+    
+    var item;
+    var isHigh = false;
+    
+    if (this.highQueue.length > 0) {
+      item = this.highQueue.shift();
+      isHigh = true;
+    } else {
+      item = this.lowQueue.shift();
+    }
 
     try {
-      var response = await fetch(item.url, item.options);
+      if (isHigh) {
+        var response = await fetch(item.url, item.options);
 
-      // --- 401 Auth Interceptor (WO7) ---
-      // When auth is enabled and the session is invalid, show the login overlay
-      // instead of immediately rejecting. The auth module registers an interceptor
-      // that shows the overlay and the user can retry after logging in.
-      if (response.status === 401 && _authInterceptor) {
-        try {
-          await _authInterceptor();
-          var retryResponse = await fetch(item.url, item.options);
-          if (!retryResponse.ok) {
-            var retryErr = new Error('HTTP ' + retryResponse.status);
-            retryErr.status = retryResponse.status;
-            try {
-              var rct = retryResponse.headers.get('content-type');
-              retryErr.body = (rct && rct.indexOf('application/json') !== -1)
-                ? await retryResponse.json()
-                : await retryResponse.text();
-            } catch (e) {
-              retryErr.body = null;
+        // --- 401 Auth Interceptor (WO7) ---
+        // When auth is enabled and the session is invalid, show the login overlay
+        // instead of immediately rejecting. The auth module registers an interceptor
+        // that shows the overlay and the user can retry after logging in.
+        if (response.status === 401 && _authInterceptor) {
+          try {
+            await _authInterceptor();
+            var retryResponse = await fetch(item.url, item.options);
+            if (!retryResponse.ok) {
+              var retryErr = new Error('HTTP ' + retryResponse.status);
+              retryErr.status = retryResponse.status;
+              try {
+                var rct = retryResponse.headers.get('content-type');
+                retryErr.body = (rct && rct.indexOf('application/json') !== -1)
+                  ? await retryResponse.json()
+                  : await retryResponse.text();
+              } catch (e) {
+                retryErr.body = null;
+              }
+              throw retryErr;
             }
-            throw retryErr;
+            response = retryResponse;
+          } catch (authErr) {
+            item.reject(authErr);
+            this.isProcessing = false;
+            setTimeout(() => this.processNext(), 0);
+            return;
           }
-          response = retryResponse;
-        } catch (authErr) {
-          item.reject(authErr);
-          this.isProcessing = false;
-          setTimeout(() => this.processNext(), 0);
-          return;
         }
-      }
 
-      if (!response.ok) {
-        var err = new Error('HTTP ' + response.status);
-        err.status = response.status;
-        try {
-          var ct = response.headers.get('content-type');
-          err.body = (ct && ct.indexOf('application/json') !== -1)
-            ? await response.json()
-            : await response.text();
-        } catch (e) {
-          err.body = null;  // body unreadable/empty — not fatal
+        if (!response.ok) {
+          var err = new Error('HTTP ' + response.status);
+          err.status = response.status;
+          try {
+            var ct = response.headers.get('content-type');
+            err.body = (ct && ct.indexOf('application/json') !== -1)
+              ? await response.json()
+              : await response.text();
+          } catch (e) {
+            err.body = null;  // body unreadable/empty — not fatal
+          }
+          throw err;
         }
-        throw err;
-      }
 
-      var contentType = response.headers.get('content-type');
-      if (contentType && contentType.indexOf('application/json') !== -1) {
-        item.resolve(await response.json());
+        var contentType = response.headers.get('content-type');
+        if (contentType && contentType.indexOf('application/json') !== -1) {
+          item.resolve(await response.json());
+        } else {
+          item.resolve(await response.text());
+        }
       } else {
-        item.resolve(await response.text());
+        var result = await item.taskFn();
+        item.resolve(result);
       }
     } catch (error) {
-      console.error('API Error for ' + item.url + ':', error);
+      console.error(isHigh ? 'API Error for ' + item.url + ':' : 'Task Error:', error);
       item.reject(error);
     } finally {
       this.isProcessing = false;
-      setTimeout(() => this.processNext(), 0);
+      
+      if (isHigh || this.highQueue.length > 0) {
+        setTimeout(() => this.processNext(), 0);
+      } else if (this.lowQueue.length > 0 && this.lowDelayMs > 0) {
+        this._delayTimer = setTimeout(() => this.processNext(), this.lowDelayMs);
+      } else {
+        setTimeout(() => this.processNext(), 0);
+      }
     }
   }
 }
@@ -104,6 +166,9 @@ window.registerAuthInterceptor = function(showOverlayFn) {
 // Global instance for all fragments to use
 var api = new ApiQueue();
 window.apiFetch = function(url, options) { return api.enqueue(url, options); };
+window.apiFetch.enqueueTask = function(taskFn, delayMs) { return api.enqueueTask(taskFn, delayMs); };
+window.apiFetch.clearBackground = function() { api.clearBackground(); };
+Object.defineProperty(window.apiFetch, 'pendingBackground', { get: function() { return api.pendingBackground; } });
 
 // =============================================================================
 // Navigation Engine
@@ -137,7 +202,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Update toggle buttons
     themeToggle.querySelectorAll('.theme-btn').forEach(function(btn) {
-      btn.classList.toggle('active', btn.getAttribute('data-theme') === mode);
+      btn.classList.toggle('theme-btn--active', btn.getAttribute('data-theme') === mode);
     });
 
     // Determine effective theme
@@ -333,7 +398,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // --- Update bottom nav active state ---
     bottomNav.querySelectorAll('.tab-link').forEach(function(link) {
-      link.classList.toggle('active', link.getAttribute('data-target') === tabId);
+      link.classList.toggle('tab-link--active', link.getAttribute('data-target') === tabId);
     });
 
     // --- Find the parent tab name for this tabId ---
@@ -417,7 +482,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Update pill active state
     pillBar.querySelectorAll('.pill-btn').forEach(function(btn) {
-      btn.classList.toggle('active', btn.getAttribute('data-target') === childId);
+      btn.classList.toggle('pill-btn--active', btn.getAttribute('data-target') === childId);
     });
 
     // Show the child content div
@@ -433,11 +498,11 @@ document.addEventListener('DOMContentLoaded', function() {
    */
   function showContentDiv(targetId) {
     document.querySelectorAll('.tab-content').forEach(function(div) {
-      div.classList.remove('active');
+      div.classList.remove('tab-content--active');
     });
 
     var target = document.getElementById(targetId);
-    if (target) target.classList.add('active');
+    if (target) target.classList.add('tab-content--active');
   }
 
   // =========================================================================
@@ -450,6 +515,8 @@ document.addEventListener('DOMContentLoaded', function() {
       if (data && data.name) {
         portalTitle.textContent = data.name;
         document.title = data.name;
+        var loginTitle = document.getElementById('login-title');
+        if (loginTitle) loginTitle.textContent = data.name;
       }
     } catch (err) {
       console.warn('Failed to fetch /api/app');

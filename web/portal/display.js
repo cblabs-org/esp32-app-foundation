@@ -289,7 +289,7 @@
 
   // Also load if already active on init
   var container = document.getElementById('tab-settings');
-  if (container && container.classList.contains('active')) {
+  if (container && container.classList.contains('tab-content--active')) {
     if (!initialized) {
       initSettingsTab();
     }

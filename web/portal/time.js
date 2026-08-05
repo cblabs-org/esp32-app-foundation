@@ -470,7 +470,7 @@
   });
 
   // If the time tab is already active on load, load immediately
-  if (container.classList.contains('active')) {
+  if (container.classList.contains('tab-content--active')) {
     loadTimeConfig();
   }
 })();

@@ -50,7 +50,7 @@ async function bootPortal(page: Page) {
   await setupRoutes(page);
   await page.goto('/');
   await page.waitForFunction(() => (window as any).apiFetch !== undefined);
-  await expect(page.locator('#portal-title')).not.toHaveText('Device Portal');
+  await expect(page.locator('#portal-title')).not.toHaveText('ESP32 App Foundation');
 }
 
 // ---------------------------------------------------------------------------
@@ -65,7 +65,7 @@ test.describe('Theme Toggle', () => {
 
     // Auto mode should be selected
     const autoBtn = page.locator('.theme-btn[data-theme="auto"]');
-    await expect(autoBtn).toHaveClass(/active/);
+    await expect(autoBtn).toHaveClass(/theme-btn--active/);
 
     // Since system is dark, <html> should have data-theme="dark"
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
@@ -82,8 +82,8 @@ test.describe('Theme Toggle', () => {
     await expect(htmlEl).not.toHaveAttribute('data-theme', 'dark');
 
     // The light button should be active
-    await expect(page.locator('.theme-btn[data-theme="light"]')).toHaveClass(/active/);
-    await expect(page.locator('.theme-btn[data-theme="dark"]')).not.toHaveClass(/active/);
+    await expect(page.locator('.theme-btn[data-theme="light"]')).toHaveClass(/theme-btn--active/);
+    await expect(page.locator('.theme-btn[data-theme="dark"]')).not.toHaveClass(/theme-btn--active/);
   });
 
   test('dark mode sets data-theme="dark"', async ({ page }) => {
@@ -96,8 +96,8 @@ test.describe('Theme Toggle', () => {
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
 
     // The dark button should be active
-    await expect(page.locator('.theme-btn[data-theme="dark"]')).toHaveClass(/active/);
-    await expect(page.locator('.theme-btn[data-theme="auto"]')).not.toHaveClass(/active/);
+    await expect(page.locator('.theme-btn[data-theme="dark"]')).toHaveClass(/theme-btn--active/);
+    await expect(page.locator('.theme-btn[data-theme="auto"]')).not.toHaveClass(/theme-btn--active/);
   });
 
   test('theme persists in localStorage and survives reload', async ({ page }) => {
@@ -113,10 +113,10 @@ test.describe('Theme Toggle', () => {
     // Reload the page — routes survive reload, localStorage persists
     await page.reload();
     await page.waitForFunction(() => (window as any).apiFetch !== undefined);
-    await expect(page.locator('#portal-title')).not.toHaveText('Device Portal');
+    await expect(page.locator('#portal-title')).not.toHaveText('ESP32 App Foundation');
 
     // After reload, dark should still be active (read from localStorage by initTheme)
-    await expect(page.locator('.theme-btn[data-theme="dark"]')).toHaveClass(/active/);
+    await expect(page.locator('.theme-btn[data-theme="dark"]')).toHaveClass(/theme-btn--active/);
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
   });
 
@@ -124,24 +124,24 @@ test.describe('Theme Toggle', () => {
     await bootPortal(page);
 
     // Default auto → auto button active
-    await expect(page.locator('.theme-btn[data-theme="auto"]')).toHaveClass(/active/);
+    await expect(page.locator('.theme-btn[data-theme="auto"]')).toHaveClass(/theme-btn--active/);
 
     // Switch to light → light active, others not
     await page.locator('.theme-btn[data-theme="light"]').click();
-    await expect(page.locator('.theme-btn[data-theme="light"]')).toHaveClass(/active/);
-    await expect(page.locator('.theme-btn[data-theme="auto"]')).not.toHaveClass(/active/);
-    await expect(page.locator('.theme-btn[data-theme="dark"]')).not.toHaveClass(/active/);
+    await expect(page.locator('.theme-btn[data-theme="light"]')).toHaveClass(/theme-btn--active/);
+    await expect(page.locator('.theme-btn[data-theme="auto"]')).not.toHaveClass(/theme-btn--active/);
+    await expect(page.locator('.theme-btn[data-theme="dark"]')).not.toHaveClass(/theme-btn--active/);
 
     // Switch to dark → dark active, others not
     await page.locator('.theme-btn[data-theme="dark"]').click();
-    await expect(page.locator('.theme-btn[data-theme="dark"]')).toHaveClass(/active/);
-    await expect(page.locator('.theme-btn[data-theme="auto"]')).not.toHaveClass(/active/);
-    await expect(page.locator('.theme-btn[data-theme="light"]')).not.toHaveClass(/active/);
+    await expect(page.locator('.theme-btn[data-theme="dark"]')).toHaveClass(/theme-btn--active/);
+    await expect(page.locator('.theme-btn[data-theme="auto"]')).not.toHaveClass(/theme-btn--active/);
+    await expect(page.locator('.theme-btn[data-theme="light"]')).not.toHaveClass(/theme-btn--active/);
 
     // Switch back to auto → auto active, others not
     await page.locator('.theme-btn[data-theme="auto"]').click();
-    await expect(page.locator('.theme-btn[data-theme="auto"]')).toHaveClass(/active/);
-    await expect(page.locator('.theme-btn[data-theme="light"]')).not.toHaveClass(/active/);
-    await expect(page.locator('.theme-btn[data-theme="dark"]')).not.toHaveClass(/active/);
+    await expect(page.locator('.theme-btn[data-theme="auto"]')).toHaveClass(/theme-btn--active/);
+    await expect(page.locator('.theme-btn[data-theme="light"]')).not.toHaveClass(/theme-btn--active/);
+    await expect(page.locator('.theme-btn[data-theme="dark"]')).not.toHaveClass(/theme-btn--active/);
   });
 });

@@ -648,5 +648,5 @@
     if (e.detail === 'tab-ota') loadStatus();
   });
 
-  if (container.classList.contains('active')) loadStatus();
+  if (container.classList.contains('tab-content--active')) loadStatus();
 })();

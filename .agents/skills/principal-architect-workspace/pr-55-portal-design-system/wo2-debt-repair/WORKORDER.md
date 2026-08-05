@@ -109,3 +109,9 @@ Extend the existing `ApiQueue` class in `web/portal/app.js` (currently lines ~10
 1. **Grep verification:** Confirm no orphaned references to old `.form-error` / migrated classes remain.
 2. **Behavioral verification:** The existing `apiFetch()` calls across all tabs must work identically (no regression). Write a brief test scenario description for the priority pre-emption behavior.
 3. **CRITICAL:** Before distilling or committing, ask the user if they are happy. Only after approval, invoke the `@distillery` skill.
+
+## Status Updates
+- **2026-08-05**: WO2 Implementation completed by worker (session `9f86be0d-27c4-4d3d-ae75-d3ba32e755c5`).
+  - `.card` and `.alert` formalized in `app.css`.
+  - `ApiQueue` priority lanes and pre-emption implemented.
+  - Distilled execution to `context_bridge.md` and related artifacts.

@@ -58,13 +58,13 @@ async function bootAndNavigateToOta(page: Page) {
 
   await page.goto('/');
   await page.waitForFunction(() => (window as any).apiFetch !== undefined);
-  await expect(page.locator('#portal-title')).not.toHaveText('Device Portal');
+  await expect(page.locator('#portal-title')).not.toHaveText('ESP32 App Foundation');
 
   // Navigate to System → OTA
   await page.locator('#bottom-nav [data-target="tab-system"]').click();
   await expect(page.locator('#pill-bar')).toBeVisible();
   await page.locator('#pill-bar .pill-btn[data-target="tab-ota"]').click();
-  await expect(page.locator('#tab-ota')).toHaveClass(/active/);
+  await expect(page.locator('#tab-ota')).toHaveClass(/tab-content--active/);
 }
 
 // ---------------------------------------------------------------------------
