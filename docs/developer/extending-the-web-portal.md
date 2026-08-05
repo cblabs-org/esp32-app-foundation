@@ -120,6 +120,12 @@ Create an HTML snippet representing your tab UI inside the `/www/<namespace>/tab
 > [!IMPORTANT]
 > **HTML ID Scoping Rule:** All element IDs must be prefixed with your module name to avoid collisions with other tabs loaded into the same SPA DOM. Use `id="myapp-save-btn"` — never `id="save-btn"`. Multiple tabs coexist in a single HTML document, so unprefixed IDs will clash.
 
+> [!TIP]
+> **Canonical Containers:** For structural card containers, use the `.card` class (e.g., `<div class="card">`). The legacy `<article>` tag is still supported for backward compatibility but `.card` is the modern standard.
+
+> [!TIP]
+> **Alerts:** Use the `.alert` component for inline feedback (e.g., `<div class="alert alert--info" role="status">Message</div>`). Modifiers include `--success`, `--error`, `--warning`, and `--info`.
+
 ```html
 <!-- MyApp tab content fragment -->
 <div class="tab-content" id="myapp-tab">
@@ -259,6 +265,7 @@ The framework provides these global functions in `utils.js` (loaded before all t
 - **`window.armButton(button, action, timeout)`** — Armed confirmation pattern. First click arms the button, second click within timeout executes the action.
 - **`window.showRebootOverlay(message, subMessage)`** — Full-screen overlay with spinner and reconnection polling. Auto-reloads the page when the device comes back online.
 - **`window.apiFetch(url, options)`** — Serialised fetch wrapper. **Always use this instead of raw `fetch()`** — it queues requests to protect ESP32 socket pools.
+- **`window.apiFetch.enqueueTask(taskFn, delayMs)`** — Enqueue a background task in the low-priority lane, preventing it from blocking UI API requests.
 
 ### Decision Rule
 

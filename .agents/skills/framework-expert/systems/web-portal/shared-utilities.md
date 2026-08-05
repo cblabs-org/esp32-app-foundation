@@ -38,6 +38,43 @@ try {
 }
 ```
 
+### `window.apiFetch.enqueueTask(taskFn, delayMs)`
+
+Enqueues a background task in the low-priority lane. UI requests (`window.apiFetch`) will always pre-empt background tasks.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `taskFn`  | `function` | Yes | A function that returns a Promise |
+| `delayMs` | `number`   | No  | Milliseconds to delay *after* this task completes before running the next background task |
+
+**Returns:** `Promise` — resolves or rejects with the result of `taskFn`.
+
+```javascript
+window.apiFetch.enqueueTask(async () => {
+  // Heavy background processing or polling
+  const res = await fetch('/api/background/sync');
+  return res.json();
+}, 1000).then(result => console.log(result));
+```
+
+### `window.apiFetch.clearBackground()`
+
+Clears all pending background tasks and cancels any active delay timer.
+
+```javascript
+window.apiFetch.clearBackground();
+```
+
+### `window.apiFetch.pendingBackground` (Getter)
+
+Returns the current number of pending tasks in the background queue.
+
+```javascript
+if (window.apiFetch.pendingBackground > 0) {
+  console.log("Background tasks are running");
+}
+```
+
 ## User Feedback
 
 ### `window.showToast(message, type, duration)`
@@ -171,6 +208,24 @@ Generates a RAG-coloured (Red/Amber/Green) progress bar as an HTML string.
 
 ```javascript
 container.innerHTML = window.renderProgressBar('Heap', freeHeap, totalHeap, 'KB');
+```
+
+## CSS Components
+
+### `.alert` Component
+
+Use `.alert` to display inline feedback boxes. Available modifier classes are:
+- `.alert--success`
+- `.alert--error`
+- `.alert--warning`
+- `.alert--info`
+
+**Accessibility (A11y):** For dynamic alerts injected by JS, add `role="alert"`. For static ones present on load, use `role="status"`.
+
+```html
+<div class="alert alert--info" role="status">
+  Please configure the device before proceeding.
+</div>
 ```
 
 ## Utility

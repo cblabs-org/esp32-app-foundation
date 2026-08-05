@@ -110,7 +110,8 @@ body.ap-mode .tab-link:not([data-target="tab-wifi"]):not([data-target="tab-syste
 /* ==========================================================================
    4. FORM ELEMENTS & BUTTONS
    ========================================================================== */
-article {
+/* .card — canonical card container. article selector retained for backward compat. See ADR. */
+article, .card {
   background: var(--card-bg);
   border-radius: 16px;
   padding: 1.25rem;
@@ -856,13 +857,32 @@ input[type="number"]::-webkit-inner-spin-button {
   margin: 0 0 20px 0;
   font-size: 0.9em;
 }
-.login-error {
-  color: var(--error);
-  font-size: 0.85em;
-  margin: 8px 0;
-  padding: 8px 12px;
-  border-radius: 6px;
+.alert {
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  border: 1px solid;
+  font-size: 0.85rem;
+  margin-bottom: 0.75rem;
+}
+.alert--success {
+  background: rgba(46, 125, 50, 0.1);
+  border-color: var(--success);
+  color: var(--success);
+}
+.alert--error {
   background: rgba(198, 40, 40, 0.1);
+  border-color: var(--error);
+  color: var(--error);
+}
+.alert--warning {
+  background: rgba(249, 168, 37, 0.1);
+  border-color: var(--warning);
+  color: var(--warning);
+}
+.alert--info {
+  background: rgba(33, 150, 243, 0.1);
+  border-color: var(--primary);
+  color: var(--primary);
 }
 .login-card .input-group {
   margin-bottom: 12px;
@@ -886,14 +906,7 @@ input[type="number"]::-webkit-inner-spin-button {
 /* ==========================================================================
    21. SECURITY TAB STYLES (WO7)
    ========================================================================== */
-.form-error {
-  color: var(--error);
-  font-size: 0.85em;
-  margin: 8px 0;
-  padding: 8px 12px;
-  border-radius: 6px;
-  background: rgba(198, 40, 40, 0.1);
-}
+
 .cert-status {
   padding: 8px 0;
 }

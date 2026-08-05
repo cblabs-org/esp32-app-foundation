@@ -51,7 +51,7 @@ Implement the shared CSS component library and JS utility enhancements proposed 
 | WO | Topic | Complexity | Dependencies | Status |
 |---|---|---|---|---|
 | **[x] [wo1-naming-convention](wo1-naming-convention/WORKORDER.md)** | BEM ADR + legacy class migration | standard | none (bases on `main`) | ✅ Complete — 70/70 tests |
-| **[ ] [wo2-debt-repair](wo2-debt-repair/WORKORDER.md)** | Formalize `.card`, `.alert`, ApiQueue priority lanes | architect | wo1 | 📋 Planned |
+| **[x] [wo2-debt-repair](wo2-debt-repair/WORKORDER.md)** | Formalize `.card`, `.alert`, ApiQueue priority lanes | architect | wo1 | ✅ Complete |
 | **[ ] [wo3-new-primitives](wo3-new-primitives/WORKORDER.md)** | Core new components (#1, #8, #9+U3, #12, #14, #16, #17, #18) | standard | wo2 | 📋 Planned |
 | **[ ] [wo4-consolidation](wo4-consolidation/WORKORDER.md)** | Card grid, dot, badge, list-item, signal bars (#2–7, #11, #15+U2) | standard | wo3 | 📋 Planned |
 

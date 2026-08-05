@@ -31,7 +31,7 @@
             '<input type="password" id="login-password" placeholder="Password" ' +
                    'autocomplete="current-password">' +
           '</div>' +
-          '<div id="login-error" class="login-error hidden"></div>' +
+          '<div id="login-error" class="alert alert--error hidden"></div>' +
           '<button type="submit" id="login-submit" style="width:100%">Unlock</button>' +
           '<button type="button" id="login-cancel" class="secondary" style="width:100%; margin-top:0.5rem">Cancel</button>' +
         '</form>' +
@@ -252,7 +252,7 @@
         '<input type="password" id="confirm-password" ' +
                'placeholder="Confirm password" autocomplete="new-password" ' +
                'style="width:100%; box-sizing:border-box; margin-bottom:0.75rem;">' +
-        '<div id="set-password-error" class="form-error hidden"></div>' +
+        '<div id="set-password-error" class="alert alert--error hidden"></div>' +
         '<button id="set-password-btn" style="width:100%;">Set Password</button>';
     } else {
       html +=
@@ -284,7 +284,7 @@
             '<input type="password" id="confirm-password" ' +
                    'placeholder="Confirm new password" autocomplete="new-password" ' +
                    'style="width:100%; box-sizing:border-box; margin-bottom:0.75rem;">' +
-            '<div id="change-password-error" class="form-error hidden"></div>' +
+            '<div id="change-password-error" class="alert alert--error hidden"></div>' +
             '<button id="change-password-btn" class="secondary" style="width:100%;">Change Password</button>';
     }
     html += '</article>';
@@ -379,7 +379,7 @@
             '<label for="upload-key-pem" style="font-size:0.85rem;">Private Key (PEM)</label>' +
             '<textarea id="upload-key-pem" rows="4" placeholder="-----BEGIN PRIVATE KEY-----..." ' +
               'style="width:100%; box-sizing:border-box; margin-bottom:0.75rem;"></textarea>' +
-            '<div id="upload-cert-error" class="form-error hidden"></div>' +
+            '<div id="upload-cert-error" class="alert alert--error hidden"></div>' +
             '<button id="upload-cert-btn" style="width:100%;">Upload Certificate</button>' +
           '</div>' +
         '</details>' +
