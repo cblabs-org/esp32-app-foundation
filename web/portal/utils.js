@@ -304,7 +304,7 @@
       append: function(line) {
         var lineEl = document.createElement('div');
         lineEl.className = 'terminal-log__line';
-        lineEl.innerHTML = window.escapeHtml(line);
+        lineEl.textContent = line;
         container.appendChild(lineEl);
         controller.scrollToBottom();
       },
