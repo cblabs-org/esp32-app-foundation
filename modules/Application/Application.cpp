@@ -328,9 +328,18 @@ void Application::tick() {
                 ? actionable->getActionStatus()
                 : GateActionStatus::Satisfied;
 
-            // Re-publish if actionable gate changed OR its status changed
+            // Re-publish if actionable gate changed, its status changed,
+            // or the device IP changed (e.g. WiFi connected after initial publish)
             bool changed = ConfigGateResolver::shouldRepublish(
                 currentGate, currentStatus, _lastPublishedGate, _lastPublishedStatus);
+
+            if (!changed) {
+                // Also re-publish if IP changed (initial event may have 0.0.0.0)
+                String currentIPStr = WiFi.localIP().toString();
+                if (strcmp(currentIPStr.c_str(), _deviceIPBuf) != 0) {
+                    changed = true;
+                }
+            }
 
             if (changed) {
                 _publishConfiguringEvent(false, actionable);

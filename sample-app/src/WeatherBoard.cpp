@@ -30,6 +30,7 @@
 WeatherBoard::WeatherBoard(WeatherModule* weatherModule)
     : _weatherModule(weatherModule) {
     // EventBus wiring is deferred to wireEventBus() — see comment there.
+    // WeatherWidget member is default-constructed with its owned LabelWidgets.
 }
 
 /**
@@ -121,6 +122,6 @@ void WeatherBoard::render(U8G2& u8g2) {
         condStr = _weatherModule->getCondition();
     }
 
-    // Draw the Weather Widget with the correct unit suffix
-    WeatherWidget::draw(u8g2, 10, 40, tempStr, condStr, unitSuffix);
+    // Draw the Weather Widget — layout is self-centred on the display
+    _weatherWidget.draw(u8g2, tempStr, condStr, unitSuffix);
 }

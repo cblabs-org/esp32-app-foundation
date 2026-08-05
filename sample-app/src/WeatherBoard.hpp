@@ -38,6 +38,7 @@ class WeatherBoard : public IDisplayBoard {
 private:
     WeatherModule* _weatherModule;          ///< Source of thread-safe weather data for rendering
     EventBus* _eventBus = nullptr;          ///< F04: EventBus ref for subscription demo
+    mutable WeatherWidget _weatherWidget;   ///< Composable weather display widget
 
     /**
      * @brief Static callback for EventBus subscription.

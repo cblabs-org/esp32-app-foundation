@@ -6,35 +6,46 @@
  * SPDX-License-Identifier: Apache-2.0
  *
  * Module: sample-app/src/WeatherWidget.hpp
- * Description: Pure static utility class for rendering weather data on a
- *              U8G2 display. Provides a composable draw() method that renders
- *              a weather icon, temperature, and condition text.
+ * Description: Composable weather display widget built from framework
+ *              LabelWidget primitives. Owns two LabelWidgets (temperature
+ *              and condition) and renders a weather icon glyph. All
+ *              positioning uses the framework's widget coordinate system
+ *              (top-left origin) with automatic display centering.
  *
  * Exported Classes:
- * - WeatherWidget: Static utility for weather UI rendering
- *   - draw():  Renders weather icon + temperature + condition on a U8G2 display
+ * - WeatherWidget: Composable weather UI widget
+ *   - draw():  Positions and renders icon + labels centred on the display
  */
 
 #pragma once
 
 #include <U8g2lib.h>
 #include <string>
+#include "widgets/LabelWidget.hpp"
 
 class WeatherWidget {
+private:
+    LabelWidget _tempLabel;     ///< Temperature display (e.g., "24.4 °C")
+    LabelWidget _condLabel;     ///< Condition display (e.g., "Clouds")
+
+    static constexpr int ICON_SIZE   = 32;  ///< open_iconic_weather_4x = 32×32
+    static constexpr int HORIZ_GAP   = 10;  ///< Gap between icon and text column
+    static constexpr int TEXT_GAP    =  4;  ///< Gap between temperature and condition labels
+
 public:
+    WeatherWidget();
+
     /**
-     * @brief Renders a weather UI element on a U8G2 display.
+     * @brief Renders the weather widget centred on the display.
      *
-     * Draws a weather condition icon (from the U8G2 open-iconic weather font),
-     * the temperature with the provided unit suffix, and the condition text.
-     * Icon selection is based on the condition string (e.g., "Clouds", "Rain").
+     * Composes a weather icon glyph with two LabelWidget instances
+     * (temperature and condition). Layout is computed dynamically from
+     * display dimensions and measured text widths.
      *
      * @param display   Reference to the U8G2 display driver instance.
-     * @param x         Horizontal pixel offset for the weather icon.
-     * @param y         Vertical pixel offset for the weather icon baseline.
      * @param tempStr   Formatted temperature string (e.g., "21.5").
      * @param condStr   Weather condition string (e.g., "Clouds", "Rain", "Clear").
      * @param units     Unit suffix to display after the temperature (e.g., "°C", "°F").
      */
-    static void draw(U8G2& display, int x, int y, const std::string& tempStr, const std::string& condStr, const char* units = "°C");
+    void draw(U8G2& display, const std::string& tempStr, const std::string& condStr, const char* units = "°C");
 };

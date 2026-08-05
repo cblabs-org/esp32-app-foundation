@@ -74,7 +74,7 @@
  *   - registerMCPTools():       Registers "weather_status" read-only MCP tool
  *
  *   IConfigGate:
- *   - getGateName():            Returns "Weather API Key" — boot-gate display name
+ *   - getGateName():            Returns "Weather Setup" — boot-gate display name
  *   - isSatisfied():            Returns true when OWM API key is configured in KeyManager
  *   - getHelpText():            Returns user-facing guidance for configuring the API key
  *
@@ -427,14 +427,21 @@ public:
 
     // --- IConfigGate ---
 
-    /** @brief Returns the boot-gate display name: "Weather API Key". */
+    /** @brief Returns the boot-gate display name: "Weather Setup". */
     const char* getGateName() const override;
 
-    /** @brief Returns true when the OWM API key is configured in KeyManager. */
+    /** @brief Returns true when both OWM API key and location are configured. */
     bool isSatisfied() const override;
 
-    /** @brief Returns user-facing guidance text for configuring the API key. */
+    /** @brief Returns user-facing guidance text for configuring weather. */
     const char* getHelpText() const override;
+
+    /** @brief Weather depends on WiFi — don't show until WiFi is connected. */
+    const char* const* getDependencies(uint8_t& count) const override {
+        static const char* deps[] = { GateNames::WIFI_STATION };
+        count = 1;
+        return deps;
+    }
 
     // --- JsonListener (hardware only — parser library unavailable in native builds) ---
     /** @brief No-op — required by JsonListener interface. */

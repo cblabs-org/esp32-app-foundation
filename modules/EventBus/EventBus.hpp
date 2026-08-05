@@ -106,6 +106,7 @@ private:
     void cleanup();
 #else
     std::vector<Subscription*> _subscribers;
+    void _ensureEventLoop();  ///< Lazy-create default esp_event loop on first use
 #endif
 
 public:
