@@ -298,7 +298,7 @@ curl -s -X POST http://<device-ip>/api/mcp \
 
 ### With an MCP Client
 
-The device-mcp-client skill provides a Python-based client for programmatic interaction. Any JSON-RPC 2.0 compatible client can connect to the HTTP endpoint.
+The framework-expert skill (`scripts/device-mcp/`) provides Python-based clients for programmatic interaction. Any JSON-RPC 2.0 compatible client can connect to the HTTP endpoint.
 
 ### Over Serial
 
