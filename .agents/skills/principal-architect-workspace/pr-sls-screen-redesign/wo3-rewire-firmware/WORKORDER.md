@@ -81,22 +81,29 @@ Part of **PR: SLS Screen Redesign** ([PROJECT.md](../PROJECT.md)); decomposition
 
 ---
 ## Completion Report
-<!-- Written by the worker at task completion -->
+<!-- Executed inline by the PA acting as architect, autonomous approval 2026-08-09 -->
 
 ### Status
-(pending)
+complete
 
 ### Changes Made
--
+- `modules/LVGLDisplay/screens/SLSSystemScreens.cpp` — `hideAllGroups()` now hides Error/Setup/OTA/Busy/Message; `onError` → `ui_uiSystemErrorTitle`/`ui_uiSystemErrorMessage`; `onOtaProgress` → `ui_ui_SystemOTABar`/`ui_ui_SystemOTAPercent`/`ui_uiSystemOTAStatus`.
+- `modules/LVGLDisplay/screens/SLSSystemScreens.hpp` — class doc lists the five groups.
+- `test/stubs/platform/ui_stubs.c` — full rewrite to the exact exported symbol set (Setup/Busy/Message added; Wizard/Interstitial/removed-Diag symbols dropped).
+- `test/test_unit/test_lvglDisplay/test_sls_screens.cpp` — fixtures + assertions updated to Setup/Busy/Message.
 
 ### Decisions Made
--
+- **Mapped straight from the export, not the WO3 table.** The human's SLS tweaks renamed several Error/OTA globals into the `ui_uiSystem…` form (e.g. `ui_uiSystemErrorTitle`, `ui_uiSystemOTAStatus`) while OTA bar/percent/title kept the `ui_ui_System…` form. Authoritative names taken from `modules/LVGLDisplay/ui/*.h`.
 
 ### Dead Ends & Warnings
--
+- First `crowpanel-128-rotary` build failed on `managed_components/joltwallet__littlefs/src/littlefs/lfs.c not found` — a **transient race**: the ESP-IDF component manager was repopulating `managed_components/` (mtime matched the build) so the build read a half-populated tree. Sources were intact; a plain rebuild succeeded. Not a code issue; nothing to fix. (Worth knowing for future flaky builds.)
+
+### Verification
+- `run_tests` native → **417/417 succeeded** (00:00:30).
+- `build_project` crowpanel-128-rotary → **[SUCCESS]** 59.01s, RAM 24.5% (80404 B), Flash 43.2% (1.81 MB).
 
 ### Out-of-Scope Findings
--
+- (none — littlefs race is environmental, self-resolving)
 
 ### Blockers
 (none)

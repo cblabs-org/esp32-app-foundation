@@ -33,11 +33,11 @@ lv_obj_t* SLSSystemScreens::otaScreen() {
 }
 
 void SLSSystemScreens::onError(const char* title, const char* message) {
-    if (ui_ui_SystemErrorTitle != nullptr && title != nullptr) {
-        lv_label_set_text(ui_ui_SystemErrorTitle, title);
+    if (ui_uiSystemErrorTitle != nullptr && title != nullptr) {
+        lv_label_set_text(ui_uiSystemErrorTitle, title);
     }
-    if (ui_ui_SystemErrorMessage != nullptr && message != nullptr) {
-        lv_label_set_text(ui_ui_SystemErrorMessage, message);
+    if (ui_uiSystemErrorMessage != nullptr && message != nullptr) {
+        lv_label_set_text(ui_uiSystemErrorMessage, message);
     }
 }
 
@@ -55,8 +55,8 @@ void SLSSystemScreens::onOtaProgress(float progress, const char* status) {
         lv_label_set_text(ui_ui_SystemOTAPercent, pctBuf);
     }
 
-    if (ui_ui_SystemOTAStatus != nullptr && status != nullptr) {
-        lv_label_set_text(ui_ui_SystemOTAStatus, status);
+    if (ui_uiSystemOTAStatus != nullptr && status != nullptr) {
+        lv_label_set_text(ui_uiSystemOTAStatus, status);
     }
 }
 
@@ -64,13 +64,16 @@ void SLSSystemScreens::hideAllGroups() {
     if (ui_uiSystemErrorGroup != nullptr) {
         lv_obj_add_flag(ui_uiSystemErrorGroup, LV_OBJ_FLAG_HIDDEN);
     }
-    if (ui_uiSystemWizardGroup != nullptr) {
-        lv_obj_add_flag(ui_uiSystemWizardGroup, LV_OBJ_FLAG_HIDDEN);
+    if (ui_uiSystemSetupGroup != nullptr) {
+        lv_obj_add_flag(ui_uiSystemSetupGroup, LV_OBJ_FLAG_HIDDEN);
     }
     if (ui_uiSystemOTAGroup != nullptr) {
         lv_obj_add_flag(ui_uiSystemOTAGroup, LV_OBJ_FLAG_HIDDEN);
     }
-    if (ui_uiSystemInterstitialGroup != nullptr) {
-        lv_obj_add_flag(ui_uiSystemInterstitialGroup, LV_OBJ_FLAG_HIDDEN);
+    if (ui_uiSystemBusyGroup != nullptr) {
+        lv_obj_add_flag(ui_uiSystemBusyGroup, LV_OBJ_FLAG_HIDDEN);
+    }
+    if (ui_uiSystemMessageGroup != nullptr) {
+        lv_obj_add_flag(ui_uiSystemMessageGroup, LV_OBJ_FLAG_HIDDEN);
     }
 }

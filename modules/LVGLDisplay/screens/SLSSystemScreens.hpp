@@ -23,8 +23,11 @@
 /**
  * @brief SquareLine Studio system screen skin provider.
  *
- * Bridges SLS-exported widget globals (ui_uiSystemScreen, ui_uiSystemErrorGroup,
- * ui_uiSystemOTAGroup, etc.) to the framework ILVGLSystemScreens interface.
+ * Bridges SLS-exported widget globals to the framework ILVGLSystemScreens
+ * interface. The System screen (ui_uiSystemScreen) hosts visibility groups —
+ * Error (ui_uiSystemErrorGroup), Setup (ui_uiSystemSetupGroup), OTA
+ * (ui_uiSystemOTAGroup), Busy (ui_uiSystemBusyGroup), and Message
+ * (ui_uiSystemMessageGroup) — shown one at a time via hideAllGroups().
  */
 class SLSSystemScreens : public ILVGLSystemScreens {
 public:
