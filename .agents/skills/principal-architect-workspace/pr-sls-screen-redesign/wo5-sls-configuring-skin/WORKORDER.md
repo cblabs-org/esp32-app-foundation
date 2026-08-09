@@ -52,22 +52,25 @@ Part of **PR: SLS Screen Redesign** ([PROJECT.md](../PROJECT.md)); approved by t
 
 ---
 ## Completion Report
-<!-- Written at task completion -->
+<!-- Executed inline by the PA acting as architect, autonomous approval 2026-08-09 -->
 
 ### Status
-(pending)
+complete
 
 ### Changes Made
--
+- `modules/LVGLDisplay/screens/SLSSystemScreens.hpp` — declared `configuringScreen`/`wifiWizardScreen`/`gateHelperScreen`/`onConfiguring` overrides + private `showGroup(lv_obj_t*)` helper.
+- `modules/LVGLDisplay/screens/SLSSystemScreens.cpp` — added `#include "interfaces/IConfigGate.hpp"` + `<cstring>`; `showGroup()` (hide-all + reveal-one → System root); `configuringScreen()`→Busy, `wifiWizardScreen()`→Setup, `gateHelperScreen(p)`→Message (nullptr for `WIFI_STATION` to defer to Tier-2 wizard); `onConfiguring(p)` populates Setup SSID/URL (`http://<deviceIP>`), Busy message, Message title/body. Refactored `errorScreen`/`otaScreen` onto `showGroup`.
+- `test/test_unit/test_lvglDisplay/test_sls_screens.cpp` — 5 new tests (Busy/Setup/Message visibility, WiFi-gate deferral, `onConfiguring` population) + extended null-defensive case.
 
 ### Decisions Made
--
+- `gateHelperScreen` returns nullptr for `GateNames::WIFI_STATION` so the module's Tier-2 (`wifiWizardScreen`, Setup group) owns WiFi; generic gates get the Message group.
 
-### Dead Ends & Warnings
--
+### Verification
+- `build_project` crowpanel-128-rotary → **[SUCCESS]** 65.22s, Flash 43.2% (1,812,871 B). Production `SLSSystemScreens.cpp` compiles with the new methods.
+- `run_tests` native → 417/417 — **but see finding below: `test_sls_screens.cpp` is NOT among them.**
 
 ### Out-of-Scope Findings
--
+- ⚠️ **The entire `test_unit/test_lvglDisplay` suite (incl. `test_sls_screens.cpp`) is dormant.** `platformio.ini` `lib_ignore`s `LVGLDisplay` on `native` (line 177), so the module can't link natively, and the suite is `test_ignore`d (line 178) — present since `f5d459a` (2026-07-30, hardware-board scaffold). Consequence: the SLS bridge tests (WO13's and mine) have **never actually executed**; native "417/417" excludes them. Production code is verified only via the crowpanel compile. My test edits are correct-by-construction against the crowpanel-validated API but unrun. **Recommend a tracked issue** to restore native LVGL-display test coverage (e.g. compile `SLSSystemScreens.cpp` into the native suite against the existing lvgl stubs, independent of the ESP-only `LVGLDisplayModule.cpp`). → PA to file.
 
 ### Blockers
 (none)

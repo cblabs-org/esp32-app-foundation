@@ -13,23 +13,64 @@
 
 #include "screens/SLSSystemScreens.hpp"
 #include "ui/ui.h"
+#include "interfaces/IConfigGate.hpp"  // GateNames
 #include <cstdio>
+#include <cstring>
 #include <algorithm>
 
 lv_obj_t* SLSSystemScreens::errorScreen() {
-    hideAllGroups();
-    if (ui_uiSystemErrorGroup != nullptr) {
-        lv_obj_remove_flag(ui_uiSystemErrorGroup, LV_OBJ_FLAG_HIDDEN);
-    }
-    return ui_uiSystemScreen;
+    return showGroup(ui_uiSystemErrorGroup);
 }
 
 lv_obj_t* SLSSystemScreens::otaScreen() {
-    hideAllGroups();
-    if (ui_uiSystemOTAGroup != nullptr) {
-        lv_obj_remove_flag(ui_uiSystemOTAGroup, LV_OBJ_FLAG_HIDDEN);
+    return showGroup(ui_uiSystemOTAGroup);
+}
+
+lv_obj_t* SLSSystemScreens::configuringScreen() {
+    return showGroup(ui_uiSystemBusyGroup);
+}
+
+lv_obj_t* SLSSystemScreens::wifiWizardScreen() {
+    return showGroup(ui_uiSystemSetupGroup);
+}
+
+lv_obj_t* SLSSystemScreens::gateHelperScreen(const AppConfiguringPayload* payload) {
+    // Defer the WiFi station gate to the module's Tier-2 wizard (Setup group).
+    if (payload != nullptr && payload->gateName != nullptr &&
+        strcmp(payload->gateName, GateNames::WIFI_STATION) == 0) {
+        return nullptr;
     }
-    return ui_uiSystemScreen;
+    return showGroup(ui_uiSystemMessageGroup);
+}
+
+void SLSSystemScreens::onConfiguring(const AppConfiguringPayload* payload) {
+    if (payload == nullptr) {
+        return;
+    }
+
+    // Setup group — AP SSID + config-portal URL.
+    if (ui_ui_SystemSetupSSID != nullptr && payload->hostname != nullptr) {
+        lv_label_set_text(ui_ui_SystemSetupSSID, payload->hostname);
+    }
+    if (ui_ui_SystemSetupURL != nullptr && payload->deviceIP != nullptr) {
+        char urlBuf[48];
+        snprintf(urlBuf, sizeof(urlBuf), "http://%s", payload->deviceIP);
+        lv_label_set_text(ui_ui_SystemSetupURL, urlBuf);
+    }
+
+    // Busy group — indeterminate please-wait message.
+    if (ui_uiSystemBusyMessage != nullptr) {
+        lv_label_set_text(ui_uiSystemBusyMessage,
+                          payload->helpText != nullptr ? payload->helpText : "Please wait...");
+    }
+
+    // Message group — generic gate-helper title/body.
+    if (ui_ui_SystemMsgTitle != nullptr && payload->gateName != nullptr) {
+        lv_label_set_text(ui_ui_SystemMsgTitle, payload->gateName);
+    }
+    if (ui_uiSystemMsgBody != nullptr && payload->helpText != nullptr) {
+        lv_label_set_text(ui_uiSystemMsgBody, payload->helpText);
+    }
 }
 
 void SLSSystemScreens::onError(const char* title, const char* message) {
@@ -76,4 +117,12 @@ void SLSSystemScreens::hideAllGroups() {
     if (ui_uiSystemMessageGroup != nullptr) {
         lv_obj_add_flag(ui_uiSystemMessageGroup, LV_OBJ_FLAG_HIDDEN);
     }
+}
+
+lv_obj_t* SLSSystemScreens::showGroup(lv_obj_t* group) {
+    hideAllGroups();
+    if (group != nullptr) {
+        lv_obj_remove_flag(group, LV_OBJ_FLAG_HIDDEN);
+    }
+    return ui_uiSystemScreen;
 }

@@ -60,11 +60,50 @@ public:
      */
     void onOtaProgress(float progress, const char* status) override;
 
+    /**
+     * @brief Base configuring screen — activates the Busy group (indeterminate wait).
+     * @return Pointer to ui_uiSystemScreen.
+     */
+    lv_obj_t* configuringScreen() override;
+
+    /**
+     * @brief WiFi wizard screen — activates the Setup group (AP SSID + portal URL).
+     * @return Pointer to ui_uiSystemScreen.
+     */
+    lv_obj_t* wifiWizardScreen() override;
+
+    /**
+     * @brief Generic gate-helper modal — activates the Message group.
+     *
+     * Returns nullptr for the WiFi station gate so the module's Tier-2 WiFi wizard
+     * (wifiWizardScreen) handles it; otherwise shows the Message group.
+     *
+     * @param payload Configuring payload (gate name selects behaviour).
+     * @return Pointer to ui_uiSystemScreen, or nullptr to defer to the WiFi wizard.
+     */
+    lv_obj_t* gateHelperScreen(const AppConfiguringPayload* payload) override;
+
+    /**
+     * @brief Populate configuring widgets from the payload on each re-publish.
+     *
+     * Sets the Setup SSID/URL, Busy message, and Message title/body from the
+     * payload. Visibility is chosen separately by the screen-factory methods.
+     * @param payload Configuring event payload (hostname, deviceIP, gateName, helpText).
+     */
+    void onConfiguring(const AppConfiguringPayload* payload) override;
+
 private:
     /**
      * @brief Hide all container visibility groups on ui_uiSystemScreen.
      */
     void hideAllGroups();
+
+    /**
+     * @brief Hide all groups then reveal one, returning the System screen root.
+     * @param group Visibility-group container to show (may be nullptr).
+     * @return Pointer to ui_uiSystemScreen.
+     */
+    lv_obj_t* showGroup(lv_obj_t* group);
 };
 
 #endif  // MODULES_LVGLDISPLAY_SCREENS_SLSSYSTEMSCREENS_HPP_
