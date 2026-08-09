@@ -20,9 +20,11 @@
 #include "../Application/Application.hpp"
 #include <base64.h>
 #include <cstdio>
+#include <cstring>
 #include <PsychicHttp.h>
 #include "esp_heap_caps.h"
 #include "esp_log.h"
+#include "interfaces/IConfigGate.hpp"  // GateNames, GateActionStatus
 
 // -----------------------------------------------------------------------------
 // Weak Symbol Declaration & Default Implementation for SquareLine Studio (D8)
@@ -555,7 +557,44 @@ void LVGLDisplayModule::_onAppConfiguring(const char* /*topic*/, const void* pay
     ESP_LOGI("LVGLDisplayModule", "CONFIGURING gate: %s (status=%d)",
              p->gateName ? p->gateName : "?",
              static_cast<int>(p->actionStatus));
-    // TODO: Implement LVGL configuring display (follow-up issue)
+
+    // D2: LVGL has no built-in configuring screens — the skin (e.g. SLSSystemScreens)
+    // supplies them. With no provider there is nothing to display.
+    if (self->_screens == nullptr) {
+        return;
+    }
+
+    // Let the provider populate its configuring widgets (AP SSID, portal URL,
+    // gate help text) from the payload before we choose which root to show.
+    self->_screens->onConfiguring(p);
+
+    // Three-tier root selection, mirroring U8G2DisplayModule::_onAppConfiguring:
+    // show a modal (gate helper / WiFi wizard) only when the gate needs user
+    // action; otherwise show the base configuring screen (indeterminate wait).
+    lv_obj_t* scr = nullptr;
+    if (p->actionStatus == GateActionStatus::NeedsUserAction) {
+        scr = self->_screens->gateHelperScreen(p);                          // Tier 1
+        if (scr == nullptr && p->gateName != nullptr &&
+            strcmp(p->gateName, GateNames::WIFI_STATION) == 0) {
+            scr = self->_screens->wifiWizardScreen();                        // Tier 2
+        }
+        if (scr == nullptr) {
+            scr = self->_screens->configuringScreen();                      // Tier 3
+        }
+    } else {
+        scr = self->_screens->configuringScreen();                          // base / InProgress
+    }
+
+    // The provider toggles visibility groups in-place on the (single) System
+    // screen, so only animate a screen-load on first entry — re-publishes that
+    // stay on the same root must not re-trigger the fade.
+    if (scr != nullptr && scr != lv_screen_active()) {
+        if (!self->_inSystemScreen) {
+            self->_priorScreen = lv_screen_active();
+            self->_inSystemScreen = true;
+        }
+        lv_scr_load_anim(scr, LV_SCR_LOAD_ANIM_FADE_IN, 200, 0, false);
+    }
 }
 
 #if defined(__GNUC__) || defined(__clang__)
@@ -568,6 +607,9 @@ void LVGLDisplayModule::_onAppRunning(const char* /*topic*/, const void* /*paylo
     auto* self = static_cast<LVGLDisplayModule*>(ctx);
     if (self == nullptr) return;
     ESP_LOGI("LVGLDisplayModule", "App transition → RUNNING");
+    // Left the system screen (configuring/error/OTA) for the running UI.
+    self->_inSystemScreen = false;
+    self->_priorScreen = nullptr;
 #if defined(__GNUC__) || defined(__clang__)
     if (&ui_ui_DiagScreen != nullptr && ui_ui_DiagScreen != nullptr) {
         lv_scr_load_anim(ui_ui_DiagScreen, LV_SCR_LOAD_ANIM_FADE_IN, 300, 0, false);

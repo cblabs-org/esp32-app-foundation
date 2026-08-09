@@ -22,8 +22,9 @@
  *   - gateHelperScreen():    Return custom LVGL screen for gate-specific helper modal
  *
  *   Optional Event Callback Methods (default no-op):
- *   - onOtaProgress(): Called when OTA progress state updates
- *   - onError():       Called when an error state is reported
+ *   - onOtaProgress():  Called when OTA progress state updates
+ *   - onError():        Called when an error state is reported
+ *   - onConfiguring():  Called on each CONFIGURING re-publish to populate configuring widgets
  */
 
 #ifndef INCLUDE_INTERFACES_ILVGLSYSTEMSCREENS_HPP_
@@ -114,6 +115,22 @@ public:
     virtual void onError(const char* title, const char* message) {
         (void)title;
         (void)message;
+    }
+
+    /**
+     * @brief Callback notification on each CONFIGURING re-publish.
+     *
+     * Called by the display module before it selects the configuring root via
+     * configuringScreen() / wifiWizardScreen() / gateHelperScreen(), so the
+     * provider can populate its configuring widgets (AP SSID, config-portal URL,
+     * gate status/help text) from the payload. Mirrors onOtaProgress()/onError().
+     *
+     * @param payload Full configuring event payload (gate name, help text,
+     *                action status, hostname/SSID, device IP). Never null when
+     *                called by the framework.
+     */
+    virtual void onConfiguring(const AppConfiguringPayload* payload) {
+        (void)payload;
     }
 };
 
