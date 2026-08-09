@@ -9,7 +9,7 @@
 (delivered by Claude Design after an interactive review pass)
 **Predecessor:** [pr-47-lvgl-display](../pr-47-lvgl-display/PROJECT.md) WO13 (SLSSystemScreens wiring)
 **Related issue:** [#82](https://github.com/matthewmcneill/esp32-app-foundation/issues/82) — LVGL CONFIGURING orchestration + `ILVGLSystemScreens` extension. **Owned and implemented in this stack** (we are the framework architect); closed by this PR via `Fixes #82`. Design decisions D1–D3 locked on the issue.
-**Status:** 🚧 IN PROGRESS — human approved autonomous execution (2026-08-09). 5-WO stack; WO1–WO3 landed, WO4–WO5 (configuring) in flight.
+**Status:** ✅ IMPLEMENTED — 5-WO stack landed on `sls-screen-redesign/wo5-sls-configuring-skin` (tip `f15ffd9`). Native 417/417 + crowpanel-128-rotary [SUCCESS] (Flash 43.2%). Not yet submitted as a PR. Known gap: LVGL display tests dormant → [#83](https://github.com/matthewmcneill/esp32-app-foundation/issues/83).
 
 ---
 
@@ -85,12 +85,12 @@ Stacked on `sls-templates/crowpanel-128`, each WO based on its predecessor.
 - **[x] [wo3-rewire-firmware](wo3-rewire-firmware/WORKORDER.md)** *(standard)* — 🚧 (native 417/417; crowpanel compile in verification).
   `SLSSystemScreens` + `ui_stubs.c` + `test_sls_screens.cpp` re-wired to the authoritative exported symbols
   (Setup/Busy/Message groups; renamed Error/OTA labels).
-- **[ ] [wo4-configuring-orchestration](wo4-configuring-orchestration/WORKORDER.md)** *(architect)* —
-  Add `ILVGLSystemScreens::onConfiguring(payload)`; implement `LVGLDisplayModule::_onAppConfiguring`
-  three-tier dispatch mirroring U8G2. **Implements #82** (framework side).
-- **[ ] [wo5-sls-configuring-skin](wo5-sls-configuring-skin/WORKORDER.md)** *(standard)* —
-  `SLSSystemScreens` implements `configuringScreen`/`wifiWizardScreen`/`gateHelperScreen`/`onConfiguring`
-  driving Setup/Busy/Message from the payload + native tests. Stack tip closes #82 (`Fixes #82`).
+- **[x] [wo4-configuring-orchestration](wo4-configuring-orchestration/WORKORDER.md)** *(architect)* — ✅ `987f06f`.
+  Added `ILVGLSystemScreens::onConfiguring(payload)`; `_onAppConfiguring` three-tier dispatch mirroring U8G2.
+  Native 417/417, crowpanel [SUCCESS]. **Framework side of #82.**
+- **[x] [wo5-sls-configuring-skin](wo5-sls-configuring-skin/WORKORDER.md)** *(standard)* — ✅ `f15ffd9`.
+  `SLSSystemScreens` drives Setup/Busy/Message from the payload (`gateHelperScreen` defers WiFi to Tier-2);
+  5 tests added. crowpanel [SUCCESS]. Tests dormant (see #83). Stack tip closes #82 on merge (`Fixes #82`).
 
 ## 5. Open Questions — RESOLVED (human, 2026-08-09)
 
@@ -136,6 +136,10 @@ Stacked on `sls-templates/crowpanel-128`, each WO based on its predecessor.
 | 2026-08-09 | Decomposition drafted (3-WO stack) + WORKORDERs authored. **No branches, no workers.** Plan gate: awaiting human approval of the decomposition and resolution of OQ-1…OQ-4. |
 | 2026-08-09 | Human resolved OQ-1/3/4 and **expanded OQ-2** — wants the full system-screen contract (boot/configuring/error/OTA/config-progress/gate-helpers) at U8G2 parity. Research: LVGL `_onAppConfiguring` is a `TODO` stub (LVGLDisplayModule.cpp:558); LVGL has no built-in configuring screens; U8G2 reference = three-tier modal dispatch (U8G2DisplayModule.cpp:1179). Worked out the SLS group ↔ contract mapping (§9). Clarified the "2 error screens" (built-in `ErrorScreen` fallback vs SLS Error group; + the new Message group is the *generic gate helper*, not a second error). |
 | 2026-08-09 | Configuring work needs an additive `ILVGLSystemScreens` change → **filed [#82](https://github.com/matthewmcneill/esp32-app-foundation/issues/82)** (P2-correctness) for the framework architect. Configuring orchestration **deferred to a follow-on gated on #82**; this project re-settled to the parity-only 3-WO stack. |
+| 2026-08-09 | Human: "we are the framework architect, so design it and proceed." Took **#82 directly** (D1 `onConfiguring`, D2 no built-in LVGL fallback, D3 spinner progress; commented on #82). Configuring folded back in → 5-WO stack. Human granted **autonomous execution**. |
+| 2026-08-09 | **WO1–WO5 executed inline & committed** on the stack (base `sls-templates/crowpanel-128` → wo1…wo5). Human ran the SLS UI export (OQ-1). Verified each WO: native **417/417**, crowpanel-128-rotary **[SUCCESS]** (Flash 43.2%, 1.81 MB). Transient `littlefs` component-manager race on one build (self-resolved). SLS project source synced to the human's in-editor tweaks (`64b3c26`). |
+| 2026-08-09 | **Finding → filed [#83](https://github.com/matthewmcneill/esp32-app-foundation/issues/83)** (P2-correctness): `test_unit/test_lvglDisplay` is `lib_ignore`/`test_ignore`d on native (since `f5d459a`), so the LVGL display suite — incl. the SLS bridge/configuring tests (WO13's + this PR's) — has **never executed**. Production verified via crowpanel compile; tests dormant/correct-by-construction. |
+| 2026-08-09 | **Stack complete, not yet submitted.** Remaining: open the stacked PR(s) (tip `f15ffd9`, `Fixes #82`), decide PR grouping (OQ-4), and a hardware smoke-test on a physical CrowPanel (no flashing done — WO10-style bringup still pending from PR-47). |
 
 ---
 
