@@ -32,21 +32,22 @@ lv_obj_set_align( ui_uiBootFadeOverlay, LV_ALIGN_CENTER );
 lv_obj_remove_flag( ui_uiBootFadeOverlay, LV_OBJ_FLAG_SCROLLABLE );    /// Flags
 
 ui_uiBootLogo = lv_image_create(ui_uiBootScreen);
-lv_image_set_src(ui_uiBootLogo, &ui_img_cblabs_320x100_png);
-lv_obj_set_width( ui_uiBootLogo, 232);
-lv_obj_set_height( ui_uiBootLogo, 83);
+lv_image_set_src(ui_uiBootLogo, &ui_img_cblabs_180x58_png);
+lv_obj_set_width( ui_uiBootLogo, 180);
+lv_obj_set_height( ui_uiBootLogo, 58);
 lv_obj_set_x( ui_uiBootLogo, 0 );
-lv_obj_set_y( ui_uiBootLogo, -1 );
+lv_obj_set_y( ui_uiBootLogo, -40 );
 lv_obj_set_align( ui_uiBootLogo, LV_ALIGN_CENTER );
 lv_obj_add_flag( ui_uiBootLogo, LV_OBJ_FLAG_CLICKABLE );   /// Flags
 lv_obj_remove_flag( ui_uiBootLogo, LV_OBJ_FLAG_SCROLLABLE );    /// Flags
-lv_image_set_scale(ui_uiBootLogo,75);
+lv_image_set_scale(ui_uiBootLogo,100);
+lv_image_set_inner_align( ui_uiBootLogo, LV_IMAGE_ALIGN_TILE );
 
 ui_uiBootTitle = lv_label_create(ui_uiBootScreen);
-lv_obj_set_width( ui_uiBootTitle, 160);
-lv_obj_set_height( ui_uiBootTitle, 47);
+lv_obj_set_width( ui_uiBootTitle, 193);
+lv_obj_set_height( ui_uiBootTitle, 48);
 lv_obj_set_x( ui_uiBootTitle, 0 );
-lv_obj_set_y( ui_uiBootTitle, -71 );
+lv_obj_set_y( ui_uiBootTitle, 20 );
 lv_obj_set_align( ui_uiBootTitle, LV_ALIGN_CENTER );
 lv_label_set_text(ui_uiBootTitle,"ESP32 App Foundation");
 lv_obj_add_flag( ui_uiBootTitle, LV_OBJ_FLAG_CLICKABLE );   /// Flags
@@ -54,38 +55,38 @@ lv_obj_remove_flag( ui_uiBootTitle, LV_OBJ_FLAG_SCROLLABLE );    /// Flags
 lv_obj_set_style_text_color(ui_uiBootTitle, lv_color_hex(0x7B2C29), LV_PART_MAIN | LV_STATE_DEFAULT );
 lv_obj_set_style_text_opa(ui_uiBootTitle, 255, LV_PART_MAIN| LV_STATE_DEFAULT);
 lv_obj_set_style_text_align(ui_uiBootTitle, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN| LV_STATE_DEFAULT);
-lv_obj_set_style_text_font(ui_uiBootTitle, &lv_font_montserrat_16, LV_PART_MAIN| LV_STATE_DEFAULT);
+lv_obj_set_style_text_font(ui_uiBootTitle, &lv_font_montserrat_18, LV_PART_MAIN| LV_STATE_DEFAULT);
 
 ui_uiBootProgressBar = lv_bar_create(ui_uiBootScreen);
-lv_bar_set_value(ui_uiBootProgressBar,50,LV_ANIM_OFF);
+lv_bar_set_value(ui_uiBootProgressBar,62,LV_ANIM_OFF);
 lv_bar_set_start_value(ui_uiBootProgressBar, 0, LV_ANIM_OFF);
 lv_obj_set_width( ui_uiBootProgressBar, 140);
 lv_obj_set_height( ui_uiBootProgressBar, 8);
 lv_obj_set_x( ui_uiBootProgressBar, 0 );
-lv_obj_set_y( ui_uiBootProgressBar, 40 );
+lv_obj_set_y( ui_uiBootProgressBar, 52 );
 lv_obj_set_align( ui_uiBootProgressBar, LV_ALIGN_CENTER );
 lv_obj_add_flag( ui_uiBootProgressBar, LV_OBJ_FLAG_CLICKABLE );   /// Flags
 lv_obj_remove_flag( ui_uiBootProgressBar, LV_OBJ_FLAG_SCROLLABLE );    /// Flags
 lv_obj_set_style_bg_color(ui_uiBootProgressBar, lv_color_hex(0xDDD1D0), LV_PART_MAIN | LV_STATE_DEFAULT );
 lv_obj_set_style_bg_opa(ui_uiBootProgressBar, 255, LV_PART_MAIN| LV_STATE_DEFAULT);
 
-lv_obj_set_style_bg_color(ui_uiBootProgressBar, lv_color_hex(0x7B2F29), LV_PART_INDICATOR | LV_STATE_DEFAULT );
+lv_obj_set_style_bg_color(ui_uiBootProgressBar, lv_color_hex(0x7B2C29), LV_PART_INDICATOR | LV_STATE_DEFAULT );
 lv_obj_set_style_bg_opa(ui_uiBootProgressBar, 255, LV_PART_INDICATOR| LV_STATE_DEFAULT);
 
 //Compensating for LVGL9.1 draw crash with bar/slider max value when top-padding is nonzero and right-padding is 0
 if (lv_obj_get_style_pad_top(ui_uiBootProgressBar,LV_PART_MAIN) > 0) lv_obj_set_style_pad_right( ui_uiBootProgressBar, lv_obj_get_style_pad_right(ui_uiBootProgressBar,LV_PART_MAIN) + 1, LV_PART_MAIN );
 ui_uiBootStatusLabel = lv_label_create(ui_uiBootScreen);
-lv_obj_set_width( ui_uiBootStatusLabel, LV_SIZE_CONTENT);  /// 100
-lv_obj_set_height( ui_uiBootStatusLabel, LV_SIZE_CONTENT);   /// 20
+lv_obj_set_width( ui_uiBootStatusLabel, LV_SIZE_CONTENT);  /// 186
+lv_obj_set_height( ui_uiBootStatusLabel, LV_SIZE_CONTENT);   /// 30
 lv_obj_set_x( ui_uiBootStatusLabel, 0 );
-lv_obj_set_y( ui_uiBootStatusLabel, 58 );
+lv_obj_set_y( ui_uiBootStatusLabel, 74 );
 lv_obj_set_align( ui_uiBootStatusLabel, LV_ALIGN_CENTER );
-lv_label_set_text(ui_uiBootStatusLabel,"Initializing...");
+lv_label_set_text(ui_uiBootStatusLabel,"Mounting filesystem...");
 lv_obj_add_flag( ui_uiBootStatusLabel, LV_OBJ_FLAG_CLICKABLE );   /// Flags
 lv_obj_remove_flag( ui_uiBootStatusLabel, LV_OBJ_FLAG_SCROLLABLE );    /// Flags
-lv_obj_set_style_text_color(ui_uiBootStatusLabel, lv_color_hex(0x888888), LV_PART_MAIN | LV_STATE_DEFAULT );
+lv_obj_set_style_text_color(ui_uiBootStatusLabel, lv_color_hex(0x7D7370), LV_PART_MAIN | LV_STATE_DEFAULT );
 lv_obj_set_style_text_opa(ui_uiBootStatusLabel, 255, LV_PART_MAIN| LV_STATE_DEFAULT);
-lv_obj_set_style_text_font(ui_uiBootStatusLabel, &lv_font_montserrat_10, LV_PART_MAIN| LV_STATE_DEFAULT);
+lv_obj_set_style_text_font(ui_uiBootStatusLabel, &lv_font_montserrat_12, LV_PART_MAIN| LV_STATE_DEFAULT);
 
 lv_obj_add_event_cb(ui_uiBootFadeOverlay, ui_event_uiBootFadeOverlay, LV_EVENT_ALL, NULL);
 

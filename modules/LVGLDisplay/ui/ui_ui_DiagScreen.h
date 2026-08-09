@@ -15,13 +15,10 @@ extern void ui_ui_DiagScreen_screen_init(void);
 extern void ui_ui_DiagScreen_screen_destroy(void);
 extern lv_obj_t *ui_ui_DiagScreen;
 extern lv_obj_t *ui_ui_DiagArc;
-extern lv_obj_t *ui_ui_DiagTitle;
+extern lv_obj_t *ui_ui_DiagCategory;
 extern lv_obj_t *ui_ui_DiagValue;
-extern lv_obj_t *ui_ui_DiagUnit;
+extern lv_obj_t *ui_ui_DiagCounter;
 extern lv_obj_t *ui_ui_DiagStatus;
-extern lv_obj_t *ui_ui_DiagInfoRoller;
-extern lv_obj_t *ui_ui_DiagTouchButton;
-extern lv_obj_t *ui_ui_DiagTouchBtnLbl;
 // CUSTOM VARIABLES
 
 #ifdef __cplusplus

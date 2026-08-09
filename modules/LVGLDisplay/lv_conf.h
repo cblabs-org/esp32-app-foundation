@@ -66,12 +66,15 @@
    FONT USAGE
  *====================*/
 
-/* Enable Montserrat fonts for UI rendering */
-#define LV_FONT_MONTSERRAT_10 1
+/* Enable Montserrat fonts used by the SquareLine-exported UI (crowpanel-128).
+ * Sizes must match the font references in modules/LVGLDisplay/ui/*.c. */
+#define LV_FONT_MONTSERRAT_12 1
 #define LV_FONT_MONTSERRAT_14 1
 #define LV_FONT_MONTSERRAT_16 1
+#define LV_FONT_MONTSERRAT_18 1
 #define LV_FONT_MONTSERRAT_20 1
-#define LV_FONT_MONTSERRAT_28 1
+#define LV_FONT_MONTSERRAT_22 1
+#define LV_FONT_MONTSERRAT_40 1
 
 /* Set default font pointer */
 #define LV_FONT_DEFAULT &lv_font_montserrat_14

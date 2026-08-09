@@ -74,22 +74,23 @@ Part of **PR: SLS Screen Redesign** ([PROJECT.md](../PROJECT.md)); decomposition
 
 ---
 ## Completion Report
-<!-- Written by the worker at task completion -->
+<!-- Executed inline by the PA acting as architect, autonomous approval 2026-08-09 -->
 
 ### Status
-(pending)
+complete
 
 ### Changes Made
--
+- `modules/LVGLDisplay/ui/*` — replaced by the human's fresh SquareLine "Export UI Files" (Boot/System/Diag screens, new Setup/Busy/Message groups, simplified Diag). SLS also removed the old `ui_img_cblabs_320x100_png.c` and added `ui_img_cblabs_180x58_png.c`; `filelist.txt` + `CMakeLists.txt` + `ui.h` `LV_IMG_DECLARE` regenerated correctly.
+- `modules/LVGLDisplay/lv_conf.h` — enabled montserrat 12/18/22/40, kept 14/16/20, **pruned 10/28** (build-wide grep confirmed unreferenced). Default stays montserrat_14.
 
 ### Decisions Made
--
+- OQ-3: pruned montserrat 10/28 (unreferenced across `modules/`, `src/`, `include/`) to save flash.
 
 ### Dead Ends & Warnings
--
+- ⚠️ **The human's SLS tweaks renamed more widgets than the raw download diff showed.** Several Error/OTA globals flipped naming form (now `ui_uiSystemErrorTitle`, `ui_uiSystemOTAStatus`, but `ui_ui_SystemOTABar/Percent/Title`). **The export is the authoritative symbol set for WO3** — WO3's mapping table (built from the pre-tweak download) is superseded; map straight from `modules/LVGLDisplay/ui/*.h`.
 
 ### Out-of-Scope Findings
--
+- (none)
 
 ### Blockers
-(none)
+(none — build verification folded into WO3's single native+crowpanel cycle)

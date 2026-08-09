@@ -4,4 +4,4 @@ ui_ui_DiagScreen.c
 ui.c
 ui_comp_hook.c
 ui_helpers.c
-ui_img_cblabs_320x100_png.c
+ui_img_cblabs_180x58_png.c
