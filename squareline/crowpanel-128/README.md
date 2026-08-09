@@ -5,8 +5,13 @@ This SquareLine Studio (SLS) project provides a complete starter template for th
 ## What This Project Contains
 This project consists of 3 distinct screens:
 - **Boot Screen** (`Screen_Boot`): A splash screen with a logo, title, progress bar, and status label. It features a fade-in animation overlay.
-- **System Screen** (`Screen_System`): A consolidated screen containing multiple hidden groups (Error, WiFi Wizard, OTA Progress, and Interstitial) that can be shown dynamically by the firmware.
-- **Diagnostics Screen** (`Screen_Diag`): A runtime consumer template for sensor readouts, featuring an edge arc, large value readout, roller for info, and a touch test button.
+- **System Screen** (`Screen_System`): A consolidated screen containing multiple hidden groups that the firmware shows dynamically, one at a time:
+  - **Error** — fatal/terminal error (icon, title, message, dismiss button).
+  - **Setup** — WiFi provisioning helper: AP SSID plus the config-portal URL to visit.
+  - **OTA Progress** — firmware update status, progress bar, and percentage.
+  - **Busy** — indeterminate "please wait" spinner with a status message.
+  - **Message** — generic gate-helper modal (icon, title, body) for configuration prompts.
+- **Diagnostics Screen** (`Screen_Diag`): A runtime consumer template for sensor readouts, featuring an edge arc, a category label, a large value readout, a status line, and a counter.
 
 ## Opening in SquareLine Studio
 You can open this project in **SquareLine Studio v1.5+** by double-clicking the `SquareLine_Project.spj` file.
@@ -30,7 +35,7 @@ This is critical because the C code generation relies on these names to produce 
 
 ## Managing Screen Transitions and Group Visibility
 - The boot screen handles an initial fade-in via the `ui_BootFadeOverlay`.
-- The system screen consolidates distinct operational states. The firmware manages this by removing the `OBJ_FLAG_HIDDEN` flag from the active group container (e.g., `ui_SystemWizardGroup`) and adding it to the others.
+- The system screen consolidates distinct operational states. The firmware manages this by removing the `OBJ_FLAG_HIDDEN` flag from the active group container (e.g., `ui_SystemSetupGroup`) and adding it to the others.
 
 ## Round Display Safe Zone Rules
 Due to the circular nature of the display (240px diameter), the corners are clipped.
@@ -39,9 +44,11 @@ Due to the circular nature of the display (240px diameter), the corners are clip
 - Wide horizontal elements should be avoided to prevent them from being cut off by the display edge.
 
 ## Customizing the Boot Logo
-The default placeholder logo is provided as `assets/cblabs.png`. 
+The boot screen uses `assets/cblabs_180x58.png` (a compact 180×58 logo sized for the
+170px round safe zone). The full-resolution source `assets/cblabs.png` is retained for
+reference/re-scaling.
 To replace it with your own brand logo:
-1. Replace `cblabs.png` in the `assets/` directory with a 24-bit PNG with alpha channel.
+1. Add your logo PNG (24-bit with alpha channel, sized to fit the safe zone) to the `assets/` directory.
 2. Open SLS and select the `ui_BootLogo` image widget.
 3. In the Inspector, update the Image Asset to point to your new logo.
 

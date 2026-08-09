@@ -58,19 +58,26 @@ Part of **PR: SLS Screen Redesign** ([PROJECT.md](../PROJECT.md)); decomposition
 
 ---
 ## Completion Report
-<!-- Written by the worker at task completion -->
+<!-- Executed inline by the PA acting as architect, at the human's direction -->
 
 ### Status
-(pending)
+complete
 
 ### Changes Made
--
+- `squareline/crowpanel-128/SquareLine_Project.spj` / `.sll` / `Themes.slt` — replaced with the reviewed Claude Design export.
+- `squareline/crowpanel-128/assets/cblabs_180x58.png` — added (new boot logo).
+- `squareline/crowpanel-128/assets/cblabs_320x100.png` — removed (`git rm`); no longer referenced by the design.
+- `squareline/crowpanel-128/README.md` — System screen groups rewritten (Error / Setup [SSID + portal URL] / OTA / Busy / Message); Diagnostics simplified (arc / category / value / status / counter); boot-logo section points at `cblabs_180x58.png`; group-visibility example updated to `ui_SystemSetupGroup`.
 
-### Dead Ends & Warnings
--
+### Decisions Made
+- Left the SLS-local `SquareLine_Project.slp` and `project.info` untouched (per boundary box). Bonus: `.slp` `uiExportFolderPath` already points at `modules/LVGLDisplay/ui`, so the human's export defaults to the correct path.
+
+### Verification
+- `squareline-studio-expert/scripts/validate_project.py` → 🟢 PASSED, 0 warnings (39 GUIDs, 3 screens, 23 font refs, nidcnt 1000713 > max nid 1000703).
+- No firmware touched (`modules/`, `src/`, `test/` untouched).
 
 ### Out-of-Scope Findings
--
+- (none)
 
 ### Blockers
 (none)
