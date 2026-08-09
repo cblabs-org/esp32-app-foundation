@@ -8,8 +8,8 @@
 **Design authority:** the reviewed SLS export at `/Users/mcneillm/Downloads/sls-project`
 (delivered by Claude Design after an interactive review pass)
 **Predecessor:** [pr-47-lvgl-display](../pr-47-lvgl-display/PROJECT.md) WO13 (SLSSystemScreens wiring)
-**Related issue:** [#82](https://github.com/matthewmcneill/esp32-app-foundation/issues/82) — LVGL CONFIGURING orchestration + `ILVGLSystemScreens` extension (with framework architect; **blocks the deferred configuring work**, see §5 OQ-2 / §9)
-**Status:** 📋 PLANNED — decomposition drafted, **awaiting human approval**. No branches, no workers spawned.
+**Related issue:** [#82](https://github.com/matthewmcneill/esp32-app-foundation/issues/82) — LVGL CONFIGURING orchestration + `ILVGLSystemScreens` extension. **Owned and implemented in this stack** (we are the framework architect); closed by this PR via `Fixes #82`. Design decisions D1–D3 locked on the issue.
+**Status:** 🚧 IN PROGRESS — human approved autonomous execution (2026-08-09). 5-WO stack; WO1–WO3 landed, WO4–WO5 (configuring) in flight.
 
 ---
 
@@ -76,19 +76,21 @@ to be driven once #82 lands. See §9 for the mapping already worked out.
 
 Stacked on `sls-templates/crowpanel-128`, each WO based on its predecessor.
 
-- **[ ] [wo1-ingest-sls-project](wo1-ingest-sls-project/WORKORDER.md)** *(mechanical)* —
-  Copy the reviewed `.spj`/`.sll`/`.slt` + `cblabs_180x58.png` into
-  `squareline/crowpanel-128/`, drop the stale `cblabs_320x100.png`, and update the
-  project `README.md`. No firmware touched. *Independent of the SLS export gate.*
-- **[ ] [wo2-integrate-ui-export](wo2-integrate-ui-export/WORKORDER.md)** *(standard)* —
-  **Precondition: OQ-1 resolved** (user supplies a fresh SquareLine "Export UI Files"
-  of the revised project). Replace `modules/LVGLDisplay/ui/`, swap the compiled logo
-  asset, enable montserrat 12/18/22/40 in `lv_conf.h`, reconcile `filelist.txt`/
-  `CMakeLists.txt`. Compile-verify `crowpanel-128-rotary`.
-- **[ ] [wo3-rewire-firmware](wo3-rewire-firmware/WORKORDER.md)** *(standard)* —
-  Update `SLSSystemScreens.hpp/.cpp` (Wizard→Setup, Interstitial→Busy, add Message
-  group to `hideAllGroups`), rewrite native `ui_stubs.c` to the new symbol set, update
-  `test_sls_screens.cpp`. Native tests + `crowpanel-128-rotary` green.
+- **[x] [wo1-ingest-sls-project](wo1-ingest-sls-project/WORKORDER.md)** *(mechanical)* — ✅ `d496574`.
+  Reviewed `.spj`/`.sll`/`.slt` + `cblabs_180x58.png` ingested; stale `cblabs_320x100.png` dropped;
+  README refreshed; validator clean.
+- **[x] [wo2-integrate-ui-export](wo2-integrate-ui-export/WORKORDER.md)** *(standard)* — ✅ (committed on wo2 branch).
+  Human re-exported UI C into `modules/LVGLDisplay/ui/`; logo asset swapped; montserrat 12/18/22/40 enabled,
+  10/28 pruned. Human tweaks renamed more widgets than the download diff → export is authoritative.
+- **[x] [wo3-rewire-firmware](wo3-rewire-firmware/WORKORDER.md)** *(standard)* — 🚧 (native 417/417; crowpanel compile in verification).
+  `SLSSystemScreens` + `ui_stubs.c` + `test_sls_screens.cpp` re-wired to the authoritative exported symbols
+  (Setup/Busy/Message groups; renamed Error/OTA labels).
+- **[ ] [wo4-configuring-orchestration](wo4-configuring-orchestration/WORKORDER.md)** *(architect)* —
+  Add `ILVGLSystemScreens::onConfiguring(payload)`; implement `LVGLDisplayModule::_onAppConfiguring`
+  three-tier dispatch mirroring U8G2. **Implements #82** (framework side).
+- **[ ] [wo5-sls-configuring-skin](wo5-sls-configuring-skin/WORKORDER.md)** *(standard)* —
+  `SLSSystemScreens` implements `configuringScreen`/`wifiWizardScreen`/`gateHelperScreen`/`onConfiguring`
+  driving Setup/Busy/Message from the payload + native tests. Stack tip closes #82 (`Fixes #82`).
 
 ## 5. Open Questions — RESOLVED (human, 2026-08-09)
 
