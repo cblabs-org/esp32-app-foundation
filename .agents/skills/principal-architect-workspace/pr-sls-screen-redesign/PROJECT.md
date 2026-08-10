@@ -9,7 +9,7 @@
 (delivered by Claude Design after an interactive review pass)
 **Predecessor:** [pr-47-lvgl-display](../pr-47-lvgl-display/PROJECT.md) WO13 (SLSSystemScreens wiring)
 **Related issue:** [#82](https://github.com/matthewmcneill/esp32-app-foundation/issues/82) — LVGL CONFIGURING orchestration + `ILVGLSystemScreens` extension. **Owned and implemented in this stack** (we are the framework architect); closed by this PR via `Fixes #82`. Design decisions D1–D3 locked on the issue.
-**Status:** ✅ IMPLEMENTED — 5-WO stack landed on `sls-screen-redesign/wo5-sls-configuring-skin` (tip `f15ffd9`). Native 417/417 + crowpanel-128-rotary [SUCCESS] (Flash 43.2%). Not yet submitted as a PR. Known gap: LVGL display tests dormant → [#83](https://github.com/matthewmcneill/esp32-app-foundation/issues/83).
+**Status:** ✅ IMPLEMENTED — 6-WO stack landed on `sls-screen-redesign/wo6-native-lvgl-tests` (tip `4d16901`). **Native 482/482** + crowpanel-128-rotary & esp32s3nano [SUCCESS]. Not yet submitted as a PR. #82 (configuring) + #83 (dormant tests, now enabled) both resolved on the branch.
 
 ---
 
@@ -90,7 +90,11 @@ Stacked on `sls-templates/crowpanel-128`, each WO based on its predecessor.
   Native 417/417, crowpanel [SUCCESS]. **Framework side of #82.**
 - **[x] [wo5-sls-configuring-skin](wo5-sls-configuring-skin/WORKORDER.md)** *(standard)* — ✅ `f15ffd9`.
   `SLSSystemScreens` drives Setup/Busy/Message from the payload (`gateHelperScreen` defers WiFi to Tier-2);
-  5 tests added. crowpanel [SUCCESS]. Tests dormant (see #83). Stack tip closes #82 on merge (`Fixes #82`).
+  5 tests added. crowpanel [SUCCESS]. Closes #82 on merge (`Fixes #82`).
+- **[x] [wo6-native-lvgl-tests](wo6-native-lvgl-tests/WORKORDER.md)** *(standard)* — ✅ `4d16901`.
+  Enabled the dormant `test_lvglDisplay` suite on native (stateful lvgl stub, `IBootReporter.hpp`→`include/`,
+  env-conditional `ui/` exclusion via library extraScript, `ui_stubs.cpp`). **Native 417→482**; crowpanel &
+  esp32s3nano [SUCCESS]. Closes #83 on merge (`Fixes #83`).
 
 ## 5. Open Questions — RESOLVED (human, 2026-08-09)
 
@@ -139,7 +143,9 @@ Stacked on `sls-templates/crowpanel-128`, each WO based on its predecessor.
 | 2026-08-09 | Human: "we are the framework architect, so design it and proceed." Took **#82 directly** (D1 `onConfiguring`, D2 no built-in LVGL fallback, D3 spinner progress; commented on #82). Configuring folded back in → 5-WO stack. Human granted **autonomous execution**. |
 | 2026-08-09 | **WO1–WO5 executed inline & committed** on the stack (base `sls-templates/crowpanel-128` → wo1…wo5). Human ran the SLS UI export (OQ-1). Verified each WO: native **417/417**, crowpanel-128-rotary **[SUCCESS]** (Flash 43.2%, 1.81 MB). Transient `littlefs` component-manager race on one build (self-resolved). SLS project source synced to the human's in-editor tweaks (`64b3c26`). |
 | 2026-08-09 | **Finding → filed [#83](https://github.com/matthewmcneill/esp32-app-foundation/issues/83)** (P2-correctness): `test_unit/test_lvglDisplay` is `lib_ignore`/`test_ignore`d on native (since `f5d459a`), so the LVGL display suite — incl. the SLS bridge/configuring tests (WO13's + this PR's) — has **never executed**. Production verified via crowpanel compile; tests dormant/correct-by-construction. |
-| 2026-08-09 | **Stack complete, not yet submitted.** Remaining: open the stacked PR(s) (tip `f15ffd9`, `Fixes #82`), decide PR grouping (OQ-4), and a hardware smoke-test on a physical CrowPanel (no flashing done — WO10-style bringup still pending from PR-47). |
+| 2026-08-09 | Human asked to evaluate reviving native LVGL tests. Investigated (empirical trial): stub infra ~95% present; blockers small. Posted feasibility to #83 → human said "proceed". |
+| 2026-08-09 | **WO6 executed & committed (`4d16901`) — enabled the native `test_lvglDisplay` suite (Fixes #83).** Moved `IBootReporter.hpp`→`include/interfaces/`; made `lv_label` stubs stateful (+`lv_obj_remove_flag`,`LV_IMG_DECLARE`); env-conditional `ui/` exclusion via a LVGLDisplay library `extraScript` (hardware compiles generated `ui/`, native uses `ui_stubs`); moved `ui_stubs.c`→ suite as `ui_stubs.cpp` (`extern "C"`). Native **417→482**; crowpanel & esp32s3nano [SUCCESS]. Generated `ui/` stays hardware/visual-verified by design; native covers our display logic. |
+| 2026-08-09 | **Stack complete (6 WOs), not yet submitted.** Remaining: open the stacked PR(s) (tip `4d16901`, `Fixes #82`, `Fixes #83`), decide PR grouping (OQ-4), and a hardware smoke-test on a physical CrowPanel (no flashing done). |
 
 ---
 
