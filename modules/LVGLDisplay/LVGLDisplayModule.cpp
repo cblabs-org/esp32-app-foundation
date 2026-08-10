@@ -839,27 +839,33 @@ void LVGLDisplayModule::registerRoutes(PsychicHttpServer& server) {
         return ESP_OK;
     });
 
-    // GET /api/display/screenshot
+    // GET /api/display/screenshot — PNG framebuffer capture
     server.on("/api/display/screenshot", HTTP_GET, [this](PsychicRequest* request, PsychicResponse* response) {
-        uint8_t* buf = nullptr;
-        size_t size = 0;
-        uint16_t w = 0;
-        uint16_t h = 0;
+        struct BufferStream : public Print {
+            std::vector<uint8_t> buffer;
+            size_t write(uint8_t c) override {
+                buffer.push_back(c);
+                return 1;
+            }
+            size_t write(const uint8_t* buf, size_t size) override {
+                buffer.insert(buffer.end(), buf, buf + size);
+                return size;
+            }
+        };
 
-        if (!captureSnapshot(buf, size, w, h) || buf == nullptr) {
-            response->send(500, "application/json", "{\"error\":\"Framebuffer unavailable\"}");
+        BufferStream stream;
+        if (!capturePNG(stream) || stream.buffer.empty()) {
+            response->send(500, "application/json", "{\"error\":\"Screenshot capture failed\"}");
             return ESP_FAIL;
         }
 
         response->addHeader("Cache-Control", "no-cache, no-store, must-revalidate");
         response->addHeader("Pragma", "no-cache");
         response->addHeader("Expires", "0");
-        response->addHeader("X-Display-Width", String(static_cast<int>(w)).c_str());
-        response->addHeader("X-Display-Height", String(static_cast<int>(h)).c_str());
-        response->addHeader("X-Display-Format", "RGB565");
+        response->addHeader("X-Display-Width", String(getDisplayWidth()).c_str());
+        response->addHeader("X-Display-Height", String(getDisplayHeight()).c_str());
 
-        response->send(200, "application/octet-stream", buf, size);
-        freeSnapshot(buf);
+        response->send(200, "image/png", stream.buffer.data(), stream.buffer.size());
         return ESP_OK;
     });
 }

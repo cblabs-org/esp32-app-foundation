@@ -955,25 +955,33 @@ void U8G2DisplayModule::registerRoutes(PsychicHttpServer& server) {
         }
     );
 
-    // --- GET /api/display/screenshot — raw framebuffer capture ---
+    // --- GET /api/display/screenshot — PNG framebuffer capture ---
     server.on("/api/display/screenshot", HTTP_GET, [this](PsychicRequest* request, PsychicResponse* response) {
-        uint8_t* buf = _u8g2.getBufferPtr();
-        if (buf == nullptr) {
-            response->send(500, "application/json", "{\"error\":\"Framebuffer unavailable\"}");
+        struct BufferStream : public Print {
+            std::vector<uint8_t> buffer;
+            size_t write(uint8_t c) override {
+                buffer.push_back(c);
+                return 1;
+            }
+            size_t write(const uint8_t* buf, size_t size) override {
+                buffer.insert(buffer.end(), buf, buf + size);
+                return size;
+            }
+        };
+
+        BufferStream stream;
+        if (!capturePNG(stream) || stream.buffer.empty()) {
+            response->send(500, "application/json", "{\"error\":\"Screenshot capture failed\"}");
             return ESP_FAIL;
         }
-
-        // U8G2 buffer: 8 pixels per tile row × tileWidth × tileHeight
-        size_t bufferSize = 8 * _u8g2.getBufferTileWidth() * _u8g2.getBufferTileHeight();
 
         response->addHeader("Cache-Control", "no-cache, no-store, must-revalidate");
         response->addHeader("Pragma", "no-cache");
         response->addHeader("Expires", "0");
-        // Pass display geometry so the JS client can render correctly
-        response->addHeader("X-Display-Width", String(_displayWidth).c_str());
-        response->addHeader("X-Display-Height", String(_displayHeight).c_str());
+        response->addHeader("X-Display-Width", String(getDisplayWidth()).c_str());
+        response->addHeader("X-Display-Height", String(getDisplayHeight()).c_str());
 
-        response->send(200, "application/octet-stream", buf, bufferSize);
+        response->send(200, "image/png", stream.buffer.data(), stream.buffer.size());
         return ESP_OK;
     });
 }

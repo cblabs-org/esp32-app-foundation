@@ -149,7 +149,8 @@
   var displayHeight = 0;
   var autoInterval = null;
   var hasCapture = false;
-  var lastBytes = null;
+  var currentBlob = null;
+  var currentImage = null;
 
   // Capture screenshot from device
   async function capture() {
@@ -160,17 +161,37 @@
       var response = await fetch('/api/display/screenshot');
       if (!response.ok) throw new Error('HTTP ' + response.status);
 
-      displayWidth = parseInt(response.headers.get('X-Display-Width') || '256', 10);
-      displayHeight = parseInt(response.headers.get('X-Display-Height') || '64', 10);
+      var wHeader = response.headers.get('X-Display-Width');
+      var hHeader = response.headers.get('X-Display-Height');
+      var headerW = wHeader ? parseInt(wHeader, 10) : 0;
+      var headerH = hHeader ? parseInt(hHeader, 10) : 0;
 
-      var buffer = await response.arrayBuffer();
-      lastBytes = new Uint8Array(buffer);
-      render(lastBytes, displayWidth, displayHeight);
+      var blob = await response.blob();
+      currentBlob = blob;
 
-      hasCapture = true;
-      downloadBtn.disabled = false;
-      infoEl.textContent = displayWidth + '×' + displayHeight +
-        ' · ' + lastBytes.length + ' bytes · ' + new Date().toLocaleTimeString();
+      var img = new Image();
+      var url = URL.createObjectURL(blob);
+
+      await new Promise(function(resolve, reject) {
+        img.onload = function() {
+          URL.revokeObjectURL(url);
+          currentImage = img;
+          displayWidth = headerW || img.naturalWidth || img.width;
+          displayHeight = headerH || img.naturalHeight || img.height;
+          renderImage();
+          hasCapture = true;
+          downloadBtn.disabled = false;
+          infoEl.textContent = displayWidth + '×' + displayHeight +
+            ' · ' + blob.size + ' bytes · ' + new Date().toLocaleTimeString();
+          resolve();
+        };
+        img.onerror = function() {
+          URL.revokeObjectURL(url);
+          reject(new Error('Failed to decode image'));
+        };
+        img.src = url;
+      });
+
     } catch (err) {
       infoEl.innerHTML = '<span style="color:var(--error);">Capture failed: ' + err.message + '</span>';
     } finally {
@@ -179,29 +200,13 @@
     }
   }
 
-  // Render U8G2 vertical-byte buffer to canvas
-  function render(bytes, w, h) {
-    canvas.width = w * currentZoom;
-    canvas.height = h * currentZoom;
-    ctx.fillStyle = '#000';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    var pagesH = Math.ceil(h / 8);
-    for (var page = 0; page < pagesH; page++) {
-      for (var x = 0; x < w; x++) {
-        var byteIndex = page * w + x;
-        if (byteIndex >= bytes.length) break;
-        var b = bytes[byteIndex];
-        for (var bit = 0; bit < 8; bit++) {
-          var y = page * 8 + bit;
-          if (y >= h) break;
-          if (b & (1 << bit)) {
-            ctx.fillStyle = '#00ff88';
-            ctx.fillRect(x * currentZoom, y * currentZoom, currentZoom, currentZoom);
-          }
-        }
-      }
-    }
+  // Render PNG image to canvas
+  function renderImage() {
+    if (!currentImage) return;
+    canvas.width = displayWidth * currentZoom;
+    canvas.height = displayHeight * currentZoom;
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(currentImage, 0, 0, canvas.width, canvas.height);
   }
 
   // Capture button
@@ -209,15 +214,13 @@
 
   // Download PNG
   downloadBtn.addEventListener('click', function() {
-    if (!hasCapture) return;
-    canvas.toBlob(function(blob) {
-      var url = URL.createObjectURL(blob);
-      var a = document.createElement('a');
-      a.href = url;
-      a.download = 'screenshot-' + new Date().toISOString().slice(0, 19).replace(/:/g, '-') + '.png';
-      a.click();
-      URL.revokeObjectURL(url);
-    }, 'image/png');
+    if (!hasCapture || !currentBlob) return;
+    var url = URL.createObjectURL(currentBlob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'screenshot-' + new Date().toISOString().slice(0, 19).replace(/:/g, '-') + '.png';
+    a.click();
+    URL.revokeObjectURL(url);
   });
 
   // Zoom buttons
@@ -226,7 +229,7 @@
       currentZoom = parseInt(btn.getAttribute('data-zoom'), 10);
       document.querySelectorAll('.zoom-btn').forEach(function(b) { b.classList.remove('active'); });
       btn.classList.add('active');
-      if (hasCapture && lastBytes) render(lastBytes, displayWidth, displayHeight);
+      if (hasCapture && currentImage) renderImage();
     });
   });
 
