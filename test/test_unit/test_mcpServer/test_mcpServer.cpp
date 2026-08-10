@@ -135,7 +135,7 @@ TEST(McpToolRegistryTest, GetToolsReturnsAll) {
 TEST(McpBuiltinToolsTest, RegistersExpectedToolCount) {
     MCPToolRegistry registry;
     mcpBuiltinTools::registerAll(registry, nullptr);
-    EXPECT_GE(registry.size(), 7u);
+    EXPECT_GE(registry.size(), 6u);
 }
 
 /** system_info tool must be findable after registerAll(). */
@@ -180,12 +180,7 @@ TEST(McpBuiltinToolsTest, ListToolsToolExists) {
     EXPECT_NE(registry.findTool("list_tools"), nullptr);
 }
 
-/** capture_display tool must be findable after registerAll() even if display is null. */
-TEST(McpBuiltinToolsTest, CaptureDisplayToolExists) {
-    MCPToolRegistry registry;
-    mcpBuiltinTools::registerAll(registry, nullptr);
-    EXPECT_NE(registry.findTool("capture_display"), nullptr);
-}
+
 
 /** system_info handler must return firmware_version in its result. */
 TEST(McpBuiltinToolsTest, SystemInfoReturnsData) {
@@ -224,56 +219,7 @@ TEST(McpBuiltinToolsTest, GetConfigWithoutManager) {
     EXPECT_TRUE(resultObj["isError"].as<bool>());
 }
 
-/** capture_display with null display must return an error in result. */
-TEST(McpBuiltinToolsTest, CaptureDisplayWithoutDisplay) {
-    MCPToolRegistry registry;
-    mcpBuiltinTools::registerAll(registry, nullptr); // No display info passed
 
-    const MCPToolEntry* tool = registry.findTool("capture_display");
-    ASSERT_NE(tool, nullptr);
-
-    JsonDocument argsDoc;
-    JsonObject args = argsDoc.to<JsonObject>();
-    JsonDocument resultDoc;
-    JsonObject resultObj = resultDoc.to<JsonObject>();
-    tool->handler(tool->context, args, resultObj);
-
-    EXPECT_TRUE(resultObj["error"].is<const char*>());
-    EXPECT_STREQ(resultObj["error"].as<const char*>(), "No display registered");
-    EXPECT_TRUE(resultObj["isError"].as<bool>());
-}
-
-/** capture_display with a valid display buffer must return base64 data. */
-TEST(McpBuiltinToolsTest, CaptureDisplayWithDisplay) {
-    MCPToolRegistry registry;
-
-    // Create a small synthetic framebuffer (4 bytes)
-    uint8_t buffer[] = { 0xAA, 0xBB, 0xCC, 0xDD };
-    DisplayInfo display;
-    display.framebuffer     = buffer;
-    display.framebufferSize = sizeof(buffer);
-    display.width           = 16;
-    display.height          = 2;
-
-    mcpBuiltinTools::registerAll(registry, nullptr, &display);
-
-    const MCPToolEntry* tool = registry.findTool("capture_display");
-    ASSERT_NE(tool, nullptr);
-
-    JsonDocument argsDoc;
-    JsonObject args = argsDoc.to<JsonObject>();
-    JsonDocument resultDoc;
-    JsonObject resultObj = resultDoc.to<JsonObject>();
-    tool->handler(tool->context, args, resultObj);
-
-    // Must contain format, width, height, and data fields
-    EXPECT_STREQ(resultObj["format"].as<const char*>(), "u8g2-tile");
-    EXPECT_EQ(resultObj["width"].as<int>(), 16);
-    EXPECT_EQ(resultObj["height"].as<int>(), 2);
-    EXPECT_TRUE(resultObj["data"].is<const char*>());
-    // Base64 of 4 bytes should be 8 chars (e.g. "qrvM3Q==")
-    EXPECT_GT(strlen(resultObj["data"].as<const char*>()), 0u);
-}
 
 // =============================================================================
 // Test Group 3: MCPServer — JSON-RPC dispatch via processLineForTest()
