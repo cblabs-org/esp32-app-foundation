@@ -20,6 +20,17 @@ namespace PngWriter {
     bool writeGrayscale1bpp(Print& sink, uint16_t width, uint16_t height, const uint8_t* buffer);
 
     /**
+     * @brief Write a 1-bit grayscale PNG (stored / no compression) from a U8G2 tile buffer.
+     *
+     * @param sink       The Print stream to write the PNG to.
+     * @param width      Width of the image in pixels.
+     * @param height     Height of the image in pixels.
+     * @param tileBuffer Pointer to 1-bit monochrome tile data (U8G2 format: vertical tiles).
+     * @return true on success, false on write failure.
+     */
+    bool writeGrayscale1bppFromTiles(Print& sink, uint16_t width, uint16_t height, const uint8_t* tileBuffer);
+
+    /**
      * @brief Write an RGB888 PNG using ROM DEFLATE compression.
      *
      * Input is an RGB565 buffer. The function will convert to RGB888 per-pixel

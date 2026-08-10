@@ -21,6 +21,7 @@
 #include <base64.h>
 #include <mbedtls/base64.h>
 #include <vector>
+#include "utils/BufferStream.h"
 #include <cstdio>
 #include <PsychicHttp.h>
 #include "esp_heap_caps.h"
@@ -841,17 +842,7 @@ void LVGLDisplayModule::registerRoutes(PsychicHttpServer& server) {
 
     // GET /api/display/screenshot — PNG framebuffer capture
     server.on("/api/display/screenshot", HTTP_GET, [this](PsychicRequest* request, PsychicResponse* response) {
-        struct BufferStream : public Print {
-            std::vector<uint8_t> buffer;
-            size_t write(uint8_t c) override {
-                buffer.push_back(c);
-                return 1;
-            }
-            size_t write(const uint8_t* buf, size_t size) override {
-                buffer.insert(buffer.end(), buf, buf + size);
-                return size;
-            }
-        };
+
 
         BufferStream stream;
         if (!capturePNG(stream) || stream.buffer.empty()) {
@@ -1013,17 +1004,7 @@ void LVGLDisplayModule::registerMCPTools(MCPToolRegistry& registry) {
     );
 
     // --- Tool 3: capture_display (read-only) ---
-    struct BufferStream : public Print {
-        std::vector<uint8_t> buffer;
-        size_t write(uint8_t c) override {
-            buffer.push_back(c);
-            return 1;
-        }
-        size_t write(const uint8_t *buf, size_t size) override {
-            buffer.insert(buffer.end(), buf, buf + size);
-            return size;
-        }
-    };
+
 
     JsonDocument captureSchema;
     captureSchema["type"] = "object";
@@ -1057,6 +1038,7 @@ void LVGLDisplayModule::registerMCPTools(MCPToolRegistry& registry) {
                 result["error"] = "Base64 encoding failed";
                 return;
             }
+            b64buf.push_back(0); // Ensure null termination for ArduinoJson
 
             result["format"]   = "png";
             result["width"]    = self->getDisplayWidth();

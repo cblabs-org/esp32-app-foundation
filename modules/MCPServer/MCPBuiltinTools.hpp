@@ -40,8 +40,8 @@ namespace mcpBuiltinTools {
     /**
      * @brief Register all foundation-level MCP tools into the registry.
      *
-     * Registers 6 tools: system_info, get_config, set_config, reboot,
-     * get_logs, and list_tools.
+     * Registers 7 tools: system_info, get_config, set_config, reboot,
+     * get_logs, get_time, list_tools.
      *
      * @param registry      The MCPToolRegistry to register tools into.
      * @param configManager Pointer to the ConfigManager (nullable if unavailable).

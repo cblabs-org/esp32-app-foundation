@@ -113,8 +113,8 @@ public:
      * Implementations must be safe to call from any task. LVGL implementations
      * should snapshot the framebuffer under the LVGL lock and encode from the copy.
      * Returns false if the display is uninitialized, the framebuffer cannot be
-     * acquired, or encoding fails. On failure, no partial data shall have been
-     * written to sink.
+     * acquired, or encoding fails. On failure, partial data may have been
+     * written to sink. Callers should discard sink contents if this method returns false.
      *
      * @param sink The Print stream to write the PNG file to.
      * @return true on successful capture and encoding; false otherwise.
