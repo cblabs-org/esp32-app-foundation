@@ -10,7 +10,7 @@
  *              lifecycle, draw buffer allocation, tick updates, input device
  *              focus groups, system screens, and two-stage boot splash.
  *              Implements IConfigurable via ConfigManager gateway (namespace "display")
- *              and IStatusReporter for boot status updates.
+ *              and IDisplayModule for display service & status updates.
  *
  * Exported Classes:
  * - LVGLDisplayModule: Generic LVGL display service module
@@ -24,10 +24,19 @@
  *   ITickable:
  *   - tick():               Advances LVGL tick clock and calls lv_timer_handler()
  *
- *   IStatusReporter:
+ *   IDisplayModule:
  *   - reportStatus():       Update status message and progress bar on boot screen
  *   - reportError():        Display system error screen
  *   - clearStatus():        Clear status overlay and restore prior screen
+ *   - getDisplayWidth():    Get physical width in pixels
+ *   - getDisplayHeight():   Get physical height in pixels
+ *   - setBrightness():      Set backlight brightness level
+ *   - getBrightness():      Get backlight brightness level
+ *   - resetActivity():      Reset screensaver inactivity timer
+ *   - isDimmed():           Check if screensaver is in dimmed state
+ *   - isSleeping():         Check if display backlight is powered off
+ *   - capturePNG():         Capture current display buffer to PNG
+ *   - showSystemState():    Show full-screen system state overlay
  *
  *   Screen Management API:
  *   - showBoot():           Show Stage-1 boot splash / status progress screen
@@ -48,7 +57,7 @@
 #include "interfaces/IStatusReporter.hpp"
 #include "interfaces/IWebContributor.hpp"
 #include "interfaces/IMCPContributor.hpp"
-#include "interfaces/IBootReporter.hpp"
+#include "interfaces/IDisplayModule.hpp"
 #include "interfaces/ILVGLHardwareAdapter.hpp"
 #include "interfaces/ILVGLSystemScreens.hpp"
 #include <types/BootBranding.h>
@@ -57,6 +66,7 @@
 #include "screens/ErrorScreen.hpp"
 #include "screens/OTAProgressScreen.hpp"
 #include "ScreensaverController.hpp"
+#include "PngWriter.h"
 #include "lvgl.h"
 
 // Forward declarations
@@ -103,7 +113,7 @@ namespace LVGLDisplayEvents {
  * Handles LVGL lifecycle (lv_init, lv_tick_inc, lv_timer_handler), draw buffer
  * allocation, input device discovery, focus group management, and framework system screens.
  */
-class LVGLDisplayModule : public ITickable, public IConfigurable, public IWebContributor, public IMCPContributor, public IBootReporter {
+class LVGLDisplayModule : public ITickable, public IConfigurable, public IWebContributor, public IMCPContributor, public IDisplayModule {
 public:
     // -------------------------------------------------------------------------
     // Lifecycle
@@ -170,8 +180,18 @@ public:
     uint32_t getTickBudgetMs() const override { return 33; } ///< Match LV_DISPLAY_DEF_REFR_PERIOD (~30 FPS)
 
     // -------------------------------------------------------------------------
-    // IStatusReporter
+    // IDisplayModule
     // -------------------------------------------------------------------------
+
+    uint16_t getDisplayWidth() const override;
+    uint16_t getDisplayHeight() const override;
+    void setBrightness(uint8_t brightness) override;
+    uint8_t getBrightness() const override { return _brightness; }
+    void resetActivity() override;
+    bool isDimmed() const override;
+    bool isSleeping() const override;
+    bool capturePNG(Print& sink) override;
+    void showSystemState(const SystemDisplayParams& params) override;
 
     /**
      * @brief Update status message and progress bar on boot screen.
@@ -243,11 +263,6 @@ public:
      * @param bootLogo Pointer to compiled-in lv_image_dsc_t asset.
      */
     void setBootLogo(const lv_image_dsc_t* bootLogo);
-
-    /**
-     * @brief Reset inactivity timer and wake screensaver if dimmed or blanked.
-     */
-    void resetActivity();
 
     // -------------------------------------------------------------------------
     // IConfigurable — ConfigManager gateway (namespace: "display")
@@ -321,8 +336,6 @@ public:
     // -------------------------------------------------------------------------
 
     void setConfigManager(ConfigManager* cm) { _configManager = cm; }
-    void setBrightness(uint8_t brightness);
-    uint8_t getBrightness() const { return _brightness; }
     void setRotation(uint16_t degrees);
     uint16_t getRotation() const { return _rotation; }
     void setScreensaverEnabled(bool enabled);
