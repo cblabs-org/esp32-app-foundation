@@ -2,7 +2,7 @@
 
 **RFC:** [#85](https://github.com/matthewmcneill/esp32-app-foundation/issues/85)
 **Base branch:** `main`
-**Status:** WO5/5 — WO1-4 complete, WO5 spawning
+**Status:** ✅ COMPLETE — all 5 WOs delivered
 **Human approval:** ✅ Approved 2026-08-10 (conversation 4d9d56b2)
 
 ---
@@ -45,7 +45,7 @@ This project introduces `IDisplayModule`, a unified interface formalising the mi
 - **[x] [wo2-u8g2-implementation](wo2-u8g2-implementation/WORKORDER.md):** Implement `IDisplayModule` on `U8G2DisplayModule` — stored-PNG capture, system state dispatch, self-register `capture_display` MCP tool
 - **[x] [wo3-lvgl-implementation](wo3-lvgl-implementation/WORKORDER.md):** Implement `IDisplayModule` on `LVGLDisplayModule` — DEFLATE-compressed PNG capture via PSRAM, system state dispatch, self-register `capture_display` MCP tool
 - **[x] [wo4-framework-wiring](wo4-framework-wiring/WORKORDER.md):** Wire `IDisplayModule*` into `Application::registerModule()`, remove `capture_display` from `MCPBuiltinTools`, delete `DisplayInfo`, remove `#ifndef` guard
-- **[/] [wo5-portal-scripts-docs](wo5-portal-scripts-docs/WORKORDER.md):** Rewrite `screenshot.js` for PNG, update HTTP endpoints, consolidate host scripts, update skill and developer docs
+- **[x] [wo5-portal-scripts-docs](wo5-portal-scripts-docs/WORKORDER.md):** Rewrite `screenshot.js` for PNG, update HTTP endpoints, consolidate host scripts, update skill and developer docs
 
 ---
 

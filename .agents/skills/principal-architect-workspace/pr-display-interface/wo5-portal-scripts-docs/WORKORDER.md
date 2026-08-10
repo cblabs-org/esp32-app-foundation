@@ -132,3 +132,28 @@ If you discover a defect, upstream bug, or concern *outside your boundary box*, 
 
 ## Completion Report
 <!-- Written by the worker at task completion -->
+### Status: COMPLETED
+
+### Summary of Accomplishments
+1. **HTTP Screenshot Endpoint PNG Migration**:
+   - `modules/U8G2Display/U8G2DisplayModule.cpp`: Updated `/api/display/screenshot` endpoint to stream PNG bytes directly via `capturePNG(BufferStream)` with `image/png` content-type. Removed obsolete raw U8G2 tile buffer pointers and octet-stream responses.
+   - `modules/LVGLDisplay/LVGLDisplayModule.cpp`: Updated `/api/display/screenshot` endpoint to stream PNG bytes directly via `capturePNG(BufferStream)` with `image/png` content-type. Removed raw RGB565 `captureSnapshot()` / `freeSnapshot()` calls and `X-Display-Format` header.
+2. **Portal Screenshot JS Simplification**:
+   - `web/portal/screenshot.js` & `web/portal/screenshot.html`: Updated portal screenshot JS to fetch PNG blob, decode natively into an HTML `Image` object, and render on `<canvas>` with crisp 1x, 2x, and 4x zoom levels (`imageSmoothingEnabled = false`).
+   - Removed obsolete U8G2-specific pixel recolouring controls.
+   - Simplified download handler to save the raw PNG blob directly.
+3. **Web Tests Update**:
+   - `test/web/tests/display.spec.ts`: Updated Playwright mock route for `/api/display/screenshot` to fulfill `image/png` with a valid 1x1 base64-decoded PNG buffer.
+4. **Build Verification**:
+   - Verified compilation on `esp32dev` environment — SUCCESS (0 errors, all tests passed).
+   - Verified compilation on `crowpanel-128-rotary` environment — SUCCESS (0 errors, all tests passed).
+5. **Git Commit**:
+   - Committed changes on `display-interface/wo5-portal-scripts-docs` with commit: `feat(portal): serve PNG screenshots via capturePNG — simplify portal rendering`.
+
+### Verification Output
+- `pio run -e esp32dev`: SUCCESS
+- `pio run -e crowpanel-128-rotary`: SUCCESS
+- Playwright Web Tests: All passed
+
+### Issues / Defects Surfaced
+- None. All requirements were completed within the strict boundary box.
