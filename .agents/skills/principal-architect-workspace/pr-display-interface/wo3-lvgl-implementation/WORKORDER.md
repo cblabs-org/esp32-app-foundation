@@ -130,26 +130,26 @@ Use the same `BufferStream` pattern as WO2 (a local `Print` subclass that append
 
 ## Line-Item Instructions
 
-- [ ] Read `LVGLDisplayModule.hpp` fully to understand the class layout, member variables, and existing methods
-- [ ] Read `ScreensaverController.hpp` in this module to find `isDimmed()` / `isBlanked()` methods
-- [ ] Read the `_onAppConfiguring()` callback in `LVGLDisplayModule.cpp` to understand how CONFIGURING display works
-- [ ] Read the existing `capture_display` MCP tool registration in `registerMCPTools()` to understand the current implementation
-- [ ] Modify `LVGLDisplayModule.hpp`:
+- [x] Read `LVGLDisplayModule.hpp` fully to understand the class layout, member variables, and existing methods
+- [x] Read `ScreensaverController.hpp` in this module to find `isDimmed()` / `isBlanked()` methods
+- [x] Read the `_onAppConfiguring()` callback in `LVGLDisplayModule.cpp` to understand how CONFIGURING display works
+- [x] Read the existing `capture_display` MCP tool registration in `registerMCPTools()` to understand the current implementation
+- [x] Modify `LVGLDisplayModule.hpp`:
   - Change `#include "interfaces/IBootReporter.hpp"` → `#include "interfaces/IDisplayModule.hpp"`
   - Add `#include "PngWriter.h"`
   - Change class inheritance from `IBootReporter` → `IDisplayModule`
   - Add declarations for new methods: `getDisplayWidth()`, `getDisplayHeight()`, `isDimmed()`, `isSleeping()`, `capturePNG()`, `showSystemState()`
   - Add `override` keyword to `setBrightness()`, `getBrightness()`, `resetActivity()` declarations
   - Update file header doc-comment to mention `IDisplayModule` instead of `IBootReporter`
-- [ ] Modify `LVGLDisplayModule.cpp`:
+- [x] Modify `LVGLDisplayModule.cpp`:
   - Implement `getDisplayWidth()` and `getDisplayHeight()` (use adapter or lv_display_get_hor/ver_res)
   - Implement `isDimmed()` → `_screensaver.isDimmed()`
   - Implement `isSleeping()` → `_screensaver.isBlanked()`
   - Implement `capturePNG()` — snapshot via `captureSnapshot()`, encode via `PngWriter::writeRGB565ToRGB888()`, free via `freeSnapshot()`
   - Implement `showSystemState()` — dispatch to `showError()`, configuring logic, or `restorePriorScreen()`
   - Update `capture_display` MCP tool to use `capturePNG()` with PNG format output
-- [ ] Verify: build `crowpanel-128-rotary` environment with PlatformIO MCP tools — must compile cleanly
-- [ ] Commit with message: `feat(lvgl): implement IDisplayModule on LVGLDisplayModule`
+- [x] Verify: build `crowpanel-128-rotary` environment with PlatformIO MCP tools — must compile cleanly
+- [x] Commit with message: `feat(lvgl): implement IDisplayModule on LVGLDisplayModule`
 
 ## Verification Requirement
 The worker must verify the `crowpanel-128-rotary` environment compiles cleanly using PlatformIO MCP build tools. **CRITICAL:** Before committing, the worker MUST ask the user if they are happy with the changes.
@@ -160,4 +160,11 @@ If you discover a defect, upstream bug, or concern *outside your boundary box*, 
 ---
 
 ## Completion Report
-<!-- Written by the worker at task completion -->
+- **Status**: Completed & Verified
+- **Commit**: `5a18d8c` — `feat(lvgl): implement IDisplayModule on LVGLDisplayModule`
+- **Summary**:
+  1. Updated `LVGLDisplayModule` class inheritance from `IBootReporter` to `IDisplayModule`.
+  2. Implemented geometry (`getDisplayWidth`, `getDisplayHeight`), screensaver status (`isDimmed`, `isSleeping`), PNG snapshot (`capturePNG`), and system state overlay (`showSystemState`) methods.
+  3. Updated `capture_display` MCP tool to output base64-encoded PNG screenshots via `capturePNG()`.
+  4. Verified clean build of `crowpanel-128-rotary` environment.
+- **Defects/Issues Surfaced**: None.
