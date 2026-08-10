@@ -133,7 +133,11 @@ lv_display_t* CrowPanel128Adapter::createDisplay() {
 void CrowPanel128Adapter::_flushCallback(lv_display_t* disp, const lv_area_t* area, uint8_t* px_map) {
     auto* adapter = static_cast<CrowPanel128Adapter*>(lv_display_get_user_data(disp));
     if (adapter) {
-        adapter->_gfx.pushImage(area->x1, area->y1, area->x2 - area->x1 + 1, area->y2 - area->y1 + 1, (lgfx::swap565_t*)px_map);
+        // LVGL 9 renders RGB565 in native (little-endian) byte order and lv_conf.h sets no
+        // colour swap, so the buffer is lgfx::rgb565_t. Pushing it as swap565_t byte-swaps every
+        // pixel and scrambles the colours on-panel. Matches the Elecrow factory example, which
+        // pushes (lgfx::rgb565_t*). (WO7 D3.)
+        adapter->_gfx.pushImage(area->x1, area->y1, area->x2 - area->x1 + 1, area->y2 - area->y1 + 1, (lgfx::rgb565_t*)px_map);
     }
     lv_display_flush_ready(disp);
 }
