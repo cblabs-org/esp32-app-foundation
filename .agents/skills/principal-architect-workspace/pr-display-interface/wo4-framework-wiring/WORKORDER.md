@@ -74,9 +74,9 @@ In all three main.cpp files, **remove** the `mcpServer.setDisplayInfo(displayMod
 
 ### 5. Verify
 
-- [ ] Build `esp32dev` environment — must compile cleanly
-- [ ] Build `crowpanel-128-rotary` environment — must compile cleanly
-- [ ] Commit with message: `refactor(mcp): remove DisplayInfo and builtin capture_display — display self-registers`
+- [x] Build `esp32dev` environment — must compile cleanly
+- [x] Build `crowpanel-128-rotary` environment — must compile cleanly
+- [x] Commit with message: `refactor(mcp): remove DisplayInfo and builtin capture_display — display self-registers`
 
 ## Verification Requirement
 Both environments must compile cleanly. **CRITICAL:** Before committing, the worker MUST ask the user if they are happy with the changes.
@@ -88,3 +88,15 @@ If you discover a defect, upstream bug, or concern *outside your boundary box*, 
 
 ## Completion Report
 <!-- Written by the worker at task completion -->
+
+- **Status**: Completed
+- **Validation**:
+  - `esp32dev` build: SUCCESS (clean compile)
+  - `crowpanel-128-rotary` build: SUCCESS (clean compile)
+  - Commit: `8da3f05` (`refactor(mcp): remove DisplayInfo and builtin capture_display — display self-registers`)
+- **Key Changes**:
+  - Removed `capture_display` builtin tool, `s_displayInfo` static variable, and `setDisplayInfo()` from `MCPBuiltinTools.cpp/.hpp` and `MCPServer.cpp/.hpp`.
+  - Deleted `include/types/DisplayInfo.hpp`.
+  - Removed `getDisplayInfo()` from `U8G2DisplayModule.hpp/.cpp` and updated `capturePNG()` to access the U8G2 buffer directly via `_u8g2.getBufferPtr()`.
+  - Removed `mcpServer.setDisplayInfo()` calls and unused `#ifdef WITH_MCP` blocks from `src/main.cpp`, `sample-app/src/main.cpp`, and `template-app/src/main.cpp`.
+- **Surfaced Issues / Notes**: None.
