@@ -111,8 +111,18 @@ void CrowPanel128Adapter::_buttonEventCallback(const char* topic, const void* pa
 }
 
 lv_display_t* CrowPanel128Adapter::createDisplay() {
+    // Assert the panel power-enable rails BEFORE initialising the GC9A01.
+    // The CrowPanel 1.28" gates LCD power behind GPIO1/GPIO2 (PIN_LCD_PWR_EN1/2);
+    // both must be driven HIGH or the panel stays unpowered and the screen is
+    // black at any backlight level. Mirrors the Elecrow factory example, which
+    // sets GPIO1/GPIO2 HIGH immediately before gfx.init(). (RFC #50 must-fix.)
+    pinMode(PIN_LCD_PWR_EN1, OUTPUT);
+    digitalWrite(PIN_LCD_PWR_EN1, HIGH);
+    pinMode(PIN_LCD_PWR_EN2, OUTPUT);
+    digitalWrite(PIN_LCD_PWR_EN2, HIGH);
+
     _gfx.init();
-    
+
     lv_display_t* disp = lv_display_create(240, 240);
     lv_display_set_user_data(disp, this);
     lv_display_set_flush_cb(disp, _flushCallback);
