@@ -44,6 +44,18 @@ public:
     virtual ~ILVGLSystemScreens() = default;
 
     /**
+     * @brief Create or retrieve the boot screen root object.
+     *
+     * Returned during the BOOT phase so the framework can drive boot progress
+     * onto the designer's boot screen (via onBootProgress()). Because boot runs
+     * before most of the framework is up, the skin's screens must already exist
+     * when this is first called (the module builds the SLS UI in bootstrap).
+     *
+     * @return Pointer to the boot screen, or nullptr to use the built-in FaultScreen.
+     */
+    virtual lv_obj_t* bootScreen() { return nullptr; }
+
+    /**
      * @brief Create or retrieve custom OTA progress screen root object.
      *
      * @return Pointer to custom lv_obj_t screen container, or nullptr to use default screen.
@@ -93,6 +105,20 @@ public:
     virtual lv_obj_t* gateHelperScreen(const AppConfiguringPayload* payload) {
         (void)payload;
         return nullptr;
+    }
+
+    /**
+     * @brief Callback notification when boot progress updates.
+     *
+     * Called on each boot status report so the provider can populate the boot
+     * screen's progress bar and status label. Mirrors onOtaProgress()/onError().
+     *
+     * @param message  Boot status text (e.g. "Initializing WiFi...").
+     * @param progress Fractional progress [0.0, 1.0] (or [0, 100]); negative = indeterminate.
+     */
+    virtual void onBootProgress(const char* message, float progress) {
+        (void)message;
+        (void)progress;
     }
 
     /**

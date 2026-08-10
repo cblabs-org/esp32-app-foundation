@@ -53,9 +53,8 @@
 #include "interfaces/ILVGLSystemScreens.hpp"
 #include <types/BootBranding.h>
 #include "assets/boot_logo.h"
-#include "screens/BootScreen.hpp"
-#include "screens/ErrorScreen.hpp"
-#include "screens/OTAProgressScreen.hpp"
+#include "screens/FaultScreen.hpp"
+#include "assets/boot_logo.h"   // cb_labs_boot_logo (default _bootLogo; retained for API)
 #include "ScreensaverController.hpp"
 #include "lvgl.h"
 
@@ -203,10 +202,21 @@ public:
     void showBoot();
 
     /**
+     * @brief Show the built-in FaultScreen with a diagnostic message.
+     *
+     * The universal fallback when the SLS skin does not supply a needed screen
+     * (no provider, or the exported UI failed to load).
+     *
+     * @param title  Short fault heading.
+     * @param detail Diagnostic/trace line.
+     */
+    void showFault(const char* title, const char* detail);
+
+    /**
      * @brief Display system error screen.
      *
      * Uses ILVGLSystemScreens provider if non-null and supplying an error screen,
-     * otherwise falls back to built-in ErrorScreen.
+     * otherwise falls back to the built-in FaultScreen.
      *
      * @param title   Error title string.
      * @param message Error description string.
@@ -225,7 +235,7 @@ public:
      * @brief Display OTA firmware update progress screen.
      *
      * Uses ILVGLSystemScreens provider if non-null and supplying an OTA screen,
-     * otherwise falls back to built-in OTAProgressScreen.
+     * otherwise falls back to the built-in FaultScreen.
      *
      * @param progress Fractional progress ratio in [0.0, 1.0].
      * @param status   Status phase text string.
@@ -344,9 +354,7 @@ public:
     bool isBootstrapMode() const { return _bootstrapMode; }
     EventBus* getEventBus() const { return _eventBus; }
 
-    BootScreen& getBootScreen() { return _builtInBootScreen; }
-    ErrorScreen& getErrorScreen() { return _builtInErrorScreen; }
-    OTAProgressScreen& getOtaScreen() { return _builtInOtaScreen; }
+    FaultScreen& getFaultScreen() { return _faultScreen; }
     ScreensaverController& getScreensaver() { return _screensaver; }
     const ScreensaverController& getScreensaver() const { return _screensaver; }
 
@@ -413,9 +421,8 @@ private:
 
     // --- System Screens & Assets ---
     const lv_image_dsc_t* _bootLogo = nullptr;
-    BootScreen            _builtInBootScreen;
-    ErrorScreen           _builtInErrorScreen;
-    OTAProgressScreen     _builtInOtaScreen;
+    FaultScreen           _faultScreen;       ///< The only built-in screen (dev fault/trace fallback)
+    bool                  _uiInitialized = false; ///< Guards the one-time ui_init() (SLS UI build)
     lv_obj_t*             _priorScreen = nullptr;
     bool                  _inSystemScreen = false;
 

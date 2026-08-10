@@ -44,8 +44,7 @@ LVGLDisplayModule::LVGLDisplayModule(ILVGLHardwareAdapter& adapter,
     : _adapter(adapter),
       _branding(branding),
       _screens(screens),
-      _bootLogo(bootLogo ? bootLogo : &cb_labs_boot_logo),
-      _builtInBootScreen(_bootLogo, _branding ? _branding->appTitle : nullptr) {
+      _bootLogo(bootLogo ? bootLogo : &cb_labs_boot_logo) {
 }
 
 LVGLDisplayModule::~LVGLDisplayModule() {
@@ -127,7 +126,16 @@ void LVGLDisplayModule::bootstrapHardware() {
 
     _bootstrapMode = true;
 
-    // --- Step 5: Stage-1 Boot Splash ---
+    // --- Build the SLS UI now (BEFORE boot status is reported) ---
+    // Boot runs synchronously before the module's begin() would normally call
+    // ui_init(), so the designer's screens must be created here or the boot
+    // screen (and its progress bar) would not exist while boot progress streams.
+    if (!_uiInitialized && ui_init != nullptr) {
+        ui_init();
+        _uiInitialized = true;
+    }
+
+    // --- Stage-1 boot screen (SLS bootScreen, or FaultScreen if no skin) ---
     showBoot();
 
     // --- Step 6: Apply Hardware Brightness & Rotation ---
@@ -170,9 +178,11 @@ void LVGLDisplayModule::begin(EventBus* eventBus) {
     _screensaver.setDimTimeout(_dimTimeoutMs);
     _screensaver.setBlankTimeout(_blankTimeoutMs);
 
-    // Execute weak ui_init() hook if defined by application
-    if (ui_init != nullptr) {
+    // Execute weak ui_init() hook (once) — normally already run in bootstrapHardware()
+    // so the SLS screens exist during boot; this is the fallback if begin() ran first.
+    if (!_uiInitialized && ui_init != nullptr) {
         ui_init();
+        _uiInitialized = true;
     }
 
     _bootstrapMode = false;
@@ -261,39 +271,42 @@ void LVGLDisplayModule::tick(uint32_t now) {
 // -----------------------------------------------------------------------------
 
 void LVGLDisplayModule::reportStatus(const char* message, float progress) {
-    // The boot sequence runs synchronously in setup(), before the main tick loop
-    // starts pumping lv_timer_handler(). LVGL is retained-mode, so simply updating
-    // the widgets here would never reach the panel until after boot — the progress
-    // would not animate. Mirror the U8G2 boot board: load the boot screen
-    // immediately (a screen-load *animation* can't advance without the tick loop,
-    // so it would never settle) and force a synchronous flush per step.
-    _builtInBootScreen.init(_bootLogo, _branding ? _branding->appTitle : nullptr);
-    lv_obj_t* bootScr = _builtInBootScreen.getScreen();
-    if (bootScr != nullptr && lv_screen_active() != bootScr) {
-        lv_screen_load(bootScr);  // immediate, no fade — see note above
-    }
-
-    if (_display == nullptr) {
-        _builtInBootScreen.setStatus(message, progress);
+    // Boot runs synchronously in setup(), before the main tick loop pumps
+    // lv_timer_handler(). LVGL is retained-mode, so updates must be flushed
+    // explicitly here or boot progress never reaches the panel. Drive the
+    // designer's boot screen; if the skin is absent or its UI failed to load,
+    // fall back to the built-in FaultScreen (the only code-drawn screen).
+    lv_obj_t* bootScr = (_screens != nullptr) ? _screens->bootScreen() : nullptr;
+    if (bootScr == nullptr) {
+        showFault("DISPLAY FAULT", "UI failed to load — reflash");
         return;
     }
 
-    // Smoothly interpolate the bar from the last rendered value to the new one,
-    // rendering each step, so progress visibly advances during boot.
+    if (lv_screen_active() != bootScr) {
+        lv_screen_load(bootScr);  // immediate — a fade can't advance before the tick loop
+    }
+
+    if (_display == nullptr) {
+        _screens->onBootProgress(message, progress);
+        return;
+    }
+
+    // Interpolate the bar from the last value to the new one, rendering each
+    // step, so progress visibly advances (mirrors the U8G2 boot update sequence).
     if (progress >= 0.0f && progress > _lastBootProgress + 0.005f) {
         const int   kSteps        = 10;
         const int   kStepDelayMs  = 12;   // ~120 ms per milestone
         const float from          = _lastBootProgress;
         const float delta         = progress - from;
         for (int i = 1; i <= kSteps; ++i) {
-            _builtInBootScreen.setStatus(message, from + (delta * (float)i / (float)kSteps));
+            _screens->onBootProgress(message, from + (delta * (float)i / (float)kSteps));
             lv_refr_now(_display);        // force immediate flush — tick loop isn't running yet
             delay(kStepDelayMs);
         }
         _lastBootProgress = progress;
     } else {
         // No forward progress (e.g. a message-only update): just render once.
-        _builtInBootScreen.setStatus(message, progress);
+        _screens->onBootProgress(message, progress);
         lv_refr_now(_display);
     }
 }
@@ -312,10 +325,21 @@ void LVGLDisplayModule::clearStatus() {
 // -----------------------------------------------------------------------------
 
 void LVGLDisplayModule::showBoot() {
-    _builtInBootScreen.init(_bootLogo, _branding ? _branding->appTitle : nullptr);
-    lv_obj_t* bootScr = _builtInBootScreen.getScreen();
+    lv_obj_t* bootScr = (_screens != nullptr) ? _screens->bootScreen() : nullptr;
     if (bootScr != nullptr) {
-        lv_scr_load_anim(bootScr, LV_SCR_LOAD_ANIM_FADE_IN, 200, 0, false);
+        if (lv_screen_active() != bootScr) {
+            lv_screen_load(bootScr);
+        }
+    } else {
+        showFault("DISPLAY FAULT", "UI failed to load — reflash");
+    }
+}
+
+void LVGLDisplayModule::showFault(const char* title, const char* detail) {
+    _faultScreen.setFault(title, detail);
+    lv_obj_t* scr = _faultScreen.getScreen();
+    if (scr != nullptr && lv_screen_active() != scr) {
+        lv_screen_load(scr);
     }
 }
 
@@ -334,11 +358,8 @@ void LVGLDisplayModule::showError(const char* title, const char* message) {
         }
     }
 
-    _builtInErrorScreen.setError(title, message);
-    lv_obj_t* errScr = _builtInErrorScreen.getScreen();
-    if (errScr != nullptr) {
-        lv_scr_load_anim(errScr, LV_SCR_LOAD_ANIM_FADE_IN, 200, 0, false);
-    }
+    // No skin error screen — show the diagnostic fault screen with the message.
+    showFault(title, message);
 }
 
 void LVGLDisplayModule::showError(int code, const char* message) {
@@ -362,11 +383,10 @@ void LVGLDisplayModule::showOtaProgress(float progress, const char* status) {
         }
     }
 
-    _builtInOtaScreen.setProgress(progress, status);
-    lv_obj_t* otaScr = _builtInOtaScreen.getScreen();
-    if (otaScr != nullptr) {
-        lv_scr_load_anim(otaScr, LV_SCR_LOAD_ANIM_FADE_IN, 200, 0, false);
-    }
+    // No skin OTA screen — show the diagnostic fault screen.
+    (void)progress;
+    (void)status;
+    showFault("DISPLAY FAULT", "UI failed to load — reflash");
 }
 
 void LVGLDisplayModule::restorePriorScreen() {
@@ -379,8 +399,8 @@ void LVGLDisplayModule::restorePriorScreen() {
 }
 
 void LVGLDisplayModule::setBootLogo(const lv_image_dsc_t* bootLogo) {
+    // The boot logo now lives in the SLS design; retained for API compatibility.
     _bootLogo = bootLogo ? bootLogo : &cb_labs_boot_logo;
-    _builtInBootScreen.setBootLogo(_bootLogo);
 }
 
 void LVGLDisplayModule::resetActivity() {

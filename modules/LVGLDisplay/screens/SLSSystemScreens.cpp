@@ -18,6 +18,21 @@
 #include <cstring>
 #include <algorithm>
 
+lv_obj_t* SLSSystemScreens::bootScreen() {
+    return ui_uiBootScreen;
+}
+
+void SLSSystemScreens::onBootProgress(const char* message, float progress) {
+    if (ui_uiBootProgressBar != nullptr && progress >= 0.0f) {
+        int pct = static_cast<int>(progress > 1.0f ? progress : (progress * 100.0f));
+        pct = std::max(0, std::min(100, pct));
+        lv_bar_set_value(ui_uiBootProgressBar, pct, LV_ANIM_OFF);
+    }
+    if (ui_uiBootStatusLabel != nullptr && message != nullptr) {
+        lv_label_set_text(ui_uiBootStatusLabel, message);
+    }
+}
+
 lv_obj_t* SLSSystemScreens::errorScreen() {
     return showGroup(ui_uiSystemErrorGroup);
 }

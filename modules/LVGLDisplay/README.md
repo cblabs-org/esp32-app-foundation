@@ -106,11 +106,20 @@ For instructions on building a custom hardware adapter, see the [Adapter Authori
 
 ---
 
-## Two-Stage Boot Splash & System Screens (D8)
+## Boot & System Screens
 
-1. **Stage 1 (Hardware Bootstrap)**: Called during `bootstrapHardware()` before LittleFS or ConfigManager are mounted. Displays a lightweight compiled-in boot logo (`cb_labs_boot_logo` or custom `lv_image_dsc_t`) with a initialisation status progress bar.
-2. **Stage 2 (Application Handshake)**: Called after `begin()`. If the user application exports a SquareLine UI via `ui_init()`, control transitions smoothly to the application's root screen.
-3. **Pluggable Skinning**: Custom error and OTA progress screens can be supplied by implementing [`ILVGLSystemScreens`](../../include/interfaces/ILVGLSystemScreens.hpp). If `nullptr`, built-in system screens (`BootScreen`, `ErrorScreen`, `OTAProgressScreen`) are used.
+All real screens live in the SquareLine (SLS) design and are supplied through the
+[`ILVGLSystemScreens`](../../include/interfaces/ILVGLSystemScreens.hpp) skin
+(`bootScreen`, `errorScreen`, `otaScreen`, configuring screens). The module builds the
+SLS UI early — in `bootstrapHardware()` — so the designer's **boot screen exists before
+boot status is reported**, then drives its progress bar / status label via
+`onBootProgress()` with synchronous rendering (the main tick loop is not running yet
+during boot).
+
+The **only built-in (code-drawn) screen is `FaultScreen`** — a minimal dev-facing
+fault/trace display shown *only* when the skin is absent or its exported UI failed to
+load (`bootScreen()`/`errorScreen()`/`otaScreen()` returns `nullptr`). It guarantees a
+developer sees a diagnostic message instead of a blank panel.
 
 ---
 

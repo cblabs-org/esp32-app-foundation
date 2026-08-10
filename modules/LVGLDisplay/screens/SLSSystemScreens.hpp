@@ -35,6 +35,19 @@ public:
     ~SLSSystemScreens() override = default;
 
     /**
+     * @brief Retrieve the SLS boot screen root object.
+     * @return Pointer to ui_uiBootScreen (nullptr if the UI failed to load).
+     */
+    lv_obj_t* bootScreen() override;
+
+    /**
+     * @brief Update the boot screen's progress bar and status label.
+     * @param message  Boot status text.
+     * @param progress Fractional progress [0.0, 1.0] or [0, 100]; negative = leave bar unchanged.
+     */
+    void onBootProgress(const char* message, float progress) override;
+
+    /**
      * @brief Retrieve error screen root object with error visibility group active.
      * @return Pointer to ui_uiSystemScreen.
      */
