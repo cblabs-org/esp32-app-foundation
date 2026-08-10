@@ -95,6 +95,9 @@ Stacked on `sls-templates/crowpanel-128`, each WO based on its predecessor.
   Enabled the dormant `test_lvglDisplay` suite on native (stateful lvgl stub, `IBootReporter.hpp`→`include/`,
   env-conditional `ui/` exclusion via library extraScript, `ui_stubs.cpp`). **Native 417→482**; crowpanel &
   esp32s3nano [SUCCESS]. Closes #83 on merge (`Fixes #83`).
+- **[ ] [wo7-hardware-test-debug](wo7-hardware-test-debug/WORKORDER.md)** *(architect)* — 📋 authored, **awaiting hardware**.
+  Interactive on-device run of [HARDWARE-TEST-PLAN.md](HARDWARE-TEST-PLAN.md) (T1–T13) + defect debug loop; the
+  human drives via [wo7-hardware-test-debug/BRIDGE-PROMPT.md](wo7-hardware-test-debug/BRIDGE-PROMPT.md). Gates the PR.
 
 ## 5. Open Questions — RESOLVED (human, 2026-08-09)
 
@@ -146,6 +149,8 @@ Stacked on `sls-templates/crowpanel-128`, each WO based on its predecessor.
 | 2026-08-09 | Human asked to evaluate reviving native LVGL tests. Investigated (empirical trial): stub infra ~95% present; blockers small. Posted feasibility to #83 → human said "proceed". |
 | 2026-08-09 | **WO6 executed & committed (`4d16901`) — enabled the native `test_lvglDisplay` suite (Fixes #83).** Moved `IBootReporter.hpp`→`include/interfaces/`; made `lv_label` stubs stateful (+`lv_obj_remove_flag`,`LV_IMG_DECLARE`); env-conditional `ui/` exclusion via a LVGLDisplay library `extraScript` (hardware compiles generated `ui/`, native uses `ui_stubs`); moved `ui_stubs.c`→ suite as `ui_stubs.cpp` (`extern "C"`). Native **417→482**; crowpanel & esp32s3nano [SUCCESS]. Generated `ui/` stays hardware/visual-verified by design; native covers our display logic. |
 | 2026-08-09 | **Stack complete (6 WOs), not yet submitted.** Remaining: open the stacked PR(s) (tip `4d16901`, `Fixes #82`, `Fixes #83`), decide PR grouping (OQ-4), and a hardware smoke-test on a physical CrowPanel (no flashing done). |
+| 2026-08-09 | Filed **[#84](https://github.com/matthewmcneill/esp32-app-foundation/issues/84)** (dormant `test_u8g2Display`/`test_application`, per-suite recommended fixes). Authored **HARDWARE-TEST-PLAN.md** (T1–T13, flash-gate, capture_display verification). |
+| 2026-08-09 | **Human holds the PR pending a hardware run.** Authored **WO7** (interactive hardware test + debug) + a **BRIDGE-PROMPT.md** for a fresh interactive worker session the human drives at the bench. No branch cut / no worker spawned — awaits the physical CrowPanel. |
 
 ---
 
