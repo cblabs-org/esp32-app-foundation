@@ -3,9 +3,15 @@
  *
  * https://github.com/matthewmcneill/esp32-app-foundation
  *
- * Module: test/stubs/platform/ui_stubs.c
- * Description: Weak symbol stubs for SLS UI globals to support native unit testing.
- *              Symbol set mirrors modules/LVGLDisplay/ui/*.h exactly (SquareLine export).
+ * Module: test/test_unit/test_lvglDisplay/ui_stubs.cpp
+ * Description: Weak-symbol stubs for the SquareLine UI globals, providing the
+ *              ui_* widget pointers + ui_init/ui_destroy for native unit tests
+ *              (the generated ui/ C is excluded on native — see LVGLDisplay's
+ *              exclude_ui_on_native.py). Symbol set mirrors the exported ui headers.
+ *
+ * Compiled as C++ so it can include the C++ lvgl stub; the definitions live in
+ * an extern "C" block to match the extern "C" declarations in ui/ui.h (so
+ * ui_init/ui_destroy are not name-mangled and link against the module).
  */
 
 #include "lvgl.h"
@@ -15,6 +21,8 @@
 #else
 #define WEAK_SYMBOL
 #endif
+
+extern "C" {
 
 // Boot screen symbols
 WEAK_SYMBOL lv_obj_t *ui_uiBootScreen = NULL;
@@ -74,3 +82,5 @@ WEAK_SYMBOL lv_obj_t *ui____initial_actions0 = NULL;
 
 WEAK_SYMBOL void ui_init(void) {}
 WEAK_SYMBOL void ui_destroy(void) {}
+
+}  // extern "C"

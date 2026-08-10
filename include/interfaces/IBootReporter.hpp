@@ -5,7 +5,7 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  *
- * Module: modules/Application/interfaces/IBootReporter.hpp
+ * Module: include/interfaces/IBootReporter.hpp
  * Description: Boot reporter interface for early hardware initialisation.
  *
  *              Extends IStatusReporter with a `beginEarly()` hook that the
