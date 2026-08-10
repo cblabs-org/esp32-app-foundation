@@ -171,10 +171,6 @@ void setup() {
     displayModule.carousel.add(&weatherBoard);
     // F04: Wire EventBus subscription now that Application is fully constructed.
     weatherBoard.wireEventBus(app.getEventBus());
-
-#ifdef WITH_MCP
-    mcpServer.setDisplayInfo(displayModule.getDisplayInfo());
-#endif
 #endif
 #endif
 

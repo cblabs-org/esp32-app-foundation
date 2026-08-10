@@ -51,7 +51,7 @@ void MCPServer::begin(const std::vector<IMCPContributor*>& contributors, ConfigM
     // --- Step 1: Register built-in foundation tools ---
     // These are always available regardless of which app uses the framework.
     _registryPtr = &_registry;
-    mcpBuiltinTools::registerAll(_registry, configManager, nullptr, timeManager);
+    mcpBuiltinTools::registerAll(_registry, configManager, timeManager);
 
     // --- Step 2: Collect tools from all contributors ---
     for (auto* contributor : contributors) {
@@ -65,14 +65,6 @@ void MCPServer::begin(const std::vector<IMCPContributor*>& contributors, ConfigM
 
     // --- Step 3: Mark initialised ---
     _initialized = true;
-}
-
-// ---------------------------------------------------------------------------
-// Late-binding display info
-// ---------------------------------------------------------------------------
-
-void MCPServer::setDisplayInfo(const DisplayInfo& info) {
-    mcpBuiltinTools::setDisplayInfo(info);
 }
 
 // ---------------------------------------------------------------------------

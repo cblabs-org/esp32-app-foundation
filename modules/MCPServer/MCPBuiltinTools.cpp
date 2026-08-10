@@ -7,7 +7,7 @@
  *
  * Module: modules/MCPServer/MCPBuiltinTools.cpp
  * Description: Implementation of all foundation-level MCP tools that are always
- *              available in the framework. Registers 8 tools into the MCPToolRegistry:
+ *              available in the framework. Registers 7 tools into the MCPToolRegistry:
  *                - system_info:      Device heap, uptime, chip info, firmware version
  *                - get_config:       Read all module configs via gateway export
  *                - set_config:       Update module configs via gateway import
@@ -15,7 +15,6 @@
  *                - reboot:           Restart the ESP32 device
  *                - get_logs:         Placeholder for future log ring-buffer
  *                - list_tools:       Enumerate all registered MCP tools
- *                - capture_display:  Capture the display framebuffer as base64-encoded XBM
  *
  * Exported Functions:
  * - mcpBuiltinTools::registerAll(): see MCPBuiltinTools.hpp
@@ -46,10 +45,6 @@
 
 static constexpr const char* TAG = "MCPBuiltinTools";
 
-// File-scope display info — updated via setDisplayInfo() for late-binding.
-// The capture_display lambda reads from this directly (no by-value capture).
-static DisplayInfo s_displayInfo;
-
 // ---------------------------------------------------------------------------
 // Base64 lookup table (hardware uses the ESP32 base64 library; native needs
 // a minimal inline implementation to avoid external dependencies).
@@ -79,7 +74,6 @@ static BuiltinToolsContext s_builtinCtx;
 
 void mcpBuiltinTools::registerAll(MCPToolRegistry& registry,
                                   ConfigManager* configManager,
-                                  const DisplayInfo* displayInfo,
                                   TimeManager* timeManager) {
 
     // Populate the file-scope context struct
@@ -461,60 +455,5 @@ void mcpBuiltinTools::registerAll(MCPToolRegistry& registry,
         &s_builtinCtx  // context: BuiltinToolsContext*
     );
 
-    // -----------------------------------------------------------------
-    // Tool 8: capture_display — Capture the display framebuffer as base64
-    // -----------------------------------------------------------------
-    // The display info is stored at file scope (s_displayInfo) so the handler
-    // can read it via pointer. Late-binding via setDisplayInfo() is supported
-    // for displays that initialise after MCPServer::begin().
-    if (displayInfo != nullptr) {
-        s_displayInfo = *displayInfo;
-    }
-
-    registry.addTool(
-        "capture_display",
-        "Capture the current display buffer as a base64-encoded U8G2 tile-format monochrome framebuffer",
-        [](void* /*ctx*/, JsonObject& params, JsonObject& result) {
-            (void)params; // No input parameters required
-
-            // --- Guard: no display registered ---
-            if (s_displayInfo.framebuffer == nullptr || s_displayInfo.framebufferSize == 0) {
-                result["error"]   = "No display registered";
-                result["isError"] = true;
-                return;
-            }
-
-            // --- Encode framebuffer to base64 ---
-                // Hardware: use the ESP32 base64 library with chunked encoding
-                // to avoid a single massive heap allocation. Process 48-byte
-                // chunks (48 divides cleanly by 3 for base64 padding alignment).
-                std::string b64;
-                size_t offset = 0;
-                size_t len = s_displayInfo.framebufferSize;
-                const uint8_t* data = s_displayInfo.framebuffer;
-                while (offset < len) {
-                    size_t chunk = (len - offset > 48) ? 48 : (len - offset);
-                    String b64Chunk = base64::encode(&data[offset], chunk);
-                    b64 += b64Chunk.c_str();
-                    offset += chunk;
-                }
-
-            result["format"] = "u8g2-tile";
-            result["width"]  = s_displayInfo.width;
-            result["height"] = s_displayInfo.height;
-            result["data"]   = b64;
-        }
-    );
-
     ESP_LOGI(TAG, "Registered %zu built-in tools", registry.size());
-}
-
-// =============================================================================
-// Late-binding display info
-// =============================================================================
-
-void mcpBuiltinTools::setDisplayInfo(const DisplayInfo& info) {
-    s_displayInfo = info;
-    ESP_LOGI(TAG, "Display info updated: %ux%u (%zu bytes)",
-             info.width, info.height, info.framebufferSize);
 }

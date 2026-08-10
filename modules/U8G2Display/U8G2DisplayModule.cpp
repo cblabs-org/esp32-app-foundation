@@ -593,25 +593,6 @@ void U8G2DisplayModule::resetConfig() {
 // =============================================================================
 // MCP display info accessor
 // =============================================================================
-
-/**
- * @brief Return a DisplayInfo struct with the live U8G2 framebuffer pointer.
- *
- * The buffer pointer remains valid for the lifetime of the U8G2 instance
- * (i.e. the entire program). Size is calculated from tile dimensions.
- *
- * @return Populated DisplayInfo (framebuffer is nullptr in native builds).
- */
-DisplayInfo U8G2DisplayModule::getDisplayInfo() {
-    DisplayInfo info;
-    info.framebuffer     = _u8g2.getBufferPtr();
-    info.framebufferSize = 8u * _u8g2.getBufferTileHeight() * _u8g2.getBufferTileWidth();
-    info.width           = _displayWidth;
-    info.height          = _displayHeight;
-    return info;
-}
-
-// =============================================================================
 // IDisplayModule interface implementation
 // =============================================================================
 
@@ -632,11 +613,11 @@ bool U8G2DisplayModule::isSleeping() const {
 }
 
 bool U8G2DisplayModule::capturePNG(Print& sink) {
-    DisplayInfo info = getDisplayInfo();
-    if (!info.framebuffer) {
+    const uint8_t* buf = _u8g2.getBufferPtr();
+    if (!buf) {
         return false;
     }
-    return PngWriter::writeGrayscale1bpp(sink, info.width, info.height, info.framebuffer);
+    return PngWriter::writeGrayscale1bpp(sink, _displayWidth, _displayHeight, buf);
 }
 
 void U8G2DisplayModule::showSystemState(const SystemDisplayParams& params) {

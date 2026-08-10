@@ -146,10 +146,6 @@ void setup() {
     diagnosticsBoard.configure(&app.getWifiManager());
     displayModule.boards.configuringStatus.setGates(&app.getConfigGates());
     displayModule.carousel.add(&diagnosticsBoard);
-
-#ifdef WITH_MCP
-    mcpServer.setDisplayInfo(displayModule.getDisplayInfo());
-#endif
 #endif
 #endif
 }

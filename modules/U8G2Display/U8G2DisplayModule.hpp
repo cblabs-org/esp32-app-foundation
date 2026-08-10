@@ -95,7 +95,6 @@
 #include "boards/ScreensaverBoard.hpp"
 #include "boards/ConfiguringStatusBoard.hpp"
 #include "boards/GenericGateHelperBoard.hpp"
-#include "../../include/types/DisplayInfo.hpp"
 #include "../../include/utils/Periodic.hpp"
 #include <types/BootBranding.h>
 #include <types/U8G2BootLogo.h>
@@ -497,16 +496,7 @@ public:
      */
     uint8_t getClockFontSize() const;
 
-    /**
-     * @brief Get the display info struct for MCP capture_display wiring.
-     *
-     * Returns a populated DisplayInfo with the U8G2 framebuffer pointer,
-     * size, and dimensions. Only valid after bootstrapHardware() has been
-     * called (the buffer is allocated during U8G2 begin()).
-     *
-     * @return DisplayInfo struct with live framebuffer pointer.
-     */
-    DisplayInfo getDisplayInfo();
+
 
     // -------------------------------------------------------------------------
     // IDisplayModule — Geometry, Screensaver state, PNG capture, System state
