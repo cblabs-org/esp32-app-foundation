@@ -464,6 +464,14 @@ void mcpBuiltinTools::registerAll(MCPToolRegistry& registry,
     // -----------------------------------------------------------------
     // Tool 8: capture_display — Capture the display framebuffer as base64
     // -----------------------------------------------------------------
+    // This built-in serves monochrome (U8G2) boards: their display module has no
+    // capture tool of its own and feeds the framebuffer here via setDisplayInfo().
+    // Colour (LVGL) boards register their own RGB565 capture_display in
+    // LVGLDisplayModule; registering this mono variant there too would shadow it
+    // — findTool() returns the first match — and break capture with "No display
+    // registered". So it is compiled unless the LVGL display is active (this also
+    // keeps it present for the host/native build, which defines neither flag).
+#ifndef WITH_DISPLAY_LVGL
     // The display info is stored at file scope (s_displayInfo) so the handler
     // can read it via pointer. Late-binding via setDisplayInfo() is supported
     // for displays that initialise after MCPServer::begin().
@@ -505,6 +513,9 @@ void mcpBuiltinTools::registerAll(MCPToolRegistry& registry,
             result["data"]   = b64;
         }
     );
+#else
+    (void)displayInfo;  // Colour displays register their own capture_display tool.
+#endif  // !WITH_DISPLAY_LVGL
 
     ESP_LOGI(TAG, "Registered %zu built-in tools", registry.size());
 }
