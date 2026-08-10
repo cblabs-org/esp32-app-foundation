@@ -261,9 +261,40 @@ void LVGLDisplayModule::tick(uint32_t now) {
 // -----------------------------------------------------------------------------
 
 void LVGLDisplayModule::reportStatus(const char* message, float progress) {
-    _builtInBootScreen.setStatus(message, progress);
-    if (lv_screen_active() != _builtInBootScreen.getScreen()) {
-        showBoot();
+    // The boot sequence runs synchronously in setup(), before the main tick loop
+    // starts pumping lv_timer_handler(). LVGL is retained-mode, so simply updating
+    // the widgets here would never reach the panel until after boot — the progress
+    // would not animate. Mirror the U8G2 boot board: load the boot screen
+    // immediately (a screen-load *animation* can't advance without the tick loop,
+    // so it would never settle) and force a synchronous flush per step.
+    _builtInBootScreen.init(_bootLogo, _branding ? _branding->appTitle : nullptr);
+    lv_obj_t* bootScr = _builtInBootScreen.getScreen();
+    if (bootScr != nullptr && lv_screen_active() != bootScr) {
+        lv_screen_load(bootScr);  // immediate, no fade — see note above
+    }
+
+    if (_display == nullptr) {
+        _builtInBootScreen.setStatus(message, progress);
+        return;
+    }
+
+    // Smoothly interpolate the bar from the last rendered value to the new one,
+    // rendering each step, so progress visibly advances during boot.
+    if (progress >= 0.0f && progress > _lastBootProgress + 0.005f) {
+        const int   kSteps        = 10;
+        const int   kStepDelayMs  = 12;   // ~120 ms per milestone
+        const float from          = _lastBootProgress;
+        const float delta         = progress - from;
+        for (int i = 1; i <= kSteps; ++i) {
+            _builtInBootScreen.setStatus(message, from + (delta * (float)i / (float)kSteps));
+            lv_refr_now(_display);        // force immediate flush — tick loop isn't running yet
+            delay(kStepDelayMs);
+        }
+        _lastBootProgress = progress;
+    } else {
+        // No forward progress (e.g. a message-only update): just render once.
+        _builtInBootScreen.setStatus(message, progress);
+        lv_refr_now(_display);
     }
 }
 

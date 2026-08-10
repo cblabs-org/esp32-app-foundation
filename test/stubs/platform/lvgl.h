@@ -357,6 +357,7 @@ inline uint16_t lv_color_to_u16(lv_color_t color) {
 inline void lv_init(void) {}
 inline void lv_tick_inc(uint32_t tick_period) { (void)tick_period; }
 inline uint32_t lv_timer_handler(void) { return 5; }
+inline void lv_refr_now(lv_display_t* disp) { (void)disp; }
 inline uint32_t lv_tick_get(void) { return 0; }
 
 // Display Management

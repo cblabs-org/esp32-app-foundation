@@ -395,6 +395,7 @@ private:
     size_t   _bufSize = 0;                     ///< Allocated size per draw buffer in bytes
     bool     _buffersConfigured = false;       ///< True if draw buffers have been configured (replaces LVGL 8 lv_display_get_buf_1)
     bool     _bootstrapMode = false;           ///< True while in Phase 1 bootstrap mode
+    float    _lastBootProgress = 0.0f;         ///< Last boot progress rendered (for synchronous boot animation)
     std::atomic<bool> _pauseRendering{false};  ///< Pause rendering flag during OTA flash writes
     uint32_t _lastIndevInactiveMs = 0;         ///< Inactivity tracking timestamp
 
