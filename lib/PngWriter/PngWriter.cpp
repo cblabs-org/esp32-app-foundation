@@ -1,7 +1,15 @@
 #include "PngWriter.h"
 #include <Arduino.h>
 #include <Print.h>
-#include "rom/miniz.h"
+#if __has_include(<esp32/rom/miniz.h>)
+#include <esp32/rom/miniz.h>
+#elif __has_include(<rom/miniz.h>)
+#include <rom/miniz.h>
+#elif __has_include(<esp_rom/rom/miniz.h>)
+#include <esp_rom/rom/miniz.h>
+#elif __has_include(<miniz.h>)
+#include <miniz.h>
+#endif
 
 namespace PngWriter {
 

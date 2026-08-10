@@ -47,6 +47,9 @@
 #include "platform/LogShim.h"
 #include <cstring>
 #include <cstdio>
+#include <vector>
+#include <Print.h>
+#include <mbedtls/base64.h>
 
 static constexpr const char* TAG = "U8G2DisplayModule";
 
@@ -609,6 +612,55 @@ DisplayInfo U8G2DisplayModule::getDisplayInfo() {
 }
 
 // =============================================================================
+// IDisplayModule interface implementation
+// =============================================================================
+
+uint16_t U8G2DisplayModule::getDisplayWidth() const {
+    return _displayWidth;
+}
+
+uint16_t U8G2DisplayModule::getDisplayHeight() const {
+    return _displayHeight;
+}
+
+bool U8G2DisplayModule::isDimmed() const {
+    return _screensaver.isDimmed();
+}
+
+bool U8G2DisplayModule::isSleeping() const {
+    return _screensaver.isBlanked();
+}
+
+bool U8G2DisplayModule::capturePNG(Print& sink) {
+    DisplayInfo info = getDisplayInfo();
+    if (!info.framebuffer) {
+        return false;
+    }
+    return PngWriter::writeGrayscale1bpp(sink, info.width, info.height, info.framebuffer);
+}
+
+void U8G2DisplayModule::showSystemState(const SystemDisplayParams& params) {
+    if (params.state != nullptr && strcmp(params.state, DisplayState::Normal) == 0) {
+        clearModal();
+    } else if (params.state != nullptr && strcmp(params.state, DisplayState::Error) == 0) {
+        _error.showError(params.message ? params.message : (params.title ? params.title : "Error"), true);
+        showModal(&_error);
+    } else if (params.state != nullptr && strcmp(params.state, DisplayState::Configuring) == 0) {
+        if (params.title != nullptr) {
+            _configuringStatusBoard.setActionableGateName(params.title);
+        }
+        if (params.message != nullptr) {
+            _configuringStatusBoard.setConnectionInfo("", params.message);
+        }
+        showBase(&_configuringStatusBoard);
+    } else {
+        _error.showError(params.message ? params.message : (params.title ? params.title : "System"), false);
+        showModal(&_error);
+    }
+    resetActivity();
+}
+
+// =============================================================================
 // Runtime display configuration setters
 // =============================================================================
 
@@ -1098,7 +1150,64 @@ void U8G2DisplayModule::registerMCPTools(MCPToolRegistry& registry) {
         /* mutatesState = */ true
     );
 
-    ESP_LOGI(TAG, "Registered MCP tools: display_status, display_control");
+    // --- Tool 3: capture_display (read-only) ---
+    // Returns a base64-encoded PNG screenshot of the live display framebuffer.
+    struct BufferStream : public Print {
+        std::vector<uint8_t> buffer;
+        size_t write(uint8_t c) override {
+            buffer.push_back(c);
+            return 1;
+        }
+        size_t write(const uint8_t *buf, size_t size) override {
+            buffer.insert(buffer.end(), buf, buf + size);
+            return size;
+        }
+    };
+
+    JsonDocument captureSchema;
+    captureSchema["type"] = "object";
+    captureSchema["properties"].to<JsonObject>();
+
+    registry.addTool(
+        "capture_display",
+        "Capture current display buffer as a base64-encoded PNG image",
+        captureSchema,
+        [](void* ctx, JsonObject& params, JsonObject& result) {
+            auto* self = static_cast<U8G2DisplayModule*>(ctx);
+            (void)params;
+
+            BufferStream stream;
+            if (!self->capturePNG(stream) || stream.buffer.empty()) {
+                result["error"] = "Failed to capture display buffer";
+                return;
+            }
+
+            size_t olen = 0;
+            mbedtls_base64_encode(nullptr, 0, &olen, stream.buffer.data(), stream.buffer.size());
+            if (olen == 0) {
+                result["error"] = "Base64 encoding length calculation failed";
+                return;
+            }
+
+            std::vector<unsigned char> b64buf(olen);
+            int ret = mbedtls_base64_encode(b64buf.data(), b64buf.size(), &olen,
+                                            stream.buffer.data(), stream.buffer.size());
+            if (ret != 0) {
+                result["error"] = "Base64 encoding failed";
+                return;
+            }
+
+            result["format"]   = "png";
+            result["width"]    = self->getDisplayWidth();
+            result["height"]   = self->getDisplayHeight();
+            result["image"]    = reinterpret_cast<char*>(b64buf.data());
+            result["encoding"] = "base64";
+        },
+        this,  // context: U8G2DisplayModule*
+        /* mutatesState = */ false
+    );
+
+    ESP_LOGI(TAG, "Registered MCP tools: display_status, display_control, capture_display");
 }
 
 // =============================================================================

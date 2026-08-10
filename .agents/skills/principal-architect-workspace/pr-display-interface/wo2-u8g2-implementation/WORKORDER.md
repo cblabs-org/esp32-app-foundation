@@ -147,3 +147,32 @@ If you discover a defect, upstream bug, or concern *outside your boundary box*, 
 
 ## Completion Report
 <!-- Written by the worker at task completion -->
+
+### Execution Summary
+- **Module**: `modules/U8G2Display/`
+- **Interface Implemented**: `IDisplayModule` (extending `IBootReporter`)
+- **Status**: Completed & Validated
+
+### Work Items Delivered:
+1. **Header Refactoring (`U8G2DisplayModule.hpp`)**:
+   - Replaced `#include "interfaces/IBootReporter.hpp"` with `#include "interfaces/IDisplayModule.hpp"` and `#include "PngWriter.h"`.
+   - Updated class declaration to inherit from `IDisplayModule`.
+   - Added `override` to existing methods (`setBrightness`, `getBrightness`, `resetActivity`).
+   - Declared `getDisplayWidth()`, `getDisplayHeight()`, `isDimmed()`, `isSleeping()`, `capturePNG(Print&)`, and `showSystemState(const SystemDisplayParams&)`.
+
+2. **Implementation & Delegation (`U8G2DisplayModule.cpp`)**:
+   - `getDisplayWidth()` / `getDisplayHeight()` returning `_displayWidth` and `_displayHeight`.
+   - `isDimmed()` / `isSleeping()` delegating to `_screensaver`.
+   - `capturePNG()` delegating to `PngWriter::writeGrayscale1bpp()`.
+   - `showSystemState()` mapping `Normal`, `Error`, and `Configuring` system state tags to `clearModal()`, `ErrorBoard`, and `ConfiguringStatusBoard`.
+   - Added `capture_display` tool in `registerMCPTools()` using `BufferStream` for base64 PNG output with dimensions.
+
+3. **Auxiliary Fix (`lib/PngWriter/PngWriter.cpp`)**:
+   - Portable `__has_include` check for `miniz.h` across ESP-IDF/Arduino-esp32 include paths.
+
+### Verification Results:
+- **PlatformIO Build (`esp32dev`)**: SUCCESS (`pio run -e esp32dev`).
+- **Unit Test Suite (`native`)**: 417 / 417 PASSED (`pio test -e native`).
+
+### Issues Surfaced:
+- None within `modules/U8G2Display/`. `PngWriter.cpp` miniz header include was updated with `#if __has_include` for cross-framework compatibility.
