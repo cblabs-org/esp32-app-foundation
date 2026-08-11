@@ -1,6 +1,7 @@
 #include "PngWriter.h"
 #ifdef ARDUINO
 #include <Arduino.h>
+#include <esp_heap_caps.h>   // heap_caps_malloc/calloc/free + MALLOC_CAP_* (native stub provides these)
 #endif
 #ifdef ARDUINO
 #include <Print.h>
