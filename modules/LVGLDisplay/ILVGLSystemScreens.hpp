@@ -5,7 +5,7 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  *
- * Module: include/interfaces/ILVGLSystemScreens.hpp
+ * Module: modules/LVGLDisplay/ILVGLSystemScreens.hpp
  * Description: Interface for pluggable system-screen skin providers in LVGLDisplayModule.
  *              Allows applications to supply custom visual screens for OTA updates,
  *              error states, and CONFIGURING-phase gate orchestration while retaining
