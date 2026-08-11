@@ -446,6 +446,14 @@ private:
     std::atomic<bool> _pendingMessage{false};
     char _pendingMessageText[128] = {};
 
+    std::atomic<bool> _pendingSnapshot{false};
+    std::atomic<bool> _snapshotComplete{false};
+    std::atomic<bool> _snapshotSuccess{false};
+    uint8_t* _snapshotBuffer = nullptr;
+    size_t _snapshotSize = 0;
+    uint16_t _snapshotWidth = 0;
+    uint16_t _snapshotHeight = 0;
+
     // --- System Screens & Assets ---
     const lv_image_dsc_t* _bootLogo = nullptr;
     FaultScreen           _faultScreen;       ///< The only built-in screen (dev fault/trace fallback)

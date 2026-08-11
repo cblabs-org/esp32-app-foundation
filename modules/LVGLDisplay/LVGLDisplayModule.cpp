@@ -18,6 +18,7 @@
 #include "ConfigManager.hpp"
 #include "MCPToolRegistry.hpp"
 #include "../Application/Application.hpp"
+#include "interfaces/IConfigGate.hpp"   // GateNames, GateActionStatus (CONFIGURING dispatch)
 #include <base64.h>
 #include <mbedtls/base64.h>
 #include <vector>
@@ -224,10 +225,8 @@ void LVGLDisplayModule::tick(uint32_t now) {
     // Tick Screensaver state machine
     _screensaver.tick(now, _adapter, _brightness, _eventBus);
 
-    // If blanked, skip LVGL timer processing
-    if (_screensaver.isBlanked()) {
-        return;
-    }
+    // Note: Do not early return here if blanked, because we must drain cross-thread
+    // events (OTA, errors, snapshots) which might wake up the screen.
 
     // Drain pending cross-thread events.
     // OTA complete and update are checked independently (not else-if) so that
@@ -254,19 +253,21 @@ void LVGLDisplayModule::tick(uint32_t now) {
         resetActivity();
     }
 
-    if (_pendingMessage.exchange(false)) {
-        if (_bootstrapMode) {
-            reportStatus(_pendingMessageText, -1.0f);
-        } else {
-            ESP_LOGI("LVGLDisplay", "Message: %s", _pendingMessageText);
-            // TODO: Add transient notification overlay widget in a future PR
-        }
-        resetActivity();
+    if (_pendingSnapshot.exchange(false)) {
+        ESP_LOGI("LVGLDisplay", "tick: Processing pending snapshot");
+        _snapshotSuccess = captureSnapshot(_snapshotBuffer, _snapshotSize, _snapshotWidth, _snapshotHeight);
+        _snapshotComplete.store(true);
+        ESP_LOGI("LVGLDisplay", "tick: Snapshot complete (success=%d)", _snapshotSuccess.load());
     }
 
     // Defense-in-depth: if OTA flash write in progress, advance tick clock but skip timer handler
     if (_pauseRendering.load()) {
         lv_tick_inc(elapsed);
+        return;
+    }
+
+    // If blanked, skip LVGL timer processing to save CPU
+    if (_screensaver.isBlanked()) {
         return;
     }
 
@@ -302,16 +303,35 @@ bool LVGLDisplayModule::isSleeping() const {
 
 bool LVGLDisplayModule::capturePNG(Print& sink) {
 #ifndef UNIT_TEST
-    uint8_t* snapBuffer = nullptr;
-    size_t snapSize = 0;
-    uint16_t w = 0, h = 0;
+    // Request tick loop to capture the raw snapshot (thread-safe)
+    _snapshotComplete.store(false);
+    _snapshotSuccess.store(false);
+    _snapshotBuffer = nullptr;
+    _snapshotSize = 0;
+    _pendingSnapshot.store(true);
+    ESP_LOGI("LVGLDisplay", "capturePNG: requesting snapshot, waiting for tick loop...");
 
-    if (!captureSnapshot(snapBuffer, snapSize, w, h) || !snapBuffer) {
+    // Wait up to 3 seconds for the tick loop to process the request
+    int timeout = 300;
+    while (!_snapshotComplete.load() && timeout > 0) {
+        delay(10);
+        timeout--;
+    }
+
+    if (!_snapshotComplete.load() || !_snapshotSuccess.load() || !_snapshotBuffer) {
+        ESP_LOGE("LVGLDisplay", "capturePNG: Snapshot failed (complete=%d, success=%d, timeout=%d)", 
+                 _snapshotComplete.load(), _snapshotSuccess.load(), timeout);
+        _pendingSnapshot.store(false); // cancel if timed out
+        if (_snapshotBuffer) freeSnapshot(_snapshotBuffer);
         return false;
     }
 
-    bool ok = PngWriter::writeRGB565ToRGB888(sink, w, h, reinterpret_cast<const uint16_t*>(snapBuffer));
-    freeSnapshot(snapBuffer);
+    ESP_LOGI("LVGLDisplay", "capturePNG: tick loop finished snapshot, converting to PNG...");
+    // Write PNG conversion from the caller's thread (safe, as it only reads the isolated buffer)
+    bool ok = PngWriter::writeRGB565ToRGB888(sink, _snapshotWidth, _snapshotHeight, reinterpret_cast<const uint16_t*>(_snapshotBuffer));
+    ESP_LOGI("LVGLDisplay", "capturePNG: PngWriter returned %d", ok);
+    freeSnapshot(_snapshotBuffer);
+    _snapshotBuffer = nullptr;
     return ok;
 #else
     (void)sink;  // native build: PngWriter (ROM tdefl) is hardware-only
@@ -678,13 +698,64 @@ void LVGLDisplayModule::_onAppConfiguring(const char* /*topic*/, const void* pay
     ESP_LOGI("LVGLDisplayModule", "CONFIGURING gate: %s (status=%d)",
              p->gateName ? p->gateName : "?",
              static_cast<int>(p->actionStatus));
-    // TODO: Implement LVGL configuring display (follow-up issue)
+             
+    // LVGL has no built-in configuring screens — the skin (SLSSystemScreens) supplies
+    // them. With no provider there is nothing to display.
+    if (self->_screens == nullptr) {
+        return;
+    }
+
+    // Populate the configuring widgets (AP SSID, portal URL, gate help text) first.
+    self->_screens->onConfiguring(p);
+
+    // Three-tier root selection (mirrors U8G2): a modal (gate helper / WiFi wizard)
+    // only when the gate needs user action; otherwise the base configuring screen.
+    lv_obj_t* scr = nullptr;
+    if (p->actionStatus == GateActionStatus::NeedsUserAction) {
+        scr = self->_screens->gateHelperScreen(p);                          // Tier 1
+        if (scr == nullptr && p->gateName != nullptr &&
+            strcmp(p->gateName, GateNames::WIFI_STATION) == 0) {
+            scr = self->_screens->wifiWizardScreen();                       // Tier 2
+        }
+        if (scr == nullptr) {
+            scr = self->_screens->configuringScreen();                     // Tier 3
+        }
+    } else {
+        scr = self->_screens->configuringScreen();                         // base / InProgress
+    }
+
+    // Groups toggle in-place on the single System screen; only animate the
+    // screen-load on first entry so re-publishes don't re-trigger the fade.
+    if (scr != nullptr && scr != lv_screen_active()) {
+        if (!self->_inSystemScreen) {
+            self->_priorScreen = lv_screen_active();
+            self->_inSystemScreen = true;
+        }
+        lv_scr_load_anim(scr, LV_SCR_LOAD_ANIM_FADE_IN, 200, 0, false);
+    }
 }
+
+#if defined(__GNUC__) || defined(__clang__)
+extern "C" {
+    __attribute__((weak)) extern lv_obj_t* ui_ui_DiagScreen;  // SLS Diag (running) screen
+}
+#endif
 
 void LVGLDisplayModule::_onAppRunning(const char* /*topic*/, const void* /*payload*/, void* ctx) {
     auto* self = static_cast<LVGLDisplayModule*>(ctx);
     if (self == nullptr) return;
     ESP_LOGI("LVGLDisplayModule", "App transition → RUNNING");
+    
+    // Left the system screen (configuring/error/OTA) for the running UI: clear the
+    // system-screen state and load the SLS Diag (running) screen — this is what
+    // dismisses the boot screen once all config gates are satisfied.
+    self->_inSystemScreen = false;
+    self->_priorScreen = nullptr;
+#if defined(__GNUC__) || defined(__clang__)
+    if (&ui_ui_DiagScreen != nullptr && ui_ui_DiagScreen != nullptr) {
+        lv_scr_load_anim(ui_ui_DiagScreen, LV_SCR_LOAD_ANIM_FADE_IN, 300, 0, false);
+    }
+#endif
 }
 
 // -----------------------------------------------------------------------------
