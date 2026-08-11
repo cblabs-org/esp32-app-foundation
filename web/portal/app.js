@@ -348,6 +348,10 @@ document.addEventListener('DOMContentLoaded', function() {
       link.className = 'tab-link';
       link.setAttribute('data-target', tabId);
       link.setAttribute('data-injected', 'true');
+      link.setAttribute('role', 'tab');
+      link.setAttribute('aria-selected', 'false');
+      link.setAttribute('aria-controls', 'tab-content-area');
+      link.id = 'nav-' + tabId.replace('tab-', '');
       link.innerHTML = '<span class="icon">' + svgHTML + '</span>' + tab.name.toUpperCase();
 
       // Insert before System tab
@@ -398,8 +402,17 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // --- Update bottom nav active state ---
     bottomNav.querySelectorAll('.tab-link').forEach(function(link) {
-      link.classList.toggle('tab-link--active', link.getAttribute('data-target') === tabId);
+      var isActive = link.getAttribute('data-target') === tabId;
+      link.classList.toggle('tab-link--active', isActive);
+      link.setAttribute('aria-selected', isActive ? 'true' : 'false');
     });
+
+    // --- Update tabpanel label ---
+    var contentArea = document.getElementById('tab-content-area');
+    var activeLink = bottomNav.querySelector('.tab-link--active');
+    if (contentArea && activeLink && activeLink.id) {
+      contentArea.setAttribute('aria-labelledby', activeLink.id);
+    }
 
     // --- Find the parent tab name for this tabId ---
     var parentName = tabIdToName(tabId);

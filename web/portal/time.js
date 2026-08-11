@@ -84,7 +84,7 @@
       case 'IN_PROGRESS':
         color = '#f9a825'; label = 'Syncing…'; break;
       default:
-        color = '#999';    label = 'Not Synced'; break;
+        color = 'var(--text-muted)';    label = 'Not Synced'; break;
     }
     return `
       <div style="display:flex; align-items:center; gap:8px; padding:0.4rem 0;">

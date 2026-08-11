@@ -62,12 +62,12 @@
         html += '<strong style="font-size:0.9rem;">' + escapeHtml(key.id) + '</strong>';
         html += '<span style="margin-left:0.5rem; color:var(--text-muted); font-size:0.8rem;">' + maskDots + '</span>';
 
-        // Ownership badge: 🔒 for exclusive, 🔗 for attributed non-exclusive
+        // Ownership badge: lock icon for exclusive, link icon for attributed non-exclusive
         if (isExclusive && managedBy) {
-          html += '<br><span style="font-size:0.7rem; color:var(--primary);">🔒 Managed by ' +
+          html += '<br><span style="font-size:0.7rem; color:var(--primary);"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0110 0v4"></path></svg> Managed by ' +
                   escapeHtml(managedBy) + '</span>';
         } else if (managedBy) {
-          html += '<br><span style="font-size:0.7rem; color:var(--text-muted);">🔗 Used by ' +
+          html += '<br><span style="font-size:0.7rem; color:var(--text-muted);"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"></path></svg> Used by ' +
                   escapeHtml(managedBy) + '</span>';
         }
         html += '</div>';
@@ -76,7 +76,7 @@
         if (!isExclusive) {
           html += '<button class="btn-key-delete" data-id="' + escapeHtml(key.id) + '" ';
           html += 'style="background:transparent; color:var(--error); border:1px solid var(--error); padding:0.25rem 0.5rem; font-size:0.75rem; cursor:pointer; border-radius:4px;">';
-          html += '🗑 Delete</button>';
+          html += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"></path></svg> Delete</button>';
         }
 
         html += '</div>';
@@ -111,7 +111,7 @@
       window.apiFetch('/api/keys?id=' + encodeURIComponent(keyId), { method: 'DELETE' })
         .then(() => loadKeys())
         .catch(() => {
-          btn.textContent = '🗑 Delete';
+          btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"></path></svg> Delete';
           btn.disabled = false;
         });
     } else {
@@ -124,7 +124,7 @@
 
       deleteTimeout = setTimeout(() => {
         deleteArmedId = null;
-        btn.textContent = '🗑 Delete';
+        btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"></path></svg> Delete';
         btn.style.background = 'transparent';
         btn.style.color = 'var(--error)';
       }, 3000);
