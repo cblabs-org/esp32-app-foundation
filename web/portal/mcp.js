@@ -60,7 +60,7 @@
           <input type="checkbox" id="${id}" ${checked ? 'checked' : ''}
                  style="opacity:0; width:0; height:0;">
           <span style="position:absolute; cursor:pointer; top:0; left:0; right:0; bottom:0;
-                       background:${checked ? 'var(--primary)' : '#ccc'};
+                       background:${checked ? 'var(--primary)' : 'var(--border)'};
                        border-radius:24px; transition:0.3s;">
             <span style="position:absolute; height:18px; width:18px; left:${checked ? '22px' : '3px'}; bottom:3px;
                          background:white; border-radius:50%; transition:0.3s; box-shadow:0 1px 3px rgba(0,0,0,0.3);"></span>
@@ -76,8 +76,8 @@
   function toolRow(tool, serverEnabled, readOnly) {
     const blocked = !serverEnabled || (readOnly && tool.mutatesState);
     const badge = tool.mutatesState
-      ? '<span style="background:' + (blocked ? '#999' : '#ff8f00') + '; color:white; font-size:0.65rem; padding:1px 6px; border-radius:8px; margin-left:8px; font-weight:600;">MUTATING</span>'
-      : '<span style="background:' + (!serverEnabled ? '#999' : '#43a047') + '; color:white; font-size:0.65rem; padding:1px 6px; border-radius:8px; margin-left:8px; font-weight:600;">READ-ONLY</span>';
+      ? '<span style="background:' + (blocked ? 'var(--text-muted)' : 'var(--warning)') + '; color:white; font-size:0.65rem; padding:1px 6px; border-radius:8px; margin-left:8px; font-weight:600;">MUTATING</span>'
+      : '<span style="background:' + (!serverEnabled ? 'var(--text-muted)' : 'var(--success)') + '; color:white; font-size:0.65rem; padding:1px 6px; border-radius:8px; margin-left:8px; font-weight:600;">READ-ONLY</span>';
     const blockedLabel = blocked
       ? ' <span style="font-size:0.65rem; color:var(--text-muted); margin-left:6px;">BLOCKED</span>'
       : '';
@@ -126,7 +126,7 @@
       // Update visual state immediately
       const slider = input.nextElementSibling;
       const dot = slider.querySelector('span');
-      slider.style.background = checked ? 'var(--primary)' : '#ccc';
+      slider.style.background = checked ? 'var(--primary)' : 'var(--border)';
       dot.style.left = checked ? '22px' : '3px';
       handleToggle(key, checked);
       if (onToggled) onToggled();

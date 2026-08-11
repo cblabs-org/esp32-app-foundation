@@ -30,7 +30,7 @@
         <label class="toggle-switch" style="position:relative; width:44px; height:24px; flex-shrink:0;">
           <input type="checkbox" id="ota-updates-enabled" style="opacity:0; width:0; height:0;">
           <span style="position:absolute; cursor:pointer; top:0; left:0; right:0; bottom:0;
-                       background:#ccc; border-radius:24px; transition:0.3s;">
+                       background:var(--border); border-radius:24px; transition:0.3s;">
             <span style="position:absolute; height:18px; width:18px; left:3px; bottom:3px;
                          background:white; border-radius:50%; transition:0.3s; box-shadow:0 1px 3px rgba(0,0,0,0.3);"></span>
           </span>
@@ -45,7 +45,7 @@
         <label class="toggle-switch" style="position:relative; width:44px; height:24px; flex-shrink:0;">
           <input type="checkbox" id="ota-autocheck" style="opacity:0; width:0; height:0;">
           <span style="position:absolute; cursor:pointer; top:0; left:0; right:0; bottom:0;
-                       background:#ccc; border-radius:24px; transition:0.3s;">
+                       background:var(--border); border-radius:24px; transition:0.3s;">
             <span style="position:absolute; height:18px; width:18px; left:3px; bottom:3px;
                          background:white; border-radius:50%; transition:0.3s; box-shadow:0 1px 3px rgba(0,0,0,0.3);"></span>
           </span>
@@ -168,7 +168,7 @@
     const slider = checkbox.nextElementSibling;
     if (!slider) return;
     const dot = slider.querySelector('span');
-    slider.style.background = checked ? 'var(--primary)' : '#ccc';
+    slider.style.background = checked ? 'var(--primary)' : 'var(--border)';
     if (dot) dot.style.left = checked ? '22px' : '3px';
   }
 

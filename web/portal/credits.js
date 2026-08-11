@@ -33,7 +33,7 @@
     html += '<div style="flex:1;min-width:0;">';
     html += '<strong style="font-size:1em;">' + lib.name + '</strong>';
     html += '<span style="display:inline-block;margin-left:8px;padding:2px 8px;' +
-      'border-radius:12px;font-size:0.75em;background:var(--accent,#6c63ff);' +
+      'border-radius:12px;font-size:0.75em;background:var(--primary);' +
       'color:#fff;vertical-align:middle;">' + lib.licence + '</span>';
     html += '<div style="font-size:0.85em;opacity:0.7;margin-top:2px;">' + lib.author + '</div>';
     html += '</div>';
@@ -52,7 +52,7 @@
     'font-size:0.9em;opacity:0.8;text-align:center;">';
   html += 'Built with <strong>ESP32 App Foundation</strong> by CB Labs &mdash; ';
   html += '<a href="https://github.com/matthewmcneill/esp32-app-foundation" ' +
-    'target="_blank" rel="noopener noreferrer" style="color:var(--accent,#6c63ff);">' +
+    'target="_blank" rel="noopener noreferrer" style="color:var(--primary);">' +
     'View on GitHub</a>';
   html += '</div>';
   html += '</div>';

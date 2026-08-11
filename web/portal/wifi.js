@@ -182,7 +182,7 @@
       if (data.ap_mode) {
         modeBadge.textContent = 'AP';
         modeBadge.style.background = 'var(--warning, #f9a825)';
-        modeBadge.style.color = '#000';
+        modeBadge.style.color = 'var(--text)';
       } else if (data.mode === 'STA') {
         modeBadge.textContent = 'STA';
         modeBadge.style.background = 'var(--success, #2e7d32)';

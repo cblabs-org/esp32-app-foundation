@@ -17,7 +17,7 @@ All hardware-specific initialisation (display controller, touch interface, rotar
 ## Key Features
 
 - **Generic LVGL v9 Engine**: Manages `lv_init()`, DMA partial SRAM draw buffer allocation, input device focus groups, and main-loop tick pumping via `ITickable`.
-- **5 Framework Interfaces**: Fully implements `ITickable`, `IConfigurable`, `IStatusReporter`, `IWebContributor`, and `IMCPContributor`.
+- **6 Framework Interfaces**: Fully implements `IDisplayModule`, `ITickable`, `IConfigurable`, `IStatusReporter`, `IWebContributor`, and `IMCPContributor`.
 - **Pluggable Hardware Adapters**: Hardware initialisation is decoupled via `ILVGLHardwareAdapter`. The framework includes the reference [`CrowPanel128Adapter`](../../adapters/lvgl/CrowPanel128Adapter.hpp) for 1.28" circular TFTs.
 - **Two-Stage Boot Splash & System Screens**: Displays a Stage-1 compiled-in boot logo during early hardware bootstrap before LittleFS mounts, with support for custom system screen skinning via [`ILVGLSystemScreens`](../../include/interfaces/ILVGLSystemScreens.hpp).
 - **SquareLine Studio Integration**: Exposes an optional weak `ui_init()` hook for seamless binding of SquareLine Studio v9 exported UI projects.
@@ -40,6 +40,7 @@ All hardware-specific initialisation (display controller, touch interface, rotar
 
 | Interface | Purpose |
 |---|---|
+| [`IDisplayModule`](../../include/interfaces/IDisplayModule.hpp) | Unified display provider — geometry, brightness, PNG capture, system state rendering. |
 | [`ITickable`](../../include/interfaces/ITickable.hpp) | Pump tick clock via `lv_tick_inc()` and process UI timers via `lv_timer_handler()`. |
 | [`IConfigurable`](../../include/interfaces/IConfigurable.hpp) | Manage `display` namespace configuration (`brightness`, `rotation`, `screensaver_enabled`, `dim_timeout_ms`, `blank_timeout_ms`). |
 | [`IStatusReporter`](../../include/interfaces/IStatusReporter.hpp) | Show boot progress updates and error splash screens early in system initialization. |

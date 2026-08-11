@@ -271,7 +271,7 @@
     } else if (data.dimmed) {
       screensaverStatusBadge.textContent = 'Dimmed';
       screensaverStatusBadge.style.background = 'var(--warning, #f9a825)';
-      screensaverStatusBadge.style.color = '#000';
+      screensaverStatusBadge.style.color = 'var(--text)';
     } else {
       screensaverStatusBadge.textContent = 'Active';
       screensaverStatusBadge.style.background = 'var(--success, #2e7d32)';

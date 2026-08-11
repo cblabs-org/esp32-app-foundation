@@ -169,7 +169,7 @@ The `mutatesState` boolean is critical for the read-only safety mode:
 
 ## 5. Built-in Tools
 
-The framework registers 7 built-in tools via `mcpBuiltinTools::registerAll()`. These are always available regardless of which application uses the framework:
+The framework registers 6 built-in tools via `mcpBuiltinTools::registerAll()`. These are always available regardless of which application uses the framework:
 
 | Tool | Description | Mutates State |
 |---|---|---|
@@ -181,6 +181,19 @@ The framework registers 7 built-in tools via `mcpBuiltinTools::registerAll()`. T
 | `list_tools` | Enumerate all registered MCP tools with names, descriptions, and schemas | No |
 
 *(Note: The `capture_display` tool is no longer built-in; it is self-registered by display modules and returns base64 PNG).*
+
+### Display Module Contributed Tools
+
+Optional display modules contribute additional MCP tools when registered:
+
+| Module | Tool | Description | Mutates State |
+|---|---|---|---|
+| `U8G2DisplayModule` | `display_status` | Get display state, brightness, active board, and screensaver status | No |
+| `U8G2DisplayModule` | `display_control` | Control display brightness, screensaver, board navigation, and orientation | Yes |
+| `U8G2DisplayModule` | `capture_display` | Capture display framebuffer and return as Base64-encoded PNG image | No |
+| `LVGLDisplayModule` | `display_status` | Get display state, brightness, active screen, and screensaver status | No |
+| `LVGLDisplayModule` | `display_control` | Control display brightness, screensaver, and screen navigation | Yes |
+| `LVGLDisplayModule` | `capture_display` | Capture display framebuffer and return as Base64-encoded PNG image | No |
 
 ---
 

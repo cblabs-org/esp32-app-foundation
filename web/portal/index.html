@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="app.css">
 </head>
 <body>
+  <a href="#tab-content-area" id="skip-nav" style="position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden;z-index:9999;padding:8px 16px;background:var(--primary);color:#fff;text-decoration:none;font-size:0.85rem;border-radius:0 0 8px 0;" onfocus="this.style.cssText='position:fixed;left:0;top:0;width:auto;height:auto;overflow:visible;z-index:9999;padding:8px 16px;background:var(--primary);color:#fff;text-decoration:none;font-size:0.85rem;border-radius:0 0 8px 0;'" onblur="this.style.cssText='position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden;'">Skip to main content</a>
   <div class="container">
     <!-- ================================================================== -->
     <!-- Top Bar: App name + theme toggle                                    -->
@@ -16,7 +17,7 @@
       <h2 id="portal-title">ESP32 App Foundation</h2>
       <div style="display: flex; gap: 8px; align-items: center;">
         <button class="theme-btn" id="credits-btn" title="Credits & Info">
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <circle cx="12" cy="12" r="10"/>
             <line x1="12" y1="16" x2="12" y2="12"/>
             <line x1="12" y1="8" x2="12.01" y2="8"/>
@@ -49,7 +50,7 @@
     <!-- All tab content divs are dynamically shown/hidden by app.js.        -->
     <!-- Fragment JS files inject their UI into their container div.          -->
     <!-- ================================================================== -->
-    <div class="tab-content-container">
+    <div class="tab-content-container" id="tab-content-area" role="tabpanel" aria-labelledby="nav-wifi" tabindex="0">
       <!-- WiFi tab (top-level, framework) -->
       <div id="tab-wifi" class="tab-content">
         <!-- Populated by wifi.js -->
@@ -118,8 +119,8 @@
     <!-- Framework tabs (WiFi, System) are hardcoded with SVG icons.          -->
     <!-- App tabs are injected dynamically by app.js.                        -->
     <!-- ================================================================== -->
-    <nav class="bottom-nav" id="bottom-nav">
-      <a href="#" class="tab-link tab-link--active" data-target="tab-wifi">
+    <nav class="bottom-nav" id="bottom-nav" role="tablist" aria-label="Main navigation">
+      <a href="#" class="tab-link tab-link--active" data-target="tab-wifi" id="nav-wifi" role="tab" aria-selected="true" aria-controls="tab-content-area">
         <span class="icon">
           <!-- WiFi arcs SVG -->
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -132,7 +133,7 @@
         WIFI
       </a>
       <!-- Security tab — hardcoded with lock icon; auth.js populates content -->
-      <a href="#" class="tab-link" data-target="tab-security">
+      <a href="#" class="tab-link" data-target="tab-security" id="nav-security" role="tab" aria-selected="false" aria-controls="tab-content-area">
         <span class="icon">
           <!-- Feather-icons padlock SVG -->
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -143,7 +144,7 @@
         </span>
         SECURITY
       </a>
-      <a href="#" class="tab-link" data-target="tab-system">
+      <a href="#" class="tab-link" data-target="tab-system" id="nav-system" role="tab" aria-selected="false" aria-controls="tab-content-area">
         <span class="icon">
           <!-- Gear/Settings SVG -->
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
