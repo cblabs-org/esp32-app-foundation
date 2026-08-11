@@ -24,3 +24,16 @@
 - Expanded scope to include sub-pill ARIA gap (pill buttons had zero ARIA attributes).
 - Implementation plan approved by user.
 - **User approval of decomposition: ✅ Approved 2026-08-11T14:15:00+01:00**
+
+### 2026-08-11 — WO1 Execution & PR
+- Worker executed all 27 checklist items (mechanical complexity, flash model).
+- Worker used `pio run` CLI instead of PIO MCP `build_project` — procedural violation of rule 04, no functional impact. PA re-verified via MCP.
+- PR #93 raised, review received from owner.
+- Review feedback: added `tabindex="0"` to all tabpanels for keyboard nav.
+- Updated `framework-expert/systems/web-portal/overview.md` skill doc to reflect new ARIA patterns.
+- PR #93 merged to main.
+
+### Project Wrap-Up
+- **Outcome:** Complete WAI-ARIA Tabs Pattern compliance at both top-level (bottom nav → tab panels) and sub-level (pill bar → sub-pill panels). 2 files changed, ~40 lines of attribute additions.
+- **Lesson:** Flash-tier workers skip MCP tooling constraints even when explicitly stated in the WORKORDER Tooling Constraints section. Reinforce MCP rules as Line-Item checkboxes with ⚠️ callouts in future WORKORDERs.
+- **Unresolved:** None.
