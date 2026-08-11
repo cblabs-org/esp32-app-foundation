@@ -248,9 +248,9 @@ GitHub does not offer a "releases-only" read permission — `Contents: Read` exp
 | Separate **private** releases repo | Yes | **No** — PAT scoped to releases repo only |
 
 ```cpp
-// Point the firmware at the releases repo, not the source repo
-config.otaGithubRepo  = "owner/my-firmware-releases";
-config.otaGithubToken = OTA_GITHUB_TOKEN;  // PAT scoped to releases repo
+// Point the firmware at the releases repo manifest, not the source repo
+config.otaManifestUrl = "https://raw.githubusercontent.com/owner/my-firmware-releases/main/manifest.json";
+config.otaToken       = OTA_GITHUB_TOKEN;  // PAT scoped to releases repo only
 ```
 
 ### Credential Storage
@@ -353,8 +353,8 @@ The public key for OTA signature verification is provided at boot time via [`Fra
 ```cpp
 struct FrameworkConfig {
     const char* otaPublicKey   = nullptr;  // PEM-encoded RSA public key (nullptr = skip verification)
-    const char* otaGithubRepo  = nullptr;  // GitHub "owner/repo" for OTA releases
-    const char* otaGithubToken = nullptr;  // Optional GitHub PAT for private repos
+    const char* otaManifestUrl = nullptr;  // Manifest URL — unkillable fallback for manifest-first OTA
+    const char* otaToken       = nullptr;  // Optional bearer token for authenticated downloads
 };
 ```
 

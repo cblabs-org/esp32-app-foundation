@@ -1,0 +1,11 @@
+{
+  "name": "ConfigManager",
+  "version": "0.1.0",
+  "description": "Centralised configuration gateway with schema versioning and JSON persistence",
+  "dependencies": {
+    "ConfigManifest": "*"
+  },
+  "build": {
+    "flags": ["-I../../include"]
+  }
+}

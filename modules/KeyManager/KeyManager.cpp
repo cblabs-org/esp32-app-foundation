@@ -11,8 +11,8 @@
  */
 
 #include "KeyManager.hpp"
-#include "../Logger/Logger.hpp"
-#include "../MCPServer/MCPToolRegistry.hpp"
+#include "Logger.hpp"
+#include "MCPToolRegistry.hpp"
 #include <fstream>
 #include <sstream>
 #include <sys/stat.h>

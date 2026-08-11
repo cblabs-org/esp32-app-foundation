@@ -1,0 +1,10 @@
+{
+  "name": "TimeManager",
+  "version": "0.1.0",
+  "description": "NTP time synchronisation and timezone management",
+  "build": {
+    "flags": [
+      "-I../../include"
+    ]
+  }
+}

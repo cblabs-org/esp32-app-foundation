@@ -222,11 +222,13 @@ unsigned long CarouselEngine::getMaxHoldMs() const {
  * logged, so a board that never releases cannot wedge the display.
  */
 void CarouselEngine::tick(unsigned long currentMs) {
+    // --- Step 1: Check suspension and interval elapsed state ---
     if (_suspended) return;
 
     unsigned long heldMs = currentMs - _lastRotationMs;
     if (heldMs < _intervalMs) return;
 
+    // --- Step 2: Query active board permission to advance via canAdvance() with bounded hold timeout ---
     IDisplayBoard* active = currentBoard();
     if (active != nullptr && !active->canAdvance()) {
         if (heldMs <= _intervalMs + _maxHoldMs) {
@@ -238,6 +240,7 @@ void CarouselEngine::tick(unsigned long currentMs) {
                  active->getBoardName(), _maxHoldMs);
     }
 
+    // --- Step 3: Advance carousel to next valid board and update rotation timestamp ---
     _advance();
     _lastRotationMs = currentMs;
 }
@@ -257,13 +260,14 @@ void CarouselEngine::tick(unsigned long currentMs) {
 bool CarouselEngine::_evictExpired() {
     bool activeRemoved = false;
 
+    // --- Step 1: Iterate pool and erase boards reporting expired status ---
     for (auto it = _pool.begin(); it != _pool.end(); ) {
         if ((*it)->isExpired()) {
             int removedIndex = static_cast<int>(it - _pool.begin());
             ESP_LOGI(TAG, "Removing expired board: %s", (*it)->getBoardName());
             it = _pool.erase(it);
 
-            // Adjust active index to keep it pointing at the same board
+            // --- Step 2: Adjust active board index to maintain reference stability across removals ---
             if (removedIndex < _activeIndex) {
                 _activeIndex--;
             } else if (removedIndex == _activeIndex) {
@@ -278,6 +282,7 @@ bool CarouselEngine::_evictExpired() {
         }
     }
 
+    // --- Step 3: Handle empty pool boundary condition by resetting index ---
     if (_pool.empty()) {
         _activeIndex = 0;
     }

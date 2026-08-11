@@ -26,7 +26,7 @@
  */
 
 #include "Application.hpp"
-#include "../../include/events/AppConfiguringPayload.hpp"
+#include "events/AppConfiguringPayload.hpp"
 #include "utils/ConfigGateResolver.hpp"
 
 

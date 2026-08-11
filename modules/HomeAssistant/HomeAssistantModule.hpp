@@ -61,17 +61,17 @@
 #ifdef WITH_HOMEASSISTANT
 
 // Interface includes
-#include "../../include/build_version.h"
-#include "../../include/interfaces/ITickable.hpp"
-#include "../../include/interfaces/IConfigurable.hpp"
-#include "../../include/interfaces/IWebContributor.hpp"
-#include "../../include/interfaces/IMCPContributor.hpp"
+#include "build_version.h"
+#include "interfaces/ITickable.hpp"
+#include "interfaces/IConfigurable.hpp"
+#include "interfaces/IWebContributor.hpp"
+#include "interfaces/IMCPContributor.hpp"
 #include "entities/IHaEntity.hpp"
 #include <vector>
 #include <string>
 #include <atomic>
 #include <ArduinoJson.h>
-#include "../../include/utils/Periodic.hpp"
+#include "utils/Periodic.hpp"
 
 class ConfigManager;
 class KeyManager;

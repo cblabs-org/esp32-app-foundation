@@ -1,0 +1,15 @@
+{
+  "name": "OTAUpdateManager",
+  "version": "0.1.0",
+  "description": "Secure OTA firmware update manager with signature verification",
+  "dependencies": {
+    "Application": "*",
+    "OTACerts": "*",
+    "OTADownloadEngine": "*",
+    "OTAManifest": "*",
+    "MCPServer": "*"
+  },
+  "build": {
+    "flags": ["-I../../include"]
+  }
+}

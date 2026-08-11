@@ -15,9 +15,12 @@
  *
  * Exported Classes:
  * - IConfigGate: Abstract interface for configuration prerequisites
- *   - isSatisfied():  Check whether this gate's condition is met
- *   - getGateName():  Return a human-readable identifier for logging
- *   - getHelpText():  Return user-facing guidance (optional, default empty)
+ *   - isSatisfied():              Check whether this gate's condition is met
+ *   - getGateName():              Return a human-readable identifier for logging
+ *   - getHelpText():              Return user-facing guidance (optional, default empty)
+ *   - getDependencies():          Return the names of gates this gate depends on
+ *   - getRegressionToleranceMs(): How long (ms) a gate can remain unsatisfied before regressing
+ *   - getActionStatus():          Return the current action status of this gate
  */
 
 #pragma once

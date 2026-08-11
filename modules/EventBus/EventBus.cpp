@@ -72,6 +72,8 @@ void EventBus::cleanup() {
 #endif
 
 bool EventBus::subscribe(const char* topic, EventCallback callback, void* ctx) {
+    // --- Step 1: Validate inputs ---
+    // Reject null or empty topic/callback early to avoid downstream crashes.
     if (topic == nullptr || callback == nullptr) {
         ESP_LOGW(TAG, "subscribe() failed: null topic or callback");
         return false;
@@ -82,8 +84,10 @@ bool EventBus::subscribe(const char* topic, EventCallback callback, void* ctx) {
         return false;
     }
 
+    // --- Step 2: Hash topic for fast comparison ---
     uint32_t topicHash = hashTopic(topic);
 
+    // --- Step 3: Register the subscription ---
 #ifdef UNIT_TEST
     if (_dispatchDepth == 0) {
         // Reuse an inactive slot if available when not dispatching
@@ -101,7 +105,11 @@ bool EventBus::subscribe(const char* topic, EventCallback callback, void* ctx) {
 
     _subscribers.push_back({topicHash, callback, ctx, true});
 #else
-    Subscription* sub = new Subscription();
+    Subscription* sub = new (std::nothrow) Subscription();
+    if (sub == nullptr) {
+        ESP_LOGE(TAG, "subscribe() failed: allocation failure");
+        return false;
+    }
     sub->topicHash = topicHash;
     sub->callback = callback;
     sub->ctx = ctx;
@@ -122,11 +130,13 @@ bool EventBus::subscribe(const char* topic, EventCallback callback, void* ctx) {
 }
 
 bool EventBus::unsubscribe(const char* topic, EventCallback callback, void* ctx) {
+    // --- Step 1: Validate inputs ---
     if (topic == nullptr || callback == nullptr || topic[0] == '\0') {
         ESP_LOGD(TAG, "unsubscribe() called with invalid topic or callback");
         return false;
     }
 
+    // --- Step 2: Hash topic and locate matching subscription ---
     uint32_t topicHash = hashTopic(topic);
 
 #ifdef UNIT_TEST
@@ -136,6 +146,9 @@ bool EventBus::unsubscribe(const char* topic, EventCallback callback, void* ctx)
             _subscribers[i].callback == callback &&
             _subscribers[i].ctx == ctx) {
 
+            // --- Step 3: Remove or tombstone the subscription ---
+            // During active dispatch, soft-delete to preserve iterator stability;
+            // otherwise erase immediately to reclaim the slot.
             if (_dispatchDepth > 0) {
                 _subscribers[i].active = false;
                 _needsCleanup = true;
@@ -149,6 +162,7 @@ bool EventBus::unsubscribe(const char* topic, EventCallback callback, void* ctx)
     for (auto it = _subscribers.begin(); it != _subscribers.end(); ++it) {
         Subscription* sub = *it;
         if (sub->topicHash == topicHash && sub->callback == callback && sub->ctx == ctx) {
+            // --- Step 3: Unregister from esp_event and free the subscription ---
             esp_event_handler_instance_unregister(APP_EVENT_BASE, topicHash, (esp_event_handler_instance_t)sub->instance);
             delete sub;
             _subscribers.erase(it);
@@ -162,13 +176,18 @@ bool EventBus::unsubscribe(const char* topic, EventCallback callback, void* ctx)
 }
 
 int EventBus::publish(const char* topic, const void* payload) {
+    // --- Step 1: Validate topic ---
     if (topic == nullptr || topic[0] == '\0') {
         return 0;
     }
 
+    // --- Step 2: Hash topic and dispatch ---
     uint32_t topicHash = hashTopic(topic);
     int count = 0;
 #ifdef UNIT_TEST
+    // --- Step 3 (native): Synchronous inline dispatch ---
+    // Increment dispatch depth to guard against re-entrant unsubscribe
+    // mutating the vector while we iterate.
     _dispatchDepth++;
 
     const size_t initialSize = _subscribers.size();
@@ -184,15 +203,13 @@ int EventBus::publish(const char* topic, const void* payload) {
         cleanup();
     }
 #else
+    // --- Step 3 (target): Post to esp_event default loop ---
+    // Dispatch is asynchronous — callbacks run on the event loop task, not here.
     const void* p = payload;
     esp_err_t err = esp_event_post(APP_EVENT_BASE, topicHash, &p, sizeof(p), portMAX_DELAY);
-    if (err == ESP_OK) {
-        for (Subscription* sub : _subscribers) {
-            if (sub->topicHash == topicHash) {
-                count++;
-            }
-        }
-    }
+    // Count is cosmetic for logging; derive from post result rather than
+    // iterating _subscribers, which is unsafe during async dispatch.
+    count = (err == ESP_OK) ? 1 : 0;
 #endif
 
     ESP_LOGD(TAG, "Published topic '%s' to %d subscriber(s)", topic, count);

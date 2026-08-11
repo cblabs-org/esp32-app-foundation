@@ -1,0 +1,10 @@
+{
+  "name": "MCPServer",
+  "version": "0.1.0",
+  "description": "Model Context Protocol server for device tool exposure",
+  "build": {
+    "flags": [
+      "-I../../include"
+    ]
+  }
+}

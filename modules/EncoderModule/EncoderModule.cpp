@@ -16,7 +16,7 @@
 #include "esp_log.h"
 #include <algorithm>
 
-static const char* TAG = "EncoderModule";
+static constexpr const char* TAG = "EncoderModule";
 
 EncoderModule::EncoderModule() = default;
 
@@ -55,6 +55,7 @@ void EncoderModule::addEncoder(const BoardEncoder& encoder) {
 }
 
 void EncoderModule::begin(Application& app) {
+    // --- Step 1: Acquire EventBus reference and validate state ---
     _bus = &app.getEventBus();
     
     if (_encoderCount == 0) {
@@ -66,6 +67,9 @@ void EncoderModule::begin(Application& app) {
         EncoderState& state = _encoders[i];
         const BoardEncoder& config = state.config;
 
+        // --- Step 2: Create PCNT unit with full 16-bit range ---
+        // accum_count=1 enables the accumulate feature so we can use
+        // the delta-from-previous pattern without clearing the counter.
         pcnt_unit_config_t unit_config = {};
         unit_config.low_limit = -32768;
         unit_config.high_limit = 32767;
@@ -77,6 +81,8 @@ void EncoderModule::begin(Application& app) {
             continue;
         }
 
+        // --- Step 3: Configure glitch filter and quadrature channels ---
+        // 1 µs glitch filter suppresses contact bounce on mechanical encoders.
         pcnt_glitch_filter_config_t filter_config = {};
         filter_config.max_glitch_ns = 1000;
         pcnt_unit_set_glitch_filter(state.pcntUnit, &filter_config);
@@ -92,6 +98,9 @@ void EncoderModule::begin(Application& app) {
         pcnt_new_channel(state.pcntUnit, &chanA_config, &state.pcntChanA);
         pcnt_new_channel(state.pcntUnit, &chanB_config, &state.pcntChanB);
 
+        // --- Step 4: Set quadrature edge/level actions (direction decode) ---
+        // Channel A and B are cross-wired so the PCNT counts up or down
+        // depending on rotation direction. The 'reversed' flag swaps polarity.
         if (!config.reversed) {
             pcnt_channel_set_edge_action(state.pcntChanA, PCNT_CHANNEL_EDGE_ACTION_DECREASE, PCNT_CHANNEL_EDGE_ACTION_INCREASE);
             pcnt_channel_set_level_action(state.pcntChanA, PCNT_CHANNEL_LEVEL_ACTION_KEEP, PCNT_CHANNEL_LEVEL_ACTION_INVERSE);
@@ -104,6 +113,7 @@ void EncoderModule::begin(Application& app) {
             pcnt_channel_set_level_action(state.pcntChanB, PCNT_CHANNEL_LEVEL_ACTION_KEEP, PCNT_CHANNEL_LEVEL_ACTION_INVERSE);
         }
 
+        // --- Step 5: Enable and start the PCNT unit ---
         pcnt_unit_enable(state.pcntUnit);
         pcnt_unit_start(state.pcntUnit);
 
@@ -120,13 +130,17 @@ void EncoderModule::tick(uint32_t currentMillis) {
             continue;
         }
 
-        // Delta-from-previous pattern: never clear the hardware counter.
-        // Clearing would lose pulses arriving between get_count and clear_count.
+        // --- Step 1: Read hardware counter (delta-from-previous pattern) ---
+        // Never clear the hardware counter — clearing would lose pulses
+        // arriving between get_count and clear_count.
         int currentCount = 0;
         pcnt_unit_get_count(state.pcntUnit, &currentCount);
         int rawCounts = currentCount - state.prevCount;
         state.prevCount = currentCount;
 
+        // --- Step 2: Normalise raw pulse counts to whole detent steps ---
+        // Fractional remainder is carried across ticks so sub-detent
+        // pulses are never lost.
         state.fractionalAccum += rawCounts;
         int32_t detents = state.fractionalAccum / static_cast<int32_t>(state.config.stepsPerDetent);
         state.fractionalAccum %= static_cast<int32_t>(state.config.stepsPerDetent);
@@ -135,6 +149,7 @@ void EncoderModule::tick(uint32_t currentMillis) {
             continue;
         }
 
+        // --- Step 3: Compute velocity-based acceleration multiplier ---
         uint32_t lastMs = state.lastMovementMs.load(std::memory_order_relaxed);
         uint32_t elapsed = (currentMillis >= lastMs) ? (currentMillis - lastMs) : 0;
 
@@ -145,6 +160,9 @@ void EncoderModule::tick(uint32_t currentMillis) {
             float cutoff = static_cast<float>(accel.shortCutoffMs);
             float currentElapsed = static_cast<float>(elapsed);
 
+            // Map elapsed time to a 0–1 normalised parameter 't':
+            //   t=0 at the deadZone boundary (slow rotation, no boost),
+            //   t=1 at the shortCutoff (fast rotation, full boost).
             float t = 0.0f;
             if (deadZone > cutoff) {
                 t = (deadZone - currentElapsed) / (deadZone - cutoff);
@@ -153,14 +171,21 @@ void EncoderModule::tick(uint32_t currentMillis) {
                 t = 1.0f;
             }
             float maxMult = static_cast<float>(accel.maxMultiplier);
+            // Quadratic curve (t²): gentle ramp at moderate speeds with an
+            // aggressive surge near the cutoff, giving a natural feel that
+            // avoids over-sensitivity during casual scrolling.
             float multiplier = 1.0f + (t * t * (maxMult - 1.0f));
             accelDetents = static_cast<int32_t>(detents * multiplier);
         }
 
+        // --- Step 4: Update atomic accumulators ---
+        // Dual accumulators allow consumers to choose raw or accelerated
+        // deltas independently. position tracks cumulative raw detents.
         state.rawDelta.fetch_add(detents, std::memory_order_relaxed);
         state.accelDelta.fetch_add(accelDetents, std::memory_order_relaxed);
         state.position.fetch_add(detents, std::memory_order_relaxed);
 
+        // --- Step 5: Publish rotation event to EventBus ---
         if (_bus) {
             EncoderEvent& evt = _eventRing[_ringHead];
             evt.id = state.config.id ? state.config.id : "main";

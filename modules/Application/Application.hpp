@@ -36,7 +36,6 @@
  *   - registerDataSource():      Add an IDataSource worker to the DataManager vector
  *   - getConfigManager():        Access the ConfigManager gateway
  *   - getWifiManager():          Access the WifiManager domain service
- *   - getOtaManager():           Access the OTAUpdateManager domain service
  *   - getKeyManager():           Access the KeyManager domain service
  *   - getAuthManager():          Access the AuthManager security service
  *   - getState():                Query the current AppState lifecycle phase
@@ -59,19 +58,19 @@
 #include "interfaces/IMCPContributor.hpp"
 #include "interfaces/IConfigGate.hpp"
 #include "interfaces/IBootReporter.hpp"
-#include "../../include/events/AppConfiguringPayload.hpp"
+#include "events/AppConfiguringPayload.hpp"
 
-#include "../EventBus/EventBus.hpp"
-#include "../DataManager/DataManager.hpp"
-#include "../WebServer/WebServerManager.hpp"
-#include "../ConfigManager/ConfigManager.hpp"
+#include "EventBus.hpp"
+#include "DataManager.hpp"
+#include "WebServerManager.hpp"
+#include "ConfigManager.hpp"
 
 // Core domain services (owned by value — full includes required)
-#include "../WifiManager/WifiManager.hpp"
-#include "../WifiManager/WifiConfigGate.hpp"
-#include "../KeyManager/KeyManager.hpp"
-#include "../AuthManager/AuthManager.hpp"
-#include "../../lib/DeviceCrypto/DeviceCrypto.hpp"
+#include "WifiManager.hpp"
+#include "WifiConfigGate.hpp"
+#include "KeyManager.hpp"
+#include "AuthManager.hpp"
+#include "DeviceCrypto.hpp"
 
 
 
@@ -136,7 +135,7 @@ namespace ApplicationEvents {
  */
 class Application {
 public:
-    /// Destructor
+    /** @brief Destructor. */
     ~Application();
 
     // -------------------------------------------------------------------------

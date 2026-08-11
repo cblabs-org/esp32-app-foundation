@@ -1,0 +1,5 @@
+{
+  "name": "OTAManifest",
+  "version": "0.1.0",
+  "description": "OTA update manifest parser for firmware metadata"
+}

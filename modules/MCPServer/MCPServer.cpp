@@ -19,10 +19,10 @@
 #include "MCPServer.hpp"
 #include "MCPBuiltinTools.hpp"
 #include "interfaces/IMCPContributor.hpp"
-#include "../WifiManager/WifiManager.hpp"
-#include "../WebServer/WebServerManager.hpp"
-#include "../AuthManager/AuthManager.hpp"
-#include "../ConfigManager/ConfigManager.hpp"
+#include "WifiManager.hpp"
+#include "WebServerManager.hpp"
+#include "AuthManager.hpp"
+#include "ConfigManager.hpp"
 
 // ---------------------------------------------------------------------------
 // Platform-conditional includes & logging shims

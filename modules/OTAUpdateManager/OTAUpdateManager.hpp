@@ -72,10 +72,10 @@
 #include <functional>
 
 
-#include "../../include/interfaces/IWebContributor.hpp"
-#include "../../include/interfaces/IConfigurable.hpp"
-#include "../../include/interfaces/ITickable.hpp"
-#include "../../include/interfaces/IMCPContributor.hpp"
+#include "interfaces/IWebContributor.hpp"
+#include "interfaces/IConfigurable.hpp"
+#include "interfaces/ITickable.hpp"
+#include "interfaces/IMCPContributor.hpp"
 
 // ---------------------------------------------------------------------------
 // Forward declarations — Hollywood Principle: never include other module headers

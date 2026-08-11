@@ -65,8 +65,8 @@
 #include <cstring>
 #include <atomic>
 
-#include "../../include/interfaces/IWebContributor.hpp"
-#include "../../include/interfaces/IConfigurable.hpp"
+#include "interfaces/IWebContributor.hpp"
+#include "interfaces/IConfigurable.hpp"
 
 
 // Forward declarations — avoids circular includes with ConfigManager/KeyManager

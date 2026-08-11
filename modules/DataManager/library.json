@@ -1,0 +1,10 @@
+{
+  "name": "DataManager",
+  "version": "0.1.0",
+  "description": "IDataSource registry and polling coordinator",
+  "build": {
+    "flags": [
+      "-I../../include"
+    ]
+  }
+}

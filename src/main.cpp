@@ -16,6 +16,8 @@
  * - loop():  Arduino entry point — delegates to Application::tick()
  */
 
+#ifndef UNIT_TEST  // GoogleTest provides main() on native; this file is not compiled
+
 #include "AppFoundation.h"
 #include "publicKey.hpp"
 
@@ -213,3 +215,5 @@ void loop() {
     app.tick();
     delay(1);   // Yield to RTOS idle task — feeds the Task Watchdog Timer (TWDT)
 }
+
+#endif // UNIT_TEST

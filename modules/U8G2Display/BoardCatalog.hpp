@@ -20,6 +20,7 @@
  * - BoardCatalog: Thin accessor struct holding references to all display boards
  *   - boot:               Reference to the BootBoard instance
  *   - configuringStatus:  Reference to the ConfiguringStatusBoard instance
+ *   - genericHelper:      Reference to the GenericGateHelperBoard instance
  *   - wifiWizard:         Reference to the WiFiWizardBoard instance
  *   - otaProgress:        Reference to the OTAProgressBoard instance
  *   - error:              Reference to the ErrorBoard instance

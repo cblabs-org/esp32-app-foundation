@@ -33,11 +33,17 @@
  * - U8G2DisplayModule::applyConfig():       Apply display settings from JSON section
  * - U8G2DisplayModule::serializeConfig():   Serialize display settings to JSON section
  * - U8G2DisplayModule::resetConfig():       Reset to factory defaults
+ * - U8G2DisplayModule::getBrightness():     Return current contrast/brightness level
+ * - U8G2DisplayModule::getFlipScreen():     Return display flip state
  * - U8G2DisplayModule::setBrightness():     Runtime brightness adjustment
  * - U8G2DisplayModule::setFlipScreen():     Runtime screen flip toggle
  * - U8G2DisplayModule::setSleepTimeout():   Runtime sleep timeout adjustment
  * - U8G2DisplayModule::setRotationInterval(): Runtime carousel interval adjustment
  * - U8G2DisplayModule::setTargetFps():      Runtime frame-rate target adjustment
+ * - U8G2DisplayModule::isDimmed():          Return true if screensaver is in dimmed state
+ * - U8G2DisplayModule::isSleeping():        Return true if screensaver is blanked/sleeping
+ * - U8G2DisplayModule::capturePNG():         Capture current display frame to 1bpp PNG stream
+ * - U8G2DisplayModule::showSystemState():   Display system overlay state (normal, error, configuring)
  * - U8G2DisplayModule::_onOtaProgress():    Static EventBus callback for OTA events
  * - U8G2DisplayModule::_onDisplayMessage(): Static EventBus callback for display messages
  */
@@ -56,7 +62,7 @@ static constexpr const char* TAG = "U8G2DisplayModule";
 
 #include <PsychicHttp.h>
 #include <ArduinoJson.h>
-#include "../Application/Application.hpp"
+#include "Application.hpp"
 
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
@@ -67,9 +73,9 @@ static constexpr const char* TAG = "U8G2DisplayModule";
 #endif
 
 // Include EventBus directly — it is native-safe (no Arduino.h dependency).
-#include "../EventBus/EventBus.hpp"
-#include "../ConfigManager/ConfigManager.hpp"
-#include "../MCPServer/MCPToolRegistry.hpp"
+#include "EventBus.hpp"
+#include "ConfigManager.hpp"
+#include "MCPToolRegistry.hpp"
 #include "fonts/Fonts.hpp"
 
 // =============================================================================
@@ -506,10 +512,11 @@ void U8G2DisplayModule::clearStatus() {
  * @param section Read-only JSON object containing display config keys.
  */
 void U8G2DisplayModule::applyConfig(const JsonObject& section) {
+    // --- Step 1: Parse brightness and screen orientation flags from JSON ---
     _brightness         = section["brightness"]      | (uint8_t)255;
     _flipScreen         = section["flip"]            | false;
 
-    // --- Screensaver settings (with legacy migration) ---
+    // --- Step 2: Configure screensaver timeouts and handle legacy sleepTimeout migration ---
     bool screensaverEnabled = section["screensaverEnabled"] | true;
     _screensaver.setEnabled(screensaverEnabled);
 
@@ -530,6 +537,7 @@ void U8G2DisplayModule::applyConfig(const JsonObject& section) {
         _screensaver.setBlankTimeout(300000);
     }
 
+    // --- Step 3: Configure carousel interval, target frame rate, and clock font selection ---
     unsigned long rotationInterval = section["rotationInterval"] | (unsigned long)8000;
     _carousel.setInterval(rotationInterval);
     _targetFrameIntervalMs = 1000UL / (section["targetFps"] | (uint8_t)30);
@@ -540,7 +548,7 @@ void U8G2DisplayModule::applyConfig(const JsonObject& section) {
     else if (_clockFontSize == 3) font = AppFonts::defaultLarge();
     _screensaverBoard.setClockFont(font);
 
-    // --- Apply hardware settings ---
+    // --- Step 4: Apply contrast and flip settings directly to U8G2 hardware driver ---
     _u8g2.setContrast(_brightness);
     _u8g2.setFlipMode(_flipScreen ? 1 : 0);
 
@@ -625,6 +633,7 @@ bool U8G2DisplayModule::capturePNG(Print& sink) {
 }
 
 void U8G2DisplayModule::showSystemState(const SystemDisplayParams& params) {
+    // --- Step 1: Evaluate requested system display state (Normal, Error, Configuring, or Generic) ---
     if (params.state != nullptr && strcmp(params.state, DisplayState::Normal) == 0) {
         clearModal();
     } else if (params.state != nullptr && strcmp(params.state, DisplayState::Error) == 0) {
@@ -642,6 +651,8 @@ void U8G2DisplayModule::showSystemState(const SystemDisplayParams& params) {
         _error.showError(params.message ? params.message : (params.title ? params.title : "System"), false);
         showModal(&_error);
     }
+
+    // --- Step 2: Reset activity timer to wake display and prevent screensaver blanking ---
     resetActivity();
 }
 
@@ -745,10 +756,11 @@ const char* U8G2DisplayModule::getTabIcon() const {
  * @param server Reference to the AsyncWebServer instance.
  */
 void U8G2DisplayModule::registerRoutes(PsychicHttpServer& server) {
+    // --- Step 1: Register shared service helper endpoints (brightness, screenshot) ---
     _serviceHelper.registerBrightnessRoute(server);
     _serviceHelper.registerScreenshotRoute(server);
 
-    // --- GET /api/display/status — current display state ---
+    // --- Step 2: Register GET /api/display/status endpoint for active display state snapshot ---
     server.on("/api/display/status", HTTP_GET, [this](PsychicRequest* request, PsychicResponse* response) {
         JsonDocument doc;
         _serviceHelper.populateCommonStatus(doc);
@@ -770,7 +782,7 @@ void U8G2DisplayModule::registerRoutes(PsychicHttpServer& server) {
         return ESP_OK;
     });
 
-    // --- POST /api/display/flip — toggle screen flip ---
+    // --- Step 3: Register POST /api/display/flip endpoint for runtime orientation control ---
     server.on("/api/display/flip", HTTP_POST,
         [this](PsychicRequest *request, PsychicResponse* response) {
             const char* body = request->bodyCStr();
@@ -796,7 +808,7 @@ void U8G2DisplayModule::registerRoutes(PsychicHttpServer& server) {
         }
     );
 
-    // --- POST /api/display/sleep — control screensaver behaviour ---
+    // --- Step 4: Register POST /api/display/sleep endpoint for screensaver mode and timeout control ---
     server.on("/api/display/sleep", HTTP_POST,
         [this](PsychicRequest *request, PsychicResponse* response) {
             const char* body = request->bodyCStr();
@@ -858,7 +870,7 @@ void U8G2DisplayModule::registerRoutes(PsychicHttpServer& server) {
         }
     );
 
-    // --- GET /api/display/boards — list all pool boards ---
+    // --- Step 5: Register GET /api/display/boards endpoint to inspect registered carousel boards ---
     server.on("/api/display/boards", HTTP_GET, [this](PsychicRequest* request, PsychicResponse* response) {
         JsonDocument doc;
         JsonArray boardsArr = doc["boards"].to<JsonArray>();
@@ -877,7 +889,7 @@ void U8G2DisplayModule::registerRoutes(PsychicHttpServer& server) {
         return ESP_OK;
     });
 
-    // --- POST /api/display/interval — set rotation interval ---
+    // --- Step 6: Register POST /api/display/interval endpoint for carousel rotation interval adjustment ---
     server.on("/api/display/interval", HTTP_POST,
         [this](PsychicRequest *request, PsychicResponse* response) {
             const char* body = request->bodyCStr();
@@ -903,7 +915,7 @@ void U8G2DisplayModule::registerRoutes(PsychicHttpServer& server) {
         }
     );
 
-    // --- POST /api/display/clockFontSize — set clock font size ---
+    // --- Step 7: Register POST /api/display/clockFontSize endpoint for screensaver clock styling ---
     server.on("/api/display/clockFontSize", HTTP_POST,
         [this](PsychicRequest *request, PsychicResponse* response) {
             const char* body = request->bodyCStr();
@@ -930,7 +942,7 @@ void U8G2DisplayModule::registerRoutes(PsychicHttpServer& server) {
         }
     );
 
-    // --- POST /api/display/show — force a specific board by index ---
+    // --- Step 8: Register POST /api/display/show endpoint to force selection of specific board ---
     server.on("/api/display/show", HTTP_POST,
         [this](PsychicRequest *request, PsychicResponse* response) {
             const char* body = request->bodyCStr();

@@ -53,11 +53,11 @@
 
 #include <memory>
 #include <cstring>
-#include "../../include/interfaces/ITickable.hpp"
-#include "../../include/interfaces/IConfigurable.hpp"
-#include "../../include/interfaces/IWebContributor.hpp"
-#include "../../include/interfaces/IMCPContributor.hpp"
-#include "../../include/utils/Periodic.hpp"
+#include "interfaces/ITickable.hpp"
+#include "interfaces/IConfigurable.hpp"
+#include "interfaces/IWebContributor.hpp"
+#include "interfaces/IMCPContributor.hpp"
+#include "utils/Periodic.hpp"
 
 class DNSServer;
 class PsychicRequest;

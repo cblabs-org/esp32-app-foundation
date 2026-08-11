@@ -45,10 +45,10 @@
 #include <memory>
 #include <vector>
 #include <ArduinoJson.h>
-#include "../../lib/DeviceCrypto/DeviceCrypto.hpp"
-#include "../../include/interfaces/IWebContributor.hpp"
-#include "../../include/interfaces/IMCPContributor.hpp"
-#include "../ConfigManager/ConfigRoot.hpp"
+#include "DeviceCrypto.hpp"
+#include "interfaces/IWebContributor.hpp"
+#include "interfaces/IMCPContributor.hpp"
+#include "ConfigRoot.hpp"
 
 #define KEY_MANAGER_PATH (ConfigRoot::getEtcFilePath("keys.json").c_str())
 

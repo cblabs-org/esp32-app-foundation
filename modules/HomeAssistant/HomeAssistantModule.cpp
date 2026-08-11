@@ -25,13 +25,13 @@
 #include <PsychicHttp.h>
 #include "portal_assets/homeassistant_js.hpp"
 
-#include "../MCPServer/MCPToolRegistry.hpp"
-#include "../ConfigManager/ConfigManager.hpp"
-#include "../KeyManager/KeyManager.hpp"
-#include "../EventBus/EventBus.hpp"
+#include "MCPToolRegistry.hpp"
+#include "ConfigManager.hpp"
+#include "KeyManager.hpp"
+#include "EventBus.hpp"
 
 #include "platform/LogShim.h"
-#include "../Logger/Logger.hpp"
+#include "Logger.hpp"
 
 static constexpr const char* TAG = "HomeAssistant";
 

@@ -44,9 +44,9 @@
 #include <time.h>
 #include <esp_sntp.h>
 
-#include "../../include/interfaces/ITickable.hpp"
-#include "../../include/interfaces/IConfigurable.hpp"
-#include "../../include/interfaces/IWebContributor.hpp"
+#include "interfaces/ITickable.hpp"
+#include "interfaces/IConfigurable.hpp"
+#include "interfaces/IWebContributor.hpp"
 
 // Forward declaration — avoids circular include with configManager.hpp
 class ConfigManager;

@@ -1,0 +1,10 @@
+{
+  "name": "AuthManager",
+  "version": "0.1.0",
+  "description": "JWT authentication and PAT management for the ESP32 App Foundation",
+  "build": {
+    "flags": [
+      "-I../../include"
+    ]
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "name": "HomeAssistant",
+  "version": "0.1.0",
+  "description": "Home Assistant MQTT integration module",
+  "build": {
+    "flags": [
+      "-I../../include"
+    ]
+  }
+}

@@ -1,0 +1,5 @@
+{
+  "name": "DeviceCrypto",
+  "version": "0.1.0",
+  "description": "Hardware-backed cryptographic operations using ESP32 secure element"
+}

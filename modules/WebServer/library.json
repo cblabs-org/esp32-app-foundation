@@ -1,0 +1,10 @@
+{
+  "name": "WebServer",
+  "version": "0.1.0",
+  "description": "PsychicHttp web server with modular route registration",
+  "build": {
+    "flags": [
+      "-I../../include"
+    ]
+  }
+}

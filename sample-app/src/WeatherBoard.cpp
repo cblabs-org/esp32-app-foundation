@@ -102,12 +102,16 @@ void WeatherBoard::onWeatherUpdated(const char* topic, const void* data, void* c
  * @param u8g2  Reference to the U8G2 display driver instance.
  */
 void WeatherBoard::render(U8G2& u8g2) {
-    // Clear buffer is handled by the CarouselEngine
-    // Get weather data — H3: getters now return float/string safely across threads
+    // --- Step 1: Read weather data from thread-safe getters ---
+    // H3: getters return float/string safely across threads via atomic loads
+    // and mutex-protected string copies. Clear buffer is handled by CarouselEngine.
     std::string tempStr;
     std::string condStr;
 
-    // Determine the display unit suffix from the configured units
+    // --- Step 2: Determine display units and format temperature string ---
+    // Read the configured unit system ("metric"/"imperial") and select the
+    // appropriate display suffix. Convert the float temperature to a formatted
+    // stack-buffer string (F10 — no heap alloc in render path).
     const char* unitSuffix = "°C";
     if (_weatherModule) {
         std::string units = _weatherModule->getUnits();
@@ -115,13 +119,14 @@ void WeatherBoard::render(U8G2& u8g2) {
             unitSuffix = "°F";
         }
 
-        // Convert float to display string
         char buf[16];
         snprintf(buf, sizeof(buf), "%.1f", _weatherModule->getTemperature());
         tempStr = buf;
         condStr = _weatherModule->getCondition();
     }
 
-    // Draw the Weather Widget — layout is self-centred on the display
+    // --- Step 3: Delegate rendering to WeatherWidget ---
+    // WeatherWidget handles icon glyph selection, text measurement,
+    // centred layout computation, and LabelWidget positioning.
     _weatherWidget.draw(u8g2, tempStr, condStr, unitSuffix);
 }

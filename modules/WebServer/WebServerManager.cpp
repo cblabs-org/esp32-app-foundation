@@ -30,9 +30,9 @@
     // AuthManager full type needed for isAuthEnabled()/hasCert()/loadCert()
     // in TLS setup. Guarded so native LDF doesn't scan it, but even if it
     // does, the transitive DeviceCrypto include now resolves via relative path.
-    #include "../AuthManager/AuthManager.hpp"
-#include "../WifiManager/WifiManager.hpp"
-#include "../ConfigManager/ConfigRoot.hpp"
+    #include "AuthManager.hpp"
+#include "WifiManager.hpp"
+#include "ConfigRoot.hpp"
 
 // Portal PROGMEM assets — hardware only (require Arduino.h for PROGMEM macro)
 #include "portal_assets/index_html.hpp"

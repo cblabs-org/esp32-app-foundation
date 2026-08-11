@@ -1,0 +1,5 @@
+{
+  "name": "ConfigManifest",
+  "version": "0.1.0",
+  "description": "Three-tier config lifecycle manifest for schema versioning"
+}

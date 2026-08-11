@@ -1,0 +1,5 @@
+{
+  "name": "MD5Utils",
+  "version": "0.1.0",
+  "description": "MD5 hash utilities for file integrity verification"
+}

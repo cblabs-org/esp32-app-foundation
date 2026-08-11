@@ -66,11 +66,21 @@
  *   - registerMCPTools():   Register display_status/display_control MCP tools
  *
  *   Runtime Display Setters:
- *   - setBrightness():      Runtime brightness adjustment (0–255)
- *   - setFlipScreen():      Runtime screen flip toggle
- *   - setSleepTimeout():    Runtime sleep timeout adjustment
+ *   - setBrightness():       Runtime brightness adjustment (0–255)
+ *   - getBrightness():       Get the current display brightness level
+ *   - setFlipScreen():       Runtime screen flip toggle
+ *   - getFlipScreen():       Get the current screen flip state
+ *   - setSleepTimeout():     Runtime sleep timeout adjustment
  *   - setRotationInterval(): Runtime carousel rotation interval adjustment
  *   - setTargetFps():        Runtime frame-rate target adjustment (default 30 FPS)
+ *
+ *   IDisplayModule:
+ *   - getDisplayWidth():     Return display width in pixels
+ *   - getDisplayHeight():    Return display height in pixels
+ *   - isDimmed():            Check if display is currently dimmed
+ *   - isSleeping():          Check if display is currently sleeping
+ *   - capturePNG():          Capture the current frame buffer as a PNG
+ *   - showSystemState():     Transition display to represent a core system state
  */
 
 #pragma once
@@ -95,7 +105,7 @@
 #include "boards/ScreensaverBoard.hpp"
 #include "boards/ConfiguringStatusBoard.hpp"
 #include "boards/GenericGateHelperBoard.hpp"
-#include "../../include/utils/Periodic.hpp"
+#include "utils/Periodic.hpp"
 #include <types/BootBranding.h>
 #include <types/U8G2BootLogo.h>
 #include <interfaces/IU8G2SystemScreens.hpp>
@@ -509,11 +519,29 @@ public:
     // IDisplayModule — Geometry, Screensaver state, PNG capture, System state
     // -------------------------------------------------------------------------
 
+    /** @brief Return display width in pixels. */
     uint16_t getDisplayWidth() const override;
+
+    /** @brief Return display height in pixels. */
     uint16_t getDisplayHeight() const override;
+
+    /** @brief Check if the display is currently dimmed by the screensaver. */
     bool isDimmed() const override;
+
+    /** @brief Check if the display is currently sleeping by the screensaver. */
     bool isSleeping() const override;
+
+    /**
+     * @brief Capture the current frame buffer as a PNG image.
+     * @param sink The print sink to write PNG data to.
+     * @return true if successful, false otherwise.
+     */
     bool capturePNG(Print& sink) override;
+
+    /**
+     * @brief Transition display to represent a core system state.
+     * @param params State transition parameters.
+     */
     void showSystemState(const SystemDisplayParams& params) override;
 
 private:

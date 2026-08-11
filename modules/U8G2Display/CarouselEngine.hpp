@@ -35,24 +35,24 @@
  *
  * Exported Functions/Classes:
  * - CarouselEngine: Runtime-mutable rotating board collection.
- *   - add(): Register a board into the pool
- *   - remove(): Remove a specific board from the pool
- *   - clear(): Remove all boards from the pool
- *   - contains(): Check if a board is in the pool
- *   - boardCount(): Return number of boards in the pool
- *   - getBoard(): Return a board by index
- *   - currentBoard(): Return the currently active board
- *   - activeIndex(): Return the index of the active board
- *   - show(): Force-show a specific pool board (reset rotation timer)
- *   - nextBoard(): Advance to the next board (user-initiated, bypasses hold)
+ *   - add():           Register a board into the pool
+ *   - remove():        Remove a specific board from the pool
+ *   - clear():         Remove all boards from the pool
+ *   - contains():      Check if a board is in the pool
+ *   - boardCount():    Return number of boards in the pool
+ *   - getBoard():      Return a board by index
+ *   - currentBoard():  Return the currently active board
+ *   - activeIndex():   Return the index of the active board
+ *   - show():          Force-show a specific pool board (reset rotation timer)
+ *   - nextBoard():     Advance to the next board (user-initiated, bypasses hold)
  *   - previousBoard(): Return to the previous board (user-initiated, bypasses hold)
- *   - suspend(): Pause automatic rotation (timer frozen)
- *   - resume(): Resume automatic rotation from current board
- *   - setInterval(): Set the rotation interval in milliseconds
- *   - getInterval(): Get the rotation interval in milliseconds
- *   - setMaxHoldMs(): Set the bounded max-hold ceiling for canAdvance() defers
- *   - getMaxHoldMs(): Get the bounded max-hold ceiling
- *   - tick(): Advance carousel if interval elapsed; call each tick
+ *   - suspend():       Pause automatic rotation (timer frozen)
+ *   - resume():        Resume automatic rotation from current board
+ *   - setInterval():   Set the rotation interval in milliseconds
+ *   - getInterval():   Get the rotation interval in milliseconds
+ *   - setMaxHoldMs():  Set the bounded max-hold ceiling for canAdvance() defers
+ *   - getMaxHoldMs():  Get the bounded max-hold ceiling
+ *   - tick():          Advance carousel if interval elapsed; call each tick
  */
 
 #pragma once

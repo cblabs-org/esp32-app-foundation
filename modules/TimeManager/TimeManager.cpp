@@ -22,7 +22,7 @@
  */
 
 #include "TimeManager.hpp"
-#include "../ConfigManager/ConfigManager.hpp"
+#include "ConfigManager.hpp"
 #include "platform/LogShim.h"
 
 #include <cstring>

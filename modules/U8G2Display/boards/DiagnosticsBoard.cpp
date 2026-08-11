@@ -20,7 +20,7 @@
  */
 
 #include "DiagnosticsBoard.hpp"
-#include "../../WifiManager/WifiManager.hpp"  // Full definition for getHostname() + getSSID()
+#include "WifiManager.hpp"  // Full definition for getHostname() + getSSID()
 #include "fonts/Fonts.hpp"
 #include <cstdio>
 

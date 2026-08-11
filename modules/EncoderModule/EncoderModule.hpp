@@ -14,13 +14,21 @@
  *
  * Exported Classes:
  * - EncoderModule: Hardware quadrature rotary encoder manager
- *   - addEncoder(): Register a BoardEncoder descriptor prior to begin()
- *   - begin(): Phase 2 initialization (configures PCNT units & channels, starts hardware)
- *   - tick(): Main-loop processing hook, reads all PCNT counts, normalises, accelerates, publishes [ITickable]
- *   - consumeDelta(): Thread-safe atomic delta extractor for first encoder (convenience)
- *   - consumeDeltaAt(): Thread-safe atomic delta extractor for encoder at given index
- *   - encoderCount(): Returns number of registered encoders
- *   - registerMCPTools(): Exposes encoder_status MCP tool for diagnostics [IMCPContributor]
+ *
+ *   Lifecycle:
+ *   - addEncoder():       Register a BoardEncoder descriptor prior to begin()
+ *   - begin():            Phase 2 initialization (configures PCNT units & channels, starts hardware)
+ *
+ *   Consumer API:
+ *   - consumeDelta():     Thread-safe atomic delta extractor for first encoder (convenience)
+ *   - consumeDeltaAt():   Thread-safe atomic delta extractor for encoder at given index
+ *   - encoderCount():     Returns number of registered encoders
+ *
+ *   ITickable:
+ *   - tick():             Main-loop processing hook: reads PCNT counts, normalises, accelerates, publishes
+ *
+ *   IMCPContributor:
+ *   - registerMCPTools(): Exposes encoder_status MCP tool for diagnostics
  */
 
 #pragma once

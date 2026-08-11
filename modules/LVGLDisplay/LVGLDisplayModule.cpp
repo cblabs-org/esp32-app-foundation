@@ -17,7 +17,7 @@
 
 #include "ConfigManager.hpp"
 #include "MCPToolRegistry.hpp"
-#include "../Application/Application.hpp"
+#include "Application.hpp"
 #include "interfaces/IConfigGate.hpp"   // GateNames, GateActionStatus (CONFIGURING dispatch)
 #include <base64.h>
 #include <mbedtls/base64.h>
@@ -303,7 +303,7 @@ bool LVGLDisplayModule::isSleeping() const {
 
 bool LVGLDisplayModule::capturePNG(Print& sink) {
 #ifndef UNIT_TEST
-    // Request tick loop to capture the raw snapshot (thread-safe)
+    // --- Step 1: Request thread-safe screen snapshot execution from main tick loop ---
     _snapshotComplete.store(false);
     _snapshotSuccess.store(false);
     _snapshotBuffer = nullptr;
@@ -311,13 +311,14 @@ bool LVGLDisplayModule::capturePNG(Print& sink) {
     _pendingSnapshot.store(true);
     ESP_LOGI("LVGLDisplay", "capturePNG: requesting snapshot, waiting for tick loop...");
 
-    // Wait up to 3 seconds for the tick loop to process the request
+    // --- Step 2: Poll and wait for main tick loop to complete raw buffer extraction ---
     int timeout = 300;
     while (!_snapshotComplete.load() && timeout > 0) {
         delay(10);
         timeout--;
     }
 
+    // --- Step 3: Validate snapshot buffer acquisition and clean up on timeout failure ---
     if (!_snapshotComplete.load() || !_snapshotSuccess.load() || !_snapshotBuffer) {
         ESP_LOGE("LVGLDisplay", "capturePNG: Snapshot failed (complete=%d, success=%d, timeout=%d)", 
                  _snapshotComplete.load(), _snapshotSuccess.load(), timeout);
@@ -326,6 +327,7 @@ bool LVGLDisplayModule::capturePNG(Print& sink) {
         return false;
     }
 
+    // --- Step 4: Encode RGB565 snapshot buffer to PNG format and free temporary memory ---
     ESP_LOGI("LVGLDisplay", "capturePNG: tick loop finished snapshot, converting to PNG...");
     // Write PNG conversion from the caller's thread (safe, as it only reads the isolated buffer)
     bool ok = PngWriter::writeRGB565ToRGB888(sink, _snapshotWidth, _snapshotHeight, reinterpret_cast<const uint16_t*>(_snapshotBuffer));

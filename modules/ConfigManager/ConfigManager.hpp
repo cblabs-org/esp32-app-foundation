@@ -64,11 +64,11 @@
 #include <freertos/semphr.h>
 
 #include <ArduinoJson.h>
-#include "../../include/interfaces/IConfigurable.hpp"
-#include "../../include/interfaces/IWebContributor.hpp"
-#include "../../include/interfaces/IMCPContributor.hpp"
+#include "interfaces/IConfigurable.hpp"
+#include "interfaces/IWebContributor.hpp"
+#include "interfaces/IMCPContributor.hpp"
 #include "ConfigRoot.hpp"
-#include "../../lib/ConfigManifest/ConfigManifest.hpp"
+#include "ConfigManifest.hpp"
 #include "JsonPatch.hpp"
 
 /**

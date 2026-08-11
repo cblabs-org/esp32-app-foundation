@@ -1,0 +1,10 @@
+{
+  "name": "EventBus",
+  "version": "0.1.0",
+  "description": "Thread-safe publish/subscribe event bus built on esp_event",
+  "build": {
+    "flags": [
+      "-I../../include"
+    ]
+  }
+}

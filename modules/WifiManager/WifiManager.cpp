@@ -38,12 +38,12 @@
  */
 
 #include "WifiManager.hpp"
-#include "../ConfigManager/ConfigManager.hpp"
-#include "../KeyManager/KeyManager.hpp"
-#include "../MCPServer/MCPToolRegistry.hpp"
-#include "../../include/utils/Periodic.hpp"
-#include "../EventBus/EventBus.hpp"
-#include "../../include/interfaces/ITickable.hpp"
+#include "ConfigManager.hpp"
+#include "KeyManager.hpp"
+#include "MCPToolRegistry.hpp"
+#include "utils/Periodic.hpp"
+#include "EventBus.hpp"
+#include "interfaces/ITickable.hpp"
 
 #include <PsychicHttp.h>
 #include <ArduinoJson.h>
@@ -52,7 +52,7 @@
 #include "esp_wifi.h"
 
 #include "platform/LogShim.h"
-#include "../Logger/Logger.hpp"
+#include "Logger.hpp"
 
 static constexpr const char* TAG = "WifiManager";
 

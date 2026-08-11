@@ -20,7 +20,7 @@
 
 #pragma once
 
-#include "../../include/interfaces/IConfigGate.hpp"
+#include "interfaces/IConfigGate.hpp"
 #include "WifiManager.hpp"
 
 /**

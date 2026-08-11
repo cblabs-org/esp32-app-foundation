@@ -1,0 +1,10 @@
+{
+  "name": "WifiManager",
+  "version": "0.1.0",
+  "description": "WiFi connection manager with AP fallback and captive portal",
+  "build": {
+    "flags": [
+      "-I../../include"
+    ]
+  }
+}

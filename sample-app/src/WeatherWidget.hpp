@@ -33,6 +33,7 @@ private:
     static constexpr int TEXT_GAP    =  4;  ///< Gap between temperature and condition labels
 
 public:
+    /** @brief Constructs the WeatherWidget, initialising owned LabelWidgets with default coordinates. */
     WeatherWidget();
 
     /**

@@ -1,0 +1,12 @@
+{
+  "name": "KeyManager",
+  "version": "0.1.0",
+  "description": "API key and secret management with encrypted storage",
+  "dependencies": {
+    "DeviceCrypto": "*",
+    "ConfigManager": "*"
+  },
+  "build": {
+    "flags": ["-I../../include"]
+  }
+}

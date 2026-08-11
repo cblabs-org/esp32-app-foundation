@@ -35,12 +35,12 @@
 #include "platform/LogShim.h"
 
 // KeyManager is needed for addKey/getKeyById/deleteKey in WO2 crypto helpers.
-#include "../KeyManager/KeyManager.hpp"
+#include "KeyManager.hpp"
 
 // ConfigManager is needed for saveModuleConfig() in POST /api/auth/password.
 // ConfigManager is needed for saveModuleConfig() in generateAndStoreCert().
-#include "../ConfigManager/ConfigManager.hpp"
-#include "../ConfigManager/ConfigRoot.hpp"
+#include "ConfigManager.hpp"
+#include "ConfigRoot.hpp"
 
 #include <mbedtls/asn1write.h>
 #include <mbedtls/oid.h>

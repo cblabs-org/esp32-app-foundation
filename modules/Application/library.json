@@ -7,7 +7,18 @@
     "type": "git",
     "url": "https://github.com/matthewmcneill/esp32-app-foundation"
   },
+  "dependencies": {
+    "EventBus": "*",
+    "DataManager": "*",
+    "WebServer": "*",
+    "ConfigManager": "*",
+    "WifiManager": "*",
+    "KeyManager": "*",
+    "AuthManager": "*",
+    "DeviceCrypto": "*"
+  },
   "build": {
-    "flags": ["-I../../include"]
+    "flags": ["-I../../include"],
+    "extraScript": "exclude_on_native.py"
   }
 }

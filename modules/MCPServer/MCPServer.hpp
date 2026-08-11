@@ -49,9 +49,9 @@
 
 #include "MCPToolRegistry.hpp"
 #include "MCPBuiltinTools.hpp"
-#include "../../include/interfaces/ITickable.hpp"
-#include "../../include/interfaces/IWebContributor.hpp"
-#include "../../include/interfaces/IConfigurable.hpp"
+#include "interfaces/ITickable.hpp"
+#include "interfaces/IWebContributor.hpp"
+#include "interfaces/IConfigurable.hpp"
 
 // Forward-declare to avoid pulling in the full headers
 class IMCPContributor;

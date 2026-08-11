@@ -66,15 +66,15 @@ static constexpr const char* TAG = "OTAUpdateManager";
 #include "esp_task_wdt.h"
 #include <inttypes.h>
 #include <freertos/idf_additions.h>
-#include "../Application/Application.hpp"
+#include "Application.hpp"
 
-#include "../../lib/OTACerts/OTACerts.h"
-#include "../../lib/OTADownloadEngine/OTADownloadEngine.hpp"
-#include "../../lib/OTADownloadEngine/MbedTLSSignatureVerifier.hpp"
-#include "../../include/utils/Periodic.hpp"
-#include "../../include/interfaces/IWebContributor.hpp"
-#include "../../lib/OTAManifest/OTAManifest.hpp"
-#include "../../modules/MCPServer/MCPToolRegistry.hpp"
+#include "OTACerts.h"
+#include "OTADownloadEngine.hpp"
+#include "MbedTLSSignatureVerifier.hpp"
+#include "utils/Periodic.hpp"
+#include "interfaces/IWebContributor.hpp"
+#include "OTAManifest.hpp"
+#include "MCPToolRegistry.hpp"
 
 // ---------------------------------------------------------------------------
 // Global instance — REMOVED (Application now owns _otaManager)
