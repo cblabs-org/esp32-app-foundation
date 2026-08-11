@@ -1,0 +1,8 @@
+{
+  "name": "PngWriter",
+  "version": "1.0.0",
+  "description": "Streaming PNG encoder library with ROM tdefl DEFLATE compression support",
+  "keywords": ["png", "encoder", "graphics"],
+  "frameworks": ["arduino", "espidf"],
+  "platforms": ["espressif32"]
+}

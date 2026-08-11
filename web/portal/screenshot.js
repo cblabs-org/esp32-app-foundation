@@ -1,6 +1,6 @@
 // web/portal/screenshot.js
-// Display → Screenshot sub-pill — Live display framebuffer capture.
-// Captures raw U8G2 buffer, renders to canvas, supports zoom and download.
+// Display → Screenshot sub-pill — Live display PNG screenshot capture.
+// Captures PNG image, renders to canvas with zoom, supports download.
 
 (function() {
   const container = document.getElementById('tab-screenshot');
@@ -16,7 +16,7 @@
         <button id="btn-ss-capture" style="flex:1;">Capture</button>
         <button id="btn-ss-download" class="outline" style="flex:1;" disabled>Download PNG</button>
       </div>
-      <div style="display:flex; align-items:center; gap:8px; margin-bottom:0.5rem;">
+      <div style="display:flex; align-items:center; gap:8px; margin-bottom:0.75rem;">
         <label style="font-size:0.8rem; color:var(--text-muted);">Zoom:</label>
         <button class="btn-ss-zoom" data-zoom="1" style="padding:0.25rem 0.5rem; font-size:0.75rem;">1×</button>
         <button class="btn-ss-zoom active" data-zoom="2" style="padding:0.25rem 0.5rem; font-size:0.75rem;">2×</button>
@@ -25,14 +25,6 @@
         <label style="font-size:0.8rem; color:var(--text-muted);">
           <input type="checkbox" id="ss-auto-refresh" /> Auto (2s)
         </label>
-      </div>
-      <div style="display:flex; align-items:center; gap:8px; margin-bottom:0.75rem;">
-        <label style="font-size:0.8rem; color:var(--text-muted); white-space:nowrap;">Pixel colour:</label>
-        <button class="btn-ss-colour outline" data-colour="#FFB300" style="padding:0.2rem 0.6rem; font-size:0.75rem;">Amber</button>
-        <button class="btn-ss-colour outline" data-colour="#FFFFFF" style="padding:0.2rem 0.6rem; font-size:0.75rem;">White</button>
-        <button class="btn-ss-colour outline" data-colour="#00FF88" style="padding:0.2rem 0.6rem; font-size:0.75rem;">Green</button>
-        <input type="color" id="ss-colour-picker" value="#FFB300"
-          style="width:28px; height:28px; padding:0; border:none; border-radius:4px; cursor:pointer; background:none;" title="Custom colour">
       </div>
       <div id="ss-canvas-wrapper" style="overflow:auto; background:var(--bg); border:1px solid var(--border); border-radius:6px; padding:8px; text-align:center;">
         <canvas id="ss-canvas" style="image-rendering:pixelated;"></canvas>
@@ -49,7 +41,8 @@
   let displayHeight = 0;
   let autoRefreshInterval = null;
   let hasCapture = false;
-  let pixelColour = '#FFB300';  // Default: amber (closest to real OLED)
+  let currentBlob = null;
+  let currentImage = null;
 
   const canvas = document.getElementById('ss-canvas');
   const ctx = canvas.getContext('2d');
@@ -70,22 +63,35 @@
         throw new Error('HTTP ' + response.status);
       }
 
-      // Read display dimensions from response headers
-      const w = parseInt(response.headers.get('X-Display-Width') || '256', 10);
-      const h = parseInt(response.headers.get('X-Display-Height') || '64', 10);
-      displayWidth = w;
-      displayHeight = h;
+      const wHeader = response.headers.get('X-Display-Width');
+      const hHeader = response.headers.get('X-Display-Height');
+      const headerW = wHeader ? parseInt(wHeader, 10) : 0;
+      const headerH = hHeader ? parseInt(hHeader, 10) : 0;
 
-      // Read the raw buffer
-      const buffer = await response.arrayBuffer();
-      const bytes = new Uint8Array(buffer);
+      const blob = await response.blob();
+      currentBlob = blob;
 
-      // Render to canvas
-      renderBuffer(bytes, w, h);
+      const img = new Image();
+      const url = URL.createObjectURL(blob);
 
-      hasCapture = true;
-      downloadBtn.disabled = false;
-      infoEl.textContent = w + '×' + h + ' · ' + bytes.length + ' bytes · ' + new Date().toLocaleTimeString();
+      await new Promise((resolve, reject) => {
+        img.onload = () => {
+          URL.revokeObjectURL(url);
+          currentImage = img;
+          displayWidth = headerW || img.naturalWidth || img.width;
+          displayHeight = headerH || img.naturalHeight || img.height;
+          renderImage();
+          hasCapture = true;
+          downloadBtn.disabled = false;
+          infoEl.textContent = displayWidth + '×' + displayHeight + ' · ' + blob.size + ' bytes · ' + new Date().toLocaleTimeString();
+          resolve();
+        };
+        img.onerror = () => {
+          URL.revokeObjectURL(url);
+          reject(new Error('Failed to decode image'));
+        };
+        img.src = url;
+      });
 
     } catch (error) {
       infoEl.innerHTML = '<span style="color:var(--error);">Capture failed: ' + error.message + '</span>';
@@ -96,37 +102,14 @@
   }
 
   // -------------------------------------------------------------------------
-  // Render U8G2 buffer to canvas
-  // U8G2 stores pixels in vertical-byte / page format:
-  //   Each byte represents 8 vertical pixels (LSB = top).
-  //   Buffer layout: width * (height / 8) bytes, scanned left-to-right,
-  //   then top-to-bottom in 8-pixel-high pages.
+  // Render PNG image to canvas at current zoom level
   // -------------------------------------------------------------------------
-  function renderBuffer(bytes, w, h) {
-    canvas.width = w * currentZoom;
-    canvas.height = h * currentZoom;
-    ctx.fillStyle = '#000';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    const pagesH = Math.ceil(h / 8);
-
-    for (let page = 0; page < pagesH; page++) {
-      for (let x = 0; x < w; x++) {
-        const byteIndex = page * w + x;
-        if (byteIndex >= bytes.length) break;
-        const b = bytes[byteIndex];
-
-        for (let bit = 0; bit < 8; bit++) {
-          const y = page * 8 + bit;
-          if (y >= h) break;
-
-          if (b & (1 << bit)) {
-            ctx.fillStyle = pixelColour;
-            ctx.fillRect(x * currentZoom, y * currentZoom, currentZoom, currentZoom);
-          }
-        }
-      }
-    }
+  function renderImage() {
+    if (!currentImage) return;
+    canvas.width = displayWidth * currentZoom;
+    canvas.height = displayHeight * currentZoom;
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(currentImage, 0, 0, canvas.width, canvas.height);
   }
 
   // -------------------------------------------------------------------------
@@ -141,38 +124,11 @@
       btn.classList.add('active');
 
       // Re-render if we have a capture
-      if (hasCapture) {
-        // Re-fetch and render to apply new zoom
-        captureScreenshot();
+      if (hasCapture && currentImage) {
+        renderImage();
       }
     });
   });
-
-  // -------------------------------------------------------------------------
-  // Pixel colour controls
-  // -------------------------------------------------------------------------
-  const colourPicker = document.getElementById('ss-colour-picker');
-
-  function setPixelColour(hex) {
-    pixelColour = hex;
-    colourPicker.value = hex;
-    // Highlight matching preset if any
-    container.querySelectorAll('.btn-ss-colour').forEach(b => {
-      b.classList.toggle('btn-ss-colour--active', b.getAttribute('data-colour').toUpperCase() === hex.toUpperCase());
-    });
-    if (hasCapture) captureScreenshot();
-  }
-
-  // Wire preset buttons
-  container.querySelectorAll('.btn-ss-colour').forEach(btn => {
-    btn.addEventListener('click', () => setPixelColour(btn.getAttribute('data-colour')));
-  });
-
-  // Wire custom colour picker
-  colourPicker.addEventListener('input', (e) => setPixelColour(e.target.value));
-
-  // Set initial active preset (Amber)
-  setPixelColour(pixelColour);
 
   // -------------------------------------------------------------------------
   // Capture button
@@ -183,15 +139,13 @@
   // Download PNG
   // -------------------------------------------------------------------------
   downloadBtn.addEventListener('click', () => {
-    if (!hasCapture) return;
-    canvas.toBlob(blob => {
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'screenshot-' + new Date().toISOString().slice(0, 19).replace(/:/g, '-') + '.png';
-      a.click();
-      URL.revokeObjectURL(url);
-    }, 'image/png');
+    if (!hasCapture || !currentBlob) return;
+    const url = URL.createObjectURL(currentBlob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'screenshot-' + new Date().toISOString().slice(0, 19).replace(/:/g, '-') + '.png';
+    a.click();
+    URL.revokeObjectURL(url);
   });
 
   // -------------------------------------------------------------------------

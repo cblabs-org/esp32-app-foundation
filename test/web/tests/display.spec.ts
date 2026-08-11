@@ -274,16 +274,15 @@ test.describe('Display Screenshot Tab', () => {
   test.beforeEach(async ({ page }) => {
     await bootPortal(page);
     await page.route('**/api/display/screenshot', route => {
-      const dummyBuffer = Buffer.alloc(240 * 240 * 2);
+      const pngBuffer = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64');
       route.fulfill({
         status: 200,
-        contentType: 'application/octet-stream',
+        contentType: 'image/png',
         headers: {
           'X-Display-Width': '240',
           'X-Display-Height': '240',
-          'X-Display-Format': 'RGB565',
         },
-        body: dummyBuffer,
+        body: pngBuffer,
       });
     });
   });

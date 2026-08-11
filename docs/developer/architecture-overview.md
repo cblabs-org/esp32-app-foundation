@@ -191,6 +191,7 @@ Application modules interact with framework subsystems by implementing one or mo
 | [IDataSource](../../include/interfaces/IDataSource.hpp) | Scheduled background data fetch worker managed by `DataManager`. | `fetchUpdate()` |
 | [IStatusReporter](../../include/interfaces/IStatusReporter.hpp) | Displays boot-phase progress status and unrecoverable errors. | `reportStatus(const char*, float)` |
 | [IBootReporter](../../modules/Application/interfaces/IBootReporter.hpp) | Early hardware initialisation reporter (extends `IStatusReporter`). | `beginEarly()` |
+| [IDisplayModule](../../include/interfaces/IDisplayModule.hpp) | Unified display provider contract for geometry, brightness, PNG capture, and system state. | `capturePNG(Print&)` |
 | [IDisplayBoard](../../include/interfaces/IDisplayBoard.hpp) | Renders a telemetry pane inside the monochrome display carousel. | `render(U8G2&)` |
 | [IOTAVerifier](../../include/interfaces/IOTAVerifier.hpp) | Streaming cryptographic firmware verification for OTA updates. | `verify(const uint8_t*, size_t)` |
 

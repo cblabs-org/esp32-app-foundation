@@ -8,7 +8,7 @@
  * Module: modules/mcpServer/MCPBuiltinTools.hpp
  * Description: Declaration of the built-in MCP tool registration function.
  *              These foundation-level tools (system_info, get_config, set_config,
- *              reboot, get_logs, list_tools, capture_display) are always available
+ *              reboot, get_logs, list_tools) are always available
  *              regardless of which application uses the framework. The MCPServer
  *              calls registerAll() during begin() before any contributor registration.
  *
@@ -22,8 +22,6 @@
  */
 
 #pragma once
-
-#include "../../include/types/DisplayInfo.hpp"
 
 // Forward declarations — avoid pulling in full headers for interface-only usage
 class MCPToolRegistry;
@@ -39,33 +37,18 @@ class TimeManager;
  */
 namespace mcpBuiltinTools {
 
-    // DisplayInfo is now defined in include/types/DisplayInfo.hpp
-
     /**
      * @brief Register all foundation-level MCP tools into the registry.
      *
      * Registers 7 tools: system_info, get_config, set_config, reboot,
-     * get_logs, list_tools, and capture_display. The capture_display tool
-     * is null-safe — it returns a descriptive error if no display is registered.
+     * get_logs, get_time, list_tools.
      *
      * @param registry      The MCPToolRegistry to register tools into.
      * @param configManager Pointer to the ConfigManager (nullable if unavailable).
-     * @param displayInfo   Optional display descriptor (nullable if no display).
+     * @param timeManager   Pointer to the TimeManager (nullable if unavailable).
      */
     void registerAll(MCPToolRegistry& registry,
                      ConfigManager* configManager,
-                     const DisplayInfo* displayInfo = nullptr,
                      TimeManager* timeManager = nullptr);
-
-    /**
-     * @brief Update the display info after initial registration.
-     *
-     * Allows late-binding the framebuffer pointer when the display module
-     * initialises after MCPServer::begin(). The capture_display tool
-     * reads from this stored info on each invocation.
-     *
-     * @param info The populated display descriptor.
-     */
-    void setDisplayInfo(const DisplayInfo& info);
 
 } // namespace mcpBuiltinTools

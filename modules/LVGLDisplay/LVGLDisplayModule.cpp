@@ -19,6 +19,9 @@
 #include "MCPToolRegistry.hpp"
 #include "../Application/Application.hpp"
 #include <base64.h>
+#include <mbedtls/base64.h>
+#include <vector>
+#include "utils/BufferStream.h"
 #include <cstdio>
 #include <PsychicHttp.h>
 #include "esp_heap_caps.h"
@@ -255,7 +258,64 @@ void LVGLDisplayModule::tick(uint32_t now) {
 }
 
 // -----------------------------------------------------------------------------
-// IStatusReporter
+// IDisplayModule
+// -----------------------------------------------------------------------------
+
+uint16_t LVGLDisplayModule::getDisplayWidth() const {
+    if (_display != nullptr) {
+        return static_cast<uint16_t>(lv_display_get_horizontal_resolution(_display));
+    }
+    return _adapter.getScreenWidth();
+}
+
+uint16_t LVGLDisplayModule::getDisplayHeight() const {
+    if (_display != nullptr) {
+        return static_cast<uint16_t>(lv_display_get_vertical_resolution(_display));
+    }
+    return _adapter.getScreenHeight();
+}
+
+bool LVGLDisplayModule::isDimmed() const {
+    return _screensaver.isDimmed();
+}
+
+bool LVGLDisplayModule::isSleeping() const {
+    return _screensaver.isBlanked();
+}
+
+bool LVGLDisplayModule::capturePNG(Print& sink) {
+    uint8_t* snapBuffer = nullptr;
+    size_t snapSize = 0;
+    uint16_t w = 0, h = 0;
+
+    if (!captureSnapshot(snapBuffer, snapSize, w, h) || !snapBuffer) {
+        return false;
+    }
+
+    bool ok = PngWriter::writeRGB565ToRGB888(sink, w, h, reinterpret_cast<const uint16_t*>(snapBuffer));
+    freeSnapshot(snapBuffer);
+    return ok;
+}
+
+void LVGLDisplayModule::showSystemState(const SystemDisplayParams& params) {
+    if (params.state != nullptr && strcmp(params.state, DisplayState::Normal) == 0) {
+        restorePriorScreen();
+    } else if (params.state != nullptr && strcmp(params.state, DisplayState::Error) == 0) {
+        showError(params.title ? params.title : "Error",
+                  params.message ? params.message : "");
+    } else if (params.state != nullptr && strcmp(params.state, DisplayState::Configuring) == 0) {
+        reportStatus(params.message ? params.message : "Configuring...",
+                     params.progress);
+    } else {
+        // Unknown state — generic overlay using error screen
+        showError(params.title ? params.title : "System",
+                  params.message ? params.message : "");
+    }
+    resetActivity();
+}
+
+// -----------------------------------------------------------------------------
+// IStatusReporter / Inherited Methods
 // -----------------------------------------------------------------------------
 
 void LVGLDisplayModule::reportStatus(const char* message, float progress) {
@@ -780,27 +840,23 @@ void LVGLDisplayModule::registerRoutes(PsychicHttpServer& server) {
         return ESP_OK;
     });
 
-    // GET /api/display/screenshot
+    // GET /api/display/screenshot — PNG framebuffer capture
     server.on("/api/display/screenshot", HTTP_GET, [this](PsychicRequest* request, PsychicResponse* response) {
-        uint8_t* buf = nullptr;
-        size_t size = 0;
-        uint16_t w = 0;
-        uint16_t h = 0;
 
-        if (!captureSnapshot(buf, size, w, h) || buf == nullptr) {
-            response->send(500, "application/json", "{\"error\":\"Framebuffer unavailable\"}");
+
+        BufferStream stream;
+        if (!capturePNG(stream) || stream.buffer.empty()) {
+            response->send(500, "application/json", "{\"error\":\"Screenshot capture failed\"}");
             return ESP_FAIL;
         }
 
         response->addHeader("Cache-Control", "no-cache, no-store, must-revalidate");
         response->addHeader("Pragma", "no-cache");
         response->addHeader("Expires", "0");
-        response->addHeader("X-Display-Width", String(static_cast<int>(w)).c_str());
-        response->addHeader("X-Display-Height", String(static_cast<int>(h)).c_str());
-        response->addHeader("X-Display-Format", "RGB565");
+        response->addHeader("X-Display-Width", String(getDisplayWidth()).c_str());
+        response->addHeader("X-Display-Height", String(getDisplayHeight()).c_str());
 
-        response->send(200, "application/octet-stream", buf, size);
-        freeSnapshot(buf);
+        response->send(200, "image/png", stream.buffer.data(), stream.buffer.size());
         return ESP_OK;
     });
 }
@@ -948,56 +1004,47 @@ void LVGLDisplayModule::registerMCPTools(MCPToolRegistry& registry) {
     );
 
     // --- Tool 3: capture_display (read-only) ---
+
+
+    JsonDocument captureSchema;
+    captureSchema["type"] = "object";
+    captureSchema["properties"].to<JsonObject>();
+
     registry.addTool(
         "capture_display",
-        "Capture a screenshot of the current display as base64-encoded RGB565 data",
+        "Capture current display buffer as a base64-encoded PNG image",
+        captureSchema,
         [](void* ctx, JsonObject& params, JsonObject& result) {
             auto* self = static_cast<LVGLDisplayModule*>(ctx);
             (void)params;
 
-            uint8_t* buf = nullptr;
-            size_t size = 0;
-            uint16_t w = 0;
-            uint16_t h = 0;
-
-            if (!self->captureSnapshot(buf, size, w, h) || buf == nullptr) {
-                result["error"] = "Failed to allocate snapshot buffer";
+            BufferStream stream;
+            if (!self->capturePNG(stream) || stream.buffer.empty()) {
+                result["error"] = "Failed to capture display buffer";
                 return;
             }
 
-            // Base64-encode the RGB565 framebuffer.
-            // Pre-allocate output buffer: base64 expands 3 bytes → 4 chars, plus padding.
-            // ~153 KB for a 240×240 RGB565 frame. Transient PSRAM allocation.
-            size_t b64Len = ((size + 2) / 3) * 4;
-            char* b64Buf = static_cast<char*>(heap_caps_malloc(b64Len + 1, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
-            if (b64Buf == nullptr) {
-                b64Buf = static_cast<char*>(malloc(b64Len + 1));
-            }
-            if (b64Buf == nullptr) {
-                self->freeSnapshot(buf);
-                result["error"] = "Failed to allocate base64 buffer";
+            size_t olen = 0;
+            mbedtls_base64_encode(nullptr, 0, &olen, stream.buffer.data(), stream.buffer.size());
+            if (olen == 0) {
+                result["error"] = "Base64 encoding length calculation failed";
                 return;
             }
 
-            size_t outPos = 0;
-            size_t offset = 0;
-            while (offset < size) {
-                size_t chunk = (size - offset > 48) ? 48 : (size - offset);
-                String b64Chunk = base64::encode(&buf[offset], chunk);
-                size_t chunkLen = b64Chunk.length();
-                memcpy(b64Buf + outPos, b64Chunk.c_str(), chunkLen);
-                outPos += chunkLen;
-                offset += chunk;
+            std::vector<unsigned char> b64buf(olen);
+            int ret = mbedtls_base64_encode(b64buf.data(), b64buf.size(), &olen,
+                                            stream.buffer.data(), stream.buffer.size());
+            if (ret != 0) {
+                result["error"] = "Base64 encoding failed";
+                return;
             }
-            b64Buf[outPos] = '\0';
+            b64buf.push_back(0); // Ensure null termination for ArduinoJson
 
-            result["format"] = "RGB565";
-            result["width"]  = w;
-            result["height"] = h;
-            result["data"]   = b64Buf;
-
-            free(b64Buf);
-            self->freeSnapshot(buf);
+            result["format"]   = "png";
+            result["width"]    = self->getDisplayWidth();
+            result["height"]   = self->getDisplayHeight();
+            result["image"]    = reinterpret_cast<char*>(b64buf.data());
+            result["encoding"] = "base64";
         },
         this,
         /* mutatesState = */ false

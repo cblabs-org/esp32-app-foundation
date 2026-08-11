@@ -179,9 +179,8 @@ The framework registers 7 built-in tools via `mcpBuiltinTools::registerAll()`. T
 | `reboot` | Restart the ESP32 device | Yes |
 | `get_logs` | Retrieve system logs (placeholder for future log ring-buffer) | No |
 | `list_tools` | Enumerate all registered MCP tools with names, descriptions, and schemas | No |
-| `capture_display` | Capture the display framebuffer as a base64-encoded XBM image | No |
 
-The `capture_display` tool is null-safe — it returns a descriptive error if no display is registered. Display info can be late-bound via `MCPServer::setDisplayInfo()` when the display module initialises after `MCPServer::begin()`.
+*(Note: The `capture_display` tool is no longer built-in; it is self-registered by display modules and returns base64 PNG).*
 
 ---
 

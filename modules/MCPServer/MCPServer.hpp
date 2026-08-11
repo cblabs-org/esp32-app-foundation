@@ -109,12 +109,6 @@ public:
     const MCPToolRegistry& getRegistry() const { return _registry; }
 
     /**
-     * @brief Late-bind display info for the capture_display tool.
-     * @param info Populated display descriptor with framebuffer pointer.
-     */
-    void setDisplayInfo(const DisplayInfo& info);
-
-    /**
      * @brief Query whether the MCP server is currently enabled.
      * @return true if the server is processing requests; false if disabled.
      */

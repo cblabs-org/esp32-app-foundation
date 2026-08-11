@@ -47,6 +47,10 @@
 #include "platform/LogShim.h"
 #include <cstring>
 #include <cstdio>
+#include <vector>
+#include "utils/BufferStream.h"
+#include <Print.h>
+#include <mbedtls/base64.h>
 
 static constexpr const char* TAG = "U8G2DisplayModule";
 
@@ -590,22 +594,52 @@ void U8G2DisplayModule::resetConfig() {
 // =============================================================================
 // MCP display info accessor
 // =============================================================================
+// IDisplayModule interface implementation
+// =============================================================================
 
-/**
- * @brief Return a DisplayInfo struct with the live U8G2 framebuffer pointer.
- *
- * The buffer pointer remains valid for the lifetime of the U8G2 instance
- * (i.e. the entire program). Size is calculated from tile dimensions.
- *
- * @return Populated DisplayInfo (framebuffer is nullptr in native builds).
- */
-DisplayInfo U8G2DisplayModule::getDisplayInfo() {
-    DisplayInfo info;
-    info.framebuffer     = _u8g2.getBufferPtr();
-    info.framebufferSize = 8u * _u8g2.getBufferTileHeight() * _u8g2.getBufferTileWidth();
-    info.width           = _displayWidth;
-    info.height          = _displayHeight;
-    return info;
+uint16_t U8G2DisplayModule::getDisplayWidth() const {
+    return _displayWidth;
+}
+
+uint16_t U8G2DisplayModule::getDisplayHeight() const {
+    return _displayHeight;
+}
+
+bool U8G2DisplayModule::isDimmed() const {
+    return _screensaver.isDimmed();
+}
+
+bool U8G2DisplayModule::isSleeping() const {
+    return _screensaver.isBlanked();
+}
+
+bool U8G2DisplayModule::capturePNG(Print& sink) {
+    const uint8_t* buf = _u8g2.getBufferPtr();
+    if (!buf) {
+        return false;
+    }
+    return PngWriter::writeGrayscale1bppFromTiles(sink, _displayWidth, _displayHeight, buf);
+}
+
+void U8G2DisplayModule::showSystemState(const SystemDisplayParams& params) {
+    if (params.state != nullptr && strcmp(params.state, DisplayState::Normal) == 0) {
+        clearModal();
+    } else if (params.state != nullptr && strcmp(params.state, DisplayState::Error) == 0) {
+        _error.showError(params.message ? params.message : (params.title ? params.title : "Error"), true);
+        showModal(&_error);
+    } else if (params.state != nullptr && strcmp(params.state, DisplayState::Configuring) == 0) {
+        if (params.title != nullptr) {
+            _configuringStatusBoard.setActionableGateName(params.title);
+        }
+        if (params.message != nullptr) {
+            _configuringStatusBoard.setConnectionInfo("", params.message);
+        }
+        showBase(&_configuringStatusBoard);
+    } else {
+        _error.showError(params.message ? params.message : (params.title ? params.title : "System"), false);
+        showModal(&_error);
+    }
+    resetActivity();
 }
 
 // =============================================================================
@@ -922,25 +956,23 @@ void U8G2DisplayModule::registerRoutes(PsychicHttpServer& server) {
         }
     );
 
-    // --- GET /api/display/screenshot — raw framebuffer capture ---
+    // --- GET /api/display/screenshot — PNG framebuffer capture ---
     server.on("/api/display/screenshot", HTTP_GET, [this](PsychicRequest* request, PsychicResponse* response) {
-        uint8_t* buf = _u8g2.getBufferPtr();
-        if (buf == nullptr) {
-            response->send(500, "application/json", "{\"error\":\"Framebuffer unavailable\"}");
+
+
+        BufferStream stream;
+        if (!capturePNG(stream) || stream.buffer.empty()) {
+            response->send(500, "application/json", "{\"error\":\"Screenshot capture failed\"}");
             return ESP_FAIL;
         }
-
-        // U8G2 buffer: 8 pixels per tile row × tileWidth × tileHeight
-        size_t bufferSize = 8 * _u8g2.getBufferTileWidth() * _u8g2.getBufferTileHeight();
 
         response->addHeader("Cache-Control", "no-cache, no-store, must-revalidate");
         response->addHeader("Pragma", "no-cache");
         response->addHeader("Expires", "0");
-        // Pass display geometry so the JS client can render correctly
-        response->addHeader("X-Display-Width", String(_displayWidth).c_str());
-        response->addHeader("X-Display-Height", String(_displayHeight).c_str());
+        response->addHeader("X-Display-Width", String(getDisplayWidth()).c_str());
+        response->addHeader("X-Display-Height", String(getDisplayHeight()).c_str());
 
-        response->send(200, "application/octet-stream", buf, bufferSize);
+        response->send(200, "image/png", stream.buffer.data(), stream.buffer.size());
         return ESP_OK;
     });
 }
@@ -1098,7 +1130,55 @@ void U8G2DisplayModule::registerMCPTools(MCPToolRegistry& registry) {
         /* mutatesState = */ true
     );
 
-    ESP_LOGI(TAG, "Registered MCP tools: display_status, display_control");
+    // --- Tool 3: capture_display (read-only) ---
+    // Returns a base64-encoded PNG screenshot of the live display framebuffer.
+
+
+    JsonDocument captureSchema;
+    captureSchema["type"] = "object";
+    captureSchema["properties"].to<JsonObject>();
+
+    registry.addTool(
+        "capture_display",
+        "Capture current display buffer as a base64-encoded PNG image",
+        captureSchema,
+        [](void* ctx, JsonObject& params, JsonObject& result) {
+            auto* self = static_cast<U8G2DisplayModule*>(ctx);
+            (void)params;
+
+            BufferStream stream;
+            if (!self->capturePNG(stream) || stream.buffer.empty()) {
+                result["error"] = "Failed to capture display buffer";
+                return;
+            }
+
+            size_t olen = 0;
+            mbedtls_base64_encode(nullptr, 0, &olen, stream.buffer.data(), stream.buffer.size());
+            if (olen == 0) {
+                result["error"] = "Base64 encoding length calculation failed";
+                return;
+            }
+
+            std::vector<unsigned char> b64buf(olen);
+            int ret = mbedtls_base64_encode(b64buf.data(), b64buf.size(), &olen,
+                                            stream.buffer.data(), stream.buffer.size());
+            if (ret != 0) {
+                result["error"] = "Base64 encoding failed";
+                return;
+            }
+            b64buf.push_back(0); // Ensure null termination for ArduinoJson
+
+            result["format"]   = "png";
+            result["width"]    = self->getDisplayWidth();
+            result["height"]   = self->getDisplayHeight();
+            result["image"]    = reinterpret_cast<char*>(b64buf.data());
+            result["encoding"] = "base64";
+        },
+        this,  // context: U8G2DisplayModule*
+        /* mutatesState = */ false
+    );
+
+    ESP_LOGI(TAG, "Registered MCP tools: display_status, display_control, capture_display");
 }
 
 // =============================================================================

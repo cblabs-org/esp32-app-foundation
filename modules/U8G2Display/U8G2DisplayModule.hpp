@@ -83,7 +83,8 @@
 #include "interfaces/IWebContributor.hpp"
 #include "interfaces/IMCPContributor.hpp"
 #include "interfaces/IDisplayBoard.hpp"
-#include "interfaces/IBootReporter.hpp"
+#include "interfaces/IDisplayModule.hpp"
+#include "PngWriter.h"
 #include "boards/BootBoard.hpp"
 #include "CarouselEngine.hpp"
 #include "ScreensaverController.hpp"
@@ -94,7 +95,6 @@
 #include "boards/ScreensaverBoard.hpp"
 #include "boards/ConfiguringStatusBoard.hpp"
 #include "boards/GenericGateHelperBoard.hpp"
-#include "../../include/types/DisplayInfo.hpp"
 #include "../../include/utils/Periodic.hpp"
 #include <types/BootBranding.h>
 #include <types/U8G2BootLogo.h>
@@ -183,7 +183,7 @@ namespace U8G2DisplayEvents {
  * Subscribes to EventBus topics "ota.progress" and "display.message" for
  * runtime integration with other framework modules.
  */
-class U8G2DisplayModule : public ITickable, public IConfigurable, public IWebContributor, public IMCPContributor, public IBootReporter {
+class U8G2DisplayModule : public ITickable, public IConfigurable, public IWebContributor, public IMCPContributor, public IDisplayModule {
 public:
     // -------------------------------------------------------------------------
     // Construction & Lifecycle
@@ -275,7 +275,7 @@ public:
      *
      * If the display was sleeping, this wakes it up and restores brightness.
      */
-    void resetActivity();
+    void resetActivity() override;
 
     /**
      * @brief Return the board currently being rendered, considering all layers.
@@ -441,7 +441,7 @@ public:
      * @brief Set the display brightness and apply to hardware.
      * @param brightness Brightness level (0–255).
      */
-    void setBrightness(uint8_t brightness);
+    void setBrightness(uint8_t brightness) override;
 
     /**
      * @brief Set the screen flip mode and apply to hardware.
@@ -482,7 +482,7 @@ public:
      * @brief Get the current display brightness level.
      * @return Brightness level (0–255).
      */
-    uint8_t getBrightness() const { return _brightness; }
+    uint8_t getBrightness() const override { return _brightness; }
 
     /**
      * @brief Get the current screen flip state.
@@ -496,16 +496,18 @@ public:
      */
     uint8_t getClockFontSize() const;
 
-    /**
-     * @brief Get the display info struct for MCP capture_display wiring.
-     *
-     * Returns a populated DisplayInfo with the U8G2 framebuffer pointer,
-     * size, and dimensions. Only valid after bootstrapHardware() has been
-     * called (the buffer is allocated during U8G2 begin()).
-     *
-     * @return DisplayInfo struct with live framebuffer pointer.
-     */
-    DisplayInfo getDisplayInfo();
+
+
+    // -------------------------------------------------------------------------
+    // IDisplayModule — Geometry, Screensaver state, PNG capture, System state
+    // -------------------------------------------------------------------------
+
+    uint16_t getDisplayWidth() const override;
+    uint16_t getDisplayHeight() const override;
+    bool isDimmed() const override;
+    bool isSleeping() const override;
+    bool capturePNG(Print& sink) override;
+    void showSystemState(const SystemDisplayParams& params) override;
 
 private:
     // -------------------------------------------------------------------------
