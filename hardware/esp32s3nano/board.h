@@ -104,7 +104,7 @@ constexpr int8_t PIN_DISPLAY_RST  = PIN_UNASSIGNED;
 
 // ── Button configuration ────────────────────────────────────────────────────
 #ifdef WITH_BUTTONS
-#include "ButtonConfig.h"
+#include "ButtonModule/ButtonConfig.h"
 
 constexpr int8_t PIN_MODE_BUTTON = 8;     // INPUT_PULLUP capable
 #define PIN_MODE_BUTTON PIN_MODE_BUTTON

@@ -169,7 +169,7 @@ constexpr int8_t PIN_AUX_I2C_SCL  = 39;
 //
 // GPIO Example:
 //   #ifdef WITH_BUTTONS
-//   #include "ButtonConfig.h"
+//   #include "ButtonModule/ButtonConfig.h"
 //   constexpr int8_t PIN_MODE_BUTTON = 34;
 //   #define PIN_MODE_BUTTON PIN_MODE_BUTTON
 //   constexpr BoardButton BOARD_BUTTONS[] = {
@@ -216,7 +216,7 @@ constexpr int8_t PIN_AUX_I2C_SCL  = 39;
 // Example (EC11 encoder on GPIO 45/42, 2 steps per detent):
 //
 //   #ifdef WITH_ENCODER
-//   #include "EncoderConfig.h"
+//   #include "EncoderModule/EncoderConfig.h"
 //   static constexpr BoardEncoder BOARD_ENCODERS[] = {
 //       {
 //           .id = "main",

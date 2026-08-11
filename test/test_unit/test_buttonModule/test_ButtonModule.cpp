@@ -15,7 +15,7 @@
 #include <cstring>
 #include <string>
 #include <vector>
-#include "ButtonConfig.h"
+#include "ButtonModule/ButtonConfig.h"
 #include "EventBus.hpp"
 
 // Lightweight Application stub providing getEventBus() for ButtonModule::begin()

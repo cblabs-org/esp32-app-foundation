@@ -76,7 +76,7 @@ constexpr int8_t PIN_DISPLAY_MOSI = PIN_UNASSIGNED;
 
 // ── Button configuration ────────────────────────────────────────────────────
 #ifdef WITH_BUTTONS
-#include "ButtonConfig.h"
+#include "ButtonModule/ButtonConfig.h"
 
 constexpr BoardButton BOARD_BUTTONS[] = {};
 constexpr size_t BOARD_BUTTON_COUNT = 0;
@@ -84,7 +84,7 @@ constexpr size_t BOARD_BUTTON_COUNT = 0;
 #endif
 
 #ifdef WITH_ENCODER
-#include "EncoderConfig.h"
+#include "EncoderModule/EncoderConfig.h"
 // No encoder hardware on native — empty descriptor
 static constexpr BoardEncoder BOARD_ENCODERS[] = {};
 static constexpr size_t BOARD_ENCODER_COUNT = 0;

@@ -5,7 +5,7 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  *
- * Module: include/EncoderConfig.h
+ * Module: modules/EncoderModule/EncoderConfig.h
  * Description: Framework-owned type definitions for hardware rotary encoder descriptors,
  *              acceleration parameters, delta mode dispatch, and EventBus payload structures.
  *
