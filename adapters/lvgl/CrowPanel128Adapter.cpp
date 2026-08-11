@@ -111,8 +111,18 @@ void CrowPanel128Adapter::_buttonEventCallback(const char* topic, const void* pa
 }
 
 lv_display_t* CrowPanel128Adapter::createDisplay() {
+    // Assert the panel power-enable rails BEFORE initialising the GC9A01.
+    // The CrowPanel 1.28" gates LCD power behind GPIO1/GPIO2 (PIN_LCD_PWR_EN1/2);
+    // both must be driven HIGH or the panel stays unpowered and the screen is
+    // black at any backlight level. Mirrors the Elecrow factory example, which
+    // sets GPIO1/GPIO2 HIGH immediately before gfx.init(). (RFC #50 must-fix.)
+    pinMode(PIN_LCD_PWR_EN1, OUTPUT);
+    digitalWrite(PIN_LCD_PWR_EN1, HIGH);
+    pinMode(PIN_LCD_PWR_EN2, OUTPUT);
+    digitalWrite(PIN_LCD_PWR_EN2, HIGH);
+
     _gfx.init();
-    
+
     lv_display_t* disp = lv_display_create(240, 240);
     lv_display_set_user_data(disp, this);
     lv_display_set_flush_cb(disp, _flushCallback);
@@ -123,7 +133,11 @@ lv_display_t* CrowPanel128Adapter::createDisplay() {
 void CrowPanel128Adapter::_flushCallback(lv_display_t* disp, const lv_area_t* area, uint8_t* px_map) {
     auto* adapter = static_cast<CrowPanel128Adapter*>(lv_display_get_user_data(disp));
     if (adapter) {
-        adapter->_gfx.pushImage(area->x1, area->y1, area->x2 - area->x1 + 1, area->y2 - area->y1 + 1, (lgfx::swap565_t*)px_map);
+        // LVGL 9 renders RGB565 in native (little-endian) byte order and lv_conf.h sets no
+        // colour swap, so the buffer is lgfx::rgb565_t. Pushing it as swap565_t byte-swaps every
+        // pixel and scrambles the colours on-panel. Matches the Elecrow factory example, which
+        // pushes (lgfx::rgb565_t*). (WO7 D3.)
+        adapter->_gfx.pushImage(area->x1, area->y1, area->x2 - area->x1 + 1, area->y2 - area->y1 + 1, (lgfx::rgb565_t*)px_map);
     }
     lv_display_flush_ready(disp);
 }

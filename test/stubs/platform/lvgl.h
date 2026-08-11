@@ -22,6 +22,7 @@
 #include <cstring>
 #include <cstdlib>
 #include <cstdarg>
+#include <string>
 
 // --- Basic Types & Compatibility ---
 typedef int32_t lv_coord_t;
@@ -70,6 +71,7 @@ struct lv_obj_t {
     int32_t height = 0;
     int32_t x = 0;
     int32_t y = 0;
+    std::string text;  ///< label text storage (stateful stub for value assertions)
 };
 
 struct lv_timer_t {
@@ -129,6 +131,11 @@ typedef struct {
 } lv_image_dsc_t;
 
 typedef lv_image_dsc_t lv_img_dsc_t;
+
+// Declares an image descriptor symbol (as the generated SLS ui/*.h expects).
+#ifndef LV_IMG_DECLARE
+#define LV_IMG_DECLARE(var_name) extern const lv_image_dsc_t var_name;
+#endif
 
 // --- Enums & Constants ---
 typedef enum {
@@ -350,6 +357,7 @@ inline uint16_t lv_color_to_u16(lv_color_t color) {
 inline void lv_init(void) {}
 inline void lv_tick_inc(uint32_t tick_period) { (void)tick_period; }
 inline uint32_t lv_timer_handler(void) { return 5; }
+inline void lv_refr_now(lv_display_t* disp) { (void)disp; }
 inline uint32_t lv_tick_get(void) { return 0; }
 
 // Display Management
@@ -579,6 +587,11 @@ inline void lv_obj_clear_flag(lv_obj_t* obj, uint32_t flag) {
     if (obj) obj->flags &= ~flag;
 }
 
+// LVGL 9 renamed clear_flag → remove_flag; provide the current name.
+inline void lv_obj_remove_flag(lv_obj_t* obj, uint32_t flag) {
+    if (obj) obj->flags &= ~flag;
+}
+
 inline bool lv_obj_has_flag(const lv_obj_t* obj, uint32_t flag) {
     return obj ? ((obj->flags & flag) == flag) : false;
 }
@@ -617,7 +630,11 @@ inline lv_obj_t* lv_label_create(lv_obj_t* parent) {
 }
 
 inline void lv_label_set_text(lv_obj_t* label, const char* text) {
-    (void)label; (void)text;
+    if (label) label->text = (text != nullptr) ? text : "";
+}
+
+inline const char* lv_label_get_text(lv_obj_t* label) {
+    return label ? label->text.c_str() : "";
 }
 
 inline void lv_label_set_text_fmt(lv_obj_t* label, const char* fmt, ...) {
