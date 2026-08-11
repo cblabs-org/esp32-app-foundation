@@ -73,6 +73,7 @@
 class EventBus;
 class ConfigManager;
 class MCPToolRegistry;
+#include "DisplayServiceHelper.h"
 
 
 
@@ -438,5 +439,6 @@ private:
     unsigned long         _dimTimeoutMs = 150000;     ///< Inactivity dim timeout in ms (default 2.5 min)
     unsigned long         _blankTimeoutMs = 300000;   ///< Inactivity blank timeout in ms (default 5 min)
     ScreensaverController _screensaver;               ///< Screensaver state machine
+    DisplayServiceHelper  _serviceHelper{this};
 };
 

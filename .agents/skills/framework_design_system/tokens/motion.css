@@ -1,0 +1,16 @@
+/* ==========================================================================
+   MOTION — shared @keyframes referenced by components (spinners, pulses).
+   Names are prefixed af- (App Foundation) to avoid collisions downstream.
+   ========================================================================== */
+@keyframes af-spin { to { transform: rotate(360deg); } }
+
+@keyframes af-pulse {
+  0%   { transform: scale(1);   opacity: 1;   }
+  50%  { transform: scale(1.3); opacity: 0.7; }
+  100% { transform: scale(1);   opacity: 1;   }
+}
+
+@keyframes af-slide-up {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}

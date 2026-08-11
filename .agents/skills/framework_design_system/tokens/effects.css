@@ -1,0 +1,29 @@
+/* ==========================================================================
+   EFFECTS — shadows, transitions, blur, motion
+   The portal is shadow-light: elevation appears only on hover, overlays and
+   floating surfaces. Motion is quick and functional (0.15–0.3s ease).
+   ========================================================================== */
+:root {
+  /* Elevation */
+  --shadow-card-hover: 0 4px 12px rgba(0, 0, 0, 0.1);   /* interactive card lift (light) */
+  --shadow-card-hover-dark: 0 4px 12px rgba(0, 0, 0, 0.4);
+  --shadow-toggle-knob: 0 1px 3px rgba(0, 0, 0, 0.25);  /* toggle / theme knob           */
+  --shadow-toggle-active: 0 2px 8px rgba(0, 0, 0, 0.1); /* active theme-toggle segment   */
+  --shadow-dialog: 0 10px 25px rgba(0, 0, 0, 0.2);      /* modal                         */
+  --shadow-login: 0 8px 32px rgba(0, 0, 0, 0.3);        /* login / reboot cards          */
+
+  /* Scrim & blur (overlays) */
+  --scrim: rgba(0, 0, 0, 0.6);
+  --scrim-strong: rgba(0, 0, 0, 0.85);
+  --blur-backdrop: 4px;
+  --blur-login: 8px;
+
+  /* Transitions */
+  --transition-fast: 0.15s ease;   /* @kind other */ /* card lift, pill hover */
+  --transition-base: 0.2s ease;    /* @kind other */ /* buttons, inputs, theme btn */
+  --transition-slow: 0.3s ease;    /* @kind other */ /* theme swap, toggles, toasts */
+  --transition-progress: width 0.5s ease; /* @kind other */ /* progress-bar fill */
+
+  /* Press feedback */
+  --press-scale: 0.98;  /* @kind other */ /* buttons shrink slightly on :active */
+}

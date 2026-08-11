@@ -1,0 +1,12 @@
+/* ==========================================================================
+   ESP32 App Foundation — Design System entry point
+   Consumers link THIS one file. It is an import manifest only; all real
+   declarations live in the imported token files. No @font-face rules exist:
+   the portal ships zero webfonts (system stack by design).
+   ========================================================================== */
+@import "tokens/colors.css";
+@import "tokens/typography.css";
+@import "tokens/spacing.css";
+@import "tokens/radii.css";
+@import "tokens/effects.css";
+@import "tokens/motion.css";

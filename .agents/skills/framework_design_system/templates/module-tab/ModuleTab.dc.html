@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<!-- @template name="Portal Module Tab" description="Starter for an optional portal tab that a firmware module contributes at runtime (IWebContributor pattern)." -->
+<helmet>
+<script src="./ds-base.js"></script>
+<style>
+  html,body{margin:0}
+  body{font-family:var(--font-sans);background:var(--bg);color:var(--text)}
+  .frame{max-width:480px;margin:0 auto;padding:1rem 1rem 90px;min-height:100vh;box-sizing:border-box}
+  .title{margin:0 0 1.25rem;font-size:1.5rem;font-weight:800;letter-spacing:-.5px;color:var(--primary)}
+  .row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:.6rem 0;border-bottom:1px solid var(--border)}
+  .row:last-child{border-bottom:none}
+  .rt{font-size:.85rem;font-weight:600}
+  .rs{display:block;font-size:.75rem;color:var(--text-muted);margin-top:2px}
+</style>
+</helmet>
+<div class="frame">
+  <h2 class="title">{{ moduleName }}</h2>
+
+  <!-- Live status card -->
+  <x-import component-from-global-scope="NS.Card" header="Status" hint-size="100%,150px">
+    <x-import component-from-global-scope="NS.InfoRow" label="Module" value="{{ moduleName }}" hint-size="100%,32px"></x-import>
+    <x-import component-from-global-scope="NS.InfoRow" label="State" value="{{ stateLabel }}" hint-size="100%,32px"></x-import>
+    <x-import component-from-global-scope="NS.ProgressBar" label="Reading" value="{{ reading }}" max="100" valueText="{{ readingText }}" hint-size="100%,40px"></x-import>
+  </x-import>
+
+  <!-- Settings card -->
+  <x-import component-from-global-scope="NS.Card" header="Settings" hint-size="100%,120px">
+    <div class="row">
+      <div><span class="rt">Enable Module</span><span class="rs">Turn this feature on or off</span></div>
+      <x-import component-from-global-scope="NS.ToggleSwitch" checked="{{ enabled }}" onChange="{{ setEnabled }}" hint-size="48px,26px"></x-import>
+    </div>
+    <div class="row">
+      <div><span class="rt">Report Interval</span><span class="rs">How often the device publishes</span></div>
+      <x-import component-from-global-scope="NS.Badge" variant="subtle" hint-size="80px,24px">{{ intervalLabel }}</x-import>
+    </div>
+  </x-import>
+
+  <x-import component-from-global-scope="NS.Button" full="{{ true }}" onClick="{{ save }}" hint-size="100%,44px">Save Settings</x-import>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:480,&quot;height&quot;:760},&quot;moduleName&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;Sensor&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+class Component extends DCLogic {
+  state = { enabled: true, reading: 72 };
+  renderVals() {
+    const { enabled, reading } = this.state;
+    return {
+      moduleName: this.props.moduleName ?? 'Sensor',
+      enabled,
+      stateLabel: enabled ? 'Active' : 'Disabled',
+      reading,
+      readingText: reading + ' / 100 (' + reading + '%)',
+      intervalLabel: '30s',
+      setEnabled: (v) => this.setState({ enabled: v }),
+      save: () => { if (window.showToast) window.showToast('Settings saved.', 'success'); },
+    };
+  }
+}
+</script>
+</body>
+</html>

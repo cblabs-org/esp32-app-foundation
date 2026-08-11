@@ -149,6 +149,9 @@ bool LVGLDisplayModule::beginEarly() {
 
 void LVGLDisplayModule::begin(EventBus* eventBus) {
     _eventBus = eventBus;
+    _serviceHelper.setSaveCallback([this]() {
+        if (_configManager) _configManager->saveModuleConfig(this);
+    });
 
     // Phase 1 fallback: ensure bootstrapHardware() ran
     if (_display == nullptr) {
@@ -685,47 +688,22 @@ void LVGLDisplayModule::freeSnapshot(uint8_t* buffer) {
 }
 
 void LVGLDisplayModule::registerRoutes(PsychicHttpServer& server) {
+    _serviceHelper.registerBrightnessRoute(server);
+    _serviceHelper.registerScreenshotRoute(server);
+
     // GET /api/display/status
     server.on("/api/display/status", HTTP_GET, [this](PsychicRequest* request, PsychicResponse* response) {
         JsonDocument doc;
-        doc["brightness"]         = _brightness;
+        _serviceHelper.populateCommonStatus(doc);
+
         doc["rotation"]           = _rotation;
         doc["screensaverEnabled"] = _screensaverEnabled;
-        doc["dimmed"]             = _screensaver.isDimmed();
-        doc["sleeping"]           = _screensaver.isBlanked();
         doc["dimTimeout"]         = _dimTimeoutMs;
         doc["blankTimeout"]       = _blankTimeoutMs;
 
         String output;
         serializeJson(doc, output);
         response->send(200, "application/json", output.c_str());
-        return ESP_OK;
-    });
-
-    // POST /api/display/brightness
-    server.on("/api/display/brightness", HTTP_POST, [this](PsychicRequest* request, PsychicResponse* response) {
-        const char* body = request->bodyCStr();
-        if (!body || strlen(body) == 0) {
-            response->send(400, "application/json", "{\"error\":\"body_required\"}");
-            return ESP_FAIL;
-        }
-        JsonDocument doc;
-        DeserializationError err = deserializeJson(doc, body);
-        if (err || !doc["value"].is<int>()) {
-            response->send(400, "application/json", "{\"error\":\"Invalid JSON or missing 'value'\"}");
-            return ESP_FAIL;
-        }
-
-        int val = doc["value"].as<int>();
-        if (val < 0) val = 0;
-        if (val > 255) val = 255;
-        setBrightness(static_cast<uint8_t>(val));
-
-        if (_configManager != nullptr) {
-            _configManager->saveModuleConfig(this);
-        }
-
-        response->send(200, "application/json", "{\"status\":\"ok\"}");
         return ESP_OK;
     });
 
@@ -840,25 +818,6 @@ void LVGLDisplayModule::registerRoutes(PsychicHttpServer& server) {
         return ESP_OK;
     });
 
-    // GET /api/display/screenshot — PNG framebuffer capture
-    server.on("/api/display/screenshot", HTTP_GET, [this](PsychicRequest* request, PsychicResponse* response) {
-
-
-        BufferStream stream;
-        if (!capturePNG(stream) || stream.buffer.empty()) {
-            response->send(500, "application/json", "{\"error\":\"Screenshot capture failed\"}");
-            return ESP_FAIL;
-        }
-
-        response->addHeader("Cache-Control", "no-cache, no-store, must-revalidate");
-        response->addHeader("Pragma", "no-cache");
-        response->addHeader("Expires", "0");
-        response->addHeader("X-Display-Width", String(getDisplayWidth()).c_str());
-        response->addHeader("X-Display-Height", String(getDisplayHeight()).c_str());
-
-        response->send(200, "image/png", stream.buffer.data(), stream.buffer.size());
-        return ESP_OK;
-    });
 }
 
 // =============================================================================
@@ -871,6 +830,8 @@ void LVGLDisplayModule::registerRoutes(PsychicHttpServer& server) {
  * @param registry The MCPToolRegistry to register tools with.
  */
 void LVGLDisplayModule::registerMCPTools(MCPToolRegistry& registry) {
+    _serviceHelper.registerCaptureTool(registry);
+
     // --- Tool 1: display_status (read-only) ---
     registry.addTool(
         "display_status",
@@ -879,7 +840,8 @@ void LVGLDisplayModule::registerMCPTools(MCPToolRegistry& registry) {
             auto* self = static_cast<LVGLDisplayModule*>(ctx);
             (void)params;
 
-            result["brightness"]         = self->_brightness;
+            self->_serviceHelper.populateCommonMCPStatus(result);
+
             result["rotation"]           = self->_rotation;
             result["screensaverEnabled"] = self->_screensaverEnabled;
 
@@ -1003,52 +965,6 @@ void LVGLDisplayModule::registerMCPTools(MCPToolRegistry& registry) {
         /* mutatesState = */ true
     );
 
-    // --- Tool 3: capture_display (read-only) ---
-
-
-    JsonDocument captureSchema;
-    captureSchema["type"] = "object";
-    captureSchema["properties"].to<JsonObject>();
-
-    registry.addTool(
-        "capture_display",
-        "Capture current display buffer as a base64-encoded PNG image",
-        captureSchema,
-        [](void* ctx, JsonObject& params, JsonObject& result) {
-            auto* self = static_cast<LVGLDisplayModule*>(ctx);
-            (void)params;
-
-            BufferStream stream;
-            if (!self->capturePNG(stream) || stream.buffer.empty()) {
-                result["error"] = "Failed to capture display buffer";
-                return;
-            }
-
-            size_t olen = 0;
-            mbedtls_base64_encode(nullptr, 0, &olen, stream.buffer.data(), stream.buffer.size());
-            if (olen == 0) {
-                result["error"] = "Base64 encoding length calculation failed";
-                return;
-            }
-
-            std::vector<unsigned char> b64buf(olen);
-            int ret = mbedtls_base64_encode(b64buf.data(), b64buf.size(), &olen,
-                                            stream.buffer.data(), stream.buffer.size());
-            if (ret != 0) {
-                result["error"] = "Base64 encoding failed";
-                return;
-            }
-            b64buf.push_back(0); // Ensure null termination for ArduinoJson
-
-            result["format"]   = "png";
-            result["width"]    = self->getDisplayWidth();
-            result["height"]   = self->getDisplayHeight();
-            result["image"]    = reinterpret_cast<char*>(b64buf.data());
-            result["encoding"] = "base64";
-        },
-        this,
-        /* mutatesState = */ false
-    );
 }
 
 
