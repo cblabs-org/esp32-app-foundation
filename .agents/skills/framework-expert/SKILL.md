@@ -31,6 +31,11 @@ If you are setting up this skill in a new project, see
 `harness-adapters/README.md` for harness-specific installation instructions
 (Antigravity, Claude Code).
 
+> **Starting from a blank folder?** If this skill isn't installed yet and
+> the user is starting from scratch, use the sibling `framework-setup` skill
+> instead — it handles cloning the framework, installing skills, and wiring
+> agent harnesses. Once complete, this skill will be available locally.
+
 ## Overview
 
 The ESP32 App Foundation is a decoupled, contract-based framework for ESP32 devices. Downstream applications inject custom behavior by implementing one or more pure virtual C++ interfaces and registering them.
