@@ -7,6 +7,7 @@
 | Project | Scope | Context |
 |---|---|---|
 | aria-tabpanel | ARIA tabpanel/tablist semantics on tab panels, pill buttons, and nav links | [PROJECT.md](../pr-aria-tabpanel/PROJECT.md) |
+| [ARIA Tabpanel (distillation)](../../context_archives/distillation-20260811-aria-tabpanel/context_bridge.md) | Issue #92: WAI-ARIA multi-panel tabs pattern, `role="tabpanel"` + keyboard nav, PR #93 | context_bridge |
 | [pr-04](../pr-04-web-portal/PROJECT.md) | Base SPA + API layer (PsychicHTTP + REST) | [distillation](../pr-04-web-portal/context_bridge.md) |
 | [pr-04a](../pr-04a-portal-enhancement/PROJECT.md) | WiFi scan UX, system diagnostics, backup/restore, UI polish | [distillation](../pr-04a-portal-enhancement/context_bridge.md) |
 | [pr-08](../pr-08-mcp-web-transport/PROJECT.md) | MCP HTTP web transport | PROJECT.md |
@@ -46,6 +47,9 @@
 | [pr-47](../pr-47-lvgl-display/PROJECT.md) | LVGL v9 colour-TFT module (generic) + `ILVGLHardwareAdapter` + CrowPanel 1.28" reference adapter — peer to U8G2, partial SRAM buffers, esp_lcd | PROJECT.md (design) |
 | [adhoc-screensaver-twdt](../adhoc-screensaver-twdt/context_bridge.md) | TWDT crash at 313 s — `vTaskDelay` fix, `setPowerSave(1)`, `localtime_r` thread safety | context_bridge |
 | [pr-66](../pr-66-configuring-orchestration/PROJECT.md) | Centralise CONFIGURING display orchestration — GateActionStatus enum, gate re-publishing, three-tier modal dispatch, LVGL parity | PROJECT.md |
+| [SLS Encoder Recovery](../../context_archives/distillation-20260811-sls-encoder-recovery/context_bridge.md) | SLS template integration, EncoderModule recovery from orphaned PR #56, CrowPanel adapter refactor | context_bridge |
+| [Encoder Multi-Fix](../../context_archives/distillation-20260801-encoder-multi-fix/context_bridge.md) | Multi-encoder architecture using `SOC_PCNT_UNITS_PER_GROUP` boundary, delta event pattern | context_bridge |
+| [Display Interface](../../context_archives/distillation-20260811-display-interface/context_bridge.md) | IDisplayModule unified contract (PR #86), DisplayServiceHelper (PR #88), portal sub-pills (PR #89) | context_bridge |
 
 ## Config System
 | Project | Scope | Context |
@@ -89,6 +93,8 @@
 | [pr-28](../pr-28-compliance-safety/PROJECT.md) | `std::function` elimination, `String→std::string` migration, ADR-39 | PROJECT.md |
 | [adhoc-oo-expert-review](../adhoc-oo-expert-review/context_bridge.md) | OO architecture review, ConfigManager locked-vector, compliance scorecard | context_bridge |
 | [Chief Architect](../esp32-app-foundation/context_bridge.md) | Program-level ADRs, sequencing decisions | [ADRs](../esp32-app-foundation/context_artifacts/adr_program_decisions.md), [Graveyard](../esp32-app-foundation/context_artifacts/graveyard_rejected_approaches.md) |
+| [PR #74 Remediation](../../context_archives/distillation-20260805-pr74-remediation/context_bridge.md) | Post-merge remediation of CONFIGURING orchestration — EventBus boot-order, gate dependency ordering | context_bridge |
+| [Include Architecture](../../context_archives/distillation-20260811-include-architecture/context_bridge.md) | LDF mode alignment (native chain→deep), Application lib_ignore removal, 18 library.json files, zero relative includes | context_bridge |
 
 ## Memory & Performance
 | Project | Scope | Context |
@@ -106,6 +112,7 @@
 | [pr-10](../pr-10-firmware-optimization/PROJECT.md) | Firmware size optimization | PROJECT.md |
 | [pr-19](../pr-19-sdkconfig-layering/PROJECT.md) | Base+delta layering, fix PSRAM regression, build guard | PROJECT.md |
 | [adhoc-sub-app-pipeline](../adhoc-sub-app-pipeline/context_bridge.md) | `merge_framework_data.py`, portalBuilder, OTA separation, esp32s3nano template | context_bridge |
+| [Include Architecture](../../context_archives/distillation-20260811-include-architecture/context_bridge.md) | LDF mode alignment, `lib_ldf_mode=deep` on native, exclude_on_native.py pattern, library.json for all modules | context_bridge |
 
 ## Testing Infrastructure
 | Project | Scope | Context |

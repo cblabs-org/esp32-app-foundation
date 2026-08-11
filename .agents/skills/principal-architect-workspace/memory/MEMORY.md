@@ -1,5 +1,5 @@
 # Principal Architect Memory
-<!-- Last updated: 2026-08-11T18:00:00+01:00 -->
+<!-- Last updated: 2026-08-11T22:26:00+01:00 -->
 
 ## Active Programs
 | Program | Plan | Status |
@@ -23,8 +23,9 @@
 |---|---|---|---|
 | pr-adopt-display-interface | 2026-08-11 | LVGLDisplay, PngWriter, WebServer | Forward-port SLS display stack onto main + #86 interface. Screenshot API stable (tdefl 164KB, PSRAM, threaded). Boot transition restored. `v0.0.12-dev.44` device-verified. [PROJECT.md](../pr-adopt-display-interface/PROJECT.md) |
 | aria-tabpanel | 2026-08-11 | web-portal | Complete WAI-ARIA tabpanel semantics on portal tabs + sub-pills; PR #93 merged closing issue #92 |
+| include-architecture | 2026-08-11 | platformio.ini, Application, all modules/libs | LDF mode alignment (native chain→deep), Application lib_ignore removal, 18 library.json, zero relative includes. Commit `1e58058`. [context_bridge](../../context_archives/distillation-20260811-include-architecture/context_bridge.md) |
 
 ## Older Projects
-77 completed projects.
+82 completed projects.
 Full project history: [PROJECT_INDEX.md](PROJECT_INDEX.md)
 Cross-cutting module index: [MODULE_INDEX.md](MODULE_INDEX.md)
