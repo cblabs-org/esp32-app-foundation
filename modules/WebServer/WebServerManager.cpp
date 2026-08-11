@@ -92,7 +92,9 @@ static constexpr size_t DEFAULT_MAX_POST_BODY = 4096;
 
 
 WebServerManager::WebServerManager() : _httpServer(80) {
-    _httpServer.config.stack_size = 16384; // Increase stack for heavy PNG compression
+#ifndef UNIT_TEST
+    _httpServer.config.stack_size = 16384; // Increase stack for heavy PNG compression (native stub has no .config)
+#endif
 }
 
 WebServerManager::~WebServerManager() {
@@ -127,7 +129,9 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors,
                 ESP_LOGE(TAG, "Failed to allocate PsychicHttpsServer, falling back to HTTP");
                 useTls = false;
             } else {
+#ifndef UNIT_TEST
                 _httpsServer->config.stack_size = 16384; // Increase stack for heavy PNG compression
+#endif
                 _httpsServer->setCertificate(certDer, certLen, keyDer, keyLen);
             }
         } else {
