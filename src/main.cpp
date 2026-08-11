@@ -19,7 +19,10 @@
 #ifndef UNIT_TEST  // GoogleTest provides main() on native; this file is not compiled
 
 #include "AppFoundation.h"
+#if __has_include("publicKey.hpp")
 #include "publicKey.hpp"
+#define HAS_OTA_PUBLIC_KEY 1
+#endif
 
 #include <Arduino.h>
 #include <cstring>
@@ -99,7 +102,9 @@ static DiagnosticsBoard diagnosticsBoard{256, 64};
 void setup() {
     FrameworkConfig config;
     config.otaManifestUrl = "https://raw.githubusercontent.com/matthewmcneill/esp32-app-foundation-releases/main/manifest.json";
+#ifdef HAS_OTA_PUBLIC_KEY
     config.otaPublicKey = (const char*)public_key_pem;
+#endif
 
     // App names its hostname default — WiFiManager owns the persisted value
     // and falls back to this on factory reset (resetConfig()).
