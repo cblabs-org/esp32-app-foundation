@@ -9,7 +9,7 @@ It also explicitly supports headless operation.
 ## Display Modules & Implementations
 
 ### Monochromatic OLEDs (`U8G2DisplayModule`)
-The `U8g2DisplayManager` owns the U8G2 instance and orchestrates monochromatic OLED rendering. It manages I2C/SPI bus setup, system status bars, and the `CarouselEngine` for multi-pane content rotation.
+The `U8G2DisplayModule` owns the U8G2 instance and orchestrates monochromatic OLED rendering. It manages I2C/SPI bus setup, system status bars, and the `CarouselEngine` for multi-pane content rotation.
 
 ### Colour TFTs & LVGL v9 (`LVGLDisplayModule`)
 The `LVGLDisplayModule` provides full-colour UI support powered by LVGL v9.5. To keep generic logic separate from panel-specific hardware, it uses the `ILVGLHardwareAdapter` interface pattern:
@@ -31,6 +31,8 @@ Display initialization across all display modules follows a two-phase bootstrap 
 
 The display subsystem interacts with modules via several specialized interfaces:
 
+- **[`IDisplayModule`](../../interfaces/display-module.md)**: Unified display provider contract implemented by all display modules.
+- **`DisplayServiceHelper`**: Shared REST routes and MCP tools (`display_status`, `display_control`, `capture_display`) provider for any display module.
 - **[`IDisplayBoard`](../../interfaces/display-board.md)**: (U8G2) Allows modules to contribute "boards" (panes/screens) to the `CarouselEngine`.
 - **`IStatusReporter`**: Allows display modules to render framework boot progress and system error screens.
 - **`ILVGLHardwareAdapter`**: Decouples hardware initialization from generic LVGL module logic.
@@ -46,5 +48,5 @@ The display subsystem interacts with modules via several specialized interfaces:
 
 ## Application Ownership
 
-The `Application` class retains ultimate ownership of the display hardware instance. Display managers are framework-level services whose lifecycles are explicitly bound to the `Application` so that they can render panic screens during `AppFoundation::panic()`.
+The `Application` class retains ultimate ownership of the display hardware instance. Display modules are framework-level services whose lifecycles are explicitly bound to the `Application` so that they can render panic screens during `AppFoundation::panic()`.
 

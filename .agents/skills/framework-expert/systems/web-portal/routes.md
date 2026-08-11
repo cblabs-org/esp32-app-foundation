@@ -72,6 +72,16 @@ void MyModule::registerRoutes(PsychicHttpServer* server) {
 
 By using `JsonDocument` with body size caps enforced via the global middleware (`getMaxPostBody()`), the web server remains stable even under heavy load or malicious input.
 
+## Display REST Endpoints
+
+The framework provides shared REST endpoints for display interaction, registered by `DisplayServiceHelper` (used by both U8G2 and LVGL modules):
+
+- `GET /api/display/status`: Returns current display telemetry and state.
+- `POST /api/display/brightness`: Sets display brightness (`{"value": 0-255}`).
+- `GET /api/display/screenshot`: Captures a PNG screenshot of the current framebuffer.
+- `POST /api/display/wake`: Wakes the display from screensaver/sleep.
+- `POST /api/display/sleep`: Forces the display to sleep immediately.
+
 ## Built-in MCP Tool Endpoints
 
 For AI agent interaction, the framework provides built-in JSON-RPC 2.0 MCP tools mapped alongside REST endpoints:

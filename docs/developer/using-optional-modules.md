@@ -92,7 +92,7 @@ If you omit the guard:
 
 ## 3. Display Module — Worked Example
 
-The [U8G2DisplayModule](../../modules/U8G2Display/U8G2DisplayModule.hpp) is the most complex optional module in the framework. It demonstrates how a hardware-dependent module can implement five interfaces and expose sub-objects while remaining fully guarded for native builds.
+The [U8G2DisplayModule](../../modules/U8G2Display/U8G2DisplayModule.hpp) is the most complex optional module in the framework. It demonstrates how a hardware-dependent module can implement six interfaces and expose sub-objects while remaining fully guarded for native builds.
 
 > [!IMPORTANT]
 > U8G2 is a **replaceable reference implementation**, not a mandatory component. The framework's display architecture is designed so that downstream applications can swap to TFT, e-ink, or headless operation. See [Replacing the Display](#replacing-the-display) below.
@@ -101,6 +101,7 @@ The [U8G2DisplayModule](../../modules/U8G2Display/U8G2DisplayModule.hpp) is the 
 
 | Interface | Purpose |
 |:---|:---|
+| `IDisplayModule` | Unified display provider — geometry, brightness, PNG capture, system state rendering |
 | `ITickable` | Carousel rotation, sleep check, frame rendering |
 | `IStatusReporter` | Boot progress display via `BootBoard` and `ErrorBoard` |
 | `IConfigurable` | Persistent display settings (namespace: `"display"`, schema v3) |
@@ -431,50 +432,37 @@ When creating optional modules:
 
 ## 6. Replacing the Display
 
-The framework is designed to allow complete replacement of the display hardware and rendering paradigm. U8G2 is the **reference implementation**, not a hard dependency.
+The framework is designed to allow complete replacement of the display hardware or running in headless mode without any display attached. U8G2 and LVGL are reference implementations, not hard dependencies.
 
-### ADR-02 Rationale: No Unified `IDisplayDriver`
+### The `IDisplayModule` Interface
 
-Early designs considered an `IDisplayDriver` interface that would abstract drawing primitives (e.g., `drawLine`, `drawText`). This approach was explicitly rejected in **ADR-02**.
+Display hardware modules implement the `IDisplayModule` interface ([`IDisplayModule.hpp`](../../include/interfaces/IDisplayModule.hpp)), which provides a unified contract across display drivers for:
+- **Geometry**: `getDisplayWidth()`, `getDisplayHeight()`
+- **Brightness**: `setBrightness()`, `getBrightness()`
+- **Screensaver / Power State**: `resetActivity()`, `isDimmed()`, `isSleeping()`
+- **PNG Capture**: `capturePNG(Print& sink)`
+- **System Lifecycle Display**: `showSystemState(const SystemDisplayParams& params)` (renders boot progress, errors, or configuration status screens)
 
-The rationale: drawing paradigms between monochromatic OLEDs (U8G2), full-colour TFTs (TFT_eSPI), and e-ink displays (GxEPD) are fundamentally incompatible. Abstraction layers either become heavily bloated "god interfaces" or restrict developers to the lowest common denominator. Instead, the framework embraces **native types** — if you use U8G2, your boards receive a `U8G2&` reference. If you swap to TFT_eSPI, you rewrite your boards to accept a `TFT_eSPI&` reference.
+Shared HTTP routes (`/api/display/brightness`, `/api/display/screenshot.png`) and remote MCP tools (`capture_display`) are provided across display implementations via `DisplayServiceHelper`.
+
+### Native Rendering Paradigms
+
+While `IDisplayModule` unifies hardware orchestration, brightness, power state management, screenshot capture, and system state overlays, low-level drawing paradigms remain native to the underlying graphics engine:
+- Monochromatic OLEDs (`U8G2DisplayModule`) draw using U8G2 primitives (`U8G2&`).
+- Colour TFT displays (`LVGLDisplayModule`) build UI trees using LVGL (`lv_obj_t*`).
 
 > [!IMPORTANT]
-> The framework manages *orchestration* (carousel rotation, screensaver timeout, panic rendering) but leaves *rendering* explicitly coupled to the chosen hardware library. Swapping the display means rewriting all custom board `render()` implementations.
+> The framework manages module lifecycle, brightness, power states, screenshots, and system overlays through `IDisplayModule`, but lower-level UI board/screen layout and component rendering remain native to the chosen graphics library.
 
-### How to Swap U8G2 for TFT / E-Ink / Headless
+### How to Implement a New Display Type
 
-#### Step 1 — Implement a New DisplayManager
+To support a custom display controller or alternative graphics engine:
+1. Implement `IDisplayModule` alongside standard framework interfaces (`ITickable`, `IConfigurable`, `IWebContributor`, `IMCPContributor`).
+2. Utilize `DisplayServiceHelper` to handle standard REST endpoints and MCP tool implementations (`capture_display`).
+3. Instantiate your custom display module in `main.cpp` and register it with `app.registerModule(&myDisplay)`.
 
-Create a new class that manages the hardware lifecycle:
+### Headless Operation
 
-```cpp
-class TftDisplayManager {
-public:
-    void begin();       // Initialise hardware and backlight
-    void tick();        // Drive the rendering pipeline
-    void panic(const char* message);  // Render crash/panic screen
-};
-```
-
-#### Step 2 — Decide Which Framework Patterns to Support
-
-| Pattern | What You Need |
-|:---|:---|
-| Carousel | Implement a `TftCarouselEngine` and define a new `ITftDisplayBoard` interface |
-| Screensaver | Implement a `ScreensaverController` that controls TFT backlight |
-| Status bar | Provide an API for modules to push status icons via `IStatusContributor` |
-
-#### Step 3 — Update Application Ownership
-
-The `Application` class owns the display so it can guarantee panic rendering:
-1. Remove the `U8g2DisplayManager` instantiation in the main application file
-2. Instantiate your `TftDisplayManager`
-3. Update the `AppFoundation::panic()` hook to route to your new display manager
-
-#### Step 4 — Headless Operation
-
-If the device requires no display at all:
-1. Define `#define HEADLESS_MODE`
-2. Provide a `NullDisplayManager` with empty `begin()`, `tick()`, and `panic()` methods
-3. The framework will gracefully operate without hardware, logging panics to serial instead of attempting to render them
+If the application requires no physical display:
+1. Simply do not instantiate or register any `IDisplayModule` in `main.cpp`.
+2. The framework gracefully operates in headless mode without a display module — core kernel services, web server, MQTT, and MCP continue functioning normally without requiring special dummy drivers or `#define HEADLESS_MODE` flags.

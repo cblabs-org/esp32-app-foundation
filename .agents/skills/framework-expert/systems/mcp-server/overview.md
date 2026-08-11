@@ -18,7 +18,6 @@ Registered by `MCPBuiltinTools` — framework-level, available on every device:
 | `reboot` | Restart device (1s delay for response flush) | **Yes** |
 | `get_logs` | Log buffer (placeholder — ring-buffer logger planned) | No |
 | `list_tools` | Enumerate all registered tools with descriptions and schemas | No |
-| `capture_display` | Framebuffer as base64 XBM (U8G2 vertical-byte format) | No |
 
 ### Module-Contributed Tools (dynamic)
 Any module implementing `IMCPContributor` registers tools via `registerMCPTools()` at boot. These are auto-discovered — you never need to update a catalog. Current framework modules contribute:
@@ -28,7 +27,8 @@ Any module implementing `IMCPContributor` registers tools via `registerMCPTools(
 | **WifiManager** | `wifi_get_status` | `wifi_scan_networks`, `wifi_forget` |
 | **OTAUpdateManager** | `ota_get_status` | `ota_check_now`, `ota_trigger_update` |
 | **ConfigManager** | `config_get_schema_version` | `config_factory_reset` |
-| **U8G2DisplayModule** | `display_status` | `display_control` |
+| **U8G2DisplayModule** | `display_status`, `capture_display` | `display_control` |
+| **LVGLDisplayModule** | `display_status`, `capture_display` | `display_control` |
 | **ButtonModule** (`WITH_BUTTONS`) | `button_status` | — |
 | **EncoderModule** (`WITH_ENCODER`) | `encoder_status` | — |
 | **KeyManager** | `key_list`, `key_get` | `key_add`, `key_delete` |
