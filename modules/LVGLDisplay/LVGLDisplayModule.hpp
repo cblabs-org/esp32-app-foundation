@@ -287,6 +287,7 @@ public:
 
     IWebContributor* settingsTabStub() { return &_settingsTabStub; }
     IWebContributor* screenshotTabStub() { return &_screenshotTabStub; }
+    IWebContributor* hardwareTabStub() { return &_hardwareContributor; }
 
     // -------------------------------------------------------------------------
     // IMCPContributor — MCP display tools
@@ -381,6 +382,15 @@ private:
 
     SettingsTabStub _settingsTabStub;
     ScreenshotTabStub _screenshotTabStub;
+    
+    struct HardwareContributor : public IWebContributor {
+        void registerRoutes(PsychicHttpServer& /*server*/) override {}
+        const char* getTabName() const override { return "Hardware"; }
+        const char* getParentTab() const override { return "Display"; }
+        int getTabOrder() const override { return 30; }
+        const char* getTabScript() const override { return "/hardware.js"; }
+    };
+    HardwareContributor _hardwareContributor;
 
 #ifdef WITH_OTA
     static void _onOtaProgress(const char* topic, const void* payload, void* ctx);

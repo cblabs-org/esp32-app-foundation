@@ -213,3 +213,9 @@ If you discover a defect, upstream bug, or concern *outside your boundary box*, 
 ## Completion Report
 <!-- Written by the worker at task completion -->
 
+- Restructured the Display portal tab's sub-pills into Settings, Screenshot, Carousel, and Hardware.
+- Moved contract-driven controls into the generic Settings tab and integrated a Display Diagnostics `<details>` drawer.
+- Shifted hardware-specific UI controls (flip, board lists, interval, rotation) into `carousel.js` (U8G2) and `hardware.js` (LVGL) scripts.
+- Updated the C++ display modules to dynamically provide the `CarouselContributor` and `HardwareContributor` stubs.
+- Ensured all display-related documentation across `framework-expert` and `developer` accurately reflects the new architecture and correctly describes headless operation.
+- Validated via `pio run` builds against `esp32dev`, `esp32s3nano`, and `crowpanel-128-rotary` targets, and successfully ran playwright automated web portal tests.

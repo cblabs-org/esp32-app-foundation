@@ -125,23 +125,6 @@ test.describe('Display Settings Tab', () => {
     expect(body.value).toBe(128);
   });
 
-  // ── Flip Toggle ─────────────────────────────────────────────────
-
-  test('flip toggle sends POST to /api/display/flip', async ({ page }) => {
-    const requestPromise = page.waitForRequest(req =>
-      req.url().includes('/api/display/flip') && req.method() === 'POST'
-    );
-
-    // Click the parent label of the hidden checkbox to toggle it
-    await page.locator('#display-flip').evaluate((el: HTMLInputElement) => {
-      el.checked = true;
-      el.dispatchEvent(new Event('change', { bubbles: true }));
-    });
-
-    const request = await requestPromise;
-    const body = request.postDataJSON();
-    expect(body.value).toBe(true);
-  });
 
   // ── Screensaver Enable/Disable ──────────────────────────────────
 

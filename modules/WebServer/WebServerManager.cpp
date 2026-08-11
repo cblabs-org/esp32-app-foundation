@@ -52,6 +52,8 @@
 #include "portal_assets/appconfig_js.hpp"
 #include "portal_assets/auth_js.hpp"
 #include "portal_assets/credits_js.hpp"
+#include "portal_assets/hardware_js.hpp"
+#include "portal_assets/carousel_js.hpp"
 
 #include "platform/LogShim.h"
 
@@ -246,6 +248,20 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors,
 
     activeServer->on("/display.js", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
         response->setContent(display_js_gz, display_js_gz_len);
+        response->setContentType("application/javascript");
+        response->addHeader("Content-Encoding", "gzip");
+        return response->send();
+    });
+
+    activeServer->on("/hardware.js", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
+        response->setContent(hardware_js_gz, hardware_js_gz_len);
+        response->setContentType("application/javascript");
+        response->addHeader("Content-Encoding", "gzip");
+        return response->send();
+    });
+
+    activeServer->on("/carousel.js", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
+        response->setContent(carousel_js_gz, carousel_js_gz_len);
         response->setContentType("application/javascript");
         response->addHeader("Content-Encoding", "gzip");
         return response->send();

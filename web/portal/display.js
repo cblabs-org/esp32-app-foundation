@@ -25,10 +25,10 @@
 
     container.innerHTML =
       // =====================================================================
-      // Section 1: Brightness & Orientation
+      // Section 1: Brightness
       // =====================================================================
       '<article>' +
-        '<header>Brightness &amp; Orientation</header>' +
+        '<header>Brightness</header>' +
 
         // --- Brightness slider ---
         '<div style="margin-bottom: 1rem;">' +
@@ -40,20 +40,6 @@
             'style="width:100%; accent-color:var(--primary); cursor:pointer;">' +
         '</div>' +
 
-        // --- Flip screen toggle ---
-        '<div class="toggle-row" style="display:flex; justify-content:space-between; align-items:center; padding:0.5rem 0;">' +
-          '<div>' +
-            '<span style="font-weight:600; font-size:0.9rem;">Flip Screen</span>' +
-            '<p style="font-size:0.75rem; color:var(--text-muted); margin:0.15rem 0 0 0;">Rotate display 180°</p>' +
-          '</div>' +
-          '<label class="toggle-switch" style="position:relative; display:inline-block; width:48px; height:26px;">' +
-            '<input type="checkbox" id="display-flip" style="opacity:0; width:0; height:0;">' +
-            '<span class="toggle-slider" style="' +
-              'position:absolute; cursor:pointer; top:0; left:0; right:0; bottom:0;' +
-              'border-radius:26px; transition:0.3s;' +
-            '"></span>' +
-          '</label>' +
-        '</div>' +
       '</article>' +
 
       // =====================================================================
@@ -111,12 +97,17 @@
           '<button type="button" id="display-wake-btn" style="flex:1;" class="outline">Wake Display</button>' +
           '<button type="button" id="display-sleep-btn" style="flex:1;" class="outline">Sleep Display</button>' +
         '</div>' +
-      '</article>';
+      '</article>' +
+      
+      '<details class="diag-drawer" style="border:1px solid var(--border); border-radius:10px; margin-bottom:1rem; margin-top:1rem;">' +
+        '<summary style="font-weight:600; color:var(--text-muted); cursor:pointer; user-select:none; padding:1rem;">Display Diagnostics</summary>' +
+        '<div id="display-diag-content" class="diag-content" style="padding:0 1rem 1rem 1rem; display:flex; flex-direction:column; gap:0.5rem;">' +
+        '</div>' +
+      '</details>';
 
     // --- Grab DOM references ---
     brightnessSlider  = document.getElementById('display-brightness');
     brightnessValue   = document.getElementById('display-brightness-value');
-    flipToggle        = document.getElementById('display-flip');
     screensaverToggle = document.getElementById('display-screensaver-enabled');
     screensaverStatusBadge = document.getElementById('display-screensaver-status');
     dimDelaySelect    = document.getElementById('display-dim-delay');
@@ -143,11 +134,6 @@
       brightnessTimer = setTimeout(function() {
         postSetting('/api/display/brightness', { value: parseInt(brightnessSlider.value, 10) });
       }, 300);
-    });
-
-    // --- Flip toggle ---
-    flipToggle.addEventListener('change', function() {
-      postSetting('/api/display/flip', { value: flipToggle.checked });
     });
 
     // --- Screensaver enable toggle ---
@@ -208,9 +194,41 @@
         brightnessValue.textContent = data.brightness;
       }
 
-      // --- Flip ---
-      if (data.flip !== undefined) {
-        flipToggle.checked = data.flip;
+      // --- Display Diagnostics ---
+      var diagContent = document.getElementById('display-diag-content');
+      if (diagContent) {
+        var rows = [];
+        var makeRow = function(label, value) {
+          return '<div style="display:flex; justify-content:space-between; align-items:center;">' +
+                   '<span style="font-size:0.8rem; color:var(--text-muted);">' + label + '</span>' +
+                   '<span style="font-family:\'Courier New\', monospace; font-size:0.85rem;">' + value + '</span>' +
+                 '</div>';
+        };
+
+        if (data.width !== undefined && data.height !== undefined) {
+          rows.push(makeRow('Resolution', data.width + ' &times; ' + data.height + ' px'));
+        }
+        if (data.brightness !== undefined) {
+          rows.push(makeRow('Brightness', data.brightness + ' / 255'));
+        }
+        
+        var ssState = 'Active';
+        if (!data.screensaverEnabled) ssState = 'Disabled';
+        else if (data.sleeping) ssState = 'Sleeping';
+        else if (data.dimmed) ssState = 'Dimmed';
+        rows.push(makeRow('Screensaver', ssState));
+
+        if (data.activeBoard !== undefined) {
+          rows.push(makeRow('Active Board', data.activeBoard));
+        }
+        if (data.rotation !== undefined) {
+          rows.push(makeRow('Rotation', data.rotation + '&deg;'));
+        }
+        if (data.flip !== undefined) {
+          rows.push(makeRow('Flip', data.flip ? 'Yes' : 'No'));
+        }
+
+        diagContent.innerHTML = rows.join('');
       }
 
       // --- Screensaver enabled ---

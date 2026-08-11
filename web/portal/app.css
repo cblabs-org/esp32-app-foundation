@@ -409,7 +409,8 @@ button.secondary {
   color: var(--primary);
 }
 
-.pill-btn--active {
+.pill-btn--active,
+.pill-btn--active:hover {
   background: var(--primary);
   color: white;
   border-color: var(--primary);
