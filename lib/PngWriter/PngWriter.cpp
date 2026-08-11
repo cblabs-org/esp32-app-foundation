@@ -32,6 +32,7 @@ public:
 #elif __has_include(<esp_rom/rom/miniz.h>)
 #include <esp_rom/rom/miniz.h>
 #endif
+#include <esp_log.h>
 
 namespace PngWriter {
 
@@ -262,20 +263,24 @@ static int tdefl_put_buf_cb(const void* pBuf, int len, void* pUser) {
 }
 
 bool writeRGB565ToRGB888(Print& sink, uint16_t width, uint16_t height, const uint16_t* buffer) {
-    tdefl_compressor* comp = (tdefl_compressor*)heap_caps_malloc(sizeof(tdefl_compressor), MALLOC_CAP_SPIRAM);
+    // The miniz compressor state is 167KB, so we allocate it securely in PSRAM.
+    tdefl_compressor* comp = (tdefl_compressor*)heap_caps_calloc(1, sizeof(tdefl_compressor), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     
     DeflateState state;
     state.sink = &sink;
-    state.outBuf = (uint8_t*)malloc(16384);
+    state.outBuf = (uint8_t*)heap_caps_malloc(16384, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     state.outLen = 0;
     
     uint32_t adler = 1;
     uint16_t rowBytes = width * 3;
-    uint8_t* rowBuf = (uint8_t*)malloc(rowBytes + 1);
+    uint8_t* rowBuf = (uint8_t*)heap_caps_malloc(rowBytes + 1, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    
+    ESP_LOGI("PngWriter", "Allocated buffers. Initializing deflate...");
     
     bool useDeflate = false;
     if (comp && state.outBuf && rowBuf) {
-        tdefl_status init_status = tdefl_init(comp, tdefl_put_buf_cb, &state, TDEFL_DEFAULT_MAX_PROBES);
+        tdefl_status init_status = tdefl_init(comp, tdefl_put_buf_cb, &state, 1); // 1 max probe for PSRAM speed
+        ESP_LOGI("PngWriter", "tdefl_init status: %d", (int)init_status);
         if (init_status == TDEFL_STATUS_OKAY) {
             // Pass zlib header into the compressor stream manually
             uint8_t zlibHeader[2] = { 0x78, 0x9C }; 
@@ -301,16 +306,19 @@ bool writeRGB565ToRGB888(Print& sink, uint16_t width, uint16_t height, const uin
             }
             
             tdefl_status status = tdefl_compress_buffer(comp, rowBuf, rowBytes + 1, (height == 1) ? TDEFL_FINISH : TDEFL_NO_FLUSH);
+            ESP_LOGI("PngWriter", "tdefl_compress_buffer first row status: %d", (int)status);
             if (status == TDEFL_STATUS_OKAY || status == TDEFL_STATUS_DONE) {
                 useDeflate = true;
             }
         }
     }
     
+    ESP_LOGI("PngWriter", "useDeflate: %d", useDeflate);
+    
     if (!useDeflate) {
-        if (rowBuf) free(rowBuf);
-        if (state.outBuf) free(state.outBuf);
-        if (comp) free(comp);
+        if (rowBuf) heap_caps_free(rowBuf);
+        if (state.outBuf) heap_caps_free(state.outBuf);
+        if (comp) heap_caps_free(comp);
         
         // Fall back to stored-PNG.
         sink.write(PNG_SIGNATURE, sizeof(PNG_SIGNATURE));
@@ -347,7 +355,7 @@ bool writeRGB565ToRGB888(Print& sink, uint16_t width, uint16_t height, const uin
             chunkCrc = crc32_le(chunkCrc, blockHeader, 5);
             
             // For performance, generate row chunks instead of byte-by-byte
-            uint8_t* chunkBuf = (uint8_t*)malloc(bLen);
+            uint8_t* chunkBuf = (uint8_t*)heap_caps_malloc(bLen, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
             if (!chunkBuf) return false;
             
             for (uint32_t i = 0; i < bLen; i++) {
@@ -377,7 +385,7 @@ bool writeRGB565ToRGB888(Print& sink, uint16_t width, uint16_t height, const uin
             sink.write(chunkBuf, bLen);
             chunkCrc = crc32_le(chunkCrc, chunkBuf, bLen);
             fallbackAdler = adler32(fallbackAdler, chunkBuf, bLen);
-            free(chunkBuf);
+            heap_caps_free(chunkBuf);
             
             offset += bLen;
         }
@@ -399,6 +407,8 @@ bool writeRGB565ToRGB888(Print& sink, uint16_t width, uint16_t height, const uin
     sink.write(PNG_SIGNATURE, sizeof(PNG_SIGNATURE));
     writeIHDR(sink, width, height, 8, 2); 
     
+    ESP_LOGI("PngWriter", "Starting deflate loop for %d rows...", height - 1);
+    
     for (uint16_t y = 1; y < height; ++y) { // Start from row 1 since row 0 is already processed
         rowBuf[0] = 0; 
         adler = adler32(adler, rowBuf, 1);
@@ -419,7 +429,10 @@ bool writeRGB565ToRGB888(Print& sink, uint16_t width, uint16_t height, const uin
         }
         
         tdefl_compress_buffer(comp, rowBuf, rowBytes + 1, (y == height - 1) ? TDEFL_FINISH : TDEFL_NO_FLUSH);
+        if (y % 50 == 0) ESP_LOGI("PngWriter", "Deflated row %d", y);
     }
+    
+    ESP_LOGI("PngWriter", "Deflate loop finished. Writing adler32 and IEND...");
     
     uint8_t adlerBytes[4];
     adlerBytes[0] = (adler >> 24) & 0xFF;
@@ -432,9 +445,11 @@ bool writeRGB565ToRGB888(Print& sink, uint16_t width, uint16_t height, const uin
     
     writeChunk(sink, "IEND", nullptr, 0);
     
-    free(rowBuf);
-    free(state.outBuf);
-    free(comp);
+    heap_caps_free(rowBuf);
+    heap_caps_free(state.outBuf);
+    heap_caps_free(comp);
+    
+    ESP_LOGI("PngWriter", "PNG write complete!");
     return true;
 }
 
