@@ -332,6 +332,7 @@ document.addEventListener('DOMContentLoaded', function() {
         div.id = tabId;
         div.className = 'tab-content';
         div.setAttribute('role', 'tabpanel');
+        div.setAttribute('tabindex', '0');
         div.setAttribute('aria-labelledby', 'nav-' + tabId.replace('tab-', ''));
         document.querySelector('.tab-content-container').appendChild(div);
       }
@@ -376,6 +377,7 @@ document.addEventListener('DOMContentLoaded', function() {
           cdiv.id = childId;
           cdiv.className = 'tab-content';
           cdiv.setAttribute('role', 'tabpanel');
+          cdiv.setAttribute('tabindex', '0');
           cdiv.setAttribute('aria-labelledby', 'pill-' + childId.replace('tab-', ''));
           document.querySelector('.tab-content-container').appendChild(cdiv);
         }
