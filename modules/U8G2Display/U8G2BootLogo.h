@@ -5,7 +5,7 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  *
- * Module: include/types/U8G2BootLogo.h
+ * Module: modules/U8G2Display/U8G2BootLogo.h
  * Description: XBM boot logo descriptor for U8G2 monochrome displays.
  */
 

@@ -59,7 +59,7 @@
 
 #include <vector>
 #include <cstdint>
-#include "interfaces/IDisplayBoard.hpp"
+#include "IDisplayBoard.hpp"
 
 class CarouselEngine {
 public:

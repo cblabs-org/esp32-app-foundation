@@ -23,11 +23,11 @@
 
 #pragma once
 
-#include "interfaces/IDisplayBoard.hpp"
+#include "IDisplayBoard.hpp"
 #include "widgets/LabelWidget.hpp"
 #include "widgets/ImageWidget.hpp"
 #include "widgets/ProgressBarWidget.hpp"
-#include <types/U8G2BootLogo.h>
+#include "U8G2BootLogo.h"
 
 #ifndef APP_TITLE
 #define APP_TITLE "ESP32 App Foundation"

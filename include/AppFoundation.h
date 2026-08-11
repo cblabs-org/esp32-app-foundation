@@ -44,7 +44,7 @@
 #include "interfaces/IStatusReporter.hpp"
 #include "interfaces/IWebContributor.hpp"
 #include "interfaces/IMCPContributor.hpp"
-#include "interfaces/IDisplayBoard.hpp"
+#include "U8G2Display/IDisplayBoard.hpp"
 #include "interfaces/IConfigGate.hpp"
 #include "interfaces/IOTAVerifier.hpp"
 

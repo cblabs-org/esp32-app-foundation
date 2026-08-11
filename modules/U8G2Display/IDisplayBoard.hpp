@@ -5,7 +5,7 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  *
- * Module: include/interfaces/IDisplayBoard.hpp
+ * Module: modules/U8G2Display/IDisplayBoard.hpp
  * Description: Pure interface for U8G2 display carousel boards. Each
  *              "board" is a full-screen rendering unit that the u8g2Display
  *              module rotates through. Both system boards (BootSplash, Error)

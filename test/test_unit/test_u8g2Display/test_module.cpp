@@ -15,8 +15,8 @@
 
 #include <gtest/gtest.h>
 #include "U8G2DisplayModule.hpp"
-#include "interfaces/IU8G2SystemScreens.hpp"
-#include "interfaces/IDisplayBoard.hpp"
+#include "U8G2Display/IU8G2SystemScreens.hpp"
+#include "U8G2Display/IDisplayBoard.hpp"
 
 // =============================================================================
 // Mocks for System Screen Overrides

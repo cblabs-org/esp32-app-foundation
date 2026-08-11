@@ -197,7 +197,7 @@ constexpr int8_t PIN_AUX_I2C_SCL  = 39;
 //
 // Example (U8G2):
 //   #include <types/BootBranding.h>
-//   #include <types/U8G2BootLogo.h>
+//   #include "U8G2Display/U8G2BootLogo.h"
 //   #include "board_logo_xbm.h"  // Custom XBM byte array (PROGMEM)
 //
 //   static constexpr BootBranding BOARD_BRANDING{ .appTitle = "My Custom Board" };

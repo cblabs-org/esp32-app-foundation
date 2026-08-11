@@ -28,7 +28,7 @@
 
 #pragma once
 
-#include "interfaces/IDisplayBoard.hpp"
+#include "IDisplayBoard.hpp"
 #include "widgets/LabelWidget.hpp"
 
 // Forward-declare WifiManager — full definition only needed in the .cpp.

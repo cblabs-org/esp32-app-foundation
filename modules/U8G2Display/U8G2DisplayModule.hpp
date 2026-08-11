@@ -92,7 +92,7 @@
 #include "interfaces/IConfigurable.hpp"
 #include "interfaces/IWebContributor.hpp"
 #include "interfaces/IMCPContributor.hpp"
-#include "interfaces/IDisplayBoard.hpp"
+#include "IDisplayBoard.hpp"
 #include "interfaces/IDisplayModule.hpp"
 #include "PngWriter.h"
 #include "boards/BootBoard.hpp"
@@ -107,8 +107,8 @@
 #include "boards/GenericGateHelperBoard.hpp"
 #include "utils/Periodic.hpp"
 #include <types/BootBranding.h>
-#include <types/U8G2BootLogo.h>
-#include <interfaces/IU8G2SystemScreens.hpp>
+#include "U8G2BootLogo.h"
+#include "IU8G2SystemScreens.hpp"
 
 // --- Hardware-only includes (excluded from native GoogleTest builds) ---
 #include "board.h"
