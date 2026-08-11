@@ -16,9 +16,9 @@ Restructure the Display portal tab's sub-pills so that contract-driven controls 
 After WO6, the `DisplayServiceHelper` handles common REST routes (brightness, screenshot) and provides `populateCommonStatus()`. But the portal JS (`display.js`) still mixes contract-driven and module-specific controls in one Settings pill.
 
 Read the design system skill for UI guidance:
-- `.agents/skills/framework_design_system/readme.md` — full DS reference
-- `.agents/skills/framework_design_system/components/navigation/Drawer.prompt.md` — Drawer component
-- `.agents/skills/framework_design_system/components/data-display/InfoRow.prompt.md` — InfoRow component
+- `.agents/skills/framework-design-system/readme.md` — full DS reference
+- `.agents/skills/framework-design-system/components/navigation/Drawer.prompt.md` — Drawer component
+- `.agents/skills/framework-design-system/components/data-display/InfoRow.prompt.md` — InfoRow component
 
 Read the current portal code:
 - `web/portal/display.js` — current Settings tab (to be cleaned)

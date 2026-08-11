@@ -10,7 +10,7 @@
 ## Objective
 
 Eliminate **all design system debt** identified in the web portal audit against
-the [framework design system](../../framework_design_system/readme.md). The
+the [framework design system](../../framework-design-system/readme.md). The
 portal's CSS (`app.css`) is the ground truth the DS was reverse-engineered from,
 so the token *values* already match — the debt is in **hard-coded literals in JS
 fragments and CSS** that bypass the semantic token layer, plus emoji/icon
