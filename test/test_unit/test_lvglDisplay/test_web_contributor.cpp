@@ -59,28 +59,24 @@ TEST_F(LVGLWebContributorTest, RouteRegistrationAndHandlers) {
     PsychicHttpServer server;
     display.registerRoutes(server);
 
-    EXPECT_GE(server.routes.size(), 6);
+    // Post-#88: module registers status/rotation/flip/sleep inline;
+    // brightness + screenshot routes are registered by DisplayServiceHelper (hardware-only)
+    EXPECT_GE(server.routes.size(), 4);
 
     bool statusFound = false;
-    bool brightnessFound = false;
     bool rotationFound = false;
     bool flipFound = false;
     bool sleepFound = false;
-    bool screenshotFound = false;
 
     for (const auto& r : server.routes) {
         if (r.uri == "/api/display/status") statusFound = true;
-        if (r.uri == "/api/display/brightness") brightnessFound = true;
         if (r.uri == "/api/display/rotation") rotationFound = true;
         if (r.uri == "/api/display/flip") flipFound = true;
         if (r.uri == "/api/display/sleep") sleepFound = true;
-        if (r.uri == "/api/display/screenshot") screenshotFound = true;
     }
 
     EXPECT_TRUE(statusFound);
-    EXPECT_TRUE(brightnessFound);
     EXPECT_TRUE(rotationFound);
     EXPECT_TRUE(flipFound);
     EXPECT_TRUE(sleepFound);
-    EXPECT_TRUE(screenshotFound);
 }

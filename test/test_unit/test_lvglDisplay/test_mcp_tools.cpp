@@ -6,7 +6,12 @@
  * Module: test/test_unit/test_lvglDisplay/test_mcp_tools.cpp
  * Description: Unit tests for LVGLDisplayModule IMCPContributor implementation,
  *              covering tool discovery, mutability flags, parameters parsing,
- *              and tool contracts (display_status, display_control, capture_display).
+ *              and tool contracts (display_status, display_control).
+ *
+ * Note: capture_display is registered by DisplayServiceHelper (hardware-only,
+ *       guarded behind #ifndef UNIT_TEST). Brightness in display_status is
+ *       populated by populateCommonMCPStatus() via the helper. These are
+ *       tested on-device / via portal web tests.
  */
 
 #include <gtest/gtest.h>
@@ -47,7 +52,9 @@ protected:
 // =============================================================================
 
 TEST_F(LVGLMcpToolsTest, ToolRegistrationAndMutability) {
-    EXPECT_EQ(registry.size(), 3);
+    // Post-#88: module registers display_status + display_control only;
+    // capture_display is registered by DisplayServiceHelper (hardware-only)
+    EXPECT_EQ(registry.size(), 2);
 
     const MCPToolEntry* statusTool = registry.findTool("display_status");
     ASSERT_NE(statusTool, nullptr);
@@ -56,10 +63,6 @@ TEST_F(LVGLMcpToolsTest, ToolRegistrationAndMutability) {
     const MCPToolEntry* controlTool = registry.findTool("display_control");
     ASSERT_NE(controlTool, nullptr);
     EXPECT_TRUE(controlTool->mutatesState);
-
-    const MCPToolEntry* captureTool = registry.findTool("capture_display");
-    ASSERT_NE(captureTool, nullptr);
-    EXPECT_FALSE(captureTool->mutatesState);
 }
 
 // =============================================================================
@@ -70,8 +73,8 @@ TEST_F(LVGLMcpToolsTest, DisplayStatusStructureAndDefaults) {
     JsonDocument doc = callTool("display_status");
     JsonObject result = doc.as<JsonObject>();
 
-    EXPECT_TRUE(result.containsKey("brightness"));
-    EXPECT_EQ(result["brightness"].as<int>(), 255);
+    // brightness is populated by populateCommonMCPStatus() via DisplayServiceHelper
+    // (hardware-only, guarded behind #ifndef UNIT_TEST) — not asserted on native
 
     EXPECT_TRUE(result.containsKey("rotation"));
     EXPECT_EQ(result["rotation"].as<int>(), 0);
@@ -131,25 +134,11 @@ TEST_F(LVGLMcpToolsTest, DisplayControlMutations) {
     });
     EXPECT_STREQ(docSleep["status"].as<const char*>(), "ok");
 
-    // Verify updated status output
+    // Verify updated status output (brightness omitted — populated by helper on hardware)
     JsonDocument docStatus = callTool("display_status");
-    EXPECT_EQ(docStatus["brightness"].as<int>(), 180);
     EXPECT_EQ(docStatus["rotation"].as<int>(), 90);
     EXPECT_FALSE(docStatus["screensaverEnabled"].as<bool>());
 }
 
-// =============================================================================
-// Test Group: capture_display Contract
-// =============================================================================
-
-TEST_F(LVGLMcpToolsTest, CaptureDisplayContract) {
-    JsonDocument doc = callTool("capture_display");
-    JsonObject result = doc.as<JsonObject>();
-
-    EXPECT_FALSE(result.containsKey("error"));
-    EXPECT_STREQ(result["format"].as<const char*>(), "RGB565");
-    EXPECT_EQ(result["width"].as<int>(), 240);
-    EXPECT_EQ(result["height"].as<int>(), 240);
-    EXPECT_TRUE(result.containsKey("data"));
-    EXPECT_FALSE(result["data"].as<std::string>().empty());
-}
+// capture_display contract: now registered by DisplayServiceHelper (hardware-only).
+// Covered by portal web tests + on-device verification.
