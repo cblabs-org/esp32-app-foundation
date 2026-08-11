@@ -1,7 +1,7 @@
 ---
 name: adopt-display-interface-wo1
 description: Forward-port the SLS-redesign stack onto main (adopt #86-89) — copy clean files, reconcile 4 collisions, reach green
-complexity: architect
+complexity: standard
 ---
 
 # WO1 — Forward-Port SLS Stack onto main (adopt the display interface)
