@@ -1,0 +1,15 @@
+/* ==========================================================================
+   RADII — ESP32 App Foundation
+   Soft, generous rounding. Cards are the roundest surface; controls are
+   moderately rounded; pills/toggles/badges are fully round.
+   ========================================================================== */
+:root {
+  --radius-sm: 6px;    /* progress tracks, micro badges, icon buttons */
+  --radius-md: 8px;    /* alerts, callouts, terminal, login inputs    */
+  --radius-lg: 10px;   /* inputs, buttons, drawers                    */
+  --radius-xl: 12px;   /* banners, dialogs, status header             */
+  --radius-2xl: 16px;  /* cards, login card                           */
+  --radius-pill: 20px; /* sub-pills                                   */
+  --radius-round: 30px;/* theme-toggle track                          */
+  --radius-full: 9999px; /* toggle switch, status dots, avatars        */
+}

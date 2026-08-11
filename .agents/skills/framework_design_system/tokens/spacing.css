@@ -1,0 +1,20 @@
+/* ==========================================================================
+   SPACING — ESP32 App Foundation
+   The portal spaces in rem. This is the observed scale from app.css; it is
+   NOT a strict 4/8px grid — values are used as-authored.
+   ========================================================================== */
+:root {
+  --space-1: 0.25rem;   /* 4px  — tight gaps, dot margins        */
+  --space-2: 0.4rem;    /* ~6px — input top-margin, row padding  */
+  --space-3: 0.5rem;    /* 8px  — icon gaps, small gutters       */
+  --space-4: 0.75rem;   /* 12px — card gaps, form field spacing  */
+  --space-5: 1rem;      /* 16px — card margin, container padding */
+  --space-6: 1.25rem;   /* 20px — card padding                   */
+  --space-7: 1.5rem;    /* 24px — top-bar margin                 */
+  --space-8: 2rem;      /* 32px — delete-button top margin       */
+
+  /* Layout */
+  --portal-max-width: 480px;   /* the whole portal is phone-width       */
+  --nav-height: 65px;          /* fixed bottom navigation bar           */
+  --body-pad-bottom: 90px;     /* keeps content clear of bottom nav     */
+}

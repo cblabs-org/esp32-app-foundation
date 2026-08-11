@@ -1,0 +1,58 @@
+/* ==========================================================================
+   COLORS — ESP32 App Foundation
+   Base palette + semantic aliases. Semantic names (--primary, --bg, --text…)
+   are the CONTRACT: downstream apps re-theme by overriding these, and every
+   portal fragment reads them. Base ramp values are lifted verbatim from the
+   firmware's app.css.
+   ========================================================================== */
+:root {
+  /* --- Base palette --------------------------------------------------- */
+  --blue-500: #2196F3;   /* Material Blue 500 — brand accent            */
+  --blue-600: #1976D2;   /* Material Blue 700 — pressed / hover accent  */
+  --green-700: #2e7d32;  /* success                                     */
+  --red-700: #c62828;    /* error / danger                              */
+  --amber-600: #f9a825;  /* warning / advanced "danger zone"            */
+
+  /* Neutrals — light */
+  --white: #ffffff;
+  --grey-50: #f8f9fa;    /* card surface                                */
+  --grey-300: #dee2e6;   /* hairline border                             */
+  --grey-600: #6c757d;   /* muted text                                  */
+  --grey-900: #212529;   /* primary text                                */
+
+  /* Neutrals — dark */
+  --black-900: #121212;  /* dark background                             */
+  --black-800: #1e1e1e;  /* dark card surface / nav                     */
+  --black-700: #333333;  /* dark border                                 */
+  --grey-400: #adb5bd;   /* dark muted text                             */
+  --grey-200: #e0e0e0;   /* dark primary text                           */
+
+  /* Terminal log */
+  --terminal-bg: #1a1a1a;
+  --terminal-fg: #4ade80;
+
+  /* --- Semantic aliases (THE token contract) — Light theme (default) -- */
+  --primary: var(--blue-500);
+  --primary-hover: var(--blue-600);
+  --primary-alpha: rgba(33, 150, 243, 0.1);
+  --bg: var(--white);
+  --card-bg: var(--grey-50);
+  --text: var(--grey-900);
+  --text-muted: var(--grey-600);
+  --border: var(--grey-300);
+  --nav-bg: var(--white);
+  --success: var(--green-700);
+  --error: var(--red-700);
+  --warning: var(--amber-600);
+}
+
+/* --- Dark theme scope ------------------------------------------------- */
+[data-theme="dark"] {
+  --bg: var(--black-900);
+  --card-bg: var(--black-800);
+  --text: var(--grey-200);
+  --text-muted: var(--grey-400);
+  --border: var(--black-700);
+  --nav-bg: var(--black-800);
+  --primary-alpha: rgba(33, 150, 243, 0.15);
+}

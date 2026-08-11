@@ -1,0 +1,10 @@
+<!-- @dsCard group="Brand" viewport="700x260" name="Card & Page States" subtitle="AP-mode banner, interactive / empty / disabled card variants" -->
+<!DOCTYPE html><html><head><link rel="stylesheet" href="../styles.css"><style>*{box-sizing:border-box}html,body{height:100%}body{margin:0;font-family:var(--font-sans);background:var(--bg);color:var(--text)}.card-body{padding:18px}a{color:var(--primary)}a:hover{color:var(--primary-hover)}</style></head><body><div class="card-body" style="display:flex;flex-direction:column;gap:12px">
+<div style="background:var(--primary-alpha);border:1px solid var(--primary);color:var(--primary);padding:.8rem;border-radius:12px;font-weight:700;text-align:center;font-size:.85rem;text-transform:uppercase;letter-spacing:.5px">Access Point Mode — connect to configure</div>
+<div style="display:flex;gap:12px;flex-wrap:wrap">
+  <div style="flex:1;min-width:180px;background:var(--card-bg);border:1px solid var(--border);border-radius:16px;padding:1rem;box-shadow:0 4px 12px rgba(0,0,0,.1)"><strong>Interactive</strong><div style="font-size:12px;color:var(--text-muted);margin-top:4px">Hover-lift + shadow, tappable</div></div>
+  <div style="flex:1;min-width:180px;border:2px dashed var(--border);border-radius:16px;padding:1rem;opacity:.6;text-align:center;background:transparent"><strong>Empty</strong><div style="font-size:12px;color:var(--text-muted);margin-top:4px">Dashed, nothing yet</div></div>
+  <div style="flex:1;min-width:180px;background:var(--card-bg);border:1px solid var(--border);border-radius:16px;padding:1rem;opacity:.5;filter:grayscale(30%)"><strong>Disabled</strong><div style="font-size:12px;color:var(--text-muted);margin-top:4px">Greyed, no pointer</div></div>
+</div>
+<div style="display:flex;gap:8px;align-items:center;font-size:12px;color:var(--text-muted)"><span style="width:8px;height:8px;border-radius:50%;background:var(--primary);box-shadow:0 0 0 3px var(--primary-alpha);display:inline-block"></span> Focus ring — <code style="font-family:var(--font-mono)">2px solid --primary, offset 2px</code> on <code style="font-family:var(--font-mono)">:focus-visible</code></div>
+</div></body></html>

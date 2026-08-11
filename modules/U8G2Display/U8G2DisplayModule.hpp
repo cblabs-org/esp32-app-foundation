@@ -109,6 +109,7 @@
 class EventBus;
 class ConfigManager;
 class MCPToolRegistry;
+#include "DisplayServiceHelper.h"
 
 // ---------------------------------------------------------------------------
 // EventBus Payload Structs
@@ -650,6 +651,8 @@ private:
     ScreensaverBoard _screensaverBoard{_displayWidth, _displayHeight};  ///< Inactivity screensaver (burn-in prevention)
     ConfiguringStatusBoard _configuringStatusBoard{_displayWidth, _displayHeight}; ///< Gate progress during CONFIGURING phase
     GenericGateHelperBoard _genericHelperBoard{_displayWidth, _displayHeight};      ///< Generic fallback helper for config gates
+
+    DisplayServiceHelper _serviceHelper{this};
 
 public:
     // -------------------------------------------------------------------------

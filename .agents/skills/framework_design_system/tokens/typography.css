@@ -1,0 +1,39 @@
+/* ==========================================================================
+   TYPOGRAPHY — ESP32 App Foundation
+   Deliberately webfont-free: the portal is served from flash on an ESP32, so
+   it uses the device's native system UI stack (zero bytes shipped) and the
+   platform monospace for code/telemetry. No @font-face rules by design.
+   ========================================================================== */
+:root {
+  /* Families */
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: "Courier New", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* Base size — drives all rem math */
+  --font-size-base: 16px;
+
+  /* Type scale (rem, relative to 16px base) */
+  --text-2xs: 0.65rem;   /* nav labels, micro badges         */
+  --text-xs: 0.7rem;     /* pill mode badges, meta           */
+  --text-sm: 0.75rem;    /* diag tables, terminal, captions  */
+  --text-base-sm: 0.8rem;/* pills, secondary body            */
+  --text-body: 0.85rem;  /* default portal body text         */
+  --text-label: 0.9rem;  /* form labels                      */
+  --text-md: 1rem;       /* inputs, buttons                  */
+  --text-card-title: 1.1rem; /* card <header>                */
+  --text-h2: 1.5rem;     /* portal title                     */
+
+  /* Weights */
+  --weight-normal: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+  --weight-heavy: 800;   /* portal title only                */
+
+  /* Line height */
+  --leading-body: 1.5;
+
+  /* Letter spacing */
+  --tracking-title: -0.5px;  /* tight, on the h2 title       */
+  --tracking-caps: 0.5px;    /* uppercase labels/banners     */
+}
