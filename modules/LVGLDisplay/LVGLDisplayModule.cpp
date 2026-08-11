@@ -21,7 +21,9 @@
 #include <base64.h>
 #include <mbedtls/base64.h>
 #include <vector>
-#include "utils/BufferStream.h"
+#ifndef UNIT_TEST
+#include "utils/BufferStream.h"  // needs Arduino Print.h; only used by the hardware capture path
+#endif
 #include <cstdio>
 #include <PsychicHttp.h>
 #include "esp_heap_caps.h"
@@ -157,9 +159,11 @@ bool LVGLDisplayModule::beginEarly() {
 
 void LVGLDisplayModule::begin(EventBus* eventBus) {
     _eventBus = eventBus;
+#ifndef UNIT_TEST
     _serviceHelper.setSaveCallback([this]() {
         if (_configManager) _configManager->saveModuleConfig(this);
     });
+#endif
 
     // Phase 1 fallback: ensure bootstrapHardware() ran
     if (_display == nullptr) {
@@ -297,6 +301,7 @@ bool LVGLDisplayModule::isSleeping() const {
 }
 
 bool LVGLDisplayModule::capturePNG(Print& sink) {
+#ifndef UNIT_TEST
     uint8_t* snapBuffer = nullptr;
     size_t snapSize = 0;
     uint16_t w = 0, h = 0;
@@ -308,6 +313,10 @@ bool LVGLDisplayModule::capturePNG(Print& sink) {
     bool ok = PngWriter::writeRGB565ToRGB888(sink, w, h, reinterpret_cast<const uint16_t*>(snapBuffer));
     freeSnapshot(snapBuffer);
     return ok;
+#else
+    (void)sink;  // native build: PngWriter (ROM tdefl) is hardware-only
+    return false;
+#endif
 }
 
 void LVGLDisplayModule::showSystemState(const SystemDisplayParams& params) {
@@ -739,13 +748,17 @@ void LVGLDisplayModule::freeSnapshot(uint8_t* buffer) {
 }
 
 void LVGLDisplayModule::registerRoutes(PsychicHttpServer& server) {
+#ifndef UNIT_TEST
     _serviceHelper.registerBrightnessRoute(server);
     _serviceHelper.registerScreenshotRoute(server);
+#endif
 
     // GET /api/display/status
     server.on("/api/display/status", HTTP_GET, [this](PsychicRequest* request, PsychicResponse* response) {
         JsonDocument doc;
+#ifndef UNIT_TEST
         _serviceHelper.populateCommonStatus(doc);
+#endif
 
         doc["rotation"]           = _rotation;
         doc["flip"]               = (_rotation == 180);
@@ -882,7 +895,9 @@ void LVGLDisplayModule::registerRoutes(PsychicHttpServer& server) {
  * @param registry The MCPToolRegistry to register tools with.
  */
 void LVGLDisplayModule::registerMCPTools(MCPToolRegistry& registry) {
+#ifndef UNIT_TEST
     _serviceHelper.registerCaptureTool(registry);
+#endif
 
     // --- Tool 1: display_status (read-only) ---
     registry.addTool(
@@ -892,7 +907,9 @@ void LVGLDisplayModule::registerMCPTools(MCPToolRegistry& registry) {
             auto* self = static_cast<LVGLDisplayModule*>(ctx);
             (void)params;
 
+#ifndef UNIT_TEST
             self->_serviceHelper.populateCommonMCPStatus(result);
+#endif
 
             result["rotation"]           = self->_rotation;
             result["screensaverEnabled"] = self->_screensaverEnabled;
