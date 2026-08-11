@@ -16,4 +16,5 @@ inline size_t heap_caps_get_total_size(uint32_t caps) { (void)caps; return 30000
 inline size_t heap_caps_get_largest_free_block(uint32_t caps) { (void)caps; return 100000; }
 
 inline void* heap_caps_malloc(size_t size, uint32_t caps) { (void)caps; return malloc(size); }
+inline void* heap_caps_calloc(size_t n, size_t size, uint32_t caps) { (void)caps; return calloc(n, size); }
 inline void heap_caps_free(void* ptr) { free(ptr); }
