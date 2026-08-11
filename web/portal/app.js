@@ -331,6 +331,9 @@ document.addEventListener('DOMContentLoaded', function() {
         var div = document.createElement('div');
         div.id = tabId;
         div.className = 'tab-content';
+        div.setAttribute('role', 'tabpanel');
+        div.setAttribute('tabindex', '0');
+        div.setAttribute('aria-labelledby', 'nav-' + tabId.replace('tab-', ''));
         document.querySelector('.tab-content-container').appendChild(div);
       }
 
@@ -350,7 +353,7 @@ document.addEventListener('DOMContentLoaded', function() {
       link.setAttribute('data-injected', 'true');
       link.setAttribute('role', 'tab');
       link.setAttribute('aria-selected', 'false');
-      link.setAttribute('aria-controls', 'tab-content-area');
+      link.setAttribute('aria-controls', tabId);
       link.id = 'nav-' + tabId.replace('tab-', '');
       link.innerHTML = '<span class="icon">' + svgHTML + '</span>' + tab.name.toUpperCase();
 
@@ -373,6 +376,9 @@ document.addEventListener('DOMContentLoaded', function() {
           var cdiv = document.createElement('div');
           cdiv.id = childId;
           cdiv.className = 'tab-content';
+          cdiv.setAttribute('role', 'tabpanel');
+          cdiv.setAttribute('tabindex', '0');
+          cdiv.setAttribute('aria-labelledby', 'pill-' + childId.replace('tab-', ''));
           document.querySelector('.tab-content-container').appendChild(cdiv);
         }
       }
@@ -407,12 +413,6 @@ document.addEventListener('DOMContentLoaded', function() {
       link.setAttribute('aria-selected', isActive ? 'true' : 'false');
     });
 
-    // --- Update tabpanel label ---
-    var contentArea = document.getElementById('tab-content-area');
-    var activeLink = bottomNav.querySelector('.tab-link--active');
-    if (contentArea && activeLink && activeLink.id) {
-      contentArea.setAttribute('aria-labelledby', activeLink.id);
-    }
 
     // --- Find the parent tab name for this tabId ---
     var parentName = tabIdToName(tabId);
@@ -470,7 +470,11 @@ document.addEventListener('DOMContentLoaded', function() {
       var childId = 'tab-' + child.name.toLowerCase().replace(/\s+/g, '-');
 
       var btn = document.createElement('button');
+      btn.id = 'pill-' + childId.replace('tab-', '');
       btn.className = 'pill-btn';
+      btn.setAttribute('role', 'tab');
+      btn.setAttribute('aria-selected', 'false');
+      btn.setAttribute('aria-controls', childId);
       btn.setAttribute('data-target', childId);
       btn.setAttribute('data-parent', parentName);
       btn.textContent = child.name;
@@ -495,7 +499,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Update pill active state
     pillBar.querySelectorAll('.pill-btn').forEach(function(btn) {
-      btn.classList.toggle('pill-btn--active', btn.getAttribute('data-target') === childId);
+      var isActive = btn.getAttribute('data-target') === childId;
+      btn.classList.toggle('pill-btn--active', isActive);
+      btn.setAttribute('aria-selected', isActive ? 'true' : 'false');
     });
 
     // Show the child content div

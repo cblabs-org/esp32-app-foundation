@@ -43,70 +43,70 @@
     </div>
 
     <!-- Sub-pill navigation bar (populated by app.js) -->
-    <div id="pill-bar" class="pill-bar" style="display:none;"></div>
+    <div id="pill-bar" class="pill-bar" role="tablist" aria-label="Sub-navigation" style="display:none;"></div>
 
     <!-- ================================================================== -->
     <!-- Tab Content Area                                                    -->
     <!-- All tab content divs are dynamically shown/hidden by app.js.        -->
     <!-- Fragment JS files inject their UI into their container div.          -->
     <!-- ================================================================== -->
-    <div class="tab-content-container" id="tab-content-area" role="tabpanel" aria-labelledby="nav-wifi" tabindex="0">
+    <div class="tab-content-container" id="tab-content-area">
       <!-- WiFi tab (top-level, framework) -->
-      <div id="tab-wifi" class="tab-content">
+      <div id="tab-wifi" class="tab-content" role="tabpanel" tabindex="0" aria-labelledby="nav-wifi">
         <!-- Populated by wifi.js -->
       </div>
 
       <!-- Display tab (top-level, contributed by U8G2DisplayModule) -->
-      <div id="tab-display" class="tab-content">
+      <div id="tab-display" class="tab-content" role="tabpanel" tabindex="0" aria-labelledby="nav-display">
       </div>
       <!-- Display sub-pill: Settings (populated by display.js) -->
-      <div id="tab-settings" class="tab-content">
+      <div id="tab-settings" class="tab-content" role="tabpanel" tabindex="0" aria-labelledby="pill-settings">
       </div>
       <!-- Display sub-pill: Screenshot (populated by screenshot.js) -->
-      <div id="tab-screenshot" class="tab-content">
+      <div id="tab-screenshot" class="tab-content" role="tabpanel" tabindex="0" aria-labelledby="pill-screenshot">
         <!-- Populated by screenshot.js -->
       </div>
       <!-- Display sub-pill: Carousel (populated by carousel.js, U8G2 only) -->
-      <div id="tab-carousel" class="tab-content">
+      <div id="tab-carousel" class="tab-content" role="tabpanel" tabindex="0" aria-labelledby="pill-carousel">
       </div>
       <!-- Display sub-pill: Hardware (populated by hardware.js, LVGL only) -->
-      <div id="tab-hardware" class="tab-content">
+      <div id="tab-hardware" class="tab-content" role="tabpanel" tabindex="0" aria-labelledby="pill-hardware">
       </div>
 
       <!-- App tab (top-level, application-level config) -->
-      <div id="tab-app" class="tab-content">
+      <div id="tab-app" class="tab-content" role="tabpanel" tabindex="0" aria-labelledby="nav-app">
         <!-- Populated by appconfig.js -->
       </div>
 
       <!-- Security tab (top-level parent, contributed by AuthManager) -->
-      <div id="tab-security" class="tab-content">
+      <div id="tab-security" class="tab-content" role="tabpanel" tabindex="0" aria-labelledby="nav-security">
       </div>
       <!-- Security sub-pill: Password (populated by auth.js) -->
-      <div id="tab-password" class="tab-content">
+      <div id="tab-password" class="tab-content" role="tabpanel" tabindex="0" aria-labelledby="pill-password">
       </div>
       <!-- Security sub-pill: TLS (populated by auth.js) -->
-      <div id="tab-tls" class="tab-content">
+      <div id="tab-tls" class="tab-content" role="tabpanel" tabindex="0" aria-labelledby="pill-tls">
       </div>
 
       <!-- System tab (top-level parent, framework) -->
-      <div id="tab-system" class="tab-content">
+      <div id="tab-system" class="tab-content" role="tabpanel" tabindex="0" aria-labelledby="nav-system">
       </div>
       <!-- System sub-pill: Status (populated by system.js) -->
-      <div id="tab-status" class="tab-content">
+      <div id="tab-status" class="tab-content" role="tabpanel" tabindex="0" aria-labelledby="pill-status">
       </div>
       <!-- System sub-pill: Time (populated by time.js) -->
-      <div id="tab-time" class="tab-content">
+      <div id="tab-time" class="tab-content" role="tabpanel" tabindex="0" aria-labelledby="pill-time">
       </div>
-      <div id="tab-keys" class="tab-content">
+      <div id="tab-keys" class="tab-content" role="tabpanel" tabindex="0" aria-labelledby="pill-keys">
         <!-- Populated by keys.js -->
       </div>
-      <div id="tab-mcp" class="tab-content">
+      <div id="tab-mcp" class="tab-content" role="tabpanel" tabindex="0" aria-labelledby="pill-mcp">
         <!-- Populated by mcp.js -->
       </div>
-      <div id="tab-backup" class="tab-content">
+      <div id="tab-backup" class="tab-content" role="tabpanel" tabindex="0" aria-labelledby="pill-backup">
         <!-- Populated by backup.js -->
       </div>
-      <div id="tab-ota" class="tab-content">
+      <div id="tab-ota" class="tab-content" role="tabpanel" tabindex="0" aria-labelledby="pill-ota">
         <!-- Populated by ota.js -->
       </div>
     </div>
@@ -120,7 +120,7 @@
     <!-- App tabs are injected dynamically by app.js.                        -->
     <!-- ================================================================== -->
     <nav class="bottom-nav" id="bottom-nav" role="tablist" aria-label="Main navigation">
-      <a href="#" class="tab-link tab-link--active" data-target="tab-wifi" id="nav-wifi" role="tab" aria-selected="true" aria-controls="tab-content-area">
+      <a href="#" class="tab-link tab-link--active" data-target="tab-wifi" id="nav-wifi" role="tab" aria-selected="true" aria-controls="tab-wifi">
         <span class="icon">
           <!-- WiFi arcs SVG -->
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -133,7 +133,7 @@
         WIFI
       </a>
       <!-- Security tab — hardcoded with lock icon; auth.js populates content -->
-      <a href="#" class="tab-link" data-target="tab-security" id="nav-security" role="tab" aria-selected="false" aria-controls="tab-content-area">
+      <a href="#" class="tab-link" data-target="tab-security" id="nav-security" role="tab" aria-selected="false" aria-controls="tab-security">
         <span class="icon">
           <!-- Feather-icons padlock SVG -->
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -144,7 +144,7 @@
         </span>
         SECURITY
       </a>
-      <a href="#" class="tab-link" data-target="tab-system" id="nav-system" role="tab" aria-selected="false" aria-controls="tab-content-area">
+      <a href="#" class="tab-link" data-target="tab-system" id="nav-system" role="tab" aria-selected="false" aria-controls="tab-system">
         <span class="icon">
           <!-- Gear/Settings SVG -->
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
