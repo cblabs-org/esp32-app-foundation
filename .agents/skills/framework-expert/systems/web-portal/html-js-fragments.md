@@ -102,6 +102,10 @@ Although each tab renders into its own container, all tabs share the same DOM do
 > Do **NOT** embed credentials, API keys, or private system data directly inside the raw JavaScript string.
 > All sensitive configuration and state data must be fetched at runtime via authenticated `/api/` REST endpoints (using `window.apiFetch()`).
 
+## Design System Compliance
+
+All portal tab markup **must** use the project's design system tokens and components rather than hard-coded colours, spacing, or ad-hoc CSS classes. The design system provides ready-made components (Drawer, PillBar, InfoRow, ToggleSwitch, Input, Select, etc.) and a module-tab scaffold template. See `../../../framework-design-system/readme.md` for the full reference and `../../../framework-design-system/templates/module-tab/` for a starter template.
+
 ## Persistence & Save Policy
 
 All configuration modifications made within the UI should follow the framework's strict four-tier save policy. This guarantees a consistent user experience with appropriate user feedback (toasts or reboot overlays) for every action. Refer to the [Save Policy](save-policy.md) documentation for full implementation patterns.

@@ -89,6 +89,7 @@ This skill uses a progressive disclosure model. Based on your query, load and re
 | **Config System** (Persistence, FrameworkConfig, ConfigManifest) | `systems/config/` |
 | **Event Bus** (Topics, pub/sub, custom topics) | `systems/event-bus/` |
 | **Web Portal** (SPA, routes, HTML/JS fragments, security) | `systems/web-portal/` |
+| **Design System** (Tokens, components, templates, UI kit for portal styling) | Sibling skill: `../framework-design-system/readme.md` |
 | **OTA Update System** (State machine, channels, config lifecycle, deploy) | `systems/ota/` |
 | **MCP Server** (Device interaction, JSON-RPC protocol, tool discovery, scripts) | `systems/mcp-server/` |
 | **Device Interaction Scripts** (discovery, diagnostics, display capture) | `scripts/device-mcp/` |

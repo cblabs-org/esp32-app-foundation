@@ -81,3 +81,7 @@ The web portal boots via the following sequential steps:
    where the container ID slug is derived from the name: `'tab-' + name.toLowerCase().replace(/\s+/g, '-')`.
 6. **Navigation Render**: The bottom navigation links and sub-pill buttons are rendered.
 7. **Initial Activation**: The default tab is activated, triggering the `tab-changed` event and causing the script to render its content.
+
+## Design System
+
+When building or modifying portal UI, use the project's design system for all styling decisions — colour tokens, typography, spacing, component patterns (Drawer, PillBar, InfoRow, ToggleSwitch, etc.), and the module-tab scaffold template. See the sibling skill at `../../../framework-design-system/readme.md`.

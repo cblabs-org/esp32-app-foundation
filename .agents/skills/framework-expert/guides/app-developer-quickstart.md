@@ -85,6 +85,9 @@ public:
 ```
 *Reference:* [`../interfaces/web-contributor.md`](../interfaces/web-contributor.md)
 
+> [!TIP]
+> Use the project's design system for all portal styling — tokens, components, and the module-tab scaffold template. See `../../framework-design-system/readme.md`.
+
 ## Step 6: Background Fetching (`IDataSource`)
 
 For slow network requests (like fetching a forecast), use `IDataSource` to offload work to a FreeRTOS background task.
@@ -154,6 +157,7 @@ Once your prototype is working, review these deep dives before shipping:
 - **[Performance & Optimization](../performance/overview.md)**: Ensure your app fits within the constrained ESP32 heap.
 - **[Replacing the Display](../systems/display/replacing-the-display.md)**: Using TFTs or e-ink instead of OLED.
 - **[Coding Patterns & Style Guide](../coding-patterns/overview.md)**: Ensure your app structure aligns with the framework's house style.
+- **[Design System](../../framework-design-system/readme.md)**: Colour tokens, typography, spacing, and pre-built portal components.
 
 ## Want a Structured Design Spec?
 

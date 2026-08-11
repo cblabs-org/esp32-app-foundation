@@ -252,6 +252,9 @@ log.clear();
 
 ## CSS Components
 
+> [!TIP]
+> The components below are lightweight utility classes bundled in `utils.js`. For the **full** design system — colour tokens, typography, spacing scale, elevation, motion, and rich components (Drawer, PillBar, InfoRow, ToggleSwitch, etc.) — see `../../../framework-design-system/readme.md`.
+
 ### `.alert` Component
 
 Use `.alert` to display inline feedback boxes. Available modifier classes are:
