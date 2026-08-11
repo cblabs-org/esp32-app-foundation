@@ -53,17 +53,21 @@ Stacked; wo1 bases on `origin/main`, wo2 on wo1.
   files, reconcile the 4 collision files + doc/submodule merges, drop the obsolete `capture_display`
   guard. **Gate:** native suite green + `crowpanel-128-rotary` + `esp32dev` + `esp32s3nano` all compile.
   Autonomous worker (objective build/test gate). **COMPLETE** — tip `216f160`.
-- **[ ] [wo2-hardware-configuring](wo2-hardware-configuring/WORKORDER.md)** *(architect, interactive)* —
-  On physical CrowPanel: re-verify the WO7 wins on the new base (boot animation, colours), exercise
-  `capturePNG` on-device (closes the #86 S3-ROM-`tdefl` runtime gap), then resume the CONFIGURING phase
-  (Setup/Busy/Message via `_onAppConfiguring`) + reconcile `showSystemState(Configuring)`. Human-at-bench.
+- **[x] wo2-hardware-configuring** *(interactive, multi-agent)* —
+  On physical CrowPanel: exercise `capturePNG` on-device (close the #86 S3-ROM-`tdefl` runtime gap),
+  fix boot→configuring→running transition, verify on hardware. **COMPLETE** — screenshot API stable,
+  boot transition restored, `v0.0.12-dev.44` verified on device. Merged to `main` at `b393e74`.
 
-## 4. Open design decisions (resolve in WO1/WO2)
+## 4. Open design decisions — RESOLVED
 
-- `showSystemState(Configuring)` currently calls `reportStatus()` (paints the *boot* screen). After our
-  rework `reportStatus` drives the SLS boot screen — wrong for configuring. **WO1:** leave as-is (compiles,
-  behaviourally same-ish); **WO2:** repoint to the configuring dispatch or unify with `_onAppConfiguring`.
-- Route our display web/MCP screenshot/status through `DisplayServiceHelper` (adopt #88) where applicable.
+- ~~`showSystemState(Configuring)` calls `reportStatus()`~~ — **Resolved:** The forward-port's gutted
+  `_onAppConfiguring`/`_onAppRunning` handlers were restored from the SLS branch. `_onAppConfiguring`
+  now uses the #82 three-tier dispatch (Setup/Busy/Message via `GateActionStatus`). `_onAppRunning`
+  clears system-screen state and loads `ui_ui_DiagScreen`. `showSystemState` is unused (Application
+  drives display purely via EventBus `APP_CONFIGURING`/`APP_RUNNING` events). No loop risk.
+- ~~Route screenshot through `DisplayServiceHelper`~~ — **Deferred:** Screenshot API works directly
+  via WebServerManager + LVGLDisplayModule cross-thread snapshot. DisplayServiceHelper integration
+  is a future enhancement, not blocking.
 
 ## 5. Session Log
 
@@ -71,3 +75,21 @@ Stacked; wo1 bases on `origin/main`, wo2 on wo1.
 |------|-------|
 | 2026-08-11 | Reviewed #86 (twice; blockers fixed by author) + #87/#88/#89. Mapped merge surface (4 collision files, ~50 clean). Human directed forward-port (no merge/squash) + PA-led execution ("proceed please"). Created `adopt-display-interface/wo1-forward-port` off `origin/main` @ `6fffa41`. Decomposed into wo1 (forward-port to green) + wo2 (hardware + CONFIGURING). |
 | 2026-08-11 | **WO1 complete.** Forward-port (steps 1–3) done across sessions `b095e8d`→`5c6a3b9`. Final step: trimmed 5 native tests to post-#88 module contract (user-approved Option 1) — `216f160`. Verification: native **482/482** PASSED; `crowpanel-128-rotary`, `esp32dev`, `esp32s3nano` all **[SUCCESS]**. Next: WO2 (flash CrowPanel + CONFIGURING). |
+| 2026-08-11 | **WO2 complete (multi-agent).** Session `b52fe7ae` (screenshot debugging agent) found: (1) ROM `tdefl_compressor` is ~164KB not 82KB → hardcoded 64KB under-allocation caused `LoadProhibited` crash, (2) 4KB HTTP worker stack overflowed from tdefl callback recursion → bumped to 16KB, (3) `lv_snapshot` called from HTTP thread (unsafe) → deferred to LVGL tick via `_pendingSnapshot`/`_snapshotComplete` atomics, (4) screensaver early-return blocked snapshot processing → moved below event drain. Session `39c65de6` (this session) picked up where that agent hit its usage limit: (a) identified the **real** boot transition root cause — forward-port kept main's gutted `_onAppConfiguring`/`_onAppRunning` (my WORKORDER said "keep main's" — that was the miss), restored the SLS three-tier dispatch + `ui_ui_DiagScreen` load, (b) fixed native `test_pngWriter` build — `#include <esp_heap_caps.h>` was inside `#ifdef ARDUINO` so native never got heap_caps symbols; moved include outside guard, added `heap_caps_calloc` to central stub, stripped redundant ad-hoc stubs from test. Hardware verified: `v0.0.12-dev.44`, boot→running transition works, screenshot API returns 240×240 RGB PNG in ~220ms, heap healthy (78KB DRAM, 8.4MB PSRAM). Merged to `main` at `b393e74`, pushed. |
+
+### 2026-08-11 — Project Wrap-Up
+
+**Architectural outcome**: The SLS SquareLine Studio display stack (WO1–WO7 from `sls-screen-redesign`) is now live on `main`, coexisting with the #86 unified `IDisplayModule` interface. The forward-port replaced the 3 built-in C++ screens (`BootScreen`/`ErrorScreen`/`OTAProgressScreen`) with SLS-generated UI files + `SLSSystemScreens` + `FaultScreen`. The CONFIGURING lifecycle orchestration (#82 three-tier dispatch) is wired and functional. The screenshot API is production-stable on ESP32-S3 with PSRAM-backed buffers.
+
+**Cross-cutting decisions**:
+- `showSystemState()` is effectively dead code — `Application` drives display purely via EventBus. Could be removed in a future cleanup pass.
+- The CONFIGURING screen is never visible on warm boots with saved WiFi credentials (gate clears in <1s). This is correct behaviour — visible only when WiFi is missing/slow or other gates are pending.
+- PngWriter's `#include <esp_heap_caps.h>` must be unconditional (not inside `#ifdef ARDUINO`) since the function body uses heap_caps symbols unconditionally.
+
+**Dead ends (project-wide)**:
+- The session report from the screenshot-debugging agent hypothesized `_screens->mainScreen()` returning nullptr as the boot-stuck cause. Wrong — `ILVGLSystemScreens` has no `mainScreen()`. The real cause was gutted EventBus handlers.
+- Commit `2100c57` tried to fix native PngWriter by adding `#include <esp_heap_caps.h>` to PngWriter.cpp but put it inside `#ifdef ARDUINO` — no effect on native. The proper fix was moving it outside the guard.
+
+**Unresolved items (deferred)**:
+- Route screenshot/display-status through `DisplayServiceHelper` (#88) for consistency with U8G2.
+- Tick budget warnings during boot transition (Module 1 exceeds 33ms budget for ~400ms during screen load). The `pr-tick-budget-override` project (planned, per-module override) would eliminate these false positives.

@@ -1,5 +1,5 @@
 # Principal Architect Memory
-<!-- Last updated: 2026-08-11T14:47:00+01:00 -->
+<!-- Last updated: 2026-08-11T18:00:00+01:00 -->
 
 ## Active Programs
 | Program | Plan | Status |
@@ -21,6 +21,7 @@
 ## Recently Completed (last 5)
 | Project | Completed | Modules | Key Outcome |
 |---|---|---|---|
+| pr-adopt-display-interface | 2026-08-11 | LVGLDisplay, PngWriter, WebServer | Forward-port SLS display stack onto main + #86 interface. Screenshot API stable (tdefl 164KB, PSRAM, threaded). Boot transition restored. `v0.0.12-dev.44` device-verified. [PROJECT.md](../pr-adopt-display-interface/PROJECT.md) |
 | aria-tabpanel | 2026-08-11 | web-portal | Complete WAI-ARIA tabpanel semantics on portal tabs + sub-pills; PR #93 merged closing issue #92 |
 
 ## Older Projects
