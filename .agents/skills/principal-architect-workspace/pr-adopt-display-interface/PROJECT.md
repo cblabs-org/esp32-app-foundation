@@ -49,10 +49,10 @@ copy over verbatim. Collisions are concentrated in **4 files** + a few doc/submo
 
 Stacked; wo1 bases on `origin/main`, wo2 on wo1.
 
-- **[ ] [wo1-forward-port](wo1-forward-port/WORKORDER.md)** *(architect)* — Forward-port the clean SLS
+- **[x] [wo1-forward-port](wo1-forward-port/WORKORDER.md)** *(architect)* — Forward-port the clean SLS
   files, reconcile the 4 collision files + doc/submodule merges, drop the obsolete `capture_display`
   guard. **Gate:** native suite green + `crowpanel-128-rotary` + `esp32dev` + `esp32s3nano` all compile.
-  Autonomous worker (objective build/test gate).
+  Autonomous worker (objective build/test gate). **COMPLETE** — tip `216f160`.
 - **[ ] [wo2-hardware-configuring](wo2-hardware-configuring/WORKORDER.md)** *(architect, interactive)* —
   On physical CrowPanel: re-verify the WO7 wins on the new base (boot animation, colours), exercise
   `capturePNG` on-device (closes the #86 S3-ROM-`tdefl` runtime gap), then resume the CONFIGURING phase
@@ -70,3 +70,4 @@ Stacked; wo1 bases on `origin/main`, wo2 on wo1.
 | Date | Event |
 |------|-------|
 | 2026-08-11 | Reviewed #86 (twice; blockers fixed by author) + #87/#88/#89. Mapped merge surface (4 collision files, ~50 clean). Human directed forward-port (no merge/squash) + PA-led execution ("proceed please"). Created `adopt-display-interface/wo1-forward-port` off `origin/main` @ `6fffa41`. Decomposed into wo1 (forward-port to green) + wo2 (hardware + CONFIGURING). |
+| 2026-08-11 | **WO1 complete.** Forward-port (steps 1–3) done across sessions `b095e8d`→`5c6a3b9`. Final step: trimmed 5 native tests to post-#88 module contract (user-approved Option 1) — `216f160`. Verification: native **482/482** PASSED; `crowpanel-128-rotary`, `esp32dev`, `esp32s3nano` all **[SUCCESS]**. Next: WO2 (flash CrowPanel + CONFIGURING). |
