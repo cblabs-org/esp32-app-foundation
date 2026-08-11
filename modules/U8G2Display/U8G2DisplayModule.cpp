@@ -877,6 +877,32 @@ void U8G2DisplayModule::registerRoutes(PsychicHttpServer& server) {
         return ESP_OK;
     });
 
+    // --- POST /api/display/interval — set rotation interval ---
+    server.on("/api/display/interval", HTTP_POST,
+        [this](PsychicRequest *request, PsychicResponse* response) {
+            const char* body = request->bodyCStr();
+            if (!body || strlen(body) == 0) {
+                response->send(400, "application/json", "{\"error\":\"body_required\"}");
+                return ESP_FAIL;
+            }
+            JsonDocument doc;
+            DeserializationError err = deserializeJson(doc, body);
+            if (err || !doc["value"].is<unsigned long>()) {
+                response->send(400, "application/json", "{\"error\":\"Invalid JSON or missing 'value'\"}");
+                return ESP_FAIL;
+            }
+
+            setRotationInterval(doc["value"].as<unsigned long>());
+
+            if (_configManager != nullptr) {
+                _configManager->saveModuleConfig(this);
+            }
+
+            response->send(200, "application/json", "{\"status\":\"ok\"}");
+            return ESP_OK;
+        }
+    );
+
     // --- POST /api/display/clockFontSize — set clock font size ---
     server.on("/api/display/clockFontSize", HTTP_POST,
         [this](PsychicRequest *request, PsychicResponse* response) {

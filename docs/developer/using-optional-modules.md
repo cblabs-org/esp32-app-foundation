@@ -123,6 +123,7 @@ struct SettingsTabStub : public IWebContributor {
 // Expose for external registration
 IWebContributor* settingsTabStub()   { return &_settingsTabStub;   }
 IWebContributor* screenshotTabStub() { return &_screenshotTabStub; }
+IWebContributor* carouselTabStub()   { return &_carouselContributor; }
 ```
 
 These stubs are registered as separate modules by `Application::begin()`:
@@ -132,6 +133,8 @@ These stubs are registered as separate modules by `Application::begin()`:
 app.registerModule(&display);                       // Main display module
 app.registerModule(display.settingsTabStub());      // Settings sub-pill
 app.registerModule(display.screenshotTabStub());    // Screenshot sub-pill
+app.registerModule(display.carouselTabStub());      // Carousel sub-pill (U8G2)
+// For LVGL, you would register display.hardwareTabStub() instead of carouselTabStub()
 ```
 
 Each sub-object is a full `IWebContributor` that appears as a child tab. The stubs carry no routes of their own — all REST endpoints are registered by the parent module via `registerRoutes()`.

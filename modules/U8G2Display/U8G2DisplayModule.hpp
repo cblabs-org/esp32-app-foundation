@@ -413,6 +413,12 @@ public:
      */
     IWebContributor* screenshotTabStub() { return &_screenshotTabStub; }
 
+    /**
+     * @brief Return the Carousel sub-pill stub for registration by Application.
+     * @return Pointer to the Carousel IWebContributor stub.
+     */
+    IWebContributor* carouselTabStub()   { return &_carouselContributor;   }
+
     // -------------------------------------------------------------------------
     // IMCPContributor — MCP display tools
     // -------------------------------------------------------------------------
@@ -535,6 +541,15 @@ private:
 
     SettingsTabStub    _settingsTabStub;    ///< Nav stub: Settings sub-pill under Display
     ScreenshotTabStub  _screenshotTabStub;  ///< Nav stub: Screenshot sub-pill under Display
+    
+    struct CarouselContributor : public IWebContributor {
+        void        registerRoutes(PsychicHttpServer& /*server*/) override {}
+        const char* getTabName()   const override { return "Carousel"; }
+        const char* getParentTab() const override { return "Display";  }
+        int         getTabOrder()  const override { return 30;         }
+        const char* getTabScript() const override { return "/carousel.js"; }
+    };
+    CarouselContributor _carouselContributor; ///< Nav stub: Carousel sub-pill under Display
 
     // -------------------------------------------------------------------------
     // Private carousel engine methods

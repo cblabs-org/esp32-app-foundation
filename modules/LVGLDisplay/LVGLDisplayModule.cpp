@@ -697,6 +697,7 @@ void LVGLDisplayModule::registerRoutes(PsychicHttpServer& server) {
         _serviceHelper.populateCommonStatus(doc);
 
         doc["rotation"]           = _rotation;
+        doc["flip"]               = (_rotation == 180);
         doc["screensaverEnabled"] = _screensaverEnabled;
         doc["dimTimeout"]         = _dimTimeoutMs;
         doc["blankTimeout"]       = _blankTimeoutMs;

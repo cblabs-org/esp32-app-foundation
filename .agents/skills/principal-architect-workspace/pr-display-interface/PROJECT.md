@@ -3,7 +3,7 @@
 **RFC:** [#85](https://github.com/matthewmcneill/esp32-app-foundation/issues/85)
 **PR:** [#86](https://github.com/matthewmcneill/esp32-app-foundation/pull/86)
 **Base branch:** `main`
-**Status:** 🔄 IN PROGRESS — WO1–WO5 complete + review fixes, WO6–WO7 pending
+**Status:** ✅ COMPLETE — all 7 WOs delivered
 **Human approval:** ✅ Approved 2026-08-10 (WO1–5), ✅ Approved 2026-08-11 (WO6–7)
 
 ---
@@ -51,8 +51,8 @@ This project introduces `IDisplayModule`, a unified interface formalising the mi
 - **[x] [wo3-lvgl-implementation](wo3-lvgl-implementation/WORKORDER.md):** Implement `IDisplayModule` on `LVGLDisplayModule` — DEFLATE-compressed PNG capture via PSRAM, system state dispatch, self-register `capture_display` MCP tool
 - **[x] [wo4-framework-wiring](wo4-framework-wiring/WORKORDER.md):** Wire `IDisplayModule*` into `Application::registerModule()`, remove `capture_display` from `MCPBuiltinTools`, delete `DisplayInfo`, remove `#ifndef` guard
 - **[x] [wo5-portal-scripts-docs](wo5-portal-scripts-docs/WORKORDER.md):** Rewrite `screenshot.js` for PNG, update HTTP endpoints, consolidate host scripts, update skill and developer docs
-- **[ ] [wo6-service-helper](wo6-service-helper/WORKORDER.md):** Extract `DisplayServiceHelper` — shared contract-driven REST routes (brightness, screenshot) + MCP tools (`display_status`, `capture_display`) + status population helpers
-- **[ ] [wo7-portal-pills](wo7-portal-pills/WORKORDER.md):** Portal pill restructure — clean `display.js` (contract-only), create `carousel.js` (U8G2), `hardware.js` (LVGL), add diagnostics info drawer
+- **[x] [wo6-service-helper](wo6-service-helper/WORKORDER.md):** Extract `DisplayServiceHelper` — shared contract-driven REST routes (brightness, screenshot) + MCP tools (`display_status`, `capture_display`) + status population helpers + save callback pattern
+- **[x] [wo7-portal-pills](wo7-portal-pills/WORKORDER.md):** Portal pill restructure — clean `display.js` (contract-only), create `carousel.js` (U8G2), `hardware.js` (LVGL), add diagnostics info drawer, update all docs
 
 ---
 

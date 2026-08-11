@@ -123,6 +123,11 @@ void setup() {
     app.registerModule(&displayModule);
     app.registerModule(displayModule.settingsTabStub());
     app.registerModule(displayModule.screenshotTabStub());
+#ifdef WITH_DISPLAY_U8G2
+    app.registerModule(displayModule.carouselTabStub());
+#elif defined(WITH_DISPLAY_LVGL)
+    app.registerModule(displayModule.hardwareTabStub());
+#endif
 #endif
 
 #ifdef WITH_MCP
