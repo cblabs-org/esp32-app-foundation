@@ -1,5 +1,6 @@
 #ifndef ARDUINO
 #include <cstdlib>
+// miniz / tdefl stubs (no central stub exists for ROM miniz)
 struct tdefl_compressor {};
 typedef int tdefl_status;
 #define TDEFL_STATUS_OKAY 0
@@ -7,8 +8,8 @@ typedef int tdefl_status;
 #define TDEFL_DEFAULT_MAX_PROBES 128
 #define TDEFL_FINISH 0
 #define TDEFL_NO_FLUSH 1
-#define MALLOC_CAP_SPIRAM 0
-static void* heap_caps_malloc(size_t size, uint32_t) { return malloc(size); }
+// heap_caps stubs come from PngWriter.cpp's #include <esp_heap_caps.h>
+// which resolves to test/stubs/platform/esp_heap_caps.h on native
 static tdefl_status tdefl_init(tdefl_compressor *, int (*)(const void *, int, void *), void *, int) { return TDEFL_STATUS_OKAY; }
 static tdefl_status tdefl_compress_buffer(tdefl_compressor *, const void *, size_t, int) { return TDEFL_STATUS_OKAY; }
 #endif

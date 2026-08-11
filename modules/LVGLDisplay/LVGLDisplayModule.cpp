@@ -18,10 +18,13 @@
 #include "ConfigManager.hpp"
 #include "MCPToolRegistry.hpp"
 #include "../Application/Application.hpp"
+#include "interfaces/IConfigGate.hpp"   // GateNames, GateActionStatus (CONFIGURING dispatch)
 #include <base64.h>
 #include <mbedtls/base64.h>
 #include <vector>
-#include "utils/BufferStream.h"
+#ifndef UNIT_TEST
+#include "utils/BufferStream.h"  // needs Arduino Print.h; only used by the hardware capture path
+#endif
 #include <cstdio>
 #include <PsychicHttp.h>
 #include "esp_heap_caps.h"
@@ -45,8 +48,7 @@ LVGLDisplayModule::LVGLDisplayModule(ILVGLHardwareAdapter& adapter,
     : _adapter(adapter),
       _branding(branding),
       _screens(screens),
-      _bootLogo(bootLogo ? bootLogo : &cb_labs_boot_logo),
-      _builtInBootScreen(_bootLogo, _branding ? _branding->appTitle : nullptr) {
+      _bootLogo(bootLogo ? bootLogo : &cb_labs_boot_logo) {
 }
 
 LVGLDisplayModule::~LVGLDisplayModule() {
@@ -128,7 +130,16 @@ void LVGLDisplayModule::bootstrapHardware() {
 
     _bootstrapMode = true;
 
-    // --- Step 5: Stage-1 Boot Splash ---
+    // --- Build the SLS UI now (BEFORE boot status is reported) ---
+    // Boot runs synchronously before the module's begin() would normally call
+    // ui_init(), so the designer's screens must be created here or the boot
+    // screen (and its progress bar) would not exist while boot progress streams.
+    if (!_uiInitialized && ui_init != nullptr) {
+        ui_init();
+        _uiInitialized = true;
+    }
+
+    // --- Stage-1 boot screen (SLS bootScreen, or FaultScreen if no skin) ---
     showBoot();
 
     // --- Step 6: Apply Hardware Brightness & Rotation ---
@@ -149,9 +160,11 @@ bool LVGLDisplayModule::beginEarly() {
 
 void LVGLDisplayModule::begin(EventBus* eventBus) {
     _eventBus = eventBus;
+#ifndef UNIT_TEST
     _serviceHelper.setSaveCallback([this]() {
         if (_configManager) _configManager->saveModuleConfig(this);
     });
+#endif
 
     // Phase 1 fallback: ensure bootstrapHardware() ran
     if (_display == nullptr) {
@@ -174,9 +187,11 @@ void LVGLDisplayModule::begin(EventBus* eventBus) {
     _screensaver.setDimTimeout(_dimTimeoutMs);
     _screensaver.setBlankTimeout(_blankTimeoutMs);
 
-    // Execute weak ui_init() hook if defined by application
-    if (ui_init != nullptr) {
+    // Execute weak ui_init() hook (once) — normally already run in bootstrapHardware()
+    // so the SLS screens exist during boot; this is the fallback if begin() ran first.
+    if (!_uiInitialized && ui_init != nullptr) {
         ui_init();
+        _uiInitialized = true;
     }
 
     _bootstrapMode = false;
@@ -210,10 +225,8 @@ void LVGLDisplayModule::tick(uint32_t now) {
     // Tick Screensaver state machine
     _screensaver.tick(now, _adapter, _brightness, _eventBus);
 
-    // If blanked, skip LVGL timer processing
-    if (_screensaver.isBlanked()) {
-        return;
-    }
+    // Note: Do not early return here if blanked, because we must drain cross-thread
+    // events (OTA, errors, snapshots) which might wake up the screen.
 
     // Drain pending cross-thread events.
     // OTA complete and update are checked independently (not else-if) so that
@@ -240,19 +253,21 @@ void LVGLDisplayModule::tick(uint32_t now) {
         resetActivity();
     }
 
-    if (_pendingMessage.exchange(false)) {
-        if (_bootstrapMode) {
-            reportStatus(_pendingMessageText, -1.0f);
-        } else {
-            ESP_LOGI("LVGLDisplay", "Message: %s", _pendingMessageText);
-            // TODO: Add transient notification overlay widget in a future PR
-        }
-        resetActivity();
+    if (_pendingSnapshot.exchange(false)) {
+        ESP_LOGI("LVGLDisplay", "tick: Processing pending snapshot");
+        _snapshotSuccess = captureSnapshot(_snapshotBuffer, _snapshotSize, _snapshotWidth, _snapshotHeight);
+        _snapshotComplete.store(true);
+        ESP_LOGI("LVGLDisplay", "tick: Snapshot complete (success=%d)", _snapshotSuccess.load());
     }
 
     // Defense-in-depth: if OTA flash write in progress, advance tick clock but skip timer handler
     if (_pauseRendering.load()) {
         lv_tick_inc(elapsed);
+        return;
+    }
+
+    // If blanked, skip LVGL timer processing to save CPU
+    if (_screensaver.isBlanked()) {
         return;
     }
 
@@ -287,17 +302,41 @@ bool LVGLDisplayModule::isSleeping() const {
 }
 
 bool LVGLDisplayModule::capturePNG(Print& sink) {
-    uint8_t* snapBuffer = nullptr;
-    size_t snapSize = 0;
-    uint16_t w = 0, h = 0;
+#ifndef UNIT_TEST
+    // Request tick loop to capture the raw snapshot (thread-safe)
+    _snapshotComplete.store(false);
+    _snapshotSuccess.store(false);
+    _snapshotBuffer = nullptr;
+    _snapshotSize = 0;
+    _pendingSnapshot.store(true);
+    ESP_LOGI("LVGLDisplay", "capturePNG: requesting snapshot, waiting for tick loop...");
 
-    if (!captureSnapshot(snapBuffer, snapSize, w, h) || !snapBuffer) {
+    // Wait up to 3 seconds for the tick loop to process the request
+    int timeout = 300;
+    while (!_snapshotComplete.load() && timeout > 0) {
+        delay(10);
+        timeout--;
+    }
+
+    if (!_snapshotComplete.load() || !_snapshotSuccess.load() || !_snapshotBuffer) {
+        ESP_LOGE("LVGLDisplay", "capturePNG: Snapshot failed (complete=%d, success=%d, timeout=%d)", 
+                 _snapshotComplete.load(), _snapshotSuccess.load(), timeout);
+        _pendingSnapshot.store(false); // cancel if timed out
+        if (_snapshotBuffer) freeSnapshot(_snapshotBuffer);
         return false;
     }
 
-    bool ok = PngWriter::writeRGB565ToRGB888(sink, w, h, reinterpret_cast<const uint16_t*>(snapBuffer));
-    freeSnapshot(snapBuffer);
+    ESP_LOGI("LVGLDisplay", "capturePNG: tick loop finished snapshot, converting to PNG...");
+    // Write PNG conversion from the caller's thread (safe, as it only reads the isolated buffer)
+    bool ok = PngWriter::writeRGB565ToRGB888(sink, _snapshotWidth, _snapshotHeight, reinterpret_cast<const uint16_t*>(_snapshotBuffer));
+    ESP_LOGI("LVGLDisplay", "capturePNG: PngWriter returned %d", ok);
+    freeSnapshot(_snapshotBuffer);
+    _snapshotBuffer = nullptr;
     return ok;
+#else
+    (void)sink;  // native build: PngWriter (ROM tdefl) is hardware-only
+    return false;
+#endif
 }
 
 void LVGLDisplayModule::showSystemState(const SystemDisplayParams& params) {
@@ -322,9 +361,43 @@ void LVGLDisplayModule::showSystemState(const SystemDisplayParams& params) {
 // -----------------------------------------------------------------------------
 
 void LVGLDisplayModule::reportStatus(const char* message, float progress) {
-    _builtInBootScreen.setStatus(message, progress);
-    if (lv_screen_active() != _builtInBootScreen.getScreen()) {
-        showBoot();
+    // Boot runs synchronously in setup(), before the main tick loop pumps
+    // lv_timer_handler(). LVGL is retained-mode, so updates must be flushed
+    // explicitly here or boot progress never reaches the panel. Drive the
+    // designer's boot screen; if the skin is absent or its UI failed to load,
+    // fall back to the built-in FaultScreen (the only code-drawn screen).
+    lv_obj_t* bootScr = (_screens != nullptr) ? _screens->bootScreen() : nullptr;
+    if (bootScr == nullptr) {
+        showFault("DISPLAY FAULT", "UI failed to load — reflash");
+        return;
+    }
+
+    if (lv_screen_active() != bootScr) {
+        lv_screen_load(bootScr);  // immediate — a fade can't advance before the tick loop
+    }
+
+    if (_display == nullptr) {
+        _screens->onBootProgress(message, progress);
+        return;
+    }
+
+    // Interpolate the bar from the last value to the new one, rendering each
+    // step, so progress visibly advances (mirrors the U8G2 boot update sequence).
+    if (progress >= 0.0f && progress > _lastBootProgress + 0.005f) {
+        const int   kSteps        = 10;
+        const int   kStepDelayMs  = 12;   // ~120 ms per milestone
+        const float from          = _lastBootProgress;
+        const float delta         = progress - from;
+        for (int i = 1; i <= kSteps; ++i) {
+            _screens->onBootProgress(message, from + (delta * (float)i / (float)kSteps));
+            lv_refr_now(_display);        // force immediate flush — tick loop isn't running yet
+            delay(kStepDelayMs);
+        }
+        _lastBootProgress = progress;
+    } else {
+        // No forward progress (e.g. a message-only update): just render once.
+        _screens->onBootProgress(message, progress);
+        lv_refr_now(_display);
     }
 }
 
@@ -342,10 +415,21 @@ void LVGLDisplayModule::clearStatus() {
 // -----------------------------------------------------------------------------
 
 void LVGLDisplayModule::showBoot() {
-    _builtInBootScreen.init(_bootLogo, _branding ? _branding->appTitle : nullptr);
-    lv_obj_t* bootScr = _builtInBootScreen.getScreen();
+    lv_obj_t* bootScr = (_screens != nullptr) ? _screens->bootScreen() : nullptr;
     if (bootScr != nullptr) {
-        lv_scr_load_anim(bootScr, LV_SCR_LOAD_ANIM_FADE_IN, 200, 0, false);
+        if (lv_screen_active() != bootScr) {
+            lv_screen_load(bootScr);
+        }
+    } else {
+        showFault("DISPLAY FAULT", "UI failed to load — reflash");
+    }
+}
+
+void LVGLDisplayModule::showFault(const char* title, const char* detail) {
+    _faultScreen.setFault(title, detail);
+    lv_obj_t* scr = _faultScreen.getScreen();
+    if (scr != nullptr && lv_screen_active() != scr) {
+        lv_screen_load(scr);
     }
 }
 
@@ -364,11 +448,8 @@ void LVGLDisplayModule::showError(const char* title, const char* message) {
         }
     }
 
-    _builtInErrorScreen.setError(title, message);
-    lv_obj_t* errScr = _builtInErrorScreen.getScreen();
-    if (errScr != nullptr) {
-        lv_scr_load_anim(errScr, LV_SCR_LOAD_ANIM_FADE_IN, 200, 0, false);
-    }
+    // No skin error screen — show the diagnostic fault screen with the message.
+    showFault(title, message);
 }
 
 void LVGLDisplayModule::showError(int code, const char* message) {
@@ -392,11 +473,10 @@ void LVGLDisplayModule::showOtaProgress(float progress, const char* status) {
         }
     }
 
-    _builtInOtaScreen.setProgress(progress, status);
-    lv_obj_t* otaScr = _builtInOtaScreen.getScreen();
-    if (otaScr != nullptr) {
-        lv_scr_load_anim(otaScr, LV_SCR_LOAD_ANIM_FADE_IN, 200, 0, false);
-    }
+    // No skin OTA screen — show the diagnostic fault screen.
+    (void)progress;
+    (void)status;
+    showFault("DISPLAY FAULT", "UI failed to load — reflash");
 }
 
 void LVGLDisplayModule::restorePriorScreen() {
@@ -409,8 +489,8 @@ void LVGLDisplayModule::restorePriorScreen() {
 }
 
 void LVGLDisplayModule::setBootLogo(const lv_image_dsc_t* bootLogo) {
+    // The boot logo now lives in the SLS design; retained for API compatibility.
     _bootLogo = bootLogo ? bootLogo : &cb_labs_boot_logo;
-    _builtInBootScreen.setBootLogo(_bootLogo);
 }
 
 void LVGLDisplayModule::resetActivity() {
@@ -618,13 +698,64 @@ void LVGLDisplayModule::_onAppConfiguring(const char* /*topic*/, const void* pay
     ESP_LOGI("LVGLDisplayModule", "CONFIGURING gate: %s (status=%d)",
              p->gateName ? p->gateName : "?",
              static_cast<int>(p->actionStatus));
-    // TODO: Implement LVGL configuring display (follow-up issue)
+             
+    // LVGL has no built-in configuring screens — the skin (SLSSystemScreens) supplies
+    // them. With no provider there is nothing to display.
+    if (self->_screens == nullptr) {
+        return;
+    }
+
+    // Populate the configuring widgets (AP SSID, portal URL, gate help text) first.
+    self->_screens->onConfiguring(p);
+
+    // Three-tier root selection (mirrors U8G2): a modal (gate helper / WiFi wizard)
+    // only when the gate needs user action; otherwise the base configuring screen.
+    lv_obj_t* scr = nullptr;
+    if (p->actionStatus == GateActionStatus::NeedsUserAction) {
+        scr = self->_screens->gateHelperScreen(p);                          // Tier 1
+        if (scr == nullptr && p->gateName != nullptr &&
+            strcmp(p->gateName, GateNames::WIFI_STATION) == 0) {
+            scr = self->_screens->wifiWizardScreen();                       // Tier 2
+        }
+        if (scr == nullptr) {
+            scr = self->_screens->configuringScreen();                     // Tier 3
+        }
+    } else {
+        scr = self->_screens->configuringScreen();                         // base / InProgress
+    }
+
+    // Groups toggle in-place on the single System screen; only animate the
+    // screen-load on first entry so re-publishes don't re-trigger the fade.
+    if (scr != nullptr && scr != lv_screen_active()) {
+        if (!self->_inSystemScreen) {
+            self->_priorScreen = lv_screen_active();
+            self->_inSystemScreen = true;
+        }
+        lv_scr_load_anim(scr, LV_SCR_LOAD_ANIM_FADE_IN, 200, 0, false);
+    }
 }
+
+#if defined(__GNUC__) || defined(__clang__)
+extern "C" {
+    __attribute__((weak)) extern lv_obj_t* ui_ui_DiagScreen;  // SLS Diag (running) screen
+}
+#endif
 
 void LVGLDisplayModule::_onAppRunning(const char* /*topic*/, const void* /*payload*/, void* ctx) {
     auto* self = static_cast<LVGLDisplayModule*>(ctx);
     if (self == nullptr) return;
     ESP_LOGI("LVGLDisplayModule", "App transition → RUNNING");
+    
+    // Left the system screen (configuring/error/OTA) for the running UI: clear the
+    // system-screen state and load the SLS Diag (running) screen — this is what
+    // dismisses the boot screen once all config gates are satisfied.
+    self->_inSystemScreen = false;
+    self->_priorScreen = nullptr;
+#if defined(__GNUC__) || defined(__clang__)
+    if (&ui_ui_DiagScreen != nullptr && ui_ui_DiagScreen != nullptr) {
+        lv_scr_load_anim(ui_ui_DiagScreen, LV_SCR_LOAD_ANIM_FADE_IN, 300, 0, false);
+    }
+#endif
 }
 
 // -----------------------------------------------------------------------------
@@ -688,13 +819,17 @@ void LVGLDisplayModule::freeSnapshot(uint8_t* buffer) {
 }
 
 void LVGLDisplayModule::registerRoutes(PsychicHttpServer& server) {
+#ifndef UNIT_TEST
     _serviceHelper.registerBrightnessRoute(server);
     _serviceHelper.registerScreenshotRoute(server);
+#endif
 
     // GET /api/display/status
     server.on("/api/display/status", HTTP_GET, [this](PsychicRequest* request, PsychicResponse* response) {
         JsonDocument doc;
+#ifndef UNIT_TEST
         _serviceHelper.populateCommonStatus(doc);
+#endif
 
         doc["rotation"]           = _rotation;
         doc["flip"]               = (_rotation == 180);
@@ -831,7 +966,9 @@ void LVGLDisplayModule::registerRoutes(PsychicHttpServer& server) {
  * @param registry The MCPToolRegistry to register tools with.
  */
 void LVGLDisplayModule::registerMCPTools(MCPToolRegistry& registry) {
+#ifndef UNIT_TEST
     _serviceHelper.registerCaptureTool(registry);
+#endif
 
     // --- Tool 1: display_status (read-only) ---
     registry.addTool(
@@ -841,7 +978,9 @@ void LVGLDisplayModule::registerMCPTools(MCPToolRegistry& registry) {
             auto* self = static_cast<LVGLDisplayModule*>(ctx);
             (void)params;
 
+#ifndef UNIT_TEST
             self->_serviceHelper.populateCommonMCPStatus(result);
+#endif
 
             result["rotation"]           = self->_rotation;
             result["screensaverEnabled"] = self->_screensaverEnabled;

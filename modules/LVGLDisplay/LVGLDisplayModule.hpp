@@ -62,18 +62,20 @@
 #include "interfaces/ILVGLSystemScreens.hpp"
 #include <types/BootBranding.h>
 #include "assets/boot_logo.h"
-#include "screens/BootScreen.hpp"
-#include "screens/ErrorScreen.hpp"
-#include "screens/OTAProgressScreen.hpp"
+#include "screens/FaultScreen.hpp"
 #include "ScreensaverController.hpp"
-#include "PngWriter.h"
+#ifndef UNIT_TEST
+#include "PngWriter.h"            // hardware-only PNG encoder (ROM tdefl); native build stubs capturePNG()
+#endif
 #include "lvgl.h"
 
 // Forward declarations
 class EventBus;
 class ConfigManager;
 class MCPToolRegistry;
-#include "DisplayServiceHelper.h"
+#ifndef UNIT_TEST
+#include "DisplayServiceHelper.h"  // .cpp needs Application.hpp (native lib_ignore's Application)
+#endif
 
 
 
@@ -224,10 +226,21 @@ public:
     void showBoot();
 
     /**
+     * @brief Show the built-in FaultScreen with a diagnostic message.
+     *
+     * The universal fallback when the SLS skin does not supply a needed screen
+     * (no provider, or the exported UI failed to load).
+     *
+     * @param title  Short fault heading.
+     * @param detail Diagnostic/trace line.
+     */
+    void showFault(const char* title, const char* detail);
+
+    /**
      * @brief Display system error screen.
      *
      * Uses ILVGLSystemScreens provider if non-null and supplying an error screen,
-     * otherwise falls back to built-in ErrorScreen.
+     * otherwise falls back to the built-in FaultScreen.
      *
      * @param title   Error title string.
      * @param message Error description string.
@@ -246,7 +259,7 @@ public:
      * @brief Display OTA firmware update progress screen.
      *
      * Uses ILVGLSystemScreens provider if non-null and supplying an OTA screen,
-     * otherwise falls back to built-in OTAProgressScreen.
+     * otherwise falls back to the built-in FaultScreen.
      *
      * @param progress Fractional progress ratio in [0.0, 1.0].
      * @param status   Status phase text string.
@@ -359,9 +372,7 @@ public:
     bool isBootstrapMode() const { return _bootstrapMode; }
     EventBus* getEventBus() const { return _eventBus; }
 
-    BootScreen& getBootScreen() { return _builtInBootScreen; }
-    ErrorScreen& getErrorScreen() { return _builtInErrorScreen; }
-    OTAProgressScreen& getOtaScreen() { return _builtInOtaScreen; }
+    FaultScreen& getFaultScreen() { return _faultScreen; }
     ScreensaverController& getScreensaver() { return _screensaver; }
     const ScreensaverController& getScreensaver() const { return _screensaver; }
 
@@ -419,6 +430,7 @@ private:
     size_t   _bufSize = 0;                     ///< Allocated size per draw buffer in bytes
     bool     _buffersConfigured = false;       ///< True if draw buffers have been configured (replaces LVGL 8 lv_display_get_buf_1)
     bool     _bootstrapMode = false;           ///< True while in Phase 1 bootstrap mode
+    float    _lastBootProgress = 0.0f;         ///< Last boot progress rendered (for synchronous boot animation)
     std::atomic<bool> _pauseRendering{false};  ///< Pause rendering flag during OTA flash writes
     uint32_t _lastIndevInactiveMs = 0;         ///< Inactivity tracking timestamp
 
@@ -434,11 +446,18 @@ private:
     std::atomic<bool> _pendingMessage{false};
     char _pendingMessageText[128] = {};
 
+    std::atomic<bool> _pendingSnapshot{false};
+    std::atomic<bool> _snapshotComplete{false};
+    std::atomic<bool> _snapshotSuccess{false};
+    uint8_t* _snapshotBuffer = nullptr;
+    size_t _snapshotSize = 0;
+    uint16_t _snapshotWidth = 0;
+    uint16_t _snapshotHeight = 0;
+
     // --- System Screens & Assets ---
     const lv_image_dsc_t* _bootLogo = nullptr;
-    BootScreen            _builtInBootScreen;
-    ErrorScreen           _builtInErrorScreen;
-    OTAProgressScreen     _builtInOtaScreen;
+    FaultScreen           _faultScreen;       ///< The only built-in screen (dev fault/trace fallback)
+    bool                  _uiInitialized = false; ///< Guards the one-time ui_init() (SLS UI build)
     lv_obj_t*             _priorScreen = nullptr;
     bool                  _inSystemScreen = false;
 
@@ -449,6 +468,8 @@ private:
     unsigned long         _dimTimeoutMs = 150000;     ///< Inactivity dim timeout in ms (default 2.5 min)
     unsigned long         _blankTimeoutMs = 300000;   ///< Inactivity blank timeout in ms (default 5 min)
     ScreensaverController _screensaver;               ///< Screensaver state machine
-    DisplayServiceHelper  _serviceHelper{this};
+#ifndef UNIT_TEST
+    DisplayServiceHelper  _serviceHelper{this};       ///< Shared web/MCP display routes (hardware only)
+#endif
 };
 

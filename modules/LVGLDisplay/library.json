@@ -11,11 +11,6 @@
       "-I.",
       "-I../../include"
     ],
-    "srcFilter": [
-      "+<*>",
-      "+<screens/*>",
-      "+<assets/*.cpp>",
-      "-<assets/*.c>"
-    ]
+    "extraScript": "exclude_ui_on_native.py"
   }
 }
