@@ -19,9 +19,6 @@
 [submodule ".agents/skills/systematic-debugging"]
 	path = .agents/skills/systematic-debugging
 	url = https://github.com/mm-skills/systematic-debugging
-[submodule ".agents/skills/framework-expert"]
-	path = .agents/skills/framework-expert
-	url = https://github.com/mm-skills/framework-expert
 [submodule ".agents/skills/squareline-studio-expert"]
 	path = .agents/skills/squareline-studio-expert
 	url = https://github.com/mm-skills/squareline-studio-expert
