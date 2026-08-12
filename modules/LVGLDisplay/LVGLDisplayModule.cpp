@@ -52,6 +52,11 @@ LVGLDisplayModule::LVGLDisplayModule(ILVGLHardwareAdapter& adapter,
 }
 
 LVGLDisplayModule::~LVGLDisplayModule() {
+    if (_eventBus) {
+        _eventBus->unsubscribe("encoder.rotate", _onInputWake, this);
+        _eventBus->unsubscribe("button.press_down", _onInputWake, this);
+        _eventBus->unsubscribe("touch.press_down", _onInputWake, this);
+    }
     if (_group != nullptr) {
         lv_group_delete(_group);
         _group = nullptr;
@@ -119,6 +124,7 @@ void LVGLDisplayModule::bootstrapHardware() {
     if (_encoderInDev != nullptr || _keypadInDev != nullptr) {
         _group = lv_group_create();
         if (_group != nullptr) {
+            lv_group_set_default(_group);
             if (_encoderInDev != nullptr) {
                 lv_indev_set_group(_encoderInDev, _group);
             }
@@ -180,6 +186,12 @@ void LVGLDisplayModule::begin(EventBus* eventBus) {
         _eventBus->subscribe(LVGLDisplayEvents::SYSTEM_ERROR, _onSystemError, this);
         _eventBus->subscribe(ApplicationEvents::APP_CONFIGURING, _onAppConfiguring, this);
         _eventBus->subscribe(ApplicationEvents::APP_RUNNING, _onAppRunning, this);
+
+        // Wake display on any physical input (encoder, button, touch).
+        // These fire independently of LVGL's lv_timer_handler().
+        _eventBus->subscribe("encoder.rotate", _onInputWake, this);
+        _eventBus->subscribe("button.press_down", _onInputWake, this);
+        _eventBus->subscribe("touch.press_down", _onInputWake, this);
     }
 
     // Sync screensaver settings
@@ -224,6 +236,19 @@ void LVGLDisplayModule::tick(uint32_t now) {
 
     // Tick Screensaver state machine
     _screensaver.tick(now, _adapter, _brightness, _eventBus);
+
+    // --- Poll adapter touch (runs every tick, even when blanked) ---
+    _adapter.pollTouch();
+
+    // --- Input-wake drain (runs even when blanked/dimmed) ---
+    // When screensaver is active and any physical input (encoder, button, touch)
+    // fires on EventBus, _pendingInputWake is set. We wake the screen here but
+    // return before lv_timer_handler() to swallow the wake-input. On the NEXT
+    // tick, isBlanked()==false so LVGL processes subsequent input normally.
+    if (_pendingInputWake.exchange(false)) {
+        resetActivity();
+        return;
+    }
 
     // Note: Do not early return here if blanked, because we must drain cross-thread
     // events (OTA, errors, snapshots) which might wake up the screen.
@@ -272,6 +297,9 @@ void LVGLDisplayModule::tick(uint32_t now) {
     }
 
     lv_tick_inc(elapsed);
+    // Tick the diagnostic carousel (periodic value refresh, ~1 Hz)
+    _diagCarousel.tick(now);
+
     lv_timer_handler();
 }
 
@@ -700,6 +728,9 @@ void LVGLDisplayModule::_onAppConfiguring(const char* /*topic*/, const void* pay
     ESP_LOGI("LVGLDisplayModule", "CONFIGURING gate: %s (status=%d)",
              p->gateName ? p->gateName : "?",
              static_cast<int>(p->actionStatus));
+
+    // Deactivate diagnostic carousel when leaving DiagScreen
+    self->_diagCarousel.stop();
              
     // LVGL has no built-in configuring screens — the skin (SLSSystemScreens) supplies
     // them. With no provider there is nothing to display.
@@ -758,6 +789,16 @@ void LVGLDisplayModule::_onAppRunning(const char* /*topic*/, const void* /*paylo
         lv_scr_load_anim(ui_ui_DiagScreen, LV_SCR_LOAD_ANIM_FADE_IN, 300, 0, false);
     }
 #endif
+
+    // Activate the diagnostic carousel (encoder-driven metric browser)
+    self->_diagCarousel.begin(self->_group);
+}
+
+void LVGLDisplayModule::_onInputWake(const char* /*topic*/, const void* /*payload*/, void* ctx) {
+    auto* self = static_cast<LVGLDisplayModule*>(ctx);
+    if (self && self->_screensaver.isActive()) {
+        self->_pendingInputWake.store(true);
+    }
 }
 
 // -----------------------------------------------------------------------------

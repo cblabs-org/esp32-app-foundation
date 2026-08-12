@@ -32,6 +32,7 @@ public:
     lv_indev_t* createTouchInput() override;
     lv_indev_t* createEncoderInput() override;
     lv_indev_t* createKeypadInput() override { return nullptr; }
+    void pollTouch() override;
 
 private:
     LGFX_CrowPanel128    _gfx;
@@ -39,6 +40,8 @@ private:
     ButtonModule*        _buttonModule  = nullptr;
     EventBus*            _bus           = nullptr;
     std::atomic<bool>    _buttonPressed{false};
+    bool                 _touchActive = false;  ///< Edge detector for touch.press_down
+    int32_t              _encoderAccum = 0;     ///< Accumulator for encoder divisor (10:1)
 
     static void _flushCallback(lv_display_t* disp, const lv_area_t* area, uint8_t* px_map);
     static void _touchReadCallback(lv_indev_t* indev, lv_indev_data_t* data);

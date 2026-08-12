@@ -64,6 +64,7 @@
 #include "assets/boot_logo.h"
 #include "screens/FaultScreen.hpp"
 #include "ScreensaverController.hpp"
+#include "DiagCarouselController.hpp"
 #ifndef UNIT_TEST
 #include "PngWriter.h"            // hardware-only PNG encoder (ROM tdefl); native build stubs capturePNG()
 #endif
@@ -410,6 +411,7 @@ private:
     static void _onSystemError(const char* topic, const void* payload, void* ctx);
     static void _onAppConfiguring(const char* topic, const void* payload, void* ctx);
     static void _onAppRunning(const char* topic, const void* payload, void* ctx);
+    static void _onInputWake(const char* topic, const void* payload, void* ctx);
 
     ILVGLHardwareAdapter& _adapter;            ///< Injected hardware adapter
     const BootBranding*   _branding = nullptr; ///< Optional boot branding configuration
@@ -433,6 +435,7 @@ private:
     float    _lastBootProgress = 0.0f;         ///< Last boot progress rendered (for synchronous boot animation)
     std::atomic<bool> _pauseRendering{false};  ///< Pause rendering flag during OTA flash writes
     uint32_t _lastIndevInactiveMs = 0;         ///< Inactivity tracking timestamp
+    std::atomic<bool> _pendingInputWake{false}; ///< Input detected while dimmed/blanked
 
     // --- Thread-safe pending state ---
     std::atomic<bool> _pendingOtaUpdate{false};
@@ -468,6 +471,7 @@ private:
     unsigned long         _dimTimeoutMs = 150000;     ///< Inactivity dim timeout in ms (default 2.5 min)
     unsigned long         _blankTimeoutMs = 300000;   ///< Inactivity blank timeout in ms (default 5 min)
     ScreensaverController _screensaver;               ///< Screensaver state machine
+    DiagCarouselController _diagCarousel;              ///< Encoder-driven diagnostic carousel
 #ifndef UNIT_TEST
     DisplayServiceHelper  _serviceHelper{this};       ///< Shared web/MCP display routes (hardware only)
 #endif

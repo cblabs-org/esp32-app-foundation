@@ -150,6 +150,22 @@ void setup() {
     app.registerModule(&encoderModule);
 #endif
 
+#ifdef WITH_DISPLAY_LVGL
+    displayAdapter.setInputModules(
+#ifdef WITH_ENCODER
+        &encoderModule,
+#else
+        nullptr,
+#endif
+#ifdef WITH_BUTTONS
+        &buttonModule,
+#else
+        nullptr,
+#endif
+        &app.getEventBus()
+    );
+#endif
+
     // Prepare Framework config — OTA
     // TODO: Set up OTA for your app:
     //   1. Create a releases repo (e.g. your-org/weather-station-releases)

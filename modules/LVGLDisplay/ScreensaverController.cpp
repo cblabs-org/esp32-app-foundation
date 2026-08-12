@@ -90,15 +90,17 @@ void ScreensaverController::tick(unsigned long currentMs, ILVGLHardwareAdapter& 
     }
 
     if (!_dimmed && elapsed >= _dimTimeoutMs) {
-        _dim(adapter);
+        _dim(adapter, activeBrightness);
     }
     if (_dimmed && !_blanked && _policy == ScreensaverPolicy::FullSleep && elapsed >= _blankTimeoutMs) {
         _blank(adapter, eventBus);
     }
 }
 
-void ScreensaverController::_dim(ILVGLHardwareAdapter& adapter) {
-    adapter.setBrightness(_dimLevel);
+void ScreensaverController::_dim(ILVGLHardwareAdapter& adapter, uint8_t activeBrightness) {
+    // Dim to 25% of active brightness (minimum 1 to keep backlight visibly on)
+    uint8_t dimBrightness = (activeBrightness > 4) ? (activeBrightness / 4) : 1;
+    adapter.setBrightness(dimBrightness);
     _dimmed = true;
 }
 

@@ -103,6 +103,18 @@ public:
      * @return lv_indev_t pointer configured as LV_INDEV_TYPE_KEYPAD, or nullptr if unsupported.
      */
     virtual lv_indev_t* createKeypadInput() { return nullptr; }
+
+    /**
+     * @brief Poll for touch activity and publish EventBus events.
+     *
+     * Called by LVGLDisplayModule on every tick — including when the screensaver
+     * has blanked the display (when LVGL's own input polling is suspended).
+     * Implementations should detect touch-start transitions and publish
+     * "touch.press_down" on the EventBus so the display module can wake.
+     *
+     * Default implementation does nothing (no touch hardware).
+     */
+    virtual void pollTouch() {}
 };
 
 #endif  // INCLUDE_INTERFACES_ILVGLHARDWAREADAPTER_HPP_

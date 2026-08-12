@@ -174,6 +174,7 @@ Several architectural decisions underpin the framework design. These are documen
 | ADR-04 | Hollywood Principle | "Don't call us, we'll call you." Application modules never orchestrate boot or poll system state. They register via `app.registerModule()` and the framework calls their lifecycle methods (`tick`, `applyConfig`, `render`). |
 | ADR-16 | Static Scope | All module instances MUST be declared at global or static scope. The ESP32 lacks an MMU — stack-allocated modules will silently corrupt memory or cause hard faults when the framework invokes them after `setup()` returns. |
 | ADR-17 | Tick Budget | Modules MUST complete their `tick()` within **10ms**. The Task Watchdog Timer (TWDT) will panic and reboot the ESP32 if the main loop blocks for more than **5 seconds**. Lengthy operations must be deferred to FreeRTOS tasks (e.g., via `IDataSource`). Modules may override `getTickBudgetMs()` to declare a higher budget (e.g. display modules use 33 ms to match their refresh period). The default remains 10 ms. |
+| [ADR](adr/adr-adapters-placement.md) | Adapters Placement | Concrete hardware adapters (e.g. `CrowPanel128Adapter`) live in a root-level `adapters/` directory, not inside `modules/` (would pollute the framework library with board-specific deps) or `hardware/` (reserved for declarative pin data). Follows the Ports & Adapters (hexagonal) pattern. |
 
 ---
 

@@ -180,9 +180,14 @@ void CrowPanel128Adapter::_encoderReadCallback(lv_indev_t* indev, lv_indev_data_
     auto* adapter = static_cast<CrowPanel128Adapter*>(lv_indev_get_user_data(indev));
     if (!adapter) return;
     
-    // Read rotation via framework EncoderModule
+    // Read rotation via framework EncoderModule (RAW mode, no acceleration).
+    // The PCNT quadrature encoder produces 2 counts per physical detent,
+    // so divide by 2 for a clean 1 click = 1 carousel step.
+    static constexpr int32_t ENC_DIVISOR = 2;
     if (adapter->_encoderModule) {
-        data->enc_diff = adapter->_encoderModule->consumeDelta(EncoderDelta::RAW);
+        adapter->_encoderAccum += adapter->_encoderModule->consumeDelta(EncoderDelta::RAW);
+        data->enc_diff = adapter->_encoderAccum / ENC_DIVISOR;
+        adapter->_encoderAccum %= ENC_DIVISOR;
     } else {
         data->enc_diff = 0;
     }
@@ -195,3 +200,14 @@ void CrowPanel128Adapter::_encoderReadCallback(lv_indev_t* indev, lv_indev_data_
     }
 }
 
+void CrowPanel128Adapter::pollTouch() {
+    uint16_t x, y;
+    bool touching = _gfx.getTouch(&x, &y);
+    if (touching && !_touchActive) {
+        // Rising edge — finger just made contact
+        if (_bus) {
+            _bus->publish("touch.press_down");
+        }
+    }
+    _touchActive = touching;
+}
