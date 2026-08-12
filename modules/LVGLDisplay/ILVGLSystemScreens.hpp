@@ -27,8 +27,8 @@
  *   - onConfiguring():  Called on each CONFIGURING re-publish to populate configuring widgets
  */
 
-#ifndef INCLUDE_INTERFACES_ILVGLSYSTEMSCREENS_HPP_
-#define INCLUDE_INTERFACES_ILVGLSYSTEMSCREENS_HPP_
+#ifndef LVGLDISPLAY_ILVGLSYSTEMSCREENS_HPP_
+#define LVGLDISPLAY_ILVGLSYSTEMSCREENS_HPP_
 
 #include "lvgl.h"
 #include "events/AppConfiguringPayload.hpp"
@@ -160,4 +160,4 @@ public:
     }
 };
 
-#endif  // INCLUDE_INTERFACES_ILVGLSYSTEMSCREENS_HPP_
+#endif  // LVGLDISPLAY_ILVGLSYSTEMSCREENS_HPP_
