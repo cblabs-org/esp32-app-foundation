@@ -74,6 +74,12 @@ constexpr int8_t PIN_DISPLAY_MISO = PIN_UNASSIGNED;
 constexpr int8_t PIN_DISPLAY_MOSI = PIN_UNASSIGNED;
 #define PIN_DISPLAY_MOSI PIN_DISPLAY_MOSI
 
+constexpr int8_t PIN_DISPLAY_RST  = PIN_UNASSIGNED;
+#define PIN_DISPLAY_RST PIN_DISPLAY_RST
+
+constexpr int8_t PIN_DISPLAY_RESET = PIN_UNASSIGNED;
+#define PIN_DISPLAY_RESET PIN_DISPLAY_RESET
+
 // ── Button configuration ────────────────────────────────────────────────────
 #ifdef WITH_BUTTONS
 #include "ButtonModule/ButtonConfig.h"
