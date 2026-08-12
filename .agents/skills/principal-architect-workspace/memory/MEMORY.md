@@ -25,6 +25,7 @@
 | pr-adopt-display-interface | 2026-08-11 | LVGLDisplay, PngWriter, WebServer | Forward-port SLS display stack onto main + #86 interface. Screenshot API stable (tdefl 164KB, PSRAM, threaded). Boot transition restored. `v0.0.12-dev.44` device-verified. [PROJECT.md](../pr-adopt-display-interface/PROJECT.md) |
 | aria-tabpanel | 2026-08-11 | web-portal | Complete WAI-ARIA tabpanel semantics on portal tabs + sub-pills; PR #93 merged closing issue #92 |
 | include-architecture | 2026-08-11 | platformio.ini, Application, all modules/libs | LDF mode alignment (native chain→deep), Application lib_ignore removal, 18 library.json, zero relative includes. Commit `1e58058`. [context_bridge](../../context_archives/distillation-20260811-include-architecture/context_bridge.md) |
+| input-carousel | 2026-08-12 | LVGLDisplay, CrowPanel128Adapter, ScreensaverController | CrowPanel encoder/button/touch wired to LVGL, 12-item DiagCarouselController (rotary diagnostic browser), RAW+/2 encoder divisor, screensaver dim=25%, em-dash glyph fix. Merged `2f5b1ad7`. [context_bridge](../../context_archives/distillation-20260812-input-carousel/context_bridge.md) |
 
 ## Older Projects
 82 completed projects.
