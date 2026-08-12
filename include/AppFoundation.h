@@ -21,7 +21,6 @@
  * - IStatusReporter:   Interface — display status overlay contract
  * - IWebContributor:   Interface — REST route registration contract
  * - IMCPContributor:   Interface — MCP tool registration contract
- * - IDisplayBoard:     Interface — U8G2 carousel board render contract
  * - IConfigGate:      Interface — config-ready gating contract
  * - IOTAVerifier:     Interface — OTA firmware signature verification contract
  * - UpdateStatus:      Enum — data fetch result codes
@@ -44,7 +43,6 @@
 #include "interfaces/IStatusReporter.hpp"
 #include "interfaces/IWebContributor.hpp"
 #include "interfaces/IMCPContributor.hpp"
-#include "U8G2Display/IDisplayBoard.hpp"
 #include "interfaces/IConfigGate.hpp"
 #include "interfaces/IOTAVerifier.hpp"
 
