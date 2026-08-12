@@ -171,10 +171,10 @@ void DiagCarouselController::stop() {
 void DiagCarouselController::tick(uint32_t now) {
     if (!_active) return;
 
-    // Periodic value refresh (~1 Hz)
+    // Periodic value refresh (lightweight — only value + status text)
     if (now - _lastRefreshMs >= REFRESH_INTERVAL_MS) {
         _lastRefreshMs = now;
-        updateWidgets();
+        refreshValueOnly();
     }
 }
 
@@ -297,6 +297,47 @@ void DiagCarouselController::updateWidgets() {
                                       LV_PART_INDICATOR);
         }
     }
+}
+
+void DiagCarouselController::refreshValueOnly() {
+    if (&ui_ui_DiagArc == nullptr || ui_ui_DiagArc == nullptr) return;
+
+    const DiagItem& item = ITEMS[_currentIndex];
+
+    if (item.type == DiagType::NUMERIC) {
+        float rawValue = item.readNumeric ? item.readNumeric() : 0.0f;
+        float displayValue = rawValue / item.displayDivisor;
+
+        if (&ui_ui_DiagValue != nullptr && ui_ui_DiagValue != nullptr) {
+            char valueBuf[32];
+            if (item.readNumeric == readUptimeSeconds) {
+                uint32_t totalSec = (uint32_t)rawValue;
+                uint32_t days  = totalSec / 86400;
+                uint32_t hours = (totalSec % 86400) / 3600;
+                uint32_t mins  = (totalSec % 3600) / 60;
+                if (days > 0) {
+                    snprintf(valueBuf, sizeof(valueBuf), "%lud %luh %lum", days, hours, mins);
+                } else if (hours > 0) {
+                    snprintf(valueBuf, sizeof(valueBuf), "%luh %lum", hours, mins);
+                } else {
+                    snprintf(valueBuf, sizeof(valueBuf), "%lum %lus", mins, totalSec % 60);
+                }
+            } else if (item.decimalPlaces == 0) {
+                snprintf(valueBuf, sizeof(valueBuf), "%.0f %s", displayValue, item.units);
+            } else {
+                snprintf(valueBuf, sizeof(valueBuf), "%.*f %s",
+                         item.decimalPlaces, displayValue, item.units);
+            }
+            lv_label_set_text(ui_ui_DiagValue, valueBuf);
+        }
+
+        // Refresh status text (evaluation may change as values cross thresholds)
+        if (&ui_ui_DiagStatus != nullptr && ui_ui_DiagStatus != nullptr) {
+            const char* status = evaluateStatus(item, displayValue);
+            lv_label_set_text(ui_ui_DiagStatus, status);
+        }
+    }
+    // TEXT items don't change frequently — skip refresh
 }
 
 // ─── Evaluation Logic ────────────────────────────────────────────────────────

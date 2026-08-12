@@ -96,6 +96,7 @@ public:
 
 private:
     void updateWidgets();                              ///< Push all widget content for current item
+    void refreshValueOnly();                           ///< Lightweight: only update value + status text
     const char* evaluateStatus(const DiagItem& item, float value) const;
     lv_color_t evaluateColour(const char* status) const;
 
@@ -110,5 +111,5 @@ private:
     bool        _callbackRegistered = false;
     char        _textBuf[64]   = {};                   ///< Shared buffer for text item reads
 
-    static constexpr uint32_t REFRESH_INTERVAL_MS = 1000;
+    static constexpr uint32_t REFRESH_INTERVAL_MS = 2000;
 };
