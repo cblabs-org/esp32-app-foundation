@@ -6,7 +6,9 @@
 # environment-conditional (library.json srcFilter is static).
 #
 # Default (hardware) build compiles everything: the module logic, screens/,
-# assets/*.cpp (excluding the duplicate assets/*.c), and the SquareLine ui/.
+# assets/*.cpp (excluding the duplicate assets/*.c), and the SquareLine ui/
+# (which SLS 1.6.2+ exports into subdirectories: ui/screens/, ui/components/,
+# ui/images/).
 #
 # On the `native` host-test build the SquareLine ui/ (plain C, includes the real
 # LVGL headers) would be compiled against the C++-only lvgl stub
@@ -15,7 +17,7 @@
 #
 Import("env")
 
-src_filter = ["+<*>", "+<screens/*>", "+<assets/*.cpp>", "-<assets/*.c>"]
+src_filter = ["+<*>", "+<screens/*>", "+<assets/*.cpp>", "-<assets/*.c>", "+<ui/**>"]
 
 if env.get("PIOENV") == "native":
     src_filter.append("-<ui/>")

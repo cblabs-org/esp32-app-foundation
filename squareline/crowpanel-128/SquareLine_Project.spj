@@ -75,6 +75,12 @@
                 "InheritedType": 1
               },
               {
+                "nid": 223,
+                "strtype": "OBJECT/State_trickle",
+                "strval": "False",
+                "InheritedType": 2
+              },
+              {
                 "nid": 225,
                 "flags": 1048576,
                 "strtype": "OBJECT/Scrolling",
@@ -269,6 +275,12 @@
                 "InheritedType": 1
               },
               {
+                "nid": 223,
+                "strtype": "OBJECT/State_trickle",
+                "strval": "False",
+                "InheritedType": 2
+              },
+              {
                 "nid": 225,
                 "flags": 1048576,
                 "strtype": "OBJECT/Scrolling",
@@ -355,7 +367,7 @@
                 "childs": [],
                 "nid": 1060,
                 "strtype": "IMAGE/Style_main",
-                "strval": "lv.PART.MAIN, Rectangle, Image, Transform, Pad",
+                "strval": "lv.PART.MAIN, Rectangle, Image, Transform,Pad",
                 "InheritedType": 11
               }
             ],
@@ -431,6 +443,12 @@
                 "InheritedType": 1
               },
               {
+                "nid": 223,
+                "strtype": "OBJECT/State_trickle",
+                "strval": "False",
+                "InheritedType": 2
+              },
+              {
                 "nid": 225,
                 "flags": 1048576,
                 "strtype": "OBJECT/Scrolling",
@@ -488,6 +506,12 @@
                 "strtype": "LABEL/Text",
                 "strval": "ESP32 App Foundation",
                 "InheritedType": 10
+              },
+              {
+                "nid": 1035,
+                "strtype": "LABEL/Recolor",
+                "strval": "False",
+                "InheritedType": 2
               },
               {
                 "part": "lv.PART.MAIN",
@@ -596,6 +620,12 @@
                 "flags": 1048576,
                 "strtype": "OBJECT/Flags",
                 "InheritedType": 1
+              },
+              {
+                "nid": 223,
+                "strtype": "OBJECT/State_trickle",
+                "strval": "False",
+                "InheritedType": 2
               },
               {
                 "nid": 225,
@@ -802,6 +832,12 @@
                 "InheritedType": 1
               },
               {
+                "nid": 223,
+                "strtype": "OBJECT/State_trickle",
+                "strval": "False",
+                "InheritedType": 2
+              },
+              {
                 "nid": 225,
                 "flags": 1048576,
                 "strtype": "OBJECT/Scrolling",
@@ -859,6 +895,12 @@
                 "strtype": "LABEL/Text",
                 "strval": "Mounting filesystem...",
                 "InheritedType": 10
+              },
+              {
+                "nid": 1035,
+                "strtype": "LABEL/Recolor",
+                "strval": "False",
+                "InheritedType": 2
               },
               {
                 "part": "lv.PART.MAIN",
@@ -1107,6 +1149,12 @@
                     "InheritedType": 1
                   },
                   {
+                    "nid": 223,
+                    "strtype": "OBJECT/State_trickle",
+                    "strval": "False",
+                    "InheritedType": 2
+                  },
+                  {
                     "nid": 225,
                     "flags": 1048576,
                     "strtype": "OBJECT/Scrolling",
@@ -1164,6 +1212,12 @@
                     "strtype": "LABEL/Text",
                     "strval": "",
                     "InheritedType": 10
+                  },
+                  {
+                    "nid": 1035,
+                    "strtype": "LABEL/Recolor",
+                    "strval": "False",
+                    "InheritedType": 2
                   },
                   {
                     "part": "lv.PART.MAIN",
@@ -1273,6 +1327,12 @@
                     "InheritedType": 1
                   },
                   {
+                    "nid": 223,
+                    "strtype": "OBJECT/State_trickle",
+                    "strval": "False",
+                    "InheritedType": 2
+                  },
+                  {
                     "nid": 225,
                     "flags": 1048576,
                     "strtype": "OBJECT/Scrolling",
@@ -1330,6 +1390,12 @@
                     "strtype": "LABEL/Text",
                     "strval": "System Error",
                     "InheritedType": 10
+                  },
+                  {
+                    "nid": 1035,
+                    "strtype": "LABEL/Recolor",
+                    "strval": "False",
+                    "InheritedType": 2
                   },
                   {
                     "part": "lv.PART.MAIN",
@@ -1439,6 +1505,12 @@
                     "InheritedType": 1
                   },
                   {
+                    "nid": 223,
+                    "strtype": "OBJECT/State_trickle",
+                    "strval": "False",
+                    "InheritedType": 2
+                  },
+                  {
                     "nid": 225,
                     "flags": 1048576,
                     "strtype": "OBJECT/Scrolling",
@@ -1496,6 +1568,12 @@
                     "strtype": "LABEL/Text",
                     "strval": "WiFi lost. Retrying...  reboot or open the setup portal.",
                     "InheritedType": 10
+                  },
+                  {
+                    "nid": 1035,
+                    "strtype": "LABEL/Recolor",
+                    "strval": "False",
+                    "InheritedType": 2
                   },
                   {
                     "part": "lv.PART.MAIN",
@@ -1614,6 +1692,12 @@
                         "InheritedType": 1
                       },
                       {
+                        "nid": 223,
+                        "strtype": "OBJECT/State_trickle",
+                        "strval": "False",
+                        "InheritedType": 2
+                      },
+                      {
                         "nid": 225,
                         "flags": 1048576,
                         "strtype": "OBJECT/Scrolling",
@@ -1671,6 +1755,12 @@
                         "strtype": "LABEL/Text",
                         "strval": "Dismiss",
                         "InheritedType": 10
+                      },
+                      {
+                        "nid": 1035,
+                        "strtype": "LABEL/Recolor",
+                        "strval": "False",
+                        "InheritedType": 2
                       },
                       {
                         "part": "lv.PART.MAIN",
@@ -1777,6 +1867,12 @@
                     "flags": 1048576,
                     "strtype": "OBJECT/Flags",
                     "InheritedType": 1
+                  },
+                  {
+                    "nid": 223,
+                    "strtype": "OBJECT/State_trickle",
+                    "strval": "False",
+                    "InheritedType": 2
                   },
                   {
                     "nid": 225,
@@ -1903,6 +1999,12 @@
                 "nid": 100,
                 "strtype": "OBJECT/Hidden",
                 "strval": "True",
+                "InheritedType": 2
+              },
+              {
+                "nid": 223,
+                "strtype": "OBJECT/State_trickle",
+                "strval": "False",
                 "InheritedType": 2
               },
               {
@@ -2039,6 +2141,12 @@
                     "InheritedType": 1
                   },
                   {
+                    "nid": 223,
+                    "strtype": "OBJECT/State_trickle",
+                    "strval": "False",
+                    "InheritedType": 2
+                  },
+                  {
                     "nid": 225,
                     "flags": 1048576,
                     "strtype": "OBJECT/Scrolling",
@@ -2096,6 +2204,12 @@
                     "strtype": "LABEL/Text",
                     "strval": "WiFi Setup",
                     "InheritedType": 10
+                  },
+                  {
+                    "nid": 1035,
+                    "strtype": "LABEL/Recolor",
+                    "strval": "False",
+                    "InheritedType": 2
                   },
                   {
                     "part": "lv.PART.MAIN",
@@ -2205,6 +2319,12 @@
                     "InheritedType": 1
                   },
                   {
+                    "nid": 223,
+                    "strtype": "OBJECT/State_trickle",
+                    "strval": "False",
+                    "InheritedType": 2
+                  },
+                  {
                     "nid": 225,
                     "flags": 1048576,
                     "strtype": "OBJECT/Scrolling",
@@ -2262,6 +2382,12 @@
                     "strtype": "LABEL/Text",
                     "strval": "SSID",
                     "InheritedType": 10
+                  },
+                  {
+                    "nid": 1035,
+                    "strtype": "LABEL/Recolor",
+                    "strval": "False",
+                    "InheritedType": 2
                   },
                   {
                     "part": "lv.PART.MAIN",
@@ -2371,6 +2497,12 @@
                     "InheritedType": 1
                   },
                   {
+                    "nid": 223,
+                    "strtype": "OBJECT/State_trickle",
+                    "strval": "False",
+                    "InheritedType": 2
+                  },
+                  {
                     "nid": 225,
                     "flags": 1048576,
                     "strtype": "OBJECT/Scrolling",
@@ -2428,6 +2560,12 @@
                     "strtype": "LABEL/Text",
                     "strval": "CBLabs-Setup",
                     "InheritedType": 10
+                  },
+                  {
+                    "nid": 1035,
+                    "strtype": "LABEL/Recolor",
+                    "strval": "False",
+                    "InheritedType": 2
                   },
                   {
                     "part": "lv.PART.MAIN",
@@ -2537,6 +2675,12 @@
                     "InheritedType": 1
                   },
                   {
+                    "nid": 223,
+                    "strtype": "OBJECT/State_trickle",
+                    "strval": "False",
+                    "InheritedType": 2
+                  },
+                  {
                     "nid": 225,
                     "flags": 1048576,
                     "strtype": "OBJECT/Scrolling",
@@ -2594,6 +2738,12 @@
                     "strtype": "LABEL/Text",
                     "strval": "",
                     "InheritedType": 10
+                  },
+                  {
+                    "nid": 1035,
+                    "strtype": "LABEL/Recolor",
+                    "strval": "False",
+                    "InheritedType": 2
                   },
                   {
                     "part": "lv.PART.MAIN",
@@ -2703,6 +2853,12 @@
                     "InheritedType": 1
                   },
                   {
+                    "nid": 223,
+                    "strtype": "OBJECT/State_trickle",
+                    "strval": "False",
+                    "InheritedType": 2
+                  },
+                  {
                     "nid": 225,
                     "flags": 1048576,
                     "strtype": "OBJECT/Scrolling",
@@ -2760,6 +2916,12 @@
                     "strtype": "LABEL/Text",
                     "strval": "URL",
                     "InheritedType": 10
+                  },
+                  {
+                    "nid": 1035,
+                    "strtype": "LABEL/Recolor",
+                    "strval": "False",
+                    "InheritedType": 2
                   },
                   {
                     "part": "lv.PART.MAIN",
@@ -2869,6 +3031,12 @@
                     "InheritedType": 1
                   },
                   {
+                    "nid": 223,
+                    "strtype": "OBJECT/State_trickle",
+                    "strval": "False",
+                    "InheritedType": 2
+                  },
+                  {
                     "nid": 225,
                     "flags": 1048576,
                     "strtype": "OBJECT/Scrolling",
@@ -2926,6 +3094,12 @@
                     "strtype": "LABEL/Text",
                     "strval": "192.168.4.1",
                     "InheritedType": 10
+                  },
+                  {
+                    "nid": 1035,
+                    "strtype": "LABEL/Recolor",
+                    "strval": "False",
+                    "InheritedType": 2
                   },
                   {
                     "part": "lv.PART.MAIN",
@@ -3037,6 +3211,12 @@
                 "nid": 100,
                 "strtype": "OBJECT/Hidden",
                 "strval": "True",
+                "InheritedType": 2
+              },
+              {
+                "nid": 223,
+                "strtype": "OBJECT/State_trickle",
+                "strval": "False",
                 "InheritedType": 2
               },
               {
@@ -3173,6 +3353,12 @@
                     "InheritedType": 1
                   },
                   {
+                    "nid": 223,
+                    "strtype": "OBJECT/State_trickle",
+                    "strval": "False",
+                    "InheritedType": 2
+                  },
+                  {
                     "nid": 225,
                     "flags": 1048576,
                     "strtype": "OBJECT/Scrolling",
@@ -3230,6 +3416,12 @@
                     "strtype": "LABEL/Text",
                     "strval": "Firmware Update",
                     "InheritedType": 10
+                  },
+                  {
+                    "nid": 1035,
+                    "strtype": "LABEL/Recolor",
+                    "strval": "False",
+                    "InheritedType": 2
                   },
                   {
                     "part": "lv.PART.MAIN",
@@ -3339,6 +3531,12 @@
                     "InheritedType": 1
                   },
                   {
+                    "nid": 223,
+                    "strtype": "OBJECT/State_trickle",
+                    "strval": "False",
+                    "InheritedType": 2
+                  },
+                  {
                     "nid": 225,
                     "flags": 1048576,
                     "strtype": "OBJECT/Scrolling",
@@ -3396,6 +3594,12 @@
                     "strtype": "LABEL/Text",
                     "strval": "Downloading...",
                     "InheritedType": 10
+                  },
+                  {
+                    "nid": 1035,
+                    "strtype": "LABEL/Recolor",
+                    "strval": "False",
+                    "InheritedType": 2
                   },
                   {
                     "part": "lv.PART.MAIN",
@@ -3498,6 +3702,12 @@
                     "flags": 1048576,
                     "strtype": "OBJECT/Flags",
                     "InheritedType": 1
+                  },
+                  {
+                    "nid": 223,
+                    "strtype": "OBJECT/State_trickle",
+                    "strval": "False",
+                    "InheritedType": 2
                   },
                   {
                     "nid": 225,
@@ -3683,6 +3893,12 @@
                     "InheritedType": 1
                   },
                   {
+                    "nid": 223,
+                    "strtype": "OBJECT/State_trickle",
+                    "strval": "False",
+                    "InheritedType": 2
+                  },
+                  {
                     "nid": 225,
                     "flags": 1048576,
                     "strtype": "OBJECT/Scrolling",
@@ -3740,6 +3956,12 @@
                     "strtype": "LABEL/Text",
                     "strval": "42%",
                     "InheritedType": 10
+                  },
+                  {
+                    "nid": 1035,
+                    "strtype": "LABEL/Recolor",
+                    "strval": "False",
+                    "InheritedType": 2
                   },
                   {
                     "part": "lv.PART.MAIN",
@@ -3851,6 +4073,12 @@
                 "nid": 100,
                 "strtype": "OBJECT/Hidden",
                 "strval": "True",
+                "InheritedType": 2
+              },
+              {
+                "nid": 223,
+                "strtype": "OBJECT/State_trickle",
+                "strval": "False",
                 "InheritedType": 2
               },
               {
@@ -3980,6 +4208,12 @@
                     "flags": 1048576,
                     "strtype": "OBJECT/Flags",
                     "InheritedType": 1
+                  },
+                  {
+                    "nid": 223,
+                    "strtype": "OBJECT/State_trickle",
+                    "strval": "False",
+                    "InheritedType": 2
                   },
                   {
                     "nid": 225,
@@ -4147,6 +4381,12 @@
                     "InheritedType": 1
                   },
                   {
+                    "nid": 223,
+                    "strtype": "OBJECT/State_trickle",
+                    "strval": "False",
+                    "InheritedType": 2
+                  },
+                  {
                     "nid": 225,
                     "flags": 1048576,
                     "strtype": "OBJECT/Scrolling",
@@ -4204,6 +4444,12 @@
                     "strtype": "LABEL/Text",
                     "strval": "Please wait...",
                     "InheritedType": 10
+                  },
+                  {
+                    "nid": 1035,
+                    "strtype": "LABEL/Recolor",
+                    "strval": "False",
+                    "InheritedType": 2
                   },
                   {
                     "part": "lv.PART.MAIN",
@@ -4315,6 +4561,12 @@
                 "nid": 100,
                 "strtype": "OBJECT/Hidden",
                 "strval": "True",
+                "InheritedType": 2
+              },
+              {
+                "nid": 223,
+                "strtype": "OBJECT/State_trickle",
+                "strval": "False",
                 "InheritedType": 2
               },
               {
@@ -4451,6 +4703,12 @@
                     "InheritedType": 1
                   },
                   {
+                    "nid": 223,
+                    "strtype": "OBJECT/State_trickle",
+                    "strval": "False",
+                    "InheritedType": 2
+                  },
+                  {
                     "nid": 225,
                     "flags": 1048576,
                     "strtype": "OBJECT/Scrolling",
@@ -4508,6 +4766,12 @@
                     "strtype": "LABEL/Text",
                     "strval": "",
                     "InheritedType": 10
+                  },
+                  {
+                    "nid": 1035,
+                    "strtype": "LABEL/Recolor",
+                    "strval": "False",
+                    "InheritedType": 2
                   },
                   {
                     "part": "lv.PART.MAIN",
@@ -4617,6 +4881,12 @@
                     "InheritedType": 1
                   },
                   {
+                    "nid": 223,
+                    "strtype": "OBJECT/State_trickle",
+                    "strval": "False",
+                    "InheritedType": 2
+                  },
+                  {
                     "nid": 225,
                     "flags": 1048576,
                     "strtype": "OBJECT/Scrolling",
@@ -4674,6 +4944,12 @@
                     "strtype": "LABEL/Text",
                     "strval": "Settings saved",
                     "InheritedType": 10
+                  },
+                  {
+                    "nid": 1035,
+                    "strtype": "LABEL/Recolor",
+                    "strval": "False",
+                    "InheritedType": 2
                   },
                   {
                     "part": "lv.PART.MAIN",
@@ -4783,6 +5059,12 @@
                     "InheritedType": 1
                   },
                   {
+                    "nid": 223,
+                    "strtype": "OBJECT/State_trickle",
+                    "strval": "False",
+                    "InheritedType": 2
+                  },
+                  {
                     "nid": 225,
                     "flags": 1048576,
                     "strtype": "OBJECT/Scrolling",
@@ -4840,6 +5122,12 @@
                     "strtype": "LABEL/Text",
                     "strval": "Applied from web portal",
                     "InheritedType": 10
+                  },
+                  {
+                    "nid": 1035,
+                    "strtype": "LABEL/Recolor",
+                    "strval": "False",
+                    "InheritedType": 2
                   },
                   {
                     "part": "lv.PART.MAIN",
@@ -4957,6 +5245,12 @@
                 "nid": 100,
                 "strtype": "OBJECT/Hidden",
                 "strval": "True",
+                "InheritedType": 2
+              },
+              {
+                "nid": 223,
+                "strtype": "OBJECT/State_trickle",
+                "strval": "False",
                 "InheritedType": 2
               },
               {
@@ -5226,6 +5520,12 @@
                 "InheritedType": 1
               },
               {
+                "nid": 223,
+                "strtype": "OBJECT/State_trickle",
+                "strval": "False",
+                "InheritedType": 2
+              },
+              {
                 "nid": 225,
                 "flags": 1048576,
                 "strtype": "OBJECT/Scrolling",
@@ -5451,6 +5751,12 @@
                 "InheritedType": 1
               },
               {
+                "nid": 223,
+                "strtype": "OBJECT/State_trickle",
+                "strval": "False",
+                "InheritedType": 2
+              },
+              {
                 "nid": 225,
                 "flags": 1048576,
                 "strtype": "OBJECT/Scrolling",
@@ -5508,6 +5814,12 @@
                 "strtype": "LABEL/Text",
                 "strval": "TEMPERATURE",
                 "InheritedType": 10
+              },
+              {
+                "nid": 1035,
+                "strtype": "LABEL/Recolor",
+                "strval": "False",
+                "InheritedType": 2
               },
               {
                 "part": "lv.PART.MAIN",
@@ -5617,6 +5929,12 @@
                 "InheritedType": 1
               },
               {
+                "nid": 223,
+                "strtype": "OBJECT/State_trickle",
+                "strval": "False",
+                "InheritedType": 2
+              },
+              {
                 "nid": 225,
                 "flags": 1048576,
                 "strtype": "OBJECT/Scrolling",
@@ -5674,6 +5992,12 @@
                 "strtype": "LABEL/Text",
                 "strval": "78°C",
                 "InheritedType": 10
+              },
+              {
+                "nid": 1035,
+                "strtype": "LABEL/Recolor",
+                "strval": "False",
+                "InheritedType": 2
               },
               {
                 "part": "lv.PART.MAIN",
@@ -5783,6 +6107,12 @@
                 "InheritedType": 1
               },
               {
+                "nid": 223,
+                "strtype": "OBJECT/State_trickle",
+                "strval": "False",
+                "InheritedType": 2
+              },
+              {
                 "nid": 225,
                 "flags": 1048576,
                 "strtype": "OBJECT/Scrolling",
@@ -5840,6 +6170,12 @@
                 "strtype": "LABEL/Text",
                 "strval": "3 / 6",
                 "InheritedType": 10
+              },
+              {
+                "nid": 1035,
+                "strtype": "LABEL/Recolor",
+                "strval": "False",
+                "InheritedType": 2
               },
               {
                 "part": "lv.PART.MAIN",
@@ -5949,6 +6285,12 @@
                 "InheritedType": 1
               },
               {
+                "nid": 223,
+                "strtype": "OBJECT/State_trickle",
+                "strval": "False",
+                "InheritedType": 2
+              },
+              {
                 "nid": 225,
                 "flags": 1048576,
                 "strtype": "OBJECT/Scrolling",
@@ -6006,6 +6348,12 @@
                 "strtype": "LABEL/Text",
                 "strval": "HIGH",
                 "InheritedType": 10
+              },
+              {
+                "nid": 1035,
+                "strtype": "LABEL/Recolor",
+                "strval": "False",
+                "InheritedType": 2
               },
               {
                 "part": "lv.PART.MAIN",
@@ -6202,14 +6550,16 @@
     "offset_y": 0,
     "shape": "CIRCLE",
     "multilang": "DISABLE",
-    "description": null,
-    "board": "Arduino with TFT_eSPI",
-    "board_version": "v2.3.0",
-    "editor_version": "1.6.1",
+    "description": "",
+    "board": "CrowPanel 1.28\" HMI ESP32 Rotary Display - ESP-IDF",
+    "board_version": "v2.5.0",
+    "editor_version": "1.6.2",
     "image": "",
     "export_temp_image": false,
     "force_export_images": false,
-    "flat_export": true,
+    "flat_export": false,
+    "optimize_image_formats": true,
+    "optimize_image_formats_initialized": true,
     "advanced_alpha": false,
     "pointfilter": false,
     "theme_simplified": false,
@@ -6220,18 +6570,18 @@
     "separate_screen_save": false,
     "hierarchy_state_save": false,
     "reverse_event_order": false,
-    "backup_cnt": 7,
+    "backup_cnt": 8,
     "autosave_cnt": 0,
     "group_color_cnt": 0,
     "imagebytearrayprefix": "",
-    "lvgl_version": "9.2.2",
+    "lvgl_version": "9.5",
     "callfuncsexport": "C_FILE",
     "imageexport": "SOURCE",
     "lvgl_include_path": "lvgl.h",
     "naming": "Name",
     "naming_force_lowercase": false,
     "naming_add_subcomponent": false,
-    "nidcnt": 1000713,
+    "nidcnt": 1000919,
     "BitDepth": 16,
     "Name": "SquareLine_Project"
   }
