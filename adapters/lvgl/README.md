@@ -4,6 +4,20 @@ This directory contains hardware-specific adapters that bridge physical displays
 
 The framework uses an interface-driven design. The `LVGLDisplayModule` contains the core LVGL lifecycle, tick management, and system screens, but it has no hardware-specific dependencies. Instead, it relies on an `ILVGLHardwareAdapter` provided by the application during setup.
 
+## Why This Directory Lives at `adapters/` (Not Inside `modules/` or `hardware/`)
+
+The adapter sits at the intersection of three concerns that must remain decoupled:
+
+| Concern | Location | Contains |
+| :--- | :--- | :--- |
+| Pin assignments | `hardware/<board>/board.h` | Pure `#define` / `constexpr` data — GPIO numbers, no code |
+| LVGL lifecycle & screens | `modules/LVGLDisplay/` | Framework module — codes against `ILVGLHardwareAdapter` interface only |
+| Board-specific driver init | `adapters/lvgl/<Adapter>` | Executable C++ — depends on _both_ the above + external driver libraries |
+
+Placing adapters inside `modules/LVGLDisplay/` would pollute the framework library with board-specific dependencies (LovyanGFX, ESP32Encoder) and break Dependency Inversion. Placing them inside `hardware/` would violate that directory's role as a pure declarative data layer. The root-level `adapters/` directory keeps each concern cleanly separated — a textbook **Ports & Adapters** (hexagonal architecture) pattern.
+
+> **Full rationale:** See [ADR: Adapters Directory Placement](../../docs/developer/adr/adr-adapters-placement.md).
+
 ## Authoring an Adapter
 
 To create a new hardware adapter, implement the `ILVGLHardwareAdapter` interface. You must provide the following methods:
@@ -26,6 +40,14 @@ If you are targeting a microcontroller without PCNT (e.g., standard ESP32), you 
 > [!IMPORTANT]
 > **16 MB Flash Required (D9)**
 > Including LVGL, large fonts, and double-buffered OTA partitions requires significant flash space. This framework strictly requires a minimum of **16 MB of Flash memory** for any target using the LVGL display module. Adapters targeting 4 MB or 8 MB boards (like the Cheap Yellow Display) are out of scope and unsupported.
+
+## Reference Adapter: `CrowPanel128Adapter`
+
+Targeting the Elecrow CrowPanel 1.28" rotary display (ESP32-S3):
+- **Display**: GC9A01 240×240 circular TFT driven via LovyanGFX.
+- **Touch**: CST816D capacitive touch controller (`read_cb`).
+- **Encoder**: `ESP32Encoder` hardware PCNT peripheral for pulse counting (offloads ISRs from software).
+- **Button**: Subscribes to `ButtonModule` press events via the `EventBus` to translate physical encoder-switch presses into LVGL `LV_INDEV_STATE_PRESSED` states.
 
 ## App Wiring Example
 

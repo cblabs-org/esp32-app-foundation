@@ -410,6 +410,7 @@ private:
     static void _onSystemError(const char* topic, const void* payload, void* ctx);
     static void _onAppConfiguring(const char* topic, const void* payload, void* ctx);
     static void _onAppRunning(const char* topic, const void* payload, void* ctx);
+    static void _onInputWake(const char* topic, const void* payload, void* ctx);
 
     ILVGLHardwareAdapter& _adapter;            ///< Injected hardware adapter
     const BootBranding*   _branding = nullptr; ///< Optional boot branding configuration
@@ -433,6 +434,7 @@ private:
     float    _lastBootProgress = 0.0f;         ///< Last boot progress rendered (for synchronous boot animation)
     std::atomic<bool> _pauseRendering{false};  ///< Pause rendering flag during OTA flash writes
     uint32_t _lastIndevInactiveMs = 0;         ///< Inactivity tracking timestamp
+    std::atomic<bool> _pendingInputWake{false}; ///< Input detected while dimmed/blanked
 
     // --- Thread-safe pending state ---
     std::atomic<bool> _pendingOtaUpdate{false};

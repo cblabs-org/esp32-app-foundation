@@ -490,6 +490,10 @@ inline void lv_group_delete(lv_group_t* group) {
     delete group;
 }
 
+inline void lv_group_set_default(lv_group_t* group) {
+    (void)group;
+}
+
 inline void lv_group_add_obj(lv_group_t* group, lv_obj_t* obj) {
     (void)group; (void)obj;
 }

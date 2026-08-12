@@ -1,6 +1,3 @@
-[submodule ".agents/skills/distillery"]
-	path = .agents/skills/distillery
-	url = https://github.com/mm-skills/distillery
 [submodule ".agents/skills/embedded-systems"]
 	path = .agents/skills/embedded-systems
 	url = https://github.com/mm-skills/embedded-systems

@@ -182,7 +182,7 @@ void CrowPanel128Adapter::_encoderReadCallback(lv_indev_t* indev, lv_indev_data_
     
     // Read rotation via framework EncoderModule
     if (adapter->_encoderModule) {
-        data->enc_diff = adapter->_encoderModule->consumeDelta(EncoderDelta::RAW);
+        data->enc_diff = adapter->_encoderModule->consumeDelta(EncoderDelta::ACCELERATED);
     } else {
         data->enc_diff = 0;
     }
@@ -195,3 +195,14 @@ void CrowPanel128Adapter::_encoderReadCallback(lv_indev_t* indev, lv_indev_data_
     }
 }
 
+void CrowPanel128Adapter::pollTouch() {
+    uint16_t x, y;
+    bool touching = _gfx.getTouch(&x, &y);
+    if (touching && !_touchActive) {
+        // Rising edge — finger just made contact
+        if (_bus) {
+            _bus->publish("touch.press_down");
+        }
+    }
+    _touchActive = touching;
+}
