@@ -280,7 +280,7 @@ void DiagCarouselController::updateWidgets() {
             if (item.readText) {
                 item.readText(_textBuf, sizeof(_textBuf));
             } else {
-                snprintf(_textBuf, sizeof(_textBuf), "—");
+                snprintf(_textBuf, sizeof(_textBuf), "-");
             }
             lv_label_set_text(ui_ui_DiagValue, _textBuf);
             // Use smaller font for text values (IPs, SSIDs, versions)
@@ -290,7 +290,7 @@ void DiagCarouselController::updateWidgets() {
 
         // No evaluation for text items
         if (&ui_ui_DiagStatus != nullptr && ui_ui_DiagStatus != nullptr) {
-            lv_label_set_text(ui_ui_DiagStatus, "\xE2\x80\x94");  // em-dash "—"
+            lv_label_set_text(ui_ui_DiagStatus, "-");
             lv_obj_set_style_text_color(ui_ui_DiagStatus,
                                         lv_color_hex(COLOR_INFO), LV_PART_MAIN);
         }
@@ -349,7 +349,7 @@ void DiagCarouselController::refreshValueOnly() {
 
 const char* DiagCarouselController::evaluateStatus(const DiagItem& item, float value) const {
     // No evaluation if thresholds are both zero (e.g. uptime)
-    if (item.warnThreshold == 0.0f && item.critThreshold == 0.0f) return "\xE2\x80\x94";
+    if (item.warnThreshold == 0.0f && item.critThreshold == 0.0f) return "-";
 
     if (item.higherIsBetter) {
         // Higher is better (e.g. free heap): low values are bad

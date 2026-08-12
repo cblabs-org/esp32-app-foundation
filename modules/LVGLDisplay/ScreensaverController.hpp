@@ -149,7 +149,7 @@ private:
     bool              _blanked = false;                  ///< True when display is blanked
     bool              _wakeRequested = false;            ///< True when wake requested for next tick
 
-    void _dim(ILVGLHardwareAdapter& adapter);
+    void _dim(ILVGLHardwareAdapter& adapter, uint8_t activeBrightness);
     void _blank(ILVGLHardwareAdapter& adapter, EventBus* eventBus);
     void _wake(ILVGLHardwareAdapter& adapter, uint8_t activeBrightness, EventBus* eventBus);
 };
