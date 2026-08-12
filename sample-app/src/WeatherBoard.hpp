@@ -29,7 +29,8 @@
 
 #pragma once
 
-#include "AppFoundation.h"           // F05: Facade include — provides IDisplayBoard, EventBus, etc.
+#include "AppFoundation.h"           // F05: Facade include — provides EventBus, etc.
+#include "U8G2Display/IDisplayBoard.hpp"
 #include "WeatherModule.hpp"         // Needed for WeatherModule* member type
 #include "WeatherWidget.hpp"
 #include <U8g2lib.h>

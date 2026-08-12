@@ -148,7 +148,7 @@ constexpr int8_t PIN_ENCODER_SW   = 41;
 
 // ── Encoder Module configuration (WITH_ENCODER) ────────────────────────────────
 #ifdef WITH_ENCODER
-#include "EncoderConfig.h"
+#include "EncoderModule/EncoderConfig.h"
 
 static constexpr BoardEncoder BOARD_ENCODERS[] = {
     {
@@ -171,7 +171,7 @@ static constexpr size_t BOARD_ENCODER_COUNT = sizeof(BOARD_ENCODERS) / sizeof(BO
 
 // ── Button Module configuration (WITH_BUTTONS) ───────────────────────────────
 #ifdef WITH_BUTTONS
-#include "ButtonConfig.h"
+#include "ButtonModule/ButtonConfig.h"
 
 static constexpr BoardButton BOARD_BUTTONS[] = {
     {

@@ -19,7 +19,7 @@ All hardware-specific initialisation (display controller, touch interface, rotar
 - **Generic LVGL v9 Engine**: Manages `lv_init()`, DMA partial SRAM draw buffer allocation, input device focus groups, and main-loop tick pumping via `ITickable`.
 - **6 Framework Interfaces**: Fully implements `IDisplayModule`, `ITickable`, `IConfigurable`, `IStatusReporter`, `IWebContributor`, and `IMCPContributor`.
 - **Pluggable Hardware Adapters**: Hardware initialisation is decoupled via `ILVGLHardwareAdapter`. The framework includes the reference [`CrowPanel128Adapter`](../../adapters/lvgl/CrowPanel128Adapter.hpp) for 1.28" circular TFTs.
-- **Two-Stage Boot Splash & System Screens**: Displays a Stage-1 compiled-in boot logo during early hardware bootstrap before LittleFS mounts, with support for custom system screen skinning via [`ILVGLSystemScreens`](../../include/interfaces/ILVGLSystemScreens.hpp).
+- **Two-Stage Boot Splash & System Screens**: Displays a Stage-1 compiled-in boot logo during early hardware bootstrap before LittleFS mounts, with support for custom system screen skinning via [`ILVGLSystemScreens`](ILVGLSystemScreens.hpp).
 - **SquareLine Studio Integration**: Exposes an optional weak `ui_init()` hook for seamless binding of SquareLine Studio v9 exported UI projects.
 - **Web Portal & MCP Remote Management**: Provides an interactive Display tab with live screenshot streaming, configuration forms (`/api/display/*`), and remote MCP tools (`display_status`, `display_control`, `capture_display`).
 
@@ -110,7 +110,7 @@ For instructions on building a custom hardware adapter, see the [Adapter Authori
 ## Boot & System Screens
 
 All real screens live in the SquareLine (SLS) design and are supplied through the
-[`ILVGLSystemScreens`](../../include/interfaces/ILVGLSystemScreens.hpp) skin
+[`ILVGLSystemScreens`](ILVGLSystemScreens.hpp) skin
 (`bootScreen`, `errorScreen`, `otaScreen`, configuring screens). The module builds the
 SLS UI early — in `bootstrapHardware()` — so the designer's **boot screen exists before
 boot status is reported**, then drives its progress bar / status label via

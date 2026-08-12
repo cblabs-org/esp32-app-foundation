@@ -15,7 +15,7 @@
 #include <cstring>
 #include <string>
 #include <vector>
-#include "EncoderConfig.h"
+#include "EncoderModule/EncoderConfig.h"
 #include "EventBus.hpp"
 
 // Lightweight Application stub providing getEventBus() for EncoderModule::begin()

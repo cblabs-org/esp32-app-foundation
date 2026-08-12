@@ -5,7 +5,7 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  *
- * Module: include/interfaces/IU8G2SystemScreens.hpp
+ * Module: modules/U8G2Display/IU8G2SystemScreens.hpp
  * Description: Pluggable system screen provider for U8G2 display module.
  *
  * Exported Classes:
@@ -19,7 +19,7 @@
 
 #pragma once
 
-#include "interfaces/IDisplayBoard.hpp"
+#include "IDisplayBoard.hpp"
 #include "events/AppConfiguringPayload.hpp"
 
 /**

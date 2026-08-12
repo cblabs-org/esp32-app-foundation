@@ -5,7 +5,7 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  *
- * Module: include/ButtonConfig.h
+ * Module: modules/ButtonModule/ButtonConfig.h
  * Description: Framework-owned type definitions for hardware button descriptors,
  *              button configuration types, and EventBus payload structures.
  *

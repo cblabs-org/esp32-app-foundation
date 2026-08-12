@@ -74,7 +74,7 @@ LVGLDisplayModule displayModule(hardwareAdapter, &myBranding);
 
 U8G2 uses monochrome XBM byte arrays. Define a `U8G2BootLogo` struct pointing to the XBM pixel array:
 
-#### Descriptor Definition (`include/types/U8G2BootLogo.h`)
+#### Descriptor Definition (`modules/U8G2Display/U8G2BootLogo.h`)
 
 ```cpp
 struct U8G2BootLogo {
@@ -105,7 +105,7 @@ static const uint8_t my_logo_bits[] PROGMEM = {
 
 ```cpp
 #include "my_logo_xbm.h"
-#include <types/U8G2BootLogo.h>
+#include <U8G2Display/U8G2BootLogo.h>
 #include <types/BootBranding.h>
 
 static constexpr U8G2BootLogo myLogo{
@@ -154,7 +154,7 @@ Applications can override the framework's built-in system screens (such as Error
 
 ### U8G2 System Screens (`IU8G2SystemScreens`)
 
-#### Interface (`include/interfaces/IU8G2SystemScreens.hpp`)
+#### Interface (`modules/U8G2Display/IU8G2SystemScreens.hpp`)
 
 ```cpp
 class IU8G2SystemScreens {
@@ -178,8 +178,8 @@ public:
 #### Example Implementation
 
 ```cpp
-#include <interfaces/IU8G2SystemScreens.hpp>
-#include <interfaces/IDisplayBoard.hpp>
+#include <U8G2Display/IU8G2SystemScreens.hpp>
+#include <U8G2Display/IDisplayBoard.hpp>
 
 class CustomErrorBoard : public IDisplayBoard {
 public:
@@ -209,7 +209,7 @@ U8G2DisplayModule displayModule(&myBranding, &myLogo, &mySystemScreens);
 
 ### LVGL System Screens (`ILVGLSystemScreens`)
 
-#### Interface (`include/interfaces/ILVGLSystemScreens.hpp`)
+#### Interface (`modules/LVGLDisplay/ILVGLSystemScreens.hpp`)
 
 ```cpp
 class ILVGLSystemScreens {
@@ -233,7 +233,7 @@ public:
 #### Example Implementation
 
 ```cpp
-#include <interfaces/ILVGLSystemScreens.hpp>
+#include <LVGLDisplay/ILVGLSystemScreens.hpp>
 
 class CustomLVGLScreens : public ILVGLSystemScreens {
 public:

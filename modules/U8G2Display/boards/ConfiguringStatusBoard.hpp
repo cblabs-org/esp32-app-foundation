@@ -24,7 +24,7 @@
 #pragma once
 
 #include <vector>
-#include "interfaces/IDisplayBoard.hpp"
+#include "IDisplayBoard.hpp"
 #include "interfaces/IConfigGate.hpp"
 #include "widgets/LabelWidget.hpp"
 #include "widgets/ProgressBarWidget.hpp"

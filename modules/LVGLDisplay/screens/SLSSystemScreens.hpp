@@ -18,7 +18,7 @@
 #ifndef MODULES_LVGLDISPLAY_SCREENS_SLSSYSTEMSCREENS_HPP_
 #define MODULES_LVGLDISPLAY_SCREENS_SLSSYSTEMSCREENS_HPP_
 
-#include "interfaces/ILVGLSystemScreens.hpp"
+#include "ILVGLSystemScreens.hpp"
 
 /**
  * @brief SquareLine Studio system screen skin provider.

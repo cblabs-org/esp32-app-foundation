@@ -16,7 +16,7 @@
 #include <string>
 #include "LVGLDisplayModule.hpp"
 #include "MockLVGLHardwareAdapter.hpp"
-#include "interfaces/ILVGLSystemScreens.hpp"
+#include "LVGLDisplay/ILVGLSystemScreens.hpp"
 #include "screens/FaultScreen.hpp"
 #include "lvgl.h"
 

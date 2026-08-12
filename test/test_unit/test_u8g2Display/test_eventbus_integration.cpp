@@ -209,7 +209,7 @@ TEST_F(EventBusIntegrationTest, Publish_NoSubscribers_ReturnsZero) {
 // =============================================================================
 
 #include "events/AppConfiguringPayload.hpp"
-#include "interfaces/IU8G2SystemScreens.hpp"
+#include "U8G2Display/IU8G2SystemScreens.hpp"
 
 /**
  * @brief Dummy custom gate helper board for consumer override testing.

@@ -59,7 +59,7 @@
 #include "interfaces/IMCPContributor.hpp"
 #include "interfaces/IDisplayModule.hpp"
 #include "interfaces/ILVGLHardwareAdapter.hpp"
-#include "interfaces/ILVGLSystemScreens.hpp"
+#include "ILVGLSystemScreens.hpp"
 #include <types/BootBranding.h>
 #include "assets/boot_logo.h"
 #include "screens/FaultScreen.hpp"
