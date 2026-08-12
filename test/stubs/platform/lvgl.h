@@ -319,9 +319,12 @@ typedef struct _lv_font_t {
     void* dsc;
 } lv_font_t;
 
+inline static const lv_font_t lv_font_montserrat_12 = { nullptr };
 inline static const lv_font_t lv_font_montserrat_14 = { nullptr };
 inline static const lv_font_t lv_font_montserrat_20 = { nullptr };
+inline static const lv_font_t lv_font_montserrat_22 = { nullptr };
 inline static const lv_font_t lv_font_montserrat_28 = { nullptr };
+inline static const lv_font_t lv_font_montserrat_40 = { nullptr };
 inline static const lv_font_t* lv_font_default = &lv_font_montserrat_14;
 
 // --- Colors ---
@@ -510,6 +513,18 @@ inline lv_obj_t* lv_group_get_focused(const lv_group_t* group) {
     return group ? group->focused_obj : nullptr;
 }
 
+inline void lv_group_set_editing(lv_group_t* group, bool editing) {
+    (void)group; (void)editing;
+}
+
+inline void* lv_event_get_user_data(lv_event_t* e) {
+    return e ? e->user_data : nullptr;
+}
+
+inline lv_obj_t* lv_event_get_target(lv_event_t* e) {
+    return e ? static_cast<lv_obj_t*>(e->target) : nullptr;
+}
+
 // Object / Screen Management
 inline lv_obj_t* lv_obj_create(lv_obj_t* parent) {
     lv_obj_t* obj = new lv_obj_t();
@@ -659,6 +674,10 @@ inline void lv_arc_set_value(lv_obj_t* arc, int32_t val) {
 
 inline void lv_arc_set_range(lv_obj_t* arc, int32_t min, int32_t max) {
     (void)arc; (void)min; (void)max;
+}
+
+inline int32_t lv_arc_get_value(const lv_obj_t* arc) {
+    (void)arc; return 0;
 }
 
 inline void lv_arc_set_bg_angles(lv_obj_t* arc, uint16_t start, uint16_t end) {

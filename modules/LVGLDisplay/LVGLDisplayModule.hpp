@@ -64,6 +64,7 @@
 #include "assets/boot_logo.h"
 #include "screens/FaultScreen.hpp"
 #include "ScreensaverController.hpp"
+#include "DiagCarouselController.hpp"
 #ifndef UNIT_TEST
 #include "PngWriter.h"            // hardware-only PNG encoder (ROM tdefl); native build stubs capturePNG()
 #endif
@@ -470,6 +471,7 @@ private:
     unsigned long         _dimTimeoutMs = 150000;     ///< Inactivity dim timeout in ms (default 2.5 min)
     unsigned long         _blankTimeoutMs = 300000;   ///< Inactivity blank timeout in ms (default 5 min)
     ScreensaverController _screensaver;               ///< Screensaver state machine
+    DiagCarouselController _diagCarousel;              ///< Encoder-driven diagnostic carousel
 #ifndef UNIT_TEST
     DisplayServiceHelper  _serviceHelper{this};       ///< Shared web/MCP display routes (hardware only)
 #endif

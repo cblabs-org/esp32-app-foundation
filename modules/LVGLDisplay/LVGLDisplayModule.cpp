@@ -297,6 +297,9 @@ void LVGLDisplayModule::tick(uint32_t now) {
     }
 
     lv_tick_inc(elapsed);
+    // Tick the diagnostic carousel (periodic value refresh, ~1 Hz)
+    _diagCarousel.tick(now);
+
     lv_timer_handler();
 }
 
@@ -725,6 +728,9 @@ void LVGLDisplayModule::_onAppConfiguring(const char* /*topic*/, const void* pay
     ESP_LOGI("LVGLDisplayModule", "CONFIGURING gate: %s (status=%d)",
              p->gateName ? p->gateName : "?",
              static_cast<int>(p->actionStatus));
+
+    // Deactivate diagnostic carousel when leaving DiagScreen
+    self->_diagCarousel.stop();
              
     // LVGL has no built-in configuring screens — the skin (SLSSystemScreens) supplies
     // them. With no provider there is nothing to display.
@@ -783,6 +789,9 @@ void LVGLDisplayModule::_onAppRunning(const char* /*topic*/, const void* /*paylo
         lv_scr_load_anim(ui_ui_DiagScreen, LV_SCR_LOAD_ANIM_FADE_IN, 300, 0, false);
     }
 #endif
+
+    // Activate the diagnostic carousel (encoder-driven metric browser)
+    self->_diagCarousel.begin(self->_group);
 }
 
 void LVGLDisplayModule::_onInputWake(const char* /*topic*/, const void* /*payload*/, void* ctx) {
