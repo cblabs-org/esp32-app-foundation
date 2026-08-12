@@ -23,7 +23,7 @@
 #include <Arduino.h>
 
 #include <PsychicHttp.h>
-#include "homeassistant_js.hpp"
+#include "portal_assets/homeassistant_js.hpp"
 
 #include "MCPToolRegistry.hpp"
 #include "ConfigManager.hpp"
