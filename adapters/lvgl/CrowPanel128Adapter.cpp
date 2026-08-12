@@ -180,9 +180,15 @@ void CrowPanel128Adapter::_encoderReadCallback(lv_indev_t* indev, lv_indev_data_
     auto* adapter = static_cast<CrowPanel128Adapter*>(lv_indev_get_user_data(indev));
     if (!adapter) return;
     
-    // Read rotation via framework EncoderModule
+    // Read rotation via framework EncoderModule, then apply 10:1 divisor.
+    // The PCNT quadrature encoder produces ~2 counts per detent and ACCELERATED
+    // mode amplifies fast rotation. Accumulating prevents losing small deltas
+    // while keeping carousel navigation precise (1 step per ~5 detent clicks).
+    static constexpr int32_t ENC_DIVISOR = 10;
     if (adapter->_encoderModule) {
-        data->enc_diff = adapter->_encoderModule->consumeDelta(EncoderDelta::ACCELERATED);
+        adapter->_encoderAccum += adapter->_encoderModule->consumeDelta(EncoderDelta::ACCELERATED);
+        data->enc_diff = adapter->_encoderAccum / ENC_DIVISOR;
+        adapter->_encoderAccum %= ENC_DIVISOR;
     } else {
         data->enc_diff = 0;
     }
