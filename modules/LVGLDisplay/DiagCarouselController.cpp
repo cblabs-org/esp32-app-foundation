@@ -152,8 +152,13 @@ void DiagCarouselController::begin(lv_group_t* group) {
         _callbackRegistered = true;
     }
 
-    // Auto-enter EDIT mode so encoder immediately drives the arc value
+    // Explicitly add the arc to the encoder group and focus it.
+    // The SLS arc is created on an inactive screen during ui_init(), so
+    // LVGL's default-group auto-add may not wire it. We must ensure the
+    // arc is the focused member before entering EDIT mode.
     if (_group != nullptr) {
+        lv_group_add_obj(_group, ui_ui_DiagArc);
+        lv_group_focus_obj(ui_ui_DiagArc);
         lv_group_set_editing(_group, true);
     }
 
