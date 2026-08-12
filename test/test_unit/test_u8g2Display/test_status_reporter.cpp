@@ -16,6 +16,7 @@
  */
 
 #include <gtest/gtest.h>
+#include "NativeU8G2DisplayType.h"
 #include "U8G2DisplayModule.hpp"
 
 // =============================================================================

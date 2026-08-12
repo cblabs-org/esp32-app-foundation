@@ -16,9 +16,25 @@
  */
 
 #include <gtest/gtest.h>
+#include "NativeU8G2DisplayType.h"
 #include "U8G2DisplayModule.hpp"
 #include "EventBus.hpp"
-#include "OTAUpdateManager.hpp"
+
+// ---------------------------------------------------------------------------
+// Local stand-in for the OTA progress payload.
+// The canonical struct moved to ApplicationEvents::OtaProgressPayload (guarded
+// by WITH_OTA).  We define a layout-compatible copy here so the struct-field
+// tests and EventBus integration tests compile without pulling in Application.hpp.
+// ---------------------------------------------------------------------------
+struct OTAProgressPayload {
+    float progress;       // 0.0 to 1.0 download fraction
+    const char* status;   // Human-readable status message
+    bool complete;        // True when OTA cycle is finished
+    bool success;         // True if OTA succeeded (only valid when complete)
+};
+
+/// Literal OTA progress topic (mirrors ApplicationEvents::OTA_PROGRESS).
+static constexpr const char* OTA_PROGRESS_TOPIC = "ota.progress";
 
 // =============================================================================
 // Test Group: Payload struct validation
@@ -112,7 +128,7 @@ protected:
 TEST_F(EventBusIntegrationTest, OtaProgress_Publish_DelegatesToBoard) {
     // Manually subscribe the static callback
     // The callback signature matches EventCallback typedef
-    bus.subscribe(OTAUpdateManagerEvents::OTA_PROGRESS,
+    bus.subscribe(OTA_PROGRESS_TOPIC,
         [](const char* topic, const void* payload, void* ctx) {
             // Simulate what _onOtaProgress does
             auto* self = static_cast<U8G2DisplayModule*>(ctx);
@@ -135,7 +151,7 @@ TEST_F(EventBusIntegrationTest, OtaProgress_Publish_DelegatesToBoard) {
     payload.complete = false;
     payload.success = false;
 
-    int delivered = bus.publish(OTAUpdateManagerEvents::OTA_PROGRESS, &payload);
+    int delivered = bus.publish(OTA_PROGRESS_TOPIC, &payload);
     EXPECT_EQ(delivered, 1);
 
     // Verify the OTA board is now active
@@ -144,7 +160,7 @@ TEST_F(EventBusIntegrationTest, OtaProgress_Publish_DelegatesToBoard) {
 
 /** Publish OTA complete(success) — board should expire. */
 TEST_F(EventBusIntegrationTest, OtaProgress_Complete_Success_BoardExpires) {
-    bus.subscribe(OTAUpdateManagerEvents::OTA_PROGRESS,
+    bus.subscribe(OTA_PROGRESS_TOPIC,
         [](const char* topic, const void* payload, void* ctx) {
             auto* self = static_cast<U8G2DisplayModule*>(ctx);
             if (payload == nullptr || self == nullptr) return;
@@ -164,7 +180,7 @@ TEST_F(EventBusIntegrationTest, OtaProgress_Complete_Success_BoardExpires) {
     payload.complete = true;
     payload.success = true;
 
-    bus.publish(OTAUpdateManagerEvents::OTA_PROGRESS, &payload);
+    bus.publish(OTA_PROGRESS_TOPIC, &payload);
     EXPECT_TRUE(display.boards.otaProgress.isExpired());
 }
 
@@ -200,7 +216,7 @@ TEST_F(EventBusIntegrationTest, Publish_NoSubscribers_ReturnsZero) {
     payload.complete = false;
     payload.success = false;
 
-    int delivered = bus.publish(OTAUpdateManagerEvents::OTA_PROGRESS, &payload);
+    int delivered = bus.publish(OTA_PROGRESS_TOPIC, &payload);
     EXPECT_EQ(delivered, 0);
 }
 
@@ -209,7 +225,7 @@ TEST_F(EventBusIntegrationTest, Publish_NoSubscribers_ReturnsZero) {
 // =============================================================================
 
 #include "events/AppConfiguringPayload.hpp"
-#include "U8G2Display/IU8G2SystemScreens.hpp"
+#include "modules/U8G2Display/IU8G2SystemScreens.hpp"
 
 /**
  * @brief Dummy custom gate helper board for consumer override testing.

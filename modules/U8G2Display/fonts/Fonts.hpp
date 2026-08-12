@@ -35,6 +35,14 @@
  */
 namespace AppFonts {
 
+    #if defined(UNIT_TEST) || defined(NATIVE_BUILD)
+    // Native test builds: U8G2 fonts are unavailable / stub arrays.
+    inline const uint8_t* defaultSmall()  { return nullptr; }
+    inline const uint8_t* defaultMedium() { return nullptr; }
+    inline const uint8_t* defaultLarge()  { return nullptr; }
+    inline const uint8_t* defaultClock()  { return nullptr; }
+    inline const uint8_t* defaultIcon()   { return nullptr; }
+    #else
     #include <U8g2lib.h>
 
     /** @brief Small text — U8G2 Helvetica 8pt regular. */
@@ -51,6 +59,7 @@ namespace AppFonts {
 
     /** @brief Icon font — U8G2 Open Iconic Embedded 2x. */
     inline const uint8_t* defaultIcon()   { return u8g2_font_open_iconic_embedded_2x_t; }
+    #endif
 
 
 } // namespace AppFonts
