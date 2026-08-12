@@ -121,7 +121,7 @@ const DiagItem DiagCarouselController::ITEMS[ITEM_COUNT] = {
     { "HEAP LOW MARK",DiagType::NUMERIC, "KB",           readHeapLowMark,    1024.0f, 30.0f, 15.0f, true,  0, nullptr },
     { "MAX ALLOC",    DiagType::NUMERIC, "KB",           readMaxAlloc,       1024.0f, 16.0f,  8.0f, true,  0, nullptr },
     { "PSRAM FREE",   DiagType::NUMERIC, "MB",           readPsramFree,      1048576.0f, 2.0f, 1.0f, true, 1, nullptr },
-    { "STORAGE",      DiagType::NUMERIC, "% used",       readStoragePercent, 1.0f,    80.0f, 95.0f, false, 1, nullptr },
+    { "STORAGE USED", DiagType::NUMERIC, "%",            readStoragePercent, 1.0f,    80.0f, 95.0f, false, 1, nullptr },
     { "WIFI RSSI",    DiagType::NUMERIC, "dBm",          readWifiRssi,       1.0f,   -75.0f,-85.0f, true,  0, nullptr },
     { "UPTIME",       DiagType::NUMERIC, "",             readUptimeSeconds,  1.0f,     0.0f,  0.0f, true,  0, nullptr },
     { "WIFI IP",      DiagType::TEXT,    nullptr,         nullptr,            0, 0, 0, false, 0, readWifiIp },
