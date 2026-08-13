@@ -315,23 +315,46 @@ function serveStaticFile(req, res) {
     filePath = '/index.html';
   }
 
-  const absolutePath = path.join(PORTAL_ROOT, filePath);
+  const cleanPath = filePath.split('?')[0];
+  const filename = path.basename(cleanPath);
 
-  // Security: prevent directory traversal
-  if (!absolutePath.startsWith(PORTAL_ROOT)) {
-    res.writeHead(403, { 'Content-Type': 'text/plain' });
-    res.end('Forbidden');
+  const searchDirs = [
+    PORTAL_ROOT,
+    path.resolve(__dirname, '..', '..', 'web', 'display'),
+  ];
+  const modulesDir = path.resolve(__dirname, '..', '..', 'modules');
+  if (fs.existsSync(modulesDir)) {
+    for (const mod of fs.readdirSync(modulesDir)) {
+      const modWeb = path.join(modulesDir, mod, 'web');
+      if (fs.existsSync(modWeb) && fs.statSync(modWeb).isDirectory()) {
+        searchDirs.push(modWeb);
+      }
+    }
+  }
+
+  let foundPath = null;
+  for (const dir of searchDirs) {
+    const candidate = path.join(dir, filename);
+    if (fs.existsSync(candidate) && fs.statSync(candidate).isFile()) {
+      foundPath = candidate;
+      break;
+    }
+  }
+
+  if (!foundPath) {
+    res.writeHead(404, { 'Content-Type': 'text/plain' });
+    res.end('Not Found');
     return;
   }
 
-  fs.readFile(absolutePath, (err, data) => {
+  fs.readFile(foundPath, (err, data) => {
     if (err) {
       res.writeHead(404, { 'Content-Type': 'text/plain' });
       res.end('Not Found');
       return;
     }
 
-    const ext = path.extname(absolutePath).toLowerCase();
+    const ext = path.extname(foundPath).toLowerCase();
     const mimeType = MIME_TYPES[ext] || 'application/octet-stream';
 
     res.writeHead(200, {

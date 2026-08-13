@@ -29,6 +29,10 @@
 #include <PsychicHttp.h>
 #include "esp_heap_caps.h"
 #include "esp_log.h"
+#include "portal_assets/display_js.hpp"
+#include "portal_assets/screenshot_js.hpp"
+#include "portal_assets/screenshot_html.hpp"
+#include "portal_assets/hardware_js.hpp"
 
 // -----------------------------------------------------------------------------
 // Weak Symbol Declaration & Default Implementation for SquareLine Studio (D8)
@@ -862,6 +866,34 @@ void LVGLDisplayModule::freeSnapshot(uint8_t* buffer) {
 }
 
 void LVGLDisplayModule::registerRoutes(PsychicHttpServer& server) {
+    server.on("/display.js", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
+        response->setContent(display_js_gz, display_js_gz_len);
+        response->setContentType("application/javascript");
+        response->addHeader("Content-Encoding", "gzip");
+        return response->send();
+    });
+
+    server.on("/screenshot.js", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
+        response->setContent(screenshot_js_gz, screenshot_js_gz_len);
+        response->setContentType("application/javascript");
+        response->addHeader("Content-Encoding", "gzip");
+        return response->send();
+    });
+
+    server.on("/screenshot.html", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
+        response->setContent(screenshot_html_gz, screenshot_html_gz_len);
+        response->setContentType("text/html");
+        response->addHeader("Content-Encoding", "gzip");
+        return response->send();
+    });
+
+    server.on("/hardware.js", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
+        response->setContent(hardware_js_gz, hardware_js_gz_len);
+        response->setContentType("application/javascript");
+        response->addHeader("Content-Encoding", "gzip");
+        return response->send();
+    });
+
 #ifndef UNIT_TEST
     _serviceHelper.registerBrightnessRoute(server);
     _serviceHelper.registerScreenshotRoute(server);

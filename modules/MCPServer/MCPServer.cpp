@@ -23,6 +23,7 @@
 #include "WebServerManager.hpp"
 #include "AuthManager.hpp"
 #include "ConfigManager.hpp"
+#include "portal_assets/mcp_js.hpp"
 
 // ---------------------------------------------------------------------------
 // Platform-conditional includes & logging shims
@@ -364,6 +365,13 @@ void MCPServer::_sendError(int code, const char* message, JsonVariantConst id, P
 // ---------------------------------------------------------------------------
 
 void MCPServer::registerRoutes(PsychicHttpServer& server) {
+    server.on("/mcp.js", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
+        response->setContent(mcp_js_gz, mcp_js_gz_len);
+        response->setContentType("application/javascript");
+        response->addHeader("Content-Encoding", "gzip");
+        return response->send();
+    });
+
     // --- POST /api/mcp — JSON-RPC endpoint for MCP tool calls ---
     // NOTE: Serial transport (_processLine) is intentionally NOT guarded —
     // Serial/USB access is physical access and is treated as trusted.

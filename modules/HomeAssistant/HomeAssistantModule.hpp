@@ -312,6 +312,12 @@ public:
     int getTabOrder() const override { return 40; }
 
     /**
+     * @brief Return the route path for this tab's JavaScript file.
+     * @return "/homeassistant.js"
+     */
+    const char* getTabScript() const override { return "/homeassistant.js"; }
+
+    /**
      * @brief Return the API path prefix for body-size middleware matching.
      * @return "/api/homeassistant"
      */

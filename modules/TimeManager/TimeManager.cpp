@@ -24,6 +24,7 @@
 #include "TimeManager.hpp"
 #include "ConfigManager.hpp"
 #include "platform/LogShim.h"
+#include "portal_assets/time_js.hpp"
 
 #include <cstring>
 
@@ -236,6 +237,13 @@ void TimeManager::resetConfig() {
  * @param server Reference to the AsyncWebServer instance.
  */
 void TimeManager::registerRoutes(PsychicHttpServer& server) {
+    server.on("/time.js", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
+        response->setContent(time_js_gz, time_js_gz_len);
+        response->setContentType("application/javascript");
+        response->addHeader("Content-Encoding", "gzip");
+        return response->send();
+    });
+
     // --- GET /api/time/config ---
     server.on("/api/time/config", HTTP_GET, [this](PsychicRequest* request, PsychicResponse* response) {
         _handleGetConfig(request, response);

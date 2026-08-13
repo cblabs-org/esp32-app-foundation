@@ -77,6 +77,10 @@ static constexpr const char* TAG = "U8G2DisplayModule";
 #include "ConfigManager.hpp"
 #include "MCPToolRegistry.hpp"
 #include "fonts/Fonts.hpp"
+#include "portal_assets/display_js.hpp"
+#include "portal_assets/screenshot_js.hpp"
+#include "portal_assets/screenshot_html.hpp"
+#include "portal_assets/carousel_js.hpp"
 
 // =============================================================================
 // Lifecycle
@@ -756,6 +760,34 @@ const char* U8G2DisplayModule::getTabIcon() const {
  * @param server Reference to the AsyncWebServer instance.
  */
 void U8G2DisplayModule::registerRoutes(PsychicHttpServer& server) {
+    server.on("/display.js", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
+        response->setContent(display_js_gz, display_js_gz_len);
+        response->setContentType("application/javascript");
+        response->addHeader("Content-Encoding", "gzip");
+        return response->send();
+    });
+
+    server.on("/screenshot.js", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
+        response->setContent(screenshot_js_gz, screenshot_js_gz_len);
+        response->setContentType("application/javascript");
+        response->addHeader("Content-Encoding", "gzip");
+        return response->send();
+    });
+
+    server.on("/screenshot.html", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
+        response->setContent(screenshot_html_gz, screenshot_html_gz_len);
+        response->setContentType("text/html");
+        response->addHeader("Content-Encoding", "gzip");
+        return response->send();
+    });
+
+    server.on("/carousel.js", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
+        response->setContent(carousel_js_gz, carousel_js_gz_len);
+        response->setContentType("application/javascript");
+        response->addHeader("Content-Encoding", "gzip");
+        return response->send();
+    });
+
     // --- Step 1: Register shared service helper endpoints (brightness, screenshot) ---
     _serviceHelper.registerBrightnessRoute(server);
     _serviceHelper.registerScreenshotRoute(server);
