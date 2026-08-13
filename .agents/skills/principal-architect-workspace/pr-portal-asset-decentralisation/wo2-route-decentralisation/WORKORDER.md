@@ -106,16 +106,23 @@ If you discover a defect or concern outside your boundary box, surface it in you
 ## Completion Report
 
 ### Status
-(pending)
+Complete — Approved by Parent Agent
 
 ### Changes Made
-(pending)
+- `WebServerManager.cpp`: Removed 8 optional asset includes and their static route registrations (`/time.js`, `/ota.js`, `/mcp.js`, `/display.js`, `/carousel.js`, `/screenshot.js`, `/screenshot.html`, `/hardware.js`). Retained core routes.
+- `OTAUpdateManager`: Added `#include "portal_assets/ota_js.hpp"`, GET `/ota.js` route in `registerRoutes()`, and `getTabScript()` override returning `"/ota.js"`.
+- `MCPServer`: Added `#include "portal_assets/mcp_js.hpp"`, GET `/mcp.js` route in `registerRoutes()`, and `getTabScript()` override returning `"/mcp.js"`.
+- `TimeManager`: Added `#include "portal_assets/time_js.hpp"`, GET `/time.js` route in `registerRoutes()`, and `getTabScript()` override returning `"/time.js"`.
+- `HomeAssistantModule`: Added `getTabScript()` override returning `"/homeassistant.js"`.
+- `U8G2DisplayModule`: Added includes for `display_js.hpp`, `screenshot_js.hpp`, `screenshot_html.hpp`, `carousel_js.hpp`, registered GET routes for `/display.js`, `/screenshot.js`, `/screenshot.html`, `/carousel.js`, and added `getTabScript()` override returning `"/display.js"`.
+- `LVGLDisplayModule`: Added includes for `display_js.hpp`, `screenshot_js.hpp`, `screenshot_html.hpp`, `hardware_js.hpp`, registered GET routes for `/display.js`, `/screenshot.js`, `/screenshot.html`, `/hardware.js`, and added `getTabScript()` override returning `"/display.js"`.
+- `test/web/server.js`: Enhanced static file resolution logic to scan `web/portal/`, `web/display/`, and `modules/*/web/` so Playwright web test server resolves relocated assets.
 
 ### Decisions Made
-(pending)
+- Updated mock web server (`test/web/server.js`) so Playwright web test suite correctly locates relocated asset files during `build_project` pre-build actions.
 
 ### Dead Ends & Warnings
-(pending)
+- None.
 
 ### Out-of-Scope Findings
-(pending)
+- None.
