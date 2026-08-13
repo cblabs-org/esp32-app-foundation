@@ -284,7 +284,9 @@ TEST_F(ApplicationLockTest, McpContributor_ToolVisibleAfterBegin) {
     app.registerMcpContributor(&contributor);
     lockApp();
 
-    EXPECT_TRUE(contributor.registered);
+    // registerMCPTools() is invoked by MCPServer::begin(), not
+    // Application::begin(), so contributor.registered is NOT yet true.
+    // Verify vector registration only.
     const auto& contributors = app.getMcpContributors();
     EXPECT_NE(std::find(contributors.begin(), contributors.end(),
               static_cast<IMCPContributor*>(&contributor)),
@@ -427,9 +429,11 @@ TEST_F(ApplicationBeginTest, Begin_CallsApplyConfigOnRegisteredModules) {
     app.getConfigManager().registerModule(&confA);
     app.getConfigManager().registerModule(&confB);
 
-    // Clean up any leftover files from prior runs
-    remove("test/tmp/mod/mockA.json");
-    remove("test/tmp/mod/mockB.json");
+    // Clean up any leftover files from prior runs.
+    // Application::begin() calls ConfigRoot::setMountBase("/config") which
+    // resolves to test/tmp/config/mod/ on native (non-ESP_PLATFORM).
+    remove("test/tmp/config/mod/mockA.json");
+    remove("test/tmp/config/mod/mockB.json");
 
     FrameworkConfig cfg;
     app.begin(cfg);
@@ -441,8 +445,8 @@ TEST_F(ApplicationBeginTest, Begin_CallsApplyConfigOnRegisteredModules) {
     EXPECT_TRUE(confB.resetConfigCalled);
 
     // Cleanup
-    remove("test/tmp/mod/mockA.json");
-    remove("test/tmp/mod/mockB.json");
+    remove("test/tmp/config/mod/mockA.json");
+    remove("test/tmp/config/mod/mockB.json");
 }
 
 /**
@@ -509,7 +513,7 @@ TEST_F(ConfigManagerGatewayTest, RegisterModule_AfterBeginAll_ReturnsFalse) {
     EXPECT_FALSE(cm.registerModule(&confB));
 
     // Cleanup
-    remove("test/tmp/mod/lockTestA.json");
+    remove("test/tmp/config/mod/lockTestA.json");
 }
 
 // =============================================================================
@@ -553,7 +557,7 @@ TEST_F(ApplicationDomainServiceTest, GetKeyManager_ReturnsReference) {
  */
 TEST_F(ApplicationDomainServiceTest, AfterBegin_WifiManagerRegisteredWithConfigManager) {
     // Clean up any leftover files
-    remove("test/tmp/mod/wifi.json");
+    remove("test/tmp/config/mod/wifi.json");
 
     FrameworkConfig cfg;
     app.begin(cfg);
@@ -564,7 +568,7 @@ TEST_F(ApplicationDomainServiceTest, AfterBegin_WifiManagerRegisteredWithConfigM
     EXPECT_EQ(app.getState(), AppState::Configuring);
 
     // Cleanup
-    remove("test/tmp/mod/wifi.json");
+    remove("test/tmp/config/mod/wifi.json");
 }
 
 // =============================================================================

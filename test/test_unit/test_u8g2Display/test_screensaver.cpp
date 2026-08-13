@@ -15,16 +15,15 @@
  */
 
 #include <gtest/gtest.h>
-#include "ScreensaverController.hpp"
+#include "modules/U8G2Display/ScreensaverController.hpp"
 
-// =============================================================================
-// Stub U8G2 for native builds (already provided by the ScreensaverController.cpp
-// native test stub, but we need it visible here for passing to tick())
-// =============================================================================
+// Pull in U8g2lib.h so we have the real U8G2 base class (the same one that
+// ScreensaverController.cpp compiles against on native).  The test never
+// drives real hardware — it only needs a valid U8G2& reference.
+#include <U8g2lib.h>
 
-// U8G2 is forward-declared in the header; define the stub here so we can
-// instantiate it in this TU (ScreensaverController.cpp has its own copy).
-class U8G2 {};
+// Instantiate the base U8G2 class for passing to tick().
+// On native, constructors are no-ops; we never call begin().
 static U8G2 stubDisplay;
 
 // =============================================================================

@@ -2,7 +2,14 @@
   "name": "U8G2Display",
   "version": "0.1.0",
   "description": "U8G2 monochrome display module with carousel engine",
+  "dependencies": {
+    "bblanchon/ArduinoJson": "^7.4.3",
+    "olikraus/U8g2": "^2.36.18"
+  },
   "build": {
-    "flags": ["-I../../include"]
+    "flags": [
+      "-I../../include"
+    ],
+    "extraScript": "exclude_on_native.py"
   }
 }

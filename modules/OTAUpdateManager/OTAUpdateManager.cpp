@@ -75,6 +75,7 @@ static constexpr const char* TAG = "OTAUpdateManager";
 #include "interfaces/IWebContributor.hpp"
 #include "OTAManifest.hpp"
 #include "MCPToolRegistry.hpp"
+#include "SemVer.hpp"
 
 // ---------------------------------------------------------------------------
 // Global instance — REMOVED (Application now owns _otaManager)

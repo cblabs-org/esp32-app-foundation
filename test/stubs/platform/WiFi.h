@@ -18,6 +18,7 @@ public:
     void disconnect(bool wifioff = false, bool eraseap = false) { (void)wifioff; (void)eraseap; }
     void mode(int m) { (void)m; }
     int status() { return WL_CONNECTED; }
+    bool isConnected() { return status() == WL_CONNECTED; }
     IPAddress localIP() { return IPAddress(192, 168, 1, 100); }
     IPAddress softAPIP() { return IPAddress(0, 0, 0, 0); }
     std::string macAddress() { return "AA:BB:CC:DD:EE:FF"; }

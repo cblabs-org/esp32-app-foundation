@@ -74,6 +74,19 @@ constexpr int8_t PIN_DISPLAY_MISO = PIN_UNASSIGNED;
 constexpr int8_t PIN_DISPLAY_MOSI = PIN_UNASSIGNED;
 #define PIN_DISPLAY_MOSI PIN_DISPLAY_MOSI
 
+constexpr int8_t PIN_DISPLAY_RST  = PIN_UNASSIGNED;
+#define PIN_DISPLAY_RST PIN_DISPLAY_RST
+
+constexpr int8_t PIN_DISPLAY_RESET = PIN_UNASSIGNED;
+#define PIN_DISPLAY_RESET PIN_DISPLAY_RESET
+
+// Native display type — uses the NativeU8G2Display stub (in-memory framebuffer
+// via u8x8_byte_empty / u8x8_dummy_cb callbacks). Satisfies board_contract.h.
+#include "NativeU8G2DisplayType.h"
+
+#define DISPLAY_WIDTH  128
+#define DISPLAY_HEIGHT 64
+
 // ── Button configuration ────────────────────────────────────────────────────
 #ifdef WITH_BUTTONS
 #include "ButtonModule/ButtonConfig.h"
