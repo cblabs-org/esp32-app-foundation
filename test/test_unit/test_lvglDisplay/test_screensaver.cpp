@@ -161,7 +161,7 @@ TEST_F(ScreensaverTimeoutsTest, IndependentTimeouts_DimBeforeBlank) {
     sc.tick(150, adapter, 255);
     EXPECT_TRUE(sc.isDimmed());
     EXPECT_FALSE(sc.isBlanked());
-    EXPECT_EQ(adapter.brightnessLevel, sc.getDimLevel());
+    EXPECT_EQ(adapter.brightnessLevel, 255 / 4);  // 25% heuristic
 
     sc.tick(350, adapter, 255);
     EXPECT_TRUE(sc.isBlanked());
@@ -179,7 +179,7 @@ TEST_F(ScreensaverTimeoutsTest, DimOnlyPolicy_NeverBlanks) {
     sc.tick(500, adapter, 255);
     EXPECT_TRUE(sc.isDimmed());
     EXPECT_FALSE(sc.isBlanked());
-    EXPECT_EQ(adapter.brightnessLevel, sc.getDimLevel());
+    EXPECT_EQ(adapter.brightnessLevel, 255 / 4);  // 25% heuristic
 }
 
 // =============================================================================
