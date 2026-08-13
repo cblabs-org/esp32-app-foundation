@@ -2,7 +2,7 @@
 
 **Parent Program:** esp32-app-foundation (standalone)
 **Base Branch:** `main`
-**Status:** 📋 PLANNED — awaiting human approval of decomposition
+**Status:** ✅ COMPLETE — PR [#78](https://github.com/matthewmcneill/esp32-app-foundation/pull/78), 417/417 tests
 
 ## Objective
 
@@ -35,7 +35,7 @@ instrumentation loop uses the per-module value instead of the hardcoded `10`.
 
 ## Work Order Ledger
 
-- **[ ] [wo1-budget-override](wo1-budget-override/WORKORDER.md):** Add `getTickBudgetMs()` to `ITickable`, override in both display modules, update Application instrumentation loop, update ADR-17 docs, verify native tests pass.
+- **[x] [wo1-budget-override](wo1-budget-override/WORKORDER.md):** Add `getTickBudgetMs()` to `ITickable`, override in both display modules, update Application instrumentation loop, update ADR-17 docs, verify native tests pass. · [distillation](wo1-budget-override/context_bridge.md)
 
 ## Status Log
 
