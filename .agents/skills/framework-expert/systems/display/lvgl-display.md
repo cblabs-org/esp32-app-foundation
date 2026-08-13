@@ -7,16 +7,11 @@ The `LVGLDisplayModule` provides full-colour TFT graphics support using LVGL v9.
 The module owns all LVGL v9 initialization, tick management, SRAM draw buffer allocations, focus groups, and framework interfaces.
 
 ### Implemented Interfaces
-- **`IDisplayModule`**: Implements the unified display contract (`getDisplayWidth()`, `capturePNG()`, etc.).
 - **`ITickable`**: Advances `lv_tick_inc()` and executes `lv_timer_handler()` on main thread.
 - **`IConfigurable`**: Exposes `"display"` namespace (`brightness`, `rotation`, `screensaver_enabled`, `dim_timeout_ms`, `blank_timeout_ms`).
 - **`IStatusReporter`**: Displays boot progress, error messages, and system overlays.
-- **`IWebContributor`**: Provides web portal sub-pills (`settingsTabStub()`, `hardwareTabStub()`, `screenshotTabStub()`).
-- **`IMCPContributor`**: Registers `display_status`, `display_control`, and `capture_display` MCP tools (via `DisplayServiceHelper`).
-
-### DisplayServiceHelper
-
-The `LVGLDisplayModule` delegates shared REST routes (`/api/display/status`, `/api/display/brightness`, etc.) and shared MCP tools to the `DisplayServiceHelper`.
+- **`IWebContributor`**: Registers `/api/display/*` REST routes, live screenshots, and Display web tab.
+- **`IMCPContributor`**: Registers `display_status`, `display_control`, and `capture_display` MCP tools.
 
 ## Pluggable Hardware Adapter Pattern
 
@@ -47,16 +42,6 @@ Targeting the Elecrow CrowPanel 1.28" rotary display (ESP32-S3):
 - **Display**: GC9A01 240x240 circular TFT driven via LovyanGFX.
 - **Touch**: CST816D capacitive touch controller (`read_cb`).
 - **Encoder**: `ESP32Encoder` hardware PCNT peripheral for pulse counting (offloads ISRs from software).
-
-## Why `adapters/` Lives at the Project Root
-
-Adapters sit in a root-level `adapters/` directory — **not** inside `modules/LVGLDisplay/` or `hardware/`. This is a deliberate Ports & Adapters (hexagonal architecture) decision:
-
-- **Not in `modules/`**: `LVGLDisplayModule` is a framework-shipping module distributed via `library.json`. It must remain hardware-agnostic. Placing concrete adapters here would pollute the framework library with board-specific dependencies (LovyanGFX, ESP32Encoder) and break Dependency Inversion.
-- **Not in `hardware/`**: The `hardware/` tree is reserved for pure declarative board definitions — `#define` pin maps, partition tables, sdkconfig defaults. It contains no executable code and no library dependencies. Adapters are ~150+ lines of executable C++ — a fundamentally different category.
-- **At the root**: The adapter is consumer-side integration glue that depends on _both_ the framework interface and board-specific driver libraries. It is the same class of code a downstream consumer would write in their own project. Placing it at `adapters/` keeps the dependency graph clean: `adapters/` → `modules/` (via interface) + `hardware/` (via pin defines) + external libs. Neither `modules/` nor `hardware/` depends back on `adapters/`.
-
-> **ADR:** [`docs/developer/adr/adr-adapters-placement.md`](../../../../../docs/developer/adr/adr-adapters-placement.md)
 
 ## Two-Stage Boot Splash & System Screens (D8)
 
