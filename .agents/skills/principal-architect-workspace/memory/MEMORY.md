@@ -10,7 +10,7 @@
 ## Active Projects
 | Project | Status | Modules | Context |
 |---|---|---|---|
-| pr-portal-asset-decentralisation | WO1/3 — decomposed | WebServer, OTAUpdateManager, MCPServer, TimeManager, HomeAssistant, U8G2Display, LVGLDisplay, portalBuilder.py, app.js | [PROJECT.md](../pr-portal-asset-decentralisation/PROJECT.md) |
+| pr-portal-asset-decentralisation | WO3/3 — all complete, PR [#109](https://github.com/matthewmcneill/esp32-app-foundation/pull/109) | WebServer, OTAUpdateManager, MCPServer, TimeManager, HomeAssistant, U8G2Display, LVGLDisplay, portalBuilder.py, app.js | [PROJECT.md](../pr-portal-asset-decentralisation/PROJECT.md) |
 | pr-p2-issue-remediation | WO4/4 — all complete + screensaver fix, awaiting PR | OTAUpdateManager, web/portal, U8G2Display, Application, platformio.ini, test/, LVGLDisplay/ScreensaverController | [PROJECT.md](../pr-p2-issue-remediation/PROJECT.md) |
 | pr-type-colocation | WO3/3 — PR #95 submitted | ButtonModule, EncoderModule, U8G2Display, LVGLDisplay, HomeAssistant, hardware/* | [PROJECT.md](../pr-type-colocation/PROJECT.md) |
 | pr-mk01-eventbus-concurrency | Planned | | [PROJECT.md](../microkernel-refactor/pr-mk01-eventbus-concurrency/PROJECT.md) |
