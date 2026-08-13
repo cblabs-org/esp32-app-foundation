@@ -562,10 +562,9 @@ document.addEventListener('DOMContentLoaded', function() {
   // =========================================================================
 
   /**
-   * @brief Load fragment scripts sequentially. utils.js is loaded first,
-   *        then all built-in tab fragment scripts, followed by any extra
-   *        scripts discovered from the /api/tabs response (tab contributor
-   *        scripts). Calls the callback when all done.
+   * @brief Load fragment scripts sequentially. Core framework scripts are
+   *        loaded first, followed by any optional module scripts discovered from
+   *        the /api/tabs response (tab contributor scripts). Calls the callback when all done.
    * @param {Array} extraScripts - Additional script URLs (e.g. from /api/tabs).
    * @param {Function} onComplete - Called after all scripts have loaded.
    */
@@ -574,17 +573,11 @@ document.addEventListener('DOMContentLoaded', function() {
       'utils.js',
       'wifi.js',
       'system.js',
-      'time.js',
       'backup.js',
-      'ota.js',
       'keys.js',
-      'mcp.js',
-      'screenshot.js',
-      'display.js',
       'appconfig.js',
       'auth.js',
-      'credits.js',
-      'homeassistant.js'
+      'credits.js'
     ];
 
     // Append dynamically-discovered tab scripts (absolute paths like /weather.js)
