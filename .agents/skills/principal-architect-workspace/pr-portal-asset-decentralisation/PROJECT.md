@@ -15,8 +15,8 @@
 | WO | Branch | Status | Summary |
 |----|--------|--------|---------|
 | **[x] [wo1-pipeline-relocation](wo1-pipeline-relocation/WORKORDER.md)** | `portal-decentralise/wo1-pipeline-relocation` | ✅ Complete (`4a276f4b`) | Update portalBuilder.py to scan module dirs + web/display/; move 9 JS/HTML files to their owners |
-| **[ ] [wo2-route-decentralisation](wo2-route-decentralisation/WORKORDER.md)** | `portal-decentralise/wo2-route-decentralisation` | Pending | Move route serving + includes from WebServerManager into individual modules; add getTabScript() overrides |
-| **[ ] [wo3-dynamic-script-loading](wo3-dynamic-script-loading/WORKORDER.md)** | `portal-decentralise/wo3-dynamic-script-loading` | Pending | Trim app.js hardcoded script list to core-only; verify dynamic loading via /api/tabs |
+| **[x] [wo2-route-decentralisation](wo2-route-decentralisation/WORKORDER.md)** | `portal-decentralise/wo2-route-decentralisation` | ✅ Complete (`e0d598e3`) | Move route serving + includes from WebServerManager into individual modules; add getTabScript() overrides |
+| **[x] [wo3-dynamic-script-loading](wo3-dynamic-script-loading/WORKORDER.md)** | `portal-decentralise/wo3-dynamic-script-loading` | ✅ Complete (`bc929ff4`) | Trim app.js hardcoded script list to core-only; verify dynamic loading via /api/tabs |
 
 ## Session Log
 

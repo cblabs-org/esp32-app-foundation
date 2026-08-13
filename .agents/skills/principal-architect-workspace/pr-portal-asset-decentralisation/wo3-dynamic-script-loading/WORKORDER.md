@@ -68,13 +68,15 @@ If you discover a defect or concern outside your boundary box, surface it in you
 ## Completion Report
 
 ### Status
-(pending)
+✅ Complete (`bc929ff4`)
 
 ### Changes Made
-(pending)
+- `web/portal/app.js`: Reduced hardcoded script array in `loadScripts()` from 14 scripts to 8 core framework scripts (`utils.js`, `wifi.js`, `system.js`, `backup.js`, `keys.js`, `appconfig.js`, `auth.js`, `credits.js`). Dynamic script appending via `extraScripts` (`/api/tabs` response -> `getTabScript()`) verified intact. Updated JSDoc comment on `loadScripts()`.
+- `web/display/display.js`: Implemented `loadScreenshotScript()` to dynamically load `screenshot.js` when the display tab or screenshot sub-pill is activated/initialised.
+- `test/web/server.js`: Added `script` properties to `MOCK_TABS` for MCP, OTA, and Display tabs so Playwright tests correctly mock the dynamic `/api/tabs` response from C++ modules.
 
 ### Dead Ends & Warnings
-(pending)
+- None. All optional module scripts (`ota.js`, `mcp.js`, `display.js`, `time.js`, `homeassistant.js`) are now dynamically discovered via `/api/tabs`.
 
 ### Out-of-Scope Findings
-(pending)
+- None.
