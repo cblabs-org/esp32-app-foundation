@@ -404,6 +404,12 @@ public:
     int getTabOrder() const override { return 50; }
 
     /**
+     * @brief Return the route path for this tab's JavaScript file.
+     * @return "/display.js"
+     */
+    const char* getTabScript() const override { return "/display.js"; }
+
+    /**
      * @brief Return the API path prefix for body-size middleware matching.
      * @return "/api/display"
      */

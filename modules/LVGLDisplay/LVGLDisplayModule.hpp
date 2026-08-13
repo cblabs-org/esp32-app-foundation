@@ -296,6 +296,7 @@ public:
     void registerRoutes(PsychicHttpServer& server) override;
     const char* getTabName() const override { return "Display"; }
     int getTabOrder() const override { return 50; }
+    const char* getTabScript() const override { return "/display.js"; }
     const char* getApiPrefix() const override { return "/api/display"; }
     const char* getTabIcon() const override;
 

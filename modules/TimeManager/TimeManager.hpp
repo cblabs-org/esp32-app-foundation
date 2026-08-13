@@ -170,6 +170,12 @@ public:
     int getTabOrder() const override { return 15; }
 
     /**
+     * @brief Return the route path for this tab's JavaScript file.
+     * @return "/time.js"
+     */
+    const char* getTabScript() const override { return "/time.js"; }
+
+    /**
      * @brief Return the API path prefix for body-size middleware matching.
      * @return "/api/time"
      */

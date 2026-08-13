@@ -40,20 +40,12 @@
 #include "portal_assets/app_js.hpp"
 #include "portal_assets/utils_js.hpp"
 #include "portal_assets/system_js.hpp"
-#include "portal_assets/time_js.hpp"
 #include "portal_assets/wifi_js.hpp"
-#include "portal_assets/ota_js.hpp"
 #include "portal_assets/backup_js.hpp"
 #include "portal_assets/keys_js.hpp"
-#include "portal_assets/mcp_js.hpp"
-#include "portal_assets/screenshot_js.hpp"
-#include "portal_assets/screenshot_html.hpp"
-#include "portal_assets/display_js.hpp"
 #include "portal_assets/appconfig_js.hpp"
 #include "portal_assets/auth_js.hpp"
 #include "portal_assets/credits_js.hpp"
-#include "portal_assets/hardware_js.hpp"
-#include "portal_assets/carousel_js.hpp"
 
 #include "platform/LogShim.h"
 
@@ -189,22 +181,8 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors,
         return response->send();
     });
 
-    activeServer->on("/time.js", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
-        response->setContent(time_js_gz, time_js_gz_len);
-        response->setContentType("application/javascript");
-        response->addHeader("Content-Encoding", "gzip");
-        return response->send();
-    });
-
     activeServer->on("/wifi.js", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
         response->setContent(wifi_js_gz, wifi_js_gz_len);
-        response->setContentType("application/javascript");
-        response->addHeader("Content-Encoding", "gzip");
-        return response->send();
-    });
-
-    activeServer->on("/ota.js", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
-        response->setContent(ota_js_gz, ota_js_gz_len);
         response->setContentType("application/javascript");
         response->addHeader("Content-Encoding", "gzip");
         return response->send();
@@ -226,48 +204,6 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors,
 
     activeServer->on("/keys.js", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
         response->setContent(keys_js_gz, keys_js_gz_len);
-        response->setContentType("application/javascript");
-        response->addHeader("Content-Encoding", "gzip");
-        return response->send();
-    });
-
-    activeServer->on("/mcp.js", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
-        response->setContent(mcp_js_gz, mcp_js_gz_len);
-        response->setContentType("application/javascript");
-        response->addHeader("Content-Encoding", "gzip");
-        return response->send();
-    });
-
-    activeServer->on("/screenshot.js", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
-        response->setContent(screenshot_js_gz, screenshot_js_gz_len);
-        response->setContentType("application/javascript");
-        response->addHeader("Content-Encoding", "gzip");
-        return response->send();
-    });
-
-    activeServer->on("/screenshot.html", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
-        response->setContent(screenshot_html_gz, screenshot_html_gz_len);
-        response->setContentType("text/html");
-        response->addHeader("Content-Encoding", "gzip");
-        return response->send();
-    });
-
-    activeServer->on("/display.js", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
-        response->setContent(display_js_gz, display_js_gz_len);
-        response->setContentType("application/javascript");
-        response->addHeader("Content-Encoding", "gzip");
-        return response->send();
-    });
-
-    activeServer->on("/hardware.js", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
-        response->setContent(hardware_js_gz, hardware_js_gz_len);
-        response->setContentType("application/javascript");
-        response->addHeader("Content-Encoding", "gzip");
-        return response->send();
-    });
-
-    activeServer->on("/carousel.js", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
-        response->setContent(carousel_js_gz, carousel_js_gz_len);
         response->setContentType("application/javascript");
         response->addHeader("Content-Encoding", "gzip");
         return response->send();

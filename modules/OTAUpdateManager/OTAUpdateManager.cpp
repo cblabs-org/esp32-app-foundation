@@ -76,6 +76,7 @@ static constexpr const char* TAG = "OTAUpdateManager";
 #include "OTAManifest.hpp"
 #include "MCPToolRegistry.hpp"
 #include "SemVer.hpp"
+#include "portal_assets/ota_js.hpp"
 
 // ---------------------------------------------------------------------------
 // Global instance — REMOVED (Application now owns _otaManager)
@@ -1311,6 +1312,13 @@ esp_err_t OTAUpdateManager::finaliseSignedUpload(PsychicResponse* response) {
 }
 
 void OTAUpdateManager::registerRoutes(PsychicHttpServer& server) {
+    server.on("/ota.js", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
+        response->setContent(ota_js_gz, ota_js_gz_len);
+        response->setContentType("application/javascript");
+        response->addHeader("Content-Encoding", "gzip");
+        return response->send();
+    });
+
     // --- GET: status endpoint ---
     server.on("/api/ota", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
         JsonDocument doc;

@@ -142,6 +142,12 @@ public:
     int getTabOrder() const override { return 30; }
 
     /**
+     * @brief Return the route path for this tab's JavaScript file.
+     * @return "/mcp.js"
+     */
+    const char* getTabScript() const override { return "/mcp.js"; }
+
+    /**
      * @brief Return the API path prefix for body-size middleware matching.
      * @return "/api/mcp"
      */

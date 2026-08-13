@@ -318,6 +318,12 @@ public:
     int getTabOrder() const override { return 50; }
 
     /**
+     * @brief Return the route path for this tab's JavaScript file.
+     * @return "/ota.js"
+     */
+    const char* getTabScript() const override { return "/ota.js"; }
+
+    /**
      * @brief Return the API path prefix for body-size middleware matching.
      * @return "/api/ota"
      */

@@ -294,20 +294,34 @@
   }
 
   // -------------------------------------------------------------------------
+  // Dynamic script loader for screenshot.js (no dedicated tab contributor)
+  // -------------------------------------------------------------------------
+  function loadScreenshotScript() {
+    if (document.querySelector('script[src="screenshot.js"]')) return;
+    var s = document.createElement('script');
+    s.src = 'screenshot.js';
+    document.body.appendChild(s);
+  }
+
+  // -------------------------------------------------------------------------
   // Tab activation listener
   // -------------------------------------------------------------------------
   window.addEventListener('tab-changed', function(e) {
-    if (e.detail === 'tab-settings') {
-      if (!initialized) {
-        initSettingsTab();
+    if (e.detail === 'tab-settings' || e.detail === 'tab-display' || e.detail === 'tab-screenshot') {
+      loadScreenshotScript();
+      if (e.detail === 'tab-settings' || e.detail === 'tab-display') {
+        if (!initialized) {
+          initSettingsTab();
+        }
+        loadSettings();
       }
-      loadSettings();
     }
   });
 
   // Also load if already active on init
   var container = document.getElementById('tab-settings');
   if (container && container.classList.contains('tab-content--active')) {
+    loadScreenshotScript();
     if (!initialized) {
       initSettingsTab();
     }
