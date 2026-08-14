@@ -1,0 +1,20 @@
+# sdkconfig.defaults template — per-board ESP-IDF overrides.
+# Settings here are loaded ON TOP of the project-root sdkconfig.defaults.
+# Only include settings that differ from the base defaults.
+#
+# Wired via: board_build.cmake_extra_args in platformio.ini [env:<board-id>].
+# See docs/developer/custom-boards.md for full details.
+
+# Main task stack size (default: 8192, increase for PSRAM boards)
+# CONFIG_ESP_MAIN_TASK_STACK_SIZE=8192
+
+# PSRAM — uncomment and configure if your board has PSRAM
+# CONFIG_SPIRAM=y
+# CONFIG_SPIRAM_MODE_OCT=y
+# CONFIG_SPIRAM_SPEED_80M=y
+
+# TLS output buffer — increase for boards with more RAM
+# CONFIG_MBEDTLS_SSL_OUT_CONTENT_LEN=4096
+
+# Console output — override if your board uses USB-JTAG instead of UART
+# CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y

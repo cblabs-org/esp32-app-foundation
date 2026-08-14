@@ -199,7 +199,7 @@ it** — the header stays the single source; we do not resurrect the weld.
 There is exactly one `board.<id>.h` per board variant, and it is
 **self-contained**. The stock board headers (`esp32dev`, `esp32s3nano`, `crowpanel-128-rotary`) are **reference implementations** that exist so the framework's sample-app and template-app compile.
 
-Consumer applications should **author their own `board.h`** using `_TEMPLATE.board.h` as a starting point. This is the normal workflow, not an advanced override. Your board header is the single source of truth for ALL your hardware pin assignments — display, buttons, sensors, LEDs, and anything else your app needs.
+Consumer applications should **author their own `board.h`** using `_TEMPLATE/board.h` as a starting point. This is the normal workflow, not an advanced override. Your board header is the single source of truth for ALL your hardware pin assignments — display, buttons, sensors, LEDs, and anything else your app needs.
 
 **Partial / layered override is explicitly rejected.** Letting an app inherit a
 default header and redefine two pins would (a) be ugly for `constexpr` values and

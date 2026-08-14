@@ -60,7 +60,7 @@ The framework ships three **stock board headers** (`esp32dev`, `esp32s3nano`, `c
 **As a consumer, you should author your own `board.h`** — this is the normal, intended workflow, not an advanced override. Your board header is the single source of truth for all your hardware pin assignments: display wiring, buttons, sensors, LEDs, and any other GPIO your application uses.
 
 The stock headers are useful as:
-- Copy-paste starting points (or use `_TEMPLATE.board.h`)
+- Copy-paste starting points (or use `_TEMPLATE/board.h`)
 - Reference examples of the pattern and conventions
 - Working configurations for the framework's own demo apps
 

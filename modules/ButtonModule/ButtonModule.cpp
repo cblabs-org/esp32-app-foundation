@@ -13,6 +13,7 @@
 #include "modules/Application/Application.hpp"
 #include "modules/MCPServer/MCPToolRegistry.hpp"
 #include <map>
+#include <cstring>
 
 #ifndef UNIT_TEST
 #include "iot_button.h"
@@ -48,6 +49,59 @@ ButtonModule::~ButtonModule() {
 
 void ButtonModule::addButton(const BoardButton& button) {
     _pendingButtons.push_back(button);
+}
+
+bool ButtonModule::removeButton(const char* id) {
+    if (!id) return false;
+
+    // --- Pre-begin path: remove from pending registration list ---
+    if (!_eventQueue) {
+        for (auto it = _pendingButtons.begin(); it != _pendingButtons.end(); ++it) {
+            if (it->id && strcmp(it->id, id) == 0) {
+                _pendingButtons.erase(it);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // --- Post-begin path: find and remove active button ---
+    // Locate the button index in _pendingButtons (kept for MCP status).
+    // Each button produces one _buttonHandles entry and multiple _shimContexts.
+    size_t buttonIndex = SIZE_MAX;
+    for (size_t i = 0; i < _pendingButtons.size(); i++) {
+        if (_pendingButtons[i].id && strcmp(_pendingButtons[i].id, id) == 0) {
+            buttonIndex = i;
+            break;
+        }
+    }
+    if (buttonIndex == SIZE_MAX) return false;
+
+    // Delete the iot_button handle (1:1 with buttons, indexed by registration order)
+    if (buttonIndex < _buttonHandles.size()) {
+#ifndef UNIT_TEST
+        if (_buttonHandles[buttonIndex]) {
+            iot_button_delete(static_cast<button_handle_t>(_buttonHandles[buttonIndex]));
+        }
+#endif
+        _buttonHandles.erase(_buttonHandles.begin() + static_cast<ptrdiff_t>(buttonIndex));
+    }
+
+    // Remove all ShimContexts belonging to this button (matched by id pointer)
+    const char* targetId = _pendingButtons[buttonIndex].id;
+    for (auto it = _shimContexts.begin(); it != _shimContexts.end(); ) {
+        if (*it && (*it)->id == targetId) {
+            delete *it;
+            it = _shimContexts.erase(it);
+        } else {
+            ++it;
+        }
+    }
+
+    // Remove from pending list (used by MCP status tool)
+    _pendingButtons.erase(_pendingButtons.begin() + static_cast<ptrdiff_t>(buttonIndex));
+
+    return true;
 }
 
 void ButtonModule::begin(Application& app) {

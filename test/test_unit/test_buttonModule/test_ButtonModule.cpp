@@ -282,6 +282,82 @@ TEST_F(ButtonModuleDrainTest, RingBuffer_WrapsCorrectly) {
 }
 
 // =============================================================================
+// Test Group 4: removeButton() — Individual Button Deregistration
+// =============================================================================
+
+class ButtonModuleRemoveTest : public ::testing::Test {
+protected:
+    Application app;
+    ButtonModule module;
+    MCPToolRegistry registry;
+
+    void SetUp() override {
+        app.getEventBus().begin();
+    }
+
+    size_t getMCPButtonCount() {
+        module.registerMCPTools(registry);
+        const MCPToolEntry* entry = registry.findTool("button_status");
+        if (!entry) return SIZE_MAX;
+
+        ArduinoJson::JsonDocument doc;
+        JsonObject args = doc.to<JsonObject>();
+        ArduinoJson::JsonDocument resultDoc;
+        JsonObject result = resultDoc.to<JsonObject>();
+        entry->handler(entry->context, args, result);
+
+        if (!result["buttons"].is<JsonArray>()) return SIZE_MAX;
+        return result["buttons"].as<JsonArray>().size();
+    }
+};
+
+TEST_F(ButtonModuleRemoveTest, BeforeBegin_RemovesFromPending) {
+    BoardButton b1 = { .id = "btn_a", .type = ButtonType::GPIO, .gpio = { 34, true, false, false } };
+    BoardButton b2 = { .id = "btn_b", .type = ButtonType::GPIO, .gpio = { 35, true, false, false } };
+
+    module.addButton(b1);
+    module.addButton(b2);
+
+    EXPECT_TRUE(module.removeButton("btn_a"));
+
+    // After removing btn_a, only btn_b should remain
+    EXPECT_EQ(getMCPButtonCount(), 1u);
+}
+
+TEST_F(ButtonModuleRemoveTest, AfterBegin_DeletesHandleAndContext) {
+    BoardButton b1 = { .id = "btn_x", .type = ButtonType::GPIO, .gpio = { 34, true, false, false } };
+    BoardButton b2 = { .id = "btn_y", .type = ButtonType::GPIO, .gpio = { 35, true, false, false } };
+
+    module.addButton(b1);
+    module.addButton(b2);
+    module.begin(app);
+
+    EXPECT_TRUE(module.removeButton("btn_x"));
+
+    // MCP status should show only btn_y
+    EXPECT_EQ(getMCPButtonCount(), 1u);
+}
+
+TEST_F(ButtonModuleRemoveTest, UnknownId_ReturnsFalse) {
+    BoardButton b1 = { .id = "btn_real", .type = ButtonType::GPIO, .gpio = { 34, true, false, false } };
+    module.addButton(b1);
+
+    EXPECT_FALSE(module.removeButton("btn_nonexistent"));
+
+    // Original button should still be there
+    EXPECT_EQ(getMCPButtonCount(), 1u);
+}
+
+TEST_F(ButtonModuleRemoveTest, DoubleFree_ReturnsFalseSecondTime) {
+    BoardButton b1 = { .id = "btn_once", .type = ButtonType::GPIO, .gpio = { 34, true, false, false } };
+    module.addButton(b1);
+    module.begin(app);
+
+    EXPECT_TRUE(module.removeButton("btn_once"));
+    EXPECT_FALSE(module.removeButton("btn_once"));
+}
+
+// =============================================================================
 // main entry point
 // =============================================================================
 

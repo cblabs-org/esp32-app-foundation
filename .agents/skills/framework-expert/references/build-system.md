@@ -106,3 +106,31 @@ Boards with PSRAM (e.g., ESP32-S3-Nano) require **two** correctly-configured lay
 **`BOARD_HAS_PSRAM` alone does NOT enable PSRAM.** It is a build flag consumed by application code. The ESP-IDF SPIRAM driver is controlled exclusively by `CONFIG_SPIRAM=y` in the sdkconfig. Sub-options like `CONFIG_SPIRAM_MODE_OCT`, `CONFIG_SPIRAM_SPEED_80M`, and `CONFIG_SPIRAM_MEMTEST` are all inert without the `CONFIG_SPIRAM=y` master switch.
 
 A compile-time guard in `Application.cpp` will `#error` if `BOARD_HAS_PSRAM` is defined without `CONFIG_SPIRAM`, catching the misconfiguration before the firmware is built. A runtime check in `Application::begin()` also logs an error if PSRAM hardware fails to initialise despite correct configuration.
+
+## Hardware Abstraction: board.h
+
+The `hardware/` directory uses a per-board subdirectory pattern:
+
+| Path | Purpose |
+|------|---------|
+| `hardware/board.h` | Facade — includes the selected board via `BOARD_HEADER` |
+| `hardware/_common/board_contract.h` | Compile-time validator for required definitions |
+| `hardware/_common/board_pins.h` | Shared constants (`PIN_UNASSIGNED`, etc.) |
+| `hardware/_TEMPLATE/board.h` | Copy this folder to create a new board |
+| `hardware/<board-id>/board.h` | Per-board pin definitions and capabilities |
+
+### Stock vs Consumer Boards
+
+**Stock boards** (`esp32dev`, `esp32s3nano`, `crowpanel-128-rotary`) ship with the
+framework as reference implementations and build targets. They are NOT meant to
+be edited by consumer applications.
+
+**Consumer applications author their own `board.h`** by copying `hardware/_TEMPLATE/`
+to `hardware/<your-board-id>/` and filling in pin assignments. The consumer's
+board header IS the application's hardware truth — display, buttons, sensors,
+LEDs, everything.
+
+The build system selects the active board via `-DBOARD_HEADER="hardware/<id>/board.h"`
+in `platformio.ini`. See [`docs/developer/custom-boards.md`](../../../../docs/developer/custom-boards.md)
+for the full walkthrough.
+

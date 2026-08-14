@@ -13,6 +13,7 @@
  * Exported Classes:
  * - ButtonModule: Hardware button and gesture manager
  *   - addButton(): Register a BoardButton descriptor prior to begin()
+ *   - removeButton(): Remove a previously registered button by ID
  *   - begin(): Phase 2 initialization (creates FreeRTOS queue, instantiates button drivers)
  *   - tick(): Main-loop processing hook, drains queue and publishes to EventBus [ITickable]
  *   - registerMCPTools(): Exposes button_status MCP tool for diagnostics [IMCPContributor]
@@ -49,6 +50,18 @@ public:
      * @param button BoardButton descriptor struct.
      */
     void addButton(const BoardButton& button);
+
+    /**
+     * @brief Remove a previously registered button by its string ID.
+     *
+     * Before begin(): removes from the pending registration list.
+     * After begin(): deletes the iot_button handle, frees associated ShimContexts,
+     * and removes from internal tracking vectors.
+     *
+     * @param id The button ID string (must match the id used in addButton).
+     * @return true if the button was found and removed, false if not found.
+     */
+    bool removeButton(const char* id);
 
     /**
      * @brief Initialize the button module, queue, and button drivers.
