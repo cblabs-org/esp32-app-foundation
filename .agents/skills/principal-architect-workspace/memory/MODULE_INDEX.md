@@ -95,6 +95,7 @@
 | [Chief Architect](../esp32-app-foundation/context_bridge.md) | Program-level ADRs, sequencing decisions | [ADRs](../esp32-app-foundation/context_artifacts/adr_program_decisions.md), [Graveyard](../esp32-app-foundation/context_artifacts/graveyard_rejected_approaches.md) |
 | [PR #74 Remediation](../../context_archives/distillation-20260805-pr74-remediation/context_bridge.md) | Post-merge remediation of CONFIGURING orchestration — EventBus boot-order, gate dependency ordering | context_bridge |
 | [Include Architecture](../../context_archives/distillation-20260811-include-architecture/context_bridge.md) | LDF mode alignment (native chain→deep), Application lib_ignore removal, 18 library.json files, zero relative includes | context_bridge |
+| [Group 3 Code Quality](../../context_archives/distillation-20260814-group3-code-quality/context_bridge.md) | ButtonModule `removeButton()`, board template folder restructure (`_TEMPLATE/`), hardware abstraction docs in framework-expert skill | context_bridge |
 
 ## Memory & Performance
 | Project | Scope | Context |
@@ -148,6 +149,7 @@
 | [adhoc-ota-docs-hotfix](../adhoc-ota-docs-hotfix/context_bridge.md) | `build_and_release_process.md` | context_bridge |
 | [pr-39](../pr-39-sample-app-remediation/PROJECT.md) | Sample app remediation — build parity, includes, EventBus, house style, tests | PROJECT.md |
 | [pr-40](../pr-40-docs-excellence/PROJECT.md) | Documentation Excellence — 10/10 compliance across template-app, sample-app, framework modules | [distillation](../pr-40-docs-excellence/context_bridge.md) |
+| [Group 3 Code Quality](../../context_archives/distillation-20260814-group3-code-quality/context_bridge.md) | board.h stock-vs-consumer ownership docs, `_TEMPLATE/` restructure, framework-expert skill Hardware Abstraction section, 5 doc path updates | context_bridge |
 
 ## Home Assistant & Weather
 | Project | Scope | Context |
