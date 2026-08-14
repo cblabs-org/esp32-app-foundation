@@ -6,7 +6,7 @@ This guide walks you through building an application (like a weather station or 
 
 ## Step 1: Author Your `board.h`
 
-The framework ships with stock boards (e.g. `esp32dev`, `esp32s3nano`), but these are just **reference implementations**. Consumer applications should always **author their own `board.h`** using `hardware/_TEMPLATE.board.h` as a starting point. This is the normal workflow, not an advanced override. Your custom board header is the single source of truth for all your pins.
+The framework ships with stock boards (e.g. `esp32dev`, `esp32s3nano`), but these are just **reference implementations**. Consumer applications should always **author their own `board.h`** using `hardware/_TEMPLATE/board.h` as a starting point. This is the normal workflow, not an advanced override. Your custom board header is the single source of truth for all your pins.
 
 ## Step 2: The Basic Module Template
 

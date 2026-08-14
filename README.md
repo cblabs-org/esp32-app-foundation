@@ -230,7 +230,7 @@ time, and a manual trigger button.
 
 The framework supports any ESP32 board via the `board.h` mechanism. The stock boards provided (e.g., `esp32dev`, `esp32s3nano`) are **reference implementations** that exist so the framework's sample apps compile.
 
-Consumer applications should **author their own `board.h`** (using `hardware/_TEMPLATE.board.h` as a starting point) with their app-specific pin assignments. This is the normal workflow, not an advanced override. Your board header is the single source of truth for ALL your hardware pin assignments — display, buttons, sensors, LEDs, and anything else your app needs. See the [Custom Board Authoring Guide](docs/developer/custom-boards.md) for details.
+Consumer applications should **author their own `board.h`** (using `hardware/_TEMPLATE/board.h` as a starting point) with their app-specific pin assignments. This is the normal workflow, not an advanced override. Your board header is the single source of truth for ALL your hardware pin assignments — display, buttons, sensors, LEDs, and anything else your app needs. See the [Custom Board Authoring Guide](docs/developer/custom-boards.md) for details.
 
 The reference implementations are tested on two boards. Both use the same 3.12″ SSD1322 OLED display.
 

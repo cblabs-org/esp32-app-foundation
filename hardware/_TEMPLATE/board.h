@@ -1,14 +1,14 @@
 /*
  * ESP32 App Foundation (c) 2026 CB Labs
  *
- * Module: hardware/_TEMPLATE.board.h
+ * Module: hardware/_TEMPLATE/board.h
  * Description: Template and reference skeleton for authoring new board configuration headers.
  *
  * =============================================================================
  * Board Hardware Configuration Template
  * =============================================================================
  * Instructions for Board Authors:
- * 1. Copy this file to `hardware/<board_id>/board.h` when introducing a new target.
+ * 1. Copy the `_TEMPLATE/` folder to `hardware/<board_id>/` when introducing a new target.
  * 2. Update the ASCII-art pinout diagram below matching the physical pin layout.
  * 3. Document pin-priority / allocation strategy notes in structured comments.
  * 4. Configure BOARD_NAME, BOARD_ID_STRING, BOARD_HAS_PSRAM, and optional display block.

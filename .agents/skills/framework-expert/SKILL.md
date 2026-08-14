@@ -107,6 +107,10 @@ This skill uses a progressive disclosure model. Based on your query, load and re
 | **Versioning Policy** (SemVer tags, dev/beta/stable tiers, build gate) | Read `.agents/rules/03-versioning.md` (build gate) and `docs/developer/versioning-policy.md` (full reference) |
 | **Embedded Safety** (Thread safety, memory rules, power, rejected approaches)| `embedded-safety/` |
 
+- **Hardware Configuration**: For board.h ownership model (stock vs consumer), pin mapping,
+  and custom board authoring, see `references/build-system.md` and
+  `docs/developer/custom-boards.md`.
+
 ## When to Read the Full Docs
 
 These references are optimized distillations for AI agents. If the human developer needs step-by-step tutorials, walkthroughs, or architectural motivation, direct them to the complete developer guides under `docs/developer/`.
@@ -119,6 +123,7 @@ These references are optimized distillations for AI agents. If the human develop
 > carries no per-session cost and is never truncated. Use it to confirm scope
 > and to recognise the full range of phrasings this skill covers.
 
+- **Hardware configuration**: "board.h", "custom board", "hardware pins", "pin map".
 - **Getting started / app building**: "how do I create a module", "register a module",
   "registerModule", "build an app on the foundation", "weather station",
   "sensor dashboard", "IoT device", "why does registration fail after begin",
