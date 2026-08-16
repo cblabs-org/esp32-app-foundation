@@ -41,6 +41,8 @@ natural cleanup of debt that project introduced, not new debt.
 - **PR shape:** a single draft PR (not a 3-deep stack) — the two WOs are
   stacked internally for execution isolation; the tip is submitted as one PR.
 
+**Draft PR:** [#112](https://github.com/matthewmcneill/esp32-app-foundation/pull/112) (base `main`, head `portal-consumer-assets/wo2-docs-and-sample`) — awaiting review.
+
 ## Work Order Ledger
 
 | WO | Branch | Status | Summary |
