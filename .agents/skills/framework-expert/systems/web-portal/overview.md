@@ -21,7 +21,7 @@ Modules inject their UI and routes into the portal by implementing the `IWebCont
 To contribute a tab, implement the following virtual overrides in your module:
 
 * `virtual void registerRoutes(PsychicHttpServer& server) = 0`
-  Registers the module's REST API route handlers with the web server. It is also where the module registers the route serving its JavaScript file (using a C++ raw-string literal).
+  Registers the module's REST API route handlers with the web server. It is also where the module registers the route serving its JavaScript file — canonically via the gzip+PROGMEM pipeline and the shared `serveGzipAsset()` helper (see [html-js-fragments.md](html-js-fragments.md)), not a raw-string literal.
 * `virtual const char* getTabName() const`
   Returns the display name for the UI tab (e.g., `"Weather"`). Return `nullptr` if the module registers API routes but does not require a UI tab.
 * `virtual const char* getParentTab() const`

@@ -284,7 +284,45 @@ Row containers are semantically distinct based on data display vs input interact
 
 ## 4. The JavaScript Fragment Pattern
 
-Immediately after loading the HTML snippet, the SPA shell loads and executes your matching Javascript fragment located at `/www/<namespace>/tab.js`.
+> [!IMPORTANT]
+> **Delivering a tab script (canonical): the gzip+PROGMEM pipeline.**
+> A tab's JavaScript is served over an HTTP route your module registers in
+> `registerRoutes()`. The **canonical** way to deliver it — for framework
+> modules *and consuming apps* — is the framework's gzip+PROGMEM asset pipeline,
+> the same one used for `app.js` and friends:
+>
+> 1. Put the script in a `web/` directory: `modules/<Name>/web/<name>.js` for a
+>    framework module, or **`<yourProject>/web/<name>.js`** for a consuming app.
+>    The build script scans the consuming project's `web/` dir automatically.
+> 2. `scripts/portalBuilder.py` gzip-compresses it at build time into
+>    `include/portal_assets/<name>_js.hpp`, exposing `<name>_js_gz` /
+>    `<name>_js_gz_len`.
+> 3. Serve it with the shared helper:
+>    ```cpp
+>    #include "web/serveGzipAsset.hpp"
+>    #include "portal_assets/weather_js.hpp"
+>    // in registerRoutes():
+>    server.on("/weather.js", HTTP_GET, [](PsychicRequest* req, PsychicResponse* res) {
+>        return serveGzipAsset(res, weather_js_gz, weather_js_gz_len,
+>                              "application/javascript");
+>    });
+>    ```
+> 4. Declare the route via `const char* getTabScript() const override { return "/weather.js"; }`.
+>
+> **Why this matters:** `response->send(body)` copies the entire body into
+> internal DRAM socket buffers. For a non-trivial script (18 KB is routine) this
+> can drop free heap to near-OOM and cause multi-second serves / `0 bytes
+> received` browser timeouts (issue #111). The gzip pipeline serves straight from
+> flash — zero DRAM impact. Only for a *tiny* inline fragment (< ~1 KB) is a raw
+> C++ string literal (`response->send(200, "application/javascript", js)`)
+> acceptable. The reference implementation is the sample app's `WeatherModule`
+> (`sample-app/web/weather.js` + `serveGzipAsset`).
+>
+> The DOM/authoring conventions below (the IIFE pattern, `tab-changed`, ID
+> scoping) apply to your script regardless of how it is delivered.
+
+Immediately after the shell loads your script, it executes it and — on tab
+activation — the script renders its own markup into its container.
 
 ### The `tab.js` IIFE Pattern
 
