@@ -107,3 +107,32 @@ consumer side: `portalBuilder.py` generated `weather_js.hpp` (24 KB) from
    NOTE; potential future namespacing enhancement.
 **Known pre-existing (not introduced)**: `test_mcpServer`/`test_pngWriter` native
 ERRORs; Playwright `pre_build_test` hook non-zero exit (false FAILED).
+
+### Session 3 — 2026-08-16 (Review round + tech-debt paydown)
+**Summary**: Three approving reviews on PR #112 (Wiser consumer, Antigravity, third).
+Addressed review nits (`05233bf1`), then — at user direction "fix everything and pay
+down the technical debt now" — implemented all three deferred follow-ups (`34f0924a`).
+**Tech-debt paydown**:
+- **HTTP caching**: build-time `<name>_gz_etag` (CRC32) in every generated header;
+  `serveGzipAsset(request, response, gz, len, etag, contentType)` does conditional
+  GET (304 on `If-None-Match`) + `Cache-Control: no-cache`. Deliberately not
+  `immutable` (OTA staleness). 24 call sites + native stub `setCode()` + 17 committed
+  native stub headers updated.
+- **Per-consumer output dir**: framework assets → `<fw>/include/portal_assets`,
+  consumer → `<project>/include/portal_assets`; sample-app `-I include` + gitignore.
+- **realpath dedupe** in portalBuilder scan.
+**Verification (all rebuilt clean)**: framework native 662/664; esp32dev_ha + crowpanel
+compile+link clean; sample-app esp32dev green (weather_js.hpp now in
+sample-app/include/portal_assets with ETag).
+**Dead ends / debugging**: native first showed `*_gz_etag undeclared` — root cause was
+`-I test/stubs/platform` (before `-I include`) shadowing the real headers with committed
+minimal stubs at `test/stubs/platform/portal_assets/` that lacked the new symbol. Fixed
+by adding `_gz_etag` to all 17 stubs. (Fragility: these stubs must mirror the generated
+header format by hand.)
+**Surfaced findings (out of scope, not fixed)**:
+- sample-app **native** `test_weather` (`#include "WeatherModule.cpp"`) fails at **link**
+  on `Application::get{EventBus,KeyManager,DataManager,ConfigManager}()` — pre-existing
+  test-harness gap (env never built in-tree). WeatherModule compiles clean; unrelated to
+  this PR. Recommend separate test-infra fix.
+- Native stub `portal_assets/` headers are hand-maintained and must track the generated
+  format — candidate for auto-generation.
