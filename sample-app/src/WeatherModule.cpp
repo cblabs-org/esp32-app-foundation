@@ -287,7 +287,7 @@ void WeatherModule::registerRoutes(PsychicHttpServer& server) {
         // string literal — PsychicHttp::send() would otherwise copy the whole
         // ~16KB body into internal DRAM socket buffers (issue #111). The
         // weather_js_gz array is generated from web/weather.js at build time.
-        return serveGzipAsset(response, weather_js_gz, weather_js_gz_len,
+        return serveGzipAsset(request, response, weather_js_gz, weather_js_gz_len, weather_js_gz_etag,
                               "application/javascript");
     });
 }

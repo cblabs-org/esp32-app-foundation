@@ -13,12 +13,17 @@ Why it is canonical: `PsychicHttp::send(body)` copies the entire response body i
 1. **Put the JS in a `web/` directory.**
    - A framework module: `modules/<Name>/web/<name>.js`
    - A consuming app: `<projectDir>/web/<name>.js` (the build script scans the consuming project's `web/` dir automatically)
-2. **The build compresses it.** `scripts/portalBuilder.py` runs at build time, gzip-compresses every scanned asset, and emits a header at `include/portal_assets/<name>_js.hpp` exposing two symbols:
+2. **The build compresses it.** `scripts/portalBuilder.py` runs at build time, gzip-compresses every scanned asset, and emits a header `portal_assets/<name>_js.hpp` exposing three symbols:
    - `const uint8_t <name>_js_gz[] PROGMEM` — the compressed bytes
    - `const size_t <name>_js_gz_len` — the compressed length
+   - `const char <name>_js_gz_etag[]` — a build-time HTTP ETag (CRC32 of the compressed bytes) for caching
+
+   The header lands in a **per-project** include dir so two consumers sharing one framework checkout never overwrite each other's output:
+   - framework-sourced assets → `<framework>/include/portal_assets/` (reached via a consumer's `-I <framework>/include`)
+   - **consumer-sourced assets → `<yourProject>/include/portal_assets/`** — add `-I include` to your `build_flags` so `#include "portal_assets/<name>_js.hpp"` resolves.
 
    > Basename collisions across all scanned directories are a hard build error (`sys.exit(1)`), so give your asset a unique filename.
-3. **Serve it from `registerRoutes()`** using the shared helper `serveGzipAsset()` (from `web/serveGzipAsset.hpp`):
+3. **Serve it from `registerRoutes()`** using the shared helper `serveGzipAsset()` (from `web/serveGzipAsset.hpp`), passing the request (for conditional GET), the `_gz`/`_gz_len`/`_gz_etag` triple, and the MIME type:
 
 ```cpp
 #include "web/serveGzipAsset.hpp"
@@ -26,7 +31,8 @@ Why it is canonical: `PsychicHttp::send(body)` copies the entire response body i
 
 void WeatherModule::registerRoutes(PsychicHttpServer& server) {
     server.on("/weather.js", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
-        return serveGzipAsset(response, weather_js_gz, weather_js_gz_len,
+        return serveGzipAsset(request, response,
+                              weather_js_gz, weather_js_gz_len, weather_js_gz_etag,
                               "application/javascript");
     });
     // ... your /api/... routes ...
@@ -39,10 +45,10 @@ void WeatherModule::registerRoutes(PsychicHttpServer& server) {
 const char* getTabScript() const override { return "/weather.js"; }
 ```
 
-The output header lands in `include/portal_assets/`, which is already on the framework include path — consuming apps reach it via their existing `-I ../include` (or equivalent) and need no extra build config. The sample app's `WeatherModule` is the reference implementation of this pattern end-to-end.
+The sample app's `WeatherModule` (`sample-app/web/weather.js` + `-I include`) is the reference implementation of this pattern end-to-end.
 
 > [!NOTE]
-> The generated `include/portal_assets/` directory lives in the **framework** tree and is shared across builds. A single consuming app (one project directory building against one framework checkout) is unaffected, but be aware the output is not namespaced per consumer.
+> **Caching is handled for you.** `serveGzipAsset()` sends the ETag and `Cache-Control: no-cache`, and answers a matching `If-None-Match` with a bodiless `304 Not Modified`. Because portal assets sit at a fixed URL but change across OTA updates, this is deliberately *not* an `immutable`/long-`max-age` policy (which would serve a stale script after an update) — the browser revalidates cheaply and only re-downloads when the content actually changes.
 
 ## Delivery: raw-string literal (secondary — small fragments only)
 

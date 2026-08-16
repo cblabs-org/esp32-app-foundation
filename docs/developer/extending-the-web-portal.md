@@ -295,18 +295,25 @@ Row containers are semantically distinct based on data display vs input interact
 >    framework module, or **`<yourProject>/web/<name>.js`** for a consuming app.
 >    The build script scans the consuming project's `web/` dir automatically.
 > 2. `scripts/portalBuilder.py` gzip-compresses it at build time into
->    `include/portal_assets/<name>_js.hpp`, exposing `<name>_js_gz` /
->    `<name>_js_gz_len`.
-> 3. Serve it with the shared helper:
+>    `portal_assets/<name>_js.hpp`, exposing `<name>_js_gz` / `<name>_js_gz_len` /
+>    `<name>_js_gz_etag`. **Framework** assets land in `<framework>/include/`;
+>    **consumer** assets land in `<yourProject>/include/` — add `-I include` to
+>    your `build_flags` so the header resolves.
+> 3. Serve it with the shared helper (pass the request for conditional GET, plus
+>    the `_gz`/`_gz_len`/`_gz_etag` triple):
 >    ```cpp
 >    #include "web/serveGzipAsset.hpp"
 >    #include "portal_assets/weather_js.hpp"
 >    // in registerRoutes():
->    server.on("/weather.js", HTTP_GET, [](PsychicRequest* req, PsychicResponse* res) {
->        return serveGzipAsset(res, weather_js_gz, weather_js_gz_len,
+>    server.on("/weather.js", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
+>        return serveGzipAsset(request, response,
+>                              weather_js_gz, weather_js_gz_len, weather_js_gz_etag,
 >                              "application/javascript");
 >    });
 >    ```
+>    The helper also sends an ETag + `Cache-Control: no-cache` and answers a
+>    matching `If-None-Match` with a `304`, so browsers revalidate cheaply and
+>    only re-download when the asset actually changes (e.g. after an OTA).
 > 4. Declare the route via `const char* getTabScript() const override { return "/weather.js"; }`.
 >
 > **Why this matters:** `response->send(body)` copies the entire body into

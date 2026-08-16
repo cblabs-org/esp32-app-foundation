@@ -239,7 +239,7 @@ void TimeManager::resetConfig() {
  */
 void TimeManager::registerRoutes(PsychicHttpServer& server) {
     server.on("/time.js", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
-        return serveGzipAsset(response, time_js_gz, time_js_gz_len, "application/javascript");
+        return serveGzipAsset(request, response, time_js_gz, time_js_gz_len, time_js_gz_etag, "application/javascript");
     });
 
     // --- GET /api/time/config ---

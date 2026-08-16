@@ -152,50 +152,50 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors,
         }
         activeHighMemRequests++;
 
-        esp_err_t err = serveGzipAsset(response, index_html_gz, index_html_gz_len, "text/html");
+        esp_err_t err = serveGzipAsset(request, response, index_html_gz, index_html_gz_len, index_html_gz_etag, "text/html");
 
         activeHighMemRequests--;
         return err;
     });
     
     activeServer->on("/app.css", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
-        return serveGzipAsset(response, app_css_gz, app_css_gz_len, "text/css");
+        return serveGzipAsset(request, response, app_css_gz, app_css_gz_len, app_css_gz_etag, "text/css");
     });
 
     activeServer->on("/app.js", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
-        return serveGzipAsset(response, app_js_gz, app_js_gz_len, "application/javascript");
+        return serveGzipAsset(request, response, app_js_gz, app_js_gz_len, app_js_gz_etag, "application/javascript");
     });
 
     activeServer->on("/system.js", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
-        return serveGzipAsset(response, system_js_gz, system_js_gz_len, "application/javascript");
+        return serveGzipAsset(request, response, system_js_gz, system_js_gz_len, system_js_gz_etag, "application/javascript");
     });
 
     activeServer->on("/wifi.js", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
-        return serveGzipAsset(response, wifi_js_gz, wifi_js_gz_len, "application/javascript");
+        return serveGzipAsset(request, response, wifi_js_gz, wifi_js_gz_len, wifi_js_gz_etag, "application/javascript");
     });
 
     activeServer->on("/utils.js", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
-        return serveGzipAsset(response, utils_js_gz, utils_js_gz_len, "application/javascript");
+        return serveGzipAsset(request, response, utils_js_gz, utils_js_gz_len, utils_js_gz_etag, "application/javascript");
     });
 
     activeServer->on("/backup.js", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
-        return serveGzipAsset(response, backup_js_gz, backup_js_gz_len, "application/javascript");
+        return serveGzipAsset(request, response, backup_js_gz, backup_js_gz_len, backup_js_gz_etag, "application/javascript");
     });
 
     activeServer->on("/keys.js", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
-        return serveGzipAsset(response, keys_js_gz, keys_js_gz_len, "application/javascript");
+        return serveGzipAsset(request, response, keys_js_gz, keys_js_gz_len, keys_js_gz_etag, "application/javascript");
     });
 
     activeServer->on("/appconfig.js", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
-        return serveGzipAsset(response, appconfig_js_gz, appconfig_js_gz_len, "application/javascript");
+        return serveGzipAsset(request, response, appconfig_js_gz, appconfig_js_gz_len, appconfig_js_gz_etag, "application/javascript");
     });
 
     activeServer->on("/auth.js", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
-        return serveGzipAsset(response, auth_js_gz, auth_js_gz_len, "application/javascript");
+        return serveGzipAsset(request, response, auth_js_gz, auth_js_gz_len, auth_js_gz_etag, "application/javascript");
     });
 
     activeServer->on("/credits.js", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
-        return serveGzipAsset(response, credits_js_gz, credits_js_gz_len, "application/javascript");
+        return serveGzipAsset(request, response, credits_js_gz, credits_js_gz_len, credits_js_gz_etag, "application/javascript");
     });
 
     // --- Register all IWebContributor routes and build tabs array ---

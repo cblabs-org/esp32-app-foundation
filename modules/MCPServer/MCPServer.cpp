@@ -367,7 +367,7 @@ void MCPServer::_sendError(int code, const char* message, JsonVariantConst id, P
 
 void MCPServer::registerRoutes(PsychicHttpServer& server) {
     server.on("/mcp.js", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
-        return serveGzipAsset(response, mcp_js_gz, mcp_js_gz_len, "application/javascript");
+        return serveGzipAsset(request, response, mcp_js_gz, mcp_js_gz_len, mcp_js_gz_etag, "application/javascript");
     });
 
     // --- POST /api/mcp — JSON-RPC endpoint for MCP tool calls ---

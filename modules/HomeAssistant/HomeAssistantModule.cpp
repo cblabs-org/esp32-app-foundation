@@ -644,7 +644,7 @@ const char* HomeAssistantModule::getTabIcon() const {
 void HomeAssistantModule::registerRoutes(PsychicHttpServer& server) {
     // --- Route 1: Serve compressed portal JavaScript ---
     server.on("/homeassistant.js", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
-        return serveGzipAsset(response, homeassistant_js_gz, homeassistant_js_gz_len, "application/javascript");
+        return serveGzipAsset(request, response, homeassistant_js_gz, homeassistant_js_gz_len, homeassistant_js_gz_etag, "application/javascript");
     });
 
     // --- Route 2: GET current config and connection status ---

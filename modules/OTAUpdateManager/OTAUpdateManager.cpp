@@ -1314,7 +1314,7 @@ esp_err_t OTAUpdateManager::finaliseSignedUpload(PsychicResponse* response) {
 
 void OTAUpdateManager::registerRoutes(PsychicHttpServer& server) {
     server.on("/ota.js", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
-        return serveGzipAsset(response, ota_js_gz, ota_js_gz_len, "application/javascript");
+        return serveGzipAsset(request, response, ota_js_gz, ota_js_gz_len, ota_js_gz_etag, "application/javascript");
     });
 
     // --- GET: status endpoint ---
