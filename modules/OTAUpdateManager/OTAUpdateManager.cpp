@@ -45,6 +45,7 @@
 #ifdef WITH_OTA
 
 #include "OTAUpdateManager.hpp"
+#include "web/serveGzipAsset.hpp"
 #include "platform/LogShim.h"
 
 static constexpr const char* TAG = "OTAUpdateManager";
@@ -1313,10 +1314,7 @@ esp_err_t OTAUpdateManager::finaliseSignedUpload(PsychicResponse* response) {
 
 void OTAUpdateManager::registerRoutes(PsychicHttpServer& server) {
     server.on("/ota.js", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
-        response->setContent(ota_js_gz, ota_js_gz_len);
-        response->setContentType("application/javascript");
-        response->addHeader("Content-Encoding", "gzip");
-        return response->send();
+        return serveGzipAsset(response, ota_js_gz, ota_js_gz_len, "application/javascript");
     });
 
     // --- GET: status endpoint ---

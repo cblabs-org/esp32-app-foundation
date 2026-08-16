@@ -23,6 +23,7 @@
  */
 
 #include "WebServerManager.hpp"
+#include "web/serveGzipAsset.hpp"
 #include <ArduinoJson.h>
 
     #include "esp_heap_caps.h"
@@ -151,83 +152,50 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors,
         }
         activeHighMemRequests++;
 
-        response->setContent(index_html_gz, index_html_gz_len);
-        response->setContentType("text/html");
-        response->addHeader("Content-Encoding", "gzip");
-        esp_err_t err = response->send();
+        esp_err_t err = serveGzipAsset(response, index_html_gz, index_html_gz_len, "text/html");
 
         activeHighMemRequests--;
         return err;
     });
     
     activeServer->on("/app.css", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
-        response->setContent(app_css_gz, app_css_gz_len);
-        response->setContentType("text/css");
-        response->addHeader("Content-Encoding", "gzip");
-        return response->send();
+        return serveGzipAsset(response, app_css_gz, app_css_gz_len, "text/css");
     });
 
     activeServer->on("/app.js", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
-        response->setContent(app_js_gz, app_js_gz_len);
-        response->setContentType("application/javascript");
-        response->addHeader("Content-Encoding", "gzip");
-        return response->send();
+        return serveGzipAsset(response, app_js_gz, app_js_gz_len, "application/javascript");
     });
 
     activeServer->on("/system.js", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
-        response->setContent(system_js_gz, system_js_gz_len);
-        response->setContentType("application/javascript");
-        response->addHeader("Content-Encoding", "gzip");
-        return response->send();
+        return serveGzipAsset(response, system_js_gz, system_js_gz_len, "application/javascript");
     });
 
     activeServer->on("/wifi.js", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
-        response->setContent(wifi_js_gz, wifi_js_gz_len);
-        response->setContentType("application/javascript");
-        response->addHeader("Content-Encoding", "gzip");
-        return response->send();
+        return serveGzipAsset(response, wifi_js_gz, wifi_js_gz_len, "application/javascript");
     });
 
     activeServer->on("/utils.js", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
-        response->setContent(utils_js_gz, utils_js_gz_len);
-        response->setContentType("application/javascript");
-        response->addHeader("Content-Encoding", "gzip");
-        return response->send();
+        return serveGzipAsset(response, utils_js_gz, utils_js_gz_len, "application/javascript");
     });
 
     activeServer->on("/backup.js", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
-        response->setContent(backup_js_gz, backup_js_gz_len);
-        response->setContentType("application/javascript");
-        response->addHeader("Content-Encoding", "gzip");
-        return response->send();
+        return serveGzipAsset(response, backup_js_gz, backup_js_gz_len, "application/javascript");
     });
 
     activeServer->on("/keys.js", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
-        response->setContent(keys_js_gz, keys_js_gz_len);
-        response->setContentType("application/javascript");
-        response->addHeader("Content-Encoding", "gzip");
-        return response->send();
+        return serveGzipAsset(response, keys_js_gz, keys_js_gz_len, "application/javascript");
     });
 
     activeServer->on("/appconfig.js", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
-        response->setContent(appconfig_js_gz, appconfig_js_gz_len);
-        response->setContentType("application/javascript");
-        response->addHeader("Content-Encoding", "gzip");
-        return response->send();
+        return serveGzipAsset(response, appconfig_js_gz, appconfig_js_gz_len, "application/javascript");
     });
 
     activeServer->on("/auth.js", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
-        response->setContent(auth_js_gz, auth_js_gz_len);
-        response->setContentType("application/javascript");
-        response->addHeader("Content-Encoding", "gzip");
-        return response->send();
+        return serveGzipAsset(response, auth_js_gz, auth_js_gz_len, "application/javascript");
     });
 
     activeServer->on("/credits.js", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
-        response->setContent(credits_js_gz, credits_js_gz_len);
-        response->setContentType("application/javascript");
-        response->addHeader("Content-Encoding", "gzip");
-        return response->send();
+        return serveGzipAsset(response, credits_js_gz, credits_js_gz_len, "application/javascript");
     });
 
     // --- Register all IWebContributor routes and build tabs array ---

@@ -43,6 +43,18 @@ def build_web_portal():
             if os.path.isdir(mod_web):
                 scan_dirs.append(mod_web)
 
+    # Also scan the consuming project's web directory (downstream apps).
+    # _FW is the framework root; PROJECT_DIR is the consuming app. In an
+    # in-tree framework build they coincide and $FW/web holds only subdirs
+    # (portal/, display/) with no top-level files, so the isfile() filter
+    # below makes this a safe no-op there.
+    try:
+        project_web = os.path.join(env.subst("$PROJECT_DIR"), "web")
+        if os.path.isdir(project_web) and project_web not in scan_dirs:
+            scan_dirs.append(project_web)
+    except NameError:
+        pass  # direct Python invocation — no env/PROJECT_DIR
+
     seen_files = {}  # filename -> filepath
 
     for s_dir in scan_dirs:
