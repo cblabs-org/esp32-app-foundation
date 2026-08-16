@@ -49,6 +49,7 @@ natural cleanup of debt that project introduced, not new debt.
 |----|--------|--------|---------|
 | **[x] [wo1-pipeline-mechanism](wo1-pipeline-mechanism/WORKORDER.md)** | `portal-consumer-assets/wo1-pipeline-mechanism` (base: `main`) | ✅ Complete (`ff841372`) | portalBuilder.py scans `$PROJECT_DIR/web`; new `include/web/serveGzipAsset.hpp`; 7 modules migrated (net −50 lines). native 662/664, esp32dev_ha + crowpanel compile clean. |
 | **[x] [wo2-docs-and-sample](wo2-docs-and-sample/WORKORDER.md)** | `portal-consumer-assets/wo2-docs-and-sample` (base: `wo1`) | ✅ Complete (`9eb3c081`) | sample-app WeatherModule migrated to pipeline (`web/weather.js` + serveGzipAsset); skill docs + developer doc rewritten. #111 proven end-to-end (WeatherModule.cpp compiles vs generated header). Executed by PA (worker-parking). |
+| **[x] wo3-followups (user-requested)** | (same branch) | ✅ Complete (`42156ecb`, `d13d41b8`) | (1) Reconcile developer doc §2–§8 with real SPA architecture (kill stale `/www/` fragment model). (2) Fix pre-existing sample-app build break: add `-I ../modules` to `env:base` — **sample-app esp32dev now builds green end-to-end** (firmware.bin, RAM 15.4%, Flash 90.1%). |
 
 ## Conflict / Concurrency Analysis
 
