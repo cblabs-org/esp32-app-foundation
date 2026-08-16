@@ -28,11 +28,12 @@ as a documented secondary for tiny fragments).
       `/weather.js` route with `serveGzipAsset(response, weather_js_gz,
       weather_js_gz_len, "application/javascript")`; removed the ~300-line
       literal.
-- [x] `.claude/skills/framework-expert/systems/web-portal/html-js-fragments.md` —
+- [x] `.agents/skills/framework-expert/systems/web-portal/html-js-fragments.md` —
       rewritten: gzip pipeline canonical (module + consumer workflow, collision
       note, output-dir note), raw-string demoted to secondary (<~1 KB) with DRAM
-      warning.
-- [x] `.claude/skills/framework-expert/systems/web-portal/overview.md` —
+      warning. (`.claude/skills/` is a symlink to `.agents/skills/`; the tracked
+      path is `.agents/skills/`.)
+- [x] `.agents/skills/framework-expert/systems/web-portal/overview.md` —
       `registerRoutes()` bullet no longer says "raw-string literal"; points to the
       pipeline.
 - [x] `docs/developer/extending-the-web-portal.md` — added canonical

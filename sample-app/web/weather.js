@@ -18,7 +18,7 @@
     
     <!-- Weather Summary -->
     <div id="weather-summary-card" style="
-        display:flex; flex-direction:column; gap:0.75rem; padding:1rem;
+        flex-direction:column; gap:0.75rem; padding:1rem;
         background:var(--card-bg, #f8f9fa); border-radius:12px;
         margin-bottom:1.2rem; display:none;
     ">
