@@ -46,7 +46,7 @@ natural cleanup of debt that project introduced, not new debt.
 | WO | Branch | Status | Summary |
 |----|--------|--------|---------|
 | **[x] [wo1-pipeline-mechanism](wo1-pipeline-mechanism/WORKORDER.md)** | `portal-consumer-assets/wo1-pipeline-mechanism` (base: `main`) | ✅ Complete (`ff841372`) | portalBuilder.py scans `$PROJECT_DIR/web`; new `include/web/serveGzipAsset.hpp`; 7 modules migrated (net −50 lines). native 662/664, esp32dev_ha + crowpanel compile clean. |
-| **[ ] [wo2-docs-and-sample](wo2-docs-and-sample/WORKORDER.md)** | `portal-consumer-assets/wo2-docs-and-sample` (base: `wo1`) | ⏳ Pending | Migrate sample-app WeatherModule to the pipeline (`sample-app/web/weather.js` + serveGzipAsset); rewrite portal docs (both locations) + skill fragments to teach the pipeline as canonical, raw-string as secondary. |
+| **[x] [wo2-docs-and-sample](wo2-docs-and-sample/WORKORDER.md)** | `portal-consumer-assets/wo2-docs-and-sample` (base: `wo1`) | ✅ Complete (`9eb3c081`) | sample-app WeatherModule migrated to pipeline (`web/weather.js` + serveGzipAsset); skill docs + developer doc rewritten. #111 proven end-to-end (WeatherModule.cpp compiles vs generated header). Executed by PA (worker-parking). |
 
 ## Conflict / Concurrency Analysis
 
@@ -78,3 +78,29 @@ No hardware flash required; no new firmware functionality → no version tag.
   raw literal) — the natural end-to-end validation target for #111.
 - Established follow-on relationship to pr-portal-asset-decentralisation (#96).
 - Decomposed into 2 stacked WOs (mechanism → docs+sample), single draft PR.
+
+### Session 2 — 2026-08-16 (Execution + draft PR)
+**Summary**: Both WOs complete. WO1 executed by a sonnet worker (code) with PA
+reclaiming verification/commit after the worker parked repeatedly on long builds;
+WO2 executed directly by PA. Single draft PR stood up from the `wo2` tip.
+**Cross-cutting decisions**:
+- Helper is `include/web/serveGzipAsset.hpp` (inline free fn) — all 7 framework
+  modules migrated (net −50 lines of boilerplate).
+- `portalBuilder.py` now scans `$PROJECT_DIR/web` (safe no-op in-tree).
+- Docs scope bounded to the two issue-named skill docs + a canonical callout in
+  the developer doc; deeper `/www/`-fragment staleness surfaced, not fixed.
+**Verification**: framework `native` 662/664 (2 pre-existing unrelated errors),
+`esp32dev_ha` + `crowpanel-128-rotary` compile+link clean. #111 proven on the
+consumer side: `portalBuilder.py` generated `weather_js.hpp` (24 KB) from
+`sample-app/web/weather.js` and `WeatherModule.cpp` compiled against it.
+**Surfaced findings (PA to triage / offer to user)**:
+1. Sample-app `esp32dev` pre-existing build break — `WeatherBoard.hpp` needs
+   `-I ../modules` (absent from sample-app `build_flags`). Unrelated to #111;
+   one-line fix candidate, not bundled.
+2. Developer doc `extending-the-web-portal.md` broadly stale (§3/§4 teach a
+   `/www/` LittleFS fragment model contradicting current architecture) — own
+   docs issue.
+3. `include/portal_assets/` output dir is cross-consumer global — documented as a
+   NOTE; potential future namespacing enhancement.
+**Known pre-existing (not introduced)**: `test_mcpServer`/`test_pngWriter` native
+ERRORs; Playwright `pre_build_test` hook non-zero exit (false FAILED).
