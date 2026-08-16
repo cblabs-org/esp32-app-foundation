@@ -2,53 +2,73 @@
 
 Because the web portal does not load external HTML fragments, each tab's entire user interface is constructed dynamically using JavaScript. Each tab module provides a script that writes its own markup and handles events.
 
-## C++ Script Registration and Delivery
+## Delivery: gzip+PROGMEM pipeline (canonical)
 
-The tab's JavaScript file is stored as a raw-string literal in C++ and served via an HTTP GET route registered in `registerRoutes()`.
+**The canonical way to deliver a tab script is the framework's gzip+PROGMEM asset pipeline** — the same pipeline the framework uses for its own scripts (`app.js`, `mcp.js`, `hardware.js`, …). This applies equally to framework modules **and to consuming apps**.
 
-For example, in `WeatherModule.cpp`:
+Why it is canonical: `PsychicHttp::send(body)` copies the entire response body into **internal DRAM** socket buffers. For a non-trivial tab script (an 18 KB script is routine) this can drop `heap_min_free` to near-OOM, take many seconds to deliver, and cause intermittent `0 bytes received` browser timeouts. The gzip pipeline serves the script as a gzip-compressed `PROGMEM` byte array straight from flash — **zero DRAM impact** — via `setContent()` + `Content-Encoding: gzip`. (See issue #111 for the failure this pipeline prevents.)
+
+### How it works
+
+1. **Put the JS in a `web/` directory.**
+   - A framework module: `modules/<Name>/web/<name>.js`
+   - A consuming app: `<projectDir>/web/<name>.js` (the build script scans the consuming project's `web/` dir automatically)
+2. **The build compresses it.** `scripts/portalBuilder.py` runs at build time, gzip-compresses every scanned asset, and emits a header `portal_assets/<name>_js.hpp` exposing three symbols:
+   - `const uint8_t <name>_js_gz[] PROGMEM` — the compressed bytes
+   - `const size_t <name>_js_gz_len` — the compressed length
+   - `const char <name>_js_gz_etag[]` — a build-time HTTP ETag (CRC32 of the compressed bytes) for caching
+
+   The header lands in a **per-project** include dir so two consumers sharing one framework checkout never overwrite each other's output:
+   - framework-sourced assets → `<framework>/include/portal_assets/` (reached via a consumer's `-I <framework>/include`)
+   - **consumer-sourced assets → `<yourProject>/include/portal_assets/`** — add `-I include` to your `build_flags` so `#include "portal_assets/<name>_js.hpp"` resolves.
+
+   > Basename collisions across all scanned directories are a hard build error (`sys.exit(1)`), so give your asset a unique filename.
+3. **Serve it from `registerRoutes()`** using the shared helper `serveGzipAsset()` (from `web/serveGzipAsset.hpp`), passing the request (for conditional GET), the `_gz`/`_gz_len`/`_gz_etag` triple, and the MIME type:
 
 ```cpp
+#include "web/serveGzipAsset.hpp"
+#include "portal_assets/weather_js.hpp"   // generated from web/weather.js
+
 void WeatherModule::registerRoutes(PsychicHttpServer& server) {
-    // Serve the JavaScript file
     server.on("/weather.js", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
-        const char* js = R"rawliteral(
-(function() {
-    var initialized = false;
-
-    window.addEventListener('tab-changed', function(e) {
-        if (e.detail !== 'tab-weather') return;
-
-        var container = document.getElementById('tab-weather');
-        if (!container) return;
-
-        if (!initialized) {
-            initialized = true;
-            container.innerHTML = `
-                <article>
-                    <header>Weather Configuration</header>
-                    <form id="weather-form">
-                        <label for="weather-lat">Latitude</label>
-                        <input type="text" id="weather-lat">
-                        <button type="submit" id="weather-save-btn">Save</button>
-                    </form>
-                </article>
-            `;
-            // Bind events here
-        }
+        return serveGzipAsset(request, response,
+                              weather_js_gz, weather_js_gz_len, weather_js_gz_etag,
+                              "application/javascript");
     });
-})();
-        )rawliteral";
-        return response->send(200, "application/javascript", js);
-    });
+    // ... your /api/... routes ...
 }
 ```
 
-The route path (e.g. `/weather.js`) is declared in C++ by overriding `getTabScript()`:
+4. **Declare the route** by overriding `getTabScript()`:
 
 ```cpp
 const char* getTabScript() const override { return "/weather.js"; }
 ```
+
+The sample app's `WeatherModule` (`sample-app/web/weather.js` + `-I include`) is the reference implementation of this pattern end-to-end.
+
+> [!NOTE]
+> **Caching is handled for you.** `serveGzipAsset()` sends the ETag and `Cache-Control: no-cache`, and answers a matching `If-None-Match` with a bodiless `304 Not Modified`. Because portal assets sit at a fixed URL but change across OTA updates, this is deliberately *not* an `immutable`/long-`max-age` policy (which would serve a stale script after an update) — the browser revalidates cheaply and only re-downloads when the content actually changes.
+
+## Delivery: raw-string literal (secondary — small fragments only)
+
+For a **small** inline fragment (roughly **< 1 KB** — a few controls, no large markup blocks) the DRAM cost is negligible and the gzip pipeline's build-time indirection isn't worth it. In that case only, it is acceptable to serve the script as a C++ raw-string literal:
+
+```cpp
+server.on("/tiny.js", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
+    const char* js = R"rawliteral(
+(function() {
+    // small tab-scoped logic only
+})();
+    )rawliteral";
+    return response->send(200, "application/javascript", js);
+});
+```
+
+> [!WARNING]
+> **Do not use the raw-string pattern for non-trivial scripts.** `response->send(body)` copies the whole string into internal DRAM. Anything beyond ~1 KB should use the gzip pipeline above. If you are unsure, use the gzip pipeline — it is always safe.
+
+The remaining conventions below (the `tab-changed` contract, IIFE wrapper, ID scoping, security, design system, save policy) apply identically regardless of which delivery mechanism you choose.
 
 ## The `tab-changed` Event Contract
 
@@ -69,7 +89,7 @@ window.addEventListener('tab-changed', function(e) {
         initialized = true;
         // 1. Inject DOM markup
         container.innerHTML = `...`;
-        
+
         // 2. Query elements and bind listeners
         var saveBtn = document.getElementById('weather-save-btn');
         // ...

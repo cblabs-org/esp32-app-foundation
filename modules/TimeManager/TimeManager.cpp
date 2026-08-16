@@ -22,6 +22,7 @@
  */
 
 #include "TimeManager.hpp"
+#include "web/serveGzipAsset.hpp"
 #include "ConfigManager.hpp"
 #include "platform/LogShim.h"
 #include "portal_assets/time_js.hpp"
@@ -238,10 +239,7 @@ void TimeManager::resetConfig() {
  */
 void TimeManager::registerRoutes(PsychicHttpServer& server) {
     server.on("/time.js", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
-        response->setContent(time_js_gz, time_js_gz_len);
-        response->setContentType("application/javascript");
-        response->addHeader("Content-Encoding", "gzip");
-        return response->send();
+        return serveGzipAsset(request, response, time_js_gz, time_js_gz_len, time_js_gz_etag, "application/javascript");
     });
 
     // --- GET /api/time/config ---

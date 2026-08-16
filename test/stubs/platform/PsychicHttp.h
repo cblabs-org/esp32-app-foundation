@@ -31,6 +31,7 @@ public:
     esp_err_t send() { return ESP_OK; }
     void setContent(const uint8_t* content, size_t len) {}
     void setContentType(const char* type) {}
+    void setCode(int code) { (void)code; }
     void addHeader(const char* name, const char* value) {}
     esp_err_t redirect(const char* url) { return ESP_OK; }
 };

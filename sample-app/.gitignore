@@ -16,3 +16,6 @@ dependencies.lock
 
 # Framework data files (copied at build time by merge_framework_data.py)
 data/timezones.json
+
+# Generated portal assets (gzip+PROGMEM headers built by portalBuilder.py from web/)
+include/portal_assets/

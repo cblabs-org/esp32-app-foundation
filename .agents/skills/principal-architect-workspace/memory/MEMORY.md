@@ -10,6 +10,7 @@
 ## Active Projects
 | Project | Status | Modules | Context |
 |---|---|---|---|
+| pr-portal-consumer-assets | WO2/2 — both complete, draft PR stood up (#111) | portalBuilder.py, include/web/serveGzipAsset.hpp, WebServer, MCPServer, OTAUpdateManager, TimeManager, HomeAssistant, U8G2Display, LVGLDisplay, sample-app, docs, framework-expert skill | [PROJECT.md](../pr-portal-consumer-assets/PROJECT.md) |
 | pr-p2-issue-remediation | WO4/4 — all complete + screensaver fix, awaiting PR | OTAUpdateManager, web/portal, U8G2Display, Application, platformio.ini, test/, LVGLDisplay/ScreensaverController | [PROJECT.md](../pr-p2-issue-remediation/PROJECT.md) |
 | pr-type-colocation | WO3/3 — PR #95 submitted | ButtonModule, EncoderModule, U8G2Display, LVGLDisplay, HomeAssistant, hardware/* | [PROJECT.md](../pr-type-colocation/PROJECT.md) |
 | pr-mk01-eventbus-concurrency | Planned | | [PROJECT.md](../microkernel-refactor/pr-mk01-eventbus-concurrency/PROJECT.md) |

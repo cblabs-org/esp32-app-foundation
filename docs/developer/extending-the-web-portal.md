@@ -57,7 +57,7 @@ const char* getTabIcon() const override {
 
 ## 2. End-to-End Pattern: C++ to DOM
 
-When a user clicks your tab, the web portal loads your HTML/JS code from LittleFS and interacts with the REST endpoints registered in C++.
+The portal is a Single Page Application. It does **not** load HTML fragments from the filesystem. Instead, at boot `app.js` fetches the tab hierarchy from `/api/tabs`, and for each tab it loads that tab's **JavaScript** over the HTTP route the module registered (declared via `getTabScript()`). When the user activates a tab, that script builds its own DOM markup into the tab's container and talks to the REST endpoints your module registered in C++. There is no separate per-tab HTML file.
 
 ### C++ Web API Routes (Backend)
 Here is the route registration from the template file [myApp.cpp](../../template-app/src/myApp.cpp). It registers a GET route to retrieve status, and a POST route to update settings:
@@ -110,12 +110,12 @@ void MyApp::registerRoutes(PsychicHttpServer& server) {
 
 ---
 
-## 3. The HTML Fragment Pattern
+## 3. Authoring Your Tab's Markup
 
-Rather than reloading the entire webpage, the portal's main Single Page Application shell (`app.js`) fetches raw HTML fragments dynamically from the filesystem when a tab is clicked and injects them into the main DOM container.
+Your tab has **no separate HTML file**. Its markup is a string your tab script injects into its container (via `container.innerHTML = ...`) the first time the tab is activated — see the IIFE pattern in §4. This section describes what that injected markup should look like.
 
-### The HTML File (`/www/myapp/tab.html`)
-Create an HTML snippet representing your tab UI inside the `/www/<namespace>/tab.html` folder. It should contain only the body components, not wrapping `<html>` or `<body>` elements.
+### The markup your script injects
+Build an HTML snippet representing your tab UI and assign it to the container's `innerHTML`. It should contain only the body components, not wrapping `<html>` or `<body>` elements.
 
 > [!IMPORTANT]
 > **HTML ID Scoping Rule:** All element IDs must be prefixed with your module name to avoid collisions with other tabs loaded into the same SPA DOM. Use `id="myapp-save-btn"` — never `id="save-btn"`. Multiple tabs coexist in a single HTML document, so unprefixed IDs will clash.
@@ -282,9 +282,54 @@ Row containers are semantically distinct based on data display vs input interact
 
 ---
 
-## 4. The JavaScript Fragment Pattern
+## 4. The Tab Script Pattern
 
-Immediately after loading the HTML snippet, the SPA shell loads and executes your matching Javascript fragment located at `/www/<namespace>/tab.js`.
+> [!IMPORTANT]
+> **Delivering a tab script (canonical): the gzip+PROGMEM pipeline.**
+> A tab's JavaScript is served over an HTTP route your module registers in
+> `registerRoutes()`. The **canonical** way to deliver it — for framework
+> modules *and consuming apps* — is the framework's gzip+PROGMEM asset pipeline,
+> the same one used for `app.js` and friends:
+>
+> 1. Put the script in a `web/` directory: `modules/<Name>/web/<name>.js` for a
+>    framework module, or **`<yourProject>/web/<name>.js`** for a consuming app.
+>    The build script scans the consuming project's `web/` dir automatically.
+> 2. `scripts/portalBuilder.py` gzip-compresses it at build time into
+>    `portal_assets/<name>_js.hpp`, exposing `<name>_js_gz` / `<name>_js_gz_len` /
+>    `<name>_js_gz_etag`. **Framework** assets land in `<framework>/include/`;
+>    **consumer** assets land in `<yourProject>/include/` — add `-I include` to
+>    your `build_flags` so the header resolves.
+> 3. Serve it with the shared helper (pass the request for conditional GET, plus
+>    the `_gz`/`_gz_len`/`_gz_etag` triple):
+>    ```cpp
+>    #include "web/serveGzipAsset.hpp"
+>    #include "portal_assets/weather_js.hpp"
+>    // in registerRoutes():
+>    server.on("/weather.js", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
+>        return serveGzipAsset(request, response,
+>                              weather_js_gz, weather_js_gz_len, weather_js_gz_etag,
+>                              "application/javascript");
+>    });
+>    ```
+>    The helper also sends an ETag + `Cache-Control: no-cache` and answers a
+>    matching `If-None-Match` with a `304`, so browsers revalidate cheaply and
+>    only re-download when the asset actually changes (e.g. after an OTA).
+> 4. Declare the route via `const char* getTabScript() const override { return "/weather.js"; }`.
+>
+> **Why this matters:** `response->send(body)` copies the entire body into
+> internal DRAM socket buffers. For a non-trivial script (18 KB is routine) this
+> can drop free heap to near-OOM and cause multi-second serves / `0 bytes
+> received` browser timeouts (issue #111). The gzip pipeline serves straight from
+> flash — zero DRAM impact. Only for a *tiny* inline fragment (< ~1 KB) is a raw
+> C++ string literal (`response->send(200, "application/javascript", js)`)
+> acceptable. The reference implementation is the sample app's `WeatherModule`
+> (`sample-app/web/weather.js` + `serveGzipAsset`).
+>
+> The DOM/authoring conventions below (the IIFE pattern, `tab-changed`, ID
+> scoping) apply to your script regardless of how it is delivered.
+
+Immediately after the shell loads your script, it executes it and — on tab
+activation — the script renders its own markup into its container.
 
 ### The `tab.js` IIFE Pattern
 
@@ -301,7 +346,7 @@ Because all tab scripts execute in the same global `window` scope, variable name
 > [!WARNING]
 > If you omit the IIFE wrapper, any `const`, `let`, or `function` declarations at the top level will collide with identically-named symbols from other tabs, causing hard-to-debug runtime errors.
 
-### The JS File (`/www/myapp/tab.js`)
+### The tab script (served from your `web/<name>.js`)
 Wire up event listeners and fetch data from your API endpoints:
 
 ```javascript
@@ -471,7 +516,7 @@ When the client SPA sees this array, it:
 1. Sorts all entries based on the `order` key.
 2. Group tabs with a `parent` key under the respective parent dropdown/view (e.g., nesting "Status" as a sub-pill under the "System" tab).
 3. Renders top-level entries (no `parent` field) in the bottom-nav bar.
-4. Binds click handlers to load `/www/<id-lowercase>/tab.html` and `/www/<id-lowercase>/tab.js`.
+4. Loads each tab's script (the `script` field, e.g. `/weather.js`) over HTTP and binds click handlers that dispatch the `tab-changed` event so the loaded script renders its container.
 
 ---
 

@@ -13,6 +13,7 @@
  *              web portal REST endpoints and MCP tools.
  */
 #include "HomeAssistantModule.hpp"
+#include "web/serveGzipAsset.hpp"
 
 #ifdef WITH_HOMEASSISTANT
 
@@ -643,10 +644,7 @@ const char* HomeAssistantModule::getTabIcon() const {
 void HomeAssistantModule::registerRoutes(PsychicHttpServer& server) {
     // --- Route 1: Serve compressed portal JavaScript ---
     server.on("/homeassistant.js", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
-        response->setContent(homeassistant_js_gz, homeassistant_js_gz_len);
-        response->setContentType("application/javascript");
-        response->addHeader("Content-Encoding", "gzip");
-        return response->send();
+        return serveGzipAsset(request, response, homeassistant_js_gz, homeassistant_js_gz_len, homeassistant_js_gz_etag, "application/javascript");
     });
 
     // --- Route 2: GET current config and connection status ---

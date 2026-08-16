@@ -49,6 +49,7 @@
  */
 
 #include "U8G2DisplayModule.hpp"
+#include "web/serveGzipAsset.hpp"
 #include "events/AppConfiguringPayload.hpp"
 #include "platform/LogShim.h"
 #include <cstring>
@@ -761,31 +762,19 @@ const char* U8G2DisplayModule::getTabIcon() const {
  */
 void U8G2DisplayModule::registerRoutes(PsychicHttpServer& server) {
     server.on("/display.js", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
-        response->setContent(display_js_gz, display_js_gz_len);
-        response->setContentType("application/javascript");
-        response->addHeader("Content-Encoding", "gzip");
-        return response->send();
+        return serveGzipAsset(request, response, display_js_gz, display_js_gz_len, display_js_gz_etag, "application/javascript");
     });
 
     server.on("/screenshot.js", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
-        response->setContent(screenshot_js_gz, screenshot_js_gz_len);
-        response->setContentType("application/javascript");
-        response->addHeader("Content-Encoding", "gzip");
-        return response->send();
+        return serveGzipAsset(request, response, screenshot_js_gz, screenshot_js_gz_len, screenshot_js_gz_etag, "application/javascript");
     });
 
     server.on("/screenshot.html", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
-        response->setContent(screenshot_html_gz, screenshot_html_gz_len);
-        response->setContentType("text/html");
-        response->addHeader("Content-Encoding", "gzip");
-        return response->send();
+        return serveGzipAsset(request, response, screenshot_html_gz, screenshot_html_gz_len, screenshot_html_gz_etag, "text/html");
     });
 
     server.on("/carousel.js", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
-        response->setContent(carousel_js_gz, carousel_js_gz_len);
-        response->setContentType("application/javascript");
-        response->addHeader("Content-Encoding", "gzip");
-        return response->send();
+        return serveGzipAsset(request, response, carousel_js_gz, carousel_js_gz_len, carousel_js_gz_etag, "application/javascript");
     });
 
     // --- Step 1: Register shared service helper endpoints (brightness, screenshot) ---

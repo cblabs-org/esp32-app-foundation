@@ -13,6 +13,7 @@
  */
 
 #include "LVGLDisplayModule.hpp"
+#include "web/serveGzipAsset.hpp"
 #include "EventBus.hpp"
 
 #include "ConfigManager.hpp"
@@ -867,31 +868,19 @@ void LVGLDisplayModule::freeSnapshot(uint8_t* buffer) {
 
 void LVGLDisplayModule::registerRoutes(PsychicHttpServer& server) {
     server.on("/display.js", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
-        response->setContent(display_js_gz, display_js_gz_len);
-        response->setContentType("application/javascript");
-        response->addHeader("Content-Encoding", "gzip");
-        return response->send();
+        return serveGzipAsset(request, response, display_js_gz, display_js_gz_len, display_js_gz_etag, "application/javascript");
     });
 
     server.on("/screenshot.js", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
-        response->setContent(screenshot_js_gz, screenshot_js_gz_len);
-        response->setContentType("application/javascript");
-        response->addHeader("Content-Encoding", "gzip");
-        return response->send();
+        return serveGzipAsset(request, response, screenshot_js_gz, screenshot_js_gz_len, screenshot_js_gz_etag, "application/javascript");
     });
 
     server.on("/screenshot.html", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
-        response->setContent(screenshot_html_gz, screenshot_html_gz_len);
-        response->setContentType("text/html");
-        response->addHeader("Content-Encoding", "gzip");
-        return response->send();
+        return serveGzipAsset(request, response, screenshot_html_gz, screenshot_html_gz_len, screenshot_html_gz_etag, "text/html");
     });
 
     server.on("/hardware.js", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
-        response->setContent(hardware_js_gz, hardware_js_gz_len);
-        response->setContentType("application/javascript");
-        response->addHeader("Content-Encoding", "gzip");
-        return response->send();
+        return serveGzipAsset(request, response, hardware_js_gz, hardware_js_gz_len, hardware_js_gz_etag, "application/javascript");
     });
 
 #ifndef UNIT_TEST

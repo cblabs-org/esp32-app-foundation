@@ -17,6 +17,7 @@
  */
 
 #include "MCPServer.hpp"
+#include "web/serveGzipAsset.hpp"
 #include "MCPBuiltinTools.hpp"
 #include "interfaces/IMCPContributor.hpp"
 #include "WifiManager.hpp"
@@ -366,10 +367,7 @@ void MCPServer::_sendError(int code, const char* message, JsonVariantConst id, P
 
 void MCPServer::registerRoutes(PsychicHttpServer& server) {
     server.on("/mcp.js", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
-        response->setContent(mcp_js_gz, mcp_js_gz_len);
-        response->setContentType("application/javascript");
-        response->addHeader("Content-Encoding", "gzip");
-        return response->send();
+        return serveGzipAsset(request, response, mcp_js_gz, mcp_js_gz_len, mcp_js_gz_etag, "application/javascript");
     });
 
     // --- POST /api/mcp — JSON-RPC endpoint for MCP tool calls ---
