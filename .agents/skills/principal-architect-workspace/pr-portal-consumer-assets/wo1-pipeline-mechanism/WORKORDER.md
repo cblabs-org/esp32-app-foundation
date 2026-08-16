@@ -143,22 +143,58 @@ NOT fix it — record it under Out-of-Scope Findings below. The PA will triage.
 ---
 
 ## Completion Report
-<!-- Written by the worker at task completion -->
+<!-- Worker executed the code; PA (graceful-degradation per claude-code adapter)
+     captured verification + report after the worker parked in a build-wait loop
+     and did not self-report. Commit ff841372. -->
 
 ### Status
-(pending)
+complete
 
 ### Changes Made
--
+- `scripts/portalBuilder.py` (+12) — scan `$PROJECT_DIR/web` after module dirs,
+  with `project_web not in scan_dirs` dedupe and `except NameError` guard for
+  direct invocation. Collision guard left intact.
+- `include/web/serveGzipAsset.hpp` (NEW, inline free fn) — `serveGzipAsset(response, data, len, contentType)`
+  does setContent + setContentType + `Content-Encoding: gzip` + send. `#pragma once`,
+  includes `<PsychicHttp.h>`, full license header + Doxygen. Returns `esp_err_t`.
+- Migrated all framework serve sites onto the helper (net −50 lines):
+  `WebServer/WebServerManager.cpp` (−56, largest cluster; **preserved the
+  `activeHighMemRequests++/--` guard** around the index.html serve), `MCPServer`,
+  `OTAUpdateManager`, `TimeManager`, `HomeAssistant`, `U8G2Display`, `LVGLDisplay`.
+  Each gained `#include "web/serveGzipAsset.hpp"`. Pure substitution — content
+  types + asset var names preserved, zero behaviour change.
+
+### Verification (via platformio MCP)
+- `native`: **662/664 test cases pass**. The 2 ERRORED (`test_mcpServer`,
+  `test_pngWriter`) are pre-existing and unrelated (documented in
+  pr-portal-asset-decentralisation session log).
+- `esp32dev_ha` (widest module set incl. HomeAssistant): compiled + linked,
+  `firmware.bin` created (RAM 15.2%, Flash 79.9%).
+- `crowpanel-128-rotary` (LVGLDisplay): compiled + linked clean, `firmware.bin`
+  created (RAM 24.6%, Flash 43.1%). The `[FAILED]` on this env was the known
+  pre-existing Playwright `pre_build_test` hook false-failure — zero compiler
+  errors; firmware image built successfully.
 
 ### Decisions Made
--
+- Helper is a free function in a new lightweight header (pre-agreed), not a
+  static on WebServerManager — keeps asset-serving modules decoupled from the
+  full manager. Returns `esp_err_t` to match `PsychicResponse::send()`.
 
 ### Dead Ends & Warnings
--
+- Worker (sonnet) repeatedly parked itself while long first-time ESP-IDF builds
+  ran, producing notification churn without self-reporting. PA reclaimed
+  verification + commit. Future: for WOs whose cost is dominated by long
+  serialized PlatformIO builds, consider PA-driven verification rather than a
+  background worker, or give the worker explicit in-session poll-loop guidance.
 
 ### Out-of-Scope Findings
--
+- **Shared output dir (`include/portal_assets/`) is cross-consumer global.**
+  Generated consumer assets land in the *framework's* include tree. For a single
+  consumer (sample-app) this is fine, but if two different downstream projects
+  built against the same framework checkout they could collide / dirty the
+  framework tree. Pre-existing pipeline design; not in scope for #111. PA to
+  consider whether to note this as a documented limitation in WO2 docs or file a
+  follow-up.
 
 ### Blockers
 (none)

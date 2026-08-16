@@ -45,7 +45,7 @@ natural cleanup of debt that project introduced, not new debt.
 
 | WO | Branch | Status | Summary |
 |----|--------|--------|---------|
-| **[ ] [wo1-pipeline-mechanism](wo1-pipeline-mechanism/WORKORDER.md)** | `portal-consumer-assets/wo1-pipeline-mechanism` (base: `main`) | ⏳ Pending | portalBuilder.py scans `$PROJECT_DIR/web`; new `include/web/serveGzipAsset.hpp`; migrate all framework serve sites (7 modules, ~23 sites) onto it. |
+| **[x] [wo1-pipeline-mechanism](wo1-pipeline-mechanism/WORKORDER.md)** | `portal-consumer-assets/wo1-pipeline-mechanism` (base: `main`) | ✅ Complete (`ff841372`) | portalBuilder.py scans `$PROJECT_DIR/web`; new `include/web/serveGzipAsset.hpp`; 7 modules migrated (net −50 lines). native 662/664, esp32dev_ha + crowpanel compile clean. |
 | **[ ] [wo2-docs-and-sample](wo2-docs-and-sample/WORKORDER.md)** | `portal-consumer-assets/wo2-docs-and-sample` (base: `wo1`) | ⏳ Pending | Migrate sample-app WeatherModule to the pipeline (`sample-app/web/weather.js` + serveGzipAsset); rewrite portal docs (both locations) + skill fragments to teach the pipeline as canonical, raw-string as secondary. |
 
 ## Conflict / Concurrency Analysis
