@@ -9,6 +9,16 @@
 
 #include "board_pins.h"
 
+// ── WebServer Configuration Fallbacks ───────────────────────────────────────
+#ifndef BOARD_HTTP_STACK_SIZE
+#define BOARD_HTTP_STACK_SIZE 8192          // safe for all non-screenshot routes (compression is offloaded, WO2)
+#endif
+
+#ifndef BOARD_HTTP_MAX_OPEN_SOCKETS
+#define BOARD_HTTP_MAX_OPEN_SOCKETS 7       // = HTTPD_DEFAULT_CONFIG default (ENABLE_ASYNC is off)
+#endif
+
+
 // ── U8G2 Display Contract Verification ───────────────────────────────────────
 #ifdef WITH_DISPLAY_U8G2
 

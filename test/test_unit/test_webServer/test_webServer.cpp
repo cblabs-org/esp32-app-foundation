@@ -169,6 +169,20 @@ TEST(WebServerManagerTest, GetServer_ReturnsSameInstance) {
     EXPECT_EQ(&server1, &server2);
 }
 
+TEST(WebServerManagerTest, DefaultHttpConfig) {
+    WebServerManager manager;
+    EXPECT_EQ(manager.getHttpStackSize(), 8192u);
+    EXPECT_EQ(manager.getHttpMaxOpenSockets(), 7);
+}
+
+TEST(WebServerManagerTest, SetHttpConfigOverride) {
+    WebServerManager manager;
+    manager.setHttpConfig(12288, 10);
+    EXPECT_EQ(manager.getHttpStackSize(), 12288u);
+    EXPECT_EQ(manager.getHttpMaxOpenSockets(), 10);
+}
+
+
 int main(int argc, char** argv) {
     PsychicHttpServer::lastMaxBodySize = 4096;
     ::testing::InitGoogleTest(&argc, argv);

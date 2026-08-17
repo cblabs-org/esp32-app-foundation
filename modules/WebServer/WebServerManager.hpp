@@ -61,6 +61,15 @@
 #include <PsychicHttpsServer.h>
 
 
+#include "board.h"
+
+#ifndef BOARD_HTTP_STACK_SIZE
+#define BOARD_HTTP_STACK_SIZE 8192          // safe for all non-screenshot routes (compression is offloaded, WO2)
+#endif
+#ifndef BOARD_HTTP_MAX_OPEN_SOCKETS
+#define BOARD_HTTP_MAX_OPEN_SOCKETS 7       // = HTTPD_DEFAULT_CONFIG default (ENABLE_ASYNC is off)
+#endif
+
 #include "interfaces/IWebContributor.hpp"
 #include "interfaces/ITickable.hpp"
 
@@ -89,6 +98,33 @@ public:
      * @brief Clean up heap-allocated HTTPS server if present.
      */
     ~WebServerManager();
+
+    /**
+     * @brief Configure the HTTP server task stack size and socket count.
+     *
+     * MUST be called before begin(). Overrides the default board stack size
+     * (BOARD_HTTP_STACK_SIZE) and socket limit (BOARD_HTTP_MAX_OPEN_SOCKETS).
+     *
+     * @note Flash-safety invariant: The httpd task stack MUST remain in internal
+     * DRAM (MALLOC_CAP_INTERNAL). Do NOT set task_caps to PSRAM. The httpd task
+     * executes direct OTA updates (Update.write) and LittleFS config-save, both
+     * of which write flash with the SPI cache disabled; a PSRAM stack would cause
+     * a fatal cache fault.
+     *
+     * @param stackSize      Task stack size in bytes (default: BOARD_HTTP_STACK_SIZE / 8192).
+     * @param maxOpenSockets Maximum concurrent open sockets (default: BOARD_HTTP_MAX_OPEN_SOCKETS / 7).
+     */
+    void setHttpConfig(size_t stackSize, int maxOpenSockets);
+
+    /**
+     * @brief Get the configured HTTP task stack size in bytes.
+     */
+    size_t getHttpStackSize() const { return _httpStackSize; }
+
+    /**
+     * @brief Get the configured maximum open sockets limit.
+     */
+    int getHttpMaxOpenSockets() const { return _httpMaxOpenSockets; }
 
     /**
      * @brief Initialize the web server(s), set up routes, register all
@@ -139,6 +175,9 @@ private:
     std::atomic<bool> _restartRequested{false}; ///< True if a device restart has been requested
     const char*  _appName = nullptr;     ///< Runtime-settable app name for /api/app response
 
+    size_t       _httpStackSize      = BOARD_HTTP_STACK_SIZE;      ///< Configured task stack size
+    int          _httpMaxOpenSockets = BOARD_HTTP_MAX_OPEN_SOCKETS; ///< Configured max open sockets
+
 public:
     /**
      * @brief Set the application name returned by /api/app.
@@ -151,3 +190,4 @@ public:
      */
     void setAppName(const char* name) { _appName = name; }
 };
+
