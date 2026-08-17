@@ -15,7 +15,7 @@
 #endif
 
 #ifndef BOARD_HTTP_MAX_OPEN_SOCKETS
-#define BOARD_HTTP_MAX_OPEN_SOCKETS 7       // = HTTPD_DEFAULT_CONFIG default (ENABLE_ASYNC is off)
+#define BOARD_HTTP_MAX_OPEN_SOCKETS 4       // browser (2-3) + MCP (1); boards with more DRAM can override upward
 #endif
 
 

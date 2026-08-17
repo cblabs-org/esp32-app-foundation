@@ -125,7 +125,7 @@ Default HTTP server task settings are defined in [hardware/_common/board_contrac
 #endif
 
 #ifndef BOARD_HTTP_MAX_OPEN_SOCKETS
-#define BOARD_HTTP_MAX_OPEN_SOCKETS 7  // Matches HTTPD_DEFAULT_CONFIG default
+#define BOARD_HTTP_MAX_OPEN_SOCKETS 4  // browser (2-3) + MCP (1); override upward if needed
 #endif
 ```
 

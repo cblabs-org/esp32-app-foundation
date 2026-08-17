@@ -172,7 +172,7 @@ TEST(WebServerManagerTest, GetServer_ReturnsSameInstance) {
 TEST(WebServerManagerTest, DefaultHttpConfig) {
     WebServerManager manager;
     EXPECT_EQ(manager.getHttpStackSize(), 8192u);
-    EXPECT_EQ(manager.getHttpMaxOpenSockets(), 7);
+    EXPECT_EQ(manager.getHttpMaxOpenSockets(), 4);
 }
 
 TEST(WebServerManagerTest, SetHttpConfigOverride) {

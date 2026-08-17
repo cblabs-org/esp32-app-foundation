@@ -584,7 +584,7 @@ The SPA client is responsible for intercepting `401` responses from the API, des
 
 Default task stack size and max open sockets are defined in `board_contract.h`:
 - `BOARD_HTTP_STACK_SIZE`: 8192 bytes (8 KB)
-- `BOARD_HTTP_MAX_OPEN_SOCKETS`: 7 (matches `HTTPD_DEFAULT_CONFIG` default)
+- `BOARD_HTTP_MAX_OPEN_SOCKETS`: 4 (browser 2-3 + MCP 1; boards with more DRAM can override upward)
 
 Because deep call stack operations (such as screenshot PNG compression) are offloaded to `DeepStackExecutor` in PSRAM, the HTTP server task stack runs safely at 8 KB without risk of stack overflow.
 
