@@ -573,3 +573,32 @@ Certain routes must be accessible without authentication. The middleware maintai
 > You do **NOT** need to write authentication verification code inside individual route handlers. All `/api/` routes are automatically protected by the global JWT middleware. Simply register your routes via `registerRoutes()` and the framework handles security.
 
 The SPA client is responsible for intercepting `401` responses from the API, destroying the local token, and redirecting the user to the login screen.
+
+---
+
+## 10. Web Server Stack & Configuration Tuning
+
+`WebServerManager` manages HTTP (port 80) and HTTPS (port 443) server tasks.
+
+### Default Sizing & Board Contract
+
+Default task stack size and max open sockets are defined in `board_contract.h`:
+- `BOARD_HTTP_STACK_SIZE`: 8192 bytes (8 KB)
+- `BOARD_HTTP_MAX_OPEN_SOCKETS`: 7 (matches `HTTPD_DEFAULT_CONFIG` default)
+
+Because deep call stack operations (such as screenshot PNG compression) are offloaded to `DeepStackExecutor` in PSRAM, the HTTP server task stack runs safely at 8 KB without risk of stack overflow.
+
+### Modern `setHttpConfig()` API
+
+If your application requires custom HTTP task stack size or socket limits, call `setHttpConfig()` before starting the web server (`begin()`):
+
+```cpp
+// Custom HTTP server configuration
+app.getWebServerManager().setHttpConfig(8192, 7);
+```
+
+> [!NOTE]
+> **Retiring Legacy Overrides**: Manual manipulation of `getServer().config.stack_size` or `max_open_sockets` is **retired**. Use `setHttpConfig()` or `board.h` macros instead.
+>
+> **Flash Safety Rule**: The HTTP task stack MUST remain in internal DRAM (`MALLOC_CAP_INTERNAL`). Do not place the HTTP server task stack in PSRAM, as direct-upload OTA writes execute on the HTTP task thread with the SPI flash cache disabled.
+

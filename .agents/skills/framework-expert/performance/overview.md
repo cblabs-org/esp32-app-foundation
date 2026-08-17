@@ -30,4 +30,5 @@ The ESP32 App Foundation operates under strict resource constraints. This overvi
 ## See Also
 - [Heap Management](heap-management.md)
 - [PSRAM Utilisation](psram.md)
+- [Web Server Stack & DRAM Tuning Architecture](../systems/web-portal/dram-tuning.md)
 - [TLS Tradeoffs](../security/tls-tradeoffs.md) — TLS is the single largest RAM consumer on ESP32

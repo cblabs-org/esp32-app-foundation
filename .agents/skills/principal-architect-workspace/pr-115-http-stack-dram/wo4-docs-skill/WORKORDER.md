@@ -50,19 +50,26 @@ Record out-of-scope findings in the Completion Report.
 <!-- Written by the worker at task completion -->
 
 ### Status
-(pending)
+Complete — verified via `platformio` `run_tests native` (667 tests passed). Prose accurate against merged WO1-WO3 code. Human/PA approved.
 
 ### Changes Made
--
+- Created `.agents/skills/framework-expert/systems/web-portal/dram-tuning.md` documenting HTTP server stack & DRAM architecture, debunked claims, capability matrix, DeepStackExecutor offloading, and mandatory OTA flash-safety invariants.
+- Updated `.agents/skills/framework-expert/skill_manifest.json` and `SKILL.md` to register `dram-tuning.md`.
+- Cross-linked `dram-tuning.md` in `systems/web-portal/overview.md`, `performance/overview.md`, and `performance/psram.md`.
+- Added Section 5 "HTTP Server Stack & Deep-Stack DRAM Optimization" to `docs/developer/performance-guide.md`.
+- Added Section 5 "Web Server & PSRAM Deep-Stack Configuration" to `docs/developer/custom-boards.md`.
+- Added Section 10 "Web Server Stack & Configuration Tuning" to `docs/developer/extending-the-web-portal.md`.
+- Added header doc cross-reference note to `lib/DeepStackExecutor/DeepStackExecutor.h`.
 
 ### Decisions Made
--
+- Unified all HTTP stack / DRAM architecture documentation across both `framework-expert` skill files and framework developer guides (`docs/developer/`).
+- Prominently highlighted the OTA flash-safety rules as a standing architectural rule for any future PSRAM deep-stack offload.
 
 ### Dead Ends & Warnings
--
+- PR #116 added early docs with debunked claims (async workers, 32 KB pool, max 9 sockets); PR #116 should be closed in favor of this PR head.
 
 ### Out-of-Scope Findings
--
+- None.
 
 ### Blockers
 (none)

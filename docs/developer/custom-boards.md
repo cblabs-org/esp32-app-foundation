@@ -190,3 +190,44 @@ When you build the project with `pio run -e my_custom_board`, the framework cont
 ```
 
 No framework files are edited, and your custom hardware definition remains completely isolated inside your repository.
+
+---
+
+## 5. Web Server & PSRAM Deep-Stack Configuration
+
+Custom board definitions can configure web server defaults and PSRAM deep-stack worker preconditions in `board.h` or `platformio.ini`:
+
+### Web Server Contract Defaults
+
+In [hardware/_common/board_contract.h](../../hardware/_common/board_contract.h), the framework defines board-overridable defaults:
+
+```cpp
+#ifndef BOARD_HTTP_STACK_SIZE
+#define BOARD_HTTP_STACK_SIZE 8192          // 8 KB task stack size (compression offloaded)
+#endif
+
+#ifndef BOARD_HTTP_MAX_OPEN_SOCKETS
+#define BOARD_HTTP_MAX_OPEN_SOCKETS 7       // Default open sockets limit
+#endif
+```
+
+If a custom board requires different stack sizing or socket limits, define `BOARD_HTTP_STACK_SIZE` or `BOARD_HTTP_MAX_OPEN_SOCKETS` in your board's `board.h` header before `#include "board_pins.h"`.
+
+### PSRAM External Task Stack Precondition
+
+For boards with display support (e.g. LVGL), real-time PNG screenshots offload memory-intensive `tdefl` compression from the HTTP server task to a persistent worker task (`DeepStackExecutor`) with a PSRAM-backed stack.
+
+For the framework to create worker task stacks in PSRAM:
+1. The board must define `-DBOARD_HAS_PSRAM` in `platformio.ini`.
+2. The Espressif SDK build must enable `CONFIG_SPIRAM_ALLOW_STACK_EXTERNAL_MEMORY=y` in `sdkconfig`.
+
+### Screenshot Capability Matrix
+
+| Board Capability | Screenshot Path | httpd Task Stack | Internal DRAM Impact |
+|---|---|---|---|
+| PSRAM + `CONFIG_SPIRAM_ALLOW_STACK_EXTERNAL_MEMORY=y` | Real-time `tdefl` on PSRAM worker (`DeepStackExecutor`) | 8 KB (`BOARD_HTTP_STACK_SIZE`) | **−8 KB** internal DRAM saved |
+| No PSRAM / Stacks disabled | Stored-PNG shallow fallback path | 8 KB (`BOARD_HTTP_STACK_SIZE`) | **−8 KB** internal DRAM saved |
+
+> [!NOTE]
+> If external task stacks are disabled or PSRAM allocation fails, the framework automatically uses the shallow stored-PNG fallback path without crashing or requiring per-board code branches.
+

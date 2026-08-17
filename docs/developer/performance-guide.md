@@ -279,7 +279,48 @@ CONFIG_MBEDTLS_CERTIFICATE_BUNDLE_DEFAULT_CMN=y
 
 ---
 
-## 5. PSRAM
+## 5. HTTP Server Stack & Deep-Stack DRAM Optimization
+
+The web server (`WebServerManager`) manages HTTP (port 80) and HTTPS (port 443) traffic. Optimizing its memory footprint is critical for preserving internal DRAM for lwIP network pbufs.
+
+### Correct Concurrency & Memory Model
+
+PsychicHttp compiles **without** `ENABLE_ASYNC` defined:
+- **No Async Worker Pool**: There is no pool of 8 async workers (no 32 KB pool overhead).
+- **Single HTTP Task**: Exactly **one** httpd server task runs all HTTP handlers synchronously.
+- **Max Open Sockets**: Default is **7** (`HTTPD_DEFAULT_CONFIG`), not 9.
+- **Footprint**: The total static HTTP infrastructure footprint is ~8–10 KB (task stack + socket control structures).
+
+### Sizing the HTTP Task Stack
+
+Historically, the HTTP server task stack was configured to 16 KB to accommodate PNG screenshot generation (`tdefl` compression). Sizing the shared httpd task for this single worst-case route consumed 16 KB of internal DRAM on every board, causing lwIP pbuf starvation on DRAM-constrained targets.
+
+By offloading PNG compression to the `DeepStackExecutor` service, the HTTP server task stack is reduced from 16 KB to **8 KB** (`BOARD_HTTP_STACK_SIZE`), returning **8 KB of internal DRAM** to the system.
+
+### DeepStackExecutor Offloading
+
+`DeepStackExecutor` ([lib/DeepStackExecutor/DeepStackExecutor.h](../../lib/DeepStackExecutor/DeepStackExecutor.h)) executes heavy callables on a persistent worker task with a PSRAM-backed static stack created via `xTaskCreateWithCaps(MALLOC_CAP_SPIRAM)`.
+
+### Screenshot Capability Matrix
+
+| Board Capability | Screenshot Path | httpd Stack Size | Internal DRAM Savings |
+|---|---|---|---|
+| PSRAM + `CONFIG_SPIRAM_ALLOW_STACK_EXTERNAL_MEMORY=y` | Real-time `tdefl` on PSRAM worker (`DeepStackExecutor`) | 8 KB (`BOARD_HTTP_STACK_SIZE`) | **−8 KB** internal DRAM |
+| No PSRAM / Stacks disabled | Stored-PNG shallow fallback path | 8 KB (`BOARD_HTTP_STACK_SIZE`) | **−8 KB** internal DRAM |
+
+### OTA Flash-Safety Invariants
+
+> [!CAUTION]
+> **SPI Flash Cache Rules During OTA**
+> External PSRAM is inaccessible while the SPI flash cache is disabled during flash write operations. Any access to PSRAM during an OTA write causes a fatal CPU cache fault.
+
+1. **HTTP Task Stack Must Remain Internal DRAM**: Never place the `httpd` task stack in PSRAM (`task_caps` must remain `MALLOC_CAP_INTERNAL`), because direct-upload OTA (`Update.write`) and LittleFS config saves execute directly on the `httpd` task thread.
+2. **OTA Worker Task Uses Internal DRAM**: `OTAUpdateManager` creates its persistent background worker task with `MALLOC_CAP_INTERNAL` (`OTA_TASK_STACK_BYTES = 16384`).
+3. **Mutual-Exclusion Gate**: `DisplayServiceHelper` checks `OTAUpdateManager::getState() != Idle` and returns HTTP 503 if an OTA update is active, preventing `DeepStackExecutor` (PSRAM stack) from executing during flash writes.
+
+---
+
+## 6. PSRAM
 
 Pseudo-Static RAM (PSRAM) extends the ESP32's available memory but comes with critical performance and safety caveats.
 

@@ -27,6 +27,9 @@
  * If PSRAM stack allocation fails or is unsupported (e.g., CONFIG_SPIRAM_ALLOW_STACK_EXTERNAL_MEMORY
  * is off), begin() returns false and available() returns false, allowing the caller to
  * fall back to a shallower execution path.
+ *
+ * @note Architecture & DRAM tuning details: see .agents/skills/framework-expert/systems/web-portal/dram-tuning.md
+ *       and docs/developer/performance-guide.md
  */
 class DeepStackExecutor {
 public:
