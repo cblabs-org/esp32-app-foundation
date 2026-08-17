@@ -121,9 +121,7 @@
 class EventBus;
 class ConfigManager;
 class MCPToolRegistry;
-#ifndef UNIT_TEST
 #include "DisplayServiceHelper.h"
-#endif
 
 // ---------------------------------------------------------------------------
 // EventBus Payload Structs
@@ -710,9 +708,7 @@ private:
     ConfiguringStatusBoard _configuringStatusBoard{_displayWidth, _displayHeight}; ///< Gate progress during CONFIGURING phase
     GenericGateHelperBoard _genericHelperBoard{_displayWidth, _displayHeight};      ///< Generic fallback helper for config gates
 
-#ifndef UNIT_TEST
     DisplayServiceHelper _serviceHelper{this};
-#endif
 
 public:
     // -------------------------------------------------------------------------

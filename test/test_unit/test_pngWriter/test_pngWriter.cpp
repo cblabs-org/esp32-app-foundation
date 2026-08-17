@@ -1,4 +1,3 @@
-#ifndef ARDUINO
 #include <cstdlib>
 // miniz / tdefl stubs (no central stub exists for ROM miniz)
 struct tdefl_compressor {};
@@ -12,7 +11,6 @@ typedef int tdefl_status;
 // which resolves to test/stubs/platform/esp_heap_caps.h on native
 static tdefl_status tdefl_init(tdefl_compressor *, int (*)(const void *, int, void *), void *, int) { return TDEFL_STATUS_OKAY; }
 static tdefl_status tdefl_compress_buffer(tdefl_compressor *, const void *, size_t, int) { return TDEFL_STATUS_OKAY; }
-#endif
 #include <gtest/gtest.h>
 #include <vector>
 
