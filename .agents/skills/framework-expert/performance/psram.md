@@ -29,11 +29,13 @@ If PSRAM is unavailable, this returns `nullptr`. Always check the return value.
 - High-frequency data access (e.g., tight DSP loops).
 - `ITickable` core logic that requires absolute deterministic timing.
 
-## Stack in PSRAM
+## Stack in PSRAM & DeepStackExecutor
 
-For large FreeRTOS tasks that don't fit in internal RAM, the stack can be placed in PSRAM:
-- Use `xTaskCreateStatic()` or explicitly configure FreeRTOS to allocate tasks from SPIRAM if enabled in `sdkconfig`.
-- **Warning:** A stack in PSRAM is significantly slower, increasing execution time for function calls and local variable access.
+For heavy operations requiring deep call stacks (e.g. image/PNG compression), task stacks can be offloaded to PSRAM:
+- Requires `CONFIG_SPIRAM_ALLOW_STACK_EXTERNAL_MEMORY=y` in Kconfig/sdkconfig.
+- Use the framework's [`DeepStackExecutor`](../../../../lib/DeepStackExecutor/DeepStackExecutor.h) service, which spawns a persistent worker using `xTaskCreateWithCaps(..., MALLOC_CAP_SPIRAM)`.
+- > [!CAUTION]
+  > **Flash Safety Rule:** The SPI flash cache controller is disabled during flash writes (e.g. OTA firmware updates). **Never** run a task with a PSRAM stack while an OTA update or flash write is active. Tasks that write flash (like `httpd` or `OTAUpdateManager`) MUST maintain their stack in internal DRAM (`MALLOC_CAP_INTERNAL`). See [Web Server Stack & DRAM Tuning](../systems/web-portal/dram-tuning.md).
 
 ## Speed Tradeoffs
 

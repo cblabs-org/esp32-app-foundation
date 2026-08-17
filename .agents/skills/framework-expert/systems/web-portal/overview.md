@@ -82,6 +82,10 @@ The web portal boots via the following sequential steps:
 6. **Navigation Render**: The bottom navigation links and sub-pill buttons are rendered. Each bottom-nav link carries `role="tab"`, `aria-selected`, and `aria-controls` pointing at its specific panel. Sub-pill buttons carry the same ARIA attributes, and the pill bar container has `role="tablist"`.
 7. **Initial Activation**: The default tab is activated, triggering the `tab-changed` event and causing the script to render its content.
 
+## Web Server Stack & DRAM Tuning
+
+The web server task stack size and socket limits are board-configurable, and deep call stack operations (such as PNG screenshot compression) are offloaded to PSRAM via `DeepStackExecutor` to preserve internal DRAM. For full details on the concurrency model, capability matrix, and mandatory OTA flash-safety rules, see [Web Server Stack & DRAM Tuning Architecture](dram-tuning.md).
+
 ## Design System
 
 When building or modifying portal UI, use the project's design system for all styling decisions — colour tokens, typography, spacing, component patterns (Drawer, PillBar, InfoRow, ToggleSwitch, etc.), and the module-tab scaffold template. See the sibling skill at `../../../framework-design-system/readme.md`.

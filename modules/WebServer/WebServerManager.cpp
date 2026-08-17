@@ -85,9 +85,6 @@ static constexpr size_t DEFAULT_MAX_POST_BODY = 4096;
 
 
 WebServerManager::WebServerManager() : _httpServer(80) {
-#ifndef UNIT_TEST
-    _httpServer.config.stack_size = 16384; // Increase stack for heavy PNG compression (native stub has no .config)
-#endif
 }
 
 WebServerManager::~WebServerManager() {
@@ -97,12 +94,22 @@ WebServerManager::~WebServerManager() {
     }
 }
 
+void WebServerManager::setHttpConfig(size_t stackSize, int maxOpenSockets) {
+    _httpStackSize = stackSize;
+    _httpMaxOpenSockets = maxOpenSockets;
+}
+
 void WebServerManager::begin(const std::vector<IWebContributor*>& contributors,
                              AuthManager* authManager, WifiManager* wifiManager) {
     _authManager = authManager;
     _wifiManager = wifiManager;
     bool apMode = _wifiManager ? _wifiManager->getAPMode() : false;
     ESP_LOGI(TAG, "Initializing WebServerManager (apMode=%d)", apMode);
+
+#ifndef UNIT_TEST
+    _httpServer.config.stack_size = _httpStackSize;
+    _httpServer.config.max_open_sockets = _httpMaxOpenSockets;
+#endif
 
     // --- TLS mode decision ---
     // AsyncWebServer does NOT support TLS — it has no SSL layer.
@@ -123,7 +130,8 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors,
                 useTls = false;
             } else {
 #ifndef UNIT_TEST
-                _httpsServer->config.stack_size = 16384; // Increase stack for heavy PNG compression
+                _httpsServer->config.stack_size = _httpStackSize;
+                _httpsServer->config.max_open_sockets = _httpMaxOpenSockets;
 #endif
                 _httpsServer->setCertificate(certDer, certLen, keyDer, keyLen);
             }

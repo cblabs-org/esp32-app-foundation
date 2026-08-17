@@ -42,10 +42,35 @@ void DisplayServiceHelper::registerBrightnessRoute(PsychicHttpServer& server) {
     );
 }
 
+bool DisplayServiceHelper::capturePNGToStream(BufferStream& stream) {
+    _executor.begin();
+    if (_executor.available()) {
+        bool ok = false;
+        bool runOk = _executor.run([this, &stream, &ok]() {
+            ok = _display->capturePNG(stream);
+        }, 5000);
+
+        if (runOk) {
+            size_t hwmark = _executor.stackHighWaterMarkBytes();
+            ESP_LOGI("DisplayService", "PNG Worker stack high water mark: %lu bytes (expected peak ~10KB)", (unsigned long)hwmark);
+        }
+        return runOk && ok;
+    } else {
+        return _display->captureStoredPNG(stream);
+    }
+}
+
 void DisplayServiceHelper::registerScreenshotRoute(PsychicHttpServer& server) {
     server.on("/api/display/screenshot", HTTP_GET, [this](PsychicRequest* request, PsychicResponse* response) {
+        if (_isOtaActive()) {
+            response->send(503, "application/json", "{\"error\":\"busy_during_update\"}");
+            return ESP_FAIL;
+        }
+
         BufferStream stream;
-        if (!_display->capturePNG(stream) || stream.buffer.empty()) {
+        bool ok = capturePNGToStream(stream);
+
+        if (!ok || stream.buffer.empty()) {
             response->send(500, "application/json", "{\"error\":\"Screenshot capture failed\"}");
             return ESP_FAIL;
         }
@@ -82,8 +107,13 @@ void DisplayServiceHelper::registerCaptureTool(MCPToolRegistry& registry) {
             auto* self = static_cast<DisplayServiceHelper*>(ctx);
             (void)params;
 
+            if (self->_isOtaActive()) {
+                result["error"] = "busy_during_update";
+                return;
+            }
+
             BufferStream stream;
-            if (!self->_display->capturePNG(stream) || stream.buffer.empty()) {
+            if (!self->capturePNGToStream(stream) || stream.buffer.empty()) {
                 result["error"] = "Failed to capture display buffer";
                 return;
             }

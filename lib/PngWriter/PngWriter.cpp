@@ -263,6 +263,89 @@ static int tdefl_put_buf_cb(const void* pBuf, int len, void* pUser) {
     return 1;
 }
 
+bool writeRGB565Stored(Print& sink, uint16_t width, uint16_t height, const uint16_t* buffer) {
+    sink.write(PNG_SIGNATURE, sizeof(PNG_SIGNATURE));
+    writeIHDR(sink, width, height, 8, 2); 
+    
+    uint16_t fallbackRowBytes = width * 3;
+    uint32_t totalBytes = (fallbackRowBytes + 1) * height;
+    
+    uint32_t totalBlocks = (totalBytes + 65535 - 1) / 65535;
+    uint32_t idatLen = 2 + (totalBlocks * 5) + totalBytes + 4;
+    
+    write32(sink, idatLen);
+    uint32_t chunkCrc = crc32_le(0, (const uint8_t*)"IDAT", 4);
+    sink.print("IDAT");
+    
+    uint8_t zlibHeader[2] = { 0x78, 0x01 };
+    sink.write(zlibHeader, 2);
+    chunkCrc = crc32_le(chunkCrc, zlibHeader, 2);
+    
+    uint32_t fallbackAdler = 1;
+    uint32_t offset = 0;
+    
+    while (offset < totalBytes) {
+        uint32_t bLen = (totalBytes - offset) > 65535 ? 65535 : (totalBytes - offset);
+        uint8_t bFinal = (offset + bLen == totalBytes) ? 1 : 0;
+        
+        uint8_t blockHeader[5];
+        blockHeader[0] = bFinal | 0x00;
+        blockHeader[1] = bLen & 0xFF;
+        blockHeader[2] = (bLen >> 8) & 0xFF;
+        blockHeader[3] = (~bLen) & 0xFF;
+        blockHeader[4] = ((~bLen) >> 8) & 0xFF;
+        sink.write(blockHeader, 5);
+        chunkCrc = crc32_le(chunkCrc, blockHeader, 5);
+        
+        // For performance, generate row chunks instead of byte-by-byte
+        uint8_t* chunkBuf = (uint8_t*)heap_caps_malloc(bLen, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+        if (!chunkBuf) return false;
+        
+        for (uint32_t i = 0; i < bLen; i++) {
+            uint32_t pixelOffset = offset + i;
+            uint32_t rowIdx = pixelOffset / (fallbackRowBytes + 1);
+            uint32_t byteInRow = pixelOffset % (fallbackRowBytes + 1);
+            
+            if (byteInRow == 0) {
+                chunkBuf[i] = 0; 
+            } else {
+                uint32_t x = (byteInRow - 1) / 3;
+                uint32_t c = (byteInRow - 1) % 3;
+                uint16_t p = buffer[rowIdx * width + x];
+                if (c == 0) {
+                    uint8_t r5 = (p >> 11) & 0x1F;
+                    chunkBuf[i] = (r5 << 3) | (r5 >> 2);
+                } else if (c == 1) {
+                    uint8_t g6 = (p >> 5) & 0x3F;
+                    chunkBuf[i] = (g6 << 2) | (g6 >> 4);
+                } else {
+                    uint8_t b5 = p & 0x1F;
+                    chunkBuf[i] = (b5 << 3) | (b5 >> 2);
+                }
+            }
+        }
+        
+        sink.write(chunkBuf, bLen);
+        chunkCrc = crc32_le(chunkCrc, chunkBuf, bLen);
+        fallbackAdler = adler32(fallbackAdler, chunkBuf, bLen);
+        heap_caps_free(chunkBuf);
+        
+        offset += bLen;
+    }
+    
+    uint8_t adlerBytes[4];
+    adlerBytes[0] = (fallbackAdler >> 24) & 0xFF;
+    adlerBytes[1] = (fallbackAdler >> 16) & 0xFF;
+    adlerBytes[2] = (fallbackAdler >> 8) & 0xFF;
+    adlerBytes[3] = fallbackAdler & 0xFF;
+    sink.write(adlerBytes, 4);
+    chunkCrc = crc32_le(chunkCrc, adlerBytes, 4);
+    
+    write32(sink, chunkCrc);
+    writeChunk(sink, "IEND", nullptr, 0);
+    return true;
+}
+
 bool writeRGB565ToRGB888(Print& sink, uint16_t width, uint16_t height, const uint16_t* buffer) {
     // The miniz compressor state is 167KB, so we allocate it securely in PSRAM.
     tdefl_compressor* comp = (tdefl_compressor*)heap_caps_calloc(1, sizeof(tdefl_compressor), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
@@ -322,86 +405,7 @@ bool writeRGB565ToRGB888(Print& sink, uint16_t width, uint16_t height, const uin
         if (comp) heap_caps_free(comp);
         
         // Fall back to stored-PNG.
-        sink.write(PNG_SIGNATURE, sizeof(PNG_SIGNATURE));
-        writeIHDR(sink, width, height, 8, 2); 
-        
-        uint16_t fallbackRowBytes = width * 3;
-        uint32_t totalBytes = (fallbackRowBytes + 1) * height;
-        
-        uint32_t totalBlocks = (totalBytes + 65535 - 1) / 65535;
-        uint32_t idatLen = 2 + (totalBlocks * 5) + totalBytes + 4;
-        
-        write32(sink, idatLen);
-        uint32_t chunkCrc = crc32_le(0, (const uint8_t*)"IDAT", 4);
-        sink.print("IDAT");
-        
-        uint8_t zlibHeader[2] = { 0x78, 0x01 };
-        sink.write(zlibHeader, 2);
-        chunkCrc = crc32_le(chunkCrc, zlibHeader, 2);
-        
-        uint32_t fallbackAdler = 1;
-        uint32_t offset = 0;
-        
-        while (offset < totalBytes) {
-            uint32_t bLen = (totalBytes - offset) > 65535 ? 65535 : (totalBytes - offset);
-            uint8_t bFinal = (offset + bLen == totalBytes) ? 1 : 0;
-            
-            uint8_t blockHeader[5];
-            blockHeader[0] = bFinal | 0x00;
-            blockHeader[1] = bLen & 0xFF;
-            blockHeader[2] = (bLen >> 8) & 0xFF;
-            blockHeader[3] = (~bLen) & 0xFF;
-            blockHeader[4] = ((~bLen) >> 8) & 0xFF;
-            sink.write(blockHeader, 5);
-            chunkCrc = crc32_le(chunkCrc, blockHeader, 5);
-            
-            // For performance, generate row chunks instead of byte-by-byte
-            uint8_t* chunkBuf = (uint8_t*)heap_caps_malloc(bLen, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-            if (!chunkBuf) return false;
-            
-            for (uint32_t i = 0; i < bLen; i++) {
-                uint32_t pixelOffset = offset + i;
-                uint32_t rowIdx = pixelOffset / (fallbackRowBytes + 1);
-                uint32_t byteInRow = pixelOffset % (fallbackRowBytes + 1);
-                
-                if (byteInRow == 0) {
-                    chunkBuf[i] = 0; 
-                } else {
-                    uint32_t x = (byteInRow - 1) / 3;
-                    uint32_t c = (byteInRow - 1) % 3;
-                    uint16_t p = buffer[rowIdx * width + x];
-                    if (c == 0) {
-                        uint8_t r5 = (p >> 11) & 0x1F;
-                        chunkBuf[i] = (r5 << 3) | (r5 >> 2);
-                    } else if (c == 1) {
-                        uint8_t g6 = (p >> 5) & 0x3F;
-                        chunkBuf[i] = (g6 << 2) | (g6 >> 4);
-                    } else {
-                        uint8_t b5 = p & 0x1F;
-                        chunkBuf[i] = (b5 << 3) | (b5 >> 2);
-                    }
-                }
-            }
-            
-            sink.write(chunkBuf, bLen);
-            chunkCrc = crc32_le(chunkCrc, chunkBuf, bLen);
-            fallbackAdler = adler32(fallbackAdler, chunkBuf, bLen);
-            heap_caps_free(chunkBuf);
-            
-            offset += bLen;
-        }
-        
-        uint8_t adlerBytes[4];
-        adlerBytes[0] = (fallbackAdler >> 24) & 0xFF;
-        adlerBytes[1] = (fallbackAdler >> 16) & 0xFF;
-        adlerBytes[2] = (fallbackAdler >> 8) & 0xFF;
-        adlerBytes[3] = fallbackAdler & 0xFF;
-        sink.write(adlerBytes, 4);
-        chunkCrc = crc32_le(chunkCrc, adlerBytes, 4);
-        
-        write32(sink, chunkCrc);
-        writeChunk(sink, "IEND", nullptr, 0);
-        return true;
+        return writeRGB565Stored(sink, width, height, buffer);
     }
     
     // We are proceeding with deflate. Write headers first.

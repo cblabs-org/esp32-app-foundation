@@ -15,6 +15,9 @@
 #include "LVGLDisplayModule.hpp"
 #include "web/serveGzipAsset.hpp"
 #include "EventBus.hpp"
+#ifdef WITH_OTA
+#include "OTAUpdateManager.hpp"
+#endif
 
 #include "ConfigManager.hpp"
 #include "MCPToolRegistry.hpp"
@@ -370,6 +373,41 @@ bool LVGLDisplayModule::capturePNG(Print& sink) {
     return ok;
 #else
     (void)sink;  // native build: PngWriter (ROM tdefl) is hardware-only
+    return false;
+#endif
+}
+
+bool LVGLDisplayModule::captureStoredPNG(Print& sink) {
+#ifndef UNIT_TEST
+    _snapshotComplete.store(false);
+    _snapshotSuccess.store(false);
+    _snapshotBuffer = nullptr;
+    _snapshotSize = 0;
+    _pendingSnapshot.store(true);
+    ESP_LOGI("LVGLDisplay", "captureStoredPNG: requesting snapshot, waiting for tick loop...");
+
+    int timeout = 300;
+    while (!_snapshotComplete.load() && timeout > 0) {
+        delay(10);
+        timeout--;
+    }
+
+    if (!_snapshotComplete.load() || !_snapshotSuccess.load() || !_snapshotBuffer) {
+        ESP_LOGE("LVGLDisplay", "captureStoredPNG: Snapshot failed (complete=%d, success=%d, timeout=%d)", 
+                 _snapshotComplete.load(), _snapshotSuccess.load(), timeout);
+        _pendingSnapshot.store(false); // cancel if timed out
+        if (_snapshotBuffer) freeSnapshot(_snapshotBuffer);
+        return false;
+    }
+
+    ESP_LOGI("LVGLDisplay", "captureStoredPNG: tick loop finished snapshot, converting to Stored PNG...");
+    bool ok = PngWriter::writeRGB565Stored(sink, _snapshotWidth, _snapshotHeight, reinterpret_cast<const uint16_t*>(_snapshotBuffer));
+    ESP_LOGI("LVGLDisplay", "captureStoredPNG: PngWriter returned %d", ok);
+    freeSnapshot(_snapshotBuffer);
+    _snapshotBuffer = nullptr;
+    return ok;
+#else
+    (void)sink;
     return false;
 #endif
 }
@@ -884,6 +922,11 @@ void LVGLDisplayModule::registerRoutes(PsychicHttpServer& server) {
     });
 
 #ifndef UNIT_TEST
+#ifdef WITH_OTA
+    _serviceHelper.setOtaPredicate([]() {
+        return OTAUpdateManager::getState() != OTAState::Idle;
+    });
+#endif
     _serviceHelper.registerBrightnessRoute(server);
     _serviceHelper.registerScreenshotRoute(server);
 #endif

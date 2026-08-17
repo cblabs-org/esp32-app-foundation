@@ -22,6 +22,7 @@
 #ifdef WITH_DISPLAY_U8G2
 #include <gtest/gtest.h>
 #include <ArduinoJson.h>
+#include <U8g2lib.h>
 #include "MCPToolRegistry.hpp"
 #include "U8G2DisplayModule.hpp"
 
@@ -95,9 +96,9 @@ protected:
 // Test Group: Tool Registration
 // =============================================================================
 
-/** registerMCPTools must register exactly two tools. */
-TEST_F(DisplayMcpToolsTest, Registration_RegistersTwoTools) {
-    EXPECT_EQ(registry.size(), 2u);
+/** registerMCPTools must register exactly three tools. */
+TEST_F(DisplayMcpToolsTest, Registration_RegistersThreeTools) {
+    EXPECT_EQ(registry.size(), 3u);
 }
 
 /** display_status must be findable in the registry. */

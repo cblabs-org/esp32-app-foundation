@@ -75,6 +75,9 @@ static constexpr const char* TAG = "U8G2DisplayModule";
 
 // Include EventBus directly — it is native-safe (no Arduino.h dependency).
 #include "EventBus.hpp"
+#ifdef WITH_OTA
+#include "OTAUpdateManager.hpp"
+#endif
 #include "ConfigManager.hpp"
 #include "MCPToolRegistry.hpp"
 #include "fonts/Fonts.hpp"
@@ -778,6 +781,13 @@ void U8G2DisplayModule::registerRoutes(PsychicHttpServer& server) {
     });
 
     // --- Step 1: Register shared service helper endpoints (brightness, screenshot) ---
+#ifndef UNIT_TEST
+#ifdef WITH_OTA
+    _serviceHelper.setOtaPredicate([]() {
+        return OTAUpdateManager::getState() != OTAState::Idle;
+    });
+#endif
+#endif
     _serviceHelper.registerBrightnessRoute(server);
     _serviceHelper.registerScreenshotRoute(server);
 
