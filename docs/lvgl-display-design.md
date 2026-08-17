@@ -517,24 +517,29 @@ Starting from ~167.5 KB idle free DRAM:
 |------------|------|-----------------|
 | Framework idle baseline | — | 167.5 KB |
 | LVGL partial double buffers (2 × 24 lines) | −23 KB | 144.5 KB |
-| LVGL object heap (`LV_MEM_SIZE`) | −32 KB | 112.5 KB |
-| LVGL static/BSS overhead | −5 KB | 107.5 KB |
-| **Remaining free SRAM (idle)** | | **~107 KB** |
-| **Remaining free SRAM (peak TLS)** | | **~65 KB** |
+| LVGL object heap (`LV_MEM_SIZE`) — **in PSRAM** on PSRAM boards | 0 KB (PSRAM) | 144.5 KB |
+| LVGL static/BSS overhead | −5 KB | 139.5 KB |
+| **Remaining free SRAM (idle)** | | **~139 KB** |
+| **Remaining free SRAM (peak TLS)** | | **~97 KB** |
 
 The framework's WebServerManager issues HTTP 503 responses when the largest free
-block drops below 20 KB. A 65 KB minimum during simultaneous TLS + LVGL rendering
-provides adequate headroom.
+block drops below 20 KB. A 97 KB minimum during simultaneous TLS + LVGL rendering
+provides comfortable headroom.
 
-### 5.5 Aggressive Option: LVGL Object Heap in PSRAM
+> **Note:** On non-PSRAM boards, the LVGL heap remains in internal DRAM (32 KB).
+> The `lv_conf.h` uses a `#if defined(CONFIG_SPIRAM)` guard to select the pool
+> location at compile time.
 
-If SRAM headroom proves tight in practice, the LVGL widget object heap can be
-moved to PSRAM using `LV_MEM_CUSTOM=1` with ESP-IDF's `heap_caps` allocator:
+### 5.5 LVGL Object Heap in PSRAM (Implemented)
 
-| LVGL Heap Location | SRAM Cost | Free SRAM (idle) | Free SRAM (peak TLS) |
-|--------------------|-----------|-------------------|-----------------------|
-| Internal SRAM (default) | 32 KB | ~107 KB | ~65 KB |
-| PSRAM (aggressive) | 0 KB | ~139 KB | ~97 KB |
+The LVGL widget object heap is now allocated from PSRAM on PSRAM-equipped boards
+via `LV_MEM_POOL_ALLOC`. LVGL's built-in TLSF allocator is retained — only the
+backing memory moves from `.bss` to PSRAM.
+
+| LVGL Heap Location | SRAM Cost | PSRAM Cost | Free SRAM (idle) | Free SRAM (peak TLS) |
+|--------------------|-----------|------------|-------------------|-----------------------|
+| PSRAM (PSRAM boards, default) | 0 KB | 64 KB | ~139 KB | ~97 KB |
+| Internal SRAM (non-PSRAM boards) | 32 KB | 0 KB | ~107 KB | ~65 KB |
 
 > **Constraint:** LVGL's draw buffers (`buf1`, `buf2`) MUST remain in internal
 > SRAM regardless. Only the widget object heap is movable.
@@ -1120,9 +1125,16 @@ Key settings for this hardware target:
 ```c
 #define LV_COLOR_DEPTH          16        // RGB565
 #define LV_DPI_DEF              160       // Approximate for 1.28" 240px
-#define LV_MEM_SIZE             (32 * 1024)  // 32 KB LVGL heap (in internal SRAM)
-#define LV_MEM_CUSTOM           0         // Use LVGL's built-in allocator
-// Set to 1 + heap_caps_malloc for PSRAM fallback if SRAM constrained
+
+// On PSRAM boards: 64 KB pool allocated from PSRAM via LV_MEM_POOL_ALLOC
+// On non-PSRAM boards: 32 KB static pool in internal DRAM
+#if defined(CONFIG_SPIRAM)
+#define LV_MEM_SIZE             (64 * 1024)
+#define LV_MEM_POOL_ALLOC(size) heap_caps_malloc(size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT)
+#else
+#define LV_MEM_SIZE             (32 * 1024)
+#endif
+#define LV_MEM_CUSTOM           0         // Retain LVGL's built-in TLSF allocator
 
 #define LV_USE_LOG              1
 #define LV_LOG_LEVEL            LV_LOG_LEVEL_WARN
