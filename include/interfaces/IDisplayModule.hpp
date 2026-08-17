@@ -121,6 +121,14 @@ public:
      */
     virtual bool capturePNG(Print& sink) = 0;
 
+    /**
+     * @brief Capture the current framebuffer to a stored (uncompressed) PNG image.
+     *
+     * @param sink The Print stream to write the PNG file to.
+     * @return true on successful capture; false otherwise.
+     */
+    virtual bool captureStoredPNG(Print& sink) = 0;
+
     // --- System Lifecycle Display ---
 
     /**

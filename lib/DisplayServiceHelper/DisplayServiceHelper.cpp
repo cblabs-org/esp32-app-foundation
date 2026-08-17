@@ -44,8 +44,31 @@ void DisplayServiceHelper::registerBrightnessRoute(PsychicHttpServer& server) {
 
 void DisplayServiceHelper::registerScreenshotRoute(PsychicHttpServer& server) {
     server.on("/api/display/screenshot", HTTP_GET, [this](PsychicRequest* request, PsychicResponse* response) {
+        if (_isOtaActive()) {
+            response->send(503, "application/json", "{\"error\":\"busy_during_update\"}");
+            return ESP_FAIL;
+        }
+
         BufferStream stream;
-        if (!_display->capturePNG(stream) || stream.buffer.empty()) {
+        bool ok = false;
+
+        _executor.begin();
+        if (_executor.available()) {
+            bool runOk = _executor.run([this, &stream, &ok]() {
+                ok = _display->capturePNG(stream);
+            }, 5000);
+            
+            if (!runOk) {
+                ok = false;
+            } else {
+                size_t hwmark = _executor.stackHighWaterMarkBytes();
+                ESP_LOGI("DisplayService", "PNG Worker stack high water mark: %zu bytes (expected peak ~10KB)", hwmark);
+            }
+        } else {
+            ok = _display->captureStoredPNG(stream);
+        }
+
+        if (!ok || stream.buffer.empty()) {
             response->send(500, "application/json", "{\"error\":\"Screenshot capture failed\"}");
             return ESP_FAIL;
         }

@@ -97,6 +97,7 @@ private:
 
     static void workerLoop(void* param);
 #else
+public:
     // Stub members for native testing
     bool _stubAvailable = true;
     size_t _stubHighWaterMark = 1024;

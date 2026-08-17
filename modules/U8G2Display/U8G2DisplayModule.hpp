@@ -549,6 +549,11 @@ public:
     bool capturePNG(Print& sink) override;
 
     /**
+     * @brief Fallback. U8G2 doesn't have a separate stored mode (capturePNG is already 1bpp).
+     */
+    bool captureStoredPNG(Print& sink) override { return false; }
+
+    /**
      * @brief Transition display to represent a core system state.
      * @param params State transition parameters.
      */

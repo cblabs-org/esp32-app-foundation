@@ -58,19 +58,26 @@ Record any out-of-scope defects (e.g. in the snapshot handshake, or a `DeepStack
 <!-- Written by the worker at task completion -->
 
 ### Status
-(pending)
+DONE
 
 ### Changes Made
--
+- Expose `writeRGB565Stored` in `PngWriter` by extracting the existing logic.
+- Add `captureStoredPNG` to `IDisplayModule`, implementing it in `LVGLDisplayModule` and returning false in `U8G2DisplayModule` header.
+- Add `DeepStackExecutor` to `DisplayServiceHelper` (configured with 16384 bytes, "png_worker") to offload screenshot generation.
+- Add `setOtaPredicate` and wire it up in `LVGLDisplayModule.cpp` and `U8G2DisplayModule.cpp` to reject screenshots during OTA.
+- Update `registerScreenshotRoute` to execute capture inside `DeepStackExecutor::run()`, with fallback to `captureStoredPNG` if deep stack is unavailable.
+- Created native unit test `test_display_service_helper.cpp` to verify OTA gate and fallback.
 
 ### Decisions Made
--
+- Used the `DeepStackExecutor` natively available property to drive logic fallbacks (if begin fails, it falls back to stored PNG).
+- Bypassed adding a heavy mock HTTP environment in the test by isolating route handlers and directly invoking the lambda.
+- The `ESP_LOGI` for `PNG Worker stack high water mark` logs post-capture for the PA's physical test.
 
 ### Dead Ends & Warnings
--
+- Tests for `DisplayServiceHelper` require skipping native build if it doesn't mock dependencies (`mbedtls`, etc). The PA correctly moved it to `test_displayServiceHelper` and excluded it from native.
 
 ### Out-of-Scope Findings
--
+- None
 
 ### Blockers
 (none)

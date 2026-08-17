@@ -195,6 +195,7 @@ public:
     bool isDimmed() const override;
     bool isSleeping() const override;
     bool capturePNG(Print& sink) override;
+    bool captureStoredPNG(Print& sink) override;
     void showSystemState(const SystemDisplayParams& params) override;
 
     /**
