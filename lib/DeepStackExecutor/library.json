@@ -1,0 +1,5 @@
+{
+  "name": "DeepStackExecutor",
+  "version": "0.1.0",
+  "description": "Reusable framework service that runs an arbitrary callable on a persistent worker task with a PSRAM-backed static stack"
+}
