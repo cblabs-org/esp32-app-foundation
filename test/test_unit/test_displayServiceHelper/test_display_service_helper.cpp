@@ -33,14 +33,12 @@ public:
     void clearStatus() override {}
 };
 
-TEST(DisplayServiceHelperTest, ScreenshotUsesStoredPNGWhenExecutorNotAvailable) {
+TEST(DisplayServiceHelperTest, ScreenshotUsesExecutorWhenAvailable) {
     MockDisplayModuleForScreenshot display;
     DisplayServiceHelper helper(&display);
     
-    // In native tests, DeepStackExecutor::available() will return what we tell it
-    // Wait, the native stub for DeepStackExecutor defaults to available() = true.
-    // Let's rely on that if we can't change it easily, but wait, the DeepStackExecutor
-    // stub has `_stubAvailable`. We can't access it easily without friend.
+    // Default: executor stub is available
+    EXPECT_TRUE(helper.getExecutor()._stubAvailable);
     
     PsychicHttpServer server;
     helper.registerScreenshotRoute(server);
@@ -58,10 +56,37 @@ TEST(DisplayServiceHelperTest, ScreenshotUsesStoredPNGWhenExecutorNotAvailable) 
     PsychicResponse res;
     handler(&req, &res);
     
-    // DeepStackExecutor stub sets available=true by default.
-    // So capturePNG_called should be true.
+    // DeepStackExecutor stub is available → capturePNG (primary path)
     EXPECT_TRUE(display.capturePNG_called);
     EXPECT_FALSE(display.captureStoredPNG_called);
+}
+
+TEST(DisplayServiceHelperTest, ScreenshotUsesStoredPNGWhenExecutorNotAvailable) {
+    MockDisplayModuleForScreenshot display;
+    DisplayServiceHelper helper(&display);
+    
+    // Force executor to report unavailable via test accessor
+    helper.getExecutor()._stubAvailable = false;
+    
+    PsychicHttpServer server;
+    helper.registerScreenshotRoute(server);
+    
+    PsychicHttpRequestCallback handler = nullptr;
+    for (const auto& route : server.routes) {
+        if (route.uri == "/api/display/screenshot") {
+            handler = route.handler;
+            break;
+        }
+    }
+    ASSERT_NE(handler, nullptr);
+    
+    PsychicRequest req;
+    PsychicResponse res;
+    handler(&req, &res);
+    
+    // Executor not available → stored-PNG fallback
+    EXPECT_FALSE(display.capturePNG_called);
+    EXPECT_TRUE(display.captureStoredPNG_called);
 }
 
 TEST(DisplayServiceHelperTest, ScreenshotOTAGate) {
@@ -89,4 +114,9 @@ TEST(DisplayServiceHelperTest, ScreenshotOTAGate) {
     // Should short-circuit and not call capture
     EXPECT_FALSE(display.capturePNG_called);
     EXPECT_FALSE(display.captureStoredPNG_called);
+}
+
+int main(int argc, char** argv) {
+    ::testing::InitGoogleTest(&argc, argv);
+    return RUN_ALL_TESTS();
 }

@@ -1,8 +1,12 @@
 #include <gtest/gtest.h>
 #include "DeepStackExecutor.h"
 
-// Note: In native test mode, DeepStackExecutor provides a stubbed synchronous
-// implementation that runs on the calling thread.
+// NOTE: These tests validate the DeepStackExecutor API contract and
+// fallback-selection gate via the synchronous UNIT_TEST stub. The FreeRTOS
+// concurrency paths — mutex serialization, task notification handshake,
+// timeout/join semantics (B2 fix), stale semaphore drain (N2 fix), and
+// PSRAM stack allocation — cannot run natively and are hardware-verified
+// via on-target flash + serial log inspection (see PR #117).
 
 class DeepStackExecutorTest : public ::testing::Test {
 protected:

@@ -316,7 +316,7 @@ By offloading PNG compression to the `DeepStackExecutor` service, the HTTP serve
 
 1. **HTTP Task Stack Must Remain Internal DRAM**: Never place the `httpd` task stack in PSRAM (`task_caps` must remain `MALLOC_CAP_INTERNAL`), because direct-upload OTA (`Update.write`) and LittleFS config saves execute directly on the `httpd` task thread.
 2. **OTA Worker Task Uses Internal DRAM**: `OTAUpdateManager` creates its persistent background worker task with `MALLOC_CAP_INTERNAL` (`OTA_TASK_STACK_BYTES = 16384`).
-3. **Mutual-Exclusion Gate**: `DisplayServiceHelper` checks `OTAUpdateManager::getState() != Idle` and returns HTTP 503 if an OTA update is active, preventing `DeepStackExecutor` (PSRAM stack) from executing during flash writes.
+3. **Mutual-Exclusion Gate**: `DisplayServiceHelper` checks `OTAUpdateManager::getState() != Idle` and returns HTTP 503 if an OTA update is active. For direct-upload OTA this is a hard guarantee (same httpd task); for scheduled background OTA the gate prevents overlap with manifest/download phases, making concurrent PSRAM access extremely unlikely.
 
 ---
 

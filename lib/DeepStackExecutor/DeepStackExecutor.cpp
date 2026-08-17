@@ -13,6 +13,8 @@
 
 #ifndef UNIT_TEST
 
+#include <esp_log.h>
+
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <freertos/semphr.h>
@@ -41,7 +43,7 @@ DeepStackExecutor::~DeepStackExecutor() {
 
 bool DeepStackExecutor::begin() {
     if (_available) return true;
-    if (_taskHandle != nullptr) return true; // Already trying/failed?
+    if (_taskHandle != nullptr) return true; // Already initialized
 
     _mutex = xSemaphoreCreateMutex();
     if (_mutex == nullptr) return false;
@@ -89,10 +91,8 @@ bool DeepStackExecutor::run(const std::function<void()>& work, uint32_t timeoutM
         return false;
     }
 
-    if (_busy) {
-        xSemaphoreGive(static_cast<SemaphoreHandle_t>(_mutex));
-        return false; // Still busy with an orphaned job
-    }
+    // Drain any stale semaphore from a previous cycle (N2 fix)
+    xSemaphoreTake(static_cast<SemaphoreHandle_t>(_doneSem), 0);
 
     _currentWork = work;
     _busy = true;
@@ -100,18 +100,25 @@ bool DeepStackExecutor::run(const std::function<void()>& work, uint32_t timeoutM
     // Wake the worker
     xTaskNotifyGive(static_cast<TaskHandle_t>(_taskHandle));
 
-    // Wait for done
+    // Wait for completion
     TickType_t ticksToWait = pdMS_TO_TICKS(timeoutMs);
-    if (xSemaphoreTake(static_cast<SemaphoreHandle_t>(_doneSem), ticksToWait) == pdTRUE) {
-        _busy = false; // Successfully finished
-        _currentWork = nullptr;
-        xSemaphoreGive(static_cast<SemaphoreHandle_t>(_mutex));
-        return true;
-    } else {
-        // Timeout occurred. Do not set _busy to false, do not clear _currentWork.
-        xSemaphoreGive(static_cast<SemaphoreHandle_t>(_mutex));
-        return false;
+    bool completed = (xSemaphoreTake(static_cast<SemaphoreHandle_t>(_doneSem), ticksToWait) == pdTRUE);
+
+    if (!completed) {
+        // Timeout: join the worker to prevent use-after-free of caller's
+        // captured references. The worker always finishes (tdefl is bounded),
+        // so this wait is safe. Without joining, the caller's stack locals
+        // (e.g. BufferStream) would be destroyed while the worker still
+        // writes to them.
+        ESP_LOGW("DeepStack", "Timeout after %lu ms, joining worker...", (unsigned long)timeoutMs);
+        xSemaphoreTake(static_cast<SemaphoreHandle_t>(_doneSem), portMAX_DELAY);
     }
+
+    // Always clean up — worker has finished either way
+    _busy = false;
+    _currentWork = nullptr;
+    xSemaphoreGive(static_cast<SemaphoreHandle_t>(_mutex));
+    return completed;
 }
 
 size_t DeepStackExecutor::stackHighWaterMarkBytes() const {

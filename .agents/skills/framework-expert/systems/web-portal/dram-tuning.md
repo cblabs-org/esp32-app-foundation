@@ -105,7 +105,7 @@ The HTTP server task stack **MUST NEVER** be placed in PSRAM (`task_caps` must r
 
 ### Rule 3: Mutual Exclusion Gate During OTA
 
-`DisplayServiceHelper` checks `OTAUpdateManager::getState() != OTAState::Idle` prior to dispatching screenshot compression. If an OTA update is in progress, the screenshot route immediately returns **HTTP 503 Service Unavailable** ("OTA update in progress"). This guarantees that `DeepStackExecutor`'s PSRAM worker task is never active while flash writes are occurring.
+`DisplayServiceHelper` checks `OTAUpdateManager::getState() != OTAState::Idle` prior to dispatching screenshot compression. If an OTA update is in progress, the screenshot route (and MCP `capture_display` tool) immediately returns **HTTP 503 Service Unavailable** ("OTA update in progress"). For direct-upload OTA (httpd task), this is a hard guarantee since both the screenshot route and the upload handler share the single httpd task — they cannot execute concurrently. For scheduled background OTA (running on the `ota_worker` task), the gate prevents overlap with the manifest-fetch and download phases; the practical gap between OTA state transitioning to non-Idle and the actual flash write makes concurrent PSRAM access extremely unlikely but not formally impossible via lock.
 
 > [!IMPORTANT]
 > **Standing Architecture Principle for Future Offloading**
