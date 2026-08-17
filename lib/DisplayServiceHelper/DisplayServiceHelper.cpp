@@ -62,7 +62,7 @@ void DisplayServiceHelper::registerScreenshotRoute(PsychicHttpServer& server) {
                 ok = false;
             } else {
                 size_t hwmark = _executor.stackHighWaterMarkBytes();
-                ESP_LOGI("DisplayService", "PNG Worker stack high water mark: %zu bytes (expected peak ~10KB)", hwmark);
+                ESP_LOGI("DisplayService", "PNG Worker stack high water mark: %lu bytes (expected peak ~10KB)", (unsigned long)hwmark);
             }
         } else {
             ok = _display->captureStoredPNG(stream);
