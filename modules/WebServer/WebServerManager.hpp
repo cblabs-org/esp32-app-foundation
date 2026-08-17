@@ -67,7 +67,7 @@
 #define BOARD_HTTP_STACK_SIZE 8192          // safe for all non-screenshot routes (compression is offloaded, WO2)
 #endif
 #ifndef BOARD_HTTP_MAX_OPEN_SOCKETS
-#define BOARD_HTTP_MAX_OPEN_SOCKETS 7       // = HTTPD_DEFAULT_CONFIG default (ENABLE_ASYNC is off)
+#define BOARD_HTTP_MAX_OPEN_SOCKETS 4       // browser (2-3) + MCP (1); boards with more DRAM can override upward
 #endif
 
 #include "interfaces/IWebContributor.hpp"
@@ -112,7 +112,7 @@ public:
      * a fatal cache fault.
      *
      * @param stackSize      Task stack size in bytes (default: BOARD_HTTP_STACK_SIZE / 8192).
-     * @param maxOpenSockets Maximum concurrent open sockets (default: BOARD_HTTP_MAX_OPEN_SOCKETS / 7).
+     * @param maxOpenSockets Maximum concurrent open sockets (default: BOARD_HTTP_MAX_OPEN_SOCKETS / 4).
      */
     void setHttpConfig(size_t stackSize, int maxOpenSockets);
 

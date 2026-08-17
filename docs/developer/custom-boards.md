@@ -207,7 +207,7 @@ In [hardware/_common/board_contract.h](../../hardware/_common/board_contract.h),
 #endif
 
 #ifndef BOARD_HTTP_MAX_OPEN_SOCKETS
-#define BOARD_HTTP_MAX_OPEN_SOCKETS 7       // Default open sockets limit
+#define BOARD_HTTP_MAX_OPEN_SOCKETS 4       // browser (2-3) + MCP (1); override upward if needed
 #endif
 ```
 

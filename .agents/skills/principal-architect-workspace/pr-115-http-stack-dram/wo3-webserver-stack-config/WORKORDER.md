@@ -25,7 +25,7 @@ Remove the unconditional 16 KB httpd stack and make the HTTP task stack / socket
   #define BOARD_HTTP_STACK_SIZE 8192          // safe for all non-screenshot routes (compression is offloaded, WO2)
   #endif
   #ifndef BOARD_HTTP_MAX_OPEN_SOCKETS
-  #define BOARD_HTTP_MAX_OPEN_SOCKETS 7       // = HTTPD_DEFAULT_CONFIG default (ENABLE_ASYNC is off)
+  #define BOARD_HTTP_MAX_OPEN_SOCKETS 4       // browser (2-3) + MCP (1); override upward if needed
   #endif
   ```
 - **Flash-safety invariant (do not violate):** the httpd task stack MUST remain **internal DRAM**. Do **NOT** set `config.task_caps` to anything PSRAM, and do **NOT** move the httpd task stack to PSRAM. The httpd task runs `Update.write` (direct OTA upload) and LittleFS config-save, both of which write flash with the SPI cache disabled — a PSRAM stack there would fault. (This is the rejected "Option D".) Leave `task_caps` at its default.
@@ -61,7 +61,7 @@ Record out-of-scope findings in the Completion Report; do not fix or file.
 Complete — verified via native unit tests (667/667 green) and crowpanel-128-rotary compilation.
 
 ### Changes Made
-- `hardware/_common/board_contract.h`: Added `#ifndef BOARD_HTTP_STACK_SIZE` (8192 B) and `#ifndef BOARD_HTTP_MAX_OPEN_SOCKETS` (7) shared fallbacks.
+- `hardware/_common/board_contract.h`: Added `#ifndef BOARD_HTTP_STACK_SIZE` (8192 B) and `#ifndef BOARD_HTTP_MAX_OPEN_SOCKETS` (4) shared fallbacks.
 - `modules/WebServer/WebServerManager.hpp`: Included `board.h`, added `setHttpConfig(size_t stackSize, int maxOpenSockets)` setter and `getHttpStackSize()` / `getHttpMaxOpenSockets()` getters with house-style documentation detailing the internal DRAM flash-safety invariant (OTA and LittleFS flash writes require internal DRAM stack). Stored stack and socket count in private members `_httpStackSize` and `_httpMaxOpenSockets`.
 - `modules/WebServer/WebServerManager.cpp`: Removed hardcoded `stack_size = 16384` lines from constructor and `begin()`. Applied `_httpStackSize` and `_httpMaxOpenSockets` to HTTP and HTTPS server configurations in `begin()`.
 - `test/test_unit/test_webServer/test_webServer.cpp`: Added `DefaultHttpConfig` and `SetHttpConfigOverride` unit tests to verify default and overridden stack size / socket count values.
