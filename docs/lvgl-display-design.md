@@ -1128,7 +1128,7 @@ Key settings for this hardware target:
 
 // On PSRAM boards: 64 KB pool allocated from PSRAM via LV_MEM_POOL_ALLOC
 // On non-PSRAM boards: 32 KB static pool in internal DRAM
-#if defined(CONFIG_SPIRAM)
+#if defined(CONFIG_SPIRAM) || defined(BOARD_HAS_PSRAM)
 #define LV_MEM_SIZE             (64 * 1024)
 #define LV_MEM_POOL_ALLOC(size) heap_caps_malloc(size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT)
 #else

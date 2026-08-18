@@ -129,7 +129,7 @@ void DataManager::workerTaskLoop(void* param) {
     // that must feed the watchdog periodically to avoid triggering a reset.
     esp_task_wdt_add(NULL);
 
-    uint32_t lastWatermarkLog = 0;
+    TickType_t lastWatermarkLog = 0;
 
     while (true) {
         manager->executeLoop();
@@ -138,8 +138,9 @@ void DataManager::workerTaskLoop(void* param) {
 
         // Periodic stack watermark telemetry — log every 60s to avoid spam.
         // Data gathered here informs future stack reduction / PSRAM migration.
-        uint32_t now = xTaskGetTickCount() * portTICK_PERIOD_MS;
-        if (lastWatermarkLog == 0 || (now - lastWatermarkLog) >= 60000) {
+        // Uses raw tick counts with pdMS_TO_TICKS to avoid multiply overflow.
+        TickType_t now = xTaskGetTickCount();
+        if (lastWatermarkLog == 0 || (now - lastWatermarkLog) >= pdMS_TO_TICKS(60000)) {
             UBaseType_t hwm = uxTaskGetStackHighWaterMark(nullptr);
             ESP_LOGI(TAG, "Worker stack high water mark: %lu B free (of 12288)",
                      (unsigned long)(hwm * sizeof(StackType_t)));
