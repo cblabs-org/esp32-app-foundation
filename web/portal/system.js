@@ -29,15 +29,30 @@
   }
 
   // -------------------------------------------------------------------------
-  // Helper: RAG colour based on percentage
-  //   Green  ≥ 50%
-  //   Amber  ≥ 25% and < 50%
-  //   Red    < 25%
+  // Helper: RAG colour for percentage-based bars (PSRAM, Storage)
+  //   Green  ≥ 50%    Amber  ≥ 25%    Red  < 25%
   // -------------------------------------------------------------------------
-  function ragColor(pct) {
+  function ragColorPct(pct) {
     if (pct >= 50) return '#2e7d32';   // Green
     if (pct >= 25) return '#f9a825';   // Amber
     return '#c62828';                   // Red
+  }
+
+  // -------------------------------------------------------------------------
+  // Helper: RAG colour for internal DRAM bars (absolute KB thresholds)
+  //
+  // ESP32 devices normally run with 20–45% free internal DRAM after boot.
+  // Percentage-based thresholds would show perpetual amber/red on healthy
+  // devices. Instead, use absolute free-byte floors that reflect actual
+  // ESP32 stability boundaries:
+  //   Green  ≥ 80 KB free    (comfortable headroom for WiFi/TLS spikes)
+  //   Amber  ≥ 40 KB free    (tight but operational)
+  //   Red    < 40 KB free    (risk of WiFi/TLS allocation failures)
+  // -------------------------------------------------------------------------
+  function ragColorDram(freeBytes) {
+    if (freeBytes >= 81920) return '#2e7d32';   // Green: ≥ 80 KB
+    if (freeBytes >= 40960) return '#f9a825';   // Amber: ≥ 40 KB
+    return '#c62828';                            // Red:   < 40 KB
   }
 
   // -------------------------------------------------------------------------
@@ -131,10 +146,12 @@
 
   // -------------------------------------------------------------------------
   // Helper: Render a progress bar row
+  //   ragFn: optional RAG function — receives raw `value` for absolute-
+  //          threshold bars (e.g. DRAM). Falls back to percentage-based RAG.
   // -------------------------------------------------------------------------
-  function progressBarHTML(label, value, total, unit) {
+  function progressBarHTML(label, value, total, unit, ragFn) {
     const pct = total > 0 ? Math.round((value / total) * 100) : 0;
-    const color = ragColor(pct);
+    const color = ragFn ? ragFn(value) : ragColorPct(pct);
     const usedStr = unit === 'bytes' ? formatBytes(value) : value;
     const totalStr = unit === 'bytes' ? formatBytes(total) : total;
 
@@ -190,11 +207,11 @@
       const heapTotal = data.heap_total || 1;
       let memHTML = '';
 
-      // --- Section 1: Internal DRAM ---
+      // --- Section 1: Internal DRAM (absolute KB thresholds — see #121) ---
       memHTML += '<div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:0.4rem;">Internal DRAM</div>';
-      memHTML += progressBarHTML('Free Heap', data.heap_free || 0, heapTotal, 'bytes');
-      memHTML += progressBarHTML('Min Free (Watermark)', data.heap_min_free || 0, heapTotal, 'bytes');
-      memHTML += progressBarHTML('Largest Free Block', data.heap_max_alloc || 0, heapTotal, 'bytes');
+      memHTML += progressBarHTML('Free Heap', data.heap_free || 0, heapTotal, 'bytes', ragColorDram);
+      memHTML += progressBarHTML('Min Free (Watermark)', data.heap_min_free || 0, heapTotal, 'bytes', ragColorDram);
+      memHTML += progressBarHTML('Largest Free Block', data.heap_max_alloc || 0, heapTotal, 'bytes', ragColorDram);
 
       // --- Section 2: PSRAM (only shown when available) ---
       if ((data.psram_total || 0) > 0) {

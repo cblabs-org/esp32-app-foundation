@@ -30,10 +30,20 @@
    MEMORY SETTINGS
  *====================*/
 
-/* Size of the memory available for `lv_malloc()` in bytes (32 KB SRAM default) */
+#if defined(CONFIG_SPIRAM) || defined(BOARD_HAS_PSRAM)
+/* PSRAM-equipped boards: allocate LVGL's widget heap pool from PSRAM.
+ * This reclaims ~32 KB of internal DRAM (.bss) while giving LVGL more room.
+ * DMA flush buffers remain in internal DRAM (allocated separately in LVGLDisplayModule).
+ * LVGL's built-in TLSF allocator is retained — only the backing memory moves. */
+#define LV_MEM_SIZE (64 * 1024)
+#define LV_MEM_POOL_INCLUDE <esp_heap_caps.h>
+#define LV_MEM_POOL_ALLOC(size) heap_caps_malloc(size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT)
+#else
+/* Non-PSRAM boards: keep the default 32 KB internal SRAM pool */
 #define LV_MEM_SIZE (32 * 1024)
+#endif
 
-/* 0: Use LVGL's built-in memory pool allocator */
+/* Use LVGL's built-in TLSF memory pool allocator (not a custom malloc/free) */
 #define LV_MEM_CUSTOM 0
 
 /*====================
