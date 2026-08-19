@@ -43,6 +43,11 @@ Example: `WiFiClientSecure` in an OTA download task is created on-demand via `st
 
 **Rule:** Document the heap impact of any locally instantiated heavy object. Use `heap_caps_get_free_size()` before and after to verify the allocation and deallocation are balanced.
 
+> **See also:** [PSRAM — LV_CONF_PATH Override Warning & PSRAM-Preference Audit](psram.md)
+> — if your project overrides `LV_CONF_PATH`, framework LVGL memory changes do not
+> apply to you. The PSRAM-Preference Audit checklist provides a systematic review
+> for any module's memory allocation strategy.
+
 ## See Also
 - [TLS Tradeoffs](../security/tls-tradeoffs.md)
 - [PSRAM Utilisation](psram.md)

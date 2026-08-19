@@ -67,8 +67,26 @@
  *
  * 5. Execution Budget & Payload Lifetime:
  *    - Callback routines MUST comply with the cooperative tick budget (<= 10 ms per callback).
- *    - Event payload pointers are valid ONLY for the duration of the callback execution.
+ *    - SUBSCRIBER-SIDE: Event payload pointers are valid ONLY for the duration of the callback execution.
  *      If the subscriber needs data beyond the callback, it must copy the payload.
+ *    - PUBLISHER-SIDE: On target, dispatch is asynchronous (§1). The payload
+ *      must remain valid from publish() until all subscribers have executed —
+ *      which is AFTER publish() returns. Do NOT pass the address of a stack
+ *      local. Use one of these patterns:
+ *        (a) A persistent member variable (e.g. Application::_systemHeapPayload)
+ *        (b) A ring buffer sized to the maximum publish cadence (e.g.
+ *            ButtonModule::_eventRing, EncoderModule::_eventRing)
+ *      On native (UNIT_TEST), dispatch is synchronous, so stack-locals appear
+ *      to work — but the bug manifests only on target, intermittently.
+ *
+ * Example — ring buffer pattern (recommended for tick-driven publishers):
+ *
+ *   MyEvent& evt = _eventRing[_ringHead];
+ *   evt.field = value;
+ *   _ringHead = (_ringHead + 1) % RING_SIZE;
+ *   _bus->publish("my.topic", &evt);
+ *
+ * The ring slot remains valid until overwritten on the next wrap.
  */
 
 /**
