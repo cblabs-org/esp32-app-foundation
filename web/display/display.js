@@ -70,6 +70,22 @@
           '</label>' +
         '</div>' +
 
+        // --- Screensaver mode radio buttons ---
+        '<div style="margin-bottom:0.75rem;">' +
+          '<span style="font-weight:600; font-size:0.9rem;">Screensaver Mode</span>' +
+          '<p style="font-size:0.75rem; color:var(--text-muted); margin:0.15rem 0 0.5rem 0;">Controls what happens when the display goes to sleep</p>' +
+          '<div style="display:flex; flex-direction:column; gap:0.35rem;">' +
+            '<label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer; font-size:0.85rem;">' +
+              '<input type="radio" name="screensaverPolicy" value="DimOnly" style="accent-color:var(--primary);">' +
+              ' Dim Only' +
+            '</label>' +
+            '<label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer; font-size:0.85rem;">' +
+              '<input type="radio" name="screensaverPolicy" value="FullSleep" checked style="accent-color:var(--primary);">' +
+              ' Full Sleep (dim then blank)' +
+            '</label>' +
+          '</div>' +
+        '</div>' +
+
         // --- Dim delay dropdown ---
         '<label for="display-dim-delay" style="font-size:0.85rem;">' +
           'Dim Delay' +
@@ -140,6 +156,14 @@
     screensaverToggle.addEventListener('change', function() {
       postSetting('/api/display/sleep', { enabled: screensaverToggle.checked });
     });
+
+    // --- Screensaver policy radios ---
+    var policyRadios = document.querySelectorAll('input[name="screensaverPolicy"]');
+    for (var i = 0; i < policyRadios.length; i++) {
+      policyRadios[i].addEventListener('change', function() {
+        postSetting('/api/display/sleep', { screensaverPolicy: this.value });
+      });
+    }
 
     // --- Dim delay ---
     dimDelaySelect.addEventListener('change', function() {
@@ -247,6 +271,12 @@
       // --- Blank timeout ---
       if (data.blankTimeout !== undefined) {
         setSelectValue(blankDelaySelect, data.blankTimeout);
+      }
+
+      // --- Screensaver policy ---
+      if (data.screensaverPolicy !== undefined) {
+        var policyRadio = document.querySelector('input[name="screensaverPolicy"][value="' + data.screensaverPolicy + '"]');
+        if (policyRadio) policyRadio.checked = true;
       }
 
     } catch (err) {

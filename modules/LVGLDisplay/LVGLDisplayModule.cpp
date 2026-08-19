@@ -152,6 +152,11 @@ void LVGLDisplayModule::bootstrapHardware() {
         _uiInitialized = true;
     }
 
+    // --- Apply runtime app title to boot screen (overrides SLS literal) ---
+    if (_screens != nullptr && _appTitle != nullptr) {
+        _screens->setAppTitle(_appTitle);
+    }
+
     // --- Stage-1 boot screen (SLS bootScreen, or FaultScreen if no skin) ---
     showBoot();
 
@@ -565,6 +570,13 @@ void LVGLDisplayModule::setBootLogo(const lv_image_dsc_t* bootLogo) {
     _bootLogo = bootLogo ? bootLogo : &cb_labs_boot_logo;
 }
 
+void LVGLDisplayModule::setAppTitle(const char* title) {
+    _appTitle = title;
+    if (_screens != nullptr && title != nullptr) {
+        _screens->setAppTitle(title);
+    }
+}
+
 void LVGLDisplayModule::resetActivity() {
     _screensaver.resetActivity();
 }
@@ -616,6 +628,13 @@ void LVGLDisplayModule::applyConfig(const JsonObject& section) {
     _screensaver.setDimTimeout(_dimTimeoutMs);
     _screensaver.setBlankTimeout(_blankTimeoutMs);
 
+    // Screensaver policy: DimOnly vs FullSleep (default: FullSleep)
+    String policyStr = section["screensaverPolicy"] | "FullSleep";
+    ScreensaverPolicy policy = (policyStr == "DimOnly")
+        ? ScreensaverPolicy::DimOnly
+        : ScreensaverPolicy::FullSleep;
+    _screensaver.setPolicy(policy);
+
     _adapter.setBrightness(_brightness);
 
     if (_display != nullptr) {
@@ -634,6 +653,8 @@ void LVGLDisplayModule::serializeConfig(JsonObject& section) const {
     section["screensaverEnabled"] = _screensaverEnabled;
     section["dimTimeout"]         = _dimTimeoutMs;
     section["blankTimeout"]       = _blankTimeoutMs;
+    section["screensaverPolicy"]  = (_screensaver.getPolicy() == ScreensaverPolicy::DimOnly)
+        ? "DimOnly" : "FullSleep";
 }
 
 void LVGLDisplayModule::resetConfig() {
@@ -646,6 +667,7 @@ void LVGLDisplayModule::resetConfig() {
     _screensaver.setEnabled(true);
     _screensaver.setDimTimeout(150000);
     _screensaver.setBlankTimeout(300000);
+    _screensaver.setPolicy(ScreensaverPolicy::FullSleep);
 
     _adapter.setBrightness(_brightness);
 
@@ -942,6 +964,8 @@ void LVGLDisplayModule::registerRoutes(PsychicHttpServer& server) {
         doc["screensaverEnabled"] = _screensaverEnabled;
         doc["dimTimeout"]         = _dimTimeoutMs;
         doc["blankTimeout"]       = _blankTimeoutMs;
+        doc["screensaverPolicy"]  = (_screensaver.getPolicy() == ScreensaverPolicy::DimOnly)
+            ? "DimOnly" : "FullSleep";
 
         String output;
         serializeJson(doc, output);
@@ -1045,6 +1069,16 @@ void LVGLDisplayModule::registerRoutes(PsychicHttpServer& server) {
             needsPersist = true;
         }
 
+        if (doc["screensaverPolicy"].is<const char*>()) {
+            const char* policy = doc["screensaverPolicy"].as<const char*>();
+            if (strcmp(policy, "DimOnly") == 0) {
+                _screensaver.setPolicy(ScreensaverPolicy::DimOnly);
+            } else if (strcmp(policy, "FullSleep") == 0) {
+                _screensaver.setPolicy(ScreensaverPolicy::FullSleep);
+            }
+            needsPersist = true;
+        }
+
         if (doc["timeout"].is<unsigned long>()) {
             unsigned long st = doc["timeout"].as<unsigned long>();
             setDimTimeout(st / 2);
@@ -1090,6 +1124,8 @@ void LVGLDisplayModule::registerMCPTools(MCPToolRegistry& registry) {
 
             result["rotation"]           = self->_rotation;
             result["screensaverEnabled"] = self->_screensaverEnabled;
+            result["screensaverPolicy"]  = (self->_screensaver.getPolicy() == ScreensaverPolicy::DimOnly)
+                ? "DimOnly" : "FullSleep";
 
             // --- Screensaver sub-object ---
             JsonObject ss = result["screensaver"].to<JsonObject>();
@@ -1103,6 +1139,8 @@ void LVGLDisplayModule::registerMCPTools(MCPToolRegistry& registry) {
             }
             ss["dimTimeout"]   = self->_dimTimeoutMs;
             ss["blankTimeout"] = self->_blankTimeoutMs;
+            ss["policy"] = (self->_screensaver.getPolicy() == ScreensaverPolicy::DimOnly)
+                ? "DimOnly" : "FullSleep";
 
             // --- Resolution sub-object ---
             JsonObject res = result["resolution"].to<JsonObject>();
@@ -1155,6 +1193,12 @@ void LVGLDisplayModule::registerMCPTools(MCPToolRegistry& registry) {
     props["blankTimeout"]["type"]        = "integer";
     props["blankTimeout"]["description"] = "Milliseconds of inactivity before blanking";
 
+    props["screensaverPolicy"]["type"]        = "string";
+    props["screensaverPolicy"]["description"] = "Screensaver mode: 'DimOnly' (dim only) or 'FullSleep' (dim then blank)";
+    JsonArray policyEnum = props["screensaverPolicy"]["enum"].to<JsonArray>();
+    policyEnum.add("DimOnly");
+    policyEnum.add("FullSleep");
+
     registry.addTool(
         "display_control",
         "Control display settings: wake/sleep, enable/disable screensaver, set brightness, rotation, and timeouts",
@@ -1198,6 +1242,16 @@ void LVGLDisplayModule::registerMCPTools(MCPToolRegistry& registry) {
 
             if (params["blankTimeout"].is<int>()) {
                 self->setBlankTimeout(static_cast<unsigned long>(params["blankTimeout"].as<int>()));
+                needsPersist = true;
+            }
+
+            if (params["screensaverPolicy"].is<const char*>()) {
+                const char* policy = params["screensaverPolicy"].as<const char*>();
+                if (strcmp(policy, "DimOnly") == 0) {
+                    self->_screensaver.setPolicy(ScreensaverPolicy::DimOnly);
+                } else if (strcmp(policy, "FullSleep") == 0) {
+                    self->_screensaver.setPolicy(ScreensaverPolicy::FullSleep);
+                }
                 needsPersist = true;
             }
 
