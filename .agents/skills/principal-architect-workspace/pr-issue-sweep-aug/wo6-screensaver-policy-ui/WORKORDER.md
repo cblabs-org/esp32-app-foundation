@@ -115,19 +115,42 @@ If you discover a defect, upstream bug, or concern *outside your boundary box*, 
 <!-- Written by the worker at task completion -->
 
 ### Status
-_(pending)_
+✅ **Complete** — committed as `ab016c4d` on `issue-sweep-aug/wo6-screensaver-policy-ui`.
 
 ### Changes Made
-_(pending)_
+
+**`modules/LVGLDisplay/LVGLDisplayModule.cpp`** (7 change sites):
+1. `applyConfig()` — reads `screensaverPolicy` from config JSON, defaults to `"FullSleep"`, calls `_screensaver.setPolicy()`.
+2. `serializeConfig()` — writes the current policy via `_screensaver.getPolicy()`.
+3. `resetConfig()` — resets policy to `FullSleep` on config reset.
+4. `GET /api/display/status` — adds `screensaverPolicy` to REST API response.
+5. `POST /api/display/sleep` — accepts `screensaverPolicy` parameter and persists.
+6. MCP `display_status` — adds `screensaverPolicy` at top level and `policy` in the `screensaver` sub-object.
+7. MCP `display_control` — adds `screensaverPolicy` parameter to schema (string enum) and handler.
+
+**`web/display/display.js`** (3 change sites):
+1. Added "Screensaver Mode" radio button group (Dim Only / Full Sleep) in the Screensaver article.
+2. Radio button `change` listeners POST `{screensaverPolicy: value}` to `/api/display/sleep`.
+3. `loadSettings()` reads `screensaverPolicy` from status API and checks the matching radio.
+
+**`test/web/server.js`**:
+- Added `screensaverPolicy: 'FullSleep'` to `MOCK_DISPLAY_STATUS`.
 
 ### Decisions Made
-_(pending)_
+- **`getPolicy()` already existed** on `ScreensaverController` (inline getter, line 100) — no header modification needed.
+- **Added `resetConfig()` policy reset** — not in WO instructions but necessary for config round-trip consistency (resetConfig must mirror applyConfig/serializeConfig).
+- **REST API coverage** — added policy to both `GET /api/display/status` and `POST /api/display/sleep` in addition to MCP tools, since the portal JS reads/writes via REST not MCP.
 
 ### Dead Ends & Warnings
-_(pending)_
+None — clean implementation with no rework.
 
 ### Out-of-Scope Findings
-_(pending)_
+- **U8G2Display has the same gap**: `modules/U8G2Display/ScreensaverController.hpp` is missing `getPolicy()` entirely, and `U8G2DisplayModule` does not persist or expose `screensaverPolicy` in config, REST API, or MCP tools. Per WO boundary box, not touched.
 
 ### Blockers
-_(pending)_
+None.
+
+### Verification
+- ✅ `pio run -e crowpanel-128-rotary` — compiled cleanly (43.2% flash, 14.6% RAM).
+- ✅ `pio test -e native` — all 748 test cases passed across 30 suites.
+

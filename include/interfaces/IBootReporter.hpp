@@ -40,4 +40,15 @@ public:
      * @return true if hardware init succeeded; false to skip display.
      */
     virtual bool beginEarly() = 0;
+
+    /**
+     * @brief Set the application title for the boot screen.
+     *
+     * Called by Application::begin() after beginEarly() so the display can
+     * override any hardcoded boot-screen title with the runtime app name.
+     * Default no-op — only display modules that support boot titles override this.
+     *
+     * @param title Application title string (static lifetime).
+     */
+    virtual void setAppTitle(const char* title) { (void)title; }
 };

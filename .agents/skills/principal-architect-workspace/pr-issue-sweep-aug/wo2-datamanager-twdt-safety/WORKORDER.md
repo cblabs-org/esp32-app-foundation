@@ -132,19 +132,22 @@ If you discover a defect, upstream bug, or concern *outside your boundary box*, 
 <!-- Written by the worker at task completion -->
 
 ### Status
-_(pending)_
+✅ **Complete** — committed as `95ac59c8` on `issue-sweep-aug/wo2-datamanager-twdt-safety`.
 
 ### Changes Made
-_(pending)_
+1. **`modules/DataManager/DataManager.hpp`** — Added `volatile uint32_t _fetchStartMs = 0` private member, `uint32_t getFetchElapsedMs() const` public method for external observability, and `#include <Arduino.h>` for `millis()` in the inline method.
+2. **`modules/DataManager/DataManager.cpp`** (executeLoop) — Instrumented fetch with `_fetchStartMs` timing, added `esp_task_wdt_reset()` immediately after `fetchUpdate()` returns, and added `ESP_LOGW` warning when a fetch exceeds 15 seconds (naming the source and duration). All new log calls use `ESP_LOGW`/`ESP_LOGI` with existing `TAG`.
+3. **`include/interfaces/IDataSource.hpp`** — Expanded `fetchUpdate()` doc comment with queue-blocking guidance, `HTTPClient::setTimeout()` recommendation, and the 15s warning threshold.
 
 ### Decisions Made
-_(pending)_
+- **Chose the simpler approach** (volatile `_fetchStartMs` + post-fetch WDT reset) over the `esp_timer` feeder. Rationale: no `esp_timer` stub needed for native tests, less code surface, and the WO explicitly sanctions the watchdog firing on genuinely infinite hangs as the correct outcome. The key invariant — task stays subscribed to TWDT at all times — is preserved.
 
 ### Dead Ends & Warnings
-_(pending)_
+None.
 
 ### Out-of-Scope Findings
-_(pending)_
+None.
 
 ### Blockers
-_(pending)_
+None.
+

@@ -33,6 +33,12 @@ void SLSSystemScreens::onBootProgress(const char* message, float progress) {
     }
 }
 
+void SLSSystemScreens::setAppTitle(const char* title) {
+    if (ui_uiBootTitle != nullptr && title != nullptr) {
+        lv_label_set_text(ui_uiBootTitle, title);
+    }
+}
+
 lv_obj_t* SLSSystemScreens::errorScreen() {
     return showGroup(ui_uiSystemErrorGroup);
 }

@@ -40,6 +40,13 @@ DataManager::DataManager() : _registryMutex(nullptr), _workerTask(nullptr) {
 }
 
 DataManager::~DataManager() {
+    if (_jobQueue) {
+        DataJobEntry* entry = nullptr;
+        while (xQueueReceive(_jobQueue, &entry, 0) == pdTRUE) {
+            delete entry;
+        }
+        vQueueDelete(_jobQueue);
+    }
     if (_workerTask) {
         vTaskDelete(_workerTask);
     }
@@ -49,6 +56,11 @@ DataManager::~DataManager() {
 }
 
 void DataManager::begin() {
+    _jobQueue = xQueueCreate(JOB_QUEUE_DEPTH, sizeof(DataJobEntry*));
+    if (!_jobQueue) {
+        ESP_LOGE(TAG, "Failed to create job queue");
+    }
+
     // Create worker task with 12KB DRAM stack — safe for TLS-heavy data sources.
     // DRAM (not PSRAM) is required because SPI flash operations (used by some
     // data sources) assert when the task stack is in PSRAM.
@@ -64,6 +76,75 @@ void DataManager::begin() {
     if (result != pdPASS) {
         ESP_LOGE(TAG, "Failed to create DataManager worker task");
         _workerTask = nullptr;
+    }
+}
+
+bool DataManager::queueDataJob(std::function<void()> job, const char* tag) {
+    return queueDataJob(std::move(job), DataJobOptions{ .tag = tag });
+}
+
+bool DataManager::queueDataJob(std::function<void()> job, const DataJobOptions& options) {
+    if (!_jobQueue || !job) return false;
+
+    DataJobEntry* entry = new (std::nothrow) DataJobEntry{
+        std::move(job),
+        options
+    };
+    if (!entry) {
+        ESP_LOGE(TAG, "Failed to allocate job entry for '%s'", options.tag);
+        return false;
+    }
+
+    if (xQueueSend(_jobQueue, &entry, 0) != pdTRUE) {
+        ESP_LOGW(TAG, "Job queue full — dropping '%s' (%d pending)",
+                 options.tag, (int)getQueuedJobCount());
+        delete entry;
+        return false;
+    }
+
+    ESP_LOGD(TAG, "Queued data job: '%s' (urgent=%s)", options.tag,
+             options.urgent ? "yes" : "no");
+
+    if (_workerTask) {
+        xTaskNotifyGive(_workerTask);
+    }
+
+    return true;
+}
+
+size_t DataManager::getQueuedJobCount() const {
+    if (!_jobQueue) return 0;
+    return (size_t)uxQueueMessagesWaiting(_jobQueue);
+}
+
+void DataManager::drainJobs(bool urgentOnly) {
+    if (!_jobQueue) return;
+
+    DataJobEntry* entry = nullptr;
+    while (xQueueReceive(_jobQueue, &entry, 0) == pdTRUE) {
+        if (urgentOnly && !entry->options.urgent) {
+            // Not urgent — put it back and stop draining
+            xQueueSendToFront(_jobQueue, &entry, 0);
+            break;
+        }
+
+        ESP_LOGD(TAG, "Executing data job: '%s'", entry->options.tag);
+
+        unsigned long jobStart = millis();
+        _fetchStartMs = jobStart;
+
+        entry->job();
+
+        _fetchStartMs = 0;
+        esp_task_wdt_reset();
+
+        unsigned long elapsed = millis() - jobStart;
+        if (entry->options.warnAfterMs > 0 && elapsed > entry->options.warnAfterMs) {
+            ESP_LOGW(TAG, "Data job '%s' took %lu ms (warn threshold: %lu ms)",
+                     entry->options.tag, elapsed, (unsigned long)entry->options.warnAfterMs);
+        }
+
+        delete entry;
     }
 }
 
@@ -102,6 +183,11 @@ void DataManager::requestPriorityFetch(IDataSource* source) {
     for (auto& r : _registry) {
         if (r.source == source) {
             r.priorityRequested = true;
+            
+            // Wake the worker task to process the priority fetch immediately
+            if (_workerTask) {
+                xTaskNotifyGive(_workerTask);
+            }
             break;
         }
     }
@@ -115,7 +201,9 @@ uint32_t DataManager::getCurrentTimeMs() const {
 }
 
 void DataManager::processNext() {
+    drainJobs(true);
     executeLoop();
+    drainJobs(false);
 }
 
 void DataManager::setAppRunning(bool running) {
@@ -132,7 +220,10 @@ void DataManager::workerTaskLoop(void* param) {
     TickType_t lastWatermarkLog = 0;
 
     while (true) {
+        manager->drainJobs(true);
         manager->executeLoop();
+        manager->drainJobs(false);
+        
         // Feed the watchdog after each fetch cycle
         esp_task_wdt_reset();
 
@@ -147,7 +238,7 @@ void DataManager::workerTaskLoop(void* param) {
             lastWatermarkLog = now;
         }
 
-        vTaskDelay(pdMS_TO_TICKS(100)); // sleep between loop checks to avoid starving other tasks
+        ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(100)); // sleep between loop checks to avoid starving other tasks
     }
 
     // Note: This loop never exits under normal operation. If it ever did,
@@ -235,3 +326,4 @@ void DataManager::executeLoop() {
         }
     }
 }
+

@@ -10,7 +10,7 @@
 ## Active Projects
 | Project | Status | Modules | Context |
 |---|---|---|---|
-| pr-issue-sweep-aug | Decomposition drafted (7 WOs) — awaiting human approval | OTAUpdateManager, LVGLDisplay, DataManager, WebServer, Application, EventBus, web/portal, framework-expert skill, squareline, sample-app | [PROJECT.md](../pr-issue-sweep-aug/PROJECT.md) |
+| pr-issue-sweep-aug | Decomposition drafted (8 WOs) — executing | OTAUpdateManager, LVGLDisplay, DataManager, WebServer, Application, EventBus, web/portal, framework-expert skill, squareline, sample-app | [PROJECT.md](../pr-issue-sweep-aug/PROJECT.md) |
 | pr-115-http-stack-dram | Decomposition drafted (4 WOs) — awaiting human approval to execute (#115) | DeepStackExecutor (new lib), DisplayServiceHelper, LVGLDisplay, PngWriter, WebServer, OTAUpdateManager (read-only), framework-expert skill, docs | [PROJECT.md](../pr-115-http-stack-dram/PROJECT.md) |
 | pr-portal-consumer-assets | WO2/2 — both complete, draft PR stood up (#111) | portalBuilder.py, include/web/serveGzipAsset.hpp, WebServer, MCPServer, OTAUpdateManager, TimeManager, HomeAssistant, U8G2Display, LVGLDisplay, sample-app, docs, framework-expert skill | [PROJECT.md](../pr-portal-consumer-assets/PROJECT.md) |
 | pr-p2-issue-remediation | WO4/4 — all complete + screensaver fix, awaiting PR | OTAUpdateManager, web/portal, U8G2Display, Application, platformio.ini, test/, LVGLDisplay/ScreensaverController | [PROJECT.md](../pr-p2-issue-remediation/PROJECT.md) |

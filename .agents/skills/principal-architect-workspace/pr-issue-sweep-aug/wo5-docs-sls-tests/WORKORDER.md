@@ -202,19 +202,35 @@ If you discover a defect, upstream bug, or concern *outside your boundary box*, 
 <!-- Written by the worker at task completion -->
 
 ### Status
-_(pending)_
+✅ **Complete** — All 5 deliverables implemented, verified, and committed on `issue-sweep-aug/wo5-docs-sls-tests` at `693ee247`.
 
 ### Changes Made
-_(pending)_
+
+| File | Issue | Change |
+|------|-------|--------|
+| `.agents/skills/framework-expert/performance/psram.md` | #127 + PR #116 | Added `LV_CONF_PATH` Consumer Warning (with diagnostic recipe and submodule bump guidance) and PSRAM-Preference Audit Checklist (Mandatory PSRAM Candidates, Must Stay in Internal DRAM, Red Flags) |
+| `.agents/skills/framework-expert/performance/heap-management.md` | #127 | Added cross-reference callout to new psram.md sections above the existing See Also |
+| `modules/EventBus/EventBus.hpp` | #130 | Added PUBLISHER-SIDE payload lifetime rule to §5 contract alongside existing (now labelled) SUBSCRIBER-SIDE rule; added ring-buffer worked example after contract block |
+| `squareline/crowpanel-128/SquareLine_Project.spj` | #97 | Renamed `ui_DiagScreen` → `uiDiagScreen` (line 6404, the only occurrence); JSON validity verified |
+| `sample-app/platformio.ini` | #113 | Added `test_filter = test_unit/* -test_unit/test_weather` with explanatory comments; `pio test -e native` passes cleanly |
 
 ### Decisions Made
-_(pending)_
+
+1. **#113 — Option B selected** over Options A and C. The root cause of the native test failure is a compilation error, not a link error: `WeatherModule.hpp` → `AppFoundation.h` → `Application.hpp` → `WebServerManager.hpp` → `board.h` → `native/board.h` → `NativeU8G2DisplayType.h` → `U8g2lib.h`. Since `U8g2` is not in the sample-app's native `lib_deps`, and both the header and the `.cpp` trigger the same include chain, Options A (header-only include) and C (stubs) were unviable within the boundary box (cannot modify WeatherModule.cpp/hpp or framework infrastructure).
+
+2. **EventBus §5 labelling** — Prefixed the existing subscriber-side rule with "SUBSCRIBER-SIDE:" for symmetry with the new "PUBLISHER-SIDE:" rule. This is a documentation-only change and doesn't alter any semantics.
 
 ### Dead Ends & Warnings
-_(pending)_
+
+1. **Option A (#113)** — Investigated switching from `#include "WeatherModule.cpp"` to `#include "WeatherModule.hpp"` with method stubs, but the compilation failure occurs at the *header* level (U8g2 not available), not at link time. Even just including the header fails identically. Would require either adding U8g2 to sample-app lib_deps or guarding `NativeU8G2DisplayType.h` behind `#ifdef WITH_DISPLAY_U8G2` in `hardware/native/board.h` — both outside boundary box.
 
 ### Out-of-Scope Findings
-_(pending)_
+
+1. **No KEEPING-CURRENT or submodule upgrade guide exists** — The WO checklist asked to add a caveat to such a guide if it exists. No document matching this purpose was found in `.agents/skills/framework-expert/` or `docs/`. The "After Bumping the Submodule" guidance was placed directly in `psram.md` instead. **Recommend creating a dedicated submodule upgrade guide** as a separate issue.
+
+2. **`hardware/native/board.h` unconditionally includes `NativeU8G2DisplayType.h`** (line 85), which requires `U8g2lib.h`. This makes ANY consumer app's native test environment fail unless it adds U8g2 to `lib_deps` — even when `WITH_DISPLAY_U8G2` is not set. The include should be guarded behind `#ifdef WITH_DISPLAY_U8G2`. **Recommend filing a separate issue** to fix this framework infrastructure bug, which would unblock re-enabling the weather test natively.
+
+3. **SLS C file desync** — `modules/LVGLDisplay/ui/` generated C files still reference `ui_DiagScreen`. This is expected and documented in the WO — they will sync on the next SquareLine Studio re-export.
 
 ### Blockers
-_(pending)_
+None.

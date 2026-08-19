@@ -12,13 +12,14 @@
 
 | WO | Branch | Status | Closes | Summary |
 |----|--------|--------|--------|---------|
-| **[ ] [wo1-ota-compilation-fixes](wo1-ota-compilation-fixes/WORKORDER.md)** | `issue-sweep-aug/wo1-ota-compilation-fixes` | 🔲 Pending | #120 | Fix 2 compilation defects blocking `WITH_OTA` on consumer apps |
-| **[ ] [wo2-datamanager-twdt-safety](wo2-datamanager-twdt-safety/WORKORDER.md)** | `issue-sweep-aug/wo2-datamanager-twdt-safety` | 🔲 Pending | #128 | Harden DataManager fetch loop against TWDT boot-loop |
-| **[ ] [wo3-portal-dram-tuning](wo3-portal-dram-tuning/WORKORDER.md)** | `issue-sweep-aug/wo3-portal-dram-tuning` | 🔲 Pending | #114, #119 | Reduce httpd stack/sockets for constrained boards + HWM logging |
-| **[ ] [wo4-branding-fouc](wo4-branding-fouc/WORKORDER.md)** | `issue-sweep-aug/wo4-branding-fouc` | 🔲 Pending | #129, #80 | LVGL boot title + portal branding FOUC elimination |
-| **[ ] [wo5-docs-sls-tests](wo5-docs-sls-tests/WORKORDER.md)** | `issue-sweep-aug/wo5-docs-sls-tests` | 🔲 Pending | #127, #130, #97, #113 | Skill/doc updates, PSRAM audit, EventBus payload lifetime doc, SLS naming fix, sample-app test fix |
-| **[ ] [wo6-screensaver-policy-ui](wo6-screensaver-policy-ui/WORKORDER.md)** | `issue-sweep-aug/wo6-screensaver-policy-ui` | 🔲 Pending | #110 | Screensaver policy toggle in portal Display settings |
-| **[ ] [wo7-lvgl-eventbus-race](wo7-lvgl-eventbus-race/WORKORDER.md)** | `issue-sweep-aug/wo7-lvgl-eventbus-race` | 🔲 Pending | #131 | Fix LVGL race in EventBus subscriber + document threading rule |
+| **[x] [wo1-ota-compilation-fixes](wo1-ota-compilation-fixes/WORKORDER.md)** | `issue-sweep-aug/wo1-ota-compilation-fixes` | ✅ Complete | #120 | Fix 2 compilation defects blocking `WITH_OTA` on consumer apps |
+| **[x] [wo2-datamanager-twdt-safety](wo2-datamanager-twdt-safety/WORKORDER.md)** | `issue-sweep-aug/wo2-datamanager-twdt-safety` | ✅ Complete | #128 | Harden DataManager fetch loop against TWDT boot-loop |
+| **[x] [wo3-portal-dram-tuning](wo3-portal-dram-tuning/WORKORDER.md)** | `issue-sweep-aug/wo3-portal-dram-tuning` | ✅ Complete | #114, #119 | Reduce httpd stack/sockets for constrained boards + HWM logging |
+| **[x] [wo4-branding-fouc](wo4-branding-fouc/WORKORDER.md)** | `issue-sweep-aug/wo4-branding-fouc` | ✅ Complete | #129, #80 | LVGL boot title + portal branding FOUC elimination |
+| **[x] [wo5-docs-sls-tests](wo5-docs-sls-tests/WORKORDER.md)** | `issue-sweep-aug/wo5-docs-sls-tests` | ✅ Complete | #127, #130, #97, #113 | Skill/doc updates, PSRAM audit, EventBus payload lifetime doc, SLS naming fix, sample-app test fix |
+| **[x] [wo6-screensaver-policy-ui](wo6-screensaver-policy-ui/WORKORDER.md)** | `issue-sweep-aug/wo6-screensaver-policy-ui` | ✅ Complete | #110 | Screensaver policy toggle in portal Display settings |
+| **[x] [wo7-lvgl-eventbus-race](wo7-lvgl-eventbus-race/WORKORDER.md)** | `issue-sweep-aug/wo7-lvgl-eventbus-race` | ✅ Complete | #131 | Fix LVGL race in EventBus subscriber + document threading rule |
+| **[/] [wo8-queue-data-job](wo8-queue-data-job/WORKORDER.md)** | `issue-sweep-aug/wo8-queue-data-job` | 🔄 In Progress | #132 | Extend DataManager with queueDataJob() for off-loop data operations |
 
 ## Modules & Components
 
@@ -26,7 +27,7 @@
 |---|---|---|
 | `modules/OTAUpdateManager/` | WO1 | Lambda capture + static method fixes |
 | `modules/LVGLDisplay/` | WO1, WO4, WO6, WO7 | Static call fix, boot title, screensaver policy, EventBus race |
-| `modules/DataManager/` | WO2 | TWDT unsubscribe around fetch, IDataSource contract |
+| `modules/DataManager/` | WO2, WO8 | TWDT unsubscribe around fetch, IDataSource contract, queueDataJob primitive |
 | `modules/WebServer/` | WO3, WO4 | Stack size, sockets, `/api/app` stylesheet |
 | `modules/Application/` | WO4 | `setAppStylesheet()` API |
 | `modules/EventBus/` | WO5, WO7 | Publisher-side payload lifetime doc (WO5), threading rule doc (WO7) |

@@ -148,19 +148,32 @@ If you discover a defect, upstream bug, or concern *outside your boundary box*, 
 <!-- Written by the worker at task completion -->
 
 ### Status
-_(pending)_
+✅ **Complete** — committed `75c4e659` on `issue-sweep-aug/wo4-branding-fouc`.
 
 ### Changes Made
-_(pending)_
+
+**Only `web/portal/app.js` required modification** — all C++ checklist items (#129 LVGL boot title, #80 Application/WebServerManager stylesheet API) were already implemented by a prior session.
+
+| File | Change |
+|------|--------|
+| `web/portal/app.js` | Extended `loadAppInfo()` to inject `<link rel="stylesheet">` when `/api/app` returns a `stylesheet` field. Restructured boot sequence: `loadAppInfo()` now runs **before** `/api/tabs` fetch, ensuring app branding (title + CSS) is applied before framework defaults flash. |
+
+**Pre-existing implementations verified in place (no changes needed):**
+- `ILVGLSystemScreens.hpp` — `setAppTitle()` virtual method with default no-op
+- `SLSSystemScreens.hpp/.cpp` — override + `lv_label_set_text(ui_uiBootTitle, title)` implementation
+- `LVGLDisplayModule.cpp` — `setAppTitle()` public API + call in `bootstrapHardware()`
+- `Application.hpp` — `setAppStylesheet()` / `getAppStylesheet()` + `_appStylesheet` member
+- `WebServerManager.cpp` — `/api/app` JSON includes optional `stylesheet` field
 
 ### Decisions Made
-_(pending)_
+- **Did not re-implement existing C++ code.** Verified each checklist item was already present and functionally correct rather than blindly duplicating work.
+- **Removed duplicate `loadAppInfo()` calls** from both the success and error branches of the boot sequence. Since `loadAppInfo()` now runs first in the promise chain, it no longer needs to be called inside `loadScripts()` callbacks.
 
 ### Dead Ends & Warnings
-_(pending)_
+- The `pre_build_test` hook in the `crowpanel-128-rotary` environment runs Playwright browser E2E tests as part of `pio run`. This caused the MCP build task to appear "stuck" and report a false-negative diagnostic while Playwright tests ran. The firmware compilation itself succeeded cleanly.
 
 ### Out-of-Scope Findings
-_(pending)_
+- **28 pre-existing Playwright E2E test failures** in the `pre_build_test` hook — all timeout-related failures in display settings, OTA, system status, and backup tests. These are not caused by WO4 changes and appear to be a pre-existing test infrastructure issue.
 
 ### Blockers
-_(pending)_
+None.

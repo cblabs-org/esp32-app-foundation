@@ -74,19 +74,39 @@ If you discover a defect, upstream bug, or concern *outside your boundary box*, 
 <!-- Written by the worker at task completion -->
 
 ### Status
-_(pending)_
+✅ **Complete** — committed as `6d8a2b9c` on `issue-sweep-aug/wo3-portal-dram-tuning`
 
 ### Changes Made
-_(pending)_
+
+**`modules/WebServer/WebServerManager.cpp`** (2 additions):
+1. **One-shot httpd HWM log on first `/api/system` request** (lines 306–318) — static `bool hwmLogged` flag captures initial post-boot stack headroom via `xTaskGetHandle("httpd")` + `uxTaskGetStackHighWaterMark()`. Guarded with `#ifdef ESP_PLATFORM`.
+2. **Periodic httpd HWM log in `tick()` every 60s** (lines 640–657) — `currentMillis` cadence check, only fires after `_serverStarted`. Same API pattern, same `#ifdef ESP_PLATFORM` guard.
+
+**`test/stubs/platform/freertos/task.h`** (1 addition):
+- Added `xTaskGetHandle()` stub (line 69) returning `nullptr` — complements the existing `uxTaskGetStackHighWaterMark` stub.
+
+**#114 Verification (no code changes needed):**
+- `board_contract.h` defaults confirmed: `BOARD_HTTP_STACK_SIZE = 8192`, `BOARD_HTTP_MAX_OPEN_SOCKETS = 4`
+- No board-specific overrides found in any `board.h` file
+- `WebServerManager.cpp` uses `_httpStackSize` / `_httpMaxOpenSockets` members (no hardcoded values)
 
 ### Decisions Made
-_(pending)_
+- Used `ESP_LOGI` (ESP-IDF logging) instead of `Log.infoln` (ArduinoLog) from WO template — entire codebase uses `ESP_LOGI` consistently.
+- Used `xTaskGetHandle("httpd")` with null-check rather than caching the handle — the httpd task is created internally by PsychicHttp/ESP-IDF, so the handle isn't available at `begin()` time. The lookup is lightweight and only runs once per 60s or once on first request.
+- Static variables for cadence tracking (`lastHwmLogMs`, `hwmLogged`) — matches the DataManager pattern and is safe since `tick()` runs on the main loop task.
 
 ### Dead Ends & Warnings
-_(pending)_
+None.
 
 ### Out-of-Scope Findings
-_(pending)_
+None.
 
 ### Blockers
-_(pending)_
+None.
+
+### Verification Results
+| Gate | Result |
+|---|---|
+| `pio run -e crowpanel-128-rotary` | ✅ Clean compile — RAM 14.6%, Flash 43.2% |
+| Native test suite (`pio test -e native`) | ✅ 748/748 tests passed |
+

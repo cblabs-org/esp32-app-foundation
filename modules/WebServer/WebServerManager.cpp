@@ -413,10 +413,14 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors,
     // the portal title without modifying platformio.ini build flags.
     // -----------------------------------------------------------------------
     const char* appTitle = _appName ? _appName : APP_TITLE;
-    activeServer->on("/api/app", HTTP_GET, [appTitle](PsychicRequest* request, PsychicResponse* response) {
+    const char* appStylesheet = _appStylesheet;
+    activeServer->on("/api/app", HTTP_GET, [appTitle, appStylesheet](PsychicRequest* request, PsychicResponse* response) {
         JsonDocument doc;
         doc["name"]    = appTitle;
         doc["version"] = BUILD_VERSION;
+        if (appStylesheet) {
+            doc["stylesheet"] = appStylesheet;
+        }
         String out;
         serializeJson(doc, out);
         return response->send(200, "application/json", out.c_str());

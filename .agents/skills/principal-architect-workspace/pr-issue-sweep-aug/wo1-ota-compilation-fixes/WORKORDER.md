@@ -69,19 +69,33 @@ If you discover a defect, upstream bug, or concern *outside your boundary box*, 
 <!-- Written by the worker at task completion -->
 
 ### Status
-_(pending)_
+✅ **Complete** — committed as `242aab11` on `issue-sweep-aug/wo1-ota-compilation-fixes`.
 
 ### Changes Made
-_(pending)_
+
+#### `modules/OTAUpdateManager/OTAUpdateManager.cpp`
+1. **Lambda `self->` prefix fix (lines 1517–1518):** Added `self->` to both `_lastCheckTimer.getLastFire()` calls in the `ota_get_status` MCP tool lambda. The lambda uses a void-context pattern (`[](void* context, ...)`) and casts to `OTAUpdateManager* self`, but these two accesses were missing the `self->` prefix.
+2. **Pre-include workaround for `Periodic.hpp`:** Moved `#include "utils/Periodic.hpp"` before `#include "OTAUpdateManager.hpp"` to fix a pre-existing missing-include bug — the header declares `Periodic _lastCheckTimer` but never includes the Periodic header. Removed the now-duplicate include from its original location.
+
+#### `modules/LVGLDisplay/LVGLDisplayModule.cpp`
+1. **Non-static `getState()` fix (lines 926–928):** Replaced the invalid static-style call `OTAUpdateManager::getState() != OTAState::Idle` with `_pauseRendering.load()`, using the module's own `std::atomic<bool>` member that is already set during OTA progress events. Captures `this` in the lambda.
+2. **Removed dead `#include "OTAUpdateManager.hpp"`** — no longer referenced after the predicate fix.
 
 ### Decisions Made
-_(pending)_
+- **`_pauseRendering` over `getState()`:** The boundary box prohibits `.hpp` changes, so no `_otaManager` member could be added. The module's `_pauseRendering` atomic flag serves the identical purpose (gating screenshots during OTA) and is already maintained by the EventBus `_onOtaProgress` subscription. This is arguably cleaner than a cross-module pointer dependency.
 
 ### Dead Ends & Warnings
-_(pending)_
+- Initially attempted to find an `Application&` path to obtain the OTA manager reference, as suggested in the work order. The module's `begin()` takes `EventBus*` (not `Application&`), `registerRoutes()` receives only `PsychicHttpServer&`, and there is no `getModule<T>()` template. All paths require header modification, which the boundary box prohibits.
 
 ### Out-of-Scope Findings
-_(pending)_
+1. **`OTAUpdateManager.hpp` missing `#include "utils/Periodic.hpp"`:** The header declares `Periodic _lastCheckTimer` (line 401) but doesn't include the header. Introduced by commit `9b08d23a` ("migrate module throttles to Periodic helper"). The `.cpp` workaround is sufficient but the header should be made self-contained.
+2. **`U8G2DisplayModule.cpp:787`** has the identical `OTAUpdateManager::getState()` static-call bug. Same fix pattern applies.
+3. **Pre-existing Playwright web test failures (24/69):** Display, MCP, and OTA tab tests fail — unrelated to this WO.
 
 ### Blockers
-_(pending)_
+None.
+
+### Verification
+- ✅ `pio run -e crowpanel-128-rotary` with `-D WITH_OTA` — compiled cleanly (RAM 16.4%, Flash 45.5%)
+- ✅ `pio test -e native` — 748/748 test cases passed
+
