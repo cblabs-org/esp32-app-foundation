@@ -19,7 +19,7 @@
 | **[x] [wo5-docs-sls-tests](wo5-docs-sls-tests/WORKORDER.md)** | `issue-sweep-aug/wo5-docs-sls-tests` | ✅ Complete | #127, #130, #97, #113 | Skill/doc updates, PSRAM audit, EventBus payload lifetime doc, SLS naming fix, sample-app test fix |
 | **[x] [wo6-screensaver-policy-ui](wo6-screensaver-policy-ui/WORKORDER.md)** | `issue-sweep-aug/wo6-screensaver-policy-ui` | ✅ Complete | #110 | Screensaver policy toggle in portal Display settings |
 | **[x] [wo7-lvgl-eventbus-race](wo7-lvgl-eventbus-race/WORKORDER.md)** | `issue-sweep-aug/wo7-lvgl-eventbus-race` | ✅ Complete | #131 | Fix LVGL race in EventBus subscriber + document threading rule |
-| **[/] [wo8-queue-data-job](wo8-queue-data-job/WORKORDER.md)** | `issue-sweep-aug/wo8-queue-data-job` | 🔄 In Progress | #132 | Extend DataManager with queueDataJob() for off-loop data operations |
+| **[x] [wo8-queue-data-job](wo8-queue-data-job/WORKORDER.md)** | `issue-sweep-aug/wo8-queue-data-job` | ✅ Complete | #132 | Extend DataManager with queueDataJob() for off-loop data operations |
 
 ## Modules & Components
 
