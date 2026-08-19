@@ -15,9 +15,8 @@
 #include "LVGLDisplayModule.hpp"
 #include "web/serveGzipAsset.hpp"
 #include "EventBus.hpp"
-#ifdef WITH_OTA
-#include "OTAUpdateManager.hpp"
-#endif
+
+
 
 #include "ConfigManager.hpp"
 #include "MCPToolRegistry.hpp"
@@ -923,8 +922,8 @@ void LVGLDisplayModule::registerRoutes(PsychicHttpServer& server) {
 
 #ifndef UNIT_TEST
 #ifdef WITH_OTA
-    _serviceHelper.setOtaPredicate([]() {
-        return OTAUpdateManager::getState() != OTAState::Idle;
+    _serviceHelper.setOtaPredicate([this]() {
+        return _pauseRendering.load();
     });
 #endif
     _serviceHelper.registerBrightnessRoute(server);

@@ -44,6 +44,7 @@
 
 #ifdef WITH_OTA
 
+#include "utils/Periodic.hpp"  // OTAUpdateManager.hpp uses Periodic but doesn't include it
 #include "OTAUpdateManager.hpp"
 #include "web/serveGzipAsset.hpp"
 #include "platform/LogShim.h"
@@ -72,7 +73,6 @@ static constexpr const char* TAG = "OTAUpdateManager";
 #include "OTACerts.h"
 #include "OTADownloadEngine.hpp"
 #include "MbedTLSSignatureVerifier.hpp"
-#include "utils/Periodic.hpp"
 #include "interfaces/IWebContributor.hpp"
 #include "OTAManifest.hpp"
 #include "MCPToolRegistry.hpp"
@@ -1514,8 +1514,8 @@ void OTAUpdateManager::registerMCPTools(MCPToolRegistry& registry) {
             result["state"]         = otaStateToString(self->_state);
             result["version"]       = BUILD_VERSION;
             result["channel"]       = self->_channel;
-            result["last_check_ms"] = (_lastCheckTimer.getLastFire() > 0)
-                                     ? static_cast<long>(millis() - _lastCheckTimer.getLastFire())
+            result["last_check_ms"] = (self->_lastCheckTimer.getLastFire() > 0)
+                                     ? static_cast<long>(millis() - self->_lastCheckTimer.getLastFire())
                                      : -1;
             result["auto_check"]     = self->_autoCheck;
             result["updates_enabled"] = self->_updatesEnabled;
