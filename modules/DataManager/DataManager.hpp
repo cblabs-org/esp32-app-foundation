@@ -24,6 +24,7 @@
 #include <atomic>
 #include "interfaces/IDataSource.hpp"
 
+#include <Arduino.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <freertos/semphr.h>
@@ -76,6 +77,19 @@ public:
     void setAppRunning(bool running);
 
     /**
+     * @brief Returns the duration in ms of the currently-running fetch, or 0 if idle.
+     *
+     * Safe to call from any task (member is volatile). Use this to detect
+     * hung fetches from a monitoring task or health-check endpoint.
+     *
+     * @return Elapsed milliseconds since fetchUpdate() was called, or 0 if no fetch is active.
+     */
+    uint32_t getFetchElapsedMs() const {
+        uint32_t start = _fetchStartMs;
+        return (start > 0) ? (millis() - start) : 0;
+    }
+
+    /**
      * @brief Test helper to override current time in native builds
      * @param timeMs The simulated current time in milliseconds
      */
@@ -93,6 +107,7 @@ private:
     TaskHandle_t _workerTask;
     std::atomic<bool> _appRunning{false};
     uint32_t _simulatedTimeMs = 0;
+    volatile uint32_t _fetchStartMs = 0;   ///< Timestamp of in-flight fetchUpdate(); 0 when idle.
 
     static void workerTaskLoop(void* param);
     void executeLoop();

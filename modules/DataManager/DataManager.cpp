@@ -199,7 +199,25 @@ void DataManager::executeLoop() {
         if (_registryMutex) xSemaphoreGive(_registryMutex);
         
         // --- Execute the fetch cycle ---
+        // Record fetch start for external observability (getFetchElapsedMs()).
+        // The TWDT stays subscribed throughout — if fetchUpdate() genuinely
+        // never returns, the watchdog fires as intended (correct outcome for
+        // an unrecoverable hang). Fetches that eventually return but exceed
+        // 15s log a warning so consumers can tighten client timeouts.
+        unsigned long fetchStart = millis();
+        _fetchStartMs = fetchStart;
+
         UpdateStatus result = fetchTarget->fetchUpdate();
+
+        _fetchStartMs = 0;
+        esp_task_wdt_reset();   // feed WDT immediately after fetch returns
+
+        unsigned long fetchDuration = millis() - fetchStart;
+        if (fetchDuration > 15000) {
+            ESP_LOGW(TAG, "fetchUpdate() for source '%s' took %lu ms — consider reducing client timeout",
+                     fetchTarget->getSourceName(), fetchDuration);
+        }
+
         if (result >= UpdateStatus::FetchError) {
             ESP_LOGW(TAG, "Fetch failed for source: %s (status=%d)",
                      fetchTarget->getSourceName(), static_cast<int>(result));

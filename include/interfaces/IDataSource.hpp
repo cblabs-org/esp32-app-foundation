@@ -57,7 +57,15 @@ public:
 
     /**
      * @brief Execute one full data-fetch cycle.
-     * @return UpdateStatus result of the attempt.
+     *
+     * @note Called from the DataManager worker task. This is a shared queue —
+     *       a long-running fetch blocks all other registered data sources until
+     *       it returns. Set client-level timeouts (e.g. HTTPClient::setTimeout())
+     *       to bound network operations. As a guideline, implementations should
+     *       aim to return within 30 seconds; fetches exceeding 15 s will log a
+     *       warning.
+     *
+     * @return UpdateStatus indicating the result of the fetch operation.
      */
     virtual UpdateStatus fetchUpdate() = 0;
 
