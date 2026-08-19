@@ -1,5 +1,5 @@
 # Principal Architect Memory
-<!-- Last updated: 2026-08-14T09:04:00+01:00 -->
+<!-- Last updated: 2026-08-19T19:30:00+01:00 -->
 
 ## Active Programs
 | Program | Plan | Status |
@@ -25,13 +25,13 @@
 ## Recently Completed (last 5)
 | Project | Completed | Modules | Key Outcome |
 |---|---|---|---|
+| pr-122-dram-psram-optimization | 2026-08-18 | LVGLDisplay/lv_conf.h, DataManager.cpp, web/portal/system.js, docs | +35 KB internal DRAM via LVGL heap→PSRAM (`LV_MEM_POOL_ALLOC`), DataManager watermark telemetry, portal RAG threshold fix. PRs #123+#124 merged. Issues #121, #122 closed. `v0.0.12-dev.52` device-verified. [PROJECT.md](../pr-122-dram-psram-optimization/PROJECT.md) |
 | pr-portal-asset-decentralisation | 2026-08-14 | WebServer, OTAUpdateManager, MCPServer, TimeManager, HomeAssistant, U8G2Display, LVGLDisplay, portalBuilder.py, app.js | Decentralised optional module web assets. Each module owns JS source, route serving, and dynamic script discovery via `getTabScript()`. PR [#109](https://github.com/matthewmcneill/esp32-app-foundation/pull/109) merged closing #96. [PROJECT.md](../pr-portal-asset-decentralisation/PROJECT.md) |
 | group3-code-quality (#108, #107) | 2026-08-14 | ButtonModule, hardware/_TEMPLATE, framework-expert skill, docs | `removeButton()` API, board template folder restructure with starter files, skill/doc ownership clarity. 662/664 tests pass, device-verified. Commit `e0dfc120`. [context_bridge](../../context_archives/distillation-20260814-group3-code-quality/context_bridge.md) |
 | pr-adopt-display-interface | 2026-08-11 | LVGLDisplay, PngWriter, WebServer | Forward-port SLS display stack onto main + #86 interface. Screenshot API stable (tdefl 164KB, PSRAM, threaded). Boot transition restored. `v0.0.12-dev.44` device-verified. [PROJECT.md](../pr-adopt-display-interface/PROJECT.md) |
 | aria-tabpanel | 2026-08-11 | web-portal | Complete WAI-ARIA tabpanel semantics on portal tabs + sub-pills; PR #93 merged closing issue #92 |
-| input-carousel | 2026-08-12 | LVGLDisplay, CrowPanel128Adapter, ScreensaverController | CrowPanel encoder/button/touch wired to LVGL, 12-item DiagCarouselController (rotary diagnostic browser), RAW+/2 encoder divisor, screensaver dim=25%, em-dash glyph fix. Merged `2f5b1ad7`. [context_bridge](../../context_archives/distillation-20260812-input-carousel/context_bridge.md) |
 
 ## Older Projects
-83 completed projects.
+84 completed projects.
 Full project history: [PROJECT_INDEX.md](PROJECT_INDEX.md)
 Cross-cutting module index: [MODULE_INDEX.md](MODULE_INDEX.md)
