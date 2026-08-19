@@ -44,6 +44,12 @@ extern "C" __attribute__((weak)) void ui_init(void) {
     // Weak default no-op implementation. Downstream applications override this.
 }
 
+#if defined(__GNUC__) || defined(__clang__)
+extern "C" {
+    __attribute__((weak)) extern lv_obj_t* ui_ui_DiagScreen;  // SLS Diag (running) screen
+}
+#endif
+
 // -----------------------------------------------------------------------------
 // Lifecycle
 // -----------------------------------------------------------------------------
@@ -283,6 +289,18 @@ void LVGLDisplayModule::tick(uint32_t now) {
     } else if (otaUpdate) {
         showOtaProgress(_pendingOtaProgress.load(), _pendingOtaStatus[0] ? _pendingOtaStatus : "Updating...");
         resetActivity();
+    }
+
+    if (_pendingAppRunning.exchange(false)) {
+        ESP_LOGI("LVGLDisplayModule", "App transition → RUNNING (deferred to tick)");
+        _inSystemScreen = false;
+        _priorScreen = nullptr;
+#if defined(__GNUC__) || defined(__clang__)
+        if (&ui_ui_DiagScreen != nullptr && ui_ui_DiagScreen != nullptr) {
+            lv_scr_load_anim(ui_ui_DiagScreen, LV_SCR_LOAD_ANIM_FADE_IN, 300, 0, false);
+        }
+#endif
+        _diagCarousel.begin(_group);
     }
 
     if (_pendingError.exchange(false)) {
@@ -832,30 +850,12 @@ void LVGLDisplayModule::_onAppConfiguring(const char* /*topic*/, const void* pay
     }
 }
 
-#if defined(__GNUC__) || defined(__clang__)
-extern "C" {
-    __attribute__((weak)) extern lv_obj_t* ui_ui_DiagScreen;  // SLS Diag (running) screen
-}
-#endif
-
 void LVGLDisplayModule::_onAppRunning(const char* /*topic*/, const void* /*payload*/, void* ctx) {
     auto* self = static_cast<LVGLDisplayModule*>(ctx);
     if (self == nullptr) return;
-    ESP_LOGI("LVGLDisplayModule", "App transition → RUNNING");
-    
-    // Left the system screen (configuring/error/OTA) for the running UI: clear the
-    // system-screen state and load the SLS Diag (running) screen — this is what
-    // dismisses the boot screen once all config gates are satisfied.
-    self->_inSystemScreen = false;
-    self->_priorScreen = nullptr;
-#if defined(__GNUC__) || defined(__clang__)
-    if (&ui_ui_DiagScreen != nullptr && ui_ui_DiagScreen != nullptr) {
-        lv_scr_load_anim(ui_ui_DiagScreen, LV_SCR_LOAD_ANIM_FADE_IN, 300, 0, false);
-    }
-#endif
-
-    // Activate the diagnostic carousel (encoder-driven metric browser)
-    self->_diagCarousel.begin(self->_group);
+    // Defer to tick() — LVGL APIs must only be called from the main loop.
+    // See EventBus.hpp §1: callbacks run on the esp_event default loop task.
+    self->_pendingAppRunning.store(true);
 }
 
 void LVGLDisplayModule::_onInputWake(const char* /*topic*/, const void* /*payload*/, void* ctx) {

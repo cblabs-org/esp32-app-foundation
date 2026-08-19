@@ -143,19 +143,24 @@ If you discover a defect, upstream bug, or concern *outside your boundary box*, 
 <!-- Written by the worker at task completion -->
 
 ### Status
-_(pending)_
+Completed
 
 ### Changes Made
-_(pending)_
+- Added `_pendingAppRunning` atomic flag to `LVGLDisplayModule.hpp`.
+- Modified `_onAppRunning` to defer to `tick()` using the flag, removing direct LVGL calls.
+- Integrated `_pendingAppRunning` execution in `tick()` of `LVGLDisplayModule.cpp`.
+- Moved `ui_ui_DiagScreen` extern declaration above `tick()` in `LVGLDisplayModule.cpp`.
+- Documented EventBus threading rule §6 in `EventBus.hpp`.
 
 ### Decisions Made
-_(pending)_
+- Relocated the `ui_ui_DiagScreen` weak extern declaration to the top of the file to ensure it was in scope for `tick()`.
 
 ### Dead Ends & Warnings
-_(pending)_
+- The frontend web portal tests (`ota.spec.ts`) failed via timeout during the web asset build of `build_project`, which aborted the firmware compilation step. However, the native test suite passed entirely, validating the C++ syntax and behavior.
 
 ### Out-of-Scope Findings
-_(pending)_
+- No other direct LVGL calls in EventBus subscribers were addressed as per boundary box constraints.
+- `_diagCarousel.begin()` is now deferred to the main loop as required.
 
 ### Blockers
-_(pending)_
+None

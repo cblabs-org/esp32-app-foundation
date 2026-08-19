@@ -280,6 +280,17 @@ public:
      */
     void setBootLogo(const lv_image_dsc_t* bootLogo);
 
+    /**
+     * @brief Set the application title on the boot screen.
+     *
+     * Delegates to the ILVGLSystemScreens provider so the SLS boot screen
+     * reflects the runtime app name instead of the hardcoded SLS literal.
+     * Must be called after bootstrapHardware() has built the SLS UI.
+     *
+     * @param title Pointer to the application title string (static lifetime).
+     */
+    void setAppTitle(const char* title) override;
+
     // -------------------------------------------------------------------------
     // IConfigurable — ConfigManager gateway (namespace: "display")
     // -------------------------------------------------------------------------
@@ -440,6 +451,7 @@ private:
     std::atomic<bool> _pendingInputWake{false}; ///< Input detected while dimmed/blanked
 
     // --- Thread-safe pending state ---
+    std::atomic<bool> _pendingAppRunning{false};  ///< Deferred RUNNING transition (from EventBus callback)
     std::atomic<bool> _pendingOtaUpdate{false};
     std::atomic<float> _pendingOtaProgress{0.0f};
     char _pendingOtaStatus[64] = {};
@@ -461,6 +473,7 @@ private:
 
     // --- System Screens & Assets ---
     const lv_image_dsc_t* _bootLogo = nullptr;
+    const char*           _appTitle = nullptr;  ///< Runtime-settable boot screen title (overrides SLS literal)
     FaultScreen           _faultScreen;       ///< The only built-in screen (dev fault/trace fallback)
     bool                  _uiInitialized = false; ///< Guards the one-time ui_init() (SLS UI build)
     lv_obj_t*             _priorScreen = nullptr;

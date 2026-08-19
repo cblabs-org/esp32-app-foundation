@@ -79,6 +79,17 @@
  *      On native (UNIT_TEST), dispatch is synchronous, so stack-locals appear
  *      to work — but the bug manifests only on target, intermittently.
  *
+ * 6. Thread Safety — LVGL and Other Single-Threaded Libraries:
+ *    - On target, callbacks execute on the esp_event default loop task (see §1),
+ *      NOT the main loop. Never call LVGL APIs (lv_obj_*, lv_scr_*, lv_label_*,
+ *      lv_anim_*, etc.) from an EventBus callback — they race lv_timer_handler()
+ *      on the main loop, and LV_USE_OS is unset (no internal locking).
+ *    - Instead, set an atomic flag in the callback and act on it in tick().
+ *      Example: _pendingInputWake.store(true) in callback, then
+ *      if (_pendingInputWake.exchange(false)) { ... } in tick().
+ *    - The same rule applies to any library with single-threaded assumptions
+ *      (U8G2 rendering, direct SPI transactions, etc.).
+ *
  * Example — ring buffer pattern (recommended for tick-driven publishers):
  *
  *   MyEvent& evt = _eventRing[_ringHead];
