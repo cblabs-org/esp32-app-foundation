@@ -77,3 +77,23 @@ Fully **serialized stack** — each WO bases on the previous. File overlap is in
 - Base branch confirmed: `main` (PR #112 portal-consumer-assets already merged as `fd5fc45e`).
 - Execution mode: PA-driven autonomous, sequential WO1→WO4, hardware flash-verify on CrowPanel after stack lands.
 - **HUMAN APPROVAL: GRANTED.** Workers may verify this entry as their authorization anchor.
+
+### 2026-08-17/18 — WO1–WO4 executed + architectural review + remediation
+**Summary**: All four WOs implemented and stacked; PR **#117 merged** to `main` (merge `d3b4f733`). #116 closed as superseded.
+**Architectural review** (high-level research agent, posted to #117): verified against the real diff and found two blockers, both fixed in `498f64c6`:
+- **B1** — the MCP `capture_display` tool still ran `capturePNG` (tdefl) inline on the now-8 KB httpd task (regression). Fixed by extracting a shared `DisplayServiceHelper::capturePNGToStream()` used by **both** the HTTP route and the MCP tool, both OTA-gated.
+- **B2** — `DeepStackExecutor::run()` timeout path caused (i) use-after-free of the caller's `BufferStream` (worker kept writing after the caller freed it) and (ii) permanent executor brick (`_busy` never cleared). Fixed with **join-on-timeout** (wait for the worker before returning) + always clearing `_busy`/`_currentWork`.
+- **N1/N2/N3, T1–T3** also addressed (stale-sem drain, honest OTA-guarantee wording, re-enabled `test_displayServiceHelper` with real branch coverage). Post-fix: 670 pass, 2 pre-existing ERRORED (see below).
+
+### 2026-08-19 — Project Wrap-Up (continued & merged elsewhere; not fully closed)
+**Architectural outcome**: Deep-stack (PNG/tdefl) work is decoupled from the single shared httpd task via a reusable, PSRAM-stacked `DeepStackExecutor` (mirrors `OTAUpdateManager`'s persistent-worker pattern); the httpd task dropped from an unconditional 16 KB to a board-tunable 8 KB (`BOARD_HTTP_STACK_SIZE`/`setHttpConfig()`), returning internal DRAM to lwIP. OTA flash-safety is preserved (httpd stack stays internal DRAM; screenshot path 503-gated during OTA). Boards without PSRAM stacks fall back to shallow stored-PNG. Establishes the "Wider Principle": any deep-stack route offloads the same way.
+**Continuation**: DRAM work continued in **`pr-122-dram-psram-optimization`** (PR **#124** merged — LVGL widget heap → PSRAM (32 KB saved), DataManager stack watermark, portal RAG thresholds), plus follow-ups **#125** (native FreeRTOS tick stubs) and **#126** (heartbeat internal-DRAM reporting). `pr-122` is distilled complete.
+**Lessons for future projects**:
+- When offloading one entry point, **sweep for siblings** — the HTTP route was fixed but the MCP tool sharing the same handler was missed (B1). Grep for every caller of the hot function.
+- A cross-task worker that captures caller locals by reference **must join before returning on timeout**, or the "timeout" becomes a use-after-free (B2). Bound-work + join beats a bare timeout.
+- Match established in-repo concurrency patterns (`OTAUpdateManager`) over introducing a second idiom — consistency the reviewer and future maintainers can trust.
+**Unresolved items** (raised as `/todo` GitHub issues for triage):
+- **#133** — measure `DeepStackExecutor` PNG-worker high-water mark on hardware; replace the 16 KB placeholder default with measured peak + margin (deferred WO2 hardware step).
+- **#134** — native suite: `test_pngWriter` (ROM `tdefl_*` symbols) and `test_mcpServer` (`U8G2DisplayModule` link) ERROR on host build (pre-existing; surfaced in review).
+- **#135** — optional/low: make OTA↔screenshot mutual exclusion bidirectional (TOCTOU; OS scheduler already prevents the fault).
+- **Triage note (not a new todo):** original symptom issue **#114** is fixed by #117 and should be closed/verified.
