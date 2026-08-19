@@ -381,11 +381,20 @@ void Application::tick() {
 
 
 
-    // Periodic heartbeat — free heap + uptime every 30s
+    // Periodic heartbeat — free heap + uptime every 30s.
+    // Also reports internal DRAM specifically: on PSRAM boards, free_heap
+    // (MALLOC_CAP_8BIT) is dominated by PSRAM and can read many MB "free"
+    // while internal DRAM is one allocation from exhaustion. dram_min is the
+    // low-water mark since boot — it matters more than dram, which is only
+    // an instantaneous snapshot and can hide a transient trough.
     if (_heartbeatPeriodic.due(currentMillis)) {
         uint32_t freeHeap = heap_caps_get_free_size(MALLOC_CAP_8BIT);
+        uint32_t freeDram = heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+        uint32_t minDram = heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
         uint32_t uptimeSec = currentMillis / 1000;
-        ESP_LOGI(TAG, "♥ uptime=%lus  free_heap=%luB", (unsigned long)uptimeSec, (unsigned long)freeHeap);
+        ESP_LOGI(TAG, "♥ uptime=%lus  free_heap=%luB  dram=%luB  dram_min=%luB",
+                 (unsigned long)uptimeSec, (unsigned long)freeHeap, (unsigned long)freeDram,
+                 (unsigned long)minDram);
     }
 }
 
