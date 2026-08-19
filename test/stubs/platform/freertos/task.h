@@ -63,4 +63,19 @@ inline uint32_t ulTaskNotifyTake(int xClearCountOnExit, uint32_t xTicksToWait) {
 inline void xTaskNotifyGive(TaskHandle_t xTaskToNotify) {}
 
 typedef uint32_t StackType_t;
+// Unsigned counterpart of BaseType_t — needed by callers that store counts
+// (e.g. stack high water marks) which are never negative on real FreeRTOS.
+typedef unsigned int UBaseType_t;
 inline uint32_t uxTaskGetStackHighWaterMark(TaskHandle_t xTask) { return 1000; }
+
+// Tick counter type. Native tests do not exercise real timing, so a plain
+// uint32_t (matching FreeRTOS.h's pdMS_TO_TICKS 10ms-per-tick convention) is
+// enough — callers only need a monotonically-nondecreasing value to diff.
+typedef uint32_t TickType_t;
+
+/**
+ * @brief Stub: returns a fixed tick count. Native tests do not exercise real
+ * timing, so callers that gate periodic work on elapsed ticks (e.g.
+ * DataManager's stack-watermark telemetry) simply see no elapsed time.
+ */
+inline TickType_t xTaskGetTickCount() { return 0; }
