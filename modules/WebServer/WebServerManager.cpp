@@ -303,6 +303,20 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors,
         }
         activeHighMemRequests++;
 
+        // --- One-shot httpd stack HWM telemetry on first request (#119) ---
+#ifdef ESP_PLATFORM
+        static bool hwmLogged = false;
+        if (!hwmLogged) {
+            TaskHandle_t httpdTask = xTaskGetHandle("httpd");
+            if (httpdTask != nullptr) {
+                UBaseType_t hwm = uxTaskGetStackHighWaterMark(httpdTask);
+                ESP_LOGI(TAG, "httpd stack HWM (first request): %u words (%u bytes free)",
+                         (unsigned)hwm, (unsigned)(hwm * 4));
+            }
+            hwmLogged = true;
+        }
+#endif
+
         JsonDocument doc;
 
         // --- Internal DRAM metrics (always present on all ESP32 variants) ---
@@ -622,6 +636,25 @@ void WebServerManager::tick(uint32_t currentMillis) {
         }
         _serverStarted = true;
     }
+
+    // --- Periodic httpd task stack high-water mark telemetry (#119) ---
+    // The httpd task is created internally by PsychicHttp / ESP-IDF with
+    // the name "httpd". Log every 60s to track headroom on constrained
+    // boards without spamming the console.
+#ifdef ESP_PLATFORM
+    if (_serverStarted) {
+        static uint32_t lastHwmLogMs = 0;
+        if (lastHwmLogMs == 0 || (currentMillis - lastHwmLogMs) >= 60000) {
+            TaskHandle_t httpdTask = xTaskGetHandle("httpd");
+            if (httpdTask != nullptr) {
+                UBaseType_t hwm = uxTaskGetStackHighWaterMark(httpdTask);
+                ESP_LOGI(TAG, "httpd stack HWM: %u words (%u bytes free)",
+                         (unsigned)hwm, (unsigned)(hwm * 4));
+            }
+            lastHwmLogMs = currentMillis;
+        }
+    }
+#endif
 
     if (_restartRequested) {
         ESP_LOGI(TAG, "Restart requested. Checking certificate generation status...");
