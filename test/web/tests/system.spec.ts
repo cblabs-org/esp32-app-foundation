@@ -45,9 +45,14 @@ const MOCK_SYSTEM_GREEN = {
 };
 
 /** System data where heap_min_free triggers RED (<25%) */
+// Internal-DRAM bars use ABSOLUTE free-byte floors, not percentages (#121):
+// green ≥ 80 KB, amber ≥ 40 KB, red < 40 KB. A percentage would show perpetual
+// amber on a healthy ESP32. 30000 B is genuinely red; the previous 45000 B was
+// chosen when the bar was percentage-based (≈18%) and has rendered amber ever
+// since that change landed.
 const MOCK_SYSTEM_RED_HEAP = {
   ...MOCK_SYSTEM_GREEN,
-  heap_min_free: 45000,    // 45000/249856 ≈ 18% → Red
+  heap_min_free: 30000,    // < 40 KB → Red
 };
 
 const MOCK_WIFI_STATUS = {
@@ -107,8 +112,8 @@ test.describe('System Status Sub-pill', () => {
 
     const memoryBars = page.locator('#sys-memory-bars');
 
-    // The "Min Free (Watermark)" bar should be red (#c62828)
-    // 45000 / 249856 ≈ 18% → red
+    // The "Min Free (Watermark)" bar should be red (#c62828).
+    // 30000 B < 40 KB absolute floor → red (see ragColorDram in system.js)
     const progressFills = memoryBars.locator('div[style*="background:#c62828"]');
     await expect(progressFills.first()).toBeVisible();
   });

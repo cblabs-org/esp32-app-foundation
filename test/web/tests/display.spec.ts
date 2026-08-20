@@ -4,15 +4,20 @@ import { test, expect, Page } from '@playwright/test';
 // Mock data
 // ---------------------------------------------------------------------------
 
+// The `script` field is load-bearing, not decoration. Since the portal asset
+// decentralisation (#96), app.js discovers optional-module JS from /api/tabs and
+// injects it — a tab whose fixture omits `script` renders an empty panel, and
+// every assertion against its contents times out. Values must match what the
+// firmware's IWebContributor::getTabScript() actually returns.
 const MOCK_TABS = [
   { name: 'WiFi',       id: 'wifi',       parent: null,      order: 0   },
   { name: 'System',     id: 'system',     parent: null,      order: 100 },
   { name: 'Status',     id: 'system',     parent: 'System',  order: 0   },
   { name: 'Keys',       id: 'keys',       parent: 'System',  order: 1   },
-  { name: 'MCP',        id: 'mcp',        parent: 'System',  order: 2   },
+  { name: 'MCP',        id: 'mcp',        parent: 'System',  order: 2, script: '/mcp.js' },
   { name: 'Backup',     id: 'backup',     parent: 'System',  order: 3   },
-  { name: 'OTA',        id: 'ota',        parent: 'System',  order: 4   },
-  { name: 'Display',    id: 'display',    parent: null,      order: 30  },
+  { name: 'OTA',        id: 'ota',        parent: 'System',  order: 4, script: '/ota.js' },
+  { name: 'Display',    id: 'display',    parent: null,      order: 30, script: '/display.js' },
   { name: 'Settings',   id: 'settings',   parent: 'Display', order: 10  },
   { name: 'Screenshot', id: 'screenshot', parent: 'Display', order: 20  },
   { name: 'App',        id: 'app',        parent: null,      order: 40  },
