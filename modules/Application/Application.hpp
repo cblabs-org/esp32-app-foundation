@@ -155,6 +155,12 @@ public:
     /** @brief Get the application name. Returns APP_TITLE if not set. */
     const char* getAppName() const { return _appName ? _appName : APP_TITLE; }
 
+    /** @brief Set an optional CSS stylesheet path for portal branding. */
+    void setAppStylesheet(const char* path) { _appStylesheet = path; }
+
+    /** @brief Get the app stylesheet path. Returns nullptr if not set. */
+    const char* getAppStylesheet() const { return _appStylesheet; }
+
     /**
      * @brief Execute the full framework boot sequence.
      *
@@ -551,6 +557,7 @@ private:
     AppTabContributor _appTabContributor;  ///< Contributes "App" top-level nav tab
     bool _enableDefaultAppTab = true;      ///< Guard for default App tab registration
     const char* _appName = nullptr;        ///< Runtime-settable application name (overrides APP_TITLE)
+    const char* _appStylesheet = nullptr;  ///< Optional CSS path for portal branding
 
 
 

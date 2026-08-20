@@ -15,10 +15,6 @@
 #include "LVGLDisplayModule.hpp"
 #include "web/serveGzipAsset.hpp"
 #include "EventBus.hpp"
-#ifdef WITH_OTA
-#include "OTAUpdateManager.hpp"
-#endif
-
 #include "ConfigManager.hpp"
 #include "MCPToolRegistry.hpp"
 #include "Application.hpp"
@@ -44,6 +40,12 @@
 extern "C" __attribute__((weak)) void ui_init(void) {
     // Weak default no-op implementation. Downstream applications override this.
 }
+
+#if defined(__GNUC__) || defined(__clang__)
+extern "C" {
+    __attribute__((weak)) extern lv_obj_t* ui_ui_DiagScreen;  // SLS Diag (running) screen
+}
+#endif
 
 // -----------------------------------------------------------------------------
 // Lifecycle
@@ -151,6 +153,11 @@ void LVGLDisplayModule::bootstrapHardware() {
     if (!_uiInitialized && ui_init != nullptr) {
         ui_init();
         _uiInitialized = true;
+    }
+
+    // --- Apply runtime app title to boot screen (overrides SLS literal) ---
+    if (_screens != nullptr && _appTitle != nullptr) {
+        _screens->setAppTitle(_appTitle);
     }
 
     // --- Stage-1 boot screen (SLS bootScreen, or FaultScreen if no skin) ---
@@ -281,6 +288,18 @@ void LVGLDisplayModule::tick(uint32_t now) {
         resetActivity();
     }
 
+    if (_pendingAppRunning.exchange(false)) {
+        ESP_LOGI("LVGLDisplayModule", "App transition → RUNNING (deferred to tick)");
+        _inSystemScreen = false;
+        _priorScreen = nullptr;
+#if defined(__GNUC__) || defined(__clang__)
+        if (&ui_ui_DiagScreen != nullptr && ui_ui_DiagScreen != nullptr) {
+            lv_scr_load_anim(ui_ui_DiagScreen, LV_SCR_LOAD_ANIM_FADE_IN, 300, 0, false);
+        }
+#endif
+        _diagCarousel.begin(_group);
+    }
+
     if (_pendingError.exchange(false)) {
         showError(_pendingErrorTitle[0] ? _pendingErrorTitle : "SYSTEM ERROR", _pendingErrorMessage);
         resetActivity();
@@ -356,7 +375,7 @@ bool LVGLDisplayModule::capturePNG(Print& sink) {
 
     // --- Step 3: Validate snapshot buffer acquisition and clean up on timeout failure ---
     if (!_snapshotComplete.load() || !_snapshotSuccess.load() || !_snapshotBuffer) {
-        ESP_LOGE("LVGLDisplay", "capturePNG: Snapshot failed (complete=%d, success=%d, timeout=%d)", 
+        ESP_LOGE("LVGLDisplay", "capturePNG: Snapshot failed (complete=%d, success=%d, timeout=%d)",
                  _snapshotComplete.load(), _snapshotSuccess.load(), timeout);
         _pendingSnapshot.store(false); // cancel if timed out
         if (_snapshotBuffer) freeSnapshot(_snapshotBuffer);
@@ -393,7 +412,7 @@ bool LVGLDisplayModule::captureStoredPNG(Print& sink) {
     }
 
     if (!_snapshotComplete.load() || !_snapshotSuccess.load() || !_snapshotBuffer) {
-        ESP_LOGE("LVGLDisplay", "captureStoredPNG: Snapshot failed (complete=%d, success=%d, timeout=%d)", 
+        ESP_LOGE("LVGLDisplay", "captureStoredPNG: Snapshot failed (complete=%d, success=%d, timeout=%d)",
                  _snapshotComplete.load(), _snapshotSuccess.load(), timeout);
         _pendingSnapshot.store(false); // cancel if timed out
         if (_snapshotBuffer) freeSnapshot(_snapshotBuffer);
@@ -566,6 +585,13 @@ void LVGLDisplayModule::setBootLogo(const lv_image_dsc_t* bootLogo) {
     _bootLogo = bootLogo ? bootLogo : &cb_labs_boot_logo;
 }
 
+void LVGLDisplayModule::setAppTitle(const char* title) {
+    _appTitle = title;
+    if (_screens != nullptr && title != nullptr) {
+        _screens->setAppTitle(title);
+    }
+}
+
 void LVGLDisplayModule::resetActivity() {
     _screensaver.resetActivity();
 }
@@ -617,6 +643,13 @@ void LVGLDisplayModule::applyConfig(const JsonObject& section) {
     _screensaver.setDimTimeout(_dimTimeoutMs);
     _screensaver.setBlankTimeout(_blankTimeoutMs);
 
+    // Screensaver policy: DimOnly vs FullSleep (default: FullSleep)
+    String policyStr = section["screensaverPolicy"] | "FullSleep";
+    ScreensaverPolicy policy = (policyStr == "DimOnly")
+        ? ScreensaverPolicy::DimOnly
+        : ScreensaverPolicy::FullSleep;
+    _screensaver.setPolicy(policy);
+
     _adapter.setBrightness(_brightness);
 
     if (_display != nullptr) {
@@ -635,6 +668,8 @@ void LVGLDisplayModule::serializeConfig(JsonObject& section) const {
     section["screensaverEnabled"] = _screensaverEnabled;
     section["dimTimeout"]         = _dimTimeoutMs;
     section["blankTimeout"]       = _blankTimeoutMs;
+    section["screensaverPolicy"]  = (_screensaver.getPolicy() == ScreensaverPolicy::DimOnly)
+        ? "DimOnly" : "FullSleep";
 }
 
 void LVGLDisplayModule::resetConfig() {
@@ -647,6 +682,7 @@ void LVGLDisplayModule::resetConfig() {
     _screensaver.setEnabled(true);
     _screensaver.setDimTimeout(150000);
     _screensaver.setBlankTimeout(300000);
+    _screensaver.setPolicy(ScreensaverPolicy::FullSleep);
 
     _adapter.setBrightness(_brightness);
 
@@ -753,7 +789,7 @@ void LVGLDisplayModule::_onSystemError(const char* /*topic*/, const void* payloa
     if (err->message != nullptr) {
         strncpy(self->_pendingErrorMessage, err->message, sizeof(self->_pendingErrorMessage) - 1);
         self->_pendingErrorMessage[sizeof(self->_pendingErrorMessage) - 1] = '\0';
-        
+
         if (err->title != nullptr) {
             strncpy(self->_pendingErrorTitle, err->title, sizeof(self->_pendingErrorTitle) - 1);
             self->_pendingErrorTitle[sizeof(self->_pendingErrorTitle) - 1] = '\0';
@@ -774,7 +810,7 @@ void LVGLDisplayModule::_onAppConfiguring(const char* /*topic*/, const void* pay
 
     // Deactivate diagnostic carousel when leaving DiagScreen
     self->_diagCarousel.stop();
-             
+
     // LVGL has no built-in configuring screens — the skin (SLSSystemScreens) supplies
     // them. With no provider there is nothing to display.
     if (self->_screens == nullptr) {
@@ -811,30 +847,12 @@ void LVGLDisplayModule::_onAppConfiguring(const char* /*topic*/, const void* pay
     }
 }
 
-#if defined(__GNUC__) || defined(__clang__)
-extern "C" {
-    __attribute__((weak)) extern lv_obj_t* ui_ui_DiagScreen;  // SLS Diag (running) screen
-}
-#endif
-
 void LVGLDisplayModule::_onAppRunning(const char* /*topic*/, const void* /*payload*/, void* ctx) {
     auto* self = static_cast<LVGLDisplayModule*>(ctx);
     if (self == nullptr) return;
-    ESP_LOGI("LVGLDisplayModule", "App transition → RUNNING");
-    
-    // Left the system screen (configuring/error/OTA) for the running UI: clear the
-    // system-screen state and load the SLS Diag (running) screen — this is what
-    // dismisses the boot screen once all config gates are satisfied.
-    self->_inSystemScreen = false;
-    self->_priorScreen = nullptr;
-#if defined(__GNUC__) || defined(__clang__)
-    if (&ui_ui_DiagScreen != nullptr && ui_ui_DiagScreen != nullptr) {
-        lv_scr_load_anim(ui_ui_DiagScreen, LV_SCR_LOAD_ANIM_FADE_IN, 300, 0, false);
-    }
-#endif
-
-    // Activate the diagnostic carousel (encoder-driven metric browser)
-    self->_diagCarousel.begin(self->_group);
+    // Defer to tick() — LVGL APIs must only be called from the main loop.
+    // See EventBus.hpp §1: callbacks run on the esp_event default loop task.
+    self->_pendingAppRunning.store(true);
 }
 
 void LVGLDisplayModule::_onInputWake(const char* /*topic*/, const void* /*payload*/, void* ctx) {
@@ -923,8 +941,15 @@ void LVGLDisplayModule::registerRoutes(PsychicHttpServer& server) {
 
 #ifndef UNIT_TEST
 #ifdef WITH_OTA
-    _serviceHelper.setOtaPredicate([]() {
-        return OTAUpdateManager::getState() != OTAState::Idle;
+    // KNOWN GAP — tracked in issue #138.
+    // _pauseRendering covers a narrower window than OTAUpdateManager::getState()
+    // != Idle: it is set by _onOtaProgress only for non-complete events, and is
+    // cleared by restorePriorScreen()/clearStatus(), which are reachable from
+    // non-OTA paths. The proper fix is to wire an OTAUpdateManager* (or an
+    // IOtaStateProvider) into this module. U8G2DisplayModule still uses the
+    // original static call and is inconsistent with this one.
+    _serviceHelper.setOtaPredicate([this]() {
+        return _pauseRendering.load();
     });
 #endif
     _serviceHelper.registerBrightnessRoute(server);
@@ -943,6 +968,8 @@ void LVGLDisplayModule::registerRoutes(PsychicHttpServer& server) {
         doc["screensaverEnabled"] = _screensaverEnabled;
         doc["dimTimeout"]         = _dimTimeoutMs;
         doc["blankTimeout"]       = _blankTimeoutMs;
+        doc["screensaverPolicy"]  = (_screensaver.getPolicy() == ScreensaverPolicy::DimOnly)
+            ? "DimOnly" : "FullSleep";
 
         String output;
         serializeJson(doc, output);
@@ -1046,6 +1073,18 @@ void LVGLDisplayModule::registerRoutes(PsychicHttpServer& server) {
             needsPersist = true;
         }
 
+        if (doc["screensaverPolicy"].is<const char*>()) {
+            const char* policy = doc["screensaverPolicy"].as<const char*>();
+            if (strcmp(policy, "DimOnly") == 0) {
+                _screensaver.setPolicy(ScreensaverPolicy::DimOnly);
+                needsPersist = true;
+            } else if (strcmp(policy, "FullSleep") == 0) {
+                _screensaver.setPolicy(ScreensaverPolicy::FullSleep);
+                needsPersist = true;
+            }
+            // Invalid values are silently ignored — no persist, no 400
+        }
+
         if (doc["timeout"].is<unsigned long>()) {
             unsigned long st = doc["timeout"].as<unsigned long>();
             setDimTimeout(st / 2);
@@ -1091,6 +1130,8 @@ void LVGLDisplayModule::registerMCPTools(MCPToolRegistry& registry) {
 
             result["rotation"]           = self->_rotation;
             result["screensaverEnabled"] = self->_screensaverEnabled;
+            result["screensaverPolicy"]  = (self->_screensaver.getPolicy() == ScreensaverPolicy::DimOnly)
+                ? "DimOnly" : "FullSleep";
 
             // --- Screensaver sub-object ---
             JsonObject ss = result["screensaver"].to<JsonObject>();
@@ -1104,6 +1145,8 @@ void LVGLDisplayModule::registerMCPTools(MCPToolRegistry& registry) {
             }
             ss["dimTimeout"]   = self->_dimTimeoutMs;
             ss["blankTimeout"] = self->_blankTimeoutMs;
+            ss["policy"] = (self->_screensaver.getPolicy() == ScreensaverPolicy::DimOnly)
+                ? "DimOnly" : "FullSleep";
 
             // --- Resolution sub-object ---
             JsonObject res = result["resolution"].to<JsonObject>();
@@ -1156,6 +1199,12 @@ void LVGLDisplayModule::registerMCPTools(MCPToolRegistry& registry) {
     props["blankTimeout"]["type"]        = "integer";
     props["blankTimeout"]["description"] = "Milliseconds of inactivity before blanking";
 
+    props["screensaverPolicy"]["type"]        = "string";
+    props["screensaverPolicy"]["description"] = "Screensaver mode: 'DimOnly' (dim only) or 'FullSleep' (dim then blank)";
+    JsonArray policyEnum = props["screensaverPolicy"]["enum"].to<JsonArray>();
+    policyEnum.add("DimOnly");
+    policyEnum.add("FullSleep");
+
     registry.addTool(
         "display_control",
         "Control display settings: wake/sleep, enable/disable screensaver, set brightness, rotation, and timeouts",
@@ -1202,6 +1251,18 @@ void LVGLDisplayModule::registerMCPTools(MCPToolRegistry& registry) {
                 needsPersist = true;
             }
 
+            if (params["screensaverPolicy"].is<const char*>()) {
+                const char* policy = params["screensaverPolicy"].as<const char*>();
+                if (strcmp(policy, "DimOnly") == 0) {
+                    self->_screensaver.setPolicy(ScreensaverPolicy::DimOnly);
+                    needsPersist = true;
+                } else if (strcmp(policy, "FullSleep") == 0) {
+                    self->_screensaver.setPolicy(ScreensaverPolicy::FullSleep);
+                    needsPersist = true;
+                }
+                // Invalid values are silently ignored — no persist, no 400
+            }
+
             if (needsPersist && self->_configManager != nullptr) {
                 self->_configManager->saveModuleConfig(self);
             }
@@ -1213,6 +1274,3 @@ void LVGLDisplayModule::registerMCPTools(MCPToolRegistry& registry) {
     );
 
 }
-
-
-

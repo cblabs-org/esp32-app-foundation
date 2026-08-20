@@ -66,6 +66,7 @@ typedef uint32_t StackType_t;
 // Unsigned counterpart of BaseType_t — needed by callers that store counts
 // (e.g. stack high water marks) which are never negative on real FreeRTOS.
 typedef unsigned int UBaseType_t;
+inline TaskHandle_t xTaskGetHandle(const char* pcNameToQuery) { return nullptr; }
 inline uint32_t uxTaskGetStackHighWaterMark(TaskHandle_t xTask) { return 1000; }
 
 // Tick counter type. Native tests do not exercise real timing, so a plain

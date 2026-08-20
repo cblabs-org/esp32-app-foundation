@@ -280,6 +280,20 @@ public:
      */
     void setBootLogo(const lv_image_dsc_t* bootLogo);
 
+    /**
+     * @brief Set the application title on the boot screen.
+     *
+     * Delegates to the ILVGLSystemScreens provider so the SLS boot screen
+     * reflects the runtime app name instead of the hardcoded SLS literal.
+     * Safe to call at any point. The title is cached in _appTitle and applied
+     * immediately if the skin provider already exists; bootstrapHardware()
+     * re-applies the cached value once the SLS UI has been built. The framework
+     * calls this from Application::begin() just after beginEarly().
+     *
+     * @param title Pointer to the application title string (static lifetime).
+     */
+    void setAppTitle(const char* title) override;
+
     // -------------------------------------------------------------------------
     // IConfigurable — ConfigManager gateway (namespace: "display")
     // -------------------------------------------------------------------------
@@ -396,7 +410,7 @@ private:
 
     SettingsTabStub _settingsTabStub;
     ScreenshotTabStub _screenshotTabStub;
-    
+
     struct HardwareContributor : public IWebContributor {
         void registerRoutes(PsychicHttpServer& /*server*/) override {}
         const char* getTabName() const override { return "Hardware"; }
@@ -440,6 +454,7 @@ private:
     std::atomic<bool> _pendingInputWake{false}; ///< Input detected while dimmed/blanked
 
     // --- Thread-safe pending state ---
+    std::atomic<bool> _pendingAppRunning{false};  ///< Deferred RUNNING transition (from EventBus callback)
     std::atomic<bool> _pendingOtaUpdate{false};
     std::atomic<float> _pendingOtaProgress{0.0f};
     char _pendingOtaStatus[64] = {};
@@ -461,6 +476,7 @@ private:
 
     // --- System Screens & Assets ---
     const lv_image_dsc_t* _bootLogo = nullptr;
+    const char*           _appTitle = nullptr;  ///< Runtime-settable boot screen title (overrides SLS literal)
     FaultScreen           _faultScreen;       ///< The only built-in screen (dev fault/trace fallback)
     bool                  _uiInitialized = false; ///< Guards the one-time ui_init() (SLS UI build)
     lv_obj_t*             _priorScreen = nullptr;
@@ -478,4 +494,3 @@ private:
     DisplayServiceHelper  _serviceHelper{this};       ///< Shared web/MCP display routes (hardware only)
 #endif
 };
-

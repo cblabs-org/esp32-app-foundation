@@ -83,6 +83,7 @@ Application::~Application() {
 bool Application::begin(const FrameworkConfig& config) {
     if (_bootReporter) {
         _bootReporter->beginEarly();
+        _bootReporter->setAppTitle(getAppName());
         _statusReporter = _bootReporter;
     } else {
         _statusReporter = &_nullReporter;
@@ -235,6 +236,9 @@ bool Application::begin(const FrameworkConfig& config) {
     // --- Step 15: WebServerManager begin() ---
     _authManager.setAPMode(_wifiManager.getAPMode());
     _webServerManager.setAppName(getAppName());
+    if (_appStylesheet) {
+        _webServerManager.setAppStylesheet(_appStylesheet);
+    }
     _webServerManager.begin(_webContributors, &_authManager, &_wifiManager);
     _statusReporter->reportStatus("Web portal starting...", 0.90f);
 

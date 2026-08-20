@@ -120,6 +120,7 @@ const MOCK_DISPLAY_STATUS = {
   sleeping:           false,
   dimTimeout:         150000,
   blankTimeout:       300000,
+  screensaverPolicy:  'FullSleep',
   rotationInterval:   8000,
   boardCount:         2,
   clockFontSize:      2,

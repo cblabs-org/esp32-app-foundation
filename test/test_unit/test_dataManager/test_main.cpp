@@ -12,6 +12,7 @@
 #include <gtest/gtest.h>
 #include "DataManager.hpp"
 #include <string>
+#include <memory>
 
 class MockDataSource : public IDataSource {
 public:
@@ -250,6 +251,176 @@ TEST(DataManagerGatingTest, AppRunningToggle_StopsFetch) {
     dm.setAppRunning(true);
     dm.processNext();
     EXPECT_EQ(src.fetchCount, 2);
+}
+
+// =============================================================================
+// Test Group: Queue Data Jobs (WO8)
+// =============================================================================
+
+TEST_F(DataManagerTest, QueueDataJob_ExecutesJob) {
+    dm.begin();
+    bool executed = false;
+    dm.queueDataJob([&executed]() { executed = true; }, "test1");
+    EXPECT_EQ(dm.getQueuedJobCount(), 1);
+    dm.processNext();
+    EXPECT_TRUE(executed);
+    EXPECT_EQ(dm.getQueuedJobCount(), 0);
+}
+
+TEST_F(DataManagerTest, QueueDataJob_FIFO_Order) {
+    dm.begin();
+    std::vector<int> executionOrder;
+    dm.queueDataJob([&]() { executionOrder.push_back(1); }, "job1");
+    dm.queueDataJob([&]() { executionOrder.push_back(2); }, "job2");
+
+    dm.processNext();
+
+    ASSERT_EQ(executionOrder.size(), 2);
+    EXPECT_EQ(executionOrder[0], 1);
+    EXPECT_EQ(executionOrder[1], 2);
+}
+
+TEST_F(DataManagerTest, QueueDataJob_Urgent_RunsBeforeFetch) {
+    dm.begin();
+    dm.setSimulatedTimeMs(1000);
+
+    std::vector<std::string> log;
+
+    // We can't easily intercept the exact fetchUpdate timing with a simple mock,
+    // but we can make the job append to a log, and the mock source also append to a log.
+    class LoggingMockDataSource : public MockDataSource {
+    public:
+        std::vector<std::string>& logRef;
+        LoggingMockDataSource(std::string n, std::vector<std::string>& lr)
+            : MockDataSource(n, 1000, PriorityTier::Low), logRef(lr) {}
+
+        UpdateStatus fetchUpdate() override {
+            logRef.push_back("fetch");
+            return MockDataSource::fetchUpdate();
+        }
+    };
+
+    LoggingMockDataSource logSrc("src1", log);
+    dm.registerSource(&logSrc);
+
+    dm.queueDataJob([&]() { log.push_back("urgentJob"); }, { .tag = "urgent", .urgent = true });
+
+    dm.processNext();
+
+    ASSERT_EQ(log.size(), 2);
+    EXPECT_EQ(log[0], "urgentJob");
+    EXPECT_EQ(log[1], "fetch");
+}
+
+TEST_F(DataManagerTest, QueueDataJob_Normal_RunsAfterFetch) {
+    dm.begin();
+    dm.setSimulatedTimeMs(1000);
+
+    std::vector<std::string> log;
+
+    class LoggingMockDataSource : public MockDataSource {
+    public:
+        std::vector<std::string>& logRef;
+        LoggingMockDataSource(std::string n, std::vector<std::string>& lr)
+            : MockDataSource(n, 1000, PriorityTier::Low), logRef(lr) {}
+
+        UpdateStatus fetchUpdate() override {
+            logRef.push_back("fetch");
+            return MockDataSource::fetchUpdate();
+        }
+    };
+
+    LoggingMockDataSource logSrc("src1", log);
+    dm.registerSource(&logSrc);
+
+    dm.queueDataJob([&]() { log.push_back("normalJob"); }, { .tag = "normal", .urgent = false });
+
+    dm.processNext();
+
+    ASSERT_EQ(log.size(), 2);
+    EXPECT_EQ(log[0], "fetch");
+    EXPECT_EQ(log[1], "normalJob");
+}
+
+TEST_F(DataManagerTest, QueueDataJob_QueueFull_ReturnsFalse) {
+    dm.begin();
+    // 8 is JOB_QUEUE_DEPTH
+    for (int i = 0; i < 8; ++i) {
+        EXPECT_TRUE(dm.queueDataJob([](){}, "job"));
+    }
+    // 9th job should fail
+    EXPECT_FALSE(dm.queueDataJob([](){}, "job_fail"));
+    EXPECT_EQ(dm.getQueuedJobCount(), 8);
+}
+
+TEST_F(DataManagerTest, QueueDataJob_BeforeBegin_ReturnsFalse) {
+    // dm.begin() is NOT called
+    EXPECT_FALSE(dm.queueDataJob([](){}, "job"));
+}
+
+TEST_F(DataManagerTest, QueueDataJob_NullCallable_ReturnsFalse) {
+    dm.begin();
+    EXPECT_FALSE(dm.queueDataJob(nullptr, "job"));
+}
+
+TEST_F(DataManagerTest, QueueDataJob_AppNotRunning_StillExecutes) {
+    dm.begin();
+    dm.setAppRunning(false);
+
+    bool executed = false;
+    dm.queueDataJob([&executed]() { executed = true; }, "test1");
+
+    dm.processNext();
+
+    EXPECT_TRUE(executed);
+}
+
+TEST_F(DataManagerTest, GetQueuedJobCount_ReflectsPending) {
+    dm.begin();
+    EXPECT_EQ(dm.getQueuedJobCount(), 0);
+    dm.queueDataJob([](){}, "job1");
+    EXPECT_EQ(dm.getQueuedJobCount(), 1);
+    dm.queueDataJob([](){}, "job2");
+    EXPECT_EQ(dm.getQueuedJobCount(), 2);
+
+    dm.processNext();
+    EXPECT_EQ(dm.getQueuedJobCount(), 0);
+}
+
+TEST_F(DataManagerTest, QueueDataJob_UrgentBypassesNormal) {
+    dm.begin();
+    dm.setAppRunning(true);
+
+    int order = 0;
+    int normalOrder = 0;
+    int urgentOrder = 0;
+
+    dm.queueDataJob([&]() { normalOrder = ++order; }, "normal");
+    dm.queueDataJob([&]() { urgentOrder = ++order; }, DataJobOptions{ .tag = "urgent", .urgent = true });
+
+    dm.processNext();  // drainJobs(true) should execute urgent first
+
+    EXPECT_EQ(urgentOrder, 1);
+    EXPECT_EQ(normalOrder, 2);
+}
+
+TEST_F(DataManagerTest, QueueDataJob_QueueFull_CallableDestroyed) {
+    dm.begin();
+
+    // Fill the queue with 8 trivial jobs
+    for (int i = 0; i < 8; i++) {
+        dm.queueDataJob([]() {}, "filler");
+    }
+
+    // Create a separate tracker for the overflow entry only.
+    // weak_ptr tracks if the shared_ptr captured in the rejected
+    // lambda is properly destroyed when the callable is dropped.
+    auto tracker = std::make_shared<int>(42);
+    std::weak_ptr<int> weak = tracker;
+    bool result = dm.queueDataJob([t = std::move(tracker)]() {}, "overflow");
+
+    EXPECT_FALSE(result);
+    EXPECT_TRUE(weak.expired());  // lambda was destroyed, releasing the shared_ptr
 }
 
 int main(int argc, char **argv) {

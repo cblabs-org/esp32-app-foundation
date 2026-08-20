@@ -48,6 +48,12 @@ public:
     void onBootProgress(const char* message, float progress) override;
 
     /**
+     * @brief Override the SLS boot screen title with the application's name.
+     * @param title Application title string (lifetime managed by caller).
+     */
+    void setAppTitle(const char* title) override;
+
+    /**
      * @brief Retrieve error screen root object with error visibility group active.
      * @return Pointer to ui_uiSystemScreen.
      */

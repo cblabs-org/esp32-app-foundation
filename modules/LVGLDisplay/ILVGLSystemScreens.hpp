@@ -56,6 +56,18 @@ public:
     virtual lv_obj_t* bootScreen() { return nullptr; }
 
     /**
+     * @brief Set the application title displayed on the boot screen.
+     *
+     * Called by the framework after Application::getAppName() is available.
+     * Default no-op for backward compatibility with custom skin providers.
+     *
+     * @param title The application title string (lifetime managed by caller).
+     */
+    virtual void setAppTitle(const char* title) {
+        (void)title;
+    }
+
+    /**
      * @brief Create or retrieve custom OTA progress screen root object.
      *
      * @return Pointer to custom lv_obj_t screen container, or nullptr to use default screen.

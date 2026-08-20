@@ -174,6 +174,7 @@ private:
     bool         _serverStarted = false; ///< True if the underlying servers have been started
     std::atomic<bool> _restartRequested{false}; ///< True if a device restart has been requested
     const char*  _appName = nullptr;     ///< Runtime-settable app name for /api/app response
+    const char*  _appStylesheet = nullptr; ///< Optional CSS path for portal branding
 
     size_t       _httpStackSize      = BOARD_HTTP_STACK_SIZE;      ///< Configured task stack size
     int          _httpMaxOpenSockets = BOARD_HTTP_MAX_OPEN_SOCKETS; ///< Configured max open sockets
@@ -186,8 +187,25 @@ public:
      * /api/app JSON response, allowing downstream apps to brand the portal
      * at runtime via Application::setAppName().
      *
+     * @note Must be called before begin() — the value is captured by copy
+     *       into route handlers at begin() time.
+     *
      * @param name  Pointer to a string with static lifetime.
      */
     void setAppName(const char* name) { _appName = name; }
+
+    /**
+     * @brief Set an optional CSS stylesheet path for portal branding.
+     *
+     * When non-null, this path is included as "stylesheet" in the /api/app
+     * JSON response. The portal JS injects a <link> tag for it before loading
+     * tab scripts, eliminating the branding FOUC.
+     *
+     * @note Must be called before begin() — the value is captured by copy
+     *       into route handlers at begin() time.
+     *
+     * @param path  Pointer to a string with static lifetime (e.g. "/app.css").
+     */
+    void setAppStylesheet(const char* path) { _appStylesheet = path; }
 };
 

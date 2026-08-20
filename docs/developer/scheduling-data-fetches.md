@@ -374,3 +374,40 @@ This sends a wake event to the DataManager's task, causing it to evaluate `weath
 - [ ] **Guard hardware code** with `#ifndef NATIVE_BUILD` — see [Using Optional Modules](using-optional-modules.md)
 - [ ] **Register via `registerModule()`** for automatic subsystem detection
 - [ ] **Keep stack usage under 8KB** in `fetchUpdate()` — avoid large local buffers
+
+---
+
+## 7. Queuing Data Jobs
+
+If you need to perform an off-loop data operation (like an HTTP POST or PUT) that doesn't fit the `IDataSource` scheduled-read model, you can enqueue a lambda to run on the `DataManager` worker task. This provides a safe, TWDT-protected background context for outbound network calls.
+
+### Basic Job
+
+```cpp
+void MyModule::onConfigSaved() {
+    app.getDataManager().queueDataJob([this]() {
+        HTTPClient http;
+        http.begin("https://hub.local/api/setpoint");
+        http.addHeader("Content-Type", "application/json");
+        int code = http.POST("{\"temp\": 22}");
+        if (code == 200) {
+            _lastWriteOk.store(true);
+            // Optionally publish to EventBus for UI update
+        }
+        http.end();
+    }, "setTemperature");
+}
+```
+
+### Urgent Job
+
+To bypass the `IDataSource` polling queue (e.g. for user-facing interactions with immediate feedback):
+
+```cpp
+void MyModule::onPortalAction() {
+    app.getDataManager().queueDataJob([this]() {
+        // HTTP PUT that the user is actively waiting for
+        sendCommandToHub();
+    }, { .tag = "hubCommand", .urgent = true });
+}
+```
