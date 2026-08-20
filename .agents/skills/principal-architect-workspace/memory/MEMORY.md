@@ -1,5 +1,5 @@
 # Principal Architect Memory
-<!-- Last updated: 2026-08-19T19:30:00+01:00 -->
+<!-- Last updated: 2026-08-20T00:00:00+01:00 -->
 
 ## Active Programs
 | Program | Plan | Status |
@@ -10,11 +10,6 @@
 ## Active Projects
 | Project | Status | Modules | Context |
 |---|---|---|---|
-| pr-issue-sweep-aug | All 8 WOs complete, draft PR stood up (#136) | OTAUpdateManager, LVGLDisplay, DataManager, WebServer, Application, EventBus, web/portal, framework-expert skill, squareline, sample-app | [PROJECT.md](../pr-issue-sweep-aug/PROJECT.md) |
-| pr-115-http-stack-dram | WO1–4 done, **PR #117 merged**; review found+fixed 2 blockers (`498f64c6`); continued in pr-122 (#124). Follow-ups open: #133 (worker stack sizing), #134 (native test ERRORs), #135 (OTA gate). #114 to close. | DeepStackExecutor (new lib), DisplayServiceHelper, LVGLDisplay, PngWriter, WebServer, OTAUpdateManager (read-only), framework-expert skill, docs | [PROJECT.md](../pr-115-http-stack-dram/PROJECT.md) |
-| pr-portal-consumer-assets | WO2/2 — both complete, draft PR stood up (#111) | portalBuilder.py, include/web/serveGzipAsset.hpp, WebServer, MCPServer, OTAUpdateManager, TimeManager, HomeAssistant, U8G2Display, LVGLDisplay, sample-app, docs, framework-expert skill | [PROJECT.md](../pr-portal-consumer-assets/PROJECT.md) |
-| pr-p2-issue-remediation | WO4/4 — all complete + screensaver fix, awaiting PR | OTAUpdateManager, web/portal, U8G2Display, Application, platformio.ini, test/, LVGLDisplay/ScreensaverController | [PROJECT.md](../pr-p2-issue-remediation/PROJECT.md) |
-| pr-type-colocation | WO3/3 — PR #95 submitted | ButtonModule, EncoderModule, U8G2Display, LVGLDisplay, HomeAssistant, hardware/* | [PROJECT.md](../pr-type-colocation/PROJECT.md) |
 | pr-mk01-eventbus-concurrency | Planned | | [PROJECT.md](../microkernel-refactor/pr-mk01-eventbus-concurrency/PROJECT.md) |
 | pr-mk02-kernel-hardening | Planned | | [PROJECT.md](../microkernel-refactor/pr-mk02-kernel-hardening/PROJECT.md) |
 | pr-mk03-module-composition | Planned | | [PROJECT.md](../microkernel-refactor/pr-mk03-module-composition/PROJECT.md) |
@@ -26,13 +21,13 @@
 ## Recently Completed (last 5)
 | Project | Completed | Modules | Key Outcome |
 |---|---|---|---|
+| pr-issue-sweep-aug | 2026-08-20 | OTAUpdateManager, LVGLDisplay, DataManager, WebServer, Application, EventBus, web/portal, framework-expert skill, squareline, sample-app | 8 WOs closing 14 issues; `queueDataJob()` primitive, LVGL EventBus race fix, portal DRAM tuning, screensaver policy UI. PR [#136](https://github.com/matthewmcneill/esp32-app-foundation/pull/136) merged (`6890dc22`). #80/#97 deliberately left open. [PROJECT.md](../pr-issue-sweep-aug/PROJECT.md) |
 | pr-122-dram-psram-optimization | 2026-08-18 | LVGLDisplay/lv_conf.h, DataManager.cpp, web/portal/system.js, docs | +35 KB internal DRAM via LVGL heap→PSRAM (`LV_MEM_POOL_ALLOC`), DataManager watermark telemetry, portal RAG threshold fix. PRs #123+#124 merged. Issues #121, #122 closed. `v0.0.12-dev.52` device-verified. [PROJECT.md](../pr-122-dram-psram-optimization/PROJECT.md) |
+| pr-115-http-stack-dram | 2026-08-17 | DeepStackExecutor (new lib), DisplayServiceHelper, LVGLDisplay, PngWriter, WebServer, framework-expert skill, docs | Deep-stack PNG work decoupled from the httpd task; httpd stack 16 KB→board-tunable 8 KB. PR [#117](https://github.com/matthewmcneill/esp32-app-foundation/pull/117) merged (`d3b4f733`); review found+fixed 2 blockers (`498f64c6`). Follow-ups open: #133, #134, #135. [PROJECT.md](../pr-115-http-stack-dram/PROJECT.md) |
+| pr-portal-consumer-assets | 2026-08-16 | portalBuilder.py, include/web/serveGzipAsset.hpp, WebServer, MCPServer, OTAUpdateManager, TimeManager, HomeAssistant, U8G2Display, LVGLDisplay, sample-app, docs, framework-expert skill | Gzip asset pipeline reachable from consuming apps. PR [#112](https://github.com/matthewmcneill/esp32-app-foundation/pull/112) merged closing #111. [PROJECT.md](../pr-portal-consumer-assets/PROJECT.md) |
 | pr-portal-asset-decentralisation | 2026-08-14 | WebServer, OTAUpdateManager, MCPServer, TimeManager, HomeAssistant, U8G2Display, LVGLDisplay, portalBuilder.py, app.js | Decentralised optional module web assets. Each module owns JS source, route serving, and dynamic script discovery via `getTabScript()`. PR [#109](https://github.com/matthewmcneill/esp32-app-foundation/pull/109) merged closing #96. [PROJECT.md](../pr-portal-asset-decentralisation/PROJECT.md) |
-| group3-code-quality (#108, #107) | 2026-08-14 | ButtonModule, hardware/_TEMPLATE, framework-expert skill, docs | `removeButton()` API, board template folder restructure with starter files, skill/doc ownership clarity. 662/664 tests pass, device-verified. Commit `e0dfc120`. [context_bridge](../../context_archives/distillation-20260814-group3-code-quality/context_bridge.md) |
-| pr-adopt-display-interface | 2026-08-11 | LVGLDisplay, PngWriter, WebServer | Forward-port SLS display stack onto main + #86 interface. Screenshot API stable (tdefl 164KB, PSRAM, threaded). Boot transition restored. `v0.0.12-dev.44` device-verified. [PROJECT.md](../pr-adopt-display-interface/PROJECT.md) |
-| aria-tabpanel | 2026-08-11 | web-portal | Complete WAI-ARIA tabpanel semantics on portal tabs + sub-pills; PR #93 merged closing issue #92 |
 
 ## Older Projects
-84 completed projects.
+85 completed projects.
 Full project history: [PROJECT_INDEX.md](PROJECT_INDEX.md)
 Cross-cutting module index: [MODULE_INDEX.md](MODULE_INDEX.md)
