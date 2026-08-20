@@ -13,6 +13,7 @@
 #include "DataManager.hpp"
 #include <string>
 #include <memory>
+#include <algorithm>
 
 class MockDataSource : public IDataSource {
 public:
@@ -32,6 +33,28 @@ public:
     uint32_t interval;
     PriorityTier tier;
     int fetchCount;
+};
+
+
+// --- WO2: programmable-result source for health/backoff tests (#128) ---
+class ScriptedSource : public IDataSource {
+public:
+    ScriptedSource(std::string n, uint32_t ivl, PriorityTier p)
+        : name(n), interval(ivl), tier(p) {}
+
+    UpdateStatus fetchUpdate() override {
+        fetchCount++;
+        return next;
+    }
+    uint32_t getUpdateIntervalMs() const override { return interval; }
+    const char* getSourceName() const override { return name.c_str(); }
+    PriorityTier getPriorityTier() const override { return tier; }
+
+    std::string  name;
+    uint32_t     interval;
+    PriorityTier tier;
+    int          fetchCount = 0;
+    UpdateStatus next = UpdateStatus::Success;
 };
 
 class DataManagerTest : public ::testing::Test {
@@ -478,6 +501,291 @@ TEST_F(DataManagerTest, StartStampClearedEvenWhenFetchReportsFailure) {
 
     EXPECT_EQ(src.fetchCount, 1);
     EXPECT_EQ(dm.getFetchElapsedMs(), 0u);
+}
+
+// ===========================================================================
+// WO2 — per-source health, backoff and quarantine (#128)
+//
+// The whole point of this state machine is that a source which cannot be
+// reached degrades ITSELF. Nothing here may reach for a reset.
+// ===========================================================================
+
+static SourceHealth healthOf(DataManager& dm, IDataSource* src) {
+    SourceHealth h;
+    EXPECT_TRUE(dm.getSourceHealth(src, h));
+    return h;
+}
+
+TEST_F(DataManagerTest, Health_StartsUnknownAndNeverConnected) {
+    ScriptedSource src("s", 1000, PriorityTier::High);
+    dm.registerSource(&src);
+
+    SourceHealth h = healthOf(dm, &src);
+    EXPECT_EQ(h.state, SourceHealthState::Unknown);
+    EXPECT_TRUE(h.neverConnected());
+    EXPECT_FALSE(h.isFailing());
+    EXPECT_EQ(h.lastAttemptMs, 0u);
+}
+
+TEST_F(DataManagerTest, Health_SuccessMarksHealthyAndEverSucceeded) {
+    ScriptedSource src("s", 1000, PriorityTier::High);
+    src.next = UpdateStatus::Success;
+    dm.registerSource(&src);
+    dm.processNext();
+
+    SourceHealth h = healthOf(dm, &src);
+    EXPECT_EQ(h.state, SourceHealthState::Healthy);
+    EXPECT_TRUE(h.everSucceeded);
+    EXPECT_FALSE(h.neverConnected());
+    EXPECT_EQ(h.consecutiveFailures, 0);
+}
+
+TEST_F(DataManagerTest, Health_FetchErrorDegradesAndBacksOff) {
+    ScriptedSource src("s", 1000, PriorityTier::High);
+    src.next = UpdateStatus::FetchError;
+    dm.registerSource(&src);
+    dm.processNext();
+
+    SourceHealth h = healthOf(dm, &src);
+    EXPECT_EQ(h.state, SourceHealthState::Degraded);
+    EXPECT_EQ(h.consecutiveFailures, 1);
+    EXPECT_EQ(h.currentBackoffMs, DataManager::HEALTH_BACKOFF_BASE_MS);
+    EXPECT_TRUE(h.isFailing());
+    EXPECT_TRUE(h.neverConnected());   // never succeeded — user-actionable
+}
+
+TEST_F(DataManagerTest, Health_BackoffSuppressesFetchesUntilDue) {
+    ScriptedSource src("s", 1000, PriorityTier::High);
+    src.next = UpdateStatus::FetchError;
+    dm.registerSource(&src);
+
+    dm.processNext();
+    EXPECT_EQ(src.fetchCount, 1);
+
+    // Interval has elapsed, but the 30s backoff has not — no fetch.
+    dm.setSimulatedTimeMs(1000 + 5000);
+    dm.processNext();
+    EXPECT_EQ(src.fetchCount, 1) << "backoff must suppress the retry";
+
+    // Past the backoff window — fetch resumes.
+    dm.setSimulatedTimeMs(1000 + DataManager::HEALTH_BACKOFF_BASE_MS + 1);
+    dm.processNext();
+    EXPECT_EQ(src.fetchCount, 2);
+}
+
+TEST_F(DataManagerTest, Health_BackoffDoublesToCapThenQuarantines) {
+    ScriptedSource src("s", 1000, PriorityTier::High);
+    src.next = UpdateStatus::FetchError;
+    dm.registerSource(&src);
+
+    uint32_t t = 1000;
+    uint32_t expected = DataManager::HEALTH_BACKOFF_BASE_MS;
+    for (int i = 0; i < 10; i++) {
+        dm.setSimulatedTimeMs(t);
+        dm.processNext();
+        SourceHealth h = healthOf(dm, &src);
+        EXPECT_EQ(h.currentBackoffMs, expected);
+        t += expected + 1;
+        expected = std::min(expected * 2, DataManager::HEALTH_BACKOFF_CAP_MS);
+    }
+
+    SourceHealth h = healthOf(dm, &src);
+    EXPECT_EQ(h.currentBackoffMs, DataManager::HEALTH_BACKOFF_CAP_MS);
+    EXPECT_EQ(h.state, SourceHealthState::Quarantined);
+}
+
+TEST_F(DataManagerTest, Health_QuarantinedStillProbesAndSelfHeals) {
+    // Quarantine is "probing every 15 minutes", not "given up" — a hub that
+    // comes back must be picked up with no user action.
+    ScriptedSource src("s", 1000, PriorityTier::High);
+    src.next = UpdateStatus::FetchError;
+    dm.registerSource(&src);
+
+    uint32_t t = 1000;
+    uint32_t backoff = DataManager::HEALTH_BACKOFF_BASE_MS;
+    while (healthOf(dm, &src).state != SourceHealthState::Quarantined) {
+        dm.setSimulatedTimeMs(t);
+        dm.processNext();
+        t += backoff + 1;
+        backoff = std::min(backoff * 2, DataManager::HEALTH_BACKOFF_CAP_MS);
+    }
+
+    int countAtQuarantine = src.fetchCount;
+    src.next = UpdateStatus::Success;
+    dm.setSimulatedTimeMs(t + DataManager::HEALTH_BACKOFF_CAP_MS + 1);
+    dm.processNext();
+
+    EXPECT_GT(src.fetchCount, countAtQuarantine) << "quarantine must keep probing";
+    SourceHealth h = healthOf(dm, &src);
+    EXPECT_EQ(h.state, SourceHealthState::Healthy);
+    EXPECT_EQ(h.consecutiveFailures, 0);
+    EXPECT_EQ(h.currentBackoffMs, 0u);
+}
+
+TEST_F(DataManagerTest, Health_AuthErrorSuspendsAndStopsRetrying) {
+    ScriptedSource src("s", 1000, PriorityTier::High);
+    src.next = UpdateStatus::AuthError;
+    dm.registerSource(&src);
+    dm.processNext();
+
+    SourceHealth h = healthOf(dm, &src);
+    EXPECT_EQ(h.state, SourceHealthState::Suspended);
+
+    // No amount of elapsed time resumes a suspended source.
+    dm.setSimulatedTimeMs(1000 + DataManager::HEALTH_BACKOFF_CAP_MS * 4);
+    dm.processNext();
+    EXPECT_EQ(src.fetchCount, 1) << "credentials do not fix themselves on a timer";
+}
+
+TEST_F(DataManagerTest, Health_ResetClearsSuspension) {
+    ScriptedSource src("s", 1000, PriorityTier::High);
+    src.next = UpdateStatus::AuthError;
+    dm.registerSource(&src);
+    dm.processNext();
+    ASSERT_EQ(healthOf(dm, &src).state, SourceHealthState::Suspended);
+
+    src.next = UpdateStatus::Success;
+    dm.resetSourceHealth(&src);
+    dm.setSimulatedTimeMs(1000 + 2000);
+    dm.processNext();
+
+    EXPECT_EQ(src.fetchCount, 2);
+    EXPECT_EQ(healthOf(dm, &src).state, SourceHealthState::Healthy);
+}
+
+TEST_F(DataManagerTest, Health_PriorityFetchOverridesSuspension) {
+    // The manual recovery path: user fixes the key and presses refresh.
+    ScriptedSource src("s", 1000, PriorityTier::High);
+    src.next = UpdateStatus::AuthError;
+    dm.registerSource(&src);
+    dm.processNext();
+    ASSERT_EQ(healthOf(dm, &src).state, SourceHealthState::Suspended);
+
+    src.next = UpdateStatus::Success;
+    dm.requestPriorityFetch(&src);
+    dm.processNext();
+
+    EXPECT_EQ(src.fetchCount, 2);
+    EXPECT_EQ(healthOf(dm, &src).state, SourceHealthState::Healthy);
+}
+
+TEST_F(DataManagerTest, Health_PriorityFetchOverridesBackoff) {
+    ScriptedSource src("s", 1000, PriorityTier::High);
+    src.next = UpdateStatus::FetchError;
+    dm.registerSource(&src);
+    dm.processNext();
+    ASSERT_EQ(src.fetchCount, 1);
+
+    // Well inside the backoff window — priority must still win.
+    dm.setSimulatedTimeMs(1000 + 100);
+    dm.requestPriorityFetch(&src);
+    dm.processNext();
+    EXPECT_EQ(src.fetchCount, 2);
+}
+
+TEST_F(DataManagerTest, Health_RateLimitedBacksOffButDoesNotQuarantine) {
+    // A rate-limited peer is reachable and answering. Slowing down is right;
+    // quarantining a working peer is not.
+    ScriptedSource src("s", 1000, PriorityTier::High);
+    src.next = UpdateStatus::RateLimited;
+    dm.registerSource(&src);
+
+    uint32_t t = 1000;
+    uint32_t backoff = DataManager::HEALTH_BACKOFF_BASE_MS;
+    for (int i = 0; i < 8; i++) {
+        dm.setSimulatedTimeMs(t);
+        dm.processNext();
+        t += backoff + 1;
+        backoff = std::min(backoff * 2, DataManager::HEALTH_BACKOFF_CAP_MS);
+    }
+
+    SourceHealth h = healthOf(dm, &src);
+    EXPECT_EQ(h.consecutiveFailures, 0) << "rate limiting is not a source fault";
+    EXPECT_EQ(h.state, SourceHealthState::Degraded);
+    EXPECT_GT(h.currentBackoffMs, 0u);
+}
+
+TEST_F(DataManagerTest, Health_SuccessAfterFailuresResetsCleanly) {
+    ScriptedSource src("s", 1000, PriorityTier::High);
+    src.next = UpdateStatus::FetchError;
+    dm.registerSource(&src);
+    dm.processNext();
+    dm.setSimulatedTimeMs(1000 + DataManager::HEALTH_BACKOFF_BASE_MS + 1);
+    dm.processNext();
+    ASSERT_EQ(healthOf(dm, &src).consecutiveFailures, 2);
+
+    src.next = UpdateStatus::Success;
+    dm.setSimulatedTimeMs(1000 + DataManager::HEALTH_BACKOFF_BASE_MS * 4);
+    dm.processNext();
+
+    SourceHealth h = healthOf(dm, &src);
+    EXPECT_EQ(h.state, SourceHealthState::Healthy);
+    EXPECT_EQ(h.consecutiveFailures, 0);
+    EXPECT_EQ(h.currentBackoffMs, 0u);
+    EXPECT_EQ(h.nextAttemptMs, 0u);
+}
+
+TEST_F(DataManagerTest, Health_NeverConnectedSurvivesQuarantine) {
+    // D5: a source that has NEVER succeeded must stay distinguishable from one
+    // that succeeded and later failed. Gates and displays branch on this.
+    ScriptedSource src("s", 1000, PriorityTier::High);
+    src.next = UpdateStatus::FetchError;
+    dm.registerSource(&src);
+
+    uint32_t t = 1000;
+    uint32_t backoff = DataManager::HEALTH_BACKOFF_BASE_MS;
+    for (int i = 0; i < 8; i++) {
+        dm.setSimulatedTimeMs(t);
+        dm.processNext();
+        t += backoff + 1;
+        backoff = std::min(backoff * 2, DataManager::HEALTH_BACKOFF_CAP_MS);
+    }
+
+    SourceHealth h = healthOf(dm, &src);
+    EXPECT_EQ(h.state, SourceHealthState::Quarantined);
+    EXPECT_TRUE(h.neverConnected());
+}
+
+TEST_F(DataManagerTest, Health_EnumerationByIndex) {
+    ScriptedSource a("a", 1000, PriorityTier::High);
+    ScriptedSource b("b", 1000, PriorityTier::Low);
+    dm.registerSource(&a);
+    dm.registerSource(&b);
+
+    EXPECT_EQ(dm.getSourceCount(), 2u);
+    SourceHealth h;
+    EXPECT_TRUE(dm.getSourceHealthAt(0, h));
+    EXPECT_STREQ(h.name, "a");
+    EXPECT_TRUE(dm.getSourceHealthAt(1, h));
+    EXPECT_STREQ(h.name, "b");
+    EXPECT_FALSE(dm.getSourceHealthAt(2, h));
+}
+
+TEST_F(DataManagerTest, Health_UnregisteredSourceQueryFails) {
+    ScriptedSource src("s", 1000, PriorityTier::High);
+    SourceHealth h;
+    EXPECT_FALSE(dm.getSourceHealth(&src, h));
+    EXPECT_FALSE(dm.getSourceHealth(nullptr, h));
+}
+
+TEST_F(DataManagerTest, Health_BackoffDoesNotBlockOtherSources) {
+    // One failing source must not starve the rest of the registry.
+    ScriptedSource bad("bad", 1000, PriorityTier::High);
+    ScriptedSource good("good", 1000, PriorityTier::High);
+    bad.next  = UpdateStatus::FetchError;
+    good.next = UpdateStatus::Success;
+    dm.registerSource(&bad);
+    dm.registerSource(&good);
+
+    dm.processNext();   // bad fetches first, fails, backs off
+    dm.processNext();   // good must still be reachable
+    ASSERT_EQ(bad.fetchCount, 1);
+    EXPECT_EQ(good.fetchCount, 1);
+
+    dm.setSimulatedTimeMs(1000 + 2000);
+    dm.processNext();
+    EXPECT_EQ(bad.fetchCount, 1) << "bad still backing off";
+    EXPECT_EQ(good.fetchCount, 2) << "good must keep running";
 }
 
 int main(int argc, char **argv) {
