@@ -272,9 +272,9 @@ TEST_F(DataManagerTest, QueueDataJob_FIFO_Order) {
     std::vector<int> executionOrder;
     dm.queueDataJob([&]() { executionOrder.push_back(1); }, "job1");
     dm.queueDataJob([&]() { executionOrder.push_back(2); }, "job2");
-    
+
     dm.processNext();
-    
+
     ASSERT_EQ(executionOrder.size(), 2);
     EXPECT_EQ(executionOrder[0], 1);
     EXPECT_EQ(executionOrder[1], 2);
@@ -286,27 +286,27 @@ TEST_F(DataManagerTest, QueueDataJob_Urgent_RunsBeforeFetch) {
 
     std::vector<std::string> log;
 
-    // We can't easily intercept the exact fetchUpdate timing with a simple mock, 
+    // We can't easily intercept the exact fetchUpdate timing with a simple mock,
     // but we can make the job append to a log, and the mock source also append to a log.
     class LoggingMockDataSource : public MockDataSource {
     public:
         std::vector<std::string>& logRef;
-        LoggingMockDataSource(std::string n, std::vector<std::string>& lr) 
+        LoggingMockDataSource(std::string n, std::vector<std::string>& lr)
             : MockDataSource(n, 1000, PriorityTier::Low), logRef(lr) {}
-        
+
         UpdateStatus fetchUpdate() override {
             logRef.push_back("fetch");
             return MockDataSource::fetchUpdate();
         }
     };
-    
+
     LoggingMockDataSource logSrc("src1", log);
     dm.registerSource(&logSrc);
 
     dm.queueDataJob([&]() { log.push_back("urgentJob"); }, { .tag = "urgent", .urgent = true });
-    
+
     dm.processNext();
-    
+
     ASSERT_EQ(log.size(), 2);
     EXPECT_EQ(log[0], "urgentJob");
     EXPECT_EQ(log[1], "fetch");
@@ -321,22 +321,22 @@ TEST_F(DataManagerTest, QueueDataJob_Normal_RunsAfterFetch) {
     class LoggingMockDataSource : public MockDataSource {
     public:
         std::vector<std::string>& logRef;
-        LoggingMockDataSource(std::string n, std::vector<std::string>& lr) 
+        LoggingMockDataSource(std::string n, std::vector<std::string>& lr)
             : MockDataSource(n, 1000, PriorityTier::Low), logRef(lr) {}
-        
+
         UpdateStatus fetchUpdate() override {
             logRef.push_back("fetch");
             return MockDataSource::fetchUpdate();
         }
     };
-    
+
     LoggingMockDataSource logSrc("src1", log);
     dm.registerSource(&logSrc);
 
     dm.queueDataJob([&]() { log.push_back("normalJob"); }, { .tag = "normal", .urgent = false });
-    
+
     dm.processNext();
-    
+
     ASSERT_EQ(log.size(), 2);
     EXPECT_EQ(log[0], "fetch");
     EXPECT_EQ(log[1], "normalJob");
@@ -366,12 +366,12 @@ TEST_F(DataManagerTest, QueueDataJob_NullCallable_ReturnsFalse) {
 TEST_F(DataManagerTest, QueueDataJob_AppNotRunning_StillExecutes) {
     dm.begin();
     dm.setAppRunning(false);
-    
+
     bool executed = false;
     dm.queueDataJob([&executed]() { executed = true; }, "test1");
-    
+
     dm.processNext();
-    
+
     EXPECT_TRUE(executed);
 }
 
@@ -382,7 +382,7 @@ TEST_F(DataManagerTest, GetQueuedJobCount_ReflectsPending) {
     EXPECT_EQ(dm.getQueuedJobCount(), 1);
     dm.queueDataJob([](){}, "job2");
     EXPECT_EQ(dm.getQueuedJobCount(), 2);
-    
+
     dm.processNext();
     EXPECT_EQ(dm.getQueuedJobCount(), 0);
 }

@@ -285,9 +285,10 @@ public:
      *
      * Delegates to the ILVGLSystemScreens provider so the SLS boot screen
      * reflects the runtime app name instead of the hardcoded SLS literal.
-     * Must be called before the display early-start phase (beginEarly()) so
-     * the boot screen shows the branded title. If called later, the title is
-     * cached in _appTitle and applied on the next screen build or transition.
+     * Safe to call at any point. The title is cached in _appTitle and applied
+     * immediately if the skin provider already exists; bootstrapHardware()
+     * re-applies the cached value once the SLS UI has been built. The framework
+     * calls this from Application::begin() just after beginEarly().
      *
      * @param title Pointer to the application title string (static lifetime).
      */
@@ -409,7 +410,7 @@ private:
 
     SettingsTabStub _settingsTabStub;
     ScreenshotTabStub _screenshotTabStub;
-    
+
     struct HardwareContributor : public IWebContributor {
         void registerRoutes(PsychicHttpServer& /*server*/) override {}
         const char* getTabName() const override { return "Hardware"; }
@@ -493,4 +494,3 @@ private:
     DisplayServiceHelper  _serviceHelper{this};       ///< Shared web/MCP display routes (hardware only)
 #endif
 };
-

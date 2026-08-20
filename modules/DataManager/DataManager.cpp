@@ -167,7 +167,11 @@ void DataManager::drainJobs(bool urgentOnly) {
 
         ESP_LOGD(TAG, "Executing data job: '%s'", entry->options.tag);
 
-        uint32_t jobStart = getCurrentTimeMs();
+        // _fetchStartMs MUST be stamped with millis(), never getCurrentTimeMs():
+        // the latter returns the _simulatedTimeMs test hook when set, and
+        // fetchWatchdogCb() compares against millis(). Mixing the two clocks
+        // yields a bogus elapsed value and can trigger a spurious abort().
+        uint32_t jobStart = (uint32_t)millis();
         _fetchStartMs.store(jobStart);
 #ifdef ESP_PLATFORM
         startFetchWatchdog();
@@ -180,7 +184,7 @@ void DataManager::drainJobs(bool urgentOnly) {
 #endif
         _fetchStartMs.store(0);
 
-        uint32_t elapsed = getCurrentTimeMs() - jobStart;
+        uint32_t elapsed = (uint32_t)millis() - jobStart;
         if (entry->options.warnAfterMs > 0 && elapsed > entry->options.warnAfterMs) {
             ESP_LOGW(TAG, "Data job '%s' took %lu ms (warn threshold: %lu ms)",
                      entry->options.tag, (unsigned long)elapsed,
@@ -190,7 +194,10 @@ void DataManager::drainJobs(bool urgentOnly) {
         delete entry;
     }
 
-    // Re-queue deferred entries in FIFO order
+    // Re-queue deferred entries, preserving their order relative to each other.
+    // Caveat: jobs enqueued by another task *during* this drain are already at
+    // the back of the queue, so they will run before these deferred entries.
+    // Strict global FIFO is therefore not guaranteed across a drain boundary.
     for (size_t i = 0; i < deferredCount; i++) {
         if (xQueueSend(_jobQueue, &deferred[i], 0) != pdTRUE) {
             ESP_LOGW(TAG, "Failed to re-queue deferred job '%s' — dropping",
@@ -203,16 +210,16 @@ void DataManager::drainJobs(bool urgentOnly) {
 void DataManager::registerSource(IDataSource* source) {
     if (!source) return;
     MutexLock lock(_registryMutex);
-    
+
     for (const auto& r : _registry) {
         if (r.source == source) return;
     }
-    
+
     SourceRecord record;
     record.source = source;
     record.lastFetchTimeMs = 0; // Set to 0 so it fetches immediately upon registration
     record.priorityRequested = false;
-    
+
     _registry.push_back(record);
     ESP_LOGI(TAG, "Registered source: %s", source->getSourceName());
 }
@@ -221,7 +228,7 @@ void DataManager::unregisterSource(IDataSource* source) {
     if (!source) return;
     ESP_LOGI(TAG, "Unregistering source: %s", source->getSourceName());
     MutexLock lock(_registryMutex);
-    
+
     _registry.erase(std::remove_if(_registry.begin(), _registry.end(),
         [source](const SourceRecord& r) { return r.source == source; }),
         _registry.end());
@@ -231,11 +238,11 @@ void DataManager::requestPriorityFetch(IDataSource* source) {
     if (!source) return;
     ESP_LOGI(TAG, "Priority fetch requested for source: %s", source->getSourceName());
     MutexLock lock(_registryMutex);
-    
+
     for (auto& r : _registry) {
         if (r.source == source) {
             r.priorityRequested = true;
-            
+
             // Wake the worker task to process the priority fetch immediately
             if (_workerTask) {
                 xTaskNotifyGive(_workerTask);
@@ -272,11 +279,14 @@ void DataManager::fetchWatchdogCb(void* arg) {
         ESP_LOGE(TAG, "FATAL: fetch/job hung for %lu ms (>30s) — aborting", (unsigned long)elapsed);
         abort();
     }
-    // Still under 30s — feed the WDT on behalf of the blocked worker
-    // (worker is unsubscribed during fetch, this keeps the system healthy)
+    // Still under 30s — nothing to do. The worker is unsubscribed from the TWDT
+    // for the duration of the fetch (see startFetchWatchdog), so there is no
+    // watchdog to feed on its behalf; this timer IS the deadline enforcement.
 }
 
 void DataManager::startFetchWatchdog() {
+    // NOTE: esp_task_wdt_delete(NULL)/esp_task_wdt_add(NULL) act on the CALLING
+    // task. Both helpers are worker-task-only — see the header for the contract.
     esp_task_wdt_delete(NULL);  // temporarily unsubscribe worker
     if (_fetchWatchdog) {
         esp_timer_start_periodic(_fetchWatchdog, 2000000);  // check every 2s
@@ -305,7 +315,7 @@ void DataManager::workerTaskLoop(void* param) {
         manager->drainJobs(true);
         manager->executeLoop();
         manager->drainJobs(false);
-        
+
         // Feed the watchdog after each fetch cycle
         esp_task_wdt_reset();
 
@@ -337,20 +347,20 @@ void DataManager::executeLoop() {
     int bestIndex = -1;
     bool foundPriority = false;
     PriorityTier bestTier = PriorityTier::Low;
-    
+
     for (size_t i = 0; i < _registry.size(); ++i) {
         auto& r = _registry[i];
-        
+
         // Handle explicit priority requests
         if (r.priorityRequested) {
             bestIndex = i;
             foundPriority = true;
             break; // Immediate selection
         }
-        
+
         // Handle scheduled execution based on interval and tier
         bool due = (r.lastFetchTimeMs == 0) || (now - r.lastFetchTimeMs >= r.source->getUpdateIntervalMs());
-        
+
         if (due && !foundPriority) {
             // Smaller priority enum values indicate higher priority (HIGH = 0, LOW = 2)
             if (bestIndex == -1 || r.source->getPriorityTier() < bestTier) {
@@ -363,20 +373,21 @@ void DataManager::executeLoop() {
     if (bestIndex != -1) {
         auto& r = _registry[bestIndex];
         r.priorityRequested = false;
-        
+
         // Extract the target source before releasing the lock
         IDataSource* fetchTarget = r.source;
         ESP_LOGD(TAG, "Selected source for fetch: %s", fetchTarget->getSourceName());
-        
+
         // Unlock mutex during fetch to prevent holding the lock during potentially long network calls
         if (_registryMutex) xSemaphoreGive(_registryMutex);
-        
+
         // --- Execute the fetch cycle ---
         // The TWDT is temporarily unsubscribed during the fetch and a periodic
         // esp_timer (2s) monitors for genuine hangs. If the fetch exceeds 30s,
         // the timer calls abort() — equivalent to a TWDT reset, but allows
         // bounded fetches (e.g. 5-10s TLS handshakes) to complete.
-        unsigned long fetchStart = millis();
+        // millis() (not getCurrentTimeMs()) — see the note in drainJobs().
+        uint32_t fetchStart = (uint32_t)millis();
         _fetchStartMs.store(fetchStart);
 #ifdef ESP_PLATFORM
         startFetchWatchdog();
@@ -389,20 +400,20 @@ void DataManager::executeLoop() {
 #endif
         _fetchStartMs.store(0);
 
-        unsigned long fetchDuration = millis() - fetchStart;
+        uint32_t fetchDuration = (uint32_t)millis() - fetchStart;
         if (fetchDuration > 15000) {
             ESP_LOGW(TAG, "fetchUpdate() for source '%s' took %lu ms — consider reducing client timeout",
-                     fetchTarget->getSourceName(), fetchDuration);
+                     fetchTarget->getSourceName(), (unsigned long)fetchDuration);
         }
 
         if (result >= UpdateStatus::FetchError) {
             ESP_LOGW(TAG, "Fetch failed for source: %s (status=%d)",
                      fetchTarget->getSourceName(), static_cast<int>(result));
         }
-        
+
         // Re-acquire mutex to update state
         if (_registryMutex) xSemaphoreTake(_registryMutex, portMAX_DELAY);
-        
+
         // Ensure source is still registered before updating tracking data
         for (auto& r2 : _registry) {
             if (r2.source == fetchTarget) {
@@ -412,4 +423,3 @@ void DataManager::executeLoop() {
         }
     }
 }
-

@@ -66,10 +66,10 @@ class ApiQueue {
     if (this.highQueue.length === 0 && this.lowQueue.length === 0) return;
 
     this.isProcessing = true;
-    
+
     var item;
     var isHigh = false;
-    
+
     if (this.highQueue.length > 0) {
       item = this.highQueue.shift();
       isHigh = true;
@@ -140,7 +140,7 @@ class ApiQueue {
       item.reject(error);
     } finally {
       this.isProcessing = false;
-      
+
       if (isHigh || this.highQueue.length > 0) {
         setTimeout(() => this.processNext(), 0);
       } else if (this.lowQueue.length > 0 && this.lowDelayMs > 0) {
@@ -528,30 +528,53 @@ document.addEventListener('DOMContentLoaded', function() {
   // 5. Load App Metadata (/api/app)
   // =========================================================================
 
-  async function loadAppInfo() {
+  // App metadata is fetched once and cached here so the stylesheet can be
+  // injected early (before tab scripts, to kill the FOUC) while the title is
+  // applied late (after the nav is built).
+  //
+  // Ordering matters: the title changing is the portal's "ready" signal — both
+  // the UI and the e2e suite treat a branded #portal-title as "navigation is
+  // usable". Applying it before loadTabs() builds #pill-bar makes the portal
+  // look ready while it still isn't. Keep applyAppTitle() after loadTabs().
+  var _appInfo = null;
+
+  async function fetchAppInfoAndStyles() {
     try {
-      var data = await window.apiFetch('/api/app');
-      if (data && data.name) {
-        portalTitle.textContent = data.name;
-        document.title = data.name;
-        var loginTitle = document.getElementById('login-title');
-        if (loginTitle) loginTitle.textContent = data.name;
-      }
-      // Inject app stylesheet if provided — loaded before tab scripts to prevent FOUC
-      if (data && data.stylesheet) {
-        await new Promise(function(resolve) {
-          var link = document.createElement('link');
-          link.rel = 'stylesheet';
-          link.onload = resolve;
-          link.onerror = resolve;  // proceed even if stylesheet fails
-          link.href = data.stylesheet;
-          document.head.appendChild(link);
-          // Safety timeout — don't block boot indefinitely
-          setTimeout(resolve, 3000);
-        });
-      }
+      _appInfo = await window.apiFetch('/api/app');
     } catch (err) {
       console.warn('Failed to fetch /api/app');
+      return;
+    }
+    // Inject app stylesheet if provided — awaited so CSS is applied before
+    // tab scripts run and render content.
+    if (_appInfo && _appInfo.stylesheet) {
+      await new Promise(function(resolve) {
+        var settled = false;
+        var timer = null;
+        function done() {
+          if (settled) return;
+          settled = true;
+          if (timer !== null) clearTimeout(timer);
+          resolve();
+        }
+        var link = document.createElement('link');
+        link.rel = 'stylesheet';
+        link.onload = done;
+        link.onerror = done;  // proceed even if stylesheet fails
+        link.href = _appInfo.stylesheet;
+        document.head.appendChild(link);
+        // Safety timeout — don't block boot indefinitely
+        timer = setTimeout(done, 3000);
+      });
+    }
+  }
+
+  function applyAppTitle() {
+    if (_appInfo && _appInfo.name) {
+      portalTitle.textContent = _appInfo.name;
+      document.title = _appInfo.name;
+      var loginTitle = document.getElementById('login-title');
+      if (loginTitle) loginTitle.textContent = _appInfo.name;
     }
   }
 
@@ -625,9 +648,11 @@ document.addEventListener('DOMContentLoaded', function() {
   // =========================================================================
 
   // Fetch app branding and /api/tabs in parallel to speed up boot.
-  // loadAppInfo() waits for stylesheet onload internally, so CSS is ready
-  // before scripts execute.
-  Promise.all([loadAppInfo(), window.apiFetch('/api/tabs')]).then(function(results) {
+  // fetchAppInfoAndStyles() awaits the stylesheet's onload internally, so CSS
+  // is applied before tab scripts execute (kills the branding FOUC). The title
+  // is applied afterwards, once loadTabs() has built the navigation — see the
+  // note on applyAppTitle().
+  Promise.all([fetchAppInfoAndStyles(), window.apiFetch('/api/tabs')]).then(function(results) {
     var tabs = results[1];
     // Extract declared script URLs, filtering out null/undefined and duplicates
     var tabScripts = tabs
@@ -638,12 +663,14 @@ document.addEventListener('DOMContentLoaded', function() {
     loadScripts(tabScripts, function() {
       // Scripts are loaded — now safe to build tabs and dispatch tab-changed
       loadTabs(tabs);
+      applyAppTitle();
       checkApMode();
     });
   }).catch(function(err) {
     console.warn('Failed to fetch /api/tabs during boot, loading without tab scripts');
     loadScripts([], function() {
       loadTabs();
+      applyAppTitle();
       checkApMode();
     });
   });

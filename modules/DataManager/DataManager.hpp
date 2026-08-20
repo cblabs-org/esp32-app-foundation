@@ -14,8 +14,8 @@
  *   - registerSource(): Adds an IDataSource to the polling loop.
  *   - unregisterSource(): Removes a source from the loop.
  *   - requestPriorityFetch(): Marks a source for immediate refresh.
- * - queueDataJob(): Enqueues a callable to execute off-loop.
- * - processNext(): Natively exposed synchronous tick loop for unit testing.
+ *   - queueDataJob(): Enqueues a callable to execute off-loop.
+ *   - processNext(): Natively exposed synchronous tick loop for unit testing.
  */
 
 #pragma once
@@ -31,6 +31,9 @@
 #include <freertos/task.h>
 #include <freertos/semphr.h>
 #include <freertos/queue.h>
+#ifdef ESP_PLATFORM
+#include <esp_timer.h>   // esp_timer_handle_t — used by the fetch watchdog below
+#endif
 
 /**
  * @brief Configuration for a queued data job.
@@ -52,6 +55,10 @@ struct DataJobOptions {
      * When true, this job is drained before the next IDataSource scheduling
      * pass. When false (default), jobs are processed in FIFO order after
      * each scheduling pass completes.
+     *
+     * FIFO holds among jobs queued before a drain begins. A job enqueued by
+     * another task while a drain is in flight may run ahead of a non-urgent
+     * job that was deferred by that same drain.
      *
      * Use for time-sensitive operations where the user is visibly waiting
      * (e.g., a web portal "save" that triggers an HTTP PUT). Do not use
@@ -152,10 +159,14 @@ public:
     void setAppRunning(bool running);
 
     /**
-     * @brief Returns the duration in ms of the currently-running fetch, or 0 if idle.
+     * @brief Returns the duration in ms of the currently-running fetch or job, or 0 if idle.
      *
      * Thread-safe (member is std::atomic). Use this to detect
      * hung fetches from a monitoring task or health-check endpoint.
+     *
+     * @note _fetchStartMs is always stamped with millis() — the real monotonic
+     *       clock — never with the getCurrentTimeMs() test hook. The fetch
+     *       watchdog compares against millis(), so the two must not diverge.
      *
      * @return Elapsed milliseconds since fetchUpdate() was called, or 0 if no fetch is active.
      */
@@ -194,7 +205,18 @@ private:
 #ifdef ESP_PLATFORM
     esp_timer_handle_t _fetchWatchdog = nullptr;  ///< 30s hard deadline for fetch/job operations
     static void fetchWatchdogCb(void* arg);
+
+    /**
+     * @brief Arm the fetch watchdog and unsubscribe the caller from the TWDT.
+     * @warning MUST be called only from the DataManager worker task. It calls
+     *          esp_task_wdt_delete(NULL) / esp_task_wdt_add(NULL), which act on
+     *          the CALLING task — invoking these from any other task would
+     *          silently change that task's watchdog subscription.
+     */
     void startFetchWatchdog();
+
+    /** @brief Disarm the fetch watchdog and re-subscribe the caller to the TWDT.
+     *  @warning Worker-task only — see startFetchWatchdog(). */
     void stopFetchWatchdog();
 #endif
 

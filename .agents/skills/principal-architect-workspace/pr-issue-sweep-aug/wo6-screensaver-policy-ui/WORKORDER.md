@@ -153,4 +153,3 @@ None.
 ### Verification
 - ✅ `pio run -e crowpanel-128-rotary` — compiled cleanly (43.2% flash, 14.6% RAM).
 - ✅ `pio test -e native` — all 748 test cases passed across 30 suites.
-

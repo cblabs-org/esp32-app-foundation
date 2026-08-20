@@ -98,4 +98,3 @@ None.
 ### Verification
 - ✅ `pio run -e crowpanel-128-rotary` with `-D WITH_OTA` — compiled cleanly (RAM 16.4%, Flash 45.5%)
 - ✅ `pio test -e native` — 748/748 test cases passed
-

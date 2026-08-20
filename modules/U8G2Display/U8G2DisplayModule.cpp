@@ -783,6 +783,10 @@ void U8G2DisplayModule::registerRoutes(PsychicHttpServer& server) {
     // --- Step 1: Register shared service helper endpoints (brightness, screenshot) ---
 #ifndef UNIT_TEST
 #ifdef WITH_OTA
+    // KNOWN GAP — tracked in issue #138. This static call into OTAUpdateManager
+    // is the coupling #120 set out to remove, and LVGLDisplayModule now uses a
+    // different (also imperfect) predicate. Both should move to an injected
+    // OTA state provider.
     _serviceHelper.setOtaPredicate([]() {
         return OTAUpdateManager::getState() != OTAState::Idle;
     });

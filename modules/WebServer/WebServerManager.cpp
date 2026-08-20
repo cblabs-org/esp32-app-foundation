@@ -165,7 +165,7 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors,
         activeHighMemRequests--;
         return err;
     });
-    
+
     activeServer->on("/app.css", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
         return serveGzipAsset(request, response, app_css_gz, app_css_gz_len, app_css_gz_etag, "text/css");
     });
@@ -209,7 +209,7 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors,
     // --- Register all IWebContributor routes and build tabs array ---
     JsonDocument tabsDoc;
     JsonArray tabsArr = tabsDoc.to<JsonArray>();
-    
+
     for (auto* contributor : contributors) {
         if (contributor != nullptr) {
             contributor->registerRoutes(*activeServer);
@@ -274,7 +274,7 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors,
         [](const BodyLimitEntry& a, const BodyLimitEntry& b) {
             return strlen(a.prefix) > strlen(b.prefix);
         });
-    
+
     // Inject the "Status" sub-pill — WebServerManager hosts /api/system
     // but is not itself an IWebContributor, so add it manually.
     JsonObject statusTab = tabsArr.add<JsonObject>();
@@ -631,6 +631,12 @@ void WebServerManager::tick(uint32_t currentMillis) {
     // The httpd task is created internally by PsychicHttp / ESP-IDF with
     // the name "httpd". Log every 60s to track headroom on constrained
     // boards without spamming the console.
+    //
+    // CAVEAT: when both the HTTPS server and the HTTP redirect server are
+    // running they each create a task named "httpd", and xTaskGetHandle()
+    // returns the FIRST match. The figure below is therefore indicative of
+    // "an httpd task", not reliably of the TLS one. Treat it as a smoke
+    // signal, not a precise measurement.
 #ifdef ESP_PLATFORM
     if (_serverStarted) {
         static uint32_t lastHwmLogMs = 0;  // static ok — singleton class

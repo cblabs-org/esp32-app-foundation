@@ -109,4 +109,3 @@ None.
 |---|---|
 | `pio run -e crowpanel-128-rotary` | ✅ Clean compile — RAM 14.6%, Flash 43.2% |
 | Native test suite (`pio test -e native`) | ✅ 748/748 tests passed |
-

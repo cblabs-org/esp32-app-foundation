@@ -15,9 +15,6 @@
 #include "LVGLDisplayModule.hpp"
 #include "web/serveGzipAsset.hpp"
 #include "EventBus.hpp"
-
-
-
 #include "ConfigManager.hpp"
 #include "MCPToolRegistry.hpp"
 #include "Application.hpp"
@@ -378,7 +375,7 @@ bool LVGLDisplayModule::capturePNG(Print& sink) {
 
     // --- Step 3: Validate snapshot buffer acquisition and clean up on timeout failure ---
     if (!_snapshotComplete.load() || !_snapshotSuccess.load() || !_snapshotBuffer) {
-        ESP_LOGE("LVGLDisplay", "capturePNG: Snapshot failed (complete=%d, success=%d, timeout=%d)", 
+        ESP_LOGE("LVGLDisplay", "capturePNG: Snapshot failed (complete=%d, success=%d, timeout=%d)",
                  _snapshotComplete.load(), _snapshotSuccess.load(), timeout);
         _pendingSnapshot.store(false); // cancel if timed out
         if (_snapshotBuffer) freeSnapshot(_snapshotBuffer);
@@ -415,7 +412,7 @@ bool LVGLDisplayModule::captureStoredPNG(Print& sink) {
     }
 
     if (!_snapshotComplete.load() || !_snapshotSuccess.load() || !_snapshotBuffer) {
-        ESP_LOGE("LVGLDisplay", "captureStoredPNG: Snapshot failed (complete=%d, success=%d, timeout=%d)", 
+        ESP_LOGE("LVGLDisplay", "captureStoredPNG: Snapshot failed (complete=%d, success=%d, timeout=%d)",
                  _snapshotComplete.load(), _snapshotSuccess.load(), timeout);
         _pendingSnapshot.store(false); // cancel if timed out
         if (_snapshotBuffer) freeSnapshot(_snapshotBuffer);
@@ -792,7 +789,7 @@ void LVGLDisplayModule::_onSystemError(const char* /*topic*/, const void* payloa
     if (err->message != nullptr) {
         strncpy(self->_pendingErrorMessage, err->message, sizeof(self->_pendingErrorMessage) - 1);
         self->_pendingErrorMessage[sizeof(self->_pendingErrorMessage) - 1] = '\0';
-        
+
         if (err->title != nullptr) {
             strncpy(self->_pendingErrorTitle, err->title, sizeof(self->_pendingErrorTitle) - 1);
             self->_pendingErrorTitle[sizeof(self->_pendingErrorTitle) - 1] = '\0';
@@ -813,7 +810,7 @@ void LVGLDisplayModule::_onAppConfiguring(const char* /*topic*/, const void* pay
 
     // Deactivate diagnostic carousel when leaving DiagScreen
     self->_diagCarousel.stop();
-             
+
     // LVGL has no built-in configuring screens — the skin (SLSSystemScreens) supplies
     // them. With no provider there is nothing to display.
     if (self->_screens == nullptr) {
@@ -944,10 +941,13 @@ void LVGLDisplayModule::registerRoutes(PsychicHttpServer& server) {
 
 #ifndef UNIT_TEST
 #ifdef WITH_OTA
-    // Note: _pauseRendering covers a narrower window than OTAUpdateManager::getState() != Idle.
-    // It's set by _onOtaProgress for non-complete events and cleared by restorePriorScreen/clearStatus.
-    // A proper fix would wire an OTAUpdateManager* member — deferred to a future PR.
-    // See also: U8G2DisplayModule.cpp:787 has the same static-call bug (untouched here).
+    // KNOWN GAP — tracked in issue #138.
+    // _pauseRendering covers a narrower window than OTAUpdateManager::getState()
+    // != Idle: it is set by _onOtaProgress only for non-complete events, and is
+    // cleared by restorePriorScreen()/clearStatus(), which are reachable from
+    // non-OTA paths. The proper fix is to wire an OTAUpdateManager* (or an
+    // IOtaStateProvider) into this module. U8G2DisplayModule still uses the
+    // original static call and is inconsistent with this one.
     _serviceHelper.setOtaPredicate([this]() {
         return _pauseRendering.load();
     });
