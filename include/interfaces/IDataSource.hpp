@@ -45,6 +45,61 @@ enum class PriorityTier : uint8_t {
 };
 
 /**
+ * @brief Health state of a registered data source.
+ *
+ * A source that cannot be reached degrades *itself* — it never resets the
+ * device. Every state below has a defined exit; see SourceHealth.
+ *
+ * @note `Unknown` is deliberately distinct from `Quarantined`. A source that has
+ *       never succeeded and a source that has failed after succeeding are
+ *       different problems for the user: the first usually means a
+ *       misconfiguration they can correct, the second an outage they cannot.
+ *       Consumers of this state — gates, boot reporters, displays — MUST
+ *       distinguish them. Reporting "still trying" for a source that has never
+ *       once connected is indistinguishable from silence to the person standing
+ *       in front of the device, and is the failure mode that produced #128.
+ */
+enum class SourceHealthState : uint8_t {
+    Unknown     = 0, ///< Registered but never attempted. Exit: first attempt.
+    Healthy     = 1, ///< Last attempt succeeded. Exit: a failure → Degraded.
+    Degraded    = 2, ///< Failing and backing off; still retrying. Exit: success → Healthy, or ceiling → Quarantined.
+    Quarantined = 3, ///< At the backoff ceiling. Still probes at the ceiling interval, so it self-heals. Exit: a successful probe → Healthy.
+    Suspended   = 4  ///< Hard failure (AuthError). No automatic retry — credentials will not fix themselves. Exit: resetSourceHealth() or an explicit priority fetch.
+};
+
+/**
+ * @brief Point-in-time health snapshot for one registered source.
+ *
+ * Returned by value; safe to read from any task.
+ */
+struct SourceHealth {
+    const char*       name                = nullptr;  ///< Source name (static lifetime, from getSourceName())
+    SourceHealthState state               = SourceHealthState::Unknown;
+    UpdateStatus      lastStatus          = UpdateStatus::Success; ///< Meaningless while state == Unknown
+    uint16_t          consecutiveFailures = 0;
+    uint32_t          lastAttemptMs       = 0;        ///< 0 = never attempted
+    uint32_t          lastSuccessMs       = 0;        ///< Only meaningful when everSucceeded is true
+    uint32_t          nextAttemptMs       = 0;        ///< Earliest next attempt; 0 = as soon as due
+    uint32_t          currentBackoffMs    = 0;        ///< Active backoff interval; 0 = not backing off
+    bool              everSucceeded       = false;    ///< Distinguishes never-connected from lost-connection
+
+    /** @brief True when the source is not currently serving usable data. */
+    bool isFailing() const {
+        return state == SourceHealthState::Degraded
+            || state == SourceHealthState::Quarantined
+            || state == SourceHealthState::Suspended;
+    }
+
+    /**
+     * @brief True when this source has never once succeeded.
+     *
+     * The case a user can usually act on — a typo'd address, a missing key, a
+     * firewall rule. Report it distinctly from a source that has merely gone away.
+     */
+    bool neverConnected() const { return !everSucceeded; }
+};
+
+/**
  * @brief Contract for background data-fetch workers managed by DataManager.
  *
  * Implementors provide a fetch callback and scheduling metadata. DataManager
