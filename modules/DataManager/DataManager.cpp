@@ -179,10 +179,17 @@ void DataManager::drainJobs(bool urgentOnly) {
 
         entry->job();
 
+        // Order matters: clear _fetchStartMs BEFORE tearing down the supervisor.
+        // esp_timer_stop() does not wait for a callback that has already been
+        // dispatched, so a fetchWatchdogCb already running on the esp_timer task
+        // can still read _fetchStartMs after stop() returns. Clearing first brings
+        // that callback's `if (start == 0) return;` guard over the window;
+        // clearing second leaves a gap in which a job that has ALREADY COMPLETED
+        // can be abort()ed for having taken >30s.
+        _fetchStartMs.store(0);
 #ifdef ESP_PLATFORM
         stopFetchWatchdog();
 #endif
-        _fetchStartMs.store(0);
 
         uint32_t elapsed = (uint32_t)millis() - jobStart;
         if (entry->options.warnAfterMs > 0 && elapsed > entry->options.warnAfterMs) {
@@ -395,10 +402,11 @@ void DataManager::executeLoop() {
 
         UpdateStatus result = fetchTarget->fetchUpdate();
 
+        // Clear before teardown — see the ordering note in drainJobs().
+        _fetchStartMs.store(0);
 #ifdef ESP_PLATFORM
         stopFetchWatchdog();
 #endif
-        _fetchStartMs.store(0);
 
         uint32_t fetchDuration = (uint32_t)millis() - fetchStart;
         if (fetchDuration > 15000) {

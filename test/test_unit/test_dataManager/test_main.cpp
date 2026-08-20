@@ -423,6 +423,63 @@ TEST_F(DataManagerTest, QueueDataJob_QueueFull_CallableDestroyed) {
     EXPECT_TRUE(weak.expired());  // lambda was destroyed, releasing the shared_ptr
 }
 
+// --- WO1: abort-on-success race (issue #128 consumer review, finding B) ---
+//
+// The deadline supervisor reads _fetchStartMs from another task. esp_timer_stop()
+// does not wait for an already-dispatched callback, so _fetchStartMs must be
+// cleared BEFORE the supervisor is torn down, not after — otherwise a fetch that
+// already returned can still be judged as hung.
+//
+// The supervisor itself is #ifdef ESP_PLATFORM and compiles out of the native
+// seam, so what these tests pin is the observable invariant it depends on:
+// no fetch/job may leave a non-zero start stamp behind.
+
+TEST_F(DataManagerTest, FetchElapsedIsZeroWhenIdle) {
+    EXPECT_EQ(dm.getFetchElapsedMs(), 0u);
+}
+
+TEST_F(DataManagerTest, FetchClearsStartStampOnCompletion) {
+    MockDataSource src("src1", 5000, PriorityTier::Low);
+    dm.registerSource(&src);
+
+    dm.processNext();
+
+    EXPECT_EQ(src.fetchCount, 1);
+    // A completed fetch must not leave a stamp the supervisor could act on.
+    EXPECT_EQ(dm.getFetchElapsedMs(), 0u);
+}
+
+TEST_F(DataManagerTest, JobClearsStartStampOnCompletion) {
+    dm.begin();
+    bool ran = false;
+    dm.queueDataJob([&ran]() { ran = true; }, "stamp");
+
+    dm.processNext();
+
+    EXPECT_TRUE(ran);
+    EXPECT_EQ(dm.getFetchElapsedMs(), 0u);
+}
+
+TEST_F(DataManagerTest, StartStampClearedEvenWhenFetchReportsFailure) {
+    // The failure path is the one that matters: a slow fetch that eventually
+    // errors is exactly the case the 30s supervisor adjudicates.
+    class FailingSource : public MockDataSource {
+    public:
+        using MockDataSource::MockDataSource;
+        UpdateStatus fetchUpdate() override {
+            fetchCount++;
+            return UpdateStatus::FetchError;
+        }
+    };
+    FailingSource src("bad", 5000, PriorityTier::Low);
+    dm.registerSource(&src);
+
+    dm.processNext();
+
+    EXPECT_EQ(src.fetchCount, 1);
+    EXPECT_EQ(dm.getFetchElapsedMs(), 0u);
+}
+
 int main(int argc, char **argv) {
     ::testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();

@@ -657,7 +657,13 @@ void WebServerManager::tick(uint32_t currentMillis) {
         if (_authManager) {
             uint32_t startMs = millis();
             while (_authManager->isCertGenerating() && (millis() - startMs < 10000)) {
-                esp_task_wdt_reset();
+                // No esp_task_wdt_reset() here: this runs on the Arduino loopTask,
+                // which is not a TWDT subscriber. Arduino-ESP32 initialises
+                // loopTaskWDTEnabled = false and only subscribes if the application
+                // calls enableLoopWDT(), which this framework never does — so a reset
+                // here returned ESP_ERR_NOT_FOUND and protected nothing. The wait is
+                // safe because no watchdog is supervising this task, not because it
+                // was being fed. See wo1 TWDT-AUDIT.md §3.
                 delay(100);
             }
         }
