@@ -944,6 +944,10 @@ void LVGLDisplayModule::registerRoutes(PsychicHttpServer& server) {
 
 #ifndef UNIT_TEST
 #ifdef WITH_OTA
+    // Note: _pauseRendering covers a narrower window than OTAUpdateManager::getState() != Idle.
+    // It's set by _onOtaProgress for non-complete events and cleared by restorePriorScreen/clearStatus.
+    // A proper fix would wire an OTAUpdateManager* member — deferred to a future PR.
+    // See also: U8G2DisplayModule.cpp:787 has the same static-call bug (untouched here).
     _serviceHelper.setOtaPredicate([this]() {
         return _pauseRendering.load();
     });
@@ -1073,10 +1077,12 @@ void LVGLDisplayModule::registerRoutes(PsychicHttpServer& server) {
             const char* policy = doc["screensaverPolicy"].as<const char*>();
             if (strcmp(policy, "DimOnly") == 0) {
                 _screensaver.setPolicy(ScreensaverPolicy::DimOnly);
+                needsPersist = true;
             } else if (strcmp(policy, "FullSleep") == 0) {
                 _screensaver.setPolicy(ScreensaverPolicy::FullSleep);
+                needsPersist = true;
             }
-            needsPersist = true;
+            // Invalid values are silently ignored — no persist, no 400
         }
 
         if (doc["timeout"].is<unsigned long>()) {
@@ -1249,10 +1255,12 @@ void LVGLDisplayModule::registerMCPTools(MCPToolRegistry& registry) {
                 const char* policy = params["screensaverPolicy"].as<const char*>();
                 if (strcmp(policy, "DimOnly") == 0) {
                     self->_screensaver.setPolicy(ScreensaverPolicy::DimOnly);
+                    needsPersist = true;
                 } else if (strcmp(policy, "FullSleep") == 0) {
                     self->_screensaver.setPolicy(ScreensaverPolicy::FullSleep);
+                    needsPersist = true;
                 }
-                needsPersist = true;
+                // Invalid values are silently ignored — no persist, no 400
             }
 
             if (needsPersist && self->_configManager != nullptr) {
@@ -1266,6 +1274,3 @@ void LVGLDisplayModule::registerMCPTools(MCPToolRegistry& registry) {
     );
 
 }
-
-
-

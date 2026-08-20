@@ -539,10 +539,16 @@ document.addEventListener('DOMContentLoaded', function() {
       }
       // Inject app stylesheet if provided — loaded before tab scripts to prevent FOUC
       if (data && data.stylesheet) {
-        var link = document.createElement('link');
-        link.rel = 'stylesheet';
-        link.href = data.stylesheet;
-        document.head.appendChild(link);
+        await new Promise(function(resolve) {
+          var link = document.createElement('link');
+          link.rel = 'stylesheet';
+          link.onload = resolve;
+          link.onerror = resolve;  // proceed even if stylesheet fails
+          link.href = data.stylesheet;
+          document.head.appendChild(link);
+          // Safety timeout — don't block boot indefinitely
+          setTimeout(resolve, 3000);
+        });
       }
     } catch (err) {
       console.warn('Failed to fetch /api/app');
@@ -618,11 +624,11 @@ document.addEventListener('DOMContentLoaded', function() {
   // 8. Boot Sequence
   // =========================================================================
 
-  // Fetch app branding FIRST (title + stylesheet) to eliminate FOUC, then
-  // fetch /api/tabs, load scripts, and build navigation.
-  loadAppInfo().then(function() {
-    return window.apiFetch('/api/tabs');
-  }).then(function(tabs) {
+  // Fetch app branding and /api/tabs in parallel to speed up boot.
+  // loadAppInfo() waits for stylesheet onload internally, so CSS is ready
+  // before scripts execute.
+  Promise.all([loadAppInfo(), window.apiFetch('/api/tabs')]).then(function(results) {
+    var tabs = results[1];
     // Extract declared script URLs, filtering out null/undefined and duplicates
     var tabScripts = tabs
       .map(function(t) { return t.script; })

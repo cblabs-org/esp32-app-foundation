@@ -13,7 +13,7 @@
  *   - begin(): Initializes FreeRTOS task and starts scheduling.
  *   - registerSource(): Adds an IDataSource to the polling loop.
  *   - unregisterSource(): Removes a source from the loop.
- *  * - requestPriorityFetch(): Marks a source for immediate refresh.
+ *   - requestPriorityFetch(): Marks a source for immediate refresh.
  * - queueDataJob(): Enqueues a callable to execute off-loop.
  * - processNext(): Natively exposed synchronous tick loop for unit testing.
  */
@@ -122,6 +122,7 @@ public:
      */
     bool queueDataJob(std::function<void()> job, const char* tag = "job");
 
+    /** @overload Uses DataJobOptions for full configuration. */
     bool queueDataJob(std::function<void()> job, const DataJobOptions& options);
 
     /**
@@ -153,13 +154,13 @@ public:
     /**
      * @brief Returns the duration in ms of the currently-running fetch, or 0 if idle.
      *
-     * Safe to call from any task (member is volatile). Use this to detect
+     * Thread-safe (member is std::atomic). Use this to detect
      * hung fetches from a monitoring task or health-check endpoint.
      *
      * @return Elapsed milliseconds since fetchUpdate() was called, or 0 if no fetch is active.
      */
     uint32_t getFetchElapsedMs() const {
-        uint32_t start = _fetchStartMs;
+        uint32_t start = _fetchStartMs.load();
         return (start > 0) ? (millis() - start) : 0;
     }
 
@@ -189,7 +190,13 @@ private:
     TaskHandle_t _workerTask;
     std::atomic<bool> _appRunning{false};
     uint32_t _simulatedTimeMs = 0;
-    volatile uint32_t _fetchStartMs = 0;   ///< Timestamp of in-flight fetchUpdate(); 0 when idle.
+    std::atomic<uint32_t> _fetchStartMs{0};   ///< Timestamp of in-flight fetchUpdate(); 0 when idle.
+#ifdef ESP_PLATFORM
+    esp_timer_handle_t _fetchWatchdog = nullptr;  ///< 30s hard deadline for fetch/job operations
+    static void fetchWatchdogCb(void* arg);
+    void startFetchWatchdog();
+    void stopFetchWatchdog();
+#endif
 
     static void workerTaskLoop(void* param);
     void executeLoop();

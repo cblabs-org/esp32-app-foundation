@@ -303,20 +303,6 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors,
         }
         activeHighMemRequests++;
 
-        // --- One-shot httpd stack HWM telemetry on first request (#119) ---
-#ifdef ESP_PLATFORM
-        static bool hwmLogged = false;
-        if (!hwmLogged) {
-            TaskHandle_t httpdTask = xTaskGetHandle("httpd");
-            if (httpdTask != nullptr) {
-                UBaseType_t hwm = uxTaskGetStackHighWaterMark(httpdTask);
-                ESP_LOGI(TAG, "httpd stack HWM (first request): %u words (%u bytes free)",
-                         (unsigned)hwm, (unsigned)(hwm * 4));
-            }
-            hwmLogged = true;
-        }
-#endif
-
         JsonDocument doc;
 
         // --- Internal DRAM metrics (always present on all ESP32 variants) ---
@@ -647,12 +633,12 @@ void WebServerManager::tick(uint32_t currentMillis) {
     // boards without spamming the console.
 #ifdef ESP_PLATFORM
     if (_serverStarted) {
-        static uint32_t lastHwmLogMs = 0;
+        static uint32_t lastHwmLogMs = 0;  // static ok — singleton class
         if (lastHwmLogMs == 0 || (currentMillis - lastHwmLogMs) >= 60000) {
             TaskHandle_t httpdTask = xTaskGetHandle("httpd");
             if (httpdTask != nullptr) {
                 UBaseType_t hwm = uxTaskGetStackHighWaterMark(httpdTask);
-                ESP_LOGI(TAG, "httpd stack HWM: %u words (%u bytes free)",
+                ESP_LOGD(TAG, "httpd stack HWM: %u words (%u bytes free)",
                          (unsigned)hwm, (unsigned)(hwm * 4));
             }
             lastHwmLogMs = currentMillis;

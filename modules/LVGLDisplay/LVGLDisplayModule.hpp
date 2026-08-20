@@ -285,7 +285,9 @@ public:
      *
      * Delegates to the ILVGLSystemScreens provider so the SLS boot screen
      * reflects the runtime app name instead of the hardcoded SLS literal.
-     * Must be called after bootstrapHardware() has built the SLS UI.
+     * Must be called before the display early-start phase (beginEarly()) so
+     * the boot screen shows the branded title. If called later, the title is
+     * cached in _appTitle and applied on the next screen build or transition.
      *
      * @param title Pointer to the application title string (static lifetime).
      */

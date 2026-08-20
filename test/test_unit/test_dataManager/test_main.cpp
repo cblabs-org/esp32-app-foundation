@@ -12,6 +12,7 @@
 #include <gtest/gtest.h>
 #include "DataManager.hpp"
 #include <string>
+#include <memory>
 
 class MockDataSource : public IDataSource {
 public:
@@ -384,6 +385,42 @@ TEST_F(DataManagerTest, GetQueuedJobCount_ReflectsPending) {
     
     dm.processNext();
     EXPECT_EQ(dm.getQueuedJobCount(), 0);
+}
+
+TEST_F(DataManagerTest, QueueDataJob_UrgentBypassesNormal) {
+    dm.begin();
+    dm.setAppRunning(true);
+
+    int order = 0;
+    int normalOrder = 0;
+    int urgentOrder = 0;
+
+    dm.queueDataJob([&]() { normalOrder = ++order; }, "normal");
+    dm.queueDataJob([&]() { urgentOrder = ++order; }, DataJobOptions{ .tag = "urgent", .urgent = true });
+
+    dm.processNext();  // drainJobs(true) should execute urgent first
+
+    EXPECT_EQ(urgentOrder, 1);
+    EXPECT_EQ(normalOrder, 2);
+}
+
+TEST_F(DataManagerTest, QueueDataJob_QueueFull_CallableDestroyed) {
+    dm.begin();
+
+    // Fill the queue with 8 trivial jobs
+    for (int i = 0; i < 8; i++) {
+        dm.queueDataJob([]() {}, "filler");
+    }
+
+    // Create a separate tracker for the overflow entry only.
+    // weak_ptr tracks if the shared_ptr captured in the rejected
+    // lambda is properly destroyed when the callable is dropped.
+    auto tracker = std::make_shared<int>(42);
+    std::weak_ptr<int> weak = tracker;
+    bool result = dm.queueDataJob([t = std::move(tracker)]() {}, "overflow");
+
+    EXPECT_FALSE(result);
+    EXPECT_TRUE(weak.expired());  // lambda was destroyed, releasing the shared_ptr
 }
 
 int main(int argc, char **argv) {

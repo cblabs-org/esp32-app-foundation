@@ -59,11 +59,13 @@ public:
      * @brief Execute one full data-fetch cycle.
      *
      * @note Called from the DataManager worker task. This is a shared queue —
-     *       a long-running fetch blocks all other registered data sources until
-     *       it returns. Set client-level timeouts (e.g. HTTPClient::setTimeout())
-     *       to bound network operations. As a guideline, implementations should
-     *       aim to return within 30 seconds; fetches exceeding 15 s will log a
-     *       warning.
+     *       a long-running fetch blocks all other registered data sources and
+     *       queued jobs until it returns.
+     *
+     *       IMPORTANT: Implementations MUST set client-level timeouts (e.g.
+     *       HTTPClient::setTimeout()) to bound network operations. The framework
+     *       enforces a 30-second hard deadline — fetches exceeding 30 s trigger
+     *       an abort/reboot. Fetches exceeding 15 s log a warning.
      *
      * @return UpdateStatus indicating the result of the fetch operation.
      */

@@ -76,6 +76,7 @@
 #include "interfaces/IConfigurable.hpp"
 #include "interfaces/ITickable.hpp"
 #include "interfaces/IMCPContributor.hpp"
+#include "utils/Periodic.hpp"
 
 // ---------------------------------------------------------------------------
 // Forward declarations — Hollywood Principle: never include other module headers
@@ -506,8 +507,6 @@ private:
      * @return true on success, false on failure (error state set internally).
      */
     bool fetchAndVerifyManifest_(OTAManifest& manifest);
-
-
 
     /**
      * @brief PsychicHttp multipart upload handler for POST /api/ota/upload.

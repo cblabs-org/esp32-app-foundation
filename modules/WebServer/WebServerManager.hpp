@@ -187,6 +187,9 @@ public:
      * /api/app JSON response, allowing downstream apps to brand the portal
      * at runtime via Application::setAppName().
      *
+     * @note Must be called before begin() — the value is captured by copy
+     *       into route handlers at begin() time.
+     *
      * @param name  Pointer to a string with static lifetime.
      */
     void setAppName(const char* name) { _appName = name; }
@@ -197,6 +200,9 @@ public:
      * When non-null, this path is included as "stylesheet" in the /api/app
      * JSON response. The portal JS injects a <link> tag for it before loading
      * tab scripts, eliminating the branding FOUC.
+     *
+     * @note Must be called before begin() — the value is captured by copy
+     *       into route handlers at begin() time.
      *
      * @param path  Pointer to a string with static lifetime (e.g. "/app.css").
      */

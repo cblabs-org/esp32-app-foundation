@@ -44,8 +44,8 @@
 
 #ifdef WITH_OTA
 
-#include "utils/Periodic.hpp"  // OTAUpdateManager.hpp uses Periodic but doesn't include it
 #include "OTAUpdateManager.hpp"
+#include "utils/Periodic.hpp"
 #include "web/serveGzipAsset.hpp"
 #include "platform/LogShim.h"
 

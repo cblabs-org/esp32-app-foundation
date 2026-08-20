@@ -17,6 +17,9 @@ static constexpr const char* TAG = "DataManager";
 
 #include <Arduino.h>
 #include "esp_task_wdt.h"
+#ifdef ESP_PLATFORM
+#include "esp_timer.h"
+#endif
 #include "esp_heap_caps.h"
 #include <freertos/idf_additions.h>
 
@@ -40,15 +43,25 @@ DataManager::DataManager() : _registryMutex(nullptr), _workerTask(nullptr) {
 }
 
 DataManager::~DataManager() {
+    // Stop worker task first — it may be inside drainJobs()/executeLoop()
+    if (_workerTask) {
+        vTaskDelete(_workerTask);
+        _workerTask = nullptr;
+    }
+#ifdef ESP_PLATFORM
+    if (_fetchWatchdog) {
+        esp_timer_stop(_fetchWatchdog);
+        esp_timer_delete(_fetchWatchdog);
+        _fetchWatchdog = nullptr;
+    }
+#endif
+    // Now safe to drain and delete the queue
     if (_jobQueue) {
         DataJobEntry* entry = nullptr;
         while (xQueueReceive(_jobQueue, &entry, 0) == pdTRUE) {
             delete entry;
         }
         vQueueDelete(_jobQueue);
-    }
-    if (_workerTask) {
-        vTaskDelete(_workerTask);
     }
     if (_registryMutex) {
         vSemaphoreDelete(_registryMutex);
@@ -60,6 +73,18 @@ void DataManager::begin() {
     if (!_jobQueue) {
         ESP_LOGE(TAG, "Failed to create job queue");
     }
+
+#ifdef ESP_PLATFORM
+    const esp_timer_create_args_t wdArgs = {
+        .callback = &DataManager::fetchWatchdogCb,
+        .arg = this,
+        .name = "dm_fetch_wd"
+    };
+    if (esp_timer_create(&wdArgs, &_fetchWatchdog) != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to create fetch watchdog timer");
+        _fetchWatchdog = nullptr;
+    }
+#endif
 
     // Create worker task with 12KB DRAM stack — safe for TLS-heavy data sources.
     // DRAM (not PSRAM) is required because SPI flash operations (used by some
@@ -120,31 +145,58 @@ size_t DataManager::getQueuedJobCount() const {
 void DataManager::drainJobs(bool urgentOnly) {
     if (!_jobQueue) return;
 
+    // Snapshot current queue depth to bound this drain pass (F8).
+    // Jobs enqueued during execution are deferred to the next iteration.
+    size_t maxDrain = (size_t)uxQueueMessagesWaiting(_jobQueue);
+    if (maxDrain == 0) return;
+
+    // Collect non-matching entries to re-queue after the scan (F5).
+    // Stack-allocated — bounded by JOB_QUEUE_DEPTH.
+    DataJobEntry* deferred[JOB_QUEUE_DEPTH];
+    size_t deferredCount = 0;
+    size_t drained = 0;
+
     DataJobEntry* entry = nullptr;
-    while (xQueueReceive(_jobQueue, &entry, 0) == pdTRUE) {
+    while (drained < maxDrain && xQueueReceive(_jobQueue, &entry, 0) == pdTRUE) {
+        drained++;
         if (urgentOnly && !entry->options.urgent) {
-            // Not urgent — put it back and stop draining
-            xQueueSendToFront(_jobQueue, &entry, 0);
-            break;
+            // Not urgent — defer for later pass
+            deferred[deferredCount++] = entry;
+            continue;
         }
 
         ESP_LOGD(TAG, "Executing data job: '%s'", entry->options.tag);
 
-        unsigned long jobStart = millis();
-        _fetchStartMs = jobStart;
+        uint32_t jobStart = getCurrentTimeMs();
+        _fetchStartMs.store(jobStart);
+#ifdef ESP_PLATFORM
+        startFetchWatchdog();
+#endif
 
         entry->job();
 
-        _fetchStartMs = 0;
-        esp_task_wdt_reset();
+#ifdef ESP_PLATFORM
+        stopFetchWatchdog();
+#endif
+        _fetchStartMs.store(0);
 
-        unsigned long elapsed = millis() - jobStart;
+        uint32_t elapsed = getCurrentTimeMs() - jobStart;
         if (entry->options.warnAfterMs > 0 && elapsed > entry->options.warnAfterMs) {
             ESP_LOGW(TAG, "Data job '%s' took %lu ms (warn threshold: %lu ms)",
-                     entry->options.tag, elapsed, (unsigned long)entry->options.warnAfterMs);
+                     entry->options.tag, (unsigned long)elapsed,
+                     (unsigned long)entry->options.warnAfterMs);
         }
 
         delete entry;
+    }
+
+    // Re-queue deferred entries in FIFO order
+    for (size_t i = 0; i < deferredCount; i++) {
+        if (xQueueSend(_jobQueue, &deferred[i], 0) != pdTRUE) {
+            ESP_LOGW(TAG, "Failed to re-queue deferred job '%s' — dropping",
+                     deferred[i]->options.tag);
+            delete deferred[i];
+        }
     }
 }
 
@@ -209,6 +261,36 @@ void DataManager::processNext() {
 void DataManager::setAppRunning(bool running) {
     _appRunning.store(running);
 }
+
+#ifdef ESP_PLATFORM
+void DataManager::fetchWatchdogCb(void* arg) {
+    auto* self = static_cast<DataManager*>(arg);
+    uint32_t start = self->_fetchStartMs.load();
+    if (start == 0) return;  // no fetch in progress
+    uint32_t elapsed = (uint32_t)(millis() - start);
+    if (elapsed > 30000) {
+        ESP_LOGE(TAG, "FATAL: fetch/job hung for %lu ms (>30s) — aborting", (unsigned long)elapsed);
+        abort();
+    }
+    // Still under 30s — feed the WDT on behalf of the blocked worker
+    // (worker is unsubscribed during fetch, this keeps the system healthy)
+}
+
+void DataManager::startFetchWatchdog() {
+    esp_task_wdt_delete(NULL);  // temporarily unsubscribe worker
+    if (_fetchWatchdog) {
+        esp_timer_start_periodic(_fetchWatchdog, 2000000);  // check every 2s
+    }
+}
+
+void DataManager::stopFetchWatchdog() {
+    if (_fetchWatchdog) {
+        esp_timer_stop(_fetchWatchdog);
+    }
+    esp_task_wdt_add(NULL);    // re-subscribe worker
+    esp_task_wdt_reset();
+}
+#endif
 
 void DataManager::workerTaskLoop(void* param) {
     DataManager* manager = static_cast<DataManager*>(param);
@@ -290,18 +372,22 @@ void DataManager::executeLoop() {
         if (_registryMutex) xSemaphoreGive(_registryMutex);
         
         // --- Execute the fetch cycle ---
-        // Record fetch start for external observability (getFetchElapsedMs()).
-        // The TWDT stays subscribed throughout — if fetchUpdate() genuinely
-        // never returns, the watchdog fires as intended (correct outcome for
-        // an unrecoverable hang). Fetches that eventually return but exceed
-        // 15s log a warning so consumers can tighten client timeouts.
+        // The TWDT is temporarily unsubscribed during the fetch and a periodic
+        // esp_timer (2s) monitors for genuine hangs. If the fetch exceeds 30s,
+        // the timer calls abort() — equivalent to a TWDT reset, but allows
+        // bounded fetches (e.g. 5-10s TLS handshakes) to complete.
         unsigned long fetchStart = millis();
-        _fetchStartMs = fetchStart;
+        _fetchStartMs.store(fetchStart);
+#ifdef ESP_PLATFORM
+        startFetchWatchdog();
+#endif
 
         UpdateStatus result = fetchTarget->fetchUpdate();
 
-        _fetchStartMs = 0;
-        esp_task_wdt_reset();   // feed WDT immediately after fetch returns
+#ifdef ESP_PLATFORM
+        stopFetchWatchdog();
+#endif
+        _fetchStartMs.store(0);
 
         unsigned long fetchDuration = millis() - fetchStart;
         if (fetchDuration > 15000) {
