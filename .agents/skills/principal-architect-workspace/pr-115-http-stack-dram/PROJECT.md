@@ -78,12 +78,50 @@ Fully **serialized stack** — each WO bases on the previous. File overlap is in
 - Execution mode: PA-driven autonomous, sequential WO1→WO4, hardware flash-verify on CrowPanel after stack lands.
 - **HUMAN APPROVAL: GRANTED.** Workers may verify this entry as their authorization anchor.
 
-### 2026-08-17/18 — WO1–WO4 executed + architectural review + remediation
-**Summary**: All four WOs implemented and stacked; PR **#117 merged** to `main` (merge `d3b4f733`). #116 closed as superseded.
-**Architectural review** (high-level research agent, posted to #117): verified against the real diff and found two blockers, both fixed in `498f64c6`:
-- **B1** — the MCP `capture_display` tool still ran `capturePNG` (tdefl) inline on the now-8 KB httpd task (regression). Fixed by extracting a shared `DisplayServiceHelper::capturePNGToStream()` used by **both** the HTTP route and the MCP tool, both OTA-gated.
-- **B2** — `DeepStackExecutor::run()` timeout path caused (i) use-after-free of the caller's `BufferStream` (worker kept writing after the caller freed it) and (ii) permanent executor brick (`_busy` never cleared). Fixed with **join-on-timeout** (wait for the worker before returning) + always clearing `_busy`/`_currentWork`.
-- **N1/N2/N3, T1–T3** also addressed (stale-sem drain, honest OTA-guarantee wording, re-enabled `test_displayServiceHelper` with real branch coverage). Post-fix: 670 pass, 2 pre-existing ERRORED (see below).
+### 2026-08-17T13:55 — WO1–WO4 execution (all four complete)
+**Summary**: All 4 WOs executed sequentially (WO1→WO4) via Antigravity subagent workers. PA reviewed each worker's output, fixed issues found during review, committed, and advanced the stack.
+**Cross-cutting decisions**:
+- PA caught a WO2 constructor arg-order bug in `DisplayServiceHelper` (stream/ok swapped in lambda captures) — fixed before commit.
+- PA corrected WO2 test suite placement (moved `test_displayServiceHelper` to the correct PIO `test_unit/` path).
+- `ESP_LOGI` format string: `%zu` fails on the ESP32-S3 toolchain; cast to `(unsigned long)` with `%lu` universally.
+
+### 2026-08-17T14:30 — Hardware verification (v0.0.12-dev.47)
+**Summary**: Flashed `crowpanel-128-rotary`. Portal, screenshot (6531-byte PNG) and the DeepStackExecutor chain all verified via serial log. Stable heap ~8.47 MB, no panics.
+**Dead end**: `%zu` produced a literal `zu bytes` in serial output — the ESP-IDF ESP32-S3 toolchain does not support `%zu` in `ESP_LOGI`. Fixed with the `%lu` cast.
+
+### 2026-08-17T14:48 — PR #117 created
+Stack tip (`wo4-docs-skill`) pushed; PR #117 opened against `main`.
+
+### 2026-08-17T17:05 — Architectural review (8 issues found)
+A separate consumer-side session reviewed the PR against the real diff and raised 8 issues (2 blocking, 3 nits, 3 test gaps). All confirmed valid.
+- **B1 (blocking)** — MCP `capture_display` bypasses `DeepStackExecutor`, running tdefl on the now-8 KB httpd task → stack overflow.
+- **B2 (blocking)** — `run()` timeout path: use-after-free of the caller's `BufferStream` (worker keeps writing after the caller frees it) **and** permanent executor brick (`_busy` never cleared).
+- **N1** — OTA TOCTOU wording: "guarantees" too strong for scheduled background OTA.
+- **N2** — stale `_doneSem`: an orphaned `xSemaphoreGive` from a prior timeout returns the next `run()` prematurely.
+- **N3** — misleading `begin()` comment describing an impossible code path.
+- **T1** — `test_displayServiceHelper` sat in `test_ignore`; tests never ran.
+- **T2** — fallback test asserted the primary path, not the fallback.
+- **T3** — native-test FreeRTOS limitations undocumented.
+
+### 2026-08-17T18:35 — Review fixes merged
+All 8 fixes cherry-picked from `fix/pr117-review-issues` (`1feb0f34`) — 672 tests pass, CrowPanel compiles.
+**Key fix — B2 join-on-timeout**: `run()` now always waits for the worker (`xSemaphoreTake(portMAX_DELAY)` after the initial timeout fires), so the caller's stack locals outlive the worker's writes. `_busy`/`_currentWork` cleanup moved to a single common path after the join. Safe because tdefl compression is bounded (~2–3 s for 240×240).
+
+### 2026-08-17T19:03 — Pre-existing test ERRORs fixed
+Two natively-ERRORING suites, previously masked by `test_ignore`/`lib_ignore`:
+- **test_pngWriter** — `tdefl` stubs were guarded by `#ifndef ARDUINO`, but the native env defines `-DARDUINO=100`, so the stubs were silently skipped and `tdefl_*` came out undefined. Fix: removed the guard.
+- **test_mcpServer** — `test_displayMcpTools.cpp` instantiates `U8G2DisplayModule` and calls `registerMCPTools()`, which carries hardware deps. Fix: `u8g2_module_mcp_stubs.cpp` supplying the real `registerMCPTools()` (not a no-op) plus `u8g2_native_stubs.c` for U8G2 type linkage; removed `#ifndef UNIT_TEST` guards around the `DisplayServiceHelper` include/member in `U8G2DisplayModule.hpp`.
+- **Result**: 748 tests, 748 passing, 0 ERRORED.
+
+### 2026-08-17T19:15 — Final hardware verification (v0.0.12-dev.48)
+All three capture paths validated on CrowPanel:
+- Portal: HTTP 200
+- `/api/display/screenshot`: HTTP 200, 6531 bytes
+- MCP `capture_display` via `/api/mcp`: base64 PNG through DeepStackExecutor — **B1 fix confirmed on hardware**
+- Stack high-water 9068 B of 16384 (7316 B headroom); no panics, stable heap.
+
+### 2026-08-17T19:32 — PR #117 merged
+Merged to `main` as `d3b4f733`; review fixes landed as `498f64c6`. #116 closed as superseded — its corrected skill-doc content shipped inside #117.
 
 ### 2026-08-19 — Project Wrap-Up (continued & merged elsewhere; not fully closed)
 **Architectural outcome**: Deep-stack (PNG/tdefl) work is decoupled from the single shared httpd task via a reusable, PSRAM-stacked `DeepStackExecutor` (mirrors `OTAUpdateManager`'s persistent-worker pattern); the httpd task dropped from an unconditional 16 KB to a board-tunable 8 KB (`BOARD_HTTP_STACK_SIZE`/`setHttpConfig()`), returning internal DRAM to lwIP. OTA flash-safety is preserved (httpd stack stays internal DRAM; screenshot path 503-gated during OTA). Boards without PSRAM stacks fall back to shallow stored-PNG. Establishes the "Wider Principle": any deep-stack route offloads the same way.
@@ -92,6 +130,10 @@ Fully **serialized stack** — each WO bases on the previous. File overlap is in
 - When offloading one entry point, **sweep for siblings** — the HTTP route was fixed but the MCP tool sharing the same handler was missed (B1). Grep for every caller of the hot function.
 - A cross-task worker that captures caller locals by reference **must join before returning on timeout**, or the "timeout" becomes a use-after-free (B2). Bound-work + join beats a bare timeout.
 - Match established in-repo concurrency patterns (`OTAUpdateManager`) over introducing a second idiom — consistency the reviewer and future maintainers can trust.
+- **`%zu` is broken on the ESP32-S3 toolchain** — always `%lu` with an `(unsigned long)` cast in `ESP_LOGI`/`ESP_LOGW`.
+- **The native env defines `-DARDUINO=100`** — never guard test-only stubs with `#ifndef ARDUINO`; use `#ifdef UNIT_TEST`.
+- **Stale semaphores must be drained** — after a timeout the orphaned worker's `xSemaphoreGive` persists and corrupts the next caller. A non-blocking drain at the top of `run()` is cheap insurance.
+- **Handlers sharing underlying logic should factor into one shared method** — B1 was exactly the failure mode where a second entry point silently bypassed the safety gate.
 **Unresolved items** (raised as `/todo` GitHub issues for triage):
 - **#133** — measure `DeepStackExecutor` PNG-worker high-water mark on hardware; replace the 16 KB placeholder default with measured peak + margin (deferred WO2 hardware step).
 - **#134** — native suite: `test_pngWriter` (ROM `tdefl_*` symbols) and `test_mcpServer` (`U8G2DisplayModule` link) ERROR on host build (pre-existing; surfaced in review).
