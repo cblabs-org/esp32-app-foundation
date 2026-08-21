@@ -307,6 +307,7 @@ enum class Cause : uint8_t {
     Rejected,         ///< Config present and refused — bad password, revoked token.
     Unreachable,      ///< Config present and plausible; the peer is not answering.
     RateLimited,      ///< The peer is answering and asking us to slow down.
+    Implausible,      ///< An answer arrived, well-formed, and a domain check rejects it.
     DependencyUnmet,  ///< Blocked upstream. Not this precondition's problem.
     FallbackEngaged,  ///< Degraded but serviceable, and still self-healing.
     Unavailable,      ///< Not present in this deployment, by configuration. Not a fault.
@@ -315,7 +316,7 @@ enum class Cause : uint8_t {
 };
 ```
 
-Three of these are additions the reviews demanded:
+Four of these are additions the reviews demanded:
 
 - **`RateLimited`** — exists in `UpdateStatus` (`IDataSource.hpp:34`) with no gate
   counterpart. A rate-limited peer is *up and talking*; treating it as `Unreachable`
@@ -328,12 +329,16 @@ Three of these are additions the reviews demanded:
 - **`Indeterminate`** — §2.4. A precondition whose dependency was not wired has no
   opinion, and must not be forced to lie. Severity `Blocked`; the **framework**
   decides policy, not each author quietly returning `true`.
+- **`Implausible`** — the transport succeeded and a **domain check rejected the
+  answer**. Every other cause is a shape of *not getting an answer*; this is the only
+  one that means *got one, don't trust it*. See CG-5a.
 
 ### CG-4 — Severity is derived, and the safe default is *Transient*
 
 | Cause | Severity | Meaning |
 |---|---|---|
 | `Connecting`, `Unreachable`, `RateLimited` | **Transient** | Keep trying. Blame nobody. |
+| `Implausible` | **Transient** or **NeedsUser** | Discriminated by trust history — see CG-4a. |
 | `NotConfigured`, `Rejected` | **NeedsUser** | Only a person resolves this. |
 | `DependencyUnmet`, `Indeterminate` | **Blocked** | Not actionable; someone else owns the report. |
 | `FallbackEngaged` | **Degraded** | Serviceable, still self-healing. |
@@ -362,32 +367,69 @@ Severity severityOf(const PreconditionStatus&, const SourceHealth* health);
 
 `health` is optional. Where it is absent, severity falls back to the CG-4 table.
 
-#### CG-5a — The boundary: cause describes the conversation, not the truth of the answer
+#### CG-5a — The framework supplies the vocabulary; the consumer supplies the predicate
 
 > [!IMPORTANT]
-> **`Cause` describes the state of the conversation. It says nothing about whether
-> the answer received is true.** No member of the enum means *"got an answer, it was
-> well-formed, and it was false."*
+> **The framework cannot judge whether an answer is true. It must still give the
+> consumer somewhere to say so.**
 
-PowerMonitor's case is the clearest statement of why this must be written down.
-`Mcp320xBus.hpp:190` substitutes `kMidRailCounts = 2048` for an absent chip, so an
-unplugged pod reads 0.00 A on every channel — identical to a correctly-wired pod
-watching eight switched-off circuits. Every read succeeds.
+Every cause except `Implausible` describes a shape of *not getting an answer*. A
+local sensor fails a third way — neither outward like the clock chain nor sideways
+like a LAN peer. **It does not fail at all.** `Mcp320xBus.hpp:190` substitutes
+`kMidRailCounts = 2048` for an absent chip, so an unplugged pod reads 0.00 A on every
+channel — identical to a correctly-wired pod watching eight switched-off circuits.
+Every read succeeds. Worse, PowerMonitor's own plausibility check is defeated by the
+same substitution: 2048 counts is 1.650 V against a 1.65 V mid-rail, deviation
+**0.000 V**. *An absent pod scores better than any real hardware ever will.*
 
-And their plausibility check is defeated by the same substitution: 2048 counts is
-1.650 V against a 1.65 V mid-rail, deviation **0.000 V**. *An absent pod scores
-better than any real hardware ever will.*
+The framework has no way to compute that verdict. But a **consumer** very often can —
+a mains voltage reference that shows no AC waveform is conclusively dead, whatever the
+ADC returns. The division is therefore:
 
-**CG-4a cannot rescue this.** `everSucceeded` is permanently true. The
-never-connected principle works because failure is observable; here it is not.
+| Responsibility | Owner |
+|---|---|
+| Deciding whether a reading is credible | **The consumer.** Domain knowledge the framework does not have. |
+| Carrying that verdict, and acting on it | **The framework.** `Cause::Implausible` + `detail`. |
+| Making driver-level substitution visible | **The framework.** See below. |
 
-A precondition over a local sensor **must be backed by a domain plausibility
-predicate the framework cannot supply.** The one affordance the framework should
-provide is in `SourceHealth`, not `Cause`: a flag distinguishing *this value came
-from the device* from *this value came from a fallback* — making substitution
-visible rather than trying to enumerate its causes.
+Without the third row a consumer with a perfectly good heuristic has nowhere to put
+it, and keeps the logic outside the framework — which is exactly what §12 records
+happening today.
 
----
+**This is also what makes CG-4a work here.** `everSucceeded` cannot discriminate a
+silent failure while it means *"ever completed a transaction"*. Once a consumer can
+report `Implausible`, it means **"ever produced a result we trust"**, and the LAN-peer
+rule applies unchanged:
+
+| Trust history | Severity | Message |
+|---|---|---|
+| Never once produced a credible reading | **NeedsUser** | *"No AC waveform on Grid ZMPT — check the CT orientation."* |
+| Produced one before, now implausible | **Transient**, escalating | *"Voltage reference lost. Retrying."* |
+
+##### Choosing the signal to check
+
+> [!WARNING]
+> A plausibility predicate is only sound on a signal with a **known-nonzero
+> expectation**.
+
+Mains voltage must always show a waveform, so flat DC is conclusive. A current channel
+legitimately reads zero — an idle circuit and a disconnected clamp are genuinely
+indistinguishable, which is the `kMidRailCounts` problem above and is **not** fixable
+by any amount of framework vocabulary.
+
+So: **put the plausibility predicate on the signal that cannot legitimately be quiet,
+and let everything else depend on it.** That is why the chain in §9.3 roots at
+`Voltage Reference` rather than per-channel current — the root is checkable, and
+`Requires`/`BindsTo` carries the verdict to channels that are not.
+
+##### The remaining framework affordance
+
+Where a *driver* substitutes a fallback value — as `Mcp320xBus` does — that
+substitution should be **visible in `SourceHealth`**, not inferred. A flag
+distinguishing *this value came from the device* from *this value came from a
+fallback* costs nothing at the point of substitution and is impossible to reconstruct
+afterwards. It composes with `Implausible`: the driver reports what it did, the
+consumer reports what it concluded. Tracked as OQ-5.
 
 ## 6. Part B — Relationships between preconditions
 
@@ -584,8 +626,25 @@ a moving timestamp.
 > indistinguishable to the person in front of the device, and never-succeeded is the
 > case they can act on.
 
-Subject to CG-5a: this vocabulary describes conversations. It carries nothing for a
-precondition over a wire.
+#### CG-15a — `UpdateStatus` has the same hole, one layer down
+
+```cpp
+ParseError = 4, ///< Response received but JSON/payload parsing failed
+```
+
+That is **structural** invalidity. There is no member for **semantic** invalidity —
+parsed cleanly, values are nonsense. A sensor module reporting into `SourceHealth`
+today must return `Success`, which makes `everSucceeded` permanently true and
+disables CG-4a's discriminator at the source.
+
+`UpdateStatus::Implausible` is the counterpart to `Cause::Implausible`, and the two
+must land together: the gate-layer vocabulary is useless if the health record
+underneath it cannot express the same verdict. With both, `everSucceeded` means
+**"ever produced a result we trust"** rather than "ever completed a transaction",
+which is what CG-4a needs to work for sensors as well as peers.
+
+This is an additive change to `IDataSource.hpp` and belongs with the #128 migration
+alongside CG-17.
 
 ### CG-16 — Per-cause text is **optional**, with a zero-cost default
 
@@ -689,11 +748,20 @@ which is why, under today's contract, this chain has never been written.
 Meanwhile the OLED shows `STALE` only after the damped window, so a two-second glitch
 does not flicker the display. One condition, two speeds.
 
-**And the case the model does not solve.** A pod that is *absent* reads a perfect
-mid-rail. `ADC Bus` is met, every read succeeds, `everSucceeded` is true. **CG-5a is the
-honest answer: the framework cannot detect this.** The precondition must be backed by a
-domain plausibility predicate — and the framework's contribution is to make the
-substitution *visible* in `SourceHealth`, not to enumerate it in `Cause`.
+**Pod absent, reading a perfect mid-rail.** `ADC Bus` is met and every read succeeds, so
+no transport-shaped cause fires. `Voltage Reference` runs the consumer's own predicate —
+no AC waveform on the ZMPT — and reports `Implausible` with
+`detail = "no AC waveform on Grid ZMPT"`. Because the reference has **never** produced a
+credible reading, CG-4a resolves that to **NeedsUser**: *"check the CT orientation"*,
+rather than *"still trying"* forever.
+
+`Energy Accumulation` `BindsTo` it and stops integrating **immediately** via the undamped
+status (CG-13). No phantom kWh, and the owner is told the one thing they can act on.
+
+**What remains genuinely unsolvable.** A *current* channel reading zero is legitimately
+ambiguous — an idle circuit and a disconnected clamp are the same measurement. No
+framework vocabulary fixes that; the answer is structural, per CG-5a: root the chain at
+the signal that cannot legitimately be quiet.
 
 ### 9.4 Fails invisibly — a revoked token behind a quorum
 
@@ -815,7 +883,11 @@ All three endorsed folding CG-17 into the #128 migration. One break beats two.
   only, never penalty), but it is still unstated whether A `BindsTo` B `Requires` C means
   A follows C. Erlang's multiplication warning argues for explicitness over inference.
 - **OQ-5 — Does the framework need a "value came from a fallback" flag** in
-  `SourceHealth` (CG-5a), or is that wholly the consumer's business?
+  `SourceHealth` (CG-5a)? A driver that substitutes knows it did; that fact is
+  impossible to reconstruct afterwards and costs nothing to record at the point of
+  substitution. It composes with `Implausible` — the driver reports what it *did*, the
+  consumer reports what it *concluded* — but it is a second mechanism and may be
+  redundant if consumers are checking plausibility anyway.
 
 ---
 
@@ -862,4 +934,5 @@ OQ-5 were resolved into CG-8 and §10. §13 lists five new questions raised by r
 |---|---|
 | 2026-08-21 | Initial draft. CG-1…CG-12, clock-chain reference case, OQ-1…OQ-5. |
 | 2026-08-21 | Round-1 amendments: CG-8 corrected to per-second accrual; CG-2a, CG-9a added; CG-7 corrected. |
+| 2026-08-21 | Added `Cause::Implausible` and `UpdateStatus::Implausible` (CG-5a, CG-15a). CG-5a had conflated *the framework cannot compute this verdict* (true) with *the model cannot carry it* (false) — a consumer with a working heuristic, such as "no AC waveform on a mains voltage reference", had nowhere to report it and would keep the logic outside the framework. With the verdict expressible, `everSucceeded` can mean "ever produced a result we trust", which restores CG-4a's discriminator for sensors. Added the rule that a plausibility predicate is only sound on a signal with a known-nonzero expectation, and that chains should root there. |
 | 2026-08-21 | **Round-2 rewrite** after reviews from all three consumer programs. Keystone moved: the three-question split is now CG-1, and `Operational` is the default role — four consumers were found routing around the boot-blocking-only contract, so chaining had nothing to describe. Added CG-3 cause vocabulary (`RateLimited`, `Unavailable`, `Indeterminate`), CG-5a (cause describes the conversation, not the truth of the answer), CG-7 (registration-time edge resolution and cycle rejection), CG-8 (satisfaction propagates immediately, penalty never), CG-13 (publish damped *and* undamped). CG-16 demoted to optional after two consumers reported one-cause preconditions. Damping made runtime-configurable. §9 worked examples and §10 decision procedure added. See §14 for the full mapping. |
