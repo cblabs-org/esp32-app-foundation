@@ -17,9 +17,9 @@
 > numbers changed — see §14. Round 2 corrected several claims the rewrite had itself
 > been built on; those corrections are marked inline.
 >
-> **One decision remains open and is not a default to be assumed: OQ-7** — whether
-> `detail` gets a lifetime contract, and at what cost. Round-1 OQ-1…OQ-5 and OQ-6 are
-> resolved; OQ-8 and OQ-9 are dependencies on other work rather than choices.
+> **No design decisions remain open.** OQ-1…OQ-7 are resolved; OQ-8 and OQ-9 are
+> dependencies on other work rather than choices. The document has not been back to the
+> consumers since CG-18 and CG-2a were written, and both touch code they own.
 >
 > Shares a health vocabulary with [#128](https://github.com/matthewmcneill/esp32-app-foundation/issues/128);
 > CG-17 retires an interface flag added there as a stopgap.
@@ -305,16 +305,58 @@ deliberate act.
 
 ### CG-2 — A precondition reports a status, not a boolean
 
+**The status and the message are separate calls, because they are needed at
+completely different rates.**
+
 ```cpp
 struct PreconditionStatus {
-    bool          met     = false;
-    Cause         cause   = Cause::NotConfigured;
-    const char*   detail  = nullptr;   ///< Optional; nullptr is valid and cheap
+    bool  met   = false;
+    Cause cause = Cause::NotConfigured;
 };
+
+/// HOT PATH — evaluated every tick. Cheap read of cached state; no formatting,
+/// no allocation, no I/O.
 virtual PreconditionStatus getStatus() const = 0;
+
+/// COLD PATH — called only when something renders or publishes. May format.
+/// Writes into a CALLER-SUPPLIED buffer. Default is a no-op.
+virtual void describe(Cause, char* buf, size_t len) const {}
 ```
 
 `isSatisfied()` remains, derived, so the common read stays cheap.
+
+#### CG-2a — why the message is not a field on the status
+
+An earlier draft carried the message as a `const char* detail` on the struct, and every
+variant of that was wrong in one of two ways:
+
+| Shape | Fails |
+|---|---|
+| `const char*` returned from a `const` method | Dynamic text needs a `mutable` member to build into — the exact wart CG-16 claims to abolish — and the pointer can be invalidated by the object that produced it while the framework still holds it ([#147](https://github.com/matthewmcneill/esp32-app-foundation/issues/147)) |
+| Framework copies it at publish time | Fixes the dangling pointer, leaves the `mutable` member |
+| `char detail[96]` by value in the struct | Fixes both, but runs an `snprintf` **every tick** to rebuild a string that changes when an IP address changes |
+
+The mistake was treating this as a question about **ownership**. It is a question about
+**frequency**:
+
+| Data | Needed when | Rate |
+|---|---|---|
+| `met`, `cause` | deciding app state | **every tick** |
+| the message | rendering or publishing | on **change** — and the publish path is already 500 ms-throttled |
+
+Nobody reads the message per tick. Splitting the calls means the expensive half runs at
+its own rate, and every ownership question disappears with it:
+
+- **No lifetime contract** — the caller supplies the buffer, so there is nothing to
+  outlive anything.
+- **No `mutable`** — you write to the caller's buffer, not to the object, so `const` is
+  honest.
+- **No struct growth**, and no per-tick formatting.
+- **Free for a one-cause precondition** — don't override `describe()` and you have paid
+  nothing (CG-16).
+- **The caller sizes it** — a portal can afford 256 characters; a 256×64 panel asks for 40.
+
+This is the out-param idiom the interface already uses for `getDependencies(uint8_t&)`.
 
 ### CG-3 — The cause vocabulary
 
@@ -783,22 +825,34 @@ alongside CG-17.
 
 ### CG-16 — Per-cause text is **optional**, with a zero-cost default
 
+`describe()` (CG-2) **is** the per-cause text mechanism, and its default is a no-op.
+
 ```cpp
-virtual const char* getHelpText(Cause) const { return getHelpText(); }
-virtual const char* getHelpText() const { return ""; }
+// One cause — override nothing. Costs exactly what it costs today.
+PreconditionStatus getStatus() const override { return {false, Cause::NotConfigured}; }
+
+// Several causes — opt in.
+void describe(Cause c, char* buf, size_t len) const override {
+    switch (c) {
+        case Cause::NotConfigured: snprintf(buf, len, "Configure your hub address"); break;
+        case Cause::Unreachable:   snprintf(buf, len, "Cannot reach hub at %s", _ip);  break;
+        default:                   snprintf(buf, len, "Hub unavailable");             break;
+    }
+}
 ```
 
 Consumers disagreed here, and the disagreement is the design constraint. DraytonWiser
-has three causes and paid for per-cause text by hand. Departures and PowerMonitor each
-have **exactly one** cause, where the blaming default is correct and one fixed string
-is a complete, honest answer.
+has three causes and paid for per-cause text by hand, with a `mutable char[96]` written
+by `snprintf` from inside a `const` accessor. Departures and PowerMonitor each have
+**exactly one** cause, where the blaming default is correct and one fixed string is a
+complete, honest answer.
 
-> If `getStatus()` is pure-virtual and `detail` has no sensible default, **a one-cause
-> precondition becomes more expensive to write than it is today.** That is a
-> regression, and it is how you get a fifth evasion in §1.2.
+> A one-cause precondition must stay **exactly as cheap to write as it is today.**
+> Making it more expensive is a regression, and it is how you get a fifth evasion in §1.2.
 
-`detail` may be `nullptr`; `getHelpText(Cause)` falls back to the single-string form.
-Multi-cause authors opt in.
+Both are served: the multi-cause author overrides `describe()`, and the one-cause author
+never mentions it. Nobody needs a `mutable` member, because the buffer belongs to the
+caller.
 
 ### CG-17 — `IDataSource::fetchesWhileConfiguring()` is retired
 
@@ -1121,22 +1175,20 @@ Reported cost, from the consumers themselves:
 
 | Consumer | Classes to change | Notes |
 |---|---|---|
-| DraytonWiserController | 1 | **Does NOT delete the `mutable char[96]`** — see below |
+| DraytonWiserController | 1 | Deletes the `mutable char[96]` — see below |
 | departures-board-v3 | 1 + 1 test | Can stop decomposing `registerModule()` to escape gatehood |
 | PowerMonitor | 0 | Authors no gates — *because the current shape fits nothing they have* |
 
-> [!CAUTION]
-> **The round-2 claim that CG-16 lets DraytonWiser delete their buffer is wrong**, and
-> two consumers found it independently. `detail` is a `const char*` returned from a
-> `const` method, so runtime-interpolated text still needs a `mutable` member —
-> exactly the wart CG-16 claims to abolish. The interface changes; the workaround
-> survives.
+> [!NOTE]
+> Round 2 correctly found that the round-2 draft **did not** let DraytonWiser delete
+> their `mutable char[96]`: `detail` was a `const char*` returned from a `const` method,
+> so runtime-interpolated text still needed a `mutable` member — the wart CG-16 claimed
+> to abolish. Two consumers found this independently.
 >
-> Fixing it properly means **splitting evaluation from reading**: a non-`const`
-> `refresh()` called by the framework once per tick, and a `const` accessor returning
-> what the last refresh computed. That changes the shape of *every* precondition, not
-> just multi-cause ones, and interacts with #147's lifetime question. **Flagged as a
-> decision, not folded in — see OQ-7.**
+> **CG-2's `describe(Cause, char*, size_t)` resolves it.** The buffer belongs to the
+> caller, so the text is built into someone else's memory from an honestly-`const`
+> method. The `mutable` member goes, and with it the lifetime question — there is no
+> pointer for the framework to hold.
 
 PowerMonitor's zeros are the most informative number here, and should be read as they
 asked: not "this app is simple", but *"this app looked at `IConfigGate`, decided every
@@ -1199,12 +1251,16 @@ All three endorsed folding CG-17 into the #128 migration. One break beats two.
 
 ### Open
 
-- **OQ-7 — Does `detail` get a lifetime contract, and at what cost?** §12. Fixing it
-  properly means splitting a non-`const` `refresh()` from a `const` accessor, changing
-  the shape of every precondition. The cheaper alternative is the #147 fix — the
-  framework copies into a stable buffer at publish time and documents *"any lifetime is
-  acceptable"* — which solves the dangling-pointer hazard but leaves consumers with the
-  `mutable` member. **This is a genuine trade and needs a decision, not a default.**
+- **OQ-7 — RESOLVED: split the calls by frequency, not by ownership.** See
+  [CG-2a](#cg-2a--why-the-message-is-not-a-field-on-the-status). Three drafted options
+  each fixed one half and charged someone for the other: a `const char*` needed a
+  `mutable` member and could dangle; a framework-side copy fixed the dangle and kept the
+  wart; a by-value `char[96]` fixed both and ran an `snprintf` every tick to rebuild a
+  string that changes when an IP address changes. Splitting `getStatus()` (hot, every
+  tick, two bytes) from `describe(Cause, char*, size_t)` (cold, on render or publish,
+  caller-supplied buffer) fixes all of it and costs a one-cause precondition nothing.
+  **The framing was the bug**: this looked like a question about who owns the string,
+  and it was a question about how often each part of the answer needs computing.
 
 - **OQ-8 — Can `CG-12`'s runtime-settable damping actually reach a portal?**
   PowerMonitor reports that `ConfigManager` has no generic per-namespace write, so
@@ -1258,6 +1314,7 @@ OQ-5 were resolved into CG-8 and §10. §13 lists five new questions raised by r
 |---|---|
 | 2026-08-21 | Initial draft. CG-1…CG-12, clock-chain reference case, OQ-1…OQ-5. |
 | 2026-08-21 | Round-1 amendments: CG-8 corrected to per-second accrual; CG-2a, CG-9a added; CG-7 corrected. |
+| 2026-08-21 | **OQ-7 resolved as CG-2a** — `getStatus()` (hot path, every tick) split from `describe(Cause, char*, size_t)` (cold path, caller-supplied buffer). The question had been framed as *who owns the string*; it is really *how often does each part of the answer need computing*. `met`/`cause` are needed every tick; the message is needed on change, and the publish path is already 500 ms-throttled. Splitting on frequency removes the ownership question entirely: no lifetime contract, no `mutable` member, no per-tick `snprintf`, no struct growth, and nothing for a one-cause precondition to implement. CG-16 restated in those terms; §12's migration note corrected — DraytonWiser *can* now delete their `mutable char[96]`. |
 | 2026-08-21 | **OQ-6 resolved as CG-18.** Portal surfacing is mandatory and prominent — not every consumer has a display, and nobody watches a portal; they open it *because* something is wrong. Display surfacing rides a published `precondition.health` topic with reference handlers in both framework display modules. **Corrects a wrong turn:** an earlier proposal had the framework call `IDisplayModule::showSystemState()`, which is precisely the direct injection MK-9 forbids — *"the kernel publishes; it stops knowing what a carousel is."* `showSystemState()` has zero callers in the framework and in all three consumers because it is downstream API, not neglected plumbing; the §11 text calling the display's event-handler path a framework defect is corrected likewise. CG-18c reserves a return path — `cause` already serves as the affordance hint, and action requests flow back by precondition name — so a touch/encoder LVGL panel can offer on-device remediation later without a contract change, while nothing assumes a display is interactive. |
 | 2026-08-21 | **Round-2 review by all three consumers.** Corrections, several to claims the round-2 rewrite had built on: CG-13 cited prior art that does not exist (PowerMonitor runs one `_stale` flag, not a split); CG-8's "fabricated kWh" was backwards — a dead bus records *zero*, and the irreversibility argument is restated as silent under-recording; §9.3's chain misrepresented (real root `Sampling Live`, depth 1 not 2, so `BindsTo` evidence rests on one consumer); §12's claim that DraytonWiser can delete their `mutable char[96]` is false, found independently by two consumers. CG-4a's discriminator rebuilt — `everMet` is framework-owned per precondition with an identity epoch, after three defects were found in sourcing it from `SourceHealth`. CG-17 made conditional: its premise was false, since `DataManager` still gates on `_appRunning`. §10 rebuilt after three reported failures. CG-5a gained a second soundness clause. CG-14a/b/c added: per-precondition level read, "never fires" separated from "fires and is missed", and the missing RUNNING surface raised as blocking OQ-6. Round-1 OQ-1…OQ-5 all resolved; OQ-6…OQ-9 opened. `helpText` lifetime defect filed as #147. |
 | 2026-08-21 | Added `Cause::Implausible` and `UpdateStatus::Implausible` (CG-5a, CG-15a). CG-5a had conflated *the framework cannot compute this verdict* (true) with *the model cannot carry it* (false) — a consumer with a working heuristic, such as "no AC waveform on a mains voltage reference", had nowhere to report it and would keep the logic outside the framework. With the verdict expressible, `everSucceeded` can mean "ever produced a result we trust", which restores CG-4a's discriminator for sensors. Added the rule that a plausibility predicate is only sound on a signal with a known-nonzero expectation, and that chains should root there. |
