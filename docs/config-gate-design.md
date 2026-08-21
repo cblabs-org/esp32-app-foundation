@@ -7,8 +7,8 @@
 > when a running device should fall back to configuring.
 
 > [!NOTE]
-> **STATUS: RFC — round 3. Two full consumer review rounds folded in. Not approved,
-> not scoped, not built.**
+> **STATUS: DESIGN COMPLETE — awaiting a confirming consumer round, then approval.
+> Not approved, not scoped, not built.**
 >
 > This is a **breaking interface change**. Rounds 1 and 2 were each reviewed by all
 > three downstream programs (DraytonWiserController, departures-board-v3,
@@ -17,12 +17,45 @@
 > numbers changed — see §14. Round 2 corrected several claims the rewrite had itself
 > been built on; those corrections are marked inline.
 >
-> **No design decisions remain open.** OQ-1…OQ-7 are resolved; OQ-8 and OQ-9 are
-> dependencies on other work rather than choices. The document has not been back to the
-> consumers since CG-18 and CG-2a were written, and both touch code they own.
+> **No design decisions remain open.** OQ-1…OQ-7 are resolved. OQ-8 and OQ-9 are
+> dependencies on other work rather than choices, and neither blocks decomposition.
+>
+> **What is still owed before approval:** CG-18 and CG-2a were written after the last
+> consumer round and have no consumer evidence behind them (§14). Every other decision
+> here is backed by code read in a consumer's tree. A short confirming round on those
+> two — not a full re-review — is the remaining gate.
 >
 > Shares a health vocabulary with [#128](https://github.com/matthewmcneill/esp32-app-foundation/issues/128);
 > CG-17 retires an interface flag added there as a stopgap.
+
+---
+
+## 0. Decision index
+
+| | Decision | Resolves |
+|---|---|---|
+| **CG-1** | Three questions answered separately; `Operational` is the default role | *the keystone* |
+| CG-2 | A precondition reports a status, not a boolean | |
+| **CG-2a** | Status and message split by **frequency**, not ownership | OQ-7 |
+| CG-3 | The cause vocabulary | |
+| CG-4 | Severity is derived; the safe default is `Transient` | |
+| CG-4a | Severity derives from cause **and** trust history | |
+| **CG-5a** | The framework supplies the vocabulary; the consumer supplies the predicate | |
+| CG-6 | Edges carry strength, typed by *when* they matter | |
+| CG-7 | Edges resolved once at registration, and validated | |
+| **CG-8** | Satisfaction propagates immediately; penalty never propagates | round-1 OQ-3 |
+| CG-9 | Retry escalates rather than looping forever | |
+| CG-10 | Fallback is a degraded operating mode, requested over the bus | |
+| CG-11 | Recovery is a half-open probe, performed by the resource owner | |
+| CG-12 | Damping: per second, per severity, runtime-configurable | |
+| CG-13 | Publish the damped *and* undamped status | |
+| CG-14 | App state is a projection, readable as a level | |
+| CG-15 | One health vocabulary with `SourceHealth` | |
+| CG-16 | Per-cause text is optional, with a zero-cost default | |
+| CG-17 | `fetchesWhileConfiguring()` retired — **conditionally** | |
+| **CG-18** | Surfacing: portal, plus a published topic | OQ-6 |
+
+Bold entries are the ones that would most change a downstream implementation.
 
 ---
 
@@ -479,7 +512,7 @@ ADC returns. The division is therefore:
 | Responsibility | Owner |
 |---|---|
 | Deciding whether a reading is credible | **The consumer.** Domain knowledge the framework does not have. |
-| Carrying that verdict, and acting on it | **The framework.** `Cause::Implausible` + `detail`. |
+| Carrying that verdict, and acting on it | **The framework.** `Cause::Implausible`, with the specifics via `describe()`. |
 | Making driver-level substitution visible | **The framework.** See below. |
 
 Without the third row a consumer with a perfectly good heuristic has nowhere to put
@@ -1028,7 +1061,7 @@ does not flicker the display. One condition, two speeds.
 **Pod absent, reading a perfect mid-rail.** `ADC Bus` is met and every read succeeds, so
 no transport-shaped cause fires. `Voltage Reference` runs the consumer's own predicate —
 no AC waveform on the ZMPT — and reports `Implausible` with
-`detail = "no AC waveform on Grid ZMPT"`. Because the reference has **never** produced a
+`describe()` yielding *"no AC waveform on Grid ZMPT"*. Because the reference has **never** produced a
 credible reading, CG-4a resolves that to **NeedsUser**: *"check the CT orientation"*,
 rather than *"still trying"* forever.
 
@@ -1153,8 +1186,10 @@ affordance or a scroll.
 **`Application::_publishConfiguringEvent()` must change** — it borrows
 `getHelpText()`'s pointer into an asynchronously-dispatched payload while copying
 `deviceIP` into a stable buffer five lines later. Tracked separately as
-[#147](https://github.com/matthewmcneill/esp32-app-foundation/issues/147); the `detail`
-field proposed here inherits the same hazard and must inherit the same fix.
+[#147](https://github.com/matthewmcneill/esp32-app-foundation/issues/147). Note this
+design does **not** inherit that hazard — CG-2a's caller-supplied buffer leaves no
+pointer for the framework to hold — but the existing field needs its own fix, since it
+ships today.
 
 **Ordering.** CG-15 means this lands after #128's health model. CG-17 deletes an
 interface member added there.
@@ -1292,6 +1327,14 @@ All three endorsed folding CG-17 into the #128 migration. One break beats two.
 | CG-10 | CG-15 | Subject to CG-5a |
 | CG-11 | CG-16 | **Demoted to optional** with a zero-cost default |
 | CG-12 | CG-17 | Unchanged |
+| — | **CG-18** | New, post-round-2: surfacing (portal + published topic + reserved interactive path). Resolves OQ-6. |
+| — | **CG-2a** | New, post-round-2: status/message split by frequency. Resolves OQ-7. |
+
+> [!IMPORTANT]
+> **CG-18 and CG-2a post-date the last consumer review.** Both touch code the consumers
+> own — CG-18 adds handlers to the display modules they use, and CG-2a changes the shape
+> of every precondition they will write. They are the two decisions in this document
+> with no consumer evidence behind them.
 
 Round-1 OQ-1, OQ-2 and OQ-4 were resolved into CG-14, CG-12 and CG-10. Round-1 OQ-3 and
 OQ-5 were resolved into CG-8 and §10. §13 lists five new questions raised by round 1.
