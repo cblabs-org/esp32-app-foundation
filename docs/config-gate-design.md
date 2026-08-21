@@ -109,6 +109,20 @@ That gate inherits the default, so a flaky network produces a device instructing
 the user to fix something — when the honest answer is *waiting for the network*.
 **The transient case must be opted into; blame is what you get for free.**
 
+**Consumer evidence (#146) makes this stronger than "the default is wrong".**
+`WiserHubConfigGate` *does* override `getActionStatus()`, carefully, with a
+documented table — and still returns `NeedsUserAction` for a hub that is
+configured, polled, and simply not answering. That is a hub mid-reboot, or a
+router that dropped for 90 seconds, and the owner is told to check their firewall.
+
+The author did not inherit that from the default; they hand-wrote it, because with
+three statuses and no `Unreachable`, `NeedsUserAction` is **the only bucket that
+surfaces anything to the user at all**. `InProgress` would have been more honest
+and would have shown them nothing.
+
+So the defect is not only the default. **The enum is too small, which pushes gate
+authors toward blame even when they are paying attention.**
+
 ### 2.3 The cause is computed, then thrown away
 
 `getHelpText()` takes no arguments. WiFi's three causes all yield:
@@ -231,6 +245,33 @@ on it" rather than an accusation. Blaming the user must be an explicit act.
 
 This inverts §2.2 and is the single highest-value change in this document.
 
+#### CG-2a — severity derives from cause **and health**, not cause alone
+
+Consumer review (#146) showed the table above is insufficient for a peer on the
+local network. `Unreachable` conflates two conditions that are the same case for
+an internet service reached by hostname and **different cases** for a LAN peer at
+a user-entered address:
+
+| Condition | Right response |
+|---|---|
+| The peer isn't answering | Wait — it will come back |
+| We may be **looking in the wrong place** | Only a person can fix this |
+
+Getting it wrong in either direction is bad: as Transient, a mistyped IP retries
+silently forever; as NeedsUser, a rebooting hub nags the owner.
+
+The discriminator already exists. `SourceHealth::everSucceeded` (CG-10) is exactly
+the bit: **a peer we have reached before and lost is Transient; a peer we have
+never once reached is NeedsUser.**
+
+```cpp
+Severity severityOf(const GateStatus& s, bool everSucceeded);
+```
+
+Severity is therefore a function of `GateStatus` **plus** health, not of `cause`
+alone. This is the never-connected principle (CG-10) arriving from a third
+direction, and it is why CG-2 and CG-10 cannot be sequenced apart.
+
 ### CG-3 — Dependency edges carry strength
 
 ```cpp
@@ -275,8 +316,17 @@ struct GateRetryPolicy {
     uint8_t  attemptsBeforeFallback = 5;
 };
 virtual GateRetryPolicy getRetryPolicy() const { return {}; }
-virtual bool engageFallback() { return false; }   ///< e.g. WifiManager → AP mode
 ```
+
+**Fallback is requested over the EventBus, not through a gate virtual**
+(resolves OQ-4, per #146). An `engageFallback()` method quietly encodes the
+assumption that fallback means *the WiFi one*: it requires the gate to reach
+`WifiManager`. One consumer's natural fallback is **hub re-discovery** — the
+sideways analogue of AP mode, owned by their poller, with nothing to do with WiFi.
+
+The framework publishes `gate.fallback.requested` carrying the gate name; the
+module that owns the resource decides what its own degraded mode is. That is also
+the only version testable without a `WifiManager` in the fixture.
 
 Following [OTP restart intensity](https://www.erlang.org/doc/system/sup_princ.html):
 after *N* failed attempts the gate stops retrying *at this level* and escalates by
@@ -310,9 +360,17 @@ Following the [circuit breaker](https://learn.microsoft.com/en-us/azure/architec
 | **Open** | Retries exhausted; fallback engaged (AP mode) |
 | **Half-Open** | Cooldown elapsed — **one** trial attempt at the real thing |
 
-From AP mode with saved credentials, the gate periodically re-attempts station
-mode. Success closes the breaker and returns to STA. Failure re-opens it with a
-longer cooldown, capped at the ceiling.
+From AP mode with saved credentials, station mode is periodically re-attempted.
+Success closes the breaker and returns to STA. Failure re-opens it with a longer
+cooldown, capped at the ceiling.
+
+> [!IMPORTANT]
+> **The gate reports breaker state; the module that owns the resource performs the
+> probe.** An earlier draft read as though the gate re-attempts the connection
+> itself, which contradicts this document's own constraint (§7) that a gate reads
+> cached state and never performs I/O. The half-open transition is a *request*
+> (CG-5) — `WifiManager` retries WiFi, a poller retries its peer — and the gate
+> observes the outcome.
 
 This is the direct answer to *"if AP mode is sitting there for 5 mins and a WiFi
 config exists it should periodically try it"* — a changed password or an
@@ -328,14 +386,35 @@ hour-long outage recovers with nobody present.
 Replace `getRegressionToleranceMs()` with
 [BGP-style damping](https://www.juniper.net/documentation/us/en/software/junos/routing-policy/topics/concept/policy-using-routing-policies-to-damp-bgp-route-flapping.html):
 
+> [!CAUTION]
+> **Penalty must accrue by elapsed time, not by attempt count.** The first draft of
+> this section copied BGP's constants directly — `penaltyPerFailure = 1000` against
+> `suppressThreshold = 2000` — which means **two failures suppress**. For a gate
+> whose unit of failure is a 30-second poll timeout that is a 60-second fuse:
+> dramatically more trigger-happy than the 5-minute tolerance it replaces, and it
+> would regress on a blip that today's code rides out.
+>
+> The flaw is that **the consumer chooses the retry cadence and the framework
+> chooses the penalty, and nothing connects them.** BGP does not have this problem
+> because a route flap is an event with its own natural rate; here the rate is a
+> downstream configuration choice.
+>
+> The policy is therefore expressed **per second unsatisfied**, so a slow-polling
+> gate and a fast-polling one reach suppression after the same wall-clock outage.
+> Raised by #146; the scenario table below is only true under this correction.
+
 ```cpp
 struct GateDampingPolicy {
-    uint16_t penaltyPerFailure = 1000;
-    uint16_t suppressThreshold = 2000;   ///< above → regress to CONFIGURING
-    uint16_t reuseThreshold    = 750;    ///< below → return to RUNNING
-    uint32_t halfLifeMs        = 900000; ///< 15 min decay
+    uint16_t penaltyPerSecond   = 10;     ///< accrual rate while unsatisfied
+    uint16_t suppressThreshold  = 2000;   ///< above → regress to CONFIGURING
+    uint16_t reuseThreshold     = 750;    ///< below → return to RUNNING
+    uint32_t halfLifeMs         = 900000; ///< 15 min decay
 };
 ```
+
+At 10/second, suppression follows roughly 200 seconds of continuous failure —
+close to the 5-minute constant consumers converged on independently, and now
+independent of poll cadence.
 
 | Scenario | Behaviour |
 |---|---|
@@ -345,9 +424,17 @@ struct GateDampingPolicy {
 | Recovery | Must fall below the *lower* reuse threshold → **no oscillation** |
 | `Rejected` (bad password) | Penalty applied at full weight → regresses promptly, because only a user can fix it |
 
-Severity scales the penalty: `Transient` causes accrue lightly, `NeedsUser`
+Severity scales the accrual rate: `Transient` causes accrue lightly, `NeedsUser`
 causes accrue at full weight. One mechanism, both behaviours — this is what
 removes the need for two code paths.
+
+**Damping parameters are owned per-severity by the framework, with a per-gate
+override that is available but not advertised** (resolves OQ-2, per #146). The
+evidence is a single consumer gate whose regression behaviour differs *from
+itself* depending on cause — its 5-minute constant carries a comment stating both
+clauses wanting different numbers, and neither case is served by the compromise.
+The meaningful axis is severity, not gate identity. If per-gate is made the
+primary knob, every consumer re-derives the same bad compromise constant.
 
 ### CG-9 — One continuous evaluation loop; app state is a projection
 
@@ -365,6 +452,32 @@ wobble currently has to be handled as a state transition.
 
 Nothing is gated *on* `AppState` — which is what dissolves the circular
 dependency in §1.1 rather than exempting it.
+
+#### CG-9a — the projection must be readable as a **level**, not only as an edge
+
+Consumer review (#146) resolves OQ-1 with a hazard I had not accounted for.
+
+Downstream does not read `AppState` as a value at all — it subscribes to the
+`APP_RUNNING` **transition**. Both state bugs that consumer shipped this month
+were edge-versus-level bugs rather than cause bugs: one where `APP_RUNNING`
+dispatched synchronously during registration and raced another handler, and one
+where a `HUB_DISCONNECTED` event published only on a transition *from* connected,
+so a device that had **never** connected published nothing and sat looking healthy.
+
+That second bug is CG-10's principle arriving from yet another direction, and it
+carries a warning for CG-9: **under CG-8 the projection can legitimately flap.** A
+gate crossing suppress and later dropping below reuse emits two more transitions
+to every consumer. CG-8 makes the projection oscillate *less often* but no longer
+*monotonically*, and existing edge-consumers were written assuming boot-time
+monotonicity.
+
+So the projection is published as gate health **and** exposed as a cheap level
+query a module can poll from `tick()`. These are not in tension; the edge-only API
+is the thing consumers keep tripping over.
+
+**The derivation ships as a framework helper.** If each display module derives
+RUNNING from the gate table itself, three modules will produce three subtly
+different answers, and the differences will surface only during a flap.
 
 ### CG-10 — Gates and data sources share one health vocabulary
 
@@ -454,6 +567,25 @@ faster than the half-life clears it, crosses suppress, and the device regresses 
 CONFIGURING — correctly, because something is genuinely wrong. Recovery requires
 dropping below the *lower* reuse threshold, so it does not bounce.
 
+### 6.1 What the clock chain does not cover: failing sideways
+
+Raised by #146, and worth recording because it shaped CG-2a.
+
+**Every link in the clock chain fails outward** — WiFi, then the internet, then
+NTP, each one further away than the last. A peer on the local network **fails
+sideways**: WiFi is healthy, the portal is reachable, the device is fully online,
+and the peer is still unreachable because it is on another subnet, behind AP
+isolation, or has moved by DHCP.
+
+Under the cause enum alone that is `Unreachable` / Transient forever — correct,
+and useless. The honest message is *"your network is fine, this specific peer
+isn't, and it's the one you typed in."*
+
+The chain is a good reference case because it has a genuine dependency, both
+failure kinds and a missing link. It is a poor one for **peer-shaped**
+preconditions, where reachability is not a function of distance. CG-2a exists to
+cover that, and any future reference case should include one sideways link.
+
 ---
 
 ## 7. Consequences
@@ -481,18 +613,18 @@ That constraint is unchanged and remains a documented contract.
 
 ## 8. Open questions
 
-- **OQ-1** — Should `AppState` remain observable at all once it is a projection
-  (CG-9), or does the framework publish *gate health* and let consumers derive?
-  Display modules currently branch on `AppState`.
-- **OQ-2** — Should damping parameters be per-gate, per-severity, or global?
-  Per-gate is most flexible and most rope.
+- **OQ-1 — RESOLVED (#146).** Both. Publish gate health *and* expose a level query;
+  ship the derivation as a framework helper. Edge-only is what consumers keep
+  tripping over, and CG-8 makes the projection flap. See CG-9a.
+- **OQ-2 — RESOLVED (#146).** Per-severity defaults owned by the framework,
+  per-gate override available but not advertised. See CG-8.
 - **OQ-3** — Does `BindsTo` propagate transitively? A clock binds to time sync,
   which requires WiFi. If WiFi drops, does the clock regress immediately or wait
   for time sync's own damping? Erlang's multiplication warning suggests
   explicitness over inference.
-- **OQ-4** — Does the framework own the fallback, or the module? `engageFallback()`
-  as a gate method assumes the gate can reach `WifiManager`. An EventBus request
-  may be cleaner and is testable.
+- **OQ-4 — RESOLVED (#146).** EventBus request, not a gate virtual. At least one
+  consumer's fallback is peer re-discovery owned by their poller, unrelated to
+  WiFi. See CG-5.
 - **OQ-5** — Should `Clock` be a gate at all, or a consumer of gate health?
   Nothing blocks boot on it; it just should not lie. This may be the boundary
   between "gate" and "degraded feature".
@@ -513,3 +645,4 @@ That constraint is unchanged and remains a documented contract.
 | Date | Change |
 |---|---|
 | 2026-08-21 | Initial draft. CG-1…CG-12, clock-chain reference case, OQ-1…OQ-5. Raised for consumer review. |
+| 2026-08-21 | Consumer review round 1 ([#146](https://github.com/matthewmcneill/esp32-app-foundation/issues/146)). **CG-8 corrected** — penalty accrues per second unsatisfied, not per failed attempt; the drafted constants were a 60-second fuse for a 30-second poll and would have regressed on blips today's code rides out. **CG-2a added** — severity derives from cause *and* `everSucceeded`, because `Unreachable` conflates "not answering" with "looking in the wrong place" for a LAN peer. **CG-9a added** — the projection must be readable as a level, not only an edge, since CG-8 makes it legitimately flap. **CG-7 corrected** — the gate reports breaker state; the owning module performs the probe (the draft contradicted §7). OQ-1, OQ-2, OQ-4 resolved. §2.2 strengthened and §6.1 added. |
