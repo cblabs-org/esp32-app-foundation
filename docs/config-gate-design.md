@@ -17,9 +17,9 @@
 > numbers changed — see §14. Round 2 corrected several claims the rewrite had itself
 > been built on; those corrections are marked inline.
 >
-> **Two decisions remain open and are not defaults to be assumed: OQ-6** (where an
-> `Operational` precondition renders — currently nowhere) and **OQ-7** (whether
-> `detail` gets a lifetime contract). Round-1 OQ-1…OQ-5 are resolved.
+> **One decision remains open and is not a default to be assumed: OQ-7** — whether
+> `detail` gets a lifetime contract, and at what cost. Round-1 OQ-1…OQ-5 and OQ-6 are
+> resolved; OQ-8 and OQ-9 are dependencies on other work rather than choices.
 >
 > Shares a health vocabulary with [#128](https://github.com/matthewmcneill/esp32-app-foundation/issues/128);
 > CG-17 retires an interface flag added there as a stopgap.
@@ -740,18 +740,13 @@ downstream timer can rescue that.
 This is the never-connected principle (CG-15) in event form, and it is the whole
 argument for a level read: **a level is defined at boot; an edge is not.**
 
-#### CG-14c — the projection needs somewhere to render *(unresolved — see OQ-6)*
+#### CG-14c — the projection needs somewhere to render
 
-> [!CAUTION]
-> **CG-14's third row currently renders to nobody.** `ConfiguringStatusBoard` is pushed
-> only from the `APP_CONFIGURING` handler (`U8G2DisplayModule.cpp:1250-1254`); every
-> other modal push in that module is boot, OTA or error. **There is no RUNNING-state
-> surface for precondition status anywhere in the framework display modules.**
+The round-2 draft raised this as a blocking gap: `ConfiguringStatusBoard` is pushed
+only from the `APP_CONFIGURING` handler, so CG-14's third row — *unmet but under
+threshold* — reached nobody, and no portal surface exposed precondition state either.
 
-CG-1 makes preconditions cheap to declare and simultaneously makes them invisible,
-which is self-defeating: the entire purpose of `Operational` is that the device keeps
-running *and tells someone*. This is the least-specified line in the document and the
-one the design most depends on. Raised as **OQ-6**.
+**Resolved by [CG-18](#cg-18--surfacing-preconditions-portal-plus-a-published-topic).**
 
 ### CG-15 — One health vocabulary with `SourceHealth`
 
@@ -831,6 +826,77 @@ reason. **Neither is optional** — shipping CG-17 without one of them is a regr
 
 All three consumers confirmed zero uses of the flag, and all three endorsed folding it
 into the #128 transport migration so downstream adapts once.
+
+### CG-18 — Surfacing preconditions: portal, plus a published topic
+
+An `Operational` precondition that nobody can see is worse than the boot-block it
+replaces: the boot-block at least forced a message onto the screen as a side effect
+of stopping the device. Surfacing is therefore part of this design, not a follow-on.
+
+#### CG-18a — The portal surfaces precondition health, prominently
+
+Not every consumer has a display; every consumer has the portal. And nobody watches a
+portal — **they open it because something is wrong**, which is exactly when this must
+be the first thing they see, not a line in a diagnostics drawer.
+
+A `/api/preconditions` route returning name, cause, severity, detail, trust history
+and breaker state for every registered precondition, with a prominent portal surface
+driven from it. This is the only surfacing that works on every device, including
+headless ones, and it is **not optional**.
+
+#### CG-18b — The framework publishes; display modules subscribe *(MK-9)*
+
+> [!IMPORTANT]
+> The framework MUST NOT call into the display to render precondition state.
+> [MK-9](microkernel-architecture-design.md) is explicit: *"The kernel publishes; it
+> stops knowing what a carousel is."* Both display modules already subscribe to
+> `APP_CONFIGURING` / `APP_RUNNING` and decide their own rendering; precondition
+> health follows the same route.
+
+A `precondition.health` topic carrying `{ name, cause, severity, detail, everMet }`.
+Display modules subscribe and render however suits their panel.
+
+> [!NOTE]
+> `IDisplayModule::showSystemState()` is **not** the mechanism here, despite looking
+> like a fit. It is a *push* API — something outside the display commanding it — which
+> is the direct injection MK-9 exists to prevent. It has no callers in the framework or
+> in any of the three consumers; it is downstream API for a consumer that wants to
+> drive its own display for app-specific states, and it is correct that the framework
+> does not use it.
+
+**The reference handlers ship with the framework.** The "every consumer builds their
+own" objection is answered the same way `APP_CONFIGURING` already answers it: the
+framework's own display modules provide the default rendering, and a consumer
+inherits it by using them.
+
+Severity drives **presentation**; cause drives **affordance**:
+
+| Severity | Presentation | Primitive already present |
+|---|---|---|
+| `NeedsUser` on a `Startup` precondition | Modal, does not auto-expire | `ErrorBoard::showError(msg, fatal = true)` |
+| Any severity on an `Operational` precondition | Warning, auto-expiring | `ErrorBoard::showError(msg, fatal = false)` |
+| `Met` / `Inactive` | Nothing | — |
+
+#### CG-18c — Leave room for interactive remediation
+
+The U8G2 panels are passive. **LVGL panels need not be** — they carry touch, a rotary
+encoder and a button, and a downstream design may reasonably want to offer a remedy
+*on the device* rather than sending the user to the portal.
+
+This is not a near-term goal, but the contract must not preclude it, because a return
+path is cheap to reserve now and expensive to retrofit.
+
+- **`cause` is already the affordance hint.** `NotConfigured` → *open settings*;
+  `Unreachable` → *retry now*; `Rejected` → *re-enter credentials*. A display can map
+  cause to an offered action with no new vocabulary.
+- **The topic is bidirectional-capable.** Health flows out; action requests flow back
+  as events addressed by precondition name. Two already exist in this design:
+  `precondition.retry.requested` (CG-11 — a user-initiated attempt, which an open
+  breaker MUST NOT suppress) and `precondition.fallback.requested` (CG-10).
+- **Reference handlers may legitimately differ in richness.** The same contract can
+  yield a rendered warning on a 256×64 mono panel and an actionable card on a
+  touch-capable LVGL screen. Nothing in the contract assumes a passive display, and
+  nothing requires an interactive one.
 
 ---
 
@@ -1015,8 +1081,10 @@ opt into, and opting in costs a consumer their display for a setting nothing rea
 (§2.10). It becomes `Operational`, and gains a separate `Time Sync` precondition for the
 fact it currently fails to model (§2.1).
 
-**`ConfiguringStatusBoard` must change**, in three ways — two of which are defects
-that CG-1 *creates* by making preconditions cheap:
+**`ConfiguringStatusBoard` must change**, in three ways. To be precise about blame:
+the display *subscribing to lifecycle events and choosing its own rendering* is MK-9
+working as designed and is not a defect. What follows are consequences of CG-1 making
+preconditions cheap, which the board's current sizing assumptions do not survive:
 
 | Site | Problem |
 |---|---|
@@ -1120,15 +1188,16 @@ All three endorsed folding CG-17 into the #128 migration. One break beats two.
   dropped transfer from a chip that has never once answered, which is the same
   never-connected distinction the rest of this document turns on.
 
-### Open
+- **OQ-6 — RESOLVED: see [CG-18](#cg-18--surfacing-preconditions-portal-plus-a-published-topic).**
+  Portal surfacing is mandatory and prominent; display surfacing rides a published
+  `precondition.health` topic with reference handlers in both framework display
+  modules, per MK-9. An earlier draft proposed calling `IDisplayModule::showSystemState()`
+  from the framework — **that was wrong**, and would have been the direct injection MK-9
+  exists to prevent. `showSystemState()` is downstream API, correctly uncalled by the
+  framework. CG-18c reserves a return path so an interactive LVGL panel can offer
+  remediation later without a contract change.
 
-- **OQ-6 — Where does an `Operational` precondition render? *(blocking)*** CG-14c.
-  There is no RUNNING-state surface for precondition status in any framework display
-  module, so the third row of CG-14's projection is invisible. Options: a persistent
-  status affordance on the carousel; a non-modal banner; an EventBus topic display
-  modules opt into; or an explicit statement that surfacing is the consumer's job —
-  which would be honest but leaves every consumer building it separately, in the
-  framework's own reference display.
+### Open
 
 - **OQ-7 — Does `detail` get a lifetime contract, and at what cost?** §12. Fixing it
   properly means splitting a non-`const` `refresh()` from a `const` accessor, changing
@@ -1189,6 +1258,7 @@ OQ-5 were resolved into CG-8 and §10. §13 lists five new questions raised by r
 |---|---|
 | 2026-08-21 | Initial draft. CG-1…CG-12, clock-chain reference case, OQ-1…OQ-5. |
 | 2026-08-21 | Round-1 amendments: CG-8 corrected to per-second accrual; CG-2a, CG-9a added; CG-7 corrected. |
+| 2026-08-21 | **OQ-6 resolved as CG-18.** Portal surfacing is mandatory and prominent — not every consumer has a display, and nobody watches a portal; they open it *because* something is wrong. Display surfacing rides a published `precondition.health` topic with reference handlers in both framework display modules. **Corrects a wrong turn:** an earlier proposal had the framework call `IDisplayModule::showSystemState()`, which is precisely the direct injection MK-9 forbids — *"the kernel publishes; it stops knowing what a carousel is."* `showSystemState()` has zero callers in the framework and in all three consumers because it is downstream API, not neglected plumbing; the §11 text calling the display's event-handler path a framework defect is corrected likewise. CG-18c reserves a return path — `cause` already serves as the affordance hint, and action requests flow back by precondition name — so a touch/encoder LVGL panel can offer on-device remediation later without a contract change, while nothing assumes a display is interactive. |
 | 2026-08-21 | **Round-2 review by all three consumers.** Corrections, several to claims the round-2 rewrite had built on: CG-13 cited prior art that does not exist (PowerMonitor runs one `_stale` flag, not a split); CG-8's "fabricated kWh" was backwards — a dead bus records *zero*, and the irreversibility argument is restated as silent under-recording; §9.3's chain misrepresented (real root `Sampling Live`, depth 1 not 2, so `BindsTo` evidence rests on one consumer); §12's claim that DraytonWiser can delete their `mutable char[96]` is false, found independently by two consumers. CG-4a's discriminator rebuilt — `everMet` is framework-owned per precondition with an identity epoch, after three defects were found in sourcing it from `SourceHealth`. CG-17 made conditional: its premise was false, since `DataManager` still gates on `_appRunning`. §10 rebuilt after three reported failures. CG-5a gained a second soundness clause. CG-14a/b/c added: per-precondition level read, "never fires" separated from "fires and is missed", and the missing RUNNING surface raised as blocking OQ-6. Round-1 OQ-1…OQ-5 all resolved; OQ-6…OQ-9 opened. `helpText` lifetime defect filed as #147. |
 | 2026-08-21 | Added `Cause::Implausible` and `UpdateStatus::Implausible` (CG-5a, CG-15a). CG-5a had conflated *the framework cannot compute this verdict* (true) with *the model cannot carry it* (false) — a consumer with a working heuristic, such as "no AC waveform on a mains voltage reference", had nowhere to report it and would keep the logic outside the framework. With the verdict expressible, `everSucceeded` can mean "ever produced a result we trust", which restores CG-4a's discriminator for sensors. Added the rule that a plausibility predicate is only sound on a signal with a known-nonzero expectation, and that chains should root there. |
 | 2026-08-21 | **Round-2 rewrite** after reviews from all three consumer programs. Keystone moved: the three-question split is now CG-1, and `Operational` is the default role — four consumers were found routing around the boot-blocking-only contract, so chaining had nothing to describe. Added CG-3 cause vocabulary (`RateLimited`, `Unavailable`, `Indeterminate`), CG-5a (cause describes the conversation, not the truth of the answer), CG-7 (registration-time edge resolution and cycle rejection), CG-8 (satisfaction propagates immediately, penalty never), CG-13 (publish damped *and* undamped). CG-16 demoted to optional after two consumers reported one-cause preconditions. Damping made runtime-configurable. §9 worked examples and §10 decision procedure added. See §14 for the full mapping. |
