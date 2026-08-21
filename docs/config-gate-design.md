@@ -7,14 +7,19 @@
 > when a running device should fall back to configuring.
 
 > [!NOTE]
-> **STATUS: RFC — round 2. Restructured after three consumer reviews. Not approved,
+> **STATUS: RFC — round 3. Two full consumer review rounds folded in. Not approved,
 > not scoped, not built.**
 >
-> This is a **breaking interface change**. Round 1 was reviewed by all three
-> downstream programs (DraytonWiserController, departures-board-v3, PowerMonitor)
-> on [#146](https://github.com/matthewmcneill/esp32-app-foundation/issues/146).
-> Their evidence moved the keystone decision, so this is a rewrite rather than an
-> amendment — decision numbers have changed. See §14 for the mapping.
+> This is a **breaking interface change**. Rounds 1 and 2 were each reviewed by all
+> three downstream programs (DraytonWiserController, departures-board-v3,
+> PowerMonitor) on [#146](https://github.com/matthewmcneill/esp32-app-foundation/issues/146).
+> Round 1's evidence moved the keystone decision, so §5–§8 were rewritten and decision
+> numbers changed — see §14. Round 2 corrected several claims the rewrite had itself
+> been built on; those corrections are marked inline.
+>
+> **Two decisions remain open and are not defaults to be assumed: OQ-6** (where an
+> `Operational` precondition renders — currently nowhere) and **OQ-7** (whether
+> `detail` gets a lifetime contract). Round-1 OQ-1…OQ-5 are resolved.
 >
 > Shares a health vocabulary with [#128](https://github.com/matthewmcneill/esp32-app-foundation/issues/128);
 > CG-17 retires an interface flag added there as a stopgap.
@@ -47,8 +52,14 @@ reached the same conclusion from unrelated domains:
 > **PowerMonitor:** yes, there is a chain we would build — and not one node of it
 > belongs in the boot-blocking set. Richer status alone does not enable it.
 
-Both then described a concrete two-deep chain they cannot express, and both named
-the same reason. That reframes everything: **the framework conflates "this must be
+Both described a chain they cannot express, and both named the same reason.
+
+> [!NOTE]
+> **Round-2 correction.** PowerMonitor's chain is **one edge deep**, not two — its
+> real root is `Sampling Live`, and `Energy Accumulation` is a *consumer* of the
+> chain rather than a node in it. `BindsTo` drops out of their design entirely. Only
+> departures-board has a genuine two-deep chain, so the evidence for `BindsTo` rests
+> on one consumer. Recorded because round 1 was cited here as validating two. That reframes everything: **the framework conflates "this must be
 true before we boot" with "this must be true for the device to work properly",
 and because only the first exists, consumers with the second either avoid the
 interface entirely or model nothing at all.**
@@ -61,9 +72,11 @@ The evidence that this is happening, not merely possible:
 | A consumer with many preconditions authors **zero** gates, by written decision | `PowerMonitor/docs/…Software System Design.md:145` — *"Not used: … IConfigGate (device is useful with defaults out-of-the-box)"* |
 | A consumer deferred a **wanted feature for a month** solely because its gate blocks boot | `PowerMonitor/.agents/…/pr-10-hw-bringup/PROJECT.md:53-56` — *"once the framework's gate no longer hard-blocks RUNNING on NTP"* |
 | A gate was designed, then abandoned | `departures-board-v3/src/NationalRailModule.cpp:61-63` — fossil `// IConfigGate` heading |
+| A consumer **complied and paid** rather than evading — wanting the *level* semantics a gate provides, and accepting the boot-block as a tax | `DraytonWiserController/include/wiser/WiserHubConfigGate.hpp:9-16` — *"unsatisfied from boot, so there is no transition to miss"* |
 
-Four consumers (including the sample app) and not one two-deep chain between them.
-That is not a domain fact. It is a contract fact.
+Four consumers (including the sample app) and exactly one two-deep chain between them.
+That is not a domain fact. It is a contract fact — and the fifth row is the proof, because
+that consumer *wanted* what a gate provides and treated the boot-block as the price.
 
 ### 1.3 The diagnosis
 
@@ -198,7 +211,12 @@ _currentPercent = _targetPercent; // Snap down (gates don't un-satisfy normally)
 
 The progress bar lerps forward smoothly and snaps backward, because the author
 assumed backward would not happen. Any design that makes un-satisfaction ordinary
-breaks this.
+invalidates the assumption.
+
+Stated precisely, per round-2 review: this is a **stale assumption, not a live bug**
+— the snap is cosmetically abrupt, not incorrect. It is recorded because the comment
+documents a framework-wide belief that CG-12 deliberately falsifies, and because
+§11 lists two further consequences of the same belief that *are* defects.
 
 ### 2.10 Being a gate is expensive, and the cost is not obvious
 
@@ -208,7 +226,8 @@ every module (`Application.cpp:282-289`). So on a factory-fresh PowerMonitor the
 OLED reads *"Set your timezone"* while sampling runs perfectly — for a setting
 nothing in its power path reads.
 
-That cost is why §1.2's four evasions happened.
+That cost is why §1.2's four evasions happened — and why the fifth consumer, who
+complied instead, recorded the boot-block as a tax it was paying deliberately.
 
 ---
 
@@ -358,14 +377,43 @@ reached by hostname and **different** for a LAN peer at a user-entered address:
 | The peer is not answering | Wait — it will come back |
 | We may be **looking in the wrong place** | Only a person can fix this |
 
-`SourceHealth::everSucceeded` (CG-15) discriminates: **a peer reached before and
-lost is Transient; a peer never once reached is NeedsUser.**
+**A peer reached before and lost is Transient; a peer never once reached is
+NeedsUser.**
+
+Round 2 found three defects in sourcing that bit from `SourceHealth::everSucceeded`,
+and all three are fatal to it:
+
+1. **It is unreachable for a consumer that does not implement `IDataSource`** —
+   PowerMonitor authors none, by written decision. `Implausible` is the only CG-4 row
+   with two severities and no fallback, so the discriminator failing means the cause
+   is unusable for the consumer it was written for.
+2. **It is source-scoped, not identity-scoped.** `WiserClient::setHubAddress()` swaps
+   the address string and resets no history, so a **re-typed wrong address** inherits
+   the old `true` and reports "still trying" forever — the exact failure §9.2 claims
+   to fix, reached by the commonest route into it.
+3. **It can be set without contact.** `WiserApiModule::fetchUpdate()` returns
+   `NoChange` for *"no hub configured"*, which the health model treats as recovery —
+   so trust is established before a socket is ever opened.
+
+Therefore **trust history is owned by the framework, per precondition, not borrowed
+from the data layer**:
 
 ```cpp
-Severity severityOf(const PreconditionStatus&, const SourceHealth* health);
+// Framework-owned, per precondition. CG-1 already evaluates every tick, so this is free.
+bool everMet;            ///< Has this precondition EVER been met with a trusted result?
+uint32_t identityEpoch;  ///< Bumped by the owner when the target changes; clears everMet.
 ```
 
-`health` is optional. Where it is absent, severity falls back to the CG-4 table.
+`SourceHealth` becomes an **enrichment, not a prerequisite**. Where present it supplies
+detail; where absent the discriminator still works.
+
+**Identity epoch.** Any owner that changes what it is talking to — a new address, new
+credentials, a different sensor channel — bumps the epoch, which clears `everMet`.
+Without this, trust survives the change that invalidated it, which is defect 2 above.
+
+**Precedence.** `DependencyUnmet` suppresses **both** predicate evaluation and trust
+updates. A precondition blocked upstream has not failed; it has not been asked, and
+must not accrue or lose trust for a question it was never put.
 
 #### CG-5a — The framework supplies the vocabulary; the consumer supplies the predicate
 
@@ -409,13 +457,30 @@ rule applies unchanged:
 ##### Choosing the signal to check
 
 > [!WARNING]
-> A plausibility predicate is only sound on a signal with a **known-nonzero
-> expectation**.
+> A plausibility predicate is sound only when **both** hold:
+> 1. it is **decisive on the quiet case** — an absent signal must be distinguishable
+>    from a legitimately idle one; and
+> 2. the expected value **differs from whatever the driver substitutes on failure**.
 
-Mains voltage must always show a waveform, so flat DC is conclusive. A current channel
-legitimately reads zero — an idle circuit and a disconnected clamp are genuinely
-indistinguishable, which is the `kMidRailCounts` problem above and is **not** fixable
-by any amount of framework vocabulary.
+Round 2 supplied both clauses, and each came from a predicate that looked sound and
+was not.
+
+**Clause 1 generalises past analog signals.** The original rule — "a signal with a
+known-nonzero expectation" — was drawn from mains voltage and is too narrow.
+departures-board's predicate is *"every listed departure is in the past"*, which is
+sound not because a feed is reliably non-empty (3 a.m. empties every channel) but
+because the predicate is **vacuous when empty** and therefore never fires falsely.
+DraytonWiser's equivalent is structural rather than numeric: root the check on room
+*count*, not room *values*.
+
+**Clause 2 is the trap that defeats clause 1.** PowerMonitor's CH2 bias-plane
+diagnostic satisfies clause 1 and is still blind, because the value the driver
+substitutes on failure is *exactly* the value the predicate calls healthy — 2048
+counts is 1.650 V against a 1.65 V rail. **A predicate whose healthy value coincides
+with the failure substitute is not a check at all.**
+
+A current channel fails clause 1 outright: an idle circuit and a disconnected clamp
+are the same measurement, and no framework vocabulary fixes that.
 
 So: **put the plausibility predicate on the signal that cannot legitimately be quiet,
 and let everything else depend on it.** That is why the chain in §9.3 roots at
@@ -472,9 +537,20 @@ reason that generalises:
 > dropping to AP mode, re-running discovery. Where the consequence of acting late is
 > **irreversible**, damping is not conservative, it is harmful.
 
-Their worked case: with per-level damping at ~200 s, an `ADC Bus` failure reaches
-`Energy Accumulation` at T+400 s, having integrated and flushed **six and a half
-minutes of fabricated kWh to flash**. *"You cannot un-bill a phantom kilowatt-hour."*
+Their worked case: with per-level damping at ~200 s, a sampling failure reaches
+`Energy Accumulation` at T+400 s.
+
+> [!NOTE]
+> **Round-2 correction to the mechanism.** An earlier draft said this fabricates
+> phantom energy. It does the opposite: `PowerMath::finalise()` returns zeros on a
+> zero-sample window and `EnergyStore::accumulate()` multiplies by that, so a dead
+> bus records **nothing**.
+>
+> The irreversibility argument is unchanged and the direction does not weaken it. A
+> monotonic counter that **silently under-records** for six minutes cannot be
+> backfilled either — Home Assistant has already consumed the gap, and there is no
+> later observation from which the missing energy can be reconstructed. Lost
+> measurement is as irreversible as invented measurement; it is merely quieter.
 
 So:
 
@@ -531,6 +607,14 @@ Neither is WiFi's business, and the event form is the only one testable without 
 > the probe.** A precondition reads cached state and never performs I/O (§4). The
 > half-open transition is a *request*.
 
+> [!WARNING]
+> **An open breaker MUST NOT suppress a user-initiated attempt.** The breaker exists
+> to stop the device hammering a peer on a timer. A person pressing "retry" after
+> correcting the address is not the device on a timer, and they have information the
+> breaker does not — they just changed something. This mirrors #128's rule that a
+> priority fetch overrides both backoff and suspension, and it is the manual half of
+> the recovery path.
+
 ### CG-12 — Damping: per second, per severity, runtime-configurable
 
 > [!CAUTION]
@@ -574,16 +658,26 @@ Stated so authors do not go looking for a knob that cannot help them.
 ### CG-13 — Publish the damped *and* undamped status
 
 One condition can carry both a reversible and an irreversible consequence, needing
-different speeds. PowerMonitor already runs this split outside the gate system:
+different speeds:
 
-| Consequence | Speed |
-|---|---|
-| Suppress kWh accumulation | **undamped** |
-| Show `STALE` on the OLED | damped, 300 s |
+| Consequence | Wanted speed | Why |
+|---|---|---|
+| Suppress energy accumulation | **undamped** | Irreversible — the gap cannot be backfilled |
+| Show `STALE` on a display | damped | Reversible, and flicker on a 2 s glitch is worse than lateness |
 
-A single accumulator producing a single outcome cannot express that, and consumers
-will keep their logic outside the framework if it does not. Both views are already
+> [!NOTE]
+> **Round-2 correction.** An earlier draft cited PowerMonitor as already running this
+> split. **They do not** — a single `_stale` flag drives both their accumulation gate
+> and their OLED marker. This is a requirement they identified, not prior art, and it
+> is recorded as such. The mistake came from reading a consumer's prose rather than
+> their code; see §16.
+
+A single accumulator producing a single outcome cannot express this, and consumers
+will keep such logic outside the framework while it cannot. Both views are already
 computed; publishing both costs nothing and makes CG-8 a non-question.
+
+**Consumers select, the framework does not choose for them.** Each subscriber reads
+whichever view its own consequence deserves.
 
 ---
 
@@ -612,6 +706,52 @@ subsystem before this RFC existed. Every one used a different timeout.
 **The framework ships the derivation as a helper, and that helper is the supported
 path.** Three display modules deriving RUNNING independently would produce three
 subtly different answers, visible only during a flap.
+
+#### CG-14a — the level read is **per precondition**, not only aggregate
+
+Two consumers asked for this by name and the round-2 draft supplied only the
+aggregate. Without a per-precondition read, an `Operational` precondition is
+invisible to the consumer that declared it — which hands DraytonWiser back the exact
+bug their gate was written to avoid, since a gate's *level* semantics were the reason
+they accepted the boot-block as a tax (§1.2).
+
+```cpp
+bool getAppRunning() const;                                   // aggregate
+bool getPreconditionStatus(const char* name, PreconditionStatus& out) const;
+size_t getPreconditionCount() const;
+bool getPreconditionStatusAt(size_t i, PreconditionStatus& out) const;
+```
+
+#### CG-14b — "never fires" is a different failure from "fires and is missed"
+
+The round-2 draft folded these together under *edge events need timers*. They are not
+the same, and the conflation hides the worse one:
+
+| Failure | Fix |
+|---|---|
+| The edge fires and a consumer misses it (race, ordering, parked task) | A timeout, as consumers have each written |
+| The edge **never fires at all**, because the event is published only on a *transition from* a state the device was never in | **A timeout cannot help.** Nothing is coming. |
+
+`HUB_DISCONNECTED` publishes only on a transition from connected. On first boot
+`hubConnected` is already false, so a failing poll finds it unchanged and publishes
+nothing — a device that has **never** reached its hub sits looking healthy, and no
+downstream timer can rescue that.
+
+This is the never-connected principle (CG-15) in event form, and it is the whole
+argument for a level read: **a level is defined at boot; an edge is not.**
+
+#### CG-14c — the projection needs somewhere to render *(unresolved — see OQ-6)*
+
+> [!CAUTION]
+> **CG-14's third row currently renders to nobody.** `ConfiguringStatusBoard` is pushed
+> only from the `APP_CONFIGURING` handler (`U8G2DisplayModule.cpp:1250-1254`); every
+> other modal push in that module is boot, OTA or error. **There is no RUNNING-state
+> surface for precondition status anywhere in the framework display modules.**
+
+CG-1 makes preconditions cheap to declare and simultaneously makes them invisible,
+which is self-defeating: the entire purpose of `Operational` is that the device keeps
+running *and tells someone*. This is the least-specified line in the document and the
+one the design most depends on. Raised as **OQ-6**.
 
 ### CG-15 — One health vocabulary with `SourceHealth`
 
@@ -670,10 +810,27 @@ Multi-cause authors opt in.
 Added under #145 as a stopgap. It asks a source a question it cannot answer — *am I
 a boot prerequisite?* — which is a property of the application's composition.
 
-Under CG-1 preconditions are `Operational` by default and under CG-14 nothing is
-gated on `AppState`, so there is nothing to opt out of. Deleted in the same breaking
-change. All three consumers confirmed zero uses; all three endorsed folding it into
-the #128 transport migration so downstream adapts once.
+> [!CAUTION]
+> **The round-2 draft justified this with a false premise.** It claimed *"nothing is
+> gated on `AppState`"*. `DataManager::executeLoop()` still consults `_appRunning`
+> per source. Deleting `fetchesWhileConfiguring()` while leaving that gate in place
+> **restores the #145 trap** for any `Startup`-role precondition backed by an
+> `IDataSource` — the circular dependency this whole document exists to remove.
+
+CG-17 is therefore **conditional**, and the condition is load-bearing. One of:
+
+1. **Delete the `_appRunning` gate from `DataManager` entirely.** Under CG-1 the
+   scheduling decision belongs to the precondition's role, not to app state, and a
+   source that cannot usefully run says so through its own readiness. This is the
+   coherent end state.
+2. **Reject the combination at registration** (CG-7): a `Startup`-role precondition
+   backed by a source gated on `AppState` is a cycle, and CG-7 already rejects cycles.
+
+Option 1 is preferred; option 2 is the safety net if the gate must survive for another
+reason. **Neither is optional** — shipping CG-17 without one of them is a regression.
+
+All three consumers confirmed zero uses of the flag, and all three endorsed folding it
+into the #128 transport migration so downstream adapts once.
 
 ---
 
@@ -790,38 +947,63 @@ device already holds.
 
 ## 10. Deciding what your precondition is
 
-Two rules, from two consumers, that compose into a procedure.
+Round 2 reported three independent failures of the round-2 procedure: a false negative
+on departures-board's only genuine `Startup` precondition, an outright disqualification
+of **WiFi**, and a contradiction with §9.1 on `Time Sync`. All three came from the
+first rule being stated with half its content missing. Rebuilt below.
 
-**Is it a precondition at all?** *(departures-board)*
+### Rule 1 — is it a precondition at all?
 
-> If it has a typed accessor that can refuse, it is not a precondition — it is a
-> feature that degrades.
+> **If it has a typed accessor that can refuse, *and* every caller has something
+> sensible to do when it refuses, it is not a precondition — it is a feature that
+> degrades at the call site.**
 
-`TimeManager::getLocalTime()` returns `false` unless synced, and `ScheduleModule`
-already handles that refusal by degrading. Nothing needs modelling.
+The second clause is load-bearing and the round-2 draft dropped it. Its author flagged
+the omission themselves: `BoardRegistry::getBoard()` returns `nullptr` — a typed
+accessor that refuses — but a device that does not know what it is *for* has no caller
+with anything sensible to do. It is a precondition. Without the second clause the rule
+disqualified it, and disqualified WiFi for the same reason.
 
-**Does it block boot?** *(PowerMonitor)*
+`TimeManager::getLocalTime()` passes **both** clauses: it refuses, and `ScheduleModule`
+already degrades on that refusal. Nothing needs modelling.
 
-> Can the user act on it **from this device, right now**, and is the device **useless**
-> until they do?
+### Rule 2 — does it block boot?
 
-Both clauses must hold. Timezone fails the second. Time sync fails both. Sensing
-hardware fails the first — you fix a ribbon cable with your hands, and you need the
-portal up to know which one.
+> **Can the user act on it from this device, right now, *and* is the device useless
+> until they do?**
 
-On a typical device exactly one condition passes: **WiFi**, because without it there is
-no portal, so nothing else is fixable. **The boot-blocking set is close to a fixed point
-of "what makes the device configurable."**
+Both clauses must hold. Timezone fails the second. Time sync fails both — which is why
+§9.1 lists it as `Operational`, and the round-2 §10 wrongly implied otherwise.
+
+Two consumers reached the same disqualifier independently: **entering CONFIGURING
+destroys the surface that diagnoses the fault.** PowerMonitor cannot inspect a loose
+ribbon cable from a gate modal; DraytonWiser's hub diagnostics — hub status, last-poll
+age, per-device RSSI — live on a System screen that `_onAppConfiguring()` deletes. A
+precondition whose diagnosis requires the running UI must not block the running UI.
+
+On a typical device exactly one condition passes both clauses: **WiFi**, because
+without it there is no portal, so nothing else is fixable. **The boot-blocking set is
+close to a fixed point of "what makes the device configurable."**
+
+### The procedure
 
 ```
-Does it have a typed accessor that can refuse?
-  ├─ yes → not a precondition; degrade at the call site
-  └─ no  → Can the user fix it from this device, now, AND is the device useless until then?
-            ├─ both → Startup
-            └─ else → Operational
+Typed accessor that refuses, AND every caller can degrade?
+  ├─ yes → not a precondition; handle it at the call site
+  └─ no  → Can the user fix it from this device now,
+           AND is the device useless until they do,
+           AND does diagnosing it NOT require the running UI?
+            ├─ all three → Startup
+            └─ else      → Operational
 ```
 
----
+### Role is not always a property of the class
+
+departures-board's abandoned National Rail credentials gate would be `Startup` or
+`Operational` depending on the *runtime* board configuration — credentials matter only
+if a board using that feed exists. `getRole()` is therefore a virtual returning a
+runtime value, not a compile-time trait, and the framework must re-read it rather than
+caching at registration.
 
 ## 11. Consequences
 
@@ -833,8 +1015,24 @@ opt into, and opting in costs a consumer their display for a setting nothing rea
 (§2.10). It becomes `Operational`, and gains a separate `Time Sync` precondition for the
 fact it currently fails to model (§2.1).
 
-**`ConfiguringStatusBoard` must change.** Its snap-down assumption (§2.9) is invalidated
-by design.
+**`ConfiguringStatusBoard` must change**, in three ways — two of which are defects
+that CG-1 *creates* by making preconditions cheap:
+
+| Site | Problem |
+|---|---|
+| `:200` | Snap-down assumption (§2.9) invalidated by design — cosmetic |
+| `:157` | `maxRows = (_displayHeight > 48) ? 3 : 2`, with **no overflow indicator**. Cheap preconditions overflow a 256×64 panel silently. |
+| `:191-192` | Boot progress is `satisfiedCount / gateCount` over **all** gates, so any legitimately-unmet `Operational` precondition **permanently stalls the boot bar** below 100%. |
+
+The last two are the price of CG-1 and must be paid with it: the progress denominator
+must count `Startup`-role preconditions only, and the row list needs an overflow
+affordance or a scroll.
+
+**`Application::_publishConfiguringEvent()` must change** — it borrows
+`getHelpText()`'s pointer into an asynchronously-dispatched payload while copying
+`deviceIP` into a stable buffer five lines later. Tracked separately as
+[#147](https://github.com/matthewmcneill/esp32-app-foundation/issues/147); the `detail`
+field proposed here inherits the same hazard and must inherit the same fix.
 
 **Ordering.** CG-15 means this lands after #128's health model. CG-17 deletes an
 interface member added there.
@@ -855,9 +1053,22 @@ Reported cost, from the consumers themselves:
 
 | Consumer | Classes to change | Notes |
 |---|---|---|
-| DraytonWiserController | 1 | Deletes a `mutable char[96]` and an `snprintf` in a `const` method |
-| departures-board-v3 | 2 + 1 test | Can stop decomposing `registerModule()` to escape gatehood |
+| DraytonWiserController | 1 | **Does NOT delete the `mutable char[96]`** — see below |
+| departures-board-v3 | 1 + 1 test | Can stop decomposing `registerModule()` to escape gatehood |
 | PowerMonitor | 0 | Authors no gates — *because the current shape fits nothing they have* |
+
+> [!CAUTION]
+> **The round-2 claim that CG-16 lets DraytonWiser delete their buffer is wrong**, and
+> two consumers found it independently. `detail` is a `const char*` returned from a
+> `const` method, so runtime-interpolated text still needs a `mutable` member —
+> exactly the wart CG-16 claims to abolish. The interface changes; the workaround
+> survives.
+>
+> Fixing it properly means **splitting evaluation from reading**: a non-`const`
+> `refresh()` called by the framework once per tick, and a `const` accessor returning
+> what the last refresh computed. That changes the shape of *every* precondition, not
+> just multi-cause ones, and interacts with #147's lifetime question. **Flagged as a
+> decision, not folded in — see OQ-7.**
 
 PowerMonitor's zeros are the most informative number here, and should be read as they
 asked: not "this app is simple", but *"this app looked at `IConfigGate`, decided every
@@ -870,26 +1081,70 @@ All three endorsed folding CG-17 into the #128 migration. One break beats two.
 
 ## 13. Open questions
 
-- **OQ-1 — Fan-out preconditions.** `met` is boolean; "met for 1 of 3 boards" has no
-  expression, and a *passing test* today asserts satisfaction with two of three broken
-  (§9.4). Does this need a quorum notion, or should a fan-out be N preconditions?
-- **OQ-2 — Empty-but-correct.** *"No trains at 3 a.m."* is not a failure. `UpdateStatus`
-  has no `NoData`, and `Cause` has no equivalent. Is that a precondition concern at all,
-  or purely a data-layer one?
-- **OQ-3 — Naming.** If most preconditions are `Operational`, `IConfigGate` is a
-  misnomer. `IPrecondition` is more honest and costs a rename across four repos. Severable
-  — the model works either way.
-- **OQ-4 — Does `BindsTo` propagate transitively?** CG-8 makes this cheap (satisfaction
-  only, never penalty), but it is still unstated whether A `BindsTo` B `Requires` C means
-  A follows C. Erlang's multiplication warning argues for explicitness over inference.
-- **OQ-5 — Does the framework need a "value came from a fallback" flag** in
-  `SourceHealth` (CG-5a)? A driver that substitutes knows it did; that fact is
-  impossible to reconstruct afterwards and costs nothing to record at the point of
-  substitution. It composes with `Implausible` — the driver reports what it *did*, the
-  consumer reports what it *concluded* — but it is a second mechanism and may be
-  redundant if consumers are checking plausibility anyway.
+### Resolved by round 2
 
----
+- **OQ-1 — Fan-out preconditions: RESOLVED, no quorum needed.** `BoardRegistry`'s
+  single boolean answers **two** questions: *"does this device know what it is for"*
+  (any-of-N → `Startup`) and *"is every configured board working"* (N per-slot
+  `Operational`). Split by role, both are clean booleans — and the passing test that
+  prompted the question is **correct** under the first reading.
+  A quorum count was rejected on its author's own evidence:
+  `BoardRegistry::getCompleteBoardCount()` has computed exactly that scalar for months
+  and never helped anyone, because **a number cannot say *which* one is broken**.
+  The dynamic-N collision with §4's non-goal resolves by statically pre-registering
+  `MAX_BOARDS` slots and marking unused ones `Unavailable` — the enum member added for
+  PowerMonitor's isolated-LAN case, doing work nobody designed it for.
+
+- **OQ-2 — Empty-but-correct: RESOLVED, close it.** Purely a data-layer concern.
+  departures-board already maps `NoData → UpdateStatus::Success` correctly; the
+  discriminator then sits unread in their own renderer, which collapses "never
+  fetched", "token revoked" and "no trains at 3 a.m." into one string. Their bug, not
+  the framework's. Note the boundary against `Implausible`: *empty* is not
+  implausible; *"every listed departure is in the past"* is.
+
+- **OQ-3 — Naming: RESOLVED, rename to `IPrecondition`.** All three consumers agreed,
+  and migration cost is dominated by the interface change already happening. **Keep the
+  name *strings*** (`GateNames::WIFI_STATION` and friends) — CG-7 resolves edges by
+  string, and renaming the constants would break edges for no benefit.
+
+- **OQ-4 — Transitive `BindsTo`: RESOLVED, falls out of CG-8 for free.** Because
+  satisfaction propagates immediately and penalty never does, transitive propagation
+  costs nothing and cannot compound. **One constraint: `Wants` must terminate
+  propagation** — a presentation-only edge carries no satisfaction semantics, so a
+  chain through a `Wants` edge stops there.
+
+- **OQ-5 — "Came from a fallback": RESOLVED, keep it, but as a count.** It earns its
+  place as the *only* cover for the case §9.3 calls unsolvable — a current channel
+  where idle and disconnected are the same measurement. A **count** of substituted
+  readings is materially more useful than a boolean: it distinguishes an occasional
+  dropped transfer from a chip that has never once answered, which is the same
+  never-connected distinction the rest of this document turns on.
+
+### Open
+
+- **OQ-6 — Where does an `Operational` precondition render? *(blocking)*** CG-14c.
+  There is no RUNNING-state surface for precondition status in any framework display
+  module, so the third row of CG-14's projection is invisible. Options: a persistent
+  status affordance on the carousel; a non-modal banner; an EventBus topic display
+  modules opt into; or an explicit statement that surfacing is the consumer's job —
+  which would be honest but leaves every consumer building it separately, in the
+  framework's own reference display.
+
+- **OQ-7 — Does `detail` get a lifetime contract, and at what cost?** §12. Fixing it
+  properly means splitting a non-`const` `refresh()` from a `const` accessor, changing
+  the shape of every precondition. The cheaper alternative is the #147 fix — the
+  framework copies into a stable buffer at publish time and documents *"any lifetime is
+  acceptable"* — which solves the dangling-pointer hazard but leaves consumers with the
+  `mutable` member. **This is a genuine trade and needs a decision, not a default.**
+
+- **OQ-8 — Can `CG-12`'s runtime-settable damping actually reach a portal?**
+  PowerMonitor reports that `ConfigManager` has no generic per-namespace write, so
+  "runtime-configurable" may not be implementable as drafted without work in
+  `ConfigManager` first.
+
+- **OQ-9 — A complete `UpdateStatus` → `Cause` mapping table.** Requested in both
+  rounds and still missing. It matters more now that CG-15a adds
+  `UpdateStatus::Implausible`, since the two enums must agree at the seam.
 
 ## 14. Decision mapping from round 1
 
@@ -934,5 +1189,6 @@ OQ-5 were resolved into CG-8 and §10. §13 lists five new questions raised by r
 |---|---|
 | 2026-08-21 | Initial draft. CG-1…CG-12, clock-chain reference case, OQ-1…OQ-5. |
 | 2026-08-21 | Round-1 amendments: CG-8 corrected to per-second accrual; CG-2a, CG-9a added; CG-7 corrected. |
+| 2026-08-21 | **Round-2 review by all three consumers.** Corrections, several to claims the round-2 rewrite had built on: CG-13 cited prior art that does not exist (PowerMonitor runs one `_stale` flag, not a split); CG-8's "fabricated kWh" was backwards — a dead bus records *zero*, and the irreversibility argument is restated as silent under-recording; §9.3's chain misrepresented (real root `Sampling Live`, depth 1 not 2, so `BindsTo` evidence rests on one consumer); §12's claim that DraytonWiser can delete their `mutable char[96]` is false, found independently by two consumers. CG-4a's discriminator rebuilt — `everMet` is framework-owned per precondition with an identity epoch, after three defects were found in sourcing it from `SourceHealth`. CG-17 made conditional: its premise was false, since `DataManager` still gates on `_appRunning`. §10 rebuilt after three reported failures. CG-5a gained a second soundness clause. CG-14a/b/c added: per-precondition level read, "never fires" separated from "fires and is missed", and the missing RUNNING surface raised as blocking OQ-6. Round-1 OQ-1…OQ-5 all resolved; OQ-6…OQ-9 opened. `helpText` lifetime defect filed as #147. |
 | 2026-08-21 | Added `Cause::Implausible` and `UpdateStatus::Implausible` (CG-5a, CG-15a). CG-5a had conflated *the framework cannot compute this verdict* (true) with *the model cannot carry it* (false) — a consumer with a working heuristic, such as "no AC waveform on a mains voltage reference", had nowhere to report it and would keep the logic outside the framework. With the verdict expressible, `everSucceeded` can mean "ever produced a result we trust", which restores CG-4a's discriminator for sensors. Added the rule that a plausibility predicate is only sound on a signal with a known-nonzero expectation, and that chains should root there. |
 | 2026-08-21 | **Round-2 rewrite** after reviews from all three consumer programs. Keystone moved: the three-question split is now CG-1, and `Operational` is the default role — four consumers were found routing around the boot-blocking-only contract, so chaining had nothing to describe. Added CG-3 cause vocabulary (`RateLimited`, `Unavailable`, `Indeterminate`), CG-5a (cause describes the conversation, not the truth of the answer), CG-7 (registration-time edge resolution and cycle rejection), CG-8 (satisfaction propagates immediately, penalty never), CG-13 (publish damped *and* undamped). CG-16 demoted to optional after two consumers reported one-cause preconditions. Damping made runtime-configurable. §9 worked examples and §10 decision procedure added. See §14 for the full mapping. |
