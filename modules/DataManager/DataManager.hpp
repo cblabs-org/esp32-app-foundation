@@ -240,9 +240,19 @@ private:
         uint16_t          consecutiveFailures = 0;
         uint32_t          lastAttemptMs       = 0;
         uint32_t          lastSuccessMs       = 0;
-        uint32_t          nextAttemptMs       = 0;  ///< Earliest next attempt; 0 = whenever due
+        uint32_t          nextAttemptMs       = 0;  ///< Deadline; meaningful only while backoffActive
         uint32_t          currentBackoffMs    = 0;
         bool              everSucceeded       = false;
+
+        /// Whether nextAttemptMs holds a live deadline. An explicit flag rather
+        /// than a 0 sentinel: 0 is a reachable millis() value after a wrap, and
+        /// the sentinel would silently read as "fetch now".
+        bool              backoffActive       = false;
+
+        /// What caused the current backoff series. Rate limiting and hard failure
+        /// are different conditions with different meanings, so a change of cause
+        /// restarts the series rather than inheriting the other's accumulated delay.
+        bool              backoffFromRateLimit = false;
     };
 
     struct DataJobEntry {

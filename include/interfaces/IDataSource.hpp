@@ -73,15 +73,24 @@ enum class SourceHealthState : uint8_t {
  * Returned by value; safe to read from any task.
  */
 struct SourceHealth {
-    const char*       name                = nullptr;  ///< Source name (static lifetime, from getSourceName())
+    /// Borrowed from getSourceName(), which the interface requires to have static
+    /// lifetime. The snapshot does NOT own it — a snapshot that outlives its
+    /// source's registration is holding a pointer the framework no longer
+    /// guarantees. Copy the string before handing a snapshot to anything that
+    /// serialises asynchronously.
+    const char*       name                = nullptr;
     SourceHealthState state               = SourceHealthState::Unknown;
-    UpdateStatus      lastStatus          = UpdateStatus::Success; ///< Meaningless while state == Unknown
+    /// Result of the last completed attempt. Carries no verdict while
+    /// state == Unknown (never attempted, or just reset) — it reads as Success
+    /// only because that is the zero value, so branch on `state` first.
+    UpdateStatus      lastStatus          = UpdateStatus::Success;
     uint16_t          consecutiveFailures = 0;
     uint32_t          lastAttemptMs       = 0;        ///< 0 = never attempted
     uint32_t          lastSuccessMs       = 0;        ///< Only meaningful when everSucceeded is true
-    uint32_t          nextAttemptMs       = 0;        ///< Earliest next attempt; 0 = as soon as due
+    uint32_t          nextAttemptMs       = 0;        ///< Deadline; meaningful only while backoffActive
     uint32_t          currentBackoffMs    = 0;        ///< Active backoff interval; 0 = not backing off
     bool              everSucceeded       = false;    ///< Distinguishes never-connected from lost-connection
+    bool              backoffActive       = false;    ///< Whether nextAttemptMs holds a live deadline
 
     /** @brief True when the source is not currently serving usable data. */
     bool isFailing() const {
@@ -134,6 +143,12 @@ public:
 
     /**
      * @brief Return a human-readable name for this data source.
+     *
+     * @warning The returned pointer MUST have static or application lifetime.
+     *          The framework stores it by reference in health snapshots and log
+     *          output; a name backed by a member that dies with the source will
+     *          dangle. Return a string literal or a static buffer.
+     *
      * @return Null-terminated string identifier used in logs and EventBus topics.
      */
     virtual const char* getSourceName() const = 0;
@@ -143,4 +158,25 @@ public:
      * @return PriorityTier value used by DataManager to group sources.
      */
     virtual PriorityTier getPriorityTier() const = 0;
+
+    /**
+     * @brief May this source be fetched while the application is CONFIGURING?
+     *
+     * Scheduled fetching is normally gated on AppState::Running, so a source is
+     * only polled once every IConfigGate is satisfied. That is right for ordinary
+     * data sources: there is no point fetching weather before WiFi exists.
+     *
+     * It is exactly wrong for a source that *backs* a gate. Such a source forms a
+     * circular dependency with the state machine — the gate blocks RUNNING,
+     * RUNNING enables fetching, and fetching is what would satisfy the gate — so
+     * it can never be satisfied, on first boot or after a regression. Return true
+     * to opt out of the gate and keep this source scheduled in CONFIGURING.
+     *
+     * @warning A source that returns true is polled before the application is
+     *          fully configured. It MUST tolerate absent configuration and
+     *          missing dependencies, and must fail fast rather than block.
+     *
+     * @return false by default (fetch only while RUNNING).
+     */
+    virtual bool fetchesWhileConfiguring() const { return false; }
 };

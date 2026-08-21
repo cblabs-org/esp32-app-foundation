@@ -49,12 +49,14 @@ public:
     uint32_t getUpdateIntervalMs() const override { return interval; }
     const char* getSourceName() const override { return name.c_str(); }
     PriorityTier getPriorityTier() const override { return tier; }
+    bool fetchesWhileConfiguring() const override { return configuring; }
 
     std::string  name;
     uint32_t     interval;
     PriorityTier tier;
     int          fetchCount = 0;
     UpdateStatus next = UpdateStatus::Success;
+    bool         configuring = false;   ///< opt out of the RUNNING gate
 };
 
 class DataManagerTest : public ::testing::Test {
@@ -786,6 +788,231 @@ TEST_F(DataManagerTest, Health_BackoffDoesNotBlockOtherSources) {
     dm.processNext();
     EXPECT_EQ(bad.fetchCount, 1) << "bad still backing off";
     EXPECT_EQ(good.fetchCount, 2) << "good must keep running";
+}
+
+// ===========================================================================
+// PR #145 review remediation (#128)
+// ===========================================================================
+
+// --- The CONFIGURING trap, reported by the consumer that filed #128 ---------
+//
+// A source backing an IConfigGate is circular with the state machine: the gate
+// blocks RUNNING, RUNNING enabled fetching, and fetching is what satisfies the
+// gate. The _appRunning early return used to sit above everything, so once such
+// a source failed the device could never recover.
+
+TEST_F(DataManagerTest, Configuring_QuarantinedSourceStillProbesWhenOptedIn) {
+    ScriptedSource src("gate-backed", 1000, PriorityTier::High);
+    src.configuring = true;              // backs a config gate
+    src.next = UpdateStatus::FetchError;
+    dm.registerSource(&src);
+
+    uint32_t t = 1000;
+    uint32_t backoff = DataManager::HEALTH_BACKOFF_BASE_MS;
+    while (healthOf(dm, &src).state != SourceHealthState::Quarantined) {
+        dm.setSimulatedTimeMs(t);
+        dm.processNext();
+        t += backoff + 1;
+        backoff = std::min(backoff * 2, DataManager::HEALTH_BACKOFF_CAP_MS);
+    }
+
+    // The gate went unsatisfied, so Application regressed to CONFIGURING.
+    dm.setAppRunning(false);
+
+    int before = src.fetchCount;
+    src.next = UpdateStatus::Success;       // peer came back
+    dm.setSimulatedTimeMs(t + DataManager::HEALTH_BACKOFF_CAP_MS + 1);
+    dm.processNext();
+
+    EXPECT_GT(src.fetchCount, before)
+        << "self-healing probe must survive the regression it caused";
+    EXPECT_EQ(healthOf(dm, &src).state, SourceHealthState::Healthy);
+}
+
+TEST_F(DataManagerTest, Configuring_OrdinarySourceStaysGatedOnRunning) {
+    ScriptedSource src("weather", 1000, PriorityTier::High);
+    // configuring == false — no reason to fetch weather before WiFi exists
+    dm.registerSource(&src);
+    dm.setAppRunning(false);
+
+    dm.processNext();
+    EXPECT_EQ(src.fetchCount, 0);
+}
+
+TEST_F(DataManagerTest, Configuring_PriorityFetchWorksWhileNotRunning) {
+    // The documented manual recovery path. The user corrects the address in the
+    // portal and presses refresh — in CONFIGURING, which is the state a broken
+    // source puts the device into.
+    ScriptedSource src("s", 1000, PriorityTier::High);
+    dm.registerSource(&src);
+    dm.setAppRunning(false);
+
+    dm.requestPriorityFetch(&src);
+    dm.processNext();
+
+    EXPECT_EQ(src.fetchCount, 1) << "priority fetch must not be inert in CONFIGURING";
+}
+
+TEST_F(DataManagerTest, Configuring_PriorityFetchRecoversSuspendedWhileNotRunning) {
+    ScriptedSource src("s", 1000, PriorityTier::High);
+    src.next = UpdateStatus::AuthError;
+    dm.registerSource(&src);
+    dm.processNext();
+    ASSERT_EQ(healthOf(dm, &src).state, SourceHealthState::Suspended);
+
+    dm.setAppRunning(false);
+    src.next = UpdateStatus::Success;
+    dm.requestPriorityFetch(&src);
+    dm.processNext();
+
+    EXPECT_EQ(healthOf(dm, &src).state, SourceHealthState::Healthy);
+}
+
+// --- millis() rollover safety ----------------------------------------------
+
+TEST_F(DataManagerTest, Rollover_BackoffHoldsAcrossMillisWrap) {
+    // Deadline computed just before the wrap lands past it. An absolute
+    // comparison reads that as "already due" and skips backoff entirely.
+    ScriptedSource src("s", 1000, PriorityTier::High);
+    src.next = UpdateStatus::FetchError;
+    dm.registerSource(&src);
+
+    const uint32_t nearMax = 0xFFFFFF00u;
+    dm.setSimulatedTimeMs(nearMax);
+    dm.processNext();
+    ASSERT_EQ(src.fetchCount, 1);
+
+    // Wrapped, but well inside the 30s backoff window.
+    dm.setSimulatedTimeMs(1000);
+    dm.processNext();
+    EXPECT_EQ(src.fetchCount, 1) << "backoff must survive the wrap";
+
+    // Past the deadline in wrapped time.
+    dm.setSimulatedTimeMs(nearMax + DataManager::HEALTH_BACKOFF_BASE_MS + 100);
+    dm.processNext();
+    EXPECT_EQ(src.fetchCount, 2);
+}
+
+TEST_F(DataManagerTest, Rollover_HealthySourceNotBlockedAfterWrap) {
+    // The damaging direction: a small post-wrap `now` against a large pre-wrap
+    // deadline used to block the source for up to ~49 days.
+    ScriptedSource src("s", 1000, PriorityTier::High);
+    src.next = UpdateStatus::FetchError;
+    dm.registerSource(&src);
+
+    dm.setSimulatedTimeMs(0xFFFFF000u);
+    dm.processNext();
+    ASSERT_EQ(src.fetchCount, 1);
+
+    src.next = UpdateStatus::Success;
+    dm.setSimulatedTimeMs(0xFFFFF000u + DataManager::HEALTH_BACKOFF_BASE_MS + 1);  // wraps
+    dm.processNext();
+
+    EXPECT_EQ(src.fetchCount, 2) << "must not be stranded for ~49 days after a wrap";
+    EXPECT_EQ(healthOf(dm, &src).state, SourceHealthState::Healthy);
+}
+
+// --- Backoff series semantics ----------------------------------------------
+
+TEST_F(DataManagerTest, Backoff_RestartsFromBaseAfterRecovery) {
+    // Explicit round trip: Degraded -> Quarantined -> Healthy -> fail again.
+    // The new series must start at the base, not resume from the ceiling.
+    ScriptedSource src("s", 1000, PriorityTier::High);
+    src.next = UpdateStatus::FetchError;
+    dm.registerSource(&src);
+
+    uint32_t t = 1000;
+    uint32_t backoff = DataManager::HEALTH_BACKOFF_BASE_MS;
+    while (healthOf(dm, &src).state != SourceHealthState::Quarantined) {
+        dm.setSimulatedTimeMs(t);
+        dm.processNext();
+        t += backoff + 1;
+        backoff = std::min(backoff * 2, DataManager::HEALTH_BACKOFF_CAP_MS);
+    }
+
+    src.next = UpdateStatus::Success;
+    t += DataManager::HEALTH_BACKOFF_CAP_MS + 1;
+    dm.setSimulatedTimeMs(t);
+    dm.processNext();
+    ASSERT_EQ(healthOf(dm, &src).state, SourceHealthState::Healthy);
+
+    src.next = UpdateStatus::FetchError;
+    t += 2000;
+    dm.setSimulatedTimeMs(t);
+    dm.processNext();
+
+    SourceHealth h = healthOf(dm, &src);
+    EXPECT_EQ(h.currentBackoffMs, DataManager::HEALTH_BACKOFF_BASE_MS);
+    EXPECT_EQ(h.state, SourceHealthState::Degraded);
+    EXPECT_EQ(h.consecutiveFailures, 1);
+}
+
+TEST_F(DataManagerTest, Backoff_CauseChangeRestartsSeries) {
+    // Rate limiting and hard failure are different conditions. A source that has
+    // been rate-limited to the ceiling must not be quarantined by its first
+    // genuine error on a peer that was answering moments ago.
+    ScriptedSource src("s", 1000, PriorityTier::High);
+    src.next = UpdateStatus::RateLimited;
+    dm.registerSource(&src);
+
+    uint32_t t = 1000;
+    uint32_t backoff = DataManager::HEALTH_BACKOFF_BASE_MS;
+    for (int i = 0; i < 8; i++) {
+        dm.setSimulatedTimeMs(t);
+        dm.processNext();
+        t += backoff + 1;
+        backoff = std::min(backoff * 2, DataManager::HEALTH_BACKOFF_CAP_MS);
+    }
+    ASSERT_EQ(healthOf(dm, &src).currentBackoffMs, DataManager::HEALTH_BACKOFF_CAP_MS);
+
+    src.next = UpdateStatus::FetchError;
+    dm.setSimulatedTimeMs(t);
+    dm.processNext();
+
+    SourceHealth h = healthOf(dm, &src);
+    EXPECT_EQ(h.currentBackoffMs, DataManager::HEALTH_BACKOFF_BASE_MS)
+        << "a change of cause restarts the series";
+    EXPECT_EQ(h.state, SourceHealthState::Degraded)
+        << "one real error must not quarantine a peer that was answering";
+}
+
+// --- resetSourceHealth() reports honestly -----------------------------------
+
+TEST_F(DataManagerTest, Reset_ReportsUnknownNotHealthy) {
+    // Healthy means "last attempt succeeded". After a reset following failures,
+    // it did not — claiming Healthy tells the portal the source is fine when
+    // nothing has been verified.
+    ScriptedSource src("s", 1000, PriorityTier::High);
+    src.next = UpdateStatus::Success;
+    dm.registerSource(&src);
+    dm.processNext();
+    ASSERT_TRUE(healthOf(dm, &src).everSucceeded);
+
+    src.next = UpdateStatus::FetchError;
+    dm.setSimulatedTimeMs(1000 + 2000);
+    dm.processNext();
+    ASSERT_EQ(healthOf(dm, &src).state, SourceHealthState::Degraded);
+
+    dm.resetSourceHealth(&src);
+
+    SourceHealth h = healthOf(dm, &src);
+    EXPECT_EQ(h.state, SourceHealthState::Unknown) << "reset verifies nothing";
+    EXPECT_TRUE(h.everSucceeded) << "but the never-connected distinction survives";
+    EXPECT_FALSE(h.backoffActive);
+    EXPECT_EQ(h.consecutiveFailures, 0);
+}
+
+TEST_F(DataManagerTest, Reset_PreservesNeverConnected) {
+    ScriptedSource src("s", 1000, PriorityTier::High);
+    src.next = UpdateStatus::AuthError;
+    dm.registerSource(&src);
+    dm.processNext();
+
+    dm.resetSourceHealth(&src);
+
+    SourceHealth h = healthOf(dm, &src);
+    EXPECT_EQ(h.state, SourceHealthState::Unknown);
+    EXPECT_TRUE(h.neverConnected());
 }
 
 int main(int argc, char **argv) {
