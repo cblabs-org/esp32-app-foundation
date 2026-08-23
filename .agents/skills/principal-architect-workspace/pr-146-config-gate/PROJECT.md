@@ -64,7 +64,7 @@ This is a **breaking interface change** with no honest shim. The old default
 - **[x] [wo4-framework-migration](wo4-framework-migration/WORKORDER.md):** Migrate `WifiConfigGate` → `WifiPreconditionContributor`. Migrate `TimeConfigGate` → `TimePreconditionContributor` (two preconditions: Timezone + Time Sync). Update built-in registrations in Application. Port existing gate tests. ✅ 801/801 tests, all targets.
 - **[x] [wo5-portal-api](wo5-portal-api/WORKORDER.md):** New `/api/preconditions` REST route. Portal JavaScript: prominent precondition health display on System page. Wire into `WebServerManager`. ✅ 801/801 native, 71/71 web.
 - **[x] [wo6-display-updates](wo6-display-updates/WORKORDER.md):** Rewrite `ConfiguringStatusBoard` — Startup-only progress bar, overflow handling, rich cause/severity rendering. Both display modules subscribe to `precondition.health`. SLS widget repurposing (round display safe zone). Port display tests. ✅ 803/803 tests, all targets.
-- **[ ] [wo7-consumer-cleanup](wo7-consumer-cleanup/WORKORDER.md):** Migrate `WeatherModule` gate → precondition with `Unavailable`/`Indeterminate` fix (§2.4). Migrate `MyApp` template. Delete `IConfigGate.hpp`, `ConfigGateResolver.hpp`, and all dead references. Final build + test verification. Documentation update.
+- **[x] [wo7-consumer-cleanup](wo7-consumer-cleanup/WORKORDER.md):** Migrate `WeatherModule` gate → precondition with `Unavailable`/`Indeterminate` fix (§2.4). Migrate `MyApp` template. Delete `IConfigGate.hpp`, `ConfigGateResolver.hpp`, and all dead references. Final build + test verification. ✅ 828/828 tests.
 
 ## Worker Model Mapping
 
@@ -114,7 +114,12 @@ All WOs are **strictly serial** — each builds on the last. No parallel executi
 - PR #145 merged: SourceHealth now on main. **WO1b eliminated.**
 - Final plan: 7 WOs, strictly serial
 - **Human approval received** for full autonomous execution
-- Execution begins with WO1
+
+### 2026-08-23 — All WOs complete
+- WO1: 789/789 → WO2: 800/800 → WO3: 797/797 → WO4: 801/801 → WO5: 801/801 → WO6: 803/803 → WO7: 828/828
+- All old interfaces deleted: IConfigGate, ConfigGateResolver, WifiConfigGate, TimeConfigGate
+- Consumer migrations: WeatherModule (§2.4 fix), MyApp template
+- Final verification: all hardware targets building, native test suite green
 
 ---
 

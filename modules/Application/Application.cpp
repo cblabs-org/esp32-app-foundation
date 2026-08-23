@@ -385,8 +385,8 @@ void Application::tick() {
                 last.cause = state.dampedStatus.cause;
                 last.severity = state.severity;
                 last.everMet = state.everMet;
-                PreconditionHealthPayload payload{state.name, state.dampedStatus.cause, state.severity, state.everMet};
-                _eventBus.publish(ApplicationEvents::PRECONDITION_HEALTH, &payload);
+                _preconditionPayloads[i] = {state.name, state.dampedStatus.cause, state.severity, state.everMet};
+                _eventBus.publish(ApplicationEvents::PRECONDITION_HEALTH, &_preconditionPayloads[i]);
             }
             if (_state == AppState::Running && (state.role == PreconditionRole::Startup || state.role == PreconditionRole::Both) && state.suppressed) {
                 ESP_LOGW(TAG, "Precondition '%s' suppressed — regressing to CONFIGURING", state.name);

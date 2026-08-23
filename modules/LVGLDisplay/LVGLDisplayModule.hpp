@@ -467,6 +467,12 @@ private:
     std::atomic<bool> _pendingMessage{false};
     char _pendingMessageText[128] = {};
 
+    std::atomic<bool> _pendingConfiguring{false};
+    AppConfiguringPayload _pendingConfiguringPayload{};
+
+    std::atomic<bool> _pendingPreconditionHealth{false};
+    PreconditionHealthPayload _pendingPreconditionPayload{};
+
     std::atomic<bool> _pendingSnapshot{false};
     std::atomic<bool> _snapshotComplete{false};
     std::atomic<bool> _snapshotSuccess{false};

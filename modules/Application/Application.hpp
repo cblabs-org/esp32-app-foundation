@@ -487,6 +487,7 @@ private:
         bool everMet = false;
     };
     PreconditionStatusRecord _lastPreconditionStatus[16]; // MAX_PRECONDITIONS
+    PreconditionHealthPayload _preconditionPayloads[16];  ///< Persistent payloads for EventBus (WO7)
  ///< Central precondition engine
     ConfigManager _configManager;       ///< Centralised config gateway (owned by Application)
     EventBus _eventBus;                 ///< Central event bus

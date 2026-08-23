@@ -289,6 +289,48 @@ void LVGLDisplayModule::tick(uint32_t now) {
         resetActivity();
     }
 
+    if (_pendingConfiguring.exchange(false)) {
+        AppConfiguringPayload p = _pendingConfiguringPayload;
+        ESP_LOGI("LVGLDisplayModule", "CONFIGURING gate: %s (cause=%d, severity=%d) (deferred)",
+                 p.gateName ? p.gateName : "?",
+                 static_cast<int>(p.cause),
+                 static_cast<int>(p.severity));
+
+        _diagCarousel.stop();
+
+        if (_screens != nullptr) {
+            _screens->onConfiguring(&p);
+            lv_obj_t* scr = nullptr;
+            if (p.severity == Severity::NeedsUser) {
+                scr = _screens->gateHelperScreen(&p);
+                if (scr == nullptr && p.gateName != nullptr &&
+                    strcmp(p.gateName, PreconditionNames::WIFI_STATION) == 0) {
+                    scr = _screens->wifiWizardScreen();
+                }
+                if (scr == nullptr) {
+                    scr = _screens->configuringScreen();
+                }
+            } else {
+                scr = _screens->configuringScreen();
+            }
+
+            if (scr != nullptr && scr != lv_screen_active()) {
+                if (!_inSystemScreen) {
+                    _priorScreen = lv_screen_active();
+                    _inSystemScreen = true;
+                }
+                lv_scr_load_anim(scr, LV_SCR_LOAD_ANIM_FADE_IN, 200, 0, false);
+            }
+        }
+    }
+
+    if (_pendingPreconditionHealth.exchange(false)) {
+        PreconditionHealthPayload p = _pendingPreconditionPayload;
+        if (_screens != nullptr) {
+            _screens->onPreconditionHealth(&p);
+        }
+    }
+
     if (_pendingAppRunning.exchange(false)) {
         ESP_LOGI("LVGLDisplayModule", "App transition → RUNNING (deferred to tick)");
         _inSystemScreen = false;
@@ -805,48 +847,8 @@ void LVGLDisplayModule::_onAppConfiguring(const char* /*topic*/, const void* pay
     auto* self = static_cast<LVGLDisplayModule*>(ctx);
     if (!self || !payload) return;
     auto* p = static_cast<const AppConfiguringPayload*>(payload);
-    ESP_LOGI("LVGLDisplayModule", "CONFIGURING gate: %s (cause=%d, severity=%d)",
-             p->gateName ? p->gateName : "?",
-             static_cast<int>(p->cause),
-             static_cast<int>(p->severity));
-
-    // Deactivate diagnostic carousel when leaving DiagScreen
-    self->_diagCarousel.stop();
-
-    // LVGL has no built-in configuring screens — the skin (SLSSystemScreens) supplies
-    // them. With no provider there is nothing to display.
-    if (self->_screens == nullptr) {
-        return;
-    }
-
-    // Populate the configuring widgets (AP SSID, portal URL, gate help text) first.
-    self->_screens->onConfiguring(p);
-
-    // Three-tier root selection (mirrors U8G2): a modal (gate helper / WiFi wizard)
-    // only when the gate needs user action; otherwise the base configuring screen.
-    lv_obj_t* scr = nullptr;
-    if (p->severity == Severity::NeedsUser) {
-        scr = self->_screens->gateHelperScreen(p);                          // Tier 1
-        if (scr == nullptr && p->gateName != nullptr &&
-            strcmp(p->gateName, PreconditionNames::WIFI_STATION) == 0) {
-            scr = self->_screens->wifiWizardScreen();                       // Tier 2
-        }
-        if (scr == nullptr) {
-            scr = self->_screens->configuringScreen();                     // Tier 3
-        }
-    } else {
-        scr = self->_screens->configuringScreen();                         // base / InProgress
-    }
-
-    // Groups toggle in-place on the single System screen; only animate the
-    // screen-load on first entry so re-publishes don't re-trigger the fade.
-    if (scr != nullptr && scr != lv_screen_active()) {
-        if (!self->_inSystemScreen) {
-            self->_priorScreen = lv_screen_active();
-            self->_inSystemScreen = true;
-        }
-        lv_scr_load_anim(scr, LV_SCR_LOAD_ANIM_FADE_IN, 200, 0, false);
-    }
+    self->_pendingConfiguringPayload = *p;
+    self->_pendingConfiguring.store(true);
 }
 
 void LVGLDisplayModule::_onAppRunning(const char* /*topic*/, const void* /*payload*/, void* ctx) {
@@ -861,9 +863,8 @@ void LVGLDisplayModule::_onPreconditionHealth(const char* /*topic*/, const void*
     auto* self = static_cast<LVGLDisplayModule*>(ctx);
     if (!self || !payload) return;
     auto* p = static_cast<const PreconditionHealthPayload*>(payload);
-    if (self->_screens != nullptr) {
-        self->_screens->onPreconditionHealth(p);
-    }
+    self->_pendingPreconditionPayload = *p;
+    self->_pendingPreconditionHealth.store(true);
 }
 
 void LVGLDisplayModule::_onInputWake(const char* /*topic*/, const void* /*payload*/, void* ctx) {

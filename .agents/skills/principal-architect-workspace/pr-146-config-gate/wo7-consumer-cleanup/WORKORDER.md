@@ -194,19 +194,27 @@ Surface any findings in the Completion Report — do not file issues directly.
 <!-- Written by the worker at task completion -->
 
 ### Status
-(pending)
+Completed
 
 ### Changes Made
-(pending)
+- Migrated `WeatherModule` and `MyApp` to implement `IPreconditionContributor` instead of `IConfigGate`.
+- Fixed the §2.4 defect in `WeatherModule` so that it returns `{false, Cause::Indeterminate}` if `_keyManager` is uninitialized.
+- Completely removed `IConfigGate.hpp`, `ConfigGateResolver.hpp`, `WifiConfigGate.hpp`, `TimeConfigGate.hpp`, and updated `Application` to strip out all old gate management code (`_configGates`, `_gateFailedSinceMs`, `registerConfigGate()`, etc.).
+- Re-enabled `test_application` in native tests. Fixed a trailing block comment issue in `Application.hpp` and updated `test_application.cpp` to call `app.tick()` before API response validation to allow preconditions to evaluate. 
+- Updated `PsychicHttp.h` stub to specify `virtual` for response and request mocked methods, which resolved a `SIGSEGV` error during `test_webServer`.
+- Updated `docs/config-gate-design.md` to reflect status "Implemented — awaiting confirming consumer round."
+- Validated that the codebase is completely clear of the old IConfigGate infrastructure via regex sweeps.
+- Verified 100% test passing via `pio test -e native` (828/828 passing).
 
 ### Decisions Made
-(pending)
+- Re-enabled `test_application` despite earlier native linker errors by recognizing that the platformio native environment is only tailored for testing, and should not be used with `pio run -e native`.
+- Ensured that `IConfigGate` documentation was fully transitioned to `IPreconditionContributor` concepts and design docs.
 
 ### Dead Ends & Warnings
-(pending)
+- When using `PsychicHttp` base pointer mock objects in native tests, ensure virtual method dispatch is correctly wired. Native stubs that omit the `virtual` keyword will bypass the mock behavior and invoke the stub's base method, which causes subtle test failures or memory segmentation faults if passing uninitialized references.
 
 ### Out-of-Scope Findings
-(pending)
+- None
 
 ### Blockers
-(pending)
+- None
