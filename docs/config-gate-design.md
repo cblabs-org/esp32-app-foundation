@@ -7,7 +7,7 @@
 > when a running device should fall back to configuring.
 
 > [!NOTE]
-> **STATUS: DESIGN COMPLETE — awaiting a confirming consumer round, then approval.
+> **STATUS: ROUND-4 AMENDMENT — concentrated corrections, not a rewrite.
 > Not approved, not scoped, not built.**
 >
 > This is a **breaking interface change**. Rounds 1 and 2 were each reviewed by all
@@ -17,8 +17,14 @@
 > numbers changed — see §14. Round 2 corrected several claims the rewrite had itself
 > been built on; those corrections are marked inline.
 >
-> **No design decisions remain open.** OQ-1…OQ-7 are resolved. OQ-8 and OQ-9 are
-> dependencies on other work rather than choices, and neither blocks decomposition.
+> **Round-4 amendments.** Review of CG-18b and the sample-app reference implementation
+> found two defects with real consequences:
+> - **`Indeterminate` severity was `Blocked` (silent)** — but `Blocked`'s justification
+>   is that an upstream owner speaks; `Indeterminate` has no upstream owner. Corrected to
+>   `Persistent` (loud, developer-facing). See CG-3, CG-4.
+> - **`Unavailable` vs `Indeterminate` conflated in the sample app** — `if (!_keyManager)
+>   return true;` picks "keep going, it's fine" for what is actually a programming error.
+>   The line is now stated explicitly. See §2.4.
 >
 > **What is still owed before approval:** CG-18 and CG-2a were written after the last
 > consumer round and have no consumer evidence behind them (§14). Every other decision
@@ -37,6 +43,7 @@
 | **CG-1** | Three questions answered separately; `Operational` is the default role | *the keystone* |
 | CG-2 | A precondition reports a status, not a boolean | |
 | **CG-2a** | Status and message split by **frequency**, not ownership | OQ-7 |
+| **CG-2b** | Registration uses the **registry/visitor** pattern, not inner stubs | [#148](https://github.com/matthewmcneill/esp32-app-foundation/issues/148) |
 | CG-3 | The cause vocabulary | |
 | CG-4 | Severity is derived; the safe default is `Transient` | |
 | CG-4a | Severity derives from cause **and** trust history | |
@@ -92,10 +99,12 @@ Both described a chain they cannot express, and both named the same reason.
 > real root is `Sampling Live`, and `Energy Accumulation` is a *consumer* of the
 > chain rather than a node in it. `BindsTo` drops out of their design entirely. Only
 > departures-board has a genuine two-deep chain, so the evidence for `BindsTo` rests
-> on one consumer. Recorded because round 1 was cited here as validating two. That reframes everything: **the framework conflates "this must be
-true before we boot" with "this must be true for the device to work properly",
-and because only the first exists, consumers with the second either avoid the
-interface entirely or model nothing at all.**
+> on one consumer. Recorded because round 1 was cited here as validating two.
+
+That reframes everything: **the framework conflates "this must be true before we boot"
+with "this must be true for the device to work properly", and because only the first
+exists, consumers with the second either avoid the interface entirely or model nothing
+at all.**
 
 The evidence that this is happening, not merely possible:
 
@@ -188,6 +197,29 @@ has done nothing wrong, and there is no third option. "Don't block boot" is exac
 the wrong default for a framework — a precondition that cannot evaluate itself
 waving boot through is how you ship a device running without the thing the gate
 existed to guarantee.
+
+And there is a sharper point underneath. The code conflates two situations that
+deserve opposite answers:
+
+| Situation | Honest cause |
+|---|---|
+| Dependency deliberately absent — module composed without it by design | `Unavailable` — not present in this deployment, not a fault |
+| Dependency accidentally absent — someone forgot the wiring | `Indeterminate` — a programming error, report it loudly |
+
+`if (!_keyManager) return true;` picks the first answer for both. A developer who
+forgets `setKeyManager()` gets silence — the gate waves through a device running
+without the thing it existed to guarantee, and the only clue is a feature that
+quietly does not work.
+
+`Indeterminate` is not a runtime condition. It is a developer error, and no end
+user can act on it. It belongs closer to `InternalError` than to `DependencyUnmet`
+— loud, developer-facing, and not hidden behind the silence that `Blocked` severity
+provides (see CG-4, round-4 correction).
+
+> [!WARNING]
+> **This is the code consumers copy.** The sample app is a teaching tool. Fixing the
+> vocabulary without fixing the reference implementation teaches the wrong pattern to
+> every project that starts from it.
 
 ### 2.5 One tolerance number for causes that want opposite handling
 
@@ -391,6 +423,54 @@ its own rate, and every ownership question disappears with it:
 
 This is the out-param idiom the interface already uses for `getDependencies(uint8_t&)`.
 
+#### CG-2b — Registration uses the registry/visitor pattern, not inner stubs
+
+A module may contribute **several** preconditions — `TimeManager` owns both `Timezone`
+and `Time Sync` (§9.1); `BoardRegistry` owns 1 + N (OQ-1). The framework already
+solves this problem twice, and the two solutions disagree:
+
+| Interface | Pattern | Multiplicity |
+|---|---|---|
+| `IWebContributor` | **Inner stub objects** — one `IWebContributor` per tab, registered separately | `LVGLDisplayModule` requires 4 `registerModule()` calls |
+| `IMCPContributor` | **Registry/visitor** — one `registerMCPTools(MCPToolRegistry&)` call, `addTool()` N times | One call, no stubs |
+
+The stub pattern's worst property is **silent omission**: forget one `registerModule()`
+call and a sub-tab vanishes with no error. For web tabs that is cosmetic. For
+preconditions it is **safety-critical** — a missing precondition is exactly the class
+of defect §2.4 exists to name: a device running without the check it needed.
+
+The registry pattern eliminates this structurally. Everything is registered inside one
+method, so nothing can be forgotten:
+
+```cpp
+class IPreconditionContributor {
+public:
+    virtual ~IPreconditionContributor() = default;
+    virtual void registerPreconditions(PreconditionRegistry& registry) = 0;
+};
+```
+
+The registry accepts the data the framework needs per precondition:
+
+```cpp
+void TimeManager::registerPreconditions(PreconditionRegistry& reg) {
+    reg.add("Timezone", PreconditionRole::Operational,
+        [this]() -> PreconditionStatus { /* … */ });
+
+    reg.add("Time Sync", PreconditionRole::Operational,
+        [this]() -> PreconditionStatus { /* … */ },
+        nullptr,  // single cause — no describe needed (CG-16)
+        syncEdges, 1);
+}
+```
+
+Dynamic counts (BoardRegistry's N slots) are a loop. Unused slots return
+`Unavailable` — the enum member OQ-1 already repurposed for exactly this.
+
+`IMCPContributor` is the existence proof: the pattern already works in this codebase,
+with zero pain points. The `IWebContributor` retrofit is tracked separately as
+[#148](https://github.com/matthewmcneill/esp32-app-foundation/issues/148).
+
 ### CG-3 — The cause vocabulary
 
 ```cpp
@@ -421,8 +501,12 @@ Four of these are additions the reviews demanded:
   device already holds, which is why this earns an enum member where §5a's case does
   not.
 - **`Indeterminate`** — §2.4. A precondition whose dependency was not wired has no
-  opinion, and must not be forced to lie. Severity `Blocked`; the **framework**
-  decides policy, not each author quietly returning `true`.
+  opinion, and must not be forced to lie. This is a **programming error** — a
+  developer forgot `setKeyManager()`, not a device state an end user can act on.
+  Severity **Persistent** (the same as `InternalError`), loud and developer-facing.
+  The counterpart is `Unavailable`: a dependency *deliberately* absent by
+  configuration is not a fault and not `Indeterminate`; conflating the two is the
+  defect §2.4 records in the sample app.
 - **`Implausible`** — the transport succeeded and a **domain check rejected the
   answer**. Every other cause is a shape of *not getting an answer*; this is the only
   one that means *got one, don't trust it*. See CG-5a.
@@ -434,7 +518,8 @@ Four of these are additions the reviews demanded:
 | `Connecting`, `Unreachable`, `RateLimited` | **Transient** | Keep trying. Blame nobody. |
 | `Implausible` | **Transient** or **NeedsUser** | Discriminated by trust history — see CG-4a. |
 | `NotConfigured`, `Rejected` | **NeedsUser** | Only a person resolves this. |
-| `DependencyUnmet`, `Indeterminate` | **Blocked** | Not actionable; someone else owns the report. |
+| `DependencyUnmet` | **Blocked** | Not actionable; the upstream precondition owns the report. |
+| `Indeterminate` | **Persistent** | A programming error — no upstream owner to speak for it. Report loudly. |
 | `FallbackEngaged` | **Degraded** | Serviceable, still self-healing. |
 | `Unavailable` | **Inactive** | Correct as-is. Report once, never nag. |
 | `InternalError` | **Persistent** | A defect. |
@@ -558,9 +643,9 @@ A current channel fails clause 1 outright: an idle circuit and a disconnected cl
 are the same measurement, and no framework vocabulary fixes that.
 
 So: **put the plausibility predicate on the signal that cannot legitimately be quiet,
-and let everything else depend on it.** That is why the chain in §9.3 roots at
-`Voltage Reference` rather than per-channel current — the root is checkable, and
-`Requires`/`BindsTo` carries the verdict to channels that are not.
+and let everything else depend on it.** In §9.3 that is the mains waveform behind
+`Voltage Reference`, not per-channel current — the waveform is checkable, and `Requires`
+carries the verdict to channels that are not.
 
 ##### The remaining framework affordance
 
@@ -926,8 +1011,9 @@ Not every consumer has a display; every consumer has the portal. And nobody watc
 portal — **they open it because something is wrong**, which is exactly when this must
 be the first thing they see, not a line in a diagnostics drawer.
 
-A `/api/preconditions` route returning name, cause, severity, detail, trust history
-and breaker state for every registered precondition, with a prominent portal surface
+A `/api/preconditions` route returning name, cause, severity, trust history and breaker
+state for every registered precondition — plus the message obtained by calling
+`describe()` into a buffer the route sizes (CG-2a) — with a prominent portal surface
 driven from it. This is the only surfacing that works on every device, including
 headless ones, and it is **not optional**.
 
@@ -940,7 +1026,12 @@ headless ones, and it is **not optional**.
 > `APP_CONFIGURING` / `APP_RUNNING` and decide their own rendering; precondition
 > health follows the same route.
 
-A `precondition.health` topic carrying `{ name, cause, severity, detail, everMet }`.
+A `precondition.health` topic carrying `{ name, cause, severity, everMet }`. The
+*message* is not on the payload: a subscriber calls `describe()` into its own buffer,
+sized for its own panel (CG-2a). That also keeps the payload free of the borrowed
+pointer that makes [#147](https://github.com/matthewmcneill/esp32-app-foundation/issues/147)
+a defect today.
+
 Display modules subscribe and render however suits their panel.
 
 > [!NOTE]
@@ -1043,20 +1134,37 @@ The second is a mistyped IP, and today it retries silently forever.
 
 | Precondition | Role | Met when | Edges |
 |---|---|---|---|
-| `ADC Bus` | Operational | SPI3 up, pods answering | — |
-| `Voltage Reference` | Operational | ZMPT bias within 0.15 V of 1.65 V | `Requires` ADC Bus |
-| `Energy Accumulation` | Operational | voltage reference trustworthy | `BindsTo` Voltage Reference |
+| `Sampling Live` | Operational | the sampler is producing windows with samples in them | — |
+| `Voltage Reference` | Operational | the mains waveform is present — **not** a DC bias check; see below | `Requires` Sampling Live |
+
+**`Energy Accumulation` is a *consumer* of this chain, not a node in it.** It reads the
+undamped status (CG-13) and stops integrating; it is not itself a precondition. The chain
+is therefore **one edge deep**, and `BindsTo` does not appear in it — the only genuine
+two-deep chain among the consumers is departures-board's.
+
+> [!CAUTION]
+> **The root cannot be "the bus is up" or "the pods are answering."** That is precisely
+> what the driver cannot tell you — an absent chip is substituted with a mid-rail value
+> and answers indistinguishably from a working one (CG-5a). Rooting a chain on transport
+> health is the mistake this whole example exists to illustrate, and an earlier draft of
+> this section made it.
+>
+> **Nor can `Voltage Reference` be "bias within 0.15 V of 1.65 V."** That predicate fails
+> CG-5a's clause 2 — 2048 substituted counts *is* 1.650 V, so the healthy value and the
+> failure substitute coincide exactly. It is not a check. The predicate must be on the
+> **waveform**, which a substituted constant cannot fake.
 
 **No node blocks boot.** A power monitor with a loose ribbon cable must still boot,
 serve its portal, and let the owner run diagnostics to discover *why* it reads zero.
 Gating this would brick the device precisely when it most needs to be diagnosable —
 which is why, under today's contract, this chain has never been written.
 
-**Ribbon works loose.** `ADC Bus` → unmet. `Voltage Reference` → `DependencyUnmet`
-**immediately** (CG-8). `Energy Accumulation` → unmet **immediately** via `BindsTo`, and
-**stops integrating at once** by reading the undamped status (CG-13) — no phantom kWh.
-Meanwhile the OLED shows `STALE` only after the damped window, so a two-second glitch
-does not flicker the display. One condition, two speeds.
+**Ribbon works loose.** `Sampling Live` → unmet. `Voltage Reference` → `DependencyUnmet`
+**immediately** (CG-8). The accumulator, reading the undamped status (CG-13), **stops
+integrating at once** — so the counter records a gap rather than continuing to log
+zero-valued windows as though the circuits were simply idle. Meanwhile the display shows
+`STALE` only after the damped window, so a two-second glitch does not flicker it. One
+condition, two speeds.
 
 **Pod absent, reading a perfect mid-rail.** `ADC Bus` is met and every read succeeds, so
 no transport-shaped cause fires. `Voltage Reference` runs the consumer's own predicate —
@@ -1190,6 +1298,14 @@ affordance or a scroll.
 design does **not** inherit that hazard — CG-2a's caller-supplied buffer leaves no
 pointer for the framework to hold — but the existing field needs its own fix, since it
 ships today.
+
+**`WeatherModule`'s `isSatisfied()` must change.** `if (!_keyManager) return true;` is
+the reference implementation consumers copy, and it teaches the wrong pattern (§2.4).
+A dependency deliberately absent by composition is `Unavailable`; a dependency
+accidentally absent because the developer forgot to wire it is `Indeterminate`. The
+current code conflates the two and picks the wrong answer — silence — for a
+programming error. The fix is to report `Indeterminate` when the dependency is missing,
+not to wave boot through.
 
 **Ordering.** CG-15 means this lands after #128's health model. CG-17 deletes an
 interface member added there.
@@ -1329,6 +1445,7 @@ All three endorsed folding CG-17 into the #128 migration. One break beats two.
 | CG-12 | CG-17 | Unchanged |
 | — | **CG-18** | New, post-round-2: surfacing (portal + published topic + reserved interactive path). Resolves OQ-6. |
 | — | **CG-2a** | New, post-round-2: status/message split by frequency. Resolves OQ-7. |
+| — | **CG-2b** | New, round-4: registry/visitor registration pattern. Resolves multi-precondition question. [#148](https://github.com/matthewmcneill/esp32-app-foundation/issues/148). |
 
 > [!IMPORTANT]
 > **CG-18 and CG-2a post-date the last consumer review.** Both touch code the consumers
@@ -1355,6 +1472,8 @@ OQ-5 were resolved into CG-8 and §10. §13 lists five new questions raised by r
 
 | Date | Change |
 |---|---|
+| 2026-08-22 | **Round-4 amendment.** Two corrections from the sample-app review: (1) `Indeterminate` severity changed from `Blocked` to `Persistent` — `Blocked` is deliberately silent because an upstream owner speaks, but `Indeterminate` has no upstream owner, so it inherited silence from a severity whose justification does not apply; it is a programming error (a developer forgot to wire a dependency), not a runtime condition, and belongs alongside `InternalError`. Role still governs blocking; no new policy. (2) The `Unavailable`-versus-`Indeterminate` line stated explicitly in §2.4: a dependency deliberately absent by composition is `Unavailable` (not a fault); a dependency accidentally absent is `Indeterminate` (a bug, report loudly). The sample app's `if (!_keyManager) return true;` conflates the two and teaches the wrong pattern; §11 now records the fix as a consequence. Status lowered from DESIGN COMPLETE. |
+| 2026-08-23 | **CG-2b added: registry/visitor registration pattern.** Resolves how a module contributes multiple preconditions. The framework already has two answers — `IWebContributor` uses inner stub objects (one per tab, multi-registration ceremony, silent omission on miss), `IMCPContributor` uses a registry/visitor (one method, `addTool()` N times, no stubs). For preconditions, silent omission is safety-critical (a missing precondition is §2.4's exact defect), so the registry pattern wins. `IPreconditionContributor::registerPreconditions(PreconditionRegistry&)` — one call, `add()` N times, dynamic counts via loop. The `IWebContributor` retrofit tracked separately as [#148](https://github.com/matthewmcneill/esp32-app-foundation/issues/148). |
 | 2026-08-21 | Initial draft. CG-1…CG-12, clock-chain reference case, OQ-1…OQ-5. |
 | 2026-08-21 | Round-1 amendments: CG-8 corrected to per-second accrual; CG-2a, CG-9a added; CG-7 corrected. |
 | 2026-08-21 | **OQ-7 resolved as CG-2a** — `getStatus()` (hot path, every tick) split from `describe(Cause, char*, size_t)` (cold path, caller-supplied buffer). The question had been framed as *who owns the string*; it is really *how often does each part of the answer need computing*. `met`/`cause` are needed every tick; the message is needed on change, and the publish path is already 500 ms-throttled. Splitting on frequency removes the ownership question entirely: no lifetime contract, no `mutable` member, no per-tick `snprintf`, no struct growth, and nothing for a one-cause precondition to implement. CG-16 restated in those terms; §12's migration note corrected — DraytonWiser *can* now delete their `mutable char[96]`. |
