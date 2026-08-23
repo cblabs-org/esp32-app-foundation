@@ -176,6 +176,53 @@ public:
     }
 
     /**
+     * @brief Number of registered sources. Pair with getSourceHealthAt() to enumerate.
+     */
+    size_t getSourceCount() const;
+
+    /**
+     * @brief Health snapshot for a registered source.
+     * @param source The source to query.
+     * @param[out] out Populated on success.
+     * @return false if the source is not registered (out is untouched).
+     */
+    bool getSourceHealth(IDataSource* source, SourceHealth& out) const;
+
+    /**
+     * @brief Health snapshot by registry index, for enumeration without holding
+     *        source pointers. Indices are not stable across register/unregister.
+     * @return false if index is out of range.
+     */
+    bool getSourceHealthAt(size_t index, SourceHealth& out) const;
+
+    /**
+     * @brief Clear a source's failure history and resume normal scheduling.
+     *
+     * The exit from SourceHealthState::Suspended, which is otherwise terminal —
+     * an AuthError will not fix itself on a timer. Call after the user changes
+     * the credentials or address the source depends on.
+     *
+     * @param source Source to reset; ignored if not registered.
+     */
+    void resetSourceHealth(IDataSource* source);
+
+    /**
+     * @brief Backoff schedule for a failing source: 30s doubling to a 15m ceiling.
+     *
+     * A source at the ceiling is Quarantined but still probes at that interval,
+     * so a hub that comes back is picked up without user action.
+     *
+     * @note The framework owns *scheduling* backoff — when fetchUpdate() is called
+     *       again. Implementations own *transport* retry — what happens inside one
+     *       fetch. Consumers that already implement their own scheduling backoff
+     *       should remove it: two uncoordinated layers multiply, and a source that
+     *       recovers after a blip can end up waiting far longer than either layer
+     *       intends. See IDataSource.hpp.
+     */
+    static constexpr uint32_t HEALTH_BACKOFF_BASE_MS = 30000;   ///< First retry delay after a failure
+    static constexpr uint32_t HEALTH_BACKOFF_CAP_MS  = 900000;  ///< 15 min ceiling; also the quarantine probe interval
+
+    /**
      * @brief Test helper to override current time in native builds
      * @param timeMs The simulated current time in milliseconds
      */
@@ -186,6 +233,26 @@ private:
         IDataSource* source;
         uint32_t lastFetchTimeMs;
         bool priorityRequested;
+
+        // --- Health (#128) ---
+        SourceHealthState state               = SourceHealthState::Unknown;
+        UpdateStatus      lastStatus          = UpdateStatus::Success;
+        uint16_t          consecutiveFailures = 0;
+        uint32_t          lastAttemptMs       = 0;
+        uint32_t          lastSuccessMs       = 0;
+        uint32_t          nextAttemptMs       = 0;  ///< Deadline; meaningful only while backoffActive
+        uint32_t          currentBackoffMs    = 0;
+        bool              everSucceeded       = false;
+
+        /// Whether nextAttemptMs holds a live deadline. An explicit flag rather
+        /// than a 0 sentinel: 0 is a reachable millis() value after a wrap, and
+        /// the sentinel would silently read as "fetch now".
+        bool              backoffActive       = false;
+
+        /// What caused the current backoff series. Rate limiting and hard failure
+        /// are different conditions with different meanings, so a change of cause
+        /// restarts the series rather than inheriting the other's accumulated delay.
+        bool              backoffFromRateLimit = false;
     };
 
     struct DataJobEntry {
@@ -224,4 +291,15 @@ private:
     void executeLoop();
     void drainJobs(bool urgentOnly);
     uint32_t getCurrentTimeMs() const;
+
+    /**
+     * @brief Apply one fetch outcome to a source's health state and backoff.
+     *
+     * Caller MUST hold _registryMutex. Pure scheduling logic — no I/O, no
+     * platform calls — so the whole state machine is natively testable.
+     */
+    void recordFetchOutcome(SourceRecord& r, UpdateStatus status, uint32_t nowMs);
+
+    /** @brief Fill a SourceHealth from a record. Caller MUST hold _registryMutex. */
+    static void snapshotHealth(const SourceRecord& r, SourceHealth& out);
 };

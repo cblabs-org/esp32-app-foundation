@@ -179,10 +179,17 @@ void DataManager::drainJobs(bool urgentOnly) {
 
         entry->job();
 
+        // Order matters: clear _fetchStartMs BEFORE tearing down the supervisor.
+        // esp_timer_stop() does not wait for a callback that has already been
+        // dispatched, so a fetchWatchdogCb already running on the esp_timer task
+        // can still read _fetchStartMs after stop() returns. Clearing first brings
+        // that callback's `if (start == 0) return;` guard over the window;
+        // clearing second leaves a gap in which a job that has ALREADY COMPLETED
+        // can be abort()ed for having taken >30s.
+        _fetchStartMs.store(0);
 #ifdef ESP_PLATFORM
         stopFetchWatchdog();
 #endif
-        _fetchStartMs.store(0);
 
         uint32_t elapsed = (uint32_t)millis() - jobStart;
         if (entry->options.warnAfterMs > 0 && elapsed > entry->options.warnAfterMs) {
@@ -248,6 +255,164 @@ void DataManager::requestPriorityFetch(IDataSource* source) {
                 xTaskNotifyGive(_workerTask);
             }
             break;
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Health state machine (#128)
+//
+// Failure is a state, not a reset. Every transition below is driven by the
+// UpdateStatus the source returned — these codes already distinguish cases the
+// scheduler should treat differently, and the distinction was previously unused.
+// ---------------------------------------------------------------------------
+void DataManager::recordFetchOutcome(SourceRecord& r, UpdateStatus status, uint32_t nowMs) {
+    r.lastAttemptMs = nowMs;
+    r.lastStatus    = status;
+
+    switch (status) {
+    case UpdateStatus::Success:
+    case UpdateStatus::NoChange:
+        // Recovery is unconditional: one success clears the whole failure history,
+        // including from Quarantined (the probe worked) and Suspended (a priority
+        // fetch after the user fixed the credentials). A later failure therefore
+        // starts a fresh series from the base delay, not from the old ceiling.
+        r.state                = SourceHealthState::Healthy;
+        r.consecutiveFailures  = 0;
+        r.currentBackoffMs     = 0;
+        r.nextAttemptMs        = 0;
+        r.backoffActive        = false;
+        r.backoffFromRateLimit = false;
+        r.lastSuccessMs        = nowMs;
+        r.everSucceeded        = true;
+        return;
+
+    case UpdateStatus::AuthError:
+        // Terminal until someone intervenes. Credentials do not fix themselves,
+        // so retrying on a timer only burns the radio and the remote's rate limit.
+        // Exit is resetSourceHealth() or an explicit priority fetch.
+        r.state             = SourceHealthState::Suspended;
+        if (r.consecutiveFailures < UINT16_MAX) r.consecutiveFailures++;
+        r.currentBackoffMs  = 0;
+        r.nextAttemptMs     = 0;
+        r.backoffActive     = false;
+        ESP_LOGE(TAG, "Source '%s' SUSPENDED after auth failure — will not retry until reset",
+                 r.source->getSourceName());
+        return;
+
+    case UpdateStatus::RateLimited:
+        // The peer is reachable and answering; we are simply asking too often.
+        // Back off, but do not count it toward quarantine — this is not a fault
+        // in the source, and quarantining a working peer would be wrong.
+        //
+        // A change of cause restarts the series: a source that has been rate-
+        // limited up to the ceiling should not inherit that delay for its first
+        // genuine failure, and vice versa. Without this the two policies interfere,
+        // and one FetchError on a peer that was answering thirty seconds ago
+        // quarantines it immediately.
+        r.currentBackoffMs = (!r.backoffActive || !r.backoffFromRateLimit)
+            ? HEALTH_BACKOFF_BASE_MS
+            : std::min(r.currentBackoffMs * 2, HEALTH_BACKOFF_CAP_MS);
+        r.nextAttemptMs        = nowMs + r.currentBackoffMs;
+        r.backoffActive        = true;
+        r.backoffFromRateLimit = true;
+        if (r.state == SourceHealthState::Healthy || r.state == SourceHealthState::Unknown) {
+            r.state = SourceHealthState::Degraded;
+        }
+        ESP_LOGW(TAG, "Source '%s' rate-limited — backing off %lu ms",
+                 r.source->getSourceName(), (unsigned long)r.currentBackoffMs);
+        return;
+
+    case UpdateStatus::FetchError:
+    case UpdateStatus::ParseError:
+    default:
+        break;
+    }
+
+    // --- Genuine failure: count it, back off, quarantine at the ceiling ---
+    // Saturating: at 15-minute ceiling probes an unsaturated uint16_t would take
+    // ~682 days to wrap, but wrapping to 0 would read as "healthy" to a consumer.
+    if (r.consecutiveFailures < UINT16_MAX) r.consecutiveFailures++;
+    r.currentBackoffMs = (!r.backoffActive || r.backoffFromRateLimit)
+        ? HEALTH_BACKOFF_BASE_MS
+        : std::min(r.currentBackoffMs * 2, HEALTH_BACKOFF_CAP_MS);
+    r.nextAttemptMs        = nowMs + r.currentBackoffMs;
+    r.backoffActive        = true;
+    r.backoffFromRateLimit = false;
+
+    // Quarantined is not "given up" — it is "at the ceiling, still probing every
+    // 15 minutes", so an unreachable peer that comes back is picked up without
+    // anyone touching the device.
+    r.state = (r.currentBackoffMs >= HEALTH_BACKOFF_CAP_MS)
+        ? SourceHealthState::Quarantined
+        : SourceHealthState::Degraded;
+
+    ESP_LOGW(TAG, "Source '%s' %s (status=%d, %u consecutive) — next attempt in %lu ms%s",
+             r.source->getSourceName(),
+             r.state == SourceHealthState::Quarantined ? "QUARANTINED" : "degraded",
+             (int)status, (unsigned)r.consecutiveFailures,
+             (unsigned long)r.currentBackoffMs,
+             r.everSucceeded ? "" : " (has never connected)");
+}
+
+void DataManager::snapshotHealth(const SourceRecord& r, SourceHealth& out) {
+    out.name                = r.source ? r.source->getSourceName() : nullptr;
+    out.state               = r.state;
+    out.lastStatus          = r.lastStatus;
+    out.consecutiveFailures = r.consecutiveFailures;
+    out.lastAttemptMs       = r.lastAttemptMs;
+    out.lastSuccessMs       = r.lastSuccessMs;
+    out.nextAttemptMs       = r.nextAttemptMs;
+    out.currentBackoffMs    = r.currentBackoffMs;
+    out.everSucceeded       = r.everSucceeded;
+    out.backoffActive       = r.backoffActive;
+}
+
+size_t DataManager::getSourceCount() const {
+    MutexLock lock(_registryMutex);
+    return _registry.size();
+}
+
+bool DataManager::getSourceHealth(IDataSource* source, SourceHealth& out) const {
+    if (!source) return false;
+    MutexLock lock(_registryMutex);
+    for (const auto& r : _registry) {
+        if (r.source == source) {
+            snapshotHealth(r, out);
+            return true;
+        }
+    }
+    return false;
+}
+
+bool DataManager::getSourceHealthAt(size_t index, SourceHealth& out) const {
+    MutexLock lock(_registryMutex);
+    if (index >= _registry.size()) return false;
+    snapshotHealth(_registry[index], out);
+    return true;
+}
+
+void DataManager::resetSourceHealth(IDataSource* source) {
+    if (!source) return;
+    MutexLock lock(_registryMutex);
+    for (auto& r : _registry) {
+        if (r.source == source) {
+            ESP_LOGI(TAG, "Health reset for source: %s", source->getSourceName());
+            // Unknown in both branches, not Healthy-if-it-ever-worked. Healthy is
+            // documented as "last attempt succeeded", and after a reset following
+            // a string of failures the last attempt did not succeed — reporting
+            // Healthy would tell the portal the source is fine when nothing has
+            // been verified. Reset means "clear the penalty box and try again",
+            // which is exactly Unknown. everSucceeded is preserved, so the
+            // never-connected distinction survives.
+            r.state                = SourceHealthState::Unknown;
+            r.lastStatus           = UpdateStatus::Success;  // no verdict; see SourceHealth::lastStatus
+            r.consecutiveFailures  = 0;
+            r.currentBackoffMs     = 0;
+            r.nextAttemptMs        = 0;
+            r.backoffActive        = false;
+            r.backoffFromRateLimit = false;
+            return;
         }
     }
 }
@@ -338,7 +503,24 @@ void DataManager::workerTaskLoop(void* param) {
 }
 
 void DataManager::executeLoop() {
-    if (!_appRunning.load()) return;
+    // NOTE: _appRunning is deliberately NOT a blanket early return.
+    //
+    // It used to be, and that silently voided two guarantees. A source that backs
+    // an IConfigGate forms a circle with the state machine: the gate blocks
+    // RUNNING, RUNNING enables fetching, and fetching is what would satisfy the
+    // gate. Once such a source failed into Quarantined, Application regressed to
+    // CONFIGURING and cleared _appRunning — so the 15-minute self-healing probe
+    // never ran again, the gate could never re-satisfy, and _appRunning could
+    // never return to true. The device sat there permanently, and the peer coming
+    // back changed nothing because there was no probe left to notice.
+    //
+    // The same early return sat above the priorityRequested check, so
+    // requestPriorityFetch() was inert in precisely the state where a source
+    // needs recovering — the user corrects the address in the portal, we request
+    // a fetch, and nothing happens.
+    //
+    // The gate is now applied per-source, below both escape hatches.
+    const bool appRunning = _appRunning.load();
 
     MutexLock lock(_registryMutex);
     if (_registry.empty()) return;
@@ -351,12 +533,34 @@ void DataManager::executeLoop() {
     for (size_t i = 0; i < _registry.size(); ++i) {
         auto& r = _registry[i];
 
-        // Handle explicit priority requests
+        // Handle explicit priority requests.
+        // A priority fetch deliberately ignores backoff, health state AND the
+        // app-running gate: it represents a person asking for this now, usually
+        // straight after correcting the thing that was broken. It is the manual
+        // recovery path for a source no timer will retry, so it must work in
+        // CONFIGURING — that is the state a broken source puts the device into.
         if (r.priorityRequested) {
             bestIndex = i;
             foundPriority = true;
             break; // Immediate selection
         }
+
+        // Scheduled fetching is gated on RUNNING, except for sources that
+        // explicitly opt out because they back a config gate (see
+        // IDataSource::fetchesWhileConfiguring).
+        if (!appRunning && !r.source->fetchesWhileConfiguring()) continue;
+
+        // Health backoff gate (#128). Suspended sources are excluded outright —
+        // they are not on a timer at all.
+        if (r.state == SourceHealthState::Suspended) continue;
+
+        // Rollover-safe comparison. millis() wraps at ~49.7 days, which is
+        // ordinary uptime here. An absolute `now < nextAttemptMs` breaks in both
+        // directions across a wrap: a deadline computed just before one wraps to a
+        // small value and skips backoff entirely, and afterwards a small `now`
+        // against a large pre-wrap deadline blocks the source for up to ~49 days.
+        // Signed difference is the same idiom the `due` computation below uses.
+        if (r.backoffActive && (int32_t)(now - r.nextAttemptMs) < 0) continue;
 
         // Handle scheduled execution based on interval and tier
         bool due = (r.lastFetchTimeMs == 0) || (now - r.lastFetchTimeMs >= r.source->getUpdateIntervalMs());
@@ -395,10 +599,11 @@ void DataManager::executeLoop() {
 
         UpdateStatus result = fetchTarget->fetchUpdate();
 
+        // Clear before teardown — see the ordering note in drainJobs().
+        _fetchStartMs.store(0);
 #ifdef ESP_PLATFORM
         stopFetchWatchdog();
 #endif
-        _fetchStartMs.store(0);
 
         uint32_t fetchDuration = (uint32_t)millis() - fetchStart;
         if (fetchDuration > 15000) {
@@ -406,18 +611,20 @@ void DataManager::executeLoop() {
                      fetchTarget->getSourceName(), (unsigned long)fetchDuration);
         }
 
-        if (result >= UpdateStatus::FetchError) {
-            ESP_LOGW(TAG, "Fetch failed for source: %s (status=%d)",
-                     fetchTarget->getSourceName(), static_cast<int>(result));
-        }
-
         // Re-acquire mutex to update state
         if (_registryMutex) xSemaphoreTake(_registryMutex, portMAX_DELAY);
 
-        // Ensure source is still registered before updating tracking data
+        // Ensure source is still registered before updating tracking data.
+        // A source can be unregistered while its fetch is in flight, in which
+        // case the outcome is simply discarded along with its health.
         for (auto& r2 : _registry) {
             if (r2.source == fetchTarget) {
-                r2.lastFetchTimeMs = getCurrentTimeMs();
+                // One clock read for both: lastFetchTimeMs gates the next
+                // scheduling pass and lastAttemptMs gates backoff, and there is no
+                // reason for them to disagree by the width of two millis() calls.
+                uint32_t completedAt = getCurrentTimeMs();
+                r2.lastFetchTimeMs = completedAt;
+                recordFetchOutcome(r2, result, completedAt);
                 break;
             }
         }

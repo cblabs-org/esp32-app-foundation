@@ -159,8 +159,8 @@ or a cancel becomes a one-line policy choice visible in review.
 
 | WO | Branch | Complexity | Status | Summary |
 |----|--------|-----------|--------|---------|
-| **[ ] [wo1-race-fix-twdt-audit](wo1-race-fix-twdt-audit/WORKORDER.md)** | `128-datamanager-resilience/wo1-race-fix-twdt-audit` | standard | Pending | Fix the live abort-on-success race; audit every TWDT interaction, task budget and `CONFIG_ESP_TASK_WDT_*` across the framework |
-| **[ ] [wo2-source-health-backoff](wo2-source-health-backoff/WORKORDER.md)** | `128-datamanager-resilience/wo2-source-health-backoff` | standard | Pending | Health state, `UpdateStatus`-differentiated policy, backoff + recovery probe + defined quarantine exit; backoff ownership documented |
+| **[x] [wo1-race-fix-twdt-audit](wo1-race-fix-twdt-audit/WORKORDER.md)** | `128-datamanager-resilience/wo1-race-fix-twdt-audit` | standard | ✅ Complete | Fix the live abort-on-success race; audit every TWDT interaction, task budget and `CONFIG_ESP_TASK_WDT_*` across the framework |
+| **[x] [wo2-source-health-backoff](wo2-source-health-backoff/WORKORDER.md)** | `128-datamanager-resilience/wo2-source-health-backoff` | standard | ✅ Complete | Health state, `UpdateStatus`-differentiated policy, backoff + recovery probe + defined quarantine exit; backoff ownership documented |
 | **[ ] [wo3-fetch-context-transport](wo3-fetch-context-transport/WORKORDER.md)** | `128-datamanager-resilience/wo3-fetch-context-transport` | architect | Pending | **BREAKING**: `fetchUpdate(const FetchContext&)` pure virtual; deadline/cancel token + framework-owned bounded client; WeatherModule migrated; cert-bundle hack deleted |
 | **[ ] [wo4-cancellation-supervisor](wo4-cancellation-supervisor/WORKORDER.md)** | `128-datamanager-resilience/wo4-cancellation-supervisor` | architect | Pending | Cancel-and-reset with defined TLS teardown; retire `abort()` and the `esp_timer`; settle the handshake/TWDT mechanism on hardware |
 | **[ ] [wo5-health-surfacing](wo5-health-surfacing/WORKORDER.md)** | `128-datamanager-resilience/wo5-health-surfacing` | architect | Pending | Health to `IConfigGate`, boot reporter, display, portal, MCP + EventBus; never-succeeded distinguishable from failed |
@@ -257,3 +257,33 @@ Changes to the plan:
   debounced PATCH → user waits). Kept, but the mechanism is chosen after WO3 measures the bound.
 - **API break authorised**, removing the default-delegating overload, the legacy-source
   detection and the two-population watchdog policy from the previous draft.
+
+### Session 2 (cont.) — 2026-08-20 (WO1, WO2 + build-gate side quest)
+
+**WO1 complete** (`64eff705`). Race fixed at both call sites. The TWDT audit found
+two things beyond the brief: the Arduino main loop has **no** watchdog supervision on
+any board (`loopTaskWDTEnabled = false`, `enableLoopWDT()` never called), which makes
+`WebServerManager`'s `esp_task_wdt_reset()` a silent no-op *and* moots half the review
+objection to raising the global timeout — there is no main-loop supervision to weaken.
+Idle-task detection on both cores remains a real cost, so the narrow mechanisms stay
+preferred. 763/763 native.
+
+**WO2 complete** (`13d7d4a8`, `bcdded65`). Health model with five states, each with a
+defined exit, driven off `UpdateStatus` codes that already drew the distinctions and
+were being discarded. 779/779 native (16 new).
+
+**Side quest — the build gate was red before we started.** `scripts/run_web_tests.py`
+is a hard pre-action on `buildprog`, and the Playwright suite was failing 24/69 on
+`main`, so no board environment could go green regardless of this project. Both defects
+were fixtures drifted behind implementation changes — missing `script` fields after the
+portal decentralisation (#96/#109), and a RAG fixture still encoding percentage
+thresholds after #121 replaced them with absolute floors. Verified the portal itself
+was fine by driving it in a browser first. Fixed in PR #143 (69/69, gate verified
+end-to-end on an esp32dev build).
+
+Root cause of the invisibility raised as **#144**: the repo has no CI at all, and the
+gate returns success when `test/web/node_modules` is absent — so it only ever bit on a
+fully-provisioned machine, and two unrelated regressions accumulated across months.
+
+**Sequencing consequence:** this stack branched from `main` before #143. Board builds
+for WO3+ stay gated until #143 merges and the stack is rebased. Native work unaffected.
