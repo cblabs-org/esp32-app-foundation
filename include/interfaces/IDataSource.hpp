@@ -163,12 +163,12 @@ public:
      * @brief May this source be fetched while the application is CONFIGURING?
      *
      * Scheduled fetching is normally gated on AppState::Running, so a source is
-     * only polled once every IConfigGate is satisfied. That is right for ordinary
+     * only polled once every startup precondition is satisfied. That is right for ordinary
      * data sources: there is no point fetching weather before WiFi exists.
      *
-     * It is exactly wrong for a source that *backs* a gate. Such a source forms a
-     * circular dependency with the state machine — the gate blocks RUNNING,
-     * RUNNING enables fetching, and fetching is what would satisfy the gate — so
+     * It is exactly wrong for a source that *backs* a precondition. Such a source forms a
+     * circular dependency with the state machine — the precondition blocks RUNNING,
+     * RUNNING enables fetching, and fetching is what would satisfy the precondition — so
      * it can never be satisfied, on first boot or after a regression. Return true
      * to opt out of the gate and keep this source scheduled in CONFIGURING.
      *

@@ -18,7 +18,7 @@
 #include "ConfigManager.hpp"
 #include "MCPToolRegistry.hpp"
 #include "Application.hpp"
-#include "interfaces/IConfigGate.hpp"   // GateNames, GateActionStatus (CONFIGURING dispatch)
+#include "interfaces/IPrecondition.hpp"
 #include <base64.h>
 #include <mbedtls/base64.h>
 #include <vector>
@@ -805,9 +805,10 @@ void LVGLDisplayModule::_onAppConfiguring(const char* /*topic*/, const void* pay
     auto* self = static_cast<LVGLDisplayModule*>(ctx);
     if (!self || !payload) return;
     auto* p = static_cast<const AppConfiguringPayload*>(payload);
-    ESP_LOGI("LVGLDisplayModule", "CONFIGURING gate: %s (status=%d)",
+    ESP_LOGI("LVGLDisplayModule", "CONFIGURING gate: %s (cause=%d, severity=%d)",
              p->gateName ? p->gateName : "?",
-             static_cast<int>(p->actionStatus));
+             static_cast<int>(p->cause),
+             static_cast<int>(p->severity));
 
     // Deactivate diagnostic carousel when leaving DiagScreen
     self->_diagCarousel.stop();
@@ -824,10 +825,10 @@ void LVGLDisplayModule::_onAppConfiguring(const char* /*topic*/, const void* pay
     // Three-tier root selection (mirrors U8G2): a modal (gate helper / WiFi wizard)
     // only when the gate needs user action; otherwise the base configuring screen.
     lv_obj_t* scr = nullptr;
-    if (p->actionStatus == GateActionStatus::NeedsUserAction) {
+    if (p->severity == Severity::NeedsUser) {
         scr = self->_screens->gateHelperScreen(p);                          // Tier 1
         if (scr == nullptr && p->gateName != nullptr &&
-            strcmp(p->gateName, GateNames::WIFI_STATION) == 0) {
+            strcmp(p->gateName, PreconditionNames::WIFI_STATION) == 0) {
             scr = self->_screens->wifiWizardScreen();                       // Tier 2
         }
         if (scr == nullptr) {

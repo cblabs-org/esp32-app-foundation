@@ -16,7 +16,6 @@
  * - ConfiguringStatusBoard::setEngine():             Bind PreconditionEngine
  * - ConfiguringStatusBoard::setPreconditions():      Bind snapshot array
  * - ConfiguringStatusBoard::updatePrecondition():    Update/insert precondition status
- * - ConfiguringStatusBoard::setActiveGateStatus():   Update current gate action status
  * - ConfiguringStatusBoard::dismiss():               Mark dismissed for expiry
  * - ConfiguringStatusBoard::render():                Draw header, status rows, progress bar, footer
  * - ConfiguringStatusBoard::isExpired():             Return dismissed state
@@ -149,14 +148,6 @@ int ConfiguringStatusBoard::getTotalPreconditions() const {
         return static_cast<int>(_engine->getPreconditionCount());
     }
     return static_cast<int>(_snapshotCount);
-}
-
-/**
- * @brief Update the action status of the current actionable gate.
- * @param status The GateActionStatus for the currently actionable gate.
- */
-void ConfiguringStatusBoard::setActiveGateStatus(GateActionStatus status) {
-    _activeGateStatus = status;
 }
 
 /**
@@ -322,9 +313,7 @@ void ConfiguringStatusBoard::render(U8G2& u8g2) {
                 char prefix;
                 if (item.cause == Cause::Met) {
                     prefix = '*';
-                } else if (item.cause == Cause::Connecting ||
-                           (_actionableGateName != nullptr && strcmp(item.name, _actionableGateName) == 0 &&
-                            _activeGateStatus == GateActionStatus::InProgress)) {
+                } else if (item.cause == Cause::Connecting) {
                     prefix = (_animFrame % 20 < 10) ? '~' : '>';
                 } else if (item.severity == Severity::NeedsUser) {
                     prefix = '!';
@@ -350,9 +339,7 @@ void ConfiguringStatusBoard::render(U8G2& u8g2) {
                 char prefix;
                 if (item.cause == Cause::Met) {
                     prefix = '*';
-                } else if (item.cause == Cause::Connecting ||
-                           (_actionableGateName != nullptr && strcmp(item.name, _actionableGateName) == 0 &&
-                            _activeGateStatus == GateActionStatus::InProgress)) {
+                } else if (item.cause == Cause::Connecting) {
                     prefix = (_animFrame % 20 < 10) ? '~' : '>';
                 } else if (item.severity == Severity::NeedsUser) {
                     prefix = '!';

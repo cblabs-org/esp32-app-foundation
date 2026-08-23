@@ -13,7 +13,7 @@ build a production-quality embedded application.
 | `IWebContributor` | WeatherModule     | Custom REST API + embedded JavaScript portal tab   |
 | `IDataSource`     | WeatherModule     | Background HTTP fetch from OpenWeatherMap API       |
 | `IMCPContributor` | WeatherModule     | MCP tool registration for AI/device interaction     |
-| `IConfigGate`     | WeatherModule     | Boot-time API key validation gate                   |
+| `IPreconditionContributor` | WeatherModule | Operational precondition for API key readiness     |
 | `IDisplayBoard`   | WeatherBoard      | Renders weather data on the OLED carousel           |
 
 ### Key Patterns Illustrated
@@ -105,7 +105,7 @@ pio test -e native         # Run all native unit tests
 
 Tests cover:
 - **IConfigurable**: Config round-trip, defaults, partial application
-- **IConfigGate**: Fail-open without KeyManager, gate metadata
+- **IPreconditionContributor**: Indeterminate on null KeyManager, precondition metadata, describe callbacks
 - **IDataSource**: Source name, priority tier, update interval
 - **Thread-safe getters**: Initial state verification
 - **IWebContributor**: Tab metadata

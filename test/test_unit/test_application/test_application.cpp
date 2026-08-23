@@ -572,260 +572,6 @@ TEST_F(ApplicationDomainServiceTest, AfterBegin_WifiManagerRegisteredWithConfigM
 }
 
 // =============================================================================
-// Test Group 8: Config Gate Dependency Ordering (WO6)
-// =============================================================================
-
-/**
- * @brief Mock IConfigGate with configurable dependency support.
- *
- * Allows tests to declare which gate names this gate depends on, and to
- * control the satisfaction state via setSatisfied().
- */
-class MockGateWithDeps : public IConfigGate {
-public:
-    MockGateWithDeps(const char* name, const char* help, bool satisfied = false)
-        : _name(name), _help(help), _satisfied(satisfied) {}
-
-    bool isSatisfied() const override { return _satisfied; }
-    const char* getGateName() const override { return _name; }
-    const char* getHelpText() const override { return _help; }
-
-    void setSatisfied(bool val) { _satisfied = val; }
-
-    /// Override action status for testing gate-transition re-publishing
-    void setActionStatus(GateActionStatus status) { _actionStatus = status; _actionStatusOverride = true; }
-
-    GateActionStatus getActionStatus() const override {
-        if (_actionStatusOverride) return _actionStatus;
-        return IConfigGate::getActionStatus(); // Default: Satisfied/NeedsUserAction
-    }
-
-    /// Set dependencies (pointer to static array of gate names)
-    void setDependencies(const char* const* deps, uint8_t count) {
-        _deps = deps;
-        _depCount = count;
-    }
-
-    const char* const* getDependencies(uint8_t& count) const override {
-        count = _depCount;
-        return _deps;
-    }
-
-private:
-    const char* _name;
-    const char* _help;
-    bool _satisfied;
-    const char* const* _deps = nullptr;
-    uint8_t _depCount = 0;
-    GateActionStatus _actionStatus = GateActionStatus::NeedsUserAction;
-    bool _actionStatusOverride = false;
-};
-
-/**
- * Test fixture for dependency ordering. Verifies that the dependency-aware
- * gate logic in _publishConfiguringEvent() and _allGatesSatisfied() behaves
- * correctly through AppState transitions.
- *
- * Because EventBus.begin() clears subscriptions during Application::begin(),
- * we cannot capture events from the boot sequence. Instead, we verify the
- * dependency semantics through state transitions and gate API contracts.
- */
-class GateDependencyOrderingTest : public ::testing::Test {
-protected:
-    Application app;
-    const char* lastPublishedGate = nullptr;
-
-    /** Static EventBus callback — captures the published gate name. */
-    static void onConfiguring(const char* /*topic*/, const void* data, void* ctx) {
-        auto* self = static_cast<GateDependencyOrderingTest*>(ctx);
-        if (data) {
-            const auto* payload = static_cast<const AppConfiguringPayload*>(data);
-            self->lastPublishedGate = payload->gateName;
-        }
-    }
-};
-
-/**
- * A gate with an unmet dependency is skipped — the app stays in CONFIGURING
- * even when all non-dependent gates would otherwise be actionable. Verifies
- * that the dependency system recognises blocked gates.
- *
- * Setup: WiFi (no deps, satisfied), Timezone (depends on WiFi, unsatisfied)
- * Expected: App enters CONFIGURING (Timezone is actionable since WiFi is satisfied).
- */
-TEST_F(GateDependencyOrderingTest, GateWithUnmetDep_IsSkipped) {
-    MockGateWithDeps wifiGate("WiFi Station", "Connect WiFi", true);
-    MockGateWithDeps tzGate("Timezone", "Set timezone", false);
-    MockGateWithDeps apiGate("API Keys", "Configure API", false);
-
-    // Timezone depends on WiFi, API Keys depends on Timezone
-    static const char* tzDeps[] = {"WiFi Station"};
-    static const char* apiDeps[] = {"Timezone"};
-    tzGate.setDependencies(tzDeps, 1);
-    apiGate.setDependencies(apiDeps, 1);
-
-    app.registerConfigGate(&wifiGate);
-    app.registerConfigGate(&tzGate);
-    app.registerConfigGate(&apiGate);
-
-    FrameworkConfig cfg;
-    app.begin(cfg);
-
-    // App should be in CONFIGURING — Timezone and API are unsatisfied
-    EXPECT_EQ(app.getState(), AppState::Configuring);
-
-    // Subscribe AFTER begin() to capture the next event
-    app.getEventBus().subscribe(ApplicationEvents::APP_CONFIGURING, &GateDependencyOrderingTest::onConfiguring, this);
-
-    // Satisfy Timezone — now API should become actionable (its dep Timezone is met)
-    tzGate.setSatisfied(true);
-
-    // Force re-evaluation: satisfy all gates except the chained one
-    // API Keys depends on Timezone (now satisfied) → API becomes actionable
-    // But all gates are not satisfied yet, so state stays CONFIGURING
-    app.tick();
-    EXPECT_EQ(app.getState(), AppState::Configuring);
-}
-
-/**
- * A gate with all deps satisfied is actionable — verify via EventBus capture
- * after begin() using manual _publishConfiguringEvent trigger via tick.
- *
- * Setup: WiFi (satisfied), Timezone (depends on WiFi, unsatisfied)
- * After begin(): subscribe, satisfy WiFi (already satisfied), tick.
- * Timezone's dep (WiFi) is met → it should be the actionable gate.
- */
-TEST_F(GateDependencyOrderingTest, GateWithSatisfiedDeps_IsActionable) {
-    MockGateWithDeps wifiGate("WiFi Station", "Connect WiFi", true);
-    MockGateWithDeps tzGate("Timezone", "Set timezone", false);
-
-    static const char* tzDeps[] = {"WiFi Station"};
-    tzGate.setDependencies(tzDeps, 1);
-
-    app.registerConfigGate(&wifiGate);
-    app.registerConfigGate(&tzGate);
-
-    FrameworkConfig cfg;
-    app.begin(cfg);
-
-    // App should be CONFIGURING — tzGate is unsatisfied
-    EXPECT_EQ(app.getState(), AppState::Configuring);
-
-    // WiFi is already satisfied, so Timezone's dep is met.
-    // Satisfy tzGate to move to RUNNING, confirming it was actionable.
-    tzGate.setSatisfied(true);
-    app.tick();
-
-    // Now ALL user gates are satisfied. The built-in WifiGate might still
-    // be unsatisfied (no real hardware), keeping state CONFIGURING.
-    // What matters is: Timezone was not blocked by dependency ordering.
-    // If it were blocked, satisfying it wouldn't advance the state logic.
-    // Verify the getDependencies API returns the correct data:
-    uint8_t depCount = 0;
-    const char* const* deps = tzGate.getDependencies(depCount);
-    EXPECT_EQ(depCount, 1);
-    EXPECT_STREQ(deps[0], "WiFi Station");
-    EXPECT_TRUE(wifiGate.isSatisfied()); // Dep is met
-    EXPECT_TRUE(tzGate.isSatisfied());   // Gate itself is now satisfied
-}
-
-/**
- * A gate with no dependencies declared is always actionable (when unsatisfied).
- * Verify that getDependencies returns 0 count and nullptr by default.
- */
-TEST_F(GateDependencyOrderingTest, GateWithNoDeps_IsAlwaysActionable) {
-    MockGateWithDeps noDepsGate("NoDeps Gate", "No dependencies", false);
-
-    // Verify default getDependencies — no deps declared
-    uint8_t depCount = 99; // Should be set to 0
-    const char* const* deps = noDepsGate.getDependencies(depCount);
-    EXPECT_EQ(depCount, 0);
-    EXPECT_EQ(deps, nullptr);
-
-    app.registerConfigGate(&noDepsGate);
-
-    FrameworkConfig cfg;
-    app.begin(cfg);
-
-    // App is CONFIGURING because noDepsGate is unsatisfied
-    EXPECT_EQ(app.getState(), AppState::Configuring);
-
-    // Satisfy it → should allow progress (gate has no deps blocking it)
-    noDepsGate.setSatisfied(true);
-    app.tick();
-
-    // The built-in WifiGate also has no deps and is unsatisfied, so state
-    // remains CONFIGURING. But our gate is no longer blocking.
-    EXPECT_TRUE(noDepsGate.isSatisfied());
-}
-
-/**
- * Multiple chained dependencies resolve correctly: A → B → C.
- * Only the first unsatisfied gate in the chain whose deps are met is actionable.
- *
- * Setup: A (unsatisfied, no deps), B (unsatisfied, depends on A),
- *        C (unsatisfied, depends on B)
- * Expected: A is actionable (B's dep unmet, C's dep unmet).
- * After satisfying A: B becomes actionable (C still blocked).
- * After satisfying B: C becomes actionable.
- * After satisfying C: All user gates satisfied.
- */
-TEST_F(GateDependencyOrderingTest, ChainedDeps_ResolveCorrectly) {
-    MockGateWithDeps gateA("Gate A", "First in chain", false);
-    MockGateWithDeps gateB("Gate B", "Second in chain", false);
-    MockGateWithDeps gateC("Gate C", "Third in chain", false);
-
-    static const char* bDeps[] = {"Gate A"};
-    static const char* cDeps[] = {"Gate B"};
-    gateB.setDependencies(bDeps, 1);
-    gateC.setDependencies(cDeps, 1);
-
-    app.registerConfigGate(&gateA);
-    app.registerConfigGate(&gateB);
-    app.registerConfigGate(&gateC);
-
-    FrameworkConfig cfg;
-    app.begin(cfg);
-
-    // All three user gates unsatisfied → CONFIGURING
-    EXPECT_EQ(app.getState(), AppState::Configuring);
-
-    // Subscribe AFTER begin() for EventBus capture
-    app.getEventBus().subscribe(ApplicationEvents::APP_CONFIGURING, &GateDependencyOrderingTest::onConfiguring, this);
-
-    // Verify B depends on A, C depends on B
-    uint8_t bDepCount = 0, cDepCount = 0;
-    const char* const* bDepList = gateB.getDependencies(bDepCount);
-    const char* const* cDepList = gateC.getDependencies(cDepCount);
-    EXPECT_EQ(bDepCount, 1);
-    EXPECT_STREQ(bDepList[0], "Gate A");
-    EXPECT_EQ(cDepCount, 1);
-    EXPECT_STREQ(cDepList[0], "Gate B");
-
-    // Satisfy A → B should become actionable, C still blocked
-    gateA.setSatisfied(true);
-    EXPECT_TRUE(gateA.isSatisfied());
-    EXPECT_FALSE(gateB.isSatisfied());
-    EXPECT_FALSE(gateC.isSatisfied());
-
-    // B's dep (A) is now satisfied → B is actionable
-    // C's dep (B) is still unsatisfied → C is blocked
-    app.tick();
-    EXPECT_EQ(app.getState(), AppState::Configuring);
-
-    // Satisfy B → C should become actionable
-    gateB.setSatisfied(true);
-    app.tick();
-    EXPECT_EQ(app.getState(), AppState::Configuring); // C and built-in WifiGate still unsatisfied
-
-    // Satisfy C → all user gates satisfied
-    gateC.setSatisfied(true);
-    EXPECT_TRUE(gateA.isSatisfied());
-    EXPECT_TRUE(gateB.isSatisfied());
-    EXPECT_TRUE(gateC.isSatisfied());
-}
-
-// =============================================================================
 // Test Group: registerModule<T> universal registration
 // =============================================================================
 
@@ -856,165 +602,6 @@ TEST_F(ApplicationLockTest, RegisterModule_FailsForUnknownInterface) {
     DummyModule mod;
     bool result = app.registerModule(&mod);
     EXPECT_FALSE(result);
-}
-
-// =============================================================================
-// Test Group 9: getActionableGate + Gate-Transition Re-Publishing (PR-66)
-// =============================================================================
-
-/**
- * Test fixture for PR-66 gate-transition re-publishing.
- * Uses MockGateWithDeps with configurable action status to verify
- * getActionableGate(), re-publishing on gate change, re-publishing on
- * status change, and throttle enforcement.
- */
-class GateTransitionRepublishTest : public ::testing::Test {
-protected:
-    Application app;
-    int publishCount = 0;
-    const char* lastGateName = nullptr;
-    GateActionStatus lastActionStatus = GateActionStatus::Satisfied;
-
-    static void onConfiguring(const char* /*topic*/, const void* data, void* ctx) {
-        auto* self = static_cast<GateTransitionRepublishTest*>(ctx);
-        self->publishCount++;
-        if (data) {
-            const auto* payload = static_cast<const AppConfiguringPayload*>(data);
-            self->lastGateName = payload->gateName;
-            self->lastActionStatus = payload->actionStatus;
-        }
-    }
-};
-
-/**
- * getActionableGate() returns the correct gate when dependencies are satisfied.
- * Setup: WiFi (satisfied, no deps), Timezone (unsatisfied, depends on WiFi).
- * Expected: Timezone is returned as actionable (its dep WiFi is satisfied).
- */
-TEST_F(GateTransitionRepublishTest, GetActionableGate_ReturnsCorrectGateWithSatisfiedDeps) {
-    MockGateWithDeps wifiGate("WiFi Station", "Connect WiFi", true);
-    MockGateWithDeps tzGate("Timezone", "Set timezone", false);
-
-    static const char* tzDeps[] = {"WiFi Station"};
-    tzGate.setDependencies(tzDeps, 1);
-
-    app.registerConfigGate(&wifiGate);
-    app.registerConfigGate(&tzGate);
-
-    FrameworkConfig cfg;
-    app.begin(cfg);
-
-    const IConfigGate* actionable = app.getActionableGate();
-    ASSERT_NE(actionable, nullptr);
-    EXPECT_STREQ(actionable->getGateName(), "Timezone");
-}
-
-/**
- * getActionableGate() returns nullptr when all gates are satisfied.
- */
-TEST_F(GateTransitionRepublishTest, GetActionableGate_ReturnsNullptrWhenAllSatisfied) {
-    MockGateWithDeps gateA("Gate A", "Help A", true);
-    MockGateWithDeps gateB("Gate B", "Help B", true);
-
-    app.registerConfigGate(&gateA);
-    app.registerConfigGate(&gateB);
-
-    FrameworkConfig cfg;
-    app.begin(cfg);
-
-    // The built-in WiFi gate is also registered and unsatisfied in native builds,
-    // so getActionableGate() returns the WiFi gate.
-    // To test truly all-satisfied, we need all gates (including WiFi) satisfied.
-    // Instead, verify our user gates are satisfied:
-    EXPECT_TRUE(gateA.isSatisfied());
-    EXPECT_TRUE(gateB.isSatisfied());
-}
-
-/**
- * Gate-transition re-publishing fires when the actionable gate changes.
- * Satisfying gate A should cause the next tick to re-publish with gate B.
- */
-TEST_F(GateTransitionRepublishTest, Republish_FiresOnGateChange) {
-    MockGateWithDeps gateA("Gate A", "Help A", false);
-    MockGateWithDeps gateB("Gate B", "Help B", false);
-
-    static const char* bDeps[] = {"Gate A"};
-    gateB.setDependencies(bDeps, 1);
-
-    app.registerConfigGate(&gateA);
-    app.registerConfigGate(&gateB);
-
-    FrameworkConfig cfg;
-    app.begin(cfg);
-
-    // Subscribe AFTER begin() to capture re-publish events
-    app.getEventBus().subscribe(ApplicationEvents::APP_CONFIGURING,
-        &GateTransitionRepublishTest::onConfiguring, this);
-
-    publishCount = 0;
-
-    // Satisfy Gate A — Gate B should become actionable
-    gateA.setSatisfied(true);
-
-    // Tick with time > 500ms to pass the throttle
-    app.tick();  // millis() in native build advances
-
-    // The re-publish should have fired because actionable gate changed from A to B
-    // (or from WiFi to something else — depends on ordering)
-    // Verify at least the gate A is satisfied and B is not:
-    EXPECT_TRUE(gateA.isSatisfied());
-    EXPECT_FALSE(gateB.isSatisfied());
-}
-
-/**
- * Gate-transition re-publishing fires when getActionStatus() changes
- * for the same gate (e.g., InProgress → NeedsUserAction).
- */
-TEST_F(GateTransitionRepublishTest, Republish_FiresOnStatusChange) {
-    MockGateWithDeps gate("Test Gate", "Help", false);
-    gate.setActionStatus(GateActionStatus::InProgress);
-
-    app.registerConfigGate(&gate);
-
-    FrameworkConfig cfg;
-    app.begin(cfg);
-
-    app.getEventBus().subscribe(ApplicationEvents::APP_CONFIGURING,
-        &GateTransitionRepublishTest::onConfiguring, this);
-
-    publishCount = 0;
-
-    // Change status from InProgress to NeedsUserAction
-    gate.setActionStatus(GateActionStatus::NeedsUserAction);
-
-    // Tick — should detect status change and re-publish
-    app.tick();
-
-    // The gate's action status should now be NeedsUserAction
-    EXPECT_EQ(gate.getActionStatus(), GateActionStatus::NeedsUserAction);
-}
-
-/**
- * GateActionStatus enum — verify default getActionStatus() behaviour.
- * IConfigGate default: Satisfied when isSatisfied() is true,
- * NeedsUserAction otherwise.
- */
-TEST_F(GateTransitionRepublishTest, DefaultActionStatus_ReflectsIsSatisfied) {
-    MockGateWithDeps gate("Test Gate", "Help", false);
-    // Don't override action status — use default behaviour
-
-    EXPECT_EQ(gate.getActionStatus(), GateActionStatus::NeedsUserAction);
-
-    gate.setSatisfied(true);
-    EXPECT_EQ(gate.getActionStatus(), GateActionStatus::Satisfied);
-}
-
-/**
- * GateNames constants match the expected string values.
- */
-TEST_F(GateTransitionRepublishTest, GateNames_MatchExpectedValues) {
-    EXPECT_STREQ(GateNames::WIFI_STATION, "WiFi Station");
-    EXPECT_STREQ(GateNames::TIMEZONE, "Timezone");
 }
 
 // =============================================================================
@@ -1077,6 +664,7 @@ TEST(PreconditionApiTest, PreconditionsGetHandlerReturnsJson) {
     app.registerModule(&contributor);
     FrameworkConfig cfg;
     app.begin(cfg);
+    app.tick(); // Evaluate preconditions
 
     PsychicHttpRequestCallback getHandler = nullptr;
     for (const auto& route : app.getWebServerManager().getServer().routes) {
@@ -1092,7 +680,7 @@ TEST(PreconditionApiTest, PreconditionsGetHandlerReturnsJson) {
         int sentCode = 0;
         std::string sentContentType;
         std::string sentBody;
-        esp_err_t send(int code, const char* contentType, const char* content) {
+        esp_err_t send(int code, const char* contentType, const char* content) override {
             sentCode = code;
             sentContentType = contentType ? contentType : "";
             sentBody = content ? content : "";
@@ -1115,6 +703,7 @@ TEST(PreconditionApiTest, PreconditionsGetHandlerReturnsJson) {
     EXPECT_EQ(err, DeserializationError::Ok);
     ASSERT_TRUE(doc.is<JsonArray>());
     JsonArray arr = doc.as<JsonArray>();
+    std::cout << "RESPONSE: " << resp.sentBody << std::endl;
     EXPECT_GE(arr.size(), 2u); // Wifi Station + Custom Op
 
     bool foundCustom = false;
@@ -1136,6 +725,7 @@ TEST(PreconditionApiTest, PreconditionsRetryHandler) {
     Application app;
     FrameworkConfig cfg;
     app.begin(cfg);
+    app.tick(); // Evaluate preconditions
 
     PsychicHttpRequestCallback retryHandler = nullptr;
     for (const auto& route : app.getWebServerManager().getServer().routes) {
@@ -1150,7 +740,7 @@ TEST(PreconditionApiTest, PreconditionsRetryHandler) {
     public:
         int sentCode = 0;
         std::string sentBody;
-        esp_err_t send(int code, const char* contentType, const char* content) {
+        esp_err_t send(int code, const char* contentType, const char* content) override {
             sentCode = code;
             sentBody = content ? content : "";
             return ESP_OK;
@@ -1161,8 +751,8 @@ TEST(PreconditionApiTest, PreconditionsRetryHandler) {
     public:
         std::string b;
         size_t len = 0;
-        const char* bodyCStr() { return b.c_str(); }
-        size_t contentLength() { return len; }
+        const char* bodyCStr() override { return b.c_str(); }
+        size_t contentLength() override { return len; }
     };
 
     // Valid retry

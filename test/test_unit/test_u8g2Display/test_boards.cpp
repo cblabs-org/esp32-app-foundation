@@ -26,51 +26,6 @@
 #include "boards/ConfiguringStatusBoard.hpp"
 
 // =============================================================================
-// Mock: IConfigGate for unit testing
-// =============================================================================
-
-/**
- * @brief Simple mock IConfigGate for testing ConfiguringStatusBoard.
- *
- * Allows manual control of satisfaction state via setSatisfied().
- */
-class MockConfigGate : public IConfigGate {
-public:
-    MockConfigGate(const char* name, const char* help, bool satisfied = false)
-        : _name(name), _help(help), _satisfied(satisfied) {}
-
-    bool isSatisfied() const override { return _satisfied; }
-    const char* getGateName() const override { return _name; }
-    const char* getHelpText() const override { return _help; }
-
-    const char* const* getDependencies(uint8_t& count) const override {
-        count = _depCount;
-        return _deps;
-    }
-
-    GateActionStatus getActionStatus() const override {
-        return _actionStatus;
-    }
-
-    void setSatisfied(bool val) { _satisfied = val; }
-
-    void setDependencies(const char* const* deps, uint8_t count) {
-        _deps = deps;
-        _depCount = count;
-    }
-
-    void setActionStatus(GateActionStatus status) { _actionStatus = status; }
-
-private:
-    const char* _name;
-    const char* _help;
-    bool _satisfied;
-    const char* const* _deps = nullptr;
-    uint8_t _depCount = 0;
-    GateActionStatus _actionStatus = GateActionStatus::NeedsUserAction;
-};
-
-// =============================================================================
 // Test Group: BootBoard
 // =============================================================================
 
@@ -574,18 +529,6 @@ TEST_F(ConfiguringStatusBoardTest, PreconditionSnapshots_CauseAndSeverity) {
     EXPECT_FLOAT_EQ(board.getTargetPercent(), 20.0f);
 }
 
-
-/** setActiveGateStatus stores the status value. */
-TEST_F(ConfiguringStatusBoardTest, SetActiveGateStatus_StoresStatus) {
-    board.setActiveGateStatus(GateActionStatus::InProgress);
-    EXPECT_EQ(board.getActiveGateStatus(), GateActionStatus::InProgress);
-
-    board.setActiveGateStatus(GateActionStatus::NeedsUserAction);
-    EXPECT_EQ(board.getActiveGateStatus(), GateActionStatus::NeedsUserAction);
-
-    board.setActiveGateStatus(GateActionStatus::Satisfied);
-    EXPECT_EQ(board.getActiveGateStatus(), GateActionStatus::Satisfied);
-}
 
 /** setActionableGateName stores the name for render comparison. */
 TEST_F(ConfiguringStatusBoardTest, SetActionableGateName_StoresName) {

@@ -39,7 +39,6 @@
 #include <vector>
 #include "IDisplayBoard.hpp"
 #include "interfaces/IPrecondition.hpp"
-#include "interfaces/IConfigGate.hpp"
 #include "events/PreconditionHealthPayload.hpp"
 #include "widgets/LabelWidget.hpp"
 #include "widgets/ProgressBarWidget.hpp"
@@ -116,20 +115,7 @@ public:
     void updatePrecondition(const char* name, Cause cause, Severity severity, bool everMet = false, PreconditionRole role = PreconditionRole::Startup);
 
     /**
-     * @brief Update the action status of the current actionable gate.
-     *
-     * Used by the display module to communicate the gate's action status
-     * from the AppConfiguringPayload. Affects the prefix character for
-     * the active gate row.
-     *
-     * @param status The GateActionStatus for the currently actionable gate.
-     */
-    void setActiveGateStatus(GateActionStatus status);
-
-    /**
      * @brief Set the authoritative actionable gate name from the Application.
-     *
-     * Called alongside setActiveGateStatus().
      *
      * @param gateName  Gate name from AppConfiguringPayload::gateName (non-owning).
      */
@@ -210,12 +196,6 @@ public:
      */
     float getCurrentPercent() const { return _currentPercent; }
 
-    /**
-     * @brief Return the current active gate status (for testing).
-     * @return The GateActionStatus set via setActiveGateStatus().
-     */
-    GateActionStatus getActiveGateStatus() const { return _activeGateStatus; }
-
     /** Return the stored actionable gate name (for testing). */
     const char* getActionableGateName() const { return _actionableGateName; }
 
@@ -239,8 +219,6 @@ private:
     uint8_t _startupCount    = 0;                         ///< Total Startup-role preconditions
     uint8_t _startupMetCount = 0;                         ///< Met Startup-role preconditions
 
-    // --- Gate action status ---
-    GateActionStatus _activeGateStatus = GateActionStatus::NeedsUserAction; ///< Current actionable gate status
     const char* _actionableGateName = nullptr;  ///< Authoritative actionable gate name (from Application via event)
 
     // --- Animated progress ---

@@ -8,7 +8,7 @@
  * Module: template-app/src/MyApp.hpp
  * Description: Main application module for the template skeleton. Implements
  *              ITickable, IConfigurable, IWebContributor, IMCPContributor,
- *              and IConfigGate to demonstrate all five primary extension points.
+ *              and IPreconditionContributor to demonstrate all five primary extension points.
  *
  * Exported Classes:
  * - MyApp: Template application module demonstrating 5 primary framework interfaces.
@@ -36,9 +36,8 @@
  *   IMCPContributor:
  *   - registerMCPTools():    Exposes tools to the MCP server.
  *
- *   IConfigGate:
- *   - getGateName():         Returns the human-readable gate name.
- *   - isSatisfied():         Checks if the gate condition is met.
+ *   IPreconditionContributor:
+ *   - registerPreconditions(): Contributes "MyApp Ready" operational precondition.
  */
 
 #pragma once
@@ -54,13 +53,13 @@ class ConfigManager;
  * @brief Main application class implementing specific business logic.
  *
  * Participates in the Application tick loop, participates in the ConfigManager,
- * contributes Web UI tabs and routes, contributes MCP tools, and exposes a config gate.
+ * contributes Web UI tabs and routes, contributes MCP tools, and exposes preconditions.
  */
 class MyApp : public ITickable,
               public IConfigurable,
               public IWebContributor,
               public IMCPContributor,
-              public IConfigGate {
+              public IPreconditionContributor {
 public:
     /** @brief Default constructor. */
     MyApp() = default;
@@ -135,25 +134,10 @@ public:
 
     // --- IMCPContributor ---
 
-    /** @brief Exposes tools to the MCP server for AI agent interaction.
-     *  @param registry Reference to the MCPToolRegistry for tool registration.
-     */
     void registerMCPTools(MCPToolRegistry& registry) override;
 
-    // --- IConfigGate ---
-    // The framework blocks transition from CONFIGURING to RUNNING state until
-    // all gates report isSatisfied() == true. In a real app, check API key
-    // readiness, hardware initialization, etc.
-
-    /** @brief Returns the human-readable gate name for status reporting.
-     *  @return Gate name string.
-     */
-    const char* getGateName() const override;
-
-    /** @brief Checks if the gate condition is met.
-     *  @return true if the gate is satisfied and the app may proceed.
-     */
-    bool isSatisfied() const override;
+    // --- IPreconditionContributor ---
+    void registerPreconditions(PreconditionRegistry& reg) override;
 
     // --- Own API ---
 
@@ -167,8 +151,8 @@ private:
     int _refreshIntervalMs = 5000;     ///< Example configurable parameter
     bool _featureEnabled = true;       ///< Example boolean toggle
 
-    // Config gate state
-    bool _gateOpen = false;
+    // Precondition readiness state
+    bool _ready = false;
 
     // Tick timing
     uint32_t _lastActionMs = 0;

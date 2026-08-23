@@ -8,7 +8,7 @@
  * Module: template-app/src/MyApp.cpp
  * Description: Implementation of the MyApp class for the template skeleton.
  *              Demonstrates all 5 primary extension points: ITickable,
- *              IConfigurable, IWebContributor, IMCPContributor, and IConfigGate.
+ *              IConfigurable, IWebContributor, IMCPContributor, and IPreconditionContributor.
  *
  * Exported Classes:
  * - MyApp: Template application module demonstrating 5 primary framework interfaces.
@@ -36,9 +36,8 @@
  *   IMCPContributor:
  *   - registerMCPTools():    Exposes tools to the MCP server.
  *
- *   IConfigGate:
- *   - getGateName():         Returns the human-readable gate name.
- *   - isSatisfied():         Checks if the gate condition is met.
+ *   IPreconditionContributor:
+ *   - registerPreconditions(): Registers "MyApp Ready" operational precondition.
  */
 
 #include "MyApp.hpp"
@@ -54,8 +53,8 @@
 /**
  * @brief Periodic update hook called by the Application hub on every loop iteration.
  *
- * Performs interval-based periodic logic and opens the config gate on the first
- * tick to demonstrate the IConfigGate pattern.
+ * Performs interval-based periodic logic and sets readiness on the first
+ * tick to demonstrate the IPreconditionContributor pattern.
  *
  * @param currentMillis Current system time in milliseconds.
  */
@@ -66,9 +65,9 @@ void MyApp::tick(uint32_t currentMillis) {
         // Your periodic logic here
     }
 
-    // Demonstrate gate pattern: open the gate after the first tick
-    if (!_gateOpen) {
-        _gateOpen = true;
+    // Demonstrate precondition pattern: mark ready after the first tick
+    if (!_ready) {
+        _ready = true;
     }
 }
 
@@ -226,27 +225,14 @@ void MyApp::registerMCPTools(MCPToolRegistry& registry) {
 }
 
 // =============================================================================
-// IConfigGate Implementation
+// IPreconditionContributor Implementation
 // =============================================================================
 
-/**
- * @brief Returns the human-readable gate name for status reporting.
- * @return Gate name string.
- */
-const char* MyApp::getGateName() const {
-    return "MyApp Ready";  // TODO: Change "MyApp Ready" to your gate name
-}
-
-/**
- * @brief Checks if the gate condition is met.
- *
- * The framework blocks transition from CONFIGURING to RUNNING state until
- * all gates report isSatisfied() == true. This simple implementation opens
- * after the first tick; in a real app, check API key readiness, hardware
- * initialization, etc.
- *
- * @return true if the gate is satisfied and the app may proceed.
- */
-bool MyApp::isSatisfied() const {
-    return _gateOpen;
+void MyApp::registerPreconditions(PreconditionRegistry& reg) {
+    reg.add("MyApp Ready", PreconditionRole::Operational,
+        [this]() -> PreconditionStatus {
+            return _gateOpen
+                ? PreconditionStatus{true, Cause::Met}
+                : PreconditionStatus{false, Cause::Connecting};
+        });
 }

@@ -40,7 +40,6 @@
  *   - getAuthManager():          Access the AuthManager security service
  *   - getState():                Query the current AppState lifecycle phase
  *   - getMcpContributors():      Access registered MCP contributor vector
- *   - registerConfigGate():      Add an IConfigGate prerequisite for RUNNING entry
  */
 
 #pragma once
@@ -56,7 +55,6 @@
 #include "interfaces/IStatusReporter.hpp"
 #include "interfaces/IWebContributor.hpp"
 #include "interfaces/IMCPContributor.hpp"
-#include "interfaces/IConfigGate.hpp"
 #include "interfaces/IBootReporter.hpp"
 #include "interfaces/IPreconditionContributor.hpp"
 #include "events/AppConfiguringPayload.hpp"
@@ -70,7 +68,6 @@
 
 // Core domain services (owned by value — full includes required)
 #include "WifiManager.hpp"
-#include "WifiConfigGate.hpp"
 #include "WifiPreconditionContributor.hpp"
 #include "KeyManager.hpp"
 #include "AuthManager.hpp"
@@ -249,7 +246,6 @@ public:
         if constexpr (std::is_base_of_v<IWebContributor, T>)  { registerWebContributor(module);        any = true; }
         if constexpr (std::is_base_of_v<IMCPContributor, T>)  { registerMcpContributor(module);        any = true; }
         if constexpr (std::is_base_of_v<IDataSource, T>)      { registerDataSource(module);            any = true; }
-        if constexpr (std::is_base_of_v<IConfigGate, T>)      { registerConfigGate(module);            any = true; }
         if constexpr (std::is_base_of_v<IStatusReporter, T>)  { registerStatusReporter(module);        any = true; }
         if constexpr (std::is_base_of_v<IBootReporter, T>)    { registerBootReporter(module);          any = true; }
         if constexpr (std::is_base_of_v<IPreconditionContributor, T>) { module->registerPreconditions(_preconditionEngine); any = true; }
@@ -309,21 +305,6 @@ public:
      * @return true if registration succeeded; false if locked or nullptr.
      */
     bool registerDataSource(IDataSource* source);
-
-    /**
-     * @brief Register a configuration prerequisite gate.
-     *
-     * Gates are evaluated after boot completes. If any gate is unsatisfied,
-     * the app enters CONFIGURING instead of RUNNING. During CONFIGURING,
-     * tick() polls all gates each cycle and transitions to RUNNING when
-     * all return isSatisfied() == true.
-     *
-     * Pre-lock only (same as other registration methods).
-     *
-     * @param gate  Non-null pointer to the IConfigGate implementation.
-     * @return true if registration succeeded; false if locked or nullptr.
-     */
-    bool registerConfigGate(IConfigGate* gate);
 
     // -------------------------------------------------------------------------
     // Core Services Accessors
@@ -405,28 +386,6 @@ public:
      */
     AppState getState() const;
 
-    /**
-     * @brief Return a const reference to the registered config gates vector.
-     *
-     * Used by the display module to bind ConfiguringStatusBoard to the
-     * gate list for rendering gate-by-gate progress during CONFIGURING.
-     *
-     * @return Const reference to the config gates vector.
-     */
-    const std::vector<IConfigGate*>& getConfigGates() const { return _configGates; }
-
-    /**
-     * @brief Find the first actionable unsatisfied gate (all dependencies satisfied).
-     *
-     * Returns nullptr if all gates are satisfied or no gate is actionable.
-     * Extracted to eliminate dependency-checking duplication between
-     * Application, ConfiguringStatusBoard, and _publishConfiguringEvent().
-     *
-     * @return Pointer to the first actionable unsatisfied gate, or nullptr.
-     */
-    const IConfigGate* getActionableGate() const;
-
-
 private:
     // -------------------------------------------------------------------------
     // Private lifecycle helpers
@@ -447,17 +406,11 @@ private:
     void _compactAndLock();
 
     /**
-     * @brief Check whether all registered config gates are satisfied.
-     * @return true if no gates are registered or all return isSatisfied().
-     */
-    bool _allGatesSatisfied() const;
-
-    /**
      * @brief Publish an "app.configuring" EventBus event for the first
-     *        unsatisfied gate, allowing display modules to react.
+     *        unsatisfied precondition, allowing display modules to react.
      * @param isRegression true if this CONFIGURING entry is a regression from RUNNING.
      */
-    void _publishConfiguringEvent(bool isRegression = false, const IConfigGate* preResolved = nullptr);
+    void _publishConfiguringEvent(bool isRegression = false);
 
     /**
      * @brief Log the current free-heap and minimum free-heap figures.
@@ -470,8 +423,8 @@ private:
      * @brief Display-driven state transition: entering CONFIGURING.
      *
      * Suspends carousel, shows the ConfiguringStatusBoard as base.
-     * Called from tick() when a gate regression is detected, and from
-     * begin() when initial gate check fails.
+     * Called from tick() when a precondition regression is detected, and from
+     * begin() when initial precondition check fails.
      *
      * @param isRegression true if regressing from RUNNING (vs initial boot).
      */
@@ -481,7 +434,7 @@ private:
      * @brief Display-driven state transition: entering RUNNING.
      *
      * Clears modal/base overlays and resumes carousel rotation.
-     * Called from tick() when all config gates become satisfied.
+     * Called from tick() when all startup preconditions become satisfied.
      */
     void _onEnterRunning();
 
@@ -503,12 +456,6 @@ private:
     std::vector<IWebContributor*>  _webContributors; ///< Modules that contribute REST API routes
     std::vector<IMCPContributor*>  _mcpContributors; ///< Modules that contribute MCP tools
     std::vector<IDataSource*>      _dataSources;     ///< Background data-fetch workers
-    std::vector<IConfigGate*>       _configGates;     ///< Configuration prerequisite gates
-
-    // Regression gate-check members
-    Periodic _gateCheckPeriodic{5000};                       ///< Throttle for runtime gate checks (5s)
-    static constexpr uint8_t MAX_CONFIG_GATES = 8;           ///< Maximum number of config gates
-    Periodic _gateFailedSinceMs[MAX_CONFIG_GATES];           ///< Per-gate unsatisfied-since timestamps
 
     // Single-pointer registrations (no vector needed)
 
@@ -548,7 +495,7 @@ private:
 
     // Gate-transition re-publishing state (PR-66)
     const char*      _lastPublishedGate   = nullptr;                     ///< Gate name from last APP_CONFIGURING
-    GateActionStatus _lastPublishedStatus = GateActionStatus::Satisfied; ///< Status from last publish
+    Cause            _lastPublishedCause  = Cause::Met;                  ///< Cause from last publish
     Periodic         _configuringPublishThrottle{500};                    ///< Gate re-publish debounce (default 500ms, overridable via FrameworkConfig)
     /// Stable buffer for device IP pointer — IPv4 only (max "255.255.255.255\0" = 16 bytes).
     /// If IPv6 support is added, increase to INET6_ADDRSTRLEN (46).
@@ -563,7 +510,6 @@ private:
     KeyManager _keyManager;             ///< Encrypted credential registry
     AuthManager _authManager;           ///< Portal + MCP authentication manager (WO1 skeleton)
     WifiManager _wifiManager;           ///< WiFi connection state machine
-    WifiConfigGate _wifiGate{_wifiManager}; ///< Built-in WiFi STA config gate
     WifiPreconditionContributor _wifiPrecondition{_wifiManager}; ///< Built-in WiFi STA precondition contributor
 
     // Heartbeat

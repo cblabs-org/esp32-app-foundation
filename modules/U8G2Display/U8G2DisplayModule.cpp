@@ -1236,10 +1236,10 @@ void U8G2DisplayModule::_onDisplayMessage(const char* /*topic*/, const void* pay
  * Suspends carousel rotation, sets the configuring status board as base layer,
  * tears down any previous modal, then applies three-tier modal dispatch:
  *   Tier 1: Consumer override via IU8G2SystemScreens::gateHelperBoard()
- *   Tier 2: Built-in WiFi wizard for GateNames::WIFI_STATION
+ *   Tier 2: Built-in WiFi wizard for PreconditionNames::WIFI_STATION
  *   Tier 3: Generic fallback via GenericGateHelperBoard
  *
- * Only shows a modal when actionStatus == NeedsUserAction.
+ * Only shows a modal when severity == NeedsUser.
  */
 void U8G2DisplayModule::_onAppConfiguring(const char* /*topic*/, const void* payload, void* ctx) {
     auto* self = static_cast<U8G2DisplayModule*>(ctx);
@@ -1263,8 +1263,7 @@ void U8G2DisplayModule::_onAppConfiguring(const char* /*topic*/, const void* pay
     }
     auto* p = static_cast<const AppConfiguringPayload*>(payload);
 
-    // --- 4. Update configuring status board with gate action status and connection info ---
-    self->boards.configuringStatus.setActiveGateStatus(p->actionStatus);
+    // --- 4. Update configuring status board with connection info ---
     self->boards.configuringStatus.setActionableGateName(p->gateName);
     char urlBuf[48] = "";
     if (p->deviceIP != nullptr) {
@@ -1275,8 +1274,8 @@ void U8G2DisplayModule::_onAppConfiguring(const char* /*topic*/, const void* pay
         p->deviceIP ? urlBuf : ""
     );
 
-    // --- 5. If not NeedsUserAction, no modal needed ---
-    if (p->actionStatus != GateActionStatus::NeedsUserAction) {
+    // --- 5. If not NeedsUser, no modal needed ---
+    if (p->severity != Severity::NeedsUser) {
         return;
     }
 
@@ -1290,7 +1289,7 @@ void U8G2DisplayModule::_onAppConfiguring(const char* /*topic*/, const void* pay
 
     // Tier 2: Built-in WiFi wizard
     if (modalBoard == nullptr && p->gateName != nullptr &&
-        strcmp(p->gateName, GateNames::WIFI_STATION) == 0) {
+        strcmp(p->gateName, PreconditionNames::WIFI_STATION) == 0) {
         // Resolve wizard board: prefer IU8G2SystemScreens wifiWizardBoard override
         IDisplayBoard* wizardBoard = (self->_screens != nullptr && self->_screens->wifiWizardBoard() != nullptr)
                                      ? self->_screens->wifiWizardBoard()

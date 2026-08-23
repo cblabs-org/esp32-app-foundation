@@ -23,17 +23,17 @@ typedef int esp_err_t;
 
 class PsychicResponse {
 public:
-    esp_err_t send(int code, const char* contentType, const char* content) { return ESP_OK; }
-    esp_err_t send(int code, const char* contentType, const uint8_t* content, size_t len) { (void)code; (void)contentType; (void)content; (void)len; return ESP_OK; }
-    esp_err_t send(int code, const char* contentType, const char* content, size_t len) { (void)code; (void)contentType; (void)content; (void)len; return ESP_OK; }
-    esp_err_t send(const char* content) { return ESP_OK; }
-    esp_err_t send(const String& content) { return ESP_OK; }
-    esp_err_t send() { return ESP_OK; }
-    void setContent(const uint8_t* content, size_t len) {}
-    void setContentType(const char* type) {}
-    void setCode(int code) { (void)code; }
-    void addHeader(const char* name, const char* value) {}
-    esp_err_t redirect(const char* url) { return ESP_OK; }
+    virtual esp_err_t send(int code, const char* contentType, const char* content) { return ESP_OK; }
+    virtual esp_err_t send(int code, const char* contentType, const uint8_t* content, size_t len) { (void)code; (void)contentType; (void)content; (void)len; return ESP_OK; }
+    virtual esp_err_t send(int code, const char* contentType, const char* content, size_t len) { (void)code; (void)contentType; (void)content; (void)len; return ESP_OK; }
+    virtual esp_err_t send(const char* content) { return ESP_OK; }
+    virtual esp_err_t send(const String& content) { return ESP_OK; }
+    virtual esp_err_t send() { return ESP_OK; }
+    virtual void setContent(const uint8_t* content, size_t len) {}
+    virtual void setContentType(const char* type) {}
+    virtual void setCode(int code) { (void)code; }
+    virtual void addHeader(const char* name, const char* value) {}
+    virtual esp_err_t redirect(const char* url) { return ESP_OK; }
 };
 
 class PsychicWebParameter {
@@ -43,17 +43,17 @@ public:
 
 class PsychicRequest {
 public:
-    String host() { return String(""); }
-    String url() { return String(""); }
-    String uri() { return String(""); }
-    String header(const char* name) { return String(""); }
-    bool hasHeader(const char* name) { return false; }
-    std::string body() { return std::string(); }
-    size_t contentLength() { return 0; }
-    const char* bodyCStr() { return ""; }
-    int method() { return HTTP_GET; }
-    bool hasParam(const char* name) { return false; }
-    PsychicWebParameter* getParam(const char* name) { static PsychicWebParameter p; return &p; }
+    virtual String host() { return String(""); }
+    virtual String url() { return String(""); }
+    virtual String uri() { return String(""); }
+    virtual String header(const char* name) { return String(""); }
+    virtual bool hasHeader(const char* name) { return false; }
+    virtual std::string body() { return std::string(); }
+    virtual size_t contentLength() { return 0; }
+    virtual const char* bodyCStr() { return ""; }
+    virtual int method() { return HTTP_GET; }
+    virtual bool hasParam(const char* name) { return false; }
+    virtual PsychicWebParameter* getParam(const char* name) { static PsychicWebParameter p; return &p; }
 };
 
 typedef std::function<esp_err_t(PsychicRequest *request, PsychicResponse *response)> PsychicHttpRequestCallback;

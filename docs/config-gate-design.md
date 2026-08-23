@@ -7,8 +7,7 @@
 > when a running device should fall back to configuring.
 
 > [!NOTE]
-> **STATUS: ROUND-4 AMENDMENT — concentrated corrections, not a rewrite.
-> Not approved, not scoped, not built.**
+> **STATUS: Implemented — awaiting confirming consumer round.**
 >
 > This is a **breaking interface change**. Rounds 1 and 2 were each reviewed by all
 > three downstream programs (DraytonWiserController, departures-board-v3,
@@ -26,10 +25,10 @@
 >   return true;` picks "keep going, it's fine" for what is actually a programming error.
 >   The line is now stated explicitly. See §2.4.
 >
-> **What is still owed before approval:** CG-18 and CG-2a were written after the last
-> consumer round and have no consumer evidence behind them (§14). Every other decision
-> here is backed by code read in a consumer's tree. A short confirming round on those
-> two — not a full re-review — is the remaining gate.
+> **Implementation Complete (2026-08-23).** Implemented across PR-146 work orders WO1–WO7.
+> PreconditionEngine, IPreconditionContributor, visitor pattern registration (CG-2b),
+> Web/MCP surfaces, and display module integrations are fully implemented.
+> Awaiting confirming consumer round on CG-18 and CG-2a.
 >
 > Shares a health vocabulary with [#128](https://github.com/matthewmcneill/esp32-app-foundation/issues/128);
 > CG-17 retires an interface flag added there as a stopgap.

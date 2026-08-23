@@ -187,6 +187,72 @@ TEST_F(WifiManagerTest, SerializeApplyRoundtrip_Consistent) {
     EXPECT_STREQ("RoundtripSSID", wm2.getSSID());
 }
 
+#include "PreconditionEngine.hpp"
+#include "WifiPreconditionContributor.hpp"
+
+// ---------------------------------------------------------------------------
+// WifiPreconditionContributor Tests
+// ---------------------------------------------------------------------------
+
+TEST(WifiPreconditionContributorTest, RegistersSingleStartupPrecondition) {
+    WifiManager wifi;
+    WifiPreconditionContributor contributor(wifi);
+    PreconditionEngine engine;
+
+    contributor.registerPreconditions(engine);
+
+    EXPECT_EQ(engine.getPreconditionCount(), 1);
+    PreconditionState state;
+    EXPECT_TRUE(engine.getStateByName(PreconditionNames::WIFI_STATION, state));
+    EXPECT_EQ(state.role, PreconditionRole::Startup);
+    EXPECT_EQ(state.resolvedEdgeCount, 0);
+}
+
+TEST(WifiPreconditionContributorTest, EvaluationAndDescriptions) {
+    WifiManager wifi;
+    WifiPreconditionContributor contributor(wifi);
+    PreconditionEngine engine;
+    contributor.registerPreconditions(engine);
+    EXPECT_TRUE(engine.resolveEdges());
+
+    // 1. Initial / unconfigured state -> NotConfigured -> NeedsUser
+    engine.tick(1000);
+    PreconditionState state;
+    EXPECT_TRUE(engine.getStateByName(PreconditionNames::WIFI_STATION, state));
+    EXPECT_FALSE(state.rawStatus.met);
+    EXPECT_EQ(state.rawStatus.cause, Cause::NotConfigured);
+    EXPECT_EQ(state.severity, Severity::NeedsUser);
+
+    char desc[128] = {};
+    state.describe(Cause::NotConfigured, desc, sizeof(desc));
+    EXPECT_STREQ("Connect to the device WiFi to configure", desc);
+
+    // 2. Connecting with configured credentials
+    wifi.updateWiFi("MyNetwork", "secret");
+    engine.tick(2000);
+    EXPECT_TRUE(engine.getStateByName(PreconditionNames::WIFI_STATION, state));
+    EXPECT_FALSE(state.rawStatus.met);
+    EXPECT_EQ(state.rawStatus.cause, Cause::Connecting);
+    EXPECT_EQ(state.severity, Severity::Transient);
+
+    state.describe(Cause::Connecting, desc, sizeof(desc));
+    EXPECT_STREQ("Connecting to MyNetwork...", desc);
+
+    // 3. Fallback / Rejected / default describe messages
+    state.describe(Cause::FallbackEngaged, desc, sizeof(desc));
+    EXPECT_TRUE(strstr(desc, "Can't reach your network") != nullptr);
+
+    state.describe(Cause::Rejected, desc, sizeof(desc));
+    EXPECT_STREQ("WiFi password was refused", desc);
+
+    state.describe(Cause::Unreachable, desc, sizeof(desc));
+    EXPECT_STREQ("WiFi unavailable", desc);
+
+    // 4. Severity derivation for FallbackEngaged (AP mode)
+    EXPECT_EQ(deriveSeverity(Cause::FallbackEngaged, false), Severity::Degraded);
+    EXPECT_EQ(deriveSeverity(Cause::FallbackEngaged, true), Severity::Degraded);
+}
+
 int main(int argc, char **argv) {
     ::testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();

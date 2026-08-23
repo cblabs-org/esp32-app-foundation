@@ -796,14 +796,14 @@ TEST_F(DataManagerTest, Health_BackoffDoesNotBlockOtherSources) {
 
 // --- The CONFIGURING trap, reported by the consumer that filed #128 ---------
 //
-// A source backing an IConfigGate is circular with the state machine: the gate
+// A source backing a startup precondition is circular with the state machine: the precondition
 // blocks RUNNING, RUNNING enabled fetching, and fetching is what satisfies the
-// gate. The _appRunning early return used to sit above everything, so once such
+// precondition. The _appRunning early return used to sit above everything, so once such
 // a source failed the device could never recover.
 
 TEST_F(DataManagerTest, Configuring_QuarantinedSourceStillProbesWhenOptedIn) {
     ScriptedSource src("gate-backed", 1000, PriorityTier::High);
-    src.configuring = true;              // backs a config gate
+    src.configuring = true;              // backs a precondition
     src.next = UpdateStatus::FetchError;
     dm.registerSource(&src);
 

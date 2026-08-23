@@ -49,9 +49,9 @@ static OTAUpdateManager otaManager;
 
 #ifdef WITH_TIME
 #include "TimeManager.hpp"
-#include "TimeConfigGate.hpp"
+#include "TimePreconditionContributor.hpp"
 static TimeManager timeManager;
-static TimeConfigGate timeGate{timeManager};
+static TimePreconditionContributor timePrecondition{timeManager};
 #endif
 
 #ifdef WITH_MCP
@@ -117,6 +117,7 @@ void setup() {
 #ifdef WITH_TIME
     timeManager.setConfigManager(&app.getConfigManager());
     app.registerModule(&timeManager);
+    app.registerModule(&timePrecondition);
 #endif
 
 #ifdef WITH_HOMEASSISTANT

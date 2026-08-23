@@ -13,7 +13,7 @@
 
 #include "screens/SLSSystemScreens.hpp"
 #include "ui/ui.h"
-#include "interfaces/IConfigGate.hpp"  // GateNames
+#include "interfaces/IPrecondition.hpp"
 #include <cstdio>
 #include <cstring>
 #include <algorithm>
@@ -58,7 +58,7 @@ lv_obj_t* SLSSystemScreens::wifiWizardScreen() {
 lv_obj_t* SLSSystemScreens::gateHelperScreen(const AppConfiguringPayload* payload) {
     // Defer the WiFi station gate to the module's Tier-2 wizard (Setup group).
     if (payload != nullptr && payload->gateName != nullptr &&
-        strcmp(payload->gateName, GateNames::WIFI_STATION) == 0) {
+        strcmp(payload->gateName, PreconditionNames::WIFI_STATION) == 0) {
         return nullptr;
     }
     return showGroup(ui_uiSystemMessageGroup);

@@ -23,7 +23,7 @@ A minimal, buildable skeleton for creating a new application on the ESP32 App Fo
 | `IConfigurable` | Persistent settings via ConfigManager |
 | `IWebContributor` | REST API endpoints + web portal tab |
 | `IMCPContributor` | MCP tool registration for AI agents |
-| `IConfigGate` | Boot-time readiness gating |
+| `IPreconditionContributor` | Operational readiness precondition |
 
 > **Note:** The sample-app demonstrates two additional interfaces not shown here: `IDataSource` (structured data providers) and `IDisplayBoard` (OLED display contributions). See [`sample-app/`](../sample-app/) for a production example.
 

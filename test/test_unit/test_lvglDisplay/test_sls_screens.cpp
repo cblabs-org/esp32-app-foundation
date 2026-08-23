@@ -13,7 +13,7 @@
 #include <gtest/gtest.h>
 #include "screens/SLSSystemScreens.hpp"
 #include "ui/ui.h"
-#include "interfaces/IConfigGate.hpp"       // GateNames
+#include "interfaces/IPrecondition.hpp"
 #include "events/AppConfiguringPayload.hpp"
 
 class SLSSystemScreensTest : public ::testing::Test {
@@ -123,7 +123,8 @@ TEST_F(SLSSystemScreensTest, WifiWizardScreenActivatesSetupGroupOnly) {
 TEST_F(SLSSystemScreensTest, GateHelperScreenShowsMessageForNonWifiGate) {
     AppConfiguringPayload p;
     p.gateName = "Timezone";
-    p.actionStatus = GateActionStatus::NeedsUserAction;
+    p.cause = Cause::NotConfigured;
+    p.severity = Severity::NeedsUser;
 
     lv_obj_t* scr = screens.gateHelperScreen(&p);
     EXPECT_EQ(scr, ui_uiSystemScreen);
@@ -133,8 +134,9 @@ TEST_F(SLSSystemScreensTest, GateHelperScreenShowsMessageForNonWifiGate) {
 
 TEST_F(SLSSystemScreensTest, GateHelperScreenDefersWifiGateToWizard) {
     AppConfiguringPayload p;
-    p.gateName = GateNames::WIFI_STATION;
-    p.actionStatus = GateActionStatus::NeedsUserAction;
+    p.gateName = PreconditionNames::WIFI_STATION;
+    p.cause = Cause::NotConfigured;
+    p.severity = Severity::NeedsUser;
 
     // nullptr signals the module to fall through to wifiWizardScreen().
     EXPECT_EQ(screens.gateHelperScreen(&p), nullptr);
@@ -142,18 +144,19 @@ TEST_F(SLSSystemScreensTest, GateHelperScreenDefersWifiGateToWizard) {
 
 TEST_F(SLSSystemScreensTest, OnConfiguringPopulatesSetupAndMessageWidgets) {
     AppConfiguringPayload p;
-    p.gateName = GateNames::WIFI_STATION;
+    p.gateName = PreconditionNames::WIFI_STATION;
     p.helpText = "Join the setup network";
     p.hostname = "device-ap";
     p.deviceIP = "192.168.4.1";
-    p.actionStatus = GateActionStatus::NeedsUserAction;
+    p.cause = Cause::NotConfigured;
+    p.severity = Severity::NeedsUser;
 
     screens.onConfiguring(&p);
 
     EXPECT_STREQ(lv_label_get_text(ui_ui_SystemSetupSSID), "device-ap");
     EXPECT_STREQ(lv_label_get_text(ui_ui_SystemSetupURL), "http://192.168.4.1");
     EXPECT_STREQ(lv_label_get_text(ui_uiSystemBusyMessage), "Join the setup network");
-    EXPECT_STREQ(lv_label_get_text(ui_ui_SystemMsgTitle), GateNames::WIFI_STATION);
+    EXPECT_STREQ(lv_label_get_text(ui_ui_SystemMsgTitle), PreconditionNames::WIFI_STATION);
     EXPECT_STREQ(lv_label_get_text(ui_uiSystemMsgBody), "Join the setup network");
 }
 
