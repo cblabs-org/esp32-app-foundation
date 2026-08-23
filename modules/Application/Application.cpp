@@ -182,6 +182,8 @@ bool Application::begin(const FrameworkConfig& config) {
     registerModule(_authManager.tlsTabStub());       // IWebContributor (sub-pill)
     registerModule(&_configManager);      // IWebContributor + IMCPContributor
     registerModule(&_keyManager);         // IWebContributor + IMCPContributor
+    _preconditionWebContributor.app = this;
+    registerModule(&_preconditionWebContributor); // IWebContributor
 
 
     registerModule(&_webServerManager);   // ITickable
@@ -788,7 +790,111 @@ void Application::_onEnterRunning() {
 }
 
 // ---------------------------------------------------------------------------
-// Display accessor
+// Precondition web routes (WO5)
 // ---------------------------------------------------------------------------
 
+namespace {
+    const char* roleToString(PreconditionRole role) {
+        switch (role) {
+            case PreconditionRole::Operational: return "Operational";
+            case PreconditionRole::Startup:     return "Startup";
+            case PreconditionRole::Both:        return "Both";
+            default:                            return "Operational";
+        }
+    }
 
+    const char* causeToString(Cause cause) {
+        switch (cause) {
+            case Cause::Met:             return "Met";
+            case Cause::NotConfigured:   return "NotConfigured";
+            case Cause::Connecting:      return "Connecting";
+            case Cause::Rejected:        return "Rejected";
+            case Cause::Unreachable:     return "Unreachable";
+            case Cause::RateLimited:     return "RateLimited";
+            case Cause::Implausible:     return "Implausible";
+            case Cause::DependencyUnmet: return "DependencyUnmet";
+            case Cause::FallbackEngaged: return "FallbackEngaged";
+            case Cause::Unavailable:     return "Unavailable";
+            case Cause::Indeterminate:   return "Indeterminate";
+            case Cause::InternalError:   return "InternalError";
+            default:                     return "NotConfigured";
+        }
+    }
+
+    const char* severityToString(Severity severity) {
+        switch (severity) {
+            case Severity::Transient:  return "Transient";
+            case Severity::NeedsUser:  return "NeedsUser";
+            case Severity::Blocked:    return "Blocked";
+            case Severity::Degraded:   return "Degraded";
+            case Severity::Inactive:   return "Inactive";
+            case Severity::Persistent: return "Persistent";
+            default:                   return "Transient";
+        }
+    }
+
+    const char* breakerToString(BreakerState breaker) {
+        switch (breaker) {
+            case BreakerState::Closed:   return "Closed";
+            case BreakerState::Open:     return "Open";
+            case BreakerState::HalfOpen: return "HalfOpen";
+            default:                     return "Closed";
+        }
+    }
+}
+
+void Application::PreconditionWebContributor::registerRoutes(PsychicHttpServer& server) {
+    if (!app) return;
+
+    server.on("/api/preconditions", HTTP_GET, [this](PsychicRequest* request, PsychicResponse* response) {
+        JsonDocument doc;
+        JsonArray arr = doc.to<JsonArray>();
+
+        PreconditionEngine& engine = app->getPreconditionEngine();
+        size_t count = engine.getPreconditionCount();
+        for (size_t i = 0; i < count; ++i) {
+            const auto& state = engine.getStateAt(i);
+            JsonObject obj = arr.add<JsonObject>();
+            obj["name"] = state.name;
+            obj["role"] = roleToString(state.role);
+            obj["met"] = state.dampedStatus.met;
+            obj["cause"] = causeToString(state.dampedStatus.cause);
+            obj["severity"] = severityToString(state.severity);
+            obj["everMet"] = state.everMet;
+            obj["breaker"] = breakerToString(state.breaker);
+            obj["suppressed"] = state.suppressed;
+        }
+
+        std::string out;
+        serializeJson(doc, out);
+        return response->send(200, "application/json", out.c_str());
+    });
+
+    server.on("/api/preconditions/retry", HTTP_POST, [this](PsychicRequest* request, PsychicResponse* response) {
+        if (request->contentLength() > 1024) {
+            response->send(413, "application/json", "{\"error\":\"Payload too large\"}");
+            return ESP_FAIL;
+        }
+
+        const char* body = request->bodyCStr();
+        std::string name;
+        if (body && strlen(body) > 0) {
+            JsonDocument doc;
+            if (deserializeJson(doc, body) == DeserializationError::Ok) {
+                if (doc["name"].is<const char*>()) {
+                    name = doc["name"].as<const char*>();
+                }
+            }
+        }
+        if (name.empty() && request->hasParam("name")) {
+            name = request->getParam("name")->value().c_str();
+        }
+        if (name.empty()) {
+            response->send(400, "application/json", "{\"error\":\"Precondition name required\"}");
+            return ESP_FAIL;
+        }
+
+        app->getPreconditionEngine().requestRetry(name.c_str());
+        return response->send(200, "application/json", "{\"status\":\"ok\"}");
+    });
+}

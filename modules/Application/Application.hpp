@@ -585,6 +585,16 @@ private:
     const char* _appName = nullptr;        ///< Runtime-settable application name (overrides APP_TITLE)
     const char* _appStylesheet = nullptr;  ///< Optional CSS path for portal branding
 
-
+    // -------------------------------------------------------------------------
+    // Precondition web contributor — exposes GET /api/preconditions snapshot
+    // and POST /api/preconditions/retry endpoint.
+    // -------------------------------------------------------------------------
+    struct PreconditionWebContributor : public IWebContributor {
+        Application* app = nullptr;
+        void        registerRoutes(PsychicHttpServer& server) override;
+        const char* getApiPrefix() const override { return "/api/preconditions"; }
+        size_t      getMaxPostBody() const override { return 1024; }
+    };
+    PreconditionWebContributor _preconditionWebContributor;
 
 };

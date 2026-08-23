@@ -1040,6 +1040,166 @@ TEST_F(ApplicationRegistrationTest, ITickable_OverrideBudget_ReturnsConfiguredVa
 }
 
 // =============================================================================
+// Test Group 11: Precondition REST API (WO5)
+// =============================================================================
+
+TEST(PreconditionApiTest, RoutesRegistered) {
+    Application app;
+    FrameworkConfig cfg;
+    app.begin(cfg);
+
+    bool preconditionsGetRegistered = false;
+    bool preconditionsRetryRegistered = false;
+    for (const auto& route : app.getWebServerManager().getServer().routes) {
+        if (route.uri == "/api/preconditions" && route.method == HTTP_GET) {
+            preconditionsGetRegistered = true;
+        }
+        if (route.uri == "/api/preconditions/retry" && route.method == HTTP_POST) {
+            preconditionsRetryRegistered = true;
+        }
+    }
+    EXPECT_TRUE(preconditionsGetRegistered);
+    EXPECT_TRUE(preconditionsRetryRegistered);
+}
+
+class MockPreconditionContributor : public IPreconditionContributor {
+public:
+    void registerPreconditions(PreconditionRegistry& registry) override {
+        registry.add("Custom Op", PreconditionRole::Operational, []() -> PreconditionStatus {
+            return {true, Cause::Met};
+        });
+    }
+};
+
+TEST(PreconditionApiTest, PreconditionsGetHandlerReturnsJson) {
+    Application app;
+    MockPreconditionContributor contributor;
+    app.registerModule(&contributor);
+    FrameworkConfig cfg;
+    app.begin(cfg);
+
+    PsychicHttpRequestCallback getHandler = nullptr;
+    for (const auto& route : app.getWebServerManager().getServer().routes) {
+        if (route.uri == "/api/preconditions" && route.method == HTTP_GET) {
+            getHandler = route.handler;
+            break;
+        }
+    }
+    ASSERT_NE(getHandler, nullptr);
+
+    class MockPsychicResponse : public PsychicResponse {
+    public:
+        int sentCode = 0;
+        std::string sentContentType;
+        std::string sentBody;
+        esp_err_t send(int code, const char* contentType, const char* content) {
+            sentCode = code;
+            sentContentType = contentType ? contentType : "";
+            sentBody = content ? content : "";
+            return ESP_OK;
+        }
+    };
+
+    class MockPsychicRequest : public PsychicRequest {
+    };
+
+    MockPsychicRequest req;
+    MockPsychicResponse resp;
+    esp_err_t res = getHandler(&req, &resp);
+    EXPECT_EQ(res, ESP_OK);
+    EXPECT_EQ(resp.sentCode, 200);
+    EXPECT_EQ(resp.sentContentType, "application/json");
+
+    JsonDocument doc;
+    DeserializationError err = deserializeJson(doc, resp.sentBody);
+    EXPECT_EQ(err, DeserializationError::Ok);
+    ASSERT_TRUE(doc.is<JsonArray>());
+    JsonArray arr = doc.as<JsonArray>();
+    EXPECT_GE(arr.size(), 2u); // Wifi Station + Custom Op
+
+    bool foundCustom = false;
+    for (JsonObject obj : arr) {
+        if (strcmp(obj["name"] | "", "Custom Op") == 0) {
+            foundCustom = true;
+            EXPECT_STREQ(obj["role"] | "", "Operational");
+            EXPECT_TRUE(obj["met"] | false);
+            EXPECT_STREQ(obj["cause"] | "", "Met");
+            EXPECT_STREQ(obj["severity"] | "", "Transient");
+            EXPECT_STREQ(obj["breaker"] | "", "Closed");
+            EXPECT_FALSE(obj["suppressed"] | false);
+        }
+    }
+    EXPECT_TRUE(foundCustom);
+}
+
+TEST(PreconditionApiTest, PreconditionsRetryHandler) {
+    Application app;
+    FrameworkConfig cfg;
+    app.begin(cfg);
+
+    PsychicHttpRequestCallback retryHandler = nullptr;
+    for (const auto& route : app.getWebServerManager().getServer().routes) {
+        if (route.uri == "/api/preconditions/retry" && route.method == HTTP_POST) {
+            retryHandler = route.handler;
+            break;
+        }
+    }
+    ASSERT_NE(retryHandler, nullptr);
+
+    class MockPsychicResponse : public PsychicResponse {
+    public:
+        int sentCode = 0;
+        std::string sentBody;
+        esp_err_t send(int code, const char* contentType, const char* content) {
+            sentCode = code;
+            sentBody = content ? content : "";
+            return ESP_OK;
+        }
+    };
+
+    class MockPsychicRequest : public PsychicRequest {
+    public:
+        std::string b;
+        size_t len = 0;
+        const char* bodyCStr() { return b.c_str(); }
+        size_t contentLength() { return len; }
+    };
+
+    // Valid retry
+    {
+        MockPsychicRequest req;
+        req.b = "{\"name\":\"WiFi Station\"}";
+        req.len = req.b.length();
+        MockPsychicResponse resp;
+        esp_err_t res = retryHandler(&req, &resp);
+        EXPECT_EQ(res, ESP_OK);
+        EXPECT_EQ(resp.sentCode, 200);
+    }
+
+    // Missing name
+    {
+        MockPsychicRequest req;
+        req.b = "{}";
+        req.len = req.b.length();
+        MockPsychicResponse resp;
+        esp_err_t res = retryHandler(&req, &resp);
+        EXPECT_EQ(res, ESP_FAIL);
+        EXPECT_EQ(resp.sentCode, 400);
+    }
+
+    // Oversized body
+    {
+        MockPsychicRequest req;
+        req.b = "{\"name\":\"WiFi Station\"}";
+        req.len = 2048; // > 1024
+        MockPsychicResponse resp;
+        esp_err_t res = retryHandler(&req, &resp);
+        EXPECT_EQ(res, ESP_FAIL);
+        EXPECT_EQ(resp.sentCode, 413);
+    }
+}
+
+// =============================================================================
 // GoogleTest main entry point
 // =============================================================================
 

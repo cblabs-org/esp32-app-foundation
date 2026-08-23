@@ -105,6 +105,16 @@
   // Render the initial HTML scaffold
   // -------------------------------------------------------------------------
   container.innerHTML = `
+    <article id="sys-preconditions-card">
+      <header style="display:flex; justify-content:space-between; align-items:center;">
+        <span>Precondition Health</span>
+        <span id="sys-preconditions-summary" style="font-size:0.8rem; font-weight:normal; color:var(--text-muted);"></span>
+      </header>
+      <div id="sys-preconditions-list">
+        <p style="color: var(--text-muted);">Loading...</p>
+      </div>
+    </article>
+
     <article>
       <header>Device Information</header>
       <div id="sys-device-info">
@@ -181,6 +191,146 @@
   }
 
   // -------------------------------------------------------------------------
+  // Fetch and render precondition health
+  // -------------------------------------------------------------------------
+  async function loadPreconditions() {
+    const listEl = document.getElementById('sys-preconditions-list');
+    const summaryEl = document.getElementById('sys-preconditions-summary');
+    if (!listEl) return;
+
+    try {
+      const items = await window.apiFetch('/api/preconditions');
+      if (!Array.isArray(items) || items.length === 0) {
+        listEl.innerHTML = '<p style="color: var(--text-muted); font-size: 0.85rem;">No preconditions registered.</p>';
+        if (summaryEl) summaryEl.textContent = '';
+        return;
+      }
+
+      const allMet = items.every(p => p.met);
+      const unmetCount = items.filter(p => !p.met).length;
+      if (summaryEl) {
+        summaryEl.innerHTML = allMet
+          ? '<span style="color:var(--success); font-weight:600;">✓ All Healthy</span>'
+          : `<span style="color:var(--warning); font-weight:600;">${unmetCount} Unmet</span>`;
+      }
+
+      const causeLabels = {
+        Met: 'Met',
+        NotConfigured: 'Not Configured',
+        Connecting: 'Connecting...',
+        Rejected: 'Rejected / Auth Failed',
+        Unreachable: 'Unreachable',
+        RateLimited: 'Rate Limited',
+        Implausible: 'Implausible Data',
+        DependencyUnmet: 'Dependency Unmet',
+        FallbackEngaged: 'Fallback Engaged',
+        Unavailable: 'Unavailable',
+        Indeterminate: 'Indeterminate',
+        InternalError: 'Internal Error'
+      };
+
+      let html = '';
+      items.forEach(p => {
+        const causeText = causeLabels[p.cause] || p.cause || 'Unknown';
+
+        let statusBadge = '';
+        if (p.met) {
+          statusBadge = '<span class="badge badge--ok" style="font-size:0.75rem; padding: 2px 8px;">✓ Met</span>';
+        } else if (p.severity === 'NeedsUser' || p.severity === 'Persistent') {
+          statusBadge = `<span class="badge" style="background:rgba(198,40,40,0.12); color:var(--error); font-size:0.75rem; padding: 2px 8px; font-weight:600;">✗ ${causeText}</span>`;
+        } else if (p.severity === 'Blocked') {
+          statusBadge = `<span class="badge" style="background:var(--border); color:var(--text-muted); font-size:0.75rem; padding: 2px 8px;">⏸ ${causeText}</span>`;
+        } else if (p.severity === 'Inactive') {
+          statusBadge = `<span class="badge" style="background:var(--border); color:var(--text-muted); font-size:0.75rem; padding: 2px 8px;">${causeText}</span>`;
+        } else {
+          statusBadge = `<span class="badge badge--warn" style="font-size:0.75rem; padding: 2px 8px;">⏳ ${causeText}</span>`;
+        }
+
+        let roleBadge = '';
+        if (p.role === 'Startup') {
+          roleBadge = '<span class="badge badge--subtle" style="font-size:0.65rem;">Startup</span>';
+        } else if (p.role === 'Both') {
+          roleBadge = '<span class="badge badge--subtle" style="font-size:0.65rem;">Startup &amp; Oper.</span>';
+        } else {
+          roleBadge = '<span class="badge" style="background:var(--border); color:var(--text-muted); font-size:0.65rem; padding:1px 6px; border-radius:10px;">Oper.</span>';
+        }
+
+        let rowStyle = 'display:flex; flex-direction:column; gap:4px; padding:0.5rem 0.75rem; margin-bottom:0.4rem; border-radius:8px; border:1px solid var(--border);';
+        if (!p.met) {
+          if (p.severity === 'NeedsUser' || p.severity === 'Persistent') {
+            rowStyle += ' border-left: 4px solid var(--error); background: rgba(198,40,40,0.04);';
+          } else if (p.severity === 'Transient' || p.severity === 'Degraded') {
+            rowStyle += ' border-left: 4px solid var(--warning); background: rgba(249,168,37,0.04);';
+          } else {
+            rowStyle += ' border-left: 4px solid var(--border);';
+          }
+        } else {
+          rowStyle += ' border-left: 4px solid var(--success);';
+        }
+
+        let detailHtml = '';
+        if (p.breaker === 'Open') {
+          detailHtml += `
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:6px; padding-top:6px; border-top:1px dashed var(--border); font-size:0.8rem;">
+              <span style="color:var(--error); font-size:0.75rem;">Paused — retries exhausted</span>
+              <button class="btn-sys-retry-precondition" data-name="${p.name}" style="padding:3px 10px; font-size:0.75rem; background:var(--primary); color:#fff; border:none; border-radius:6px; cursor:pointer;">Retry</button>
+            </div>`;
+        } else if (p.breaker === 'HalfOpen') {
+          detailHtml += `<div style="font-size:0.75rem; color:var(--warning); margin-top:4px;">Trial retry probe in progress...</div>`;
+        }
+
+        if (p.suppressed) {
+          detailHtml += `<div style="font-size:0.75rem; color:var(--text-muted); margin-top:2px;">Flap damping active (suppressed)</div>`;
+        }
+
+        html += `
+          <div style="${rowStyle}">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <div style="display:flex; align-items:center; gap:6px;">
+                <strong style="font-size:0.9rem;">${p.name}</strong>
+                ${roleBadge}
+              </div>
+              <div>${statusBadge}</div>
+            </div>
+            ${detailHtml}
+          </div>
+        `;
+      });
+
+      listEl.innerHTML = html;
+
+      // Bind retry buttons
+      listEl.querySelectorAll('.btn-sys-retry-precondition').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          const btnEl = e.currentTarget;
+          const name = btnEl.getAttribute('data-name');
+          btnEl.disabled = true;
+          btnEl.textContent = 'Retrying...';
+          try {
+            await window.apiFetch('/api/preconditions/retry', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ name: name })
+            });
+            setTimeout(loadPreconditions, 300);
+          } catch (err) {
+            btnEl.textContent = 'Failed';
+            setTimeout(() => {
+              btnEl.disabled = false;
+              btnEl.textContent = 'Retry';
+            }, 2000);
+          }
+        });
+      });
+
+    } catch (err) {
+      if (listEl) {
+        listEl.innerHTML = '<p style="color: var(--error); font-size: 0.85rem;">Error loading precondition health.</p>';
+      }
+    }
+  }
+
+  // -------------------------------------------------------------------------
   // Fetch and render system data
   // -------------------------------------------------------------------------
   async function loadSystemInfo() {
@@ -243,6 +393,10 @@
     }
   }
 
+  async function loadAllData() {
+    await Promise.allSettled([loadPreconditions(), loadSystemInfo()]);
+  }
+
   // -------------------------------------------------------------------------
   // Auto-refresh (5s interval, pauses via Visibility API)
   // -------------------------------------------------------------------------
@@ -253,8 +407,8 @@
     if (refreshInterval) return;
     refreshActive = true;
     document.getElementById('sys-refresh-status').textContent = 'active';
-    loadSystemInfo();
-    refreshInterval = setInterval(loadSystemInfo, 5000);
+    loadAllData();
+    refreshInterval = setInterval(loadAllData, 5000);
   }
 
   function stopAutoRefresh() {

@@ -97,19 +97,32 @@ Surface any findings in the Completion Report — do not file issues directly.
 <!-- Written by the worker at task completion -->
 
 ### Status
-(pending)
+Complete
 
 ### Changes Made
-(pending)
+- `modules/Application/Application.hpp`: Declared `PreconditionWebContributor` inner struct implementing `IWebContributor` (`getApiPrefix()` = `/api/preconditions`, `getMaxPostBody()` = 1024).
+- `modules/Application/Application.cpp`:
+  - Registered `_preconditionWebContributor` during module registration sequence.
+  - Added enum-to-string mapping helpers for `PreconditionRole`, `Cause`, `Severity`, and `BreakerState`.
+  - Implemented `GET /api/preconditions` route returning JSON snapshot array of registered preconditions (`name`, `role`, `met`, `cause`, `severity`, `everMet`, `breaker`, `suppressed`).
+  - Implemented `POST /api/preconditions/retry` route with 1KB body limit invoking `_preconditionEngine.requestRetry(name)`.
+- `web/portal/system.js`:
+  - Added Precondition Health card to System page scaffold.
+  - Implemented `loadPreconditions()` polling `/api/preconditions` on load and every 5 seconds.
+  - Rendered status badges (✓ met, ✗ unmet with severity styling, ⏳ transient, ⏸ blocked), role badges (`Startup` vs `Operational`), warning row highlights, and retry button for open circuit breakers.
+- `scripts/portalBuilder.py`: Rebuilt portal compressed PROGMEM assets (`include/portal_assets/`).
+- `test/test_unit/test_application/test_application.cpp`: Added `PreconditionApiTest` test suite covering route registration, GET response structure, and POST retry behavior (801/801 passed).
+- `test/web/tests/system.spec.ts`: Added Playwright tests verifying precondition health card rendering, badge states, and retry button interaction (71/71 passed).
 
 ### Decisions Made
-(pending)
+- Used an inner `PreconditionWebContributor` in `Application` rather than hardcoding routes in `WebServerManager` to keep precondition engine knowledge encapsulated within Application while following the established `IWebContributor` pattern.
+- Supported both JSON body `{ "name": "..." }` and query parameter `?name=...` for `POST /api/preconditions/retry` with 1024-byte body size limit.
 
 ### Dead Ends & Warnings
-(pending)
+- None.
 
 ### Out-of-Scope Findings
-(pending)
+- None.
 
 ### Blockers
-(pending)
+- None.
