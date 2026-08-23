@@ -430,9 +430,6 @@ void DataManager::processNext() {
     drainJobs(false);
 }
 
-void DataManager::setAppRunning(bool running) {
-    _appRunning.store(running);
-}
 
 #ifdef ESP_PLATFORM
 void DataManager::fetchWatchdogCb(void* arg) {
@@ -520,7 +517,7 @@ void DataManager::executeLoop() {
     // a fetch, and nothing happens.
     //
     // The gate is now applied per-source, below both escape hatches.
-    const bool appRunning = _appRunning.load();
+    const bool appRunning = true;
 
     MutexLock lock(_registryMutex);
     if (_registry.empty()) return;

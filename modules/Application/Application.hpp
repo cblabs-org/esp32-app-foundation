@@ -58,7 +58,9 @@
 #include "interfaces/IMCPContributor.hpp"
 #include "interfaces/IConfigGate.hpp"
 #include "interfaces/IBootReporter.hpp"
+#include "interfaces/IPreconditionContributor.hpp"
 #include "events/AppConfiguringPayload.hpp"
+#include "PreconditionEngine/PreconditionEngine.hpp"
 
 #include "EventBus.hpp"
 #include "DataManager.hpp"
@@ -88,6 +90,10 @@ namespace ApplicationEvents {
     /// @brief Published when the system transition to RUNNING state finishes.
     /// Payload: nullptr
     constexpr const char* APP_RUNNING = "app.running";
+
+    /// @brief Published when a precondition changes status.
+    /// Payload: const PreconditionHealthPayload*
+    constexpr const char* PRECONDITION_HEALTH = "precondition.health";
 
     /// @brief Published when entering or updating CONFIGURING state.
     /// Payload: const AppConfiguringPayload*
@@ -244,6 +250,7 @@ public:
         if constexpr (std::is_base_of_v<IConfigGate, T>)      { registerConfigGate(module);            any = true; }
         if constexpr (std::is_base_of_v<IStatusReporter, T>)  { registerStatusReporter(module);        any = true; }
         if constexpr (std::is_base_of_v<IBootReporter, T>)    { registerBootReporter(module);          any = true; }
+        if constexpr (std::is_base_of_v<IPreconditionContributor, T>) { module->registerPreconditions(_preconditionEngine); any = true; }
         if (!any) {
             ESP_LOGW("Application", "registerModule: type implements no known framework interface");
         }
@@ -349,6 +356,12 @@ public:
      * @return Reference to the ConfigManager gateway.
      */
     ConfigManager& getConfigManager();
+
+    /**
+     * @brief Get the application's PreconditionEngine instance.
+     * @return Reference to the PreconditionEngine.
+     */
+    PreconditionEngine& getPreconditionEngine() { return _preconditionEngine; }
 
     // -------------------------------------------------------------------------
     // Core Domain Service Accessors
@@ -516,6 +529,16 @@ private:
     IBootReporter* _bootReporter = nullptr;                         ///< Boot reporter for early hardware init
 
     // Core infrastructure services
+    PreconditionEngine _preconditionEngine;
+    struct PreconditionStatusRecord {
+        bool initialized = false;
+        bool met = false;
+        Cause cause = Cause::NotConfigured;
+        Severity severity = Severity::Transient;
+        bool everMet = false;
+    };
+    PreconditionStatusRecord _lastPreconditionStatus[16]; // MAX_PRECONDITIONS
+ ///< Central precondition engine
     ConfigManager _configManager;       ///< Centralised config gateway (owned by Application)
     EventBus _eventBus;                 ///< Central event bus
     uint32_t _systemHeapPayload = 0;    ///< Persistent payload for system.heap event

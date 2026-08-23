@@ -249,6 +249,9 @@ bool Application::begin(const FrameworkConfig& config) {
     // --- Step 17: Lock all registration vectors ---
     // No further registrations are permitted after this point.
     _compactAndLock();
+    if (!_preconditionEngine.resolveEdges()) {
+        ESP_LOGE(TAG, "PreconditionEngine cycle detected!");
+    }
     _statusReporter->reportStatus("Boot complete", 1.0f);
 
     // --- Step 17b: Bless firmware (auto-rollback barrier) ---
@@ -265,9 +268,8 @@ bool Application::begin(const FrameworkConfig& config) {
     _statusReporter->clearStatus();
 
     // --- Step 20: Check config gates → RUNNING or CONFIGURING ---
-    if (_allGatesSatisfied()) {
+    if (_allGatesSatisfied() && _preconditionEngine.allStartupMet()) {
         setState(AppState::Running);
-        _dataManager.setAppRunning(true);
         _onEnterRunning();
         ESP_LOGI(TAG, "Boot sequence complete — all gates satisfied, entering RUNNING state");
     } else {
@@ -293,6 +295,7 @@ void Application::tick() {
     if (_state != AppState::Configuring && _state != AppState::Running) return;
 
     uint32_t currentMillis = millis();
+    _preconditionEngine.tick(currentMillis);
 
     // --- RUNNING: throttled gate regression check ---
     if (_state == AppState::Running) {
@@ -309,7 +312,6 @@ void Application::tick() {
                         ESP_LOGW(TAG, "Gate '%s' unsatisfied for %lums — regressing to CONFIGURING",
                                  _configGates[i]->getGateName(), (currentMillis - _gateFailedSinceMs[i].getLastFire()));
                         setState(AppState::Configuring);
-                        _dataManager.setAppRunning(false);
                         _publishConfiguringEvent(true); // isRegression = true
                         _onEnterConfiguring(true);
                         for(int j=0; j<MAX_CONFIG_GATES; ++j) _gateFailedSinceMs[j].setInterval(0);
@@ -351,10 +353,9 @@ void Application::tick() {
         }
 
         // Check if all gates now satisfied
-        if (_allGatesSatisfied()) {
+        if (_allGatesSatisfied() && _preconditionEngine.allStartupMet()) {
             setState(AppState::Running);
-            _dataManager.setAppRunning(true);
-            _onEnterRunning();
+                _onEnterRunning();
             _eventBus.publish(ApplicationEvents::APP_RUNNING);
             ESP_LOGI(TAG, "All config gates satisfied — entering RUNNING state");
         }
@@ -391,6 +392,33 @@ void Application::tick() {
     // while internal DRAM is one allocation from exhaustion. dram_min is the
     // low-water mark since boot — it matters more than dram, which is only
     // an instantaneous snapshot and can hide a transient trough.
+    if (_configuringPublishThrottle.due(currentMillis)) {
+        for (size_t i = 0; i < _preconditionEngine.getPreconditionCount(); ++i) {
+            const auto& state = _preconditionEngine.getStateAt(i);
+            auto& last = _lastPreconditionStatus[i];
+            bool changed = !last.initialized || last.met != state.dampedStatus.met ||
+                           last.cause != state.dampedStatus.cause ||
+                           last.severity != state.severity ||
+                           last.everMet != state.everMet;
+            if (changed) {
+                last.initialized = true;
+                last.met = state.dampedStatus.met;
+                last.cause = state.dampedStatus.cause;
+                last.severity = state.severity;
+                last.everMet = state.everMet;
+                PreconditionHealthPayload payload{state.name, state.dampedStatus.cause, state.severity, state.everMet};
+                _eventBus.publish(ApplicationEvents::PRECONDITION_HEALTH, &payload);
+            }
+            if (_state == AppState::Running && (state.role == PreconditionRole::Startup || state.role == PreconditionRole::Both) && state.suppressed) {
+                ESP_LOGW(TAG, "Precondition '%s' suppressed — regressing to CONFIGURING", state.name);
+                setState(AppState::Configuring);
+                _publishConfiguringEvent(true);
+                _onEnterConfiguring(true);
+                for(int j=0; j<MAX_CONFIG_GATES; ++j) _gateFailedSinceMs[j].setInterval(0);
+            }
+        }
+    }
+
     if (_heartbeatPeriodic.due(currentMillis)) {
         uint32_t freeHeap = heap_caps_get_free_size(MALLOC_CAP_8BIT);
         uint32_t freeDram = heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
