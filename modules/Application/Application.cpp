@@ -666,18 +666,16 @@ void Application::_publishConfiguringEvent(bool isRegression) {
     }
     if (blocking == nullptr) return;
 
-    static char helpBuf[128] = {};
+    _helpTextBuf[0] = '\0';
     if (blocking->describe) {
-        blocking->describe(blocking->dampedStatus.cause, helpBuf, sizeof(helpBuf));
-    } else {
-        helpBuf[0] = '\0';
+        blocking->describe(blocking->dampedStatus.cause, _helpTextBuf, sizeof(_helpTextBuf));
     }
 
     _lastPublishedGate   = blocking->name;
     _lastPublishedCause  = blocking->dampedStatus.cause;
 
     _configuringPayload.gateName     = blocking->name;
-    _configuringPayload.helpText     = helpBuf[0] != '\0' ? helpBuf : nullptr;
+    _configuringPayload.helpText     = _helpTextBuf[0] != '\0' ? _helpTextBuf : nullptr;
     _configuringPayload.cause        = blocking->dampedStatus.cause;
     _configuringPayload.severity     = blocking->severity;
     _configuringPayload.isRegression = isRegression;

@@ -501,6 +501,8 @@ private:
     /// Stable buffer for device IP pointer — IPv4 only (max "255.255.255.255\0" = 16 bytes).
     /// If IPv6 support is added, increase to INET6_ADDRSTRLEN (46).
     char             _deviceIPBuf[16] = {};
+    /// Stable buffer for precondition help text pointer in configuring payloads.
+    char             _helpTextBuf[128] = {};
 
     DataManager _dataManager;           ///< Background data manager
     WebServerManager _webServerManager; ///< Local HTTP Server
