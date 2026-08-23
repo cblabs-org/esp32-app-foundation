@@ -1,5 +1,5 @@
 # Principal Architect Memory
-<!-- Last updated: 2026-08-23T18:41:00+01:00 -->
+<!-- Last updated: 2026-08-23T19:10:00+01:00 -->
 
 ## Active Programs
 | Program | Plan | Status |
@@ -11,6 +11,7 @@
 | Project | Status | Modules | Context |
 |---|---|---|---|
 | pr-146-config-gate | WO8/8 (engine bugfixes in progress) | IPrecondition, PreconditionEngine, Application, DataManager, WifiManager, TimeManager, Display, Portal, WeatherModule, MyApp | [PROJECT.md](../pr-146-config-gate/PROJECT.md) |
+| pr-148-web-tab-registry | WO2/2 complete — awaiting PR submission | TabRegistry, IWebContributor, Application, AuthManager, LVGLDisplay, U8G2Display, WebServerManager, ConfigManager, KeyManager, WifiManager, OTA, TimeManager, HA, MCP, WeatherModule, MyApp | [PROJECT.md](../pr-148-web-tab-registry/PROJECT.md) |
 | pr-mk01-eventbus-concurrency | Planned | | [PROJECT.md](../microkernel-refactor/pr-mk01-eventbus-concurrency/PROJECT.md) |
 | pr-mk02-kernel-hardening | Planned | | [PROJECT.md](../microkernel-refactor/pr-mk02-kernel-hardening/PROJECT.md) |
 | pr-mk03-module-composition | Planned | | [PROJECT.md](../microkernel-refactor/pr-mk03-module-composition/PROJECT.md) |
