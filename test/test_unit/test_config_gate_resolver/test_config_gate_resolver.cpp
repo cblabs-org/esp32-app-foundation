@@ -16,6 +16,9 @@
 #include <gtest/gtest.h>
 #include "utils/ConfigGateResolver.hpp"
 #include "interfaces/IConfigGate.hpp"
+#include "PreconditionEngine.hpp"
+#include "WifiPreconditionContributor.hpp"
+#include "TimePreconditionContributor.hpp"
 #include <vector>
 
 class MockGate : public IConfigGate {
@@ -210,6 +213,132 @@ TEST(ConfigGateResolverTest, ShouldRepublish_BothNull_DifferentStatus_ReturnsTru
     EXPECT_TRUE(ConfigGateResolver::shouldRepublish(
         nullptr, GateActionStatus::NeedsUserAction,
         nullptr, GateActionStatus::Satisfied));
+}
+
+// ---------------------------------------------------------------------------
+// WifiPreconditionContributor Tests
+// ---------------------------------------------------------------------------
+
+TEST(WifiPreconditionContributorTest, RegistersSingleStartupPrecondition) {
+    WifiManager wifi;
+    WifiPreconditionContributor contributor(wifi);
+    PreconditionEngine engine;
+
+    contributor.registerPreconditions(engine);
+
+    EXPECT_EQ(engine.getPreconditionCount(), 1);
+    PreconditionState state;
+    EXPECT_TRUE(engine.getStateByName(PreconditionNames::WIFI_STATION, state));
+    EXPECT_EQ(state.role, PreconditionRole::Startup);
+    EXPECT_EQ(state.resolvedEdgeCount, 0);
+}
+
+TEST(WifiPreconditionContributorTest, EvaluationAndDescriptions) {
+    WifiManager wifi;
+    WifiPreconditionContributor contributor(wifi);
+    PreconditionEngine engine;
+    contributor.registerPreconditions(engine);
+    EXPECT_TRUE(engine.resolveEdges());
+
+    // 1. Initial / unconfigured state -> NotConfigured -> NeedsUser
+    engine.tick(1000);
+    PreconditionState state;
+    EXPECT_TRUE(engine.getStateByName(PreconditionNames::WIFI_STATION, state));
+    EXPECT_FALSE(state.rawStatus.met);
+    EXPECT_EQ(state.rawStatus.cause, Cause::NotConfigured);
+    EXPECT_EQ(state.severity, Severity::NeedsUser);
+
+    char desc[128] = {};
+    state.describe(Cause::NotConfigured, desc, sizeof(desc));
+    EXPECT_STREQ("Connect to the device WiFi to configure", desc);
+
+    // 2. Connecting with configured credentials
+    wifi.updateWiFi("MyNetwork", "secret");
+    engine.tick(2000);
+    EXPECT_TRUE(engine.getStateByName(PreconditionNames::WIFI_STATION, state));
+    EXPECT_FALSE(state.rawStatus.met);
+    EXPECT_EQ(state.rawStatus.cause, Cause::Connecting);
+    EXPECT_EQ(state.severity, Severity::Transient);
+
+    state.describe(Cause::Connecting, desc, sizeof(desc));
+    EXPECT_STREQ("Connecting to MyNetwork...", desc);
+
+    // 3. Fallback / Rejected / default describe messages
+    state.describe(Cause::FallbackEngaged, desc, sizeof(desc));
+    EXPECT_TRUE(strstr(desc, "Can't reach your network") != nullptr);
+
+    state.describe(Cause::Rejected, desc, sizeof(desc));
+    EXPECT_STREQ("WiFi password was refused", desc);
+
+    state.describe(Cause::Unreachable, desc, sizeof(desc));
+    EXPECT_STREQ("WiFi unavailable", desc);
+
+    // 4. Severity derivation for FallbackEngaged (AP mode)
+    EXPECT_EQ(deriveSeverity(Cause::FallbackEngaged, false), Severity::Degraded);
+    EXPECT_EQ(deriveSeverity(Cause::FallbackEngaged, true), Severity::Degraded);
+}
+
+// ---------------------------------------------------------------------------
+// TimePreconditionContributor Tests
+// ---------------------------------------------------------------------------
+
+TEST(TimePreconditionContributorTest, RegistersTwoOperationalPreconditions) {
+    TimeManager tm;
+    TimePreconditionContributor timeContributor(tm);
+
+    WifiManager wifi;
+    WifiPreconditionContributor wifiContributor(wifi);
+
+    PreconditionEngine engine;
+    wifiContributor.registerPreconditions(engine);
+    timeContributor.registerPreconditions(engine);
+
+    EXPECT_EQ(engine.getPreconditionCount(), 3);
+    EXPECT_TRUE(engine.resolveEdges());
+
+    PreconditionState tzState;
+    EXPECT_TRUE(engine.getStateByName(PreconditionNames::TIMEZONE, tzState));
+    EXPECT_EQ(tzState.role, PreconditionRole::Operational);
+    EXPECT_EQ(tzState.resolvedEdgeCount, 0);
+
+    PreconditionState syncState;
+    EXPECT_TRUE(engine.getStateByName(PreconditionNames::TIME_SYNC, syncState));
+    EXPECT_EQ(syncState.role, PreconditionRole::Operational);
+    EXPECT_EQ(syncState.resolvedEdgeCount, 1);
+    EXPECT_EQ(syncState.resolvedEdges[0], 0); // Index of PreconditionNames::WIFI_STATION
+}
+
+TEST(TimePreconditionContributorTest, EvaluationAndDescriptions) {
+    TimeManager tm;
+    TimePreconditionContributor timeContributor(tm);
+
+    WifiManager wifi;
+    WifiPreconditionContributor wifiContributor(wifi);
+
+    PreconditionEngine engine;
+    wifiContributor.registerPreconditions(engine);
+    timeContributor.registerPreconditions(engine);
+    EXPECT_TRUE(engine.resolveEdges());
+
+    engine.tick(1000);
+
+    // Timezone: unconfigured -> NotConfigured -> NeedsUser
+    PreconditionState tzState;
+    EXPECT_TRUE(engine.getStateByName(PreconditionNames::TIMEZONE, tzState));
+    EXPECT_FALSE(tzState.rawStatus.met);
+    EXPECT_EQ(tzState.rawStatus.cause, Cause::NotConfigured);
+    EXPECT_EQ(tzState.severity, Severity::NeedsUser);
+
+    char desc[128] = {};
+    tzState.describe(tzState.rawStatus.cause, desc, sizeof(desc));
+    EXPECT_STREQ("Set your timezone in the Time settings", desc);
+
+    // Time Sync: Requires WiFi Station which is unmet -> DependencyUnmet -> Blocked
+    PreconditionState syncState;
+    EXPECT_TRUE(engine.getStateByName(PreconditionNames::TIME_SYNC, syncState));
+    EXPECT_FALSE(syncState.rawStatus.met);
+    EXPECT_EQ(syncState.rawStatus.cause, Cause::DependencyUnmet);
+    EXPECT_EQ(syncState.severity, Severity::Blocked);
 }
 
 int main(int argc, char** argv) {

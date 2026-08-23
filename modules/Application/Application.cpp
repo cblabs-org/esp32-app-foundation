@@ -27,6 +27,7 @@
 
 #include "Application.hpp"
 #include "events/AppConfiguringPayload.hpp"
+#include "events/PreconditionHealthPayload.hpp"
 #include "utils/ConfigGateResolver.hpp"
 
 
@@ -191,6 +192,7 @@ bool Application::begin(const FrameworkConfig& config) {
 
 
     registerModule(&_wifiGate);           // IConfigGate
+    _wifiPrecondition.registerPreconditions(_preconditionEngine);
 
     // --- Step 8: ConfigManager.beginAll() — load all persisted config ---
     // Iterates the registry, loads each module's namespace file from

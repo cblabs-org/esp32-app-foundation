@@ -5,24 +5,6 @@
 
 static const char* TAG = "PreconditionEngine";
 
-Severity deriveSeverity(Cause cause, bool everMet) {
-    switch (cause) {
-        case Cause::Met: return Severity::Transient;
-        case Cause::Connecting: return Severity::Transient;
-        case Cause::Unreachable: return everMet ? Severity::Transient : Severity::NeedsUser;
-        case Cause::RateLimited: return Severity::Transient;
-        case Cause::Implausible: return everMet ? Severity::Transient : Severity::NeedsUser;
-        case Cause::NotConfigured: return Severity::NeedsUser;
-        case Cause::Rejected: return Severity::NeedsUser;
-        case Cause::DependencyUnmet: return Severity::Blocked;
-        case Cause::Indeterminate: return Severity::Persistent;
-        case Cause::FallbackEngaged: return Severity::Degraded;
-        case Cause::Unavailable: return Severity::Inactive;
-        case Cause::InternalError: return Severity::Persistent;
-        default: return Severity::Transient;
-    }
-}
-
 void PreconditionEngine::add(const char* name,
                              PreconditionRole role,
                              EvalFn evaluate,

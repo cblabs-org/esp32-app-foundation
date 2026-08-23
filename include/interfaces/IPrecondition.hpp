@@ -122,14 +122,23 @@ enum class BreakerState : uint8_t {
     HalfOpen     ///< Cooldown elapsed — trial probe in progress
 };
 
-/**
- * @brief Derive the severity level from a cause and trust history (CG-4, CG-4a).
- *
- * @param cause   The current evaluation cause.
- * @param everMet Whether this precondition has ever succeeded with trusted result in the current epoch.
- * @return Derived Severity level.
- */
-Severity deriveSeverity(Cause cause, bool everMet = false);
+inline Severity deriveSeverity(Cause cause, bool everMet = false) {
+    switch (cause) {
+        case Cause::Met: return Severity::Transient;
+        case Cause::Connecting: return Severity::Transient;
+        case Cause::Unreachable: return everMet ? Severity::Transient : Severity::NeedsUser;
+        case Cause::RateLimited: return Severity::Transient;
+        case Cause::Implausible: return everMet ? Severity::Transient : Severity::NeedsUser;
+        case Cause::NotConfigured: return Severity::NeedsUser;
+        case Cause::Rejected: return Severity::NeedsUser;
+        case Cause::DependencyUnmet: return Severity::Blocked;
+        case Cause::Indeterminate: return Severity::Persistent;
+        case Cause::FallbackEngaged: return Severity::Degraded;
+        case Cause::Unavailable: return Severity::Inactive;
+        case Cause::InternalError: return Severity::Persistent;
+        default: return Severity::Transient;
+    }
+}
 
 /**
  * @brief Well-known precondition name constants.

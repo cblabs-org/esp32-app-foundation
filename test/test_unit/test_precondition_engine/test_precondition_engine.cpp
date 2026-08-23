@@ -1,8 +1,5 @@
 #include <gtest/gtest.h>
-#include "modules/PreconditionEngine/PreconditionEngine.hpp"
-
-// Include cpp file directly for native testing to bypass LDF issue
-#include "modules/PreconditionEngine/PreconditionEngine.cpp"
+#include "PreconditionEngine.hpp"
 
 class PreconditionEngineTest : public ::testing::Test {
 protected:

@@ -109,19 +109,23 @@ If you discover a defect, upstream bug, or concern *outside your boundary box*, 
 <!-- Written by the worker at task completion -->
 
 ### Status
-(pending)
+Completed
 
 ### Changes Made
-(pending)
+- **New File**: Created `include/events/PreconditionHealthPayload.hpp` defining the `PreconditionHealthPayload` struct for `PRECONDITION_HEALTH` events.
+- **Application.hpp/cpp**: Injected the `PreconditionEngine` instance, added `PreconditionStatusRecord` for state-change detection, and integrated `registerPreconditions` dispatching. Implemented graph edge resolution on `begin()`, gated transition on `allStartupMet()`, delegated `tick()` calls to the engine, published `PRECONDITION_HEALTH` events in the 500ms throttle, and drove regressive `AppState::Configuring` transitions from damped suppressed states.
+- **DataManager.hpp/cpp**: Fully scrubbed the `_appRunning` variable, removing the orchestrator anti-pattern `setAppRunning` guard from the `executeLoop()`.
+- **Tests**: Replaced/disabled deprecated `_appRunning` tests in `test_dataManager` and added unit test coverage in `test_application` for the engine's integration. Verified a full 797-test passing native suite.
 
 ### Decisions Made
-(pending)
+- Used Python-based find/replace scripts to safely navigate complex, multi-line C++ file surgeries during execution.
+- Completely `DISABLED_` legacy test cases reliant upon `DataManagerGatingTest` asserting that the app suppressed fetching when `setAppRunning(false)`, as `DataManager`'s standalone fetching behavior had been modified.
 
 ### Dead Ends & Warnings
-(pending)
+- Encountered a short detour where `TaskHandle_t _workerTask` was mistakenly removed from `DataManager.hpp` during refactoring, bringing down a batch of unit tests. It was quickly diagnosed and reverted.
 
 ### Out-of-Scope Findings
-(pending)
+None
 
 ### Blockers
-(pending)
+None

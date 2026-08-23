@@ -60,6 +60,7 @@
 #include "interfaces/IBootReporter.hpp"
 #include "interfaces/IPreconditionContributor.hpp"
 #include "events/AppConfiguringPayload.hpp"
+#include "events/PreconditionHealthPayload.hpp"
 #include "PreconditionEngine/PreconditionEngine.hpp"
 
 #include "EventBus.hpp"
@@ -70,6 +71,7 @@
 // Core domain services (owned by value — full includes required)
 #include "WifiManager.hpp"
 #include "WifiConfigGate.hpp"
+#include "WifiPreconditionContributor.hpp"
 #include "KeyManager.hpp"
 #include "AuthManager.hpp"
 #include "DeviceCrypto.hpp"
@@ -562,6 +564,7 @@ private:
     AuthManager _authManager;           ///< Portal + MCP authentication manager (WO1 skeleton)
     WifiManager _wifiManager;           ///< WiFi connection state machine
     WifiConfigGate _wifiGate{_wifiManager}; ///< Built-in WiFi STA config gate
+    WifiPreconditionContributor _wifiPrecondition{_wifiManager}; ///< Built-in WiFi STA precondition contributor
 
     // Heartbeat
     Periodic _heartbeatPeriodic{30000};                              ///< Throttle for periodic heartbeat log (30s)
