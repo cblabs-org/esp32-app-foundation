@@ -245,22 +245,30 @@ TEST_F(AuthManagerTest, test_apply_config_sets_tls_enabled) {
 }
 
 // ===========================================================================
-// WO1 Tests — IWebContributor: tab metadata
+// WO1 Tests — IWebContributor: tab metadata (via registerTabs)
 // ===========================================================================
 
 /**
- * @brief getTabName() must return "Security" for the Security bottom-nav tab.
+ * @brief registerTabs() must register the Security tab with expected metadata.
  */
-TEST_F(AuthManagerTest, test_tab_name) {
-    EXPECT_STREQ("Security", auth.getTabName());
-}
+TEST_F(AuthManagerTest, test_register_tabs) {
+    // Collect tabs via a mock TabRegistry
+    struct CollectorRegistry : public TabRegistry {
+        struct Entry { std::string name; std::string parent; int order; };
+        std::vector<Entry> entries;
+        void addTab(const char* name, const char* parent, int order,
+                    const char* /*icon*/, const char* /*script*/) override {
+            entries.push_back({name, parent ? parent : "", order});
+        }
+    };
+    CollectorRegistry collector;
+    auth.registerTabs(collector);
 
-/**
- * @brief getParentTab() must return nullptr — Security is a top-level tab
- *        (not nested under System or any other parent).
- */
-TEST_F(AuthManagerTest, test_parent_tab) {
-    EXPECT_EQ(nullptr, auth.getParentTab());
+    // Security parent tab must be first
+    ASSERT_GE(collector.entries.size(), 1u);
+    EXPECT_EQ(collector.entries[0].name, "Security");
+    EXPECT_EQ(collector.entries[0].parent, "");
+    EXPECT_EQ(collector.entries[0].order, 5);
 }
 
 /**

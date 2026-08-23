@@ -470,16 +470,21 @@ TEST_F(ConfigManagerTest, ExportAllConfig_OtaNamespacePresent) {
 // Test Group 7: IWebContributor
 // =============================================================================
 
-TEST_F(ConfigManagerTest, GetTabName_ReturnsBackup) {
-    EXPECT_STREQ("Backup", configManager.getTabName());
-}
-
-TEST_F(ConfigManagerTest, GetParentTab_ReturnsSystem) {
-    EXPECT_STREQ("System", configManager.getParentTab());
-}
-
-TEST_F(ConfigManagerTest, GetTabOrder_Returns40) {
-    EXPECT_EQ(40, configManager.getTabOrder());
+TEST_F(ConfigManagerTest, RegisterTabs_BackupUnderSystem) {
+    struct CollectorRegistry : public TabRegistry {
+        struct Entry { std::string name; std::string parent; int order; };
+        std::vector<Entry> entries;
+        void addTab(const char* name, const char* parent, int order,
+                    const char* /*icon*/, const char* /*script*/) override {
+            entries.push_back({name, parent ? parent : "", order});
+        }
+    };
+    CollectorRegistry collector;
+    configManager.registerTabs(collector);
+    ASSERT_EQ(collector.entries.size(), 1u);
+    EXPECT_EQ(collector.entries[0].name, "Backup");
+    EXPECT_EQ(collector.entries[0].parent, "System");
+    EXPECT_EQ(collector.entries[0].order, 40);
 }
 
 // =============================================================================

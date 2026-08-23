@@ -152,28 +152,12 @@ public:
     void registerRoutes(PsychicHttpServer& server) override;
 
     /**
-     * @brief Get the UI tab name for this contributor.
-     * @return "Time"
+     * @brief Register the Time tab in the System sub-navigation.
+     * @param registry  The TabRegistry to register tabs with.
      */
-    const char* getTabName() const override { return "Time"; }
-
-    /**
-     * @brief Get the parent tab for navigation hierarchy.
-     * @return "System" — Time appears as a sub-section of the System tab.
-     */
-    const char* getParentTab() const override { return "System"; }
-
-    /**
-     * @brief Get the tab display order within the System sub-navigation.
-     * @return 15 — positioned between Status (10) and Keys (20).
-     */
-    int getTabOrder() const override { return 15; }
-
-    /**
-     * @brief Return the route path for this tab's JavaScript file.
-     * @return "/time.js"
-     */
-    const char* getTabScript() const override { return "/time.js"; }
+    void registerTabs(TabRegistry& registry) override {
+        registry.addTab("Time", "System", 15, nullptr, "/time.js");
+    }
 
     /**
      * @brief Return the API path prefix for body-size middleware matching.

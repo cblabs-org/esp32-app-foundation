@@ -292,37 +292,12 @@ public:
     void registerRoutes(PsychicHttpServer& server) override;
 
     /**
-     * @brief Get the UI tab name for this contributor.
-     * @return String name of the tab.
+     * @brief Register the OTA tab in the System sub-navigation.
+     * @param registry  The TabRegistry to register tabs with.
      */
-    const char* getTabName() const override { return "OTA"; }
-
-    /**
-     * @brief Get the parent tab name for hierarchical navigation.
-     *
-     * OTA is a sub-section of the "System" top-level tab, alongside
-     * ConfigManager (order 20). This groups all system-level
-     * contributors under a single bottom-nav item.
-     *
-     * @return "System"
-     */
-    const char* getParentTab() const override { return "System"; }
-
-    /**
-     * @brief Get the display order within the System sub-navigation.
-     *
-     * Positioned after Backup (40) in the System pill bar:
-     * Status=10, Keys=20, MCP=30, Backup=40, OTA=50, Screenshot=60.
-     *
-     * @return 50
-     */
-    int getTabOrder() const override { return 50; }
-
-    /**
-     * @brief Return the route path for this tab's JavaScript file.
-     * @return "/ota.js"
-     */
-    const char* getTabScript() const override { return "/ota.js"; }
+    void registerTabs(TabRegistry& registry) override {
+        registry.addTab("OTA", "System", 50, nullptr, "/ota.js");
+    }
 
     /**
      * @brief Return the API path prefix for body-size middleware matching.

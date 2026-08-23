@@ -238,16 +238,12 @@ public:
     void registerRoutes(PsychicHttpServer& server) override;
 
     /**
-     * @brief Get the UI tab name for this contributor.
-     * @return "WiFi"
+     * @brief Register the WiFi tab as a top-level navigation tab.
+     * @param registry  The TabRegistry to register tabs with.
      */
-    const char* getTabName() const override { return "WiFi"; }
-
-    /**
-     * @brief Get the tab display order. WiFi is the primary/first tab.
-     * @return 10
-     */
-    int getTabOrder() const override { return 10; }
+    void registerTabs(TabRegistry& registry) override {
+        registry.addTab("WiFi", nullptr, 10);
+    }
 
     /**
      * @brief Return the API path prefix for body-size middleware matching.

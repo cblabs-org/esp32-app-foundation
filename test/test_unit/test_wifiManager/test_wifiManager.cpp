@@ -123,9 +123,22 @@ TEST_F(WifiManagerTest, SSIDOverflow) {
     EXPECT_STREQ("12345678901234567890123456789012", wifiManager.getSSID());
 }
 
-// getTabName()
-TEST_F(WifiManagerTest, GetTabName) {
-    EXPECT_STREQ("WiFi", wifiManager.getTabName());
+// registerTabs()
+TEST_F(WifiManagerTest, RegisterTabs_WiFiTopLevel) {
+    struct CollectorRegistry : public TabRegistry {
+        struct Entry { std::string name; std::string parent; int order; };
+        std::vector<Entry> entries;
+        void addTab(const char* name, const char* parent, int order,
+                    const char* /*icon*/, const char* /*script*/) override {
+            entries.push_back({name, parent ? parent : "", order});
+        }
+    };
+    CollectorRegistry collector;
+    wifiManager.registerTabs(collector);
+    ASSERT_EQ(collector.entries.size(), 1u);
+    EXPECT_EQ(collector.entries[0].name, "WiFi");
+    EXPECT_EQ(collector.entries[0].parent, "");
+    EXPECT_EQ(collector.entries[0].order, 10);
 }
 
 // getConfigNamespace()
@@ -136,11 +149,6 @@ TEST_F(WifiManagerTest, GetConfigNamespace) {
 // getSchemaVersion()
 TEST_F(WifiManagerTest, GetSchemaVersion) {
     EXPECT_EQ(1, wifiManager.getSchemaVersion());
-}
-
-// getTabOrder()
-TEST_F(WifiManagerTest, GetTabOrder) {
-    EXPECT_EQ(10, wifiManager.getTabOrder());
 }
 
 // applyConfig with valid JSON

@@ -180,19 +180,12 @@ void MyApp::registerRoutes(PsychicHttpServer& server) {
 }
 
 /**
- * @brief Returns the UI tab name for this module.
- * @return Tab display name string.
+ * @brief Register the MyApp tab as a top-level navigation tab.
+ * @param registry  The TabRegistry to register tabs with.
  */
-const char* MyApp::getTabName() const {
-    return "MyApp";  // TODO: Change "MyApp" to your tab display name
-}
-
-/**
- * @brief Returns the tab sort order (lower values appear first).
- * @return Integer sort order.
- */
-int MyApp::getTabOrder() const {
-    return 100; // Default tab order
+void MyApp::registerTabs(TabRegistry& registry) {
+    registry.addTab("MyApp", nullptr, 100);
+    // TODO: Change "MyApp" and 100 to your tab name and desired order
 }
 
 // =============================================================================

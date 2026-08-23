@@ -183,7 +183,7 @@ bool Application::begin(const FrameworkConfig& config) {
     registerModule(&_preconditionWebContributor); // IWebContributor
 
 
-    registerModule(&_webServerManager);   // ITickable
+    registerModule(&_webServerManager);   // ITickable + IWebContributor (Status tab)
     if (_enableDefaultAppTab) {
         registerModule(&_appTabContributor);  // IWebContributor
     }

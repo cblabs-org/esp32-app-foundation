@@ -222,22 +222,6 @@ public:
      */
     void registerRoutes(PsychicHttpServer& server) override;
 
-    /** @brief Return the Security tab display name. @return "Security" */
-    const char* getTabName()   const override { return "Security"; }
-
-    /** @brief Return nullptr — Security is a top-level bottom-nav tab. @return nullptr */
-    const char* getParentTab() const override { return nullptr; }
-
-    /**
-     * @brief Return the tab order — 5 places Security first in the bottom nav.
-     *
-     * WiFi uses order 10; placing Security at 5 makes the lock icon the leftmost
-     * tab, visually emphasising that security configuration is available and prominent.
-     *
-     * @return 5
-     */
-    int getTabOrder() const override { return 5; }
-
     /**
      * @brief Return the API path prefix for body-size middleware matching.
      * @return "/api/auth"
@@ -253,12 +237,11 @@ public:
     /**
      * @brief Return the feather-icons lock SVG inner content for the bottom-nav icon.
      *
-     * The returned string contains two <path> elements (no outer <svg> tag).
-     * app.js wraps these in <svg viewBox="0 0 24 24" ...> when building the nav link.
+     * Called by registerTabs() to provide the icon for the Security tab.
      *
      * @return Lock SVG path string (feather-icons style, stroke-based).
      */
-    const char* getTabIcon() const override;
+    const char* getTabIcon() const;
 
     // -------------------------------------------------------------------------
     // Multi-tab registration (replaces inner stub objects)

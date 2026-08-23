@@ -87,7 +87,7 @@ class WifiManager;
  * - HTTP-open mode: all routes on port 80 via _httpServer (pre-PR-24 behavior)
  * - TLS mode: all routes on port 443 via _httpsServer + redirect on port 80
  */
-class WebServerManager : public ITickable {
+class WebServerManager : public ITickable, public IWebContributor {
 public:
     /**
      * @brief Construct the WebServerManager with HTTP server on port 80.
@@ -146,6 +146,12 @@ public:
                WifiManager* wifiManager = nullptr);
 
     void tick(uint32_t currentMillis) override;
+
+    // IWebContributor — Status tab + system routes (registered in begin())
+    void registerRoutes(PsychicHttpServer& /*server*/) override {}  // Routes registered inline in begin()
+    void registerTabs(TabRegistry& registry) override {
+        registry.addTab("Status", "System", 10);
+    }
 
     // Non-copyable, non-movable: AsyncWebServer member is not copy/move-safe.
     WebServerManager(const WebServerManager&) = delete;

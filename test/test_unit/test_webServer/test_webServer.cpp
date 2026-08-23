@@ -9,6 +9,7 @@ public:
     void registerRoutes(PsychicHttpServer& server) override {
         registered = true;
     }
+    void registerTabs(TabRegistry& /*registry*/) override {}
 };
 
 TEST(WebServerManagerTest, InitializationAndDispatch) {
@@ -44,8 +45,10 @@ public:
     void registerRoutes(PsychicHttpServer& server) override {
         registered = true;
     }
-    const char* getTabName() const override {
-        return tabName;
+    void registerTabs(TabRegistry& registry) override {
+        if (tabName) {
+            registry.addTab(tabName, nullptr, 100);
+        }
     }
 };
 
@@ -127,12 +130,12 @@ TEST(WebServerManagerTest, RouteMethodVerification) {
 
 TEST(WebServerManagerTest, ContributorWithTabName) {
     TabMockContributor c("MyTab");
-    EXPECT_STREQ(c.getTabName(), "MyTab");
+    EXPECT_STREQ(c.tabName, "MyTab");
 }
 
 TEST(WebServerManagerTest, ContributorWithoutTabName) {
     TabMockContributor c(nullptr);
-    EXPECT_EQ(c.getTabName(), nullptr);
+    EXPECT_EQ(c.tabName, nullptr);
 }
 
 TEST(WebServerManagerTest, POSTBodySizeCap) {

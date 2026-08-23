@@ -214,11 +214,25 @@ TEST_F(WeatherModuleTest, GetUnitsAfterConfig) {
 // =============================================================================
 
 TEST_F(WeatherModuleTest, TabMetadata) {
-    EXPECT_STREQ(module.getTabName(), "Weather");
-    EXPECT_EQ(module.getParentTab(), nullptr);
-    EXPECT_EQ(module.getTabOrder(), 50);
+    // Verify tab registration via registerTabs()
+    struct CollectorRegistry : public TabRegistry {
+        struct Entry { std::string name; std::string parent; int order; bool hasIcon; std::string script; };
+        std::vector<Entry> entries;
+        void addTab(const char* name, const char* parent, int order,
+                    const char* icon, const char* script) override {
+            entries.push_back({name, parent ? parent : "", order, icon != nullptr, script ? script : ""});
+        }
+    };
+    CollectorRegistry collector;
+    module.registerTabs(collector);
+    ASSERT_EQ(collector.entries.size(), 1u);
+    EXPECT_EQ(collector.entries[0].name, "Weather");
+    EXPECT_EQ(collector.entries[0].parent, "");
+    EXPECT_EQ(collector.entries[0].order, 50);
+    EXPECT_TRUE(collector.entries[0].hasIcon);
+    EXPECT_EQ(collector.entries[0].script, "/weather.js");
+
     EXPECT_NE(module.getTabIcon(), nullptr);
-    EXPECT_STREQ(module.getTabScript(), "/weather.js");
     EXPECT_STREQ(module.getApiPrefix(), "/api/weather");
     EXPECT_EQ(module.getMaxPostBody(), 4096u);
 }

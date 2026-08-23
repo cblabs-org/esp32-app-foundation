@@ -390,24 +390,6 @@ public:
     void registerRoutes(PsychicHttpServer& server) override;
 
     /**
-     * @brief Get the UI tab name for this contributor.
-     * @return "Display"
-     */
-    const char* getTabName() const override { return "Display"; }
-
-    /**
-     * @brief Get the tab display order.
-     * @return 30 — Display tab appears before mid-range tabs.
-     */
-    int getTabOrder() const override { return 50; }
-
-    /**
-     * @brief Return the route path for this tab's JavaScript file.
-     * @return "/display.js"
-     */
-    const char* getTabScript() const override { return "/display.js"; }
-
-    /**
      * @brief Return the API path prefix for body-size middleware matching.
      * @return "/api/display"
      */
@@ -417,7 +399,7 @@ public:
      * @brief Return SVG inner content for the Display bottom-nav icon.
      * @return Feather-style "monitor" icon SVG body string.
      */
-    const char* getTabIcon() const override;
+    const char* getTabIcon() const;
 
     /**
      * @brief Register Display parent tab and Settings/Screenshot/Carousel sub-pills.

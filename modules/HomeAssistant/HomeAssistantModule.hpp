@@ -41,10 +41,7 @@
  *
  *   IWebContributor:
  *   - registerRoutes():    Registers GET/POST routes for HA config and TLS cert
- *   - getTabName():        Returns "HA"
- *   - getParentTab():      Returns nullptr (top-level tab)
- *   - getTabOrder():       Returns 40
- *   - getTabIcon():        Returns Home Assistant logo SVG
+ *   - registerTabs():      Registers "HA" top-level tab (order 40, icon, script)
  *
  *   IMCPContributor:
  *   - registerMCPTools():  Registers ha_get_state and ha_call_service MCP tools
@@ -302,29 +299,22 @@ public:
      */
     void registerRoutes(PsychicHttpServer& server) override;
 
-    /** @brief Returns the bottom-nav tab label "HA". */
-    const char* getTabName() const override { return "HA"; }
-
-    /** @brief Returns nullptr (top-level tab, no parent). */
-    const char* getParentTab() const override { return nullptr; }
-
-    /** @brief Returns tab display order 40. */
-    int getTabOrder() const override { return 40; }
-
     /**
-     * @brief Return the route path for this tab's JavaScript file.
-     * @return "/homeassistant.js"
+     * @brief Register the HA tab as a top-level navigation tab.
+     * @param registry  The TabRegistry to register tabs with.
      */
-    const char* getTabScript() const override { return "/homeassistant.js"; }
+    void registerTabs(TabRegistry& registry) override {
+        registry.addTab("HA", nullptr, 40, getTabIcon(), "/homeassistant.js");
+    }
+
+    /** @brief Returns SVG inner content for the Home Assistant logo icon. */
+    const char* getTabIcon() const;
 
     /**
      * @brief Return the API path prefix for body-size middleware matching.
      * @return "/api/homeassistant"
      */
     const char* getApiPrefix() const override { return "/api/homeassistant"; }
-
-    /** @brief Returns SVG inner content for the Home Assistant logo icon. */
-    const char* getTabIcon() const override;
 
     // IMCPContributor
 

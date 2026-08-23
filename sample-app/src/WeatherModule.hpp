@@ -368,20 +368,14 @@ public:
      */
     void registerRoutes(PsychicHttpServer& server) override;
 
-    /** @brief Returns the portal tab label: "Weather". */
-    const char* getTabName() const override { return "Weather"; }
-
-    /** @brief Returns nullptr — this is a top-level tab with no parent. */
-    const char* getParentTab() const override { return nullptr; }
-
-    /** @brief Returns the tab display order: 50 (mid-priority). */
-    int getTabOrder() const override { return 50; }
+    /** @brief Register the Weather tab as a top-level navigation tab.
+     *  @param registry  The TabRegistry to register tabs with. */
+    void registerTabs(TabRegistry& registry) override {
+        registry.addTab("Weather", nullptr, 50, getTabIcon(), "/weather.js");
+    }
 
     /** @brief Returns the SVG path data for the cloud weather icon. */
-    const char* getTabIcon() const override { return "<path d=\"M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z\"/>"; }
-
-    /** @brief Returns the route path for the Weather tab's JavaScript file. */
-    const char* getTabScript() const override { return "/weather.js"; }
+    const char* getTabIcon() const { return "<path d=\"M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z\"/>"; }
 
     /** @brief Returns the API path prefix for body-size middleware matching. */
     const char* getApiPrefix() const override { return "/api/weather"; }

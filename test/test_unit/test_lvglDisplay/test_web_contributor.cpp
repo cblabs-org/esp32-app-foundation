@@ -34,8 +34,6 @@ public:
 };
 
 TEST_F(LVGLWebContributorTest, TabMetadata) {
-    EXPECT_STREQ(display.getTabName(), "Display");
-    EXPECT_EQ(display.getTabOrder(), 50);
     EXPECT_STREQ(display.getApiPrefix(), "/api/display");
     EXPECT_NE(display.getTabIcon(), nullptr);
 
