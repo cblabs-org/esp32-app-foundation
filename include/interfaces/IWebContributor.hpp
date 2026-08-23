@@ -31,6 +31,8 @@
 
 #pragma once
 
+#include "utils/TabRegistry.hpp"
+
 // Forward-declare to avoid pulling in full headers in interface-only files.
 // Concrete implementations include the full headers.
 class PsychicHttpServer;
@@ -122,6 +124,21 @@ public:
      * @return Route path string (e.g. "/weather.js"), or nullptr.
      */
     virtual const char* getTabScript() const { return nullptr; }
+
+    /**
+     * @brief Register all navigation tabs this module contributes.
+     *
+     * Override to register multiple tabs from a single module.
+     * Default reads scalar getters for backward compatibility;
+     * will become pure virtual once all modules migrate.
+     */
+    virtual void registerTabs(TabRegistry& registry) {
+        const char* name = getTabName();
+        if (name) {
+            registry.addTab(name, getParentTab(), getTabOrder(),
+                            getTabIcon(), getTabScript());
+        }
+    }
 
     /**
      * @brief Return the API path prefix for this contributor's routes.

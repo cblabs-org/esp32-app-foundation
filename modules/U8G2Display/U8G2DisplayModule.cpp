@@ -756,6 +756,13 @@ const char* U8G2DisplayModule::getTabIcon() const {
            "<line x1=\"12\" y1=\"17\" x2=\"12\" y2=\"21\"/>";
 }
 
+void U8G2DisplayModule::registerTabs(TabRegistry& registry) {
+    registry.addTab("Display", nullptr, 50, getTabIcon(), "/display.js");
+    registry.addTab("Settings",   "Display", 10);
+    registry.addTab("Screenshot", "Display", 20);
+    registry.addTab("Carousel",   "Display", 30, nullptr, "/carousel.js");
+}
+
 /**
  * @brief Register display REST API routes with the web server.
  *

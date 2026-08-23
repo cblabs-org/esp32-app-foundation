@@ -48,8 +48,7 @@
  *   - getParentTab():           Returns nullptr (top-level tab).
  *   - getTabOrder():            Returns 5 (first in bottom nav, emphasises security).
  *   - getTabIcon():             Returns lock SVG inner content (feather-icons style).
- *   - passwordTabStub():        Returns inner IWebContributor for "Password" sub-pill.
- *   - tlsTabStub():             Returns inner IWebContributor for "TLS" sub-pill.
+ *   - registerTabs():           Registers Security, Password, and TLS tabs via TabRegistry.
  *
  *   IConfigurable (namespace: "auth", schema v1):
  *   - getConfigNamespace():     Returns "auth".
@@ -262,30 +261,18 @@ public:
     const char* getTabIcon() const override;
 
     // -------------------------------------------------------------------------
-    // Sub-pill navigation stubs
+    // Multi-tab registration (replaces inner stub objects)
     // -------------------------------------------------------------------------
 
     /**
-     * @brief Return the Password sub-pill tab stub for registration.
+     * @brief Register the Security parent tab and its Password/TLS sub-pills.
      *
-     * Provides a "Password" child tab entry under the "Security" parent in
-     * /api/tabs. Carries no routes — all REST routes remain registered by
-     * the main AuthManager via registerRoutes().
+     * Overrides the default scalar-getter implementation to register all three
+     * tabs from a single module, eliminating inner IWebContributor stub objects.
      *
-     * @return Pointer to the internal PasswordTabStub IWebContributor.
+     * @param registry  The TabRegistry to register tabs with.
      */
-    IWebContributor* passwordTabStub() { return &_passwordTabStub; }
-
-    /**
-     * @brief Return the TLS sub-pill tab stub for registration.
-     *
-     * Provides a "TLS" child tab entry under the "Security" parent in
-     * /api/tabs. Carries no routes — all REST routes remain registered by
-     * the main AuthManager via registerRoutes().
-     *
-     * @return Pointer to the internal TlsTabStub IWebContributor.
-     */
-    IWebContributor* tlsTabStub() { return &_tlsTabStub; }
+    void registerTabs(TabRegistry& registry) override;
 
     // -------------------------------------------------------------------------
     // IConfigurable (namespace: "auth", schema v1)
@@ -487,30 +474,6 @@ private:
     // -------------------------------------------------------------------------
     friend class AuthManagerAccessor;
 #endif
-    // -------------------------------------------------------------------------
-    // Sub-tab navigation stubs — provide "Password" and "TLS" child tab
-    // entries under the "Security" parent in /api/tabs. They carry no routes;
-    // all REST routes remain registered by the main module via registerRoutes().
-    // Owned as members; exposed via passwordTabStub() / tlsTabStub()
-    // for registration by Application::begin().
-    // -------------------------------------------------------------------------
-
-    struct PasswordTabStub : public IWebContributor {
-        void        registerRoutes(PsychicHttpServer& /*server*/) override {}
-        const char* getTabName()   const override { return "Password"; }
-        const char* getParentTab() const override { return "Security"; }
-        int         getTabOrder()  const override { return 10;         }
-    };
-
-    struct TlsTabStub : public IWebContributor {
-        void        registerRoutes(PsychicHttpServer& /*server*/) override {}
-        const char* getTabName()   const override { return "TLS"; }
-        const char* getParentTab() const override { return "Security"; }
-        int         getTabOrder()  const override { return 20;         }
-    };
-
-    PasswordTabStub _passwordTabStub; ///< Nav stub: Password sub-pill under Security
-    TlsTabStub      _tlsTabStub;      ///< Nav stub: TLS sub-pill under Security
 
     // LittleFS helpers (hardware builds only — no-ops in native builds)
     // -------------------------------------------------------------------------

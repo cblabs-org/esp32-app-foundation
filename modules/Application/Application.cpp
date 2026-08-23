@@ -177,8 +177,6 @@ bool Application::begin(const FrameworkConfig& config) {
     // --- Module registration (auto-detects all interfaces per module) ---
     registerModule(&_wifiManager);        // ITickable + IConfigurable + IWebContributor + IMCPContributor
     registerModule(&_authManager);        // IConfigurable + IWebContributor
-    registerModule(_authManager.passwordTabStub());  // IWebContributor (sub-pill)
-    registerModule(_authManager.tlsTabStub());       // IWebContributor (sub-pill)
     registerModule(&_configManager);      // IWebContributor + IMCPContributor
     registerModule(&_keyManager);         // IWebContributor + IMCPContributor
     _preconditionWebContributor.app = this;

@@ -240,6 +240,13 @@ const char* U8G2DisplayModule::getTabIcon() const {
     return nullptr;
 }
 
+void U8G2DisplayModule::registerTabs(TabRegistry& registry) {
+    registry.addTab("Display", nullptr, 50, getTabIcon(), "/display.js");
+    registry.addTab("Settings",   "Display", 10);
+    registry.addTab("Screenshot", "Display", 20);
+    registry.addTab("Carousel",   "Display", 30, nullptr, "/carousel.js");
+}
+
 // ── IMCPContributor ──────────────────────────────────────────────────────────
 
 void U8G2DisplayModule::registerMCPTools(MCPToolRegistry& registry) {

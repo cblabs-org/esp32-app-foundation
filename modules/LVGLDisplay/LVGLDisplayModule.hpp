@@ -315,9 +315,11 @@ public:
     const char* getApiPrefix() const override { return "/api/display"; }
     const char* getTabIcon() const override;
 
-    IWebContributor* settingsTabStub() { return &_settingsTabStub; }
-    IWebContributor* screenshotTabStub() { return &_screenshotTabStub; }
-    IWebContributor* hardwareTabStub() { return &_hardwareContributor; }
+    /**
+     * @brief Register Display parent tab and Settings/Screenshot/Hardware sub-pills.
+     * @param registry  The TabRegistry to register tabs with.
+     */
+    void registerTabs(TabRegistry& registry) override;
 
     // -------------------------------------------------------------------------
     // IMCPContributor — MCP display tools
@@ -394,32 +396,6 @@ public:
     const ScreensaverController& getScreensaver() const { return _screensaver; }
 
 private:
-    struct SettingsTabStub : public IWebContributor {
-        void registerRoutes(PsychicHttpServer& /*server*/) override {}
-        const char* getTabName() const override { return "Settings"; }
-        const char* getParentTab() const override { return "Display"; }
-        int getTabOrder() const override { return 10; }
-    };
-
-    struct ScreenshotTabStub : public IWebContributor {
-        void registerRoutes(PsychicHttpServer& /*server*/) override {}
-        const char* getTabName() const override { return "Screenshot"; }
-        const char* getParentTab() const override { return "Display"; }
-        int getTabOrder() const override { return 20; }
-    };
-
-    SettingsTabStub _settingsTabStub;
-    ScreenshotTabStub _screenshotTabStub;
-
-    struct HardwareContributor : public IWebContributor {
-        void registerRoutes(PsychicHttpServer& /*server*/) override {}
-        const char* getTabName() const override { return "Hardware"; }
-        const char* getParentTab() const override { return "Display"; }
-        int getTabOrder() const override { return 30; }
-        const char* getTabScript() const override { return "/hardware.js"; }
-    };
-    HardwareContributor _hardwareContributor;
-
 #ifdef WITH_OTA
     static void _onOtaProgress(const char* topic, const void* payload, void* ctx);
 #endif
