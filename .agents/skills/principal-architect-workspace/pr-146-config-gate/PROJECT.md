@@ -115,12 +115,28 @@ All WOs are **strictly serial** — each builds on the last. No parallel executi
 - Final plan: 7 WOs, strictly serial
 - **Human approval received** for full autonomous execution
 
-### 2026-08-23 — All WOs complete
-- WO1: 789/789 → WO2: 800/800 → WO3: 797/797 → WO4: 801/801 → WO5: 801/801 → WO6: 803/803 → WO7: 828/828
-- All old interfaces deleted: IConfigGate, ConfigGateResolver, WifiConfigGate, TimeConfigGate
-- Consumer migrations: WeatherModule (§2.4 fix), MyApp template
-- Final verification: all hardware targets building, native test suite green
+### 2026-08-23 — Hardware validation & PR submission
+- **Hardware crash found & fixed**: `LoadProhibited` on CrowPanel after CONFIGURING→RUNNING transition. Two root causes:
+  1. Dangling pointer: `PreconditionHealthPayload` stack-allocated in `tick()` but EventBus dispatch is async on real hardware (sync in native tests — invisible to unit tests)
+  2. LVGL thread safety: display callbacks called `lv_label_set_text()` from `esp_event` task. Fix: deferred flag pattern with atomic booleans (matching `_onOtaProgress` pattern)
+- All 4 environments build clean: `native` (828/828), `esp32dev`, `esp32s3nano`, `crowpanel-128-rotary`
+- CrowPanel physical device: 60s+ stable uptime, 8.4MB free heap, NTP synced, no crash on multiple resets
+- **PR [#149](https://github.com/matthewmcneill/esp32-app-foundation/pull/149) created** — `feat(precondition)!: replace IConfigGate with PreconditionEngine (#146)`
+- 77 files changed, 7044 insertions, 1931 deletions
+- **Status: Awaiting downstream consumer review before merge**
+
+### Dead-ends & lessons
+- **MCP monitor spooler**: consistently fails to capture serial data from ESP32-S3 USB JTAG CDC on `/dev/cu.usbmodem101`. The spooler opens the port but writes 0 bytes. Had to use direct pyserial reads as workaround. The MCP tool defaults to `/dev/cu.debug-console` for upload/monitor which is a macOS virtual console, not the CrowPanel. Always specify `port` explicitly.
+- **ESP32-S3 USB CDC after flash**: `esptool` reports "Device not configured" on post-flash port reconfiguration — this is normal, the USB CDC drops during reset. The firmware IS flashed correctly. Manual RESET button press required after flash to boot.
+- **EventBus sync vs async**: Native tests use synchronous EventBus dispatch (callback runs inline). Real hardware uses `esp_event_loop_run` on a separate task. This means **any EventBus subscriber that touches thread-unsafe APIs (LVGL, SPI, etc.) will crash on hardware but pass native tests**. This is a systemic testing gap worth addressing in a future PR.
+- **WO7 flash model quota exhaustion**: Hit 429 rate limit on `flash` model mid-session. Re-spawned on `pro` model which had separate quota. Worked fine.
+
+### Unresolved items (out of scope)
+- **Issue [#148](https://github.com/matthewmcneill/esp32-app-foundation/issues/148)**: IWebContributor multi-contribution retrofit — separate PR
+- **Module [1] tick budget warnings**: LVGL display module consistently exceeds its 33ms tick budget (~50ms renders). Pre-existing, not caused by our changes. Needs separate investigation (LVGL render batching or tick budget tuning).
+- **SLS `.spj` downstream notification**: WO6 determined SLS files did NOT need modification (round display safe zone, dynamic widget repurposing instead). But the downstream notification checklist item should be reviewed once consumers test the new display behaviour.
 
 ---
 
-*Created: 2026-08-23. Status: Approved, execution in progress.*
+*Created: 2026-08-23. Status: **Implementation complete — PR [#149](https://github.com/matthewmcneill/esp32-app-foundation/pull/149) awaiting review.***
+

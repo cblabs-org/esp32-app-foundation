@@ -1,5 +1,5 @@
 # Principal Architect Memory
-<!-- Last updated: 2026-08-23T07:30:00+01:00 -->
+<!-- Last updated: 2026-08-23T18:41:00+01:00 -->
 
 ## Active Programs
 | Program | Plan | Status |
@@ -10,7 +10,7 @@
 ## Active Projects
 | Project | Status | Modules | Context |
 |---|---|---|---|
-| pr-146-config-gate | Decomposition (WO0/7) | IPrecondition, PreconditionEngine, Application, DataManager, WifiManager, TimeManager, Display, Portal, WeatherModule, MyApp | [PROJECT.md](../pr-146-config-gate/PROJECT.md) |
+| pr-146-config-gate | PR [#149](https://github.com/matthewmcneill/esp32-app-foundation/pull/149) submitted — awaiting review (WO7/7 ✅) | IPrecondition, PreconditionEngine, Application, DataManager, WifiManager, TimeManager, Display, Portal, WeatherModule, MyApp | [PROJECT.md](../pr-146-config-gate/PROJECT.md) |
 | pr-mk01-eventbus-concurrency | Planned | | [PROJECT.md](../microkernel-refactor/pr-mk01-eventbus-concurrency/PROJECT.md) |
 | pr-mk02-kernel-hardening | Planned | | [PROJECT.md](../microkernel-refactor/pr-mk02-kernel-hardening/PROJECT.md) |
 | pr-mk03-module-composition | Planned | | [PROJECT.md](../microkernel-refactor/pr-mk03-module-composition/PROJECT.md) |
