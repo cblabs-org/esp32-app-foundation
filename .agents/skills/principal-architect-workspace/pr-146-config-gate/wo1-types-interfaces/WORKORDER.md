@@ -34,7 +34,7 @@ The existing interface being replaced is at `include/interfaces/IConfigGate.hpp`
 
 ## Line-Item Instructions
 
-- [ ] **`include/interfaces/IPrecondition.hpp`** [NEW] — Create with the following contents, all from the design doc:
+- [x] **`include/interfaces/IPrecondition.hpp`** [NEW] — Create with the following contents, all from the design doc:
 
   **`Cause` enum** (CG-3, L428–412 of design doc):
   ```cpp
@@ -141,7 +141,7 @@ The existing interface being replaced is at `include/interfaces/IConfigGate.hpp`
 
   Include standard headers (`<cstdint>`, `<cstddef>`). Use `#pragma once`. Add the project copyright header. Document each enum member with `///< ` doc comments matching the design doc.
 
-- [ ] **`include/interfaces/IPreconditionContributor.hpp`** [NEW] — The registry/visitor interface (CG-2b):
+- [x] **`include/interfaces/IPreconditionContributor.hpp`** [NEW] — The registry/visitor interface (CG-2b):
 
   ```cpp
   #pragma once
@@ -154,7 +154,7 @@ The existing interface being replaced is at `include/interfaces/IConfigGate.hpp`
   };
   ```
 
-- [ ] **`include/utils/PreconditionRegistry.hpp`** [NEW] — The registry that `IPreconditionContributor::registerPreconditions` receives. This WO creates the **interface only** — the implementation lives in WO2's engine.
+- [x] **`include/utils/PreconditionRegistry.hpp`** [NEW] — The registry that `IPreconditionContributor::registerPreconditions` receives. This WO creates the **interface only** — the implementation lives in WO2's engine.
 
   ```cpp
   #pragma once
@@ -179,7 +179,7 @@ The existing interface being replaced is at `include/interfaces/IConfigGate.hpp`
 
   Make `add()` pure virtual — `PreconditionEngine` (WO2) provides the concrete implementation.
 
-- [ ] Verify: `pio run -e native` compiles cleanly (use `platformio` MCP `build_project`, env `native`).
+- [x] Verify: `pio run -e native` compiles cleanly (use `platformio` MCP `build_project`, env `native`).
 
 ## Verification Requirement
 
@@ -197,19 +197,36 @@ If you discover a defect, upstream bug, or concern *outside your boundary box*, 
 <!-- Written by the worker at task completion -->
 
 ### Status
-(pending)
+Complete. All items in the line-item checklist implemented, verified against compiler with strict flags, all 789 native unit tests passing, and all hardware targets (`esp32dev`, `esp32s3nano`, `crowpanel-128-rotary`) building cleanly.
 
 ### Changes Made
-(pending)
+- Created `include/interfaces/IPrecondition.hpp` containing:
+  - `Cause` enum (12 members: `Met`, `NotConfigured`, `Connecting`, `Rejected`, `Unreachable`, `RateLimited`, `Implausible`, `DependencyUnmet`, `FallbackEngaged`, `Unavailable`, `Indeterminate`, `InternalError`)
+  - `Severity` enum (6 members: `Transient`, `NeedsUser`, `Blocked`, `Degraded`, `Inactive`, `Persistent`)
+  - `PreconditionRole` enum (`Operational`, `Startup`, `Both`)
+  - `PreconditionStatus` struct (`bool met = false`, `Cause cause = Cause::NotConfigured`)
+  - `EdgeKind` enum (`Wants`, `Requires`, `BindsTo`)
+  - `Edge` struct (`const char* name`, `EdgeKind kind`)
+  - `RetryPolicy` struct (`baseDelayMs = 5000`, `ceilingMs = 300000`, `attemptsBeforeFallback = 5`)
+  - `DampingPolicy` struct (`penaltyPerSecond = 10`, `suppressThreshold = 2000`, `reuseThreshold = 750`, `halfLifeMs = 900000`)
+  - `BreakerState` enum (`Closed`, `Open`, `HalfOpen`)
+  - `deriveSeverity(Cause cause, bool everMet = false)` free function declaration
+  - `PreconditionNames` namespace constants (`WIFI_STATION`, `TIMEZONE`, `TIME_SYNC`)
+- Created `include/interfaces/IPreconditionContributor.hpp` containing:
+  - Pure virtual interface `IPreconditionContributor` with `virtual void registerPreconditions(PreconditionRegistry& registry) = 0;`
+  - Forward declaration `class PreconditionRegistry;`
+- Created `include/utils/PreconditionRegistry.hpp` containing:
+  - Pure virtual abstract interface `PreconditionRegistry` defining `EvalFn`, `DescribeFn`, and pure virtual `add()`.
 
 ### Decisions Made
-(pending)
+- Added project copyright headers and house style Doxygen documentation comments to all three header files matching the design doc and `.agents/skills/house-style-docs/`.
+- Declared `deriveSeverity(Cause cause, bool everMet = false)` with default `everMet = false` to enable convenient invocation while maintaining full CG-4/CG-4a trust discrimination.
 
 ### Dead Ends & Warnings
-(pending)
+None. All headers compiled cleanly without warnings.
 
 ### Out-of-Scope Findings
-(pending)
+None.
 
 ### Blockers
-(pending)
+None. Ready for Work Order 2 (`wo2-precondition-engine`).

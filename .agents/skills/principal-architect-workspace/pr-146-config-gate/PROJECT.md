@@ -58,7 +58,7 @@ This is a **breaking interface change** with no honest shim. The old default
 
 ## Work Order Ledger
 
-- **[ ] [wo1-types-interfaces](wo1-types-interfaces/WORKORDER.md):** New `IPrecondition.hpp`, `IPreconditionContributor.hpp`, `PreconditionRegistry.hpp` — all the types, enums, and interfaces. No behavioral change. Build verification only.
+- **[x] [wo1-types-interfaces](wo1-types-interfaces/WORKORDER.md):** New `IPrecondition.hpp`, `IPreconditionContributor.hpp`, `PreconditionRegistry.hpp` — all the types, enums, and interfaces. No behavioral change. Build verification only. ✅ 789/789 tests, all targets build.
 - **[ ] [wo2-precondition-engine](wo2-precondition-engine/WORKORDER.md):** `PreconditionEngine` — core evaluation loop, edge resolution with cycle detection, damping accumulator, breaker state machine, severity derivation (reads `SourceHealth` for enrichment), trust history. Comprehensive native test suite.
 - **[ ] [wo3-application-wiring](wo3-application-wiring/WORKORDER.md):** Wire `PreconditionEngine` into `Application`. Auto-detect `IPreconditionContributor` in `registerModule<T>`. New state-machine projection (Startup-role gates boot). `DataManager._appRunning` gate removal (CG-17). New `precondition.health` event topic. Update `AppConfiguringPayload`. Existing Application tests migrated.
 - **[ ] [wo4-framework-migration](wo4-framework-migration/WORKORDER.md):** Migrate `WifiConfigGate` → `WifiPreconditionContributor`. Migrate `TimeConfigGate` → `TimePreconditionContributor` (two preconditions: Timezone + Time Sync). Update built-in registrations in Application. Port existing gate tests.
