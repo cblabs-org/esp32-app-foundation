@@ -157,6 +157,20 @@ TEST_F(SLSSystemScreensTest, OnConfiguringPopulatesSetupAndMessageWidgets) {
     EXPECT_STREQ(lv_label_get_text(ui_uiSystemMsgBody), "Join the setup network");
 }
 
+TEST_F(SLSSystemScreensTest, OnPreconditionHealthPopulatesMessageWidgets) {
+    PreconditionHealthPayload p;
+    p.name = "Time Sync";
+    p.cause = Cause::Connecting;
+    p.severity = Severity::Transient;
+    p.everMet = false;
+
+    screens.onPreconditionHealth(&p);
+
+    EXPECT_STREQ(lv_label_get_text(ui_ui_SystemMsgTitle), "Time Sync");
+    EXPECT_STREQ(lv_label_get_text(ui_uiSystemMsgBody), "Connecting...");
+    EXPECT_STREQ(lv_label_get_text(ui_uiSystemBusyMessage), "Time Sync: Connecting...");
+}
+
 TEST_F(SLSSystemScreensTest, NullGlobalsDefensiveNoCrash) {
     TearDown(); // Null all globals
 
@@ -174,4 +188,8 @@ TEST_F(SLSSystemScreensTest, NullGlobalsDefensiveNoCrash) {
     p.deviceIP = "1.2.3.4";
     screens.onConfiguring(&p);            // must not crash with null widgets
     EXPECT_EQ(screens.gateHelperScreen(&p), ui_uiSystemScreen);  // null root passthrough
+
+    PreconditionHealthPayload php{"Timezone", Cause::Met, Severity::Transient, true};
+    screens.onPreconditionHealth(&php); // must not crash
 }
+

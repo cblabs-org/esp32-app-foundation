@@ -393,21 +393,25 @@ TEST_F(ScreensaverBoardTest, MultipleCycles_WorkCorrectly) {
 }
 
 // =============================================================================
+// =============================================================================
 // Test Group: ConfiguringStatusBoard
 // =============================================================================
+
+#include "interfaces/IPrecondition.hpp"
+#include "events/PreconditionHealthPayload.hpp"
+#include "PreconditionEngine/PreconditionEngine.hpp"
 
 class ConfiguringStatusBoardTest : public ::testing::Test {
 protected:
     ConfiguringStatusBoard board{256, 64}; ///< Fresh instance for each test
 
-    // Mock gates for binding
-    MockConfigGate gate1{"WiFi Station", "Connect to WiFi", true};
-    MockConfigGate gate2{"API Keys", "Validate API keys", false};
-    MockConfigGate gate3{"Time Sync", "Synchronize NTP", false};
-    std::vector<IConfigGate*> gates;
+    PreconditionSnapshot prec1{"WiFi Station", PreconditionRole::Startup, Cause::Met, Severity::Transient, true, true};
+    PreconditionSnapshot prec2{"API Keys", PreconditionRole::Startup, Cause::NotConfigured, Severity::NeedsUser, false, false};
+    PreconditionSnapshot prec3{"Time Sync", PreconditionRole::Startup, Cause::DependencyUnmet, Severity::Blocked, false, false};
+    std::vector<PreconditionSnapshot> snapshots;
 
     void SetUp() override {
-        gates = {&gate1, &gate2, &gate3};
+        snapshots = {prec1, prec2, prec3};
     }
 };
 
@@ -427,75 +431,149 @@ TEST_F(ConfiguringStatusBoardTest, Dismiss_CausesExpiry) {
     EXPECT_TRUE(board.isExpired());
 }
 
-/** setGates must bind the gate list for counting. */
-TEST_F(ConfiguringStatusBoardTest, SetGates_BindsGateList) {
-    board.setGates(&gates);
-    EXPECT_EQ(board.getTotalGateCount(), 3);
+/** setPreconditions must bind the snapshot list for counting. */
+TEST_F(ConfiguringStatusBoardTest, SetPreconditions_BindsSnapshotList) {
+    board.setPreconditions(snapshots.data(), snapshots.size());
+    EXPECT_EQ(board.getTotalPreconditions(), 3);
+    EXPECT_EQ(board.getStartupCount(), 3);
+    EXPECT_EQ(board.getStartupMetCount(), 1);
 }
 
-/** getSatisfiedCount must reflect gate satisfaction state. */
-TEST_F(ConfiguringStatusBoardTest, GetSatisfiedCount_ReflectsState) {
-    board.setGates(&gates);
-    EXPECT_EQ(board.getSatisfiedCount(), 1); // Only gate1 is satisfied
+/** getStartupMetCount must reflect precondition satisfaction state. */
+TEST_F(ConfiguringStatusBoardTest, GetStartupMetCount_ReflectsState) {
+    board.setPreconditions(snapshots.data(), snapshots.size());
+    EXPECT_EQ(board.getStartupMetCount(), 1); // Only prec1 is met
 }
 
-/** getSatisfiedCount must update as gates become satisfied. */
-TEST_F(ConfiguringStatusBoardTest, GetSatisfiedCount_UpdatesAsGatesSatisfied) {
-    board.setGates(&gates);
-    EXPECT_EQ(board.getSatisfiedCount(), 1);
+/** getStartupMetCount and target percent must update as preconditions become met. */
+TEST_F(ConfiguringStatusBoardTest, GetStartupMetCount_UpdatesAsPreconditionsSatisfied) {
+    board.setPreconditions(snapshots.data(), snapshots.size());
+    EXPECT_EQ(board.getStartupMetCount(), 1);
+    EXPECT_FLOAT_EQ(board.getTargetPercent(), (1.0f / 3.0f) * 100.0f);
 
-    gate2.setSatisfied(true);
-    EXPECT_EQ(board.getSatisfiedCount(), 2);
+    board.updatePrecondition("API Keys", Cause::Met, Severity::Transient);
+    EXPECT_EQ(board.getStartupMetCount(), 2);
+    EXPECT_FLOAT_EQ(board.getTargetPercent(), (2.0f / 3.0f) * 100.0f);
 
-    gate3.setSatisfied(true);
-    EXPECT_EQ(board.getSatisfiedCount(), 3);
+    board.updatePrecondition("Time Sync", Cause::Met, Severity::Transient);
+    EXPECT_EQ(board.getStartupMetCount(), 3);
+    EXPECT_FLOAT_EQ(board.getTargetPercent(), 100.0f);
 }
 
-/** getTotalGateCount must return 0 when no gates are bound. */
-TEST_F(ConfiguringStatusBoardTest, GetTotalGateCount_NoGates_ReturnsZero) {
-    EXPECT_EQ(board.getTotalGateCount(), 0);
+/** getTotalPreconditions must return 0 when no preconditions are bound. */
+TEST_F(ConfiguringStatusBoardTest, GetTotalPreconditions_NoPreconditions_ReturnsZero) {
+    EXPECT_EQ(board.getTotalPreconditions(), 0);
+    EXPECT_EQ(board.getStartupCount(), 0);
+    EXPECT_EQ(board.getStartupMetCount(), 0);
 }
 
-/** getSatisfiedCount must return 0 when no gates are bound. */
-TEST_F(ConfiguringStatusBoardTest, GetSatisfiedCount_NoGates_ReturnsZero) {
-    EXPECT_EQ(board.getSatisfiedCount(), 0);
+/** clear must unbind / reset snapshots safely. */
+TEST_F(ConfiguringStatusBoardTest, Clear_ResetsCounts) {
+    board.setPreconditions(snapshots.data(), snapshots.size());
+    EXPECT_EQ(board.getTotalPreconditions(), 3);
+
+    board.clear();
+    EXPECT_EQ(board.getTotalPreconditions(), 0);
+    EXPECT_EQ(board.getStartupCount(), 0);
+    EXPECT_EQ(board.getStartupMetCount(), 0);
+    EXPECT_FLOAT_EQ(board.getTargetPercent(), 0.0f);
 }
 
-/** setGates(nullptr) must unbind the gate list safely. */
-TEST_F(ConfiguringStatusBoardTest, SetGates_Nullptr_UnbindsGates) {
-    board.setGates(&gates);
-    EXPECT_EQ(board.getTotalGateCount(), 3);
-
-    board.setGates(nullptr);
-    EXPECT_EQ(board.getTotalGateCount(), 0);
-    EXPECT_EQ(board.getSatisfiedCount(), 0);
-}
-
-/** dismiss must not affect gate counts. */
-TEST_F(ConfiguringStatusBoardTest, Dismiss_DoesNotAffectGateCounts) {
-    board.setGates(&gates);
+/** dismiss must not affect precondition counts. */
+TEST_F(ConfiguringStatusBoardTest, Dismiss_DoesNotAffectCounts) {
+    board.setPreconditions(snapshots.data(), snapshots.size());
     board.dismiss();
     EXPECT_TRUE(board.isExpired());
-    EXPECT_EQ(board.getTotalGateCount(), 3);
-    EXPECT_EQ(board.getSatisfiedCount(), 1);
+    EXPECT_EQ(board.getTotalPreconditions(), 3);
+    EXPECT_EQ(board.getStartupMetCount(), 1);
 }
 
-/** All gates satisfied count must equal total gate count. */
-TEST_F(ConfiguringStatusBoardTest, AllGatesSatisfied_CountMatchesTotal) {
-    gate1.setSatisfied(true);
-    gate2.setSatisfied(true);
-    gate3.setSatisfied(true);
-    board.setGates(&gates);
-    EXPECT_EQ(board.getSatisfiedCount(), board.getTotalGateCount());
+/** All startup preconditions satisfied must yield 100% target progress. */
+TEST_F(ConfiguringStatusBoardTest, AllStartupPreconditionsSatisfied_Yields100Percent) {
+    snapshots[0].cause = Cause::Met;
+    snapshots[0].met = true;
+    snapshots[1].cause = Cause::Met;
+    snapshots[1].met = true;
+    snapshots[2].cause = Cause::Met;
+    snapshots[2].met = true;
+
+    board.setPreconditions(snapshots.data(), snapshots.size());
+    EXPECT_EQ(board.getStartupMetCount(), 3);
+    EXPECT_FLOAT_EQ(board.getTargetPercent(), 100.0f);
 }
 
-/** Empty gate vector must return zero counts. */
-TEST_F(ConfiguringStatusBoardTest, EmptyGateVector_ReturnsZeroCounts) {
-    std::vector<IConfigGate*> emptyGates;
-    board.setGates(&emptyGates);
-    EXPECT_EQ(board.getTotalGateCount(), 0);
-    EXPECT_EQ(board.getSatisfiedCount(), 0);
+/** Progress bar counts Startup-role preconditions ONLY (CG-14). */
+TEST_F(ConfiguringStatusBoardTest, ProgressBar_CountsStartupOnly) {
+    PreconditionSnapshot mixed[4] = {
+        {"WiFi Station", PreconditionRole::Startup, Cause::Met, Severity::Transient, true, true},
+        {"Time Sync", PreconditionRole::Startup, Cause::NotConfigured, Severity::NeedsUser, false, false},
+        {"Weather Data", PreconditionRole::Operational, Cause::Met, Severity::Transient, true, true},
+        {"OTA Channel", PreconditionRole::Operational, Cause::Met, Severity::Transient, true, true}
+    };
+
+    board.setPreconditions(mixed, 4);
+    EXPECT_EQ(board.getTotalPreconditions(), 4);
+    EXPECT_EQ(board.getStartupCount(), 2);
+    EXPECT_EQ(board.getStartupMetCount(), 1);
+    EXPECT_FLOAT_EQ(board.getTargetPercent(), 50.0f);
 }
+
+/** Operational preconditions do NOT affect progress percentage (even if unmet or failing). */
+TEST_F(ConfiguringStatusBoardTest, OperationalPreconditions_DoNotAffectProgressPercentage) {
+    PreconditionSnapshot items[3] = {
+        {"WiFi Station", PreconditionRole::Startup, Cause::Met, Severity::Transient, true, true},
+        {"Time Sync", PreconditionRole::Startup, Cause::Met, Severity::Transient, true, true},
+        {"MQTT Broker", PreconditionRole::Operational, Cause::Unreachable, Severity::Transient, false, false}
+    };
+
+    board.setPreconditions(items, 3);
+    EXPECT_EQ(board.getStartupCount(), 2);
+    EXPECT_EQ(board.getStartupMetCount(), 2);
+    EXPECT_FLOAT_EQ(board.getTargetPercent(), 100.0f); // 2/2 startup met = 100%, op is ignored for progress
+
+    board.updatePrecondition("MQTT Broker", Cause::Rejected, Severity::NeedsUser, false, PreconditionRole::Operational);
+    EXPECT_FLOAT_EQ(board.getTargetPercent(), 100.0f);
+}
+
+/** Precondition updates: updating status changes startup met count and target percent. */
+TEST_F(ConfiguringStatusBoardTest, DynamicPreconditionUpdates) {
+    board.updatePrecondition("WiFi Station", Cause::Connecting, Severity::Transient, false, PreconditionRole::Startup);
+    board.updatePrecondition("Time Sync", Cause::NotConfigured, Severity::NeedsUser, false, PreconditionRole::Startup);
+    board.updatePrecondition("Weather", Cause::Met, Severity::Transient, true, PreconditionRole::Operational);
+
+    EXPECT_EQ(board.getTotalPreconditions(), 3);
+    EXPECT_EQ(board.getStartupCount(), 2);
+    EXPECT_EQ(board.getStartupMetCount(), 0);
+    EXPECT_FLOAT_EQ(board.getTargetPercent(), 0.0f);
+
+    board.updatePrecondition("WiFi Station", Cause::Met, Severity::Transient, true, PreconditionRole::Startup);
+    EXPECT_EQ(board.getStartupMetCount(), 1);
+    EXPECT_FLOAT_EQ(board.getTargetPercent(), 50.0f);
+
+    board.updatePrecondition("Time Sync", Cause::Met, Severity::Transient, true, PreconditionRole::Startup);
+    EXPECT_EQ(board.getStartupMetCount(), 2);
+    EXPECT_FLOAT_EQ(board.getTargetPercent(), 100.0f);
+}
+
+
+/** Cause-aware prefixes and snapshot properties. */
+TEST_F(ConfiguringStatusBoardTest, PreconditionSnapshots_CauseAndSeverity) {
+    PreconditionSnapshot items[6] = {
+        {"WiFi Met", PreconditionRole::Startup, Cause::Met, Severity::Transient, true, true},
+        {"WiFi Conn", PreconditionRole::Startup, Cause::Connecting, Severity::Transient, false, false},
+        {"WiFi Reject", PreconditionRole::Startup, Cause::Rejected, Severity::NeedsUser, false, false},
+        {"Time Blocked", PreconditionRole::Startup, Cause::DependencyUnmet, Severity::Blocked, false, false},
+        {"Bug Indet", PreconditionRole::Startup, Cause::Indeterminate, Severity::Persistent, false, false},
+        {"Rate Lim", PreconditionRole::Operational, Cause::RateLimited, Severity::Transient, false, false}
+    };
+
+    board.setPreconditions(items, 6);
+    EXPECT_EQ(board.getTotalPreconditions(), 6);
+    EXPECT_EQ(board.getStartupCount(), 5);
+    EXPECT_EQ(board.getStartupMetCount(), 1);
+    EXPECT_FLOAT_EQ(board.getTargetPercent(), 20.0f);
+}
+
 
 /** setActiveGateStatus stores the status value. */
 TEST_F(ConfiguringStatusBoardTest, SetActiveGateStatus_StoresStatus) {
@@ -509,28 +587,21 @@ TEST_F(ConfiguringStatusBoardTest, SetActiveGateStatus_StoresStatus) {
     EXPECT_EQ(board.getActiveGateStatus(), GateActionStatus::Satisfied);
 }
 
-/** setActionableGateName stores the name for render() comparison. */
+/** setActionableGateName stores the name for render comparison. */
 TEST_F(ConfiguringStatusBoardTest, SetActionableGateName_StoresName) {
     board.setActionableGateName("WiFi Station");
     EXPECT_STREQ(board.getActionableGateName(), "WiFi Station");
-}
 
-/** setActionableGateName with nullptr is safe. */
-TEST_F(ConfiguringStatusBoardTest, SetActionableGateName_Nullptr_IsSafe) {
-    board.setActionableGateName("Test");
     board.setActionableGateName(nullptr);
     EXPECT_EQ(board.getActionableGateName(), nullptr);
 }
 
-/** setConnectionInfo must not crash with valid inputs. */
-TEST_F(ConfiguringStatusBoardTest, SetConnectionInfo_ValidInputs_DoesNotCrash) {
+/** setConnectionInfo must not crash with valid and null inputs. */
+TEST_F(ConfiguringStatusBoardTest, SetConnectionInfo_ValidAndNull_DoesNotCrash) {
     EXPECT_NO_FATAL_FAILURE(board.setConnectionInfo("MyNetwork", "http://192.168.1.42"));
-}
-
-/** setConnectionInfo must not crash with nullptr inputs. */
-TEST_F(ConfiguringStatusBoardTest, SetConnectionInfo_NullInputs_DoesNotCrash) {
     EXPECT_NO_FATAL_FAILURE(board.setConnectionInfo(nullptr, nullptr));
 }
+
 
 // =============================================================================
 // Test Group: GenericGateHelperBoard

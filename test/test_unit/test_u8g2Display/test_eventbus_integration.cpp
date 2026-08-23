@@ -369,3 +369,24 @@ TEST_F(ThreeTierDispatchTest, InProgress_NoModal) {
     EXPECT_EQ(display.visibleBoard(), &display.boards.configuringStatus);
 }
 
+/**
+ * PreconditionHealth event updates ConfiguringStatusBoard state.
+ */
+TEST_F(ThreeTierDispatchTest, PreconditionHealth_UpdatesConfiguringStatusBoard) {
+    U8G2DisplayModule display;
+    display.begin(&bus);
+
+    PreconditionHealthPayload p1{"WiFi Station", Cause::Connecting, Severity::Transient, false};
+    bus.publish("precondition.health", &p1);
+
+    EXPECT_EQ(display.boards.configuringStatus.getTotalPreconditions(), 1);
+    EXPECT_EQ(display.boards.configuringStatus.getStartupMetCount(), 0);
+
+    PreconditionHealthPayload p2{"WiFi Station", Cause::Met, Severity::Transient, true};
+    bus.publish("precondition.health", &p2);
+
+    EXPECT_EQ(display.boards.configuringStatus.getTotalPreconditions(), 1);
+    EXPECT_EQ(display.boards.configuringStatus.getStartupMetCount(), 1);
+    EXPECT_FLOAT_EQ(display.boards.configuringStatus.getTargetPercent(), 100.0f);
+}
+

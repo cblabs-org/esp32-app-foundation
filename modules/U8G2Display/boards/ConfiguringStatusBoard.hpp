@@ -7,50 +7,82 @@
  *
  * Module: modules/U8G2Display/boards/ConfiguringStatusBoard.hpp
  * Description: System board displayed during the CONFIGURING lifecycle phase.
- *              Renders per-gate status rows with prefix indicators (* = satisfied,
- *              > = actionable, - = blocked), an animated progress bar that lerps
- *              toward the target percentage, and a footer with the device IP.
+ *              Renders per-precondition status rows with cause-aware prefix
+ *              indicators (* = satisfied, ~ = connecting, ! = needs user,
+ *              - = blocked, ? = indeterminate, > = in progress), an animated
+ *              progress bar that lerps toward the target percentage (Startup-only),
+ *              and a footer with the device IP.
  *
  * Exported Classes:
- * - ConfiguringStatusBoard: Gate-progress display implementing IDisplayBoard
- *   - setGates():              Bind the gate list (vector of IConfigGate pointers)
+ * - PreconditionSnapshot:  Precondition snapshot for display rendering
+ * - ConfiguringStatusBoard: Precondition-progress display implementing IDisplayBoard
+ *   - setEngine():             Bind PreconditionEngine (non-owning)
+ *   - setPreconditions():      Bind direct snapshot array
+ *   - updatePrecondition():    Update/insert a precondition health status
  *   - setActiveGateStatus():   Update the action status of the current gate
+ *   - setActionableGateName(): Set the actionable gate/precondition name
+ *   - setConnectionInfo():     Set WiFi SSID and portal URL for footer
  *   - dismiss():               Mark the board as dismissed (triggers expiry)
  *   - render():                Draw header, status rows, and progress bar
  *   - isExpired():             True when dismiss() has been called
  *   - getBoardName():          Returns "SYS: Configuring"
+ *   - getStartupCount():       Count of Startup-role preconditions
+ *   - getStartupMetCount():    Count of satisfied Startup-role preconditions
+ *   - getSatisfiedCount():     Returns getStartupMetCount()
+ *   - getTotalGateCount():     Returns total preconditions count
  */
 
 #pragma once
 
+#include <cstdint>
+#include <cstddef>
 #include <vector>
 #include "IDisplayBoard.hpp"
+#include "interfaces/IPrecondition.hpp"
 #include "interfaces/IConfigGate.hpp"
+#include "events/PreconditionHealthPayload.hpp"
 #include "widgets/LabelWidget.hpp"
 #include "widgets/ProgressBarWidget.hpp"
 
+class PreconditionEngine;
+
 /**
- * @brief System board showing gate-by-gate progress during the CONFIGURING phase.
+ * @brief Lightweight snapshot of a precondition's display state.
+ */
+struct PreconditionSnapshot {
+    char             name[32] = "";
+    PreconditionRole role     = PreconditionRole::Operational;
+    Cause            cause    = Cause::NotConfigured;
+    Severity         severity = Severity::NeedsUser;
+    bool             met      = false;
+    bool             everMet  = false;
+};
+
+/**
+ * @brief System board showing precondition progress during the CONFIGURING phase.
  *
  * Visual layout (256x64):
  * ```
  * +------------------------------------------+
  * |          Configuring...                   |  <- Header (Y=0, bold, centred)
  * |                                          |
- * |  * WiFi Station                          |  <- Satisfied gate row
- * |  > API Keys                              |  <- Actionable gate row
- * |  - Time Sync                             |  <- Blocked gate row
+ * |  * WiFi Station                          |  <- Met precondition (* or ✓)
+ * |  ! API Keys                              |  <- NeedsUser precondition (!)
+ * |  - Time Sync                             |  <- Blocked precondition (-)
  * |                                          |
- * |    [===========>              ]           |  <- Animated progress bar
+ * |    [===========>              ]           |  <- Animated progress bar (Startup only)
  * |          http://192.168.1.42             |  <- Footer (device IP)
  * +------------------------------------------+
  * ```
  *
- * The board does NOT own the gate list -- it holds a non-owning pointer set via
- * setGates(). The Application owns the vector and the board reads it each frame.
+ * Progress bar counts ONLY Startup-role preconditions (CG-14 projection).
+ * Operational preconditions degrade features without blocking boot and do not
+ * affect the progress bar.
  */
 class ConfiguringStatusBoard : public IDisplayBoard {
 public:
+    static constexpr size_t MAX_DISPLAY_PRECONDITIONS = 16;
+
     /**
      * @brief Construct with display dimensions for widget layout.
      * @param displayWidth  Display width in pixels (from U8G2 driver).
@@ -59,22 +91,36 @@ public:
     ConfiguringStatusBoard(uint16_t displayWidth, uint16_t displayHeight);
 
     /**
-     * @brief Bind the gate list for rendering.
-     *
-     * The board reads this vector each frame to determine gate status. The
-     * caller retains ownership of the vector and its contents. Pass nullptr
-     * to unbind.
-     *
-     * @param gates Pointer to the Application's gate vector (non-owning).
+     * @brief Bind a PreconditionEngine for live status reading.
+     * @param engine Pointer to PreconditionEngine (non-owning, or nullptr to unbind).
      */
-    void setGates(const std::vector<IConfigGate*>* gates);
+    void setEngine(const PreconditionEngine* engine);
+
+    /**
+     * @brief Bind a static snapshot array of preconditions (useful for testing or decoupled updates).
+     * @param items Pointer to array of PreconditionSnapshot.
+     * @param count Number of items in array (clamped to MAX_DISPLAY_PRECONDITIONS).
+     */
+    void setPreconditions(const PreconditionSnapshot* items, size_t count);
+
+    /**
+     * @brief Update or add a precondition entry from a health event.
+     * @param payload Health payload containing name, cause, severity, everMet.
+     * @param role Optional role override (defaults to Startup if new entry, or preserves existing).
+     */
+    void updatePrecondition(const PreconditionHealthPayload& payload, PreconditionRole role = PreconditionRole::Startup);
+
+    /**
+     * @brief Update or add a precondition entry by explicit parameters.
+     */
+    void updatePrecondition(const char* name, Cause cause, Severity severity, bool everMet = false, PreconditionRole role = PreconditionRole::Startup);
 
     /**
      * @brief Update the action status of the current actionable gate.
      *
      * Used by the display module to communicate the gate's action status
      * from the AppConfiguringPayload. Affects the prefix character for
-     * the active gate row (> for NeedsUserAction, ~ for InProgress).
+     * the active gate row.
      *
      * @param status The GateActionStatus for the currently actionable gate.
      */
@@ -83,13 +129,18 @@ public:
     /**
      * @brief Set the authoritative actionable gate name from the Application.
      *
-     * Called by U8G2DisplayModule::_onAppConfiguring() alongside
-     * setActiveGateStatus(). Eliminates the need for render() to
-     * re-derive the actionable gate by re-walking the dependency graph.
+     * Called alongside setActiveGateStatus().
      *
      * @param gateName  Gate name from AppConfiguringPayload::gateName (non-owning).
      */
     void setActionableGateName(const char* gateName);
+
+    /**
+     * @brief Set network connection info for the footer display.
+     * @param network  The WiFi network name (SSID) the device is connected to.
+     * @param url      The device URL (e.g., "http://192.168.1.42").
+     */
+    void setConnectionInfo(const char* network, const char* url);
 
     /**
      * @brief Mark the board as dismissed, causing isExpired() to return true.
@@ -102,8 +153,9 @@ public:
     /**
      * @brief Render the configuring status screen to the U8G2 display buffer.
      *
-     * Draws: (1) "Configuring..." header (centred), (2) per-gate status rows
-     * with prefix indicators, (3) animated progress bar, (4) device IP footer.
+     * Draws: (1) "Configuring..." header (centred), (2) per-precondition status rows
+     * with cause-aware prefix indicators, (3) animated progress bar (Startup-only),
+     * (4) device IP footer.
      *
      * @param u8g2 Reference to the active U8G2 driver instance.
      */
@@ -122,23 +174,41 @@ public:
     const char* getBoardName() const override;
 
     /**
-     * @brief Return the count of satisfied gates (for testing).
-     * @return Number of gates where isSatisfied() == true, or 0 if no gates bound.
+     * @brief Return count of Startup preconditions.
      */
-    int getSatisfiedCount() const;
+    uint8_t getStartupCount() const { return _startupCount; }
 
     /**
-     * @brief Return the total number of bound gates (for testing).
-     * @return Total gate count, or 0 if no gates bound.
+     * @brief Return count of satisfied Startup preconditions.
      */
-    int getTotalGateCount() const;
+    uint8_t getStartupMetCount() const { return _startupMetCount; }
 
     /**
-     * @brief Set network connection info for the footer display.
-     * @param network  The WiFi network name (SSID) the device is connected to.
-     * @param url      The device URL (e.g., "http://192.168.1.42").
+     * @brief Return total number of bound/cached preconditions.
      */
-    void setConnectionInfo(const char* network, const char* url);
+    int getTotalPreconditions() const;
+
+    /**
+     * @brief Return count of satisfied Startup preconditions (for test compatibility).
+     * @return Number of satisfied Startup preconditions.
+     */
+    int getSatisfiedCount() const { return static_cast<int>(_startupMetCount); }
+
+    /**
+     * @brief Return total number of bound/cached preconditions (for test compatibility).
+     * @return Total precondition count.
+     */
+    int getTotalGateCount() const { return getTotalPreconditions(); }
+
+    /**
+     * @brief Return target progress percentage (0.0 to 100.0).
+     */
+    float getTargetPercent() const { return _targetPercent; }
+
+    /**
+     * @brief Return current animated progress percentage (0.0 to 100.0).
+     */
+    float getCurrentPercent() const { return _currentPercent; }
 
     /**
      * @brief Return the current active gate status (for testing).
@@ -149,12 +219,25 @@ public:
     /** Return the stored actionable gate name (for testing). */
     const char* getActionableGateName() const { return _actionableGateName; }
 
+    /**
+     * @brief Clear all cached snapshots.
+     */
+    void clear();
+
 private:
+    void _recomputeCounts();
+
     uint16_t _displayWidth;                               ///< Display width in pixels
     uint16_t _displayHeight;                              ///< Display height in pixels
     bool     _dismissed = false;                          ///< True after dismiss()
 
-    const std::vector<IConfigGate*>* _gates = nullptr;    ///< Non-owning pointer to gate list
+    const PreconditionEngine* _engine = nullptr;          ///< Non-owning pointer to live engine
+    PreconditionSnapshot      _snapshots[MAX_DISPLAY_PRECONDITIONS];
+    size_t                    _snapshotCount = 0;
+
+    // --- Precondition counts (Startup-role only for progress bar) ---
+    uint8_t _startupCount    = 0;                         ///< Total Startup-role preconditions
+    uint8_t _startupMetCount = 0;                         ///< Met Startup-role preconditions
 
     // --- Gate action status ---
     GateActionStatus _activeGateStatus = GateActionStatus::NeedsUserAction; ///< Current actionable gate status
@@ -172,7 +255,7 @@ private:
     char _networkName[33] = "";                            ///< Connected WiFi network name
     char _deviceUrl[48] = "";                              ///< Device URL for portal access
 
-    // --- Animation frame counter for InProgress effect ---
-    uint8_t _animFrame = 0;                               ///< Frame counter for > / ~ alternation
+    // --- Animation frame counter for Connecting / InProgress effect ---
+    uint8_t _animFrame = 0;                               ///< Frame counter for animation
 };
 

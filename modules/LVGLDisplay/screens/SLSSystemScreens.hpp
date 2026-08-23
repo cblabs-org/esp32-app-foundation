@@ -111,6 +111,12 @@ public:
      */
     void onConfiguring(const AppConfiguringPayload* payload) override;
 
+    /**
+     * @brief Populate precondition health widgets on each precondition.health event.
+     * @param payload Precondition health payload (name, cause, severity, everMet).
+     */
+    void onPreconditionHealth(const PreconditionHealthPayload* payload) override;
+
 private:
     /**
      * @brief Hide all container visibility groups on ui_uiSystemScreen.

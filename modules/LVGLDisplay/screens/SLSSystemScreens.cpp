@@ -94,6 +94,47 @@ void SLSSystemScreens::onConfiguring(const AppConfiguringPayload* payload) {
     }
 }
 
+void SLSSystemScreens::onPreconditionHealth(const PreconditionHealthPayload* payload) {
+    if (payload == nullptr) {
+        return;
+    }
+
+    // Update Message group widgets with precondition health info
+    if (ui_ui_SystemMsgTitle != nullptr && payload->name != nullptr) {
+        lv_label_set_text(ui_ui_SystemMsgTitle, payload->name);
+    }
+    if (ui_uiSystemMsgBody != nullptr) {
+        const char* causeStr = "Unknown";
+        switch (payload->cause) {
+            case Cause::Met:             causeStr = "Satisfied"; break;
+            case Cause::NotConfigured:   causeStr = "Setup required"; break;
+            case Cause::Connecting:      causeStr = "Connecting..."; break;
+            case Cause::Rejected:        causeStr = "Rejected (check credentials)"; break;
+            case Cause::Unreachable:     causeStr = "Peer unreachable"; break;
+            case Cause::RateLimited:     causeStr = "Rate limited"; break;
+            case Cause::Implausible:     causeStr = "Implausible response"; break;
+            case Cause::DependencyUnmet: causeStr = "Waiting for dependencies"; break;
+            case Cause::FallbackEngaged: causeStr = "Fallback engaged"; break;
+            case Cause::Unavailable:     causeStr = "Unavailable"; break;
+            case Cause::Indeterminate:   causeStr = "Indeterminate state"; break;
+            case Cause::InternalError:   causeStr = "Internal error"; break;
+            default:                     causeStr = "Pending"; break;
+        }
+        char msgBuf[64];
+        snprintf(msgBuf, sizeof(msgBuf), "%s", causeStr);
+        lv_label_set_text(ui_uiSystemMsgBody, msgBuf);
+    }
+
+    // Update Busy group message if connecting
+    if (ui_uiSystemBusyMessage != nullptr && payload->name != nullptr) {
+        char busyBuf[64];
+        if (payload->cause == Cause::Connecting) {
+            snprintf(busyBuf, sizeof(busyBuf), "%s: Connecting...", payload->name);
+            lv_label_set_text(ui_uiSystemBusyMessage, busyBuf);
+        }
+    }
+}
+
 void SLSSystemScreens::onError(const char* title, const char* message) {
     if (ui_uiSystemErrorTitle != nullptr && title != nullptr) {
         lv_label_set_text(ui_uiSystemErrorTitle, title);

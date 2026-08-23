@@ -642,6 +642,14 @@ private:
      */
     static void _onAppRunning(const char* topic, const void* payload, void* ctx);
 
+    /**
+     * @brief Static callback for "precondition.health" EventBus topic.
+     * @param topic The topic string ("precondition.health").
+     * @param payload Pointer to a PreconditionHealthPayload struct.
+     * @param ctx Context pointer (this U8G2DisplayModule instance).
+     */
+    static void _onPreconditionHealth(const char* topic, const void* payload, void* ctx);
+
 
     // -------------------------------------------------------------------------
     // Member variables

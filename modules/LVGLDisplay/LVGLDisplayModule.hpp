@@ -427,6 +427,7 @@ private:
     static void _onSystemError(const char* topic, const void* payload, void* ctx);
     static void _onAppConfiguring(const char* topic, const void* payload, void* ctx);
     static void _onAppRunning(const char* topic, const void* payload, void* ctx);
+    static void _onPreconditionHealth(const char* topic, const void* payload, void* ctx);
     static void _onInputWake(const char* topic, const void* payload, void* ctx);
 
     ILVGLHardwareAdapter& _adapter;            ///< Injected hardware adapter

@@ -4,7 +4,8 @@
   "description": "U8G2 monochrome display module with carousel engine",
   "dependencies": {
     "bblanchon/ArduinoJson": "^7.4.3",
-    "olikraus/U8g2": "^2.36.18"
+    "olikraus/U8g2": "^2.36.18",
+    "PreconditionEngine": "*"
   },
   "build": {
     "flags": [

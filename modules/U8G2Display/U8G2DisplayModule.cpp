@@ -227,6 +227,7 @@ void U8G2DisplayModule::begin(EventBus* eventBus) {
         _eventBus->subscribe(U8G2DisplayEvents::DISPLAY_MESSAGE, _onDisplayMessage, this);
         _eventBus->subscribe(ApplicationEvents::APP_CONFIGURING, _onAppConfiguring, this);
         _eventBus->subscribe(ApplicationEvents::APP_RUNNING, _onAppRunning, this);
+        _eventBus->subscribe(ApplicationEvents::PRECONDITION_HEALTH, _onPreconditionHealth, this);
     }
 
     // --- Step 3: Activate boot splash (skip if bootstrapped — already shown) ---
@@ -1330,6 +1331,21 @@ void U8G2DisplayModule::_onAppRunning(const char* /*topic*/, const void* /*paylo
     self->clearModal();
     self->showBase(nullptr);
     self->carousel.resume();
+}
+
+/**
+ * @brief Static callback for "precondition.health" EventBus events.
+ *
+ * Updates ConfiguringStatusBoard cached precondition state.
+ */
+void U8G2DisplayModule::_onPreconditionHealth(const char* /*topic*/, const void* payload, void* ctx) {
+    auto* self = static_cast<U8G2DisplayModule*>(ctx);
+    if (self == nullptr || payload == nullptr) {
+        return;
+    }
+
+    const auto* p = static_cast<const PreconditionHealthPayload*>(payload);
+    self->boards.configuringStatus.updatePrecondition(*p);
 }
 
 

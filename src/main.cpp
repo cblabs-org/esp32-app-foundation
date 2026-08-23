@@ -204,7 +204,7 @@ void setup() {
     displayModule.begin(&app.getEventBus());
 #ifdef WITH_DISPLAY_U8G2
     diagnosticsBoard.configure(&app.getWifiManager());
-    displayModule.boards.configuringStatus.setGates(&app.getConfigGates());
+    displayModule.boards.configuringStatus.setEngine(&app.getPreconditionEngine());
     displayModule.carousel.add(&diagnosticsBoard);
 #endif
 #endif

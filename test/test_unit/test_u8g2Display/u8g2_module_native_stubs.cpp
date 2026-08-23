@@ -41,7 +41,15 @@ void U8G2DisplayModule::begin(EventBus* eventBus) {
     _eventBus = eventBus;
     if (_eventBus) {
         _eventBus->subscribe("app.configuring", _onAppConfiguring, this);
+        _eventBus->subscribe("precondition.health", _onPreconditionHealth, this);
     }
+}
+
+void U8G2DisplayModule::_onPreconditionHealth(const char* /*topic*/, const void* payload, void* ctx) {
+    auto* self = static_cast<U8G2DisplayModule*>(ctx);
+    if (!self || !payload) return;
+    const auto* p = static_cast<const PreconditionHealthPayload*>(payload);
+    self->boards.configuringStatus.updatePrecondition(*p);
 }
 
 void U8G2DisplayModule::_onAppConfiguring(const char* topic, const void* payload, void* ctx) {

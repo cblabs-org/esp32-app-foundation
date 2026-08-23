@@ -201,6 +201,7 @@ void LVGLDisplayModule::begin(EventBus* eventBus) {
         _eventBus->subscribe(LVGLDisplayEvents::SYSTEM_ERROR, _onSystemError, this);
         _eventBus->subscribe(ApplicationEvents::APP_CONFIGURING, _onAppConfiguring, this);
         _eventBus->subscribe(ApplicationEvents::APP_RUNNING, _onAppRunning, this);
+        _eventBus->subscribe(ApplicationEvents::PRECONDITION_HEALTH, _onPreconditionHealth, this);
 
         // Wake display on any physical input (encoder, button, touch).
         // These fire independently of LVGL's lv_timer_handler().
@@ -853,6 +854,15 @@ void LVGLDisplayModule::_onAppRunning(const char* /*topic*/, const void* /*paylo
     // Defer to tick() — LVGL APIs must only be called from the main loop.
     // See EventBus.hpp §1: callbacks run on the esp_event default loop task.
     self->_pendingAppRunning.store(true);
+}
+
+void LVGLDisplayModule::_onPreconditionHealth(const char* /*topic*/, const void* payload, void* ctx) {
+    auto* self = static_cast<LVGLDisplayModule*>(ctx);
+    if (!self || !payload) return;
+    auto* p = static_cast<const PreconditionHealthPayload*>(payload);
+    if (self->_screens != nullptr) {
+        self->_screens->onPreconditionHealth(p);
+    }
 }
 
 void LVGLDisplayModule::_onInputWake(const char* /*topic*/, const void* /*payload*/, void* ctx) {

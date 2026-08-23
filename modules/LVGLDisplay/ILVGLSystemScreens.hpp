@@ -32,6 +32,7 @@
 
 #include "lvgl.h"
 #include "events/AppConfiguringPayload.hpp"
+#include "events/PreconditionHealthPayload.hpp"
 
 /**
  * @brief Pluggable system screen visual provider interface for LVGL displays.
@@ -168,6 +169,17 @@ public:
      *                called by the framework.
      */
     virtual void onConfiguring(const AppConfiguringPayload* payload) {
+        (void)payload;
+    }
+
+    /**
+     * @brief Callback notification on each precondition health update.
+     *
+     * Called by the display module when a PreconditionHealthPayload event is received.
+     *
+     * @param payload Full precondition health payload (name, cause, severity, everMet).
+     */
+    virtual void onPreconditionHealth(const PreconditionHealthPayload* payload) {
         (void)payload;
     }
 };
