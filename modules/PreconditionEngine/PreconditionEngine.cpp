@@ -2,6 +2,7 @@
 #include "platform/LogShim.h"
 #include <cstring>
 #include <cmath>
+#include <cassert>
 
 static const char* TAG = "PreconditionEngine";
 
@@ -118,6 +119,14 @@ void PreconditionEngine::tick(uint32_t nowMs) {
     for (size_t i = 0; i < count_; ++i) {
         auto& p = preconditions_[i];
         
+        // Step 1: Evaluate the precondition's own function first.
+        if (p.evaluate) {
+            p.rawStatus = p.evaluate();
+        } else {
+            p.rawStatus = {false, Cause::InternalError};
+        }
+
+        // Step 2: Walk edges and overlay dependency constraints.
         bool dependencyUnmet = false;
         bool bindsToBecameUnmet = false;
 
@@ -129,6 +138,9 @@ void PreconditionEngine::tick(uint32_t nowMs) {
                 const auto& upstream = preconditions_[idx];
                 if (!upstream.rawStatus.met) {
                     dependencyUnmet = true;
+                    // BindsTo teardown: upstream was met on the previous tick
+                    // (rawStatus still reflects last eval before this tick's
+                    // damping update) but is unmet now.
                     if (kind == EdgeKind::BindsTo && p.rawStatus.met) {
                         bindsToBecameUnmet = true;
                     }
@@ -136,20 +148,15 @@ void PreconditionEngine::tick(uint32_t nowMs) {
             }
         }
 
+        // Step 3: Override rawStatus based on dependency evaluation.
         if (dependencyUnmet) {
             p.rawStatus.met = false;
             p.rawStatus.cause = Cause::DependencyUnmet;
-        } else {
-            if (p.evaluate) {
-                p.rawStatus = p.evaluate();
-            } else {
-                p.rawStatus = {false, Cause::InternalError};
-            }
-            
-            if (bindsToBecameUnmet) {
-                p.rawStatus.met = false;
-                p.rawStatus.cause = Cause::DependencyUnmet;
-            }
+        } else if (bindsToBecameUnmet) {
+            // BindsTo tears down even though Requires deps are met —
+            // the upstream it was bound to regressed.
+            p.rawStatus.met = false;
+            p.rawStatus.cause = Cause::DependencyUnmet;
         }
 
         if (p.rawStatus.met && p.rawStatus.cause != Cause::DependencyUnmet) {
@@ -265,6 +272,7 @@ size_t PreconditionEngine::getPreconditionCount() const {
 }
 
 const PreconditionState& PreconditionEngine::getStateAt(size_t i) const {
+    assert(i < count_);
     return preconditions_[i];
 }
 

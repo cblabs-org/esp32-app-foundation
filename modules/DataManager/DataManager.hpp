@@ -265,7 +265,6 @@ private:
     std::vector<SourceRecord> _registry;
     SemaphoreHandle_t _registryMutex;
     TaskHandle_t _workerTask;
-    std::vector<IDataSource*> _sources;
     uint32_t _simulatedTimeMs = 0;
     std::atomic<uint32_t> _fetchStartMs{0};   ///< Timestamp of in-flight fetchUpdate(); 0 when idle.
 #ifdef ESP_PLATFORM

@@ -144,7 +144,7 @@ void MyApp::registerRoutes(PsychicHttpServer& server) {
         doc["status"] = "ok";
         doc["refreshMs"] = _refreshIntervalMs;
         doc["enabled"] = _featureEnabled;
-        doc["gateOpen"] = _gateOpen;
+        doc["ready"] = _ready;
 
         String output;
         serializeJson(doc, output);
@@ -217,7 +217,7 @@ void MyApp::registerMCPTools(MCPToolRegistry& registry) {
             (void)params;
             result["refreshMs"] = self->_refreshIntervalMs;
             result["enabled"] = self->_featureEnabled;
-            result["gateOpen"] = self->_gateOpen;
+            result["ready"] = self->_ready;
         },
         this,  // context: MyApp*
         false // mutatesState = false
@@ -231,7 +231,7 @@ void MyApp::registerMCPTools(MCPToolRegistry& registry) {
 void MyApp::registerPreconditions(PreconditionRegistry& reg) {
     reg.add("MyApp Ready", PreconditionRole::Operational,
         [this]() -> PreconditionStatus {
-            return _gateOpen
+            return _ready
                 ? PreconditionStatus{true, Cause::Met}
                 : PreconditionStatus{false, Cause::Connecting};
         });

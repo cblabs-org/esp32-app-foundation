@@ -478,7 +478,7 @@ private:
     IBootReporter* _bootReporter = nullptr;                         ///< Boot reporter for early hardware init
 
     // Core infrastructure services
-    PreconditionEngine _preconditionEngine;
+    PreconditionEngine _preconditionEngine;                ///< Central precondition engine
     struct PreconditionStatusRecord {
         bool initialized = false;
         bool met = false;
@@ -486,9 +486,8 @@ private:
         Severity severity = Severity::Transient;
         bool everMet = false;
     };
-    PreconditionStatusRecord _lastPreconditionStatus[16]; // MAX_PRECONDITIONS
-    PreconditionHealthPayload _preconditionPayloads[16];  ///< Persistent payloads for EventBus (WO7)
- ///< Central precondition engine
+    PreconditionStatusRecord _lastPreconditionStatus[MAX_PRECONDITIONS];
+    PreconditionHealthPayload _preconditionPayloads[MAX_PRECONDITIONS];  ///< Persistent payloads for EventBus (WO7)
     ConfigManager _configManager;       ///< Centralised config gateway (owned by Application)
     EventBus _eventBus;                 ///< Central event bus
     uint32_t _systemHeapPayload = 0;    ///< Persistent payload for system.heap event

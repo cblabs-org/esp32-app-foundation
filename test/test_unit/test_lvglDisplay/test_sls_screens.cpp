@@ -122,7 +122,7 @@ TEST_F(SLSSystemScreensTest, WifiWizardScreenActivatesSetupGroupOnly) {
 
 TEST_F(SLSSystemScreensTest, GateHelperScreenShowsMessageForNonWifiGate) {
     AppConfiguringPayload p;
-    p.gateName = "Timezone";
+    p.preconditionName = "Timezone";
     p.cause = Cause::NotConfigured;
     p.severity = Severity::NeedsUser;
 
@@ -134,7 +134,7 @@ TEST_F(SLSSystemScreensTest, GateHelperScreenShowsMessageForNonWifiGate) {
 
 TEST_F(SLSSystemScreensTest, GateHelperScreenDefersWifiGateToWizard) {
     AppConfiguringPayload p;
-    p.gateName = PreconditionNames::WIFI_STATION;
+    p.preconditionName = PreconditionNames::WIFI_STATION;
     p.cause = Cause::NotConfigured;
     p.severity = Severity::NeedsUser;
 
@@ -144,7 +144,7 @@ TEST_F(SLSSystemScreensTest, GateHelperScreenDefersWifiGateToWizard) {
 
 TEST_F(SLSSystemScreensTest, OnConfiguringPopulatesSetupAndMessageWidgets) {
     AppConfiguringPayload p;
-    p.gateName = PreconditionNames::WIFI_STATION;
+    p.preconditionName = PreconditionNames::WIFI_STATION;
     p.helpText = "Join the setup network";
     p.hostname = "device-ap";
     p.deviceIP = "192.168.4.1";
@@ -185,7 +185,7 @@ TEST_F(SLSSystemScreensTest, NullGlobalsDefensiveNoCrash) {
     screens.onOtaProgress(0.5f, "STATUS");
 
     AppConfiguringPayload p;
-    p.gateName = "Timezone";
+    p.preconditionName = "Timezone";
     p.helpText = "help";
     p.hostname = "ap";
     p.deviceIP = "1.2.3.4";

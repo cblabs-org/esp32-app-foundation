@@ -75,7 +75,7 @@ void U8G2DisplayModule::_onAppConfiguring(const char* topic, const void* payload
         }
     }
     // Tier 2: Built-in WiFi wizard
-    if (p->gateName && strcmp(p->gateName, PreconditionNames::WIFI_STATION) == 0) {
+    if (p->preconditionName && strcmp(p->preconditionName, PreconditionNames::WIFI_STATION) == 0) {
         self->_wifiWizard.configure(p->hostname, p->deviceIP);
         self->showModal(&self->_wifiWizard);
         return;

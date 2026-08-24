@@ -517,6 +517,12 @@ void DataManager::executeLoop() {
     // a fetch, and nothing happens.
     //
     // The gate is now applied per-source, below both escape hatches.
+    // _appRunning was deliberately removed. See the NOTE above for the full rationale.
+    // This constant preserves the per-source gating logic below (fetchesWhileConfiguring)
+    // without the global blanket early return that caused the circular-dependency deadlock.
+    // The variable reads as "all sources allowed" and the per-source checks provide the
+    // actual gating. If a global gate is ever needed again, it should be an atomic bool
+    // driven by Application state transitions, not a removed setter.
     const bool appRunning = true;
 
     MutexLock lock(_registryMutex);

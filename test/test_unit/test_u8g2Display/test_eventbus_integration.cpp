@@ -263,7 +263,7 @@ TEST_F(ThreeTierDispatchTest, Tier1_ConsumerOverride_WinsOverBuiltIn) {
     display.begin(&bus);
 
     AppConfiguringPayload payload;
-    payload.gateName = "API Keys";
+    payload.preconditionName = "API Keys";
     payload.helpText = "Enter your API key";
     payload.cause = Cause::NotConfigured;
     payload.severity = Severity::NeedsUser;
@@ -284,7 +284,7 @@ TEST_F(ThreeTierDispatchTest, Tier2_WifiStation_ShowsWifiWizard) {
     display.begin(&bus);
 
     AppConfiguringPayload payload;
-    payload.gateName = PreconditionNames::WIFI_STATION;
+    payload.preconditionName = PreconditionNames::WIFI_STATION;
     payload.helpText = "Connect to WiFi";
     payload.cause = Cause::NotConfigured;
     payload.severity = Severity::NeedsUser;
@@ -305,7 +305,7 @@ TEST_F(ThreeTierDispatchTest, Tier3_UnknownGate_ShowsGenericHelper) {
     display.begin(&bus);
 
     AppConfiguringPayload payload;
-    payload.gateName = "Board Config";
+    payload.preconditionName = "Board Config";
     payload.helpText = "Add a departure board";
     payload.cause = Cause::NotConfigured;
     payload.severity = Severity::NeedsUser;
@@ -329,7 +329,7 @@ TEST_F(ThreeTierDispatchTest, ClearModal_CalledOnEveryInvocation) {
 
     // First: push WiFi wizard via NeedsUser
     AppConfiguringPayload payload1;
-    payload1.gateName = PreconditionNames::WIFI_STATION;
+    payload1.preconditionName = PreconditionNames::WIFI_STATION;
     payload1.helpText = "Connect to WiFi";
     payload1.cause = Cause::NotConfigured;
     payload1.severity = Severity::NeedsUser;
@@ -341,7 +341,7 @@ TEST_F(ThreeTierDispatchTest, ClearModal_CalledOnEveryInvocation) {
 
     // Second: publish Transient (Connecting) — modal should be cleared, no new modal pushed
     AppConfiguringPayload payload2;
-    payload2.gateName = PreconditionNames::WIFI_STATION;
+    payload2.preconditionName = PreconditionNames::WIFI_STATION;
     payload2.helpText = "Connecting...";
     payload2.cause = Cause::Connecting;
     payload2.severity = Severity::Transient;
@@ -362,7 +362,7 @@ TEST_F(ThreeTierDispatchTest, Transient_NoModal) {
     display.begin(&bus);
 
     AppConfiguringPayload payload;
-    payload.gateName = PreconditionNames::WIFI_STATION;
+    payload.preconditionName = PreconditionNames::WIFI_STATION;
     payload.helpText = "Connecting...";
     payload.cause = Cause::Connecting;
     payload.severity = Severity::Transient;
@@ -382,13 +382,13 @@ TEST_F(ThreeTierDispatchTest, PreconditionHealth_UpdatesConfiguringStatusBoard) 
     U8G2DisplayModule display;
     display.begin(&bus);
 
-    PreconditionHealthPayload p1{"WiFi Station", Cause::Connecting, Severity::Transient, false};
+    PreconditionHealthPayload p1{"WiFi Station", Cause::Connecting, Severity::Transient, false, PreconditionRole::Startup};
     bus.publish("precondition.health", &p1);
 
     EXPECT_EQ(display.boards.configuringStatus.getTotalPreconditions(), 1);
     EXPECT_EQ(display.boards.configuringStatus.getStartupMetCount(), 0);
 
-    PreconditionHealthPayload p2{"WiFi Station", Cause::Met, Severity::Transient, true};
+    PreconditionHealthPayload p2{"WiFi Station", Cause::Met, Severity::Transient, true, PreconditionRole::Startup};
     bus.publish("precondition.health", &p2);
 
     EXPECT_EQ(display.boards.configuringStatus.getTotalPreconditions(), 1);

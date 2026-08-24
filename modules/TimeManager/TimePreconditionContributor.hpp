@@ -27,6 +27,13 @@
  * Splits the old TimeConfigGate into two Operational preconditions:
  * 1. Timezone: Operational, no edges (settable in AP mode).
  * 2. Time Sync: Operational, Requires WiFi Station (§9.1).
+ *
+ * Both preconditions are registered as Operational by default. Consumer apps
+ * that require time sync before entering RUNNING can override the role to
+ * Startup by registering their own TimePreconditionContributor subclass, or
+ * by adding a Startup-role precondition that wraps these Operational ones
+ * via BindsTo edges. The framework does not enforce Startup here because
+ * many applications function correctly without NTP on first boot.
  */
 class TimePreconditionContributor : public IPreconditionContributor {
 public:

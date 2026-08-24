@@ -27,7 +27,7 @@
  * the appropriate system board or modal helper.
  */
 struct AppConfiguringPayload {
-    const char*      gateName     = nullptr;                          ///< Name of the blocking precondition
+    const char*      preconditionName = nullptr;                      ///< Name of the blocking precondition
     const char*      helpText     = nullptr;                          ///< User-facing guidance text
     Cause            cause        = Cause::NotConfigured;             ///< Precondition cause
     Severity         severity     = Severity::NeedsUser;              ///< Derived severity

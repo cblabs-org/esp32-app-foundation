@@ -299,10 +299,13 @@ void Application::tick() {
     uint32_t currentMillis = millis();
     _preconditionEngine.tick(currentMillis);
 
+    // Extract once — Periodic::due() is consumable (returns true once, resets).
+    bool throttleDue = _configuringPublishThrottle.due(currentMillis);
+
     // --- CONFIGURING: precondition re-publishing + transition check ---
     if (_state == AppState::Configuring) {
         // Precondition re-publishing (500ms throttle)
-        if (_configuringPublishThrottle.due(currentMillis)) {
+        if (throttleDue) {
             const PreconditionState* blocking = nullptr;
             for (size_t i = 0; i < _preconditionEngine.getPreconditionCount(); ++i) {
                 const auto& s = _preconditionEngine.getStateAt(i);
@@ -316,7 +319,6 @@ void Application::tick() {
             Cause currentCause = blocking ? blocking->dampedStatus.cause : Cause::Met;
 
             bool changed = (currentGate != _lastPublishedGate) ||
-                           (currentGate != nullptr && _lastPublishedGate != nullptr && strcmp(currentGate, _lastPublishedGate) != 0) ||
                            (currentCause != _lastPublishedCause);
 
             if (!changed) {
@@ -371,7 +373,7 @@ void Application::tick() {
     // while internal DRAM is one allocation from exhaustion. dram_min is the
     // low-water mark since boot — it matters more than dram, which is only
     // an instantaneous snapshot and can hide a transient trough.
-    if (_configuringPublishThrottle.due(currentMillis)) {
+    if (throttleDue) {
         for (size_t i = 0; i < _preconditionEngine.getPreconditionCount(); ++i) {
             const auto& state = _preconditionEngine.getStateAt(i);
             auto& last = _lastPreconditionStatus[i];
@@ -385,7 +387,7 @@ void Application::tick() {
                 last.cause = state.dampedStatus.cause;
                 last.severity = state.severity;
                 last.everMet = state.everMet;
-                _preconditionPayloads[i] = {state.name, state.dampedStatus.cause, state.severity, state.everMet};
+                _preconditionPayloads[i] = {state.name, state.dampedStatus.cause, state.severity, state.everMet, state.role};
                 _eventBus.publish(ApplicationEvents::PRECONDITION_HEALTH, &_preconditionPayloads[i]);
             }
             if (_state == AppState::Running && (state.role == PreconditionRole::Startup || state.role == PreconditionRole::Both) && state.suppressed) {
@@ -393,6 +395,7 @@ void Application::tick() {
                 setState(AppState::Configuring);
                 _publishConfiguringEvent(true);
                 _onEnterConfiguring(true);
+                break;
             }
         }
     }
@@ -674,7 +677,7 @@ void Application::_publishConfiguringEvent(bool isRegression) {
     _lastPublishedGate   = blocking->name;
     _lastPublishedCause  = blocking->dampedStatus.cause;
 
-    _configuringPayload.gateName     = blocking->name;
+    _configuringPayload.preconditionName     = blocking->name;
     _configuringPayload.helpText     = _helpTextBuf[0] != '\0' ? _helpTextBuf : nullptr;
     _configuringPayload.cause        = blocking->dampedStatus.cause;
     _configuringPayload.severity     = blocking->severity;

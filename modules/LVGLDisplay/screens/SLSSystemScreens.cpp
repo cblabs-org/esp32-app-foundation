@@ -57,8 +57,8 @@ lv_obj_t* SLSSystemScreens::wifiWizardScreen() {
 
 lv_obj_t* SLSSystemScreens::gateHelperScreen(const AppConfiguringPayload* payload) {
     // Defer the WiFi station gate to the module's Tier-2 wizard (Setup group).
-    if (payload != nullptr && payload->gateName != nullptr &&
-        strcmp(payload->gateName, PreconditionNames::WIFI_STATION) == 0) {
+    if (payload != nullptr && payload->preconditionName != nullptr &&
+        strcmp(payload->preconditionName, PreconditionNames::WIFI_STATION) == 0) {
         return nullptr;
     }
     return showGroup(ui_uiSystemMessageGroup);
@@ -86,8 +86,8 @@ void SLSSystemScreens::onConfiguring(const AppConfiguringPayload* payload) {
     }
 
     // Message group — generic gate-helper title/body.
-    if (ui_ui_SystemMsgTitle != nullptr && payload->gateName != nullptr) {
-        lv_label_set_text(ui_ui_SystemMsgTitle, payload->gateName);
+    if (ui_ui_SystemMsgTitle != nullptr && payload->preconditionName != nullptr) {
+        lv_label_set_text(ui_ui_SystemMsgTitle, payload->preconditionName);
     }
     if (ui_uiSystemMsgBody != nullptr && payload->helpText != nullptr) {
         lv_label_set_text(ui_uiSystemMsgBody, payload->helpText);
@@ -120,9 +120,7 @@ void SLSSystemScreens::onPreconditionHealth(const PreconditionHealthPayload* pay
             case Cause::InternalError:   causeStr = "Internal error"; break;
             default:                     causeStr = "Pending"; break;
         }
-        char msgBuf[64];
-        snprintf(msgBuf, sizeof(msgBuf), "%s", causeStr);
-        lv_label_set_text(ui_uiSystemMsgBody, msgBuf);
+        lv_label_set_text(ui_uiSystemMsgBody, causeStr);
     }
 
     // Update Busy group message if connecting

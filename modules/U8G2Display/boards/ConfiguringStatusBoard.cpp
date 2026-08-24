@@ -33,6 +33,26 @@
 #include <U8g2lib.h>
 #include "fonts/Fonts.hpp"
 
+/**
+ * @brief Map a precondition's cause/severity to a single-character prefix.
+ *
+ * Used by render() for per-row status indicators:
+ *   '*' = Met, '~'/'\>' = Connecting (animated), '!' = NeedsUser,
+ *   '-' = DependencyUnmet, '?' = Indeterminate, '\>' = in progress.
+ *
+ * @param item     The precondition snapshot to derive the prefix from.
+ * @param animFrame Current animation frame counter (for Connecting toggle).
+ * @return Single character prefix for the status row.
+ */
+static char causeToPrefix(const PreconditionSnapshot& item, uint8_t animFrame) {
+    if (item.cause == Cause::Met) return '*';
+    if (item.cause == Cause::Connecting) return (animFrame % 20 < 10) ? '~' : '>';
+    if (item.severity == Severity::NeedsUser) return '!';
+    if (item.cause == Cause::DependencyUnmet) return '-';
+    if (item.cause == Cause::Indeterminate) return '?';
+    return '>';
+}
+
 // =============================================================================
 // Construction
 // =============================================================================
@@ -95,7 +115,11 @@ void ConfiguringStatusBoard::setPreconditions(const PreconditionSnapshot* items,
  * @brief Update or add a precondition entry from a health event.
  */
 void ConfiguringStatusBoard::updatePrecondition(const PreconditionHealthPayload& payload, PreconditionRole role) {
-    updatePrecondition(payload.name, payload.cause, payload.severity, payload.everMet, role);
+    // When caller provides an explicit role override (e.g., from test code), use it.
+    // Otherwise, use the role from the payload (populated by Application.cpp from PreconditionState).
+    // The default parameter is PreconditionRole::Startup for backward compatibility.
+    (void)role;  // Legacy parameter — payload.role is now the source of truth
+    updatePrecondition(payload.name, payload.cause, payload.severity, payload.everMet, payload.role);
 }
 
 /**
@@ -310,20 +334,7 @@ void ConfiguringStatusBoard::render(U8G2& u8g2) {
         if (displayCount <= static_cast<uint8_t>(maxRows)) {
             for (uint8_t r = 0; r < displayCount; ++r) {
                 const auto& item = items[displayOrder[r]];
-                char prefix;
-                if (item.cause == Cause::Met) {
-                    prefix = '*';
-                } else if (item.cause == Cause::Connecting) {
-                    prefix = (_animFrame % 20 < 10) ? '~' : '>';
-                } else if (item.severity == Severity::NeedsUser) {
-                    prefix = '!';
-                } else if (item.cause == Cause::DependencyUnmet) {
-                    prefix = '-';
-                } else if (item.cause == Cause::Indeterminate) {
-                    prefix = '?';
-                } else {
-                    prefix = '>';
-                }
+                char prefix = causeToPrefix(item, _animFrame);
 
                 char rowBuf[64];
                 snprintf(rowBuf, sizeof(rowBuf), "%c %s", prefix, item.name);
@@ -336,20 +347,7 @@ void ConfiguringStatusBoard::render(U8G2& u8g2) {
             const uint8_t visibleItems = static_cast<uint8_t>(maxRows - 1);
             for (uint8_t r = 0; r < visibleItems; ++r) {
                 const auto& item = items[displayOrder[r]];
-                char prefix;
-                if (item.cause == Cause::Met) {
-                    prefix = '*';
-                } else if (item.cause == Cause::Connecting) {
-                    prefix = (_animFrame % 20 < 10) ? '~' : '>';
-                } else if (item.severity == Severity::NeedsUser) {
-                    prefix = '!';
-                } else if (item.cause == Cause::DependencyUnmet) {
-                    prefix = '-';
-                } else if (item.cause == Cause::Indeterminate) {
-                    prefix = '?';
-                } else {
-                    prefix = '>';
-                }
+                char prefix = causeToPrefix(item, _animFrame);
 
                 char rowBuf[64];
                 snprintf(rowBuf, sizeof(rowBuf), "%c %s", prefix, item.name);

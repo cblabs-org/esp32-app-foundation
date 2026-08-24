@@ -207,6 +207,40 @@ TEST_F(PreconditionEngineTest, CG8Invariant) {
     EXPECT_TRUE(bState.dampedStatus.met); // because it has no penalty
 }
 
+TEST_F(PreconditionEngineTest, BindsTo_TearsDown_WhenUpstreamRegresses) {
+    // Upstream "A" starts met; downstream "B" binds to "A" and also starts met.
+    // When "A" regresses to unmet, "B" must be torn down (DependencyUnmet).
+    bool aMet = true;
+    bool bMet = true;
+    engine.add("A", PreconditionRole::Operational, [&]() { return PreconditionStatus{aMet, aMet ? Cause::Met : Cause::Unreachable}; });
+    
+    Edge edgesB[] = {{"A", EdgeKind::BindsTo}};
+    engine.add("B", PreconditionRole::Operational, [&]() { return PreconditionStatus{bMet, bMet ? Cause::Met : Cause::NotConfigured}; }, nullptr, edgesB, 1);
+    
+    EXPECT_TRUE(engine.resolveEdges());
+    
+    // Initial tick — both met
+    engine.tick(nowMs);
+    PreconditionState bState;
+    engine.getStateByName("B", bState);
+    EXPECT_TRUE(bState.rawStatus.met);
+    
+    // Regress upstream A
+    aMet = false;
+    nowMs += 1000;
+    engine.tick(nowMs);
+    engine.getStateByName("B", bState);
+    EXPECT_FALSE(bState.rawStatus.met);
+    EXPECT_EQ(bState.rawStatus.cause, Cause::DependencyUnmet);
+    
+    // Recover upstream A — B should recover too (its own evalFn returns met)
+    aMet = true;
+    nowMs += 1000;
+    engine.tick(nowMs);
+    engine.getStateByName("B", bState);
+    EXPECT_TRUE(bState.rawStatus.met);
+}
+
 int main(int argc, char** argv) {
     ::testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();

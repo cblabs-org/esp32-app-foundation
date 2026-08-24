@@ -703,7 +703,6 @@ TEST(PreconditionApiTest, PreconditionsGetHandlerReturnsJson) {
     EXPECT_EQ(err, DeserializationError::Ok);
     ASSERT_TRUE(doc.is<JsonArray>());
     JsonArray arr = doc.as<JsonArray>();
-    std::cout << "RESPONSE: " << resp.sentBody << std::endl;
     EXPECT_GE(arr.size(), 2u); // Wifi Station + Custom Op
 
     bool foundCustom = false;

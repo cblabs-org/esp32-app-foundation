@@ -292,7 +292,7 @@ void LVGLDisplayModule::tick(uint32_t now) {
     if (_pendingConfiguring.exchange(false)) {
         AppConfiguringPayload p = _pendingConfiguringPayload;
         ESP_LOGI("LVGLDisplayModule", "CONFIGURING gate: %s (cause=%d, severity=%d) (deferred)",
-                 p.gateName ? p.gateName : "?",
+                 p.preconditionName ? p.preconditionName : "?",
                  static_cast<int>(p.cause),
                  static_cast<int>(p.severity));
 
@@ -303,8 +303,8 @@ void LVGLDisplayModule::tick(uint32_t now) {
             lv_obj_t* scr = nullptr;
             if (p.severity == Severity::NeedsUser) {
                 scr = _screens->gateHelperScreen(&p);
-                if (scr == nullptr && p.gateName != nullptr &&
-                    strcmp(p.gateName, PreconditionNames::WIFI_STATION) == 0) {
+                if (scr == nullptr && p.preconditionName != nullptr &&
+                    strcmp(p.preconditionName, PreconditionNames::WIFI_STATION) == 0) {
                     scr = _screens->wifiWizardScreen();
                 }
                 if (scr == nullptr) {
@@ -843,6 +843,20 @@ void LVGLDisplayModule::_onSystemError(const char* /*topic*/, const void* payloa
     }
 }
 
+// Deferred-flag pattern for cross-thread EventBus → LVGL main-loop dispatch.
+//
+// The struct write (_pendingConfiguringPayload = *p) is non-atomic, but this is
+// safe because:
+//   (a) The 500ms publish throttle in Application::tick() guarantees no
+//       rapid-fire overwrites — the next publish cannot arrive before the
+//       main-loop tick has drained the flag.
+//   (b) Payload pointers (name, helpText, etc.) reference stable Application
+//       member buffers that outlive the event, so a partially-written struct
+//       cannot produce a dangling pointer.
+//   (c) This is the identical pattern used by _onOtaProgress, where a struct
+//       copy precedes an atomic flag store, and the consuming tick() reads the
+//       struct only after the flag exchange.
+// No mutex is needed.
 void LVGLDisplayModule::_onAppConfiguring(const char* /*topic*/, const void* payload, void* ctx) {
     auto* self = static_cast<LVGLDisplayModule*>(ctx);
     if (!self || !payload) return;
@@ -859,6 +873,7 @@ void LVGLDisplayModule::_onAppRunning(const char* /*topic*/, const void* /*paylo
     self->_pendingAppRunning.store(true);
 }
 
+// Same deferred-flag pattern as _onAppConfiguring — see TOCTOU comment above.
 void LVGLDisplayModule::_onPreconditionHealth(const char* /*topic*/, const void* payload, void* ctx) {
     auto* self = static_cast<LVGLDisplayModule*>(ctx);
     if (!self || !payload) return;

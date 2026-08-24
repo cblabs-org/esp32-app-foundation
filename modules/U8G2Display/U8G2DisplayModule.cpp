@@ -1264,7 +1264,7 @@ void U8G2DisplayModule::_onAppConfiguring(const char* /*topic*/, const void* pay
     auto* p = static_cast<const AppConfiguringPayload*>(payload);
 
     // --- 4. Update configuring status board with connection info ---
-    self->boards.configuringStatus.setActionableGateName(p->gateName);
+    self->boards.configuringStatus.setActionableGateName(p->preconditionName);
     char urlBuf[48] = "";
     if (p->deviceIP != nullptr) {
         snprintf(urlBuf, sizeof(urlBuf), "http://%s", p->deviceIP);
@@ -1288,8 +1288,8 @@ void U8G2DisplayModule::_onAppConfiguring(const char* /*topic*/, const void* pay
     }
 
     // Tier 2: Built-in WiFi wizard
-    if (modalBoard == nullptr && p->gateName != nullptr &&
-        strcmp(p->gateName, PreconditionNames::WIFI_STATION) == 0) {
+    if (modalBoard == nullptr && p->preconditionName != nullptr &&
+        strcmp(p->preconditionName, PreconditionNames::WIFI_STATION) == 0) {
         // Resolve wizard board: prefer IU8G2SystemScreens wifiWizardBoard override
         IDisplayBoard* wizardBoard = (self->_screens != nullptr && self->_screens->wifiWizardBoard() != nullptr)
                                      ? self->_screens->wifiWizardBoard()
@@ -1305,7 +1305,7 @@ void U8G2DisplayModule::_onAppConfiguring(const char* /*topic*/, const void* pay
     // Tier 3: Generic fallback
     if (modalBoard == nullptr) {
         self->boards.genericHelper.configure(
-            p->gateName ? p->gateName : "Configuration",
+            p->preconditionName ? p->preconditionName : "Configuration",
             p->helpText ? p->helpText : "",
             p->deviceIP ? p->deviceIP : ""
         );

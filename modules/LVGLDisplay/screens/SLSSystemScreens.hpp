@@ -107,7 +107,7 @@ public:
      *
      * Sets the Setup SSID/URL, Busy message, and Message title/body from the
      * payload. Visibility is chosen separately by the screen-factory methods.
-     * @param payload Configuring event payload (hostname, deviceIP, gateName, helpText).
+     * @param payload Configuring event payload (hostname, deviceIP, preconditionName, helpText).
      */
     void onConfiguring(const AppConfiguringPayload* payload) override;
 

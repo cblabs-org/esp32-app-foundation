@@ -224,6 +224,11 @@ TEST_F(DataManagerTest, ProcessNext_WithNoSources_DoesNotCrash) {
 
 /**
  * When _appRunning is false (default), processNext() must not fetch any source.
+ *
+ * PERMANENTLY DISABLED (CG-17): The global _appRunning gate was removed to fix
+ * the circular-dependency deadlock (see DataManager.cpp executeLoop() comment).
+ * appRunning is now `const bool = true`, making this test's premise impossible.
+ * Retained as documentation of the old contract.
  */
 TEST(DataManagerGatingTest, DISABLED_AppNotRunning_SkipsFetch) {
     DataManager dm;
@@ -254,6 +259,9 @@ TEST(DataManagerGatingTest, AppRunning_AllowsFetch) {
 
 /**
  * Toggling _appRunning back to false after fetches must prevent further fetches.
+ *
+ * PERMANENTLY DISABLED (CG-17): See DISABLED_AppNotRunning_SkipsFetch above.
+ * The setter and the toggle semantics were removed with the gate.
  */
 TEST(DataManagerGatingTest, DISABLED_AppRunningToggle_StopsFetch) {
     DataManager dm;
