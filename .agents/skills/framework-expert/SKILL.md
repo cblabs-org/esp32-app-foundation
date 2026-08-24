@@ -10,9 +10,10 @@ description: >
   a design doc, spec out my project, design before coding, application
   architecture document. (3) Building and extending — registerModule,
   AppFoundation.h, ITickable, IConfigurable, IWebContributor, IMCPContributor,
-  IConfigGate, IDataSource, IDisplayBoard, IOTAVerifier, EventBus, ConfigManager,
-  LittleFS, web portal, display carousel, OTA verification, MCP server/device
-  tools. (4) Patterns and safety — Service Module Pattern, orchestrator
+  IPreconditionContributor, IDataSource, IDisplayBoard, IOTAVerifier, EventBus,
+  ConfigManager, LittleFS, web portal, display carousel, OTA verification,
+  MCP server/device tools, PreconditionEngine, precondition, Cause, Severity.
+  (4) Patterns and safety — Service Module Pattern, orchestrator
   anti-pattern, Domain Meaning Test, SOLID, thread safety, std::function, TWDT,
   watchdog, heap, PSRAM, TLS memory, flash size. (5) Security — DeviceCrypto,
   KeyManager, AuthManager, JWT, setInsecure, certificate bundles, esp_crt_bundle,
@@ -66,7 +67,7 @@ Always use `#include "AppFoundation.h"`. Do not couple directly to internal fram
 | `IConfigurable` | Persists and loads module settings via `ConfigManager` gateway. | `applyConfig(const JsonObject&)` |
 | `IWebContributor` | Exposes REST API endpoints and appends navigation tabs. | `registerRoutes(PsychicHttpServer&)` |
 | `IMCPContributor` | Registers JSON-RPC tools with the local Model Context Protocol. | `registerMCPTools(MCPToolRegistry&)` |
-| `IConfigGate` | Blocks transition to RUNNING state until requirements are satisfied. | `isSatisfied()` |
+| `IPreconditionContributor` | Contributes preconditions to the `PreconditionEngine` via visitor pattern. | `registerPreconditions(PreconditionRegistry&)` |
 | `IDataSource` | Scheduled background data fetch worker managed by `DataManager`. | `fetchUpdate()` |
 | `IStatusReporter` | Displays boot-phase progress status and unrecoverable errors. | `reportStatus(const char*, float)` |
 | `IDisplayBoard` | Renders a telemetry pane inside the monochrome display carousel. | `render(U8G2&)` |
@@ -139,7 +140,9 @@ These references are optimized distillations for AI agents. If the human develop
   "what should my app look like", "help me think through my app",
   "application architecture", "design session".
 - **Interfaces**: "ITickable", "IConfigurable", "IWebContributor", "IMCPContributor",
-  "IOTAVerifier", "IConfigGate", "IDataSource", "IStatusReporter", "IDisplayBoard".
+  "IOTAVerifier", "IPreconditionContributor", "PreconditionEngine", "PreconditionRegistry",
+  "Cause", "Severity", "PreconditionRole", "precondition",
+  "IDataSource", "IStatusReporter", "IDisplayBoard".
 - **Core systems**: "EventBus", "ConfigManager", "FrameworkConfig", "config system",
   "extension point", "framework architecture", "AppFoundation.h", "tick function",
   "boot sequence", "LittleFS layout".

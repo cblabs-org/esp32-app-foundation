@@ -50,21 +50,21 @@ Executed synchronously inside `app.begin(config)`:
 5.  REST routes and MCP tools registered.
 6.  Registry **compacted and locked** (Registration closes).
 7.  Firmware self-test checks boot partition.
-8.  `IConfigGate` gates evaluated.
+8.  `PreconditionEngine` edges resolved, first tick.
 
 ### 2. CONFIGURING Phase
-Entered if any `IConfigGate::isSatisfied()` returns `false` (e.g., station credentials missing).
+Entered if `PreconditionEngine::allStartupMet()` returns `false` (e.g., station credentials missing).
 *   Ticks are dispatched; WiFi AP/Captive Portal active.
-*   Framework polls gates; transitions to `RUNNING` when all are satisfied.
-*   Gate-transition re-publishing: Application polls on configurable throttle, re-publishes via `AppConfiguringPayload` when actionable gate or its status changes.
-*   `ConfigGateResolver::findActionableGate()` is the SSOT for dependency-aware gate resolution.
-*   Display modules are pure event-driven reactors consuming `app.configuring` events.
+*   `PreconditionEngine::tick()` evaluates all preconditions each cycle, applying damping and breaker state machine logic, and deriving `Severity` from `Cause` and trust history via `deriveSeverity()`.
+*   Transitions to `RUNNING` when `PreconditionEngine::allStartupMet()` returns `true`.
+*   Application re-publishes via `AppConfiguringPayload` (preconditionName, cause, severity) when the actionable precondition or its status changes.
+*   Display modules are pure event-driven reactors consuming `app.configuring` and `precondition.health` events.
 
 ### 3. RUNNING Phase
-Entered once all configuration gates are satisfied.
+Entered once all Startup-role preconditions are met.
 *   Ticks dispatched to all `ITickable` modules.
 *   **Tick Budget (ADR-17):** Modules MUST complete their `tick()` within 10ms. The Task Watchdog Timer (TWDT) will panic and reboot the ESP32 if the main loop blocks for more than 5 seconds. Lengthy operations must be deferred to FreeRTOS tasks (e.g., `IDataSource`) or broken into state machines.
-*   Gates are checked every 5 seconds. If a gate regresses beyond its `getRegressionToleranceMs()`, the system reverts to `CONFIGURING`.
+*   `PreconditionEngine` continues ticking. If a Startup/Both-role precondition becomes suppressed (damping threshold exceeded), the system reverts to `CONFIGURING`.
 
 ## LittleFS Directory Layout
 *   `/mod/<namespace>.json`: Central config file for `IConfigurable` namespace.

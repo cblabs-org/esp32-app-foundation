@@ -26,7 +26,7 @@
     "harness-adapters/README.md",
     "harness-adapters/antigravity.md",
     "harness-adapters/claude-code.md",
-    "interfaces/config-gate.md",
+    "interfaces/precondition-contributor.md",
     "interfaces/configurable.md",
     "interfaces/data-source.md",
     "interfaces/display-board.md",

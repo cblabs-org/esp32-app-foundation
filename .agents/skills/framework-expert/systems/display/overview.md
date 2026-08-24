@@ -39,8 +39,10 @@ The display subsystem interacts with modules via several specialized interfaces:
 
 ## CONFIGURING Phase Display Orchestration
 
-- **`ConfiguringStatusBoard`**: Always-visible base board showing per-gate status rows with prefix indicators (`*` satisfied, `>` actionable, `~` in-progress, `-` blocked).
+- **`ConfiguringStatusBoard`**: Always-visible base board showing cause-aware precondition status rows with a 6-char prefix vocabulary (`*` met, `~` transient, `!` needs-user, `-` blocked, `?` degraded, `>` actionable). Startup-role preconditions display a progress bar.
 - **Three-tier modal dispatch**: Consumer override (`gateHelperBoard()`) → Built-in WiFi wizard → `GenericGateHelperBoard` fallback.
+- Both U8G2 and LVGL display modules subscribe to the `precondition.health` EventBus topic for per-precondition state changes.
+- LVGL uses a deferred flag pattern (atomic booleans consumed in `tick()`) for thread-safe UI updates from EventBus callbacks.
 - **`IU8G2SystemScreens` extensions**: `configuringBoard()`, `wifiWizardBoard()`, `gateHelperBoard(const AppConfiguringPayload*)`.
 - **`ILVGLSystemScreens` parity**: `configuringScreen()`, `wifiWizardScreen()`, `gateHelperScreen(const AppConfiguringPayload*)`.
 

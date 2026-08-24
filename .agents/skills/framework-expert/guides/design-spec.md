@@ -272,8 +272,8 @@ the developer must observe (tick budget, static scope, thread safety rules).>
 ### IDisplayBoard _(if selected)_
 <Rationale + board name + what it renders>
 
-### IConfigGate _(if selected)_
-<Rationale + what it blocks on + how the gate resolves>
+### IPreconditionContributor _(if selected)_
+<Rationale for precondition. Cause vocabulary selection. Role (Startup vs Operational). Dependency edges if any. describe() callback content.>
 
 ### IOTAVerifier _(if selected)_
 <Rationale + signing scheme + what the verifier checks>
