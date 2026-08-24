@@ -33,9 +33,7 @@
  *
  *   IWebContributor (tab: "Time", parent: "System", order: 15):
  *   - registerRoutes():     Register REST API endpoints for time management
- *   - getTabName():         Return "Time" for portal tab
- *   - getParentTab():       Return "System" for navigation hierarchy
- *   - getTabOrder():        Return 15 for pill ordering
+ *   - registerTabs():       Register "Time" tab (parent: "System", order: 15) via TabRegistry.
  */
 
 #pragma once

@@ -56,11 +56,7 @@
  *
  *   IWebContributor:
  *   - registerRoutes():         Registers /api/weather/config (GET/POST), /api/weather/status, /weather.js
- *   - getTabName():             Returns "Weather" — portal tab label
- *   - getParentTab():           Returns nullptr — top-level tab
- *   - getTabOrder():            Returns 50 — mid-priority tab position
- *   - getTabIcon():             Returns SVG path for cloud icon
- *   - getTabScript():           Returns "/weather.js" dynamic script loading [NEW]
+ *   - registerTabs():           Register "Weather" tab (top-level, order: 50, cloud icon, /weather.js) via TabRegistry.
  *   - getApiPrefix():           Returns "/api/weather" for body-size middleware [NEW]
  *   - getMaxPostBody():         Returns 4096 (ADR-15 default) [NEW]
  *

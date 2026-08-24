@@ -30,9 +30,7 @@
  *
  *   IWebContributor (tab: "MCP", parent: "System", order: 30):
  *   - registerRoutes():    Register REST API routes
- *   - getTabName():        Return "MCP" for portal tab
- *   - getParentTab():      Return "System" for navigation hierarchy
- *   - getTabOrder():       Return 30 for pill ordering
+ *   - registerTabs():      Register "MCP" tab (parent: "System", order: 30) via TabRegistry.
  *
  *   IConfigurable (namespace: "mcp"):
  *   - getConfigNamespace(): Return "mcp"

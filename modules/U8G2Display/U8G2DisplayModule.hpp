@@ -57,10 +57,9 @@
  *   - serializeConfig():    Serialize display settings to JSON section
  *   - resetConfig():        Restore factory defaults
  *
- *   IWebContributor (tab: "App", order: 30):
- *   - registerRoutes():     Register display REST API routes (/api/display/*)
- *   - getTabName():         Return "App" for portal tab
- *   - getTabOrder():        Return 50 for portal tab ordering
+ *   IWebContributor (tab: "Display"):
+ *   - registerRoutes():     Registers display API endpoints.
+ *   - registerTabs():       Register "Display", "Settings", "Screenshot", "Carousel" tabs via TabRegistry.
  *
  *   IMCPContributor:
  *   - registerMCPTools():   Register display_status/display_control MCP tools

@@ -17,6 +17,7 @@
 #include "../../../modules/Application/Application.hpp"
 
 #include "../../../modules/OTAUpdateManager/OTAUpdateManager.hpp"
+#include "../test_helpers/MockTabRegistry.hpp"
 #include <ArduinoJson.h>
 
 #include "../../../modules/WebServer/WebServerManager.hpp"
@@ -91,9 +92,14 @@ TEST_F(OtaUpdateManagerTest, RollbackFirmware_NoCrash) {
     SUCCEED();
 }
 
-/// getTabName() should return "OTA".
-TEST_F(OtaUpdateManagerTest, GetTabName_ReturnsOTA) {
-    EXPECT_STREQ("OTA", manager.getTabName());
+/// registerTabs() should register OTA under System at order 50.
+TEST_F(OtaUpdateManagerTest, RegisterTabs_OTAUnderSystem) {
+    MockTabRegistry collector;
+    manager.registerTabs(collector);
+    ASSERT_EQ(collector.entries.size(), 1u);
+    EXPECT_EQ(collector.entries[0].name, "OTA");
+    EXPECT_EQ(collector.entries[0].parent, "System");
+    EXPECT_EQ(collector.entries[0].order, 50);
 }
 
 /// writeStream() should return 0 on native.

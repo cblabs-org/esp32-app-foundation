@@ -72,8 +72,7 @@ public:
 
     // IWebContributor
     void registerRoutes(PsychicHttpServer& server) override;
-    const char* getTabName() const override;
-    int getTabOrder() const override;
+    void registerTabs(TabRegistry& registry) override;
 
     // IMCPContributor
     void registerMCPTools(MCPToolRegistry& registry) override;

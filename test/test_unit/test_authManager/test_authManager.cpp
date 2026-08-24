@@ -20,9 +20,7 @@
  *   test_serialize_defaults        — fresh instance serialises expected flags
  *   test_apply_config_roundtrip    — serialize → apply → serialize produces identical JSON
  *   test_reset_config              — after setting flags, resetConfig() clears all to false
- *   test_tab_name                  — getTabName() returns "Security"
- *   test_parent_tab                — getParentTab() returns nullptr
- *   test_tab_icon_not_null         — getTabIcon() returns a non-null string
+ *   test_register_tabs             — registerTabs() registers Security, Password, and TLS tabs
  *   test_check_portal_auth_open    — checkPortalAuth() returns true when auth disabled
  *   test_check_mcp_auth_open       — checkMcpAuth() returns true when auth disabled
  *

@@ -49,9 +49,7 @@
  *
  *   IWebContributor (tab: "OTA", parent: "System", order: 50):
  *   - registerRoutes():       Register REST API routes
- *   - getTabName():           Return "OTA" for portal tab
- *   - getParentTab():         Return "System" for navigation hierarchy
- *   - getTabOrder():          Return 50 for pill ordering
+ *   - registerTabs():         Register "OTA" tab (parent: "System", order: 50) via TabRegistry.
  *
  *   IConfigurable (namespace: "ota", schema v5):
  *   - getConfigNamespace():   Return "ota"

@@ -32,9 +32,7 @@
  *
  *   IWebContributor (tab: "Keys", parent: "System", order: 20):
  *   - registerRoutes():       Register REST API routes
- *   - getTabName():           Return "Keys" for portal tab
- *   - getParentTab():         Return "System" for navigation hierarchy
- *   - getTabOrder():          Return 20 for pill ordering
+ *   - registerTabs():         Register "Keys" tab (parent: "System", order: 20) via TabRegistry.
  */
 
 #pragma once

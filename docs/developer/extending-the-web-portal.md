@@ -24,40 +24,29 @@ Called during the boot phase (`WebServerManager::begin()`). This is where you re
 void registerRoutes(PsychicHttpServer& server) override;
 ```
 
-#### `getTabName()`
-Returns the user-facing display label for the tab (e.g., "MyApp"). If a module only needs to register REST API routes but does not require a frontend tab, return `nullptr` (default).
+#### `registerTabs(TabRegistry& registry)`
+Called during the boot phase (`WebServerManager::begin()`). This is where you declare your module's navigation tabs. Each call to `registry.addTab()` registers one tab entry.
 ```cpp
-const char* getTabName() const override { return "MyApp"; }
-```
-
-#### `getParentTab()`
-Returns the name of a parent tab to create hierarchical sub-navigation.
-- Return `nullptr` (default) to render the tab as a top-level item in the main bottom navigation bar.
-- Return `"System"` to nest the tab under the system sub-navigation (rendered as pills in the System pane).
-```cpp
-const char* getParentTab() const override { return nullptr; } // Renders in bottom-nav
-```
-
-#### `getTabOrder()`
-Returns an integer that controls the rendering order relative to other tabs at the same level. Lower values are positioned first. Default is `100`.
-```cpp
-int getTabOrder() const override { return 100; }
-```
-
-#### `getTabIcon()`
-Returns the SVG path body (inner content of the `<svg>` block) to use as the nav icon. If you return `nullptr` (default), the web portal automatically displays a generic grid icon.
-```cpp
-const char* getTabIcon() const override {
-    // Example: simple checkmark icon path
-    return "<path d='M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z'/>";
+void registerTabs(TabRegistry& registry) override {
+    registry.addTab("MyApp", nullptr, 100, nullptr, "/myapp.js");
+    // name:   "MyApp"      — user-facing tab label
+    // parent: nullptr       — top-level (use "System" for sub-pills)
+    // order:  100           — sort position (lower = earlier)
+    // icon:   nullptr       — nullptr → generic grid icon; or SVG path body
+    // script: "/myapp.js"   — JS file loaded when tab is activated
 }
 ```
+- **name**: User-facing display label (e.g., `"MyApp"`). Return `nullptr` to register routes without a tab.
+- **parent**: `nullptr` for top-level bottom-nav; `"System"` for sub-pills under the System pane.
+- **order**: Integer controlling render order among siblings. Lower values render first. Default convention: `100`.
+- **icon**: Inner SVG path body for the nav icon, or `nullptr` for the default grid icon.
+- **script**: HTTP route for the tab's JavaScript file (e.g., `"/myapp.js"`), or `nullptr` if the tab has no script.
 
 ---
 
 ## 2. End-to-End Pattern: C++ to DOM
 
-The portal is a Single Page Application. It does **not** load HTML fragments from the filesystem. Instead, at boot `app.js` fetches the tab hierarchy from `/api/tabs`, and for each tab it loads that tab's **JavaScript** over the HTTP route the module registered (declared via `getTabScript()`). When the user activates a tab, that script builds its own DOM markup into the tab's container and talks to the REST endpoints your module registered in C++. There is no separate per-tab HTML file.
+The portal is a Single Page Application. It does **not** load HTML fragments from the filesystem. Instead, at boot `app.js` fetches the tab hierarchy from `/api/tabs`, and for each tab it loads that tab's **JavaScript** over the HTTP route the module registered (declared via `registry.addTab(…, script)` in `registerTabs()`). When the user activates a tab, that script builds its own DOM markup into the tab's container and talks to the REST endpoints your module registered in C++. There is no separate per-tab HTML file.
 
 ### C++ Web API Routes (Backend)
 Here is the route registration from the template file [myApp.cpp](../../template-app/src/myApp.cpp). It registers a GET route to retrieve status, and a POST route to update settings:
@@ -314,7 +303,7 @@ Row containers are semantically distinct based on data display vs input interact
 >    The helper also sends an ETag + `Cache-Control: no-cache` and answers a
 >    matching `If-None-Match` with a `304`, so browsers revalidate cheaply and
 >    only re-download when the asset actually changes (e.g. after an OTA).
-> 4. Declare the route via `const char* getTabScript() const override { return "/weather.js"; }`.
+> 4. Declare the script route via `registry.addTab("Weather", nullptr, 50, icon, "/weather.js");` in your `registerTabs()` override.
 >
 > **Why this matters:** `response->send(body)` copies the entire body into
 > internal DRAM socket buffers. For a non-trivial script (18 KB is routine) this
@@ -491,7 +480,7 @@ server.on("/api/myapp/config", HTTP_POST, [this](PsychicRequest* request, Psychi
 
 The main web page generates the navigation interface by querying `/api/tabs` on load. 
 
-The `WebServerManager` builds this registry dynamically at boot by querying all registered `IWebContributor` pointers. It returns a JSON array of configuration objects.
+The `WebServerManager` builds this registry dynamically at boot by calling `registerTabs()` on all registered `IWebContributor` instances. It returns a JSON array of configuration objects.
 
 ### JSON Schema Response:
 ```json

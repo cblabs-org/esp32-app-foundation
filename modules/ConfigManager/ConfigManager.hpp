@@ -42,9 +42,7 @@
  *
  *   IWebContributor (tab: "Backup", parent: "System", order: 40):
  *   - registerRoutes():      Register REST API routes
- *   - getTabName():          Return "Backup" for portal tab
- *   - getParentTab():        Return "System" for navigation hierarchy
- *   - getTabOrder():         Return 40 for pill ordering
+ *   - registerTabs():        Register "Backup" tab (parent: "System", order: 40) via TabRegistry.
  *
  *   IMCPContributor:
  *   - registerMCPTools():    Register config_get_schema_version and
