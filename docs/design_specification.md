@@ -563,17 +563,18 @@ App display boards implement it and register with the display module directly.
 ```cpp
 class IWebContributor {
 public:
-    virtual void registerRoutes(WebServerManager& server) = 0;
-    virtual const char* getTabName() const { return nullptr; } // nullptr = no nav tab
-    virtual const char* getTabEndpoint() const { return nullptr; }
+    virtual void registerRoutes(PsychicHttpServer& server) = 0;
+    virtual void registerTabs(TabRegistry& registry) = 0;
+    virtual const char* getApiPrefix() const { return nullptr; }
+    virtual size_t getMaxPostBody() const { return 4096; }
     virtual ~IWebContributor() = default;
 };
 ```
 
-Registered via `app.registerWebContributor(IWebContributor*)`. The base
+Registered via `app.registerModule(&myModule)`. The base
 web portal calls `registerRoutes()` on all contributors during `webServer.init()`.
-`WebServerManager` collects non-null `getTabName()` results to build the
-`GET /api/tabs` response.
+`WebServerManager` calls `registerTabs()` on each contributor to build the
+`GET /api/tabs` response via the `TabRegistry` visitor pattern.
 
 ### 6.8 `IMcpContributor`
 
@@ -1099,9 +1100,10 @@ Modules register additional tabs via `IWebContributor`:
 
 ```cpp
 class MyModule : public IWebContributor {
-    const char* getTabName() const override { return "Station Config"; }
-    const char* getTabEndpoint() const override { return "/api/station"; }
-    void registerRoutes(WebServerManager& server) override {
+    void registerTabs(TabRegistry& registry) override {
+        registry.addTab("Station Config", nullptr, 100);
+    }
+    void registerRoutes(PsychicHttpServer& server) override {
         server.on("/api/station", HTTP_GET, handleGetStation);
         server.on("/api/station", HTTP_POST, handlePostStation);
     }
@@ -2602,14 +2604,15 @@ A minimal module that participates in the framework tick loop:
 #pragma once
 #include <AppFoundation.h>  // Canonical single-include façade
 
-class MyModule : public ITickable, public iConfigurable, public IWebContributor {
+class MyModule : public ITickable, public IConfigurable, public IWebContributor {
 public:
     void begin(Application* ctx);
     void tick(uint32_t ms) override;
     void reapplyConfig(const FrameworkConfig& cfg) override;
-    void registerRoutes(WebServerManager& server) override;
-    const char* getTabName() const override { return "My Module"; }
-    const char* getTabEndpoint() const override { return "/api/mymodule"; }
+    void registerRoutes(PsychicHttpServer& server) override;
+    void registerTabs(TabRegistry& registry) override {
+        registry.addTab("My Module", nullptr, 100);
+    }
 private:
     Application* _ctx = nullptr;
     // module state...

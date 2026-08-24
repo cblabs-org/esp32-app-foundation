@@ -23,9 +23,9 @@ Use this decision table to guide your implementation:
 | :--- | :--- | :--- |
 | Run code periodically on every main-loop tick | **`ITickable`** | `tick(uint32_t currentMillis)` |
 | Save and load configuration settings from flash | **`IConfigurable`** | `applyConfig()`, `serializeConfig()` |
-| Expose REST API routes or add tabs to the Web UI | **`IWebContributor`** | `registerRoutes()`, `getTabName()` |
+| Expose REST API routes or add tabs to the Web UI | **`IWebContributor`** | `registerRoutes()`, `registerTabs()` |
 | Expose JSON-RPC commands to external clients / agents | **`IMCPContributor`** | `registerMCPTools()` |
-| Block entering the `RUNNING` state until configured | **`IConfigGate`** | `isSatisfied()` |
+| Contribute preconditions that block RUNNING state | **`IPreconditionContributor`** | `registerPreconditions()` |
 | Poll remote servers periodically in the background | **`IDataSource`** | `fetchUpdate()` |
 | Render a telemetry pane on the OLED display carousel | **`IDisplayBoard`** | `render(U8G2&)`, `getBoardName()` |
 | Report boot-phase progress and fatal errors to the display | **`IStatusReporter`** | `reportStatus()`, `reportError()` |
