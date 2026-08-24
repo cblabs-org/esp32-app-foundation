@@ -214,22 +214,24 @@ TEST_F(WeatherModuleTest, GetUnitsAfterConfig) {
 // =============================================================================
 
 TEST_F(WeatherModuleTest, TabMetadata) {
-    // Verify tab registration via registerTabs()
-    struct CollectorRegistry : public TabRegistry {
-        struct Entry { std::string name; std::string parent; int order; bool hasIcon; std::string script; };
+    // Inline mock — sample-app is a separate PlatformIO project; can't
+    // reach the parent framework's test/test_unit/test_helpers/.
+    struct MockTabRegistry : public TabRegistry {
+        struct Entry { std::string name; std::string parent; int order; std::string icon; std::string script; };
         std::vector<Entry> entries;
         void addTab(const char* name, const char* parent, int order,
                     const char* icon, const char* script) override {
-            entries.push_back({name, parent ? parent : "", order, icon != nullptr, script ? script : ""});
+            entries.push_back({name ? name : "", parent ? parent : "", order,
+                               icon ? icon : "", script ? script : ""});
         }
     };
-    CollectorRegistry collector;
+    MockTabRegistry collector;
     module.registerTabs(collector);
     ASSERT_EQ(collector.entries.size(), 1u);
     EXPECT_EQ(collector.entries[0].name, "Weather");
     EXPECT_EQ(collector.entries[0].parent, "");
     EXPECT_EQ(collector.entries[0].order, 50);
-    EXPECT_TRUE(collector.entries[0].hasIcon);
+    EXPECT_FALSE(collector.entries[0].icon.empty());
     EXPECT_EQ(collector.entries[0].script, "/weather.js");
 
     EXPECT_NE(module.getTabIcon(), nullptr);

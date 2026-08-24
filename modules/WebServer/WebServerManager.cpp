@@ -214,7 +214,7 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors,
     // TabRegistryImpl captures tab entries into a JsonArray.
     struct TabRegistryImpl : public TabRegistry {
         JsonArray& arr;
-        TabRegistryImpl(JsonArray& a) : arr(a) {}
+        explicit TabRegistryImpl(JsonArray& a) : arr(a) {}
         void addTab(const char* name, const char* parent, int order,
                     const char* icon, const char* script) override {
             JsonObject tabObj = arr.add<JsonObject>();

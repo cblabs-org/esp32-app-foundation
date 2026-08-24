@@ -44,11 +44,8 @@
  *
  *   IWebContributor (tab: "Security", order: 5, top-level parent):
  *   - registerRoutes():         Registers all /api/auth/... route handlers (WO2 real impl).
- *   - getTabName():             Returns "Security".
- *   - getParentTab():           Returns nullptr (top-level tab).
- *   - getTabOrder():            Returns 5 (first in bottom nav, emphasises security).
- *   - getTabIcon():             Returns lock SVG inner content (feather-icons style).
  *   - registerTabs():           Registers Security, Password, and TLS tabs via TabRegistry.
+ *   - getTabIcon():             Returns lock SVG inner content (feather-icons style).
  *
  *   IConfigurable (namespace: "auth", schema v1):
  *   - getConfigNamespace():     Returns "auth".

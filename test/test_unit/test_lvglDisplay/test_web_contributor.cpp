@@ -21,17 +21,7 @@ protected:
     }
 };
 
-/**
- * @brief Lightweight mock TabRegistry that captures addTab() calls for verification.
- */
-class MockTabRegistry : public TabRegistry {
-public:
-    struct Entry { const char* name; const char* parent; int order; const char* icon; const char* script; };
-    std::vector<Entry> entries;
-    void addTab(const char* name, const char* parent, int order, const char* icon, const char* script) override {
-        entries.push_back({name, parent, order, icon, script});
-    }
-};
+#include "../test_helpers/MockTabRegistry.hpp"
 
 TEST_F(LVGLWebContributorTest, TabMetadata) {
     EXPECT_STREQ(display.getApiPrefix(), "/api/display");
@@ -43,23 +33,23 @@ TEST_F(LVGLWebContributorTest, TabMetadata) {
     ASSERT_EQ(registry.entries.size(), 4u);
 
     // Parent: Display
-    EXPECT_STREQ(registry.entries[0].name, "Display");
-    EXPECT_EQ(registry.entries[0].parent, nullptr);
+    EXPECT_EQ(registry.entries[0].name, "Display");
+    EXPECT_EQ(registry.entries[0].parent, "");
     EXPECT_EQ(registry.entries[0].order, 50);
 
     // Child: Settings
-    EXPECT_STREQ(registry.entries[1].name, "Settings");
-    EXPECT_STREQ(registry.entries[1].parent, "Display");
+    EXPECT_EQ(registry.entries[1].name, "Settings");
+    EXPECT_EQ(registry.entries[1].parent, "Display");
     EXPECT_EQ(registry.entries[1].order, 10);
 
     // Child: Screenshot
-    EXPECT_STREQ(registry.entries[2].name, "Screenshot");
-    EXPECT_STREQ(registry.entries[2].parent, "Display");
+    EXPECT_EQ(registry.entries[2].name, "Screenshot");
+    EXPECT_EQ(registry.entries[2].parent, "Display");
     EXPECT_EQ(registry.entries[2].order, 20);
 
     // Child: Hardware
-    EXPECT_STREQ(registry.entries[3].name, "Hardware");
-    EXPECT_STREQ(registry.entries[3].parent, "Display");
+    EXPECT_EQ(registry.entries[3].name, "Hardware");
+    EXPECT_EQ(registry.entries[3].parent, "Display");
     EXPECT_EQ(registry.entries[3].order, 30);
 }
 

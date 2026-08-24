@@ -20,6 +20,7 @@
 
 #include <gtest/gtest.h>
 #include "ConfigManager.hpp"
+#include "../test_helpers/MockTabRegistry.hpp"
 #include <fstream>
 #include <cstdio>
 #include <string>
@@ -471,15 +472,7 @@ TEST_F(ConfigManagerTest, ExportAllConfig_OtaNamespacePresent) {
 // =============================================================================
 
 TEST_F(ConfigManagerTest, RegisterTabs_BackupUnderSystem) {
-    struct CollectorRegistry : public TabRegistry {
-        struct Entry { std::string name; std::string parent; int order; };
-        std::vector<Entry> entries;
-        void addTab(const char* name, const char* parent, int order,
-                    const char* /*icon*/, const char* /*script*/) override {
-            entries.push_back({name, parent ? parent : "", order});
-        }
-    };
-    CollectorRegistry collector;
+    MockTabRegistry collector;
     configManager.registerTabs(collector);
     ASSERT_EQ(collector.entries.size(), 1u);
     EXPECT_EQ(collector.entries[0].name, "Backup");

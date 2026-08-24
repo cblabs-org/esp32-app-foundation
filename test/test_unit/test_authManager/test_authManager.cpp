@@ -43,6 +43,7 @@
 #include <cstring>
 #include <string>
 #include "../../../modules/AuthManager/AuthManager.hpp"
+#include "../test_helpers/MockTabRegistry.hpp"
 
 // ---------------------------------------------------------------------------
 // Mock DeviceCrypto — needed by KeyManager (pass-through, no real crypto)
@@ -252,23 +253,27 @@ TEST_F(AuthManagerTest, test_apply_config_sets_tls_enabled) {
  * @brief registerTabs() must register the Security tab with expected metadata.
  */
 TEST_F(AuthManagerTest, test_register_tabs) {
-    // Collect tabs via a mock TabRegistry
-    struct CollectorRegistry : public TabRegistry {
-        struct Entry { std::string name; std::string parent; int order; };
-        std::vector<Entry> entries;
-        void addTab(const char* name, const char* parent, int order,
-                    const char* /*icon*/, const char* /*script*/) override {
-            entries.push_back({name, parent ? parent : "", order});
-        }
-    };
-    CollectorRegistry collector;
+    // Collect tabs via shared MockTabRegistry
+    MockTabRegistry collector;
     auth.registerTabs(collector);
 
-    // Security parent tab must be first
-    ASSERT_GE(collector.entries.size(), 1u);
+    // All three tabs must be registered: parent Security + children Password, TLS
+    ASSERT_EQ(collector.entries.size(), 3u);
+
+    // Security parent tab
     EXPECT_EQ(collector.entries[0].name, "Security");
     EXPECT_EQ(collector.entries[0].parent, "");
     EXPECT_EQ(collector.entries[0].order, 5);
+
+    // Password child tab
+    EXPECT_EQ(collector.entries[1].name, "Password");
+    EXPECT_EQ(collector.entries[1].parent, "Security");
+    EXPECT_EQ(collector.entries[1].order, 10);
+
+    // TLS child tab
+    EXPECT_EQ(collector.entries[2].name, "TLS");
+    EXPECT_EQ(collector.entries[2].parent, "Security");
+    EXPECT_EQ(collector.entries[2].order, 20);
 }
 
 /**

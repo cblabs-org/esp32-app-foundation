@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 #include <ArduinoJson.h>
 #include "../../../modules/WifiManager/WifiManager.hpp"
+#include "../test_helpers/MockTabRegistry.hpp"
 
 class WifiManagerTest : public ::testing::Test {
 protected:
@@ -125,15 +126,7 @@ TEST_F(WifiManagerTest, SSIDOverflow) {
 
 // registerTabs()
 TEST_F(WifiManagerTest, RegisterTabs_WiFiTopLevel) {
-    struct CollectorRegistry : public TabRegistry {
-        struct Entry { std::string name; std::string parent; int order; };
-        std::vector<Entry> entries;
-        void addTab(const char* name, const char* parent, int order,
-                    const char* /*icon*/, const char* /*script*/) override {
-            entries.push_back({name, parent ? parent : "", order});
-        }
-    };
-    CollectorRegistry collector;
+    MockTabRegistry collector;
     wifiManager.registerTabs(collector);
     ASSERT_EQ(collector.entries.size(), 1u);
     EXPECT_EQ(collector.entries[0].name, "WiFi");

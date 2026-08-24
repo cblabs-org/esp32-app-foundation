@@ -110,8 +110,10 @@ public:
      *  @param registry  The TabRegistry to register tabs with. */
     void registerTabs(TabRegistry& registry) override;
 
-    // Optional overrides — uncomment to customize:
-    // const char* getParentTab() const override { return "System"; }
+    // Optional: nest under System instead of top-level:
+    // void registerTabs(TabRegistry& registry) override {
+    //     registry.addTab("MyApp", "System", 100);
+    // }
 
     /** @brief Returns the API path prefix for body-size middleware matching.
      *  @return API prefix string.
