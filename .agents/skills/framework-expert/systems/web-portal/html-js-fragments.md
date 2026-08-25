@@ -39,10 +39,12 @@ void WeatherModule::registerRoutes(PsychicHttpServer& server) {
 }
 ```
 
-4. **Declare the route** by overriding `getTabScript()`:
+4. **Declare the script** in your `registerTabs()` override:
 
 ```cpp
-const char* getTabScript() const override { return "/weather.js"; }
+void WeatherModule::registerTabs(TabRegistry& registry) {
+    registry.addTab("Weather", nullptr, 50, kWeatherIcon, "/weather.js");
+}
 ```
 
 The sample app's `WeatherModule` (`sample-app/web/weather.js` + `-I include`) is the reference implementation of this pattern end-to-end.

@@ -20,9 +20,7 @@
  *   test_serialize_defaults        — fresh instance serialises expected flags
  *   test_apply_config_roundtrip    — serialize → apply → serialize produces identical JSON
  *   test_reset_config              — after setting flags, resetConfig() clears all to false
- *   test_tab_name                  — getTabName() returns "Security"
- *   test_parent_tab                — getParentTab() returns nullptr
- *   test_tab_icon_not_null         — getTabIcon() returns a non-null string
+ *   test_register_tabs             — registerTabs() registers Security, Password, and TLS tabs
  *   test_check_portal_auth_open    — checkPortalAuth() returns true when auth disabled
  *   test_check_mcp_auth_open       — checkMcpAuth() returns true when auth disabled
  *
@@ -43,6 +41,7 @@
 #include <cstring>
 #include <string>
 #include "../../../modules/AuthManager/AuthManager.hpp"
+#include "../test_helpers/MockTabRegistry.hpp"
 
 // ---------------------------------------------------------------------------
 // Mock DeviceCrypto — needed by KeyManager (pass-through, no real crypto)
@@ -245,22 +244,34 @@ TEST_F(AuthManagerTest, test_apply_config_sets_tls_enabled) {
 }
 
 // ===========================================================================
-// WO1 Tests — IWebContributor: tab metadata
+// WO1 Tests — IWebContributor: tab metadata (via registerTabs)
 // ===========================================================================
 
 /**
- * @brief getTabName() must return "Security" for the Security bottom-nav tab.
+ * @brief registerTabs() must register the Security tab with expected metadata.
  */
-TEST_F(AuthManagerTest, test_tab_name) {
-    EXPECT_STREQ("Security", auth.getTabName());
-}
+TEST_F(AuthManagerTest, test_register_tabs) {
+    // Collect tabs via shared MockTabRegistry
+    MockTabRegistry collector;
+    auth.registerTabs(collector);
 
-/**
- * @brief getParentTab() must return nullptr — Security is a top-level tab
- *        (not nested under System or any other parent).
- */
-TEST_F(AuthManagerTest, test_parent_tab) {
-    EXPECT_EQ(nullptr, auth.getParentTab());
+    // All three tabs must be registered: parent Security + children Password, TLS
+    ASSERT_EQ(collector.entries.size(), 3u);
+
+    // Security parent tab
+    EXPECT_EQ(collector.entries[0].name, "Security");
+    EXPECT_EQ(collector.entries[0].parent, "");
+    EXPECT_EQ(collector.entries[0].order, 5);
+
+    // Password child tab
+    EXPECT_EQ(collector.entries[1].name, "Password");
+    EXPECT_EQ(collector.entries[1].parent, "Security");
+    EXPECT_EQ(collector.entries[1].order, 10);
+
+    // TLS child tab
+    EXPECT_EQ(collector.entries[2].name, "TLS");
+    EXPECT_EQ(collector.entries[2].parent, "Security");
+    EXPECT_EQ(collector.entries[2].order, 20);
 }
 
 /**

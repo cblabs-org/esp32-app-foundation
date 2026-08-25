@@ -30,9 +30,7 @@
  *
  *   IWebContributor (tab: "MCP", parent: "System", order: 30):
  *   - registerRoutes():    Register REST API routes
- *   - getTabName():        Return "MCP" for portal tab
- *   - getParentTab():      Return "System" for navigation hierarchy
- *   - getTabOrder():       Return 30 for pill ordering
+ *   - registerTabs():      Register "MCP" tab (parent: "System", order: 30) via TabRegistry.
  *
  *   IConfigurable (namespace: "mcp"):
  *   - getConfigNamespace(): Return "mcp"
@@ -124,28 +122,12 @@ public:
     void registerRoutes(PsychicHttpServer& server) override;
 
     /**
-     * @brief The MCP server exposes a "MCP" UI tab under System.
-     * @return "MCP"
+     * @brief Register the MCP tab in the System sub-navigation.
+     * @param registry  The TabRegistry to register tabs with.
      */
-    const char* getTabName() const override { return "MCP"; }
-
-    /**
-     * @brief Get the parent tab for navigation hierarchy.
-     * @return "System" — MCP appears as a sub-section of the System tab.
-     */
-    const char* getParentTab() const override { return "System"; }
-
-    /**
-     * @brief Get the tab display order within the System sub-navigation.
-     * @return 30 — MCP pill appears after Keys (20).
-     */
-    int getTabOrder() const override { return 30; }
-
-    /**
-     * @brief Return the route path for this tab's JavaScript file.
-     * @return "/mcp.js"
-     */
-    const char* getTabScript() const override { return "/mcp.js"; }
+    void registerTabs(TabRegistry& registry) override {
+        registry.addTab("MCP", "System", 30, nullptr, "/mcp.js");
+    }
 
     /**
      * @brief Return the API path prefix for body-size middleware matching.

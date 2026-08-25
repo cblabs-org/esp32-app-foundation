@@ -1025,6 +1025,18 @@ const char* AuthManager::getTabIcon() const {
     return LOCK_ICON_SVG;
 }
 
+/**
+ * @brief Register Security parent tab and Password/TLS sub-pills via TabRegistry.
+ *
+ * Replaces the former PasswordTabStub and TlsTabStub inner objects. The parent
+ * tab carries the lock icon; child tabs inherit the parent's navigation group.
+ */
+void AuthManager::registerTabs(TabRegistry& registry) {
+    registry.addTab("Security", nullptr, 5, LOCK_ICON_SVG);
+    registry.addTab("Password", "Security", 10);
+    registry.addTab("TLS",      "Security", 20);
+}
+
 // ===========================================================================
 // IConfigurable — Config Persistence
 // ===========================================================================

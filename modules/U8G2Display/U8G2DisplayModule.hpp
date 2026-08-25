@@ -57,10 +57,9 @@
  *   - serializeConfig():    Serialize display settings to JSON section
  *   - resetConfig():        Restore factory defaults
  *
- *   IWebContributor (tab: "App", order: 30):
- *   - registerRoutes():     Register display REST API routes (/api/display/*)
- *   - getTabName():         Return "App" for portal tab
- *   - getTabOrder():        Return 50 for portal tab ordering
+ *   IWebContributor (tab: "Display"):
+ *   - registerRoutes():     Registers display API endpoints.
+ *   - registerTabs():       Register "Display", "Settings", "Screenshot", "Carousel" tabs via TabRegistry.
  *
  *   IMCPContributor:
  *   - registerMCPTools():   Register display_status/display_control MCP tools
@@ -390,24 +389,6 @@ public:
     void registerRoutes(PsychicHttpServer& server) override;
 
     /**
-     * @brief Get the UI tab name for this contributor.
-     * @return "Display"
-     */
-    const char* getTabName() const override { return "Display"; }
-
-    /**
-     * @brief Get the tab display order.
-     * @return 30 — Display tab appears before mid-range tabs.
-     */
-    int getTabOrder() const override { return 50; }
-
-    /**
-     * @brief Return the route path for this tab's JavaScript file.
-     * @return "/display.js"
-     */
-    const char* getTabScript() const override { return "/display.js"; }
-
-    /**
      * @brief Return the API path prefix for body-size middleware matching.
      * @return "/api/display"
      */
@@ -417,25 +398,13 @@ public:
      * @brief Return SVG inner content for the Display bottom-nav icon.
      * @return Feather-style "monitor" icon SVG body string.
      */
-    const char* getTabIcon() const override;
+    const char* getTabIcon() const;
 
     /**
-     * @brief Return the Settings sub-pill stub for registration by Application.
-     * @return Pointer to the Settings IWebContributor stub.
+     * @brief Register Display parent tab and Settings/Screenshot/Carousel sub-pills.
+     * @param registry  The TabRegistry to register tabs with.
      */
-    IWebContributor* settingsTabStub()   { return &_settingsTabStub;   }
-
-    /**
-     * @brief Return the Screenshot sub-pill stub for registration by Application.
-     * @return Pointer to the Screenshot IWebContributor stub.
-     */
-    IWebContributor* screenshotTabStub() { return &_screenshotTabStub; }
-
-    /**
-     * @brief Return the Carousel sub-pill stub for registration by Application.
-     * @return Pointer to the Carousel IWebContributor stub.
-     */
-    IWebContributor* carouselTabStub()   { return &_carouselContributor;   }
+    void registerTabs(TabRegistry& registry) override;
 
     // -------------------------------------------------------------------------
     // IMCPContributor — MCP display tools
@@ -558,39 +527,6 @@ public:
     void showSystemState(const SystemDisplayParams& params) override;
 
 private:
-    // -------------------------------------------------------------------------
-    // Sub-tab navigation stubs — provide "Settings" and "Screenshot" child tab
-    // entries under the "Display" parent in /api/tabs. They carry no routes;
-    // all REST routes remain registered by the main module via registerRoutes().
-    // Owned as members; exposed via settingsTabStub() / screenshotTabStub()
-    // for registration by Application::begin().
-    // -------------------------------------------------------------------------
-
-    struct SettingsTabStub : public IWebContributor {
-        void        registerRoutes(PsychicHttpServer& /*server*/) override {}
-        const char* getTabName()   const override { return "Settings"; }
-        const char* getParentTab() const override { return "Display";  }
-        int         getTabOrder()  const override { return 10;         }
-    };
-
-    struct ScreenshotTabStub : public IWebContributor {
-        void        registerRoutes(PsychicHttpServer& /*server*/) override {}
-        const char* getTabName()   const override { return "Screenshot"; }
-        const char* getParentTab() const override { return "Display";    }
-        int         getTabOrder()  const override { return 20;           }
-    };
-
-    SettingsTabStub    _settingsTabStub;    ///< Nav stub: Settings sub-pill under Display
-    ScreenshotTabStub  _screenshotTabStub;  ///< Nav stub: Screenshot sub-pill under Display
-    
-    struct CarouselContributor : public IWebContributor {
-        void        registerRoutes(PsychicHttpServer& /*server*/) override {}
-        const char* getTabName()   const override { return "Carousel"; }
-        const char* getParentTab() const override { return "Display";  }
-        int         getTabOrder()  const override { return 30;         }
-        const char* getTabScript() const override { return "/carousel.js"; }
-    };
-    CarouselContributor _carouselContributor; ///< Nav stub: Carousel sub-pill under Display
 
     // -------------------------------------------------------------------------
     // Private carousel engine methods

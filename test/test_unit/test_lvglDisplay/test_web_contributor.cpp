@@ -10,6 +10,7 @@
 #include "LVGLDisplayModule.hpp"
 #include "MockLVGLHardwareAdapter.hpp"
 #include <PsychicHttp.h>
+#include <vector>
 
 class LVGLWebContributorTest : public ::testing::Test {
 protected:
@@ -20,23 +21,36 @@ protected:
     }
 };
 
+#include "../test_helpers/MockTabRegistry.hpp"
+
 TEST_F(LVGLWebContributorTest, TabMetadata) {
-    EXPECT_STREQ(display.getTabName(), "Display");
-    EXPECT_EQ(display.getTabOrder(), 50);
     EXPECT_STREQ(display.getApiPrefix(), "/api/display");
     EXPECT_NE(display.getTabIcon(), nullptr);
 
-    IWebContributor* settingsStub = display.settingsTabStub();
-    ASSERT_NE(settingsStub, nullptr);
-    EXPECT_STREQ(settingsStub->getTabName(), "Settings");
-    EXPECT_STREQ(settingsStub->getParentTab(), "Display");
-    EXPECT_EQ(settingsStub->getTabOrder(), 10);
+    // Verify registerTabs() registers the expected parent + child tabs
+    MockTabRegistry registry;
+    display.registerTabs(registry);
+    ASSERT_EQ(registry.entries.size(), 4u);
 
-    IWebContributor* screenshotStub = display.screenshotTabStub();
-    ASSERT_NE(screenshotStub, nullptr);
-    EXPECT_STREQ(screenshotStub->getTabName(), "Screenshot");
-    EXPECT_STREQ(screenshotStub->getParentTab(), "Display");
-    EXPECT_EQ(screenshotStub->getTabOrder(), 20);
+    // Parent: Display
+    EXPECT_EQ(registry.entries[0].name, "Display");
+    EXPECT_EQ(registry.entries[0].parent, "");
+    EXPECT_EQ(registry.entries[0].order, 50);
+
+    // Child: Settings
+    EXPECT_EQ(registry.entries[1].name, "Settings");
+    EXPECT_EQ(registry.entries[1].parent, "Display");
+    EXPECT_EQ(registry.entries[1].order, 10);
+
+    // Child: Screenshot
+    EXPECT_EQ(registry.entries[2].name, "Screenshot");
+    EXPECT_EQ(registry.entries[2].parent, "Display");
+    EXPECT_EQ(registry.entries[2].order, 20);
+
+    // Child: Hardware
+    EXPECT_EQ(registry.entries[3].name, "Hardware");
+    EXPECT_EQ(registry.entries[3].parent, "Display");
+    EXPECT_EQ(registry.entries[3].order, 30);
 }
 
 TEST_F(LVGLWebContributorTest, CaptureSnapshotPrimitive) {

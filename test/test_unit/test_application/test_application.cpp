@@ -104,6 +104,7 @@ public:
     // accepts the reference signature but never dereferences the pointer so
     // no linker dependency on ESPPsychicHttpServer is introduced.
     void registerRoutes(PsychicHttpServer& /*server*/) override {}
+    void registerTabs(TabRegistry& /*registry*/) override {}
 };
 
 /** @brief Minimal IMCPContributor mock that registers a named test tool. */
@@ -579,6 +580,7 @@ class MultiModule : public ITickable, public IWebContributor {
 public:
     void tick(uint32_t currentMillis) override { tickCount++; (void)currentMillis; }
     void registerRoutes(PsychicHttpServer& /*server*/) override {}
+    void registerTabs(TabRegistry& /*registry*/) override {}
     int tickCount = 0;
 };
 

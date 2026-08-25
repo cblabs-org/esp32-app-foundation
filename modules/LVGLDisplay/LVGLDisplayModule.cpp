@@ -899,6 +899,13 @@ const char* LVGLDisplayModule::getTabIcon() const {
            "<line x1=\"12\" y1=\"17\" x2=\"12\" y2=\"21\"/>";
 }
 
+void LVGLDisplayModule::registerTabs(TabRegistry& registry) {
+    registry.addTab("Display", nullptr, 50, getTabIcon(), "/display.js");
+    registry.addTab("Settings",   "Display", 10);
+    registry.addTab("Screenshot", "Display", 20);
+    registry.addTab("Hardware",   "Display", 30, nullptr, "/hardware.js");
+}
+
 bool LVGLDisplayModule::captureSnapshot(uint8_t*& outBuffer, size_t& outSize, uint16_t& outWidth, uint16_t& outHeight) {
     if (_display != nullptr) {
         outWidth = static_cast<uint16_t>(lv_display_get_horizontal_resolution(_display));

@@ -18,20 +18,16 @@ Modules inject their UI and routes into the portal by implementing the `IWebCont
 > [!NOTE]
 > There is a private struct called `AppTabContributor` within `Application.hpp`, but this is an internal framework helper and is not part of the public tab-registration API. Modules should implement `IWebContributor` directly.
 
-To contribute a tab, implement the following virtual overrides in your module:
+To contribute tabs, implement the following virtual overrides in your module:
 
 * `virtual void registerRoutes(PsychicHttpServer& server) = 0`
   Registers the module's REST API route handlers with the web server. It is also where the module registers the route serving its JavaScript file — canonically via the gzip+PROGMEM pipeline and the shared `serveGzipAsset()` helper (see [html-js-fragments.md](html-js-fragments.md)), not a raw-string literal.
-* `virtual const char* getTabName() const`
-  Returns the display name for the UI tab (e.g., `"Weather"`). Return `nullptr` if the module registers API routes but does not require a UI tab.
-* `virtual const char* getParentTab() const`
-  Returns the display name of the parent tab (e.g., `"System"`) to nest this tab as a sub-section/pill. Return `nullptr` for a top-level tab (displayed in the main bottom navigation bar).
-* `virtual int getTabOrder() const`
-  Returns the integer sort order (lower values appear first). Default is `100`.
-* `virtual const char* getTabIcon() const`
-  Returns the inner SVG elements string (e.g. `<path ... />`) for the bottom-nav icon. Return `nullptr` to use the default generic grid icon. The outer `<svg>` tag wrapper is supplied by the client.
-* `virtual const char* getTabScript() const`
-  Returns the route path for this tab's JavaScript file (e.g., `"/weather.js"`). Return `nullptr` if the tab requires no script. The path MUST start with `/` (same-origin only) or it will be ignored by `WebServerManager`.
+* `virtual void registerTabs(TabRegistry& registry) = 0`
+  Registers one or more navigation tabs via the `TabRegistry` visitor pattern. Call `registry.addTab(name, parent, order, icon, script)` for each tab. A single module can register multiple tabs (e.g., AuthManager registers Security, Password, and TLS tabs in one call). Return without calling `addTab()` if the module registers API routes but does not require a UI tab.
+* `virtual const char* getApiPrefix() const` *(optional)*
+  Returns the API path prefix for body-size middleware matching (e.g., `"/api/weather"`). Return `nullptr` (default) if no special body-limit is needed.
+* `virtual size_t getMaxPostBody() const` *(optional)*
+  Returns the maximum POST/PUT body size for this module's routes. Default is `4096`.
 
 ## /api/tabs JSON Schema
 

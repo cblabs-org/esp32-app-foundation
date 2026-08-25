@@ -140,8 +140,8 @@ preferences screen, not a website.
   to `assets/icons/`: `wifi`, `lock`, `settings` (gear), `info`, `sun`, `moon`,
   `monitor` (auto-theme), `eye`, `eye-off`, `x` (close), `copy`.
 - Bottom-nav icons: WiFi arcs, padlock (Security), gear (System). App-contributed
-  tabs may supply their own inner-SVG path via `getTabIcon()`; otherwise a generic
-  grid icon is used.
+  tabs supply their own inner-SVG path via `registry.addTab(…, icon, …)` in
+  `registerTabs()`; otherwise a generic grid icon is used.
 - **Substitution note:** icons are the genuine Feather paths from the codebase —
   no substitution was needed. Match new icons to Feather's 2px-stroke style.
 

@@ -42,9 +42,7 @@
  *
  *   IWebContributor (tab: "Backup", parent: "System", order: 40):
  *   - registerRoutes():      Register REST API routes
- *   - getTabName():          Return "Backup" for portal tab
- *   - getParentTab():        Return "System" for navigation hierarchy
- *   - getTabOrder():         Return 40 for pill ordering
+ *   - registerTabs():        Register "Backup" tab (parent: "System", order: 40) via TabRegistry.
  *
  *   IMCPContributor:
  *   - registerMCPTools():    Register config_get_schema_version and
@@ -207,22 +205,12 @@ public:
     void registerRoutes(PsychicHttpServer& server) override;
 
     /**
-     * @brief Get the UI tab name for this contributor.
-     * @return "Backup"
+     * @brief Register the Backup tab in the System sub-navigation.
+     * @param registry  The TabRegistry to register tabs with.
      */
-    const char* getTabName() const override { return "Backup"; }
-
-    /**
-     * @brief Get the parent tab for navigation hierarchy.
-     * @return "System" — ConfigManager appears as a sub-section of the System tab.
-     */
-    const char* getParentTab() const override { return "System"; }
-
-    /**
-     * @brief Get the tab display order within the System sub-navigation.
-     * @return 40 — positioned after Keys (20) and MCP (30) in the pill bar.
-     */
-    int getTabOrder() const override { return 40; }
+    void registerTabs(TabRegistry& registry) override {
+        registry.addTab("Backup", "System", 40);
+    }
 
     /**
      * @brief Return the API path prefix for body-size middleware matching.

@@ -32,9 +32,7 @@
  *
  *   IWebContributor (tab: "Keys", parent: "System", order: 20):
  *   - registerRoutes():       Register REST API routes
- *   - getTabName():           Return "Keys" for portal tab
- *   - getParentTab():         Return "System" for navigation hierarchy
- *   - getTabOrder():          Return 20 for pill ordering
+ *   - registerTabs():         Register "Keys" tab (parent: "System", order: 20) via TabRegistry.
  */
 
 #pragma once
@@ -197,22 +195,12 @@ public:
     void registerRoutes(PsychicHttpServer& server) override;
 
     /**
-     * @brief Get the UI tab name for this contributor.
-     * @return "Keys"
+     * @brief Register the Keys tab in the System sub-navigation.
+     * @param registry  The TabRegistry to register tabs with.
      */
-    const char* getTabName() const override { return "Keys"; }
-
-    /**
-     * @brief Get the parent tab for navigation hierarchy.
-     * @return "System" — Keys appears as a sub-section of the System tab.
-     */
-    const char* getParentTab() const override { return "System"; }
-
-    /**
-     * @brief Get the tab display order within the System sub-navigation.
-     * @return 20 — Keys pill appears after Status (10).
-     */
-    int getTabOrder() const override { return 20; }
+    void registerTabs(TabRegistry& registry) override {
+        registry.addTab("Keys", "System", 20);
+    }
 
     /**
      * @brief Return the API path prefix for body-size middleware matching.

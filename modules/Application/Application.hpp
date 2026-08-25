@@ -525,8 +525,9 @@ private:
 
     struct AppTabContributor : public IWebContributor {
         void        registerRoutes(PsychicHttpServer& /*server*/) override {}
-        const char* getTabName()  const override { return "App"; }
-        int         getTabOrder() const override { return 30;    }
+        void registerTabs(TabRegistry& registry) override {
+            registry.addTab("App", nullptr, 30);
+        }
     };
     AppTabContributor _appTabContributor;  ///< Contributes "App" top-level nav tab
     bool _enableDefaultAppTab = true;      ///< Guard for default App tab registration
@@ -540,6 +541,7 @@ private:
     struct PreconditionWebContributor : public IWebContributor {
         Application* app = nullptr;
         void        registerRoutes(PsychicHttpServer& server) override;
+        void        registerTabs(TabRegistry& /*registry*/) override {}
         const char* getApiPrefix() const override { return "/api/preconditions"; }
         size_t      getMaxPostBody() const override { return 1024; }
     };

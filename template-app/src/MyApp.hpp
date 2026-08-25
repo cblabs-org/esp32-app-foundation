@@ -28,8 +28,7 @@
  *
  *   IWebContributor:
  *   - registerRoutes():      Registers custom REST endpoints with the web server.
- *   - getTabName():          Returns the UI tab name for this module.
- *   - getTabOrder():         Returns the tab sort order.
+ *   - registerTabs():        Register navigation tabs via TabRegistry.
  *   - getApiPrefix():        API path prefix for body-size middleware [NEW]
  *   - getMaxPostBody():      Max POST/PUT body size (default: 4096) [NEW]
  *
@@ -106,21 +105,14 @@ public:
      */
     void registerRoutes(PsychicHttpServer& server) override;
 
-    /** @brief Returns the UI tab name for this module.
-     *  @return Tab display name string.
-     */
-    const char* getTabName() const override;
+    /** @brief Register the MyApp tab as a top-level navigation tab.
+     *  @param registry  The TabRegistry to register tabs with. */
+    void registerTabs(TabRegistry& registry) override;
 
-    /** @brief Returns the tab sort order (lower values appear first).
-     *  @return Integer sort order.
-     */
-    int getTabOrder() const override;
-
-    // Optional overrides — uncomment to customize:
-    // const char* getParentTab() const override { return "System"; }
-    // const char* getTabIcon() const override { return "⚙️"; }
-    // const char* getHelpText() const override { return "Help text for this tab"; }
-    // const char* getTabScript() const override { return "/myapp.js"; }
+    // Optional: nest under System instead of top-level:
+    // void registerTabs(TabRegistry& registry) override {
+    //     registry.addTab("MyApp", "System", 100);
+    // }
 
     /** @brief Returns the API path prefix for body-size middleware matching.
      *  @return API prefix string.

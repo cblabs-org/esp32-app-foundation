@@ -12,7 +12,8 @@ description: >
   AppFoundation.h, ITickable, IConfigurable, IWebContributor, IMCPContributor,
   IPreconditionContributor, IDataSource, IDisplayBoard, IOTAVerifier, EventBus,
   ConfigManager, LittleFS, web portal, display carousel, OTA verification,
-  MCP server/device tools, PreconditionEngine, precondition, Cause, Severity.
+  MCP server/device tools, PreconditionEngine, precondition, Cause, Severity,
+  TabRegistry, registerTabs.
   (4) Patterns and safety — Service Module Pattern, orchestrator
   anti-pattern, Domain Meaning Test, SOLID, thread safety, std::function, TWDT,
   watchdog, heap, PSRAM, TLS memory, flash size. (5) Security — DeviceCrypto,
@@ -65,7 +66,7 @@ Always use `#include "AppFoundation.h"`. Do not couple directly to internal fram
 | :--- | :--- | :--- |
 | `ITickable` | Runs periodic, non-blocking logic in the main tick loop. | `tick(uint32_t)` |
 | `IConfigurable` | Persists and loads module settings via `ConfigManager` gateway. | `applyConfig(const JsonObject&)` |
-| `IWebContributor` | Exposes REST API endpoints and appends navigation tabs. | `registerRoutes(PsychicHttpServer&)` |
+| `IWebContributor` | Exposes REST API endpoints and registers navigation tabs. | `registerRoutes()`, `registerTabs(TabRegistry&)` |
 | `IMCPContributor` | Registers JSON-RPC tools with the local Model Context Protocol. | `registerMCPTools(MCPToolRegistry&)` |
 | `IPreconditionContributor` | Contributes preconditions to the `PreconditionEngine` via visitor pattern. | `registerPreconditions(PreconditionRegistry&)` |
 | `IDataSource` | Scheduled background data fetch worker managed by `DataManager`. | `fetchUpdate()` |
@@ -142,7 +143,7 @@ These references are optimized distillations for AI agents. If the human develop
 - **Interfaces**: "ITickable", "IConfigurable", "IWebContributor", "IMCPContributor",
   "IOTAVerifier", "IPreconditionContributor", "PreconditionEngine", "PreconditionRegistry",
   "Cause", "Severity", "PreconditionRole", "precondition",
-  "IDataSource", "IStatusReporter", "IDisplayBoard".
+  "IDataSource", "IStatusReporter", "IDisplayBoard", "TabRegistry", "registerTabs".
 - **Core systems**: "EventBus", "ConfigManager", "FrameworkConfig", "config system",
   "extension point", "framework architecture", "AppFoundation.h", "tick function",
   "boot sequence", "LittleFS layout".

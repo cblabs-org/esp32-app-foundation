@@ -210,30 +210,28 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors,
     JsonDocument tabsDoc;
     JsonArray tabsArr = tabsDoc.to<JsonArray>();
 
+    // --- Collect tabs from all IWebContributor modules via registerTabs() ---
+    // TabRegistryImpl captures tab entries into a JsonArray.
+    struct TabRegistryImpl : public TabRegistry {
+        JsonArray& arr;
+        explicit TabRegistryImpl(JsonArray& a) : arr(a) {}
+        void addTab(const char* name, const char* parent, int order,
+                    const char* icon, const char* script) override {
+            JsonObject tabObj = arr.add<JsonObject>();
+            tabObj["name"] = name;
+            tabObj["id"]   = name;
+            if (parent) tabObj["parent"] = parent;
+            tabObj["order"] = order;
+            if (icon)   tabObj["icon"]   = icon;
+            if (script && script[0] == '/') tabObj["script"] = script;
+        }
+    };
+    TabRegistryImpl tabRegistry(tabsArr);
+
     for (auto* contributor : contributors) {
         if (contributor != nullptr) {
             contributor->registerRoutes(*activeServer);
-            const char* tabName = contributor->getTabName();
-            if (tabName != nullptr) {
-                JsonObject tabObj = tabsArr.add<JsonObject>();
-                tabObj["name"] = tabName;
-                tabObj["id"] = tabName; // Using name as ID for simplicity
-                const char* parentTab = contributor->getParentTab();
-                if (parentTab != nullptr) {
-                    tabObj["parent"] = parentTab;
-                }
-                tabObj["order"] = contributor->getTabOrder();
-                // Include SVG icon string when the contributor declares one.
-                // nullptr return means "use the generic grid icon" (app.js default).
-                const char* icon = contributor->getTabIcon();
-                if (icon != nullptr) {
-                    tabObj["icon"] = icon;
-                }
-                const char* script = contributor->getTabScript();
-                if (script != nullptr && script[0] == '/') {
-                    tabObj["script"] = script;
-                }
-            }
+            contributor->registerTabs(tabRegistry);
         }
     }
 
@@ -274,14 +272,6 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors,
         [](const BodyLimitEntry& a, const BodyLimitEntry& b) {
             return strlen(a.prefix) > strlen(b.prefix);
         });
-
-    // Inject the "Status" sub-pill — WebServerManager hosts /api/system
-    // but is not itself an IWebContributor, so add it manually.
-    JsonObject statusTab = tabsArr.add<JsonObject>();
-    statusTab["name"]   = "Status";
-    statusTab["id"]     = "Status";
-    statusTab["parent"] = "System";
-    statusTab["order"]  = 10;
 
     String tabsJson;
     serializeJson(tabsDoc, tabsJson);

@@ -108,37 +108,20 @@ The [U8G2DisplayModule](../../modules/U8G2Display/U8G2DisplayModule.hpp) is the 
 | `IWebContributor` | REST API routes under `/api/display/*` and portal tab |
 | `IMCPContributor` | `display_status` (read-safe) and `display_control` (mutating) MCP tools |
 
-### Sub-Object Registration
+### Tab Registration
 
-The display module exposes its internal components as sub-objects and uses inner stub classes for sub-tab navigation in the web portal:
-
-```cpp
-// Inner struct — provides a "Settings" sub-pill under the "Display" parent tab
-struct SettingsTabStub : public IWebContributor {
-    void        registerRoutes(PsychicHttpServer& /*server*/) override {}
-    const char* getTabName()   const override { return "Settings"; }
-    const char* getParentTab() const override { return "Display";  }
-    int         getTabOrder()  const override { return 10;         }
-};
-
-// Expose for external registration
-IWebContributor* settingsTabStub()   { return &_settingsTabStub;   }
-IWebContributor* screenshotTabStub() { return &_screenshotTabStub; }
-IWebContributor* carouselTabStub()   { return &_carouselContributor; }
-```
-
-These stubs are registered as separate modules by `Application::begin()`:
+The display module registers all its tabs (including sub-tabs) via `registerTabs()`:
 
 ```cpp
-// In Application::begin() — registering display sub-objects
-app.registerModule(&display);                       // Main display module
-app.registerModule(display.settingsTabStub());      // Settings sub-pill
-app.registerModule(display.screenshotTabStub());    // Screenshot sub-pill
-app.registerModule(display.carouselTabStub());      // Carousel sub-pill (U8G2)
-// For LVGL, you would register display.hardwareTabStub() instead of carouselTabStub()
+void U8G2DisplayModule::registerTabs(TabRegistry& registry) {
+    registry.addTab("Display",    nullptr,    10, displayIcon, "/display.js");
+    registry.addTab("Settings",   "Display",  10, nullptr,     nullptr);
+    registry.addTab("Screenshot", "Display",  20, nullptr,     nullptr);
+    registry.addTab("Carousel",   "Display",  30, nullptr,     nullptr);
+}
 ```
 
-Each sub-object is a full `IWebContributor` that appears as a child tab. The stubs carry no routes of their own — all REST endpoints are registered by the parent module via `registerRoutes()`.
+Sub-tabs are declared in the same `registerTabs()` call by specifying a `parent` name. There is no need for separate stub classes or `registerModule()` calls for sub-tab registration — the `TabRegistry` handles the hierarchy automatically.
 
 ### Two-Phase Hardware Bootstrap
 
