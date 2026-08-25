@@ -445,14 +445,14 @@ method, so nothing can be forgotten:
 class IPreconditionContributor {
 public:
     virtual ~IPreconditionContributor() = default;
-    virtual void registerPreconditions(PreconditionRegistry& registry) = 0;
+    virtual void registerPreconditions(IPreconditionRegistry& registry) = 0;
 };
 ```
 
 The registry accepts the data the framework needs per precondition:
 
 ```cpp
-void TimeManager::registerPreconditions(PreconditionRegistry& reg) {
+void TimeManager::registerPreconditions(IPreconditionRegistry& reg) {
     reg.add("Timezone", PreconditionRole::Operational,
         [this]() -> PreconditionStatus { /* … */ });
 

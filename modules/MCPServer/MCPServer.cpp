@@ -17,7 +17,7 @@
  */
 
 #include "MCPServer.hpp"
-#include "web/serveGzipAsset.hpp"
+#include "utils/serveGzipAsset.hpp"
 #include "MCPBuiltinTools.hpp"
 #include "interfaces/IMCPContributor.hpp"
 #include "WifiManager.hpp"

@@ -28,7 +28,7 @@
  *
  *   IWebContributor:
  *   - registerRoutes():      Registers custom REST endpoints with the web server.
- *   - registerTabs():        Register navigation tabs via TabRegistry.
+ *   - registerTabs():        Register navigation tabs via ITabRegistry.
  *   - getApiPrefix():        API path prefix for body-size middleware [NEW]
  *   - getMaxPostBody():      Max POST/PUT body size (default: 4096) [NEW]
  *
@@ -106,11 +106,11 @@ public:
     void registerRoutes(PsychicHttpServer& server) override;
 
     /** @brief Register the MyApp tab as a top-level navigation tab.
-     *  @param registry  The TabRegistry to register tabs with. */
-    void registerTabs(TabRegistry& registry) override;
+     *  @param registry  The ITabRegistry to register tabs with. */
+    void registerTabs(ITabRegistry& registry) override;
 
     // Optional: nest under System instead of top-level:
-    // void registerTabs(TabRegistry& registry) override {
+    // void registerTabs(ITabRegistry& registry) override {
     //     registry.addTab("MyApp", "System", 100);
     // }
 
@@ -129,7 +129,7 @@ public:
     void registerMCPTools(MCPToolRegistry& registry) override;
 
     // --- IPreconditionContributor ---
-    void registerPreconditions(PreconditionRegistry& reg) override;
+    void registerPreconditions(IPreconditionRegistry& reg) override;
 
     // --- Own API ---
 

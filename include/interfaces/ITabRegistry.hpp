@@ -5,7 +5,7 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  *
- * Module: include/utils/TabRegistry.hpp
+ * Module: include/interfaces/ITabRegistry.hpp
  * Description: Abstract registry interface for registering navigation tabs in
  *              the web portal. Passed to IWebContributor implementors via
  *              registerTabs() to declare one or more UI tabs from a single
@@ -15,7 +15,7 @@
  * - TabEntry: Value type describing a single navigation tab
  *
  * Exported Classes:
- * - TabRegistry: Abstract interface for tab registration
+ * - ITabRegistry: Abstract interface for tab registration
  *   - addTab(): Register a navigation tab with optional parent, order, icon, and script
  */
 
@@ -44,9 +44,9 @@ struct TabEntry {
  * All const char* parameters must point to storage with static or application
  * lifetime — the registry stores pointers, not copies.
  */
-class TabRegistry {
+class ITabRegistry {
 public:
-    virtual ~TabRegistry() = default;
+    virtual ~ITabRegistry() = default;
 
     /**
      * @brief Register a navigation tab with optional hierarchy and metadata.
@@ -62,4 +62,14 @@ public:
                         int         order  = 100,
                         const char* icon   = nullptr,
                         const char* script = nullptr) = 0;
+
+    /**
+     * @brief Convenience overload — register a tab from a TabEntry struct.
+     *
+     * Delegates to the 5-parameter addTab(). Non-virtual so concrete
+     * registries only need to implement the parameter form.
+     */
+    void addTab(const TabEntry& entry) {
+        addTab(entry.name, entry.parent, entry.order, entry.icon, entry.script);
+    }
 };

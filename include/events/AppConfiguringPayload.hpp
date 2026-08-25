@@ -12,7 +12,7 @@
  *              board (e.g., WiFi wizard).
  *
  * Exported Structs:
- * - AppConfiguringPayload: Gate name and help text for display routing
+ * - AppConfiguringPayload: Precondition name, cause, and help text for display routing
  */
 
 #pragma once

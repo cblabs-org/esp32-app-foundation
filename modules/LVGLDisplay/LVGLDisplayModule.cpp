@@ -13,7 +13,7 @@
  */
 
 #include "LVGLDisplayModule.hpp"
-#include "web/serveGzipAsset.hpp"
+#include "utils/serveGzipAsset.hpp"
 #include "EventBus.hpp"
 #include "ConfigManager.hpp"
 #include "MCPToolRegistry.hpp"
@@ -899,7 +899,7 @@ const char* LVGLDisplayModule::getTabIcon() const {
            "<line x1=\"12\" y1=\"17\" x2=\"12\" y2=\"21\"/>";
 }
 
-void LVGLDisplayModule::registerTabs(TabRegistry& registry) {
+void LVGLDisplayModule::registerTabs(ITabRegistry& registry) {
     registry.addTab("Display", nullptr, 50, getTabIcon(), "/display.js");
     registry.addTab("Settings",   "Display", 10);
     registry.addTab("Screenshot", "Display", 20);

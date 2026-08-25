@@ -33,7 +33,7 @@
  *
  *   IWebContributor (tab: "Time", parent: "System", order: 15):
  *   - registerRoutes():     Register REST API endpoints for time management
- *   - registerTabs():       Register "Time" tab (parent: "System", order: 15) via TabRegistry.
+ *   - registerTabs():       Register "Time" tab (parent: "System", order: 15) via ITabRegistry.
  */
 
 #pragma once
@@ -151,9 +151,9 @@ public:
 
     /**
      * @brief Register the Time tab in the System sub-navigation.
-     * @param registry  The TabRegistry to register tabs with.
+     * @param registry  The ITabRegistry to register tabs with.
      */
-    void registerTabs(TabRegistry& registry) override {
+    void registerTabs(ITabRegistry& registry) override {
         registry.addTab("Time", "System", 15, nullptr, "/time.js");
     }
 

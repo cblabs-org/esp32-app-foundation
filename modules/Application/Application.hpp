@@ -46,8 +46,8 @@
 #include <vector>
 #include <type_traits>
 #include "platform/LogShim.h"
-#include "AppState.hpp"
-#include "FrameworkConfig.hpp"
+#include "types/AppState.hpp"
+#include "types/FrameworkConfig.hpp"
 #include "utils/Periodic.hpp"
 #include "interfaces/ITickable.hpp"
 #include "interfaces/IConfigurable.hpp"
@@ -525,7 +525,7 @@ private:
 
     struct AppTabContributor : public IWebContributor {
         void        registerRoutes(PsychicHttpServer& /*server*/) override {}
-        void registerTabs(TabRegistry& registry) override {
+        void registerTabs(ITabRegistry& registry) override {
             registry.addTab("App", nullptr, 30);
         }
     };
@@ -541,7 +541,7 @@ private:
     struct PreconditionWebContributor : public IWebContributor {
         Application* app = nullptr;
         void        registerRoutes(PsychicHttpServer& server) override;
-        void        registerTabs(TabRegistry& /*registry*/) override {}
+        void        registerTabs(ITabRegistry& /*registry*/) override {}
         const char* getApiPrefix() const override { return "/api/preconditions"; }
         size_t      getMaxPostBody() const override { return 1024; }
     };

@@ -239,9 +239,9 @@ public:
 
     /**
      * @brief Register the WiFi tab as a top-level navigation tab.
-     * @param registry  The TabRegistry to register tabs with.
+     * @param registry  The ITabRegistry to register tabs with.
      */
-    void registerTabs(TabRegistry& registry) override {
+    void registerTabs(ITabRegistry& registry) override {
         registry.addTab("WiFi", nullptr, 10);
     }
 

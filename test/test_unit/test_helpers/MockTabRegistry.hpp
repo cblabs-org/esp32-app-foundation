@@ -2,18 +2,22 @@
  * ESP32 App Foundation (c) 2026 CB Labs
  *
  * Module: test/test_unit/test_helpers/MockTabRegistry.hpp
- * Description: Shared mock TabRegistry for unit tests. Captures addTab()
+ * Description: Shared mock ITabRegistry for unit tests. Captures addTab()
  *              calls into a vector of TabEntry for assertion.
+ *
+ * NOTE: sample-app/test/test_unit/test_weather/test_main.cpp contains a
+ *       local copy of this mock (separate PlatformIO project, cannot use
+ *       shared helpers). Keep both in sync when modifying.
  */
 
 #pragma once
 
-#include "utils/TabRegistry.hpp"
+#include "interfaces/ITabRegistry.hpp"
 #include <string>
 #include <vector>
 
 /**
- * @brief Mock TabRegistry that captures addTab() calls for test verification.
+ * @brief Mock ITabRegistry that captures addTab() calls for test verification.
  *
  * Usage:
  * @code
@@ -23,7 +27,7 @@
  *   EXPECT_EQ(registry.entries[0].name, "Security");
  * @endcode
  */
-class MockTabRegistry : public TabRegistry {
+class MockTabRegistry : public ITabRegistry {
 public:
     struct Entry {
         std::string name;
@@ -34,6 +38,8 @@ public:
     };
 
     std::vector<Entry> entries;
+
+    using ITabRegistry::addTab;  // Expose TabEntry convenience overload
 
     void addTab(const char* name, const char* parent, int order,
                 const char* icon, const char* script) override {

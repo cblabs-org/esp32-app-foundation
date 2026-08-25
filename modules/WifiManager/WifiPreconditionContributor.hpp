@@ -17,12 +17,12 @@
 #pragma once
 
 #include "interfaces/IPreconditionContributor.hpp"
-#include "utils/PreconditionRegistry.hpp"
+#include "interfaces/IPreconditionRegistry.hpp"
 #include "WifiManager.hpp"
 #include <cstdio>
 
 /**
- * @brief Contributes the WiFi Station prerequisite to PreconditionRegistry.
+ * @brief Contributes the WiFi Station prerequisite to IPreconditionRegistry.
  *
  * WiFi Station remains Startup role — without network connectivity, there is no
  * portal or remote configuration available, so other services cannot be resolved.
@@ -43,9 +43,9 @@ public:
 
     /**
      * @brief Register the WiFi Station precondition with the registry.
-     * @param reg Target PreconditionRegistry instance.
+     * @param reg Target IPreconditionRegistry instance.
      */
-    void registerPreconditions(PreconditionRegistry& reg) override {
+    void registerPreconditions(IPreconditionRegistry& reg) override {
         reg.add(PreconditionNames::WIFI_STATION, PreconditionRole::Startup,
             [this]() -> PreconditionStatus {
                 if (_wifi.isReady() && !_wifi.getAPMode())

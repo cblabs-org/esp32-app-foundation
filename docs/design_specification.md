@@ -564,7 +564,7 @@ App display boards implement it and register with the display module directly.
 class IWebContributor {
 public:
     virtual void registerRoutes(PsychicHttpServer& server) = 0;
-    virtual void registerTabs(TabRegistry& registry) = 0;
+    virtual void registerTabs(ITabRegistry& registry) = 0;
     virtual const char* getApiPrefix() const { return nullptr; }
     virtual size_t getMaxPostBody() const { return 4096; }
     virtual ~IWebContributor() = default;
@@ -574,7 +574,7 @@ public:
 Registered via `app.registerModule(&myModule)`. The base
 web portal calls `registerRoutes()` on all contributors during `webServer.init()`.
 `WebServerManager` calls `registerTabs()` on each contributor to build the
-`GET /api/tabs` response via the `TabRegistry` visitor pattern.
+`GET /api/tabs` response via the `ITabRegistry` visitor pattern.
 
 ### 6.8 `IMcpContributor`
 
@@ -1100,7 +1100,7 @@ Modules register additional tabs via `IWebContributor`:
 
 ```cpp
 class MyModule : public IWebContributor {
-    void registerTabs(TabRegistry& registry) override {
+    void registerTabs(ITabRegistry& registry) override {
         registry.addTab("Station Config", nullptr, 100);
     }
     void registerRoutes(PsychicHttpServer& server) override {
@@ -2610,7 +2610,7 @@ public:
     void tick(uint32_t ms) override;
     void reapplyConfig(const FrameworkConfig& cfg) override;
     void registerRoutes(PsychicHttpServer& server) override;
-    void registerTabs(TabRegistry& registry) override {
+    void registerTabs(ITabRegistry& registry) override {
         registry.addTab("My Module", nullptr, 100);
     }
 private:

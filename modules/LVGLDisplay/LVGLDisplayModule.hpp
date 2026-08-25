@@ -316,9 +316,9 @@ public:
 
     /**
      * @brief Register Display parent tab and Settings/Screenshot/Hardware sub-pills.
-     * @param registry  The TabRegistry to register tabs with.
+     * @param registry  The ITabRegistry to register tabs with.
      */
-    void registerTabs(TabRegistry& registry) override;
+    void registerTabs(ITabRegistry& registry) override;
 
     // -------------------------------------------------------------------------
     // IMCPContributor — MCP display tools

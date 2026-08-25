@@ -42,9 +42,10 @@
  *   - hasCert():                Returns _certPresent flag state.
  *   - loadCert():               Load DER cert+key from LittleFS into static buffers.
  *
- *   IWebContributor (tab: "Security", order: 5, top-level parent):
- *   - registerRoutes():         Registers all /api/auth/... route handlers (WO2 real impl).
- *   - registerTabs():           Registers Security, Password, and TLS tabs via TabRegistry.
+ *   IWebContributor:
+ *   - registerRoutes():         Registers auth REST API endpoints.
+ *   - registerTabs():           Registers Security, Password, and TLS tabs via ITabRegistry.
+ *   - getApiPrefix():           Returns "/api/auth" for body-size middleware.
  *   - getTabIcon():             Returns lock SVG inner content (feather-icons style).
  *
  *   IConfigurable (namespace: "auth", schema v1):
@@ -250,9 +251,9 @@ public:
      * Overrides the default scalar-getter implementation to register all three
      * tabs from a single module, eliminating inner IWebContributor stub objects.
      *
-     * @param registry  The TabRegistry to register tabs with.
+     * @param registry  The ITabRegistry to register tabs with.
      */
-    void registerTabs(TabRegistry& registry) override;
+    void registerTabs(ITabRegistry& registry) override;
 
     // -------------------------------------------------------------------------
     // IConfigurable (namespace: "auth", schema v1)

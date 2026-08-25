@@ -7,12 +7,12 @@
  *
  * Module: include/interfaces/IPreconditionContributor.hpp
  * Description: Pure interface for kernel and application modules that contribute
- *              preconditions to the PreconditionRegistry. Implements the
+ *              preconditions to the IPreconditionRegistry. Implements the
  *              registry/visitor pattern (CG-2b).
  *
  * Exported Classes:
  * - IPreconditionContributor: Abstract base for modules contributing preconditions
- *   - registerPreconditions(): Register preconditions with the provided PreconditionRegistry
+ *   - registerPreconditions(): Register preconditions with the provided IPreconditionRegistry
  *
  * ## Extensibility Guide: Implementing Preconditions
  *
@@ -22,11 +22,11 @@
  *
  * ```cpp
  * #include "interfaces/IPreconditionContributor.hpp"
- * #include "utils/PreconditionRegistry.hpp"
+ * #include "interfaces/IPreconditionRegistry.hpp"
  *
  * class SensorModule : public IPreconditionContributor {
  * public:
- *     void registerPreconditions(PreconditionRegistry& reg) override {
+ *     void registerPreconditions(IPreconditionRegistry& reg) override {
  *         // 1. Declare any prerequisite dependencies (e.g. WiFi connection)
  *         static const Edge edges[] = {
  *             {PreconditionNames::WIFI_STATION, EdgeKind::Requires}
@@ -84,14 +84,14 @@
 #pragma once
 
 // Forward declaration to avoid circular dependencies.
-// Concrete implementations include "utils/PreconditionRegistry.hpp".
-class PreconditionRegistry;
+// Concrete implementations include "interfaces/IPreconditionRegistry.hpp".
+class IPreconditionRegistry;
 
 /**
  * @brief Contract for modules that contribute preconditions to the system.
  *
  * Implementing modules define registerPreconditions() to install one or more
- * preconditions into the PreconditionRegistry via the visitor pattern (CG-2b).
+ * preconditions into the IPreconditionRegistry via the visitor pattern (CG-2b).
  * This eliminates the need for inner stub objects and prevents silent omission
  * of preconditions.
  */
@@ -102,7 +102,7 @@ public:
     /**
      * @brief Register all preconditions this module provides.
      *
-     * @param registry The PreconditionRegistry instance to add preconditions to.
+     * @param registry The IPreconditionRegistry instance to add preconditions to.
      */
-    virtual void registerPreconditions(PreconditionRegistry& registry) = 0;
+    virtual void registerPreconditions(IPreconditionRegistry& registry) = 0;
 };

@@ -5,7 +5,7 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  *
- * Module: include/FrameworkConfig.hpp
+ * Module: include/types/FrameworkConfig.hpp
  * Description: POD struct holding framework-level configuration values loaded
  *              from LittleFS /etc/config.json by the ConfigManager. An app
  *              populates this struct during BOOTING and passes it to

@@ -104,7 +104,7 @@ public:
     // accepts the reference signature but never dereferences the pointer so
     // no linker dependency on ESPPsychicHttpServer is introduced.
     void registerRoutes(PsychicHttpServer& /*server*/) override {}
-    void registerTabs(TabRegistry& /*registry*/) override {}
+    void registerTabs(ITabRegistry& /*registry*/) override {}
 };
 
 /** @brief Minimal IMCPContributor mock that registers a named test tool. */
@@ -580,7 +580,7 @@ class MultiModule : public ITickable, public IWebContributor {
 public:
     void tick(uint32_t currentMillis) override { tickCount++; (void)currentMillis; }
     void registerRoutes(PsychicHttpServer& /*server*/) override {}
-    void registerTabs(TabRegistry& /*registry*/) override {}
+    void registerTabs(ITabRegistry& /*registry*/) override {}
     int tickCount = 0;
 };
 
@@ -653,7 +653,7 @@ TEST(PreconditionApiTest, RoutesRegistered) {
 
 class MockPreconditionContributor : public IPreconditionContributor {
 public:
-    void registerPreconditions(PreconditionRegistry& registry) override {
+    void registerPreconditions(IPreconditionRegistry& registry) override {
         registry.add("Custom Op", PreconditionRole::Operational, []() -> PreconditionStatus {
             return {true, Cause::Met};
         });

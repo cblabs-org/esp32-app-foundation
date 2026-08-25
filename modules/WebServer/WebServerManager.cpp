@@ -23,7 +23,7 @@
  */
 
 #include "WebServerManager.hpp"
-#include "web/serveGzipAsset.hpp"
+#include "utils/serveGzipAsset.hpp"
 #include <ArduinoJson.h>
 
     #include "esp_heap_caps.h"
@@ -212,9 +212,10 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors,
 
     // --- Collect tabs from all IWebContributor modules via registerTabs() ---
     // TabRegistryImpl captures tab entries into a JsonArray.
-    struct TabRegistryImpl : public TabRegistry {
+    struct TabRegistryImpl : public ITabRegistry {
         JsonArray& arr;
         explicit TabRegistryImpl(JsonArray& a) : arr(a) {}
+        using ITabRegistry::addTab;  // Expose TabEntry convenience overload
         void addTab(const char* name, const char* parent, int order,
                     const char* icon, const char* script) override {
             JsonObject tabObj = arr.add<JsonObject>();

@@ -103,8 +103,27 @@ TEST_F(WeatherModuleTest, ConfigApplyPartial) {
 // IPreconditionContributor — Precondition Logic
 // =============================================================================
 
+struct MockPreconditionRegistry : public IPreconditionRegistry {
+    struct Spec {
+        const char* name;
+        PreconditionRole role;
+        EvalFn evaluate;
+        DescribeFn describe;
+        const Edge* edges;
+        uint8_t edgeCount;
+    };
+    std::vector<Spec> specs;
+    void add(const char* name, PreconditionRole role, EvalFn evaluate,
+             DescribeFn describe = nullptr, const Edge* edges = nullptr,
+             uint8_t edgeCount = 0) override {
+        specs.push_back({name, role, evaluate, describe, edges, edgeCount});
+    }
+    size_t count() const { return specs.size(); }
+    const Spec& get(size_t i) const { return specs[i]; }
+};
+
 TEST_F(WeatherModuleTest, PreconditionRegistrationAndMetadata) {
-    PreconditionRegistry reg;
+    MockPreconditionRegistry reg;
     module.registerPreconditions(reg);
 
     EXPECT_EQ(reg.count(), 1u);
@@ -119,7 +138,7 @@ TEST_F(WeatherModuleTest, PreconditionRegistrationAndMetadata) {
 TEST_F(WeatherModuleTest, PreconditionNoKeyManager_ReturnsIndeterminate) {
     // Without calling begin(), _keyManager is nullptr.
     // §2.4: Must return Indeterminate (defect fix: not true / not met).
-    PreconditionRegistry reg;
+    MockPreconditionRegistry reg;
     module.registerPreconditions(reg);
 
     ASSERT_EQ(reg.count(), 1u);
@@ -129,7 +148,7 @@ TEST_F(WeatherModuleTest, PreconditionNoKeyManager_ReturnsIndeterminate) {
 }
 
 TEST_F(WeatherModuleTest, PreconditionDescriptions) {
-    PreconditionRegistry reg;
+    MockPreconditionRegistry reg;
     module.registerPreconditions(reg);
 
     ASSERT_EQ(reg.count(), 1u);
@@ -216,9 +235,10 @@ TEST_F(WeatherModuleTest, GetUnitsAfterConfig) {
 TEST_F(WeatherModuleTest, TabMetadata) {
     // Inline mock — sample-app is a separate PlatformIO project; can't
     // reach the parent framework's test/test_unit/test_helpers/.
-    struct MockTabRegistry : public TabRegistry {
+    struct MockTabRegistry : public ITabRegistry {
         struct Entry { std::string name; std::string parent; int order; std::string icon; std::string script; };
         std::vector<Entry> entries;
+        using ITabRegistry::addTab;  // Expose TabEntry convenience overload
         void addTab(const char* name, const char* parent, int order,
                     const char* icon, const char* script) override {
             entries.push_back({name ? name : "", parent ? parent : "", order,

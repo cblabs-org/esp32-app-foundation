@@ -24,10 +24,10 @@ Called during the boot phase (`WebServerManager::begin()`). This is where you re
 void registerRoutes(PsychicHttpServer& server) override;
 ```
 
-#### `registerTabs(TabRegistry& registry)`
+#### `registerTabs(ITabRegistry& registry)`
 Called during the boot phase (`WebServerManager::begin()`). This is where you declare your module's navigation tabs. Each call to `registry.addTab()` registers one tab entry.
 ```cpp
-void registerTabs(TabRegistry& registry) override {
+void registerTabs(ITabRegistry& registry) override {
     registry.addTab("MyApp", nullptr, 100, nullptr, "/myapp.js");
     // name:   "MyApp"      — user-facing tab label
     // parent: nullptr       — top-level (use "System" for sub-pills)
@@ -291,7 +291,7 @@ Row containers are semantically distinct based on data display vs input interact
 > 3. Serve it with the shared helper (pass the request for conditional GET, plus
 >    the `_gz`/`_gz_len`/`_gz_etag` triple):
 >    ```cpp
->    #include "web/serveGzipAsset.hpp"
+>    #include "utils/serveGzipAsset.hpp"
 >    #include "portal_assets/weather_js.hpp"
 >    // in registerRoutes():
 >    server.on("/weather.js", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {

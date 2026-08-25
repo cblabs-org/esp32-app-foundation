@@ -46,7 +46,7 @@
 
 #include "OTAUpdateManager.hpp"
 #include "utils/Periodic.hpp"
-#include "web/serveGzipAsset.hpp"
+#include "utils/serveGzipAsset.hpp"
 #include "platform/LogShim.h"
 
 static constexpr const char* TAG = "OTAUpdateManager";

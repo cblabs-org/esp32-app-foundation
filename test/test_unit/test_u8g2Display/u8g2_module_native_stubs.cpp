@@ -245,7 +245,7 @@ const char* U8G2DisplayModule::getTabIcon() const {
     return nullptr;
 }
 
-void U8G2DisplayModule::registerTabs(TabRegistry& registry) {
+void U8G2DisplayModule::registerTabs(ITabRegistry& registry) {
     registry.addTab("Display", nullptr, 50, getTabIcon(), "/display.js");
     registry.addTab("Settings",   "Display", 10);
     registry.addTab("Screenshot", "Display", 20);

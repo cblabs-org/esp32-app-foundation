@@ -42,7 +42,7 @@
  *
  *   IWebContributor (tab: "Backup", parent: "System", order: 40):
  *   - registerRoutes():      Register REST API routes
- *   - registerTabs():        Register "Backup" tab (parent: "System", order: 40) via TabRegistry.
+ *   - registerTabs():        Register "Backup" tab (parent: "System", order: 40) via ITabRegistry.
  *
  *   IMCPContributor:
  *   - registerMCPTools():    Register config_get_schema_version and
@@ -206,9 +206,9 @@ public:
 
     /**
      * @brief Register the Backup tab in the System sub-navigation.
-     * @param registry  The TabRegistry to register tabs with.
+     * @param registry  The ITabRegistry to register tabs with.
      */
-    void registerTabs(TabRegistry& registry) override {
+    void registerTabs(ITabRegistry& registry) override {
         registry.addTab("Backup", "System", 40);
     }
 

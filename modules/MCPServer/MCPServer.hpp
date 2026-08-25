@@ -30,7 +30,7 @@
  *
  *   IWebContributor (tab: "MCP", parent: "System", order: 30):
  *   - registerRoutes():    Register REST API routes
- *   - registerTabs():      Register "MCP" tab (parent: "System", order: 30) via TabRegistry.
+ *   - registerTabs():      Register "MCP" tab (parent: "System", order: 30) via ITabRegistry.
  *
  *   IConfigurable (namespace: "mcp"):
  *   - getConfigNamespace(): Return "mcp"
@@ -123,9 +123,9 @@ public:
 
     /**
      * @brief Register the MCP tab in the System sub-navigation.
-     * @param registry  The TabRegistry to register tabs with.
+     * @param registry  The ITabRegistry to register tabs with.
      */
-    void registerTabs(TabRegistry& registry) override {
+    void registerTabs(ITabRegistry& registry) override {
         registry.addTab("MCP", "System", 30, nullptr, "/mcp.js");
     }
 
