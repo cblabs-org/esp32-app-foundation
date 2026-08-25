@@ -63,7 +63,7 @@ This is a **breaking change** for downstream consumers — any code referencing
 
 ## Work Order Ledger
 
-- **[ ] [wo1-rename-move](wo1-rename-move/WORKORDER.md):** Rename `PreconditionRegistry` → `IPreconditionRegistry` and `TabRegistry` → `ITabRegistry`, relocate both from `include/utils/` to `include/interfaces/`, update all includers (30+ files), update framework-expert skill documentation, verify zero old-name references remain, run full test + build verification.
+- **[x] [wo1-rename-move](wo1-rename-move/WORKORDER.md):** Rename `PreconditionRegistry` → `IPreconditionRegistry` and `TabRegistry` → `ITabRegistry`, relocate both from `include/utils/` to `include/interfaces/`, update all includers (30+ files), update framework-expert skill documentation, verify zero old-name references remain, run full test + build verification. ✅ 825/825 tests, all targets build. Commit `5706344d`.
 
 ## Worker Model Mapping
 
@@ -93,6 +93,12 @@ Single WO — no concurrency concerns.
 - Stacks on `148-web-tab-registry/wo2-clean-break` (PR #150).
 - Branch name: `151-interface-naming-cleanup/wo1-rename-move`.
 
+### 2026-08-25 — WO1 Complete: rename-move
+**Summary**: Both abstract registration interfaces renamed and relocated cleanly. 825/825 tests, all 4 build targets pass (esp32dev, crowpanel-128-rotary, sample-app, template-app). Commit `5706344d`.
+**Cross-cutting decisions**: Worker added `IPreconditionRegistry.hpp` and `ITabRegistry.hpp` to `AppFoundation.h` façade exports — correct, ensures consumer apps get full type visibility via the single umbrella header.
+**Surfaced findings**: None.
+**Dead ends**: None — all renames were clean drop-in replacements.
+
 ---
 
-*Created: 2026-08-25. Status: Awaiting human approval of decomposition.*
+*Created: 2026-08-25. Status: All WOs complete — awaiting PR submission.*
