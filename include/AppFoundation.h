@@ -20,11 +20,12 @@
  * - IDataSource:       Interface — background data fetch contract
  * - IStatusReporter:   Interface — display status overlay contract
  * - IWebContributor:   Interface — REST route registration contract
- * - IMCPContributor:   Interface — MCP tool registration contract
- * - IConfigGate:      Interface — config-ready gating contract
- * - IOTAVerifier:     Interface — OTA firmware signature verification contract
- * - UpdateStatus:      Enum — data fetch result codes
- * - PriorityTier:      Enum — DataManager scheduling tier
+ * - IMCPContributor:          Interface — MCP tool registration contract
+ * - IPreconditionContributor: Interface — precondition contributor contract
+ * - IPrecondition:           Types and enums for precondition system
+ * - IOTAVerifier:            Interface — OTA firmware signature verification contract
+ * - UpdateStatus:            Enum — data fetch result codes
+ * - PriorityTier:            Enum — DataManager scheduling tier
  */
 
 #pragma once
@@ -43,7 +44,8 @@
 #include "interfaces/IStatusReporter.hpp"
 #include "interfaces/IWebContributor.hpp"
 #include "interfaces/IMCPContributor.hpp"
-#include "interfaces/IConfigGate.hpp"
+#include "interfaces/IPrecondition.hpp"
+#include "interfaces/IPreconditionContributor.hpp"
 #include "interfaces/IOTAVerifier.hpp"
 
 // Application hub

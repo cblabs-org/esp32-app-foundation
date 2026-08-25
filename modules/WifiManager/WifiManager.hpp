@@ -343,6 +343,18 @@ public:
     const char* getSSID() const { return _wifiSsid; }
 
     /**
+     * @brief Returns true if WiFi credentials (SSID) are configured.
+     * @return true if SSID is non-empty
+     */
+    bool hasCredentials() const { return strlen(_wifiSsid) > 0; }
+
+    /**
+     * @brief Returns the SSID of the AP mode captive portal network.
+     * @return AP SSID (hostname or "ESP32-Setup")
+     */
+    const char* getAPSSID() const { return (strlen(_currentHostname) > 0) ? _currentHostname : "ESP32-Setup"; }
+
+    /**
      * @brief Returns true if a password is set.
      * @return true if a password exists
      */

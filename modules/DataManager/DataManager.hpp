@@ -156,8 +156,7 @@ public:
      *
      * @param running true to allow fetches; false to gate them.
      */
-    void setAppRunning(bool running);
-
+    
     /**
      * @brief Returns the duration in ms of the currently-running fetch or job, or 0 if idle.
      *
@@ -266,7 +265,6 @@ private:
     std::vector<SourceRecord> _registry;
     SemaphoreHandle_t _registryMutex;
     TaskHandle_t _workerTask;
-    std::atomic<bool> _appRunning{false};
     uint32_t _simulatedTimeMs = 0;
     std::atomic<uint32_t> _fetchStartMs{0};   ///< Timestamp of in-flight fetchUpdate(); 0 when idle.
 #ifdef ESP_PLATFORM

@@ -149,7 +149,7 @@ bool TimeManager::isTimeSet() const {
  *
  * Reads timezone (IANA name + POSIX string) and NTP server addresses
  * from the persisted config. Sets _configured = true to signal that
- * the user has explicitly configured timezone (used by TimeConfigGate).
+ * the user has explicitly configured timezone (used by TimePreconditionContributor).
  *
  * @param section Read-only JSON object containing config keys.
  */

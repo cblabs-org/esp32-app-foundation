@@ -49,9 +49,9 @@ static OTAUpdateManager otaManager;
 
 #ifdef WITH_TIME
 #include "TimeManager.hpp"
-#include "TimeConfigGate.hpp"
+#include "TimePreconditionContributor.hpp"
 static TimeManager timeManager;
-static TimeConfigGate timeGate{timeManager};
+static TimePreconditionContributor timePrecondition{timeManager};
 #endif
 
 #ifdef WITH_MCP
@@ -117,6 +117,7 @@ void setup() {
 #ifdef WITH_TIME
     timeManager.setConfigManager(&app.getConfigManager());
     app.registerModule(&timeManager);
+    app.registerModule(&timePrecondition);
 #endif
 
 #ifdef WITH_HOMEASSISTANT
@@ -204,7 +205,7 @@ void setup() {
     displayModule.begin(&app.getEventBus());
 #ifdef WITH_DISPLAY_U8G2
     diagnosticsBoard.configure(&app.getWifiManager());
-    displayModule.boards.configuringStatus.setGates(&app.getConfigGates());
+    displayModule.boards.configuringStatus.setEngine(&app.getPreconditionEngine());
     displayModule.carousel.add(&diagnosticsBoard);
 #endif
 #endif

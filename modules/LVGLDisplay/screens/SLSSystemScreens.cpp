@@ -13,7 +13,7 @@
 
 #include "screens/SLSSystemScreens.hpp"
 #include "ui/ui.h"
-#include "interfaces/IConfigGate.hpp"  // GateNames
+#include "interfaces/IPrecondition.hpp"
 #include <cstdio>
 #include <cstring>
 #include <algorithm>
@@ -57,8 +57,8 @@ lv_obj_t* SLSSystemScreens::wifiWizardScreen() {
 
 lv_obj_t* SLSSystemScreens::gateHelperScreen(const AppConfiguringPayload* payload) {
     // Defer the WiFi station gate to the module's Tier-2 wizard (Setup group).
-    if (payload != nullptr && payload->gateName != nullptr &&
-        strcmp(payload->gateName, GateNames::WIFI_STATION) == 0) {
+    if (payload != nullptr && payload->preconditionName != nullptr &&
+        strcmp(payload->preconditionName, PreconditionNames::WIFI_STATION) == 0) {
         return nullptr;
     }
     return showGroup(ui_uiSystemMessageGroup);
@@ -86,11 +86,50 @@ void SLSSystemScreens::onConfiguring(const AppConfiguringPayload* payload) {
     }
 
     // Message group — generic gate-helper title/body.
-    if (ui_ui_SystemMsgTitle != nullptr && payload->gateName != nullptr) {
-        lv_label_set_text(ui_ui_SystemMsgTitle, payload->gateName);
+    if (ui_ui_SystemMsgTitle != nullptr && payload->preconditionName != nullptr) {
+        lv_label_set_text(ui_ui_SystemMsgTitle, payload->preconditionName);
     }
     if (ui_uiSystemMsgBody != nullptr && payload->helpText != nullptr) {
         lv_label_set_text(ui_uiSystemMsgBody, payload->helpText);
+    }
+}
+
+void SLSSystemScreens::onPreconditionHealth(const PreconditionHealthPayload* payload) {
+    if (payload == nullptr) {
+        return;
+    }
+
+    // Update Message group widgets with precondition health info
+    if (ui_ui_SystemMsgTitle != nullptr && payload->name != nullptr) {
+        lv_label_set_text(ui_ui_SystemMsgTitle, payload->name);
+    }
+    if (ui_uiSystemMsgBody != nullptr) {
+        const char* causeStr = "Unknown";
+        switch (payload->cause) {
+            case Cause::Met:             causeStr = "Satisfied"; break;
+            case Cause::NotConfigured:   causeStr = "Setup required"; break;
+            case Cause::Connecting:      causeStr = "Connecting..."; break;
+            case Cause::Rejected:        causeStr = "Rejected (check credentials)"; break;
+            case Cause::Unreachable:     causeStr = "Peer unreachable"; break;
+            case Cause::RateLimited:     causeStr = "Rate limited"; break;
+            case Cause::Implausible:     causeStr = "Implausible response"; break;
+            case Cause::DependencyUnmet: causeStr = "Waiting for dependencies"; break;
+            case Cause::FallbackEngaged: causeStr = "Fallback engaged"; break;
+            case Cause::Unavailable:     causeStr = "Unavailable"; break;
+            case Cause::Indeterminate:   causeStr = "Indeterminate state"; break;
+            case Cause::InternalError:   causeStr = "Internal error"; break;
+            default:                     causeStr = "Pending"; break;
+        }
+        lv_label_set_text(ui_uiSystemMsgBody, causeStr);
+    }
+
+    // Update Busy group message if connecting
+    if (ui_uiSystemBusyMessage != nullptr && payload->name != nullptr) {
+        char busyBuf[64];
+        if (payload->cause == Cause::Connecting) {
+            snprintf(busyBuf, sizeof(busyBuf), "%s: Connecting...", payload->name);
+            lv_label_set_text(ui_uiSystemBusyMessage, busyBuf);
+        }
     }
 }
 

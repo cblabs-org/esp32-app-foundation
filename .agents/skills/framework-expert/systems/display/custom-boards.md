@@ -77,9 +77,9 @@ The framework includes several standard system boards you can reference:
 - `BootSequenceBoard`: Specialized board handling the two-phase bootstrap, drawing progress bars during Wi-Fi connection and file system mounting.
 - `NetworkStatusBoard`: Displays the current IP address, SSID, and MQTT connection state.
 - `OtaProgressBoard`: While technically an overlay rather than a carousel board, it demonstrates high-priority drawing mechanics.
-- `ConfiguringStatusBoard`: System board during CONFIGURING phase, renders per-gate status rows with dependency-aware prefix indicators.
-- `GenericGateHelperBoard`: Fallback modal for config gates without a dedicated built-in board. Shows gate name, help text, and portal URL.
+- `ConfiguringStatusBoard`: System board during CONFIGURING phase, renders cause-aware precondition status rows with a 6-char prefix vocabulary (`*` met, `~` transient, `!` needs-user, `-` blocked, `?` degraded, `>` actionable).
+- `GenericGateHelperBoard`: Fallback modal for preconditions without a dedicated built-in board. Shows precondition name, help text (via `DescribeFn`), and portal URL.
 
-> **Note:** Custom configuring boards should subscribe to `app.configuring` on the EventBus directly, as the built-in dispatch uses `IU8G2SystemScreens` overrides.
+> **Note:** Custom configuring boards should subscribe to the `precondition.health` EventBus topic for per-precondition state changes, or to `app.configuring` for the actionable precondition. The built-in dispatch uses `IU8G2SystemScreens` overrides.
 
 When designing custom boards, always ensure your `render()` routine is non-blocking. Avoid `delay()` or heavy computation, as this will stall the entire rendering pipeline and degrade the device's perceived responsiveness.

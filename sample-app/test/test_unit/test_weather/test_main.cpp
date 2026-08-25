@@ -5,12 +5,12 @@
  * Description: Unit tests for WeatherModule demonstrating how to test
  *              framework modules in the native GoogleTest environment.
  *              Tests cover IConfigurable (config round-trip, defaults,
- *              schema metadata), IConfigGate (gate logic), and
+ *              schema metadata), IPreconditionContributor (precondition logic), and
  *              IDataSource (source metadata).
  *
  * Test Groups:
  * - WeatherModuleConfigTest: Config serialization, application, and reset
- * - WeatherModuleGateTest:   IConfigGate satisfaction logic
+ * - WeatherModulePreconditionTest: IPreconditionContributor satisfaction logic
  * - WeatherModuleMetadataTest: Interface metadata (namespace, name, tier)
  */
 
@@ -100,20 +100,50 @@ TEST_F(WeatherModuleTest, ConfigApplyPartial) {
 }
 
 // =============================================================================
-// IConfigGate — Gate Logic
+// IPreconditionContributor — Precondition Logic
 // =============================================================================
 
-TEST_F(WeatherModuleTest, GateNoKeyManager) {
-    // Without calling begin(), _keyManager is nullptr.
-    // Gate should fail-open (return true) to avoid blocking boot
-    // when no KeyManager is wired.
-    EXPECT_TRUE(module.isSatisfied());
+TEST_F(WeatherModuleTest, PreconditionRegistrationAndMetadata) {
+    PreconditionRegistry reg;
+    module.registerPreconditions(reg);
+
+    EXPECT_EQ(reg.count(), 1u);
+    const auto& spec = reg.get(0);
+    EXPECT_STREQ(spec.name, "Weather Setup");
+    EXPECT_EQ(spec.role, PreconditionRole::Operational);
+    EXPECT_EQ(spec.edgeCount, 1u);
+    EXPECT_STREQ(spec.edges[0].name, PreconditionNames::WIFI_STATION);
+    EXPECT_EQ(spec.edges[0].kind, EdgeKind::Requires);
 }
 
-TEST_F(WeatherModuleTest, GateNameAndHelpText) {
-    EXPECT_STREQ(module.getGateName(), "Weather API Key");
-    EXPECT_NE(module.getHelpText(), nullptr);
-    EXPECT_GT(strlen(module.getHelpText()), 0u);
+TEST_F(WeatherModuleTest, PreconditionNoKeyManager_ReturnsIndeterminate) {
+    // Without calling begin(), _keyManager is nullptr.
+    // §2.4: Must return Indeterminate (defect fix: not true / not met).
+    PreconditionRegistry reg;
+    module.registerPreconditions(reg);
+
+    ASSERT_EQ(reg.count(), 1u);
+    PreconditionStatus status = reg.get(0).evaluate();
+    EXPECT_FALSE(status.met);
+    EXPECT_EQ(status.cause, Cause::Indeterminate);
+}
+
+TEST_F(WeatherModuleTest, PreconditionDescriptions) {
+    PreconditionRegistry reg;
+    module.registerPreconditions(reg);
+
+    ASSERT_EQ(reg.count(), 1u);
+    ASSERT_NE(reg.get(0).describe, nullptr);
+
+    char buf[128] = {};
+    reg.get(0).describe(Cause::NotConfigured, buf, sizeof(buf));
+    EXPECT_STREQ(buf, "Set API key and location in Weather settings");
+
+    reg.get(0).describe(Cause::Indeterminate, buf, sizeof(buf));
+    EXPECT_STREQ(buf, "BUG: KeyManager not wired — call setKeyManager()");
+
+    reg.get(0).describe(Cause::Connecting, buf, sizeof(buf));
+    EXPECT_STREQ(buf, "Weather setup incomplete");
 }
 
 // =============================================================================

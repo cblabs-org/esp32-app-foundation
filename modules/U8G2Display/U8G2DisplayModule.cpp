@@ -227,6 +227,7 @@ void U8G2DisplayModule::begin(EventBus* eventBus) {
         _eventBus->subscribe(U8G2DisplayEvents::DISPLAY_MESSAGE, _onDisplayMessage, this);
         _eventBus->subscribe(ApplicationEvents::APP_CONFIGURING, _onAppConfiguring, this);
         _eventBus->subscribe(ApplicationEvents::APP_RUNNING, _onAppRunning, this);
+        _eventBus->subscribe(ApplicationEvents::PRECONDITION_HEALTH, _onPreconditionHealth, this);
     }
 
     // --- Step 3: Activate boot splash (skip if bootstrapped — already shown) ---
@@ -1235,10 +1236,10 @@ void U8G2DisplayModule::_onDisplayMessage(const char* /*topic*/, const void* pay
  * Suspends carousel rotation, sets the configuring status board as base layer,
  * tears down any previous modal, then applies three-tier modal dispatch:
  *   Tier 1: Consumer override via IU8G2SystemScreens::gateHelperBoard()
- *   Tier 2: Built-in WiFi wizard for GateNames::WIFI_STATION
+ *   Tier 2: Built-in WiFi wizard for PreconditionNames::WIFI_STATION
  *   Tier 3: Generic fallback via GenericGateHelperBoard
  *
- * Only shows a modal when actionStatus == NeedsUserAction.
+ * Only shows a modal when severity == NeedsUser.
  */
 void U8G2DisplayModule::_onAppConfiguring(const char* /*topic*/, const void* payload, void* ctx) {
     auto* self = static_cast<U8G2DisplayModule*>(ctx);
@@ -1262,9 +1263,8 @@ void U8G2DisplayModule::_onAppConfiguring(const char* /*topic*/, const void* pay
     }
     auto* p = static_cast<const AppConfiguringPayload*>(payload);
 
-    // --- 4. Update configuring status board with gate action status and connection info ---
-    self->boards.configuringStatus.setActiveGateStatus(p->actionStatus);
-    self->boards.configuringStatus.setActionableGateName(p->gateName);
+    // --- 4. Update configuring status board with connection info ---
+    self->boards.configuringStatus.setActionableGateName(p->preconditionName);
     char urlBuf[48] = "";
     if (p->deviceIP != nullptr) {
         snprintf(urlBuf, sizeof(urlBuf), "http://%s", p->deviceIP);
@@ -1274,8 +1274,8 @@ void U8G2DisplayModule::_onAppConfiguring(const char* /*topic*/, const void* pay
         p->deviceIP ? urlBuf : ""
     );
 
-    // --- 5. If not NeedsUserAction, no modal needed ---
-    if (p->actionStatus != GateActionStatus::NeedsUserAction) {
+    // --- 5. If not NeedsUser, no modal needed ---
+    if (p->severity != Severity::NeedsUser) {
         return;
     }
 
@@ -1288,8 +1288,8 @@ void U8G2DisplayModule::_onAppConfiguring(const char* /*topic*/, const void* pay
     }
 
     // Tier 2: Built-in WiFi wizard
-    if (modalBoard == nullptr && p->gateName != nullptr &&
-        strcmp(p->gateName, GateNames::WIFI_STATION) == 0) {
+    if (modalBoard == nullptr && p->preconditionName != nullptr &&
+        strcmp(p->preconditionName, PreconditionNames::WIFI_STATION) == 0) {
         // Resolve wizard board: prefer IU8G2SystemScreens wifiWizardBoard override
         IDisplayBoard* wizardBoard = (self->_screens != nullptr && self->_screens->wifiWizardBoard() != nullptr)
                                      ? self->_screens->wifiWizardBoard()
@@ -1305,7 +1305,7 @@ void U8G2DisplayModule::_onAppConfiguring(const char* /*topic*/, const void* pay
     // Tier 3: Generic fallback
     if (modalBoard == nullptr) {
         self->boards.genericHelper.configure(
-            p->gateName ? p->gateName : "Configuration",
+            p->preconditionName ? p->preconditionName : "Configuration",
             p->helpText ? p->helpText : "",
             p->deviceIP ? p->deviceIP : ""
         );
@@ -1330,6 +1330,21 @@ void U8G2DisplayModule::_onAppRunning(const char* /*topic*/, const void* /*paylo
     self->clearModal();
     self->showBase(nullptr);
     self->carousel.resume();
+}
+
+/**
+ * @brief Static callback for "precondition.health" EventBus events.
+ *
+ * Updates ConfiguringStatusBoard cached precondition state.
+ */
+void U8G2DisplayModule::_onPreconditionHealth(const char* /*topic*/, const void* payload, void* ctx) {
+    auto* self = static_cast<U8G2DisplayModule*>(ctx);
+    if (self == nullptr || payload == nullptr) {
+        return;
+    }
+
+    const auto* p = static_cast<const PreconditionHealthPayload*>(payload);
+    self->boards.configuringStatus.updatePrecondition(*p);
 }
 
 

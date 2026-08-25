@@ -213,7 +213,7 @@ public:
     /**
      * @brief Returns true if the user has explicitly configured timezone.
      *
-     * This is the primary check for TimeConfigGate. Returns true when
+     * This is the primary check for the Timezone precondition. Returns true when
      * applyConfig() has been called with a persisted config section
      * (i.e., /mod/time.json exists and was loaded).
      *

@@ -41,7 +41,15 @@ void U8G2DisplayModule::begin(EventBus* eventBus) {
     _eventBus = eventBus;
     if (_eventBus) {
         _eventBus->subscribe("app.configuring", _onAppConfiguring, this);
+        _eventBus->subscribe("precondition.health", _onPreconditionHealth, this);
     }
+}
+
+void U8G2DisplayModule::_onPreconditionHealth(const char* /*topic*/, const void* payload, void* ctx) {
+    auto* self = static_cast<U8G2DisplayModule*>(ctx);
+    if (!self || !payload) return;
+    const auto* p = static_cast<const PreconditionHealthPayload*>(payload);
+    self->boards.configuringStatus.updatePrecondition(*p);
 }
 
 void U8G2DisplayModule::_onAppConfiguring(const char* topic, const void* payload, void* ctx) {
@@ -57,25 +65,28 @@ void U8G2DisplayModule::_onAppConfiguring(const char* topic, const void* payload
     // Always set base board to configuring status
     self->_baseBoard = &self->_configuringStatusBoard;
 
-    // Only push a modal for NeedsUserAction
-    if (p->actionStatus == GateActionStatus::NeedsUserAction) {
-        // Tier 1: Consumer override via IU8G2SystemScreens
-        if (self->_screens) {
-            IDisplayBoard* custom = self->_screens->gateHelperBoard(p);
-            if (custom) {
-                self->showModal(custom);
-                return;
-            }
-        }
-        // Tier 2: Built-in WiFi wizard
-        if (p->gateName && strcmp(p->gateName, GateNames::WIFI_STATION) == 0) {
-            self->_wifiWizard.configure(p->hostname, p->deviceIP);
-            self->showModal(&self->_wifiWizard);
+    // Non-blocking statuses (Transient, Blocked, Met, Unknown) are tracked
+    // on the base ConfiguringStatusBoard — do NOT push a modal board.
+    if (p->severity != Severity::NeedsUser) {
+        return;
+    }
+
+    // Tier 1: Consumer override via IU8G2SystemScreens
+    if (self->_screens) {
+        IDisplayBoard* custom = self->_screens->gateHelperBoard(p);
+        if (custom) {
+            self->showModal(custom);
             return;
         }
-        // Tier 3: Generic gate helper fallback
-        self->showModal(&self->_genericHelperBoard);
     }
+    // Tier 2: Built-in WiFi wizard
+    if (p->preconditionName && strcmp(p->preconditionName, PreconditionNames::WIFI_STATION) == 0) {
+        self->_wifiWizard.configure(p->hostname, p->deviceIP);
+        self->showModal(&self->_wifiWizard);
+        return;
+    }
+    // Tier 3: Generic gate helper fallback
+    self->showModal(&self->_genericHelperBoard);
 }
 
 void U8G2DisplayModule::tick(uint32_t currentMillis) {

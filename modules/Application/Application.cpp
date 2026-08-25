@@ -27,7 +27,7 @@
 
 #include "Application.hpp"
 #include "events/AppConfiguringPayload.hpp"
-#include "utils/ConfigGateResolver.hpp"
+#include "events/PreconditionHealthPayload.hpp"
 
 
 // ---------------------------------------------------------------------------
@@ -181,6 +181,8 @@ bool Application::begin(const FrameworkConfig& config) {
     registerModule(_authManager.tlsTabStub());       // IWebContributor (sub-pill)
     registerModule(&_configManager);      // IWebContributor + IMCPContributor
     registerModule(&_keyManager);         // IWebContributor + IMCPContributor
+    _preconditionWebContributor.app = this;
+    registerModule(&_preconditionWebContributor); // IWebContributor
 
 
     registerModule(&_webServerManager);   // ITickable
@@ -190,7 +192,7 @@ bool Application::begin(const FrameworkConfig& config) {
 
 
 
-    registerModule(&_wifiGate);           // IConfigGate
+    _wifiPrecondition.registerPreconditions(_preconditionEngine);
 
     // --- Step 8: ConfigManager.beginAll() — load all persisted config ---
     // Iterates the registry, loads each module's namespace file from
@@ -249,6 +251,9 @@ bool Application::begin(const FrameworkConfig& config) {
     // --- Step 17: Lock all registration vectors ---
     // No further registrations are permitted after this point.
     _compactAndLock();
+    if (!_preconditionEngine.resolveEdges()) {
+        ESP_LOGE(TAG, "PreconditionEngine: edge resolution failed (unknown name or cycle)");
+    }
     _statusReporter->reportStatus("Boot complete", 1.0f);
 
     // --- Step 17b: Bless firmware (auto-rollback barrier) ---
@@ -264,12 +269,11 @@ bool Application::begin(const FrameworkConfig& config) {
     // --- Step 19: Clear boot status ---
     _statusReporter->clearStatus();
 
-    // --- Step 20: Check config gates → RUNNING or CONFIGURING ---
-    if (_allGatesSatisfied()) {
+    // --- Step 20: Check preconditions → RUNNING or CONFIGURING ---
+    if (_preconditionEngine.allStartupMet()) {
         setState(AppState::Running);
-        _dataManager.setAppRunning(true);
         _onEnterRunning();
-        ESP_LOGI(TAG, "Boot sequence complete — all gates satisfied, entering RUNNING state");
+        ESP_LOGI(TAG, "Boot sequence complete — all startup preconditions satisfied, entering RUNNING state");
     } else {
         setState(AppState::Configuring);
         _publishConfiguringEvent();
@@ -285,57 +289,37 @@ bool Application::begin(const FrameworkConfig& config) {
  *
  * The guard ensures tick() is a no-op until AppState::Configuring or
  * AppState::Running. During CONFIGURING, all modules still receive ticks
- * (WiFi, display, web portal) but config gates are polled each cycle.
- * Once all gates are satisfied, state advances to RUNNING.
+ * (WiFi, display, web portal) and preconditions are ticked each cycle.
+ * Once all startup preconditions are satisfied, state advances to RUNNING.
  */
 void Application::tick() {
     // Guard: do not tick during boot phases
     if (_state != AppState::Configuring && _state != AppState::Running) return;
 
     uint32_t currentMillis = millis();
+    _preconditionEngine.tick(currentMillis);
 
-    // --- RUNNING: throttled gate regression check ---
-    if (_state == AppState::Running) {
-        if (_gateCheckPeriodic.due(currentMillis)) {
-            for (uint8_t i = 0; i < _configGates.size(); i++) {
-                if (!_configGates[i]->isSatisfied()) {
-                    uint32_t tolerance = _configGates[i]->getRegressionToleranceMs();
-                    if (tolerance == UINT32_MAX) continue; // App handles recovery
+    // Extract once — Periodic::due() is consumable (returns true once, resets).
+    bool throttleDue = _configuringPublishThrottle.due(currentMillis);
 
-                    if (_gateFailedSinceMs[i].getInterval() == 0) {
-                        _gateFailedSinceMs[i].reset(currentMillis);
-                        _gateFailedSinceMs[i].setInterval(1); // Enable tracking
-                    } else if ((currentMillis - _gateFailedSinceMs[i].getLastFire()) >= tolerance) {
-                        ESP_LOGW(TAG, "Gate '%s' unsatisfied for %lums — regressing to CONFIGURING",
-                                 _configGates[i]->getGateName(), (currentMillis - _gateFailedSinceMs[i].getLastFire()));
-                        setState(AppState::Configuring);
-                        _dataManager.setAppRunning(false);
-                        _publishConfiguringEvent(true); // isRegression = true
-                        _onEnterConfiguring(true);
-                        for(int j=0; j<MAX_CONFIG_GATES; ++j) _gateFailedSinceMs[j].setInterval(0);
-                        break;
-                    }
-                } else {
-                    _gateFailedSinceMs[i].setInterval(0); // Gate re-satisfied, reset timer
+    // --- CONFIGURING: precondition re-publishing + transition check ---
+    if (_state == AppState::Configuring) {
+        // Precondition re-publishing (500ms throttle)
+        if (throttleDue) {
+            const PreconditionState* blocking = nullptr;
+            for (size_t i = 0; i < _preconditionEngine.getPreconditionCount(); ++i) {
+                const auto& s = _preconditionEngine.getStateAt(i);
+                if ((s.role == PreconditionRole::Startup || s.role == PreconditionRole::Both) && !s.dampedStatus.met) {
+                    blocking = &s;
+                    break;
                 }
             }
-        }
-    }
 
-    // --- CONFIGURING: gate-transition re-publishing + transition check ---
-    if (_state == AppState::Configuring) {
-        // Gate-transition re-publishing (500ms throttle)
-        if (_configuringPublishThrottle.due(currentMillis)) {
-            const IConfigGate* actionable = getActionableGate();
-            const char* currentGate = actionable ? actionable->getGateName() : nullptr;
-            GateActionStatus currentStatus = actionable
-                ? actionable->getActionStatus()
-                : GateActionStatus::Satisfied;
+            const char* currentGate = blocking ? blocking->name : nullptr;
+            Cause currentCause = blocking ? blocking->dampedStatus.cause : Cause::Met;
 
-            // Re-publish if actionable gate changed, its status changed,
-            // or the device IP changed (e.g. WiFi connected after initial publish)
-            bool changed = ConfigGateResolver::shouldRepublish(
-                currentGate, currentStatus, _lastPublishedGate, _lastPublishedStatus);
+            bool changed = (currentGate != _lastPublishedGate) ||
+                           (currentCause != _lastPublishedCause);
 
             if (!changed) {
                 // Also re-publish if IP changed (initial event may have 0.0.0.0)
@@ -345,20 +329,18 @@ void Application::tick() {
                 }
             }
 
-            if (changed) {
-                _publishConfiguringEvent(false, actionable);
+            if (changed && blocking != nullptr) {
+                _publishConfiguringEvent(false);
             }
         }
 
-        // Check if all gates now satisfied
-        if (_allGatesSatisfied()) {
+        // Check if all startup preconditions now satisfied
+        if (_preconditionEngine.allStartupMet()) {
             setState(AppState::Running);
-            _dataManager.setAppRunning(true);
             _onEnterRunning();
             _eventBus.publish(ApplicationEvents::APP_RUNNING);
-            ESP_LOGI(TAG, "All config gates satisfied — entering RUNNING state");
+            ESP_LOGI(TAG, "All startup preconditions satisfied — entering RUNNING state");
         }
-
     }
 
     // In native builds, drive DataManager synchronously for tests
@@ -391,6 +373,33 @@ void Application::tick() {
     // while internal DRAM is one allocation from exhaustion. dram_min is the
     // low-water mark since boot — it matters more than dram, which is only
     // an instantaneous snapshot and can hide a transient trough.
+    if (throttleDue) {
+        for (size_t i = 0; i < _preconditionEngine.getPreconditionCount(); ++i) {
+            const auto& state = _preconditionEngine.getStateAt(i);
+            auto& last = _lastPreconditionStatus[i];
+            bool changed = !last.initialized || last.met != state.dampedStatus.met ||
+                           last.cause != state.dampedStatus.cause ||
+                           last.severity != state.severity ||
+                           last.everMet != state.everMet;
+            if (changed) {
+                last.initialized = true;
+                last.met = state.dampedStatus.met;
+                last.cause = state.dampedStatus.cause;
+                last.severity = state.severity;
+                last.everMet = state.everMet;
+                _preconditionPayloads[i] = {state.name, state.dampedStatus.cause, state.severity, state.everMet, state.role};
+                _eventBus.publish(ApplicationEvents::PRECONDITION_HEALTH, &_preconditionPayloads[i]);
+            }
+            if (_state == AppState::Running && (state.role == PreconditionRole::Startup || state.role == PreconditionRole::Both) && state.suppressed) {
+                ESP_LOGW(TAG, "Precondition '%s' suppressed — regressing to CONFIGURING", state.name);
+                setState(AppState::Configuring);
+                _publishConfiguringEvent(true);
+                _onEnterConfiguring(true);
+                break;
+            }
+        }
+    }
+
     if (_heartbeatPeriodic.due(currentMillis)) {
         uint32_t freeHeap = heap_caps_get_free_size(MALLOC_CAP_8BIT);
         uint32_t freeDram = heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
@@ -535,22 +544,6 @@ bool Application::registerDataSource(IDataSource* source) {
     return true;
 }
 
-/**
- * @brief Register a configuration prerequisite gate.
- */
-bool Application::registerConfigGate(IConfigGate* gate) {
-    if (_locked) {
-        ESP_LOGE(TAG, "registerConfigGate() rejected — registration is closed after begin()");
-        return false;
-    }
-    if (gate == nullptr) {
-        ESP_LOGE(TAG, "registerConfigGate() rejected — null pointer");
-        return false;
-    }
-    _configGates.push_back(gate);
-    return true;
-}
-
 // ---------------------------------------------------------------------------
 // Core Services Accessors
 // ---------------------------------------------------------------------------
@@ -633,18 +626,16 @@ void Application::_compactAndLock() {
     _webContributors.shrink_to_fit();
     _mcpContributors.shrink_to_fit();
     _dataSources.shrink_to_fit();
-    _configGates.shrink_to_fit();
 
     _locked = true;
 
     ESP_LOGI(TAG, "Registry locked — tickables=%u "
              "webContributors=%u mcpContributors=%u dataSources=%u "
-             "configGates=%u statusReporter=%s",
+             "statusReporter=%s",
              (unsigned)_tickables.size(),
              (unsigned)_webContributors.size(),
              (unsigned)_mcpContributors.size(),
              (unsigned)_dataSources.size(),
-             (unsigned)_configGates.size(),
              (_statusReporter != nullptr) ? "registered" : "none");
 }
 
@@ -663,62 +654,36 @@ void Application::_reportHeap() {
              freeHeap, minFreeHeap);
 }
 
-
-// ---------------------------------------------------------------------------
-// Config Gate Helpers
-// ---------------------------------------------------------------------------
-
-/**
- * @brief Check whether all registered config gates are satisfied.
- *
- * Returns true if no gates are registered (zero-gate fast path) or if
- * every gate's isSatisfied() returns true.
- */
-bool Application::_allGatesSatisfied() const {
-    for (const auto* gate : _configGates) {
-        if (!gate->isSatisfied()) return false;
-    }
-    return true;
-}
-
-/**
- * @brief Find the first actionable unsatisfied gate (all dependencies satisfied).
- *
- * Iterates the registered config gates in registration order, skipping satisfied
- * gates. For each unsatisfied gate, checks whether all of its declared
- * dependencies are satisfied by comparing gate names via strcmp().
- *
- * @return Pointer to the first actionable gate, or nullptr if all are satisfied
- *         or no gate has its dependencies met.
- */
-const IConfigGate* Application::getActionableGate() const {
-    return ConfigGateResolver::findActionableGate(_configGates);
-}
-
 /**
  * @brief Publish an "app.configuring" EventBus event for the first
- *        **actionable** unsatisfied gate.
- *
- * Uses getActionableGate() to find the first gate whose dependencies are
- * satisfied, then populates the enriched AppConfiguringPayload with gate
- * name, help text, action status, hostname, and device IP.
+ *        blocking unsatisfied precondition.
  */
-void Application::_publishConfiguringEvent(bool isRegression, const IConfigGate* preResolved) {
-    const IConfigGate* gate = preResolved ? preResolved : getActionableGate();
-    if (gate == nullptr) return;
+void Application::_publishConfiguringEvent(bool isRegression) {
+    const PreconditionState* blocking = nullptr;
+    for (size_t i = 0; i < _preconditionEngine.getPreconditionCount(); ++i) {
+        const auto& s = _preconditionEngine.getStateAt(i);
+        if ((s.role == PreconditionRole::Startup || s.role == PreconditionRole::Both) && !s.dampedStatus.met) {
+            blocking = &s;
+            break;
+        }
+    }
+    if (blocking == nullptr) return;
 
-    // Stamp tracking state atomically with publish (F1: structural invariant)
-    _lastPublishedGate   = gate->getGateName();
-    _lastPublishedStatus = gate->getActionStatus();
+    _helpTextBuf[0] = '\0';
+    if (blocking->describe) {
+        blocking->describe(blocking->dampedStatus.cause, _helpTextBuf, sizeof(_helpTextBuf));
+    }
 
-    _configuringPayload.gateName     = gate->getGateName();
-    _configuringPayload.helpText     = gate->getHelpText();
-    _configuringPayload.actionStatus = gate->getActionStatus();
+    _lastPublishedGate   = blocking->name;
+    _lastPublishedCause  = blocking->dampedStatus.cause;
+
+    _configuringPayload.preconditionName     = blocking->name;
+    _configuringPayload.helpText     = _helpTextBuf[0] != '\0' ? _helpTextBuf : nullptr;
+    _configuringPayload.cause        = blocking->dampedStatus.cause;
+    _configuringPayload.severity     = blocking->severity;
     _configuringPayload.isRegression = isRegression;
     _configuringPayload.hostname     = _wifiManager.getHostname();
 
-    // Write device IP into a stable buffer to avoid dangling pointer from
-    // WiFi.localIP().toString().c_str() (returns pointer to a temporary String)
     if (_wifiManager.getAPMode()) {
         strncpy(_deviceIPBuf, "192.168.4.1", sizeof(_deviceIPBuf));
     } else {
@@ -728,9 +693,10 @@ void Application::_publishConfiguringEvent(bool isRegression, const IConfigGate*
     _configuringPayload.deviceIP = _deviceIPBuf;
 
     _eventBus.publish(ApplicationEvents::APP_CONFIGURING, &_configuringPayload);
-    ESP_LOGI(TAG, "Config gate unsatisfied: %s (status=%d)%s",
-             gate->getGateName(),
-             static_cast<int>(gate->getActionStatus()),
+    ESP_LOGI(TAG, "Precondition unsatisfied: %s (cause=%d, severity=%d)%s",
+             blocking->name,
+             static_cast<int>(blocking->dampedStatus.cause),
+             static_cast<int>(blocking->severity),
              isRegression ? " (regression)" : "");
 }
 
@@ -758,7 +724,111 @@ void Application::_onEnterRunning() {
 }
 
 // ---------------------------------------------------------------------------
-// Display accessor
+// Precondition web routes (WO5)
 // ---------------------------------------------------------------------------
 
+namespace {
+    const char* roleToString(PreconditionRole role) {
+        switch (role) {
+            case PreconditionRole::Operational: return "Operational";
+            case PreconditionRole::Startup:     return "Startup";
+            case PreconditionRole::Both:        return "Both";
+            default:                            return "Operational";
+        }
+    }
 
+    const char* causeToString(Cause cause) {
+        switch (cause) {
+            case Cause::Met:             return "Met";
+            case Cause::NotConfigured:   return "NotConfigured";
+            case Cause::Connecting:      return "Connecting";
+            case Cause::Rejected:        return "Rejected";
+            case Cause::Unreachable:     return "Unreachable";
+            case Cause::RateLimited:     return "RateLimited";
+            case Cause::Implausible:     return "Implausible";
+            case Cause::DependencyUnmet: return "DependencyUnmet";
+            case Cause::FallbackEngaged: return "FallbackEngaged";
+            case Cause::Unavailable:     return "Unavailable";
+            case Cause::Indeterminate:   return "Indeterminate";
+            case Cause::InternalError:   return "InternalError";
+            default:                     return "NotConfigured";
+        }
+    }
+
+    const char* severityToString(Severity severity) {
+        switch (severity) {
+            case Severity::Transient:  return "Transient";
+            case Severity::NeedsUser:  return "NeedsUser";
+            case Severity::Blocked:    return "Blocked";
+            case Severity::Degraded:   return "Degraded";
+            case Severity::Inactive:   return "Inactive";
+            case Severity::Persistent: return "Persistent";
+            default:                   return "Transient";
+        }
+    }
+
+    const char* breakerToString(BreakerState breaker) {
+        switch (breaker) {
+            case BreakerState::Closed:   return "Closed";
+            case BreakerState::Open:     return "Open";
+            case BreakerState::HalfOpen: return "HalfOpen";
+            default:                     return "Closed";
+        }
+    }
+}
+
+void Application::PreconditionWebContributor::registerRoutes(PsychicHttpServer& server) {
+    if (!app) return;
+
+    server.on("/api/preconditions", HTTP_GET, [this](PsychicRequest* request, PsychicResponse* response) {
+        JsonDocument doc;
+        JsonArray arr = doc.to<JsonArray>();
+
+        PreconditionEngine& engine = app->getPreconditionEngine();
+        size_t count = engine.getPreconditionCount();
+        for (size_t i = 0; i < count; ++i) {
+            const auto& state = engine.getStateAt(i);
+            JsonObject obj = arr.add<JsonObject>();
+            obj["name"] = state.name;
+            obj["role"] = roleToString(state.role);
+            obj["met"] = state.dampedStatus.met;
+            obj["cause"] = causeToString(state.dampedStatus.cause);
+            obj["severity"] = severityToString(state.severity);
+            obj["everMet"] = state.everMet;
+            obj["breaker"] = breakerToString(state.breaker);
+            obj["suppressed"] = state.suppressed;
+        }
+
+        std::string out;
+        serializeJson(doc, out);
+        return response->send(200, "application/json", out.c_str());
+    });
+
+    server.on("/api/preconditions/retry", HTTP_POST, [this](PsychicRequest* request, PsychicResponse* response) {
+        if (request->contentLength() > 1024) {
+            response->send(413, "application/json", "{\"error\":\"Payload too large\"}");
+            return ESP_FAIL;
+        }
+
+        const char* body = request->bodyCStr();
+        std::string name;
+        if (body && strlen(body) > 0) {
+            JsonDocument doc;
+            if (deserializeJson(doc, body) == DeserializationError::Ok) {
+                if (doc["name"].is<const char*>()) {
+                    name = doc["name"].as<const char*>();
+                }
+            }
+        }
+        if (name.empty() && request->hasParam("name")) {
+            name = request->getParam("name")->value().c_str();
+        }
+        if (name.empty()) {
+            response->send(400, "application/json", "{\"error\":\"Precondition name required\"}");
+            return ESP_FAIL;
+        }
+
+        app->getPreconditionEngine().requestRetry(name.c_str());
+        return response->send(200, "application/json", "{\"status\":\"ok\"}");
+    });
+}

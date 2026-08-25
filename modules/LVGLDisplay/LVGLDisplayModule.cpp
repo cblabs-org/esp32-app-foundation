@@ -18,7 +18,7 @@
 #include "ConfigManager.hpp"
 #include "MCPToolRegistry.hpp"
 #include "Application.hpp"
-#include "interfaces/IConfigGate.hpp"   // GateNames, GateActionStatus (CONFIGURING dispatch)
+#include "interfaces/IPrecondition.hpp"
 #include <base64.h>
 #include <mbedtls/base64.h>
 #include <vector>
@@ -201,6 +201,7 @@ void LVGLDisplayModule::begin(EventBus* eventBus) {
         _eventBus->subscribe(LVGLDisplayEvents::SYSTEM_ERROR, _onSystemError, this);
         _eventBus->subscribe(ApplicationEvents::APP_CONFIGURING, _onAppConfiguring, this);
         _eventBus->subscribe(ApplicationEvents::APP_RUNNING, _onAppRunning, this);
+        _eventBus->subscribe(ApplicationEvents::PRECONDITION_HEALTH, _onPreconditionHealth, this);
 
         // Wake display on any physical input (encoder, button, touch).
         // These fire independently of LVGL's lv_timer_handler().
@@ -286,6 +287,48 @@ void LVGLDisplayModule::tick(uint32_t now) {
     } else if (otaUpdate) {
         showOtaProgress(_pendingOtaProgress.load(), _pendingOtaStatus[0] ? _pendingOtaStatus : "Updating...");
         resetActivity();
+    }
+
+    if (_pendingConfiguring.exchange(false)) {
+        AppConfiguringPayload p = _pendingConfiguringPayload;
+        ESP_LOGI("LVGLDisplayModule", "CONFIGURING gate: %s (cause=%d, severity=%d) (deferred)",
+                 p.preconditionName ? p.preconditionName : "?",
+                 static_cast<int>(p.cause),
+                 static_cast<int>(p.severity));
+
+        _diagCarousel.stop();
+
+        if (_screens != nullptr) {
+            _screens->onConfiguring(&p);
+            lv_obj_t* scr = nullptr;
+            if (p.severity == Severity::NeedsUser) {
+                scr = _screens->gateHelperScreen(&p);
+                if (scr == nullptr && p.preconditionName != nullptr &&
+                    strcmp(p.preconditionName, PreconditionNames::WIFI_STATION) == 0) {
+                    scr = _screens->wifiWizardScreen();
+                }
+                if (scr == nullptr) {
+                    scr = _screens->configuringScreen();
+                }
+            } else {
+                scr = _screens->configuringScreen();
+            }
+
+            if (scr != nullptr && scr != lv_screen_active()) {
+                if (!_inSystemScreen) {
+                    _priorScreen = lv_screen_active();
+                    _inSystemScreen = true;
+                }
+                lv_scr_load_anim(scr, LV_SCR_LOAD_ANIM_FADE_IN, 200, 0, false);
+            }
+        }
+    }
+
+    if (_pendingPreconditionHealth.exchange(false)) {
+        PreconditionHealthPayload p = _pendingPreconditionPayload;
+        if (_screens != nullptr) {
+            _screens->onPreconditionHealth(&p);
+        }
     }
 
     if (_pendingAppRunning.exchange(false)) {
@@ -800,51 +843,26 @@ void LVGLDisplayModule::_onSystemError(const char* /*topic*/, const void* payloa
     }
 }
 
+// Deferred-flag pattern for cross-thread EventBus → LVGL main-loop dispatch.
+//
+// The struct write (_pendingConfiguringPayload = *p) is non-atomic, but this is
+// safe because:
+//   (a) The 500ms publish throttle in Application::tick() guarantees no
+//       rapid-fire overwrites — the next publish cannot arrive before the
+//       main-loop tick has drained the flag.
+//   (b) Payload pointers (name, helpText, etc.) reference stable Application
+//       member buffers that outlive the event, so a partially-written struct
+//       cannot produce a dangling pointer.
+//   (c) This is the identical pattern used by _onOtaProgress, where a struct
+//       copy precedes an atomic flag store, and the consuming tick() reads the
+//       struct only after the flag exchange.
+// No mutex is needed.
 void LVGLDisplayModule::_onAppConfiguring(const char* /*topic*/, const void* payload, void* ctx) {
     auto* self = static_cast<LVGLDisplayModule*>(ctx);
     if (!self || !payload) return;
     auto* p = static_cast<const AppConfiguringPayload*>(payload);
-    ESP_LOGI("LVGLDisplayModule", "CONFIGURING gate: %s (status=%d)",
-             p->gateName ? p->gateName : "?",
-             static_cast<int>(p->actionStatus));
-
-    // Deactivate diagnostic carousel when leaving DiagScreen
-    self->_diagCarousel.stop();
-
-    // LVGL has no built-in configuring screens — the skin (SLSSystemScreens) supplies
-    // them. With no provider there is nothing to display.
-    if (self->_screens == nullptr) {
-        return;
-    }
-
-    // Populate the configuring widgets (AP SSID, portal URL, gate help text) first.
-    self->_screens->onConfiguring(p);
-
-    // Three-tier root selection (mirrors U8G2): a modal (gate helper / WiFi wizard)
-    // only when the gate needs user action; otherwise the base configuring screen.
-    lv_obj_t* scr = nullptr;
-    if (p->actionStatus == GateActionStatus::NeedsUserAction) {
-        scr = self->_screens->gateHelperScreen(p);                          // Tier 1
-        if (scr == nullptr && p->gateName != nullptr &&
-            strcmp(p->gateName, GateNames::WIFI_STATION) == 0) {
-            scr = self->_screens->wifiWizardScreen();                       // Tier 2
-        }
-        if (scr == nullptr) {
-            scr = self->_screens->configuringScreen();                     // Tier 3
-        }
-    } else {
-        scr = self->_screens->configuringScreen();                         // base / InProgress
-    }
-
-    // Groups toggle in-place on the single System screen; only animate the
-    // screen-load on first entry so re-publishes don't re-trigger the fade.
-    if (scr != nullptr && scr != lv_screen_active()) {
-        if (!self->_inSystemScreen) {
-            self->_priorScreen = lv_screen_active();
-            self->_inSystemScreen = true;
-        }
-        lv_scr_load_anim(scr, LV_SCR_LOAD_ANIM_FADE_IN, 200, 0, false);
-    }
+    self->_pendingConfiguringPayload = *p;
+    self->_pendingConfiguring.store(true);
 }
 
 void LVGLDisplayModule::_onAppRunning(const char* /*topic*/, const void* /*payload*/, void* ctx) {
@@ -853,6 +871,15 @@ void LVGLDisplayModule::_onAppRunning(const char* /*topic*/, const void* /*paylo
     // Defer to tick() — LVGL APIs must only be called from the main loop.
     // See EventBus.hpp §1: callbacks run on the esp_event default loop task.
     self->_pendingAppRunning.store(true);
+}
+
+// Same deferred-flag pattern as _onAppConfiguring — see TOCTOU comment above.
+void LVGLDisplayModule::_onPreconditionHealth(const char* /*topic*/, const void* payload, void* ctx) {
+    auto* self = static_cast<LVGLDisplayModule*>(ctx);
+    if (!self || !payload) return;
+    auto* p = static_cast<const PreconditionHealthPayload*>(payload);
+    self->_pendingPreconditionPayload = *p;
+    self->_pendingPreconditionHealth.store(true);
 }
 
 void LVGLDisplayModule::_onInputWake(const char* /*topic*/, const void* /*payload*/, void* ctx) {

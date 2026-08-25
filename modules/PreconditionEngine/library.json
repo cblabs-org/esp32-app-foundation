@@ -1,0 +1,10 @@
+{
+  "name": "PreconditionEngine",
+  "version": "0.1.0",
+  "description": "Precondition evaluation engine with damping, circuit breaker, and edge resolution",
+  "build": {
+    "flags": [
+      "-I../../include"
+    ]
+  }
+}

@@ -15,7 +15,8 @@
     "WifiManager": "*",
     "KeyManager": "*",
     "AuthManager": "*",
-    "DeviceCrypto": "*"
+    "DeviceCrypto": "*",
+    "PreconditionEngine": "*"
   },
   "build": {
     "flags": ["-I../../include"],

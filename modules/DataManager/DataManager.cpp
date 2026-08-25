@@ -430,9 +430,6 @@ void DataManager::processNext() {
     drainJobs(false);
 }
 
-void DataManager::setAppRunning(bool running) {
-    _appRunning.store(running);
-}
 
 #ifdef ESP_PLATFORM
 void DataManager::fetchWatchdogCb(void* arg) {
@@ -506,9 +503,9 @@ void DataManager::executeLoop() {
     // NOTE: _appRunning is deliberately NOT a blanket early return.
     //
     // It used to be, and that silently voided two guarantees. A source that backs
-    // an IConfigGate forms a circle with the state machine: the gate blocks
+    // a startup precondition forms a circle with the state machine: the precondition blocks
     // RUNNING, RUNNING enables fetching, and fetching is what would satisfy the
-    // gate. Once such a source failed into Quarantined, Application regressed to
+    // precondition. Once such a source failed into Quarantined, Application regressed to
     // CONFIGURING and cleared _appRunning — so the 15-minute self-healing probe
     // never ran again, the gate could never re-satisfy, and _appRunning could
     // never return to true. The device sat there permanently, and the peer coming
@@ -520,7 +517,13 @@ void DataManager::executeLoop() {
     // a fetch, and nothing happens.
     //
     // The gate is now applied per-source, below both escape hatches.
-    const bool appRunning = _appRunning.load();
+    // _appRunning was deliberately removed. See the NOTE above for the full rationale.
+    // This constant preserves the per-source gating logic below (fetchesWhileConfiguring)
+    // without the global blanket early return that caused the circular-dependency deadlock.
+    // The variable reads as "all sources allowed" and the per-source checks provide the
+    // actual gating. If a global gate is ever needed again, it should be an atomic bool
+    // driven by Application state transitions, not a removed setter.
+    const bool appRunning = true;
 
     MutexLock lock(_registryMutex);
     if (_registry.empty()) return;

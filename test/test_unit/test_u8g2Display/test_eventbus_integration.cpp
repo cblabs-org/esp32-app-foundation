@@ -263,9 +263,10 @@ TEST_F(ThreeTierDispatchTest, Tier1_ConsumerOverride_WinsOverBuiltIn) {
     display.begin(&bus);
 
     AppConfiguringPayload payload;
-    payload.gateName = "API Keys";
+    payload.preconditionName = "API Keys";
     payload.helpText = "Enter your API key";
-    payload.actionStatus = GateActionStatus::NeedsUserAction;
+    payload.cause = Cause::NotConfigured;
+    payload.severity = Severity::NeedsUser;
     payload.hostname = "mydevice";
     payload.deviceIP = "192.168.1.42";
 
@@ -276,16 +277,17 @@ TEST_F(ThreeTierDispatchTest, Tier1_ConsumerOverride_WinsOverBuiltIn) {
 }
 
 /**
- * Tier 2: Built-in WiFi wizard for GateNames::WIFI_STATION when no consumer override.
+ * Tier 2: Built-in WiFi wizard for PreconditionNames::WIFI_STATION when no consumer override.
  */
 TEST_F(ThreeTierDispatchTest, Tier2_WifiStation_ShowsWifiWizard) {
     U8G2DisplayModule display;
     display.begin(&bus);
 
     AppConfiguringPayload payload;
-    payload.gateName = GateNames::WIFI_STATION;
+    payload.preconditionName = PreconditionNames::WIFI_STATION;
     payload.helpText = "Connect to WiFi";
-    payload.actionStatus = GateActionStatus::NeedsUserAction;
+    payload.cause = Cause::NotConfigured;
+    payload.severity = Severity::NeedsUser;
     payload.hostname = "esp32-device";
     payload.deviceIP = "192.168.4.1";
 
@@ -303,9 +305,10 @@ TEST_F(ThreeTierDispatchTest, Tier3_UnknownGate_ShowsGenericHelper) {
     display.begin(&bus);
 
     AppConfiguringPayload payload;
-    payload.gateName = "Board Config";
+    payload.preconditionName = "Board Config";
     payload.helpText = "Add a departure board";
-    payload.actionStatus = GateActionStatus::NeedsUserAction;
+    payload.cause = Cause::NotConfigured;
+    payload.severity = Severity::NeedsUser;
     payload.hostname = "mydevice";
     payload.deviceIP = "192.168.1.42";
 
@@ -317,29 +320,31 @@ TEST_F(ThreeTierDispatchTest, Tier3_UnknownGate_ShowsGenericHelper) {
 
 /**
  * clearModal is called on every _onAppConfiguring invocation.
- * Verify by pushing a modal first, then publishing configuring with InProgress
+ * Verify by pushing a modal first, then publishing configuring with Transient
  * (which should NOT push a new modal, but should clear the old one).
  */
 TEST_F(ThreeTierDispatchTest, ClearModal_CalledOnEveryInvocation) {
     U8G2DisplayModule display;
     display.begin(&bus);
 
-    // First: push WiFi wizard via NeedsUserAction
+    // First: push WiFi wizard via NeedsUser
     AppConfiguringPayload payload1;
-    payload1.gateName = GateNames::WIFI_STATION;
+    payload1.preconditionName = PreconditionNames::WIFI_STATION;
     payload1.helpText = "Connect to WiFi";
-    payload1.actionStatus = GateActionStatus::NeedsUserAction;
+    payload1.cause = Cause::NotConfigured;
+    payload1.severity = Severity::NeedsUser;
     payload1.hostname = "device";
     payload1.deviceIP = "192.168.4.1";
 
     bus.publish("app.configuring", &payload1);
     EXPECT_EQ(display.visibleBoard(), &display.boards.wifiWizard);
 
-    // Second: publish InProgress — modal should be cleared, no new modal pushed
+    // Second: publish Transient (Connecting) — modal should be cleared, no new modal pushed
     AppConfiguringPayload payload2;
-    payload2.gateName = GateNames::WIFI_STATION;
+    payload2.preconditionName = PreconditionNames::WIFI_STATION;
     payload2.helpText = "Connecting...";
-    payload2.actionStatus = GateActionStatus::InProgress;
+    payload2.cause = Cause::Connecting;
+    payload2.severity = Severity::Transient;
     payload2.hostname = "device";
     payload2.deviceIP = "192.168.1.100";
 
@@ -350,16 +355,17 @@ TEST_F(ThreeTierDispatchTest, ClearModal_CalledOnEveryInvocation) {
 }
 
 /**
- * InProgress action status must NOT show a modal.
+ * Transient severity must NOT show a modal.
  */
-TEST_F(ThreeTierDispatchTest, InProgress_NoModal) {
+TEST_F(ThreeTierDispatchTest, Transient_NoModal) {
     U8G2DisplayModule display;
     display.begin(&bus);
 
     AppConfiguringPayload payload;
-    payload.gateName = GateNames::WIFI_STATION;
+    payload.preconditionName = PreconditionNames::WIFI_STATION;
     payload.helpText = "Connecting...";
-    payload.actionStatus = GateActionStatus::InProgress;
+    payload.cause = Cause::Connecting;
+    payload.severity = Severity::Transient;
     payload.hostname = "device";
     payload.deviceIP = "192.168.1.100";
 
@@ -367,5 +373,26 @@ TEST_F(ThreeTierDispatchTest, InProgress_NoModal) {
 
     // Only the base configuring board should be visible (no modal)
     EXPECT_EQ(display.visibleBoard(), &display.boards.configuringStatus);
+}
+
+/**
+ * PreconditionHealth event updates ConfiguringStatusBoard state.
+ */
+TEST_F(ThreeTierDispatchTest, PreconditionHealth_UpdatesConfiguringStatusBoard) {
+    U8G2DisplayModule display;
+    display.begin(&bus);
+
+    PreconditionHealthPayload p1{"WiFi Station", Cause::Connecting, Severity::Transient, false, PreconditionRole::Startup};
+    bus.publish("precondition.health", &p1);
+
+    EXPECT_EQ(display.boards.configuringStatus.getTotalPreconditions(), 1);
+    EXPECT_EQ(display.boards.configuringStatus.getStartupMetCount(), 0);
+
+    PreconditionHealthPayload p2{"WiFi Station", Cause::Met, Severity::Transient, true, PreconditionRole::Startup};
+    bus.publish("precondition.health", &p2);
+
+    EXPECT_EQ(display.boards.configuringStatus.getTotalPreconditions(), 1);
+    EXPECT_EQ(display.boards.configuringStatus.getStartupMetCount(), 1);
+    EXPECT_FLOAT_EQ(display.boards.configuringStatus.getTargetPercent(), 100.0f);
 }
 

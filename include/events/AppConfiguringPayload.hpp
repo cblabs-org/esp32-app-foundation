@@ -17,19 +17,20 @@
 
 #pragma once
 
-#include "interfaces/IConfigGate.hpp"  // for GateActionStatus
+#include "interfaces/IPrecondition.hpp"
 
 /**
  * @brief Payload for the "app.configuring" EventBus event.
  *
- * Contains the name, help text, action status, and connection details of the
- * first actionable unsatisfied config gate, allowing display modules to show
+ * Contains the name, help text, cause, severity, and connection details of the
+ * first actionable unsatisfied precondition, allowing display modules to show
  * the appropriate system board or modal helper.
  */
 struct AppConfiguringPayload {
-    const char*      gateName     = nullptr;                          ///< Name of the blocking gate
+    const char*      preconditionName = nullptr;                      ///< Name of the blocking precondition
     const char*      helpText     = nullptr;                          ///< User-facing guidance text
-    GateActionStatus actionStatus = GateActionStatus::NeedsUserAction; ///< Gate's action status
+    Cause            cause        = Cause::NotConfigured;             ///< Precondition cause
+    Severity         severity     = Severity::NeedsUser;              ///< Derived severity
     bool             isRegression = false;                            ///< true if regressed from RUNNING
     const char*      hostname     = nullptr;                          ///< Device hostname (AP SSID)
     const char*      deviceIP     = nullptr;                          ///< Always-valid device IP for portal URLs

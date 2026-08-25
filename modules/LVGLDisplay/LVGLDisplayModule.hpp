@@ -427,6 +427,7 @@ private:
     static void _onSystemError(const char* topic, const void* payload, void* ctx);
     static void _onAppConfiguring(const char* topic, const void* payload, void* ctx);
     static void _onAppRunning(const char* topic, const void* payload, void* ctx);
+    static void _onPreconditionHealth(const char* topic, const void* payload, void* ctx);
     static void _onInputWake(const char* topic, const void* payload, void* ctx);
 
     ILVGLHardwareAdapter& _adapter;            ///< Injected hardware adapter
@@ -465,6 +466,12 @@ private:
     char _pendingErrorMessage[128] = {};
     std::atomic<bool> _pendingMessage{false};
     char _pendingMessageText[128] = {};
+
+    std::atomic<bool> _pendingConfiguring{false};
+    AppConfiguringPayload _pendingConfiguringPayload{};
+
+    std::atomic<bool> _pendingPreconditionHealth{false};
+    PreconditionHealthPayload _pendingPreconditionPayload{};
 
     std::atomic<bool> _pendingSnapshot{false};
     std::atomic<bool> _snapshotComplete{false};

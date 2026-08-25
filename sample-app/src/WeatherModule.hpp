@@ -8,7 +8,7 @@
  * Module: sample-app/src/WeatherModule.hpp
  * Description: Weather station module demonstrating 6 framework interfaces:
  *              ITickable, IConfigurable, IWebContributor, IDataSource,
- *              IMCPContributor, and IConfigGate. Fetches current weather from
+ *              IMCPContributor, and IPreconditionContributor. Fetches current weather from
  *              the OpenWeatherMap API using streaming JSON parsing.
  *
  *              Thread Safety: Numeric fields use std::atomic for lock-free
@@ -73,10 +73,8 @@
  *   IMCPContributor:
  *   - registerMCPTools():       Registers "weather_status" read-only MCP tool
  *
- *   IConfigGate:
- *   - getGateName():            Returns "Weather Setup" — boot-gate display name
- *   - isSatisfied():            Returns true when OWM API key is configured in KeyManager
- *   - getHelpText():            Returns user-facing guidance for configuring the API key
+ *   IPreconditionContributor:
+ *   - registerPreconditions():  Registers "Weather Setup" operational precondition
  *
  *   JsonListener (hardware only):
  *   - startDocument():          Zeros all parser scratch buffers
@@ -119,8 +117,8 @@ class WeatherModule : public ITickable,
                       public IWebContributor, 
                       public IDataSource, 
                       public IMCPContributor,
-                      public IConfigGate
-                      , public JsonListener
+                      public IPreconditionContributor,
+                      public JsonListener
                       {
 private:
 #ifdef WITH_HOMEASSISTANT
@@ -425,23 +423,8 @@ public:
      */
     void registerMCPTools(MCPToolRegistry& registry) override;
 
-    // --- IConfigGate ---
-
-    /** @brief Returns the boot-gate display name: "Weather Setup". */
-    const char* getGateName() const override;
-
-    /** @brief Returns true when both OWM API key and location are configured. */
-    bool isSatisfied() const override;
-
-    /** @brief Returns user-facing guidance text for configuring weather. */
-    const char* getHelpText() const override;
-
-    /** @brief Weather depends on WiFi — don't show until WiFi is connected. */
-    const char* const* getDependencies(uint8_t& count) const override {
-        static const char* deps[] = { GateNames::WIFI_STATION };
-        count = 1;
-        return deps;
-    }
+    // --- IPreconditionContributor ---
+    void registerPreconditions(PreconditionRegistry& reg) override;
 
     // --- JsonListener (hardware only — parser library unavailable in native builds) ---
     /** @brief No-op — required by JsonListener interface. */

@@ -8,7 +8,7 @@
  * Module: sample-app/src/WeatherModule.cpp
  * Description: Implementation of the WeatherModule — a comprehensive sample
  *              demonstrating ITickable, IConfigurable, IWebContributor,
- *              IDataSource, IMCPContributor, and IConfigGate interfaces.
+ *              IDataSource, IMCPContributor, and IPreconditionContributor interfaces.
  *
  *              Fetches weather data from the OpenWeatherMap API via
  *              streaming JSON parsing (JsonStreamingParser) on the
@@ -654,36 +654,38 @@ void WeatherModule::registerMCPTools(MCPToolRegistry& registry) {
 }
 
 // -----------------------------------------------------------------------------
-// IConfigGate Implementation
+// IPreconditionContributor Implementation
 // -----------------------------------------------------------------------------
 
-/**
- * @brief Returns the boot-gate display name: "Weather API Key".
- * @return A C-string identifying this configuration gate.
- */
-const char* WeatherModule::getGateName() const {
-    return "Weather Setup";
-}
+void WeatherModule::registerPreconditions(PreconditionRegistry& reg) {
+    static const Edge edges[] = {
+        {PreconditionNames::WIFI_STATION, EdgeKind::Requires}
+    };
+    reg.add("Weather Setup", PreconditionRole::Operational,
+        [this]() -> PreconditionStatus {
+            // §2.4: Indeterminate, not "return true"
+            if (!_keyManager)
+                return {false, Cause::Indeterminate};
 
-/**
- * @brief Returns true when the OWM API key is configured in KeyManager.
- *
- * If no KeyManager is wired (e.g., in test scenarios), returns true to
- * avoid blocking the boot sequence unnecessarily.
- *
- * @return true if the API key exists or KeyManager is unavailable.
- */
-bool WeatherModule::isSatisfied() const {
-    if (!_keyManager) return true;  // No KeyManager wired — don't block boot
-    bool hasApiKey = !_keyManager->getKeyById("owm_api_key").empty();
-    bool hasLocation = (_lat != 0.0 || _lon != 0.0);
-    return hasApiKey && hasLocation;
-}
+            bool hasApiKey = !_keyManager->getKeyById("owm_api_key").empty();
+            bool hasLocation = (_lat != 0.0 || _lon != 0.0);
 
-/**
- * @brief Returns user-facing guidance text for configuring the API key.
- * @return A C-string with instructions directing the user to the Weather portal tab.
- */
-const char* WeatherModule::getHelpText() const {
-    return "Set your API key and location via the Weather tab";
+            if (hasApiKey && hasLocation)
+                return {true, Cause::Met};
+            return {false, Cause::NotConfigured};
+        },
+        [](Cause c, char* buf, size_t len) {
+            switch (c) {
+                case Cause::NotConfigured:
+                    snprintf(buf, len, "Set API key and location in Weather settings");
+                    break;
+                case Cause::Indeterminate:
+                    snprintf(buf, len, "BUG: KeyManager not wired — call setKeyManager()");
+                    break;
+                default:
+                    snprintf(buf, len, "Weather setup incomplete");
+                    break;
+            }
+        },
+        edges, 1);
 }

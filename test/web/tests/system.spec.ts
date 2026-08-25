@@ -64,14 +64,48 @@ const MOCK_WIFI_STATUS = {
   ap_mode: false,
 };
 
+const MOCK_PRECONDITIONS = [
+  {
+    name: 'WiFi Station',
+    role: 'Startup',
+    met: true,
+    cause: 'Met',
+    severity: 'Transient',
+    everMet: true,
+    breaker: 'Closed',
+    suppressed: false,
+  },
+  {
+    name: 'Time Sync',
+    role: 'Operational',
+    met: false,
+    cause: 'Connecting',
+    severity: 'Transient',
+    everMet: false,
+    breaker: 'Closed',
+    suppressed: false,
+  },
+  {
+    name: 'External API',
+    role: 'Operational',
+    met: false,
+    cause: 'Unreachable',
+    severity: 'NeedsUser',
+    everMet: false,
+    breaker: 'Open',
+    suppressed: false,
+  },
+];
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-async function bootAndNavigateToStatus(page: Page, systemData = MOCK_SYSTEM_GREEN) {
+async function bootAndNavigateToStatus(page: Page, systemData = MOCK_SYSTEM_GREEN, preconditionsData = MOCK_PRECONDITIONS) {
   await page.route('**/api/app', route => route.fulfill({ json: { name: 'Foundation Test App' } }));
   await page.route('**/api/tabs', route => route.fulfill({ json: MOCK_TABS }));
   await page.route('**/api/system', route => route.fulfill({ json: systemData }));
+  await page.route('**/api/preconditions', route => route.fulfill({ json: preconditionsData }));
   await page.route('**/api/wifi/status', route => route.fulfill({ json: MOCK_WIFI_STATUS }));
   await page.route('**/api/wifi/scan', route => route.fulfill({ json: { networks: [] } }));
 
@@ -196,5 +230,45 @@ test.describe('System Status Sub-pill', () => {
     // Click confirm
     await confirmBtn.click();
     await expect(confirmBtn).toContainText('Erasing...');
+  });
+
+  test('precondition health card renders registered preconditions and status badges', async ({ page }) => {
+    await bootAndNavigateToStatus(page);
+
+    const card = page.locator('#sys-preconditions-card');
+    await expect(card).toBeVisible();
+    await expect(card.locator('header')).toContainText('Precondition Health');
+    await expect(page.locator('#sys-preconditions-summary')).toContainText('2 Unmet');
+
+    const list = page.locator('#sys-preconditions-list');
+    await expect(list).toContainText('WiFi Station');
+    await expect(list).toContainText('Time Sync');
+    await expect(list).toContainText('External API');
+
+    // WiFi Station is Met -> green badge
+    await expect(list.locator('.badge--ok')).toContainText('✓ Met');
+    // External API has Open breaker -> retry button visible
+    const retryBtn = list.locator('.btn-sys-retry-precondition[data-name="External API"]');
+    await expect(retryBtn).toBeVisible();
+  });
+
+  test('precondition retry button triggers POST /api/preconditions/retry', async ({ page }) => {
+    let retryCalled = false;
+    let retryPayload: any = null;
+
+    await page.route('**/api/preconditions/retry', async route => {
+      retryCalled = true;
+      retryPayload = route.request().postDataJSON();
+      await route.fulfill({ json: { status: 'ok' } });
+    });
+
+    await bootAndNavigateToStatus(page);
+
+    const retryBtn = page.locator('.btn-sys-retry-precondition[data-name="External API"]');
+    await expect(retryBtn).toBeVisible();
+    await retryBtn.click();
+
+    await expect.poll(() => retryCalled).toBe(true);
+    expect(retryPayload).toEqual({ name: 'External API' });
   });
 });

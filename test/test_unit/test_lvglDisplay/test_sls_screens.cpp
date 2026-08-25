@@ -13,7 +13,7 @@
 #include <gtest/gtest.h>
 #include "screens/SLSSystemScreens.hpp"
 #include "ui/ui.h"
-#include "interfaces/IConfigGate.hpp"       // GateNames
+#include "interfaces/IPrecondition.hpp"
 #include "events/AppConfiguringPayload.hpp"
 
 class SLSSystemScreensTest : public ::testing::Test {
@@ -122,8 +122,9 @@ TEST_F(SLSSystemScreensTest, WifiWizardScreenActivatesSetupGroupOnly) {
 
 TEST_F(SLSSystemScreensTest, GateHelperScreenShowsMessageForNonWifiGate) {
     AppConfiguringPayload p;
-    p.gateName = "Timezone";
-    p.actionStatus = GateActionStatus::NeedsUserAction;
+    p.preconditionName = "Timezone";
+    p.cause = Cause::NotConfigured;
+    p.severity = Severity::NeedsUser;
 
     lv_obj_t* scr = screens.gateHelperScreen(&p);
     EXPECT_EQ(scr, ui_uiSystemScreen);
@@ -133,8 +134,9 @@ TEST_F(SLSSystemScreensTest, GateHelperScreenShowsMessageForNonWifiGate) {
 
 TEST_F(SLSSystemScreensTest, GateHelperScreenDefersWifiGateToWizard) {
     AppConfiguringPayload p;
-    p.gateName = GateNames::WIFI_STATION;
-    p.actionStatus = GateActionStatus::NeedsUserAction;
+    p.preconditionName = PreconditionNames::WIFI_STATION;
+    p.cause = Cause::NotConfigured;
+    p.severity = Severity::NeedsUser;
 
     // nullptr signals the module to fall through to wifiWizardScreen().
     EXPECT_EQ(screens.gateHelperScreen(&p), nullptr);
@@ -142,19 +144,34 @@ TEST_F(SLSSystemScreensTest, GateHelperScreenDefersWifiGateToWizard) {
 
 TEST_F(SLSSystemScreensTest, OnConfiguringPopulatesSetupAndMessageWidgets) {
     AppConfiguringPayload p;
-    p.gateName = GateNames::WIFI_STATION;
+    p.preconditionName = PreconditionNames::WIFI_STATION;
     p.helpText = "Join the setup network";
     p.hostname = "device-ap";
     p.deviceIP = "192.168.4.1";
-    p.actionStatus = GateActionStatus::NeedsUserAction;
+    p.cause = Cause::NotConfigured;
+    p.severity = Severity::NeedsUser;
 
     screens.onConfiguring(&p);
 
     EXPECT_STREQ(lv_label_get_text(ui_ui_SystemSetupSSID), "device-ap");
     EXPECT_STREQ(lv_label_get_text(ui_ui_SystemSetupURL), "http://192.168.4.1");
     EXPECT_STREQ(lv_label_get_text(ui_uiSystemBusyMessage), "Join the setup network");
-    EXPECT_STREQ(lv_label_get_text(ui_ui_SystemMsgTitle), GateNames::WIFI_STATION);
+    EXPECT_STREQ(lv_label_get_text(ui_ui_SystemMsgTitle), PreconditionNames::WIFI_STATION);
     EXPECT_STREQ(lv_label_get_text(ui_uiSystemMsgBody), "Join the setup network");
+}
+
+TEST_F(SLSSystemScreensTest, OnPreconditionHealthPopulatesMessageWidgets) {
+    PreconditionHealthPayload p;
+    p.name = "Time Sync";
+    p.cause = Cause::Connecting;
+    p.severity = Severity::Transient;
+    p.everMet = false;
+
+    screens.onPreconditionHealth(&p);
+
+    EXPECT_STREQ(lv_label_get_text(ui_ui_SystemMsgTitle), "Time Sync");
+    EXPECT_STREQ(lv_label_get_text(ui_uiSystemMsgBody), "Connecting...");
+    EXPECT_STREQ(lv_label_get_text(ui_uiSystemBusyMessage), "Time Sync: Connecting...");
 }
 
 TEST_F(SLSSystemScreensTest, NullGlobalsDefensiveNoCrash) {
@@ -168,10 +185,14 @@ TEST_F(SLSSystemScreensTest, NullGlobalsDefensiveNoCrash) {
     screens.onOtaProgress(0.5f, "STATUS");
 
     AppConfiguringPayload p;
-    p.gateName = "Timezone";
+    p.preconditionName = "Timezone";
     p.helpText = "help";
     p.hostname = "ap";
     p.deviceIP = "1.2.3.4";
     screens.onConfiguring(&p);            // must not crash with null widgets
     EXPECT_EQ(screens.gateHelperScreen(&p), ui_uiSystemScreen);  // null root passthrough
+
+    PreconditionHealthPayload php{"Timezone", Cause::Met, Severity::Transient, true};
+    screens.onPreconditionHealth(&php); // must not crash
 }
+
