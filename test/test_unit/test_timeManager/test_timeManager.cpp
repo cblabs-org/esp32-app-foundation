@@ -98,16 +98,16 @@ TEST(TimePreconditionContributorTest, RegistersTwoOperationalPreconditions) {
     EXPECT_EQ(engine.getPreconditionCount(), 3);
     EXPECT_TRUE(engine.resolveEdges());
 
-    PreconditionState tzState;
-    EXPECT_TRUE(engine.getStateByName(PreconditionNames::TIMEZONE, tzState));
-    EXPECT_EQ(tzState.role, PreconditionRole::Operational);
-    EXPECT_EQ(tzState.resolvedEdgeCount, 0);
+    const PreconditionState* tzState = engine.getStateByName(PreconditionNames::TIMEZONE);
+    EXPECT_NE(tzState, nullptr);
+    EXPECT_EQ(tzState->role, PreconditionRole::Operational);
+    EXPECT_EQ(tzState->resolvedEdgeCount, 0);
 
-    PreconditionState syncState;
-    EXPECT_TRUE(engine.getStateByName(PreconditionNames::TIME_SYNC, syncState));
-    EXPECT_EQ(syncState.role, PreconditionRole::Operational);
-    EXPECT_EQ(syncState.resolvedEdgeCount, 1);
-    EXPECT_EQ(syncState.resolvedEdges[0], 0); // Index of PreconditionNames::WIFI_STATION
+    const PreconditionState* syncState = engine.getStateByName(PreconditionNames::TIME_SYNC);
+    EXPECT_NE(syncState, nullptr);
+    EXPECT_EQ(syncState->role, PreconditionRole::Operational);
+    EXPECT_EQ(syncState->resolvedEdgeCount, 1);
+    EXPECT_EQ(syncState->resolvedEdges[0], 0); // Index of PreconditionNames::WIFI_STATION
 }
 
 TEST(TimePreconditionContributorTest, EvaluationAndDescriptions) {
@@ -125,22 +125,22 @@ TEST(TimePreconditionContributorTest, EvaluationAndDescriptions) {
     engine.tick(1000);
 
     // Timezone: unconfigured -> NotConfigured -> NeedsUser
-    PreconditionState tzState;
-    EXPECT_TRUE(engine.getStateByName(PreconditionNames::TIMEZONE, tzState));
-    EXPECT_FALSE(tzState.rawStatus.met);
-    EXPECT_EQ(tzState.rawStatus.cause, Cause::NotConfigured);
-    EXPECT_EQ(tzState.severity, Severity::NeedsUser);
+    const PreconditionState* tzState = engine.getStateByName(PreconditionNames::TIMEZONE);
+    EXPECT_NE(tzState, nullptr);
+    EXPECT_FALSE(tzState->rawStatus.met);
+    EXPECT_EQ(tzState->rawStatus.cause, Cause::NotConfigured);
+    EXPECT_EQ(tzState->severity, Severity::NeedsUser);
 
     char desc[128] = {};
-    tzState.describe(tzState.rawStatus.cause, desc, sizeof(desc));
+    tzState->describe(tzState->rawStatus.cause, desc, sizeof(desc));
     EXPECT_STREQ("Set your timezone in the Time settings", desc);
 
     // Time Sync: Requires WiFi Station which is unmet -> DependencyUnmet -> Blocked
-    PreconditionState syncState;
-    EXPECT_TRUE(engine.getStateByName(PreconditionNames::TIME_SYNC, syncState));
-    EXPECT_FALSE(syncState.rawStatus.met);
-    EXPECT_EQ(syncState.rawStatus.cause, Cause::DependencyUnmet);
-    EXPECT_EQ(syncState.severity, Severity::Blocked);
+    const PreconditionState* syncState = engine.getStateByName(PreconditionNames::TIME_SYNC);
+    EXPECT_NE(syncState, nullptr);
+    EXPECT_FALSE(syncState->rawStatus.met);
+    EXPECT_EQ(syncState->rawStatus.cause, Cause::DependencyUnmet);
+    EXPECT_EQ(syncState->severity, Severity::Blocked);
 }
 
 int main(int argc, char **argv) {

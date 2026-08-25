@@ -15,6 +15,8 @@ struct PreconditionState {
     uint8_t edgeCount;
     // Resolved edge indices (CG-7)
     uint8_t resolvedEdges[MAX_EDGES_PER_PRECONDITION];
+    EdgeKind resolvedEdgeKinds[MAX_EDGES_PER_PRECONDITION];
+    bool prevUpstreamMet[MAX_EDGES_PER_PRECONDITION];
     uint8_t resolvedEdgeCount = 0;
     // Runtime state
     PreconditionStatus rawStatus;         // undamped
@@ -47,7 +49,7 @@ public:
     bool getAppRunning() const;
     size_t getPreconditionCount() const;
     const PreconditionState& getStateAt(size_t i) const;
-    bool getStateByName(const char* name, PreconditionState& out) const;
+    const PreconditionState* getStateByName(const char* name) const;
     void bumpIdentityEpoch(const char* name);
     void requestRetry(const char* name);
 

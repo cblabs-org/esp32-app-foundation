@@ -65,6 +65,7 @@ This is a **breaking interface change** with no honest shim. The old default
 - **[x] [wo5-portal-api](wo5-portal-api/WORKORDER.md):** New `/api/preconditions` REST route. Portal JavaScript: prominent precondition health display on System page. Wire into `WebServerManager`. ✅ 801/801 native, 71/71 web.
 - **[x] [wo6-display-updates](wo6-display-updates/WORKORDER.md):** Rewrite `ConfiguringStatusBoard` — Startup-only progress bar, overflow handling, rich cause/severity rendering. Both display modules subscribe to `precondition.health`. SLS widget repurposing (round display safe zone). Port display tests. ✅ 803/803 tests, all targets.
 - **[x] [wo7-consumer-cleanup](wo7-consumer-cleanup/WORKORDER.md):** Migrate `WeatherModule` gate → precondition with `Unavailable`/`Indeterminate` fix (§2.4). Migrate `MyApp` template. Delete `IConfigGate.hpp`, `ConfigGateResolver.hpp`, and all dead references. Final build + test verification. ✅ 828/828 tests.
+- **[/] [wo8-engine-bugfixes](wo8-engine-bugfixes/WORKORDER.md):** Fix three PreconditionEngine bugs from independent review: P1 damping lockout (unbounded penalty, merge blocker), P2 BindsTo dead code (implement with previous-tick state), P3 edge index misalignment (compaction safety). Human-approved 2026-08-25.
 
 ## Worker Model Mapping
 
@@ -77,6 +78,7 @@ This is a **breaking interface change** with no honest shim. The old default
 | WO5 | `standard` | `flash` (Gemini Flash 3.7 High) |
 | WO6 | `standard` | `flash` (Gemini Flash 3.7 High) |
 | WO7 | `standard` | `flash` (Gemini Flash 3.7 High) |
+| WO8 | `architect` | `pro` — engine correctness fixes requiring reasoning about state machines and edge semantics |
 
 ## Concurrency Analysis
 

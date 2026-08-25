@@ -202,10 +202,10 @@ TEST(WifiPreconditionContributorTest, RegistersSingleStartupPrecondition) {
     contributor.registerPreconditions(engine);
 
     EXPECT_EQ(engine.getPreconditionCount(), 1);
-    PreconditionState state;
-    EXPECT_TRUE(engine.getStateByName(PreconditionNames::WIFI_STATION, state));
-    EXPECT_EQ(state.role, PreconditionRole::Startup);
-    EXPECT_EQ(state.resolvedEdgeCount, 0);
+    const PreconditionState* state = engine.getStateByName(PreconditionNames::WIFI_STATION);
+    EXPECT_NE(state, nullptr);
+    EXPECT_EQ(state->role, PreconditionRole::Startup);
+    EXPECT_EQ(state->resolvedEdgeCount, 0);
 }
 
 TEST(WifiPreconditionContributorTest, EvaluationAndDescriptions) {
@@ -217,35 +217,36 @@ TEST(WifiPreconditionContributorTest, EvaluationAndDescriptions) {
 
     // 1. Initial / unconfigured state -> NotConfigured -> NeedsUser
     engine.tick(1000);
-    PreconditionState state;
-    EXPECT_TRUE(engine.getStateByName(PreconditionNames::WIFI_STATION, state));
-    EXPECT_FALSE(state.rawStatus.met);
-    EXPECT_EQ(state.rawStatus.cause, Cause::NotConfigured);
-    EXPECT_EQ(state.severity, Severity::NeedsUser);
+    const PreconditionState* state = engine.getStateByName(PreconditionNames::WIFI_STATION);
+    EXPECT_NE(state, nullptr);
+    EXPECT_FALSE(state->rawStatus.met);
+    EXPECT_EQ(state->rawStatus.cause, Cause::NotConfigured);
+    EXPECT_EQ(state->severity, Severity::NeedsUser);
 
     char desc[128] = {};
-    state.describe(Cause::NotConfigured, desc, sizeof(desc));
+    state->describe(Cause::NotConfigured, desc, sizeof(desc));
     EXPECT_STREQ("Connect to the device WiFi to configure", desc);
 
     // 2. Connecting with configured credentials
     wifi.updateWiFi("MyNetwork", "secret");
     engine.tick(2000);
-    EXPECT_TRUE(engine.getStateByName(PreconditionNames::WIFI_STATION, state));
-    EXPECT_FALSE(state.rawStatus.met);
-    EXPECT_EQ(state.rawStatus.cause, Cause::Connecting);
-    EXPECT_EQ(state.severity, Severity::Transient);
+    state = engine.getStateByName(PreconditionNames::WIFI_STATION);
+    EXPECT_NE(state, nullptr);
+    EXPECT_FALSE(state->rawStatus.met);
+    EXPECT_EQ(state->rawStatus.cause, Cause::Connecting);
+    EXPECT_EQ(state->severity, Severity::Transient);
 
-    state.describe(Cause::Connecting, desc, sizeof(desc));
+    state->describe(Cause::Connecting, desc, sizeof(desc));
     EXPECT_STREQ("Connecting to MyNetwork...", desc);
 
     // 3. Fallback / Rejected / default describe messages
-    state.describe(Cause::FallbackEngaged, desc, sizeof(desc));
+    state->describe(Cause::FallbackEngaged, desc, sizeof(desc));
     EXPECT_TRUE(strstr(desc, "Can't reach your network") != nullptr);
 
-    state.describe(Cause::Rejected, desc, sizeof(desc));
+    state->describe(Cause::Rejected, desc, sizeof(desc));
     EXPECT_STREQ("WiFi password was refused", desc);
 
-    state.describe(Cause::Unreachable, desc, sizeof(desc));
+    state->describe(Cause::Unreachable, desc, sizeof(desc));
     EXPECT_STREQ("WiFi unavailable", desc);
 
     // 4. Severity derivation for FallbackEngaged (AP mode)

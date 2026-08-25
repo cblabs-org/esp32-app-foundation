@@ -252,7 +252,7 @@ bool Application::begin(const FrameworkConfig& config) {
     // No further registrations are permitted after this point.
     _compactAndLock();
     if (!_preconditionEngine.resolveEdges()) {
-        ESP_LOGE(TAG, "PreconditionEngine cycle detected!");
+        ESP_LOGE(TAG, "PreconditionEngine: edge resolution failed (unknown name or cycle)");
     }
     _statusReporter->reportStatus("Boot complete", 1.0f);
 

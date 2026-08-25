@@ -24,6 +24,9 @@ void PreconditionEngine::add(const char* name,
     p.edges = edges;
     p.edgeCount = edgeCount;
     p.resolvedEdgeCount = 0;
+    for (uint8_t i = 0; i < MAX_EDGES_PER_PRECONDITION; ++i) {
+        p.prevUpstreamMet[i] = false;
+    }
     
     p.rawStatus = {false, Cause::NotConfigured};
     p.dampedStatus = {false, Cause::NotConfigured};
@@ -50,7 +53,9 @@ bool PreconditionEngine::resolveEdges() {
             for (size_t j = 0; j < count_; ++j) {
                 if (strcmp(preconditions_[j].name, p.edges[e].name) == 0) {
                     if (p.resolvedEdgeCount < MAX_EDGES_PER_PRECONDITION) {
-                        p.resolvedEdges[p.resolvedEdgeCount++] = static_cast<uint8_t>(j);
+                        p.resolvedEdges[p.resolvedEdgeCount] = static_cast<uint8_t>(j);
+                        p.resolvedEdgeKinds[p.resolvedEdgeCount] = p.edges[e].kind;
+                        p.resolvedEdgeCount++;
                         found = true;
                     }
                     break;
@@ -58,7 +63,9 @@ bool PreconditionEngine::resolveEdges() {
             }
             if (!found) {
                 ESP_LOGE(TAG, "Unknown edge name '%s' requested by '%s'", p.edges[e].name, p.name);
+                p.resolvedEdgeCount = 0;
                 ok = false;
+                break;
             }
         }
     }
@@ -132,18 +139,20 @@ void PreconditionEngine::tick(uint32_t nowMs) {
 
         for (uint8_t e = 0; e < p.resolvedEdgeCount; ++e) {
             uint8_t idx = p.resolvedEdges[e];
-            EdgeKind kind = p.edges[e].kind;
+            EdgeKind kind = p.resolvedEdgeKinds[e];
+            const auto& upstream = preconditions_[idx];
+            
+            bool upstreamMet = upstream.rawStatus.met;
+            bool wasMet = p.prevUpstreamMet[e];
+            p.prevUpstreamMet[e] = upstreamMet;
             
             if (kind == EdgeKind::Requires || kind == EdgeKind::BindsTo) {
-                const auto& upstream = preconditions_[idx];
-                if (!upstream.rawStatus.met) {
+                if (!upstreamMet) {
                     dependencyUnmet = true;
-                    // BindsTo teardown: upstream was met on the previous tick
-                    // (rawStatus still reflects last eval before this tick's
-                    // damping update) but is unmet now.
-                    if (kind == EdgeKind::BindsTo && p.rawStatus.met) {
-                        bindsToBecameUnmet = true;
-                    }
+                }
+                // BindsTo teardown: upstream WAS met last tick but is unmet now
+                if (kind == EdgeKind::BindsTo && wasMet && !upstreamMet) {
+                    bindsToBecameUnmet = true;
                 }
             }
         }
@@ -152,14 +161,13 @@ void PreconditionEngine::tick(uint32_t nowMs) {
         if (dependencyUnmet) {
             p.rawStatus.met = false;
             p.rawStatus.cause = Cause::DependencyUnmet;
-        } else if (bindsToBecameUnmet) {
-            // BindsTo tears down even though Requires deps are met —
-            // the upstream it was bound to regressed.
+        }
+        if (bindsToBecameUnmet) {
             p.rawStatus.met = false;
             p.rawStatus.cause = Cause::DependencyUnmet;
         }
 
-        if (p.rawStatus.met && p.rawStatus.cause != Cause::DependencyUnmet) {
+        if (p.rawStatus.met) {
             p.everMet = true;
         }
 
@@ -178,6 +186,8 @@ void PreconditionEngine::tick(uint32_t nowMs) {
 }
 
 void PreconditionEngine::updateDamping(PreconditionState& state, float elapsedSec) {
+    if (!state.everMet) return;
+
     float weight = 1.0f;
     switch (state.severity) {
         case Severity::NeedsUser: weight = 5.0f; break;
@@ -197,6 +207,11 @@ void PreconditionEngine::updateDamping(PreconditionState& state, float elapsedSe
         }
     } else {
         state.penalty += dampingPolicy_.penaltyPerSecond * weight * elapsedSec;
+    }
+    
+    float maxPenalty = dampingPolicy_.suppressThreshold * 2.0f;
+    if (state.penalty > maxPenalty) {
+        state.penalty = maxPenalty;
     }
     
     if (!state.suppressed && state.penalty > dampingPolicy_.suppressThreshold) {
@@ -276,14 +291,13 @@ const PreconditionState& PreconditionEngine::getStateAt(size_t i) const {
     return preconditions_[i];
 }
 
-bool PreconditionEngine::getStateByName(const char* name, PreconditionState& out) const {
+const PreconditionState* PreconditionEngine::getStateByName(const char* name) const {
     for (size_t i = 0; i < count_; ++i) {
         if (strcmp(preconditions_[i].name, name) == 0) {
-            out = preconditions_[i];
-            return true;
+            return &preconditions_[i];
         }
     }
-    return false;
+    return nullptr;
 }
 
 void PreconditionEngine::bumpIdentityEpoch(const char* name) {
@@ -301,6 +315,8 @@ void PreconditionEngine::requestRetry(const char* name) {
         if (strcmp(preconditions_[i].name, name) == 0) {
             preconditions_[i].breaker = BreakerState::HalfOpen;
             preconditions_[i].lastAttemptMs = 0; // force immediate retry
+            preconditions_[i].penalty = 0.0f;
+            preconditions_[i].suppressed = false;
             break;
         }
     }
