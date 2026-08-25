@@ -4,6 +4,10 @@
  * Module: test/test_unit/test_helpers/MockTabRegistry.hpp
  * Description: Shared mock ITabRegistry for unit tests. Captures addTab()
  *              calls into a vector of TabEntry for assertion.
+ *
+ * NOTE: sample-app/test/test_unit/test_weather/test_main.cpp contains a
+ *       local copy of this mock (separate PlatformIO project, cannot use
+ *       shared helpers). Keep both in sync when modifying.
  */
 
 #pragma once
@@ -34,6 +38,8 @@ public:
     };
 
     std::vector<Entry> entries;
+
+    using ITabRegistry::addTab;  // Expose TabEntry convenience overload
 
     void addTab(const char* name, const char* parent, int order,
                 const char* icon, const char* script) override {

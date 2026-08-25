@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 #include "WebServerManager.hpp"
 #include "interfaces/IWebContributor.hpp"
+#include "../test_helpers/MockTabRegistry.hpp"
 
 
 class MockContributor : public IWebContributor {
@@ -187,6 +188,28 @@ TEST(WebServerManagerTest, SetHttpConfigOverride) {
     EXPECT_EQ(manager.getHttpMaxOpenSockets(), 10);
 }
 
+
+TEST(WebServerManagerTest, RegisterTabs_StatusUnderSystem) {
+    WebServerManager manager;
+    MockTabRegistry registry;
+    manager.registerTabs(registry);
+    ASSERT_EQ(registry.entries.size(), 1u);
+    EXPECT_EQ(registry.entries[0].name, "Status");
+    EXPECT_EQ(registry.entries[0].parent, "System");
+    EXPECT_EQ(registry.entries[0].order, 10);
+}
+
+TEST(WebServerManagerTest, AddTab_TabEntryOverload) {
+    MockTabRegistry registry;
+    TabEntry entry{"MyTab", "System", 42, "<path/>", "/my.js"};
+    registry.addTab(entry);
+    ASSERT_EQ(registry.entries.size(), 1u);
+    EXPECT_EQ(registry.entries[0].name, "MyTab");
+    EXPECT_EQ(registry.entries[0].parent, "System");
+    EXPECT_EQ(registry.entries[0].order, 42);
+    EXPECT_EQ(registry.entries[0].icon, "<path/>");
+    EXPECT_EQ(registry.entries[0].script, "/my.js");
+}
 
 int main(int argc, char** argv) {
     PsychicHttpServer::lastMaxBodySize = 4096;

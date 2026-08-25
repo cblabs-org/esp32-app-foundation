@@ -62,4 +62,14 @@ public:
                         int         order  = 100,
                         const char* icon   = nullptr,
                         const char* script = nullptr) = 0;
+
+    /**
+     * @brief Convenience overload — register a tab from a TabEntry struct.
+     *
+     * Delegates to the 5-parameter addTab(). Non-virtual so concrete
+     * registries only need to implement the parameter form.
+     */
+    void addTab(const TabEntry& entry) {
+        addTab(entry.name, entry.parent, entry.order, entry.icon, entry.script);
+    }
 };
