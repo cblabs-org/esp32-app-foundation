@@ -99,6 +99,11 @@ Single WO — no concurrency concerns.
 **Surfaced findings**: None.
 **Dead ends**: None — all renames were clean drop-in replacements.
 
+### 2026-08-25 — Project Wrap-Up
+**Architectural outcome**: `include/interfaces/` is now the single source of truth for all pure abstract contracts in the framework. `include/utils/` retains only genuine utility helpers (`Periodic.hpp`, `BufferStream.h`). Every abstract interface uses the `I`-prefix consistently: `ITickable`, `IConfigurable`, `IWebContributor`, `IMCPContributor`, `IPreconditionContributor`, `IPreconditionRegistry`, `ITabRegistry`, `IOTAVerifier`, `IDataSource`, `IStatusReporter`, `IDisplayBoard`. `MCPToolRegistry` confirmed as correctly non-prefixed (concrete class with private state, non-virtual methods, lives inside its owning module).
+**Lessons for future projects**: (1) The `self` subagent type fails under Opus Thinking sessions with `flash`/`pro` model tiers due to a `planner config is not declarative` error — workaround is `define_subagent` with `execution-worker` type. (2) Single-WO mechanical refactors can run at `flash` tier via custom subagent types without quality loss. (3) Keeping old names in skill trigger keywords is a deliberate discoverability pattern but should be documented or removed to avoid future confusion — user chose removal.
+**Unresolved items**: None.
+
 ---
 
-*Created: 2026-08-25. Status: All WOs complete — awaiting PR submission.*
+*Created: 2026-08-25. Completed: 2026-08-25. PR [#151](https://github.com/matthewmcneill/esp32-app-foundation/pull/151) merged.*

@@ -105,21 +105,35 @@ Both WOs are **strictly serial** — WO2 depends on WO1's interface changes.
 - [ ] Notify downstream consumers: `IWebContributor` breaking change — scalar tab getters removed, all implementors must add `registerTabs()` override.
 - [ ] Notify downstream consumers: delete any `registerModule(display.xxxTabStub())` calls from `main.cpp` — tabs are now automatic.
 
-## Session Log
+### 2026-08-24/25 — PR review, documentation sweep, and merge
 
-### 2026-08-23 — Project initialisation
-- Interface audit complete: `IWebContributor` confirmed as sole interface with inner-stub problem (8 stubs across 3 modules).
-- Issue #147 confirmed structurally resolved by PR #149; minor `helpBuf` cleanup scoped.
-- User decisions: Option B (clean break, no deprecation), WebServerManager migrates to `IWebContributor`, zero technical debt in release.
-- Decomposition: 2 WOs, strictly serial.
-- Stacks on PR #149 (`146-config-gate/wo7-consumer-cleanup`).
+**PR #150 opened** targeting `146-config-gate/wo7-consumer-cleanup` (later retargeted to `main` after PR #149 merged).
 
-### 2026-08-23 — All WOs complete
-- WO1: `dd06d109` — TabRegistry + multi-tab migrations. 828/828 tests. Deleted 8 inner stubs across AuthManager (2), LVGLDisplayModule (3), U8G2DisplayModule (3). Also cleaned `src/main.cpp` display stub registrations (discovered during build — outside original WO scope but correct).
-- WO2: `b5c67270` — Complete clean break. 824/824 tests (4 fewer: scalar getter tests consolidated into registry-based tests). 28 files changed, 468 insertions, 383 deletions.
-- Dead end (WO2): initial test sweep missed `test_wifiManager.cpp` and `test_configManager.cpp` which called removed scalar getters. Caught during PA review of test results (828→722 drop). Fixed by replacing with `registerTabs()` collector tests.
-- `getApiPrefix()` and `getMaxPostBody()` confirmed retained — body-limit middleware is orthogonal to tab metadata.
+**Documentation sweep (2 passes, 22 files)**:
+- Pass 1 (`ccc4e942`): 17 files — all framework-expert skill refs, developer docs, module Doxygen, test comments migrated from scalar tab getters to `registerTabs()`.
+- Pass 2 (`4acd0a50`): 5 files — design spec (3 code blocks), sample-app walkthrough (Weather section), template-app `.cpp` Doxygen. Final grep confirmed zero stale references.
+
+**PR #150 review cycle** (3 rounds):
+1. First review: 7 findings. Fixed 5 in `e622f375` (shared `MockTabRegistry`, AuthManager 3-tab test, `explicit` constructor, stale Doxygen, template-app comment).
+2. Delta review: 2 remaining low-severity items (TabEntry dead code, no WebServerManager registerTabs test). Fixed in `877bb7b9` — added `addTab(const TabEntry&)` convenience overload + `RegisterTabs_StatusUnderSystem` test + mock sync note.
+3. Deep review: M1 finding — C++ name hiding means the `TabEntry` overload is unreachable through derived-typed references unless `using ITabRegistry::addTab;` is declared. Fixed in `c3fdd94d` for all 3 concrete implementors.
+
+**Cross-cutting decisions**:
+- `TabEntry` struct earns its keep via convenience overload (not dead code). User confirmed framework-completeness philosophy: "push functionality for completeness even if never used yet."
+- `using ITabRegistry::addTab;` required in every concrete `ITabRegistry` subclass — C++ name hiding trap. Must be documented as a pattern requirement for future implementors.
+- `docs/archive/` files intentionally excluded from sweeps — they're historical records of design decisions at the time.
+
+**Dead ends**:
+- First attempt at `AddTab_TabEntryOverload` test failed with "too few arguments to function call" — the `MockTabRegistry` override of `addTab(5 params)` hid the base class `addTab(const TabEntry&)`. Fix: `using ITabRegistry::addTab;` in all derived classes.
+
+**Rebase onto main** (post PR #149 merge):
+- Only conflict: `MEMORY.md` (PA workspace metadata). Resolved by keeping HEAD's WO8/8 status + our tab-registry row.
+- PR #151 also rebased cleanly onto new PR #150 tip.
+
+**Merge**: PR #150 merged into `main` on 2026-08-25.
+
+**Final test count**: 826/826 (31 suites) on PR #150 branch; 827/827 on PR #151 (includes 2 review-fix tests).
 
 ---
 
-*Created: 2026-08-23. Status: All WOs complete — awaiting PR submission.*
+*Created: 2026-08-23. Completed: 2026-08-25. PR #150 merged.*

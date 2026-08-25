@@ -70,27 +70,152 @@ Part of **PR: SLS Screen Redesign** ([PROJECT.md](../PROJECT.md)); the human is 
 <!-- Written at task completion -->
 
 ### Status
-(pending)   <!-- complete | partial | blocked -->
+partial   <!-- bring-up debugging in progress; hardware test plan T1–T13 NOT yet executed -->
 
 ### Firmware
-- Tag flashed: ______   on-device `firmware_version`: ______
+- Tag flashed: `v0.0.12-dev.37`   on-device `firmware_version`: `0.0.12-dev.37` (confirmed via MCP `system_info`)
+- Flashing note: this board's esptool auto-reset into download mode **fails from factory firmware**
+  (first flash needed a physical BOOT-hold during "Connecting…"). Once our firmware is running,
+  **normal auto-reset flashing works** — no BOOT-hold needed for re-flashes.
 
 ### Test Results (T1–T13)
-<!-- paste/attach the filled §5 results log + screenshot filenames -->
--
+Not started — blocked on bring-up. The display was **totally black** on first flash; root-caused and
+fixed (see below). Panel now lights and renders, but **colours are wrong** (suspected LGFX
+`invert` / `rgb_order`), and the screenshot tool needs finishing before we can capture per-case
+evidence. Test-plan execution resumes once colours + `capture_display` are sorted.
 
 ### Defects Found & Dispositions
-<!-- id → in-boundary fix (commit) | SLS re-export needed (spec) | framework issue (surface to PA) -->
--
+- **D1 — Display totally black (backlight/panel unpowered).** Root cause: `CrowPanel128Adapter`
+  never drove the panel power-enable rails GPIO1/GPIO2 (PWR_EN1/2) HIGH before `_gfx.init()`
+  (board.h "RFC #50 must-fix … currently absent from build"). Confirmed 3 ways (board.h, live
+  `display_control brightness:255` still-black test, Elecrow factory reference). → **In-boundary
+  fix, committed** `476f60e`, tagged `v0.0.12-dev.37`, flashed, verified running.
+- **D2 — `capture_display` MCP returns "No display registered" on LVGL boards.** Name collision:
+  `MCPBuiltinTools.cpp:475` registers a U8G2-mono `capture_display` unconditionally and
+  `LVGLDisplayModule.cpp:1005` registers the RGB565 one; `findTool()` returns the first match, so
+  the mono stub shadows the colour tool. → **Interim in-boundary fix applied** (guarded the builtin
+  `#ifndef WITH_DISPLAY_LVGL`), **uncommitted in the WO7 working tree**; superseded by the framework
+  design hand-off below. **Escalated to the architect** (see "Framework Design Hand-off").
+- **D3 — Colours wrong on the (now lit) panel.** Suspected `Panel_GC9A01` `invert`/`rgb_order`
+  config in `CrowPanel128Adapter`. Open; not yet investigated (deferred behind screenshots).
 
 ### Fixes Applied
-- `path` — what changed, and the re-verify result (native + re-flash)
+- `adapters/lvgl/CrowPanel128Adapter.cpp` — drive PWR_EN1/PWR_EN2 HIGH before `_gfx.init()`.
+  Re-verify: crowpanel-128-rotary **[SUCCESS]**, native **482/482**, on-device version `dev.37`,
+  panel now lit + rendering. **Committed `476f60e`.**
+- `modules/MCPServer/MCPBuiltinTools.cpp` — guard builtin `capture_display` under
+  `#ifndef WITH_DISPLAY_LVGL` (interim; **uncommitted**). Likely replaced by the PNG contract below.
 
 ### Dead Ends & Warnings
--
+- Transient boot-time `tick budget exceeded` warnings (Module [1]/[5], ~80 ms) during NTP sync;
+  not yet characterised — watch for recurrence at idle.
 
 ### Out-of-Scope / Framework Findings (PA to triage)
--
+See the **Framework Design Hand-off** section below — a full display-capture interface redesign
+(`capture_display`/screenshot → uniform PNG) that the architect can develop **in parallel**.
 
 ### Blockers
-(none)
+(none blocking bring-up) — awaiting: (a) colour fix D3, (b) architect direction on the capture
+interface (or proceed with the worker's proposed contract), before running T1–T13.
+
+---
+
+## Framework Design Hand-off — Display Capture → PNG Contract (FOR THE ARCHITECT)
+
+> Written by the WO7 worker (2026-08-10) for the Principal/main architect to pick up **in
+> parallel**. Self-contained: everything needed to develop it is here. Origin: WO7 CrowPanel
+> bring-up surfaced defect **D2** (above) and, digging in with the human, we converged on a full
+> capture-interface redesign rather than a point patch.
+
+### Problem
+`capture_display` (MCP) and `/api/display/screenshot` (HTTP) are **non-uniform and collision-prone**:
+- Two tools share the name `capture_display`: a U8G2-mono one in `MCPBuiltinTools` (format
+  `u8g2-tile`) registered **unconditionally**, and an RGB565 one in `LVGLDisplayModule`.
+  `MCPToolRegistry::findTool()` is first-match, so the mono stub shadows the colour tool on LVGL
+  boards → `"No display registered"`.
+- Even without the collision, the two backends emit **different formats** (`u8g2-tile` vs raw
+  `RGB565`), so every consumer must branch. The web portal ([web/portal/screenshot.js](../../../../web/portal/screenshot.js))
+  only decodes the U8G2 vertical-page format → the **colour screenshot is broken** on LVGL.
+
+### Design principle (agreed with the human)
+The **display library owns** the conversion from its internal pixel format to **one standard,
+consumption-ready container**. Container = **PNG**, emitted as **"stored" (uncompressed DEFLATE)**
+by default — "a BMP inside a PNG wrapper" — so it's a valid PNG everywhere (browser `<img>`, MCP
+clients, host scripts) but as cheap to produce as a raw blob.
+
+### Hard constraint (this drives the whole design)
+Display modules are **optional and mutually exclusive**. `miniz` is only present via **LovyanGFX**
+(the LVGL/colour path). **U8G2 builds (e.g. `esp32dev`) have no miniz and no PSRAM.** Therefore
+**nothing shared, and nothing on the U8G2 path, may depend on miniz.**
+
+### Runtime finding — the MCP JSON path can't carry a colour frame (measured on hardware)
+After fixing the collision (D2), `capture_display` correctly routes to the LVGL RGB565 tool but
+returns `data:null` for the 240×240 frame. Cause (traced in `MCPServer::_handleToolsCall`,
+MCPServer.cpp:297-332): the ~153 KB base64 string is copied **~3–4×** through internal-heap
+buffers — `resultDoc` (ArduinoJson copies the `char*`), `serializeJson`→`innerText` String, outer
+`resp` doc, `printer.output` String — before `response->send(...c_str())`. With only ~86 KB free
+internal heap on the S3, the first copy already fails → the value drops to `null`. By contrast
+`/api/display/screenshot` works because it `send()`s the raw PSRAM buffer directly (no base64, no
+JSON, no String). **Implications for the contract:** (a) the capture path must **stream** to the
+response, not build giant Strings/docs on the internal heap; (b) MCP delivery of an image is only
+viable if the payload is **small** — i.e. **compressed PNG** (≈10–40 KB) on PSRAM boards; a raw or
+stored-PNG colour frame (~115–173 KB) will not fit the JSON path regardless. This is independent
+evidence for "stream + PSRAM-compress," and means the MCP `capture_display` for colour effectively
+*requires* the compression path, while HTTP `/api/display/screenshot` can stay raw/stored.
+
+### Memory analysis (why stored-PNG is the baseline, not real DEFLATE)
+Measured from the vendored compressor (`LovyanGFX/.../lgfx_miniz.c`, 4 KB dict already):
+`sizeof(tdefl_compressor)` ≈ **81 KB** with `TDEFL_LESS_MEMORY`, **~232 KB** default — a single
+contiguous allocation. `esp32dev` free heap after WiFi+web ≈ 100–160 KB (largest block smaller),
+so **real DEFLATE is not viable on no-PSRAM**. **Stored-PNG needs only ~one scanline** of working
+RAM (+ running CRC32/adler32); a 128×64 mono frame is < 1 KB total.
+
+### Proposed contract
+1. **Shared, dependency-free `png_writer`** util (CRC32 + adler32 + BTYPE=0 stored zlib blocks),
+   supporting **1-bit grayscale** and **RGB888**. No miniz. Location TBD by architect (e.g.
+   `include/` or a small shared lib) so both backends **and** MCPServer can use it. Prefer a
+   **streaming sink** (callback) so a full second buffer isn't required — one sink drives both the
+   PsychicHttp chunked response and the MCP base64 encoder.
+2. **`captureImage()`** (name TBD) on the display abstraction; each backend owns its conversion:
+   U8G2 1bpp tile → 1-bit gray PNG (stored, streamed); LVGL RGB565 snapshot → RGB888 PNG.
+3. **Optional compression, LVGL+PSRAM only:** `#ifdef BOARD_HAS_PSRAM` compiles a `miniz tdefl`
+   path (reusing LovyanGFX's copy — no new dep); **runtime** guard allocates the compressor in
+   PSRAM and **falls back to stored** on failure. Optional `display` config key to force stored.
+4. **Consumers to migrate:**
+   - MCP `capture_display`: single tool, `format:"png"`, base64. Removes the U8G2/LVGL split + the
+     D2 collision (so the interim `#ifndef WITH_DISPLAY_LVGL` guard becomes unnecessary).
+   - HTTP `/api/display/screenshot`: `Content-Type: image/png`.
+   - Web portal `screenshot.js`: replace canvas + format-specific decoder with `<img>` —
+     **fit-to-width** default (`width:100%; height:auto`), `image-rendering:pixelated`, a sensible
+     `max-width`, optional zoom multiplier. Self-sizing from the PNG's intrinsic dimensions (no need
+     to plumb `X-Display-Width/Height`).
+   - Host scripts [scripts/device-mcp/capture_display.py](../../../../.agents/skills/framework-expert/scripts/device-mcp/capture_display.py)
+     + `captureU8g2.py`: collapse to "save the PNG bytes"; drop RGB565/tile decoding.
+5. **Tests:** update `test_mcpServer` (capture_display contract) + `test_lvglDisplay/test_mcp_tools`
+   (PNG output); add `png_writer` unit tests (deterministic bytes, CRC/adler correctness, 1-bit +
+   RGB888). Keep native **482/482** green. NB: `native` defines **neither** display flag, so the
+   builtin-tool guard must be `#ifndef WITH_DISPLAY_LVGL` (present on native), not
+   `#ifdef WITH_DISPLAY_U8G2` (absent on native → would drop the tool and fail `test_mcpServer`).
+
+### Open questions for the architect
+- **Interface placement:** there is no single cross-backend display interface today
+  (`U8G2DisplayModule` and `LVGLDisplayModule` are separate). Options: (a) a new minimal
+  `IDisplayCapture` both implement; (b) keep per-module but share `png_writer`; (c) fold into an
+  existing contract. Worker leans (a) or (b).
+- **Method shape:** streaming sink vs returned buffer; buffer ownership/free semantics.
+- **Keep raw formats** behind a debug param, or PNG-only?
+- **Compression config surface** (per-board default, user toggle).
+- **U8G2 bit depth:** 1-bit assumed; any 2-/4-level grayscale panels to support?
+- **Round display:** show the square framebuffer (recommended, shows the 170 px safe zone) vs a
+  circular mask in the portal.
+
+### Interim state on the WO7 branch (for coordination)
+- **Committed:** `476f60e` (D1 PWR_EN fix) + tag `v0.0.12-dev.37`.
+- **Uncommitted (working tree):** the D2 interim guard in `MCPBuiltinTools.cpp`. If the architect
+  takes the PNG contract, this guard is subsumed — coordinate before committing to avoid churn.
+- Worker will NOT start the PNG implementation until the architect and human decide ownership;
+  meanwhile the worker continues hardware bring-up (D3 colours + T1–T13).
+- **Decision (human, 2026-08-10):** for bring-up, screenshots are taken via the working HTTP
+  endpoint `/api/display/screenshot` (raw RGB565 stream → host decodes). MCP `capture_display` for
+  colour is **deferred to the architect's compressed-PNG contract** (see runtime finding above);
+  the D2 collision guard stays as the interim so the tool at least routes correctly.

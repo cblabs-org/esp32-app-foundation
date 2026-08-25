@@ -96,6 +96,7 @@
 | [PR #74 Remediation](../../context_archives/distillation-20260805-pr74-remediation/context_bridge.md) | Post-merge remediation of CONFIGURING orchestration — EventBus boot-order, gate dependency ordering | context_bridge |
 | [Include Architecture](../../context_archives/distillation-20260811-include-architecture/context_bridge.md) | LDF mode alignment (native chain→deep), Application lib_ignore removal, 18 library.json files, zero relative includes | context_bridge |
 | [Group 3 Code Quality](../../context_archives/distillation-20260814-group3-code-quality/context_bridge.md) | ButtonModule `removeButton()`, board template folder restructure (`_TEMPLATE/`), hardware abstraction docs in framework-expert skill | context_bridge |
+| [pr-151-interface-naming-cleanup](../pr-151-interface-naming-cleanup/PROJECT.md) | `PreconditionRegistry`→`IPreconditionRegistry`, `TabRegistry`→`ITabRegistry`, relocate to `include/interfaces/`, clean `include/utils/`, `AppFoundation.h` alignment | [PROJECT.md](../pr-151-interface-naming-cleanup/PROJECT.md) |
 
 ## Memory & Performance
 | Project | Scope | Context |
@@ -150,6 +151,7 @@
 | [pr-39](../pr-39-sample-app-remediation/PROJECT.md) | Sample app remediation — build parity, includes, EventBus, house style, tests | PROJECT.md |
 | [pr-40](../pr-40-docs-excellence/PROJECT.md) | Documentation Excellence — 10/10 compliance across template-app, sample-app, framework modules | [distillation](../pr-40-docs-excellence/context_bridge.md) |
 | [Group 3 Code Quality](../../context_archives/distillation-20260814-group3-code-quality/context_bridge.md) | board.h stock-vs-consumer ownership docs, `_TEMPLATE/` restructure, framework-expert skill Hardware Abstraction section, 5 doc path updates | context_bridge |
+| pr-151-interface-naming-cleanup | `framework-expert` skill trigger keywords and interface docs updated for `IPreconditionRegistry`/`ITabRegistry` rename | [PROJECT.md](../pr-151-interface-naming-cleanup/PROJECT.md) |
 
 ## Home Assistant & Weather
 | Project | Scope | Context |
