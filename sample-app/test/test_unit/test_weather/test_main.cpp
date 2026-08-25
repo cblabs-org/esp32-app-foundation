@@ -238,6 +238,7 @@ TEST_F(WeatherModuleTest, TabMetadata) {
     struct MockTabRegistry : public ITabRegistry {
         struct Entry { std::string name; std::string parent; int order; std::string icon; std::string script; };
         std::vector<Entry> entries;
+        using ITabRegistry::addTab;  // Expose TabEntry convenience overload
         void addTab(const char* name, const char* parent, int order,
                     const char* icon, const char* script) override {
             entries.push_back({name ? name : "", parent ? parent : "", order,

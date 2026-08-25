@@ -215,6 +215,7 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors,
     struct TabRegistryImpl : public ITabRegistry {
         JsonArray& arr;
         explicit TabRegistryImpl(JsonArray& a) : arr(a) {}
+        using ITabRegistry::addTab;  // Expose TabEntry convenience overload
         void addTab(const char* name, const char* parent, int order,
                     const char* icon, const char* script) override {
             JsonObject tabObj = arr.add<JsonObject>();
