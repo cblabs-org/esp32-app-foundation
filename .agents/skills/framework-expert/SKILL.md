@@ -143,9 +143,9 @@ These references are optimized distillations for AI agents. If the human develop
   "what should my app look like", "help me think through my app",
   "application architecture", "design session".
 - **Interfaces**: "ITickable", "IConfigurable", "IWebContributor", "IMCPContributor",
-  "IOTAVerifier", "IPreconditionContributor", "IPreconditionRegistry", "PreconditionEngine", "PreconditionRegistry",
+  "IOTAVerifier", "IPreconditionContributor", "IPreconditionRegistry", "PreconditionEngine",
   "Cause", "Severity", "PreconditionRole", "precondition",
-  "IDataSource", "IStatusReporter", "IDisplayBoard", "ITabRegistry", "TabRegistry", "registerTabs".
+  "IDataSource", "IStatusReporter", "IDisplayBoard", "ITabRegistry", "registerTabs".
 - **Core systems**: "EventBus", "ConfigManager", "FrameworkConfig", "config system",
   "extension point", "framework architecture", "AppFoundation.h", "tick function",
   "boot sequence", "LittleFS layout".
