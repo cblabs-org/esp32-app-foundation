@@ -32,6 +32,10 @@ with that program's PA.
 ## Strict Boundary Box
 
 - Persistence/partition/mount work **only**. **Do not** re-open module extraction.
+- [x] **WO2: Partition & Mount Logic** (Agent: Execution Worker)
+- [x] **WO3: Partition Presets** (Agent: Execution Worker)
+- [x] **WO4: Persistence Migration** (Agent: Execution Worker)
+- [x] **WO5: Integration & Verification** (Agent: Execution Worker).
 - **Coordinate partition CSV + `board.<id>.h` changes with the hardware-config PA**
   — do not run concurrently on `partitions.*.csv` / `platformio.ini`.
 - Migration is **new-layout-only** (no field-device compat path — MK-15).
