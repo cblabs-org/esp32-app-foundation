@@ -138,7 +138,38 @@ All WOs are **strictly serial** — each builds on the last. No parallel executi
 - **Module [1] tick budget warnings**: LVGL display module consistently exceeds its 33ms tick budget (~50ms renders). Pre-existing, not caused by our changes. Needs separate investigation (LVGL render batching or tick budget tuning).
 - **SLS `.spj` downstream notification**: WO6 determined SLS files did NOT need modification (round display safe zone, dynamic widget repurposing instead). But the downstream notification checklist item should be reviewed once consumers test the new display behaviour.
 
+### 2026-08-25 — WO8 Complete: Engine Bug Fixes (P1/P2/P3)
+**Summary**: Independent deep review (with native harness verification) found three bugs that survived six prior review passes. All fixed in commit `0fa87768`.
+**Cross-cutting decisions**:
+- `getStateByName()` changed from copy-return to `const PreconditionState*` — propagated across 5 test files. Eliminates 128-byte copy with `std::function` heap churn.
+- BindsTo semantic now implemented with `prevUpstreamMet[]` per-edge tracking — this is the first time the Requires/BindsTo distinction is actually observable at runtime.
+- `requestRetry()` now clears damping state (`penalty`, `suppressed`) in addition to breaker state — portal Retry button has full effect.
+**Surfaced findings**:
+- PlatformIO `esp-dsp` component download can corrupt during concurrent builds. Workaround: `rm -rf managed_components/espressif__esp-dsp/` and rebuild.
+**Dead ends** (project-wide):
+- The original damping test encoded the bug as the specification (50-min recovery asserted as correct). Lesson: when a test covers a timing/policy mechanism, verify the test's own assertions make engineering sense — a test that passes is not proof of correctness if it validates broken behaviour.
+
+### 2026-08-25 — PR #149 Review Remediation & Documentation Sweep
+**Summary**: Two rounds of review remediation (18 items in first pass, 5 in follow-up), comprehensive documentation sweep migrating all IConfigGate references to PreconditionEngine terminology across 10 files, and OO architecture assessment of `include/` structure.
+**Cross-cutting decisions**:
+- `PreconditionRegistry` and `TabRegistry` identified as pure abstract interfaces misplaced in `include/utils/` — should be `IPreconditionRegistry` and `ITabRegistry` in `include/interfaces/`. Deferred to PR #151 (bridge prompt written).
+- `IConfigurable` confirmed as actively used (8+ modules) — NOT stale despite `IConfigGate` deletion.
+- Historical references (past-tense mentions of old patterns in design docs) accepted as contextually accurate — no purge needed.
+- `docs/developer/` stale IConfigGate references flagged as out-of-scope for this PR.
+
+### 2026-08-25 — Project Wrap-Up
+**Architectural outcome**: The boolean `IConfigGate` predicate system is fully replaced by the `PreconditionEngine` — a cause-aware, trust-discriminated, damped precondition system with dependency edges, breaker state machine, and portal/display integration. The system supports 12 cause values, 6 severity levels, 3 edge kinds (Wants/Requires/BindsTo), and auto-detection via `registerModule<T>()`. Three post-review engine bugs (damping lockout, BindsTo dead code, edge misalignment) were caught and fixed before merge.
+**Lessons for future projects**:
+1. **Test-encoded bugs are invisible to review**: When a test asserts a broken behaviour as correct, all subsequent reviews read the test as validation. Independent verification with a native harness (outside the test framework) is the only way to catch this class of defect.
+2. **`else if` on correlated flags is a code smell**: If flag B can only be true when flag A is also true, `if (A) ... else if (B)` makes B unreachable. This pattern should be caught in code review.
+3. **Compaction-based index arrays must carry their metadata**: When `resolveEdges()` compacts resolved indices but `tick()` reads kind from the original declared array, a single unresolved edge misaligns every subsequent edge. Store kind alongside the resolved index.
+4. **EventBus sync vs async gap**: Native tests use synchronous dispatch; hardware uses async `esp_event`. Any subscriber touching thread-unsafe APIs (LVGL, SPI) will crash on hardware but pass native tests. This is a systemic gap (see pr-mk01-eventbus-concurrency).
+**Unresolved items**:
+- PR #151 (interface naming cleanup: `IPreconditionRegistry`, `ITabRegistry`) — bridge prompt written, stacks on PR #150.
+- Issue #148 (IWebContributor multi-contribution retrofit) — tracked.
+- `docs/developer/` stale IConfigGate references — not in scope for this PR, should be tracked separately.
+
 ---
 
-*Created: 2026-08-23. Status: **Implementation complete — PR [#149](https://github.com/matthewmcneill/esp32-app-foundation/pull/149) awaiting review.***
+*Created: 2026-08-23. Status: **MERGED** — PR [#149](https://github.com/matthewmcneill/esp32-app-foundation/pull/149) merged 2026-08-25 (`de123a99`).*
 
