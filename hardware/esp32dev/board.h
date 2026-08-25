@@ -17,13 +17,13 @@
  *   MH-ET LIVE repo: https://github.com/MHEtLive/ESP32-MINI-KIT
  *   ESP32 GPIO ref : https://randomnerdtutorials.com/esp32-pinout-reference-gpios/
  *
- *            outer                                       outer
- *            row                                         row
- *              │         ┌─────────────────┐             │
- *              │         │   Micro-USB     │             │
- *              │         ├─────────────────┤             │
- *   ─ ─ ─ ─ ─ ┤  inner  │  ┌───────────┐  │  inner     ├ ─ ─ ─ ─ ─
- *              │   row   │  │           │  │   row      │
+ *            outer                                 outer
+ *            row                                     row
+ *              │         ┌─────────────────┐         │
+ *              │         │   Micro-USB     │         │
+ *              │         ├─────────────────┤         │
+ *    ─ ─ ─ ─ ─ ┤  inner  │  ┌───────────┐  │  inner  ├ ─ ─ ─ ─ ─
+ *              │   row   │  │           │  │   row   │
  *  RST    ── ○ ┤ ○ ──    │  │           │  │    ── ○ ┤ ○ ── G2  (LED)
  *  G36 A0 ── ○ ┤ ○ ── G21│  │           │  │G3  ── ○ ┤ ○ ── G12
  *  G39 A3 ── ○ ┤ ○ ── G22│  │  ESP32    │  │G1  ── ○ ┤ ○ ── G13
@@ -34,7 +34,7 @@
  *  G27    ── ○ ┤ ○ ──    │  │           │  │    ── ○ ┤ ○ ──
  *         5V ○ ┤         │  │           │  │         ├ ○ GND
  *        GND ○ ┤         │  └───────────┘  │         ├ ○ 3V3
- *              │         └─────────────────┘             │
+ *              │         └─────────────────┘         │
  *
  *  LEFT (outer)  : RST, G36, G39, G32, G33, G25, G26, G27, 5V, GND
  *  LEFT (inner)  : G21(SDA), G22(SCL), G5(SS◄DispDC), G23(MOSI◄Disp),
