@@ -38,7 +38,7 @@
 // time (the framework scans the consuming project's web/ dir). Serving it from
 // flash via serveGzipAsset() keeps the ~16KB script out of internal DRAM socket
 // buffers — see issue #111.
-#include "web/serveGzipAsset.hpp"
+#include "utils/serveGzipAsset.hpp"
 #include "portal_assets/weather_js.hpp"
 
 // M2: Forward-declare the Arduino ESP32 ssl_client function we need.

@@ -36,8 +36,8 @@
 #include "build_version.h"
 
 // Core framework headers — order matters for dependency resolution
-#include "AppState.hpp"
-#include "FrameworkConfig.hpp"
+#include "types/AppState.hpp"
+#include "types/FrameworkConfig.hpp"
 
 // Interface contracts
 #include "interfaces/ITickable.hpp"

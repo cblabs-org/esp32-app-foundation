@@ -5,7 +5,7 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  *
- * Module: include/AppState.hpp
+ * Module: include/types/AppState.hpp
  * Description: Application lifecycle state machine enum. Defines a 3-state
  *              bidirectional model for the Application hub. Boot covers all
  *              hardware initialisation during setup(). Configuring and Running

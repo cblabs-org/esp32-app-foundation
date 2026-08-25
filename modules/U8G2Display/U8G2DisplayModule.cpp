@@ -49,7 +49,7 @@
  */
 
 #include "U8G2DisplayModule.hpp"
-#include "web/serveGzipAsset.hpp"
+#include "utils/serveGzipAsset.hpp"
 #include "events/AppConfiguringPayload.hpp"
 #include "platform/LogShim.h"
 #include <cstring>

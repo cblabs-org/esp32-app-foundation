@@ -23,7 +23,7 @@
  */
 
 #include "WebServerManager.hpp"
-#include "web/serveGzipAsset.hpp"
+#include "utils/serveGzipAsset.hpp"
 #include <ArduinoJson.h>
 
     #include "esp_heap_caps.h"

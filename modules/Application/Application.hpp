@@ -46,8 +46,8 @@
 #include <vector>
 #include <type_traits>
 #include "platform/LogShim.h"
-#include "AppState.hpp"
-#include "FrameworkConfig.hpp"
+#include "types/AppState.hpp"
+#include "types/FrameworkConfig.hpp"
 #include "utils/Periodic.hpp"
 #include "interfaces/ITickable.hpp"
 #include "interfaces/IConfigurable.hpp"

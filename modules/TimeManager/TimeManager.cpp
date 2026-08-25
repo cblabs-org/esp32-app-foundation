@@ -22,7 +22,7 @@
  */
 
 #include "TimeManager.hpp"
-#include "web/serveGzipAsset.hpp"
+#include "utils/serveGzipAsset.hpp"
 #include "ConfigManager.hpp"
 #include "platform/LogShim.h"
 #include "portal_assets/time_js.hpp"

@@ -291,7 +291,7 @@ Row containers are semantically distinct based on data display vs input interact
 > 3. Serve it with the shared helper (pass the request for conditional GET, plus
 >    the `_gz`/`_gz_len`/`_gz_etag` triple):
 >    ```cpp
->    #include "web/serveGzipAsset.hpp"
+>    #include "utils/serveGzipAsset.hpp"
 >    #include "portal_assets/weather_js.hpp"
 >    // in registerRoutes():
 >    server.on("/weather.js", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {

@@ -13,7 +13,7 @@
  */
 
 #include "LVGLDisplayModule.hpp"
-#include "web/serveGzipAsset.hpp"
+#include "utils/serveGzipAsset.hpp"
 #include "EventBus.hpp"
 #include "ConfigManager.hpp"
 #include "MCPToolRegistry.hpp"

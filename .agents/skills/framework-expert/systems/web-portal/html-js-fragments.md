@@ -23,10 +23,10 @@ Why it is canonical: `PsychicHttp::send(body)` copies the entire response body i
    - **consumer-sourced assets → `<yourProject>/include/portal_assets/`** — add `-I include` to your `build_flags` so `#include "portal_assets/<name>_js.hpp"` resolves.
 
    > Basename collisions across all scanned directories are a hard build error (`sys.exit(1)`), so give your asset a unique filename.
-3. **Serve it from `registerRoutes()`** using the shared helper `serveGzipAsset()` (from `web/serveGzipAsset.hpp`), passing the request (for conditional GET), the `_gz`/`_gz_len`/`_gz_etag` triple, and the MIME type:
+3. **Serve it from `registerRoutes()`** using the shared helper `serveGzipAsset()` (from `utils/serveGzipAsset.hpp`), passing the request (for conditional GET), the `_gz`/`_gz_len`/`_gz_etag` triple, and the MIME type:
 
 ```cpp
-#include "web/serveGzipAsset.hpp"
+#include "utils/serveGzipAsset.hpp"
 #include "portal_assets/weather_js.hpp"   // generated from web/weather.js
 
 void WeatherModule::registerRoutes(PsychicHttpServer& server) {
