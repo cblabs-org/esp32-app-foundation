@@ -212,7 +212,7 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors,
 
     // --- Collect tabs from all IWebContributor modules via registerTabs() ---
     // TabRegistryImpl captures tab entries into a JsonArray.
-    struct TabRegistryImpl : public TabRegistry {
+    struct TabRegistryImpl : public ITabRegistry {
         JsonArray& arr;
         explicit TabRegistryImpl(JsonArray& a) : arr(a) {}
         void addTab(const char* name, const char* parent, int order,

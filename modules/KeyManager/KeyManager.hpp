@@ -32,7 +32,7 @@
  *
  *   IWebContributor (tab: "Keys", parent: "System", order: 20):
  *   - registerRoutes():       Register REST API routes
- *   - registerTabs():         Register "Keys" tab (parent: "System", order: 20) via TabRegistry.
+ *   - registerTabs():         Register "Keys" tab (parent: "System", order: 20) via ITabRegistry.
  */
 
 #pragma once
@@ -196,9 +196,9 @@ public:
 
     /**
      * @brief Register the Keys tab in the System sub-navigation.
-     * @param registry  The TabRegistry to register tabs with.
+     * @param registry  The ITabRegistry to register tabs with.
      */
-    void registerTabs(TabRegistry& registry) override {
+    void registerTabs(ITabRegistry& registry) override {
         registry.addTab("Keys", "System", 20);
     }
 

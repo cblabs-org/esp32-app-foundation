@@ -72,7 +72,7 @@ public:
 
     // IWebContributor
     void registerRoutes(PsychicHttpServer& server) override;
-    void registerTabs(TabRegistry& registry) override;
+    void registerTabs(ITabRegistry& registry) override;
 
     // IMCPContributor
     void registerMCPTools(MCPToolRegistry& registry) override;

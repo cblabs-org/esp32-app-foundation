@@ -9,7 +9,7 @@ public:
     void registerRoutes(PsychicHttpServer& server) override {
         registered = true;
     }
-    void registerTabs(TabRegistry& /*registry*/) override {}
+    void registerTabs(ITabRegistry& /*registry*/) override {}
 };
 
 TEST(WebServerManagerTest, InitializationAndDispatch) {
@@ -45,7 +45,7 @@ public:
     void registerRoutes(PsychicHttpServer& server) override {
         registered = true;
     }
-    void registerTabs(TabRegistry& registry) override {
+    void registerTabs(ITabRegistry& registry) override {
         if (tabName) {
             registry.addTab(tabName, nullptr, 100);
         }

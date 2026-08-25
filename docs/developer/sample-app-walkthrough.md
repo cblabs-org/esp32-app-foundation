@@ -265,7 +265,7 @@ void MyApp::registerRoutes(PsychicHttpServer& server) {
         });
 }
 
-void MyApp::registerTabs(TabRegistry& registry) {
+void MyApp::registerTabs(ITabRegistry& registry) {
     registry.addTab("MyApp", nullptr, 100);
 }
 ```
@@ -488,7 +488,7 @@ std::string getCondition() const {
 `WeatherModule`'s `IWebContributor` implementation is more sophisticated than `MyApp`'s:
 
 ```cpp
-void WeatherModule::registerTabs(TabRegistry& registry) {
+void WeatherModule::registerTabs(ITabRegistry& registry) {
     // Top-level tab with custom cloud icon and JavaScript file
     registry.addTab("Weather", nullptr, 50, kWeatherIcon, "/weather.js");
 }

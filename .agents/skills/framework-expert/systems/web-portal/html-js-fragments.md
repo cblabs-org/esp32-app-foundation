@@ -42,7 +42,7 @@ void WeatherModule::registerRoutes(PsychicHttpServer& server) {
 4. **Declare the script** in your `registerTabs()` override:
 
 ```cpp
-void WeatherModule::registerTabs(TabRegistry& registry) {
+void WeatherModule::registerTabs(ITabRegistry& registry) {
     registry.addTab("Weather", nullptr, 50, kWeatherIcon, "/weather.js");
 }
 ```

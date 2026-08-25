@@ -149,7 +149,7 @@ public:
 
     // IWebContributor — Status tab + system routes (registered in begin())
     void registerRoutes(PsychicHttpServer& /*server*/) override {}  // Routes registered inline in begin()
-    void registerTabs(TabRegistry& registry) override {
+    void registerTabs(ITabRegistry& registry) override {
         registry.addTab("Status", "System", 10);
     }
 

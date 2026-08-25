@@ -113,7 +113,7 @@ The [U8G2DisplayModule](../../modules/U8G2Display/U8G2DisplayModule.hpp) is the 
 The display module registers all its tabs (including sub-tabs) via `registerTabs()`:
 
 ```cpp
-void U8G2DisplayModule::registerTabs(TabRegistry& registry) {
+void U8G2DisplayModule::registerTabs(ITabRegistry& registry) {
     registry.addTab("Display",    nullptr,    10, displayIcon, "/display.js");
     registry.addTab("Settings",   "Display",  10, nullptr,     nullptr);
     registry.addTab("Screenshot", "Display",  20, nullptr,     nullptr);
@@ -121,7 +121,7 @@ void U8G2DisplayModule::registerTabs(TabRegistry& registry) {
 }
 ```
 
-Sub-tabs are declared in the same `registerTabs()` call by specifying a `parent` name. There is no need for separate stub classes or `registerModule()` calls for sub-tab registration — the `TabRegistry` handles the hierarchy automatically.
+Sub-tabs are declared in the same `registerTabs()` call by specifying a `parent` name. There is no need for separate stub classes or `registerModule()` calls for sub-tab registration — the `ITabRegistry` handles the hierarchy automatically.
 
 ### Two-Phase Hardware Bootstrap
 

@@ -56,7 +56,7 @@
  *
  *   IWebContributor:
  *   - registerRoutes():         Registers /api/weather/config (GET/POST), /api/weather/status, /weather.js
- *   - registerTabs():           Register "Weather" tab (top-level, order: 50, cloud icon, /weather.js) via TabRegistry.
+ *   - registerTabs():           Register "Weather" tab (top-level, order: 50, cloud icon, /weather.js) via ITabRegistry.
  *   - getApiPrefix():           Returns "/api/weather" for body-size middleware [NEW]
  *   - getMaxPostBody():         Returns 4096 (ADR-15 default) [NEW]
  *
@@ -365,8 +365,8 @@ public:
     void registerRoutes(PsychicHttpServer& server) override;
 
     /** @brief Register the Weather tab as a top-level navigation tab.
-     *  @param registry  The TabRegistry to register tabs with. */
-    void registerTabs(TabRegistry& registry) override {
+     *  @param registry  The ITabRegistry to register tabs with. */
+    void registerTabs(ITabRegistry& registry) override {
         registry.addTab("Weather", nullptr, 50, getTabIcon(), "/weather.js");
     }
 
@@ -414,7 +414,7 @@ public:
     void registerMCPTools(MCPToolRegistry& registry) override;
 
     // --- IPreconditionContributor ---
-    void registerPreconditions(PreconditionRegistry& reg) override;
+    void registerPreconditions(IPreconditionRegistry& reg) override;
 
     // --- JsonListener (hardware only — parser library unavailable in native builds) ---
     /** @brief No-op — required by JsonListener interface. */

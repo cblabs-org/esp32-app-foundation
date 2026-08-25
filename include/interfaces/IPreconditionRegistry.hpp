@@ -5,14 +5,14 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  *
- * Module: include/utils/PreconditionRegistry.hpp
+ * Module: include/interfaces/IPreconditionRegistry.hpp
  * Description: Abstract registry interface for registering preconditions in the
  *              framework. Passed to IPreconditionContributor implementors to
  *              register evaluation callbacks, description formatters, and dependency
  *              edges.
  *
  * Exported Classes:
- * - PreconditionRegistry: Abstract interface for precondition registration
+ * - IPreconditionRegistry: Abstract interface for precondition registration
  *   - add(): Register a new precondition with evaluation callback and metadata
  */
 
@@ -27,9 +27,9 @@
  * @brief Abstract registry interface for registering preconditions.
  *
  * Passed to IPreconditionContributor::registerPreconditions() during module registration.
- * Concrete implementation is provided by PreconditionEngine in WO2.
+ * Concrete implementation is provided by PreconditionEngine.
  */
-class PreconditionRegistry {
+class IPreconditionRegistry {
 public:
     /// Fast-path evaluation callback invoked every tick cycle.
     using EvalFn     = std::function<PreconditionStatus()>;
@@ -37,7 +37,7 @@ public:
     /// Cold-path description formatter writing into a caller-supplied buffer.
     using DescribeFn = std::function<void(Cause, char*, size_t)>;
 
-    virtual ~PreconditionRegistry() = default;
+    virtual ~IPreconditionRegistry() = default;
 
     /**
      * @brief Register a precondition with evaluation callback and dependency metadata.

@@ -12,7 +12,7 @@
  *              during begin() and registerTabs() to collect navigation metadata.
  *
  *              Tab registration model:
- *              Modules override registerTabs(TabRegistry&) to declare one or
+ *              Modules override registerTabs(ITabRegistry&) to declare one or
  *              more UI tabs. Modules with no visible tab provide an empty
  *              override. Multi-tab modules register all their tabs in a single
  *              call, eliminating the need for inner stub objects.
@@ -20,14 +20,14 @@
  * Exported Classes:
  * - IWebContributor: Abstract base for modules exposing REST endpoints
  *   - registerRoutes():  Register all routes with the provided PsychicHttpServer
- *   - registerTabs():    Register navigation tabs via TabRegistry (pure virtual)
+ *   - registerTabs():    Register navigation tabs via ITabRegistry (pure virtual)
  *   - getApiPrefix():    Return the API path prefix for body-size middleware matching (or nullptr)
  *   - getMaxPostBody():  Return the max POST/PUT body size in bytes (default: 4096, ADR-15)
  */
 
 #pragma once
 
-#include "utils/TabRegistry.hpp"
+#include "interfaces/ITabRegistry.hpp"
 
 // Forward-declare to avoid pulling in full headers in interface-only files.
 // Concrete implementations include the full headers.
@@ -42,7 +42,7 @@ class AuthManager;
  * during the begin() phase, before server.begin() is called.
  *
  * Tab registration:
- * Modules override registerTabs(TabRegistry&) to declare their navigation tabs.
+ * Modules override registerTabs(ITabRegistry&) to declare their navigation tabs.
  * Modules that contribute only API routes (no visible tab) provide an empty
  * override. Multi-tab modules register all tabs in a single registerTabs() call.
  */
@@ -64,12 +64,12 @@ public:
     /**
      * @brief Register all navigation tabs this module contributes.
      *
-     * Override to register one or more tabs via TabRegistry::addTab().
+     * Override to register one or more tabs via ITabRegistry::addTab().
      * Modules with no visible tab must provide an empty override.
      *
-     * @param registry  The TabRegistry to register tabs with.
+     * @param registry  The ITabRegistry to register tabs with.
      */
-    virtual void registerTabs(TabRegistry& registry) = 0;
+    virtual void registerTabs(ITabRegistry& registry) = 0;
 
     /**
      * @brief Return the API path prefix for this contributor's routes.

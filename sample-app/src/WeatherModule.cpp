@@ -657,7 +657,7 @@ void WeatherModule::registerMCPTools(MCPToolRegistry& registry) {
 // IPreconditionContributor Implementation
 // -----------------------------------------------------------------------------
 
-void WeatherModule::registerPreconditions(PreconditionRegistry& reg) {
+void WeatherModule::registerPreconditions(IPreconditionRegistry& reg) {
     static const Edge edges[] = {
         {PreconditionNames::WIFI_STATION, EdgeKind::Requires}
     };

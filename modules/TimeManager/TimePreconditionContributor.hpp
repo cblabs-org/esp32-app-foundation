@@ -17,7 +17,7 @@
 #pragma once
 
 #include "interfaces/IPreconditionContributor.hpp"
-#include "utils/PreconditionRegistry.hpp"
+#include "interfaces/IPreconditionRegistry.hpp"
 #include "TimeManager.hpp"
 #include <cstdio>
 
@@ -45,9 +45,9 @@ public:
 
     /**
      * @brief Register Timezone and Time Sync preconditions with the registry.
-     * @param reg Target PreconditionRegistry instance.
+     * @param reg Target IPreconditionRegistry instance.
      */
-    void registerPreconditions(PreconditionRegistry& reg) override {
+    void registerPreconditions(IPreconditionRegistry& reg) override {
         // 1. Timezone — Operational, no edges (settable in AP mode)
         reg.add(PreconditionNames::TIMEZONE, PreconditionRole::Operational,
             [this]() -> PreconditionStatus {

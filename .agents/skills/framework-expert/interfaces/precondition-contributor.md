@@ -6,17 +6,17 @@ Abstract interface for modules that contribute preconditions to the `Preconditio
 
 A precondition represents a condition that the system monitors for operational readiness. During boot, the `PreconditionEngine` ticks all registered preconditions. Once every Startup-role precondition is met (`allStartupMet()` returns `true`), the application transitions from `CONFIGURING` to `RUNNING`. Operational-role preconditions continue to be evaluated at runtime but do not block boot.
 
-Modules do not inherit a precondition object. Instead, they implement `IPreconditionContributor` and use a visitor pattern to register preconditions via `PreconditionRegistry::add()`.
+Modules do not inherit a precondition object. Instead, they implement `IPreconditionContributor` and use a visitor pattern to register preconditions via `IPreconditionRegistry::add()`.
 
 ```cpp
 class IPreconditionContributor {
 public:
     virtual ~IPreconditionContributor() = default;
-    virtual void registerPreconditions(PreconditionRegistry& registry) = 0;
+    virtual void registerPreconditions(IPreconditionRegistry& registry) = 0;
 };
 ```
 
-## PreconditionRegistry::add()
+## IPreconditionRegistry::add()
 
 ```cpp
 void add(const char* name,
@@ -140,7 +140,7 @@ namespace PreconditionNames {
 ## Registration Flow
 
 1. Module inherits `IPreconditionContributor`.
-2. Implements `registerPreconditions(PreconditionRegistry& reg)`.
+2. Implements `registerPreconditions(IPreconditionRegistry& reg)`.
 3. Inside that method, calls `reg.add(...)` for each precondition it contributes.
 4. At startup, `app.registerModule(&myModule)` auto-detects `IPreconditionContributor` via `is_base_of_v<IPreconditionContributor, T>` and calls `registerPreconditions()`.
 
@@ -153,7 +153,7 @@ class WifiPreconditionContributor : public IPreconditionContributor {
 public:
     explicit WifiPreconditionContributor(const WifiManager& wifi) : _wifi(wifi) {}
 
-    void registerPreconditions(PreconditionRegistry& reg) override {
+    void registerPreconditions(IPreconditionRegistry& reg) override {
         reg.add(PreconditionNames::WIFI_STATION, PreconditionRole::Startup,
             [this]() -> PreconditionStatus {
                 if (_wifi.isReady() && !_wifi.getAPMode())
@@ -198,7 +198,7 @@ private:
 
 class MyApp : public ITickable, public IPreconditionContributor {
 public:
-    void registerPreconditions(PreconditionRegistry& reg) override {
+    void registerPreconditions(IPreconditionRegistry& reg) override {
         reg.add("API Key", PreconditionRole::Startup,
             [this]() -> PreconditionStatus {
                 return _apiKeyConfigured
@@ -223,7 +223,7 @@ private:
 class WeatherModule : public ITickable, public IDataSource,
                       public IPreconditionContributor {
 public:
-    void registerPreconditions(PreconditionRegistry& reg) override {
+    void registerPreconditions(IPreconditionRegistry& reg) override {
         static const Edge edges[] = {
             {PreconditionNames::WIFI_STATION, EdgeKind::Requires}
         };
@@ -255,7 +255,7 @@ public:
 
 ## PreconditionEngine Public API
 
-The `PreconditionEngine` is the concrete engine that implements `PreconditionRegistry` and manages all registered preconditions.
+The `PreconditionEngine` is the concrete engine that implements `IPreconditionRegistry` and manages all registered preconditions.
 
 | Method | Description |
 |:---|:---|

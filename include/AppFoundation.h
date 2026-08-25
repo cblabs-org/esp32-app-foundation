@@ -20,8 +20,10 @@
  * - IDataSource:       Interface — background data fetch contract
  * - IStatusReporter:   Interface — display status overlay contract
  * - IWebContributor:   Interface — REST route registration contract
+ * - ITabRegistry:      Interface — navigation tab registration contract
  * - IMCPContributor:          Interface — MCP tool registration contract
  * - IPreconditionContributor: Interface — precondition contributor contract
+ * - IPreconditionRegistry:    Interface — precondition registration contract
  * - IPrecondition:           Types and enums for precondition system
  * - IOTAVerifier:            Interface — OTA firmware signature verification contract
  * - UpdateStatus:            Enum — data fetch result codes
@@ -42,9 +44,11 @@
 #include "interfaces/IConfigurable.hpp"
 #include "interfaces/IDataSource.hpp"
 #include "interfaces/IStatusReporter.hpp"
+#include "interfaces/ITabRegistry.hpp"
 #include "interfaces/IWebContributor.hpp"
 #include "interfaces/IMCPContributor.hpp"
 #include "interfaces/IPrecondition.hpp"
+#include "interfaces/IPreconditionRegistry.hpp"
 #include "interfaces/IPreconditionContributor.hpp"
 #include "interfaces/IOTAVerifier.hpp"
 

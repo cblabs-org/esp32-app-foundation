@@ -13,7 +13,7 @@ description: >
   IPreconditionContributor, IDataSource, IDisplayBoard, IOTAVerifier, EventBus,
   ConfigManager, LittleFS, web portal, display carousel, OTA verification,
   MCP server/device tools, PreconditionEngine, precondition, Cause, Severity,
-  TabRegistry, registerTabs.
+  IPreconditionRegistry, ITabRegistry, registerTabs.
   (4) Patterns and safety — Service Module Pattern, orchestrator
   anti-pattern, Domain Meaning Test, SOLID, thread safety, std::function, TWDT,
   watchdog, heap, PSRAM, TLS memory, flash size. (5) Security — DeviceCrypto,
@@ -66,9 +66,11 @@ Always use `#include "AppFoundation.h"`. Do not couple directly to internal fram
 | :--- | :--- | :--- |
 | `ITickable` | Runs periodic, non-blocking logic in the main tick loop. | `tick(uint32_t)` |
 | `IConfigurable` | Persists and loads module settings via `ConfigManager` gateway. | `applyConfig(const JsonObject&)` |
-| `IWebContributor` | Exposes REST API endpoints and registers navigation tabs. | `registerRoutes()`, `registerTabs(TabRegistry&)` |
+| `IWebContributor` | Exposes REST API endpoints and registers navigation tabs. | `registerRoutes()`, `registerTabs(ITabRegistry&)` |
+| `ITabRegistry` | Collects UI navigation tabs from `IWebContributor` modules. | `addTab()` |
 | `IMCPContributor` | Registers JSON-RPC tools with the local Model Context Protocol. | `registerMCPTools(MCPToolRegistry&)` |
-| `IPreconditionContributor` | Contributes preconditions to the `PreconditionEngine` via visitor pattern. | `registerPreconditions(PreconditionRegistry&)` |
+| `IPreconditionContributor` | Contributes preconditions to the `PreconditionEngine` via visitor pattern. | `registerPreconditions(IPreconditionRegistry&)` |
+| `IPreconditionRegistry` | Collects preconditions and dependency edges from `IPreconditionContributor` modules. | `add()` |
 | `IDataSource` | Scheduled background data fetch worker managed by `DataManager`. | `fetchUpdate()` |
 | `IStatusReporter` | Displays boot-phase progress status and unrecoverable errors. | `reportStatus(const char*, float)` |
 | `IDisplayBoard` | Renders a telemetry pane inside the monochrome display carousel. | `render(U8G2&)` |
@@ -141,9 +143,9 @@ These references are optimized distillations for AI agents. If the human develop
   "what should my app look like", "help me think through my app",
   "application architecture", "design session".
 - **Interfaces**: "ITickable", "IConfigurable", "IWebContributor", "IMCPContributor",
-  "IOTAVerifier", "IPreconditionContributor", "PreconditionEngine", "PreconditionRegistry",
+  "IOTAVerifier", "IPreconditionContributor", "IPreconditionRegistry", "PreconditionEngine", "PreconditionRegistry",
   "Cause", "Severity", "PreconditionRole", "precondition",
-  "IDataSource", "IStatusReporter", "IDisplayBoard", "TabRegistry", "registerTabs".
+  "IDataSource", "IStatusReporter", "IDisplayBoard", "ITabRegistry", "TabRegistry", "registerTabs".
 - **Core systems**: "EventBus", "ConfigManager", "FrameworkConfig", "config system",
   "extension point", "framework architecture", "AppFoundation.h", "tick function",
   "boot sequence", "LittleFS layout".

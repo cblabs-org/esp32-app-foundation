@@ -5,7 +5,7 @@ Contract for modules that expose REST API routes and navigation tabs to the `Web
 ## Overview
 
 The web server calls `registerRoutes()` once during `begin()` to register REST API endpoints.
-Modules also contribute navigation tab metadata via the `registerTabs(TabRegistry&)` visitor
+Modules also contribute navigation tab metadata via the `registerTabs(ITabRegistry&)` visitor
 pattern — the same approach used by `IMCPContributor` and `IPreconditionContributor`.
 
 ```cpp
@@ -17,7 +17,7 @@ public:
     virtual void registerRoutes(PsychicHttpServer& server) = 0;
 
     // UI Integration — tab metadata via registry/visitor pattern
-    virtual void registerTabs(TabRegistry& registry) = 0;
+    virtual void registerTabs(ITabRegistry& registry) = 0;
 
     // Body-limit middleware hints (1:1 per contributor)
     virtual const char* getApiPrefix() const { return nullptr; }
@@ -52,7 +52,7 @@ Override `registerTabs()` and call `registry.addTab()` for each tab your module 
 A single module can register multiple tabs in one call — no inner stubs needed.
 
 ```cpp
-void MyModule::registerTabs(TabRegistry& registry) {
+void MyModule::registerTabs(ITabRegistry& registry) {
     // Top-level tab with custom icon and JavaScript
     registry.addTab("Weather", nullptr, 50, kWeatherIcon, "/weather.js");
 }
@@ -61,7 +61,7 @@ void MyModule::registerTabs(TabRegistry& registry) {
 Multi-tab modules register all their tabs in a single override:
 
 ```cpp
-void AuthManager::registerTabs(TabRegistry& registry) {
+void AuthManager::registerTabs(ITabRegistry& registry) {
     registry.addTab("Security", nullptr, 5, getTabIcon()); // parent tab
     registry.addTab("Password", "Security", 10);            // child tab
     registry.addTab("TLS",      "Security", 20);            // child tab
@@ -86,7 +86,7 @@ void AuthManager::registerTabs(TabRegistry& registry) {
 If your module registers routes but has no visible tab, provide an empty `registerTabs()`:
 
 ```cpp
-void PreconditionWebContributor::registerTabs(TabRegistry& registry) {
+void PreconditionWebContributor::registerTabs(ITabRegistry& registry) {
     // API-only — no visible tab.
 }
 ```

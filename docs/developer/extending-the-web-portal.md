@@ -24,10 +24,10 @@ Called during the boot phase (`WebServerManager::begin()`). This is where you re
 void registerRoutes(PsychicHttpServer& server) override;
 ```
 
-#### `registerTabs(TabRegistry& registry)`
+#### `registerTabs(ITabRegistry& registry)`
 Called during the boot phase (`WebServerManager::begin()`). This is where you declare your module's navigation tabs. Each call to `registry.addTab()` registers one tab entry.
 ```cpp
-void registerTabs(TabRegistry& registry) override {
+void registerTabs(ITabRegistry& registry) override {
     registry.addTab("MyApp", nullptr, 100, nullptr, "/myapp.js");
     // name:   "MyApp"      — user-facing tab label
     // parent: nullptr       — top-level (use "System" for sub-pills)

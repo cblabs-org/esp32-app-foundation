@@ -28,7 +28,7 @@
  *
  *   IWebContributor:
  *   - registerRoutes():      Registers custom REST endpoints with the web server.
- *   - registerTabs():        Register navigation tabs via TabRegistry.
+ *   - registerTabs():        Register navigation tabs via ITabRegistry.
  *   - getApiPrefix():        API path prefix for body-size middleware.
  *   - getMaxPostBody():      Max POST/PUT body size (default: 4096).
  *
@@ -180,9 +180,9 @@ void MyApp::registerRoutes(PsychicHttpServer& server) {
 
 /**
  * @brief Register the MyApp tab as a top-level navigation tab.
- * @param registry  The TabRegistry to register tabs with.
+ * @param registry  The ITabRegistry to register tabs with.
  */
-void MyApp::registerTabs(TabRegistry& registry) {
+void MyApp::registerTabs(ITabRegistry& registry) {
     registry.addTab("MyApp", nullptr, 100);
     // TODO: Change "MyApp" and 100 to your tab name and desired order
 }
@@ -220,7 +220,7 @@ void MyApp::registerMCPTools(MCPToolRegistry& registry) {
 // IPreconditionContributor Implementation
 // =============================================================================
 
-void MyApp::registerPreconditions(PreconditionRegistry& reg) {
+void MyApp::registerPreconditions(IPreconditionRegistry& reg) {
     reg.add("MyApp Ready", PreconditionRole::Operational,
         [this]() -> PreconditionStatus {
             return _ready

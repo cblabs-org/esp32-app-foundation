@@ -1,6 +1,6 @@
 #pragma once
 
-#include "utils/PreconditionRegistry.hpp"
+#include "interfaces/IPreconditionRegistry.hpp"
 #include <cstdint>
 
 constexpr size_t MAX_PRECONDITIONS = 16;
@@ -9,8 +9,8 @@ constexpr size_t MAX_EDGES_PER_PRECONDITION = 8;
 struct PreconditionState {
     const char* name;
     PreconditionRole role;
-    PreconditionRegistry::EvalFn evaluate;
-    PreconditionRegistry::DescribeFn describe;
+    IPreconditionRegistry::EvalFn evaluate;
+    IPreconditionRegistry::DescribeFn describe;
     const Edge* edges;
     uint8_t edgeCount;
     // Resolved edge indices (CG-7)
@@ -34,7 +34,7 @@ struct PreconditionState {
     uint32_t cooldownMs = 0;
 };
 
-class PreconditionEngine : public PreconditionRegistry {
+class PreconditionEngine : public IPreconditionRegistry {
 public:
     void add(const char* name,
              PreconditionRole role,

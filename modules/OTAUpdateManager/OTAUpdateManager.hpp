@@ -49,7 +49,7 @@
  *
  *   IWebContributor (tab: "OTA", parent: "System", order: 50):
  *   - registerRoutes():       Register REST API routes
- *   - registerTabs():         Register "OTA" tab (parent: "System", order: 50) via TabRegistry.
+ *   - registerTabs():         Register "OTA" tab (parent: "System", order: 50) via ITabRegistry.
  *
  *   IConfigurable (namespace: "ota", schema v5):
  *   - getConfigNamespace():   Return "ota"
@@ -291,9 +291,9 @@ public:
 
     /**
      * @brief Register the OTA tab in the System sub-navigation.
-     * @param registry  The TabRegistry to register tabs with.
+     * @param registry  The ITabRegistry to register tabs with.
      */
-    void registerTabs(TabRegistry& registry) override {
+    void registerTabs(ITabRegistry& registry) override {
         registry.addTab("OTA", "System", 50, nullptr, "/ota.js");
     }
 

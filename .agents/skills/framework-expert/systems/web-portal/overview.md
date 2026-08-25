@@ -22,8 +22,8 @@ To contribute tabs, implement the following virtual overrides in your module:
 
 * `virtual void registerRoutes(PsychicHttpServer& server) = 0`
   Registers the module's REST API route handlers with the web server. It is also where the module registers the route serving its JavaScript file — canonically via the gzip+PROGMEM pipeline and the shared `serveGzipAsset()` helper (see [html-js-fragments.md](html-js-fragments.md)), not a raw-string literal.
-* `virtual void registerTabs(TabRegistry& registry) = 0`
-  Registers one or more navigation tabs via the `TabRegistry` visitor pattern. Call `registry.addTab(name, parent, order, icon, script)` for each tab. A single module can register multiple tabs (e.g., AuthManager registers Security, Password, and TLS tabs in one call). Return without calling `addTab()` if the module registers API routes but does not require a UI tab.
+* `virtual void registerTabs(ITabRegistry& registry) = 0`
+  Registers one or more navigation tabs via the `ITabRegistry` visitor pattern. Call `registry.addTab(name, parent, order, icon, script)` for each tab. A single module can register multiple tabs (e.g., AuthManager registers Security, Password, and TLS tabs in one call). Return without calling `addTab()` if the module registers API routes but does not require a UI tab.
 * `virtual const char* getApiPrefix() const` *(optional)*
   Returns the API path prefix for body-size middleware matching (e.g., `"/api/weather"`). Return `nullptr` (default) if no special body-limit is needed.
 * `virtual size_t getMaxPostBody() const` *(optional)*

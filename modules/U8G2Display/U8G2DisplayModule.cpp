@@ -756,7 +756,7 @@ const char* U8G2DisplayModule::getTabIcon() const {
            "<line x1=\"12\" y1=\"17\" x2=\"12\" y2=\"21\"/>";
 }
 
-void U8G2DisplayModule::registerTabs(TabRegistry& registry) {
+void U8G2DisplayModule::registerTabs(ITabRegistry& registry) {
     registry.addTab("Display", nullptr, 50, getTabIcon(), "/display.js");
     registry.addTab("Settings",   "Display", 10);
     registry.addTab("Screenshot", "Display", 20);
