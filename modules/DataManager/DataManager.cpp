@@ -425,6 +425,18 @@ uint32_t DataManager::getCurrentTimeMs() const {
 }
 
 void DataManager::processNext() {
+#ifdef ESP_PLATFORM
+    // On target the worker task drives this loop. Calling from any other
+    // task would run blocking network I/O on the caller (e.g. loopTask)
+    // without supervision, and corrupt the caller's TWDT state via
+    // startFetchWatchdog()/stopFetchWatchdog(). Refuse outright. See #156.
+    if (xTaskGetCurrentTaskHandle() != _workerTask) {
+        ESP_LOGE(TAG, "processNext() called from %s — native/test only, "
+                 "the worker task drives this loop on target",
+                 pcTaskGetName(NULL));
+        return;
+    }
+#endif
     drainJobs(true);
     executeLoop();
     drainJobs(false);
@@ -447,8 +459,15 @@ void DataManager::fetchWatchdogCb(void* arg) {
 }
 
 void DataManager::startFetchWatchdog() {
-    // NOTE: esp_task_wdt_delete(NULL)/esp_task_wdt_add(NULL) act on the CALLING
-    // task. Both helpers are worker-task-only — see the header for the contract.
+    // Guard: these helpers act on the CALLING task's TWDT subscription.
+    // Invoking from any task other than the worker silently corrupts that
+    // task's watchdog state — see #156.
+    if (xTaskGetCurrentTaskHandle() != _workerTask) {
+        ESP_LOGE(TAG, "startFetchWatchdog() called from wrong task (%s) — "
+                 "only the DataManager worker may call this",
+                 pcTaskGetName(NULL));
+        return;
+    }
     esp_task_wdt_delete(NULL);  // temporarily unsubscribe worker
     if (_fetchWatchdog) {
         esp_timer_start_periodic(_fetchWatchdog, 2000000);  // check every 2s
@@ -456,6 +475,12 @@ void DataManager::startFetchWatchdog() {
 }
 
 void DataManager::stopFetchWatchdog() {
+    if (xTaskGetCurrentTaskHandle() != _workerTask) {
+        ESP_LOGE(TAG, "stopFetchWatchdog() called from wrong task (%s) — "
+                 "only the DataManager worker may call this",
+                 pcTaskGetName(NULL));
+        return;
+    }
     if (_fetchWatchdog) {
         esp_timer_stop(_fetchWatchdog);
     }
