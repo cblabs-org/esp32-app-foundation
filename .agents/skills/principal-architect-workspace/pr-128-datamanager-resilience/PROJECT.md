@@ -69,7 +69,7 @@ from the 2026-08-26 review:
 - **[x] [wo4-watchdog-replacement](wo4-watchdog-replacement/WORKORDER.md):** Feed-on-progress TWDT; delete `esp_timer` + `abort()`; injectable deadline → quarantine (not reboot); TWDT reconfigured via `esp_task_wdt_reconfigure()` around fetches; 120s far-outer backstop. ✅ Complete (`85601880`).
 - **[x] [wo5-health-surfacing](wo5-health-surfacing/WORKORDER.md):** EventBus `data.source.health` (publish after mutex release) + REST `/api/data/sources` + `/api/data/sources/reset` + portal cards with state badges and reset button + display (vector+mutex deferred pattern) + MCP `get_data_sources`. ✅ Complete (`519ffcb5`).
 - **[ ] wo6-job-fetch-isolation:** Urgent jobs behind scheduled fetches — mechanism chosen after WO3 measures bound. **Re-plan gate after WO3.**
-- **[ ] [wo7-docs-migration](wo7-docs-migration/WORKORDER.md):** FetchContext contract docs + downstream migration guide + framework-expert skill.
+- **[x] [wo7-docs-migration](wo7-docs-migration/WORKORDER.md):** FetchContext contract doc + fetchUpdate migration guide (Path A/B) + framework-expert skill update (triggers, interfaces, event-bus, MCP, portal routes). ✅ Complete (`1f2e0a56`).
 
 ## Worker Model Mapping
 
@@ -160,6 +160,29 @@ All WOs are **strictly serialised** — DataManager.cpp is touched by four WOs.
 - Worker noted: `sample-app/main.cpp`, `src/main.cpp`, `template-app/main.cpp` updated for
   `MCPServer::begin()` signature change (added `DataManager*` param).
 
+### 2026-08-26 — Session 3e (WO7 Execution)
+- WO7 complete (`1f2e0a56`): Documentation-only WO, 7 files changed.
+- Created `docs/developer/fetch-context-contract.md` (252 lines) — full FetchContext contract
+  with ASCII ownership diagram, DeadlineToken API, policy constants, health state machine.
+- Created `docs/developer/migration-guide-fetchupdate.md` (329 lines) — Path A (minimum viable,
+  5 min) and Path B (recommended full migration) with before/after WeatherModule examples.
+- Updated `framework-expert/SKILL.md` — added `FetchContext`, `DeadlineToken`,
+  `DataSourceHealthPayload`, `data.source.health`, `get_data_sources` to triggers.
+  Added 30-line "Data Source Resilience Architecture" section.
+- Updated 4 framework-expert reference docs (data-source, event-bus topics, MCP, portal routes).
+- Updated `docs/developer/scheduling-data-fetches.md` and `README.md` index.
+
+### Project Completion Summary
+- **WO1–WO5 + WO7**: All complete. WO6 (job/fetch isolation) remains re-plan gated.
+- **Stack tip**: `128-dm-resilience/wo7-docs-migration` at `d930c15b`.
+- **Total delta from `main`**: 40 files, +2571/-728.
+- **Test count**: 832 native tests passing (was 830 at start).
+- **Both target builds**: `esp32dev` and `crowpanel-128-rotary` green throughout.
+- **Issue #128 closing conditions**:
+  1. ✅ "Never resets the device" — `abort()` deleted, deadline → quarantine.
+  2. ✅ "Says what is wrong" — portal, display, MCP, REST, EventBus all wired.
+- **Remaining**: WO6 (job/fetch isolation) deferred to post-hardware-measurement re-plan.
+
 ---
 
-*Created: 2026-08-20. Status: **IN PROGRESS** — WO1/WO2 merged (PR #145), WO3–WO7 pending.*
+*Created: 2026-08-20. Status: **READY FOR PR** — WO1-WO5+WO7 complete. WO6 re-plan gated.*
