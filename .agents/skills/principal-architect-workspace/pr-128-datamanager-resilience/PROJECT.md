@@ -67,7 +67,7 @@ from the 2026-08-26 review:
 - **[x] [wo2-source-health-backoff](wo2-source-health-backoff/WORKORDER.md):** Health state, `UpdateStatus`-differentiated policy, backoff + recovery probe + defined quarantine exit. ✅ Complete (PR #145).
 - **[x] [wo3-fetch-context-transport](wo3-fetch-context-transport/WORKORDER.md):** **BREAKING**: `fetchUpdate(const FetchContext&)` — deadline token + DNS bounding constant + framework-owned bounded client; WeatherModule migrated; cert-bundle hack moved to DataManager; `queueDataJob` closure updated to accept `FetchContext`. ✅ Complete (`8cb4da87`).
 - **[x] [wo4-watchdog-replacement](wo4-watchdog-replacement/WORKORDER.md):** Feed-on-progress TWDT; delete `esp_timer` + `abort()`; injectable deadline → quarantine (not reboot); TWDT reconfigured via `esp_task_wdt_reconfigure()` around fetches; 120s far-outer backstop. ✅ Complete (`85601880`).
-- **[ ] [wo5-health-surfacing](wo5-health-surfacing/WORKORDER.md):** EventBus `data.source.health` (publish after mutex release) + REST `/api/data/sources` + portal cards + display (signal-only deferred flag) + MCP `get_data_sources`.
+- **[x] [wo5-health-surfacing](wo5-health-surfacing/WORKORDER.md):** EventBus `data.source.health` (publish after mutex release) + REST `/api/data/sources` + `/api/data/sources/reset` + portal cards with state badges and reset button + display (vector+mutex deferred pattern) + MCP `get_data_sources`. ✅ Complete (`519ffcb5`).
 - **[ ] wo6-job-fetch-isolation:** Urgent jobs behind scheduled fetches — mechanism chosen after WO3 measures bound. **Re-plan gate after WO3.**
 - **[ ] [wo7-docs-migration](wo7-docs-migration/WORKORDER.md):** FetchContext contract docs + downstream migration guide + framework-expert skill.
 
@@ -143,6 +143,22 @@ All WOs are **strictly serialised** — DataManager.cpp is touched by four WOs.
   now that cross-task watchdog is gone). `getFetchElapsedMs()` deleted.
 - Closes #128 closing condition 1: "never resets the device".
 - 830+ native tests pass, both target builds green.
+
+### 2026-08-26 — Session 3d (WO5 Execution)
+- WO5 complete (`519ffcb5`): Health surfacing across all 5 framework surfaces.
+  18 files changed, +437/-13. 832 native tests pass.
+- **EventBus**: `data.source.health` published from DataManager worker task (new threading
+  precedent — `esp_event_post()` is thread-safe). B5 fix: transition recorded inside
+  `_registryMutex`, published after lock release using pending-transition fields on `SourceRecord`.
+- **REST**: `GET /api/data/sources` and `POST /api/data/sources/reset` via `DataSourceWebContributor`
+  inner class on Application (follows `PreconditionWebContributor` pattern).
+- **Portal**: Data Sources card with state badges (Healthy✓/Degraded⏳/Quarantined✗/Suspended⏸),
+  neverConnected distinction, Reset button for Suspended sources, auto-refresh.
+- **Display**: Both U8G2 and LVGL use vector+mutex+atomic deferred pattern (N6 satisfied —
+  no single-slot drop). Virtual `onDataSourceHealth()` stubs on screen interfaces.
+- **MCP**: `get_data_sources` tool added to `MCPBuiltinTools` via `BuiltinToolsContext.dataManager`.
+- Worker noted: `sample-app/main.cpp`, `src/main.cpp`, `template-app/main.cpp` updated for
+  `MCPServer::begin()` signature change (added `DataManager*` param).
 
 ---
 
