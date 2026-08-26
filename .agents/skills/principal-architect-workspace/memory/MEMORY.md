@@ -1,5 +1,5 @@
 # Principal Architect Memory
-<!-- Last updated: 2026-08-25T22:42:00+01:00 -->
+<!-- Last updated: 2026-08-26T10:13:00+01:00 -->
 
 ## Active Programs
 | Program | Plan | Status |
@@ -9,7 +9,7 @@
 ## Active Projects
 | Project | Status | Modules | Context |
 |---|---|---|---|
-| _(none)_ | | | |
+| pr-128-datamanager-resilience | WO3/7 (resumed) | DataManager, IDataSource, FetchContext, Application, MCPServer, Display, Portal | [PROJECT.md](../pr-128-datamanager-resilience/PROJECT.md) |
 
 ## Recently Completed (last 5)
 | Project | Completed | Modules | Key Outcome |
