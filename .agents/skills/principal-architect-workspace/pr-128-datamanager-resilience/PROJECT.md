@@ -15,6 +15,7 @@ description: Resolve #128 — a data source that cannot be reached must degrade 
 - [x] Re-decomposition approved by human: 2026-08-26 — WO3–WO7 refreshed against `f97d17ce`
       after PRs 149/150/151/157 merged. Full review with 6 blocking issues (B1–B6) resolved.
 - [x] API-breaking changes to `IDataSource` authorised by human: 2026-08-20.
+- [x] WO8 (four-layer review fixes) approved by human: 2026-08-26 — "proceed with this plan".
 
 ## Architectural Position
 
@@ -68,8 +69,9 @@ from the 2026-08-26 review:
 - **[x] [wo3-fetch-context-transport](wo3-fetch-context-transport/WORKORDER.md):** **BREAKING**: `fetchUpdate(const FetchContext&)` — deadline token + DNS bounding constant + framework-owned bounded client; WeatherModule migrated; cert-bundle hack moved to DataManager; `queueDataJob` closure updated to accept `FetchContext`. ✅ Complete (`8cb4da87`).
 - **[x] [wo4-watchdog-replacement](wo4-watchdog-replacement/WORKORDER.md):** Feed-on-progress TWDT; delete `esp_timer` + `abort()`; injectable deadline → quarantine (not reboot); TWDT reconfigured via `esp_task_wdt_reconfigure()` around fetches; 120s far-outer backstop. ✅ Complete (`85601880`).
 - **[x] [wo5-health-surfacing](wo5-health-surfacing/WORKORDER.md):** EventBus `data.source.health` (publish after mutex release) + REST `/api/data/sources` + `/api/data/sources/reset` + portal cards with state badges and reset button + display (vector+mutex deferred pattern) + MCP `get_data_sources`. ✅ Complete (`519ffcb5`).
-- **[ ] wo6-job-fetch-isolation:** Urgent jobs behind scheduled fetches — mechanism chosen after WO3 measures bound. **Re-plan gate after WO3.**
+- **[x] wo6-job-fetch-isolation:** Superseded — fetch isolation now addressed by WO8 Layer 3+4 (bounded DNS + fd escalation). No separate WO needed.
 - **[x] [wo7-docs-migration](wo7-docs-migration/WORKORDER.md):** FetchContext contract doc + fetchUpdate migration guide (Path A/B) + framework-expert skill update (triggers, interfaces, event-bus, MCP, portal routes). ✅ Complete (`1f2e0a56`).
+- **[ ] [wo8-review-fixes](wo8-review-fixes/WORKORDER.md):** PR #159 review fixes — four-layer bounded transport architecture: (1) bound transport from deadline, (2) TWDT unsub/resub matching OTA precedent, (3) bounded DNS via lwIP async, (4) fd shutdown escalation. Plus DeadlineToken encapsulation, dangling payload fix, shared state strings, hoisted client, doc updates.
 
 ## Worker Model Mapping
 
@@ -80,6 +82,7 @@ from the 2026-08-26 review:
 | WO5 | `standard` | `flash` |
 | WO6 | `standard` | `flash` |
 | WO7 | `standard` | `flash` |
+| WO8 | `architect` | `pro` |
 
 ## Concurrency Analysis
 
@@ -183,6 +186,25 @@ All WOs are **strictly serialised** — DataManager.cpp is touched by four WOs.
   2. ✅ "Says what is wrong" — portal, display, MCP, REST, EventBus all wired.
 - **Remaining**: WO6 (job/fetch isolation) deferred to post-hardware-measurement re-plan.
 
+### 2026-08-26 — Session 3f (PR #159 Review Response + WO8)
+- PR #159 received 3 consumer review comments (14 findings total).
+  - 3 🔴 blockers: RAII TWDT guard, save/restore, dangling payload pointer.
+  - 5 🟠 improvements: DeadlineToken encapsulation, transport bounding, state strings.
+  - 6 🟡 enhancements: hoisted client, dead code, doc fixes.
+- ADR review (external) identified 5 factual corrections (F1–F5):
+  - F1: Main loop is NOT a TWDT subscriber (our own TWDT-AUDIT §3 says so).
+  - F2: `esp_task_wdt_reconfigure()` re-arms via `wdt_hal_feed()` — worse than widen.
+  - F3: True non-cooperative worst case is ~150s not ~30s (handshake_timeout=120s unconfigured).
+  - F4: Option C permanent-split is ~+1-2KB not +12KB.
+  - F5: Bounding transport from deadline (~10 lines) is the highest-value fix.
+- **Architectural decision**: Replace global TWDT widen (Option A) with unsub/resub (Option B),
+  matching OTA precedent at `OTAUpdateManager.cpp:666-671`. Four-layer architecture:
+  Layer 1 (bound transport), Layer 2 (unsub/resub), Layer 3 (bounded DNS), Layer 4 (fd escalation).
+- WO6 superseded — fetch isolation addressed by WO8 Layers 3+4.
+- **Human approved WO8 decomposition**: 2026-08-26 — "please take on the role of
+  /principal-architect and proceed with this plan".
+- WO8 created (`wo8-review-fixes/WORKORDER.md`), complexity `architect`, model `pro`.
+
 ---
 
-*Created: 2026-08-20. Status: **READY FOR PR** — WO1-WO5+WO7 complete. WO6 re-plan gated.*
+*Created: 2026-08-20. Status: **WO8 IN PROGRESS** — WO1-WO5+WO7 complete, WO8 executing.*
