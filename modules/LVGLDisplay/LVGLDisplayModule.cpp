@@ -202,6 +202,15 @@ void LVGLDisplayModule::begin(EventBus* eventBus) {
         _eventBus->subscribe(ApplicationEvents::APP_CONFIGURING, _onAppConfiguring, this);
         _eventBus->subscribe(ApplicationEvents::APP_RUNNING, _onAppRunning, this);
         _eventBus->subscribe(ApplicationEvents::PRECONDITION_HEALTH, _onPreconditionHealth, this);
+        _eventBus->subscribe(ApplicationEvents::DATA_SOURCE_HEALTH, [](const char*, const void* payload, void* ctx) {
+            auto* self = static_cast<LVGLDisplayModule*>(ctx);
+            const auto* p = static_cast<const DataSourceHealthPayload*>(payload);
+            if (self && p) {
+                std::lock_guard<std::mutex> lock(self->_dataSourceHealthMutex);
+                self->_dataSourceUpdates.push_back(*p);
+                self->_pendingDataSourceHealth.store(true);
+            }
+        }, this);
 
         // Wake display on any physical input (encoder, button, touch).
         // These fire independently of LVGL's lv_timer_handler().
@@ -328,6 +337,20 @@ void LVGLDisplayModule::tick(uint32_t now) {
         PreconditionHealthPayload p = _pendingPreconditionPayload;
         if (_screens != nullptr) {
             _screens->onPreconditionHealth(&p);
+        }
+    }
+
+    if (_pendingDataSourceHealth.exchange(false)) {
+        std::vector<DataSourceHealthPayload> updates;
+        {
+            std::lock_guard<std::mutex> lock(_dataSourceHealthMutex);
+            updates = _dataSourceUpdates;
+            _dataSourceUpdates.clear();
+        }
+        for (const auto& payload : updates) {
+            if (_screens) {
+                _screens->onDataSourceHealth(payload.name, payload.state);
+            }
         }
     }
 

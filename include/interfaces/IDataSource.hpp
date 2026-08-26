@@ -26,6 +26,7 @@
 
 #pragma once
 #include <stdint.h>
+#include "types/FetchContext.hpp"
 
 /** @brief Result codes for a single IDataSource::fetchUpdate() execution. */
 enum class UpdateStatus : uint8_t {
@@ -126,14 +127,16 @@ public:
      *       a long-running fetch blocks all other registered data sources and
      *       queued jobs until it returns.
      *
-     *       IMPORTANT: Implementations MUST set client-level timeouts (e.g.
-     *       HTTPClient::setTimeout()) to bound network operations. The framework
-     *       enforces a 30-second hard deadline — fetches exceeding 30 s trigger
-     *       an abort/reboot. Fetches exceeding 15 s log a warning.
+     *       The framework provides a FetchContext with a bounded deadline and, for HTTP sources,
+     *       a pre-configured TLS client. Consumers SHOULD use ctx.deadline.isExpired() to bail early
+     *       on long operations. Consumers MUST NOT build their own scheduling backoff — the framework
+     *       owns scheduling (when to call fetchUpdate() again); the consumer owns transport retry
+     *       (what happens inside one fetch).
      *
+     * @param ctx The FetchContext provided by the framework.
      * @return UpdateStatus indicating the result of the fetch operation.
      */
-    virtual UpdateStatus fetchUpdate() = 0;
+    virtual UpdateStatus fetchUpdate(const FetchContext& ctx) = 0;
 
     /**
      * @brief Return the desired polling interval in milliseconds.
@@ -143,11 +146,9 @@ public:
 
     /**
      * @brief Return a human-readable name for this data source.
-     *
-     * @warning The returned pointer MUST have static or application lifetime.
-     *          The framework stores it by reference in health snapshots and log
-     *          output; a name backed by a member that dies with the source will
-     *          dangle. Return a string literal or a static buffer.
+     * 
+     * @note The returned pointer MUST have static or source-outliving lifetime.
+     *       The framework stores this pointer for deferred event publishing.
      *
      * @return Null-terminated string identifier used in logs and EventBus topics.
      */

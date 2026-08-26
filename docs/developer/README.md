@@ -20,19 +20,21 @@ For the best developer experience, read the core guides in order:
 7. [Event Bus](event-bus.md) — Implement decoupled, event-driven cross-module communication.
 8. [Using Optional Modules](using-optional-modules.md) — The display subsystem (carousel, custom boards, screensaver), replacing the display hardware, and the `NATIVE_BUILD` guard pattern.
 9. [Scheduling Data Fetches](scheduling-data-fetches.md) — Background data workers via `IDataSource` and `DataManager`, including thread safety patterns.
-10. [Build System](build-system.md) — PlatformIO environments, version injection, partition schemes, and the LittleFS filesystem.
+10. [FetchContext Contract](fetch-context-contract.md) — The data source resilience contract, cooperative deadlines, TLS client lifecycle, and health state machine (#128).
+11. [Build System](build-system.md) — PlatformIO environments, version injection, partition schemes, and the LittleFS filesystem.
 
 ## Advanced Topics
 
 Once you are building or shipping an application, read these for production readiness:
 
-11. [Performance & Optimization](performance-guide.md) — RAM/flash budgeting, heap management, TLS memory costs, PSRAM usage, and profiling techniques.
-12. [Embedded Safety](embedded-safety.md) — Thread safety rules, memory allocation constraints, power management, and the design graveyard (10 rejected approaches with full rationale).
-13. [Security](security.md) — Threat model, hardware encryption, credential storage, TLS tradeoffs, web portal authentication, and OTA firmware integrity.
-14. [MCP Server](mcp-server.md) — The Model Context Protocol server, tool registration via `IMCPContributor`, built-in tools, and HTTP JSON-RPC transport.
-15. [OTA Update System](ota-update-system.md) — The complete OTA lifecycle: state machine, release channels, config snapshots, multi-board manifests, error codes, and deployment procedures.
-16. [Custom Board Authoring Guide](custom-boards.md) — Author custom board definitions and pinouts for downstream repos with zero framework edits (HC-11).
-17. [Reporting Framework Issues](issue-management.md) — How to raise, label, and track defects on the framework repo; the consumer-pointer convention for audit files.
+12. [Performance & Optimization](performance-guide.md) — RAM/flash budgeting, heap management, TLS memory costs, PSRAM usage, and profiling techniques.
+13. [Embedded Safety](embedded-safety.md) — Thread safety rules, memory allocation constraints, power management, and the design graveyard (10 rejected approaches with full rationale).
+14. [Security](security.md) — Threat model, hardware encryption, credential storage, TLS tradeoffs, web portal authentication, and OTA firmware integrity.
+15. [MCP Server](mcp-server.md) — The Model Context Protocol server, tool registration via `IMCPContributor`, built-in tools, and HTTP JSON-RPC transport.
+16. [OTA Update System](ota-update-system.md) — The complete OTA lifecycle: state machine, release channels, config snapshots, multi-board manifests, error codes, and deployment procedures.
+17. [Custom Board Authoring Guide](custom-boards.md) — Author custom board definitions and pinouts for downstream repos with zero framework edits (HC-11).
+18. [Reporting Framework Issues](issue-management.md) — How to raise, label, and track defects on the framework repo; the consumer-pointer convention for audit files.
+19. [Migration Guide: fetchUpdate](migration-guide-fetchupdate.md) — Downstream migration guide for the breaking `fetchUpdate(const FetchContext&)` and `queueDataJob()` APIs.
 
 ## Quick Reference
 

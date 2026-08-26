@@ -131,11 +131,11 @@ void setup() {
 #ifdef WITH_MCP
     mcpServer.begin(app.getMcpContributors(), &app.getConfigManager(), 
 #ifdef WITH_TIME
-        &timeManager,
+        &timeManager, 
 #else
         nullptr,
 #endif
-        &app.getWifiManager(), &app.getAuthManager());
+        &app.getWifiManager(), &app.getAuthManager(), &app.getDataManager());
 #endif
 
 #if defined(WITH_DISPLAY_U8G2) || defined(WITH_DISPLAY_LVGL)

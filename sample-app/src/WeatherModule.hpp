@@ -386,11 +386,13 @@ public:
      *
      * Runs on the DataManager background task. Uses WiFiClientSecure with the
      * ESP-IDF certificate bundle for TLS verification. Parsed values are stored
-     * in atomic/mutex-protected fields for thread-safe access.
+     * Retrieves current conditions from OpenWeatherMap, parsing the JSON stream
+     * in place.
      *
+     * @param ctx The transport context provided by the framework.
      * @return UpdateStatus indicating success, error type, or rate limiting.
      */
-    UpdateStatus fetchUpdate() override;
+    UpdateStatus fetchUpdate(const FetchContext& ctx) override;
 
     /** @brief Returns the configured polling interval in milliseconds (default: 600000ms / 10min). */
     uint32_t getUpdateIntervalMs() const override { return _pollingIntervalMs; }

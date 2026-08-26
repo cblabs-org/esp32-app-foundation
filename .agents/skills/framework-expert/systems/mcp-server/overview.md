@@ -18,6 +18,7 @@ Registered by `MCPBuiltinTools` — framework-level, available on every device:
 | `reboot` | Restart device (1s delay for response flush) | **Yes** |
 | `get_logs` | Log buffer (placeholder — ring-buffer logger planned) | No |
 | `list_tools` | Enumerate all registered tools with descriptions and schemas | No |
+| `get_data_sources` | Returns current state, failure counts, backoffs for all data sources | No |
 
 ### Module-Contributed Tools (dynamic)
 Any module implementing `IMCPContributor` registers tools via `registerMCPTools()` at boot. These are auto-discovered — you never need to update a catalog. Current framework modules contribute:

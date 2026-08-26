@@ -190,7 +190,7 @@ void setup() {
 #else
         nullptr,
 #endif
-        &app.getWifiManager(), &app.getAuthManager());
+        &app.getWifiManager(), &app.getAuthManager(), &app.getDataManager());
 #endif
 
 #if defined(WITH_DISPLAY_U8G2) || defined(WITH_DISPLAY_LVGL)
