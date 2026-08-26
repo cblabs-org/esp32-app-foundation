@@ -836,18 +836,7 @@ void Application::PreconditionWebContributor::registerRoutes(PsychicHttpServer& 
     });
 }
 
-namespace {
-    const char* sourceStateToString(SourceHealthState state) {
-        switch (state) {
-            case SourceHealthState::Healthy: return "Healthy";
-            case SourceHealthState::Degraded: return "Degraded";
-            case SourceHealthState::Quarantined: return "Quarantined";
-            case SourceHealthState::Suspended: return "Suspended";
-            case SourceHealthState::Unknown: return "Unknown";
-            default: return "Unknown";
-        }
-    }
-}
+
 
 void Application::DataSourceWebContributor::registerRoutes(PsychicHttpServer& server) {
     if (!app) return;
@@ -901,7 +890,6 @@ void Application::DataSourceWebContributor::registerRoutes(PsychicHttpServer& se
         }
 
         DataManager& dm = app->getDataManager();
-        size_t count = dm.getSourceCount();
         IDataSource* target = nullptr;
         
         // Iterate Application's _dataSources to find the IDataSource* by name.

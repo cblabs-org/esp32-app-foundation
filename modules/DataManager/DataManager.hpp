@@ -27,6 +27,10 @@
 #include "interfaces/IDataSource.hpp"
 #include "types/FetchContext.hpp"
 
+#ifdef ESP_PLATFORM
+struct FrameworkSecureClient;
+#endif
+
 #include <Arduino.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
@@ -255,8 +259,6 @@ private:
         bool              backoffFromRateLimit = false;
 
         DataSourceHealthPayload _healthPayload;
-        const char* _pendingHealthName = nullptr;
-        SourceHealthState _pendingHealthState = SourceHealthState::Unknown;
         bool _hasPendingHealthTransition = false;
     };
 
@@ -274,6 +276,9 @@ private:
     uint32_t _simulatedTimeMs = 0;
     EventBus* _eventBus = nullptr;
 
+#ifdef ESP_PLATFORM
+    FrameworkSecureClient* _secureClient = nullptr;
+#endif
 
     static void workerTaskLoop(void* param);
     void executeLoop();

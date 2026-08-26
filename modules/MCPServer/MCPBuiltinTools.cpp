@@ -26,6 +26,7 @@
 #include "JsonPatch.hpp"
 #include "TimeManager.hpp"
 #include "DataManager.hpp"
+#include "events/DataSourceHealthPayload.hpp"
 #include <ArduinoJson.h>
 
 // ---------------------------------------------------------------------------
@@ -483,14 +484,7 @@ void mcpBuiltinTools::registerAll(MCPToolRegistry& registry,
                     JsonObject src = sourcesArray.add<JsonObject>();
                     src["name"] = health.name;
                     
-                    switch(health.state) {
-                        case SourceHealthState::Healthy:     src["state"] = "HEALTHY"; break;
-                        case SourceHealthState::Degraded:    src["state"] = "DEGRADED"; break;
-                        case SourceHealthState::Quarantined: src["state"] = "QUARANTINED"; break;
-                        case SourceHealthState::Suspended:   src["state"] = "SUSPENDED"; break;
-                        case SourceHealthState::Unknown:     src["state"] = "UNKNOWN"; break;
-                        default:                             src["state"] = "UNKNOWN"; break;
-                    }
+                    src["state"] = sourceStateToString(health.state);
                     
                     src["consecutive_failures"] = health.consecutiveFailures;
                     src["ms_since_last_fetch"] = health.lastAttemptMs == 0 ? 0 : millis() - health.lastAttemptMs;

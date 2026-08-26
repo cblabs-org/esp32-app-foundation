@@ -25,3 +25,14 @@ struct DataSourceHealthPayload {
     const char*       name;   ///< Source name (static lifetime)
     SourceHealthState state;  ///< New health state after transition
 };
+
+inline const char* sourceStateToString(SourceHealthState state) {
+    switch (state) {
+        case SourceHealthState::Healthy:     return "Healthy";
+        case SourceHealthState::Degraded:    return "Degraded";
+        case SourceHealthState::Suspended:   return "Suspended";
+        case SourceHealthState::Quarantined: return "Quarantined";
+        case SourceHealthState::Unknown:
+        default:                             return "Unknown";
+    }
+}

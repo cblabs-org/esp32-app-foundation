@@ -58,7 +58,11 @@ If you have existing code and want to compile immediately without refactoring in
    ```
 
 > [!WARNING]
-> While Path A fixes compilation, your module will not benefit from cooperative deadline cancellation or the framework-managed certificate bundle. Proceed to Path B as soon as possible.
+> **Path A is transitional. Without polling ctx.deadline.isExpired(), your source relies on the framework's transport timeouts (~15s). Migrate to Path B as soon as possible.**
+
+### Plain-HTTP Consumers
+
+`ctx.client` is a `WiFiClientSecure*` pre-configured for TLS. If your source requires plain HTTP (e.g. communicating with local unencrypted network devices), you must retain your own `WiFiClient` allocation. However, you should still poll `ctx.deadline.isExpired()` during parsing loops to participate in the cooperative timeout, and use `resolveHostBounded` for DNS if doing raw socket work.
 
 ---
 

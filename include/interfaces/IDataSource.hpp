@@ -146,11 +146,9 @@ public:
 
     /**
      * @brief Return a human-readable name for this data source.
-     *
-     * @warning The returned pointer MUST have static or application lifetime.
-     *          The framework stores it by reference in health snapshots and log
-     *          output; a name backed by a member that dies with the source will
-     *          dangle. Return a string literal or a static buffer.
+     * 
+     * @note The returned pointer MUST have static or source-outliving lifetime.
+     *       The framework stores this pointer for deferred event publishing.
      *
      * @return Null-terminated string identifier used in logs and EventBus topics.
      */

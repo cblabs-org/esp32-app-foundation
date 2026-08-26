@@ -126,8 +126,8 @@ The framework coordinates background data fetching via `DataManager` and `IDataS
 `IDataSource::fetchUpdate(const FetchContext& ctx)` receives a `FetchContext` providing:
 - **`ctx.deadline`**: A `DeadlineToken` with `isExpired()`, `isCancelled()`, `remainingMs()`. Long loops (streaming parsers, chunked reads) MUST check `ctx.deadline.isExpired()`.
 - **`ctx.client`**: Pre-configured `WiFiClientSecure*` using the ESP-IDF certificate bundle (`FrameworkSecureClient`). Consumers do NOT construct their own TLS clients or call `setInsecure()`.
-- **Policy Constants**: `FETCH_TOTAL_TIMEOUT_MS = 15000` (15s total budget), `CONNECT_TIMEOUT_MS = 5000`, `DNS_TIMEOUT_MS = 5000`, `FAR_OUTER_BACKSTOP_S = 120` (120s TWDT backstop).
-- **TWDT Supervision**: `DataManager` dynamically reconfigures the TWDT timeout to 120s during active fetches, resetting and restoring the standard 5s timeout immediately on return.
+- **Policy Constants**: `FETCH_TOTAL_TIMEOUT_MS = 15000` (15s total budget), `CONNECT_TIMEOUT_MS = 5000`, `DNS_TIMEOUT_MS = 5000`.
+- **Four-Layer Bounded Transport**: `DataManager` bounds the transport via `setTimeout`, temporarily unsubscribes from the TWDT (`TwdtFetchGuard`), bounds DNS via lwIP timed semaphore, and escalates to `shutdown(fd)` if the deadline expires while blocked.
 
 ### Health State Machine & Exponential Backoff
 A failing source degrades itself; it **never reboots the device**.

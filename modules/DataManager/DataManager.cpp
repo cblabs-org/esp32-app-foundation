@@ -16,16 +16,37 @@
 #include <algorithm>
 
 #ifdef ESP_PLATFORM
-// Forward-declare the Arduino ESP32 ssl_client function we need.
-struct sslclient_context;
-void attach_ssl_certificate_bundle(sslclient_context *ssl_client, bool att);
+#include "types/FrameworkSecureClient.hpp"
+#include "lwip/dns.h"
+#include "lwip/ip_addr.h"
+#include "esp_task_wdt.h"
+#include "lwip/sockets.h"
 
-struct FrameworkSecureClient : public WiFiClientSecure {
-    void useDefaultCertBundle() {
-        attach_ssl_certificate_bundle(sslclient.get(), true);
-        _use_ca_bundle = true;
+/// @brief RAII guard: unsubscribes current task from TWDT for scope lifetime,
+///        resubscribes on destruction. Matches OTAUpdateManager pattern
+///        (OTAUpdateManager.cpp:666-671).
+/// @note The TWDT is a starvation detector. A task parked in select() during
+///       a network fetch is not the failure mode it exists to catch — that is
+///       already answered by the idle tasks. Unsubscription is safe here because:
+///       (1) DeadlineToken provides cooperative cancel,
+///       (2) Layer 1 bounds the transport at ~15s,
+///       (3) Layer 4 escalates via shutdown(fd) if the fetch overruns.
+///       See ADR: TWDT Supervision Strategy.
+/// @warning Proxy-feeding (esp_timer calling esp_task_wdt_reset()) does NOT work:
+///          esp_task_wdt_reset() acts on the CALLING task's handle. From a timer
+///          context it either fails with ESP_ERR_NOT_FOUND or feeds the wrong entry.
+struct TwdtFetchGuard {
+    explicit TwdtFetchGuard() {
+        esp_task_wdt_delete(NULL);
     }
+    ~TwdtFetchGuard() {
+        esp_task_wdt_add(NULL);
+        esp_task_wdt_reset();
+    }
+    TwdtFetchGuard(const TwdtFetchGuard&) = delete;
+    TwdtFetchGuard& operator=(const TwdtFetchGuard&) = delete;
 };
+
 #endif
 
 static constexpr const char* TAG = "DataManager";
@@ -51,6 +72,55 @@ private:
     SemaphoreHandle_t mutex;
 };
 
+#ifdef ESP_PLATFORM
+/// @brief Resolve hostname with a hard deadline bound using lwIP async DNS.
+/// @return true if resolved (result populated), false on timeout or failure.
+static bool resolveHostBounded(const char* hostname, IPAddress& result,
+                                const DeadlineToken& deadline) {
+    // Try numeric first
+    ip_addr_t cached;
+    err_t err = dns_gethostbyname(hostname, &cached, nullptr, nullptr);
+    if (err == ERR_OK) {
+        result = IPAddress(cached.u_addr.ip4.addr);
+        return true;
+    }
+    if (err != ERR_INPROGRESS) return false;
+
+    // Async resolution with deadline-bounded wait
+    struct DnsResult {
+        SemaphoreHandle_t sem;
+        ip_addr_t addr;
+        bool resolved;
+    };
+    DnsResult ctx_dns = { xSemaphoreCreateBinary(), {}, false };
+
+    err = dns_gethostbyname(hostname, &ctx_dns.addr,
+        [](const char*, const ip_addr_t* ipaddr, void* arg) {
+            auto* r = static_cast<DnsResult*>(arg);
+            if (ipaddr) {
+                r->addr = *ipaddr;
+                r->resolved = true;
+            }
+            xSemaphoreGive(r->sem);
+        }, &ctx_dns);
+
+    if (err == ERR_OK) {
+        result = IPAddress(ctx_dns.addr.u_addr.ip4.addr);
+        vSemaphoreDelete(ctx_dns.sem);
+        return true;
+    }
+
+    uint32_t remaining = deadline.remainingMs();
+    bool got = xSemaphoreTake(ctx_dns.sem, pdMS_TO_TICKS(remaining)) == pdTRUE;
+    vSemaphoreDelete(ctx_dns.sem);
+    if (got && ctx_dns.resolved) {
+        result = IPAddress(ctx_dns.addr.u_addr.ip4.addr);
+        return true;
+    }
+    return false;
+}
+#endif
+
 DataManager::DataManager() : _registryMutex(nullptr), _workerTask(nullptr) {
     _registryMutex = xSemaphoreCreateMutex();
 }
@@ -73,6 +143,12 @@ DataManager::~DataManager() {
     if (_registryMutex) {
         vSemaphoreDelete(_registryMutex);
     }
+#ifdef ESP_PLATFORM
+    if (_secureClient) {
+        delete _secureClient;
+        _secureClient = nullptr;
+    }
+#endif
 }
 
 void DataManager::setEventBus(EventBus* bus) {
@@ -84,6 +160,11 @@ void DataManager::begin() {
     if (!_jobQueue) {
         ESP_LOGE(TAG, "Failed to create job queue");
     }
+
+#ifdef ESP_PLATFORM
+    _secureClient = new FrameworkSecureClient();
+    _secureClient->useDefaultCertBundle();
+#endif
 
 
 
@@ -173,28 +254,51 @@ void DataManager::drainJobs(bool urgentOnly) {
         DeadlineToken token(jobStart + FetchContext::FETCH_TOTAL_TIMEOUT_MS, [this]() { return getCurrentTimeMs(); });
         FetchContext ctx{token};
 #ifdef ESP_PLATFORM
-        FrameworkSecureClient secureClient;
-        secureClient.useDefaultCertBundle();
-        ctx.client = &secureClient;
-        esp_task_wdt_config_t wdConfigWide = {
-            .timeout_ms = FetchContext::FAR_OUTER_BACKSTOP_S * 1000,
-            .idle_core_mask = (1 << portNUM_PROCESSORS) - 1,
-            .trigger_panic = true
+        if (_secureClient) {
+            _secureClient->stop();
+            _secureClient->applyDeadline(ctx.deadline);
+        }
+        ctx.client = _secureClient;
+        TwdtFetchGuard wdtGuard;
+
+        esp_timer_handle_t fetchEscalationTimer = nullptr;
+        struct EscalationCtx {
+            WiFiClientSecure* client;
         };
-        esp_task_wdt_reconfigure(&wdConfigWide);
+        EscalationCtx escCtx = { ctx.client };
+
+        esp_timer_create_args_t timerArgs = {};
+        timerArgs.callback = [](void* arg) {
+            auto* e = static_cast<EscalationCtx*>(arg);
+            if (e->client) {
+                int fd = e->client->fd();
+                if (fd >= 0) {
+                    shutdown(fd, SHUT_RDWR);
+                    ESP_LOGW(TAG, "Fetch deadline exceeded — socket shutdown forced");
+                }
+            }
+        };
+        timerArgs.arg = &escCtx;
+        timerArgs.name = "fetch_deadline";
+
+        uint32_t remaining = ctx.deadline.remainingMs();
+        if (remaining > 0) {
+            esp_timer_create(&timerArgs, &fetchEscalationTimer);
+            esp_timer_start_once(fetchEscalationTimer, (uint64_t)remaining * 1000);
+        }
 #endif
 
         entry->job(ctx);
 
 #ifdef ESP_PLATFORM
-        esp_task_wdt_config_t wdConfigRestore = {
-            .timeout_ms = CONFIG_ESP_TASK_WDT_TIMEOUT_S * 1000,
-            .idle_core_mask = (1 << portNUM_PROCESSORS) - 1,
-            .trigger_panic = true
-        };
-        esp_task_wdt_reconfigure(&wdConfigRestore);
-        esp_task_wdt_reset();
+        if (fetchEscalationTimer) {
+            esp_timer_stop(fetchEscalationTimer);
+            esp_timer_delete(fetchEscalationTimer);
+        }
 #endif
+        if (ctx.deadline.isExpired()) {
+            ESP_LOGW(TAG, "Data job '%s' exceeded deadline", entry->options.tag);
+        }
 
         uint32_t elapsed = getCurrentTimeMs() - jobStart;
         if (entry->options.warnAfterMs > 0 && elapsed > entry->options.warnAfterMs) {
@@ -294,8 +398,7 @@ void DataManager::recordFetchOutcome(SourceRecord& r, UpdateStatus status, uint3
 
         if (oldState != r.state) {
             r._hasPendingHealthTransition = true;
-            r._pendingHealthName = r.source->getSourceName();
-            r._pendingHealthState = r.state;
+            r._healthPayload = { r.source->getSourceName(), r.state };
         }
         return;
 
@@ -311,8 +414,7 @@ void DataManager::recordFetchOutcome(SourceRecord& r, UpdateStatus status, uint3
         
         if (oldState != r.state) {
             r._hasPendingHealthTransition = true;
-            r._pendingHealthName = r.source->getSourceName();
-            r._pendingHealthState = r.state;
+            r._healthPayload = { r.source->getSourceName(), r.state };
         }
 
         ESP_LOGE(TAG, "Source '%s' SUSPENDED after auth failure — will not retry until reset",
@@ -341,8 +443,7 @@ void DataManager::recordFetchOutcome(SourceRecord& r, UpdateStatus status, uint3
         
         if (oldState != r.state) {
             r._hasPendingHealthTransition = true;
-            r._pendingHealthName = r.source->getSourceName();
-            r._pendingHealthState = r.state;
+            r._healthPayload = { r.source->getSourceName(), r.state };
         }
 
         ESP_LOGW(TAG, "Source '%s' rate-limited — backing off %lu ms",
@@ -375,8 +476,7 @@ void DataManager::recordFetchOutcome(SourceRecord& r, UpdateStatus status, uint3
 
     if (oldState != r.state) {
         r._hasPendingHealthTransition = true;
-        r._pendingHealthName = r.source->getSourceName();
-        r._pendingHealthState = r.state;
+        r._healthPayload = { r.source->getSourceName(), r.state };
     }
 
     ESP_LOGW(TAG, "Source '%s' %s (status=%d, %u consecutive) — next attempt in %lu ms%s",
@@ -607,28 +707,52 @@ void DataManager::executeLoop() {
         DeadlineToken token(fetchStart + FetchContext::FETCH_TOTAL_TIMEOUT_MS, [this]() { return getCurrentTimeMs(); });
         FetchContext ctx{token};
 #ifdef ESP_PLATFORM
-        FrameworkSecureClient secureClient;
-        secureClient.useDefaultCertBundle();
-        ctx.client = &secureClient;
-        esp_task_wdt_config_t wdConfigWide = {
-            .timeout_ms = FetchContext::FAR_OUTER_BACKSTOP_S * 1000,
-            .idle_core_mask = (1 << portNUM_PROCESSORS) - 1,
-            .trigger_panic = true
+        if (_secureClient) {
+            _secureClient->stop();
+            _secureClient->applyDeadline(ctx.deadline);
+        }
+        ctx.client = _secureClient;
+        TwdtFetchGuard wdtGuard;
+
+        esp_timer_handle_t fetchEscalationTimer = nullptr;
+        struct EscalationCtx {
+            WiFiClientSecure* client;
         };
-        esp_task_wdt_reconfigure(&wdConfigWide);
+        EscalationCtx escCtx = { ctx.client };
+
+        esp_timer_create_args_t timerArgs = {};
+        timerArgs.callback = [](void* arg) {
+            auto* e = static_cast<EscalationCtx*>(arg);
+            if (e->client) {
+                int fd = e->client->fd();
+                if (fd >= 0) {
+                    shutdown(fd, SHUT_RDWR);
+                    ESP_LOGW(TAG, "Fetch deadline exceeded — socket shutdown forced");
+                }
+            }
+        };
+        timerArgs.arg = &escCtx;
+        timerArgs.name = "fetch_deadline";
+
+        uint32_t remaining = ctx.deadline.remainingMs();
+        if (remaining > 0) {
+            esp_timer_create(&timerArgs, &fetchEscalationTimer);
+            esp_timer_start_once(fetchEscalationTimer, (uint64_t)remaining * 1000);
+        }
 #endif
 
         UpdateStatus result = fetchTarget->fetchUpdate(ctx);
 
 #ifdef ESP_PLATFORM
-        esp_task_wdt_config_t wdConfigRestore = {
-            .timeout_ms = CONFIG_ESP_TASK_WDT_TIMEOUT_S * 1000,
-            .idle_core_mask = (1 << portNUM_PROCESSORS) - 1,
-            .trigger_panic = true
-        };
-        esp_task_wdt_reconfigure(&wdConfigRestore);
-        esp_task_wdt_reset();
+        if (fetchEscalationTimer) {
+            esp_timer_stop(fetchEscalationTimer);
+            esp_timer_delete(fetchEscalationTimer);
+        }
 #endif
+        if (ctx.deadline.isExpired()) {
+            ESP_LOGW(TAG, "Fetch for '%s' exceeded deadline — marking as FetchError",
+                     fetchTarget->getSourceName());
+        }
         if (ctx.deadline.isExpired() && result == UpdateStatus::Success) {
             result = UpdateStatus::FetchError;
         }
@@ -643,7 +767,7 @@ void DataManager::executeLoop() {
         if (_registryMutex) xSemaphoreTake(_registryMutex, portMAX_DELAY);
 
         bool publishHealth = false;
-        DataSourceHealthPayload* pubPayload = nullptr;
+        DataSourceHealthPayload localPayload{};
 
         // Ensure source is still registered before updating tracking data.
         // A source can be unregistered while its fetch is in flight, in which
@@ -659,9 +783,7 @@ void DataManager::executeLoop() {
                 
                 if (r2._hasPendingHealthTransition) {
                     publishHealth = true;
-                    r2._healthPayload.name = r2._pendingHealthName;
-                    r2._healthPayload.state = r2._pendingHealthState;
-                    pubPayload = &r2._healthPayload;
+                    localPayload = r2._healthPayload;
                     r2._hasPendingHealthTransition = false;
                 }
                 break;
@@ -671,8 +793,8 @@ void DataManager::executeLoop() {
         // Temporarily release lock to publish event safely
         if (_registryMutex) xSemaphoreGive(_registryMutex);
 
-        if (publishHealth && _eventBus && pubPayload) {
-            _eventBus->publish(ApplicationEvents::DATA_SOURCE_HEALTH, pubPayload);
+        if (publishHealth && _eventBus) {
+            _eventBus->publish(ApplicationEvents::DATA_SOURCE_HEALTH, &localPayload);
         }
 
         // Re-acquire lock to maintain MutexLock destructor balance

@@ -26,15 +26,18 @@
  *
  * Provides a universal floor for all transports (HTTP, MQTT, serial).
  */
-struct DeadlineToken {
+class DeadlineToken {
+private:
     uint32_t _deadlineMs;
     std::atomic<bool> _cancelled{false};
     std::function<uint32_t()> _timeProvider;
 
+public:
     DeadlineToken(uint32_t deadlineMs, std::function<uint32_t()> timeProvider = nullptr)
         : _deadlineMs(deadlineMs), _timeProvider(timeProvider) {}
 
     bool isExpired() const {
+        if (_cancelled.load(std::memory_order_relaxed)) return true;
         uint32_t now = _timeProvider ? _timeProvider() : millis();
         return now >= _deadlineMs;
     }
@@ -65,9 +68,9 @@ struct FetchContext {
     static constexpr uint32_t FETCH_TOTAL_TIMEOUT_MS = 15000;
     static constexpr uint32_t CONNECT_TIMEOUT_MS = 5000;
     static constexpr uint32_t DNS_TIMEOUT_MS = 5000;
-    static constexpr uint32_t FAR_OUTER_BACKSTOP_S = 120;
 
 #ifdef ESP_PLATFORM
     WiFiClientSecure* client = nullptr;
 #endif
 };
+
