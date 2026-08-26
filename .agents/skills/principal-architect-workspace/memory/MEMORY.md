@@ -9,7 +9,7 @@
 ## Active Projects
 | Project | Status | Modules | Context |
 |---|---|---|---|
-| pr-128-datamanager-resilience | WO3/7 (resumed) | DataManager, IDataSource, FetchContext, Application, MCPServer, Display, Portal | [PROJECT.md](../pr-128-datamanager-resilience/PROJECT.md) |
+| pr-128-datamanager-resilience | WO4/7 | DataManager, IDataSource, FetchContext, Application, MCPServer, Display, Portal | [PROJECT.md](../pr-128-datamanager-resilience/PROJECT.md) |
 
 ## Recently Completed (last 5)
 | Project | Completed | Modules | Key Outcome |

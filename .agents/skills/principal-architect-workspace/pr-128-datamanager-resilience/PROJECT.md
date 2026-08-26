@@ -65,7 +65,7 @@ from the 2026-08-26 review:
 
 - **[x] [wo1-race-fix-twdt-audit](wo1-race-fix-twdt-audit/WORKORDER.md):** Fix the live abort-on-success race; audit every TWDT interaction across the framework. ✅ Complete (PR #145).
 - **[x] [wo2-source-health-backoff](wo2-source-health-backoff/WORKORDER.md):** Health state, `UpdateStatus`-differentiated policy, backoff + recovery probe + defined quarantine exit. ✅ Complete (PR #145).
-- **[ ] [wo3-fetch-context-transport](wo3-fetch-context-transport/WORKORDER.md):** **BREAKING**: `fetchUpdate(const FetchContext&)` — Step 0 TLS measurement, deadline token + DNS bounding + framework-owned bounded client; WeatherModule migrated; cert-bundle hack deleted.
+- **[x] [wo3-fetch-context-transport](wo3-fetch-context-transport/WORKORDER.md):** **BREAKING**: `fetchUpdate(const FetchContext&)` — deadline token + DNS bounding constant + framework-owned bounded client; WeatherModule migrated; cert-bundle hack moved to DataManager; `queueDataJob` closure updated to accept `FetchContext`. ✅ Complete (`8cb4da87`).
 - **[ ] [wo4-watchdog-replacement](wo4-watchdog-replacement/WORKORDER.md):** Feed-on-progress TWDT; delete `esp_timer` + `abort()`; injectable deadline → quarantine (not reboot); settle handshake mechanism; 120s far-outer backstop.
 - **[ ] [wo5-health-surfacing](wo5-health-surfacing/WORKORDER.md):** EventBus `data.source.health` (publish after mutex release) + REST `/api/data/sources` + portal cards + display (signal-only deferred flag) + MCP `get_data_sources`.
 - **[ ] wo6-job-fetch-isolation:** Urgent jobs behind scheduled fetches — mechanism chosen after WO3 measures bound. **Re-plan gate after WO3.**
@@ -124,6 +124,15 @@ All WOs are **strictly serialised** — DataManager.cpp is touched by four WOs.
   gaps (N1–N6). All resolved in the final plan.
 - WO6 marked as re-plan gate (not decomposable until WO3 measures real fetch bound).
 - **Base commit for remaining stack:** `f97d17ce`.
+
+### 2026-08-26 — Session 3b (WO3 Execution)
+- WO3 complete (`8cb4da87`): `FetchContext` introduced, `IDataSource::fetchUpdate()` signature
+  broken (authorised), WeatherModule migrated, cert-bundle hack lifted into `DataManager` as
+  `FrameworkSecureClient`, `queueDataJob` closures updated to `const FetchContext&`.
+- Worker decision: `queueDataJob` and `DataJobEntry` closures changed to accept `FetchContext`
+  so jobs get the same deadline/client as scheduled fetches.
+- 830 native tests pass, `esp32dev` + `crowpanel-128-rotary` builds green.
+- No out-of-scope findings surfaced by worker.
 
 ---
 
