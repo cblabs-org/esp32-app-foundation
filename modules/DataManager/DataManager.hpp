@@ -143,7 +143,15 @@ public:
     size_t getQueuedJobCount() const;
 
     /**
-     * @brief Synchronous tick loop for unit testing. Simulates one iteration of the worker task.
+     * @brief Synchronous tick loop for native/test builds only.
+     *
+     * Drives one iteration of the worker-task loop (drain → execute → drain).
+     * On target (ESP_PLATFORM), the FreeRTOS worker task created in begin()
+     * drives this loop — calling processNext() from any other context
+     * (e.g. loopTask) will corrupt that task's TWDT subscription via
+     * startFetchWatchdog()/stopFetchWatchdog().
+     *
+     * @warning NOT safe to call on target — worker-task only. See #156.
      */
     void processNext();
 

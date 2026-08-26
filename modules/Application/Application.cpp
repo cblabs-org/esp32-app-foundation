@@ -341,8 +341,10 @@ void Application::tick() {
         }
     }
 
-    // In native builds, drive DataManager synchronously for tests
+#ifndef ESP_PLATFORM
+    // In native builds, drive DataManager synchronously (no FreeRTOS worker task).
     _dataManager.processNext();
+#endif
 
     // Dispatch to all registered tickables in registration order
 #ifndef NDEBUG
