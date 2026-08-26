@@ -66,7 +66,7 @@ from the 2026-08-26 review:
 - **[x] [wo1-race-fix-twdt-audit](wo1-race-fix-twdt-audit/WORKORDER.md):** Fix the live abort-on-success race; audit every TWDT interaction across the framework. ✅ Complete (PR #145).
 - **[x] [wo2-source-health-backoff](wo2-source-health-backoff/WORKORDER.md):** Health state, `UpdateStatus`-differentiated policy, backoff + recovery probe + defined quarantine exit. ✅ Complete (PR #145).
 - **[x] [wo3-fetch-context-transport](wo3-fetch-context-transport/WORKORDER.md):** **BREAKING**: `fetchUpdate(const FetchContext&)` — deadline token + DNS bounding constant + framework-owned bounded client; WeatherModule migrated; cert-bundle hack moved to DataManager; `queueDataJob` closure updated to accept `FetchContext`. ✅ Complete (`8cb4da87`).
-- **[ ] [wo4-watchdog-replacement](wo4-watchdog-replacement/WORKORDER.md):** Feed-on-progress TWDT; delete `esp_timer` + `abort()`; injectable deadline → quarantine (not reboot); settle handshake mechanism; 120s far-outer backstop.
+- **[x] [wo4-watchdog-replacement](wo4-watchdog-replacement/WORKORDER.md):** Feed-on-progress TWDT; delete `esp_timer` + `abort()`; injectable deadline → quarantine (not reboot); TWDT reconfigured via `esp_task_wdt_reconfigure()` around fetches; 120s far-outer backstop. ✅ Complete (`85601880`).
 - **[ ] [wo5-health-surfacing](wo5-health-surfacing/WORKORDER.md):** EventBus `data.source.health` (publish after mutex release) + REST `/api/data/sources` + portal cards + display (signal-only deferred flag) + MCP `get_data_sources`.
 - **[ ] wo6-job-fetch-isolation:** Urgent jobs behind scheduled fetches — mechanism chosen after WO3 measures bound. **Re-plan gate after WO3.**
 - **[ ] [wo7-docs-migration](wo7-docs-migration/WORKORDER.md):** FetchContext contract docs + downstream migration guide + framework-expert skill.
@@ -133,6 +133,16 @@ All WOs are **strictly serialised** — DataManager.cpp is touched by four WOs.
   so jobs get the same deadline/client as scheduled fetches.
 - 830 native tests pass, `esp32dev` + `crowpanel-128-rotary` builds green.
 - No out-of-scope findings surfaced by worker.
+
+### 2026-08-26 — Session 3c (WO4 Execution)
+- WO4 complete (`85601880`): `esp_timer` watchdog + `abort()` deleted (-62 lines .cpp, -34 lines
+  .hpp). Worker stays on TWDT throughout. TWDT widened via `esp_task_wdt_reconfigure()` to
+  `FAR_OUTER_BACKSTOP_S=120s` during fetches, restored to `CONFIG_ESP_TASK_WDT_TIMEOUT_S`
+  after. Deadline enforcement: expired fetch overrides Success→FetchError, driving health
+  state machine to quarantine. `millis()` timing migrated to `getCurrentTimeMs()` (correct
+  now that cross-task watchdog is gone). `getFetchElapsedMs()` deleted.
+- Closes #128 closing condition 1: "never resets the device".
+- 830+ native tests pass, both target builds green.
 
 ---
 
