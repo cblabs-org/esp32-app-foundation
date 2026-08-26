@@ -30,9 +30,7 @@ static constexpr const char* TAG = "DataManager";
 
 #include <Arduino.h>
 #include "esp_task_wdt.h"
-#ifdef ESP_PLATFORM
-#include "esp_timer.h"
-#endif
+
 #include "esp_heap_caps.h"
 #include <freertos/idf_additions.h>
 
@@ -61,13 +59,7 @@ DataManager::~DataManager() {
         vTaskDelete(_workerTask);
         _workerTask = nullptr;
     }
-#ifdef ESP_PLATFORM
-    if (_fetchWatchdog) {
-        esp_timer_stop(_fetchWatchdog);
-        esp_timer_delete(_fetchWatchdog);
-        _fetchWatchdog = nullptr;
-    }
-#endif
+
     // Now safe to drain and delete the queue
     if (_jobQueue) {
         DataJobEntry* entry = nullptr;
@@ -87,17 +79,7 @@ void DataManager::begin() {
         ESP_LOGE(TAG, "Failed to create job queue");
     }
 
-#ifdef ESP_PLATFORM
-    const esp_timer_create_args_t wdArgs = {
-        .callback = &DataManager::fetchWatchdogCb,
-        .arg = this,
-        .name = "dm_fetch_wd"
-    };
-    if (esp_timer_create(&wdArgs, &_fetchWatchdog) != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to create fetch watchdog timer");
-        _fetchWatchdog = nullptr;
-    }
-#endif
+
 
     // Create worker task with 12KB DRAM stack — safe for TLS-heavy data sources.
     // DRAM (not PSRAM) is required because SPI flash operations (used by some
@@ -180,15 +162,7 @@ void DataManager::drainJobs(bool urgentOnly) {
 
         ESP_LOGD(TAG, "Executing data job: '%s'", entry->options.tag);
 
-        // _fetchStartMs MUST be stamped with millis(), never getCurrentTimeMs():
-        // the latter returns the _simulatedTimeMs test hook when set, and
-        // fetchWatchdogCb() compares against millis(). Mixing the two clocks
-        // yields a bogus elapsed value and can trigger a spurious abort().
-        uint32_t jobStart = (uint32_t)millis();
-        _fetchStartMs.store(jobStart);
-#ifdef ESP_PLATFORM
-        startFetchWatchdog();
-#endif
+        uint32_t jobStart = getCurrentTimeMs();
 
         DeadlineToken token(jobStart + FetchContext::FETCH_TOTAL_TIMEOUT_MS, [this]() { return getCurrentTimeMs(); });
         FetchContext ctx{token};
@@ -196,23 +170,27 @@ void DataManager::drainJobs(bool urgentOnly) {
         FrameworkSecureClient secureClient;
         secureClient.useDefaultCertBundle();
         ctx.client = &secureClient;
+        esp_task_wdt_config_t wdConfigWide = {
+            .timeout_ms = FetchContext::FAR_OUTER_BACKSTOP_S * 1000,
+            .idle_core_mask = (1 << portNUM_PROCESSORS) - 1,
+            .trigger_panic = true
+        };
+        esp_task_wdt_reconfigure(&wdConfigWide);
 #endif
 
         entry->job(ctx);
 
-        // Order matters: clear _fetchStartMs BEFORE tearing down the supervisor.
-        // esp_timer_stop() does not wait for a callback that has already been
-        // dispatched, so a fetchWatchdogCb already running on the esp_timer task
-        // can still read _fetchStartMs after stop() returns. Clearing first brings
-        // that callback's `if (start == 0) return;` guard over the window;
-        // clearing second leaves a gap in which a job that has ALREADY COMPLETED
-        // can be abort()ed for having taken >30s.
-        _fetchStartMs.store(0);
 #ifdef ESP_PLATFORM
-        stopFetchWatchdog();
+        esp_task_wdt_config_t wdConfigRestore = {
+            .timeout_ms = CONFIG_ESP_TASK_WDT_TIMEOUT_S * 1000,
+            .idle_core_mask = (1 << portNUM_PROCESSORS) - 1,
+            .trigger_panic = true
+        };
+        esp_task_wdt_reconfigure(&wdConfigRestore);
+        esp_task_wdt_reset();
 #endif
 
-        uint32_t elapsed = (uint32_t)millis() - jobStart;
+        uint32_t elapsed = getCurrentTimeMs() - jobStart;
         if (entry->options.warnAfterMs > 0 && elapsed > entry->options.warnAfterMs) {
             ESP_LOGW(TAG, "Data job '%s' took %lu ms (warn threshold: %lu ms)",
                      entry->options.tag, (unsigned long)elapsed,
@@ -464,51 +442,7 @@ void DataManager::processNext() {
 }
 
 
-#ifdef ESP_PLATFORM
-void DataManager::fetchWatchdogCb(void* arg) {
-    auto* self = static_cast<DataManager*>(arg);
-    uint32_t start = self->_fetchStartMs.load();
-    if (start == 0) return;  // no fetch in progress
-    uint32_t elapsed = (uint32_t)(millis() - start);
-    if (elapsed > 30000) {
-        ESP_LOGE(TAG, "FATAL: fetch/job hung for %lu ms (>30s) — aborting", (unsigned long)elapsed);
-        abort();
-    }
-    // Still under 30s — nothing to do. The worker is unsubscribed from the TWDT
-    // for the duration of the fetch (see startFetchWatchdog), so there is no
-    // watchdog to feed on its behalf; this timer IS the deadline enforcement.
-}
 
-void DataManager::startFetchWatchdog() {
-    // Guard: these helpers act on the CALLING task's TWDT subscription.
-    // Invoking from any task other than the worker silently corrupts that
-    // task's watchdog state — see #156.
-    if (xTaskGetCurrentTaskHandle() != _workerTask) {
-        ESP_LOGE(TAG, "startFetchWatchdog() called from wrong task (%s) — "
-                 "only the DataManager worker may call this",
-                 pcTaskGetName(NULL));
-        return;
-    }
-    esp_task_wdt_delete(NULL);  // temporarily unsubscribe worker
-    if (_fetchWatchdog) {
-        esp_timer_start_periodic(_fetchWatchdog, 2000000);  // check every 2s
-    }
-}
-
-void DataManager::stopFetchWatchdog() {
-    if (xTaskGetCurrentTaskHandle() != _workerTask) {
-        ESP_LOGE(TAG, "stopFetchWatchdog() called from wrong task (%s) — "
-                 "only the DataManager worker may call this",
-                 pcTaskGetName(NULL));
-        return;
-    }
-    if (_fetchWatchdog) {
-        esp_timer_stop(_fetchWatchdog);
-    }
-    esp_task_wdt_add(NULL);    // re-subscribe worker
-    esp_task_wdt_reset();
-}
-#endif
 
 void DataManager::workerTaskLoop(void* param) {
     DataManager* manager = static_cast<DataManager*>(param);
@@ -635,16 +569,7 @@ void DataManager::executeLoop() {
         if (_registryMutex) xSemaphoreGive(_registryMutex);
 
         // --- Execute the fetch cycle ---
-        // The TWDT is temporarily unsubscribed during the fetch and a periodic
-        // esp_timer (2s) monitors for genuine hangs. If the fetch exceeds 30s,
-        // the timer calls abort() — equivalent to a TWDT reset, but allows
-        // bounded fetches (e.g. 5-10s TLS handshakes) to complete.
-        // millis() (not getCurrentTimeMs()) — see the note in drainJobs().
-        uint32_t fetchStart = (uint32_t)millis();
-        _fetchStartMs.store(fetchStart);
-#ifdef ESP_PLATFORM
-        startFetchWatchdog();
-#endif
+        uint32_t fetchStart = getCurrentTimeMs();
 
         DeadlineToken token(fetchStart + FetchContext::FETCH_TOTAL_TIMEOUT_MS, [this]() { return getCurrentTimeMs(); });
         FetchContext ctx{token};
@@ -652,17 +577,30 @@ void DataManager::executeLoop() {
         FrameworkSecureClient secureClient;
         secureClient.useDefaultCertBundle();
         ctx.client = &secureClient;
+        esp_task_wdt_config_t wdConfigWide = {
+            .timeout_ms = FetchContext::FAR_OUTER_BACKSTOP_S * 1000,
+            .idle_core_mask = (1 << portNUM_PROCESSORS) - 1,
+            .trigger_panic = true
+        };
+        esp_task_wdt_reconfigure(&wdConfigWide);
 #endif
 
         UpdateStatus result = fetchTarget->fetchUpdate(ctx);
 
-        // Clear before teardown — see the ordering note in drainJobs().
-        _fetchStartMs.store(0);
 #ifdef ESP_PLATFORM
-        stopFetchWatchdog();
+        esp_task_wdt_config_t wdConfigRestore = {
+            .timeout_ms = CONFIG_ESP_TASK_WDT_TIMEOUT_S * 1000,
+            .idle_core_mask = (1 << portNUM_PROCESSORS) - 1,
+            .trigger_panic = true
+        };
+        esp_task_wdt_reconfigure(&wdConfigRestore);
+        esp_task_wdt_reset();
 #endif
+        if (ctx.deadline.isExpired() && result == UpdateStatus::Success) {
+            result = UpdateStatus::FetchError;
+        }
 
-        uint32_t fetchDuration = (uint32_t)millis() - fetchStart;
+        uint32_t fetchDuration = getCurrentTimeMs() - fetchStart;
         if (fetchDuration > 15000) {
             ESP_LOGW(TAG, "fetchUpdate() for source '%s' took %lu ms — consider reducing client timeout",
                      fetchTarget->getSourceName(), (unsigned long)fetchDuration);

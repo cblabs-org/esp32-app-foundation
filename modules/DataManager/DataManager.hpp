@@ -32,9 +32,7 @@
 #include <freertos/task.h>
 #include <freertos/semphr.h>
 #include <freertos/queue.h>
-#ifdef ESP_PLATFORM
-#include <esp_timer.h>   // esp_timer_handle_t — used by the fetch watchdog below
-#endif
+
 
 /**
  * @brief Configuration for a queued data job.
@@ -166,22 +164,7 @@ public:
      * @param running true to allow fetches; false to gate them.
      */
     
-    /**
-     * @brief Returns the duration in ms of the currently-running fetch or job, or 0 if idle.
-     *
-     * Thread-safe (member is std::atomic). Use this to detect
-     * hung fetches from a monitoring task or health-check endpoint.
-     *
-     * @note _fetchStartMs is always stamped with millis() — the real monotonic
-     *       clock — never with the getCurrentTimeMs() test hook. The fetch
-     *       watchdog compares against millis(), so the two must not diverge.
-     *
-     * @return Elapsed milliseconds since fetchUpdate() was called, or 0 if no fetch is active.
-     */
-    uint32_t getFetchElapsedMs() const {
-        uint32_t start = _fetchStartMs.load();
-        return (start > 0) ? (millis() - start) : 0;
-    }
+
 
     /**
      * @brief Number of registered sources. Pair with getSourceHealthAt() to enumerate.
@@ -275,24 +258,7 @@ private:
     SemaphoreHandle_t _registryMutex;
     TaskHandle_t _workerTask;
     uint32_t _simulatedTimeMs = 0;
-    std::atomic<uint32_t> _fetchStartMs{0};   ///< Timestamp of in-flight fetchUpdate(); 0 when idle.
-#ifdef ESP_PLATFORM
-    esp_timer_handle_t _fetchWatchdog = nullptr;  ///< 30s hard deadline for fetch/job operations
-    static void fetchWatchdogCb(void* arg);
 
-    /**
-     * @brief Arm the fetch watchdog and unsubscribe the caller from the TWDT.
-     * @warning MUST be called only from the DataManager worker task. It calls
-     *          esp_task_wdt_delete(NULL) / esp_task_wdt_add(NULL), which act on
-     *          the CALLING task — invoking these from any other task would
-     *          silently change that task's watchdog subscription.
-     */
-    void startFetchWatchdog();
-
-    /** @brief Disarm the fetch watchdog and re-subscribe the caller to the TWDT.
-     *  @warning Worker-task only — see startFetchWatchdog(). */
-    void stopFetchWatchdog();
-#endif
 
     static void workerTaskLoop(void* param);
     void executeLoop();

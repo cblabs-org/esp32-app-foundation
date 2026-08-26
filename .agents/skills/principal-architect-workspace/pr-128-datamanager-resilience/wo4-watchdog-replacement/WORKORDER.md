@@ -190,19 +190,26 @@ triage and file them under the correct author identity.
 <!-- Written by the worker at task completion -->
 
 ### Status
-(pending)
+Completed
 
 ### Changes Made
-(pending)
+- Removed `esp_timer` watchdog components from `DataManager.cpp` and `DataManager.hpp` including all associated callbacks, structures, and unsubscription code.
+- Kept the worker securely subscribed to TWDT continuously without dropping subscriptions around fetch operations.
+- Switched to cooperative tracking by actively comparing time using `getCurrentTimeMs()` against `ctx.deadline.isExpired()` forcing endpoints that overrun their window but still formally return `UpdateStatus::Success` downwards toward `UpdateStatus::FetchError` quarantine.
+- Wrote proper ESP-IDF 5.x compatible struct instantiations using `esp_task_wdt_config_t` for `esp_task_wdt_reconfigure()` around fetch actions to widen the core-kill timeout to `FAR_OUTER_BACKSTOP_S` (120s) and promptly returning it to `CONFIG_ESP_TASK_WDT_TIMEOUT_S`.
+- Realigned `fetchStart` internal counters to correctly track simulated clocks.
+- Executed native tests successfully after adapting previous `getFetchElapsedMs()` checks out of `test_main.cpp`. Added new deadline test routines covering expiration logic.
+- Built firmwares for `esp32dev` and `crowpanel-128-rotary` completely via PlatformIO MCP tooling.
 
 ### Decisions Made
-(pending)
+- Replaced direct `bool`/`int` usage in `esp_task_wdt_reconfigure` (due to IDF 5.x compiler complaints about missing structs) with accurate `esp_task_wdt_config_t` structure layouts holding `FAR_OUTER_BACKSTOP_S * 1000` to avoid type mismatch compilation errors.
+- Shifted initial `jobStart` timer assignment from `millis()` to `getCurrentTimeMs()` since the deadline context evaluates against the simulated time clock. If it had been fed a raw hardware monotonic clock, the deadlines in unit testing would trigger prematurely.
 
 ### Dead Ends & Warnings
-(pending)
+- Hit `[Errno 1] Operation not permitted` trying to evaluate raw commands without sandbox permissions, specifically with test routines utilizing PIO CLIs. Resolved successfully by using MCP lazy tools instead.
 
 ### Out-of-Scope Findings
-(pending)
+- None explicitly blocking this component.
 
 ### Blockers
-(pending)
+- None.
