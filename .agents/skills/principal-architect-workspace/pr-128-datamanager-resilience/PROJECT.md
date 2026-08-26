@@ -71,7 +71,7 @@ from the 2026-08-26 review:
 - **[x] [wo5-health-surfacing](wo5-health-surfacing/WORKORDER.md):** EventBus `data.source.health` (publish after mutex release) + REST `/api/data/sources` + `/api/data/sources/reset` + portal cards with state badges and reset button + display (vector+mutex deferred pattern) + MCP `get_data_sources`. ✅ Complete (`519ffcb5`).
 - **[x] wo6-job-fetch-isolation:** Superseded — fetch isolation now addressed by WO8 Layer 3+4 (bounded DNS + fd escalation). No separate WO needed.
 - **[x] [wo7-docs-migration](wo7-docs-migration/WORKORDER.md):** FetchContext contract doc + fetchUpdate migration guide (Path A/B) + framework-expert skill update (triggers, interfaces, event-bus, MCP, portal routes). ✅ Complete (`1f2e0a56`).
-- **[ ] [wo8-review-fixes](wo8-review-fixes/WORKORDER.md):** PR #159 review fixes — four-layer bounded transport architecture: (1) bound transport from deadline, (2) TWDT unsub/resub matching OTA precedent, (3) bounded DNS via lwIP async, (4) fd shutdown escalation. Plus DeadlineToken encapsulation, dangling payload fix, shared state strings, hoisted client, doc updates.
+- **[x] [wo8-review-fixes](wo8-review-fixes/WORKORDER.md):** PR #159 review fixes — four-layer bounded transport architecture: (1) bound transport from deadline, (2) TWDT unsub/resub matching OTA precedent, (3) bounded DNS via lwIP async, (4) fd shutdown escalation. Plus DeadlineToken encapsulation, dangling payload fix, shared state strings, hoisted client, doc updates. ✅ Complete (`3ba77873`).
 
 ## Worker Model Mapping
 
@@ -205,6 +205,14 @@ All WOs are **strictly serialised** — DataManager.cpp is touched by four WOs.
   /principal-architect and proceed with this plan".
 - WO8 created (`wo8-review-fixes/WORKORDER.md`), complexity `architect`, model `pro`.
 
+### 2026-08-26 — Session 3g (WO8 Execution + PR Update)
+- WO8 complete (`3ba77873`): Four-layer bounded transport architecture.
+  11 files changed, +228/-105.
+- All native tests pass, both target builds green (software-only verification).
+- Branch pushed to origin, design rationale comment posted to PR #159.
+- WO6 superseded — fetch isolation addressed by WO8 Layers 3+4.
+- All work orders complete. Project status: **READY FOR MERGE**.
+
 ---
 
-*Created: 2026-08-20. Status: **WO8 IN PROGRESS** — WO1-WO5+WO7 complete, WO8 executing.*
+*Created: 2026-08-20. Status: **READY FOR MERGE** — WO1-WO5+WO7+WO8 complete. All review findings addressed.*
