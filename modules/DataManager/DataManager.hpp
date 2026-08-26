@@ -25,6 +25,7 @@
 #include <atomic>
 #include <functional>
 #include "interfaces/IDataSource.hpp"
+#include "types/FetchContext.hpp"
 
 #include <Arduino.h>
 #include <freertos/FreeRTOS.h>
@@ -127,10 +128,10 @@ public:
      * @return true if enqueued successfully, false if the queue is full or
      *         the worker task has not been started.
      */
-    bool queueDataJob(std::function<void()> job, const char* tag = "job");
+    bool queueDataJob(std::function<void(const FetchContext&)> job, const char* tag = "job");
 
     /** @overload Uses DataJobOptions for full configuration. */
-    bool queueDataJob(std::function<void()> job, const DataJobOptions& options);
+    bool queueDataJob(std::function<void(const FetchContext&)> job, const DataJobOptions& options);
 
     /**
      * @brief Return the number of data jobs currently waiting in the queue.
@@ -263,7 +264,7 @@ private:
     };
 
     struct DataJobEntry {
-        std::function<void()> job;
+        std::function<void(const FetchContext&)> job;
         DataJobOptions options;
     };
 

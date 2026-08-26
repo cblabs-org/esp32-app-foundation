@@ -83,7 +83,7 @@ public:
 /** @brief Minimal IDataSource mock — scheduling metadata returns fixed values. */
 class MockDataSource : public IDataSource {
 public:
-    UpdateStatus fetchUpdate() override               { return UpdateStatus::Success; }
+    UpdateStatus fetchUpdate(const FetchContext& ctx) override { return UpdateStatus::Success; }
     uint32_t     getUpdateIntervalMs() const override { return 60000; } // 60 s
     const char*  getSourceName()       const override { return "MockDataSource"; }
     PriorityTier getPriorityTier()     const override { return PriorityTier::Normal; }

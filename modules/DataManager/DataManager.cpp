@@ -13,6 +13,19 @@
 #include "platform/LogShim.h"
 #include <algorithm>
 
+#ifdef ESP_PLATFORM
+// Forward-declare the Arduino ESP32 ssl_client function we need.
+struct sslclient_context;
+void attach_ssl_certificate_bundle(sslclient_context *ssl_client, bool att);
+
+struct FrameworkSecureClient : public WiFiClientSecure {
+    void useDefaultCertBundle() {
+        attach_ssl_certificate_bundle(sslclient.get(), true);
+        _use_ca_bundle = true;
+    }
+};
+#endif
+
 static constexpr const char* TAG = "DataManager";
 
 #include <Arduino.h>
@@ -104,11 +117,11 @@ void DataManager::begin() {
     }
 }
 
-bool DataManager::queueDataJob(std::function<void()> job, const char* tag) {
+bool DataManager::queueDataJob(std::function<void(const FetchContext&)> job, const char* tag) {
     return queueDataJob(std::move(job), DataJobOptions{ .tag = tag });
 }
 
-bool DataManager::queueDataJob(std::function<void()> job, const DataJobOptions& options) {
+bool DataManager::queueDataJob(std::function<void(const FetchContext&)> job, const DataJobOptions& options) {
     if (!_jobQueue || !job) return false;
 
     DataJobEntry* entry = new (std::nothrow) DataJobEntry{
@@ -177,7 +190,15 @@ void DataManager::drainJobs(bool urgentOnly) {
         startFetchWatchdog();
 #endif
 
-        entry->job();
+        DeadlineToken token(jobStart + FetchContext::FETCH_TOTAL_TIMEOUT_MS, [this]() { return getCurrentTimeMs(); });
+        FetchContext ctx{token};
+#ifdef ESP_PLATFORM
+        FrameworkSecureClient secureClient;
+        secureClient.useDefaultCertBundle();
+        ctx.client = &secureClient;
+#endif
+
+        entry->job(ctx);
 
         // Order matters: clear _fetchStartMs BEFORE tearing down the supervisor.
         // esp_timer_stop() does not wait for a callback that has already been
@@ -625,7 +646,15 @@ void DataManager::executeLoop() {
         startFetchWatchdog();
 #endif
 
-        UpdateStatus result = fetchTarget->fetchUpdate();
+        DeadlineToken token(fetchStart + FetchContext::FETCH_TOTAL_TIMEOUT_MS, [this]() { return getCurrentTimeMs(); });
+        FetchContext ctx{token};
+#ifdef ESP_PLATFORM
+        FrameworkSecureClient secureClient;
+        secureClient.useDefaultCertBundle();
+        ctx.client = &secureClient;
+#endif
+
+        UpdateStatus result = fetchTarget->fetchUpdate(ctx);
 
         // Clear before teardown — see the ordering note in drainJobs().
         _fetchStartMs.store(0);

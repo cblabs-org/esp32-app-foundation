@@ -41,11 +41,7 @@
 #include "utils/serveGzipAsset.hpp"
 #include "portal_assets/weather_js.hpp"
 
-// M2: Forward-declare the Arduino ESP32 ssl_client function we need.
-// Including ssl_client.h directly pulls in mbedTLS internal headers
-// that conflict with the ESP-IDF build.
-struct sslclient_context;
-void attach_ssl_certificate_bundle(sslclient_context *ssl_client, bool att);
+// M2: (Removed cert bundle forward declarations; FetchContext provides client)
 
 /**
  * @brief Constructs the WeatherModule.
@@ -301,7 +297,7 @@ void WeatherModule::registerRoutes(PsychicHttpServer& server) {
  *
  * @return UpdateStatus indicating success, error type, or rate limiting.
  */
-UpdateStatus WeatherModule::fetchUpdate() {
+UpdateStatus WeatherModule::fetchUpdate(const FetchContext& ctx) {
     // --- Step 1: Validate credentials (API key check) ---
     // Retrieve the OWM API key from KeyManager. If absent, return AuthError
     // immediately — no point making a network request without credentials.
@@ -317,36 +313,30 @@ UpdateStatus WeatherModule::fetchUpdate() {
 
     // --- Step 2: Build URL and allocate TLS client ---
     // Construct the OWM API URL with lat/lon/key/units parameters.
-    // Allocate a WiFiClientSecure with the ESP-IDF built-in certificate bundle
-    // for TLS verification (M2 — never use setInsecure()).
     char url[256];
     snprintf(url, sizeof(url), "https://api.openweathermap.org/data/2.5/weather?lat=%f&lon=%f&appid=%s&units=%s",
              _lat, _lon, apiKey.c_str(), _units.c_str());
 
     ESP_LOGI("WeatherModule", "Fetching weather from OWM: lat=%f, lon=%f, units=%s", _lat, _lon, _units.c_str());
 
-    // M2: Use ESP-IDF built-in certificate bundle instead of setInsecure().
-    struct SecureClient : public WiFiClientSecure {
-        void useDefaultCertBundle() {
-            attach_ssl_certificate_bundle(sslclient.get(), true);
-            _use_ca_bundle = true;
-        }
-    };
-    
-    std::unique_ptr<SecureClient> client(new (std::nothrow) SecureClient());
-    if (!client) {
-        ESP_LOGE("WeatherModule", "Failed to allocate SecureClient");
+#ifdef ESP_PLATFORM
+    if (!ctx.client) {
+        ESP_LOGE("WeatherModule", "FetchContext provided null client");
         _lastFetchStatus.store(UpdateStatus::FetchError, std::memory_order_release);
         return UpdateStatus::FetchError;
     }
-    client->useDefaultCertBundle();
+#endif
 
     // --- Step 3: Execute HTTP GET request ---
     // Open the connection, send GET, and check the response code.
     // Map HTTP error codes to appropriate UpdateStatus values.
     HTTPClient http;
     ESP_LOGI("WeatherModule", "Starting HTTP connection...");
-    if (!http.begin(*client, url)) {
+#ifdef ESP_PLATFORM
+    if (!http.begin(*ctx.client, url)) {
+#else
+    if (false) { // Native mocks
+#endif
         ESP_LOGE("WeatherModule", "HTTP begin failed");
         _lastFetchStatus.store(UpdateStatus::FetchError, std::memory_order_release);
         return UpdateStatus::FetchError;
@@ -385,9 +375,8 @@ UpdateStatus WeatherModule::fetchUpdate() {
 
     while (http.connected() && (len > 0 || len == -1)) {
         // Check absolute timeout
-        if ((millis() - streamStartMs) > kStreamTimeoutMs) {
-            ESP_LOGE("WeatherModule", "Stream timeout after %lu ms — aborting parse",
-                     (unsigned long)kStreamTimeoutMs);
+        if (ctx.deadline.isExpired() || (millis() - streamStartMs) > kStreamTimeoutMs) {
+            ESP_LOGE("WeatherModule", "Stream timeout or context expired — aborting parse");
             http.end();
             _lastFetchStatus.store(UpdateStatus::FetchError, std::memory_order_release);
             return UpdateStatus::FetchError;

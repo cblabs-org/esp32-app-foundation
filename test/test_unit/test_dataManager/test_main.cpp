@@ -20,7 +20,7 @@ public:
     MockDataSource(std::string n, uint32_t ivl, PriorityTier p) 
         : name(n), interval(ivl), tier(p), fetchCount(0) {}
 
-    UpdateStatus fetchUpdate() override {
+    UpdateStatus fetchUpdate(const FetchContext& ctx) override {
         fetchCount++;
         return UpdateStatus::Success;
     }
@@ -42,7 +42,7 @@ public:
     ScriptedSource(std::string n, uint32_t ivl, PriorityTier p)
         : name(n), interval(ivl), tier(p) {}
 
-    UpdateStatus fetchUpdate() override {
+    UpdateStatus fetchUpdate(const FetchContext& ctx) override {
         fetchCount++;
         return next;
     }
@@ -293,7 +293,7 @@ TEST(DataManagerGatingTest, DISABLED_AppRunningToggle_StopsFetch) {
 TEST_F(DataManagerTest, QueueDataJob_ExecutesJob) {
     dm.begin();
     bool executed = false;
-    dm.queueDataJob([&executed]() { executed = true; }, "test1");
+    dm.queueDataJob([&executed](const FetchContext&) { executed = true; }, "test1");
     EXPECT_EQ(dm.getQueuedJobCount(), 1);
     dm.processNext();
     EXPECT_TRUE(executed);
@@ -303,8 +303,8 @@ TEST_F(DataManagerTest, QueueDataJob_ExecutesJob) {
 TEST_F(DataManagerTest, QueueDataJob_FIFO_Order) {
     dm.begin();
     std::vector<int> executionOrder;
-    dm.queueDataJob([&]() { executionOrder.push_back(1); }, "job1");
-    dm.queueDataJob([&]() { executionOrder.push_back(2); }, "job2");
+    dm.queueDataJob([&](const FetchContext&) { executionOrder.push_back(1); }, "job1");
+    dm.queueDataJob([&](const FetchContext&) { executionOrder.push_back(2); }, "job2");
 
     dm.processNext();
 
@@ -327,16 +327,16 @@ TEST_F(DataManagerTest, QueueDataJob_Urgent_RunsBeforeFetch) {
         LoggingMockDataSource(std::string n, std::vector<std::string>& lr)
             : MockDataSource(n, 1000, PriorityTier::Low), logRef(lr) {}
 
-        UpdateStatus fetchUpdate() override {
+        UpdateStatus fetchUpdate(const FetchContext& ctx) override {
             logRef.push_back("fetch");
-            return MockDataSource::fetchUpdate();
+            return MockDataSource::fetchUpdate(ctx);
         }
     };
 
     LoggingMockDataSource logSrc("src1", log);
     dm.registerSource(&logSrc);
 
-    dm.queueDataJob([&]() { log.push_back("urgentJob"); }, { .tag = "urgent", .urgent = true });
+    dm.queueDataJob([&](const FetchContext&) { log.push_back("urgentJob"); }, { .tag = "urgent", .urgent = true });
 
     dm.processNext();
 
@@ -357,16 +357,16 @@ TEST_F(DataManagerTest, QueueDataJob_Normal_RunsAfterFetch) {
         LoggingMockDataSource(std::string n, std::vector<std::string>& lr)
             : MockDataSource(n, 1000, PriorityTier::Low), logRef(lr) {}
 
-        UpdateStatus fetchUpdate() override {
+        UpdateStatus fetchUpdate(const FetchContext& ctx) override {
             logRef.push_back("fetch");
-            return MockDataSource::fetchUpdate();
+            return MockDataSource::fetchUpdate(ctx);
         }
     };
 
     LoggingMockDataSource logSrc("src1", log);
     dm.registerSource(&logSrc);
 
-    dm.queueDataJob([&]() { log.push_back("normalJob"); }, { .tag = "normal", .urgent = false });
+    dm.queueDataJob([&](const FetchContext&) { log.push_back("normalJob"); }, { .tag = "normal", .urgent = false });
 
     dm.processNext();
 
@@ -379,16 +379,16 @@ TEST_F(DataManagerTest, QueueDataJob_QueueFull_ReturnsFalse) {
     dm.begin();
     // 8 is JOB_QUEUE_DEPTH
     for (int i = 0; i < 8; ++i) {
-        EXPECT_TRUE(dm.queueDataJob([](){}, "job"));
+        EXPECT_TRUE(dm.queueDataJob([](const FetchContext&){}, "job"));
     }
     // 9th job should fail
-    EXPECT_FALSE(dm.queueDataJob([](){}, "job_fail"));
+    EXPECT_FALSE(dm.queueDataJob([](const FetchContext&){}, "job_fail"));
     EXPECT_EQ(dm.getQueuedJobCount(), 8);
 }
 
 TEST_F(DataManagerTest, QueueDataJob_BeforeBegin_ReturnsFalse) {
     // dm.begin() is NOT called
-    EXPECT_FALSE(dm.queueDataJob([](){}, "job"));
+    EXPECT_FALSE(dm.queueDataJob([](const FetchContext&){}, "job"));
 }
 
 TEST_F(DataManagerTest, QueueDataJob_NullCallable_ReturnsFalse) {
@@ -401,7 +401,7 @@ TEST_F(DataManagerTest, QueueDataJob_AppNotRunning_StillExecutes) {
     /* removed */
 
     bool executed = false;
-    dm.queueDataJob([&executed]() { executed = true; }, "test1");
+    dm.queueDataJob([&executed](const FetchContext&) { executed = true; }, "test1");
 
     dm.processNext();
 
@@ -411,9 +411,9 @@ TEST_F(DataManagerTest, QueueDataJob_AppNotRunning_StillExecutes) {
 TEST_F(DataManagerTest, GetQueuedJobCount_ReflectsPending) {
     dm.begin();
     EXPECT_EQ(dm.getQueuedJobCount(), 0);
-    dm.queueDataJob([](){}, "job1");
+    dm.queueDataJob([](const FetchContext&){}, "job1");
     EXPECT_EQ(dm.getQueuedJobCount(), 1);
-    dm.queueDataJob([](){}, "job2");
+    dm.queueDataJob([](const FetchContext&){}, "job2");
     EXPECT_EQ(dm.getQueuedJobCount(), 2);
 
     dm.processNext();
@@ -428,8 +428,8 @@ TEST_F(DataManagerTest, QueueDataJob_UrgentBypassesNormal) {
     int normalOrder = 0;
     int urgentOrder = 0;
 
-    dm.queueDataJob([&]() { normalOrder = ++order; }, "normal");
-    dm.queueDataJob([&]() { urgentOrder = ++order; }, DataJobOptions{ .tag = "urgent", .urgent = true });
+    dm.queueDataJob([&](const FetchContext&) { normalOrder = ++order; }, "normal");
+    dm.queueDataJob([&](const FetchContext&) { urgentOrder = ++order; }, DataJobOptions{ .tag = "urgent", .urgent = true });
 
     dm.processNext();  // drainJobs(true) should execute urgent first
 
@@ -442,7 +442,7 @@ TEST_F(DataManagerTest, QueueDataJob_QueueFull_CallableDestroyed) {
 
     // Fill the queue with 8 trivial jobs
     for (int i = 0; i < 8; i++) {
-        dm.queueDataJob([]() {}, "filler");
+        dm.queueDataJob([](const FetchContext&) {}, "filler");
     }
 
     // Create a separate tracker for the overflow entry only.
@@ -450,7 +450,7 @@ TEST_F(DataManagerTest, QueueDataJob_QueueFull_CallableDestroyed) {
     // lambda is properly destroyed when the callable is dropped.
     auto tracker = std::make_shared<int>(42);
     std::weak_ptr<int> weak = tracker;
-    bool result = dm.queueDataJob([t = std::move(tracker)]() {}, "overflow");
+    bool result = dm.queueDataJob([t = std::move(tracker)](const FetchContext&) {}, "overflow");
 
     EXPECT_FALSE(result);
     EXPECT_TRUE(weak.expired());  // lambda was destroyed, releasing the shared_ptr
@@ -485,7 +485,7 @@ TEST_F(DataManagerTest, FetchClearsStartStampOnCompletion) {
 TEST_F(DataManagerTest, JobClearsStartStampOnCompletion) {
     dm.begin();
     bool ran = false;
-    dm.queueDataJob([&ran]() { ran = true; }, "stamp");
+    dm.queueDataJob([&ran](const FetchContext&) { ran = true; }, "stamp");
 
     dm.processNext();
 
@@ -499,7 +499,7 @@ TEST_F(DataManagerTest, StartStampClearedEvenWhenFetchReportsFailure) {
     class FailingSource : public MockDataSource {
     public:
         using MockDataSource::MockDataSource;
-        UpdateStatus fetchUpdate() override {
+        UpdateStatus fetchUpdate(const FetchContext& ctx) override {
             fetchCount++;
             return UpdateStatus::FetchError;
         }
@@ -1011,6 +1011,45 @@ TEST_F(DataManagerTest, Reset_PreservesNeverConnected) {
     SourceHealth h = healthOf(dm, &src);
     EXPECT_EQ(h.state, SourceHealthState::Unknown);
     EXPECT_TRUE(h.neverConnected());
+}
+
+TEST(FetchContextTest, DeadlineTokenExpirationAndRemainingMs) {
+    uint32_t simulatedTime = 1000;
+    auto timeProvider = [&]() -> uint32_t { return simulatedTime; };
+
+    DeadlineToken token(1500, timeProvider);
+
+    // At t=1000, deadline=1500 -> remaining=500, not expired
+    EXPECT_FALSE(token.isExpired());
+    EXPECT_EQ(token.remainingMs(), 500);
+
+    // Advance to t=1400 -> remaining=100, not expired
+    simulatedTime = 1400;
+    EXPECT_FALSE(token.isExpired());
+    EXPECT_EQ(token.remainingMs(), 100);
+
+    // Advance to t=1500 -> remaining=0, expired
+    simulatedTime = 1500;
+    EXPECT_EQ(token.remainingMs(), 0);
+
+    // Advance to t=1600 -> remaining=0, expired
+    simulatedTime = 1600;
+    EXPECT_EQ(token.remainingMs(), 0);
+}
+
+TEST(FetchContextTest, DeadlineTokenCancellation) {
+    uint32_t simulatedTime = 1000;
+    auto timeProvider = [&]() -> uint32_t { return simulatedTime; };
+
+    DeadlineToken token(1500, timeProvider);
+
+    EXPECT_FALSE(token.isCancelled());
+    EXPECT_FALSE(token.isExpired());
+
+    token.cancel();
+
+    EXPECT_TRUE(token.isCancelled());
+    // Cancellation should also make it effectively expired immediately
 }
 
 int main(int argc, char **argv) {
