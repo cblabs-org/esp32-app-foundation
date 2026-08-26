@@ -223,19 +223,29 @@ triage and file them under the correct author identity.
 <!-- Written by the worker at task completion -->
 
 ### Status
-(pending)
+Complete
 
 ### Changes Made
-(pending)
+- Created `include/types/FetchContext.hpp` with `DeadlineToken` and `FetchContext`, including the Apache-2.0 house-style header.
+- Modified `IDataSource::fetchUpdate()` signature to take `const FetchContext&`.
+- Updated `DataManager.cpp` to construct `FetchContext` in `executeLoop()` and `drainJobs()`.
+- Implemented `FrameworkSecureClient` with `attach_ssl_certificate_bundle` in `DataManager.cpp` and passed it in the context on ESP_PLATFORM.
+- Updated `DataManager::queueDataJob` to accept `std::function<void(const FetchContext&)>` instead of `void()`, and passed the context through `drainJobs`.
+- Migrated `sample-app/src/WeatherModule` to use `ctx.client` and deleted its local `SecureClient` implementation. Added `ctx.deadline.isExpired()` check to its JSON parse loop.
+- Updated all test mocks in `test_main.cpp` and `test_application.cpp` with the new signature and updated the test lambdas passed to `queueDataJob`.
+- Added tests for `DeadlineToken` expiration and cancellation behavior in `test_main.cpp`.
+- Verified native tests pass (830/830), and both `esp32dev` and `crowpanel-128-rotary` environments compile successfully.
+- Reverted `TAG` in `DataManager.cpp` back to `constexpr` as requested.
 
 ### Decisions Made
-(pending)
+- Modified `queueDataJob` and `DataJobEntry` closures to accept `const FetchContext&` so that jobs can use the context deadline/client, fulfilling the "Same deadline pattern" instruction for `drainJobs()`.
+- Added `FrameworkSecureClient` in `DataManager.cpp` with `attach_ssl_certificate_bundle` to fulfill the framework-owned client requirement without changing global SSL context.
 
 ### Dead Ends & Warnings
-(pending)
+- When migrating `test_main.cpp` test cases, updating `queueDataJob` required changing the closure signatures, which cascaded to over 10 test closures. All closures were successfully updated and passed.
 
 ### Out-of-Scope Findings
-(pending)
+None
 
 ### Blockers
-(pending)
+None
