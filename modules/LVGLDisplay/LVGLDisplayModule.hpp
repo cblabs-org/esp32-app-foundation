@@ -53,6 +53,9 @@
 #include <atomic>
 #include <ArduinoJson.h>
 #include "interfaces/ITickable.hpp"
+#include "events/AppConfiguringPayload.hpp"
+#include "events/PreconditionHealthPayload.hpp"
+#include "events/DataSourceHealthPayload.hpp"
 #include "interfaces/IConfigurable.hpp"
 #include "interfaces/IStatusReporter.hpp"
 #include "interfaces/IWebContributor.hpp"
@@ -447,7 +450,11 @@ private:
 
     std::atomic<bool> _pendingPreconditionHealth{false};
     PreconditionHealthPayload _pendingPreconditionPayload{};
-
+    
+    std::atomic<bool> _pendingDataSourceHealth{false};
+    std::mutex _dataSourceHealthMutex;
+    std::vector<DataSourceHealthPayload> _dataSourceUpdates;
+    
     std::atomic<bool> _pendingSnapshot{false};
     std::atomic<bool> _snapshotComplete{false};
     std::atomic<bool> _snapshotSuccess{false};

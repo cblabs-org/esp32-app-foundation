@@ -181,7 +181,9 @@ bool Application::begin(const FrameworkConfig& config) {
     registerModule(&_keyManager);         // IWebContributor + IMCPContributor
     _preconditionWebContributor.app = this;
     registerModule(&_preconditionWebContributor); // IWebContributor
-
+    
+    _dataSourceWebContributor.app = this;
+    registerModule(&_dataSourceWebContributor); // IWebContributor
 
     registerModule(&_webServerManager);   // ITickable + IWebContributor (Status tab)
     if (_enableDefaultAppTab) {
@@ -223,6 +225,7 @@ bool Application::begin(const FrameworkConfig& config) {
     // --- Step 11: (Removed — TimeManager extracted to explicit composition) ---
 
     // --- Step 12: DataManager — background data workers ---
+    _dataManager.setEventBus(&_eventBus);
     _dataManager.begin();
     for (IDataSource* source : _dataSources) {
         _dataManager.registerSource(source);
@@ -830,5 +833,90 @@ void Application::PreconditionWebContributor::registerRoutes(PsychicHttpServer& 
 
         app->getPreconditionEngine().requestRetry(name.c_str());
         return response->send(200, "application/json", "{\"status\":\"ok\"}");
+    });
+}
+
+namespace {
+    const char* sourceStateToString(SourceHealthState state) {
+        switch (state) {
+            case SourceHealthState::Healthy: return "Healthy";
+            case SourceHealthState::Degraded: return "Degraded";
+            case SourceHealthState::Quarantined: return "Quarantined";
+            case SourceHealthState::Suspended: return "Suspended";
+            case SourceHealthState::Unknown: return "Unknown";
+            default: return "Unknown";
+        }
+    }
+}
+
+void Application::DataSourceWebContributor::registerRoutes(PsychicHttpServer& server) {
+    if (!app) return;
+
+    server.on("/api/data/sources", HTTP_GET, [this](PsychicRequest* request, PsychicResponse* response) {
+        JsonDocument doc;
+        JsonArray arr = doc.to<JsonArray>();
+
+        DataManager& dm = app->getDataManager();
+        size_t count = dm.getSourceCount();
+        for (size_t i = 0; i < count; ++i) {
+            SourceHealth sh;
+            if (dm.getSourceHealthAt(i, sh)) {
+                JsonObject obj = arr.add<JsonObject>();
+                obj["name"] = sh.name ? sh.name : "";
+                obj["state"] = sourceStateToString(sh.state);
+                obj["lastStatus"] = static_cast<int>(sh.lastStatus);
+                obj["consecutiveFailures"] = sh.consecutiveFailures;
+                obj["everSucceeded"] = sh.everSucceeded;
+                obj["currentBackoffMs"] = sh.currentBackoffMs;
+            }
+        }
+
+        std::string out;
+        serializeJson(doc, out);
+        return response->send(200, "application/json", out.c_str());
+    });
+
+    server.on("/api/data/sources/reset", HTTP_POST, [this](PsychicRequest* request, PsychicResponse* response) {
+        if (request->contentLength() > 1024) {
+            response->send(413, "application/json", "{\"error\":\"Payload too large\"}");
+            return ESP_FAIL;
+        }
+
+        const char* body = request->bodyCStr();
+        std::string name;
+        if (body && strlen(body) > 0) {
+            JsonDocument doc;
+            if (deserializeJson(doc, body) == DeserializationError::Ok) {
+                if (doc["name"].is<const char*>()) {
+                    name = doc["name"].as<const char*>();
+                }
+            }
+        }
+        if (name.empty() && request->hasParam("name")) {
+            name = request->getParam("name")->value().c_str();
+        }
+        if (name.empty()) {
+            response->send(400, "application/json", "{\"error\":\"Source name required\"}");
+            return ESP_FAIL;
+        }
+
+        DataManager& dm = app->getDataManager();
+        size_t count = dm.getSourceCount();
+        IDataSource* target = nullptr;
+        
+        // Iterate Application's _dataSources to find the IDataSource* by name.
+        for (IDataSource* src : app->_dataSources) {
+            if (src && src->getSourceName() && strcmp(src->getSourceName(), name.c_str()) == 0) {
+                target = src;
+                break;
+            }
+        }
+        
+        if (target) {
+            dm.resetSourceHealth(target);
+            return response->send(200, "application/json", "{\"status\":\"ok\"}");
+        } else {
+            return response->send(404, "application/json", "{\"error\":\"Source not found\"}");
+        }
     });
 }

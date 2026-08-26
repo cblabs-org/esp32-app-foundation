@@ -208,7 +208,7 @@ void setup() {
 #else
         nullptr,
 #endif
-        &app.getWifiManager(), &app.getAuthManager());
+        &app.getWifiManager(), &app.getAuthManager(), &app.getDataManager());
 #endif
 
 #ifdef WITH_HOMEASSISTANT

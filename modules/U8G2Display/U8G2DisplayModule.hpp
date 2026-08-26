@@ -172,6 +172,9 @@ namespace U8G2DisplayEvents {
     constexpr const char* DISPLAY_MESSAGE = "display.message";
 }
 
+#include "events/DataSourceHealthPayload.hpp"
+#include <mutex>
+
 // ---------------------------------------------------------------------------
 // Default U8G2 driver type — apps override this via build_flags
 // e.g. -DU8G2_DISPLAY_TYPE=U8G2_SSD1322_NHD_256X64_F_4W_HW_SPI
@@ -637,6 +640,11 @@ private:
     // --- Bootstrap state ---
     bool  _bootstrapMode    = false;               ///< True between bootstrapHardware() and begin()
     float _lastBootProgress = 0.0f;                ///< Cached progress for smooth inline interpolation
+
+    // --- Deferred Events ---
+    std::atomic<bool> _pendingDataSourceHealth{false};
+    std::mutex _dataSourceHealthMutex;
+    std::vector<DataSourceHealthPayload> _dataSourceUpdates;
 
     // --- System screen branding & overrides ---
     const BootBranding*   _branding = nullptr;     ///< Optional boot branding (app title)

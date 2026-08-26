@@ -115,6 +115,15 @@
       </div>
     </article>
 
+    <article id="sys-datasources-card">
+      <header style="display:flex; justify-content:space-between; align-items:center;">
+        <span>Data Sources</span>
+      </header>
+      <div id="sys-datasources-list">
+        <p style="color: var(--text-muted);">Loading...</p>
+      </div>
+    </article>
+
     <article>
       <header>Device Information</header>
       <div id="sys-device-info">
@@ -393,8 +402,106 @@
     }
   }
 
+  // -------------------------------------------------------------------------
+  // Fetch and render data sources
+  // -------------------------------------------------------------------------
+  async function loadDataSources() {
+    const listEl = document.getElementById('sys-datasources-list');
+    if (!listEl) return;
+
+    try {
+      const items = await window.apiFetch('/api/data/sources');
+      if (!Array.isArray(items) || items.length === 0) {
+        listEl.innerHTML = '<p style="color: var(--text-muted); font-size: 0.85rem;">No data sources registered.</p>';
+        return;
+      }
+
+      let html = '';
+      items.forEach(s => {
+        let statusBadge = '';
+        let borderAccent = 'var(--border)';
+        let bgStyle = '';
+        
+        if (s.state === 'Healthy') {
+            statusBadge = '<span class="badge badge--ok" style="font-size:0.75rem; padding: 2px 8px;">✓ Healthy</span>';
+            borderAccent = 'var(--success)';
+        } else if (s.state === 'Degraded') {
+            statusBadge = '<span class="badge badge--warn" style="font-size:0.75rem; padding: 2px 8px;">⏳ Degraded</span>';
+            borderAccent = 'var(--warning)';
+            bgStyle = 'background: rgba(249,168,37,0.04);';
+        } else if (s.state === 'Quarantined') {
+            statusBadge = '<span class="badge" style="background:rgba(198,40,40,0.12); color:var(--error); font-size:0.75rem; padding: 2px 8px; font-weight:600;">✗ Quarantined</span>';
+            borderAccent = 'var(--error)';
+            bgStyle = 'background: rgba(198,40,40,0.04);';
+        } else if (s.state === 'Suspended') {
+            statusBadge = '<span class="badge" style="background:rgba(198,40,40,0.12); color:var(--error); font-size:0.75rem; padding: 2px 8px; font-weight:600;">⏸ Suspended</span>';
+            borderAccent = 'var(--error)';
+            bgStyle = 'background: rgba(198,40,40,0.04);';
+        } else {
+            statusBadge = '<span class="badge" style="background:var(--border); color:var(--text-muted); font-size:0.75rem; padding: 2px 8px;">? Unknown</span>';
+        }
+
+        let rowStyle = `display:flex; flex-direction:column; gap:4px; padding:0.5rem 0.75rem; margin-bottom:0.4rem; border-radius:8px; border:1px solid var(--border); border-left: 4px solid ${borderAccent}; ${bgStyle}`;
+        
+        let detailHtml = '';
+        if (!s.everSucceeded) {
+            detailHtml += `<div style="font-size:0.75rem; color:var(--text-muted); margin-top:2px;">Never connected</div>`;
+        } else if (s.consecutiveFailures > 0) {
+            detailHtml += `<div style="font-size:0.75rem; color:var(--warning); margin-top:2px;">Failures: ${s.consecutiveFailures} (next attempt: ${(s.currentBackoffMs / 1000).toFixed(1)}s delay)</div>`;
+        }
+        
+        if (s.state === 'Suspended') {
+            detailHtml += `
+            <div style="display:flex; justify-content:flex-end; margin-top:6px; padding-top:6px; border-top:1px dashed var(--border);">
+              <button class="btn-sys-reset-source" data-name="${s.name}" style="padding:3px 10px; font-size:0.75rem; background:var(--primary); color:#fff; border:none; border-radius:6px; cursor:pointer;">Reset</button>
+            </div>`;
+        }
+
+        html += `
+          <div style="${rowStyle}">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <strong style="font-size:0.9rem;">${s.name}</strong>
+              <div>${statusBadge}</div>
+            </div>
+            ${detailHtml}
+          </div>
+        `;
+      });
+      listEl.innerHTML = html;
+      
+      // Bind reset buttons
+      listEl.querySelectorAll('.btn-sys-reset-source').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          const btnEl = e.currentTarget;
+          const name = btnEl.getAttribute('data-name');
+          btnEl.disabled = true;
+          btnEl.textContent = 'Resetting...';
+          try {
+            await window.apiFetch('/api/data/sources/reset', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ name: name })
+            });
+            setTimeout(loadDataSources, 300);
+          } catch (err) {
+            btnEl.textContent = 'Failed';
+            setTimeout(() => {
+              btnEl.disabled = false;
+              btnEl.textContent = 'Reset';
+            }, 2000);
+          }
+        });
+      });
+
+    } catch (err) {
+      if (listEl) {
+        listEl.innerHTML = '<p style="color: var(--error); font-size: 0.85rem;">Error loading data sources.</p>';
+      }
+    }
+  }
+
   async function loadAllData() {
-    await Promise.allSettled([loadPreconditions(), loadSystemInfo()]);
+    await Promise.allSettled([loadPreconditions(), loadDataSources(), loadSystemInfo()]);
   }
 
   // -------------------------------------------------------------------------

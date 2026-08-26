@@ -59,6 +59,7 @@
 #include "interfaces/IPreconditionContributor.hpp"
 #include "events/AppConfiguringPayload.hpp"
 #include "events/PreconditionHealthPayload.hpp"
+#include "events/DataSourceHealthPayload.hpp"
 #include "PreconditionEngine/PreconditionEngine.hpp"
 
 #include "EventBus.hpp"
@@ -93,6 +94,10 @@ namespace ApplicationEvents {
     /// @brief Published when a precondition changes status.
     /// Payload: const PreconditionHealthPayload*
     constexpr const char* PRECONDITION_HEALTH = "precondition.health";
+
+    /// @brief Published when a data source changes health status.
+    /// Payload: const DataSourceHealthPayload*
+    constexpr const char* DATA_SOURCE_HEALTH = "data.source.health";
 
     /// @brief Published when entering or updating CONFIGURING state.
     /// Payload: const AppConfiguringPayload*
@@ -546,5 +551,18 @@ private:
         size_t      getMaxPostBody() const override { return 1024; }
     };
     PreconditionWebContributor _preconditionWebContributor;
+
+    // -------------------------------------------------------------------------
+    // Data source web contributor — exposes GET /api/data/sources snapshot
+    // and POST /api/data/sources/reset endpoint.
+    // -------------------------------------------------------------------------
+    struct DataSourceWebContributor : public IWebContributor {
+        Application* app = nullptr;
+        void        registerRoutes(PsychicHttpServer& server) override;
+        void        registerTabs(ITabRegistry& /*registry*/) override {}
+        const char* getApiPrefix() const override { return "/api/data"; }
+        size_t      getMaxPostBody() const override { return 1024; }
+    };
+    DataSourceWebContributor _dataSourceWebContributor;
 
 };

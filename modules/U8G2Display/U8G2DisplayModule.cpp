@@ -228,6 +228,15 @@ void U8G2DisplayModule::begin(EventBus* eventBus) {
         _eventBus->subscribe(ApplicationEvents::APP_CONFIGURING, _onAppConfiguring, this);
         _eventBus->subscribe(ApplicationEvents::APP_RUNNING, _onAppRunning, this);
         _eventBus->subscribe(ApplicationEvents::PRECONDITION_HEALTH, _onPreconditionHealth, this);
+        _eventBus->subscribe(ApplicationEvents::DATA_SOURCE_HEALTH, [](const char*, const void* payload, void* ctx) {
+            auto* self = static_cast<U8G2DisplayModule*>(ctx);
+            const auto* p = static_cast<const DataSourceHealthPayload*>(payload);
+            if (self && p) {
+                std::lock_guard<std::mutex> lock(self->_dataSourceHealthMutex);
+                self->_dataSourceUpdates.push_back(*p);
+                self->_pendingDataSourceHealth.store(true);
+            }
+        }, this);
     }
 
     // --- Step 3: Activate boot splash (skip if bootstrapped — already shown) ---
@@ -283,6 +292,20 @@ void U8G2DisplayModule::tick(uint32_t currentMillis) {
     // --- 2. Auto-clear expired modals ---
     if (_modal != nullptr && _modal->isExpired()) {
         clearModal();
+    }
+
+    if (_pendingDataSourceHealth.exchange(false)) {
+        std::vector<DataSourceHealthPayload> updates;
+        {
+            std::lock_guard<std::mutex> lock(_dataSourceHealthMutex);
+            updates = _dataSourceUpdates;
+            _dataSourceUpdates.clear();
+        }
+        for (const auto& payload : updates) {
+            if (_screens) {
+                _screens->onDataSourceHealth(payload.name, payload.state);
+            }
+        }
     }
 
     // --- 3. Tick Carousel ---

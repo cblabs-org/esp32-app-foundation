@@ -21,6 +21,7 @@
 
 #include "IDisplayBoard.hpp"
 #include "events/AppConfiguringPayload.hpp"
+#include "interfaces/IDataSource.hpp"
 
 /**
  * @brief Pluggable system screen provider for U8G2 display module.
@@ -70,5 +71,10 @@ public:
     virtual IDisplayBoard* gateHelperBoard(const AppConfiguringPayload* payload) {
         (void)payload;
         return nullptr;
+    }
+
+    virtual void onDataSourceHealth(const char* name, SourceHealthState state) {
+        (void)name;
+        (void)state;
     }
 };

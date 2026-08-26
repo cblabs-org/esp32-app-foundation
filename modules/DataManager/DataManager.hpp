@@ -33,6 +33,9 @@
 #include <freertos/semphr.h>
 #include <freertos/queue.h>
 
+#include "events/DataSourceHealthPayload.hpp"
+
+class EventBus;
 
 /**
  * @brief Configuration for a queued data job.
@@ -88,6 +91,12 @@ public:
      * @brief Initializes the FreeRTOS event queue and spawns the worker task.
      */
     void begin();
+
+    /**
+     * @brief Sets the EventBus for health state publishing.
+     * @param bus Pointer to the application EventBus.
+     */
+    void setEventBus(EventBus* bus);
 
     /**
      * @brief Registers a data source with the manager.
@@ -244,6 +253,11 @@ private:
         /// are different conditions with different meanings, so a change of cause
         /// restarts the series rather than inheriting the other's accumulated delay.
         bool              backoffFromRateLimit = false;
+
+        DataSourceHealthPayload _healthPayload;
+        const char* _pendingHealthName = nullptr;
+        SourceHealthState _pendingHealthState = SourceHealthState::Unknown;
+        bool _hasPendingHealthTransition = false;
     };
 
     struct DataJobEntry {
@@ -258,6 +272,7 @@ private:
     SemaphoreHandle_t _registryMutex;
     TaskHandle_t _workerTask;
     uint32_t _simulatedTimeMs = 0;
+    EventBus* _eventBus = nullptr;
 
 
     static void workerTaskLoop(void* param);

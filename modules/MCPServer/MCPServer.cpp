@@ -44,7 +44,12 @@ static constexpr const char* TAG = "MCPServer";
  * @brief Collect tools from all IMCPContributor modules and mark the server
  *        as initialised so tick() begins processing.
  */
-void MCPServer::begin(const std::vector<IMCPContributor*>& contributors, ConfigManager* configManager, TimeManager* timeManager, WifiManager* wifiManager, AuthManager* authManager) {
+void MCPServer::begin(const std::vector<IMCPContributor*>& contributors, ConfigManager* configManager, TimeManager* timeManager, WifiManager* wifiManager, AuthManager* authManager, DataManager* dataManager) {
+    if (_initialized) {
+        ESP_LOGW(TAG, "MCPServer already initialized");
+        return;
+    }
+
     // --- Step 0: Cache dependencies for runtime config persistence ---
     _configManager = configManager;
     _wifiManager = wifiManager;
@@ -53,7 +58,7 @@ void MCPServer::begin(const std::vector<IMCPContributor*>& contributors, ConfigM
     // --- Step 1: Register built-in foundation tools ---
     // These are always available regardless of which app uses the framework.
     _registryPtr = &_registry;
-    mcpBuiltinTools::registerAll(_registry, configManager, timeManager);
+    mcpBuiltinTools::registerAll(_registry, configManager, timeManager, dataManager);
 
     // --- Step 2: Collect tools from all contributors ---
     for (auto* contributor : contributors) {

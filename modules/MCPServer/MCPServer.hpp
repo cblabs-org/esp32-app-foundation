@@ -82,7 +82,7 @@ public:
      *                      is enabled, all HTTP /api/mcp/<endpoint> requests require a valid
      *                      Authorization: Bearer header. Serial transport is exempt.
      */
-    void begin(const std::vector<IMCPContributor*>& contributors, ConfigManager* configManager = nullptr, TimeManager* timeManager = nullptr, WifiManager* wifiManager = nullptr, AuthManager* authManager = nullptr);
+    void begin(const std::vector<IMCPContributor*>& contributors, ConfigManager* configManager = nullptr, TimeManager* timeManager = nullptr, WifiManager* wifiManager = nullptr, AuthManager* authManager = nullptr, DataManager* dataManager = nullptr);
 
     /**
      * @brief Process a single JSON-RPC request and write the response to the provided stream.

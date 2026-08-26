@@ -33,6 +33,7 @@
 #include "lvgl.h"
 #include "events/AppConfiguringPayload.hpp"
 #include "events/PreconditionHealthPayload.hpp"
+#include "interfaces/IDataSource.hpp"
 
 /**
  * @brief Pluggable system screen visual provider interface for LVGL displays.
@@ -181,6 +182,16 @@ public:
      */
     virtual void onPreconditionHealth(const PreconditionHealthPayload* payload) {
         (void)payload;
+    }
+
+    /**
+     * @brief Called when a data source's health state changes.
+     * @param name Name of the data source.
+     * @param state New health state.
+     */
+    virtual void onDataSourceHealth(const char* name, SourceHealthState state) {
+        (void)name;
+        (void)state;
     }
 };
 

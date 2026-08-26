@@ -10,6 +10,8 @@
  */
 
 #include "DataManager.hpp"
+#include "EventBus.hpp"
+#include "Application.hpp"
 #include "platform/LogShim.h"
 #include <algorithm>
 
@@ -71,6 +73,10 @@ DataManager::~DataManager() {
     if (_registryMutex) {
         vSemaphoreDelete(_registryMutex);
     }
+}
+
+void DataManager::setEventBus(EventBus* bus) {
+    _eventBus = bus;
 }
 
 void DataManager::begin() {
@@ -266,6 +272,7 @@ void DataManager::requestPriorityFetch(IDataSource* source) {
 // scheduler should treat differently, and the distinction was previously unused.
 // ---------------------------------------------------------------------------
 void DataManager::recordFetchOutcome(SourceRecord& r, UpdateStatus status, uint32_t nowMs) {
+    SourceHealthState oldState = r.state;
     r.lastAttemptMs = nowMs;
     r.lastStatus    = status;
 
@@ -284,6 +291,12 @@ void DataManager::recordFetchOutcome(SourceRecord& r, UpdateStatus status, uint3
         r.backoffFromRateLimit = false;
         r.lastSuccessMs        = nowMs;
         r.everSucceeded        = true;
+
+        if (oldState != r.state) {
+            r._hasPendingHealthTransition = true;
+            r._pendingHealthName = r.source->getSourceName();
+            r._pendingHealthState = r.state;
+        }
         return;
 
     case UpdateStatus::AuthError:
@@ -295,6 +308,13 @@ void DataManager::recordFetchOutcome(SourceRecord& r, UpdateStatus status, uint3
         r.currentBackoffMs  = 0;
         r.nextAttemptMs     = 0;
         r.backoffActive     = false;
+        
+        if (oldState != r.state) {
+            r._hasPendingHealthTransition = true;
+            r._pendingHealthName = r.source->getSourceName();
+            r._pendingHealthState = r.state;
+        }
+
         ESP_LOGE(TAG, "Source '%s' SUSPENDED after auth failure — will not retry until reset",
                  r.source->getSourceName());
         return;
@@ -318,6 +338,13 @@ void DataManager::recordFetchOutcome(SourceRecord& r, UpdateStatus status, uint3
         if (r.state == SourceHealthState::Healthy || r.state == SourceHealthState::Unknown) {
             r.state = SourceHealthState::Degraded;
         }
+        
+        if (oldState != r.state) {
+            r._hasPendingHealthTransition = true;
+            r._pendingHealthName = r.source->getSourceName();
+            r._pendingHealthState = r.state;
+        }
+
         ESP_LOGW(TAG, "Source '%s' rate-limited — backing off %lu ms",
                  r.source->getSourceName(), (unsigned long)r.currentBackoffMs);
         return;
@@ -345,6 +372,12 @@ void DataManager::recordFetchOutcome(SourceRecord& r, UpdateStatus status, uint3
     r.state = (r.currentBackoffMs >= HEALTH_BACKOFF_CAP_MS)
         ? SourceHealthState::Quarantined
         : SourceHealthState::Degraded;
+
+    if (oldState != r.state) {
+        r._hasPendingHealthTransition = true;
+        r._pendingHealthName = r.source->getSourceName();
+        r._pendingHealthState = r.state;
+    }
 
     ESP_LOGW(TAG, "Source '%s' %s (status=%d, %u consecutive) — next attempt in %lu ms%s",
              r.source->getSourceName(),
@@ -609,6 +642,9 @@ void DataManager::executeLoop() {
         // Re-acquire mutex to update state
         if (_registryMutex) xSemaphoreTake(_registryMutex, portMAX_DELAY);
 
+        bool publishHealth = false;
+        DataSourceHealthPayload* pubPayload = nullptr;
+
         // Ensure source is still registered before updating tracking data.
         // A source can be unregistered while its fetch is in flight, in which
         // case the outcome is simply discarded along with its health.
@@ -620,8 +656,26 @@ void DataManager::executeLoop() {
                 uint32_t completedAt = getCurrentTimeMs();
                 r2.lastFetchTimeMs = completedAt;
                 recordFetchOutcome(r2, result, completedAt);
+                
+                if (r2._hasPendingHealthTransition) {
+                    publishHealth = true;
+                    r2._healthPayload.name = r2._pendingHealthName;
+                    r2._healthPayload.state = r2._pendingHealthState;
+                    pubPayload = &r2._healthPayload;
+                    r2._hasPendingHealthTransition = false;
+                }
                 break;
             }
         }
+        
+        // Temporarily release lock to publish event safely
+        if (_registryMutex) xSemaphoreGive(_registryMutex);
+
+        if (publishHealth && _eventBus && pubPayload) {
+            _eventBus->publish(ApplicationEvents::DATA_SOURCE_HEALTH, pubPayload);
+        }
+
+        // Re-acquire lock to maintain MutexLock destructor balance
+        if (_registryMutex) xSemaphoreTake(_registryMutex, portMAX_DELAY);
     }
 }

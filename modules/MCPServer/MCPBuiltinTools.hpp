@@ -27,6 +27,7 @@
 class MCPToolRegistry;
 class ConfigManager;
 class TimeManager;
+class DataManager;
 
 /**
  * @brief Namespace containing built-in MCP tool registration.
@@ -46,9 +47,11 @@ namespace mcpBuiltinTools {
      * @param registry      The MCPToolRegistry to register tools into.
      * @param configManager Pointer to the ConfigManager (nullable if unavailable).
      * @param timeManager   Pointer to the TimeManager (nullable if unavailable).
+     * @param dataManager   Pointer to the DataManager (nullable if unavailable).
      */
     void registerAll(MCPToolRegistry& registry,
-                     ConfigManager* configManager,
-                     TimeManager* timeManager = nullptr);
+                     ConfigManager* configManager = nullptr,
+                     TimeManager* timeManager = nullptr,
+                     DataManager* dataManager = nullptr);
 
 } // namespace mcpBuiltinTools

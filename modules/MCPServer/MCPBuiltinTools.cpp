@@ -25,6 +25,7 @@
 #include "ConfigManager.hpp"
 #include "JsonPatch.hpp"
 #include "TimeManager.hpp"
+#include "DataManager.hpp"
 #include <ArduinoJson.h>
 
 // ---------------------------------------------------------------------------
@@ -63,6 +64,7 @@ static constexpr const char* TAG = "MCPBuiltinTools";
 struct BuiltinToolsContext {
     ConfigManager*  configManager = nullptr;
     TimeManager*    timeManager   = nullptr;
+    DataManager*    dataManager   = nullptr;
     MCPToolRegistry* registry    = nullptr;
 };
 
@@ -74,11 +76,13 @@ static BuiltinToolsContext s_builtinCtx;
 
 void mcpBuiltinTools::registerAll(MCPToolRegistry& registry,
                                   ConfigManager* configManager,
-                                  TimeManager* timeManager) {
+                                  TimeManager* timeManager,
+                                  DataManager* dataManager) {
 
     // Populate the file-scope context struct
     s_builtinCtx.configManager = configManager;
     s_builtinCtx.timeManager   = timeManager;
+    s_builtinCtx.dataManager   = dataManager;
     s_builtinCtx.registry      = &registry;
 
     // -----------------------------------------------------------------
@@ -453,6 +457,48 @@ void mcpBuiltinTools::registerAll(MCPToolRegistry& registry,
             result["count"] = c->registry->size();
         },
         &s_builtinCtx  // context: BuiltinToolsContext*
+    );
+
+    // -----------------------------------------------------------------
+    // Tool 8: get_data_sources — Retrieve DataManager health states
+    // -----------------------------------------------------------------
+    registry.addTool(
+        "get_data_sources",
+        "Returns current state, failure counts, backoffs for all data sources",
+        [](void* ctx, JsonObject& params, JsonObject& result) {
+            auto* c = static_cast<BuiltinToolsContext*>(ctx);
+            (void)params; // No input parameters required
+
+            if (c->dataManager == nullptr) {
+                result["error"] = "DataManager not available";
+                result["isError"] = true;
+                return;
+            }
+
+            JsonArray sourcesArray = result["sources"].to<JsonArray>();
+            size_t count = c->dataManager->getSourceCount();
+            for (size_t i = 0; i < count; ++i) {
+                SourceHealth health;
+                if (c->dataManager->getSourceHealthAt(i, health)) {
+                    JsonObject src = sourcesArray.add<JsonObject>();
+                    src["name"] = health.name;
+                    
+                    switch(health.state) {
+                        case SourceHealthState::Healthy:     src["state"] = "HEALTHY"; break;
+                        case SourceHealthState::Degraded:    src["state"] = "DEGRADED"; break;
+                        case SourceHealthState::Quarantined: src["state"] = "QUARANTINED"; break;
+                        case SourceHealthState::Suspended:   src["state"] = "SUSPENDED"; break;
+                        case SourceHealthState::Unknown:     src["state"] = "UNKNOWN"; break;
+                        default:                             src["state"] = "UNKNOWN"; break;
+                    }
+                    
+                    src["consecutive_failures"] = health.consecutiveFailures;
+                    src["ms_since_last_fetch"] = health.lastAttemptMs == 0 ? 0 : millis() - health.lastAttemptMs;
+                    src["current_backoff_ms"] = health.currentBackoffMs;
+                }
+            }
+        },
+        &s_builtinCtx
     );
 
     ESP_LOGI(TAG, "Registered %zu built-in tools", registry.size());

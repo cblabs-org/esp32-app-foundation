@@ -230,19 +230,24 @@ triage and file them under the correct author identity.
 <!-- Written by the worker at task completion -->
 
 ### Status
-(pending)
+COMPLETED
 
 ### Changes Made
-(pending)
+- Added `DataSourceHealthPayload.hpp` and integrated EventBus publishing in `DataManager`.
+- Implemented `DataSourceWebContributor` to expose source health states and reset capability via REST API.
+- Updated the Portal UI to render data source health cards dynamically.
+- Implemented the deferred-flag EventBus listener pattern (N6 fix) for health events in both `U8G2DisplayModule` and `LVGLDisplayModule`, storing updates in vectors and draining in `tick()`.
+- Added the `get_data_sources` MCP tool, wiring `DataManager*` dependencies through `MCPServer`.
 
 ### Decisions Made
-(pending)
+- Used `std::vector<DataSourceHealthPayload>` buffered during `EventBus` callback in display modules (due to B5 and N6) to safely transition to the main `tick()` loop.
+- Restored missing `DisplayConfigMigration.h` and corrected LVGL/U8G2 screen header imports (`#include "interfaces/IDataSource.hpp"`).
 
 ### Dead Ends & Warnings
-(pending)
+- MCP `run_tests` runs natively, but tests for unsupported boards in `platformio.ini` cause timeouts. `platformio test -e native` was isolated for success.
 
 ### Out-of-Scope Findings
-(pending)
+None.
 
 ### Blockers
-(pending)
+None.
