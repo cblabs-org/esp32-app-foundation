@@ -28,6 +28,7 @@
 #include "types/FetchContext.hpp"
 
 #ifdef ESP_PLATFORM
+#include <WiFiClient.h>
 struct FrameworkSecureClient;
 #endif
 
@@ -275,9 +276,11 @@ private:
     TaskHandle_t _workerTask;
     uint32_t _simulatedTimeMs = 0;
     EventBus* _eventBus = nullptr;
+    std::atomic<uint32_t> _fetchInFlightSince{0};
 
 #ifdef ESP_PLATFORM
     FrameworkSecureClient* _secureClient = nullptr;
+    WiFiClient* _plainClient = nullptr;
 #endif
 
     static void workerTaskLoop(void* param);

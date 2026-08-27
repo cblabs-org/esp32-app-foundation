@@ -22,7 +22,8 @@ struct FrameworkSecureClient : public WiFiClientSecure {
     void applyDeadline(const DeadlineToken& d) {
         uint32_t remainSec = std::max((uint32_t)1, (uint32_t)(d.remainingMs() / 1000));
         uint32_t connectSec = std::min(remainSec, FetchContext::CONNECT_TIMEOUT_MS / 1000);
-        setTimeout(connectSec);
+        setConnectionTimeout(connectSec * 1000);
+        // Note: read timeouts are owned by HTTPClient::setTimeout() — consumers should set that themselves.
         setHandshakeTimeout(connectSec);
     }
 };

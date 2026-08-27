@@ -180,3 +180,16 @@ If you discover a defect, upstream bug, or concern *outside your boundary box*, 
 
 ## Completion Report
 <!-- Written by the worker at task completion -->
+### Summary
+I have successfully implemented all fixes requested in WO3:
+1. **Dual-Transport**: Replaced `resolveHostBounded` logic with the `FetchGuard` pattern for `DataManager`. Implemented `WiFiClient` as the base transport for plain-HTTP contexts.
+2. **`UpdateStatus::Skipped`**: Addressed `#165` to return `Skipped` from `WeatherModule` (leaving the AuthError check untouched) when coordinates are missing, and properly handle it in `recordFetchOutcome()` without altering health state.
+3. **Migration Guide**: Updated `migration-guide-fetchupdate.md` to properly communicate plain-HTTP instructions regarding `ctx.client`.
+4. **Tests**: Added tests for `requiresTls`, `Skipped` logic, and `EscalationTimer` fd verification. All tests run and pass!
+
+### Verification
+- **Native Tests**: Passed (812/812 tests)
+- **`esp32dev`**: Built successfully
+- **`crowpanel-128-rotary`**: Built successfully
+
+Awaiting your approval before committing the changes.

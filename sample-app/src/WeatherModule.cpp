@@ -307,8 +307,8 @@ UpdateStatus WeatherModule::fetchUpdate(const FetchContext& ctx) {
         return UpdateStatus::AuthError;
     }
     if (_lat == 0.0 && _lon == 0.0) {
-        _lastFetchStatus.store(UpdateStatus::NoChange, std::memory_order_release);
-        return UpdateStatus::NoChange;
+        _lastFetchStatus.store(UpdateStatus::Skipped, std::memory_order_release);
+        return UpdateStatus::Skipped;
     }
 
     // --- Step 2: Build URL and allocate TLS client ---

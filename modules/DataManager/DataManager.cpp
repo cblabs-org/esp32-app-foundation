@@ -15,6 +15,7 @@
 #include "platform/LogShim.h"
 #include <algorithm>
 
+static constexpr const char* TAG = "DataManager";
 #ifdef ESP_PLATFORM
 #include "types/FrameworkSecureClient.hpp"
 #include "lwip/dns.h"
@@ -47,9 +48,67 @@ struct TwdtFetchGuard {
     TwdtFetchGuard& operator=(const TwdtFetchGuard&) = delete;
 };
 
+struct EscalationCtx {
+    WiFiClient* client;
+};
+
+
+
+class FetchGuard {
+public:
+    FetchGuard(DataManager* dm, IDataSource* source, FetchContext& ctx, FrameworkSecureClient* secureClient, WiFiClient* plainClient)
+        : _timer(nullptr) {
+        bool useTls = source ? source->requiresTls() : true;
+        
+        if (useTls && secureClient) {
+            secureClient->stop();
+            secureClient->applyDeadline(ctx.deadline);
+            ctx.client = secureClient;
+        } else if (plainClient) {
+            plainClient->stop();
+            plainClient->setConnectionTimeout(ctx.deadline.remainingMs());
+            ctx.client = plainClient;
+        }
+        
+        _escCtx.client = ctx.client;
+        
+        esp_timer_create_args_t timerArgs = {};
+        timerArgs.callback = [](void* arg) {
+            auto* e = static_cast<EscalationCtx*>(arg);
+            if (e->client) {
+                int fd = e->client->fd();
+                if (fd >= 0) {
+                    shutdown(fd, SHUT_RDWR);
+                    ESP_LOGW(TAG, "Fetch deadline exceeded — socket shutdown forced");
+                }
+            }
+        };
+        timerArgs.arg = &_escCtx;
+        timerArgs.name = "fetch_deadline";
+
+        uint32_t remaining = ctx.deadline.remainingMs();
+        if (remaining > 0) {
+            esp_timer_create(&timerArgs, &_timer);
+            esp_timer_start_once(_timer, (uint64_t)remaining * 1000);
+        }
+    }
+
+    ~FetchGuard() {
+        if (_timer) {
+            esp_timer_stop(_timer);
+            esp_timer_delete(_timer);
+            _timer = nullptr;
+        }
+    }
+
+private:
+    esp_timer_handle_t _timer;
+    EscalationCtx _escCtx;
+    TwdtFetchGuard _wdtGuard;
+};
+
 #endif
 
-static constexpr const char* TAG = "DataManager";
 
 #include <Arduino.h>
 #include "esp_task_wdt.h"
@@ -71,55 +130,6 @@ public:
 private:
     SemaphoreHandle_t mutex;
 };
-
-#ifdef ESP_PLATFORM
-/// @brief Resolve hostname with a hard deadline bound using lwIP async DNS.
-/// @return true if resolved (result populated), false on timeout or failure.
-static bool __attribute__((unused)) resolveHostBounded(const char* hostname, IPAddress& result,
-                                const DeadlineToken& deadline) {
-    // Try numeric first
-    ip_addr_t cached;
-    err_t err = dns_gethostbyname(hostname, &cached, nullptr, nullptr);
-    if (err == ERR_OK) {
-        result = IPAddress(cached.u_addr.ip4.addr);
-        return true;
-    }
-    if (err != ERR_INPROGRESS) return false;
-
-    // Async resolution with deadline-bounded wait
-    struct DnsResult {
-        SemaphoreHandle_t sem;
-        ip_addr_t addr;
-        bool resolved;
-    };
-    DnsResult ctx_dns = { xSemaphoreCreateBinary(), {}, false };
-
-    err = dns_gethostbyname(hostname, &ctx_dns.addr,
-        [](const char*, const ip_addr_t* ipaddr, void* arg) {
-            auto* r = static_cast<DnsResult*>(arg);
-            if (ipaddr) {
-                r->addr = *ipaddr;
-                r->resolved = true;
-            }
-            xSemaphoreGive(r->sem);
-        }, &ctx_dns);
-
-    if (err == ERR_OK) {
-        result = IPAddress(ctx_dns.addr.u_addr.ip4.addr);
-        vSemaphoreDelete(ctx_dns.sem);
-        return true;
-    }
-
-    uint32_t remaining = deadline.remainingMs();
-    bool got = xSemaphoreTake(ctx_dns.sem, pdMS_TO_TICKS(remaining)) == pdTRUE;
-    vSemaphoreDelete(ctx_dns.sem);
-    if (got && ctx_dns.resolved) {
-        result = IPAddress(ctx_dns.addr.u_addr.ip4.addr);
-        return true;
-    }
-    return false;
-}
-#endif
 
 DataManager::DataManager() : _registryMutex(nullptr), _workerTask(nullptr) {
     _registryMutex = xSemaphoreCreateMutex();
@@ -148,6 +158,10 @@ DataManager::~DataManager() {
         delete _secureClient;
         _secureClient = nullptr;
     }
+    if (_plainClient) {
+        delete _plainClient;
+        _plainClient = nullptr;
+    }
 #endif
 }
 
@@ -164,6 +178,7 @@ void DataManager::begin() {
 #ifdef ESP_PLATFORM
     _secureClient = new FrameworkSecureClient();
     _secureClient->useDefaultCertBundle();
+    _plainClient = new WiFiClient();
 #endif
 
 
@@ -250,52 +265,16 @@ void DataManager::drainJobs(bool urgentOnly) {
         ESP_LOGD(TAG, "Executing data job: '%s'", entry->options.tag);
 
         uint32_t jobStart = getCurrentTimeMs();
+        _fetchInFlightSince.store(jobStart, std::memory_order_release);
 
         DeadlineToken token(jobStart + FetchContext::FETCH_TOTAL_TIMEOUT_MS, [this]() { return getCurrentTimeMs(); });
         FetchContext ctx{token};
 #ifdef ESP_PLATFORM
-        if (_secureClient) {
-            _secureClient->stop();
-            _secureClient->applyDeadline(ctx.deadline);
-        }
-        ctx.client = _secureClient;
-        TwdtFetchGuard wdtGuard;
-
-        esp_timer_handle_t fetchEscalationTimer = nullptr;
-        struct EscalationCtx {
-            WiFiClientSecure* client;
-        };
-        EscalationCtx escCtx = { ctx.client };
-
-        esp_timer_create_args_t timerArgs = {};
-        timerArgs.callback = [](void* arg) {
-            auto* e = static_cast<EscalationCtx*>(arg);
-            if (e->client) {
-                int fd = e->client->fd();
-                if (fd >= 0) {
-                    shutdown(fd, SHUT_RDWR);
-                    ESP_LOGW(TAG, "Fetch deadline exceeded — socket shutdown forced");
-                }
-            }
-        };
-        timerArgs.arg = &escCtx;
-        timerArgs.name = "fetch_deadline";
-
-        uint32_t remaining = ctx.deadline.remainingMs();
-        if (remaining > 0) {
-            esp_timer_create(&timerArgs, &fetchEscalationTimer);
-            esp_timer_start_once(fetchEscalationTimer, (uint64_t)remaining * 1000);
-        }
+        FetchGuard fg(this, nullptr, ctx, _secureClient, _plainClient);
 #endif
 
         entry->job(ctx);
-
-#ifdef ESP_PLATFORM
-        if (fetchEscalationTimer) {
-            esp_timer_stop(fetchEscalationTimer);
-            esp_timer_delete(fetchEscalationTimer);
-        }
-#endif
+        _fetchInFlightSince.store(0, std::memory_order_release);
         if (ctx.deadline.isExpired()) {
             ESP_LOGW(TAG, "Data job '%s' exceeded deadline", entry->options.tag);
         }
@@ -377,10 +356,17 @@ void DataManager::requestPriorityFetch(IDataSource* source) {
 // ---------------------------------------------------------------------------
 void DataManager::recordFetchOutcome(SourceRecord& r, UpdateStatus status, uint32_t nowMs) {
     SourceHealthState oldState = r.state;
-    r.lastAttemptMs = nowMs;
-    r.lastStatus    = status;
+
+    // lastStatus is stamped for ALL statuses — surfaces can show *why* nothing is happening
+    r.lastStatus = status;
+
+    // lastAttemptMs is NOT stamped for Skipped — it was not a genuine attempt
+    if (status != UpdateStatus::Skipped) r.lastAttemptMs = nowMs;
 
     switch (status) {
+    case UpdateStatus::Skipped:
+        return;   // health, backoff, everSucceeded all untouched
+
     case UpdateStatus::Success:
     case UpdateStatus::NoChange:
         // Recovery is unconditional: one success clears the whole failure history,
@@ -587,6 +573,14 @@ void DataManager::workerTaskLoop(void* param) {
     TickType_t lastWatermarkLog = 0;
 
     while (true) {
+        uint32_t inFlightSince = manager->_fetchInFlightSince.load(std::memory_order_acquire);
+        if (inFlightSince > 0) {
+            uint32_t elapsed = manager->getCurrentTimeMs() - inFlightSince;
+            if (elapsed > 2 * FetchContext::FETCH_TOTAL_TIMEOUT_MS) {
+                ESP_LOGE(TAG, "Fetch overrun detected! A source is ignoring ctx.client and blocking for %lu ms", (unsigned long)elapsed);
+            }
+        }
+
         manager->drainJobs(true);
         manager->executeLoop();
         manager->drainJobs(false);
@@ -703,52 +697,16 @@ void DataManager::executeLoop() {
 
         // --- Execute the fetch cycle ---
         uint32_t fetchStart = getCurrentTimeMs();
+        _fetchInFlightSince.store(fetchStart, std::memory_order_release);
 
         DeadlineToken token(fetchStart + FetchContext::FETCH_TOTAL_TIMEOUT_MS, [this]() { return getCurrentTimeMs(); });
         FetchContext ctx{token};
 #ifdef ESP_PLATFORM
-        if (_secureClient) {
-            _secureClient->stop();
-            _secureClient->applyDeadline(ctx.deadline);
-        }
-        ctx.client = _secureClient;
-        TwdtFetchGuard wdtGuard;
-
-        esp_timer_handle_t fetchEscalationTimer = nullptr;
-        struct EscalationCtx {
-            WiFiClientSecure* client;
-        };
-        EscalationCtx escCtx = { ctx.client };
-
-        esp_timer_create_args_t timerArgs = {};
-        timerArgs.callback = [](void* arg) {
-            auto* e = static_cast<EscalationCtx*>(arg);
-            if (e->client) {
-                int fd = e->client->fd();
-                if (fd >= 0) {
-                    shutdown(fd, SHUT_RDWR);
-                    ESP_LOGW(TAG, "Fetch deadline exceeded — socket shutdown forced");
-                }
-            }
-        };
-        timerArgs.arg = &escCtx;
-        timerArgs.name = "fetch_deadline";
-
-        uint32_t remaining = ctx.deadline.remainingMs();
-        if (remaining > 0) {
-            esp_timer_create(&timerArgs, &fetchEscalationTimer);
-            esp_timer_start_once(fetchEscalationTimer, (uint64_t)remaining * 1000);
-        }
+        FetchGuard fg(this, fetchTarget, ctx, _secureClient, _plainClient);
 #endif
 
         UpdateStatus result = fetchTarget->fetchUpdate(ctx);
-
-#ifdef ESP_PLATFORM
-        if (fetchEscalationTimer) {
-            esp_timer_stop(fetchEscalationTimer);
-            esp_timer_delete(fetchEscalationTimer);
-        }
-#endif
+        _fetchInFlightSince.store(0, std::memory_order_release);
         if (ctx.deadline.isExpired()) {
             ESP_LOGW(TAG, "Fetch for '%s' exceeded deadline — marking as FetchError",
                      fetchTarget->getSourceName());

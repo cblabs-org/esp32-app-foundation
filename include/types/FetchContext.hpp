@@ -18,7 +18,7 @@
 #include <Arduino.h>
 
 #ifdef ESP_PLATFORM
-#include <WiFiClientSecure.h>
+#include <WiFiClient.h>
 #endif
 
 /**
@@ -70,7 +70,7 @@ struct FetchContext {
     static constexpr uint32_t DNS_TIMEOUT_MS = 5000;
 
 #ifdef ESP_PLATFORM
-    WiFiClientSecure* client = nullptr;
+    WiFiClient* client = nullptr;
 #endif
 };
 

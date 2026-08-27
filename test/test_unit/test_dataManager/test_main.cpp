@@ -1100,6 +1100,65 @@ TEST(FetchContextTest, DeadlineTokenCancellation) {
     // Cancellation should also make it effectively expired immediately
 }
 
+// ===========================================================================
+// WO3 — DataManager Transport & Health Semantics
+// ===========================================================================
+
+TEST_F(DataManagerTest, Health_SkippedUntouched) {
+    ScriptedSource src("s", 1000, PriorityTier::High);
+    src.next = UpdateStatus::Success;
+    dm.registerSource(&src);
+    dm.processNext();
+    
+    SourceHealth h = healthOf(dm, &src);
+    EXPECT_EQ(h.state, SourceHealthState::Healthy);
+    uint32_t lastAttempt = h.lastAttemptMs;
+    
+    src.next = UpdateStatus::Skipped;
+    dm.setSimulatedTimeMs(2000);
+    dm.processNext();
+    
+    SourceHealth h2 = healthOf(dm, &src);
+    EXPECT_EQ(h2.lastStatus, UpdateStatus::Skipped);
+    EXPECT_EQ(h2.lastAttemptMs, lastAttempt); // unchanged
+    EXPECT_EQ(h2.state, SourceHealthState::Healthy);
+    EXPECT_TRUE(h2.everSucceeded);
+}
+
+TEST_F(DataManagerTest, Health_SkippedDoesNotCountTowardFailures) {
+    ScriptedSource src("s", 1000, PriorityTier::High);
+    src.next = UpdateStatus::FetchError;
+    dm.registerSource(&src);
+    dm.processNext();
+    
+    SourceHealth h = healthOf(dm, &src);
+    EXPECT_EQ(h.consecutiveFailures, 1);
+    
+    src.next = UpdateStatus::Skipped;
+    dm.setSimulatedTimeMs(1000 + DataManager::HEALTH_BACKOFF_BASE_MS + 100);
+    dm.processNext();
+    
+    SourceHealth h2 = healthOf(dm, &src);
+    EXPECT_EQ(h2.consecutiveFailures, 1); // Not 2
+    EXPECT_EQ(h2.lastStatus, UpdateStatus::Skipped);
+}
+
+TEST_F(DataManagerTest, RequiresTlsDefaultsToTrue) {
+    MockDataSource src("s", 1000, PriorityTier::Low);
+    EXPECT_TRUE(src.requiresTls());
+}
+
+#ifdef ESP_PLATFORM
+TEST_F(DataManagerTest, EscalationTimerUsesFdFromWiFiClient) {
+    // This is essentially a compile-time check for the instruction:
+    // "Escalation timer uses fd() from WiFiClient base (verify compilation at minimum)"
+    WiFiClient client;
+    int fd = client.fd();
+    (void)fd;
+    SUCCEED();
+}
+#endif
+
 int main(int argc, char **argv) {
     ::testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();
