@@ -12,7 +12,7 @@
  *
  * Exported Enums:
  * - UpdateStatus: Result code returned by fetchUpdate()
- *   - Success, NoChange, RateLimited, FetchError, ParseError, AuthError
+ *   - Success, NoChange, RateLimited, FetchError, ParseError, AuthError, Skipped
  * - PriorityTier: Scheduling priority tier for DataManager
  *   - High (every ~1 min), Normal (every ~5 min), Low (every ~30 min)
  *
@@ -22,6 +22,9 @@
  *   - getUpdateIntervalMs(): Report the desired polling interval in milliseconds
  *   - getSourceName(): Human-readable identifier used in logs and EventBus topics
  *   - getPriorityTier(): Return the scheduling priority tier
+ *   - fetchesWhileConfiguring(): Opt out of RUNNING gate for precondition sources
+ *   - requiresTls(): Report whether HTTPS/TLS client is required
+ *   - getMaxBackoffMs(): Report maximum backoff interval when failing
  */
 
 #pragma once
@@ -35,7 +38,8 @@ enum class UpdateStatus : uint8_t {
     RateLimited  = 2, ///< Server returned 429 or local back-off triggered
     FetchError   = 3, ///< Network or TLS connection failure
     ParseError   = 4, ///< Response received but JSON/payload parsing failed
-    AuthError    = 5  ///< API key rejected or credentials missing
+    AuthError    = 5, ///< API key rejected or credentials missing
+    Skipped      = 6  ///< Source declined to fetch (unconfigured, missing coordinates, etc.)
 };
 
 /** @brief Scheduling priority tier for DataManager worker scheduling. */
@@ -180,4 +184,41 @@ public:
      * @return false by default (fetch only while RUNNING).
      */
     virtual bool fetchesWhileConfiguring() const { return false; }
+
+    /**
+     * @brief Does this source require TLS (HTTPS)?
+     *
+     * The framework provides either a TLS client (WiFiClientSecure with cert bundle)
+     * or a plain WiFiClient via ctx.client based on this return value. Sources that
+     * talk to local unencrypted devices (e.g. Zigbee hubs, LAN APIs) should override
+     * to return false.
+     *
+     * @return true by default (TLS client provided).
+     */
+    virtual bool requiresTls() const { return true; }
+
+    /**
+     * @brief Maximum backoff interval for this source when failing.
+     *
+     * Controls how long the framework waits between retry probes once the source
+     * is in backoff. The tier-derived default aligns the probe interval with the
+     * documented tier cadences. Sources that need finer control (e.g. a local hub
+     * that should recover within seconds) may override.
+     *
+     * The framework enforces a floor of HEALTH_BACKOFF_BASE_MS (30s) regardless
+     * of the returned value — an override cannot become a way to hammer a peer.
+     *
+     * @note Lowering this also shortens self-heal latency: a quarantined source
+     *       probes at this interval, so a lower cap means faster recovery detection.
+     *
+     * @return Maximum backoff interval in milliseconds.
+     */
+    virtual uint32_t getMaxBackoffMs() const {
+        switch (getPriorityTier()) {
+            case PriorityTier::High:   return 60000;    // 60s
+            case PriorityTier::Normal: return 300000;   // 5 min
+            case PriorityTier::Low:    return 900000;   // 15 min (preserves today's behaviour)
+            default:                   return 900000;
+        }
+    }
 };

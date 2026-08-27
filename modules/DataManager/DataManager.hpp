@@ -28,6 +28,7 @@
 #include "types/FetchContext.hpp"
 
 #ifdef ESP_PLATFORM
+#include <WiFiClient.h>
 struct FrameworkSecureClient;
 #endif
 
@@ -81,6 +82,13 @@ struct DataJobOptions {
      * This is advisory only — the job is not cancelled or interrupted.
      */
     uint32_t warnAfterMs = 15000;
+
+    // NOTE: Jobs always receive the TLS client (WiFiClientSecure) via
+    // ctx.client. Unlike IDataSource::requiresTls(), there is currently no
+    // opt-out for plain-HTTP jobs. The TLS default is intentional — most
+    // jobs hit external APIs where cleartext would leak credentials. If a
+    // future consumer needs a plain-HTTP job, add a `requiresTls` field
+    // here (defaulting to true for safety).
 };
 
 /**
@@ -211,7 +219,7 @@ public:
     void resetSourceHealth(IDataSource* source);
 
     /**
-     * @brief Backoff schedule for a failing source: 30s doubling to a 15m ceiling.
+     * @brief Backoff schedule for a failing source: 30s doubling to a per-tier or per-source ceiling.
      *
      * A source at the ceiling is Quarantined but still probes at that interval,
      * so a hub that comes back is picked up without user action.
@@ -223,8 +231,14 @@ public:
      *       recovers after a blip can end up waiting far longer than either layer
      *       intends. See IDataSource.hpp.
      */
-    static constexpr uint32_t HEALTH_BACKOFF_BASE_MS = 30000;   ///< First retry delay after a failure
-    static constexpr uint32_t HEALTH_BACKOFF_CAP_MS  = 900000;  ///< 15 min ceiling; also the quarantine probe interval
+    static constexpr uint32_t HEALTH_BACKOFF_BASE_MS = 30000;   ///< First retry delay after a failure (enforced as floor)
+    static constexpr uint32_t HEALTH_BACKOFF_CAP_MS  = 900000;  ///< 15 min ceiling (default for Low tier); per-source caps come from getMaxBackoffMs()
+
+    /// Consecutive failures required to transition from Degraded to Quarantined.
+    /// Decoupled from the backoff cap so per-source/per-tier caps don't change
+    /// how many failures it takes to reach Quarantined. Value preserves today's
+    /// behaviour (30→60→120→240→480→900 = 6 doublings to the 900s cap).
+    static constexpr uint16_t QUARANTINE_FAILURE_THRESHOLD = 6;
 
     /**
      * @brief Test helper to override current time in native builds
@@ -278,6 +292,7 @@ private:
 
 #ifdef ESP_PLATFORM
     FrameworkSecureClient* _secureClient = nullptr;
+    WiFiClient* _plainClient = nullptr;
 #endif
 
     static void workerTaskLoop(void* param);

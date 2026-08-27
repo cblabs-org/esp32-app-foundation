@@ -28,6 +28,13 @@
  * - IOTAVerifier:               Interface — OTA firmware signature verification contract
  * - UpdateStatus:               Enum — data fetch result codes
  * - PriorityTier:               Enum — DataManager scheduling tier
+ * - FetchContext:               Transport context and deadline token for fetches
+ * - DeadlineToken:              Cooperative cancellation token
+ * - SourceHealth:               Point-in-time health snapshot for a data source
+ * - SourceHealthState:          Health state enum (Unknown, Healthy, Degraded, Quarantined, Suspended)
+ * - DataSourceHealthPayload:    EventBus payload for data source health transitions
+ * - PreconditionHealthPayload:  EventBus payload for precondition health transitions
+ * - AppConfiguringPayload:      EventBus payload for app configuring state
  */
 
 #pragma once
@@ -51,6 +58,11 @@
 #include "interfaces/IPreconditionRegistry.hpp"
 #include "interfaces/IPreconditionContributor.hpp"
 #include "interfaces/IOTAVerifier.hpp"
+
+// Event payloads
+#include "events/DataSourceHealthPayload.hpp"
+#include "events/PreconditionHealthPayload.hpp"
+#include "events/AppConfiguringPayload.hpp"
 
 // Application hub
 #include "../modules/Application/Application.hpp"
