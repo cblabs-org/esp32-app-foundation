@@ -62,11 +62,11 @@ Key design decisions:
 
 ## Work Order Ledger
 
-- **[ ] [wo1-unbreak-main](wo1-unbreak-main/WORKORDER.md):** Track missing `FrameworkSecureClient.hpp`, suppress `resolveHostBounded` warning. Closes #160.
-- **[ ] [wo3-transport-health](wo3-transport-health/WORKORDER.md):** Dual-transport support (#164), `Skipped` status (#165), `resolveHostBounded` wiring (#161), FetchGuard extraction, supervisory backstop. Closes #161, #164, #165, #168.
-- **[ ] [wo4-backoff-proportionality](wo4-backoff-proportionality/WORKORDER.md):** Per-source `getMaxBackoffMs()`, decoupled quarantine threshold. Closes #166.
-- **[ ] [wo2-docs-facade](wo2-docs-facade/WORKORDER.md):** Façade includes (#163), stale docs (#162), reserved prefixes (#167). Closes #162, #163, #167.
-- **[ ] [wo5-device-verification](wo5-device-verification/WORKORDER.md):** Hardware build, flash, MCP probe, 30-min soak test with serial + MCP monitoring.
+- **[x] [wo1-unbreak-main](wo1-unbreak-main/WORKORDER.md):** Track missing `FrameworkSecureClient.hpp`, suppress `resolveHostBounded` warning. Closes #160. `901c99cc`
+- **[x] [wo3-transport-health](wo3-transport-health/WORKORDER.md):** Dual-transport support (#164), `Skipped` status (#165), `resolveHostBounded` wiring (#161), FetchGuard extraction, supervisory backstop. Closes #161, #164, #165, #168. `e638940c`
+- **[x] [wo4-backoff-proportionality](wo4-backoff-proportionality/WORKORDER.md):** Per-source `getMaxBackoffMs()`, decoupled quarantine threshold. Closes #166. `823e9087`
+- **[x] [wo2-docs-facade](wo2-docs-facade/WORKORDER.md):** Façade includes (#163), stale docs (#162), reserved prefixes (#167). Closes #162, #163, #167. `362a85e0`
+- **[x] [wo5-device-verification](wo5-device-verification/WORKORDER.md):** Hardware build, flash, MCP probe, 30-min soak test. Tagged `v0.0.12-dev.55`. `e37e4644`
 
 ## Worker Model Mapping
 
@@ -114,4 +114,4 @@ All WOs are **strictly serialised** — DataManager.cpp is touched by WO1, WO3, 
 
 ---
 
-*Created: 2026-08-27. Status: **IN PROGRESS** — WO1 pending.*
+*Created: 2026-08-27. Status: **COMPLETE** — all 5 WOs executed, soak-tested, tagged `v0.0.12-dev.55`. Ready for PR.*
