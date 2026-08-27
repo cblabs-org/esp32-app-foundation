@@ -38,8 +38,7 @@ struct FetchContext {
     DeadlineToken& deadline;
 
     static constexpr uint32_t FETCH_TOTAL_TIMEOUT_MS = 15000; ///< 15s total budget
-    static constexpr uint32_t CONNECT_TIMEOUT_MS     = 5000;  ///< 5s connection budget
-    static constexpr uint32_t DNS_TIMEOUT_MS         = 5000;  ///< 5s DNS resolution budget
+    static constexpr uint32_t CONNECT_TIMEOUT_MS     = 5000;  ///< 5s TLS/TCP connect budget
 
 #ifdef ESP_PLATFORM
     WiFiClient* client = nullptr; ///< Framework-owned client (TLS or plain per requiresTls())

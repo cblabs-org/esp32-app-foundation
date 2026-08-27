@@ -56,7 +56,7 @@ struct EscalationCtx {
 
 class FetchGuard {
 public:
-    FetchGuard(DataManager* dm, IDataSource* source, FetchContext& ctx, FrameworkSecureClient* secureClient, WiFiClient* plainClient)
+    FetchGuard(IDataSource* source, FetchContext& ctx, FrameworkSecureClient* secureClient, WiFiClient* plainClient)
         : _timer(nullptr) {
         bool useTls = source ? source->requiresTls() : true;
         
@@ -66,7 +66,8 @@ public:
             ctx.client = secureClient;
         } else if (plainClient) {
             plainClient->stop();
-            plainClient->setConnectionTimeout(ctx.deadline.remainingMs());
+            plainClient->setConnectionTimeout(
+                std::min(ctx.deadline.remainingMs(), FetchContext::CONNECT_TIMEOUT_MS));
             ctx.client = plainClient;
         }
         
@@ -75,12 +76,13 @@ public:
         esp_timer_create_args_t timerArgs = {};
         timerArgs.callback = [](void* arg) {
             auto* e = static_cast<EscalationCtx*>(arg);
-            if (e->client) {
-                int fd = e->client->fd();
-                if (fd >= 0) {
-                    shutdown(fd, SHUT_RDWR);
-                    ESP_LOGW(TAG, "Fetch deadline exceeded — socket shutdown forced");
-                }
+            int fd = e->client ? e->client->fd() : -1;
+            if (fd >= 0) {
+                shutdown(fd, SHUT_RDWR);
+                ESP_LOGW(TAG, "Fetch deadline exceeded — socket shutdown forced");
+            } else {
+                ESP_LOGE(TAG, "Fetch deadline exceeded with no framework socket in flight — "
+                              "source is not using ctx.client and cannot be interrupted");
             }
         };
         timerArgs.arg = &_escCtx;
@@ -265,16 +267,14 @@ void DataManager::drainJobs(bool urgentOnly) {
         ESP_LOGD(TAG, "Executing data job: '%s'", entry->options.tag);
 
         uint32_t jobStart = getCurrentTimeMs();
-        _fetchInFlightSince.store(jobStart, std::memory_order_release);
 
         DeadlineToken token(jobStart + FetchContext::FETCH_TOTAL_TIMEOUT_MS, [this]() { return getCurrentTimeMs(); });
         FetchContext ctx{token};
 #ifdef ESP_PLATFORM
-        FetchGuard fg(this, nullptr, ctx, _secureClient, _plainClient);
+        FetchGuard fg(nullptr, ctx, _secureClient, _plainClient);
 #endif
 
         entry->job(ctx);
-        _fetchInFlightSince.store(0, std::memory_order_release);
         if (ctx.deadline.isExpired()) {
             ESP_LOGW(TAG, "Data job '%s' exceeded deadline", entry->options.tag);
         }
@@ -577,14 +577,6 @@ void DataManager::workerTaskLoop(void* param) {
     TickType_t lastWatermarkLog = 0;
 
     while (true) {
-        uint32_t inFlightSince = manager->_fetchInFlightSince.load(std::memory_order_acquire);
-        if (inFlightSince > 0) {
-            uint32_t elapsed = manager->getCurrentTimeMs() - inFlightSince;
-            if (elapsed > 2 * FetchContext::FETCH_TOTAL_TIMEOUT_MS) {
-                ESP_LOGE(TAG, "Fetch overrun detected! A source is ignoring ctx.client and blocking for %lu ms", (unsigned long)elapsed);
-            }
-        }
-
         manager->drainJobs(true);
         manager->executeLoop();
         manager->drainJobs(false);
@@ -701,16 +693,14 @@ void DataManager::executeLoop() {
 
         // --- Execute the fetch cycle ---
         uint32_t fetchStart = getCurrentTimeMs();
-        _fetchInFlightSince.store(fetchStart, std::memory_order_release);
 
         DeadlineToken token(fetchStart + FetchContext::FETCH_TOTAL_TIMEOUT_MS, [this]() { return getCurrentTimeMs(); });
         FetchContext ctx{token};
 #ifdef ESP_PLATFORM
-        FetchGuard fg(this, fetchTarget, ctx, _secureClient, _plainClient);
+        FetchGuard fg(fetchTarget, ctx, _secureClient, _plainClient);
 #endif
 
         UpdateStatus result = fetchTarget->fetchUpdate(ctx);
-        _fetchInFlightSince.store(0, std::memory_order_release);
         if (ctx.deadline.isExpired()) {
             ESP_LOGW(TAG, "Fetch for '%s' exceeded deadline — marking as FetchError",
                      fetchTarget->getSourceName());

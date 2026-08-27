@@ -82,6 +82,13 @@ struct DataJobOptions {
      * This is advisory only — the job is not cancelled or interrupted.
      */
     uint32_t warnAfterMs = 15000;
+
+    // NOTE: Jobs always receive the TLS client (WiFiClientSecure) via
+    // ctx.client. Unlike IDataSource::requiresTls(), there is currently no
+    // opt-out for plain-HTTP jobs. The TLS default is intentional — most
+    // jobs hit external APIs where cleartext would leak credentials. If a
+    // future consumer needs a plain-HTTP job, add a `requiresTls` field
+    // here (defaulting to true for safety).
 };
 
 /**
@@ -282,7 +289,6 @@ private:
     TaskHandle_t _workerTask;
     uint32_t _simulatedTimeMs = 0;
     EventBus* _eventBus = nullptr;
-    std::atomic<uint32_t> _fetchInFlightSince{0};
 
 #ifdef ESP_PLATFORM
     FrameworkSecureClient* _secureClient = nullptr;

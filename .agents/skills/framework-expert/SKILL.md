@@ -139,8 +139,8 @@ The framework coordinates background data fetching via `DataManager` and `IDataS
 `IDataSource::fetchUpdate(const FetchContext& ctx)` receives a `FetchContext` providing:
 - **`ctx.deadline`**: A `DeadlineToken` with `isExpired()`, `isCancelled()`, `remainingMs()`. Long loops (streaming parsers, chunked reads) MUST check `ctx.deadline.isExpired()`.
 - **`ctx.client`**: Pre-configured `WiFiClient*` using the ESP-IDF certificate bundle (`FrameworkSecureClient`) when `requiresTls() == true` (default), or standard `WiFiClient` when `false`. Consumers do NOT construct their own TLS clients or call `setInsecure()`.
-- **Policy Constants**: `FETCH_TOTAL_TIMEOUT_MS = 15000` (15s total budget), `CONNECT_TIMEOUT_MS = 5000`, `DNS_TIMEOUT_MS = 5000`.
-- **Four-Layer Bounded Transport**: `DataManager` bounds the transport via `setTimeout`, temporarily unsubscribes from the TWDT (`TwdtFetchGuard`), bounds DNS via lwIP timed semaphore, and escalates to `shutdown(fd)` if the deadline expires while blocked.
+- **Policy Constants**: `FETCH_TOTAL_TIMEOUT_MS = 15000` (15s total budget), `CONNECT_TIMEOUT_MS = 5000`.
+- **Three-Layer Bounded Transport**: `DataManager` bounds the transport via `setConnectionTimeout`, temporarily unsubscribes from the TWDT (`TwdtFetchGuard`), and escalates to `shutdown(fd)` if the deadline expires while blocked. DNS resolution is bounded indirectly by the escalation timer — a slow resolver is detected and logged but cannot be interrupted from the timer context. Sources that ignore `ctx.client` are detected via the escalation timer's `fd() < 0` check.
 
 ### Health State Machine & Exponential Backoff
 A failing source degrades itself; it **never reboots the device**.

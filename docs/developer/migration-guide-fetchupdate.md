@@ -64,7 +64,7 @@ If you have existing code and want to compile immediately without refactoring in
 
 `ctx.client` is now a `WiFiClient*` (the base class). If your source requires plain HTTP (e.g. communicating with local unencrypted network devices), simply override `requiresTls()` to return `false`, and the framework will provide a plain `WiFiClient` via `ctx.client`. TLS sources will continue to receive a `WiFiClientSecure` transparently.
 
-If you decline to use `ctx.client` and allocate your own, you forfeit Layers 1, 3, and 4 of the framework's transport supervision. Only the supervisory backstop remains to detect fetch overruns. You should still poll `ctx.deadline.isExpired()` during parsing loops to participate in the cooperative timeout.
+If you decline to use `ctx.client` and allocate your own, you forfeit all three layers of the framework's transport supervision. The escalation timer will still fire at the deadline and detect that no framework socket is in flight (`fd() < 0`), logging an `ESP_LOGE` — but it **cannot interrupt** a consumer-owned transport. You should still poll `ctx.deadline.isExpired()` during parsing loops to participate in the cooperative timeout.
 
 ---
 

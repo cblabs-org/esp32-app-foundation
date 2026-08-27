@@ -27,7 +27,7 @@ To achieve this, the framework splits responsibilities cleanly between the kerne
 │  - Owns HEALTH STATE MACHINE (Unknown, Healthy, Degraded, Quarantined) │
 │  - Owns EXPONENTIAL BACKOFF (30s base, 15m ceiling)                    │
 │  - Owns TLS CERTIFICATE BUNDLE (FrameworkSecureClient)                 │
-│  - Owns SUPERVISION (Four-Layer Bounded Transport Architecture)        │
+│  - Owns SUPERVISION (Three-Layer Bounded Transport Architecture)       │
 │  - Owns EVENT PUBLISHING (data.source.health) & REST/MCP APIs          │
 └───────────────────────────────────┬────────────────────────────────────┘
                                     │ passes const FetchContext& ctx
@@ -56,7 +56,6 @@ struct FetchContext {
 
     static constexpr uint32_t FETCH_TOTAL_TIMEOUT_MS = 15000; ///< 15s total budget for fetch
     static constexpr uint32_t CONNECT_TIMEOUT_MS     = 5000;  ///< 5s TCP connection timeout
-    static constexpr uint32_t DNS_TIMEOUT_MS         = 5000;  ///< 5s DNS resolution timeout
 
 #ifdef ESP_PLATFORM
     WiFiClient* client = nullptr; ///< Framework-owned client (TLS or plain per requiresTls())
@@ -69,8 +68,9 @@ struct FetchContext {
 | Constant | Value | Purpose |
 |:---|:---|:---|
 | `FETCH_TOTAL_TIMEOUT_MS` | `15,000 ms` (15s) | Total elapsed execution budget for a single `fetchUpdate()` cycle. If exceeded, the fetch is marked expired. |
-| `CONNECT_TIMEOUT_MS` | `5,000 ms` (5s) | Recommended TCP connect timeout for outbound network sockets. |
-| `DNS_TIMEOUT_MS` | `5,000 ms` (5s) | Recommended DNS resolution timeout to bound slow lwIP `getaddrinfo()` retries. |
+| `CONNECT_TIMEOUT_MS` | `5,000 ms` (5s) | TCP/TLS connect timeout for outbound network sockets. Applied to both TLS and plain clients. |
+
+> **Note:** DNS resolution happens inside `NetworkClient::connect()` before `setConnectionTimeout()` applies to the socket connect. A slow resolver is bounded indirectly by the escalation timer — if it fires while DNS is still resolving, the `fd() < 0` path logs the overrun.
 
 ### `DeadlineToken` API
 
@@ -137,14 +137,15 @@ When implementing `IDataSource::fetchUpdate(const FetchContext& ctx)` or enqueui
           - EventBus events (data.source.health, custom topics)
 ```
 
-### Four-Layer Bounded Transport Architecture
+### Three-Layer Bounded Transport Architecture
 
-During a fetch, `DataManager` actively supervises task liveness via four layers:
+During a fetch, `DataManager` actively supervises task liveness via three layers:
 
-1. **Transport Bounding**: The deadline is plumbed directly into the underlying `WiFiClientSecure` connection and handshake timeouts, ensuring the hardware itself honors the cooperative deadline.
+1. **Transport Bounding**: The deadline is plumbed directly into the underlying client's `setConnectionTimeout()` (capped at `CONNECT_TIMEOUT_MS`) and, for TLS, `setHandshakeTimeout()`. Both TLS and plain-HTTP clients receive the same connect budget.
 2. **TWDT Unsub/Resub**: The worker task temporarily unsubscribes from the global Task Watchdog Timer using a `TwdtFetchGuard`. A task parked in a network `select()` is not a starvation condition, so the starvation detector is bypassed to avoid spurious device reboots.
-3. **Bounded DNS**: lwIP asynchronous DNS (`dns_gethostbyname`) is wrapped with a timed semaphore, applying the deadline to DNS resolution.
-4. **Escalation via `shutdown(fd)`**: If the deadline expires while a network call is still blocking, a hardware timer (`esp_timer`) fires and invokes `shutdown(fd)` on the socket, violently unblocking the stalled `recv()`/`select()` and rescuing the worker task.
+3. **Escalation via `shutdown(fd)` / Detection**: If the deadline expires while a network call is still blocking, a hardware timer (`esp_timer`) fires. If the framework-owned client has an active socket (`fd() >= 0`), `shutdown(fd)` violently unblocks the stalled `recv()`/`select()`. If `fd() < 0`, no framework socket is in flight — the source is not using `ctx.client` and the timer logs an `ESP_LOGE` to flag the unsupervised fetch. This is a detection-only backstop: a consumer that ignores `ctx.client` and allocates its own transport cannot be interrupted from the timer context.
+
+> **DNS Note:** DNS resolution occurs inside `NetworkClient::connect()` before `setConnectionTimeout()` takes effect on the socket. A slow resolver is bounded indirectly by the escalation timer — if it fires during DNS, the `fd() < 0` path detects and logs the overrun.
 
 Finally, if `ctx.deadline.isExpired()` is true when `fetchUpdate()` returns (even if the consumer returned `UpdateStatus::Success`), `DataManager` overrides the outcome to `UpdateStatus::FetchError`. This ensures slow fetches drive the health state machine into backoff rather than masking degraded network conditions.
 
