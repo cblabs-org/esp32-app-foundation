@@ -75,7 +75,7 @@ private:
 #ifdef ESP_PLATFORM
 /// @brief Resolve hostname with a hard deadline bound using lwIP async DNS.
 /// @return true if resolved (result populated), false on timeout or failure.
-static bool resolveHostBounded(const char* hostname, IPAddress& result,
+static bool __attribute__((unused)) resolveHostBounded(const char* hostname, IPAddress& result,
                                 const DeadlineToken& deadline) {
     // Try numeric first
     ip_addr_t cached;
