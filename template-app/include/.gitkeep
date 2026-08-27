@@ -1,0 +1,3 @@
+# Consumer application include directory.
+# Place app-scoped headers here (e.g. include/modules/my-module/MyHeader.hpp).
+# Do not use framework-reserved prefixes: events/, interfaces/, platform/, portal_assets/, types/, utils/.

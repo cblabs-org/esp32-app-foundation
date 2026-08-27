@@ -61,6 +61,19 @@ Call `app.registerModule(&myModule);` inside `setup()`. The framework uses compi
 ### What include do I use?
 Always use `#include "AppFoundation.h"`. Do not couple directly to internal framework header paths.
 
+### Framework-Reserved Include Prefixes
+
+The following subdirectories of `include/` are reserved by the framework:
+- `events/` — EventBus payload types
+- `interfaces/` — Pure interface contracts (IDataSource, ITickable, etc.)
+- `platform/` — Platform abstraction layer
+- `portal_assets/` — Web portal static assets
+- `types/` — Framework value types (FetchContext, AppState, etc.)
+- `utils/` — Framework utility headers
+
+Consumer applications MUST NOT place headers in these directories. Use app-scoped
+paths instead, e.g. `include/modules/my-module/MyTypes.hpp`.
+
 ### What interfaces are available?
 
 | Interface Class | Purpose | Key Callback |
@@ -125,7 +138,7 @@ The framework coordinates background data fetching via `DataManager` and `IDataS
 ### The `FetchContext` Contract
 `IDataSource::fetchUpdate(const FetchContext& ctx)` receives a `FetchContext` providing:
 - **`ctx.deadline`**: A `DeadlineToken` with `isExpired()`, `isCancelled()`, `remainingMs()`. Long loops (streaming parsers, chunked reads) MUST check `ctx.deadline.isExpired()`.
-- **`ctx.client`**: Pre-configured `WiFiClientSecure*` using the ESP-IDF certificate bundle (`FrameworkSecureClient`). Consumers do NOT construct their own TLS clients or call `setInsecure()`.
+- **`ctx.client`**: Pre-configured `WiFiClient*` using the ESP-IDF certificate bundle (`FrameworkSecureClient`) when `requiresTls() == true` (default), or standard `WiFiClient` when `false`. Consumers do NOT construct their own TLS clients or call `setInsecure()`.
 - **Policy Constants**: `FETCH_TOTAL_TIMEOUT_MS = 15000` (15s total budget), `CONNECT_TIMEOUT_MS = 5000`, `DNS_TIMEOUT_MS = 5000`.
 - **Four-Layer Bounded Transport**: `DataManager` bounds the transport via `setTimeout`, temporarily unsubscribes from the TWDT (`TwdtFetchGuard`), bounds DNS via lwIP timed semaphore, and escalates to `shutdown(fd)` if the deadline expires while blocked.
 

@@ -59,7 +59,7 @@ struct FetchContext {
     static constexpr uint32_t DNS_TIMEOUT_MS         = 5000;  ///< 5s DNS resolution timeout
 
 #ifdef ESP_PLATFORM
-    WiFiClientSecure* client = nullptr; ///< Framework-owned, cert-bundle configured client
+    WiFiClient* client = nullptr; ///< Framework-owned client (TLS or plain per requiresTls())
 #endif
 };
 ```
@@ -93,7 +93,7 @@ When implementing `IDataSource::fetchUpdate(const FetchContext& ctx)` or enqueui
 
 ### ✅ What the Consumer SHOULD Do
 
-1. **Use `ctx.client` for TLS/HTTPS**: On hardware (`#ifdef ESP_PLATFORM`), use the pre-configured `*ctx.client` provided in `FetchContext`. It comes configured with the ESP-IDF root certificate bundle (`FrameworkSecureClient`).
+1. **Use `ctx.client` for HTTP/HTTPS**: On hardware (`#ifdef ESP_PLATFORM`), use the pre-configured `*ctx.client` provided in `FetchContext`. For TLS sources (`requiresTls() == true`, default), it comes configured with the ESP-IDF root certificate bundle (`FrameworkSecureClient`). For plain HTTP sources (`requiresTls() == false`), the framework provides a standard `WiFiClient`.
 2. **Check `ctx.deadline.isExpired()`**: In any loop reading from a stream (e.g. `WiFiClient* stream = http.getStreamPtr()`) or chunked JSON parser, check `ctx.deadline.isExpired()` on each iteration and abort if true.
 3. **Return Accurate `UpdateStatus`**: Return the exact status reflecting the outcome:
    - `UpdateStatus::Success`: Data fetched and parsed successfully.

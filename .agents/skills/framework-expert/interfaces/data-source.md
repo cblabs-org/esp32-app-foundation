@@ -40,7 +40,6 @@ struct FetchContext {
     static constexpr uint32_t FETCH_TOTAL_TIMEOUT_MS = 15000; ///< 15s total budget
     static constexpr uint32_t CONNECT_TIMEOUT_MS     = 5000;  ///< 5s connection budget
     static constexpr uint32_t DNS_TIMEOUT_MS         = 5000;  ///< 5s DNS resolution budget
-    static constexpr uint32_t FAR_OUTER_BACKSTOP_S   = 120;   ///< 120s TWDT backstop watchdog
 
 #ifdef ESP_PLATFORM
     WiFiClient* client = nullptr; ///< Framework-owned client (TLS or plain per requiresTls())
@@ -110,10 +109,10 @@ Determines scheduling grouping:
 > use a fixed `char[]` buffer protected by a FreeRTOS mutex (`xSemaphoreCreateMutex()`).
 > See [thread-safety.md](../embedded-safety/thread-safety.md) for recommended approaches.
 
-### TLS Client Placement (ADR-14 & PR #128)
+### Client Placement & Dual-Transport Support (ADR-14 & PR #128)
 
-The framework supplies a pre-configured, ESP-IDF certificate bundle-attached `WiFiClientSecure` via `ctx.client`.
-Consumers do **NOT** instantiate local `WiFiClientSecure` objects and MUST NOT call `setInsecure()`.
+The framework supplies a pre-configured `WiFiClient*` via `ctx.client` — either an ESP-IDF certificate bundle-attached `WiFiClientSecure` (when `requiresTls() == true`, the default) or a standard `WiFiClient` (when `requiresTls() == false`).
+Consumers do **NOT** instantiate local client objects and MUST NOT call `setInsecure()`.
 
 ```cpp
 UpdateStatus MySource::fetchUpdate(const FetchContext& ctx) {

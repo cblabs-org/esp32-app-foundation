@@ -87,9 +87,22 @@ This file transitively includes:
 - Structural configurations ([FrameworkConfig.hpp](../../include/FrameworkConfig.hpp))
 - Operational state enums ([AppState.hpp](../../include/AppState.hpp))
 - All extension interfaces from `include/interfaces/`
+- All event payloads from `include/events/` ([DataSourceHealthPayload.hpp](../../include/events/DataSourceHealthPayload.hpp), [PreconditionHealthPayload.hpp](../../include/events/PreconditionHealthPayload.hpp), [AppConfiguringPayload.hpp](../../include/events/AppConfiguringPayload.hpp))
 - The composition root header ([Application.hpp](../../modules/Application/Application.hpp))
 
 Downstream developers only need to include `#include "AppFoundation.h"` at the top of their files.
+
+### Framework-Reserved Include Prefixes
+
+The following subdirectories of `include/` are reserved by the framework:
+- `events/` — EventBus payload types
+- `interfaces/` — Pure interface contracts (`IDataSource`, `ITickable`, etc.)
+- `platform/` — Platform abstraction layer
+- `portal_assets/` — Web portal static assets
+- `types/` — Framework value types (`FetchContext`, `AppState`, etc.)
+- `utils/` — Framework utility headers
+
+Consumer applications MUST NOT place headers in these directories. Use app-scoped paths instead, e.g. `include/modules/my-module/MyTypes.hpp`.
 
 ---
 
