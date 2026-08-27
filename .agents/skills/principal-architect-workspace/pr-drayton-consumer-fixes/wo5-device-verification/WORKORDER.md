@@ -118,34 +118,37 @@ If you discover a defect, upstream bug, or concern *outside your boundary box*, 
 <!-- Written by the worker at task completion -->
 
 ### Status
-(pending)
+✅ COMPLETED
 
 ### Soak Test Results
 
 | Metric | Value |
 |---|---|
-| Duration | |
-| Initial DRAM free heap | |
-| Final DRAM free heap | |
-| Heap delta | |
-| TWDT panics | |
-| Reboots | |
-| Error spam | |
-| MCP responsive throughout | |
-| Firmware version | |
+| Duration | 30 minutes (1,852s continuous runtime) |
+| Initial DRAM free heap | 114,527 B (min: 79,452 B) |
+| Final DRAM free heap | 114,455 B (min: 71,224 B) |
+| Heap delta | -72 B (stable, well within ±2 KB) |
+| TWDT panics | 0 |
+| Reboots | 0 |
+| Error spam | None (steady 30s heartbeats, DataManager worker stack HWM 10,944 B free) |
+| MCP responsive throughout | Yes (22 tools listed, JSON-RPC responsive across all 6 checkpoints) |
+| Firmware version | v0.0.12-dev.55 |
 
 ### Data Source Health States (final)
 | Source | State | Last Status | Consecutive Failures |
 |---|---|---|---|
+| *(none registered in default sample app)* | N/A | N/A | 0 |
 
 ### Serial Log Anomalies
-(none / list)
+None. Clean boot sequence, WiFi connected to `cb-home` (`192.168.86.188`), NTP synchronized, HTTP server started on port 80, steady 30s heartbeats with no crashes, TWDT alerts, or heap exhaustion.
 
 ### MCP Probe Results
-(summary)
+- `system_info`: Returned valid JSON payload with firmware `0.0.12-dev.55`, chip model `ESP32-S3`, time sync `SYNCED`.
+- `tools/list`: All 22 foundation and contributor tools registered and available.
+- `get_data_sources`: Returned `{"sources":[]}` cleanly.
 
 ### Out-of-Scope Findings
-(none / list)
+None.
 
 ### Blockers
-(none)
+None. Ready for PR completion.
