@@ -407,7 +407,7 @@ void DataManager::recordFetchOutcome(SourceRecord& r, UpdateStatus status, uint3
                  r.source->getSourceName());
         return;
 
-    case UpdateStatus::RateLimited:
+    case UpdateStatus::RateLimited: {
         // The peer is reachable and answering; we are simply asking too often.
         // Back off, but do not count it toward quarantine — this is not a fault
         // in the source, and quarantining a working peer would be wrong.
@@ -417,9 +417,10 @@ void DataManager::recordFetchOutcome(SourceRecord& r, UpdateStatus status, uint3
         // genuine failure, and vice versa. Without this the two policies interfere,
         // and one FetchError on a peer that was answering thirty seconds ago
         // quarantines it immediately.
+        uint32_t effectiveCap = std::max(r.source ? r.source->getMaxBackoffMs() : HEALTH_BACKOFF_CAP_MS, HEALTH_BACKOFF_BASE_MS);
         r.currentBackoffMs = (!r.backoffActive || !r.backoffFromRateLimit)
             ? HEALTH_BACKOFF_BASE_MS
-            : std::min(r.currentBackoffMs * 2, HEALTH_BACKOFF_CAP_MS);
+            : std::min(r.currentBackoffMs * 2, effectiveCap);
         r.nextAttemptMs        = nowMs + r.currentBackoffMs;
         r.backoffActive        = true;
         r.backoffFromRateLimit = true;
@@ -435,6 +436,7 @@ void DataManager::recordFetchOutcome(SourceRecord& r, UpdateStatus status, uint3
         ESP_LOGW(TAG, "Source '%s' rate-limited — backing off %lu ms",
                  r.source->getSourceName(), (unsigned long)r.currentBackoffMs);
         return;
+    }
 
     case UpdateStatus::FetchError:
     case UpdateStatus::ParseError:
@@ -443,20 +445,22 @@ void DataManager::recordFetchOutcome(SourceRecord& r, UpdateStatus status, uint3
     }
 
     // --- Genuine failure: count it, back off, quarantine at the ceiling ---
-    // Saturating: at 15-minute ceiling probes an unsaturated uint16_t would take
+    // Saturating: at ceiling probes an unsaturated uint16_t would take
     // ~682 days to wrap, but wrapping to 0 would read as "healthy" to a consumer.
     if (r.consecutiveFailures < UINT16_MAX) r.consecutiveFailures++;
+    uint32_t effectiveCap = std::max(r.source ? r.source->getMaxBackoffMs() : HEALTH_BACKOFF_CAP_MS, HEALTH_BACKOFF_BASE_MS);
     r.currentBackoffMs = (!r.backoffActive || r.backoffFromRateLimit)
         ? HEALTH_BACKOFF_BASE_MS
-        : std::min(r.currentBackoffMs * 2, HEALTH_BACKOFF_CAP_MS);
+        : std::min(r.currentBackoffMs * 2, effectiveCap);
     r.nextAttemptMs        = nowMs + r.currentBackoffMs;
     r.backoffActive        = true;
     r.backoffFromRateLimit = false;
 
-    // Quarantined is not "given up" — it is "at the ceiling, still probing every
-    // 15 minutes", so an unreachable peer that comes back is picked up without
-    // anyone touching the device.
-    r.state = (r.currentBackoffMs >= HEALTH_BACKOFF_CAP_MS)
+    // Quarantined is not "given up" — it is "probing at the backoff cap",
+    // so an unreachable peer that comes back is picked up without
+    // anyone touching the device. Quarantining is triggered after
+    // QUARANTINE_FAILURE_THRESHOLD consecutive failures, decoupled from backoff cap.
+    r.state = (r.consecutiveFailures >= QUARANTINE_FAILURE_THRESHOLD)
         ? SourceHealthState::Quarantined
         : SourceHealthState::Degraded;
 

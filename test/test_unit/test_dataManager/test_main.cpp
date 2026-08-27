@@ -632,7 +632,7 @@ TEST_F(DataManagerTest, Health_BackoffSuppressesFetchesUntilDue) {
 }
 
 TEST_F(DataManagerTest, Health_BackoffDoublesToCapThenQuarantines) {
-    ScriptedSource src("s", 1000, PriorityTier::High);
+    ScriptedSource src("s", 1000, PriorityTier::Low);
     src.next = UpdateStatus::FetchError;
     dm.registerSource(&src);
 
@@ -997,7 +997,7 @@ TEST_F(DataManagerTest, Backoff_CauseChangeRestartsSeries) {
     // Rate limiting and hard failure are different conditions. A source that has
     // been rate-limited to the ceiling must not be quarantined by its first
     // genuine error on a peer that was answering moments ago.
-    ScriptedSource src("s", 1000, PriorityTier::High);
+    ScriptedSource src("s", 1000, PriorityTier::Low);
     src.next = UpdateStatus::RateLimited;
     dm.registerSource(&src);
 
@@ -1158,6 +1158,231 @@ TEST_F(DataManagerTest, EscalationTimerUsesFdFromWiFiClient) {
     SUCCEED();
 }
 #endif
+
+// ===========================================================================
+// WO4 — Backoff Proportionality & Decoupled Quarantine (#166)
+// ===========================================================================
+
+TEST_F(DataManagerTest, Backoff_HighTierCapsAt60sAndQuarantinesAt6Failures) {
+    ScriptedSource src("high", 1000, PriorityTier::High);
+    src.next = UpdateStatus::FetchError;
+    dm.registerSource(&src);
+
+    // Failure 1: 30s base backoff, fail 1 -> Degraded
+    dm.setSimulatedTimeMs(1000);
+    dm.processNext();
+    SourceHealth h1 = healthOf(dm, &src);
+    EXPECT_EQ(h1.currentBackoffMs, 30000u);
+    EXPECT_EQ(h1.consecutiveFailures, 1u);
+    EXPECT_EQ(h1.state, SourceHealthState::Degraded);
+
+    // Failure 2: 60s cap reached, fail 2 -> STILL Degraded (decoupled from cap)
+    dm.setSimulatedTimeMs(1000 + 30000 + 1);
+    dm.processNext();
+    SourceHealth h2 = healthOf(dm, &src);
+    EXPECT_EQ(h2.currentBackoffMs, 60000u);
+    EXPECT_EQ(h2.consecutiveFailures, 2u);
+    EXPECT_EQ(h2.state, SourceHealthState::Degraded); // Not quarantined after 2 failures!
+
+    // Failures 3, 4, 5 -> backoff stays 60s, state Degraded
+    uint32_t t = 1000 + 30000 + 1;
+    for (int i = 3; i <= 5; ++i) {
+        t += 60000 + 1;
+        dm.setSimulatedTimeMs(t);
+        dm.processNext();
+        SourceHealth h = healthOf(dm, &src);
+        EXPECT_EQ(h.currentBackoffMs, 60000u);
+        EXPECT_EQ(h.consecutiveFailures, (uint16_t)i);
+        EXPECT_EQ(h.state, SourceHealthState::Degraded);
+    }
+
+    // Failure 6 (QUARANTINE_FAILURE_THRESHOLD) -> Quarantined
+    t += 60000 + 1;
+    dm.setSimulatedTimeMs(t);
+    dm.processNext();
+    SourceHealth h6 = healthOf(dm, &src);
+    EXPECT_EQ(h6.currentBackoffMs, 60000u);
+    EXPECT_EQ(h6.consecutiveFailures, 6u);
+    EXPECT_EQ(h6.state, SourceHealthState::Quarantined);
+}
+
+TEST_F(DataManagerTest, Backoff_NormalTierCapsAt300sAndQuarantinesAt6Failures) {
+    ScriptedSource src("normal", 1000, PriorityTier::Normal);
+    src.next = UpdateStatus::FetchError;
+    dm.registerSource(&src);
+
+    // Failure 1: 30s
+    uint32_t t = 1000;
+    dm.setSimulatedTimeMs(t);
+    dm.processNext();
+    EXPECT_EQ(healthOf(dm, &src).currentBackoffMs, 30000u);
+
+    // Failure 2: 60s
+    t += 30000 + 1;
+    dm.setSimulatedTimeMs(t);
+    dm.processNext();
+    EXPECT_EQ(healthOf(dm, &src).currentBackoffMs, 60000u);
+
+    // Failure 3: 120s
+    t += 60000 + 1;
+    dm.setSimulatedTimeMs(t);
+    dm.processNext();
+    EXPECT_EQ(healthOf(dm, &src).currentBackoffMs, 120000u);
+
+    // Failure 4: 240s
+    t += 120000 + 1;
+    dm.setSimulatedTimeMs(t);
+    dm.processNext();
+    EXPECT_EQ(healthOf(dm, &src).currentBackoffMs, 240000u);
+
+    // Failure 5: 300s (capped at 300s, since 240*2=480 > 300), fail 5 -> Degraded
+    t += 240000 + 1;
+    dm.setSimulatedTimeMs(t);
+    dm.processNext();
+    SourceHealth h5 = healthOf(dm, &src);
+    EXPECT_EQ(h5.currentBackoffMs, 300000u);
+    EXPECT_EQ(h5.consecutiveFailures, 5u);
+    EXPECT_EQ(h5.state, SourceHealthState::Degraded);
+
+    // Failure 6: 300s, fail 6 -> Quarantined
+    t += 300000 + 1;
+    dm.setSimulatedTimeMs(t);
+    dm.processNext();
+    SourceHealth h6 = healthOf(dm, &src);
+    EXPECT_EQ(h6.currentBackoffMs, 300000u);
+    EXPECT_EQ(h6.consecutiveFailures, 6u);
+    EXPECT_EQ(h6.state, SourceHealthState::Quarantined);
+}
+
+TEST_F(DataManagerTest, Backoff_LowTierCapsAt900sAndQuarantinesAt6Failures) {
+    ScriptedSource src("low", 1000, PriorityTier::Low);
+    src.next = UpdateStatus::FetchError;
+    dm.registerSource(&src);
+
+    uint32_t t = 1000;
+    // Expected backoff schedule: 30s, 60s, 120s, 240s, 480s, 900s (capped)
+    uint32_t schedule[] = { 30000, 60000, 120000, 240000, 480000, 900000 };
+    for (int i = 0; i < 6; ++i) {
+        dm.setSimulatedTimeMs(t);
+        dm.processNext();
+        SourceHealth h = healthOf(dm, &src);
+        EXPECT_EQ(h.currentBackoffMs, schedule[i]);
+        EXPECT_EQ(h.consecutiveFailures, (uint16_t)(i + 1));
+        if (i < 5) {
+            EXPECT_EQ(h.state, SourceHealthState::Degraded);
+        } else {
+            EXPECT_EQ(h.state, SourceHealthState::Quarantined);
+        }
+        t += schedule[i] + 1;
+    }
+}
+
+class CustomBackoffSource : public ScriptedSource {
+public:
+    uint32_t customCap;
+    CustomBackoffSource(std::string n, uint32_t ivl, PriorityTier p, uint32_t cap)
+        : ScriptedSource(n, ivl, p), customCap(cap) {}
+    uint32_t getMaxBackoffMs() const override { return customCap; }
+};
+
+TEST_F(DataManagerTest, Backoff_CustomMaxBackoffMsOverrideRespected) {
+    CustomBackoffSource src("custom45", 1000, PriorityTier::Low, 45000);
+    src.next = UpdateStatus::FetchError;
+    dm.registerSource(&src);
+
+    // Fail 1: 30s
+    dm.setSimulatedTimeMs(1000);
+    dm.processNext();
+    EXPECT_EQ(healthOf(dm, &src).currentBackoffMs, 30000u);
+
+    // Fail 2: 45s (capped at 45000, min(30*2, 45) = 45)
+    dm.setSimulatedTimeMs(1000 + 30000 + 1);
+    dm.processNext();
+    EXPECT_EQ(healthOf(dm, &src).currentBackoffMs, 45000u);
+}
+
+TEST_F(DataManagerTest, Backoff_FloorEnforcedForSubBaseMaxBackoffMs) {
+    CustomBackoffSource srcZero("zero", 1000, PriorityTier::Low, 0);
+    srcZero.next = UpdateStatus::FetchError;
+    dm.registerSource(&srcZero);
+
+    // Fail 1: 30s
+    dm.setSimulatedTimeMs(1000);
+    dm.processNext();
+    EXPECT_EQ(healthOf(dm, &srcZero).currentBackoffMs, DataManager::HEALTH_BACKOFF_BASE_MS);
+
+    // Fail 2: 30s (effectiveCap is max(0, 30000) = 30000)
+    dm.setSimulatedTimeMs(1000 + 30000 + 1);
+    dm.processNext();
+    EXPECT_EQ(healthOf(dm, &srcZero).currentBackoffMs, DataManager::HEALTH_BACKOFF_BASE_MS);
+
+    CustomBackoffSource srcSmall("small", 1000, PriorityTier::High, 100);
+    srcSmall.next = UpdateStatus::FetchError;
+    dm.registerSource(&srcSmall);
+
+    // Fail 1: 30s
+    dm.setSimulatedTimeMs(2000);
+    dm.processNext();
+    EXPECT_EQ(healthOf(dm, &srcSmall).currentBackoffMs, DataManager::HEALTH_BACKOFF_BASE_MS);
+
+    // Fail 2: 30s (effectiveCap is max(100, 30000) = 30000)
+    dm.setSimulatedTimeMs(2000 + 30000 + 1);
+    dm.processNext();
+    EXPECT_EQ(healthOf(dm, &srcSmall).currentBackoffMs, DataManager::HEALTH_BACKOFF_BASE_MS);
+}
+
+TEST_F(DataManagerTest, Quarantine_ExactFailureThresholdBoundary) {
+    ScriptedSource src("boundary", 1000, PriorityTier::High);
+    src.next = UpdateStatus::FetchError;
+    dm.registerSource(&src);
+
+    uint32_t t = 1000;
+    // Run QUARANTINE_FAILURE_THRESHOLD - 1 (5) failures
+    for (uint16_t i = 1; i < DataManager::QUARANTINE_FAILURE_THRESHOLD; ++i) {
+        dm.setSimulatedTimeMs(t);
+        dm.processNext();
+        SourceHealth h = healthOf(dm, &src);
+        EXPECT_EQ(h.consecutiveFailures, i);
+        EXPECT_EQ(h.state, SourceHealthState::Degraded)
+            << "Must remain Degraded before failure threshold is reached";
+        t += h.currentBackoffMs + 1;
+    }
+
+    // Exactly QUARANTINE_FAILURE_THRESHOLD (6) failures
+    dm.setSimulatedTimeMs(t);
+    dm.processNext();
+    SourceHealth hFinal = healthOf(dm, &src);
+    EXPECT_EQ(hFinal.consecutiveFailures, DataManager::QUARANTINE_FAILURE_THRESHOLD);
+    EXPECT_EQ(hFinal.state, SourceHealthState::Quarantined);
+}
+
+TEST_F(DataManagerTest, Backoff_RateLimitedRespectsTierCapAndNeverQuarantines) {
+    ScriptedSource src("rl_high", 1000, PriorityTier::High);
+    src.next = UpdateStatus::RateLimited;
+    dm.registerSource(&src);
+
+    // Fail 1: 30s
+    dm.setSimulatedTimeMs(1000);
+    dm.processNext();
+    EXPECT_EQ(healthOf(dm, &src).currentBackoffMs, 30000u);
+
+    // Fail 2: 60s (High tier cap)
+    dm.setSimulatedTimeMs(1000 + 30000 + 1);
+    dm.processNext();
+    EXPECT_EQ(healthOf(dm, &src).currentBackoffMs, 60000u);
+
+    // Additional rate limits stay at 60s and remain Degraded
+    uint32_t t = 1000 + 30000 + 1;
+    for (int i = 0; i < 10; ++i) {
+        t += 60000 + 1;
+        dm.setSimulatedTimeMs(t);
+        dm.processNext();
+        SourceHealth h = healthOf(dm, &src);
+        EXPECT_EQ(h.currentBackoffMs, 60000u);
+        EXPECT_EQ(h.state, SourceHealthState::Degraded);
+        EXPECT_EQ(h.consecutiveFailures, 0u);
+    }
+}
 
 int main(int argc, char **argv) {
     ::testing::InitGoogleTest(&argc, argv);
