@@ -1,5 +1,9 @@
 # Compliance Audit Guide
 
+> **See also:** For a full release quality gate covering 10 dimensions with graded
+> evidence, see [Release Audit Protocol](release-audit.md). This compliance audit
+> covers the cross-referencing checklist for a single-dimension code review pass.
+
 When auditing the codebase for compliance, the principles in this skill interact — a finding in one domain often implies a finding in another. This guide helps you systematically cover the full surface area.
 
 ## Audit Scope

@@ -20,6 +20,9 @@ description: >
   watchdog, heap, PSRAM, TLS memory, flash size. (5) Security — DeviceCrypto,
   KeyManager, AuthManager, JWT, setInsecure, certificate bundles, esp_crt_bundle,
   DEFAULT_NONE, PAT, OTA tokens, SECURITY_VERSION, anti-rollback, inject_version.
+  (6) Release quality gate — release audit, pre-release check, quality gate,
+  release readiness, beta audit, stable audit, consumer compliance audit,
+  audit my app, compliance check.
   Trigger whenever context includes ESP32, IoT firmware, sensor dashboard,
   embedded C++, or AppFoundation — even if those exact words aren't used.
 ---
@@ -101,6 +104,7 @@ This skill uses a progressive disclosure model. Based on your query, load and re
 | **App Developer Quickstart** (Building a new IoT app) | `guides/app-developer-quickstart.md` |
 | **Module Developer Guide** (Adding a kernel module) | `guides/module-developer-guide.md` |
 | **Compliance Audit** (Systematic codebase review against all principles) | `guides/compliance-audit.md` |
+| **Release Audit** (Structured quality gate for beta/stable releases and consumer compliance) | `guides/release-audit.md` |
 | **Filing and triaging framework issues** | `references/issue-management.md` |
 | **Contributing changes or proposing new capabilities** | `references/contribution-protocol.md` |
 | **Interface Contracts** (Full API, rules, lifecycle for each interface) | `interfaces/` (One file per interface) |
@@ -207,7 +211,11 @@ These references are optimized distillations for AI agents. If the human develop
   "running low on RAM", "firmware too large", "flash partition",
   "reduce binary size", "performance optimisation", "profiling ESP32".
 - **Audit / compliance**: "audit", "compliance", "tech debt", "code review",
-  "scan for violations", "check compliance", "naming conventions".
+  "scan for violations", "check compliance", "naming conventions",
+  "release audit", "release gate", "pre-release check", "quality gate",
+  "release checklist", "beta audit", "stable audit", "release readiness",
+  "pre-release validation", "release candidate review", "consumer audit",
+  "compliance check", "audit my app".
 - **Security & credentials**: "DeviceCrypto", "KeyManager", "AuthManager", "JWT",
   "credential storage", "setInsecure", "SECURITY_VERSION", "anti-rollback",
   "private_key.pem".
