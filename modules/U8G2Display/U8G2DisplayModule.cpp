@@ -298,8 +298,7 @@ void U8G2DisplayModule::tick(uint32_t currentMillis) {
         std::vector<DataSourceHealthPayload> updates;
         {
             std::lock_guard<std::mutex> lock(_dataSourceHealthMutex);
-            updates = _dataSourceUpdates;
-            _dataSourceUpdates.clear();
+            std::swap(updates, _dataSourceUpdates);
         }
         for (const auto& payload : updates) {
             if (_screens) {

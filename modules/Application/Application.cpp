@@ -324,8 +324,10 @@ void Application::tick() {
 
             if (!changed) {
                 // Also re-publish if IP changed (initial event may have 0.0.0.0)
-                String currentIPStr = WiFi.localIP().toString();
-                if (strcmp(currentIPStr.c_str(), _deviceIPBuf) != 0) {
+                IPAddress ip = WiFi.localIP();
+                char currentIP[16];
+                snprintf(currentIP, sizeof(currentIP), "%u.%u.%u.%u", ip[0], ip[1], ip[2], ip[3]);
+                if (strcmp(currentIP, _deviceIPBuf) != 0) {
                     changed = true;
                 }
             }

@@ -344,8 +344,7 @@ void LVGLDisplayModule::tick(uint32_t now) {
         std::vector<DataSourceHealthPayload> updates;
         {
             std::lock_guard<std::mutex> lock(_dataSourceHealthMutex);
-            updates = _dataSourceUpdates;
-            _dataSourceUpdates.clear();
+            std::swap(updates, _dataSourceUpdates);
         }
         for (const auto& payload : updates) {
             if (_screens) {
