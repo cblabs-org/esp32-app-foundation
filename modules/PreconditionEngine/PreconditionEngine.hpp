@@ -32,6 +32,9 @@ struct PreconditionState {
     uint8_t attemptCount = 0;
     uint32_t lastAttemptMs = 0;
     uint32_t cooldownMs = 0;
+    // Per-precondition policy overrides (#154). nullptr = use engine defaults.
+    const DampingPolicy* dampingOverride = nullptr;
+    const RetryPolicy*   retryOverride   = nullptr;
 };
 
 class PreconditionEngine : public IPreconditionRegistry {
@@ -41,7 +44,9 @@ public:
              EvalFn evaluate,
              DescribeFn describe = nullptr,
              const Edge* edges = nullptr,
-             uint8_t edgeCount = 0) override;
+             uint8_t edgeCount = 0,
+             const DampingPolicy* damping = nullptr,
+             const RetryPolicy*  retry   = nullptr) override;
 
     bool resolveEdges();
     void tick(uint32_t nowMs);

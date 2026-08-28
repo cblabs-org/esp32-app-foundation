@@ -79,7 +79,7 @@ Instead of a monolithic `IModule` super-interface, the framework provides granul
 | [IConfigurable](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/include/interfaces/IConfigurable.hpp) | `applyConfig(const JsonObject&)` — config persistence |
 | [IWebContributor](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/include/interfaces/IWebContributor.hpp) | `registerRoutes(PsychicHttpServer&)` — REST API routes |
 | [IMCPContributor](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/include/interfaces/IMCPContributor.hpp) | `registerMCPTools(MCPToolRegistry&)` — JSON-RPC tools |
-| [IConfigGate](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/include/interfaces/IConfigGate.hpp) | `isSatisfied()` — boot prerequisites |
+| [IPreconditionContributor](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/include/interfaces/IPreconditionContributor.hpp) | `registerPreconditions()` — boot prerequisites |
 | [IDataSource](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/include/interfaces/IDataSource.hpp) | `fetchUpdate()` — background data fetching |
 
 A module that only needs periodic execution implements `ITickable` alone — it never touches config or web routes.

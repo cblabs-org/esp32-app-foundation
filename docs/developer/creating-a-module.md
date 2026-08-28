@@ -49,13 +49,13 @@ class MCPToolRegistry;
  * @brief Main application class implementing specific business logic.
  *
  * Participates in the Application tick loop, participates in the ConfigManager,
- * contributes Web UI tabs and routes, contributes MCP tools, and exposes a config gate.
+ * contributes Web UI tabs and routes, contributes MCP tools, and contributes preconditions.
  */
 class MyApp : public ITickable,
               public IConfigurable,
               public IWebContributor,
               public IMCPContributor,
-              public IConfigGate {
+              public IPreconditionContributor {
 public:
     MyApp() = default;
     ~MyApp() override = default;
@@ -78,17 +78,13 @@ public:
     void registerMCPTools(MCPToolRegistry& registry) override;
     void registerMcpTools(MCPServer& mcp); // Deprecated legacy method signature
 
-    // IConfigGate
-    const char* getGateName() const override;
-    bool isSatisfied() const override;
+    // IPreconditionContributor
+    void registerPreconditions(IPreconditionRegistry& registry) override;
 
 private:
     // Configuration state (persisted via IConfigurable)
     int _refreshIntervalMs = 5000;     // Example configurable parameter
     bool _featureEnabled = true;        // Example boolean toggle
-
-    // Config gate state
-    bool _gateOpen = false;
 
     // Tick timing
     uint32_t _lastActionMs = 0;
@@ -170,7 +166,7 @@ MyApp myApp;  // Allocated inside global/static scope
 void setup() {
     // Register the module - one call auto-attaches it to:
     // ITickable (tick), IConfigurable (config), IWebContributor (REST),
-    // IMCPContributor (MCP tools), and IConfigGate (boot gates).
+    // IMCPContributor (MCP tools), and IPreconditionContributor (boot preconditions).
     app.registerModule(&myApp);
 
     FrameworkConfig config;
