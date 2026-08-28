@@ -29,13 +29,28 @@
   }
 
   // -------------------------------------------------------------------------
+  // RAG colour tokens — resolved lazily from CSS custom properties (#185).
+  // -------------------------------------------------------------------------
+  function cssVar(name) {
+    return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  }
+  let _ragGreen, _ragAmber, _ragRed;
+  function ragGreen() { return _ragGreen || (_ragGreen = cssVar('--success') || '#2e7d32'); }
+  function ragAmber() { return _ragAmber || (_ragAmber = cssVar('--warning') || '#f9a825'); }
+  function ragRed()   { return _ragRed   || (_ragRed   = cssVar('--error')   || '#c62828'); }
+
+  // Invalidate cache on theme change so dark-mode values are picked up
+  const themeObserver = new MutationObserver(() => { _ragGreen = _ragAmber = _ragRed = null; });
+  themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+  // -------------------------------------------------------------------------
   // Helper: RAG colour for percentage-based bars (PSRAM, Storage)
   //   Green  ≥ 50%    Amber  ≥ 25%    Red  < 25%
   // -------------------------------------------------------------------------
   function ragColorPct(pct) {
-    if (pct >= 50) return '#2e7d32';   // Green
-    if (pct >= 25) return '#f9a825';   // Amber
-    return '#c62828';                   // Red
+    if (pct >= 50) return ragGreen();
+    if (pct >= 25) return ragAmber();
+    return ragRed();
   }
 
   // -------------------------------------------------------------------------
@@ -50,9 +65,9 @@
   //   Red    < 40 KB free    (risk of WiFi/TLS allocation failures)
   // -------------------------------------------------------------------------
   function ragColorDram(freeBytes) {
-    if (freeBytes >= 81920) return '#2e7d32';   // Green: ≥ 80 KB
-    if (freeBytes >= 40960) return '#f9a825';   // Amber: ≥ 40 KB
-    return '#c62828';                            // Red:   < 40 KB
+    if (freeBytes >= 81920) return ragGreen();
+    if (freeBytes >= 40960) return ragAmber();
+    return ragRed();
   }
 
   // -------------------------------------------------------------------------
@@ -96,9 +111,9 @@
   // Helper: Temperature colour
   // -------------------------------------------------------------------------
   function tempColor(temp) {
-    if (temp >= 70) return '#c62828';
-    if (temp >= 55) return '#f9a825';
-    return '#2e7d32';
+    if (temp >= 70) return ragRed();
+    if (temp >= 55) return ragAmber();
+    return ragGreen();
   }
 
   // -------------------------------------------------------------------------
