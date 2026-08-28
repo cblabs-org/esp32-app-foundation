@@ -13,9 +13,10 @@
  *              web portal REST endpoints and MCP tools.
  */
 #include "HomeAssistantModule.hpp"
-#include "utils/serveGzipAsset.hpp"
 
 #ifdef WITH_HOMEASSISTANT
+
+#include "utils/serveGzipAsset.hpp"
 
 #include <esp_log.h>
 #include <esp_mac.h>

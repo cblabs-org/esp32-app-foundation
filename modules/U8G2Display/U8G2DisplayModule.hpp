@@ -555,6 +555,7 @@ private:
      */
 #ifdef WITH_OTA
     static void _onOtaProgress(const char* topic, const void* payload, void* ctx);
+    std::atomic<bool> _otaInProgress{false};  ///< True while OTA is in progress (set by _onOtaProgress)
 #endif
 
     /**

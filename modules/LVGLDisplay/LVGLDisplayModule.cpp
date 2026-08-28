@@ -998,15 +998,10 @@ void LVGLDisplayModule::registerRoutes(PsychicHttpServer& server) {
 
 #ifndef UNIT_TEST
 #ifdef WITH_OTA
-    // KNOWN GAP — tracked in issue #138.
-    // _pauseRendering covers a narrower window than OTAUpdateManager::getState()
-    // != Idle: it is set by _onOtaProgress only for non-complete events, and is
-    // cleared by restorePriorScreen()/clearStatus(), which are reachable from
-    // non-OTA paths. The proper fix is to wire an OTAUpdateManager* (or an
-    // IOtaStateProvider) into this module. U8G2DisplayModule still uses the
-    // original static call and is inconsistent with this one.
+    // OTA predicate: uses _pauseRendering atomic flag set by _onOtaProgress EventBus callback.
+    // Consistent with U8G2DisplayModule which uses _otaInProgress in the same pattern.
     _serviceHelper.setOtaPredicate([this]() {
-        return _pauseRendering.load();
+        return _pauseRendering.load(std::memory_order_relaxed);
     });
 #endif
     _serviceHelper.registerBrightnessRoute(server);
