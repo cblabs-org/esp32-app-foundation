@@ -195,8 +195,46 @@ check_missing_doxygen() {
 }
 
 check_undocumented_constants() {
-    # Match #define, constexpr, static declarations that don't have an inline comment (//)
-    run_check_grep 1 "undocumented_constants" "^[[:space:]]*(#define|constexpr|static[[:space:]]+const)[^/]+$" "*.hpp"
+    # Match #define, constexpr, static const declarations that lack documentation.
+    # Must check BOTH the current line for inline comments (// or ///<) AND
+    # the preceding line for block-doc comments (///, /**, * @brief).
+    # Exclude lines with '(' — those are methods/constructors, not constants.
+    local hits=0
+    local files=""
+    for f in $(get_source_files | grep '\.hpp$' || true); do
+        local out
+        out=$(awk '
+            BEGIN { prev="" }
+            {
+                line = $0
+                # Check if current line is a constant/define declaration
+                if (line ~ /^[ \t]*(#define|constexpr|static[ \t]+const)/) {
+                    # Skip if line has inline comment (//)
+                    if (line ~ /\/\//) { prev=line; next }
+                    # Skip if line contains parentheses (method/constructor)
+                    if (line ~ /\(/) { prev=line; next }
+                    # Skip if line is an array initializer
+                    if (line ~ /\[\]/) { prev=line; next }
+                    # Skip if preceding line is a doc comment
+                    if (prev ~ /\/\/\// || prev ~ /\/\*\*/ || prev ~ /\* @/ || prev ~ /\*\//) { prev=line; next }
+                    # This is an undocumented constant
+                    print NR
+                }
+                prev = line
+            }
+        ' "$f")
+        if [ -n "$out" ]; then
+            local count
+            count=$(echo "$out" | wc -l | tr -d ' ')
+            hits=$((hits + count))
+            files="$files ${f#$ROOT_DIR/}"
+        fi
+    done
+    if [ $hits -gt 0 ]; then
+        report 1 "undocumented_constants" "FAIL" "$hits" "$files"
+    else
+        report 1 "undocumented_constants" "PASS" 0
+    fi
 }
 
 check_tag_mismatch() {

@@ -117,7 +117,7 @@ namespace ApplicationEvents {
 #else
     // EO-07: Legible absent-module error for consumers attempting to use OTA without the flag
     struct OTA_PROGRESS_requires_WITH_OTA {};
-    constexpr OTA_PROGRESS_requires_WITH_OTA OTA_PROGRESS{};
+    constexpr OTA_PROGRESS_requires_WITH_OTA OTA_PROGRESS{}; ///< Sentinel — compile error if used without WITH_OTA
     
     struct OtaProgressPayload_requires_WITH_OTA {};
     typedef OtaProgressPayload_requires_WITH_OTA OtaProgressPayload;

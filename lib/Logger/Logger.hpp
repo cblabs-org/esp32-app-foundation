@@ -25,7 +25,7 @@
 
 #include "platform/LogShim.h"
 
-#define LOG_SECURE(tag, fmt, ...) Logger::logSecure(tag, fmt, ##__VA_ARGS__)
+#define LOG_SECURE(tag, fmt, ...) Logger::logSecure(tag, fmt, ##__VA_ARGS__) ///< Convenience macro for redacted secure logging
 
 /**
  * @brief Static utility class for system-wide logging with redaction support.
