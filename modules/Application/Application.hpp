@@ -473,8 +473,11 @@ private:
      */
     class NullStatusReporter : public IStatusReporter {
     public:
+        /** @brief Auto-generated doc */
         void reportStatus(const char* /*message*/, float /*progress*/ = -1.0f) override {}
+        /** @brief Auto-generated doc */
         void reportError(const char* /*errorMessage*/) override {}
+        /** @brief Auto-generated doc */
         void clearStatus() override {}
     };
 
@@ -529,7 +532,9 @@ private:
     // -------------------------------------------------------------------------
 
     struct AppTabContributor : public IWebContributor {
+        /** @brief Auto-generated doc */
         void        registerRoutes(PsychicHttpServer& /*server*/) override {}
+        /** @brief Auto-generated doc */
         void registerTabs(ITabRegistry& registry) override {
             registry.addTab("App", nullptr, 30);
         }
@@ -547,8 +552,10 @@ private:
         Application* app = nullptr;
         /** @brief Register routes. */
         void        registerRoutes(PsychicHttpServer& server) override;
+        /** @brief Auto-generated doc */
         void        registerTabs(ITabRegistry& /*registry*/) override {}
         const char* getApiPrefix() const override { return "/api/preconditions"; }
+        /** @brief Auto-generated doc */
         size_t      getMaxPostBody() const override { return 1024; }
     };
     PreconditionWebContributor _preconditionWebContributor;
@@ -561,8 +568,10 @@ private:
         Application* app = nullptr;
         /** @brief Register routes. */
         void        registerRoutes(PsychicHttpServer& server) override;
+        /** @brief Auto-generated doc */
         void        registerTabs(ITabRegistry& /*registry*/) override {}
         const char* getApiPrefix() const override { return "/api/data"; }
+        /** @brief Auto-generated doc */
         size_t      getMaxPostBody() const override { return 1024; }
     };
     DataSourceWebContributor _dataSourceWebContributor;

@@ -149,7 +149,9 @@ public:
     void tick(uint32_t currentMillis) override;
 
     // IWebContributor — Status tab + system routes (registered in begin())
+    /** @brief Auto-generated doc */
     void registerRoutes(PsychicHttpServer& /*server*/) override {}  // Routes registered inline in begin()
+    /** @brief Auto-generated doc */
     void registerTabs(ITabRegistry& registry) override {
         registry.addTab("Status", "System", 10);
     }

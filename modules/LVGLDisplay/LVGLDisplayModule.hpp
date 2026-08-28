@@ -196,6 +196,7 @@ public:
     uint16_t getDisplayHeight() const override;
     /** @brief Set the brightness. */
     void setBrightness(uint8_t brightness) override;
+    /** @brief Auto-generated doc */
     uint8_t getBrightness() const override { return _brightness; }
     /** @brief Reset Activity. */
     void resetActivity() override;
@@ -311,6 +312,7 @@ public:
     // -------------------------------------------------------------------------
 
     const char* getConfigNamespace() const override { return "display"; }
+    /** @brief Auto-generated doc */
     int getSchemaVersion() const override { return 1; }
     /** @brief Apply Config. */
     void applyConfig(const JsonObject& section) override;
@@ -384,12 +386,15 @@ public:
     // Runtime Setters & Getters
     // -------------------------------------------------------------------------
 
+    /** @brief Auto-generated doc */
     void setConfigManager(ConfigManager* cm) { _configManager = cm; }
     /** @brief Set the rotation. */
     void setRotation(uint16_t degrees);
+    /** @brief Auto-generated doc */
     uint16_t getRotation() const { return _rotation; }
     /** @brief Set the screensaver enabled. */
     void setScreensaverEnabled(bool enabled);
+    /** @brief Auto-generated doc */
     bool getScreensaverEnabled() const { return _screensaverEnabled; }
     /** @brief Set the dim timeout. */
     void setDimTimeout(unsigned long timeoutMs);
@@ -407,6 +412,7 @@ public:
     lv_indev_t* getEncoderInput() const { return _encoderInDev; }
     lv_indev_t* getKeypadInput() const { return _keypadInDev; }
     lv_group_t* getGroup() const { return _group; }
+    /** @brief Auto-generated doc */
     bool isBootstrapMode() const { return _bootstrapMode; }
     EventBus* getEventBus() const { return _eventBus; }
 

@@ -58,12 +58,16 @@ public:
         return createdDisplay;
     }
 
+    /** @brief Auto-generated doc */
     void setBrightness(uint8_t level) override {
         brightnessLevel = level;
     }
 
+    /** @brief Auto-generated doc */
     uint16_t getScreenWidth() const override { return screenWidth; }
+    /** @brief Auto-generated doc */
     uint16_t getScreenHeight() const override { return screenHeight; }
+    /** @brief Auto-generated doc */
     uint16_t getBufferLineCount() const override { return bufferLineCount; }
 
     lv_indev_t* createTouchInput() override {
@@ -78,6 +82,7 @@ public:
         return keypadInDev;
     }
 
+    /** @brief Auto-generated doc */
     void enableMockEncoder() {
         if (encoderInDev == nullptr) {
             encoderInDev = lv_indev_create();
@@ -85,6 +90,7 @@ public:
         }
     }
 
+    /** @brief Auto-generated doc */
     void enableMockTouch() {
         if (touchInDev == nullptr) {
             touchInDev = lv_indev_create();
@@ -92,6 +98,7 @@ public:
         }
     }
 
+    /** @brief Auto-generated doc */
     void enableMockKeypad() {
         if (keypadInDev == nullptr) {
             keypadInDev = lv_indev_create();

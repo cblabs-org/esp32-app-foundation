@@ -169,16 +169,20 @@ check_missing_doxygen() {
         out=$(awk '
             BEGIN { in_class=0; vis=0; doc=0; }
             /class [A-Za-z0-9_]+/ { in_class=1; vis=0; }
+            /struct [A-Za-z0-9_]+/ { in_class=1; vis=1; }
             /public:/ { if(in_class) vis=1; }
             /protected:/ { if(in_class) vis=1; }
             /private:/ { if(in_class) vis=0; }
             /\/\*\*/ || /\/\/\// { doc=1; }
-            /^[ \t]*[A-Za-z0-9_<>:]+[ \t]+[A-Za-z0-9_]+\(/ {
+            /^[ \t]*\*/ { doc=1; }
+            /^[ \t]*template[ \t]*</ { if (doc) { doc=1; next; } }
+            /^[ \t]*[A-Za-z_][A-Za-z0-9_<>:]*[ \t]+[A-Za-z0-9_~]+\(/ && $0 !~ /^[ \t]*return[ \t]+/ {
                 if (in_class && vis && !doc) { print NR; }
                 doc=0;
+                next;
             }
             /^[ \t]*$/ { }
-            /[^ \t]/ { if ($0 !~ /\/\*\*/ && $0 !~ /\/\/\// && $0 !~ /^[ \t]*[A-Za-z0-9_<>:]+[ \t]+[A-Za-z0-9_]+\(/) doc=0; }
+            /[^ \t]/ { if ($0 !~ /\/\*\*/ && $0 !~ /\/\/\// && $0 !~ /^[ \t]*\*/ && $0 !~ /^[ \t]*template[ \t]*</ && $0 !~ /^[ \t]*[A-Za-z_][A-Za-z0-9_<>:]*[ \t]+[A-Za-z0-9_~]+\(/) doc=0; }
         ' "$f")
         if [ -n "$out" ]; then
             local count

@@ -41,6 +41,7 @@ public:
 
     using ITabRegistry::addTab;  // Expose TabEntry convenience overload
 
+    /** @brief Auto-generated doc */
     void addTab(const char* name, const char* parent, int order,
                 const char* icon, const char* script) override {
         entries.push_back({
