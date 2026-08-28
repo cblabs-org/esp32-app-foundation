@@ -130,12 +130,12 @@ struct OTAProgressEvent {
  *  Stack MUST reside in DRAM (not PSRAM) because the OTA pipeline performs SPI
  *  flash writes. 16 KB fits within the typical largest free DRAM block (~31 KB)
  *  on a running device. Used in performUpdate() and exposed via the status API. */
-static constexpr uint32_t OTA_TASK_STACK_BYTES = 16384;
+static constexpr uint32_t OTA_TASK_STACK_BYTES = 16384;     ///< 16 KB — headroom for TLS handshake + signature verification
 
 /** Minimum free DRAM headroom required before attempting an OTA task launch.
  *  If free DRAM < (OTA_TASK_STACK_BYTES + OTA_TASK_DRAM_HEADROOM_BYTES),
  *  the pre-flight guard will log a diagnostics message and attempt PSRAM fallback. */
-static constexpr uint32_t OTA_TASK_DRAM_HEADROOM_BYTES = 8192;
+static constexpr uint32_t OTA_TASK_DRAM_HEADROOM_BYTES = 8192; ///< Ota Task Dram Headroom Bytes
 
 // ---------------------------------------------------------------------------
 // OTA Update Manager
@@ -187,6 +187,7 @@ public:
     void begin(Application& app);
 
     // --- ITickable ---
+    /** @brief Periodic tick handler. */
     void tick(uint32_t currentMillis) override;
 
     /**

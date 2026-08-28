@@ -46,6 +46,7 @@ struct TabEntry {
  */
 class ITabRegistry {
 public:
+    /** @brief Destructor for ITabRegistry. */
     virtual ~ITabRegistry() = default;
 
     /**

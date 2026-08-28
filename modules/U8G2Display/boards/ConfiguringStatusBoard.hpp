@@ -80,7 +80,7 @@ struct PreconditionSnapshot {
  */
 class ConfiguringStatusBoard : public IDisplayBoard {
 public:
-    static constexpr size_t MAX_DISPLAY_PRECONDITIONS = 16;
+    static constexpr size_t MAX_DISPLAY_PRECONDITIONS = 16; ///< Maximum display preconditions
 
     /**
      * @brief Construct with display dimensions for widget layout.

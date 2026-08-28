@@ -234,9 +234,17 @@ button.outline {
 }
 
 button.secondary {
-  background: var(--card-bg);
+  background: var(--bg);
   color: var(--text);
-  border: 1px solid var(--border);
+  border: 1.5px solid var(--border);
+}
+button.secondary:hover {
+  border-color: var(--primary);
+}
+
+/* Utility: hide elements via JS classList toggle (#139) */
+.hidden {
+  display: none !important;
 }
 
 /* Password toggle eye button */

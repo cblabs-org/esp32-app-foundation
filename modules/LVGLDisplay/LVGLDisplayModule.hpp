@@ -84,7 +84,7 @@ class MCPToolRegistry;
 
 
 #ifndef DISPLAY_MESSAGE_PAYLOAD_DEFINED
-#define DISPLAY_MESSAGE_PAYLOAD_DEFINED
+#define DISPLAY_MESSAGE_PAYLOAD_DEFINED                     ///< Display Message Payload Defined
 struct DisplayMessagePayload {
     const char* message;       // Text to display
     unsigned long durationMs;  // How long to display (0 = until cleared)
@@ -92,7 +92,7 @@ struct DisplayMessagePayload {
 #endif
 
 #ifndef SYSTEM_ERROR_PAYLOAD_DEFINED
-#define SYSTEM_ERROR_PAYLOAD_DEFINED
+#define SYSTEM_ERROR_PAYLOAD_DEFINED                        ///< System Error Payload Defined
 /**
  * @brief Payload for LVGLDisplayEvents::SYSTEM_ERROR EventBus topic.
  *
@@ -108,10 +108,10 @@ struct SystemErrorPayload {
 #endif
 
 namespace LVGLDisplayEvents {
-    constexpr const char* DISPLAY_SLEEP = "display.sleep";
-    constexpr const char* DISPLAY_WAKE = "display.wake";
-    constexpr const char* DISPLAY_MESSAGE = "display.message";
-    constexpr const char* SYSTEM_ERROR = "system.error";
+    constexpr const char* DISPLAY_SLEEP = "display.sleep";  ///< Display Sleep
+    constexpr const char* DISPLAY_WAKE = "display.wake";    ///< Display Wake
+    constexpr const char* DISPLAY_MESSAGE = "display.message"; ///< Display Message
+    constexpr const char* SYSTEM_ERROR = "system.error";    ///< System Error
 }
 
 /**
@@ -190,15 +190,25 @@ public:
     // IDisplayModule
     // -------------------------------------------------------------------------
 
+    /** @brief Get the display width. */
     uint16_t getDisplayWidth() const override;
+    /** @brief Get the display height. */
     uint16_t getDisplayHeight() const override;
+    /** @brief Set the brightness. */
     void setBrightness(uint8_t brightness) override;
+    /** @brief Return current brightness level. */
     uint8_t getBrightness() const override { return _brightness; }
+    /** @brief Reset Activity. */
     void resetActivity() override;
+    /** @brief Check whether dimmed. */
     bool isDimmed() const override;
+    /** @brief Check whether sleeping. */
     bool isSleeping() const override;
+    /** @brief Capture P N G. */
     bool capturePNG(Print& sink) override;
+    /** @brief Capture Stored P N G. */
     bool captureStoredPNG(Print& sink) override;
+    /** @brief Show System State. */
     void showSystemState(const SystemDisplayParams& params) override;
 
     /**
@@ -302,15 +312,20 @@ public:
     // -------------------------------------------------------------------------
 
     const char* getConfigNamespace() const override { return "display"; }
+    /** @brief Return config schema version. */
     int getSchemaVersion() const override { return 1; }
+    /** @brief Apply Config. */
     void applyConfig(const JsonObject& section) override;
+    /** @brief Serialize Config. */
     void serializeConfig(JsonObject& section) const override;
+    /** @brief Reset Config. */
     void resetConfig() override;
 
     // -------------------------------------------------------------------------
     // IWebContributor — Display REST API and portal tab
     // -------------------------------------------------------------------------
 
+    /** @brief Register routes. */
     void registerRoutes(PsychicHttpServer& server) override;
     const char* getApiPrefix() const override { return "/api/display"; }
 
@@ -371,13 +386,20 @@ public:
     // Runtime Setters & Getters
     // -------------------------------------------------------------------------
 
+    /** @brief Inject ConfigManager reference for persistent settings. */
     void setConfigManager(ConfigManager* cm) { _configManager = cm; }
+    /** @brief Set the rotation. */
     void setRotation(uint16_t degrees);
+    /** @brief Return current display rotation in degrees. */
     uint16_t getRotation() const { return _rotation; }
+    /** @brief Set the screensaver enabled. */
     void setScreensaverEnabled(bool enabled);
+    /** @brief Return whether the screensaver is enabled. */
     bool getScreensaverEnabled() const { return _screensaverEnabled; }
+    /** @brief Set the dim timeout. */
     void setDimTimeout(unsigned long timeoutMs);
     unsigned long getDimTimeout() const { return _dimTimeoutMs; }
+    /** @brief Set the blank timeout. */
     void setBlankTimeout(unsigned long timeoutMs);
     unsigned long getBlankTimeout() const { return _blankTimeoutMs; }
 
@@ -390,6 +412,7 @@ public:
     lv_indev_t* getEncoderInput() const { return _encoderInDev; }
     lv_indev_t* getKeypadInput() const { return _keypadInDev; }
     lv_group_t* getGroup() const { return _group; }
+    /** @brief Return whether the display is in bootstrap mode. */
     bool isBootstrapMode() const { return _bootstrapMode; }
     EventBus* getEventBus() const { return _eventBus; }
 
@@ -429,6 +452,7 @@ private:
     bool     _bootstrapMode = false;           ///< True while in Phase 1 bootstrap mode
     float    _lastBootProgress = 0.0f;         ///< Last boot progress rendered (for synchronous boot animation)
     std::atomic<bool> _pauseRendering{false};  ///< Pause rendering flag during OTA flash writes
+    std::atomic<bool> _otaInProgress{false};   ///< True while OTA is active (independent of _pauseRendering which is cleared by non-OTA paths)
     uint32_t _lastIndevInactiveMs = 0;         ///< Inactivity tracking timestamp
     std::atomic<bool> _pendingInputWake{false}; ///< Input detected while dimmed/blanked
 

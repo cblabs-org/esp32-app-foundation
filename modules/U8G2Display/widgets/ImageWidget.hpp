@@ -17,7 +17,7 @@
  */
 
 #ifndef IMAGE_WIDGET_HPP
-#define IMAGE_WIDGET_HPP
+#define IMAGE_WIDGET_HPP                                    ///< Image Widget Hpp
 
 #include "IGfxWidget.hpp"
 

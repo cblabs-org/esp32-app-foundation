@@ -1,3 +1,10 @@
+/*
+ * ESP32 App Foundation (c) 2026 CB Labs
+ *
+ * Test: test/test_unit/test_timeManager/test_timeManager.cpp
+ * Description: Implementation of TimeManagerTest class.
+ */
+
 #include <gtest/gtest.h>
 #include "../../../modules/TimeManager/TimeManager.hpp"
 

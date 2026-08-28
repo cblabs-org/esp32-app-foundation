@@ -40,6 +40,7 @@
  */
 class IConfigurable {
 public:
+    /** @brief Destructor for IConfigurable. */
     virtual ~IConfigurable() = default;
 
     /**

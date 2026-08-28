@@ -144,7 +144,7 @@ inline Severity deriveSeverity(Cause cause, bool everMet = false) {
  * @brief Well-known precondition name constants.
  */
 namespace PreconditionNames {
-    inline constexpr const char* WIFI_STATION = "WiFi Station";
-    inline constexpr const char* TIMEZONE     = "Timezone";
-    inline constexpr const char* TIME_SYNC    = "Time Sync";
+    inline constexpr const char* WIFI_STATION = "WiFi Station"; ///< Wifi Station
+    inline constexpr const char* TIMEZONE     = "Timezone"; ///< Timezone
+    inline constexpr const char* TIME_SYNC    = "Time Sync"; ///< Time Sync
 }

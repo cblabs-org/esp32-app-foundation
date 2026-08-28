@@ -99,6 +99,29 @@ void SLSSystemScreens::onPreconditionHealth(const PreconditionHealthPayload* pay
         return;
     }
 
+    // Update icon to reflect current precondition state (#158)
+    // Previously the icon was never updated, so an unmet precondition could
+    // display a stale checkmark from a prior satisfied state.
+    if (ui_ui_SystemMsgIcon != nullptr) {
+        if (payload->cause == Cause::Met) {
+            lv_label_set_text(ui_ui_SystemMsgIcon, LV_SYMBOL_OK);
+            lv_obj_set_style_text_color(ui_ui_SystemMsgIcon,
+                                        lv_color_hex(0x75B798),
+                                        LV_PART_MAIN);
+        } else if (payload->severity == Severity::NeedsUser ||
+                   payload->severity == Severity::Persistent) {
+            lv_label_set_text(ui_ui_SystemMsgIcon, LV_SYMBOL_CLOSE);
+            lv_obj_set_style_text_color(ui_ui_SystemMsgIcon,
+                                        lv_color_hex(0xEA868F),
+                                        LV_PART_MAIN);
+        } else {
+            lv_label_set_text(ui_ui_SystemMsgIcon, LV_SYMBOL_WARNING);
+            lv_obj_set_style_text_color(ui_ui_SystemMsgIcon,
+                                        lv_color_hex(0xFFDA6A),
+                                        LV_PART_MAIN);
+        }
+    }
+
     // Update Message group widgets with precondition health info
     if (ui_ui_SystemMsgTitle != nullptr && payload->name != nullptr) {
         lv_label_set_text(ui_ui_SystemMsgTitle, payload->name);

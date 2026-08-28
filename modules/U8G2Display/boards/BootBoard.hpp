@@ -30,7 +30,7 @@
 #include "U8G2BootLogo.h"
 
 #ifndef APP_TITLE
-#define APP_TITLE "ESP32 App Foundation"
+#define APP_TITLE "ESP32 App Foundation"                    ///< App Title
 #endif
 
 /**

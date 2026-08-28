@@ -60,7 +60,7 @@ void setup() {
 #endif
 
     // Register user application modules
-    app.registerModule(&myApp);  // Auto-registers for tick, config, web, MCP, config gate
+    app.registerModule(&myApp);  // Auto-registers for tick, config, web, MCP, preconditions
 
     // Prepare Framework config
     FrameworkConfig config;
@@ -121,7 +121,7 @@ bool registerModule(T* module) {
     if constexpr (std::is_base_of_v<IWebContributor, T>)  { registerWebContributor(module);        any = true; }
     if constexpr (std::is_base_of_v<IMCPContributor, T>)  { registerMcpContributor(module);        any = true; }
     if constexpr (std::is_base_of_v<IDataSource, T>)      { registerDataSource(module);            any = true; }
-    if constexpr (std::is_base_of_v<IConfigGate, T>)      { registerConfigGate(module);            any = true; }
+    if constexpr (std::is_base_of_v<IPreconditionContributor, T>)      { registerPreconditionContributor(module);   any = true; }
     if constexpr (std::is_base_of_v<IStatusReporter, T>)  { registerStatusReporter(module);        any = true; }
     if constexpr (std::is_base_of_v<IBootReporter, T>)    { registerBootReporter(module);          any = true; }
     return any;
@@ -201,7 +201,7 @@ Application modules interact with framework subsystems by implementing one or mo
 | [IConfigurable](../../include/interfaces/IConfigurable.hpp) | Persists and loads module settings via `ConfigManager` gateway. | `applyConfig(const JsonObject&)` |
 | [IWebContributor](../../include/interfaces/IWebContributor.hpp) | Exposes REST API endpoints and appends navigation tabs. | `registerRoutes(PsychicHttpServer&)` |
 | [IMCPContributor](../../include/interfaces/IMCPContributor.hpp) | Registers JSON-RPC tools with the local Model Context Protocol. | `registerMCPTools(MCPToolRegistry&)` |
-| [IConfigGate](../../include/interfaces/IConfigGate.hpp) | Blocks transition to RUNNING state until requirements are satisfied. | `isSatisfied()` |
+| [IPreconditionContributor](../../include/interfaces/IPreconditionContributor.hpp) | Registers preconditions that must be met before transition to RUNNING state. | `registerPreconditions()` |
 | [IDataSource](../../include/interfaces/IDataSource.hpp) | Scheduled background data fetch worker managed by `DataManager`. | `fetchUpdate()` |
 | [IStatusReporter](../../include/interfaces/IStatusReporter.hpp) | Displays boot-phase progress status and unrecoverable errors. | `reportStatus(const char*, float)` |
 | [IBootReporter](../../modules/Application/interfaces/IBootReporter.hpp) | Early hardware initialisation reporter (extends `IStatusReporter`). | `beginEarly()` |
@@ -239,15 +239,15 @@ Executed synchronously inside `app.begin(config)`. The framework mounts the file
 - Boot gates are evaluated to determine the next state.
 
 ### 2. CONFIGURING Phase
-Entered if any registered `IConfigGate` (such as the default `WifiConfigGate` if the station credentials are missing) returns `isSatisfied() == false`.
-- Ticks are still dispatched to all modules (WiFi stays active, display displays a configuration progress board, and the local portal is open).
-- The tick loop polls config gates. Once all gates are satisfied, the framework transitions to `RUNNING`.
+Entered if any registered precondition (such as the WiFi station precondition if credentials are missing) is not satisfied.
+
+- The `PreconditionEngine` evaluates all preconditions. Once all startup preconditions are met, the framework transitions to `RUNNING`.
 
 ### 3. RUNNING Phase
 Entered once all configuration gates are satisfied.
 - The framework dispatches ticks to all registered `ITickable` modules.
 - A throttled check (every 5 seconds) polls gates for regression. If an actionable gate remains unsatisfied beyond its declared `getRegressionToleranceMs()` threshold, the framework regresses the system back to the `CONFIGURING` state.
-- `getRegressionToleranceMs()` returns a `uint32_t` duration in milliseconds (default: 30 seconds). Return `0` for immediate regression. Return `UINT32_MAX` to **never regress** — the module handles recovery internally. For example, the built-in `TimeConfigGate` uses `UINT32_MAX` to prevent NTP timeouts from forcing a re-configuration cycle.
+- Regression is managed by the `PreconditionEngine`'s `DampingPolicy` — if a previously-met precondition regresses, damping prevents UI flapping.
 
 For more details on the boot phases and state transitions, refer to the [Application Lifecycle](../design_specification.md#9-application-lifecycle) section in the Design Specification.
 

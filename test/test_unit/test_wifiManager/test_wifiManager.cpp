@@ -1,3 +1,10 @@
+/*
+ * ESP32 App Foundation (c) 2026 CB Labs
+ *
+ * Test: test/test_unit/test_wifiManager/test_wifiManager.cpp
+ * Description: Implementation of WifiManagerTest class.
+ */
+
 #include <gtest/gtest.h>
 #include <ArduinoJson.h>
 #include "../../../modules/WifiManager/WifiManager.hpp"

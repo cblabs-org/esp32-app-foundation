@@ -23,7 +23,7 @@
  */
 
 #ifndef PROGRESS_BAR_WIDGET_HPP
-#define PROGRESS_BAR_WIDGET_HPP
+#define PROGRESS_BAR_WIDGET_HPP                             ///< Progress Bar Widget Hpp
 
 #include "IGfxWidget.hpp"
 

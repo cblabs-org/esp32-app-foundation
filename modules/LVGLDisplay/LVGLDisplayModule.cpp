@@ -286,6 +286,7 @@ void LVGLDisplayModule::tick(uint32_t now) {
     bool otaUpdate   = _pendingOtaUpdate.exchange(false);
 
     if (otaComplete) {
+        _otaInProgress.store(false, std::memory_order_relaxed);
         _pauseRendering.store(false);
         if (_pendingOtaSuccess.load()) {
             restorePriorScreen();
@@ -344,8 +345,7 @@ void LVGLDisplayModule::tick(uint32_t now) {
         std::vector<DataSourceHealthPayload> updates;
         {
             std::lock_guard<std::mutex> lock(_dataSourceHealthMutex);
-            updates = _dataSourceUpdates;
-            _dataSourceUpdates.clear();
+            std::swap(updates, _dataSourceUpdates);
         }
         for (const auto& payload : updates) {
             if (_screens) {
@@ -822,6 +822,7 @@ void LVGLDisplayModule::_onOtaProgress(const char* /*topic*/, const void* payloa
         }
         self->_pendingOtaComplete.store(true);
     } else {
+        self->_otaInProgress.store(true, std::memory_order_relaxed);
         self->_pauseRendering.store(true);
         self->_pendingOtaProgress.store(ota->progress);
         if (ota->status) {
@@ -998,15 +999,11 @@ void LVGLDisplayModule::registerRoutes(PsychicHttpServer& server) {
 
 #ifndef UNIT_TEST
 #ifdef WITH_OTA
-    // KNOWN GAP — tracked in issue #138.
-    // _pauseRendering covers a narrower window than OTAUpdateManager::getState()
-    // != Idle: it is set by _onOtaProgress only for non-complete events, and is
-    // cleared by restorePriorScreen()/clearStatus(), which are reachable from
-    // non-OTA paths. The proper fix is to wire an OTAUpdateManager* (or an
-    // IOtaStateProvider) into this module. U8G2DisplayModule still uses the
-    // original static call and is inconsistent with this one.
+    // OTA predicate: uses dedicated _otaInProgress flag (not _pauseRendering,
+    // which is cleared by non-OTA paths like clearStatus/restorePriorScreen).
+    // Mirrors U8G2DisplayModule which uses the same pattern.
     _serviceHelper.setOtaPredicate([this]() {
-        return _pauseRendering.load();
+        return _otaInProgress.load(std::memory_order_relaxed);
     });
 #endif
     _serviceHelper.registerBrightnessRoute(server);

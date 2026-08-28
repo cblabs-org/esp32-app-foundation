@@ -18,7 +18,7 @@
  */
 
 #ifndef EVENT_BUS_HPP
-#define EVENT_BUS_HPP
+#define EVENT_BUS_HPP                                       ///< Event Bus Hpp
 
 #include <stdint.h>
 #include <stddef.h>

@@ -42,6 +42,7 @@
  */
 class ILVGLHardwareAdapter {
 public:
+    /** @brief Destructor for ILVGLHardwareAdapter. */
     virtual ~ILVGLHardwareAdapter() = default;
 
     // --- Required Interface Methods ---

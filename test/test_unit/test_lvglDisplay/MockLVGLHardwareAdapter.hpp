@@ -58,12 +58,16 @@ public:
         return createdDisplay;
     }
 
+    /** @brief Set mock brightness level. */
     void setBrightness(uint8_t level) override {
         brightnessLevel = level;
     }
 
+    /** @brief Return mock screen width. */
     uint16_t getScreenWidth() const override { return screenWidth; }
+    /** @brief Return mock screen height. */
     uint16_t getScreenHeight() const override { return screenHeight; }
+    /** @brief Return mock buffer line count. */
     uint16_t getBufferLineCount() const override { return bufferLineCount; }
 
     lv_indev_t* createTouchInput() override {
@@ -78,6 +82,7 @@ public:
         return keypadInDev;
     }
 
+    /** @brief Create and register a mock encoder input device. */
     void enableMockEncoder() {
         if (encoderInDev == nullptr) {
             encoderInDev = lv_indev_create();
@@ -85,6 +90,7 @@ public:
         }
     }
 
+    /** @brief Create and register a mock touch input device. */
     void enableMockTouch() {
         if (touchInDev == nullptr) {
             touchInDev = lv_indev_create();
@@ -92,6 +98,7 @@ public:
         }
     }
 
+    /** @brief Create and register a mock keypad input device. */
     void enableMockKeypad() {
         if (keypadInDev == nullptr) {
             keypadInDev = lv_indev_create();

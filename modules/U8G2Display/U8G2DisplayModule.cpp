@@ -298,8 +298,7 @@ void U8G2DisplayModule::tick(uint32_t currentMillis) {
         std::vector<DataSourceHealthPayload> updates;
         {
             std::lock_guard<std::mutex> lock(_dataSourceHealthMutex);
-            updates = _dataSourceUpdates;
-            _dataSourceUpdates.clear();
+            std::swap(updates, _dataSourceUpdates);
         }
         for (const auto& payload : updates) {
             if (_screens) {
@@ -814,12 +813,10 @@ void U8G2DisplayModule::registerRoutes(PsychicHttpServer& server) {
     // --- Step 1: Register shared service helper endpoints (brightness, screenshot) ---
 #ifndef UNIT_TEST
 #ifdef WITH_OTA
-    // KNOWN GAP — tracked in issue #138. This static call into OTAUpdateManager
-    // is the coupling #120 set out to remove, and LVGLDisplayModule now uses a
-    // different (also imperfect) predicate. Both should move to an injected
-    // OTA state provider.
-    _serviceHelper.setOtaPredicate([]() {
-        return OTAUpdateManager::getState() != OTAState::Idle;
+    // OTA predicate: uses _otaInProgress atomic flag set by _onOtaProgress EventBus callback.
+    // Consistent with LVGLDisplayModule which uses _pauseRendering in the same pattern.
+    _serviceHelper.setOtaPredicate([this]() {
+        return _otaInProgress.load(std::memory_order_relaxed);
     });
 #endif
 #endif
@@ -1216,6 +1213,9 @@ void U8G2DisplayModule::_onOtaProgress(const char* /*topic*/, const void* payloa
     if (payload == nullptr || self == nullptr) return;
 
     const auto* ota = static_cast<const ApplicationEvents::OtaProgressPayload*>(payload);
+
+    // Track OTA state for the service-route predicate
+    self->_otaInProgress.store(!ota->complete, std::memory_order_relaxed);
 
     IDisplayBoard* otaBoard = (self->_screens != nullptr && self->_screens->otaProgressBoard() != nullptr)
                               ? self->_screens->otaProgressBoard()

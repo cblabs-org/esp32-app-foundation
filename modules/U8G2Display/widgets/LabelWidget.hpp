@@ -21,7 +21,7 @@
  */
 
 #ifndef LABEL_WIDGET_HPP
-#define LABEL_WIDGET_HPP
+#define LABEL_WIDGET_HPP                                    ///< Label Widget Hpp
 
 #include "IGfxWidget.hpp"
 

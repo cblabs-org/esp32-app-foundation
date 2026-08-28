@@ -1,3 +1,15 @@
+/*
+ * ESP32 App Foundation (c) 2026 CB Labs
+ *
+ * https://github.com/matthewmcneill/esp32-app-foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Module: modules/PreconditionEngine/PreconditionEngine.cpp
+ * Description: PreconditionEngine implementation.
+ *
+ */
+
 #include "PreconditionEngine.hpp"
 #include "platform/LogShim.h"
 #include <cstring>
@@ -11,7 +23,9 @@ void PreconditionEngine::add(const char* name,
                              EvalFn evaluate,
                              DescribeFn describe,
                              const Edge* edges,
-                             uint8_t edgeCount) {
+                             uint8_t edgeCount,
+                             const DampingPolicy* damping,
+                             const RetryPolicy*  retry) {
     if (count_ >= MAX_PRECONDITIONS) {
         ESP_LOGE(TAG, "Cannot add %s: MAX_PRECONDITIONS reached", name);
         return;
@@ -40,7 +54,10 @@ void PreconditionEngine::add(const char* name,
     p.breaker = BreakerState::Closed;
     p.attemptCount = 0;
     p.lastAttemptMs = 0;
-    p.cooldownMs = retryPolicy_.baseDelayMs;
+    p.dampingOverride = damping;
+    p.retryOverride = retry;
+    const RetryPolicy& rp = retry ? *retry : retryPolicy_;
+    p.cooldownMs = rp.baseDelayMs;
 }
 
 bool PreconditionEngine::resolveEdges() {
@@ -188,6 +205,9 @@ void PreconditionEngine::tick(uint32_t nowMs) {
 void PreconditionEngine::updateDamping(PreconditionState& state, float elapsedSec) {
     if (!state.everMet) return;
 
+    // Per-precondition override (#154) or engine-wide default
+    const DampingPolicy& dp = state.dampingOverride ? *state.dampingOverride : dampingPolicy_;
+
     float weight = 1.0f;
     switch (state.severity) {
         case Severity::NeedsUser: weight = 5.0f; break;
@@ -200,32 +220,35 @@ void PreconditionEngine::updateDamping(PreconditionState& state, float elapsedSe
 
     if (state.rawStatus.met) {
         if (state.penalty > 0.0f && elapsedSec > 0.0f) {
-            float halfLifeSec = dampingPolicy_.halfLifeMs / 1000.0f;
+            float halfLifeSec = dp.halfLifeMs / 1000.0f;
             if (halfLifeSec > 0.0f) {
                 state.penalty = state.penalty * std::pow(0.5f, elapsedSec / halfLifeSec);
             }
         }
     } else {
-        state.penalty += dampingPolicy_.penaltyPerSecond * weight * elapsedSec;
+        state.penalty += dp.penaltyPerSecond * weight * elapsedSec;
     }
     
-    float maxPenalty = dampingPolicy_.suppressThreshold * 2.0f;
+    float maxPenalty = dp.suppressThreshold * 2.0f;
     if (state.penalty > maxPenalty) {
         state.penalty = maxPenalty;
     }
     
-    if (!state.suppressed && state.penalty > dampingPolicy_.suppressThreshold) {
+    if (!state.suppressed && state.penalty > dp.suppressThreshold) {
         state.suppressed = true;
-    } else if (state.suppressed && state.penalty < dampingPolicy_.reuseThreshold) {
+    } else if (state.suppressed && state.penalty < dp.reuseThreshold) {
         state.suppressed = false;
     }
 }
 
 void PreconditionEngine::updateBreaker(PreconditionState& state, uint32_t nowMs) {
+    // Per-precondition override (#154) or engine-wide default
+    const RetryPolicy& rp = state.retryOverride ? *state.retryOverride : retryPolicy_;
+
     if (state.rawStatus.met) {
         state.breaker = BreakerState::Closed;
         state.attemptCount = 0;
-        state.cooldownMs = retryPolicy_.baseDelayMs;
+        state.cooldownMs = rp.baseDelayMs;
         state.lastAttemptMs = nowMs;
         return;
     }
@@ -244,9 +267,9 @@ void PreconditionEngine::updateBreaker(PreconditionState& state, uint32_t nowMs)
             state.attemptCount++;
             state.lastAttemptMs = nowMs;
             
-            if (state.attemptCount >= retryPolicy_.attemptsBeforeFallback) {
+            if (state.attemptCount >= rp.attemptsBeforeFallback) {
                 state.breaker = BreakerState::Open;
-                state.cooldownMs = retryPolicy_.baseDelayMs;
+                state.cooldownMs = rp.baseDelayMs;
             }
         }
     } else if (state.breaker == BreakerState::Open) {
@@ -255,14 +278,14 @@ void PreconditionEngine::updateBreaker(PreconditionState& state, uint32_t nowMs)
             state.lastAttemptMs = nowMs;
         }
     } else if (state.breaker == BreakerState::HalfOpen) {
-        if (nowMs - state.lastAttemptMs >= retryPolicy_.baseDelayMs) {
+        if (nowMs - state.lastAttemptMs >= rp.baseDelayMs) {
             // Failure in HalfOpen
             state.breaker = BreakerState::Open;
             state.lastAttemptMs = nowMs;
             
             uint32_t nextCooldown = state.cooldownMs * 2;
-            if (nextCooldown > retryPolicy_.ceilingMs) {
-                nextCooldown = retryPolicy_.ceilingMs;
+            if (nextCooldown > rp.ceilingMs) {
+                nextCooldown = rp.ceilingMs;
             }
             state.cooldownMs = nextCooldown;
         }

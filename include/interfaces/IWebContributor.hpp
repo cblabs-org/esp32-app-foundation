@@ -48,6 +48,7 @@ class AuthManager;
  */
 class IWebContributor {
 public:
+    /** @brief Destructor for IWebContributor. */
     virtual ~IWebContributor() = default;
 
     /**

@@ -1,3 +1,10 @@
+/*
+ * ESP32 App Foundation (c) 2026 CB Labs
+ *
+ * Test: test/test_hardware/test_ota/test_ota.cpp
+ * Description: Unit tests for test_ota.
+ */
+
 #include <Arduino.h>
 #include <unity.h>
 #include "OTAUpdateManager.hpp"

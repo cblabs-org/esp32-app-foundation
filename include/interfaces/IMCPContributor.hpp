@@ -31,6 +31,7 @@ class MCPToolRegistry;
  */
 class IMCPContributor {
 public:
+    /** @brief Destructor for IMCPContributor. */
     virtual ~IMCPContributor() = default;
 
     /**

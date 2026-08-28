@@ -97,6 +97,7 @@ class IPreconditionRegistry;
  */
 class IPreconditionContributor {
 public:
+    /** @brief Destructor for IPreconditionContributor. */
     virtual ~IPreconditionContributor() = default;
 
     /**

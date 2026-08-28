@@ -76,9 +76,9 @@ class EventBus;
  * (e.g. HomeAssistantModule) can react to real-time WiFi events.
  */
 namespace WifiEvents {
-    static constexpr const char* WIFI_CONNECTED    = "wifi.connected";
-    static constexpr const char* WIFI_DISCONNECTED = "wifi.disconnected";
-    static constexpr const char* WIFI_AP_STARTED   = "wifi.ap_started";
+    static constexpr const char* WIFI_CONNECTED    = "wifi.connected"; ///< Wifi Connected
+    static constexpr const char* WIFI_DISCONNECTED = "wifi.disconnected"; ///< Wifi Disconnected
+    static constexpr const char* WIFI_AP_STARTED   = "wifi.ap_started"; ///< Wifi Ap Started
 }
 
 
@@ -172,6 +172,7 @@ private:
     void scheduleRestart();
 
 public:
+    /** @brief Construct a WifiManager instance. */
     WifiManager();
     ~WifiManager() override;
 

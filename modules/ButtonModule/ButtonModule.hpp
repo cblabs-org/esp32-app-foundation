@@ -42,6 +42,7 @@ class MCPToolRegistry;
 
 class ButtonModule : public ITickable, public IMCPContributor {
 public:
+    /** @brief Construct a ButtonModule instance. */
     ButtonModule();
     ~ButtonModule() override;
 
@@ -82,9 +83,9 @@ public:
     void registerMCPTools(MCPToolRegistry& registry) override;
 
 private:
-    static constexpr size_t QUEUE_DEPTH = 8;
-    static constexpr int MAX_EVENTS_PER_TICK = 4;
-    static constexpr size_t EVENT_RING_SIZE = 8;
+    static constexpr size_t QUEUE_DEPTH = 8;                ///< Queue Depth
+    static constexpr int MAX_EVENTS_PER_TICK = 4;           ///< Maximum events per tick
+    static constexpr size_t EVENT_RING_SIZE = 8;            ///< Power-of-2 ring buffer for debounced button events
 
     // Pending buttons (collected before begin())
     std::vector<BoardButton> _pendingButtons;
@@ -109,13 +110,18 @@ private:
     std::vector<void*> _buttonHandles;
 
     // Internal creation helpers
+    /** @brief Create Gpio Button. */
     void createGpioButton(const BoardButton& button);
+    /** @brief Create Adc Ladder. */
     void createAdcLadder(int8_t pin, const std::vector<const BoardButton*>& buttons);
+    /** @brief Create Matrix Button. */
     void createMatrixButton(const BoardButton& button);
 
     // Static shim — plain function pointer (GRAVE-05)
+    /** @brief _button Shim. */
     static void _buttonShim(void* handle, void* userData);
 
     // Gesture → topic mapping
+    /** @brief Gesture To Topic. */
     static const char* gestureToTopic(ButtonGesture gesture);
 };

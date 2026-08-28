@@ -23,7 +23,7 @@
  */
 
 #ifndef SCROLLING_TEXT_WIDGET_HPP
-#define SCROLLING_TEXT_WIDGET_HPP
+#define SCROLLING_TEXT_WIDGET_HPP                           ///< Scrolling Text Widget Hpp
 
 #include "IGfxWidget.hpp"
 
@@ -53,6 +53,7 @@ public:
      * @param _font U8G2 font array to use for rendering (nullptr for default).
      */
     ScrollingTextWidget(int _x, int _y, int _w, int _h, const uint8_t* _font = nullptr);
+    /** @brief Destructor for ScrollingTextWidget. */
     virtual ~ScrollingTextWidget() = default;
 
     /**

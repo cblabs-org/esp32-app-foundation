@@ -173,7 +173,7 @@ class MyApp : public ITickable,
               public IConfigurable,
               public IWebContributor,
               public IMCPContributor,
-              public IConfigGate {
+              public IPreconditionContributor {
 ```
 
 Five interfaces, each adding a specific capability. Let's walk through them.
@@ -192,7 +192,7 @@ void MyApp::tick(uint32_t currentMillis) {
     }
 
     if (!_gateOpen) {
-        _gateOpen = true;  // Open the config gate after first tick
+        _gateOpen = true;  // Open the precondition after first tick
     }
 }
 ```
@@ -322,7 +322,7 @@ void MyApp::registerMCPTools(MCPToolRegistry& registry) {
 
 ---
 
-### 4.5 — Gating Boot: `IConfigGate`
+### 4.5 — Gating Boot: `IPreconditionContributor`
 
 Block the framework from entering the `RUNNING` state until your module is ready.
 
@@ -353,7 +353,7 @@ if constexpr (std::is_base_of_v<ITickable, MyApp>)       → register as tickabl
 if constexpr (std::is_base_of_v<IConfigurable, MyApp>)   → register as configurable
 if constexpr (std::is_base_of_v<IWebContributor, MyApp>) → register as web contributor
 if constexpr (std::is_base_of_v<IMCPContributor, MyApp>) → register as MCP contributor
-if constexpr (std::is_base_of_v<IConfigGate, MyApp>)     → register as config gate
+if constexpr (std::is_base_of_v<IPreconditionContributor, MyApp>)     → register as precondition
 // ... and so on for all 9 interfaces
 ```
 
@@ -376,14 +376,14 @@ class WeatherModule : public ITickable,
                       public IWebContributor,
                       public IDataSource,        // Background data fetching
                       public IMCPContributor,     // MCP tool registration
-                      public IConfigGate,         // Boot readiness gating
+                      public IPreconditionContributor,         // Boot readiness gating
                       public JsonListener {       // Streaming JSON parser (external library)
 ```
 
 Notice what's **different** from `MyApp`:
 - **Adds `IDataSource`** — for background network requests (OpenWeatherMap API)
 - **Adds `JsonListener`** — not a framework interface; it's from the `JsonStreamingParser` library
-- **All 7 app-facing interfaces demonstrated** — `WeatherModule` now implements every framework interface including `IMCPContributor` and `IConfigGate`
+- **All 7 app-facing interfaces demonstrated** — `WeatherModule` now implements every framework interface including `IMCPContributor` and `IPreconditionContributor`
 
 ---
 
@@ -568,7 +568,7 @@ This exposes the same data as `GET /api/weather/status` but via the MCP JSON-RPC
 
 ---
 
-### 6.5 — Boot Gating (`IConfigGate`)
+### 6.5 — Boot Gating (`IPreconditionContributor`)
 
 The weather module gates the CONFIGURING → RUNNING transition on having an API key configured:
 
@@ -757,7 +757,7 @@ Start simple and add interfaces as your module grows:
 | 4 | `IDataSource` | Background network requests |
 | 5 | `IDisplayBoard` | OLED display pane |
 | 6 | `IMCPContributor` | Device MCP tools |
-| 7 | `IConfigGate` | Boot-time readiness gating |
+| 7 | `IPreconditionContributor` | Boot-time readiness gating |
 
 ### Developer Checklist
 

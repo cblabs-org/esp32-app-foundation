@@ -54,6 +54,7 @@ struct SystemDisplayParams {
  */
 class IDisplayModule : public IBootReporter {
 public:
+    /** @brief Destructor for IDisplayModule. */
     virtual ~IDisplayModule() = default;
 
     // --- Geometry ---

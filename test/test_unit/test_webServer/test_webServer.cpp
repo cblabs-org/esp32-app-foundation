@@ -1,3 +1,10 @@
+/*
+ * ESP32 App Foundation (c) 2026 CB Labs
+ *
+ * Test: test/test_unit/test_webServer/test_webServer.cpp
+ * Description: Implementation of MockContributor, TabMockContributor classes.
+ */
+
 #include <gtest/gtest.h>
 #include "WebServerManager.hpp"
 #include "interfaces/IWebContributor.hpp"

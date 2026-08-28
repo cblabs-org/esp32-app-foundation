@@ -126,9 +126,11 @@ public:
 
     // --- IMCPContributor ---
 
+    /** @brief Register m c p tools. */
     void registerMCPTools(MCPToolRegistry& registry) override;
 
     // --- IPreconditionContributor ---
+    /** @brief Register preconditions. */
     void registerPreconditions(IPreconditionRegistry& reg) override;
 
     // --- Own API ---

@@ -43,6 +43,7 @@
  */
 class ILVGLSystemScreens {
 public:
+    /** @brief Destructor for ILVGLSystemScreens. */
     virtual ~ILVGLSystemScreens() = default;
 
     /**

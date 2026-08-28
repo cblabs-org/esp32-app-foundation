@@ -81,6 +81,7 @@
  */
 class ConfigManager : public IWebContributor, public IMCPContributor {
 public:
+    /** @brief Construct a ConfigManager instance. */
     ConfigManager();
 
     // -------------------------------------------------------------------------

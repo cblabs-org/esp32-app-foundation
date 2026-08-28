@@ -1,3 +1,10 @@
+/*
+ * ESP32 App Foundation (c) 2026 CB Labs
+ *
+ * Test: test/test_unit/test_pngWriter/test_pngWriter.cpp
+ * Description: Implementation of for, TestPrintSink classes.
+ */
+
 #include <cstdlib>
 // miniz / tdefl stubs (no central stub exists for ROM miniz)
 struct tdefl_compressor {};

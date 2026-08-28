@@ -75,7 +75,9 @@ using OTAProgressCallback = void(*)(void* context, size_t bytesWritten, size_t t
  */
 class OTADownloadEngine {
 public:
+    /** @brief Construct a OTADownloadEngine instance. */
     OTADownloadEngine();
+    /** @brief Destructor for OTADownloadEngine. */
     ~OTADownloadEngine() = default;
 
     /**
@@ -165,8 +167,8 @@ private:
     OTAError             lastError_   = OTAError::None; // Most recent error
     char                 expectedVersion_[32] = {};     // Expected version for pre-flash validation
 
-    static constexpr int kMaxRedirects = 5;       // Maximum redirect hops before failure
-    static constexpr size_t kChunkSize = 1024;    // Streaming read/write buffer size
+    static constexpr int kMaxRedirects = 5;       // Maximum redirect hops before failure ///< Maximum kmaxredirects
+    static constexpr size_t kChunkSize = 1024;    // Streaming read/write buffer size ///< Size of kchunksize
 
     /**
      * @brief Follow HTTP redirects and return the final response code.

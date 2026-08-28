@@ -37,6 +37,7 @@ public:
     /// Cold-path description formatter writing into a caller-supplied buffer.
     using DescribeFn = std::function<void(Cause, char*, size_t)>;
 
+    /** @brief Destructor for IPreconditionRegistry. */
     virtual ~IPreconditionRegistry() = default;
 
     /**
@@ -48,11 +49,17 @@ public:
      * @param describe   Optional cold-path description formatter writing into a buffer.
      * @param edges      Optional pointer to array of dependency edges.
      * @param edgeCount  Number of dependency edges in the edges array.
+     * @param damping    Optional per-precondition damping policy override (nullptr = engine default).
+     *                   Must have static lifetime — pointer is stored, not copied.
+     * @param retry      Optional per-precondition retry policy override (nullptr = engine default).
+     *                   Must have static lifetime — pointer is stored, not copied.
      */
     virtual void add(const char* name,
                      PreconditionRole role,
                      EvalFn evaluate,
                      DescribeFn describe = nullptr,
                      const Edge* edges = nullptr,
-                     uint8_t edgeCount = 0) = 0;
+                     uint8_t edgeCount = 0,
+                     const DampingPolicy* damping = nullptr,
+                     const RetryPolicy*  retry   = nullptr) = 0;
 };

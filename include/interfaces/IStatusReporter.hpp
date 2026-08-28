@@ -29,6 +29,7 @@
  */
 class IStatusReporter {
 public:
+    /** @brief Destructor for IStatusReporter. */
     virtual ~IStatusReporter() = default;
 
     /**

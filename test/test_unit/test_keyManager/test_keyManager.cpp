@@ -1,3 +1,10 @@
+/*
+ * ESP32 App Foundation (c) 2026 CB Labs
+ *
+ * Test: test/test_unit/test_keyManager/test_keyManager.cpp
+ * Description: Implementation of MockDeviceCrypto, KeyManagerTest classes.
+ */
+
 #include <gtest/gtest.h>
 #include <unistd.h>
 #include "KeyManager.hpp"

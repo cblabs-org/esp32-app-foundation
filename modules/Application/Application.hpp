@@ -117,7 +117,7 @@ namespace ApplicationEvents {
 #else
     // EO-07: Legible absent-module error for consumers attempting to use OTA without the flag
     struct OTA_PROGRESS_requires_WITH_OTA {};
-    constexpr OTA_PROGRESS_requires_WITH_OTA OTA_PROGRESS{};
+    constexpr OTA_PROGRESS_requires_WITH_OTA OTA_PROGRESS{}; ///< Sentinel — compile error if used without WITH_OTA
     
     struct OtaProgressPayload_requires_WITH_OTA {};
     typedef OtaProgressPayload_requires_WITH_OTA OtaProgressPayload;
@@ -473,8 +473,11 @@ private:
      */
     class NullStatusReporter : public IStatusReporter {
     public:
+        /** @brief No-op status report (null reporter). */
         void reportStatus(const char* /*message*/, float /*progress*/ = -1.0f) override {}
+        /** @brief No-op error report (null reporter). */
         void reportError(const char* /*errorMessage*/) override {}
+        /** @brief No-op status clear (null reporter). */
         void clearStatus() override {}
     };
 
@@ -529,7 +532,9 @@ private:
     // -------------------------------------------------------------------------
 
     struct AppTabContributor : public IWebContributor {
+        /** @brief No-op — routes registered inline in begin(). */
         void        registerRoutes(PsychicHttpServer& /*server*/) override {}
+        /** @brief Register the top-level App tab. */
         void registerTabs(ITabRegistry& registry) override {
             registry.addTab("App", nullptr, 30);
         }
@@ -545,9 +550,12 @@ private:
     // -------------------------------------------------------------------------
     struct PreconditionWebContributor : public IWebContributor {
         Application* app = nullptr;
+        /** @brief Register routes. */
         void        registerRoutes(PsychicHttpServer& server) override;
+        /** @brief No-op — tabs registered by Application. */
         void        registerTabs(ITabRegistry& /*registry*/) override {}
         const char* getApiPrefix() const override { return "/api/preconditions"; }
+        /** @brief Return max POST body size for precondition endpoints. */
         size_t      getMaxPostBody() const override { return 1024; }
     };
     PreconditionWebContributor _preconditionWebContributor;
@@ -558,9 +566,12 @@ private:
     // -------------------------------------------------------------------------
     struct DataSourceWebContributor : public IWebContributor {
         Application* app = nullptr;
+        /** @brief Register routes. */
         void        registerRoutes(PsychicHttpServer& server) override;
+        /** @brief No-op — tabs registered by Application. */
         void        registerTabs(ITabRegistry& /*registry*/) override {}
         const char* getApiPrefix() const override { return "/api/data"; }
+        /** @brief Return max POST body size for data source endpoints. */
         size_t      getMaxPostBody() const override { return 1024; }
     };
     DataSourceWebContributor _dataSourceWebContributor;

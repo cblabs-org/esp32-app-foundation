@@ -154,7 +154,7 @@ Structural container for tab content sections.
 ```
 
 ### Disabled Section State (`[aria-disabled="true"]`)
-Disables interactive cards or sections (e.g., feature-gated via `IConfigGate`). Applies 50% opacity, `pointer-events: none`, and subtle grayscale filter.
+Disables interactive cards or sections (e.g., feature-gated via `IPreconditionContributor`). Applies 50% opacity, `pointer-events: none`, and subtle grayscale filter.
 ```html
 <div class="card" aria-disabled="true">
     <h3>Gated Feature</h3>

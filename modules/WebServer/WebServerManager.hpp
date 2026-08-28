@@ -50,7 +50,7 @@
 #include <atomic>
 
 #ifndef APP_TITLE
-#define APP_TITLE "ESP32 App Foundation"
+#define APP_TITLE "ESP32 App Foundation"                    ///< App Title
 #endif
 
 // NOTE: PsychicHttpRequestCallback, PsychicMiddlewareNext, and
@@ -64,10 +64,10 @@
 #include "board.h"
 
 #ifndef BOARD_HTTP_STACK_SIZE
-#define BOARD_HTTP_STACK_SIZE 8192          // safe for all non-screenshot routes (compression is offloaded, WO2)
+#define BOARD_HTTP_STACK_SIZE 8192          // safe for all non-screenshot routes (compression is offloaded, WO2) ///< 8 KB — sufficient for JSON APIs without screenshot PNG encoding
 #endif
 #ifndef BOARD_HTTP_MAX_OPEN_SOCKETS
-#define BOARD_HTTP_MAX_OPEN_SOCKETS 4       // browser (2-3) + MCP (1); boards with more DRAM can override upward
+#define BOARD_HTTP_MAX_OPEN_SOCKETS 4       // browser (2-3) + MCP (1); boards with more DRAM can override upward ///< Maximum board http open sockets
 #endif
 
 #include "interfaces/IWebContributor.hpp"
@@ -145,10 +145,13 @@ public:
                AuthManager* authManager = nullptr,
                WifiManager* wifiManager = nullptr);
 
+    /** @brief Periodic tick handler. */
     void tick(uint32_t currentMillis) override;
 
     // IWebContributor — Status tab + system routes (registered in begin())
+    /** @brief No-op — routes registered inline in begin(). */
     void registerRoutes(PsychicHttpServer& /*server*/) override {}  // Routes registered inline in begin()
+    /** @brief Register the Status system tab. */
     void registerTabs(ITabRegistry& registry) override {
         registry.addTab("Status", "System", 10);
     }

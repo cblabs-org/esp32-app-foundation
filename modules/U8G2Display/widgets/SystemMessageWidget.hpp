@@ -19,7 +19,7 @@
  */
 
 #ifndef SYSTEM_MESSAGE_WIDGET_HPP
-#define SYSTEM_MESSAGE_WIDGET_HPP
+#define SYSTEM_MESSAGE_WIDGET_HPP                           ///< System Message Widget Hpp
 
 #include "IGfxWidget.hpp"
 

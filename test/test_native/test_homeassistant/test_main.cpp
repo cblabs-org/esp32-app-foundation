@@ -1,3 +1,10 @@
+/*
+ * ESP32 App Foundation (c) 2026 CB Labs
+ *
+ * Test: test/test_native/test_homeassistant/test_main.cpp
+ * Description: Unit tests for test_main.
+ */
+
 #define MOCK_MQTT_PUBLISH_RETURN_VALUE_DEFINED
 int mock_mqtt_publish_return_value = 0;
 
