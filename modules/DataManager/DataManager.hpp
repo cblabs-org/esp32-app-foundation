@@ -83,12 +83,16 @@ struct DataJobOptions {
      */
     uint32_t warnAfterMs = 15000;
 
-    // NOTE: Jobs always receive the TLS client (WiFiClientSecure) via
-    // ctx.client. Unlike IDataSource::requiresTls(), there is currently no
-    // opt-out for plain-HTTP jobs. The TLS default is intentional — most
-    // jobs hit external APIs where cleartext would leak credentials. If a
-    // future consumer needs a plain-HTTP job, add a `requiresTls` field
-    // here (defaulting to true for safety).
+    /**
+     * When true (default), the job receives the TLS client (WiFiClientSecure)
+     * via ctx.client. When false, a plain WiFiClient is used instead — suitable
+     * for local-network targets (e.g. LAN hub APIs) where TLS handshakes are
+     * unnecessary overhead and may exhaust the ESP32's DRAM.
+     *
+     * Default: true — most jobs hit external APIs where cleartext would leak
+     * credentials.
+     */
+    bool requiresTls = true;
 };
 
 /**
@@ -98,6 +102,19 @@ class DataManager {
 public:
     DataManager();
     ~DataManager();
+
+    /// Default worker task stack size in bytes (12 KB DRAM).
+    static constexpr uint32_t DEFAULT_WORKER_STACK_SIZE = 12288;
+
+    /**
+     * @brief Override the worker task stack size.
+     *
+     * Must be called before begin(). Consumers with deeply-nested JSON
+     * parsers or heavy TLS usage may need more headroom.
+     *
+     * @param bytes Stack size in bytes (DRAM). Minimum 8192.
+     */
+    void setWorkerStackSize(uint32_t bytes) { _workerStackSize = bytes; }
 
     /**
      * @brief Initializes the FreeRTOS event queue and spawns the worker task.
@@ -287,6 +304,7 @@ private:
     std::vector<SourceRecord> _registry;
     SemaphoreHandle_t _registryMutex;
     TaskHandle_t _workerTask;
+    uint32_t _workerStackSize = DEFAULT_WORKER_STACK_SIZE;
     uint32_t _simulatedTimeMs = 0;
     EventBus* _eventBus = nullptr;
 

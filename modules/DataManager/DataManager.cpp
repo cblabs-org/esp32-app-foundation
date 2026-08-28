@@ -184,15 +184,15 @@ void DataManager::begin() {
 #endif
 
 
-
-    // Create worker task with 12KB DRAM stack — safe for TLS-heavy data sources.
+    // Create worker task with configurable DRAM stack — safe for TLS-heavy data sources.
     // DRAM (not PSRAM) is required because SPI flash operations (used by some
     // data sources) assert when the task stack is in PSRAM.
-    ESP_LOGI(TAG, "Creating worker task (stack=12288, priority=5, core=any, DRAM)");
+    ESP_LOGI(TAG, "Creating worker task (stack=%u, priority=5, core=any, DRAM)",
+             (unsigned)_workerStackSize);
     BaseType_t result = xTaskCreate(
         workerTaskLoop,
         "DataManager",
-        12288,                                    // 12KB — safe for TLS
+        _workerStackSize,
         this,
         5,
         &_workerTask
@@ -271,7 +271,9 @@ void DataManager::drainJobs(bool urgentOnly) {
         DeadlineToken token(jobStart + FetchContext::FETCH_TOTAL_TIMEOUT_MS, [this]() { return getCurrentTimeMs(); });
         FetchContext ctx{token};
 #ifdef ESP_PLATFORM
-        FetchGuard fg(nullptr, ctx, _secureClient, _plainClient);
+        FetchGuard fg(nullptr, ctx,
+                      entry->options.requiresTls ? _secureClient : nullptr,
+                      entry->options.requiresTls ? nullptr : _plainClient);
 #endif
 
         entry->job(ctx);

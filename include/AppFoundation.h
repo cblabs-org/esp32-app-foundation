@@ -64,6 +64,11 @@
 #include "events/PreconditionHealthPayload.hpp"
 #include "events/AppConfiguringPayload.hpp"
 
-// Application hub
+// Application hub — target builds only.
+// Native test builds should include only the interfaces and event payloads
+// above; the concrete Application and TimeManager classes pull platform
+// headers (esp_event.h, WiFi.h) that don't exist on the host.
+#ifdef ESP_PLATFORM
 #include "../modules/Application/Application.hpp"
 #include "../modules/TimeManager/TimeManager.hpp"
+#endif

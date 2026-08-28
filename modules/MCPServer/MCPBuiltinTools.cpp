@@ -485,6 +485,15 @@ void mcpBuiltinTools::registerAll(MCPToolRegistry& registry,
                     src["name"] = health.name;
                     
                     src["state"] = sourceStateToString(health.state);
+
+                    // Last fetch result and lifetime success flag (#170)
+                    static const char* statusNames[] = {
+                        "Success", "NoChange", "RateLimited",
+                        "FetchError", "ParseError", "AuthError", "Skipped"
+                    };
+                    uint8_t statusIdx = static_cast<uint8_t>(health.lastStatus);
+                    src["last_status"] = (statusIdx < 7) ? statusNames[statusIdx] : "Unknown";
+                    src["ever_succeeded"] = health.everSucceeded;
                     
                     src["consecutive_failures"] = health.consecutiveFailures;
                     src["ms_since_last_fetch"] = health.lastAttemptMs == 0 ? 0 : millis() - health.lastAttemptMs;
