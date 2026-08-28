@@ -14,6 +14,14 @@ if [ ! -d "$ROOT_DIR" ]; then
     exit 1
 fi
 
+# Auto-detect framework submodule for consumer repos (#188).
+# If esp32-app-foundation/ exists as a subdirectory with its own .git,
+# exclude it — the Authored-Code Scope Rule says only audit authored code.
+SUBMODULE_EXCLUDE=""
+if [ -d "$ROOT_DIR/esp32-app-foundation/.git" ] || [ -f "$ROOT_DIR/esp32-app-foundation/.git" ]; then
+    SUBMODULE_EXCLUDE="esp32-app-foundation"
+fi
+
 TOTAL_CHECKS=0
 PASSED=0
 FINDINGS=0
@@ -27,7 +35,7 @@ report() {
     local files="${5:-}"
 
     TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
-    if [ "$status" == "PASS" ]; then
+    if [ "$status" == "PASS" ] || [ "$status" == "ADVISORY" ]; then
         PASSED=$((PASSED + 1))
     else
         FINDINGS=$((FINDINGS + 1))
@@ -60,6 +68,10 @@ report() {
 
 # Auto-discover authored C++ source files
 get_source_files() {
+    local exclude_submod=""
+    if [ -n "$SUBMODULE_EXCLUDE" ]; then
+        exclude_submod="-not -path */$SUBMODULE_EXCLUDE/*"
+    fi
     find "$ROOT_DIR" -type f \( -name "*.hpp" -o -name "*.cpp" \) \
         -not -path "*/.pio/*" \
         -not -path "*/.pio-mcp-workspace/*" \
@@ -71,7 +83,8 @@ get_source_files() {
         -not -path "*/vendor/*" \
         -not -path "*/node_modules/*" \
         -not -path "*/managed_components/*" \
-        -not -path "*/tmp/*"
+        -not -path "*/tmp/*" \
+        $exclude_submod
 }
 
 # Generic grep runner for quick pattern matching
@@ -86,6 +99,10 @@ run_check_grep() {
     
     # Use standard grep with excludes for safety, plus include pattern
     local grep_out
+    local submod_exclude=""
+    if [ -n "$SUBMODULE_EXCLUDE" ]; then
+        submod_exclude="--exclude-dir=$SUBMODULE_EXCLUDE"
+    fi
     grep_out=$(grep -rnE "$pattern" \
         --exclude-dir=".pio" \
         --exclude-dir=".pio-mcp-workspace" \
@@ -98,12 +115,17 @@ run_check_grep() {
         --exclude-dir="node_modules" \
         --exclude-dir="managed_components" \
         --exclude-dir="tmp" \
+        $submod_exclude \
         --include="$file_ext" \
         "$ROOT_DIR" 2>/dev/null || true)
         
     if [ -n "$grep_out" ]; then
         # Additional exact-path filtering to respect the full exclude rules
-        grep_out=$(echo "$grep_out" | grep -v "/.pio/" | grep -v "/.pio-mcp-workspace/" | grep -v "/.git/" | grep -v "/.agents/" | grep -v "/test/stubs/" | grep -v "/include/portal_assets/" | grep -v "third_party" | grep -v "vendor" | grep -v "node_modules" | grep -v "managed_components" | grep -v "/tmp/" || true)
+        local filter_chain="grep -v '/.pio/' | grep -v '/.pio-mcp-workspace/' | grep -v '/.git/' | grep -v '/.agents/' | grep -v '/test/stubs/' | grep -v '/include/portal_assets/' | grep -v 'third_party' | grep -v 'vendor' | grep -v 'node_modules' | grep -v 'managed_components' | grep -v '/tmp/'"
+        if [ -n "$SUBMODULE_EXCLUDE" ]; then
+            filter_chain="$filter_chain | grep -v '/$SUBMODULE_EXCLUDE/'"
+        fi
+        grep_out=$(echo "$grep_out" | eval "$filter_chain" || true)
         
         if [ -n "$grep_out" ]; then
             hits=$(echo "$grep_out" | wc -l | tr -d ' ')
@@ -251,7 +273,9 @@ check_public_member_variables() {
 }
 
 check_extern_global_state() {
-    run_check_grep 2 "extern_global_state" "^[[:space:]]*extern[[:space:]]+" "*.cpp"
+    # Exclude 'extern "C"' language linkage — those are LVGL/ESP-IDF callback
+    # declarations, not global state (#188).
+    run_check_grep 2 "extern_global_state" "^[[:space:]]*extern[[:space:]]+[^\"C]" "*.cpp"
 }
 
 check_std_function_member() {
@@ -259,15 +283,27 @@ check_std_function_member() {
 }
 
 check_missing_nothrow() {
-    # `new Type` without `(std::nothrow)`
-    # This is difficult to represent precisely in standard regex, using a negative lookbehind approximation if perl compatible
-    # Fallback: Just search for plain `new ` and exclude `nothrow` matches.
+    # `new Type` without `(std::nothrow)` — only match C++ allocations,
+    # not the English word "new" in comments (#188).
     local hits=0
     local files=""
     
+    local submod_excl=""
+    if [ -n "$SUBMODULE_EXCLUDE" ]; then
+        submod_excl="--exclude-dir=$SUBMODULE_EXCLUDE"
+    fi
+    
     local grep_out
-    grep_out=$(grep -rn "new " "$ROOT_DIR" --include="*.cpp" --exclude-dir=".pio" --exclude-dir="vendor" --exclude-dir="third_party" 2>/dev/null || true)
+    # Match 'new' followed by an uppercase letter (type name) to skip prose
+    grep_out=$(grep -rn "new [A-Z]" "$ROOT_DIR" --include="*.cpp" \
+        --exclude-dir=".pio" --exclude-dir=".pio-mcp-workspace" \
+        --exclude-dir="vendor" --exclude-dir="third_party" \
+        --exclude-dir=".agents" --exclude-dir=".git" \
+        $submod_excl 2>/dev/null || true)
     if [ -n "$grep_out" ]; then
+        # Strip comment lines (// at start or after whitespace)
+        grep_out=$(echo "$grep_out" | grep -v "^[^:]*:[^:]*:[[:space:]]*//" || true)
+        # Remove lines with nothrow
         grep_out=$(echo "$grep_out" | grep -v "(std::nothrow)" || true)
         if [ -n "$grep_out" ]; then
             hits=$(echo "$grep_out" | wc -l | tr -d ' ')
@@ -283,9 +319,29 @@ check_missing_nothrow() {
 }
 
 check_tick_heap_allocation() {
-    # new, malloc, String(, std::vector<
-    # We will flag any occurrence in .cpp files as a warning since limiting purely to tick() scope in grep is frail.
-    run_check_grep 2 "tick_heap_allocation" "(new[[:space:]]|malloc\(|String\(|std::vector<)" "*.cpp"
+    # Advisory: grepping all .cpp files for allocation patterns cannot
+    # distinguish tick-path from init-path calls. Report as ADVISORY
+    # for manual review rather than FAIL (#188).
+    local hits=0
+    local files=""
+    local submod_excl=""
+    if [ -n "$SUBMODULE_EXCLUDE" ]; then
+        submod_excl="--exclude-dir=$SUBMODULE_EXCLUDE"
+    fi
+    local grep_out
+    grep_out=$(grep -rlE "(new[[:space:]]|malloc\(|String\(|std::vector<)" "$ROOT_DIR" \
+        --include="*.cpp" --exclude-dir=".pio" --exclude-dir=".pio-mcp-workspace" \
+        --exclude-dir="vendor" --exclude-dir="third_party" --exclude-dir=".agents" \
+        --exclude-dir=".git" $submod_excl 2>/dev/null || true)
+    if [ -n "$grep_out" ]; then
+        hits=$(echo "$grep_out" | wc -l | tr -d ' ')
+        files=$(echo "$grep_out" | sed "s|^$ROOT_DIR/||" | sed "s|^\./||" | sort -u)
+    fi
+    if [ "$hits" -gt 0 ]; then
+        report 2 "tick_heap_allocation" "ADVISORY" "$hits" "$(echo $files | tr '\n' ' ')"
+    else
+        report 2 "tick_heap_allocation" "PASS" 0
+    fi
 }
 
 check_law_of_demeter() {
@@ -297,7 +353,28 @@ check_law_of_demeter() {
 # Dimension 3: Framework Practices
 # -----------------------------------------------------------------------------
 check_eventbus_thread_safety() {
-    run_check_grep 3 "eventbus_thread_safety" "(lv_|WiFi\.|SPI\.)" "*.cpp"
+    # Advisory: any lv_/WiFi./SPI. call in .cpp fires this check, but most
+    # are legitimate single-threaded usage. Report as ADVISORY (#188).
+    local hits=0
+    local files=""
+    local submod_excl=""
+    if [ -n "$SUBMODULE_EXCLUDE" ]; then
+        submod_excl="--exclude-dir=$SUBMODULE_EXCLUDE"
+    fi
+    local grep_out
+    grep_out=$(grep -rlE "(lv_|WiFi\.|SPI\.)" "$ROOT_DIR" \
+        --include="*.cpp" --exclude-dir=".pio" --exclude-dir=".pio-mcp-workspace" \
+        --exclude-dir="vendor" --exclude-dir="third_party" --exclude-dir=".agents" \
+        --exclude-dir=".git" $submod_excl 2>/dev/null || true)
+    if [ -n "$grep_out" ]; then
+        hits=$(echo "$grep_out" | wc -l | tr -d ' ')
+        files=$(echo "$grep_out" | sed "s|^$ROOT_DIR/||" | sed "s|^\./||" | sort -u)
+    fi
+    if [ "$hits" -gt 0 ]; then
+        report 3 "eventbus_thread_safety" "ADVISORY" "$hits" "$(echo $files | tr '\n' ' ')"
+    else
+        report 3 "eventbus_thread_safety" "PASS" 0
+    fi
 }
 
 check_facade_completeness() {
@@ -320,8 +397,11 @@ check_committed_secrets() {
     
     if [ -n "$bad_files" ]; then
         for f in $bad_files; do
-            hits=$((hits + 1))
-            files="$files ${f#$ROOT_DIR/}"
+            # Only flag files tracked by git — gitignored files are safe (#184)
+            if git -C "$ROOT_DIR" ls-files --error-unmatch "$f" >/dev/null 2>&1; then
+                hits=$((hits + 1))
+                files="$files ${f#$ROOT_DIR/}"
+            fi
         done
     fi
     
@@ -387,14 +467,38 @@ check_stale_lib_deps() {
 }
 
 check_duplicate_driver_registration() {
-    run_check_grep 8 "duplicate_driver_registration" "(pcnt_unit_config|lv_indev_create)" "*.cpp"
+    # Advisory: pcnt_unit_config and lv_indev_create are expected once per
+    # peripheral/input device — a small count (≤8) is normal. Only flag
+    # as FAIL above threshold to catch actual duplicate registrations (#186).
+    local hits
+    hits=$(grep -rl --include="*.cpp" -E "(pcnt_unit_config|lv_indev_create)" "$ROOT_DIR" \
+        --include="*.cpp" 2>/dev/null | wc -l | tr -d ' ')
+    if [ "$hits" -gt 8 ]; then
+        report 8 "duplicate_driver_registration" "FAIL" "$hits"
+    elif [ "$hits" -gt 0 ]; then
+        report 8 "duplicate_driver_registration" "ADVISORY" "$hits" "expected per-peripheral registrations"
+    else
+        report 8 "duplicate_driver_registration" "PASS" 0
+    fi
 }
 
 # -----------------------------------------------------------------------------
 # Dimension 9: Config Shadowing
 # -----------------------------------------------------------------------------
 check_config_overrides_enumeration() {
-    run_check_grep 9 "config_overrides_enumeration" "(LV_CONF_PATH|sdkconfig\.defaults|build_flags)" "*.ini"
+    # Advisory: a multi-board framework inherently has many build_flags,
+    # sdkconfig.defaults, and LV_CONF_PATH entries across environments.
+    # Report count for awareness but only fail above a generous threshold (#187).
+    local hits
+    hits=$(grep -c -E "(LV_CONF_PATH|sdkconfig\.defaults|build_flags)" \
+        "$ROOT_DIR/platformio.ini" 2>/dev/null || echo 0)
+    if [ "$hits" -gt 60 ]; then
+        report 9 "config_overrides_enumeration" "FAIL" "$hits"
+    elif [ "$hits" -gt 0 ]; then
+        report 9 "config_overrides_enumeration" "ADVISORY" "$hits" "multi-board config — review for stale entries"
+    else
+        report 9 "config_overrides_enumeration" "PASS" 0
+    fi
 }
 
 main() {

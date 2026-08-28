@@ -392,19 +392,23 @@ void ConfiguringStatusBoard::render(U8G2& u8g2) {
     }
 
     // --- 4. Draw connection info footer (device IP) ---
+    // Under setFontPosTop() the y-coordinate is the top of the glyph, so
+    // position at displayHeight minus font height for full visibility (#189).
     if (_deviceUrl[0] != '\0') {
         u8g2.setFont(AppFonts::defaultSmall());
+        int fontH = u8g2.getMaxCharHeight();
         int textWidth = u8g2.getStrWidth(_deviceUrl);
         int footerX = (_displayWidth - textWidth) / 2;
         if (footerX < 0) footerX = 0;
-        u8g2.drawStr(footerX, _displayHeight - 2, _deviceUrl);
+        u8g2.drawStr(footerX, _displayHeight - fontH, _deviceUrl);
     } else if (_networkName[0] != '\0') {
         // Fallback: show network name if no URL set
         u8g2.setFont(AppFonts::defaultSmall());
+        int fontH = u8g2.getMaxCharHeight();
         int textWidth = u8g2.getStrWidth(_networkName);
         int footerX = (_displayWidth - textWidth) / 2;
         if (footerX < 0) footerX = 0;
-        u8g2.drawStr(footerX, _displayHeight - 2, _networkName);
+        u8g2.drawStr(footerX, _displayHeight - fontH, _networkName);
     }
 }
 
