@@ -22,7 +22,7 @@
  */
 
 #ifndef SCROLLING_MESSAGE_POOL_WIDGET_HPP
-#define SCROLLING_MESSAGE_POOL_WIDGET_HPP
+#define SCROLLING_MESSAGE_POOL_WIDGET_HPP                   ///< Scrolling Message Pool Widget Hpp
 
 #include "ScrollingTextWidget.hpp"
 #include <cstddef>
@@ -82,6 +82,7 @@ public:
      * @param _font U8G2 font for rendering (nullptr for default).
      */
     ScrollingMessagePoolWidget(int _x, int _y, int _w, int _h, const uint8_t* _font = nullptr);
+    /** @brief Destructor for ScrollingMessagePoolWidget. */
     virtual ~ScrollingMessagePoolWidget() = default;
 
     /**

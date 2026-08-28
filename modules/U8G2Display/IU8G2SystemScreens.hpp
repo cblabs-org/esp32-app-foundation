@@ -34,6 +34,7 @@
  */
 class IU8G2SystemScreens {
 public:
+    /** @brief Destructor for IU8G2SystemScreens. */
     virtual ~IU8G2SystemScreens() = default;
 
     /** @brief Custom error board, or nullptr for built-in ErrorBoard. */

@@ -100,7 +100,9 @@ struct DataJobOptions {
  */
 class DataManager {
 public:
+    /** @brief Construct a DataManager instance. */
     DataManager();
+    /** @brief Destructor for DataManager. */
     ~DataManager();
 
     /// Default worker task stack size in bytes (12 KB DRAM).
@@ -298,7 +300,7 @@ private:
         DataJobOptions options;
     };
 
-    static constexpr size_t JOB_QUEUE_DEPTH = 8;
+    static constexpr size_t JOB_QUEUE_DEPTH = 8;            ///< Job Queue Depth
     QueueHandle_t _jobQueue = nullptr;
 
     std::vector<SourceRecord> _registry;
@@ -313,9 +315,13 @@ private:
     WiFiClient* _plainClient = nullptr;
 #endif
 
+    /** @brief Worker Task Loop. */
     static void workerTaskLoop(void* param);
+    /** @brief Execute Loop. */
     void executeLoop();
+    /** @brief Drain Jobs. */
     void drainJobs(bool urgentOnly);
+    /** @brief Get the current time ms. */
     uint32_t getCurrentTimeMs() const;
 
     /**

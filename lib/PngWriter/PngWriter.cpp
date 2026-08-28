@@ -1,3 +1,18 @@
+/*
+ * ESP32 App Foundation (c) 2026 CB Labs
+ *
+ * https://github.com/matthewmcneill/esp32-app-foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Module: lib/PngWriter/PngWriter.cpp
+ * Description: Implementation of Print class.
+ *
+ * Exported Classes:
+ * - Print
+ * - DeflateState
+ */
+
 #include "PngWriter.h"
 #include <esp_heap_caps.h>   // heap_caps_malloc/calloc/free + MALLOC_CAP_* (native stub provides these)
 #ifdef ARDUINO

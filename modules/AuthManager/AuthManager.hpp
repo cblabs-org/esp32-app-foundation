@@ -98,6 +98,7 @@ class PsychicHttpServer;
 class AuthManager : public IWebContributor, public IConfigurable {
 public:
     AuthManager() = default;
+    /** @brief Destructor for AuthManager. */
     ~AuthManager() = default;
 
     // -------------------------------------------------------------------------

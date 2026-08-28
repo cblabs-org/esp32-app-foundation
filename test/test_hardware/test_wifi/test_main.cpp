@@ -1,3 +1,10 @@
+/*
+ * ESP32 App Foundation (c) 2026 CB Labs
+ *
+ * Test: test/test_hardware/test_wifi/test_main.cpp
+ * Description: Unit tests for test_main.
+ */
+
 #include "AppFoundation.h"
 #include <Arduino.h>
 #include <unity.h>

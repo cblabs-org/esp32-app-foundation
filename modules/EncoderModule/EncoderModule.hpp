@@ -52,11 +52,12 @@ public:
     /// On real hardware this comes from SOC_PCNT_UNITS_PER_GROUP; on native
     /// builds we define a reasonable default.
 #ifdef SOC_PCNT_UNITS_PER_GROUP
-    static constexpr size_t MAX_ENCODERS = SOC_PCNT_UNITS_PER_GROUP;
+    static constexpr size_t MAX_ENCODERS = SOC_PCNT_UNITS_PER_GROUP; ///< Maximum encoders
 #else
-    static constexpr size_t MAX_ENCODERS = 4;
+    static constexpr size_t MAX_ENCODERS = 4;               ///< Maximum encoders
 #endif
 
+    /** @brief Construct a EncoderModule instance. */
     EncoderModule();
     ~EncoderModule() override;
 
@@ -110,7 +111,7 @@ public:
     void registerMCPTools(MCPToolRegistry& registry) override;
 
 private:
-    static constexpr size_t EVENT_RING_SIZE = 4;
+    static constexpr size_t EVENT_RING_SIZE = 4;            ///< Size of event ring
 
     /**
      * @brief Per-encoder runtime state bundle. Each encoder gets one PCNT unit,

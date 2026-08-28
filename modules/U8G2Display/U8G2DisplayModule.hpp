@@ -180,7 +180,7 @@ namespace U8G2DisplayEvents {
 // e.g. -DU8G2_DISPLAY_TYPE=U8G2_SSD1322_NHD_256X64_F_4W_HW_SPI
 // ---------------------------------------------------------------------------
 #ifndef U8G2_DISPLAY_TYPE
-#define U8G2_DISPLAY_TYPE U8G2_SSD1306_128X64_NONAME_F_HW_I2C
+#define U8G2_DISPLAY_TYPE U8G2_SSD1306_128X64_NONAME_F_HW_I2C ///< U8g2 Display Type
 #endif
 
 /**

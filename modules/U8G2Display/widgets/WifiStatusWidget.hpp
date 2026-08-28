@@ -20,7 +20,7 @@
  */
 
 #ifndef WIFI_STATUS_WIDGET_HPP
-#define WIFI_STATUS_WIDGET_HPP
+#define WIFI_STATUS_WIDGET_HPP                              ///< Wifi Status Widget Hpp
 
 #include "IGfxWidget.hpp"
 

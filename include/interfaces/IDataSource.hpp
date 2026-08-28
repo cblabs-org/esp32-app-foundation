@@ -122,6 +122,7 @@ struct SourceHealth {
  */
 class IDataSource {
 public:
+    /** @brief Destructor for IDataSource. */
     virtual ~IDataSource() = default;
 
     /**

@@ -1,3 +1,10 @@
+/*
+ * ESP32 App Foundation (c) 2026 CB Labs
+ *
+ * Test: test/test_unit/test_deepStackExecutor/test_deepStackExecutor.cpp
+ * Description: Implementation of DeepStackExecutorTest class.
+ */
+
 #include <gtest/gtest.h>
 #include "DeepStackExecutor.h"
 

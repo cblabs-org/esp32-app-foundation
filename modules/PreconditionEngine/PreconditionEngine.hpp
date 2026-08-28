@@ -1,10 +1,25 @@
+/*
+ * ESP32 App Foundation (c) 2026 CB Labs
+ *
+ * https://github.com/matthewmcneill/esp32-app-foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Module: modules/PreconditionEngine/PreconditionEngine.hpp
+ * Description: Implementation of PreconditionEngine class.
+ *
+ * Exported Classes:
+ * - PreconditionEngine
+ * - PreconditionState
+ */
+
 #pragma once
 
 #include "interfaces/IPreconditionRegistry.hpp"
 #include <cstdint>
 
-constexpr size_t MAX_PRECONDITIONS = 16;
-constexpr size_t MAX_EDGES_PER_PRECONDITION = 8;
+constexpr size_t MAX_PRECONDITIONS = 16;                    ///< Maximum preconditions
+constexpr size_t MAX_EDGES_PER_PRECONDITION = 8;            ///< Maximum edges per precondition
 
 struct PreconditionState {
     const char* name;
@@ -48,14 +63,23 @@ public:
              const DampingPolicy* damping = nullptr,
              const RetryPolicy*  retry   = nullptr) override;
 
+    /** @brief Resolve Edges. */
     bool resolveEdges();
+    /** @brief Periodic tick handler. */
     void tick(uint32_t nowMs);
+    /** @brief All Startup Met. */
     bool allStartupMet() const;
+    /** @brief Get the app running. */
     bool getAppRunning() const;
+    /** @brief Get the precondition count. */
     size_t getPreconditionCount() const;
+    /** @brief Get the state at. */
     const PreconditionState& getStateAt(size_t i) const;
+    /** @brief Get the state by name. */
     const PreconditionState* getStateByName(const char* name) const;
+    /** @brief Bump Identity Epoch. */
     void bumpIdentityEpoch(const char* name);
+    /** @brief Request Retry. */
     void requestRetry(const char* name);
 
 private:

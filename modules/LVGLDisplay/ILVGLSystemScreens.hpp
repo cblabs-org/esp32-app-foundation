@@ -28,7 +28,7 @@
  */
 
 #ifndef LVGLDISPLAY_ILVGLSYSTEMSCREENS_HPP_
-#define LVGLDISPLAY_ILVGLSYSTEMSCREENS_HPP_
+#define LVGLDISPLAY_ILVGLSYSTEMSCREENS_HPP_                 ///< Lvgldisplay Ilvglsystemscreens Hpp
 
 #include "lvgl.h"
 #include "events/AppConfiguringPayload.hpp"
@@ -43,6 +43,7 @@
  */
 class ILVGLSystemScreens {
 public:
+    /** @brief Destructor for ILVGLSystemScreens. */
     virtual ~ILVGLSystemScreens() = default;
 
     /**

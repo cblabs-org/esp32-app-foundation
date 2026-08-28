@@ -27,7 +27,7 @@
  */
 
 #ifndef INCLUDE_INTERFACES_ILVGLHARDWAREADAPTER_HPP_
-#define INCLUDE_INTERFACES_ILVGLHARDWAREADAPTER_HPP_
+#define INCLUDE_INTERFACES_ILVGLHARDWAREADAPTER_HPP_        ///< Include Interfaces Ilvglhardwareadapter Hpp
 
 #include <cstdint>
 #include "lvgl.h"
@@ -42,6 +42,7 @@
  */
 class ILVGLHardwareAdapter {
 public:
+    /** @brief Destructor for ILVGLHardwareAdapter. */
     virtual ~ILVGLHardwareAdapter() = default;
 
     // --- Required Interface Methods ---

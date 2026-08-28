@@ -37,6 +37,7 @@ public:
     /// Cold-path description formatter writing into a caller-supplied buffer.
     using DescribeFn = std::function<void(Cause, char*, size_t)>;
 
+    /** @brief Destructor for IPreconditionRegistry. */
     virtual ~IPreconditionRegistry() = default;
 
     /**

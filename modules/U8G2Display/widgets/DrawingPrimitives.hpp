@@ -30,7 +30,7 @@
  */
 
 #ifndef DRAWING_PRIMITIVES_HPP
-#define DRAWING_PRIMITIVES_HPP
+#define DRAWING_PRIMITIVES_HPP                              ///< Drawing Primitives Hpp
 
 #include <cstdint>
 

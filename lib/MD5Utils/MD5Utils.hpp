@@ -15,7 +15,7 @@
  */
 
 #ifndef MD5_UTILS_HPP
-#define MD5_UTILS_HPP
+#define MD5_UTILS_HPP                                       ///< Md5 Utils Hpp
 
 #include <string>
 #include <cstdint>
@@ -29,6 +29,7 @@
 class MD5Utils {
 public:
     MD5Utils() = default;
+    /** @brief Destructor for MD5Utils. */
     ~MD5Utils() = default;
 
     /**

@@ -32,6 +32,7 @@
  */
 class ITickable {
 public:
+    /** @brief Destructor for ITickable. */
     virtual ~ITickable() = default;
 
     /**

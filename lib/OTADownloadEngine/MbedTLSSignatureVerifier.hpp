@@ -40,6 +40,7 @@
  */
 class MbedTLSSignatureVerifier : public IOTAVerifier {
 public:
+    /** @brief Construct a MbedTLSSignatureVerifier instance. */
     MbedTLSSignatureVerifier();
     ~MbedTLSSignatureVerifier() override;
 

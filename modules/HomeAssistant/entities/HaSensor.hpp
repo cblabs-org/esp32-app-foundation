@@ -92,6 +92,7 @@ public:
      * @param state New sensor value string.
      */
     void setState(const std::string& state) {
+        /** @brief Guard. */
         std::lock_guard<FreeRTOSMutex> guard(_mutex);
         _state = state;
     }
@@ -126,6 +127,7 @@ public:
      * @return Current sensor value string.
      */
     std::string getState() const override {
+        /** @brief Guard. */
         std::lock_guard<FreeRTOSMutex> guard(_mutex);
         return _state;  // returns a copy while locked
     }

@@ -1,3 +1,10 @@
+/*
+ * ESP32 App Foundation (c) 2026 CB Labs
+ *
+ * Test: test/test_unit/test_deviceCrypto/test_deviceCrypto.cpp
+ * Description: Implementation of MockDeviceCrypto, DeviceCryptoTest classes.
+ */
+
 #include <gtest/gtest.h>
 #include "DeviceCrypto.hpp"
 #include <string>

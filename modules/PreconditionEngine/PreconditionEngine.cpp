@@ -1,3 +1,15 @@
+/*
+ * ESP32 App Foundation (c) 2026 CB Labs
+ *
+ * https://github.com/matthewmcneill/esp32-app-foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Module: modules/PreconditionEngine/PreconditionEngine.cpp
+ * Description: PreconditionEngine implementation.
+ *
+ */
+
 #include "PreconditionEngine.hpp"
 #include "platform/LogShim.h"
 #include <cstring>

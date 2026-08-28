@@ -25,7 +25,7 @@
  */
 
 #ifndef CLOCK_WIDGET_HPP
-#define CLOCK_WIDGET_HPP
+#define CLOCK_WIDGET_HPP                                    ///< Clock Widget Hpp
 
 #include "IGfxWidget.hpp"
 

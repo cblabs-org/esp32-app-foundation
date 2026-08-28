@@ -1,3 +1,10 @@
+/*
+ * ESP32 App Foundation (c) 2026 CB Labs
+ *
+ * Test: test/test_unit/test_md5Utils/test_md5Utils.cpp
+ * Description: Implementation of Md5UtilsTest class.
+ */
+
 #include <gtest/gtest.h>
 #include "MD5Utils.hpp"
 

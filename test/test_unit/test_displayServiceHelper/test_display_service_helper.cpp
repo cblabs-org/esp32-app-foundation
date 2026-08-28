@@ -1,3 +1,10 @@
+/*
+ * ESP32 App Foundation (c) 2026 CB Labs
+ *
+ * Test: test/test_unit/test_displayServiceHelper/test_display_service_helper.cpp
+ * Description: Implementation of MockDisplayModuleForScreenshot class.
+ */
+
 #include <gtest/gtest.h>
 #include "DisplayServiceHelper.h"
 #include "interfaces/IDisplayModule.hpp"

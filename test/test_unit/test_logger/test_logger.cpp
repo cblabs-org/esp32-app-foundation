@@ -1,3 +1,10 @@
+/*
+ * ESP32 App Foundation (c) 2026 CB Labs
+ *
+ * Test: test/test_unit/test_logger/test_logger.cpp
+ * Description: Implementation of LoggerTest class.
+ */
+
 #include <gtest/gtest.h>
 #include "Logger.hpp"
 #include <string>

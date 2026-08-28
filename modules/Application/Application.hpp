@@ -545,6 +545,7 @@ private:
     // -------------------------------------------------------------------------
     struct PreconditionWebContributor : public IWebContributor {
         Application* app = nullptr;
+        /** @brief Register routes. */
         void        registerRoutes(PsychicHttpServer& server) override;
         void        registerTabs(ITabRegistry& /*registry*/) override {}
         const char* getApiPrefix() const override { return "/api/preconditions"; }
@@ -558,6 +559,7 @@ private:
     // -------------------------------------------------------------------------
     struct DataSourceWebContributor : public IWebContributor {
         Application* app = nullptr;
+        /** @brief Register routes. */
         void        registerRoutes(PsychicHttpServer& server) override;
         void        registerTabs(ITabRegistry& /*registry*/) override {}
         const char* getApiPrefix() const override { return "/api/data"; }

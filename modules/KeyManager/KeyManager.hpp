@@ -48,7 +48,7 @@
 #include "interfaces/IMCPContributor.hpp"
 #include "ConfigRoot.hpp"
 
-#define KEY_MANAGER_PATH (ConfigRoot::getEtcFilePath("keys.json").c_str())
+#define KEY_MANAGER_PATH (ConfigRoot::getEtcFilePath("keys.json").c_str()) ///< File path for key manager
 
 /**
  * @brief Metadata descriptor for a single key entry.
@@ -94,6 +94,7 @@ private:
 
 public:
     KeyManager() = default;
+    /** @brief Destructor for KeyManager. */
     ~KeyManager() = default;
 
     /**

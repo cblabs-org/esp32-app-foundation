@@ -17,7 +17,7 @@
  * - LOG_SECURE(tag, fmt, ...): Secure wrapper for ESP_LOGI to redact secrets.
  */
 #ifndef LOGGER_HPP
-#define LOGGER_HPP
+#define LOGGER_HPP                                          ///< Logger Hpp
 
 #include <Arduino.h>
 #include <vector>
@@ -37,7 +37,9 @@ public:
      * @param secret The plaintext string that should not appear in the logs.
      */
     static void registerSecret(const String& secret);
+    /** @brief Register secret. */
     static void registerSecret(const std::string& secret);
+    /** @brief Register secret. */
     static void registerSecret(const char* secret);
 
     /**

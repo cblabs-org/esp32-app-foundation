@@ -17,7 +17,7 @@
  */
 
 #ifndef DEVICE_CRYPTO_HPP
-#define DEVICE_CRYPTO_HPP
+#define DEVICE_CRYPTO_HPP                                   ///< Device Crypto Hpp
 
 #include <Arduino.h>
 #include <memory>
@@ -49,6 +49,7 @@ private:
 
 public:
     DeviceCrypto() = default;
+    /** @brief Destructor for DeviceCrypto. */
     ~DeviceCrypto() = default;
 
     /**

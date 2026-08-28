@@ -1,3 +1,15 @@
+/*
+ * ESP32 App Foundation (c) 2026 CB Labs
+ *
+ * https://github.com/matthewmcneill/esp32-app-foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Module: lib/DisplayServiceHelper/DisplayServiceHelper.cpp
+ * Description: DisplayServiceHelper implementation.
+ *
+ */
+
 #include "DisplayServiceHelper.h"
 #include "Application.hpp"
 #include "interfaces/IDisplayModule.hpp"

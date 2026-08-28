@@ -1,3 +1,10 @@
+/*
+ * ESP32 App Foundation (c) 2026 CB Labs
+ *
+ * Test: test/test_unit/test_precondition_engine/test_precondition_engine.cpp
+ * Description: Implementation of PreconditionEngineTest class.
+ */
+
 #include <gtest/gtest.h>
 #include "PreconditionEngine.hpp"
 

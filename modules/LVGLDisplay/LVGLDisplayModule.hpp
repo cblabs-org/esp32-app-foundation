@@ -84,7 +84,7 @@ class MCPToolRegistry;
 
 
 #ifndef DISPLAY_MESSAGE_PAYLOAD_DEFINED
-#define DISPLAY_MESSAGE_PAYLOAD_DEFINED
+#define DISPLAY_MESSAGE_PAYLOAD_DEFINED                     ///< Display Message Payload Defined
 struct DisplayMessagePayload {
     const char* message;       // Text to display
     unsigned long durationMs;  // How long to display (0 = until cleared)
@@ -92,7 +92,7 @@ struct DisplayMessagePayload {
 #endif
 
 #ifndef SYSTEM_ERROR_PAYLOAD_DEFINED
-#define SYSTEM_ERROR_PAYLOAD_DEFINED
+#define SYSTEM_ERROR_PAYLOAD_DEFINED                        ///< System Error Payload Defined
 /**
  * @brief Payload for LVGLDisplayEvents::SYSTEM_ERROR EventBus topic.
  *
@@ -108,10 +108,10 @@ struct SystemErrorPayload {
 #endif
 
 namespace LVGLDisplayEvents {
-    constexpr const char* DISPLAY_SLEEP = "display.sleep";
-    constexpr const char* DISPLAY_WAKE = "display.wake";
-    constexpr const char* DISPLAY_MESSAGE = "display.message";
-    constexpr const char* SYSTEM_ERROR = "system.error";
+    constexpr const char* DISPLAY_SLEEP = "display.sleep";  ///< Display Sleep
+    constexpr const char* DISPLAY_WAKE = "display.wake";    ///< Display Wake
+    constexpr const char* DISPLAY_MESSAGE = "display.message"; ///< Display Message
+    constexpr const char* SYSTEM_ERROR = "system.error";    ///< System Error
 }
 
 /**
@@ -190,15 +190,24 @@ public:
     // IDisplayModule
     // -------------------------------------------------------------------------
 
+    /** @brief Get the display width. */
     uint16_t getDisplayWidth() const override;
+    /** @brief Get the display height. */
     uint16_t getDisplayHeight() const override;
+    /** @brief Set the brightness. */
     void setBrightness(uint8_t brightness) override;
     uint8_t getBrightness() const override { return _brightness; }
+    /** @brief Reset Activity. */
     void resetActivity() override;
+    /** @brief Check whether dimmed. */
     bool isDimmed() const override;
+    /** @brief Check whether sleeping. */
     bool isSleeping() const override;
+    /** @brief Capture P N G. */
     bool capturePNG(Print& sink) override;
+    /** @brief Capture Stored P N G. */
     bool captureStoredPNG(Print& sink) override;
+    /** @brief Show System State. */
     void showSystemState(const SystemDisplayParams& params) override;
 
     /**
@@ -303,14 +312,18 @@ public:
 
     const char* getConfigNamespace() const override { return "display"; }
     int getSchemaVersion() const override { return 1; }
+    /** @brief Apply Config. */
     void applyConfig(const JsonObject& section) override;
+    /** @brief Serialize Config. */
     void serializeConfig(JsonObject& section) const override;
+    /** @brief Reset Config. */
     void resetConfig() override;
 
     // -------------------------------------------------------------------------
     // IWebContributor — Display REST API and portal tab
     // -------------------------------------------------------------------------
 
+    /** @brief Register routes. */
     void registerRoutes(PsychicHttpServer& server) override;
     const char* getApiPrefix() const override { return "/api/display"; }
 
@@ -372,12 +385,16 @@ public:
     // -------------------------------------------------------------------------
 
     void setConfigManager(ConfigManager* cm) { _configManager = cm; }
+    /** @brief Set the rotation. */
     void setRotation(uint16_t degrees);
     uint16_t getRotation() const { return _rotation; }
+    /** @brief Set the screensaver enabled. */
     void setScreensaverEnabled(bool enabled);
     bool getScreensaverEnabled() const { return _screensaverEnabled; }
+    /** @brief Set the dim timeout. */
     void setDimTimeout(unsigned long timeoutMs);
     unsigned long getDimTimeout() const { return _dimTimeoutMs; }
+    /** @brief Set the blank timeout. */
     void setBlankTimeout(unsigned long timeoutMs);
     unsigned long getBlankTimeout() const { return _blankTimeoutMs; }
 

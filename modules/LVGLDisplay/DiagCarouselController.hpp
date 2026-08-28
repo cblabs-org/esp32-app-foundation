@@ -111,5 +111,5 @@ private:
     bool        _callbackRegistered = false;
     char        _textBuf[64]   = {};                   ///< Shared buffer for text item reads
 
-    static constexpr uint32_t REFRESH_INTERVAL_MS = 2000;
+    static constexpr uint32_t REFRESH_INTERVAL_MS = 2000;   ///< Interval in milliseconds for refresh ms
 };

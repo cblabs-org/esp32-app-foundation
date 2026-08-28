@@ -43,6 +43,7 @@ class U8G2;
  */
 class IDisplayBoard {
 public:
+    /** @brief Destructor for IDisplayBoard. */
     virtual ~IDisplayBoard() = default;
 
     /**

@@ -34,6 +34,7 @@
  */
 class IHaEntity {
 public:
+    /** @brief Destructor for IHaEntity. */
     virtual ~IHaEntity() = default;
     
     /**

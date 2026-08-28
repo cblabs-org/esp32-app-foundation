@@ -40,6 +40,7 @@
  */
 class IOTAVerifier {
 public:
+    /** @brief Destructor for IOTAVerifier. */
     virtual ~IOTAVerifier() = default;
 
     /**

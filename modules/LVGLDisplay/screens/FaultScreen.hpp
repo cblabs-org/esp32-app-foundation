@@ -33,6 +33,7 @@
 class FaultScreen {
 public:
     FaultScreen() = default;
+    /** @brief Destructor for FaultScreen. */
     ~FaultScreen();
 
     FaultScreen(const FaultScreen&) = delete;

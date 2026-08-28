@@ -212,6 +212,7 @@ public:
      * @param ha  Reference to the initialised HomeAssistantModule.
      */
 #ifdef WITH_HOMEASSISTANT
+    /** @brief Wire Home Assistant. */
     void wireHomeAssistant(HomeAssistantModule& ha);
 #endif
 
@@ -416,6 +417,7 @@ public:
     void registerMCPTools(MCPToolRegistry& registry) override;
 
     // --- IPreconditionContributor ---
+    /** @brief Register preconditions. */
     void registerPreconditions(IPreconditionRegistry& reg) override;
 
     // --- JsonListener (hardware only — parser library unavailable in native builds) ---

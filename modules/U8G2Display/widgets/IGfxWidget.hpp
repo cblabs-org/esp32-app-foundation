@@ -22,7 +22,7 @@
  */
 
 #ifndef I_GFX_WIDGET_HPP
-#define I_GFX_WIDGET_HPP
+#define I_GFX_WIDGET_HPP                                    ///< I Gfx Widget Hpp
 
 #include <cstdint>
 
