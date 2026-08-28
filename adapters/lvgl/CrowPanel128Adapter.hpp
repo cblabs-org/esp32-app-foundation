@@ -48,11 +48,11 @@ public:
     lv_display_t* createDisplay() override;
     /** @brief Set the brightness. */
     void setBrightness(uint8_t level) override;
-    /** @brief Auto-generated doc */
+    /** @brief Return screen width in pixels. */
     uint16_t getScreenWidth() const override { return 240; }
-    /** @brief Auto-generated doc */
+    /** @brief Return screen height in pixels. */
     uint16_t getScreenHeight() const override { return 240; }
-    /** @brief Auto-generated doc */
+    /** @brief Return number of lines per draw buffer. */
     uint16_t getBufferLineCount() const override { return 40; } // 40 lines of 240 pixels is 9600px. x2 bytes = 19.2KB
 
     /** @brief Create Touch Input. */

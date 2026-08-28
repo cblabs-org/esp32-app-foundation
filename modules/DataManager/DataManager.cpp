@@ -592,8 +592,9 @@ void DataManager::workerTaskLoop(void* param) {
         TickType_t now = xTaskGetTickCount();
         if (lastWatermarkLog == 0 || (now - lastWatermarkLog) >= pdMS_TO_TICKS(60000)) {
             UBaseType_t hwm = uxTaskGetStackHighWaterMark(nullptr);
-            ESP_LOGI(TAG, "Worker stack high water mark: %lu B free (of 12288)",
-                     (unsigned long)(hwm * sizeof(StackType_t)));
+            ESP_LOGI(TAG, "Worker stack high water mark: %lu B free (of %lu)",
+                     (unsigned long)(hwm * sizeof(StackType_t)),
+                     (unsigned long)manager->_workerStackSize);
             lastWatermarkLog = now;
         }
 

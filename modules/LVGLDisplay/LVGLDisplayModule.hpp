@@ -196,7 +196,7 @@ public:
     uint16_t getDisplayHeight() const override;
     /** @brief Set the brightness. */
     void setBrightness(uint8_t brightness) override;
-    /** @brief Auto-generated doc */
+    /** @brief Return current brightness level. */
     uint8_t getBrightness() const override { return _brightness; }
     /** @brief Reset Activity. */
     void resetActivity() override;
@@ -312,7 +312,7 @@ public:
     // -------------------------------------------------------------------------
 
     const char* getConfigNamespace() const override { return "display"; }
-    /** @brief Auto-generated doc */
+    /** @brief Return config schema version. */
     int getSchemaVersion() const override { return 1; }
     /** @brief Apply Config. */
     void applyConfig(const JsonObject& section) override;
@@ -386,15 +386,15 @@ public:
     // Runtime Setters & Getters
     // -------------------------------------------------------------------------
 
-    /** @brief Auto-generated doc */
+    /** @brief Inject ConfigManager reference for persistent settings. */
     void setConfigManager(ConfigManager* cm) { _configManager = cm; }
     /** @brief Set the rotation. */
     void setRotation(uint16_t degrees);
-    /** @brief Auto-generated doc */
+    /** @brief Return current display rotation in degrees. */
     uint16_t getRotation() const { return _rotation; }
     /** @brief Set the screensaver enabled. */
     void setScreensaverEnabled(bool enabled);
-    /** @brief Auto-generated doc */
+    /** @brief Return whether the screensaver is enabled. */
     bool getScreensaverEnabled() const { return _screensaverEnabled; }
     /** @brief Set the dim timeout. */
     void setDimTimeout(unsigned long timeoutMs);
@@ -412,7 +412,7 @@ public:
     lv_indev_t* getEncoderInput() const { return _encoderInDev; }
     lv_indev_t* getKeypadInput() const { return _keypadInDev; }
     lv_group_t* getGroup() const { return _group; }
-    /** @brief Auto-generated doc */
+    /** @brief Return whether the display is in bootstrap mode. */
     bool isBootstrapMode() const { return _bootstrapMode; }
     EventBus* getEventBus() const { return _eventBus; }
 
@@ -452,6 +452,7 @@ private:
     bool     _bootstrapMode = false;           ///< True while in Phase 1 bootstrap mode
     float    _lastBootProgress = 0.0f;         ///< Last boot progress rendered (for synchronous boot animation)
     std::atomic<bool> _pauseRendering{false};  ///< Pause rendering flag during OTA flash writes
+    std::atomic<bool> _otaInProgress{false};   ///< True while OTA is active (independent of _pauseRendering which is cleared by non-OTA paths)
     uint32_t _lastIndevInactiveMs = 0;         ///< Inactivity tracking timestamp
     std::atomic<bool> _pendingInputWake{false}; ///< Input detected while dimmed/blanked
 

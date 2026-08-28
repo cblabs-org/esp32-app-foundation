@@ -28,7 +28,7 @@
  */
 
 #ifndef LVGLDISPLAY_ILVGLSYSTEMSCREENS_HPP_
-#define LVGLDISPLAY_ILVGLSYSTEMSCREENS_HPP_                 ///< Lvgldisplay Ilvglsystemscreens Hpp
+#define LVGLDISPLAY_ILVGLSYSTEMSCREENS_HPP_
 
 #include "lvgl.h"
 #include "events/AppConfiguringPayload.hpp"

@@ -54,7 +54,7 @@ struct PreconditionState {
 
 class PreconditionEngine : public IPreconditionRegistry {
 public:
-    /** @brief Auto-generated doc */
+    /** @brief Register a precondition with evaluation function, description, and options. */
     void add(const char* name,
              PreconditionRole role,
              EvalFn evaluate,

@@ -39,8 +39,8 @@ public:
     /** @brief Check if deadline has passed or token cancelled. */
     bool isExpired() const {
         if (_cancelled.load(std::memory_order_relaxed)) return true;
-        if (!_timeProvider) return false;
-        return _timeProvider() >= _deadlineMs;
+        uint32_t now = _timeProvider ? _timeProvider() : millis();
+        return now >= _deadlineMs;
     }
 
     /** @brief Check if token was explicitly cancelled. */
@@ -50,10 +50,7 @@ public:
 
     /** @brief Get remaining time until deadline in ms. */
     uint32_t remainingMs() const {
-        if (_cancelled.load(std::memory_order_relaxed)) return 0;
-        if (!_timeProvider) return UINT32_MAX;
-        
-        uint32_t now = _timeProvider();
+        uint32_t now = _timeProvider ? _timeProvider() : millis();
         return (now >= _deadlineMs) ? 0 : (_deadlineMs - now);
     }
 
@@ -69,8 +66,8 @@ public:
 struct FetchContext {
     DeadlineToken& deadline;
 
-    static constexpr uint32_t FETCH_TOTAL_TIMEOUT_MS = 15000; ///< Timeout duration in milliseconds for fetch total ms
-    static constexpr uint32_t CONNECT_TIMEOUT_MS = 5000;    ///< Timeout duration in milliseconds for connect ms
+    static constexpr uint32_t FETCH_TOTAL_TIMEOUT_MS = 15000; ///< Total wall-clock budget per fetch (connect + TLS + response)
+    static constexpr uint32_t CONNECT_TIMEOUT_MS = 5000;    ///< TCP connect phase ceiling (subset of total budget)
 
 #ifdef ESP_PLATFORM
     WiFiClient* client = nullptr;

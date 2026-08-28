@@ -21,19 +21,19 @@
 
 // Forward-declare the Arduino ESP32 ssl_client function we need.
 struct sslclient_context;
-/** @brief Auto-generated doc */
+/** @brief Attach the default root CA certificate bundle for TLS validation. */
 void attach_ssl_certificate_bundle(sslclient_context *ssl_client, bool att);
 
 extern const uint8_t rootca_crt_bundle_start[];
 
 struct FrameworkSecureClient : public WiFiClientSecure {
-    /** @brief Auto-generated doc */
+    /** @brief Attach the default root CA certificate bundle. */
     void useDefaultCertBundle() {
         attach_ssl_certificate_bundle(sslclient.get(), true);
         _use_ca_bundle = true;
     }
 
-    /** @brief Auto-generated doc */
+    /** @brief Apply deadline token timeouts to connection and handshake. */
     void applyDeadline(const DeadlineToken& d) {
         uint32_t connectMs = std::min(d.remainingMs(), FetchContext::CONNECT_TIMEOUT_MS);
         if (connectMs == 0) connectMs = 1;  // never pass 0 — means "no timeout"

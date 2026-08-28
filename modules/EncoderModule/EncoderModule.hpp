@@ -111,7 +111,7 @@ public:
     void registerMCPTools(MCPToolRegistry& registry) override;
 
 private:
-    static constexpr size_t EVENT_RING_SIZE = 4;            ///< Size of event ring
+    static constexpr size_t EVENT_RING_SIZE = 4;            ///< Power-of-2 ring buffer for encoder events
 
     /**
      * @brief Per-encoder runtime state bundle. Each encoder gets one PCNT unit,

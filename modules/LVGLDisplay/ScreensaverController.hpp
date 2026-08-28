@@ -14,7 +14,7 @@
  */
 
 #ifndef MODULES_LVGLDISPLAY_SCREENSAVERCONTROLLER_HPP_
-#define MODULES_LVGLDISPLAY_SCREENSAVERCONTROLLER_HPP_      ///< Modules Lvgldisplay Screensavercontroller Hpp
+#define MODULES_LVGLDISPLAY_SCREENSAVERCONTROLLER_HPP_
 
 #include <cstdint>
 

@@ -286,6 +286,7 @@ void LVGLDisplayModule::tick(uint32_t now) {
     bool otaUpdate   = _pendingOtaUpdate.exchange(false);
 
     if (otaComplete) {
+        _otaInProgress.store(false, std::memory_order_relaxed);
         _pauseRendering.store(false);
         if (_pendingOtaSuccess.load()) {
             restorePriorScreen();
@@ -821,6 +822,7 @@ void LVGLDisplayModule::_onOtaProgress(const char* /*topic*/, const void* payloa
         }
         self->_pendingOtaComplete.store(true);
     } else {
+        self->_otaInProgress.store(true, std::memory_order_relaxed);
         self->_pauseRendering.store(true);
         self->_pendingOtaProgress.store(ota->progress);
         if (ota->status) {
@@ -997,10 +999,11 @@ void LVGLDisplayModule::registerRoutes(PsychicHttpServer& server) {
 
 #ifndef UNIT_TEST
 #ifdef WITH_OTA
-    // OTA predicate: uses _pauseRendering atomic flag set by _onOtaProgress EventBus callback.
-    // Consistent with U8G2DisplayModule which uses _otaInProgress in the same pattern.
+    // OTA predicate: uses dedicated _otaInProgress flag (not _pauseRendering,
+    // which is cleared by non-OTA paths like clearStatus/restorePriorScreen).
+    // Mirrors U8G2DisplayModule which uses the same pattern.
     _serviceHelper.setOtaPredicate([this]() {
-        return _pauseRendering.load(std::memory_order_relaxed);
+        return _otaInProgress.load(std::memory_order_relaxed);
     });
 #endif
     _serviceHelper.registerBrightnessRoute(server);

@@ -492,7 +492,8 @@ void mcpBuiltinTools::registerAll(MCPToolRegistry& registry,
                         "FetchError", "ParseError", "AuthError", "Skipped"
                     };
                     uint8_t statusIdx = static_cast<uint8_t>(health.lastStatus);
-                    src["last_status"] = (statusIdx < 7) ? statusNames[statusIdx] : "Unknown";
+                    src["last_status"] = (statusIdx < sizeof(statusNames)/sizeof(statusNames[0]))
+                                             ? statusNames[statusIdx] : "Unknown";
                     src["ever_succeeded"] = health.everSucceeded;
                     
                     src["consecutive_failures"] = health.consecutiveFailures;

@@ -473,11 +473,11 @@ private:
      */
     class NullStatusReporter : public IStatusReporter {
     public:
-        /** @brief Auto-generated doc */
+        /** @brief No-op status report (null reporter). */
         void reportStatus(const char* /*message*/, float /*progress*/ = -1.0f) override {}
-        /** @brief Auto-generated doc */
+        /** @brief No-op error report (null reporter). */
         void reportError(const char* /*errorMessage*/) override {}
-        /** @brief Auto-generated doc */
+        /** @brief No-op status clear (null reporter). */
         void clearStatus() override {}
     };
 
@@ -532,9 +532,9 @@ private:
     // -------------------------------------------------------------------------
 
     struct AppTabContributor : public IWebContributor {
-        /** @brief Auto-generated doc */
+        /** @brief No-op — routes registered inline in begin(). */
         void        registerRoutes(PsychicHttpServer& /*server*/) override {}
-        /** @brief Auto-generated doc */
+        /** @brief Register the top-level App tab. */
         void registerTabs(ITabRegistry& registry) override {
             registry.addTab("App", nullptr, 30);
         }
@@ -552,10 +552,10 @@ private:
         Application* app = nullptr;
         /** @brief Register routes. */
         void        registerRoutes(PsychicHttpServer& server) override;
-        /** @brief Auto-generated doc */
+        /** @brief No-op — tabs registered by Application. */
         void        registerTabs(ITabRegistry& /*registry*/) override {}
         const char* getApiPrefix() const override { return "/api/preconditions"; }
-        /** @brief Auto-generated doc */
+        /** @brief Return max POST body size for precondition endpoints. */
         size_t      getMaxPostBody() const override { return 1024; }
     };
     PreconditionWebContributor _preconditionWebContributor;
@@ -568,10 +568,10 @@ private:
         Application* app = nullptr;
         /** @brief Register routes. */
         void        registerRoutes(PsychicHttpServer& server) override;
-        /** @brief Auto-generated doc */
+        /** @brief No-op — tabs registered by Application. */
         void        registerTabs(ITabRegistry& /*registry*/) override {}
         const char* getApiPrefix() const override { return "/api/data"; }
-        /** @brief Auto-generated doc */
+        /** @brief Return max POST body size for data source endpoints. */
         size_t      getMaxPostBody() const override { return 1024; }
     };
     DataSourceWebContributor _dataSourceWebContributor;

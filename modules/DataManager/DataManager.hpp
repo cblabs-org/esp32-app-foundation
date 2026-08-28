@@ -21,6 +21,7 @@
 #pragma once
 
 #include <stdint.h>
+#include <algorithm>
 #include <vector>
 #include <atomic>
 #include <functional>
@@ -116,7 +117,7 @@ public:
      *
      * @param bytes Stack size in bytes (DRAM). Minimum 8192.
      */
-    void setWorkerStackSize(uint32_t bytes) { _workerStackSize = bytes; }
+    void setWorkerStackSize(uint32_t bytes) { _workerStackSize = std::max(static_cast<uint32_t>(8192), bytes); }
 
     /**
      * @brief Initializes the FreeRTOS event queue and spawns the worker task.

@@ -85,7 +85,7 @@ public:
 private:
     static constexpr size_t QUEUE_DEPTH = 8;                ///< Queue Depth
     static constexpr int MAX_EVENTS_PER_TICK = 4;           ///< Maximum events per tick
-    static constexpr size_t EVENT_RING_SIZE = 8;            ///< Size of event ring
+    static constexpr size_t EVENT_RING_SIZE = 8;            ///< Power-of-2 ring buffer for debounced button events
 
     // Pending buttons (collected before begin())
     std::vector<BoardButton> _pendingButtons;

@@ -27,7 +27,7 @@
  */
 
 #ifndef INCLUDE_INTERFACES_ILVGLHARDWAREADAPTER_HPP_
-#define INCLUDE_INTERFACES_ILVGLHARDWAREADAPTER_HPP_        ///< Include Interfaces Ilvglhardwareadapter Hpp
+#define INCLUDE_INTERFACES_ILVGLHARDWAREADAPTER_HPP_
 
 #include <cstdint>
 #include "lvgl.h"
