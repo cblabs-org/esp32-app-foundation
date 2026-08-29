@@ -9,11 +9,11 @@
 ## Active Projects
 | Project | Status | Modules | Context |
 |---|---|---|---|
-| pr-p1-p2-sweep | WO1/5 | DataManager, Test, CI, OTA, WifiManager | [PROJECT.md](../pr-p1-p2-sweep/PROJECT.md) |
 | pr-drayton-consumer-fixes | WO5/5 — COMPLETE, soak-tested | DataManager, IDataSource, FetchContext, AppFoundation.h, WeatherModule, framework-expert skill | [PROJECT.md](../pr-drayton-consumer-fixes/PROJECT.md) |
 | pr-128-datamanager-resilience | WO7/7 (WO6 re-plan gated) | DataManager, IDataSource, FetchContext, Application, MCPServer, Display, Portal | [PROJECT.md](../pr-128-datamanager-resilience/PROJECT.md) |
 
 ## Recently Completed (last 5)
+| pr-p1-p2-sweep | 2026-08-29 | DataManager, Test, CI, OTA, WifiManager | Fixed P1 EventBus UAF (#175) and four P2 issues (#134 native tests, #144 CI pipeline, #102 OTA bug debunked, #192 mesh WiFi roaming). Stack of 5 WOs complete. |
 | Project | Completed | Modules | Key Outcome |
 |---|---|---|---|
 | session-repo-cleanup-build-verify | 2026-08-25 | repo hygiene, build matrix (3 projects × 5 envs), CrowPanel hardware | Repo cleanup (14 local + 16 remote dead branches deleted, 5 stashes recovered/dropped, stash content merged to main). Full build matrix: 12/14 green, 2 `esp32dev_all_on` failures (pre-existing OTA predicate bug → [#153](https://github.com/matthewmcneill/esp32-app-foundation/issues/153)). Tagged `v0.0.12-dev.53`, CrowPanel flashed, MCP probe (13 tools), soak-tested (DRAM flat 119KB, zero errors). Commit `02fa738b`. |

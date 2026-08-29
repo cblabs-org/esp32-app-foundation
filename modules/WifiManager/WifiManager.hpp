@@ -10,17 +10,17 @@
  *              Handles AP captive portal, connection recovery, and mesh roaming.
  *
  *              Mesh Roaming and AP Selection:
- *              - Enables 802.11v BTM (BSS Transition Management) and 802.11k RRM
- *                for seamless roaming across mesh networks (Issue #192).
  *              - Uses all-channel scan (WIFI_ALL_CHANNEL_SCAN) sorted by signal
- *                strength (WIFI_CONNECT_AP_BY_SIGNAL) during connection.
- *              - Configures an RSSI threshold (-75 dBm default) so the device
- *                prefers strong APs and seeks stronger nodes when signal drops.
+ *                strength (WIFI_CONNECT_AP_BY_SIGNAL) during connection so the
+ *                device always associates with the strongest AP at boot/reconnect.
+ *              - 802.11k/v roaming (BTM, RRM) is enabled via CONFIG_ESP_WIFI_11KV_SUPPORT
+ *                in sdkconfig.defaults — the IDF supplicant handles mesh controller
+ *                steering requests natively, requiring no application-layer code.
  *
  *              Implements IConfigurable via ConfigManager gateway pattern:
  *              - Namespace: "wifi" (config stored at /mod/wifi.json)
  *              - Schema version: 1
- *              - Hostname and RSSI threshold are stored in the wifi config section
+ *              - Hostname is stored in the wifi config section
  *
  *              RESTful API endpoints (PR-04a/WO1):
  *              - GET  /api/wifi/status  — connection status + diagnostics
@@ -43,8 +43,6 @@
  *   - setKeyManager():      Wire the KeyManager pointer for encrypted password storage.
  *   - setDefaultHostname(): App-supplied factory default hostname (used by resetConfig()).
  *   - getHostname():        Current effective hostname (single source of truth for the framework).
- *   - setRssiThreshold():   Set minimum RSSI threshold for station connection and roaming.
- *   - getRssiThreshold():   Get minimum RSSI threshold in dBm.
  *
  *   IConfigurable (namespace: "wifi", schema v1):
  *   - getConfigNamespace(): Return "wifi"
@@ -111,13 +109,10 @@ private:
         Shutdown          // Explicitly disabled
     };
 
-    static constexpr int8_t DEFAULT_RSSI_THRESHOLD = -75; ///< Default minimum RSSI for roaming/selection (dBm)
-
     char _wifiSsid[33];
     char _wifiPass[65];
     char _currentHostname[33];
     char _defaultHostname[33];               ///< App-supplied factory default hostname (set via setDefaultHostname)
-    int8_t _rssiThreshold = DEFAULT_RSSI_THRESHOLD; ///< Minimum RSSI threshold for STA connection / roaming (dBm)
     bool _isAPMode = false;
     WiFiState _currentState = WiFiState::Init;
     Periodic _stateTimer;
@@ -397,16 +392,4 @@ public:
      * @return true if in persistent error state
      */
     bool isWifiPersistentError() const;
-
-    /**
-     * @brief Set the minimum RSSI threshold for station connection and roaming.
-     * @param threshold Minimum RSSI in dBm (e.g. -75).
-     */
-    void setRssiThreshold(int8_t threshold) { _rssiThreshold = threshold; }
-
-    /**
-     * @brief Get the minimum RSSI threshold for station connection and roaming.
-     * @return Minimum RSSI in dBm.
-     */
-    int8_t getRssiThreshold() const { return _rssiThreshold; }
 };
