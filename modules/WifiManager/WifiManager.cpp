@@ -7,7 +7,7 @@
  *
  * Module: modules/WifiManager/wifiManager.cpp
  * Description: Implementation of Wi-Fi credentials management and connection state machine.
- *              Handles AP captive portal and connection recovery.
+ *              Handles AP captive portal, connection recovery, and mesh roaming.
  *
  *              Config persistence is delegated to ConfigManager via the IConfigurable
  *              gateway interface. WifiManager never touches LittleFS directly for
@@ -24,9 +24,10 @@
  * - WifiManager: [Class implementation]
  *   - begin: Initial non-blocking hardware initialization.
  *   - tick: Main non-blocking state machine for connection maintenance.
+ *   - connectStation: Connects STA with 802.11k/v roaming and RSSI filtering.
  *   - applyConfig: Apply config from JSON section.
  *   - serializeConfig: Serialize config to JSON section.
- *   - resetConfig: Erase credentials.
+ *   - resetConfig: Erase credentials and restore defaults.
  *   - registerRoutes: Register 5 RESTful WiFi API endpoints.
  *   - updateWiFi: Configuration persistence via ConfigManager.
  *   - testConnection: Momentary connection probe for verification.
@@ -91,8 +92,8 @@ void WifiManager::transitionTo(WiFiState newState) {
 /**
  * @brief Apply WiFi configuration from a parsed JSON section.
  *
- * Reads "ssid" and "hostname" from the provided JSON object and copies
- * them into internal buffers. Password is retrieved from KeyManager
+ * Reads "ssid" and "hostname" from the provided JSON object
+ * and copies them into internal members. Password is retrieved from KeyManager
  * (AES-256 encrypted) rather than from config files.
  *
  * @param section Read-only JSON object containing config keys.
@@ -129,8 +130,8 @@ void WifiManager::applyConfig(const JsonObject& section) {
 /**
  * @brief Serialize current WiFi configuration into a JSON section.
  *
- * Writes "ssid" and "hostname" to the JSON object. Password is deliberately
- * excluded — secrets are managed by KeyManager.
+ * Writes "ssid" and "hostname" to the JSON object.
+ * Password is deliberately excluded — secrets are managed by KeyManager.
  *
  * @param section Mutable JSON object to write config into.
  */
@@ -153,6 +154,36 @@ void WifiManager::resetConfig() {
     WiFi.disconnect(true, true);
     esp_wifi_restore();
     ESP_LOGI(TAG, "WiFi settings erased and restored to factory defaults.");
+}
+
+/**
+ * @brief Connects to a WiFi station with all-channel scanning and signal-strength sorting.
+ *
+ * Configures all-channel scanning and signal-strength based AP selection so that
+ * the device always associates with the strongest AP on the SSID at connection time.
+ * Actual 802.11k/v roaming (BTM, RRM) is enabled via CONFIG_ESP_WIFI_11KV_SUPPORT
+ * in sdkconfig.defaults — the IDF supplicant handles mesh steering natively.
+ *
+ * Uses the two-stage pattern (WiFi.begin with connect=false, then esp_wifi_set_config
+ * + esp_wifi_connect) to prevent the Arduino core from overwriting the IDF config.
+ *
+ * @param ssid WiFi network SSID.
+ * @param pass WiFi network password.
+ */
+void WifiManager::connectStation(const char* ssid, const char* pass) {
+#ifndef UNIT_TEST
+    WiFi.begin(ssid, pass, 0, nullptr, false);
+
+    wifi_config_t conf;
+    if (esp_wifi_get_config(WIFI_IF_STA, &conf) == ESP_OK) {
+        conf.sta.scan_method = WIFI_ALL_CHANNEL_SCAN;
+        conf.sta.sort_method = WIFI_CONNECT_AP_BY_SIGNAL;
+        esp_wifi_set_config(WIFI_IF_STA, &conf);
+    }
+    esp_wifi_connect();
+#else
+    WiFi.begin(ssid, pass);
+#endif
 }
 
 /**
@@ -205,7 +236,7 @@ void WifiManager::tick(uint32_t currentMillis) {
                     if (strlen(_currentHostname) > 0) {
                         WiFi.setHostname(_currentHostname);
                     }
-                    WiFi.begin(_wifiSsid, _wifiPass);
+                    connectStation(_wifiSsid, _wifiPass);
                     _connectionRetries = 0;
                     transitionTo(WiFiState::StaConnecting);
                 } else {
@@ -499,11 +530,11 @@ esp_err_t WifiManager::handleStatus(PsychicRequest* request, PsychicResponse* re
     this->notifyApiActivity();
 
     JsonDocument doc;
-    doc["ssid"]       = this->getSSID();
-    doc["passExists"] = this->hasPassword();
-    doc["ap_mode"]    = this->getAPMode();
-    doc["ip"]         = WiFi.localIP().toString();
-    doc["mac"]        = WiFi.macAddress();
+    doc["ssid"]           = this->getSSID();
+    doc["passExists"]     = this->hasPassword();
+    doc["ap_mode"]        = this->getAPMode();
+    doc["ip"]             = WiFi.localIP().toString();
+    doc["mac"]            = WiFi.macAddress();
 
     // --- STA-mode specific fields ---
     if (!_isAPMode && WiFi.status() == WL_CONNECTED) {
@@ -862,7 +893,7 @@ bool WifiManager::testConnection(const char* ssid, const char* pass, std::string
     // immediate readiness after disconnect(true).
     delay(200);
 
-    WiFi.begin(ssid, realPass);
+    connectStation(ssid, realPass);
     
     int retries = 0;
     while (WiFi.status() != WL_CONNECTED && retries < 20) {
@@ -887,7 +918,7 @@ bool WifiManager::testConnection(const char* ssid, const char* pass, std::string
             // because the radio is transitioning to a known-good configuration
             // (the stored STA credentials) rather than a new network.
             delay(100);
-            WiFi.begin(_wifiSsid, _wifiPass);
+            connectStation(_wifiSsid, _wifiPass);
         }
         return false;
     }

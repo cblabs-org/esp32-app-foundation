@@ -10,11 +10,20 @@
 #define WIFI_SCAN_FAILED -1
 #define WIFI_SCAN_RUNNING -2
 
+#define WIFI_FAST_SCAN 0
+#define WIFI_ALL_CHANNEL_SCAN 1
+#define WIFI_CONNECT_AP_BY_SIGNAL 0
+#define WIFI_CONNECT_AP_BY_SECURITY 1
+
 class WiFiClass {
 public:
     void persistent(bool) {}
     void setSleep(int) {}
-    void begin(const char* ssid = nullptr, const char* pass = nullptr) { (void)ssid; (void)pass; }
+    void setScanMethod(int) {}
+    void setSortMethod(int) {}
+    void begin(const char* ssid = nullptr, const char* pass = nullptr, int32_t channel = 0, const uint8_t* bssid = nullptr, bool tryConnect = true) {
+        (void)ssid; (void)pass; (void)channel; (void)bssid; (void)tryConnect;
+    }
     void disconnect(bool wifioff = false, bool eraseap = false) { (void)wifioff; (void)eraseap; }
     void mode(int m) { (void)m; }
     int status() { return WL_CONNECTED; }

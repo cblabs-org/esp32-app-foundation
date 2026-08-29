@@ -7,7 +7,15 @@
  *
  * Module: modules/WifiManager/WifiManager.hpp
  * Description: Wi-Fi credentials management and connection state machine.
- *              Handles AP captive portal and connection recovery.
+ *              Handles AP captive portal, connection recovery, and mesh roaming.
+ *
+ *              Mesh Roaming and AP Selection:
+ *              - Uses all-channel scan (WIFI_ALL_CHANNEL_SCAN) sorted by signal
+ *                strength (WIFI_CONNECT_AP_BY_SIGNAL) during connection so the
+ *                device always associates with the strongest AP at boot/reconnect.
+ *              - 802.11k/v roaming (BTM, RRM) is enabled via CONFIG_ESP_WIFI_11KV_SUPPORT
+ *                in sdkconfig.defaults — the IDF supplicant handles mesh controller
+ *                steering requests natively, requiring no application-layer code.
  *
  *              Implements IConfigurable via ConfigManager gateway pattern:
  *              - Namespace: "wifi" (config stored at /mod/wifi.json)
@@ -124,6 +132,7 @@ private:
 
     void transitionTo(WiFiState newState);
     void processDNS();
+    void connectStation(const char* ssid, const char* pass);
 
     // --- RESTful API Handlers (PR-04a/WO1) ---
 
