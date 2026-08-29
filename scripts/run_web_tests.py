@@ -20,26 +20,35 @@ TAG = "[web-tests]"
 def run_web_tests(project_dir):
     """Run Playwright web tests. Returns True on success, False on failure."""
 
-    # Guard 1: SKIP_WEB_TESTS env var
-    skip = os.environ.get("SKIP_WEB_TESTS", "").strip().lower()
-    if skip in ("1", "true", "yes"):
-        print(f"{TAG} Skipping web tests (SKIP_WEB_TESTS is set)")
-        return True
-
     test_web_dir = os.path.join(project_dir, "test", "web")
 
-    # Guard 2: test/web/ directory must exist
+    # Guard 1: test/web/ directory must exist
     if not os.path.isdir(test_web_dir):
         print(f"{TAG} test/web/ not found, skipping")
         return True
 
-    # Guard 3: node_modules must be installed
+    # Guard 2: node_modules must be installed
+    is_ci = os.environ.get("CI", "").strip().lower() in ("1", "true", "yes") or \
+            os.environ.get("GITHUB_ACTIONS", "").strip().lower() in ("1", "true", "yes")
+
     node_modules = os.path.join(test_web_dir, "node_modules")
     if not os.path.isdir(node_modules):
+        if is_ci:
+            print(
+                f"{TAG} ERROR: node_modules/ not found in test/web/ in CI environment. "
+                "Web tests are mandatory in CI. Failing."
+            )
+            return False
         print(
             f"{TAG} WARNING: node_modules/ not found in test/web/. "
             "Run 'npm install' first. Skipping."
         )
+        return True
+
+    # Guard 3: SKIP_WEB_TESTS env var
+    skip = os.environ.get("SKIP_WEB_TESTS", "").strip().lower()
+    if skip in ("1", "true", "yes"):
+        print(f"{TAG} Skipping web tests (SKIP_WEB_TESTS is set)")
         return True
 
     # Run Playwright tests
@@ -51,6 +60,9 @@ def run_web_tests(project_dir):
             text=True,
         )
     except Exception as exc:
+        if is_ci:
+            print(f"{TAG} ERROR: Could not run tests in CI ({exc}). Failing.")
+            return False
         # Infrastructure error (e.g. npx not found) — warn but don't block
         print(f"{TAG} WARNING: Could not run tests ({exc}). Skipping.")
         return True
