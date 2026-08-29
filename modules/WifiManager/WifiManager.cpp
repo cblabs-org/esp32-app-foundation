@@ -7,7 +7,7 @@
  *
  * Module: modules/WifiManager/wifiManager.cpp
  * Description: Implementation of Wi-Fi credentials management and connection state machine.
- *              Handles AP captive portal and connection recovery.
+ *              Handles AP captive portal, connection recovery, and mesh roaming.
  *
  *              Config persistence is delegated to ConfigManager via the IConfigurable
  *              gateway interface. WifiManager never touches LittleFS directly for
@@ -24,9 +24,10 @@
  * - WifiManager: [Class implementation]
  *   - begin: Initial non-blocking hardware initialization.
  *   - tick: Main non-blocking state machine for connection maintenance.
+ *   - connectStation: Connects STA with 802.11k/v roaming and RSSI filtering.
  *   - applyConfig: Apply config from JSON section.
  *   - serializeConfig: Serialize config to JSON section.
- *   - resetConfig: Erase credentials.
+ *   - resetConfig: Erase credentials and restore defaults.
  *   - registerRoutes: Register 5 RESTful WiFi API endpoints.
  *   - updateWiFi: Configuration persistence via ConfigManager.
  *   - testConnection: Momentary connection probe for verification.
@@ -91,8 +92,8 @@ void WifiManager::transitionTo(WiFiState newState) {
 /**
  * @brief Apply WiFi configuration from a parsed JSON section.
  *
- * Reads "ssid" and "hostname" from the provided JSON object and copies
- * them into internal buffers. Password is retrieved from KeyManager
+ * Reads "ssid", "hostname", and "rssi_threshold" from the provided JSON object
+ * and copies them into internal members. Password is retrieved from KeyManager
  * (AES-256 encrypted) rather than from config files.
  *
  * @param section Read-only JSON object containing config keys.
@@ -114,6 +115,12 @@ void WifiManager::applyConfig(const JsonObject& section) {
         }
     }
 
+    // --- Read RSSI threshold ---
+    if (section["rssi_threshold"].is<int8_t>()) {
+        _rssiThreshold = section["rssi_threshold"].as<int8_t>();
+        ESP_LOGI(TAG, "Config applied — RSSI threshold: %d dBm", _rssiThreshold);
+    }
+
     // --- Retrieve encrypted password from KeyManager ---
     if (_keyManager != nullptr) {
         std::string storedPass = _keyManager->getKeyById("wifi_password");
@@ -129,14 +136,15 @@ void WifiManager::applyConfig(const JsonObject& section) {
 /**
  * @brief Serialize current WiFi configuration into a JSON section.
  *
- * Writes "ssid" and "hostname" to the JSON object. Password is deliberately
- * excluded — secrets are managed by KeyManager.
+ * Writes "ssid", "hostname", and "rssi_threshold" to the JSON object.
+ * Password is deliberately excluded — secrets are managed by KeyManager.
  *
  * @param section Mutable JSON object to write config into.
  */
 void WifiManager::serializeConfig(JsonObject& section) const {
     section["ssid"] = _wifiSsid;
     section["hostname"] = _currentHostname;
+    section["rssi_threshold"] = _rssiThreshold;
     // Password deliberately excluded — managed by KeyManager
 }
 
@@ -145,14 +153,49 @@ void WifiManager::serializeConfig(JsonObject& section) const {
  *
  * Hostname falls back to the app-supplied default (set via setDefaultHostname(),
  * or the framework fallback "esp32-device" if the app never called it).
+ * RSSI threshold falls back to DEFAULT_RSSI_THRESHOLD (-75 dBm).
  */
 void WifiManager::resetConfig() {
     memset(_wifiSsid, 0, sizeof(_wifiSsid));
     memset(_wifiPass, 0, sizeof(_wifiPass));
     strlcpy(_currentHostname, _defaultHostname, sizeof(_currentHostname));
+    _rssiThreshold = DEFAULT_RSSI_THRESHOLD;
     WiFi.disconnect(true, true);
     esp_wifi_restore();
     ESP_LOGI(TAG, "WiFi settings erased and restored to factory defaults.");
+}
+
+/**
+ * @brief Connects to a WiFi station with 802.11k/v roaming and RSSI filtering enabled.
+ *
+ * Configures all-channel scanning, signal-strength based AP selection, 802.11v BSS
+ * Transition Management (BTM), 802.11k Radio Resource Management (RRM), and minimum
+ * RSSI threshold before connecting so that the device roams across mesh nodes.
+ *
+ * @param ssid WiFi network SSID.
+ * @param pass WiFi network password.
+ */
+void WifiManager::connectStation(const char* ssid, const char* pass) {
+#ifndef UNIT_TEST
+    WiFi.setScanMethod(WIFI_ALL_CHANNEL_SCAN);
+    WiFi.setSortMethod(WIFI_CONNECT_AP_BY_SIGNAL);
+    WiFi.begin(ssid, pass, 0, nullptr, false);
+
+    wifi_config_t conf;
+    if (esp_wifi_get_config(WIFI_IF_STA, &conf) == ESP_OK) {
+        conf.sta.scan_method = WIFI_ALL_CHANNEL_SCAN;
+        conf.sta.sort_method = WIFI_CONNECT_AP_BY_SIGNAL;
+        conf.sta.threshold.rssi = _rssiThreshold;
+        conf.sta.btm_enabled = 1;
+        conf.sta.rm_enabled = 1;
+        conf.sta.mbo_enabled = 1;
+        conf.sta.ft_enabled = 1;
+        esp_wifi_set_config(WIFI_IF_STA, &conf);
+    }
+    esp_wifi_connect();
+#else
+    WiFi.begin(ssid, pass);
+#endif
 }
 
 /**
@@ -176,7 +219,7 @@ void WifiManager::begin() {
     
     _stateTimer.setInterval(2000);  // 2s debounce before Init fires (pre-MK: `elapsed > 2000`)
     transitionTo(WiFiState::Init);
-    ESP_LOGI(TAG, "WiFi Manager initialized in NON-BLOCKING mode. Hostname: %s", _currentHostname);
+    ESP_LOGI(TAG, "WiFi Manager initialized in NON-BLOCKING mode. Hostname: %s, RSSI threshold: %d dBm", _currentHostname, _rssiThreshold);
 }
 
 /**
@@ -199,13 +242,13 @@ void WifiManager::tick(uint32_t currentMillis) {
         case WiFiState::Init: {
             if (_stateTimer.check(currentMillis)) {
                 if (strlen(_wifiSsid) > 0) {
-                    ESP_LOGI(TAG, "Connecting to %s...", _wifiSsid);
+                    ESP_LOGI(TAG, "Connecting to %s (RSSI threshold: %d dBm)...", _wifiSsid, _rssiThreshold);
                     WiFi.mode(WIFI_STA);
                     WiFi.setSleep(WIFI_PS_NONE);
                     if (strlen(_currentHostname) > 0) {
                         WiFi.setHostname(_currentHostname);
                     }
-                    WiFi.begin(_wifiSsid, _wifiPass);
+                    connectStation(_wifiSsid, _wifiPass);
                     _connectionRetries = 0;
                     transitionTo(WiFiState::StaConnecting);
                 } else {
@@ -219,6 +262,11 @@ void WifiManager::tick(uint32_t currentMillis) {
         case WiFiState::StaConnecting:
             if (WiFi.status() == WL_CONNECTED) {
                 ESP_LOGI(TAG, "Connected successfully. IP: %s", WiFi.localIP().toString().c_str());
+#ifndef UNIT_TEST
+                if (_rssiThreshold != 0) {
+                    esp_wifi_set_rssi_threshold(_rssiThreshold);
+                }
+#endif
                 _isAPMode = false;
                 _wifiDisconnectTimer.setInterval(0); // Reset downtime tracker
                 updateMyUrl();
@@ -436,6 +484,7 @@ void WifiManager::registerMCPTools(MCPToolRegistry& registry) {
                 result["gateway"] = WiFi.gatewayIP().toString();
                 result["subnet"] = WiFi.subnetMask().toString();
                 result["rssi"] = WiFi.RSSI();
+                result["rssi_threshold"] = self->_rssiThreshold;
                 result["bssid"] = WiFi.BSSIDstr();
                 result["ap_mode"] = false;
             }
@@ -493,17 +542,18 @@ void WifiManager::registerMCPTools(MCPToolRegistry& registry) {
  * @brief Handle GET /api/wifi/status.
  *
  * Returns comprehensive WiFi status including mode, SSID, IP, RSSI,
- * MAC address, channel, gateway, password existence flag, and AP mode state.
+ * RSSI threshold, MAC address, channel, gateway, password existence flag, and AP mode state.
  */
 esp_err_t WifiManager::handleStatus(PsychicRequest* request, PsychicResponse* response) {
     this->notifyApiActivity();
 
     JsonDocument doc;
-    doc["ssid"]       = this->getSSID();
-    doc["passExists"] = this->hasPassword();
-    doc["ap_mode"]    = this->getAPMode();
-    doc["ip"]         = WiFi.localIP().toString();
-    doc["mac"]        = WiFi.macAddress();
+    doc["ssid"]           = this->getSSID();
+    doc["passExists"]     = this->hasPassword();
+    doc["ap_mode"]        = this->getAPMode();
+    doc["ip"]             = WiFi.localIP().toString();
+    doc["mac"]            = WiFi.macAddress();
+    doc["rssi_threshold"] = _rssiThreshold;
 
     // --- STA-mode specific fields ---
     if (!_isAPMode && WiFi.status() == WL_CONNECTED) {
@@ -862,7 +912,7 @@ bool WifiManager::testConnection(const char* ssid, const char* pass, std::string
     // immediate readiness after disconnect(true).
     delay(200);
 
-    WiFi.begin(ssid, realPass);
+    connectStation(ssid, realPass);
     
     int retries = 0;
     while (WiFi.status() != WL_CONNECTED && retries < 20) {
@@ -887,7 +937,7 @@ bool WifiManager::testConnection(const char* ssid, const char* pass, std::string
             // because the radio is transitioning to a known-good configuration
             // (the stored STA credentials) rather than a new network.
             delay(100);
-            WiFi.begin(_wifiSsid, _wifiPass);
+            connectStation(_wifiSsid, _wifiPass);
         }
         return false;
     }

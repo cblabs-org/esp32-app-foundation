@@ -21,6 +21,7 @@ TEST_F(WifiManagerTest, ConstructionDefaults) {
     EXPECT_FALSE(wifiManager.hasPassword());
     EXPECT_FALSE(wifiManager.getAPMode());
     EXPECT_FALSE(wifiManager.isReady());
+    EXPECT_EQ(-75, wifiManager.getRssiThreshold());
 }
 
 // begin() initializes state machine
@@ -179,12 +180,15 @@ TEST_F(WifiManagerTest, SerializeConfig_ProducesExpectedKeys) {
 
     EXPECT_TRUE(section["ssid"].is<JsonVariant>());
     EXPECT_TRUE(section["hostname"].is<JsonVariant>());
+    EXPECT_TRUE(section["rssi_threshold"].is<JsonVariant>());
     EXPECT_STREQ("MySSID", section["ssid"].as<const char*>());
+    EXPECT_EQ(-75, section["rssi_threshold"].as<int8_t>());
 }
 
 // serializeConfig roundtrip
 TEST_F(WifiManagerTest, SerializeApplyRoundtrip_Consistent) {
     wifiManager.updateWiFi("RoundtripSSID", "pass");
+    wifiManager.setRssiThreshold(-80);
 
     JsonDocument doc;
     JsonObject section = doc.to<JsonObject>();
@@ -193,6 +197,31 @@ TEST_F(WifiManagerTest, SerializeApplyRoundtrip_Consistent) {
     WifiManager wm2;
     wm2.applyConfig(section);
     EXPECT_STREQ("RoundtripSSID", wm2.getSSID());
+    EXPECT_EQ(-80, wm2.getRssiThreshold());
+}
+
+// setRssiThreshold and getRssiThreshold
+TEST_F(WifiManagerTest, SetAndGetRssiThreshold) {
+    wifiManager.setRssiThreshold(-82);
+    EXPECT_EQ(-82, wifiManager.getRssiThreshold());
+}
+
+// applyConfig sets RSSI threshold
+TEST_F(WifiManagerTest, ApplyConfig_SetsRssiThreshold) {
+    JsonDocument doc;
+    JsonObject section = doc.to<JsonObject>();
+    section["rssi_threshold"] = -70;
+
+    wifiManager.applyConfig(section);
+    EXPECT_EQ(-70, wifiManager.getRssiThreshold());
+}
+
+// resetConfig restores default RSSI threshold
+TEST_F(WifiManagerTest, ResetConfigRestoresDefaultRssiThreshold) {
+    wifiManager.setRssiThreshold(-60);
+    EXPECT_EQ(-60, wifiManager.getRssiThreshold());
+    wifiManager.resetConfig();
+    EXPECT_EQ(-75, wifiManager.getRssiThreshold());
 }
 
 #include "PreconditionEngine.hpp"
