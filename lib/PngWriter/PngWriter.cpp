@@ -39,6 +39,7 @@ public:
     }
 };
 #endif
+#if defined(ESP_PLATFORM)
 #if __has_include(<miniz.h>)
 #include <miniz.h>
 #elif __has_include(<esp32/rom/miniz.h>)
@@ -47,6 +48,7 @@ public:
 #include <rom/miniz.h>
 #elif __has_include(<esp_rom/rom/miniz.h>)
 #include <esp_rom/rom/miniz.h>
+#endif
 #endif
 #include <esp_log.h>
 
@@ -243,6 +245,7 @@ bool writeGrayscale1bppFromTiles(Print& sink, uint16_t width, uint16_t height, c
     return true;
 }
 
+#if defined(ESP_PLATFORM)
 struct DeflateState {
     Print* sink;
     uint8_t* outBuf;
@@ -277,6 +280,7 @@ static int tdefl_put_buf_cb(const void* pBuf, int len, void* pUser) {
     }
     return 1;
 }
+#endif
 
 bool writeRGB565Stored(Print& sink, uint16_t width, uint16_t height, const uint16_t* buffer) {
     sink.write(PNG_SIGNATURE, sizeof(PNG_SIGNATURE));
@@ -362,6 +366,7 @@ bool writeRGB565Stored(Print& sink, uint16_t width, uint16_t height, const uint1
 }
 
 bool writeRGB565ToRGB888(Print& sink, uint16_t width, uint16_t height, const uint16_t* buffer) {
+#if defined(ESP_PLATFORM)
     // The miniz compressor state is 167KB, so we allocate it securely in PSRAM.
     tdefl_compressor* comp = (tdefl_compressor*)heap_caps_calloc(1, sizeof(tdefl_compressor), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     
@@ -471,6 +476,10 @@ bool writeRGB565ToRGB888(Print& sink, uint16_t width, uint16_t height, const uin
     
     ESP_LOGI("PngWriter", "PNG write complete!");
     return true;
+#else
+    // Fall back to uncompressed stored-PNG on host builds
+    return writeRGB565Stored(sink, width, height, buffer);
+#endif
 }
 
 } // namespace PngWriter

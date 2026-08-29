@@ -6,18 +6,6 @@
  */
 
 #include <cstdlib>
-// miniz / tdefl stubs (no central stub exists for ROM miniz)
-struct tdefl_compressor {};
-typedef int tdefl_status;
-#define TDEFL_STATUS_OKAY 0
-#define TDEFL_STATUS_DONE 1
-#define TDEFL_DEFAULT_MAX_PROBES 128
-#define TDEFL_FINISH 0
-#define TDEFL_NO_FLUSH 1
-// heap_caps stubs come from PngWriter.cpp's #include <esp_heap_caps.h>
-// which resolves to test/stubs/platform/esp_heap_caps.h on native
-static tdefl_status tdefl_init(tdefl_compressor *, int (*)(const void *, int, void *), void *, int) { return TDEFL_STATUS_OKAY; }
-static tdefl_status tdefl_compress_buffer(tdefl_compressor *, const void *, size_t, int) { return TDEFL_STATUS_OKAY; }
 #include <gtest/gtest.h>
 #include <vector>
 
@@ -143,8 +131,39 @@ TEST(PngWriterTest, StoredBlockGuard) {
     EXPECT_FALSE(PngWriter::writeGrayscale1bppFromTiles(sink, 800, 700, dummy));
 }
 
-// Note: RGB path is not tested in native because it relies on tdefl which is a ROM dependency.
+TEST(PngWriterTest, WriteRGB565Stored) {
+    TestPrintSink sink;
+    uint16_t rgbBuf[4] = {0xF800, 0x07E0, 0x001F, 0xFFFF}; // Red, Green, Blue, White in RGB565
+    EXPECT_TRUE(PngWriter::writeRGB565Stored(sink, 2, 2, rgbBuf));
 
+    EXPECT_GE(sink.buffer.size(), sizeof(PNG_SIG));
+    for (size_t i = 0; i < sizeof(PNG_SIG); ++i) {
+        EXPECT_EQ(sink.buffer[i], PNG_SIG[i]);
+    }
+
+    // IHDR checks (RGB is colorType=2, bitDepth=8)
+    EXPECT_EQ(sink.buffer[19], 2); // width=2
+    EXPECT_EQ(sink.buffer[23], 2); // height=2
+    EXPECT_EQ(sink.buffer[24], 8); // bitDepth=8
+    EXPECT_EQ(sink.buffer[25], 2); // colorType=2 (RGB)
+}
+
+TEST(PngWriterTest, WriteRGB565ToRGB888_NativeFallback) {
+    TestPrintSink sink;
+    uint16_t rgbBuf[4] = {0xF800, 0x07E0, 0x001F, 0xFFFF};
+    // On native/host, writeRGB565ToRGB888 safely falls back to writeRGB565Stored
+    EXPECT_TRUE(PngWriter::writeRGB565ToRGB888(sink, 2, 2, rgbBuf));
+
+    EXPECT_GE(sink.buffer.size(), sizeof(PNG_SIG));
+    for (size_t i = 0; i < sizeof(PNG_SIG); ++i) {
+        EXPECT_EQ(sink.buffer[i], PNG_SIG[i]);
+    }
+
+    EXPECT_EQ(sink.buffer[19], 2);
+    EXPECT_EQ(sink.buffer[23], 2);
+    EXPECT_EQ(sink.buffer[24], 8);
+    EXPECT_EQ(sink.buffer[25], 2);
+}
 
 int main(int argc, char** argv) {
     ::testing::InitGoogleTest(&argc, argv);

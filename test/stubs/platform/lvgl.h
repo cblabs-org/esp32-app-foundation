@@ -246,6 +246,11 @@ typedef lv_screen_load_anim_t lv_scr_load_anim_t;
 #define LV_LABEL_LONG_SCROLL_CIRCULAR 3
 #define LV_LABEL_LONG_CLIP            4
 
+// Font Symbols
+#define LV_SYMBOL_OK      "\xEF\x80\x8C"
+#define LV_SYMBOL_CLOSE   "\xEF\x80\x8D"
+#define LV_SYMBOL_WARNING "\xEF\x81\xB1"
+
 // Event Codes
 typedef enum {
     LV_EVENT_ALL = 0,
