@@ -722,7 +722,6 @@ void DataManager::executeLoop() {
         if (_registryMutex) xSemaphoreTake(_registryMutex, portMAX_DELAY);
 
         bool publishHealth = false;
-        DataSourceHealthPayload localPayload{};
 
         // Ensure source is still registered before updating tracking data.
         // A source can be unregistered while its fetch is in flight, in which
@@ -738,7 +737,7 @@ void DataManager::executeLoop() {
                 
                 if (r2._hasPendingHealthTransition) {
                     publishHealth = true;
-                    localPayload = r2._healthPayload;
+                    _publishPayload = r2._healthPayload;
                     r2._hasPendingHealthTransition = false;
                 }
                 break;
@@ -749,7 +748,7 @@ void DataManager::executeLoop() {
         if (_registryMutex) xSemaphoreGive(_registryMutex);
 
         if (publishHealth && _eventBus) {
-            _eventBus->publish(ApplicationEvents::DATA_SOURCE_HEALTH, &localPayload);
+            _eventBus->publish(ApplicationEvents::DATA_SOURCE_HEALTH, &_publishPayload);
         }
 
         // Re-acquire lock to maintain MutexLock destructor balance

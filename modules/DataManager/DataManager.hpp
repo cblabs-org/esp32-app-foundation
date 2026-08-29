@@ -310,6 +310,7 @@ private:
     uint32_t _workerStackSize = DEFAULT_WORKER_STACK_SIZE;
     uint32_t _simulatedTimeMs = 0;
     EventBus* _eventBus = nullptr;
+    DataSourceHealthPayload _publishPayload;
 
 #ifdef ESP_PLATFORM
     FrameworkSecureClient* _secureClient = nullptr;
