@@ -21,8 +21,8 @@ Implement a generalized `AuditModule` providing a standardized, flash-persisted 
 
 ## Work Order Ledger
 
-- **[ ] [wo1-redactor-extraction](wo1-redactor-extraction/WORKORDER.md):** Extract secret registry + redaction from `lib/Logger` into dependency-free `lib/Redactor` leaf
-- **[ ] [wo2-audit-core](wo2-audit-core/WORKORDER.md):** AuditModule core engine — queue, DRAM writer task, JSONL rotation, rate limiter, `log()`, `auditSync()`, `clearAll()`
+- **[x] [wo1-redactor-extraction](wo1-redactor-extraction/WORKORDER.md):** Extract secret registry + redaction from `lib/Logger` into dependency-free `lib/Redactor` leaf *(commit `8d2f471a`, 851 tests pass)*
+- **[x] [wo2-audit-core](wo2-audit-core/WORKORDER.md):** AuditModule core engine — queue, DRAM writer task, JSONL rotation, rate limiter, `log()`, `auditSync()`, `clearAll()` *(commit `7a1800c4`, 861 tests pass)*
 - **[ ] [wo3-board-constants](wo3-board-constants/WORKORDER.md):** Add `BOARD_AUDIT_BYTES` to board.h files and `board_contract.h` fallback
 - **[ ] [wo4-rest-mcp-surfaces](wo4-rest-mcp-surfaces/WORKORDER.md):** IWebContributor + IMCPContributor — REST endpoints, MCP tools, `get_logs` → `get_debug_logs` rename
 - **[ ] [wo5-config-preconditions](wo5-config-preconditions/WORKORDER.md):** IConfigurable + IPreconditionContributor — runtime toggle, health reporting

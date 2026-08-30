@@ -18,6 +18,11 @@
 #define BOARD_HTTP_MAX_OPEN_SOCKETS 4       // browser (2-3) + MCP (1); boards with more DRAM can override upward
 #endif
 
+// ── Audit Budget Fallback ─────────────────────────────────────────────────
+#ifndef BOARD_AUDIT_BYTES
+#define BOARD_AUDIT_BYTES 32768              // 32 KiB default; boards override in board.h
+#endif
+
 
 // ── U8G2 Display Contract Verification ───────────────────────────────────────
 #ifdef WITH_DISPLAY_U8G2
