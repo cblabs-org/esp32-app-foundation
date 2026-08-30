@@ -11,6 +11,8 @@
 
 #include "AuditModule.hpp"
 #include "platform/LogShim.h"
+#include "MCPToolRegistry.hpp"
+#include <PsychicHttp.h>
 #include <LittleFS.h>
 #include <esp_task_wdt.h>
 #include <esp_random.h>
@@ -393,3 +395,258 @@ void AuditModule::clearAll() {
     _throttleCount.store(0, std::memory_order_relaxed);
     resetRateLimiter();
 }
+
+void AuditModule::readAuditFile(uint8_t fileIndex, size_t offset, size_t maxLines,
+                                String& output, size_t& linesRead, bool& truncated, size_t& nextOffset) {
+    output = "";
+    linesRead = 0;
+    truncated = false;
+    nextOffset = offset;
+
+    if (fileIndex > 1) {
+        return;
+    }
+
+    char path[64];
+    snprintf(path, sizeof(path), "%s%u.jsonl", AUDIT_FILE_PREFIX, fileIndex);
+
+    FILE* f = fopen(path, "rb");
+    if (!f) {
+        nextOffset = 0;
+        return;
+    }
+
+    if (fseek(f, 0, SEEK_END) != 0) {
+        fclose(f);
+        return;
+    }
+    long totalSize = ftell(f);
+    if (totalSize <= 0 || offset >= static_cast<size_t>(totalSize)) {
+        fclose(f);
+        nextOffset = (totalSize > 0) ? static_cast<size_t>(totalSize) : 0;
+        return;
+    }
+
+    if (fseek(f, offset, SEEK_SET) != 0) {
+        fclose(f);
+        return;
+    }
+
+    char lineBuf[1024];
+    size_t currentPos = offset;
+
+    while (linesRead < maxLines) {
+        if (!fgets(lineBuf, sizeof(lineBuf), f)) {
+            break;
+        }
+
+        char* nl = strchr(lineBuf, '\n');
+        if (!nl) {
+            // Line was longer than buffer or reached EOF without newline.
+            if (feof(f)) {
+                // Incomplete trailing line (crash tolerance) -> drop it
+                break;
+            }
+            // Consume remaining characters until '\n' or EOF
+            int c;
+            bool foundNl = false;
+            while ((c = fgetc(f)) != EOF) {
+                if (c == '\n') {
+                    foundNl = true;
+                    break;
+                }
+            }
+            if (!foundNl) {
+                break;
+            }
+            currentPos = ftell(f);
+            continue;
+        }
+
+        output += lineBuf;
+        linesRead++;
+        currentPos = ftell(f);
+    }
+
+    nextOffset = currentPos;
+    if (currentPos < static_cast<size_t>(totalSize) && linesRead >= maxLines) {
+        truncated = true;
+    } else {
+        truncated = false;
+    }
+
+    fclose(f);
+}
+
+void AuditModule::registerRoutes(PsychicHttpServer& server) {
+    // --- GET /api/system/audit ---
+    server.on("/api/system/audit", HTTP_GET, [this](PsychicRequest* request, PsychicResponse* response) {
+        size_t maxLines = 50;
+        if (request->hasParam("lines")) {
+            int val = atoi(request->getParam("lines")->value().c_str());
+            if (val > 0) {
+                maxLines = static_cast<size_t>(val);
+                if (maxLines > 200) maxLines = 200;
+            }
+        }
+
+        size_t offset = 0;
+        if (request->hasParam("offset")) {
+            long val = atol(request->getParam("offset")->value().c_str());
+            if (val > 0) {
+                offset = static_cast<size_t>(val);
+            }
+        }
+
+        uint8_t fileIndex = _activeFileIndex;
+        if (request->hasParam("file")) {
+            int val = atoi(request->getParam("file")->value().c_str());
+            if (val == 0 || val == 1) {
+                fileIndex = static_cast<uint8_t>(val);
+            }
+        }
+
+        String output;
+        size_t linesRead = 0;
+        bool truncated = false;
+        size_t nextOffset = 0;
+
+        readAuditFile(fileIndex, offset, maxLines, output, linesRead, truncated, nextOffset);
+
+        response->addHeader("X-Audit-Truncated", truncated ? "true" : "false");
+        char offsetStr[32];
+        snprintf(offsetStr, sizeof(offsetStr), "%lu", (unsigned long)nextOffset);
+        response->addHeader("X-Audit-Next-Offset", offsetStr);
+
+        return response->send(200, "application/x-ndjson", output.c_str());
+    });
+
+    // --- POST /api/system/audit/clear ---
+    server.on("/api/system/audit/clear", HTTP_POST, [this](PsychicRequest* request, PsychicResponse* response) {
+        (void)request;
+        clearAll();
+        return response->send(200, "application/json", "{\"ok\":true}");
+    });
+}
+
+void AuditModule::registerTabs(ITabRegistry& /*registry*/) {
+    // No dedicated portal tab — audit is a diagnostic surface, not a user-facing page.
+}
+
+void AuditModule::registerMCPTools(MCPToolRegistry& registry) {
+    // -----------------------------------------------------------------
+    // Tool: get_audit_log (read-only, mutatesState = false)
+    // -----------------------------------------------------------------
+    JsonDocument getAuditSchema;
+    getAuditSchema["type"] = "object";
+    JsonObject props = getAuditSchema["properties"].to<JsonObject>();
+
+    JsonObject linesProp = props["lines"].to<JsonObject>();
+    linesProp["type"] = "integer";
+    linesProp["description"] = "Number of records to retrieve (default 50, max 200)";
+
+    JsonObject offsetProp = props["offset"].to<JsonObject>();
+    offsetProp["type"] = "integer";
+    offsetProp["description"] = "Byte offset to start reading from (default 0)";
+
+    JsonObject fileProp = props["file"].to<JsonObject>();
+    fileProp["type"] = "integer";
+    fileProp["description"] = "Audit file index: 0 or 1 (default: active file)";
+
+    registry.addTool(
+        "get_audit_log",
+        "Retrieve flash-persisted structured audit log records",
+        getAuditSchema,
+        [](void* context, JsonObject& params, JsonObject& result) {
+            auto* self = static_cast<AuditModule*>(context);
+            if (!self) return;
+
+            size_t maxLines = 50;
+            if (params["lines"].is<int>()) {
+                int l = params["lines"].as<int>();
+                if (l > 0) {
+                    maxLines = static_cast<size_t>(l);
+                    if (maxLines > 200) maxLines = 200;
+                }
+            }
+
+            size_t offset = 0;
+            if (params["offset"].is<int>()) {
+                int off = params["offset"].as<int>();
+                if (off > 0) {
+                    offset = static_cast<size_t>(off);
+                }
+            } else if (params["offset"].is<size_t>()) {
+                offset = params["offset"].as<size_t>();
+            }
+
+            uint8_t fileIndex = self->activeFileIndex();
+            if (params["file"].is<int>()) {
+                int f = params["file"].as<int>();
+                if (f == 0 || f == 1) {
+                    fileIndex = static_cast<uint8_t>(f);
+                }
+            }
+
+            String output;
+            size_t linesRead = 0;
+            bool truncated = false;
+            size_t nextOffset = 0;
+
+            self->readAuditFile(fileIndex, offset, maxLines, output, linesRead, truncated, nextOffset);
+
+            JsonArray records = result["records"].to<JsonArray>();
+
+            const char* p = output.c_str();
+            while (*p) {
+                const char* nextNl = strchr(p, '\n');
+                std::string line;
+                if (nextNl) {
+                    line.assign(p, nextNl - p);
+                    p = nextNl + 1;
+                } else {
+                    line.assign(p);
+                    p += line.length();
+                }
+
+                while (!line.empty() && (line.back() == '\r' || line.back() == ' ')) {
+                    line.pop_back();
+                }
+
+                if (line.empty()) continue;
+
+                JsonDocument recordDoc;
+                DeserializationError err = deserializeJson(recordDoc, line);
+                if (err == DeserializationError::Ok) {
+                    records.add(recordDoc.as<JsonObject>());
+                }
+            }
+
+            result["lines_returned"] = records.size();
+            result["truncated"] = truncated;
+            result["next_offset"] = nextOffset;
+        },
+        this,
+        false
+    );
+
+    // -----------------------------------------------------------------
+    // Tool: clear_audit_log (mutatesState = true)
+    // -----------------------------------------------------------------
+    registry.addTool(
+        "clear_audit_log",
+        "Clear all flash-persisted audit log files and reset diagnostic counters",
+        [](void* context, JsonObject& params, JsonObject& result) {
+            (void)params;
+            auto* self = static_cast<AuditModule*>(context);
+            if (!self) return;
+
+            self->clearAll();
+            result["ok"] = true;
+            result["message"] = "Audit log cleared";
+        },
+        this,
+        true
+    );
+}
+

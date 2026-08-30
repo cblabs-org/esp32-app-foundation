@@ -166,11 +166,11 @@ TEST(McpBuiltinToolsTest, RebootToolExists) {
     EXPECT_NE(registry.findTool("reboot"), nullptr);
 }
 
-/** get_logs tool must be findable after registerAll(). */
-TEST(McpBuiltinToolsTest, GetLogsToolExists) {
+/** get_debug_logs tool must be findable after registerAll(). */
+TEST(McpBuiltinToolsTest, GetDebugLogsToolExists) {
     MCPToolRegistry registry;
     mcpBuiltinTools::registerAll(registry, nullptr);
-    EXPECT_NE(registry.findTool("get_logs"), nullptr);
+    EXPECT_NE(registry.findTool("get_debug_logs"), nullptr);
 }
 
 /** list_tools tool must be findable after registerAll(). */
@@ -515,9 +515,9 @@ TEST(McpSecurityTest, MutatesStateTaggedCorrectly) {
     ASSERT_NE(getConfig, nullptr);
     EXPECT_FALSE(getConfig->mutatesState) << "get_config must NOT be tagged as mutating";
 
-    const MCPToolEntry* getLogs = registry.findTool("get_logs");
-    ASSERT_NE(getLogs, nullptr);
-    EXPECT_FALSE(getLogs->mutatesState) << "get_logs must NOT be tagged as mutating";
+    const MCPToolEntry* getDebugLogs = registry.findTool("get_debug_logs");
+    ASSERT_NE(getDebugLogs, nullptr);
+    EXPECT_FALSE(getDebugLogs->mutatesState) << "get_debug_logs must NOT be tagged as mutating";
 }
 
 /** In read-only mode, calling a mutating tool must return error -32000. */

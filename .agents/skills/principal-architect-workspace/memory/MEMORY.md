@@ -9,7 +9,7 @@
 ## Active Projects
 | Project | Status | Modules | Context |
 |---|---|---|---|
-| pr-194-audit-module | WO3/7 | lib/Redactor, lib/Logger, AuditModule, board.h, MCPBuiltinTools, Audit.h, framework-expert skill | [PROJECT.md](../pr-194-audit-module/PROJECT.md) |
+| pr-194-audit-module | WO4/7 | lib/Redactor, lib/Logger, AuditModule, board.h, MCPBuiltinTools, Audit.h, framework-expert skill | [PROJECT.md](../pr-194-audit-module/PROJECT.md) |
 | pr-drayton-consumer-fixes | WO5/5 — COMPLETE, soak-tested | DataManager, IDataSource, FetchContext, AppFoundation.h, WeatherModule, framework-expert skill | [PROJECT.md](../pr-drayton-consumer-fixes/PROJECT.md) |
 | pr-128-datamanager-resilience | WO7/7 (WO6 re-plan gated) | DataManager, IDataSource, FetchContext, Application, MCPServer, Display, Portal | [PROJECT.md](../pr-128-datamanager-resilience/PROJECT.md) |
 

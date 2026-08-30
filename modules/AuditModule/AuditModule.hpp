@@ -37,6 +37,8 @@
 #include <atomic>
 #include <mutex>
 #include "Redactor.h"
+#include "interfaces/IWebContributor.hpp"
+#include "interfaces/IMCPContributor.hpp"
 
 /**
  * @brief Internal heap-allocated audit record passed through the queue.
@@ -64,7 +66,7 @@ enum class RateLimitAction : uint8_t {
 /**
  * @brief Core engine for flash-persisted structured audit logging.
  */
-class AuditModule {
+class AuditModule : public IWebContributor, public IMCPContributor {
 public:
     static constexpr size_t AUDIT_QUEUE_DEPTH = 16;
     static constexpr uint32_t AUDIT_WRITER_STACK_SIZE = 4096;
@@ -75,7 +77,11 @@ public:
     static constexpr size_t AUDIT_BUDGET_BYTES = 32768;
 #endif
     static constexpr uint32_t AUDIT_RATE_LIMIT_PER_MIN = 120;
+#ifdef ESP_PLATFORM
     static constexpr const char* AUDIT_FILE_PREFIX = "/littlefs/audit_";
+#else
+    static constexpr const char* AUDIT_FILE_PREFIX = "test/tmp/audit_";
+#endif
 
     /**
      * @brief Returns the singleton instance of AuditModule.
@@ -88,6 +94,30 @@ public:
      * @return true on success, false if preflight or task creation fails.
      */
     bool begin();
+
+    /**
+     * @brief Registers REST API routes with PsychicHttpServer.
+     * @param server Reference to PsychicHttpServer instance.
+     */
+    void registerRoutes(PsychicHttpServer& server) override;
+
+    /**
+     * @brief Registers navigation tabs (empty override; diagnostic only).
+     * @param registry Reference to ITabRegistry instance.
+     */
+    void registerTabs(ITabRegistry& registry) override;
+
+    /**
+     * @brief Registers MCP tools (get_audit_log, clear_audit_log).
+     * @param registry Reference to MCPToolRegistry instance.
+     */
+    void registerMCPTools(MCPToolRegistry& registry) override;
+
+    /** @brief Returns API route prefix for body size middleware. */
+    const char* getApiPrefix() const override { return "/api/system/audit"; }
+
+    /** @brief Maximum POST body size for audit endpoints. */
+    size_t getMaxPostBody() const override { return 4096; }
 
     /**
      * @brief Enqueues an audit event record asynchronously (non-blocking).
@@ -155,11 +185,14 @@ public:
     uint32_t bootId() const { return _bootId; }
 
 private:
+    friend class AuditModuleTest;
+
     AuditModule();
     ~AuditModule();
     AuditModule(const AuditModule&) = delete;
     AuditModule& operator=(const AuditModule&) = delete;
 
+    void readAuditFile(uint8_t fileIndex, size_t offset, size_t maxLines, String& output, size_t& linesRead, bool& truncated, size_t& nextOffset);
     static void writerLoop(void* param);
     void writeRecord(AuditRecord* record);
     void seedActiveFile();

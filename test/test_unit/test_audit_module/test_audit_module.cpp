@@ -13,6 +13,9 @@
 #include <gtest/gtest.h>
 #include "AuditModule.hpp"
 #include "Redactor.h"
+#include "MCPToolRegistry.hpp"
+#include <PsychicHttp.h>
+#include "interfaces/ITabRegistry.hpp"
 #include <cstring>
 #include <string>
 
@@ -20,6 +23,10 @@ class AuditModuleTest : public ::testing::Test {
 protected:
     void SetUp() override {
         AuditModule::instance().clearAll();
+    }
+    void callReadAuditFile(AuditModule& m, uint8_t fileIndex, size_t offset, size_t maxLines,
+                           String& output, size_t& linesRead, bool& truncated, size_t& nextOffset) {
+        m.readAuditFile(fileIndex, offset, maxLines, output, linesRead, truncated, nextOffset);
     }
 };
 
@@ -215,6 +222,202 @@ TEST_F(AuditModuleTest, ClearAllResetsCounters) {
     EXPECT_EQ(module.recordCount(), 0u);
     EXPECT_EQ(module.dropCount(), 0u);
     EXPECT_EQ(module.throttleCount(), 0u);
+}
+
+TEST_F(AuditModuleTest, ReadAuditFile_PaginationAndOffset) {
+    AuditModule& module = AuditModule::instance();
+    module.clearAll();
+
+    // Write 3 records to file 0
+    char path0[64];
+    snprintf(path0, sizeof(path0), "%s0.jsonl", AuditModule::AUDIT_FILE_PREFIX);
+    FILE* f = fopen(path0, "wb");
+    ASSERT_NE(f, nullptr);
+    fputs("{\"seq\":0,\"action\":\"first\"}\n", f);
+    fputs("{\"seq\":1,\"action\":\"second\"}\n", f);
+    fputs("{\"seq\":2,\"action\":\"third\"}\n", f);
+    fclose(f);
+
+    String output;
+    size_t linesRead = 0;
+    bool truncated = false;
+    size_t nextOffset = 0;
+
+    // Page 1: maxLines = 2
+    callReadAuditFile(module, 0, 0, 2, output, linesRead, truncated, nextOffset);
+    EXPECT_EQ(linesRead, 2u);
+    EXPECT_TRUE(truncated);
+    EXPECT_GT(nextOffset, 0u);
+    EXPECT_NE(std::string(output.c_str()).find("first"), std::string::npos);
+    EXPECT_NE(std::string(output.c_str()).find("second"), std::string::npos);
+    EXPECT_EQ(std::string(output.c_str()).find("third"), std::string::npos);
+
+    // Page 2: start from nextOffset, maxLines = 2
+    String outputPage2;
+    size_t linesReadPage2 = 0;
+    bool truncatedPage2 = false;
+    size_t nextOffsetPage2 = 0;
+    callReadAuditFile(module, 0, nextOffset, 2, outputPage2, linesReadPage2, truncatedPage2, nextOffsetPage2);
+    EXPECT_EQ(linesReadPage2, 1u);
+    EXPECT_FALSE(truncatedPage2);
+    EXPECT_NE(std::string(outputPage2.c_str()).find("third"), std::string::npos);
+}
+
+TEST_F(AuditModuleTest, ReadAuditFile_DropTrailingIncompleteLine) {
+    AuditModule& module = AuditModule::instance();
+    module.clearAll();
+
+    // Write 1 complete line and 1 incomplete line (no trailing newline)
+    char path0[64];
+    snprintf(path0, sizeof(path0), "%s0.jsonl", AuditModule::AUDIT_FILE_PREFIX);
+    FILE* f = fopen(path0, "wb");
+    ASSERT_NE(f, nullptr);
+    fputs("{\"seq\":0,\"action\":\"valid_complete\"}\n", f);
+    fputs("{\"seq\":1,\"action\":\"broken_incomp", f); // Missing newline
+    fclose(f);
+
+    String output;
+    size_t linesRead = 0;
+    bool truncated = false;
+    size_t nextOffset = 0;
+
+    callReadAuditFile(module, 0, 0, 10, output, linesRead, truncated, nextOffset);
+    EXPECT_EQ(linesRead, 1u);
+    EXPECT_FALSE(truncated);
+    EXPECT_NE(std::string(output.c_str()).find("valid_complete"), std::string::npos);
+    EXPECT_EQ(std::string(output.c_str()).find("broken_incomp"), std::string::npos);
+}
+
+TEST_F(AuditModuleTest, ReadAuditFile_NonExistentFile) {
+    AuditModule& module = AuditModule::instance();
+    module.clearAll();
+
+    String output;
+    size_t linesRead = 0;
+    bool truncated = false;
+    size_t nextOffset = 0;
+
+    // File index 0 (doesn't exist after clearAll)
+    callReadAuditFile(module, 0, 0, 10, output, linesRead, truncated, nextOffset);
+    EXPECT_EQ(linesRead, 0u);
+    EXPECT_FALSE(truncated);
+    EXPECT_EQ(output.length(), 0u);
+
+    // Invalid file index (> 1)
+    callReadAuditFile(module, 5, 0, 10, output, linesRead, truncated, nextOffset);
+    EXPECT_EQ(linesRead, 0u);
+    EXPECT_FALSE(truncated);
+}
+
+TEST_F(AuditModuleTest, MCPTools_RegistrationAndGetAuditLog) {
+    AuditModule& module = AuditModule::instance();
+    module.clearAll();
+
+    MCPToolRegistry registry;
+    module.registerMCPTools(registry);
+
+    const MCPToolEntry* getTool = registry.findTool("get_audit_log");
+    ASSERT_NE(getTool, nullptr);
+    EXPECT_FALSE(getTool->mutatesState);
+
+    const MCPToolEntry* clearTool = registry.findTool("clear_audit_log");
+    ASSERT_NE(clearTool, nullptr);
+    EXPECT_TRUE(clearTool->mutatesState);
+
+    // Write 2 test records to file 0
+    char path0[64];
+    snprintf(path0, sizeof(path0), "%s0.jsonl", AuditModule::AUDIT_FILE_PREFIX);
+    FILE* f = fopen(path0, "wb");
+    ASSERT_NE(f, nullptr);
+    fputs("{\"t_ms\":100,\"action\":\"login\",\"seq\":0}\n", f);
+    fputs("{\"t_ms\":200,\"action\":\"logout\",\"seq\":1}\n", f);
+    fclose(f);
+
+    // Call get_audit_log handler
+    JsonDocument paramsDoc;
+    JsonObject params = paramsDoc.to<JsonObject>();
+    params["lines"] = 10;
+    params["offset"] = 0;
+    params["file"] = 0;
+
+    JsonDocument resultDoc;
+    JsonObject result = resultDoc.to<JsonObject>();
+
+    getTool->handler(getTool->context, params, result);
+
+    EXPECT_EQ(result["lines_returned"].as<size_t>(), 2u);
+    EXPECT_FALSE(result["truncated"].as<bool>());
+    EXPECT_TRUE(result["records"].is<JsonArray>());
+    JsonArray records = result["records"].as<JsonArray>();
+    EXPECT_EQ(records.size(), 2u);
+    EXPECT_STREQ(records[0]["action"].as<const char*>(), "login");
+    EXPECT_STREQ(records[1]["action"].as<const char*>(), "logout");
+}
+
+TEST_F(AuditModuleTest, MCPTools_ClearAuditLog) {
+    AuditModule& module = AuditModule::instance();
+    module.clearAll();
+
+    // Create file
+    char path0[64];
+    snprintf(path0, sizeof(path0), "%s0.jsonl", AuditModule::AUDIT_FILE_PREFIX);
+    FILE* f = fopen(path0, "wb");
+    ASSERT_NE(f, nullptr);
+    fputs("{\"seq\":0}\n", f);
+    fclose(f);
+
+    MCPToolRegistry registry;
+    module.registerMCPTools(registry);
+    const MCPToolEntry* clearTool = registry.findTool("clear_audit_log");
+    ASSERT_NE(clearTool, nullptr);
+
+    JsonDocument paramsDoc;
+    JsonObject params = paramsDoc.to<JsonObject>();
+    JsonDocument resultDoc;
+    JsonObject result = resultDoc.to<JsonObject>();
+
+    clearTool->handler(clearTool->context, params, result);
+    EXPECT_TRUE(result["ok"].as<bool>());
+    EXPECT_STREQ(result["message"].as<const char*>(), "Audit log cleared");
+
+    // File should no longer exist
+    FILE* check = fopen(path0, "rb");
+    EXPECT_EQ(check, nullptr);
+}
+
+TEST_F(AuditModuleTest, WebRoutes_RegisterRoutesAndTabs) {
+    AuditModule& module = AuditModule::instance();
+    PsychicHttpServer server;
+    module.registerRoutes(server);
+
+    bool hasAuditGet = false;
+    bool hasAuditClearPost = false;
+    for (const auto& route : server.routes) {
+        if (route.uri == "/api/system/audit" && route.method == HTTP_GET) {
+            hasAuditGet = true;
+        }
+        if (route.uri == "/api/system/audit/clear" && route.method == HTTP_POST) {
+            hasAuditClearPost = true;
+        }
+    }
+    EXPECT_TRUE(hasAuditGet);
+    EXPECT_TRUE(hasAuditClearPost);
+
+    // Verify registerTabs does not add tabs
+    struct MockTabRegistry : public ITabRegistry {
+        size_t count = 0;
+        using ITabRegistry::addTab;
+        void addTab(const char* name, const char* parent, int order, const char* icon, const char* script) override {
+            count++;
+        }
+    } tabReg;
+
+    module.registerTabs(tabReg);
+    EXPECT_EQ(tabReg.count, 0u);
+
+    // Verify ApiPrefix and MaxPostBody
+    EXPECT_STREQ(module.getApiPrefix(), "/api/system/audit");
+    EXPECT_EQ(module.getMaxPostBody(), 4096u);
 }
 
 int main(int argc, char** argv) {
