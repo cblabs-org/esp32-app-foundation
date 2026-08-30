@@ -97,6 +97,7 @@
 | [Include Architecture](../../context_archives/distillation-20260811-include-architecture/context_bridge.md) | LDF mode alignment (native chain→deep), Application lib_ignore removal, 18 library.json files, zero relative includes | context_bridge |
 | [Group 3 Code Quality](../../context_archives/distillation-20260814-group3-code-quality/context_bridge.md) | ButtonModule `removeButton()`, board template folder restructure (`_TEMPLATE/`), hardware abstraction docs in framework-expert skill | context_bridge |
 | [pr-151-interface-naming-cleanup](../pr-151-interface-naming-cleanup/PROJECT.md) | `PreconditionRegistry`→`IPreconditionRegistry`, `TabRegistry`→`ITabRegistry`, relocate to `include/interfaces/`, clean `include/utils/`, `AppFoundation.h` alignment | [PROJECT.md](../pr-151-interface-naming-cleanup/PROJECT.md) |
+| [pr-194-audit-module](../pr-194-audit-module/PROJECT.md) | `lib/Redactor` extraction, `AuditModule` (4 interfaces: IWebContributor, IMCPContributor, IConfigurable, IPreconditionContributor), `include/Audit.h` two-tier macro API, `BOARD_AUDIT_BYTES`, `get_logs`→`get_debug_logs` rename, MK-6/MK-14 doc updates. PR [#203](https://github.com/matthewmcneill/esp32-app-foundation/pull/203) merged | [PROJECT.md](../pr-194-audit-module/PROJECT.md) |
 
 ## Memory & Performance
 | Project | Scope | Context |
