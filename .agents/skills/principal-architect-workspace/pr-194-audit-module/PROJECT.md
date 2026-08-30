@@ -97,5 +97,16 @@ Implement a generalized `AuditModule` providing a standardized, flash-persisted 
 
 **Unresolved items**:
 - D4 (DRAM) hardware soak test not yet performed — `heap_min_free` with audit active needs measurement on physical hardware before stable release.
-- D1 finding #6 deferred: `// --- Step N` flow comments in short helper functions (seedActiveFile, formatRecord, readAuditFile, enqueueInternal, checkRateLimit).
 - `get_debug_logs` is still a renamed stub (returns debug log output) — a proper PSRAM ring-buffer implementation for debug logs is a future enhancement.
+
+### 2026-08-30T20:03:00+01:00 — Post-Merge: Documentation Audit & Factory Reset Fix
+
+**Summary**: Ran comprehensive documentation completeness audit against the implementation. Found and fixed 10 gaps in the audit guide (thread safety, limitations, flash wear, field sizes), 6 missing cross-references across other skill docs, and 1 code bug (factory reset not clearing audit logs). Also completed the deferred D1 step-comment finding.
+
+**Code fix** (`cec5b8b6`): `ConfigManager::config_factory_reset` now calls `AuditModule::instance().clearAll()` under `#ifdef WITH_AUDIT`. Audit logs are wiped on factory reset as per design decision D18.
+
+**Doc commits**: `79539bdf` (guide rewrite: §9 Thread Safety, §10 Limitations, §7 FR correction), `6ba79e5a` (step comments in 5 functions, 6 cross-reference updates).
+
+**Resolved items from wrap-up**:
+- ✅ D1 finding #6: Step comments added to all 5 deferred functions.
+- ✅ Factory reset bug: audit logs now cleared on FR (was missing wiring).
