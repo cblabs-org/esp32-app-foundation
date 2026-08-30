@@ -36,6 +36,10 @@
 
 #pragma once
 
+#ifndef WITH_AUDIT
+#error "AuditModule.hpp requires WITH_AUDIT to be defined. Use the AUDIT() macro from include/Audit.h for soft dependency."
+#endif
+
 #include <Arduino.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/queue.h>

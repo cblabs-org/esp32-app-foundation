@@ -9,6 +9,8 @@
  * Description: Core implementation of the flash-backed AuditModule engine.
  */
 
+#ifdef WITH_AUDIT
+
 #include "AuditModule.hpp"
 #include "platform/LogShim.h"
 #include "MCPToolRegistry.hpp"
@@ -740,3 +742,6 @@ void AuditModule::registerPreconditions(IPreconditionRegistry& registry) {
             }
         });
 }
+
+#endif // WITH_AUDIT
+

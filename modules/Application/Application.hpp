@@ -122,6 +122,11 @@ namespace ApplicationEvents {
     struct OtaProgressPayload_requires_WITH_OTA {};
     typedef OtaProgressPayload_requires_WITH_OTA OtaProgressPayload;
 #endif
+
+#ifndef WITH_AUDIT
+    // Legible absent-module error for consumers attempting to use AuditModule without the flag
+    struct AuditModule_requires_WITH_AUDIT {};
+#endif
 }
 
 /**

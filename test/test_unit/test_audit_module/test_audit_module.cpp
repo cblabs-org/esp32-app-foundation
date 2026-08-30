@@ -12,6 +12,7 @@
 
 #include <gtest/gtest.h>
 #include "AuditModule.hpp"
+#include "Audit.h"
 #include "Redactor.h"
 #include "MCPToolRegistry.hpp"
 #include "interfaces/IPreconditionRegistry.hpp"
@@ -607,6 +608,19 @@ TEST_F(AuditModuleTest, PreconditionContributor_RegistrationAndEvaluation) {
 
     registry.describe(Cause::Met, buf, sizeof(buf));
     EXPECT_NE(std::string(buf).find("active"), std::string::npos);
+}
+
+TEST_F(AuditModuleTest, MacroConvenience_AsyncAndSyncLogging) {
+    AuditModule& module = AuditModule::instance();
+    module.begin();
+    module.clearAll();
+    module.resetConfig();
+
+    // Verify AUDIT and AUDIT_SYNC macros work when WITH_AUDIT is active
+    AUDIT("auth", "login", "user1", "success");
+    AUDIT_SYNC("system", "config_change", "audit", "rate_limit=120");
+
+    EXPECT_EQ(module.dropCount(), 0u);
 }
 
 int main(int argc, char** argv) {
