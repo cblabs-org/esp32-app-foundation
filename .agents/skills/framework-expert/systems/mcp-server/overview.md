@@ -16,7 +16,7 @@ Registered by `MCPBuiltinTools` — framework-level, available on every device:
 | `set_config` | Update config by namespace: `{"config":{"wifi":{"ssid":"X"}}}` | **Yes** |
 | `patch_config` | Apply RFC 6902 JSON Patch ops to a config namespace | **Yes** |
 | `reboot` | Restart device (1s delay for response flush) | **Yes** |
-| `get_debug_logs` | Log buffer (placeholder — ring-buffer logger planned) | No |
+| `get_debug_logs` | Volatile debug log buffer (RAM, lost on reboot) — contrast with flash-persisted `get_audit_log` below | No |
 | `list_tools` | Enumerate all registered tools with descriptions and schemas | No |
 | `get_data_sources` | Returns current state, failure counts, backoffs for all data sources | No |
 
@@ -28,7 +28,7 @@ Any module implementing `IMCPContributor` registers tools via `registerMCPTools(
 | **WifiManager** | `wifi_get_status` | `wifi_scan_networks`, `wifi_forget` |
 | **OTAUpdateManager** | `ota_get_status` | `ota_check_now`, `ota_trigger_update` |
 | **ConfigManager** | `config_get_schema_version` | `config_factory_reset` |
-| **AuditModule** (`WITH_AUDIT`) | `get_audit_log` | `clear_audit_log` |
+| **[AuditModule](../../references/audit-module-guide.md)** (`WITH_AUDIT`) | `get_audit_log` | `clear_audit_log` |
 | **U8G2DisplayModule** | `display_status`, `capture_display` | `display_control` |
 | **LVGLDisplayModule** | `display_status`, `capture_display` | `display_control` |
 | **ButtonModule** (`WITH_BUTTONS`) | `button_status` | — |

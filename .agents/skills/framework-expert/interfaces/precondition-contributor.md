@@ -137,6 +137,12 @@ namespace PreconditionNames {
 }
 ```
 
+### Optional Module Preconditions
+
+| Precondition | Module | Role | Build Flag | Description |
+|:---|:---|:---|:---|:---|
+| `audit_health` | `AuditModule` | `Operational` | `WITH_AUDIT` | Tracks audit subsystem health. Uses sticky `FallbackEngaged` degradation — once a drop or throttle occurs, stays degraded until `clearAll()`. See [Audit Module Guide](../references/audit-module-guide.md) §8. |
+
 ## Registration Flow
 
 1. Module inherits `IPreconditionContributor`.

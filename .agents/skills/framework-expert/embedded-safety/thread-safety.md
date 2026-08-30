@@ -68,4 +68,5 @@ When reviewing thread safety, also check these related concerns:
 - **Found a `WiFiClientSecure`?** → Check the task stack size (≥12KB for stack allocation). Check if the task does flash writes (PSRAM/SPI constraint above). See also [TLS Tradeoffs](../security/tls-tradeoffs.md).
 - **Found a custom FreeRTOS task?** → Verify it registers with TWDT. Verify its stack size is adequate for its workload. Verify stack memory type (DRAM vs PSRAM) matches its I/O operations.
 - **Found a `new` or `malloc` in a task?** → Check if it uses `std::nothrow`. See [Error Handling](../coding-patterns/error-handling.md).
-
+- **Found `Redactor::registerSecret()`?** → Must only be called during single-threaded `setup()` before `begin()` returns. The internal `_secrets` vector has no mutex; late registration races with `redact()` from background tasks.
+- **Found `AuditWriter` task or `AUDIT_SYNC()`?** → `AuditWriter` allocates its 4 KB stack in internal DRAM (`MALLOC_CAP_INTERNAL`) because it writes to LittleFS flash. `AUDIT_SYNC()` blocks the caller for up to 5 seconds — never use in tick loops, EventBus callbacks, or the main loop (triggers TWDT). See [Audit Module Guide](../references/audit-module-guide.md) §9.

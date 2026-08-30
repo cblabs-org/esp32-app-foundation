@@ -51,7 +51,22 @@ If your module exposes debugging state, consider implementing `IMCPContributor`.
 - Respect the read-only mode toggle.
 - *Reference:* [`../interfaces/mcp-contributor.md`](../interfaces/mcp-contributor.md)
 
-## 7. Testing Contracts
+## 7. Audit Logging
+
+To emit structured audit records from your module, use the soft-dependency macro API:
+
+```cpp
+#include "Audit.h"
+
+AUDIT("mymodule", "setting_changed", "param_name", "old=X new=Y");
+```
+
+- `AUDIT()` compiles to a no-op when `WITH_AUDIT` is not defined — zero overhead.
+- **Never** `#include "AuditModule.hpp"` directly in shared modules (causes compile errors without `WITH_AUDIT`).
+- Reserve `AUDIT_SYNC()` for shutdown/handshake sequences in dedicated tasks — it blocks up to 5 seconds.
+- *Reference:* [`../references/audit-module-guide.md`](../references/audit-module-guide.md)
+
+## 8. Testing Contracts
 
 ### Native Compilation (Mandatory)
 All core modules MUST compile on `env:native`. Use the stub-header architecture in `test/stubs/platform/` instead of inline `#ifndef NATIVE_BUILD` guards.

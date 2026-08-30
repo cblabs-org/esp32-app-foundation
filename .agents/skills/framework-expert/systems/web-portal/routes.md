@@ -91,10 +91,12 @@ Registered by `DataSourceWebContributor` on `Application`:
 
 ## Audit REST Endpoints
 
-Registered by `AuditModule` (`WITH_AUDIT`):
+Registered by `AuditModule` (requires `-D WITH_AUDIT` build flag):
 
 - `GET /api/system/audit`: Paginated audit log retrieval in `application/x-ndjson` format (`lines`, `offset`, `file` query params, `X-Audit-Truncated` and `X-Audit-Next-Offset` headers).
 - `POST /api/system/audit/clear`: Clears all audit log files and resets counters (`{"ok": true}`).
+
+*Full schema, pagination details, and limitations:* [Audit Module Guide](../../references/audit-module-guide.md) §8.
 
 ## Built-in MCP Tool Endpoints
 

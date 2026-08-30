@@ -116,11 +116,13 @@ bool AuditModule::begin() {
 }
 
 void AuditModule::seedActiveFile() {
+    // --- Step 1: Build paths for both rotation files ---
     char path0[64];
     char path1[64];
     snprintf(path0, sizeof(path0), "%s0.jsonl", AUDIT_FILE_PREFIX);
     snprintf(path1, sizeof(path1), "%s1.jsonl", AUDIT_FILE_PREFIX);
 
+    // --- Step 2: Probe existing file sizes ---
     size_t size0 = 0;
     size_t size1 = 0;
     bool exists0 = false;
@@ -144,6 +146,7 @@ void AuditModule::seedActiveFile() {
         fclose(f1);
     }
 
+    // --- Step 3: Select active file based on rotation state ---
     if (exists0 && size0 >= _maxFileSize) {
         _activeFileIndex = 1;
         if (exists1 && size1 >= _maxFileSize) {
@@ -166,9 +169,11 @@ void AuditModule::seedActiveFile() {
 // arbitrary user-supplied text (e.g., from MCP tool parameters), add minimal
 // JSON escaping (at least for double-quote, backslash, and control characters).
 size_t AuditModule::formatRecord(const AuditRecord& record, uint32_t bootId, const char* buildVersion, char* buffer, size_t bufferSize) {
+    // --- Step 1: Validate inputs ---
     if (!buffer || bufferSize == 0) return 0;
     const char* build = (buildVersion && buildVersion[0] != '\0') ? buildVersion : "unknown";
 
+    // --- Step 2: Select JSON shape based on optional fields ---
     int written = 0;
     if (record.targetId[0] != '\0' && record.details[0] != '\0') {
         written = snprintf(buffer, bufferSize,
@@ -192,6 +197,7 @@ size_t AuditModule::formatRecord(const AuditRecord& record, uint32_t bootId, con
             build, record.source, record.action);
     }
 
+    // --- Step 3: Handle truncation ---
     if (written < 0 || (size_t)written >= bufferSize) {
         buffer[bufferSize - 1] = '\0';
         return bufferSize - 1;
@@ -258,6 +264,8 @@ void AuditModule::writerLoop(void* param) {
 
 RateLimitAction AuditModule::checkRateLimit(uint32_t nowMs) {
     std::lock_guard<std::mutex> lock(_rateLimitMutex);
+
+    // --- Step 1: Refill tokens based on elapsed time ---
     if (_lastRefillMs == 0) {
         _lastRefillMs = nowMs;
     } else {
@@ -272,6 +280,7 @@ RateLimitAction AuditModule::checkRateLimit(uint32_t nowMs) {
         }
     }
 
+    // --- Step 2: Consume a token or transition to throttled state ---
     if (_rateTokens >= 1.0f) {
         _rateTokens -= 1.0f;
         _throttledState = false;
@@ -293,22 +302,26 @@ void AuditModule::resetRateLimiter() {
 }
 
 bool AuditModule::enqueueInternal(const char* source, const char* action, const char* targetId, const char* details, SemaphoreHandle_t syncSem) {
+    // --- Step 1: Guard against uninitialized state ---
     if (!_started || !_queue) {
         _dropCount.fetch_add(1, std::memory_order_relaxed);
         return false;
     }
 
+    // --- Step 2: Allocate record on heap (no-throw) ---
     AuditRecord* record = new (std::nothrow) AuditRecord();
     if (!record) {
         _dropCount.fetch_add(1, std::memory_order_relaxed);
         return false;
     }
 
+    // --- Step 3: Populate metadata fields ---
     record->t_ms = millis();
     record->ts = (int64_t)time(nullptr);
     record->seq = _seq.fetch_add(1, std::memory_order_relaxed);
     record->sync = syncSem;
 
+    // --- Step 4: Copy and null-terminate string fields ---
     if (source) {
         strncpy(record->source, source, sizeof(record->source) - 1);
         record->source[sizeof(record->source) - 1] = '\0';
@@ -330,6 +343,7 @@ bool AuditModule::enqueueInternal(const char* source, const char* action, const 
         record->targetId[0] = '\0';
     }
 
+    // --- Step 5: Copy details and apply secret redaction ---
     if (details) {
         strncpy(record->details, details, sizeof(record->details) - 1);
         record->details[sizeof(record->details) - 1] = '\0';
@@ -338,6 +352,7 @@ bool AuditModule::enqueueInternal(const char* source, const char* action, const 
         record->details[0] = '\0';
     }
 
+    // --- Step 6: Enqueue with zero-wait (non-blocking) ---
     if (xQueueSend(_queue, &record, 0) != pdTRUE) {
         delete record;
         _dropCount.fetch_add(1, std::memory_order_relaxed);
@@ -426,6 +441,7 @@ void AuditModule::clearAll() {
 
 void AuditModule::readAuditFile(uint8_t fileIndex, size_t offset, size_t maxLines,
                                 String& output, size_t& linesRead, bool& truncated, size_t& nextOffset) {
+    // --- Step 1: Initialize output parameters ---
     output = "";
     linesRead = 0;
     truncated = false;
@@ -435,6 +451,7 @@ void AuditModule::readAuditFile(uint8_t fileIndex, size_t offset, size_t maxLine
         return;
     }
 
+    // --- Step 2: Open file and validate offset ---
     char path[64];
     snprintf(path, sizeof(path), "%s%u.jsonl", AUDIT_FILE_PREFIX, fileIndex);
 
@@ -460,6 +477,7 @@ void AuditModule::readAuditFile(uint8_t fileIndex, size_t offset, size_t maxLine
         return;
     }
 
+    // --- Step 3: Read lines with crash-tolerance (drop incomplete trailing lines) ---
     char lineBuf[1024];
     size_t currentPos = offset;
 
@@ -496,6 +514,7 @@ void AuditModule::readAuditFile(uint8_t fileIndex, size_t offset, size_t maxLine
         currentPos = ftell(f);
     }
 
+    // --- Step 4: Set pagination state ---
     nextOffset = currentPos;
     if (currentPos < static_cast<size_t>(totalSize) && linesRead >= maxLines) {
         truncated = true;

@@ -158,6 +158,7 @@ Once your prototype is working, review these deep dives before shipping:
 - **[Replacing the Display](../systems/display/replacing-the-display.md)**: Using TFTs or e-ink instead of OLED.
 - **[Coding Patterns & Style Guide](../coding-patterns/overview.md)**: Ensure your app structure aligns with the framework's house style.
 - **[Design System](../../framework-design-system/readme.md)**: Colour tokens, typography, spacing, and pre-built portal components.
+- **[Audit System](../references/audit-module-guide.md)**: Add structured event auditing via `AUDIT()` / `WITH_AUDIT` and configure flash-persisted audit trails.
 
 ## Want a Structured Design Spec?
 
