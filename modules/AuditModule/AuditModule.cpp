@@ -21,6 +21,7 @@
 #include <PsychicHttp.h>
 #include <LittleFS.h>
 #include <esp_task_wdt.h>
+#include <freertos/idf_additions.h>
 #include <esp_random.h>
 #include <cinttypes>
 #include <cstdio>
@@ -92,14 +93,18 @@ bool AuditModule::begin() {
         return false;
     }
 
-    // --- Step 4: Spawn background DRAM writer task ---
-    BaseType_t result = xTaskCreate(
+    // --- Step 4: Spawn background writer task with DRAM stack ---
+    // MUST use xTaskCreateWithCaps with MALLOC_CAP_INTERNAL because this task
+    // writes to LittleFS flash. During SPI flash operations the cache is disabled,
+    // making PSRAM-resident stacks inaccessible (IllegalInstruction on ESP32-S3).
+    BaseType_t result = xTaskCreateWithCaps(
         writerLoop,
         "AuditWriter",
         AUDIT_WRITER_STACK_SIZE,
         this,
         AUDIT_WRITER_PRIORITY,
-        &_writerTask
+        &_writerTask,
+        MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT
     );
 
     if (result != pdPASS) {
