@@ -37,6 +37,10 @@
 #include "MCPToolRegistry.hpp"
 #include "DeviceCrypto.hpp"
 
+#ifdef WITH_AUDIT
+#include "AuditModule.hpp"
+#endif
+
 static constexpr const char* TAG = "ConfigManager";
 
 // =============================================================================
@@ -890,6 +894,12 @@ void ConfigManager::registerMCPTools(MCPToolRegistry& registry) {
                 LittleFS.remove("/config_manifest.json");
                 ESP_LOGI(TAG, "Removed config manifest file");
             }
+
+            // Clear audit trail files (factory reset cleans everything)
+#ifdef WITH_AUDIT
+            AuditModule::instance().clearAll();
+            ESP_LOGI(TAG, "Cleared audit trail files");
+#endif
 
             result["success"] = true;
             result["message"] = "Config wiped, restarting";

@@ -133,10 +133,8 @@ To prevent silent log tampering:
 
 ## 7. Factory Reset & Maintenance
 
-> [!IMPORTANT]
-> **Audit logs intentionally survive factory reset.** The `config_factory_reset` MCP tool and `ConfigManager::factoryReset()` only sweep module configuration files (`/mod/*.json`). They do **not** call `AuditModule::clearAll()`. This is by design — audit records are a permanent administrative trail that should persist across configuration changes.
-
-- **Manual Clearing**: Available via REST (`POST /api/system/audit/clear`) and MCP (`clear_audit_log`). These call `clearAll()`, which deletes both JSONL files and resets all counters (including `seq`, `dropCount`, `throttleCount`, `recordCount`).
+- **Factory Reset**: `config_factory_reset` (MCP) and the web portal factory reset wipe **everything** — module configuration files (`/mod/*.json`), the config manifest, and audit trail files. `AuditModule::clearAll()` is called automatically, deleting both JSONL files and resetting all counters (`seq`, `dropCount`, `throttleCount`, `recordCount`). A factory reset is a factory reset.
+- **Manual Clearing**: Also available independently via REST (`POST /api/system/audit/clear`) and MCP (`clear_audit_log`), which call `clearAll()` without affecting other configuration.
 
 ---
 
