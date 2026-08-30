@@ -153,6 +153,9 @@ Contributed via `IPreconditionContributor` with role `PreconditionRole::Operatio
 | Dropping or throttling | `true` | `Cause::FallbackEngaged` | Queue full or rate limit exceeded |
 | Normal operation | `true` | `Cause::Met` | Audit logging active |
 
+> [!NOTE]
+> The `FallbackEngaged` state is **sticky** — once a single drop or throttle occurs, the precondition stays degraded until `clearAll()` is called (which resets counters). This is intentional: an audit trail should surface historical reliability problems, not silently recover.
+
 ---
 
 ## 9. Anti-Patterns & Best Practices

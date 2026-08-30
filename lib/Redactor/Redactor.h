@@ -22,6 +22,12 @@
 
 /**
  * @brief Static utility class for registering sensitive strings and redacting them from buffers.
+ *
+ * Thread safety contract: registerSecret() must be called only during
+ * single-threaded initialization (before FreeRTOS scheduler starts or from
+ * setup()). After init, redact() is safe to call from any task — the secrets
+ * vector is read-only at that point. A late registerSecret() call concurrent
+ * with redact() would race on the underlying std::vector.
  */
 class Redactor {
 public:

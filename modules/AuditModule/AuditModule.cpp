@@ -157,6 +157,11 @@ void AuditModule::seedActiveFile() {
     }
 }
 
+// NOTE: Fields are injected via %s without JSON escaping. This is safe because
+// all current callers use short alphanumeric constants for source/action/targetId,
+// and details is redacted before reaching this point. If details ever carries
+// arbitrary user-supplied text (e.g., from MCP tool parameters), add minimal
+// JSON escaping (at least for double-quote, backslash, and control characters).
 size_t AuditModule::formatRecord(const AuditRecord& record, uint32_t bootId, const char* buildVersion, char* buffer, size_t bufferSize) {
     if (!buffer || bufferSize == 0) return 0;
     const char* build = (buildVersion && buildVersion[0] != '\0') ? buildVersion : "unknown";
@@ -387,6 +392,11 @@ bool AuditModule::auditSync(const char* source, const char* action, const char* 
         return false;
     }
 
+    // NOTE: On timeout, the semaphore is NOT leaked. The record (with its sync
+    // semaphore handle) is still in the queue and will be processed by writerLoop(),
+    // which unconditionally calls xSemaphoreGive() + vSemaphoreDelete() after
+    // writing. The caller has already abandoned the wait, so the Give() is harmless
+    // (no task is blocked on it), and Delete() cleans up the kernel object.
     if (xSemaphoreTake(syncSem, pdMS_TO_TICKS(timeoutMs)) != pdTRUE) {
         _dropCount.fetch_add(1, std::memory_order_relaxed);
         return false;
@@ -537,6 +547,8 @@ void AuditModule::registerRoutes(PsychicHttpServer& server) {
     });
 
     // --- POST /api/system/audit/clear ---
+    // NOTE: Authentication is enforced by the framework's AuthManager middleware,
+    // which intercepts all /api/ routes before they reach module handlers.
     server.on("/api/system/audit/clear", HTTP_POST, [this](PsychicRequest* request, PsychicResponse* response) {
         (void)request;
         clearAll();

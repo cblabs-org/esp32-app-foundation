@@ -246,6 +246,9 @@ public:
     /** @brief Resets rate limiter tokens and timestamp. */
     void resetRateLimiter();
 
+    // NOTE: activeFileIndex() and currentFileSize() are written only from the
+    // writer task but may be read from any task. Values are eventually-consistent
+    // diagnostic snapshots — callers should not depend on precise real-time accuracy.
     /** @brief Exposes active file index for testing and inspection. */
     uint8_t activeFileIndex() const { return _activeFileIndex; }
 
