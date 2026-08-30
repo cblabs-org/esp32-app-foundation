@@ -12,6 +12,7 @@
 #include "AuditModule.hpp"
 #include "platform/LogShim.h"
 #include "MCPToolRegistry.hpp"
+#include "interfaces/IPreconditionRegistry.hpp"
 #include <PsychicHttp.h>
 #include <LittleFS.h>
 #include <esp_task_wdt.h>
@@ -47,7 +48,9 @@ AuditModule::AuditModule()
       _started(false),
       _rateTokens((float)AUDIT_RATE_LIMIT_PER_MIN),
       _lastRefillMs(0),
-      _throttledState(false) {}
+      _throttledState(false),
+      _enabled(true),
+      _configuredRateLimit(AUDIT_RATE_LIMIT_PER_MIN) {}
 
 AuditModule::~AuditModule() {
     if (_queue) {
@@ -250,10 +253,10 @@ RateLimitAction AuditModule::checkRateLimit(uint32_t nowMs) {
     } else {
         uint32_t elapsed = nowMs - _lastRefillMs;
         if (elapsed > 0) {
-            float refill = ((float)elapsed * (float)AUDIT_RATE_LIMIT_PER_MIN) / 60000.0f;
+            float refill = ((float)elapsed * (float)_configuredRateLimit) / 60000.0f;
             _rateTokens += refill;
-            if (_rateTokens > (float)AUDIT_RATE_LIMIT_PER_MIN) {
-                _rateTokens = (float)AUDIT_RATE_LIMIT_PER_MIN;
+            if (_rateTokens > (float)_configuredRateLimit) {
+                _rateTokens = (float)_configuredRateLimit;
             }
             _lastRefillMs = nowMs;
         }
@@ -274,7 +277,7 @@ RateLimitAction AuditModule::checkRateLimit(uint32_t nowMs) {
 
 void AuditModule::resetRateLimiter() {
     std::lock_guard<std::mutex> lock(_rateLimitMutex);
-    _rateTokens = (float)AUDIT_RATE_LIMIT_PER_MIN;
+    _rateTokens = (float)_configuredRateLimit;
     _lastRefillMs = 0;
     _throttledState = false;
 }
@@ -335,6 +338,11 @@ bool AuditModule::enqueueInternal(const char* source, const char* action, const 
 }
 
 bool AuditModule::log(const char* source, const char* action, const char* targetId, const char* details) {
+    bool isInternal = (source != nullptr && strcmp(source, "audit") == 0);
+    if (!_enabled && !isInternal) {
+        return false;
+    }
+
     uint32_t nowMs = millis();
     RateLimitAction rla = checkRateLimit(nowMs);
     if (rla == RateLimitAction::ThrottleFirst) {
@@ -350,6 +358,11 @@ bool AuditModule::log(const char* source, const char* action, const char* target
 }
 
 bool AuditModule::auditSync(const char* source, const char* action, const char* targetId, const char* details, uint32_t timeoutMs) {
+    bool isInternal = (source != nullptr && strcmp(source, "audit") == 0);
+    if (!_enabled && !isInternal) {
+        return false;
+    }
+
     uint32_t nowMs = millis();
     RateLimitAction rla = checkRateLimit(nowMs);
     if (rla == RateLimitAction::ThrottleFirst) {
@@ -650,3 +663,80 @@ void AuditModule::registerMCPTools(MCPToolRegistry& registry) {
     );
 }
 
+// =============================================================================
+// IConfigurable Implementation
+// =============================================================================
+
+void AuditModule::applyConfig(const JsonObject& section) {
+    if (section["enabled"].is<bool>()) {
+        bool newEnabled = section["enabled"].as<bool>();
+        if (_enabled && !newEnabled) {
+            // Before disabling: write an audit record {source: "audit", action: "audit_disabled"} via log()
+            log("audit", "audit_disabled");
+            _enabled = false;
+        } else if (!_enabled && newEnabled) {
+            // After enabling: write an audit record {source: "audit", action: "audit_enabled"}
+            _enabled = true;
+            log("audit", "audit_enabled");
+        }
+    }
+
+    if (section["rate_limit"].is<int>()) {
+        int r = section["rate_limit"].as<int>();
+        if (r > 0) {
+            _configuredRateLimit = static_cast<uint32_t>(r);
+            std::lock_guard<std::mutex> lock(_rateLimitMutex);
+            if (_rateTokens > static_cast<float>(_configuredRateLimit)) {
+                _rateTokens = static_cast<float>(_configuredRateLimit);
+            }
+        }
+    }
+}
+
+void AuditModule::serializeConfig(JsonObject& section) const {
+    section["enabled"] = _enabled;
+    section["rate_limit"] = _configuredRateLimit;
+}
+
+void AuditModule::resetConfig() {
+    _enabled = true;
+    _configuredRateLimit = AUDIT_RATE_LIMIT_PER_MIN;
+    resetRateLimiter();
+}
+
+// =============================================================================
+// IPreconditionContributor Implementation
+// =============================================================================
+
+void AuditModule::registerPreconditions(IPreconditionRegistry& registry) {
+    registry.add("audit_health", PreconditionRole::Operational,
+        [this]() -> PreconditionStatus {
+            if (!_started) {
+                return {false, Cause::InternalError};
+            }
+            if (!_enabled) {
+                return {false, Cause::Unavailable};
+            }
+            if (_dropCount.load(std::memory_order_relaxed) > 0 ||
+                _throttleCount.load(std::memory_order_relaxed) > 0) {
+                return {true, Cause::FallbackEngaged};
+            }
+            return {true, Cause::Met};
+        },
+        [](Cause c, char* buf, size_t len) {
+            switch (c) {
+                case Cause::InternalError:
+                    snprintf(buf, len, "Audit storage or task initialization failed");
+                    break;
+                case Cause::Unavailable:
+                    snprintf(buf, len, "Audit logging disabled in configuration");
+                    break;
+                case Cause::FallbackEngaged:
+                    snprintf(buf, len, "Audit logging degraded — dropping or throttling records");
+                    break;
+                default:
+                    snprintf(buf, len, "Audit logging active");
+                    break;
+            }
+        });
+}

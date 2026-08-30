@@ -21,6 +21,15 @@
  *   - recordCount(): Returns total records written this boot.
  *   - dropCount(): Returns total records dropped due to queue-full.
  *   - throttleCount(): Returns total records suppressed by rate limiter.
+ *   - isEnabled(): Returns true if audit logging is enabled.
+ *   - configuredRateLimit(): Returns configured rate limit per minute.
+ *   - getConfigNamespace(): Returns "audit" namespace.
+ *   - getSchemaVersion(): Returns config schema version.
+ *   - applyConfig(): Applies configuration from JSON section.
+ *   - serializeConfig(): Serializes configuration into JSON section.
+ *   - migrateConfig(): Migrates config from older schema version.
+ *   - resetConfig(): Resets configuration to defaults.
+ *   - registerPreconditions(): Registers audit_health precondition.
  *   - formatRecord(): Formats an AuditRecord into a JSONL string.
  *   - instance(): Returns the singleton instance of AuditModule.
  */
@@ -39,6 +48,8 @@
 #include "Redactor.h"
 #include "interfaces/IWebContributor.hpp"
 #include "interfaces/IMCPContributor.hpp"
+#include "interfaces/IConfigurable.hpp"
+#include "interfaces/IPreconditionContributor.hpp"
 
 /**
  * @brief Internal heap-allocated audit record passed through the queue.
@@ -66,7 +77,10 @@ enum class RateLimitAction : uint8_t {
 /**
  * @brief Core engine for flash-persisted structured audit logging.
  */
-class AuditModule : public IWebContributor, public IMCPContributor {
+class AuditModule : public IWebContributor,
+                    public IMCPContributor,
+                    public IConfigurable,
+                    public IPreconditionContributor {
 public:
     static constexpr size_t AUDIT_QUEUE_DEPTH = 16;
     static constexpr uint32_t AUDIT_WRITER_STACK_SIZE = 4096;
@@ -145,6 +159,59 @@ public:
      */
     void clearAll();
 
+    // -------------------------------------------------------------------------
+    // IConfigurable Implementation
+    // -------------------------------------------------------------------------
+
+    /** @brief Return the configuration namespace identifier ("audit"). */
+    const char* getConfigNamespace() const override { return "audit"; }
+
+    /** @brief Return the current schema version (1). */
+    int getSchemaVersion() const override { return 1; }
+
+    /**
+     * @brief Apply configuration from a parsed JSON object.
+     * @param section Read-only reference to JSON object.
+     */
+    void applyConfig(const JsonObject& section) override;
+
+    /**
+     * @brief Serialize current configuration into a JSON object.
+     * @param section Mutable reference to JSON object.
+     */
+    void serializeConfig(JsonObject& section) const override;
+
+    /**
+     * @brief Migrate configuration from an older schema version.
+     * @param section Mutable JSON config section.
+     * @param fromVersion Stored schema version.
+     * @return true on successful migration.
+     */
+    bool migrateConfig(JsonObject& section, int fromVersion) override {
+        (void)section;
+        (void)fromVersion;
+        return true;
+    }
+
+    /** @brief Reset configuration to factory defaults. */
+    void resetConfig() override;
+
+    // -------------------------------------------------------------------------
+    // IPreconditionContributor Implementation
+    // -------------------------------------------------------------------------
+
+    /**
+     * @brief Register the audit health precondition with the registry.
+     * @param registry Target IPreconditionRegistry instance.
+     */
+    void registerPreconditions(IPreconditionRegistry& registry) override;
+
+    /** @brief Returns true if audit logging is enabled at runtime. */
+    bool isEnabled() const { return _enabled; }
+
+    /** @brief Returns configured rate limit per minute. */
+    uint32_t configuredRateLimit() const { return _configuredRateLimit; }
+
     /** @brief Returns total number of records successfully written this boot. */
     size_t recordCount() const { return _recordCount.load(std::memory_order_relaxed); }
 
@@ -214,4 +281,7 @@ private:
     float _rateTokens = (float)AUDIT_RATE_LIMIT_PER_MIN;
     uint32_t _lastRefillMs = 0;
     bool _throttledState = false;
+
+    bool _enabled = true;
+    uint32_t _configuredRateLimit = AUDIT_RATE_LIMIT_PER_MIN;
 };

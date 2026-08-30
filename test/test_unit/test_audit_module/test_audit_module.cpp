@@ -14,6 +14,7 @@
 #include "AuditModule.hpp"
 #include "Redactor.h"
 #include "MCPToolRegistry.hpp"
+#include "interfaces/IPreconditionRegistry.hpp"
 #include <PsychicHttp.h>
 #include "interfaces/ITabRegistry.hpp"
 #include <cstring>
@@ -23,10 +24,23 @@ class AuditModuleTest : public ::testing::Test {
 protected:
     void SetUp() override {
         AuditModule::instance().clearAll();
+        AuditModule::instance().resetConfig();
     }
     void callReadAuditFile(AuditModule& m, uint8_t fileIndex, size_t offset, size_t maxLines,
                            String& output, size_t& linesRead, bool& truncated, size_t& nextOffset) {
         m.readAuditFile(fileIndex, offset, maxLines, output, linesRead, truncated, nextOffset);
+    }
+    void setStarted(AuditModule& m, bool started) {
+        m._started = started;
+    }
+    void setEnabled(AuditModule& m, bool enabled) {
+        m._enabled = enabled;
+    }
+    void setDropCount(AuditModule& m, size_t drops) {
+        m._dropCount.store(drops);
+    }
+    void setThrottleCount(AuditModule& m, size_t throttles) {
+        m._throttleCount.store(throttles);
     }
 };
 
@@ -418,6 +432,181 @@ TEST_F(AuditModuleTest, WebRoutes_RegisterRoutesAndTabs) {
     // Verify ApiPrefix and MaxPostBody
     EXPECT_STREQ(module.getApiPrefix(), "/api/system/audit");
     EXPECT_EQ(module.getMaxPostBody(), 4096u);
+}
+
+TEST_F(AuditModuleTest, Configurable_NamespaceVersionAndReset) {
+    AuditModule& module = AuditModule::instance();
+    module.resetConfig();
+
+    EXPECT_STREQ(module.getConfigNamespace(), "audit");
+    EXPECT_EQ(module.getSchemaVersion(), 1);
+
+    JsonDocument doc;
+    JsonObject obj = doc.to<JsonObject>();
+    module.serializeConfig(obj);
+    EXPECT_TRUE(obj["enabled"].as<bool>());
+    EXPECT_EQ(obj["rate_limit"].as<uint32_t>(), AuditModule::AUDIT_RATE_LIMIT_PER_MIN);
+
+    // Apply custom config
+    JsonDocument customDoc;
+    JsonObject customObj = customDoc.to<JsonObject>();
+    customObj["enabled"] = false;
+    customObj["rate_limit"] = 60;
+    module.applyConfig(customObj);
+
+    EXPECT_FALSE(module.isEnabled());
+    EXPECT_EQ(module.configuredRateLimit(), 60u);
+
+    JsonDocument outDoc;
+    JsonObject outObj = outDoc.to<JsonObject>();
+    module.serializeConfig(outObj);
+    EXPECT_FALSE(outObj["enabled"].as<bool>());
+    EXPECT_EQ(outObj["rate_limit"].as<uint32_t>(), 60u);
+
+    // Migrate config returns true
+    EXPECT_TRUE(module.migrateConfig(outObj, 0));
+
+    // Reset config
+    module.resetConfig();
+    EXPECT_TRUE(module.isEnabled());
+    EXPECT_EQ(module.configuredRateLimit(), AuditModule::AUDIT_RATE_LIMIT_PER_MIN);
+}
+
+TEST_F(AuditModuleTest, Configurable_ApplyConfig_StateTransitions) {
+    AuditModule& module = AuditModule::instance();
+    module.begin();
+    module.clearAll();
+    module.resetConfig();
+
+    // 1. Transition enabled -> disabled: should write audit_disabled record
+    JsonDocument disableDoc;
+    JsonObject disableObj = disableDoc.to<JsonObject>();
+    disableObj["enabled"] = false;
+    module.applyConfig(disableObj);
+    EXPECT_FALSE(module.isEnabled());
+
+    // 2. Normal log while disabled is suppressed (returns false, no drop increment)
+    EXPECT_FALSE(module.log("app", "user_action"));
+    EXPECT_EQ(module.dropCount(), 0u);
+
+    // 3. Transition disabled -> enabled: should write audit_enabled record
+    JsonDocument enableDoc;
+    JsonObject enableObj = enableDoc.to<JsonObject>();
+    enableObj["enabled"] = true;
+    module.applyConfig(enableObj);
+    EXPECT_TRUE(module.isEnabled());
+
+    // 4. Normal log while enabled succeeds
+    EXPECT_TRUE(module.log("app", "user_action_after_enable"));
+}
+
+TEST_F(AuditModuleTest, Log_DisabledSuppressionAndInternalBypass) {
+    AuditModule& module = AuditModule::instance();
+    module.begin();
+    module.clearAll();
+    module.resetConfig();
+
+    // Disable logging
+    JsonDocument doc;
+    JsonObject obj = doc.to<JsonObject>();
+    obj["enabled"] = false;
+    module.applyConfig(obj);
+    EXPECT_FALSE(module.isEnabled());
+
+    // External log is suppressed without drop count increment
+    EXPECT_FALSE(module.log("mcp", "tool_call", "device1", "details"));
+    EXPECT_EQ(module.dropCount(), 0u);
+
+    // External sync log is also suppressed without drop count increment
+    EXPECT_FALSE(module.auditSync("mcp", "tool_call_sync", "device1", "details"));
+    EXPECT_EQ(module.dropCount(), 0u);
+
+    // Internal audit record (source == "audit") bypasses enabled check
+    EXPECT_TRUE(module.log("audit", "rate_limited", nullptr, "internal test"));
+}
+
+TEST_F(AuditModuleTest, PreconditionContributor_RegistrationAndEvaluation) {
+    AuditModule& module = AuditModule::instance();
+    module.resetConfig();
+    module.clearAll();
+
+    struct MockRegistry : public IPreconditionRegistry {
+        std::string name;
+        PreconditionRole role = PreconditionRole::Startup;
+        EvalFn eval;
+        DescribeFn describe;
+
+        void add(const char* n,
+                 PreconditionRole r,
+                 EvalFn e,
+                 DescribeFn d = nullptr,
+                 const Edge* = nullptr,
+                 uint8_t = 0,
+                 const DampingPolicy* = nullptr,
+                 const RetryPolicy* = nullptr) override {
+            name = n ? n : "";
+            role = r;
+            eval = e;
+            describe = d;
+        }
+    } registry;
+
+    module.registerPreconditions(registry);
+
+    EXPECT_EQ(registry.name, "audit_health");
+    EXPECT_EQ(registry.role, PreconditionRole::Operational);
+    ASSERT_TRUE(registry.eval != nullptr);
+    ASSERT_TRUE(registry.describe != nullptr);
+
+    // Case 1: Not started
+    setStarted(module, false);
+    PreconditionStatus status = registry.eval();
+    EXPECT_FALSE(status.met);
+    EXPECT_EQ(status.cause, Cause::InternalError);
+
+    // Case 2: Started and enabled, clean (no drops, no throttles)
+    setStarted(module, true);
+    setEnabled(module, true);
+    setDropCount(module, 0);
+    setThrottleCount(module, 0);
+    status = registry.eval();
+    EXPECT_TRUE(status.met);
+    EXPECT_EQ(status.cause, Cause::Met);
+
+    // Case 3: Started but disabled in config
+    setEnabled(module, false);
+    status = registry.eval();
+    EXPECT_FALSE(status.met);
+    EXPECT_EQ(status.cause, Cause::Unavailable);
+
+    // Case 4: Started, enabled, but degraded (drops > 0)
+    setEnabled(module, true);
+    setDropCount(module, 3);
+    setThrottleCount(module, 0);
+    status = registry.eval();
+    EXPECT_TRUE(status.met);
+    EXPECT_EQ(status.cause, Cause::FallbackEngaged);
+
+    // Case 5: Started, enabled, but degraded (throttles > 0)
+    setDropCount(module, 0);
+    setThrottleCount(module, 2);
+    status = registry.eval();
+    EXPECT_TRUE(status.met);
+    EXPECT_EQ(status.cause, Cause::FallbackEngaged);
+
+    // Test describe function
+    char buf[128];
+    registry.describe(Cause::InternalError, buf, sizeof(buf));
+    EXPECT_NE(std::string(buf).find("initialization failed"), std::string::npos);
+
+    registry.describe(Cause::Unavailable, buf, sizeof(buf));
+    EXPECT_NE(std::string(buf).find("disabled"), std::string::npos);
+
+    registry.describe(Cause::FallbackEngaged, buf, sizeof(buf));
+    EXPECT_NE(std::string(buf).find("degraded"), std::string::npos);
+
+    registry.describe(Cause::Met, buf, sizeof(buf));
+    EXPECT_NE(std::string(buf).find("active"), std::string::npos);
 }
 
 int main(int argc, char** argv) {
