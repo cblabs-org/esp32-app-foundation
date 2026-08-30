@@ -37,6 +37,16 @@ Consumers gate optional modules and display drivers via `build_flags` in
 | `WITH_DISPLAY_LVGL` | LVGL colour-TFT display module | `systems/display/` |
 | `WITH_DISPLAY_U8G2` | U8G2 monochrome display module | `systems/display/` |
 
+### Hardware Budget Constants
+
+Define these in `hardware/<board-id>/board.h` to override defaults:
+
+| Constant | Default | Purpose |
+|:---|:---|:---|
+| `BOARD_AUDIT_BYTES` | `32768` (32 KiB) | Total flash budget for audit trail (two rotation files, each half this value) |
+
+See `hardware/_common/board_contract.h` for all fallback defaults.
+
 ## Version Injection — `inject_version.py`
 
 Single source of truth. Runs as pre-build hook.
@@ -78,6 +88,8 @@ pio run -e esp32dev --target uploadfs
 | `/www/<module>/tab.html` | Portal tab HTML fragment |
 | `/www/<module>/tab.js` | Portal tab JavaScript |
 | `/config_manifest.json` | OTA config lifecycle manifest |
+| `/audit_0.jsonl` | Audit trail file 0 (WITH_AUDIT, rotated by AuditModule) |
+| `/audit_1.jsonl` | Audit trail file 1 (WITH_AUDIT, rotated by AuditModule) |
 
 ## Release Pipeline
 

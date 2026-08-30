@@ -62,17 +62,20 @@ Each line in the JSONL audit file is a single JSON object formatted as follows:
 
 ### Field Definitions
 
-| Field | Type | Description |
-|:---|:---|:---|
-| `t_ms` | `uint32_t` | Millis timestamp (`millis()`) when the record was enqueued |
-| `ts` | `int64_t` | Epoch seconds from `time(nullptr)` (or `0` if NTP is not synced) |
-| `seq` | `uint32_t` | Monotonic per-boot sequence counter |
-| `boot_id` | `string` | 8-character hex identifier unique to each boot cycle (`esp_random()`) |
-| `build` | `string` | `BUILD_VERSION` injected at compile time (or `"unknown"`) |
-| `source` | `string` | Originating subsystem or module (max 32 chars, e.g. `"auth"`, `"config"`, `"mcp"`) |
-| `action` | `string` | Specific action taken (max 48 chars, e.g. `"login_failed"`, `"setting_changed"`) |
-| `target_id`| `string` | *Optional.* Target device, entity, or namespace (omitted if empty) |
-| `details` | `string` | *Optional.* Free-form payload (max 128 chars, redacted before storage, omitted if empty) |
+| Field | Type | Max Chars | Description |
+|:---|:---|:---|:---|
+| `t_ms` | `uint32_t` | — | Millis timestamp (`millis()`) when the record was enqueued |
+| `ts` | `int64_t` | — | Epoch seconds from `time(nullptr)` (or `0` if NTP is not synced) |
+| `seq` | `uint32_t` | — | Monotonic per-boot sequence counter (reset by `clearAll()`) |
+| `boot_id` | `string` | 8 | 8-character hex identifier unique to each boot cycle (`esp_random()`) |
+| `build` | `string` | — | `BUILD_VERSION` injected at compile time (or `"unknown"`) |
+| `source` | `string` | 31 | Originating subsystem or module (e.g. `"auth"`, `"config"`, `"mcp"`) |
+| `action` | `string` | 47 | Specific action taken (e.g. `"login_failed"`, `"setting_changed"`) |
+| `target_id`| `string` | 47 | *Optional.* Target device, entity, or namespace (omitted if empty) |
+| `details` | `string` | 127 | *Optional.* Free-form payload (redacted before storage, omitted if empty) |
+
+> [!NOTE]
+> Max Chars is the usable string capacity (C struct size minus null terminator).
 
 ---
 
@@ -101,6 +104,15 @@ To prevent flash wear from accidental tight loops or flood attacks, `AuditModule
     `{"source": "audit", "action": "rate_limited", "details": "rate limit exceeded"}`
   - Subsequent excessive records are dropped until tokens refill, incrementing the `throttleCount()` diagnostic metric.
 
+### Flash Wear Guidance
+
+At the default rate limit of 120 records/min (~200 bytes each), the 32 KiB budget rotates in approximately 1.4 minutes at sustained max rate. LittleFS wear-leveling distributes writes across the partition, but sustained high-rate logging should be avoided.
+
+**Recommended operational budgets:**
+- **Normal operation**: < 10 events/hour (administrative, config, security events)
+- **Burst scenario**: < 60 events/minute during incident response or OTA
+- **Anti-pattern**: > 120 events/minute sustained — this will trigger rate limiting and degrade `audit_health`
+
 ---
 
 ## 6. Runtime Toggle & Self-Documenting Gaps
@@ -121,8 +133,10 @@ To prevent silent log tampering:
 
 ## 7. Factory Reset & Maintenance
 
-- **Factory Reset**: By default, factory reset (`config_factory_reset`) wipes persisted configuration. `AuditModule::clearAll()` deletes `/littlefs/audit_0.jsonl` and `/littlefs/audit_1.jsonl`, resetting all counters (`seq`, `dropCount`, `throttleCount`, `recordCount`).
-- **Manual Clearing**: Available via REST (`POST /api/system/audit/clear`) and MCP (`clear_audit_log`).
+> [!IMPORTANT]
+> **Audit logs intentionally survive factory reset.** The `config_factory_reset` MCP tool and `ConfigManager::factoryReset()` only sweep module configuration files (`/mod/*.json`). They do **not** call `AuditModule::clearAll()`. This is by design — audit records are a permanent administrative trail that should persist across configuration changes.
+
+- **Manual Clearing**: Available via REST (`POST /api/system/audit/clear`) and MCP (`clear_audit_log`). These call `clearAll()`, which deletes both JSONL files and resets all counters (including `seq`, `dropCount`, `throttleCount`, `recordCount`).
 
 ---
 
@@ -146,19 +160,74 @@ To prevent silent log tampering:
 
 Contributed via `IPreconditionContributor` with role `PreconditionRole::Operational`:
 
-| Precondition State | Status | Cause | Description |
+| Precondition State | Status | Cause | Help Text |
 |:---|:---|:---|:---|
-| Uninitialized / Preflight failed | `false` | `Cause::InternalError` | Storage full or task creation failed |
-| Disabled via config | `false` | `Cause::Unavailable` | Audit logging disabled in configuration |
-| Dropping or throttling | `true` | `Cause::FallbackEngaged` | Queue full or rate limit exceeded |
-| Normal operation | `true` | `Cause::Met` | Audit logging active |
+| Uninitialized / Preflight failed | `false` | `Cause::InternalError` | "Audit storage or task initialization failed" |
+| Disabled via config | `false` | `Cause::Unavailable` | "Audit logging disabled in configuration" |
+| Dropping or throttling | `true` | `Cause::FallbackEngaged` | "Audit logging degraded — dropping or throttling records" |
+| Normal operation | `true` | `Cause::Met` | "Audit logging active" |
 
 > [!NOTE]
 > The `FallbackEngaged` state is **sticky** — once a single drop or throttle occurs, the precondition stays degraded until `clearAll()` is called (which resets counters). This is intentional: an audit trail should surface historical reliability problems, not silently recover.
 
 ---
 
-## 9. Anti-Patterns & Best Practices
+## 9. Thread Safety & Concurrency
+
+> [!IMPORTANT]
+> Understanding the thread-safety model is critical for correct use in multi-task firmware.
+
+| Function | Thread-Safe? | Notes |
+|:---|:---|:---|
+| `log()` | ✅ Yes | Non-blocking `xQueueSend` with zero-wait. Safe from any FreeRTOS task. |
+| `auditSync()` | ✅ Yes | Per-call binary semaphore. Safe from any task, but **blocks the caller** (see below). |
+| `clearAll()` | ✅ Yes | File deletion + atomic counter resets. Writer task may interleave a write. |
+| `checkRateLimit()` | ✅ Yes | Protected by `_rateLimitMutex`. |
+| `recordCount()`, `dropCount()`, `throttleCount()` | ✅ Yes | `std::atomic` reads, safe from any context. |
+| `activeFileIndex()`, `currentFileSize()` | ⚠️ Eventually consistent | Written by the writer task without atomics. Reads from other threads may see slightly stale values. Safe but not real-time precise. |
+| `begin()` | ❌ Single-call | Must be called once from the main task during `setup()`. |
+| `log()` / `auditSync()` | ❌ **Not ISR-safe** | Heap allocation (`new`) and FreeRTOS queue primitives are not ISR-safe. |
+
+### `auditSync()` Timeout Semantics
+
+`auditSync()` blocks the calling thread for up to **5 seconds** (default `timeoutMs = 5000`) waiting for the writer task to flush the record to flash.
+
+- **On success**: Returns `true`. The record is confirmed written to flash.
+- **On timeout**: Returns `false` and increments `_dropCount`. However, the record **remains in the queue** and **will still be written to flash** by the writer task. The semaphore is cleaned up by the writer (no memory leak). The `false` return means "not confirmed within your deadline", not "record lost".
+- **On queue-full**: Returns `false` immediately (the record is deleted, not enqueued).
+
+### Redactor Thread-Safety Contract
+
+`Redactor::registerSecret()` must only be called during single-threaded initialization (`setup()`) before `begin()` returns. The internal `_secrets` vector has no mutex protection. Concurrent `registerSecret()` calls from background tasks will cause undefined behavior.
+
+---
+
+## 10. Limitations & Known Constraints
+
+> [!WARNING]
+> Read this section carefully before integrating audit logging into production firmware.
+
+### JSON Field Escaping
+`formatRecord()` injects string fields via `%s` (C `snprintf`) **without JSON string escaping**. This is safe for current callers because `source`, `action`, and `targetId` are short alphanumeric constants, and `details` is redacted before formatting. However, if `details` ever carries arbitrary user-supplied text containing `"`, `\`, or control characters, the JSONL record will be malformed. **Mitigation**: Keep `details` to simple key=value pairs. If arbitrary text must be logged, sanitize it before passing to `AUDIT()`.
+
+### 512-Byte Record Buffer
+Each record is formatted into a 512-byte stack buffer in `writeRecord()`. If the serialized JSON exceeds 511 bytes (unlikely with the field size limits), `snprintf` silently truncates it, producing a malformed JSON line. The field size limits (31+47+47+127 = 252 chars of payload) keep records well within this budget under normal use.
+
+### Queue Saturation Under Load
+The DRAM queue holds 16 records. When the queue is full:
+- `log()` returns `false` immediately and **deletes the record** — it is permanently lost.
+- `_dropCount` is incremented and `audit_health` degrades to `FallbackEngaged` (sticky).
+- The queue uses zero-wait semantics (`xQueueSend` with `0` timeout) to avoid blocking callers.
+
+### No EventBus Integration
+`AuditModule` does not publish to or subscribe from the EventBus. There is no `audit.record.written` event. This is intentional to avoid circular dependencies (if EventBus handlers themselves emit audit records).
+
+### `begin()` Must Precede All Logging
+If `log()` or `auditSync()` is called before `begin()` completes, the function returns `false` immediately. Ensure `registerModule(&auditModule)` executes during `Application::begin()` before any module emits audit records.
+
+---
+
+## 11. Anti-Patterns & Best Practices
 
 > [!CAUTION]
 > Avoid these common audit anti-patterns:
@@ -170,8 +239,11 @@ Contributed via `IPreconditionContributor` with role `PreconditionRole::Operatio
   - *Problem*: `AUDIT()` allocates memory and calls FreeRTOS queue primitives that are not ISR-safe.
   - *Fix*: Defer audit logging to a task or EventBus handler.
 - ❌ **Calling `AUDIT_SYNC()` in tick loops or EventBus callbacks**
-  - *Problem*: `AUDIT_SYNC()` blocks the calling thread until flash write completes (up to 5s). This will stall the main loop and trigger the Task Watchdog Timer (TWDT).
+  - *Problem*: `AUDIT_SYNC()` blocks the calling thread for up to 5 seconds. This will stall the main loop and trigger the Task Watchdog Timer (TWDT).
   - *Fix*: Use asynchronous `AUDIT()` in tick loops and EventBus subscribers. Reserve `AUDIT_SYNC()` for deliberate shutdown/handshake sequences in dedicated tasks.
 - ❌ **Logging high-frequency sensor readings as audit events**
   - *Problem*: Rapid writes quickly exhaust the 120/min rate limit and cause premature flash wear.
   - *Fix*: Audit logs are for administrative, operational, and security events. Use telemetry channels, display buffers, or debug logs for high-frequency measurements.
+- ❌ **Calling `Redactor::registerSecret()` from background tasks**
+  - *Problem*: The secret registry is a `std::vector` without mutex protection. Late registration races with concurrent `redact()` calls from the writer task.
+  - *Fix*: Register all secrets during `setup()` before `Application::begin()` returns.

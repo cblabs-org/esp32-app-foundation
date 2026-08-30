@@ -15,8 +15,9 @@ description: >
   display carousel, OTA verification, MCP server/device tools,
   PreconditionEngine, precondition, Cause, Severity, IPreconditionRegistry,
   ITabRegistry, registerTabs, DataSourceHealthPayload, data.source.health,
-  get_data_sources, AUDIT, audit trail, audit log, WITH_AUDIT, AuditModule,
-  Audit.h, get_audit_log, clear_audit_log, BOARD_AUDIT_BYTES, audit_health.
+  get_data_sources, AUDIT, AUDIT_SYNC, audit trail, audit log, WITH_AUDIT,
+  AuditModule, Audit.h, get_audit_log, clear_audit_log, BOARD_AUDIT_BYTES,
+  audit_health, Redactor, registerSecret, flash wear.
   (4) Patterns and safety — Service Module Pattern, orchestrator
   anti-pattern, Domain Meaning Test, SOLID, thread safety, std::function, TWDT,
   watchdog, heap, PSRAM, TLS memory, flash size. (5) Security — DeviceCrypto,
@@ -221,7 +222,9 @@ These references are optimized distillations for AI agents. If the human develop
   "compliance check", "audit my app".
 - **Audit trail / event logging**: "AuditModule", "AUDIT", "AUDIT_SYNC", "WITH_AUDIT",
   "Audit.h", "audit trail", "audit log", "get_audit_log", "clear_audit_log",
-  "BOARD_AUDIT_BYTES", "audit_health", "flash audit", "structured audit".
+  "BOARD_AUDIT_BYTES", "audit_health", "flash audit", "structured audit",
+  "Redactor", "registerSecret", "redact", "secret redaction", "flash wear",
+  "token bucket", "rate limit", "SYNC_EACH".
 - **Security & credentials**: "DeviceCrypto", "KeyManager", "AuthManager", "JWT",
   "credential storage", "setInsecure", "SECURITY_VERSION", "anti-rollback",
   "private_key.pem".
