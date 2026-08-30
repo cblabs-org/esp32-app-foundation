@@ -97,6 +97,10 @@ bool AuditModule::begin() {
     // MUST use xTaskCreateWithCaps with MALLOC_CAP_INTERNAL because this task
     // writes to LittleFS flash. During SPI flash operations the cache is disabled,
     // making PSRAM-resident stacks inaccessible (IllegalInstruction on ESP32-S3).
+    // NOTE: _started is set BEFORE task creation because on dual-core targets
+    // (ESP32-S3), the new task may be scheduled immediately on the other core.
+    // If it reads _started == false, the while-loop exits and the writer dies.
+    _started = true;
     BaseType_t result = xTaskCreateWithCaps(
         writerLoop,
         "AuditWriter",
@@ -108,13 +112,13 @@ bool AuditModule::begin() {
     );
 
     if (result != pdPASS) {
+        _started = false;
         ESP_LOGE(TAG, "Failed to create AuditWriter task");
         vQueueDelete(_queue);
         _queue = nullptr;
         return false;
     }
 
-    _started = true;
     ESP_LOGI(TAG, "AuditModule started (boot_id=%08x, budget=%u B, active_file=%u)",
              (unsigned)_bootId, (unsigned)AUDIT_BUDGET_BYTES, _activeFileIndex);
     return true;
