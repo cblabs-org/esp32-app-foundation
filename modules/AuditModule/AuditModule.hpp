@@ -14,24 +14,36 @@
  * - AuditRecord: Struct containing in-memory audit event fields.
  * - RateLimitAction: Enum representing the rate limiter decision.
  * - AuditModule: Core engine for flash-backed audit event logging.
+ *
+ *   Lifecycle / Own Public API:
+ *   - instance(): Returns the singleton instance.
  *   - begin(): Initializes queue, worker task, and file rotation.
  *   - log(): Enqueues an audit record asynchronously.
- *   - auditSync(): Enqueues an audit record and blocks until written to flash.
+ *   - auditSync(): Enqueues an audit record and blocks until written.
  *   - clearAll(): Deletes audit log files and resets counters.
- *   - recordCount(): Returns total records written this boot.
- *   - dropCount(): Returns total records dropped due to queue-full.
- *   - throttleCount(): Returns total records suppressed by rate limiter.
- *   - isEnabled(): Returns true if audit logging is enabled.
- *   - configuredRateLimit(): Returns configured rate limit per minute.
- *   - getConfigNamespace(): Returns "audit" namespace.
- *   - getSchemaVersion(): Returns config schema version.
- *   - applyConfig(): Applies configuration from JSON section.
- *   - serializeConfig(): Serializes configuration into JSON section.
- *   - migrateConfig(): Migrates config from older schema version.
- *   - resetConfig(): Resets configuration to defaults.
- *   - registerPreconditions(): Registers audit_health precondition.
  *   - formatRecord(): Formats an AuditRecord into a JSONL string.
- *   - instance(): Returns the singleton instance of AuditModule.
+ *   - checkRateLimit(): Evaluates token-bucket rate limiter.
+ *   - resetRateLimiter(): Resets rate limiter tokens and timestamp.
+ *
+ *   Diagnostic Accessors:
+ *   - recordCount(), dropCount(), throttleCount(): Counter snapshots.
+ *   - isEnabled(), configuredRateLimit(): Config state queries.
+ *   - activeFileIndex(), currentFileSize(), bootId(): File tracking.
+ *
+ *   IWebContributor:
+ *   - registerRoutes(): GET /api/system/audit, POST /api/system/audit/clear.
+ *   - registerTabs(): Empty (diagnostic surface, no portal tab).
+ *   - getApiPrefix(), getMaxPostBody(): Route metadata.
+ *
+ *   IMCPContributor:
+ *   - registerMCPTools(): get_audit_log (read), clear_audit_log (write).
+ *
+ *   IConfigurable:
+ *   - getConfigNamespace(), getSchemaVersion(): "audit", version 1.
+ *   - applyConfig(), serializeConfig(), migrateConfig(), resetConfig().
+ *
+ *   IPreconditionContributor:
+ *   - registerPreconditions(): Registers audit_health precondition.
  */
 
 #pragma once
@@ -86,19 +98,19 @@ class AuditModule : public IWebContributor,
                     public IConfigurable,
                     public IPreconditionContributor {
 public:
-    static constexpr size_t AUDIT_QUEUE_DEPTH = 16;
-    static constexpr uint32_t AUDIT_WRITER_STACK_SIZE = 4096;
-    static constexpr UBaseType_t AUDIT_WRITER_PRIORITY = 2;
+    static constexpr size_t AUDIT_QUEUE_DEPTH = 16;              ///< Max records buffered before drops
+    static constexpr uint32_t AUDIT_WRITER_STACK_SIZE = 4096;    ///< DRAM stack for AuditWriter task
+    static constexpr UBaseType_t AUDIT_WRITER_PRIORITY = 2;      ///< Low priority — non-critical I/O
 #ifdef BOARD_AUDIT_BYTES
-    static constexpr size_t AUDIT_BUDGET_BYTES = BOARD_AUDIT_BYTES;
+    static constexpr size_t AUDIT_BUDGET_BYTES = BOARD_AUDIT_BYTES;  ///< Board-specific flash budget
 #else
-    static constexpr size_t AUDIT_BUDGET_BYTES = 32768;
+    static constexpr size_t AUDIT_BUDGET_BYTES = 32768;          ///< Fallback: 32 KiB total for both files
 #endif
-    static constexpr uint32_t AUDIT_RATE_LIMIT_PER_MIN = 120;
+    static constexpr uint32_t AUDIT_RATE_LIMIT_PER_MIN = 120;   ///< Token-bucket capacity (records/min)
 #ifdef ESP_PLATFORM
-    static constexpr const char* AUDIT_FILE_PREFIX = "/littlefs/audit_";
+    static constexpr const char* AUDIT_FILE_PREFIX = "/littlefs/audit_";  ///< Storage partition path
 #else
-    static constexpr const char* AUDIT_FILE_PREFIX = "test/tmp/audit_";
+    static constexpr const char* AUDIT_FILE_PREFIX = "test/tmp/audit_";   ///< Native test path
 #endif
 
     /**
@@ -272,23 +284,23 @@ private:
     void seedActiveFile();
     bool enqueueInternal(const char* source, const char* action, const char* targetId, const char* details, SemaphoreHandle_t syncSem);
 
-    QueueHandle_t _queue = nullptr;
-    TaskHandle_t _writerTask = nullptr;
-    std::atomic<uint32_t> _seq{0};
-    uint32_t _bootId = 0;
-    size_t _currentFileSize = 0;
-    uint8_t _activeFileIndex = 0;
-    size_t _maxFileSize = AUDIT_BUDGET_BYTES / 2;
-    std::atomic<size_t> _dropCount{0};
-    std::atomic<size_t> _recordCount{0};
-    std::atomic<size_t> _throttleCount{0};
-    bool _started = false;
+    QueueHandle_t _queue = nullptr;                  ///< FreeRTOS queue for AuditRecord pointers
+    TaskHandle_t _writerTask = nullptr;              ///< Background DRAM writer task handle
+    std::atomic<uint32_t> _seq{0};                   ///< Monotonic sequence number (per-boot)
+    uint32_t _bootId = 0;                            ///< Random ID generated at begin()
+    size_t _currentFileSize = 0;                     ///< Tracked size of the active JSONL file
+    uint8_t _activeFileIndex = 0;                    ///< Which file (0 or 1) is being written
+    size_t _maxFileSize = AUDIT_BUDGET_BYTES / 2;    ///< Rotation threshold (half of total budget)
+    std::atomic<size_t> _dropCount{0};               ///< Records lost to queue-full or I/O errors
+    std::atomic<size_t> _recordCount{0};             ///< Records successfully written to flash
+    std::atomic<size_t> _throttleCount{0};           ///< Records suppressed by rate limiter
+    bool _started = false;                           ///< True after successful begin()
 
-    std::mutex _rateLimitMutex;
-    float _rateTokens = (float)AUDIT_RATE_LIMIT_PER_MIN;
-    uint32_t _lastRefillMs = 0;
-    bool _throttledState = false;
+    std::mutex _rateLimitMutex;                      ///< Guards token bucket state
+    float _rateTokens = (float)AUDIT_RATE_LIMIT_PER_MIN;  ///< Available tokens in bucket
+    uint32_t _lastRefillMs = 0;                      ///< Timestamp of last token refill
+    bool _throttledState = false;                    ///< True while actively throttling
 
-    bool _enabled = true;
-    uint32_t _configuredRateLimit = AUDIT_RATE_LIMIT_PER_MIN;
+    bool _enabled = true;                            ///< Runtime toggle via IConfigurable
+    uint32_t _configuredRateLimit = AUDIT_RATE_LIMIT_PER_MIN;  ///< Configured rate limit (records/min)
 };

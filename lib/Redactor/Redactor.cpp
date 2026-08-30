@@ -8,6 +8,9 @@
  * Module: lib/Redactor/Redactor.cpp
  * Description: Redactor implementation for sensitive string masking.
  *
+ * Exported Functions/Classes:
+ * - Redactor::registerSecret(): Adds a secret to the global redaction registry.
+ * - Redactor::redact(): Scans a buffer and masks all registered secrets.
  */
 
 #include "Redactor.h"

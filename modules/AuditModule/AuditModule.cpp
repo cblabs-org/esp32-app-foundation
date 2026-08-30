@@ -7,6 +7,9 @@
  *
  * Module: modules/AuditModule/AuditModule.cpp
  * Description: Core implementation of the flash-backed AuditModule engine.
+ *
+ * Exported Functions/Classes:
+ * - AuditModule (implementation of all interface methods and internal helpers)
  */
 
 #ifdef WITH_AUDIT
@@ -29,7 +32,7 @@
 #define BUILD_VERSION "unknown"
 #endif
 
-static const char* TAG = "AuditModule";
+static constexpr const char* TAG = "AuditModule";
 
 AuditModule& AuditModule::instance() {
     static AuditModule s_instance;
