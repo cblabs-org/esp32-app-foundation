@@ -1,0 +1,10 @@
+{
+  "name": "AuditModule",
+  "version": "0.1.0",
+  "description": "Flash-persisted FreeRTOS audit trail engine",
+  "build": {
+    "flags": [
+      "-I../../include"
+    ]
+  }
+}
