@@ -73,6 +73,12 @@
 #define BOARD_ID_STRING     "template"
 constexpr bool HAS_PSRAM = false;
 
+// ── Audit budget (optional — override default in board_contract.h) ────────
+// #define BOARD_AUDIT_BYTES 32768           // Total bytes for audit log files
+//                                          // Default: 32 KiB (see board_contract.h)
+//                                          // 4 MB boards: use 16384 (16 KiB)
+//                                          // 16 MB boards: use 65536 (64 KiB)
+
 // ── Display pin block (U8G2 Option Example) ──────────────────────────────────
 #ifdef WITH_DISPLAY_U8G2
 #define U8G2_DISPLAY_TYPE U8G2_SSD1322_NHD_256X64_F_4W_HW_SPI

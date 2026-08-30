@@ -49,6 +49,11 @@
 #include "platform/LogShim.h"
 #include "DeviceCrypto.hpp"
 
+#ifdef WITH_AUDIT
+#include "AuditModule.hpp"
+static AuditModule& auditModule = AuditModule::instance();
+#endif
+
 static constexpr const char* TAG = "Application";
 
 // --- PSRAM configuration guard (Issue #36) ---
@@ -190,7 +195,10 @@ bool Application::begin(const FrameworkConfig& config) {
         registerModule(&_appTabContributor);  // IWebContributor
     }
 
-
+#ifdef WITH_AUDIT
+    auditModule.begin();
+    registerModule(&auditModule);
+#endif
 
     _wifiPrecondition.registerPreconditions(_preconditionEngine);
 

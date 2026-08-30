@@ -13,7 +13,7 @@
  *                - set_config:       Update module configs via gateway import
  *                - patch_config:     Apply RFC 6902 JSON Patch ops to a single config namespace
  *                - reboot:           Restart the ESP32 device
- *                - get_logs:         Placeholder for future log ring-buffer
+ *                - get_debug_logs:   Placeholder for future volatile log ring-buffer
  *                - list_tools:       Enumerate all registered MCP tools
  *
  * Exported Functions:
@@ -411,7 +411,7 @@ void mcpBuiltinTools::registerAll(MCPToolRegistry& registry,
     );
 
     // -----------------------------------------------------------------
-    // Tool 6: get_logs — Placeholder for future log ring-buffer
+    // Tool 6: get_debug_logs — Placeholder for future log ring-buffer
     // -----------------------------------------------------------------
 
     // Build input schema with optional 'count' parameter
@@ -424,8 +424,8 @@ void mcpBuiltinTools::registerAll(MCPToolRegistry& registry,
     countP["description"] = "Number of recent log lines to retrieve (default 20)";
 
     registry.addTool(
-        "get_logs",
-        "Get recent log entries from the device log buffer",
+        "get_debug_logs",
+        "Get recent debug log entries from the volatile log buffer (ESP_LOG output)",
         getLogsSchema,
         [](void* /*ctx*/, JsonObject& params, JsonObject& result) {
             // v1 stub — the full ring-buffer logger is a future enhancement.
@@ -434,7 +434,7 @@ void mcpBuiltinTools::registerAll(MCPToolRegistry& registry,
             int count = params["count"] | 20; // Default to 20 lines
             (void)count; // Suppress unused-variable warning until buffer is implemented
             result["logs"] = "Log buffer not yet implemented (PR-05b placeholder)";
-            result["note"] = "A ring-buffer logger will be added in a future PR";
+            result["note"] = "Debug log ring-buffer not yet implemented. See get_audit_log for durable audit records.";
         }
     );
 

@@ -233,7 +233,7 @@ third lane.
 |---|---|---|
 | **Core infrastructure** (always) | EventBus, ConfigManager, DataManager, KeyManager, DeviceCrypto, WifiManager + gate, AuthManager, WebServer | none |
 | **Optional — default on** | TimeManager | e.g. `WITH_TIME` (default on) |
-| **Optional — default off** | MCPServer, HomeAssistant, **OTAUpdateManager** | e.g. `WITH_MCP`, `WITH_HOMEASSISTANT`, `WITH_OTA` |
+| **Optional — default off** | MCPServer, HomeAssistant, **OTAUpdateManager**, AuditModule | e.g. `WITH_MCP`, `WITH_HOMEASSISTANT`, `WITH_OTA`, `WITH_AUDIT` |
 | **Hardware / display** (mutually exclusive) | U8G2, LVGL, none | `BOARD_DISPLAY_KIND` (from `board.<id>.h`) |
 
 Two decisions are recorded here as **provisional** and flagged in
@@ -462,6 +462,7 @@ differ per physical device, and must it survive an update?"*
 |---|---|---|---|---|
 | **NVS** | encryption keys (secrets) | n/a | never | already used via `Preferences` (KeyManager/DeviceCrypto) |
 | **`config` LittleFS partition** | `/etc` (keys.json, cert/key) + `/mod` config | **No — by design** | never | device identity/state; A/B is a *non-goal* (you don't roll back identity) |
+| **`storage` LittleFS partition** | `/littlefs/audit_*.jsonl` (audit trail) | **No** | never | budget-bounded (`BOARD_AUDIT_BYTES`), `SYNC_EACH` durability, two-file rotation |
 | **App slots (A/B)** | firmware **+ all shippable assets** | **Yes (inherited)** | yes, signed | portal already compiled-in ([include/portal_assets/](../include/portal_assets/)); LVGL via PR-47 |
 | **`data` / cache partition** (opt-in) | app runtime data + **re-fetchable caches** (e.g. `timezones.json`) | No | never | disposable; re-derivable at runtime |
 

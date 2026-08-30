@@ -15,7 +15,9 @@ description: >
   display carousel, OTA verification, MCP server/device tools,
   PreconditionEngine, precondition, Cause, Severity, IPreconditionRegistry,
   ITabRegistry, registerTabs, DataSourceHealthPayload, data.source.health,
-  get_data_sources. (4) Patterns and safety — Service Module Pattern, orchestrator
+  get_data_sources, AUDIT, audit trail, audit log, WITH_AUDIT, AuditModule,
+  Audit.h, get_audit_log, clear_audit_log, BOARD_AUDIT_BYTES, audit_health.
+  (4) Patterns and safety — Service Module Pattern, orchestrator
   anti-pattern, Domain Meaning Test, SOLID, thread safety, std::function, TWDT,
   watchdog, heap, PSRAM, TLS memory, flash size. (5) Security — DeviceCrypto,
   KeyManager, AuthManager, JWT, setInsecure, certificate bundles, esp_crt_bundle,
@@ -128,6 +130,7 @@ This skill uses a progressive disclosure model. Based on your query, load and re
 | **Performance** (PSRAM, flash size, heap, profiling) | `performance/` |
 | **TLS Memory Optimization** (sdkconfig tuning, measured results, cert bundles) | `performance/tls-memory-optimization.md` |
 | **Certificate Bundle Config** (CMN/FULL/none, disable guide, DEFAULT_NONE bug) | `security/tls-tradeoffs.md` § Certificate Bundle Configuration |
+| **Audit System** (Audit trail, AUDIT() macro, rate limits, flash durability, WITH_AUDIT) | `references/audit-module-guide.md` |
 | **Versioning Policy** (SemVer tags, dev/beta/stable tiers, build gate) | Read `.agents/rules/03-versioning.md` (build gate) and `docs/developer/versioning-policy.md` (full reference) |
 | **Embedded Safety** (Thread safety, memory rules, power, rejected approaches)| `embedded-safety/` |
 
@@ -216,6 +219,9 @@ These references are optimized distillations for AI agents. If the human develop
   "release checklist", "beta audit", "stable audit", "release readiness",
   "pre-release validation", "release candidate review", "consumer audit",
   "compliance check", "audit my app".
+- **Audit trail / event logging**: "AuditModule", "AUDIT", "AUDIT_SYNC", "WITH_AUDIT",
+  "Audit.h", "audit trail", "audit log", "get_audit_log", "clear_audit_log",
+  "BOARD_AUDIT_BYTES", "audit_health", "flash audit", "structured audit".
 - **Security & credentials**: "DeviceCrypto", "KeyManager", "AuthManager", "JWT",
   "credential storage", "setInsecure", "SECURITY_VERSION", "anti-rollback",
   "private_key.pem".
@@ -236,10 +242,11 @@ These references are optimized distillations for AI agents. If the human develop
 - **MCP server / device interaction**: "MCP server", "MCP tool", "device MCP",
   "list_tools", "get_data_sources", "device diagnostics", "device IP", "system_info", "capture_display",
   "wifi_get_status", "ota_get_status", "display_status", "config_factory_reset",
+  "get_audit_log", "clear_audit_log",
   "readOnly mode", "JSON-RPC", "call a tool on the device", "talk to the device",
   "query the device", "device telemetry".
 - **REST APIs**: "/api/data/sources", "/api/data/sources/reset", "/api/mcp",
-  "/api/wifi/status", "/api/system".
+  "/api/wifi/status", "/api/system", "/api/system/audit", "/api/system/audit/clear".
 
 Also trigger when an agent is working on code that extends the framework and needs
 guidance on interface contracts, patterns, performance, or embedded safety.

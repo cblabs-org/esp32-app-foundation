@@ -1,0 +1,5 @@
+{
+  "name": "Redactor",
+  "version": "0.1.0",
+  "description": "In-place secret redaction utility for ESP32 App Foundation"
+}

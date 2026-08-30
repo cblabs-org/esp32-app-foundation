@@ -83,6 +83,9 @@
 #define BOARD_ID_STRING     "esp32dev"
 constexpr bool HAS_PSRAM = false;
 
+// ── Audit budget (storage partition = 128 KiB) ────────────────────────────
+#define BOARD_AUDIT_BYTES 16384              // 16 KiB — conservative for 128 KiB storage
+
 // ── Display pin block (U8G2 SSD1322 4-wire HW SPI) ───────────────────────────
 #ifdef WITH_DISPLAY_U8G2
 #define U8G2_DISPLAY_TYPE U8G2_SSD1322_NHD_256X64_F_4W_HW_SPI

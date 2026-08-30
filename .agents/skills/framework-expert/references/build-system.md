@@ -33,6 +33,7 @@ Consumers gate optional modules and display drivers via `build_flags` in
 |:---|:---|:---|
 | `WITH_BUTTONS` | `ButtonModule` | `systems/input/button-module.md` |
 | `WITH_ENCODER` | `EncoderModule` | `systems/input/encoder-module.md` |
+| `WITH_AUDIT` | `AuditModule` | `references/audit-module-guide.md` |
 | `WITH_DISPLAY_LVGL` | LVGL colour-TFT display module | `systems/display/` |
 | `WITH_DISPLAY_U8G2` | U8G2 monochrome display module | `systems/display/` |
 

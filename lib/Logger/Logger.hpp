@@ -24,6 +24,7 @@
 #include <string>
 
 #include "platform/LogShim.h"
+#include "Redactor.h"
 
 #define LOG_SECURE(tag, fmt, ...) Logger::logSecure(tag, fmt, ##__VA_ARGS__) ///< Convenience macro for redacted secure logging
 
@@ -48,15 +49,6 @@ public:
      * @param format Printf-style format string.
      */
     static void logSecure(const char* tag, const char* format, ...);
-
-private:
-    static std::vector<std::string> secrets; ///< Registry of sensitive strings
-
-    /**
-     * @brief Scans a char buffer and replaces any registered secrets with asterisks in-place.
-     * @param buffer The character array to redact.
-     */
-    static void redactInPlace(char* buffer);
 };
 
 #endif // LOGGER_HPP
