@@ -24,10 +24,10 @@ Implement a generalized `AuditModule` providing a standardized, flash-persisted 
 - **[x] [wo1-redactor-extraction](wo1-redactor-extraction/WORKORDER.md):** Extract secret registry + redaction from `lib/Logger` into dependency-free `lib/Redactor` leaf *(commit `8d2f471a`, 851 tests pass)*
 - **[x] [wo2-audit-core](wo2-audit-core/WORKORDER.md):** AuditModule core engine — queue, DRAM writer task, JSONL rotation, rate limiter, `log()`, `auditSync()`, `clearAll()` *(commit `7a1800c4`, 861 tests pass)*
 - **[x] [wo3-board-constants](wo3-board-constants/WORKORDER.md):** Add `BOARD_AUDIT_BYTES` to board.h files and `board_contract.h` fallback *(commit `0f85c42d`, all boards build clean)*
-- **[x] [wo4-rest-mcp-surfaces](wo4-rest-mcp-surfaces/WORKORDER.md):** IWebContributor + IMCPContributor — REST endpoints, MCP tools, `get_logs` → `get_debug_logs` rename *(867 tests pass)*
-- **[ ] [wo5-config-preconditions](wo5-config-preconditions/WORKORDER.md):** IConfigurable + IPreconditionContributor — runtime toggle, health reporting
-- **[ ] [wo6-macro-gating](wo6-macro-gating/WORKORDER.md):** `AUDIT()` macro, `WITH_AUDIT` build flag, sentinel pattern, MK-6/MK-14 doc updates
-- **[ ] [wo7-docs-ci](wo7-docs-ci/WORKORDER.md):** Framework-expert skill updates, developer guide, CI build-matrix case
+- **[x] [wo4-rest-mcp-surfaces](wo4-rest-mcp-surfaces/WORKORDER.md):** IWebContributor + IMCPContributor — REST endpoints, MCP tools, `get_logs` → `get_debug_logs` rename *(commit `696e44e6`, 867 tests pass)*
+- **[x] [wo5-config-preconditions](wo5-config-preconditions/WORKORDER.md):** IConfigurable + IPreconditionContributor — runtime toggle, health reporting *(commit `c5813561`, 871 tests pass)*
+- **[x] [wo6-macro-gating](wo6-macro-gating/WORKORDER.md):** `AUDIT()` macro, `WITH_AUDIT` build flag, sentinel pattern, MK-6/MK-14 doc updates *(commit `e1ff0a3e`, 872 tests pass)*
+- **[x] [wo7-docs-ci](wo7-docs-ci/WORKORDER.md):** Framework-expert skill updates, developer guide, CI build-matrix case *(872 tests pass)*
 
 ## Modules & Components
 

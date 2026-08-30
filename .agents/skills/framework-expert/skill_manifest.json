@@ -43,6 +43,7 @@
     "performance/psram.md",
     "performance/tls-memory-optimization.md",
     "references/architecture.md",
+    "references/audit-module-guide.md",
     "references/build-system.md",
     "references/coding-discipline.md",
     "references/contribution-protocol.md",

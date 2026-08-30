@@ -89,6 +89,13 @@ Registered by `DataSourceWebContributor` on `Application`:
 - `GET /api/data/sources`: Returns JSON array of all registered data sources, their health states (`HEALTHY`, `DEGRADED`, `QUARANTINED`, `SUSPENDED`, `UNKNOWN`), failure counts, and active backoff durations.
 - `POST /api/data/sources/reset`: Resets a suspended or quarantined data source's health history (`{"name": "sourceName"}` or query param `?name=sourceName`), clearing backoff and resuming scheduled fetches.
 
+## Audit REST Endpoints
+
+Registered by `AuditModule` (`WITH_AUDIT`):
+
+- `GET /api/system/audit`: Paginated audit log retrieval in `application/x-ndjson` format (`lines`, `offset`, `file` query params, `X-Audit-Truncated` and `X-Audit-Next-Offset` headers).
+- `POST /api/system/audit/clear`: Clears all audit log files and resets counters (`{"ok": true}`).
+
 ## Built-in MCP Tool Endpoints
 
 For AI agent interaction, the framework provides built-in JSON-RPC 2.0 MCP tools mapped alongside REST endpoints:
@@ -98,7 +105,7 @@ For AI agent interaction, the framework provides built-in JSON-RPC 2.0 MCP tools
 - `set_config`: Update full configuration by namespace (`{"config":{"wifi":{...}}}`).
 - `patch_config`: Apply RFC 6902 JSON Patch ops to a single config namespace.
 - `reboot`: Restart the device with a 1-second flush delay.
-- `get_logs`: Read buffered log entries.
+- `get_debug_logs`: Read buffered log entries (placeholder for volatile log ring-buffer).
 - `list_tools`: Enumerate all registered MCP tools and schemas.
 - `get_data_sources`: Returns current health states, failure counts, and backoffs for all data sources.
 - `capture_display`: Capture monochrome/RGB display framebuffer.
