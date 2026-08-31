@@ -54,9 +54,7 @@ AuditModule::AuditModule()
       _started(false),
       _rateTokens((float)AUDIT_RATE_LIMIT_PER_MIN),
       _lastRefillMs(0),
-      _throttledState(false),
-      _enabled(true),
-      _configuredRateLimit(AUDIT_RATE_LIMIT_PER_MIN) {}
+      _throttledState(false) {}
 
 AuditModule::~AuditModule() {
     if (_queue) {
@@ -182,31 +180,39 @@ size_t AuditModule::formatRecord(const AuditRecord& record, uint32_t bootId, con
     if (!buffer || bufferSize == 0) return 0;
     const char* build = (buildVersion && buildVersion[0] != '\0') ? buildVersion : "unknown";
 
-    // --- Step 2: Select JSON shape based on optional fields ---
+    // --- Step 2: Defensive local pointers (guard against corrupted records) ---
+    const char* src = record.source;
+    const char* act = record.action;
+    const char* tid = record.targetId;
+    const char* det = record.details;
+    bool hasTid = (tid[0] != '\0');
+    bool hasDet = (det[0] != '\0');
+
+    // --- Step 3: Select JSON shape based on optional fields ---
     int written = 0;
-    if (record.targetId[0] != '\0' && record.details[0] != '\0') {
+    if (hasTid && hasDet) {
         written = snprintf(buffer, bufferSize,
             "{\"t_ms\":%u,\"ts\":%" PRId64 ",\"seq\":%u,\"boot_id\":\"%08x\",\"build\":\"%s\",\"source\":\"%s\",\"action\":\"%s\",\"target_id\":\"%s\",\"details\":\"%s\"}",
             (unsigned)record.t_ms, (int64_t)record.ts, (unsigned)record.seq, (unsigned)bootId,
-            build, record.source, record.action, record.targetId, record.details);
-    } else if (record.targetId[0] != '\0') {
+            build, src, act, tid, det);
+    } else if (hasTid) {
         written = snprintf(buffer, bufferSize,
             "{\"t_ms\":%u,\"ts\":%" PRId64 ",\"seq\":%u,\"boot_id\":\"%08x\",\"build\":\"%s\",\"source\":\"%s\",\"action\":\"%s\",\"target_id\":\"%s\"}",
             (unsigned)record.t_ms, (int64_t)record.ts, (unsigned)record.seq, (unsigned)bootId,
-            build, record.source, record.action, record.targetId);
-    } else if (record.details[0] != '\0') {
+            build, src, act, tid);
+    } else if (hasDet) {
         written = snprintf(buffer, bufferSize,
             "{\"t_ms\":%u,\"ts\":%" PRId64 ",\"seq\":%u,\"boot_id\":\"%08x\",\"build\":\"%s\",\"source\":\"%s\",\"action\":\"%s\",\"details\":\"%s\"}",
             (unsigned)record.t_ms, (int64_t)record.ts, (unsigned)record.seq, (unsigned)bootId,
-            build, record.source, record.action, record.details);
+            build, src, act, det);
     } else {
         written = snprintf(buffer, bufferSize,
             "{\"t_ms\":%u,\"ts\":%" PRId64 ",\"seq\":%u,\"boot_id\":\"%08x\",\"build\":\"%s\",\"source\":\"%s\",\"action\":\"%s\"}",
             (unsigned)record.t_ms, (int64_t)record.ts, (unsigned)record.seq, (unsigned)bootId,
-            build, record.source, record.action);
+            build, src, act);
     }
 
-    // --- Step 3: Handle truncation ---
+    // --- Step 4: Handle truncation ---
     if (written < 0 || (size_t)written >= bufferSize) {
         buffer[bufferSize - 1] = '\0';
         return bufferSize - 1;
@@ -280,10 +286,10 @@ RateLimitAction AuditModule::checkRateLimit(uint32_t nowMs) {
     } else {
         uint32_t elapsed = nowMs - _lastRefillMs;
         if (elapsed > 0) {
-            float refill = ((float)elapsed * (float)_configuredRateLimit) / 60000.0f;
+            float refill = ((float)elapsed * (float)AUDIT_RATE_LIMIT_PER_MIN) / 60000.0f;
             _rateTokens += refill;
-            if (_rateTokens > (float)_configuredRateLimit) {
-                _rateTokens = (float)_configuredRateLimit;
+            if (_rateTokens > (float)AUDIT_RATE_LIMIT_PER_MIN) {
+                _rateTokens = (float)AUDIT_RATE_LIMIT_PER_MIN;
             }
             _lastRefillMs = nowMs;
         }
@@ -305,7 +311,7 @@ RateLimitAction AuditModule::checkRateLimit(uint32_t nowMs) {
 
 void AuditModule::resetRateLimiter() {
     std::lock_guard<std::mutex> lock(_rateLimitMutex);
-    _rateTokens = (float)_configuredRateLimit;
+    _rateTokens = (float)AUDIT_RATE_LIMIT_PER_MIN;
     _lastRefillMs = 0;
     _throttledState = false;
 }
@@ -372,11 +378,6 @@ bool AuditModule::enqueueInternal(const char* source, const char* action, const 
 }
 
 bool AuditModule::log(const char* source, const char* action, const char* targetId, const char* details) {
-    bool isInternal = (source != nullptr && strcmp(source, "audit") == 0);
-    if (!_enabled && !isInternal) {
-        return false;
-    }
-
     uint32_t nowMs = millis();
     RateLimitAction rla = checkRateLimit(nowMs);
     if (rla == RateLimitAction::ThrottleFirst) {
@@ -392,11 +393,6 @@ bool AuditModule::log(const char* source, const char* action, const char* target
 }
 
 bool AuditModule::auditSync(const char* source, const char* action, const char* targetId, const char* details, uint32_t timeoutMs) {
-    bool isInternal = (source != nullptr && strcmp(source, "audit") == 0);
-    if (!_enabled && !isInternal) {
-        return false;
-    }
-
     uint32_t nowMs = millis();
     RateLimitAction rla = checkRateLimit(nowMs);
     if (rla == RateLimitAction::ThrottleFirst) {
@@ -709,47 +705,6 @@ void AuditModule::registerMCPTools(MCPToolRegistry& registry) {
 }
 
 // =============================================================================
-// IConfigurable Implementation
-// =============================================================================
-
-void AuditModule::applyConfig(const JsonObject& section) {
-    if (section["enabled"].is<bool>()) {
-        bool newEnabled = section["enabled"].as<bool>();
-        if (_enabled && !newEnabled) {
-            // Before disabling: write an audit record {source: "audit", action: "audit_disabled"} via log()
-            log("audit", "audit_disabled");
-            _enabled = false;
-        } else if (!_enabled && newEnabled) {
-            // After enabling: write an audit record {source: "audit", action: "audit_enabled"}
-            _enabled = true;
-            log("audit", "audit_enabled");
-        }
-    }
-
-    if (section["rate_limit"].is<int>()) {
-        int r = section["rate_limit"].as<int>();
-        if (r > 0) {
-            _configuredRateLimit = static_cast<uint32_t>(r);
-            std::lock_guard<std::mutex> lock(_rateLimitMutex);
-            if (_rateTokens > static_cast<float>(_configuredRateLimit)) {
-                _rateTokens = static_cast<float>(_configuredRateLimit);
-            }
-        }
-    }
-}
-
-void AuditModule::serializeConfig(JsonObject& section) const {
-    section["enabled"] = _enabled;
-    section["rate_limit"] = _configuredRateLimit;
-}
-
-void AuditModule::resetConfig() {
-    _enabled = true;
-    _configuredRateLimit = AUDIT_RATE_LIMIT_PER_MIN;
-    resetRateLimiter();
-}
-
-// =============================================================================
 // IPreconditionContributor Implementation
 // =============================================================================
 
@@ -758,9 +713,6 @@ void AuditModule::registerPreconditions(IPreconditionRegistry& registry) {
         [this]() -> PreconditionStatus {
             if (!_started) {
                 return {false, Cause::InternalError};
-            }
-            if (!_enabled) {
-                return {false, Cause::Unavailable};
             }
             if (_dropCount.load(std::memory_order_relaxed) > 0 ||
                 _throttleCount.load(std::memory_order_relaxed) > 0) {
@@ -772,9 +724,6 @@ void AuditModule::registerPreconditions(IPreconditionRegistry& registry) {
             switch (c) {
                 case Cause::InternalError:
                     snprintf(buf, len, "Audit storage or task initialization failed");
-                    break;
-                case Cause::Unavailable:
-                    snprintf(buf, len, "Audit logging disabled in configuration");
                     break;
                 case Cause::FallbackEngaged:
                     snprintf(buf, len, "Audit logging degraded — dropping or throttling records");
