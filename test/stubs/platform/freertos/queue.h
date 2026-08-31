@@ -58,6 +58,14 @@ inline int xQueueReceive(QueueHandle_t xQueue, void* pvBuffer, uint32_t xTicksTo
     return pdTRUE;
 }
 
+inline int xQueuePeek(QueueHandle_t xQueue, void* pvBuffer, uint32_t xTicksToWait) {
+    if (!xQueue || !pvBuffer) return pdFALSE;
+    auto* q = static_cast<NativeQueue*>(xQueue);
+    if (q->items.empty()) return pdFALSE;
+    std::memcpy(pvBuffer, q->items.front().data(), q->itemSize);
+    return pdTRUE;
+}
+
 inline size_t uxQueueMessagesWaiting(QueueHandle_t xQueue) {
     if (!xQueue) return 0;
     auto* q = static_cast<NativeQueue*>(xQueue);

@@ -36,9 +36,6 @@ protected:
     void setDropCount(AuditModule& m, size_t drops) {
         m._dropCount.store(drops);
     }
-    void setThrottleCount(AuditModule& m, size_t throttles) {
-        m._throttleCount.store(throttles);
-    }
 };
 
 TEST_F(AuditModuleTest, FormatRecord_FullFields) {
@@ -142,13 +139,13 @@ TEST_F(AuditModuleTest, RateLimiter_BurstCapacityAndExhaustion) {
         EXPECT_EQ(action, RateLimitAction::Allow) << "Failed on iteration " << i;
     }
 
-    // Call 121 at same timestamp must be throttled (first time)
+    // Call 121 at same timestamp must be throttled
     RateLimitAction action121 = module.checkRateLimit(1000);
-    EXPECT_EQ(action121, RateLimitAction::ThrottleFirst);
+    EXPECT_EQ(action121, RateLimitAction::Wait);
 
-    // Call 122 at same timestamp must be throttled (subsequent)
+    // Call 122 at same timestamp still throttled
     RateLimitAction action122 = module.checkRateLimit(1000);
-    EXPECT_EQ(action122, RateLimitAction::ThrottleSubsequent);
+    EXPECT_EQ(action122, RateLimitAction::Wait);
 }
 
 TEST_F(AuditModuleTest, RateLimiter_RefillOverTime) {
@@ -159,14 +156,14 @@ TEST_F(AuditModuleTest, RateLimiter_RefillOverTime) {
     for (int i = 0; i < 120; ++i) {
         module.checkRateLimit(1000);
     }
-    EXPECT_EQ(module.checkRateLimit(1000), RateLimitAction::ThrottleFirst);
+    EXPECT_EQ(module.checkRateLimit(1000), RateLimitAction::Wait);
 
     // 500 ms later: 120 / 60000 * 500 = 1.0 token refilled
     RateLimitAction actionAfter500ms = module.checkRateLimit(1500);
     EXPECT_EQ(actionAfter500ms, RateLimitAction::Allow);
 
     // Immediate next call at t=1500 is throttled again
-    EXPECT_EQ(module.checkRateLimit(1500), RateLimitAction::ThrottleFirst);
+    EXPECT_EQ(module.checkRateLimit(1500), RateLimitAction::Wait);
 
     // 60 seconds later: full refill (120 tokens)
     RateLimitAction actionAfter60s = module.checkRateLimit(61500);
@@ -178,7 +175,7 @@ TEST_F(AuditModuleTest, RateLimiter_RefillOverTime) {
     }
 
     // Call 121 is throttled
-    EXPECT_EQ(module.checkRateLimit(61500), RateLimitAction::ThrottleFirst);
+    EXPECT_EQ(module.checkRateLimit(61500), RateLimitAction::Wait);
 }
 
 TEST_F(AuditModuleTest, FieldTruncationAndNullTermination) {
@@ -232,7 +229,6 @@ TEST_F(AuditModuleTest, ClearAllResetsCounters) {
 
     EXPECT_EQ(module.recordCount(), 0u);
     EXPECT_EQ(module.dropCount(), 0u);
-    EXPECT_EQ(module.throttleCount(), 0u);
 }
 
 TEST_F(AuditModuleTest, ReadAuditFile_PaginationAndOffset) {
@@ -470,24 +466,15 @@ TEST_F(AuditModuleTest, PreconditionContributor_RegistrationAndEvaluation) {
     EXPECT_FALSE(status.met);
     EXPECT_EQ(status.cause, Cause::InternalError);
 
-    // Case 2: Started, clean (no drops, no throttles)
+    // Case 2: Started, clean (no drops)
     setStarted(module, true);
     setDropCount(module, 0);
-    setThrottleCount(module, 0);
     status = registry.eval();
     EXPECT_TRUE(status.met);
     EXPECT_EQ(status.cause, Cause::Met);
 
     // Case 3: Started but degraded (drops > 0)
     setDropCount(module, 3);
-    setThrottleCount(module, 0);
-    status = registry.eval();
-    EXPECT_TRUE(status.met);
-    EXPECT_EQ(status.cause, Cause::FallbackEngaged);
-
-    // Case 4: Started but degraded (throttles > 0)
-    setDropCount(module, 0);
-    setThrottleCount(module, 2);
     status = registry.eval();
     EXPECT_TRUE(status.met);
     EXPECT_EQ(status.cause, Cause::FallbackEngaged);

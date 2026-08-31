@@ -26,8 +26,8 @@
  *   - resetRateLimiter(): Resets rate limiter tokens and timestamp.
  *
  *   Diagnostic Accessors:
- *   - recordCount(), dropCount(), throttleCount(): Counter snapshots.
- *   - isEnabled(), configuredRateLimit(): Config state queries.
+ *   - recordCount(), dropCount(): Counter snapshots.
+ *   - configuredRateLimit(): Compile-time rate limit query.
  *   - activeFileIndex(), currentFileSize(), bootId(): File tracking.
  *
  *   IWebContributor:
@@ -85,9 +85,8 @@ struct AuditRecord {
  * @brief Represents the outcome of rate limit evaluation.
  */
 enum class RateLimitAction : uint8_t {
-    Allow,
-    ThrottleFirst,
-    ThrottleSubsequent
+    Allow,              ///< Writer may flush to flash
+    Wait                ///< Writer should delay — tokens exhausted
 };
 
 /**
@@ -154,7 +153,7 @@ public:
      * @param action    Action performed (e.g., "set_temperature").
      * @param targetId  Target identifier, or nullptr if none.
      * @param details   Free-form payload, or nullptr if none (will be redacted).
-     * @return true if enqueued successfully, false if queue full or throttled.
+     * @return true if enqueued successfully, false if queue full.
      */
     bool log(const char* source, const char* action, const char* targetId = nullptr, const char* details = nullptr);
 
@@ -193,8 +192,7 @@ public:
     /** @brief Returns total number of records dropped due to full queue. */
     size_t dropCount() const { return _dropCount.load(std::memory_order_relaxed); }
 
-    /** @brief Returns total number of records suppressed by the rate limiter. */
-    size_t throttleCount() const { return _throttleCount.load(std::memory_order_relaxed); }
+
 
     /**
      * @brief Formats an AuditRecord into a single JSONL line without newline.
@@ -239,7 +237,7 @@ private:
 
     void readAuditFile(uint8_t fileIndex, size_t offset, size_t maxLines, String& output, size_t& linesRead, bool& truncated, size_t& nextOffset);
     static void writerLoop(void* param);
-    void writeRecord(AuditRecord* record);
+    void writeBatch(AuditRecord** batch, size_t count);
     void seedActiveFile();
     bool enqueueInternal(const char* source, const char* action, const char* targetId, const char* details, SemaphoreHandle_t syncSem);
 
@@ -252,11 +250,9 @@ private:
     size_t _maxFileSize = AUDIT_BUDGET_BYTES / 2;    ///< Rotation threshold (half of total budget)
     std::atomic<size_t> _dropCount{0};               ///< Records lost to queue-full or I/O errors
     std::atomic<size_t> _recordCount{0};             ///< Records successfully written to flash
-    std::atomic<size_t> _throttleCount{0};           ///< Records suppressed by rate limiter
     bool _started = false;                           ///< True after successful begin()
 
     std::mutex _rateLimitMutex;                      ///< Guards token bucket state
     float _rateTokens = (float)AUDIT_RATE_LIMIT_PER_MIN;  ///< Available tokens in bucket
     uint32_t _lastRefillMs = 0;                      ///< Timestamp of last token refill
-    bool _throttledState = false;                    ///< True while actively throttling
 };

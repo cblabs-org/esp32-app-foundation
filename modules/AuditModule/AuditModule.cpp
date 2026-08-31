@@ -50,11 +50,9 @@ AuditModule::AuditModule()
       _maxFileSize(AUDIT_BUDGET_BYTES / 2),
       _dropCount(0),
       _recordCount(0),
-      _throttleCount(0),
       _started(false),
       _rateTokens((float)AUDIT_RATE_LIMIT_PER_MIN),
-      _lastRefillMs(0),
-      _throttledState(false) {}
+      _lastRefillMs(0) {}
 
 AuditModule::~AuditModule() {
     if (_queue) {
@@ -220,30 +218,37 @@ size_t AuditModule::formatRecord(const AuditRecord& record, uint32_t bootId, con
     return (size_t)written;
 }
 
-void AuditModule::writeRecord(AuditRecord* record) {
-    if (!record) return;
-
-    char line[512];
-    size_t lineLen = formatRecord(*record, _bootId, BUILD_VERSION, line, sizeof(line));
-    if (lineLen == 0) return;
+void AuditModule::writeBatch(AuditRecord** batch, size_t count) {
+    if (count == 0) return;
 
     char path[64];
     snprintf(path, sizeof(path), "%s%u.jsonl", AUDIT_FILE_PREFIX, _activeFileIndex);
 
-    // --- SYNC_EACH durability: open -> append -> flush -> close ---
+    // --- Single open → write N records → flush → close ---
     FILE* f = fopen(path, "a");
-    if (f) {
-        fprintf(f, "%s\n", line);
-        fflush(f);
-        fclose(f);
-        _currentFileSize += (lineLen + 1);
-        _recordCount.fetch_add(1, std::memory_order_relaxed);
-    } else {
+    if (!f) {
         ESP_LOGE(TAG, "Failed to open audit file: %s", path);
-        _dropCount.fetch_add(1, std::memory_order_relaxed);
+        _dropCount.fetch_add(count, std::memory_order_relaxed);
+        return;
     }
 
-    // --- Rotation check ---
+    char line[512];
+    for (size_t i = 0; i < count; ++i) {
+        AuditRecord* record = batch[i];
+        if (!record) continue;
+
+        size_t lineLen = formatRecord(*record, _bootId, BUILD_VERSION, line, sizeof(line));
+        if (lineLen > 0) {
+            fprintf(f, "%s\n", line);
+            _currentFileSize += (lineLen + 1);
+            _recordCount.fetch_add(1, std::memory_order_relaxed);
+        }
+    }
+
+    fflush(f);
+    fclose(f);
+
+    // --- Rotation check after batch write ---
     if (_currentFileSize >= _maxFileSize) {
         _activeFileIndex = (_activeFileIndex == 0) ? 1 : 0;
         char nextPath[64];
@@ -258,21 +263,48 @@ void AuditModule::writerLoop(void* param) {
     esp_task_wdt_add(NULL);
 
     while (self->_started) {
-        AuditRecord* record = nullptr;
-        if (xQueueReceive(self->_queue, &record, pdMS_TO_TICKS(1000)) == pdTRUE) {
-            if (record) {
-                self->writeRecord(record);
-                if (record->sync != nullptr) {
-                    xSemaphoreGive(record->sync);
-                    vSemaphoreDelete(record->sync);
-                }
-                delete record;
-            }
+        // --- Step 1: Block until at least one record arrives ---
+        AuditRecord* first = nullptr;
+        if (xQueuePeek(self->_queue, &first, pdMS_TO_TICKS(1000)) != pdTRUE) {
+            esp_task_wdt_reset();
+#ifndef ESP_PLATFORM
+            break;  // Native stub: exit after one empty poll to avoid blocking
+#endif
+            continue;  // Timeout — no records, loop to check _started
         }
+
+        // --- Step 2: Check rate limit before flushing ---
+        if (self->checkRateLimit(millis()) == RateLimitAction::Wait) {
+            // Throttled — delay briefly and retry. Records stay in queue.
+            vTaskDelay(pdMS_TO_TICKS(50));
+            esp_task_wdt_reset();
+            continue;
+        }
+
+        // --- Step 3: Drain queue into local batch array ---
+        AuditRecord* batch[AUDIT_QUEUE_DEPTH];
+        size_t count = 0;
+        AuditRecord* record = nullptr;
+        while (count < AUDIT_QUEUE_DEPTH &&
+               xQueueReceive(self->_queue, &record, 0) == pdTRUE) {
+            batch[count++] = record;
+        }
+
+        // --- Step 4: Batch write to flash (single open/close) ---
+        self->writeBatch(batch, count);
+
+        // --- Step 5: Signal sync semaphores and free records ---
+        for (size_t i = 0; i < count; ++i) {
+            if (batch[i]->sync != nullptr) {
+                xSemaphoreGive(batch[i]->sync);
+                vSemaphoreDelete(batch[i]->sync);
+            }
+            delete batch[i];
+        }
+
         esp_task_wdt_reset();
 #ifndef ESP_PLATFORM
-        // In native test stub environment, exit loop to avoid blocking single-threaded runner
-        break;
+        break;  // Native stub: exit after one batch to avoid blocking
 #endif
     }
 }
@@ -295,25 +327,18 @@ RateLimitAction AuditModule::checkRateLimit(uint32_t nowMs) {
         }
     }
 
-    // --- Step 2: Consume a token or transition to throttled state ---
+    // --- Step 2: Consume a token or signal wait ---
     if (_rateTokens >= 1.0f) {
         _rateTokens -= 1.0f;
-        _throttledState = false;
         return RateLimitAction::Allow;
-    } else {
-        if (!_throttledState) {
-            _throttledState = true;
-            return RateLimitAction::ThrottleFirst;
-        }
-        return RateLimitAction::ThrottleSubsequent;
     }
+    return RateLimitAction::Wait;
 }
 
 void AuditModule::resetRateLimiter() {
     std::lock_guard<std::mutex> lock(_rateLimitMutex);
     _rateTokens = (float)AUDIT_RATE_LIMIT_PER_MIN;
     _lastRefillMs = 0;
-    _throttledState = false;
 }
 
 bool AuditModule::enqueueInternal(const char* source, const char* action, const char* targetId, const char* details, SemaphoreHandle_t syncSem) {
@@ -378,32 +403,10 @@ bool AuditModule::enqueueInternal(const char* source, const char* action, const 
 }
 
 bool AuditModule::log(const char* source, const char* action, const char* targetId, const char* details) {
-    uint32_t nowMs = millis();
-    RateLimitAction rla = checkRateLimit(nowMs);
-    if (rla == RateLimitAction::ThrottleFirst) {
-        _throttleCount.fetch_add(1, std::memory_order_relaxed);
-        enqueueInternal("audit", "rate_limited", nullptr, "rate limit exceeded", nullptr);
-        return false;
-    } else if (rla == RateLimitAction::ThrottleSubsequent) {
-        _throttleCount.fetch_add(1, std::memory_order_relaxed);
-        return false;
-    }
-
     return enqueueInternal(source, action, targetId, details, nullptr);
 }
 
 bool AuditModule::auditSync(const char* source, const char* action, const char* targetId, const char* details, uint32_t timeoutMs) {
-    uint32_t nowMs = millis();
-    RateLimitAction rla = checkRateLimit(nowMs);
-    if (rla == RateLimitAction::ThrottleFirst) {
-        _throttleCount.fetch_add(1, std::memory_order_relaxed);
-        enqueueInternal("audit", "rate_limited", nullptr, "rate limit exceeded", nullptr);
-        return false;
-    } else if (rla == RateLimitAction::ThrottleSubsequent) {
-        _throttleCount.fetch_add(1, std::memory_order_relaxed);
-        return false;
-    }
-
     SemaphoreHandle_t syncSem = xSemaphoreCreateBinary();
     if (!syncSem) {
         _dropCount.fetch_add(1, std::memory_order_relaxed);
@@ -440,7 +443,6 @@ void AuditModule::clearAll() {
     _seq.store(0, std::memory_order_relaxed);
     _dropCount.store(0, std::memory_order_relaxed);
     _recordCount.store(0, std::memory_order_relaxed);
-    _throttleCount.store(0, std::memory_order_relaxed);
     resetRateLimiter();
 }
 
@@ -714,8 +716,7 @@ void AuditModule::registerPreconditions(IPreconditionRegistry& registry) {
             if (!_started) {
                 return {false, Cause::InternalError};
             }
-            if (_dropCount.load(std::memory_order_relaxed) > 0 ||
-                _throttleCount.load(std::memory_order_relaxed) > 0) {
+            if (_dropCount.load(std::memory_order_relaxed) > 0) {
                 return {true, Cause::FallbackEngaged};
             }
             return {true, Cause::Met};
@@ -726,7 +727,7 @@ void AuditModule::registerPreconditions(IPreconditionRegistry& registry) {
                     snprintf(buf, len, "Audit storage or task initialization failed");
                     break;
                 case Cause::FallbackEngaged:
-                    snprintf(buf, len, "Audit logging degraded — dropping or throttling records");
+                    snprintf(buf, len, "Audit logging degraded — records dropped (queue full)");
                     break;
                 default:
                     snprintf(buf, len, "Audit logging active");
