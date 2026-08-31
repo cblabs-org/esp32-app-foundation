@@ -462,7 +462,7 @@ differ per physical device, and must it survive an update?"*
 |---|---|---|---|---|
 | **NVS** | encryption keys (secrets) | n/a | never | already used via `Preferences` (KeyManager/DeviceCrypto) |
 | **`config` LittleFS partition** | `/etc` (keys.json, cert/key) + `/mod` config | **No — by design** | never | device identity/state; A/B is a *non-goal* (you don't roll back identity) |
-| **`storage` LittleFS partition** | `/littlefs/audit_*.jsonl` (audit trail) | **No** | never | budget-bounded (`BOARD_AUDIT_BYTES`), `SYNC_EACH` durability, two-file rotation |
+| **`storage` LittleFS partition** | `/littlefs/audit_*.jsonl` (audit trail) | **No** | never | budget-bounded (`BOARD_AUDIT_BYTES`), batch-flush durability, two-file rotation |
 | **App slots (A/B)** | firmware **+ all shippable assets** | **Yes (inherited)** | yes, signed | portal already compiled-in ([include/portal_assets/](../include/portal_assets/)); LVGL via PR-47 |
 | **`data` / cache partition** (opt-in) | app runtime data + **re-fetchable caches** (e.g. `timezones.json`) | No | never | disposable; re-derivable at runtime |
 

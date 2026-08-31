@@ -224,7 +224,7 @@ These references are optimized distillations for AI agents. If the human develop
   "Audit.h", "audit trail", "audit log", "get_audit_log", "clear_audit_log",
   "BOARD_AUDIT_BYTES", "audit_health", "flash audit", "structured audit",
   "Redactor", "registerSecret", "redact", "secret redaction", "flash wear",
-  "token bucket", "rate limit", "SYNC_EACH".
+  "token bucket", "rate limit", "batch flush".
 - **Security & credentials**: "DeviceCrypto", "KeyManager", "AuthManager", "JWT",
   "credential storage", "setInsecure", "SECURITY_VERSION", "anti-rollback",
   "private_key.pem".

@@ -39,11 +39,11 @@ Consumers gate optional modules and display drivers via `build_flags` in
 
 ### Hardware Budget Constants
 
-Define these in `hardware/<board-id>/board.h` to override defaults:
+Set in `platformio.ini` via `build_flags` (or in `hardware/<board-id>/board.h`):
 
 | Constant | Default | Purpose |
 |:---|:---|:---|
-| `BOARD_AUDIT_BYTES` | `32768` (32 KiB) | Total flash budget for audit trail (two rotation files, each half this value) |
+| `BOARD_AUDIT_BYTES` | `32768` (32 KiB) | Total flash budget for audit trail (two rotation files, each half). S3 boards set 128 KiB in `platformio.ini`. |
 
 See `hardware/_common/board_contract.h` for all fallback defaults.
 

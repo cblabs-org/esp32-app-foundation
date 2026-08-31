@@ -4,14 +4,14 @@ The `AuditModule` (`modules/AuditModule/AuditModule.hpp`) provides a standardize
 
 Unlike volatile debug logs (`ESP_LOG*`, `get_debug_logs`), which are lost on reset, audit records are persisted in JSONL format across reboots on the LittleFS `storage` partition.
 
-Implements [`IWebContributor`](../interfaces/web-contributor.md), [`IMCPContributor`](../interfaces/mcp-contributor.md), [`IConfigurable`](../interfaces/configurable.md), and [`IPreconditionContributor`](../interfaces/precondition-contributor.md).
+Implements [`IWebContributor`](../interfaces/web-contributor.md), [`IMCPContributor`](../interfaces/mcp-contributor.md), and [`IPreconditionContributor`](../interfaces/precondition-contributor.md).
 
 ---
 
 ## 1. Overview & Architecture
 
-- **Dedicated DRAM Writer Task**: An internal FreeRTOS task (`AuditWriter`, 4 KB stack, priority 2) drains a shallow DRAM queue (`AUDIT_QUEUE_DEPTH = 16`) to decouple callers from flash I/O latency.
-- **`SYNC_EACH` Durability**: Every record write follows `fopen(append)` → `fprintf` → `fflush` → `fclose`. Records survive immediate brownouts, hard faults, or ungraceful reboots without periodic flushing timers.
+- **Dedicated DRAM Writer Task**: An internal FreeRTOS task (`AuditWriter`, 3 KiB stack, priority 2) drains a shallow DRAM queue (`AUDIT_QUEUE_DEPTH = 16`) to decouple callers from flash I/O latency.
+- **Batch-Flush Durability**: The writer drains the queue and writes all records in a single `fopen(append)` → N × `fprintf` → `fflush` → `fclose` cycle. Records survive brownouts and hard faults without periodic flushing timers.
 - **Two-File Rotation**: Stored at `/littlefs/audit_0.jsonl` and `/littlefs/audit_1.jsonl`. Each file is bounded to `BOARD_AUDIT_BYTES / 2`. When the active file fills up, the older file is deleted and becomes the new active target.
 - **Automatic Secret Redaction**: All `details` strings are processed by `Redactor::redact()` before being committed to flash, preventing credentials, tokens, or passwords from leaking into audit storage.
 
@@ -84,61 +84,79 @@ Each line in the JSONL audit file is a single JSON object formatted as follows:
 The total flash storage budget for audit logs is controlled by `BOARD_AUDIT_BYTES`:
 
 - **Default**: `32768` bytes (32 KiB total = two 16 KiB rotation files).
-- **Custom Budget**: Define `BOARD_AUDIT_BYTES` in your `hardware/<board-id>/board.h`:
-  ```cpp
-  #define BOARD_AUDIT_BYTES 65536  // 64 KiB total budget
+- **Custom Budget**: Set `-DBOARD_AUDIT_BYTES=N` in your board's `build_flags` in `platformio.ini`:
+  ```ini
+  build_flags = -DBOARD_AUDIT_BYTES=131072  ; 128 KiB for S3 boards
   ```
-- **Fallback Guarantee**: `hardware/_common/board_contract.h` provides the 32 KiB fallback if omitted.
+- **Framework defaults**: S3 boards (esp32s3nano, crowpanel-128-rotary) set 128 KiB. esp32dev uses the 32 KiB default.
+- **Fallback**: `hardware/_common/board_contract.h` provides the 32 KiB fallback if omitted.
 - **Storage Preflight**: During `begin()`, `AuditModule` verifies that `LittleFS.totalBytes() - LittleFS.usedBytes() >= BOARD_AUDIT_BYTES`. If storage is insufficient, initialization safely aborts.
 
 ---
 
 ## 5. Rate Limiting & Flash Protection
 
-To prevent flash wear from accidental tight loops or flood attacks, `AuditModule` includes a token-bucket rate limiter:
+To prevent flash wear from burst logging, `AuditModule` includes a token-bucket
+rate limiter that runs at the **writer boundary**:
 
 - **Default**: 120 records per minute (`AUDIT_RATE_LIMIT_PER_MIN`).
-- **Runtime Configuration**: Modifiable via `IConfigurable` namespace `"audit"` (property `"rate_limit"`).
-- **Throttling Behavior**:
-  - The first record exceeding the rate limit triggers an automatic audit entry:
-    `{"source": "audit", "action": "rate_limited", "details": "rate limit exceeded"}`
-  - Subsequent excessive records are dropped until tokens refill, incrementing the `throttleCount()` diagnostic metric.
+- **Writer-side enforcement**: Callers always enqueue unconditionally. The writer
+  task peeks at the queue, checks the rate limit, and delays (50ms) when throttled.
+  Records stay safely in the queue — the only drop point is queue-full.
+- **Batch flush**: When the rate limit allows, the writer drains the entire queue
+  and writes all records in a single `open → write-N → close` for flash efficiency.
 
 ### Flash Wear Guidance
 
-At the default rate limit of 120 records/min (~200 bytes each), the 32 KiB budget rotates in approximately 1.4 minutes at sustained max rate. LittleFS wear-leveling distributes writes across the partition, but sustained high-rate logging should be avoided.
+At the default rate limit of 120 records/min (~200 bytes each), the 32 KiB budget
+rotates in approximately 1.4 minutes at sustained max rate. LittleFS wear-leveling
+distributes writes across the partition, but sustained high-rate logging should be
+avoided.
 
 **Recommended operational budgets:**
 - **Normal operation**: < 10 events/hour (administrative, config, security events)
 - **Burst scenario**: < 60 events/minute during incident response or OTA
-- **Anti-pattern**: > 120 events/minute sustained — this will trigger rate limiting and degrade `audit_health`
+- **Anti-pattern**: > 120 events/minute sustained — this will trigger rate limiting and delay writes
 
 ---
 
-## 6. Runtime Toggle & Self-Documenting Gaps
+## 6. Security Design — No Runtime Toggle
 
-Audit logging can be dynamically enabled or disabled via `applyConfig()`:
+Audit cannot be disabled at runtime. There is no `IConfigurable` implementation,
+no `enabled` config property, and no MCP tool to toggle auditing. This is a
+deliberate security decision: a compromised agent cannot disable auditing,
+perform malicious actions, then re-enable it.
 
-```json
-{"enabled": false}
-```
-
-To prevent silent log tampering:
-- When disabled, `AuditModule` writes a final self-documenting record before stopping:
-  `{"source": "audit", "action": "audit_disabled"}`
-- When re-enabled, `AuditModule` immediately records:
-  `{"source": "audit", "action": "audit_enabled"}`
+The binary either has full auditing (`WITH_AUDIT` defined) or none (macro no-ops).
+There is no runtime attack surface.
 
 ---
 
 ## 7. Factory Reset & Maintenance
 
-- **Factory Reset**: `config_factory_reset` (MCP) and the web portal factory reset wipe **everything** — module configuration files (`/mod/*.json`), the config manifest, and audit trail files. `AuditModule::clearAll()` is called automatically, deleting both JSONL files and resetting all counters (`seq`, `dropCount`, `throttleCount`, `recordCount`). A factory reset is a factory reset.
+- **Factory Reset**: `config_factory_reset` (MCP) and the web portal factory reset wipe **everything** — module configuration files (`/mod/*.json`), the config manifest, and audit trail files. `AuditModule::clearAll()` is called automatically, deleting both JSONL files and resetting all counters (`seq`, `dropCount`, `recordCount`). A factory reset is a factory reset.
 - **Manual Clearing**: Also available independently via REST (`POST /api/system/audit/clear`) and MCP (`clear_audit_log`), which call `clearAll()` without affecting other configuration.
 
 ---
 
-## 8. Multi-Surface Integration
+## 8. Framework-Level Audit Events
+
+The framework instruments these security-relevant operations out of the box:
+
+| Source | Action | When | Sync? |
+|---|---|---|---|
+| `audit` | `started` | `begin()` succeeds — first record in every boot chain | No |
+| `ota` | `pipeline_start` | OTA worker task begins manifest-first flow | No |
+| `ota` | `pipeline_complete` | Firmware verified, pre-reboot | **Yes** (`AUDIT_SYNC`) |
+| `ota` | `pipeline_failed` | Download/verify failure (error in details) | No |
+| `keys` | `key_added` | Key stored to encrypted registry (ID only, never secret) | No |
+| `keys` | `key_deleted` | Key removed from registry | No |
+
+Consumer apps add their own events via `AUDIT()` / `AUDIT_SYNC()` macros.
+
+---
+
+## 9. Multi-Surface Integration
 
 ### REST Endpoints
 
@@ -162,15 +180,15 @@ Contributed via `IPreconditionContributor` with role `PreconditionRole::Operatio
 |:---|:---|:---|:---|
 | Uninitialized / Preflight failed | `false` | `Cause::InternalError` | "Audit storage or task initialization failed" |
 | Disabled via config | `false` | `Cause::Unavailable` | "Audit logging disabled in configuration" |
-| Dropping or throttling | `true` | `Cause::FallbackEngaged` | "Audit logging degraded — dropping or throttling records" |
+| Dropping records | `true` | `Cause::FallbackEngaged` | "Audit logging degraded — dropping records" |
 | Normal operation | `true` | `Cause::Met` | "Audit logging active" |
 
 > [!NOTE]
-> The `FallbackEngaged` state is **sticky** — once a single drop or throttle occurs, the precondition stays degraded until `clearAll()` is called (which resets counters). This is intentional: an audit trail should surface historical reliability problems, not silently recover.
+> The `FallbackEngaged` state is **sticky** — once a single drop occurs, the precondition stays degraded until `clearAll()` is called (which resets counters). This is intentional: an audit trail should surface historical reliability problems, not silently recover.
 
 ---
 
-## 9. Thread Safety & Concurrency
+## 10. Thread Safety & Concurrency
 
 > [!IMPORTANT]
 > Understanding the thread-safety model is critical for correct use in multi-task firmware.
@@ -180,8 +198,8 @@ Contributed via `IPreconditionContributor` with role `PreconditionRole::Operatio
 | `log()` | ✅ Yes | Non-blocking `xQueueSend` with zero-wait. Safe from any FreeRTOS task. |
 | `auditSync()` | ✅ Yes | Per-call binary semaphore. Safe from any task, but **blocks the caller** (see below). |
 | `clearAll()` | ✅ Yes | File deletion + atomic counter resets. Writer task may interleave a write. |
-| `checkRateLimit()` | ✅ Yes | Protected by `_rateLimitMutex`. |
-| `recordCount()`, `dropCount()`, `throttleCount()` | ✅ Yes | `std::atomic` reads, safe from any context. |
+| `checkRateLimit()` | ✅ Yes | Writer-side only, protected by `_rateLimitMutex`. |
+| `recordCount()`, `dropCount()` | ✅ Yes | `std::atomic` reads, safe from any context. |
 | `activeFileIndex()`, `currentFileSize()` | ⚠️ Eventually consistent | Written by the writer task without atomics. Reads from other threads may see slightly stale values. Safe but not real-time precise. |
 | `begin()` | ❌ Single-call | Must be called once from the main task during `setup()`. |
 | `log()` / `auditSync()` | ❌ **Not ISR-safe** | Heap allocation (`new`) and FreeRTOS queue primitives are not ISR-safe. |
@@ -200,7 +218,7 @@ Contributed via `IPreconditionContributor` with role `PreconditionRole::Operatio
 
 ---
 
-## 10. Limitations & Known Constraints
+## 11. Limitations & Known Constraints
 
 > [!WARNING]
 > Read this section carefully before integrating audit logging into production firmware.
@@ -209,7 +227,7 @@ Contributed via `IPreconditionContributor` with role `PreconditionRole::Operatio
 `formatRecord()` injects string fields via `%s` (C `snprintf`) **without JSON string escaping**. This is safe for current callers because `source`, `action`, and `targetId` are short alphanumeric constants, and `details` is redacted before formatting. However, if `details` ever carries arbitrary user-supplied text containing `"`, `\`, or control characters, the JSONL record will be malformed. **Mitigation**: Keep `details` to simple key=value pairs. If arbitrary text must be logged, sanitize it before passing to `AUDIT()`.
 
 ### 512-Byte Record Buffer
-Each record is formatted into a 512-byte stack buffer in `writeRecord()`. If the serialized JSON exceeds 511 bytes (unlikely with the field size limits), `snprintf` silently truncates it, producing a malformed JSON line. The field size limits (31+47+47+127 = 252 chars of payload) keep records well within this budget under normal use.
+Each record is formatted into a 512-byte stack buffer in `writeBatch()`. If the serialized JSON exceeds 511 bytes (unlikely with the field size limits), `snprintf` silently truncates it, producing a malformed JSON line. The field size limits (31+47+47+127 = 252 chars of payload) keep records well within this budget under normal use.
 
 ### Queue Saturation Under Load
 The DRAM queue holds 16 records. When the queue is full:
@@ -225,7 +243,7 @@ If `log()` or `auditSync()` is called before `begin()` completes, the function r
 
 ---
 
-## 11. Anti-Patterns & Best Practices
+## 12. Anti-Patterns & Best Practices
 
 > [!CAUTION]
 > Avoid these common audit anti-patterns:
