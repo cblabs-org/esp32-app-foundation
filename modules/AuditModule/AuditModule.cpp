@@ -196,23 +196,23 @@ size_t AuditModule::formatRecord(const AuditRecord& record, uint32_t bootId, con
     int written = 0;
     if (hasTid && hasDet) {
         written = snprintf(buffer, bufferSize,
-            "{\"t_ms\":%u,\"ts\":%" PRId64 ",\"seq\":%u,\"boot_id\":\"%08x\",\"build\":\"%s\",\"source\":\"%s\",\"action\":\"%s\",\"target_id\":\"%s\",\"details\":\"%s\"}",
-            (unsigned)record.t_ms, (int64_t)record.ts, (unsigned)record.seq, (unsigned)bootId,
+            "{\"t_ms\":%u,\"ts\":%u,\"seq\":%u,\"boot_id\":\"%08x\",\"build\":\"%s\",\"source\":\"%s\",\"action\":\"%s\",\"target_id\":\"%s\",\"details\":\"%s\"}",
+            (unsigned)record.t_ms, (uint32_t)record.ts, (unsigned)record.seq, (unsigned)bootId,
             build, src, act, tid, det);
     } else if (hasTid) {
         written = snprintf(buffer, bufferSize,
-            "{\"t_ms\":%u,\"ts\":%" PRId64 ",\"seq\":%u,\"boot_id\":\"%08x\",\"build\":\"%s\",\"source\":\"%s\",\"action\":\"%s\",\"target_id\":\"%s\"}",
-            (unsigned)record.t_ms, (int64_t)record.ts, (unsigned)record.seq, (unsigned)bootId,
+            "{\"t_ms\":%u,\"ts\":%u,\"seq\":%u,\"boot_id\":\"%08x\",\"build\":\"%s\",\"source\":\"%s\",\"action\":\"%s\",\"target_id\":\"%s\"}",
+            (unsigned)record.t_ms, (uint32_t)record.ts, (unsigned)record.seq, (unsigned)bootId,
             build, src, act, tid);
     } else if (hasDet) {
         written = snprintf(buffer, bufferSize,
-            "{\"t_ms\":%u,\"ts\":%" PRId64 ",\"seq\":%u,\"boot_id\":\"%08x\",\"build\":\"%s\",\"source\":\"%s\",\"action\":\"%s\",\"details\":\"%s\"}",
-            (unsigned)record.t_ms, (int64_t)record.ts, (unsigned)record.seq, (unsigned)bootId,
+            "{\"t_ms\":%u,\"ts\":%u,\"seq\":%u,\"boot_id\":\"%08x\",\"build\":\"%s\",\"source\":\"%s\",\"action\":\"%s\",\"details\":\"%s\"}",
+            (unsigned)record.t_ms, (uint32_t)record.ts, (unsigned)record.seq, (unsigned)bootId,
             build, src, act, det);
     } else {
         written = snprintf(buffer, bufferSize,
-            "{\"t_ms\":%u,\"ts\":%" PRId64 ",\"seq\":%u,\"boot_id\":\"%08x\",\"build\":\"%s\",\"source\":\"%s\",\"action\":\"%s\"}",
-            (unsigned)record.t_ms, (int64_t)record.ts, (unsigned)record.seq, (unsigned)bootId,
+            "{\"t_ms\":%u,\"ts\":%u,\"seq\":%u,\"boot_id\":\"%08x\",\"build\":\"%s\",\"source\":\"%s\",\"action\":\"%s\"}",
+            (unsigned)record.t_ms, (uint32_t)record.ts, (unsigned)record.seq, (unsigned)bootId,
             build, src, act);
     }
 
