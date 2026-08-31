@@ -26,6 +26,7 @@
 #include <PsychicHttp.h>
 
 #include "platform/LogShim.h"
+#include "Audit.h"
 
 static constexpr const char* TAG = "KeyManager";
 
@@ -120,6 +121,7 @@ bool KeyManager::addKey(const char* id, const char* secret,
     }
 
     ESP_LOGI(TAG, "Successfully stored encrypted key: %s", id);
+    AUDIT("keys", "key_added", id);
     return true;
 }
 
@@ -189,6 +191,7 @@ bool KeyManager::deleteKey(const char* id) {
     }
 
     ESP_LOGI(TAG, "Successfully deleted key: %s", id);
+    AUDIT("keys", "key_deleted", id);
     return true;
 }
 

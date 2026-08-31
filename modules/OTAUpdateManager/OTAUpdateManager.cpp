@@ -75,6 +75,7 @@ static constexpr const char* TAG = "OTAUpdateManager";
 #include "MbedTLSSignatureVerifier.hpp"
 #include "interfaces/IWebContributor.hpp"
 #include "OTAManifest.hpp"
+#include "Audit.h"
 #include "MCPToolRegistry.hpp"
 #include "SemVer.hpp"
 #include "portal_assets/ota_js.hpp"
@@ -439,6 +440,7 @@ void OTAUpdateManager::clearTaskHandle_() {
  */
 void OTAUpdateManager::performUpdateTask() {
     ESP_LOGI(TAG, "OTA task started (manifest-first flow)");
+    AUDIT("ota", "pipeline_start");
 
     // NOTE: Do NOT register this task with TWDT here. The OTA pipeline makes
     // multiple blocking HTTPS calls (manifest, signature, firmware) involving
@@ -673,6 +675,7 @@ void OTAUpdateManager::performUpdateTask() {
     if (result != OTAError::None) {
         _lastOtaError = engine.getLastErrorString();
         ESP_LOGE(TAG, "OTA download failed: %s", _lastOtaError);
+        AUDIT("ota", "pipeline_failed", nullptr, _lastOtaError);
         publishProgress(0.0f, _lastOtaError, true, false);
         _state = OTAState::Error;
         return;
@@ -684,6 +687,7 @@ void OTAUpdateManager::performUpdateTask() {
     _state = OTAState::Complete;
     publishProgress(1.0f, "Update complete — rebooting...", true, true);
     ESP_LOGI(TAG, "OTA update complete — rebooting in 2 seconds");
+    AUDIT_SYNC("ota", "pipeline_complete", nullptr, "rebooting");
 
     // SAFETY: TWDT was deregistered above. This delay is safe only because
     // we are outside TWDT scope. Do not move TWDT deregistration below.

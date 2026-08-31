@@ -117,6 +117,12 @@ bool AuditModule::begin() {
 
     ESP_LOGI(TAG, "AuditModule started (boot_id=%08x, budget=%u B, active_file=%u)",
              (unsigned)_bootId, (unsigned)AUDIT_BUDGET_BYTES, _activeFileIndex);
+
+    // --- Self-audit: record module startup as the first audit event ---
+    char detail[64];
+    snprintf(detail, sizeof(detail), "boot_id=%08x budget=%uB", (unsigned)_bootId, (unsigned)AUDIT_BUDGET_BYTES);
+    log("audit", "started", nullptr, detail);
+
     return true;
 }
 
