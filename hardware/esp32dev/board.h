@@ -84,7 +84,9 @@
 constexpr bool HAS_PSRAM = false;
 
 // ── Audit budget (storage partition = 128 KiB) ────────────────────────────
+#ifndef BOARD_AUDIT_BYTES
 #define BOARD_AUDIT_BYTES 16384              // 16 KiB — conservative for 128 KiB storage
+#endif
 
 // ── Display pin block (U8G2 SSD1322 4-wire HW SPI) ───────────────────────────
 #ifdef WITH_DISPLAY_U8G2
