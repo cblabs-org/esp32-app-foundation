@@ -110,3 +110,27 @@ Implement a generalized `AuditModule` providing a standardized, flash-persisted 
 **Resolved items from wrap-up**:
 - ✅ D1 finding #6: Step comments added to all 5 deferred functions.
 - ✅ Factory reset bug: audit logs now cleared on FR (was missing wiring).
+
+### 2026-08-31 — Post-Merge 2: Stability Fixes, Rate Limiter Redesign, and PR 207
+
+**Summary**: Addressed post-release field issues across three PRs (#205, #206, #207) stabilizing the audit module on physical hardware, specifically S3 boards with PSRAM, and improving flash wear protection.
+
+**1. Crash Fix (Issue #205)**:
+- **Root Cause**: On S3 boards, `xTaskCreate` allocates task stack in PSRAM. When the AuditWriter task called LittleFS flash write operations, the SPI cache was temporarily disabled, causing an instant `Cache disabled but cached memory region accessed` panic if the task context switched or accessed stack.
+- **Fix**: Replaced `xTaskCreate` with ESP-IDF's `xTaskCreateWithCaps` enforcing `MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT` to guarantee DRAM stack. Fixed a related race condition by moving `_started = true` to *before* task creation. Stack size optimized from 4 KiB to 3 KiB.
+
+**2. Rate Limiter Redesign & Config Removal (Issue #206)**:
+- **Security Design**: Removed `IConfigurable` implementation entirely. Audit can no longer be toggled off at runtime (a compromised MCP client turning off audit is a threat).
+- **Writer-Side Batch-Flush**: The original rate limiter was at the caller boundary, dropping records before they reached the queue. Moved rate limiting to the writer task. Callers now unconditionally enqueue. The writer peeks the queue, checks the token bucket, and if allowed, drains the entire queue in a single `open → write-N → close` batch to optimize flash wear. If throttled, the writer delays 50ms and retries (records stay safe in the queue).
+- **Diagnostics**: `throttleCount()` accessor and state removed. `dropCount()` (queue full) is now the sole indicator of record loss.
+- **Framework Events**: Instrumented core framework operations out-of-the-box using the macro API: `audit/started`, `ota/pipeline_start|complete|failed`, and `keys/key_added|key_deleted`.
+- **Config Refinement**: Board default flash budgets (`BOARD_AUDIT_BYTES`) bumped to 128 KiB for S3 boards and 16 KiB for esp32dev, wrapped in `#ifndef` guards in `board.h` to allow clean `platformio.ini` overrides without redefinition warnings.
+
+**3. Xtensa Alignment Bug (Issue/PR #207)**:
+- **Root Cause**: `snprintf` varargs misalignment on Xtensa when mixing 64-bit `int64_t` (for `ts`) with `%s` string pointers, causing memory corruption / `LoadProhibited` exceptions in `strlen()`.
+- **Fix**: Reviewed and merged consumer PR #207 which casts the unix timestamp `ts` to `uint32_t` and uses `%u`, resolving the alignment crash. Caught a format string regression during review (hardcoded `"build":"unknown"`) which the author fixed before merge.
+
+**Architectural outcome**: The Audit module is now heavily battle-tested on physical hardware, resilient against flash/PSRAM cache conflicts, protected against malicious runtime deactivation, and highly optimized for flash wear via single-cycle batch flushes.
+
+**Resolved items from wrap-up**:
+- ✅ D4 hardware soak test completed: Identified and resolved the PSRAM/SPI cache panic.
