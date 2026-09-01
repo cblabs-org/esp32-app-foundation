@@ -15,8 +15,6 @@
 
 void Logger::registerSecret(const std::string& secret) { Redactor::registerSecret(secret); }
 
-void Logger::registerSecret(const String& secret)      { Redactor::registerSecret(secret); }
-
 void Logger::registerSecret(const char* secret)        { Redactor::registerSecret(secret); }
 
 void Logger::logSecure(const char* tag, const char* format, ...) {

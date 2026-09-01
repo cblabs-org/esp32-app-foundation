@@ -13,7 +13,7 @@
 
 #include "DiagCarouselController.hpp"
 #include "ui_gen.h"
-#include "Logger.hpp"
+#include "esp_log.h"
 #include <cstdio>
 #include <cstring>
 
