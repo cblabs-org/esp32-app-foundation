@@ -10,8 +10,8 @@
 
 The framework decouples code into three distinct layers to ensure hardware/software independence and enable host-based testing.
 
-*   **Framework Kernel (`modules/`):** Central reusable infrastructure (e.g., `Application`, `ConfigManager`, `EventBus`, `WifiManager`). Zero dependencies on application code.
-*   **Interfaces (`include/interfaces/`):** Pure virtual C++ class contracts. This is the only coupling point between Kernel and Application.
+*   **Framework Kernel (`modules/` & `lib/`):** Central reusable infrastructure (e.g., `Application`, `ConfigManager`, `EventBus`, `WifiManager`, `LogPipeline`, `Redactor`). Zero dependencies on application code.
+*   **Interfaces (`include/interfaces/`):** Pure virtual C++ class contracts (`ITickable`, `IConfigurable`, `ISanitizer`, etc.). This is the only coupling point between Kernel and Application.
 *   **Your App (`your-project/src/` — see `sample-app/` for reference):** Implements interfaces to inject custom behavior.
 
 ### ADR-04: The Hollywood Principle
@@ -43,14 +43,15 @@ The system transitions: `BOOT` $\rightarrow$ `CONFIGURING` $\leftrightarrow$ `RU
 
 ### 1. BOOT Phase
 Executed synchronously inside `app.begin(config)`:
-1.  **EventBus** & **LittleFS** initialized.
-2.  **DeviceCrypto** & **KeyManager** initialize keys.
-3.  **ConfigManager** loads configs from LittleFS.
-4.  **WifiManager**, **TimeManager**, **DataManager**, and **OTAUpdateManager** start.
-5.  REST routes and MCP tools registered.
-6.  Registry **compacted and locked** (Registration closes).
-7.  Firmware self-test checks boot partition.
-8.  `PreconditionEngine` edges resolved, first tick.
+1.  **Boot banner** & **LogPipeline** installed (`esp_log_set_vprintf` hook for global secret redaction via `Redactor`).
+2.  **EventBus** & **LittleFS** initialized.
+3.  **DeviceCrypto** & **KeyManager** initialize keys (auto-registering decrypted secrets with `Redactor`).
+4.  **ConfigManager** loads configs from LittleFS.
+5.  **WifiManager**, **TimeManager**, **DataManager**, and **OTAUpdateManager** start.
+6.  REST routes and MCP tools registered.
+7.  Registry **compacted and locked** (Registration closes).
+8.  Firmware self-test checks boot partition.
+9.  `PreconditionEngine` edges resolved, first tick.
 
 ### 2. CONFIGURING Phase
 Entered if `PreconditionEngine::allStartupMet()` returns `false` (e.g., station credentials missing).
@@ -70,3 +71,9 @@ Entered once all Startup-role preconditions are met.
 *   `/mod/<namespace>.json`: Central config file for `IConfigurable` namespace.
 *   `/www/`: Root directory for the Single Page Application (SPA) web portal.
 *   `/www/<namespace>/tab.html` & `/www/<namespace>/tab.js`: Dynamic UI fragments.
+
+## Logging & Secret Sanitization
+
+*   **LogPipeline (`lib/LogPipeline/`):** Installs an `esp_log_set_vprintf()` hook early in `Application::begin()` to intercept all `ESP_LOG*` output across the entire codebase. Formats into a 2 KB static buffer in `.bss` and redacts registered secrets in-place via `Redactor::instance()`.
+*   **Redactor (`lib/Redactor/`):** Thread-safe singleton (`Redactor::instance()`) with a fixed-capacity lock-free array (16 secrets max, writer spinlock). Implements `ISanitizer` (`include/interfaces/ISanitizer.hpp`) to provide Dependency Inversion for testable modules like `AuditModule`.
+*   **ISanitizer (`include/interfaces/ISanitizer.hpp`):** Pure abstract interface (`sanitize(char* buf, size_t len) = 0`) allowing modules to sanitize buffers without direct coupling to the `Redactor` singleton.
