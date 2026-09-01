@@ -219,19 +219,19 @@ void ui_init_gen(const char * asset_path)
      * Subjects
      *----------------*/
     lv_subject_init_int(&sys_boot_progress, 0);
-    static char boot_status_buf[UI_SUBJECT_STRING_LENGTH];
-    static char boot_status_prev_buf[UI_SUBJECT_STRING_LENGTH];
+    static char sys_boot_status_buf[UI_SUBJECT_STRING_LENGTH];
+    static char sys_boot_status_prev_buf[UI_SUBJECT_STRING_LENGTH];
     lv_subject_init_string(&sys_boot_status,
-                           boot_status_buf,
-                           boot_status_prev_buf,
+                           sys_boot_status_buf,
+                           sys_boot_status_prev_buf,
                            UI_SUBJECT_STRING_LENGTH,
                            "Initialising..."
                           );
-    static char app_title_buf[UI_SUBJECT_STRING_LENGTH];
-    static char app_title_prev_buf[UI_SUBJECT_STRING_LENGTH];
+    static char sys_app_title_buf[UI_SUBJECT_STRING_LENGTH];
+    static char sys_app_title_prev_buf[UI_SUBJECT_STRING_LENGTH];
     lv_subject_init_string(&sys_app_title,
-                           app_title_buf,
-                           app_title_prev_buf,
+                           sys_app_title_buf,
+                           sys_app_title_prev_buf,
                            UI_SUBJECT_STRING_LENGTH,
                            "ESP32 App"
                           );
@@ -240,109 +240,109 @@ void ui_init_gen(const char * asset_path)
     lv_subject_init_int(&sys_ota_visible, 0);
     lv_subject_init_int(&sys_busy_visible, 0);
     lv_subject_init_int(&sys_msg_visible, 0);
-    static char error_title_buf[UI_SUBJECT_STRING_LENGTH];
-    static char error_title_prev_buf[UI_SUBJECT_STRING_LENGTH];
+    static char sys_error_title_buf[UI_SUBJECT_STRING_LENGTH];
+    static char sys_error_title_prev_buf[UI_SUBJECT_STRING_LENGTH];
     lv_subject_init_string(&sys_error_title,
-                           error_title_buf,
-                           error_title_prev_buf,
+                           sys_error_title_buf,
+                           sys_error_title_prev_buf,
                            UI_SUBJECT_STRING_LENGTH,
                            "System Error"
                           );
-    static char error_message_buf[UI_SUBJECT_STRING_LENGTH];
-    static char error_message_prev_buf[UI_SUBJECT_STRING_LENGTH];
+    static char sys_error_message_buf[UI_SUBJECT_STRING_LENGTH];
+    static char sys_error_message_prev_buf[UI_SUBJECT_STRING_LENGTH];
     lv_subject_init_string(&sys_error_message,
-                           error_message_buf,
-                           error_message_prev_buf,
+                           sys_error_message_buf,
+                           sys_error_message_prev_buf,
                            UI_SUBJECT_STRING_LENGTH,
                            ""
                           );
-    static char setup_ssid_buf[UI_SUBJECT_STRING_LENGTH];
-    static char setup_ssid_prev_buf[UI_SUBJECT_STRING_LENGTH];
+    static char sys_setup_ssid_buf[UI_SUBJECT_STRING_LENGTH];
+    static char sys_setup_ssid_prev_buf[UI_SUBJECT_STRING_LENGTH];
     lv_subject_init_string(&sys_setup_ssid,
-                           setup_ssid_buf,
-                           setup_ssid_prev_buf,
+                           sys_setup_ssid_buf,
+                           sys_setup_ssid_prev_buf,
                            UI_SUBJECT_STRING_LENGTH,
                            "CBLabs-Setup"
                           );
-    static char setup_url_buf[UI_SUBJECT_STRING_LENGTH];
-    static char setup_url_prev_buf[UI_SUBJECT_STRING_LENGTH];
+    static char sys_setup_url_buf[UI_SUBJECT_STRING_LENGTH];
+    static char sys_setup_url_prev_buf[UI_SUBJECT_STRING_LENGTH];
     lv_subject_init_string(&sys_setup_url,
-                           setup_url_buf,
-                           setup_url_prev_buf,
+                           sys_setup_url_buf,
+                           sys_setup_url_prev_buf,
                            UI_SUBJECT_STRING_LENGTH,
                            "192.168.4.1"
                           );
-    static char ota_status_buf[UI_SUBJECT_STRING_LENGTH];
-    static char ota_status_prev_buf[UI_SUBJECT_STRING_LENGTH];
+    static char sys_ota_status_buf[UI_SUBJECT_STRING_LENGTH];
+    static char sys_ota_status_prev_buf[UI_SUBJECT_STRING_LENGTH];
     lv_subject_init_string(&sys_ota_status,
-                           ota_status_buf,
-                           ota_status_prev_buf,
+                           sys_ota_status_buf,
+                           sys_ota_status_prev_buf,
                            UI_SUBJECT_STRING_LENGTH,
                            "Downloading..."
                           );
     lv_subject_init_int(&sys_ota_progress, 0);
-    static char ota_percent_buf[UI_SUBJECT_STRING_LENGTH];
-    static char ota_percent_prev_buf[UI_SUBJECT_STRING_LENGTH];
+    static char sys_ota_percent_buf[UI_SUBJECT_STRING_LENGTH];
+    static char sys_ota_percent_prev_buf[UI_SUBJECT_STRING_LENGTH];
     lv_subject_init_string(&sys_ota_percent,
-                           ota_percent_buf,
-                           ota_percent_prev_buf,
+                           sys_ota_percent_buf,
+                           sys_ota_percent_prev_buf,
                            UI_SUBJECT_STRING_LENGTH,
                            "0%"
                           );
-    static char busy_message_buf[UI_SUBJECT_STRING_LENGTH];
-    static char busy_message_prev_buf[UI_SUBJECT_STRING_LENGTH];
+    static char sys_busy_message_buf[UI_SUBJECT_STRING_LENGTH];
+    static char sys_busy_message_prev_buf[UI_SUBJECT_STRING_LENGTH];
     lv_subject_init_string(&sys_busy_message,
-                           busy_message_buf,
-                           busy_message_prev_buf,
+                           sys_busy_message_buf,
+                           sys_busy_message_prev_buf,
                            UI_SUBJECT_STRING_LENGTH,
                            "Please wait..."
                           );
-    static char msg_title_buf[UI_SUBJECT_STRING_LENGTH];
-    static char msg_title_prev_buf[UI_SUBJECT_STRING_LENGTH];
+    static char sys_msg_title_buf[UI_SUBJECT_STRING_LENGTH];
+    static char sys_msg_title_prev_buf[UI_SUBJECT_STRING_LENGTH];
     lv_subject_init_string(&sys_msg_title,
-                           msg_title_buf,
-                           msg_title_prev_buf,
+                           sys_msg_title_buf,
+                           sys_msg_title_prev_buf,
                            UI_SUBJECT_STRING_LENGTH,
                            ""
                           );
-    static char msg_body_buf[UI_SUBJECT_STRING_LENGTH];
-    static char msg_body_prev_buf[UI_SUBJECT_STRING_LENGTH];
+    static char sys_msg_body_buf[UI_SUBJECT_STRING_LENGTH];
+    static char sys_msg_body_prev_buf[UI_SUBJECT_STRING_LENGTH];
     lv_subject_init_string(&sys_msg_body,
-                           msg_body_buf,
-                           msg_body_prev_buf,
+                           sys_msg_body_buf,
+                           sys_msg_body_prev_buf,
                            UI_SUBJECT_STRING_LENGTH,
                            ""
                           );
     lv_subject_init_int(&sys_diag_arc_value, 0);
-    static char diag_category_buf[UI_SUBJECT_STRING_LENGTH];
-    static char diag_category_prev_buf[UI_SUBJECT_STRING_LENGTH];
+    static char sys_diag_category_buf[UI_SUBJECT_STRING_LENGTH];
+    static char sys_diag_category_prev_buf[UI_SUBJECT_STRING_LENGTH];
     lv_subject_init_string(&sys_diag_category,
-                           diag_category_buf,
-                           diag_category_prev_buf,
+                           sys_diag_category_buf,
+                           sys_diag_category_prev_buf,
                            UI_SUBJECT_STRING_LENGTH,
                            "TEMPERATURE"
                           );
-    static char diag_value_buf[UI_SUBJECT_STRING_LENGTH];
-    static char diag_value_prev_buf[UI_SUBJECT_STRING_LENGTH];
+    static char sys_diag_value_buf[UI_SUBJECT_STRING_LENGTH];
+    static char sys_diag_value_prev_buf[UI_SUBJECT_STRING_LENGTH];
     lv_subject_init_string(&sys_diag_value,
-                           diag_value_buf,
-                           diag_value_prev_buf,
+                           sys_diag_value_buf,
+                           sys_diag_value_prev_buf,
                            UI_SUBJECT_STRING_LENGTH,
                            "--"
                           );
-    static char diag_counter_buf[UI_SUBJECT_STRING_LENGTH];
-    static char diag_counter_prev_buf[UI_SUBJECT_STRING_LENGTH];
+    static char sys_diag_counter_buf[UI_SUBJECT_STRING_LENGTH];
+    static char sys_diag_counter_prev_buf[UI_SUBJECT_STRING_LENGTH];
     lv_subject_init_string(&sys_diag_counter,
-                           diag_counter_buf,
-                           diag_counter_prev_buf,
+                           sys_diag_counter_buf,
+                           sys_diag_counter_prev_buf,
                            UI_SUBJECT_STRING_LENGTH,
                            "0 / 0"
                           );
-    static char diag_status_buf[UI_SUBJECT_STRING_LENGTH];
-    static char diag_status_prev_buf[UI_SUBJECT_STRING_LENGTH];
+    static char sys_diag_status_buf[UI_SUBJECT_STRING_LENGTH];
+    static char sys_diag_status_prev_buf[UI_SUBJECT_STRING_LENGTH];
     lv_subject_init_string(&sys_diag_status,
-                           diag_status_buf,
-                           diag_status_prev_buf,
+                           sys_diag_status_buf,
+                           sys_diag_status_prev_buf,
                            UI_SUBJECT_STRING_LENGTH,
                            ""
                           );

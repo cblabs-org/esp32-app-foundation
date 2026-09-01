@@ -1,8 +1,6 @@
 list(
   APPEND
   LV_EDITOR_PROJECT_SOURCES
-  ${CMAKE_CURRENT_LIST_DIR}/ui_gen.c
-  ${CMAKE_CURRENT_LIST_DIR}/ui.c
   ${CMAKE_CURRENT_LIST_DIR}/fonts/fontawesome_20_data.c
   ${CMAKE_CURRENT_LIST_DIR}/fonts/fontawesome_22_data.c
   ${CMAKE_CURRENT_LIST_DIR}/fonts/montserrat_12_data.c
@@ -15,4 +13,6 @@ list(
   ${CMAKE_CURRENT_LIST_DIR}/images/img_cblabs_logo_data.c
   ${CMAKE_CURRENT_LIST_DIR}/screens/screen_boot_gen.c
   ${CMAKE_CURRENT_LIST_DIR}/screens/screen_diag_gen.c
-  ${CMAKE_CURRENT_LIST_DIR}/screens/screen_system_gen.c)
+  ${CMAKE_CURRENT_LIST_DIR}/screens/screen_system_gen.c
+  ${CMAKE_CURRENT_LIST_DIR}/ui_gen.c
+  ${CMAKE_CURRENT_LIST_DIR}/ui.c)
