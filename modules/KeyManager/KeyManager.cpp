@@ -11,7 +11,7 @@
  */
 
 #include "KeyManager.hpp"
-#include "Logger.hpp"
+#include "Redactor.h"
 #include "MCPToolRegistry.hpp"
 #include <fstream>
 #include <sstream>
@@ -165,7 +165,7 @@ std::string KeyManager::getKeyById(const char* id) const {
     }
 
     std::string result(decrypted.get(), outLen);
-    Logger::registerSecret(std::string(result.c_str()));
+    Redactor::instance().registerSecret(std::string(result.c_str()));
     return result;
 }
 

@@ -1,5 +1,0 @@
-{
-  "name": "Logger",
-  "version": "0.1.0",
-  "description": "Structured logging facade for ESP32 App Foundation"
-}
