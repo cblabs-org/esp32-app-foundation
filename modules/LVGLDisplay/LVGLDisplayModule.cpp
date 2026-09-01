@@ -35,29 +35,14 @@
 #include "portal_assets/hardware_js.hpp"
 
 // -----------------------------------------------------------------------------
-// Weak Symbol Declaration & Default Implementation for SquareLine Studio (D8)
-// -----------------------------------------------------------------------------
-extern "C" __attribute__((weak)) void ui_init(void) {
-    // Weak default no-op implementation. Downstream applications override this.
-}
-
-#if defined(__GNUC__) || defined(__clang__)
-extern "C" {
-    __attribute__((weak)) extern lv_obj_t* ui_ui_DiagScreen;  // SLS Diag (running) screen
-}
-#endif
-
-// -----------------------------------------------------------------------------
 // Lifecycle
 // -----------------------------------------------------------------------------
 
 LVGLDisplayModule::LVGLDisplayModule(ILVGLHardwareAdapter& adapter,
                                      const BootBranding* branding,
-                                     const lv_image_dsc_t* bootLogo,
-                                     ILVGLSystemScreens* screens)
+                                     const lv_image_dsc_t* bootLogo)
     : _adapter(adapter),
       _branding(branding),
-      _screens(screens),
       _bootLogo(bootLogo ? bootLogo : &cb_labs_boot_logo) {
 }
 
@@ -146,21 +131,25 @@ void LVGLDisplayModule::bootstrapHardware() {
 
     _bootstrapMode = true;
 
-    // --- Build the SLS UI now (BEFORE boot status is reported) ---
+    // --- Build the LVGL Pro UI now (BEFORE boot status is reported) ---
     // Boot runs synchronously before the module's begin() would normally call
-    // ui_init(), so the designer's screens must be created here or the boot
+    // ui_init(""), so the designer's screens must be created here or the boot
     // screen (and its progress bar) would not exist while boot progress streams.
-    if (!_uiInitialized && ui_init != nullptr) {
-        ui_init();
+    if (!_uiInitialized) {
+        ui_init("");
         _uiInitialized = true;
     }
 
-    // --- Apply runtime app title to boot screen (overrides SLS literal) ---
-    if (_screens != nullptr && _appTitle != nullptr) {
-        _screens->setAppTitle(_appTitle);
+    _bootScreen = screen_boot_create();
+    _systemScreen = screen_system_create();
+    _diagScreen = screen_diag_create();
+
+    // --- Apply runtime app title to boot screen (overrides default literal) ---
+    if (_appTitle != nullptr) {
+        lv_subject_copy_string(&sys_app_title, _appTitle);
     }
 
-    // --- Stage-1 boot screen (SLS bootScreen, or FaultScreen if no skin) ---
+    // --- Stage-1 boot screen ---
     showBoot();
 
     // --- Step 6: Apply Hardware Brightness & Rotation ---
@@ -223,13 +212,6 @@ void LVGLDisplayModule::begin(EventBus* eventBus) {
     _screensaver.setEnabled(_screensaverEnabled);
     _screensaver.setDimTimeout(_dimTimeoutMs);
     _screensaver.setBlankTimeout(_blankTimeoutMs);
-
-    // Execute weak ui_init() hook (once) — normally already run in bootstrapHardware()
-    // so the SLS screens exist during boot; this is the fallback if begin() ran first.
-    if (!_uiInitialized && ui_init != nullptr) {
-        ui_init();
-        _uiInitialized = true;
-    }
 
     _bootstrapMode = false;
     resetActivity();
@@ -308,36 +290,75 @@ void LVGLDisplayModule::tick(uint32_t now) {
 
         _diagCarousel.stop();
 
-        if (_screens != nullptr) {
-            _screens->onConfiguring(&p);
-            lv_obj_t* scr = nullptr;
-            if (p.severity == Severity::NeedsUser) {
-                scr = _screens->gateHelperScreen(&p);
-                if (scr == nullptr && p.preconditionName != nullptr &&
-                    strcmp(p.preconditionName, PreconditionNames::WIFI_STATION) == 0) {
-                    scr = _screens->wifiWizardScreen();
-                }
-                if (scr == nullptr) {
-                    scr = _screens->configuringScreen();
-                }
-            } else {
-                scr = _screens->configuringScreen();
-            }
+        _hideAllSystemGroups();
 
-            if (scr != nullptr && scr != lv_screen_active()) {
-                if (!_inSystemScreen) {
-                    _priorScreen = lv_screen_active();
-                    _inSystemScreen = true;
-                }
-                lv_scr_load_anim(scr, LV_SCR_LOAD_ANIM_FADE_IN, 200, 0, false);
+        if (p.hostname != nullptr) {
+            lv_subject_copy_string(&sys_setup_ssid, p.hostname);
+        }
+        if (p.deviceIP != nullptr) {
+            char urlBuf[48];
+            snprintf(urlBuf, sizeof(urlBuf), "http://%s", p.deviceIP);
+            lv_subject_copy_string(&sys_setup_url, urlBuf);
+        }
+        if (p.helpText != nullptr) {
+            lv_subject_copy_string(&sys_busy_message, p.helpText);
+            lv_subject_copy_string(&sys_msg_body, p.helpText);
+        } else {
+            lv_subject_copy_string(&sys_busy_message, "Please wait...");
+            lv_subject_copy_string(&sys_msg_body, "");
+        }
+        if (p.preconditionName != nullptr) {
+            lv_subject_copy_string(&sys_msg_title, p.preconditionName);
+        } else {
+            lv_subject_copy_string(&sys_msg_title, "");
+        }
+
+        if (p.severity == Severity::NeedsUser) {
+            if (p.preconditionName != nullptr &&
+                strcmp(p.preconditionName, PreconditionNames::WIFI_STATION) == 0) {
+                lv_subject_set_int(&sys_setup_visible, 1);
+            } else {
+                lv_subject_set_int(&sys_msg_visible, 1);
             }
+        } else {
+            lv_subject_set_int(&sys_busy_visible, 1);
+        }
+
+        if (_systemScreen != nullptr && _systemScreen != lv_screen_active()) {
+            if (!_inSystemScreen) {
+                _priorScreen = lv_screen_active();
+                _inSystemScreen = true;
+            }
+            lv_scr_load_anim(_systemScreen, LV_SCR_LOAD_ANIM_FADE_IN, 200, 0, false);
         }
     }
 
     if (_pendingPreconditionHealth.exchange(false)) {
         PreconditionHealthPayload p = _pendingPreconditionPayload;
-        if (_screens != nullptr) {
-            _screens->onPreconditionHealth(&p);
+        if (p.name != nullptr) {
+            lv_subject_copy_string(&sys_msg_title, p.name);
+        }
+        const char* causeStr = "Unknown";
+        switch (p.cause) {
+            case Cause::Met:             causeStr = "Satisfied"; break;
+            case Cause::NotConfigured:   causeStr = "Setup required"; break;
+            case Cause::Connecting:      causeStr = "Connecting..."; break;
+            case Cause::Rejected:        causeStr = "Rejected (check credentials)"; break;
+            case Cause::Unreachable:     causeStr = "Peer unreachable"; break;
+            case Cause::RateLimited:     causeStr = "Rate limited"; break;
+            case Cause::Implausible:     causeStr = "Implausible response"; break;
+            case Cause::DependencyUnmet: causeStr = "Waiting for dependencies"; break;
+            case Cause::FallbackEngaged: causeStr = "Fallback engaged"; break;
+            case Cause::Unavailable:     causeStr = "Unavailable"; break;
+            case Cause::Indeterminate:   causeStr = "Indeterminate state"; break;
+            case Cause::InternalError:   causeStr = "Internal error"; break;
+            default:                     causeStr = "Pending"; break;
+        }
+        lv_subject_copy_string(&sys_msg_body, causeStr);
+        if (p.cause == Cause::Connecting && p.name != nullptr) {
+            char busyBuf[64];
+            snprintf(busyBuf, sizeof(busyBuf), "%s: Connecting...", p.name);
+            lv_subject_copy_string(&sys_busy_message, busyBuf);
         }
     }
 
@@ -347,22 +368,16 @@ void LVGLDisplayModule::tick(uint32_t now) {
             std::lock_guard<std::mutex> lock(_dataSourceHealthMutex);
             std::swap(updates, _dataSourceUpdates);
         }
-        for (const auto& payload : updates) {
-            if (_screens) {
-                _screens->onDataSourceHealth(payload.name, payload.state);
-            }
-        }
+        (void)updates;
     }
 
     if (_pendingAppRunning.exchange(false)) {
         ESP_LOGI("LVGLDisplayModule", "App transition → RUNNING (deferred to tick)");
         _inSystemScreen = false;
         _priorScreen = nullptr;
-#if defined(__GNUC__) || defined(__clang__)
-        if (&ui_ui_DiagScreen != nullptr && ui_ui_DiagScreen != nullptr) {
-            lv_scr_load_anim(ui_ui_DiagScreen, LV_SCR_LOAD_ANIM_FADE_IN, 300, 0, false);
+        if (_diagScreen != nullptr) {
+            lv_scr_load_anim(_diagScreen, LV_SCR_LOAD_ANIM_FADE_IN, 300, 0, false);
         }
-#endif
         _diagCarousel.begin(_group);
     }
 
@@ -522,20 +537,30 @@ void LVGLDisplayModule::reportStatus(const char* message, float progress) {
     // Boot runs synchronously in setup(), before the main tick loop pumps
     // lv_timer_handler(). LVGL is retained-mode, so updates must be flushed
     // explicitly here or boot progress never reaches the panel. Drive the
-    // designer's boot screen; if the skin is absent or its UI failed to load,
-    // fall back to the built-in FaultScreen (the only code-drawn screen).
-    lv_obj_t* bootScr = (_screens != nullptr) ? _screens->bootScreen() : nullptr;
-    if (bootScr == nullptr) {
+    // designer's boot screen; if the UI failed to load, fall back to the built-in
+    // FaultScreen (the only code-drawn screen).
+    if (_bootScreen == nullptr) {
         showFault("DISPLAY FAULT", "UI failed to load — reflash");
         return;
     }
 
-    if (lv_screen_active() != bootScr) {
-        lv_screen_load(bootScr);  // immediate — a fade can't advance before the tick loop
+    if (lv_screen_active() != _bootScreen) {
+        lv_screen_load(_bootScreen);  // immediate — a fade can't advance before the tick loop
     }
 
+    auto applyProgress = [](const char* msg, float prog) {
+        if (prog >= 0.0f) {
+            int pct = static_cast<int>(prog > 1.0f ? prog : (prog * 100.0f));
+            pct = std::max(0, std::min(100, pct));
+            lv_subject_set_int(&sys_boot_progress, pct);
+        }
+        if (msg != nullptr) {
+            lv_subject_copy_string(&sys_boot_status, msg);
+        }
+    };
+
     if (_display == nullptr) {
-        _screens->onBootProgress(message, progress);
+        applyProgress(message, progress);
         return;
     }
 
@@ -547,14 +572,14 @@ void LVGLDisplayModule::reportStatus(const char* message, float progress) {
         const float from          = _lastBootProgress;
         const float delta         = progress - from;
         for (int i = 1; i <= kSteps; ++i) {
-            _screens->onBootProgress(message, from + (delta * (float)i / (float)kSteps));
+            applyProgress(message, from + (delta * (float)i / (float)kSteps));
             lv_refr_now(_display);        // force immediate flush — tick loop isn't running yet
             delay(kStepDelayMs);
         }
         _lastBootProgress = progress;
     } else {
         // No forward progress (e.g. a message-only update): just render once.
-        _screens->onBootProgress(message, progress);
+        applyProgress(message, progress);
         lv_refr_now(_display);
     }
 }
@@ -572,11 +597,18 @@ void LVGLDisplayModule::clearStatus() {
 // System Screen Management API
 // -----------------------------------------------------------------------------
 
+void LVGLDisplayModule::_hideAllSystemGroups() {
+    lv_subject_set_int(&sys_error_visible, 0);
+    lv_subject_set_int(&sys_setup_visible, 0);
+    lv_subject_set_int(&sys_ota_visible, 0);
+    lv_subject_set_int(&sys_busy_visible, 0);
+    lv_subject_set_int(&sys_msg_visible, 0);
+}
+
 void LVGLDisplayModule::showBoot() {
-    lv_obj_t* bootScr = (_screens != nullptr) ? _screens->bootScreen() : nullptr;
-    if (bootScr != nullptr) {
-        if (lv_screen_active() != bootScr) {
-            lv_screen_load(bootScr);
+    if (_bootScreen != nullptr) {
+        if (lv_screen_active() != _bootScreen) {
+            lv_screen_load(_bootScreen);
         }
     } else {
         showFault("DISPLAY FAULT", "UI failed to load — reflash");
@@ -597,16 +629,16 @@ void LVGLDisplayModule::showError(const char* title, const char* message) {
         _inSystemScreen = true;
     }
 
-    if (_screens != nullptr) {
-        _screens->onError(title, message);
-        lv_obj_t* customScr = _screens->errorScreen();
-        if (customScr != nullptr) {
-            lv_scr_load_anim(customScr, LV_SCR_LOAD_ANIM_FADE_IN, 200, 0, false);
-            return;
-        }
+    if (_systemScreen != nullptr) {
+        _hideAllSystemGroups();
+        lv_subject_copy_string(&sys_error_title, title ? title : "System Error");
+        lv_subject_copy_string(&sys_error_message, message ? message : "");
+        lv_subject_set_int(&sys_error_visible, 1);
+        lv_scr_load_anim(_systemScreen, LV_SCR_LOAD_ANIM_FADE_IN, 200, 0, false);
+        return;
     }
 
-    // No skin error screen — show the diagnostic fault screen with the message.
+    // No system screen — show the diagnostic fault screen with the message.
     showFault(title, message);
 }
 
@@ -622,16 +654,21 @@ void LVGLDisplayModule::showOtaProgress(float progress, const char* status) {
         _inSystemScreen = true;
     }
 
-    if (_screens != nullptr) {
-        _screens->onOtaProgress(progress, status);
-        lv_obj_t* customScr = _screens->otaScreen();
-        if (customScr != nullptr) {
-            lv_scr_load_anim(customScr, LV_SCR_LOAD_ANIM_FADE_IN, 200, 0, false);
-            return;
-        }
+    if (_systemScreen != nullptr) {
+        _hideAllSystemGroups();
+        int pct = static_cast<int>(progress > 1.0f ? progress : (progress * 100.0f));
+        pct = std::max(0, std::min(100, pct));
+        lv_subject_set_int(&sys_ota_progress, pct);
+        char pctBuf[16];
+        snprintf(pctBuf, sizeof(pctBuf), "%d%%", pct);
+        lv_subject_copy_string(&sys_ota_percent, pctBuf);
+        lv_subject_copy_string(&sys_ota_status, status ? status : "Updating...");
+        lv_subject_set_int(&sys_ota_visible, 1);
+        lv_scr_load_anim(_systemScreen, LV_SCR_LOAD_ANIM_FADE_IN, 200, 0, false);
+        return;
     }
 
-    // No skin OTA screen — show the diagnostic fault screen.
+    // No system screen — show the diagnostic fault screen.
     (void)progress;
     (void)status;
     showFault("DISPLAY FAULT", "UI failed to load — reflash");
@@ -647,14 +684,14 @@ void LVGLDisplayModule::restorePriorScreen() {
 }
 
 void LVGLDisplayModule::setBootLogo(const lv_image_dsc_t* bootLogo) {
-    // The boot logo now lives in the SLS design; retained for API compatibility.
+    // The boot logo now lives in the design library; retained for API compatibility.
     _bootLogo = bootLogo ? bootLogo : &cb_labs_boot_logo;
 }
 
 void LVGLDisplayModule::setAppTitle(const char* title) {
     _appTitle = title;
-    if (_screens != nullptr && title != nullptr) {
-        _screens->setAppTitle(title);
+    if (title != nullptr) {
+        lv_subject_copy_string(&sys_app_title, title);
     }
 }
 

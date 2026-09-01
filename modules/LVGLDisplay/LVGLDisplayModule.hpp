@@ -72,6 +72,11 @@
 #include "PngWriter.h"            // hardware-only PNG encoder (ROM tdefl); native build stubs capturePNG()
 #endif
 #include "lvgl.h"
+#ifndef LV_LVGL_H_INCLUDE_SIMPLE
+#define LV_LVGL_H_INCLUDE_SIMPLE
+#endif
+#include "ui.h"
+#include "ui_gen.h"
 
 // Forward declarations
 class EventBus;
@@ -130,13 +135,21 @@ public:
      * @brief Construct a new LVGLDisplayModule with hardware adapter.
      *
      * @param adapter Reference to concrete ILVGLHardwareAdapter implementation.
-     * @param screens Optional pointer to ILVGLSystemScreens provider (default nullptr).
+     * @param branding Optional pointer to BootBranding configuration.
      * @param bootLogo Optional pointer to compiled-in lv_image_dsc_t for Stage 1 boot splash (defaults to cb_labs_boot_logo).
      */
     explicit LVGLDisplayModule(ILVGLHardwareAdapter& adapter,
                                const BootBranding* branding = nullptr,
-                               const lv_image_dsc_t* bootLogo = nullptr,
-                               ILVGLSystemScreens* screens = nullptr);
+                               const lv_image_dsc_t* bootLogo = nullptr);
+
+    /**
+     * @brief Legacy delegating constructor for backwards compatibility until WO4.
+     */
+    LVGLDisplayModule(ILVGLHardwareAdapter& adapter,
+                      const BootBranding* branding,
+                      const lv_image_dsc_t* bootLogo,
+                      ILVGLSystemScreens* /*screens*/)
+        : LVGLDisplayModule(adapter, branding, bootLogo) {}
 
     /**
      * @brief Destructor. Cleans up draw buffers and LVGL handles.
@@ -431,9 +444,11 @@ private:
     static void _onPreconditionHealth(const char* topic, const void* payload, void* ctx);
     static void _onInputWake(const char* topic, const void* payload, void* ctx);
 
+    void _hideAllSystemGroups();
+    
     ILVGLHardwareAdapter& _adapter;            ///< Injected hardware adapter
     const BootBranding*   _branding = nullptr; ///< Optional boot branding configuration
-    ILVGLSystemScreens*   _screens = nullptr;  ///< Optional system screens provider
+    ILVGLSystemScreens*   _screens = nullptr;  ///< Optional system screens provider (unused, retained for ABI)
     ConfigManager*        _configManager = nullptr; ///< Cached ConfigManager reference
     EventBus*             _eventBus = nullptr; ///< Framework EventBus reference
 
@@ -442,6 +457,10 @@ private:
     lv_indev_t*   _encoderInDev = nullptr;     ///< Rotary encoder input device
     lv_indev_t*   _keypadInDev = nullptr;      ///< Keypad/button input device
     lv_group_t*   _group = nullptr;            ///< Widget focus group for encoder/keypad
+
+    lv_obj_t*     _bootScreen = nullptr;       ///< Cached LVGL Pro boot screen object
+    lv_obj_t*     _systemScreen = nullptr;     ///< Cached LVGL Pro system screen object
+    lv_obj_t*     _diagScreen = nullptr;       ///< Cached LVGL Pro diagnostic screen object
 
     uint32_t _lastTickMs = 0;                  ///< Timestamp of last tick() execution
     bool     _tickInitialized = false;         ///< Sentinel for first tick
