@@ -14,7 +14,6 @@
 #include "esp_lcd.h"
 #include "esp_lvgl_port.h"
 #include "interfaces/ILVGLHardwareAdapter.hpp"
-#include "LVGLDisplay/ILVGLSystemScreens.hpp"
 
 class MockLVGLHardwareAdapter : public ILVGLHardwareAdapter {
 public:
@@ -42,24 +41,6 @@ public:
         lv_indev_t* enc = lv_indev_create();
         lv_indev_set_type(enc, LV_INDEV_TYPE_ENCODER);
         return enc;
-    }
-};
-
-class MockSystemScreens : public ILVGLSystemScreens {
-public:
-    bool otaCalled = false;
-    bool errorCalled = false;
-
-    void onOtaProgress(float progress, const char* status) override {
-        (void)progress;
-        (void)status;
-        otaCalled = true;
-    }
-
-    void onError(const char* title, const char* message) override {
-        (void)title;
-        (void)message;
-        errorCalled = true;
     }
 };
 
@@ -149,18 +130,6 @@ TEST(LVGLStubsTest, HardwareAdapterInterface) {
     ASSERT_NE(enc, nullptr);
     EXPECT_EQ(enc->type, static_cast<uint8_t>(LV_INDEV_TYPE_ENCODER));
     lv_indev_delete(enc);
-}
-
-TEST(LVGLStubsTest, SystemScreensInterface) {
-    MockSystemScreens screens;
-    EXPECT_EQ(screens.otaScreen(), nullptr);
-    EXPECT_EQ(screens.errorScreen(), nullptr);
-
-    screens.onOtaProgress(50.0f, "Downloading...");
-    EXPECT_TRUE(screens.otaCalled);
-
-    screens.onError("WiFi Error", "Connection failed");
-    EXPECT_TRUE(screens.errorCalled);
 }
 
 TEST(LVGLStubsTest, ESPLCDPortStubs) {

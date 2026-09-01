@@ -11,8 +11,10 @@ description: >
   architecture document. (3) Building and extending — registerModule,
   AppFoundation.h, ITickable, IConfigurable, IWebContributor, IMCPContributor,
   IPreconditionContributor, IDataSource, FetchContext, DeadlineToken,
-  IDisplayBoard, IOTAVerifier, EventBus, ConfigManager, LittleFS, web portal,
-  display carousel, OTA verification, MCP server/device tools,
+  IDisplayBoard, ILVGLHardwareAdapter, IOTAVerifier, EventBus, ConfigManager,
+  LittleFS, web portal, display carousel, LVGL Pro, UIDesign, uidesign,
+  sys_*, subjects, ui_init, screen_create, bind_text, bind_value,
+  LV_USE_OBSERVER, OTA verification, MCP server/device tools,
   PreconditionEngine, precondition, Cause, Severity, IPreconditionRegistry,
   ITabRegistry, registerTabs, DataSourceHealthPayload, data.source.health,
   get_data_sources, AUDIT, AUDIT_SYNC, audit trail, audit log, WITH_AUDIT,
@@ -67,6 +69,15 @@ Call `app.registerModule(&myModule);` inside `setup()`. The framework uses compi
 ### What include do I use?
 Always use `#include "AppFoundation.h"`. Do not couple directly to internal framework header paths.
 
+### How does firmware talk to the LVGL display?
+Via `sys_*` reactive subjects (never direct widget manipulation). The framework updates subjects using `lv_subject_set_int()` and `lv_subject_copy_string()`, and LVGL observers (`bind_text`, `bind_value`, `LV_USE_OBSERVER`) update the bound UI widgets automatically.
+
+### How does a consumer extend the UI?
+Fork the `uidesign/` project folder into the application repository, preserve all 23 contracted `sys_*` subjects so framework screens and modals continue functioning, and add custom `app_*` subjects with corresponding widgets and screens. Export the design to the `UIDesign` PlatformIO library.
+
+### What is the `sys_` prefix?
+`sys_` denotes framework-contracted reactive subjects (e.g. `sys_boot_progress`, `sys_error_visible`, `sys_ota_status`). Designers must not rename or remove these subjects in their LVGL Pro projects so core framework events (boot splash, OTA updates, WiFi configuration, error states, diagnostics) bind correctly.
+
 ### Framework-Reserved Include Prefixes
 
 The following subdirectories of `include/` are reserved by the framework:
@@ -93,8 +104,14 @@ paths instead, e.g. `include/modules/my-module/MyTypes.hpp`.
 | `IPreconditionRegistry` | Collects preconditions and dependency edges from `IPreconditionContributor` modules. | `add()` |
 | `IDataSource` | Scheduled background data fetch worker managed by `DataManager`. | `fetchUpdate(const FetchContext&)` |
 | `IStatusReporter` | Displays boot-phase progress status and unrecoverable errors. | `reportStatus(const char*, float)` |
-| `IDisplayBoard` | Renders a telemetry pane inside the monochrome display carousel. | `render(U8G2&)` |
+| `IDisplayBoard` | Renders a telemetry pane inside the monochrome display carousel (U8G2). | `render(U8G2&)` |
+| `ILVGLHardwareAdapter` | Abstracts display hardware (SPI/bus init, backlight PWM, touch, encoder inputs) for `LVGLDisplayModule`. | `createDisplay()`, `setBrightness()`, `createTouchInput()`, `createEncoderInput()` |
 | `IOTAVerifier` | Streaming cryptographic firmware verification for OTA updates. | `verify()` |
+
+> **LVGL Pro UI Contract**: Unlike U8G2's virtual render callbacks, the LVGL Pro display architecture uses:
+> - **`ILVGLHardwareAdapter`**: Hardware abstraction decoupling display and input peripheral initialization.
+> - **Subject Contract**: 23 `sys_*` reactive subjects for decoupled firmware↔UI data flow (`bind_text`, `bind_value`).
+> - **`screen_*_create()`**: LVGL Pro screen factory functions called during bootstrap (`screen_boot_create()`, `screen_system_create()`, `screen_diag_create()`).
 
 ## Detailed References
 
@@ -114,7 +131,8 @@ This skill uses a progressive disclosure model. Based on your query, load and re
 | **Architecture & Boot** (Lifecycle, 3-tier model, LittleFS) | `references/architecture.md` |
 | **Registration System** (registerModule, compact-and-lock) | `references/registration.md` |
 | **Build System** (PlatformIO, version injection, LittleFS) | `references/build-system.md` |
-| **Display System** (Carousel, custom boards, replacing U8G2) | `systems/display/` |
+| **Display System — LVGL Pro & Colour TFTs** (Architecture, 23 sys_* subjects, ILVGLHardwareAdapter, UIDesign) | `systems/display/lvgl-display.md` |
+| **Display System — U8G2 Monochrome** (Carousel, custom boards, replacing U8G2) | `systems/display/overview.md` |
 | **Input System** (buttons, rotary encoders, gestures) | `systems/input/` |
 | **Config System** (Persistence, FrameworkConfig, ConfigManifest) | `systems/config/` |
 | **Event Bus** (Topics, pub/sub, custom topics) | `systems/event-bus/` |
@@ -196,12 +214,14 @@ These references are optimized distillations for AI agents. If the human develop
   "Cause", "Severity", "PreconditionRole", "precondition",
   "IDataSource", "FetchContext", "DeadlineToken", "DataSourceHealthPayload",
   "data.source.health", "get_data_sources", "resetSourceHealth",
-  "IStatusReporter", "IDisplayBoard", "ITabRegistry", "registerTabs".
+  "IStatusReporter", "IDisplayBoard", "ILVGLHardwareAdapter", "ITabRegistry", "registerTabs".
 - **Core systems**: "EventBus", "ConfigManager", "FrameworkConfig", "config system",
   "extension point", "framework architecture", "AppFoundation.h", "tick function",
   "boot sequence", "LittleFS layout", "DataManager", "fetchUpdate", "queueDataJob".
 - **Display**: "display board", "carousel", "screensaver", "replace the display",
-  "use a TFT", "different screen", "e-ink display".
+  "use a TFT", "different screen", "e-ink display", "LVGL Pro", "UIDesign",
+  "uidesign", "ILVGLHardwareAdapter", "LVGLDisplayModule", "subjects", "sys_*",
+  "ui_init", "screen_create", "bind_text", "bind_value", "LV_USE_OBSERVER".
 - **Input**: "button", "ButtonModule", "WITH_BUTTONS", "rotary encoder",
   "EncoderModule", "WITH_ENCODER", "PCNT", "quadrature", "gesture",
   "button.click", "encoder.rotate", "iot_button", "consumeDelta".

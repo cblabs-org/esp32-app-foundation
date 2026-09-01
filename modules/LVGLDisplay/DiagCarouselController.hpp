@@ -7,7 +7,7 @@
  *
  * Module: modules/LVGLDisplay/DiagCarouselController.hpp
  * Description: Rotary diagnostic carousel for the CrowPanel DiagScreen.
- *              Drives the SLS arc/label widgets via LVGL's encoder EDIT mode:
+ *              Drives the diagnostic arc/label widgets via sys_diag_* subjects and LVGL's encoder EDIT mode:
  *              encoder rotation snaps the arc between N diagnostic items,
  *              and the text labels update to show each metric's category,
  *              value+units, position counter, and health evaluation.
@@ -58,7 +58,7 @@ struct DiagItem {
 /**
  * @brief Encoder-driven diagnostic carousel for the CrowPanel LVGL DiagScreen.
  *
- * When activated (via begin()), configures the SLS DiagArc as a discrete
+ * When activated (via begin()), configures the DiagArc as a discrete
  * segment selector with range [0, N-1]. LVGL's encoder EDIT mode drives the
  * arc value; a VALUE_CHANGED callback updates the category/value/counter/status
  * labels for the selected diagnostic item.
@@ -78,7 +78,7 @@ public:
      *
      * @param group  The LVGL encoder focus group (to enter EDIT mode).
      */
-    void begin(lv_group_t* group);
+    void begin(lv_group_t* group, lv_obj_t* diagScreen = nullptr);
 
     /**
      * @brief Deactivate the carousel (when leaving DiagScreen).
@@ -111,5 +111,11 @@ private:
     bool        _callbackRegistered = false;
     char        _textBuf[64]   = {};                   ///< Shared buffer for text item reads
 
+    // Direct widget pointers for styling (resolved in begin() via screen tree traversal)
+    lv_obj_t*   _arc           = nullptr;
+    lv_obj_t*   _valueLabel    = nullptr;
+    lv_obj_t*   _statusLabel   = nullptr;
+
     static constexpr uint32_t REFRESH_INTERVAL_MS = 2000;   ///< Interval in milliseconds for refresh ms
 };
+

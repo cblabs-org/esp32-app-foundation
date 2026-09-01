@@ -68,3 +68,8 @@ sample-app/sdkconfig.*
 # SquareLine Studio working files
 squareline/**/backup/
 squareline/**/cache/
+
+# LVGL Pro Editor build artifacts
+uidesign/*/lvglpro/preview-build/
+uidesign/*/lvglpro/preview-bin/
+uidesign/*/lvglpro/.cache.json

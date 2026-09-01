@@ -6,67 +6,42 @@
  * SPDX-License-Identifier: Apache-2.0
  *
  * Module: test/test_unit/test_lvglDisplay/test_screens.cpp
- * Description: Unit tests for LVGLDisplayModule system-screen routing. All real
- *              screens come from the ILVGLSystemScreens skin (boot / error / OTA);
- *              the only built-in is FaultScreen, shown when the skin is absent or
- *              its UI failed to load.
+ * Description: Unit tests for LVGLDisplayModule system-screen routing and reactive
+ *              LVGL Pro subjects data binding (boot / error / OTA / system states).
  */
 
 #include <gtest/gtest.h>
 #include <string>
 #include "LVGLDisplayModule.hpp"
 #include "MockLVGLHardwareAdapter.hpp"
-#include "LVGLDisplay/ILVGLSystemScreens.hpp"
 #include "screens/FaultScreen.hpp"
 #include "lvgl.h"
-
-// -----------------------------------------------------------------------------
-// Mock skin provider — supplies boot/error/OTA screens and records callbacks.
-// -----------------------------------------------------------------------------
-class MockSystemScreens : public ILVGLSystemScreens {
-public:
-    lv_obj_t* customBootScr  = nullptr;
-    lv_obj_t* customOtaScr   = nullptr;
-    lv_obj_t* customErrorScr = nullptr;
-
-    bool  bootProgressCalled = false;
-    bool  otaProgressCalled  = false;
-    bool  errorCalled        = false;
-    float lastBootProgress   = -1.0f;
-    float lastOtaProgress    = 0.0f;
-    std::string lastBootMessage;
-    std::string lastOtaStatus;
-    std::string lastErrorTitle;
-    std::string lastErrorMessage;
-
-    lv_obj_t* bootScreen() override  { return customBootScr; }
-    lv_obj_t* otaScreen() override   { return customOtaScr; }
-    lv_obj_t* errorScreen() override { return customErrorScr; }
-
-    void onBootProgress(const char* message, float progress) override {
-        bootProgressCalled = true;
-        lastBootProgress = progress;
-        if (message) lastBootMessage = message;
-    }
-    void onOtaProgress(float progress, const char* status) override {
-        otaProgressCalled = true;
-        lastOtaProgress = progress;
-        if (status) lastOtaStatus = status;
-    }
-    void onError(const char* title, const char* message) override {
-        errorCalled = true;
-        if (title) lastErrorTitle = title;
-        if (message) lastErrorMessage = message;
-    }
-};
+#include "ui_gen.h"
 
 class LVGLScreensTest : public ::testing::Test {
 protected:
     MockLVGLHardwareAdapter adapter;
+
+    void SetUp() override {
+        // Reset subjects to baseline
+        lv_subject_set_int(&sys_boot_progress, 0);
+        lv_subject_copy_string(&sys_boot_status, "");
+        lv_subject_copy_string(&sys_app_title, "");
+        lv_subject_set_int(&sys_error_visible, 0);
+        lv_subject_copy_string(&sys_error_title, "");
+        lv_subject_copy_string(&sys_error_message, "");
+        lv_subject_set_int(&sys_ota_visible, 0);
+        lv_subject_set_int(&sys_ota_progress, 0);
+        lv_subject_copy_string(&sys_ota_percent, "");
+        lv_subject_copy_string(&sys_ota_status, "");
+        lv_subject_set_int(&sys_setup_visible, 0);
+        lv_subject_set_int(&sys_busy_visible, 0);
+        lv_subject_set_int(&sys_msg_visible, 0);
+    }
 };
 
 // -----------------------------------------------------------------------------
-// FaultScreen — the sole built-in screen
+// FaultScreen — the fallback screen
 // -----------------------------------------------------------------------------
 TEST_F(LVGLScreensTest, FaultScreenLifecycle) {
     FaultScreen fault;
@@ -76,112 +51,90 @@ TEST_F(LVGLScreensTest, FaultScreenLifecycle) {
 }
 
 // -----------------------------------------------------------------------------
-// Boot: with no skin, bootstrap shows the FaultScreen
+// Boot: bootstrapHardware loads boot screen and reportStatus updates subjects
 // -----------------------------------------------------------------------------
-TEST_F(LVGLScreensTest, NoSkinBootShowsFaultScreen) {
+TEST_F(LVGLScreensTest, BootScreenDrivenByReportStatus) {
     LVGLDisplayModule module(adapter);
     module.bootstrapHardware();
 
     EXPECT_TRUE(module.isBootstrapMode());
-    EXPECT_EQ(lv_screen_active(), module.getFaultScreen().getScreen());
-}
-
-// -----------------------------------------------------------------------------
-// Boot: with a skin, bootstrap loads the skin boot screen and drives progress
-// -----------------------------------------------------------------------------
-TEST_F(LVGLScreensTest, SkinBootScreenDrivenByReportStatus) {
-    MockSystemScreens provider;
-    provider.customBootScr = lv_obj_create(nullptr);
-
-    LVGLDisplayModule module(adapter, nullptr, nullptr, &provider);
-    module.bootstrapHardware();
-    EXPECT_EQ(lv_screen_active(), provider.customBootScr);
+    EXPECT_NE(module.getDisplay(), nullptr);
 
     IStatusReporter& reporter = module;
     reporter.reportStatus("Mounted LittleFS", 0.5f);
-    EXPECT_TRUE(provider.bootProgressCalled);
-    EXPECT_EQ(provider.lastBootMessage, "Mounted LittleFS");
-    EXPECT_EQ(lv_screen_active(), provider.customBootScr);
 
-    lv_obj_delete(provider.customBootScr);
+    EXPECT_EQ(lv_subject_get_int(&sys_boot_progress), 50);
+    EXPECT_STREQ(lv_subject_get_string(&sys_boot_status), "Mounted LittleFS");
 }
 
 // -----------------------------------------------------------------------------
-// Boot: skin present but its boot screen is null (UI failed to load) -> fault
+// App Title: setAppTitle updates sys_app_title subject
 // -----------------------------------------------------------------------------
-TEST_F(LVGLScreensTest, SkinWithNullBootScreenFallsBackToFault) {
-    MockSystemScreens provider;  // customBootScr stays nullptr
-
-    LVGLDisplayModule module(adapter, nullptr, nullptr, &provider);
-    module.bootstrapHardware();
-
-    IStatusReporter& reporter = module;
-    reporter.reportStatus("Booting", 0.2f);
-    EXPECT_EQ(lv_screen_active(), module.getFaultScreen().getScreen());
+TEST_F(LVGLScreensTest, AppTitleUpdatesSubject) {
+    LVGLDisplayModule module(adapter);
+    module.setAppTitle("Test App Title");
+    EXPECT_STREQ(lv_subject_get_string(&sys_app_title), "Test App Title");
 }
 
 // -----------------------------------------------------------------------------
-// Error/OTA: skin screens + callbacks are used when supplied
+// Error: showError populates error subjects and sets error visible
 // -----------------------------------------------------------------------------
-TEST_F(LVGLScreensTest, SkinErrorAndOtaWiring) {
-    MockSystemScreens provider;
-    provider.customBootScr  = lv_obj_create(nullptr);
-    provider.customOtaScr   = lv_obj_create(nullptr);
-    provider.customErrorScr = lv_obj_create(nullptr);
-
-    LVGLDisplayModule module(adapter, nullptr, nullptr, &provider);
-    module.bootstrapHardware();
-
-    module.showError("CFG_ERR", "Invalid json");
-    EXPECT_TRUE(provider.errorCalled);
-    EXPECT_EQ(provider.lastErrorTitle, "CFG_ERR");
-    EXPECT_EQ(provider.lastErrorMessage, "Invalid json");
-    EXPECT_EQ(lv_screen_active(), provider.customErrorScr);
-
-    module.showOtaProgress(0.88f, "Verifying hash");
-    EXPECT_TRUE(provider.otaProgressCalled);
-    EXPECT_FLOAT_EQ(provider.lastOtaProgress, 0.88f);
-    EXPECT_EQ(provider.lastOtaStatus, "Verifying hash");
-    EXPECT_EQ(lv_screen_active(), provider.customOtaScr);
-
-    lv_obj_delete(provider.customBootScr);
-    lv_obj_delete(provider.customOtaScr);
-    lv_obj_delete(provider.customErrorScr);
-}
-
-// -----------------------------------------------------------------------------
-// Error: with no skin, showError falls back to the FaultScreen
-// -----------------------------------------------------------------------------
-TEST_F(LVGLScreensTest, ErrorFallsBackToFaultScreen) {
+TEST_F(LVGLScreensTest, ErrorScreenWiring) {
     LVGLDisplayModule module(adapter);
     module.bootstrapHardware();
 
-    module.showError(500, "Internal Server Error");
-    EXPECT_EQ(lv_screen_active(), module.getFaultScreen().getScreen());
+    module.showError("CFG_ERR", "Invalid configuration");
+
+    EXPECT_EQ(lv_subject_get_int(&sys_error_visible), 1);
+    EXPECT_STREQ(lv_subject_get_string(&sys_error_title), "CFG_ERR");
+    EXPECT_STREQ(lv_subject_get_string(&sys_error_message), "Invalid configuration");
 }
 
 // -----------------------------------------------------------------------------
-// Prior-screen restoration after a skin error overlay
+// Error: numeric error overload formats title string
+// -----------------------------------------------------------------------------
+TEST_F(LVGLScreensTest, ErrorScreenNumericCode) {
+    LVGLDisplayModule module(adapter);
+    module.bootstrapHardware();
+
+    module.showError(500, "Internal Error");
+
+    EXPECT_EQ(lv_subject_get_int(&sys_error_visible), 1);
+    EXPECT_STREQ(lv_subject_get_string(&sys_error_title), "ERROR 500");
+    EXPECT_STREQ(lv_subject_get_string(&sys_error_message), "Internal Error");
+}
+
+// -----------------------------------------------------------------------------
+// OTA: showOtaProgress populates OTA subjects and sets ota visible
+// -----------------------------------------------------------------------------
+TEST_F(LVGLScreensTest, OtaProgressWiring) {
+    LVGLDisplayModule module(adapter);
+    module.bootstrapHardware();
+
+    module.showOtaProgress(0.88f, "Verifying hash");
+
+    EXPECT_EQ(lv_subject_get_int(&sys_ota_visible), 1);
+    EXPECT_EQ(lv_subject_get_int(&sys_ota_progress), 88);
+    EXPECT_STREQ(lv_subject_get_string(&sys_ota_percent), "88%");
+    EXPECT_STREQ(lv_subject_get_string(&sys_ota_status), "Verifying hash");
+}
+
+// -----------------------------------------------------------------------------
+// Prior-screen restoration after a system error overlay
 // -----------------------------------------------------------------------------
 TEST_F(LVGLScreensTest, PriorScreenRestoration) {
-    MockSystemScreens provider;
-    provider.customBootScr  = lv_obj_create(nullptr);
-    provider.customErrorScr = lv_obj_create(nullptr);
-
-    LVGLDisplayModule module(adapter, nullptr, nullptr, &provider);
+    LVGLDisplayModule module(adapter);
     module.bootstrapHardware();
 
     lv_obj_t* appMainScreen = lv_obj_create(nullptr);
-    lv_scr_load(appMainScreen);
+    lv_screen_load(appMainScreen);
     EXPECT_EQ(lv_screen_active(), appMainScreen);
 
     module.showError("WIFI_ERR", "Connection timeout");
-    EXPECT_EQ(lv_screen_active(), provider.customErrorScr);
+    EXPECT_EQ(lv_subject_get_int(&sys_error_visible), 1);
 
     module.restorePriorScreen();
     EXPECT_EQ(lv_screen_active(), appMainScreen);
 
     lv_obj_delete(appMainScreen);
-    lv_obj_delete(provider.customBootScr);
-    lv_obj_delete(provider.customErrorScr);
 }

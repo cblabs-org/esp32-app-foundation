@@ -1,0 +1,328 @@
+<screen>
+	<view width="100%" height="100%" style_bg_color="0x121220" style_bg_opa="255" scrollable="false">
+		<!-- ===== ERROR GROUP ===== -->
+		<lv_obj
+			name="system_error_group"
+			align="center"
+			x="0"
+			y="0"
+			width="160"
+			height="160"
+			style_bg_opa="0"
+			style_border_width="0"
+			style_pad_all="0"
+			scrollable="false"
+			hidden=""
+		>
+			<bind_flag_if_eq subject="sys_error_visible" ref_value="0" flag="hidden" />
+
+			<lv_label
+				name="error_icon"
+				text=""
+				align="center"
+				x="0"
+				y="-60"
+				width="content"
+				height="content"
+				style_text_font="montserrat_22"
+				style_text_color="0xE05040"
+			/>
+
+			<lv_label
+				name="error_title"
+				bind_text="sys_error_title"
+				text="System Error"
+				align="center"
+				x="0"
+				y="-34"
+				width="content"
+				height="content"
+				style_text_font="montserrat_16"
+				style_text_color="0xE05040"
+			/>
+
+			<lv_label
+				name="error_message"
+				bind_text="sys_error_message"
+				text="WiFi lost. Retrying...  reboot or open the setup portal."
+				align="center"
+				x="0"
+				y="5"
+				width="157"
+				height="42"
+				long_mode="wrap"
+				style_text_font="montserrat_12"
+				style_text_color="0xFFFFFF"
+				style_text_align="center"
+			/>
+
+			<lv_button name="system_dismiss_btn" align="center" x="0" y="58" width="84" height="34">
+				<lv_label
+					name="dismiss_btn_label"
+					text="Dismiss"
+					align="center"
+					x="0"
+					y="0"
+					width="content"
+					height="content"
+					style_text_font="montserrat_12"
+					style_text_color="0xFFFFFF"
+				/>
+				<event_cb trigger="clicked" callback="ui_system_dismiss_clicked" />
+			</lv_button>
+		</lv_obj>
+
+		<!-- ===== SETUP GROUP ===== -->
+		<lv_obj
+			name="system_setup_group"
+			align="center"
+			x="0"
+			y="0"
+			width="160"
+			height="160"
+			style_bg_opa="0"
+			style_border_width="0"
+			style_pad_all="0"
+			scrollable="false"
+		>
+			<bind_flag_if_eq subject="sys_setup_visible" ref_value="0" flag="hidden" />
+
+			<lv_label
+				name="setup_icon"
+				text=""
+				align="center"
+				x="0"
+				y="-62"
+				width="content"
+				height="content"
+				style_text_font="montserrat_20"
+				style_text_color="0x3FB950"
+			/>
+
+			<lv_label
+				name="setup_title"
+				text="WiFi Setup"
+				align="center"
+				x="0"
+				y="-38"
+				width="content"
+				height="content"
+				style_text_font="montserrat_16"
+				style_text_color="0xFFFFFF"
+			/>
+
+			<lv_label
+				name="setup_ssid_caption"
+				text="SSID"
+				align="center"
+				x="0"
+				y="-12"
+				width="content"
+				height="content"
+				style_text_font="montserrat_12"
+				style_text_color="0x8B929D"
+			/>
+
+			<lv_label
+				name="setup_ssid"
+				bind_text="sys_setup_ssid"
+				text="CBLabs-Setup"
+				align="center"
+				x="0"
+				y="6"
+				width="content"
+				height="content"
+				style_text_font="montserrat_14"
+				style_text_color="0xFFFFFF"
+			/>
+
+			<lv_label
+				name="setup_url_caption"
+				text="URL"
+				align="center"
+				x="0"
+				y="30"
+				width="content"
+				height="content"
+				style_text_font="montserrat_12"
+				style_text_color="0x8B929D"
+			/>
+
+			<lv_label
+				name="setup_url"
+				bind_text="sys_setup_url"
+				text="192.168.4.1"
+				align="center"
+				x="0"
+				y="48"
+				width="content"
+				height="content"
+				style_text_font="montserrat_14"
+				style_text_color="0xFFFFFF"
+			/>
+		</lv_obj>
+
+		<!-- ===== OTA GROUP ===== -->
+		<lv_obj
+			name="system_ota_group"
+			align="center"
+			x="0"
+			y="0"
+			width="160"
+			height="160"
+			style_bg_opa="0"
+			style_border_width="0"
+			style_pad_all="0"
+			scrollable="false"
+		>
+			<bind_flag_if_eq subject="sys_ota_visible" ref_value="0" flag="hidden" />
+
+			<lv_label
+				name="ota_title"
+				text="Firmware Update"
+				align="center"
+				x="0"
+				y="-38"
+				width="content"
+				height="content"
+				style_text_font="montserrat_16"
+				style_text_color="0x2196F3"
+			/>
+
+			<lv_label
+				name="ota_status"
+				bind_text="sys_ota_status"
+				text="Downloading..."
+				align="center"
+				x="0"
+				y="-12"
+				width="content"
+				height="content"
+				style_text_font="montserrat_12"
+				style_text_color="0xFFFFFF"
+			/>
+
+			<lv_bar
+				name="ota_bar"
+				bind_value="sys_ota_progress"
+				min_value="0"
+				max_value="100"
+				align="center"
+				x="0"
+				y="14"
+				width="130"
+				height="10"
+				style_bg_color-indicator="0x2196F3"
+			/>
+
+			<lv_label
+				name="ota_percent"
+				bind_text="sys_ota_percent"
+				text="0%"
+				align="center"
+				x="0"
+				y="40"
+				width="content"
+				height="content"
+				style_text_font="montserrat_16"
+				style_text_color="0xFFFFFF"
+			/>
+		</lv_obj>
+
+		<!-- ===== BUSY GROUP ===== -->
+		<lv_obj
+			name="system_busy_group"
+			align="center"
+			x="0"
+			y="0"
+			width="160"
+			height="160"
+			style_bg_opa="0"
+			style_border_width="0"
+			style_pad_all="0"
+			scrollable="false"
+		>
+			<bind_flag_if_eq subject="sys_busy_visible" ref_value="0" flag="hidden" />
+
+			<lv_spinner
+				name="busy_spinner"
+				align="center"
+				x="0"
+				y="0"
+				height="48"
+				style_arc_width="6"
+				style_arc_width-indicator="6"
+				width="48"
+			/>
+
+			<lv_label
+				name="busy_message"
+				bind_text="sys_busy_message"
+				text="Please wait..."
+				align="center"
+				x="0"
+				y="46"
+				width="content"
+				height="content"
+				style_text_font="montserrat_12"
+				style_text_color="0xFFFFFF"
+			/>
+		</lv_obj>
+
+		<!-- ===== MESSAGE GROUP ===== -->
+		<lv_obj
+			name="system_message_group"
+			align="center"
+			x="0"
+			y="0"
+			width="160"
+			height="160"
+			style_bg_opa="0"
+			style_border_width="0"
+			style_pad_all="0"
+			scrollable="false"
+		>
+			<bind_flag_if_eq subject="sys_msg_visible" ref_value="0" flag="hidden" />
+
+			<lv_label
+				name="msg_icon"
+				text=""
+				align="center"
+				x="0"
+				y="-34"
+				width="content"
+				height="content"
+				style_text_font="montserrat_20"
+				style_text_color="0x6EA8FE"
+			/>
+
+			<lv_label
+				name="msg_title"
+				bind_text="sys_msg_title"
+				text="Settings saved"
+				align="center"
+				x="0"
+				y="-4"
+				width="content"
+				height="content"
+				style_text_font="montserrat_14"
+				style_text_color="0xFFFFFF"
+			/>
+
+			<lv_label
+				name="msg_body"
+				bind_text="sys_msg_body"
+				text="Applied from web portal"
+				align="center"
+				x="0"
+				y="44"
+				width="140"
+				height="50"
+				long_mode="wrap"
+				style_text_font="montserrat_12"
+				style_text_color="0x8B929D"
+				style_text_align="center"
+			/>
+		</lv_obj>
+	</view>
+</screen>

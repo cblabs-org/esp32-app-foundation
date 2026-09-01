@@ -79,10 +79,8 @@ static constexpr BootBranding branding{"ESP32 App Foundation"};
 #ifdef WITH_DISPLAY_LVGL
 #include "LVGLDisplayModule.hpp"
 #include "CrowPanel128Adapter.hpp"
-#include "screens/SLSSystemScreens.hpp"
 static CrowPanel128Adapter displayAdapter;
-static SLSSystemScreens slsScreens;
-static LVGLDisplayModule displayModule(displayAdapter, &branding, nullptr, &slsScreens);
+static LVGLDisplayModule displayModule(displayAdapter, &branding, nullptr);
 #elif defined(WITH_DISPLAY_U8G2)
 #include "U8G2DisplayModule.hpp"
 #include "boards/DiagnosticsBoard.hpp"

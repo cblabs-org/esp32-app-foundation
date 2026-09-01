@@ -257,7 +257,7 @@ For full-colour TFT screens, the framework provides [LVGLDisplayModule](../../mo
 
 - **5 Framework Interfaces**: Implements `ITickable`, `IConfigurable`, `IStatusReporter`, `IWebContributor`, and `IMCPContributor`.
 - **Hardware Isolation**: Display controllers, touch sensors, encoders, and backlight PWM are implemented in hardware adapters (such as the reference [`CrowPanel128Adapter`](../../adapters/lvgl/CrowPanel128Adapter.hpp)).
-- **Two-Stage Boot Splash (D8)**: Displays a Stage-1 compiled-in boot logo during Phase 1 (`bootstrapHardware()`) before LittleFS or ConfigManager mount, and handsoff to SquareLine Studio UI via `ui_init()`.
+- **Two-Stage Boot Splash (D8)**: Displays a Stage-1 compiled-in boot logo during Phase 1 (`bootstrapHardware()`) before LittleFS or ConfigManager mount, and hands off to the LVGL Pro UI via `ui_init()`.
 - **Asset Storage & 16 MB Requirement (D9)**: UI graphics and fonts are compiled directly into the binary (`rodata`), ensuring asset updates flow through standard firmware OTA without touching LittleFS config. Requires a minimum of **16 MB Flash memory** (`partitions.esp32s3nano.csv`).
 
 For full details, see the [LVGLDisplayModule README](../../modules/LVGLDisplay/README.md) and [Adapter Authoring Guide](../../adapters/lvgl/README.md).

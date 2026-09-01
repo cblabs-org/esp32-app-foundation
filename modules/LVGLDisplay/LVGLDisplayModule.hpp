@@ -16,7 +16,7 @@
  * - LVGLDisplayModule: Generic LVGL display service module
  *
  *   Lifecycle:
- *   - LVGLDisplayModule(): Constructor taking adapter reference, optional system screens, and boot logo
+ *   - LVGLDisplayModule(): Constructor taking adapter reference, branding config, and boot logo
  *   - ~LVGLDisplayModule(): Destructor freeing allocated draw buffers and handles
  *   - bootstrapHardware(): Phase 1 hardware initialization, buffer setup, and Stage-1 boot splash
  *   - begin():              Phase 2 framework integration and ui_init hook
@@ -40,8 +40,8 @@
  *
  *   Screen Management API:
  *   - showBoot():           Show Stage-1 boot splash / status progress screen
- *   - showError():          Show error screen (prefers ILVGLSystemScreens provider, falls back to built-in)
- *   - showOtaProgress():    Show OTA progress screen (prefers provider, falls back to built-in)
+ *   - showError():          Show error screen (sets sys_error_* subjects, falls back to FaultScreen)
+ *   - showOtaProgress():    Show OTA progress screen (sets sys_ota_* subjects, falls back to FaultScreen)
  *   - restorePriorScreen(): Restore screen active before error/OTA display
  *   - setBootLogo():        Set custom Stage-1 boot logo image descriptor
  */
@@ -62,7 +62,6 @@
 #include "interfaces/IMCPContributor.hpp"
 #include "interfaces/IDisplayModule.hpp"
 #include "interfaces/ILVGLHardwareAdapter.hpp"
-#include "ILVGLSystemScreens.hpp"
 #include <types/BootBranding.h>
 #include "assets/boot_logo.h"
 #include "screens/FaultScreen.hpp"
@@ -72,6 +71,11 @@
 #include "PngWriter.h"            // hardware-only PNG encoder (ROM tdefl); native build stubs capturePNG()
 #endif
 #include "lvgl.h"
+#ifndef LV_LVGL_H_INCLUDE_SIMPLE
+#define LV_LVGL_H_INCLUDE_SIMPLE
+#endif
+#include "ui.h"
+#include "ui_gen.h"
 
 // Forward declarations
 class EventBus;
@@ -130,13 +134,12 @@ public:
      * @brief Construct a new LVGLDisplayModule with hardware adapter.
      *
      * @param adapter Reference to concrete ILVGLHardwareAdapter implementation.
-     * @param screens Optional pointer to ILVGLSystemScreens provider (default nullptr).
+     * @param branding Optional pointer to BootBranding configuration.
      * @param bootLogo Optional pointer to compiled-in lv_image_dsc_t for Stage 1 boot splash (defaults to cb_labs_boot_logo).
      */
     explicit LVGLDisplayModule(ILVGLHardwareAdapter& adapter,
                                const BootBranding* branding = nullptr,
-                               const lv_image_dsc_t* bootLogo = nullptr,
-                               ILVGLSystemScreens* screens = nullptr);
+                               const lv_image_dsc_t* bootLogo = nullptr);
 
     /**
      * @brief Destructor. Cleans up draw buffers and LVGL handles.
@@ -243,7 +246,7 @@ public:
     /**
      * @brief Show the built-in FaultScreen with a diagnostic message.
      *
-     * The universal fallback when the SLS skin does not supply a needed screen
+     * The universal fallback when the LVGL Pro UI design does not supply a needed screen
      * (no provider, or the exported UI failed to load).
      *
      * @param title  Short fault heading.
@@ -254,8 +257,8 @@ public:
     /**
      * @brief Display system error screen.
      *
-     * Uses ILVGLSystemScreens provider if non-null and supplying an error screen,
-     * otherwise falls back to the built-in FaultScreen.
+     * Sets sys_error_* subjects and activates the error overlay on the system screen,
+     * or falls back to the built-in FaultScreen if no system screen is available.
      *
      * @param title   Error title string.
      * @param message Error description string.
@@ -273,8 +276,8 @@ public:
     /**
      * @brief Display OTA firmware update progress screen.
      *
-     * Uses ILVGLSystemScreens provider if non-null and supplying an OTA screen,
-     * otherwise falls back to the built-in FaultScreen.
+     * Sets sys_ota_* subjects and activates the OTA overlay on the system screen,
+     * or falls back to the built-in FaultScreen if no system screen is available.
      *
      * @param progress Fractional progress ratio in [0.0, 1.0].
      * @param status   Status phase text string.
@@ -296,12 +299,9 @@ public:
     /**
      * @brief Set the application title on the boot screen.
      *
-     * Delegates to the ILVGLSystemScreens provider so the SLS boot screen
-     * reflects the runtime app name instead of the hardcoded SLS literal.
-     * Safe to call at any point. The title is cached in _appTitle and applied
-     * immediately if the skin provider already exists; bootstrapHardware()
-     * re-applies the cached value once the SLS UI has been built. The framework
-     * calls this from Application::begin() just after beginEarly().
+     * Updates the sys_app_title subject so the boot screen reflects the runtime
+     * app name instead of the default literal. Safe to call at any point.
+     * The framework calls this from Application::begin() just after beginEarly().
      *
      * @param title Pointer to the application title string (static lifetime).
      */
@@ -431,9 +431,10 @@ private:
     static void _onPreconditionHealth(const char* topic, const void* payload, void* ctx);
     static void _onInputWake(const char* topic, const void* payload, void* ctx);
 
+    void _hideAllSystemGroups();
+    
     ILVGLHardwareAdapter& _adapter;            ///< Injected hardware adapter
     const BootBranding*   _branding = nullptr; ///< Optional boot branding configuration
-    ILVGLSystemScreens*   _screens = nullptr;  ///< Optional system screens provider
     ConfigManager*        _configManager = nullptr; ///< Cached ConfigManager reference
     EventBus*             _eventBus = nullptr; ///< Framework EventBus reference
 
@@ -442,6 +443,10 @@ private:
     lv_indev_t*   _encoderInDev = nullptr;     ///< Rotary encoder input device
     lv_indev_t*   _keypadInDev = nullptr;      ///< Keypad/button input device
     lv_group_t*   _group = nullptr;            ///< Widget focus group for encoder/keypad
+
+    lv_obj_t*     _bootScreen = nullptr;       ///< Cached LVGL Pro boot screen object
+    lv_obj_t*     _systemScreen = nullptr;     ///< Cached LVGL Pro system screen object
+    lv_obj_t*     _diagScreen = nullptr;       ///< Cached LVGL Pro diagnostic screen object
 
     uint32_t _lastTickMs = 0;                  ///< Timestamp of last tick() execution
     bool     _tickInitialized = false;         ///< Sentinel for first tick
@@ -489,9 +494,9 @@ private:
 
     // --- System Screens & Assets ---
     const lv_image_dsc_t* _bootLogo = nullptr;
-    const char*           _appTitle = nullptr;  ///< Runtime-settable boot screen title (overrides SLS literal)
+    const char*           _appTitle = nullptr;  ///< Runtime-settable boot screen title (overrides UI design default)
     FaultScreen           _faultScreen;       ///< The only built-in screen (dev fault/trace fallback)
-    bool                  _uiInitialized = false; ///< Guards the one-time ui_init() (SLS UI build)
+    bool                  _uiInitialized = false; ///< Guards the one-time ui_init() (LVGL Pro UI)
     lv_obj_t*             _priorScreen = nullptr;
     bool                  _inSystemScreen = false;
 

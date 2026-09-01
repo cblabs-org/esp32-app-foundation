@@ -19,9 +19,9 @@
 #ifndef LOGGER_HPP
 #define LOGGER_HPP                                          ///< Logger Hpp
 
-#include <Arduino.h>
 #include <vector>
 #include <string>
+#include <cstdarg>
 
 #include "platform/LogShim.h"
 #include "Redactor.h"
@@ -37,10 +37,8 @@ public:
      * @brief Registers a sensitive string to be redacted from all future log output.
      * @param secret The plaintext string that should not appear in the logs.
      */
-    static void registerSecret(const String& secret);
-    /** @brief Register secret. */
     static void registerSecret(const std::string& secret);
-    /** @brief Register secret. */
+    /** @brief Register secret from C string. */
     static void registerSecret(const char* secret);
 
     /**

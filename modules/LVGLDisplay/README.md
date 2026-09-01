@@ -19,8 +19,8 @@ All hardware-specific initialisation (display controller, touch interface, rotar
 - **Generic LVGL v9 Engine**: Manages `lv_init()`, DMA partial SRAM draw buffer allocation, input device focus groups, and main-loop tick pumping via `ITickable`.
 - **6 Framework Interfaces**: Fully implements `IDisplayModule`, `ITickable`, `IConfigurable`, `IStatusReporter`, `IWebContributor`, and `IMCPContributor`.
 - **Pluggable Hardware Adapters**: Hardware initialisation is decoupled via `ILVGLHardwareAdapter`. The framework includes the reference [`CrowPanel128Adapter`](../../adapters/lvgl/CrowPanel128Adapter.hpp) for 1.28" circular TFTs.
-- **Two-Stage Boot Splash & System Screens**: Displays a Stage-1 compiled-in boot logo during early hardware bootstrap before LittleFS mounts, with support for custom system screen skinning via [`ILVGLSystemScreens`](ILVGLSystemScreens.hpp).
-- **SquareLine Studio Integration**: Exposes an optional weak `ui_init()` hook for seamless binding of SquareLine Studio v9 exported UI projects.
+- **Two-Stage Boot Splash & System Screens**: Displays a Stage-1 compiled-in boot logo during early hardware bootstrap before LittleFS mounts, with full support for LVGL Pro system screen skinning via standard `sys_*` subjects.
+- **LVGL Pro Integration**: Binds designer-created UI projects via the `UIDesign` library and reactive `sys_*` subjects contract, eliminating boilerplate screen adapter classes.
 - **Web Portal & MCP Remote Management**: Provides an interactive Display tab with live screenshot streaming, configuration forms (`/api/display/*`), and remote MCP tools (`display_status`, `display_control`, `capture_display`).
 
 ---
@@ -107,34 +107,45 @@ For instructions on building a custom hardware adapter, see the [Adapter Authori
 
 ---
 
-## Boot & System Screens
+## Boot & System Screens Architecture
 
-All real screens live in the SquareLine (SLS) design and are supplied through the
-[`ILVGLSystemScreens`](ILVGLSystemScreens.hpp) skin
-(`bootScreen`, `errorScreen`, `otaScreen`, configuring screens). The module builds the
-SLS UI early — in `bootstrapHardware()` — so the designer's **boot screen exists before
-boot status is reported**, then drives its progress bar / status label via
-`onBootProgress()` with synchronous rendering (the main tick loop is not running yet
-during boot).
+System screens (Boot, System / Configuring / OTA / Error, Diagnostics) are authored in LVGL Pro Editor and exported as a PlatformIO library (`UIDesign`). The framework drives screens and overlays entirely through **reactive LVGL subjects** with the `sys_*` prefix.
 
-The **only built-in (code-drawn) screen is `FaultScreen`** — a minimal dev-facing
-fault/trace display shown *only* when the skin is absent or its exported UI failed to
-load (`bootScreen()`/`errorScreen()`/`otaScreen()` returns `nullptr`). It guarantees a
-developer sees a diagnostic message instead of a blank panel.
+The module initializes the UI in `bootstrapHardware()` via `ui_init("")` and instantiates screens (`screen_boot_create()`, `screen_system_create()`, `screen_diag_create()`).
+
+The **only built-in (code-drawn) fallback is `FaultScreen`** — a minimal dev-facing fault/trace display shown *only* when the UI library fails to load or create screens.
 
 ---
 
-## SquareLine Studio v9 Integration
+## Framework Subject Contract (`sys_*`)
 
-To bind a SquareLine Studio v9 export, simply define `ui_init()` in your application code. `LVGLDisplayModule::begin()` detects this weak symbol automatically:
+All UI state synchronization is driven through 23 contracted LVGL subjects:
 
-```cpp
-extern "C" void ui_init(void) {
-    // SquareLine-generated UI initialization
-    ui_Screen1_screen_init();
-    lv_disp_load_scr(ui_Screen1);
-}
-```
+| Subject Name | Type | Description |
+|---|---|---|
+| `sys_boot_progress` | `int` | Boot progress percentage (0–100) |
+| `sys_boot_status` | `string` | Current boot phase status text |
+| `sys_app_title` | `string` | Runtime application title override |
+| `sys_error_visible` | `int` | Visibility flag (0/1) for system error overlay |
+| `sys_error_title` | `string` | Error header text |
+| `sys_error_message` | `string` | Error details / message body |
+| `sys_setup_visible` | `int` | Visibility flag (0/1) for WiFi setup wizard |
+| `sys_setup_ssid` | `string` | Captive portal AP SSID / hostname |
+| `sys_setup_url` | `string` | Captive portal access URL |
+| `sys_ota_visible` | `int` | Visibility flag (0/1) for OTA update overlay |
+| `sys_ota_progress` | `int` | OTA progress percentage (0–100) |
+| `sys_ota_percent` | `string` | Formatted progress string (e.g. `"85%"`) |
+| `sys_ota_status` | `string` | Current OTA phase description |
+| `sys_busy_visible` | `int` | Visibility flag (0/1) for busy/connecting modal |
+| `sys_busy_message` | `string` | Busy indicator description |
+| `sys_msg_visible` | `int` | Visibility flag (0/1) for generic message/gate modal |
+| `sys_msg_title` | `string` | Message modal title (gate name) |
+| `sys_msg_body` | `string` | Message modal description (gate help text) |
+| `sys_diag_arc_value` | `int` | Diagnostics arc indicator index |
+| `sys_diag_category` | `string` | Metric category heading |
+| `sys_diag_value` | `string` | Metric reading / status value |
+| `sys_diag_status` | `string` | Health badge status text |
+| `sys_diag_counter` | `string` | Carousel page counter (e.g. `"3 / 12"`) |
 
 ---
 
@@ -145,11 +156,12 @@ extern "C" void ui_init(void) {
 #include "modules/LVGLDisplay/LVGLDisplayModule.hpp"
 #include "adapters/lvgl/CrowPanel128Adapter.hpp"
 
-// 1. Instantiate hardware adapter
+// 1. Instantiate hardware adapter & branding
 CrowPanel128Adapter adapter;
+static constexpr BootBranding branding{"My ESP32 Device"};
 
-// 2. Instantiate generic LVGL module with adapter
-LVGLDisplayModule displayModule(adapter);
+// 2. Instantiate generic LVGL module with adapter & branding
+LVGLDisplayModule displayModule(adapter, &branding, nullptr);
 
 void setup() {
     Application& app = Application::getInstance();
