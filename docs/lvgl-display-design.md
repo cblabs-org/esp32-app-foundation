@@ -1,4 +1,12 @@
-# LVGL Display Module — Design Document
+> [!CAUTION]
+> **SUPERSEDED** — This design document was written for the SquareLine Studio
+> era and is retained for historical reference only. The framework has migrated
+> to LVGL Pro Editor with a reactive subjects-based architecture. For current
+> documentation see:
+> - [`modules/LVGLDisplay/README.md`](../modules/LVGLDisplay/README.md)
+> - [`docs/developer/custom-branding.md`](developer/custom-branding.md)
+
+# LVGL Display Module — Design Document (Historical)
 
 > ESP32 App Foundation (c) 2026 CB Labs
 >

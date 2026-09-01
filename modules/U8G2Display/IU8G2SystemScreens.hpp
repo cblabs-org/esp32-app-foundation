@@ -30,7 +30,7 @@
  * implementations for framework system states. Each method returns
  * nullptr to use the built-in default screen.
  *
- * Pattern matches ILVGLSystemScreens — same opt-in override model.
+ * Opt-in override model for custom system screens.
  */
 class IU8G2SystemScreens {
 public:

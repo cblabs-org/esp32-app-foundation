@@ -16,7 +16,7 @@
  * - LVGLDisplayModule: Generic LVGL display service module
  *
  *   Lifecycle:
- *   - LVGLDisplayModule(): Constructor taking adapter reference, optional system screens, and boot logo
+ *   - LVGLDisplayModule(): Constructor taking adapter reference, branding config, and boot logo
  *   - ~LVGLDisplayModule(): Destructor freeing allocated draw buffers and handles
  *   - bootstrapHardware(): Phase 1 hardware initialization, buffer setup, and Stage-1 boot splash
  *   - begin():              Phase 2 framework integration and ui_init hook
@@ -246,7 +246,7 @@ public:
     /**
      * @brief Show the built-in FaultScreen with a diagnostic message.
      *
-     * The universal fallback when the SLS skin does not supply a needed screen
+     * The universal fallback when the LVGL Pro UI design does not supply a needed screen
      * (no provider, or the exported UI failed to load).
      *
      * @param title  Short fault heading.
@@ -494,9 +494,9 @@ private:
 
     // --- System Screens & Assets ---
     const lv_image_dsc_t* _bootLogo = nullptr;
-    const char*           _appTitle = nullptr;  ///< Runtime-settable boot screen title (overrides SLS literal)
+    const char*           _appTitle = nullptr;  ///< Runtime-settable boot screen title (overrides UI design default)
     FaultScreen           _faultScreen;       ///< The only built-in screen (dev fault/trace fallback)
-    bool                  _uiInitialized = false; ///< Guards the one-time ui_init() (SLS UI build)
+    bool                  _uiInitialized = false; ///< Guards the one-time ui_init() (LVGL Pro UI)
     lv_obj_t*             _priorScreen = nullptr;
     bool                  _inSystemScreen = false;
 

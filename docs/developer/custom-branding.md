@@ -19,14 +19,12 @@ explicit U8G2DisplayModule(const BootBranding* branding = nullptr,
 // LVGL Display Module
 explicit LVGLDisplayModule(ILVGLHardwareAdapter& adapter,
                            const BootBranding* branding = nullptr,
-                           const lv_image_dsc_t* bootLogo = nullptr,
-                           ILVGLSystemScreens* screens = nullptr);
+                           const lv_image_dsc_t* bootLogo = nullptr);
 ```
 
 If no custom parameters are supplied (`nullptr`), the framework falls back to defaults:
 - **Application Title:** Defaults to the `"ESP32 App Foundation"` string (or `APP_TITLE` macro definition if set at compile time).
 - **Boot Logo:** Defaults to the built-in CB Labs logo.
-- **System Screens:** Defaults to built-in system screens/boards.
 
 ---
 
@@ -207,57 +205,47 @@ static CustomSystemScreens mySystemScreens;
 U8G2DisplayModule displayModule(&myBranding, &myLogo, &mySystemScreens);
 ```
 
-### LVGL System Screens (`ILVGLSystemScreens`)
+### LVGL Pro UI Customisation
 
-#### Interface (`modules/LVGLDisplay/ILVGLSystemScreens.hpp`)
+The LVGL display no longer uses an `ILVGLSystemScreens` adapter interface.
+Instead, the framework communicates with the UI design through **reactive subjects**
+(`sys_*`). The UI design is an LVGL Pro Editor project living in
+`uidesign/<environment>/lvglpro/` and packaged as a PlatformIO library via `library.json`.
 
-```cpp
-class ILVGLSystemScreens {
-public:
-    virtual ~ILVGLSystemScreens() = default;
+#### How Consumers Extend the UI
 
-    /// Custom OTA progress screen object, or nullptr for built-in
-    virtual lv_obj_t* otaScreen()   { return nullptr; }
+1. **Fork the framework's design folder** into your application repository
+   (e.g. `src/ui/lvglpro/` or `uidesign/<your-env>/lvglpro/`)
+2. **Override `lib_extra_dirs`** in your `platformio.ini` to point to your design folder
+   instead of the framework's
+3. **Preserve the 23 `sys_*` subjects** — the framework contract requires these names
+   to exist in `globals.xml`. Do not rename or remove them.
+4. **Add application subjects** with an `app_*` prefix (e.g. `app_temperature`,
+   `app_zone_name`) to avoid collisions
+5. **Add custom screens** — create additional `screen_*.xml` files for app-specific
+   screens (e.g. thermostat control, dashboard)
+6. **Override the RUNNING transition** — your display module loads your app screen
+   instead of the default `_diagScreen`
 
-    /// Custom error screen object, or nullptr for built-in
-    virtual lv_obj_t* errorScreen() { return nullptr; }
+#### Example: Consumer `platformio.ini`
 
-    /// OTA progress event callback
-    virtual void onOtaProgress(float progress, const char* status) { (void)progress; (void)status; }
-
-    /// Error event callback
-    virtual void onError(const char* title, const char* message) { (void)title; (void)message; }
-};
+```ini
+[env:my-product]
+lib_extra_dirs =
+    esp32-app-foundation/modules
+    esp32-app-foundation/adapters
+    src/ui    ; Consumer's LVGL Pro design overrides framework default
 ```
 
-#### Example Implementation
+#### Example: Consumer `main.cpp`
 
 ```cpp
-#include <LVGLDisplay/ILVGLSystemScreens.hpp>
+#include <LVGLDisplay/LVGLDisplayModule.hpp>
+#include <MyAdapter.hpp>
 
-class CustomLVGLScreens : public ILVGLSystemScreens {
-public:
-    lv_obj_t* errorScreen() override {
-        if (!_errorScreenObj) {
-            _errorScreenObj = lv_obj_create(NULL);
-            lv_obj_t* label = lv_label_create(_errorScreenObj);
-            lv_label_set_text(label, "Custom LVGL Error Screen");
-            lv_obj_center(label);
-        }
-        return _errorScreenObj;
-    }
-
-    void onError(const char* title, const char* message) override {
-        // Handle error state updates on custom LVGL widgets
-    }
-
-private:
-    lv_obj_t* _errorScreenObj = nullptr;
-};
-
-// Instantiation & Injection
-static CustomLVGLScreens myLVGLScreens;
-LVGLDisplayModule displayModule(hardwareAdapter, &myBranding, &my_lvgl_logo, &myLVGLScreens);
+static BootBranding branding = { .appTitle = "My Product" };
+static MyAdapter adapter;
+static LVGLDisplayModule displayModule(adapter, &branding, &my_logo);
 ```
 
 ---
@@ -266,5 +254,6 @@ LVGLDisplayModule displayModule(hardwareAdapter, &myBranding, &my_lvgl_logo, &my
 
 1. Create a `BootBranding` struct for your product title.
 2. Prepare an XBM array (U8G2) or `lv_image_dsc_t` (LVGL) for the boot splash logo in `PROGMEM`.
-3. Optionally subclass `IU8G2SystemScreens` or `ILVGLSystemScreens` if overriding default system screens.
-4. Pass these pointers into the display module constructor in your `main.cpp` or board setup.
+3. For U8G2: optionally subclass `IU8G2SystemScreens` if overriding default system screens.
+4. For LVGL: fork the LVGL Pro design folder, preserve `sys_*` subjects, add `app_*` subjects.
+5. Pass branding and logo pointers into the display module constructor in your `main.cpp`.

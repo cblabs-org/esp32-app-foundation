@@ -8,9 +8,9 @@
  * Module: modules/LVGLDisplay/screens/FaultScreen.hpp
  * Description: The single built-in (code-drawn) LVGL screen. It is a minimal,
  *              dev-facing fault/trace display — a title plus a message — shown
- *              only when the SquareLine design cannot be used (no skin provider,
- *              or the exported UI failed to load). Every real screen lives in the
- *              SLS design; this is the last-resort screen that always renders so a
+ *              only when the LVGL Pro UI design cannot be used (no design library,
+ *              or the generated UI failed to load). Every real screen lives in the
+ *              LVGL Pro design; this is the last-resort screen that always renders so a
  *              developer sees *something* diagnostic instead of a blank panel.
  *
  * Exported Classes:
@@ -28,7 +28,7 @@
  * @brief Minimal built-in fault/trace screen (the only code-drawn screen).
  *
  * Renders a red title and a white detail line on a black background. Used as
- * the universal fallback when the SLS skin does not supply a system screen.
+ * the universal fallback when the LVGL Pro UI design does not supply a system screen.
  */
 class FaultScreen {
 public:
