@@ -69,10 +69,10 @@ library is deleted.
 
 > All WOs are strictly serialized — each builds on the previous.
 
-- **[ ] [wo1-redactor-hardening](wo1-redactor-hardening/WORKORDER.md):** Harden Redactor with OO redesign — Singleton, fixed-capacity lock-free array, ISanitizer interface, AuditModule wiring. Fixes defects D1, D4, D5.
-- **[ ] [wo2-logpipeline](wo2-logpipeline/WORKORDER.md):** Create LogPipeline with `esp_log_set_vprintf()` hook, 2 KB static format buffer, re-entrancy guard, serial output. Install from `Application::begin()`. Implements D28.
-- **[ ] [wo3-logger-deletion](wo3-logger-deletion/WORKORDER.md):** Delete `lib/Logger/`, convert `LOG_SECURE` → `ESP_LOGD`, migrate `registerSecret` callers to Redactor, remove dead includes, enhance test_redactor, delete test_logger. Fixes D3.
-- **[ ] [wo4-docs](wo4-docs/WORKORDER.md):** Realign design spec §11A, update framework-expert skill, security checklist, thread-safety docs, audit-module guide. Fixes D6.
+- **[x] [wo1-redactor-hardening](wo1-redactor-hardening/WORKORDER.md):** Harden Redactor with OO redesign — Singleton, fixed-capacity lock-free array, ISanitizer interface, AuditModule wiring. Fixes defects D1, D4, D5.
+- **[x] [wo2-logpipeline](wo2-logpipeline/WORKORDER.md):** Create LogPipeline with `esp_log_set_vprintf()` hook, 2 KB static format buffer, re-entrancy guard, serial output. Install from `Application::begin()`. Implements D28.
+- **[x] [wo3-logger-deletion](wo3-logger-deletion/WORKORDER.md):** Delete `lib/Logger/`, convert `LOG_SECURE` → `ESP_LOGD`, migrate `registerSecret` callers to Redactor, remove dead includes, enhance test_redactor, delete test_logger. Fixes D3.
+- **[x] [wo4-docs](wo4-docs/WORKORDER.md):** Realign design spec §11A, update framework-expert skill, security checklist, thread-safety docs, audit-module guide. Fixes D6.
 
 ---
 
@@ -96,3 +96,15 @@ approach, now closed as wrong direction).
 8. Final decomposition: 4 WOs approved.
 
 **Human approval:** User explicitly approved the 4-WO decomposition on 2026-09-01T20:35:07+01:00 with instruction to proceed with full implementation and stage PR for review.
+
+### Session 1 — Execution (2026-09-01 20:35–21:18)
+
+**WO1 (Redactor Hardening):** Completed. Worker executed on Pro model. Paranoid-worker failure mode encountered (refused PA approval messages) — PA committed directly per operating-model fallback. Commit `2f1db263`.
+
+**WO2 (LogPipeline):** Completed. Worker executed on Flash model. Clean execution, committed autonomously. Commits `feb7d2cc`, `69d389bc`.
+
+**WO3 (Logger Deletion):** Completed. Worker executed on Flash model. Clean execution, committed autonomously. 8 tests retired (863→855). Commit `0de8760a`.
+
+**WO4 (Documentation):** Completed. Worker executed on Flash model. Clean execution, committed autonomously. Design spec, framework-expert skill, thread-safety, audit-module guide, architecture reference all updated. Commit `71532e18`.
+
+**Final state:** 5 commits on `pr-211-logging/wo4-docs`, 31 files changed, +1243/−316, 855 tests passing, firmware builds clean. PR staged for review.
