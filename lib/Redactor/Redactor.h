@@ -9,55 +9,88 @@
  * Description: In-place secret redaction utility for sensitive data protection.
  *
  * Exported Functions/Classes:
- * - Redactor: Static utility class for registering secrets and redacting them from buffers.
+ * - Redactor: Singleton utility class for registering secrets and redacting them from buffers.
  *   - registerSecret(): Adds a string to the redaction list.
  *   - redact(): Scans a character buffer and replaces registered secrets with asterisks.
  */
-#ifndef REDACTOR_H
-#define REDACTOR_H
+#pragma once
 
-#include <Arduino.h>
-#include <vector>
 #include <string>
+#include <atomic>
+#include <cstddef>
+#include "interfaces/ISanitizer.hpp"
+
+#ifdef ESP_PLATFORM
+#include <freertos/FreeRTOS.h>
+#else
+#include <mutex>
+#endif
 
 /**
- * @brief Static utility class for registering sensitive strings and redacting them from buffers.
+ * @brief Singleton class for registering sensitive strings and redacting them from buffers.
  *
- * Thread safety contract: registerSecret() must be called only during
- * single-threaded initialization (before FreeRTOS scheduler starts or from
- * setup()). After init, redact() is safe to call from any task — the secrets
- * vector is read-only at that point. A late registerSecret() call concurrent
- * with redact() would race on the underlying std::vector.
+ * Thread safety contract: Thread-safe. Lock-free on the read (redact) path.
+ * Fixed capacity, zero-allocation redaction.
  */
-class Redactor {
+class Redactor : public ISanitizer {
 public:
+    static Redactor& instance() {
+        static Redactor _instance;
+        return _instance;
+    }
+
+    static constexpr size_t MAX_SECRETS = 16;
+
     /**
      * @brief Registers a sensitive string to be redacted from all future output.
-     * @param secret The plaintext string that should not appear in outputs.
+     * @param secret The null-terminated C-string that should not appear in outputs.
+     * @return true if registered successfully, false if rejected.
      */
-    static void registerSecret(const String& secret);
+    bool registerSecret(const char* secret);
 
     /**
      * @brief Registers a sensitive string to be redacted from all future output.
      * @param secret The plaintext std::string that should not appear in outputs.
+     * @return true if registered successfully, false if rejected.
      */
-    static void registerSecret(const std::string& secret);
-
-    /**
-     * @brief Registers a sensitive C-string to be redacted from all future output.
-     * @param secret The null-terminated C-string that should not appear in outputs.
-     */
-    static void registerSecret(const char* secret);
+    bool registerSecret(const std::string& secret);
 
     /**
      * @brief Scans a char buffer and replaces any registered secrets with asterisks in-place.
      * @param buffer The character array to redact.
      * @param bufferSize The maximum capacity of the buffer.
      */
-    static void redact(char* buffer, size_t bufferSize);
+    void redact(char* buffer, size_t bufferSize);
+
+    /**
+     * @brief ISanitizer interface implementation.
+     */
+    void sanitize(char* buffer, size_t bufferSize) override;
+
+    /**
+     * @brief Returns the number of currently registered secrets.
+     */
+    size_t secretCount() const;
+
+    /**
+     * @brief Clears all registered secrets (primarily for testing).
+     */
+    void clearSecrets();
+
+    // Prevent copies
+    Redactor(const Redactor&) = delete;
+    Redactor& operator=(const Redactor&) = delete;
 
 private:
-    static std::vector<std::string> _secrets; ///< Registry of sensitive strings
-};
+    Redactor();
+    ~Redactor() = default;
 
-#endif // REDACTOR_H
+    std::string _secrets[MAX_SECRETS];
+    std::atomic<size_t> _count{0};
+
+#ifdef ESP_PLATFORM
+    portMUX_TYPE _writerLock;
+#else
+    std::mutex _writerMutex;
+#endif
+};

@@ -14,45 +14,97 @@
  */
 
 #include "Redactor.h"
-#include <string.h>
+#include <cstring>
+#include <cstdio>
 
-std::vector<std::string> Redactor::_secrets;
-
-void Redactor::registerSecret(const std::string& secret) {
-    if (secret.empty()) return;
-    for (const auto& s : _secrets) {
-        if (s == secret) return;
-    }
-    _secrets.push_back(secret);
+Redactor::Redactor() {
+#ifdef ESP_PLATFORM
+    _writerLock = portMUX_INITIALIZER_UNLOCKED;
+#endif
 }
 
-void Redactor::registerSecret(const String& secret) {
-    if (secret.length() == 0) return;
-    registerSecret(std::string(secret.c_str()));
-}
+bool Redactor::registerSecret(const char* secret) {
+    if (!secret || secret[0] == '\0') return false;
+    size_t len = std::strlen(secret);
+    if (len < 4) return false;
 
-void Redactor::registerSecret(const char* secret) {
-    if (secret) registerSecret(std::string(secret));
-}
+#ifdef ESP_PLATFORM
+    portENTER_CRITICAL(&_writerLock);
+#else
+    std::lock_guard<std::mutex> lock(_writerMutex);
+#endif
 
-void Redactor::redact(char* buffer, size_t bufferSize) {
-    if (_secrets.empty() || buffer == nullptr || bufferSize == 0) return;
-
-    std::string message(buffer);
-    bool modified = false;
-
-    for (const auto& secret : _secrets) {
-        size_t index = message.find(secret);
-        while (index != std::string::npos) {
-            std::string replacement(secret.length(), '*');
-            message.replace(index, secret.length(), replacement);
-            modified = true;
-            index = message.find(secret, index + secret.length());
+    size_t count = _count.load(std::memory_order_relaxed);
+    for (size_t i = 0; i < count; ++i) {
+        if (_secrets[i] == secret) {
+#ifdef ESP_PLATFORM
+            portEXIT_CRITICAL(&_writerLock);
+#endif
+            return true;
         }
     }
 
-    if (modified) {
-        strncpy(buffer, message.c_str(), bufferSize - 1);
-        buffer[bufferSize - 1] = '\0';
+    if (count >= MAX_SECRETS) {
+#ifdef ESP_PLATFORM
+        portEXIT_CRITICAL(&_writerLock);
+#endif
+        std::printf("Redactor warning: MAX_SECRETS capacity reached. Secret rejected.\n");
+        return false;
     }
+
+    _secrets[count] = secret;
+    _count.fetch_add(1, std::memory_order_release);
+
+#ifdef ESP_PLATFORM
+    portEXIT_CRITICAL(&_writerLock);
+#endif
+    return true;
+}
+
+bool Redactor::registerSecret(const std::string& secret) {
+    return registerSecret(secret.c_str());
+}
+
+void Redactor::redact(char* buffer, size_t bufferSize) {
+    if (!buffer || bufferSize == 0) return;
+
+    size_t count = _count.load(std::memory_order_acquire);
+    if (count == 0) return;
+
+    size_t bufLen = strnlen(buffer, bufferSize);
+    if (bufLen == 0) return;
+
+    for (size_t i = 0; i < count; ++i) {
+        const std::string& secret = _secrets[i];
+        size_t secretLen = secret.length();
+        if (secretLen == 0) continue;
+
+        char* searchStart = buffer;
+        while (char* match = std::strstr(searchStart, secret.c_str())) {
+            std::memset(match, '*', secretLen);
+            searchStart = match + secretLen;
+        }
+    }
+}
+
+void Redactor::sanitize(char* buffer, size_t bufferSize) {
+    redact(buffer, bufferSize);
+}
+
+size_t Redactor::secretCount() const {
+    return _count.load(std::memory_order_acquire);
+}
+
+void Redactor::clearSecrets() {
+#ifdef ESP_PLATFORM
+    portENTER_CRITICAL(&_writerLock);
+#else
+    std::lock_guard<std::mutex> lock(_writerMutex);
+#endif
+    
+    _count.store(0, std::memory_order_release);
+
+#ifdef ESP_PLATFORM
+    portEXIT_CRITICAL(&_writerLock);
+#endif
 }

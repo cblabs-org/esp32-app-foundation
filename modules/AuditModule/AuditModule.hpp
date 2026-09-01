@@ -61,7 +61,7 @@
 #include <cstddef>
 #include <atomic>
 #include <mutex>
-#include "Redactor.h"
+#include "interfaces/ISanitizer.hpp"
 #include "interfaces/IWebContributor.hpp"
 #include "interfaces/IMCPContributor.hpp"
 
@@ -119,9 +119,10 @@ public:
 
     /**
      * @brief Initializes storage preflight, queue, and background writer task.
+     * @param sanitizer Optional ISanitizer instance for secret redaction.
      * @return true on success, false if preflight or task creation fails.
      */
-    bool begin();
+    bool begin(ISanitizer* sanitizer = nullptr);
 
     /**
      * @brief Registers REST API routes with PsychicHttpServer.
@@ -255,4 +256,5 @@ private:
     std::mutex _rateLimitMutex;                      ///< Guards token bucket state
     float _rateTokens = (float)AUDIT_RATE_LIMIT_PER_MIN;  ///< Available tokens in bucket
     uint32_t _lastRefillMs = 0;                      ///< Timestamp of last token refill
+    ISanitizer* _sanitizer = nullptr;                ///< Injected sanitizer instance
 };

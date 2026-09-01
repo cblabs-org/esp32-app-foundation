@@ -13,9 +13,9 @@
 #include "Logger.hpp"
 #include <string.h>
 
-void Logger::registerSecret(const std::string& secret) { Redactor::registerSecret(secret); }
+void Logger::registerSecret(const std::string& secret) { Redactor::instance().registerSecret(secret); }
 
-void Logger::registerSecret(const char* secret)        { Redactor::registerSecret(secret); }
+void Logger::registerSecret(const char* secret)        { Redactor::instance().registerSecret(secret); }
 
 void Logger::logSecure(const char* tag, const char* format, ...) {
     char buffer[512];
@@ -24,6 +24,6 @@ void Logger::logSecure(const char* tag, const char* format, ...) {
     vsnprintf(buffer, sizeof(buffer), format, args);
     va_end(args);
 
-    Redactor::redact(buffer, sizeof(buffer));
+    Redactor::instance().redact(buffer, sizeof(buffer));
     ESP_LOGI(tag, "%s", buffer);
 }

@@ -9,9 +9,11 @@
 #include "Logger.hpp"
 #include <string>
 
+#include "Redactor.h"
 class LoggerTest : public ::testing::Test {
 protected:
     void SetUp() override {
+        Redactor::instance().clearSecrets();
     }
 };
 
@@ -36,17 +38,17 @@ TEST_F(LoggerTest, LogSecureWithSecretRedaction) {
 }
 
 TEST_F(LoggerTest, MultipleSecretsRegistered) {
-    Logger::registerSecret("foo");
-    Logger::registerSecret("bar");
-    Logger::registerSecret("baz");
+    Logger::registerSecret("fooo");
+    Logger::registerSecret("barr");
+    Logger::registerSecret("bazz");
     
     testing::internal::CaptureStdout();
-    Logger::logSecure("TEST", "foo bar baz");
+    Logger::logSecure("TEST", "fooo barr bazz");
     std::string output = testing::internal::GetCapturedStdout();
     
-    EXPECT_EQ(output.find("foo"), std::string::npos);
-    EXPECT_EQ(output.find("bar"), std::string::npos);
-    EXPECT_EQ(output.find("baz"), std::string::npos);
+    EXPECT_EQ(output.find("fooo"), std::string::npos);
+    EXPECT_EQ(output.find("barr"), std::string::npos);
+    EXPECT_EQ(output.find("bazz"), std::string::npos);
 }
 
 TEST_F(LoggerTest, EmptySecret) {

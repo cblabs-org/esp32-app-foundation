@@ -204,7 +204,7 @@ TEST_F(AuditModuleTest, FieldTruncationAndNullTermination) {
 }
 
 TEST_F(AuditModuleTest, RedactionIntegrationInDetails) {
-    Redactor::registerSecret("mySecretToken99");
+    Redactor::instance().registerSecret("mySecretToken99");
 
     AuditRecord record{};
     record.t_ms = 500;
@@ -214,7 +214,7 @@ TEST_F(AuditModuleTest, RedactionIntegrationInDetails) {
     strncpy(record.action, "tool_exec", sizeof(record.action));
     strncpy(record.details, "token=mySecretToken99,ok=1", sizeof(record.details));
 
-    Redactor::redact(record.details, sizeof(record.details));
+    Redactor::instance().redact(record.details, sizeof(record.details));
     EXPECT_STREQ(record.details, "token=***************,ok=1");
 
     char buffer[512];

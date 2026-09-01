@@ -26,6 +26,7 @@
  */
 
 #include "Application.hpp"
+#include "Redactor.h"
 #include "events/AppConfiguringPayload.hpp"
 #include "events/PreconditionHealthPayload.hpp"
 
@@ -196,7 +197,7 @@ bool Application::begin(const FrameworkConfig& config) {
     }
 
 #ifdef WITH_AUDIT
-    auditModule.begin();
+    auditModule.begin(&Redactor::instance());
     registerModule(&auditModule);
 #endif
 
