@@ -111,5 +111,11 @@ private:
     bool        _callbackRegistered = false;
     char        _textBuf[64]   = {};                   ///< Shared buffer for text item reads
 
+    // Direct widget pointers for styling (resolved in begin() via screen tree traversal)
+    lv_obj_t*   _arc           = nullptr;
+    lv_obj_t*   _valueLabel    = nullptr;
+    lv_obj_t*   _statusLabel   = nullptr;
+
     static constexpr uint32_t REFRESH_INTERVAL_MS = 2000;   ///< Interval in milliseconds for refresh ms
 };
+
