@@ -76,8 +76,15 @@
    FONT USAGE
  *====================*/
 
-/* Enable Montserrat fonts used by the SquareLine-exported UI (crowpanel-128).
- * Sizes must match the font references in modules/LVGLDisplay/ui/*.c. */
+/* ═══ LVGL Pro Editor requirements ═══════════════════════════════════════════
+ * LV_USE_OBSERVER  — required for lv_subject_t data binding (subjects)
+ * LV_USE_OBJ_NAME  — required for lv_obj_set_name() in generated screen code
+ */
+#define LV_USE_OBSERVER  1
+#define LV_USE_OBJ_NAME  1
+
+/* Enable Montserrat fonts used by the UI design.
+ * Sizes must match the font references in the LVGL Pro generated code. */
 #define LV_FONT_MONTSERRAT_12 1
 #define LV_FONT_MONTSERRAT_14 1
 #define LV_FONT_MONTSERRAT_16 1

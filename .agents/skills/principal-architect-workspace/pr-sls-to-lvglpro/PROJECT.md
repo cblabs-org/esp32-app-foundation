@@ -13,8 +13,8 @@ with `sys_*` prefix, design-folder-as-PIO-library, and eliminate the
 
 ## Work Order Ledger
 
-- **[ ] [wo1-infrastructure](wo1-infrastructure/WORKORDER.md):** Rename design folder, rename project to "ui", add sys_ prefix to all subjects, create library.json, update platformio.ini, remove old SLS ui/ files
-- **[ ] [wo2-module-integration](wo2-module-integration/WORKORDER.md):** Rewrite LVGLDisplayModule to use subjects directly, remove ILVGLSystemScreens dependency
+- **[x] [wo1-infrastructure](wo1-infrastructure/WORKORDER.md):** Rename design folder, rename project to "ui", add sys_ prefix to all subjects, create library.json, update platformio.ini, remove old SLS ui/ files — **DONE** (`c375cf25`)
+- **[x] [wo2-module-integration](wo2-module-integration/WORKORDER.md):** Rewrite LVGLDisplayModule to use subjects directly, remove ILVGLSystemScreens dependency — **DONE** (`edc1bf60`)
 - **[ ] [wo3-diagcarousel](wo3-diagcarousel/WORKORDER.md):** Rebind DiagCarouselController from SLS widget pointers to sys_diag_* subjects
 - **[ ] [wo4-cleanup-docs](wo4-cleanup-docs/WORKORDER.md):** Delete SLS files, create subject contract docs, consumer migration guide
 

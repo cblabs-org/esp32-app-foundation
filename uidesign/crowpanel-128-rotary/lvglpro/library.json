@@ -7,6 +7,7 @@
     },
     "build": {
         "srcDir": ".",
+        "flags": ["-DLV_LVGL_H_INCLUDE_SIMPLE"],
         "srcFilter": [
             "+<*.c>",
             "+<screens/*.c>",
