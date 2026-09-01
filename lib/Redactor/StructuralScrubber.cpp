@@ -1,3 +1,18 @@
+/*
+ * ESP32 App Foundation (c) 2026 CB Labs
+ *
+ * https://github.com/matthewmcneill/esp32-app-foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Module: lib/Redactor/StructuralScrubber.cpp
+ * Description: Zero-allocation structural scrubber for sensitive HTTP headers
+ *              and JSON key-value patterns in debug log output.
+ *
+ * Exported Functions/Classes:
+ * - StructuralScrubber::sanitize(): Scans buffer for known sensitive keys and masks values.
+ */
+
 #include "StructuralScrubber.h"
 #include <cstring>
 

@@ -1,3 +1,22 @@
+/*
+ * ESP32 App Foundation (c) 2026 CB Labs
+ *
+ * https://github.com/matthewmcneill/esp32-app-foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Module: lib/LogPipeline/LogPipeline.cpp
+ * Description: Implementation of the global log interception pipeline.
+ *              Intercepts all ESP_LOG* output at the vprintf sink, performs
+ *              in-place secret redaction using an injected ISanitizer, and
+ *              emits the sanitized output to a sink.
+ *
+ * Exported Functions/Classes:
+ * - LogPipeline::begin(): Installs the esp_log_set_vprintf hook.
+ * - LogPipeline::isInstalled(): Returns true if the hook has been installed.
+ * - LogPipeline::dumpPayload(): Chunks and redacts large payloads for debug output.
+ */
+
 #include "LogPipeline.h"
 #include <cstdio>
 #include <cstring>

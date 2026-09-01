@@ -28,6 +28,7 @@ public:
      * 
      * @param buffer Null-terminated string buffer to sanitize.
      * @param bufferSize Maximum capacity of the buffer.
+     * @param isTruncated True if the buffer was truncated, enabling tail-prefix checks.
      */
     virtual void sanitize(char* buffer, size_t bufferSize, bool isTruncated = false) = 0;
 };

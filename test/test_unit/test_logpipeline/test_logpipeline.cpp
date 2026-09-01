@@ -1,3 +1,15 @@
+/*
+ * ESP32 App Foundation (c) 2026 CB Labs
+ *
+ * https://github.com/matthewmcneill/esp32-app-foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Test: test/test_unit/test_logpipeline/test_logpipeline.cpp
+ * Description: GoogleTest suite for LogPipeline vprintf hook, secret redaction,
+ *              and dumpPayload chunking.
+ */
+
 #include <gtest/gtest.h>
 #define CONFIG_LOG_MAXIMUM_LEVEL 5
 #include "LogPipeline.h"
