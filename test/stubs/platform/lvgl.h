@@ -23,6 +23,7 @@
 #include <cstdlib>
 #include <cstdarg>
 #include <string>
+#include <vector>
 
 // --- Basic Types & Compatibility ---
 typedef int32_t lv_coord_t;
@@ -66,6 +67,7 @@ struct lv_group_t {
 struct lv_obj_t {
     void* user_data = nullptr;
     struct lv_obj_t* parent = nullptr;
+    std::vector<lv_obj_t*> children;
     uint32_t flags = 0;
     int32_t width = 0;
     int32_t height = 0;
@@ -319,6 +321,11 @@ typedef void (*lv_display_flush_cb_t)(lv_display_t* disp, const lv_area_t* area,
 typedef void (*lv_indev_read_cb_t)(lv_indev_t* indev, lv_indev_data_t* data);
 typedef void (*lv_event_cb_t)(lv_event_t* e);
 
+// --- Styles ---
+typedef struct {
+    void* user_data;
+} lv_style_t;
+
 // --- Fonts ---
 typedef struct _lv_font_t {
     void* dsc;
@@ -534,7 +541,19 @@ inline lv_obj_t* lv_event_get_target(lv_event_t* e) {
 inline lv_obj_t* lv_obj_create(lv_obj_t* parent) {
     lv_obj_t* obj = new lv_obj_t();
     obj->parent = parent;
+    if (parent != nullptr) {
+        parent->children.push_back(obj);
+    }
     return obj;
+}
+
+inline uint32_t lv_obj_get_child_count(const lv_obj_t* obj) {
+    return obj ? static_cast<uint32_t>(obj->children.size()) : 0;
+}
+
+inline lv_obj_t* lv_obj_get_child(const lv_obj_t* obj, int32_t idx) {
+    if (!obj || idx < 0 || static_cast<size_t>(idx) >= obj->children.size()) return nullptr;
+    return obj->children[idx];
 }
 
 inline void lv_obj_delete(lv_obj_t* obj) {
@@ -759,11 +778,36 @@ inline lv_result_t lv_snapshot_take_to_draw_buf(lv_obj_t* obj, lv_color_format_t
     return LV_RESULT_OK;
 }
 
-// Deprecated compat stub (kept for any legacy test references)
-inline lv_result_t lv_snapshot_take_to_buf(lv_obj_t* obj, lv_color_format_t cf, lv_image_dsc_t* dsc, void* buf, uint32_t buf_size) {
-    (void)obj; (void)cf; (void)dsc;
-    memset(buf, 0, buf_size);
-    return LV_RESULT_OK;
+// Observer & Subject Data Binding API (LVGL ≥9.1)
+struct lv_subject_t {
+    int32_t val = 0;
+    std::string str;
+    void* user_data = nullptr;
+};
+
+inline void lv_subject_init_int(lv_subject_t* subject, int32_t value) {
+    if (subject) subject->val = value;
+}
+
+inline void lv_subject_init_string(lv_subject_t* subject, char* buf, char* prev_buf, size_t size, const char* value) {
+    (void)buf; (void)prev_buf; (void)size;
+    if (subject && value) subject->str = value;
+}
+
+inline void lv_subject_set_int(lv_subject_t* subject, int32_t value) {
+    if (subject) subject->val = value;
+}
+
+inline int32_t lv_subject_get_int(const lv_subject_t* subject) {
+    return subject ? subject->val : 0;
+}
+
+inline void lv_subject_copy_string(lv_subject_t* subject, const char* str) {
+    if (subject) subject->str = (str != nullptr) ? str : "";
+}
+
+inline const char* lv_subject_get_string(const lv_subject_t* subject) {
+    return subject ? subject->str.c_str() : "";
 }
 
 #endif  // TEST_STUBS_PLATFORM_LVGL_H_

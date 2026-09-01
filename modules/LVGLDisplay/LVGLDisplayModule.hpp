@@ -40,8 +40,8 @@
  *
  *   Screen Management API:
  *   - showBoot():           Show Stage-1 boot splash / status progress screen
- *   - showError():          Show error screen (prefers ILVGLSystemScreens provider, falls back to built-in)
- *   - showOtaProgress():    Show OTA progress screen (prefers provider, falls back to built-in)
+ *   - showError():          Show error screen (sets sys_error_* subjects, falls back to FaultScreen)
+ *   - showOtaProgress():    Show OTA progress screen (sets sys_ota_* subjects, falls back to FaultScreen)
  *   - restorePriorScreen(): Restore screen active before error/OTA display
  *   - setBootLogo():        Set custom Stage-1 boot logo image descriptor
  */
@@ -62,7 +62,6 @@
 #include "interfaces/IMCPContributor.hpp"
 #include "interfaces/IDisplayModule.hpp"
 #include "interfaces/ILVGLHardwareAdapter.hpp"
-#include "ILVGLSystemScreens.hpp"
 #include <types/BootBranding.h>
 #include "assets/boot_logo.h"
 #include "screens/FaultScreen.hpp"
@@ -141,15 +140,6 @@ public:
     explicit LVGLDisplayModule(ILVGLHardwareAdapter& adapter,
                                const BootBranding* branding = nullptr,
                                const lv_image_dsc_t* bootLogo = nullptr);
-
-    /**
-     * @brief Legacy delegating constructor for backwards compatibility until WO4.
-     */
-    LVGLDisplayModule(ILVGLHardwareAdapter& adapter,
-                      const BootBranding* branding,
-                      const lv_image_dsc_t* bootLogo,
-                      ILVGLSystemScreens* /*screens*/)
-        : LVGLDisplayModule(adapter, branding, bootLogo) {}
 
     /**
      * @brief Destructor. Cleans up draw buffers and LVGL handles.
@@ -267,8 +257,8 @@ public:
     /**
      * @brief Display system error screen.
      *
-     * Uses ILVGLSystemScreens provider if non-null and supplying an error screen,
-     * otherwise falls back to the built-in FaultScreen.
+     * Sets sys_error_* subjects and activates the error overlay on the system screen,
+     * or falls back to the built-in FaultScreen if no system screen is available.
      *
      * @param title   Error title string.
      * @param message Error description string.
@@ -286,8 +276,8 @@ public:
     /**
      * @brief Display OTA firmware update progress screen.
      *
-     * Uses ILVGLSystemScreens provider if non-null and supplying an OTA screen,
-     * otherwise falls back to the built-in FaultScreen.
+     * Sets sys_ota_* subjects and activates the OTA overlay on the system screen,
+     * or falls back to the built-in FaultScreen if no system screen is available.
      *
      * @param progress Fractional progress ratio in [0.0, 1.0].
      * @param status   Status phase text string.
@@ -309,12 +299,9 @@ public:
     /**
      * @brief Set the application title on the boot screen.
      *
-     * Delegates to the ILVGLSystemScreens provider so the SLS boot screen
-     * reflects the runtime app name instead of the hardcoded SLS literal.
-     * Safe to call at any point. The title is cached in _appTitle and applied
-     * immediately if the skin provider already exists; bootstrapHardware()
-     * re-applies the cached value once the SLS UI has been built. The framework
-     * calls this from Application::begin() just after beginEarly().
+     * Updates the sys_app_title subject so the boot screen reflects the runtime
+     * app name instead of the default literal. Safe to call at any point.
+     * The framework calls this from Application::begin() just after beginEarly().
      *
      * @param title Pointer to the application title string (static lifetime).
      */
@@ -448,7 +435,6 @@ private:
     
     ILVGLHardwareAdapter& _adapter;            ///< Injected hardware adapter
     const BootBranding*   _branding = nullptr; ///< Optional boot branding configuration
-    ILVGLSystemScreens*   _screens = nullptr;  ///< Optional system screens provider (unused, retained for ABI)
     ConfigManager*        _configManager = nullptr; ///< Cached ConfigManager reference
     EventBus*             _eventBus = nullptr; ///< Framework EventBus reference
 

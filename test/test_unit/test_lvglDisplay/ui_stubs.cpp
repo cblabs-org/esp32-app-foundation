@@ -3,15 +3,11 @@
  *
  * https://github.com/matthewmcneill/esp32-app-foundation
  *
- * Module: test/test_unit/test_lvglDisplay/ui_stubs.cpp
- * Description: Weak-symbol stubs for the SquareLine UI globals, providing the
- *              ui_* widget pointers + ui_init/ui_destroy for native unit tests
- *              (the generated ui/ C is excluded on native — see LVGLDisplay's
- *              exclude_ui_on_native.py). Symbol set mirrors the exported ui headers.
+ * SPDX-License-Identifier: Apache-2.0
  *
- * Compiled as C++ so it can include the C++ lvgl stub; the definitions live in
- * an extern "C" block to match the extern "C" declarations in ui/ui.h (so
- * ui_init/ui_destroy are not name-mangled and link against the module).
+ * Module: test/test_unit/test_lvglDisplay/ui_stubs.cpp
+ * Description: Weak-symbol stubs for LVGL Pro UI globals, subjects, and screen constructors
+ *              for native unit tests.
  */
 
 #include "lvgl.h"
@@ -24,63 +20,56 @@
 
 extern "C" {
 
-// Boot screen symbols
-WEAK_SYMBOL lv_obj_t *ui_uiBootScreen = NULL;
-WEAK_SYMBOL lv_obj_t *ui_uiBootFadeOverlay = NULL;
-WEAK_SYMBOL lv_obj_t *ui_uiBootLogo = NULL;
-WEAK_SYMBOL lv_obj_t *ui_uiBootTitle = NULL;
-WEAK_SYMBOL lv_obj_t *ui_uiBootProgressBar = NULL;
-WEAK_SYMBOL lv_obj_t *ui_uiBootStatusLabel = NULL;
+// Subjects
+WEAK_SYMBOL lv_subject_t sys_boot_progress;
+WEAK_SYMBOL lv_subject_t sys_boot_status;
+WEAK_SYMBOL lv_subject_t sys_app_title;
+WEAK_SYMBOL lv_subject_t sys_error_visible;
+WEAK_SYMBOL lv_subject_t sys_setup_visible;
+WEAK_SYMBOL lv_subject_t sys_ota_visible;
+WEAK_SYMBOL lv_subject_t sys_busy_visible;
+WEAK_SYMBOL lv_subject_t sys_msg_visible;
+WEAK_SYMBOL lv_subject_t sys_error_title;
+WEAK_SYMBOL lv_subject_t sys_error_message;
+WEAK_SYMBOL lv_subject_t sys_setup_ssid;
+WEAK_SYMBOL lv_subject_t sys_setup_url;
+WEAK_SYMBOL lv_subject_t sys_ota_status;
+WEAK_SYMBOL lv_subject_t sys_ota_progress;
+WEAK_SYMBOL lv_subject_t sys_ota_percent;
+WEAK_SYMBOL lv_subject_t sys_busy_message;
+WEAK_SYMBOL lv_subject_t sys_msg_title;
+WEAK_SYMBOL lv_subject_t sys_msg_body;
+WEAK_SYMBOL lv_subject_t sys_diag_arc_value;
+WEAK_SYMBOL lv_subject_t sys_diag_category;
+WEAK_SYMBOL lv_subject_t sys_diag_value;
+WEAK_SYMBOL lv_subject_t sys_diag_counter;
+WEAK_SYMBOL lv_subject_t sys_diag_status;
 
-// System screen root
-WEAK_SYMBOL lv_obj_t *ui_uiSystemScreen = NULL;
+// Fonts & Assets
+WEAK_SYMBOL const void * img_cblabs_logo = NULL;
+WEAK_SYMBOL lv_font_t * montserrat_12 = NULL;
+WEAK_SYMBOL lv_font_t * montserrat_14 = NULL;
+WEAK_SYMBOL lv_font_t * montserrat_16 = NULL;
+WEAK_SYMBOL lv_font_t * montserrat_18 = NULL;
+WEAK_SYMBOL lv_font_t * montserrat_20 = NULL;
+WEAK_SYMBOL lv_font_t * montserrat_22 = NULL;
+WEAK_SYMBOL lv_font_t * montserrat_40 = NULL;
+WEAK_SYMBOL lv_font_t * fontawesome_20 = NULL;
+WEAK_SYMBOL lv_font_t * fontawesome_22 = NULL;
+WEAK_SYMBOL lv_style_t transparent_container;
 
-// System — Error group
-WEAK_SYMBOL lv_obj_t *ui_uiSystemErrorGroup = NULL;
-WEAK_SYMBOL lv_obj_t *ui_uiSystemErrorIcon = NULL;
-WEAK_SYMBOL lv_obj_t *ui_uiSystemErrorTitle = NULL;
-WEAK_SYMBOL lv_obj_t *ui_uiSystemErrorMessage = NULL;
-WEAK_SYMBOL lv_obj_t *ui_uiSystemDismissBtnLbl = NULL;
-WEAK_SYMBOL lv_obj_t *ui_ui_SystemDismissBtn = NULL;
+// Screen constructors
+WEAK_SYMBOL lv_obj_t * screen_boot_create(void) { return lv_obj_create(nullptr); }
+WEAK_SYMBOL lv_obj_t * screen_system_create(void) { return lv_obj_create(nullptr); }
+WEAK_SYMBOL lv_obj_t * screen_diag_create(void) { return lv_obj_create(nullptr); }
 
-// System — Setup group (WiFi wizard: SSID + config-portal URL)
-WEAK_SYMBOL lv_obj_t *ui_uiSystemSetupGroup = NULL;
-WEAK_SYMBOL lv_obj_t *ui_ui_SystemSetupTitle = NULL;
-WEAK_SYMBOL lv_obj_t *ui_ui_SystemSetupSSIDCaption = NULL;
-WEAK_SYMBOL lv_obj_t *ui_ui_SystemSetupSSID = NULL;
-WEAK_SYMBOL lv_obj_t *ui_ui_SystemSetupIcon = NULL;
-WEAK_SYMBOL lv_obj_t *ui_ui_SystemSetupURLCaption = NULL;
-WEAK_SYMBOL lv_obj_t *ui_ui_SystemSetupURL = NULL;
-
-// System — OTA group
-WEAK_SYMBOL lv_obj_t *ui_uiSystemOTAGroup = NULL;
-WEAK_SYMBOL lv_obj_t *ui_ui_SystemOTATitle = NULL;
-WEAK_SYMBOL lv_obj_t *ui_uiSystemOTAStatus = NULL;
-WEAK_SYMBOL lv_obj_t *ui_ui_SystemOTABar = NULL;
-WEAK_SYMBOL lv_obj_t *ui_ui_SystemOTAPercent = NULL;
-
-// System — Busy group (indeterminate please-wait spinner)
-WEAK_SYMBOL lv_obj_t *ui_uiSystemBusyGroup = NULL;
-WEAK_SYMBOL lv_obj_t *ui_uiSystemBusyMessage = NULL;
-WEAK_SYMBOL lv_obj_t *ui_uiSystemSpinner = NULL;
-
-// System — Message group (generic gate-helper modal)
-WEAK_SYMBOL lv_obj_t *ui_uiSystemMessageGroup = NULL;
-WEAK_SYMBOL lv_obj_t *ui_ui_SystemMsgIcon = NULL;
-WEAK_SYMBOL lv_obj_t *ui_ui_SystemMsgTitle = NULL;
-WEAK_SYMBOL lv_obj_t *ui_uiSystemMsgBody = NULL;
-
-// Diagnostics screen symbols
-WEAK_SYMBOL lv_obj_t *ui_ui_DiagScreen = NULL;
-WEAK_SYMBOL lv_obj_t *ui_ui_DiagArc = NULL;
-WEAK_SYMBOL lv_obj_t *ui_ui_DiagCategory = NULL;
-WEAK_SYMBOL lv_obj_t *ui_ui_DiagValue = NULL;
-WEAK_SYMBOL lv_obj_t *ui_ui_DiagStatus = NULL;
-WEAK_SYMBOL lv_obj_t *ui_ui_DiagCounter = NULL;
-
-WEAK_SYMBOL lv_obj_t *ui____initial_actions0 = NULL;
-
-WEAK_SYMBOL void ui_init(void) {}
-WEAK_SYMBOL void ui_destroy(void) {}
+// UI Init / callbacks
+WEAK_SYMBOL void ui_init(const char * asset_path) { (void)asset_path; }
+WEAK_SYMBOL void ui_init_gen(const char * asset_path) { (void)asset_path; }
+WEAK_SYMBOL void ui_set_target(uint32_t target) { (void)target; }
+WEAK_SYMBOL uint32_t ui_get_target(void) { return 0; }
+WEAK_SYMBOL bool ui_check_target(uint32_t target) { (void)target; return true; }
+WEAK_SYMBOL void ui_boot_fade_overlay_loaded(lv_event_t * e) { (void)e; }
+WEAK_SYMBOL void ui_system_dismiss_clicked(lv_event_t * e) { (void)e; }
 
 }  // extern "C"

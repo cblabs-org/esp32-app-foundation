@@ -35,6 +35,19 @@
 #include "portal_assets/hardware_js.hpp"
 
 // -----------------------------------------------------------------------------
+// LVGL Pro Event Callbacks (default weak implementations)
+// -----------------------------------------------------------------------------
+
+extern "C" {
+__attribute__((weak)) void ui_boot_fade_overlay_loaded(lv_event_t* e) {
+    (void)e;
+}
+__attribute__((weak)) void ui_system_dismiss_clicked(lv_event_t* e) {
+    (void)e;
+}
+}
+
+// -----------------------------------------------------------------------------
 // Lifecycle
 // -----------------------------------------------------------------------------
 
