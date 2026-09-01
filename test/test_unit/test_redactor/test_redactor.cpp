@@ -29,7 +29,7 @@ TEST_F(RedactorTest, RedactWithoutSecrets) {
 }
 
 TEST_F(RedactorTest, RegisterSecretAndRedact) {
-    Redactor::instance().registerSecret("mySecretPassword");
+    EXPECT_EQ(Redactor::instance().registerSecret("mySecretPassword"), RegisterResult::Registered);
     char buffer[128];
     strncpy(buffer, "User pass is mySecretPassword!", sizeof(buffer));
     Redactor::instance().redact(buffer, sizeof(buffer));
@@ -49,9 +49,9 @@ TEST_F(RedactorTest, MultipleSecretsRegistered) {
 }
 
 TEST_F(RedactorTest, EmptySecretIgnored) {
-    EXPECT_FALSE(Redactor::instance().registerSecret(""));
-    EXPECT_FALSE(Redactor::instance().registerSecret(std::string("")));
-    EXPECT_FALSE(Redactor::instance().registerSecret(static_cast<const char*>(nullptr)));
+    EXPECT_EQ(Redactor::instance().registerSecret(""), RegisterResult::Invalid);
+    EXPECT_EQ(Redactor::instance().registerSecret(std::string("")), RegisterResult::Invalid);
+    EXPECT_EQ(Redactor::instance().registerSecret(static_cast<const char*>(nullptr)), RegisterResult::Invalid);
 }
 
 TEST_F(RedactorTest, BufferLongerThanSecret) {
@@ -68,9 +68,9 @@ TEST_F(RedactorTest, BufferLongerThanSecret) {
 }
 
 TEST_F(RedactorTest, DeduplicationDoesNotDuplicate) {
-    EXPECT_TRUE(Redactor::instance().registerSecret("duplicateSecret"));
-    EXPECT_TRUE(Redactor::instance().registerSecret("duplicateSecret")); // returns true if already registered
-    EXPECT_TRUE(Redactor::instance().registerSecret(std::string("duplicateSecret")));
+    EXPECT_EQ(Redactor::instance().registerSecret("duplicateSecret"), RegisterResult::Registered);
+    EXPECT_EQ(Redactor::instance().registerSecret("duplicateSecret"), RegisterResult::AlreadyPresent);
+    EXPECT_EQ(Redactor::instance().registerSecret(std::string("duplicateSecret")), RegisterResult::AlreadyPresent);
 
     EXPECT_EQ(Redactor::instance().secretCount(), 1);
 
@@ -89,10 +89,10 @@ TEST_F(RedactorTest, NullOrZeroLengthBufferSafe) {
 
 TEST_F(RedactorTest, MaxSecretsCapEnforced) {
     for (size_t i = 0; i < Redactor::MAX_SECRETS; ++i) {
-        std::string s = "secret" + std::to_string(i);
-        EXPECT_TRUE(Redactor::instance().registerSecret(s));
+        std::string s = "secret" + std::to_string(i + 1000); // Ensures length is >= 4
+        EXPECT_EQ(Redactor::instance().registerSecret(s), RegisterResult::Registered);
     }
-    EXPECT_FALSE(Redactor::instance().registerSecret("oneTooMany"));
+    EXPECT_EQ(Redactor::instance().registerSecret("oneTooMany"), RegisterResult::Full);
 }
 
 TEST_F(RedactorTest, SecretCountReturnsCorrectValue) {
@@ -103,8 +103,53 @@ TEST_F(RedactorTest, SecretCountReturnsCorrectValue) {
 }
 
 TEST_F(RedactorTest, ShortSecretRejected) {
-    EXPECT_FALSE(Redactor::instance().registerSecret("ab"));
+    EXPECT_EQ(Redactor::instance().registerSecret("ab"), RegisterResult::TooShort);
     EXPECT_EQ(Redactor::instance().secretCount(), 0);
+}
+
+TEST_F(RedactorTest, TooLongSecretRejected) {
+    std::string longSecret(200, 'X');
+    EXPECT_EQ(Redactor::instance().registerSecret(longSecret), RegisterResult::TooLong);
+    EXPECT_EQ(Redactor::instance().secretCount(), 0);
+}
+
+TEST_F(RedactorTest, DescendingScanOrder) {
+    // Registering a short secret, then a longer secret that contains the short one
+    EXPECT_EQ(Redactor::instance().registerSecret("pass"), RegisterResult::Registered);
+    EXPECT_EQ(Redactor::instance().registerSecret("password"), RegisterResult::Registered);
+    
+    char buffer[128];
+    strncpy(buffer, "I have a password", sizeof(buffer));
+    // Should redact the whole 'password' to 8 stars, not '****word'
+    Redactor::instance().redact(buffer, sizeof(buffer));
+    EXPECT_STREQ(buffer, "I have a ********");
+}
+
+TEST_F(RedactorTest, UnterminatedBufferSafe) {
+    Redactor::instance().registerSecret("secret");
+    
+    // Create an unterminated buffer
+    char buffer[8] = {'s', 'e', 'c', 'r', 'e', 't', '1', '2'};
+    
+    // We expect it to redact only within the given bound (which acts as bufLen)
+    Redactor::instance().redact(buffer, 8);
+    EXPECT_EQ(memcmp(buffer, "******12", 8), 0);
+}
+
+TEST_F(RedactorTest, TailPrefixCheck) {
+    Redactor::instance().registerSecret("mySecretToken");
+    
+    // Simulate truncation mid-secret
+    char buffer[128];
+    strncpy(buffer, "Auth: mySecre", sizeof(buffer));
+    
+    // With isTruncated=false (default), it shouldn't match partial
+    Redactor::instance().redact(buffer, sizeof(buffer), false);
+    EXPECT_STREQ(buffer, "Auth: mySecre");
+    
+    // With isTruncated=true, it should mask the partial secret at the tail
+    Redactor::instance().redact(buffer, sizeof(buffer), true);
+    EXPECT_STREQ(buffer, "Auth: *******");
 }
 
 TEST_F(RedactorTest, SingletonIdentity) {

@@ -26,6 +26,15 @@
 #include <mutex>
 #endif
 
+enum class RegisterResult {
+    Registered,
+    AlreadyPresent,
+    TooShort,
+    TooLong,
+    Full,
+    Invalid
+};
+
 /**
  * @brief Singleton class for registering sensitive strings and redacting them from buffers.
  *
@@ -40,32 +49,34 @@ public:
     }
 
     static constexpr size_t MAX_SECRETS = 16;
+    static constexpr size_t MAX_SECRET_LEN = 192;
 
     /**
      * @brief Registers a sensitive string to be redacted from all future output.
      * @param secret The null-terminated C-string that should not appear in outputs.
-     * @return true if registered successfully, false if rejected.
+     * @return RegisterResult indicating success or failure reason.
      */
-    bool registerSecret(const char* secret);
+    RegisterResult registerSecret(const char* secret);
 
     /**
      * @brief Registers a sensitive string to be redacted from all future output.
      * @param secret The plaintext std::string that should not appear in outputs.
-     * @return true if registered successfully, false if rejected.
+     * @return RegisterResult indicating success or failure reason.
      */
-    bool registerSecret(const std::string& secret);
+    RegisterResult registerSecret(const std::string& secret);
 
     /**
      * @brief Scans a char buffer and replaces any registered secrets with asterisks in-place.
      * @param buffer The character array to redact.
      * @param bufferSize The maximum capacity of the buffer.
+     * @param isTruncated True if the buffer was truncated (for tail-prefix checking).
      */
-    void redact(char* buffer, size_t bufferSize);
+    void redact(char* buffer, size_t bufferSize, bool isTruncated = false);
 
     /**
      * @brief ISanitizer interface implementation.
      */
-    void sanitize(char* buffer, size_t bufferSize) override;
+    void sanitize(char* buffer, size_t bufferSize, bool isTruncated = false) override;
 
     /**
      * @brief Returns the number of currently registered secrets.
@@ -85,7 +96,8 @@ private:
     Redactor();
     ~Redactor() = default;
 
-    std::string _secrets[MAX_SECRETS];
+    char _secrets[MAX_SECRETS][MAX_SECRET_LEN];
+    size_t _secretLens[MAX_SECRETS];
     std::atomic<size_t> _count{0};
 
 #ifdef ESP_PLATFORM

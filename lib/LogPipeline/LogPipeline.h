@@ -6,42 +6,28 @@
  * SPDX-License-Identifier: Apache-2.0
  *
  * Module: lib/LogPipeline/LogPipeline.h
- * Description: Global log interception pipeline. Installs an esp_log_set_vprintf()
- *              hook to intercept all ESP_LOG* output, redacts sensitive secrets
- *              via Redactor::instance(), and outputs sanitized logs to stdout.
- *
- * Exported Functions/Classes:
- * - LogPipeline: Pure static utility class managing global log interception and redaction.
- *   - begin(): Installs the esp_log_set_vprintf hook.
- *   - isInstalled(): Returns true if the hook has been installed.
  */
 
 #pragma once
 
 #include <cstddef>
+#include <cstdarg>
+#include "interfaces/ISanitizer.hpp"
 
-/**
- * @brief Global log interception and secret redaction pipeline.
- *
- * LogPipeline installs a vprintf hook into the ESP-IDF logging subsystem.
- * Every ESP_LOG* macro routes through this hook, where secrets registered
- * with the Redactor singleton are redacted in-place before being emitted to stdout.
- */
-class LogPipeline {
-public:
-    /**
-     * @brief Installs the esp_log_set_vprintf hook.
-     *
-     * Idempotent: safe to call multiple times, will only install once.
-     */
-    static void begin();
+#ifdef ESP_PLATFORM
+#include "esp_log.h"
+#else
+typedef int esp_log_level_t;
+#endif
 
-    /**
-     * @brief Checks if the vprintf hook is currently installed.
-     * @return true if installed, false otherwise.
-     */
-    static bool isInstalled();
+namespace LogPipeline {
 
-    // Delete constructors — pure static class
-    LogPipeline() = delete;
-};
+    using Sink = int (*)(const char*);
+
+    void begin(ISanitizer* sanitizer, Sink sink);
+
+    bool isInstalled();
+
+    void dumpPayload(esp_log_level_t level, const char* tag, const void* data, size_t len);
+
+} // namespace LogPipeline

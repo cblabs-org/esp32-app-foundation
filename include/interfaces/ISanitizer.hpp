@@ -29,5 +29,5 @@ public:
      * @param buffer Null-terminated string buffer to sanitize.
      * @param bufferSize Maximum capacity of the buffer.
      */
-    virtual void sanitize(char* buffer, size_t bufferSize) = 0;
+    virtual void sanitize(char* buffer, size_t bufferSize, bool isTruncated = false) = 0;
 };

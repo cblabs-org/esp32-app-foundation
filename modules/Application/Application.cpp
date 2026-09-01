@@ -28,6 +28,8 @@
 #include "Application.hpp"
 #include "Redactor.h"
 #include "LogPipeline.h"
+#include "CompositeSanitizer.h"
+#include "StructuralScrubber.h"
 #include "events/AppConfiguringPayload.hpp"
 #include "events/PreconditionHealthPayload.hpp"
 
@@ -104,7 +106,12 @@ bool Application::begin(const FrameworkConfig& config) {
     // --- Step 1b: Install log pipeline ---
     // Intercepts all ESP_LOG* output for global secret redaction.
     // Must be early — all subsequent log output is redacted.
-    LogPipeline::begin();
+    static CompositeSanitizer s_compositeSanitizer;
+    s_compositeSanitizer.add(&Redactor::instance());
+#if defined(CONFIG_LOG_MAXIMUM_LEVEL) && CONFIG_LOG_MAXIMUM_LEVEL >= 4
+    s_compositeSanitizer.add(&StructuralScrubber::instance());
+#endif
+    LogPipeline::begin(&s_compositeSanitizer, [](const char* str) -> int { return fputs(str, stdout); });
 
 #if defined(BOARD_HAS_PSRAM)
     // Runtime PSRAM initialization check (Issue #36)

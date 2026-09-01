@@ -22,8 +22,20 @@ static inline void esp_log_level_set(const char* tag, int level) { (void)tag; (v
 
 // Native build stubs for log pipeline compatibility
 typedef int (*vprintf_like_t)(const char*, va_list);
+
+extern vprintf_like_t g_test_vprintf_handler;
+
 static inline vprintf_like_t esp_log_set_vprintf(vprintf_like_t func) {
-    (void)func;
-    return nullptr;
+    vprintf_like_t old = g_test_vprintf_handler;
+    g_test_vprintf_handler = func;
+    return old;
 }
 
+static inline int test_invoke_vprintf(const char* fmt, ...) {
+    if (!g_test_vprintf_handler) return 0;
+    va_list args;
+    va_start(args, fmt);
+    int ret = g_test_vprintf_handler(fmt, args);
+    va_end(args);
+    return ret;
+}
