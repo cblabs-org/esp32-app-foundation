@@ -1,5 +1,5 @@
 # Principal Architect Memory
-<!-- Last updated: 2026-08-30T15:25:00+01:00 -->
+<!-- Last updated: 2026-09-01T07:40:00+01:00 -->
 
 ## Active Programs
 | Program | Plan | Status |
@@ -9,6 +9,7 @@
 ## Active Projects
 | Project | Status | Modules | Context |
 |---|---|---|---|
+| pr-sls-to-lvglpro | WO1/4 — starting | LVGLDisplay, uidesign, platformio.ini, DiagCarouselController | [PROJECT.md](../pr-sls-to-lvglpro/PROJECT.md) |
 | pr-drayton-consumer-fixes | WO5/5 — COMPLETE, soak-tested | DataManager, IDataSource, FetchContext, AppFoundation.h, WeatherModule, framework-expert skill | [PROJECT.md](../pr-drayton-consumer-fixes/PROJECT.md) |
 | pr-128-datamanager-resilience | WO7/7 (WO6 re-plan gated) | DataManager, IDataSource, FetchContext, Application, MCPServer, Display, Portal | [PROJECT.md](../pr-128-datamanager-resilience/PROJECT.md) |
 

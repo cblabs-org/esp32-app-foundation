@@ -1,7 +1,0 @@
-screens/ui_uiBootScreen.c
-screens/ui_uiSystemScreen.c
-screens/ui_ui_DiagScreen.c
-ui.c
-components/ui_comp_hook.c
-ui_helpers.c
-images/ui_img_cblabs_180x58_png.c

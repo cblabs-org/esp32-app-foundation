@@ -1,0 +1,19 @@
+{
+    "name": "UIDesign",
+    "version": "1.0.0",
+    "description": "LVGL Pro generated UI for this display environment",
+    "dependencies": {
+        "lvgl/lvgl": "^9.5.0"
+    },
+    "build": {
+        "srcDir": ".",
+        "srcFilter": [
+            "+<*.c>",
+            "+<screens/*.c>",
+            "+<fonts/*.c>",
+            "+<images/*.c>",
+            "-<preview-build/>",
+            "-<preview-bin/>"
+        ]
+    }
+}

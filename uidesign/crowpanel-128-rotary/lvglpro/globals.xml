@@ -1,0 +1,78 @@
+<globals>
+    <consts>
+        <!-- Boot screen -->
+        <color name="boot_bg"          value="0xF5F5F5" />
+        <color name="boot_maroon"      value="0x7B2C29" />
+        <color name="boot_bar_track"   value="0xDDD1D0" />
+        <color name="boot_status_text" value="0x7D7370" />
+        <!-- System screen -->
+        <color name="system_bg"        value="0x121220" />
+        <color name="error_red"        value="0xE05040" />
+        <color name="setup_green"      value="0x3FB950" />
+        <color name="ota_blue"         value="0x2196F3" />
+        <color name="msg_icon_blue"    value="0x6EA8FE" />
+        <color name="caption_grey"     value="0x8B929D" />
+        <color name="white"            value="0xFFFFFF" />
+        <!-- Diag screen -->
+        <color name="diag_bg"          value="0x0D1117" />
+        <color name="diag_amber"       value="0xF0A020" />
+        <color name="counter_grey"     value="0x5B6270" />
+    </consts>
+
+    <subjects>
+        <!-- Boot screen -->
+        <int    name="sys_boot_progress"    value="0"  />
+        <string name="sys_boot_status"      value="Initialising..." />
+        <string name="sys_app_title"        value="ESP32 App" />
+        <!-- System screen visibility (0=hidden, 1=visible) -->
+        <int    name="sys_error_visible"    value="0"  />
+        <int    name="sys_setup_visible"    value="0"  />
+        <int    name="sys_ota_visible"      value="0"  />
+        <int    name="sys_busy_visible"     value="0"  />
+        <int    name="sys_msg_visible"      value="0"  />
+        <!-- System screen content -->
+        <string name="sys_error_title"      value="System Error" />
+        <string name="sys_error_message"    value="" />
+        <string name="sys_setup_ssid"       value="CBLabs-Setup" />
+        <string name="sys_setup_url"        value="192.168.4.1" />
+        <string name="sys_ota_status"       value="Downloading..." />
+        <int    name="sys_ota_progress"     value="0"  />
+        <string name="sys_ota_percent"      value="0%" />
+        <string name="sys_busy_message"     value="Please wait..." />
+        <string name="sys_msg_title"        value="" />
+        <string name="sys_msg_body"         value="" />
+        <!-- Diag screen -->
+        <int    name="sys_diag_arc_value"   value="0"  />
+        <string name="sys_diag_category"    value="TEMPERATURE" />
+        <string name="sys_diag_value"       value="--" />
+        <string name="sys_diag_counter"     value="0 / 0" />
+        <string name="sys_diag_status"      value="" />
+    </subjects>
+
+    <images memory="int_flash">
+        <data name="img_cblabs_logo" src_path="images/cblabs_180x58.png"
+              color_format="argb8888" />
+    </images>
+
+    <fonts memory="int_flash">
+        <!-- Text Fonts -->
+        <bin name="montserrat_12" src_path="fonts/Montserrat-Medium.ttf" size="12" bpp="4" as_file="false" range="0x20-0x7F" symbols="°" />
+        <bin name="montserrat_14" src_path="fonts/Montserrat-Medium.ttf" size="14" bpp="4" as_file="false" range="0x20-0x7F" symbols="°" />
+        <bin name="montserrat_16" src_path="fonts/Montserrat-Medium.ttf" size="16" bpp="4" as_file="false" range="0x20-0x7F" />
+        <bin name="montserrat_18" src_path="fonts/Montserrat-Medium.ttf" size="18" bpp="4" as_file="false" range="0x20-0x7F" />
+        <bin name="montserrat_20" src_path="fonts/Montserrat-Medium.ttf" size="20" bpp="4" as_file="false" range="0x20-0x7F" />
+        <bin name="montserrat_22" src_path="fonts/Montserrat-Medium.ttf" size="22" bpp="4" as_file="false" range="0x20-0x7F" />
+        <bin name="montserrat_40" src_path="fonts/Montserrat-Medium.ttf" size="40" bpp="4" as_file="false" range="0x20-0x7F" symbols="°" />
+        
+        <!-- Icon Fonts -->
+        <bin name="fontawesome_20" src_path="fonts/FontAwesome.woff" size="20" bpp="4" as_file="false" range="" symbols="&#xf1eb;&#xf00c;" />
+        <bin name="fontawesome_22" src_path="fonts/FontAwesome.woff" size="22" bpp="4" as_file="false" range="" symbols="&#xf071;" />
+    </fonts>
+
+
+
+    <styles>
+        <style name="transparent_container"
+               bg_opa="0" border_width="0" pad_all="0" />
+    </styles>
+</globals>

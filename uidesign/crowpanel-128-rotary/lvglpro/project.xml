@@ -1,0 +1,9 @@
+<project name="ui" lvgl_version="9.5.0">
+    <targets>
+        <target name="default">
+            <display width="240" height="240" radius="120"
+                     color_format="rgb565" />
+            <memory name="int_flash" size="4MB" />
+        </target>
+    </targets>
+</project>
