@@ -27,6 +27,7 @@
 
 #include "Application.hpp"
 #include "Redactor.h"
+#include "LogPipeline.h"
 #include "events/AppConfiguringPayload.hpp"
 #include "events/PreconditionHealthPayload.hpp"
 
@@ -99,6 +100,11 @@ bool Application::begin(const FrameworkConfig& config) {
     // --- Step 1: Boot banner ---
     // Print the firmware version so the first log line is always identifiable.
     ESP_LOGI(TAG, "ESP32 App Foundation v%s — booting", BUILD_VERSION);
+
+    // --- Step 1b: Install log pipeline ---
+    // Intercepts all ESP_LOG* output for global secret redaction.
+    // Must be early — all subsequent log output is redacted.
+    LogPipeline::begin();
 
 #if defined(BOARD_HAS_PSRAM)
     // Runtime PSRAM initialization check (Issue #36)

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdio>
+#include <cstdarg>
 
 // Log level constants (mirror esp_log.h enum values)
 #define ESP_LOG_NONE    0
@@ -18,3 +19,11 @@
 
 // No-op for native builds — runtime level control is hardware-only
 static inline void esp_log_level_set(const char* tag, int level) { (void)tag; (void)level; }
+
+// Native build stubs for log pipeline compatibility
+typedef int (*vprintf_like_t)(const char*, va_list);
+static inline vprintf_like_t esp_log_set_vprintf(vprintf_like_t func) {
+    (void)func;
+    return nullptr;
+}
+

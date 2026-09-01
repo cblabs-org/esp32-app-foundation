@@ -1,0 +1,5 @@
+{
+  "name": "LogPipeline",
+  "version": "0.1.0",
+  "description": "Global log interception and secret redaction pipeline for ESP32 App Foundation"
+}
