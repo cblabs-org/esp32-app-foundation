@@ -391,7 +391,7 @@ void LVGLDisplayModule::tick(uint32_t now) {
         if (_diagScreen != nullptr) {
             lv_scr_load_anim(_diagScreen, LV_SCR_LOAD_ANIM_FADE_IN, 300, 0, false);
         }
-        _diagCarousel.begin(_group);
+        _diagCarousel.begin(_group, _diagScreen);
     }
 
     if (_pendingError.exchange(false)) {

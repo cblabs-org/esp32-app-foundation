@@ -78,7 +78,7 @@ public:
      *
      * @param group  The LVGL encoder focus group (to enter EDIT mode).
      */
-    void begin(lv_group_t* group);
+    void begin(lv_group_t* group, lv_obj_t* diagScreen = nullptr);
 
     /**
      * @brief Deactivate the carousel (when leaving DiagScreen).

@@ -145,13 +145,13 @@ static lv_obj_t* findChildByName(lv_obj_t* parent, const char* name) {
 
 // ─── Controller Implementation ───────────────────────────────────────────────
 
-void DiagCarouselController::begin(lv_group_t* group) {
+void DiagCarouselController::begin(lv_group_t* group, lv_obj_t* diagScreen) {
     _group = group;
     _currentIndex = 0;
     _active = true;
     _lastRefreshMs = 0;
 
-    lv_obj_t* scr = lv_screen_active();
+    lv_obj_t* scr = diagScreen ? diagScreen : lv_screen_active();
     if (scr != nullptr) {
         _arc = findChildByName(scr, "diag_arc");
         _valueLabel = findChildByName(scr, "diag_value");
