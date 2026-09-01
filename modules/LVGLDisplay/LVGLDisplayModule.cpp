@@ -153,9 +153,12 @@ void LVGLDisplayModule::bootstrapHardware() {
         _uiInitialized = true;
     }
 
-    _bootScreen = screen_boot_create();
-    _systemScreen = screen_system_create();
-    _diagScreen = screen_diag_create();
+    // Cache screen objects (create once — these allocate LVGL objects)
+    if (_bootScreen == nullptr) {
+        _bootScreen = screen_boot_create();
+        _systemScreen = screen_system_create();
+        _diagScreen = screen_diag_create();
+    }
 
     // --- Apply runtime app title to boot screen (overrides default literal) ---
     if (_appTitle != nullptr) {
@@ -381,7 +384,13 @@ void LVGLDisplayModule::tick(uint32_t now) {
             std::lock_guard<std::mutex> lock(_dataSourceHealthMutex);
             std::swap(updates, _dataSourceUpdates);
         }
-        (void)updates;
+        // Data source health events are captured but not yet displayed on the
+        // LVGL UI. When a data-source dashboard screen is designed, bind these
+        // to app_datasource_* subjects. See GitHub issue #209.
+        for (const auto& payload : updates) {
+            ESP_LOGD("LVGLDisplayModule", "Data source health: %s state=%d",
+                     payload.name, static_cast<int>(payload.state));
+        }
     }
 
     if (_pendingAppRunning.exchange(false)) {
@@ -610,6 +619,9 @@ void LVGLDisplayModule::clearStatus() {
 // System Screen Management API
 // -----------------------------------------------------------------------------
 
+// All subject updates occur within a single tick iteration — lv_timer_handler()
+// is not called between them, so no intermediate frame is rendered where all
+// groups are hidden before the target group becomes visible.
 void LVGLDisplayModule::_hideAllSystemGroups() {
     lv_subject_set_int(&sys_error_visible, 0);
     lv_subject_set_int(&sys_setup_visible, 0);

@@ -13,6 +13,7 @@
 
 #include "DiagCarouselController.hpp"
 #include "ui_gen.h"
+#include "Logger.hpp"
 #include <cstdio>
 #include <cstring>
 
@@ -157,8 +158,11 @@ void DiagCarouselController::begin(lv_group_t* group, lv_obj_t* diagScreen) {
         _valueLabel = findChildByName(scr, "diag_value");
         _statusLabel = findChildByName(scr, "diag_status");
 
-        // Fallback by child index if name-based lookup did not find widgets
+        // Fallback by child index if name-based lookup did not find widgets.
+        // This should not trigger with LV_USE_OBJ_NAME enabled.
         if (_arc == nullptr && lv_obj_get_child_count(scr) >= 5) {
+            ESP_LOGW("DiagCarousel", "Name-based widget lookup failed — "
+                     "falling back to child index (expected: diag_arc, diag_value, diag_status)");
             _arc = lv_obj_get_child(scr, 0);
             _valueLabel = lv_obj_get_child(scr, 3);
             _statusLabel = lv_obj_get_child(scr, 4);

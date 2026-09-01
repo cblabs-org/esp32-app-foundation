@@ -63,3 +63,8 @@ A module should only communicate with its immediate dependencies.
 ## Modules vs Libraries
 - **Module**: Requires access to the `EventBus` or application state. Registered with the framework; driven by `tick()`.
 - **Library**: Passive, application-agnostic utility. Portable unchanged to other projects.
+
+## Logging Discipline
+- **Single entry point**: All logging MUST go through `#include "Logger.hpp"`. Never include `esp_log.h` or `platform/LogShim.h` directly.
+- **Why**: `Logger.hpp` provides `LOG_SECURE(tag, fmt, ...)` which routes all output through the `Redactor`, scrubbing registered secrets (WiFi passwords, API keys, JWT tokens). Direct `ESP_LOGI`/`ESP_LOGW`/`ESP_LOGD`/`ESP_LOGE` calls bypass redaction and can leak credentials to serial output.
+- **Audit rule**: When reviewing code, flag any `#include "esp_log.h"` or raw `ESP_LOG*` call outside of `lib/Logger/` as a violation. See GitHub issue #210.

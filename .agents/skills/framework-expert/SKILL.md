@@ -78,6 +78,9 @@ Fork the `uidesign/` project folder into the application repository, preserve al
 ### What is the `sys_` prefix?
 `sys_` denotes framework-contracted reactive subjects (e.g. `sys_boot_progress`, `sys_error_visible`, `sys_ota_status`). Designers must not rename or remove these subjects in their LVGL Pro projects so core framework events (boot splash, OTA updates, WiFi configuration, error states, diagnostics) bind correctly.
 
+### How do I log messages?
+**Always `#include "Logger.hpp"` — never use `esp_log.h` or `platform/LogShim.h` directly.** The Logger library is the single logging abstraction. It provides `LOG_SECURE(tag, fmt, ...)` which automatically redacts registered secrets from output via `Redactor`. Direct `ESP_LOGI`/`ESP_LOGW`/`ESP_LOGD`/`ESP_LOGE` calls bypass redaction and can leak secrets (WiFi credentials, API keys, tokens) to serial output. When writing new code or reviewing existing code, flag any direct `ESP_LOG*` usage as a violation of this invariant. See GitHub issue #210.
+
 ### Framework-Reserved Include Prefixes
 
 The following subdirectories of `include/` are reserved by the framework:
