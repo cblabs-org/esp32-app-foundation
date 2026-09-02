@@ -394,10 +394,14 @@ bool AuditModule::enqueueInternal(const char* source, const char* action, const 
 
     // --- Step 5: Copy details and apply secret redaction ---
     if (details) {
+        // strncpy truncates silently. The sanitizer must be told, or a secret
+        // straddling the cut leaves an unmatchable prefix persisted to flash.
+        const bool truncated =
+            std::strlen(details) > sizeof(record->details) - 1;
         strncpy(record->details, details, sizeof(record->details) - 1);
         record->details[sizeof(record->details) - 1] = '\0';
         if (_sanitizer) {
-            _sanitizer->sanitize(record->details, sizeof(record->details));
+            _sanitizer->sanitize(record->details, sizeof(record->details), truncated);
         }
     } else {
         record->details[0] = '\0';

@@ -1358,19 +1358,52 @@ during `Application::begin()` (Step 1b). This handler forms a **log pipeline**:
 ```
 ESP_LOGI(TAG, "...")   → esp_log_write()
   → LogPipeline (custom vprintf handler installed via esp_log_set_vprintf)
-    → Step 1: Check thread_local re-entrancy guard (prevents recursive logging)
-    → Step 2: Format string into 2 KB static buffer in .bss (vsnprintf)
-    → Step 3: Redact secrets in-place (Redactor::instance().redact)
-    → Step 4: Write to Serial / stdout
+    → Step 1: thread_local re-entrancy guard — on re-entry, format into a
+              STACK buffer (the shared buffer belongs to the outer call)
+    → Step 2: Acquire the buffer mutex (bounded timeout; on timeout, degrade
+              to a stack buffer — still redacted, never chained un-redacted)
+    → Step 3: Format into the 256 B static .bss buffer; verbose builds only,
+              grow a retained heap buffer if the line does not fit
+    → Step 4: Redact in-place via the injected ISanitizer chain
+    → Step 5: Write to the sink (Serial / stdout)
 ```
 
-**Secret redaction** is applied globally via `Redactor::instance().redact()`. Any
-string registered as a secret via `Redactor::instance().registerSecret()` (e.g. decrypted
-credentials from `KeyManager`, WiFi passwords) is automatically masked with `*`
-characters in all log output. This covers all `ESP_LOG*` call sites across the codebase
-with zero call-site churn. The 2 KB static buffer in `.bss` is protected against
-concurrency by ESP-IDF's internal log lock (`esp_log_impl_lock()`), and is sized to
-accommodate large headers such as HTTP Authorization tokens.
+**Secret redaction** is applied globally via the injected `ISanitizer`. Any string
+registered via `Redactor::instance().registerSecret()` (e.g. decrypted credentials
+from `KeyManager`, WiFi passwords) is masked with `*` characters, covering every
+`ESP_LOG*` call site with zero call-site churn. Verbose builds additionally chain a
+`StructuralScrubber`, which masks by *structure* (`Authorization:`, `Set-Cookie:`,
+`"access_token"`, `api_key=` …) and so catches third-party tokens the device never
+registered — and does so independently of secret length.
+
+**Concurrency.** The shared buffer is protected by a FreeRTOS mutex owned by
+`LogPipeline`. It is *not* safe to rely on ESP-IDF's internal log lock: under
+`CONFIG_LOG_VERSION=1` — the setting all boards ship — `esp_log_va()` invokes the
+registered print function with **no lock held**. The `thread_local` re-entrancy guard
+covers same-task recursion only; cross-task exclusion is the mutex's job.
+
+**Buffer sizing.** The static buffer is 256 B. Across 19,236 captured log lines the
+longest line reaching this hook was 144 B, and `CONFIG_LOG_MAXIMUM_LEVEL=3` strips
+`ESP_LOGD`/`ESP_LOGV` from shipped builds, so no production line can exceed it. Only
+verbose builds (`CONFIG_LOG_MAXIMUM_LEVEL >= 4`) compile in the oversize path, which
+grows and retains a heap buffer (hard cap 16 KB) and falls back to safe truncation if
+the allocation fails. `LogPipeline::contendedLines()` and `oversizeAllocFailures()`
+expose degradation rather than letting it pass silently.
+
+> [!IMPORTANT]
+> **Sink-level redaction is a backstop, not a guarantee.** It cannot cover:
+> - **`ESP_EARLY_LOG*` / `ESP_DRAM_LOG*`** — these use `ets_printf` and bypass the
+>   hook entirely, so early-boot and ISR logs are not redacted.
+> - **Raw `printf()`** — not a log call, so it never reaches the hook.
+> - **Encoded payloads** — hex or base64 output never matches a plaintext needle.
+> - **Secrets split across separate log calls** — redaction is per-call, so a secret
+>   spanning two `ESP_LOG*` invocations is matched by neither.
+> - **Secret length** — masking preserves length, which discloses it.
+>
+> To dump a large payload (an HTTP request or response, say), use
+> `LogPipeline::dumpPayload()` rather than `ESP_LOGV`. It scans a sliding window that
+> overlaps by `MAX_SECRET_LEN - 1`, so a secret cannot straddle a chunk boundary and
+> escape — the failure mode that makes naive chunked logging unsafe.
 
 ### 11A.5 `ILogSink` Interface *(Deferred)*
 
@@ -2797,7 +2830,7 @@ This section tracks decisions made and questions still to resolve.
 | D22 | POSIX TZ via `setenv`/`tzset` for timezone | Leverages standard `localtime()` for automatic DST handling |
 | D23 | Non-blocking async NTP sync | Never blocks boot; sync checked asynchronously |
 | D27 | Standardise on `ESP_LOGx` via `LogShim.h` — no custom macros | ESP-IDF logging provides compile-time stripping, runtime per-module control, thread safety, and pluggable backends |
-| D28 | Global secret redaction via `esp_log_set_vprintf()` pipeline (`LogPipeline`) | All `ESP_LOG*` output intercepted at sink and redacted via `Redactor` Singleton in 2 KB `.bss` buffer. Zero call-site churn; legacy `Logger` deleted. (Issue #211) |
+| D28 | Global secret redaction via `esp_log_set_vprintf()` pipeline (`LogPipeline`) | `ESP_LOG*` output intercepted at the sink and redacted via an injected `ISanitizer` chain, under a `LogPipeline`-owned FreeRTOS mutex (ESP-IDF holds no lock across the callback at `CONFIG_LOG_VERSION=1`). 256 B static buffer; verbose builds add a retained heap buffer and `dumpPayload()`. Zero call-site churn; legacy `Logger` deleted. Backstop, not a guarantee — see §11A.4. (Issue #211) |
 | D29 | RAM ring buffer for log capture *(Deferred)* | Deferred to follow-up PR (Issue #211); serial monitor + local capture suffices for current developer workflows. |
 | D30 | `ILogSink` interface for pluggable log destinations *(Deferred)* | Deferred to follow-up PR (Issue #211) until ring buffer and remote sinks are implemented. |
 | D31 | Heartbeat telemetry every ~15s in `Application::tick()` | Provides continuous runtime observability (heap, uptime, RSSI) with zero external infrastructure |
@@ -2811,7 +2844,7 @@ This section tracks decisions made and questions still to resolve.
 | D36 | Concrete board types at caller layer; `IDisplayBoard*` only at engine boundaries | Callers need board-specific APIs (`setProgress()`, `configure()`); abstracting to `IDisplayBoard&` destroys the value of the hierarchy. Interface is used only where polymorphism is genuinely needed: `showModal(IDisplayBoard*)`, `carousel.add(IDisplayBoard*)` |
 | D37 | Screensaver is a distinct display-intrinsic policy layer (not a modal) | Pushing `ScreensaverBoard` via `showModal()` assigned it MODAL priority, allowing it to suppress OTA progress and wizard overlays. Screensaver is the lowest of three explicit rendering layers (Modal → Base/Carousel → Screensaver), driven by inactivity timer, not application decision |
 | D38 | Board taxonomy split: system boards (internal), user-surfaced boards (in `display.boards`), display-intrinsic boards (in `display.screensaver`) | Not all boards should be externally configurable. `BootBoard` and `ConfiguringStatusBoard` are driven by Application state transitions; exposing them via getters invited callers to bypass the module's lifecycle management |
-| D39 | Unified secret redaction via `Redactor` Singleton + `ISanitizer` DIP interface | `Redactor` promoted from static class to Meyer's Singleton with fixed-capacity lock-free array (16 secrets, atomic count, writer spinlock). Implements `ISanitizer` for DI into `AuditModule`. `LogPipeline` consumes Singleton directly via C callback. Replaces and deletes legacy `Logger` and `LOG_SECURE`. (Issue #211) |
+| D39 | Unified secret redaction via `Redactor` Singleton + `ISanitizer` DIP interface | `Redactor` promoted from static class to Meyer's Singleton with fixed-capacity lock-free **append-only** array (16 secrets, atomic count, writer spinlock; published slots are never reordered or rewritten, which is what makes the lock-free read path safe). Implements `ISanitizer` for DI into `AuditModule`. `LogPipeline` consumes Singleton directly via C callback. Replaces and deletes legacy `Logger` and `LOG_SECURE`. (Issue #211) |
 
 ### Open Questions
 
