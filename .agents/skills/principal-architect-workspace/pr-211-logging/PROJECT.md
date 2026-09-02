@@ -97,6 +97,7 @@ approach, now closed as wrong direction).
 
 **Human approval:** User explicitly approved the 4-WO decomposition on 2026-09-01T20:35:07+01:00 with instruction to proceed with full implementation and stage PR for review.
 
+
 ### Session 1 — Execution (2026-09-01 20:35–21:18)
 
 **WO1 (Redactor Hardening):** Completed. Worker executed on Pro model. Paranoid-worker failure mode encountered (refused PA approval messages) — PA committed directly per operating-model fallback. Commit `2f1db263`.
@@ -108,3 +109,9 @@ approach, now closed as wrong direction).
 **WO4 (Documentation):** Completed. Worker executed on Flash model. Clean execution, committed autonomously. Design spec, framework-expert skill, thread-safety, audit-module guide, architecture reference all updated. Commit `71532e18`.
 
 **Final state:** 5 commits on `pr-211-logging/wo4-docs`, 31 files changed, +1243/−316, 855 tests passing, firmware builds clean. PR staged for review.
+
+### Session 2 — Review, Remediation & Merge (2026-09-01 22:00 – 2026-09-02 23:08)
+
+**Summary**: PR #212 received two rounds of Chief Architect review. First round (our commits): soak-tested, release-audited, remediated D1 findings. Second round found 6 blockers in our code (most significantly: insertion sort breaking append-only invariant, dumpPayload chunk-boundary straddle, extern stub breaking full native suite). A second agent (`9cbe6878`) fixed all blockers with reproduction-backed regression tests. 888 native tests pass. PR merged as `7ac38167`.
+
+**Continuation project**: See [pr-212-remediation/PROJECT.md](../pr-212-remediation/PROJECT.md) for the full remediation session log.
