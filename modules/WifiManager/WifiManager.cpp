@@ -53,7 +53,7 @@
 #include "esp_wifi.h"
 
 #include "platform/LogShim.h"
-#include "Logger.hpp"
+#include "Redactor.h"
 
 static constexpr const char* TAG = "WifiManager";
 
@@ -842,7 +842,12 @@ void WifiManager::updateWiFi(const char* ssid, const char* pass) {
     if (ssid != nullptr) strlcpy(_wifiSsid, ssid, sizeof(_wifiSsid));
     if (pass != nullptr && strlen(pass) > 0) {
         strlcpy(_wifiPass, pass, sizeof(_wifiPass));
-        Logger::registerSecret(std::string(_wifiPass));
+        const auto redaction = Redactor::instance().registerSecret(std::string(_wifiPass));
+        if (redaction == Redactor::RegisterResult::Full ||
+            redaction == Redactor::RegisterResult::TooLong) {
+            ESP_LOGE(TAG, "WiFi password will NOT be redacted from logs: %s",
+                     Redactor::describe(redaction));
+        }
 
         // Persist password via KeyManager (AES-256 encrypted)
         if (_keyManager != nullptr) {

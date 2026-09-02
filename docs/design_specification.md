@@ -257,7 +257,7 @@ multiple concerns into a single "systemManager" is explicitly prohibited.
 │  wifiManager          │  otaUpdateManager               │
 │  webServer            │  timeManager                    │
 │  deviceCrypto         │  EventBus                       │
-│  mcpServer            │  LogRouter (vprintf pipeline)   │
+│  mcpServer            │  LogPipeline (vprintf pipeline) │
 │  githubClient         │  md5Utils                       │
 └─────────────────────────────────────────────────────────┘
 │            PlatformIO / Arduino + ESP-IDF               │
@@ -337,9 +337,9 @@ The kernel is always present. No app can opt out of kernel services.
 | `EventBus` | Synchronous publish/subscribe with static fn-ptr callbacks | `modules/eventBus/` |
 | `mcpServer` | JSON-RPC MCP server (Serial + HTTP transport) | `modules/mcpServer/` |
 | `deviceCrypto` | Hardware-backed key derivation & AES-256 encryption | `lib/deviceCrypto/` |
-| `logger` | Secret-redaction utility (`Logger::logSecure()`) wired into the LogRouter `vprintf` pipeline | `lib/logger/` |
+| `LogPipeline` | Global log interception pipeline (vprintf hook + secret redaction) | `lib/LogPipeline/` |
+| `Redactor` | Singleton secret registry with zero-allocation in-place redaction. Implements `ISanitizer`. | `lib/Redactor/` |
 | `LogShim.h` | Unified logging shim — bridges ESP-IDF `esp_log.h` to native `printf` stubs | `include/platform/` |
-| `LogRouter` | Custom `esp_log_set_vprintf()` handler: redaction → serial → ILogSink dispatch | `modules/application/` |
 | `githubClient` | HTTPS GitHub API client (used by OTA) | `lib/githubClient/` |
 | `md5Utils` | Streaming MD5 hashing via MbedTLS (incremental, not full-file) | `lib/md5Utils/` |
 
@@ -1350,28 +1350,68 @@ build_flags = -DCORE_DEBUG_LEVEL=3
 build_flags = -DCORE_DEBUG_LEVEL=1
 ```
 
-### 11A.4 LogRouter Pipeline
+### 11A.4 LogPipeline
 
-The framework installs a custom `esp_log_set_vprintf()` handler during
-`Application::begin()`. This handler forms a **log pipeline**:
+The framework installs a custom `esp_log_set_vprintf()` handler via `LogPipeline::begin()`
+during `Application::begin()` (Step 1b). This handler forms a **log pipeline**:
 
 ```
 ESP_LOGI(TAG, "...")   → esp_log_write()
-  → LogRouter (custom vprintf handler)
-    → Step 1: Format the string
-    → Step 2: Redact secrets (Logger::redactInPlace)
-    → Step 3: Write to Serial (always)
-    → Step 4: Write to RAM ring buffer (always, ~4-8KB)
-    → Step 5: Dispatch to registered ILogSink implementations
+  → LogPipeline (custom vprintf handler installed via esp_log_set_vprintf)
+    → Step 1: thread_local re-entrancy guard — on re-entry, format into a
+              STACK buffer (the shared buffer belongs to the outer call)
+    → Step 2: Acquire the buffer mutex (bounded timeout; on timeout, degrade
+              to a stack buffer — still redacted, never chained un-redacted)
+    → Step 3: Format into the 256 B static .bss buffer; verbose builds only,
+              grow a retained heap buffer if the line does not fit
+    → Step 4: Redact in-place via the injected ISanitizer chain
+    → Step 5: Write to the sink (Serial / stdout)
 ```
 
-**Secret redaction** is applied globally via the `Logger` library's
-`redactInPlace()` function. Any string registered as a secret via
-`Logger::registerSecret()` is automatically masked with `*` characters
-in all log output. This is safe for development use; production builds
-strip most log output entirely via `CORE_DEBUG_LEVEL`.
+**Secret redaction** is applied globally via the injected `ISanitizer`. Any string
+registered via `Redactor::instance().registerSecret()` (e.g. decrypted credentials
+from `KeyManager`, WiFi passwords) is masked with `*` characters, covering every
+`ESP_LOG*` call site with zero call-site churn. Verbose builds additionally chain a
+`StructuralScrubber`, which masks by *structure* (`Authorization:`, `Set-Cookie:`,
+`"access_token"`, `api_key=` …) and so catches third-party tokens the device never
+registered — and does so independently of secret length.
 
-### 11A.5 `ILogSink` Interface
+**Concurrency.** The shared buffer is protected by a FreeRTOS mutex owned by
+`LogPipeline`. It is *not* safe to rely on ESP-IDF's internal log lock: under
+`CONFIG_LOG_VERSION=1` — the setting all boards ship — `esp_log_va()` invokes the
+registered print function with **no lock held**. The `thread_local` re-entrancy guard
+covers same-task recursion only; cross-task exclusion is the mutex's job.
+
+**Buffer sizing.** The static buffer is 256 B. Across 19,236 captured log lines the
+longest line reaching this hook was 144 B, and `CONFIG_LOG_MAXIMUM_LEVEL=3` strips
+`ESP_LOGD`/`ESP_LOGV` from shipped builds, so no production line can exceed it. Only
+verbose builds (`CONFIG_LOG_MAXIMUM_LEVEL >= 4`) compile in the oversize path, which
+grows and retains a heap buffer (hard cap 16 KB) and falls back to safe truncation if
+the allocation fails. `LogPipeline::contendedLines()` and `oversizeAllocFailures()`
+expose degradation rather than letting it pass silently.
+
+> [!IMPORTANT]
+> **Sink-level redaction is a backstop, not a guarantee.** It cannot cover:
+> - **`ESP_EARLY_LOG*` / `ESP_DRAM_LOG*`** — these use `ets_printf` and bypass the
+>   hook entirely, so early-boot and ISR logs are not redacted.
+> - **Raw `printf()`** — not a log call, so it never reaches the hook.
+> - **Encoded payloads** — hex or base64 output never matches a plaintext needle.
+> - **Secrets split across separate log calls** — redaction is per-call, so a secret
+>   spanning two `ESP_LOG*` invocations is matched by neither.
+> - **Secret length** — masking preserves length, which discloses it.
+>
+> To dump a large payload (an HTTP request or response, say), use
+> `LogPipeline::dumpPayload()` rather than `ESP_LOGV`. It scans a sliding window that
+> overlaps by `MAX_SECRET_LEN - 1`, so a secret cannot straddle a chunk boundary and
+> escape — the failure mode that makes naive chunked logging unsafe.
+
+### 11A.5 `ILogSink` Interface *(Deferred)*
+
+> [!NOTE]
+> **Status: DEFERRED to a future release (Issue #211)**
+> Pluggable log sinks (`ILogSink`) will be introduced when consumer sinks exist
+> (e.g., in-memory ring buffer, MCP log tools, or web portal log viewer). For now,
+> `LogPipeline` outputs directly to the serial console (`vprintf`).
 
 ```cpp
 class ILogSink {
@@ -1381,15 +1421,21 @@ public:
 };
 ```
 
-Registered via `app.registerLogSink(ILogSink*)`. The LogRouter dispatches
-formatted, redacted log lines to all registered sinks after writing to Serial.
+When implemented, registration will be via `app.registerLogSink(ILogSink*)`. The LogPipeline
+will dispatch formatted, redacted log lines to all registered sinks after writing to Serial.
 This follows the same Hollywood Principle pattern as `IWebContributor` and
 `IMcpContributor`.
 
-### 11A.6 RAM Ring Buffer & Crash Persistence
+### 11A.6 RAM Ring Buffer & Crash Persistence *(Deferred)*
 
-The LogRouter maintains a **RAM ring buffer** (~4-8KB) that always contains
-the most recent log output. This buffer serves two purposes:
+> [!NOTE]
+> **Status: DEFERRED to a future release (Issue #211)**
+> Developer workflow currently relies on the serial monitor and local capture. A RAM ring
+> buffer consumes memory (~4–8 KB) that is lost on hard crash without panic dumping. Ring buffer
+> support and crash dump persistence will be added in a follow-up PR alongside MCP log tooling.
+
+The proposed architecture will maintain a **RAM ring buffer** (~4-8KB) that contains
+the most recent log output for:
 
 1. **Live telemetry**: Optional `ILogSink` implementations (e.g., MQTT) read
    from the buffer and flush to their transport periodically.
@@ -1423,7 +1469,7 @@ monitoring infrastructure — just a serial connection.
 An optional module (`mqttTelemetry`) can be added to any application for remote
 log forwarding. It implements `ILogSink` and:
 
-- Reads from the LogRouter's RAM ring buffer
+- Reads from the LogPipeline's RAM ring buffer (when ring buffer is implemented)
 - A background FreeRTOS task flushes batched log lines to the MQTT broker
   periodically (e.g., every 5-15 seconds)
 - Publishes to a structured topic: `devices/{device_id}/logs`
@@ -1479,7 +1525,7 @@ The framework deliberately uses a monorepo topology rather than splitting into s
 ```
 esp32-app-foundation/           ← Monorepo (everything lives here)
   include/                      ← All framework interface headers + FrameworkConfig
-    interfaces/                 ← Pure abstract interfaces (ITickable, etc.)
+    interfaces/                 ← Pure abstract interfaces (ITickable, ISanitizer, etc.)
     platform/                   ← Platform abstraction headers
       LogShim.h                 ← Unified ESP-IDF ↔ native logging bridge
     portal_assets/              ← Generated PROGMEM gzip headers (build output)
@@ -1488,8 +1534,9 @@ esp32-app-foundation/           ← Monorepo (everything lives here)
     FrameworkConfig.hpp         ← Kernel config struct
   lib/                          ← Low-level utilities
     deviceCrypto/
-    logger/
+    LogPipeline/
     md5Utils/
+    Redactor/
     githubClient/
   modules/
     application/                ← Kernel: Application hub + AppState
@@ -2737,7 +2784,7 @@ While littering the codebase with `#ifndef NATIVE_BUILD` guards may feel like a 
 - `AsyncWebServerResponse` stub with `beginResponse_P`, `addHeader`, `send`
 - `DNSServer` dummy class in `wifiManager.hpp` (resolves incomplete type for
   `std::unique_ptr<DNSServer>`)
-- `Logger` uses `PIO_UNIT_TESTING` flag to stub ESP log macros
+- `LogPipeline` / `LogShim` uses `PIO_UNIT_TESTING` stubs for native testing
 - Serial mocked with string-buffer class for MCP server tests
 
 > **Critical:** Always use project-wide canonical mocks. Defining inline duplicate
@@ -2783,9 +2830,9 @@ This section tracks decisions made and questions still to resolve.
 | D22 | POSIX TZ via `setenv`/`tzset` for timezone | Leverages standard `localtime()` for automatic DST handling |
 | D23 | Non-blocking async NTP sync | Never blocks boot; sync checked asynchronously |
 | D27 | Standardise on `ESP_LOGx` via `LogShim.h` — no custom macros | ESP-IDF logging provides compile-time stripping, runtime per-module control, thread safety, and pluggable backends |
-| D28 | Global secret redaction via `esp_log_set_vprintf()` pipeline | All log output automatically redacted; only matters during debug builds where logging is active |
-| D29 | RAM ring buffer for log capture, flash only on crash | Flash endurance (10K-100K cycles) and write latency (20-200ms) make continuous flash logging infeasible; RAM has zero overhead |
-| D30 | `ILogSink` interface for pluggable log destinations | Mirrors `IWebContributor`/`IMcpContributor` pattern; enables optional MQTT telemetry without kernel coupling |
+| D28 | Global secret redaction via `esp_log_set_vprintf()` pipeline (`LogPipeline`) | `ESP_LOG*` output intercepted at the sink and redacted via an injected `ISanitizer` chain, under a `LogPipeline`-owned FreeRTOS mutex (ESP-IDF holds no lock across the callback at `CONFIG_LOG_VERSION=1`). 256 B static buffer; verbose builds add a retained heap buffer and `dumpPayload()`. Zero call-site churn; legacy `Logger` deleted. Backstop, not a guarantee — see §11A.4. (Issue #211) |
+| D29 | RAM ring buffer for log capture *(Deferred)* | Deferred to follow-up PR (Issue #211); serial monitor + local capture suffices for current developer workflows. |
+| D30 | `ILogSink` interface for pluggable log destinations *(Deferred)* | Deferred to follow-up PR (Issue #211) until ring buffer and remote sinks are implemented. |
 | D31 | Heartbeat telemetry every ~15s in `Application::tick()` | Provides continuous runtime observability (heap, uptime, RSSI) with zero external infrastructure |
 | D32 | MQTT telemetry as optional module, not kernel | Not all apps need remote logging; kernel stays minimal |
 | D33 | ArduinoJson v7 `JsonDocument` replaces v6 `StaticJsonDocument`/`DynamicJsonDocument` | Unified API; v6 types are deprecated |
@@ -2797,6 +2844,7 @@ This section tracks decisions made and questions still to resolve.
 | D36 | Concrete board types at caller layer; `IDisplayBoard*` only at engine boundaries | Callers need board-specific APIs (`setProgress()`, `configure()`); abstracting to `IDisplayBoard&` destroys the value of the hierarchy. Interface is used only where polymorphism is genuinely needed: `showModal(IDisplayBoard*)`, `carousel.add(IDisplayBoard*)` |
 | D37 | Screensaver is a distinct display-intrinsic policy layer (not a modal) | Pushing `ScreensaverBoard` via `showModal()` assigned it MODAL priority, allowing it to suppress OTA progress and wizard overlays. Screensaver is the lowest of three explicit rendering layers (Modal → Base/Carousel → Screensaver), driven by inactivity timer, not application decision |
 | D38 | Board taxonomy split: system boards (internal), user-surfaced boards (in `display.boards`), display-intrinsic boards (in `display.screensaver`) | Not all boards should be externally configurable. `BootBoard` and `ConfiguringStatusBoard` are driven by Application state transitions; exposing them via getters invited callers to bypass the module's lifecycle management |
+| D39 | Unified secret redaction via `Redactor` Singleton + `ISanitizer` DIP interface | `Redactor` promoted from static class to Meyer's Singleton with fixed-capacity lock-free **append-only** array (16 secrets, atomic count, writer spinlock; published slots are never reordered or rewritten, which is what makes the lock-free read path safe). Implements `ISanitizer` for DI into `AuditModule`. `LogPipeline` consumes Singleton directly via C callback. Replaces and deletes legacy `Logger` and `LOG_SECURE`. (Issue #211) |
 
 ### Open Questions
 

@@ -9,7 +9,6 @@
  */
 
 #include "DeviceCrypto.hpp"
-#include "../Logger/Logger.hpp"
 #include "platform/LogShim.h"
 #include <string.h>
 
@@ -50,10 +49,10 @@ void DeviceCrypto::begin() {
         mbedtls_md_free(&ctx);
 
         prefs.putBytes("aes_key", aesKey, 32);
-        LOG_SECURE("CRYPTO", "Generated and firmly committed new MAC-derived 256-bit AES Hardware Key.");
+        ESP_LOGD("CRYPTO", "Generated and firmly committed new MAC-derived 256-bit AES Hardware Key.");
     } else {
         prefs.getBytes("aes_key", aesKey, 32);
-        LOG_SECURE("CRYPTO", "Mounted existing persistent AES Master Key.");
+        ESP_LOGD("CRYPTO", "Mounted existing persistent AES Master Key.");
     }
     prefs.end();
     keyLoaded = true;
@@ -106,7 +105,7 @@ std::unique_ptr<char[]> DeviceCrypto::encrypt(const char* plaintext, size_t inpu
         return std::unique_ptr<char[]>();
     }
 
-    LOG_SECURE("CRYPTO", "Executing AES-256-CBC Encryption. Plaintext payload size: %u bytes", (unsigned)inputLen);
+    ESP_LOGD("CRYPTO", "Executing AES-256-CBC Encryption. Plaintext payload size: %u bytes", (unsigned)inputLen);
 
     size_t paddedLen = inputLen + (16 - (inputLen % 16));
     size_t totalLen = 16 + paddedLen;
@@ -145,7 +144,7 @@ std::unique_ptr<char[]> DeviceCrypto::encrypt(const char* plaintext, size_t inpu
                 b64Buffer[b64Len] = '\0';
                 result.reset(b64Buffer);
                 if (outLen) *outLen = b64Len;
-                LOG_SECURE("CRYPTO", "Encryption completed securely. Export Base64 size: %u bytes", (unsigned)b64Len);
+                ESP_LOGD("CRYPTO", "Encryption completed securely. Export Base64 size: %u bytes", (unsigned)b64Len);
             } else {
                 ESP_LOGE(TAG, "encrypt() failed: base64 encoding error");
                 delete[] b64Buffer;
@@ -178,7 +177,7 @@ std::unique_ptr<char[]> DeviceCrypto::decrypt(const char* ciphertext, size_t inp
         return std::unique_ptr<char[]>();
     }
     
-    LOG_SECURE("CRYPTO", "Decoding inbound Base64 Ciphertext. Payload size: %u bytes", (unsigned)inputLen);
+    ESP_LOGD("CRYPTO", "Decoding inbound Base64 Ciphertext. Payload size: %u bytes", (unsigned)inputLen);
 
     size_t decOutLen = 0;
     mbedtls_base64_decode(nullptr, 0, &decOutLen, (const unsigned char*)ciphertext, inputLen);
@@ -231,13 +230,13 @@ std::unique_ptr<char[]> DeviceCrypto::decrypt(const char* ciphertext, size_t inp
             plaintextBuf[unpaddedLen] = '\0';
             result.reset(plaintextBuf);
             if (outLen) *outLen = unpaddedLen;
-            LOG_SECURE("CRYPTO", "Decryption verified. Extracted plaintext configuration length: %u bytes", (unsigned)unpaddedLen);
+            ESP_LOGD("CRYPTO", "Decryption verified. Extracted plaintext configuration length: %u bytes", (unsigned)unpaddedLen);
         } else {
             ESP_LOGE(TAG, "decrypt() failed: plaintext buffer allocation error");
             if (outLen) *outLen = 0;
         }
     } else {
-        LOG_SECURE("CRYPTO", "Padding validation failed post-decryption. Key mismatch or stream corrupted!");
+        ESP_LOGD("CRYPTO", "Padding validation failed post-decryption. Key mismatch or stream corrupted!");
         if (outLen) *outLen = 0;
     }
     

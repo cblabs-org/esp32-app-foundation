@@ -19,7 +19,7 @@ description: >
   ITabRegistry, registerTabs, DataSourceHealthPayload, data.source.health,
   get_data_sources, AUDIT, AUDIT_SYNC, audit trail, audit log, WITH_AUDIT,
   AuditModule, Audit.h, get_audit_log, clear_audit_log, BOARD_AUDIT_BYTES,
-  audit_health, Redactor, registerSecret, flash wear.
+  audit_health, LogPipeline, Redactor, registerSecret, ISanitizer, flash wear.
   (4) Patterns and safety — Service Module Pattern, orchestrator
   anti-pattern, Domain Meaning Test, SOLID, thread safety, std::function, TWDT,
   watchdog, heap, PSRAM, TLS memory, flash size. (5) Security — DeviceCrypto,
@@ -106,6 +106,7 @@ paths instead, e.g. `include/modules/my-module/MyTypes.hpp`.
 | `IStatusReporter` | Displays boot-phase progress status and unrecoverable errors. | `reportStatus(const char*, float)` |
 | `IDisplayBoard` | Renders a telemetry pane inside the monochrome display carousel (U8G2). | `render(U8G2&)` |
 | `ILVGLHardwareAdapter` | Abstracts display hardware (SPI/bus init, backlight PWM, touch, encoder inputs) for `LVGLDisplayModule`. | `createDisplay()`, `setBrightness()`, `createTouchInput()`, `createEncoderInput()` |
+| `ISanitizer` | Pure abstract interface for in-place string/buffer sanitization and secret redaction. | `sanitize(char*, size_t)` |
 | `IOTAVerifier` | Streaming cryptographic firmware verification for OTA updates. | `verify()` |
 
 > **LVGL Pro UI Contract**: Unlike U8G2's virtual render callbacks, the LVGL Pro display architecture uses:
@@ -243,8 +244,10 @@ These references are optimized distillations for AI agents. If the human develop
 - **Audit trail / event logging**: "AuditModule", "AUDIT", "AUDIT_SYNC", "WITH_AUDIT",
   "Audit.h", "audit trail", "audit log", "get_audit_log", "clear_audit_log",
   "BOARD_AUDIT_BYTES", "audit_health", "flash audit", "structured audit",
-  "Redactor", "registerSecret", "redact", "secret redaction", "flash wear",
-  "token bucket", "rate limit", "batch flush".
+  "flash wear", "token bucket", "rate limit", "batch flush".
+- **Logging & Redaction**: "LogPipeline", "Redactor", "Redactor::instance", "registerSecret",
+  "ISanitizer", "sanitize", "redact", "secret redaction", "esp_log_set_vprintf",
+  "vprintf hook", "format buffer", "re-entrancy guard", "LogShim", "ESP_LOG".
 - **Security & credentials**: "DeviceCrypto", "KeyManager", "AuthManager", "JWT",
   "credential storage", "setInsecure", "SECURITY_VERSION", "anti-rollback",
   "private_key.pem".

@@ -15,6 +15,7 @@
 #ifdef WITH_AUDIT
 
 #include "AuditModule.hpp"
+#include "Redactor.h"
 #include "platform/LogShim.h"
 #include "MCPToolRegistry.hpp"
 #include "interfaces/IPreconditionRegistry.hpp"
@@ -61,10 +62,12 @@ AuditModule::~AuditModule() {
     }
 }
 
-bool AuditModule::begin() {
+bool AuditModule::begin(ISanitizer* sanitizer) {
     if (_started) {
         return true;
     }
+
+    _sanitizer = sanitizer ? sanitizer : static_cast<ISanitizer*>(&Redactor::instance());
 
     _bootId = esp_random();
     _maxFileSize = AUDIT_BUDGET_BYTES / 2;
@@ -391,9 +394,15 @@ bool AuditModule::enqueueInternal(const char* source, const char* action, const 
 
     // --- Step 5: Copy details and apply secret redaction ---
     if (details) {
+        // strncpy truncates silently. The sanitizer must be told, or a secret
+        // straddling the cut leaves an unmatchable prefix persisted to flash.
+        const bool truncated =
+            std::strlen(details) > sizeof(record->details) - 1;
         strncpy(record->details, details, sizeof(record->details) - 1);
         record->details[sizeof(record->details) - 1] = '\0';
-        Redactor::redact(record->details, sizeof(record->details));
+        if (_sanitizer) {
+            _sanitizer->sanitize(record->details, sizeof(record->details), truncated);
+        }
     } else {
         record->details[0] = '\0';
     }

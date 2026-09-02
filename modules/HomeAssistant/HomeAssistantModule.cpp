@@ -33,7 +33,6 @@
 #include "EventBus.hpp"
 
 #include "platform/LogShim.h"
-#include "Logger.hpp"
 
 static constexpr const char* TAG = "HomeAssistant";
 

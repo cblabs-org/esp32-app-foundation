@@ -13,7 +13,7 @@ Implements [`IWebContributor`](../interfaces/web-contributor.md), [`IMCPContribu
 - **Dedicated DRAM Writer Task**: An internal FreeRTOS task (`AuditWriter`, 3 KiB stack, priority 2) drains a shallow DRAM queue (`AUDIT_QUEUE_DEPTH = 16`) to decouple callers from flash I/O latency.
 - **Batch-Flush Durability**: The writer drains the queue and writes all records in a single `fopen(append)` → N × `fprintf` → `fflush` → `fclose` cycle. Records survive brownouts and hard faults without periodic flushing timers.
 - **Two-File Rotation**: Stored at `/littlefs/audit_0.jsonl` and `/littlefs/audit_1.jsonl`. Each file is bounded to `BOARD_AUDIT_BYTES / 2`. When the active file fills up, the older file is deleted and becomes the new active target.
-- **Automatic Secret Redaction**: All `details` strings are processed by `Redactor::redact()` before being committed to flash, preventing credentials, tokens, or passwords from leaking into audit storage.
+- **Automatic Secret Redaction**: All `details` strings are processed via `ISanitizer` (injected at `begin(ISanitizer* sanitizer)`, defaulting to `&Redactor::instance()`) before being committed to flash, preventing credentials, tokens, or passwords from leaking into audit storage.
 
 ---
 
@@ -212,9 +212,11 @@ Contributed via `IPreconditionContributor` with role `PreconditionRole::Operatio
 - **On timeout**: Returns `false` and increments `_dropCount`. However, the record **remains in the queue** and **will still be written to flash** by the writer task. The semaphore is cleaned up by the writer (no memory leak). The `false` return means "not confirmed within your deadline", not "record lost".
 - **On queue-full**: Returns `false` immediately (the record is deleted, not enqueued).
 
-### Redactor Thread-Safety Contract
+### Sanitizer & Redactor Thread Safety
 
-`Redactor::registerSecret()` must only be called during single-threaded initialization (`setup()`) before `begin()` returns. The internal `_secrets` vector has no mutex protection. Concurrent `registerSecret()` calls from background tasks will cause undefined behavior.
+`AuditModule` consumes the abstract `ISanitizer` interface (`include/interfaces/ISanitizer.hpp`) injected via `begin(ISanitizer* sanitizer)`. If `nullptr` is passed, it defaults to `&Redactor::instance()`.
+
+`Redactor` uses a fixed-capacity lock-free array (16 secrets max) with atomic count (`std::memory_order_acquire`) and writer spinlock protection. Runtime secret registration via `Redactor::instance().registerSecret()` is safe across threads. In-place redaction via `_sanitizer->sanitize(record->details, sizeof(record->details))` is zero-allocation and lock-free for readers.
 
 ---
 
@@ -260,6 +262,6 @@ If `log()` or `auditSync()` is called before `begin()` completes, the function r
 - ❌ **Logging high-frequency sensor readings as audit events**
   - *Problem*: Rapid writes quickly exhaust the 120/min rate limit and cause premature flash wear.
   - *Fix*: Audit logs are for administrative, operational, and security events. Use telemetry channels, display buffers, or debug logs for high-frequency measurements.
-- ❌ **Calling `Redactor::registerSecret()` from background tasks**
-  - *Problem*: The secret registry is a `std::vector` without mutex protection. Late registration races with concurrent `redact()` calls from the writer task.
-  - *Fix*: Register all secrets during `setup()` before `Application::begin()` returns.
+- ❌ **Hardcoding concrete `Redactor` in testable modules**
+  - *Problem*: Directly calling concrete `Redactor::instance()` makes unit testing difficult and violates the Dependency Inversion Principle (DIP).
+  - *Fix*: Accept `ISanitizer*` via dependency injection (e.g. `begin(ISanitizer* sanitizer)`), defaulting to `&Redactor::instance()`.

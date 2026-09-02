@@ -26,6 +26,10 @@
  */
 
 #include "Application.hpp"
+#include "Redactor.h"
+#include "LogPipeline.h"
+#include "CompositeSanitizer.h"
+#include "StructuralScrubber.h"
 #include "events/AppConfiguringPayload.hpp"
 #include "events/PreconditionHealthPayload.hpp"
 
@@ -98,6 +102,16 @@ bool Application::begin(const FrameworkConfig& config) {
     // --- Step 1: Boot banner ---
     // Print the firmware version so the first log line is always identifiable.
     ESP_LOGI(TAG, "ESP32 App Foundation v%s — booting", BUILD_VERSION);
+
+    // --- Step 1b: Install log pipeline ---
+    // Intercepts all ESP_LOG* output for global secret redaction.
+    // Must be early — all subsequent log output is redacted.
+    static CompositeSanitizer s_compositeSanitizer;
+    s_compositeSanitizer.add(&Redactor::instance());
+#if defined(CONFIG_LOG_MAXIMUM_LEVEL) && CONFIG_LOG_MAXIMUM_LEVEL >= 4
+    s_compositeSanitizer.add(&StructuralScrubber::instance());
+#endif
+    LogPipeline::begin(&s_compositeSanitizer, [](const char* str) -> int { return fputs(str, stdout); });
 
 #if defined(BOARD_HAS_PSRAM)
     // Runtime PSRAM initialization check (Issue #36)
@@ -196,7 +210,7 @@ bool Application::begin(const FrameworkConfig& config) {
     }
 
 #ifdef WITH_AUDIT
-    auditModule.begin();
+    auditModule.begin(&Redactor::instance());
     registerModule(&auditModule);
 #endif
 

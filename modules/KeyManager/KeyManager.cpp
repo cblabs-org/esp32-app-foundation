@@ -11,7 +11,7 @@
  */
 
 #include "KeyManager.hpp"
-#include "Logger.hpp"
+#include "Redactor.h"
 #include "MCPToolRegistry.hpp"
 #include <fstream>
 #include <sstream>
@@ -165,7 +165,13 @@ std::string KeyManager::getKeyById(const char* id) const {
     }
 
     std::string result(decrypted.get(), outLen);
-    Logger::registerSecret(std::string(result.c_str()));
+    // A Full or TooLong result means this key will NOT be redacted from logs.
+    const auto redaction = Redactor::instance().registerSecret(std::string(result.c_str()));
+    if (redaction == Redactor::RegisterResult::Full ||
+        redaction == Redactor::RegisterResult::TooLong) {
+        ESP_LOGE(TAG, "Key '%s' will NOT be redacted from logs: %s",
+                 id, Redactor::describe(redaction));
+    }
     return result;
 }
 
