@@ -17,7 +17,7 @@
  */
 
 #pragma once
-#include "interfaces/ILVGLHardwareAdapter.hpp"
+#include "../../modules/LVGLDisplay/ILVGLHardwareAdapter.hpp"
 #include <LovyanGFX.hpp>
 #include <atomic>
 

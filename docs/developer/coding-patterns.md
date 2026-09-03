@@ -497,6 +497,20 @@ void setup() {
 
 ---
 
+## 7. std::function — When It's Permitted
+
+The framework strictly avoids `std::function` for high-frequency paths (like the EventBus) to prevent heap fragmentation (see Anti-Pattern 3). However, `std::function` is permitted for **one-shot, boot-or-user-initiated job submission and lifecycle hooks**. It is excluded from tick paths and per-event dispatch.
+
+There are exactly four sanctioned sites where `std::function` is permitted:
+1. `DataManager::queueDataJob()` (`DataManager.hpp` — public consumer API for job submission)
+2. `OTAUpdateManager::setPreRebootHook()` (`OTAUpdateManager.hpp` — one-shot lifecycle hook)
+3. `DeepStackExecutor::run()` (`lib/DeepStackExecutor/DeepStackExecutor.h` — one-shot task submission)
+4. `DisplayServiceHelper` (`lib/DisplayServiceHelper/DisplayServiceHelper.h` — including a defaulted lambda member)
+
+As a counter-example, the `MCPToolRegistry` (`MCPToolRegistry.hpp`) explicitly avoids `std::function` for tool handlers because tools can be invoked frequently over the lifetime of the application, opting instead for static function pointers with a context argument.
+
+---
+
 ## See Also
 
 - [Architecture Overview](architecture-overview.md) — 3-tier model and lifecycle

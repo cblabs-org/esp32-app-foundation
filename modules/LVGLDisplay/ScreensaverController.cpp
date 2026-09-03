@@ -10,7 +10,7 @@
  */
 
 #include "ScreensaverController.hpp"
-#include "interfaces/ILVGLHardwareAdapter.hpp"
+#include "ILVGLHardwareAdapter.hpp"
 #include "EventBus.hpp"
 #include "LVGLDisplayModule.hpp"
 

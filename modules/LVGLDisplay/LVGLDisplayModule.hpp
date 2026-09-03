@@ -61,7 +61,7 @@
 #include "interfaces/IWebContributor.hpp"
 #include "interfaces/IMCPContributor.hpp"
 #include "interfaces/IDisplayModule.hpp"
-#include "interfaces/ILVGLHardwareAdapter.hpp"
+#include "ILVGLHardwareAdapter.hpp"
 #include <types/BootBranding.h>
 #include "assets/boot_logo.h"
 #include "screens/FaultScreen.hpp"
