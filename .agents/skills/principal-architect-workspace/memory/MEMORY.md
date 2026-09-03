@@ -9,7 +9,7 @@
 ## Active Projects
 | Project | Status | Modules | Context |
 |---|---|---|---|
-| pr-spec-v2 | WO1/6 — in progress | docs/design_specification.md, include/interfaces/, include/AppFoundation.h, modules/MCPServer/, CHANGELOG.md, scripts/ | [PROJECT.md](../pr-spec-v2/PROJECT.md) |
+| pr-spec-v2 | WO6/6 — COMPLETE, PR #224 staged | docs/design_specification.md, include/interfaces/, include/AppFoundation.h, modules/MCPServer/, CHANGELOG.md, scripts/ | [PROJECT.md](../pr-spec-v2/PROJECT.md) |
 | pr-drayton-consumer-fixes | WO5/5 — COMPLETE, soak-tested | DataManager, IDataSource, FetchContext, AppFoundation.h, WeatherModule, framework-expert skill | [PROJECT.md](../pr-drayton-consumer-fixes/PROJECT.md) |
 | pr-128-datamanager-resilience | WO7/7 (WO6 re-plan gated) | DataManager, IDataSource, FetchContext, Application, MCPServer, Display, Portal | [PROJECT.md](../pr-128-datamanager-resilience/PROJECT.md) |
 
