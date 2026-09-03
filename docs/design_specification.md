@@ -159,8 +159,8 @@ functionally indistinguishable from static allocation in terms of heap health.
 
 The framework uses a **two-tier vector model**:
 
-- **Structural arrays** (`ITickable*`, `IDisplayBoard*`, `iDataSource*`,
-  `IMcpContributor*`) — built with `std::vector` during `begin()` or a controlled
+- **Structural arrays** (`ITickable*`, `IDisplayBoard*`, `IDataSource*`,
+  `IMCPContributor*`) — built with `std::vector` during `begin()` or a controlled
   soft-reset sequence, then `shrink_to_fit()` is called to release over-allocated
   capacity. These arrays are **never mutated during `tick()` steady-state**. Any
   structural change (e.g. adding a display board) requires a soft-reset.
@@ -209,7 +209,7 @@ a Linux-inspired layout so that file ownership is immediately self-evident:
 ├── app/                   ← Application owned files
 │   └── <appname>.json     ← App-specific config
 └── www/                   ← Web portal LittleFS-served assets
-    └── <appname>/         ← App tab fragments (served by ESPAsyncWebServer)
+    └── <appname>/         ← App tab fragments (served by PsychicHttpServer)
         ├── station.html   ← App tab content fragment
         └── station.js     ← App tab logic
 ```
@@ -224,16 +224,16 @@ a Linux-inspired layout so that file ownership is immediately self-evident:
 
 ### 2.8 Native Build Portability
 
-> 📖 See [Build System](developer/build-system.md#native-environment) and [Creating a Module § NATIVE_BUILD Compilation Guards](developer/creating-a-module.md#native_build-compilation-guards) for guard patterns.
+> 📖 See [Build System](developer/build-system.md#native-environment) and [Creating a Module § Native Build Compilation Guards](developer/creating-a-module.md#native_build-compilation-guards) for guard patterns.
 
 All framework code must compile on both ESP32 hardware targets and host CPU
 (x86_64/arm64) for native GoogleTest execution. This is a non-negotiable
 cross-cutting concern that affects every module.
 
 - Hardware-specific APIs (`esp_restart()`, `LittleFS`, `WiFi.h`, free heap queries)
-  are wrapped in `#ifndef NATIVE_BUILD` preprocessor guards
+  are wrapped in `#ifdef ESP_PLATFORM` preprocessor guards (or platform stubs)
 - Interface headers use forward declarations for external library types
-  (e.g., `class U8G2;`, `class AsyncWebServer;`) — never `#include` heavy
+  (e.g., `class U8G2;`, `class PsychicHttpServer;`) — never `#include` heavy
   hardware-dependent headers
 - Widget and board `render()` methods are no-ops on native; logic-only paths
   (tick, state machines, scheduling) are fully testable
@@ -243,7 +243,7 @@ cross-cutting concern that affects every module.
 > **Critical LDF constraint:** PlatformIO's Library Dependency Finder (LDF)
 > scans `#include` directives as **text patterns** regardless of `#ifdef`
 > preprocessor guards. A conditional `#include "Application.hpp"` inside
-> `#ifndef NATIVE_BUILD` will still trigger LDF to resolve and compile the
+> `#ifdef ESP_PLATFORM` will still trigger LDF to resolve and compile the
 > entire dependency chain. Always forward-declare in headers.
 
 ### 2.9 No Monolithic Services
@@ -273,22 +273,23 @@ multiple concerns into a single "systemManager" is explicitly prohibited.
                         │  registers via extension points
 ┌───────────────────────▼─────────────────────────────────┐
 │                 OPTIONAL MODULE CATALOG                  │
-│  U8G2 Display Module  │  MQTT Module                    │
-│  TFT Display Module   │  HomeAssistant Module           │
-│  Weather Client       │  RSS Client                     │
-│  Scheduler            │  boardLED                       │
-│  buttonHandler        │  (future modules...)            │
+│  U8G2Display Module   │  LVGLDisplay Module             │
+│  ButtonModule         │  EncoderModule                  │
+│  HomeAssistant Module │  AuditModule (WITH_AUDIT)       │
+│  (app-specific & future modules...)                     │
 └───────────────────────┬─────────────────────────────────┘
                         │  uses framework interfaces
 ┌───────────────────────▼─────────────────────────────────┐
 │                  FRAMEWORK KERNEL                        │
-│  Application (DI hub) │  configManager                  │
-│  keyManager           │  dataManager + iDataSource      │
-│  wifiManager          │  otaUpdateManager               │
-│  webServer            │  timeManager                    │
-│  deviceCrypto         │  EventBus                       │
-│  mcpServer            │  LogPipeline (vprintf pipeline) │
-│  githubClient         │  md5Utils                       │
+│  Application (DI hub) │  ConfigManager                  │
+│  KeyManager           │  DataManager + IDataSource      │
+│  WifiManager          │  OTAUpdateManager               │
+│  WebServer            │  TimeManager                    │
+│  DeviceCrypto         │  EventBus                       │
+│  MCPServer            │  PreconditionEngine             │
+│  AuthManager          │  DisplayServiceHelper           │
+│  LogPipeline          │  Redactor (ISanitizer)          │
+│  MD5Utils             │  OTACerts / DeepStackExecutor   │
 └─────────────────────────────────────────────────────────┘
 │            PlatformIO / Arduino + ESP-IDF               │
 └─────────────────────────────────────────────────────────┘
@@ -304,22 +305,36 @@ under `modules/`. Apps consume the framework via git submodule.
 
 `Application` is the single composition root and the central name for the framework's
 DI hub. It:
-- Owns all kernel services as member variables (deterministic lifetime, avoids heap):
-  - `EventBus _eventBus`
-  - `DataManager _dataManager`
-  - `WebServerManager _webServerManager`
-  - `McpServer _mcpServer`
-  - `NullStatusReporter _nullReporter` (private nested class)
-- Exposes kernel services via reference getter methods (DI injection points)
+- Owns all kernel and domain services as member variables (deterministic lifetime, avoids heap allocation):
+  - Infrastructure Services:
+    - `ConfigManager _configManager` (centralised LittleFS JSON config gateway)
+    - `DataManager _dataManager` (background `IDataSource` worker task)
+    - `EventBus _eventBus` (synchronous pub/sub event broker)
+    - `PreconditionEngine _preconditionEngine` (readiness evaluation, damping, circuit breaking)
+    - `WebServerManager _webServerManager` (PsychicHttpServer portal and REST API)
+  - Core Domain Services:
+    - `WifiManager _wifiManager` (WiFi STA state machine and captive portal AP)
+    - `WifiPreconditionContributor _wifiPrecondition` (built-in WiFi readiness contributor)
+    - `KeyManager _keyManager` (encrypted API key and credential store)
+    - `AuthManager _authManager` (portal authentication and MCP access control)
+    - `DeviceCrypto _deviceCrypto` (hardware-backed AES-256 encryption)
+  - Display and Status Adapters:
+    - `NullStatusReporter _nullReporter` (fallback status reporter)
+    - `IStatusReporter* _statusReporter` (display adapter for boot status)
+    - `IBootReporter* _bootReporter` (display adapter for early hardware init)
+- Exposes kernel services via reference getter methods (DI injection points: `getConfigManager()`,
+  `getDataManager()`, `getEventBus()`, `getPreconditionEngine()`, `getWebServerManager()`,
+  `getWifiManager()`, `getKeyManager()`, `getAuthManager()`, etc.)
 - Maintains registration lists for tickables, config consumers, data sources,
-  web contributors, and MCP contributors
-- Owns and drives the `AppState` state machine
-- Dispatches `begin()` and `tick()` to all registered components in the correct order
+  web contributors, and MCP contributors via the two-tier vector model
+- Owns and drives the bidirectional `AppState` state machine (`Boot` → `Configuring` ↔ `Running`)
+- Dispatches `begin()` and `tick()` to all registered components in registration order, monitoring
+  execution duration against each module's declared tick budget
 - Provides `softReset()` for structural changes at runtime
 
 `Application` is instantiated as a **file-scope static** in `src/main.cpp` — never
 stack-allocated, never a singleton via `getInstance()`. Application code receives
-an `Application*` pointer at setup and uses it to access services — it never
+an `Application*` pointer (or references the static instance) at setup and uses it to access services — it never
 constructs kernel services directly.
 
 ### 3.3 Entry Point Contract
@@ -338,9 +353,18 @@ void setup() { app.begin(); }
 void loop()  { app.tick();  }
 ```
 
-`AppFoundation.h` is the **canonical single-include façade** — it includes all
-framework interface headers. Downstream consumers should only include this file.
+`AppFoundation.h` is the **canonical single-include façade** — it transitively includes:
+- Version metadata (`build_version.h`)
+- Framework lifecycle and configuration types (`AppState.hpp`, `FrameworkConfig.hpp`, `FetchContext.hpp`)
+- All 14 framework interfaces:
+  `ITickable`, `IConfigurable`, `IDataSource`, `IStatusReporter`, `ITabRegistry`,
+  `IWebContributor`, `IMCPContributor`, `IPrecondition`, `IPreconditionRegistry`,
+  `IPreconditionContributor`, `IOTAVerifier`, `ISanitizer`, `IBootReporter`, `IDisplayModule`
+- EventBus payloads: `DataSourceHealthPayload`, `PreconditionHealthPayload`, `AppConfiguringPayload`
+- Concrete Application hub headers (`Application.hpp`, `TimeManager.hpp`) under `#ifdef ESP_PLATFORM` guards
+  (target builds only; host-native test builds omit platform-specific headers and compile against stubs)
 
+Downstream consumers should only include `AppFoundation.h`.
 `MyApp` instantiates its modules and registers them with the `Application` hub
 inside `begin()`.
 
@@ -356,38 +380,43 @@ The kernel is always present. No app can opt out of kernel services.
 
 | Component | Purpose | Source |
 |---|---|---|
-| `Application` | DI hub, orchestrator, AppState owner | `modules/application/` |
-| `configManager` | LittleFS JSON config persistence with schema versioning | `modules/configManager/` |
-| `keyManager` | Encrypted API key/credential registry (uses DeviceCrypto) | `modules/keyManager/` |
-| `dataManager` | Background data-source scheduler (FreeRTOS task) | `modules/dataManager/` |
-| `wifiManager` | WiFi connection + captive portal AP mode | `modules/wifiManager/` |
-| `webServer` | ESPAsyncWebServer, base portal routes, `IWebContributor` dispatch | `modules/webServer/` |
-| `otaUpdateManager` | GitHub-based OTA firmware updates with rollback | `modules/otaUpdateManager/` |
-| `timeManager` | Non-blocking NTP sync, POSIX timezone management | `modules/timeManager/` |
-| `EventBus` | Synchronous publish/subscribe with static fn-ptr callbacks | `modules/eventBus/` |
-| `mcpServer` | JSON-RPC MCP server (Serial + HTTP transport) | `modules/mcpServer/` |
-| `deviceCrypto` | Hardware-backed key derivation & AES-256 encryption | `lib/deviceCrypto/` |
-| `LogPipeline` | Global log interception pipeline (vprintf hook + secret redaction) | `lib/LogPipeline/` |
-| `Redactor` | Singleton secret registry with zero-allocation in-place redaction. Implements `ISanitizer`. | `lib/Redactor/` |
+| `Application` | DI hub, orchestrator, AppState lifecycle owner, two-tier module registry | `modules/Application/` |
+| `ConfigManager` | LittleFS JSON config persistence gateway with schema versioning & migrations (`/mod/<ns>.json`) | `modules/ConfigManager/` |
+| `KeyManager` | Encrypted API key and credential registry (uses DeviceCrypto) | `modules/KeyManager/` |
+| `AuthManager` | Web portal session authentication, MCP authorization, and credential management | `modules/AuthManager/` |
+| `DataManager` | Background `IDataSource` worker task (Core 0), health tracking, backoff & quarantine | `modules/DataManager/` |
+| `WifiManager` | WiFi station state machine + captive portal AP mode fallback | `modules/WifiManager/` |
+| `WebServer` | PsychicHttpServer wrapper, base portal routes, `IWebContributor` route & tab dispatch | `modules/WebServer/` |
+| `MCPServer` | JSON-RPC MCP server (Serial + HTTP SSE/POST) with `IMCPContributor` tool registry | `modules/MCPServer/` |
+| `OTAUpdateManager` | Manifest-first OTA firmware updates with dual-partition rollback and cryptographic verification | `modules/OTAUpdateManager/` |
+| `TimeManager` | Non-blocking NTP synchronization, POSIX timezone management | `modules/TimeManager/` |
+| `EventBus` | Synchronous publish/subscribe event broker with type-safe payloads | `modules/EventBus/` |
+| `PreconditionEngine` | Precondition evaluation, damping, circuit breaker, and state machine gating | `modules/PreconditionEngine/` |
+| `AuditModule` | Tamper-evident structured audit logging with flash wear-levelled ring buffer (`WITH_AUDIT`) | `modules/AuditModule/` |
+| `DeviceCrypto` | Hardware-backed key derivation & AES-256 encryption via ESP32 crypto hardware | `lib/DeviceCrypto/` |
+| `DisplayServiceHelper` | Shared REST endpoints and MCP tools for any `IDisplayModule` implementation | `lib/DisplayServiceHelper/` |
+| `DeepStackExecutor` | Task stack overflow protection helper for deep recursion/call stacks | `lib/DeepStackExecutor/` |
+| `OTACerts` | Built-in root CA certificate bundles for OTA HTTPS downloads | `lib/OTACerts/` |
+| `PngWriter` | High-performance framebuffer-to-PNG stream encoder | `lib/PngWriter/` |
+| `LogPipeline` | Global log interception pipeline (`vprintf` hook + secret redaction) | `lib/LogPipeline/` |
+| `Redactor` | Singleton secret registry with zero-allocation in-place redaction (implements `ISanitizer`) | `lib/Redactor/` |
 | `LogShim.h` | Unified logging shim — bridges ESP-IDF `esp_log.h` to native `printf` stubs | `include/platform/` |
-| `githubClient` | HTTPS GitHub API client (used by OTA) | `lib/githubClient/` |
-| `md5Utils` | Streaming MD5 hashing via MbedTLS (incremental, not full-file) | `lib/md5Utils/` |
+| `MD5Utils` | Streaming MD5 hashing via MbedTLS (incremental, not full-file) | `lib/MD5Utils/` |
 
-### 4.2 Kernel Configuration
+### 4.2 Kernel Configuration (`FrameworkConfig`)
 
-The kernel's config schema (`FrameworkConfig`) covers only cross-cutting concerns:
+The kernel's boot-phase configuration struct (`FrameworkConfig`, defined in `include/types/FrameworkConfig.hpp`) covers cross-cutting startup parameters and OTA credentials:
 
+```cpp
+struct FrameworkConfig {
+    const char* otaPublicKey                = nullptr;  ///< PEM-encoded RSA public key for OTA signature verification (nullptr = skip)
+    const char* otaManifestUrl              = nullptr;  ///< Compiled-in manifest URL — unkillable fallback for manifest-first OTA
+    const char* otaToken                    = nullptr;  ///< Optional bearer token for authenticated manifest/asset downloads
+    uint16_t    configuringPublishIntervalMs = 0;        ///< Gate re-publish throttle in CONFIGURING phase (0 = default 500ms)
+};
 ```
-otaPublicKey            — PEM-encoded RSA public key for OTA signature verification
-otaGithubRepo           — GitHub repository ("owner/repo") for OTA releases
-otaGithubToken          — Optional GitHub PAT for private repos
-```
 
-`FrameworkConfig` is passed to `Application::begin(config)` and now carries only
-compile-time OTA secrets. All runtime/module defaults that previously lived here
-(`hostname`, `timezone`, `mcpReadOnly`, `firmwareUpdatesEnabled`) are now factory
-defaults owned by their respective modules' `resetConfig()` and persisted in
-their own config files — see each module's IConfigurable section.
+`FrameworkConfig` is passed to `Application::begin(config)` and carries only compile-time OTA secrets and startup throttling. All runtime/module configurations that previously lived in monolithic settings (`hostname`, `timezone`, `mcpReadOnly`, `firmwareUpdatesEnabled`) are now factory defaults owned by their respective modules' `resetConfig()` and persisted in their own files under `/mod/<namespace>.json` via the `IConfigurable` interface. For example, the OTA enable/disable toggle is persisted in `/mod/ota.json` as `updatesEnabled` by `OTAUpdateManager`.
 
 > **Required downstream build flag:** Apps must define `APP_FOUNDATION_VERSION`
 > in their `platformio.ini` `build_flags` (e.g., `-DAPP_FOUNDATION_VERSION=\"0.1.0\"`).
@@ -403,13 +432,14 @@ their own config files — see each module's IConfigurable section.
 
 > 📖 See [Creating a Module](developer/creating-a-module.md) for the step-by-step implementation tutorial.
 
-A module is an optional unit of functionality that:
-1. Implements one or more framework interfaces (`ITickable`, `iConfigurable`,
-   `iDataSource`, `IStatusReporter`, `IWebContributor`, `IMcpContributor`)
-2. Self-registers with `Application` during app setup
-3. Manages its own configuration file on LittleFS under `/mod/`
-4. Registers its own web portal routes (if it has a UI)
-5. **Never directly `#include`s another optional module**
+A module is a cohesive unit of functionality that:
+1. Implements one or more framework interfaces (`ITickable`, `IConfigurable`,
+   `IDataSource`, `IStatusReporter`, `IBootReporter`, `IDisplayModule`,
+   `IWebContributor`, `IMCPContributor`, `IPreconditionContributor`)
+2. Self-registers with `Application` during app setup (preferring `app.registerModule(&module)`)
+3. Manages its own configuration persistence via `ConfigManager` under `/mod/<namespace>.json` (never touching LittleFS directly)
+4. Registers its own web portal routes and navigation tabs (via `IWebContributor` and `ITabRegistry`)
+5. **Never directly `#include`s another optional module** (decoupling via interfaces and `EventBus`)
 
 ### 5.2 Module Catalog
 
@@ -417,21 +447,24 @@ All modules live under `modules/` in the monorepo alongside kernel modules.
 
 | Module | Interfaces | Config File | Notes |
 |---|---|---|---|
-| `u8g2Display` | `ITickable`, `IStatusReporter`, `IConfigurable` | ConfigManager (`display`) | Monochrome OLED/LCD + widget toolkit |
-| `LVGLDisplay` | `ITickable`, `IConfigurable`, `IStatusReporter`, `IWebContributor`, `IMCPContributor` | ConfigManager (`display`) | Full-colour TFT using LVGL v9.5 + pluggable `ILVGLHardwareAdapter` (see [Design Spec](lvgl-display-design.md)) |
-| `mqtt-client` | `ITickable`, `IConfigurable` | `/mod/mqtt.json` | (future) |
-| `homeassistant` | `ITickable`, `iConfigurable` | `/mod/ha.json` | (future) |
-| `weather-client` | `iDataSource`, `iConfigurable` | `/mod/weather.json` | (future) |
-| `rss-client` | `iDataSource`, `iConfigurable` | `/mod/rss.json` | (future) |
-| `scheduler` | `ITickable`, `iConfigurable` | `/mod/scheduler.json` | Generic time-based callback scheduler |
-| `boardLED` | `ITickable` | — | Optional: device has a status LED |
-| `buttonHandler` | `ITickable` | — | Optional: device has a physical button |
-
-> **On `scheduler`**: The kernel does not include a scheduler. An optional `scheduler`
-> module provides a generic time-based callback mechanism (`schedule.at(hour, min, fn)`,
-> `schedule.every(ms, fn)`). App-specific logic such as "show board X between 08:00
-> and 18:00" is implemented by the app using this module — the module itself has no
-> concept of display boards or carousel routing.
+| `Application` | DI hub / Kernel | `/etc/config.json` | Core composition root and lifecycle coordinator |
+| `AuditModule` | `ITickable`, `IConfigurable`, `IWebContributor`, `IMCPContributor`, `IPreconditionContributor` | ConfigManager (`audit`) | Tamper-evident audit trail with flash wear-levelled ring buffer (`WITH_AUDIT`) |
+| `AuthManager` | `IConfigurable`, `IWebContributor`, `IMCPContributor` | ConfigManager (`auth`) | Portal passwords, JWT sessions, and MCP tool access control |
+| `ButtonModule` | `ITickable` | — | Physical pushbutton debouncing and EventBus event dispatch (replaces legacy `buttonHandler`) |
+| `ConfigManager` | `IWebContributor` | Gateway owner | Centralised LittleFS JSON configuration persistence and schema migrations |
+| `DataManager` | `ITickable`, `IWebContributor`, `IMCPContributor` | — | Background `IDataSource` worker task (Core 0), health monitoring, and quarantine |
+| `EncoderModule` | `ITickable` | — | Rotary encoder pulse tracking and click events |
+| `EventBus` | Kernel service | — | Synchronous pub/sub event broker |
+| `HomeAssistant` | `ITickable`, `IConfigurable`, `IWebContributor`, `IMCPContributor`, `IPreconditionContributor` | ConfigManager (`ha`) | MQTT auto-discovery and entity state management (`IHaEntity`) |
+| `KeyManager` | `IWebContributor`, `IMCPContributor` | `/etc/apikeys.json` | Encrypted credential and API key storage (uses DeviceCrypto) |
+| `LVGLDisplay` | `ITickable`, `IConfigurable`, `IDisplayModule` (`IBootReporter`, `IStatusReporter`), `IWebContributor`, `IMCPContributor`, `IPreconditionContributor` | ConfigManager (`display`) | Full-colour TFT display via LVGL v9.5 + `ILVGLHardwareAdapter` |
+| `MCPServer` | `ITickable`, `IWebContributor` | ConfigManager (`mcp`) | Model Context Protocol server exposing registered tools to AI agents |
+| `OTAUpdateManager` | `ITickable`, `IConfigurable`, `IWebContributor`, `IMCPContributor`, `IPreconditionContributor` | ConfigManager (`ota`) | Manifest-first OTA updates with dual-partition rollback and cryptographic verification |
+| `PreconditionEngine` | `ITickable`, `IWebContributor`, `IMCPContributor`, `IPreconditionRegistry` | — | Precondition evaluation, damping, circuit breaker, and state machine gating |
+| `TimeManager` | `ITickable`, `IConfigurable`, `IWebContributor`, `IMCPContributor`, `IPreconditionContributor` | ConfigManager (`time`) | Non-blocking NTP synchronization and POSIX timezone management |
+| `U8G2Display` | `ITickable`, `IConfigurable`, `IDisplayModule` (`IBootReporter`, `IStatusReporter`), `IWebContributor`, `IMCPContributor`, `IPreconditionContributor` | ConfigManager (`display`) | Monochrome OLED/LCD display module with carousel engine (`IDisplayBoard`) |
+| `WebServer` | `ITickable` | ConfigManager (`web`) | PsychicHttpServer-backed portal, REST API dispatch, tab registry |
+| `WifiManager` | `ITickable`, `IConfigurable`, `IWebContributor`, `IMCPContributor` | ConfigManager (`wifi`) | WiFi STA connection state machine and captive portal AP |
 
 ### 5.3 Adding a Module to an App
 
@@ -457,7 +490,7 @@ lib_deps =
     framework/                  ; local submodule path
     olikraus/U8g2@2.36.18
     bblanchon/ArduinoJson@7.4.3
-    ESP32Async/ESPAsyncWebServer
+    https://github.com/hoeken/PsychicHttp.git#v1.2.1
 extra_scripts =
     pre:framework/scripts/build_timestamp.py
 ```
@@ -467,19 +500,47 @@ extra_scripts =
 > explicit `lib_deps` instead.
 
 In app setup:
+
+The framework provides a unified registration template `app.registerModule(&module)` (added in PR-25)
+that uses compile-time type introspection (`if constexpr` and `std::is_base_of_v`) to auto-detect
+all interfaces implemented by the concrete type and wire them into their respective subsystems:
+
 ```cpp
 #include <AppFoundation.h>
-#include <u8g2DisplayModule.hpp>
-#include <boardLED.hpp>
+#include <U8G2DisplayModule.hpp>
+#include <ButtonModule.hpp>
 
 static U8G2DisplayModule display;
-static BoardLED statusLed;
+static ButtonModule button(0); // GPIO 0
 
 void MyApp::begin() {
-    app.registerTickable(&display);
-    app.registerTickable(&statusLed);
-    app.registerConfigConsumer(&display);
+    // Primary pattern: unified auto-detecting registration
+    app.registerModule(&display);
+    app.registerModule(&button);
 }
+```
+
+The unified `registerModule()` method automatically checks and registers:
+- `ITickable` → `registerTickable(module)`
+- `IConfigurable` → `registerConfigurable(module)`
+- `IWebContributor` → `registerWebContributor(module)`
+- `IMCPContributor` → `registerMcpContributor(module)`
+- `IDataSource` → `registerDataSource(module)`
+- `IStatusReporter` → `registerStatusReporter(module)`
+- `IBootReporter` → `registerBootReporter(module)`
+- `IPreconditionContributor` → `module->registerPreconditions(_preconditionEngine)`
+
+Granular per-interface registration methods remain available as secondary options for
+scenarios requiring explicit control or partial registration:
+
+```cpp
+// Secondary pattern: granular per-interface registration
+app.registerTickable(&display);
+app.registerConfigurable(&display);
+app.registerStatusReporter(&display);
+app.registerBootReporter(&display);
+app.registerWebContributor(&display);
+app.registerMcpContributor(&display);
 ```
 
 ---
@@ -488,139 +549,535 @@ void MyApp::begin() {
 
 > 📖 **Developer Guide:** [Creating a Module](developer/creating-a-module.md) — interface catalog and implementation examples.
 
-All interfaces live in the framework kernel under `include/interfaces/` and are the
-only cross-tier dependency.
+All framework interfaces live under `include/interfaces/` and represent the formal contracts
+governing the system's extension points.
 
 ### 6.1 Interface Naming Convention
 
-The framework uses a mixed naming convention inherited from the reference application:
+All framework interfaces strictly adhere to **PascalCase with an `I` prefix**:
+- `ITickable`, `IConfigurable`, `IDataSource`, `IStatusReporter`
+- `IBootReporter`, `IDisplayModule`, `IWebContributor`, `ITabRegistry`
+- `IMCPContributor`, `IPreconditionContributor`, `IPreconditionRegistry`
+- `IPrecondition`, `ISanitizer`, `IOTAVerifier`
 
-- **PascalCase `I` prefix**: `ITickable`, `IStatusReporter`, `IWebContributor`,
-  `IDisplayBoard`, `IMcpContributor`
-- **camelCase `i` prefix**: `iConfigurable`, `iDataSource`
+Interface names are consistently uppercase-`I` prefixed across all kernel subsystems, modules, and extension points.
 
-All interfaces are **pure abstract classes** with only pure virtual methods and
-`virtual ~IFoo() = default;`. Interface headers MUST forward-declare external
-library types (e.g., `class U8G2;`, `class AsyncWebServer;`) — never `#include`
-them. This is required for native build portability.
+All kernel interfaces are abstract base classes with pure virtual methods (or safe default implementations where documented) and a virtual default destructor (`virtual ~IFoo() = default;`). Interface headers forward-declare external types (such as `class PsychicHttpServer;` or `class U8G2;`) to maintain strict separation and enable native host compilation without platform-specific dependencies.
 
 ### 6.2 `ITickable`
 
-> 📖 See [Creating a Module § The Tick Loop](developer/creating-a-module.md#3-implementing-the-module-logic) for implementation tutorial.
+> 📖 See [Creating a Module § The Tick Loop](developer/creating-a-module.md#3-implementing-the-module-logic) and [Tickable Interface Doc](../.agents/skills/framework-expert/interfaces/tickable.md).
+
+Defined in `include/interfaces/ITickable.hpp`. Contract for components participating in the cooperative main-thread update loop.
 
 ```cpp
 class ITickable {
 public:
-    virtual void tick(uint32_t currentMillis) = 0;
     virtual ~ITickable() = default;
+
+    /**
+     * @brief Periodic update hook called by the Application hub on every loop iteration.
+     * @param currentMillis Milliseconds since boot, captured once per Application::tick() loop.
+     */
+    virtual void tick(uint32_t currentMillis) = 0;
+
+    /**
+     * @brief Per-module tick budget in milliseconds (ADR-17).
+     * @return Maximum expected tick duration in milliseconds (default: 10ms).
+     */
+    virtual uint32_t getTickBudgetMs() const { return 10; }
 };
 ```
 
-Registered via `app.registerTickable(ITickable*)`. Called every `loop()`.
-Modules use this for polling, state transitions, and heartbeat operations.
+Registered via `app.registerModule(&module)` or `app.registerTickable(ITickable*)`.
 
-### 6.3 `iConfigurable`
+**Performance Contract (ADR-17):**
+`tick()` executes synchronously on Core 1 in the main loop. Implementations MUST complete within their declared budget (default: 10ms). Long I/O, network operations, or blocking sleeps MUST be deferred to dedicated FreeRTOS tasks (such as `DataManager` for background fetches). The `Application` hub monitors tick durations and emits warnings when a module exceeds its declared budget. Display modules or components with inherently heavier draw loops may override `getTickBudgetMs()` to declare higher limits.
 
-> 📖 See [Configuration System § The IConfigurable Interface](developer/config-system.md#2-the-iconfigurable-interface) for the full method contract.
+### 6.3 `IConfigurable`
+
+> 📖 See [Configuration System § The IConfigurable Interface](developer/config-system.md#2-the-iconfigurable-interface) and [Configurable Interface Doc](../.agents/skills/framework-expert/interfaces/configurable.md).
+
+Defined in `include/interfaces/IConfigurable.hpp`. Contract for modules participating in the centralised configuration gateway managed by `ConfigManager`.
 
 ```cpp
-class iConfigurable {
+class IConfigurable {
 public:
-    virtual void reapplyConfig(const FrameworkConfig& config) = 0;
-    virtual ~iConfigurable() = default;
+    virtual ~IConfigurable() = default;
+
+    virtual const char* getConfigNamespace() const = 0;
+    virtual int getSchemaVersion() const = 0;
+    virtual void applyConfig(const JsonObject& section) = 0;
+    virtual void serializeConfig(JsonObject& section) const = 0;
+    virtual bool migrateConfig(JsonObject& section, int fromVersion) { return true; }
+    virtual void resetConfig() = 0;
 };
 ```
 
-Registered via `app.registerConfigConsumer(iConfigurable*)`. Called on
-boot after config load and after any web portal config update.
+Registered via `app.registerModule(&module)` or `app.registerConfigurable(IConfigurable*)`.
 
-### 6.4 `iDataSource`
+**ConfigManager-as-Gateway Pattern:**
+Modules **never touch LittleFS directly** for configuration persistence. `ConfigManager` owns all configuration file I/O under `/mod/<namespace>.json`, enforcing transactional writes (write-to-temp then atomic rename) and schema integrity.
 
-> 📖 See [Scheduling Data Fetches § The IDataSource Interface](developer/scheduling-data-fetches.md#1-the-idatasource-interface) for method signatures and scheduling tiers.
+- **`getConfigNamespace()`**: Returns a unique compile-time string literal (e.g. `"wifi"`, `"display"`, `"ota"`). Determines file location at `/mod/<namespace>.json`.
+- **`getSchemaVersion()`**: Returns the integer schema version (starting at 1). Incremented when configuration key structures change.
+- **`applyConfig(const JsonObject& section)`**: Deserializes configuration into internal state during boot (`beginAll()`) or portal configuration imports. The JSON object is guaranteed to be complete.
+- **`serializeConfig(JsonObject& section)`**: Serializes current configuration state into the JSON object. `ConfigManager` injects the metadata field `_v` automatically.
+- **`migrateConfig(JsonObject& section, int fromVersion)`**: Invoked when stored `_v` is older than `getSchemaVersion()`. Modules modify the JSON object in-place (renaming keys, adding new defaults). Returning `true` persists the migrated format; `false` falls back to defaults.
+- **`resetConfig()`**: Resets all module settings to hardcoded factory defaults. Called before factory resets or when configuration files are missing or corrupt.
+
+### 6.4 `IDataSource`
+
+> 📖 See [Scheduling Data Fetches § The IDataSource Interface](developer/scheduling-data-fetches.md#1-the-idatasource-interface) and [Data Source Interface Doc](../.agents/skills/framework-expert/interfaces/data-source.md).
+
+Defined in `include/interfaces/IDataSource.hpp`. Contract for background data-fetching workers scheduled by `DataManager`.
 
 ```cpp
-class iDataSource {
+class IDataSource {
 public:
-    virtual UpdateStatus updateData() = 0;
-    virtual void executeFetch() = 0;
-    virtual uint32_t getNextFetchTime() = 0;
-    virtual PriorityTier getPriorityTier() = 0;
-    // ... (full interface in dataManager/iDataSource.hpp)
+    virtual ~IDataSource() = default;
+
+    virtual UpdateStatus fetchUpdate(const FetchContext& ctx) = 0;
+    virtual uint32_t getUpdateIntervalMs() const = 0;
+    virtual const char* getSourceName() const = 0;
+    virtual PriorityTier getPriorityTier() const = 0;
+    virtual bool fetchesWhileConfiguring() const { return false; }
+    virtual bool requiresTls() const { return true; }
+    virtual uint32_t getMaxBackoffMs() const;
 };
 ```
 
-Registered via `app.registerDataSource(iDataSource*)`. The `dataManager`
-background task calls `executeFetch()` on a FreeRTOS worker thread — network
-operations must ONLY occur inside this method.
+Registered via `app.registerModule(&module)` or `app.registerDataSource(IDataSource*)`.
 
-> **Note:** `dataManager` is a generic data-source scheduler, not HTTP-specific.
-> HTTP fetching is the responsibility of individual `iDataSource` implementations.
-> `PriorityTier` uses numerical mapping: `HIGH = 0`, `LOW = 2` — lower value
-> means higher scheduling precedence.
+**Execution Model & FreeRTOS Worker Task:**
+Unlike `ITickable`, `fetchUpdate()` runs on a dedicated FreeRTOS worker task (Core 0, 12KB stack) managed by `DataManager`. This isolates blocking network operations (TLS handshakes, HTTP transactions) from the cooperative main thread.
+
+**Key Types & Contracts:**
+- **`UpdateStatus`**: Enum indicating fetch result:
+  `Success` (0), `NoChange` (1, HTTP 304), `RateLimited` (2, HTTP 429), `FetchError` (3, network/TLS/timeout), `ParseError` (4, malformed payload), `AuthError` (5, 401/403 or missing credentials), `Skipped` (6, source declined to fetch due to missing prerequisites).
+- **`PriorityTier`**: Scheduling cadence:
+  `High` (0, ~60s), `Normal` (1, ~300s / 5 min), `Low` (2, ~1800s / 30 min).
+- **`FetchContext` & `DeadlineToken`** (`include/types/FetchContext.hpp`):
+  Provides cooperative cancellation and execution budget:
+  - `ctx.deadline.isExpired()`: Checked periodically during socket reads and JSON parsing. Total budget is `FETCH_TOTAL_TIMEOUT_MS` (15s), with `CONNECT_TIMEOUT_MS` (5s) for TCP/TLS connection.
+  - `ctx.client`: Framework-provided `WiFiClient*`. When `requiresTls() == true` (default), provides a `WiFiClientSecure` pre-attached to the system certificate bundle (`esp_crt_bundle`). When `false`, provides a plain unencrypted `WiFiClient`. Consumers never instantiate raw clients or call `setInsecure()`.
+- **`SourceHealth` System**:
+  Tracks health transitions across 5 states:
+  - `Unknown` (0): Registered but unattempted.
+  - `Healthy` (1): Last fetch succeeded.
+  - `Degraded` (2): Failing and backing off (exponential backoff doubling from 30s up to `getMaxBackoffMs()`).
+  - `Quarantined` (3): Backoff ceiling reached after 6 consecutive failures. Continues probing at ceiling interval for automatic self-healing.
+  - `Suspended` (4): Hard failure (`AuthError`). Automatic polling ceases until credentials change or manual reset.
+- **`fetchesWhileConfiguring()`**: Returns `true` to allow polling while the framework is in `AppState::Configuring`. Required for data sources that back startup preconditions.
 
 ### 6.5 `IStatusReporter`
 
-> 📖 See [Creating a Module § Choosing Your Interfaces](developer/creating-a-module.md#1-choosing-your-interfaces) for when to use `IStatusReporter`.
+> 📖 See [Creating a Module § Choosing Your Interfaces](developer/creating-a-module.md#1-choosing-your-interfaces) and [Status Reporter Interface Doc](../.agents/skills/framework-expert/interfaces/status-reporter.md).
 
-The framework-level abstraction for cross-module status display. Any module can
-report status without depending on a concrete display implementation.
+Defined in `include/interfaces/IStatusReporter.hpp`. Contract for display modules providing boot-phase status overlays without coupling the kernel to concrete graphics libraries.
 
 ```cpp
 class IStatusReporter {
 public:
-    virtual void reportMessage(const char* source, const char* message) = 0;
-    virtual void reportProgress(const char* label, int percent) = 0;
-    virtual void reportError(const char* source, const char* error) = 0;
     virtual ~IStatusReporter() = default;
+
+    virtual void reportStatus(const char* message, float progress = -1.0f) = 0;
+    virtual void reportError(const char* errorMessage) = 0;
+    virtual void clearStatus() = 0;
 };
 ```
 
-Registered via `app.setStatusReporter(IStatusReporter*)`. If no display
-module is present, a `NullStatusReporter` (private nested class within
-`Application`) handles calls silently.
+Registered via `app.registerModule(&module)` or `app.registerStatusReporter(IStatusReporter*)`.
 
-### 6.6 `IDisplayBoard` (Display Module Interface)
+- **`reportStatus(message, progress)`**: Renders a one-line status string. `progress` is in `[0.0, 1.0]`; negative values indicate an indeterminate spinner or progress bar.
+- **`reportError(errorMessage)`**: Displays a fatal error screen and halt indicator (e.g. storage mount failure).
+- **`clearStatus()`**: Dismisses active status overlays, transitioning to normal rendering.
+- **`NullStatusReporter`**: A private nested class in `Application` that acts as a silent no-op fallback when running headless or in native tests.
 
-> 📖 See [Using Optional Modules § The IDisplayBoard Interface](developer/using-optional-modules.md#the-idisplayboard-interface) for the board contract.
+### 6.6 `IBootReporter`
 
-See Section 7. This interface is defined by the display module, not the kernel.
-App display boards implement it and register with the display module directly.
+> 📖 See [IBootReporter Header](include/interfaces/IBootReporter.hpp).
 
-### 6.7 `IWebContributor`
+Defined in `include/interfaces/IBootReporter.hpp`. Extends `IStatusReporter` to provide early hardware initialization hooks before full framework module registration.
 
-> 📖 See [Extending the Web Portal § The IWebContributor Interface](developer/extending-the-web-portal.md#1-the-iwebcontributor-interface) for the full method walkthrough.
+```cpp
+class IBootReporter : public IStatusReporter {
+public:
+    virtual bool beginEarly() = 0;
+    virtual void setAppTitle(const char* title) { (void)title; }
+};
+```
+
+Registered via `app.registerModule(&module)` or `app.registerBootReporter(IBootReporter*)`.
+
+- **`beginEarly()`**: Called by `Application::begin()` before registration is locked. Initializes display hardware (SPI/I2C buses, framebuffers) and draws an instant boot splash before network and filesystem services initialize. Must be non-blocking and fast.
+- **`setAppTitle(title)`**: Updates the displayed boot screen title with the runtime application name.
+
+### 6.7 `IDisplayModule`
+
+> 📖 See [Display Module Interface Doc](../.agents/skills/framework-expert/interfaces/display-module.md).
+
+Defined in `include/interfaces/IDisplayModule.hpp`. Unified hardware abstraction contract for display providers (both `U8G2DisplayModule` and `LVGLDisplayModule`). Extends `IBootReporter` and decouples high-level services like `DisplayServiceHelper` from specific rendering engines.
+
+```cpp
+namespace DisplayState {
+    constexpr const char* Normal      = "normal";
+    constexpr const char* Error       = "error";
+    constexpr const char* Configuring = "configuring";
+}
+
+struct SystemDisplayParams {
+    const char* state   = DisplayState::Normal;
+    const char* title   = nullptr;
+    const char* message = nullptr;
+    float       progress = -1.0f;
+};
+
+class IDisplayModule : public IBootReporter {
+public:
+    virtual ~IDisplayModule() = default;
+
+    // Geometry
+    virtual uint16_t getDisplayWidth() const = 0;
+    virtual uint16_t getDisplayHeight() const = 0;
+
+    // Brightness
+    virtual void setBrightness(uint8_t level) = 0;
+    virtual uint8_t getBrightness() const = 0;
+
+    // Screensaver & Activity
+    virtual void resetActivity() = 0;
+    virtual bool isDimmed() const = 0;
+    virtual bool isSleeping() const = 0;
+
+    // Framebuffer Capture (PNG)
+    virtual bool capturePNG(Print& sink) = 0;
+    virtual bool captureStoredPNG(Print& sink) = 0;
+
+    // System Lifecycle Overlays
+    virtual void showSystemState(const SystemDisplayParams& params) = 0;
+};
+```
+
+This interface unifies display geometry, backlight dimming/sleeping, screensaver timeouts, on-device PNG screenshot streaming, and system-level lifecycle overlays (`Normal`, `Error`, `Configuring`). Shared REST routes (`/api/display/*`) and MCP tools (`display_status`, `display_control`, `capture_display`) delegate directly to `IDisplayModule` via `DisplayServiceHelper`.
+
+### 6.8 `IWebContributor`
+
+> 📖 See [Extending the Web Portal § The IWebContributor Interface](developer/extending-the-web-portal.md#1-the-iwebcontributor-interface) and [Web Contributor Interface Doc](../.agents/skills/framework-expert/interfaces/web-contributor.md).
+
+Defined in `include/interfaces/IWebContributor.hpp`. Contract for modules exposing REST API endpoints and navigation tabs to `WebServerManager`.
 
 ```cpp
 class IWebContributor {
 public:
+    virtual ~IWebContributor() = default;
+
     virtual void registerRoutes(PsychicHttpServer& server) = 0;
     virtual void registerTabs(ITabRegistry& registry) = 0;
     virtual const char* getApiPrefix() const { return nullptr; }
     virtual size_t getMaxPostBody() const { return 4096; }
-    virtual ~IWebContributor() = default;
 };
 ```
 
-Registered via `app.registerModule(&myModule)`. The base
-web portal calls `registerRoutes()` on all contributors during `webServer.init()`.
-`WebServerManager` calls `registerTabs()` on each contributor to build the
-`GET /api/tabs` response via the `ITabRegistry` visitor pattern.
+Registered via `app.registerModule(&module)` or `app.registerWebContributor(IWebContributor*)`.
 
-### 6.8 `IMcpContributor`
+- **`registerRoutes(PsychicHttpServer& server)`**: Installs HTTP route handlers on the underlying `PsychicHttpServer`. Global authentication middleware automatically enforces portal auth for `/api/` endpoints.
+- **`registerTabs(ITabRegistry& registry)`**: Declares navigation tabs in the web portal via the `ITabRegistry` visitor pattern. Modules with no visible UI provide an empty implementation.
+- **`getApiPrefix()`**: Returns the route prefix (e.g. `"/api/mcp"`) used by the web server's body-size middleware to match incoming POST/PUT requests.
+- **`getMaxPostBody()`**: Overrides the maximum allowed request body size (default: 4096 bytes, ADR-15).
 
-> 📖 See [MCP Server § Implementing IMCPContributor](developer/mcp-server.md#3-implementing-imcpcontributor) for tool registration examples.
+### 6.9 `ITabRegistry`
+
+> 📖 See [ITabRegistry Header](include/interfaces/ITabRegistry.hpp).
+
+Defined in `include/interfaces/ITabRegistry.hpp`. Abstract visitor registry passed to `IWebContributor::registerTabs()`, eliminating inner stub objects and enabling modules to register multiple tabs or sub-tabs in a single call.
 
 ```cpp
-class IMcpContributor {
+struct TabEntry {
+    const char* name;    ///< Display name for the tab (static lifetime)
+    const char* parent;  ///< Parent tab name for sub-navigation (nullptr = top-level)
+    int         order;   ///< Sort order within level (lower = first, default 100)
+    const char* icon;    ///< SVG inner content for navigation icon (nullptr = generic)
+    const char* script;  ///< Route path for tab JavaScript file (nullptr = none)
+};
+
+class ITabRegistry {
 public:
-    virtual void registerMcpTools(McpToolRegistry& registry) = 0;
-    virtual ~IMcpContributor() = default;
+    virtual ~ITabRegistry() = default;
+
+    virtual void addTab(const char* name,
+                        const char* parent = nullptr,
+                        int         order  = 100,
+                        const char* icon   = nullptr,
+                        const char* script = nullptr) = 0;
+
+    void addTab(const TabEntry& entry);
 };
 ```
 
-Registered via `app.registerMcpContributor(IMcpContributor*)`. Mirrors the
-`IWebContributor` pattern — Hollywood Principle applied to MCP tool registration.
-The `McpServer` calls `registerMcpTools()` on all contributors during init.
+String arguments must point to memory with static or application lifetime (compile-time string literals or class member constants), as the registry stores pointers rather than making heap copies.
+
+### 6.10 `IMCPContributor`
+
+> 📖 See [MCP Server § Implementing IMCPContributor](developer/mcp-server.md#3-implementing-imcpcontributor) and [MCP Contributor Interface Doc](../.agents/skills/framework-expert/interfaces/mcp-contributor.md).
+
+Defined in `include/interfaces/IMCPContributor.hpp`. Contract for modules exposing Model Context Protocol (MCP) tools to AI agents via `MCPServer`.
+
+```cpp
+class IMCPContributor {
+public:
+    virtual ~IMCPContributor() = default;
+
+    virtual void registerMCPTools(MCPToolRegistry& registry) = 0;
+};
+```
+
+Registered via `app.registerModule(&module)` or `app.registerMcpContributor(IMCPContributor*)`.
+
+**Tool Registration Pattern:**
+Tools are registered inside `registerMCPTools()` using `registry.addTool()` with stateless lambdas:
+
+```cpp
+void MyModule::registerMCPTools(MCPToolRegistry& registry) {
+    registry.addTool("my_action", "Executes an action on MyModule",
+        [](void* ctx, JsonObject& args, JsonObject& result) {
+            auto* self = static_cast<MyModule*>(ctx);
+            result["success"] = self->doAction();
+        },
+        this,
+        true // mutatesState = true (blocked in read-only mode with code -32000)
+    );
+}
+```
+
+- **Stateless Lambdas**: Handlers MUST NOT capture variables (`[]`), preventing hidden heap allocations (`std::function` ban, GRAVE-05).
+- **`void* context`**: Pointer to the module instance (`this`), cast back via `static_cast`.
+- **`mutatesState`**: Set to `true` for any action that mutates configuration, writes flash, or controls hardware. When `MCPServer` is operating in read-only mode, mutating tools are automatically rejected.
+
+### 6.11 `IPreconditionContributor`
+
+> 📖 See [Precondition Contributor Interface Doc](../.agents/skills/framework-expert/interfaces/precondition-contributor.md).
+
+Defined in `include/interfaces/IPreconditionContributor.hpp`. Contract for modules contributing readiness conditions to the system via `PreconditionEngine`.
+
+```cpp
+class IPreconditionContributor {
+public:
+    virtual ~IPreconditionContributor() = default;
+
+    virtual void registerPreconditions(IPreconditionRegistry& registry) = 0;
+};
+```
+
+Registered via `app.registerModule(&module)` or automatically introspected during `app.registerModule()`. Modules implement `registerPreconditions()` to install evaluation callbacks and dependency edges into the central engine.
+
+### 6.12 `IPreconditionRegistry`
+
+> 📖 See [IPreconditionRegistry Header](include/interfaces/IPreconditionRegistry.hpp).
+
+Defined in `include/interfaces/IPreconditionRegistry.hpp`. Visitor interface passed to `IPreconditionContributor::registerPreconditions()`.
+
+```cpp
+class IPreconditionRegistry {
+public:
+    using EvalFn     = std::function<PreconditionStatus()>;
+    using DescribeFn = std::function<void(Cause, char*, size_t)>;
+
+    virtual ~IPreconditionRegistry() = default;
+
+    virtual void add(const char* name,
+                     PreconditionRole role,
+                     EvalFn evaluate,
+                     DescribeFn describe = nullptr,
+                     const Edge* edges = nullptr,
+                     uint8_t edgeCount = 0,
+                     const DampingPolicy* damping = nullptr,
+                     const RetryPolicy*  retry   = nullptr) = 0;
+};
+```
+
+- **`EvalFn evaluate`** (Hot Path): Non-blocking fast-path function called every tick. Checks a cached flag or state variable and returns `PreconditionStatus{met, cause}`.
+- **`DescribeFn describe`** (Cold Path): Formats context-sensitive user guidance into a caller-provided buffer based on the current `Cause`. Called on-demand by displays and portal UI.
+- **`edges` / `edgeCount`**: Prerequisite dependencies on other preconditions.
+
+### 6.13 `IPrecondition` (Types, Enums, and Policies)
+
+> 📖 See [IPrecondition Header](include/interfaces/IPrecondition.hpp) and [Precondition Contributor Doc](../.agents/skills/framework-expert/interfaces/precondition-contributor.md).
+
+Defined in `include/interfaces/IPrecondition.hpp`. Defines the vocabulary and policies for multi-cause readiness evaluation:
+
+- **`Cause`** (12 codes): `Met`, `NotConfigured`, `Connecting`, `Rejected`, `Unreachable`, `RateLimited`, `Implausible`, `DependencyUnmet`, `FallbackEngaged`, `Unavailable`, `Indeterminate`, `InternalError`.
+- **`Severity`** (6 derived levels): `Transient` (self-healing), `NeedsUser` (human intervention required), `Blocked` (upstream dependency unmet), `Degraded` (fallback operational), `Inactive` (disabled by config), `Persistent` (unwired dependency or code defect).
+- **`deriveSeverity(Cause cause, bool everMet = false)`**: Maps cause and trust history to operational severity (e.g. `Unreachable` is `Transient` if previously connected, but `NeedsUser` if never connected).
+- **`PreconditionRole`**:
+  - `Operational`: Monitored at runtime; degrades features but does not block boot.
+  - `Startup`: Must be met to transition from `Boot`/`Configuring` to `Running`.
+  - `Both`: Required for startup and triggers regression from `Running` to `Configuring` if suppressed.
+- **`EdgeKind` & `Edge`**: Dependency graph edges: `Wants` (presentation order), `Requires` (cannot be met without), `BindsTo` (if upstream fails, this condition drops immediately).
+- **`DampingPolicy` & `RetryPolicy`**: Damping score prevents flap oscillation by accumulating penalty while unmet and decaying exponentially. Circuit breaker state (`Closed`, `Open`, `HalfOpen`) governs retry backoff.
+- **`PreconditionNames`**: Well-known constants (`WIFI_STATION`, `TIMEZONE`, `TIME_SYNC`).
+
+### 6.14 `ISanitizer`
+
+> 📖 See [ISanitizer Header](include/interfaces/ISanitizer.hpp).
+
+Defined in `include/interfaces/ISanitizer.hpp`. Interface for zero-allocation in-place redaction of secrets, decoupling logging and audit systems from concrete redactor implementations.
+
+```cpp
+class ISanitizer {
+public:
+    virtual ~ISanitizer() = default;
+
+    virtual void sanitize(char* buffer, size_t bufferSize, bool isTruncated = false) = 0;
+};
+```
+
+Implemented by `Redactor` in `lib/Redactor/`. Modules such as `AuditModule` and `LogPipeline` accept an `ISanitizer*` to scrub sensitive strings (passwords, tokens, API keys) in-place without heap allocations.
+
+### 6.15 `IOTAVerifier`
+
+> 📖 See [OTA Verifier Interface Doc](../.agents/skills/framework-expert/interfaces/ota-verifier.md).
+
+Defined in `include/interfaces/IOTAVerifier.hpp`. Cryptographic verification interface for OTA firmware updates, enforcing streaming signature validation before flashing.
+
+```cpp
+class IOTAVerifier {
+public:
+    virtual ~IOTAVerifier() = default;
+
+    virtual bool begin(const char* publicKeyPem) = 0;
+    virtual void update(const uint8_t* data, size_t length) = 0;
+    virtual bool verify(const uint8_t* signature, size_t signatureLength) = 0;
+};
+```
+
+**Streaming Verification Contract (ADR-13):**
+Because firmware images exceed available RAM, `IOTAVerifier` consumes firmware incrementally:
+1. `begin()`: Injects the PEM-encoded public key and initializes the digest context.
+2. `update()`: Incrementally accumulates SHA-256 hash over incoming network chunks with $O(1)$ memory usage.
+3. `verify()`: Finalizes digest and verifies RSA/ECDSA signature against the detached manifest signature.
+
+### 6.16 Module-Local Extension Points
+
+Per the interface placement heuristic ([ADR Interface Placement](developer/adr/adr-interface-placement.md)), interfaces tightly coupled to a specific module's graphics library or subsystem belong to that module's directory rather than the kernel `include/interfaces/`.
+
+#### 6.16.1 `IDisplayBoard` (U8G2 Display Carousel)
+
+Defined in `modules/U8G2Display/IDisplayBoard.hpp`. Contract for monochrome carousel rendering units managed by `U8G2DisplayModule`'s `CarouselEngine`.
+
+```cpp
+class IDisplayBoard {
+public:
+    virtual ~IDisplayBoard() = default;
+
+    virtual void render(U8G2& u8g2) = 0;
+    virtual bool isExpired() const = 0;
+    virtual bool canAdvance() const { return true; }
+    virtual const char* getBoardName() const = 0;
+    virtual void onActivate() {}
+    virtual void onDeactivate() {}
+    virtual void tick(uint32_t currentMillis) {}
+};
+```
+
+- **`render(u8g2)`**: Renders a frame using the native `U8G2` drawing API. Must be fast and non-blocking.
+- **`isExpired()`**: Pure virtual query. Permanent boards return `false`; transient notification overlays return `true` when finished to evict themselves from rotation.
+- **`canAdvance()`**: Bounded pull-based pacing hook. Returns `false` to defer carousel rotation away from this board while a scrolling animation or multi-frame transition is in-flight. The engine bounds this hold (default max 30s) to prevent wedging.
+- **Lifecycle hooks**: `onActivate()`, `onDeactivate()`, and per-frame `tick(currentMillis)`.
+
+#### 6.16.2 `ILVGLHardwareAdapter` (LVGL Display Hardware)
+
+Defined in `modules/LVGLDisplay/ILVGLHardwareAdapter.hpp`. Isolates `LVGLDisplayModule` from hardware-specific display controllers, pinouts, and bus drivers.
+
+```cpp
+class ILVGLHardwareAdapter {
+public:
+    virtual ~ILVGLHardwareAdapter() = default;
+
+    // Required Display Methods
+    virtual lv_display_t* createDisplay() = 0;
+    virtual void setBrightness(uint8_t level) = 0;
+    virtual uint16_t getScreenWidth() const = 0;
+    virtual uint16_t getScreenHeight() const = 0;
+    virtual uint16_t getBufferLineCount() const = 0;
+
+    // Optional Input Methods (Default nullptr)
+    virtual lv_indev_t* createTouchInput() { return nullptr; }
+    virtual lv_indev_t* createEncoderInput() { return nullptr; }
+    virtual lv_indev_t* createKeypadInput() { return nullptr; }
+
+    // Screensaver Touch Polling
+    virtual void pollTouch() {}
+};
+```
+
+Hardware adapters configure the display driver, wire the `flush_cb`, allocate draw buffers, and optionally initialize touch panels (`createTouchInput()`), rotary encoders (`createEncoderInput()`), or keypads (`createKeypadInput()`). `pollTouch()` is called on tick to wake displays when blanked.
+
+#### 6.16.3 `IHaEntity` (Home Assistant MQTT Entities)
+
+Defined in `modules/HomeAssistant/entities/IHaEntity.hpp`. Abstract contract for entity implementations contributing to Home Assistant MQTT auto-discovery and state tracking.
+
+```cpp
+class IHaEntity {
+public:
+    virtual ~IHaEntity() = default;
+
+    virtual std::string getObjectId() const = 0;
+    virtual const char* getEntityType() const = 0;
+    virtual void buildDiscoveryPayload(JsonObject& payload) const = 0;
+    virtual std::string getState() const = 0;
+    virtual bool hasState() const { return true; }
+    virtual void handleCommand(const std::string& topic, const std::string& payload) {}
+    virtual bool isCommandable() const { return false; }
+};
+```
+
+Entities provide object IDs, entity types (e.g. `"sensor"`, `"switch"`), discovery JSON schema, state serialization, and inbound command dispatch.
+
+### 6.17 EventBus Payloads
+
+Predefined typed structs published on the synchronous `EventBus`:
+
+#### 6.17.1 `DataSourceHealthPayload`
+
+Defined in `include/events/DataSourceHealthPayload.hpp`. Broadcast on `ApplicationEvents::DATA_SOURCE_HEALTH` (`"data.source.health"`) when a data source transitions state:
+
+```cpp
+struct DataSourceHealthPayload {
+    const char*       name;   ///< Source name (static lifetime)
+    SourceHealthState state;  ///< New health state (Healthy, Degraded, Quarantined, Suspended)
+};
+```
+
+#### 6.17.2 `PreconditionHealthPayload`
+
+Defined in `include/events/PreconditionHealthPayload.hpp`. Broadcast on `ApplicationEvents::PRECONDITION_HEALTH` (`"precondition.health"`) when a precondition's damped cause or severity changes:
+
+```cpp
+struct PreconditionHealthPayload {
+    const char*      name;                                  ///< Precondition name (static lifetime)
+    Cause            cause;                                 ///< Current damped cause
+    Severity         severity;                              ///< Derived operational severity
+    bool             everMet;                               ///< Trust history
+    PreconditionRole role = PreconditionRole::Operational;  ///< Lifecycle role
+};
+```
+
+#### 6.17.3 `AppConfiguringPayload`
+
+Defined in `include/events/AppConfiguringPayload.hpp`. Broadcast on `ApplicationEvents::APP_CONFIGURING` (`"app.configuring"`) to guide display helper modals:
+
+```cpp
+struct AppConfiguringPayload {
+    const char* preconditionName = nullptr;                  ///< Name of blocking precondition
+    const char* helpText     = nullptr;                      ///< User guidance string
+    Cause       cause        = Cause::NotConfigured;         ///< Precondition cause
+    Severity    severity     = Severity::NeedsUser;          ///< Derived severity
+    bool        isRegression = false;                        ///< True if regressed from RUNNING
+    const char* hostname     = nullptr;                      ///< Device hostname (AP SSID)
+    const char* deviceIP     = nullptr;                      ///< Device IP address string
+};
+```
 
 ---
 

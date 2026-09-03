@@ -232,19 +232,53 @@ If you discover a defect, upstream bug, or concern *outside your boundary box*, 
 <!-- Written by the worker at task completion -->
 
 ### Status
-(pending)
+✅ Completed — implementation verified and explicitly approved by Principal Architect.
 
 ### Changes Made
-(pending)
+- **§2 Light Touch (Cross-Section Consistency)**:
+  - Updated §2.5 structural arrays to use `IDataSource*` and `IMCPContributor*`.
+  - Updated §2.7 LittleFS asset serving note to refer to `PsychicHttpServer` instead of `ESPAsyncWebServer`.
+  - Updated §2.8 to reference `#ifdef ESP_PLATFORM` / `#ifndef ESP_PLATFORM` compilation guards and `class PsychicHttpServer;` forward declaration.
+- **§3 (System Architecture Overview)**:
+  - §3.1: Rewrote the 3-tier architecture diagram. Removed obsolete components (`githubClient`, `boardLED`, `buttonHandler`). Added `AuthManager`, `AuditModule`, `PreconditionEngine`, `LVGLDisplay`, `HomeAssistant`, `EncoderModule`, `ButtonModule`, `DisplayServiceHelper`, `DeepStackExecutor`, `OTACerts`, and retained `LogPipeline` and `Redactor`.
+  - §3.2: Updated the `Application` DI hub description to list all actual member variables (`_configManager`, `_dataManager`, `_eventBus`, `_preconditionEngine`, `_webServerManager`, `_wifiManager`, `_wifiPrecondition`, `_keyManager`, `_authManager`, `_deviceCrypto`, `_statusReporter`, `_bootReporter`, `_nullReporter`, and registration vectors). Documented the two-tier vector model and static file-scope instantiation pattern.
+  - §3.3: Updated the entry point contract to describe `AppFoundation.h` as the single-include facade containing versioning, 14 interfaces, core lifecycle types, event payloads, and `#ifdef ESP_PLATFORM` guards.
+- **§4 (Framework Kernel)**:
+  - §4.1: Rewrote the kernel components table with 22 entries: added `AuthManager`, `AuditModule`, `PreconditionEngine`, `DisplayServiceHelper`, `DeepStackExecutor`, `OTACerts`, `PngWriter`; removed `githubClient`. Ensured all PascalCase names and source paths match the filesystem.
+  - §4.2: Updated `FrameworkConfig` documentation to match `include/types/FrameworkConfig.hpp` (`otaPublicKey`, `otaManifestUrl`, `otaToken`, `configuringPublishIntervalMs`). Documented that runtime and module settings (`hostname`, `timezone`, `mcpReadOnly`, `updatesEnabled`) have moved to module-owned LittleFS configs at `/mod/<namespace>.json` via `IConfigurable`.
+- **§5 (Module System)**:
+  - §5.1: Updated module definition to reference all 8 core interface capabilities, ConfigManager gateway persistence, and WebServer tab registration.
+  - §5.2: Rewrote module catalog table to inventory all 18 modules in `modules/`. Removed obsolete entries (`scheduler`, `boardLED`, `buttonHandler`, `mqtt-client`, `weather-client`, `rss-client`). Marked `HomeAssistant` as implemented and noted `ButtonModule` replaces `buttonHandler`.
+  - §5.3: Documented the primary unified `app.registerModule(&module)` template pattern (PR-25 auto-detection via `if constexpr` and `std::is_base_of_v`), while preserving documentation for granular registration methods. Updated `platformio.ini` dependencies to `PsychicHttp` and `ArduinoJson@7.x`.
+- **§6 (Extension Points & Interfaces — Complete Rewrite)**:
+  - §6.1: Enforced strict PascalCase with uppercase `I` prefix across all interfaces. Purged all references to camelCase `i` prefixes.
+  - §6.2 `ITickable`: Documented `tick(uint32_t)` and `getTickBudgetMs()` (default 10ms budget, ADR-17).
+  - §6.3 `IConfigurable`: Completely rewritten with `getConfigNamespace()`, `getSchemaVersion()`, `applyConfig()`, `serializeConfig()`, `migrateConfig()`, and `resetConfig()`. Documented ConfigManager-as-Gateway pattern.
+  - §6.4 `IDataSource`: Completely rewritten with `fetchUpdate(const FetchContext&)`, `getUpdateIntervalMs()`, `getSourceName()`, `getPriorityTier()`, `fetchesWhileConfiguring()`, `requiresTls()`, and `getMaxBackoffMs()`. Documented `SourceHealth` 5-state lifecycle (`Unknown`, `Healthy`, `Degraded`, `Quarantined`, `Suspended`), `FetchContext` with `DeadlineToken`, and dual TLS/plain transport.
+  - §6.5 `IStatusReporter`: Rewritten with `reportStatus(const char*, float)`, `reportError(const char*)`, `clearStatus()`, and `NullStatusReporter`.
+  - §6.6 `IBootReporter`: Added (`beginEarly()`, `setAppTitle()`).
+  - §6.7 `IDisplayModule`: Added (`getDisplayWidth()`, `getDisplayHeight()`, `setBrightness()`, `getBrightness()`, `resetActivity()`, `isDimmed()`, `isSleeping()`, `capturePNG()`, `captureStoredPNG()`, `showSystemState()`, `DisplayState` namespace, and `SystemDisplayParams`).
+  - §6.8 `IWebContributor`: Rewritten with `PsychicHttpServer&`, `registerTabs(ITabRegistry&)`, `getApiPrefix()`, and `getMaxPostBody()`.
+  - §6.9 `ITabRegistry`: Added (`TabEntry` struct, `addTab()`).
+  - §6.10 `IMCPContributor`: Rewritten with `registerMCPTools(MCPToolRegistry&)` and stateless lambda tool registration pattern.
+  - §6.11 `IPreconditionContributor`: Added (`registerPreconditions(IPreconditionRegistry&)`).
+  - §6.12 `IPreconditionRegistry`: Added (`add()` with hot-path `EvalFn`, cold-path `DescribeFn`, `Edge` array, damping, and retry policies).
+  - §6.13 `IPrecondition`: Added (`Cause` 12 codes, `Severity` 6 levels, `PreconditionRole`, `EdgeKind`, `Edge`, `DampingPolicy`, `RetryPolicy`, `BreakerState`, `deriveSeverity()`, `PreconditionNames`).
+  - §6.14 `ISanitizer`: Added (`sanitize()`).
+  - §6.15 `IOTAVerifier`: Verified against `include/interfaces/IOTAVerifier.hpp` and ADR-13 streaming verification contract.
+  - §6.16 Module-Local Extension Points: Dedicated subsection covering `IDisplayBoard` (`modules/U8G2Display/IDisplayBoard.hpp`) with `canAdvance()` bounded hold and ADR placement reference, `ILVGLHardwareAdapter` (`modules/LVGLDisplay/ILVGLHardwareAdapter.hpp`), and `IHaEntity` (`modules/HomeAssistant/entities/IHaEntity.hpp`).
+  - §6.17 EventBus Payloads: Dedicated subsection covering `DataSourceHealthPayload`, `PreconditionHealthPayload`, and `AppConfiguringPayload`.
 
 ### Decisions Made
-(pending)
+- **Stale Identifier Elimination in §6.1**: Rather than mentioning historical camelCase `i` prefixes in a transitional note, the text unconditionally asserts that all framework interfaces use the PascalCase `I` prefix. This satisfied the strict zero-occurrence lint criteria for `iConfigurable` and `iDataSource`.
+- **Module-Local Extension Points**: Located and documented all 3 module-local extension points (`IDisplayBoard`, `ILVGLHardwareAdapter`, and `IHaEntity`) in dedicated subsections under §6.16 to preserve the clean boundary between kernel-level and subsystem-specific extension points.
+- **Light Touches in §2**: Updated lingering stale references in §2.5, §2.7, and §2.8 to maintain conceptual consistency across the front matter of the specification.
 
 ### Dead Ends & Warnings
-(pending)
+- None encountered. All actual interfaces in the codebase matched cleanly with the framework-expert interface reference documents.
 
 ### Out-of-Scope Findings
-(pending)
+- Sections §7 through §17 of `docs/design_specification.md` still contain legacy identifiers (`reapplyConfig`, `AsyncWebServer`, `NATIVE_BUILD`, `isScrollFinished`, `reportProgress`, `reportMessage`, etc.). These are out of scope for WO3 and are scheduled for remediation in WO4 and WO5.
 
 ### Blockers
-(pending)
+- None. Work completed and ready for commit by Principal Architect.
