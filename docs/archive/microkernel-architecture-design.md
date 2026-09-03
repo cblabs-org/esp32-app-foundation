@@ -8,14 +8,12 @@
 > persistence, and partition models. Intended as the basis for a staged
 > refactoring effort.
 
-> [!WARNING]
-> **STATUS: WORK IN PROGRESS — design record, not shipped code.**
->
-> This captures architectural decisions reached in a design discussion. It is a
-> *proposal to guide refactoring*, not a description of current behaviour. Where
-> it describes the codebase *as it is today* the text says so explicitly ("Today
-> …"); everything under **Core Decisions** is the *target* state. Several items
-> remain open — see [§10 Open Questions](#10-open-questions).
+> [!NOTE]
+> **FOLDED into the Design Specification v2.0 §3–§6.** The three-ring kernel model (MK-1),
+> `registerModule` single entry (MK-2), structural microkernel (MK-3), cooperative tick loop
+> (MK-3a), module optionality, and all other MK decisions are now normative in the spec.
+> This document is preserved for its rationale, rejected alternatives, and consumer review
+> history. Open questions OQ-MK-1 through OQ-MK-5 have been resolved in the delivered code.
 
 ---
 

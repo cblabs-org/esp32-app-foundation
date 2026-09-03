@@ -7,23 +7,11 @@
 > build-time facts that surround them).
 
 > [!NOTE]
-> **STATUS: FINALIZED — consumer-reviewed and decomposed; ready for implementation.**
->
-> This document is the **design authority for PR-51** (the `board.h` pin-map
-> migration). It has been reconciled with the landed microkernel work (MK-1…MK-18,
-> now on `main`), consumer-reviewed via RFC
-> [#50](https://github.com/matthewmcneill/esp32-app-foundation/issues/50) — **endorsed
-> by all three consumer programs, no blockers** — and decomposed into a 4-Work-Order
-> stack. The core `board.<id>.h` work is **not yet built** (`hardware/` does not
-> exist yet); **execution is gated on the human's go recorded in the PR-51
-> `PROJECT.md` Approval Log**
-> ([`.agents/skills/principal-architect-workspace/pr-51-hardware-config/PROJECT.md`](../.agents/skills/principal-architect-workspace/pr-51-hardware-config/PROJECT.md)),
-> not here.
->
-> The most consequential reconciliation: the proposed `BOARD_DISPLAY_KIND` tag is
-> **superseded** by the landed `WITH_DISPLAY_U8G2` / `WITH_DISPLAY_LVGL` flags
-> ([HC-6](#hc-6--display-availability-uses-the-landed-with_display_-flags-not-a-bespoke-tag));
-> see [§0](#0-relationship-to-the-landed-microkernel-work).
+> **FOLDED into the Design Specification v2.0 §12 and delivered as `hardware/`.** The
+> `board.h` pin-map system, per-board partition tables, `_common/` shared definitions,
+> and `_TEMPLATE/` scaffolding are all shipped. This document is preserved for its
+> rationale, HC decisions, consumer review record (RFC #50), and the reconciliation
+> with the landed microkernel work.
 
 ---
 

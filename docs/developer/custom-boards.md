@@ -8,7 +8,7 @@
 
 ## 1. Overview & Architecture (HC-11)
 
-The ESP32 App Foundation framework uses a **zero-edit custom board model** ([HC-11](../../docs/hardware-configuration-design.md)). Hardware pin mappings, bus routing, and display hardware types are specified in a single, co-located board header (`board.h`) rather than scattered `-D` flags in `platformio.ini` or hardcoded framework headers.
+The ESP32 App Foundation framework uses a **zero-edit custom board model** ([HC-11](../../docs/archive/hardware-configuration-design.md)). Hardware pin mappings, bus routing, and display hardware types are specified in a single, co-located board header (`board.h`) rather than scattered `-D` flags in `platformio.ini` or hardcoded framework headers.
 
 Downstream applications (or new board targets) supply their own board definition header and point to it using the PlatformIO `-DBOARD_HEADER` macro.
 
