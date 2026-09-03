@@ -1085,261 +1085,65 @@ struct AppConfiguringPayload {
 
 > 📖 **Developer Guide:** [Using Optional Modules](developer/using-optional-modules.md) — display subsystem, carousel, custom boards, and screensaver.
 
-### 7.1 Design Decision: Module Variants, Not a Unified Driver Interface
+### 7.1 Dual-Display Architecture & Unified Abstraction (`IDisplayModule`)
 
-A unified `IDisplayDriver` abstraction that both U8G2 (monochrome bitmap) and
-TFT colour displays implement is architecturally problematic:
+The framework provides first-class dual-display support, accommodating both lightweight monochrome panels and high-resolution colour touchscreens:
 
-- U8G2 uses a page-buffer model; TFT uses a full framebuffer / sprite model
-- Their drawing APIs are fundamentally different in colour model and coordinate system
-- A meaningful common interface would either be too thin to be useful or too thick
-  to avoid re-implementing both libraries
+| Module | Technology | Characteristics | Target Hardware |
+|---|---|---|---|
+| `U8G2DisplayModule` | U8G2 library | Monochrome OLED/LCD, page-buffer rendering, low RAM (<1 KB) | SSD1306, SH1106, SSD1322, ST7920 (I2C/SPI) |
+| `LVGLDisplayModule` | LVGL v9.5 | Full-colour TFT/IPS, scene graph, DMA partial draw buffer | ST7789, GC9A01, touch/encoder (strictly ≥16 MB flash D9) |
 
-**Decision**: There is no `IDisplayDriver`. Instead, the module catalog provides
-**separate display modules**:
+#### Unified Hardware Abstraction (`IDisplayModule`)
 
-| Module | Technology | Use Case |
-|---|---|---|
-| `u8g2Display` | U8G2 library | Monochrome OLED/LCD (SSD1322, SH1106, SSD1306, etc.) |
-| `LVGLDisplay` | LVGL v9.5 + `ILVGLHardwareAdapter` | Colour TFT with touch/encoder (e.g. CrowPanel 1.28", strictly requires ≥16 MB flash D9) — see [LVGL Display Design](lvgl-display-design.md) |
+Both modules implement the unified `IDisplayModule` interface defined in `include/interfaces/IDisplayModule.hpp` (see §6.7). This unified interface standardizes:
+- **Geometry & Capability Queries:** `getDisplayWidth()`, `getDisplayHeight()`, `isColor()`, `getDisplayType()`
+- **Brightness & Power Control:** `setBrightness(uint8_t)`, `getBrightness()`, `sleep()`, `wake()`, `isSleeping()`
+- **Screensaver Idle Timings:** `setDimTimeoutMs()`, `setBlankTimeoutMs()`, `resetScreensaverActivity()`
+- **On-Device PNG Streaming:** `capturePNG(BufferStream& stream)`
+- **System Lifecycle Overlays:** `showSystemState(DisplaySystemState state)`
+- **Boot Status Integration:** Inherits `IBootReporter` and `IStatusReporter` (`reportStatus`, `reportError`, `clearStatus`)
 
-Each module provides its own board interface and carousel management. App display
-boards are written natively for their target display technology.
+While `IDisplayModule` unifies hardware control, REST routes, and MCP tooling, application-level board views remain native to their rendering paradigm:
+- U8G2 boards implement the page-buffered `IDisplayBoard` interface (§7.7).
+- LVGL screens bind directly to LVGL Pro UI designs using reactive `sys_*` subjects (see [`modules/LVGLDisplay/README.md`](../modules/LVGLDisplay/README.md)).
 
-### 7.2 Display Module Responsibilities
+### 7.2 `ILVGLHardwareAdapter` (Hardware Decoupling)
 
-A display module:
-1. Initialises the physical hardware driver
-2. Implements `IStatusReporter` — enables cross-module status messages
-3. Manages the board carousel (slot pool via `std::vector<IDisplayBoard*>`, locked
-   post-`begin()` — no `MAX_BOARDS` ceiling)
-4. Provides system boards (boot splash, loading, WiFi wizard, OTA progress, error screens)
-5. Exposes `registerBoard(IDisplayBoard*)` for app-specific views
-6. Registers itself with `Application` as `ITickable` and `iConfigurable`
-
-**Override Board Mechanism**: System boards bypass the carousel entirely via an
-`_overrideBoard` pointer. When `showBoard(IDisplayBoard*)` receives a non-pool
-board, the module stores it in `_overrideBoard` and renders it instead of the
-current carousel board. This ensures system boards (boot splash, error, OTA
-progress) are shown immediately without disrupting carousel state.
-
-**Display Controller Selection**: The `U8G2_DISPLAY_TYPE` macro defaults to
-`U8G2_SSD1306_128X64_NONAME_F_HW_I2C`, overridable via `build_flags` in
-`platformio.ini`. The module owns a `U8G2` instance by value (not pointer).
-
-**System boards** are stored as member variables of the module (not heap-allocated),
-ensuring predictable lifetime and zero heap fragmentation.
-
-### 7.3 `IDisplayBoard` (U8G2 Variant)
-
-> 📖 See [Using Optional Modules § The IDisplayBoard Interface](developer/using-optional-modules.md#the-idisplayboard-interface) for the full interface contract.
+Defined in `modules/LVGLDisplay/ILVGLHardwareAdapter.hpp` (relocated from `include/interfaces/` per ADR-001). The adapter decouples physical display initialization, bus communication (SPI/QSPI/I80), touch controllers, rotary encoders, and backlight PWM from the generic `LVGLDisplayModule` engine:
 
 ```cpp
-class IDisplayBoard {
+class ILVGLHardwareAdapter {
 public:
-    virtual const char* getBoardName() const = 0;
-    virtual void onActivate() = 0;
-    virtual void onDeactivate() = 0;
-    virtual void tick(uint32_t ms) = 0;
-    virtual void render(U8G2& display) = 0;  // U8G2-native
-    virtual UpdateStatus updateData() = 0;
-    virtual bool isScrollFinished() { return true; }
-    virtual bool isExpired() { return false; }
-    virtual ~IDisplayBoard() = default;
+    virtual ~ILVGLHardwareAdapter() = default;
+    virtual bool initHardware() = 0;
+    virtual lv_display_t* initDisplay(lv_display_t* disp) = 0;
+    virtual lv_indev_t* initInput(lv_indev_t* indev) = 0;
+    virtual void setBrightness(uint8_t level) = 0;
+    virtual uint8_t getBrightness() const = 0;
+    virtual void sleep() = 0;
+    virtual void wake() = 0;
 };
 ```
 
-#### Board Expiry Semantics
+- **Reference Implementation:** [`CrowPanel128Adapter`](../adapters/lvgl/CrowPanel128Adapter.hpp) supports the CrowPanel 1.28" circular TFT (GC9A01 display, CST816S touch controller, EC11 rotary encoder).
+- **16 MB Flash Requirement (D9):** Environments with LVGL v9, anti-aliased typography, dual 4 MB OTA app partitions, and compiled-in UI assets strictly require a minimum of 16 MB flash memory (e.g. `esp32s3nano`). 4 MB targets (`esp32dev`) are unsupported.
+- **LVGL Pro Integration:** Binds designer-created UI projects via the `UIDesign` library and standard reactive subjects (`sys_heap`, `sys_state`, `sys_ip`, `sys_wifi`, `sys_ota`). See [`modules/LVGLDisplay/README.md`](../modules/LVGLDisplay/README.md) for full subject contracts and component architecture.
 
-The `isExpired()` method controls when a board auto-dismisses. The framework uses
-an **asymmetric expiry model** — different board types have different lifecycles:
+### 7.3 `DisplayServiceHelper` Library
 
-- **OTA Progress**: `isExpired()` returns `true` when complete AND successful.
-  Failed OTA persists to show the error.
-- **Error Board**: `isExpired()` returns `true` only when explicitly `dismiss()`ed.
-  The `fatal` flag controls UI text ("System halted") but NOT expiry.
-- **Screensaver**: `isExpired()` returns `true` when `!_active`. Starts expired
-  by default; controlled via `activate()`/`deactivate()` lifecycle.
-- **Transient boards** (boot splash, loading): Auto-dismiss after their purpose
-  is fulfilled.
+Located in `lib/DisplayServiceHelper/`. Encapsulates shared web routes and MCP management tools for any module implementing `IDisplayModule`:
 
-### 7.4 Board Registration
+- **REST API Routes:**
+  - `GET /api/display/brightness`, `POST /api/display/brightness` — queries or sets backlight brightness with optional `saveCallback` configuration persistence.
+  - `GET /api/display/status` — reports display dimensions, color capability, brightness, sleep status, and active board name.
+  - `GET /api/display/screenshot` — captures an instantaneous PNG screenshot streamed directly over HTTP.
+- **MCP Tool Registration:** Registers `display_status`, `display_control`, and `capture_display` with the `MCPToolRegistry`.
+- **Dedicated Stack Task (`DeepStackExecutor`):** Generating PNG screenshots requires significant stack memory (~16 KB) for compression buffers. `DisplayServiceHelper` offloads capture to an isolated FreeRTOS worker task (`png_worker`), preventing stack exhaustion on the web server or main loop tasks.
 
-> 📖 See [Using Optional Modules § Sub-Object Registration](developer/using-optional-modules.md#sub-object-registration) for the registration pattern.
+### 7.4 Display Layer Priority Stack
 
-```cpp
-// In app setup — registering a custom board with the U8G2 display module
-u8g2Display.registerBoard(&myDeparturesBoard);
-```
-
-The board slot pool (`std::vector<IDisplayBoard*>`) allocates the slot during
-`begin()`; the pool is locked after `_compactAndLock()`. The app provides the
-board instance (app-owned, static lifetime).
-
-### 7.5 System Boards
-
-The display module provides a standard set of system boards that the framework
-drives directly during boot, WiFi setup, OTA, and error states:
-
-- Boot Splash
-- Loading / Progress
-- WiFi Setup Wizard
-- OTA Firmware Update Progress
-- Error screens (WiFi lost, data error, auth error)
-- Screensaver / Sleep Clock
-
-All system boards internally compose with widgets from the widget toolkit (§7.7).
-System board content is customisable per app (app name, logo, branding).
-
-### 7.6 Sleep / Wake Integration
-
-The display module manages power saving via sleep/wake:
-
-- **`_sleep()` sequence**: Set `_sleeping=true` → activate screensaver → show
-  screensaver board → call `setPowerSave(1)` (display off)
-- **`_wake()` sequence**: Set `_sleeping=false` → deactivate screensaver →
-  `setPowerSave(0)` + restore contrast → carousel resumes from current position
-
-Activity tracking: `_lastActivityMs` updated on user interaction; sleep triggered
-after configurable timeout.
-
-### 7.7 Widget Toolkit Architecture
-
-> 📖 See [Using Optional Modules § Display Module — Worked Example](developer/using-optional-modules.md#3-display-module--worked-example) for widget usage in practice.
-
-The widget toolkit provides composable UI building blocks for U8G2 displays.
-All widget files live within `modules/u8g2Display/widgets/`, fonts in
-`modules/u8g2Display/fonts/`, and board layout interfaces in
-`modules/u8g2Display/boards/interfaces/`.
-
-#### Three-Tier Widget Architecture
-
-| Tier | Components | Dependencies |
-|---|---|---|
-| **Primitives** | `iGfxWidget`, `drawingPrimitives`, `U8g2StateSaver`, `iBoardLayout` | U8G2 only |
-| **Generic Widgets** | `labelWidget`, `scrollingTextWidget`, `clockWidget`, `progressBarWidget`, `imageWidget` | Tier 1 |
-| **Module-Aware Widgets** | `wifiStatusWidget`, `systemMessageWidget`, `scrollingMessagePoolWidget` | Tier 1 + framework services |
-
-#### `iGfxWidget` (Abstract Base)
-
-```cpp
-class iGfxWidget {
-public:
-    int16_t x, y, width, height;  // concrete members, not virtual getters
-    bool visible = true;
-
-    virtual void tick(uint32_t currentMillis) = 0;
-    virtual void render(U8G2& display) = 0;
-    virtual void renderAnimationUpdate(U8G2& display) {}
-    virtual ~iGfxWidget() = default;
-
-    void setCoords(int16_t x, int16_t y);
-};
-```
-
-Key design decisions:
-- **Concrete x/y/w/h members** — zero vtable overhead for position queries
-- **`currentMillis` parameter injection** — no `Arduino.h` in widget headers
-- **Three-phase lifecycle**: `tick()` for logic, `render()` for full redraw,
-  `renderAnimationUpdate()` for partial animation frames
-
-#### `drawingPrimitives` (Stateless Utility Functions)
-
-Free functions for consistent text rendering with alignment and truncation:
-- `drawText(U8G2&, x, y, text, align, maxWidth)` with `TextAlign` enum
-  (`LEFT`, `CENTER`, `RIGHT`)
-- `blankArea(U8G2&, x, y, w, h)`
-- `drawTriangle(U8G2&, ...)`
-
-`TextAlign` is declared outside `#ifndef NATIVE_BUILD` (universally available).
-All other drawing functions are guarded.
-
-#### `U8g2StateSaver` (RAII Scope Guard)
-
-Non-copyable scope guard that saves/restores U8G2 font, clip window, and draw
-colour. Constructor saves state, destructor restores. Holds `U8G2&` reference —
-zero heap allocation.
-
-#### `iBoardLayout` (Board View Interface)
-
-Decouples rendering from board controller logic. Receives `Application*` for
-framework service access. Forward-declares both `class U8G2;` and
-`class Application;` in the header.
-
-#### `AppFonts` Namespace
-
-Inline functions returning U8G2 built-in Helvetica fonts on hardware, `nullptr`
-on native. `#include <U8g2lib.h>` placed inside the namespace block (never at
-header top level).
-
-#### Display Dimension Queries
-
-All widgets use `display.getDisplayWidth()` and `display.getDisplayHeight()` at
-runtime — **no compile-time `SCREEN_WIDTH`/`SCREEN_HEIGHT` constants**. When
-`width == -1`, widgets fall back to full display width. In `tick()` (where no
-display reference is available), a conservative 256px fallback is used.
-
-#### `scrollingMessagePoolWidget`
-
-Consumes EventBus topic `"display.message"` via static callback + `void* ctx`.
-Maintains a fixed circular buffer (`MessageEntry[8]`). Uses late binding via
-`begin(EventBus*)` — no EventBus dependency at construction time.
-
-### 7.8 Display Module Object Model (Target Architecture)
-
-> **Status**: This section documents the **target architecture** for `U8G2DisplayModule`
-> following the OO refactoring review of 2026-06 (see D34–D38 in §17). The implementation
-> plan for this refactoring is tracked as PR-16 in the PA workspace.
-
-#### 7.8.1 Hierarchical Sub-Object API
-
-The display module exposes three first-class sub-objects. Callers navigate these directly
-rather than calling flat methods on the root module:
-
-```
-display
- ├── .carousel                 CarouselEngine — manages the rotating board pool
- ├── .boards                   BoardCatalog   — named, concrete board references
- │    ├── .boot                BootBoard&
- │    ├── .wifiWizard          WiFiWizardBoard&
- │    ├── .otaProgress         OTAProgressBoard&
- │    └── .error               ErrorBoard&
- └── .screensaver              ScreensaverController — display-intrinsic idle policy
-```
-
-Callers configure boards via their **concrete types** (the domain API differs per board).
-The `IDisplayBoard*` interface appears only at engine boundaries (`showModal`, `carousel.add`),
-where the render loop needs polymorphism but not board-specific methods.
-
-#### 7.8.2 Canonical API Usage
-
-```cpp
-// Configure a board (data concern — concrete type, caller's domain):
-display.boards.otaProgress.setProgress(0.5f, "Downloading...");
-display.boards.wifiWizard.configure(hostname);
-
-// Surface a board (presentation concern — root module, IDisplayBoard* boundary):
-display.showModal(&display.boards.otaProgress);
-display.clearModal();
-display.showBase(&display.boards.configuringStatus);
-
-// Carousel (sub-object — manages its own pool and timing):
-display.carousel.add(&myClockBoard);
-display.carousel.suspend();
-display.carousel.resume();
-display.carousel.setInterval(8000);
-
-// Screensaver (display-intrinsic — driven by inactivity, not app decision):
-display.screensaver.setDimTimeout(60000);
-display.screensaver.setBlankTimeout(300000);
-display.screensaver.setPolicy(ScreensaverPolicy::FullSleep);
-display.screensaver.resetActivity();     // called by App on user interaction
-```
-
-#### 7.8.3 Display Layer Priority Stack
-
-Three distinct rendering layers with explicit priority. A layer at lower priority
-automatically yields to any layer above it that is active:
+The display subsystem implements a strict three-layer rendering priority stack:
 
 ```
 ┌──────────────────────────────────────────┐  Priority
@@ -1356,32 +1160,58 @@ automatically yields to any layer above it that is active:
 └──────────────────────────────────────────┘  yields to modal and base
 ```
 
-**Critical**: `ScreensaverBoard` must NOT be pushed via `showModal()`. Doing so assigns
-it MODAL priority, allowing it to suppress legitimate OTA progress and wizard overlays.
+- **MODAL (Highest):** Transient overlays driven by immediate application needs (e.g., `WiFiWizardBoard` during captive portal setup, `OTAProgressBoard` during firmware updates, `ErrorBoard` on fatal errors). Overrides carousel and screensaver.
+- **BASE / CAROUSEL (Mid):** The persistent backdrop. Displays either the rotating user board carousel (`display.carousel.*`) during `Running`, or the `ConfiguringStatusBoard` during `Configuring`.
+- **SCREENSAVER (Lowest):** Activated automatically by inactivity timers. Suppressed whenever any Modal is active or when user input wakes the display.
+- **Safety Rule:** `ScreensaverBoard` must NEVER be pushed via `showModal()`. Doing so assigns it MODAL priority, which would suppress critical OTA progress and setup wizard screens.
 
-#### 7.8.4 Board Taxonomy: System vs User-Surfaced
+### 7.5 Implemented Sub-Object API (`U8G2DisplayModule`)
 
-Not all boards are exposed in `display.boards`. System boards are driven by
-Application-layer state transitions; the module manages their rendering internally:
+The `U8G2DisplayModule` exposes three first-class sub-objects rather than flat root methods:
 
-| Board | Taxonomy | Visibility | Who controls |
-|---|---|---|---|
-| `BootBoard` | System | Not in `display.boards` | App via `display.reportStatus()` |
-| `ConfiguringStatusBoard` | System | Not in `display.boards` | App via `display.showBase()` |
-| `ScreensaverBoard` | Display-intrinsic | In `display.screensaver` | Screensaver sub-object internally |
-| `OTAProgressBoard` | User-surfaced | `display.boards.otaProgress` | Caller (OTA module) |
-| `WiFiWizardBoard` | User-surfaced | `display.boards.wifiWizard` | App (`onWifiAPStarted`) |
-| `ErrorBoard` | User-surfaced | `display.boards.error` | Any module via `display.reportError()` |
-| App-defined boards | User-surfaced | Registered via `display.carousel.add()` | Application |
+```
+display
+ ├── .carousel                 CarouselEngine — manages rotating board pool and intervals
+ ├── .boards                   BoardCatalog   — named, concrete system board references
+ │    ├── .boot                BootBoard&
+ │    ├── .configuringStatus   ConfiguringStatusBoard&
+ │    ├── .gateHelper          GenericGateHelperBoard&
+ │    ├── .diagnostics         DiagnosticsBoard&
+ │    ├── .wifiWizard          WiFiWizardBoard&
+ │    ├── .otaProgress         OTAProgressBoard&
+ │    └── .error               ErrorBoard&
+ └── .screensaver              ScreensaverController — display-intrinsic idle policy
+```
 
-#### 7.8.5 Service Module Boundary
-
-The display module is a **pure service** — it accepts commands and renders. It does not
-poll `Application` state or make decisions based on `AppState`. All "when to show what"
-decisions belong to the Application layer:
+#### Canonical API Usage
 
 ```cpp
-// Application owns state transitions — display is driven, not driving:
+// Board configuration (concrete type domain concern):
+display.boards.otaProgress.setProgress(0.5f, "Downloading...");
+display.boards.wifiWizard.configure(hostname);
+
+// Presentation control (polymorphic IDisplayBoard* boundary):
+display.showModal(&display.boards.otaProgress);
+display.clearModal();
+display.showBase(&display.boards.configuringStatus);
+
+// Carousel management (sub-object):
+display.carousel.add(&myClockBoard);
+display.carousel.suspend();
+display.carousel.resume();
+display.carousel.setInterval(8000);
+
+// Screensaver idle policy:
+display.screensaver.setDimTimeout(60000);
+display.screensaver.setBlankTimeout(300000);
+display.screensaver.resetActivity(); // called on input events
+```
+
+#### Service Module Boundary
+
+`U8G2DisplayModule` is a pure service module: it accepts commands and renders. It does not poll `Application` state or read `AppState`. State transitions belong entirely to the `Application` coordinator:
+
+```cpp
 void Application::onEnterConfiguring() {
     _display.carousel.suspend();
     _display.showBase(&_display.boards.configuringStatus);
@@ -1396,10 +1226,52 @@ void Application::onWifiConnected() { _display.clearModal(); }
 void Application::onEnterRunning()  { _display.carousel.resume(); }
 ```
 
-`Application*` is removed from `U8G2DisplayModule`'s member variables. The module
-publishes `display.sleep`, `display.wake`, `display.board.changed` events via EventBus
-but does not read from the Application. The screensaver sub-object manages its own
-inactivity timer without needing application state.
+### 7.6 Board Catalog & System Boards
+
+The framework includes a comprehensive catalog of pre-built system boards stored as member variables within `BoardCatalog` (zero heap allocations during runtime):
+
+| Board | Purpose | Visibility | Controller |
+|---|---|---|---|
+| `BootBoard` | Splash logo, version string, boot-phase progress | System | `Application` via `IStatusReporter` |
+| `ConfiguringStatusBoard` | Precondition status list, boot progress bar, help prompts | System | `Application` via `showBase()` |
+| `GenericGateHelperBoard` | Gate-specific troubleshooting instructions and IP guidance | System | `Application` via `showModal()` |
+| `DiagnosticsBoard` | Real-time heap, internal DRAM, uptime, task diagnostics | User / App | App via `carousel.add()` or modal |
+| `WiFiWizardBoard` | Captive portal AP credentials, URL, connection wizard | User-surfaced | `Application` (`onWifiAPStarted`) |
+| `OTAProgressBoard` | Firmware update download progress bar and verification status | User-surfaced | OTA subsystem / EventBus |
+| `ErrorBoard` | Fatal system halts or warning banners with error text | User-surfaced | Any module via `reportError()` |
+| `ScreensaverBoard` | Low-power clock and burn-in prevention animations | Display-intrinsic | `ScreensaverController` |
+
+### 7.7 `IDisplayBoard` Interface & Lifecycle (U8G2 Variant)
+
+```cpp
+class IDisplayBoard {
+public:
+    virtual const char* getBoardName() const = 0;
+    virtual void onActivate() = 0;
+    virtual void onDeactivate() = 0;
+    virtual void tick(uint32_t ms) = 0;
+    virtual void render(U8G2& display) = 0;
+    virtual UpdateStatus updateData() = 0;
+    virtual bool isScrollFinished() { return true; }
+    virtual bool isExpired() { return false; }
+    virtual ~IDisplayBoard() = default;
+};
+```
+
+- **Asymmetric Expiry Model:** `isExpired()` dictates when a board should auto-dismiss:
+  - `OTAProgressBoard`: Returns `true` only when download completes successfully. Failed OTA persists to display the error.
+  - `ErrorBoard`: Returns `true` only when explicitly dismissed via `dismiss()`.
+  - `ScreensaverBoard`: Returns `true` when inactive (`!_active`).
+  - Transient splash boards auto-expire after their timeout elapses.
+
+### 7.8 Widget Toolkit Architecture
+
+Located in `modules/U8G2Display/widgets/`. Provides composable UI primitives for U8G2 displays:
+
+- **Tier 1 (Primitives):** `iGfxWidget` (concrete `x, y, width, height` members, zero vtable query overhead), `drawingPrimitives` (stateless text alignment and clipping functions), `U8g2StateSaver` (RAII font/color clip scope guard), `iBoardLayout`.
+- **Tier 2 (Generic Widgets):** `labelWidget`, `scrollingTextWidget`, `clockWidget`, `progressBarWidget`, `imageWidget`.
+- **Tier 3 (Module-Aware Widgets):** `wifiStatusWidget`, `systemMessageWidget`, `scrollingMessagePoolWidget` (consumes `"display.message"` EventBus topic).
+- **Dynamic Dimension Queries:** Widgets query `display.getDisplayWidth()` and `display.getDisplayHeight()` dynamically at runtime with fallback defaults, avoiding hardcoded compile-time screen dimensions.
 
 ---
 
@@ -1407,91 +1279,128 @@ inactivity timer without needing application state.
 
 > 📖 **Developer Guide:** [Configuration System](developer/config-system.md) — saving, migrating, and restoring module settings.
 
-### 8.1 Separation of Concerns
+### 8.1 ConfigManager-as-Gateway Pattern
 
-> 📖 See [Configuration System § Config File Ownership Model](developer/config-system.md#1-config-file-ownership-model) for the ownership rules.
+The framework standardises on a centralized configuration gateway model. Modules **never interact directly with LittleFS** or perform raw file I/O for configuration. Instead, `ConfigManager` (`modules/ConfigManager/ConfigManager.hpp`) serves as the sole gateway for file operations, JSON serialization, schema versioning, and atomic persistence.
 
-Configuration is split across multiple JSON files on LittleFS, organised under
-the directory convention defined in §2.7:
+#### Storage Organization & Path Conventions
 
-| Path | Owner | Contents |
+Configuration files are partitioned cleanly by ownership across dedicated paths on flash storage:
+
+| Path | Owner | Purpose & Format |
 |---|---|---|
-| `/etc/config.json` | Framework kernel | FrameworkConfig (hostname, timezone, OTA, mcpReadOnly) |
-| `/etc/apikeys.json` | Framework kernel | KeyManager encrypted credential store |
-| `/mod/display.json` | Display module | Brightness, flip, sleep timeout |
-| `/mod/mqtt.json` | MQTT module | Broker host, port, credentials |
-| `/mod/ha.json` | HA module | HA API endpoint, token reference |
-| `/mod/scheduler.json` | Scheduler module | Schedule rules |
-| `/app/<appname>.json` | Application | App-specific settings |
+| `/etc/config.json` | Framework kernel | `FrameworkConfig` (hostname, timezone, OTA settings, publish interval) |
+| `/etc/apikeys.json` | Framework kernel | `KeyManager` AES-GCM encrypted credential vault |
+| `/mod/<namespace>.json` | `ConfigManager` | Module configuration files, keyed by `getConfigNamespace()` |
+| `/config_manifest.json` | `ConfigManifest` | Three-tier lifecycle manifest tracking schema versions |
+| `/app/<appname>.json` | Application | Application domain settings (managed via `IConfigurable`) |
 
-**Ownership rules:**
-- Framework kernel reads/writes only `etc/`
-- Each module reads/writes only its own file under `mod/`
-- Application code reads/writes only `app/`
-- No component reads or writes outside its designated directory
+#### Filesystem Mount Point (`ConfigRoot`)
 
-### 8.2 Config Versioning & Schema Migration
+When a dedicated `config` LittleFS partition exists (defined in `partitions.csv`), the framework mounts it at `/config` for maximum wear-leveling isolation. If no separate config partition is present, it falls back to the main `/littlefs` storage partition. In native GoogleTest runs, storage resolves to `test/tmp/config`.
 
-> 📖 See [Configuration System § Schema Versioning & Migrations](developer/config-system.md#4-schema-versioning--migrations) for the migration contract.
+#### Transactional File Persistence
 
-Each config file includes a `configVersion` integer field. On load, the owning
-module:
-1. Reads the stored version
-2. Performs incremental migration if the stored version is older than the current schema
-3. Falls back to safe defaults if migration is impossible or the file is corrupt
-4. Writes the updated config with the current version
+All configuration writes follow an atomic two-phase write pattern:
+1. Serialize configuration payload to a temporary file (`/mod/<namespace>.json.tmp`).
+2. Call `flush()` to ensure buffers are physically written to flash.
+3. Atomically rename the temporary file to `/mod/<namespace>.json` via POSIX `rename()`.
 
-### 8.3 App Config Extension Pattern
+If a brownout or power loss occurs mid-write, the existing configuration remains intact, eliminating corrupted or truncated configuration files.
 
-> 📖 See [Configuration System § Saving Configuration at Runtime](developer/config-system.md#7-saving-configuration-at-runtime) for the save/load pattern.
+### 8.2 The `IConfigurable` Contract
 
-The application defines its own struct and manages serialisation:
+Modules participate in configuration persistence by implementing the pure interface [`IConfigurable`](include/interfaces/IConfigurable.hpp) (see §6.3):
 
 ```cpp
-struct MyAppConfig {
-    char stationId[13];
-    char apiKeyId[13];
-    int refreshInterval;
-};
-
-class MyAppConfigManager {
-    MyAppConfig config;
+class IConfigurable {
 public:
-    void load();   // reads /app/myapp.json from LittleFS
-    bool save();   // writes /app/myapp.json to LittleFS
-    MyAppConfig& getConfig() { return config; }
+    virtual ~IConfigurable() = default;
+
+    virtual const char* getConfigNamespace() const = 0;
+    virtual int getSchemaVersion() const = 0;
+    virtual void applyConfig(const JsonObject& section) = 0;
+    virtual void serializeConfig(JsonObject& section) const = 0;
+    virtual bool migrateConfig(JsonObject& section, int fromVersion) { return true; }
+    virtual void resetConfig() = 0;
 };
 ```
 
-The app's web portal endpoints read/write this config independently.
+- **`getConfigNamespace()`**: Returns a unique, lowercase compile-time string literal (e.g. `"wifi"`, `"display"`, `"ota"`). Determines the filename at `/mod/<namespace>.json`.
+- **`getSchemaVersion()`**: Returns an integer schema version (starting at 1). Incremented whenever configuration keys or types change.
+- **`applyConfig(const JsonObject& section)`**: Deserializes JSON settings into internal state. Called at boot (`beginAll()`), after mutations (`saveModuleConfig()`), or upon backup restoration.
+- **`serializeConfig(JsonObject& section) const`**: Serializes current internal state into the JSON object. `ConfigManager` automatically injects the metadata field `_v`.
+- **`migrateConfig(JsonObject& section, int fromVersion)`**: Migrates an older schema in-place. Returning `true` persists the migrated format; `false` triggers a fallback to defaults.
+- **`resetConfig()`**: Resets all internal settings to hardcoded factory defaults.
 
-### 8.4 Config Consumer Notification & Hot Reload
+Modules register with `ConfigManager` automatically when passed to `app.registerModule(&module)`.
 
-When the web portal saves any config, it calls:
+### 8.3 Schema Versioning & Migration Lifecycle
+
+Each `/mod/<namespace>.json` file maintains a root-level integer field `_v` managed exclusively by `ConfigManager`. During `ConfigManager::beginAll()` (Boot Step 8):
+
+1. **File Read:** `ConfigManager` loads `/mod/<namespace>.json`. If missing, it invokes `resetConfig()`, serializes defaults, and writes the initial file.
+2. **Version Inspection:** The stored `_v` is compared against `module.getSchemaVersion()`.
+3. **Migration Execution:** If `stored_v < current_v`, `migrateConfig(section, stored_v)` is executed:
+   - If migration succeeds (`true`), `_v` is updated to `current_v` and the migrated file is atomically saved back to flash.
+   - If migration fails (`false`) or the JSON payload is malformed, an error is logged, `resetConfig()` is called, and factory defaults are persisted.
+4. **State Application:** `module.applyConfig(section)` is called to populate runtime module memory.
+
+### 8.4 Runtime Persistence (`saveModuleConfig`)
+
+When a module or web route mutates settings at runtime, it triggers persistence through `ConfigManager`:
+
 ```cpp
-appContext.getConfigManager().requestReload();
+// Save and re-apply settings for a module namespace:
+configManager.saveModuleConfig("display");
+
+// Or by pointer:
+configManager.saveModuleConfig(&myModule);
 ```
 
-On the next `tick()`, the framework safely executes the reload on the main thread
-and calls `reapplyConfig()` on all registered `iConfigurable` consumers. This is
-an EventBus-dispatched reload — **no device reboot required**.
+#### Mutation Sequence
+1. Allocates a bounded `JsonDocument`.
+2. Invokes `module->serializeConfig(root)`.
+3. Injects `root["_v"] = module->getSchemaVersion()`.
+4. Writes atomically to `/mod/<namespace>.json` via write-to-temp and atomic rename.
+5. Re-applies immediately: calls `module->applyConfig(root)`.
 
-### 8.5 JSON Memory Safety
+This update is **synchronous and immediate**. No device reboot or asynchronous reload dispatch is required.
 
-> 📖 See [Embedded Safety § Bounded JsonDocument for POST Body Parsing](developer/embedded-safety.md#rule-4-bounded-jsondocument-for-post-body-parsing-adr-15) for memory-safe JSON patterns.
+### 8.5 Three-Tier Configuration Manifest (`lib/ConfigManifest/`)
 
-**`DynamicJsonDocument` is banned project-wide.** The framework uses ArduinoJson
-v7, which replaces `StaticJsonDocument<N>` and `DynamicJsonDocument` with a
-unified `JsonDocument` type. All JSON operations use the v7 API:
+The `ConfigManifest` subsystem tracks configuration schema lifecycles across firmware updates:
 
-```cpp
-// ✅ Correct — ArduinoJson v7 unified type
-JsonDocument doc;
+- **Active:** The schema version currently running on the device.
+- **Previous:** The schema version that was active prior to the last OTA update.
+- **Golden:** The last-known-good schema version, snapshotted when the firmware passes validation and is blessed via `snapshotActiveToGolden()`.
 
-// ❌ Banned — v6 API, causes heap fragmentation
-DynamicJsonDocument doc(1024);
-StaticJsonDocument<512> doc;  // v6 legacy — use JsonDocument instead
-```
+The manifest is maintained in `/config_manifest.json` across up to 16 module slots (`ModuleSlot`), providing an audit trail and fallback reference during rollback scenarios.
+
+### 8.6 Configuration Backup, Export & Import
+
+`ConfigManager` provides holistic backup and restore across all registered modules:
+
+- **Export (`exportAllConfig`):** Iterates all registered `IConfigurable` modules and compiles their serialized JSON objects into a single backup envelope:
+  ```json
+  {
+    "version": 1,
+    "device": "esp32-app",
+    "modules": {
+      "wifi": { "_v": 1, "hostname": "living-room" },
+      "display": { "_v": 1, "brightness": 255 }
+    }
+  }
+  ```
+- **Import (`importAllConfig`):** Validates schema versions, imports sections into their respective `/mod/<namespace>.json` files, and re-applies configuration across all modules.
+
+### 8.7 JSON Memory Safety (ArduinoJson v7)
+
+The framework standardises strictly on **ArduinoJson v7**:
+
+- **`JsonDocument` Unified Document Type:** Replaces v6 `DynamicJsonDocument` and `StaticJsonDocument<N>`. Allocation is memory-pool based and handles both small and large documents safely.
+- **Banned Types:** `DynamicJsonDocument` and `StaticJsonDocument` are **strictly prohibited** across the codebase.
+- **Safe Extraction:** Always use the fallback operator `config["key"] | defaultValue` rather than `.as<T>()` to prevent crashes on missing or null keys.
 
 ---
 
@@ -1499,70 +1408,209 @@ StaticJsonDocument<512> doc;  // v6 legacy — use JsonDocument instead
 
 > 📖 **Developer Guide:** [Architecture Overview](developer/architecture-overview.md) — boot sequence, tick loop, and state transitions.
 
-### 9.1 Boot State Machine
+### 9.1 Three-State Bidirectional Lifecycle Machine
 
-> 📖 See [Architecture Overview § The Application Lifecycle](developer/architecture-overview.md#7-the-application-lifecycle) for the boot phase walkthrough.
+The application lifecycle is governed by an explicit 3-state machine defined in `include/types/AppState.hpp`:
 
-```
-BOOTING
-  │  (crypto init, display init, splash)
-  │  (filesystem mount, config load)
-  │  (WiFi connect attempt)
-  ├──→ WIFI_SETUP   (WiFi failed, AP mode active — show WiFi wizard)
-  │       ├──→ BOOTING (on successful connect)
-  │       └──→ WIFI_SHUTDOWN (10-min AP inactivity timeout)
-  │
-  │  (NTP sync, web server init, MCP server init, first data fetch)
-  ├──→ APP_SETUP    (no app config present — show setup guide)
-  │       └──→ RUNNING (on config save via portal)
-  │
-  └──→ RUNNING      (normal operation)
-         │
-         └──→ WIFI_SETUP (on WiFi loss during runtime)
+```cpp
+enum class AppState : uint8_t {
+    Boot        = 0, ///< Hardware init, module begin() — only valid during setup()
+    Configuring = 1, ///< Kernel up, awaiting user configuration / preconditions
+    Running     = 2  ///< Normal tick() loop; all prerequisites satisfied
+};
 ```
 
-### 9.2 `begin()` Sequence (Framework-Managed)
+Legacy states `WIFI_SETUP` and `APP_SETUP` are completely removed, unified into `AppState::Configuring`.
 
-> 📖 See [Architecture Overview § BOOT Phase](developer/architecture-overview.md#1-boot-phase) for the deterministic boot order.
+```
+┌────────────────────────┐
+│       AppState::Boot   │ (setup / hardware init)
+└───────────┬────────────┘
+            │
+            ├──────────────────────────────────────┐
+            │ (startup preconditions unsatisfied)  │ (all startup preconditions satisfied)
+            ▼                                      ▼
+┌────────────────────────┐  all startup met   ┌────────────────────────┐
+│  AppState::Configuring │ ─────────────────> │   AppState::Running    │
+│  (portal up, waiting)  │ <───────────────── │   (normal operation)   │
+└────────────────────────┘ startup suppressed └────────────────────────┘
+                             (regression)
+```
 
-The framework executes boot in this deterministic order:
+- **`AppState::Boot` (0):** Ephemeral hardware bootstrap phase. DeviceCrypto initializes, filesystems mount, configuration loads, and modules are wired. Valid only during `Application::begin()`.
+- **`AppState::Configuring` (1):** Kernel services, web portal, captive AP, and background workers are active, but the device is waiting for mandatory configuration or startup preconditions to be satisfied. The display presents `ConfiguringStatusBoard`.
+- **`AppState::Running` (2):** Normal operation. All startup preconditions are satisfied. Background data sources fetch on their declared schedules, and the display carousel cycles user boards.
 
-1. DeviceCrypto init (must precede any credential reads)
-2. Display module init → Boot Splash (if display module registered)
-3. LittleFS mount
-4. FrameworkConfig load → KeyManager load
-5. App config load (app-provided hook)
-6. WiFi init (non-blocking, transitions to WIFI_SETUP if AP mode needed)
-7. NTP sync (asynchronous — never blocks boot; sync status checked periodically)
-8. DataManager task start (FreeRTOS background worker, ≥ 8KB stack)
-9. Register all module config consumers
-10. WebServerManager init (registers all `IWebContributor` routes)
-11. McpServer init (registers built-in + all `IMcpContributor` tools)
-12. OTA manager init
-13. OTA firmware blessing (see §13.3)
-14. `_compactAndLock()` — shrink structural arrays, log heap, publish `"system.heap"`
-15. → Yield to `tick()` loop
+#### Bidirectional State Transitions & Regression
 
-> Modules such as `boardLED` and `buttonHandler` self-initialise during their own
-> `registerTickable()` call. The framework does not assume their presence.
+Transitions between `Configuring` and `Running` are fully bidirectional:
+- **`Boot → Configuring`:** At the conclusion of `begin()`, one or more `Startup`-role preconditions remain unsatisfied.
+- **`Boot → Running`:** At the conclusion of `begin()`, all `Startup`-role preconditions are already satisfied.
+- **`Configuring → Running`:** During `tick()`, `PreconditionEngine::allStartupMet()` becomes true. The framework publishes `ApplicationEvents::APP_RUNNING` (`"app.running"`).
+- **`Running → Configuring` (Regression):** During `tick()`, if any `Startup` or `Both`-role precondition becomes suppressed (e.g. WiFi connection drops and exceeds flap damping tolerance), the application regresses back to `Configuring`. The framework publishes `ApplicationEvents::APP_CONFIGURING` (`"app.configuring"`), suspends the display carousel, and presents the configuration screen.
 
-Progress is reported to `IStatusReporter` at each step (visible on display if present).
+### 9.2 The PreconditionEngine Gate Subsystem
 
-### 9.3 `tick()` Sequence (Every Loop)
+The framework replaces coarse boolean gates with the `PreconditionEngine` (`modules/PreconditionEngine/PreconditionEngine.hpp`), providing fine-grained dependency modeling, structured causes, and automated flap suppression.
 
-> 📖 See [Creating a Module § The Tick Loop](developer/creating-a-module.md#the-tick-loop--injected-time) for tick implementation guidance.
+#### 9.2.1 Three-Question Split & Precondition Roles
 
-1. Check deferred config reload flag → reload + notify if pending
-2. WiFiManager tick (connection state machine)
-3. OTA manager tick (update check, download state)
-4. AppState evaluation → drive state transitions
-5. Registered `ITickable` dispatch (all modules, including boardLED, buttonHandler,
-   display module, MQTT, etc. — whatever the app registered)
-6. McpServer tick (Serial JSON-RPC polling)
-7. WiFi connection health monitor
+One predicate cannot answer whether a device may boot, whether it should be serving, and whether a fault is severe enough to regress. Preconditions declare their operational scope via `PreconditionRole`:
 
-Under `NATIVE_BUILD`, `tick()` also calls `_dataManager.processNext()` synchronously
-(on hardware this runs on the FreeRTOS background task).
+```cpp
+enum class PreconditionRole : uint8_t {
+    Operational = 0,  ///< Features degrade while unmet. Does NOT block boot. (default)
+    Startup,          ///< Must be met to leave boot / enter Running.
+    Both              ///< Blocks startup AND causes regression if suppressed at runtime.
+};
+```
+
+**The default role is `Operational`.** Declaring a precondition is cheap and non-blocking by default; blocking boot requires deliberate design intent.
+
+#### 9.2.2 Frequency-Based Status & Description Split
+
+To prevent per-tick string formatting and heap allocations, status evaluation and description formatting are decoupled by frequency:
+
+```cpp
+struct PreconditionStatus {
+    bool  met   = false;
+    Cause cause = Cause::NotConfigured;
+};
+
+// HOT PATH — evaluated every tick. Zero allocation, no formatting.
+virtual PreconditionStatus getStatus() const = 0;
+
+// COLD PATH — invoked only when publishing or rendering into a CALLER-SUPPLIED buffer.
+virtual void describe(Cause cause, char* buf, size_t len) const {}
+```
+
+- Single-cause preconditions do not need to override `describe()` (zero cost).
+- Multi-cause preconditions format human-readable descriptions into caller-owned memory, eliminating dangling pointers and `mutable` member variables.
+
+#### 9.2.3 Structured Cause Vocabulary
+
+```cpp
+enum class Cause : uint8_t {
+    Met = 0,
+    NotConfigured,    ///< Missing credentials or user inputs. Person must act.
+    Connecting,       ///< In progress; expected to resolve automatically.
+    Rejected,         ///< Configuration rejected by peer (e.g. invalid password/token).
+    Unreachable,      ///< Target endpoint configured but peer does not answer.
+    RateLimited,      ///< Peer is reachable but requesting throttling.
+    Implausible,      ///< Data received but failed domain validation (e.g. flatline sensor).
+    DependencyUnmet,  ///< Upstream precondition is unsatisfied.
+    FallbackEngaged,  ///< Degraded but serviceable operating mode (e.g. AP portal mode).
+    Unavailable,      ///< Feature intentionally unconfigured or hardware absent. Not a fault.
+    Indeterminate,    ///< Dependency was not wired into module (programming error, loud).
+    InternalError     ///< System defect or hardware fault.
+};
+```
+
+#### 9.2.4 Derived Severity & Trust History
+
+Severity is derived by the framework to guide UI presentation and escalation:
+
+| Cause | Derived Severity | Meaning |
+|---|---|---|
+| `Connecting`, `Unreachable`, `RateLimited` | **Transient** | Temporary glitch; keep retrying without user alarm. |
+| `Implausible` | **Transient** or **NeedsUser** | Discriminated by trust history (`everMet`). |
+| `NotConfigured`, `Rejected` | **NeedsUser** | Actionable only by the user. |
+| `DependencyUnmet` | **Blocked** | Upstream precondition owns user notification. |
+| `Indeterminate`, `InternalError` | **Persistent** | Developer or system defect; reported loudly. |
+| `FallbackEngaged` | **Degraded** | Operating under degraded fallback mode. |
+| `Unavailable` | **Inactive** | Intentionally omitted; reported once, never nags. |
+
+**Trust History:** Framework-owned `bool everMet` and `uint32_t identityEpoch` track whether a precondition has ever succeeded. A LAN peer that worked previously and disconnected is `Transient`; a LAN peer that has never once succeeded is `NeedsUser` (flagging a likely mistyped IP address).
+
+#### 9.2.5 Typed Dependency Edges & Cycle Rejection
+
+Preconditions define dependency edges using typed strengths:
+- **`Wants`:** Presentation hint only; does not block evaluation.
+- **`Requires`:** Strict dependency; dependent cannot be met unless prerequisite is met.
+- **`BindsTo`:** `Requires` plus runtime linkage; if prerequisite becomes unmet, dependent immediately un-satisfies.
+
+All edges are validated once during boot (`resolveEdges()`). Unknown precondition names and dependency cycles are rejected loudly at startup.
+
+#### 9.2.6 Flap Damping & Recovery Probes
+
+To prevent network glitches from bouncing the device between states, failures accrue penalty points per second:
+- Penalty accrues per second based on severity; decays exponentially over a runtime-configurable half-life.
+- **Asymmetric Thresholds:** Crossing `suppressThreshold` (e.g. 2000) causes regression; returning requires falling below `reuseThreshold` (e.g. 750), preventing hysteresis flapping.
+- **Half-Open Recovery:** When retries exhaust, fallback engages via the EventBus (`precondition.fallback.requested`). The resource owner executes half-open trial probes after a cooldown period. Manual user retries bypass the breaker.
+
+#### 9.2.7 Dual Status Publication
+
+The framework publishes both undamped and damped statuses on `ApplicationEvents::PRECONDITION_HEALTH` (`"precondition.health"`). Subsystems select the view suited to their consequences: irreversible integrations (such as power accumulation counters) read undamped status to cut off integration immediately, while displays read damped status to prevent cosmetic UI flicker.
+
+#### 9.2.8 Registration Pattern (`IPreconditionContributor`)
+
+Modules register preconditions using the visitor pattern to prevent silent omission:
+
+```cpp
+class IPreconditionContributor {
+public:
+    virtual ~IPreconditionContributor() = default;
+    virtual void registerPreconditions(IPreconditionRegistry& registry) = 0;
+};
+```
+
+### 9.3 Framework Deterministic `begin()` Sequence
+
+The framework executes boot across 20 deterministic steps in `Application::begin()`:
+
+1. **Early Boot Banner:** Log `BUILD_VERSION` and framework identifier to serial.
+2. **Install Log Pipeline (Step 1b):** Register `CompositeSanitizer` with `Redactor` (and `StructuralScrubber` on verbose builds) via `esp_log_set_vprintf`. All subsequent logs are redacted. Check PSRAM if configured.
+3. **Enter BOOT State:** Set `AppState::Boot` and initialize early `_statusReporter`.
+4. **Initialize EventBus:** Call `_eventBus.begin()`. First service ready; enables event dispatch.
+5. **Mount Filesystem:** Mount the dedicated `/config` partition (if present) and `/littlefs` storage partition.
+6. **Load FrameworkConfig:** Store internal `FrameworkConfig` and configure publishing throttles.
+7. **Security Subsystems:** Initialize `DeviceCrypto.begin()` and `KeyManager.begin(&_deviceCrypto)`.
+8. **Dependency Injection & Framework Registrations:** Wire dependencies and register core modules (`WifiManager`, `AuthManager`, `ConfigManager`, `KeyManager`, `WebServerManager`, `PreconditionWebContributor`, `DataSourceWebContributor`, `AuditModule`, WiFi preconditions).
+9. **ConfigManager Gateway Boot:** Call `_configManager.beginAll()`. Load all `/mod/<ns>.json`, execute migrations, and apply configuration to all registered modules.
+10. **Custom Module Registration:** Register application-specific modules passed via `app.registerModule()`.
+11. **WifiManager Begin:** Call `_wifiManager.begin()`. Initiate network interface with loaded credentials.
+12. **WiFi Event Binding:** Subscribe to `wifi.ap_started` to automatically enable `AuthManager` AP-mode authentication bypass.
+13. **DataManager Begin:** Start background data worker FreeRTOS task and register all `IDataSource` workers.
+14. **Time Sync:** Initialize asynchronous NTP synchronization via `TimeManager` if present.
+15. **Display Hardware Init:** Initialize display adapter and show early boot splash.
+16. **WebServerManager Begin:** Start `PsychicHttpServer`, bind static PROGMEM assets, and register all contributor routes and tabs.
+17. **MCP Server Init:** Register built-in tools and all `IMCPContributor` tools with `MCPToolRegistry`.
+18. **Lock Registration Vectors:** Call `_compactAndLock()` to seal module arrays and execute `_preconditionEngine.resolveEdges()`.
+19. **Firmware Self-Test Logging (Step 17b):** Log self-test pass. (App validation is delegated to the consumer; see §9.5).
+20. **Heap & Gate Evaluation (Steps 18–20):** Publish `system.heap`, clear status overlay, evaluate `PreconditionEngine::allStartupMet()`, and transition to either `AppState::Running` or `AppState::Configuring`.
+
+### 9.4 Framework `tick()` Sequence
+
+Executed continuously on Core 1 in the main loop:
+
+1. **State Guard:** Return immediately if `_state` is neither `Configuring` nor `Running`.
+2. **PreconditionEngine Tick:** Call `_preconditionEngine.tick(currentMillis)`.
+3. **Throttled Gate Check (500ms):** If in `Configuring`, evaluate blocking gates and re-publish `app.configuring` if gate status or IP address changed. If all startup preconditions are met, transition to `Running` and emit `app.running`.
+4. **Native Simulation:** Under `NATIVE_BUILD`, call `_dataManager.processNext()` synchronously.
+5. **Tickable Module Dispatch:** Iterate registered `ITickable` modules in registration order. In debug builds, monitor execution duration against `module->getTickBudgetMs()` (default 10ms) and emit warnings on budget overruns.
+6. **Precondition Health & Regression Monitor:** Detect status changes across all preconditions and publish `precondition.health`. If in `Running` and any `Startup` or `Both` precondition becomes suppressed, immediately regress to `Configuring` and publish `app.configuring`.
+7. **Periodic Heartbeat (~30s):** Emit system telemetry log: `♥ uptime=%lus free_heap=%luB dram=%luB dram_min=%luB` (uptime, free heap, internal DRAM, and minimum DRAM watermark since boot).
+8. **Service Maintenance:** Pump periodic background maintenance for `AuthManager` session expiration, `WifiManager` connection state, and `AuditModule` flash sync.
+
+### 9.5 Firmware Blessing & Soft Reset
+
+#### Consumer-Delegated Firmware Blessing (`markAppValid`)
+
+The framework does NOT automatically bless new OTA firmware images upon successful boot. Downstream applications must explicitly validate that their domain dependencies are working (e.g. successful cloud communication or valid sensor acquisition) and call:
+
+```cpp
+otaManager.markAppValid();
+```
+
+If the device reboots or watchdog-resets before `markAppValid()` is called, the ESP-IDF anti-rollback system marks the partition invalid and automatically reverts to the previous operational firmware slot.
+
+#### Soft Reset (`softReset`)
+
+```cpp
+void Application::softReset();
+```
+
+Logs a warning identifying the reset trigger and calls `esp_restart()` directly. In native unit test builds, `esp_restart()` delegates to a test harness wrapper to verify graceful teardown without crashing the test process.
 
 ---
 
@@ -1570,121 +1618,144 @@ Under `NATIVE_BUILD`, `tick()` also calls `_dataManager.processNext()` synchrono
 
 > 📖 **Developer Guide:** [Extending the Web Portal](developer/extending-the-web-portal.md) — custom tabs, REST endpoints, and JWT authentication.
 
-### 10.1 Base Portal
+### 10.1 Single Page Application (SPA) & PsychicHttp Server
 
-The framework provides a base web portal as a PROGMEM-hosted Single Page Application.
-The SPA shell (HTML/CSS/JS) is framework-owned and serves:
+The framework web portal operates as a PROGMEM-hosted Single Page Application (SPA) served by **`PsychicHttpServer`** (`PsychicHttp.h`). The legacy `ESPAsyncWebServer` has been completely replaced.
 
-- **WiFi tab** — SSID scan, connect, hostname, password change
-- **System tab** — Device info, firmware version, build time, heap stats
-- **OTA tab** — Firmware update trigger, release notes, OTA settings
+#### Server Features & Dual-Server TLS Mode
+- **Asynchronous HTTP (Port 80):** Serves static PROGMEM assets at ~0ms latency and handles JSON REST APIs.
+- **Dual-Server TLS Mode (Port 443):** When authentication is enabled, a certificate is loaded, and the device is not in AP mode, a `PsychicHttpsServer` serves HTTPS on port 443 while port 80 automatically redirects incoming requests to HTTPS. In AP mode or when TLS is unconfigured, all routes run open over HTTP port 80.
+- **Heap Guard Semaphore:** `WebServerManager` maintains an atomic counter of concurrent high-memory requests (`MAX_CONCURRENT_HIGH_MEM = 2`). If concurrency exceeds this limit or the largest free DRAM block drops below `HEAP_GUARD_MIN_BLOCK_BYTES` (16 KB), incoming requests receive HTTP 503 "Low memory — retry".
+- **Socket Throttling:** Limited by `BOARD_HTTP_MAX_OPEN_SOCKETS` (default 4; 2–3 browser connections + 1 MCP connection) to protect internal DRAM.
 
-### 10.2 App Tab Extension
+### 10.2 PROGMEM Static Asset Inventory (20 Assets)
 
-> 📖 See [Extending the Web Portal § End-to-End Pattern](developer/extending-the-web-portal.md#2-end-to-end-pattern-c-to-dom) for the full tab registration walkthrough.
+The framework SPA shell is compiled directly into flash memory (`rodata`) by `portalBuilder.py` as gzip-compressed byte arrays (`include/portal_assets/*.hpp`), eliminating any LittleFS dependency for base portal functionality:
 
-Modules register additional tabs via `IWebContributor`:
+| # | Asset Header | Purpose & Content |
+|---|---|---|
+| 1 | `index_html.hpp` | Compressed HTML5 SPA shell, responsive viewport, mount container |
+| 2 | `app_css.hpp` | Core CSS styles, dark-theme custom properties, BEM component library |
+| 3 | `app_js.hpp` | Application bootstrapper, DOM router, `ApiQueue`, modal manager |
+| 4 | `utils_js.hpp` | Shared frontend utilities, toast alerts, escaping, formatting |
+| 5 | `wifi_js.hpp` | WiFi scanner, network selection, AP configuration, signal gauges |
+| 6 | `system_js.hpp` | System info, real-time heap gauges, uptime counter, restart modal |
+| 7 | `ota_js.hpp` | OTA firmware updates, upload forms, progress bars, version check |
+| 8 | `display_js.hpp` | Backlight sliders, display status metrics, screenshot stream viewer |
+| 9 | `auth_js.hpp` | Session login, password rotation, bearer token generator |
+| 10 | `keys_js.hpp` | KeyManager vault editor, secret registration, credential table |
+| 11 | `mcp_js.hpp` | MCP tool inspector, JSON-RPC endpoint viewer, read-only mode toggle |
+| 12 | `time_js.hpp` | Timezone selector, NTP server configuration, sync status |
+| 13 | `backup_js.hpp` | Full configuration JSON export, file upload restore, factory reset |
+| 14 | `appconfig_js.hpp` | Generic schema-driven application configuration tab |
+| 15 | `hardware_js.hpp` | Hardware pinouts, peripheral status, hardware configuration viewer |
+| 16 | `carousel_js.hpp` | U8G2 display carousel board list, interval settings, active board control |
+| 17 | `homeassistant_js.hpp` | Home Assistant MQTT discovery state, entity monitor |
+| 18 | `screenshot_html.hpp` | Standalone full-screen screenshot preview page |
+| 19 | `screenshot_js.hpp` | Continuous screenshot polling and stream rendering logic |
+| 20 | `credits_js.hpp` | Open-source licenses, framework credits, build metadata |
+
+### 10.3 Navigation Hierarchy: Pills & Sub-Pills
+
+Navigation tabs are organized hierarchically using pill and sub-pill selectors registered via `ITabRegistry`:
 
 ```cpp
-class MyModule : public IWebContributor {
-    void registerTabs(ITabRegistry& registry) override {
-        registry.addTab("Station Config", nullptr, 100);
-    }
-    void registerRoutes(PsychicHttpServer& server) override {
-        server.on("/api/station", HTTP_GET, handleGetStation);
-        server.on("/api/station", HTTP_POST, handlePostStation);
-    }
+class IWebContributor {
+public:
+    virtual ~IWebContributor() = default;
+    virtual void registerRoutes(PsychicHttpServer& server) = 0;
+    virtual void registerTabs(ITabRegistry& registry) = 0;
 };
 ```
 
-The portal shell fetches `/api/tabs` on load and dynamically builds the navigation.
-Each tab's content is fetched from its registered endpoint.
+#### Multi-Tab Registration (`ITabRegistry`)
 
-### 10.3 POST Body Handling
-
-> 📖 See [Extending the Web Portal § POST Safety (ADR-15)](developer/extending-the-web-portal.md#6-post-safety-adr-15) for body cap and parsing rules.
-
-POST requests use ESPAsyncWebServer's multi-argument `server.on` with a chunk
-body callback:
+Modules register one or more tabs in a single `registerTabs()` call:
 
 ```cpp
-server.on("/api/endpoint", HTTP_POST,
-    onRequest,     // called after body received
-    nullptr,       // upload handler (unused)
-    onBody);       // (request, data, len, index, total)
+void MyModule::registerTabs(ITabRegistry& registry) {
+    // Top-level pill
+    registry.addTab("Sensors", nullptr, 100, ICON_SENSOR_SVG, "/js/sensors.js");
+
+    // Nested sub-pill under "Sensors"
+    registry.addTab("Calibration", "Sensors", 110, nullptr, "/js/calibration.js");
+}
 ```
 
-Body size validation is performed **per-handler** by checking `len` and `total`
-in the body callback. `AsyncCallbackJsonWebHandler` / `AsyncJson.h` is NOT used.
-Single-chunk assumption for small WiFi/Config JSON payloads; deserialized directly
-with `deserializeJson(doc, data, len)`.
+The portal queries `GET /api/tabs` on startup and dynamically renders top-level navigation pills and nested sub-pill toolbars.
 
-> **Note:** `AsyncWebServer::setMaxBodySize()` does not exist in the ESPAsyncWebServer
-> library version used. All body validation must be manual.
+### 10.4 REST Route Registration & PsychicHttp Patterns
 
-### 10.4 Static Asset Organisation
+Modules install routes on `PsychicHttpServer` during the `registerRoutes()` phase:
 
-> 📖 See [Extending the Web Portal § The HTML Fragment Pattern](developer/extending-the-web-portal.md#3-the-html-fragment-pattern) for LittleFS asset conventions.
+```cpp
+void MyModule::registerRoutes(PsychicHttpServer& server) {
+    // GET endpoint:
+    server.on("/api/sensors", HTTP_GET, [this](PsychicRequest* request) {
+        JsonDocument doc;
+        doc["temperature"] = _temp;
+        doc["humidity"] = _humidity;
+        String response;
+        serializeJson(doc, response);
+        return request->reply("application/json", response.c_str());
+    });
 
-The portal uses a **hybrid asset model**:
-- **Framework SPA shell** — compiled into PROGMEM as gzip-compressed `const uint8_t[]`
-  arrays inside the kernel library. Served at ~0ms. Always present with the firmware.
-  No LittleFS dependency for the base portal.
-- **App-specific tab fragments** — stored in LittleFS under `www/` and served at
-  request time by ESPAsyncWebServer. Updated via `pio run --target uploadfs`.
-
-Source directory: `web/portal/` contains the SPA source files.
-
-PROGMEM assets (compiled by `portalBuilder.py`):
-```
-[kernel library PROGMEM]
-  index_html_gz[]   ← SPA shell (HTML)
-  app_css_gz[]      ← Base styles
-  app_js_gz[]       ← Core SPA logic, tab routing, ApiQueue
-  wifi_js_gz[]      ← WiFi tab logic
-  system_js_gz[]    ← System tab logic
-  ota_js_gz[]       ← OTA tab logic
-```
-
-Generated PROGMEM headers (`include/portal_assets/*.h`) MUST include `#ifndef NATIVE_BUILD`
-guards with fallback `#define PROGMEM` and `<cstddef>`/`<cstdint>` includes for
-native test compatibility.
-
-LittleFS app fragments:
-```
-data/                      ← LittleFS image root
-└── www/                   ← Web portal app-specific assets only
-    └── <appname>/         ← One subdirectory per app
-        ├── station.html   ← App tab content fragment
-        └── station.js     ← App tab logic
+    // POST endpoint with body handling:
+    server.on("/api/sensors/config", HTTP_POST, [this](PsychicRequest* request) {
+        if (request->contentLength() > 1024) {
+            return request->reply(413, "text/plain", "Payload too large");
+        }
+        JsonDocument doc;
+        DeserializationError err = deserializeJson(doc, request->body());
+        if (err) {
+            return request->reply(400, "text/plain", "Malformed JSON");
+        }
+        _tempOffset = doc["offset"] | 0.0f;
+        return request->reply("application/json", "{\"ok\":true}");
+    });
+}
 ```
 
-### 10.5 API Request Serialisation
+### 10.5 POST Body Handling & Memory Safety (ADR-15)
 
-The SPA serialises API requests via the `ApiQueue` class in `app.js`. All frontend
-code MUST use `window.apiFetch(url, options)` — never raw `fetch()` or `XMLHttpRequest`.
+In compliance with ADR-15 and embedded memory budgets, POST request bodies are strictly guarded:
 
-- One HTTP request inflight at a time (protects ESP32's limited TCP socket pool)
-- Requests are queued and dispatched sequentially
-- Yields to event loop between requests to prevent UI blocking
+- **Per-Route Payload Ceilings:** Web routes inspect `request->contentLength()` and reject oversize requests immediately with HTTP 413:
+  - System restart/actions: ≤256 B
+  - Sensor/WiFi configuration: ≤1 KB
+  - Full configuration restore: ≤8 KB
+- **ArduinoJson v7 Deserialization:** Handlers deserialize directly from `request->body()` using a scoped `JsonDocument`.
+- **Heap Protection:** Memory allocations for incoming payloads are strictly bounded before JSON parsing begins.
 
-### 10.6 AP Mode Timeout
+### 10.6 Portal Design System & Frontend Architecture
 
-When in AP (captive portal) mode, the framework tracks API activity:
+The web frontend follows the **BEM (Block Element Modifier)** methodology and lightweight component design:
 
-- `WifiManager::tick()` maintains `lastApiRequestTime`
-- Updated via `notifyApiActivity()` callback from API handlers
-- After 10 minutes of API inactivity → transitions to `WIFI_SHUTDOWN` state
-- Conserves power and limits vulnerability window
+- **Component Classes:** `.card`, `.card__header`, `.card__body`, `.alert`, `.alert--warning`, `.alert--danger`, `.btn`, `.btn--primary`, `.btn--danger`, `.form-group`, `.form-control`.
+- **CSS Architecture:** Dark-theme first, custom CSS variables (`--bg-primary`, `--accent-color`), responsive grid layouts for mobile and desktop screens.
 
-### 10.7 API Conventions
+#### `ApiQueue` Priority Lanes
 
-All API endpoints follow REST conventions:
+To prevent saturating the ESP32's limited TCP sockets (`BOARD_HTTP_MAX_OPEN_SOCKETS = 4`), all frontend requests route through `window.apiFetch(url, options, priority)`. The `ApiQueue` enforces **exactly one request inflight at a time** across three prioritized lanes:
 
-- `GET /api/<resource>` — read current state as JSON
-- `POST /api/<resource>` — update state, body is JSON, response is `{ok: true}` or error
-- `GET /api/tabs` — returns nav tab registry `[{name, endpoint}]`
-- `POST /api/mcp` — MCP JSON-RPC endpoint (registered by McpServer via IWebContributor)
+1. **Priority Lane:** Immediate user interactions (e.g. saving settings, triggering reboot, initiating WiFi connection).
+2. **Normal Lane:** Navigation tab loads and DOM fragment fetches.
+3. **Background Lane:** Non-critical background polling (heap metrics, RSSI, telemetry).
+
+### 10.7 AuthManager Security Integration
+
+All `/api/*` endpoints are protected by centralized authentication middleware in `WebServerManager`:
+
+- **Session Cookies:** The web browser authenticates via `POST /api/auth/login` and receives an `esp32_session` cookie.
+- **Bearer Tokens:** External API clients (scripts, automation) pass credentials via `Authorization: Bearer <token>`.
+- **Security Tab:** Provides a built-in interface for changing administrator passwords, rotating keys, and invalidating active sessions.
+- **Automatic AP Mode Bypass:** When the device starts in AP mode (`wifi.ap_started`), `Application` automatically notifies `AuthManager::setAPMode(true)`. In AP mode, authentication checks on the portal are bypassed, allowing owners to connect and configure the device without pre-existing credentials.
+
+### 10.8 AP Mode Inactivity Timeout
+
+When operating in captive AP mode, `WifiManager` continuously tracks API interaction:
+- Each HTTP request updates `lastApiRequestTime` via `notifyApiActivity()`.
+- After **1 hour** (3,600,000 ms) of API inactivity, AP mode transitions to a power-saving shutdown state to preserve battery and minimize wireless exposure.
 
 ---
 
@@ -1692,88 +1763,101 @@ All API endpoints follow REST conventions:
 
 > 📖 **Developer Guide:** [Event Bus](developer/event-bus.md) — decoupled, event-driven cross-module communication.
 
-### 11.1 The Core Rule
+### 11.1 The Core Decoupling Rule
 
-**Modules never call each other directly.** All inter-module communication
-uses one of three framework-mediated mechanisms:
+**Modules never call each other directly.** All inter-module communication is mediated through framework mechanisms:
 
-### 11.2 EventBus (Synchronous Publish/Subscribe)
+1. **`EventBus`:** Asynchronous publish/subscribe messaging for cross-module notifications.
+2. **Centralized Gateways:** `ConfigManager` for persistence, `DataManager` for background data fetching, `PreconditionEngine` for lifecycle gating.
+3. **Pure Interfaces:** Polymorphic contracts (`ITickable`, `IConfigurable`, `IStatusReporter`, `IWebContributor`, `IMCPContributor`).
 
-> 📖 See [Event Bus § EventBus C++ API](developer/event-bus.md#1-eventbus-c-api) for the full API reference and subscription patterns.
+### 11.2 EventBus Architecture
 
-The `EventBus` is the primary mechanism for decoupled cross-module communication.
-Modules publish events by string topic; any number of subscribers receive them
-without the publisher knowing who (if anyone) is listening.
+The `EventBus` (`modules/EventBus/EventBus.hpp`) provides lightweight, decoupled publish/subscribe event distribution.
 
-**Callback signature:**
+#### Execution Context & Concurrency Model
+- **Target Hardware (ESP32/FreeRTOS):** `publish()` posts events to the `esp_event` default event loop via `esp_event_post()`. Subscriber callbacks execute **asynchronously on the default event loop task** — not within the publisher's task. There is no synchronous ordering guarantee between `publish()` returning and callbacks executing.
+- **Native Unit Test Builds:** `publish()` executes callbacks synchronously and inline within the caller's thread for deterministic assertions.
+
+#### Topic Interning (FNV-1a Hash)
+Topics are represented as `const char*` string literals. Upon subscription and publication, topic strings are interned to 32-bit FNV-1a hashes (`uint32_t`) via `EventBus::hashTopic(topic)`. Hot-path vector lookups match integer hashes directly, incurring **zero string comparisons**.
+
+#### Dynamic Capacity & Vector Storage
+There are **no fixed subscriber ceilings or topic length limits**. Subscribers are maintained in `std::vector<SubscriberEntry>`. Soft-deletion (tombstoning) guarantees iterator stability if callbacks subscribe or unsubscribe during an active dispatch; inactive entries are compacted once top-level dispatch completes.
+
+#### Static Callback Function Pointer Pattern
+To prevent heap allocations and memory fragmentation, subscriptions use static function pointers with a user context pointer:
+
 ```cpp
-void (*callback)(const char* topic, const void* payload, void* ctx)
+typedef void (*EventCallback)(const char* topic, const void* payload, void* ctx);
 ```
 
-**Key design facts:**
-- Topics are `const char*` strings (e.g., `"ota.progress"`, `"display.message"`)
-- Payloads are `const void*` — **the EventBus is payload-type-agnostic**. JSON
-  typing (if desired) is the publisher/subscriber's responsibility, not the bus's.
-- Subscribers use **static function pointers** with a `void* ctx` context pointer
-  (never `std::function` — prevents heap fragmentation on ESP32)
-- Publishing is **synchronous** — `publish()` iterates subscribers sequentially
-  in the same thread. Payloads are valid **ONLY during callback execution**
-  (no copying, no queueing)
-- **Capacity limits:** 32 maximum subscribers, 64 bytes maximum topic length
-- If no subscribers exist for a topic, the event is silently dropped
-
-**Usage example:**
 ```cpp
-// Publisher (e.g., OTA manager)
-OtaProgressPayload payload = {45, "Downloading...", false, false};
-app.getEventBus().publish("ota.progress", &payload);
-
-// Subscriber (e.g., display module) — static function + void* ctx
+// Subscriber registration:
 static void onOtaProgress(const char* topic, const void* payload, void* ctx) {
-    auto* self = static_cast<DisplayModule*>(ctx);
-    auto* p = static_cast<const OtaProgressPayload*>(payload);
-    self->updateOtaBoard(p->progress, p->status);
+    auto* self = static_cast<MyModule*>(ctx);
+    const auto* p = static_cast<const OtaProgressPayload*>(payload);
+    self->handleProgress(p->progress, p->status);
 }
+
 app.getEventBus().subscribe("ota.progress", onOtaProgress, this);
 ```
 
-**Known payload structs:**
-- `OtaProgressPayload` — progress percentage, status text, complete flag, success flag
-- `DisplayMessagePayload` — message text, duration in ms
+#### Concurrency & Payload Lifetime Rules
+- **Subscriber-Side Rule:** The `const void* payload` pointer is valid **ONLY during callback execution**. If subscriber logic needs payload data beyond the callback (e.g. processing in `tick()`), it MUST copy the data into internal member storage.
+- **Publisher-Side Rule:** Because dispatch on hardware is asynchronous, **stack-allocated payloads are strictly prohibited on target**. A stack-local payload will be corrupted before the `esp_event` task executes the callback. Publishers must use:
+  - (a) A persistent class member variable (e.g. `Application::_systemHeapPayload`), or
+  - (b) A ring buffer sized to the maximum publish cadence (e.g. `ButtonModule::_eventRing`).
+- **Thread Safety for Single-Threaded Libraries:** Because callbacks execute on the `esp_event` task, callbacks MUST NEVER invoke single-threaded rendering APIs (such as `lv_obj_*`, `lv_timer_*`, or U8G2 draw routines) directly. Instead, set an atomic flag or copy data, and process the change during the module's main-loop `tick()`.
 
-### 11.3 IStatusReporter (Structured UI Status)
+### 11.3 `std::function` Exception Policy
 
-For progress bars, error overlays, and structured status during long operations
-(boot, OTA, data fetch), any component can report status without knowing if a
-display is present:
+While `std::function` is prohibited on the inter-module EventBus to prevent heap fragmentation on microcontrollers, it is classified as a **documented exception** for point-to-point bindings and third-party library adapters per ADR-001 and `docs/developer/coding-patterns.md` [PA-6]:
 
-```cpp
-app.getStatusReporter().reportProgress("Connecting...", 45);
-app.getStatusReporter().reportError("MQTT", "Auth failed");
-```
+- **Permitted Use Cases:**
+  - One-time setup callbacks between tightly coupled kernel services (e.g., `DisplayServiceHelper::setSaveCallback`, OTA update progress delegates).
+  - Third-party library interfaces requiring `std::function` (e.g., `PsychicHttpRequestCallback` in `PsychicHttpServer`).
+- **Prohibited Use Cases:** High-frequency event dispatch, inter-module pub/sub, or per-tick execution loops.
 
-The display module's `IStatusReporter` implementation maps these to appropriate
-system boards or overlay widgets. If no display is present, the `NullStatusReporter`
-(private nested class in `Application`) no-ops silently.
+### 11.4 `IStatusReporter` (Structured UI Status)
 
-### 11.4 Callbacks / std::function (Point-to-Point)
-
-> 📖 See [Coding Patterns § Anti-Pattern 3: std::function Heap Fragmentation](developer/coding-patterns.md#anti-pattern-3-stdfunction-heap-fragmentation-grave-05) for why `std::function` is rejected.
-
-For tight coupling between two known kernel components (e.g., OTA manager → display),
-the framework uses typed callbacks registered at setup. This pattern is **only**
-used for kernel→kernel-service coupling, never for cross-module communication:
+Defined in `include/interfaces/IStatusReporter.hpp`. Provides a clean abstraction for long-running operations (boot progress, WiFi connection, OTA firmware downloads) to report status without coupling to a concrete display module:
 
 ```cpp
-otaManager.setProgressCallback([&display](int pct) {
-    display.showOtaProgress(pct);
-});
+class IStatusReporter {
+public:
+    virtual ~IStatusReporter() = default;
+    virtual void reportStatus(const char* message, float progress = -1.0f) = 0;
+    virtual void reportError(const char* errorMessage) = 0;
+    virtual void clearStatus() = 0;
+};
 ```
 
-> **Known platform constraint:** `Arduino.h` defines `#define LOW 0x0` and
-> `#define HIGH 0x1`, which collide with the `PriorityTier` enum values.
-> `dataManager.cpp` must include explicit `#undef LOW` and `#undef HIGH`
-> after including `Arduino.h` (guarded by `#ifndef NATIVE_BUILD`).
+- **`reportStatus(msg, progress)`:** Displays a one-line status string and optional progress fraction (`[0.0, 1.0]`; negative values indicate indeterminate progress).
+- **`reportError(errorMessage)`:** Displays a fatal or persistent error overlay.
+- **`clearStatus()`:** Dismisses active status overlays from the screen.
+
+When no display is attached, `Application` uses a silent `NullStatusReporter` no-op implementation.
+
+### 11.5 Standard Framework Event Topics Registry
+
+The framework kernel and standard modules publish the following topics across the `EventBus`:
+
+| Topic String | Topic Constant | Publisher | Payload Type | Description |
+|---|---|---|---|---|
+| `"system.heap"` | `ApplicationEvents::SYSTEM_HEAP` | `Application` | `const uint32_t*` | Free heap memory in bytes (emitted periodically and at boot). |
+| `"app.running"` | `ApplicationEvents::APP_RUNNING` | `Application` | `nullptr` | Emitted when all startup preconditions are met and system enters Running. |
+| `"app.configuring"` | `ApplicationEvents::APP_CONFIGURING` | `Application` | `const AppConfiguringPayload*` | Emitted when entering Configuring or when a blocking gate changes. |
+| `"precondition.health"` | `ApplicationEvents::PRECONDITION_HEALTH` | `Application` | `const PreconditionHealthPayload*` | Emitted when any precondition status, cause, or severity changes. |
+| `"data.source.health"` | `ApplicationEvents::DATA_SOURCE_HEALTH` | `DataManager` | `const DataSourceHealthPayload*` | Emitted when a background data source health state changes. |
+| `"ota.progress"` | `ApplicationEvents::OTA_PROGRESS` | `OTAUpdateManager` | `const OtaProgressPayload*` | Emitted during firmware downloads (progress, status, complete, success). |
+| `"display.sleep"` | `U8G2DisplayEvents::DISPLAY_SLEEP` | Display Modules | `nullptr` | Emitted when screensaver enters sleep mode. |
+| `"display.wake"` | `U8G2DisplayEvents::DISPLAY_WAKE` | Display Modules | `nullptr` | Emitted when user interaction wakes the display. |
+| `"display.board.changed"` | `U8G2DisplayEvents::DISPLAY_BOARD_CHANGED` | `U8G2DisplayModule` | `const DisplayBoardChangedPayload*` | Emitted when active carousel board changes (boardName, boardIndex). |
+| `"display.message"` | `U8G2DisplayEvents::DISPLAY_MESSAGE` | *Any Module* | `const DisplayMessagePayload*` | Subscribed by display modules to present scrolling message overlays. |
+| `"wifi.connected"` | `WifiEvents::WIFI_CONNECTED` | `WifiManager` | `const WifiConnectedPayload*` | Emitted when station connects (IP, SSID, RSSI). |
+| `"wifi.disconnected"` | `WifiEvents::WIFI_DISCONNECTED` | `WifiManager` | `nullptr` | Emitted when station connection drops. |
+| `"wifi.ap_started"` | `WifiEvents::WIFI_AP_STARTED` | `WifiManager` | `const char*` | Emitted when soft-AP mode activates (AP SSID / hostname). |
 
 ---
 
@@ -1791,23 +1875,18 @@ which are lost when modules use ad-hoc alternatives.
 
 ### 11A.2 Unified Logging via `LogShim.h`
 
-All modules include `platform/LogShim.h` instead of `esp_log.h` directly. This
-header bridges ESP-IDF's logging to the native GoogleTest build:
+All modules include `platform/LogShim.h` instead of `esp_log.h` directly:
 
 ```cpp
 // include/platform/LogShim.h
 #pragma once
-#ifndef NATIVE_BUILD
-    #include "esp_log.h"
-#else
-    #include <cstdio>
-    #define ESP_LOGE(tag, fmt, ...) printf("E (%s): " fmt "\n", tag, ##__VA_ARGS__)
-    #define ESP_LOGW(tag, fmt, ...) printf("W (%s): " fmt "\n", tag, ##__VA_ARGS__)
-    #define ESP_LOGI(tag, fmt, ...) printf("I (%s): " fmt "\n", tag, ##__VA_ARGS__)
-    #define ESP_LOGD(tag, fmt, ...) printf("D (%s): " fmt "\n", tag, ##__VA_ARGS__)
-    #define ESP_LOGV(tag, fmt, ...) printf("V (%s): " fmt "\n", tag, ##__VA_ARGS__)
-#endif
+
+// --- Hardware build: delegate to the real ESP-IDF logging system ---
+#include "esp_log.h"
 ```
+
+- **Hardware Builds:** Delegates directly to ESP-IDF's logging subsystem, inheriting compile-time dead-code elimination (`CORE_DEBUG_LEVEL`), runtime per-module verbosity control (`esp_log_level_set`), thread-safe FreeRTOS primitives, and custom `esp_log_set_vprintf` handler hooks.
+- **Native Unit Test Builds:** Following the WO1 cleanup, native builds resolve `esp_log.h` through clean test stubs located at `test/stubs/platform/esp_log.h` via PlatformIO native include path flags (`-Itest/stubs/platform`), eliminating `#ifndef NATIVE_BUILD` preprocessor clutter from production headers.
 
 **Module logging pattern** (every `.cpp` file):
 ```cpp
@@ -1837,10 +1916,9 @@ build_flags = -DCORE_DEBUG_LEVEL=3
 build_flags = -DCORE_DEBUG_LEVEL=1
 ```
 
-### 11A.4 LogPipeline
+### 11A.4 LogPipeline & Global Redaction Architecture
 
-The framework installs a custom `esp_log_set_vprintf()` handler via `LogPipeline::begin()`
-during `Application::begin()` (Step 1b). This handler forms a **log pipeline**:
+The framework installs a custom `esp_log_set_vprintf()` handler via `LogPipeline::begin()` during `Application::begin()` (Step 1b). This handler intercepts all system and module logs:
 
 ```
 ESP_LOGI(TAG, "...")   → esp_log_write()
@@ -1855,42 +1933,33 @@ ESP_LOGI(TAG, "...")   → esp_log_write()
     → Step 5: Write to the sink (Serial / stdout)
 ```
 
-**Secret redaction** is applied globally via the injected `ISanitizer`. Any string
-registered via `Redactor::instance().registerSecret()` (e.g. decrypted credentials
-from `KeyManager`, WiFi passwords) is masked with `*` characters, covering every
-`ESP_LOG*` call site with zero call-site churn. Verbose builds additionally chain a
-`StructuralScrubber`, which masks by *structure* (`Authorization:`, `Set-Cookie:`,
-`"access_token"`, `api_key=` …) and so catches third-party tokens the device never
-registered — and does so independently of secret length.
+#### Thread Safety and Buffer Management
+- **Production (`CONFIG_LOG_MAXIMUM_LEVEL <= 3`):** Uses a single, lock-free (if re-entered) 256 B static `.bss` buffer. Zero heap allocations occur on the logging path. Across 19,236 captured log lines, the longest production line was 144 B; 256 B provides ample headroom.
+- **Debug/Verbose (`CONFIG_LOG_MAXIMUM_LEVEL >= 4`):** Supports opportunistic dynamic sizing. A dynamically growing (up to 16 KB) retained heap buffer accommodates large debug dumps. This branch utilizes `va_copy` and a FreeRTOS static mutex (`xSemaphoreCreateMutexStatic`) with a variable timeout derived from serial baud rate capacity `(bufSize * 300) / 1152`. If allocation fails or mutex times out, it degrades gracefully to a stack buffer.
+- **Concurrency Protection:** The shared buffer is protected by a FreeRTOS mutex owned by `LogPipeline`. Under `CONFIG_LOG_VERSION=1` (the default for ESP-IDF boards), `esp_log_va()` invokes the registered print hook with no lock held; the `LogPipeline` mutex prevents cross-task corruption while the `thread_local` guard handles same-task recursion.
 
-**Concurrency.** The shared buffer is protected by a FreeRTOS mutex owned by
-`LogPipeline`. It is *not* safe to rely on ESP-IDF's internal log lock: under
-`CONFIG_LOG_VERSION=1` — the setting all boards ship — `esp_log_va()` invokes the
-registered print function with **no lock held**. The `thread_local` re-entrancy guard
-covers same-task recursion only; cross-task exclusion is the mutex's job.
+#### Sanitizer Components: `Redactor`, `StructuralScrubber`, and `CompositeSanitizer`
+- **`Redactor` Singleton:** Maintains a bounded array of registered secrets (`MAX_SECRETS = 16`, `MAX_SECRET_LEN = 192`) in fixed `.bss` storage (`char[16][192]`). Registration executes an insertion sort to maintain descending string lengths, preventing partial masking of nested secrets (e.g. masking "password" before "pass"). `findBounded()` safely traverses non-NUL-terminated buffers without out-of-bounds reads.
+- **`StructuralScrubber`:** Second-pass structural interceptor for un-registered secrets and structured spillage (HTTP headers, JSON fields). Scans for keys like `Authorization`, `Cookie`, `"password"`, `"token"`, `"api_key"` and masks their values using zero-allocation C-string scanning.
+- **`CompositeSanitizer`:** Implements `ISanitizer` to chain multiple sanitizers together. Registered in `Application.cpp`, chaining `Redactor` globally and adding `StructuralScrubber` for verbose builds (`CONFIG_LOG_MAXIMUM_LEVEL >= 4`).
 
-**Buffer sizing.** The static buffer is 256 B. Across 19,236 captured log lines the
-longest line reaching this hook was 144 B, and `CONFIG_LOG_MAXIMUM_LEVEL=3` strips
-`ESP_LOGD`/`ESP_LOGV` from shipped builds, so no production line can exceed it. Only
-verbose builds (`CONFIG_LOG_MAXIMUM_LEVEL >= 4`) compile in the oversize path, which
-grows and retains a heap buffer (hard cap 16 KB) and falls back to safe truncation if
-the allocation fails. `LogPipeline::contendedLines()` and `oversizeAllocFailures()`
-expose degradation rather than letting it pass silently.
+#### Payload Dumping API (`dumpPayload`)
+
+For large binary or structured payloads (such as raw HTTP request/response bodies) where standard `ESP_LOGV` would truncate or risk stack exhaustion, use:
+
+```cpp
+LogPipeline::dumpPayload(esp_log_level_t level, const char* tag, const void* data, size_t length);
+```
+
+This API chunks the payload into manageable segments using an overlapping sliding window (`MAX_SECRET_LEN - 1` overlap), redacts each chunk independently, and writes directly to the output sink, ensuring secrets spanning chunk boundaries are never leaked.
 
 > [!IMPORTANT]
 > **Sink-level redaction is a backstop, not a guarantee.** It cannot cover:
-> - **`ESP_EARLY_LOG*` / `ESP_DRAM_LOG*`** — these use `ets_printf` and bypass the
->   hook entirely, so early-boot and ISR logs are not redacted.
-> - **Raw `printf()`** — not a log call, so it never reaches the hook.
+> - **`ESP_EARLY_LOG*` / `ESP_DRAM_LOG*`** — these use `ets_printf` and bypass the hook entirely, so early-boot and ISR logs are not redacted.
+> - **Raw `printf()`** — not an ESP-IDF log call, so it never reaches the hook.
 > - **Encoded payloads** — hex or base64 output never matches a plaintext needle.
-> - **Secrets split across separate log calls** — redaction is per-call, so a secret
->   spanning two `ESP_LOG*` invocations is matched by neither.
-> - **Secret length** — masking preserves length, which discloses it.
->
-> To dump a large payload (an HTTP request or response, say), use
-> `LogPipeline::dumpPayload()` rather than `ESP_LOGV`. It scans a sliding window that
-> overlaps by `MAX_SECRET_LEN - 1`, so a secret cannot straddle a chunk boundary and
-> escape — the failure mode that makes naive chunked logging unsafe.
+> - **Secrets split across separate log calls** — redaction is per-call, so a secret spanning two separate `ESP_LOG*` invocations cannot be matched across the boundary.
+> - **Secret length** — masking with asterisks preserves string length, which discloses secret length.
 
 ### 11A.5 `ILogSink` Interface *(Deferred)*
 
@@ -1911,7 +1980,7 @@ public:
 When implemented, registration will be via `app.registerLogSink(ILogSink*)`. The LogPipeline
 will dispatch formatted, redacted log lines to all registered sinks after writing to Serial.
 This follows the same Hollywood Principle pattern as `IWebContributor` and
-`IMcpContributor`.
+`IMCPContributor`.
 
 ### 11A.6 RAM Ring Buffer & Crash Persistence *(Deferred)*
 
@@ -1941,15 +2010,18 @@ the most recent log output for:
 
 ### 11A.7 Heartbeat Telemetry
 
-The `Application::tick()` loop emits a periodic heartbeat log every ~15 seconds
-containing:
-- Free heap (via `heap_caps_get_free_size(MALLOC_CAP_8BIT)`)
-- Minimum free heap watermark (via `heap_caps_get_minimum_free_size(MALLOC_CAP_8BIT)`)
+The `Application::tick()` loop emits a periodic heartbeat log every **~30 seconds** containing:
+- Free heap (`heap_caps_get_free_size(MALLOC_CAP_8BIT)`)
+- Internal DRAM (`heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT)`)
+- Minimum internal DRAM watermark (`heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT)`)
 - Uptime in seconds
-- WiFi RSSI (if connected)
+- **No RSSI** — on PSRAM boards, `free_heap` is dominated by PSRAM and can report megabytes free while internal DRAM is near exhaustion. `dram_min` tracks the lifetime low-water mark since boot.
 
-This provides continuous runtime observability without requiring any external
-monitoring infrastructure — just a serial connection.
+```
+♥ uptime=120s  free_heap=4238120B  dram=214880B  dram_min=198420B
+```
+
+This provides continuous runtime observability without requiring any external monitoring infrastructure — just a serial monitor connection.
 
 ### 11A.8 Optional MQTT Telemetry Module
 

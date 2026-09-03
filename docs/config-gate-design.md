@@ -1,5 +1,8 @@
 # Configuration Gate Design
 
+> [!NOTE]
+> **FOLDED into the Design Specification v2.0 §8/§9.** Rationale preserved at `docs/design/config-gate.md`.
+
 > ESP32 App Foundation (c) 2026 CB Labs
 >
 > Design record for how the framework decides whether a device is ready to run,
