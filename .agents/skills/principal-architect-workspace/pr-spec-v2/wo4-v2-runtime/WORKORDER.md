@@ -56,80 +56,80 @@ Rewrite §7–§11A of `docs/design_specification.md`. This WO also **folds** tw
 
 ### §7 — Display Architecture (lines 597–918)
 
-- [ ] Update to reflect dual-display support: U8G2 monochrome AND LVGL v9 colour TFT
-- [ ] Document `IDisplayModule` unified interface (from WO3's §6 — just reference it here)
-- [ ] Document `ILVGLHardwareAdapter` at its WO1 location (`modules/LVGLDisplay/`)
-- [ ] Document `DisplayServiceHelper` library
-- [ ] §7.8 Target Architecture → relabel as **implemented** (not "target"). CarouselEngine, BoardCatalog, ScreensaverController are production code
-- [ ] Display layer priority stack: Modal → Base/Carousel → Screensaver — now implemented
-- [ ] Point at `modules/LVGLDisplay/README.md` for LVGL Pro specifics (do NOT restate it)
-- [ ] Add system boards: ConfiguringStatusBoard, GenericGateHelperBoard, DiagnosticsBoard
+- [x] Update to reflect dual-display support: U8G2 monochrome AND LVGL v9 colour TFT
+- [x] Document `IDisplayModule` unified interface (from WO3's §6 — just reference it here)
+- [x] Document `ILVGLHardwareAdapter` at its WO1 location (`modules/LVGLDisplay/`)
+- [x] Document `DisplayServiceHelper` library
+- [x] §7.8 Target Architecture → relabel as **implemented** (not "target"). CarouselEngine, BoardCatalog, ScreensaverController are production code
+- [x] Display layer priority stack: Modal → Base/Carousel → Screensaver — now implemented
+- [x] Point at `modules/LVGLDisplay/README.md` for LVGL Pro specifics (do NOT restate it)
+- [x] Add system boards: ConfiguringStatusBoard, GenericGateHelperBoard, DiagnosticsBoard
 
 ### §8 — Configuration Architecture (lines 919–1010)
 
-- [ ] **Complete rewrite** using ConfigManager-as-Gateway as the described design:
+- [x] **Complete rewrite** using ConfigManager-as-Gateway as the described design:
   - Modules implement `IConfigurable` with `applyConfig`/`serializeConfig`/`migrateConfig`/`resetConfig`
   - ConfigManager owns ALL `mod/<namespace>.json` file I/O
   - Schema versioning with `_v` field and migration callbacks
   - `saveModuleConfig()` — atomic serialize + write + re-apply
   - Import/export support
   - Three-tier config manifest (Active/Previous/Golden) — reference `lib/ConfigManifest/`
-- [ ] Delete description of modules doing their own LittleFS file I/O
-- [ ] Delete `requestReload()` — it doesn't exist
-- [ ] Fold normative content from `docs/config-gate-design.md`:
+- [x] Delete description of modules doing their own LittleFS file I/O
+- [x] Delete `requestReload()` — it doesn't exist
+- [x] Fold normative content from `docs/config-gate-design.md`:
   - The design (ConfigManager-as-Gateway, AppState transitions, PreconditionEngine gate)
   - NOT the rationale/review history — extract that to `docs/design/config-gate.md`
 
 ### §9 — Application Lifecycle (lines 1011–1081)
 
-- [ ] Correct AppState enum: **3 states** — `Boot(0)`, `Configuring(1)`, `Running(2)`
+- [x] Correct AppState enum: **3 states** — `Boot(0)`, `Configuring(1)`, `Running(2)`
   - Delete `WIFI_SETUP` and `APP_SETUP` — replaced by unified `Configuring`
   - Document bidirectional `Configuring ↔ Running` (regression support)
-- [ ] Document PreconditionEngine gate: CONFIGURING→RUNNING transition requires all preconditions satisfied
-- [ ] Update `begin()` sequence (~20 steps now, not 15)
-- [ ] Update `tick()` sequence — includes precondition evaluation, audit tick, auth session management
-- [ ] `markAppValid()` → documented as **consumer-delegated** (not called in boot sequence)
-- [ ] `softReset()` → calls `esp_restart()` directly
+- [x] Document PreconditionEngine gate: CONFIGURING→RUNNING transition requires all preconditions satisfied
+- [x] Update `begin()` sequence (~20 steps now, not 15)
+- [x] Update `tick()` sequence — includes precondition evaluation, audit tick, auth session management
+- [x] `markAppValid()` → documented as **consumer-delegated** (not called in boot sequence)
+- [x] `softReset()` → calls `esp_restart()` directly
 
 ### §10 — Web Portal Architecture (lines 1082–1203)
 
-- [ ] Replace ALL `AsyncWebServer` / `ESPAsyncWebServer` references with `PsychicHttpServer` / `PsychicHttp`
-- [ ] Update code samples to use PsychicHttp request handling patterns
-- [ ] PROGMEM assets: now **20** assets (spec says 6)
-- [ ] AP mode timeout: **1 hour** (3600000 ms), not 10 minutes
-- [ ] Add Portal Design System: BEM convention, `.card`/`.alert` components, ApiQueue priority lanes
-- [ ] Add AuthManager portal integration: Security tab, session cookies, bearer tokens
-- [ ] Add Tab pill/sub-pill navigation system
-- [ ] POST body handling: update to PsychicHttp patterns
+- [x] Replace ALL `AsyncWebServer` / `ESPAsyncWebServer` references with `PsychicHttpServer` / `PsychicHttp`
+- [x] Update code samples to use PsychicHttp request handling patterns
+- [x] PROGMEM assets: now **20** assets (spec says 6)
+- [x] AP mode timeout: **1 hour** (3600000 ms), not 10 minutes
+- [x] Add Portal Design System: BEM convention, `.card`/`.alert` components, ApiQueue priority lanes
+- [x] Add AuthManager portal integration: Security tab, session cookies, bearer tokens
+- [x] Add Tab pill/sub-pill navigation system
+- [x] POST body handling: update to PsychicHttp patterns
 
 ### §11 — Inter-Module Communication (lines 1204–1292)
 
-- [ ] EventBus dispatch: **`esp_event`** (async) on hardware, synchronous on native. NOT "synchronous" as spec claims.
-- [ ] Topic interning: FNV-1a hash
-- [ ] Capacity: **no fixed limits** (uses `std::vector`). Delete "32 subscribers, 64-byte topics"
-- [ ] Static fn-ptr + void* ctx pattern — still correct
-- [ ] `std::function` policy: reference the WO1 `coding-patterns.md` section. Reclassify from "violation" to "documented exception" per [PA-6]
-- [ ] `IStatusReporter`: correct to `reportStatus(msg, progress)`, `reportError(errorMessage)`, `clearStatus()`
-- [ ] Add EventBus topic registry: `data.source.health`, `precondition.health`, `app.configuring`, `ota.progress`, `system.heap`, etc.
+- [x] EventBus dispatch: **`esp_event`** (async) on hardware, synchronous on native. NOT "synchronous" as spec claims.
+- [x] Topic interning: FNV-1a hash
+- [x] Capacity: **no fixed limits** (uses `std::vector`). Delete "32 subscribers, 64-byte topics"
+- [x] Static fn-ptr + void* ctx pattern — still correct
+- [x] `std::function` policy: reference the WO1 `coding-patterns.md` section. Reclassify from "violation" to "documented exception" per [PA-6]
+- [x] `IStatusReporter`: correct to `reportStatus(msg, progress)`, `reportError(errorMessage)`, `clearStatus()`
+- [x] Add EventBus topic registry: `data.source.health`, `precondition.health`, `app.configuring`, `ota.progress`, `system.heap`, etc.
 
 ### §11A — Logging & Observability (lines 1293–1502)
 
-- [ ] This section is largely correct (written during PR-211). Make minimal updates:
+- [x] This section is largely correct (written during PR-211). Make minimal updates:
   - LogShim.h description: correct to match WO1 cleanup (native resolved through test stubs, not `#ifndef NATIVE_BUILD`)
   - Heartbeat: every **~30s** (not ~15s), reports `free_heap`, `dram`, `dram_min`, `uptime` — **no RSSI**
   - Add CompositeSanitizer and StructuralScrubber to the documented components
-- [ ] **Fold** `docs/design/logging.md` (24 lines) into this section if any content is missing
-- [ ] After folding, **delete** `docs/design/logging.md` (use `git rm`)
+- [x] **Fold** `docs/design/logging.md` (24 lines) into this section if any content is missing
+- [x] After folding, **delete** `docs/design/logging.md` (use `git rm`)
 
 ### Fold Operations
 
-- [ ] **Create `docs/design/config-gate.md`** — extract rationale and #146 review history from `config-gate-design.md` (the parts that don't belong in a specification)
-- [ ] After folding normative content from `config-gate-design.md` into §8/§9, **add a banner** to the top of `config-gate-design.md`:
+- [x] **Create `docs/design/config-gate.md`** — extract rationale and #146 review history from `config-gate-design.md` (the parts that don't belong in a specification)
+- [x] After folding normative content from `config-gate-design.md` into §8/§9, **add a banner** to the top of `config-gate-design.md`:
   ```
   > [!NOTE]
   > **FOLDED into the Design Specification v2.0 §8/§9.** Rationale preserved at `docs/design/config-gate.md`.
   ```
-- [ ] **Delete `docs/design/logging.md`** after folding (use `git rm`)
+- [x] **Delete `docs/design/logging.md`** after folding (use `git rm`)
 
 ## Verification Requirement
 
@@ -151,19 +151,30 @@ If you discover a defect, upstream bug, or concern *outside your boundary box*, 
 <!-- Written by the worker at task completion -->
 
 ### Status
-(pending)
+Complete. Validated against repository reality and approved by Principal Architect.
 
 ### Changes Made
-(pending)
+- **`docs/design/config-gate.md`** [NEW]: Created historical rationale and review record document extracted from `docs/config-gate-design.md`, preserving the #146 review history (DraytonWiser, departures-board, PowerMonitor), diagnosis of legacy gate breakage, prior art, and migration notes.
+- **`docs/config-gate-design.md`**: Added top-level note banner linking to the normative specification in v2.0 §8/§9 and the rationale at `docs/design/config-gate.md`.
+- **`docs/design/logging.md`** [DELETED]: Removed file via `git rm` after confirming all 24 lines (LogPipeline hook, buffer sizing, FreeRTOS mutex, Redactor, StructuralScrubber, CompositeSanitizer, and `dumpPayload()` API) are fully incorporated into §11A.
+- **`docs/design_specification.md`**:
+  - **§7 Display Architecture**: Rewritten to document dual-display support (`U8G2DisplayModule` monochrome and `LVGLDisplayModule` colour TFT), reference `IDisplayModule` (§6.7) and `ILVGLHardwareAdapter`, describe `DisplayServiceHelper` (REST, MCP tools, and `DeepStackExecutor` on 16 KB `png_worker` stack), 3-layer priority stack (Modal > Base/Carousel > Screensaver), sub-object API (`.carousel`, `.boards`, `.screensaver`), full system board catalog (`BootBoard`, `ConfiguringStatusBoard`, `GenericGateHelperBoard`, `DiagnosticsBoard`, `WiFiWizardBoard`, `OTAProgressBoard`, `ErrorBoard`, `ScreensaverBoard`), and widget toolkit.
+  - **§8 Configuration Architecture**: Rewritten to document ConfigManager-as-Gateway pattern (modules never touch LittleFS directly), partition mounts (`ConfigRoot`), file ownership paths (`/etc/`, `/mod/`, `/config_manifest.json`, `/app/`), `IConfigurable` interface contract (`applyConfig`, `serializeConfig`, `migrateConfig`, `resetConfig`), schema versioning with `_v` and migration lifecycle, atomic persistence via `saveModuleConfig()`, three-tier config manifest (Active/Previous/Golden referencing `lib/ConfigManifest/`), backup import/export, and ArduinoJson v7 memory safety rules. All references to `requestReload()` and direct module LittleFS file I/O eliminated.
+  - **§9 Application Lifecycle**: Rewritten with explicit 3-state machine (`Boot=0`, `Configuring=1`, `Running=2`) and bidirectional transitions with regression support (`Running → Configuring`). Documented PreconditionEngine gate: `PreconditionRole` (`Operational`, `Startup`, `Both`), hot/cold split (`getStatus()` hot vs `describe()` cold), 12 structured causes, framework-derived severity, trust history (`everMet`, `identityEpoch`), typed dependency edges (`Wants`, `Requires`, `BindsTo`), flap damping and escalating recovery, and dual-status publication (`precondition.health`). Documented 20-step `begin()` sequence, cooperative `tick()` dispatch loop, consumer-delegated `markAppValid()`, and direct `softReset()`.
+  - **§10 Web Portal Architecture**: Replaced all `AsyncWebServer`/`ESPAsyncWebServer` with `PsychicHttpServer` and dual-server TLS mode. Updated code samples to PsychicHttp patterns. Documented full 20 PROGMEM static asset inventory generated by `portalBuilder.py`. Documented hierarchical navigation pills and sub-pills (`ITabRegistry`). Documented BEM portal design system and `ApiQueue` priority lanes (Priority, Normal, Background). Documented AuthManager portal integration and updated captive AP mode inactivity timeout to 1 hour (3,600,000 ms).
+  - **§11 Inter-Module Communication**: Documented `EventBus` asynchronous hardware dispatch via `esp_event` default loop and synchronous native execution. Documented FNV-1a topic interning, dynamic vector capacity, static function pointer callbacks with `void* ctx`, thread-safety / payload lifetime rules, `std::function` documented exception policy per ADR-001/`coding-patterns.md`, `IStatusReporter` contract (`reportStatus`, `reportError`, `clearStatus`), and standard EventBus topics registry.
+  - **§11A Logging & Observability Architecture**: Updated `LogShim.h` description to reflect clean native stub resolution without `#ifndef NATIVE_BUILD`. Added `CompositeSanitizer` and `StructuralScrubber`. Added `dumpPayload()` API. Updated periodic heartbeat to ~30s with `free_heap`, `dram`, `dram_min`, `uptime` (no RSSI).
 
 ### Decisions Made
-(pending)
+- Confined all specification changes strictly to §7–§11A (lines 1085–2061, 978 lines). §1–§6, §12–§17, source code, and agent skills remained completely untouched.
+- Cleanly separated historical design rationale (`docs/design/config-gate.md`) from normative technical specification (§8/§9).
+- Documented `markAppValid()` as explicitly delegated to the downstream application rather than called during the boot sequence.
 
 ### Dead Ends & Warnings
-(pending)
+- None encountered. All interfaces and behaviors documented match current production code.
 
 ### Out-of-Scope Findings
-(pending)
+- Lines 2092, 2107, 2155, 3341, 3343 in §12 and §17 still reference `AsyncWebServer` and legacy `AppState` values; these will be addressed in Work Order 5 (§12–§17).
 
 ### Blockers
-(pending)
+None.

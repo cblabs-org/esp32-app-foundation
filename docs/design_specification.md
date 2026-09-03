@@ -2067,8 +2067,8 @@ points:
 
 > 📖 See [Build System § PlatformIO Environments](developer/build-system.md#1-platformio-environments) for the project structure walkthrough.
 
-The framework is a **monorepo** — kernel, optional modules, scripts, template,
-and documentation all live in a single repository.
+The framework is a **monorepo** — kernel, optional modules, hardware definitions,
+adapters, UI projects, scripts, templates, and documentation all live in a single repository.
 
 #### Architectural Rationale: Monorepo vs Multi-repo
 
@@ -2079,284 +2079,342 @@ The framework deliberately uses a monorepo topology rather than splitting into s
 3. **Atomic Refactoring:** Sweeping architectural changes can be executed and tested atomically in a single PR, rather than requiring synchronized merges across multiple repositories.
 4. **Linker Efficiency:** The monorepo does *not* cause firmware bloat. PlatformIO and the C++ linker only compile and link the modules explicitly `#include`'d in the application code. Unused modules take up zero bytes on the ESP32 flash.
 
-*Decision:* Keep it as a Monorepo for `v1.x`. While separating mature modules into their own repositories might encourage third-party development later (e.g., `v2.x`), doing so prematurely creates unnecessary fragmentation and versioning friction.
+*Decision:* Keep it as a Monorepo for `v1.x`/`v2.x`. Separating mature modules into third-party repositories prematurely creates unnecessary fragmentation and versioning friction.
 
 ```
-esp32-app-foundation/           ← Monorepo (everything lives here)
-  include/                      ← All framework interface headers + FrameworkConfig
-    interfaces/                 ← Pure abstract interfaces (ITickable, ISanitizer, etc.)
-    platform/                   ← Platform abstraction headers
-      LogShim.h                 ← Unified ESP-IDF ↔ native logging bridge
-    portal_assets/              ← Generated PROGMEM gzip headers (build output)
+esp32-app-foundation/           ← Monorepo root
+  include/                      ← Public façade and contracts
     AppFoundation.h             ← Canonical single-include façade
-    AppState.hpp                ← BOOTING, WIFI_SETUP, APP_SETUP, RUNNING
-    FrameworkConfig.hpp         ← Kernel config struct
-  lib/                          ← Low-level utilities
-    deviceCrypto/
-    LogPipeline/
-    md5Utils/
-    Redactor/
-    githubClient/
-  modules/
-    application/                ← Kernel: Application hub + AppState
-    configManager/              ← Kernel: LittleFS JSON config
-    keyManager/                 ← Kernel: encrypted credential store
-    wifiManager/                ← Kernel: WiFi + captive portal
-    timeManager/                ← Kernel: NTP + POSIX timezone
-    otaUpdateManager/           ← Kernel: GitHub OTA + rollback
-    webServer/                  ← Kernel: ESPAsyncWebServer + REST API
-    eventBus/                   ← Kernel: typed pub/sub
-    dataManager/                ← Kernel: FreeRTOS background scheduler
-    mcpServer/                  ← Kernel: JSON-RPC MCP server
-    u8g2Display/                ← Optional: U8G2 monochrome display module
-      widgets/                  ← Widget toolkit (3-tier)
-      fonts/                    ← Font management
-      boards/interfaces/        ← iBoardLayout
-  scripts/                      ← Build scripts
-  web/portal/                   ← Web portal SPA source
-  test/                         ← All tests
-    test_unit/                  ← GoogleTest native — no hardware required
-    test_hardware/              ← Hardware integration tests
-    test_e2e/                   ← Full boot-to-RUNNING integration test
-  template/                     ← Starter skeleton for new apps
-    src/main.cpp                ← 3-line entry point
-    src/myApp.hpp/.cpp          ← Skeleton app class
-    platformio.ini              ← lib_deps = framework/
-    README.md                   ← "How to start a new app" guide
-  docs/                         ← This document
-  partitions.esp32dev.csv
-  partitions.esp32s3nano.csv
-  sdkconfig.defaults
-  sdkconfig.defaults.esp32s3nano
-  library.json                  ← PlatformIO library manifest
+    Audit.h                     ← Structured audit macros (AUDIT, AUDIT_SYNC)
+    build_version.h             ← Compile-time version injection
+    publicKey.hpp               ← Public key PEM definitions
+    types/                      ← Concrete framework types (AppState, FrameworkConfig, PriorityTier)
+    interfaces/                 ← Pure abstract interfaces (ITickable, IConfigurable, IDataSource, etc.)
+    events/                     ← EventBus event payload structs
+    platform/                   ← Platform abstraction headers (LogShim.h)
+    portal_assets/              ← Generated PROGMEM gzip headers (build output)
+    utils/                      ← Header-only utilities
+  hardware/                     ← Pure declarative board definitions (pin maps, partitions, sdkconfigs)
+    _common/                    ← Shared hardware definitions and base headers
+    _TEMPLATE/                  ← Porting template for new hardware targets
+    esp32dev/                   ← Espressif ESP-WROOM-32 / NodeMCU (board.h, partitions.csv)
+    esp32s3nano/                ← Waveshare ESP32-S3-Nano (board.h, partitions.csv, sdkconfig.defaults)
+    crowpanel-128-rotary/       ← Elecrow CrowPanel 1.28" Rotary Display (board.h, partitions.csv)
+    native/                     ← Host CPU mock board header
+  adapters/                     ← Concrete hardware adapters (Ports & Adapters pattern)
+    lvgl/                       ← ILVGLHardwareAdapter implementations (e.g. CrowPanel128Adapter)
+  uidesign/                     ← Declarative UI projects
+    crowpanel-128-rotary/       ← LVGL Pro Editor XML project files, screens, components, subjects
+  lib/                          ← Low-level foundation utilities and libraries
+    ConfigManifest/             ← Three-tier config snapshot tracking (Active/Previous/Golden)
+    DeepStackExecutor/          ← PSRAM-backed worker execution for stack-heavy callables
+    DeviceCrypto/               ← AES-256-CBC hardware encryption with NVS master key
+    DisplayServiceHelper/       ← Tick-safe, non-blocking display service bridge
+    LogPipeline/                ← Global log redaction pipeline via esp_log_set_vprintf()
+    MD5Utils/                   ← MD5 hash verification for firmware uploads
+    OTACerts/                   ← Embedded X.509 certificates and verification helpers
+    OTADownloadEngine/          ← Redirect-aware streaming HTTP OTA download engine
+    OTAManifest/                ← Multi-architecture manifest parser and asset resolver
+    PngWriter/                  ← Display frame snapshot and compression utilities
+    Redactor/                   ← Lock-free Meyer's Singleton secret redaction engine
+    SemVer/                     ← Zero-allocation packed 32-bit SemVer comparison
+  modules/                      ← Framework modules (kernel and optional)
+    Application/                ← Kernel: Application hub, lifecycle state machine, registerModule()
+    AuditModule/                ← Optional: LittleFS JSONL security and operational audit trail
+    AuthManager/                ← Kernel: Session cookies, EC P-256 HTTPS certs, MCP bearer tokens
+    ButtonModule/               ← Optional: Debounced push-button input event dispatch
+    ConfigManager/              ← Kernel: Gateway for LittleFS JSON config and schema migration
+    DataManager/                ← Kernel: Background fetch scheduler with FetchContext & DeadlineToken
+    EncoderModule/              ← Optional: Rotary encoder hardware input event dispatch
+    EventBus/                   ← Kernel: FreeRTOS esp_event C++ publish-subscribe wrapper
+    HomeAssistant/              ← Optional: Home Assistant MQTT discovery contributor
+    KeyManager/                 ← Kernel: AES-256 encrypted credential store in /etc/keys.json
+    LVGLDisplay/                ← Optional: Modern LVGL v9 graphical display module
+    MCPServer/                  ← Kernel: Model Context Protocol JSON-RPC server and tool registry
+    OTAUpdateManager/           ← Kernel: Split-repo OTA, manifest resolution, signature verification
+    PreconditionEngine/         ← Kernel: Boot gating, dependency DAG, and service readiness engine
+    TimeManager/                ← Kernel: SNTP time synchronization and POSIX timezone
+    U8G2Display/                ← Optional: Monochrome OLED display and widget module
+    WebServer/                  ← Kernel: PsychicHttp / PsychicHttpsServer REST API and SPA host
+    WifiManager/                ← Kernel: WiFi station connection and captive portal AP
+  scripts/                      ← SCons build hooks and standalone CLI tools
+  sample-app/                   ← Reference application demonstrating full framework usage
+  template-app/                 ← Blank starter template for downstream projects
+  web/portal/                   ← Web portal Single Page Application source (HTML/CSS/JS)
+  test/                         ← Unified test suite
+    test_unit/                  ← GoogleTest native unit test suites (host CPU)
+    test_hardware/              ← Physical hardware integration tests
+    test_e2e/                   ← End-to-end boot-to-RUNNING integration tests
+    stubs/platform/             ← Stub-header architecture mocking Arduino and ESP-IDF APIs
+  platformio.ini                ← Multi-environment build configuration
+  library.json                  ← PlatformIO library manifest for downstream consumption
+  sdkconfig.defaults            ← Baseline ESP-IDF SDK configuration
 ```
 
 ### 12.2 How Apps Consume the Framework
 
-Apps add the framework as a **git submodule** pinned to a commit SHA:
+Apps consume the framework either as a **git submodule** pinned to a commit SHA or as a PlatformIO library:
 
 ```bash
 git submodule add https://github.com/matthewmcneill/esp32-app-foundation.git framework
 git submodule update --init
 ```
 
-App `platformio.ini`:
+Consuming application `platformio.ini`:
 ```ini
 [env:esp32dev]
 platform = espressif32
 framework = arduino, espidf
+lib_compat_mode = strict
+lib_ldf_mode = deep
 lib_extra_dirs =
     framework/modules
     framework/lib
+    framework/adapters
 lib_deps =
-    framework/                  ; local submodule path — no registry, no absolute paths
-    olikraus/U8g2@2.36.18
-    bblanchon/ArduinoJson@7.4.3
-    ESP32Async/ESPAsyncWebServer
+    framework/                  ; local submodule path — no registry, deterministic SHA
+    bblanchon/ArduinoJson@^7.4.3
+    hoeken/PsychicHttp@^3.0.0
+    olikraus/U8g2@^2.36.18      ; conditional on WITH_DISPLAY_U8G2
 extra_scripts =
-    pre:framework/scripts/build_timestamp.py
+    pre:framework/scripts/sync_sdkconfig.py
+    pre:framework/scripts/portalBuilder.py
+    pre:framework/scripts/inject_version.py
 build_flags =
     -DAPP_FOUNDATION_VERSION=\"0.1.0\"
+    -I framework/include
 ```
 
-> **Warning:** `build_src_filter` does NOT work with ESP-IDF (it uses `CMakeLists.txt`
-> for component discovery). Use `lib_extra_dirs` + explicit `lib_deps` instead.
+> **Warning:** `build_src_filter` does NOT work with ESP-IDF components (ESP-IDF relies on `CMakeLists.txt` for component discovery). Use `lib_extra_dirs` + explicit `lib_deps` instead.
 
-### 12.3 Local Development Workflow
+### 12.3 Library Distribution via `library.json`
 
-When actively developing the framework alongside an app, the submodule points at
-a local checkout. Push changes to the framework repo; update the submodule SHA
-when ready to adopt a new framework version.
+The framework is published as a PlatformIO library described by `library.json`. Downstream consumers who install the framework via PlatformIO's package manager or registry obtain a self-contained library package:
 
-### 12.4 Build Scripts
+```json
+{
+  "name": "esp32-app-foundation",
+  "version": "0.1.0",
+  "description": "Reusable ESP32 application framework — Arduino + ESP-IDF dual-framework.",
+  "export": {
+    "include": ["include", "modules", "lib"],
+    "exclude": ["src", "test", "docs", ".agents", "scripts", "web", "template-app", "sample-app"]
+  },
+  "build": {
+    "flags": ["-I include"]
+  },
+  "dependencies": {
+    "bblanchon/ArduinoJson": "^7.4.3",
+    "hoeken/PsychicHttp": "^3.0.0",
+    "olikraus/U8g2": "^2.36.18"
+  },
+  "frameworks": ["arduino", "espidf"],
+  "platforms": ["espressif32"]
+}
+```
 
-> 📖 See [Build System § The Release Pipeline](developer/build-system.md#7-the-release-pipeline) for script usage in the release workflow.
+The export filter ensures that test fixtures, developer documentation, and portal build tools are excluded from downstream consumer distributions, keeping the package lean.
 
-Build scripts ship in the framework repo under `scripts/`.
+### 12.4 Local Development Workflow
+
+When actively developing the framework alongside an application, the submodule or `lib_deps` path points directly to the local checkout. Push changes to the framework repository; update the submodule commit SHA in the consuming app when ready to adopt a new framework release.
+
+### 12.5 Build Scripts
+
+Build scripts reside under `scripts/` and operate either as automated SCons hooks in PlatformIO or as standalone CLI utilities:
 
 | Script | Type | Purpose |
 |---|---|---|
-| `build_timestamp.py` | PIO hook (`extra_scripts`) | Injects `BUILD_TIME` and `BUILD_DATE` macros via SCons `Import("env")` |
-| `build_fonts.py` | Standalone CLI | Compiles custom U8G2 fonts → C++ headers. Run manually when font files change |
-| `generate_layouts.py` | Standalone CLI | Generates display layout constants from YAML/JSON → C++ headers. Run manually when layouts change |
-| `portalBuilder.py` | PIO hook | Packages `web/portal/` assets → PROGMEM gzip headers in `include/portal_assets/` |
+| `sync_sdkconfig.py` | PIO hook (`extra_scripts`) | Synchronizes board-specific `sdkconfig.defaults` into the build directory |
+| `portalBuilder.py` | PIO hook (`extra_scripts`) | Bundles and minifies `web/portal/` assets → gzip headers in `include/portal_assets/` |
+| `run_web_tests.py` | PIO hook (`extra_scripts`) | Executes frontend JavaScript/HTML unit tests before compiling firmware |
+| `inject_version.py` | PIO hook (`extra_scripts`) | Extracts Git tag / commit metadata and generates `include/build_version.h` |
+| `build_fonts.py` | Standalone CLI | Compiles BDF font files into C++ header structures for U8G2 displays |
+| `generate_layouts.py` | Standalone CLI | Translates declarative screen layout definitions into C++ header constants |
+| `deploy_release.py` | Standalone CLI | Releases signed firmware binaries with detached RSA signatures and SHA-256 digests |
+| `generate_manifest.py` | Standalone CLI | Generates `manifest.json` describing multi-board firmware release assets |
 
-> **Standalone vs hook:** `build_fonts.py` and `generate_layouts.py` are deliberately
-> NOT PIO hooks — hooking them into compile-time would break builds if downstream
-> projects lack the input files (BDF fonts, YAML layouts). Run them manually, commit
-> the generated headers.
+> **Standalone vs PIO hook:** Heavy code generators such as `build_fonts.py` and `deploy_release.py` are deliberately NOT wired as compile hooks. This prevents build failures in downstream projects that lack BDF font sources or private signing keys.
 
-### 12.5 CI Workflow
+### 12.6 CI Workflow
 
-The framework provides `.github/workflows/ci.yml`:
+The framework provides automated continuous integration via `.github/workflows/`:
 
-1. **Dual-env firmware build**: `esp32dev` + `esp32s3nano`
-2. **Native test execution**: `pio test -e native` (GoogleTest)
-3. **Include-graph lint**: Verifies no kernel header imports a module header
+1. **Multi-environment compilation**: Builds `esp32dev`, `esp32s3nano`, and `crowpanel-128-rotary` firmware targets.
+2. **Native test execution**: Executes the complete GoogleTest suite on host runners via `pio test -e native`.
+3. **Include-graph linting**: Enforces strict separation ensuring kernel headers never import optional module headers.
 
-### 12.6 PlatformIO LDF Constraints
+### 12.7 PlatformIO LDF Constraints & Stub Architecture
 
-> **Critical:** PlatformIO's Library Dependency Finder (LDF) scans `#include`
-> directives as **text patterns** regardless of `#ifdef` preprocessor guards.
-> A conditional `#include "Application.hpp"` inside `#ifndef NATIVE_BUILD` will
-> still trigger LDF to resolve and compile the entire dependency chain.
+PlatformIO's Library Dependency Finder (LDF) scans `#include` directives textually. To ensure deterministic resolution and prevent unwanted transitive library compilation:
 
-**Mitigation strategies:**
-- Forward-declare types in headers; include only in `.cpp` files behind guards
-- `library.json` files should have NO `"platforms"` or `"frameworks"` restrictions
-  (unless the library is genuinely platform-specific)
-- Never include `Application.hpp` in display module native-visible translation units
-- Use `lib_extra_dirs = modules` so headers resolve by basename (e.g.,
-  `#include "EventBus.hpp"` without directory prefix)
+- `lib_ldf_mode = deep` is mandated in `platformio.ini` across all hardware environments.
+- `lib_compat_mode = strict` prevents PlatformIO from attempting to compile desktop libraries on target microcontrollers.
+- **Stub-Header Architecture**: Native host tests resolve hardware dependencies via stub headers in `test/stubs/platform/`, completely eliminating the need for invasive preprocessor guards in production source files.
+- `lib_ignore` selectively disables unused display drivers per target environment (e.g. ignoring `LVGLDisplay` on `esp32dev`, and ignoring `U8G2Display` on `crowpanel-128-rotary`).
 
 ---
 
 ## 13. Security Architecture
 
-> 📖 **Developer Guide:** [Security](developer/security.md) — threat model, hardware encryption, credential storage, and TLS tradeoffs.
+> 📖 **Developer Guide:** [Security](developer/security.md) — threat model, hardware encryption, credential storage, TLS tradeoffs, web portal authentication, and OTA firmware integrity.
 
-### 13.1 DeviceCrypto
+### 13.1 Threat Model & Layered Security
 
-> 📖 See [Security § Hardware Encryption (DeviceCrypto)](developer/security.md#3-hardware-encryption-devicecrypto) for the API and usage rules.
+The framework assumes devices operate on a local WiFi network, potentially shared with untrusted or compromised devices. The primary threats addressed are:
+1. **Unauthorized network access** to configuration, system controls, and device APIs.
+2. **Firmware tampering and supply-chain corruption** during over-the-air updates.
+3. **Credential extraction** from flash storage or network transit.
+4. **Accidental system state mutation** via automated or misconfigured tooling.
 
-The framework includes a hardware-backed cryptographic engine (`DeviceCrypto`)
-that derives a unique device key from the ESP32's hardware MAC/eFuse and uses it
-for symmetric encryption of sensitive configuration values (API tokens, passwords).
+The framework enforces defense-in-depth through five layered security controls:
 
-- Keys are **never stored in plaintext** on LittleFS
-- Encrypted values use AES-256 with the device-unique key
-- The device key is non-exportable — encrypted config is device-specific
-- All cryptographic operations use **ESP-IDF/MbedTLS** hardware-accelerated APIs
-  (not standard C++ library crypto)
+| Layer | Component | Mechanism |
+|---|---|---|
+| **Hardware Encryption** | `DeviceCrypto` | AES-256-CBC encryption using a hardware RNG master key in NVS |
+| **Credential Storage** | `KeyManager` | Encrypted key registry in `/etc/keys.json` with ownership metadata |
+| **Identity & Authentication** | `AuthManager` | Session cookies, SHA-256 salted hashes, PAT bearer tokens, EC P-256 HTTPS certs |
+| **Firmware Integrity** | `IOTAVerifier` | Streaming RSA-2048/SHA-256 signature verification with fail-closed enforcement |
+| **Anti-Rollback** | Bootloader & NVS | Monotonic `SECURITY_VERSION` counter in `esp_app_desc_t` and NVS |
 
-### 13.2 KeyManager & API Key Registry
+### 13.2 DeviceCrypto
 
-> 📖 See [Security § Credential Storage (KeyManager)](developer/security.md#4-credential-storage-keymanager) for the CRUD API and storage architecture.
+The `DeviceCrypto` library (`lib/DeviceCrypto/`) provides hardware-accelerated cryptographic primitives using ESP-IDF and mbedTLS:
 
-Key and credential management is a distinct concern from configuration persistence
-and is handled by a dedicated `KeyManager` kernel component:
+- **Master Key Generation**: On first boot, a 256-bit cryptographic key is generated using the ESP32 hardware True Random Number Generator (`esp_random()`).
+- **NVS Non-Exportable Storage**: The master key is stored in the NVS partition under the `"device_crypto"` namespace. It persists across firmware updates and is never exported over any network or serial interface. If NVS is wiped, stored encrypted credentials become permanently unrecoverable by design.
+- **Symmetric Encryption**: Provides AES-256-CBC encryption and decryption with PKCS#7 padding and random IV generation. Output is Base64-encoded for safe JSON serialization.
+- **Hardware Acceleration**: Leverages the ESP32's internal cryptographic hardware engine via mbedTLS APIs rather than software emulation.
 
-- `KeyManager` depends on `DeviceCrypto` (initialised first) for encryption/decryption
-- API keys and tokens are stored in `/etc/apikeys.json` in encrypted form
-- **CRUD API**: `addKey(id, secret)`, `getKeyById(id, buffer, size)`, `deleteKey(id)`
-  — ConfigManager has no knowledge of key content
-- Keys are referenced by opaque IDs (e.g., `k-12345678`) in module configs — the
-  ID is not sensitive; only the resolved key value is
-- Modules retrieve keys at runtime via `app.getKeyManager().getKeyById(id)`
-- **Plaintext credential storage is prohibited** — all credentials must be AES-256
-  encrypted via DeviceCrypto before writing to flash
+### 13.3 KeyManager & Encrypted Credential Store
 
-### 13.3 OTA Production System
+`KeyManager` (`modules/KeyManager/`) is a kernel service that decouples secret management from general application configuration:
 
-> 📖 **Developer Guide:** [OTA Update System](developer/ota-update-system.md) — complete OTA lifecycle, state machine, release channels, and deployment procedures.
+- **Isolated Storage**: Stored at `/etc/keys.json` on LittleFS. Plaintext credentials never touch configuration files (`/mod/*.json`).
+- **Encryption at Rest**: All secret values are encrypted via `DeviceCrypto` before writing to the filesystem.
+- **CRUD Contract**: Provides `addKey(id, secret, managedBy, exclusive)`, `getKeyById(id)`, `deleteKey(id)`, and `listKeys()`.
+- **Ownership Metadata & Access Control**:
+  - `managedBy`: Identifies the subsystem that registered the secret (e.g. `"WiFi"`, `"AuthManager"`).
+  - `exclusive`: When `true`, prevents the secret from being modified, overwritten, or deleted via the Web Portal REST API (`/api/keys`).
+- **Opaque Key References**: Modules reference keys using opaque identifiers (e.g. `"openweather_api"`) rather than storing raw secrets in module config structs.
 
-The framework provides a complete, production-grade OTA firmware update pipeline:
-semantic version comparison → channel-aware release discovery → multi-architecture
-manifest resolution → binary download → cryptographic signature verification →
-flash → self-test → firmware blessing → config snapshot. The system is designed
-with defence-in-depth: fail-closed signature enforcement, task watchdog supervision,
-auto-rollback via the ESP-IDF bootloader, and application-layer anti-rollback via
-an NVS security version counter.
+### 13.4 AuthManager & Web Portal Authentication
 
-#### 13.3.1 Architecture Overview
+The framework integrates a complete authentication subsystem (`AuthManager`) that rejects unauthenticated access across the device's web interfaces and REST APIs:
 
-The OTA subsystem is composed of five libraries and one orchestrator module:
+#### 13.4.1 Password Hashing & Salted Storage
+- Passwords are salted with 16 bytes of hardware-generated entropy (`esp_random()`).
+- Stored as `SHA-256(salt || password)` inside `KeyManager` under the keys `"portal_password_salt"` and `"portal_password_hash"`.
+- Password verification performs constant-time memory comparisons to prevent timing attacks.
 
-| Layer | Location | Responsibility |
-|-------|----------|----------------|
-| **`OTAUpdateManager`** | `modules/otaUpdateManager/` | Orchestrator — state machine, FreeRTOS task, EventBus progress, REST API routes, IConfigurable channel/autoCheck persistence |
-| **`OTADownloadEngine`** | `lib/OTADownloadEngine/` | Utility — redirect-aware HTTP download, binary header verification, chunked streaming flash, verifier integration |
-| **`IOTAVerifier` / `MbedTLSSignatureVerifier`** | `include/interfaces/` + `lib/OTADownloadEngine/` | Interface + default impl — RSA+SHA256 signature verification via mbedtls |
-| **`SemVer`** | `lib/SemVer/` | Firmware version parsing, packed 32-bit comparison, channel-aware ordering |
-| **`OTAManifest`** | `lib/OTAManifest/` | Multi-architecture manifest parser — maps board IDs to firmware assets |
-| **`ConfigManifest`** | `lib/ConfigManifest/` | Three-Tier config lifecycle — Active/Previous/Golden schema version tracking |
+#### 13.4.2 Session Management
+- Successful login issues an authenticated session token consisting of 16 random bytes (32 hex characters).
+- Delivered to the client via an HTTP response cookie:
+  ```http
+  Set-Cookie: esp32_session=<32-hex-characters>; Path=/; HttpOnly; SameSite=Strict
+  ```
+- Validated via constant-time comparison on all protected routes.
+- Sessions are invalidated explicitly on logout or upon reboot.
 
-The layers follow the Hollywood Principle: `OTAUpdateManager` (a module)
-depends on the `lib/` libraries, but the libraries have no knowledge of the
-module. The download engine accepts a `WiFiClient&` from the caller and never
-creates its own network client.
+#### 13.4.3 Global Authentication Middleware
+`WebServerManager` registers an authentication middleware callback on `PsychicHttpServer` that inspects all incoming HTTP requests:
+
+| Route / Path Pattern | Access Rule | Rationale |
+|---|---|---|
+| Static Assets (`/`, `*.css`, `*.js`, `*.ico`, `*.png`) | Public | Static frontend shell must load before authentication |
+| `/api/auth/status`, `/api/auth/login` | Public | Login endpoints to establish session |
+| `/api/tabs`, `/api/app` | Public | Read-only bootstrap data for the SPA shell |
+| `/api/system` (GET only) | Public | Non-sensitive system status telemetry |
+| `/api/system/restart`, `/api/system/factory-reset` | **Authenticated** | Destructive system actions require active session |
+| `/api/mcp/*` | MCP Guard | Dedicated MCP bearer token / session cookie validation |
+| All other `/api/*` endpoints | **Authenticated** | Protected by `AuthManager::checkPortalAuth()` |
+
+If an unauthenticated request targets a protected endpoint, the middleware halts request processing and returns HTTP 401 Unauthorized JSON immediately.
+
+#### 13.4.4 AP Mode First-Boot Provisioning
+When the device boots in Access Point mode (`AppState::WIFI_SETUP`), `AuthManager::setAPMode(true)` activates a temporary provisioning bypass, allowing initial password configuration and WiFi setup without pre-existing credentials. As soon as the device connects to station mode, AP mode is disabled and full authentication is enforced.
+
+#### 13.4.5 On-Device EC P-256 Certificate Generation
+To secure transport without relying on external Public Key Infrastructure (PKI), `AuthManager` can generate an on-device EC P-256 self-signed X.509 certificate:
+- **Algorithm**: Elliptic Curve Cryptography using curve `secp256r1` (NIST P-256) with SHA-256 signatures.
+- **Subject**: Common Name matches `<hostname>.local`.
+- **Storage**: DER-encoded key and certificate saved to `/etc/server.key` and `/etc/server.crt`.
+- **Memory Optimization**: Certificate generation uses fixed static buffers (1024 bytes for cert, 256 bytes for private key) and an atomic guard (`_certGenRunning`) to eliminate dynamic heap fragmentation.
+- **HTTPS Enforcement**: `PsychicHttpsServer` listens on port 443 with an automatic HTTP-to-HTTPS redirect on port 80.
+
+### 13.5 Model Context Protocol (MCP) Security
+
+The Model Context Protocol server (`MCPServer`) provides structured JSON-RPC tool integration for AI agents with strict security defaults:
+
+- **Read-Only Mode Default**: `_mcpReadOnly` defaults to `true` (Security fix #214). Any attempt to invoke a tool with `mutatesState = true` while read-only mode is active is rejected with JSON-RPC error `-32000` ("Read-only mode").
+- **Bearer Token Authentication**: When authentication is enabled, MCP requests over HTTP (`POST /api/mcp`) must supply an authorization header:
+  ```http
+  Authorization: Bearer <mcp_token>
+  ```
+  The bearer token matches the device's password hash, retrievable by an authenticated administrator via `GET /api/auth/mcp-token`.
+- **Serial Port Trust Model**: MCP requests arriving over the physical hardware UART / USB-CDC serial interface bypass authentication, treating direct physical access as trusted.
+
+### 13.6 OTA Production Update System
+
+The framework provides an end-to-end, cryptographically verified OTA update pipeline.
+
+#### 13.6.1 Split-Repo Architecture
+The framework uses a **split-repo OTA model** (PR-37) that decouples firmware binary distribution from source code repositories:
+- Firmware release assets and manifests are hosted on a dedicated release endpoint or CDN.
+- Eliminates the need for personal access tokens (PATs) with source-code read permissions embedded in firmware binaries.
+- Avoids GitHub API unauthenticated rate limits (60 requests/hour) by performing direct HTTP/HTTPS manifest fetching.
+- Enables multi-architecture distribution where a single manifest references builds for distinct hardware profiles.
 
 ```
-SemVer → OTAManifest → OTAUpdateManager → OTADownloadEngine → IOTAVerifier
-                              ↕
-                      ConfigManifest ↔ ConfigManager
-                              ↕
-                      GithubClient (release queries)
++-------------------------------------------------------------+
+|                  Dedicated Releases Server                  |
+|  manifest.json (v2)                                         |
+|    - esp32dev:            firmware-esp32dev.bin (+ .sig)    |
+|    - esp32s3nano:         firmware-esp32s3nano.bin (+ .sig) |
+|    - crowpanel-128-rotary:firmware-crowpanel.bin (+ .sig)   |
++-------------------------------------------------------------+
+                               |
+                        Direct HTTPS GET
+                               |
+                               v
+   +-------------------------------------------------------+
+   |                  OTAUpdateManager                     |
+   |  1. Fetch & parse manifest.json                       |
+   |  2. Compare version (SemVer engine)                   |
+   |  3. Check anti-rollback security version              |
+   |  4. Match BOARD_ID via findAssetForBoard()            |
+   |  5. Download firmware + .sig via OTADownloadEngine    |
+   |  6. Stream to IOTAVerifier (RSA-2048 / SHA-256)       |
+   |  7. Flash write -> reboot -> self-test -> blessing    |
+   +-------------------------------------------------------+
 ```
 
-#### 13.3.2 SemVer Engine
+#### 13.6.2 SemVer Engine & Packed Tag Comparison
+The `SemVer` library (`lib/SemVer/`) provides zero-allocation firmware version comparison using packed 32-bit integers:
 
-The `SemVer` library (`lib/SemVer/`) provides zero-allocation firmware version
-comparison on MCU using packed 32-bit integers.
+- **Version Struct**:
+  ```cpp
+  struct FirmwareVersion {
+      uint8_t major   = 0;
+      uint8_t minor   = 0;
+      uint8_t patch   = 0;
+      Channel channel = Channel::STABLE;
+      uint8_t preNum  = 0;
+  };
+  ```
+- **Bit Packing**: `packVersion()` packs versions into:
+  `MAJOR(8) | MINOR(8) | PATCH(8) | CHANNEL(4) | PRE_NUM(4)`
+  allowing instantaneous single-word numeric comparisons.
+- **Channel Ordering**: `DEV (0) < BETA (2) < RC (3) < STABLE (15)`. A stable release always supersedes any pre-release with matching major, minor, and patch values.
+- **Anti-Rollback Version Packing**: The SemVer tag format packs `CHANNEL(2) | PRE_NUM(6)` into the `SECURITY_VERSION` metadata within `esp_app_desc_t`.
 
-**`FirmwareVersion` struct:**
-```cpp
-struct FirmwareVersion {
-    uint8_t major   = 0;
-    uint8_t minor   = 0;
-    uint8_t patch   = 0;
-    Channel channel = Channel::STABLE;
-    uint8_t preNum  = 0;
-};
-```
+#### 13.6.3 Release Channels & Implicit Downgrades
+The active release channel is configured via `IConfigurable` (`/mod/ota.json`, schema v5):
+- Channels: `stable` (production releases), `beta` (pre-release testing), `dev` (bleeding-edge builds).
+- **Implicit Downgrade**: If a user switches channels (e.g. `beta` to `stable`), `checkForUpdate()` detects that `channel != lastCheckedChannel` and flags an update even if the remote stable version number is lower than the installed beta build.
 
-**`Channel` enum** — numeric values produce correct ordering via `packVersion()`:
-
-| Channel | Value | Example Tag |
-|---------|-------|-------------|
-| `DEV` | 0 | `v3.1.0-dev.3` |
-| `BETA` | 2 | `v3.1.0-beta.1` |
-| `RC` | 3 | `v3.1.0-rc.1` |
-| `STABLE` | 15 | `v3.1.0` |
-
-**`packVersion()`** — bit layout: `MAJOR(8) | MINOR(8) | PATCH(8) | CHANNEL(4) | PRE_NUM(4)`.
-A single 32-bit integer comparison replaces multi-field comparison logic.
-
-**`parseVersionTag()`** — parses git tag strings (`"v3.1.0"`, `"v3.1.0-beta.1"`,
-`"3.1.0-dev.3"`) into `FirmwareVersion` using `strtoul()` and `strncmp()` — zero
-heap allocation. Leading `v` prefix is optional.
-
-**Channel ordering:** `DEV < BETA < RC < STABLE`. A stable release always
-sorts higher than any pre-release of the same major.minor.patch.
-
-#### 13.3.3 Release Channels
-
-The OTA system supports three release channels for firmware distribution:
-
-| Channel | Description | Tag Convention |
-|---------|-------------|----------------|
-| `stable` | Production releases | `v3.1.0` (no pre-release suffix) |
-| `beta` | Pre-release testing | `v3.2.0-beta.1` |
-| `dev` | Development builds | `v3.2.0-dev.3` |
-
-**Channel persistence:** The active channel is stored as an `IConfigurable`
-field in `/mod/ota.json` (namespace: `"ota"`, schema version: 2). Fields:
-
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `channel` | `char[16]` | `"stable"` | Active release channel |
-| `autoCheck` | `bool` | `true` | Whether to auto-check for updates on boot |
-| `lastCheckedChannel` | `char[16]` | `""` | Channel used for the previous update check |
-
-**Implicit downgrade:** When the user changes channel (e.g., `beta` → `stable`),
-`checkForUpdate()` detects that `_channel != _lastCheckedChannel` and signals
-"update available" even if the remote version is numerically lower than the
-running version. This allows seamless channel switching without manual intervention.
-
-**`lastCheckedChannel` tracking:** Updated after each successful check. Enables
-detection of channel changes between checks. Persisted via `ConfigManager`.
-
-**`GithubClient::getLatestReleaseForChannel()`:** For `"stable"`, delegates to
-the standard `getLatestRelease()` endpoint. For `"beta"` or `"dev"`, queries
-`/repos/{owner}/{repo}/releases` (all releases including pre-releases) and finds
-the first release whose tag contains the channel string.
-
-#### 13.3.4 Multi-Architecture Manifest
-
-The OTA system supports multiple board architectures via a `manifest.json` file
-shipped as a release asset alongside firmware binaries.
-
-**Manifest schema (`OTAManifest`):**
+#### 13.6.4 Multi-Architecture Manifest (v2)
+`OTAManifest` (`lib/OTAManifest/`) parses release metadata without heap allocation using fixed stack buffers:
 ```json
 {
   "version": "v3.1.0",
@@ -2380,416 +2438,54 @@ shipped as a release asset alongside firmware binaries.
   ]
 }
 ```
+The orchestrator matches the build-time macro `BOARD_ID` (e.g. `"esp32dev"`, `"crowpanel-128-rotary"`) using `findAssetForBoard(manifest, BOARD_ID)` to resolve the correct firmware binary and signature.
 
-**`OTAManifest` struct** (`lib/OTAManifest/`):
-- `version[32]` — release version tag
-- `channel[16]` — release channel
-- `securityVersion` — anti-rollback counter
-- `assets[kMaxBoards]` — array of per-board `OTAAsset` entries (max 4 boards)
-- All storage is stack-allocated using fixed-size char arrays — no heap, no String
-
-**`OTAAsset` struct** — per-board firmware asset descriptor:
-- `board[24]` — board identifier (e.g., `"esp32dev"`)
-- `firmware[64]` — firmware binary filename
-- `signature[64]` — signature filename
-- `size` — binary size in bytes
-- `sha256[65]` — SHA-256 hex digest
-
-**`BOARD_ID` compile-time injection:** Each PlatformIO environment defines
-`-DBOARD_ID=\"esp32dev\"` (or `\"esp32s3nano\"`, `\"native\"`) in `build_flags`.
-The orchestrator uses this macro to call `findAssetForBoard(manifest, BOARD_ID)`
-for board-specific asset resolution.
-
-**Legacy fallback:** If no `manifest.json` is present in a release (pre-manifest
-releases), the orchestrator falls back to a linear scan of release assets,
-matching by `.bin` and `.sig` file extensions. This ensures backward compatibility
-with older releases.
-
-**`parseManifest()` / `findAssetForBoard()`** — free functions: parse raw JSON
-into the struct and perform a linear scan for the board-matching asset.
-
-#### 13.3.5 Cryptographic Verification Pipeline
-
-The `IOTAVerifier` interface defines a three-step verification contract:
-
+#### 13.6.5 Cryptographic Verification Pipeline & Fail-Closed Policy
+Firmware integrity is verified via the `IOTAVerifier` interface implemented by `MbedTLSSignatureVerifier`:
 ```cpp
 class IOTAVerifier {
 public:
-    virtual bool begin(const char* publicKeyPem) = 0;   // Load key + init digest
-    virtual void update(const uint8_t* data, size_t length) = 0;  // Per-chunk hash
-    virtual bool verify(const uint8_t* signature, size_t signatureLength) = 0;  // Validate
+    virtual bool begin(const char* publicKeyPem) = 0;
+    virtual void update(const uint8_t* data, size_t length) = 0;
+    virtual bool verify(const uint8_t* signature, size_t signatureLength) = 0;
 };
 ```
-
-**Default implementation: `MbedTLSSignatureVerifier`**
-
-- Uses `mbedtls_pk_context` for public key parsing and `mbedtls_md_context_t`
-  for SHA-256 digest accumulation
-- RAII lifecycle — destructor calls `mbedtls_pk_free()` + `mbedtls_sha256_free()`,
-  preventing resource leaks even on error paths
-- The public key is PEM-encoded RSA, injected at runtime via
-  `FrameworkConfig.otaPublicKey` — never hardcoded in the framework
-- Non-copyable, non-movable (owns mbedtls context handles)
-- On native builds (`NATIVE_BUILD`), stub implementations compile cleanly but
-  return failure, enabling interface contract tests without crypto dependencies
-
-#### 13.3.6 Fail-Closed OTA Enforcement
-
-When `FrameworkConfig.otaPublicKey` is configured (non-null), the OTA pipeline
-operates in **fail-closed mode**:
-
-- If the release has **no `.sig` asset**, the update is **aborted** with:
-  `"Missing .sig file — update rejected (fail-closed)"`
-- If the `.sig` file downloads but contains **zero bytes**, the update is
-  **aborted** with: `"Signature empty — update rejected (fail-closed)"`
-- If signature verification **fails**, the download engine returns
-  `OTAError::SignatureVerifyFailed`
-
-This is a **security invariant**: when a public key is present, there is no
-code path that accepts unsigned firmware. The check occurs at two levels:
-
-1. **Asset presence check** — before any download begins (fast rejection)
-2. **Post-download verification** — after the full binary is written and hashed
-
-**Degraded mode (no key):** If `FrameworkConfig.otaPublicKey` is `nullptr`,
-signature verification is skipped entirely. A warning is logged at `ESP_LOGW`.
-This is a dev convenience; production deployments must configure a public key.
-
-#### 13.3.7 Download Engine
-
-`OTADownloadEngine` handles the complete binary download pipeline:
-
-1. **Redirect-following HTTP GET** — up to 5 hops (`kMaxRedirects`), using
-   HTTP/1.0 to avoid chunked-transfer encoding complications on the ESP32
-2. **Separate `.sig` file fetch** — `fetchSignature()` downloads the detached
-   signature file with its own redirect chain
-3. **ESP32 binary header validation** — verifies the first byte is the ESP32
-   magic byte `0xE9`, rejecting non-firmware payloads before any flash write
-4. **Partition space validation** — checks `Content-Length` against
-   `ESP.getFreeSketchSpace()`, failing early with `OTAError::InsufficientSpace`
-   if the binary exceeds the available OTA partition
-5. **Chunked streaming write** — reads the binary in 1024-byte chunks
-   (`kChunkSize`), writing each chunk to the flash via `Update.write()` and
-   feeding it to `IOTAVerifier::update()` for hash accumulation
-6. **Post-download signature verification** — calls `IOTAVerifier::verify()`
-   against the fetched `.sig` file contents
-7. **Progress callbacks** — invokes `OTAProgressCallback(bytesWritten, totalSize)`
-   after each chunk for UI integration
-
-**Error codes** (`OTAError` enum):
-
-| Code | Value | Description |
-|------|-------|-------------|
-| `None` | 0 | Success |
-| `HttpConnectionFailed` | -1 | TCP/TLS connection could not be established |
-| `HttpWrongResponseCode` | -2 | Unexpected HTTP status code |
-| `HttpFileNotFound` | -3 | Server returned 404 |
-| `HttpForbidden` | -4 | Server returned 403 |
-| `ServerNoContentLength` | -5 | Server did not report Content-Length |
-| `TooManyRedirects` | -6 | Exceeded 5 redirect hops |
-| `InsufficientSpace` | -7 | Binary exceeds free sketch space |
-| `NoOtaPartition` | -8 | No OTA partition available |
-| `BinaryHeaderInvalid` | -9 | First byte is not `0xE9` |
-| `SignatureFetchFailed` | -10 | Failed to download `.sig` file |
-| `SignatureVerifyFailed` | -11 | Cryptographic verification failed |
-| `UpdateBeginFailed` | -12 | `Update.begin()` returned false |
-| `UpdateWriteFailed` | -13 | `Update.write()` wrote fewer bytes than expected |
-| `UpdateEndFailed` | -14 | `Update.end()` returned false |
-| `StreamReadTimeout` | -15 | Stream read timed out during download |
-
-Each error maps to a human-readable string via `otaErrorToString()`.
-
-> **Design constraint:** The engine does NOT own the `WiFiClient` — the caller
-> passes a configured client by reference. This allows the orchestrator to
-> control TLS configuration and heap allocation per §14.3.
-
-#### 13.3.8 Orchestrator State Machine
-
-`OTAUpdateManager` manages the OTA lifecycle through the `OTAState` enum:
-
-```
-Idle → Checking → Idle              (no update found)
-Idle → Downloading → Verifying → Complete → (reboot)
-Any  → Error                        (on failure)
-```
-
-| State | Description |
-|-------|-------------|
-| `Idle` | No OTA activity — ready to accept a check or update |
-| `Checking` | Querying GitHub for latest release metadata |
-| `Downloading` | FreeRTOS task running the download pipeline |
-| `Verifying` | Signature verification in progress |
-| `Complete` | Update finalised — waiting for reboot |
-| `Error` | An error occurred (query `getLastOtaError()` for details) |
-
-**`checkForUpdate()`** creates a `GithubClient` with the repo and token from
-`FrameworkConfig`, queries the latest release for the configured `_channel`,
-compares versions using `SemVer`, and returns `true` if a new release is
-available or if the channel has changed since the last check (implicit downgrade).
-Guards: must be in `Idle` state with a configured `otaGithubRepo`.
-
-**`performUpdate()`** launches a FreeRTOS task (8KB stack, priority 1) that
-executes the full pipeline:
-
-1. Guard checks (firmware updates enabled, GitHub repo configured)
-2. Query GitHub for releases via `GithubClient::getLatestReleaseForChannel()`
-3. Download and parse `manifest.json` (or fall back to legacy asset scan)
-4. Match `BOARD_ID` to manifest assets via `findAssetForBoard()`
-5. Fail-closed check: reject missing/empty `.sig` when public key is configured
-6. Snapshot config manifest: Active → Previous (via `ConfigManifest`)
-7. Initialise `MbedTLSSignatureVerifier` (if `otaPublicKey` configured)
-8. Allocate `WiFiClientSecure` on the heap (per §14.3)
-9. Create and configure `OTADownloadEngine`
-10. Fetch the `.sig` signature file
-11. Download and flash the firmware binary (with per-chunk TWDT feeding)
-12. Finalise and reboot (2-second delay for event propagation)
-
-The FreeRTOS task ensures the `tick() ≤ 10ms` constraint is never violated by
-blocking download I/O. On native builds, `performUpdate()` sets `OTAState::Error`
-(no FreeRTOS available).
-
-#### 13.3.9 Task Watchdog Supervision
-
-The OTA FreeRTOS task subscribes to the ESP-IDF Task Watchdog Timer (TWDT):
-
-```cpp
-esp_task_wdt_add(NULL);   // Subscribe at task start
-// ... download chunks, feed watchdog implicitly via chunk processing ...
-esp_task_wdt_delete(NULL); // Unsubscribe before reboot or error return
-```
-
-**`CONFIG_ESP_TASK_WDT_PANIC=y`** in `sdkconfig.defaults` means a TWDT timeout
-triggers a kernel panic → reboot. If the download hangs (network timeout,
-infinite redirect loop), the watchdog fires → panic → reboot → bootloader auto-
-rollback reverts to the previous firmware.
-
-This creates a closed safety loop: hung download → watchdog → panic → reboot →
-auto-rollback — with no human intervention required.
-
-#### 13.3.10 Auto-Rollback
-
-The ESP-IDF bootloader provides hardware-level auto-rollback via
-`CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y`:
-
-1. After OTA flash, the device reboots into the new firmware in **pending
-   verification** state
-2. The **`Application` hub** calls `markAppValid()` at **Step 17b** of the boot
-   sequence — after `_compactAndLock()` (Step 17). This means the self-test
-   barrier covers ALL subsystem initialisation:
-   - Display hardware bootstrap
-   - EventBus, LittleFS mount, FrameworkConfig
-   - DeviceCrypto, KeyManager
-   - ConfigManager (register + beginAll)
-   - WiFi, Time, Data, OTA, Web, MCP
-   - Display integration, carousel board registration
-   - Registry lock (`_compactAndLock`)
-3. If any step crashes or hangs before `markAppValid()`, the bootloader
-   automatically reverts to the previous firmware partition on the next reboot
-
-> **Prohibited:** Blessing the partition at download/write time. This defeats the
-> rollback purpose — firmware could still have fatal startup or runtime crashes.
-
-#### 13.3.11 Anti-Rollback (Application Layer)
-
-The application-layer anti-rollback mechanism uses an NVS security version counter
-to prevent downgrade past security-critical firmware boundaries:
-
-- **`SECURITY_VERSION` macro** — defined in `platformio.ini` `build_flags`
-  (e.g., `-DSECURITY_VERSION=1`). Incremented when a release contains a
-  security fix that must not be rolled back past.
-- **NVS storage** — `Preferences` namespace `"ota_security"`, key `"sec_ver"`
-- **Check logic** (`checkSecurityVersion()`, called from `markAppValid()`):
-  - If `SECURITY_VERSION > stored` → update NVS to the new value
-  - If `SECURITY_VERSION < stored` → firmware is running a version below the
-    security floor (this scenario is prevented by the orchestrator checking the
-    manifest's `securityVersion` field before download)
-
-The `OTAManifest.securityVersion` field enables the orchestrator to compare the
-remote release's security version against the stored NVS value before initiating
-a download, rejecting downgrades at the network layer before any flash write.
-
-#### 13.3.12 Config Lifecycle — Three-Tier Model
-
-The `ConfigManifest` library (`lib/ConfigManifest/`) manages configuration
-versioning across OTA updates using three tiers:
-
-| Tier | Description | Snapshot Trigger |
-|------|-------------|-----------------|
-| **Active** | Currently running config schema version per module | Updated by `ConfigManager` during `beginAll()` |
-| **Previous** | Config state before the last OTA download | `snapshotActiveToPrevious()` — called before OTA download |
-| **Golden** | Last-known-good config (firmware blessed) | `snapshotActiveToGolden()` — called from `markAppValid()` |
-
-**Persistence:** Stored as `/config_manifest.json` on LittleFS, alongside the
-per-module config files at `/mod/<namespace>.json`.
-
-**OTA integration points:**
-1. Before download: `_configManager.getManifest().snapshotActiveToPrevious()` +
-   `save()` — preserves the pre-update config state
-2. After firmware blessing: `_configManager.getManifest().snapshotActiveToGolden()`
-   + `save()` — records the last-known-good configuration
-
-**`ModuleSlot` struct** — per-module slot tracking Active/Previous/Golden schema
-versions. Up to `kMaxModules` (16) namespaces are tracked.
-
-**`ConfigManifest` API:**
-- `load()` / `save()` — JSON persistence on LittleFS
-- `updateActive()` / `updatePrevious()` / `updateGolden()` — per-namespace setters
-- `snapshotActiveToPrevious()` / `snapshotActiveToGolden()` — bulk copy all slots
-- `getSlot()` / `getActiveVersion()` / `getPreviousVersion()` / `getGoldenVersion()`
-
-#### 13.3.13 FrameworkConfig OTA Secrets
-
-`FrameworkConfig` carries only compile-time OTA secrets. The runtime master
-kill-switch moved to OTAUpdateManager's persisted config as `updatesEnabled`
-(see §13.3.14); `otaQuietHour` was removed (never implemented — daily
-scheduling is handled by `checkHour`).
-
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `otaPublicKey` | `const char*` | `nullptr` | PEM-encoded RSA public key for signature verification. `nullptr` = skip verification (degraded mode) |
-| `otaGithubRepo` | `const char*` | `nullptr` | GitHub repository in `"owner/repo"` format for OTA releases |
-| `otaGithubToken` | `const char*` | `nullptr` | Optional GitHub access token for private repos |
-
-These secrets have safe defaults (`nullptr`) so the framework boots without
-requiring any OTA configuration. The consuming app populates them during the
-`BOOTING` phase via `FrameworkConfig`.
-
-#### 13.3.14 IConfigurable OTA Fields
-
-`OTAUpdateManager` implements `IConfigurable` (namespace: `"ota"`, schema v4):
-
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `channel` | `char[16]` | `"stable"` | Active release channel (`"stable"`, `"beta"`, `"dev"`) |
-| `autoCheck` | `bool` | `true` | Auto-check for updates on boot |
-| `updatesEnabled` | `bool` | `true` | Master kill-switch for applying firmware updates (moved from `FrameworkConfig`) |
-| `checkHour` | `uint8_t` | `3` | Hour (0–23) for the daily scheduled update check |
-| `lastCheckedChannel` | `char[16]` | `""` | Last channel used for an update check (implicit downgrade detection) |
-
-Persisted at `/mod/ota.json` via `ConfigManager`. Schema migrations: v1→v2 adds
-`lastCheckedChannel`; v2→v3 adds `checkHour`; v3→v4 adds `updatesEnabled`
-(defaults to `true`).
-
-#### 13.3.15 EventBus Integration
-
-The orchestrator publishes `OTAProgressEvent` on topic `"ota.progress"`:
-
-```cpp
-struct OTAProgressEvent {
-    float progress;       // 0.0 to 1.0 download fraction
-    const char* status;   // Human-readable status message
-    bool complete;        // True when OTA cycle is finished
-    bool success;         // True if OTA succeeded (only valid when complete)
-};
-```
-
-`OTAProgressEvent` is **layout-compatible** with `OTAProgressPayload` in
-`U8G2DisplayModule.hpp` — the display module subscribes to `"ota.progress"` and
-can safely cast the payload to either type for rendering the `OTAProgressBoard`.
-
-Events are published:
-- At each major pipeline step (checking, downloading, verifying, complete, error)
-- On every progress callback from the download engine (per-chunk granularity)
-- With `complete=true` on both success and failure (check `success` to distinguish)
-
-#### 13.3.16 CI/CD Pipeline
-
-Firmware is built and released via a two-stage pipeline:
-
-**Stage 1 — GitHub Actions CI** (`.github/workflows/build.yml`):
-- Triggers on tag push (`v*`)
-- Matrix build: `esp32dev` + `esp32s3nano`
-- Each job: PlatformIO build → rename binary → generate SHA-256 hash → upload
-  unsigned artifacts
-- Artifacts are named `firmware-{board}.bin` + `firmware-{board}.bin.sha256`
-
-**Stage 2 — Local release** (`scripts/deploy_release.py`):
-1. Download CI artifacts: `gh run download <run-id>`
-2. Sign each board's firmware: `openssl dgst -sha256 -sign private_key.pem`
-3. Generate `manifest.json`: `scripts/generate_manifest.py`
-4. Create GitHub Release: `gh release create <tag>`
-5. Upload all assets: `.bin`, `.bin.sig`, `.bin.sha256`, `manifest.json`
-
-**Design rationale:** Signing is performed locally (not in CI) because the
-private key must never be stored in GitHub Secrets or any remote system. The
-CI pipeline produces unsigned artifacts; the human operator signs them with the
-locally-held private key before publishing the release.
-
-#### 13.3.17 REST API
-
-The `OTAUpdateManager` registers the following routes via `IWebContributor`:
-
-| Method | Route | Body | Description |
-|--------|-------|------|-------------|
-| `GET` | `/api/ota` | — | Returns `{ "status": "ready" }` |
-| `POST` | `/api/ota` | `{ "action": "checkGithub" }` | Check GitHub + perform update if available |
-| `POST` | `/api/ota` | `{ "action": "status" }` | Returns state, version, channel, boardId, autoCheck, lastError |
-| `POST` | `/api/ota` | `{ "action": "setChannel", "channel": "beta" }` | Change update channel (persisted via ConfigManager) |
-| `POST` | `/api/ota` | `{ "action": "rollback", "confirm": "ROLLBACK" }` | Rollback firmware (requires typed confirmation) |
-| `POST` | `/api/ota` | `{ "action": "markValid" }` | Bless the running firmware |
-
-**Rollback confirmation:** The `rollback` action requires `"confirm": "ROLLBACK"`
-in the POST body. Without this exact string, the server responds with HTTP 403
-and an error message. This prevents accidental rollbacks from automated tools.
-
-**Status response** includes: `state`, `version` (major.minor.patch), `channel`,
-`boardId`, `autoCheck`, and `lastError` (if any).
-
-#### 13.3.18 Web Portal Integration
-
-The OTA tab in the web portal (parent: "System", order: 50) provides:
-
-- **Channel dropdown** — allows switching between `stable`, `beta`, and `dev`
-  channels. Calls `POST /api/ota { "action": "setChannel" }` on change.
-- **Check for update** button — triggers `POST /api/ota { "action": "checkGithub" }`
-- **Rollback** button — requires the user to type "ROLLBACK" in a confirmation
-  dialog before sending `POST /api/ota { "action": "rollback", "confirm": "ROLLBACK" }`
-- **Enhanced status display** — shows current firmware version, active channel,
-  board ID, and OTA state
-
-#### 13.3.19 Security Considerations
-
-- **Public key management:** The consuming app provides the PEM-encoded RSA
-  public key via `FrameworkConfig.otaPublicKey`. The framework never hardcodes
-  key material — this is an app-side responsibility
-- **Fail-closed enforcement:** When a public key is configured, missing or empty
-  `.sig` files cause an immediate abort — not a warning (see §13.3.6)
-- **WiFiClientSecure allocation:** Always heap-allocated via
-  `std::unique_ptr<WiFiClientSecure>(new (std::nothrow) WiFiClientSecure())`
-  per §14.3 memory rules — never on the stack
-- **GitHub CDN TLS:** Uses `setInsecure()` for CDN redirect hops because GitHub's
-  CDN endpoints use different certificate chains than `api.github.com`. The
-  mandatory signature verification (not TLS certificate pinning) is the security
-  boundary — GitHub CDN uses rotating certs that cannot be reliably pinned
-- **Anti-rollback:** NVS `security_version` counter prevents downgrade past
-  security-critical firmware (see §13.3.11)
-- **Task watchdog:** Hung downloads are terminated by TWDT → panic → reboot →
-  auto-rollback (see §13.3.9)
-- **Rollback safety:** The blessing ceremony (§13.3.10) ensures that bad firmware
-  is automatically reverted by the bootloader if core services fail to initialise
-- **Legacy direct-upload path:** The web-upload OTA route
-  (`beginUpdate`/`writeStream`/`endUpdate`) is preserved alongside the new
-  GitHub pipeline. It uses MD5 verification via `Update.setMD5()` — this path
-  does not use RSA+SHA256 signature verification
-
-### 13.4 Web Portal Security
-
-> 📖 See [Security § Web Portal & MCP Authentication](developer/security.md#6-web-portal--mcp-authentication) for the auth middleware flow.
-
-- The portal is only accessible on the local network (no cloud dependency)
-- No authentication is implemented by default (local network trust model)
-- Future: optional HTTP Basic Auth configurable via `FrameworkConfig`
-
-### 13.5 MCP Security
-
-> 📖 See [Security § Web Portal & MCP Authentication](developer/security.md#6-web-portal--mcp-authentication) and [MCP Server § Configuration Persistence](developer/mcp-server.md#7-configuration-persistence) for read-only mode details.
-
-- `FrameworkConfig.mcpReadOnly` toggle (default `false`)
-- Each tool in `McpToolEntry` has a `bool mutatesState` metadata field (default `false`)
-- When `mcpReadOnly == true`, tools with `mutatesState == true` return JSON-RPC
-  error code `-32000` ("Read-only mode")
-- HTTP transport (`POST /api/mcp`) inherits the same security checks as Serial
-  transport — both call the same `processRequest()` core
+- **Streaming Hash**: Chunks are processed through `IOTAVerifier::update()` as they are received from the network, maintaining an $O(1)$ RAM footprint during multi-megabyte downloads.
+- **Fail-Closed Security Invariant**: When an RSA public key is configured in `FrameworkConfig.otaPublicKey`:
+  - If the release lacks a `.sig` signature asset, the update is rejected immediately.
+  - If the signature payload is empty or truncated, the update aborts before flash operations.
+  - If cryptographic signature validation fails, flash writes are halted and the active partition remains untouched.
+- **Degraded Mode**: If `otaPublicKey` is `nullptr`, signature validation is skipped and a warning is logged (`ESP_LOGW`). This is permitted only in local development builds.
+
+#### 13.6.6 Download Engine & Flash Safety
+`OTADownloadEngine` manages streaming transfers with comprehensive safety checks:
+1. **Redirect Handling**: Follows up to 5 HTTP/HTTPS redirects.
+2. **Magic Byte Validation**: Validates that the first downloaded byte is the ESP32 firmware magic byte `0xE9`, aborting immediately on invalid binaries.
+3. **Partition Space Check**: Compares `Content-Length` against available sketch partition space before starting flash writes.
+4. **Task Watchdog Feeding**: Explicitly feeds the ESP-IDF Task Watchdog Timer (TWDT) during chunk processing to prevent panics during network jitter.
+5. **DRAM Stack Constraint**: The OTA FreeRTOS worker task stack is allocated strictly in internal DRAM (`MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT`). Because SPI flash operations disable the CPU instruction cache, any task stack allocated in external PSRAM would cause an immediate, fatal cache fault.
+
+#### 13.6.7 Auto-Rollback & Firmware Blessing Ceremony
+The framework leverages ESP-IDF hardware bootloader rollback (`CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y`):
+1. Upon flashing a new firmware image, the bootloader boots into the newly flashed slot in a `pending verification` state.
+2. The firmware is **not blessed** during download or reboot.
+3. `Application` invokes `markAppValid()` only at **Step 17b** of the boot sequence, after all hardware, filesystem, network, configuration, and security subsystems have successfully initialized.
+4. If a panic, crash, or watchdog timeout occurs prior to Step 17b, the ESP32 reboots and the bootloader automatically rolls back to the previous stable firmware partition.
+
+#### 13.6.8 Application-Layer Anti-Rollback
+An NVS-backed anti-rollback monotonic counter (`Preferences` namespace `"ota_security"`, key `"sec_ver"`) prevents rollback to older, vulnerable firmware versions:
+- `SECURITY_VERSION` is embedded in the firmware image (`esp_app_desc_t`).
+- During boot validation, if `SECURITY_VERSION > stored_sec_ver`, the NVS counter is updated to the higher value.
+- Pre-download manifest checks reject any firmware offering a `securityVersion` lower than the device's recorded hardware security floor.
+
+#### 13.6.9 Three-Tier Configuration Lifecycle (ConfigManifest)
+`ConfigManifest` (`lib/ConfigManifest/`) maintains configuration schema snapshots across OTA cycles in `/config_manifest.json`:
+- **Active**: Current schema version per registered module namespace.
+- **Previous**: Snapshot taken immediately before an OTA download (`snapshotActiveToPrevious()`).
+- **Golden**: Snapshot recorded after successful firmware blessing at boot (`snapshotActiveToGolden()`).
+
+#### 13.6.10 Web Portal Firmware Upload Route
+The web portal exposes `POST /api/ota/upload` supporting multipart file streaming (`firmware` + `signature` fields). The upload handler streams chunks directly into `Update.write()` while accumulating the SHA-256 digest in `MbedTLSSignatureVerifier`, executing the identical cryptographic validation and blessing protocol as remote network updates.
 
 ---
 
@@ -2799,397 +2495,166 @@ The OTA tab in the web portal (parent: "System", order: 50) provides:
 > - [Performance & Optimization](developer/performance-guide.md) — heap budgeting, PSRAM, flash size, TLS memory costs
 > - [Embedded Safety](developer/embedded-safety.md) — memory rules, thread safety, DRAM constraints
 
-### 14.1 Target Hardware & Partition Layout
+### 14.1 Target Hardware & Partition Structure
 
-| Parameter | esp32dev (4MB) | esp32s3nano (8MB+) |
-|---|---|---|
-| Flash | 4MB | 8MB+ |
-| DRAM | 320KB (usable ~200KB) | 512KB |
-| IRAM | 128KB | 128KB |
-| PSRAM | Not assumed | Board-dependent |
-| OTA Partition A | 1280KB | 2MB |
-| OTA Partition B | 1280KB | 2MB |
-| LittleFS | 896KB | 3.75MB |
+The framework supports multiple ESP32 silicon variants (ESP32 Classic, ESP32-S3) with varying flash and PSRAM configurations. Rather than hardcoding fixed partition sizes into the specification, the definitive partition allocation for each hardware target is defined in its board configuration file at `hardware/<board>/partitions.csv`:
 
-> **Note:** esp32dev partition layout was resized from the original 960KB OTA / 1.5MB
-> LittleFS to accommodate U8G2 font tables in the firmware binary.
+- `hardware/esp32dev/partitions.csv` — Generic ESP32-WROOM-32 (4MB flash)
+- `hardware/esp32s3nano/partitions.csv` — Waveshare ESP32-S3-Nano (8MB+ flash, QSPI PSRAM)
+- `hardware/crowpanel-128-rotary/partitions.csv` — Elecrow 1.28" Rotary Display (16MB flash, Octal PSRAM)
 
-### 14.2 Framework Kernel Budget
+#### Standard Partition Layout Architecture
 
-> 📖 See [Performance & Optimization § RAM Budgeting](developer/performance-guide.md#2-ram-budgeting) for budgeting targets and measurement.
+All supported board configurations follow a unified partition architecture designed for safe dual-slot OTA updates and reliable configuration persistence:
 
-The kernel (without any optional modules) should target:
+| Partition | Type | SubType | Purpose |
+|---|---|---|---|
+| `nvs` | `data` | `nvs` | Non-Volatile Storage for hardware master key (`DeviceCrypto`), WiFi credentials, and anti-rollback `SECURITY_VERSION` counter |
+| `otadata` | `data` | `ota` | OTA boot selection table tracking active, candidate, and rollback boot slots |
+| `app0` | `app` | `ota_0` | Primary application firmware partition slot |
+| `app1` | `app` | `ota_1` | Symmetrical secondary application firmware partition slot |
+| `config` | `data` | `spiffs` | Dedicated LittleFS partition for module configuration (`/mod/*.json`), keys (`/etc/keys.json`), and schema tracking |
+| `storage` | `data` | `spiffs` | Secondary LittleFS partition for runtime storage, user assets, and audit logs (`/var/audit.log`) |
+| `coredump`| `data` | `coredump`| Dedicated flash sector for crash dumps and panic backtraces |
 
-| Resource | Budget | Notes |
-|---|---|---|
-| Flash (binary) | < 600KB | Leaves room for app + LittleFS partition |
-| Static RAM | < 40KB | Globals, BSS, static arrays |
-| Heap at boot | > 120KB free | Required for WiFi stack + async web server |
+#### Measurement Procedures
 
-### 14.3 Key Memory Rules
+To inspect and verify partition allocations and binary footprints:
+
+1. **Partition Table Sizing**: Inspect `hardware/<board>/partitions.csv` directly for exact partition boundaries, offsets, and byte allocations.
+2. **Firmware Binary Size & Partition Utilization**:
+   Execute the PlatformIO size target for the target environment:
+   ```bash
+   pio run -e <env> -t size
+   ```
+   Alternatively, inspect the compiled binary header using `esptool.py`:
+   ```bash
+   esptool.py image_info .pio/build/<env>/firmware.bin
+   ```
+
+### 14.2 Framework Kernel Budget & Sizing Methodology
+
+The framework enforces strict budgeting principles across flash, static memory, and dynamic heap to guarantee stability across all operating conditions:
+
+#### Budgeting Guidelines
+
+- **Flash Binary Headroom**: Production builds must reserve sufficient flash headroom within the board's designated application partition (`app0`/`app1`) to accommodate downstream application logic and optional modules.
+- **Static RAM (Data & BSS)**: Minimized by placing immutable lookup tables in flash (`.rodata`), avoiding monolithic global structs, and allocating one-off working buffers on the stack or in short-lived heap scopes.
+- **Boot Heap Reserve**: The framework guarantees that upon entering `AppState::RUNNING`, sufficient free DRAM is available to service concurrent WiFi networking, HTTP request dispatching, and TLS handshakes.
+- **Static Asset Footprint**: Static web portal assets are compiled into PROGMEM gzip byte arrays by `scripts/portalBuilder.py`. The canonical asset inventory is maintained in `web/portal/` and bundled into `include/portal_assets/` during build time.
+- **Test Suite Metrics**: Test coverage and case counts are dynamically reported by the test runner:
+  ```bash
+  pio test -e native --json-output | jq '.test_count'
+  ```
+
+### 14.3 Key Memory & Execution Rules
 
 > 📖 See [Embedded Safety § Memory Rules](developer/embedded-safety.md#1-memory-rules) for the full rule set with examples.
 
-- `WiFiClientSecure`, `HTTPClient` must NEVER be allocated on the stack in HTTPS
-  operations — always heap via `std::unique_ptr<WiFiClientSecure>(new (std::nothrow) WiFiClientSecure())`
-- Registration arrays are `std::vector` — built once at boot/soft-reset,
-  `shrink_to_fit()` called on structural arrays after each build phase
-- **Structural arrays are NEVER mutated during `tick()` steady-state** — any
-  structural change triggers a soft-reset cycle
-- Lightweight arrays (keys, web routes, config consumers) may grow at any time
-  since they do not affect loop scheduling
-- Module instances MUST be declared `static` at file scope — never stack-allocated.
-  Stack-allocated module destructors fire on scope exit, leaving dangling pointers
-  in the `Application` hub's tick array.
+1. **Heap Allocation for TLS/HTTP**: `WiFiClientSecure` and `HTTPClient` must NEVER be allocated on the stack due to their large frame size (>500 bytes plus internal buffers). Always allocate dynamically via `std::unique_ptr<WiFiClientSecure>(new (std::nothrow) WiFiClientSecure())` and verify the pointer before use.
+2. **Registration Array Immutability**: All subsystem registration arrays use `std::vector` and are built exclusively during the boot phase. After `Application::begin()` completes Phase 2 (`_compactAndLock()`), structural arrays are permanently locked against runtime mutation.
+3. **Module Scope & Lifecycle**: Module instances must be declared `static` at file scope or owned as long-lived member variables within the application class. Stack-allocated modules are strictly prohibited because their destructors leave dangling pointers in the hub's dispatch arrays.
+4. **DRAM vs PSRAM Constraints**:
+   - **SPI Flash Inaccessibility**: During SPI flash erase and write operations (such as OTA updates or LittleFS writes), the CPU cache is disabled, rendering external PSRAM inaccessible. Any access to PSRAM during a flash write results in a fatal cache fault.
+   - **Task Stack Placement**: The FreeRTOS task stacks for tasks performing flash operations (e.g. the OTA download task or HTTP server task) MUST reside strictly in internal DRAM (`MALLOC_CAP_INTERNAL`).
+   - **DeepStackExecutor**: Stack-intensive worker tasks (such as JSON parsing or cryptographic operations) that do not perform flash writes may utilize PSRAM task stacks via `DeepStackExecutor` (`lib/DeepStackExecutor/`) to preserve internal DRAM.
+   - **Mutual Exclusion**: `DisplayServiceHelper` provides a mutual-exclusion gate that suspends display rendering routines during active OTA flash operations.
 
 **Required SDK configuration:**
-- `CONFIG_AUTOSTART_ARDUINO=y` in `sdkconfig.defaults` — mandatory for dual-framework
-  (Arduino + ESP-IDF) projects. Without it, Arduino's `app_main()` wrapper fails
-  to link against ESP-IDF's `app_startup.c`.
-- `CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y` — enables OTA rollback.
+- `CONFIG_AUTOSTART_ARDUINO=y` in `sdkconfig.defaults` — mandatory for dual-framework (Arduino + ESP-IDF) projects.
+- `CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y` — enables bootloader auto-rollback.
 
 **Known platform constraint:**
-- `Arduino.h` defines `#define LOW 0x0` and `#define HIGH 0x1`, which collide with
-  the `PriorityTier` enum. `dataManager.cpp` must `#undef LOW` and `#undef HIGH`
-  after including `Arduino.h`.
+- `Arduino.h` defines macros `#define LOW 0x0` and `#define HIGH 0x1`, which collide with `PriorityTier` enum values. Any translation unit referencing `PriorityTier` alongside Arduino headers must `#undef LOW` and `#undef HIGH`.
 
 ### 14.4 Registration Array Model
 
-There are **no `MAX_*` compile-time ceilings**. The framework sizes arrays exactly
-to what the application registers — no waste, no artificial constraints.
+There are **no `MAX_*` compile-time ceilings**. The framework sizes arrays dynamically during initialisation to fit registered components:
 
-**Structural arrays** (rebuilt at boot/soft-reset, `shrink_to_fit()` after build):
+**Structural arrays** (built once at boot, `shrink_to_fit()` called during compaction, immutable in steady state):
 
-| Array | Type | Mutation Policy |
+| Array | Element Type | Mutation Policy |
 |---|---|---|
-| `ITickable*` | `std::vector` | Soft-reset only |
-| `IDisplayBoard*` | `std::vector` | Soft-reset only |
-| `iDataSource*` | `std::vector` | Soft-reset only |
-| `IMcpContributor*` | `std::vector` | Soft-reset only |
+| `_tickables` | `ITickable*` | Soft-reset only |
+| `_displayBoards` | `IDisplayBoard*` | Soft-reset only |
+| `_dataSources` | `IDataSource*` | Soft-reset only |
+| `_mcpContributors` | `IMCPContributor*` | Soft-reset only |
 
-**Lightweight arrays** (may grow at any time):
+**Lightweight arrays** (append permitted at any time):
 
-| Array | Type | Mutation Policy |
+| Array | Element Type | Mutation Policy |
 |---|---|---|
-| `iConfigurable*` | `std::vector` | Append any time |
-| `IWebContributor*` | `std::vector` | Append any time |
-| `KeyManager` entries | `std::vector` | Append any time |
+| `_configConsumers` | `IConfigurable*` | Append any time |
+| `_webContributors` | `IWebContributor*` | Append any time |
+| `KeyManager` entries | `KeyInfo` | Append any time |
 
-**After each build phase**, the framework logs heap stats and publishes:
-```cpp
-app.getEventBus().publish("system.heap", &heapPayload);
-```
-The web portal's System tab consumes this directly.
+After Phase 2 compaction, the framework logs heap statistics and publishes an event on `"system.heap"`.
 
 ### 14.5 Boot-Phase Allocation Pattern (Reference Implementation)
-
-> 📖 See [Embedded Safety § Memory Rules](developer/embedded-safety.md#1-memory-rules) and [Architecture Overview § Two-Tier Vector Model](developer/architecture-overview.md#two-tier-vector-model--_compactandlock-lifecycle) for the allocation discipline.
-
-This section documents how the two-tier vector model is implemented inside the
-`Application` hub. It is the normative reference for any contributor implementing
-or extending the hub.
-
-#### The Three Lifecycle Phases
 
 ```
 ╔══════════════════════════════════════════════════════════════════════╗
 ║  PHASE 1: REGISTRATION                                           ║
-║  begin() open — all register*() calls accepted                  ║
+║  begin() open — all registerModule() calls accepted              ║
 ║  std::vector grows via push_back() (amortised doubling)         ║
 ╠══════════════════════════════════════════════════════════════════════╣
-║  PHASE 2: COMPACTION                                             ║
-║  Structural arrays: shrink_to_fit() releases over-capacity      ║
-║  Heap stats logged + 'system.heap' EventBus event fired         ║
-║  _locked = true  ← structural arrays are now immutable          ║
+║  PHASE 2: COMPACTION & LOCK                                      ║
+║  Structural arrays: shrink_to_fit() releases excess capacity     ║
+║  Heap statistics logged + 'system.heap' EventBus event fired     ║
+║  _locked = true  <-- structural arrays are now immutable         ║
 ╠══════════════════════════════════════════════════════════════════════╣
 ║  PHASE 3: STEADY-STATE  (tick() loop)                           ║
 ║  Structural: reads only — zero allocation, zero deallocation    ║
 ║  Lightweight: append freely — no lock, no shrink                ║
-║  Any call to register structural array → assert / panic         ║
+║  Any call to register structural array -> assert / panic         ║
 ╚══════════════════════════════════════════════════════════════════════╝
 ```
 
-#### `Application` Hub Sketch
+#### Soft-Reset Cycle
 
-```cpp
-class Application {
-public:
-    // ── Structural registration (Phase 1 only) ──────────────────
-    void registerTickable(ITickable* t) {
-        ASSERT_MESSAGE(!_locked, "registerTickable() after begin() — use softReset()");
-        _tickables.push_back(t);
-    }
-    void registerDataSource(iDataSource* ds) {
-        ASSERT_MESSAGE(!_locked, "registerDataSource() after begin() — use softReset()");
-        _dataSources.push_back(ds);
-    }
-    void registerMcpContributor(IMcpContributor* mc) {
-        ASSERT_MESSAGE(!_locked, "registerMcpContributor() after begin()");
-        _mcpContributors.push_back(mc);
-    }
-
-    // ── Lightweight registration (any phase) ────────────────────
-    void registerConfigConsumer(iConfigurable* c)  { _configConsumers.push_back(c); }
-    void registerWebContributor(IWebContributor* w) { _webContributors.push_back(w); }
-
-    // ── Kernel service accessors ────────────────────────────────
-    EventBus& getEventBus()                { return _eventBus; }
-    DataManager& getDataManager()          { return _dataManager; }
-    WebServerManager& getWebServerManager(){ return _webServerManager; }
-    McpServer& getMcpServer()              { return _mcpServer; }
-    IStatusReporter& getStatusReporter();
-
-    // ── Lifecycle ───────────────────────────────────────────────
-    void begin(const FrameworkConfig& config);
-    void tick();
-    void softReset();
-
-private:
-    // ── Kernel services (owned by value) ─────────────────────────
-    EventBus          _eventBus;
-    DataManager       _dataManager;
-    WebServerManager  _webServerManager;
-    McpServer         _mcpServer;
-
-    // ── Structural arrays ────────────────────────────────────────
-    std::vector<ITickable*>        _tickables;
-    std::vector<iDataSource*>      _dataSources;
-    std::vector<IMcpContributor*>  _mcpContributors;
-    bool                           _locked = false;
-
-    // ── Lightweight arrays ───────────────────────────────────────
-    std::vector<iConfigurable*>    _configConsumers;
-    std::vector<IWebContributor*>  _webContributors;
-
-    // ── Status reporter fallback ─────────────────────────────────
-    class NullStatusReporter : public IStatusReporter {
-        void reportMessage(const char*, const char*) override {}
-        void reportProgress(const char*, int) override {}
-        void reportError(const char*, const char*) override {}
-    };
-    NullStatusReporter _nullReporter;
-
-    void _compactAndLock();
-    void _reportHeap();
-};
-```
-
-#### The Soft-Reset Cycle in Detail
-
-A soft-reset is triggered when a structural change is needed at runtime (e.g.
-the user adds a new display board via the web portal, or a module is dynamically
-enabled by a config change):
-
-```
-1. Web portal receives POST /api/module/add
-2. Handler sets a deferred flag: _softResetPending = true
-3. Next tick() boundary: framework detects flag before dispatching tickables
-4. framework calls softReset():
-     a. _locked = false
-     b. _tickables.clear() / _dataSources.clear() / _mcpContributors.clear()
-     c. _onRegister() — app re-registers all modules (including new one)
-     d. _compactAndLock() — shrink_to_fit + heap report + _locked = true
-5. tick() resumes with the updated arrays
-```
-
-The deferred flag pattern mirrors the existing config reload flag — structural
-changes are never applied mid-dispatch.
+When structural changes are required at runtime (e.g. adding a new display board or enabling a module via configuration):
+1. The request sets a deferred flag: `_softResetPending = true`.
+2. At the next `tick()` boundary, the framework detects the pending flag.
+3. `Application::softReset()` unlocks the registry, clears structural arrays, invokes the application's re-registration hook, calls `_compactAndLock()`, and resumes execution.
 
 ### 14.6 Build Profiles & Compiler Optimization
 
-The framework uses aggressive binary size optimization to maximise headroom on
-the 4MB esp32dev target. All settings are in `sdkconfig.defaults` and apply to
-both esp32dev and esp32s3nano environments unless overridden by
-`sdkconfig.defaults.<env>`.
+The framework applies compiler and library optimizations configured via `sdkconfig.defaults`:
 
 #### 14.6.1 Compiler Optimization: `-Os`
 
-The production build uses `CONFIG_COMPILER_OPTIMIZATION_SIZE=y` (`-Os`), which
-enables the same optimization passes as `-O2` (the "fast" flag) but disables
-optimizations that increase code size — specifically loop unrolling and
-aggressive function inlining.
+Production builds configure `CONFIG_COMPILER_OPTIMIZATION_SIZE=y` (`-Os`), enabling speed optimizations while omitting code-expanding transformations such as aggressive loop unrolling.
+- The ESP32 executes code from external SPI flash via a 32KB instruction cache. Smaller binary size reduces cache thrashing, making `-Os` highly effective on cache-constrained microcontrollers.
+- Workloads are primarily I/O-bound (network, display refresh, serial I/O), making execution time insensitive to unrolled loops.
 
-**Performance impact on ESP32: negligible to beneficial.**
+#### 14.6.2 Logging Strategy & Compile-Time Stripping
 
-- The ESP32 executes code from external SPI flash via a 32KB instruction cache.
-  Smaller code means fewer cache misses, which can make `-Os` *faster* than
-  `-O2` on cache-constrained microcontrollers.
-- The framework is I/O-bound — WiFi packets (milliseconds), HTTP responses
-  (hundreds of milliseconds), display refresh (I2C at 400KHz), and `tick()`
-  sleep intervals (10ms+). The 10–20% instruction-level overhead of `-Os` vs
-  `-O2` on tight computational loops is invisible when the CPU is idle 99%+ of
-  the time.
-- ESP-IDF documentation recommends `-Os` as the standard production setting.
-  The default `-Og` exists specifically for debugger-friendly code layout, not
-  for performance.
-- The only workloads where `-Os` has measurable impact are pure CPU tasks like
-  mbedTLS RSA signature verification (~10–20% slower) and large JSON parsing
-  (~5–15% slower). Both are infrequent, one-shot operations (OTA updates and
-  API responses) where sub-millisecond differences are irrelevant.
-
-#### 14.6.2 Logging Strategy
-
-The framework maintains **208 active log call sites** (82 ERROR, 40 WARN,
-86 INFO) across all modules, consuming approximately 8.5KB of format strings
-in the binary. An additional 15 DEBUG-level call sites exist in the source but
-are stripped at compile time.
-
-**Production builds use `CONFIG_LOG_MAXIMUM_LEVEL=3` (INFO).** This is a
-**compile-time ceiling** — the preprocessor completely removes `ESP_LOGD` and
-`ESP_LOGV` calls from the binary. They cannot be re-enabled at runtime via
-`esp_log_level_set()` without recompiling.
-
-| Level | Macro | Ceiling | Status in Production |
-|-------|-------|:---:|---|
-| ERROR (1) | `ESP_LOGE` | ≤3 | ✅ Always compiled in |
-| WARN (2) | `ESP_LOGW` | ≤3 | ✅ Always compiled in |
-| INFO (3) | `ESP_LOGI` | ≤3 | ✅ Always compiled in |
-| DEBUG (4) | `ESP_LOGD` | >3 | ❌ Stripped by preprocessor |
-| VERBOSE (5) | `ESP_LOGV` | >3 | ❌ Stripped by preprocessor |
-
-**Rationale for keeping INFO in production:**
-
-- INFO provides full lifecycle visibility: boot sequence, WiFi connection,
-  OTA progress, state transitions, module initialisation. These are essential
-  for field diagnostics when a USB cable is the only debugging tool.
-- Dropping to WARN would save only ~5.6KB (0.7% of the binary) — not
-  meaningful given the 469KB of available headroom.
-- The serial port is shared with the MCP server, making logging a first-class
-  diagnostic channel alongside structured MCP tool queries.
-- The framework invested significant effort instrumenting all modules with
-  consistent `ESP_LOGx` calls via `LogShim.h`. Stripping them at compile time
-  would undermine that observability architecture.
-
-**Runtime log level control** remains available within the compiled ceiling.
-An app can call `esp_log_level_set("McpServer", ESP_LOG_ERROR)` to silence a
-noisy module at runtime without recompiling, as long as the requested level
-is ≤ the compile-time maximum (3 = INFO).
+Production builds specify `CONFIG_LOG_MAXIMUM_LEVEL=3` (INFO). This sets a **compile-time ceiling**:
+- Calls to `ESP_LOGD` (DEBUG) and `ESP_LOGV` (VERBOSE) are completely eliminated from the binary by the preprocessor.
+- `ESP_LOGE`, `ESP_LOGW`, and `ESP_LOGI` are compiled into the image.
+- Runtime log level adjustments via `esp_log_level_set()` operate within the compiled ceiling (up to level 3).
 
 #### 14.6.3 Build Profiles
 
-Three build profiles are supported via `sdkconfig.defaults` overrides. The
-production profile is the default; debug and release profiles can be activated
-by creating environment-specific override files or by modifying
-`sdkconfig.defaults` before building.
-
-**Production (default):**
-
-| Setting | Value | Effect |
-|---------|-------|--------|
-| `CONFIG_COMPILER_OPTIMIZATION_SIZE` | `y` | `-Os` compiler flag |
-| `CONFIG_NEWLIB_NANO_FORMAT` | `y` | Smaller `printf`/`scanf` (~25–50KB savings) |
-| `CONFIG_LOG_MAXIMUM_LEVEL` | `3` (INFO) | DEBUG/VERBOSE stripped at compile time |
-| `CONFIG_COMPILER_OPTIMIZATION_ASSERTIONS_SILENT` | `y` | `assert()` aborts without file/line strings |
-| `CONFIG_ESP_ERR_TO_NAME_LOOKUP` | `n` | `esp_err_to_name()` returns `"UNKNOWN"` |
-
-**Debug** (for development — override with `CONFIG_LOG_MAXIMUM_LEVEL=5` etc.):
-
-| Setting | Value | Effect |
-|---------|-------|--------|
-| `CONFIG_COMPILER_OPTIMIZATION_DEBUG` | `y` | `-Og` for debugger-friendly code |
-| `CONFIG_NEWLIB_NANO_FORMAT` | `n` | Full `printf` formatting |
-| `CONFIG_LOG_MAXIMUM_LEVEL` | `5` (VERBOSE) | All log levels available at runtime |
-| `CONFIG_COMPILER_OPTIMIZATION_ASSERTIONS_DISABLE` | `n` | Full assertion messages with file/line |
-| `CONFIG_ESP_ERR_TO_NAME_LOOKUP` | `y` | Human-readable error names |
-
-> **Note:** The debug profile increases binary size by ~220KB. On the 4MB
-> esp32dev target this exceeds 80% flash usage. Debug builds are recommended
-> only on the esp32s3nano (8MB) target or when temporarily overriding for a
-> specific investigation on esp32dev.
-
-**Release** (maximum size reduction for space-constrained deployments):
-
-| Setting | Value | Effect |
-|---------|-------|--------|
-| All production settings | — | As above |
-| `CONFIG_LOG_MAXIMUM_LEVEL` | `2` (WARN) | INFO stripped, saves ~5.6KB |
-| `CONFIG_LOG_DEFAULT_LEVEL` | `1` (ERROR) | Only errors emitted at runtime |
-
-> **Warning:** The release profile strips INFO-level lifecycle logging. Serial
-> monitoring will show only warnings and errors. Use only for final production
-> deployments where serial diagnostics are not expected.
-
-#### 14.6.4 Observability Implications of Silent Assertions & Error Lookup
-
-Two production settings reduce diagnostic clarity in exchange for flash savings:
-
-**`CONFIG_COMPILER_OPTIMIZATION_ASSERTIONS_SILENT=y`** — when `assert()` or
-`configASSERT()` fires, the device aborts and reboots *without printing the
-file name and line number* that triggered the assertion. The abort still occurs
-(the watchdog catches it), but the serial output will show only the panic
-handler backtrace, not the assertion source location. Use `addr2line` on the
-backtrace addresses against the `.elf` file to locate the source.
-
-**`CONFIG_ESP_ERR_TO_NAME_LOOKUP=n`** — `esp_err_to_name(err)` returns
-`"UNKNOWN"` for all error codes instead of human-readable strings like
-`"ESP_ERR_NO_MEM"`. Framework log messages that include `esp_err_to_name()`
-will show the numeric error code but not the symbolic name. Consult the ESP-IDF
-`esp_err.h` header to decode numeric values.
-
-#### 14.6.5 Size Optimization Summary
-
-The cumulative effect of all optimizations (PR-10):
-
-| Optimization | Savings | Section |
+| Profile | Target Use | Primary Settings |
 |---|---|---|
-| Compiler `-Os` + newlib nano + silent assertions | ~174KB | §14.6.1, §14.6.3 |
-| mbedTLS cipher pruning (3DES, Blowfish, Camellia, etc.) | ~24KB | §14.6.6 |
-| ECC curve pruning, WPS disable, ChaCha20 disable | ~17KB | §14.6.6 |
-| sdkconfig cleanup (console, PPP, libsodium) | ~11KB | §14.6.6 |
-| **Total** | **~226KB (−21.4%)** | |
+| **Production** (Default) | Field deployment | `-Os`, `NEWLIB_NANO_FORMAT=y`, `LOG_MAXIMUM_LEVEL=3` (INFO), silent assertions |
+| **Debug** | Development & tracing | `-Og`, full printf formatting, `LOG_MAXIMUM_LEVEL=5` (VERBOSE), full assertions |
+| **Release** | Highly space-constrained | All production settings + `LOG_MAXIMUM_LEVEL=2` (WARN), default level ERROR |
 
-Final binary: **830KB (63.4%)** on esp32dev, leaving **469KB (36.6%)** headroom
-for application code and optional modules.
+#### 14.6.4 Observability Tradeoffs: Silent Assertions & Error Lookups
 
-#### 14.6.6 mbedTLS & Network Pruning
+Production builds configure:
+- `CONFIG_COMPILER_OPTIMIZATION_ASSERTIONS_SILENT=y`: Assertions abort without printing file/line strings to conserve flash. Backtraces are resolved via `addr2line` against the build `.elf` file.
+- `CONFIG_ESP_ERR_TO_NAME_LOOKUP=n`: `esp_err_to_name()` returns numeric error codes rather than human-readable strings.
 
-The production build disables unused cryptographic primitives to reduce the
-mbedTLS contribution to the binary. Only the cipher suites required for
-HTTPS (GitHub API, OTA downloads) and OTA signature verification are retained.
+#### 14.6.5 mbedTLS & Cryptographic Pruning
 
-**Disabled ciphers:** 3DES, Blowfish, XTEA, Camellia, RC4, ChaCha20-Poly1305,
-RIPEMD-160.
+To minimize the cryptographic library footprint, `sdkconfig.defaults` disables unused legacy cipher suites (3DES, Blowfish, RC4, ChaCha20) and unneeded ECC curves, retaining only `secp256r1` (P-256) and AES-GCM/CBC suites required for modern HTTPS and OTA signature verification.
 
-**Disabled key exchange modes:** DHE-RSA, DHE-PSK, RSA-PSK, PSK. The framework
-uses ECDHE-RSA and ECDHE-ECDSA for TLS, which are retained.
+#### 14.6.6 Arduino Managed Components Platform Limitation
 
-**Disabled ECC curves:** All except secp256r1 (P-256), which is the standard
-TLS curve used by GitHub's servers and most HTTPS endpoints.
-
-**Network:** IPv6 is disabled (`CONFIG_LWIP_IPV6=n`). The framework operates
-exclusively on IPv4 local networks. WPS (WiFi Protected Setup) is disabled
-as the framework uses its own captive portal for WiFi provisioning.
-
-> **TLS compatibility note:** These pruning decisions are based on GitHub's
-> current TLS requirements (TLS 1.2+ with AES-GCM or AES-CBC, ECDHE key
-> exchange, P-256 curve). If future OTA sources require different cipher
-> suites, the corresponding `CONFIG_MBEDTLS_*` options must be re-enabled
-> in `sdkconfig.defaults`.
-
-#### 14.6.7 Known Platform Limitation: Arduino Managed Components
-
-The Arduino Core framework (`framework-arduinoespressif32`) declares 27
-managed component dependencies in its `idf_component.yml` manifest, of which
-the framework uses only 3 (`littlefs`, `mdns`, and the Arduino core itself).
-The unused components include Rainmaker (cloud IoT), Zigbee, Modbus, cellular
-modem, DSP, speech recognition, MP3 decoding, and libsodium.
-
-**The standard ESP-IDF `EXCLUDE_COMPONENTS` mechanism does not work with
-PlatformIO's dual-framework build.** PlatformIO's IDF Component Manager
-resolves and compiles managed components before CMake processes the
-`EXCLUDE_COMPONENTS` variable. Additionally, PlatformIO auto-generates
-`CMakeLists.txt` (gitignored), so persistent modifications are not possible.
-
-The linker's garbage collector (`--gc-sections`) strips most unused code from
-these components, but static initialisers, VFS registration macros, and
-`.rodata` string tables may survive. This is an estimated 20–60KB of residual
-dead weight that cannot currently be eliminated without switching away from
-PlatformIO or using ESP-IDF as the sole framework.
-
-**Mitigation:** Monitor PlatformIO releases for `EXCLUDE_COMPONENTS` support
-in dual-framework builds. If space becomes critical, evaluate migrating to
-pure ESP-IDF with Arduino as a manually managed component (bypassing the
-Component Manager entirely).
+PlatformIO's dual-framework builder compiles managed components declared in Arduino's `idf_component.yml` before CMake processes exclusion flags. Unused components are largely stripped by the linker's garbage collection (`--gc-sections`), though some static initialisers and symbol tables remain in the binary. Framework releases are monitored for improved upstream component exclusion support.
 
 ---
 
@@ -3198,89 +2663,176 @@ Component Manager entirely).
 > 📖 **Developer Guides:**
 > - [Creating a Module](developer/creating-a-module.md) — step-by-step module implementation tutorial
 > - [Coding Patterns](developer/coding-patterns.md) — SOLID principles, Service Module Pattern, style guide
+> - [Config System](developer/config-system.md) — ConfigManager gateway, schema migrations, and persistence
 
 ### 15.1 Creating a New Module
 
-> 📖 See [Creating a Module](developer/creating-a-module.md) for the complete step-by-step tutorial.
+Modules in the ESP32 App Foundation follow the **Service Module Pattern**: they are autonomous, self-contained components that encapsulate their own state, declare their dependencies via abstract interfaces, and participate in kernel lifecycle loops.
 
-A minimal module that participates in the framework tick loop:
+#### Canonical Module Definition (`MyModule.hpp`)
 
-**`myModule.hpp`**
 ```cpp
 #pragma once
 #include <AppFoundation.h>  // Canonical single-include façade
 
-class MyModule : public ITickable, public IConfigurable, public IWebContributor {
+class MyModule : public ITickable,
+                 public IConfigurable,
+                 public IWebContributor,
+                 public IMCPContributor,
+                 public IPreconditionContributor {
 public:
-    void begin(Application* ctx);
+    MyModule() = default;
+
+    // ── ITickable ───────────────────────────────────────────────
     void tick(uint32_t ms) override;
-    void reapplyConfig(const FrameworkConfig& cfg) override;
+
+    // ── IConfigurable (ConfigManager Gateway Pattern) ───────────
+    const char* getConfigNamespace() const override { return "mymodule"; }
+    int getSchemaVersion() const override { return 1; }
+    void applyConfig(const JsonObject& section) override;
+    void serializeConfig(JsonObject& section) const override;
+    bool migrateConfig(JsonObject& section, int fromVersion) override;
+    void resetConfig() override;
+
+    // ── IWebContributor (PsychicHttp) ───────────────────────────
     void registerRoutes(PsychicHttpServer& server) override;
-    void registerTabs(ITabRegistry& registry) override {
-        registry.addTab("My Module", nullptr, 100);
-    }
+    void registerTabs(ITabRegistry& registry) override;
+
+    // ── IMCPContributor ─────────────────────────────────────────
+    void registerTools(MCPServer& server) override;
+
+    // ── IPreconditionContributor ────────────────────────────────
+    void registerPreconditions(IPreconditionRegistry& registry) override;
+
 private:
-    Application* _ctx = nullptr;
-    // module state...
+    char _host[64] = "localhost";
+    uint16_t _port = 8080;
+    bool _enabled = true;
 };
 ```
 
-**Registration in app setup:**
+#### Registration via `Application::registerModule()`
+
+Downstream applications declare module instances as `static` or long-lived member variables and register them with the `Application` hub using template auto-detection:
+
 ```cpp
+// Static or long-lived application instance
 static MyModule myModule;
 
 void MyApp::begin() {
-    myModule.begin(&appCtx);
-    appCtx.registerTickable(&myModule);
-    appCtx.registerConfigConsumer(&myModule);
-    appCtx.registerWebContributor(&myModule);
+    // Template auto-detection checks base interfaces at compile-time (if constexpr)
+    // and registers with tick loop, ConfigManager, WebServer, MCP server, etc.
+    app.registerModule(&myModule);
 }
 ```
 
-### 15.2 Module Config File Pattern
+### 15.2 ConfigManager-as-Gateway Pattern
 
-> 📖 See [Configuration System § Config File Ownership Model](developer/config-system.md#1-config-file-ownership-model) for the directory and naming conventions.
+Modules **NEVER interact with LittleFS directly** for configuration persistence. Instead, `ConfigManager` acts as a centralized gateway that manages all filesystem I/O, file locks, atomic writes, and schema migrations:
 
-All modules store config under `/mod/<modulename>.json`:
+1. **Namespace Ownership**: Each module implements `getConfigNamespace()`, mapping its configuration to `/mod/<namespace>.json` (e.g. `/mod/mymodule.json`).
+2. **Schema Versioning**: `getSchemaVersion()` declares the active schema integer (starts at 1). `ConfigManager` automatically embeds this as a metadata field `"_v"` in the JSON payload.
+3. **Applying Configuration**: On boot and configuration imports, `ConfigManager` parses `/mod/<namespace>.json` into an ArduinoJson v7 `JsonObject` and calls `applyConfig(section)`.
+4. **Serializing Configuration**: When settings change, the application or web portal triggers a save. `ConfigManager` calls `serializeConfig(section)`, appends the schema version `_v`, and performs an atomic filesystem write.
+5. **Schema Migration**: When firmware upgrades increase `getSchemaVersion()`, `ConfigManager` detects `stored_v < getSchemaVersion()` and calls `migrateConfig(section, stored_v)`, allowing the module to upgrade legacy fields in-place before `applyConfig()` is invoked.
+
+#### Example Implementation (`MyModule.cpp`)
 
 ```cpp
-// Convention: /mod/<modulename>.json
-constexpr char CONFIG_PATH[] = "/mod/mymodule.json";
+#include "MyModule.hpp"
+#include <platform/LogShim.h>
 
-void MyModule::loadConfig() {
-    File f = LittleFS.open(CONFIG_PATH, "r");
-    if (!f) { writeDefaults(); return; }
-    JsonDocument doc;   // ArduinoJson v7 unified type
-    deserializeJson(doc, f);
-    strlcpy(_config.host, doc["host"] | "localhost", sizeof(_config.host));
-    _config.port = doc["port"] | 1883;
-    f.close();
+static const char* TAG = "MyModule";
+
+void MyModule::tick(uint32_t ms) {
+    // Keep tick execution <= 10ms
+}
+
+void MyModule::applyConfig(const JsonObject& section) {
+    strlcpy(_host, section["host"] | "localhost", sizeof(_host));
+    _port = section["port"] | 8080;
+    _enabled = section["enabled"] | true;
+    ESP_LOGI(TAG, "Config applied: host=%s, port=%u", _host, _port);
+}
+
+void MyModule::serializeConfig(JsonObject& section) const {
+    section["host"] = _host;
+    section["port"] = _port;
+    section["enabled"] = _enabled;
+}
+
+bool MyModule::migrateConfig(JsonObject& section, int fromVersion) {
+    if (fromVersion == 0) {
+        // Upgrade legacy unversioned structure
+        section["enabled"] = true;
+    }
+    return true;
+}
+
+void MyModule::resetConfig() {
+    strlcpy(_host, "localhost", sizeof(_host));
+    _port = 8080;
+    _enabled = true;
+}
+
+void MyModule::registerRoutes(PsychicHttpServer& server) {
+    server.on("/api/mymodule/status", HTTP_GET, [this](PsychicRequest* req, PsychicResponse* resp) {
+        JsonDocument doc;
+        doc["host"] = _host;
+        doc["port"] = _port;
+        doc["enabled"] = _enabled;
+        String output;
+        serializeJson(doc, output);
+        return resp->send(200, "application/json", output.c_str());
+    });
+}
+
+void MyModule::registerTabs(ITabRegistry& registry) {
+    registry.registerTab("My Module", "mymodule", 100);
+}
+
+void MyModule::registerTools(MCPServer& server) {
+    server.registerTool({
+        "mymodule_set_host",
+        "Configure host address for MyModule",
+        true, // mutatesState: guarded when _mcpReadOnly is true
+        [this](const JsonObject& params, JsonObject& result) {
+            strlcpy(_host, params["host"] | "localhost", sizeof(_host));
+            result["success"] = true;
+            return true;
+        }
+    });
+}
+
+void MyModule::registerPreconditions(IPreconditionRegistry& registry) {
+    registry.registerPrecondition({
+        "mymodule.ready",
+        "MyModule Initialisation",
+        [this]() { return _enabled; },
+        PreconditionSeverity::Warning
+    });
 }
 ```
 
-### 15.3 Module Checklist
+### 15.3 Module Authoring Checklist
 
-> 📖 See [Creating a Module § Developer Checklist & Best Practices](developer/creating-a-module.md#5-developer-checklist--best-practices) for the interactive checklist.
+When creating or reviewing a module for the ESP32 App Foundation, verify compliance against the following standards:
 
-- [ ] Implements required interfaces (at minimum `ITickable`)
-- [ ] Uses `app.getStatusReporter()` for user-visible status
-- [ ] Publishes to EventBus topics for cross-module messages (e.g., `"display.message"`)
-- [ ] Config file is stored at `/mod/<modulename>.json` — nowhere else
-- [ ] Config file includes a `configVersion` field; module validates and migrates on load
-- [ ] Config is parsed with `JsonDocument` (ArduinoJson v7) — never v6 `StaticJsonDocument` or `DynamicJsonDocument`
-- [ ] All logging uses `#include "platform/LogShim.h"` + `ESP_LOGx(TAG, ...)` — never `Serial.print()` or custom macros
-- [ ] Module instance declared `static` — never stack-allocated
-- [ ] Never `#include`s another optional module header
-- [ ] `tick()` completes in ≤ 10ms — long I/O is deferred to a FreeRTOS task
-- [ ] Registers web routes via `IWebContributor` if it has a UI
-- [ ] Web assets (if any) stored under `www/<appname>/` in LittleFS
-- [ ] Implements `reapplyConfig()` to respond to config changes
-- [ ] Has no compile-time dependency on display hardware
-- [ ] All hardware-specific calls wrapped in `#ifndef NATIVE_BUILD`
-- [ ] Module compiles on `native` environment for GoogleTest
-- [ ] Interface headers forward-declare external types — never `#include` heavy libs
-- [ ] `currentMillis` parameter injection preferred over calling `millis()` directly
-- [ ] `library.json` has NO `"platforms"` or `"frameworks"` restrictions (unless platform-specific)
+- [ ] **Interface Contracts**: Implements appropriate framework interfaces (`ITickable`, `IConfigurable`, `IWebContributor`, `IMCPContributor`, `IPreconditionContributor`, `IDataSource`, `ISanitizer`, `IBootReporter`).
+- [ ] **ConfigManager Gateway**: Never accesses LittleFS or filesystem APIs directly for config. Exclusively uses `applyConfig()`, `serializeConfig()`, `migrateConfig()`, and `resetConfig()`.
+- [ ] **Schema Versioning**: Declares a unique namespace via `getConfigNamespace()` and an integer schema version via `getSchemaVersion()`.
+- [ ] **ArduinoJson v7**: Uses unified `JsonDocument` and `JsonObject` types — never legacy ArduinoJson v6 types (`StaticJsonDocument`/`DynamicJsonDocument`).
+- [ ] **Registration**: Module registers cleanly with the application hub via `app.registerModule(&myModule)` with compile-time interface auto-detection.
+- [ ] **Boot Preconditions**: Modules that gate system readiness implement `IPreconditionContributor` and register preconditions with appropriate severity (`Info`, `Warning`, `Critical`).
+- [ ] **PsychicHttp Routing**: All HTTP endpoints use `PsychicHttpServer` (`PsychicRequest*`, `PsychicResponse*`) and register navigation tabs via `ITabRegistry`.
+- [ ] **MCP Tool Safety**: Tools that modify state declare `mutatesState = true`, ensuring enforcement of the `_mcpReadOnly` security guard.
+- [ ] **Background Data Sources**: Periodic data fetching implements `IDataSource` and respects `FetchContext` deadline tokens (`DeadlineToken`) to ensure non-blocking cancellation.
+- [ ] **Audit & Sanitization**: Sensitive parameters (tokens, passwords) are registered with `Redactor` or sanitized via `ISanitizer` before emission via `AUDIT()` or `AUDIT_SYNC()`.
+- [ ] **Observability & Logging**: Uses `#include "platform/LogShim.h"` and `ESP_LOGx(TAG, ...)` macros. Never uses raw `Serial.print()` or custom logging macros.
+- [ ] **Module Lifecycle**: Declared as `static` or member-owned. Stack allocation is strictly prohibited.
+- [ ] **Decoupling**: Never directly includes another optional module header. Inter-module communication is conducted via `EventBus` pub/sub topics.
+- [ ] **Loop Execution Budget**: `tick()` executes in $\le 10$ ms. Heavy operations, network I/O, and blocking loops are deferred to FreeRTOS tasks.
+- [ ] **Host Testability**: Compiles cleanly in the native test environment (`[env:native]`) against the Stub-Header Architecture without requiring invasive preprocessor guards in production headers.
 
 ---
 
@@ -3290,144 +2842,190 @@ void MyModule::loadConfig() {
 
 ### 16.1 Three Testing Tiers
 
-| Tier | Runs Where | Purpose |
-|---|---|---|
-| **Tier 1 — Native Unit Tests** | Host CPU via `[env:native]` + GoogleTest | Logic, state machines, registration, scheduling |
-| **Tier 2 — Hardware Integration** | Physical ESP32 board | WiFi, OTA, LittleFS, crypto, display |
-| **Tier 3 — End-to-End Boot** | Physical board, full stack | Boot-to-`RUNNING` all services |
+The framework implements a tiered testing methodology designed to validate logic rapidly on host machines while reserving physical hardware for silicon verification:
 
-### 16.2 `NATIVE_BUILD` Guard Pattern
+| Tier | Environment | Runner | Target Scope |
+|---|---|---|---|
+| **Tier 1 — Native Unit Tests** | Host CPU (`[env:native]`) | GoogleTest | Core logic, state machines, registration, schedulers, parsers, redactor, config migrations |
+| **Tier 2 — Hardware Integration** | Physical ESP32 hardware | Unity on-target | WiFi, LittleFS, NVS, hardware crypto, display drivers, peripheral I/O |
+| **Tier 3 — End-to-End Boot** | Physical board, full stack | Automated test rig | Full cold boot through `markAppValid()` (Phase 1 → Phase 2 → Phase 3 `RUNNING`) |
 
-> 📖 See [Creating a Module § NATIVE_BUILD Compilation Guards](developer/creating-a-module.md#native_build-compilation-guards) and [Build System § Native Environment](developer/build-system.md#native-environment) for guard strategies.
+### 16.2 Stub-Header Architecture & Compilation Guards
 
-All modules must compile on native (host CPU) for Tier 1 testing. The `NATIVE_BUILD`
-preprocessor define (set by `[env:native]`) controls hardware-specific code:
+The framework has completely retired the legacy practice of scattering `#ifndef` preprocessor guards throughout production headers. Instead, it relies on a clean **Stub-Header Architecture**:
 
-#### Architectural Rationale: The Cost vs Benefit of Native Builds
+#### How the Stub-Header Architecture Works
 
-While littering the codebase with `#ifndef NATIVE_BUILD` guards may feel like a heavy aesthetic tax, it is the most important architectural discipline in the framework:
+When compiling the native test runner (`[env:native]`), PlatformIO prepends `test/stubs/platform/` to the compiler include search path with highest priority. This directory provides lightweight mock implementations of ESP-IDF and Arduino headers:
+- `PsychicHttp.h`, `PsychicHttpsServer.h` — Full mock web server, request/response objects, middleware chaining, and route dispatching
+- `Arduino.h`, `Print.h`, `Stream.h` — Core Arduino types, string handling, and timing stubs
+- `LittleFS.h`, `Preferences.h` — Virtual in-memory filesystem and key-value storage mocks
+- `esp_system.h`, `esp_timer.h`, `esp_random.h` — ESP-IDF system services, timer functions, and pseudo-random entropy generators
+- `esp_log.h` — Native logging bridge routing `ESP_LOGx` macros through `LogShim.h`
+- `esp_ota_ops.h`, `Update.h` — Flash partition and OTA update simulation
+- `WiFi.h`, `WiFiClient.h`, `WiFiClientSecure.h` — Network transport mocks
 
-1. **Iteration Speed:** Hardware-only testing (compile → flash via USB → boot) takes 15–45 seconds per cycle. Native GoogleTest execution runs in milliseconds, fundamentally changing how developers write and refactor logic.
-2. **CI/CD Feasibility:** Native builds allow the full logic suite to run on standard cloud runners (e.g., GitHub Actions) without complex Hardware-in-the-Loop server farms.
-3. **Forced Decoupling:** The host CPU lacks `<WiFi.h>` and `<LittleFS.h>`. This missing dependency actively prevents developers from tightly coupling high-level logic to low-level hardware drivers. It forces the use of forward declarations (e.g., `class U8G2;`) and dependency injection (e.g., passing `currentMillis` instead of calling `millis()`), ensuring business logic remains pure and testable.
+Production code includes canonical headers (e.g. `#include <PsychicHttp.h>` or `#include <esp_timer.h>`). On target hardware, these resolve to real ESP-IDF/Arduino components; on native test builds, the compiler seamlessly links against the stubs.
 
-```cpp
-#ifndef NATIVE_BUILD
-#include <WiFi.h>
-#include <LittleFS.h>
-// ... hardware-specific implementation
-#else
-// ... stubs or no-ops for native testing
-#endif
+#### Target Compilation Guards
+
+When compile-time divergence is strictly necessary (e.g. including target-only FreeRTOS hardware tasks or native-only GoogleTest helpers), the codebase standardises exclusively on:
+- **`ESP_PLATFORM`**: Defined by ESP-IDF when compiling for target silicon. Used to exclude physical hardware drivers and real task creation from native host builds.
+- **`PIO_UNIT_TESTING`**: Defined by PlatformIO during test suite compilation. Used to expose internal test helpers (such as `DataManager::processNext()` or mock injection hooks).
+
+### 16.3 Native Unit Test Suite Inventory
+
+Host unit tests are organised under `test/test_unit/` by module and functional subsystem. The native test suite encompasses:
+
+| Test Directory | Target Subsystem |
+|---|---|
+| `test/test_unit/test_application/` | Application hub, boot lifecycle, registration, soft-reset |
+| `test/test_unit/test_audit_module/` | AuditModule, JSONL rotation, size caps, event formatting |
+| `test/test_unit/test_authManager/` | Password hashing, session cookies, auth middleware, cert generation |
+| `test/test_unit/test_buttonModule/` | Debounced push button inputs, press/release event dispatch |
+| `test/test_unit/test_configManager/` | LittleFS JSON persistence, schema migrations, import/export |
+| `test/test_unit/test_config_manifest/` | Three-tier schema tracking (Active, Previous, Golden) |
+| `test/test_unit/test_dataManager/` | Priority scheduling, FetchContext, DeadlineToken cancellation |
+| `test/test_unit/test_deepStackExecutor/` | Worker task offloading and stack safety |
+| `test/test_unit/test_deviceCrypto/` | AES-256-CBC encryption/decryption, Base64 encoding |
+| `test/test_unit/test_displayServiceHelper/` | Tick-safe async bridge, frame buffering, OTA mutual exclusion |
+| `test/test_unit/test_encoderModule/` | Rotary encoder direction and rotation step events |
+| `test/test_unit/test_eventbus/` | Pub/sub topic dispatching, subscription lifecycle, zero-malloc delivery |
+| `test/test_unit/test_hardware_board/` | Board pin configuration and declaration validation |
+| `test/test_unit/test_helpers/` | Test fixture helpers and memory leak assertions |
+| `test/test_unit/test_homeassistant/` | MQTT discovery payload generation and state reporting |
+| `test/test_unit/test_keyManager/` | Encrypted credential storage, exclusive ownership metadata |
+| `test/test_unit/test_logpipeline/` | esp_log_set_vprintf interception, mutex locking, log routing |
+| `test/test_unit/test_lvglDisplay/` | LVGL v9 display lifecycle, subject binding, screensaver |
+| `test/test_unit/test_lvgl_stubs/` | LVGL headless rendering stubs and canvas tests |
+| `test/test_unit/test_mcpServer/` | JSON-RPC dispatch, tool registration, read-only guard enforcement |
+| `test/test_unit/test_md5Utils/` | Firmware MD5 checksum validation |
+| `test/test_unit/test_otaUpdateManager/` | Update state machine, rollback logic, channel transitions |
+| `test/test_unit/test_ota_channel/` | Release channel selection and implicit downgrade checks |
+| `test/test_unit/test_ota_download_engine/` | Chunked download streaming, redirect handling, header validation |
+| `test/test_unit/test_ota_fail_closed/` | Signature enforcement invariants and missing .sig rejection |
+| `test/test_unit/test_ota_manifest/` | Multi-architecture manifest parsing and board asset matching |
+| `test/test_unit/test_ota_verifier/` | MbedTLS RSA-2048 streaming signature verification |
+| `test/test_unit/test_periodic/` | Periodic interval timers and clock math |
+| `test/test_unit/test_pngWriter/` | Framebuffer snapshot encoding to PNG byte streams |
+| `test/test_unit/test_precondition_engine/` | Boot gating DAG, severity evaluation, PreconditionHealthPayload |
+| `test/test_unit/test_redactor/` | Lock-free Meyer's Singleton secret redaction, pattern replacement |
+| `test/test_unit/test_semver/` | Packed 32-bit SemVer parsing, sorting, and pre-release precedence |
+| `test/test_unit/test_structural_scrubber/` | Log sanitization scrubber and secret masking |
+| `test/test_unit/test_timeManager/` | SNTP time synchronization, POSIX timezone parsing, DST rules |
+| `test/test_unit/test_u8g2Display/` | Monochrome display boards, carousel timing, widget hierarchy |
+| `test/test_unit/test_webServer/` | PsychicHttp route registration, parameter extraction, POST bodies |
+| `test/test_unit/test_wifiManager/` | Station connection state machine, AP captive portal DNS routing |
+
+### 16.4 Test Execution & Metrics Verification
+
+Rather than hardcoding static test counts, test coverage and metrics are verified dynamically via the test runner:
+
+```bash
+# Execute full native test suite
+pio test -e native
+
+# Query total executed test count dynamically
+pio test -e native --json-output | jq '.test_count'
 ```
 
-**Guard strategies:**
-- **Individual call wrapping**: Hardware calls wrapped inline — same source compiles
-  on both targets
-- **Split guards**: Enums/structs outside guard (always available), function bodies
-  inside guard
-- **Full-file guards**: Entire `.cpp` file wrapped when it's purely hardware rendering
+### 16.5 Build Cache Hygiene
 
-**Testing helpers exposed under `NATIVE_BUILD`:**
-- `DataManager::processNext()` — drive scheduling synchronously
-- `DataManager::setSimulatedTimeMs()` — manual time progression
-- `McpServer::_processLine()` — direct JSON-RPC dispatch without Serial
-
-### 16.3 Mock Strategy
-
-> 📖 See [Build System § Building and Testing](developer/build-system.md#4-building-and-testing) for test execution and mock patterns.
-
-- `MockDeviceCrypto` subclass for `encrypt()`/`decrypt()` virtual methods
-- `AsyncWebServer` dummy class in `webServer.hpp` (canonical mock — never define
-  inline duplicates)
-- `AsyncWebServerResponse` stub with `beginResponse_P`, `addHeader`, `send`
-- `DNSServer` dummy class in `wifiManager.hpp` (resolves incomplete type for
-  `std::unique_ptr<DNSServer>`)
-- `LogPipeline` / `LogShim` uses `PIO_UNIT_TESTING` stubs for native testing
-- Serial mocked with string-buffer class for MCP server tests
-
-> **Critical:** Always use project-wide canonical mocks. Defining inline duplicate
-> mocks causes ODR (One Definition Rule) violations that break downstream tests.
-
-### 16.4 Build Cache
-
-`pio run -t clean -e native` MUST be run whenever core test entry points or
-preprocessor guards change fundamentally. Stale cached objects from different
-architectures (x86_64 vs arm64) cause linker errors.
+When switching between native host architectures (e.g. x86_64 vs Apple Silicon arm64) or updating platform stub headers, clear PlatformIO's cached object files to prevent linker mismatch errors:
+```bash
+pio run -t clean -e native
+```
 
 ---
 
 ## 17. Open Questions & Decision Log
 
-This section tracks decisions made and questions still to resolve.
+This section tracks the architectural decisions that govern the framework, alongside open questions and technical debt.
 
-### Resolved Decisions
+### Canonical Decision Ledger Policy
 
-| # | Decision | Rationale |
-|---|---|---|
-| D1 | No unified `IDisplayDriver` interface | U8G2 and TFT API models are incompatible; display module variants are the correct embedded pattern |
-| D2 | Per-module LittleFS config files, not a monolithic struct | Enables true module independence; avoids schema coupling |
-| D3 | Two-tier `std::vector` model, no `MAX_*` ceilings | Boot-phase allocation is functionally static. Avoids over-allocating and removes artificial ceilings. Structural arrays use `shrink_to_fit()` after each build phase. |
-| D4 | Framework owns `setup()` and `loop()` | Defines this as an application framework (Hollywood Principle) |
-| D5 | Monorepo — kernel + all optional modules in one repo | No premature repo fragmentation; avoids version compatibility matrix in v1. Modules extracted to submodules only when mature |
-| D6 | Structural array mutations require soft-reset; lightweight arrays may grow freely | Keeps `tick()` hot path completely free of vector mutations. Structural changes are rare; the soft-reset cost is acceptable. |
-| D7 | Heap stats logged + published on `'system.heap'` EventBus after each build phase | Replaces artificial MAX_* ceilings with observable runtime evidence |
-| D8 | Linux-inspired LittleFS directory layout: `etc/`, `mod/`, `app/`, `www/` | Directory-per-tier makes ownership self-evident, enables selective wipe, prevents naming collisions |
-| D9 | Hybrid web portal asset model: PROGMEM shell + LittleFS `www/` app fragments | Framework shell in PROGMEM: serves at ~0ms, always present with firmware. App fragments in LittleFS: updated independently |
-| D10 | Apps consume framework via git submodule, not `lib_deps` registry | Deterministic SHA pinning; no absolute path hacks; CI reproducible |
-| D11 | Template as `template/` within monorepo, not separate repo | One repo to clone; no separate template overhead |
-| D12 | EventBus uses static fn-ptr + `void* ctx`, not `std::function` | Prevents heap fragmentation on ESP32; zero overhead |
-| D13 | EventBus is payload-type-agnostic (`const void*`), not JSON-typed | Maximum flexibility; JSON typing is subscriber's responsibility |
-| D14 | DataManager is a generic scheduler, not HTTP-specific | HTTP fetching is individual `iDataSource`'s concern |
-| D15 | `NullStatusReporter` as private nested class in Application | Fully encapsulated; no external/global class |
-| D16 | Widget toolkit: three-tier composable architecture | Primitives → Generic → Module-Aware. Runtime display dimensions, parameter injection |
-| D17 | MCP Server as kernel service with `IMcpContributor` extension | Mirrors IWebContributor pattern; Hollywood Principle |
-| D18 | MCP transport-agnostic via `processRequest()` | Decouples from Serial; enables HTTP and future WebSocket |
-| D19 | `McpServer` implements `IWebContributor` for HTTP route | Follows Hollywood Principle; WebServerManager has no MCP coupling |
-| D20 | OTA blessing by Application hub, not OTA manager | App must verify WiFi, LittleFS, core services before blessing |
-| D21 | `setMaxBodySize()` unavailable; per-handler body validation | Library method doesn't exist; manual len/total checks |
-| D22 | POSIX TZ via `setenv`/`tzset` for timezone | Leverages standard `localtime()` for automatic DST handling |
-| D23 | Non-blocking async NTP sync | Never blocks boot; sync checked asynchronously |
-| D27 | Standardise on `ESP_LOGx` via `LogShim.h` — no custom macros | ESP-IDF logging provides compile-time stripping, runtime per-module control, thread safety, and pluggable backends |
-| D28 | Global secret redaction via `esp_log_set_vprintf()` pipeline (`LogPipeline`) | `ESP_LOG*` output intercepted at the sink and redacted via an injected `ISanitizer` chain, under a `LogPipeline`-owned FreeRTOS mutex (ESP-IDF holds no lock across the callback at `CONFIG_LOG_VERSION=1`). 256 B static buffer; verbose builds add a retained heap buffer and `dumpPayload()`. Zero call-site churn; legacy `Logger` deleted. Backstop, not a guarantee — see §11A.4. (Issue #211) |
-| D29 | RAM ring buffer for log capture *(Deferred)* | Deferred to follow-up PR (Issue #211); serial monitor + local capture suffices for current developer workflows. |
-| D30 | `ILogSink` interface for pluggable log destinations *(Deferred)* | Deferred to follow-up PR (Issue #211) until ring buffer and remote sinks are implemented. |
-| D31 | Heartbeat telemetry every ~15s in `Application::tick()` | Provides continuous runtime observability (heap, uptime, RSSI) with zero external infrastructure |
-| D32 | MQTT telemetry as optional module, not kernel | Not all apps need remote logging; kernel stays minimal |
-| D33 | ArduinoJson v7 `JsonDocument` replaces v6 `StaticJsonDocument`/`DynamicJsonDocument` | Unified API; v6 types are deprecated |
-| D24 | `build_fonts.py`/`generate_layouts.py` as standalone CLI, not PIO hooks | Avoids breaking builds if input files are missing |
-| D25 | `U8G2_DISPLAY_TYPE` macro for display controller selection | Overridable via `build_flags`; default SSD1306 128x64 |
-| D26 | Dual framework: Arduino + ESP-IDF | OTA rollback, IDF logging, DeviceCrypto require IDF; display/web libs require Arduino |
-| D34 | Display module redesigned as pure service: `Application*` removed from member variables | Display module was polling `AppState`, `WifiManager`, and `ConfigGates` inside `tick()` — business logic in a hardware presenter. Application layer now owns all "when to show what" decisions; display module owns only rendering, carousel timing, and screensaver inactivity policy |
-| D35 | Hierarchical COM-style sub-object API for display module: `display.carousel`, `display.boards.*`, `display.screensaver` | Flat `getBootBoard()` / `getWifiWizard()` / etc. accessors exposed private concrete types with no hierarchy and required callers to three-step orchestrate (configure + take address + pushModal). Sub-objects with domain meaning are now navigable directly |
-| D36 | Concrete board types at caller layer; `IDisplayBoard*` only at engine boundaries | Callers need board-specific APIs (`setProgress()`, `configure()`); abstracting to `IDisplayBoard&` destroys the value of the hierarchy. Interface is used only where polymorphism is genuinely needed: `showModal(IDisplayBoard*)`, `carousel.add(IDisplayBoard*)` |
-| D37 | Screensaver is a distinct display-intrinsic policy layer (not a modal) | Pushing `ScreensaverBoard` via `showModal()` assigned it MODAL priority, allowing it to suppress OTA progress and wizard overlays. Screensaver is the lowest of three explicit rendering layers (Modal → Base/Carousel → Screensaver), driven by inactivity timer, not application decision |
-| D38 | Board taxonomy split: system boards (internal), user-surfaced boards (in `display.boards`), display-intrinsic boards (in `display.screensaver`) | Not all boards should be externally configurable. `BootBoard` and `ConfiguringStatusBoard` are driven by Application state transitions; exposing them via getters invited callers to bypass the module's lifecycle management |
-| D39 | Unified secret redaction via `Redactor` Singleton + `ISanitizer` DIP interface | `Redactor` promoted from static class to Meyer's Singleton with fixed-capacity lock-free **append-only** array (16 secrets, atomic count, writer spinlock; published slots are never reordered or rewritten, which is what makes the lock-free read path safe). Implements `ISanitizer` for DI into `AuditModule`. `LogPipeline` consumes Singleton directly via C callback. Replaces and deletes legacy `Logger` and `LOG_SECURE`. (Issue #211) |
+- **Section 17 (`docs/design_specification.md`)** is the canonical summary ledger and index for all framework architectural decisions.
+- **Detailed ADRs (`docs/developer/adr/`)**: Decisions involving complex trade-offs, interface relocations, or external component evaluations maintain dedicated Architecture Decision Records with full historical context and rationale. Detailed ADRs are cross-linked from this ledger.
+
+### Architectural Decision Log
+
+| # | Decision | Status | Rationale |
+|---|---|:---:|---|
+| **D1** | No unified `IDisplayDriver` interface | Implemented | U8G2 and TFT/LVGL API models are fundamentally incompatible; display module variants are the correct embedded pattern. |
+| **D2** | Per-module LittleFS config files, not a monolithic struct | Superseded | Enables true module independence. Superseded by D40 (ConfigManager gateway pattern). |
+| **D3** | Two-tier `std::vector` model, no `MAX_*` ceilings | Implemented | Boot-phase allocation is functionally static. Avoids over-allocating and removes artificial ceilings. Structural arrays use `shrink_to_fit()` after compaction. |
+| **D4** | Framework owns `setup()` and `loop()` | Implemented | Defines this as an application framework (Hollywood Principle). Consuming apps implement lifecycle hooks. |
+| **D5** | Monorepo — kernel + all optional modules in one repo | Implemented | Avoids multi-repo version matrix fragmentation; ensures atomic refactoring and deterministic submodule SHA pinning. |
+| **D6** | Structural array mutations require soft-reset; lightweight arrays grow freely | Implemented | Keeps `tick()` hot path completely free of vector reallocations. Structural mutations trigger a deterministic soft-reset cycle. |
+| **D7** | Heap stats logged and published on `'system.heap'` EventBus topic | Implemented | Replaces artificial ceilings with observable runtime evidence. |
+| **D8** | Linux-inspired LittleFS directory layout: `etc/`, `mod/`, `app/`, `www/` | Implemented | Directory-per-tier makes ownership self-evident, enables selective wipe, and prevents namespace collisions. |
+| **D9** | Hybrid web portal asset model: PROGMEM shell + LittleFS app fragments | Implemented | Framework shell serves from PROGMEM at ~0ms with zero filesystem overhead. Application fragments can be updated independently. |
+| **D10** | Apps consume framework via git submodule or PlatformIO library | Implemented | Deterministic SHA pinning and clean `library.json` distribution; no absolute path hacks; reproducible CI. |
+| **D11** | Template in monorepo (`template-app/`, `sample-app/`) | Implemented | Single repository to clone; keeps reference applications synchronized with kernel refactors. |
+| **D12** | EventBus uses static fn-ptr + `void* ctx` | Superseded | Superseded by D42 (ESP-IDF `esp_event` C++ wrapper). |
+| **D13** | EventBus is payload-type-agnostic (`const void*`), not JSON-typed | Implemented | Maximum dispatch performance; type safety and deserialization are the subscriber's responsibility. |
+| **D14** | DataManager is a generic scheduler, not HTTP-specific | Implemented | Network transport details belong to individual `IDataSource` implementations. |
+| **D15** | `NullStatusReporter` as private nested class in Application | Implemented | Encapsulates default fallback status handling without global dependencies. |
+| **D16** | Widget toolkit: three-tier composable architecture | Implemented | Primitives → Generic → Module-Aware widgets with parameter injection. |
+| **D17** | MCP Server as kernel service with `IMCPContributor` extension | Implemented | Mirrors `IWebContributor` pattern following the Hollywood Principle. |
+| **D18** | MCP transport-agnostic via `processRequest()` | Implemented | Decouples MCP tool dispatching from Serial UART; enables HTTP and future transports. |
+| **D19** | `MCPServer` implements `IWebContributor` for HTTP route | Implemented | `WebServerManager` has zero compile-time coupling to MCP internals. |
+| **D20** | OTA blessing by Application hub at Step 17b | Implemented | Application must verify hardware, filesystem, and network subsystems before blessing firmware. |
+| **D21** | `setMaxRequestBodySize()` body size limits in PsychicHttp | Implemented | Upgraded to native `PsychicHttpServer` request body limits, replacing fragile per-handler checks. |
+| **D22** | POSIX TZ via `setenv`/`tzset` for timezone management | Implemented | Leverages standard C runtime `localtime()` for automatic Daylight Saving Time handling. |
+| **D23** | Non-blocking async NTP sync | Implemented | SNTP synchronization never blocks boot sequence or main loop execution. |
+| **D24** | `build_fonts.py` and `generate_layouts.py` as standalone CLIs | Implemented | Prevents breaking downstream builds when optional font or layout sources are absent. |
+| **D25** | `U8G2_DISPLAY_TYPE` macro for display controller selection | Implemented | Overridable via `build_flags`; defaults to SSD1306 128x64. |
+| **D26** | Dual framework: Arduino + ESP-IDF | Implemented | Bootloader rollback, IDF logging, and crypto require ESP-IDF; display and web libraries leverage Arduino. |
+| **D27** | Standardise on `ESP_LOGx` via `LogShim.h` — no custom macros | Implemented | Provides compile-time log stripping, runtime level control, thread safety, and native test stubs. |
+| **D28** | Global secret redaction via `esp_log_set_vprintf()` pipeline (`LogPipeline`) | Implemented | Intercepts all `ESP_LOGx` output at the sink, routing through an injected `ISanitizer` under FreeRTOS mutex protection (Issue #211). |
+| **D29** | RAM ring buffer for log capture | Deferred | Deferred to future observability sweep; serial monitor and local capture suffice for current workflows. |
+| **D30** | `ILogSink` interface for pluggable log destinations | Deferred | Deferred until remote telemetry sinks and ring buffers are implemented. |
+| **D31** | Heartbeat telemetry in `Application::tick()` | Implemented | Emits periodic heap, uptime, and RSSI telemetry every ~15s without external infrastructure. |
+| **D32** | MQTT telemetry as optional module (`HomeAssistant`) | Implemented | Keeps kernel minimal; MQTT discovery is enabled via `WITH_HOMEASSISTANT`. |
+| **D33** | ArduinoJson v7 `JsonDocument` replaces v6 | Implemented | Unified memory model; eliminates deprecated `StaticJsonDocument` and `DynamicJsonDocument`. |
+| **D34** | Display module redesigned as pure service: `Application*` removed | Implemented | Eliminates hardware presenter polling application state; Application owns all display coordination. |
+| **D35** | Hierarchical sub-object API for display: `display.carousel`, `display.boards.*`, `display.screensaver` | Implemented | Replaces flat getter lists with domain-rich sub-objects navigable directly by callers. |
+| **D36** | Concrete board types at caller layer; `IDisplayBoard*` only at engine boundaries | Implemented | Callers interact with typed boards; abstract interfaces are restricted to container boundaries. |
+| **D37** | Screensaver is a distinct display-intrinsic policy layer (not a modal) | Implemented | Screensaver runs as lowest rendering layer, driven by inactivity timers rather than modal interrupts. |
+| **D38** | Board taxonomy split: system boards, user boards, display-intrinsic boards | Implemented | Encapsulates internal lifecycle boards while exposing custom boards for application configuration. |
+| **D39** | Unified secret redaction via `Redactor` Singleton + `ISanitizer` interface | Implemented | Lock-free append-only array (16 secrets, atomic count, writer spinlock) implementing `ISanitizer` for `AuditModule` and `LogPipeline` (Issue #211). |
+| **D40** | ConfigManager-as-Gateway pattern (PR-11) | Implemented | Centralizes all LittleFS persistence in `ConfigManager`. Modules implement `IConfigurable`, declaring namespaces and schema versions, and never perform direct filesystem operations. |
+| **D41** | PsychicHttp replacement of legacy web server | Implemented | Adopts `PsychicHttp` built on ESP-IDF's native `esp_http_server`, resolving memory leaks, crash loops, and abandoned maintenance in the legacy async web server library. |
+| **D42** | EventBus as `esp_event` C++ wrapper | Implemented | Replaces custom static function pointer arrays with a thin C++ wrapper around the FreeRTOS-backed ESP-IDF default event loop. |
+| **D43** | Split-repo OTA update architecture (PR-37) | Implemented | Manifest-first HTTP/HTTPS update pipeline pointing to a dedicated releases repository, eliminating GitHub API rate limits and PAT source-code exposure. |
+| **D44** | AuthManager with EC P-256 self-signed certificates & session cookies | Implemented | Complete authentication subsystem: SHA-256 salted hashes, `esp32_session` cookies, PAT bearer tokens for MCP, and on-device EC P-256 X.509 cert generation. |
+| **D45** | AuditModule with JSONL rotation | Implemented | Structured operational and security event logging in JSON Lines format to `/var/audit.log` with size-capped rotation, sanitized via `ISanitizer`. |
+| **D46** | PreconditionEngine boot gate & health reporting | Implemented | Explicit boot-gating dependency engine and `IPreconditionContributor` interface with `Info`/`Warning`/`Critical` severity evaluation and health payloads. |
+| **D47** | LogPipeline and Redactor secret scrubbing (PR-211/212) | Implemented | Automatic redaction of sensitive credentials from serial, crash dumps, and sink outputs without call-site developer burden. Deletes legacy `Logger`. |
+| **D48** | DisplayServiceHelper as tick-safe bridge | Implemented | Asynchronous, thread-safe bridge decoupling UI rendering workloads from the main 10ms application tick loop. |
+| **D49** | Interface placement heuristic (ADR-002) | Implemented | Interfaces belong in `include/interfaces/` only if called by kernel, free of optional dependencies, and surviving module removal. See [adr-interface-placement.md](developer/adr/adr-interface-placement.md). |
+| **D50** | `IDataSource` FetchContext + DeadlineToken (PR-128) | Implemented | Background data fetch contracts accept cooperative cancellation tokens and transport context, preventing task starvation and watchdog timeouts. |
+| **D51** | LVGL Pro replacement of SquareLine Studio | Implemented | Adopts LVGL Pro Editor (LVGL v9 XML project format) and LovyanGFX drivers for graphical touch displays, replacing rigid C code generation with declarative XML and reactive subject binding. |
+| **D52** | ButtonModule & EncoderModule replacing monolithic buttonHandler | Implemented | Splits hardware input handling into standalone `ButtonModule` and `EncoderModule` components publishing distinct EventBus events. |
+| **D53** | Hardware Adapters directory placement (ADR-001) | Implemented | Concrete hardware adapter implementations (e.g. `CrowPanel128Adapter`) live in `adapters/`, maintaining Ports & Adapters separation from pure declarative hardware pin definitions. See [adr-adapters-placement.md](developer/adr/adr-adapters-placement.md). |
+| **D54** | DeepStackExecutor for stack-heavy worker execution | Implemented | Offloads deep stack callables (TLS handshakes, complex JSON parsing) to a PSRAM-backed worker task, preserving internal DRAM. |
 
 ### Open Questions
 
-| # | Question | Impact |
-|---|---|---|
-| Q1 | Should `schedulerManager` be kernel or optional module? | Medium — most apps benefit from it; few apps are truly headless |
-| Q2 | What is the `webServer` base portal's auth model? | Security — no auth vs. optional HTTP Basic Auth |
-| Q3 | Should display modules provide a `PSRAM framebuffer` option for S3 boards? | Performance — large colour displays need framebuffer in PSRAM |
-| Q4 | How should multi-board hardware configs (e.g., dual display) be handled? | Scope — possibly out of scope for v1 |
+| # | Question | Impact | Resolution |
+|---|---|---|---|
+| **Q1** | Should `DataManager` or a separate `SchedulerManager` manage task scheduling? | Medium | **Resolved**: `DataManager` provides priority-tiered scheduling with `FetchContext` and cooperative `DeadlineToken` cancellation. |
+| **Q2** | What is the Web Portal authentication model? | Security | **Resolved**: Implemented by `AuthManager` (D44) using session cookies, SHA-256 salted hashes, and EC P-256 HTTPS certificates. |
+| **Q3** | Should display modules provide a PSRAM framebuffer option for S3 boards? | Performance | **Resolved**: Supported on ESP32-S3 boards with `BOARD_HAS_PSRAM` via `LVGLDisplay` and LovyanGFX integration. |
+| **Q4** | How should multi-board hardware configs (e.g. dual displays) be handled? | Scope | **Scoped**: Single primary display active per target environment; multi-panel support deferred to future releases. |
+| **Q5** | Should BLE provisioning be supported alongside WiFi AP captive portal? | Usability | **Open**: WiFi AP mode currently handles initial onboarding; BLE transport under consideration for headless setups. |
 
 ### Known Issues & Technical Debt
 
-| # | Issue | Status |
-|---|---|---|
-| TD-1 | `u8g2Display` has broken forward declarations on `esp32s3nano` (missing `Application.hpp` include) | Needs fix |
-| TD-2 | `test_webServer` pre-existing failure (`setMaxBodySize` assertion) | Known — requires mock update |
-| TD-3 | `get_logs` MCP tool is a stub placeholder | Needs implementation |
-| TD-4 | `portalBuilder.py` referenced in spec but not fully integrated into CI | Deferred |
-| TD-5 | `webServer` portal_assets headers break native builds without `NATIVE_BUILD` guards | Requires guard on all generated headers |
+| # | Issue | Status | Notes |
+|---|---|---|---|
+| **TD-1** | Forward declaration cleanup across modular build targets | Resolved | Resolved in PR-17 clean include hierarchy. |
+| **TD-2** | Request body size validation across HTTP endpoints | Resolved | Resolved via `PsychicHttpServer::setMaxRequestBodySize()`. |
+| **TD-3** | `get_logs` MCP tool integration | Active | Stub placeholder to be connected with AuditModule and RAM ring buffer. |
+| **TD-4** | `portalBuilder.py` CI build automation | Resolved | Integrated as automated PlatformIO `extra_scripts` pre-hook. |
+| **TD-5** | Generated portal asset header include hygiene | Resolved | Headers encapsulated with include guards and resolved via the Stub-Header Architecture without macro collisions. |
 
 ---
 
-*This document is a living specification. It was updated on 2026-05-22 to reflect
-all architectural decisions made during PR-01 through PR-08 implementation,
-including the unified logging/observability architecture (§11A) and ArduinoJson
-v7 migration. Updated 2026-06-03 to add §7.8 (Display Module Object Model target
-architecture) and D34–D38 (display module OO refactoring decisions).*
+*This document is a living specification. Updated on 2026-09-03 for Design Specification v2.0 to reflect the complete delivered architecture across PR-01 through PR-220, including the Stub-Header test architecture, AuthManager security subsystem, ConfigManager gateway pattern, split-repo OTA pipeline, and architectural decisions D40–D54.*

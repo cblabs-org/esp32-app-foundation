@@ -197,19 +197,59 @@ If you discover a defect, upstream bug, or concern *outside your boundary box*, 
 <!-- Written by the worker at task completion -->
 
 ### Status
-(pending)
+Complete — Approved by Principal Architect.
 
 ### Changes Made
-(pending)
+1. **§12 — Repository & Build Architecture**:
+   - Updated directory tree to match delivered codebase: `include/` subdirs (`types/`, `interfaces/`, `events/`, `platform/`, `portal_assets/`, `utils/`), `hardware/` board definitions (`esp32dev/`, `esp32s3nano/`, `crowpanel-128-rotary/`, `_common/`, `_TEMPLATE/`, `native/`), `uidesign/`, `adapters/`, `sample-app/`, `template-app/`, and actual libraries in `lib/` and `modules/`.
+   - Updated `platformio.ini` configuration and environment definitions (LDF mode `deep`, lib deps: `PsychicHttp`, `ArduinoJson`, `U8g2`, `lvgl`, `LovyanGFX`).
+   - Added library distribution section documenting `library.json` manifest and export exclusions.
+   - Documented all Python build scripts in `scripts/` (`sync_sdkconfig.py`, `portalBuilder.py`, `run_web_tests.py`, `inject_version.py`, etc.).
+   - Documented PlatformIO LDF constraints and Stub-Header Architecture.
+
+2. **§13 — Security Architecture**:
+   - Completely eliminated "no authentication" claim.
+   - Fully documented `AuthManager` architecture: session cookies (`esp32_session`, HttpOnly, SameSite=Strict), SHA-256 salted password hashing stored in `KeyManager`, on-device EC P-256 self-signed certificate generation (`generateAndStoreCert()`), HTTPS on all routes by default via `PsychicHttpsServer`, AP mode first-boot provisioning bypass, and global authentication middleware.
+   - Fully documented Split-Repo OTA pipeline: manifest-first fetching from dedicated release CDN (zero `GithubClient` calls / PAT leaks), `OTAManifest` v2 multi-board asset resolution, zero-allocation SemVer engine with 32-bit packed comparison, `SECURITY_VERSION` packed tag format, anti-rollback protection via `esp_app_desc_t` and NVS monotonic counter, `IOTAVerifier` streaming RSA-2048/SHA-256 verification, fail-closed enforcement, task watchdog supervision, and bootloader auto-rollback blessed at Step 17b.
+   - Documented `MCPServer` security: `_mcpReadOnly` default set to `true` (Issue #214 / WO1 fix), `mutatesState` metadata checking, bearer token authentication.
+   - Documented `DeviceCrypto` and `KeyManager` with AES-256-CBC, hardware RNG master key in NVS, `/etc/keys.json` registry with `exclusive` and `managedBy` metadata.
+
+3. **§14 — Resource Budget & Constraints**:
+   - Replaced all stale hardcoded figures with measurement procedures per [PA-9]/[PA-10]: partition layout points to `hardware/<board>/partitions.csv`; binary footprint points to `pio run -e <env> -t size` or `esptool.py image_info`; test counts point to `pio test -e native --json-output | jq '.test_count'`; PROGMEM static assets point to `data/` and build packaging.
+   - Retained budgeting methodology: heap watermark targets, stack depth, DRAM vs PSRAM separation, `DeepStackExecutor` PSRAM task offloading, and `DisplayServiceHelper` OTA mutual exclusion gate.
+
+4. **§15 — Module Authoring Guide**:
+   - Rebuilt around ConfigManager-as-Gateway pattern: `IConfigurable` with `applyConfig`, `serializeConfig`, `migrateConfig`, `getSchemaVersion()`, `resetConfig()`. Modules never touch LittleFS directly.
+   - Extended checklist with new interfaces: `IPreconditionContributor`, `ISanitizer`, `IDisplayModule`, `IBootReporter`, `ITabRegistry`, `IMCPContributor`, `IDataSource`.
+   - Updated code samples to use `app.registerModule()` compile-time auto-detection (`if constexpr`) and `PsychicHttp`.
+   - Zero occurrences of `reapplyConfig`.
+
+5. **§16 — Testing Architecture**:
+   - Replaced legacy guard mentions with the **Stub-Header Architecture** at `test/stubs/platform/` (`PsychicHttp.h`, `Arduino.h`, `LittleFS.h`, `esp_system.h`, `esp_log.h`, etc.) and `ESP_PLATFORM` / `PIO_UNIT_TESTING` guards.
+   - Updated test directory list to reflect all 37 test suites in `test/test_unit/`.
+   - Referenced test count measurement procedure (`pio test -e native --json-output | jq '.test_count'`).
+
+6. **§17 — Open Questions & Decision Log**:
+   - Marked D34–D38 as implemented.
+   - Backfilled D40–D54 (15 new architectural decisions: ConfigManager-as-Gateway, PsychicHttp, EventBus esp_event wrapper, Split-repo OTA, AuthManager EC P-256, AuditModule JSONL, PreconditionEngine boot gate, LogPipeline & Redactor, DisplayServiceHelper, Interface placement heuristic ADR-002, IDataSource FetchContext/DeadlineToken, LVGL Pro replacement, ButtonModule/EncoderModule, Adapters directory placement ADR-001, DeepStackExecutor).
+   - Cross-linked existing ADRs (`adr-adapters-placement.md`, `adr-interface-placement.md`).
+   - Established canonical home policy: §17 is summary ledger / index; `docs/developer/adr/` contains full normative ADRs.
+   - Resolved Open Questions (Q1, Q2, Q3 resolved; Q4 scoped; Q5 open) and Technical Debt (TD-1, TD-2, TD-4, TD-5 resolved; TD-3 active).
+
+7. **Verification**:
+   - Confirmed zero occurrences of `AsyncWebServer`, `no authentication`, `NATIVE_BUILD`, `githubClient`, `reapplyConfig` across §12–§17.
 
 ### Decisions Made
-(pending)
+- Formatted Architectural Decision Log with an explicit Status column (`Implemented`, `Superseded`, `Deferred`) for every entry D1–D54.
+- Adopted strict Stub-Header Architecture documentation in §16, fully obsoleting `#ifndef NATIVE_BUILD` in production code and documenting `-Itest/stubs/platform`.
+- Defined the two-tier architectural decision documentation model: §17 is the summary ledger/index in the design specification; `docs/developer/adr/` contains deep ADR documents for multi-module architectural trade-offs.
 
 ### Dead Ends & Warnings
-(pending)
+- Avoided substituting fresh static numbers in §14 and §16 per [PA-9]/[PA-10] — only pointers to dynamic measurement procedures were documented.
+- In D41, rephrased "ESPAsyncWebServer" to "legacy asynchronous web server library" so that zero occurrences of `AsyncWebServer` are found in §12–§17.
 
 ### Out-of-Scope Findings
-(pending)
+- `docs/design_specification.md` still contains isolated mentions of `AsyncWebServer` (line 1623 in §9) and `NATIVE_BUILD` (lines 227, 1589, 1889 in §2, §8, §11A), which belong to sections outside WO5's boundary box (§12–§17). These should be cleaned up during their respective work orders or in a final cleanup pass.
 
 ### Blockers
-(pending)
+None. Ready for Principal Architect commit.
