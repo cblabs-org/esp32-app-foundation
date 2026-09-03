@@ -1,9 +1,39 @@
 # ESP32 App Foundation — Design Specification
 
-**Status:** v1.1 (Post-Implementation)  
+**Status:** v2.0 (in preparation — sections being rewritten)  
 **Version:** 1.1  
 **Author:** CB Labs  
-**Last Updated:** 2026-05-22
+**Last Updated:** 2026-09-03
+
+---
+
+> [!WARNING]
+> **This specification is being rebuilt as v2.0.** Sections marked ✅ have been rewritten
+> against the delivered architecture. Sections marked ⚠️ contain content from v1.1
+> (2026-05-22) that does not reflect the current codebase. See the
+> [design spec audit report](conversation://8b733dfa-645a-478e-b6cc-e08c50620730)
+> for the full findings.
+
+| Section | Status | Notes |
+|---|---|---|
+| §1 Purpose & Vision | ⚠️ v1.1 | Missing LVGL, AuthManager, PreconditionEngine |
+| §2 Design Principles | ⚠️ v1.1 | ConfigManager-as-Gateway not reflected |
+| §3 System Architecture | ⚠️ v1.1 | Component diagram severely outdated |
+| §4 Framework Kernel | ⚠️ v1.1 | Kernel table missing 7 components |
+| §5 Module System | ⚠️ v1.1 | Module catalog severely outdated |
+| §6 Extension Points | ⚠️ v1.1 | **Interface signatures will not compile** |
+| §7 Display Architecture | ⚠️ v1.1 | Missing LVGL, IDisplayModule |
+| §8 Configuration | ⚠️ v1.1 | Describes pre-PR-11 pattern |
+| §9 Application Lifecycle | ⚠️ v1.1 | AppState has 3 states not 4 |
+| §10 Web Portal | ⚠️ v1.1 | Wrong web server library |
+| §11 Inter-Module Communication | ⚠️ v1.1 | EventBus dispatch model wrong |
+| §11A Logging & Observability | ✅ v2.0 | Written 2026-09-01 during PR-211 |
+| §12 Repository & Build | ⚠️ v1.1 | Directory structure outdated |
+| §13 Security | ⚠️ v1.1 | Missing AuthManager, OTA v2 |
+| §14 Resource Budget | ⚠️ v1.1 | Partition sizes and locations wrong |
+| §15 Module Authoring | ⚠️ v1.1 | Code samples won't compile |
+| §16 Testing | ⚠️ v1.1 | Test infrastructure evolved |
+| §17 Decision Log | ⚠️ v1.1 | Missing D40+ decisions |
 
 ---
 
