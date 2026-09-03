@@ -37,8 +37,8 @@ This approval covers the full WO1–WO6 ledger as specified in Rev. B.1. The `_m
 | **WO2** | [Documentation inventory, authority map, spec triage](wo2-inventory-and-triage/WORKORDER.md) | `mechanical` | ✅ Complete | `spec-v2/wo2-inventory-and-triage` |
 | **WO3** | [v2.0 §3–§6 — architecture, kernel, modules, interfaces](wo3-v2-interfaces/WORKORDER.md) | `standard` | ✅ Complete | `spec-v2/wo3-v2-interfaces` |
 | **WO4** | [v2.0 §7–§11A — display, config, lifecycle, portal, comms, logging](wo4-v2-runtime/WORKORDER.md) | `standard` | ✅ Complete | `spec-v2/wo4-v2-runtime` |
-| **WO5** | [v2.0 §12–§17 — build, security, budgets, authoring, testing, decision log](wo5-v2-platform/WORKORDER.md) | `standard` | 🔄 In progress | `spec-v2/wo5-v2-platform` |
-| **WO6** | [Doc-rot lint gate + fold-forward rules](wo6-rot-gate/WORKORDER.md) | `architect` | ⬜ Not started | `spec-v2/wo6-rot-gate` |
+| **WO5** | [v2.0 §12–§17 — build, security, budgets, authoring, testing, decision log](wo5-v2-platform/WORKORDER.md) | `standard` | ✅ Complete | `spec-v2/wo5-v2-platform` |
+| **WO6** | [Doc-rot lint gate + fold-forward rules](wo6-rot-gate/WORKORDER.md) | `architect` | 🔄 In progress | `spec-v2/wo6-rot-gate` |
 
 ---
 

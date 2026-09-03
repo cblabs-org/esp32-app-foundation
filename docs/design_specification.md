@@ -1586,7 +1586,7 @@ Executed continuously on Core 1 in the main loop:
 1. **State Guard:** Return immediately if `_state` is neither `Configuring` nor `Running`.
 2. **PreconditionEngine Tick:** Call `_preconditionEngine.tick(currentMillis)`.
 3. **Throttled Gate Check (500ms):** If in `Configuring`, evaluate blocking gates and re-publish `app.configuring` if gate status or IP address changed. If all startup preconditions are met, transition to `Running` and emit `app.running`.
-4. **Native Simulation:** Under `NATIVE_BUILD`, call `_dataManager.processNext()` synchronously.
+4. **Native Simulation:** On non-`ESP_PLATFORM` builds, call `_dataManager.processNext()` synchronously.
 5. **Tickable Module Dispatch:** Iterate registered `ITickable` modules in registration order. In debug builds, monitor execution duration against `module->getTickBudgetMs()` (default 10ms) and emit warnings on budget overruns.
 6. **Precondition Health & Regression Monitor:** Detect status changes across all preconditions and publish `precondition.health`. If in `Running` and any `Startup` or `Both` precondition becomes suppressed, immediately regress to `Configuring` and publish `app.configuring`.
 7. **Periodic Heartbeat (~30s):** Emit system telemetry log: `♥ uptime=%lus free_heap=%luB dram=%luB dram_min=%luB` (uptime, free heap, internal DRAM, and minimum DRAM watermark since boot).
@@ -2332,7 +2332,7 @@ The framework integrates a complete authentication subsystem (`AuthManager`) tha
 If an unauthenticated request targets a protected endpoint, the middleware halts request processing and returns HTTP 401 Unauthorized JSON immediately.
 
 #### 13.4.4 AP Mode First-Boot Provisioning
-When the device boots in Access Point mode (`AppState::WIFI_SETUP`), `AuthManager::setAPMode(true)` activates a temporary provisioning bypass, allowing initial password configuration and WiFi setup without pre-existing credentials. As soon as the device connects to station mode, AP mode is disabled and full authentication is enforced.
+When the device boots in Access Point mode (`AppState::Configuring`), `AuthManager::setAPMode(true)` activates a temporary provisioning bypass, allowing initial password configuration and WiFi setup without pre-existing credentials. As soon as the device connects to station mode, AP mode is disabled and full authentication is enforced.
 
 #### 13.4.5 On-Device EC P-256 Certificate Generation
 To secure transport without relying on external Public Key Infrastructure (PKI), `AuthManager` can generate an on-device EC P-256 self-signed X.509 certificate:

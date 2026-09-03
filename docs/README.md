@@ -71,3 +71,21 @@ Point-in-time assessments, early evaluations, and superseded designs preserved f
 - [Embedded Best Practices Assessment](archive/embedded-best-practices-assessment.md) — initial review (2026-05-31)
 - [Comparative Analysis Report](archive/comparative_analysis_report.md) — T1/T2 agent comparison
 - [LVGL Display Module — Design Document (Historical)](archive/lvgl-display-design.md) — SquareLine Studio era (superseded by LVGL Pro Editor architecture)
+
+## Documentation Linter
+
+To prevent "doc-rot" and ensure terminology remains consistent with the current architecture, a zero-dependency documentation linter is provided.
+
+**How to run:**
+```bash
+python3 scripts/doc_lint.py
+```
+
+**What it checks:**
+- Banned/stale identifiers across all documentation files (e.g., ensuring `IConfigurable` instead of `iConfigurable`).
+- Valid `STATUS:` banners on all design documents.
+- Presence of a fold-forward reference for design documents marked as `IMPLEMENTED`.
+
+*Note: The lint gate is local-only until CI integration (issue #144) lands. Please run it manually.*
+
+To add new banned identifiers, edit the `BANNED_IDS` table inside `scripts/doc_lint.py`.

@@ -32,6 +32,7 @@ Documentation in this repository is governed by the [Documentation Authority Map
 - **Authority & Conflict Resolution:** Refer to [`docs/README.md`](docs/README.md) for the four documentation trees and the two-tier conflict-resolution orders (factual vs. architectural).
 - **Design Document Status Banners:** Every new design document placed in `docs/` or `docs/design/` **must** carry a prominent STATUS banner declaring one of: `WIP`, `FINALIZED`, `IMPLEMENTED`, or `SUPERSEDED`.
 - **Folding Rule:** Design documents fold into the [Design Specification](docs/design_specification.md) when — and only when — their design has shipped. Unshipped designs remain outside so the specification accurately describes delivered reality; superseded designs are moved to `docs/archive/`. See the [Folding Rule](docs/README.md#folding-rule-for-design-documents) in `docs/README.md` for full details.
+- **Linting:** Run `python3 scripts/doc_lint.py` before submitting documentation PRs to ensure no stale identifiers are introduced.
 
 ## Agent Harness Configuration
 
