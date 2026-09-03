@@ -1,39 +1,38 @@
 # ESP32 App Foundation — Design Specification
 
-**Status:** v2.0 (in preparation — sections being rewritten)  
-**Version:** 1.1  
+**Status:** v2.0  
+**Version:** 2.0  
 **Author:** CB Labs  
 **Last Updated:** 2026-09-03
 
 ---
 
-> [!WARNING]
-> **This specification is being rebuilt as v2.0.** Sections marked ✅ have been rewritten
-> against the delivered architecture. Sections marked ⚠️ contain content from v1.1
-> (2026-05-22) that does not reflect the current codebase. See the
+> [!NOTE]
+> **This specification was rebuilt as v2.0 on 2026-09-03.** Sections marked ✅ have been rewritten
+> against the delivered architecture. §1 remains at v1.1 (light touch only). See the
 > [design spec audit report](conversation://8b733dfa-645a-478e-b6cc-e08c50620730)
-> for the full findings.
+> for the full audit findings that motivated this rebuild.
 
 | Section | Status | Notes |
 |---|---|---|
-| §1 Purpose & Vision | ⚠️ v1.1 | Missing LVGL, AuthManager, PreconditionEngine |
-| §2 Design Principles | ⚠️ v1.1 | ConfigManager-as-Gateway not reflected |
-| §3 System Architecture | ⚠️ v1.1 | Component diagram severely outdated |
-| §4 Framework Kernel | ⚠️ v1.1 | Kernel table missing 7 components |
-| §5 Module System | ⚠️ v1.1 | Module catalog severely outdated |
-| §6 Extension Points | ⚠️ v1.1 | **Interface signatures will not compile** |
-| §7 Display Architecture | ⚠️ v1.1 | Missing LVGL, IDisplayModule |
-| §8 Configuration | ⚠️ v1.1 | Describes pre-PR-11 pattern |
-| §9 Application Lifecycle | ⚠️ v1.1 | AppState has 3 states not 4 |
-| §10 Web Portal | ⚠️ v1.1 | Wrong web server library |
-| §11 Inter-Module Communication | ⚠️ v1.1 | EventBus dispatch model wrong |
-| §11A Logging & Observability | ✅ v2.0 | Written 2026-09-01 during PR-211 |
-| §12 Repository & Build | ⚠️ v1.1 | Directory structure outdated |
-| §13 Security | ⚠️ v1.1 | Missing AuthManager, OTA v2 |
-| §14 Resource Budget | ⚠️ v1.1 | Partition sizes and locations wrong |
-| §15 Module Authoring | ⚠️ v1.1 | Code samples won't compile |
-| §16 Testing | ⚠️ v1.1 | Test infrastructure evolved |
-| §17 Decision Log | ⚠️ v1.1 | Missing D40+ decisions |
+| §1 Purpose & Vision | ⚠️ v1.1 | Light touch only (§3–§6 rewrote core architecture) |
+| §2 Design Principles | ✅ v2.0 | Stale identifiers cleaned |
+| §3 System Architecture | ✅ v2.0 | Component diagram rewritten |
+| §4 Framework Kernel | ✅ v2.0 | Kernel table: 18 components |
+| §5 Module System | ✅ v2.0 | Module catalog: 18 modules |
+| §6 Extension Points | ✅ v2.0 | 14 kernel interfaces + 3 module-local + 3 payloads |
+| §7 Display Architecture | ✅ v2.0 | Dual-display, LVGL v9, DisplayServiceHelper |
+| §8 Configuration | ✅ v2.0 | ConfigManager-as-Gateway, config-gate folded |
+| §9 Application Lifecycle | ✅ v2.0 | 3-state machine, PreconditionEngine gate |
+| §10 Web Portal | ✅ v2.0 | PsychicHttp, AuthManager integration |
+| §11 Inter-Module Communication | ✅ v2.0 | EventBus esp_event, std::function policy |
+| §11A Logging & Observability | ✅ v2.0 | Written 2026-09-01, updated 2026-09-03 |
+| §12 Repository & Build | ✅ v2.0 | Directory structure, library.json |
+| §13 Security | ✅ v2.0 | AuthManager, split-repo OTA, DeviceCrypto |
+| §14 Resource Budget | ✅ v2.0 | Measurement procedures, not stale numbers |
+| §15 Module Authoring | ✅ v2.0 | ConfigManager-as-Gateway, registerModule() |
+| §16 Testing | ✅ v2.0 | Stub-header architecture, 37 test suites |
+| §17 Decision Log | ✅ v2.0 | D40–D54 backfilled (15 new decisions) |
 
 ---
 
