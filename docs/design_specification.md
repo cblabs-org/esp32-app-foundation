@@ -202,17 +202,14 @@ a Linux-inspired layout so that file ownership is immediately self-evident:
 │   └── scheduler.json     ← Scheduler module settings
 ├── app/                   ← Application owned files
 │   └── <appname>.json     ← App-specific config
-└── www/                   ← Web portal LittleFS-served assets
-    └── <appname>/         ← App tab fragments (served by PsychicHttpServer)
-        ├── station.html   ← App tab content fragment
-        └── station.js     ← App tab logic
 ```
 
 **Ownership rules:**
 - `etc/` — written only by the framework kernel (`configManager`, `keyManager`). Never touched by modules or apps.
 - `mod/` — each module owns exactly one file, named after the module. No module reads another module's file.
 - `app/` — owned by application code. The framework never writes here.
-- `www/` — app-specific web assets served at runtime. Framework SPA shell lives in PROGMEM, not here.
+
+> **Note:** Web portal assets (both framework SPA shell and app tab scripts) are compiled into PROGMEM gzip byte arrays by `portalBuilder.py` at build time, not served from LittleFS. This eliminates filesystem overhead and enables ~0ms static asset latency.
 
 **Why short names?** LittleFS stores directory entries inline; shorter path components reduce inode overhead on the 4MB flash partition.
 
@@ -2952,8 +2949,8 @@ This section tracks the architectural decisions that govern the framework, along
 | **D5** | Monorepo — kernel + all optional modules in one repo | Implemented | Avoids multi-repo version matrix fragmentation; ensures atomic refactoring and deterministic submodule SHA pinning. |
 | **D6** | Structural array mutations require soft-reset; lightweight arrays grow freely | Implemented | Keeps `tick()` hot path completely free of vector reallocations. Structural mutations trigger a deterministic soft-reset cycle. |
 | **D7** | Heap stats logged and published on `'system.heap'` EventBus topic | Implemented | Replaces artificial ceilings with observable runtime evidence. |
-| **D8** | Linux-inspired LittleFS directory layout: `etc/`, `mod/`, `app/`, `www/` | Implemented | Directory-per-tier makes ownership self-evident, enables selective wipe, and prevents namespace collisions. |
-| **D9** | Hybrid web portal asset model: PROGMEM shell + LittleFS app fragments | Implemented | Framework shell serves from PROGMEM at ~0ms with zero filesystem overhead. Application fragments can be updated independently. |
+| **D8** | Linux-inspired LittleFS directory layout: `etc/`, `mod/`, `app/` | Implemented | Directory-per-tier makes ownership self-evident, enables selective wipe, and prevents namespace collisions. |
+| **D9** | All-PROGMEM web portal asset model | Implemented | Framework shell and app tab scripts are compiled into PROGMEM gzip byte arrays by `portalBuilder.py` at build time. No LittleFS web serving. ~0ms static asset latency. |
 | **D10** | Apps consume framework via git submodule or PlatformIO library | Implemented | Deterministic SHA pinning and clean `library.json` distribution; no absolute path hacks; reproducible CI. |
 | **D11** | Template in monorepo (`template-app/`, `sample-app/`) | Implemented | Single repository to clone; keeps reference applications synchronized with kernel refactors. |
 | **D12** | EventBus uses static fn-ptr + `void* ctx` | Superseded | Superseded by D42 (ESP-IDF `esp_event` C++ wrapper). |
