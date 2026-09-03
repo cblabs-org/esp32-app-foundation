@@ -12,7 +12,7 @@ To achieve this, the project relies on a **Stub-Header Architecture** to mock ha
 
 ## 1. The Stub-Header Architecture
 
-Historically, embedded projects used inline preprocessor guards (e.g., `#ifndef NATIVE_BUILD`) to wrap every ESP-IDF or Arduino API call. This pattern pollutes production code and makes it difficult to read.
+Historically, embedded projects used inline preprocessor guards (e.g., `#ifdef ESP_PLATFORM`) to wrap every ESP-IDF or Arduino API call. This pattern pollutes production code and makes it difficult to read.
 
 Instead, this framework uses **Stub Headers**.
 

@@ -52,7 +52,7 @@ The portal is a Single Page Application. It does **not** load HTML fragments fro
 Here is the route registration from the template file [myApp.cpp](../../template-app/src/myApp.cpp). It registers a GET route to retrieve status, and a POST route to update settings:
 
 ```cpp
-#ifndef NATIVE_BUILD
+#ifdef ESP_PLATFORM
 void MyApp::registerRoutes(PsychicHttpServer& server) {
     // --- GET Endpoint: Retrieve Status ---
     server.on("/api/myapp/status", HTTP_GET, [this](PsychicRequest* request, PsychicResponse* response) {

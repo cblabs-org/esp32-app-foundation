@@ -18,7 +18,7 @@ For the best developer experience, read the core guides in order:
 5. [Configuration System](config-system.md) — Learn how to save, migrate, and restore module settings via the ConfigManager.
 6. [Extending the Web Portal](extending-the-web-portal.md) — Add custom bottom-nav tabs, page layouts, REST API endpoints, and JWT authentication to the device web portal.
 7. [Event Bus](event-bus.md) — Implement decoupled, event-driven cross-module communication.
-8. [Using Optional Modules](using-optional-modules.md) — The display subsystem (carousel, custom boards, screensaver), replacing the display hardware, and the `NATIVE_BUILD` guard pattern.
+8. [Using Optional Modules](using-optional-modules.md) — The display subsystem (carousel, custom boards, screensaver), replacing the display hardware, and the `ESP_PLATFORM` guard pattern.
 9. [Scheduling Data Fetches](scheduling-data-fetches.md) — Background data workers via `IDataSource` and `DataManager`, including thread safety patterns.
 10. [FetchContext Contract](fetch-context-contract.md) — The data source resilience contract, cooperative deadlines, TLS client lifecycle, and health state machine (#128).
 11. [Build System](build-system.md) — PlatformIO environments, version injection, partition schemes, and the LittleFS filesystem.

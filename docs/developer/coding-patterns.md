@@ -363,9 +363,9 @@ Use Doxygen-style block comments (`/** ... */`) for all public declarations. Inc
 int readSensor(int samples = 1);
 ```
 
-### NATIVE_BUILD Stubs
+### Native Test Stubs
 
-When providing mock/stub definitions for native testing (under `#ifdef NATIVE_BUILD`), define the stub in **exactly one authoritative header file** and use forward declarations everywhere else. This prevents redefinition errors during the build process.
+When providing mock/stub definitions for native testing (under `#ifndef ESP_PLATFORM`), define the stub in **exactly one authoritative header file** and use forward declarations everywhere else. This prevents redefinition errors during the build process.
 
 ---
 

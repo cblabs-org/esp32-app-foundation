@@ -9,13 +9,13 @@
 
 > [!NOTE]
 > **This specification was rebuilt as v2.0 on 2026-09-03.** Sections marked ✅ have been rewritten
-> against the delivered architecture. §1 remains at v1.1 (light touch only). See the
+> against the delivered architecture. See the
 > [design spec audit report](conversation://8b733dfa-645a-478e-b6cc-e08c50620730)
 > for the full audit findings that motivated this rebuild.
 
 | Section | Status | Notes |
 |---|---|---|
-| §1 Purpose & Vision | ⚠️ v1.1 | Light touch only (§3–§6 rewrote core architecture) |
+| §1 Purpose & Vision | ✅ v2.0 | Rewritten against delivered architecture |
 | §2 Design Principles | ✅ v2.0 | Stale identifiers cleaned |
 | §3 System Architecture | ✅ v2.0 | Component diagram rewritten |
 | §4 Framework Kernel | ✅ v2.0 | Kernel table: 18 components |
@@ -63,53 +63,48 @@
 
 ### 1.1 Problem Statement
 
-Embedded ESP32 development repeatedly requires the same foundational infrastructure:
-WiFi provisioning, configuration persistence, OTA firmware updates, a device web
-portal, logging, and system lifecycle management. Without a shared foundation, each
-new project either starts from scratch or inherits a messy copy-paste of a previous
-project's internals — leading to divergent, hard-to-maintain codebases.
+Embedded ESP32 development repeatedly requires the same foundational infrastructure: robust networking, configuration persistence, authenticated web administration, structured logging, health gating, audit logging, OTA firmware distribution, and display rendering pipelines.
+
+Without a shared foundation, each new project either starts from scratch or inherits a fragile copy-paste of a previous project's internals. This creates divergent, hard-to-maintain codebases where security fixes, memory optimizations, and stability improvements must be manually backported across multiple repositories.
 
 ### 1.2 What This Framework Is
 
-The **ESP32 App Foundation** is a **C++ application framework** for ESP32 devices
-built with PlatformIO (Arduino + ESP-IDF dual framework). It provides:
+The **ESP32 App Foundation** is a production-ready **C++ application framework** for ESP32 microcontrollers built with PlatformIO (Arduino + ESP-IDF dual framework). It delivers a complete, reusable foundational infrastructure so developers never start a device project from scratch.
 
-- A structured, deterministic application lifecycle (`begin()` / `tick()`)
-- Pre-wired core services (WiFi, Config, OTA, Web Portal, Crypto, Logging, MCP)
-- A registration bus so optional modules self-attach without kernel changes
-- Defined extension points where app-specific logic plugs in
-- A base web portal that apps extend with custom tabs
-- A composable widget toolkit for U8G2 monochrome displays
+Key architectural pillars delivered by the framework include:
+
+- **Deterministic Lifecycle & Boot Gating**: A structured 3-state application lifecycle (`Booting` → `Configuring` ↔ `Running`) governed by **`PreconditionEngine`**, which evaluates system prerequisites, gates normal execution, continuously monitors runtime health, and attributes failures with Cause and Severity to prevent wedged device states.
+- **Dual Display Subsystems**: First-class support for both monochrome and high-resolution colour user interfaces:
+  - **U8G2**: Low-overhead widget toolkit and rotating carousel engine for monochrome OLED and e-paper displays.
+  - **LVGL v9**: Modern, touch-driven colour TFT display pipeline featuring observer-based data binding (`LV_USE_OBSERVER`), subject reactivity, and seamless integration with the LVGL Pro Editor XML workflow.
+- **Hardened Web Administration**: High-performance PROGMEM Single Page Application (SPA) served by `PsychicHttpServer`, backed by **`AuthManager`** for robust portal authentication, secure session cookies, JWT bearer tokens, and captive portal provisioning.
+- **Observability & Secret Scrubbing**: Structured **`LogPipeline`** coupled with **`Redactor`** (`ISanitizer`) for real-time in-flight scrubbing of Wi-Fi credentials, API keys, and sensitive tokens before writing to serial or remote log ring buffers.
+- **Tamper-Evident Audit Trail**: **`AuditModule`** recording critical system events, boot transitions, auth attempts, and configuration mutations into a compact, flash-wear-mitigated, tamper-evident log (`BOARD_AUDIT_BYTES`).
+- **AI Agent Integration**: Built-in **Model Context Protocol (MCP)** server enabling AI coding agents and automated tooling to inspect device state, query logs, audit configurations, and execute diagnostic tools directly over standard JSON-RPC / HTTP.
+- **HomeAssistant & Smart Home Ecosystem**: Native MQTT integration with **Home Assistant** MQTT auto-discovery for automated sensor reporting, diagnostic entities, and remote device management.
+- **Cryptographically Verified Split-Repo OTA**: Secure, two-stage over-the-air firmware updates with cryptographic payload verification, Ed25519 signature checks, anti-rollback protection (`SECURITY_VERSION`), and asset filesystem synchronization.
+- **Extensible Module Model**: Defined extension points (`IConfigurable`, `ITickable`, `IDataSource`, `IWebContributor`, `IMCPContributor`, `IPreconditionContributor`) allowing domain modules to self-register via `registerModule()` without touching the kernel.
 
 ### 1.3 What This Framework Is Not
 
-- **Not ESPHome**: This is a code-first C++ framework, not a YAML/config-driven
-  device compiler. It targets genuinely custom application logic — complex state
-  machines, display rendering pipelines, data transformation — not sensor reporting.
-- **Not a monolith**: The framework does not mandate a display, MQTT, or any domain
-  module. Apps compose the modules they need.
-- **Not a HAL or RTOS**: The framework operates above the Arduino/ESP-IDF layer.
-  FreeRTOS task management and peripheral drivers are app concerns.
+- **Not ESPHome**: This is a code-first C++ framework, not a YAML/config-driven device compiler. It targets bespoke, complex embedded applications — intricate state machines, custom communication protocols, high-framerate rendering pipelines, and advanced sensor fusion — that cannot be represented in declarative configuration files.
+- **Not a Monolith**: The framework is modular. Modules like displays (U8G2 / LVGL), MQTT, Home Assistant, or custom hardware peripherals are optional. Applications compose only the components they require, keeping flash and RAM footprints strictly aligned with hardware capabilities.
+- **Not a HAL or Bare-Metal RTOS**: The framework operates above the Arduino/ESP-IDF layer. FreeRTOS task scheduling, interrupts, and low-level peripheral drivers remain cleanly decoupled or managed by application concerns.
 
 ### 1.4 Primary Use Case
 
-Building custom embedded applications on ESP32 that require a standardised
-boot sequence, network stack, web configuration portal, and OTA updates — but
-with bespoke application logic that would be impossible to express in a declarative
-config-driven system.
+Building production-ready, bespoke embedded IoT devices on ESP32 that demand enterprise-grade reliability, secure network management, authenticated web interfaces, deep observability, and verifiable remote updates — while providing complete freedom to implement custom application logic and proprietary hardware interactions.
 
-**Reference application**: The `departures-board` project (rail/tube/bus departure
-display) demonstrates the class of application this framework targets.
+**Reference applications**:
+- `departures-board`: Real-time public transit departure display (rail, tube, bus) leveraging U8G2/LVGL display pipelines, background data fetching, and web configuration.
+- Custom IoT sensor nodes, touch-screen controllers, and automation gateways requiring Home Assistant auto-discovery, MCP agent diagnostics, and cryptographic OTA verification.
 
 ### 1.5 Goals
 
-- A new app can be created by cloning the `template/` skeleton and writing only
-  application-specific code
-- Adding or removing optional modules requires only changes to `platformio.ini` and
-  app setup code — no kernel changes
-- Framework updates flow to all derived apps via git submodule SHA pinning
-- The framework compiles cleanly on `esp32dev`, `esp32s3nano`, and `native`
-  (host CPU for GoogleTest) environments
+- **Zero-Scratch Project Scaffolding**: New apps instantiate from the `template/` skeleton and write only application-specific code, inheriting battle-tested infrastructure immediately.
+- **Zero Kernel Changes**: Adding, configuring, or removing optional modules requires only changes to `platformio.ini` and app setup code via the module registration bus.
+- **Upstream Maintainability**: Framework improvements and security fixes flow cleanly to all derived apps via git submodule SHA pinning.
+- **Native Host Testability**: Complete test portability across target hardware (`esp32dev`, `esp32s3nano`) and native host CPU (`native` environment with GoogleTest) through stub headers and platform abstraction.
 
 ---
 
@@ -1250,8 +1245,8 @@ public:
     virtual void onDeactivate() = 0;
     virtual void tick(uint32_t ms) = 0;
     virtual void render(U8G2& display) = 0;
-    virtual UpdateStatus updateData() = 0;
-    virtual bool isScrollFinished() { return true; }
+    virtual UpdateStatus updateData() = 0;             // Legacy signature (superseded by IDataSource::fetchUpdate)
+    virtual bool isScrollFinished() { return true; }   // Legacy signature (replaced by canAdvance)
     virtual bool isExpired() { return false; }
     virtual ~IDisplayBoard() = default;
 };

@@ -38,19 +38,19 @@ Optional modules are full framework citizens: they implement the same interfaces
 
 ---
 
-## 2. The `#ifndef NATIVE_BUILD` Guard Pattern
+## 2. The `#ifdef ESP_PLATFORM` Guard Pattern
 
 ### Why It Exists
 
 The framework supports two build environments (see [Build System](build-system.md)):
 - **Hardware environments** (`esp32dev`, `esp32s3nano`) — compile with the full Arduino + ESP-IDF toolchain
-- **Native environment** (`native`) — compiles with the host CPU's C++ compiler for GoogleTest, with `-DNATIVE_BUILD` defined
+- **Native environment** (`native`) — compiles with the host CPU's C++ compiler for GoogleTest, without `ESP_PLATFORM` defined
 
 Hardware-specific headers like `<U8g2lib.h>`, `<Wire.h>`, or `<SPI.h>` do not exist on the host machine. If your module `#include`s them unconditionally, the native build will fail to compile.
 
 ### How to Use It
 
-Wrap all hardware-specific includes and member variables in `#ifndef NATIVE_BUILD` guards:
+Wrap all hardware-specific includes and member variables in `#ifdef ESP_PLATFORM` guards:
 
 ```cpp
 #pragma once
@@ -58,7 +58,7 @@ Wrap all hardware-specific includes and member variables in `#ifndef NATIVE_BUIL
 #include "interfaces/ITickable.hpp"
 
 // --- Hardware-only includes ---
-#ifndef NATIVE_BUILD
+#ifdef ESP_PLATFORM
 #include <U8g2lib.h>
 #include <ArduinoJson.h>
 #endif
@@ -68,7 +68,7 @@ public:
     void tick(uint32_t currentMillis) override;
 
 private:
-#ifndef NATIVE_BUILD
+#ifdef ESP_PLATFORM
     // Hardware driver — only exists on target builds
     U8G2_SSD1306_128X64_NONAME_F_HW_I2C _u8g2{U8G2_R0};
     const uint16_t _displayWidth  = _u8g2.getDisplayWidth();
@@ -135,7 +135,7 @@ The display uses a two-phase initialization pattern to show boot progress before
 The display driver and geometry pseudo-constants are fully guarded:
 
 ```cpp
-#ifndef NATIVE_BUILD
+#ifdef ESP_PLATFORM
     // Pin configuration is read from your custom board.h (PIN_DISPLAY_* symbols)
     U8G2_DISPLAY_TYPE _u8g2{U8G2_R0, PIN_DISPLAY_CS, PIN_DISPLAY_DC, PIN_DISPLAY_RST};
     const uint16_t _displayWidth  = _u8g2.getDisplayWidth();
@@ -279,7 +279,7 @@ Implement the interfaces your module needs. See [Creating a Module](creating-a-m
 #include "interfaces/ITickable.hpp"
 #include "interfaces/IDataSource.hpp"
 
-#ifndef NATIVE_BUILD
+#ifdef ESP_PLATFORM
 #include <Wire.h>
 #include "MySensorDriver.h"
 #endif
@@ -295,7 +295,7 @@ public:
     PriorityTier  getPriorityTier() const override { return PriorityTier::Normal; }
 
 private:
-#ifndef NATIVE_BUILD
+#ifdef ESP_PLATFORM
     MySensorDriver _driver;
 #endif
     float _lastReading = 0.0f;
@@ -314,7 +314,7 @@ void MySensorModule::tick(uint32_t currentMillis) {
     // Non-blocking periodic logic (works on both targets)
 }
 
-#ifndef NATIVE_BUILD
+#ifdef ESP_PLATFORM
 UpdateStatus MySensorModule::fetchUpdate() {
     // Real hardware read on the DataManager's FreeRTOS task
     _lastReading = _driver.readTemperature();
@@ -334,7 +334,7 @@ UpdateStatus MySensorModule::fetchUpdate() {
 #include "AppFoundation.h"
 #include "myApp.hpp"
 
-#ifndef NATIVE_BUILD
+#ifdef ESP_PLATFORM
 #include "MySensorModule.hpp"
 MySensorModule sensor;
 #endif
@@ -345,7 +345,7 @@ MyApp myApp;
 void setup() {
     app.registerModule(&myApp);
 
-#ifndef NATIVE_BUILD
+#ifdef ESP_PLATFORM
     app.registerModule(&sensor);
 #endif
 
@@ -404,7 +404,7 @@ For unit testing, you have two options:
 
 When creating optional modules:
 
-- [ ] **Guard all hardware includes** with `#ifndef NATIVE_BUILD`
+- [ ] **Guard all hardware includes** with `#ifdef ESP_PLATFORM`
 - [ ] **Guard hardware member variables** — provide native-build defaults for any values tests depend on
 - [ ] **Guard the global instantiation** in `main.cpp` — both the `#include` and the variable declaration
 - [ ] **Test the native build** — run `pio run -e native` to verify compilation succeeds

@@ -85,7 +85,7 @@ python3 scripts/doc_lint.py
 ```
 
 **What it checks:**
-- Banned/stale identifiers across all documentation files (e.g., ensuring `IConfigurable` instead of `iConfigurable`).
+- Banned/stale identifiers across all documentation files (e.g., ensuring `IConfigurable` instead of legacy naming).
 - Valid `STATUS:` banners on all design documents.
 - Presence of a fold-forward reference for design documents marked as `IMPLEMENTED`.
 

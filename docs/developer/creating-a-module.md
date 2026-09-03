@@ -130,12 +130,12 @@ void MyApp::tick(uint32_t currentMillis) {
 }
 ```
 
-### NATIVE_BUILD Compilation Guards
-To allow your module to be fully tested on host machines (running tests on macOS or Linux), any hardware-specific code or SDK library that is unavailable on host machines must be guarded using `#ifndef NATIVE_BUILD`.
+### ESP_PLATFORM Compilation Guards
+To allow your module to be fully tested on host machines (running tests on macOS or Linux), any hardware-specific code or SDK library that is unavailable on host machines must be guarded using `#ifdef ESP_PLATFORM`.
 
 Observe how the web server routes are registered:
 ```cpp
-#ifndef NATIVE_BUILD
+#ifdef ESP_PLATFORM
 void MyApp::registerRoutes(PsychicHttpServer& server) {
     // Register real route handlers targeting target hardware here...
     server.on("/api/myapp/status", HTTP_GET, [this](PsychicRequest* request, PsychicResponse* response) {
@@ -189,7 +189,7 @@ When writing custom modules for the ESP32 App Foundation, you must adhere to the
 
 - [ ] **Never Use `delay()`:** Using `delay()` blocks the entire thread, halting WiFi operations, display rendering, web services, and other modules. Use the `currentMillis` comparison pattern instead.
 - [ ] **Avoid Runtime Heap Allocation:** Avoid using `new`, `std::vector::push_back`, or Arduino `String` manipulation inside `tick()`. Allocate all memory upfront during initialization or on the stack to prevent heap fragmentation.
-- [ ] **Implement `#ifndef NATIVE_BUILD` Guards:** Ensure your module compiles on host CPUs by mocking out target-specific hardware headers (e.g. wire drivers, ESP32 specific registers).
+- [ ] **Implement `#ifdef ESP_PLATFORM` Guards:** Ensure your module compiles on host CPUs by mocking out target-specific hardware headers (e.g. wire drivers, ESP32 specific registers).
 - [ ] **Adhere to the 10ms Budget:** Profile your `tick()` callback to ensure it returns within 10ms.
 - [ ] **Namespace Configs:** Keep your configuration keys short and group them under a unique, lowercase namespace (e.g., `wifi`, `clock`, `myapp`).
 - [ ] **Follow House-Style Documentation:** Add standard file header comment blocks and document your public methods using Doxygen-style markup.
@@ -201,6 +201,6 @@ When writing custom modules for the ESP32 App Foundation, you must adhere to the
 
 1. **Late registration panics the device:** Calling `app.registerModule()` after `app.begin()` has been called will trigger a **fatal panic**. The registration registry is compacted and locked during boot — late registration is unconditionally forbidden. All registrations must occur in `setup()` before `app.begin()` is invoked.
 2. **Stack-allocating modules (no MMU on ESP32):** Declaring a module as a local variable inside `setup()` creates a dangling pointer. The ESP32 has no MMU to trap this — it will silently corrupt memory or hard-fault when the framework calls the module's `tick()`. Always declare modules at global or `static` scope.
-3. **Exposing hardware code in native builds:** Failing to wrap `#include <Wire.h>` or hardware-dependent drivers in `#ifndef NATIVE_BUILD` will cause host test builds to fail to compile.
+3. **Exposing hardware code in native builds:** Failing to wrap `#include <Wire.h>` or hardware-dependent drivers in `#ifdef ESP_PLATFORM` will cause host test builds to fail to compile.
 4. **Implicit memory leaks in `tick()`:** Doing `JsonObject obj = doc.to<JsonObject>()` repeatedly inside `tick()` without clearing memory can lead to out-of-memory crashes.
 5. **Duplicate registrations:** Calling `app.registerTickable(&myModule)` AND `app.registerModule(&myModule)` is redundant. The universal `registerModule()` call does all the work.

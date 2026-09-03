@@ -6,6 +6,9 @@
 >
 > **Normative Specification:** The normative architecture, interfaces, and lifecycle integration are specified in [`docs/design_specification.md`](../design_specification.md) §8 (*Configuration Architecture*) and §9 (*Application Lifecycle*).
 
+> **STATUS: IMPLEMENTED** — rationale and review record for the ConfigManager-as-Gateway
+> design. Normative specification in [`docs/design_specification.md`](../design_specification.md) §8/§9.
+
 ---
 
 ## 1. Motivation

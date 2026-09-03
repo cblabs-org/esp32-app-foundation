@@ -34,6 +34,11 @@ STATUS_PATTERNS = [
     r'\*\*SUPERSEDED\*\*'
 ]
 
+HISTORICAL_CONTEXT_REGEX = re.compile(
+    r'\b(legacy|replaced?|replacing|removed?|removing|eliminated?|eliminating|superseded?|superseding)\b',
+    re.IGNORECASE
+)
+
 def main():
     parser = argparse.ArgumentParser(description='Lint documentation for stale identifiers and STATUS banners.')
     parser.add_argument('--verbose', action='store_true', help='Verbose output')
@@ -100,12 +105,15 @@ def main():
             # Check for banned identifiers
             # Skip decision-log entries: lines inside a table row that starts with | D[0-9]
             if re.match(r'^\s*\|\s*D[0-9]+', line):
-                continue
-                
-            for banned_key, replacement in BANNED_IDS.items():
-                if banned_regexes[banned_key].search(line):
-                    print(f"{rel_path}:{i}: BANNED identifier '{banned_key}' — replace with '{replacement}'")
-                    errors += 1
+                pass
+            # Skip historical context references (e.g. explaining what was removed/replaced/superseded)
+            elif HISTORICAL_CONTEXT_REGEX.search(line):
+                pass
+            else:
+                for banned_key, replacement in BANNED_IDS.items():
+                    if banned_regexes[banned_key].search(line):
+                        print(f"{rel_path}:{i}: BANNED identifier '{banned_key}' — replace with '{replacement}'")
+                        errors += 1
                     
             if is_design_doc:
                 if status_regex.search(line):
