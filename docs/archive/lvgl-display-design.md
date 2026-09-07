@@ -3,8 +3,8 @@
 > era and is retained for historical reference only. The framework has migrated
 > to LVGL Pro Editor with a reactive subjects-based architecture. For current
 > documentation see:
-> - [`modules/LVGLDisplay/README.md`](../modules/LVGLDisplay/README.md)
-> - [`docs/developer/custom-branding.md`](developer/custom-branding.md)
+> - [`modules/LVGLDisplay/README.md`](../../modules/LVGLDisplay/README.md)
+> - [`docs/developer/custom-branding.md`](../developer/custom-branding.md)
 
 # LVGL Display Module — Design Document (Historical)
 
@@ -67,7 +67,7 @@ embedded graphical user interfaces. It is:
 
 ### 1.2 Relationship to Existing Display Architecture
 
-The framework's [Design Specification §7.1](design_specification.md#71-design-decision-module-variants-not-a-unified-driver-interface)
+The framework's [Design Specification §7.1](../design_specification.md#71-design-decision-module-variants-not-a-unified-driver-interface)
 established that there is no unified `IDisplayDriver` abstraction. Instead, the
 module catalogue provides **separate display modules** per technology. The design
 spec already anticipated a future colour TFT module:
@@ -1336,7 +1336,7 @@ allocate buffers internally and return a pre-configured `lv_display_t*`.
 - [esp_lvgl_port Component](https://github.com/espressif/esp_lvgl_port)
 
 ### Framework
-- [Design Specification §7 — Display Architecture](design_specification.md#7-display-architecture)
-- [Using Optional Modules](developer/using-optional-modules.md)
-- [Performance Guide](developer/performance-guide.md)
-- [Embedded Safety](developer/embedded-safety.md)
+- [Design Specification §7 — Display Architecture](../design_specification.md#7-display-architecture)
+- [Using Optional Modules](../developer/using-optional-modules.md)
+- [Performance Guide](../developer/performance-guide.md)
+- [Embedded Safety](../developer/embedded-safety.md)

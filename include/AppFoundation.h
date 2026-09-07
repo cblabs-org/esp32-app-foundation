@@ -16,7 +16,7 @@
  * - FrameworkConfig:            Boot-phase configuration struct
  * - AppState:                   Lifecycle phase enum (BOOTING → RUNNING)
  * - ITickable:                  Interface — periodic tick contract
- * - IConfigurable:              Interface — LittleFS config load/save contract
+ * - IConfigurable:              Interface — ConfigManager gateway config contract
  * - IDataSource:                Interface — background data fetch contract
  * - IStatusReporter:            Interface — display status overlay contract
  * - IWebContributor:            Interface — REST route registration contract
@@ -26,6 +26,9 @@
  * - IPreconditionRegistry:      Interface — precondition registration contract
  * - IPrecondition:              Types and enums for precondition system
  * - IOTAVerifier:               Interface — OTA firmware signature verification contract
+ * - ISanitizer:                 Interface — log sanitization contract
+ * - IBootReporter:              Interface — boot progress reporting contract
+ * - IDisplayModule:             Interface — unified display module contract
  * - UpdateStatus:               Enum — data fetch result codes
  * - PriorityTier:               Enum — DataManager scheduling tier
  * - FetchContext:               Transport context and deadline token for fetches
@@ -58,6 +61,9 @@
 #include "interfaces/IPreconditionRegistry.hpp"
 #include "interfaces/IPreconditionContributor.hpp"
 #include "interfaces/IOTAVerifier.hpp"
+#include "interfaces/ISanitizer.hpp"
+#include "interfaces/IBootReporter.hpp"
+#include "interfaces/IDisplayModule.hpp"
 
 // Event payloads
 #include "events/DataSourceHealthPayload.hpp"

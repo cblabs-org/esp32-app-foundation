@@ -77,7 +77,7 @@ The project defines three PlatformIO environments:
 | `esp32s3nano` | ESP32-S3 Nano | Secondary target with PSRAM |
 | `native` | Host machine | Unit testing (no hardware) |
 
-The `native` environment uses the `-DNATIVE_BUILD` flag, which is critical for the compilation guard pattern described later.
+The `native` environment leaves `ESP_PLATFORM` undefined, which is critical for the compilation guard pattern described later.
 
 ---
 
@@ -274,10 +274,10 @@ void MyApp::registerTabs(ITabRegistry& registry) {
 - `registerRoutes()` is called **once** during boot — register all your routes here.
 - Route handlers take `(PsychicRequest*, PsychicResponse*)` — use `response->send()` to reply.
 - Auth enforcement for `/api/` paths is handled centrally — your handlers don't need to check authentication.
-- Wrap the implementation in `#ifndef NATIVE_BUILD` / `#else` guards for host testing:
+- Wrap the implementation in `#ifdef ESP_PLATFORM` / `#else` guards for host testing:
 
 ```cpp
-#ifndef NATIVE_BUILD
+#ifdef ESP_PLATFORM
 void MyApp::registerRoutes(PsychicHttpServer& server) {
     // Real implementation
 }
@@ -655,7 +655,7 @@ Display boards are registered via the carousel engine, **not** via `registerModu
 app.getDisplay().carousel.add(&weatherClockBoard);
 ```
 
-This is wrapped in `#ifndef NATIVE_BUILD` because the display subsystem is hardware-only.
+This is wrapped in `#ifdef ESP_PLATFORM` because the display subsystem is hardware-only.
 
 *Reference:* [Using Optional Modules](using-optional-modules.md)
 
@@ -766,7 +766,7 @@ Before shipping, verify:
 - [ ] All modules declared at global/static scope (ADR-16)
 - [ ] All `registerModule()` calls happen before `app.begin()`
 - [ ] `tick()` completes within 10ms — no `delay()`, no blocking I/O
-- [ ] Hardware code wrapped in `#ifndef NATIVE_BUILD`
+- [ ] Hardware code wrapped in `#ifdef ESP_PLATFORM`
 - [ ] No `new` without `std::nothrow` — use `std::unique_ptr` for RAII
 - [ ] Thread-safe data exchange for `IDataSource` modules
 - [ ] Config namespace is unique and lowercase

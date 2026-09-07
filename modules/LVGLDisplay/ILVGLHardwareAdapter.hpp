@@ -1,14 +1,19 @@
 /*
  * ESP32 App Foundation (c) 2026 CB Labs
  *
- * https://github.com/matthewmcneill/esp32-app-foundation
+ * @file ILVGLHardwareAdapter.hpp
+ * @brief Hardware adaptation interface for LVGL display drivers
+ * @author Matthew McNeill
+ * 
+ * Module: modules/LVGLDisplay/ILVGLHardwareAdapter.hpp
+ * Project: esp32-app-foundation
+ * 
+ * This interface isolates the LVGLDisplay module from the specific details of
+ * the underlying display and touch hardware. It is called during the LVGL boot
+ * sequence to initialize the hardware, register drivers with LVGL, and wire up
+ * flush and input read callbacks.
  *
  * SPDX-License-Identifier: Apache-2.0
- *
- * Module: include/interfaces/ILVGLHardwareAdapter.hpp
- * Description: Pure abstract hardware adapter interface for LVGL display modules.
- *              Isolates hardware-specific display, touch, and input initialisation
- *              from the generic LVGLDisplayModule framework layer.
  *
  * Exported Classes:
  * - ILVGLHardwareAdapter: Abstract hardware adapter interface for LVGL displays

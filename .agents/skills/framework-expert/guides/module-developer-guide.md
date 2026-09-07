@@ -30,7 +30,7 @@ The framework uses a two-tier vector strategy to fight heap fragmentation:
 
 Core framework modules must compile both on the ESP32 and in the native testing environment (`env:native`). The framework uses a **Stub-Header Architecture** to accomplish this.
 
-- **Do NOT** use inline `#ifdef NATIVE_BUILD` guards to wrap hardware-specific code like `WiFi.h` or `LittleFS.h`.
+- **Do NOT** use inline `#ifndef ESP_PLATFORM` guards to wrap hardware-specific code like `WiFi.h` or `LittleFS.h`.
 - The native environment uses include-path priority to resolve `#include <WiFi.h>` to a local mock stub in `test/stubs/platform/WiFi.h`.
 - If you use a new ESP-IDF API, you must provide a mock implementation in the `test/stubs/platform/` directory.
 - Exception: Pure display code can be wrapped in `#ifdef WITH_DISPLAY_U8G2` or `#ifdef WITH_DISPLAY_LVGL`.
@@ -69,7 +69,7 @@ AUDIT("mymodule", "setting_changed", "param_name", "old=X new=Y");
 ## 8. Testing Contracts
 
 ### Native Compilation (Mandatory)
-All core modules MUST compile on `env:native`. Use the stub-header architecture in `test/stubs/platform/` instead of inline `#ifndef NATIVE_BUILD` guards.
+All core modules MUST compile on `env:native`. Use the stub-header architecture in `test/stubs/platform/` instead of inline `#ifndef ESP_PLATFORM` guards.
 
 ### Unit Tests (Expected for Core Modules)
 Core framework modules should have unit tests in `test/test_native/`. Tests run on the host machine without hardware, exercising logic, state machines, and edge cases.

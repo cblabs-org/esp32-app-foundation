@@ -15,8 +15,8 @@
  *              runtime per-module control (esp_log_level_set), thread safety,
  *              and pluggable backends (esp_log_set_vprintf).
  *
- *              On native: thin printf shims that mirror the ESP-IDF output
- *              format for test readability.
+ *
+ *              On native: resolved through test stubs at test/stubs/platform/esp_log.h (see platformio.ini [env:native] -I flags)
  *
  * Usage:
  *   #include "platform/LogShim.h"
@@ -26,5 +26,5 @@
 
 #pragma once
 
-    // --- Hardware build: delegate to the real ESP-IDF logging system ---
-    #include "esp_log.h"
+// --- Hardware build: delegate to the real ESP-IDF logging system ---
+#include "esp_log.h"

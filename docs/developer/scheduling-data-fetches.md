@@ -160,7 +160,7 @@ Here is a complete, minimal `IDataSource` implementation:
 #include <cstdint>
 #include <atomic>
 
-#ifndef NATIVE_BUILD
+#ifdef ESP_PLATFORM
 #include <ArduinoJson.h>
 #endif
 
@@ -185,7 +185,7 @@ private:
 // modules/WeatherFetcher/WeatherFetcher.cpp
 #include "WeatherFetcher.hpp"
 
-#ifndef NATIVE_BUILD
+#ifdef ESP_PLATFORM
 #include <HTTPClient.h>
 #include <esp_log.h>
 
@@ -200,7 +200,7 @@ void WeatherFetcher::tick(uint32_t currentMillis) {
     }
 }
 
-#ifndef NATIVE_BUILD
+#ifdef ESP_PLATFORM
 UpdateStatus WeatherFetcher::fetchUpdate(const FetchContext& ctx) {
     if (!ctx.client) {
         return UpdateStatus::FetchError;

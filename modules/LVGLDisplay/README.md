@@ -184,4 +184,4 @@ void loop() {
 
 - [LVGL Hardware Adapter Authoring Guide](../../adapters/lvgl/README.md)
 - [Framework Display Subsystem Overview](../../.agents/skills/framework-expert/systems/display/overview.md)
-- [Design Specification Document](../../docs/lvgl-display-design.md)
+- [Design Specification Document (Archived)](../../docs/archive/lvgl-display-design.md)

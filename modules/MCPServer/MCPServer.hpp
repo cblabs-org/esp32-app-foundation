@@ -187,7 +187,7 @@ private:
     std::string     _inputBuffer;                 ///< Accumulator for incoming Serial bytes
     bool            _initialized = false;         ///< Guard: begin() must be called first
     bool            _mcpEnabled  = true;          ///< Master on/off switch — false disables all processing
-    bool            _mcpReadOnly = false;         ///< Guard: if true, mutating tools return error
+    bool            _mcpReadOnly = true;          ///< Guard: if true, mutating tools return error (defence-in-depth: safe before config load)
     ConfigManager*  _configManager = nullptr;     ///< Cached for runtime config persistence
     WifiManager*    _wifiManager = nullptr;       ///< Cached reference for status endpoint hostname (single source of truth)
     AuthManager*    _authManager = nullptr;       ///< Cached for bearer token auth on HTTP routes (WO6); nullptr = no auth

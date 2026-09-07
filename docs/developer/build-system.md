@@ -48,7 +48,6 @@ The `native` environment targets the host CPU for unit testing:
 platform              = native
 build_flags           =
     -std=c++17
-    -DNATIVE_BUILD
     -DUNIT_TEST
     -DBOARD_ID=\"native\"
     -DBUILD_VERSION=\"0.0.0-native\"
@@ -61,7 +60,7 @@ test_filter           = test_unit/*
 ```
 
 Key differences from hardware environments:
-- **Stub-Header Architecture** — `-I test/stubs/platform` is added to the include path. This resolves ESP-IDF and Arduino hardware dependencies to local mock implementations, allowing tests to run on the host CPU without inline `#ifdef NATIVE_BUILD` guards. See the [Testing Architecture](testing.md) guide for details.
+- **Stub-Header Architecture** — `-I test/stubs/platform` is added to the include path. This resolves ESP-IDF and Arduino hardware dependencies to local mock implementations, allowing tests to run on the host CPU without inline `#ifndef ESP_PLATFORM` guards. See the [Testing Architecture](testing.md) guide for details.
 - **`-DUNIT_TEST`** — signals the test context to framework code
 - **Static version flags** — version is hardcoded because `inject_version.py` is not run for the native environment (no git tag lookup needed at test time)
 - **GoogleTest** — uses the `googletest` test framework with tests filtered to `test_unit/*`

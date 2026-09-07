@@ -46,7 +46,7 @@ Here is the entire entry point from [main.cpp](../../sample-app/src/main.cpp) sh
 
 ```cpp
 #include "AppFoundation.h"
-#ifndef NATIVE_BUILD
+#ifdef ESP_PLATFORM
 #include <Arduino.h>
 #endif
 #include "myApp.hpp"
@@ -55,7 +55,7 @@ Application app;
 MyApp myApp;
 
 void setup() {
-#ifndef NATIVE_BUILD
+#ifdef ESP_PLATFORM
     Serial.begin(115200);
 #endif
 
@@ -167,7 +167,7 @@ stateDiagram-v2
 
 ## 5. Platform Abstraction Strategy
 
-The framework is designed to be fully testable on the host machine without hardware. To achieve this, it relies on a **Stub-Header Architecture** rather than littering production code with `#ifdef NATIVE_BUILD` guards.
+The framework is designed to be fully testable on the host machine without hardware. To achieve this, it relies on a **Stub-Header Architecture** rather than littering production code with `#ifndef ESP_PLATFORM` guards.
 
 Key principles of this strategy:
 - **No Runtime Cost**: Stubs are compile-time only. Production builds link directly against the true ESP-IDF or Arduino headers.

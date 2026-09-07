@@ -13,7 +13,7 @@
 #include "lvgl.h"
 #include "esp_lcd.h"
 #include "esp_lvgl_port.h"
-#include "interfaces/ILVGLHardwareAdapter.hpp"
+#include "../../modules/LVGLDisplay/ILVGLHardwareAdapter.hpp"
 
 class MockLVGLHardwareAdapter : public ILVGLHardwareAdapter {
 public:
