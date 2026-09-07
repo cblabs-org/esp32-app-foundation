@@ -71,6 +71,6 @@ When a class implements interfaces, group the exported methods by the interface 
 
 Use Doxygen-style block comments (`/** ... */`) for all public declarations. Include `@brief`, `@param`, and `@return` tags for complex methods. For simple getters/setters, a single-line `@brief` is sufficient.
 
-## 5. NATIVE_BUILD Stubs
+## 5. Native Test Stubs
 
-When providing mock/stub definitions for native testing (under `#ifdef NATIVE_BUILD`), define the stub in **exactly one authoritative header file** and use forward declarations everywhere else. This prevents redefinition errors during the build process.
+When providing mock/stub definitions for native testing (under `#ifndef ESP_PLATFORM`), define the stub in **exactly one authoritative header file** and use forward declarations everywhere else. This prevents redefinition errors during the build process.

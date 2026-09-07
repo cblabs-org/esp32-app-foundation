@@ -95,7 +95,7 @@ void PreconditionWebContributor::registerTabs(ITabRegistry& registry) {
 
 PsychicHttp and PsychicHttpsServer are mocked via the framework's **Stub-Header Architecture** in `test/stubs/platform/`.
 
-Because the build system maps `#include <PsychicHttp.h>` to the local mock during `env:native` builds, you do **not** need to wrap your `server.on()` declarations in `#ifndef NATIVE_BUILD` guards.
+Because the build system maps `#include <PsychicHttp.h>` to the local mock during `env:native` builds, you do **not** need to wrap your `server.on()` declarations in `#ifndef ESP_PLATFORM` guards.
 
 Use the shared `MockTabRegistry` (`test/test_unit/test_helpers/MockTabRegistry.hpp`) to verify tab registration in unit tests:
 
