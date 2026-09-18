@@ -25,11 +25,17 @@ date: 2026-08-09T21:50:13Z
 | Components (`components/**`) | `web/portal/app.css` component classes + fragment JS patterns |
 | `ui_kits/portal/WifiScreen.jsx` | `web/portal/wifi.js`, `web/portal/index.html` |
 | `ui_kits/portal/SystemScreen.jsx` | `web/portal/system.js` |
-| `ui_kits/portal/OtaScreen.jsx` | `web/portal/ota.js` |
+| `ui_kits/portal/OtaScreen.jsx` | `modules/OTAUpdateManager/web/ota.js` |
 | `ui_kits/portal/SecurityScreen.jsx` | `web/portal/auth.js` + framework-expert `security/` docs |
 | `ui_kits/portal/Portal.jsx` | `web/portal/index.html`, `app.js`, framework-expert `systems/web-portal/overview.md` |
 | `assets/icons/*.svg` | inline SVGs across `web/portal/*` (Feather Icons) |
 
-> Note: `web/portal/` is an attached local codebase (the primary ground truth).
+> Note: the portal source is an attached local codebase (the primary ground truth).
+> Since #96 (`4a276f4b`) it is split: `web/portal/` holds only the core shell and
+> kernel tabs (`index.html`, `app.css`, `app.js`, `utils.js`, `wifi.js`, `system.js`,
+> `auth.js`, `keys.js`, `backup.js`, `appconfig.js`, `credits.js`); module-owned tabs
+> live beside their module in `modules/<Name>/web/<name>.js` (e.g. `ota.js`, `mcp.js`,
+> `time.js`, `homeassistant.js`, `carousel.js`, `hardware.js`); display tooling is in
+> `web/display/`. `scripts/portalBuilder.py` auto-discovers all of these.
 > The `mm-skills/framework-expert` repo above is the framework documentation used
 > for portal conventions and is the tracked repo for upstream sync.
