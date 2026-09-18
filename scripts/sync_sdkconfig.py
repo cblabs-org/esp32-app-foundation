@@ -17,7 +17,7 @@ Description: Invalidates stale generated sdkconfig.<env> files when any
         3. If any source is newer → delete the generated file.
         4. CMake will regenerate it from the full SDKCONFIG_DEFAULTS list on next run.
 
-    Supported environments: esp32dev, esp32s3nano
+    Supported environments: esp32dev, esp32s3nano, esp32s3nano_ble
     Skips gracefully: native env, envs without sdkconfig configuration.
 """
 

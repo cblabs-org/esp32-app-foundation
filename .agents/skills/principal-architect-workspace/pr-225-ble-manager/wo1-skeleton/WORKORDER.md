@@ -90,19 +90,43 @@ Record any defect or concern outside your boundary box under *Out-of-Scope Findi
 <!-- Written by the worker at task completion -->
 
 ### Status
-complete | partial | blocked
+complete
 
 ### Changes Made
-- `path/to/file`: what changed and why
+- `modules/BLEManager/library.json`: PlatformIO library manifest for BLEManager module depending on ArduinoJson and Application (with `-I../../include`).
+- `modules/BLEManager/README.md`: Architecture overview, enablement guide, NimBLE isolation guarantee, and thread model documentation.
+- `modules/BLEManager/BLETypes.hpp` & `BLETypes.cpp`: Value types per RFC §4 (`BLEPeerAddress` preserving raw 6-byte little-endian address, colon/hyphen string parser, `toRedactedString()`, `BLEManagerState`, scan parameter clamping).
+- `modules/BLEManager/BLEAdvertisingBuilder.hpp` & `BLEAdvertisingBuilder.cpp`: Deterministic advertising builder implementing priority sorting, 16-bit UUID merge, appearance conflict resolution (last-writer-wins with warning), overflow spillover into scan response, and Required-element overflow fault logging (verified against Echenon worked example byte budget).
+- `modules/BLEManager/BLEDeviceRegistry.hpp` & `BLEDeviceRegistry.cpp`: Stored peer device registry with CRUD methods and ArduinoJson v7 serialization/deserialization preserving address type.
+- `modules/BLEManager/BLEReconnectPolicy.hpp` & `BLEReconnectPolicy.cpp`: Exponential fast schedule progression `[2, 4, 8, 16, 32]` s, slow retry phase, suspend/resume maintaining backoff state, and give-up on `slowRetryMs == 0`.
+- `modules/BLEManager/IBLEServiceProvider.hpp`: Pure virtual interface for Peripheral role service providers per RFC §5.2.
+- `modules/BLEManager/IBLEClientProvider.hpp`: Pure virtual interface for Central role client providers per RFC §5.3, including `BLESubscriptionSpec` and `BLENotification`.
+- `modules/BLEManager/BLEEvents.hpp`: EventBus topics and ring buffer payload structs per RFC §11.
+- `modules/BLEManager/BLEStack.hpp` & `BLEStack.cpp`: Low-level NimBLE stack encapsulation isolating `#include <NimBLEDevice.h>` strictly to `BLEStack.cpp` with inline host stubs for native testing.
+- `modules/BLEManager/BLEManager.hpp` & `BLEManager.cpp`: Core BLE orchestrator implementing `ITickable`, `IConfigurable`, `IWebContributor`, `IMCPContributor`, and `IPreconditionContributor`. Includes `ScanInhibit` RAII token, FreeRTOS queue dispatch, ring buffer state publishing, and compile-time `#error` guards (`SOC_BLE_SUPPORTED` and `CONFIG_BT_NIMBLE_ENABLED`).
+- `scripts/sync_sdkconfig.py`: Added `esp32s3nano_ble` to supported environments docstring.
+- `sample-app/platformio.ini`: Added `[ble]` mix-in and `[env:esp32s3nano_ble]` layered with `../hardware/_common/sdkconfig.ble.defaults`.
+- `platformio.ini`: Added `BLEManager` to `[ble].lib_deps` and `-D WITH_BLE` to `[env:native].build_flags`.
+- `src/main.cpp` & `sample-app/src/main.cpp`: Added `#ifdef WITH_BLE` conditional instantiation, `app.registerModule(&bleManager)` before `app.begin()`, and `bleManager.begin(app)` after `app.begin()`.
+- `test/test_unit/test_bleManager/test_main.cpp`: GoogleTest test runner entry point.
+- `test/test_unit/test_bleManager/test_bleTypes.cpp`: Unit tests for `BLEPeerAddress` validity, equality, parsing, formatting/redaction, and scan parameter clamping.
+- `test/test_unit/test_bleManager/test_bleAdvertisingBuilder.cpp`: Unit tests validating Echenon byte budget (20/31 primary, 14/31 scan response), UUID merging, appearance conflicts, scan response spillover, and required overflow faults.
+- `test/test_unit/test_bleManager/test_bleReconnectPolicy.cpp`: Unit tests for default schedule progression, slow retry expiration, suspend/resume phase preservation, and reset on connect.
+- `test/test_unit/test_bleManager/test_bleDeviceRegistry.cpp`: Unit tests for CRUD operations and JSON round-trip serialization preserving address types.
+- `test/test_unit/test_bleManager/test_bleConfig.cpp`: Unit tests for configuration defaults, schema version, namespace, scan window clamping, and JSON round-trip serialization.
+- `test/test_unit/test_bleManager/test_bleManager.cpp`: Unit tests for registration lock, ScanInhibit RAII token semantics, pause/resume, and precondition registration and evaluation.
 
 ### Decisions Made
-- Decision description and rationale
+- **Host Test Isolation**: To avoid pulling transitive dependencies into native host tests, `BLEManager.cpp` conditionally uses a lightweight `Application` stub under `#ifdef UNIT_TEST` while linking against the full `Application` class on embedded targets.
+- **Header Inclusion**: Included `sdkconfig.h` in `BLEManager.hpp` before checking `CONFIG_BT_NIMBLE_ENABLED` to ensure ESP-IDF configuration macros are properly expanded.
+- **Appearance Conflict Handling**: Resolved duplicate appearance entries using last-writer-wins with an `ESP_LOGW` warning per RFC §7.2.
 
 ### Dead Ends & Warnings
-- What was attempted, why it failed, and what to avoid
+- **PlatformIO LDF Transitive Include**: Adding `BLEManager` to `[env:native].lib_deps` caused PlatformIO to attempt compiling non-native modules (`MCPServer.cpp`). Relying on PlatformIO's `chain+` mode with direct header includes in test suites (`#include "BLEManager.hpp"`) cleanly avoided this issue.
+- **Include of `sdkconfig.h`**: On ESP32, `#if !CONFIG_BT_NIMBLE_ENABLED` evaluated to true if `sdkconfig.h` was not included first, triggering the `#error` guard. Always ensure `#include "sdkconfig.h"` precedes sdkconfig macro checks.
 
 ### Out-of-Scope Findings
-- Finding description and suggested action
+- `test/test_unit/test_lvgl_stubs` has a pre-existing unit test error on native host tests (unrelated to BLEManager).
 
 ### Blockers
 (none)
