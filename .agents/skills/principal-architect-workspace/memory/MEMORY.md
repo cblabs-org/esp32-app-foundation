@@ -9,7 +9,7 @@
 ## Active Projects
 | Project | Status | Modules | Context |
 |---|---|---|---|
-| pr-225-ble-manager | WO0/7 — decomposition drafted, AWAITING human approval | BLEManager (new), platformio.ini, sdkconfig fragment, sample-app, sync_sdkconfig.py, docs, framework-expert skill | [PROJECT.md](../pr-225-ble-manager/PROJECT.md) |
+| pr-225-ble-manager | WO0 ✅ — D3 recorded (`esp-nimble-cpp@^2.1.0`), budgets presented, awaiting gate pass → WO-1 | BLEManager (new), platformio.ini, sdkconfig fragment, sample-app, sync_sdkconfig.py, docs, framework-expert skill | [PROJECT.md](../pr-225-ble-manager/PROJECT.md) |
 | pr-drayton-consumer-fixes | WO5/5 — COMPLETE, soak-tested | DataManager, IDataSource, FetchContext, AppFoundation.h, WeatherModule, framework-expert skill | [PROJECT.md](../pr-drayton-consumer-fixes/PROJECT.md) |
 | pr-128-datamanager-resilience | WO7/7 (WO6 re-plan gated) | DataManager, IDataSource, FetchContext, Application, MCPServer, Display, Portal | [PROJECT.md](../pr-128-datamanager-resilience/PROJECT.md) |
 
