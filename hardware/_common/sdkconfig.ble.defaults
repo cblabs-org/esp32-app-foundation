@@ -1,0 +1,40 @@
+# =============================================================================
+# ESP32 App Foundation — BLE sdkconfig fragment
+# =============================================================================
+# Purpose:  Enable the NimBLE BLE stack for environments that define WITH_BLE.
+#           This fragment is layered LAST in SDKCONFIG_DEFAULTS for BLE envs,
+#           so its values WIN over sdkconfig.defaults (which sets BT_ENABLED=n).
+#
+# Wired via: board_build.cmake_extra_args in platformio.ini [env:esp32s3nano_ble].
+# Authoritative: RFC #225 rev 2 §16.2.
+# =============================================================================
+
+# --- Bluetooth controller & host ---
+CONFIG_BT_ENABLED=y
+CONFIG_BT_NIMBLE_ENABLED=y
+
+# --- NimBLE roles (all four for peripheral + central) ---
+CONFIG_BT_NIMBLE_ROLE_CENTRAL=y
+CONFIG_BT_NIMBLE_ROLE_PERIPHERAL=y
+CONFIG_BT_NIMBLE_ROLE_OBSERVER=y
+CONFIG_BT_NIMBLE_ROLE_BROADCASTER=y
+
+# --- Connection budget: 3 peripheral + 1 central ---
+CONFIG_BT_NIMBLE_MAX_CONNECTIONS=4
+
+# --- Bonding (NVS-persisted, Just Works) ---
+CONFIG_BT_NIMBLE_MAX_BONDS=4
+CONFIG_BT_NIMBLE_SM_LEGACY=y
+CONFIG_BT_NIMBLE_SM_SC=y
+
+# --- NVS persistence for bonding data ---
+CONFIG_BT_NIMBLE_NVS_PERSIST=y
+
+# --- Memory allocation: use external PSRAM (S3 has plenty) ---
+CONFIG_BT_NIMBLE_MEM_ALLOC_MODE_EXTERNAL=y
+
+# --- Legacy advertising only (v1 scope; no extended advertising) ---
+CONFIG_BT_NIMBLE_EXT_ADV=n
+
+# --- Wi-Fi / BLE coexistence (software) ---
+CONFIG_ESP_COEX_SW_COEXIST_ENABLE=y

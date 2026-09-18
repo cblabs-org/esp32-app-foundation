@@ -47,6 +47,11 @@ static HomeAssistantModule haModule;
 static OTAUpdateManager otaManager;
 #endif
 
+// BLE build spike (temporary — removed after WO-0)
+#if defined(BLE_SPIKE) && defined(WITH_BLE)
+extern void bleSpikeRun();
+#endif
+
 #ifdef WITH_TIME
 #include "TimeManager.hpp"
 #include "TimePreconditionContributor.hpp"
@@ -199,6 +204,10 @@ void setup() {
     displayModule.boards.configuringStatus.setEngine(&app.getPreconditionEngine());
     displayModule.carousel.add(&diagnosticsBoard);
 #endif
+#endif
+
+#if defined(BLE_SPIKE) && defined(WITH_BLE)
+    bleSpikeRun();
 #endif
 }
 
