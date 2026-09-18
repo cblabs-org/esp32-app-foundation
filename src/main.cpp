@@ -65,6 +65,11 @@ static MCPServer mcpServer;
 static ButtonModule buttonModule;
 #endif
 
+#ifdef WITH_BLE
+#include "BLEManager/BLEManager.hpp"
+static BLEManager bleManager;
+#endif
+
 #ifdef WITH_ENCODER
 #include "EncoderModule.hpp"
 #include "board.h"
@@ -167,10 +172,18 @@ void setup() {
     );
 #endif
 
+#ifdef WITH_BLE
+    app.registerModule(&bleManager);
+#endif
+
     if (!app.begin(config)) {
         delay(5000);
         app.softReset();
     }
+
+#ifdef WITH_BLE
+    bleManager.begin(app);
+#endif
 
 #ifdef WITH_OTA
     otaManager.begin(app);
