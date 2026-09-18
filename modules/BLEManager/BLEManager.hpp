@@ -39,6 +39,9 @@
 #include "IBLEClientProvider.hpp"
 #include "BLEEvents.hpp"
 #include "BLEStack.hpp"
+#include "BLERoutingTable.hpp"
+#include "BLEAdvertisingDecision.hpp"
+#include "BLEQueueMessage.hpp"
 
 #include "interfaces/ITickable.hpp"
 #include "interfaces/IConfigurable.hpp"
@@ -140,12 +143,15 @@ public:
 
     State  getState() const;
     bool   isScanning() const;
+    bool   isAdvertising() const;
     size_t getPeripheralConnectionCount() const;
+    const std::vector<BLEPeerInfo>& getActiveConnections() const { return _activeConnections; }
+    bool   getPeerInfo(BLEConnHandle handle, BLEPeerInfo& out) const;
     bool   isClientConnected(const char* providerId) const;
     bool   getStoredDevice(const char* providerId, BLEStoredDevice& out) const;
     const BLEConfig& getConfig() const { return _config; }
     const BLEAdvPackResult& getLastPackResult() const { return _advPackResult; }
-    uint32_t getDroppedEventsCount() const { return _droppedEventsCount; }
+    uint32_t getDroppedEventsCount() const;
     uint32_t getScanInhibitCount() const { return _scanInhibitCount; }
 
     // --- Discovery and Pairing (User-initiated) ---
@@ -165,6 +171,10 @@ public:
 
     // --- Testing helpers ---
     void lockRegistration() { _locked = true; }
+    void setStateForTesting(State s) { _state = s; }
+    void setGattStartedForTesting(bool g) { _gattStarted = g; }
+    void setProviderRegistrationFaultForTesting(bool f) { _providerRegistrationFault = f; }
+    bool postTestQueueMessage(const BLEQueueMessage& msg);
 
     // --- ITickable Interface ---
     void tick(uint32_t currentMillis) override;
@@ -205,10 +215,14 @@ private:
     BLEStack                           _stack;
     BLEDeviceRegistry                  _deviceRegistry;
     BLEAdvPackResult                   _advPackResult;
+    BLERoutingTable                    _routingTable;
+    std::vector<BLEPeerInfo>           _activeConnections;
 
     std::vector<IBLEServiceProvider*>  _serviceProviders;
     std::vector<IBLEClientProvider*>   _clientProviders;
 
+    bool                               _gattStarted = false;
+    bool                               _providerRegistrationFault = false;
     uint32_t                           _scanInhibitCount = 0;
     std::string                        _pauseReason;
 

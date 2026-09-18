@@ -77,19 +77,36 @@ Record any defect or concern outside your boundary box under *Out-of-Scope Findi
 <!-- Written by the worker at task completion -->
 
 ### Status
-complete | partial | blocked
+complete
 
 ### Changes Made
-- `path/to/file`: what changed and why
+- `modules/BLEManager/BLEQueueMessage.hpp`: Created FreeRTOS queue message types and payloads (`BLEQueueMessage`, `BLEPeerConnectedMsg`, `BLEPeerDisconnectedMsg`, `BLESubscriptionChangedMsg`, `BLEMTUChangedMsg`, `BLEConnParamsUpdatedMsg`) to marshal asynchronous events from NimBLE host task callbacks to main thread `Application::tick()`.
+- `modules/BLEManager/BLERoutingTable.hpp`: Implemented pure C++ GATT characteristic handle lookup table routing subscription events strictly to owning `IBLEServiceProvider` instances.
+- `modules/BLEManager/BLEAdvertisingDecision.hpp`: Implemented pure C++ logic evaluating advertising start/restart/suppression conditions against max connection cap and paused states.
+- `modules/BLEManager/BLEStack.hpp`: Added peripheral lifecycle, connectable advertising, disconnect, conn param update, characteristic enumeration, and native stubs.
+- `modules/BLEManager/BLEStack.cpp`: Implemented NimBLE server callbacks, characteristic subscribe callbacks, GAP advertising configuration, and type-safe private member access to `NimBLEServer::m_svcVec` using C++ template friend explicit instantiation (`Rob<Tag, M>`).
+- `modules/BLEManager/BLEManager.hpp`: Added routing table, active connections vector, queue drop metrics, and peripheral query accessors (`getActiveConnections()`, `getPeerInfo()`, `isAdvertising()`, `getDroppedEventsCount()`).
+- `modules/BLEManager/BLEManager.cpp`: Implemented peripheral startup sequence, GATT static locking, queue event dispatching in `tick()` (capped at 16 per tick), dynamic advertising refresh, stack pause/resume, ring-buffer event publishing with redacted addresses, and operational preconditions (`BLE Stack`, `BLE Advertising`).
+- `modules/BLEManager/README.md`: Documented Peripheral Role, `IBLEServiceProvider` implementation, advertising aggregation, handle routing, and preconditions.
+- `sample-app/src/ble/SampleFtmsProvider.hpp` & `.cpp`: Created Fitness Machine Service provider (0x1826) with feature bits (0x2ACC), 2 Hz synthetic indoor bike data notifications (0x2AD2) active only when subscribed, machine status (0x2ADA), and DIS (0x180A).
+- `sample-app/src/ble/SampleHrRepeater.hpp` & `.cpp`: Created Heart Rate Service repeater (0x180D, 0x2A37 notify) with `publishHr(uint8_t bpm)`.
+- `sample-app/src/main.cpp`: Registered `ftmsProvider` and `hrRepeater` with `bleManager` and `app` under `#ifdef WITH_BLE`.
+- `test/test_unit/test_bleManager/test_bleRouting.cpp`: Added 5 unit tests for `BLERoutingTable`.
+- `test/test_unit/test_bleManager/test_bleAdvertisingDecision.cpp`: Added 5 unit tests for `BLEAdvertisingDecision`.
+- `test/test_unit/test_bleManager/test_bleManager.cpp`: Added unit tests for GATT static enforcement, peer connection lifecycle tracking, and precondition faults.
 
 ### Decisions Made
-- Decision description and rationale
+- **Header Isolation & Private Member Access**: `BLEManager.cpp` and all public headers remain completely free of `<NimBLE*.h>` includes (D6). In `esp-nimble-cpp` v2, `NimBLEServer::m_svcVec` is private without a public vector getter; rather than hacking headers or leaking stack abstractions, standard C++ template friend instantiation (`template struct Rob<...>`) was used in `BLEStack.cpp` to safely access `m_svcVec` at zero runtime cost.
+- **Application Decoupling**: Avoided including `modules/Application/Application.hpp` inside `BLEManager.cpp` to prevent circular LDF dependency chains pulling `MCPServer` into native test runs. Declared only the minimal non-virtual interface needed (`getState()` and `getEventBus()`).
+- **Queue Event Dispatching**: Followed the bounded processing pattern from `ButtonModule`, processing up to 16 queue events per `tick()` to maintain predictable frame timing without starving other modules.
 
 ### Dead Ends & Warnings
-- What was attempted, why it failed, and what to avoid
+- **`NimBLEServer::getServices()`**: In `esp-nimble-cpp` v2, `NimBLEClient` has `getServices()` but `NimBLEServer` does not. Attempting to call `_server->getServices()` fails compilation. Use `getServerServices(_server)` via `Rob` accessor in `BLEStack.cpp`.
+- **`ble_svc_gap_ppcp_set()`**: GAP PPCP is not set via a runtime C API function in NimBLE ESP-IDF; it is configured via Mynewt syscfg and advertising parameters (`pAdv->setPreferredParams()`).
+- **`library.json` Dependency on Application**: Adding `"Application": "*"` to `BLEManager/library.json` causes PlatformIO's LDF in native test environments to transitively pull `MCPServer`, which fails on native without `WifiManager.hpp`. `BLEManager` must not declare `Application` in `library.json`.
 
 ### Out-of-Scope Findings
-- Finding description and suggested action
+- `test_unit/test_lvgl_stubs` fails compilation on native environment due to missing `ConfigManager.hpp` / `WifiManager.hpp` in its include search path when compiling `MCPServer`.
 
 ### Blockers
 (none)
