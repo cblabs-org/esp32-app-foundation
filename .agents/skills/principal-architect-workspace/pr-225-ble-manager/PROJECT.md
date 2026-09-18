@@ -45,7 +45,7 @@ It also contributes a portal tab, REST routes, MCP tools, EventBus `ble.*` event
 |---|---|---|
 | **D1** | Module kind | Optional module; explicit `main.cpp` composition; `app.registerModule(&bleManager)` covers its own framework interfaces only. (RFC §3, review A3) |
 | **D2** | Interface placement | `IBLEServiceProvider`, `IBLEClientProvider` and `BLEAdvertisingBuilder` live in `modules/BLEManager/`. (ADR, review A1/A2) |
-| **D3** | NimBLE library | **Decided by WO-0.** Criteria, in order: (1) clean build under the dual `arduino, espidf` framework with no duplicate NimBLE host or symbols; (2) configured through sdkconfig (the fragment is authoritative); (3) API supports every RFC §5 need (legacy adv + scan response, direct connect with address type, bonding/`deleteBond`, preferred connection params, subscriptions); (4) flash/RAM delta. **Tie-break: `esp-nimble-cpp`** (IDF-native host, sdkconfig-driven). The WO-0 findings record the ruling; the PA copies it here. |
+| **D3** | NimBLE library | **`h2zero/esp-nimble-cpp@^2.1.0`** — confirmed by WO-0 spike (2026-09-18). Clean build under dual `arduino, espidf` framework (IDF 5.5.5), no duplicate-symbol or duplicate-host errors. IDF-native NimBLE host, sdkconfig-driven. All RFC §5 APIs present (server/client/scan/advertise/bond/subscribe). Flash Δ = +251 KB (37.7% of 4 MB), RAM Δ = +2.1 KB. Controller budget: 6/6 activities (3P+1C+adv+scan). Candidate B (`NimBLE-Arduino@^2`) was not tested — A passed all gates and is the pre-agreed tie-break winner. See [`wo0-spike/FINDINGS.md`](wo0-spike/FINDINGS.md). |
 | **D4** | Targets | v1 = ESP32-S3. Env `esp32s3nano_ble` in the **root** `platformio.ini` (compile/CI) **and** in `sample-app/platformio.ini` (proves the out-of-tree consumer path). `esp32dev` is out of scope. |
 | **D5** | Framework-side validation | **Reference providers in `sample-app/src/ble/`**, under `WITH_BLE`: `SampleFtmsProvider` (synthetic indoor-bike data, so real FTMS apps can discover it), `SampleHrRepeater` (0x180D peripheral), `SampleHrClient` (0x180D central). Echenon validates its own providers in its own programme (its PR-07). |
 | **D6** | Pure-logic isolation | `BLETypes`, `BLEAdvertisingBuilder`, `BLEDeviceRegistry`, `BLEReconnectPolicy` are NimBLE-free and unit-tested under `env:native`. **Only `BLEStack.*` includes NimBLE headers**, wrapped in `#if defined(ESP_PLATFORM) && defined(WITH_BLE)`. `BLEManager.cpp` has no NimBLE includes. |
@@ -61,7 +61,7 @@ It also contributes a portal tab, REST routes, MCP tools, EventBus `ble.*` event
 
 | WO | Title | Complexity | Status | Branch | Commit |
 |----|-------|-----------|--------|--------|--------|
-| **WO-0** | [Build spike: library choice, sdkconfig fragment, budgets](wo0-spike/WORKORDER.md) | `standard` (build-dominated → PA-driven verification) | ⬜ Not started | `ble-manager/wo0-spike` | — |
+| **WO-0** | [Build spike: library choice, sdkconfig fragment, budgets](wo0-spike/WORKORDER.md) | `standard` (build-dominated → PA-driven verification) | ✅ Complete | `ble-manager/wo0-spike` | `e499f010` |
 | **WO-1** | [Module skeleton, types, pure logic, env plumbing, lifecycle](wo1-skeleton/WORKORDER.md) | `standard` | ⬜ Not started | `ble-manager/wo1-skeleton` | — |
 | **WO-2** | [Peripheral role: GATT registration, advertising packer, callbacks](wo2-peripheral/WORKORDER.md) | `standard` | ⬜ Not started | `ble-manager/wo2-peripheral` | — |
 | **WO-3** | [Central role: discovery, registry, bonding, reconnect, worker task](wo3-central/WORKORDER.md) | `architect` | ⬜ Not started | `ble-manager/wo3-central` | — |
@@ -134,3 +134,8 @@ main
 **Related issues filed during review:** #226 (P1, OTA `checkOnBoot`/deferral; Echenon runs `autoCheck=false` meanwhile), #227 (P2, EventBus payload-lifetime contract wrong on target; single-slot `OTA_PROGRESS`/`DATA_SOURCE_HEALTH` publishers race → D8).
 **Consumer items outstanding (non-blocking):** Beat strap address type / SMP support (RFC §19 item 1), Appearance value for Indoor Bike (item 5; the sample FTMS provider uses its own value, so this doesn't block framework WOs).
 **Next:** the implementing PA obtains and records human approval, then starts WO-0.
+
+### 2026-09-18 — WO-0 complete (PA-driven build spike)
+**Summary:** Human approved all WOs (verbatim: "approved all WOs. Happy for you to do the spike here in-session and then delegate for the following."). WO-0 executed PA-driven on branch `ble-manager/wo0-spike`. Created `hardware/_common/sdkconfig.ble.defaults` (RFC §16.2), `[ble]` mix-in and `[env:esp32s3nano_ble]` in root `platformio.ini`. Built baseline (`esp32s3nano`) and spike (`esp32s3nano_ble` with full API harness). Candidate A (`h2zero/esp-nimble-cpp@^2.1.0`) passed all gates — clean build, no duplicate symbols, IDF-native host, all RFC §5 APIs present. D3 recorded. Controller activity budget: 6/6 exact fit (3P+1C+adv+scan). Flash Δ = +251 KB (37.7%), RAM Δ = +2.1 KB. Candidate B not tested (A won). Spike harness committed then removed in separate commit. `FINDINGS.md` written. 5 esp-nimble-cpp v2 API differences documented (all straightforward).
+**Commits:** `0f666cb5` (approval), `2b02db51` (spike harness), `e499f010` (harness removal).
+**Next:** Present budgets to human for confirmation. If approved, create `ble-manager/wo1-skeleton` and spawn WO-1 autonomous worker.
