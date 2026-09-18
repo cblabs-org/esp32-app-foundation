@@ -74,3 +74,60 @@ BLE operations interact with Espressif's low-level Bluetooth controller and Free
 4. **`onClientReadyWorker(NimBLEClient&)`**: An optional opt-in hook that executes on a dedicated background worker task for synchronous GATT discovery sequences that require blocking I/O.
 5. **Event Publishing**: All `ble.*` events are published to `EventBus` from `Application::tick()` on the main loop. Payloads use persistent ring-buffer storage to guarantee reference stability.
 6. **Notifications**: Calling `NimBLECharacteristic::notify()` is thread-safe and may be invoked from the main loop during `tick()`.
+
+## Peripheral Role
+
+### Implementing `IBLEServiceProvider`
+
+To expose GATT services and contribute to advertising, implement `IBLEServiceProvider`:
+
+```cpp
+#include "BLEManager/IBLEServiceProvider.hpp"
+#include "BLEManager/BLEAdvertisingBuilder.hpp"
+
+class MyServiceProvider : public IBLEServiceProvider {
+public:
+    const char* getProviderId() const override { return "my_service"; }
+
+    bool registerServices(NimBLEServer& server) override {
+        NimBLEService* pSvc = server.createService(NimBLEUUID((uint16_t)0x180D));
+        if (!pSvc) return false;
+        _pChar = pSvc->createCharacteristic(NimBLEUUID((uint16_t)0x2A37), NIMBLE_PROPERTY::NOTIFY);
+        return true;
+    }
+
+    void contributeAdvertising(BLEAdvertisingBuilder& adv) override {
+        adv.addServiceUuid16(0x180D, BLEAdvertisingBuilder::Priority::Required);
+    }
+
+    void onSubscriptionChanged(BLEConnHandle handle, uint16_t attrHandle, uint16_t uuid16,
+                               bool notify, bool indicate) override {
+        _subscribed = notify;
+    }
+
+private:
+    NimBLECharacteristic* _pChar = nullptr;
+    bool _subscribed = false;
+};
+```
+
+### Advertising Aggregation & Packing
+
+`BLEManager` uses `BLEAdvertisingBuilder` to combine advertising contributions from all registered providers:
+- **Priority-based Budgeting**: Fits within standard 31-byte legacy advertising and scan response budgets.
+- **Spillover & Fault Handling**: High/Normal priority items spill into scan response if the primary PDU overflows. If `Required` items exceed budget, a `BLE Advertising` precondition fault is raised.
+- **Dynamic Refresh**: Calling `bleManager.refreshAdvertising()` re-packs advertising contributions on the fly without stopping or restarting the GATT server.
+
+### GATT Handle Routing & Static Topology
+
+In compliance with Bluetooth Core Specification and RFC #225:
+- GATT services are **static** after stack initialization (`AppState::Running`). Attempting to register providers after start throws an error.
+- All GATT attribute handles are enumerated at startup into a high-performance, collision-free lookup table (`BLERoutingTable`).
+- Characteristic subscription events (`onSubscriptionChanged`) are routed directly and exclusively to the service provider that registered the corresponding characteristic.
+
+### Preconditions
+
+`BLEManager` contributes two operational health preconditions to `IPreconditionRegistry`:
+- **`BLE Stack`**: Monitors Bluetooth controller and NimBLE host initialization. Reports `InternalError` if stack initialization or provider service registration fails.
+- **`BLE Advertising`**: Monitors advertising packet composition. Reports `Implausible` if required advertising payload elements exceed the 31-byte PDU budget.
+

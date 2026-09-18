@@ -24,11 +24,16 @@
 
 #ifdef WITH_BLE
 
-#ifndef UNIT_TEST
-#include "modules/Application/Application.hpp"
-#else
 #include "types/AppState.hpp"
 #include "EventBus.hpp"
+
+#ifndef UNIT_TEST
+class Application {
+public:
+    AppState getState() const;
+    EventBus& getEventBus();
+};
+#else
 class Application {
 public:
     AppState getState() const { return _state; }
@@ -53,31 +58,6 @@ private:
 static const char* TAG = "BLEManager";
 static constexpr size_t QUEUE_CAPACITY = 32;
 static constexpr size_t MAX_EVENTS_PER_TICK = 16;
-
-namespace {
-    struct BLEQueueMessage {
-        enum class Type : uint8_t {
-            PeerConnected = 0,
-            PeerDisconnected,
-            SubscriptionChanged,
-            CentralConnected,
-            CentralDisconnected,
-            Notification,
-            ScanResult,
-            ScanCompleted,
-            AdvFault
-        } type;
-
-        BLEConnHandle       handle;
-        BLEPeerAddress      address;
-        BLEDisconnectReason reason;
-        uint16_t            attrHandle;
-        uint16_t            uuid16;
-        bool                boolVal1;
-        bool                boolVal2;
-        char                providerId[24];
-    };
-}
 
 // -----------------------------------------------------------------------------
 // ScanInhibit RAII Implementation
@@ -136,9 +116,9 @@ BLEManager::~BLEManager() {
 }
 
 bool BLEManager::registerServiceProvider(IBLEServiceProvider* p) {
-    if (_locked || !p) {
-        if (_locked) {
-            ESP_LOGW(TAG, "registerServiceProvider: rejected after registration locked");
+    if (_locked || _gattStarted || !p) {
+        if (_locked || _gattStarted) {
+            ESP_LOGW(TAG, "registerServiceProvider: rejected after registration locked or GATT started");
         }
         return false;
     }
@@ -168,6 +148,11 @@ void BLEManager::begin(Application& app) {
     ESP_LOGI(TAG, "BLEManager wired to Application. Providers locked.");
 }
 
+bool BLEManager::postTestQueueMessage(const BLEQueueMessage& msg) {
+    if (!_eventQueue) return false;
+    return xQueueSend(static_cast<QueueHandle_t>(_eventQueue), &msg, 0) == pdTRUE;
+}
+
 BLEManager::State BLEManager::getState() const {
     return _state;
 }
@@ -177,9 +162,26 @@ bool BLEManager::isScanning() const {
     return false;
 }
 
+bool BLEManager::isAdvertising() const {
+    return _stack.isAdvertising();
+}
+
 size_t BLEManager::getPeripheralConnectionCount() const {
-    // WO-2: Will return active peripheral peer connection count
-    return 0;
+    return _activeConnections.size();
+}
+
+bool BLEManager::getPeerInfo(BLEConnHandle handle, BLEPeerInfo& out) const {
+    auto it = std::find_if(_activeConnections.begin(), _activeConnections.end(),
+                           [handle](const BLEPeerInfo& p) { return p.handle == handle; });
+    if (it != _activeConnections.end()) {
+        out = *it;
+        return true;
+    }
+    return false;
+}
+
+uint32_t BLEManager::getDroppedEventsCount() const {
+    return _droppedEventsCount + _stack.getDroppedEventsCount();
 }
 
 bool BLEManager::isClientConnected(const char* providerId) const {
@@ -243,7 +245,38 @@ void BLEManager::releaseScanInhibit(const char* reason) {
 }
 
 void BLEManager::refreshAdvertising() {
-    // WO-2: Will re-collect provider advertising contributions and pack
+    if (_state != State::Active && _state != State::Paused) {
+        return;
+    }
+
+    BLEPeerAddress ownAddr;
+    _stack.getOwnAddress(ownAddr);
+    BLEAdvertisingBuilder advBuilder;
+    for (auto* p : _serviceProviders) {
+        if (p) p->contributeAdvertising(advBuilder);
+    }
+
+    _advPackResult = advBuilder.pack(_config.advertisedName.c_str(), _config.nameSuffix, ownAddr.bytes);
+    if (_advPackResult.hasFault()) {
+        ESP_LOGE(TAG, "BLE advertising pack fault during refresh: required element exceeds PDU capacity");
+        const auto& fault = _advPackResult.faults.front();
+        _faultRing[_faultRingHead].providerId   = "packer";
+        _faultRing[_faultRingHead].elementBytes = fault.requiredBytes;
+        _faultRing[_faultRingHead].freeBytes    = fault.availableBytes;
+        if (_eventBus) {
+            _eventBus->publish(BLEEvents::ADVERTISING_FAULT, &_faultRing[_faultRingHead]);
+        }
+        _faultRingHead = (_faultRingHead + 1) % RING_SIZE;
+        return;
+    }
+
+    if (_state == State::Active &&
+        BLEAdvertisingDecision::shouldAdvertise(_activeConnections.size(),
+                                                _config.maxPeripheralConnections,
+                                                false,
+                                                _config.enabled)) {
+        _stack.startAdvertising(_advPackResult, _config.peripheralPreferredConnParams);
+    }
 }
 
 void BLEManager::pause(const char* reason) {
@@ -251,6 +284,18 @@ void BLEManager::pause(const char* reason) {
         _state = State::Paused;
         _pauseReason = reason ? reason : "administrative";
         ESP_LOGI(TAG, "BLE stack paused: %s", _pauseReason.c_str());
+
+        // Stop advertising while paused
+        _stack.stopAdvertising();
+
+        // Disconnect peers if reason is OTA and otaDisconnectPeers is configured
+        if (_config.otaDisconnectPeers && _pauseReason.find("ota") != std::string::npos) {
+            ESP_LOGI(TAG, "Disconnecting all peripheral peers due to OTA pause");
+            for (const auto& peer : _activeConnections) {
+                _stack.disconnect(peer.handle, 0x13);
+            }
+        }
+
         publishState(_state, _pauseReason.c_str());
         for (auto* p : _serviceProviders) {
             if (p) p->onStackPaused();
@@ -263,9 +308,17 @@ void BLEManager::resume() {
         _state = State::Active;
         _pauseReason.clear();
         ESP_LOGI(TAG, "BLE stack resumed");
+
         publishState(_state, "resumed");
         for (auto* p : _serviceProviders) {
             if (p) p->onStackResumed();
+        }
+
+        if (BLEAdvertisingDecision::shouldAdvertise(_activeConnections.size(),
+                                                _config.maxPeripheralConnections,
+                                                false,
+                                                _config.enabled)) {
+            _stack.startAdvertising(_advPackResult, _config.peripheralPreferredConnParams);
         }
     }
 }
@@ -299,7 +352,72 @@ void BLEManager::tick(uint32_t /*currentMillis*/) {
                 return;
             }
 
-            // In WO-1, Peripheral GATT and Advertising start in WO-2; Central in WO-3
+            // GATT registration (done once per boot, static thereafter)
+            if (!_gattStarted) {
+                _gattStarted = true;
+                NimBLEServer* server = _stack.getServer();
+                std::vector<IBLEServiceProvider*> serviceOwners;
+
+                for (auto* p : _serviceProviders) {
+                    if (!p) continue;
+                    size_t startIdx = _stack.getServiceCount();
+                    bool ok = true;
+                    if (server) {
+                        ok = p->registerServices(*server);
+                    }
+                    size_t endIdx = _stack.getServiceCount();
+                    for (size_t i = startIdx; i < endIdx; ++i) {
+                        if (i >= serviceOwners.size()) {
+                            serviceOwners.resize(i + 1, nullptr);
+                        }
+                        serviceOwners[i] = p;
+                    }
+                    if (!ok) {
+                        ESP_LOGE(TAG, "Provider %s failed service registration", p->getProviderId());
+                        _providerRegistrationFault = true;
+                    }
+                }
+
+                if (!_stack.startServer()) {
+                    ESP_LOGE(TAG, "BLE GATT start failed");
+                    _providerRegistrationFault = true;
+                }
+
+                auto chars = _stack.getRegisteredCharacteristics();
+                for (const auto& entry : chars) {
+                    if (entry.serviceIndex < serviceOwners.size() && serviceOwners[entry.serviceIndex]) {
+                        _routingTable.addRoute(entry.handle, serviceOwners[entry.serviceIndex]);
+                    }
+                }
+            }
+
+            // Aggregate advertising contributions and pack AD payloads
+            BLEPeerAddress ownAddr;
+            _stack.getOwnAddress(ownAddr);
+            BLEAdvertisingBuilder advBuilder;
+            for (auto* p : _serviceProviders) {
+                if (p) p->contributeAdvertising(advBuilder);
+            }
+            _advPackResult = advBuilder.pack(_config.advertisedName.c_str(), _config.nameSuffix, ownAddr.bytes);
+            if (_advPackResult.hasFault()) {
+                ESP_LOGE(TAG, "BLE advertising pack fault: required element exceeds PDU capacity");
+                const auto& fault = _advPackResult.faults.front();
+                _faultRing[_faultRingHead].providerId   = "packer";
+                _faultRing[_faultRingHead].elementBytes = fault.requiredBytes;
+                _faultRing[_faultRingHead].freeBytes    = fault.availableBytes;
+                if (_eventBus) {
+                    _eventBus->publish(BLEEvents::ADVERTISING_FAULT, &_faultRing[_faultRingHead]);
+                }
+                _faultRingHead = (_faultRingHead + 1) % RING_SIZE;
+            } else {
+                if (BLEAdvertisingDecision::shouldAdvertise(_activeConnections.size(),
+                                                            _config.maxPeripheralConnections,
+                                                            false,
+                                                            _config.enabled)) {
+                    _stack.startAdvertising(_advPackResult, _config.peripheralPreferredConnParams);
+                }
+            }
+
             _state = State::Active;
             publishReady();
             publishState(_state, "ready");
@@ -317,7 +435,115 @@ void BLEManager::dispatchQueueEvents() {
 
     while (processed < MAX_EVENTS_PER_TICK && xQueueReceive(queue, &msg, 0) == pdTRUE) {
         processed++;
-        // Dispatch to appropriate provider callbacks (wired in WO-2 & WO-3)
+
+        switch (msg.type) {
+            case BLEQueueMessage::Type::PeerConnected: {
+                BLEPeerInfo peer;
+                peer.handle = msg.handle;
+                peer.address = msg.address;
+                peer.mtu = msg.mtu;
+                peer.params = msg.params;
+                peer.encrypted = msg.boolVal1;
+
+                auto it = std::find_if(_activeConnections.begin(), _activeConnections.end(),
+                                       [h = msg.handle](const BLEPeerInfo& p) { return p.handle == h; });
+                if (it != _activeConnections.end()) {
+                    *it = peer;
+                } else {
+                    _activeConnections.push_back(peer);
+                }
+
+                // Request connection parameter update once after connect (RFC §9)
+                _stack.updateConnParams(msg.handle, _config.peripheralPreferredConnParams);
+
+                for (auto* p : _serviceProviders) {
+                    if (p) p->onPeerConnected(peer);
+                }
+
+                // Stop advertising if reached cap
+                if (!BLEAdvertisingDecision::shouldAdvertise(_activeConnections.size(),
+                                                            _config.maxPeripheralConnections,
+                                                            _state == State::Paused,
+                                                            _config.enabled)) {
+                    _stack.stopAdvertising();
+                }
+
+                _peerConnRing[_peerConnRingHead].handle = peer.handle;
+                peer.address.toRedactedString(_peerConnRing[_peerConnRingHead].addrRedacted,
+                                              sizeof(_peerConnRing[_peerConnRingHead].addrRedacted));
+                _peerConnRing[_peerConnRingHead].activeCount = static_cast<uint8_t>(_activeConnections.size());
+                if (_eventBus) {
+                    _eventBus->publish(BLEEvents::PERIPHERAL_CONNECTED, &_peerConnRing[_peerConnRingHead]);
+                }
+                _peerConnRingHead = (_peerConnRingHead + 1) % RING_SIZE;
+                break;
+            }
+
+            case BLEQueueMessage::Type::PeerDisconnected: {
+                char redacted[18] = {};
+                msg.address.toRedactedString(redacted, sizeof(redacted));
+
+                auto it = std::find_if(_activeConnections.begin(), _activeConnections.end(),
+                                       [h = msg.handle](const BLEPeerInfo& p) { return p.handle == h; });
+                if (it != _activeConnections.end()) {
+                    _activeConnections.erase(it);
+                }
+
+                for (auto* p : _serviceProviders) {
+                    if (p) p->onPeerDisconnected(msg.handle, msg.reason);
+                }
+
+                // Restart advertising if below cap and active
+                if (_state == State::Active &&
+                    BLEAdvertisingDecision::shouldAdvertise(_activeConnections.size(),
+                                                            _config.maxPeripheralConnections,
+                                                            false,
+                                                            _config.enabled)) {
+                    if (!_stack.isAdvertising() && !_advPackResult.hasFault()) {
+                        _stack.startAdvertising(_advPackResult, _config.peripheralPreferredConnParams);
+                    }
+                }
+
+                _peerConnRing[_peerConnRingHead].handle = msg.handle;
+                std::memcpy(_peerConnRing[_peerConnRingHead].addrRedacted, redacted, sizeof(redacted));
+                _peerConnRing[_peerConnRingHead].activeCount = static_cast<uint8_t>(_activeConnections.size());
+                if (_eventBus) {
+                    _eventBus->publish(BLEEvents::PERIPHERAL_DISCONNECTED, &_peerConnRing[_peerConnRingHead]);
+                }
+                _peerConnRingHead = (_peerConnRingHead + 1) % RING_SIZE;
+                break;
+            }
+
+            case BLEQueueMessage::Type::SubscriptionChanged: {
+                IBLEServiceProvider* prov = _routingTable.findProvider(msg.attrHandle);
+                if (prov) {
+                    prov->onSubscriptionChanged(msg.handle, msg.attrHandle, msg.uuid16, msg.boolVal1, msg.boolVal2);
+                }
+                break;
+            }
+
+            case BLEQueueMessage::Type::MTUChanged: {
+                auto it = std::find_if(_activeConnections.begin(), _activeConnections.end(),
+                                       [h = msg.handle](const BLEPeerInfo& p) { return p.handle == h; });
+                if (it != _activeConnections.end()) {
+                    it->mtu = msg.mtu;
+                }
+                break;
+            }
+
+            case BLEQueueMessage::Type::ConnParamsUpdated: {
+                auto it = std::find_if(_activeConnections.begin(), _activeConnections.end(),
+                                       [h = msg.handle](const BLEPeerInfo& p) { return p.handle == h; });
+                if (it != _activeConnections.end()) {
+                    it->params = msg.params;
+                    it->encrypted = msg.boolVal1;
+                }
+                break;
+            }
+
+            default:
+                break;
+        }
     }
 }
 
@@ -475,7 +701,7 @@ void BLEManager::registerPreconditions(IPreconditionRegistry& registry) {
             if (_state == State::Disabled) {
                 return {false, Cause::Unavailable};
             }
-            if (_state == State::Error) {
+            if (_state == State::Error || _providerRegistrationFault) {
                 return {false, Cause::InternalError};
             }
             return {true, Cause::Met};
@@ -486,7 +712,7 @@ void BLEManager::registerPreconditions(IPreconditionRegistry& registry) {
                     std::snprintf(buf, len, "BLE disabled in configuration");
                     break;
                 case Cause::InternalError:
-                    std::snprintf(buf, len, "BLE stack failed to initialize");
+                    std::snprintf(buf, len, "BLE stack or provider GATT registration failed");
                     break;
                 default:
                     std::snprintf(buf, len, "BLE stack operational");

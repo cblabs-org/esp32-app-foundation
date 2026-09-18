@@ -146,9 +146,159 @@ TEST(BLEManagerTest, PauseAndResume) {
     EXPECT_EQ(mgr.getState(), BLEManager::State::Idle);
 
     // Pause only takes effect if Active. We can manually pause if Active.
-    // Transition to Paused
     mgr.pause("test");
     // Since state was Idle, pause did not change it
     EXPECT_EQ(mgr.getState(), BLEManager::State::Idle);
     EXPECT_EQ(srv.pausedCalled, 0);
+
+    // Now set Active
+    mgr.setStateForTesting(BLEManager::State::Active);
+    mgr.pause("test_admin");
+    EXPECT_EQ(mgr.getState(), BLEManager::State::Paused);
+    EXPECT_EQ(srv.pausedCalled, 1);
+
+    mgr.resume();
+    EXPECT_EQ(mgr.getState(), BLEManager::State::Active);
+    EXPECT_EQ(srv.resumedCalled, 1);
 }
+
+class MockDetailedServiceProvider : public IBLEServiceProvider {
+public:
+    const char* getProviderId() const override { return "mock_srv"; }
+    bool registerServices(NimBLEServer&) override { return shouldSucceed; }
+    void contributeAdvertising(BLEAdvertisingBuilder& adv) override {
+        adv.addServiceUuid16(0x1826, BLEAdvertisingBuilder::Priority::Required);
+    }
+    void onPeerConnected(const BLEPeerInfo& peer) override {
+        connectedPeers.push_back(peer);
+    }
+    void onPeerDisconnected(BLEConnHandle handle, BLEDisconnectReason reason) override {
+        disconnectedPeers.push_back({handle, reason});
+    }
+    void onSubscriptionChanged(BLEConnHandle handle, uint16_t attrHandle, uint16_t uuid16, bool notify, bool indicate) override {
+        subscriptions.push_back({handle, attrHandle, uuid16, notify, indicate});
+    }
+    void onStackPaused() override { pausedCount++; }
+    void onStackResumed() override { resumedCount++; }
+
+    struct DisconnRecord {
+        BLEConnHandle handle;
+        BLEDisconnectReason reason;
+    };
+    struct SubRecord {
+        BLEConnHandle handle;
+        uint16_t attrHandle;
+        uint16_t uuid16;
+        bool notify;
+        bool indicate;
+    };
+
+    bool shouldSucceed = true;
+    int pausedCount = 0;
+    int resumedCount = 0;
+    std::vector<BLEPeerInfo> connectedPeers;
+    std::vector<DisconnRecord> disconnectedPeers;
+    std::vector<SubRecord> subscriptions;
+};
+
+TEST(BLEManagerTest, GATTStaticEnforcement) {
+    BLEManager mgr;
+    MockDetailedServiceProvider srv;
+
+    // Normal registration succeeds
+    EXPECT_TRUE(mgr.registerServiceProvider(&srv));
+
+    // Once GATT is started in this boot, further registrations are rejected
+    mgr.setGattStartedForTesting(true);
+    MockDetailedServiceProvider srv2;
+    EXPECT_FALSE(mgr.registerServiceProvider(&srv2));
+}
+
+TEST(BLEManagerTest, PeerConnectionAndLifecycleTracking) {
+    BLEManager mgr;
+    MockDetailedServiceProvider srv;
+    mgr.registerServiceProvider(&srv);
+    mgr.setStateForTesting(BLEManager::State::Active);
+
+    // 1. Post PeerConnected message
+    BLEQueueMessage connMsg;
+    connMsg.type = BLEQueueMessage::Type::PeerConnected;
+    connMsg.handle = 1;
+    BLEPeerAddress::parse("AA:BB:CC:DD:EE:FF", BLEPeerAddress::Type::Public, connMsg.address);
+    connMsg.mtu = 185;
+    connMsg.params.minIntervalUnits = 24;
+    connMsg.params.maxIntervalUnits = 40;
+    connMsg.boolVal1 = false; // not encrypted yet
+
+    EXPECT_TRUE(mgr.postTestQueueMessage(connMsg));
+    mgr.tick(0);
+
+    // Verify peer info stored
+    EXPECT_EQ(mgr.getPeripheralConnectionCount(), 1);
+    BLEPeerInfo peer;
+    EXPECT_TRUE(mgr.getPeerInfo(1, peer));
+    EXPECT_EQ(peer.handle, 1);
+    EXPECT_EQ(peer.mtu, 185);
+    EXPECT_EQ(peer.params.minIntervalUnits, 24);
+    EXPECT_EQ(srv.connectedPeers.size(), 1);
+    EXPECT_EQ(srv.connectedPeers[0].handle, 1);
+
+    // 2. Post MTUChanged
+    BLEQueueMessage mtuMsg;
+    mtuMsg.type = BLEQueueMessage::Type::MTUChanged;
+    mtuMsg.handle = 1;
+    mtuMsg.mtu = 256;
+    EXPECT_TRUE(mgr.postTestQueueMessage(mtuMsg));
+    mgr.tick(0);
+
+    EXPECT_TRUE(mgr.getPeerInfo(1, peer));
+    EXPECT_EQ(peer.mtu, 256);
+
+    // 3. Post ConnParamsUpdated
+    BLEQueueMessage paramsMsg;
+    paramsMsg.type = BLEQueueMessage::Type::ConnParamsUpdated;
+    paramsMsg.handle = 1;
+    paramsMsg.params.minIntervalUnits = 12;
+    paramsMsg.params.maxIntervalUnits = 16;
+    paramsMsg.boolVal1 = true; // encrypted
+    EXPECT_TRUE(mgr.postTestQueueMessage(paramsMsg));
+    mgr.tick(0);
+
+    EXPECT_TRUE(mgr.getPeerInfo(1, peer));
+    EXPECT_EQ(peer.params.minIntervalUnits, 12);
+    EXPECT_TRUE(peer.encrypted);
+
+    // 4. Post PeerDisconnected
+    BLEQueueMessage discMsg;
+    discMsg.type = BLEQueueMessage::Type::PeerDisconnected;
+    discMsg.handle = 1;
+    discMsg.address = connMsg.address;
+    discMsg.reason = BLEDisconnectReason::PeerTerminated;
+    EXPECT_TRUE(mgr.postTestQueueMessage(discMsg));
+    mgr.tick(0);
+
+    EXPECT_EQ(mgr.getPeripheralConnectionCount(), 0);
+    EXPECT_FALSE(mgr.getPeerInfo(1, peer));
+    EXPECT_EQ(srv.disconnectedPeers.size(), 1);
+    EXPECT_EQ(srv.disconnectedPeers[0].handle, 1);
+    EXPECT_EQ(srv.disconnectedPeers[0].reason, BLEDisconnectReason::PeerTerminated);
+}
+
+TEST(BLEManagerTest, PreconditionFaultOnProviderFailure) {
+    BLEManager mgr;
+    MockPreconditionRegistry reg;
+    mgr.registerPreconditions(reg);
+
+    ASSERT_TRUE(reg._registered.find("BLE Stack") != reg._registered.end());
+
+    // Initially met
+    auto status = reg._registered["BLE Stack"].evaluate();
+    EXPECT_TRUE(status.met);
+
+    // Simulate provider registration failure
+    mgr.setProviderRegistrationFaultForTesting(true);
+    status = reg._registered["BLE Stack"].evaluate();
+    EXPECT_FALSE(status.met);
+    EXPECT_EQ(status.cause, Cause::InternalError);
+}
+

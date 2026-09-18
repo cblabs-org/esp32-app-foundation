@@ -11,14 +11,17 @@
  *              Authoritative: RFC #225 rev 2 §5.1, §16.
  *
  * Exported Classes:
- * - BLEStack: Host/controller initialization, own-address query, and server access
+ * - BLEStack: Host/controller initialization, own-address query, server, and advertising
  */
 
 #pragma once
 
 #include "BLETypes.hpp"
+#include "BLEQueueMessage.hpp"
+#include "BLEAdvertisingBuilder.hpp"
 #include <cstdint>
 #include <cstring>
+#include <vector>
 
 class NimBLEServer;
 class NimBLEClient;
@@ -33,6 +36,12 @@ class NimBLEScan;
  */
 class BLEStack {
 public:
+    struct CharacteristicEntry {
+        size_t   serviceIndex = 0;
+        uint16_t handle       = 0;
+        uint16_t uuid16       = 0;
+    };
+
     BLEStack();
     ~BLEStack();
 
@@ -68,10 +77,83 @@ public:
      */
     NimBLEServer* getServer() const;
 
+    /**
+     * @brief Start the GATT server, assign characteristic handles, and attach callbacks.
+     * @return true on success, false on failure.
+     */
+    bool startServer();
+
+    /**
+     * @brief Configure and start legacy connectable advertising with packed PDU.
+     * @param packResult Packed primary and scan response AD payloads.
+     * @param preferredParams GAP connection timing parameters.
+     * @return true on success, false on failure.
+     */
+    bool startAdvertising(const BLEAdvPackResult& packResult, const BLEConnParams& preferredParams);
+
+    /**
+     * @brief Stop advertising.
+     * @return true on success, false on failure.
+     */
+    bool stopAdvertising();
+
+    /**
+     * @brief Query whether advertising is currently running.
+     * @return true if active, false otherwise.
+     */
+    bool isAdvertising() const;
+
+    /**
+     * @brief Terminate an active connection with a peripheral peer.
+     * @param handle Connection handle.
+     * @param reason HCI reason code (e.g. 0x13).
+     * @return true on success, false on failure.
+     */
+    bool disconnect(BLEConnHandle handle, uint8_t reason = 0x13);
+
+    /**
+     * @brief Request a connection timing parameter update from connected central.
+     * @param handle Connection handle.
+     * @param params Requested connection timing parameters.
+     */
+    void updateConnParams(BLEConnHandle handle, const BLEConnParams& params);
+
+    /**
+     * @brief Set GAP Peripheral Preferred Connection Parameters (PPCP).
+     * @param params Connection parameters to expose in GAP service.
+     */
+    void setPreferredConnParams(const BLEConnParams& params);
+
+    /**
+     * @brief Count of services currently registered on the GATT server.
+     * @return Number of services.
+     */
+    size_t getServiceCount() const;
+
+    /**
+     * @brief Enumerate all characteristics registered on the GATT server.
+     * @return Vector of CharacteristicEntry records with handles and UUIDs.
+     */
+    std::vector<CharacteristicEntry> getRegisteredCharacteristics() const;
+
+    /**
+     * @brief Count of queue message drops due to a full FreeRTOS queue.
+     * @return Number of dropped messages.
+     */
+    uint32_t getDroppedEventsCount() const;
+
+    /**
+     * @brief Increment dropped events counter.
+     */
+    void incrementDropCount() {
+        _droppedEventsCount++;
+    }
+
 private:
-    bool          _initialized = false;
-    NimBLEServer* _server      = nullptr;
-    void*         _eventQueue  = nullptr;
+    bool          _initialized        = false;
+    NimBLEServer* _server             = nullptr;
+    void*         _eventQueue         = nullptr;
+    uint32_t      _droppedEventsCount = 0;
 };
 
 #if !defined(ESP_PLATFORM) || !defined(WITH_BLE)
@@ -104,5 +186,31 @@ inline bool BLEStack::getOwnAddress(BLEPeerAddress& out) const {
 }
 inline NimBLEServer* BLEStack::getServer() const {
     return nullptr;
+}
+inline bool BLEStack::startServer() {
+    return true;
+}
+inline bool BLEStack::startAdvertising(const BLEAdvPackResult& /*packResult*/, const BLEConnParams& /*preferredParams*/) {
+    return true;
+}
+inline bool BLEStack::stopAdvertising() {
+    return true;
+}
+inline bool BLEStack::isAdvertising() const {
+    return false;
+}
+inline bool BLEStack::disconnect(BLEConnHandle /*handle*/, uint8_t /*reason*/) {
+    return true;
+}
+inline void BLEStack::updateConnParams(BLEConnHandle /*handle*/, const BLEConnParams& /*params*/) {}
+inline void BLEStack::setPreferredConnParams(const BLEConnParams& /*params*/) {}
+inline size_t BLEStack::getServiceCount() const {
+    return 0;
+}
+inline std::vector<BLEStack::CharacteristicEntry> BLEStack::getRegisteredCharacteristics() const {
+    return {};
+}
+inline uint32_t BLEStack::getDroppedEventsCount() const {
+    return _droppedEventsCount;
 }
 #endif
