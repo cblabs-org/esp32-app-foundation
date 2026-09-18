@@ -3,7 +3,7 @@
 **Project:** `pr-225-ble-manager`
 **Base branch:** `main`
 **Branch prefix:** `ble-manager/` (linear stack, see [Branch Plan](#branch-plan))
-**Status:** 📝 DECOMPOSITION DRAFTED. **Awaiting human approval of the WO ledger.** No branches exist yet and no worker may be spawned.
+**Status:** 🔨 WO-0 IN PROGRESS (PA-driven). Ledger approved 2026-09-18T21:02:01+01:00.
 **Parent issue:** [#225](https://github.com/matthewmcneill/esp32-app-foundation/issues/225)
 **Agreed design (source of truth):** [RFC #225 revision 2](https://github.com/matthewmcneill/esp32-app-foundation/issues/225#issuecomment-5729939169), plus the amendments in the [framework acknowledgement](https://github.com/matthewmcneill/esp32-app-foundation/issues/225#issuecomment-5735199501) (acceptance item 6 is split into 6a/6b/6c)
 **Consumer:** Echenon ([SPEC.md](https://github.com/cblabs-org/echenon/blob/main/SPEC.md) §7–§8), labels `upstream-issue`, `found-by:echenon`
@@ -12,11 +12,14 @@
 
 ## Approval Record
 
-> ⛔ **No approval recorded yet.**
+> ✅ **Approved — all WOs (WO-0 through WO-6).**
 >
-> The implementing Principal Architect must present this ledger to the human and obtain **explicit** approval, using the wording required by `.agents/rules/01-plan-before-execute.md`. It must then record that approval here **before** creating any branch or spawning any worker. It records the approver's exact words, the ISO timestamp, and the scope approved (all WOs, or a subset such as "WO-0 only").
+> - **Approver's exact words:** "approved all WOs. Happy for you to do the spike here in-session and then delegate for the following."
+> - **Timestamp:** 2026-09-18T21:02:01+01:00
+> - **Scope:** All WOs (WO-0 through WO-6)
+> - **Spawn mode:** WO-0 PA-driven (in-session); WO-1…WO-5 autonomous workers; WO-6 interactive bridge.
 >
-> Workers verify provenance against this section (`.agents/rules/00-operating-model.md`). While it reads "No approval recorded", a correct worker **must refuse**.
+> Workers verify provenance against this section (`.agents/rules/00-operating-model.md`). This approval authorises execution of all WOs within their respective Strict Boundary Boxes.
 
 ---
 
