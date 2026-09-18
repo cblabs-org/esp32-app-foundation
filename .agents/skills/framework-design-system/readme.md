@@ -21,8 +21,11 @@ This system was reverse-engineered from real product code — build against thes
 not from memory:
 
 - **Portal codebase** (ground truth): `web/portal/` — `index.html`, `app.css`
-  (the ~1,200-line design system), and per-tab fragments (`wifi.js`, `system.js`,
-  `ota.js`, `auth.js`, `mcp.js`, `credits.js`, …). All token values, radii,
+  (the ~1,200-line design system), and the core per-tab fragments (`wifi.js`,
+  `system.js`, `auth.js`, `credits.js`, …). **Module-owned tabs are not in
+  `web/portal/`** — they live beside their module as `modules/<Name>/web/<name>.js`
+  (e.g. `modules/OTAUpdateManager/web/ota.js`, `modules/MCPServer/web/mcp.js`), and a
+  new module's tab goes there too; `scripts/portalBuilder.py` discovers them. All token values, radii,
   spacing and component styling in this system are lifted verbatim from `app.css`.
 - **Framework skill** (context): `mm-skills/framework-expert`
   → https://github.com/mm-skills/framework-expert — the firmware framework docs.

@@ -18,6 +18,6 @@ re-implements them).
 ## What's faithful
 Layout, spacing, radii, the mobile 480px column, bottom-nav pattern, sub-pills,
 armed/type-to-confirm destructive flows, toast + reboot messaging, and the
-auto/light/dark theme are lifted from the real `web/portal/` fragments. Data is
+auto/light/dark theme are lifted from the real portal fragments (`web/portal/` and `modules/*/web/`). Data is
 mocked; navigation and interactions are live. Backend `/api/*` calls are stubbed
 with timeouts.
