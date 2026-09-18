@@ -3,7 +3,7 @@
 **Project:** `pr-225-ble-manager`
 **Base branch:** `main`
 **Branch prefix:** `ble-manager/` (linear stack, see [Branch Plan](#branch-plan))
-**Status:** 🔨 WO-1 IN PROGRESS (autonomous worker). WO-0 gate passed 2026-09-18T21:22:33+01:00.
+**Status:** 🔨 WO-2 IN PROGRESS (autonomous worker). WO-1 complete 2026-09-18T21:57:00+01:00.
 **Parent issue:** [#225](https://github.com/matthewmcneill/esp32-app-foundation/issues/225)
 **Agreed design (source of truth):** [RFC #225 revision 2](https://github.com/matthewmcneill/esp32-app-foundation/issues/225#issuecomment-5729939169), plus the amendments in the [framework acknowledgement](https://github.com/matthewmcneill/esp32-app-foundation/issues/225#issuecomment-5735199501) (acceptance item 6 is split into 6a/6b/6c)
 **Consumer:** Echenon ([SPEC.md](https://github.com/cblabs-org/echenon/blob/main/SPEC.md) §7–§8), labels `upstream-issue`, `found-by:echenon`
@@ -62,7 +62,7 @@ It also contributes a portal tab, REST routes, MCP tools, EventBus `ble.*` event
 | WO | Title | Complexity | Status | Branch | Commit |
 |----|-------|-----------|--------|--------|--------|
 | **WO-0** | [Build spike: library choice, sdkconfig fragment, budgets](wo0-spike/WORKORDER.md) | `standard` (build-dominated → PA-driven verification) | ✅ Complete | `ble-manager/wo0-spike` | `e499f010` |
-| **WO-1** | [Module skeleton, types, pure logic, env plumbing, lifecycle](wo1-skeleton/WORKORDER.md) | `standard` | ⬜ Not started | `ble-manager/wo1-skeleton` | — |
+| **WO-1** | [Module skeleton, types, pure logic, env plumbing, lifecycle](wo1-skeleton/WORKORDER.md) | `standard` | ✅ Complete | `ble-manager/wo1-skeleton` | `01be46a0` |
 | **WO-2** | [Peripheral role: GATT registration, advertising packer, callbacks](wo2-peripheral/WORKORDER.md) | `standard` | ⬜ Not started | `ble-manager/wo2-peripheral` | — |
 | **WO-3** | [Central role: discovery, registry, bonding, reconnect, worker task](wo3-central/WORKORDER.md) | `architect` | ⬜ Not started | `ble-manager/wo3-central` | — |
 | **WO-4** | [Portal tab, REST routes, MCP tools](wo4-portal-mcp/WORKORDER.md) | `standard` | ⬜ Not started | `ble-manager/wo4-portal-mcp` | — |
