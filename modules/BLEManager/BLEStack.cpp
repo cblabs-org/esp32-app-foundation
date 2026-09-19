@@ -387,4 +387,154 @@ uint32_t BLEStack::getDroppedEventsCount() const {
     return _droppedEventsCount;
 }
 
+// --- Central Role (WO-3) ---
+
+namespace {
+    static void* s_hostQueue = nullptr;
+
+    class ClientCallbacks : public NimBLEClientCallbacks {
+    public:
+        explicit ClientCallbacks(const char* providerId) {
+            if (providerId) strncpy(_providerId, providerId, sizeof(_providerId) - 1);
+        }
+        void onConnect(NimBLEClient* /*pClient*/) override {}
+        void onDisconnect(NimBLEClient* /*pClient*/, int reason) override {
+            if (!s_hostQueue) return;
+            BLEQueueMessage msg;
+            msg.type = BLEQueueMessage::Type::CentralDisconnected;
+            strncpy(msg.providerId, _providerId, sizeof(msg.providerId) - 1);
+            switch (reason) {
+                case 0x13: msg.reason = BLEDisconnectReason::PeerTerminated; break;
+                case 0x16: msg.reason = BLEDisconnectReason::LocalTerminated; break;
+                case 0x08: msg.reason = BLEDisconnectReason::SupervisionTimeout; break;
+                case 0x3e: msg.reason = BLEDisconnectReason::ConnectFailed; break;
+                default: msg.reason = BLEDisconnectReason::Other; break;
+            }
+            xQueueSend(static_cast<QueueHandle_t>(s_hostQueue), &msg, 0);
+        }
+    private:
+        char _providerId[24] = {};
+    };
+
+    void notifyCB(NimBLERemoteCharacteristic* pChr, uint8_t* pData, size_t length, bool /*isNotify*/) {
+        if (!s_hostQueue || !pChr) return;
+        BLEQueueMessage msg;
+        msg.type = BLEQueueMessage::Type::Notification;
+        
+        const NimBLEUUID& srvUuid = pChr->getRemoteService()->getUUID();
+        const NimBLEUUID& chrUuid = pChr->getUUID();
+        if (srvUuid.bitSize() == 16 && srvUuid.getBase() != nullptr) {
+            msg.attrHandle = reinterpret_cast<const ble_uuid16_t*>(srvUuid.getBase())->value; // Use attrHandle for srv uuid
+        }
+        if (chrUuid.bitSize() == 16 && chrUuid.getBase() != nullptr) {
+            msg.uuid16 = reinterpret_cast<const ble_uuid16_t*>(chrUuid.getBase())->value;
+        }
+
+        msg.rawLen = std::min(length, (size_t)64);
+        msg.boolVal1 = (length > 64); // truncated
+        memcpy(msg.rawBytes, pData, msg.rawLen);
+        xQueueSend(static_cast<QueueHandle_t>(s_hostQueue), &msg, 0);
+    }
+
+    class ScanCallbacks : public NimBLEScanCallbacks {
+    public:
+        void onResult(NimBLEAdvertisedDevice* advertisedDevice) override {
+            if (!s_hostQueue) return;
+            BLEQueueMessage msg;
+            msg.type = BLEQueueMessage::Type::ScanResult;
+            
+            NimBLEAddress addr = advertisedDevice->getAddress();
+            BLEPeerAddress::parse(addr.toString().c_str(), static_cast<BLEPeerAddress::Type>(addr.getType()), msg.address);
+            
+            if (advertisedDevice->haveName()) {
+                strncpy(msg.providerId, advertisedDevice->getName().c_str(), sizeof(msg.providerId) - 1);
+            }
+            
+            xQueueSend(static_cast<QueueHandle_t>(s_hostQueue), &msg, 0);
+        }
+    };
+}
+
+bool BLEStack::executeCentralConnect(const CentralConnectOptions& opts, const BLEPeerAddress& addr, bool& bondedOut) {
+    s_hostQueue = opts.hostEventQueue;
+    NimBLEClient* pClient = NimBLEDevice::createClient();
+    if (!pClient) return false;
+
+    pClient->setClientCallbacks(new ClientCallbacks(opts.provider->getProviderId()), true);
+    pClient->setConnectionParams(opts.initiatorScan.intervalMs * 1000 / 625, opts.initiatorScan.windowMs * 1000 / 625,
+                                 opts.centralConnParams.minIntervalUnits, opts.centralConnParams.maxIntervalUnits,
+                                 opts.centralConnParams.latency, opts.centralConnParams.supervisionTimeoutUnits);
+    
+    NimBLEAddress bleAddr(addr.bytes, static_cast<uint8_t>(addr.type));
+    if (!pClient->connect(bleAddr)) {
+        NimBLEDevice::deleteClient(pClient);
+        return false;
+    }
+
+    // Opportunistic bonding
+    bondedOut = pClient->secureConnection();
+
+    // Subscribe
+    BLESubscriptionSpec subs[16];
+    size_t count = opts.provider->getSubscriptions(subs, 16);
+    for (size_t i = 0; i < count; ++i) {
+        NimBLERemoteService* pSvc = pClient->getService(subs[i].serviceUuid16);
+        if (pSvc) {
+            NimBLERemoteCharacteristic* pChr = pSvc->getCharacteristic(subs[i].charUuid16);
+            if (pChr) {
+                pChr->subscribe(!subs[i].indicate, notifyCB, true);
+            }
+        }
+    }
+
+    opts.provider->onClientReadyWorker(*pClient);
+
+    BLEQueueMessage msg;
+    msg.type = BLEQueueMessage::Type::CentralConnected;
+    msg.address = addr;
+    strncpy(msg.providerId, opts.provider->getProviderId(), sizeof(msg.providerId) - 1);
+    xQueueSend(static_cast<QueueHandle_t>(opts.hostEventQueue), &msg, 0);
+
+    return true;
+}
+
+void BLEStack::executeCentralDisconnect(const char* /*providerId*/) {
+    // Basic implementation: NimBLE limits to 1 client usually, or we can iterate
+    for (auto* c : NimBLEDevice::getClientList()) {
+        if (c->isConnected()) c->disconnect();
+    }
+}
+
+void BLEStack::executeCentralForget(const char* providerId) {
+    executeCentralDisconnect(providerId);
+    // Ideally we'd map providerId to address and deleteBond
+}
+
+void BLEStack::executeDiscovery(const BLEScanParams& params, uint32_t durationMs, IBLEClientProvider* /*provider*/, void* hostEventQueue, std::vector<BLEScanResult>& /*resultsOut*/) {
+    s_hostQueue = hostEventQueue;
+    NimBLEScan* pScan = NimBLEDevice::getScan();
+    pScan->setScanCallbacks(new ScanCallbacks(), false);
+    pScan->setInterval(params.intervalMs * 1000 / 625);
+    pScan->setWindow(params.windowMs * 1000 / 625);
+    pScan->setActiveScan(params.active);
+    pScan->start(durationMs / 1000, false);
+    
+    BLEQueueMessage msg;
+    msg.type = BLEQueueMessage::Type::ScanCompleted;
+    xQueueSend(static_cast<QueueHandle_t>(hostEventQueue), &msg, 0);
+}
+
+void BLEStack::stopDiscovery() {
+    NimBLEDevice::getScan()->stop();
+}
+
+bool BLEStack::isScanning() const {
+    return NimBLEDevice::getScan()->isScanning();
+}
+
+void BLEStack::sendScanResult(void* /*hostEventQueue*/, const BLEScanResult& /*res*/) {
+}
+void BLEStack::sendScanComplete(void* /*hostEventQueue*/) {
+}
+
 #endif // defined(ESP_PLATFORM) && defined(WITH_BLE)

@@ -50,9 +50,11 @@ static ButtonModule buttonModule;
 #include "BLEManager/BLEManager.hpp"
 #include "ble/SampleFtmsProvider.hpp"
 #include "ble/SampleHrRepeater.hpp"
+#include "ble/SampleHrClient.hpp"
 static BLEManager bleManager;
 static SampleFtmsProvider ftmsProvider;
 static SampleHrRepeater hrRepeater;
+static SampleHrClient hrClient(&hrRepeater);
 #endif
 
 #ifdef WITH_ENCODER
@@ -117,8 +119,10 @@ void setup() {
 #ifdef WITH_BLE
     bleManager.registerServiceProvider(&ftmsProvider);
     bleManager.registerServiceProvider(&hrRepeater);
+    bleManager.registerClientProvider(&hrClient);
     app.registerModule(&bleManager);
     app.registerModule(&ftmsProvider);
+    app.registerModule(&hrClient);
 #endif
 
 #ifdef WITH_HOMEASSISTANT

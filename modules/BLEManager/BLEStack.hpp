@@ -19,6 +19,7 @@
 #include "BLETypes.hpp"
 #include "BLEQueueMessage.hpp"
 #include "BLEAdvertisingBuilder.hpp"
+#include "IBLEClientProvider.hpp"
 #include <cstdint>
 #include <cstring>
 #include <vector>
@@ -149,6 +150,22 @@ public:
         _droppedEventsCount++;
     }
 
+    // --- Central Role (WO-3) ---
+    struct CentralConnectOptions {
+        BLEScanParams initiatorScan;
+        BLEConnParams centralConnParams;
+        IBLEClientProvider* provider;
+        void* hostEventQueue;
+    };
+    bool executeCentralConnect(const CentralConnectOptions& opts, const BLEPeerAddress& addr, bool& bondedOut);
+    void executeCentralDisconnect(const char* providerId);
+    void executeCentralForget(const char* providerId);
+    void executeDiscovery(const BLEScanParams& params, uint32_t durationMs, IBLEClientProvider* provider, void* hostEventQueue, std::vector<BLEScanResult>& resultsOut);
+    void stopDiscovery();
+    bool isScanning() const;
+    void sendScanResult(void* hostEventQueue, const BLEScanResult& res);
+    void sendScanComplete(void* hostEventQueue);
+
 private:
     bool          _initialized        = false;
     NimBLEServer* _server             = nullptr;
@@ -213,4 +230,16 @@ inline std::vector<BLEStack::CharacteristicEntry> BLEStack::getRegisteredCharact
 inline uint32_t BLEStack::getDroppedEventsCount() const {
     return _droppedEventsCount;
 }
+
+inline bool BLEStack::executeCentralConnect(const CentralConnectOptions& /*opts*/, const BLEPeerAddress& /*addr*/, bool& bondedOut) {
+    bondedOut = false;
+    return true;
+}
+inline void BLEStack::executeCentralDisconnect(const char* /*providerId*/) {}
+inline void BLEStack::executeCentralForget(const char* /*providerId*/) {}
+inline void BLEStack::executeDiscovery(const BLEScanParams& /*params*/, uint32_t /*durationMs*/, IBLEClientProvider* /*provider*/, void* /*hostEventQueue*/, std::vector<BLEScanResult>& /*resultsOut*/) {}
+inline void BLEStack::stopDiscovery() {}
+inline bool BLEStack::isScanning() const { return false; }
+inline void BLEStack::sendScanResult(void* /*hostEventQueue*/, const BLEScanResult& /*res*/) {}
+inline void BLEStack::sendScanComplete(void* /*hostEventQueue*/) {}
 #endif

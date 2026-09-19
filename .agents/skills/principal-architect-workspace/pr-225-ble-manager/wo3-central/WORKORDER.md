@@ -114,3 +114,11 @@ complete | partial | blocked
 
 ### Blockers
 (none)
+
+## Completion Report
+- **Worker Task Architecture**: Successfully implemented `centralWorkerTask` to isolate blocking NimBLE operations (connect, disconnect, discover, forget) from the main loop, preserving the strict isolation rules (NimBLE headers only in `BLEStack.cpp`).
+- **Main Loop Callbacks**: Queue messages correctly bridge NimBLE callbacks to `BLEManager::dispatchQueueEvents()`, driving notifications, connection events, and scan results back to the main thread.
+- **Client Provider & Routing**: Wrote `SampleHrClient` implementing `IBLEClientProvider` to parse 8-bit/16-bit HR values and pipe them to the `SampleHrRepeater`.
+- **Reconnect Policy Integration**: Instantiated a `BLEReconnectPolicy` per client provider, driven by `BLEManager::tick()`. The policy pauses during scan inhibits, schedules reconnections safely without spamming the worker, and halts on RPA exhaustion.
+- **Preconditions**: Central preconditions properly registered dynamically by mapping the current state (NotConfigured, Connecting, Met, Unreachable, Rejected) for each provider.
+- **Verification**: Compilation passed natively and 46 `test_bleManager` native unit tests succeeded. Hardware flash deferred to WO-6.

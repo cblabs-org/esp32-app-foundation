@@ -200,6 +200,8 @@ public:
 
 private:
     friend class ScanInhibit;
+    static void centralWorkerTask(void* arg);
+
     void releaseScanInhibit(const char* reason);
 
     void dispatchQueueEvents();
@@ -220,14 +222,35 @@ private:
 
     std::vector<IBLEServiceProvider*>  _serviceProviders;
     std::vector<IBLEClientProvider*>   _clientProviders;
+    std::map<std::string, BLEReconnectPolicy> _reconnectPolicies;
+    std::map<std::string, bool>        _clientConnected;
+    std::map<std::string, bool>        _clientConnecting;
 
     bool                               _gattStarted = false;
     bool                               _providerRegistrationFault = false;
     uint32_t                           _scanInhibitCount = 0;
     std::string                        _pauseReason;
 
+    // --- Worker Task Queue ---
+    struct WorkerCommand {
+        enum class Type : uint8_t { Connect, Disconnect, Forget, Shutdown, Discover, StopDiscovery } type;
+        const char* providerId;
+        BLEPeerAddress addr;
+        uint32_t durationMs;
+    };
+    void*                              _workerQueue = nullptr;
+    void*                              _workerTask = nullptr;
+
     void*                              _eventQueue = nullptr;
     uint32_t                           _droppedEventsCount = 0;
+
+    // Central state
+    struct DiscoveryState {
+        bool active = false;
+        uint32_t startMs = 0;
+        uint32_t durationMs = 0;
+        const char* providerId = nullptr;
+    } _discovery;
 
     // Ring buffers for EventBus published payloads
     static constexpr size_t RING_SIZE = 4;
