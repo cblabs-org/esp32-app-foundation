@@ -3,7 +3,7 @@
 **Project:** `pr-225-ble-manager`
 **Base branch:** `main`
 **Branch prefix:** `ble-manager/` (linear stack, see [Branch Plan](#branch-plan))
-**Status:** 🚦 WO-5 GATE (D8 decision required). WO-4 complete 2026-09-19T07:28:17+01:00.
+**Status:** 🔨 WO-5 IN PROGRESS (autonomous worker). D8 fallback chosen 2026-09-19T07:34:40+01:00.
 **Parent issue:** [#225](https://github.com/matthewmcneill/esp32-app-foundation/issues/225)
 **Agreed design (source of truth):** [RFC #225 revision 2](https://github.com/matthewmcneill/esp32-app-foundation/issues/225#issuecomment-5729939169), plus the amendments in the [framework acknowledgement](https://github.com/matthewmcneill/esp32-app-foundation/issues/225#issuecomment-5735199501) (acceptance item 6 is split into 6a/6b/6c)
 **Consumer:** Echenon ([SPEC.md](https://github.com/cblabs-org/echenon/blob/main/SPEC.md) §7–§8), labels `upstream-issue`, `found-by:echenon`
@@ -50,7 +50,7 @@ It also contributes a portal tab, REST routes, MCP tools, EventBus `ble.*` event
 | **D5** | Framework-side validation | **Reference providers in `sample-app/src/ble/`**, under `WITH_BLE`: `SampleFtmsProvider` (synthetic indoor-bike data, so real FTMS apps can discover it), `SampleHrRepeater` (0x180D peripheral), `SampleHrClient` (0x180D central). Echenon validates its own providers in its own programme (its PR-07). |
 | **D6** | Pure-logic isolation | `BLETypes`, `BLEAdvertisingBuilder`, `BLEDeviceRegistry`, `BLEReconnectPolicy` are NimBLE-free and unit-tested under `env:native`. **Only `BLEStack.*` includes NimBLE headers**, wrapped in `#if defined(ESP_PLATFORM) && defined(WITH_BLE)`. `BLEManager.cpp` has no NimBLE includes. |
 | **D7** | Stack start trigger | `tick()` polls `Application::getState()` and starts on the main loop. The stack is **not** started from an EventBus callback: the esp_event task has a ~4 KB stack and the wrong thread context. `ota.progress` subscriptions only set an atomic flag, which `tick()` acts on. |
-| **D8** | [#227](https://github.com/matthewmcneill/esp32-app-foundation/issues/227) dependency | WO-5 consumes `ota.progress`, which is currently a single-slot payload that can be torn. **WO-5 is gated on #227's OTA fix being on `main`**, or on the human explicitly choosing the fallback: BLEManager reacts only to the *first* `ota.progress` event (pause) and to `complete && !success` (resume), and copies fields immediately. The PA must raise this with the human at the WO-5 gate. |
+| **D8** | [#227](https://github.com/matthewmcneill/esp32-app-foundation/issues/227) dependency | **DECIDED 2026-09-19:** Human chose **fallback** — react to first `ota.progress` only (pause), `complete && !success` (resume), copy fields immediately. No progress-percentage tracking. Code markers: `// FALLBACK(#227)`. Detailed follow-up comment posted to [#227](https://github.com/matthewmcneill/esp32-app-foundation/issues/227#issuecomment-5739961669) specifying exact files and changes needed once the fix lands. |
 | **D9** | [#226](https://github.com/matthewmcneill/esp32-app-foundation/issues/226) | Independent. Not a dependency of any WO. |
 | **D10** | Docs and skills | Each WO documents its own surface in the module README. WO-5 writes the consolidated developer guide, framework-expert skill material and CHANGELOG. |
 | **D11** | Portal disconnect-peer action | Deferred to v1.1 (RFC §19 item 7). |
