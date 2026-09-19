@@ -3,7 +3,7 @@
 **Project:** `pr-225-ble-manager`
 **Base branch:** `main`
 **Branch prefix:** `ble-manager/` (linear stack, see [Branch Plan](#branch-plan))
-**Status:** 🔨 WO-5 IN PROGRESS (autonomous worker). D8 fallback chosen 2026-09-19T07:34:40+01:00.
+**Status:** 🎯 WO-6 READY (interactive hardware acceptance). WO-0–5 complete.
 **Parent issue:** [#225](https://github.com/matthewmcneill/esp32-app-foundation/issues/225)
 **Agreed design (source of truth):** [RFC #225 revision 2](https://github.com/matthewmcneill/esp32-app-foundation/issues/225#issuecomment-5729939169), plus the amendments in the [framework acknowledgement](https://github.com/matthewmcneill/esp32-app-foundation/issues/225#issuecomment-5735199501) (acceptance item 6 is split into 6a/6b/6c)
 **Consumer:** Echenon ([SPEC.md](https://github.com/cblabs-org/echenon/blob/main/SPEC.md) §7–§8), labels `upstream-issue`, `found-by:echenon`
@@ -66,7 +66,7 @@ It also contributes a portal tab, REST routes, MCP tools, EventBus `ble.*` event
 | **WO-2** | [Peripheral role: GATT registration, advertising packer, callbacks](wo2-peripheral/WORKORDER.md) | `standard` | ✅ Complete | `ble-manager/wo2-peripheral` | `1c048c72` |
 | **WO-3** | [Central role: discovery, registry, bonding, reconnect, worker task](wo3-central/WORKORDER.md) | `architect` | ✅ Complete | `ble-manager/wo3-central` | `539488c7` |
 | **WO-4** | [Portal tab, REST routes, MCP tools](wo4-portal-mcp/WORKORDER.md) | `standard` | ✅ Complete | `ble-manager/wo4-portal-mcp` | `c133d59b` |
-| **WO-5** | [Coexistence, OTA pause, docs and skill](wo5-coexistence-ota/WORKORDER.md) | `standard` | ⬜ Not started (gated by D8) | `ble-manager/wo5-coexistence-ota` | — |
+| **WO-5** | [Coexistence, OTA pause, docs and skill](wo5-coexistence-ota/WORKORDER.md) | `standard` | ✅ Complete (D8 fallback) | `ble-manager/wo5-coexistence-ota` | `b568ec5f` |
 | **WO-6** | [Hardware acceptance run (RFC §17.2, amended)](wo6-validation/WORKORDER.md) | `interactive` | ⬜ Not started | `ble-manager/wo6-validation` | — |
 
 ### Gates between WOs
