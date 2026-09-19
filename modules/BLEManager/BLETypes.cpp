@@ -82,18 +82,19 @@ bool BLEPeerAddress::parse(const char* str, Type addrType, BLEPeerAddress& out) 
     return true;
 }
 
-void clampScanParams(uint16_t& intervalMs, uint16_t& windowMs) {
+void clampScanParams(uint16_t& intervalMs, uint16_t& windowMs, bool hasPeripheralConnections) {
     if (intervalMs < 10) {
         intervalMs = 10;
     }
-    uint16_t maxWindow = intervalMs / 2;
+    uint16_t maxWindow = hasPeripheralConnections ? (intervalMs / 4) : (intervalMs / 2);
     if (windowMs > maxWindow) {
-        ESP_LOGW(TAG, "Scan window (%u ms) > 50%% of interval (%u ms); clamping to %u ms",
-                 windowMs, intervalMs, maxWindow);
+        ESP_LOGW(TAG, "Scan window (%u ms) > %u%% of interval (%u ms); clamping to %u ms",
+                 windowMs, hasPeripheralConnections ? 25 : 50, intervalMs, maxWindow);
         windowMs = maxWindow;
     }
 }
 
-void clampScanParams(BLEScanParams& params) {
-    clampScanParams(params.intervalMs, params.windowMs);
+void clampScanParams(BLEScanParams& params, bool hasPeripheralConnections) {
+    clampScanParams(params.intervalMs, params.windowMs, hasPeripheralConnections);
 }
+

@@ -33,6 +33,7 @@ Examples in the framework include:
 - **HomeAssistantModule** — MQTT discovery and telemetry reporting (guarded by `WITH_HOMEASSISTANT`)
 - **U8G2DisplayModule** — Monochrome OLED/LCD display driver via SPI/I2C (guarded by `WITH_DISPLAY_U8G2`)
 - **LVGLDisplayModule** — Colour TFT display driver powered by LVGL v9.5 (guarded by `WITH_DISPLAY_LVGL`)
+- **BLEManager** — Managed Bluetooth Low Energy peripheral and central stack for ESP32-S3 (guarded by `WITH_BLE`, see [Bluetooth Low Energy](bluetooth.md))
 
 Optional modules are full framework citizens: they implement the same interfaces (`ITickable`, `IConfigurable`, `IWebContributor`, etc.) and are registered with the same `registerModule()` call.
 
@@ -390,6 +391,44 @@ void setup() {
     app.begin(config);
 }
 ```
+
+### Framework Optional Module Example: BLEManager
+
+`BLEManager` provides concurrent Peripheral (GATT server) and Central (client discovery and subscriptions) BLE capabilities for ESP32-S3 targets. It follows the same explicit composition pattern:
+
+```cpp
+#include "AppFoundation.h"
+
+static Application app;
+
+#ifdef WITH_BLE
+#include "BLEManager/BLEManager.hpp"
+static BLEManager bleManager;
+#endif
+
+void setup() {
+    app.getWifiManager().setDefaultHostname("sensor-hub");
+
+#ifdef WITH_BLE
+    // Register custom service / client providers before app.begin()
+    bleManager.registerServiceProvider(&myServiceProvider);
+    bleManager.registerClientProvider(&myClientProvider);
+
+    // Register BLEManager with the Application kernel hub
+    app.registerModule(&bleManager);
+#endif
+
+    FrameworkConfig config;
+    app.begin(config);
+
+#ifdef WITH_BLE
+    // Connect BLEManager to Application and EventBus
+    bleManager.begin(app);
+#endif
+}
+```
+
+For full details on provider contracts, threading rules, and Wi-Fi/BLE coexistence, see [Bluetooth Low Energy](bluetooth.md).
 
 ### Step 4 — Provide Native Build Stubs or Mocks
 

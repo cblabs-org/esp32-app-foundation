@@ -19,7 +19,9 @@ description: >
   ITabRegistry, registerTabs, DataSourceHealthPayload, data.source.health,
   get_data_sources, AUDIT, AUDIT_SYNC, audit trail, audit log, WITH_AUDIT,
   AuditModule, Audit.h, get_audit_log, clear_audit_log, BOARD_AUDIT_BYTES,
-  audit_health, LogPipeline, Redactor, registerSecret, ISanitizer, flash wear.
+  audit_health, LogPipeline, Redactor, registerSecret, ISanitizer, flash wear,
+  BLEManager, WITH_BLE, Bluetooth, BLE, IBLEServiceProvider, IBLEClientProvider,
+  NimBLE, ble_status, ble_scan, ble_pair, ble_forget, ScanInhibit, BLEAdvertisingBuilder.
   (4) Patterns and safety — Service Module Pattern, orchestrator
   anti-pattern, Domain Meaning Test, SOLID, thread safety, std::function, TWDT,
   watchdog, heap, PSRAM, TLS memory, flash size. (5) Security — DeviceCrypto,
@@ -140,6 +142,7 @@ This skill uses a progressive disclosure model. Based on your query, load and re
 | **Web Portal** (SPA, routes, HTML/JS fragments, security) | `systems/web-portal/` |
 | **Web Server Stack & DRAM Tuning** (httpd stack, DeepStackExecutor, PSRAM offload) | `systems/web-portal/dram-tuning.md` |
 | **Design System** (Tokens, components, templates, UI kit for portal styling) | Sibling skill: `../framework-design-system/readme.md` |
+| **Bluetooth LE Subsystem** (BLEManager, Peripheral/Central providers, threading rules, coexistence, ScanInhibit) | `systems/ble/overview.md` |
 | **OTA Update System** (State machine, channels, config lifecycle, deploy) | `systems/ota/` |
 | **Data Sources & Resilience** (FetchContext, deadlines, health backoff, TLS client) | `interfaces/data-source.md` |
 | **MCP Server** (Device interaction, JSON-RPC protocol, tool discovery, scripts) | `systems/mcp-server/` |

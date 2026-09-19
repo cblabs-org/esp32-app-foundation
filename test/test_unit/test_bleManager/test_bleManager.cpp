@@ -302,3 +302,78 @@ TEST(BLEManagerTest, PreconditionFaultOnProviderFailure) {
     EXPECT_EQ(status.cause, Cause::InternalError);
 }
 
+TEST(BLEManagerTest, OtaProgressHandlingFallback) {
+    BLEManager mgr;
+    mgr.setStateForTesting(BLEManager::State::Active);
+
+    // Initial state Active
+    EXPECT_EQ(mgr.getState(), BLEManager::State::Active);
+
+    // 1. First OTA progress event (!complete) -> pauses stack on tick
+    // FALLBACK(#227): reacts only to first ota.progress
+    mgr.handleOtaProgressForTesting(false, false);
+    mgr.tick(0);
+    EXPECT_EQ(mgr.getState(), BLEManager::State::Paused);
+
+    // 2. Duplicate progress events do not churn
+    mgr.handleOtaProgressForTesting(false, false);
+    mgr.tick(0);
+    EXPECT_EQ(mgr.getState(), BLEManager::State::Paused);
+
+    // 3. Complete and failure -> resumes stack on tick
+    mgr.handleOtaProgressForTesting(true, false);
+    mgr.tick(0);
+    EXPECT_EQ(mgr.getState(), BLEManager::State::Active);
+
+    // 4. Another OTA starts -> pauses stack
+    mgr.handleOtaProgressForTesting(false, false);
+    mgr.tick(0);
+    EXPECT_EQ(mgr.getState(), BLEManager::State::Paused);
+
+    // 5. Complete and success -> leaves stack paused (reboot pending)
+    mgr.handleOtaProgressForTesting(true, true);
+    mgr.tick(0);
+    EXPECT_EQ(mgr.getState(), BLEManager::State::Paused);
+}
+
+TEST(BLEManagerTest, CoexistenceDiscoveryRunningOnly) {
+    BLEManager mgr;
+    mgr.setStateForTesting(BLEManager::State::Active);
+
+    // Initial state is Boot (not Running) -> rejected
+    mgr.setAppStateForTesting(AppState::Boot);
+    EXPECT_FALSE(mgr.startDiscovery("dummy_cli", 5000));
+
+    // Configuring -> rejected
+    mgr.setAppStateForTesting(AppState::Configuring);
+    EXPECT_FALSE(mgr.startDiscovery("dummy_cli", 5000));
+
+    // Running -> accepted
+    mgr.setAppStateForTesting(AppState::Running);
+    EXPECT_TRUE(mgr.startDiscovery("dummy_cli", 5000));
+}
+
+TEST(BLEManagerTest, ScanInhibitCancelsActiveDiscovery) {
+    BLEManager mgr;
+    mgr.setStateForTesting(BLEManager::State::Active);
+
+    // Standalone manager (no app) starts discovery
+    EXPECT_TRUE(mgr.startDiscovery("dummy_cli", 5000));
+    EXPECT_TRUE(mgr.isScanning());
+
+    // Concurrent startDiscovery is rejected
+    EXPECT_FALSE(mgr.startDiscovery("dummy_cli", 5000));
+
+    // ScanInhibit cancels active discovery
+    {
+        auto token = mgr.inhibitScanning("wifi_upload");
+        EXPECT_FALSE(mgr.isScanning());
+        // Cannot start discovery while inhibited
+        EXPECT_FALSE(mgr.startDiscovery("dummy_cli", 5000));
+    }
+
+    // After release, discovery is no longer active
+    EXPECT_FALSE(mgr.isScanning());
+}
+
+
