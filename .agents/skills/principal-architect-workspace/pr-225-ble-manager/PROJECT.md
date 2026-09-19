@@ -3,7 +3,7 @@
 **Project:** `pr-225-ble-manager`
 **Base branch:** `main`
 **Branch prefix:** `ble-manager/` (linear stack, see [Branch Plan](#branch-plan))
-**Status:** 🔨 WO-4 IN PROGRESS (autonomous worker). WO-3 complete 2026-09-19T06:58:27+01:00.
+**Status:** 🚦 WO-5 GATE (D8 decision required). WO-4 complete 2026-09-19T07:28:17+01:00.
 **Parent issue:** [#225](https://github.com/matthewmcneill/esp32-app-foundation/issues/225)
 **Agreed design (source of truth):** [RFC #225 revision 2](https://github.com/matthewmcneill/esp32-app-foundation/issues/225#issuecomment-5729939169), plus the amendments in the [framework acknowledgement](https://github.com/matthewmcneill/esp32-app-foundation/issues/225#issuecomment-5735199501) (acceptance item 6 is split into 6a/6b/6c)
 **Consumer:** Echenon ([SPEC.md](https://github.com/cblabs-org/echenon/blob/main/SPEC.md) §7–§8), labels `upstream-issue`, `found-by:echenon`
@@ -65,7 +65,7 @@ It also contributes a portal tab, REST routes, MCP tools, EventBus `ble.*` event
 | **WO-1** | [Module skeleton, types, pure logic, env plumbing, lifecycle](wo1-skeleton/WORKORDER.md) | `standard` | ✅ Complete | `ble-manager/wo1-skeleton` | `01be46a0` |
 | **WO-2** | [Peripheral role: GATT registration, advertising packer, callbacks](wo2-peripheral/WORKORDER.md) | `standard` | ✅ Complete | `ble-manager/wo2-peripheral` | `1c048c72` |
 | **WO-3** | [Central role: discovery, registry, bonding, reconnect, worker task](wo3-central/WORKORDER.md) | `architect` | ✅ Complete | `ble-manager/wo3-central` | `539488c7` |
-| **WO-4** | [Portal tab, REST routes, MCP tools](wo4-portal-mcp/WORKORDER.md) | `standard` | ⬜ Not started | `ble-manager/wo4-portal-mcp` | — |
+| **WO-4** | [Portal tab, REST routes, MCP tools](wo4-portal-mcp/WORKORDER.md) | `standard` | ✅ Complete | `ble-manager/wo4-portal-mcp` | `c133d59b` |
 | **WO-5** | [Coexistence, OTA pause, docs and skill](wo5-coexistence-ota/WORKORDER.md) | `standard` | ⬜ Not started (gated by D8) | `ble-manager/wo5-coexistence-ota` | — |
 | **WO-6** | [Hardware acceptance run (RFC §17.2, amended)](wo6-validation/WORKORDER.md) | `interactive` | ⬜ Not started | `ble-manager/wo6-validation` | — |
 
