@@ -131,3 +131,99 @@ In compliance with Bluetooth Core Specification and RFC #225:
 - **`BLE Stack`**: Monitors Bluetooth controller and NimBLE host initialization. Reports `InternalError` if stack initialization or provider service registration fails.
 - **`BLE Advertising`**: Monitors advertising packet composition. Reports `Implausible` if required advertising payload elements exceed the 31-byte PDU budget.
 
+
+## Central Role
+
+### Implementing `IBLEClientProvider`
+
+To connect to remote BLE peripherals, bond with devices, and receive notifications, implement `IBLEClientProvider`:
+
+```cpp
+#include "BLEManager/IBLEClientProvider.hpp"
+
+class HeartRateClientProvider : public IBLEClientProvider {
+public:
+    const char* getProviderId() const override { return "hrm"; }
+    const char* getDeviceTypeLabel() const override { return "Heart Rate Monitor"; }
+
+    size_t getTargetServiceUUIDs(uint16_t* outUuids, size_t maxCount) const override {
+        if (maxCount < 1) return 0;
+        outUuids[0] = 0x180D; // Heart Rate Service
+        return 1;
+    }
+
+    size_t getSubscriptions(BLESubscriptionSpec* outSpecs, size_t maxCount) const override {
+        if (maxCount < 1) return 0;
+        outSpecs[0].serviceUuid16 = 0x180D;
+        outSpecs[0].charUuid16 = 0x2A37; // Heart Rate Measurement
+        outSpecs[0].notify = true;
+        return 1;
+    }
+
+    void onConnected(const BLEStoredDevice& dev) override {
+        // Device connected and subscribed
+    }
+
+    void onNotification(const BLENotification& n) override {
+        // Handle incoming sensor measurement on the main loop
+    }
+
+    void onDisconnected(BLEDisconnectReason reason) override {
+        // Central worker will automatically apply reconnect policy
+    }
+};
+```
+
+## Web Portal (`IWebContributor`)
+
+`BLEManager` contributes a dedicated, responsive management tab to the device configuration portal:
+- **Tab Name**: `Bluetooth` (Icon: Feather Bluetooth, sort order `60`).
+- **Route**: Serves gzipped static asset `/ble.js` via `serveGzipAsset` with ETag caching.
+- **Status Card**:
+  - State badge with live color dot (`Active`, `Idle`, `Starting`, `Paused`, `Error`).
+  - Advertised device name.
+  - Interactive advertising and scan response byte budget meters (0..31 B).
+  - Collapsible `<details>` hex dump of raw primary advertising and scan response PDUs.
+  - Active peripheral connections list showing connection handle, redacted address, MTU, encryption status, and negotiated connection interval in milliseconds.
+  - Real-time diagnostic counters: queue dropped events and scan inhibit count.
+- **Client Provider Device Cards**:
+  - One card per registered `IBLEClientProvider` with device type label.
+  - Stored device details: name, redacted MAC, address type, bonded status.
+  - Reconnect status and schedule phase (`Idle`, `Fast`, `Slow`, `Exhausted`).
+  - Scan controls: user-triggered discovery scan (30s duration cap).
+  - Interactive scan results table with RSSI, device name, and 1-click **Pair** button.
+  - **Forget** device button with a 2-click armed confirmation pattern.
+- **Lifecycle & Polling**: Uses visibility-aware polling at 1 Hz (`setInterval` clamped to 1000ms) only when the tab is active and visible (`visibilitychange` and `tab-changed` aware).
+
+## REST API
+
+All BLE REST routes are hosted under `/api/ble/` and protected by the framework's central `AuthManager` middleware:
+
+| Method | Endpoint | Description | Status Codes |
+|---|---|---|---|
+| `GET` | `/api/ble/status` | Complete manager status (unredacted MAC addresses) | `200 OK` |
+| `POST` | `/api/ble/scan` | Initiate 30s discovery scan `{ "providerId": "hrm", "durationMs": 30000 }` | `202 Accepted`, `400`, `409` |
+| `GET` | `/api/ble/scan/results` | Array of accepted scan results | `200 OK` |
+| `POST` | `/api/ble/pair` | Pair and store device `{ "providerId": "hrm", "address": "...", "addressType": "Public" }` | `202 Accepted`, `400`, `404` |
+| `POST` | `/api/ble/forget` | Forget stored device and unbond `{ "providerId": "hrm" }` | `200 OK`, `400`, `404` |
+
+*Note: In accordance with RFC #225 §12, `getMaxPostBody()` is capped to 512 bytes.*
+
+## MCP Tools (`IMCPContributor`)
+
+When the MCP Server module is active, `BLEManager` contributes four tools to the tool registry:
+
+1. **`ble_status`** (`mutatesState = false`):
+   Retrieves operational state, advertising budget, active connections, and client provider devices. In compliance with RFC #225 §15 privacy requirements, all MAC addresses are **strictly redacted** (`**:**:**:**:EE:FF`).
+2. **`ble_scan`** (`mutatesState = true`):
+   Starts discovery scan for a specific client provider (`providerId`, optional `durationMs` up to 30000). Rejects concurrent scans or scans while inhibited.
+3. **`ble_pair`** (`mutatesState = true`):
+   Pairs and persists a remote peripheral (`providerId`, `address`, `addressType` enum: `Public`, `RandomStatic`, `RandomResolvable`, `RandomNonResolvable`).
+4. **`ble_forget`** (`mutatesState = true`):
+   Forgets a remote peripheral identity and unbonds the device (`providerId`).
+
+## Privacy & Redaction (RFC #225 §15)
+
+To prevent tracking and unauthorized surveillance:
+- **Diagnostic & Agent Interfaces**: MCP tool outputs, log entries, and public telemetry mask the first four bytes of MAC addresses (`**:**:**:**:EE:FF`) via `BLEPeerAddress::toRedactedString()`.
+- **Authenticated REST**: Full unredacted addresses are restricted to the authenticated REST endpoint (`/api/ble/status`), accessible only to authorized administrators through the portal.

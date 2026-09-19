@@ -46,6 +46,16 @@ private:
 #endif
 
 #include "interfaces/IPreconditionRegistry.hpp"
+#include "interfaces/ITabRegistry.hpp"
+#include "MCPToolRegistry.hpp"
+#include "BLESerialization.hpp"
+#include <PsychicHttp.h>
+
+#if defined(ESP_PLATFORM)
+#include "utils/serveGzipAsset.hpp"
+#include "portal_assets/ble_js.hpp"
+#endif
+
 #include "esp_log.h"
 
 #include "freertos/FreeRTOS.h"
@@ -176,9 +186,9 @@ BLEManager::BLEManager() {
     if (!_eventQueue || !_workerQueue) {
         ESP_LOGE(TAG, "Failed to create FreeRTOS queues");
     } else {
-        // Internal RAM for worker stack. Size: 4096 is enough for NimBLE operations, 
-        // as NimBLE host task handles the heavy lifting, but we do blocking calls.
+#if defined(ESP_PLATFORM)
         xTaskCreate(centralWorkerTask, "ble_worker", 4096, this, 5, reinterpret_cast<TaskHandle_t*>(&_workerTask));
+#endif
     }
 
     if (_config.enabled) {
@@ -299,6 +309,7 @@ bool BLEManager::startDiscovery(const char* providerId, uint32_t durationMs) {
     _discovery.startMs = millis();
     _discovery.durationMs = durationMs;
     _discovery.providerId = providerId;
+    _discovery.results.clear();
 
     WorkerCommand cmd;
     cmd.type = WorkerCommand::Type::Discover;
@@ -322,8 +333,41 @@ void BLEManager::stopDiscovery() {
     }
 }
 
-size_t BLEManager::getDiscoveryResults(BLEScanResult* /*out*/, size_t /*max*/) const {
-    return 0; // we will populate this later
+size_t BLEManager::getDiscoveryResults(BLEScanResult* out, size_t max) const {
+    if (!out || max == 0) {
+        return _discovery.results.size();
+    }
+    size_t count = std::min(max, _discovery.results.size());
+    for (size_t i = 0; i < count; ++i) {
+        out[i] = _discovery.results[i];
+    }
+    return count;
+}
+
+const std::vector<BLEScanResult>& BLEManager::getDiscoveryResults() const {
+    return _discovery.results;
+}
+
+bool BLEManager::isDiscoveryActive() const {
+    return _discovery.active;
+}
+
+const char* BLEManager::getDiscoveryProviderId() const {
+    return _discovery.providerId;
+}
+
+uint32_t BLEManager::getDiscoveryDurationMs() const {
+    return _discovery.durationMs;
+}
+
+bool BLEManager::getReconnectPolicy(const char* providerId, BLEReconnectPolicy& out) const {
+    if (!providerId) return false;
+    auto it = _reconnectPolicies.find(providerId);
+    if (it != _reconnectPolicies.end()) {
+        out = it->second;
+        return true;
+    }
+    return false;
 }
 
 bool BLEManager::pair(const char* providerId, const BLEPeerAddress& addr) {
@@ -783,7 +827,7 @@ void BLEManager::dispatchQueueEvents() {
             case BLEQueueMessage::Type::ScanResult: {
                 IBLEClientProvider* prov = nullptr;
                 for (auto* p : _clientProviders) {
-                    if (p && strcmp(p->getProviderId(), _discovery.providerId) == 0) {
+                    if (p && _discovery.providerId && strcmp(p->getProviderId(), _discovery.providerId) == 0) {
                         prov = p;
                         break;
                     }
@@ -793,8 +837,17 @@ void BLEManager::dispatchQueueEvents() {
                     res.address = msg.address;
                     strncpy(res.name, msg.providerId, sizeof(res.name) - 1);
                     if (prov->acceptScanResult(res)) {
-                        // Normally we save this to a list and return via getDiscoveryResults
-                        // Given WO-3, I'll store it internally.
+                        bool found = false;
+                        for (auto& existing : _discovery.results) {
+                            if (existing.address == res.address) {
+                                existing = res;
+                                found = true;
+                                break;
+                            }
+                        }
+                        if (!found && _discovery.results.size() < 30) {
+                            _discovery.results.push_back(res);
+                        }
                     }
                 }
                 break;
@@ -941,19 +994,357 @@ void BLEManager::resetConfig() {
 // Web & MCP Extension Points (Stubs for WO-4)
 // -----------------------------------------------------------------------------
 
-void BLEManager::registerRoutes(PsychicHttpServer& server) {
-    (void)server;
-    // WO-4
+void BLEManager::registerTabs(ITabRegistry& registry) {
+    registry.addTab(
+        "Bluetooth",
+        nullptr,
+        60,
+        "<polyline points=\"6.5 6.5 17.5 17.5 12 23 12 1 17.5 6.5 6.5 17.5\"></polyline>",
+        "/ble.js"
+    );
 }
 
-void BLEManager::registerTabs(ITabRegistry& registry) {
-    (void)registry;
-    // WO-4
+void BLEManager::registerRoutes(PsychicHttpServer& server) {
+#if defined(ESP_PLATFORM)
+    // 1. Static Web Asset
+    server.on("/ble.js", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
+        return serveGzipAsset(request, response, ble_js_gz, ble_js_gz_len, ble_js_gz_etag, "application/javascript");
+    });
+#endif
+
+    // 2. GET /api/ble/status (Full unredacted addresses)
+    server.on("/api/ble/status", HTTP_GET, [this](PsychicRequest* /*request*/, PsychicResponse* response) {
+        JsonDocument doc;
+        JsonObject root = doc.to<JsonObject>();
+        BLESerialization::serializeStatus(root, *this, /*redactAddresses=*/false);
+        String json;
+        serializeJson(doc, json);
+        return response->send(200, "application/json", json.c_str());
+    });
+
+    // 3. POST /api/ble/scan
+    server.on("/api/ble/scan", HTTP_POST, [this](PsychicRequest* request, PsychicResponse* response) {
+        const char* body = request->bodyCStr();
+        if (!body || strlen(body) == 0) {
+            return response->send(400, "application/json", "{\"error\":\"empty body\"}");
+        }
+        JsonDocument doc;
+        DeserializationError err = deserializeJson(doc, body);
+        if (err) {
+            return response->send(400, "application/json", "{\"error\":\"invalid json\"}");
+        }
+        const char* providerId = doc["providerId"] | "";
+        if (!providerId || strlen(providerId) == 0) {
+            return response->send(400, "application/json", "{\"error\":\"missing providerId\"}");
+        }
+        bool found = false;
+        for (auto* p : _clientProviders) {
+            if (p && strcmp(p->getProviderId(), providerId) == 0) {
+                found = true;
+                break;
+            }
+        }
+        if (!found) {
+            return response->send(400, "application/json", "{\"error\":\"unknown providerId\"}");
+        }
+        uint32_t durationMs = doc["durationMs"] | 30000;
+        if (durationMs == 0 || durationMs > 30000) {
+            return response->send(400, "application/json", "{\"error\":\"durationMs must be between 1 and 30000\"}");
+        }
+        if (_state != State::Active) {
+            return response->send(409, "application/json", "{\"error\":\"BLE not active\"}");
+        }
+        if (_scanInhibitCount > 0) {
+            return response->send(409, "application/json", "{\"error\":\"scanning inhibited\"}");
+        }
+        if (isScanning() || _discovery.active) {
+            return response->send(409, "application/json", "{\"error\":\"scan already in progress\"}");
+        }
+        if (!startDiscovery(providerId, durationMs)) {
+            return response->send(409, "application/json", "{\"error\":\"failed to start scan\"}");
+        }
+        return response->send(202, "application/json", "{\"status\":\"scanning\"}");
+    });
+
+    // 4. GET /api/ble/scan/results
+    server.on("/api/ble/scan/results", HTTP_GET, [this](PsychicRequest* /*request*/, PsychicResponse* response) {
+        JsonDocument doc;
+        JsonArray arr = doc.to<JsonArray>();
+        BLESerialization::serializeScanResults(arr, _discovery.results.data(), _discovery.results.size(), /*redactAddresses=*/false);
+        String json;
+        serializeJson(doc, json);
+        return response->send(200, "application/json", json.c_str());
+    });
+
+    // 5. POST /api/ble/pair
+    server.on("/api/ble/pair", HTTP_POST, [this](PsychicRequest* request, PsychicResponse* response) {
+        const char* body = request->bodyCStr();
+        if (!body || strlen(body) == 0) {
+            return response->send(400, "application/json", "{\"error\":\"empty body\"}");
+        }
+        JsonDocument doc;
+        DeserializationError err = deserializeJson(doc, body);
+        if (err) {
+            return response->send(400, "application/json", "{\"error\":\"invalid json\"}");
+        }
+        const char* providerId = doc["providerId"] | "";
+        if (!providerId || strlen(providerId) == 0) {
+            return response->send(400, "application/json", "{\"error\":\"missing providerId\"}");
+        }
+        bool found = false;
+        for (auto* p : _clientProviders) {
+            if (p && strcmp(p->getProviderId(), providerId) == 0) {
+                found = true;
+                break;
+            }
+        }
+        if (!found) {
+            return response->send(404, "application/json", "{\"error\":\"unknown providerId\"}");
+        }
+        const char* addrStr = doc["address"] | "";
+        const char* typeStr = doc["addressType"] | "";
+        BLEPeerAddress::Type addrType;
+        if (!BLESerialization::parseAddressType(typeStr, addrType)) {
+            return response->send(400, "application/json", "{\"error\":\"invalid addressType\"}");
+        }
+        BLEPeerAddress addr;
+        if (!BLEPeerAddress::parse(addrStr, addrType, addr) || !addr.isValid()) {
+            return response->send(400, "application/json", "{\"error\":\"invalid address\"}");
+        }
+        if (!pair(providerId, addr)) {
+            return response->send(500, "application/json", "{\"error\":\"pair failed\"}");
+        }
+        return response->send(202, "application/json", "{\"status\":\"pairing\"}");
+    });
+
+    // 6. POST /api/ble/forget
+    server.on("/api/ble/forget", HTTP_POST, [this](PsychicRequest* request, PsychicResponse* response) {
+        const char* body = request->bodyCStr();
+        if (!body || strlen(body) == 0) {
+            return response->send(400, "application/json", "{\"error\":\"empty body\"}");
+        }
+        JsonDocument doc;
+        DeserializationError err = deserializeJson(doc, body);
+        if (err) {
+            return response->send(400, "application/json", "{\"error\":\"invalid json\"}");
+        }
+        const char* providerId = doc["providerId"] | "";
+        if (!providerId || strlen(providerId) == 0) {
+            return response->send(400, "application/json", "{\"error\":\"missing providerId\"}");
+        }
+        bool found = false;
+        for (auto* p : _clientProviders) {
+            if (p && strcmp(p->getProviderId(), providerId) == 0) {
+                found = true;
+                break;
+            }
+        }
+        if (!found) {
+            return response->send(404, "application/json", "{\"error\":\"unknown providerId\"}");
+        }
+        if (!forget(providerId)) {
+            return response->send(500, "application/json", "{\"error\":\"forget failed\"}");
+        }
+        return response->send(200, "application/json", "{\"status\":\"forgotten\"}");
+    });
 }
 
 void BLEManager::registerMCPTools(MCPToolRegistry& registry) {
-    (void)registry;
-    // WO-4
+    // 1. ble_status (Read-only, mutatesState = false, addresses REDACTED per RFC §15)
+    registry.addTool(
+        "ble_status",
+        "Get Bluetooth Low Energy manager status, connection info, stored devices, and advertising state (addresses redacted for privacy)",
+        [](void* ctx, JsonObject& /*params*/, JsonObject& result) {
+            auto* mgr = static_cast<BLEManager*>(ctx);
+            BLESerialization::serializeStatus(result, *mgr, /*redactAddresses=*/true);
+        },
+        this,
+        /*mutatesState=*/false
+    );
+
+    // 2. ble_scan (Mutating, mutatesState = true)
+    JsonDocument scanSchema;
+    scanSchema["type"] = "object";
+    JsonObject scanProps = scanSchema["properties"].to<JsonObject>();
+    scanProps["providerId"]["type"] = "string";
+    scanProps["providerId"]["description"] = "Client provider identifier (e.g. 'hrm')";
+    scanProps["durationMs"]["type"] = "integer";
+    scanProps["durationMs"]["description"] = "Scan duration in milliseconds (max 30000, default 30000)";
+    JsonArray scanReq = scanSchema["required"].to<JsonArray>();
+    scanReq.add("providerId");
+
+    registry.addTool(
+        "ble_scan",
+        "Start user-initiated BLE discovery scan for a central client provider",
+        scanSchema,
+        [](void* ctx, JsonObject& params, JsonObject& result) {
+            auto* mgr = static_cast<BLEManager*>(ctx);
+            const char* providerId = params["providerId"] | "";
+            if (!providerId || strlen(providerId) == 0) {
+                result["error"] = "missing providerId";
+                result["isError"] = true;
+                return;
+            }
+            bool found = false;
+            for (auto* p : mgr->getClientProviders()) {
+                if (p && strcmp(p->getProviderId(), providerId) == 0) {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                result["error"] = "unknown providerId";
+                result["isError"] = true;
+                return;
+            }
+            uint32_t durationMs = params["durationMs"] | 30000;
+            if (durationMs == 0 || durationMs > 30000) {
+                result["error"] = "durationMs must be between 1 and 30000";
+                result["isError"] = true;
+                return;
+            }
+            if (mgr->getState() != State::Active) {
+                result["error"] = "BLE not active";
+                result["isError"] = true;
+                return;
+            }
+            if (mgr->getScanInhibitCount() > 0) {
+                result["error"] = "scanning inhibited";
+                result["isError"] = true;
+                return;
+            }
+            if (mgr->isScanning() || mgr->isDiscoveryActive()) {
+                result["error"] = "scan already in progress";
+                result["isError"] = true;
+                return;
+            }
+            if (!mgr->startDiscovery(providerId, durationMs)) {
+                result["error"] = "failed to start scan";
+                result["isError"] = true;
+                return;
+            }
+            result["status"] = "scanning";
+            result["providerId"] = providerId;
+            result["durationMs"] = durationMs;
+        },
+        this,
+        /*mutatesState=*/true
+    );
+
+    // 3. ble_pair (Mutating, mutatesState = true)
+    JsonDocument pairSchema;
+    pairSchema["type"] = "object";
+    JsonObject pairProps = pairSchema["properties"].to<JsonObject>();
+    pairProps["providerId"]["type"] = "string";
+    pairProps["providerId"]["description"] = "Client provider identifier";
+    pairProps["address"]["type"] = "string";
+    pairProps["address"]["description"] = "6-byte MAC address (AA:BB:CC:DD:EE:FF)";
+    pairProps["addressType"]["type"] = "string";
+    JsonArray enumArr = pairProps["addressType"]["enum"].to<JsonArray>();
+    enumArr.add("Public");
+    enumArr.add("RandomStatic");
+    enumArr.add("RandomResolvable");
+    enumArr.add("RandomNonResolvable");
+    pairProps["addressType"]["description"] = "Bluetooth address type classification";
+    JsonArray pairReq = pairSchema["required"].to<JsonArray>();
+    pairReq.add("providerId");
+    pairReq.add("address");
+    pairReq.add("addressType");
+
+    registry.addTool(
+        "ble_pair",
+        "Pair and store a remote BLE device for a central client provider",
+        pairSchema,
+        [](void* ctx, JsonObject& params, JsonObject& result) {
+            auto* mgr = static_cast<BLEManager*>(ctx);
+            const char* providerId = params["providerId"] | "";
+            if (!providerId || strlen(providerId) == 0) {
+                result["error"] = "missing providerId";
+                result["isError"] = true;
+                return;
+            }
+            bool found = false;
+            for (auto* p : mgr->getClientProviders()) {
+                if (p && strcmp(p->getProviderId(), providerId) == 0) {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                result["error"] = "unknown providerId";
+                result["isError"] = true;
+                return;
+            }
+            const char* addrStr = params["address"] | "";
+            const char* typeStr = params["addressType"] | "";
+            BLEPeerAddress::Type addrType;
+            if (!BLESerialization::parseAddressType(typeStr, addrType)) {
+                result["error"] = "invalid addressType";
+                result["isError"] = true;
+                return;
+            }
+            BLEPeerAddress addr;
+            if (!BLEPeerAddress::parse(addrStr, addrType, addr) || !addr.isValid()) {
+                result["error"] = "invalid address";
+                result["isError"] = true;
+                return;
+            }
+            if (!mgr->pair(providerId, addr)) {
+                result["error"] = "pair failed";
+                result["isError"] = true;
+                return;
+            }
+            result["status"] = "pairing";
+            result["providerId"] = providerId;
+        },
+        this,
+        /*mutatesState=*/true
+    );
+
+    // 4. ble_forget (Mutating, mutatesState = true)
+    JsonDocument forgetSchema;
+    forgetSchema["type"] = "object";
+    JsonObject forgetProps = forgetSchema["properties"].to<JsonObject>();
+    forgetProps["providerId"]["type"] = "string";
+    forgetProps["providerId"]["description"] = "Client provider identifier";
+    JsonArray forgetReq = forgetSchema["required"].to<JsonArray>();
+    forgetReq.add("providerId");
+
+    registry.addTool(
+        "ble_forget",
+        "Forget stored device identity and remove bond for a central client provider",
+        forgetSchema,
+        [](void* ctx, JsonObject& params, JsonObject& result) {
+            auto* mgr = static_cast<BLEManager*>(ctx);
+            const char* providerId = params["providerId"] | "";
+            if (!providerId || strlen(providerId) == 0) {
+                result["error"] = "missing providerId";
+                result["isError"] = true;
+                return;
+            }
+            bool found = false;
+            for (auto* p : mgr->getClientProviders()) {
+                if (p && strcmp(p->getProviderId(), providerId) == 0) {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                result["error"] = "unknown providerId";
+                result["isError"] = true;
+                return;
+            }
+            if (!mgr->forget(providerId)) {
+                result["error"] = "forget failed";
+                result["isError"] = true;
+                return;
+            }
+            result["status"] = "forgotten";
+            result["providerId"] = providerId;
+        },
+        this,
+        /*mutatesState=*/true
+    );
 }
 
 // -----------------------------------------------------------------------------

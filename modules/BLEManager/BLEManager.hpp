@@ -159,6 +159,12 @@ public:
     bool   startDiscovery(const char* providerId, uint32_t durationMs = 30000);
     void   stopDiscovery();
     size_t getDiscoveryResults(BLEScanResult* out, size_t max) const;
+    const std::vector<BLEScanResult>& getDiscoveryResults() const;
+    bool   isDiscoveryActive() const;
+    const char* getDiscoveryProviderId() const;
+    uint32_t getDiscoveryDurationMs() const;
+    const std::vector<IBLEClientProvider*>& getClientProviders() const { return _clientProviders; }
+    bool   getReconnectPolicy(const char* providerId, BLEReconnectPolicy& out) const;
     bool   pair(const char* providerId, const BLEPeerAddress& addr);
     bool   forget(const char* providerId);
 
@@ -190,7 +196,7 @@ public:
     void        registerRoutes(PsychicHttpServer& server) override;
     void        registerTabs(ITabRegistry& registry) override;
     const char* getApiPrefix() const override { return "/api/ble"; }
-    size_t      getMaxPostBody() const override { return 4096; }
+    size_t      getMaxPostBody() const override { return 512; }
 
     // --- IMCPContributor Interface ---
     void registerMCPTools(MCPToolRegistry& registry) override;
@@ -250,6 +256,7 @@ private:
         uint32_t startMs = 0;
         uint32_t durationMs = 0;
         const char* providerId = nullptr;
+        std::vector<BLEScanResult> results;
     } _discovery;
 
     // Ring buffers for EventBus published payloads
