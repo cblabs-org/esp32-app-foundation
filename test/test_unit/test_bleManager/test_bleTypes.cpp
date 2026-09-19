@@ -126,3 +126,33 @@ TEST(BLETypesTest, ClampScanParams) {
     clampScanParams(params);
     EXPECT_EQ(params.windowMs, 100);
 }
+
+TEST(BLETypesTest, ClampScanParamsWithPeripheralConnections) {
+    BLEScanParams params;
+    params.intervalMs = 160;
+    params.windowMs = 80; // 80 > 40 (25% of 160) -> should clamp to 40
+    clampScanParams(params, true);
+    EXPECT_EQ(params.intervalMs, 160);
+    EXPECT_EQ(params.windowMs, 40);
+
+    // Within 25% limit
+    params.intervalMs = 200;
+    params.windowMs = 50; // Exactly 25%
+    clampScanParams(params, true);
+    EXPECT_EQ(params.intervalMs, 200);
+    EXPECT_EQ(params.windowMs, 50);
+
+    // Exceeds 25% limit (e.g. 60 ms on 200 ms interval)
+    params.intervalMs = 200;
+    params.windowMs = 60;
+    clampScanParams(params, true);
+    EXPECT_EQ(params.windowMs, 50);
+
+    // Minimum interval clamp
+    uint16_t interval = 5;
+    uint16_t window = 5;
+    clampScanParams(interval, window, false);
+    EXPECT_EQ(interval, 10);
+    EXPECT_EQ(window, 5);
+}
+

@@ -112,6 +112,8 @@ void BLEManager::centralWorkerTask(void* arg) {
                     bool bonded = false;
                     BLEStack::CentralConnectOptions opts;
                     opts.initiatorScan = mgr->_config.reconnectScan;
+                    // Coexistence hardening: clamp reconnect scan to 25% duty when peripheral connections exist
+                    clampScanParams(opts.initiatorScan, cmd.hasPeripherals);
                     opts.centralConnParams = mgr->_config.centralConnParams;
                     
                     IBLEClientProvider* provider = nullptr;
@@ -165,7 +167,9 @@ void BLEManager::centralWorkerTask(void* arg) {
                     }
                     if (provider) {
                         std::vector<BLEScanResult> results;
-                        mgr->_stack.executeDiscovery(mgr->_config.discoveryScan, cmd.durationMs, provider, mgr->_eventQueue, results);
+                        BLEScanParams discParams = mgr->_config.discoveryScan;
+                        clampScanParams(discParams, false);
+                        mgr->_stack.executeDiscovery(discParams, cmd.durationMs, provider, mgr->_eventQueue, results);
                     }
                     break;
                 }
@@ -244,11 +248,49 @@ void BLEManager::begin(Application& app) {
     _eventBus = &app.getEventBus();
     _locked = true;
     ESP_LOGI(TAG, "BLEManager wired to Application. Providers locked.");
+
+#ifdef WITH_OTA
+    if (_eventBus) {
+        _eventBus->subscribe(ApplicationEvents::OTA_PROGRESS, _onOtaProgress, this);
+    }
+#endif
 }
+
+#ifdef WITH_OTA
+void BLEManager::_onOtaProgress(const char* /*topic*/, const void* payload, void* ctx) {
+    auto* self = static_cast<BLEManager*>(ctx);
+    if (!payload || !self) return;
+
+    // FALLBACK(#227): Single-slot payload may be mutated/overwritten by publisher.
+    // Copy complete and success immediately out of the payload.
+    // BLEManager reacts only to the first ota.progress event (pause) and to complete && !success (resume).
+    // No progress-percentage tracking. Mark all fallback code with // FALLBACK(#227).
+    const auto* ota = static_cast<const ApplicationEvents::OtaProgressPayload*>(payload);
+    self->handleOtaProgress(ota->complete, ota->success);
+}
+#endif
+
+void BLEManager::handleOtaProgress(bool complete, bool success) {
+    // FALLBACK(#227): Copy fields into atomics immediately from event callback context.
+    // The callback runs on the esp_event task. No BLE calls happen here.
+    _otaComplete.store(complete, std::memory_order_relaxed);
+    _otaSuccess.store(success, std::memory_order_relaxed);
+    _pendingOtaEvent.store(true, std::memory_order_release);
+}
+
+void BLEManager::handleOtaProgressForTesting(bool complete, bool success) {
+    handleOtaProgress(complete, success);
+}
+
 
 bool BLEManager::postTestQueueMessage(const BLEQueueMessage& msg) {
     if (!_eventQueue) return false;
     return xQueueSend(static_cast<QueueHandle_t>(_eventQueue), &msg, 0) == pdTRUE;
+}
+
+AppState BLEManager::getEffectiveAppState() const {
+    if (_hasAppStateForTesting) return _appStateForTesting;
+    return _app ? _app->getState() : AppState::Running;
 }
 
 BLEManager::State BLEManager::getState() const {
@@ -300,10 +342,16 @@ bool BLEManager::getStoredDevice(const char* providerId, BLEStoredDevice& out) c
 // -----------------------------------------------------------------------------
 
 bool BLEManager::startDiscovery(const char* providerId, uint32_t durationMs) {
-    if (_state != State::Active || _scanInhibitCount > 0 || _state == State::Paused) {
+    // Coexistence hardening: Running-only rule (RFC §6.1, RFC §9)
+    if (getEffectiveAppState() != AppState::Running) {
+        ESP_LOGW(TAG, "startDiscovery rejected: only allowed in AppState::Running");
+        return false;
+    }
+    if (_state != State::Active || _scanInhibitCount > 0 || _state == State::Paused || _discovery.active) {
         return false;
     }
     if (durationMs > 30000) durationMs = 30000;
+
 
     _discovery.active = true;
     _discovery.startMs = millis();
@@ -327,6 +375,7 @@ bool BLEManager::startDiscovery(const char* providerId, uint32_t durationMs) {
 
 void BLEManager::stopDiscovery() {
     if (_discovery.active) {
+        _discovery.active = false;
         WorkerCommand cmd;
         cmd.type = WorkerCommand::Type::StopDiscovery;
         xQueueSend(static_cast<QueueHandle_t>(_workerQueue), &cmd, 0);
@@ -409,6 +458,23 @@ BLEManager::ScanInhibit BLEManager::inhibitScanning(const char* reason) {
     _scanInhibitCount++;
     ESP_LOGI(TAG, "Scan inhibited (reason: %s, active tokens: %u)",
              reason ? reason : "unspecified", _scanInhibitCount);
+
+    if (_scanInhibitCount == 1) {
+        if (_discovery.active) {
+            stopDiscovery();
+            _scanRing[_scanRingHead].kind = BLEScanPayload::Kind::Discovery;
+            _scanRing[_scanRingHead].reason = "inhibited";
+            if (_eventBus) _eventBus->publish(BLEEvents::SCAN_STOPPED, &_scanRing[_scanRingHead]);
+            _scanRingHead = (_scanRingHead + 1) % RING_SIZE;
+        }
+        _stack.stopDiscovery();
+
+        // Suspend reconnect policies
+        for (auto& kv : _reconnectPolicies) {
+            kv.second.suspend();
+        }
+    }
+
     return ScanInhibit(this, reason);
 }
 
@@ -417,6 +483,13 @@ void BLEManager::releaseScanInhibit(const char* reason) {
         _scanInhibitCount--;
         ESP_LOGI(TAG, "Scan inhibit released (reason: %s, active tokens: %u)",
                  reason ? reason : "unspecified", _scanInhibitCount);
+
+        if (_scanInhibitCount == 0 && _state == State::Active) {
+            uint32_t nowMs = millis();
+            for (auto& kv : _reconnectPolicies) {
+                kv.second.resume(nowMs);
+            }
+        }
     }
 }
 
@@ -464,11 +537,34 @@ void BLEManager::pause(const char* reason) {
         // Stop advertising while paused
         _stack.stopAdvertising();
 
+        // Stop active scans while paused
+        if (_discovery.active) {
+            stopDiscovery();
+            _scanRing[_scanRingHead].kind = BLEScanPayload::Kind::Discovery;
+            _scanRing[_scanRingHead].reason = "paused";
+            if (_eventBus) _eventBus->publish(BLEEvents::SCAN_STOPPED, &_scanRing[_scanRingHead]);
+            _scanRingHead = (_scanRingHead + 1) % RING_SIZE;
+        }
+        _stack.stopDiscovery();
+
+        // Suspend reconnect policies while paused
+        for (auto& kv : _reconnectPolicies) {
+            kv.second.suspend();
+        }
+
         // Disconnect peers if reason is OTA and otaDisconnectPeers is configured
         if (_config.otaDisconnectPeers && _pauseReason.find("ota") != std::string::npos) {
             ESP_LOGI(TAG, "Disconnecting all peripheral peers due to OTA pause");
             for (const auto& peer : _activeConnections) {
                 _stack.disconnect(peer.handle, 0x13);
+            }
+            for (const auto& kv : _clientConnected) {
+                if (kv.second) {
+                    WorkerCommand cmd;
+                    cmd.type = WorkerCommand::Type::Disconnect;
+                    cmd.providerId = kv.first.c_str();
+                    xQueueSend(static_cast<QueueHandle_t>(_workerQueue), &cmd, 0);
+                }
             }
         }
 
@@ -483,11 +579,20 @@ void BLEManager::resume() {
     if (_state == State::Paused) {
         _state = State::Active;
         _pauseReason.clear();
+        _otaPaused = false;
         ESP_LOGI(TAG, "BLE stack resumed");
 
         publishState(_state, "resumed");
         for (auto* p : _serviceProviders) {
             if (p) p->onStackResumed();
+        }
+
+        // Resume reconnect policies if not inhibited
+        if (_scanInhibitCount == 0) {
+            uint32_t nowMs = millis();
+            for (auto& kv : _reconnectPolicies) {
+                kv.second.resume(nowMs);
+            }
         }
 
         if (BLEAdvertisingDecision::shouldAdvertise(_activeConnections.size(),
@@ -499,6 +604,7 @@ void BLEManager::resume() {
     }
 }
 
+
 // -----------------------------------------------------------------------------
 // Periodic Update Hook (ITickable)
 // -----------------------------------------------------------------------------
@@ -507,11 +613,34 @@ void BLEManager::tick(uint32_t /*currentMillis*/) {
     // 1. Drain incoming messages from FreeRTOS queue (host -> main loop)
     dispatchQueueEvents();
 
+    // 1.5 Process pending OTA event (RFC #225 rev 2 §6.1, PROJECT.md D8)
+    if (_pendingOtaEvent.exchange(false, std::memory_order_acq_rel)) {
+        // FALLBACK(#227): BLEManager reacts only to the first ota.progress event (pause)
+        // and to complete && !success (resume), copying fields immediately.
+        // No progress-percentage tracking. Mark all fallback code with // FALLBACK(#227).
+        bool complete = _otaComplete.load(std::memory_order_relaxed);
+        bool success = _otaSuccess.load(std::memory_order_relaxed);
+
+        if (!complete) {
+            if (!_otaPaused) {
+                _otaPaused = true;
+                pause("ota");
+            }
+        } else {
+            _otaPaused = false;
+            if (!success) {
+                resume();
+            }
+            // on complete && success, do nothing (the device reboots)
+        }
+    }
+
     // 2. Lifecycle state machine progression (RFC §6.1, PROJECT.md D7)
-    if (_state == State::Idle && _app != nullptr) {
-        AppState appState = _app->getState();
+    if (_state == State::Idle && (_app != nullptr || _hasAppStateForTesting)) {
+        AppState appState = getEffectiveAppState();
         bool startNow = (appState == AppState::Running) ||
                         (appState == AppState::Configuring && _config.advertiseInConfiguring);
+
 
         if (startNow) {
             _state = State::Starting;
@@ -599,21 +728,43 @@ void BLEManager::tick(uint32_t /*currentMillis*/) {
             publishState(_state, "ready");
             ESP_LOGI(TAG, "BLE stack active and ready.");
 
-            // Start reconnect policies for stored devices
-            uint32_t nowMs = millis();
-            for (auto* p : _clientProviders) {
-                if (p) {
-                    BLEStoredDevice stored;
-                    if (_deviceRegistry.get(p->getProviderId(), stored)) {
-                        _reconnectPolicies[p->getProviderId()].start(nowMs);
+            // Start reconnect policies for stored devices if in Running state
+            if (getEffectiveAppState() == AppState::Running) {
+                uint32_t nowMs = millis();
+                for (auto* p : _clientProviders) {
+                    if (p) {
+                        BLEStoredDevice stored;
+                        if (_deviceRegistry.get(p->getProviderId(), stored)) {
+                            _reconnectPolicies[p->getProviderId()].start(nowMs);
+                        }
                     }
                 }
             }
         }
     }
 
-    // Drive Reconnect Policies
-    if (_state == State::Active && _scanInhibitCount == 0 && !_discovery.active) {
+    // Ensure reconnect policies start once entering Running state
+    if (_state == State::Active && getEffectiveAppState() == AppState::Running) {
+        uint32_t nowMs = millis();
+        for (auto* p : _clientProviders) {
+            if (p) {
+                const char* pid = p->getProviderId();
+                BLEStoredDevice stored;
+                if (_deviceRegistry.get(pid, stored)) {
+                    auto& policy = _reconnectPolicies[pid];
+                    if (policy.phase() == BLEReconnectPolicy::Phase::Idle && !_clientConnected[pid]) {
+                        policy.start(nowMs);
+                    }
+                }
+            }
+        }
+    }
+
+    // Drive Reconnect Policies (Running-only rule: RFC §6.1, RFC §9)
+    if (_state == State::Active &&
+        getEffectiveAppState() == AppState::Running &&
+        _scanInhibitCount == 0 &&
+        !_discovery.active) {
         uint32_t nowMs = millis();
         for (auto* p : _clientProviders) {
             if (!p) continue;
@@ -629,6 +780,7 @@ void BLEManager::tick(uint32_t /*currentMillis*/) {
                         cmd.type = WorkerCommand::Type::Connect;
                         cmd.providerId = pid;
                         cmd.addr = stored.address;
+                        cmd.hasPeripherals = (_activeConnections.size() > 0);
                         xQueueSend(static_cast<QueueHandle_t>(_workerQueue), &cmd, 0);
                         
                         // We do NOT advance the schedule here; onCentralDisconnected will do that

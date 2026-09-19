@@ -227,3 +227,67 @@ When the MCP Server module is active, `BLEManager` contributes four tools to the
 To prevent tracking and unauthorized surveillance:
 - **Diagnostic & Agent Interfaces**: MCP tool outputs, log entries, and public telemetry mask the first four bytes of MAC addresses (`**:**:**:**:EE:FF`) via `BLEPeerAddress::toRedactedString()`.
 - **Authenticated REST**: Full unredacted addresses are restricted to the authenticated REST endpoint (`/api/ble/status`), accessible only to authorized administrators through the portal.
+
+## Coexistence & Radio Hardening (RFC #225 §9)
+
+The ESP32-S3 shares a single 2.4 GHz RF front-end between Wi-Fi and Bluetooth LE. To maintain high Wi-Fi throughput and link stability without dropping BLE connections, `BLEManager` enforces five deterministic coexistence rules:
+
+### Coexistence Rules Table
+
+| Rule | Trigger / Phase | Enforcement Mechanism | Purpose |
+|---|---|---|---|
+| **Running-Only** | Boot / Configuring | Active scanning and reconnect loops are blocked until `AppState::Running`. Advertising in Configuring is allowed only if `advertiseInConfiguring` is set. | Prevents BLE from degrading captive portal or AP/STA Wi-Fi connection handshake. |
+| **ScanInhibit** | Intensive Wi-Fi activity | RAII token `bleManager.inhibitScanning(reason)` cancels active discovery and suspends reconnect policies. | Dedicates RF radio to bursty Wi-Fi operations (e.g. HTTPS upload, cloud sync). |
+| **Administrative Pause** | OTA download / Maintenance | `pause("ota")` stops advertising and scanning; disconnects peers if `otaDisconnectPeers` is true. | Protects flash writes and Wi-Fi streaming during firmware update. |
+| **Duty Cycle Clamping** | Peripheral connections active | Connect initiator scan is clamped to $\le 25\%$ duty cycle (`window <= interval / 4`) when any peripheral connection exists, and $\le 50\%$ normally. Minimum interval is clamped to 10 ms. | Guarantees RF time-slots for established peripheral connection events. |
+| **Exponential Backoff** | Peripheral connection loss | `BLEReconnectPolicy` schedules fast retries, slow retries, and eventual backoff with jitter. | Prevents continuous scanning from monopolizing the radio when a peer is offline. |
+
+> [!NOTE]
+> **Timer staggering is NOT a coexistence mechanism.** Coexistence is dynamic hardware-level RF arbitration managed by the ESP32 MAC/PHY layer (via `CONFIG_ESP_COEX_SW_COEXIST_ENABLE`). Staggering application timers only smooths CPU queue contention on FreeRTOS tasks; it does not arbitrate radio packet collisions.
+
+### ScanInhibit Usage Recipe
+
+Use `ScanInhibit` as an RAII guard around network-intensive operations like HTTPS uploads or bulk telemetry:
+
+```cpp
+void performCloudSync() {
+    // Acquire RAII token: cancels active BLE scans and suspends reconnect schedules
+    auto token = bleManager.inhibitScanning("https_upload");
+
+    // Perform bursty Wi-Fi operations with full radio bandwidth
+    httpClient.postJson("/api/telemetry", largePayload);
+
+    // Token destructor releases inhibit when scope exits.
+    // Reconnect policies automatically resume once all active tokens are destroyed.
+}
+```
+
+### Preferred vs Applied Connection Parameters
+
+Connection parameters (interval, latency, supervision timeout) dictate throughput, power consumption, and radio channel reservation:
+- **Peripheral Role**: As a peripheral, the ESP32 can only propose *preferred* parameters (configured via `BLEConfig::peripheralPreferredConnParams` and included in advertising / L2CAP update requests). The **remote Central decides the applied parameters**.
+- **Central Role**: As a central, the ESP32 dictates the connection parameters used when connecting to remote peripherals.
+
+### ESP-IDF Controller Activity Budget & Resource Footprint
+
+Measured facts from benchmark profiling on ESP32-S3 (IDF 5.5.5, NimBLE 2.5.0):
+- **Flash delta**: ~140 KB flash consumption when `WITH_BLE` is enabled.
+- **RAM delta**: ~32 KB static heap allocation for NimBLE host stack and controller structures.
+- **Activity budget**: 6 / 6 concurrent controller slots allocated in `hardware/_common/sdkconfig.ble.defaults`:
+  - 3 Peripheral connection slots
+  - 1 Central connection slot
+  - 1 Advertising slot
+  - 1 Scanning slot
+- Wi-Fi and Bluetooth coexistence is enabled in software via `CONFIG_ESP_COEX_SW_COEXIST_ENABLE=y` with balanced priority arbitration.
+
+### OTA Coupling & Fallback Contract
+
+During firmware updates:
+- Under `#ifdef WITH_OTA`, `BLEManager` subscribes to `ApplicationEvents::OTA_PROGRESS`.
+- The callback runs on the `esp_event` task and performs zero BLE or FreeRTOS blocking calls; it records status flags in atomic variables.
+- On the next `tick()` cycle, receiving the first progress event triggers `pause("ota")`.
+- If `otaDisconnectPeers` is true in `BLEConfig`, all peripheral and central links are cleanly disconnected.
+- If OTA fails (`complete && !success`), `BLEManager::resume()` automatically restores advertising and reconnect schedules.
+- If OTA succeeds (`complete && success`), the BLE stack remains paused while the device reboots into the new firmware.
+- *Note:* The OTA progress handling uses the D8 fallback pattern (`// FALLBACK(#227)`), reacting strictly to the initial pause and final resume/reboot transitions.
+

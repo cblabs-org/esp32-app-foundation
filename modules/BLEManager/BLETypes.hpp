@@ -182,14 +182,17 @@ enum class BLEDisconnectReason : uint8_t {
 };
 
 /**
- * @brief Clamp scan window to at most 50% of scan interval.
+ * @brief Clamp scan window to at most 50% of scan interval (or 25% if peripheral connections exist).
  * @param params Scan parameters structure to validate and clamp in-place.
+ * @param hasPeripheralConnections If true, clamp duty cycle to <= 25% (RFC #225 rev 2 §9).
  */
-void clampScanParams(BLEScanParams& params);
+void clampScanParams(BLEScanParams& params, bool hasPeripheralConnections = false);
 
 /**
- * @brief Clamp scan window to at most 50% of scan interval.
+ * @brief Clamp scan window to at most 50% of scan interval (or 25% if peripheral connections exist).
  * @param intervalMs Reference to interval in milliseconds.
  * @param windowMs Reference to window in milliseconds (clamped in-place).
+ * @param hasPeripheralConnections If true, clamp duty cycle to <= 25% (RFC #225 rev 2 §9).
  */
-void clampScanParams(uint16_t& intervalMs, uint16_t& windowMs);
+void clampScanParams(uint16_t& intervalMs, uint16_t& windowMs, bool hasPeripheralConnections = false);
+

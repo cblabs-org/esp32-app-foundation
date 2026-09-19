@@ -48,9 +48,11 @@
 #include "interfaces/IWebContributor.hpp"
 #include "interfaces/IMCPContributor.hpp"
 #include "interfaces/IPreconditionContributor.hpp"
+#include "types/AppState.hpp"
 
 #include <vector>
 #include <string>
+#include <atomic>
 
 // Forward declarations
 class Application;
@@ -181,6 +183,13 @@ public:
     void setGattStartedForTesting(bool g) { _gattStarted = g; }
     void setProviderRegistrationFaultForTesting(bool f) { _providerRegistrationFault = f; }
     bool postTestQueueMessage(const BLEQueueMessage& msg);
+    void handleOtaProgressForTesting(bool complete, bool success);
+    AppState getEffectiveAppState() const;
+    void setAppStateForTesting(AppState s) {
+        _appStateForTesting = s;
+        _hasAppStateForTesting = true;
+    }
+
 
     // --- ITickable Interface ---
     void tick(uint32_t currentMillis) override;
@@ -218,6 +227,8 @@ private:
     State                              _state = State::Disabled;
     bool                               _locked = false;
     Application*                       _app = nullptr;
+    AppState                           _appStateForTesting = AppState::Boot;
+    bool                               _hasAppStateForTesting = false;
     EventBus*                          _eventBus = nullptr;
 
     BLEStack                           _stack;
@@ -243,12 +254,27 @@ private:
         const char* providerId;
         BLEPeerAddress addr;
         uint32_t durationMs;
+        bool hasPeripherals = false;
     };
     void*                              _workerQueue = nullptr;
     void*                              _workerTask = nullptr;
 
     void*                              _eventQueue = nullptr;
     uint32_t                           _droppedEventsCount = 0;
+
+#ifdef WITH_OTA
+    static void _onOtaProgress(const char* topic, const void* payload, void* ctx);
+#endif
+    void handleOtaProgress(bool complete, bool success);
+
+    // FALLBACK(#227): Atomic flags for OTA coupling.
+    // BLEManager reacts only to the first ota.progress event (pause) and to complete && !success (resume).
+    // No progress-percentage tracking. Mark all fallback code with // FALLBACK(#227).
+    std::atomic<bool>                  _pendingOtaEvent{false};
+    std::atomic<bool>                  _otaComplete{false};
+    std::atomic<bool>                  _otaSuccess{false};
+    bool                               _otaPaused = false;
+
 
     // Central state
     struct DiscoveryState {

@@ -27,6 +27,8 @@
 #include <cstring>
 #include <algorithm>
 #include <memory>
+#include <map>
+#include <string>
 
 static const char* TAG = "BLEStack";
 
@@ -453,6 +455,8 @@ namespace {
             xQueueSend(static_cast<QueueHandle_t>(s_hostQueue), &msg, 0);
         }
     };
+
+    static std::map<std::string, NimBLEClient*> s_clients;
 }
 
 bool BLEStack::executeCentralConnect(const CentralConnectOptions& opts, const BLEPeerAddress& addr, bool& bondedOut) {
@@ -489,6 +493,8 @@ bool BLEStack::executeCentralConnect(const CentralConnectOptions& opts, const BL
 
     opts.provider->onClientReadyWorker(*pClient);
 
+    s_clients[opts.provider->getProviderId()] = pClient;
+
     BLEQueueMessage msg;
     msg.type = BLEQueueMessage::Type::CentralConnected;
     msg.address = addr;
@@ -498,16 +504,19 @@ bool BLEStack::executeCentralConnect(const CentralConnectOptions& opts, const BL
     return true;
 }
 
-void BLEStack::executeCentralDisconnect(const char* /*providerId*/) {
-    // In v2, there's no getClientList. We disconnect using the server's known
-    // connections or by tracking the client pointer. For now, a no-op stub that
-    // WO-3 central connect code will enhance when it tracks the created client.
-    // The connect path already stores _pClient; we guard with isInitialized.
+void BLEStack::executeCentralDisconnect(const char* providerId) {
+    if (!providerId) return;
+    auto it = s_clients.find(providerId);
+    if (it != s_clients.end() && it->second) {
+        it->second->disconnect();
+    }
 }
 
 void BLEStack::executeCentralForget(const char* providerId) {
     executeCentralDisconnect(providerId);
-    // Ideally we'd map providerId to address and deleteBond
+    if (providerId) {
+        s_clients.erase(providerId);
+    }
 }
 
 void BLEStack::executeDiscovery(const BLEScanParams& params, uint32_t durationMs, IBLEClientProvider* /*provider*/, void* hostEventQueue, std::vector<BLEScanResult>& /*resultsOut*/) {
