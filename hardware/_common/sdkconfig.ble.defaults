@@ -30,8 +30,14 @@ CONFIG_BT_NIMBLE_SM_SC=y
 # --- NVS persistence for bonding data ---
 CONFIG_BT_NIMBLE_NVS_PERSIST=y
 
-# --- Memory allocation: use external PSRAM (S3 has plenty) ---
-CONFIG_BT_NIMBLE_MEM_ALLOC_MODE_EXTERNAL=y
+# --- Memory allocation: use internal DRAM (IDF default) ---
+# EXTERNAL mode routes all NimBLE allocs to PSRAM, which causes three
+# failure modes on ESP32-S3: (1) BLE controller DMA cannot access PSRAM,
+# (2) Xtensa atomic instructions fail on PSRAM (cross-core spinlock panics),
+# (3) PSRAM bus contention inflates init past TWDT timeout.
+# INTERNAL is the IDF default and ensures all NimBLE allocs use fast DRAM.
+# See ESP-IDF issues IDFGH-7560, IDFGH-10048.
+CONFIG_BT_NIMBLE_MEM_ALLOC_MODE_INTERNAL=y
 
 # --- Legacy advertising only (v1 scope; no extended advertising) ---
 CONFIG_BT_NIMBLE_EXT_ADV=n
