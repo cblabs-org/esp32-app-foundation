@@ -23,6 +23,8 @@
  *   - ~WeatherModule():         Destructor — releases FreeRTOS mutex
  *   - begin():                  ADR-39 transient service locator wiring  [ITickable lifecycle]
  *   - wireHomeAssistant():      Deferred HA entity registration (post app.begin())
+ *   - onWifiConnected():        Static EventBus callback — updates WiFi connected state
+ *   - onWifiDisconnected():     Static EventBus callback — updates WiFi disconnected state
  *
  *   Data Accessors:
  *   - hasData():                Returns true once first successful parse completes
@@ -143,6 +145,7 @@ private:
     // cross-thread reads. Condition is a variable-length string — use a
     // fixed char buffer protected by a FreeRTOS mutex.
     std::atomic<bool> _hasData{false};                     ///< True after first successful parse
+    std::atomic<bool> _wifiConnected{false};               ///< True when station has an active IP connection
     std::atomic<UpdateStatus> _lastFetchStatus{UpdateStatus::NoChange}; ///< Last fetch result code
     std::atomic<float> _temperature{0.0f};                 ///< Current temperature (atomic)
     std::atomic<float> _windSpeed{0.0f};                   ///< Current wind speed (atomic)
@@ -215,6 +218,24 @@ public:
     /** @brief Wire Home Assistant. */
     void wireHomeAssistant(HomeAssistantModule& ha);
 #endif
+
+    // --- EventBus Callbacks ---
+
+    /**
+     * @brief EventBus callback: updates WiFi connected state on connection.
+     * @param topic    Event topic ("wifi.connected").
+     * @param payload  Event payload (unused).
+     * @param ctx      Opaque context pointer (WeatherModule instance).
+     */
+    static void onWifiConnected(const char* topic, const void* payload, void* ctx);
+
+    /**
+     * @brief EventBus callback: updates WiFi connected state on disconnection.
+     * @param topic    Event topic ("wifi.disconnected").
+     * @param payload  Event payload (unused).
+     * @param ctx      Opaque context pointer (WeatherModule instance).
+     */
+    static void onWifiDisconnected(const char* topic, const void* payload, void* ctx);
 
 
     // --- Data Accessors (H3: Thread-safe getters) ---
