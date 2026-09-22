@@ -139,3 +139,59 @@ main
 **Summary:** Human approved all WOs (verbatim: "approved all WOs. Happy for you to do the spike here in-session and then delegate for the following."). WO-0 executed PA-driven on branch `ble-manager/wo0-spike`. Created `hardware/_common/sdkconfig.ble.defaults` (RFC §16.2), `[ble]` mix-in and `[env:esp32s3nano_ble]` in root `platformio.ini`. Built baseline (`esp32s3nano`) and spike (`esp32s3nano_ble` with full API harness). Candidate A (`h2zero/esp-nimble-cpp@^2.1.0`) passed all gates — clean build, no duplicate symbols, IDF-native host, all RFC §5 APIs present. D3 recorded. Controller activity budget: 6/6 exact fit (3P+1C+adv+scan). Flash Δ = +251 KB (37.7%), RAM Δ = +2.1 KB. Candidate B not tested (A won). Spike harness committed then removed in separate commit. `FINDINGS.md` written. 5 esp-nimble-cpp v2 API differences documented (all straightforward).
 **Commits:** `0f666cb5` (approval), `2b02db51` (spike harness), `e499f010` (harness removal).
 **Next:** Present budgets to human for confirmation. If approved, create `ble-manager/wo1-skeleton` and spawn WO-1 autonomous worker.
+
+### 2026-09-19 — WO-1 through WO-5 complete (autonomous workers)
+**Summary:** WO-1 through WO-5 were executed by autonomous workers in sequence per the stacked branch plan. All completed successfully.
+- **WO-1** (`01be46a0`): Module skeleton, BLETypes, BLEAdvertisingBuilder, env plumbing, lifecycle. Branch `ble-manager/wo1-skeleton`.
+- **WO-2** (`1c048c72`): Peripheral role — GATT server, handle routing, advertising packer, NimBLE callbacks, sample providers (`SampleFtmsProvider`, `SampleHrRepeater`). Branch `ble-manager/wo2-peripheral`.
+- **WO-3** (`539488c7`): Central role — discovery, BLEDeviceRegistry, bonding, BLEReconnectPolicy, worker task, `SampleHrClient`. Branch `ble-manager/wo3-central`.
+- **WO-4** (`c133d59b`): Portal tab (`ble.js`), REST routes, MCP tools (`ble_status`, `ble_scan`, `ble_pair`, `ble_forget`). D8 gate: human chose fallback (option 2) for #227 EventBus payload lifetime. Branch `ble-manager/wo4-portal-mcp`.
+- **WO-5** (`b568ec5f`): OTA pause/resume (D8 fallback pattern with `// FALLBACK(#227)` markers), WiFi/BLE coexistence hardening, `ScanInhibit`, consolidated docs (`docs/developer/bluetooth.md`), framework-expert skill BLE material, CHANGELOG entry. Branch `ble-manager/wo5-coexistence-ota`. Tagged `v0.0.12-dev.58`.
+**Cross-cutting decisions:** D8 fallback chosen and posted to [#227](https://github.com/matthewmcneill/esp32-app-foundation/issues/227#issuecomment-5739961669). Template app issue filed as [#229](https://github.com/matthewmcneill/esp32-app-foundation/issues/229).
+**Build numbers (post WO-5):** `esp32s3nano_ble` — Flash 1,761,971 B (52.5%), RAM 62,180 B (18.9%).
+
+### 2026-09-22 — WO-6 interactive session: BLE WDT crash blocker + baseline recovery
+**Summary:** Attempted WO-6 interactive hardware acceptance. **BLE init crashes on boot — BLOCKER.** 7 fix attempts all failed, systematic debugging invoked, all thrash reverted, non-BLE baseline confirmed stable at `v0.0.12-dev.60`. WO-6 acceptance protocol did NOT execute.
+
+**BLE WDT Crash — Root Cause Analysis (CRITICAL — do not retry these):**
+The BLE controller's `NimBLEDevice::init()` on ESP32-S3 acquires cross-core heap spinlocks that disable interrupts on BOTH CPUs for >5 seconds, causing watchdog resets. The controller also dumps 80+ lines of debug output (`EM_BASE_REG_LUT` table) during init, which is not normal production behaviour.
+
+**Failed fix attempts (DO NOT RETRY):**
+
+| # | Fix | WDT Type | Why it failed |
+|---|-----|----------|---------------|
+| 1 | `vTaskDelay(10ms)` before init | INT_WDT | Contention is DURING init, not before |
+| 2 | `vTaskDelay(100ms)` + `advertiseInConfiguring=true` | INT_WDT | Stale config overrides default, still blocks |
+| 3 | One-shot task on CPU1 (semaphore) | INT_WDT | Cross-core spinlock blocks CPU0 regardless |
+| 4 | `CONFIG_ESP_INT_WDT_TIMEOUT_MS=800` | INT_WDT | Interrupts masked at level 11 — no timeout helps |
+| 5 | `CONFIG_ESP_INT_WDT_TIMEOUT_MS=2000` | INT_WDT | Same |
+| 6 | `CONFIG_ESP_INT_WDT_CHECK_CPU1=n` | INT_WDT | CPU0 still hit by cross-core spinlock |
+| 7 | `CONFIG_ESP_INT_WDT=n` (disable entirely) | **TG0WDT** | Task WDT fires instead (5s default, init >5s) |
+
+**Systematic debugging hypotheses (ranked, untested):**
+- **H1:** BLE controller debug logging enabled — `EM_BASE_REG_LUT` dump shouldn't appear; check for `CONFIG_BT_LE_CONTROLLER_LOG_*` or similar
+- **H2:** `CONFIG_BT_NIMBLE_MEM_ALLOC_MODE_EXTERNAL=y` (PSRAM) causing slow init — controller needs internal DRAM
+- **H3:** `esp-nimble-cpp@2.5.0` vs IDF 5.5.5 compatibility issue
+- **H4:** Task WDT needs deregistration during init (`esp_task_wdt_delete/add` around semaphore wait) + INT_WDT=n combined
+
+**Key technical facts for next session:**
+- NimBLE version: `esp-nimble-cpp@2.5.0` (h2zero)
+- Task WDT config: `CONFIG_ESP_TASK_WDT_TIMEOUT_S=5`, `CONFIG_ESP_TASK_WDT_PANIC=1`
+- `CONFIG_BT_NIMBLE_MEM_ALLOC_MODE_EXTERNAL=1` (PSRAM alloc)
+- `CONFIG_BT_NIMBLE_LOG_LEVEL=1` (INFO)
+- `CONFIG_BT_CTRL_MODE_EFF=1`
+- Crash timeline: BLE_INIT starts ~7900ms, MAC printed, EM_BASE_REG_LUT dump (51 entries), reset at ~13000ms
+- Waveshare board has 1 button (BOOT/GPIO0). Download mode: unplug USB, hold button, plug in, wait 2s, release
+- Port: `/dev/cu.usbmodem101`
+
+**Other work completed this session:**
+- **PlatformIO MCP `extends` bug fix:** Root cause found in `parseTargetEnvironments()` — doesn't resolve `extends` directive. Fixed in `platformio-mcp` fork, 3 tests added, upstream PR [jl-codes/platformio-mcp#28](https://github.com/jl-codes/platformio-mcp/pull/28) submitted. Issue [#27](https://github.com/jl-codes/platformio-mcp/issues/27) filed.
+- **WeatherModule WiFi guard:** Committed `3b20a443` — `fetchUpdate()` now checks WiFi connectivity via EventBus before attempting HTTP.
+- **LittleFS re-uploaded** (fresh filesystem after factory flash).
+- **Non-BLE baseline confirmed:** `esp32s3nano` env, `v0.0.12-dev.60`, 10-minute soak test PASS, zero crashes. Weather config saved via portal confirmed.
+
+**All BLE thrash changes REVERTED.** Working tree is clean except `MEMORY.md` status update. The code on `ble-manager/wo6-validation` is identical to `ble-manager/wo5-coexistence-ota` plus the WeatherModule WiFi guard commit.
+
+**Sample app remediation needed:** The weather station sample app is not a canonical best-in-class consumer of the framework. Boot sequence, dependency mapping, configuration flow, and DataManager usage need review against the post-Drayton-Wiser framework APIs. This should be a separate work stream before BLE acceptance.
+
+**Next:** (1) Fix BLE WDT crash using systematic debugging (start with H1/H2). (2) Remediate sample app. (3) Then retry WO-6 acceptance protocol.
