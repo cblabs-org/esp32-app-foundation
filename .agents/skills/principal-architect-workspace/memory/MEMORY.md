@@ -1,5 +1,5 @@
 # Principal Architect Memory
-<!-- Last updated: 2026-09-23T23:13:00+01:00 -->
+<!-- Last updated: 2026-09-23T23:46:00+01:00 -->
 
 ## Active Programs
 | Program | Plan | Status |
@@ -9,7 +9,7 @@
 ## Active Projects
 | Project | Status | Modules | Context |
 |---|---|---|---|
-| pr-225-ble-manager | WO6/7 — DIS delivered (`v0.0.12-dev.66`), feature-complete. Ready for interactive hardware acceptance testing. | BLEManager, DeviceInfoServiceProvider (new), Application (setManufacturer), framework_version.h (new), platformio.ini, sdkconfig fragment, docs, framework-expert skill, credits.js | [PROJECT.md](../pr-225-ble-manager/PROJECT.md) |
+| pr-225-ble-manager | **WO-6 COMPLETE** (`v0.0.12-dev.67`). All 7 WOs done. Hardware acceptance passed: DIS 6/6, coexistence 80/80, DRAM flat, MCP read-only ✅. One fix: DIS Serial → BLE MAC. Ready for PR merge. | BLEManager, DeviceInfoServiceProvider, Application, framework_version.h, platformio.ini, sdkconfig, docs, credits.js | [PROJECT.md](../pr-225-ble-manager/PROJECT.md) |
 | sample-app-remediation | NEW — weather station sample app needs review: boot sequence, dependency mapping, config flow, DataManager usage vs post-Drayton framework APIs | sample-app/src/main.cpp, WeatherModule, DataManager, ConfigManager, web portal | (pending PROJECT.md creation) |
 | pr-drayton-consumer-fixes | WO5/5 — COMPLETE, soak-tested | DataManager, IDataSource, FetchContext, AppFoundation.h, WeatherModule, framework-expert skill | [PROJECT.md](../pr-drayton-consumer-fixes/PROJECT.md) |
 | pr-128-datamanager-resilience | WO7/7 (WO6 re-plan gated) | DataManager, IDataSource, FetchContext, Application, MCPServer, Display, Portal | [PROJECT.md](../pr-128-datamanager-resilience/PROJECT.md) |
