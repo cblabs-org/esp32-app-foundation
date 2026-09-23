@@ -11,13 +11,18 @@
   if (!container) return;
 
   var libs = [
-    { name: 'ESP-IDF',        author: 'Espressif Systems',          licence: 'Apache-2.0',    url: 'https://github.com/espressif/esp-idf' },
-    { name: 'Arduino-ESP32',  author: 'Espressif Systems',          licence: 'LGPL-2.1',      url: 'https://github.com/espressif/arduino-esp32' },
-    { name: 'ArduinoJson',    author: 'Benoît Blanchon',            licence: 'MIT',            url: 'https://github.com/bblanchon/ArduinoJson' },
-    { name: 'PsychicHttp',    author: 'Hoeken / Zach Hoeken',       licence: 'LGPL-2.1',      url: 'https://github.com/hoeken/PsychicHttp' },
-    { name: 'U8g2',           author: 'Oliver Kraus (olikraus)',     licence: 'BSD-2-Clause',  url: 'https://github.com/olikraus/u8g2' },
-    { name: 'mbedTLS',        author: 'TrustedFirmware.org (ARM)',   licence: 'Apache-2.0',    url: 'https://github.com/Mbed-TLS/mbedtls' },
-    { name: 'GoogleTest',     author: 'Google',                      licence: 'BSD-3-Clause',  url: 'https://github.com/google/googletest' }
+    { name: 'ESP-IDF',              author: 'Espressif Systems',          licence: 'Apache-2.0',    url: 'https://github.com/espressif/esp-idf' },
+    { name: 'Arduino-ESP32',        author: 'Espressif Systems',          licence: 'LGPL-2.1',      url: 'https://github.com/espressif/arduino-esp32' },
+    { name: 'ArduinoJson',          author: 'Benoît Blanchon',            licence: 'MIT',            url: 'https://github.com/bblanchon/ArduinoJson' },
+    { name: 'esp-nimble-cpp',       author: 'h2zero',                     licence: 'Apache-2.0',    url: 'https://github.com/h2zero/esp-nimble-cpp' },
+    { name: 'JsonStreamingParser',  author: 'Daniel Eichhorn (squix78)',  licence: 'MIT',            url: 'https://github.com/squix78/json-streaming-parser' },
+    { name: 'LovyanGFX',            author: 'lovyan03',                   licence: 'FreeBSD',       url: 'https://github.com/lovyan03/LovyanGFX' },
+    { name: 'LVGL',                  author: 'LVGL Kft',                   licence: 'MIT',            url: 'https://github.com/lvgl/lvgl' },
+    { name: 'mbedTLS',              author: 'TrustedFirmware.org (ARM)',   licence: 'Apache-2.0',    url: 'https://github.com/Mbed-TLS/mbedtls' },
+    { name: 'NimBLE',               author: 'Apache Mynewt',              licence: 'Apache-2.0',    url: 'https://github.com/apache/mynewt-nimble' },
+    { name: 'PsychicHttp',          author: 'Hoeken / Zach Hoeken',       licence: 'LGPL-2.1',      url: 'https://github.com/hoeken/PsychicHttp' },
+    { name: 'U8g2',                  author: 'Oliver Kraus (olikraus)',     licence: 'BSD-2-Clause',  url: 'https://github.com/olikraus/u8g2' },
+    { name: 'GoogleTest',           author: 'Google',                      licence: 'BSD-3-Clause',  url: 'https://github.com/google/googletest' }
   ];
 
   var html = '<div class="card">';
