@@ -67,7 +67,7 @@ It also contributes a portal tab, REST routes, MCP tools, EventBus `ble.*` event
 | **WO-3** | [Central role: discovery, registry, bonding, reconnect, worker task](wo3-central/WORKORDER.md) | `architect` | ✅ Complete | `ble-manager/wo3-central` | `539488c7` |
 | **WO-4** | [Portal tab, REST routes, MCP tools](wo4-portal-mcp/WORKORDER.md) | `standard` | ✅ Complete | `ble-manager/wo4-portal-mcp` | `c133d59b` |
 | **WO-5** | [Coexistence, OTA pause, docs and skill](wo5-coexistence-ota/WORKORDER.md) | `standard` | ✅ Complete (D8 fallback) | `ble-manager/wo5-coexistence-ota` | `b568ec5f` |
-| **WO-6** | [Hardware acceptance run (RFC §17.2, amended)](wo6-validation/WORKORDER.md) | `interactive` | ⬜ Not started | `ble-manager/wo6-validation` | — |
+| **WO-6** | [Hardware acceptance run (RFC §17.2, amended)](wo6-validation/WORKORDER.md) | `interactive` | ✅ Complete | `ble-manager/wo6-validation` | `18618a43` (ACCEPTANCE.md), fix `c697ff55` (DIS MAC). Tag `v0.0.12-dev.67`. |
 
 ### Gates between WOs
 - **After WO-0 (hard gate):** the PA reviews `wo0-spike/FINDINGS.md`, records D3 and any sdkconfig changes here, and **presents the budget numbers to the human**. If the S3 budget or the controller activity budget can't meet 3P+1C, **stop** and return to the RFC. Don't continue on assumptions.
@@ -257,18 +257,20 @@ The BLE controller's `NimBLEDevice::init()` on ESP32-S3 acquires cross-core heap
 | `v0.0.12-dev.66` | `344ee6df` | DIS implementation |
 | — | `162ebf30` | WO6-DIS completion report |
 | — | `a148b938` | Credits: 5 missing libraries |
+| `v0.0.12-dev.67` | `c697ff55` | fix(ble): DIS Serial → BLE MAC |
+| — | `18618a43` | docs(wo6): hardware acceptance report |
 
-**What remains for WO-6 completion:** Interactive hardware acceptance testing cycle. The code is feature-complete; what's needed is a structured acceptance test covering:
-1. BLE Peripheral advertising and connection (nRF Connect)
-2. DIS characteristic reads (verify all 6 fields)
-3. BLE Central scan and connect
-4. WiFi+BLE coexistence stability
-5. OTA pause/resume with BLE active
-6. Extended soak test (1+ hours)
-7. DRAM headroom confirmation under load
+**WO-6 complete.** Interactive hardware acceptance testing passed on `v0.0.12-dev.67`:
+- DIS 6/6 characteristics verified via Mac BLE (bleak)
+- BLE advertising, connect/disconnect cycling, DRAM stability all pass
+- WiFi+BLE coexistence 80/80 HTTP requests with BLE active
+- MCP read-only enforcement verified
+- One fix applied: DIS Serial Number changed from WiFi MAC to BLE MAC
+- Full report: [`ACCEPTANCE.md`](wo6-validation/ACCEPTANCE.md)
 
 **Unresolved items:**
 - [#232](https://github.com/matthewmcneill/esp32-app-foundation/issues/232): Device name unification (P2, deferred)
 - [#230](https://github.com/matthewmcneill/esp32-app-foundation/issues/230): OTA module unloading RFC (future)
 - Sample app remediation (separate project)
 - `FRAMEWORK_VERSION` auto-injection from git tags (future)
+
