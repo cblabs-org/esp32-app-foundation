@@ -80,6 +80,24 @@ Fork the `uidesign/` project folder into the application repository, preserve al
 ### What is the `sys_` prefix?
 `sys_` denotes framework-contracted reactive subjects (e.g. `sys_boot_progress`, `sys_error_visible`, `sys_ota_status`). Designers must not rename or remove these subjects in their LVGL Pro projects so core framework events (boot splash, OTA updates, WiFi configuration, error states, diagnostics) bind correctly.
 
+### How much DRAM does BLE cost?
+~69 KB on ESP32-S3 (controller ~35-40 KB non-negotiable + host ~25-30 KB tunable). See `docs/developer/bluetooth.md` § Memory & DRAM Budget.
+
+### Can BLE buffers use PSRAM?
+No. BLE controller DMA cannot access PSRAM. `MEM_ALLOC_MODE_EXTERNAL` causes spinlock panics (IDFGH-7560). All BLE memory must be internal DRAM.
+
+### How do I add a GATT service?
+Implement `IBLEServiceProvider`, register in `main.cpp` via `bleManager.registerServiceProvider()`. See `docs/developer/bluetooth.md` § Peripheral Role.
+
+### How do I connect to a remote BLE device?
+Implement `IBLEClientProvider`, register via `bleManager.registerClientProvider()`. See `docs/developer/bluetooth.md` § Central Role.
+
+### How do I reduce BLE memory usage?
+Choose a memory profile from the BLE Memory Profiles section below. The `peripheral-only` profile saves ~15-20 KB by dropping Central/Observer roles.
+
+### What is `bleInUse()`?
+A strong symbol override in `BLEStack.cpp` that prevents Arduino's `initArduino()` from releasing BT controller memory. Without it, BLE init crashes with WDT resets.
+
 ### Framework-Reserved Include Prefixes
 
 The following subdirectories of `include/` are reserved by the framework:
@@ -142,7 +160,7 @@ This skill uses a progressive disclosure model. Based on your query, load and re
 | **Web Portal** (SPA, routes, HTML/JS fragments, security) | `systems/web-portal/` |
 | **Web Server Stack & DRAM Tuning** (httpd stack, DeepStackExecutor, PSRAM offload) | `systems/web-portal/dram-tuning.md` |
 | **Design System** (Tokens, components, templates, UI kit for portal styling) | Sibling skill: `../framework-design-system/readme.md` |
-| **Bluetooth LE Subsystem** (BLEManager, Peripheral/Central providers, threading rules, coexistence, ScanInhibit) | `systems/ble/overview.md` |
+| **Bluetooth LE Subsystem** (BLEManager, Peripheral/Central providers, threading rules, coexistence, ScanInhibit) | `bluetooth.md` |
 | **OTA Update System** (State machine, channels, config lifecycle, deploy) | `systems/ota/` |
 | **Data Sources & Resilience** (FetchContext, deadlines, health backoff, TLS client) | `interfaces/data-source.md` |
 | **MCP Server** (Device interaction, JSON-RPC protocol, tool discovery, scripts) | `systems/mcp-server/` |
@@ -191,6 +209,8 @@ A failing source degrades itself; it **never reboots the device**.
 The framework's `sdkconfig.ble.defaults` ships a **balanced** configuration: all four BLE
 roles enabled, 2 concurrent connections, right-sized buffer pools. This costs ~70 KB of
 internal DRAM at steady state on an ESP32-S3.
+
+ESP32-S3 has 320 KB total internal DRAM. The BLE controller enforces a non-negotiable ~35-40 KB floor (proprietary blob, cannot use PSRAM). The profiles below tune the HOST side only (~25-30 KB). Note that while WiFi costs similar amounts, it can offload to PSRAM; BLE cannot.
 
 Downstream consumers can layer an optimisation profile on top by adding the overrides to
 their board-specific `sdkconfig.*.defaults` file **after** the framework's BLE fragment
