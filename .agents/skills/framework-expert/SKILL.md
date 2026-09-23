@@ -98,6 +98,9 @@ Choose a memory profile from the BLE Memory Profiles section below. The `periphe
 ### What is `bleInUse()`?
 A strong symbol override in `BLEStack.cpp` that prevents Arduino's `initArduino()` from releasing BT controller memory. Without it, BLE init crashes with WDT resets.
 
+### What BLE services does the framework provide?
+The framework automatically registers a standard Bluetooth SIG Device Information Service (DIS, UUID `0x180A`) in `BLEManager::begin()`. It exposes 6 read-only characteristics: Manufacturer (`app.getManufacturer()`, defaults to `"CB Labs"`), Model (`app.getAppName()`), Serial Number (last 3 bytes of WiFi MAC), Firmware Revision (`BUILD_VERSION`), Hardware Revision (`ESP.getChipModel()`), and Software Revision (`"App Foundation " + FRAMEWORK_VERSION`). Consumers do not need to register DIS manually.
+
 ### Framework-Reserved Include Prefixes
 
 The following subdirectories of `include/` are reserved by the framework:

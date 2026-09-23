@@ -40,6 +40,10 @@
  *   - getAuthManager():          Access the AuthManager security service
  *   - getState():                Query the current AppState lifecycle phase
  *   - getMcpContributors():      Access registered MCP contributor vector
+ *   - setAppName():              Set the application name displayed in portal title
+ *   - getAppName():              Get the application name
+ *   - setManufacturer():         Set the manufacturer name for device identity
+ *   - getManufacturer():         Get the manufacturer name (defaults to "CB Labs")
  */
 
 #pragma once
@@ -169,6 +173,12 @@ public:
 
     /** @brief Get the application name. Returns APP_TITLE if not set. */
     const char* getAppName() const { return _appName ? _appName : APP_TITLE; }
+
+    /** @brief Set the manufacturer name for device identity (DIS, portal). */
+    void setManufacturer(const char* name) { _manufacturer = name; }
+
+    /** @brief Get the manufacturer name. Returns "CB Labs" if not set. */
+    const char* getManufacturer() const { return _manufacturer ? _manufacturer : "CB Labs"; }
 
     /** @brief Set an optional CSS stylesheet path for portal branding. */
     void setAppStylesheet(const char* path) { _appStylesheet = path; }
@@ -547,6 +557,7 @@ private:
     AppTabContributor _appTabContributor;  ///< Contributes "App" top-level nav tab
     bool _enableDefaultAppTab = true;      ///< Guard for default App tab registration
     const char* _appName = nullptr;        ///< Runtime-settable application name (overrides APP_TITLE)
+    const char* _manufacturer = nullptr;   ///< Runtime-settable manufacturer name (defaults to "CB Labs")
     const char* _appStylesheet = nullptr;  ///< Optional CSS path for portal branding
 
     // -------------------------------------------------------------------------

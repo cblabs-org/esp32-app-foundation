@@ -161,7 +161,32 @@ private:
 - **`Priority::Required`**: Guaranteed placement in primary advertising. If the primary payload exceeds 31 bytes, a `BLE Advertising` precondition fault is raised.
 - **`Priority::High`**: Placed in primary advertising if space permits, otherwise spills over into the 31-byte scan response.
 - **`Priority::Normal`**: Placed in scan response if space permits; dropped if full.
- 
+
+### 3.5 Built-in Device Information Service (DIS)
+
+`BLEManager` automatically registers a standard Bluetooth SIG Device Information Service (UUID `0x180A`) on the shared GATT server during `begin()`, before any consumer service providers. Applications do not need to implement or register DIS manually.
+
+The service exposes 6 standard read-only characteristics:
+
+| Characteristic | UUID | Value Source | Default / Format |
+|---|---|---|---|
+| **Manufacturer Name String** | `0x2A29` | `app.getManufacturer()` | `"CB Labs"` (set via `app.setManufacturer()`) |
+| **Model Number String** | `0x2A24` | `app.getAppName()` | `"ESP32 App Foundation"` (or `app.setAppName()`) |
+| **Serial Number String** | `0x2A25` | WiFi STA MAC address | Last 3 bytes formatted as `"XX:YY:ZZ"` |
+| **Firmware Revision String** | `0x2A26` | `BUILD_VERSION` | Application version from git tags (e.g. `"0.1.0"`) |
+| **Hardware Revision String** | `0x2A27` | `ESP.getChipModel()` | Chip model string from ESP-IDF (e.g. `"ESP32-S3"`) |
+| **Software Revision String** | `0x2A28` | Framework version | `"App Foundation " + FRAMEWORK_VERSION` (e.g. `"App Foundation 0.0.12"`) |
+
+Consumers can customise the manufacturer name in their `setup()` before `app.begin()`:
+
+```cpp
+app.setManufacturer("Acme Corp");
+app.setAppName("SuperSensor");
+```
+
+> [!NOTE]
+> DIS is not added to advertising packets. It is discovered by central devices via GATT service discovery after establishing a connection.
+
 ---
  
 ## 4. Central Role: `IBLEClientProvider`
