@@ -1,0 +1,30 @@
+{
+  "flash-tag-gate": {
+    "PreToolUse": [
+      {
+        "matcher": "call_mcp_tool",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ./scripts/flash-tag-gate.py",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  },
+  "pio-cli-gate": {
+    "PreToolUse": [
+      {
+        "matcher": "run_command",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ./scripts/pio-cli-gate.py",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}
