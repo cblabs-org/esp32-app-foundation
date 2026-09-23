@@ -334,7 +334,7 @@ Exposes 4 AI agent tools via the Model Context Protocol:
  
 - **MAC Address Privacy**: In compliance with RFC #225 §15, all diagnostic logging, EventBus telemetry, and MCP tool outputs mask the first four bytes of device MAC addresses (`**:**:**:**:EE:FF`). Unredacted addresses are only exposed through authenticated REST endpoints.
 - **Open GATT Model**: In v1, GATT services operate without required passkey authentication or MITM bonding. Sensitive application characteristics must implement application-level encryption or rely on physical proximity.
-- **Controller Slot Capacity**: `sdkconfig.ble.defaults` allocates 6 controller activity slots (3 Peripheral connections + 1 Central connection + 1 Advertising slot + 1 Scanning slot).
+- **Controller Slot Capacity**: `sdkconfig.ble.defaults` allocates 4 controller activity slots (configurable via `CONFIG_BT_CTRL_BLE_MAX_ACT`).
 - **Legacy Advertising Only**: v1 utilizes standard 31-byte legacy advertising PDUs for universal compatibility with older smartphones and sensors. Extended advertising (BLE 5.0) is not supported.
  
 ---
@@ -344,3 +344,21 @@ Exposes 4 AI agent tools via the Model Context Protocol:
 - **Advertising packet truncated / Missing UUID**: Check the Advertising byte meter in the web portal or inspect `ble_status`. If total bytes exceed 31, demote optional UUIDs from `Priority::Required` to `Priority::High` so they spill into the scan response.
 - **Remote client fails to connect**: Inspect device logs using nRF Connect. Verify that the client is requesting connection intervals within the preferred range (`minIntervalUnits = 24`, `maxIntervalUnits = 40`).
 - **Scanning fails to start**: Check if `bleManager.inhibitScanning()` was called by a Wi-Fi task, or if the device is still in `AppState::Configuring`. Scanning is only permitted in `AppState::Running`.
+- **BLE init crashes with WDT reset or EM_BASE_REG_LUT dump**: Root cause is Arduino's `initArduino()` releasing BT controller memory when `bleInUse()` returns false. The framework's `BLEStack.cpp` provides `extern "C" bool bleInUse(void) { return true; }` to prevent this. If you see this crash, verify the strong symbol override is present in your build. See H-G in the debugging history.
+
+---
+ 
+## 13. Memory & DRAM Budget
+
+1. **Total BLE DRAM cost**: ~69 KB on ESP32-S3 (measured on v0.0.12-dev.65 sample app)
+2. **Cost breakdown**:
+   - BLE controller (proprietary blob): ~35-40 KB — non-negotiable hardware floor
+   - NimBLE host (buffers, transport, conn pools): ~25-30 KB — tunable via sdkconfig
+   - Static DRAM (.bss/.data): only ~6.5 KB (most BLE cost is dynamic heap)
+   - esp-nimble-cpp C++ wrapper overhead: ~2-4 KB (negligible)
+3. **PSRAM limitation**: BLE controller DMA cannot access external PSRAM. ALL BLE memory must be internal DRAM. This is a hardware constraint (ESP32-S3 Xtensa architecture), not a software limitation. `CONFIG_BT_NIMBLE_MEM_ALLOC_MODE_EXTERNAL=y` causes spinlock panics (IDFGH-7560).
+4. **WiFi vs BLE comparison**: WiFi costs similar DRAM (~55 KB) but can offload TX/RX buffers to PSRAM via `CONFIG_SPIRAM_TRY_ALLOCATE_WIFI_LWIP=y`. BLE cannot. Running both simultaneously costs ~110 KB of internal DRAM.
+5. **Optimization profiles**: Reference the framework-expert skill's BLE Memory Profiles section for four named profiles (balanced, peripheral-only, gateway, ultra-minimal).
+6. **OTA headroom**: Reference RFC #230 for temporary module unloading during OTA.
+7. **`CONFIG_BT_NIMBLE_LOW_SPEED_MODE`**: Saves <1 KB on ESP32-S3 (NimBLE host code is already in flash). Not recommended.
+8. **`CONFIG_BT_CTRL_RUN_IN_FLASH_ONLY`**: Saves ~25 KB but EXPERIMENTAL — controller ISR handlers run from flash, causing BLE failures during flash erase. Not suitable as framework default.
