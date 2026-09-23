@@ -216,4 +216,59 @@ The BLE controller's `NimBLEDevice::init()` on ESP32-S3 acquires cross-core heap
 > - **Timestamp:** 2026-09-23T22:53:04+01:00
 > - **Scope:** [wo6-dis-service/WORKORDER.md](wo6-dis-service/WORKORDER.md)
 
-**Next:** Execute DIS work order, then WO-6 interactive hardware acceptance.
+**WO6-DIS executed by worker `32b05cf5`:** DIS implementation delivered, hardware-validated at `v0.0.12-dev.66`. Worker Completion Report in [wo6-dis-service/WORKORDER.md](wo6-dis-service/WORKORDER.md). 933 unit tests pass. DRAM=70,739 B (negligible regression from 6 GATT entries). Serial confirmed `Device Information Service (0x180A) registered`.
+
+**Additional work this session:**
+- Credits screen (`web/portal/credits.js`) updated — 5 missing libraries added (esp-nimble-cpp, NimBLE, LVGL, LovyanGFX, JsonStreamingParser). Commit `a148b938`.
+- Documentation gaps closed by worker `191242a3`: bluetooth.md §13 Memory & DRAM Budget, bleInUse() troubleshooting, SKILL.md BLE quick answers, DRAM preamble for memory profiles.
+- Full device naming audit (17+ surfaces). Filed as [#232](https://github.com/matthewmcneill/esp32-app-foundation/issues/232) with extended findings (TLS cert CN bug, LVGL boot binding bug, mDNS unimplemented).
+
+**Cross-cutting decisions (project-wide implications):**
+- D13: `FRAMEWORK_VERSION` constant created (`include/framework_version.h`). Must be manually bumped on framework releases. Used by DIS Software Revision. Future: could be auto-injected by `inject_version.py`.
+- D14: `Application::setManufacturer()`/`getManufacturer()` API added. Defaults to `"CB Labs"`. Third-party consumers override. This feeds into #232 identity unification.
+- D15: Portal credits must list ALL third-party dependencies with correct licences. 12 libraries now credited.
+
+**Dead ends (project-wide):**
+- `CONFIG_BT_NIMBLE_MEM_ALLOC_MODE_EXTERNAL=y` (PSRAM for NimBLE): Causes spinlock panics (IDFGH-7560). BLE controller DMA physically cannot access PSRAM. This is a hardware constraint, not software — applies to ALL ESP32-S3 projects.
+- `CONFIG_BT_CTRL_RUN_IN_FLASH_ONLY`: Saves ~28 KB IRAM but is EXPERIMENTAL, breaks during flash erase (OTA, LittleFS). Espressif's own CI disables it. Not viable as framework default.
+
+**Soak test results:**
+- `v0.0.12-dev.65`: 12/12 checks over 56m33s, DRAM dead flat at 73,527 B, zero crashes.
+- `v0.0.12-dev.64`: 12/12 checks over 3h24m, stable.
+
+### Session Wrap-Up — 2026-09-23T23:12:00+01:00
+
+**Architectural outcome:** BLE module is now feature-complete for framework v0.0.12. The module provides:
+- Dual-role BLE (Peripheral + Central) via `IBLEServiceProvider` / `IBLEClientProvider`
+- Built-in Device Information Service (DIS 0x180A) with dynamic identity from `Application` APIs
+- Optimised DRAM footprint (~69 KB, down from ~97 KB)
+- Documented memory profiles (balanced, peripheral-only, gateway, ultra-minimal)
+- Full developer documentation (`bluetooth.md`) and agent skill coverage
+
+**Branch status:** `ble-manager/wo6-validation` — 8 commits ahead of `ble-manager/wo5-coexistence-ota`:
+
+| Tag | Commit | Description |
+|-----|--------|-------------|
+| `v0.0.12-dev.62/63` | `4e047185` | WDT scaffolding (reverted in dev.64) |
+| `v0.0.12-dev.64` | `d59ce16f` | BLE crash fix (bleInUse + WDT revert) |
+| `v0.0.12-dev.65` | `f517e790` | DRAM optimisation |
+| — | `0afff5ec` | Skill: BLE memory profiles |
+| — | `4b263a7a` | Docs: memory, troubleshooting, skill gaps |
+| `v0.0.12-dev.66` | `344ee6df` | DIS implementation |
+| — | `162ebf30` | WO6-DIS completion report |
+| — | `a148b938` | Credits: 5 missing libraries |
+
+**What remains for WO-6 completion:** Interactive hardware acceptance testing cycle. The code is feature-complete; what's needed is a structured acceptance test covering:
+1. BLE Peripheral advertising and connection (nRF Connect)
+2. DIS characteristic reads (verify all 6 fields)
+3. BLE Central scan and connect
+4. WiFi+BLE coexistence stability
+5. OTA pause/resume with BLE active
+6. Extended soak test (1+ hours)
+7. DRAM headroom confirmation under load
+
+**Unresolved items:**
+- [#232](https://github.com/matthewmcneill/esp32-app-foundation/issues/232): Device name unification (P2, deferred)
+- [#230](https://github.com/matthewmcneill/esp32-app-foundation/issues/230): OTA module unloading RFC (future)
+- Sample app remediation (separate project)
+- `FRAMEWORK_VERSION` auto-injection from git tags (future)
