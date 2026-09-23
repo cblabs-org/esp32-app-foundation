@@ -45,17 +45,3 @@ CONFIG_BT_NIMBLE_EXT_ADV=n
 # --- Wi-Fi / BLE coexistence (software) ---
 CONFIG_ESP_COEX_SW_COEXIST_ENABLE=y
 
-# --- Interrupt WDT: disabled for BLE environments ---
-# The BLE controller ROM code dumps EM_BASE_REG_LUT under a spinlock
-# that masks interrupts on Core 0 for >800ms during init. This is
-# inside the ROM and cannot be patched. INT_WDT must be disabled
-# for BLE envs to allow controller init to complete.
-CONFIG_ESP_INT_WDT=n
-
-# --- Task WDT: relaxed for BLE controller init ---
-# The BLE controller init blocks Core 0 for >5s under a spinlock,
-# starving both the calling task AND the idle task. Increase timeout
-# to 30s and disable idle-task checks to prevent TG0WDT_SYS_RST.
-CONFIG_ESP_TASK_WDT_TIMEOUT_S=30
-CONFIG_ESP_TASK_WDT_CHECK_IDLE_TASK_CPU0=n
-CONFIG_ESP_TASK_WDT_CHECK_IDLE_TASK_CPU1=n

@@ -97,7 +97,7 @@ class AuditModule : public IWebContributor,
                     public IPreconditionContributor {
 public:
     static constexpr size_t AUDIT_QUEUE_DEPTH = 16;              ///< Max records buffered before drops
-    static constexpr uint32_t AUDIT_WRITER_STACK_SIZE = 3072;    ///< DRAM stack for AuditWriter task (worst-case ~1.8 KiB used)
+    static constexpr uint32_t AUDIT_WRITER_STACK_SIZE = 4096;    ///< DRAM stack for AuditWriter task
     static constexpr UBaseType_t AUDIT_WRITER_PRIORITY = 2;      ///< Low priority — non-critical I/O
 #ifdef BOARD_AUDIT_BYTES
     static constexpr size_t AUDIT_BUDGET_BYTES = BOARD_AUDIT_BYTES;  ///< Board-specific flash budget

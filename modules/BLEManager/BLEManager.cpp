@@ -26,7 +26,6 @@
 
 #include "types/AppState.hpp"
 #include "EventBus.hpp"
-#include "esp_task_wdt.h"
 
 #ifndef UNIT_TEST
 class Application {
@@ -651,24 +650,12 @@ void BLEManager::tick(uint32_t /*currentMillis*/) {
             char nameBuf[40] = {};
             std::strncpy(nameBuf, _config.advertisedName.c_str(), sizeof(nameBuf) - 1);
 
-            // Temporarily deregister the calling task from the Task WDT.
-            // NimBLEDevice::init() blocks for >5s on ESP32-S3 while the ROM
-            // BLE controller dumps EM_BASE_REG_LUT under a spinlock. The
-            // default TWDT timeout is 5s, so the init would trigger a panic.
-            // Use xTaskGetCurrentTaskHandle() — NULL does not resolve to
-            // current task in IDF 5.5.x esp_task_wdt API.
-            TaskHandle_t thisTask = xTaskGetCurrentTaskHandle();
-            esp_task_wdt_delete(thisTask);
-
             if (!_stack.init(nameBuf, _eventQueue)) {
-                esp_task_wdt_add(thisTask);  // re-register even on failure
                 _state = State::Error;
                 publishState(_state, "init_failed");
                 ESP_LOGE(TAG, "BLE stack failed to initialize. State -> Error");
                 return;
             }
-
-            esp_task_wdt_add(thisTask);  // re-register after successful init
 
             // GATT registration (done once per boot, static thereafter)
             if (!_gattStarted) {

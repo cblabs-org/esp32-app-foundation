@@ -22,12 +22,22 @@
 #include <NimBLEAdvertisementData.h>
 #include "services/gap/ble_svc_gap.h"
 #include "esp_log.h"
+#include "esp32-hal-bt.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
 #include <cstring>
 #include <algorithm>
 #include <memory>
 #include <map>
+
+// ─── Arduino BLE-in-use override ────────────────────────────────────
+// The Arduino core's initArduino() releases the BT controller's ROM
+// data/bss regions to the heap when bleInUse() returns false.  The
+// weak default returns false because esp-nimble-cpp doesn't include
+// Arduino's esp32-hal-alloc-ble-mem.h.  Providing a strong definition
+// here prevents the release so NimBLEDevice::init() finds its memory
+// intact.  See: cores/esp32/esp32-hal-misc.c:353, esp32-hal-bt.c:52.
+extern "C" bool bleInUse(void) { return true; }
 #include <string>
 
 static const char* TAG = "BLEStack";
@@ -186,6 +196,16 @@ bool BLEStack::init(const char* deviceName, void* eventQueue) {
     _eventQueue = eventQueue;
 
     ESP_LOGI(TAG, "Initializing NimBLE stack as '%s'...", deviceName ? deviceName : "ESP32");
+
+    // Fail-closed: if Arduino released BT controller memory at boot
+    // (bleInUse() was false), NimBLEDevice::init() would write into
+    // heap-owned regions and corrupt memory.  Abort with a clear error.
+    if (btMemReleased(BT_MODE_BLE)) {
+        ESP_LOGE(TAG, "BT controller memory was released by Arduino core. "
+                       "Ensure bleInUse() returns true. Cannot init BLE.");
+        return false;
+    }
+
     NimBLEDevice::init(deviceName ? deviceName : "ESP32");
     NimBLEDevice::setMTU(185);
 

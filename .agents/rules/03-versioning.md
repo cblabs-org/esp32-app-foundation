@@ -44,6 +44,17 @@ esptool/OTA upload command, stop and verify:
 
 * **Agents MUST NEVER execute `deploy_release.py` directly.** The private key requires an interactive passphrase, which causes background agent tasks to hang indefinitely on `openssl`. Always output the exact CLI command and ask the user to run it in their terminal.
 
+## Mechanical Enforcement
+
+This rule is **enforced by a `PreToolUse` lifecycle hook** (`.agents/hooks.json`
+→ `flash-tag-gate`). The hook runs before every `upload_firmware` and
+`agent_flash_monitor_verify` MCP call and will **hard-deny** the flash if HEAD
+has untagged commits. The denial message includes the exact tag command to run.
+
+The agent does not need to remember this checklist — the runtime will block it.
+The rule text above remains as educational context explaining *why* tagging
+matters and the conventions for tag formats.
+
 ## Full Policy Reference
 
 For tag anatomy, three-tier release model, decision tree, and tag hygiene
