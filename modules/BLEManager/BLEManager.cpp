@@ -24,21 +24,32 @@
 
 #ifdef WITH_BLE
 
+#include "framework_version.h"
+#include <esp_mac.h>
+
+#if defined(ESP_PLATFORM)
+#include <Arduino.h>
+#else
+#include <esp_system.h>
+#endif
+
+#ifndef BUILD_VERSION
+#define BUILD_VERSION "unknown"
+#endif
+
 #include "types/AppState.hpp"
 #include "EventBus.hpp"
 
 #ifndef UNIT_TEST
-class Application {
-public:
-    AppState getState() const;
-    EventBus& getEventBus();
-};
+#include "Application.hpp"
 #else
 class Application {
 public:
     AppState getState() const { return _state; }
     void setState(AppState s) { _state = s; }
     EventBus& getEventBus() { return _bus; }
+    const char* getManufacturer() const { return "CB Labs"; }
+    const char* getAppName() const { return "ESP32 App Foundation"; }
 private:
     AppState _state = AppState::Running;
     EventBus _bus;
@@ -244,6 +255,21 @@ bool BLEManager::registerClientProvider(IBLEClientProvider* p) {
 }
 
 void BLEManager::begin(Application& app) {
+    uint8_t mac[6];
+    esp_read_mac(mac, ESP_MAC_WIFI_STA);
+    snprintf(_disSerial, sizeof(_disSerial), "%02X:%02X:%02X", mac[3], mac[4], mac[5]);
+    snprintf(_disSoftwareRev, sizeof(_disSoftwareRev), "App Foundation %s", FRAMEWORK_VERSION);
+
+    _disProvider = std::make_unique<DeviceInfoServiceProvider>(
+        app.getManufacturer(),
+        app.getAppName(),
+        _disSerial,
+        BUILD_VERSION,
+        ESP.getChipModel(),
+        _disSoftwareRev
+    );
+    registerServiceProvider(_disProvider.get());
+
     _app = &app;
     _eventBus = &app.getEventBus();
     _locked = true;

@@ -195,3 +195,25 @@ The BLE controller's `NimBLEDevice::init()` on ESP32-S3 acquires cross-core heap
 **Sample app remediation needed:** The weather station sample app is not a canonical best-in-class consumer of the framework. Boot sequence, dependency mapping, configuration flow, and DataManager usage need review against the post-Drayton-Wiser framework APIs. This should be a separate work stream before BLE acceptance.
 
 **Next:** (1) Fix BLE WDT crash using systematic debugging (start with H1/H2). (2) Remediate sample app. (3) Then retry WO-6 acceptance protocol.
+
+### 2026-09-23 — BLE crash resolved, DRAM optimisation, DIS implementation approved
+**Summary:** BLE WDT crash root-caused (H-G: Arduino `initArduino()` releases BT controller memory when `bleInUse()` returns false), fixed with strong symbol override. DRAM optimised via sdkconfig right-sizing (+27 KB recovered). Full DRAM audit completed. BLE library alternatives researched (NimBLE confirmed as optimal). LOW_SPEED_MODE and RUN_IN_FLASH_ONLY investigated and rejected. Built-in DIS service designed and approved.
+
+**Commits:** `v0.0.12-dev.64` (crash fix), `v0.0.12-dev.65` (DRAM optimisation), `4b263a7a` (docs gap closure).
+
+**Key decisions:**
+- D9: NimBLE is the optimal BLE library for ESP32-S3. Bluedroid costs ~40 KB more, BTstack has GPL licensing issues, Zephyr is infeasible.
+- D10: `CONFIG_BT_NIMBLE_LOW_SPEED_MODE` saves <1 KB — not useful. `CONFIG_BT_CTRL_RUN_IN_FLASH_ONLY` saves ~25 KB but is EXPERIMENTAL and causes BLE failures during flash erase — not suitable as framework default.
+- D11: Built-in DIS (0x180A) approved with field mapping: Manufacturer=app author (`setManufacturer()`, default "CB Labs"), Model=`getAppName()`, Serial=MAC, FirmwareRev=`BUILD_VERSION`, HardwareRev=`ESP.getChipModel()`, SoftwareRev=`"App Foundation " + FRAMEWORK_VERSION`.
+- D12: NimBLE built-in GATT services (HR, BAS, DIS, etc.) are demo cruft — framework implements DIS via `IBLEServiceProvider` for dynamic values.
+
+**Issues filed:**
+- [#230](https://github.com/matthewmcneill/esp32-app-foundation/issues/230): RFC — OTA memory headroom via temporary module unloading
+- [#232](https://github.com/matthewmcneill/esp32-app-foundation/issues/232): P2 — Device name inconsistency across WiFi AP, BLE, boot screen, portal, HA, TLS certs
+
+> ✅ **DIS Work Order approved.**
+> - **Approver's exact words:** "OK please write up the work order and proceed with implementation."
+> - **Timestamp:** 2026-09-23T22:53:04+01:00
+> - **Scope:** [wo6-dis-service/WORKORDER.md](wo6-dis-service/WORKORDER.md)
+
+**Next:** Execute DIS work order, then WO-6 interactive hardware acceptance.

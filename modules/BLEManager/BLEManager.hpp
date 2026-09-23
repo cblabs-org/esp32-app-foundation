@@ -37,6 +37,7 @@
 #include "BLEReconnectPolicy.hpp"
 #include "IBLEServiceProvider.hpp"
 #include "IBLEClientProvider.hpp"
+#include "DeviceInfoServiceProvider.hpp"
 #include "BLEEvents.hpp"
 #include "BLEStack.hpp"
 #include "BLERoutingTable.hpp"
@@ -53,6 +54,7 @@
 #include <vector>
 #include <string>
 #include <atomic>
+#include <memory>
 
 // Forward declarations
 class Application;
@@ -304,6 +306,11 @@ private:
 
     BLEAdvFaultPayload       _faultRing[RING_SIZE];
     uint8_t                  _faultRingHead = 0;
+
+    // Built-in Device Information Service (DIS, 0x180A) provider
+    std::unique_ptr<DeviceInfoServiceProvider> _disProvider;
+    char                     _disSerial[12];
+    char                     _disSoftwareRev[40];
 };
 
 #else // !defined(WITH_BLE)
