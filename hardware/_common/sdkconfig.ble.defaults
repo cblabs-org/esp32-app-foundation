@@ -1,9 +1,15 @@
 # =============================================================================
-# ESP32 App Foundation — BLE sdkconfig fragment
+# ESP32 App Foundation — BLE sdkconfig fragment (memory-optimised)
 # =============================================================================
 # Purpose:  Enable the NimBLE BLE stack for environments that define WITH_BLE.
 #           This fragment is layered LAST in SDKCONFIG_DEFAULTS for BLE envs,
 #           so its values WIN over sdkconfig.defaults (which sets BT_ENABLED=n).
+#
+#           Defaults are sized for a general-purpose ESP32-S3 device with ≤2
+#           concurrent BLE connections.  All four roles are enabled so every
+#           framework feature (IBLEServiceProvider, IBLEClientProvider, scanning)
+#           works out of the box.  Downstream apps can layer an optimisation
+#           profile on top — see docs/developer/bluetooth.md §Memory Profiles.
 #
 # Wired via: board_build.cmake_extra_args in platformio.ini [env:esp32s3nano_ble].
 # Authoritative: RFC #225 rev 2 §16.2.
@@ -13,22 +19,59 @@
 CONFIG_BT_ENABLED=y
 CONFIG_BT_NIMBLE_ENABLED=y
 
-# --- NimBLE roles (all four for peripheral + central) ---
+# --- NimBLE roles (all four — general-purpose framework) ---
+# Consumer apps that only need Peripheral+Broadcaster can disable
+# Central/Observer via a downstream sdkconfig fragment for ~15 KB savings.
 CONFIG_BT_NIMBLE_ROLE_CENTRAL=y
 CONFIG_BT_NIMBLE_ROLE_PERIPHERAL=y
 CONFIG_BT_NIMBLE_ROLE_OBSERVER=y
 CONFIG_BT_NIMBLE_ROLE_BROADCASTER=y
 
-# --- Connection budget: 3 peripheral + 1 central ---
-CONFIG_BT_NIMBLE_MAX_CONNECTIONS=4
+# --- Connection budget: 2 (right-sized for most devices) ---
+# Gateway/hub apps needing more connections override to 4 in their fragment.
+CONFIG_BT_NIMBLE_MAX_CONNECTIONS=2
 
-# --- Bonding (NVS-persisted, Just Works) ---
-CONFIG_BT_NIMBLE_MAX_BONDS=4
+# --- Controller: right-sized for 2 conns + 1 adv + 1 scan ---
+# Each activity slot costs 828 bytes of internal DRAM (per Kconfig docs).
+CONFIG_BT_CTRL_BLE_MAX_ACT=4
+
+# --- Transport buffers: proportional to 2 connections ---
+# ACL RX from controller (was 24 — sized for 4 conns)
+CONFIG_BT_NIMBLE_TRANSPORT_ACL_FROM_LL_COUNT=12
+CONFIG_BT_NIMBLE_TRANSPORT_ACL_SIZE=255
+# HCI event buffers (was 30 high + 8 discard)
+CONFIG_BT_NIMBLE_TRANSPORT_EVT_SIZE=70
+CONFIG_BT_NIMBLE_TRANSPORT_EVT_COUNT=16
+CONFIG_BT_NIMBLE_TRANSPORT_EVT_DISCARD_COUNT=4
+
+# --- MSYS mbuf pools: right-sized for 2 connections ---
+CONFIG_BT_NIMBLE_MSYS_1_BLOCK_COUNT=12
+CONFIG_BT_NIMBLE_MSYS_1_BLOCK_SIZE=256
+# MSYS_2 halved (was 24 — sized for 4 conns)
+CONFIG_BT_NIMBLE_MSYS_2_BLOCK_COUNT=12
+CONFIG_BT_NIMBLE_MSYS_2_BLOCK_SIZE=320
+
+# --- Runtime mempool allocation (allocate on demand, not at boot) ---
+CONFIG_BT_NIMBLE_MEMPOOL_RUNTIME_ALLOC=y
+CONFIG_BT_NIMBLE_MEMPOOL_BLOCK_REUSED=y
+
+# --- ATT / GATT: right-sized ---
+# MTU matches BLEStack.cpp setMTU(185) — was 256
+CONFIG_BT_NIMBLE_ATT_PREFERRED_MTU=185
+# Prepare-write queue (was 64 — absurdly high)
+CONFIG_BT_NIMBLE_ATT_MAX_PREP_ENTRIES=8
+# Concurrent GATT procedures (was 4 — 2 matches connection count)
+CONFIG_BT_NIMBLE_GATT_MAX_PROCS=2
+# GAP device name buffer (was 31 — legacy adv max ~20 chars)
+CONFIG_BT_NIMBLE_GAP_DEVICE_NAME_MAX_LEN=24
+
+# --- Bonding: right-sized ---
+CONFIG_BT_NIMBLE_MAX_BONDS=3
+CONFIG_BT_NIMBLE_MAX_CCCDS=6
+CONFIG_BT_NIMBLE_WHITELIST_SIZE=4
+CONFIG_BT_NIMBLE_NVS_PERSIST=y
 CONFIG_BT_NIMBLE_SM_LEGACY=y
 CONFIG_BT_NIMBLE_SM_SC=y
-
-# --- NVS persistence for bonding data ---
-CONFIG_BT_NIMBLE_NVS_PERSIST=y
 
 # --- Memory allocation: use internal DRAM (IDF default) ---
 # EXTERNAL mode routes all NimBLE allocs to PSRAM, which causes three
@@ -39,9 +82,40 @@ CONFIG_BT_NIMBLE_NVS_PERSIST=y
 # See ESP-IDF issues IDFGH-7560, IDFGH-10048.
 CONFIG_BT_NIMBLE_MEM_ALLOC_MODE_INTERNAL=y
 
+# --- BLE 5.0: keep 2M PHY (faster), disable Coded PHY (saves DRAM) ---
+CONFIG_BT_NIMBLE_50_FEATURE_SUPPORT=y
+CONFIG_BT_NIMBLE_LL_CFG_FEAT_LE_2M_PHY=y
+CONFIG_BT_NIMBLE_LL_CFG_FEAT_LE_CODED_PHY=n
+
 # --- Legacy advertising only (v1 scope; no extended advertising) ---
 CONFIG_BT_NIMBLE_EXT_ADV=n
 
+# --- Logging: ERROR only (saves flash; set to INFO for dev builds) ---
+CONFIG_BT_NIMBLE_LOG_LEVEL=3
+
+# --- Scan dedup: right-sized (was 100/30/100) ---
+CONFIG_BT_CTRL_SCAN_DUPL_CACHE_SIZE=30
+CONFIG_BT_CTRL_ADV_DUP_FILT_MAX=10
+CONFIG_BT_CTRL_BLE_ADV_REPORT_FLOW_CTRL_NUM=50
+
+# --- Timer pool: right-sized (was 50) ---
+CONFIG_BT_ALARM_MAX_NUM=20
+
+# --- Disable all built-in demo services ---
+# The framework registers its own GATT services via IBLEServiceProvider.
+# These NimBLE demo services waste flash and are never used.
+CONFIG_BT_NIMBLE_PROX_SERVICE=n
+CONFIG_BT_NIMBLE_ANS_SERVICE=n
+CONFIG_BT_NIMBLE_CTS_SERVICE=n
+CONFIG_BT_NIMBLE_HTP_SERVICE=n
+CONFIG_BT_NIMBLE_IPSS_SERVICE=n
+CONFIG_BT_NIMBLE_TPS_SERVICE=n
+CONFIG_BT_NIMBLE_IAS_SERVICE=n
+CONFIG_BT_NIMBLE_LLS_SERVICE=n
+CONFIG_BT_NIMBLE_SPS_SERVICE=n
+CONFIG_BT_NIMBLE_HR_SERVICE=n
+CONFIG_BT_NIMBLE_BAS_SERVICE=n
+CONFIG_BT_NIMBLE_DIS_SERVICE=n
+
 # --- Wi-Fi / BLE coexistence (software) ---
 CONFIG_ESP_COEX_SW_COEXIST_ENABLE=y
-
