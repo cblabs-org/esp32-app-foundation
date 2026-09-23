@@ -186,6 +186,109 @@ A failing source degrades itself; it **never reboots the device**.
 - **Portal**: Data Sources card on Status tab with live state badges and reset action.
 - **Display**: Deferred vector+mutex subscriber in `U8G2DisplayModule` and `LVGLDisplayModule`.
 - **MCP Server**: `get_data_sources` built-in tool returns current health snapshots and backoff timings.
+## BLE Memory Profiles
+
+The framework's `sdkconfig.ble.defaults` ships a **balanced** configuration: all four BLE
+roles enabled, 2 concurrent connections, right-sized buffer pools. This costs ~70 KB of
+internal DRAM at steady state on an ESP32-S3.
+
+Downstream consumers can layer an optimisation profile on top by adding the overrides to
+their board-specific `sdkconfig.*.defaults` file **after** the framework's BLE fragment
+in their `SDKCONFIG_DEFAULTS` chain. Later files win.
+
+> **Important:** After changing any BLE sdkconfig setting, delete the generated
+> `sdkconfig.<env>` file and do a clean build. The Kconfig system caches values.
+
+### Profile: `balanced` (framework default)
+
+No overrides needed — this is what ships. All roles, 2 connections, mempool runtime alloc.
+
+| Metric (ESP32-S3 sample app) | Value |
+|------------------------------|-------|
+| DRAM steady state | ~73 KB free |
+| DRAM low-water (WiFi scan) | ~40 KB free |
+| Roles | Peripheral, Broadcaster, Central, Observer |
+| Max connections | 2 |
+
+### Profile: `peripheral-only`
+
+For sensor devices, config portals, and beacons that accept incoming connections but
+never scan or connect outbound. Saves ~15-20 KB DRAM over balanced.
+
+```ini
+# --- Peripheral-only BLE profile ---
+# Layer after framework's sdkconfig.ble.defaults.
+CONFIG_BT_NIMBLE_ROLE_CENTRAL=n
+CONFIG_BT_NIMBLE_ROLE_OBSERVER=n
+CONFIG_BT_NIMBLE_GATT_CLIENT=n
+CONFIG_BT_CTRL_BLE_SCAN=n
+CONFIG_BT_CTRL_BLE_MASTER=n
+CONFIG_BT_CTRL_BLE_MAX_ACT=3
+CONFIG_BT_NIMBLE_ENABLE_CONN_REATTEMPT=n
+CONFIG_BT_NIMBLE_TRANSPORT_EVT_DISCARD_COUNT=0
+CONFIG_BT_NIMBLE_MSYS_2_BLOCK_COUNT=0
+CONFIG_BT_NIMBLE_MSYS_2_BLOCK_SIZE=0
+CONFIG_BT_NIMBLE_HOST_TASK_STACK_SIZE=3072
+CONFIG_BT_NIMBLE_SM_LEGACY=n
+```
+
+**Trade-offs:** `IBLEClientProvider` and `ble_scan` MCP tool will not function.
+Scanning APIs compile to no-ops. Re-enable Central/Observer to restore.
+
+### Profile: `gateway`
+
+For hub devices scanning many peripherals and maintaining multiple connections.
+Uses ~10-15 KB more DRAM than balanced.
+
+```ini
+# --- Gateway/hub BLE profile ---
+CONFIG_BT_NIMBLE_MAX_CONNECTIONS=4
+CONFIG_BT_CTRL_BLE_MAX_ACT=6
+CONFIG_BT_NIMBLE_TRANSPORT_ACL_FROM_LL_COUNT=24
+CONFIG_BT_NIMBLE_TRANSPORT_EVT_COUNT=30
+CONFIG_BT_NIMBLE_TRANSPORT_EVT_DISCARD_COUNT=8
+CONFIG_BT_NIMBLE_MSYS_2_BLOCK_COUNT=24
+CONFIG_BT_NIMBLE_GATT_MAX_PROCS=4
+CONFIG_BT_NIMBLE_MAX_BONDS=4
+CONFIG_BT_NIMBLE_MAX_CCCDS=8
+CONFIG_BT_CTRL_SCAN_DUPL_CACHE_SIZE=100
+CONFIG_BT_CTRL_ADV_DUP_FILT_MAX=30
+CONFIG_BT_CTRL_BLE_ADV_REPORT_FLOW_CTRL_NUM=100
+```
+
+**Trade-offs:** Higher DRAM cost. Monitor `dram_min` to ensure sufficient headroom
+for WiFi, TLS, and OTA alongside BLE.
+
+### Profile: `ultra-minimal`
+
+Advertising-only beacon with no connections and no scanning. Saves ~30-40 KB over balanced.
+
+```ini
+# --- Ultra-minimal BLE profile (beacon/advertiser only) ---
+CONFIG_BT_NIMBLE_ROLE_CENTRAL=n
+CONFIG_BT_NIMBLE_ROLE_OBSERVER=n
+CONFIG_BT_NIMBLE_ROLE_PERIPHERAL=n
+CONFIG_BT_NIMBLE_GATT_CLIENT=n
+CONFIG_BT_NIMBLE_GATT_SERVER=n
+CONFIG_BT_NIMBLE_SECURITY_ENABLE=n
+CONFIG_BT_NIMBLE_MAX_CONNECTIONS=0
+CONFIG_BT_CTRL_BLE_MAX_ACT=1
+CONFIG_BT_CTRL_BLE_SCAN=n
+CONFIG_BT_CTRL_BLE_MASTER=n
+CONFIG_BT_NIMBLE_TRANSPORT_ACL_FROM_LL_COUNT=0
+CONFIG_BT_NIMBLE_TRANSPORT_EVT_COUNT=4
+CONFIG_BT_NIMBLE_TRANSPORT_EVT_DISCARD_COUNT=0
+CONFIG_BT_NIMBLE_MSYS_1_BLOCK_COUNT=4
+CONFIG_BT_NIMBLE_MSYS_2_BLOCK_COUNT=0
+CONFIG_BT_NIMBLE_MSYS_2_BLOCK_SIZE=0
+CONFIG_BT_NIMBLE_HOST_TASK_STACK_SIZE=2560
+CONFIG_BT_NIMBLE_NVS_PERSIST=n
+CONFIG_BT_NIMBLE_SM_LEGACY=n
+CONFIG_BT_NIMBLE_SM_SC=n
+```
+
+**Trade-offs:** No GATT server, no connections, no bonding. Device can only broadcast
+advertisement data. Use `BLEAdvertisingBuilder` to set payload.
 
 ## When to Read the Full Docs
 
