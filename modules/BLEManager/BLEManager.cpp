@@ -495,6 +495,7 @@ bool BLEManager::forget(const char* providerId) {
 // -----------------------------------------------------------------------------
 
 BLEManager::ScanInhibit BLEManager::inhibitScanning(const char* reason) {
+    auto guard = lockState();  // O2: safe to call from any task
     _scanInhibitCount++;
     ESP_LOGI(TAG, "Scan inhibited (reason: %s, active tokens: %u)",
              reason ? reason : "unspecified", _scanInhibitCount.load());
@@ -519,6 +520,7 @@ BLEManager::ScanInhibit BLEManager::inhibitScanning(const char* reason) {
 }
 
 void BLEManager::releaseScanInhibit(const char* reason) {
+    auto guard = lockState();  // O2: safe to call from any task
     if (_scanInhibitCount > 0) {
         _scanInhibitCount--;
         ESP_LOGI(TAG, "Scan inhibit released (reason: %s, active tokens: %u)",
@@ -840,6 +842,7 @@ void BLEManager::tick(uint32_t /*currentMillis*/) {
 
 void BLEManager::dispatchQueueEvents() {
     if (!_eventQueue) return;
+    auto guard = lockState();  // O2: hold while processing events
 
     BLEQueueMessage msg;
     size_t processed = 0;
@@ -1288,6 +1291,7 @@ void BLEManager::registerRoutes(PsychicHttpServer& server) {
 
     // 2. GET /api/ble/status (Full unredacted addresses)
     server.on("/api/ble/status", HTTP_GET, [this](PsychicRequest* /*request*/, PsychicResponse* response) {
+        auto guard = lockState();  // O2: serialize with tick()
         JsonDocument doc;
         JsonObject root = doc.to<JsonObject>();
         BLESerialization::serializeStatus(root, *this, /*redactAddresses=*/false);
@@ -1298,6 +1302,7 @@ void BLEManager::registerRoutes(PsychicHttpServer& server) {
 
     // 3. POST /api/ble/scan
     server.on("/api/ble/scan", HTTP_POST, [this](PsychicRequest* request, PsychicResponse* response) {
+        auto guard = lockState();  // O2: serialize with tick()
         const char* body = request->bodyCStr();
         if (!body || strlen(body) == 0) {
             return response->send(400, "application/json", "{\"error\":\"empty body\"}");
@@ -1342,6 +1347,7 @@ void BLEManager::registerRoutes(PsychicHttpServer& server) {
 
     // 4. GET /api/ble/scan/results
     server.on("/api/ble/scan/results", HTTP_GET, [this](PsychicRequest* /*request*/, PsychicResponse* response) {
+        auto guard = lockState();  // O2: serialize with tick()
         JsonDocument doc;
         JsonArray arr = doc.to<JsonArray>();
         BLESerialization::serializeScanResults(arr, _discovery.results.data(), _discovery.results.size(), /*redactAddresses=*/false);
@@ -1352,6 +1358,7 @@ void BLEManager::registerRoutes(PsychicHttpServer& server) {
 
     // 5. POST /api/ble/pair
     server.on("/api/ble/pair", HTTP_POST, [this](PsychicRequest* request, PsychicResponse* response) {
+        auto guard = lockState();  // O2: serialize with tick()
         const char* body = request->bodyCStr();
         if (!body || strlen(body) == 0) {
             return response->send(400, "application/json", "{\"error\":\"empty body\"}");
@@ -1393,6 +1400,7 @@ void BLEManager::registerRoutes(PsychicHttpServer& server) {
 
     // 6. POST /api/ble/forget
     server.on("/api/ble/forget", HTTP_POST, [this](PsychicRequest* request, PsychicResponse* response) {
+        auto guard = lockState();  // O2: serialize with tick()
         const char* body = request->bodyCStr();
         if (!body || strlen(body) == 0) {
             return response->send(400, "application/json", "{\"error\":\"empty body\"}");
@@ -1430,6 +1438,7 @@ void BLEManager::registerMCPTools(MCPToolRegistry& registry) {
         "Get Bluetooth Low Energy manager status, connection info, stored devices, and advertising state (addresses redacted for privacy)",
         [](void* ctx, JsonObject& /*params*/, JsonObject& result) {
             auto* mgr = static_cast<BLEManager*>(ctx);
+            auto guard = mgr->lockState();  // O2: serialize with tick()
             BLESerialization::serializeStatus(result, *mgr, /*redactAddresses=*/true);
         },
         this,
@@ -1453,6 +1462,7 @@ void BLEManager::registerMCPTools(MCPToolRegistry& registry) {
         scanSchema,
         [](void* ctx, JsonObject& params, JsonObject& result) {
             auto* mgr = static_cast<BLEManager*>(ctx);
+            auto guard = mgr->lockState();  // O2: serialize with tick()
             const char* providerId = params["providerId"] | "";
             if (!providerId || strlen(providerId) == 0) {
                 result["error"] = "missing providerId";
@@ -1531,6 +1541,7 @@ void BLEManager::registerMCPTools(MCPToolRegistry& registry) {
         pairSchema,
         [](void* ctx, JsonObject& params, JsonObject& result) {
             auto* mgr = static_cast<BLEManager*>(ctx);
+            auto guard = mgr->lockState();  // O2: serialize with tick()
             const char* providerId = params["providerId"] | "";
             if (!providerId || strlen(providerId) == 0) {
                 result["error"] = "missing providerId";
@@ -1590,6 +1601,7 @@ void BLEManager::registerMCPTools(MCPToolRegistry& registry) {
         forgetSchema,
         [](void* ctx, JsonObject& params, JsonObject& result) {
             auto* mgr = static_cast<BLEManager*>(ctx);
+            auto guard = mgr->lockState();  // O2: serialize with tick()
             const char* providerId = params["providerId"] | "";
             if (!providerId || strlen(providerId) == 0) {
                 result["error"] = "missing providerId";

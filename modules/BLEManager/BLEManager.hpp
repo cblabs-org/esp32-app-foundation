@@ -55,6 +55,7 @@
 #include <string>
 #include <atomic>
 #include <memory>
+#include <mutex>
 
 // Forward declarations
 class Application;
@@ -174,10 +175,8 @@ public:
     // --- Coexistence and Lifecycle Control ---
 
     /// @brief Suppress all scanning (discovery + reconnect) while the token is alive.
-    /// @note Must be called from the main Arduino loop task only. While the REST/MCP
-    ///       thread safety work (O2) is deferred, calling from other tasks (e.g. the
-    ///       DataManager upload task) is undefined behaviour. Acquire on the main loop
-    ///       before starting the upload, then release when it completes.
+    /// @note Thread-safe (O2): protected by _stateMutex, safe to call from any task
+    ///       (e.g. the DataManager upload task or the httpd task).
     ScanInhibit inhibitScanning(const char* reason);
     void        refreshAdvertising();
     void        pause(const char* reason);
@@ -219,8 +218,17 @@ public:
     // --- IPreconditionContributor Interface ---
     void registerPreconditions(IPreconditionRegistry& registry) override;
 
+    /// @brief Acquire a scoped lock on BLEManager state.
+    /// REST/MCP handlers MUST hold this while reading or mutating state to
+    /// avoid racing with tick()/dispatchQueueEvents() on the main loop.
+    /// Uses a recursive mutex so nested calls within the same task are safe.
+    [[nodiscard]] std::unique_lock<std::recursive_mutex> lockState() const {
+        return std::unique_lock<std::recursive_mutex>(_stateMutex);
+    }
+
 private:
     friend class ScanInhibit;
+    mutable std::recursive_mutex _stateMutex;  // O2: protects state vs httpd task
     static void centralWorkerTask(void* arg);
 
     void releaseScanInhibit(const char* reason);
