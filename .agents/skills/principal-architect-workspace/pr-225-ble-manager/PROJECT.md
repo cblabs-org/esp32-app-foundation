@@ -269,8 +269,68 @@ The BLE controller's `NimBLEDevice::init()` on ESP32-S3 acquires cross-core heap
 - Full report: [`ACCEPTANCE.md`](wo6-validation/ACCEPTANCE.md)
 
 **Unresolved items:**
-- [#232](https://github.com/matthewmcneill/esp32-app-foundation/issues/232): Device name unification (P2, deferred)
+- ~~[#232](https://github.com/matthewmcneill/esp32-app-foundation/issues/232): Device name unification (P2, deferred)~~ BLE surface fixed (dev.71)
+- [#232](https://github.com/matthewmcneill/esp32-app-foundation/issues/232): Remaining surfaces (TLS cert CN, LVGL boot title, MCP server name, OTA UA, mDNS)
 - [#230](https://github.com/matthewmcneill/esp32-app-foundation/issues/230): OTA module unloading RFC (future)
 - Sample app remediation (separate project)
 - `FRAMEWORK_VERSION` auto-injection from git tags (future)
+- BLE portal page UX redesign (bridge prompt prepared for next session)
+- Hooks investigation: `.agents/hooks.json` flash-tag-gate hook did not fire on dev.70 flash — root cause undetermined
+
+### Session — 2026-09-24T22:35:00+01:00 — PR #235 Re-Review + Issue #232 BLE Fix
+
+**Summary:** Addressed all PR #235 re-review comments (Round 2), added `_stateMutex` thread safety (O2), and fixed issue #232's BLE surface (advertised name auto-wires from app identity).
+
+**Commits (this session):**
+
+| Tag | Commit | Description |
+|-----|--------|-------------|
+| `v0.0.12-dev.69` | `71ef9480` | fix(ble): PR #235 re-review — N1-N3 blockers, N4-N6, O6-O7, O9, R5, R9, Y1, Y8 |
+| `v0.0.12-dev.70` | `476d252e` | fix(ble): O2 — add _stateMutex for REST/MCP thread safety |
+| `v0.0.12-dev.71` | `cee0bb30` | fix(ble): issue #232 — auto-wire advertised name from app identity |
+
+**PR #235 re-review items resolved:**
+- **N1 (BLOCKER):** ChainingCharCallbacks — NimBLE 2.5.0 never has null callbacks; must chain
+- **N2 (BLOCKER):** setClientCallbacks leak — moved inside create-only branch
+- **N3 (BLOCKER):** Dangling providerId in event payloads — use getProviderId() (static lifetime)
+- **N4:** 6-arg setConnectionParams with scan interval/window
+- **N5:** millis() replaces xTaskGetTickCount (different time bases with PSRAM memtest)
+- **N6:** Lambda subscribe captures providerId by value; s_clientProviderMap removed
+- **O2:** `mutable std::recursive_mutex _stateMutex` with `lockState()` RAII accessor. All REST/MCP handlers + inhibitScanning/releaseScanInhibit + dispatchQueueEvents now hold the lock
+- **O6:** Removed hasFault() check from PeerDisconnected advertising restart
+- **O7:** Bond result consumed, stored device updated and persisted
+- **O9:** executeCentralForget takes BLEPeerAddress for address-based bond deletion
+- **R5:** setMaxResults(0) for callbacks-only discovery
+- **R9:** forget() synchronously erases state before queuing worker
+- **Y1:** .pyc files removed from tracking
+- **Y8:** FTMS Feature bits 0x4486→0x4482, Appearance removed from SampleFtmsProvider
+
+**Issue #232 fix (BLE surface):**
+- Added `setDefaultAdvertisedName()` mirroring `WifiManager::setDefaultHostname()`
+- `BLEManager::begin()` auto-pulls `app.getAppName()` as factory default
+- Persisted user config still overrides
+- Hardware verified: `adv.local_name = 'ESP32 App Foundation-8E92'`
+
+**Cross-cutting decisions:**
+- O2 mutex is `recursive` because REST handlers call `pair()`/`forget()` which are also called during `dispatchQueueEvents()` (same lock path)
+- Issue #237 (O2 thread safety) created and closed — fixed directly in PR #235 per user directive ("no technical debt, no splitting")
+- SampleFtmsProvider Appearance codes removed — consumer-specific, not framework
+
+**Dead ends (project-wide):**
+- `NimBLECharacteristic::getCallbacks() == nullptr` guard: NimBLE 2.5.0 constructor always sets a static default callback — never returns nullptr. Must CHAIN callbacks via wrapper class.
+- `BLEDevice.rssi` attribute in bleak 3.x: doesn't exist. Must use `BleakScanner.discover(return_adv=True)` and read `AdvertisementData.rssi`.
+- `.agents/hooks.json` flash-tag-gate: correctly written, valid location per official docs, but did NOT fire when flashing dev.70 without a tag. Root cause unknown — possibly an Antigravity hooks loading issue.
+
+**Hardware verification (v0.0.12-dev.71):**
+- BLE advertising: active, name = "ESP32 App Foundation-8E92" ✅
+- Scan response: 27/31 bytes used ✅
+- DRAM heap: 67,439 B free ✅
+- droppedEvents: 0 ✅
+- Mac BLE scan confirms `adv.local_name` correctly shows full app name ✅
+- Firmware version: v0.0.12-dev.71 ✅
+
+**Pending for next session (bridge prompt prepared):**
+- BLE portal page UX redesign: 3 cards (Status, Central Clients, Connections) + diagnostics drawer
+- Bottom nav ordering: WiFi → Bluetooth → Security → System (add data-order attributes)
+- Add `bleAddress` field to status API
 
