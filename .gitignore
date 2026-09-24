@@ -73,3 +73,4 @@ squareline/**/cache/
 uidesign/*/lvglpro/preview-build/
 uidesign/*/lvglpro/preview-bin/
 uidesign/*/lvglpro/.cache.json
+__pycache__/

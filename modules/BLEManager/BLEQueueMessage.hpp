@@ -31,7 +31,8 @@ struct BLEQueueMessage {
         Notification,
         ScanResult,
         ScanCompleted,
-        AdvFault
+        AdvFault,
+        DeviceForgotten      // R9: Worker→main-loop signal for forget completion
     } type = Type::PeerConnected;
 
     BLEConnHandle       handle          = BLE_CONN_HANDLE_NONE;
@@ -46,4 +47,5 @@ struct BLEQueueMessage {
     char                providerId[24]  = {};
     uint8_t             rawBytes[64]    = {};
     uint8_t             rawLen          = 0;
+    uint32_t            receivedAtMs    = 0;    ///< O3: host-task timestamp for latency measurement
 };

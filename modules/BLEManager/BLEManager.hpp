@@ -247,13 +247,13 @@ private:
 
     bool                               _gattStarted = false;
     bool                               _providerRegistrationFault = false;
-    uint32_t                           _scanInhibitCount = 0;
+    std::atomic<uint32_t>              _scanInhibitCount{0};  // O1: thread-safe for cross-task inhibit
     std::string                        _pauseReason;
 
     // --- Worker Task Queue ---
     struct WorkerCommand {
         enum class Type : uint8_t { Connect, Disconnect, Forget, Shutdown, Discover, StopDiscovery } type;
-        const char* providerId;
+        char providerId[24] = {};  // R7: Owned copy, not a dangling const char*
         BLEPeerAddress addr;
         uint32_t durationMs;
         bool hasPeripherals = false;
@@ -283,7 +283,7 @@ private:
         bool active = false;
         uint32_t startMs = 0;
         uint32_t durationMs = 0;
-        const char* providerId = nullptr;
+        char providerId[24] = {};  // R7: Owned copy, not a dangling const char*
         std::vector<BLEScanResult> results;
     } _discovery;
 

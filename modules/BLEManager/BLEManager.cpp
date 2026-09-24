@@ -146,28 +146,18 @@ void BLEManager::centralWorkerTask(void* arg) {
                 case BLEManager::WorkerCommand::Type::Disconnect:
                     mgr->_stack.executeCentralDisconnect(cmd.providerId);
                     break;
-                case BLEManager::WorkerCommand::Type::Forget:
+                case BLEManager::WorkerCommand::Type::Forget: {
+                    // R9: Only do BLE stack work on the worker task.
+                    // Registry, events, provider callbacks, and persistence run on the main loop.
                     mgr->_stack.executeCentralForget(cmd.providerId);
-                    // Also clear from registry and save config
-                    mgr->_deviceRegistry.remove(cmd.providerId);
-                    // config save requires dispatching an event if needed
-                    if (mgr->_eventBus) {
-                        BLEDevicePayload p;
-                        p.providerId = cmd.providerId;
-                        cmd.addr.toRedactedString(p.addrRedacted, sizeof(p.addrRedacted));
-                        mgr->_eventBus->publish(BLEEvents::DEVICE_FORGOTTEN, &p);
-                    }
-                    {
-                        IBLEClientProvider* p = nullptr;
-                        for (auto* pr : mgr->_clientProviders) {
-                            if (pr && strcmp(pr->getProviderId(), cmd.providerId) == 0) {
-                                p = pr;
-                                break;
-                            }
-                        }
-                        if (p) p->onDeviceForgotten();
-                    }
+                    // Send a DeviceForgotten message to the main loop
+                    BLEQueueMessage forgetMsg;
+                    forgetMsg.type = BLEQueueMessage::Type::DeviceForgotten;
+                    strncpy(forgetMsg.providerId, cmd.providerId, sizeof(forgetMsg.providerId) - 1);
+                    forgetMsg.address = cmd.addr;
+                    xQueueSend(static_cast<QueueHandle_t>(mgr->_eventQueue), &forgetMsg, 0);
                     break;
+                }
                 case BLEManager::WorkerCommand::Type::Discover: {
                     IBLEClientProvider* provider = nullptr;
                     for (auto* p : mgr->_clientProviders) {
@@ -196,14 +186,12 @@ void BLEManager::centralWorkerTask(void* arg) {
 }
 
 BLEManager::BLEManager() {
+    // Y6: Queues are safe to create during static init (heap alloc only).
+    // Worker task creation is deferred to begin() (needs RTOS scheduler).
     _eventQueue = xQueueCreate(QUEUE_CAPACITY, sizeof(BLEQueueMessage));
     _workerQueue = xQueueCreate(QUEUE_CAPACITY, sizeof(WorkerCommand));
     if (!_eventQueue || !_workerQueue) {
         ESP_LOGE(TAG, "Failed to create FreeRTOS queues");
-    } else {
-#if defined(ESP_PLATFORM)
-        xTaskCreate(centralWorkerTask, "ble_worker", 4096, this, 5, reinterpret_cast<TaskHandle_t*>(&_workerTask));
-#endif
     }
 
     if (_config.enabled) {
@@ -255,6 +243,14 @@ bool BLEManager::registerClientProvider(IBLEClientProvider* p) {
 }
 
 void BLEManager::begin(Application& app) {
+    // Y6: Worker task needs RTOS scheduler — create here, not in constructor
+#if defined(ESP_PLATFORM)
+    if (_workerQueue && !_workerTask) {
+        // Y6: 6 KB stack — NimBLE connect + service discovery + onClientReadyWorker need headroom
+        xTaskCreate(centralWorkerTask, "ble_worker", 6144, this, 5, reinterpret_cast<TaskHandle_t*>(&_workerTask));
+    }
+#endif
+
     uint8_t mac[6];
     esp_read_mac(mac, ESP_MAC_BT);
     snprintf(_disSerial, sizeof(_disSerial), "%02X:%02X:%02X", mac[3], mac[4], mac[5]);
@@ -382,12 +378,12 @@ bool BLEManager::startDiscovery(const char* providerId, uint32_t durationMs) {
     _discovery.active = true;
     _discovery.startMs = millis();
     _discovery.durationMs = durationMs;
-    _discovery.providerId = providerId;
+    strncpy(_discovery.providerId, providerId, sizeof(_discovery.providerId) - 1);
     _discovery.results.clear();
 
     WorkerCommand cmd;
     cmd.type = WorkerCommand::Type::Discover;
-    cmd.providerId = providerId;
+    strncpy(cmd.providerId, providerId, sizeof(cmd.providerId) - 1);
     cmd.durationMs = durationMs;
     xQueueSend(static_cast<QueueHandle_t>(_workerQueue), &cmd, 0);
 
@@ -453,12 +449,16 @@ bool BLEManager::pair(const char* providerId, const BLEPeerAddress& addr) {
     strncpy(device.providerId, providerId, sizeof(device.providerId) - 1);
     
     _deviceRegistry.set(device);
-    // Config persistence should ideally be triggered here
-    // e.g., if (_app) _app->getConfigManager().saveModuleConfig(this);
+    // R8: Persist paired devices to flash so they survive reboot
+#if defined(ESP_PLATFORM)
+    if (_app) {
+        _app->getConfigManager().saveModuleConfig(this);
+    }
+#endif
 
     WorkerCommand cmd;
     cmd.type = WorkerCommand::Type::Connect;
-    cmd.providerId = providerId;
+    strncpy(cmd.providerId, providerId, sizeof(cmd.providerId) - 1);
     cmd.addr = addr;
     xQueueSend(static_cast<QueueHandle_t>(_workerQueue), &cmd, 0);
 
@@ -470,7 +470,7 @@ bool BLEManager::forget(const char* providerId) {
 
     WorkerCommand cmd;
     cmd.type = WorkerCommand::Type::Forget;
-    cmd.providerId = providerId;
+    strncpy(cmd.providerId, providerId, sizeof(cmd.providerId) - 1);
     xQueueSend(static_cast<QueueHandle_t>(_workerQueue), &cmd, 0);
 
     return true;
@@ -483,7 +483,7 @@ bool BLEManager::forget(const char* providerId) {
 BLEManager::ScanInhibit BLEManager::inhibitScanning(const char* reason) {
     _scanInhibitCount++;
     ESP_LOGI(TAG, "Scan inhibited (reason: %s, active tokens: %u)",
-             reason ? reason : "unspecified", _scanInhibitCount);
+             reason ? reason : "unspecified", _scanInhibitCount.load());
 
     if (_scanInhibitCount == 1) {
         if (_discovery.active) {
@@ -508,7 +508,7 @@ void BLEManager::releaseScanInhibit(const char* reason) {
     if (_scanInhibitCount > 0) {
         _scanInhibitCount--;
         ESP_LOGI(TAG, "Scan inhibit released (reason: %s, active tokens: %u)",
-                 reason ? reason : "unspecified", _scanInhibitCount);
+                 reason ? reason : "unspecified", _scanInhibitCount.load());
 
         if (_scanInhibitCount == 0 && _state == State::Active) {
             uint32_t nowMs = millis();
@@ -542,7 +542,7 @@ void BLEManager::refreshAdvertising() {
             _eventBus->publish(BLEEvents::ADVERTISING_FAULT, &_faultRing[_faultRingHead]);
         }
         _faultRingHead = (_faultRingHead + 1) % RING_SIZE;
-        return;
+        // O6: Don't return — still advertise with the faulting element dropped
     }
 
     if (_state == State::Active &&
@@ -578,8 +578,8 @@ void BLEManager::pause(const char* reason) {
             kv.second.suspend();
         }
 
-        // Disconnect peers if reason is OTA and otaDisconnectPeers is configured
-        if (_config.otaDisconnectPeers && _pauseReason.find("ota") != std::string::npos) {
+        // Y4: Only disconnect peers if the pause reason is exactly "ota" (case-insensitive)
+        if (_config.otaDisconnectPeers && (_pauseReason == "ota" || _pauseReason == "OTA")) {
             ESP_LOGI(TAG, "Disconnecting all peripheral peers due to OTA pause");
             for (const auto& peer : _activeConnections) {
                 _stack.disconnect(peer.handle, 0x13);
@@ -588,7 +588,7 @@ void BLEManager::pause(const char* reason) {
                 if (kv.second) {
                     WorkerCommand cmd;
                     cmd.type = WorkerCommand::Type::Disconnect;
-                    cmd.providerId = kv.first.c_str();
+                    strncpy(cmd.providerId, kv.first.c_str(), sizeof(cmd.providerId) - 1);
                     xQueueSend(static_cast<QueueHandle_t>(_workerQueue), &cmd, 0);
                 }
             }
@@ -740,13 +740,15 @@ void BLEManager::tick(uint32_t /*currentMillis*/) {
                     _eventBus->publish(BLEEvents::ADVERTISING_FAULT, &_faultRing[_faultRingHead]);
                 }
                 _faultRingHead = (_faultRingHead + 1) % RING_SIZE;
-            } else {
-                if (BLEAdvertisingDecision::shouldAdvertise(_activeConnections.size(),
-                                                            _config.maxPeripheralConnections,
-                                                            false,
-                                                            _config.enabled)) {
-                    _stack.startAdvertising(_advPackResult, _config.peripheralPreferredConnParams);
-                }
+            }
+            // O6: Always attempt to advertise — the packer already dropped the
+            // offending element. Making the device undiscoverable is worse than
+            // advertising without a missing UUID.
+            if (BLEAdvertisingDecision::shouldAdvertise(_activeConnections.size(),
+                                                        _config.maxPeripheralConnections,
+                                                        false,
+                                                        _config.enabled)) {
+                _stack.startAdvertising(_advPackResult, _config.peripheralPreferredConnParams);
             }
 
             _state = State::Active;
@@ -778,6 +780,9 @@ void BLEManager::tick(uint32_t /*currentMillis*/) {
                 BLEStoredDevice stored;
                 if (_deviceRegistry.get(pid, stored)) {
                     auto& policy = _reconnectPolicies[pid];
+                    // O5: Apply config to newly created policies
+                    policy.setFastSchedule(_config.reconnectFastScheduleS);
+                    policy.setSlowRetryMs(_config.slowRetryMs);
                     if (policy.phase() == BLEReconnectPolicy::Phase::Idle && !_clientConnected[pid]) {
                         policy.start(nowMs);
                     }
@@ -799,12 +804,14 @@ void BLEManager::tick(uint32_t /*currentMillis*/) {
             if (_deviceRegistry.get(pid, stored)) {
                 auto& policy = _reconnectPolicies[pid];
                 if (policy.phase() != BLEReconnectPolicy::Phase::Idle && policy.phase() != BLEReconnectPolicy::Phase::Exhausted) {
-                    if (!_clientConnecting[pid] && policy.nextAttemptAtMs(nowMs) > 0 && nowMs >= policy.nextAttemptAtMs(nowMs)) {
+                    uint32_t nextAt = policy.nextAttemptAtMs(nowMs);
+                    // A3: Use signed diff to survive 49.7-day millis() wrap
+                    if (!_clientConnecting[pid] && nextAt > 0 && (int32_t)(nowMs - nextAt) >= 0) {
                         _clientConnecting[pid] = true;
                         
                         WorkerCommand cmd;
                         cmd.type = WorkerCommand::Type::Connect;
-                        cmd.providerId = pid;
+                        strncpy(cmd.providerId, pid, sizeof(cmd.providerId) - 1);
                         cmd.addr = stored.address;
                         cmd.hasPeripherals = (_activeConnections.size() > 0);
                         xQueueSend(static_cast<QueueHandle_t>(_workerQueue), &cmd, 0);
@@ -949,6 +956,19 @@ void BLEManager::dispatchQueueEvents() {
                         prov->onConnected(stored);
                     }
                 }
+                // O4: Publish ble.central.connected via ring buffer (not stack)
+                if (_eventBus) {
+                    auto& cp = _centralConnRing[_centralConnRingHead];
+                    cp.providerId = msg.providerId;
+                    BLEStoredDevice stored;
+                    if (_deviceRegistry.get(msg.providerId, stored)) {
+                        stored.address.toRedactedString(cp.addrRedacted, sizeof(cp.addrRedacted));
+                    }
+                    cp.reason = BLEDisconnectReason::Other; // not a disconnect
+                    cp.nextRetryMs = 0;
+                    _eventBus->publish(BLEEvents::CENTRAL_CONNECTED, &cp);
+                    _centralConnRingHead = (_centralConnRingHead + 1) % RING_SIZE;
+                }
                 break;
             }
 
@@ -966,17 +986,20 @@ void BLEManager::dispatchQueueEvents() {
                     prov->onDisconnected(msg.reason);
                 }
                 _reconnectPolicies[msg.providerId].onAttemptFailed(millis());
+                // O4: Publish via ring buffer, not stack payload
                 if (_eventBus) {
-                    BLECentralConnPayload cp;
+                    auto& cp = _centralConnRing[_centralConnRingHead];
                     cp.providerId = msg.providerId;
-                    // Note: addr not easily available here, but we can get it from registry
                     BLEStoredDevice stored;
                     if (_deviceRegistry.get(msg.providerId, stored)) {
                         stored.address.toRedactedString(cp.addrRedacted, sizeof(cp.addrRedacted));
                     }
                     cp.reason = msg.reason;
-                    cp.nextRetryMs = _reconnectPolicies[msg.providerId].nextAttemptAtMs(millis());
+                    uint32_t nowMs = millis();
+                    uint32_t nextAt = _reconnectPolicies[msg.providerId].nextAttemptAtMs(nowMs);
+                    cp.nextRetryMs = (nextAt > nowMs) ? (nextAt - nowMs) : 0; // relative delay
                     _eventBus->publish(BLEEvents::CENTRAL_DISCONNECTED, &cp);
+                    _centralConnRingHead = (_centralConnRingHead + 1) % RING_SIZE;
                 }
                 break;
             }
@@ -995,7 +1018,8 @@ void BLEManager::dispatchQueueEvents() {
                     n.charUuid16 = msg.uuid16;
                     n.length = msg.rawLen;
                     n.truncated = msg.boolVal1;
-                    n.receivedAtMs = millis();
+                    // O3: Use the host-task timestamp from notifyCB
+                    n.receivedAtMs = msg.receivedAtMs ? msg.receivedAtMs : millis();
                     memcpy(n.data, msg.rawBytes, n.length);
                     prov->onNotification(n);
                 }
@@ -1005,7 +1029,7 @@ void BLEManager::dispatchQueueEvents() {
             case BLEQueueMessage::Type::ScanResult: {
                 IBLEClientProvider* prov = nullptr;
                 for (auto* p : _clientProviders) {
-                    if (p && _discovery.providerId && strcmp(p->getProviderId(), _discovery.providerId) == 0) {
+                    if (p && _discovery.providerId[0] && strcmp(p->getProviderId(), _discovery.providerId) == 0) {
                         prov = p;
                         break;
                     }
@@ -1023,7 +1047,7 @@ void BLEManager::dispatchQueueEvents() {
                                 break;
                             }
                         }
-                        if (!found && _discovery.results.size() < 30) {
+                        if (!found && _discovery.results.size() < 16) { // Y3: RFC §8.1 cap
                             _discovery.results.push_back(res);
                         }
                     }
@@ -1037,6 +1061,38 @@ void BLEManager::dispatchQueueEvents() {
                 _scanRing[_scanRingHead].reason = "completed";
                 if (_eventBus) _eventBus->publish(BLEEvents::SCAN_STOPPED, &_scanRing[_scanRingHead]);
                 _scanRingHead = (_scanRingHead + 1) % RING_SIZE;
+                break;
+            }
+
+            // R9: Handle DeviceForgotten on the main loop (thread-safe)
+            case BLEQueueMessage::Type::DeviceForgotten: {
+                _deviceRegistry.remove(msg.providerId);
+                _clientConnected.erase(msg.providerId);
+                _clientConnecting.erase(msg.providerId);
+                _reconnectPolicies.erase(msg.providerId);
+                // Persist after removal
+#if defined(ESP_PLATFORM)
+                if (_app) {
+                    _app->getConfigManager().saveModuleConfig(this);
+                }
+#endif
+                // Notify provider
+                IBLEClientProvider* prov = nullptr;
+                for (auto* p : _clientProviders) {
+                    if (p && strcmp(p->getProviderId(), msg.providerId) == 0) {
+                        prov = p;
+                        break;
+                    }
+                }
+                if (prov) prov->onDeviceForgotten();
+                // Publish event via ring buffer
+                if (_eventBus) {
+                    auto& dp = _deviceRing[_deviceRingHead];
+                    dp.providerId = msg.providerId;
+                    msg.address.toRedactedString(dp.addrRedacted, sizeof(dp.addrRedacted));
+                    _eventBus->publish(BLEEvents::DEVICE_FORGOTTEN, &dp);
+                    _deviceRingHead = (_deviceRingHead + 1) % RING_SIZE;
+                }
                 break;
             }
 
@@ -1116,6 +1172,12 @@ void BLEManager::applyConfig(const JsonObject& root) {
 
     _config.slowRetryMs        = root["slowRetryMs"] | _config.slowRetryMs;
     _config.otaDisconnectPeers = root["otaDisconnectPeers"] | _config.otaDisconnectPeers;
+
+    // O5: Apply reconnect schedule to all active policies
+    for (auto& kv : _reconnectPolicies) {
+        kv.second.setFastSchedule(_config.reconnectFastScheduleS);
+        kv.second.setSlowRetryMs(_config.slowRetryMs);
+    }
 
     if (root["devices"].is<JsonObjectConst>()) {
         _deviceRegistry.deserialize(root["devices"].as<JsonObjectConst>());
@@ -1583,11 +1645,19 @@ void BLEManager::registerPreconditions(IPreconditionRegistry& registry) {
     // 3. Central Client Providers Preconditions
     for (auto* p : _clientProviders) {
         if (!p) continue;
-        std::string* name = new std::string("BLE: ");
-        *name += p->getDeviceTypeLabel();
+        // Y5: Use static lifetime storage — provider labels are stable after lock
+        static char preconditionNames[4][40] = {};
+        static size_t preconditionIdx = 0;
+        if (preconditionIdx < 4) {
+            snprintf(preconditionNames[preconditionIdx], sizeof(preconditionNames[0]),
+                     "BLE: %s", p->getDeviceTypeLabel());
+        }
         
+        const char* precName = (preconditionIdx < 4) ? preconditionNames[preconditionIdx] : "BLE: ?";
+        if (preconditionIdx < 4) preconditionIdx++;
+
         registry.add(
-            name->c_str(),
+            precName,
             PreconditionRole::Operational,
             [this, pid = p->getProviderId()]() -> PreconditionStatus {
                 BLEStoredDevice stored;

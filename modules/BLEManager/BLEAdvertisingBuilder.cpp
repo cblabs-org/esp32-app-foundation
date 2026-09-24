@@ -150,7 +150,7 @@ BLEAdvPackResult BLEAdvertisingBuilder::pack(const char* advertisedName,
             // Truncate if exceeds max payload
             size_t fitLen = BLE_ADV_MAX_PAYLOAD - 2;
             result.scanResponse.data[0] = static_cast<uint8_t>(fitLen + 1);
-            result.scanResponse.data[1] = 0x09;
+            result.scanResponse.data[1] = 0x08;  // Y2: Shortened Local Name (truncated)
             std::memcpy(&result.scanResponse.data[2], fullName, fitLen);
             result.scanResponse.length = static_cast<uint8_t>(BLE_ADV_MAX_PAYLOAD);
         }
