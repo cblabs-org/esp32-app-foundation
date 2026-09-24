@@ -74,3 +74,4 @@ uidesign/*/lvglpro/preview-build/
 uidesign/*/lvglpro/preview-bin/
 uidesign/*/lvglpro/.cache.json
 .cm_project
+__pycache__/

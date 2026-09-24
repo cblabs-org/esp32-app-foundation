@@ -33,14 +33,24 @@ bool SampleFtmsProvider::registerServices(NimBLEServer& server) {
     }
 
     // Fitness Machine Feature: 0x2ACC (Read)
-    // Feature bits: Cadence (bit 1), Resistance (bit 3), Heart Rate (bit 10), Power (bit 14)
-    uint32_t features = 0x0000440A;
+    // Y8: Correct FTMS Feature bits per FTMS Table 4.3:
+    //   bit 1  = Average Speed Supported
+    //   bit 2  = Cadence Supported
+    //   bit 7  = Resistance Level Supported
+    //   bit 10 = Heart Rate Measurement Supported
+    //   bit 14 = Power Measurement Supported
+    // Target Features = 0x00004486 (field is 32-bit little-endian)
+    // Plus 32-bit Target Setting Features = 0x00000000
+    uint8_t featureVal[8] = {};
+    uint32_t machineFeatures = 0x00004486;
+    memcpy(featureVal, &machineFeatures, 4);  // Machine Features
+    // featureVal[4..7] = 0 — no target settings
     _pFeatureChar = pFtms->createCharacteristic(
         NimBLEUUID((uint16_t)0x2ACC),
         NIMBLE_PROPERTY::READ
     );
     if (_pFeatureChar) {
-        _pFeatureChar->setValue(reinterpret_cast<const uint8_t*>(&features), sizeof(features));
+        _pFeatureChar->setValue(featureVal, sizeof(featureVal));
     }
 
     // Indoor Bike Data: 0x2AD2 (Notify)
@@ -55,18 +65,7 @@ bool SampleFtmsProvider::registerServices(NimBLEServer& server) {
         NIMBLE_PROPERTY::NOTIFY
     );
 
-    // 2. Device Information Service (0x180A)
-    NimBLEService* pDis = server.createService(NimBLEUUID((uint16_t)0x180A));
-    if (pDis) {
-        auto* mfg = pDis->createCharacteristic(NimBLEUUID((uint16_t)0x2A29), NIMBLE_PROPERTY::READ);
-        if (mfg) mfg->setValue("CB Labs");
-
-        auto* model = pDis->createCharacteristic(NimBLEUUID((uint16_t)0x2A24), NIMBLE_PROPERTY::READ);
-        if (model) model->setValue("AppFoundation-FTMS");
-
-        auto* fwr = pDis->createCharacteristic(NimBLEUUID((uint16_t)0x2A26), NIMBLE_PROPERTY::READ);
-        if (fwr) fwr->setValue("1.0.0");
-    }
+    // Y8: Don't create a second DIS — the framework auto-registers one in begin().
 
     return true;
 #else
@@ -83,8 +82,8 @@ void SampleFtmsProvider::contributeAdvertising(BLEAdvertisingBuilder& adv) {
     const uint8_t serviceData[3] = {0x01, 0x20, 0x00};
     adv.addServiceData16(0x1826, serviceData, sizeof(serviceData), BLEAdvertisingBuilder::Priority::Required);
 
-    // Bluetooth Appearance: 0x0460 (Cycling: Fitness Machine / Indoor Bike)
-    adv.setAppearance(0x0460);
+    // Y8: Appearance 0x0491 = Cycling: Indoor Bike (GATT assigned numbers §6.3)
+    adv.setAppearance(0x0491);
 }
 
 void SampleFtmsProvider::onPeerConnected(const BLEPeerInfo& /*peer*/) {

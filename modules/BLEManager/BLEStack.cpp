@@ -291,12 +291,16 @@ bool BLEStack::startServer() {
         return false;
     }
 
-    // Attach characteristic callbacks to all characteristics on all services
+    // R6: Only attach routing callbacks to characteristics that DON'T already
+    // have provider-installed callbacks. Providers may set their own callbacks
+    // during registerServices() (e.g. for writable Control Point characteristics).
     for (auto* svc : getServerServices(_server)) {
         if (!svc) continue;
         for (auto* chr : svc->getCharacteristics()) {
             if (!chr) continue;
-            chr->setCallbacks(s_chrCallbacks.get());
+            if (chr->getCallbacks() == nullptr) {
+                chr->setCallbacks(s_chrCallbacks.get());
+            }
         }
     }
 
@@ -333,8 +337,9 @@ bool BLEStack::startAdvertising(const BLEAdvPackResult& packResult, const BLECon
         pAdv->enableScanResponse(false);
     }
 
-    // Preferred params in advert data
-    pAdv->setPreferredParams(preferredParams.minIntervalUnits, preferredParams.maxIntervalUnits);
+    // A2: Don't call setPreferredParams() here — it adds AD bytes after the
+    // packer has done its 31-byte accounting. The GAP PPCP characteristic
+    // (set by setPreferredConnParams above) already communicates preferred params.
 
     return pAdv->start();
 }
@@ -414,6 +419,9 @@ uint32_t BLEStack::getDroppedEventsCount() const {
 namespace {
     static void* s_hostQueue = nullptr;
 
+    // Reverse lookup: NimBLEClient* → providerId for notification routing (R1)
+    static std::map<NimBLEClient*, std::string> s_clientProviderMap;
+
     class ClientCallbacks : public NimBLEClientCallbacks {
     public:
         explicit ClientCallbacks(const char* providerId) {
@@ -443,10 +451,20 @@ namespace {
         BLEQueueMessage msg;
         msg.type = BLEQueueMessage::Type::Notification;
         
+        // R1: Look up providerId from the owning client
+        NimBLEClient* pClient = pChr->getRemoteService()->getClient();
+        auto provIt = s_clientProviderMap.find(pClient);
+        if (provIt != s_clientProviderMap.end()) {
+            strncpy(msg.providerId, provIt->second.c_str(), sizeof(msg.providerId) - 1);
+        }
+
+        // O3: Stamp receivedAtMs at the point the NimBLE host task received it
+        msg.receivedAtMs = (uint32_t)xTaskGetTickCount() * portTICK_PERIOD_MS;
+
         const NimBLEUUID& srvUuid = pChr->getRemoteService()->getUUID();
         const NimBLEUUID& chrUuid = pChr->getUUID();
         if (srvUuid.bitSize() == 16 && srvUuid.getBase() != nullptr) {
-            msg.attrHandle = reinterpret_cast<const ble_uuid16_t*>(srvUuid.getBase())->value; // Use attrHandle for srv uuid
+            msg.attrHandle = reinterpret_cast<const ble_uuid16_t*>(srvUuid.getBase())->value;
         }
         if (chrUuid.bitSize() == 16 && chrUuid.getBase() != nullptr) {
             msg.uuid16 = reinterpret_cast<const ble_uuid16_t*>(chrUuid.getBase())->value;
@@ -471,7 +489,18 @@ namespace {
             if (advertisedDevice->haveName()) {
                 strncpy(msg.providerId, advertisedDevice->getName().c_str(), sizeof(msg.providerId) - 1);
             }
+
+            // Store RSSI in a signed field
+            msg.handle = (BLEConnHandle)(int16_t)advertisedDevice->getRSSI();
             
+            xQueueSend(static_cast<QueueHandle_t>(s_hostQueue), &msg, 0);
+        }
+
+        // R5: Use onScanEnd instead of sending ScanCompleted immediately
+        void onScanEnd(const NimBLEScanResults& /*results*/, int /*reason*/) override {
+            if (!s_hostQueue) return;
+            BLEQueueMessage msg;
+            msg.type = BLEQueueMessage::Type::ScanCompleted;
             xQueueSend(static_cast<QueueHandle_t>(s_hostQueue), &msg, 0);
         }
     };
@@ -481,44 +510,104 @@ namespace {
 
 bool BLEStack::executeCentralConnect(const CentralConnectOptions& opts, const BLEPeerAddress& addr, bool& bondedOut) {
     s_hostQueue = opts.hostEventQueue;
-    NimBLEClient* pClient = NimBLEDevice::createClient();
-    if (!pClient) return false;
+    const char* providerId = opts.provider->getProviderId();
 
-    pClient->setClientCallbacks(new ClientCallbacks(opts.provider->getProviderId()), true);
-    pClient->setConnectionParams(opts.initiatorScan.intervalMs * 1000 / 625, opts.initiatorScan.windowMs * 1000 / 625,
-                                 opts.centralConnParams.minIntervalUnits, opts.centralConnParams.maxIntervalUnits,
-                                 opts.centralConnParams.latency, opts.centralConnParams.supervisionTimeoutUnits);
+    // R4: Reuse existing client for this provider, or create a new one
+    NimBLEClient* pClient = nullptr;
+    auto existingIt = s_clients.find(providerId);
+    if (existingIt != s_clients.end() && existingIt->second) {
+        pClient = existingIt->second;
+        if (pClient->isConnected()) {
+            pClient->disconnect();
+        }
+    } else {
+        pClient = NimBLEDevice::createClient();
+        if (!pClient) return false;
+    }
+
+    pClient->setClientCallbacks(new ClientCallbacks(providerId), true);
+
+    // R2: setConnectionParams takes (minInterval, maxInterval, latency, timeout) in 1.25ms units
+    pClient->setConnectionParams(
+        opts.centralConnParams.minIntervalUnits,
+        opts.centralConnParams.maxIntervalUnits,
+        opts.centralConnParams.latency,
+        opts.centralConnParams.supervisionTimeoutUnits
+    );
     
     NimBLEAddress bleAddr(addr.bytes, static_cast<uint8_t>(addr.type));
     if (!pClient->connect(bleAddr)) {
-        NimBLEDevice::deleteClient(pClient);
+        // R3: Report failure — clean up and send a failure message
+        // Only delete if we created it fresh (not reusing)
+        if (existingIt == s_clients.end()) {
+            NimBLEDevice::deleteClient(pClient);
+        }
+        // R3: Send a CentralDisconnected with ConnectFailed reason so the manager knows
+        BLEQueueMessage failMsg;
+        failMsg.type = BLEQueueMessage::Type::CentralDisconnected;
+        failMsg.reason = BLEDisconnectReason::ConnectFailed;
+        strncpy(failMsg.providerId, providerId, sizeof(failMsg.providerId) - 1);
+        failMsg.address = addr;
+        xQueueSend(static_cast<QueueHandle_t>(opts.hostEventQueue), &failMsg, 0);
         return false;
     }
 
-    // Opportunistic bonding
+    // O7: Opportunistic bonding — carry result through
     bondedOut = pClient->secureConnection();
 
-    // Subscribe
+    // O8: Subscribe with required-check
     BLESubscriptionSpec subs[16];
     size_t count = opts.provider->getSubscriptions(subs, 16);
+    bool requiredFailed = false;
     for (size_t i = 0; i < count; ++i) {
         NimBLERemoteService* pSvc = pClient->getService(subs[i].serviceUuid16);
         if (pSvc) {
             NimBLERemoteCharacteristic* pChr = pSvc->getCharacteristic(subs[i].charUuid16);
             if (pChr) {
-                pChr->subscribe(!subs[i].indicate, notifyCB, true);
+                bool ok = pChr->subscribe(!subs[i].indicate, notifyCB, true);
+                if (!ok && subs[i].required) {
+                    ESP_LOGW("BLEStack", "Required subscription 0x%04X/0x%04X failed for '%s'",
+                             subs[i].serviceUuid16, subs[i].charUuid16, providerId);
+                    requiredFailed = true;
+                }
+            } else if (subs[i].required) {
+                ESP_LOGW("BLEStack", "Required characteristic 0x%04X not found for '%s'",
+                         subs[i].charUuid16, providerId);
+                requiredFailed = true;
             }
+        } else if (subs[i].required) {
+            ESP_LOGW("BLEStack", "Required service 0x%04X not found for '%s'",
+                     subs[i].serviceUuid16, providerId);
+            requiredFailed = true;
         }
+    }
+
+    // O8: If a required subscription failed, disconnect and report failure
+    if (requiredFailed) {
+        pClient->disconnect();
+        if (existingIt == s_clients.end()) {
+            NimBLEDevice::deleteClient(pClient);
+        }
+        BLEQueueMessage failMsg;
+        failMsg.type = BLEQueueMessage::Type::CentralDisconnected;
+        failMsg.reason = BLEDisconnectReason::ConnectFailed;
+        strncpy(failMsg.providerId, providerId, sizeof(failMsg.providerId) - 1);
+        failMsg.address = addr;
+        xQueueSend(static_cast<QueueHandle_t>(opts.hostEventQueue), &failMsg, 0);
+        return false;
     }
 
     opts.provider->onClientReadyWorker(*pClient);
 
-    s_clients[opts.provider->getProviderId()] = pClient;
+    // R4: Store client and R1: register in provider map for notification routing
+    s_clients[providerId] = pClient;
+    s_clientProviderMap[pClient] = providerId;
 
     BLEQueueMessage msg;
     msg.type = BLEQueueMessage::Type::CentralConnected;
     msg.address = addr;
-    strncpy(msg.providerId, opts.provider->getProviderId(), sizeof(msg.providerId) - 1);
+    msg.boolVal1 = bondedOut; // O7: carry bond result to main loop
+    strncpy(msg.providerId, providerId, sizeof(msg.providerId) - 1);
     xQueueSend(static_cast<QueueHandle_t>(opts.hostEventQueue), &msg, 0);
 
     return true;
@@ -528,29 +617,37 @@ void BLEStack::executeCentralDisconnect(const char* providerId) {
     if (!providerId) return;
     auto it = s_clients.find(providerId);
     if (it != s_clients.end() && it->second) {
+        // R1: Clean up provider map
+        s_clientProviderMap.erase(it->second);
         it->second->disconnect();
     }
 }
 
 void BLEStack::executeCentralForget(const char* providerId) {
-    executeCentralDisconnect(providerId);
-    if (providerId) {
-        s_clients.erase(providerId);
+    if (!providerId) return;
+    auto it = s_clients.find(providerId);
+    if (it != s_clients.end() && it->second) {
+        NimBLEClient* pClient = it->second;
+        // O9: Delete the NVS bond before disconnecting
+        NimBLEDevice::deleteBond(pClient->getPeerAddress());
+        s_clientProviderMap.erase(pClient);
+        pClient->disconnect();
+        NimBLEDevice::deleteClient(pClient);
+        s_clients.erase(it);
     }
 }
 
 void BLEStack::executeDiscovery(const BLEScanParams& params, uint32_t durationMs, IBLEClientProvider* /*provider*/, void* hostEventQueue, std::vector<BLEScanResult>& /*resultsOut*/) {
     s_hostQueue = hostEventQueue;
     NimBLEScan* pScan = NimBLEDevice::getScan();
-    pScan->setScanCallbacks(new ScanCallbacks(), false);
+    static ScanCallbacks scanCB;
+    pScan->setScanCallbacks(&scanCB, false);
     pScan->setInterval(params.intervalMs * 1000 / 625);
     pScan->setWindow(params.windowMs * 1000 / 625);
     pScan->setActiveScan(params.active);
-    pScan->start(durationMs / 1000, false);
-    
-    BLEQueueMessage msg;
-    msg.type = BLEQueueMessage::Type::ScanCompleted;
-    xQueueSend(static_cast<QueueHandle_t>(hostEventQueue), &msg, 0);
+    // R5: NimBLE 2.x takes milliseconds directly — pass durationMs as-is.
+    // ScanCompleted is sent by ScanCallbacks::onDiscoveryComplete, not here.
+    pScan->start(durationMs, false);
 }
 
 void BLEStack::stopDiscovery() {
