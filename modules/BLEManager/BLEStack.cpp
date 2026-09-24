@@ -51,6 +51,13 @@ public:
         : _stack(stack), _queue(queue) {}
 
     void onConnect(NimBLEServer* /*pServer*/, NimBLEConnInfo& connInfo) override {
+        ESP_LOGI(TAG, ">>> Central connected: handle=%d, addr=%s, itvl=%d (%.2fms), latency=%d, timeout=%d (%dms), MTU=%d",
+                 connInfo.getConnHandle(), connInfo.getAddress().toString().c_str(),
+                 connInfo.getConnInterval(), connInfo.getConnInterval() * 1.25f,
+                 connInfo.getConnLatency(),
+                 connInfo.getConnTimeout(), connInfo.getConnTimeout() * 10,
+                 connInfo.getMTU());
+
         if (!_queue) return;
 
         BLEQueueMessage msg;
@@ -75,6 +82,10 @@ public:
     }
 
     void onDisconnect(NimBLEServer* /*pServer*/, NimBLEConnInfo& connInfo, int reason) override {
+        ESP_LOGW(TAG, "<<< Central disconnected: handle=%d, addr=%s, reason=0x%02x (%s)",
+                 connInfo.getConnHandle(), connInfo.getAddress().toString().c_str(),
+                 reason, NimBLEUtils::returnCodeToString(reason));
+
         if (!_queue) return;
 
         BLEQueueMessage msg;
@@ -110,6 +121,21 @@ public:
     }
 
     void onMTUChange(uint16_t MTU, NimBLEConnInfo& connInfo) override {
+        ESP_LOGI(TAG, ">>> Central MTU changed: handle=%d, MTU=%u", connInfo.getConnHandle(), (unsigned)MTU);
+
+        // Once MTU exchange is complete, if the central used a dangerously short
+        // supervision timeout (< 2.0s, e.g. macOS default 720ms), update it to
+        // 4.0s so radio coexistence bursts don't drop the connection.
+        if (connInfo.getConnTimeout() < 200 && _stack) {
+            BLEConnParams robustParams;
+            robustParams.minIntervalUnits        = connInfo.getConnInterval();
+            robustParams.maxIntervalUnits        = connInfo.getConnInterval();
+            robustParams.latency                 = connInfo.getConnLatency();
+            robustParams.supervisionTimeoutUnits = 400; // 4.0s
+            ESP_LOGI(TAG, "Updating supervision timeout to 4.0s (was %dms)", connInfo.getConnTimeout() * 10);
+            _stack->updateConnParams(connInfo.getConnHandle(), robustParams);
+        }
+
         if (!_queue) return;
 
         BLEQueueMessage msg;
@@ -411,8 +437,7 @@ void BLEStack::updateConnParams(BLEConnHandle handle, const BLEConnParams& param
 }
 
 void BLEStack::setPreferredConnParams(const BLEConnParams& /*params*/) {
-    // Preferred parameters are advertised via pAdv->setPreferredParams()
-    // and negotiated per connection via updateConnParams().
+    // Preferred parameters are negotiated per connection via updateConnParams().
 }
 
 size_t BLEStack::getServiceCount() const {
