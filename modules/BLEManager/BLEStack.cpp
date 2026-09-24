@@ -235,6 +235,9 @@ bool BLEStack::init(const char* deviceName, void* eventQueue) {
     NimBLEDevice::setSecurityAuth(BLE_SM_PAIR_AUTHREQ_BOND);
     NimBLEDevice::setSecurityIOCap(BLE_HS_IO_NO_INPUT_OUTPUT);
 
+    // Maximize RF transmission power (+9 dBm) for advertising, scanning, and connections
+    NimBLEDevice::setPower(9, NimBLETxPowerType::All);
+
     _server = NimBLEDevice::createServer();
     if (!_server) {
         ESP_LOGE(TAG, "Failed to create NimBLE server");
