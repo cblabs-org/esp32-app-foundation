@@ -33,16 +33,16 @@ bool SampleFtmsProvider::registerServices(NimBLEServer& server) {
     }
 
     // Fitness Machine Feature: 0x2ACC (Read)
-    // Y8: Correct FTMS Feature bits per FTMS Table 4.3:
-    //   bit 1  = Average Speed Supported
-    //   bit 2  = Cadence Supported
+    // FTMS Table 4.3 — bits for Indoor Bike Data fields this sample provides:
+    //   bit 1  = Cadence Supported
     //   bit 7  = Resistance Level Supported
     //   bit 10 = Heart Rate Measurement Supported
     //   bit 14 = Power Measurement Supported
-    // Target Features = 0x00004486 (field is 32-bit little-endian)
+    // = 0x00004482.  (bit 2 = Total Distance is NOT set — Indoor Bike Data
+    //   doesn't carry it.)
     // Plus 32-bit Target Setting Features = 0x00000000
     uint8_t featureVal[8] = {};
-    uint32_t machineFeatures = 0x00004486;
+    uint32_t machineFeatures = 0x00004482;
     memcpy(featureVal, &machineFeatures, 4);  // Machine Features
     // featureVal[4..7] = 0 — no target settings
     _pFeatureChar = pFtms->createCharacteristic(
@@ -75,15 +75,18 @@ bool SampleFtmsProvider::registerServices(NimBLEServer& server) {
 }
 
 void SampleFtmsProvider::contributeAdvertising(BLEAdvertisingBuilder& adv) {
-    // Service UUID
+    // Service UUID — FTMS apps discover via this, not Appearance
     adv.addServiceUuid16(0x1826, BLEAdvertisingBuilder::Priority::Required);
 
     // Service Data (Indoor Bike flag 0x0020, 3 bytes)
     const uint8_t serviceData[3] = {0x01, 0x20, 0x00};
     adv.addServiceData16(0x1826, serviceData, sizeof(serviceData), BLEAdvertisingBuilder::Priority::Required);
 
-    // Y8: Appearance 0x0491 = Cycling: Indoor Bike (GATT assigned numbers §6.3)
-    adv.setAppearance(0x0491);
+    // NOTE: Appearance is consumer-specific. The SIG Assigned Numbers define
+    // Cycling sub-categories only for Computer, Speed, Cadence, Power, and
+    // Speed+Cadence sensors — there is no Indoor Bike value. Consumer apps
+    // should set their own appearance via contributeAdvertising() if needed
+    // (e.g. adv.setAppearance(0x0480) for generic Cycling).
 }
 
 void SampleFtmsProvider::onPeerConnected(const BLEPeerInfo& /*peer*/) {

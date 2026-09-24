@@ -159,7 +159,7 @@ public:
     };
     bool executeCentralConnect(const CentralConnectOptions& opts, const BLEPeerAddress& addr, bool& bondedOut);
     void executeCentralDisconnect(const char* providerId);
-    void executeCentralForget(const char* providerId);
+    void executeCentralForget(const char* providerId, const BLEPeerAddress& addr);
     void executeDiscovery(const BLEScanParams& params, uint32_t durationMs, IBLEClientProvider* provider, void* hostEventQueue, std::vector<BLEScanResult>& resultsOut);
     void stopDiscovery();
     bool isScanning() const;
@@ -236,7 +236,7 @@ inline bool BLEStack::executeCentralConnect(const CentralConnectOptions& /*opts*
     return true;
 }
 inline void BLEStack::executeCentralDisconnect(const char* /*providerId*/) {}
-inline void BLEStack::executeCentralForget(const char* /*providerId*/) {}
+inline void BLEStack::executeCentralForget(const char* /*providerId*/, const BLEPeerAddress& /*addr*/) {}
 inline void BLEStack::executeDiscovery(const BLEScanParams& /*params*/, uint32_t /*durationMs*/, IBLEClientProvider* /*provider*/, void* /*hostEventQueue*/, std::vector<BLEScanResult>& /*resultsOut*/) {}
 inline void BLEStack::stopDiscovery() {}
 inline bool BLEStack::isScanning() const { return false; }

@@ -149,7 +149,7 @@ void BLEManager::centralWorkerTask(void* arg) {
                 case BLEManager::WorkerCommand::Type::Forget: {
                     // R9: Only do BLE stack work on the worker task.
                     // Registry, events, provider callbacks, and persistence run on the main loop.
-                    mgr->_stack.executeCentralForget(cmd.providerId);
+                    mgr->_stack.executeCentralForget(cmd.providerId, cmd.addr);
                     // Send a DeviceForgotten message to the main loop
                     BLEQueueMessage forgetMsg;
                     forgetMsg.type = BLEQueueMessage::Type::DeviceForgotten;
@@ -468,9 +468,23 @@ bool BLEManager::pair(const char* providerId, const BLEPeerAddress& addr) {
 bool BLEManager::forget(const char* providerId) {
     if (!providerId) return false;
 
+    // R9: Synchronously prevent the reconnect race — if tick() runs before
+    // the worker processes Forget, it must NOT queue a Connect.
+    _clientConnected.erase(providerId);
+    _clientConnecting.erase(providerId);
+    _reconnectPolicies.erase(providerId);
+
     WorkerCommand cmd;
     cmd.type = WorkerCommand::Type::Forget;
     strncpy(cmd.providerId, providerId, sizeof(cmd.providerId) - 1);
+
+    // O9: Copy the stored address so the worker can delete the NVS bond
+    // even after reboot (when no live client object exists).
+    BLEStoredDevice stored;
+    if (_deviceRegistry.get(providerId, stored)) {
+        cmd.addr = stored.address;
+    }
+
     xQueueSend(static_cast<QueueHandle_t>(_workerQueue), &cmd, 0);
 
     return true;
@@ -897,7 +911,9 @@ void BLEManager::dispatchQueueEvents() {
                                                             _config.maxPeripheralConnections,
                                                             false,
                                                             _config.enabled)) {
-                    if (!_stack.isAdvertising() && !_advPackResult.hasFault()) {
+                    // O6: Advertise even with a packer fault — the faulting
+                    // element was already dropped, remaining data is valid.
+                    if (!_stack.isAdvertising()) {
                         _stack.startAdvertising(_advPackResult, _config.peripheralPreferredConnParams);
                     }
                 }
@@ -950,17 +966,34 @@ void BLEManager::dispatchQueueEvents() {
                         break;
                     }
                 }
-                if (prov) {
-                    BLEStoredDevice stored;
-                    if (_deviceRegistry.get(msg.providerId, stored)) {
-                        prov->onConnected(stored);
+                // O7: Consume bond result — update stored device if bonded
+                BLEStoredDevice stored;
+                if (_deviceRegistry.get(msg.providerId, stored)) {
+                    if (msg.boolVal1 && !stored.bonded) {
+                        stored.bonded = true;
+                        _deviceRegistry.set(stored);
+                        #if defined(ESP_PLATFORM)
+                        if (_app) _app->getConfigManager().saveModuleConfig(this);
+                        #endif
                     }
+                    // Also copy device name from discovery results if available
+                    if (stored.name[0] == '\0' && !_discovery.results.empty()) {
+                        for (size_t i = 0; i < _discovery.results.size(); ++i) {
+                            if (_discovery.results[i].address == stored.address) {
+                                strncpy(stored.name, _discovery.results[i].name, sizeof(stored.name) - 1);
+                                _deviceRegistry.set(stored);
+                                break;
+                            }
+                        }
+                    }
+                    if (prov) prov->onConnected(stored);
                 }
                 // O4: Publish ble.central.connected via ring buffer (not stack)
                 if (_eventBus) {
                     auto& cp = _centralConnRing[_centralConnRingHead];
-                    cp.providerId = msg.providerId;
-                    BLEStoredDevice stored;
+                    // N3: Use provider's getProviderId() (static lifetime) — not
+                    // msg.providerId which is a stack-local that goes away.
+                    cp.providerId = prov ? prov->getProviderId() : "";
                     if (_deviceRegistry.get(msg.providerId, stored)) {
                         stored.address.toRedactedString(cp.addrRedacted, sizeof(cp.addrRedacted));
                     }
@@ -989,7 +1022,8 @@ void BLEManager::dispatchQueueEvents() {
                 // O4: Publish via ring buffer, not stack payload
                 if (_eventBus) {
                     auto& cp = _centralConnRing[_centralConnRingHead];
-                    cp.providerId = msg.providerId;
+                    // N3: Use provider's getProviderId() (static lifetime)
+                    cp.providerId = prov ? prov->getProviderId() : "";
                     BLEStoredDevice stored;
                     if (_deviceRegistry.get(msg.providerId, stored)) {
                         stored.address.toRedactedString(cp.addrRedacted, sizeof(cp.addrRedacted));
@@ -1067,9 +1101,8 @@ void BLEManager::dispatchQueueEvents() {
             // R9: Handle DeviceForgotten on the main loop (thread-safe)
             case BLEQueueMessage::Type::DeviceForgotten: {
                 _deviceRegistry.remove(msg.providerId);
-                _clientConnected.erase(msg.providerId);
-                _clientConnecting.erase(msg.providerId);
-                _reconnectPolicies.erase(msg.providerId);
+                // Note: _clientConnected, _clientConnecting, _reconnectPolicies
+                // already erased synchronously in forget() to prevent the reconnect race.
                 // Persist after removal
 #if defined(ESP_PLATFORM)
                 if (_app) {
@@ -1088,7 +1121,8 @@ void BLEManager::dispatchQueueEvents() {
                 // Publish event via ring buffer
                 if (_eventBus) {
                     auto& dp = _deviceRing[_deviceRingHead];
-                    dp.providerId = msg.providerId;
+                    // N3: Use provider's getProviderId() (static lifetime)
+                    dp.providerId = prov ? prov->getProviderId() : "";
                     msg.address.toRedactedString(dp.addrRedacted, sizeof(dp.addrRedacted));
                     _eventBus->publish(BLEEvents::DEVICE_FORGOTTEN, &dp);
                     _deviceRingHead = (_deviceRingHead + 1) % RING_SIZE;

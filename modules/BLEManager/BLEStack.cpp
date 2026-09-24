@@ -143,12 +143,29 @@ private:
     void*     _queue;
 };
 
-class CharacteristicCallbacksHandler : public NimBLECharacteristicCallbacks {
+// N1: ChainingCharCallbacks wraps any existing callback pointer (including
+// provider-installed ones) and adds onSubscribe routing to BLEManager.
+// NimBLE 2.5.0 always has a non-null default callback, so the old approach
+// (skip if getCallbacks() != nullptr) silently broke onSubscribe for all chars.
+class ChainingCharCallbacks : public NimBLECharacteristicCallbacks {
 public:
-    explicit CharacteristicCallbacksHandler(BLEStack* stack, void* queue)
-        : _stack(stack), _queue(queue) {}
+    explicit ChainingCharCallbacks(NimBLECharacteristicCallbacks* prev, BLEStack* stack, void* queue)
+        : _prev(prev), _stack(stack), _queue(queue) {}
 
+    void onRead(NimBLECharacteristic* chr, NimBLEConnInfo& info) override {
+        if (_prev) _prev->onRead(chr, info);
+    }
+    void onWrite(NimBLECharacteristic* chr, NimBLEConnInfo& info) override {
+        if (_prev) _prev->onWrite(chr, info);
+    }
+    void onStatus(NimBLECharacteristic* chr, int code) override {
+        if (_prev) _prev->onStatus(chr, code);
+    }
     void onSubscribe(NimBLECharacteristic* pCharacteristic, NimBLEConnInfo& connInfo, uint16_t subValue) override {
+        // Forward to provider callback first (if any)
+        if (_prev) _prev->onSubscribe(pCharacteristic, connInfo, subValue);
+
+        // Then route to BLEManager for subscription tracking
         if (!_queue || !pCharacteristic) return;
 
         BLEQueueMessage msg;
@@ -172,12 +189,17 @@ public:
     }
 
 private:
+    NimBLECharacteristicCallbacks* _prev;
     BLEStack* _stack;
     void*     _queue;
 };
 
-static std::unique_ptr<ServerCallbacksHandler>         s_serverCallbacks;
-static std::unique_ptr<CharacteristicCallbacksHandler> s_chrCallbacks;
+static std::unique_ptr<ServerCallbacksHandler>  s_serverCallbacks;
+// N1: s_chrCallbacks is used only to hold the BLEStack* and queue* for
+// creating ChainingCharCallbacks instances in startServer(). The actual
+// chaining wrappers are allocated per-characteristic (once, at boot).
+static BLEStack* s_chainingStack = nullptr;
+static void*     s_chainingQueue = nullptr;
 
 } // namespace
 
@@ -221,7 +243,8 @@ bool BLEStack::init(const char* deviceName, void* eventQueue) {
     }
 
     s_serverCallbacks = std::make_unique<ServerCallbacksHandler>(this, _eventQueue);
-    s_chrCallbacks    = std::make_unique<CharacteristicCallbacksHandler>(this, _eventQueue);
+    s_chainingStack = this;
+    s_chainingQueue = _eventQueue;
 
     _initialized = true;
     ESP_LOGI(TAG, "NimBLE stack initialized successfully. Host task running.");
@@ -234,7 +257,8 @@ void BLEStack::deinit() {
     }
     ESP_LOGI(TAG, "Deinitializing NimBLE stack...");
     s_serverCallbacks.reset();
-    s_chrCallbacks.reset();
+    s_chainingStack = nullptr;
+    s_chainingQueue = nullptr;
     _server = nullptr;
     NimBLEDevice::deinit(true);
     _initialized = false;
@@ -291,16 +315,18 @@ bool BLEStack::startServer() {
         return false;
     }
 
-    // R6: Only attach routing callbacks to characteristics that DON'T already
-    // have provider-installed callbacks. Providers may set their own callbacks
-    // during registerServices() (e.g. for writable Control Point characteristics).
+    // N1: Install chaining callbacks on ALL characteristics. This wraps any
+    // existing callback (provider-installed or NimBLE default) and adds
+    // onSubscribe routing. NimBLE 2.5.0's getCallbacks() is never null
+    // (returns &defaultCallback), so the old "skip if non-null" approach
+    // silently prevented onSubscribe from ever firing.
+    // One-time allocation per characteristic (~24 bytes each).
     for (auto* svc : getServerServices(_server)) {
         if (!svc) continue;
         for (auto* chr : svc->getCharacteristics()) {
             if (!chr) continue;
-            if (chr->getCallbacks() == nullptr) {
-                chr->setCallbacks(s_chrCallbacks.get());
-            }
+            auto* prev = chr->getCallbacks();
+            chr->setCallbacks(new ChainingCharCallbacks(prev, s_chainingStack, s_chainingQueue));
         }
     }
 
@@ -419,9 +445,6 @@ uint32_t BLEStack::getDroppedEventsCount() const {
 namespace {
     static void* s_hostQueue = nullptr;
 
-    // Reverse lookup: NimBLEClient* → providerId for notification routing (R1)
-    static std::map<NimBLEClient*, std::string> s_clientProviderMap;
-
     class ClientCallbacks : public NimBLEClientCallbacks {
     public:
         explicit ClientCallbacks(const char* providerId) {
@@ -446,35 +469,10 @@ namespace {
         char _providerId[24] = {};
     };
 
-    void notifyCB(NimBLERemoteCharacteristic* pChr, uint8_t* pData, size_t length, bool /*isNotify*/) {
-        if (!s_hostQueue || !pChr) return;
-        BLEQueueMessage msg;
-        msg.type = BLEQueueMessage::Type::Notification;
-        
-        // R1: Look up providerId from the owning client
-        NimBLEClient* pClient = pChr->getRemoteService()->getClient();
-        auto provIt = s_clientProviderMap.find(pClient);
-        if (provIt != s_clientProviderMap.end()) {
-            strncpy(msg.providerId, provIt->second.c_str(), sizeof(msg.providerId) - 1);
-        }
-
-        // O3: Stamp receivedAtMs at the point the NimBLE host task received it
-        msg.receivedAtMs = (uint32_t)xTaskGetTickCount() * portTICK_PERIOD_MS;
-
-        const NimBLEUUID& srvUuid = pChr->getRemoteService()->getUUID();
-        const NimBLEUUID& chrUuid = pChr->getUUID();
-        if (srvUuid.bitSize() == 16 && srvUuid.getBase() != nullptr) {
-            msg.attrHandle = reinterpret_cast<const ble_uuid16_t*>(srvUuid.getBase())->value;
-        }
-        if (chrUuid.bitSize() == 16 && chrUuid.getBase() != nullptr) {
-            msg.uuid16 = reinterpret_cast<const ble_uuid16_t*>(chrUuid.getBase())->value;
-        }
-
-        msg.rawLen = std::min(length, (size_t)64);
-        msg.boolVal1 = (length > 64); // truncated
-        memcpy(msg.rawBytes, pData, msg.rawLen);
-        xQueueSend(static_cast<QueueHandle_t>(s_hostQueue), &msg, 0);
-    }
+    // N6: The old standalone notifyCB and s_clientProviderMap are removed.
+    // Each subscription now captures providerId by value in its lambda,
+    // eliminating the ordering gap (map populated after subscribe) and
+    // the data race (map written on worker, read on NimBLE host task).
 
     class ScanCallbacks : public NimBLEScanCallbacks {
     public:
@@ -523,16 +521,26 @@ bool BLEStack::executeCentralConnect(const CentralConnectOptions& opts, const BL
     } else {
         pClient = NimBLEDevice::createClient();
         if (!pClient) return false;
+        // N2: Set callbacks once at creation — NimBLE doesn't delete the old
+        // callbacks on setClientCallbacks(), only in ~NimBLEClient(). Setting
+        // on every reconnect leaks ~40 B per attempt.
+        pClient->setClientCallbacks(new ClientCallbacks(providerId), true);
     }
 
-    pClient->setClientCallbacks(new ClientCallbacks(providerId), true);
+    // N6: Register client→provider mapping BEFORE subscribing so
+    // early notifications can be routed. s_clients is also used for reuse.
+    s_clients[providerId] = pClient;
 
     // R2: setConnectionParams takes (minInterval, maxInterval, latency, timeout) in 1.25ms units
     pClient->setConnectionParams(
         opts.centralConnParams.minIntervalUnits,
         opts.centralConnParams.maxIntervalUnits,
         opts.centralConnParams.latency,
-        opts.centralConnParams.supervisionTimeoutUnits
+        opts.centralConnParams.supervisionTimeoutUnits,
+        // N4: Pass initiator scan params to avoid 100% duty default (16/16).
+        // Convert ms → BLE units (0.625 ms per unit = ms * 1000 / 625).
+        opts.initiatorScan.intervalMs * 1000 / 625,
+        opts.initiatorScan.windowMs * 1000 / 625
     );
     
     NimBLEAddress bleAddr(addr.bytes, static_cast<uint8_t>(addr.type));
@@ -552,19 +560,44 @@ bool BLEStack::executeCentralConnect(const CentralConnectOptions& opts, const BL
         return false;
     }
 
-    // O7: Opportunistic bonding — carry result through
-    bondedOut = pClient->secureConnection();
-
-    // O8: Subscribe with required-check
+    // N6: Subscribe BEFORE secureConnection() so HR data flows immediately.
+    // SMP-silent peers would otherwise delay subscriptions by up to 30 s.
+    // Capture providerId by value in the lambda — NimBLE 2.x notify_callback
+    // is a std::function, so no shared map is needed.
     BLESubscriptionSpec subs[16];
     size_t count = opts.provider->getSubscriptions(subs, 16);
     bool requiredFailed = false;
+    std::string provIdCapture(providerId);  // owned copy for lambda
     for (size_t i = 0; i < count; ++i) {
         NimBLERemoteService* pSvc = pClient->getService(subs[i].serviceUuid16);
         if (pSvc) {
             NimBLERemoteCharacteristic* pChr = pSvc->getCharacteristic(subs[i].charUuid16);
             if (pChr) {
-                bool ok = pChr->subscribe(!subs[i].indicate, notifyCB, true);
+                // N6: Lambda captures providerId by value — no shared map needed
+                auto cb = [provIdCapture](NimBLERemoteCharacteristic* pRemChr,
+                                           uint8_t* pData, size_t length, bool isNotify) {
+                    if (!s_hostQueue || !pRemChr) return;
+                    BLEQueueMessage msg;
+                    msg.type = BLEQueueMessage::Type::Notification;
+                    strncpy(msg.providerId, provIdCapture.c_str(), sizeof(msg.providerId) - 1);
+                    // O3/N5: millis() for consistent time base
+                    msg.receivedAtMs = (uint32_t)millis();
+
+                    const NimBLEUUID& srvUuid = pRemChr->getRemoteService()->getUUID();
+                    const NimBLEUUID& chrUuid = pRemChr->getUUID();
+                    if (srvUuid.bitSize() == 16 && srvUuid.getBase() != nullptr) {
+                        msg.attrHandle = reinterpret_cast<const ble_uuid16_t*>(srvUuid.getBase())->value;
+                    }
+                    if (chrUuid.bitSize() == 16 && chrUuid.getBase() != nullptr) {
+                        msg.uuid16 = reinterpret_cast<const ble_uuid16_t*>(chrUuid.getBase())->value;
+                    }
+
+                    msg.rawLen = std::min(length, (size_t)64);
+                    msg.boolVal1 = (length > 64); // truncated
+                    memcpy(msg.rawBytes, pData, msg.rawLen);
+                    xQueueSend(static_cast<QueueHandle_t>(s_hostQueue), &msg, 0);
+                };
+                bool ok = pChr->subscribe(!subs[i].indicate, cb, true);
                 if (!ok && subs[i].required) {
                     ESP_LOGW("BLEStack", "Required subscription 0x%04X/0x%04X failed for '%s'",
                              subs[i].serviceUuid16, subs[i].charUuid16, providerId);
@@ -581,6 +614,9 @@ bool BLEStack::executeCentralConnect(const CentralConnectOptions& opts, const BL
             requiredFailed = true;
         }
     }
+
+    // O7: Opportunistic bonding — after subscribe so data flows before SMP
+    bondedOut = pClient->secureConnection();
 
     // O8: If a required subscription failed, disconnect and report failure
     if (requiredFailed) {
@@ -599,9 +635,7 @@ bool BLEStack::executeCentralConnect(const CentralConnectOptions& opts, const BL
 
     opts.provider->onClientReadyWorker(*pClient);
 
-    // R4: Store client and R1: register in provider map for notification routing
-    s_clients[providerId] = pClient;
-    s_clientProviderMap[pClient] = providerId;
+    // R4: s_clients[providerId] already set before subscribe (N6 fix)
 
     BLEQueueMessage msg;
     msg.type = BLEQueueMessage::Type::CentralConnected;
@@ -617,20 +651,22 @@ void BLEStack::executeCentralDisconnect(const char* providerId) {
     if (!providerId) return;
     auto it = s_clients.find(providerId);
     if (it != s_clients.end() && it->second) {
-        // R1: Clean up provider map
-        s_clientProviderMap.erase(it->second);
         it->second->disconnect();
     }
 }
 
-void BLEStack::executeCentralForget(const char* providerId) {
+void BLEStack::executeCentralForget(const char* providerId, const BLEPeerAddress& addr) {
     if (!providerId) return;
+
+    // O9: Delete the NVS bond unconditionally using the stored address.
+    // This works even after reboot when no client object exists.
+    NimBLEAddress bleAddr(addr.bytes, static_cast<uint8_t>(addr.type));
+    NimBLEDevice::deleteBond(bleAddr);
+
+    // If a live client exists, disconnect and delete it
     auto it = s_clients.find(providerId);
     if (it != s_clients.end() && it->second) {
         NimBLEClient* pClient = it->second;
-        // O9: Delete the NVS bond before disconnecting
-        NimBLEDevice::deleteBond(pClient->getPeerAddress());
-        s_clientProviderMap.erase(pClient);
         pClient->disconnect();
         NimBLEDevice::deleteClient(pClient);
         s_clients.erase(it);
@@ -645,8 +681,11 @@ void BLEStack::executeDiscovery(const BLEScanParams& params, uint32_t durationMs
     pScan->setInterval(params.intervalMs * 1000 / 625);
     pScan->setWindow(params.windowMs * 1000 / 625);
     pScan->setActiveScan(params.active);
+    // R5: Don't let NimBLE accumulate scan results internally — we send each
+    // one via the queue in onResult(). 0 = callbacks only.
+    pScan->setMaxResults(0);
     // R5: NimBLE 2.x takes milliseconds directly — pass durationMs as-is.
-    // ScanCompleted is sent by ScanCallbacks::onDiscoveryComplete, not here.
+    // ScanCompleted is sent by ScanCallbacks::onScanEnd, not here.
     pScan->start(durationMs, false);
 }
 

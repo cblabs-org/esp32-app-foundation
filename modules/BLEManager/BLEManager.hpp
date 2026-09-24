@@ -171,9 +171,13 @@ public:
     bool   getReconnectPolicy(const char* providerId, BLEReconnectPolicy& out) const;
     bool   pair(const char* providerId, const BLEPeerAddress& addr);
     bool   forget(const char* providerId);
-
     // --- Coexistence and Lifecycle Control ---
 
+    /// @brief Suppress all scanning (discovery + reconnect) while the token is alive.
+    /// @note Must be called from the main Arduino loop task only. While the REST/MCP
+    ///       thread safety work (O2) is deferred, calling from other tasks (e.g. the
+    ///       DataManager upload task) is undefined behaviour. Acquire on the main loop
+    ///       before starting the upload, then release when it completes.
     ScanInhibit inhibitScanning(const char* reason);
     void        refreshAdvertising();
     void        pause(const char* reason);
