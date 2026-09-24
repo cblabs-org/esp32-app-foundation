@@ -1,5 +1,6 @@
 // web/portal/ble.js
-// Bluetooth Low Energy Management Tab — RFC #225 rev 2 §12
+// Bluetooth Low Energy Management Tab — RFC #225 rev 2 / WO-7 Redesign
+// 3-card layout (Status, Paired Devices, Connections) + Diagnostics drawer.
 // Contributed tab lifecycle: scaffold on first tab-changed, 1 Hz auto-polling when visible.
 
 (function() {
@@ -10,6 +11,7 @@
   let isTabActive = false;
   let isScanningLocal = false;
   let scanProviderId = null;
+  const scanResultsCache = {};
 
   /**
    * Escape HTML special characters for safe innerHTML injection.
@@ -25,49 +27,141 @@
   }
 
   /**
-   * Fetch current BLE status and update UI.
+   * Format address to redacted form showing last 4 hex characters (e.g. ••:••:••:8E:92).
+   */
+  function formatRedactedAddress(addr) {
+    if (!addr) return '••:••:••:••••';
+    const hexOnly = addr.replace(/[^0-9a-fA-F]/g, '');
+    if (hexOnly.length >= 4) {
+      const last4 = hexOnly.slice(-4);
+      return '••:••:••:' + last4.slice(0, 2).toUpperCase() + ':' + last4.slice(2).toUpperCase();
+    }
+    return addr.replace(/\*/g, '•');
+  }
+
+  /**
+   * Universal fetch helper using window.apiFetch with fallback.
+   */
+  function apiCall(url, opts) {
+    if (window.apiFetch) {
+      return window.apiFetch(url, opts);
+    }
+    return fetch(url, opts).then(r => {
+      if (!r.ok) throw new Error(r.statusText || 'HTTP ' + r.status);
+      return r.json();
+    });
+  }
+
+  /**
+   * Universal toast notification helper.
+   */
+  function showToast(msg, type) {
+    if (window.showToast) {
+      window.showToast(msg, type);
+    } else {
+      console.log('[BLE ' + type + '] ' + msg);
+    }
+  }
+
+  /**
+   * Arm a button with 3.5s confirmation timeout before executing destructive action.
+   */
+  function armForgetButton(btn, onConfirm) {
+    if (btn.getAttribute('data-armed') === 'true') {
+      if (btn._armTimer) clearTimeout(btn._armTimer);
+      btn.removeAttribute('data-armed');
+      btn.classList.remove('ble-btn--danger-armed');
+      btn.disabled = true;
+      btn.textContent = 'Forgetting...';
+      onConfirm();
+      return;
+    }
+
+    btn.setAttribute('data-armed', 'true');
+    btn._origText = btn.textContent;
+    btn.textContent = 'Confirm Forget?';
+    btn.classList.add('ble-btn--danger-armed');
+
+    btn._armTimer = setTimeout(() => {
+      btn.removeAttribute('data-armed');
+      btn.textContent = btn._origText || 'Forget';
+      btn.classList.remove('ble-btn--danger-armed');
+    }, 3500);
+  }
+
+  // =========================================================================
+  // Data Fetching & Polling
+  // =========================================================================
+
+  /**
+   * Fetch current BLE status and update all cards.
    */
   async function fetchStatus() {
     try {
-      const status = await (window.apiFetch
-        ? window.apiFetch('/api/ble/status')
-        : fetch('/api/ble/status').then(r => r.json()));
-
+      const status = await apiCall('/api/ble/status');
       renderStatusCard(status);
-      renderDeviceCards(status);
+      renderDevicesCard(status);
+      renderConnectionsCard(status);
+      renderDiagnosticsDrawer(status);
 
       // If system reports scanning active, keep fetching scan results
       if (status.isScanning || (status.discovery && status.discovery.active)) {
         isScanningLocal = true;
-        scanProviderId = status.discovery ? status.discovery.providerId : scanProviderId;
-        await fetchScanResults();
+        scanProviderId = (status.discovery && status.discovery.providerId) ? status.discovery.providerId : scanProviderId;
+        await fetchScanResults(scanProviderId);
       } else if (isScanningLocal) {
         // Just finished scanning
         isScanningLocal = false;
-        await fetchScanResults();
+        await fetchScanResults(scanProviderId);
       }
     } catch (err) {
-      console.error('BLE status fetch error:', err);
+      console.error('[BLE] status fetch error:', err);
     }
   }
 
   /**
-   * Fetch latest scan results and render them in the active provider card.
+   * Fetch latest scan results.
    */
-  async function fetchScanResults() {
+  async function fetchScanResults(providerId) {
+    if (!providerId) return;
     try {
-      const results = await (window.apiFetch
-        ? window.apiFetch('/api/ble/scan/results')
-        : fetch('/api/ble/scan/results').then(r => r.json()));
-
-      renderScanResults(results);
+      const results = await apiCall('/api/ble/scan/results');
+      scanResultsCache[providerId] = results || [];
+      renderScanResultsTable(providerId, results || []);
     } catch (err) {
-      console.error('BLE scan results fetch error:', err);
+      console.error('[BLE] scan results fetch error:', err);
     }
   }
 
   /**
-   * Render the Status Card.
+   * Start 1 Hz polling when tab is visible and active.
+   */
+  function startPolling() {
+    if (pollInterval) return;
+    fetchStatus();
+    pollInterval = setInterval(() => {
+      if (isTabActive && document.visibilityState === 'visible') {
+        fetchStatus();
+      }
+    }, 1000);
+  }
+
+  /**
+   * Stop polling when tab is inactive.
+   */
+  function stopPolling() {
+    if (pollInterval) {
+      clearInterval(pollInterval);
+      pollInterval = null;
+    }
+  }
+
+  // =========================================================================
+  // Rendering Functions
+  // =========================================================================
+
+  /**
+   * Card 1: Status Overview
    */
   function renderStatusCard(status) {
     const state = status.state || 'Disabled';
@@ -88,215 +182,174 @@
       text.textContent = state.toUpperCase();
     }
 
+    const addrEl = document.getElementById('ble-address');
+    if (addrEl) {
+      addrEl.textContent = status.bleAddress || '—';
+    }
+
     const nameEl = document.getElementById('ble-adv-name');
     if (nameEl) {
-      nameEl.textContent = status.advertisedName || '(none)';
+      nameEl.textContent = status.advertisedName || '—';
     }
 
-    // Byte budgets
-    const adv = status.advertising || {};
-    const budget = adv.budget || { advUsed: 0, advMax: 31, scanRespUsed: 0, scanRespMax: 31 };
-    
-    const advUsedEl = document.getElementById('ble-adv-used');
-    const advFillEl = document.getElementById('ble-adv-fill');
-    if (advUsedEl && advFillEl) {
-      const advPercent = Math.min(100, Math.round((budget.advUsed / (budget.advMax || 31)) * 100));
-      advUsedEl.textContent = `${budget.advUsed} / ${budget.advMax} B`;
-      advFillEl.style.width = `${advPercent}%`;
-      if (budget.advUsed > budget.advMax) advFillEl.style.background = 'var(--error, #e53e3e)';
-      else advFillEl.style.background = 'var(--primary, #3182ce)';
-    }
-
-    const srUsedEl = document.getElementById('ble-sr-used');
-    const srFillEl = document.getElementById('ble-sr-fill');
-    if (srUsedEl && srFillEl) {
-      const srPercent = Math.min(100, Math.round((budget.scanRespUsed / (budget.scanRespMax || 31)) * 100));
-      srUsedEl.textContent = `${budget.scanRespUsed} / ${budget.scanRespMax} B`;
-      srFillEl.style.width = `${srPercent}%`;
-      if (budget.scanRespUsed > budget.scanRespMax) srFillEl.style.background = 'var(--error, #e53e3e)';
-      else srFillEl.style.background = 'var(--primary, #3182ce)';
-    }
-
-    // Packet Hex
-    const hexPre = document.getElementById('ble-hex-dump');
-    if (hexPre) {
-      hexPre.textContent = `Primary Adv:   ${adv.primaryAdvHex || '(empty)'}\nScan Response: ${adv.scanResponseHex || '(empty)'}`;
-    }
-
-    // Active Connections
-    const connsList = document.getElementById('ble-connections-list');
-    if (connsList) {
-      const conns = status.connections || [];
-      if (conns.length === 0) {
-        connsList.innerHTML = '<div style="font-size:0.85rem; color:var(--text-muted); padding:0.4rem 0;">No active peripheral connections.</div>';
+    const advBadge = document.getElementById('ble-adv-badge');
+    if (advBadge) {
+      if (status.isAdvertising) {
+        advBadge.className = 'ble-badge ble-badge--active';
+        advBadge.textContent = 'Active';
       } else {
-        connsList.innerHTML = conns.map(c => {
-          const addr = escapeHtml(c.addressRedacted || c.address || 'Unknown');
-          const interval = c.params ? `${c.params.intervalMs.toFixed(1)} ms` : 'N/A';
-          const enc = c.encrypted ? 'Encrypted' : 'Plaintext';
-          return `
-            <div style="display:flex; justify-content:space-between; align-items:center; padding:0.5rem 0; border-bottom:1px solid var(--border); font-size:0.85rem;">
-              <div>
-                <span style="font-family:var(--font-mono); font-weight:600;">${addr}</span>
-                <span style="font-size:0.75rem; color:var(--text-muted); margin-left:8px;">Handle ${c.handle}</span>
-              </div>
-              <div style="text-align:right;">
-                <span style="font-size:0.8rem; background:var(--primary-alpha); padding:2px 6px; border-radius:4px; font-weight:500;">${interval}</span>
-                <span style="font-size:0.75rem; color:var(--text-muted); margin-left:4px;">${enc}</span>
-              </div>
-            </div>
-          `;
-        }).join('');
+        advBadge.className = 'ble-badge ble-badge--stopped';
+        advBadge.textContent = 'Stopped';
       }
-    }
-
-    // Diagnostic counters
-    const dropsEl = document.getElementById('ble-dropped-events');
-    if (dropsEl) {
-      const drops = (status.counters && status.counters.droppedEvents) || 0;
-      dropsEl.textContent = drops;
-      dropsEl.style.color = drops > 0 ? 'var(--error, #e53e3e)' : 'inherit';
-    }
-    const inhibitEl = document.getElementById('ble-inhibit-count');
-    if (inhibitEl) {
-      inhibitEl.textContent = (status.counters && status.counters.scanInhibitCount) || 0;
     }
   }
 
   /**
-   * Render Client Provider Device Cards.
+   * Card 2: Paired Devices (conditional — only rendered if status.devices.length > 0)
    */
-  function renderDeviceCards(status) {
-    const container = document.getElementById('ble-devices-container');
-    if (!container) return;
+  function renderDevicesCard(status) {
+    const card = document.getElementById('ble-card-devices');
+    const container = document.getElementById('ble-devices-list');
+    if (!card || !container) return;
 
     const devices = status.devices || [];
     if (devices.length === 0) {
-      container.innerHTML = `
-        <article>
-          <header>BLE Client Devices</header>
-          <p style="font-size:0.85rem; color:var(--text-muted); margin:0.5rem 0;">No client providers registered.</p>
-        </article>
-      `;
+      card.style.display = 'none';
       return;
     }
+    card.style.display = 'block';
 
-    const html = devices.map(dev => {
-      const pid = escapeHtml(dev.providerId);
-      const label = escapeHtml(dev.label || dev.providerId);
-      const connected = !!dev.connected;
-      const stored = dev.stored;
-      const isScanning = isScanningLocal && scanProviderId === dev.providerId;
-      const bleActive = status.state === 'Active';
+    // Check if we need a full DOM rebuild of devices list
+    const currentPids = Array.from(container.querySelectorAll('.ble-provider')).map(el => el.getAttribute('data-provider')).join(',');
+    const newPids = devices.map(d => d.providerId).join(',');
 
-      let statusBadge = connected
-        ? '<span class="status-badge" style="display:inline-flex;"><span class="dot dot--green"></span><span style="font-size:0.75rem; font-weight:600; text-transform:uppercase;">Connected</span></span>'
-        : (dev.reconnect && dev.reconnect.phase !== 'Idle'
-            ? `<span class="status-badge" style="display:inline-flex;"><span class="dot dot--yellow dot--pulse"></span><span style="font-size:0.75rem; font-weight:600; text-transform:uppercase;">Reconnecting (${escapeHtml(dev.reconnect.phase)})</span></span>`
-            : '<span class="status-badge" style="display:inline-flex;"><span class="dot dot--grey"></span><span style="font-size:0.75rem; font-weight:600; text-transform:uppercase;">Disconnected</span></span>');
-
-      let storedHtml = '';
-      if (stored) {
-        const devName = escapeHtml(stored.name || '(unnamed device)');
-        const devAddr = escapeHtml(stored.addressRedacted || stored.address);
-        const bonded = stored.bonded ? 'Yes' : 'No';
-        storedHtml = `
-          <div style="background:var(--bg-subtle, rgba(0,0,0,0.02)); border:1px solid var(--border); border-radius:6px; padding:0.75rem; margin:0.75rem 0;">
-            <div style="display:flex; justify-content:space-between; align-items:flex-start;">
-              <div>
-                <div style="font-weight:600; font-size:0.9rem;">${devName}</div>
-                <div style="font-family:var(--font-mono); font-size:0.8rem; color:var(--text-muted); margin-top:2px;">${devAddr} (${escapeHtml(stored.addressType)})</div>
-                <div style="font-size:0.75rem; color:var(--text-muted); margin-top:2px;">Bonded: ${bonded}</div>
-              </div>
-              <button type="button" class="btn btn--outline btn--sm ble-forget-btn" data-provider="${pid}" style="color:var(--error, #e53e3e); border-color:var(--error, #e53e3e);">Forget</button>
-            </div>
-          </div>
-        `;
-      } else {
-        storedHtml = `
-          <div style="font-size:0.85rem; color:var(--text-muted); margin:0.75rem 0;">No device paired yet. Scan below to discover and pair a device.</div>
-        `;
-      }
-
-      const scanBtnText = isScanning ? 'Scanning...' : 'Scan for Devices';
-      const scanBtnDisabled = (!bleActive || isScanningLocal) ? 'disabled' : '';
-
-      return `
-        <article class="ble-device-card" data-provider="${pid}" style="margin-bottom:1rem;">
-          <header style="display:flex; justify-content:space-between; align-items:center;">
-            <div>
-              <span style="font-weight:700;">${label}</span>
-              <span style="font-size:0.75rem; color:var(--text-muted); margin-left:6px;">(${pid})</span>
-            </div>
-            ${statusBadge}
-          </header>
-
-          ${storedHtml}
-
-          <div style="margin-top:0.75rem;">
-            <div style="display:flex; justify-content:space-between; align-items:center;">
-              <button type="button" class="btn btn--sm ble-scan-btn" data-provider="${pid}" ${scanBtnDisabled}>
-                ${scanBtnText}
-              </button>
-              ${isScanning ? '<span style="font-size:0.75rem; color:var(--primary); font-weight:500;">Searching (30s max)...</span>' : ''}
-            </div>
-            <div class="ble-scan-results-container" data-provider="${pid}" style="margin-top:0.5rem;"></div>
-          </div>
-        </article>
-      `;
-    }).join('');
-
-    container.innerHTML = html;
-    wireDeviceCardListeners(container);
+    if (currentPids !== newPids) {
+      // Rebuild structure
+      container.innerHTML = devices.map(dev => buildProviderHtml(dev, status)).join('');
+      wireProviderListeners(container);
+    } else {
+      // Update dynamic fields in place without disrupting armed buttons or scan tables
+      devices.forEach(dev => {
+        updateProviderElement(dev, status);
+      });
+    }
   }
 
-  /**
-   * Wire clicks for Forget, Scan, and Pair buttons.
-   */
-  function wireDeviceCardListeners(container) {
-    // Forget buttons with armed confirmation
+  function buildProviderHtml(dev, status) {
+    const pid = escapeHtml(dev.providerId);
+    const label = escapeHtml(dev.label || dev.providerId);
+    const isScanning = isScanningLocal && scanProviderId === dev.providerId;
+    const bleActive = status.state === 'Active';
+
+    let statusBadgeHtml = '';
+    if (dev.connected) {
+      statusBadgeHtml = '<span class="status-badge"><span class="dot dot--green"></span><span style="font-size:0.75rem; font-weight:700; text-transform:uppercase;">Connected</span></span>';
+    } else if (dev.reconnect && dev.reconnect.phase && dev.reconnect.phase !== 'Idle') {
+      statusBadgeHtml = '<span class="status-badge"><span class="dot dot--yellow dot--pulse"></span><span style="font-size:0.75rem; font-weight:700; text-transform:uppercase;">Reconnecting (' + escapeHtml(dev.reconnect.phase) + ')</span></span>';
+    } else {
+      statusBadgeHtml = '<span class="status-badge"><span class="dot dot--grey"></span><span style="font-size:0.75rem; font-weight:700; text-transform:uppercase;">Disconnected</span></span>';
+    }
+
+    let storedHtml = '';
+    if (dev.stored) {
+      const devName = escapeHtml(dev.stored.name || '(unnamed device)');
+      const devAddr = escapeHtml(dev.stored.address || dev.stored.addressRedacted || '—');
+      const devType = escapeHtml(dev.stored.addressType || '');
+      const bondedBadge = dev.stored.bonded ? '<span class="badge badge--subtle" style="margin-left:6px;">Bonded</span>' : '';
+      storedHtml = `
+        <div class="ble-stored" id="ble-stored-${pid}">
+          <div class="ble-stored-info">
+            <div class="ble-stored-name">${devName}${bondedBadge}</div>
+            <div class="ble-stored-addr ble-value--mono">${devAddr} <span style="font-size:0.75rem; color:var(--text-muted);">(${devType})</span></div>
+          </div>
+          <button type="button" class="ble-btn ble-btn--outline-danger ble-forget-btn" data-provider="${pid}">Forget</button>
+        </div>
+      `;
+    } else {
+      storedHtml = `<div class="ble-no-device" id="ble-stored-${pid}">No device paired yet. Scan below to discover and pair.</div>`;
+    }
+
+    const scanBtnDisabled = (!bleActive || isScanningLocal) ? 'disabled' : '';
+    const scanBtnText = isScanning ? 'Scanning...' : 'Scan for Devices';
+
+    return `
+      <div class="ble-provider" data-provider="${pid}">
+        <div class="ble-provider-hdr">
+          <div>
+            <span class="ble-provider-name">${label}</span>
+            <span class="ble-provider-id">(${pid})</span>
+          </div>
+          <div class="ble-provider-badge-container">${statusBadgeHtml}</div>
+        </div>
+
+        <div class="ble-stored-container">${storedHtml}</div>
+
+        <div class="ble-provider-actions">
+          <button type="button" class="ble-btn ble-btn--primary ble-scan-btn" data-provider="${pid}" ${scanBtnDisabled}>
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            <span>${scanBtnText}</span>
+          </button>
+          <span class="ble-scanning-indicator" style="display:${isScanning ? 'inline' : 'none'};">Searching (30s max)...</span>
+        </div>
+
+        <div class="ble-scan-results-container" data-provider="${pid}"></div>
+      </div>
+    `;
+  }
+
+  function updateProviderElement(dev, status) {
+    const el = document.querySelector(`.ble-provider[data-provider="${dev.providerId}"]`);
+    if (!el) return;
+
+    // Update status badge
+    const badgeContainer = el.querySelector('.ble-provider-badge-container');
+    if (badgeContainer) {
+      if (dev.connected) {
+        badgeContainer.innerHTML = '<span class="status-badge"><span class="dot dot--green"></span><span style="font-size:0.75rem; font-weight:700; text-transform:uppercase;">Connected</span></span>';
+      } else if (dev.reconnect && dev.reconnect.phase && dev.reconnect.phase !== 'Idle') {
+        badgeContainer.innerHTML = '<span class="status-badge"><span class="dot dot--yellow dot--pulse"></span><span style="font-size:0.75rem; font-weight:700; text-transform:uppercase;">Reconnecting (' + escapeHtml(dev.reconnect.phase) + ')</span></span>';
+      } else {
+        badgeContainer.innerHTML = '<span class="status-badge"><span class="dot dot--grey"></span><span style="font-size:0.75rem; font-weight:700; text-transform:uppercase;">Disconnected</span></span>';
+      }
+    }
+
+    // Update scan button state
+    const isScanning = isScanningLocal && scanProviderId === dev.providerId;
+    const bleActive = status.state === 'Active';
+    const scanBtn = el.querySelector('.ble-scan-btn');
+    const scanInd = el.querySelector('.ble-scanning-indicator');
+
+    if (scanBtn) {
+      scanBtn.disabled = !bleActive || isScanningLocal;
+      const span = scanBtn.querySelector('span');
+      if (span) span.textContent = isScanning ? 'Scanning...' : 'Scan for Devices';
+    }
+    if (scanInd) {
+      scanInd.style.display = isScanning ? 'inline' : 'none';
+    }
+  }
+
+  function wireProviderListeners(container) {
+    // Forget buttons
     container.querySelectorAll('.ble-forget-btn').forEach(btn => {
-      btn.addEventListener('click', async (e) => {
+      btn.addEventListener('click', (e) => {
         e.preventDefault();
         const pid = btn.getAttribute('data-provider');
-        if (btn.getAttribute('data-armed') !== 'true') {
-          btn.setAttribute('data-armed', 'true');
-          btn.textContent = 'Confirm Forget?';
-          btn.style.background = 'var(--error, #e53e3e)';
-          btn.style.color = '#fff';
-          setTimeout(() => {
-            if (btn && btn.getAttribute('data-armed') === 'true') {
-              btn.removeAttribute('data-armed');
-              btn.textContent = 'Forget';
-              btn.style.background = '';
-              btn.style.color = 'var(--error, #e53e3e)';
-            }
-          }, 3500);
-          return;
-        }
-
-        btn.disabled = true;
-        btn.textContent = 'Forgetting...';
-        try {
-          const res = await (window.apiFetch
-            ? window.apiFetch('/api/ble/forget', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ providerId: pid })
-              })
-            : fetch('/api/ble/forget', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ providerId: pid })
-              }).then(r => r.json()));
-
-          if (window.showToast) window.showToast(`Device forgotten for ${pid}`, 'info');
-          await fetchStatus();
-        } catch (err) {
-          if (window.showToast) window.showToast(`Forget failed: ${err.message}`, 'error');
-          btn.disabled = false;
-          btn.textContent = 'Forget';
-        }
+        armForgetButton(btn, async () => {
+          try {
+            await apiCall('/api/ble/forget', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ providerId: pid })
+            });
+            showToast('Device forgotten for ' + pid, 'info');
+            await fetchStatus();
+          } catch (err) {
+            showToast('Forget failed: ' + err.message, 'error');
+            btn.disabled = false;
+            btn.textContent = 'Forget';
+          }
+        });
       });
     });
 
@@ -306,61 +359,57 @@
         e.preventDefault();
         const pid = btn.getAttribute('data-provider');
         btn.disabled = true;
-        btn.textContent = 'Starting scan...';
         isScanningLocal = true;
         scanProviderId = pid;
+        const ind = btn.parentElement.querySelector('.ble-scanning-indicator');
+        if (ind) ind.style.display = 'inline';
+        const span = btn.querySelector('span');
+        if (span) span.textContent = 'Starting scan...';
 
         try {
-          await (window.apiFetch
-            ? window.apiFetch('/api/ble/scan', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ providerId: pid, durationMs: 30000 })
-              })
-            : fetch('/api/ble/scan', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ providerId: pid, durationMs: 30000 })
-              }).then(r => r.json()));
-
-          if (window.showToast) window.showToast('BLE discovery scan started', 'info');
+          await apiCall('/api/ble/scan', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ providerId: pid, durationMs: 30000 })
+          });
+          showToast('BLE discovery scan started', 'info');
           await fetchStatus();
         } catch (err) {
           isScanningLocal = false;
           scanProviderId = null;
-          if (window.showToast) window.showToast(`Scan failed: ${err.message}`, 'error');
+          if (ind) ind.style.display = 'none';
+          if (span) span.textContent = 'Scan for Devices';
           btn.disabled = false;
-          btn.textContent = 'Scan for Devices';
+          showToast('Scan failed: ' + err.message, 'error');
         }
       });
     });
   }
 
   /**
-   * Render scan results in the active scan results container.
+   * Render inline scan results table for a provider.
    */
-  function renderScanResults(results) {
-    if (!scanProviderId) return;
-    const target = document.querySelector(`.ble-scan-results-container[data-provider="${scanProviderId}"]`);
+  function renderScanResultsTable(providerId, results) {
+    const target = document.querySelector(`.ble-scan-results-container[data-provider="${providerId}"]`);
     if (!target) return;
 
     if (!results || results.length === 0) {
       if (isScanningLocal) {
-        target.innerHTML = '<div style="font-size:0.8rem; color:var(--text-muted); padding:0.4rem 0;">Scanning for matching devices...</div>';
+        target.innerHTML = '<div style="font-size:0.8rem; color:var(--text-muted); padding:0.5rem 0;">Scanning for matching devices...</div>';
       } else {
-        target.innerHTML = '<div style="font-size:0.8rem; color:var(--text-muted); padding:0.4rem 0;">No devices found during scan.</div>';
+        target.innerHTML = '<div style="font-size:0.8rem; color:var(--text-muted); padding:0.5rem 0;">No matching devices found during scan.</div>';
       }
       return;
     }
 
     target.innerHTML = `
-      <div style="border:1px solid var(--border); border-radius:6px; margin-top:0.4rem; max-height:220px; overflow-y:auto;">
-        <table style="width:100%; border-collapse:collapse; font-size:0.8rem;">
+      <div class="ble-scan-wrap">
+        <table class="ble-scan-table">
           <thead>
-            <tr style="background:var(--bg-subtle, rgba(0,0,0,0.03)); border-bottom:1px solid var(--border); text-align:left;">
-              <th style="padding:6px 8px;">Device</th>
-              <th style="padding:6px 8px;">RSSI</th>
-              <th style="padding:6px 8px; text-align:right;">Action</th>
+            <tr>
+              <th>Device</th>
+              <th>RSSI</th>
+              <th style="text-align:right;">Action</th>
             </tr>
           </thead>
           <tbody>
@@ -368,17 +417,18 @@
               const name = escapeHtml(r.name || '(unnamed)');
               const addr = escapeHtml(r.addressRedacted || r.address);
               const fullAddr = escapeHtml(r.address);
-              const addrType = escapeHtml(r.addressType);
-              const rssi = r.rssi ? `${r.rssi} dBm` : '';
+              const addrType = escapeHtml(r.addressType || 'Public');
+              const rssi = r.rssi ? `${r.rssi} dBm` : '—';
               return `
-                <tr style="border-bottom:1px solid var(--border);">
-                  <td style="padding:6px 8px;">
+                <tr>
+                  <td>
                     <div style="font-weight:600;">${name}</div>
-                    <div style="font-family:var(--font-mono); font-size:0.75rem; color:var(--text-muted);">${addr}</div>
+                    <div class="ble-value--mono" style="font-size:0.75rem; color:var(--text-muted);">${addr}</div>
                   </td>
-                  <td style="padding:6px 8px; color:var(--text-muted);">${rssi}</td>
-                  <td style="padding:6px 8px; text-align:right;">
-                    <button type="button" class="btn btn--sm ble-pair-btn" data-provider="${scanProviderId}" data-address="${fullAddr}" data-type="${addrType}">Pair</button>
+                  <td style="color:var(--text-muted); font-size:0.75rem;">${rssi}</td>
+                  <td style="text-align:right;">
+                    <button type="button" class="ble-btn ble-btn--primary ble-pair-btn" style="padding:0.25rem 0.6rem; font-size:0.75rem;"
+                      data-provider="${providerId}" data-address="${fullAddr}" data-type="${addrType}">Pair</button>
                   </td>
                 </tr>
               `;
@@ -389,62 +439,441 @@
     `;
 
     // Wire Pair buttons
-    target.querySelectorAll('.ble-pair-btn').forEach(pairBtn => {
-      pairBtn.addEventListener('click', async (e) => {
+    target.querySelectorAll('.ble-pair-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
         e.preventDefault();
-        const pid = pairBtn.getAttribute('data-provider');
-        const addr = pairBtn.getAttribute('data-address');
-        const type = pairBtn.getAttribute('data-type');
+        const pid = btn.getAttribute('data-provider');
+        const addr = btn.getAttribute('data-address');
+        const type = btn.getAttribute('data-type');
 
-        pairBtn.disabled = true;
-        pairBtn.textContent = 'Pairing...';
+        btn.disabled = true;
+        btn.textContent = 'Pairing...';
 
         try {
-          await (window.apiFetch
-            ? window.apiFetch('/api/ble/pair', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ providerId: pid, address: addr, addressType: type })
-              })
-            : fetch('/api/ble/pair', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ providerId: pid, address: addr, addressType: type })
-              }).then(r => r.json()));
-
-          if (window.showToast) window.showToast(`Pairing initiated with ${addr}`, 'success');
+          await apiCall('/api/ble/pair', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ providerId: pid, address: addr, addressType: type })
+          });
+          showToast(`Pairing initiated with ${addr}`, 'success');
           isScanningLocal = false;
           await fetchStatus();
         } catch (err) {
-          if (window.showToast) window.showToast(`Pair failed: ${err.message}`, 'error');
-          pairBtn.disabled = false;
-          pairBtn.textContent = 'Pair';
+          showToast(`Pair failed: ${err.message}`, 'error');
+          btn.disabled = false;
+          btn.textContent = 'Pair';
         }
       });
     });
   }
 
   /**
-   * Start polling when tab is active and visible.
+   * Card 3: Connections
    */
-  function startPolling() {
-    if (pollInterval) return;
-    fetchStatus();
-    pollInterval = setInterval(() => {
-      if (isTabActive && document.visibilityState === 'visible') {
-        fetchStatus();
-      }
-    }, 1000);
+  function renderConnectionsCard(status) {
+    const countBadge = document.getElementById('ble-conns-count');
+    const listEl = document.getElementById('ble-conns-list');
+    if (!listEl) return;
+
+    const conns = status.connections || [];
+    if (countBadge) countBadge.textContent = String(conns.length);
+
+    if (conns.length === 0) {
+      listEl.innerHTML = '<div class="ble-empty">No active connections</div>';
+      return;
+    }
+
+    listEl.innerHTML = conns.map(c => {
+      const formattedAddr = formatRedactedAddress(c.addressRedacted || c.address);
+      const handleTxt = 'Handle ' + (c.handle !== undefined ? c.handle : '—');
+      const intervalTxt = (c.params && c.params.intervalMs) ? `<span class="badge badge--subtle">${c.params.intervalMs.toFixed(1)} ms</span>` : '';
+      const encBadge = c.encrypted
+        ? `<span class="ble-badge ble-badge--active" title="Encrypted connection"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>Encrypted</span>`
+        : `<span class="ble-badge ble-badge--stopped" title="Plaintext connection">Plaintext</span>`;
+
+      return `
+        <div class="ble-conn-item">
+          <div class="ble-conn-left">
+            <span class="ble-value--mono" style="font-size:0.9rem;">${escapeHtml(formattedAddr)}</span>
+            <span class="ble-conn-handle">${escapeHtml(handleTxt)}</span>
+          </div>
+          <div class="ble-conn-right">
+            ${intervalTxt}
+            ${encBadge}
+          </div>
+        </div>
+      `;
+    }).join('');
   }
 
   /**
-   * Stop polling when tab is inactive or document hidden.
+   * Drawer: Diagnostics (collapsed by default, uses native <details>/<summary>)
    */
-  function stopPolling() {
-    if (pollInterval) {
-      clearInterval(pollInterval);
-      pollInterval = null;
+  function renderDiagnosticsDrawer(status) {
+    const droppedEl = document.getElementById('ble-diag-dropped');
+    const inhibitEl = document.getElementById('ble-diag-inhibit');
+    const counters = status.counters || {};
+
+    if (droppedEl) {
+      const dropped = counters.droppedEvents || 0;
+      droppedEl.textContent = String(dropped);
+      droppedEl.style.color = dropped > 0 ? 'var(--error, #c62828)' : 'inherit';
     }
+    if (inhibitEl) {
+      inhibitEl.textContent = String(counters.scanInhibitCount || 0);
+    }
+
+    // Byte budget bars
+    const adv = status.advertising || {};
+    const budget = adv.budget || { advUsed: 0, advMax: 31, scanRespUsed: 0, scanRespMax: 31 };
+
+    const advTxt = document.getElementById('ble-adv-budget-txt');
+    const advFill = document.getElementById('ble-adv-budget-fill');
+    if (advTxt && advFill) {
+      const max = budget.advMax || 31;
+      const pct = Math.min(100, Math.round((budget.advUsed / max) * 100));
+      advTxt.textContent = `${budget.advUsed} / ${max} B`;
+      advFill.style.width = pct + '%';
+      if (budget.advUsed > max) advFill.classList.add('ble-progress-fill--warn');
+      else advFill.classList.remove('ble-progress-fill--warn');
+    }
+
+    const srTxt = document.getElementById('ble-sr-budget-txt');
+    const srFill = document.getElementById('ble-sr-budget-fill');
+    if (srTxt && srFill) {
+      const max = budget.scanRespMax || 31;
+      const pct = Math.min(100, Math.round((budget.scanRespUsed / max) * 100));
+      srTxt.textContent = `${budget.scanRespUsed} / ${max} B`;
+      srFill.style.width = pct + '%';
+      if (budget.scanRespUsed > max) srFill.classList.add('ble-progress-fill--warn');
+      else srFill.classList.remove('ble-progress-fill--warn');
+    }
+
+    // Faults list
+    const faultsSec = document.getElementById('ble-faults-section');
+    const faultsList = document.getElementById('ble-faults-list');
+    const faults = adv.faults || [];
+    if (faultsSec && faultsList) {
+      if (faults.length > 0) {
+        faultsSec.style.display = 'block';
+        faultsList.innerHTML = faults.map(f => `
+          <div class="ble-fault-item">
+            <strong>${escapeHtml(f.description || 'Advertising fault')}</strong>
+            <span style="color:var(--text-muted); margin-left:6px;">(${f.requiredBytes}B required, ${f.availableBytes}B available)</span>
+          </div>
+        `).join('');
+      } else {
+        faultsSec.style.display = 'none';
+        faultsList.innerHTML = '';
+      }
+    }
+  }
+
+  // =========================================================================
+  // Scaffolding & Initialization
+  // =========================================================================
+
+  /**
+   * Inject tab CSS styles scoped with #ble-tab prefix.
+   */
+  function injectStyles() {
+    if (document.getElementById('ble-tab-styles')) return;
+
+    const style = document.createElement('style');
+    style.id = 'ble-tab-styles';
+    style.textContent = `
+      #ble-tab .ble-stat-rows {
+        display: flex;
+        flex-direction: column;
+      }
+      #ble-tab .ble-stat-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.6rem 0;
+        border-bottom: 1px solid var(--border, #dee2e6);
+        font-size: 0.85rem;
+      }
+      #ble-tab .ble-stat-row:last-child {
+        border-bottom: none;
+      }
+      #ble-tab .ble-label {
+        color: var(--text-muted, #6c757d);
+        font-size: 0.85rem;
+      }
+      #ble-tab .ble-value {
+        font-weight: 600;
+        font-size: 0.85rem;
+        color: var(--text, #212529);
+      }
+      #ble-tab .ble-value--mono {
+        font-family: var(--font-mono, "Courier New", monospace);
+        font-weight: 600;
+      }
+      #ble-tab .ble-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 2px 8px;
+        border-radius: 6px;
+        font-size: 0.75rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+      #ble-tab .ble-badge--active {
+        background: rgba(46, 125, 50, 0.12);
+        color: var(--success, #2e7d32);
+      }
+      #ble-tab .ble-badge--stopped {
+        background: var(--border, #dee2e6);
+        color: var(--text-muted, #6c757d);
+      }
+      [data-theme="dark"] #ble-tab .ble-badge--active {
+        background: rgba(74, 222, 128, 0.15);
+        color: #4ade80;
+      }
+      [data-theme="dark"] #ble-tab .ble-badge--stopped {
+        background: rgba(255, 255, 255, 0.1);
+        color: #9ca3af;
+      }
+      #ble-tab .ble-provider {
+        border: 1px solid var(--border, #dee2e6);
+        border-radius: 10px;
+        padding: 0.75rem;
+        margin-bottom: 0.75rem;
+        background: var(--card-bg, #fff);
+      }
+      #ble-tab .ble-provider:last-child {
+        margin-bottom: 0;
+      }
+      #ble-tab .ble-provider-hdr {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 0.5rem;
+      }
+      #ble-tab .ble-provider-name {
+        font-weight: 700;
+        font-size: 0.9rem;
+      }
+      #ble-tab .ble-provider-id {
+        font-size: 0.75rem;
+        color: var(--text-muted, #6c757d);
+        margin-left: 4px;
+        font-weight: normal;
+      }
+      #ble-tab .ble-stored {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: var(--bg-subtle, rgba(0,0,0,0.02));
+        border: 1px solid var(--border, #dee2e6);
+        border-radius: 8px;
+        padding: 0.5rem 0.75rem;
+        margin: 0.5rem 0;
+      }
+      [data-theme="dark"] #ble-tab .ble-stored {
+        background: rgba(255, 255, 255, 0.03);
+      }
+      #ble-tab .ble-stored-info {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+      #ble-tab .ble-stored-name {
+        font-weight: 600;
+        font-size: 0.85rem;
+      }
+      #ble-tab .ble-stored-addr {
+        font-size: 0.78rem;
+        color: var(--text-muted, #6c757d);
+      }
+      #ble-tab .ble-no-device {
+        font-size: 0.82rem;
+        color: var(--text-muted, #6c757d);
+        font-style: italic;
+        padding: 0.4rem 0;
+      }
+      #ble-tab .ble-provider-actions {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 0.6rem;
+      }
+      #ble-tab .ble-btn {
+        border-radius: 8px;
+        font-weight: 600;
+        font-size: 0.8rem;
+        padding: 0.4rem 0.8rem;
+        cursor: pointer;
+        transition: all 0.2s;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+      }
+      #ble-tab .ble-btn--primary {
+        background: var(--primary, #2196F3);
+        color: white;
+        border: none;
+      }
+      #ble-tab .ble-btn--primary:hover {
+        background: var(--primary-hover, #1976D2);
+      }
+      #ble-tab .ble-btn--primary:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+      #ble-tab .ble-btn--outline-danger {
+        background: transparent;
+        color: var(--error, #c62828);
+        border: 1.5px solid var(--error, #c62828);
+      }
+      #ble-tab .ble-btn--outline-danger:hover {
+        background: rgba(198, 40, 40, 0.08);
+      }
+      #ble-tab .ble-btn--danger-armed {
+        background: var(--error, #c62828) !important;
+        color: white !important;
+        border-color: var(--error, #c62828) !important;
+      }
+      #ble-tab .ble-scanning-indicator {
+        font-size: 0.75rem;
+        color: var(--primary, #2196F3);
+        font-weight: 600;
+      }
+      #ble-tab .ble-scan-wrap {
+        margin-top: 0.6rem;
+        border: 1px solid var(--border, #dee2e6);
+        border-radius: 8px;
+        overflow: hidden;
+        max-height: 200px;
+        overflow-y: auto;
+      }
+      #ble-tab .ble-scan-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.8rem;
+      }
+      #ble-tab .ble-scan-table th {
+        padding: 6px 8px;
+        text-align: left;
+        background: var(--bg-subtle, rgba(0,0,0,0.03));
+        border-bottom: 1px solid var(--border, #dee2e6);
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        color: var(--text-muted, #6c757d);
+      }
+      [data-theme="dark"] #ble-tab .ble-scan-table th {
+        background: rgba(255, 255, 255, 0.05);
+      }
+      #ble-tab .ble-scan-table td {
+        padding: 6px 8px;
+        border-bottom: 1px solid var(--border, #dee2e6);
+        vertical-align: middle;
+      }
+      #ble-tab .ble-scan-table tr:last-child td {
+        border-bottom: none;
+      }
+      #ble-tab .ble-conn-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.6rem 0;
+        border-bottom: 1px solid var(--border, #dee2e6);
+        font-size: 0.85rem;
+      }
+      #ble-tab .ble-conn-item:last-child {
+        border-bottom: none;
+      }
+      #ble-tab .ble-conn-left {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+      #ble-tab .ble-conn-handle {
+        font-size: 0.75rem;
+        color: var(--text-muted, #6c757d);
+      }
+      #ble-tab .ble-conn-right {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      #ble-tab .ble-empty {
+        text-align: center;
+        padding: 1.25rem 0;
+        color: var(--text-muted, #6c757d);
+        font-size: 0.85rem;
+      }
+      #ble-tab .ble-diag-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.4rem 0;
+        border-bottom: 1px solid var(--border, #dee2e6);
+        font-size: 0.85rem;
+      }
+      #ble-tab .ble-budget-block {
+        margin-top: 0.8rem;
+      }
+      #ble-tab .ble-budget-title {
+        font-weight: 700;
+        font-size: 0.75rem;
+        color: var(--text-muted, #6c757d);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 0.4rem;
+      }
+      #ble-tab .ble-budget-item {
+        margin-bottom: 0.5rem;
+      }
+      #ble-tab .ble-budget-meta {
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.8rem;
+        margin-bottom: 3px;
+      }
+      #ble-tab .ble-progress {
+        height: 6px;
+        background: var(--border, #dee2e6);
+        border-radius: 3px;
+        overflow: hidden;
+      }
+      #ble-tab .ble-progress-fill {
+        height: 100%;
+        background: var(--primary, #2196F3);
+        border-radius: 3px;
+        transition: width 0.3s ease;
+      }
+      #ble-tab .ble-progress-fill--warn {
+        background: var(--error, #c62828);
+      }
+      #ble-tab .ble-faults-hdr {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        font-weight: 700;
+        font-size: 0.8rem;
+        color: var(--error, #c62828);
+        margin-top: 0.8rem;
+        margin-bottom: 0.4rem;
+      }
+      #ble-tab .ble-fault-item {
+        background: rgba(198, 40, 40, 0.05);
+        border: 1px solid rgba(198, 40, 40, 0.2);
+        border-radius: 6px;
+        padding: 0.4rem 0.6rem;
+        margin-top: 0.3rem;
+        font-size: 0.75rem;
+      }
+      [data-theme="dark"] #ble-tab .ble-fault-item {
+        background: rgba(239, 68, 68, 0.1);
+        border-color: rgba(239, 68, 68, 0.25);
+      }
+    `;
+    document.head.appendChild(style);
   }
 
   /**
@@ -454,69 +883,109 @@
     if (initialized) return;
     initialized = true;
 
+    injectStyles();
+
     container.innerHTML = `
-      <article style="margin-bottom:1rem;">
-        <header style="display:flex; justify-content:space-between; align-items:center;">
-          <span>Bluetooth Low Energy</span>
-          <div class="status-badge" style="display:inline-flex;">
-            <div class="dot dot--grey" id="ble-state-dot"></div>
-            <span id="ble-state-text" style="font-size:0.75rem; font-weight:600; text-transform:uppercase;">LOADING</span>
-          </div>
-        </header>
-
-        <div style="display:flex; flex-direction:column; gap:8px; margin:0.75rem 0;">
-          <div style="display:flex; justify-content:space-between; font-size:0.85rem;">
-            <span style="color:var(--text-muted);">Advertised Name</span>
-            <span id="ble-adv-name" style="font-weight:600;">—</span>
-          </div>
-
-          <!-- Advertising Byte Budget -->
-          <div style="margin-top:0.25rem;">
-            <div style="display:flex; justify-content:space-between; font-size:0.75rem; color:var(--text-muted); margin-bottom:2px;">
-              <span>Primary Adv Budget</span>
-              <span id="ble-adv-used">0 / 31 B</span>
+      <div id="ble-tab">
+        <!-- Card 1: Status Overview -->
+        <article>
+          <header style="display:flex; justify-content:space-between; align-items:center;">
+            <span>Bluetooth</span>
+            <div class="status-badge">
+              <span class="dot dot--grey" id="ble-state-dot"></span>
+              <span id="ble-state-text" style="font-size:0.75rem; font-weight:700; text-transform:uppercase;">LOADING</span>
             </div>
-            <div style="height:6px; background:var(--border); border-radius:3px; overflow:hidden;">
-              <div id="ble-adv-fill" style="height:100%; width:0%; background:var(--primary); transition:width 0.3s;"></div>
+          </header>
+          <div class="ble-stat-rows">
+            <div class="ble-stat-row">
+              <span class="ble-label">BLE Address</span>
+              <span class="ble-value ble-value--mono" id="ble-address">—</span>
             </div>
-          </div>
-
-          <div style="margin-top:0.25rem;">
-            <div style="display:flex; justify-content:space-between; font-size:0.75rem; color:var(--text-muted); margin-bottom:2px;">
-              <span>Scan Response Budget</span>
-              <span id="ble-sr-used">0 / 31 B</span>
+            <div class="ble-stat-row">
+              <span class="ble-label">Advertised Name</span>
+              <span class="ble-value" id="ble-adv-name">—</span>
             </div>
-            <div style="height:6px; background:var(--border); border-radius:3px; overflow:hidden;">
-              <div id="ble-sr-fill" style="height:100%; width:0%; background:var(--primary); transition:width 0.3s;"></div>
+            <div class="ble-stat-row">
+              <span class="ble-label">Advertising</span>
+              <span id="ble-adv-badge" class="ble-badge ble-badge--stopped">Stopped</span>
             </div>
           </div>
+        </article>
 
-          <details style="margin-top:0.5rem; font-size:0.8rem;">
-            <summary style="cursor:pointer; color:var(--primary); font-weight:500;">View Raw Packets (Hex)</summary>
-            <pre id="ble-hex-dump" style="background:var(--bg-subtle, rgba(0,0,0,0.03)); padding:8px; border-radius:4px; font-family:var(--font-mono); font-size:0.75rem; margin-top:4px; overflow-x:auto; white-space:pre-wrap;"></pre>
+        <!-- Card 2: Paired Devices (conditional) -->
+        <article id="ble-card-devices" style="display:none;">
+          <header>Paired Devices</header>
+          <div id="ble-devices-list"></div>
+        </article>
+
+        <!-- Card 3: Connections -->
+        <article id="ble-card-conns">
+          <header style="display:flex; justify-content:space-between; align-items:center;">
+            <span>Connections</span>
+            <span class="badge badge--subtle" id="ble-conns-count">0</span>
+          </header>
+          <div id="ble-conns-list">
+            <div class="ble-empty">Loading connections...</div>
+          </div>
+        </article>
+
+        <!-- Drawer: Diagnostics -->
+        <article class="info-drawer" id="ble-drawer-diag">
+          <details id="ble-diag-details">
+            <summary class="info-summary">Diagnostics</summary>
+            <div class="info-drawer-content">
+              <div class="ble-diag-row">
+                <span class="ble-label">Dropped Events</span>
+                <strong id="ble-diag-dropped" class="ble-value--mono">0</strong>
+              </div>
+              <div class="ble-diag-row">
+                <span class="ble-label">Scan Inhibit Count</span>
+                <strong id="ble-diag-inhibit" class="ble-value--mono">0</strong>
+              </div>
+
+              <div class="ble-budget-block">
+                <div class="ble-budget-title">Advertising Budget</div>
+                <div class="ble-budget-item">
+                  <div class="ble-budget-meta">
+                    <span>Primary Advertising Data</span>
+                    <span id="ble-adv-budget-txt" class="ble-value--mono">0 / 31 B</span>
+                  </div>
+                  <div class="ble-progress">
+                    <div id="ble-adv-budget-fill" class="ble-progress-fill" style="width:0%;"></div>
+                  </div>
+                </div>
+                <div class="ble-budget-item">
+                  <div class="ble-budget-meta">
+                    <span>Scan Response Data</span>
+                    <span id="ble-sr-budget-txt" class="ble-value--mono">0 / 31 B</span>
+                  </div>
+                  <div class="ble-progress">
+                    <div id="ble-sr-budget-fill" class="ble-progress-fill" style="width:0%;"></div>
+                  </div>
+                </div>
+              </div>
+
+              <div id="ble-faults-section" style="display:none;">
+                <div class="ble-faults-hdr">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                    <line x1="12" y1="9" x2="12" y2="13"/>
+                    <line x1="12" y1="17" x2="12.01" y2="17"/>
+                  </svg>
+                  <span>Advertising Faults</span>
+                </div>
+                <div id="ble-faults-list"></div>
+              </div>
+            </div>
           </details>
-        </div>
-
-        <div style="margin-top:1rem; border-top:1px solid var(--border); padding-top:0.75rem;">
-          <div style="font-size:0.85rem; font-weight:600; margin-bottom:4px;">Peripheral Connections</div>
-          <div id="ble-connections-list">
-            <div style="font-size:0.85rem; color:var(--text-muted);">Loading connections...</div>
-          </div>
-        </div>
-
-        <div style="margin-top:0.75rem; border-top:1px solid var(--border); padding-top:0.75rem; display:flex; justify-content:space-between; font-size:0.75rem; color:var(--text-muted);">
-          <span>Dropped Events: <strong id="ble-dropped-events">0</strong></span>
-          <span>Scan Inhibited: <strong id="ble-inhibit-count">0</strong></span>
-        </div>
-      </article>
-
-      <div id="ble-devices-container"></div>
+        </article>
+      </div>
     `;
   }
 
-  // ---------------------------------------------------------------------------
-  // Lifecycle listeners
-  // ---------------------------------------------------------------------------
+  // =========================================================================
+  // Lifecycle Listeners
+  // =========================================================================
 
   window.addEventListener('tab-changed', (e) => {
     if (e.detail === 'tab-bluetooth') {
@@ -542,7 +1011,7 @@
     }
   });
 
-  // Check if tab is already active on load
+  // Check if tab is already active on script load
   const existing = document.getElementById('tab-bluetooth');
   if (existing && existing.classList.contains('tab-content--active')) {
     isTabActive = true;

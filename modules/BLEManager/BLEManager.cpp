@@ -1295,7 +1295,7 @@ void BLEManager::registerTabs(ITabRegistry& registry) {
     registry.addTab(
         "Bluetooth",
         nullptr,
-        60,
+        15,   // was 60; WiFi=10, Security=50, System=900
         "<polyline points=\"6.5 6.5 17.5 17.5 12 23 12 1 17.5 6.5 6.5 17.5\"></polyline>",
         "/ble.js"
     );

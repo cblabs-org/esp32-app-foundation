@@ -16,6 +16,10 @@
 #include <strings.h>
 #include <cstdio>
 
+#if defined(ESP_PLATFORM) && defined(WITH_BLE)
+#include <NimBLEDevice.h>
+#endif
+
 namespace BLESerialization {
 
 static void bytesToHex(const uint8_t* data, size_t len, char* out, size_t outSize) {
@@ -93,6 +97,11 @@ void serializeStatus(JsonObject root, const BLEManager& mgr, bool redactAddresse
     root["isScanning"] = mgr.isScanning();
     root["isAdvertising"] = mgr.isAdvertising();
     root["advertisedName"] = mgr.getConfig().advertisedName;
+#if defined(ESP_PLATFORM) && defined(WITH_BLE)
+    root["bleAddress"] = NimBLEDevice::getAddress().toString();
+#else
+    root["bleAddress"] = "";
+#endif
 
     JsonObject adv = root["advertising"].to<JsonObject>();
     const auto& pack = mgr.getLastPackResult();
