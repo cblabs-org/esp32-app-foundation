@@ -23,6 +23,7 @@
 #include "services/gap/ble_svc_gap.h"
 #include "esp_log.h"
 #include "esp32-hal-bt.h"
+#include "esp_coexist.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
 #include <cstring>
@@ -238,6 +239,9 @@ bool BLEStack::init(const char* deviceName, void* eventQueue) {
     // Maximize RF transmission power (+9 dBm) for advertising, scanning, and connections
     NimBLEDevice::setPower(9, NimBLETxPowerType::All);
 
+    // Balance WiFi and Bluetooth radio access on the shared 2.4 GHz hardware
+    esp_coex_preference_set(ESP_COEX_PREFER_BALANCE);
+
     _server = NimBLEDevice::createServer();
     if (!_server) {
         ESP_LOGE(TAG, "Failed to create NimBLE server");
@@ -345,6 +349,10 @@ bool BLEStack::startAdvertising(const BLEAdvPackResult& packResult, const BLECon
     pAdv->stop();
     pAdv->clearData();
     pAdv->setConnectableMode(BLE_GAP_CONN_MODE_UND);
+
+    // Fast connectable advertising interval: 100 ms (160 * 0.625 ms)
+    pAdv->setMinInterval(160);
+    pAdv->setMaxInterval(160);
 
     // Set GAP PPCP characteristic
     setPreferredConnParams(preferredParams);
