@@ -251,7 +251,7 @@ TEST(BLESerializationTest, RegisterTabsMetadata) {
 
     ASSERT_EQ(registry.tabs.size(), 1);
     EXPECT_EQ(registry.tabs[0].title, "Bluetooth");
-    EXPECT_EQ(registry.tabs[0].order, 60);
+    EXPECT_EQ(registry.tabs[0].order, 15);
     EXPECT_EQ(registry.tabs[0].scriptPath, "/ble.js");
     EXPECT_NE(registry.tabs[0].iconSvg.find("polyline"), std::string::npos);
 }

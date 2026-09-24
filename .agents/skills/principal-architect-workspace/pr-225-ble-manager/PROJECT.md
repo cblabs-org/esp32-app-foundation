@@ -3,7 +3,7 @@
 **Project:** `pr-225-ble-manager`
 **Base branch:** `main`
 **Branch prefix:** `ble-manager/` (linear stack, see [Branch Plan](#branch-plan))
-**Status:** 🎯 WO-6 READY (interactive hardware acceptance). WO-0–5 complete.
+**Status:** ✅ WO-7 COMPLETE (BLE portal redesign). PR #235 complete.
 **Parent issue:** [#225](https://github.com/matthewmcneill/esp32-app-foundation/issues/225)
 **Agreed design (source of truth):** [RFC #225 revision 2](https://github.com/matthewmcneill/esp32-app-foundation/issues/225#issuecomment-5729939169), plus the amendments in the [framework acknowledgement](https://github.com/matthewmcneill/esp32-app-foundation/issues/225#issuecomment-5735199501) (acceptance item 6 is split into 6a/6b/6c)
 **Consumer:** Echenon ([SPEC.md](https://github.com/cblabs-org/echenon/blob/main/SPEC.md) §7–§8), labels `upstream-issue`, `found-by:echenon`
@@ -89,6 +89,7 @@ It also contributes a portal tab, REST routes, MCP tools, EventBus `ble.*` event
 | **WO-4** | [Portal tab, REST routes, MCP tools](wo4-portal-mcp/WORKORDER.md) | `standard` | ✅ Complete | `ble-manager/wo4-portal-mcp` | `c133d59b` |
 | **WO-5** | [Coexistence, OTA pause, docs and skill](wo5-coexistence-ota/WORKORDER.md) | `standard` | ✅ Complete (D8 fallback) | `ble-manager/wo5-coexistence-ota` | `b568ec5f` |
 | **WO-6** | [Hardware acceptance run (RFC §17.2, amended)](wo6-validation/WORKORDER.md) | `interactive` | ✅ Complete | `ble-manager/wo6-validation` | `18618a43` (ACCEPTANCE.md), fix `c697ff55` (DIS MAC). Tag `v0.0.12-dev.67`. |
+| **WO-7** | [BLE portal tab redesign — 3 cards + drawer + nav ordering](wo7-portal-redesign/WORKORDER.md) | `standard` | ✅ Complete | `ble-manager/wo7-portal-redesign` | `2fcf98a1` |
 | **WO-8** | [PR #235 R3: central client lifecycle and discovery](wo8-central-lifecycle/WORKORDER.md) | `standard` | ✅ Complete (`e206b12f`) | `ble-manager/wo8-central-lifecycle` (base `ble-manager/wo6-validation`) | — |
 | **WO-10** | [Fix #236: WifiManager STA resilience](wo10-wifi-sta-resilience/WORKORDER.md) | `architect` | ✅ Complete (`295f2c7a`) | `ble-manager/wo10-wifi-sta-resilience` | — |
 | **WO-11** | [App-neutral tests and sample](wo11-app-neutral/WORKORDER.md) | `mechanical` | ✅ Complete (`0ec19b87`) | `ble-manager/wo11-app-neutral` | — |
@@ -114,7 +115,8 @@ main
              └─ ble-manager/wo3-central
                  └─ ble-manager/wo4-portal-mcp
                      └─ ble-manager/wo5-coexistence-ota
-                         └─ ble-manager/wo6-validation   ← PR head
+                         └─ ble-manager/wo6-validation
+                             └─ ble-manager/wo7-portal-redesign   ← PR head
 ```
 
 **File overlap:** WO-2 through WO-5 all touch `modules/BLEManager/BLEManager.{hpp,cpp}` and `BLEStack.{hpp,cpp}`. **They must be serialized (Option A), not run in parallel.** WO-4 (portal/MCP) touches the fewest shared files. It *could* branch from WO-3 in parallel with WO-5 only if the human accepts manual conflict resolution in `BLEManager.cpp`. The default is serial.
@@ -354,10 +356,20 @@ The BLE controller's `NimBLEDevice::init()` on ESP32-S3 acquires cross-core heap
 - Mac BLE scan confirms `adv.local_name` correctly shows full app name ✅
 - Firmware version: v0.0.12-dev.71 ✅
 
-**Pending for next session (bridge prompt prepared):**
-- BLE portal page UX redesign: 3 cards (Status, Central Clients, Connections) + diagnostics drawer
-- Bottom nav ordering: WiFi → Bluetooth → Security → System (add data-order attributes)
-- Add `bleAddress` field to status API
+### Session — 2026-09-24T22:54:00+01:00 — WO-7 BLE Portal Redesign
+
+**Summary:** Fully executed WO-7 (BLE portal redesign and bottom nav ordering):
+- **Bottom nav ordering:** Added `data-order` attributes to hardcoded nav links (`10` WiFi, `50` Security, `900` System) in `web/portal/index.html`. Updated `buildBottomNav()` in `web/portal/app.js` to insert dynamic tabs before first link with higher `data-order`. Changed Bluetooth tab order parameter from 60 to 15 in `BLEManager.cpp`. Resulting order: WiFi → Bluetooth → Security → System.
+- **Backend BLE Address:** Added `bleAddress` field to `serializeStatus()` in `BLESerialization.cpp` (using `NimBLEDevice::getAddress().toString()`), guarded with `#if defined(ESP_PLATFORM) && defined(WITH_BLE)` to preserve native unit testing.
+- **Frontend Portal Tab Rewrite:** Completely redesigned `modules/BLEManager/web/ble.js` into 3 cards + diagnostics drawer:
+  - Card 1: Status Overview (Bluetooth header + dot, BLE Address in monospace, Advertised Name, Advertising indicator badge)
+  - Card 2: Paired Devices (conditional on `devices.length > 0`, showing provider label, status badge, stored device, armed Forget button with 3.5s timeout, Scan button with timer, inline scan results table with Pair buttons)
+  - Card 3: Connections (Connections header + count badge, active peripheral connections list with redacted address `••:••:••:8E:92`, handle number, interval, encrypted/plaintext badge, empty state)
+  - Drawer: Diagnostics (`<details>/<summary>Diagnostics</summary>` with Dropped Events, Scan Inhibit count, Advertising budget bars with progress fill and warning color on overflow, Advertising faults list)
+  - Scoped styles with `#ble-tab` prefix, dark/light theme support via `[data-theme="dark"]`
+  - Lifecycle hooks: `tab-changed` listener for `tab-bluetooth`, scaffold on first activation, 1 Hz polling when visible, stops when hidden/deactivated
+- **Unit test update:** Updated `RegisterTabsMetadata` in `test_bleSerialization.cpp` to expect order 15 instead of 60. All 933 native tests pass.
+- **Build verification:** `esp32s3nano_ble` compiles cleanly via PlatformIO MCP `build_project` (Flash: 1,636,399 B, RAM: 61,804 B). `include/portal_assets/ble_js.hpp` regenerated.
 
 
 ### Session — 2026-09-25 — PR #235 third-round fixes (WO-8, WO-9, WO-10) and #236
