@@ -242,7 +242,27 @@ bool BLEManager::registerClientProvider(IBLEClientProvider* p) {
     return true;
 }
 
+// Issue #232: mirrors WifiManager::setDefaultHostname()
+void BLEManager::setDefaultAdvertisedName(const char* name) {
+    if (name && name[0]) {
+        _defaultAdvertisedName = name;
+    }
+}
+
 void BLEManager::begin(Application& app) {
+    // Issue #232: auto-wire advertised name from app identity.
+    // If the consumer already called setDefaultAdvertisedName(), honour that.
+    // Otherwise, use the app name (which the consumer set via app.setAppName()).
+    if (_defaultAdvertisedName == "ESP32") {
+        const char* appName = app.getAppName();
+        if (appName && appName[0]) {
+            _defaultAdvertisedName = appName;
+        }
+    }
+    // If the persisted config still has the struct default, replace with the app default
+    if (_config.advertisedName == "ESP32") {
+        _config.advertisedName = _defaultAdvertisedName;
+    }
     // Y6: Worker task needs RTOS scheduler — create here, not in constructor
 #if defined(ESP_PLATFORM)
     if (_workerQueue && !_workerTask) {

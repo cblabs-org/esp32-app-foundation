@@ -138,6 +138,18 @@ public:
     // --- Late Wiring ---
 
     /**
+     * @brief Set the factory-default advertised name (issue #232).
+     *
+     * Mirrors WifiManager::setDefaultHostname(). Call before begin().
+     * If the user has not persisted a custom advertisedName in config,
+     * this value is used instead of the hardcoded "ESP32" default.
+     * The MAC-based suffix (-XXXX) is still appended if nameSuffix is true.
+     *
+     * @param name  App-supplied default (static lifetime or copied before return).
+     */
+    void setDefaultAdvertisedName(const char* name);
+
+    /**
      * @brief Wire application hub and lock provider registration.
      * Called after app.begin().
      * @param app Reference to Application hub.
@@ -238,6 +250,7 @@ private:
     void publishReady();
 
     BLEConfig                          _config;
+    std::string                        _defaultAdvertisedName = "ESP32"; ///< App-supplied factory default (issue #232)
     State                              _state = State::Disabled;
     bool                               _locked = false;
     Application*                       _app = nullptr;
