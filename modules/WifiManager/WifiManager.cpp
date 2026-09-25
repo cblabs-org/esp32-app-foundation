@@ -260,7 +260,7 @@ void WifiManager::tick(uint32_t currentMillis) {
                     ESP_LOGI(TAG, "Published WIFI_CONNECTED to %d subscribers", count);
                 }
                 transitionTo(WiFiState::Ready);
-            } else if (_stateTimer.check(currentMillis) && (currentMillis - _stateTimer.getLastFire() > 15000)) { // 15 second timeout for STA
+            } else if (_stateTimer.check(currentMillis) && (currentMillis - _stateTimer.getLastFire() > 30000)) { // 30 second timeout for STA (was 15s; auth retries + DHCP need headroom)
                 ESP_LOGW(TAG, "WiFi connection timed out. Falling back to AP.");
                 WiFi.disconnect(true); // Ensure clean slate
                 transitionTo(WiFiState::ApStarting);
