@@ -15,7 +15,7 @@
  * - WeatherBoard: IDisplayBoard for weather data overlay
  *
  *   Lifecycle:
- *   - WeatherBoard():            Stores WeatherModule pointer; defers EventBus wiring
+ *   - WeatherBoard():            Stores IWeatherDataProvider pointer; defers EventBus wiring
  *   - wireEventBus():            Deferred EventBus subscription (post-Application init)
  *
  *   IDisplayBoard:
@@ -31,13 +31,13 @@
 
 #include "AppFoundation.h"           // F05: Facade include — provides EventBus, etc.
 #include "U8G2Display/IDisplayBoard.hpp"
-#include "WeatherModule.hpp"         // Needed for WeatherModule* member type
+#include "IWeatherDataProvider.hpp"
 #include "WeatherWidget.hpp"
 #include <U8g2lib.h>
 
 class WeatherBoard : public IDisplayBoard {
 private:
-    WeatherModule* _weatherModule;          ///< Source of thread-safe weather data for rendering
+    IWeatherDataProvider* _dataProvider;          ///< Source of thread-safe weather data for rendering
     EventBus* _eventBus = nullptr;          ///< F04: EventBus ref for subscription demo
     mutable WeatherWidget _weatherWidget;   ///< Composable weather display widget
 
@@ -57,9 +57,9 @@ private:
 public:
     /**
      * @brief Constructs the WeatherBoard with a pointer to the weather data source.
-     * @param weatherModule  Pointer to the WeatherModule providing thread-safe data getters.
+     * @param dataProvider  Pointer to the IWeatherDataProvider providing thread-safe data getters.
      */
-    explicit WeatherBoard(WeatherModule* weatherModule);
+    explicit WeatherBoard(IWeatherDataProvider* dataProvider);
 
     /**
      * @brief Wires the EventBus subscription for weather.updated events.
@@ -81,7 +81,7 @@ public:
     /**
      * @brief Renders the weather display using WeatherWidget::draw().
      *
-     * Reads temperature and condition via WeatherModule's thread-safe getters,
+     * Reads temperature and condition via IWeatherDataProvider's thread-safe getters,
      * formats the temperature as a display string, and delegates rendering
      * to the static WeatherWidget::draw() utility.
      *

@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "app": "weather-station",
+  "namespaces": {
+    "weather": {
+      "fields": {
+        "lat": { "type": "double", "required": true, "description": "Latitude for weather query" },
+        "lon": { "type": "double", "required": true, "description": "Longitude for weather query" },
+        "interval": { "type": "uint32", "default": 600000, "description": "Fetch interval in milliseconds" },
+        "units": { "type": "string", "default": "metric", "enum": ["metric", "imperial"], "description": "Temperature units" }
+      },
+      "secrets": ["owm_api_key"]
+    }
+  }
+}

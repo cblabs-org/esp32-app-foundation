@@ -11,7 +11,7 @@
  *              IDataSource, IMCPContributor, and IPreconditionContributor interfaces.
  *
  *              Fetches weather data from the OpenWeatherMap API via
- *              streaming JSON parsing (JsonStreamingParser) on the
+ *              selective JSON parsing (ArduinoJson DeserializationFilter) on the
  *              DataManager background task, then stores parsed fields
  *              thread-safely for display rendering and REST/MCP queries.
  *
@@ -19,7 +19,8 @@
  * - F07: Uses AppFoundation.h facade; MCPToolRegistry.hpp is the only
  *   direct kernel include (not re-exported by the facade)
  * - F12: REST handlers use stack-allocated char[] buffers (no Arduino String)
- * - F19: JSON parser scratch fields are fixed char[] (no std::string)
+ * - F19: ArduinoJson DeserializationFilter limits parsing to required fields
+ * - C2: Thread safety fixes applied (_units char array, _publishPending)
  */
 
 #include "WeatherModule.hpp"
@@ -30,7 +31,6 @@
 #include <ArduinoJson.h>
 
 #include <PsychicHttp.h>
-#include <WiFiClientSecure.h>
 #include <HTTPClient.h>
 
 // Portal tab script: the JS source lives in this app's web/weather.js and is
@@ -99,42 +99,9 @@ void WeatherModule::begin(Application& app) {
     _configManager = &app.getConfigManager();
     _dataManager   = &app.getDataManager();
 
-    if (_eventBus) {
-        _eventBus->subscribe("wifi.connected", onWifiConnected, this);
-        _eventBus->subscribe("wifi.disconnected", onWifiDisconnected, this);
-    }
-
     // NOTE: HomeAssistant is NOT available here — _haModule is nullptr
     // until app.begin() allocates it. HA entity registration is deferred
     // to wireHomeAssistant(), called from main.cpp after app.begin().
-}
-
-/**
- * @brief EventBus callback: updates WiFi connectivity state on connection.
- * @param topic    The event topic string ("wifi.connected").
- * @param payload  Event payload (unused).
- * @param ctx      Opaque context pointer (WeatherModule instance).
- */
-void WeatherModule::onWifiConnected(const char* topic, const void* payload, void* ctx) {
-    (void)topic;
-    (void)payload;
-    if (ctx) {
-        static_cast<WeatherModule*>(ctx)->_wifiConnected.store(true, std::memory_order_release);
-    }
-}
-
-/**
- * @brief EventBus callback: updates WiFi connectivity state on disconnection.
- * @param topic    The event topic string ("wifi.disconnected").
- * @param payload  Event payload (unused).
- * @param ctx      Opaque context pointer (WeatherModule instance).
- */
-void WeatherModule::onWifiDisconnected(const char* topic, const void* payload, void* ctx) {
-    (void)topic;
-    (void)payload;
-    if (ctx) {
-        static_cast<WeatherModule*>(ctx)->_wifiConnected.store(false, std::memory_order_release);
-    }
 }
 
 /**
@@ -165,8 +132,39 @@ void WeatherModule::wireHomeAssistant(HomeAssistantModule& ha) {
  * @param currentMillis  Current system uptime in milliseconds (unused).
  */
 void WeatherModule::tick(uint32_t currentMillis) {
-    // Fast, non-blocking tick. Background fetching is handled by IDataSource in DataManager.
     (void)currentMillis;
+    if (_publishPending.exchange(false, std::memory_order_acq_rel)) {
+        #ifdef WITH_HOMEASSISTANT
+        // Publish sensor states to HA from the main thread
+        char buf[16];
+        float temp = _temperature.load(std::memory_order_acquire);
+        snprintf(buf, sizeof(buf), "%.1f", temp);
+        _tempSensor.setState(buf);
+        if (_ha) _ha->publishState(&_tempSensor);
+
+        float wind = _windSpeed.load(std::memory_order_acquire);
+        snprintf(buf, sizeof(buf), "%.1f", wind);
+        _windSensor.setState(buf);
+        if (_ha) _ha->publishState(&_windSensor);
+
+        // Condition string needs mutex
+        char condBuf[64];
+        if (xSemaphoreTake(_dataMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
+            strlcpy(condBuf, _condition, sizeof(condBuf));
+            xSemaphoreGive(_dataMutex);
+        } else {
+            condBuf[0] = '\0';
+        }
+        if (condBuf[0] != '\0') {
+            _condSensor.setState(condBuf);
+            if (_ha) _ha->publishState(&_condSensor);
+        }
+        #endif
+
+        if (_eventBus) {
+            _eventBus->publish("weather.updated");
+        }
+    }
 }
 
 /**
@@ -180,8 +178,16 @@ void WeatherModule::tick(uint32_t currentMillis) {
 void WeatherModule::applyConfig(const JsonObject& config) {
     _lat = config["lat"] | 0.0;
     _lon = config["lon"] | 0.0;
+    if (config.containsKey("lat") || config.containsKey("lon")) {
+        _locationConfigured = true;
+    }
     _pollingIntervalMs = config["interval"] | 600000;
-    _units = config["units"] | "metric";
+    
+    const char* units = config["units"] | "metric";
+    if (xSemaphoreTake(_dataMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
+        strlcpy(_units, units, sizeof(_units));
+        xSemaphoreGive(_dataMutex);
+    }
 }
 
 /**
@@ -196,7 +202,15 @@ void WeatherModule::serializeConfig(JsonObject& config) const {
     config["lat"] = _lat;
     config["lon"] = _lon;
     config["interval"] = _pollingIntervalMs;
-    config["units"] = _units;
+    
+    char localUnits[16];
+    if (xSemaphoreTake(_dataMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
+        strlcpy(localUnits, _units, sizeof(localUnits));
+        xSemaphoreGive(_dataMutex);
+    } else {
+        strlcpy(localUnits, "metric", sizeof(localUnits));
+    }
+    config["units"] = localUnits;
 }
 
 /**
@@ -208,8 +222,12 @@ void WeatherModule::serializeConfig(JsonObject& config) const {
 void WeatherModule::resetConfig() {
     _lat = 0.0;
     _lon = 0.0;
+    _locationConfigured = false;
     _pollingIntervalMs = 600000;
-    _units = "metric";
+    if (xSemaphoreTake(_dataMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
+        strlcpy(_units, "metric", sizeof(_units));
+        xSemaphoreGive(_dataMutex);
+    }
 }
 
 /**
@@ -229,7 +247,7 @@ void WeatherModule::registerRoutes(PsychicHttpServer& server) {
         doc["lat"] = _lat;
         doc["lon"] = _lon;
         doc["interval"] = _pollingIntervalMs;
-        doc["units"] = _units;
+        doc["units"] = getUnits();
         
         bool hasApiKey = false;
         if (_keyManager && !_keyManager->getKeyById("owm_api_key").empty()) {
@@ -259,7 +277,12 @@ void WeatherModule::registerRoutes(PsychicHttpServer& server) {
         if (doc["lat"].is<double>()) _lat = doc["lat"].as<double>();
         if (doc["lon"].is<double>()) _lon = doc["lon"].as<double>();
         if (doc["interval"].is<uint32_t>()) _pollingIntervalMs = doc["interval"].as<uint32_t>();
-        if (doc["units"].is<const char*>()) _units = doc["units"].as<const char*>();
+        if (doc["units"].is<const char*>()) {
+            if (xSemaphoreTake(_dataMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
+                strlcpy(_units, doc["units"].as<const char*>(), sizeof(_units));
+                xSemaphoreGive(_dataMutex);
+            }
+        }
 
         if (doc["apiKey"].is<const char*>() && _keyManager) {
             const char* apiKey = doc["apiKey"].as<const char*>();
@@ -283,7 +306,7 @@ void WeatherModule::registerRoutes(PsychicHttpServer& server) {
         JsonDocument doc;
         doc["hasData"] = hasData();
         doc["status"] = static_cast<int>(_lastFetchStatus.load(std::memory_order_acquire));
-        doc["units"] = _units;
+        doc["units"] = getUnits();
         
         if (hasData()) {
             doc["temperature"] = getTemperature();
@@ -322,43 +345,45 @@ void WeatherModule::registerRoutes(PsychicHttpServer& server) {
 }
 
 /**
- * @brief Executes an HTTPS GET to the OpenWeatherMap API with streaming JSON parse.
+ * @brief Executes an HTTPS GET to the OpenWeatherMap API with selective JSON parsing.
  *
- * Runs on the DataManager background task. Uses WiFiClientSecure with the
- * ESP-IDF certificate bundle for TLS verification. The response is streamed
- * through JsonStreamingParser to avoid buffering the entire payload in RAM.
+ * Runs on the DataManager background task. Uses the FetchContext-provided HTTP client
+ * with the ESP-IDF certificate bundle for TLS verification. Parses the response
+ * using ArduinoJson with a DeserializationFilter to conserve RAM.
  *
+ * @param ctx The transport context provided by the framework.
  * @return UpdateStatus indicating success, error type, or rate limiting.
  */
 UpdateStatus WeatherModule::fetchUpdate(const FetchContext& ctx) {
-    // WiFi connectivity gate — don't attempt network I/O without a connection.
-    // Skipped (not NoChange) tells DataManager we didn't even try, so health
-    // tracking stays honest. Pattern: DraytonWiserController/WiserApiModule.cpp.
-    if (_eventBus && !_wifiConnected.load(std::memory_order_acquire)) {
-        _lastFetchStatus.store(UpdateStatus::Skipped, std::memory_order_release);
-        return UpdateStatus::Skipped;
-    }
-
     // --- Step 1: Validate credentials (API key check) ---
     // Retrieve the OWM API key from KeyManager. If absent, return AuthError
     // immediately — no point making a network request without credentials.
     std::string apiKey = _keyManager ? _keyManager->getKeyById("owm_api_key") : "";
     if (apiKey.empty()) {
+        ESP_LOGW("WeatherModule", "OWM API key empty — not configured or decryption error");
         _lastFetchStatus.store(UpdateStatus::AuthError, std::memory_order_release);
         return UpdateStatus::AuthError;
     }
-    if (_lat == 0.0 && _lon == 0.0) {
+    if (!_locationConfigured) {
         _lastFetchStatus.store(UpdateStatus::Skipped, std::memory_order_release);
         return UpdateStatus::Skipped;
     }
 
     // --- Step 2: Build URL and allocate TLS client ---
     // Construct the OWM API URL with lat/lon/key/units parameters.
+    char localUnits[16];
+    if (xSemaphoreTake(_dataMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
+        strlcpy(localUnits, _units, sizeof(localUnits));
+        xSemaphoreGive(_dataMutex);
+    } else {
+        strlcpy(localUnits, "metric", sizeof(localUnits));
+    }
+    
     char url[256];
     snprintf(url, sizeof(url), "https://api.openweathermap.org/data/2.5/weather?lat=%f&lon=%f&appid=%s&units=%s",
-             _lat, _lon, apiKey.c_str(), _units.c_str());
+             _lat, _lon, apiKey.c_str(), localUnits);
 
-    ESP_LOGI("WeatherModule", "Fetching weather from OWM: lat=%f, lon=%f, units=%s", _lat, _lon, _units.c_str());
+    ESP_LOGI("WeatherModule", "Fetching weather from OWM: lat=%f, lon=%f, units=%s", _lat, _lon, localUnits);
 
 #ifdef ESP_PLATFORM
     if (!ctx.client) {
@@ -396,249 +421,106 @@ UpdateStatus WeatherModule::fetchUpdate(const FetchContext& ctx) {
         return err;
     }
 
-    // --- Step 4: Stream and parse JSON response ---
-    // Read the response body in 128-byte chunks to avoid heap exhaustion.
-    // Each byte is fed to the JsonStreamingParser, which calls our
-    // JsonListener callbacks (key(), value(), endDocument()) as it parses.
-    WiFiClient* stream = http.getStreamPtr();
-    JsonStreamingParser parser;
-    parser.setListener(this);
+    // --- Step 3: Parse response with ArduinoJson DeserializationFilter ---
+    // Use DeserializationFilter for memory-efficient selective parsing.
+    // Only parse the fields we need from the OWM response (~800 bytes).
+    JsonDocument filter;
+    filter["main"]["temp"] = true;
+    filter["main"]["feels_like"] = true;
+    filter["main"]["temp_min"] = true;
+    filter["main"]["temp_max"] = true;
+    filter["main"]["pressure"] = true;
+    filter["main"]["humidity"] = true;
+    filter["wind"]["speed"] = true;
+    filter["wind"]["deg"] = true;
+    filter["clouds"]["all"] = true;
+    filter["visibility"] = true;
+    filter["name"] = true;
+    filter["sys"]["country"] = true;
+    filter["sys"]["sunrise"] = true;
+    filter["sys"]["sunset"] = true;
+    filter["weather"][0]["main"] = true;
+    filter["weather"][0]["icon"] = true;
 
-    int len = http.getSize();
-    uint8_t buff[128] = { 0 };
+    JsonDocument doc;
+    DeserializationError err = deserializeJson(doc, *ctx.client,
+        DeserializationOption::Filter(filter));
 
-    ESP_LOGI("WeatherModule", "Streaming and parsing %d bytes...", len);
+    http.end();
 
-    // Absolute timeout guard — prevents indefinite blocking if the server
-    // stalls mid-stream (e.g. keeps the connection open but stops sending data).
-    const uint32_t streamStartMs = millis();
-    const uint32_t kStreamTimeoutMs = 30000; // 30 seconds
-
-    while (http.connected() && (len > 0 || len == -1)) {
-        // Check absolute timeout
-        if (ctx.deadline.isExpired() || (millis() - streamStartMs) > kStreamTimeoutMs) {
-            ESP_LOGE("WeatherModule", "Stream timeout or context expired — aborting parse");
-            http.end();
-            _lastFetchStatus.store(UpdateStatus::FetchError, std::memory_order_release);
-            return UpdateStatus::FetchError;
-        }
-
-        size_t size = stream->available();
-        if (size) {
-            int c = stream->readBytes(buff, ((size > sizeof(buff)) ? sizeof(buff) : size));
-            for (int i = 0; i < c; i++) {
-                parser.parse(buff[i]);
-            }
-            if (len > 0) {
-                len -= c;
-            }
-        }
-        // M1: Use vTaskDelay instead of delay() in FreeRTOS task context
-        vTaskDelay(pdMS_TO_TICKS(1));
+    if (err) {
+        ESP_LOGE("WeatherModule", "JSON parse failed: %s", err.c_str());
+        _lastFetchStatus.store(UpdateStatus::FetchError, std::memory_order_release);
+        return UpdateStatus::FetchError;
     }
 
-    // --- Step 5: Cleanup and return status ---
-    // Close the HTTP connection and report success. The parsed data is now
-    // available via the thread-safe getters (populated by endDocument()).
-    http.end();
-    ESP_LOGI("WeatherModule", "Fetch and parse complete");
+    // --- Step 4: Extract parsed fields into atomic/mutex members ---
+    bool updated = false;
+
+    if (doc["main"]["temp"].is<float>()) {
+        _temperature.store(doc["main"]["temp"].as<float>(), std::memory_order_release);
+        updated = true;
+    }
+    if (doc["main"]["feels_like"].is<float>()) {
+        _feelsLike.store(doc["main"]["feels_like"].as<float>(), std::memory_order_release);
+    }
+    if (doc["main"]["temp_min"].is<float>()) {
+        _tempMin.store(doc["main"]["temp_min"].as<float>(), std::memory_order_release);
+    }
+    if (doc["main"]["temp_max"].is<float>()) {
+        _tempMax.store(doc["main"]["temp_max"].as<float>(), std::memory_order_release);
+    }
+    if (doc["main"]["pressure"].is<int>()) {
+        _pressure.store(doc["main"]["pressure"].as<int>(), std::memory_order_release);
+    }
+    if (doc["main"]["humidity"].is<int>()) {
+        _humidity.store(doc["main"]["humidity"].as<int>(), std::memory_order_release);
+    }
+    if (doc["wind"]["speed"].is<float>()) {
+        _windSpeed.store(doc["wind"]["speed"].as<float>(), std::memory_order_release);
+        updated = true;
+    }
+    if (doc["wind"]["deg"].is<int>()) {
+        _windDeg.store(doc["wind"]["deg"].as<int>(), std::memory_order_release);
+    }
+    if (doc["clouds"]["all"].is<int>()) {
+        _clouds.store(doc["clouds"]["all"].as<int>(), std::memory_order_release);
+    }
+    if (doc["visibility"].is<int>()) {
+        _visibility.store(doc["visibility"].as<int>(), std::memory_order_release);
+    }
+
+    // Mutex-protected string fields
+    if (xSemaphoreTake(_dataMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+        const char* cond = doc["weather"][0]["main"] | "";
+        if (cond[0] != '\0') { strlcpy(_condition, cond, sizeof(_condition)); updated = true; }
+        const char* icon = doc["weather"][0]["icon"] | "";
+        if (icon[0] != '\0') strlcpy(_icon, icon, sizeof(_icon));
+        const char* city = doc["name"] | "";
+        if (city[0] != '\0') strlcpy(_cityName, city, sizeof(_cityName));
+        const char* country = doc["sys"]["country"] | "";
+        if (country[0] != '\0') strlcpy(_country, country, sizeof(_country));
+        xSemaphoreGive(_dataMutex);
+    }
+
+    if (doc["sys"]["sunrise"].is<uint32_t>()) {
+        _sunrise.store(doc["sys"]["sunrise"].as<uint32_t>(), std::memory_order_release);
+    }
+    if (doc["sys"]["sunset"].is<uint32_t>()) {
+        _sunset.store(doc["sys"]["sunset"].as<uint32_t>(), std::memory_order_release);
+    }
+
+    if (updated) {
+        _hasData.store(true, std::memory_order_release);
+        _publishPending.store(true, std::memory_order_release);
+    }
+
     _lastFetchStatus.store(UpdateStatus::Success, std::memory_order_release);
+    ESP_LOGI("WeatherModule", "Weather update: %.1f°, %s",
+             _temperature.load(), doc["weather"][0]["main"] | "Unknown");
     return UpdateStatus::Success;
 }
 
-/**
- * @brief Zeros all parser scratch buffers at the start of a new JSON document.
- *
- * Called by the JsonStreamingParser when a new document begins. Resets all
- * scratch buffers to empty strings and the weather array depth to zero.
- */
-// F19: Parser scratch buffers are now fixed char[] — zero-fill on new document
-void WeatherModule::startDocument() {
-    _currentKey[0] = '\0';
-    _parsedTemp[0] = '\0';
-    _parsedWind[0] = '\0';
-    _parsedCond[0] = '\0';
-    _parsedHumidity[0] = '\0';
-    _parsedPressure[0] = '\0';
-    _parsedFeelsLike[0] = '\0';
-    _parsedTempMin[0] = '\0';
-    _parsedTempMax[0] = '\0';
-    _parsedVisibility[0] = '\0';
-    _parsedWindDeg[0] = '\0';
-    _parsedClouds[0] = '\0';
-    _parsedCityName[0] = '\0';
-    _parsedCountry[0] = '\0';
-    _parsedSunrise[0] = '\0';
-    _parsedSunset[0] = '\0';
-    _parsedIcon[0] = '\0';
-    _weatherArrayDepth = 0;
-}
-
-// JsonListener methods that use Arduino String type — hardware only
-/**
- * @brief Increments the weather array depth tracker on array entry.
- *
- * Tracks when the parser enters the "weather" JSON array so that nested
- * values (condition "main" and "icon") can be correctly scoped.
- */
-void WeatherModule::startArray() {
-    if (strcmp(_currentKey, "weather") == 0) {
-        _weatherArrayDepth++;
-    }
-}
-
-/**
- * @brief Decrements the weather array depth tracker on array exit.
- */
-void WeatherModule::endArray() {
-    if (_weatherArrayDepth > 0) {
-        _weatherArrayDepth--;
-    }
-}
-
-/**
- * @brief Records the current JSON key for subsequent value dispatch.
- *
- * Copies the key string into the _currentKey scratch buffer so that the
- * next value() call can dispatch the value to the correct field.
- *
- * @param key  The JSON key string from the streaming parser.
- */
-void WeatherModule::key(String key) {
-    strlcpy(_currentKey, key.c_str(), sizeof(_currentKey));
-}
-
-/**
- * @brief Dispatches a JSON value to the appropriate scratch buffer based on the current key.
- *
- * Uses strlcpy into fixed char[] buffers (F19 — no std::string heap allocation).
- * Only writes to a buffer if it is still empty (first-write-wins) to handle
- * duplicate keys in nested objects (e.g., "main" appears in both the weather
- * array and the top-level response).
- *
- * @param value  The JSON value string from the streaming parser.
- */
-// F19: Use strlcpy into fixed char[] buffers — no std::string heap allocation
-void WeatherModule::value(String value) {
-    if (strcmp(_currentKey, "temp") == 0 && _parsedTemp[0] == '\0') {
-        strlcpy(_parsedTemp, value.c_str(), sizeof(_parsedTemp));
-    } else if (strcmp(_currentKey, "feels_like") == 0 && _parsedFeelsLike[0] == '\0') {
-        strlcpy(_parsedFeelsLike, value.c_str(), sizeof(_parsedFeelsLike));
-    } else if (strcmp(_currentKey, "temp_min") == 0 && _parsedTempMin[0] == '\0') {
-        strlcpy(_parsedTempMin, value.c_str(), sizeof(_parsedTempMin));
-    } else if (strcmp(_currentKey, "temp_max") == 0 && _parsedTempMax[0] == '\0') {
-        strlcpy(_parsedTempMax, value.c_str(), sizeof(_parsedTempMax));
-    } else if (strcmp(_currentKey, "pressure") == 0 && _parsedPressure[0] == '\0') {
-        strlcpy(_parsedPressure, value.c_str(), sizeof(_parsedPressure));
-    } else if (strcmp(_currentKey, "humidity") == 0 && _parsedHumidity[0] == '\0') {
-        strlcpy(_parsedHumidity, value.c_str(), sizeof(_parsedHumidity));
-    } else if (strcmp(_currentKey, "visibility") == 0 && _parsedVisibility[0] == '\0') {
-        strlcpy(_parsedVisibility, value.c_str(), sizeof(_parsedVisibility));
-    } else if (strcmp(_currentKey, "speed") == 0 && _parsedWind[0] == '\0') {
-        strlcpy(_parsedWind, value.c_str(), sizeof(_parsedWind));
-    } else if (strcmp(_currentKey, "deg") == 0 && _parsedWindDeg[0] == '\0') {
-        strlcpy(_parsedWindDeg, value.c_str(), sizeof(_parsedWindDeg));
-    } else if (strcmp(_currentKey, "all") == 0 && _parsedClouds[0] == '\0') {
-        strlcpy(_parsedClouds, value.c_str(), sizeof(_parsedClouds));
-    } else if (strcmp(_currentKey, "name") == 0 && _parsedCityName[0] == '\0') {
-        strlcpy(_parsedCityName, value.c_str(), sizeof(_parsedCityName));
-    } else if (strcmp(_currentKey, "country") == 0 && _parsedCountry[0] == '\0') {
-        strlcpy(_parsedCountry, value.c_str(), sizeof(_parsedCountry));
-    } else if (strcmp(_currentKey, "sunrise") == 0 && _parsedSunrise[0] == '\0') {
-        strlcpy(_parsedSunrise, value.c_str(), sizeof(_parsedSunrise));
-    } else if (strcmp(_currentKey, "sunset") == 0 && _parsedSunset[0] == '\0') {
-        strlcpy(_parsedSunset, value.c_str(), sizeof(_parsedSunset));
-    } else if (_weatherArrayDepth > 0) {
-        if (strcmp(_currentKey, "main") == 0 && _parsedCond[0] == '\0') {
-            strlcpy(_parsedCond, value.c_str(), sizeof(_parsedCond));
-        } else if (strcmp(_currentKey, "icon") == 0 && _parsedIcon[0] == '\0') {
-            strlcpy(_parsedIcon, value.c_str(), sizeof(_parsedIcon));
-        }
-    }
-}
-
-/**
- * @brief Parses scratch buffers into typed atomic/mutex-protected fields.
- *
- * Called when the JSON streaming parser completes the document. Converts string
- * scratch buffers to numeric types (strtof/atoi), writes them to atomic fields
- * for thread-safe cross-task access, copies string fields under mutex protection,
- * publishes HA sensor states, and fires the "weather.updated" EventBus notification.
- */
-void WeatherModule::endDocument() {
-    bool updated = false;
-
-    // --- Step 1: Parse scratch buffers to typed values ---
-    // Convert string scratch buffers to numeric types using strtof/atoi.
-    // F19: char[] buffers — use strtof/atoi directly (no .c_str() needed)
-    if (_parsedTemp[0] != '\0') {
-        float temp = std::strtof(_parsedTemp, nullptr);
-        // H3: Store via atomic for thread-safe cross-task access
-        _temperature.store(temp, std::memory_order_release);
-
-        // Publish numeric value as string state to HA sensor
-        char buf[16];
-        snprintf(buf, sizeof(buf), "%.1f", temp);
-#ifdef WITH_HOMEASSISTANT
-        _tempSensor.setState(buf);
-        if (_ha) _ha->publishState(&_tempSensor);
-#endif
-        updated = true;
-    }
-    if (_parsedWind[0] != '\0') {
-        float wind = std::strtof(_parsedWind, nullptr);
-        _windSpeed.store(wind, std::memory_order_release);
-
-        char buf[16];
-        snprintf(buf, sizeof(buf), "%.1f", wind);
-#ifdef WITH_HOMEASSISTANT
-        _windSensor.setState(buf);
-        if (_ha) _ha->publishState(&_windSensor);
-#endif
-        updated = true;
-    }
-    if (_parsedHumidity[0] != '\0') _humidity.store(std::atoi(_parsedHumidity), std::memory_order_release);
-    if (_parsedPressure[0] != '\0') _pressure.store(std::atoi(_parsedPressure), std::memory_order_release);
-    if (_parsedFeelsLike[0] != '\0') _feelsLike.store(std::strtof(_parsedFeelsLike, nullptr), std::memory_order_release);
-    if (_parsedTempMin[0] != '\0') _tempMin.store(std::strtof(_parsedTempMin, nullptr), std::memory_order_release);
-    if (_parsedTempMax[0] != '\0') _tempMax.store(std::strtof(_parsedTempMax, nullptr), std::memory_order_release);
-    if (_parsedVisibility[0] != '\0') _visibility.store(std::atoi(_parsedVisibility), std::memory_order_release);
-    if (_parsedWindDeg[0] != '\0') _windDeg.store(std::atoi(_parsedWindDeg), std::memory_order_release);
-    if (_parsedClouds[0] != '\0') _clouds.store(std::atoi(_parsedClouds), std::memory_order_release);
-    if (_parsedSunrise[0] != '\0') _sunrise.store(std::strtoul(_parsedSunrise, nullptr, 10), std::memory_order_release);
-    if (_parsedSunset[0] != '\0') _sunset.store(std::strtoul(_parsedSunset, nullptr, 10), std::memory_order_release);
-
-    // --- Step 2: Write to atomic/mutex-protected fields ---
-    // String fields require mutex protection for thread-safe cross-task access.
-    if (_parsedCond[0] != '\0' || _parsedIcon[0] != '\0' || _parsedCityName[0] != '\0' || _parsedCountry[0] != '\0') {
-        // H3: Write string buffers under mutex protection
-        if (xSemaphoreTake(_dataMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
-            if (_parsedCond[0] != '\0') strlcpy(_condition, _parsedCond, sizeof(_condition));
-            if (_parsedIcon[0] != '\0') strlcpy(_icon, _parsedIcon, sizeof(_icon));
-            if (_parsedCityName[0] != '\0') strlcpy(_cityName, _parsedCityName, sizeof(_cityName));
-            if (_parsedCountry[0] != '\0') strlcpy(_country, _parsedCountry, sizeof(_country));
-            xSemaphoreGive(_dataMutex);
-        }
-
-        if (_parsedCond[0] != '\0') {
-#ifdef WITH_HOMEASSISTANT
-            _condSensor.setState(_parsedCond);
-            if (_ha) _ha->publishState(&_condSensor);
-#endif
-        }
-        updated = true;
-    }
-
-    // --- Step 3: Publish EventBus notification + HA state ---
-    // Notify subscribers that weather data has been updated. The display
-    // carousel listens for this event to trigger board refreshes.
-    if (updated) {
-        _hasData.store(true, std::memory_order_release);
-        if (_eventBus) {
-            _eventBus->publish("weather.updated");
-        }
-    }
-}
 
 // -----------------------------------------------------------------------------
 // IMCPContributor Implementation
@@ -681,6 +563,7 @@ void WeatherModule::registerMCPTools(MCPToolRegistry& registry) {
         this,
         false  // mutatesState = false (read-only)
     );
+    ESP_LOGI("WeatherModule", "MCP tools registered: weather_status");
 }
 
 // -----------------------------------------------------------------------------
@@ -688,34 +571,99 @@ void WeatherModule::registerMCPTools(MCPToolRegistry& registry) {
 // -----------------------------------------------------------------------------
 
 void WeatherModule::registerPreconditions(IPreconditionRegistry& reg) {
-    static const Edge edges[] = {
+    // Precondition 1: API Key — Startup, requires WiFi
+    static const Edge apiKeyEdges[] = {
         {PreconditionNames::WIFI_STATION, EdgeKind::Requires}
     };
-    reg.add("Weather Setup", PreconditionRole::Operational,
+    reg.add("Weather API Key", PreconditionRole::Startup,
         [this]() -> PreconditionStatus {
-            // §2.4: Indeterminate, not "return true"
             if (!_keyManager)
                 return {false, Cause::Indeterminate};
-
-            bool hasApiKey = !_keyManager->getKeyById("owm_api_key").empty();
-            bool hasLocation = (_lat != 0.0 || _lon != 0.0);
-
-            if (hasApiKey && hasLocation)
-                return {true, Cause::Met};
-            return {false, Cause::NotConfigured};
+            std::string apiKey = _keyManager->getKeyById("owm_api_key");
+            if (apiKey.empty()) {
+                ESP_LOGW("WeatherModule", "OWM API key empty — not configured or decryption error");
+            }
+            bool hasKey = !apiKey.empty();
+            return hasKey ? PreconditionStatus{true, Cause::Met}
+                          : PreconditionStatus{false, Cause::NotConfigured};
         },
         [](Cause c, char* buf, size_t len) {
             switch (c) {
                 case Cause::NotConfigured:
-                    snprintf(buf, len, "Set API key and location in Weather settings");
+                    snprintf(buf, len, "Enter your OpenWeatherMap API key in the Weather tab");
                     break;
                 case Cause::Indeterminate:
-                    snprintf(buf, len, "BUG: KeyManager not wired — call setKeyManager()");
+                    snprintf(buf, len, "BUG: KeyManager not wired — call begin(app)");
                     break;
                 default:
-                    snprintf(buf, len, "Weather setup incomplete");
+                    snprintf(buf, len, "Weather API key check");
                     break;
             }
         },
-        edges, 1);
+        apiKeyEdges, 1);
+
+    // Precondition 2: Location — Startup, requires WiFi
+    static const Edge locationEdges[] = {
+        {PreconditionNames::WIFI_STATION, EdgeKind::Requires}
+    };
+    reg.add("Weather Location", PreconditionRole::Startup,
+        [this]() -> PreconditionStatus {
+            return _locationConfigured
+                ? PreconditionStatus{true, Cause::Met}
+                : PreconditionStatus{false, Cause::NotConfigured};
+        },
+        [](Cause c, char* buf, size_t len) {
+            switch (c) {
+                case Cause::NotConfigured:
+                    snprintf(buf, len, "Set latitude and longitude in the Weather tab");
+                    break;
+                default:
+                    snprintf(buf, len, "Weather location check");
+                    break;
+            }
+        },
+        locationEdges, 1);
+
+    // Precondition 3: API connectivity — Operational, requires both config preconditions
+    // Note: This precondition uses name-based edges to the two Startup preconditions
+    // above. Because they are both Startup, they will block boot and appear on the
+    // configuring display. This Operational precondition degrades gracefully at runtime.
+    static const Edge apiEdges[] = {
+        {"Weather API Key", EdgeKind::Requires},
+        {"Weather Location", EdgeKind::Requires}
+    };
+    reg.add("Weather API", PreconditionRole::Operational,
+        [this]() -> PreconditionStatus {
+            if (!_hasData.load(std::memory_order_acquire)) {
+                UpdateStatus lastStatus = _lastFetchStatus.load(std::memory_order_acquire);
+                switch (lastStatus) {
+                    case UpdateStatus::AuthError:
+                        return {false, Cause::Rejected};
+                    case UpdateStatus::FetchError:
+                        return {false, Cause::Unreachable};
+                    case UpdateStatus::Skipped:
+                        return {false, Cause::Connecting};
+                    default:
+                        return {false, Cause::Connecting};
+                }
+            }
+            return {true, Cause::Met};
+        },
+        [](Cause c, char* buf, size_t len) {
+            switch (c) {
+                case Cause::Rejected:
+                    snprintf(buf, len, "API key rejected — check your OpenWeatherMap key");
+                    break;
+                case Cause::Unreachable:
+                    snprintf(buf, len, "Cannot reach OpenWeatherMap API — check internet");
+                    break;
+                case Cause::Connecting:
+                    snprintf(buf, len, "Waiting for first weather data fetch...");
+                    break;
+                default:
+                    snprintf(buf, len, "Weather API connectivity check");
+                    break;
+            }
+        },
+        apiEdges, 2);
 }
