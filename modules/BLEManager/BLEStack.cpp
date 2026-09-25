@@ -50,6 +50,13 @@ public:
         : _stack(stack), _queue(queue) {}
 
     void onConnect(NimBLEServer* /*pServer*/, NimBLEConnInfo& connInfo) override {
+        ESP_LOGI(TAG, ">>> Central connected: handle=%d, addr=%s, itvl=%d (%.2fms), latency=%d, timeout=%d (%dms), MTU=%d",
+                 connInfo.getConnHandle(), connInfo.getAddress().toString().c_str(),
+                 connInfo.getConnInterval(), connInfo.getConnInterval() * 1.25f,
+                 connInfo.getConnLatency(),
+                 connInfo.getConnTimeout(), connInfo.getConnTimeout() * 10,
+                 connInfo.getMTU());
+
         if (!_queue) return;
 
         BLEQueueMessage msg;
@@ -74,6 +81,10 @@ public:
     }
 
     void onDisconnect(NimBLEServer* /*pServer*/, NimBLEConnInfo& connInfo, int reason) override {
+        ESP_LOGW(TAG, "<<< Central disconnected: handle=%d, addr=%s, reason=0x%02x (%s)",
+                 connInfo.getConnHandle(), connInfo.getAddress().toString().c_str(),
+                 reason, NimBLEUtils::returnCodeToString(reason));
+
         if (!_queue) return;
 
         BLEQueueMessage msg;
@@ -109,6 +120,21 @@ public:
     }
 
     void onMTUChange(uint16_t MTU, NimBLEConnInfo& connInfo) override {
+        ESP_LOGI(TAG, ">>> Central MTU changed: handle=%d, MTU=%u", connInfo.getConnHandle(), (unsigned)MTU);
+
+        // Once MTU exchange is complete, if the central used a dangerously short
+        // supervision timeout (< 2.0s, e.g. macOS default 720ms), update it to
+        // 4.0s so radio coexistence bursts don't drop the connection.
+        if (connInfo.getConnTimeout() < 200 && _stack) {
+            BLEConnParams robustParams;
+            robustParams.minIntervalUnits        = connInfo.getConnInterval();
+            robustParams.maxIntervalUnits        = connInfo.getConnInterval();
+            robustParams.latency                 = connInfo.getConnLatency();
+            robustParams.supervisionTimeoutUnits = 400; // 4.0s
+            ESP_LOGI(TAG, "Updating supervision timeout to 4.0s (was %dms)", connInfo.getConnTimeout() * 10);
+            _stack->updateConnParams(connInfo.getConnHandle(), robustParams);
+        }
+
         if (!_queue) return;
 
         BLEQueueMessage msg;
@@ -235,6 +261,14 @@ bool BLEStack::init(const char* deviceName, void* eventQueue) {
     NimBLEDevice::setSecurityAuth(BLE_SM_PAIR_AUTHREQ_BOND);
     NimBLEDevice::setSecurityIOCap(BLE_HS_IO_NO_INPUT_OUTPUT);
 
+    // Maximize RF transmission power (+20 dBm) for advertising, scanning, and connections
+    NimBLEDevice::setPower(20, NimBLETxPowerType::All);
+
+    // Wi-Fi / BLE coexistence: leave at ESP-IDF default (PREFER_WIFI, enum 0).
+    // PREFER_BT (dev.76) starved WiFi entirely; PREFER_BALANCE (dev.78) still
+    // caused AUTH_EXPIRE during WiFi association.  The default has always worked
+    // and BLE stability comes from +20 dBm TX power and deferred conn params.
+
     _server = NimBLEDevice::createServer();
     if (!_server) {
         ESP_LOGE(TAG, "Failed to create NimBLE server");
@@ -343,6 +377,10 @@ bool BLEStack::startAdvertising(const BLEAdvPackResult& packResult, const BLECon
     pAdv->clearData();
     pAdv->setConnectableMode(BLE_GAP_CONN_MODE_UND);
 
+    // Fast connectable advertising interval: 50 ms (80 * 0.625 ms)
+    pAdv->setMinInterval(80);
+    pAdv->setMaxInterval(80);
+
     // Set GAP PPCP characteristic
     setPreferredConnParams(preferredParams);
 
@@ -365,7 +403,8 @@ bool BLEStack::startAdvertising(const BLEAdvPackResult& packResult, const BLECon
 
     // A2: Don't call setPreferredParams() here — it adds AD bytes after the
     // packer has done its 31-byte accounting. The GAP PPCP characteristic
-    // (set by setPreferredConnParams above) already communicates preferred params.
+    // Re-assert maximum TX power (+20 dBm) for advertising
+    NimBLEDevice::setPower(20, NimBLETxPowerType::Advertise);
 
     return pAdv->start();
 }
@@ -398,8 +437,7 @@ void BLEStack::updateConnParams(BLEConnHandle handle, const BLEConnParams& param
 }
 
 void BLEStack::setPreferredConnParams(const BLEConnParams& /*params*/) {
-    // Preferred parameters are advertised via pAdv->setPreferredParams()
-    // and negotiated per connection via updateConnParams().
+    // Preferred parameters are negotiated per connection via updateConnParams().
 }
 
 size_t BLEStack::getServiceCount() const {

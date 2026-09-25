@@ -616,7 +616,11 @@ void WifiManager::registerMCPTools(MCPToolRegistry& registry) {
             if (self->_isAPMode) {
                 WiFi.mode(WIFI_AP_STA);
             }
+#if defined(WITH_BLE)
+            int16_t count = WiFi.scanNetworks(false, false, false, 120);
+#else
             int16_t count = WiFi.scanNetworks(false);
+#endif
             if (count < 0) {
                 result["error"] = "Scan failed";
             } else {
@@ -720,7 +724,12 @@ esp_err_t WifiManager::handleScan(PsychicRequest* request, PsychicResponse* resp
             WiFi.mode(WIFI_AP_STA);
         }
         ESP_LOGI(TAG, "Starting async WiFi scan...");
+#if defined(WITH_BLE)
+        // Use 120ms max channel time when coexistence with BLE is active to prevent radio starvation
+        WiFi.scanNetworks(true, false, false, 120);
+#else
         WiFi.scanNetworks(true); // true = async
+#endif
         response->send(202, "application/json", "{\"status\":\"scanning\"}");
         return ESP_OK;
     }

@@ -918,8 +918,12 @@ void BLEManager::dispatchQueueEvents() {
                     _activeConnections.push_back(peer);
                 }
 
-                // Request connection parameter update once after connect (RFC §9)
-                _stack.updateConnParams(msg.handle, _config.peripheralPreferredConnParams);
+                // Do not immediately update connection parameters on connect.
+                // Apple and Android guidelines mandate waiting at least 5 seconds
+                // after connection establishment before requesting parameter updates.
+                // Requesting an L2CAP update in the first few hundred milliseconds
+                // collides with the central's MTU exchange and GATT service discovery,
+                // causing Android (nRF Connect) to drop with GATT CONN TIMEOUT (Error 147/133).
 
                 for (auto* p : _serviceProviders) {
                     if (p) p->onPeerConnected(peer);
