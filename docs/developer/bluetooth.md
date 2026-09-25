@@ -298,12 +298,11 @@ The framework defers connection parameter updates to prevent GATT timeouts:
  
 #### WiFi STA Connection Timeout
  
-`WifiManager` uses a **30-second** timeout for WiFi STA connection (`StaConnecting` state). This accommodates:
+`WifiManager` uses a **15-second** per-attempt timeout for WiFi STA connection (`StaConnecting` state), with **indefinite STA-first retries** using an exponential backoff schedule (5 s / 10 s / 30 s / then every 60 s). This accommodates:
  
 - **802.11 auth retries**: Congested 2.4 GHz environments or busy IoT routers may take 8–10 seconds of AUTH_EXPIRE retry cycles before a successful auth frame exchange.
 - **DHCP lease**: After WiFi association, DHCP typically completes in 1–3 seconds but can take longer on networks with many clients.
- 
-The previous 15-second timeout caused premature AP fallback when auth retries consumed most of the budget, leaving insufficient time for DHCP. See `WifiManager.cpp` `StaConnecting` case.
+- **Resilience**: A failed attempt never falls back to AP-only mode when credentials are stored. After 3 minutes of continuous STA downtime, a **fallback AP** starts in `WIFI_AP_STA` mode so the portal remains reachable while STA keeps retrying. The fallback AP is torn down when STA reconnects. See `WifiManager.cpp` and issue #236.
  
 ### ScanInhibit Recipe
  
@@ -403,8 +402,8 @@ Exposes 4 AI agent tools via the Model Context Protocol:
 - **Scanning fails to start**: Check if `bleManager.inhibitScanning()` was called by a Wi-Fi task, or if the device is still in `AppState::Configuring`. Scanning is only permitted in `AppState::Running`.
 - **BLE init crashes with WDT reset or EM_BASE_REG_LUT dump**: Root cause is Arduino's `initArduino()` releasing BT controller memory when `bleInUse()` returns false. The framework's `BLEStack.cpp` provides `extern "C" bool bleInUse(void) { return true; }` to prevent this. If you see this crash, verify the strong symbol override is present in your build. See H-G in the debugging history.
 - **Android GATT CONN TIMEOUT (Error 147/0x93 + Error 133/0x85)**: The central drops the connection within 200ms of connecting. Root cause: requesting an L2CAP connection parameter update (`updateConnParams()`) immediately on `PeerConnected` collides with the central's MTU exchange and GATT service discovery. **Fix**: Do NOT call `updateConnParams()` in the `PeerConnected` handler. The framework defers parameter negotiation to after MTU exchange (see § Radio Settings & Physical Layer → Connection Parameter Safety).
-- **WiFi AUTH_EXPIRE with BLE active**: WiFi auth frames time out (reason 2) when BLE and WiFi are both active. Check: (1) `esp_coex_preference_set()` must NOT be called — the ESP-IDF default (`PREFER_WIFI`) is required for reliable WiFi auth. Both `PREFER_BT` and `PREFER_BALANCE` degrade WiFi. (2) Verify `CONFIG_ESP_COEX_SW_COEXIST_ENABLE=y` is set in sdkconfig. (3) The WiFi STA timeout must be ≥30 seconds to accommodate auth retries + DHCP.
-- **WiFi connects but falls back to AP mode**: WiFi association succeeds (serial shows `wifi:connected`) but `WifiManager` falls back to AP. Root cause: the STA connection timeout expired before DHCP completed. Increase the timeout in `WifiManager.cpp` (`StaConnecting` case) — the framework default is 30 seconds. If the router's 2.4 GHz band is congested, auth retries can consume 8–10 seconds, leaving insufficient time for DHCP with shorter timeouts.
+- **WiFi AUTH_EXPIRE with BLE active**: WiFi auth frames time out (reason 2) when BLE and WiFi are both active. Check: (1) `esp_coex_preference_set()` must NOT be called — the ESP-IDF default (`PREFER_WIFI`) is required for reliable WiFi auth. Both `PREFER_BT` and `PREFER_BALANCE` degrade WiFi. (2) Verify `CONFIG_ESP_COEX_SW_COEXIST_ENABLE=y` is set in sdkconfig. (3) WifiManager's STA-first retry with backoff (15 s per attempt, indefinite retries) should handle this automatically — if it doesn't, the coexistence config is the issue.
+- **WiFi connects but falls back to AP mode**: With WO-10 (#236), WifiManager no longer falls back to AP-only mode when credentials are stored. STA retries indefinitely with backoff (5 s / 10 s / 30 s / 60 s). A fallback AP starts in `WIFI_AP_STA` mode after 3 minutes of continuous STA downtime, keeping the portal reachable while STA keeps retrying. The fallback AP is torn down when STA reconnects.
 
 ---
  

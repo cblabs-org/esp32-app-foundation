@@ -114,7 +114,7 @@ The framework automatically registers a standard Bluetooth SIG Device Informatio
 Apple and Android guidelines mandate waiting ≥5 seconds after connection before requesting L2CAP parameter updates. Calling `updateConnParams()` immediately on `PeerConnected` collides with the central's MTU exchange and GATT service discovery, causing Android (nRF Connect) to drop with GATT CONN TIMEOUT (Error 147/0x93 + Error 133/0x85). Instead, the framework updates the supervision timeout to 4.0s after MTU exchange if the central's default is dangerously short (e.g. macOS CoreBluetooth 720ms).
 
 ### What is the WiFi STA connection timeout?
-30 seconds (was 15s pre-dev.80). Set in `WifiManager.cpp` `StaConnecting` case. On congested 2.4 GHz networks, WiFi auth retries (`AUTH_EXPIRE` reason 2) can consume 8–10 seconds. The 30s budget gives sufficient headroom for auth retries + DHCP.
+15 seconds per attempt, with indefinite STA-first retries using exponential backoff (5 s / 10 s / 30 s / 60 s). After 3 minutes of continuous STA downtime, a fallback AP starts in `WIFI_AP_STA` mode (portal reachable while STA keeps retrying). The fallback AP is torn down when STA reconnects. WiFi never falls back to AP-only mode when credentials are stored. See `WifiManager.cpp` and #236.
 
 ### How do WiFi and BLE coexist?
 `CONFIG_ESP_COEX_SW_COEXIST_ENABLE=y` in sdkconfig enables hardware-level RF time-sharing. The framework adds five application-level mechanisms: Running-Only gating, ScanInhibit tokens, Administrative Pause, Duty Cycle Clamping, and Exponential Backoff. See `docs/developer/bluetooth.md` § Coexistence & Radio Hardening.
