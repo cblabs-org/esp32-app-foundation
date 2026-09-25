@@ -16,7 +16,7 @@
  *              protected by a FreeRTOS mutex.
  *
  * Exported Classes:
- * - WeatherModule: Full-featured framework module (6 interfaces + JsonListener)
+ * - WeatherModule: Full-featured framework module (6 interfaces + IWeatherDataProvider)
  *
  *   Lifecycle:
  *   - WeatherModule():          Constructor — configures HA sensor metadata, creates mutex
@@ -72,17 +72,6 @@
  *   IPreconditionContributor:
  *   - registerPreconditions():  Registers three preconditions: "Weather API Key" (Startup),
  *                               "Weather Location" (Startup), and "Weather API" (Operational).
- *
- *   JsonListener (hardware only):
- *   - startDocument():          Zeros all parser scratch buffers
- *   - key():                    Records current JSON key for value dispatch
- *   - value():                  Dispatches JSON value to appropriate scratch buffer
- *   - startArray():             Tracks entry into the "weather" array
- *   - endArray():               Tracks exit from the "weather" array
- *   - endDocument():            Parses scratch buffers → atomic/mutex fields, publishes events
- *   - startObject():            No-op (required by JsonListener interface)
- *   - endObject():              No-op (required by JsonListener interface)
- *   - whitespace():             No-op (required by JsonListener interface)
  */
 
 #pragma once
@@ -98,8 +87,7 @@
 #include <string>
 #include <cstdlib>
 
-#include <JsonStreamingParser.h>
-#include <JsonListener.h>
+#include "IWeatherDataProvider.hpp"
 #include <freertos/semphr.h>
 
 class Application;
@@ -115,7 +103,7 @@ class WeatherModule : public ITickable,
                       public IDataSource, 
                       public IMCPContributor,
                       public IPreconditionContributor,
-                      public JsonListener
+                      public IWeatherDataProvider
                       {
 private:
 #ifdef WITH_HOMEASSISTANT
@@ -166,27 +154,7 @@ private:
     char _country[8] = "";                    ///< Location country code (mutex-protected)
     SemaphoreHandle_t _dataMutex = nullptr;   ///< FreeRTOS mutex guarding string field writes
 
-    // F19: JsonListener scratch buffers — fixed char[] instead of std::string.
-    // Used only within fetchUpdate() task context (single-threaded).
-    // Sizes match the expected max field lengths from the OWM JSON response.
-    char _currentKey[32] = "";                ///< Current JSON key during streaming parse
-    char _parsedTemp[16] = "";                ///< Scratch: parsed temperature value
-    char _parsedWind[16] = "";                ///< Scratch: parsed wind speed value
-    char _parsedCond[32] = "";                ///< Scratch: parsed weather condition
-    char _parsedHumidity[8] = "";             ///< Scratch: parsed humidity value
-    char _parsedPressure[8] = "";             ///< Scratch: parsed pressure value
-    char _parsedFeelsLike[16] = "";           ///< Scratch: parsed feels-like temperature
-    char _parsedTempMin[16] = "";             ///< Scratch: parsed daily minimum temperature
-    char _parsedTempMax[16] = "";             ///< Scratch: parsed daily maximum temperature
-    char _parsedVisibility[8] = "";           ///< Scratch: parsed visibility value
-    char _parsedWindDeg[8] = "";              ///< Scratch: parsed wind direction
-    char _parsedClouds[8] = "";               ///< Scratch: parsed cloud coverage
-    char _parsedCityName[64] = "";            ///< Scratch: parsed city name
-    char _parsedCountry[8] = "";              ///< Scratch: parsed country code
-    char _parsedSunrise[16] = "";             ///< Scratch: parsed sunrise epoch
-    char _parsedSunset[16] = "";              ///< Scratch: parsed sunset epoch
-    char _parsedIcon[8] = "";                 ///< Scratch: parsed OWM icon code
-    int _weatherArrayDepth = 0;               ///< Nesting depth tracker for "weather" JSON array
+    // (Scratch buffers removed as part of ArduinoJson migration)
 
 public:
     /** @brief Constructs the WeatherModule — configures HA sensor metadata and creates the data mutex. */
@@ -226,50 +194,50 @@ public:
     // --- Data Accessors (H3: Thread-safe getters) ---
 
     /** @brief Returns true once the first successful weather parse has completed. */
-    bool hasData() const { return _hasData.load(std::memory_order_acquire); }
+    bool hasData() const override { return _hasData.load(std::memory_order_acquire); }
 
     /** @brief Returns the current temperature via atomic load. */
-    float getTemperature() const { return _temperature.load(std::memory_order_acquire); }
+    float getTemperature() const override { return _temperature.load(std::memory_order_acquire); }
 
     /** @brief Returns the current wind speed via atomic load. */
-    float getWindSpeed() const { return _windSpeed.load(std::memory_order_acquire); }
+    float getWindSpeed() const override { return _windSpeed.load(std::memory_order_acquire); }
 
     /** @brief Returns the current relative humidity percentage via atomic load. */
-    int getHumidity() const { return _humidity.load(std::memory_order_acquire); }
+    int getHumidity() const override { return _humidity.load(std::memory_order_acquire); }
 
     /** @brief Returns the current barometric pressure in hPa via atomic load. */
-    int getPressure() const { return _pressure.load(std::memory_order_acquire); }
+    int getPressure() const override { return _pressure.load(std::memory_order_acquire); }
 
     /** @brief Returns the current apparent ("feels like") temperature via atomic load. */
-    float getFeelsLike() const { return _feelsLike.load(std::memory_order_acquire); }
+    float getFeelsLike() const override { return _feelsLike.load(std::memory_order_acquire); }
 
     /** @brief Returns the daily minimum temperature via atomic load. */
-    float getTempMin() const { return _tempMin.load(std::memory_order_acquire); }
+    float getTempMin() const override { return _tempMin.load(std::memory_order_acquire); }
 
     /** @brief Returns the daily maximum temperature via atomic load. */
-    float getTempMax() const { return _tempMax.load(std::memory_order_acquire); }
+    float getTempMax() const override { return _tempMax.load(std::memory_order_acquire); }
 
     /** @brief Returns the visibility distance in metres via atomic load. */
-    int getVisibility() const { return _visibility.load(std::memory_order_acquire); }
+    int getVisibility() const override { return _visibility.load(std::memory_order_acquire); }
 
     /** @brief Returns the wind direction in degrees via atomic load. */
-    int getWindDeg() const { return _windDeg.load(std::memory_order_acquire); }
+    int getWindDeg() const override { return _windDeg.load(std::memory_order_acquire); }
 
     /** @brief Returns the cloud coverage percentage via atomic load. */
-    int getClouds() const { return _clouds.load(std::memory_order_acquire); }
+    int getClouds() const override { return _clouds.load(std::memory_order_acquire); }
 
     /** @brief Returns the sunrise time as a UTC epoch timestamp via atomic load. */
-    uint32_t getSunrise() const { return _sunrise.load(std::memory_order_acquire); }
+    uint32_t getSunrise() const override { return _sunrise.load(std::memory_order_acquire); }
 
     /** @brief Returns the sunset time as a UTC epoch timestamp via atomic load. */
-    uint32_t getSunset() const { return _sunset.load(std::memory_order_acquire); }
+    uint32_t getSunset() const override { return _sunset.load(std::memory_order_acquire); }
 
     /**
      * @brief Returns the configured temperature units string ("metric" or "imperial").
      *
      * Returns by value.
      */
-    std::string getUnits() const {
+    std::string getUnits() const override {
         char buf[16];
         if (xSemaphoreTake(_dataMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
             strlcpy(buf, _units, sizeof(buf));
@@ -284,7 +252,7 @@ public:
      * @brief Returns the current weather condition string under mutex protection.
      * @return A copy of the condition string, or empty string if mutex acquisition fails.
      */
-    std::string getCondition() const {
+    std::string getCondition() const override {
         std::string result;
         if (xSemaphoreTake(_dataMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
             result = _condition;
@@ -297,7 +265,7 @@ public:
      * @brief Returns the OWM weather icon code under mutex protection.
      * @return A copy of the icon code string, or empty string if mutex acquisition fails.
      */
-    std::string getIcon() const {
+    std::string getIcon() const override {
         std::string result;
         if (xSemaphoreTake(_dataMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
             result = _icon;
@@ -310,7 +278,7 @@ public:
      * @brief Returns the weather location city name under mutex protection.
      * @return A copy of the city name string, or empty string if mutex acquisition fails.
      */
-    std::string getCityName() const {
+    std::string getCityName() const override {
         std::string result;
         if (xSemaphoreTake(_dataMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
             result = _cityName;
@@ -323,7 +291,7 @@ public:
      * @brief Returns the weather location country code under mutex protection.
      * @return A copy of the country code string, or empty string if mutex acquisition fails.
      */
-    std::string getCountry() const {
+    std::string getCountry() const override {
         std::string result;
         if (xSemaphoreTake(_dataMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
             result = _country;
@@ -433,43 +401,4 @@ public:
     /** @brief Register preconditions. */
     void registerPreconditions(IPreconditionRegistry& reg) override;
 
-    // --- JsonListener (hardware only — parser library unavailable in native builds) ---
-    /** @brief No-op — required by JsonListener interface. */
-    void whitespace(char c) override {}
-
-    /** @brief Zeros all parser scratch buffers at the start of a new JSON document. */
-    void startDocument() override;
-
-    /**
-     * @brief Records the current JSON key for subsequent value dispatch.
-     * @param key  The JSON key string from the streaming parser.
-     */
-    void key(String key) override;
-
-    /**
-     * @brief Dispatches a JSON value to the appropriate scratch buffer based on the current key.
-     * @param value  The JSON value string from the streaming parser.
-     */
-    void value(String value) override;
-
-    /** @brief Decrements the weather array depth tracker on array exit. */
-    void endArray() override;
-
-    /** @brief No-op — required by JsonListener interface. */
-    void endObject() override {}
-
-    /**
-     * @brief Parses scratch buffers into typed atomic/mutex-protected fields.
-     *
-     * Converts string scratch buffers to numeric types, writes to atomic fields,
-     * copies string fields under mutex protection, publishes HA sensor states,
-     * and fires the "weather.updated" EventBus notification.
-     */
-    void endDocument() override;
-
-    /** @brief Increments the weather array depth tracker on array entry. */
-    void startArray() override;
-
-    /** @brief No-op — required by JsonListener interface. */
-    void startObject() override {}
 };

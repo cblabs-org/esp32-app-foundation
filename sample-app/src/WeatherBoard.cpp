@@ -25,10 +25,10 @@
  * initialisation order fiasco — Application members may not be ready at
  * file-scope construction time.
  *
- * @param weatherModule  Pointer to the WeatherModule providing thread-safe data getters.
+ * @param dataProvider  Pointer to the IWeatherDataProvider providing thread-safe data getters.
  */
-WeatherBoard::WeatherBoard(WeatherModule* weatherModule)
-    : _weatherModule(weatherModule) {
+WeatherBoard::WeatherBoard(IWeatherDataProvider* dataProvider)
+    : _dataProvider(dataProvider) {
     // EventBus wiring is deferred to wireEventBus() — see comment there.
     // WeatherWidget member is default-constructed with its owned LabelWidgets.
 }
@@ -94,7 +94,7 @@ void WeatherBoard::onWeatherUpdated(const char* topic, const void* data, void* c
 /**
  * @brief Renders the weather display using WeatherWidget::draw().
  *
- * Reads the current temperature and condition from WeatherModule's thread-safe
+ * Reads the current temperature and condition from IWeatherDataProvider's thread-safe
  * getters (H3: atomic loads and mutex-protected string copies), formats the
  * temperature as a display string using snprintf into a stack buffer (F10),
  * and delegates the actual drawing to WeatherWidget::draw().
@@ -113,16 +113,16 @@ void WeatherBoard::render(U8G2& u8g2) {
     // appropriate display suffix. Convert the float temperature to a formatted
     // stack-buffer string (F10 — no heap alloc in render path).
     const char* unitSuffix = "°C";
-    if (_weatherModule) {
-        std::string units = _weatherModule->getUnits();
+    if (_dataProvider) {
+        std::string units = _dataProvider->getUnits();
         if (units == "imperial") {
             unitSuffix = "°F";
         }
 
         char buf[16];
-        snprintf(buf, sizeof(buf), "%.1f", _weatherModule->getTemperature());
+        snprintf(buf, sizeof(buf), "%.1f", _dataProvider->getTemperature());
         tempStr = buf;
-        condStr = _weatherModule->getCondition();
+        condStr = _dataProvider->getCondition();
     }
 
     // --- Step 3: Delegate rendering to WeatherWidget ---
