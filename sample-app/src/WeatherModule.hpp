@@ -23,8 +23,6 @@
  *   - ~WeatherModule():         Destructor — releases FreeRTOS mutex
  *   - begin():                  ADR-39 transient service locator wiring  [ITickable lifecycle]
  *   - wireHomeAssistant():      Deferred HA entity registration (post app.begin())
- *   - onWifiConnected():        Static EventBus callback — updates WiFi connected state
- *   - onWifiDisconnected():     Static EventBus callback — updates WiFi disconnected state
  *
  *   Data Accessors:
  *   - hasData():                Returns true once first successful parse completes
@@ -47,7 +45,7 @@
  *   - getCountry():             Thread-safe mutex-protected getter — location country code
  *
  *   ITickable:
- *   - tick():                   Periodic update hook (intentionally empty — delegates to DataManager)
+ *   - tick():                   Periodic update hook (drains _publishPending)
  *
  *   IConfigurable ("weather"):
  *   - getConfigNamespace():     Returns "weather" — LittleFS config partition key
@@ -131,7 +129,8 @@ private:
     double _lon = 0.0;                        ///< Configured longitude for weather query
     uint32_t _pollingIntervalMs = 600000;     ///< Fetch interval in ms (default: 10 minutes)
 
-    std::string _units = "metric";            ///< Temperature units: "metric" (°C) or "imperial" (°F)
+    char _units[16] = "metric";               ///< Temperature units: "metric" (°C) or "imperial" (°F)
+    std::atomic<bool> _publishPending{false}; ///< True when a new weather update needs to be published on the main thread
 
 #ifdef WITH_HOMEASSISTANT
     // H2: Static member allocation — no bare new
@@ -145,7 +144,6 @@ private:
     // cross-thread reads. Condition is a variable-length string — use a
     // fixed char buffer protected by a FreeRTOS mutex.
     std::atomic<bool> _hasData{false};                     ///< True after first successful parse
-    std::atomic<bool> _wifiConnected{false};               ///< True when station has an active IP connection
     std::atomic<UpdateStatus> _lastFetchStatus{UpdateStatus::NoChange}; ///< Last fetch result code
     std::atomic<float> _temperature{0.0f};                 ///< Current temperature (atomic)
     std::atomic<float> _windSpeed{0.0f};                   ///< Current wind speed (atomic)
@@ -221,21 +219,6 @@ public:
 
     // --- EventBus Callbacks ---
 
-    /**
-     * @brief EventBus callback: updates WiFi connected state on connection.
-     * @param topic    Event topic ("wifi.connected").
-     * @param payload  Event payload (unused).
-     * @param ctx      Opaque context pointer (WeatherModule instance).
-     */
-    static void onWifiConnected(const char* topic, const void* payload, void* ctx);
-
-    /**
-     * @brief EventBus callback: updates WiFi connected state on disconnection.
-     * @param topic    Event topic ("wifi.disconnected").
-     * @param payload  Event payload (unused).
-     * @param ctx      Opaque context pointer (WeatherModule instance).
-     */
-    static void onWifiDisconnected(const char* topic, const void* payload, void* ctx);
 
 
     // --- Data Accessors (H3: Thread-safe getters) ---
@@ -282,11 +265,18 @@ public:
     /**
      * @brief Returns the configured temperature units string ("metric" or "imperial").
      *
-     * Returns by value. Config writes (applyConfig) and data reads (fetchUpdate)
-     * may race on _units, but SSO guarantees atomicity for short strings like
-     * "metric"/"imperial".
+     * Returns by value.
      */
-    const std::string& getUnits() const { return _units; }
+    std::string getUnits() const {
+        char buf[16];
+        if (xSemaphoreTake(_dataMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
+            strlcpy(buf, _units, sizeof(buf));
+            xSemaphoreGive(_dataMutex);
+        } else {
+            strlcpy(buf, "metric", sizeof(buf));
+        }
+        return std::string(buf);
+    }
 
     /**
      * @brief Returns the current weather condition string under mutex protection.

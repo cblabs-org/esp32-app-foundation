@@ -20,6 +20,7 @@
  *   direct kernel include (not re-exported by the facade)
  * - F12: REST handlers use stack-allocated char[] buffers (no Arduino String)
  * - F19: JSON parser scratch fields are fixed char[] (no std::string)
+ * - C2: Thread safety fixes applied (_units char array, _publishPending)
  */
 
 #include "WeatherModule.hpp"
@@ -30,7 +31,6 @@
 #include <ArduinoJson.h>
 
 #include <PsychicHttp.h>
-#include <WiFiClientSecure.h>
 #include <HTTPClient.h>
 
 // Portal tab script: the JS source lives in this app's web/weather.js and is
@@ -99,42 +99,9 @@ void WeatherModule::begin(Application& app) {
     _configManager = &app.getConfigManager();
     _dataManager   = &app.getDataManager();
 
-    if (_eventBus) {
-        _eventBus->subscribe("wifi.connected", onWifiConnected, this);
-        _eventBus->subscribe("wifi.disconnected", onWifiDisconnected, this);
-    }
-
     // NOTE: HomeAssistant is NOT available here — _haModule is nullptr
     // until app.begin() allocates it. HA entity registration is deferred
     // to wireHomeAssistant(), called from main.cpp after app.begin().
-}
-
-/**
- * @brief EventBus callback: updates WiFi connectivity state on connection.
- * @param topic    The event topic string ("wifi.connected").
- * @param payload  Event payload (unused).
- * @param ctx      Opaque context pointer (WeatherModule instance).
- */
-void WeatherModule::onWifiConnected(const char* topic, const void* payload, void* ctx) {
-    (void)topic;
-    (void)payload;
-    if (ctx) {
-        static_cast<WeatherModule*>(ctx)->_wifiConnected.store(true, std::memory_order_release);
-    }
-}
-
-/**
- * @brief EventBus callback: updates WiFi connectivity state on disconnection.
- * @param topic    The event topic string ("wifi.disconnected").
- * @param payload  Event payload (unused).
- * @param ctx      Opaque context pointer (WeatherModule instance).
- */
-void WeatherModule::onWifiDisconnected(const char* topic, const void* payload, void* ctx) {
-    (void)topic;
-    (void)payload;
-    if (ctx) {
-        static_cast<WeatherModule*>(ctx)->_wifiConnected.store(false, std::memory_order_release);
-    }
 }
 
 /**
@@ -165,8 +132,39 @@ void WeatherModule::wireHomeAssistant(HomeAssistantModule& ha) {
  * @param currentMillis  Current system uptime in milliseconds (unused).
  */
 void WeatherModule::tick(uint32_t currentMillis) {
-    // Fast, non-blocking tick. Background fetching is handled by IDataSource in DataManager.
     (void)currentMillis;
+    if (_publishPending.exchange(false, std::memory_order_acq_rel)) {
+        #ifdef WITH_HOMEASSISTANT
+        // Publish sensor states to HA from the main thread
+        char buf[16];
+        float temp = _temperature.load(std::memory_order_acquire);
+        snprintf(buf, sizeof(buf), "%.1f", temp);
+        _tempSensor.setState(buf);
+        if (_ha) _ha->publishState(&_tempSensor);
+
+        float wind = _windSpeed.load(std::memory_order_acquire);
+        snprintf(buf, sizeof(buf), "%.1f", wind);
+        _windSensor.setState(buf);
+        if (_ha) _ha->publishState(&_windSensor);
+
+        // Condition string needs mutex
+        char condBuf[64];
+        if (xSemaphoreTake(_dataMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
+            strlcpy(condBuf, _condition, sizeof(condBuf));
+            xSemaphoreGive(_dataMutex);
+        } else {
+            condBuf[0] = '\0';
+        }
+        if (condBuf[0] != '\0') {
+            _condSensor.setState(condBuf);
+            if (_ha) _ha->publishState(&_condSensor);
+        }
+        #endif
+
+        if (_eventBus) {
+            _eventBus->publish("weather.updated");
+        }
+    }
 }
 
 /**
@@ -181,7 +179,12 @@ void WeatherModule::applyConfig(const JsonObject& config) {
     _lat = config["lat"] | 0.0;
     _lon = config["lon"] | 0.0;
     _pollingIntervalMs = config["interval"] | 600000;
-    _units = config["units"] | "metric";
+    
+    const char* units = config["units"] | "metric";
+    if (xSemaphoreTake(_dataMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
+        strlcpy(_units, units, sizeof(_units));
+        xSemaphoreGive(_dataMutex);
+    }
 }
 
 /**
@@ -196,7 +199,15 @@ void WeatherModule::serializeConfig(JsonObject& config) const {
     config["lat"] = _lat;
     config["lon"] = _lon;
     config["interval"] = _pollingIntervalMs;
-    config["units"] = _units;
+    
+    char localUnits[16];
+    if (xSemaphoreTake(_dataMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
+        strlcpy(localUnits, _units, sizeof(localUnits));
+        xSemaphoreGive(_dataMutex);
+    } else {
+        strlcpy(localUnits, "metric", sizeof(localUnits));
+    }
+    config["units"] = localUnits;
 }
 
 /**
@@ -209,7 +220,10 @@ void WeatherModule::resetConfig() {
     _lat = 0.0;
     _lon = 0.0;
     _pollingIntervalMs = 600000;
-    _units = "metric";
+    if (xSemaphoreTake(_dataMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
+        strlcpy(_units, "metric", sizeof(_units));
+        xSemaphoreGive(_dataMutex);
+    }
 }
 
 /**
@@ -229,7 +243,7 @@ void WeatherModule::registerRoutes(PsychicHttpServer& server) {
         doc["lat"] = _lat;
         doc["lon"] = _lon;
         doc["interval"] = _pollingIntervalMs;
-        doc["units"] = _units;
+        doc["units"] = getUnits();
         
         bool hasApiKey = false;
         if (_keyManager && !_keyManager->getKeyById("owm_api_key").empty()) {
@@ -259,7 +273,12 @@ void WeatherModule::registerRoutes(PsychicHttpServer& server) {
         if (doc["lat"].is<double>()) _lat = doc["lat"].as<double>();
         if (doc["lon"].is<double>()) _lon = doc["lon"].as<double>();
         if (doc["interval"].is<uint32_t>()) _pollingIntervalMs = doc["interval"].as<uint32_t>();
-        if (doc["units"].is<const char*>()) _units = doc["units"].as<const char*>();
+        if (doc["units"].is<const char*>()) {
+            if (xSemaphoreTake(_dataMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
+                strlcpy(_units, doc["units"].as<const char*>(), sizeof(_units));
+                xSemaphoreGive(_dataMutex);
+            }
+        }
 
         if (doc["apiKey"].is<const char*>() && _keyManager) {
             const char* apiKey = doc["apiKey"].as<const char*>();
@@ -283,7 +302,7 @@ void WeatherModule::registerRoutes(PsychicHttpServer& server) {
         JsonDocument doc;
         doc["hasData"] = hasData();
         doc["status"] = static_cast<int>(_lastFetchStatus.load(std::memory_order_acquire));
-        doc["units"] = _units;
+        doc["units"] = getUnits();
         
         if (hasData()) {
             doc["temperature"] = getTemperature();
@@ -331,14 +350,6 @@ void WeatherModule::registerRoutes(PsychicHttpServer& server) {
  * @return UpdateStatus indicating success, error type, or rate limiting.
  */
 UpdateStatus WeatherModule::fetchUpdate(const FetchContext& ctx) {
-    // WiFi connectivity gate — don't attempt network I/O without a connection.
-    // Skipped (not NoChange) tells DataManager we didn't even try, so health
-    // tracking stays honest. Pattern: DraytonWiserController/WiserApiModule.cpp.
-    if (_eventBus && !_wifiConnected.load(std::memory_order_acquire)) {
-        _lastFetchStatus.store(UpdateStatus::Skipped, std::memory_order_release);
-        return UpdateStatus::Skipped;
-    }
-
     // --- Step 1: Validate credentials (API key check) ---
     // Retrieve the OWM API key from KeyManager. If absent, return AuthError
     // immediately — no point making a network request without credentials.
@@ -354,11 +365,19 @@ UpdateStatus WeatherModule::fetchUpdate(const FetchContext& ctx) {
 
     // --- Step 2: Build URL and allocate TLS client ---
     // Construct the OWM API URL with lat/lon/key/units parameters.
+    char localUnits[16];
+    if (xSemaphoreTake(_dataMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
+        strlcpy(localUnits, _units, sizeof(localUnits));
+        xSemaphoreGive(_dataMutex);
+    } else {
+        strlcpy(localUnits, "metric", sizeof(localUnits));
+    }
+    
     char url[256];
     snprintf(url, sizeof(url), "https://api.openweathermap.org/data/2.5/weather?lat=%f&lon=%f&appid=%s&units=%s",
-             _lat, _lon, apiKey.c_str(), _units.c_str());
+             _lat, _lon, apiKey.c_str(), localUnits);
 
-    ESP_LOGI("WeatherModule", "Fetching weather from OWM: lat=%f, lon=%f, units=%s", _lat, _lon, _units.c_str());
+    ESP_LOGI("WeatherModule", "Fetching weather from OWM: lat=%f, lon=%f, units=%s", _lat, _lon, localUnits);
 
 #ifdef ESP_PLATFORM
     if (!ctx.client) {
@@ -409,14 +428,9 @@ UpdateStatus WeatherModule::fetchUpdate(const FetchContext& ctx) {
 
     ESP_LOGI("WeatherModule", "Streaming and parsing %d bytes...", len);
 
-    // Absolute timeout guard — prevents indefinite blocking if the server
-    // stalls mid-stream (e.g. keeps the connection open but stops sending data).
-    const uint32_t streamStartMs = millis();
-    const uint32_t kStreamTimeoutMs = 30000; // 30 seconds
-
     while (http.connected() && (len > 0 || len == -1)) {
         // Check absolute timeout
-        if (ctx.deadline.isExpired() || (millis() - streamStartMs) > kStreamTimeoutMs) {
+        if (ctx.deadline.isExpired()) {
             ESP_LOGE("WeatherModule", "Stream timeout or context expired — aborting parse");
             http.end();
             _lastFetchStatus.store(UpdateStatus::FetchError, std::memory_order_release);
@@ -575,26 +589,11 @@ void WeatherModule::endDocument() {
         float temp = std::strtof(_parsedTemp, nullptr);
         // H3: Store via atomic for thread-safe cross-task access
         _temperature.store(temp, std::memory_order_release);
-
-        // Publish numeric value as string state to HA sensor
-        char buf[16];
-        snprintf(buf, sizeof(buf), "%.1f", temp);
-#ifdef WITH_HOMEASSISTANT
-        _tempSensor.setState(buf);
-        if (_ha) _ha->publishState(&_tempSensor);
-#endif
         updated = true;
     }
     if (_parsedWind[0] != '\0') {
         float wind = std::strtof(_parsedWind, nullptr);
         _windSpeed.store(wind, std::memory_order_release);
-
-        char buf[16];
-        snprintf(buf, sizeof(buf), "%.1f", wind);
-#ifdef WITH_HOMEASSISTANT
-        _windSensor.setState(buf);
-        if (_ha) _ha->publishState(&_windSensor);
-#endif
         updated = true;
     }
     if (_parsedHumidity[0] != '\0') _humidity.store(std::atoi(_parsedHumidity), std::memory_order_release);
@@ -619,13 +618,6 @@ void WeatherModule::endDocument() {
             if (_parsedCountry[0] != '\0') strlcpy(_country, _parsedCountry, sizeof(_country));
             xSemaphoreGive(_dataMutex);
         }
-
-        if (_parsedCond[0] != '\0') {
-#ifdef WITH_HOMEASSISTANT
-            _condSensor.setState(_parsedCond);
-            if (_ha) _ha->publishState(&_condSensor);
-#endif
-        }
         updated = true;
     }
 
@@ -634,9 +626,7 @@ void WeatherModule::endDocument() {
     // carousel listens for this event to trigger board refreshes.
     if (updated) {
         _hasData.store(true, std::memory_order_release);
-        if (_eventBus) {
-            _eventBus->publish("weather.updated");
-        }
+        _publishPending.store(true, std::memory_order_release);
     }
 }
 
@@ -681,6 +671,7 @@ void WeatherModule::registerMCPTools(MCPToolRegistry& registry) {
         this,
         false  // mutatesState = false (read-only)
     );
+    ESP_LOGI("WeatherModule", "MCP tools registered: weather_status");
 }
 
 // -----------------------------------------------------------------------------
