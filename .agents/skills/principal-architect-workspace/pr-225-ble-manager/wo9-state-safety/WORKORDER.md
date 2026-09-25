@@ -69,3 +69,40 @@ Out-of-boundary defects go under *Out-of-Scope Findings* in your Completion Repo
 ---
 ## Completion Report
 <!-- Written by the worker at task completion; append below using the template. -->
+
+### Status
+Complete. All line-item instructions implemented; all verification steps pass.
+
+### Changes Made
+- `modules/BLEManager/BLEManager.hpp`: added `std::atomic<bool> _configDirty{false}` member (documented as set under `_stateMutex`, flushed after the lock is released).
+- `modules/BLEManager/BLEManager.cpp`:
+  - `tick()`: entire body now runs under `auto guard = lockState();` in an inner scope; after the scope closes (lock released), flush `if (_configDirty.exchange(false)) { #if ESP_PLATFORM saveModuleConfig #endif }`. The pre-existing `lockState()` inside `dispatchQueueEvents()` is kept (recursive mutex makes it safe/redundant) with a comment explaining why.
+  - `applyConfig()`, `serializeConfig()` (const, uses the already-`mutable` `_stateMutex`), `resetConfig()`: each now takes `lockState()` at entry.
+  - `resetConfig()`: after `_config = BLEConfig()`, sets `_config.advertisedName = _defaultAdvertisedName;` (issue #232 fix).
+  - `registerPreconditions()`: added `lockState()` inside the "BLE Stack" evaluator (reads `_state`/`_providerRegistrationFault`), the "BLE Advertising" evaluator (reads `_advPackResult`), and the per-client-provider evaluator (reads registry/`isClientConnected`/`_reconnectPolicies`).
+  - `pair()`: replaced the direct `saveModuleConfig()` call with `_configDirty = true;` (pair() is always called under the lock already, from the `ble_pair`/REST handlers).
+  - `forget()`: reordered so the `WorkerCommand` (including the address copy for NVS bond deletion) is built first, then — synchronously, before `xQueueSend` — erases `_clientConnected`, `_clientConnecting`, `_reconnectPolicies` **and now also `_deviceRegistry`**, and sets `_configDirty = true`. This is the R9 fix: the "ensure policies start" block and the reconnect scheduler in `tick()` both gate on `_deviceRegistry.get(pid, ...)`, so removing the registry entry synchronously — not just the reconnect bookkeeping — is what actually prevents a `tick()` that runs before the worker processes `Forget` from recreating/restarting a policy and queuing a `Connect` behind the in-flight `Forget`.
+  - `dispatchQueueEvents()` `CentralConnected` handler: bond-update `saveModuleConfig()` call replaced with `_configDirty = true;`.
+  - `dispatchQueueEvents()` `DeviceForgotten` handler: `saveModuleConfig()` call replaced with `_configDirty = true;`; comment updated to note the registry/bookkeeping erases are now idempotent (already done synchronously in `forget()`).
+- `test/test_unit/test_bleManager/test_bleManagerCentral.cpp`: added `BLEManagerCentralTest.ForgetClosesReconnectRaceImmediately` — pairs a device on a real `BLEManager` with a registered `IBLEClientProvider`, forgets it, asserts `getStoredDevice()` is false immediately (before any `tick()`), then ticks once and asserts no reconnect policy was (re)started for the forgotten provider (absent, or phase `Idle`).
+- `test/test_unit/test_bleManager/test_bleConfig.cpp`: added `BLEConfigTest.ResetConfigRestoresAppDefaultName` — sets a custom default name via `setDefaultAdvertisedName("Foo")`, changes the persisted name via `applyConfig()`, calls `resetConfig()`, and asserts the name reverts to `"Foo"` (not `"ESP32"`).
+- Verified (item c, no new test needed): `BLEConfigTest.SerializationRoundTrip` (pre-existing) already exercises the `applyConfig()`/`serializeConfig()` round-trip and still passes with both functions now locking.
+
+### Decisions Made
+- Kept the `lockState()` call inside `dispatchQueueEvents()` rather than removing it, since the mutex is recursive and the call documents/enforces that `dispatchQueueEvents()` is itself safe to call directly (it's implicitly `private` but called only from `tick()` today — kept as defense-in-depth per the WORKORDER's stated option).
+- `forget()` now does the registry removal itself (a private-state mutation), rather than routing it through a helper — kept the diff minimal and consistent with how `_clientConnected`/`_clientConnecting`/`_reconnectPolicies` were already erased in the same function.
+- Did not add a std::mutex-based "hasPolicy" assert to a hard `EXPECT_FALSE` in the new race test — used a conditional (`if (hasPolicy) EXPECT_EQ(... Idle)`) because the WORKORDER's acceptance text explicitly allows either "absent, or phase Idle", and the current implementation actually leaves it absent (the registry gate prevents policy creation entirely), so the conditional is future-proofing against a legitimate alternate implementation, not a weakening of this test.
+- No multi-threaded/concurrency test was written, per the WORKORDER's explicit instruction ("Don't try to unit-test real multi-threading; say so in the report"). All new coverage is single-threaded, exercising the synchronous-ordering guarantee (registry gone before `forget()` returns) rather than true concurrent access.
+
+### Dead Ends & Warnings
+- None. The change was mechanical once the lock/flush boundary was decided; no dead ends encountered.
+
+### Out-of-Scope Findings
+- `_discovery.results.clear()` (`stopDiscovery()`, called from `startDiscovery()`/`inhibitScanning()`) and `_pauseReason.clear()` (`pause()`) are containers/state mutated outside `_stateMutex` in some call paths. They weren't in the WORKORDER's named lock-scope list (`_reconnectPolicies`, `_state`, `_advPackResult`, `isClientConnected`, registry) and weren't flagged in the PA's Background section, so left untouched per the Strict Boundary Box — flagging for a future review pass in case `_discovery`/`_pauseReason` also need `_stateMutex` coverage.
+- `registerPreconditions()`'s per-provider evaluator does `const_cast<BLEManager*>(this)->_reconnectPolicies[pid]` to get a non-const reference from a `const`-context lambda capture pattern; this now happens inside the newly-added `lockState()` in that lambda, so it's correctly synchronized, but the `const_cast` pattern itself is pre-existing and outside this WORKORDER's scope to change.
+
+### Blockers
+None.
+
+---
+
