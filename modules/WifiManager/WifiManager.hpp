@@ -127,7 +127,7 @@ private:
     };
 
     // --- Connection policy timings (#236) ---
-    static constexpr uint32_t STA_ATTEMPT_TIMEOUT_MS   = 15000;    ///< Per-attempt STA connect timeout
+    static constexpr uint32_t STA_ATTEMPT_TIMEOUT_MS   = 30000;    ///< Per-attempt STA connect timeout (30 s; 15 s was too short with BLE coex — dev.81)
     static constexpr uint32_t STA_LINK_LOSS_GRACE_MS   = 10000;    ///< Grace after link loss before the first reconnect attempt
     static constexpr uint32_t FALLBACK_AP_DELAY_MS     = 180000;   ///< Continuous STA downtime before the fallback AP starts (matches isWifiPersistentError())
     static constexpr uint32_t AP_INACTIVITY_TIMEOUT_MS = 3600000;  ///< Portal inactivity before the AP is dropped

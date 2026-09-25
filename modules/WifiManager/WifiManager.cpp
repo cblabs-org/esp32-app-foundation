@@ -217,18 +217,17 @@ void WifiManager::begin() {
 /**
  * @brief Apply the Wi-Fi power-save mode.
  *
- * ESP-IDF Wi-Fi/BT coexistence requires modem sleep while Bluetooth is
- * enabled (the Wi-Fi library logs "Should enable WiFi modem sleep when both
- * WiFi and Bluetooth are enabled" otherwise, and association becomes
- * unreliable under BLE load — #236). Non-BT builds keep WIFI_PS_NONE for
- * lowest latency, unchanged.
+ * Always WIFI_PS_NONE.  WO-10 originally set WIFI_PS_MIN_MODEM on BLE
+ * builds (the ESP-IDF logs "Should enable WiFi modem sleep when both WiFi
+ * and Bluetooth are enabled"), but on congested 2.4 GHz networks modem
+ * sleep causes the radio to miss 802.11 auth response frames, leading to
+ * persistent AUTH_EXPIRE failures (dev.81 regression).  The hardware
+ * coexistence arbiter (CONFIG_ESP_COEX_SW_COEXIST_ENABLE) handles BLE/WiFi
+ * time-sharing independently of the power-save mode.  For always-powered
+ * devices there is no battery benefit to modem sleep.
  */
 void WifiManager::applyPowerSave() {
-#if !defined(UNIT_TEST) && (defined(WITH_BLE) || (defined(CONFIG_BT_ENABLED) && CONFIG_BT_ENABLED))
-    WiFi.setSleep(WIFI_PS_MIN_MODEM);
-#else
     WiFi.setSleep(WIFI_PS_NONE);
-#endif
 }
 
 /**
