@@ -178,6 +178,9 @@ void WeatherModule::tick(uint32_t currentMillis) {
 void WeatherModule::applyConfig(const JsonObject& config) {
     _lat = config["lat"] | 0.0;
     _lon = config["lon"] | 0.0;
+    if (config.containsKey("lat") || config.containsKey("lon")) {
+        _locationConfigured = true;
+    }
     _pollingIntervalMs = config["interval"] | 600000;
     
     const char* units = config["units"] | "metric";
@@ -219,6 +222,7 @@ void WeatherModule::serializeConfig(JsonObject& config) const {
 void WeatherModule::resetConfig() {
     _lat = 0.0;
     _lon = 0.0;
+    _locationConfigured = false;
     _pollingIntervalMs = 600000;
     if (xSemaphoreTake(_dataMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
         strlcpy(_units, "metric", sizeof(_units));
@@ -358,7 +362,7 @@ UpdateStatus WeatherModule::fetchUpdate(const FetchContext& ctx) {
         _lastFetchStatus.store(UpdateStatus::AuthError, std::memory_order_release);
         return UpdateStatus::AuthError;
     }
-    if (_lat == 0.0 && _lon == 0.0) {
+    if (!_locationConfigured) {
         _lastFetchStatus.store(UpdateStatus::Skipped, std::memory_order_release);
         return UpdateStatus::Skipped;
     }
@@ -679,34 +683,95 @@ void WeatherModule::registerMCPTools(MCPToolRegistry& registry) {
 // -----------------------------------------------------------------------------
 
 void WeatherModule::registerPreconditions(IPreconditionRegistry& reg) {
-    static const Edge edges[] = {
+    // Precondition 1: API Key — Startup, requires WiFi
+    static const Edge apiKeyEdges[] = {
         {PreconditionNames::WIFI_STATION, EdgeKind::Requires}
     };
-    reg.add("Weather Setup", PreconditionRole::Operational,
+    reg.add("Weather API Key", PreconditionRole::Startup,
         [this]() -> PreconditionStatus {
-            // §2.4: Indeterminate, not "return true"
             if (!_keyManager)
                 return {false, Cause::Indeterminate};
-
-            bool hasApiKey = !_keyManager->getKeyById("owm_api_key").empty();
-            bool hasLocation = (_lat != 0.0 || _lon != 0.0);
-
-            if (hasApiKey && hasLocation)
-                return {true, Cause::Met};
-            return {false, Cause::NotConfigured};
+            bool hasKey = !_keyManager->getKeyById("owm_api_key").empty();
+            return hasKey ? PreconditionStatus{true, Cause::Met}
+                          : PreconditionStatus{false, Cause::NotConfigured};
         },
         [](Cause c, char* buf, size_t len) {
             switch (c) {
                 case Cause::NotConfigured:
-                    snprintf(buf, len, "Set API key and location in Weather settings");
+                    snprintf(buf, len, "Enter your OpenWeatherMap API key in the Weather tab");
                     break;
                 case Cause::Indeterminate:
-                    snprintf(buf, len, "BUG: KeyManager not wired — call setKeyManager()");
+                    snprintf(buf, len, "BUG: KeyManager not wired — call begin(app)");
                     break;
                 default:
-                    snprintf(buf, len, "Weather setup incomplete");
+                    snprintf(buf, len, "Weather API key check");
                     break;
             }
         },
-        edges, 1);
+        apiKeyEdges, 1);
+
+    // Precondition 2: Location — Startup, requires WiFi
+    static const Edge locationEdges[] = {
+        {PreconditionNames::WIFI_STATION, EdgeKind::Requires}
+    };
+    reg.add("Weather Location", PreconditionRole::Startup,
+        [this]() -> PreconditionStatus {
+            return _locationConfigured
+                ? PreconditionStatus{true, Cause::Met}
+                : PreconditionStatus{false, Cause::NotConfigured};
+        },
+        [](Cause c, char* buf, size_t len) {
+            switch (c) {
+                case Cause::NotConfigured:
+                    snprintf(buf, len, "Set latitude and longitude in the Weather tab");
+                    break;
+                default:
+                    snprintf(buf, len, "Weather location check");
+                    break;
+            }
+        },
+        locationEdges, 1);
+
+    // Precondition 3: API connectivity — Operational, requires both config preconditions
+    // Note: This precondition uses name-based edges to the two Startup preconditions
+    // above. Because they are both Startup, they will block boot and appear on the
+    // configuring display. This Operational precondition degrades gracefully at runtime.
+    static const Edge apiEdges[] = {
+        {"Weather API Key", EdgeKind::Requires},
+        {"Weather Location", EdgeKind::Requires}
+    };
+    reg.add("Weather API", PreconditionRole::Operational,
+        [this]() -> PreconditionStatus {
+            if (!_hasData.load(std::memory_order_acquire)) {
+                UpdateStatus lastStatus = _lastFetchStatus.load(std::memory_order_acquire);
+                switch (lastStatus) {
+                    case UpdateStatus::AuthError:
+                        return {false, Cause::Rejected};
+                    case UpdateStatus::FetchError:
+                        return {false, Cause::Unreachable};
+                    case UpdateStatus::Skipped:
+                        return {false, Cause::Connecting};
+                    default:
+                        return {false, Cause::Connecting};
+                }
+            }
+            return {true, Cause::Met};
+        },
+        [](Cause c, char* buf, size_t len) {
+            switch (c) {
+                case Cause::Rejected:
+                    snprintf(buf, len, "API key rejected — check your OpenWeatherMap key");
+                    break;
+                case Cause::Unreachable:
+                    snprintf(buf, len, "Cannot reach OpenWeatherMap API — check internet");
+                    break;
+                case Cause::Connecting:
+                    snprintf(buf, len, "Waiting for first weather data fetch...");
+                    break;
+                default:
+                    snprintf(buf, len, "Weather API connectivity check");
+                    break;
+            }
+        },
+        apiEdges, 2);
 }

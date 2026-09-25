@@ -70,7 +70,8 @@
  *   - registerMCPTools():       Registers "weather_status" read-only MCP tool
  *
  *   IPreconditionContributor:
- *   - registerPreconditions():  Registers "Weather Setup" operational precondition
+ *   - registerPreconditions():  Registers three preconditions: "Weather API Key" (Startup),
+ *                               "Weather Location" (Startup), and "Weather API" (Operational).
  *
  *   JsonListener (hardware only):
  *   - startDocument():          Zeros all parser scratch buffers
@@ -127,6 +128,7 @@ private:
 
     double _lat = 0.0;                        ///< Configured latitude for weather query
     double _lon = 0.0;                        ///< Configured longitude for weather query
+    bool _locationConfigured = false;         ///< True if location has been configured
     uint32_t _pollingIntervalMs = 600000;     ///< Fetch interval in ms (default: 10 minutes)
 
     char _units[16] = "metric";               ///< Temperature units: "metric" (°C) or "imperial" (°F)
