@@ -392,3 +392,42 @@ The BLE controller's `NimBLEDevice::init()` on ESP32-S3 acquires cross-core heap
 
 ### Session — 2026-09-25 — WO-11 app-neutral cleanup
 **Summary:** The human flagged that consumer-app-specific material had leaked into this framework PR. An audit found the framework modules clean. The leaks were in the BLE tests (the consumer app name, and the invalid appearance 0x0491), one comment in the FTMS sample, and the PA review framing on the PR thread. WO-11 (haiku) neutralised the tests and sample with no logic change; bleManager passes 52/52 and a grep for the app name across code, tests, samples and docs is empty. A correction note was posted on the PR thread. PA planning docs were left as they are (human choice).
+### Session — 2026-09-25T12:20:00+01:00 — BLE Radio Hardening & WiFi Coexistence (dev.73–dev.80)
+
+**Summary:** Debugged and resolved BLE/WiFi radio coexistence failures. BLE connections were failing with GATT CONN TIMEOUT on Android, and WiFi was failing with AUTH_EXPIRE when BLE was active. Root-caused through systematic debugging, validated with 4 Mac CoreBluetooth connection cycles + HTTP/MCP portal verification.
+
+**Root causes found:**
+1. **Android GATT CONN TIMEOUT (Error 147/133):** Calling `updateConnParams()` immediately on `PeerConnected` collided with the central's MTU exchange and GATT service discovery. Fix: removed the call entirely; parameter negotiation deferred to post-MTU supervision timeout update.
+2. **WiFi AUTH_EXPIRE (reason 2):** `esp_coex_preference_set(ESP_COEX_PREFER_BALANCE)` reduced WiFi's RF arbitration priority below the ESP-IDF default (`PREFER_WIFI`). WiFi auth frames have a 1-second deadline and need priority. Fix: removed the `esp_coex_preference_set()` call entirely.
+3. **WiFi premature AP fallback:** The 15-second STA connection timeout was too short when 802.11 auth retries consumed 8-10 seconds on congested 2.4 GHz networks, leaving insufficient time for DHCP. Fix: increased to 30 seconds.
+
+**Cross-cutting decisions:**
+- **D12: Never call `esp_coex_preference_set()`** — the ESP-IDF default (`PREFER_WIFI`) is the only setting that works for simultaneous WiFi+BLE. Both `PREFER_BT` and `PREFER_BALANCE` were tested and failed.
+- **D13: BLE TX power +20 dBm is safe** — `NimBLEDevice::setPower(20, All)` sets only BLE power types (ADV, SCAN, DEFAULT), not WiFi TX power. The user approved aggressive power for always-powered devices.
+- **D14: Deferred conn params are the BLE stability mechanism** — not coexistence tuning. The supervision timeout update after MTU exchange (720ms → 4.0s) prevents macOS CoreBluetooth link drops.
+
+**Dead ends (project-wide):**
+- `PREFER_BT` starves WiFi entirely (portal unreachable).
+- `PREFER_BALANCE` still causes AUTH_EXPIRE during WiFi association — it's not "balanced" enough for WiFi auth frame timing.
+- `ble_svc_gap_ppcp_set()` is not available in the current NimBLE version — build failed, was reverted.
+
+**Commits:**
+- `65642996` (dev.75): Boost TX power +20 dBm, defer conn params
+- `22882ffc` (dev.76): Set PREFER_BT coexistence, 50ms advertising
+- `9c7ae368` (dev.77): Connection diagnostic logging, safe supervision timeout
+- `651b6eef` (dev.78): Revert to PREFER_BALANCE
+- `7521972f` (dev.79): Remove `esp_coex_preference_set()` entirely
+- `1f1dd207` (dev.80): Increase WiFi STA timeout 15s → 30s
+- `37b54f34`: Documentation (bluetooth.md + framework-expert SKILL.md)
+
+**Documentation added:**
+- `docs/developer/bluetooth.md` § Radio Settings & Physical Layer (TX power, coex, advertising interval, conn param safety, WiFi STA timeout)
+- `docs/developer/bluetooth.md` § Troubleshooting: 3 new entries (GATT CONN TIMEOUT, AUTH_EXPIRE, AP fallback)
+- `.agents/skills/framework-expert/SKILL.md`: 7 new Quick Answer entries for radio/WiFi/BLE settings
+- PR #235 review comment posted with full validation matrix
+
+**Validation (v0.0.12-dev.80 on ESP32-S3-Nano):**
+- WiFi STA: connected to `cb-iot`, IP 192.168.20.186, uptime 327s+
+- Portal: `/api/system`, `/api/tabs`, `/api/ble/status`, MCP `tools/list` all ✅
+- BLE: 4 Mac CoreBluetooth connect/disconnect cycles, MTU 185, FW version read, 3s hold stable, all clean disconnects (reason 0x213)
+- Serial: supervision timeout safely updated 720ms → 4.0s on every connection, zero GATT errors
