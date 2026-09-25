@@ -256,19 +256,29 @@ If you discover a defect, upstream bug, or concern *outside your boundary box*, 
 <!-- Written by the worker at task completion -->
 
 ### Status
-(pending)
+Completed. Build succeeded with zero errors.
 
 ### Changes Made
-(pending)
+- Created `IWeatherDataProvider.hpp` pure virtual interface.
+- Modified `WeatherModule.hpp` and `WeatherModule.cpp` to implement `IWeatherDataProvider`, removed `JsonListener` base and all parser scratch buffers/SAX callbacks.
+- Migrated `WeatherModule::fetchUpdate()` to use ArduinoJson v7 with `DeserializationFilter` for memory-efficient streaming parsing.
+- Refactored `WeatherBoard.hpp` and `WeatherBoard.cpp` to rely solely on `IWeatherDataProvider` instead of the concrete `WeatherModule`.
+- Added diagnostic logging at `_keyManager->getKeyById("owm_api_key")` call sites in `fetchUpdate` and `registerPreconditions`.
+- Removed `squix78/JsonStreamingParser` from `platformio.ini`.
 
 ### Decisions Made
-(pending)
+- Used the provided JSON DeserializationFilter snippet for exact parsing logic.
+- Maintained thread-safety mechanisms (atomics and mutex) unchanged, simply delegating them via the interface overrides.
 
 ### Dead Ends & Warnings
-(pending)
+- Hit an initial compilation error where `_city` was used instead of `_cityName` in the updated `fetchUpdate` string copy code. Fixed.
+- Corrected an invalid status `UpdateStatus::NewData` in the provided JSON snippet to `UpdateStatus::Success` during the rewrite.
 
 ### Out-of-Scope Findings
-(pending)
+**KeyManager API Limitations:**
+- `getKeyById()` returns a plain `std::string`, which is empty on both "not found" and "decryption error" scenarios. It provides no error codes.
+- There is no direct `hasKey()` method. However, `getKeyMetadata(const char* id, KeyInfo& outInfo)` can be used to check if an entry exists before attempting decryption.
+- To allow consumers to distinguish "not configured" from "decryption error", `KeyManager` could either return a `std::expected<std::string, ErrorCode>` / `std::optional<std::string>`, or consumers could query `getKeyMetadata` first to verify existence.
 
 ### Blockers
-(pending)
+None. Ready for user approval.
