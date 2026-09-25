@@ -1,5 +1,5 @@
 # Principal Architect Memory
-<!-- Last updated: 2026-09-24T22:36:00+01:00 -->
+<!-- Last updated: 2026-09-25T21:30:00+01:00 -->
 
 ## Active Programs
 | Program | Plan | Status |
@@ -9,7 +9,7 @@
 ## Active Projects
 | Project | Status | Modules | Context |
 |---|---|---|---|
-| pr-225-ble-manager | **PR #235 complete** (`v0.0.12-dev.80`). WO-0–WO-7 complete + radio hardening session (dev.73–dev.80). BLE+WiFi coexistence validated: 4 Mac CoreBluetooth connection cycles, portal HTTP+MCP verified. Docs updated (bluetooth.md § Radio Settings, SKILL.md +7 QAs). | BLEManager, BLEStack, BLESerialization, DeviceInfoServiceProvider, Application, SampleFtmsProvider, web/portal, WifiManager | [PROJECT.md](../pr-225-ble-manager/PROJECT.md) |
+| pr-225-ble-manager | **PR #235 ready for merge** (`v0.0.12-dev.82`). WO-0–WO-11 + WO-7 portal redesign + radio hardening + WiFi modem sleep fix. 15-min soak test: 29/29 HTTP, 7/8 BLE. WiFi 4s connect, BLE 4.5–15.8s. Android nRF Connect validated. | BLEManager, BLEStack, BLESerialization, DeviceInfoServiceProvider, Application, SampleFtmsProvider, web/portal, WifiManager | [PROJECT.md](../pr-225-ble-manager/PROJECT.md) |
 | sample-app-remediation | NEW — weather station sample app needs review: boot sequence, dependency mapping, config flow, DataManager usage vs post-Drayton framework APIs | sample-app/src/main.cpp, WeatherModule, DataManager, ConfigManager, web portal | (pending PROJECT.md creation) |
 | pr-drayton-consumer-fixes | WO5/5 — COMPLETE, soak-tested | DataManager, IDataSource, FetchContext, AppFoundation.h, WeatherModule, framework-expert skill | [PROJECT.md](../pr-drayton-consumer-fixes/PROJECT.md) |
 | pr-128-datamanager-resilience | WO7/7 (WO6 re-plan gated) | DataManager, IDataSource, FetchContext, Application, MCPServer, Display, Portal | [PROJECT.md](../pr-128-datamanager-resilience/PROJECT.md) |

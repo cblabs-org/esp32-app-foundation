@@ -3,7 +3,7 @@
 **Project:** `pr-225-ble-manager`
 **Base branch:** `main`
 **Branch prefix:** `ble-manager/` (linear stack, see [Branch Plan](#branch-plan))
-**Status:** ✅ WO-7 COMPLETE (BLE portal redesign). PR #235 complete.
+**Status:** ✅ PR #235 ready for review & merge (`v0.0.12-dev.82`). All WOs complete. WiFi modem sleep regression fixed. 15-min soak test passed.
 **Parent issue:** [#225](https://github.com/matthewmcneill/esp32-app-foundation/issues/225)
 **Agreed design (source of truth):** [RFC #225 revision 2](https://github.com/matthewmcneill/esp32-app-foundation/issues/225#issuecomment-5729939169), plus the amendments in the [framework acknowledgement](https://github.com/matthewmcneill/esp32-app-foundation/issues/225#issuecomment-5735199501) (acceptance item 6 is split into 6a/6b/6c)
 **Consumer:** Echenon ([SPEC.md](https://github.com/cblabs-org/echenon/blob/main/SPEC.md) §7–§8), labels `upstream-issue`, `found-by:echenon`
@@ -431,3 +431,51 @@ The BLE controller's `NimBLEDevice::init()` on ESP32-S3 acquires cross-core heap
 - Portal: `/api/system`, `/api/tabs`, `/api/ble/status`, MCP `tools/list` all ✅
 - BLE: 4 Mac CoreBluetooth connect/disconnect cycles, MTU 185, FW version read, 3s hold stable, all clean disconnects (reason 0x213)
 - Serial: supervision timeout safely updated 720ms → 4.0s on every connection, zero GATT errors
+
+### Session — 2026-09-25T18:00:00+01:00 — Rebase, WiFi Modem Sleep Regression Fix, Soak Test (dev.81–dev.82)
+
+**Summary:** Rebased wo7-portal-redesign (12 commits → 6) onto WO-8–WO-11. Tagged dev.81 and flashed — WiFi entered persistent AUTH_EXPIRE, BLE connections timed out due to WiFi radio starvation. Root-caused to WO-10's `WIFI_PS_MIN_MODEM` introduction. Fixed by removing modem sleep and restoring 30s STA timeout. Validated with 15-minute soak test and Android nRF Connect. PR #235 updated with all commits.
+
+**Root cause:** WO-10 (#236) added `WIFI_PS_MIN_MODEM` for BLE builds. On congested 2.4 GHz networks (cb-iot router), modem sleep caused the WiFi radio to sleep between DTIM beacons, missing 802.11 auth response frames. This produced:
+1. **Persistent AUTH_EXPIRE** — WiFi couldn't authenticate (328+s to first connect, then dropped again)
+2. **BLE GATT CONN TIMEOUT** — constant WiFi auth retries (12 per 15s window across 3 channels) starved BLE of radio time
+3. **Android GATT cache poisoning** — the 147+133 cascade from failed BLE connections persisted across attempts, requiring a phone reboot to clear
+
+**Cross-cutting decisions:**
+- **D15: Never use WIFI_PS_MIN_MODEM on BLE builds** — the hardware coexistence arbiter (`CONFIG_ESP_COEX_SW_COEXIST_ENABLE`) handles BLE/WiFi time-sharing independently of the power-save mode. Modem sleep is harmful on always-powered devices with congested 2.4 GHz networks. `WIFI_PS_NONE` unconditionally.
+- **D16: STA_ATTEMPT_TIMEOUT_MS = 30s, not 15s** — with BLE coexistence eating WiFi airtime, 15s is insufficient for 802.11 auth retries on congested networks. 30s was proven stable at dev.80.
+
+**Dead ends:**
+- `WIFI_PS_MIN_MODEM` is recommended by an ESP-IDF log message ("Should enable WiFi modem sleep when both WiFi and Bluetooth are enabled") but is actively harmful for WiFi auth reliability on congested networks.
+- Android BLE GATT cache corruption (error 147+133 in <200ms) cannot be cleared by forget+toggle — requires a phone reboot.
+- Silent WiFi link loss (router drops client without deauth frame) is not detected by WO-10's event-driven state machine — the device thinks it's connected but is unreachable. This is a known gap to address in a future WO.
+
+**Fix (commit `61f7f754`, tag v0.0.12-dev.82):**
+- `WifiManager.cpp`: `applyPowerSave()` → `WIFI_PS_NONE` unconditionally (was `WIFI_PS_MIN_MODEM` on BLE builds)
+- `WifiManager.hpp`: `STA_ATTEMPT_TIMEOUT_MS` → 30000 (was 15000)
+
+**Rebase result (6 clean commits):**
+1. `c1490354` — WO-7 BLE portal redesign
+2. `45129914` — Radio hardening (squash of dev.73–dev.79)
+3. `d0485c5a` — Docs: bluetooth.md + SKILL.md
+4. `e138ee88` — PA session distillation
+5. `65cab1ac` — Docs: sdkconfig.ble.defaults rationale
+6. `dd51686a` — Docs: WiFi timeout alignment
+7. `61f7f754` — Fix: modem sleep removal + 30s STA timeout
+
+**15-minute soak test results (v0.0.12-dev.82, ps type: 0):**
+- HTTP: **29/29** (100%), zero AUTH_EXPIRE in 15 min
+- BLE: **7/8** (87.5%), 1 macOS CoreBluetooth transient (not device-side)
+- WiFi connect time: **4 seconds** (was 328+s with modem sleep)
+- BLE connect time: **4.5–15.8s** (was 25+s or timeout)
+- Heap: flat at 65.6 KB free across 15 min, no leak
+- Temp: 40.7–42.7°C stable
+- Zero `"Coexist: Wi-Fi connect fail"` messages
+
+**Android nRF Connect validation (post phone reboot):**
+- Connected on 2nd attempt (1st was residual cold-start 147), services discovered
+- All 6 DIS characteristics readable: Manufacturer "CB Labs", Model "ESP32 App Foundation", Serial "A1:8E:92", FW "0.0.12-dev.81", HW "ESP32-S3", SW "App Foundation 0.0.12"
+- Connection params: interval 48.75ms, latency 0, timeout 5000ms
+
+**PR #235 update:** Fast-forwarded `ble-manager/wo6-validation` to include all 7 wo7 commits (15 files, +1397 lines). PR ready for review and merge.
+
