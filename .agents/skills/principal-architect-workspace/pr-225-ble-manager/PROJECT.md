@@ -84,9 +84,9 @@ It also contributes a portal tab, REST routes, MCP tools, EventBus `ble.*` event
 | **WO-4** | [Portal tab, REST routes, MCP tools](wo4-portal-mcp/WORKORDER.md) | `standard` | ✅ Complete | `ble-manager/wo4-portal-mcp` | `c133d59b` |
 | **WO-5** | [Coexistence, OTA pause, docs and skill](wo5-coexistence-ota/WORKORDER.md) | `standard` | ✅ Complete (D8 fallback) | `ble-manager/wo5-coexistence-ota` | `b568ec5f` |
 | **WO-6** | [Hardware acceptance run (RFC §17.2, amended)](wo6-validation/WORKORDER.md) | `interactive` | ✅ Complete | `ble-manager/wo6-validation` | `18618a43` (ACCEPTANCE.md), fix `c697ff55` (DIS MAC). Tag `v0.0.12-dev.67`. |
-| **WO-8** | [PR #235 R3: central client lifecycle and discovery](wo8-central-lifecycle/WORKORDER.md) | `standard` | 🔄 In progress | `ble-manager/wo8-central-lifecycle` (base `ble-manager/wo6-validation`) | — |
+| **WO-8** | [PR #235 R3: central client lifecycle and discovery](wo8-central-lifecycle/WORKORDER.md) | `standard` | ✅ Complete | `ble-manager/wo8-central-lifecycle` (base `ble-manager/wo6-validation`) | — |
 | **WO-10** | [Fix #236: WifiManager STA resilience](wo10-wifi-sta-resilience/WORKORDER.md) | `architect` | 🔄 In progress (parallel) | `ble-manager/wo10-wifi-sta-resilience` | — |
-| **WO-9** | [PR #235 R3: manager state safety and persistence](wo9-state-safety/WORKORDER.md) | `standard` | ⬜ Not started | `ble-manager/wo9-state-safety` (base `ble-manager/wo8-central-lifecycle`) | — |
+| **WO-9** | [PR #235 R3: manager state safety and persistence](wo9-state-safety/WORKORDER.md) | `standard` | 🔄 In progress | `ble-manager/wo9-state-safety` (base `ble-manager/wo8-central-lifecycle`) | — |
 
 ### Gates between WOs
 - **After WO-0 (hard gate):** the PA reviews `wo0-spike/FINDINGS.md`, records D3 and any sdkconfig changes here, and **presents the budget numbers to the human**. If the S3 budget or the controller activity budget can't meet 3P+1C, **stop** and return to the RFC. Don't continue on assumptions.
