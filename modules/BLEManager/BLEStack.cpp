@@ -265,9 +265,11 @@ bool BLEStack::init(const char* deviceName, void* eventQueue) {
     // Maximize RF transmission power (+20 dBm) for advertising, scanning, and connections
     NimBLEDevice::setPower(20, NimBLETxPowerType::All);
 
-    // Prioritize Bluetooth radio access on the shared 2.4 GHz hardware to prevent
-    // Wi-Fi traffic from preempting BLE connection events (HCI 0x3E / Android Error 147)
-    esp_coex_preference_set(ESP_COEX_PREFER_BT);
+    // Balance Bluetooth and Wi-Fi radio access on the shared 2.4 GHz hardware.
+    // PREFER_BT was tried (dev.76–dev.77) but starves Wi-Fi, making the web
+    // portal unreachable.  The real BLE stability wins come from removing the
+    // immediate updateConnParams() on connect (dev.75) and +20 dBm TX power.
+    esp_coex_preference_set(ESP_COEX_PREFER_BALANCE);
 
     _server = NimBLEDevice::createServer();
     if (!_server) {
