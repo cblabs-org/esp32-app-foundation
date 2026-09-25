@@ -163,19 +163,25 @@ If you discover a defect, upstream bug, or concern *outside your boundary box*, 
 <!-- Written by the worker at task completion -->
 
 ### Status
-(pending)
+Complete. Implementation verified via `build_project` with zero errors.
 
 ### Changes Made
-(pending)
+- Removed `_wifiConnected` guard logic and EventBus subscriptions from `WeatherModule`.
+- Fixed thread safety by converting `_units` to a `char[16]` buffer protected by `_dataMutex`.
+- Replaced direct Home Assistant and EventBus publishing in the background task with a `_publishPending` atomic flag, drained synchronously on the main thread via `tick()`.
+- Removed dead include `WiFiClientSecure.h` and obsolete `kStreamTimeoutMs` logic.
+- Updated `getUnits()` to use thread-safe mutex reads, and updated dependent REST API handlers.
+- Updated documentation headers and added MCP tool registration logging.
 
 ### Decisions Made
-(pending)
+- `getUnits()` continues to return `std::string` for API stability, but now builds a thread-safe copy from `_units` under `_dataMutex`.
+- `tick()` logic added to successfully drain `_publishPending` safely on the main thread.
 
 ### Dead Ends & Warnings
-(pending)
+- None encountered.
 
 ### Out-of-Scope Findings
-(pending)
+- None discovered.
 
 ### Blockers
-(pending)
+- None.
