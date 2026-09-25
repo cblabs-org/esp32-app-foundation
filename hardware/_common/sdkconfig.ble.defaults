@@ -239,8 +239,10 @@ CONFIG_BT_NIMBLE_EXT_ADV=n
 # Levels: 0=DEBUG, 1=INFO, 2=WARNING, 3=ERROR, 4=CRITICAL, 5=NONE.
 # ERROR-only saves ~10-15 KB flash (NimBLE has extensive debug logging).
 # For development/debugging, temporarily set to 1 (INFO) or 0 (DEBUG)
-# in a downstream sdkconfig fragment.
-CONFIG_BT_NIMBLE_LOG_LEVEL=3
+# SOAK TEST: Raised to INFO (1) for Issue #239 investigation — revert to 3 (ERROR) after soak
+# NOTE: NimBLE levels are inverted: 0=DEBUG, 1=INFO, 2=WARNING, 3=ERROR. Using INFO not DEBUG
+# to avoid flooding serial with thousands of scheduler messages/sec.
+CONFIG_BT_NIMBLE_LOG_LEVEL=1
 
 # ╔═══════════════════════════════════════════════════════════════════════════╗
 # ║  15. SCAN DEDUPLICATION                                                  ║
