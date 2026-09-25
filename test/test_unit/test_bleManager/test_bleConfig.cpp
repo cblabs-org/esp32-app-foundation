@@ -83,3 +83,21 @@ TEST(BLEConfigTest, SerializationRoundTrip) {
     EXPECT_TRUE(mgr1.getConfig().nameSuffix);
     EXPECT_EQ(mgr1.getConfig().maxPeripheralConnections, 3);
 }
+
+// WO-9 / issue #232: resetConfig() must restore the app-supplied factory
+// default name (set via setDefaultAdvertisedName(), mirroring
+// WifiManager::setDefaultHostname()), not silently fall back to the
+// BLEConfig struct's hardcoded "ESP32".
+TEST(BLEConfigTest, ResetConfigRestoresAppDefaultName) {
+    BLEManager mgr;
+    mgr.setDefaultAdvertisedName("Foo");
+
+    JsonDocument doc;
+    JsonObject obj = doc.to<JsonObject>();
+    obj["advertisedName"] = "UserCustomName";
+    mgr.applyConfig(obj);
+    EXPECT_EQ(mgr.getConfig().advertisedName, "UserCustomName");
+
+    mgr.resetConfig();
+    EXPECT_EQ(mgr.getConfig().advertisedName, "Foo");
+}

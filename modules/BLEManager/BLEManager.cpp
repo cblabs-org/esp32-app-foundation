@@ -469,12 +469,10 @@ bool BLEManager::pair(const char* providerId, const BLEPeerAddress& addr) {
     strncpy(device.providerId, providerId, sizeof(device.providerId) - 1);
     
     _deviceRegistry.set(device);
-    // R8: Persist paired devices to flash so they survive reboot
-#if defined(ESP_PLATFORM)
-    if (_app) {
-        _app->getConfigManager().saveModuleConfig(this);
-    }
-#endif
+    // R8/WO-9: Persist paired devices to flash so they survive reboot. Defer the
+    // actual flash write to the end of tick() — don't block callers (potentially
+    // the httpd task holding _stateMutex) on a flash write here.
+    _configDirty = true;
 
     WorkerCommand cmd;
     cmd.type = WorkerCommand::Type::Connect;
@@ -488,12 +486,6 @@ bool BLEManager::pair(const char* providerId, const BLEPeerAddress& addr) {
 bool BLEManager::forget(const char* providerId) {
     if (!providerId) return false;
 
-    // R9: Synchronously prevent the reconnect race — if tick() runs before
-    // the worker processes Forget, it must NOT queue a Connect.
-    _clientConnected.erase(providerId);
-    _clientConnecting.erase(providerId);
-    _reconnectPolicies.erase(providerId);
-
     WorkerCommand cmd;
     cmd.type = WorkerCommand::Type::Forget;
     strncpy(cmd.providerId, providerId, sizeof(cmd.providerId) - 1);
@@ -504,6 +496,19 @@ bool BLEManager::forget(const char* providerId) {
     if (_deviceRegistry.get(providerId, stored)) {
         cmd.addr = stored.address;
     }
+
+    // R9: Synchronously prevent the reconnect race — if tick() runs before
+    // the worker processes Forget, it must NOT queue a Connect. Removing the
+    // registry entry here (not just the reconnect bookkeeping) is what
+    // actually closes the race: the "ensure policies start" block and the
+    // reconnect scheduler in tick() both gate on _deviceRegistry.get(pid, ...),
+    // so with the entry gone neither can recreate/restart a policy for this
+    // device, even if the worker is still busy inside a blocking connect().
+    _clientConnected.erase(providerId);
+    _clientConnecting.erase(providerId);
+    _reconnectPolicies.erase(providerId);
+    _deviceRegistry.remove(providerId);
+    _configDirty = true;
 
     xQueueSend(static_cast<QueueHandle_t>(_workerQueue), &cmd, 0);
 
@@ -672,6 +677,17 @@ void BLEManager::resume() {
 // -----------------------------------------------------------------------------
 
 void BLEManager::tick(uint32_t /*currentMillis*/) {
+    // WO-9: Lock the whole tick() body — previously only dispatchQueueEvents(),
+    // inhibitScanning()/releaseScanInhibit() and the REST/MCP handlers took
+    // _stateMutex, leaving the lifecycle state machine, the "ensure reconnect
+    // policies start" block and the reconnect scheduler below unlocked and
+    // racing with the httpd task. The mutex is recursive, so the nested
+    // lockState() inside dispatchQueueEvents() is redundant now but kept as
+    // documentation/defense-in-depth for its own direct callers (there are
+    // none today, but it's public API).
+    {
+    auto guard = lockState();
+
     // 1. Drain incoming messages from FreeRTOS queue (host -> main loop)
     dispatchQueueEvents();
 
@@ -858,6 +874,20 @@ void BLEManager::tick(uint32_t /*currentMillis*/) {
             }
         }
     }
+    } // end lockState() scope
+
+    // WO-9: Deferred persistence — flash writes (ConfigManager::saveModuleConfig)
+    // must never happen while _stateMutex is held, since that can block the
+    // httpd task (and any other caller of lockState()) for the duration of the
+    // flash write. Any locked region that mutates persisted state (pair(),
+    // forget(), the CentralConnected bond/name update, DeviceForgotten) sets
+    // _configDirty instead of writing directly; the actual write happens here,
+    // once per tick, after the lock has been released.
+    if (_configDirty.exchange(false)) {
+#if defined(ESP_PLATFORM)
+        if (_app) _app->getConfigManager().saveModuleConfig(this);
+#endif
+    }
 }
 
 void BLEManager::dispatchQueueEvents() {
@@ -995,9 +1025,7 @@ void BLEManager::dispatchQueueEvents() {
                     if (msg.boolVal1 && !stored.bonded) {
                         stored.bonded = true;
                         _deviceRegistry.set(stored);
-                        #if defined(ESP_PLATFORM)
-                        if (_app) _app->getConfigManager().saveModuleConfig(this);
-                        #endif
+                        _configDirty = true;
                     }
                     // Also copy device name from discovery results if available
                     if (stored.name[0] == '\0' && !_discovery.results.empty()) {
@@ -1123,17 +1151,13 @@ void BLEManager::dispatchQueueEvents() {
                 break;
             }
 
-            // R9: Handle DeviceForgotten on the main loop (thread-safe)
+            // R9/WO-9: Handle DeviceForgotten on the main loop (thread-safe)
             case BLEQueueMessage::Type::DeviceForgotten: {
+                // Idempotent: _deviceRegistry entry, _clientConnected,
+                // _clientConnecting and _reconnectPolicies were already erased
+                // synchronously in forget() to prevent the reconnect race.
                 _deviceRegistry.remove(msg.providerId);
-                // Note: _clientConnected, _clientConnecting, _reconnectPolicies
-                // already erased synchronously in forget() to prevent the reconnect race.
-                // Persist after removal
-#if defined(ESP_PLATFORM)
-                if (_app) {
-                    _app->getConfigManager().saveModuleConfig(this);
-                }
-#endif
+                _configDirty = true;
                 // Notify provider
                 IBLEClientProvider* prov = nullptr;
                 for (auto* p : _clientProviders) {
@@ -1184,6 +1208,7 @@ void BLEManager::publishReady() {
 // -----------------------------------------------------------------------------
 
 void BLEManager::applyConfig(const JsonObject& root) {
+    auto guard = lockState();  // WO-9: applyConfig can run on the httpd task (ConfigManager REST patch/restore)
     _config.enabled                = root["enabled"] | _config.enabled;
     _config.advertisedName         = root["advertisedName"] | _config.advertisedName;
     _config.nameSuffix             = root["nameSuffix"] | _config.nameSuffix;
@@ -1244,6 +1269,7 @@ void BLEManager::applyConfig(const JsonObject& root) {
 }
 
 void BLEManager::serializeConfig(JsonObject& root) const {
+    auto guard = lockState();  // WO-9: serializeConfig can run on the httpd task (backup export)
     root["enabled"]                  = _config.enabled;
     root["advertisedName"]           = _config.advertisedName;
     root["nameSuffix"]               = _config.nameSuffix;
@@ -1285,7 +1311,12 @@ void BLEManager::serializeConfig(JsonObject& root) const {
 }
 
 void BLEManager::resetConfig() {
+    auto guard = lockState();  // WO-9: resetConfig can run on the httpd task (ConfigManager restore)
     _config = BLEConfig();
+    // issue #232: BLEConfig()'s hardcoded "ESP32" is only the compile-time
+    // fallback. Restore the app-supplied factory default name instead of
+    // silently reverting to "ESP32" on a config reset.
+    _config.advertisedName = _defaultAdvertisedName;
     _deviceRegistry.clear();
 }
 
@@ -1665,6 +1696,7 @@ void BLEManager::registerPreconditions(IPreconditionRegistry& registry) {
         "BLE Stack",
         PreconditionRole::Operational,
         [this]() -> PreconditionStatus {
+            auto guard = lockState();  // WO-9: reads _state, may run on any task
             if (_state == State::Disabled) {
                 return {false, Cause::Unavailable};
             }
@@ -1693,6 +1725,7 @@ void BLEManager::registerPreconditions(IPreconditionRegistry& registry) {
         "BLE Advertising",
         PreconditionRole::Operational,
         [this]() -> PreconditionStatus {
+            auto guard = lockState();  // WO-9: reads _advPackResult, may run on any task
             if (_advPackResult.hasFault()) {
                 return {false, Cause::Implausible};
             }
@@ -1728,6 +1761,7 @@ void BLEManager::registerPreconditions(IPreconditionRegistry& registry) {
             precName,
             PreconditionRole::Operational,
             [this, pid = p->getProviderId()]() -> PreconditionStatus {
+                auto guard = lockState();  // WO-9: reads registry/_reconnectPolicies, may run on any task
                 BLEStoredDevice stored;
                 if (!_deviceRegistry.get(pid, stored)) {
                     return {false, Cause::NotConfigured};

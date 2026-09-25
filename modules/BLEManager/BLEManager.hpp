@@ -275,6 +275,11 @@ private:
     std::atomic<uint32_t>              _scanInhibitCount{0};  // O1: thread-safe for cross-task inhibit
     std::string                        _pauseReason;
 
+    // WO-9: Set (under _stateMutex) whenever config changes while locked; the
+    // flash write itself happens at the end of tick(), after the lock is
+    // released, so it never blocks the httpd task while holding _stateMutex.
+    std::atomic<bool>                  _configDirty{false};
+
     // --- Worker Task Queue ---
     struct WorkerCommand {
         enum class Type : uint8_t { Connect, Disconnect, Forget, Shutdown, Discover, StopDiscovery } type;
