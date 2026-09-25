@@ -23,7 +23,6 @@
 #include "services/gap/ble_svc_gap.h"
 #include "esp_log.h"
 #include "esp32-hal-bt.h"
-#include "esp_coexist.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
 #include <cstring>
@@ -265,11 +264,10 @@ bool BLEStack::init(const char* deviceName, void* eventQueue) {
     // Maximize RF transmission power (+20 dBm) for advertising, scanning, and connections
     NimBLEDevice::setPower(20, NimBLETxPowerType::All);
 
-    // Balance Bluetooth and Wi-Fi radio access on the shared 2.4 GHz hardware.
-    // PREFER_BT was tried (dev.76–dev.77) but starves Wi-Fi, making the web
-    // portal unreachable.  The real BLE stability wins come from removing the
-    // immediate updateConnParams() on connect (dev.75) and +20 dBm TX power.
-    esp_coex_preference_set(ESP_COEX_PREFER_BALANCE);
+    // Wi-Fi / BLE coexistence: leave at ESP-IDF default (PREFER_WIFI, enum 0).
+    // PREFER_BT (dev.76) starved WiFi entirely; PREFER_BALANCE (dev.78) still
+    // caused AUTH_EXPIRE during WiFi association.  The default has always worked
+    // and BLE stability comes from +20 dBm TX power and deferred conn params.
 
     _server = NimBLEDevice::createServer();
     if (!_server) {
