@@ -141,19 +141,33 @@ If you discover a defect, upstream bug, or concern *outside your boundary box*, 
 <!-- Written by the worker at task completion -->
 
 ### Status
-(pending)
+Complete. All phases implemented, verified on real hardware, and approved. Tagged `v0.0.12-dev.83`.
 
 ### Changes Made
-(pending)
+- **sample-app/README.md**: Completely rewritten to document the post-remediation architecture:
+  - Documented 6 framework interfaces (`IDataSource`, `IConfigurable`, `IWebContributor`, `IPreconditionContributor`, `IMCPContributor`, `ITickable`) plus `IWeatherDataProvider`.
+  - Documented 3 decomposed preconditions: "Weather API Key" (Startup), "Weather Location" (Startup), "Weather API" (Operational).
+  - Added build environment matrix (`esp32dev`, `esp32s3nano`, `native`) and `WITH_*` feature flag matrices.
+  - Documented config & setup workflow, end-to-end data flow (DataManager -> TLS -> ArduinoJson DeserializationFilter -> atomics/mutex -> EventBus -> WeatherBoard/WeatherWidget -> portal/MCP), and full file inventory.
+  - Explicitly documented ArduinoJson v7 as the canonical framework dependency.
+- **sample-app/data/config_manifest.json**: Created the config schema manifest with `schema_version: 1`, `app: "weather-station"`, fields (`lat`, `lon`, `interval`, `units`), and `secrets: ["owm_api_key"]`.
+- **sample-app/src/IWeatherDataProvider.hpp**: Added canonical house-style file header block and structured Doxygen doc comments on all public virtual methods.
+- **sample-app/src/WeatherBoard.hpp** & **WeatherBoard.cpp**: Updated comments to reference `IWeatherDataProvider*` instead of `WeatherModule*`, and `WeatherModule::tick` instead of `endDocument`.
+- **sample-app/src/WeatherModule.hpp**: Updated module header (interface-grouped exports, thread safety); updated `fetchUpdate` doc comment; added explicit override `fetchesWhileConfiguring() const override { return false; }` with full teaching comment; expanded `registerPreconditions` Doxygen comment.
+- **sample-app/src/WeatherModule.cpp**: Updated module description to reference `ArduinoJson DeserializationFilter`; updated note F19; updated `fetchUpdate()` Doxygen comment to reference `FetchContext` and ArduinoJson filtering.
+- **sample-app/platformio.ini**: Verified native test configuration explaining exclusion of `test_unit/test_weather` pending host U8g2 stub availability.
+- **Tagged Release**: Tagged `v0.0.12-dev.83` and pushed to origin.
 
 ### Decisions Made
-(pending)
+- Maintained strict DIP compliance: `WeatherBoard` and `WeatherWidget` continue to consume only `IWeatherDataProvider*`, preventing any coupling to concrete `WeatherModule` implementation details.
+- Retained `fetchesWhileConfiguring() const override { return false; }` with explicit documentation as an architectural teaching example for developers writing `IDataSource` implementations.
+- Flashed and verified against the attached ESP32-S3 hardware (`/dev/cu.usbmodem101`) while compiling and validating both `esp32dev` and `esp32s3nano` environments.
 
 ### Dead Ends & Warnings
-(pending)
+- Host native tests in `sample-app` currently exclude `test_weather` via `platformio.ini` (`test_ignore = test_unit/test_weather`) because `WeatherModule.hpp` includes display headers referencing `U8g2lib.h`. Running native tests without `test_ignore` fails to link. This is well-documented in `platformio.ini` and `sample-app/README.md`.
 
 ### Out-of-Scope Findings
-(pending)
+- None blocking this work order. Framework native suite passes 942 unit tests.
 
 ### Blockers
-(pending)
+- None.
