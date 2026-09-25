@@ -21,6 +21,22 @@
 >
 > Workers verify provenance against this section (`.agents/rules/00-operating-model.md`). This approval authorises execution of all WOs within their respective Strict Boundary Boxes.
 
+> ✅ **Approved: WO-8 and WO-9 (PR #235 third-round review fixes).**
+>
+> - **Approver's exact words:** "Wait - I just want you to fix the current PR, don;t start a new one!" This was given in response to the PA's proposed WO-8…WO-11 decomposition, and narrows it to the PR #235 fixes only (WO-8, WO-9). No new PR; the WO-7 branch is not touched.
+> - **Timestamp:** 2026-09-25
+> - **Scope:** WO-8 (central client lifecycle and discovery) and WO-9 (manager state safety and persistence). Both are stacked on `ble-manager/wo6-validation` (the PR #235 head). After review, the PA fast-forwards `ble-manager/wo6-validation` to the WO-9 tip and pushes.
+> - **Spawn mode:** autonomous workers (`standard` → sonnet), serialized (both touch `BLEManager.cpp`).
+> - **Source of findings:** Chief Architect third-round review of PR #235 at `665b847`.
+>
+> ✅ **Approved: WO-10 (fix issue #236 in this PR).**
+> - **Approver's exact words:** "Fix it fully now. and close #236 out". This was the answer to the PA's question about the WifiManager STA timeout / #236.
+> - **Timestamp:** 2026-09-25
+> - **Scope:** WO-10, WifiManager STA resilience and no unauthenticated fallback AP. Branch `ble-manager/wo10-wifi-sta-resilience`, run in parallel with WO-8/WO-9 (disjoint files), then rebased onto the WO-9 tip before the PR head fast-forward. Spawn mode: autonomous (`architect` → opus).
+> - **Recorded for later (not in this PR):** the TX-power answer "Configurable, default +20" applies to the WO-7 branch (`BLEConfig.txPowerDbm`, default +20 dBm, documented regulatory responsibility).
+>
+> Workers verify provenance against this section (`.agents/rules/00-operating-model.md`). This approval authorises execution of WO-8 and WO-9 within their Strict Boundary Boxes.
+
 ---
 
 ## Architectural Shift (summary)
@@ -68,6 +84,9 @@ It also contributes a portal tab, REST routes, MCP tools, EventBus `ble.*` event
 | **WO-4** | [Portal tab, REST routes, MCP tools](wo4-portal-mcp/WORKORDER.md) | `standard` | ✅ Complete | `ble-manager/wo4-portal-mcp` | `c133d59b` |
 | **WO-5** | [Coexistence, OTA pause, docs and skill](wo5-coexistence-ota/WORKORDER.md) | `standard` | ✅ Complete (D8 fallback) | `ble-manager/wo5-coexistence-ota` | `b568ec5f` |
 | **WO-6** | [Hardware acceptance run (RFC §17.2, amended)](wo6-validation/WORKORDER.md) | `interactive` | ✅ Complete | `ble-manager/wo6-validation` | `18618a43` (ACCEPTANCE.md), fix `c697ff55` (DIS MAC). Tag `v0.0.12-dev.67`. |
+| **WO-8** | [PR #235 R3: central client lifecycle and discovery](wo8-central-lifecycle/WORKORDER.md) | `standard` | 🔄 In progress | `ble-manager/wo8-central-lifecycle` (base `ble-manager/wo6-validation`) | — |
+| **WO-10** | [Fix #236: WifiManager STA resilience](wo10-wifi-sta-resilience/WORKORDER.md) | `architect` | 🔄 In progress (parallel) | `ble-manager/wo10-wifi-sta-resilience` | — |
+| **WO-9** | [PR #235 R3: manager state safety and persistence](wo9-state-safety/WORKORDER.md) | `standard` | ⬜ Not started | `ble-manager/wo9-state-safety` (base `ble-manager/wo8-central-lifecycle`) | — |
 
 ### Gates between WOs
 - **After WO-0 (hard gate):** the PA reviews `wo0-spike/FINDINGS.md`, records D3 and any sdkconfig changes here, and **presents the budget numbers to the human**. If the S3 budget or the controller activity budget can't meet 3P+1C, **stop** and return to the RFC. Don't continue on assumptions.
