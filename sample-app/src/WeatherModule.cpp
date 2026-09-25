@@ -99,9 +99,42 @@ void WeatherModule::begin(Application& app) {
     _configManager = &app.getConfigManager();
     _dataManager   = &app.getDataManager();
 
+    if (_eventBus) {
+        _eventBus->subscribe("wifi.connected", onWifiConnected, this);
+        _eventBus->subscribe("wifi.disconnected", onWifiDisconnected, this);
+    }
+
     // NOTE: HomeAssistant is NOT available here — _haModule is nullptr
     // until app.begin() allocates it. HA entity registration is deferred
     // to wireHomeAssistant(), called from main.cpp after app.begin().
+}
+
+/**
+ * @brief EventBus callback: updates WiFi connectivity state on connection.
+ * @param topic    The event topic string ("wifi.connected").
+ * @param payload  Event payload (unused).
+ * @param ctx      Opaque context pointer (WeatherModule instance).
+ */
+void WeatherModule::onWifiConnected(const char* topic, const void* payload, void* ctx) {
+    (void)topic;
+    (void)payload;
+    if (ctx) {
+        static_cast<WeatherModule*>(ctx)->_wifiConnected.store(true, std::memory_order_release);
+    }
+}
+
+/**
+ * @brief EventBus callback: updates WiFi connectivity state on disconnection.
+ * @param topic    The event topic string ("wifi.disconnected").
+ * @param payload  Event payload (unused).
+ * @param ctx      Opaque context pointer (WeatherModule instance).
+ */
+void WeatherModule::onWifiDisconnected(const char* topic, const void* payload, void* ctx) {
+    (void)topic;
+    (void)payload;
+    if (ctx) {
+        static_cast<WeatherModule*>(ctx)->_wifiConnected.store(false, std::memory_order_release);
+    }
 }
 
 /**
@@ -298,6 +331,14 @@ void WeatherModule::registerRoutes(PsychicHttpServer& server) {
  * @return UpdateStatus indicating success, error type, or rate limiting.
  */
 UpdateStatus WeatherModule::fetchUpdate(const FetchContext& ctx) {
+    // WiFi connectivity gate — don't attempt network I/O without a connection.
+    // Skipped (not NoChange) tells DataManager we didn't even try, so health
+    // tracking stays honest. Pattern: DraytonWiserController/WiserApiModule.cpp.
+    if (_eventBus && !_wifiConnected.load(std::memory_order_acquire)) {
+        _lastFetchStatus.store(UpdateStatus::Skipped, std::memory_order_release);
+        return UpdateStatus::Skipped;
+    }
+
     // --- Step 1: Validate credentials (API key check) ---
     // Retrieve the OWM API key from KeyManager. If absent, return AuthError
     // immediately — no point making a network request without credentials.

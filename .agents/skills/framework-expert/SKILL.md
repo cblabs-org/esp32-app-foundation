@@ -19,7 +19,9 @@ description: >
   ITabRegistry, registerTabs, DataSourceHealthPayload, data.source.health,
   get_data_sources, AUDIT, AUDIT_SYNC, audit trail, audit log, WITH_AUDIT,
   AuditModule, Audit.h, get_audit_log, clear_audit_log, BOARD_AUDIT_BYTES,
-  audit_health, LogPipeline, Redactor, registerSecret, ISanitizer, flash wear.
+  audit_health, LogPipeline, Redactor, registerSecret, ISanitizer, flash wear,
+  BLEManager, WITH_BLE, Bluetooth, BLE, IBLEServiceProvider, IBLEClientProvider,
+  NimBLE, ble_status, ble_scan, ble_pair, ble_forget, ScanInhibit, BLEAdvertisingBuilder.
   (4) Patterns and safety — Service Module Pattern, orchestrator
   anti-pattern, Domain Meaning Test, SOLID, thread safety, std::function, TWDT,
   watchdog, heap, PSRAM, TLS memory, flash size. (5) Security — DeviceCrypto,
@@ -77,6 +79,45 @@ Fork the `uidesign/` project folder into the application repository, preserve al
 
 ### What is the `sys_` prefix?
 `sys_` denotes framework-contracted reactive subjects (e.g. `sys_boot_progress`, `sys_error_visible`, `sys_ota_status`). Designers must not rename or remove these subjects in their LVGL Pro projects so core framework events (boot splash, OTA updates, WiFi configuration, error states, diagnostics) bind correctly.
+
+### How much DRAM does BLE cost?
+~69 KB on ESP32-S3 (controller ~35-40 KB non-negotiable + host ~25-30 KB tunable). See `docs/developer/bluetooth.md` § Memory & DRAM Budget.
+
+### Can BLE buffers use PSRAM?
+No. BLE controller DMA cannot access PSRAM. `MEM_ALLOC_MODE_EXTERNAL` causes spinlock panics (IDFGH-7560). All BLE memory must be internal DRAM.
+
+### How do I add a GATT service?
+Implement `IBLEServiceProvider`, register in `main.cpp` via `bleManager.registerServiceProvider()`. See `docs/developer/bluetooth.md` § Peripheral Role.
+
+### How do I connect to a remote BLE device?
+Implement `IBLEClientProvider`, register via `bleManager.registerClientProvider()`. See `docs/developer/bluetooth.md` § Central Role.
+
+### How do I reduce BLE memory usage?
+Choose a memory profile from the BLE Memory Profiles section below. The `peripheral-only` profile saves ~15-20 KB by dropping Central/Observer roles.
+
+### What is `bleInUse()`?
+A strong symbol override in `BLEStack.cpp` that prevents Arduino's `initArduino()` from releasing BT controller memory. Without it, BLE init crashes with WDT resets.
+
+### What BLE services does the framework provide?
+The framework automatically registers a standard Bluetooth SIG Device Information Service (DIS, UUID `0x180A`) in `BLEManager::begin()`. It exposes 6 read-only characteristics: Manufacturer (`app.getManufacturer()`, defaults to `"CB Labs"`), Model (`app.getAppName()`), Serial Number (last 3 bytes of WiFi MAC), Firmware Revision (`BUILD_VERSION`), Hardware Revision (`ESP.getChipModel()`), and Software Revision (`"App Foundation " + FRAMEWORK_VERSION`). Consumers do not need to register DIS manually.
+
+### What TX power does BLE use?
++20 dBm (maximum). Set in two places that must agree: `NimBLEDevice::setPower(20, NimBLETxPowerType::All)` in `BLEStack::init()`, and `CONFIG_BT_CTRL_DFT_TX_POWER_LEVEL_P20=y` in `sdkconfig.ble.defaults`. The `setPower()` call sets ADV, SCAN, and DEFAULT power types. It does NOT affect WiFi TX power.
+
+### What is the BLE advertising interval?
+50ms (80 × 0.625ms units). Set in `BLEStack::startAdvertising()` via `setMinInterval(80)` / `setMaxInterval(80)`. This is twice as fast as Apple's recommended ≤100ms for quick discovery.
+
+### Should I call `esp_coex_preference_set()`?
+**No.** Leave it at the ESP-IDF default (`PREFER_WIFI`, enum 0). `PREFER_BT` starves WiFi entirely (portal unreachable). `PREFER_BALANCE` causes `AUTH_EXPIRE` during WiFi 802.11 association. WiFi auth frames have a 1-second deadline and need priority. BLE stability comes from +20 dBm TX power and deferred connection parameters instead. See `docs/developer/bluetooth.md` § Radio Settings.
+
+### Why doesn't the framework call `updateConnParams()` on connect?
+Apple and Android guidelines mandate waiting ≥5 seconds after connection before requesting L2CAP parameter updates. Calling `updateConnParams()` immediately on `PeerConnected` collides with the central's MTU exchange and GATT service discovery, causing Android (nRF Connect) to drop with GATT CONN TIMEOUT (Error 147/0x93 + Error 133/0x85). Instead, the framework updates the supervision timeout to 4.0s after MTU exchange if the central's default is dangerously short (e.g. macOS CoreBluetooth 720ms).
+
+### What is the WiFi STA connection timeout?
+15 seconds per attempt, with indefinite STA-first retries using exponential backoff (5 s / 10 s / 30 s / 60 s). After 3 minutes of continuous STA downtime, a fallback AP starts in `WIFI_AP_STA` mode (portal reachable while STA keeps retrying). The fallback AP is torn down when STA reconnects. WiFi never falls back to AP-only mode when credentials are stored. See `WifiManager.cpp` and #236.
+
+### How do WiFi and BLE coexist?
+`CONFIG_ESP_COEX_SW_COEXIST_ENABLE=y` in sdkconfig enables hardware-level RF time-sharing. The framework adds five application-level mechanisms: Running-Only gating, ScanInhibit tokens, Administrative Pause, Duty Cycle Clamping, and Exponential Backoff. See `docs/developer/bluetooth.md` § Coexistence & Radio Hardening.
 
 ### Framework-Reserved Include Prefixes
 
@@ -140,6 +181,7 @@ This skill uses a progressive disclosure model. Based on your query, load and re
 | **Web Portal** (SPA, routes, HTML/JS fragments, security) | `systems/web-portal/` |
 | **Web Server Stack & DRAM Tuning** (httpd stack, DeepStackExecutor, PSRAM offload) | `systems/web-portal/dram-tuning.md` |
 | **Design System** (Tokens, components, templates, UI kit for portal styling) | Sibling skill: `../framework-design-system/readme.md` |
+| **Bluetooth LE Subsystem** (BLEManager, Peripheral/Central providers, threading rules, coexistence, ScanInhibit) | `bluetooth.md` |
 | **OTA Update System** (State machine, channels, config lifecycle, deploy) | `systems/ota/` |
 | **Data Sources & Resilience** (FetchContext, deadlines, health backoff, TLS client) | `interfaces/data-source.md` |
 | **MCP Server** (Device interaction, JSON-RPC protocol, tool discovery, scripts) | `systems/mcp-server/` |
@@ -183,6 +225,111 @@ A failing source degrades itself; it **never reboots the device**.
 - **Portal**: Data Sources card on Status tab with live state badges and reset action.
 - **Display**: Deferred vector+mutex subscriber in `U8G2DisplayModule` and `LVGLDisplayModule`.
 - **MCP Server**: `get_data_sources` built-in tool returns current health snapshots and backoff timings.
+## BLE Memory Profiles
+
+The framework's `sdkconfig.ble.defaults` ships a **balanced** configuration: all four BLE
+roles enabled, 2 concurrent connections, right-sized buffer pools. This costs ~70 KB of
+internal DRAM at steady state on an ESP32-S3.
+
+ESP32-S3 has 320 KB total internal DRAM. The BLE controller enforces a non-negotiable ~35-40 KB floor (proprietary blob, cannot use PSRAM). The profiles below tune the HOST side only (~25-30 KB). Note that while WiFi costs similar amounts, it can offload to PSRAM; BLE cannot.
+
+Downstream consumers can layer an optimisation profile on top by adding the overrides to
+their board-specific `sdkconfig.*.defaults` file **after** the framework's BLE fragment
+in their `SDKCONFIG_DEFAULTS` chain. Later files win.
+
+> **Important:** After changing any BLE sdkconfig setting, delete the generated
+> `sdkconfig.<env>` file and do a clean build. The Kconfig system caches values.
+
+### Profile: `balanced` (framework default)
+
+No overrides needed — this is what ships. All roles, 2 connections, mempool runtime alloc.
+
+| Metric (ESP32-S3 sample app) | Value |
+|------------------------------|-------|
+| DRAM steady state | ~73 KB free |
+| DRAM low-water (WiFi scan) | ~40 KB free |
+| Roles | Peripheral, Broadcaster, Central, Observer |
+| Max connections | 2 |
+
+### Profile: `peripheral-only`
+
+For sensor devices, config portals, and beacons that accept incoming connections but
+never scan or connect outbound. Saves ~15-20 KB DRAM over balanced.
+
+```ini
+# --- Peripheral-only BLE profile ---
+# Layer after framework's sdkconfig.ble.defaults.
+CONFIG_BT_NIMBLE_ROLE_CENTRAL=n
+CONFIG_BT_NIMBLE_ROLE_OBSERVER=n
+CONFIG_BT_NIMBLE_GATT_CLIENT=n
+CONFIG_BT_CTRL_BLE_SCAN=n
+CONFIG_BT_CTRL_BLE_MASTER=n
+CONFIG_BT_CTRL_BLE_MAX_ACT=3
+CONFIG_BT_NIMBLE_ENABLE_CONN_REATTEMPT=n
+CONFIG_BT_NIMBLE_TRANSPORT_EVT_DISCARD_COUNT=0
+CONFIG_BT_NIMBLE_MSYS_2_BLOCK_COUNT=0
+CONFIG_BT_NIMBLE_MSYS_2_BLOCK_SIZE=0
+CONFIG_BT_NIMBLE_HOST_TASK_STACK_SIZE=3072
+CONFIG_BT_NIMBLE_SM_LEGACY=n
+```
+
+**Trade-offs:** `IBLEClientProvider` and `ble_scan` MCP tool will not function.
+Scanning APIs compile to no-ops. Re-enable Central/Observer to restore.
+
+### Profile: `gateway`
+
+For hub devices scanning many peripherals and maintaining multiple connections.
+Uses ~10-15 KB more DRAM than balanced.
+
+```ini
+# --- Gateway/hub BLE profile ---
+CONFIG_BT_NIMBLE_MAX_CONNECTIONS=4
+CONFIG_BT_CTRL_BLE_MAX_ACT=6
+CONFIG_BT_NIMBLE_TRANSPORT_ACL_FROM_LL_COUNT=24
+CONFIG_BT_NIMBLE_TRANSPORT_EVT_COUNT=30
+CONFIG_BT_NIMBLE_TRANSPORT_EVT_DISCARD_COUNT=8
+CONFIG_BT_NIMBLE_MSYS_2_BLOCK_COUNT=24
+CONFIG_BT_NIMBLE_GATT_MAX_PROCS=4
+CONFIG_BT_NIMBLE_MAX_BONDS=4
+CONFIG_BT_NIMBLE_MAX_CCCDS=8
+CONFIG_BT_CTRL_SCAN_DUPL_CACHE_SIZE=100
+CONFIG_BT_CTRL_ADV_DUP_FILT_MAX=30
+CONFIG_BT_CTRL_BLE_ADV_REPORT_FLOW_CTRL_NUM=100
+```
+
+**Trade-offs:** Higher DRAM cost. Monitor `dram_min` to ensure sufficient headroom
+for WiFi, TLS, and OTA alongside BLE.
+
+### Profile: `ultra-minimal`
+
+Advertising-only beacon with no connections and no scanning. Saves ~30-40 KB over balanced.
+
+```ini
+# --- Ultra-minimal BLE profile (beacon/advertiser only) ---
+CONFIG_BT_NIMBLE_ROLE_CENTRAL=n
+CONFIG_BT_NIMBLE_ROLE_OBSERVER=n
+CONFIG_BT_NIMBLE_ROLE_PERIPHERAL=n
+CONFIG_BT_NIMBLE_GATT_CLIENT=n
+CONFIG_BT_NIMBLE_GATT_SERVER=n
+CONFIG_BT_NIMBLE_SECURITY_ENABLE=n
+CONFIG_BT_NIMBLE_MAX_CONNECTIONS=0
+CONFIG_BT_CTRL_BLE_MAX_ACT=1
+CONFIG_BT_CTRL_BLE_SCAN=n
+CONFIG_BT_CTRL_BLE_MASTER=n
+CONFIG_BT_NIMBLE_TRANSPORT_ACL_FROM_LL_COUNT=0
+CONFIG_BT_NIMBLE_TRANSPORT_EVT_COUNT=4
+CONFIG_BT_NIMBLE_TRANSPORT_EVT_DISCARD_COUNT=0
+CONFIG_BT_NIMBLE_MSYS_1_BLOCK_COUNT=4
+CONFIG_BT_NIMBLE_MSYS_2_BLOCK_COUNT=0
+CONFIG_BT_NIMBLE_MSYS_2_BLOCK_SIZE=0
+CONFIG_BT_NIMBLE_HOST_TASK_STACK_SIZE=2560
+CONFIG_BT_NIMBLE_NVS_PERSIST=n
+CONFIG_BT_NIMBLE_SM_LEGACY=n
+CONFIG_BT_NIMBLE_SM_SC=n
+```
+
+**Trade-offs:** No GATT server, no connections, no bonding. Device can only broadcast
+advertisement data. Use `BLEAdvertisingBuilder` to set payload.
 
 ## When to Read the Full Docs
 

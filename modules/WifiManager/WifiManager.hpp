@@ -9,6 +9,19 @@
  * Description: Wi-Fi credentials management and connection state machine.
  *              Handles AP captive portal, connection recovery, and mesh roaming.
  *
+ *              Connection policy (issue #236):
+ *              - No credentials (first boot): setup AP in WIFI_AP mode with the
+ *                portal auth bypass (isSetupMode()). After 1 h of portal
+ *                inactivity Wi-Fi is switched off (unchanged behaviour).
+ *              - Credentials stored: STA-first. A failed/timed-out attempt (15 s)
+ *                never switches to AP-only mode; STA is retried indefinitely with
+ *                backoff delays of 5 s, 10 s, 30 s, then every 60 s.
+ *              - Credentials stored and STA down continuously for > 3 min: a
+ *                fallback captive AP is started in WIFI_AP_STA mode so STA keeps
+ *                retrying. Portal auth stays ENFORCED. The AP is torn down as soon
+ *                as STA reconnects; after 1 h of AP inactivity only the fallback
+ *                AP is dropped — Wi-Fi is never switched off.
+ *
  *              Mesh Roaming and AP Selection:
  *              - Uses all-channel scan (WIFI_ALL_CHANNEL_SCAN) sorted by signal
  *                strength (WIFI_CONNECT_AP_BY_SIGNAL) during connection so the
@@ -103,11 +116,21 @@ private:
      */
     enum class WiFiState {
         Init,             // System just started, need to decide next step
-        StaConnecting,   // Trying to connect as Station
-        ApStarting,      // Station failed, starting AP mode
-        Ready,            // Connected or AP is active
-        Shutdown          // Explicitly disabled
+        StaConnecting,    // One STA connect attempt in flight (15 s timeout)
+        StaBackoff,       // Credentials stored, STA attempt failed: waiting the
+                          // backoff delay (5/10/30/60 s) before the next attempt.
+                          // The fallback AP (AP+STA) is raised from here after
+                          // > 3 min of continuous STA downtime (#236).
+        ApStarting,       // No credentials: starting the first-boot setup AP
+        Ready,            // STA connected, or setup AP active
+        Shutdown          // Setup AP idle for 1 h: Wi-Fi off (no credentials only)
     };
+
+    // --- Connection policy timings (#236) ---
+    static constexpr uint32_t STA_ATTEMPT_TIMEOUT_MS   = 30000;    ///< Per-attempt STA connect timeout (30 s; 15 s was too short with BLE coex — dev.81)
+    static constexpr uint32_t STA_LINK_LOSS_GRACE_MS   = 10000;    ///< Grace after link loss before the first reconnect attempt
+    static constexpr uint32_t FALLBACK_AP_DELAY_MS     = 180000;   ///< Continuous STA downtime before the fallback AP starts (matches isWifiPersistentError())
+    static constexpr uint32_t AP_INACTIVITY_TIMEOUT_MS = 3600000;  ///< Portal inactivity before the AP is dropped
 
     char _wifiSsid[33];
     char _wifiPass[65];
@@ -116,7 +139,8 @@ private:
     bool _isAPMode = false;
     WiFiState _currentState = WiFiState::Init;
     Periodic _stateTimer;
-    int _connectionRetries = 0;
+    int _connectionRetries = 0;               ///< Consecutive failed STA attempts (drives the backoff schedule)
+    bool _fallbackApSuppressed = false;       ///< Fallback AP dropped after 1 h idle; not re-raised until STA reconnects
     Periodic _wifiDisconnectTimer; ///< Continuous downtime tracker (ms)
     char _myUrl[24];                        ///< Formatted string URL for local IP
     volatile uint32_t _lastApiRequestTime = 0;  ///< Last time an API request was received (cross-thread)
@@ -130,9 +154,24 @@ private:
 
     std::unique_ptr<DNSServer> _dnsServer;
 
-    void transitionTo(WiFiState newState);
+    void transitionTo(WiFiState newState, uint32_t now);
     void processDNS();
     void connectStation(const char* ssid, const char* pass);
+
+    /** @brief Apply the Wi-Fi power-save mode (modem sleep when BT is enabled, #236). */
+    void applyPowerSave();
+    /** @brief Start one STA connect attempt (AP+STA if the fallback AP is up) and enter StaConnecting. */
+    void startStaAttempt(uint32_t now);
+    /** @brief STA association succeeded: tear down any fallback AP, reset retry state, publish WIFI_CONNECTED. */
+    void onStaConnected(uint32_t now);
+    /** @brief Start the captive AP (WIFI_AP in setup mode, WIFI_AP_STA when credentials exist) and publish WIFI_AP_STARTED. */
+    void startAccessPoint(uint32_t now);
+    /** @brief Stop the captive AP and DNS hijacker if running; clears _isAPMode. */
+    void stopAccessPoint();
+    /** @brief Start the continuous STA-downtime tracker if it is not already running. */
+    void markStaDown(uint32_t now);
+    /** @brief Milliseconds of continuous STA downtime (0 when not tracking). */
+    uint32_t staDownMs(uint32_t now) const;
 
     // --- RESTful API Handlers (PR-04a/WO1) ---
 
@@ -331,16 +370,60 @@ public:
     void updateWiFi(const char* ssid, const char* pass);
 
     /**
-     * @brief Returns true if currently operating in Setup/AP Mode.
+     * @brief Returns true if the captive soft-AP is currently running — either
+     *        the first-boot setup AP or the fallback AP raised during a long STA
+     *        outage (see isSetupMode() to tell them apart).
      * @return true if AP mode is active
      */
     bool getAPMode() const { return _isAPMode; }
 
     /**
+     * @brief Returns true only for first-boot setup: AP active AND no stored credentials.
+     *
+     * Security rationale (#236): the AuthManager portal-auth bypass must follow
+     * this, NOT getAPMode(). A device that already has Wi-Fi credentials may raise
+     * a fallback AP during a long STA outage; that outage can be forced by anyone
+     * in radio range (e.g. spoofed deauthentication frames), so the portal behind
+     * the fallback AP (config, credentials, OTA, MCP) must keep requiring login.
+     * The bypass is only acceptable when there is nothing configured yet.
+     *
+     * @return true if in first-boot setup mode
+     */
+    bool isSetupMode() const { return _isAPMode && !hasCredentials(); }
+
+    /**
      * @brief Returns true if WiFi is ready (either STA connected or AP active).
+     *        The fallback AP counts as ready so the portal is served on it even
+     *        while the state machine is cycling STA retries.
      * @return true if ready
      */
-    bool isReady() const { return _currentState == WiFiState::Ready; }
+    bool isReady() const { return _currentState == WiFiState::Ready || _isAPMode; }
+
+    // --- Reconnect policy (pure functions; unit-tested, #236) ---
+
+    /**
+     * @brief Backoff delay before the next STA attempt.
+     * @param failedAttempts Consecutive failed attempts so far (>= 1).
+     * @return 5 s, 10 s, 30 s, then 60 s for every later attempt.
+     */
+    static uint32_t staRetryDelayMs(int failedAttempts) {
+        if (failedAttempts <= 1) return 5000;
+        if (failedAttempts == 2) return 10000;
+        if (failedAttempts == 3) return 30000;
+        return 60000;
+    }
+
+    /**
+     * @brief Decide whether the fallback AP (AP+STA, auth enforced) should start.
+     * @param hasCreds       Stored credentials exist.
+     * @param apActive       An AP is already running.
+     * @param suppressed     Fallback AP was dropped after 1 h idle during this outage.
+     * @param staDownForMs   Continuous STA downtime in ms.
+     * @return true if the fallback AP should be started now.
+     */
+    static bool shouldStartFallbackAp(bool hasCreds, bool apActive, bool suppressed, uint32_t staDownForMs) {
+        return hasCreds && !apActive && !suppressed && staDownForMs > FALLBACK_AP_DELAY_MS;
+    }
 
     /**
      * @brief Returns the current stored SSID.

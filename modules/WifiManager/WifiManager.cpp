@@ -23,7 +23,11 @@
  * Exported Functions/Classes:
  * - WifiManager: [Class implementation]
  *   - begin: Initial non-blocking hardware initialization.
- *   - tick: Main non-blocking state machine for connection maintenance.
+ *   - tick: Main non-blocking state machine for connection maintenance
+ *           (STA-first retry with backoff, fallback AP+STA, #236).
+ *   - startStaAttempt / onStaConnected: STA attempt lifecycle helpers.
+ *   - startAccessPoint / stopAccessPoint: Captive soft-AP lifecycle helpers.
+ *   - applyPowerSave: Modem sleep on BT builds, WIFI_PS_NONE otherwise.
  *   - connectStation: Connects STA with 802.11k/v roaming and RSSI filtering.
  *   - applyConfig: Apply config from JSON section.
  *   - serializeConfig: Serialize config to JSON section.
@@ -80,9 +84,9 @@ WifiManager::~WifiManager() {
 /**
  * @brief transitionTo helper to log and reset timers.
  */
-void WifiManager::transitionTo(WiFiState newState) {
+void WifiManager::transitionTo(WiFiState newState, uint32_t now) {
     _currentState = newState;
-    _stateTimer.reset(millis());
+    _stateTimer.reset(now);
 }
 
 // =============================================================================
@@ -206,12 +210,143 @@ void WifiManager::begin() {
     WiFi.mode(WIFI_OFF);
     
     _stateTimer.setInterval(2000);  // 2s debounce before Init fires (pre-MK: `elapsed > 2000`)
-    transitionTo(WiFiState::Init);
+    transitionTo(WiFiState::Init, millis());
     ESP_LOGI(TAG, "WiFi Manager initialized in NON-BLOCKING mode. Hostname: %s", _currentHostname);
 }
 
 /**
+ * @brief Apply the Wi-Fi power-save mode.
+ *
+ * Always WIFI_PS_NONE.  WO-10 originally set WIFI_PS_MIN_MODEM on BLE
+ * builds (the ESP-IDF logs "Should enable WiFi modem sleep when both WiFi
+ * and Bluetooth are enabled"), but on congested 2.4 GHz networks modem
+ * sleep causes the radio to miss 802.11 auth response frames, leading to
+ * persistent AUTH_EXPIRE failures (dev.81 regression).  The hardware
+ * coexistence arbiter (CONFIG_ESP_COEX_SW_COEXIST_ENABLE) handles BLE/WiFi
+ * time-sharing independently of the power-save mode.  For always-powered
+ * devices there is no battery benefit to modem sleep.
+ */
+void WifiManager::applyPowerSave() {
+    WiFi.setSleep(WIFI_PS_NONE);
+}
+
+/**
+ * @brief Start the continuous STA-downtime tracker if it is not already running.
+ */
+void WifiManager::markStaDown(uint32_t now) {
+    if (_wifiDisconnectTimer.getInterval() == 0) {
+        _wifiDisconnectTimer.reset(now);
+        _wifiDisconnectTimer.setInterval(1); // Enable tracking
+    }
+}
+
+/**
+ * @brief Milliseconds of continuous STA downtime (0 when not tracking).
+ */
+uint32_t WifiManager::staDownMs(uint32_t now) const {
+    if (_wifiDisconnectTimer.getInterval() == 0) return 0;
+    return now - _wifiDisconnectTimer.getLastFire();
+}
+
+/**
+ * @brief Start one STA connect attempt and enter StaConnecting.
+ *
+ * If the fallback AP is up, the radio runs in WIFI_AP_STA so the portal
+ * stays reachable while STA retries (#236 D-B).
+ */
+void WifiManager::startStaAttempt(uint32_t now) {
+    ESP_LOGI(TAG, "Connecting to %s (attempt %d%s)...", _wifiSsid, _connectionRetries + 1,
+             _isAPMode ? ", fallback AP active" : "");
+    WiFi.mode(_isAPMode ? WIFI_AP_STA : WIFI_STA);
+    applyPowerSave();
+    if (strlen(_currentHostname) > 0) {
+        WiFi.setHostname(_currentHostname);
+    }
+    connectStation(_wifiSsid, _wifiPass);
+    // Downtime counts from the first attempt, so a device that boots while its
+    // router is off also gets the fallback AP after 3 min.
+    markStaDown(now);
+    transitionTo(WiFiState::StaConnecting, now);
+}
+
+/**
+ * @brief STA association succeeded.
+ *
+ * Tears down the fallback AP (if any) BEFORE publishing WIFI_CONNECTED so
+ * subscribers re-evaluating isSetupMode()/getAPMode() see the final state.
+ */
+void WifiManager::onStaConnected(uint32_t now) {
+    ESP_LOGI(TAG, "Connected successfully. IP: %s", WiFi.localIP().toString().c_str());
+    if (_isAPMode) {
+        ESP_LOGI(TAG, "STA restored — tearing down fallback AP.");
+        stopAccessPoint();
+    }
+    _connectionRetries = 0;
+    _fallbackApSuppressed = false;
+    _wifiDisconnectTimer.setInterval(0); // Reset downtime tracker
+    updateMyUrl();
+    if (_eventBus) {
+        int count = _eventBus->publish(WifiEvents::WIFI_CONNECTED);
+        ESP_LOGI(TAG, "Published WIFI_CONNECTED to %d subscribers", count);
+    }
+    transitionTo(WiFiState::Ready, now);
+}
+
+/**
+ * @brief Start the captive soft-AP and DNS hijacker.
+ *
+ * Setup mode (no credentials): WIFI_AP, as before. With credentials this is
+ * the fallback AP: WIFI_AP_STA so STA keeps retrying the stored network, and
+ * portal auth stays enforced (Application follows isSetupMode(), not
+ * getAPMode()). The network itself stays open; the portal behind it requires
+ * login.
+ */
+void WifiManager::startAccessPoint(uint32_t now) {
+    const bool fallback = hasCredentials();
+    ESP_LOGI(TAG, "Starting Access Point (Captive Portal, %s)...",
+             fallback ? "fallback AP+STA, auth enforced" : "first-boot setup");
+    _isAPMode = true;
+    WiFi.mode(fallback ? WIFI_AP_STA : WIFI_AP);
+
+    IPAddress apIP(192, 168, 4, 1);
+    WiFi.softAPConfig(apIP, apIP, IPAddress(255, 255, 255, 0));
+
+    const char* portalName = (strlen(_currentHostname) > 0) ? _currentHostname : "ESP32-Setup";
+    bool apResult = WiFi.softAP(portalName);
+    ESP_LOGI(TAG, "softAP('%s') returned %s", portalName, apResult ? "true" : "FALSE");
+
+    // Start DNS Hijacker
+    _dnsServer = std::make_unique<DNSServer>();
+    _dnsServer->start(53, "*", apIP);
+    ESP_LOGI(TAG, "Access Point '%s' is online. IP: %s", portalName, apIP.toString().c_str());
+    _lastApiRequestTime = now; // Reset AP timeout timer
+
+    // Notify subscribers that AP mode is active
+    if (_eventBus) {
+        _eventBus->publish(WifiEvents::WIFI_AP_STARTED);
+    }
+}
+
+/**
+ * @brief Stop the captive AP and DNS hijacker if running.
+ *
+ * softAPdisconnect(true) disables only the AP interface: from WIFI_AP_STA the
+ * radio drops to WIFI_STA and an established STA link is kept.
+ */
+void WifiManager::stopAccessPoint() {
+    if (!_isAPMode) return;
+    if (_dnsServer) {
+        _dnsServer->stop();
+        _dnsServer.reset();
+    }
+    WiFi.softAPdisconnect(true);
+    _isAPMode = false;
+}
+
+/**
  * @brief Periodic maintenance tick for the WiFi state machine.
+ *
+ * All WiFi.* calls happen here, on the main loop.
  */
 void WifiManager::tick(uint32_t currentMillis) {
     // --- Handle deferred restart (set by connect/forget handlers) ---
@@ -226,22 +361,47 @@ void WifiManager::tick(uint32_t currentMillis) {
         return; // Unreachable, but makes intent clear
     }
 
+    // --- Deferred reconnect (triggered by updateWiFi via portal) ---
+    // Honoured in every state: with the fallback AP the portal is reachable
+    // while the state machine cycles StaConnecting/StaBackoff (#236 D-F).
+    if (_reconnectRequested) {
+        _reconnectRequested = false;
+        ESP_LOGI(TAG, "Executing deferred reconnect with new credentials...");
+        stopAccessPoint();
+        WiFi.disconnect(true);
+        WiFi.mode(WIFI_OFF);
+        _connectionRetries = 0;
+        _fallbackApSuppressed = false;
+        _wifiDisconnectTimer.setInterval(0);
+        transitionTo(WiFiState::Init, currentMillis);
+        return;
+    }
+
+    // The captive portal DNS must be served in every state the AP can be up in.
+    processDNS();
+
+    // --- Fallback AP inactivity (credentials stored) ---
+    // Drop only the fallback AP; STA keeps retrying. Wi-Fi is never switched
+    // off on a device with credentials (#236 D-D).
+    // Guard: _lastApiRequestTime may be set by an HTTP handler (via
+    // notifyApiActivity → millis()) AFTER currentMillis was captured
+    // at tick-start, causing unsigned underflow to ~4.3 billion.
+    if (_isAPMode && hasCredentials() &&
+        currentMillis > _lastApiRequestTime &&
+        (currentMillis - _lastApiRequestTime) > AP_INACTIVITY_TIMEOUT_MS) {
+        ESP_LOGW(TAG, "Fallback AP inactive for 1 hour. Dropping AP; STA retries continue.");
+        stopAccessPoint(); // AP_STA -> STA; the STA interface stays up
+        _fallbackApSuppressed = true;
+    }
+
     switch (_currentState) {
         case WiFiState::Init: {
             if (_stateTimer.check(currentMillis)) {
-                if (strlen(_wifiSsid) > 0) {
-                    ESP_LOGI(TAG, "Connecting to %s...", _wifiSsid);
-                    WiFi.mode(WIFI_STA);
-                    WiFi.setSleep(WIFI_PS_NONE);
-                    if (strlen(_currentHostname) > 0) {
-                        WiFi.setHostname(_currentHostname);
-                    }
-                    connectStation(_wifiSsid, _wifiPass);
-                    _connectionRetries = 0;
-                    transitionTo(WiFiState::StaConnecting);
+                if (hasCredentials()) {
+                    startStaAttempt(currentMillis);
                 } else {
                     ESP_LOGW(TAG, "No credentials found. Falling back to AP mode.");
-                    transitionTo(WiFiState::ApStarting);
+                    transitionTo(WiFiState::ApStarting, currentMillis);
                 }
             }
             break;
@@ -249,117 +409,94 @@ void WifiManager::tick(uint32_t currentMillis) {
 
         case WiFiState::StaConnecting:
             if (WiFi.status() == WL_CONNECTED) {
-                ESP_LOGI(TAG, "Connected successfully. IP: %s", WiFi.localIP().toString().c_str());
-                _isAPMode = false;
-                _wifiDisconnectTimer.setInterval(0); // Reset downtime tracker
-                updateMyUrl();
-                ESP_LOGI(TAG, "Attempting to publish wifi.connected, _eventBus=%p", _eventBus);
-                if (_eventBus) {
-                    ESP_LOGI(TAG, "Publishing WIFI_CONNECTED to event bus...");
-                    int count = _eventBus->publish(WifiEvents::WIFI_CONNECTED);
-                    ESP_LOGI(TAG, "Published WIFI_CONNECTED to %d subscribers", count);
+                onStaConnected(currentMillis);
+            } else if (currentMillis - _stateTimer.getLastFire() > STA_ATTEMPT_TIMEOUT_MS) {
+                // Abort the pending association without disabling the STA
+                // interface (keeps a running fallback AP untouched).
+                WiFi.disconnect(false);
+                if (!hasCredentials()) {
+                    // Credentials were erased mid-attempt: first-boot setup path.
+                    ESP_LOGW(TAG, "WiFi connection timed out and no credentials remain. Starting setup AP.");
+                    transitionTo(WiFiState::ApStarting, currentMillis);
+                    break;
                 }
-                transitionTo(WiFiState::Ready);
-            } else if (_stateTimer.check(currentMillis) && (currentMillis - _stateTimer.getLastFire() > 15000)) { // 15 second timeout for STA
-                ESP_LOGW(TAG, "WiFi connection timed out. Falling back to AP.");
-                WiFi.disconnect(true); // Ensure clean slate
-                transitionTo(WiFiState::ApStarting);
+                // STA-first (#236 D-A): never fall back to AP-only mode.
+                _connectionRetries++;
+                ESP_LOGW(TAG, "WiFi connection attempt %d timed out. Retrying in %u s.",
+                         _connectionRetries, (unsigned)(staRetryDelayMs(_connectionRetries) / 1000));
+                transitionTo(WiFiState::StaBackoff, currentMillis);
+            }
+            break;
+
+        case WiFiState::StaBackoff:
+            // The driver may still re-associate on its own during the wait.
+            if (WiFi.status() == WL_CONNECTED) {
+                onStaConnected(currentMillis);
+                break;
+            }
+            // Long outage: raise the fallback AP alongside STA (#236 D-B).
+            if (shouldStartFallbackAp(hasCredentials(), _isAPMode, _fallbackApSuppressed,
+                                      staDownMs(currentMillis))) {
+                ESP_LOGW(TAG, "STA down for > %u s. Starting fallback AP alongside STA.",
+                         (unsigned)(FALLBACK_AP_DELAY_MS / 1000));
+                startAccessPoint(currentMillis);
+            }
+            if (currentMillis - _stateTimer.getLastFire() >= staRetryDelayMs(_connectionRetries)) {
+                startStaAttempt(currentMillis);
             }
             break;
 
         case WiFiState::ApStarting:
-            ESP_LOGI(TAG, "Starting Access Point setup (Captive Portal)...");
-            _isAPMode = true;
-            WiFi.mode(WIFI_AP);
-            
-            {
-                IPAddress apIP(192, 168, 4, 1);
-                WiFi.softAPConfig(apIP, apIP, IPAddress(255, 255, 255, 0));
-                
-                const char* portalName = (strlen(_currentHostname) > 0) ? _currentHostname : "ESP32-Setup";
-                bool apResult = WiFi.softAP(portalName);
-                ESP_LOGI(TAG, "softAP('%s') returned %s", portalName, apResult ? "true" : "FALSE");
-                
-                // Start DNS Hijacker
-                _dnsServer = std::make_unique<DNSServer>();
-                _dnsServer->start(53, "*", apIP);
-                ESP_LOGI(TAG, "Access Point '%s' is online. IP: %s", portalName, apIP.toString().c_str());
-                _lastApiRequestTime = currentMillis; // Reset AP timeout timer
-            }
-            
-            // Notify subscribers that AP mode is active
-            if (_eventBus) {
-                _eventBus->publish(WifiEvents::WIFI_AP_STARTED);
-            }
-            transitionTo(WiFiState::Ready);
+            // Reached only without credentials: first-boot setup AP (unchanged).
+            startAccessPoint(currentMillis);
+            transitionTo(WiFiState::Ready, currentMillis);
             break;
 
         case WiFiState::Ready:
-            // --- Deferred reconnect (triggered by updateWiFi via portal) ---
-            if (_reconnectRequested) {
-                _reconnectRequested = false;
-                ESP_LOGI(TAG, "Executing deferred reconnect with new credentials...");
-                if (_isAPMode) {
-                    if (_dnsServer) {
-                        _dnsServer->stop();
-                        _dnsServer.reset();
-                    }
-                    WiFi.softAPdisconnect(true);
-                    _isAPMode = false;
+            if (_isAPMode) {
+                if (hasCredentials()) {
+                    // Credentials were applied while the setup AP was up
+                    // (e.g. config import): leave setup mode via the normal
+                    // reconnect path so STA-first applies from here on.
+                    _reconnectRequested = true;
+                    break;
                 }
-                WiFi.disconnect(true);
-                WiFi.mode(WIFI_OFF);
-                transitionTo(WiFiState::Init);
-                break;
-            }
-
-            // Standard operational maintenance
-            processDNS();
-            
-            // Reconnection logic: If we're in STA mode and lost connection
-            if (!_isAPMode && WiFi.status() != WL_CONNECTED) {
-                // If this is the first tick since disconnection, start the timer
+                // Setup AP 1-hour inactivity timeout (no credentials only).
+                // Guard: see the underflow note above.
+                if (currentMillis > _lastApiRequestTime &&
+                    (currentMillis - _lastApiRequestTime) > AP_INACTIVITY_TIMEOUT_MS) {
+                    ESP_LOGW(TAG, "AP Mode inactive for 1 hour. Shutting down AP to save power.");
+                    transitionTo(WiFiState::Shutdown, currentMillis);
+                }
+            } else if (WiFi.status() != WL_CONNECTED) {
+                // STA link lost. If this is the first tick since disconnection,
+                // start the downtime tracker and notify subscribers.
                 if (_wifiDisconnectTimer.getInterval() == 0) {
-                    _wifiDisconnectTimer.reset(currentMillis);
-                    _wifiDisconnectTimer.setInterval(1); // Enable tracking
-                    ESP_LOGI(TAG, "_eventBus is %p", _eventBus);
+                    markStaDown(currentMillis);
                     if (_eventBus) {
                         _eventBus->publish(WifiEvents::WIFI_DISCONNECTED);
                     }
                 }
 
-                // Wait 10 seconds before attempting to recycle the connection
-                if (_wifiDisconnectTimer.check(currentMillis) && (currentMillis - _wifiDisconnectTimer.getLastFire() > 10000)) {
+                // Give the driver a grace period to re-associate on its own,
+                // then start the STA retry schedule.
+                if (staDownMs(currentMillis) > STA_LINK_LOSS_GRACE_MS) {
                     ESP_LOGW(TAG, "Primary connection lost. Retrying...");
-                    transitionTo(WiFiState::Init);
+                    _connectionRetries = 0;
+                    startStaAttempt(currentMillis);
                 }
-            } else if (_isAPMode) {
-                // AP Mode 1-hour inactivity timeout
-                // Guard: _lastApiRequestTime may be set by an HTTP handler (via
-                // notifyApiActivity → millis()) AFTER currentMillis was captured
-                // at tick-start, causing unsigned underflow to ~4.3 billion.
-                if (currentMillis > _lastApiRequestTime &&
-                    (currentMillis - _lastApiRequestTime) > 3600000) {
-                    ESP_LOGW(TAG, "AP Mode inactive for 1 hour. Shutting down AP to save power.");
-                    transitionTo(WiFiState::Shutdown);
-                }
-            } else {
-                // Reset timer if we are connected
-                if (WiFi.status() == WL_CONNECTED) {
-                    _wifiDisconnectTimer.setInterval(0); // Reset
-                }
+            } else if (_wifiDisconnectTimer.getInterval() != 0) {
+                // Re-associated within the grace period: pair the earlier
+                // WIFI_DISCONNECTED with WIFI_CONNECTED.
+                onStaConnected(currentMillis);
             }
             break;
 
         case WiFiState::Shutdown:
+            // Reached only from setup mode (no credentials).
             if (_isAPMode) {
-                _isAPMode = false;
-                WiFi.softAPdisconnect(true);
+                stopAccessPoint();
                 WiFi.mode(WIFI_OFF);
-                if (_dnsServer != nullptr) {
-                    _dnsServer->stop();
-                    _dnsServer.reset();
-                }
                 ESP_LOGI(TAG, "WiFi AP has been shut down.");
             }
             break;
@@ -478,7 +615,11 @@ void WifiManager::registerMCPTools(MCPToolRegistry& registry) {
             if (self->_isAPMode) {
                 WiFi.mode(WIFI_AP_STA);
             }
+#if defined(WITH_BLE)
+            int16_t count = WiFi.scanNetworks(false, false, false, 120);
+#else
             int16_t count = WiFi.scanNetworks(false);
+#endif
             if (count < 0) {
                 result["error"] = "Scan failed";
             } else {
@@ -491,7 +632,9 @@ void WifiManager::registerMCPTools(MCPToolRegistry& registry) {
                 }
                 WiFi.scanDelete();
             }
-            if (self->_isAPMode) {
+            // Only the setup AP returns to AP-only; the fallback AP must keep
+            // STA running so it can keep retrying the stored network (#236).
+            if (self->isSetupMode()) {
                 WiFi.mode(WIFI_AP);
             }
         }, this, true);
@@ -580,7 +723,12 @@ esp_err_t WifiManager::handleScan(PsychicRequest* request, PsychicResponse* resp
             WiFi.mode(WIFI_AP_STA);
         }
         ESP_LOGI(TAG, "Starting async WiFi scan...");
+#if defined(WITH_BLE)
+        // Use 120ms max channel time when coexistence with BLE is active to prevent radio starvation
+        WiFi.scanNetworks(true, false, false, 120);
+#else
         WiFi.scanNetworks(true); // true = async
+#endif
         response->send(202, "application/json", "{\"status\":\"scanning\"}");
         return ESP_OK;
     }
@@ -941,7 +1089,8 @@ void WifiManager::updateMyUrl() {
  * @brief Returns true if WiFi has been disconnected for longer than the timeout period (3 minutes).
  */
 bool WifiManager::isWifiPersistentError() const {
-    if (_isAPMode || (WiFi.status() == WL_CONNECTED)) return false;
+    // The fallback AP (credentials stored) does not mask an STA outage.
+    if (isSetupMode() || (WiFi.status() == WL_CONNECTED)) return false;
     if (_wifiDisconnectTimer.getInterval() == 0) return false;
     
     // Over 3 minutes of continuous disconnection

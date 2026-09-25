@@ -233,13 +233,24 @@ bool Application::begin(const FrameworkConfig& config) {
     _wifiManager.begin();
     ESP_LOGI(TAG, "WiFi setup initiated");
 
-    // React to async AP mode activation — sync AuthManager so portal API
-    // requests bypass the auth guard (AP mode has no credentials to check).
+    // Sync the AuthManager AP-mode bypass with WifiManager. The bypass applies
+    // ONLY to first-boot setup (AP up and no stored credentials). A fallback AP
+    // raised during an STA outage on a configured device keeps portal auth
+    // enforced (#236). Re-evaluated whenever the AP starts and whenever STA
+    // connects (which also tears any fallback AP down), so it is never left
+    // true once credentials exist.
     _eventBus.subscribe(WifiEvents::WIFI_AP_STARTED,
         [](const char* /*topic*/, const void* /*payload*/, void* ctx) {
             auto* self = static_cast<Application*>(ctx);
-            self->_authManager.setAPMode(true);
-            ESP_LOGI(TAG, "AP mode detected — AuthManager auth bypass enabled");
+            const bool setup = self->_wifiManager.isSetupMode();
+            self->_authManager.setAPMode(setup);
+            ESP_LOGI(TAG, "AP started (%s) — AuthManager auth bypass %s",
+                     setup ? "setup" : "fallback", setup ? "enabled" : "NOT enabled");
+        }, this);
+    _eventBus.subscribe(WifiEvents::WIFI_CONNECTED,
+        [](const char* /*topic*/, const void* /*payload*/, void* ctx) {
+            auto* self = static_cast<Application*>(ctx);
+            self->_authManager.setAPMode(self->_wifiManager.isSetupMode());
         }, this);
 
     _statusReporter->reportStatus("WiFi initialized", 0.55f);
@@ -259,7 +270,7 @@ bool Application::begin(const FrameworkConfig& config) {
     // --- Step 14: (Merged into Step 7 module registration) ---
 
     // --- Step 15: WebServerManager begin() ---
-    _authManager.setAPMode(_wifiManager.getAPMode());
+    _authManager.setAPMode(_wifiManager.isSetupMode());
     _webServerManager.setAppName(getAppName());
     if (_appStylesheet) {
         _webServerManager.setAppStylesheet(_appStylesheet);

@@ -20,6 +20,7 @@ src/CMakeLists.txt
 CMakeLists.txt
 dependencies.lock
 idf_component.yml
+!src/idf_component.yml
 !sample-app/src/idf_component.yml
 
 # Web test infrastructure (test/web/)
@@ -74,3 +75,4 @@ uidesign/*/lvglpro/preview-build/
 uidesign/*/lvglpro/preview-bin/
 uidesign/*/lvglpro/.cache.json
 .cm_project
+__pycache__/

@@ -35,6 +35,7 @@ Once you are building or shipping an application, read these for production read
 17. [Custom Board Authoring Guide](custom-boards.md) — Author custom board definitions and pinouts for downstream repos with zero framework edits (HC-11).
 18. [Reporting Framework Issues](issue-management.md) — How to raise, label, and track defects on the framework repo; the consumer-pointer convention for audit files.
 19. [Migration Guide: fetchUpdate](migration-guide-fetchupdate.md) — Downstream migration guide for the breaking `fetchUpdate(const FetchContext&)` and `queueDataJob()` APIs.
+20. [Bluetooth Low Energy (BLE)](bluetooth.md) — Managed BLE infrastructure, Peripheral and Central role providers, threading contracts, and Wi-Fi/BLE coexistence.
 
 ## Quick Reference
 

@@ -195,6 +195,145 @@ TEST_F(WifiManagerTest, SerializeApplyRoundtrip_Consistent) {
     EXPECT_STREQ("RoundtripSSID", wm2.getSSID());
 }
 
+// ---------------------------------------------------------------------------
+// STA resilience / setup-mode policy (issue #236)
+//
+// Stub limitations: test/stubs/platform/WiFi.h reports WL_CONNECTED
+// unconditionally and WiFi.mode() is a no-op without a getter, so the native
+// suite cannot drive a real STA failure through tick() nor observe the radio
+// mode. The failure-path decisions are therefore factored into the pure
+// policy helpers staRetryDelayMs() / shouldStartFallbackAp(), which tick()
+// uses directly and which are tested here; tick() itself is driven through
+// the setup and credentials paths the stub can express.
+// ---------------------------------------------------------------------------
+
+#include "EventBus.hpp"
+
+namespace {
+struct EventCounter {
+    int connected = 0;
+    int apStarted = 0;
+    static void onConnected(const char*, const void*, void* ctx) { static_cast<EventCounter*>(ctx)->connected++; }
+    static void onApStarted(const char*, const void*, void* ctx) { static_cast<EventCounter*>(ctx)->apStarted++; }
+};
+} // namespace
+
+// Backoff between STA attempts: 5 s, 10 s, 30 s, then every 60 s.
+TEST(WifiReconnectPolicyTest, StaRetryBackoffSchedule) {
+    EXPECT_EQ(5000u,  WifiManager::staRetryDelayMs(1));
+    EXPECT_EQ(10000u, WifiManager::staRetryDelayMs(2));
+    EXPECT_EQ(30000u, WifiManager::staRetryDelayMs(3));
+    EXPECT_EQ(60000u, WifiManager::staRetryDelayMs(4));
+    EXPECT_EQ(60000u, WifiManager::staRetryDelayMs(5));
+    EXPECT_EQ(60000u, WifiManager::staRetryDelayMs(1000));
+}
+
+// Fallback AP (AP+STA) starts only after > 3 min of continuous STA downtime,
+// only when credentials exist, and not while an AP is up or it was dropped for idleness.
+TEST(WifiReconnectPolicyTest, FallbackApStartsOnlyAfterThreeMinutesWithCredentials) {
+    EXPECT_FALSE(WifiManager::shouldStartFallbackAp(true, false, false, 0));
+    EXPECT_FALSE(WifiManager::shouldStartFallbackAp(true, false, false, 60000));   // 60 s router reboot
+    EXPECT_FALSE(WifiManager::shouldStartFallbackAp(true, false, false, 180000));  // exactly 3 min
+    EXPECT_TRUE (WifiManager::shouldStartFallbackAp(true, false, false, 180001));  // > 3 min
+    EXPECT_TRUE (WifiManager::shouldStartFallbackAp(true, false, false, 600000));  // 10 min outage
+    EXPECT_FALSE(WifiManager::shouldStartFallbackAp(false, false, false, 600000)); // no creds: setup path owns the AP
+    EXPECT_FALSE(WifiManager::shouldStartFallbackAp(true, true, false, 600000));   // already up
+    EXPECT_FALSE(WifiManager::shouldStartFallbackAp(true, false, true, 600000));   // dropped after 1 h idle
+}
+
+// Cumulative timeline for a 60 s outage under the schedule: the fallback AP
+// cannot start before STA has had several attempts, and never within 3 min.
+TEST(WifiReconnectPolicyTest, BackoffScheduleReachesFallbackAfterAboutThreeMinutes) {
+    const uint32_t graceMs = 10000, attemptMs = 15000;
+    uint32_t t = graceMs;  // first attempt after link-loss grace
+    int attempts = 0;
+    bool apStarted = false;
+    uint32_t apAt = 0;
+    while (t < 600000 && !apStarted) {
+        t += attemptMs;                      // attempt times out
+        attempts++;
+        uint32_t backoffEnd = t + WifiManager::staRetryDelayMs(attempts);
+        // fallback AP is evaluated during backoff
+        if (WifiManager::shouldStartFallbackAp(true, false, false, backoffEnd)) {
+            apStarted = true;
+            apAt = (t > 180000) ? t : 180001;
+        }
+        t = backoffEnd;
+    }
+    EXPECT_TRUE(apStarted);
+    EXPECT_GE(attempts, 4);
+    EXPECT_GT(apAt, 180000u);
+    EXPECT_LT(apAt, 250000u);  // "about 3 min"
+}
+
+// First boot, no credentials: setup AP with auth bypass (unchanged behaviour).
+TEST(WifiSetupModeTest, NoCredentialsStartsSetupAp) {
+    WifiManager wifi;
+    EventBus bus;
+    EventCounter counter;
+    bus.subscribe(WifiEvents::WIFI_AP_STARTED, &EventCounter::onApStarted, &counter);
+    wifi.setEventBus(&bus);
+
+    wifi.begin();
+    wifi.tick(2000);   // Init -> ApStarting
+    wifi.tick(2001);   // ApStarting -> Ready (AP up)
+    EXPECT_TRUE(wifi.getAPMode());
+    EXPECT_TRUE(wifi.isSetupMode());
+    EXPECT_TRUE(wifi.isReady());
+    EXPECT_EQ(1, counter.apStarted);
+}
+
+// Credentials arriving while in setup mode end the bypass immediately and
+// the device leaves AP mode for STA.
+TEST(WifiSetupModeTest, CredentialsEndSetupMode) {
+    WifiManager wifi;
+    EventBus bus;
+    EventCounter counter;
+    bus.subscribe(WifiEvents::WIFI_CONNECTED, &EventCounter::onConnected, &counter);
+    wifi.setEventBus(&bus);
+
+    wifi.begin();
+    wifi.tick(2000);
+    wifi.tick(2001);
+    ASSERT_TRUE(wifi.isSetupMode());
+
+    wifi.updateWiFi("HomeNet", "secret");
+    EXPECT_FALSE(wifi.isSetupMode());   // AP still up, but credentials exist: no bypass
+
+    wifi.tick(3000);                    // deferred reconnect: AP torn down -> Init
+    EXPECT_FALSE(wifi.getAPMode());
+    wifi.tick(5000);                    // Init -> STA attempt
+    wifi.tick(5001);                    // StaConnecting -> connected (stub)
+    EXPECT_TRUE(wifi.isReady());
+    EXPECT_FALSE(wifi.getAPMode());
+    EXPECT_FALSE(wifi.isSetupMode());
+    EXPECT_EQ(1, counter.connected);
+}
+
+// With credentials the device goes STA, never AP, and isSetupMode() is never true.
+TEST(WifiSetupModeTest, WithCredentialsNeverEntersApOrSetupMode) {
+    WifiManager wifi;
+    EventBus bus;
+    EventCounter counter;
+    bus.subscribe(WifiEvents::WIFI_AP_STARTED, &EventCounter::onApStarted, &counter);
+    wifi.setEventBus(&bus);
+
+    JsonDocument doc;
+    JsonObject section = doc.to<JsonObject>();
+    section["ssid"] = "HomeNet";
+    wifi.applyConfig(section);
+    EXPECT_FALSE(wifi.isSetupMode());
+
+    wifi.begin();
+    for (uint32_t t = 0; t <= 600000; t += 500) {
+        wifi.tick(t);
+        EXPECT_FALSE(wifi.getAPMode());
+        EXPECT_FALSE(wifi.isSetupMode());
+    }
+    EXPECT_TRUE(wifi.isReady());
+    EXPECT_EQ(0, counter.apStarted);
+}
+
 #include "PreconditionEngine.hpp"
 #include "WifiPreconditionContributor.hpp"
 

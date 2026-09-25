@@ -309,9 +309,6 @@ document.addEventListener('DOMContentLoaded', function() {
       el.remove();
     });
 
-    // Find the System tab link to insert app tabs before it
-    var systemLink = bottomNav.querySelector('[data-target="tab-system"]');
-
     // Generic grid icon used for app-contributed tabs that declare no custom icon.
     // Tabs that return a non-null icon string from getTabIcon() use it instead.
     var DEFAULT_GENERIC_ICON =
@@ -351,16 +348,26 @@ document.addEventListener('DOMContentLoaded', function() {
       link.className = 'tab-link';
       link.setAttribute('data-target', tabId);
       link.setAttribute('data-injected', 'true');
+      var tabOrder = (tab.order !== undefined && tab.order !== null) ? Number(tab.order) : 100;
+      link.setAttribute('data-order', String(tabOrder));
       link.setAttribute('role', 'tab');
       link.setAttribute('aria-selected', 'false');
       link.setAttribute('aria-controls', tabId);
       link.id = 'nav-' + tabId.replace('tab-', '');
       link.innerHTML = '<span class="icon">' + svgHTML + '</span>' + tab.name.toUpperCase();
 
-      // Insert before System tab
-      if (systemLink) {
-        bottomNav.insertBefore(link, systemLink);
-      } else {
+      // Walk all nav links and insert before the first link with a higher order value
+      var existingLinks = bottomNav.querySelectorAll('.tab-link');
+      var inserted = false;
+      for (var j = 0; j < existingLinks.length; j++) {
+        var existingOrder = parseInt(existingLinks[j].getAttribute('data-order'), 10);
+        if (!isNaN(existingOrder) && existingOrder > tabOrder) {
+          bottomNav.insertBefore(link, existingLinks[j]);
+          inserted = true;
+          break;
+        }
+      }
+      if (!inserted) {
         bottomNav.appendChild(link);
       }
     }

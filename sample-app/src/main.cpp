@@ -46,6 +46,17 @@ static MCPServer mcpServer;
 static ButtonModule buttonModule;
 #endif
 
+#ifdef WITH_BLE
+#include "BLEManager/BLEManager.hpp"
+#include "ble/SampleFtmsProvider.hpp"
+#include "ble/SampleHrRepeater.hpp"
+#include "ble/SampleHrClient.hpp"
+static BLEManager bleManager;
+static SampleFtmsProvider ftmsProvider;
+static SampleHrRepeater hrRepeater;
+static SampleHrClient hrClient(&hrRepeater);
+#endif
+
 #ifdef WITH_ENCODER
 #include "EncoderModule.hpp"
 #include "board.h"
@@ -103,6 +114,15 @@ void setup() {
 
 #ifdef WITH_OTA
     app.registerModule(&otaManager);
+#endif
+
+#ifdef WITH_BLE
+    bleManager.registerServiceProvider(&ftmsProvider);
+    bleManager.registerServiceProvider(&hrRepeater);
+    bleManager.registerClientProvider(&hrClient);
+    app.registerModule(&bleManager);
+    app.registerModule(&ftmsProvider);
+    app.registerModule(&hrClient);
 #endif
 
 #ifdef WITH_HOMEASSISTANT
@@ -191,6 +211,10 @@ void setup() {
 
     // Begin framework
     app.begin(config);
+
+#ifdef WITH_BLE
+    bleManager.begin(app);
+#endif
 
 #ifdef WITH_OTA
     otaManager.begin(app);
