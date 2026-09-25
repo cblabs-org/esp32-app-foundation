@@ -50,16 +50,16 @@ These should be consolidated — derive the hostname from the app name.
 
 ### Phase 1: Fix Display Init Order (W1)
 
-- [ ] **`main.cpp`** — Move `displayModule.begin(&app.getEventBus())` call from its current position (BEFORE `app.begin(config)`) to AFTER the `app.begin(config)` call. Read `docs/developer/using-optional-modules.md` for the canonical two-phase init pattern. If `bootstrapHardware()` is mentioned, verify whether it's needed and add it if so.
-- [ ] **`main.cpp`** — Move `configuringStatus.setEngine(...)` call to also be after `app.begin(config)` if it depends on the PreconditionEngine being initialized.
+- [x] **`main.cpp`** — Move `displayModule.begin(&app.getEventBus())` call from its current position (BEFORE `app.begin(config)`) to AFTER the `app.begin(config)` call. Read `docs/developer/using-optional-modules.md` for the canonical two-phase init pattern. If `bootstrapHardware()` is mentioned, verify whether it's needed and add it if so.
+- [x] **`main.cpp`** — Move `configuringStatus.setEngine(...)` call to also be after `app.begin(config)` if it depends on the PreconditionEngine being initialized.
 
 ### Phase 2: Remove Stale Include (W3)
 
-- [ ] **`main.cpp`** — Remove `#include <cstring>` if no `memcpy`, `strlen`, `strcpy`, `strncpy`, `strlcpy`, `memset`, `memmove`, or other `<cstring>` functions are used directly in main.cpp. Verify by searching before removing.
+- [x] **`main.cpp`** — Remove `#include <cstring>` if no `memcpy`, `strlen`, `strcpy`, `strncpy`, `strlcpy`, `memset`, `memmove`, or other `<cstring>` functions are used directly in main.cpp. Verify by searching before removing.
 
 ### Phase 3: OTA Config (W4)
 
-- [ ] **`main.cpp`** — Replace the commented-out OTA lines (around L191-192) with a well-documented example block:
+- [x] **`main.cpp`** — Replace the commented-out OTA lines (around L191-192) with a well-documented example block:
   ```cpp
   // --- OTA Configuration ---
   // Uncomment and configure for over-the-air firmware updates.
@@ -70,7 +70,7 @@ These should be consolidated — derive the hostname from the app name.
 
 ### Phase 4: Identity Consolidation (#232)
 
-- [ ] **`main.cpp`** — Add a helper lambda or inline code near the top of `setup()` (after `app.setAppName(...)`) that derives the WiFi hostname from the app name. Convert to lowercase and replace spaces/special chars with hyphens:
+- [x] **`main.cpp`** — Add a helper lambda or inline code near the top of `setup()` (after `app.setAppName(...)`) that derives the WiFi hostname from the app name. Convert to lowercase and replace spaces/special chars with hyphens:
   ```cpp
   // #232: Derive WiFi hostname from app name until framework auto-propagates.
   // "Weather Station" → "weather-station"
@@ -88,14 +88,14 @@ These should be consolidated — derive the hostname from the app name.
       return hostname;
   };
   ```
-- [ ] **`main.cpp`** — Replace the hardcoded `setDefaultHostname("WeatherStation")` call with `setDefaultHostname(sanitiseHostname(app.getAppName()).c_str())`
-- [ ] **`main.cpp`** — Add an inline comment at the `haModule.setAppName(app.getAppName())` line: `// #232: Manual wiring until framework auto-propagates`
-- [ ] **`main.cpp`** — In the `#ifdef WITH_BLE` block, add a comment documenting the BLE gap: `// #232: BLE advertised name not yet wirable from app name — see issue #232`
-- [ ] **`main.cpp`** — Verify the `BootBranding` title is set to `"Weather Station"` (it should already be correct)
+- [x] **`main.cpp`** — Replace the hardcoded `setDefaultHostname("WeatherStation")` call with `setDefaultHostname(sanitiseHostname(app.getAppName()).c_str())`
+- [x] **`main.cpp`** — Add an inline comment at the `haModule.setAppName(app.getAppName())` line: `// #232: Manual wiring until framework auto-propagates`
+- [x] **`main.cpp`** — In the `#ifdef WITH_BLE` block, add a comment documenting the BLE gap: `// #232: BLE advertised name not yet wirable from app name — see issue #232`
+- [x] **`main.cpp`** — Verify the `BootBranding` title is set to `"Weather Station"` (it should already be correct)
 
 ### Phase 5: Header Cleanup
 
-- [ ] **`main.cpp`** — Update the file header comment block to reflect the changes made (identity consolidation, display init order fix)
+- [x] **`main.cpp`** — Update the file header comment block to reflect the changes made (identity consolidation, display init order fix)
 
 ## Verification Requirement
 
@@ -113,19 +113,25 @@ If you discover a defect, upstream bug, or concern *outside your boundary box*, 
 <!-- Written by the worker at task completion -->
 
 ### Status
-(pending)
+Complete
 
 ### Changes Made
-(pending)
+- `sample-app/src/main.cpp`:
+  - **Display Init Order (W1)**: Moved `displayModule.begin(&app.getEventBus())`, `displayModule.setConfigManager(...)`, `diagnosticsBoard.configure(...)`, `displayModule.boards.configuringStatus.setEngine(...)`, `displayModule.carousel.add(...)`, and `weatherBoard.wireEventBus(...)` from before `app.begin(config)` to after `app.begin(config)`.
+  - **Stale Include Removal (W3)**: Removed `#include <cstring>` after verifying no C-string memory/string manipulation functions were utilized.
+  - **OTA Configuration (W4)**: Replaced commented-out legacy OTA configuration and TODO comments with the documented example block.
+  - **Identity Consolidation (#232)**: Added `sanitiseHostname` lambda in `setup()` immediately following `app.setAppName("Weather Station")` to derive `"weather-station"`. Replaced hardcoded `setDefaultHostname("WeatherStation")` with `setDefaultHostname(sanitiseHostname(app.getAppName()).c_str())`. Annotated `haModule.setAppName(...)` and `#ifdef WITH_BLE` block with `#232` tracking comments. Verified `BootBranding` title is `"Weather Station"`.
+  - **Header Cleanup**: Updated file header comment block to document identity consolidation and display two-phase lifecycle.
 
 ### Decisions Made
-(pending)
+- `bootstrapHardware()` is called automatically by `Application::begin()` through `_bootReporter->beginEarly()` when `displayModule` is registered prior to `app.begin()`, conforming to the framework's two-phase display initialization architecture without requiring an explicit call in `setup()`.
+- Grouped `sanitiseHostname` and `app.getWifiManager().setDefaultHostname(...)` directly after `app.setAppName("Weather Station")` at the beginning of `setup()` to consolidate identity initialization in a single location.
 
 ### Dead Ends & Warnings
-(pending)
+- None encountered.
 
 ### Out-of-Scope Findings
-(pending)
+- Issue #232 tracking: Automatic propagation of device application name to peripheral identifiers (such as BLE advertising local name and WiFi default hostname) remains a desirable future framework-level feature.
 
 ### Blockers
-(pending)
+- None. User approval explicitly granted on 2026-09-25.
