@@ -110,19 +110,36 @@ If you discover a defect, upstream bug, or concern *outside your boundary box*, 
 <!-- Written by the worker at task completion -->
 
 ### Status
-(pending)
+Complete. Implementation approved by coordinator.
 
 ### Changes Made
-(pending)
+- Rewrote `sample-app/web/weather.js` from scratch to adhere to the ESP32 App Foundation portal design system.
+- Completely removed all inline `style="..."` attributes and hard-coded hex colors, introducing a scoped `<style>` block using `.weather-` prefixed class names and standard framework CSS custom properties (`--primary`, `--primary-hover`, `--primary-alpha`, `--card-bg`, `--border`, `--text`, `--text-muted`, `--error`, `--warning`).
+- Implemented three distinct display states:
+  1. **Loading state (`#weather-loading`)**: Centered spinner and descriptive status text during initial async data loading.
+  2. **Configuration-needed state (`#weather-config-needed`)**: Prominent callout card displayed when API key or location coordinates are missing, explaining requirements with a link to OpenWeatherMap, while retaining the config form below for immediate entry.
+  3. **Data state (`#weather-summary-card`)**: Responsive card with primary temperature, apparent temperature, condition text, OWM icon, and a 6-item CSS Grid detail layout (Humidity, Wind Speed, Pressure, Visibility, Temp Range, Cloud Cover).
+- Overhauled the configuration form:
+  - Masked API key field displaying `"Key saved ✓"` when a key is already stored, preventing credential exposure in DOM.
+  - Interactive Feather eye icon button to toggle password visibility during active input.
+  - Status dot indicator (`.dot--green` / `.dot--red`) for API key state.
+  - Save button with native `aria-busy` busy spinner support.
+- Added lifecycle-aware auto-refresh:
+  - Polls `GET /api/weather/status` every 60 seconds while the Weather tab is active.
+  - Automatically ceases polling when navigating away or when document visibility is hidden (`visibilitychange`).
+- Added dismissible error/warning alert banner (`#weather-alert`) for API connection issues and OpenWeatherMap return codes (Auth Error, Rate Limited, Network Error, Parse Error).
+- Refactored supplementary diagnostics drawer to use `.info-drawer` and `.diag-table` component classes.
 
 ### Decisions Made
-(pending)
+- Replaced dynamic inline `.style.*` DOM manipulations with clean classList toggles (`.weather-hidden`, `.dot--green`, `.dot--red`, `.dot--yellow`, `.dot--grey`) and standard HTML attributes (`disabled`, `aria-busy`).
+- Used `color-mix()` with framework CSS tokens for subtle alert and callout background tints, ensuring automatic adaptability in both light and dark themes without hardcoding RGB values.
+- Retained the diagnostics drawer below the configuration form so detailed backend state and raw metrics remain accessible without cluttering the primary weather view.
 
 ### Dead Ends & Warnings
-(pending)
+- None.
 
 ### Out-of-Scope Findings
-(pending)
+- None.
 
 ### Blockers
-(pending)
+- None.

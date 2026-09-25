@@ -9,16 +9,16 @@
 |---|---|
 | Project ID | `sample-app-remediation` |
 | Base Branch | `main` |
-| Status | **WO3/6 — In Progress** |
+| Status | **WO5/6 — In Progress** |
 | Human Approval | ✅ 2026-09-23 (Q1–Q6 resolved), 2026-09-25 (execution approved) |
 
 ## Work Order Ledger
 
 - **[x] [wo1-fix-fetch](wo1-fix-fetch/WORKORDER.md):** Fix critical WiFi guard race condition + thread safety violations (C1, C2, N4, N5, N7, N8, W6)
 - **[x] [wo2-precondition-arch](wo2-precondition-arch/WORKORDER.md):** Precondition architecture & CONFIGURING UX (C4, N9)
-- **[ ] [wo3-arduinojson-migration](wo3-arduinojson-migration/WORKORDER.md):** ArduinoJson migration + data/display separation (N1, N2, N3, C3)
-- **[ ] wo4-boot-cleanup:** Boot sequence + main.cpp cleanup + identity consolidation #232 (W1, W3, W4, W7)
-- **[ ] wo5-portal-redesign:** Portal JS design system overhaul (W5)
+- **[x] [wo3-arduinojson-migration](wo3-arduinojson-migration/WORKORDER.md):** ArduinoJson migration + data/display separation (N1, N2, N3, C3)
+- **[x] [wo4-boot-cleanup](wo4-boot-cleanup/WORKORDER.md):** Boot sequence + main.cpp cleanup + identity consolidation #232 (W1, W3, W4, W7)
+- **[ ] [wo5-portal-redesign](wo5-portal-redesign/WORKORDER.md):** Portal JS design system overhaul (W5)
 - **[ ] wo6-docs-soak:** Documentation, tests, house style & device verification (N6, N10, N11, N12)
 
 ## Modules & Components
