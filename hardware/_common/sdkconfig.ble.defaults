@@ -13,100 +13,271 @@
 #
 # Wired via: board_build.cmake_extra_args in platformio.ini [env:esp32s3nano_ble].
 # Authoritative: RFC #225 rev 2 §16.2.
+#
+# Measured cost:  ~69 KB internal DRAM on ESP32-S3 (controller ~35-40 KB
+#                 non-negotiable + host ~25-30 KB tunable via settings below).
+#
+# IMPORTANT:  After changing ANY setting in this file, delete the generated
+#             sdkconfig.<env> file and perform a clean build (`pio run -t clean`).
+#             The Kconfig system caches values and will silently ignore updates.
 # =============================================================================
 
-# --- Bluetooth controller & host ---
+# ╔═══════════════════════════════════════════════════════════════════════════╗
+# ║  1. CONTROLLER & HOST SELECTION                                          ║
+# ╚═══════════════════════════════════════════════════════════════════════════╝
+# Enable the Bluetooth controller and select NimBLE as the host stack.
+# NimBLE was chosen over Bluedroid for its significantly lower memory footprint
+# (~30 KB DRAM vs ~100 KB), faster boot time, and better ESP-IDF 5.x integration.
+# The framework uses h2zero/esp-nimble-cpp@^2.1.0 as the C++ wrapper.
 CONFIG_BT_ENABLED=y
 CONFIG_BT_NIMBLE_ENABLED=y
 
-# --- NimBLE roles (all four — general-purpose framework) ---
-# Consumer apps that only need Peripheral+Broadcaster can disable
-# Central/Observer via a downstream sdkconfig fragment for ~15 KB savings.
+# ╔═══════════════════════════════════════════════════════════════════════════╗
+# ║  2. ROLES                                                                ║
+# ╚═══════════════════════════════════════════════════════════════════════════╝
+# All four BLE roles are enabled so the framework's full feature set works
+# out of the box: IBLEServiceProvider (Peripheral+Broadcaster) and
+# IBLEClientProvider (Central+Observer) are both available.
+#
+# Consumer apps that only need the peripheral role (sensors, config portals,
+# beacons) can disable Central+Observer in a downstream sdkconfig fragment
+# for ~15-20 KB DRAM savings.  See the "peripheral-only" profile in
+# docs/developer/bluetooth.md §Memory Profiles.
 CONFIG_BT_NIMBLE_ROLE_CENTRAL=y
 CONFIG_BT_NIMBLE_ROLE_PERIPHERAL=y
 CONFIG_BT_NIMBLE_ROLE_OBSERVER=y
 CONFIG_BT_NIMBLE_ROLE_BROADCASTER=y
 
-# --- Connection budget: 2 (right-sized for most devices) ---
-# Gateway/hub apps needing more connections override to 4 in their fragment.
+# ╔═══════════════════════════════════════════════════════════════════════════╗
+# ║  3. CONNECTION BUDGET                                                    ║
+# ╚═══════════════════════════════════════════════════════════════════════════╝
+# 2 concurrent connections is sufficient for most IoT devices (e.g. one phone
+# connected to the peripheral GATT server + one outbound central connection to
+# a sensor).  Gateway/hub apps needing more connections should override to 4
+# in their downstream sdkconfig fragment.  Buffer pools below are proportional.
 CONFIG_BT_NIMBLE_MAX_CONNECTIONS=2
 
-# --- Controller: right-sized for 2 conns + 1 adv + 1 scan ---
+# ╔═══════════════════════════════════════════════════════════════════════════╗
+# ║  4. CONTROLLER ACTIVITY SLOTS                                            ║
+# ╚═══════════════════════════════════════════════════════════════════════════╝
 # Each activity slot costs 828 bytes of internal DRAM (per Kconfig docs).
+# 4 slots = 2 connections + 1 advertising + 1 scanning.  This is the minimum
+# for full-role operation.  The "peripheral-only" profile drops to 3 (no scan).
+# The "gateway" profile uses 6 (4 conns + adv + scan).
 CONFIG_BT_CTRL_BLE_MAX_ACT=4
 
-# --- Radio TX power: boost to maximum (+20 dBm) for ESP32-S3 ---
+# ╔═══════════════════════════════════════════════════════════════════════════╗
+# ║  5. RADIO TX POWER                                                       ║
+# ╚═══════════════════════════════════════════════════════════════════════════╝
+# Sets the controller's default TX power at boot to +20 dBm (ESP32-S3 max).
+# This is the sdkconfig-level complement to the runtime call in BLEStack::init():
+#   NimBLEDevice::setPower(20, NimBLETxPowerType::All);
+# Both must agree.  The runtime setPower() covers ADV, SCAN, and DEFAULT power
+# types — it does NOT affect WiFi TX power (that's a separate radio config).
+#
+# +20 dBm maximises advertising range and connection stability.  Validated in
+# the dev.73-dev.80 hardening cycle with 4 Mac CoreBluetooth connection cycles
+# at RSSI -85 to -91 dBm.
+#
+# Trade-off: higher TX power increases current draw by ~40-60 mA during
+# transmission bursts.  Battery-powered devices may want to lower this to
+# +9 dBm (P9) or +3 dBm (P3) in their downstream sdkconfig.
 CONFIG_BT_CTRL_DFT_TX_POWER_LEVEL_P20=y
 
-# --- Transport buffers: proportional to 2 connections ---
-# ACL RX from controller (was 24 — sized for 4 conns)
+# ╔═══════════════════════════════════════════════════════════════════════════╗
+# ║  6. HCI TRANSPORT BUFFERS                                                ║
+# ╚═══════════════════════════════════════════════════════════════════════════╝
+# These buffers shuttle data between the BLE controller (proprietary blob) and
+# the NimBLE host (open-source).  Sized proportionally to 2 connections.
+#
+# ACL (data) buffers from controller → host:
+#   12 buffers × 255 bytes = 3,060 bytes.
+#   Was 24 (sized for 4 connections in NimBLE defaults); halved.
 CONFIG_BT_NIMBLE_TRANSPORT_ACL_FROM_LL_COUNT=12
 CONFIG_BT_NIMBLE_TRANSPORT_ACL_SIZE=255
-# HCI event buffers (was 30 high + 8 discard)
+
+# HCI event buffers (advertisements, connection events, etc.):
+#   16 high-priority + 4 discardable = 20 total × 70 bytes = 1,400 bytes.
+#   Was 30+8 (NimBLE defaults); reduced to match 2-connection workload.
+#   The "discard" pool holds low-priority events that can be silently dropped
+#   under memory pressure (e.g. duplicate scan reports).
 CONFIG_BT_NIMBLE_TRANSPORT_EVT_SIZE=70
 CONFIG_BT_NIMBLE_TRANSPORT_EVT_COUNT=16
 CONFIG_BT_NIMBLE_TRANSPORT_EVT_DISCARD_COUNT=4
 
-# --- MSYS mbuf pools: right-sized for 2 connections ---
+# ╔═══════════════════════════════════════════════════════════════════════════╗
+# ║  7. MSYS MBUF POOLS                                                      ║
+# ╚═══════════════════════════════════════════════════════════════════════════╝
+# NimBLE's internal memory buffer system.  MSYS_1 handles small payloads
+# (ATT commands, HCI events); MSYS_2 handles larger payloads (L2CAP data
+# fragments, long GATT reads/writes).
+#
+# MSYS_1: 12 blocks × 256 bytes = 3,072 bytes.
+#   Block size matches ATT_PREFERRED_MTU (185) with room for headers.
 CONFIG_BT_NIMBLE_MSYS_1_BLOCK_COUNT=12
 CONFIG_BT_NIMBLE_MSYS_1_BLOCK_SIZE=256
-# MSYS_2 halved (was 24 — sized for 4 conns)
+
+# MSYS_2: 12 blocks × 320 bytes = 3,840 bytes.
+#   Was 24 blocks (sized for 4 connections); halved.
+#   The "ultra-minimal" profile sets both to 0 (no connections needed).
 CONFIG_BT_NIMBLE_MSYS_2_BLOCK_COUNT=12
 CONFIG_BT_NIMBLE_MSYS_2_BLOCK_SIZE=320
 
-# --- Runtime mempool allocation (allocate on demand, not at boot) ---
+# ╔═══════════════════════════════════════════════════════════════════════════╗
+# ║  8. RUNTIME MEMPOOL ALLOCATION                                           ║
+# ╚═══════════════════════════════════════════════════════════════════════════╝
+# Allocate NimBLE memory pools on demand rather than reserving them at boot.
+# This defers ~5-10 KB of DRAM allocation until BLE is actually started,
+# reducing boot-time memory pressure.  BLOCK_REUSED returns freed blocks to
+# the pool instead of releasing them to the heap (avoids fragmentation).
 CONFIG_BT_NIMBLE_MEMPOOL_RUNTIME_ALLOC=y
 CONFIG_BT_NIMBLE_MEMPOOL_BLOCK_REUSED=y
 
-# --- ATT / GATT: right-sized ---
-# MTU matches BLEStack.cpp setMTU(185) — was 256
+# ╔═══════════════════════════════════════════════════════════════════════════╗
+# ║  9. ATT / GATT                                                           ║
+# ╚═══════════════════════════════════════════════════════════════════════════╝
+# MTU: 185 bytes — matches the runtime call in BLEStack::init():
+#   NimBLEDevice::setMTU(185);
+# 185 was chosen as the sweet spot between throughput and memory.  Higher MTUs
+# (e.g. 512) require proportionally larger MSYS buffers.  Lower MTUs (23, the
+# BLE default) severely limit GATT characteristic payload size.  185 bytes
+# allows a single ATT_MTU-3 = 182 byte payload per notification, which is
+# enough for most sensor data and JSON config payloads.
 CONFIG_BT_NIMBLE_ATT_PREFERRED_MTU=185
-# Prepare-write queue (was 64 — absurdly high)
+
+# Prepare-write queue: 8 entries (was 64 — absurdly high).
+# Used for "long writes" where the client sends multiple ATT_PREPARE_WRITE
+# commands before ATT_EXECUTE_WRITE.  8 is enough for most characteristics.
 CONFIG_BT_NIMBLE_ATT_MAX_PREP_ENTRIES=8
-# Concurrent GATT procedures (was 4 — 2 matches connection count)
+
+# Concurrent GATT procedures: 2 (matches connection count).
+# Each active connection can have one outstanding GATT procedure.
 CONFIG_BT_NIMBLE_GATT_MAX_PROCS=2
-# GAP device name buffer (was 31 — legacy adv max ~20 chars)
+
+# GAP device name buffer: 24 chars (was 31).
+# Legacy advertising PDU is 31 bytes total.  With AD type overhead (2 bytes)
+# and flags (3 bytes), the practical name limit is ~20-24 characters.
+# The framework's BLEAdvertisingBuilder handles truncation, but this caps
+# the internal GAP characteristic buffer to save DRAM.
 CONFIG_BT_NIMBLE_GAP_DEVICE_NAME_MAX_LEN=24
 
-# --- Bonding: right-sized ---
+# ╔═══════════════════════════════════════════════════════════════════════════╗
+# ║  10. BONDING & SECURITY                                                  ║
+# ╚═══════════════════════════════════════════════════════════════════════════╝
+# Bonding persists pairing keys to NVS so reconnections skip re-pairing.
+# 3 bond slots are enough for most consumer devices (phone + 1-2 sensors).
+# The "gateway" profile increases to 4+.
 CONFIG_BT_NIMBLE_MAX_BONDS=3
+
+# CCCDs (Client Characteristic Configuration Descriptors): 6.
+# Each notification/indication-enabled characteristic needs 1 CCCD per bonded
+# device.  6 = 3 bonds × 2 notifiable characteristics (typical).
 CONFIG_BT_NIMBLE_MAX_CCCDS=6
+
+# Whitelist: 4 entries.  Used for directed advertising and connection filtering.
 CONFIG_BT_NIMBLE_WHITELIST_SIZE=4
+
+# Persist bonds to NVS (flash).  Without this, bonds are lost on reboot.
 CONFIG_BT_NIMBLE_NVS_PERSIST=y
+
+# Enable both Legacy Pairing and Secure Connections (BLE 4.2+).
+# The framework uses "Just Works" pairing (no passkey/OOB) via:
+#   NimBLEDevice::setSecurityAuth(BLE_SM_PAIR_AUTHREQ_BOND);
+#   NimBLEDevice::setSecurityIOCap(BLE_HS_IO_NO_INPUT_OUTPUT);
+# SC (Secure Connections) is preferred when both sides support it;
+# Legacy is the fallback for older devices.
 CONFIG_BT_NIMBLE_SM_LEGACY=y
 CONFIG_BT_NIMBLE_SM_SC=y
 
-# --- Memory allocation: use internal DRAM (IDF default) ---
-# EXTERNAL mode routes all NimBLE allocs to PSRAM, which causes three
-# failure modes on ESP32-S3: (1) BLE controller DMA cannot access PSRAM,
-# (2) Xtensa atomic instructions fail on PSRAM (cross-core spinlock panics),
-# (3) PSRAM bus contention inflates init past TWDT timeout.
-# INTERNAL is the IDF default and ensures all NimBLE allocs use fast DRAM.
-# See ESP-IDF issues IDFGH-7560, IDFGH-10048.
+# ╔═══════════════════════════════════════════════════════════════════════════╗
+# ║  11. MEMORY ALLOCATION MODE                                              ║
+# ╚═══════════════════════════════════════════════════════════════════════════╝
+# CRITICAL: All BLE memory MUST use internal DRAM.  EXTERNAL (PSRAM) mode
+# causes three failure modes on ESP32-S3:
+#   (1) BLE controller DMA cannot access PSRAM — the DMA engine is hardwired
+#       to internal SRAM address space.
+#   (2) Xtensa atomic instructions (s32c1i) fail on PSRAM bus — causes
+#       cross-core spinlock panics in FreeRTOS queue operations.
+#   (3) PSRAM bus contention during BLE init inflates startup past the
+#       Task Watchdog Timer (TWDT) timeout, triggering a WDT reset.
+#
+# This is a hardware constraint of the ESP32-S3 architecture, not a software
+# limitation.  See ESP-IDF issues IDFGH-7560, IDFGH-10048.
+#
+# WiFi can offload TX/RX buffers to PSRAM (CONFIG_SPIRAM_TRY_ALLOCATE_WIFI_LWIP),
+# but BLE cannot.  Running both simultaneously costs ~110 KB internal DRAM.
 CONFIG_BT_NIMBLE_MEM_ALLOC_MODE_INTERNAL=y
 
-# --- BLE 5.0: keep 2M PHY (faster), disable Coded PHY (saves DRAM) ---
+# ╔═══════════════════════════════════════════════════════════════════════════╗
+# ║  12. BLE 5.0 FEATURES                                                   ║
+# ╚═══════════════════════════════════════════════════════════════════════════╝
+# Enable BLE 5.0 feature support for 2M PHY negotiation.
+# 2M PHY doubles the air data rate (2 Mbps vs 1 Mbps), reducing time-on-air
+# per packet and improving coexistence with WiFi on the shared 2.4 GHz radio.
+#
+# Coded PHY (long range, 125/500 kbps) is disabled to save DRAM.  Most IoT
+# devices operate within Bluetooth's standard ~10m range.  Re-enable in a
+# downstream fragment if long-range (50-200m line-of-sight) is needed.
 CONFIG_BT_NIMBLE_50_FEATURE_SUPPORT=y
 CONFIG_BT_NIMBLE_LL_CFG_FEAT_LE_2M_PHY=y
 CONFIG_BT_NIMBLE_LL_CFG_FEAT_LE_CODED_PHY=n
 
-# --- Legacy advertising only (v1 scope; no extended advertising) ---
+# ╔═══════════════════════════════════════════════════════════════════════════╗
+# ║  13. ADVERTISING MODE                                                    ║
+# ╚═══════════════════════════════════════════════════════════════════════════╝
+# Legacy advertising only (31-byte PDU).  Extended advertising (BLE 5.0,
+# up to 1650 bytes) is out of scope for v1 — it requires different APIs
+# and is not universally supported by older smartphones and sensors.
+# The framework's BLEAdvertisingBuilder manages 31-byte packing with
+# priority-based overflow to the scan response PDU.
 CONFIG_BT_NIMBLE_EXT_ADV=n
 
-# --- Logging: ERROR only (saves flash; set to INFO for dev builds) ---
+# ╔═══════════════════════════════════════════════════════════════════════════╗
+# ║  14. LOGGING                                                             ║
+# ╚═══════════════════════════════════════════════════════════════════════════╝
+# NimBLE log level: 3 = ERROR only.
+# Levels: 0=DEBUG, 1=INFO, 2=WARNING, 3=ERROR, 4=CRITICAL, 5=NONE.
+# ERROR-only saves ~10-15 KB flash (NimBLE has extensive debug logging).
+# For development/debugging, temporarily set to 1 (INFO) or 0 (DEBUG)
+# in a downstream sdkconfig fragment.
 CONFIG_BT_NIMBLE_LOG_LEVEL=3
 
-# --- Scan dedup: right-sized (was 100/30/100) ---
+# ╔═══════════════════════════════════════════════════════════════════════════╗
+# ║  15. SCAN DEDUPLICATION                                                  ║
+# ╚═══════════════════════════════════════════════════════════════════════════╝
+# Controls how the controller filters duplicate scan results before forwarding
+# them to the host.  Right-sized from NimBLE defaults (100/30/100) to reduce
+# controller DRAM usage.
+#
+# SCAN_DUPL_CACHE_SIZE: 30 unique devices tracked for dedup (was 100).
+#   30 is enough for typical home/office environments.  If scanning in a
+#   dense BLE environment (trade show, warehouse), increase in downstream.
 CONFIG_BT_CTRL_SCAN_DUPL_CACHE_SIZE=30
+
+# ADV_DUP_FILT_MAX: 10 duplicate advertising reports filtered (was 30).
 CONFIG_BT_CTRL_ADV_DUP_FILT_MAX=10
+
+# ADV_REPORT_FLOW_CTRL_NUM: 50 outstanding scan reports before backpressure.
+#   Prevents the host from being overwhelmed during active scanning.
 CONFIG_BT_CTRL_BLE_ADV_REPORT_FLOW_CTRL_NUM=50
 
-# --- Timer pool: right-sized (was 50) ---
+# ╔═══════════════════════════════════════════════════════════════════════════╗
+# ║  16. TIMER POOL                                                          ║
+# ╚═══════════════════════════════════════════════════════════════════════════╝
+# NimBLE internal software timers (connection supervision, scan windows, etc.).
+# 20 is sufficient for 2 connections + advertising + scanning.  Was 50
+# (NimBLE default, sized for many simultaneous connections).
 CONFIG_BT_ALARM_MAX_NUM=20
 
-# --- Disable all built-in demo services ---
-# The framework registers its own GATT services via IBLEServiceProvider.
-# These NimBLE demo services waste flash and are never used.
+# ╔═══════════════════════════════════════════════════════════════════════════╗
+# ║  17. DEMO SERVICES (all disabled)                                        ║
+# ╚═══════════════════════════════════════════════════════════════════════════╝
+# NimBLE ships 12 optional demo GATT services.  ALL are disabled because:
+#   (1) The framework registers its own services via IBLEServiceProvider.
+#   (2) The framework provides its own DIS (Device Information Service) in
+#       BLEManager::begin() with app-specific data (manufacturer, model,
+#       serial, firmware version, hardware revision, software revision).
+#   (3) Each enabled demo service costs 1-3 KB flash + DRAM for GATT tables.
 CONFIG_BT_NIMBLE_PROX_SERVICE=n
 CONFIG_BT_NIMBLE_ANS_SERVICE=n
 CONFIG_BT_NIMBLE_CTS_SERVICE=n
@@ -120,5 +291,25 @@ CONFIG_BT_NIMBLE_HR_SERVICE=n
 CONFIG_BT_NIMBLE_BAS_SERVICE=n
 CONFIG_BT_NIMBLE_DIS_SERVICE=n
 
-# --- Wi-Fi / BLE coexistence (software) ---
+# ╔═══════════════════════════════════════════════════════════════════════════╗
+# ║  18. WI-FI / BLE COEXISTENCE                                            ║
+# ╚═══════════════════════════════════════════════════════════════════════════╝
+# REQUIRED for simultaneous WiFi + BLE on the ESP32-S3's shared 2.4 GHz radio.
+# Without this, WiFi and BLE cannot time-share the RF frontend and will
+# interfere destructively.
+#
+# This enables the ESP-IDF software coexistence arbiter, which dynamically
+# schedules WiFi and BLE radio access at the MAC/PHY layer.  The default
+# arbitration priority is PREFER_WIFI (enum 0), which gives WiFi auth/assoc
+# frames priority over BLE advertising events.
+#
+# IMPORTANT — do NOT call esp_coex_preference_set() in application code:
+#   - PREFER_BT (dev.76):      Starved WiFi entirely — portal unreachable.
+#   - PREFER_BALANCE (dev.78):  Still caused AUTH_EXPIRE during WiFi 802.11
+#                               association (auth frames have a 1s deadline).
+#   - Default / PREFER_WIFI:    Works reliably.  BLE stability comes from
+#                               +20 dBm TX power and deferred connection
+#                               parameter updates, not from coexistence tuning.
+# Validated in the dev.73–dev.80 hardening cycle.  See bluetooth.md § Radio
+# Settings & Physical Layer for the full analysis.
 CONFIG_ESP_COEX_SW_COEXIST_ENABLE=y
