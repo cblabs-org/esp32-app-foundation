@@ -48,4 +48,5 @@ struct BLEQueueMessage {
     uint8_t             rawBytes[64]    = {};
     uint8_t             rawLen          = 0;
     uint32_t            receivedAtMs    = 0;    ///< O3: host-task timestamp for latency measurement
+    int8_t              rssi            = 0;    ///< R8: ScanResult RSSI, carried in its own field (not packed into handle)
 };

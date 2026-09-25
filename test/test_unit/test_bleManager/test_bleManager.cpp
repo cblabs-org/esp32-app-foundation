@@ -376,4 +376,29 @@ TEST(BLEManagerTest, ScanInhibitCancelsActiveDiscovery) {
     EXPECT_FALSE(mgr.isScanning());
 }
 
+// R8: ScanResult dispatch must carry RSSI through its own dedicated queue-message
+// field (previously overloaded onto `handle`, which BLEManager never read).
+TEST(BLEManagerTest, ScanResultCarriesRssi) {
+    BLEManager mgr;
+    DummyClientProvider cli;
+    mgr.registerClientProvider(&cli);
+    mgr.setStateForTesting(BLEManager::State::Active);
+
+    EXPECT_TRUE(mgr.startDiscovery("dummy_cli", 5000));
+
+    BLEQueueMessage scanMsg;
+    scanMsg.type = BLEQueueMessage::Type::ScanResult;
+    BLEPeerAddress::parse("11:22:33:44:55:66", BLEPeerAddress::Type::Public, scanMsg.address);
+    strncpy(scanMsg.providerId, "SomeDevice", sizeof(scanMsg.providerId) - 1);
+    scanMsg.rssi = -42;
+
+    EXPECT_TRUE(mgr.postTestQueueMessage(scanMsg));
+    mgr.tick(0);
+
+    const std::vector<BLEScanResult>& results = mgr.getDiscoveryResults();
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rssi, -42);
+    EXPECT_EQ(results[0].address, scanMsg.address);
+}
+
 

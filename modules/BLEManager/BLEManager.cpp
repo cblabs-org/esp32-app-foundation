@@ -1095,6 +1095,8 @@ void BLEManager::dispatchQueueEvents() {
                     BLEScanResult res;
                     res.address = msg.address;
                     strncpy(res.name, msg.providerId, sizeof(res.name) - 1);
+                    // R8: RSSI now carried in its own queue-message field.
+                    res.rssi = msg.rssi;
                     if (prov->acceptScanResult(res)) {
                         bool found = false;
                         for (auto& existing : _discovery.results) {

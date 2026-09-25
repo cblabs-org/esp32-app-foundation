@@ -476,21 +476,39 @@ namespace {
 
     class ScanCallbacks : public NimBLEScanCallbacks {
     public:
+        // R8: Target service UUIDs for the active discovery, set by executeDiscovery()
+        // before the scan starts. An empty list (targetUuidCount == 0) means no filtering.
+        uint16_t targetUuids[6] = {};
+        size_t   targetUuidCount = 0;
+
         void onResult(const NimBLEAdvertisedDevice* advertisedDevice) override {
             if (!s_hostQueue) return;
+
+            // R8: Filter by the provider's target service UUIDs (RFC #225 rev 2 §8.1).
+            if (targetUuidCount > 0) {
+                bool matches = false;
+                for (size_t i = 0; i < targetUuidCount; ++i) {
+                    if (advertisedDevice->isAdvertisingService(NimBLEUUID(targetUuids[i]))) {
+                        matches = true;
+                        break;
+                    }
+                }
+                if (!matches) return;
+            }
+
             BLEQueueMessage msg;
             msg.type = BLEQueueMessage::Type::ScanResult;
-            
+
             NimBLEAddress addr = advertisedDevice->getAddress();
             BLEPeerAddress::parse(addr.toString().c_str(), static_cast<BLEPeerAddress::Type>(addr.getType()), msg.address);
-            
+
             if (advertisedDevice->haveName()) {
                 strncpy(msg.providerId, advertisedDevice->getName().c_str(), sizeof(msg.providerId) - 1);
             }
 
-            // Store RSSI in a signed field
-            msg.handle = (BLEConnHandle)(int16_t)advertisedDevice->getRSSI();
-            
+            // R8: RSSI now carried in its own dedicated field, not packed into handle.
+            msg.rssi = (int8_t)advertisedDevice->getRSSI();
+
             xQueueSend(static_cast<QueueHandle_t>(s_hostQueue), &msg, 0);
         }
 
@@ -504,13 +522,34 @@ namespace {
     };
 
     static std::map<std::string, NimBLEClient*> s_clients;
+
+    // R8: Post a CentralDisconnected/ConnectFailed message to the main loop.
+    // Factors the three identical failure-report blocks (createClient() nullptr,
+    // connect() failure, required-subscription failure) into one helper.
+    // R8 fix: the client is deliberately NOT deleted here — s_clients keeps one
+    // client per provider for its lifetime, and executeCentralForget() is now the
+    // only place a client is ever deleted, so s_clients can never hold a dangling
+    // pointer to freed NimBLEClient memory.
+    static void postCentralConnectFailure(void* hostEventQueue, const char* providerId, const BLEPeerAddress& addr) {
+        if (!hostEventQueue) return;
+        BLEQueueMessage failMsg;
+        failMsg.type = BLEQueueMessage::Type::CentralDisconnected;
+        failMsg.reason = BLEDisconnectReason::ConnectFailed;
+        strncpy(failMsg.providerId, providerId, sizeof(failMsg.providerId) - 1);
+        failMsg.address = addr;
+        xQueueSend(static_cast<QueueHandle_t>(hostEventQueue), &failMsg, 0);
+    }
 }
 
 bool BLEStack::executeCentralConnect(const CentralConnectOptions& opts, const BLEPeerAddress& addr, bool& bondedOut) {
     s_hostQueue = opts.hostEventQueue;
     const char* providerId = opts.provider->getProviderId();
 
-    // R4: Reuse existing client for this provider, or create a new one
+    // R4/R8: One client per provider for its lifetime. Reuse the existing
+    // client if we have one; only create (and set callbacks on) a new one
+    // the first time. Connect/subscription failures below never delete this
+    // client — executeCentralForget() is the sole deletion path — so s_clients
+    // can never end up pointing at freed memory.
     NimBLEClient* pClient = nullptr;
     auto existingIt = s_clients.find(providerId);
     if (existingIt != s_clients.end() && existingIt->second) {
@@ -520,7 +559,10 @@ bool BLEStack::executeCentralConnect(const CentralConnectOptions& opts, const BL
         }
     } else {
         pClient = NimBLEDevice::createClient();
-        if (!pClient) return false;
+        if (!pClient) {
+            postCentralConnectFailure(opts.hostEventQueue, providerId, addr);
+            return false;
+        }
         // N2: Set callbacks once at creation — NimBLE doesn't delete the old
         // callbacks on setClientCallbacks(), only in ~NimBLEClient(). Setting
         // on every reconnect leaks ~40 B per attempt.
@@ -545,18 +587,9 @@ bool BLEStack::executeCentralConnect(const CentralConnectOptions& opts, const BL
     
     NimBLEAddress bleAddr(addr.bytes, static_cast<uint8_t>(addr.type));
     if (!pClient->connect(bleAddr)) {
-        // R3: Report failure — clean up and send a failure message
-        // Only delete if we created it fresh (not reusing)
-        if (existingIt == s_clients.end()) {
-            NimBLEDevice::deleteClient(pClient);
-        }
-        // R3: Send a CentralDisconnected with ConnectFailed reason so the manager knows
-        BLEQueueMessage failMsg;
-        failMsg.type = BLEQueueMessage::Type::CentralDisconnected;
-        failMsg.reason = BLEDisconnectReason::ConnectFailed;
-        strncpy(failMsg.providerId, providerId, sizeof(failMsg.providerId) - 1);
-        failMsg.address = addr;
-        xQueueSend(static_cast<QueueHandle_t>(opts.hostEventQueue), &failMsg, 0);
+        // R3/R8: Report failure. The client is kept in s_clients for reuse on the
+        // next attempt — it is never deleted here (see executeCentralForget()).
+        postCentralConnectFailure(opts.hostEventQueue, providerId, addr);
         return false;
     }
 
@@ -618,18 +651,11 @@ bool BLEStack::executeCentralConnect(const CentralConnectOptions& opts, const BL
     // O7: Opportunistic bonding — after subscribe so data flows before SMP
     bondedOut = pClient->secureConnection();
 
-    // O8: If a required subscription failed, disconnect and report failure
+    // O8/R8: If a required subscription failed, disconnect and report failure.
+    // The client is kept in s_clients for reuse — never deleted here.
     if (requiredFailed) {
         pClient->disconnect();
-        if (existingIt == s_clients.end()) {
-            NimBLEDevice::deleteClient(pClient);
-        }
-        BLEQueueMessage failMsg;
-        failMsg.type = BLEQueueMessage::Type::CentralDisconnected;
-        failMsg.reason = BLEDisconnectReason::ConnectFailed;
-        strncpy(failMsg.providerId, providerId, sizeof(failMsg.providerId) - 1);
-        failMsg.address = addr;
-        xQueueSend(static_cast<QueueHandle_t>(opts.hostEventQueue), &failMsg, 0);
+        postCentralConnectFailure(opts.hostEventQueue, providerId, addr);
         return false;
     }
 
@@ -663,20 +689,30 @@ void BLEStack::executeCentralForget(const char* providerId, const BLEPeerAddress
     NimBLEAddress bleAddr(addr.bytes, static_cast<uint8_t>(addr.type));
     NimBLEDevice::deleteBond(bleAddr);
 
-    // If a live client exists, disconnect and delete it
+    // R8: This is the only place a client is ever deleted. Erase the s_clients
+    // entry before deleting so no other code path can observe (let alone reuse)
+    // a dangling pointer to freed NimBLEClient memory.
     auto it = s_clients.find(providerId);
     if (it != s_clients.end() && it->second) {
         NimBLEClient* pClient = it->second;
+        s_clients.erase(it);
         pClient->disconnect();
         NimBLEDevice::deleteClient(pClient);
-        s_clients.erase(it);
     }
 }
 
-void BLEStack::executeDiscovery(const BLEScanParams& params, uint32_t durationMs, IBLEClientProvider* /*provider*/, void* hostEventQueue, std::vector<BLEScanResult>& /*resultsOut*/) {
+void BLEStack::executeDiscovery(const BLEScanParams& params, uint32_t durationMs, IBLEClientProvider* provider, void* hostEventQueue, std::vector<BLEScanResult>& /*resultsOut*/) {
     s_hostQueue = hostEventQueue;
     NimBLEScan* pScan = NimBLEDevice::getScan();
     static ScanCallbacks scanCB;
+
+    // R8: RFC #225 rev 2 §8.1 — filter scan results by the provider's target
+    // service UUIDs. An empty list means no filtering (queue everything).
+    scanCB.targetUuidCount = 0;
+    if (provider) {
+        scanCB.targetUuidCount = provider->getTargetServiceUUIDs(scanCB.targetUuids, 6);
+    }
+
     pScan->setScanCallbacks(&scanCB, false);
     pScan->setInterval(params.intervalMs * 1000 / 625);
     pScan->setWindow(params.windowMs * 1000 / 625);
