@@ -9,12 +9,12 @@
 |---|---|
 | Project ID | `sample-app-remediation` |
 | Base Branch | `main` |
-| Status | **WO1/6 — In Progress** |
+| Status | **WO2/6 — In Progress** |
 | Human Approval | ✅ 2026-09-23 (Q1–Q6 resolved), 2026-09-25 (execution approved) |
 
 ## Work Order Ledger
 
-- **[ ] [wo1-fix-fetch](wo1-fix-fetch/WORKORDER.md):** Fix critical WiFi guard race condition + thread safety violations (C1, C2, N4, N5, N7, N8, W6)
+- **[x] [wo1-fix-fetch](wo1-fix-fetch/WORKORDER.md):** Fix critical WiFi guard race condition + thread safety violations (C1, C2, N4, N5, N7, N8, W6)
 - **[ ] wo2-precondition-arch:** Precondition architecture & CONFIGURING UX (C4, N9)
 - **[ ] wo3-arduinojson-migration:** ArduinoJson migration + data/display separation (N1, N2, N3, C3)
 - **[ ] wo4-boot-cleanup:** Boot sequence + main.cpp cleanup + identity consolidation #232 (W1, W3, W4, W7)
