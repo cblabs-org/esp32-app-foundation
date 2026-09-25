@@ -199,7 +199,9 @@ The MCP bearer token equals the stored password hash (deterministic, hex string)
 
 ### AP Mode Bypass
 
-When the device is in AP (Access Point) mode — typically during initial physical setup — `checkPortalAuth()` returns `true` unconditionally. Controlled by `setAPMode(bool)`, called by `Application::begin()`.
+When the device is in first-boot setup mode — the setup AP is running **and no Wi-Fi credentials are stored** (`WifiManager::isSetupMode()`) — `checkPortalAuth()` returns `true` unconditionally. Controlled by `setAPMode(bool)`, which `Application` drives from `isSetupMode()` at boot and on `wifi.ap_started` / `wifi.connected`.
+
+A device that already has credentials never gets the bypass. If its STA link stays down for more than 3 minutes, `WifiManager` starts a fallback captive AP in `WIFI_AP_STA` mode (STA keeps retrying, and the AP is torn down when STA reconnects), but portal authentication stays enforced on it ([#236](https://github.com/matthewmcneill/esp32-app-foundation/issues/236)).
 
 ### TLS for the Portal
 
