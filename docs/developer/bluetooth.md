@@ -273,6 +273,38 @@ The ESP32-S3 uses a single 2.4 GHz RF radio shared between Wi-Fi and Bluetooth. 
 > [!NOTE]
 > **Timer staggering is NOT a coexistence mechanism.** Coexistence is dynamic hardware-level RF arbitration managed by the ESP32 MAC/PHY layer (`CONFIG_ESP_COEX_SW_COEXIST_ENABLE`). Staggering application timers only smooths FreeRTOS queue contention; it does not arbitrate radio packet collisions.
  
+### Radio Settings & Physical Layer
+ 
+The framework configures several PHY-layer parameters in `BLEStack::init()` and `sdkconfig.ble.defaults` that directly affect BLE range, connection reliability, and WiFi coexistence. These settings were validated across the dev.73–dev.80 hardening cycle.
+ 
+| Setting | Value | Where | Rationale |
+|---|---|---|---|
+| **BLE TX Power** | +20 dBm (max) | `BLEStack::init()` via `NimBLEDevice::setPower(20, All)` + `CONFIG_BT_CTRL_DFT_TX_POWER_LEVEL_P20` in sdkconfig | Maximises advertising range and connection stability. The `setPower()` call sets ADV, SCAN, and DEFAULT power types. The sdkconfig default sets the controller's boot-time power level. Both must agree. |
+| **Coexistence Preference** | ESP-IDF default (`PREFER_WIFI`, enum 0) | Not called — see comment in `BLEStack::init()` | `esp_coex_preference_set()` was tested at `PREFER_BT` (dev.76) and `PREFER_BALANCE` (dev.78). Both degraded WiFi: `PREFER_BT` starved WiFi entirely; `PREFER_BALANCE` caused `AUTH_EXPIRE` during 802.11 association. The ESP-IDF default gives WiFi priority for RF arbitration, which is correct because WiFi auth/assoc frames are time-critical (1s deadline). BLE stability comes from TX power and deferred conn params instead. **Do not call `esp_coex_preference_set()`.** |
+| **Advertising Interval** | 50 ms (80 × 0.625 ms) | `BLEStack::startAdvertising()` via `setMinInterval(80)` / `setMaxInterval(80)` | Fast discovery for mobile apps. Apple's BLE Design Guidelines recommend ≤100ms for quick discovery. The 50ms interval doubles discoverability vs the NimBLE default (1.28s). |
+| **Software Coexistence** | Enabled | `CONFIG_ESP_COEX_SW_COEXIST_ENABLE=y` in sdkconfig | Required for simultaneous WiFi + BLE operation on the shared 2.4 GHz radio. Without this, WiFi and BLE cannot time-share the RF frontend. |
+ 
+#### Connection Parameter Safety
+ 
+The framework defers connection parameter updates to prevent GATT timeouts:
+ 
+| Rule | Implementation | Rationale |
+|---|---|---|
+| **No immediate `updateConnParams()` on connect** | `BLEManager::dispatchQueueEvents()` — the `PeerConnected` handler does NOT call `_stack.updateConnParams()` | Apple and Android guidelines mandate waiting ≥5 seconds after connection before requesting L2CAP parameter updates. Requesting during the central's MTU exchange / GATT discovery window causes Android nRF Connect to drop with GATT CONN TIMEOUT (Error 147 / 0x93 + Error 133 / 0x85). |
+| **Safe supervision timeout on MTU exchange** | `ServerCallbacksHandler::onMTUChange()` in `BLEStack.cpp` | After MTU negotiation completes, if the central's supervision timeout is dangerously short (<2.0s, e.g. macOS CoreBluetooth default of 720ms), the handler updates it to 4.0s. This prevents coexistence RF bursts from triggering a link supervision timeout. |
+ 
+> [!CAUTION]
+> **Never re-add `updateConnParams()` to the `PeerConnected` handler.** This was the root cause of Android GATT CONN TIMEOUT errors. The framework relies on the GAP PPCP characteristic and post-MTU supervision timeout update instead.
+ 
+#### WiFi STA Connection Timeout
+ 
+`WifiManager` uses a **30-second** timeout for WiFi STA connection (`StaConnecting` state). This accommodates:
+ 
+- **802.11 auth retries**: Congested 2.4 GHz environments or busy IoT routers may take 8–10 seconds of AUTH_EXPIRE retry cycles before a successful auth frame exchange.
+- **DHCP lease**: After WiFi association, DHCP typically completes in 1–3 seconds but can take longer on networks with many clients.
+ 
+The previous 15-second timeout caused premature AP fallback when auth retries consumed most of the budget, leaving insufficient time for DHCP. See `WifiManager.cpp` `StaConnecting` case.
+ 
 ### ScanInhibit Recipe
  
 ```cpp
@@ -370,6 +402,9 @@ Exposes 4 AI agent tools via the Model Context Protocol:
 - **Remote client fails to connect**: Inspect device logs using nRF Connect. Verify that the client is requesting connection intervals within the preferred range (`minIntervalUnits = 24`, `maxIntervalUnits = 40`).
 - **Scanning fails to start**: Check if `bleManager.inhibitScanning()` was called by a Wi-Fi task, or if the device is still in `AppState::Configuring`. Scanning is only permitted in `AppState::Running`.
 - **BLE init crashes with WDT reset or EM_BASE_REG_LUT dump**: Root cause is Arduino's `initArduino()` releasing BT controller memory when `bleInUse()` returns false. The framework's `BLEStack.cpp` provides `extern "C" bool bleInUse(void) { return true; }` to prevent this. If you see this crash, verify the strong symbol override is present in your build. See H-G in the debugging history.
+- **Android GATT CONN TIMEOUT (Error 147/0x93 + Error 133/0x85)**: The central drops the connection within 200ms of connecting. Root cause: requesting an L2CAP connection parameter update (`updateConnParams()`) immediately on `PeerConnected` collides with the central's MTU exchange and GATT service discovery. **Fix**: Do NOT call `updateConnParams()` in the `PeerConnected` handler. The framework defers parameter negotiation to after MTU exchange (see § Radio Settings & Physical Layer → Connection Parameter Safety).
+- **WiFi AUTH_EXPIRE with BLE active**: WiFi auth frames time out (reason 2) when BLE and WiFi are both active. Check: (1) `esp_coex_preference_set()` must NOT be called — the ESP-IDF default (`PREFER_WIFI`) is required for reliable WiFi auth. Both `PREFER_BT` and `PREFER_BALANCE` degrade WiFi. (2) Verify `CONFIG_ESP_COEX_SW_COEXIST_ENABLE=y` is set in sdkconfig. (3) The WiFi STA timeout must be ≥30 seconds to accommodate auth retries + DHCP.
+- **WiFi connects but falls back to AP mode**: WiFi association succeeds (serial shows `wifi:connected`) but `WifiManager` falls back to AP. Root cause: the STA connection timeout expired before DHCP completed. Increase the timeout in `WifiManager.cpp` (`StaConnecting` case) — the framework default is 30 seconds. If the router's 2.4 GHz band is congested, auth retries can consume 8–10 seconds, leaving insufficient time for DHCP with shorter timeouts.
 
 ---
  

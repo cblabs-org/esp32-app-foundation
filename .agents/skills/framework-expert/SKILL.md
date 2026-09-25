@@ -101,6 +101,24 @@ A strong symbol override in `BLEStack.cpp` that prevents Arduino's `initArduino(
 ### What BLE services does the framework provide?
 The framework automatically registers a standard Bluetooth SIG Device Information Service (DIS, UUID `0x180A`) in `BLEManager::begin()`. It exposes 6 read-only characteristics: Manufacturer (`app.getManufacturer()`, defaults to `"CB Labs"`), Model (`app.getAppName()`), Serial Number (last 3 bytes of WiFi MAC), Firmware Revision (`BUILD_VERSION`), Hardware Revision (`ESP.getChipModel()`), and Software Revision (`"App Foundation " + FRAMEWORK_VERSION`). Consumers do not need to register DIS manually.
 
+### What TX power does BLE use?
++20 dBm (maximum). Set in two places that must agree: `NimBLEDevice::setPower(20, NimBLETxPowerType::All)` in `BLEStack::init()`, and `CONFIG_BT_CTRL_DFT_TX_POWER_LEVEL_P20=y` in `sdkconfig.ble.defaults`. The `setPower()` call sets ADV, SCAN, and DEFAULT power types. It does NOT affect WiFi TX power.
+
+### What is the BLE advertising interval?
+50ms (80 × 0.625ms units). Set in `BLEStack::startAdvertising()` via `setMinInterval(80)` / `setMaxInterval(80)`. This is twice as fast as Apple's recommended ≤100ms for quick discovery.
+
+### Should I call `esp_coex_preference_set()`?
+**No.** Leave it at the ESP-IDF default (`PREFER_WIFI`, enum 0). `PREFER_BT` starves WiFi entirely (portal unreachable). `PREFER_BALANCE` causes `AUTH_EXPIRE` during WiFi 802.11 association. WiFi auth frames have a 1-second deadline and need priority. BLE stability comes from +20 dBm TX power and deferred connection parameters instead. See `docs/developer/bluetooth.md` § Radio Settings.
+
+### Why doesn't the framework call `updateConnParams()` on connect?
+Apple and Android guidelines mandate waiting ≥5 seconds after connection before requesting L2CAP parameter updates. Calling `updateConnParams()` immediately on `PeerConnected` collides with the central's MTU exchange and GATT service discovery, causing Android (nRF Connect) to drop with GATT CONN TIMEOUT (Error 147/0x93 + Error 133/0x85). Instead, the framework updates the supervision timeout to 4.0s after MTU exchange if the central's default is dangerously short (e.g. macOS CoreBluetooth 720ms).
+
+### What is the WiFi STA connection timeout?
+30 seconds (was 15s pre-dev.80). Set in `WifiManager.cpp` `StaConnecting` case. On congested 2.4 GHz networks, WiFi auth retries (`AUTH_EXPIRE` reason 2) can consume 8–10 seconds. The 30s budget gives sufficient headroom for auth retries + DHCP.
+
+### How do WiFi and BLE coexist?
+`CONFIG_ESP_COEX_SW_COEXIST_ENABLE=y` in sdkconfig enables hardware-level RF time-sharing. The framework adds five application-level mechanisms: Running-Only gating, ScanInhibit tokens, Administrative Pause, Duty Cycle Clamping, and Exponential Backoff. See `docs/developer/bluetooth.md` § Coexistence & Radio Hardening.
+
 ### Framework-Reserved Include Prefixes
 
 The following subdirectories of `include/` are reserved by the framework:
