@@ -84,9 +84,9 @@ It also contributes a portal tab, REST routes, MCP tools, EventBus `ble.*` event
 | **WO-4** | [Portal tab, REST routes, MCP tools](wo4-portal-mcp/WORKORDER.md) | `standard` | ✅ Complete | `ble-manager/wo4-portal-mcp` | `c133d59b` |
 | **WO-5** | [Coexistence, OTA pause, docs and skill](wo5-coexistence-ota/WORKORDER.md) | `standard` | ✅ Complete (D8 fallback) | `ble-manager/wo5-coexistence-ota` | `b568ec5f` |
 | **WO-6** | [Hardware acceptance run (RFC §17.2, amended)](wo6-validation/WORKORDER.md) | `interactive` | ✅ Complete | `ble-manager/wo6-validation` | `18618a43` (ACCEPTANCE.md), fix `c697ff55` (DIS MAC). Tag `v0.0.12-dev.67`. |
-| **WO-8** | [PR #235 R3: central client lifecycle and discovery](wo8-central-lifecycle/WORKORDER.md) | `standard` | ✅ Complete | `ble-manager/wo8-central-lifecycle` (base `ble-manager/wo6-validation`) | — |
-| **WO-10** | [Fix #236: WifiManager STA resilience](wo10-wifi-sta-resilience/WORKORDER.md) | `architect` | 🔄 In progress (parallel) | `ble-manager/wo10-wifi-sta-resilience` | — |
-| **WO-9** | [PR #235 R3: manager state safety and persistence](wo9-state-safety/WORKORDER.md) | `standard` | 🔄 In progress | `ble-manager/wo9-state-safety` (base `ble-manager/wo8-central-lifecycle`) | — |
+| **WO-8** | [PR #235 R3: central client lifecycle and discovery](wo8-central-lifecycle/WORKORDER.md) | `standard` | ✅ Complete (`e206b12f`) | `ble-manager/wo8-central-lifecycle` (base `ble-manager/wo6-validation`) | — |
+| **WO-10** | [Fix #236: WifiManager STA resilience](wo10-wifi-sta-resilience/WORKORDER.md) | `architect` | ✅ Complete (`295f2c7a`) | `ble-manager/wo10-wifi-sta-resilience` | — |
+| **WO-9** | [PR #235 R3: manager state safety and persistence](wo9-state-safety/WORKORDER.md) | `standard` | ✅ Complete (`9d833913`) | `ble-manager/wo9-state-safety` (base `ble-manager/wo8-central-lifecycle`) | — |
 
 ### Gates between WOs
 - **After WO-0 (hard gate):** the PA reviews `wo0-spike/FINDINGS.md`, records D3 and any sdkconfig changes here, and **presents the budget numbers to the human**. If the S3 budget or the controller activity budget can't meet 3P+1C, **stop** and return to the RFC. Don't continue on assumptions.
@@ -353,3 +353,21 @@ The BLE controller's `NimBLEDevice::init()` on ESP32-S3 acquires cross-core heap
 - Bottom nav ordering: WiFi → Bluetooth → Security → System (add data-order attributes)
 - Add `bleAddress` field to status API
 
+
+### Session — 2026-09-25 — PR #235 third-round fixes (WO-8, WO-9, WO-10) and #236
+**Summary:** The Chief Architect's third-round review of `665b847` found one 🔴 (a use-after-free after a failed first central connect) and three 🟠 in-PR items (O2 lock scope, flash writes under the lock, the R9 race). The human approved narrowing the fixes to "fix the current PR" (no new PR) and asked for #236 to be fixed fully now. WO-8 (sonnet) and WO-10 (opus) ran in parallel in separate worktrees; WO-9 (sonnet) was stacked on WO-8. WO-10 was then rebased onto the WO-9 tip (disjoint files, clean). The PA reviewed every diff.
+**Outcomes:**
+- **WO-8:** one client per provider for its lifetime, deleted only in forget; every failure path reports back; discovery UUID filter and RSSI.
+- **WO-9:** whole-`tick()`, config-hook and precondition locking; `_configDirty` deferred persistence (the single `saveModuleConfig` call runs outside the lock); synchronous registry removal in `forget()`; `resetConfig()` default name.
+- **WO-10:** STA-first backoff; fallback AP in AP+STA mode after more than 3 min with auth enforced (`isSetupMode()`); Wi-Fi never switches itself off with credentials; modem sleep on BLE builds.
+
+**Verification (integrated head):** root `esp32s3nano_ble` RAM 61,380 / Flash 1,635,307; root `esp32s3nano` 57,940 / 1,332,831; sample-app BLE 62,484 / 1,767,839. No warnings in the BLE or Wi-Fi sources. Native: 943 cases, 942 pass (`test_lvgl_stubs` pre-existing); `test_bleManager` and `test_wifiManager` pass.
+**Residual:**
+- The public `pair()`, `forget()` and `startDiscovery()` rely on the caller holding the lock.
+- `_discovery.results.clear()` and `_pauseReason.clear()` are unlocked on some paths.
+- `docs/design_specification.md` still describes the old AP bypass.
+- Native tests need glob filters (`-f "*test_x"`).
+- Central-role hardware acceptance (RFC §17.2 items 4–9) and the #236 router-drop hardware checks are still to be run (interactive).
+
+**Recorded for WO-7 (not in this PR):** TX power becomes `BLEConfig.txPowerDbm`, default +20 dBm (owner decision). The WO-7 branch needs a rebase onto the new head.
+**Next:** fast-forward `ble-manager/wo6-validation` (PR #235 head) and push; post the PR update; add "Fixes #236" to the PR body.
