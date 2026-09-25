@@ -35,6 +35,11 @@
 > - **Scope:** WO-10, WifiManager STA resilience and no unauthenticated fallback AP. Branch `ble-manager/wo10-wifi-sta-resilience`, run in parallel with WO-8/WO-9 (disjoint files), then rebased onto the WO-9 tip before the PR head fast-forward. Spawn mode: autonomous (`architect` → opus).
 > - **Recorded for later (not in this PR):** the TX-power answer "Configurable, default +20" applies to the WO-7 branch (`BLEConfig.txPowerDbm`, default +20 dBm, documented regulatory responsibility).
 >
+> ✅ **Approved: WO-11 (app-neutral tests and sample).**
+> - **Approver's exact words:** "This PR is a PR on the framework NOT the echelon app", followed by the selected option "Neutralise tests + sample" and "Post a correction note".
+> - **Timestamp:** 2026-09-25
+> - **Scope:** WO-11 (`mechanical` → haiku), branch `ble-manager/wo11-app-neutral` on `ble-manager/wo6-validation`. Removes the consumer-app name and spec references from the BLE tests and the FTMS sample, with no logic changes. The PA then fast-forwards the PR head and posts a correction note on the PR thread.
+>
 > Workers verify provenance against this section (`.agents/rules/00-operating-model.md`). This approval authorises execution of WO-8 and WO-9 within their Strict Boundary Boxes.
 
 ---
@@ -86,6 +91,7 @@ It also contributes a portal tab, REST routes, MCP tools, EventBus `ble.*` event
 | **WO-6** | [Hardware acceptance run (RFC §17.2, amended)](wo6-validation/WORKORDER.md) | `interactive` | ✅ Complete | `ble-manager/wo6-validation` | `18618a43` (ACCEPTANCE.md), fix `c697ff55` (DIS MAC). Tag `v0.0.12-dev.67`. |
 | **WO-8** | [PR #235 R3: central client lifecycle and discovery](wo8-central-lifecycle/WORKORDER.md) | `standard` | ✅ Complete (`e206b12f`) | `ble-manager/wo8-central-lifecycle` (base `ble-manager/wo6-validation`) | — |
 | **WO-10** | [Fix #236: WifiManager STA resilience](wo10-wifi-sta-resilience/WORKORDER.md) | `architect` | ✅ Complete (`295f2c7a`) | `ble-manager/wo10-wifi-sta-resilience` | — |
+| **WO-11** | [App-neutral tests and sample](wo11-app-neutral/WORKORDER.md) | `mechanical` | 🔄 In progress | `ble-manager/wo11-app-neutral` | — |
 | **WO-9** | [PR #235 R3: manager state safety and persistence](wo9-state-safety/WORKORDER.md) | `standard` | ✅ Complete (`9d833913`) | `ble-manager/wo9-state-safety` (base `ble-manager/wo8-central-lifecycle`) | — |
 
 ### Gates between WOs
