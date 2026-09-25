@@ -80,3 +80,55 @@ Out-of-boundary findings go under *Out-of-Scope Findings* in your Completion Rep
 ---
 ## Completion Report
 <!-- Written by the worker at task completion; append below using the template. -->
+
+### Status
+complete
+
+Code commit: `eae1f9cc` on `ble-manager/wo10-wifi-sta-resilience` (not pushed). Provenance checked: this WORKORDER names PR #235 / `pr-225-ble-manager`, and `PROJECT.md` → Approval Record has the human's WO-10 approval ("Fix it fully now. and close #236 out").
+
+**Verification**
+- `pio run -e esp32s3nano_ble`: SUCCESS (RAM 18.7%, Flash 39.0%). `pio run -e esp32s3nano`: SUCCESS (RAM 17.7%, Flash 31.8%). No warnings from `WifiManager.*` or `Application.cpp` in either log.
+- `pio test -e native -f "*test_wifiManager"`: 32/32 passed (6 new). Note: `-f test_wifiManager` with no glob matches nothing ("0 test cases") because the test path is `test_unit/test_wifiManager`.
+- Full `pio test -e native`: 939/940 passed; the only failure is the pre-existing `test_lvgl_stubs` ERRORED.
+
+**Scenario walk-throughs** (times measured from the moment the link drops)
+1. *Router reboot, 60 s.* `Ready` sees the link drop → `WIFI_DISCONNECTED` and the downtime tracker starts. If the driver re-associates within the 10 s grace, `onStaConnected()` publishes `WIFI_CONNECTED` (HA MQTT reconnects). Otherwise attempt 1 runs at t=10 s and times out at 25 s → 5 s backoff → attempt 2 runs 30–45 s → 10 s backoff → attempt 3 starts at 55 s, and the router is back at 60 s, so it connects inside that 15 s window (worst case, attempt 4 at 100 s). Any background re-association during a backoff is also picked up. `shouldStartFallbackAp()` needs > 180 s of downtime, so **no AP ever appears**, `_isAPMode` stays false and the auth bypass stays false.
+2. *Router off, 10 min.* Attempts run at 10, 30, 55, 100 and 175 s (timeouts at 25/45/70/115/190 s). In `StaBackoff` at ≈190 s, downtime > 180 s, so `startAccessPoint()` runs `WiFi.mode(WIFI_AP_STA)` (the setup AP uses `WIFI_AP`), brings up the open soft-AP plus DNS, and publishes `WIFI_AP_STARTED`. Application runs `setAPMode(isSetupMode())`, which is **false** because credentials exist, so **portal auth stays enforced**. `isReady()` is true (AP up), so the portal is served even when STA has not connected since boot. STA keeps retrying every 60 s in AP+STA mode. When the router returns, the next attempt (or a background re-association) calls `onStaConnected()`: `stopAccessPoint()` stops DNS, `softAPdisconnect(true)` switches AP_STA to STA with the STA link kept, `_isAPMode=false`, the retry/suppression state resets, and **only then** is `WIFI_CONNECTED` published (Application re-evaluates the bypass to false). If the AP had been idle for 1 h, only the AP is dropped (`_fallbackApSuppressed`) and STA keeps retrying; Wi-Fi is never switched off.
+3. *First boot, no credentials.* `Init` (2 s) → `ApStarting` → `startAccessPoint()` with `WIFI_AP`, then `WIFI_AP_STARTED` → `isSetupMode()` is true → bypass enabled. Then `Ready`, and after 1 h idle → `Shutdown` (Wi-Fi off). Unchanged. If credentials arrive via `updateWiFi()`, `isSetupMode()` becomes false at once, the deferred reconnect tears the AP down, and STA-first applies. Covered by the native tests.
+
+### Changes Made
+- `modules/WifiManager/WifiManager.hpp`: new `StaBackoff` state (documented in the enum and the file header policy block); named timing constants; `_fallbackApSuppressed`; `isSetupMode()` with a doc comment on the #236 security rationale; pure policy helpers `staRetryDelayMs()` and `shouldStartFallbackAp()`; `isReady()` is now also true while an AP is up; `getAPMode()` doc clarified; private helper declarations; `transitionTo()` takes `now`.
+- `modules/WifiManager/WifiManager.cpp`: state machine rewritten around the helpers `startStaAttempt`, `onStaConnected`, `startAccessPoint`, `stopAccessPoint`, `applyPowerSave`, `markStaDown` and `staDownMs`.
+  - D-A: timeout → `_connectionRetries++` → `StaBackoff` (5/10/30/60 s), never AP-only.
+  - D-B: fallback AP in `WIFI_AP_STA` from `StaBackoff` after > 3 min; torn down on reconnect.
+  - D-D: the 1 h inactivity check drops only the fallback AP; `Shutdown` is reachable only from setup mode.
+  - D-E: `WIFI_PS_MIN_MODEM` when `WITH_BLE` or `CONFIG_BT_ENABLED` (not on native); `WIFI_PS_NONE` otherwise.
+  - D-F: `_reconnectRequested` and DNS are handled at the top of `tick()` in every state; `Init → ApStarting` without credentials is unchanged.
+  - Also: `isWifiPersistentError()` now masks only setup mode, not the fallback AP. The MCP `wifi_scan_networks` tool reverts to `WIFI_AP` only in setup mode, because on the fallback AP that revert would have killed STA.
+- `modules/Application/Application.cpp` (AuthManager wiring sites only): the `WIFI_AP_STARTED` handler now uses `isSetupMode()`; a `WIFI_CONNECTED` subscription re-evaluates `setAPMode(isSetupMode())`; the boot-time `setAPMode` uses `isSetupMode()`.
+- `test/test_unit/test_wifiManager/test_wifiManager.cpp`: 6 tests covering the backoff schedule, fallback thresholds and preconditions, the cumulative timeline (fallback after about 3 min, ≥ 4 attempts first), setup AP plus `WIFI_AP_STARTED`, credentials ending setup mode (and `WIFI_CONNECTED` published once), and credentials never entering AP or setup mode over a simulated 10 min.
+- `docs/developer/security.md`: the "AP Mode Bypass" section now describes the setup-only bypass and the fallback AP with auth enforced.
+
+### Decisions Made
+- **One new state (`StaBackoff`).** The fallback AP is raised only from it, between attempts, so the radio mode never changes mid-association. With the schedule this puts it at ≈ 3 min 10 s after link loss.
+- **`WiFi.disconnect(false)` on attempt timeout** (was `disconnect(true)`). It aborts the association without disabling the STA interface, so a running fallback AP is untouched and the radio isn't cycled off/on every minute. The next attempt re-applies the mode.
+- **The downtime tracker starts at the first attempt**, not only at link loss. A device that boots while its router is off therefore also gets the fallback AP (and `isWifiPersistentError()`) after 3 min.
+- **Pairing `WIFI_CONNECTED` after a re-association within the grace period.** Previously only `WIFI_DISCONNECTED` fired, which left HomeAssistant MQTT disconnected (`HomeAssistantModule::onWifiDisconnected` → `disconnectMqtt()`). This uses an existing event, not a new one.
+- **`isReady()` includes `_isAPMode`.** `WebServerManager::tick()` starts the HTTP server on the first `isReady()`. Without this, a device that booted with its router off would never serve the portal on the fallback AP.
+- **Setup AP plus credentials applied at runtime** (for example a config import): `Ready` sets `_reconnectRequested`, so STA-first takes over rather than sitting in AP-only mode with credentials.
+- **Power-save gate: `!UNIT_TEST && (WITH_BLE || CONFIG_BT_ENABLED)`.** `sdkconfig.defaults` sets `CONFIG_BT_ENABLED=n` and only `sdkconfig.ble.defaults` sets it to `y`, so non-BLE envs keep `WIFI_PS_NONE`. Native is excluded because its WiFi stub has no `WIFI_PS_MIN_MODEM`.
+- **No event on AP stop.** None exists, and none was invented.
+
+### Dead Ends & Warnings
+- **Native stub limits.** `test/stubs/platform/WiFi.h` always returns `WL_CONNECTED` and `WiFi.mode()` is a no-op with no getter, and the stub is outside my boundary. So a real STA failure can't be driven through `tick()`, and the AP_STA radio mode can't be observed natively. The failure-path decisions were factored into the pure helpers that `tick()` calls, and those are what is tested. The AP+STA mode choice and the teardown are verified by code review only.
+- **Hardware not exercised** (flashing is not allowed). The issue's hardware check is still outstanding: drop the AP for 60 s and for more than 3 min on `esp32s3nano_ble`, with BLE churn, and confirm that the "Should enable WiFi modem sleep" log line is gone.
+- **Asynchronous event dispatch on target.** EventBus dispatch is asynchronous there, so the bypass re-evaluation on `WIFI_CONNECTED` / `WIFI_AP_STARTED` lags by a loop iteration. The only case where the bypass is still true once credentials exist is setup mode → `updateWiFi()` → STA up, until the queued `WIFI_CONNECTED` is dispatched. The setup AP is already torn down at that point.
+
+### Out-of-Scope Findings
+- **`docs/design_specification.md` is stale.** L1563 and L1743 still say `wifi.ap_started` enables the AuthManager bypass unconditionally. This file is outside `docs/developer/`.
+- **`docs/developer/bluetooth.md` §6 (Coexistence)** should mention modem sleep (`WIFI_PS_MIN_MODEM`) on BLE builds, as #236 suggests. That isn't old AP-fallback or auth-bypass text, so I left it.
+- **`testConnection()`** runs blocking `WiFi.*` calls (`disconnect(true)`, `begin`, `delay` polling) from the HTTP handler thread. This is pre-existing and not main-loop confined. On the fallback AP it can briefly flip the radio mode.
+- **`WifiPreconditionContributor`** reports `FallbackEngaged` for any AP mode, and its describe text for that cause might want wording that fits the fallback AP (STA still retrying). No change was needed for correctness.
+
+### Blockers
+None.
