@@ -7,7 +7,7 @@
  *
  * Test: test/test_unit/test_bleManager/test_bleAdvertisingBuilder.cpp
  * Description: Unit tests for BLEAdvertisingBuilder and deterministic packing engine.
- *              Validates RFC §7 Echenon worked example, PDU spillover, Required overflow
+ *              Validates the RFC §7 worked example (standard SIG FTMS + Heart Rate profiles), PDU spillover, Required overflow
  *              fault generation, 16-bit UUID merging, and Appearance conflict handling.
  */
 
@@ -15,10 +15,10 @@
 #include "BLEAdvertisingBuilder.hpp"
 #include <cstring>
 
-TEST(BLEAdvertisingBuilderTest, EchenonWorkedExample) {
+TEST(BLEAdvertisingBuilderTest, FitnessProfileWorkedExample) {
     BLEAdvertisingBuilder adv;
 
-    // Echenon elements from RFC §7 and §20:
+    // Worked-example elements (RFC §7):
     // 1. Service UUID 0x1826 (FTMS)
     adv.addServiceUuid16(0x1826, BLEAdvertisingBuilder::Priority::Required);
 
@@ -26,8 +26,8 @@ TEST(BLEAdvertisingBuilderTest, EchenonWorkedExample) {
     const uint8_t sdData[] = {0x01, 0x20, 0x00};
     adv.addServiceData16(0x1826, sdData, sizeof(sdData), BLEAdvertisingBuilder::Priority::Required);
 
-    // 3. Appearance 0x0491 (Indoor Bike)
-    adv.setAppearance(0x0491);
+    // 3. Appearance 0x0540 (Generic Sensor, valid SIG appearance; same 4-byte AD size)
+    adv.setAppearance(0x0540);
 
     // 4. Service UUID 0x180D (Heart Rate) - merged into 16-bit UUID list
     adv.addServiceUuid16(0x180D, BLEAdvertisingBuilder::Priority::Required);
@@ -35,7 +35,7 @@ TEST(BLEAdvertisingBuilderTest, EchenonWorkedExample) {
     // Own MAC address ending in 1A:2B (little-endian: bytes[0]=0x2B, bytes[1]=0x1A)
     const uint8_t ownMac[6] = {0x2B, 0x1A, 0x00, 0x00, 0x00, 0x00};
 
-    BLEAdvPackResult res = adv.pack("Echenon", true, ownMac);
+    BLEAdvPackResult res = adv.pack("Example", true, ownMac);
 
     EXPECT_FALSE(res.hasFault());
     EXPECT_EQ(res.faults.size(), 0);
@@ -49,14 +49,14 @@ TEST(BLEAdvertisingBuilderTest, EchenonWorkedExample) {
     EXPECT_EQ(res.primaryAdv.data[1], 0x01);
     EXPECT_EQ(res.primaryAdv.data[2], 0x06);
 
-    // Scan response must carry "Echenon-1A2B" (14 bytes / 31)
+    // Scan response must carry "Example-1A2B" (14 bytes / 31)
     EXPECT_EQ(res.budget.scanRespUsed, 14);
     EXPECT_EQ(res.scanResponse.length, 14);
     EXPECT_EQ(res.scanResponse.data[0], 13);   // Length = 1 byte type + 12 chars
     EXPECT_EQ(res.scanResponse.data[1], 0x09); // Complete Local Name
     char nameBuf[13] = {};
     std::memcpy(nameBuf, &res.scanResponse.data[2], 12);
-    EXPECT_STREQ(nameBuf, "Echenon-1A2B");
+    EXPECT_STREQ(nameBuf, "Example-1A2B");
 }
 
 TEST(BLEAdvertisingBuilderTest, UuidMergeAndDeDuplication) {

@@ -62,7 +62,7 @@ TEST(BLEConfigTest, SerializationRoundTrip) {
     BLEManager mgr1;
     JsonDocument docIn;
     JsonObject objIn = docIn.to<JsonObject>();
-    objIn["advertisedName"] = "TestEchenon";
+    objIn["advertisedName"] = "TestDevice";
     objIn["nameSuffix"] = false;
     objIn["maxPeripheralConnections"] = 2;
     objIn["slowRetryMs"] = 30000;
@@ -72,7 +72,7 @@ TEST(BLEConfigTest, SerializationRoundTrip) {
     JsonObject objOut = docOut.to<JsonObject>();
     mgr1.serializeConfig(objOut);
 
-    EXPECT_STREQ(objOut["advertisedName"], "TestEchenon");
+    EXPECT_STREQ(objOut["advertisedName"], "TestDevice");
     EXPECT_FALSE(objOut["nameSuffix"].as<bool>());
     EXPECT_EQ(objOut["maxPeripheralConnections"], 2);
     EXPECT_EQ(objOut["slowRetryMs"], 30000);

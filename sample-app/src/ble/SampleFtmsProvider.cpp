@@ -131,7 +131,7 @@ void SampleFtmsProvider::tick(uint32_t currentMillis) {
         return;
     }
 
-    // FTMS Indoor Bike Data packet (Echenon SPEC §7.4):
+    // FTMS Indoor Bike Data packet (Bluetooth SIG Fitness Machine Service v1.0, Indoor Bike Data):
     // Flags (16-bit):
     //   bit 0 = 0 (Instantaneous Speed present)
     //   bit 2 = 1 (Instantaneous Cadence present)
