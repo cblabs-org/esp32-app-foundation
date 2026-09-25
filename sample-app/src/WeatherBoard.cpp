@@ -11,7 +11,7 @@
  *              and EventBus subscription with static function pointer callback.
  *
  * Implementation Notes:
- * - render() reads data from WeatherModule's thread-safe getters
+ * - render() reads data from IWeatherDataProvider's thread-safe getters
  * - EventBus subscription registered via wireEventBus() (F04 demo)
  */
 
@@ -65,8 +65,8 @@ void WeatherBoard::wireEventBus(EventBus& eventBus) {
  * @brief Static EventBus callback — logs weather.updated events.
  *
  * Casts the void* context back to WeatherBoard*. Thread-safety: this
- * callback is invoked synchronously by the publisher (WeatherModule::endDocument,
- * running on the DataManager background task). For a display board, the carousel
+ * callback is invoked synchronously by the publisher (WeatherModule::tick,
+ * running on the main application task). For a display board, the carousel
  * engine handles refresh timing, so no work is needed here beyond demonstrating
  * the subscription pattern. In a more complex scenario, you would set an atomic
  * flag here and handle the work in the next tick()/render() call.
@@ -78,7 +78,7 @@ void WeatherBoard::wireEventBus(EventBus& eventBus) {
 // F04: Static callback — EventBus requires a captureless function pointer.
 // Cast void* context back to concrete type to access members.
 // Thread-safety: this callback is invoked synchronously by the publisher
-// (WeatherModule::endDocument, running on the DataManager background task).
+// (WeatherModule::tick, running on the main application task).
 // For a display board, the carousel engine handles refresh timing,
 // so no work is needed here beyond demonstrating the subscription pattern.
 // In a more complex scenario, you would set an atomic flag here and

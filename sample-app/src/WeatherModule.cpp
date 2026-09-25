@@ -11,7 +11,7 @@
  *              IDataSource, IMCPContributor, and IPreconditionContributor interfaces.
  *
  *              Fetches weather data from the OpenWeatherMap API via
- *              streaming JSON parsing (JsonStreamingParser) on the
+ *              selective JSON parsing (ArduinoJson DeserializationFilter) on the
  *              DataManager background task, then stores parsed fields
  *              thread-safely for display rendering and REST/MCP queries.
  *
@@ -19,7 +19,7 @@
  * - F07: Uses AppFoundation.h facade; MCPToolRegistry.hpp is the only
  *   direct kernel include (not re-exported by the facade)
  * - F12: REST handlers use stack-allocated char[] buffers (no Arduino String)
- * - F19: JSON parser scratch fields are fixed char[] (no std::string)
+ * - F19: ArduinoJson DeserializationFilter limits parsing to required fields
  * - C2: Thread safety fixes applied (_units char array, _publishPending)
  */
 
@@ -345,12 +345,13 @@ void WeatherModule::registerRoutes(PsychicHttpServer& server) {
 }
 
 /**
- * @brief Executes an HTTPS GET to the OpenWeatherMap API with streaming JSON parse.
+ * @brief Executes an HTTPS GET to the OpenWeatherMap API with selective JSON parsing.
  *
- * Runs on the DataManager background task. Uses WiFiClientSecure with the
- * ESP-IDF certificate bundle for TLS verification. The response is streamed
- * through JsonStreamingParser to avoid buffering the entire payload in RAM.
+ * Runs on the DataManager background task. Uses the FetchContext-provided HTTP client
+ * with the ESP-IDF certificate bundle for TLS verification. Parses the response
+ * using ArduinoJson with a DeserializationFilter to conserve RAM.
  *
+ * @param ctx The transport context provided by the framework.
  * @return UpdateStatus indicating success, error type, or rate limiting.
  */
 UpdateStatus WeatherModule::fetchUpdate(const FetchContext& ctx) {

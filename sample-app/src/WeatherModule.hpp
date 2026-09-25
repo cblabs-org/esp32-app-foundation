@@ -8,8 +8,9 @@
  * Module: sample-app/src/WeatherModule.hpp
  * Description: Weather station module demonstrating 6 framework interfaces:
  *              ITickable, IConfigurable, IWebContributor, IDataSource,
- *              IMCPContributor, and IPreconditionContributor. Fetches current weather from
- *              the OpenWeatherMap API using streaming JSON parsing.
+ *              IMCPContributor, and IPreconditionContributor, plus the
+ *              IWeatherDataProvider abstraction for UI decouple. Fetches current
+ *              weather from OpenWeatherMap using ArduinoJson DeserializationFilter.
  *
  *              Thread Safety: Numeric fields use std::atomic for lock-free
  *              cross-thread reads. String fields use fixed char[] buffers
@@ -21,10 +22,10 @@
  *   Lifecycle:
  *   - WeatherModule():          Constructor — configures HA sensor metadata, creates mutex
  *   - ~WeatherModule():         Destructor — releases FreeRTOS mutex
- *   - begin():                  ADR-39 transient service locator wiring  [ITickable lifecycle]
+ *   - begin():                  ADR-39 transient service locator wiring
  *   - wireHomeAssistant():      Deferred HA entity registration (post app.begin())
  *
- *   Data Accessors:
+ *   IWeatherDataProvider:
  *   - hasData():                Returns true once first successful parse completes
  *   - getTemperature():         Thread-safe atomic getter — current temp (float)
  *   - getWindSpeed():           Thread-safe atomic getter — wind speed (float)
@@ -38,7 +39,7 @@
  *   - getClouds():              Thread-safe atomic getter — cloud coverage (int %)
  *   - getSunrise():             Thread-safe atomic getter — sunrise UTC epoch (uint32_t)
  *   - getSunset():              Thread-safe atomic getter — sunset UTC epoch (uint32_t)
- *   - getUnits():               Config accessor for units string ("metric"/"imperial")
+ *   - getUnits():               Thread-safe mutex-protected getter — units ("metric"/"imperial")
  *   - getCondition():           Thread-safe mutex-protected getter — weather condition
  *   - getIcon():                Thread-safe mutex-protected getter — OWM icon code
  *   - getCityName():            Thread-safe mutex-protected getter — location city name
@@ -56,22 +57,24 @@
  *
  *   IWebContributor:
  *   - registerRoutes():         Registers /api/weather/config (GET/POST), /api/weather/status, /weather.js
- *   - registerTabs():           Register "Weather" tab (top-level, order: 50, cloud icon, /weather.js) via ITabRegistry.
- *   - getApiPrefix():           Returns "/api/weather" for body-size middleware [NEW]
- *   - getMaxPostBody():         Returns 4096 (ADR-15 default) [NEW]
+ *   - registerTabs():           Registers "Weather" tab (top-level, order: 50, cloud icon, /weather.js) via ITabRegistry
+ *   - getTabIcon():             Returns SVG path data for the cloud tab icon
+ *   - getApiPrefix():           Returns "/api/weather" for body-size middleware
+ *   - getMaxPostBody():         Returns 4096 (ADR-15 default)
  *
  *   IDataSource:
- *   - fetchUpdate():            Executes HTTPS GET to OpenWeatherMap with streaming JSON parse
+ *   - fetchUpdate():            Executes HTTPS GET to OpenWeatherMap with ArduinoJson DeserializationFilter
  *   - getUpdateIntervalMs():    Returns configured polling interval (default 600000ms / 10min)
  *   - getSourceName():          Returns "OpenWeatherMap" — data source identifier
  *   - getPriorityTier():        Returns PriorityTier::Normal — standard fetch scheduling
+ *   - fetchesWhileConfiguring(): Returns false — prevents fetch attempts prior to configuration
  *
  *   IMCPContributor:
  *   - registerMCPTools():       Registers "weather_status" read-only MCP tool
  *
  *   IPreconditionContributor:
  *   - registerPreconditions():  Registers three preconditions: "Weather API Key" (Startup),
- *                               "Weather Location" (Startup), and "Weather API" (Operational).
+ *                               "Weather Location" (Startup), and "Weather API" (Operational)
  */
 
 #pragma once
@@ -364,12 +367,11 @@ public:
     // --- IDataSource ---
 
     /**
-     * @brief Executes an HTTPS GET to the OpenWeatherMap API with streaming JSON parse.
+     * @brief Executes an HTTPS GET to the OpenWeatherMap API with selective JSON parsing.
      *
-     * Runs on the DataManager background task. Uses WiFiClientSecure with the
-     * ESP-IDF certificate bundle for TLS verification. Parsed values are stored
-     * Retrieves current conditions from OpenWeatherMap, parsing the JSON stream
-     * in place.
+     * Runs on the DataManager background task. Uses the FetchContext-provided HTTP client
+     * with the ESP-IDF certificate bundle for TLS verification. Parses the response
+     * using ArduinoJson with a DeserializationFilter to conserve RAM.
      *
      * @param ctx The transport context provided by the framework.
      * @return UpdateStatus indicating success, error type, or rate limiting.
@@ -385,6 +387,20 @@ public:
     /** @brief Returns PriorityTier::Normal — standard fetch scheduling priority. */
     PriorityTier getPriorityTier() const override { return PriorityTier::Normal; }
 
+    /**
+     * @brief Whether the DataManager should schedule fetches while in CONFIGURING state.
+     *
+     * Returns false — weather data cannot be fetched without an API key and location,
+     * both of which are Startup preconditions. Returning false prevents unnecessary
+     * network attempts during initial configuration.
+     *
+     * Framework contract: IDataSource::fetchesWhileConfiguring() defaults to false.
+     * Modules that CAN usefully fetch before full configuration (e.g., time sync
+     * from NTP before the user configures other settings) should override this
+     * to return true.
+     */
+    bool fetchesWhileConfiguring() const override { return false; }
+
     // --- IMCPContributor ---
 
     /**
@@ -398,7 +414,15 @@ public:
     void registerMCPTools(MCPToolRegistry& registry) override;
 
     // --- IPreconditionContributor ---
-    /** @brief Register preconditions. */
+
+    /**
+     * @brief Registers weather preconditions with the PreconditionEngine.
+     *
+     * Registers "Weather API Key" (Startup), "Weather Location" (Startup),
+     * and "Weather API" (Operational).
+     *
+     * @param reg  Reference to the IPreconditionRegistry.
+     */
     void registerPreconditions(IPreconditionRegistry& reg) override;
 
 };

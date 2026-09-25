@@ -15,7 +15,7 @@
  * - WeatherBoard: IDisplayBoard for weather data overlay
  *
  *   Lifecycle:
- *   - WeatherBoard():            Stores WeatherModule pointer; defers EventBus wiring
+ *   - WeatherBoard():            Stores IWeatherDataProvider pointer; defers EventBus wiring
  *   - wireEventBus():            Deferred EventBus subscription (post-Application init)
  *
  *   IDisplayBoard:
