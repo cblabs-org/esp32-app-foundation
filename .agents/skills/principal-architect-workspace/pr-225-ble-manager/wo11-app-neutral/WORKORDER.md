@@ -53,4 +53,43 @@ Out-of-boundary findings go under *Out-of-Scope Findings* in your Completion Rep
 
 ---
 ## Completion Report
-<!-- Written by the worker at task completion; append below using the template. -->
+
+### Status
+✅ COMPLETE
+
+All objectives achieved: framework tests and sample are now app-neutral. Consumer application references removed, replaced with generic RFC §7 terminology and standard Bluetooth SIG spec references.
+
+### Changes Made
+
+**test_bleAdvertisingBuilder.cpp:**
+- Renamed test: `EchenonWorkedExample` → `FitnessProfileWorkedExample`
+- Line 10 file header: updated description to "Validates the RFC §7 worked example (standard SIG FTMS + Heart Rate profiles)"
+- Line 21 comment: "Echenon elements from RFC §7 and §20:" → "Worked-example elements (RFC §7):"
+- Line 30 appearance value: 0x0491 → 0x0540 (Generic Sensor, valid SIG value, maintains 4-byte AD size)
+- Line 38 device name: "Echenon" → "Example" (7 characters, scan response remains 14 bytes)
+- Line 52-59: expected name "Echenon-1A2B" → "Example-1A2B" with updated comment
+
+**test_bleConfig.cpp:**
+- Line 65 & 75: "TestEchenon" → "TestDevice" (both input and expected values)
+
+**SampleFtmsProvider.cpp:**
+- Line 134 comment: "FTMS Indoor Bike Data packet (Echenon SPEC §7.4):" → "FTMS Indoor Bike Data packet (Bluetooth SIG Fitness Machine Service v1.0, Indoor Bike Data):"
+
+### Verification Results
+- ✅ Tests: 52 test cases passed (native environment, same count as before)
+  - Test name successfully changed to `BLEAdvertisingBuilderTest.FitnessProfileWorkedExample`
+  - All byte counts verified (primary: 20 bytes, scan response: 14 bytes unchanged)
+- ✅ Build: sample-app compiled for esp32s3nano_ble (1.7 MB firmware.bin generated)
+- ✅ Grep: zero "echenon" references remain in test/, sample-app/src/, modules/, src/, docs/
+
+### Dead Ends & Warnings
+None.
+
+### Out-of-Scope Findings
+None.
+
+### Blockers
+None.
+
+**Committed:** `0ec19b87` (ble-manager/wo11-app-neutral)
+**Worker:** Claude Haiku 4.5
