@@ -184,6 +184,21 @@
   }
 
   // -------------------------------------------------------------------------
+  // Helper: Format firmware version with release notes hyperlink
+  // -------------------------------------------------------------------------
+  function formatVersionLink(ver, baseUrl) {
+    if (!ver || ver === '?' || ver === 'unknown') {
+      return ver === 'unknown' ? 'unknown' : 'v' + (ver || '?');
+    }
+    const tag = (ver.startsWith('v') || ver.startsWith('V')) ? ver : 'v' + ver;
+    const template = baseUrl || 'https://github.com/matthewmcneill/esp32-app-foundation-releases/releases/tag/{version}';
+    const url = template.includes('{version}')
+      ? template.replace('{version}', encodeURIComponent(tag))
+      : template.replace(/\/+$/, '') + '/' + encodeURIComponent(tag);
+    return `<a href="${url}" target="_blank" rel="noopener noreferrer" style="color:var(--primary); text-decoration:underline;">${tag}</a>`;
+  }
+
+  // -------------------------------------------------------------------------
   // Load and render: Card 1 (Firmware) + Card 2 initial state (Settings)
   // Single merged call: /api/system + /api/ota status
   // -------------------------------------------------------------------------
@@ -203,7 +218,7 @@
 
       // --- Card 1: Firmware ---
       let rows = '';
-      rows += infoRow('Version',   'v' + (ota.version  || sys.firmware_version || '?'));
+      rows += infoRow('Version',   formatVersionLink(ota.version || sys.firmware_version, ota.releaseNotesUrl || sys.release_notes_url));
       rows += infoRow('Partition', sys.partition || '?');
       rows += infoRow('Board',     ota.boardId   || '?');
       if (ota.lastError) {

@@ -130,7 +130,7 @@ async function bootAndNavigateToStatus(page: Page, systemData = MOCK_SYSTEM_GREE
 // ---------------------------------------------------------------------------
 
 test.describe('System Status Sub-pill', () => {
-  test('device info card renders chip model, SDK, and firmware version', async ({ page }) => {
+  test('device info card renders chip model, SDK, and firmware version link', async ({ page }) => {
     await bootAndNavigateToStatus(page);
 
     const deviceInfo = page.locator('#sys-device-info');
@@ -139,6 +139,36 @@ test.describe('System Status Sub-pill', () => {
     await expect(deviceInfo).toContainText('ESP32-S3');
     await expect(deviceInfo).toContainText('app0');
     await expect(deviceInfo).toContainText('20260601-001');
+
+    const versionLink = deviceInfo.locator('a[href*="releases/tag"]');
+    await expect(versionLink).toHaveText('v1.0.0-test');
+    await expect(versionLink).toHaveAttribute('href', 'https://github.com/matthewmcneill/esp32-app-foundation-releases/releases/tag/v1.0.0-test');
+    await expect(versionLink).toHaveAttribute('target', '_blank');
+    await expect(versionLink).toHaveAttribute('rel', 'noopener noreferrer');
+  });
+
+  test('firmware version links to custom releaseNotesUrl template when provided', async ({ page }) => {
+    await bootAndNavigateToStatus(page, {
+      ...MOCK_SYSTEM_GREEN,
+      firmware_version: '2.3.4',
+      release_notes_url: 'https://example.com/releases/{version}',
+    });
+
+    const versionLink = page.locator('#sys-device-info a[href*="example.com"]');
+    await expect(versionLink).toHaveText('v2.3.4');
+    await expect(versionLink).toHaveAttribute('href', 'https://example.com/releases/v2.3.4');
+    await expect(versionLink).toHaveAttribute('target', '_blank');
+  });
+
+  test('firmware version renders plain text when unknown or missing', async ({ page }) => {
+    await bootAndNavigateToStatus(page, {
+      ...MOCK_SYSTEM_GREEN,
+      firmware_version: 'unknown',
+    });
+
+    const deviceInfo = page.locator('#sys-device-info');
+    await expect(deviceInfo).toContainText('unknown');
+    await expect(deviceInfo.locator('a[href*="releases"]')).toHaveCount(0);
   });
 
   test('memory bars show RAG colours — red when heap min free < 25%', async ({ page }) => {

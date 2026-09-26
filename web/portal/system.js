@@ -215,6 +215,21 @@
   }
 
   // -------------------------------------------------------------------------
+  // Helper: Format firmware version with release notes hyperlink
+  // -------------------------------------------------------------------------
+  function formatVersionLink(ver, baseUrl) {
+    if (!ver || ver === '?' || ver === 'unknown') {
+      return ver === 'unknown' ? 'unknown' : 'v' + (ver || '?');
+    }
+    const tag = (ver.startsWith('v') || ver.startsWith('V')) ? ver : 'v' + ver;
+    const template = baseUrl || 'https://github.com/matthewmcneill/esp32-app-foundation-releases/releases/tag/{version}';
+    const url = template.includes('{version}')
+      ? template.replace('{version}', encodeURIComponent(tag))
+      : template.replace(/\/+$/, '') + '/' + encodeURIComponent(tag);
+    return `<a href="${url}" target="_blank" rel="noopener noreferrer" style="color:var(--primary); text-decoration:underline;">${tag}</a>`;
+  }
+
+  // -------------------------------------------------------------------------
   // Fetch and render precondition health
   // -------------------------------------------------------------------------
   async function loadPreconditions() {
@@ -364,7 +379,7 @@
       // --- Device info card ---
       const deviceInfo = document.getElementById('sys-device-info');
       deviceInfo.innerHTML =
-        infoRow('Firmware', 'v' + (data.firmware_version || '?')) +
+        infoRow('Firmware', formatVersionLink(data.firmware_version, data.release_notes_url)) +
         infoRow('Build', data.build_serial || 'Unknown') +
         infoRow('SDK', data.sdk_version || '?') +
         infoRow('Chip', (data.chip_model || 'ESP32') + ' rev ' + (data.chip_revision || '?')) +
