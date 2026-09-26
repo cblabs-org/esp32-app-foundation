@@ -74,6 +74,7 @@
 // Core domain services (owned by value — full includes required)
 #include "WifiManager.hpp"
 #include "WifiPreconditionContributor.hpp"
+#include "RedactorPreconditionContributor.hpp"
 #include "KeyManager.hpp"
 #include "AuthManager.hpp"
 #include "DeviceCrypto.hpp"
@@ -536,6 +537,7 @@ private:
     AuthManager _authManager;           ///< Portal + MCP authentication manager (WO1 skeleton)
     WifiManager _wifiManager;           ///< WiFi connection state machine
     WifiPreconditionContributor _wifiPrecondition{_wifiManager}; ///< Built-in WiFi STA precondition contributor
+    RedactorPreconditionContributor _redactorPrecondition;       ///< Built-in Redactor health precondition contributor
 
     // Heartbeat
     Periodic _heartbeatPeriodic{30000};                              ///< Throttle for periodic heartbeat log (30s)

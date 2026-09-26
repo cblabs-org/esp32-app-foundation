@@ -147,4 +147,5 @@ namespace PreconditionNames {
     inline constexpr const char* WIFI_STATION = "WiFi Station"; ///< Wifi Station
     inline constexpr const char* TIMEZONE     = "Timezone"; ///< Timezone
     inline constexpr const char* TIME_SYNC    = "Time Sync"; ///< Time Sync
+    inline constexpr const char* REDACTOR_HEALTH = "Redactor Health"; ///< Redactor Health
 }
