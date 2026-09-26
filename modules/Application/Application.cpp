@@ -189,6 +189,7 @@ bool Application::begin(const FrameworkConfig& config) {
     _wifiManager.setConfigManager(&_configManager);
     _wifiManager.setKeyManager(&_keyManager);
     _wifiManager.setEventBus(&_eventBus);
+    _webServerManager.setEventBus(&_eventBus);
     _authManager.begin(&_configManager, &_keyManager);
 
 
@@ -275,7 +276,7 @@ bool Application::begin(const FrameworkConfig& config) {
     if (_appStylesheet) {
         _webServerManager.setAppStylesheet(_appStylesheet);
     }
-    _webServerManager.begin(_webContributors, &_authManager, &_wifiManager);
+    _webServerManager.begin(_webContributors, &_authManager, &_wifiManager, &_eventBus);
     _statusReporter->reportStatus("Web portal starting...", 0.90f);
 
 

@@ -33,6 +33,7 @@
     // does, the transitive DeviceCrypto include now resolves via relative path.
     #include "AuthManager.hpp"
 #include "WifiManager.hpp"
+#include "EventBus.hpp"
 #include "ConfigRoot.hpp"
 
 // Portal PROGMEM assets — hardware only (require Arduino.h for PROGMEM macro)
@@ -99,10 +100,18 @@ void WebServerManager::setHttpConfig(size_t stackSize, int maxOpenSockets) {
     _httpMaxOpenSockets = maxOpenSockets;
 }
 
+void WebServerManager::setEventBus(EventBus* eventBus) {
+    _eventBus = eventBus;
+}
+
 void WebServerManager::begin(const std::vector<IWebContributor*>& contributors,
-                             AuthManager* authManager, WifiManager* wifiManager) {
+                             AuthManager* authManager, WifiManager* wifiManager,
+                             EventBus* eventBus) {
     _authManager = authManager;
     _wifiManager = wifiManager;
+    if (eventBus != nullptr) {
+        _eventBus = eventBus;
+    }
     bool apMode = _wifiManager ? _wifiManager->getAPMode() : false;
     ESP_LOGI(TAG, "Initializing WebServerManager (apMode=%d)", apMode);
 
@@ -411,6 +420,7 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors,
     activeServer->on("/api/system/restart", HTTP_POST, [this](PsychicRequest* request, PsychicResponse* response) {
         ESP_LOGW(TAG, "POST /api/system/restart — scheduling device restart");
         esp_err_t err = response->send(200, "application/json", "{\"status\":\"restarting\"}");
+        _restartRequestedMs = millis();
         _restartRequested = true;
         return err;
     });
@@ -604,20 +614,43 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors,
 
     ESP_LOGI(TAG, "WebServer configured (TLS=%d, AP=%d), registered %u contributors",
              useTls, apMode, (unsigned)contributors.size());
+
+    if (_eventBus != nullptr) {
+        _eventBus->subscribe(WifiEvents::WIFI_CONNECTED, onWifiEvent, this);
+        _eventBus->subscribe(WifiEvents::WIFI_AP_STARTED, onWifiEvent, this);
+        ESP_LOGI(TAG, "Subscribed to WiFi events (%s, %s) on EventBus",
+                 WifiEvents::WIFI_CONNECTED, WifiEvents::WIFI_AP_STARTED);
+    }
+
+    // If WiFi is already active at begin() time (e.g. prior connection), start immediately
+    if (_wifiManager && _wifiManager->isReady()) {
+        ESP_LOGI(TAG, "WiFi is already ready at begin() — starting server immediately");
+        _startServer();
+    }
+}
+
+void WebServerManager::_startServer() {
+    bool expected = false;
+    if (!_serverStarted.compare_exchange_strong(expected, true)) {
+        return;
+    }
+    _httpServer.begin();
+    if (_tlsMode && _httpsServer) {
+        _httpsServer->begin();
+        ESP_LOGI(TAG, "HTTPS server started on port 443; HTTP redirect on port 80");
+    } else {
+        ESP_LOGI(TAG, "HTTP server started on port 80");
+    }
+}
+
+void WebServerManager::onWifiEvent(const char* topic, const void* /*payload*/, void* ctx) {
+    if (ctx == nullptr) return;
+    auto* self = static_cast<WebServerManager*>(ctx);
+    ESP_LOGI(TAG, "Received wifi event '%s' — starting web server", topic ? topic : "unknown");
+    self->_startServer();
 }
 
 void WebServerManager::tick(uint32_t currentMillis) {
-    if (!_serverStarted && _wifiManager && _wifiManager->isReady()) {
-        _httpServer.begin();
-        if (_tlsMode && _httpsServer) {
-            _httpsServer->begin();
-            ESP_LOGI(TAG, "HTTPS server started on port 443; HTTP redirect on port 80");
-        } else {
-            ESP_LOGI(TAG, "HTTP server started on port 80");
-        }
-        _serverStarted = true;
-    }
-
     // --- Periodic httpd task stack high-water mark telemetry (#119) ---
     // The httpd task is created internally by PsychicHttp / ESP-IDF with
     // the name "httpd". Log every 60s to track headroom on constrained
@@ -629,7 +662,7 @@ void WebServerManager::tick(uint32_t currentMillis) {
     // "an httpd task", not reliably of the TLS one. Treat it as a smoke
     // signal, not a precise measurement.
 #ifdef ESP_PLATFORM
-    if (_serverStarted) {
+    if (_serverStarted.load()) {
         static uint32_t lastHwmLogMs = 0;  // static ok — singleton class
         if (lastHwmLogMs == 0 || (currentMillis - lastHwmLogMs) >= 60000) {
             TaskHandle_t httpdTask = xTaskGetHandle("httpd");
@@ -643,21 +676,17 @@ void WebServerManager::tick(uint32_t currentMillis) {
     }
 #endif
 
-    if (_restartRequested) {
-        ESP_LOGI(TAG, "Restart requested. Checking certificate generation status...");
-        if (_authManager) {
-            uint32_t startMs = millis();
-            while (_authManager->isCertGenerating() && (millis() - startMs < 10000)) {
-                // No esp_task_wdt_reset() here: this runs on the Arduino loopTask,
-                // which is not a TWDT subscriber. Arduino-ESP32 initialises
-                // loopTaskWDTEnabled = false and only subscribes if the application
-                // calls enableLoopWDT(), which this framework never does — so a reset
-                // here returned ESP_ERR_NOT_FOUND and protected nothing. The wait is
-                // safe because no watchdog is supervising this task, not because it
-                // was being fed. See wo1 TWDT-AUDIT.md §3.
-                delay(100);
-            }
+    if (_restartRequested.load()) {
+        if (_restartRequestedMs == 0) {
+            _restartRequestedMs = currentMillis ? currentMillis : 1;
+            ESP_LOGI(TAG, "Restart requested. Checking certificate generation status...");
         }
+
+        if (_authManager && _authManager->isCertGenerating() && (currentMillis - _restartRequestedMs < 10000)) {
+            // Non-blocking: wait for certificate generation to complete without blocking the main loop
+            return;
+        }
+
         ESP_LOGI(TAG, "Ending web servers...");
         if (_httpsServer) {
             _httpsServer->end();

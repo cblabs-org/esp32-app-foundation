@@ -9,6 +9,8 @@
 #include "WebServerManager.hpp"
 #include "interfaces/IWebContributor.hpp"
 #include "../test_helpers/MockTabRegistry.hpp"
+#include "EventBus.hpp"
+#include "WifiManager.hpp"
 
 
 class MockContributor : public IWebContributor {
@@ -216,6 +218,92 @@ TEST(WebServerManagerTest, AddTab_TabEntryOverload) {
     EXPECT_EQ(registry.entries[0].order, 42);
     EXPECT_EQ(registry.entries[0].icon, "<path/>");
     EXPECT_EQ(registry.entries[0].script, "/my.js");
+}
+
+TEST(WebServerManagerTest, InitialServerNotStarted) {
+    WebServerManager manager;
+    EXPECT_FALSE(manager.isServerStarted());
+}
+
+TEST(WebServerManagerTest, WifiConnectedEventStartsServer) {
+    EventBus bus;
+    bus.begin();
+
+    WebServerManager manager;
+    MockContributor c1;
+    std::vector<IWebContributor*> contributors = { &c1 };
+
+    manager.begin(contributors, nullptr, nullptr, &bus);
+    EXPECT_FALSE(manager.isServerStarted());
+
+    int count = bus.publish(WifiEvents::WIFI_CONNECTED);
+    EXPECT_GT(count, 0);
+    EXPECT_TRUE(manager.isServerStarted());
+}
+
+TEST(WebServerManagerTest, WifiApStartedEventStartsServer) {
+    EventBus bus;
+    bus.begin();
+
+    WebServerManager manager;
+    manager.setEventBus(&bus);
+
+    MockContributor c1;
+    std::vector<IWebContributor*> contributors = { &c1 };
+
+    manager.begin(contributors);
+    EXPECT_FALSE(manager.isServerStarted());
+
+    int count = bus.publish(WifiEvents::WIFI_AP_STARTED);
+    EXPECT_GT(count, 0);
+    EXPECT_TRUE(manager.isServerStarted());
+}
+
+TEST(WebServerManagerTest, UnrelatedEventDoesNotStartServer) {
+    EventBus bus;
+    bus.begin();
+
+    WebServerManager manager;
+    MockContributor c1;
+    std::vector<IWebContributor*> contributors = { &c1 };
+
+    manager.begin(contributors, nullptr, nullptr, &bus);
+    EXPECT_FALSE(manager.isServerStarted());
+
+    bus.publish("system.heap");
+    bus.publish(WifiEvents::WIFI_DISCONNECTED);
+    EXPECT_FALSE(manager.isServerStarted());
+}
+
+TEST(WebServerManagerTest, DoubleStartIsIdempotent) {
+    EventBus bus;
+    bus.begin();
+
+    WebServerManager manager;
+    MockContributor c1;
+    std::vector<IWebContributor*> contributors = { &c1 };
+
+    manager.begin(contributors, nullptr, nullptr, &bus);
+    EXPECT_FALSE(manager.isServerStarted());
+
+    bus.publish(WifiEvents::WIFI_CONNECTED);
+    EXPECT_TRUE(manager.isServerStarted());
+
+    bus.publish(WifiEvents::WIFI_CONNECTED);
+    EXPECT_TRUE(manager.isServerStarted());
+}
+
+TEST(WebServerManagerTest, TickDoesNotCrashWhenNotStarted) {
+    WebServerManager manager;
+    MockContributor c1;
+    std::vector<IWebContributor*> contributors = { &c1 };
+
+    manager.begin(contributors);
+    EXPECT_FALSE(manager.isServerStarted());
+
+    // Calling tick() must not start the server and must not crash
+    manager.tick(100);
+    EXPECT_FALSE(manager.isServerStarted());
 }
 
 int main(int argc, char** argv) {

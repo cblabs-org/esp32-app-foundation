@@ -19,9 +19,27 @@
  *              all routes are served on port 80 as before.
  *
  * Exported Functions/Classes:
- * - WebServerManager: Manages the internal AsyncWebServer(s).
- *   - begin():     Starts the web server(s) and registers all contributor routes.
- *   - getServer(): Returns a reference to the active server (HTTPS or HTTP).
+ * - WebServerManager: Manages the internal PsychicHttpServer / PsychicHttpsServer.
+ *
+ *   Lifecycle:
+ *   - begin(): Starts the web server(s) and registers all contributor routes.
+ *   - tick(): Periodic tick handler for stack telemetry and deferred restart. [ITickable]
+ *   - setEventBus(): Injects EventBus instance for WiFi event subscriptions.
+ *
+ *   Configuration:
+ *   - setHttpConfig(): Configures HTTP task stack size and socket limit.
+ *   - setAppName(): Sets runtime application name.
+ *   - setAppStylesheet(): Sets optional CSS path.
+ *
+ *   Accessors:
+ *   - getServer(): Returns reference to the active server (HTTPS or HTTP).
+ *   - isServerStarted(): Returns true if server has been started.
+ *   - getHttpStackSize(): Returns configured task stack size.
+ *   - getHttpMaxOpenSockets(): Returns configured max open sockets limit.
+ *
+ *   IWebContributor:
+ *   - registerRoutes(): No-op (routes registered inline in begin()). [IWebContributor]
+ *   - registerTabs(): Registers Status tab under System. [IWebContributor]
  *
  * Heap Guard:
  *   A static atomic counter limits concurrent high-memory requests (portal HTML,
@@ -76,6 +94,7 @@
 // Forward declaration — avoids pulling AuthManager.hpp into every translation unit
 class AuthManager;
 class WifiManager;
+class EventBus;
 
 /**
  * @brief Manages the web server lifecycle and IWebContributor dispatch.
@@ -127,6 +146,20 @@ public:
     int getHttpMaxOpenSockets() const { return _httpMaxOpenSockets; }
 
     /**
+     * @brief Set the EventBus instance for subscribing to network events.
+     *
+     * @param eventBus Pointer to the framework EventBus instance.
+     */
+    void setEventBus(EventBus* eventBus);
+
+    /**
+     * @brief Check whether the underlying HTTP/HTTPS server(s) have been started.
+     *
+     * @return true if server has been started, false otherwise.
+     */
+    bool isServerStarted() const { return _serverStarted.load(); }
+
+    /**
      * @brief Initialize the web server(s), set up routes, register all
      *        contributor routes, and start listening.
      *
@@ -138,12 +171,15 @@ public:
      * @param contributors List of IWebContributor pointers to register.
      * @param authManager  Pointer to the AuthManager for TLS cert loading
      *                     and auth state queries. Nullable (HTTP-open mode).
-     * @param apMode       True if the device is in AP (access point) mode.
-     *                     Forces HTTP-open mode regardless of auth/cert state.
+     * @param wifiManager  Pointer to the WifiManager for AP mode query and
+     *                     initial ready check. Nullable.
+     * @param eventBus     Pointer to the EventBus for subscribing to WiFi
+     *                     state events. Nullable.
      */
     void begin(const std::vector<IWebContributor*>& contributors,
                AuthManager* authManager = nullptr,
-               WifiManager* wifiManager = nullptr);
+               WifiManager* wifiManager = nullptr,
+               EventBus* eventBus = nullptr);
 
     /** @brief Periodic tick handler. */
     void tick(uint32_t currentMillis) override;
@@ -173,6 +209,9 @@ public:
     PsychicHttpServer& getServer();
 
 private:
+    void _startServer();
+    static void onWifiEvent(const char* topic, const void* payload, void* ctx);
+
     PsychicHttpServer _httpServer; ///< HTTP server on port 80 (always exists)
 
     PsychicHttpsServer* _httpsServer = nullptr; ///< HTTPS server on port 443 (heap-allocated in TLS mode)
@@ -180,8 +219,10 @@ private:
     bool         _tlsMode     = false;   ///< True when serving HTTPS on port 443
     AuthManager* _authManager = nullptr; ///< Stored for WO5 route guards (nullable)
     WifiManager* _wifiManager = nullptr; ///< Required to check network ready state
-    bool         _serverStarted = false; ///< True if the underlying servers have been started
+    EventBus*    _eventBus    = nullptr; ///< EventBus for network event subscriptions
+    std::atomic<bool> _serverStarted{false}; ///< True if the underlying servers have been started
     std::atomic<bool> _restartRequested{false}; ///< True if a device restart has been requested
+    uint32_t     _restartRequestedMs = 0; ///< Timestamp when restart was requested
     const char*  _appName = nullptr;     ///< Runtime-settable app name for /api/app response
     const char*  _appStylesheet = nullptr; ///< Optional CSS path for portal branding
 
