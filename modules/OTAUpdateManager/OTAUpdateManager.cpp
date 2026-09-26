@@ -603,7 +603,8 @@ void OTAUpdateManager::performUpdateTask() {
     }
     // Binary download uses setInsecure() — the firmware payload is independently
     // verified via MbedTLSSignatureVerifier (RSA-2048 signature). Transport
-    // security is redundant. GitHub CDN redirects use different certs than the API.
+    // security is redundant. GitHub CDN redirects use different certs than the API
+    // and root CAs may rotate over the device's operational lifetime.
     client->setInsecure();
     ESP_LOGI(TAG, "WiFiClientSecure allocated on heap");
 
@@ -784,6 +785,9 @@ static bool downloadRawFile_(const char* url, const char* token,
             ESP_LOGE(TAG, "downloadRawFile_: WiFiClientSecure retry allocation failed");
             return false;
         }
+        // Manifest fallback uses setInsecure() — manifest.json and manifest.json.sig
+        // integrity and authenticity are independently verified via RSA-2048 signature.
+        // Transport security is redundant, and fallback prevents bricking if root CAs rotate.
         client->setInsecure();
 
         if (!http.begin(*client, String(url))) {
