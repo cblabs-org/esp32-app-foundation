@@ -13,6 +13,7 @@
 
 #ifndef UNIT_TEST
 
+#include <vector>
 #include <esp_log.h>
 
 #include <freertos/FreeRTOS.h>
@@ -21,11 +22,31 @@
 #include <freertos/idf_additions.h>
 #include <esp_heap_caps.h>
 
+static void* s_registryMutex = nullptr;
+static std::vector<DeepStackExecutor*> s_executors;
+
 DeepStackExecutor::DeepStackExecutor(size_t stackBytes, const char* name)
     : _stackBytes(stackBytes), _name(name) {
+    if (s_registryMutex == nullptr) {
+        s_registryMutex = xSemaphoreCreateMutex();
+    }
+    xSemaphoreTake(static_cast<SemaphoreHandle_t>(s_registryMutex), portMAX_DELAY);
+    s_executors.push_back(this);
+    xSemaphoreGive(static_cast<SemaphoreHandle_t>(s_registryMutex));
 }
 
 DeepStackExecutor::~DeepStackExecutor() {
+    if (s_registryMutex) {
+        xSemaphoreTake(static_cast<SemaphoreHandle_t>(s_registryMutex), portMAX_DELAY);
+        for (auto it = s_executors.begin(); it != s_executors.end(); ++it) {
+            if (*it == this) {
+                s_executors.erase(it);
+                break;
+            }
+        }
+        xSemaphoreGive(static_cast<SemaphoreHandle_t>(s_registryMutex));
+    }
+
     if (_taskHandle != nullptr) {
         TaskHandle_t handle = static_cast<TaskHandle_t>(_taskHandle);
         _taskHandle = nullptr;
@@ -138,6 +159,20 @@ void DeepStackExecutor::workerLoop(void* param) {
     }
 }
 
+void DeepStackExecutor::awaitAllIdle() {
+    if (s_registryMutex) {
+        xSemaphoreTake(static_cast<SemaphoreHandle_t>(s_registryMutex), portMAX_DELAY);
+        for (auto* exec : s_executors) {
+            if (exec->_mutex) {
+                // Acquire and immediately release to ensure it's not currently running
+                xSemaphoreTake(static_cast<SemaphoreHandle_t>(exec->_mutex), portMAX_DELAY);
+                xSemaphoreGive(static_cast<SemaphoreHandle_t>(exec->_mutex));
+            }
+        }
+        xSemaphoreGive(static_cast<SemaphoreHandle_t>(s_registryMutex));
+    }
+}
+
 #else // UNIT_TEST stub
 
 DeepStackExecutor::DeepStackExecutor(size_t stackBytes, const char* name)
@@ -166,6 +201,10 @@ bool DeepStackExecutor::run(const std::function<void()>& work, uint32_t timeoutM
 
 size_t DeepStackExecutor::stackHighWaterMarkBytes() const {
     return _stubHighWaterMark;
+}
+
+void DeepStackExecutor::awaitAllIdle() {
+    // Stub
 }
 
 #endif // UNIT_TEST

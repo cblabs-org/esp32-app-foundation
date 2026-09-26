@@ -75,6 +75,7 @@ static constexpr const char* TAG = "OTAUpdateManager";
 #include "MbedTLSSignatureVerifier.hpp"
 #include "interfaces/IWebContributor.hpp"
 #include "OTAManifest.hpp"
+#include "DeepStackExecutor.h"
 #include "Audit.h"
 #include "MCPToolRegistry.hpp"
 #include "SemVer.hpp"
@@ -987,6 +988,9 @@ bool OTAUpdateManager::beginUpdate(size_t size, const char* expectedMD5) {
     ESP_LOGI(TAG, "Beginning OTA update: size=%u, MD5=%s",
              (unsigned)size, expectedMD5 ? expectedMD5 : "(none)");
     // --- Step 1: Initialize the Update library ---
+    // Ensure no screenshots or other deep stack jobs are mid-flight.
+    DeepStackExecutor::awaitAllIdle();
+
     if (!Update.begin(size)) {
         ESP_LOGE(TAG, "Update.begin() failed for size %u", (unsigned)size);
         return false;
@@ -1194,6 +1198,9 @@ esp_err_t OTAUpdateManager::handleSignedUpload(PsychicRequest* request,
         }
 
         // Begin the flash update — size is unknown at this point so use OTA_SIZE_UNKNOWN
+        // Ensure no screenshots or other deep stack jobs are mid-flight.
+        DeepStackExecutor::awaitAllIdle();
+
         if (!Update.begin(UPDATE_SIZE_UNKNOWN)) {
             ESP_LOGE(TAG, "Upload: Update.begin() failed");
             _uploadAborted = true;

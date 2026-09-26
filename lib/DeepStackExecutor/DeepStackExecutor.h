@@ -82,6 +82,14 @@ public:
      */
     size_t stackHighWaterMarkBytes() const;
 
+    /**
+     * @brief Block until all registered DeepStackExecutor instances are idle.
+     *
+     * Acquires and immediately releases the mutex of every active instance.
+     * Used by OTA to prevent TOCTOU flash write collisions.
+     */
+    static void awaitAllIdle();
+
     // Non-copyable
     DeepStackExecutor(const DeepStackExecutor&) = delete;
     DeepStackExecutor& operator=(const DeepStackExecutor&) = delete;
