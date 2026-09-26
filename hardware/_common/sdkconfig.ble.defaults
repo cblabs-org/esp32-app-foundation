@@ -82,8 +82,8 @@ CONFIG_BT_CTRL_BLE_MAX_ACT=4
 # Trade-off: higher TX power increases current draw by ~40-60 mA during
 # transmission bursts.  Battery-powered devices may want to lower this to
 # +9 dBm (P9) or +3 dBm (P3) in their downstream sdkconfig.
-# SOAK TEST Phase 4: TX power at +15 dBm (was +9 in Phase 3) — revert after soak
-CONFIG_BT_CTRL_DFT_TX_POWER_LEVEL_P15=y
+# REPRO TEST: TX power at +20 dBm (original Issue #239 setting)
+CONFIG_BT_CTRL_DFT_TX_POWER_LEVEL_P20=y
 
 # ╔═══════════════════════════════════════════════════════════════════════════╗
 # ║  6. HCI TRANSPORT BUFFERS                                                ║
