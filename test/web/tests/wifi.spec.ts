@@ -135,9 +135,17 @@ test.describe('WiFi Settings Tab', () => {
   test('eye toggle is disabled for saved password, enabled when user types', async ({ page }) => {
     const eyeBtn = page.locator('#wifi-eye-btn');
     const passInput = page.locator('#wifi-pass-input');
+    const wrapper = page.locator('.password-input-wrapper');
 
     // Wait for status fetch
     await expect(page.locator('#wifi-mode-badge')).toHaveText('STA');
+
+    // Verify .password-input-wrapper wraps the input and eye button
+    await expect(wrapper).toBeVisible();
+    await expect(wrapper.locator('#wifi-pass-input')).toBeVisible();
+    await expect(wrapper.locator('#wifi-eye-btn')).toBeVisible();
+    await expect(eyeBtn).toHaveClass(/eye-btn/);
+    await expect(eyeBtn).toHaveAttribute('aria-label', 'Show password');
 
     // Eye button should be visually dimmed (opacity 0.3) and pointer-events none
     await expect(eyeBtn).toHaveCSS('opacity', '0.3');
@@ -149,6 +157,16 @@ test.describe('WiFi Settings Tab', () => {
     // Eye button should now be active
     await expect(eyeBtn).toHaveCSS('opacity', '1');
     await expect(eyeBtn).toHaveCSS('pointer-events', 'auto');
+
+    // Clicking eye toggle reveals password
+    await eyeBtn.click();
+    await expect(passInput).toHaveAttribute('type', 'text');
+    await expect(eyeBtn).toHaveAttribute('aria-label', 'Hide password');
+
+    // Clicking again hides password
+    await eyeBtn.click();
+    await expect(passInput).toHaveAttribute('type', 'password');
+    await expect(eyeBtn).toHaveAttribute('aria-label', 'Show password');
   });
 
   test('test connection sends POST and shows success with IP', async ({ page }) => {
