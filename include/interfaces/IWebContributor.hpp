@@ -68,6 +68,13 @@ public:
      * Override to register one or more tabs via ITabRegistry::addTab().
      * Modules with no visible tab must provide an empty override.
      *
+     * Top-level tab icons: When contributing top-level tabs with icons, provide
+     * bare SVG inner geometry only (no outer <svg> tag and no inline stroke or
+     * fill attributes). The web client wraps icons in a standard 24x24 Feather
+     * SVG container with 2px stroke (stroke="currentColor" stroke-width="2").
+     * Inline stroke attributes on inner elements silently override the wrapper
+     * and break the design system. See ITabRegistry::addTab().
+     *
      * @param registry  The ITabRegistry to register tabs with.
      */
     virtual void registerTabs(ITabRegistry& registry) = 0;

@@ -310,7 +310,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     // Generic grid icon used for app-contributed tabs that declare no custom icon.
-    // Tabs that return a non-null icon string from getTabIcon() use it instead.
+    // Tabs that supply a non-null icon string via addTab() / getTabIcon() use it instead.
     var DEFAULT_GENERIC_ICON =
       '<rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>' +
       '<line x1="3" y1="9" x2="21" y2="9"/>' +
@@ -335,7 +335,10 @@ document.addEventListener('DOMContentLoaded', function() {
       }
 
       // Use the contributor's declared SVG icon if available; fall back to the
-      // generic grid icon for contributors that do not implement getTabIcon().
+      // generic grid icon for contributors that do not declare an icon.
+      // If bare geometry is returned (not starting with <svg), wrap it with
+      // the standard design system 2px Feather stroke attributes. Note: inner
+      // elements must NOT define stroke/fill attributes as they override this wrapper.
       var iconInner = tab.icon || DEFAULT_GENERIC_ICON;
       var svgHTML = iconInner;
       if (iconInner.trim().indexOf('<svg') !== 0) {

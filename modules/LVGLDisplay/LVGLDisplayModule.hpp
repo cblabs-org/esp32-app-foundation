@@ -329,7 +329,12 @@ public:
     void registerRoutes(PsychicHttpServer& server) override;
     const char* getApiPrefix() const override { return "/api/display"; }
 
-    /** @brief Return SVG inner content for the Display bottom-nav icon. */
+    /**
+     * @brief Return SVG inner content for the Display bottom-nav icon.
+     *
+     * Returns bare geometry (<rect>, <line>) without inline stroke/fill attributes;
+     * the web client wrapper supplies 2px stroke styling.
+     */
     const char* getTabIcon() const;
 
     /**

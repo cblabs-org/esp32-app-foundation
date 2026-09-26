@@ -89,8 +89,9 @@ static constexpr size_t MAX_BODY_SIZE = 256;
 // Two path elements:
 //   1. The rectangular shackle body
 //   2. The shackle arc (arch of the padlock)
-// Returned as a single string literal; app.js wraps in the outer svg element
-// with viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2".
+// Returned as a single string literal of bare geometry (no inline stroke/fill);
+// app.js wraps in the outer svg element with viewBox="0 0 24 24" fill="none"
+// stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round".
 // ---------------------------------------------------------------------------
 static const char* LOCK_ICON_SVG =
     "<path d=\"M19 11H5a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2z\"/>"
@@ -1014,12 +1015,16 @@ void AuthManager::registerRoutes(PsychicHttpServer& server) {
 /**
  * @brief Return the feather-icons lock SVG inner content for the bottom-nav icon.
  *
- * The string contains two <path> elements with no outer <svg> wrapper.
+ * The string contains two <path> elements with no outer <svg> wrapper and no
+ * inline stroke, stroke-width, or fill attributes.
  * app.js injects the wrapper when building the nav link:
  *   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
  *        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
  *     {returned string}
  *   </svg>
+ *
+ * Return bare geometry only. Any stroke or stroke-width attributes on inner
+ * elements silently override the wrapper and break the 2px Feather stroke weight.
  */
 const char* AuthManager::getTabIcon() const {
     return LOCK_ICON_SVG;

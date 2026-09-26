@@ -399,6 +399,10 @@ public:
 
     /**
      * @brief Return SVG inner content for the Display bottom-nav icon.
+     *
+     * Returns bare geometry (<rect>, <line>) without inline stroke/fill attributes;
+     * the web client wrapper supplies 2px stroke styling.
+     *
      * @return Feather-style "monitor" icon SVG body string.
      */
     const char* getTabIcon() const;

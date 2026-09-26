@@ -218,6 +218,22 @@ TEST(WebServerManagerTest, AddTab_TabEntryOverload) {
     EXPECT_EQ(registry.entries[0].script, "/my.js");
 }
 
+TEST(WebServerManagerTest, AddTab_BareGeometryIcon) {
+    MockTabRegistry registry;
+    const char* bareIcon = "<path d=\"M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z\"/>";
+    registry.addTab("Sensor", nullptr, 60, bareIcon, "/sensor.js");
+    ASSERT_EQ(registry.entries.size(), 1u);
+    EXPECT_EQ(registry.entries[0].name, "Sensor");
+    EXPECT_EQ(registry.entries[0].parent, "");
+    EXPECT_EQ(registry.entries[0].order, 60);
+    EXPECT_EQ(registry.entries[0].icon, bareIcon);
+    EXPECT_EQ(registry.entries[0].script, "/sensor.js");
+    EXPECT_EQ(nullptr, strstr(registry.entries[0].icon.c_str(), "<svg"));
+    EXPECT_EQ(nullptr, strstr(registry.entries[0].icon.c_str(), "stroke="));
+    EXPECT_EQ(nullptr, strstr(registry.entries[0].icon.c_str(), "stroke-width="));
+    EXPECT_EQ(nullptr, strstr(registry.entries[0].icon.c_str(), "fill="));
+}
+
 int main(int argc, char** argv) {
     PsychicHttpServer::lastMaxBodySize = 4096;
     ::testing::InitGoogleTest(&argc, argv);

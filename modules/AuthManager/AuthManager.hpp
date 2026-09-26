@@ -237,8 +237,11 @@ public:
      * @brief Return the feather-icons lock SVG inner content for the bottom-nav icon.
      *
      * Called by registerTabs() to provide the icon for the Security tab.
+     * Returns bare SVG geometry (<path> elements) without inline stroke,
+     * fill, or stroke-width attributes — the web client's SVG wrapper supplies
+     * stroke="currentColor" stroke-width="2".
      *
-     * @return Lock SVG path string (feather-icons style, stroke-based).
+     * @return Lock SVG path string (feather-icons style, bare stroke geometry).
      */
     const char* getTabIcon() const;
 
