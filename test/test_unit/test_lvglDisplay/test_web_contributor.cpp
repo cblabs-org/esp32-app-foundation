@@ -25,7 +25,12 @@ protected:
 
 TEST_F(LVGLWebContributorTest, TabMetadata) {
     EXPECT_STREQ(display.getApiPrefix(), "/api/display");
-    EXPECT_NE(display.getTabIcon(), nullptr);
+    const char* icon = display.getTabIcon();
+    ASSERT_NE(icon, nullptr);
+    EXPECT_EQ(nullptr, strstr(icon, "<svg"));
+    EXPECT_EQ(nullptr, strstr(icon, "stroke="));
+    EXPECT_EQ(nullptr, strstr(icon, "stroke-width="));
+    EXPECT_EQ(nullptr, strstr(icon, "fill="));
 
     // Verify registerTabs() registers the expected parent + child tabs
     MockTabRegistry registry;

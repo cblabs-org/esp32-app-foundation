@@ -979,6 +979,12 @@ void LVGLDisplayModule::_onInputWake(const char* /*topic*/, const void* /*payloa
 // IWebContributor & Snapshot Primitive (WO7)
 // -----------------------------------------------------------------------------
 
+/**
+ * @brief Return SVG inner content for the Display bottom-nav icon.
+ *
+ * Uses a Feather-style "monitor" icon (24x24 viewBox). Only bare geometry
+ * is returned; the outer <svg> wrapper supplying 2px stroke is added by app.js.
+ */
 const char* LVGLDisplayModule::getTabIcon() const {
     return "<rect x=\"2\" y=\"3\" width=\"20\" height=\"14\" rx=\"2\" ry=\"2\"/>"
            "<line x1=\"8\" y1=\"21\" x2=\"16\" y2=\"21\"/>"

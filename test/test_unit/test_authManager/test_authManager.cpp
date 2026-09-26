@@ -286,6 +286,21 @@ TEST_F(AuthManagerTest, test_tab_icon_not_null) {
     EXPECT_GT(strlen(icon), 0u);
 }
 
+/**
+ * @brief getTabIcon() must return bare geometry only (no stroke/fill attributes).
+ *
+ * The client SVG wrapper supplies stroke="currentColor" and stroke-width="2".
+ * Inline attributes on inner elements silently override the wrapper styling.
+ */
+TEST_F(AuthManagerTest, test_tab_icon_bare_geometry) {
+    const char* icon = auth.getTabIcon();
+    ASSERT_NE(nullptr, icon);
+    EXPECT_EQ(nullptr, strstr(icon, "<svg"));
+    EXPECT_EQ(nullptr, strstr(icon, "stroke="));
+    EXPECT_EQ(nullptr, strstr(icon, "stroke-width="));
+    EXPECT_EQ(nullptr, strstr(icon, "fill="));
+}
+
 // ===========================================================================
 // WO1 Tests — Auth guards: pass-through
 // ===========================================================================

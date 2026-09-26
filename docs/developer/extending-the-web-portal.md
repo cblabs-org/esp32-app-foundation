@@ -32,14 +32,26 @@ void registerTabs(ITabRegistry& registry) override {
     // name:   "MyApp"      — user-facing tab label
     // parent: nullptr       — top-level (use "System" for sub-pills)
     // order:  100           — sort position (lower = earlier)
-    // icon:   nullptr       — nullptr → generic grid icon; or SVG path body
+    // icon:   nullptr       — nullptr → generic grid icon; or bare SVG geometry
     // script: "/myapp.js"   — JS file loaded when tab is activated
 }
 ```
 - **name**: User-facing display label (e.g., `"MyApp"`). Return `nullptr` to register routes without a tab.
 - **parent**: `nullptr` for top-level bottom-nav; `"System"` for sub-pills under the System pane.
 - **order**: Integer controlling render order among siblings. Lower values render first. Default convention: `100`.
-- **icon**: Inner SVG path body for the nav icon, or `nullptr` for the default grid icon.
+- **icon**: Inner SVG geometry string for the nav icon, or `nullptr` for the default grid icon.
+  The client (`app.js`) wraps the returned string in a 24×24 Feather SVG element:
+  ```html
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+       stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <!-- your bare geometry here -->
+  </svg>
+  ```
+  > [!IMPORTANT]
+  > **Return BARE geometry only** — `<path d="..."/>`, `<circle .../>`, `<rect .../>` with **no** `stroke`, `stroke-width`, `fill`, or `stroke-linecap` attributes. Any such attributes on inner elements silently override the wrapper and break the design system's mandated 2px Feather stroke weight.
+  >
+  > - **Correct:** `"<path d=\"M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z\"/>"`
+  > - **Incorrect:** `"<path d=\"...\" stroke-width=\"1.5\"/>"` *(silently overrides wrapper)*
 - **script**: HTTP route for the tab's JavaScript file (e.g., `"/myapp.js"`), or `nullptr` if the tab has no script.
 
 ---
