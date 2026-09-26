@@ -77,12 +77,18 @@ async function bootAndNavigateToOta(page: Page) {
 // ---------------------------------------------------------------------------
 
 test.describe('OTA Update Sub-pill', () => {
-  test('firmware info card renders version and partition from /api/system', async ({ page }) => {
+  test('firmware info card renders version with release notes link and partition from /api/system', async ({ page }) => {
     await bootAndNavigateToOta(page);
 
     const firmwareInfo = page.locator('#ota-firmware-info');
     await expect(firmwareInfo).toContainText('v1.0.0-test');
     await expect(firmwareInfo).toContainText('app0');
+
+    const versionLink = firmwareInfo.locator('a[href*="releases/tag"]');
+    await expect(versionLink).toHaveText('v1.0.0-test');
+    await expect(versionLink).toHaveAttribute('href', 'https://github.com/matthewmcneill/esp32-app-foundation-releases/releases/tag/v1.0.0-test');
+    await expect(versionLink).toHaveAttribute('target', '_blank');
+    await expect(versionLink).toHaveAttribute('rel', 'noopener noreferrer');
   });
 
   test('check for update flow — POST checkGithub, shows status message', async ({ page }) => {
