@@ -73,8 +73,8 @@ CONFIG_COMPILER_OPTIMIZATION_SIZE=y
 # Newlib nano — smaller printf/scanf (~25-50KB savings)
 CONFIG_NEWLIB_NANO_FORMAT=y
 
-# SOAK TEST: Raised to DEBUG (4) for Issue #239 investigation — revert to 3 after soak
-CONFIG_LOG_MAXIMUM_LEVEL=4
+# Strip VERBOSE and DEBUG log strings at compile time
+CONFIG_LOG_MAXIMUM_LEVEL=3
 
 # Use silent assertions — saves flash from assertion message strings
 CONFIG_COMPILER_OPTIMIZATION_ASSERTIONS_SILENT=y

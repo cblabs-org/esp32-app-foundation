@@ -261,8 +261,10 @@ bool BLEStack::init(const char* deviceName, void* eventQueue) {
     NimBLEDevice::setSecurityAuth(BLE_SM_PAIR_AUTHREQ_BOND);
     NimBLEDevice::setSecurityIOCap(BLE_HS_IO_NO_INPUT_OUTPUT);
 
-    // REPRO TEST: TX power at +20 dBm (original Issue #239 setting)
-    NimBLEDevice::setPower(20, NimBLETxPowerType::All);
+    // BLE TX power is set via CONFIG_BT_CTRL_DFT_TX_POWER_LEVEL_* in
+    // sdkconfig.ble.defaults (default: +9 dBm / P9). Downstream consumers
+    // can override in their own sdkconfig fragment — no code change needed.
+    // See Issue #239: +20 dBm caused WiFi coexistence instability in soak testing.
 
     // Wi-Fi / BLE coexistence: leave at ESP-IDF default (PREFER_WIFI, enum 0).
     // PREFER_BT (dev.76) starved WiFi entirely; PREFER_BALANCE (dev.78) still
@@ -403,8 +405,7 @@ bool BLEStack::startAdvertising(const BLEAdvPackResult& packResult, const BLECon
 
     // A2: Don't call setPreferredParams() here — it adds AD bytes after the
     // packer has done its 31-byte accounting. The GAP PPCP characteristic
-    // REPRO TEST: TX power at +20 dBm (original Issue #239 setting)
-    NimBLEDevice::setPower(20, NimBLETxPowerType::Advertise);
+    // already exposes preferred params; let the central decide.
 
     return pAdv->start();
 }
