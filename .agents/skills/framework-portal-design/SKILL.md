@@ -1,5 +1,5 @@
 ---
-name: esp32-app-foundation-design
+name: framework-portal-design
 description: Use this skill to generate well-branded interfaces and assets for the ESP32 App Foundation device configuration portal, either for production or throwaway prototypes/mocks/etc. Contains essential design guidelines, colors, type, fonts, assets, and UI kit components for prototyping.
 user-invocable: true
 ---

@@ -86,13 +86,13 @@ no manual copy/refresh needed.
 ```bash
 mkdir -p .agents/skills
 ln -s ../../framework/.agents/skills/framework-expert .agents/skills/framework-expert
-ln -s ../../framework/.agents/skills/framework-design-system .agents/skills/framework-design-system
+ln -s ../../framework/.agents/skills/framework-portal-design .agents/skills/framework-portal-design
 ```
 
 These two skills provide:
 - **framework-expert** — the main development skill covering interfaces,
   patterns, security, design specs, and project scaffolding.
-- **framework-design-system** — UI kit, brand tokens, and portal styling
+- **framework-portal-design** — UI kit, brand tokens, and portal styling
   guidelines.
 
 > **Note:** Additional skills (embedded-systems, house-style-docs,
@@ -130,7 +130,7 @@ filename order. These are unconditional operational constraints.
 
 The following skills are installed at `.agents/skills/`:
 - `framework-expert` — ESP32 App Foundation development guidance
-- `framework-design-system` — portal UI and branding
+- `framework-portal-design` — portal UI and branding
 
 Read a skill's `SKILL.md` when it triggers.
 ```
@@ -182,7 +182,7 @@ Confirm the setup is correct by checking all expected paths exist:
 └── skills/
     ├── framework-expert/
     │   └── SKILL.md
-    └── framework-design-system/
+    └── framework-portal-design/
         └── SKILL.md
 AGENTS.md
 GEMINI.md

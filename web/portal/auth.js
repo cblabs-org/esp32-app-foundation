@@ -377,7 +377,7 @@
             '<textarea id="upload-cert-pem" rows="4" placeholder="-----BEGIN CERTIFICATE-----..." ' +
               'style="width:100%; box-sizing:border-box; margin-bottom:0.75rem;"></textarea>' +
             '<label for="upload-key-pem" style="font-size:0.85rem;">Private Key (PEM)</label>' +
-            '<textarea id="upload-key-pem" rows="4" placeholder="-----BEGIN PRIVATE KEY-----..." ' +
+            '<textarea id="upload-key-pem" rows="4" placeholder="-----BEGIN PRIVATE KEY -----..." ' +
               'style="width:100%; box-sizing:border-box; margin-bottom:0.75rem;"></textarea>' +
             '<div id="upload-cert-error" class="alert alert--error hidden"></div>' +
             '<button id="upload-cert-btn" style="width:100%;">Upload Certificate</button>' +

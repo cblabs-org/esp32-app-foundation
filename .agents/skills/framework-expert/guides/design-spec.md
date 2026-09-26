@@ -152,7 +152,7 @@ Using the confirmed Concept Summary, select and read the relevant references:
 | Display (any type) | `systems/display/overview.md`, `systems/display/custom-boards.md` |
 | Non-OLED display | `systems/display/replacing-the-display.md` |
 | Web portal or REST API | `systems/web-portal/overview.md`, `systems/web-portal/routes.md` |
-| Portal styling / UI components | Sibling skill: `../../framework-design-system/readme.md` |
+| Portal styling / UI components | Sibling skill: `../../framework-portal-design/readme.md` |
 | Persistent settings | `systems/config/overview.md`, `systems/config/persistence.md` |
 | EventBus pub/sub | `systems/event-bus/overview.md`, `systems/event-bus/custom-topics.md` |
 | OTA firmware updates | `systems/ota/` (all files in directory) |
@@ -324,7 +324,7 @@ config file at /mod/<namespace>.json>
 
 <For each IWebContributor: tab name, REST endpoints, what the UI shows.
 All portal UI must use the project design system tokens and components
-(see `../../framework-design-system/readme.md`).>
+(see `../../framework-portal-design/readme.md`).>
 
 ### `<TabName>` tab
 

@@ -84,4 +84,4 @@ The web server task stack size and socket limits are board-configurable, and dee
 
 ## Design System
 
-When building or modifying portal UI, use the project's design system for all styling decisions — colour tokens, typography, spacing, component patterns (Drawer, PillBar, InfoRow, ToggleSwitch, etc.), and the module-tab scaffold template. See the sibling skill at `../../../framework-design-system/readme.md`.
+When building or modifying portal UI, use the project's design system for all styling decisions — colour tokens, typography, spacing, component patterns (Drawer, PillBar, InfoRow, ToggleSwitch, etc.), and the module-tab scaffold template. See the sibling skill at `../../../framework-portal-design/readme.md`.
