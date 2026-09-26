@@ -30,6 +30,7 @@
 
 #include "OTADownloadEngine.hpp"
 #include "platform/LogShim.h"
+#include "DeepStackExecutor.h"
 
 static constexpr const char* TAG = "OTADownloadEngine";
 
@@ -415,6 +416,9 @@ OTAError OTADownloadEngine::downloadAndFlash(WiFiClient& client, const std::stri
     }
 
     // --- Step 6: Begin Update ---
+    // Ensure no screenshots or other deep stack jobs are mid-flight.
+    DeepStackExecutor::awaitAllIdle();
+
     if (!Update.begin(contentLen)) {
         ESP_LOGE(TAG, "Update.begin() failed for size %d", contentLen);
         http.end();
