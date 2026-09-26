@@ -89,16 +89,11 @@
         style="width:100%; box-sizing:border-box; margin-bottom:0.75rem; background:var(--card-bg,#f8f9fa); cursor:default;">
 
       <label for="wifi-pass-input" style="font-size:0.85rem;">Password</label>
-      <div style="position:relative; margin-bottom:0.75rem;">
+      <div class="password-input-wrapper">
         <input type="password" id="wifi-pass-input" placeholder="Network password"
-          autocomplete="new-password" style="width:100%; box-sizing:border-box; padding-right:2.5rem;">
-        <button type="button" id="wifi-eye-btn" title="Toggle visibility" style="
-          position:absolute; right:8px; top:50%; transform:translateY(-50%);
-          background:none; border:none; cursor:pointer; padding:4px;
-          color:var(--text-muted,#6c757d); display:flex; align-items:center;
-        ">
-          <svg id="wifi-eye-icon" width="20" height="20" viewBox="0 0 24 24" fill="none"
-            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          autocomplete="new-password">
+        <button type="button" class="eye-btn" id="wifi-eye-btn" title="Toggle visibility" aria-label="Show password">
+          <svg id="wifi-eye-icon" viewBox="0 0 24 24">
             <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
             <circle cx="12" cy="12" r="3"></circle>
           </svg>
@@ -410,6 +405,7 @@
     if (!userIsTypingPass) return;
     const isPassword = passInput.type === 'password';
     passInput.type = isPassword ? 'text' : 'password';
+    eyeBtn.setAttribute('aria-label', isPassword ? 'Hide password' : 'Show password');
     const icon = document.getElementById('wifi-eye-icon');
     if (isPassword) {
       icon.innerHTML = '<path d="M2 2l20 20"></path><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>';
