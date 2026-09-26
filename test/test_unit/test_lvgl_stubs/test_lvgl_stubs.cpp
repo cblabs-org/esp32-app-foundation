@@ -13,6 +13,10 @@
 #include "lvgl.h"
 #include "esp_lcd.h"
 #include "esp_lvgl_port.h"
+// ConfigManager.hpp and WifiManager.hpp satisfy PlatformIO LDF chain+ resolution
+// when ILVGLHardwareAdapter pulls in the LVGLDisplay -> MCPServer library chain.
+#include "ConfigManager.hpp"
+#include "WifiManager.hpp"
 #include "../../modules/LVGLDisplay/ILVGLHardwareAdapter.hpp"
 
 class MockLVGLHardwareAdapter : public ILVGLHardwareAdapter {
