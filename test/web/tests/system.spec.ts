@@ -265,10 +265,19 @@ test.describe('System Status Sub-pill', () => {
   test('precondition health card renders registered preconditions and status badges', async ({ page }) => {
     await bootAndNavigateToStatus(page);
 
-    const card = page.locator('#sys-preconditions-card');
-    await expect(card).toBeVisible();
-    await expect(card.locator('header')).toContainText('Precondition Health');
-    await expect(page.locator('#sys-preconditions-summary')).toContainText('2 Unmet');
+    const summaryCard = page.locator('#sys-config-status-card');
+    await expect(summaryCard).toBeVisible();
+    await expect(summaryCard).toContainText('Configuration Status');
+    // MOCK_PRECONDITIONS has 2 unmet, both are 'Operational', so it's Degraded
+    await expect(page.locator('#sys-preconditions-summary')).toContainText('2 Unmet (Degraded)');
+    await expect(page.locator('#sys-preconditions-rag-dot')).toHaveAttribute('style', /var\(--warning\)/);
+
+    // Click to open drawer
+    await summaryCard.click();
+
+    const drawer = page.locator('#sys-preconditions-drawer');
+    await expect(drawer).toBeVisible();
+    await expect(drawer.locator('header')).toContainText('Precondition Diagnostics');
 
     const list = page.locator('#sys-preconditions-list');
     await expect(list).toContainText('WiFi Station');
@@ -293,6 +302,9 @@ test.describe('System Status Sub-pill', () => {
     });
 
     await bootAndNavigateToStatus(page);
+
+    // Open the drawer first
+    await page.locator('#sys-config-status-card').click();
 
     const retryBtn = page.locator('.btn-sys-retry-precondition[data-name="External API"]');
     await expect(retryBtn).toBeVisible();

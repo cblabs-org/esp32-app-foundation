@@ -120,13 +120,16 @@
   // Render the initial HTML scaffold
   // -------------------------------------------------------------------------
   container.innerHTML = `
-    <article id="sys-preconditions-card">
-      <header style="display:flex; justify-content:space-between; align-items:center;">
-        <span>Precondition Health</span>
-        <span id="sys-preconditions-summary" style="font-size:0.8rem; font-weight:normal; color:var(--text-muted);"></span>
-      </header>
-      <div id="sys-preconditions-list">
-        <p style="color: var(--text-muted);">Loading...</p>
+    <article id="sys-config-status-card" style="padding: 0.75rem 1rem; cursor: pointer;" onclick="document.getElementById('sys-preconditions-drawer').style.display='block'; document.getElementById('sys-preconditions-drawer').scrollIntoView({behavior:'smooth'});">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <div style="display:flex; align-items:center; gap:10px;">
+          <span id="sys-preconditions-rag-dot" style="display:inline-block; width:12px; height:12px; border-radius:50%; background:var(--text-muted);"></span>
+          <strong style="font-size:0.95rem;">Configuration Status</strong>
+        </div>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span id="sys-preconditions-summary" style="font-size:0.85rem; font-weight:normal; color:var(--text-muted);">Loading...</span>
+          <span style="font-size:0.8rem; color:var(--text-muted);">▼</span>
+        </div>
       </div>
     </article>
 
@@ -170,6 +173,16 @@
         <p style="font-size:0.8rem; color:var(--error); margin-bottom:0.5rem;">Type <strong>RESET</strong> to confirm factory reset. This erases all configuration.</p>
         <input type="text" id="sys-factory-input" placeholder="Type RESET..." style="margin-bottom:0.5rem;" autocomplete="off" />
         <button id="btn-sys-factory-confirm" style="background:var(--error);" disabled>Confirm Factory Reset</button>
+      </div>
+    </article>
+
+    <article id="sys-preconditions-drawer" style="display:none; border-top: 2px solid var(--border);">
+      <header style="display:flex; justify-content:space-between; align-items:center;">
+        <span>Precondition Diagnostics</span>
+        <button id="btn-sys-preconditions-close" style="background:transparent; border:none; color:var(--text-muted); cursor:pointer; font-size:1.2rem; line-height:1; padding:0 4px;">&times;</button>
+      </header>
+      <div id="sys-preconditions-list">
+        <p style="color: var(--text-muted);">Loading...</p>
       </div>
     </article>
 
@@ -247,10 +260,20 @@
 
       const allMet = items.every(p => p.met);
       const unmetCount = items.filter(p => !p.met).length;
+      const hasUnmetStartup = items.some(p => !p.met && (p.role === 'Startup' || p.role === 'Both'));
+      const ragDotEl = document.getElementById('sys-preconditions-rag-dot');
+
       if (summaryEl) {
-        summaryEl.innerHTML = allMet
-          ? '<span style="color:var(--success); font-weight:600;">✓ All Healthy</span>'
-          : `<span style="color:var(--warning); font-weight:600;">${unmetCount} Unmet</span>`;
+        if (allMet) {
+          summaryEl.innerHTML = '<span style="color:var(--success); font-weight:600;">All Healthy</span>';
+          if (ragDotEl) ragDotEl.style.background = 'var(--success)';
+        } else if (hasUnmetStartup) {
+          summaryEl.innerHTML = `<span style="color:var(--error); font-weight:600;">${unmetCount} Unmet (Configuring)</span>`;
+          if (ragDotEl) ragDotEl.style.background = 'var(--error)';
+        } else {
+          summaryEl.innerHTML = `<span style="color:var(--warning); font-weight:600;">${unmetCount} Unmet (Degraded)</span>`;
+          if (ragDotEl) ragDotEl.style.background = 'var(--warning)';
+        }
       }
 
       const causeLabels = {
@@ -655,5 +678,13 @@
   // If the system tab is already active on load, start refresh
   if (container.classList.contains('tab-content--active')) {
     startAutoRefresh();
+  }
+
+  const drawerCloseBtn = document.getElementById('btn-sys-preconditions-close');
+  if (drawerCloseBtn) {
+    drawerCloseBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      document.getElementById('sys-preconditions-drawer').style.display = 'none';
+    });
   }
 })();
