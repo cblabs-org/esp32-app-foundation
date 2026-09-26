@@ -261,8 +261,8 @@ bool BLEStack::init(const char* deviceName, void* eventQueue) {
     NimBLEDevice::setSecurityAuth(BLE_SM_PAIR_AUTHREQ_BOND);
     NimBLEDevice::setSecurityIOCap(BLE_HS_IO_NO_INPUT_OUTPUT);
 
-    // Maximize RF transmission power (+20 dBm) for advertising, scanning, and connections
-    NimBLEDevice::setPower(20, NimBLETxPowerType::All);
+    // SOAK TEST Phase 3: TX power reduced to +9 dBm (was +20) — revert after soak
+    NimBLEDevice::setPower(9, NimBLETxPowerType::All);
 
     // Wi-Fi / BLE coexistence: leave at ESP-IDF default (PREFER_WIFI, enum 0).
     // PREFER_BT (dev.76) starved WiFi entirely; PREFER_BALANCE (dev.78) still
@@ -403,8 +403,8 @@ bool BLEStack::startAdvertising(const BLEAdvPackResult& packResult, const BLECon
 
     // A2: Don't call setPreferredParams() here — it adds AD bytes after the
     // packer has done its 31-byte accounting. The GAP PPCP characteristic
-    // Re-assert maximum TX power (+20 dBm) for advertising
-    NimBLEDevice::setPower(20, NimBLETxPowerType::Advertise);
+    // SOAK TEST Phase 3: TX power reduced to +9 dBm (was +20) — revert after soak
+    NimBLEDevice::setPower(9, NimBLETxPowerType::Advertise);
 
     return pAdv->start();
 }
