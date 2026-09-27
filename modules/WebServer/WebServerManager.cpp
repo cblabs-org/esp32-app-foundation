@@ -607,6 +607,21 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors,
 }
 
 void WebServerManager::tick(uint32_t currentMillis) {
+    // --- Deferred server start: DELIBERATE tick-polling, not EventBus (PR-24 WO10) ---
+    // PsychicHttp must not bind before the network interface is up, so start is
+    // deferred until WifiManager reports ready. This is polled here ON PURPOSE
+    // rather than driven by a WIFI_CONNECTED / WIFI_AP_STARTED subscription:
+    //   - On target, EventBus callbacks run on the esp_event default loop task
+    //     (CONFIG_ESP_SYSTEM_EVENT_TASK_STACK_SIZE = 2304 bytes in our sdkconfigs),
+    //     too small for httpd/TLS start-up, and concurrent with other modules' tick().
+    //   - Level-triggered polling self-heals; an edge-triggered subscription can
+    //     miss an event raised before subscribe() and needs a second start path.
+    //   - WIFI_CONNECTED is published before WifiManager transitions to Ready.
+    // Keeping start-up on the loop task gives one deterministic execution context
+    // (microkernel MK-3a). Direct WifiManager access is the sanctioned typed-service
+    // deviation (MK-3), so this is NOT an Orchestrator Anti-Pattern violation.
+    // If the per-tick query must go, the only acceptable variant is an EventBus
+    // callback that sets an atomic flag consumed here (EventBus.hpp §6). See #180 / PR #249.
     if (!_serverStarted && _wifiManager && _wifiManager->isReady()) {
         _httpServer.begin();
         if (_tlsMode && _httpsServer) {
@@ -643,6 +658,12 @@ void WebServerManager::tick(uint32_t currentMillis) {
     }
 #endif
 
+    // --- Deferred restart: DELIBERATE blocking wait (PR-29 WO9) ---
+    // Blocks the loop (max 10 s) until any in-flight cert generation finishes so
+    // the cert task is not killed mid-LittleFS write. Freezing every other module
+    // during shutdown is intended: it gives an orderly, deterministic teardown.
+    // delay() in shutdown/reboot paths is explicitly permitted
+    // (framework-expert rejected-approaches.md §10, tier 3). See #180 / PR #249.
     if (_restartRequested) {
         ESP_LOGI(TAG, "Restart requested. Checking certificate generation status...");
         if (_authManager) {
