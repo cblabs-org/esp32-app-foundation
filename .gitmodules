@@ -22,3 +22,6 @@
 [submodule ".agents/skills/lvgl-pro-expert"]
 	path = .agents/skills/lvgl-pro-expert
 	url = https://github.com/mm-skills/lvgl-pro-expert.git
+[submodule ".agents/plugins/bug-fixer-loop-plugin"]
+	path = .agents/plugins/bug-fixer-loop-plugin
+	url = https://github.com/matthewmcneill/bug-fixer-loop-plugin.git
