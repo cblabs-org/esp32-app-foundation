@@ -75,20 +75,30 @@ Point-in-time assessments, early evaluations, and superseded designs preserved f
 - [Microkernel Architecture Design (Historical)](archive/microkernel-architecture-design.md) — folded into v2.0 §3–§6
 - [Hardware Configuration Design (Historical)](archive/hardware-configuration-design.md) — folded into v2.0 §12; delivered as `hardware/`
 
-## Documentation Linter
+## Documentation Linters and Code Verification
 
-To prevent "doc-rot" and ensure terminology remains consistent with the current architecture, a zero-dependency documentation linter is provided.
+To prevent "doc-rot" and ensure documentation accurately matches the delivered codebase, two zero-dependency verification scripts are provided:
 
-**How to run:**
+### 1. Identifier Linter (`scripts/doc_lint.py`)
+Checks for banned/stale identifiers across all documentation files (e.g., ensuring `IConfigurable` instead of legacy naming), valid `STATUS:` banners on design documents, and fold-forward references for `IMPLEMENTED` documents.
+
 ```bash
 python3 scripts/doc_lint.py
 ```
 
-**What it checks:**
-- Banned/stale identifiers across all documentation files (e.g., ensuring `IConfigurable` instead of legacy naming).
-- Valid `STATUS:` banners on all design documents.
-- Presence of a fold-forward reference for design documents marked as `IMPLEMENTED`.
-
-*Note: The lint gate is local-only until CI integration (issue #144) lands. Please run it manually.*
-
 To add new banned identifiers, edit the `BANNED_IDS` table inside `scripts/doc_lint.py`.
+
+### 2. C++ Code Sample Checker (`scripts/check_doc_cpp_samples.py`)
+Compile-checks fenced C++ code samples (`cpp`, `c++`, `c`) in Markdown documentation against actual framework headers using host `clang++` or `g++` configured identically to PlatformIO's `[env:native]`.
+
+```bash
+python3 scripts/check_doc_cpp_samples.py
+```
+
+**What it checks:**
+- Synthesizes compilation candidates against real framework headers and verifies syntax, types, and method signatures.
+- Enforces exact signature parity for all framework interfaces (`ITickable`, `IConfigurable`, `IDataSource`, `IStatusReporter`, `IBootReporter`, `IWebContributor`, `IMCPContributor`, `IPreconditionContributor`, `ISanitizer`) using compile-time static assertions.
+- Respects skip annotations (`no-compile`, `skip-compile`, `pseudo-code`, `illustrative`, anti-pattern markers `❌`) for intentional non-compilable or illustrative fragments.
+- Supports single-file checking: `python3 scripts/check_doc_cpp_samples.py docs/developer/creating-a-module.md`.
+
+*Note: The lint gates are local-only until CI integration (issue #144) lands. Please run them manually before submitting PRs.*

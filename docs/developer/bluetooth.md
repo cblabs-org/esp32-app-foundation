@@ -215,7 +215,7 @@ public:
         if (maxCount < 1) return 0;
         outSpecs[0].serviceUuid16 = 0x180D;
         outSpecs[0].charUuid16 = 0x2A37;
-        outSpecs[0].notify = true;
+        outSpecs[0].indicate = false; // false = notify, true = indicate
         return 1;
     }
  
