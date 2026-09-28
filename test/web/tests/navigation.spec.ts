@@ -104,6 +104,37 @@ test.describe('Tab Navigation', () => {
     await expect(systemTab).toContainText('SYSTEM');
   });
 
+  test('bottom nav places Bluetooth tab immediately after WiFi tab when present', async ({ page }) => {
+    const tabsWithBle = [
+      ...MOCK_TABS,
+      { name: 'Bluetooth', id: 'bluetooth', parent: null, order: 15, script: '/ble.js' },
+    ];
+    await page.route('**/api/tabs', route => route.fulfill({ json: tabsWithBle }));
+    await page.goto('/');
+    await page.waitForFunction(() => (window as any).apiFetch !== undefined);
+
+    const bottomNav = page.locator('#bottom-nav');
+    const wifiTab = bottomNav.locator('[data-target="tab-wifi"]');
+    const bleTab = bottomNav.locator('[data-target="tab-bluetooth"]');
+    const securityTab = bottomNav.locator('[data-target="tab-security"]');
+
+    await expect(wifiTab).toBeVisible();
+    await expect(bleTab).toBeVisible();
+    await expect(securityTab).toBeVisible();
+
+    // Verify ordering: WiFi -> Bluetooth -> Security
+    const navLinks = await bottomNav.locator('.tab-link').evaluateAll(links =>
+      links.map(el => el.getAttribute('data-target'))
+    );
+    const wifiIndex = navLinks.indexOf('tab-wifi');
+    const bleIndex = navLinks.indexOf('tab-bluetooth');
+    const secIndex = navLinks.indexOf('tab-security');
+
+    expect(wifiIndex).toBeGreaterThanOrEqual(0);
+    expect(bleIndex).toBe(wifiIndex + 1);
+    expect(secIndex).toBeGreaterThan(bleIndex);
+  });
+
   test('tab switching — clicking System shows system content, hides WiFi', async ({ page }) => {
     // WiFi is active by default
     await expect(page.locator('#tab-wifi')).toHaveClass(/tab-content--active/);

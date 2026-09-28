@@ -177,7 +177,7 @@ public:
 ## Web Portal (`IWebContributor`)
 
 `BLEManager` contributes a dedicated, responsive management tab to the device configuration portal:
-- **Tab Name**: `Bluetooth` (Icon: Feather Bluetooth, sort order `60`).
+- **Tab Name**: `Bluetooth` (Icon: Feather Bluetooth, sort order `15`, immediately following WiFi at `10`).
 - **Route**: Serves gzipped static asset `/ble.js` via `serveGzipAsset` with ETag caching.
 - **Status Card**:
   - State badge with live color dot (`Active`, `Idle`, `Starting`, `Paused`, `Error`).
