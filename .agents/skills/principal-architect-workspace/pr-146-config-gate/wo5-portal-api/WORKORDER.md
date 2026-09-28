@@ -17,7 +17,7 @@ Expose precondition health via a REST API and render it prominently in the porta
 
 Read:
 - `docs/config-gate-design.md` — CG-18 (surfacing: portal mandatory), CG-18b (portal surfacing details)
-- The design skill at `.agents/skills/framework-design-system/SKILL.md` — for portal UI guidelines, colors, typography
+- The design skill at `.agents/skills/framework-portal-design/SKILL.md` — for portal UI guidelines, colors, typography
 - `modules/WebServer/WebServerManager.cpp` — how routes are registered and the `/api/tabs` pattern
 - `modules/Application/Application.hpp` — `getPreconditionEngine()` accessor
 - `web/portal/app.js` — SPA structure, dynamic script loading, `GET /api/tabs`

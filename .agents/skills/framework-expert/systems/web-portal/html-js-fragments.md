@@ -126,7 +126,7 @@ Although each tab renders into its own container, all tabs share the same DOM do
 
 ## Design System Compliance
 
-All portal tab markup **must** use the project's design system tokens and components rather than hard-coded colours, spacing, or ad-hoc CSS classes. The design system provides ready-made components (Drawer, PillBar, InfoRow, ToggleSwitch, Input, Select, etc.) and a module-tab scaffold template. See `../../../framework-design-system/readme.md` for the full reference and `../../../framework-design-system/templates/module-tab/` for a starter template.
+All portal tab markup **must** use the project's design system tokens and components rather than hard-coded colours, spacing, or ad-hoc CSS classes. The design system provides ready-made components (Drawer, PillBar, InfoRow, ToggleSwitch, Input, Select, etc.) and a module-tab scaffold template. See `../../../framework-portal-design/readme.md` for the full reference and `../../../framework-portal-design/templates/module-tab/` for a starter template.
 
 ## Persistence & Save Policy
 

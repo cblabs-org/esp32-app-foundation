@@ -34,7 +34,7 @@ Redesign the BLE portal tab to be a lightweight, framework-appropriate overview 
 
 ## Design System
 
-**You MUST read** `.agents/skills/framework-design-system/SKILL.md` and its `readme.md` before writing any HTML/CSS/JS. Key constraints:
+**You MUST read** `.agents/skills/framework-portal-design/SKILL.md` and its `readme.md` before writing any HTML/CSS/JS. Key constraints:
 
 - 480px mobile column, card-based layout
 - Material Blue `#2196F3` accent, dark/light theme via `[data-theme]`
@@ -150,7 +150,7 @@ complete
 - `web/portal/app.js` — Updated `buildBottomNav()` to be order-aware, inserting dynamic tab links before the first link with higher `data-order` attribute or appending at the end.
 - `modules/BLEManager/BLEManager.cpp` — Changed tab order parameter from 60 to 15 in `registerTabs()`.
 - `modules/BLEManager/BLESerialization.cpp` — Added `bleAddress` field to `serializeStatus()`, populated from `NimBLEDevice::getAddress().toString()` guarded with `#if defined(ESP_PLATFORM) && defined(WITH_BLE)` (and empty string for native).
-- `modules/BLEManager/web/ble.js` — Complete rewrite of BLE portal tab into 3 cards + diagnostics drawer following `framework-design-system`:
+- `modules/BLEManager/web/ble.js` — Complete rewrite of BLE portal tab into 3 cards + diagnostics drawer following `framework-portal-design`:
   - Card 1: Status Overview (Bluetooth header + dot, BLE Address in monospace, Advertised Name, Advertising indicator badge)
   - Card 2: Paired Devices (conditional — displayed only when `devices.length > 0`, showing provider label, status badge, stored device, armed Forget button with 3.5s timeout, Scan button with timer, inline scan results table with Pair buttons)
   - Card 3: Connections (Connections header + count badge, active peripheral connections list with redacted address `••:••:••:8E:92`, handle number, interval, encrypted/plaintext badge, empty state)

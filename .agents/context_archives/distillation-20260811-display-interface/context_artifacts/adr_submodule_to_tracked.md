@@ -22,4 +22,4 @@ Convert `framework-expert` from a submodule to a regular tracked directory. This
 
 - Skill content is now version-controlled with the framework — no more orphaned refs
 - Skill-manager needs config update to push FROM this repo rather than pull TO it
-- `framework-design-system` was already tracked as regular files (no action needed)
+- `framework-portal-design` was already tracked as regular files (no action needed)

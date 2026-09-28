@@ -29,7 +29,7 @@ Everything calls the public BLEManager API from WO-1…WO-3; there is no new BLE
 
 ## Tooling Constraints
 - `platformio` MCP only; poll in-session. Versioning rule 03 before any flash.
-- **Portal conventions:** read `docs/developer/extending-the-web-portal.md` (tab IIFE lifecycle, `tab-changed`, `utils.js` helpers `apiFetch`/`showToast`), the `framework-design-system` skill (tokens, components, the `templates/module-tab/` scaffold) and `modules/HomeAssistant/web/homeassistant.js` as the reference implementation. Use design-system classes; no inline styling beyond the conventions.
+- **Portal conventions:** read `docs/developer/extending-the-web-portal.md` (tab IIFE lifecycle, `tab-changed`, `utils.js` helpers `apiFetch`/`showToast`), the `framework-portal-design` skill (tokens, components, the `templates/module-tab/` scaffold) and `modules/HomeAssistant/web/homeassistant.js` as the reference implementation. Use design-system classes; no inline styling beyond the conventions.
 - The asset pipeline is automatic: `scripts/portalBuilder.py` → `include/portal_assets/ble_js.hpp`. Serve it with `include/utils/serveGzipAsset.hpp`.
 - `house-style-docs` for C++ comments.
 

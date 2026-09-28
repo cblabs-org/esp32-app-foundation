@@ -180,7 +180,7 @@ This skill uses a progressive disclosure model. Based on your query, load and re
 | **Event Bus** (Topics, pub/sub, custom topics) | `systems/event-bus/` |
 | **Web Portal** (SPA, routes, HTML/JS fragments, security) | `systems/web-portal/` |
 | **Web Server Stack & DRAM Tuning** (httpd stack, DeepStackExecutor, PSRAM offload) | `systems/web-portal/dram-tuning.md` |
-| **Design System** (Tokens, components, templates, UI kit for portal styling) | Sibling skill: `../framework-design-system/readme.md` |
+| **Design System** (Tokens, components, templates, UI kit for portal styling) | Sibling skill: `../framework-portal-design/readme.md` |
 | **Bluetooth LE Subsystem** (BLEManager, Peripheral/Central providers, threading rules, coexistence, ScanInhibit) | `bluetooth.md` |
 | **OTA Update System** (State machine, channels, config lifecycle, deploy) | `systems/ota/` |
 | **Data Sources & Resilience** (FetchContext, deadlines, health backoff, TLS client) | `interfaces/data-source.md` |

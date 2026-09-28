@@ -32,10 +32,10 @@ The current `weather.js` (302 lines) uses extensive hard-coded inline styles rat
 ## Tooling Constraints
 - No build tool verification needed for this WO — it's a standalone JS file.
 - **Read these design references first** (in this order):
-  1. `/Users/mcneillm/Documents/Projects/esp32-app-foundation/.agents/skills/framework-design-system/SKILL.md` — design system overview, tokens, and principles
+  1. `/Users/mcneillm/Documents/Projects/esp32-app-foundation/.agents/skills/framework-portal-design/SKILL.md` — design system overview, tokens, and principles
   2. `/Users/mcneillm/Documents/Projects/esp32-app-foundation/.agents/skills/framework-expert/systems/web-portal/html-js-fragments.md` — framework HTML/JS component patterns
   3. `/Users/mcneillm/Documents/Projects/esp32-app-foundation/.agents/skills/framework-expert/systems/web-portal/overview.md` — portal architecture
-  4. `/Users/mcneillm/Documents/Projects/esp32-app-foundation/.agents/skills/framework-design-system/styles.css` — the actual framework CSS variables
+  4. `/Users/mcneillm/Documents/Projects/esp32-app-foundation/.agents/skills/framework-portal-design/styles.css` — the actual framework CSS variables
   5. Look at other framework portal tab JS files for reference patterns. Search `modules/*/web/` for examples.
 
 ## Line-Item Instructions
