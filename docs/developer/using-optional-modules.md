@@ -290,7 +290,7 @@ public:
     void tick(uint32_t currentMillis) override;
 
     // IDataSource
-    UpdateStatus  fetchUpdate() override;
+    UpdateStatus  fetchUpdate(const FetchContext& ctx) override;
     uint32_t      getUpdateIntervalMs() const override { return 60000; }
     const char*   getSourceName() const override { return "my_sensor"; }
     PriorityTier  getPriorityTier() const override { return PriorityTier::Normal; }

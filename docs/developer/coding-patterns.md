@@ -112,6 +112,7 @@ class MyModule : public ITickable {
 public:
     void begin(Application& app);   // Standardised signature
 private:
+    static void onAppRunning(const char* topic, const void* payload, void* ctx);
     EventBus*      _bus  = nullptr;   // ← narrow stored ref
     ConfigManager* _cfg  = nullptr;   // ← narrow stored ref
     // NO Application* member

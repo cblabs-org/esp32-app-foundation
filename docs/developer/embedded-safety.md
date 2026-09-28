@@ -32,6 +32,7 @@ Code inside an [ITickable::tick()](file:///Users/mcneillm/Documents/Projects/esp
 ```cpp
 class SensorModule : public ITickable {
     // ✅ Pre-allocated at construction — no runtime allocation
+    float _temperature = 21.5f;
     char _formatBuffer[128];
     JsonDocument _doc;
 

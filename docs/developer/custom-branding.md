@@ -201,8 +201,9 @@ private:
 };
 
 // Instantiation & Injection
+static constexpr BootBranding myBranding{"My Product"};
 static CustomSystemScreens mySystemScreens;
-U8G2DisplayModule displayModule(&myBranding, &myLogo, &mySystemScreens);
+U8G2DisplayModule displayModule(&myBranding, nullptr, &mySystemScreens);
 ```
 
 ### LVGL Pro UI Customisation
