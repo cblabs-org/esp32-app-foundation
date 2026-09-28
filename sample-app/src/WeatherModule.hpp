@@ -199,6 +199,9 @@ public:
     /** @brief Returns true once the first successful weather parse has completed. */
     bool hasData() const override { return _hasData.load(std::memory_order_acquire); }
 
+    /** @brief Returns true if location coordinates have been configured. */
+    bool isLocationConfigured() const { return _locationConfigured; }
+
     /** @brief Returns the current temperature via atomic load. */
     float getTemperature() const override { return _temperature.load(std::memory_order_acquire); }
 

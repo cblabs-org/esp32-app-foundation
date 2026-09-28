@@ -178,7 +178,7 @@ void WeatherModule::tick(uint32_t currentMillis) {
 void WeatherModule::applyConfig(const JsonObject& config) {
     _lat = config["lat"] | 0.0;
     _lon = config["lon"] | 0.0;
-    if (config.containsKey("lat") || config.containsKey("lon")) {
+    if (config.containsKey("lat") || config.containsKey("lon") || _lat != 0.0 || _lon != 0.0) {
         _locationConfigured = true;
     }
     _pollingIntervalMs = config["interval"] | 600000;
@@ -276,6 +276,9 @@ void WeatherModule::registerRoutes(PsychicHttpServer& server) {
 
         if (doc["lat"].is<double>()) _lat = doc["lat"].as<double>();
         if (doc["lon"].is<double>()) _lon = doc["lon"].as<double>();
+        if (doc.containsKey("lat") || doc.containsKey("lon") || _lat != 0.0 || _lon != 0.0) {
+            _locationConfigured = true;
+        }
         if (doc["interval"].is<uint32_t>()) _pollingIntervalMs = doc["interval"].as<uint32_t>();
         if (doc["units"].is<const char*>()) {
             if (xSemaphoreTake(_dataMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
