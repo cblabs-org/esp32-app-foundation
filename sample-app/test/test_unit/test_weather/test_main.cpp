@@ -99,6 +99,56 @@ TEST_F(WeatherModuleTest, ConfigApplyPartial) {
     EXPECT_STREQ(serObj["units"].as<const char*>(), "metric");
 }
 
+TEST_F(WeatherModuleTest, LocationConfiguredWithKeys) {
+    EXPECT_FALSE(module.isLocationConfigured());
+    JsonDocument doc;
+    JsonObject obj = doc.to<JsonObject>();
+    obj["lat"] = 51.5074;
+    obj["lon"] = -0.1278;
+    module.applyConfig(obj);
+    EXPECT_TRUE(module.isLocationConfigured());
+}
+
+TEST_F(WeatherModuleTest, LocationConfiguredNonDefaultValues) {
+    EXPECT_FALSE(module.isLocationConfigured());
+    JsonDocument doc;
+    JsonObject obj = doc.to<JsonObject>();
+    obj["lat"] = 40.7128;
+    module.applyConfig(obj);
+    EXPECT_TRUE(module.isLocationConfigured());
+}
+
+TEST_F(WeatherModuleTest, LocationConfiguredZeroZeroWithKeys) {
+    EXPECT_FALSE(module.isLocationConfigured());
+    // Explicit 0.0, 0.0 in config (Gulf of Guinea) should be marked configured
+    JsonDocument doc;
+    JsonObject obj = doc.to<JsonObject>();
+    obj["lat"] = 0.0;
+    obj["lon"] = 0.0;
+    module.applyConfig(obj);
+    EXPECT_TRUE(module.isLocationConfigured());
+}
+
+TEST_F(WeatherModuleTest, LocationResetRestoresUnconfigured) {
+    JsonDocument doc;
+    JsonObject obj = doc.to<JsonObject>();
+    obj["lat"] = 51.5074;
+    obj["lon"] = -0.1278;
+    module.applyConfig(obj);
+    EXPECT_TRUE(module.isLocationConfigured());
+
+    module.resetConfig();
+    EXPECT_FALSE(module.isLocationConfigured());
+}
+
+TEST_F(WeatherModuleTest, LocationEmptyConfigRemainsUnconfigured) {
+    EXPECT_FALSE(module.isLocationConfigured());
+    JsonDocument doc;
+    JsonObject obj = doc.to<JsonObject>();
+    module.applyConfig(obj);
+    EXPECT_FALSE(module.isLocationConfigured());
+}
+
 // =============================================================================
 // IPreconditionContributor — Precondition Logic
 // =============================================================================
@@ -126,22 +176,66 @@ TEST_F(WeatherModuleTest, PreconditionRegistrationAndMetadata) {
     MockPreconditionRegistry reg;
     module.registerPreconditions(reg);
 
-    EXPECT_EQ(reg.count(), 1u);
-    const auto& spec = reg.get(0);
-    EXPECT_STREQ(spec.name, "Weather Setup");
-    EXPECT_EQ(spec.role, PreconditionRole::Operational);
-    EXPECT_EQ(spec.edgeCount, 1u);
-    EXPECT_STREQ(spec.edges[0].name, PreconditionNames::WIFI_STATION);
-    EXPECT_EQ(spec.edges[0].kind, EdgeKind::Requires);
+    EXPECT_EQ(reg.count(), 3u);
+
+    // Precondition 0: Weather API Key
+    const auto& specKey = reg.get(0);
+    EXPECT_STREQ(specKey.name, "Weather API Key");
+    EXPECT_EQ(specKey.role, PreconditionRole::Startup);
+    EXPECT_EQ(specKey.edgeCount, 1u);
+    EXPECT_STREQ(specKey.edges[0].name, PreconditionNames::WIFI_STATION);
+    EXPECT_EQ(specKey.edges[0].kind, EdgeKind::Requires);
+
+    // Precondition 1: Weather Location
+    const auto& specLoc = reg.get(1);
+    EXPECT_STREQ(specLoc.name, "Weather Location");
+    EXPECT_EQ(specLoc.role, PreconditionRole::Startup);
+    EXPECT_EQ(specLoc.edgeCount, 1u);
+    EXPECT_STREQ(specLoc.edges[0].name, PreconditionNames::WIFI_STATION);
+    EXPECT_EQ(specLoc.edges[0].kind, EdgeKind::Requires);
+
+    // Precondition 2: Weather API
+    const auto& specApi = reg.get(2);
+    EXPECT_STREQ(specApi.name, "Weather API");
+    EXPECT_EQ(specApi.role, PreconditionRole::Operational);
+    EXPECT_EQ(specApi.edgeCount, 2u);
+    EXPECT_STREQ(specApi.edges[0].name, "Weather API Key");
+    EXPECT_STREQ(specApi.edges[1].name, "Weather Location");
+}
+
+TEST_F(WeatherModuleTest, PreconditionWeatherLocation_ReflectsConfiguredState) {
+    MockPreconditionRegistry reg;
+    module.registerPreconditions(reg);
+
+    ASSERT_EQ(reg.count(), 3u);
+    auto evalLoc = reg.get(1).evaluate;
+
+    // Initially not configured
+    EXPECT_FALSE(evalLoc().met);
+    EXPECT_EQ(evalLoc().cause, Cause::NotConfigured);
+
+    // Configure location
+    JsonDocument doc;
+    JsonObject obj = doc.to<JsonObject>();
+    obj["lat"] = 51.5074;
+    obj["lon"] = -0.1278;
+    module.applyConfig(obj);
+
+    EXPECT_TRUE(evalLoc().met);
+    EXPECT_EQ(evalLoc().cause, Cause::Met);
+
+    // Reset config
+    module.resetConfig();
+    EXPECT_FALSE(evalLoc().met);
+    EXPECT_EQ(evalLoc().cause, Cause::NotConfigured);
 }
 
 TEST_F(WeatherModuleTest, PreconditionNoKeyManager_ReturnsIndeterminate) {
     // Without calling begin(), _keyManager is nullptr.
-    // §2.4: Must return Indeterminate (defect fix: not true / not met).
     MockPreconditionRegistry reg;
     module.registerPreconditions(reg);
 
-    ASSERT_EQ(reg.count(), 1u);
+    ASSERT_EQ(reg.count(), 3u);
     PreconditionStatus status = reg.get(0).evaluate();
     EXPECT_FALSE(status.met);
     EXPECT_EQ(status.cause, Cause::Indeterminate);
@@ -151,18 +245,29 @@ TEST_F(WeatherModuleTest, PreconditionDescriptions) {
     MockPreconditionRegistry reg;
     module.registerPreconditions(reg);
 
-    ASSERT_EQ(reg.count(), 1u);
+    ASSERT_EQ(reg.count(), 3u);
     ASSERT_NE(reg.get(0).describe, nullptr);
+    ASSERT_NE(reg.get(1).describe, nullptr);
+    ASSERT_NE(reg.get(2).describe, nullptr);
 
     char buf[128] = {};
     reg.get(0).describe(Cause::NotConfigured, buf, sizeof(buf));
-    EXPECT_STREQ(buf, "Set API key and location in Weather settings");
+    EXPECT_STREQ(buf, "Enter your OpenWeatherMap API key in the Weather tab");
 
     reg.get(0).describe(Cause::Indeterminate, buf, sizeof(buf));
-    EXPECT_STREQ(buf, "BUG: KeyManager not wired — call setKeyManager()");
+    EXPECT_STREQ(buf, "BUG: KeyManager not wired — call begin(app)");
 
-    reg.get(0).describe(Cause::Connecting, buf, sizeof(buf));
-    EXPECT_STREQ(buf, "Weather setup incomplete");
+    reg.get(1).describe(Cause::NotConfigured, buf, sizeof(buf));
+    EXPECT_STREQ(buf, "Set latitude and longitude in the Weather tab");
+
+    reg.get(2).describe(Cause::Rejected, buf, sizeof(buf));
+    EXPECT_STREQ(buf, "API key rejected — check your OpenWeatherMap key");
+
+    reg.get(2).describe(Cause::Unreachable, buf, sizeof(buf));
+    EXPECT_STREQ(buf, "Cannot reach OpenWeatherMap API — check internet");
+
+    reg.get(2).describe(Cause::Connecting, buf, sizeof(buf));
+    EXPECT_STREQ(buf, "Waiting for first weather data fetch...");
 }
 
 // =============================================================================
