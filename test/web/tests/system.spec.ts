@@ -265,21 +265,21 @@ test.describe('System Status Sub-pill', () => {
   test('precondition health card renders registered preconditions and status badges', async ({ page }) => {
     await bootAndNavigateToStatus(page);
 
-    const summaryCard = page.locator('#sys-config-status-card');
-    await expect(summaryCard).toBeVisible();
-    await expect(summaryCard).toContainText('Configuration Status');
+    const card = page.locator('#sys-preconditions-card');
+    await expect(card).toBeVisible();
+    await expect(card.locator('header')).toContainText('Configuration Status');
     // MOCK_PRECONDITIONS has 2 unmet, both are 'Operational', so it's Degraded
     await expect(page.locator('#sys-preconditions-summary')).toContainText('2 Unmet (Degraded)');
-    await expect(page.locator('#sys-preconditions-rag-dot')).toHaveAttribute('style', /var\(--warning\)/);
+    await expect(page.locator('#sys-preconditions-rag-dot')).toHaveAttribute('style', /warning/);
 
-    // Click to open drawer
-    await summaryCard.click();
-
-    const drawer = page.locator('#sys-preconditions-drawer');
-    await expect(drawer).toBeVisible();
-    await expect(drawer.locator('header')).toContainText('Precondition Diagnostics');
-
+    // List is collapsed by default
     const list = page.locator('#sys-preconditions-list');
+    await expect(list).toBeHidden();
+
+    // Click header to expand
+    await card.locator('header').click();
+    await expect(list).toBeVisible();
+
     await expect(list).toContainText('WiFi Station');
     await expect(list).toContainText('Time Sync');
     await expect(list).toContainText('External API');
@@ -303,8 +303,8 @@ test.describe('System Status Sub-pill', () => {
 
     await bootAndNavigateToStatus(page);
 
-    // Open the drawer first
-    await page.locator('#sys-config-status-card').click();
+    // Expand the preconditions list first
+    await page.locator('#sys-preconditions-header').click();
 
     const retryBtn = page.locator('.btn-sys-retry-precondition[data-name="External API"]');
     await expect(retryBtn).toBeVisible();
