@@ -121,11 +121,17 @@
   // -------------------------------------------------------------------------
   container.innerHTML = `
     <article id="sys-preconditions-card">
-      <header style="display:flex; justify-content:space-between; align-items:center;">
-        <span>Precondition Health</span>
-        <span id="sys-preconditions-summary" style="font-size:0.8rem; font-weight:normal; color:var(--text-muted);"></span>
+      <header id="sys-preconditions-header" style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;">
+        <span style="display:flex; align-items:center; gap:8px;">
+          <span id="sys-preconditions-rag-dot" style="display:inline-block; width:12px; height:12px; border-radius:50%; background:var(--text-muted);"></span>
+          Configuration Status
+        </span>
+        <span style="display:flex; align-items:center; gap:8px;">
+          <span id="sys-preconditions-summary" style="font-size:0.8rem; font-weight:normal; color:var(--text-muted);"></span>
+          <span id="sys-preconditions-chevron" style="font-size:0.8rem; color:var(--text-muted); transition:transform 0.2s;">▶</span>
+        </span>
       </header>
-      <div id="sys-preconditions-list">
+      <div id="sys-preconditions-list" style="display:none;">
         <p style="color: var(--text-muted);">Loading...</p>
       </div>
     </article>
@@ -247,10 +253,20 @@
 
       const allMet = items.every(p => p.met);
       const unmetCount = items.filter(p => !p.met).length;
+      const hasUnmetStartup = items.some(p => !p.met && (p.role === 'Startup' || p.role === 'Both'));
+      const ragDotEl = document.getElementById('sys-preconditions-rag-dot');
+
       if (summaryEl) {
-        summaryEl.innerHTML = allMet
-          ? '<span style="color:var(--success); font-weight:600;">✓ All Healthy</span>'
-          : `<span style="color:var(--warning); font-weight:600;">${unmetCount} Unmet</span>`;
+        if (allMet) {
+          summaryEl.innerHTML = '<span style="color:var(--success); font-weight:600;">All Healthy</span>';
+          if (ragDotEl) ragDotEl.style.background = 'var(--success)';
+        } else if (hasUnmetStartup) {
+          summaryEl.innerHTML = `<span style="color:var(--error); font-weight:600;">${unmetCount} Unmet (Configuring)</span>`;
+          if (ragDotEl) ragDotEl.style.background = 'var(--error)';
+        } else {
+          summaryEl.innerHTML = `<span style="color:var(--warning); font-weight:600;">${unmetCount} Unmet (Degraded)</span>`;
+          if (ragDotEl) ragDotEl.style.background = 'var(--warning)';
+        }
       }
 
       const causeLabels = {
@@ -655,5 +671,18 @@
   // If the system tab is already active on load, start refresh
   if (container.classList.contains('tab-content--active')) {
     startAutoRefresh();
+  }
+
+  // Wire up the preconditions header toggle (expand/collapse the detail list)
+  const precondHeader = document.getElementById('sys-preconditions-header');
+  if (precondHeader) {
+    precondHeader.addEventListener('click', () => {
+      const listEl = document.getElementById('sys-preconditions-list');
+      const chevron = document.getElementById('sys-preconditions-chevron');
+      if (!listEl) return;
+      const isHidden = listEl.style.display === 'none';
+      listEl.style.display = isHidden ? 'block' : 'none';
+      if (chevron) chevron.style.transform = isHidden ? 'rotate(90deg)' : '';
+    });
   }
 })();
