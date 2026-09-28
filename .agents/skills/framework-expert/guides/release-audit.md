@@ -208,6 +208,9 @@ Why these matter: #122 (7,852 B free at boot — portal non-functional), #36
 | `AuthManager` middleware covers all sensitive endpoints | 🟠 TRACED |
 | `SECURITY_VERSION` incremented if anti-rollback-relevant changes | 🟡 MECHANICAL |
 
+> [!NOTE]
+> **OTA & Transport Security Rationale:** `OTAUpdateManager` legitimately calls `setInsecure()` because firmware binaries and update manifests are independently verified via RSA-2048 cryptographic signatures (`MbedTLSSignatureVerifier`). Transport layer TLS verification is redundant, and avoiding root CA pinning prevents bricking devices when public root certificates rotate. OTA downloads must NOT route through `KeyManager` (which is a credential registry for passwords/tokens, not a CA cert store or transport provider).
+
 Reference: [security/overview.md](../security/overview.md) for grep patterns.
 
 ---
