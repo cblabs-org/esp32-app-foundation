@@ -60,6 +60,8 @@ public:
      */
     bool available() const;
 
+    using WorkFn = void (*)(void* ctx);
+
     /**
      * @brief Run a callable on the worker task and block until completion or timeout.
      *
@@ -72,6 +74,16 @@ public:
      * @return true if the work completed successfully within the timeout.
      */
     bool run(const std::function<void()>& work, uint32_t timeoutMs);
+
+    /**
+     * @brief Run a function pointer with context on the worker task and block until completion or timeout.
+     *
+     * @param work      Function pointer to execute.
+     * @param ctx       Context passed to the function pointer.
+     * @param timeoutMs Maximum time to wait for the work to complete, in milliseconds.
+     * @return true if the work completed successfully within the timeout.
+     */
+    bool run(WorkFn work, void* ctx, uint32_t timeoutMs);
 
     /**
      * @brief Get the minimum remaining free stack space since task creation.
@@ -103,7 +115,8 @@ private:
     void* _taskHandle = nullptr;
     void* _mutex = nullptr;
     void* _doneSem = nullptr;
-    std::function<void()> _currentWork = nullptr;
+    WorkFn _workFn = nullptr;
+    void* _workCtx = nullptr;
     bool _busy = false;
 
     static void workerLoop(void* param);

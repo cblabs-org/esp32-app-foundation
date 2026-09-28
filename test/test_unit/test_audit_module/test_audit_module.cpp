@@ -435,21 +435,32 @@ TEST_F(AuditModuleTest, PreconditionContributor_RegistrationAndEvaluation) {
     struct MockRegistry : public IPreconditionRegistry {
         std::string name;
         PreconditionRole role = PreconditionRole::Startup;
-        EvalFn eval;
-        DescribeFn describe;
+        EvalFn evalFn = nullptr;
+        DescribeFn describeFn = nullptr;
+        void* context = nullptr;
 
         void add(const char* n,
                  PreconditionRole r,
                  EvalFn e,
                  DescribeFn d = nullptr,
+                 void* ctx = nullptr,
                  const Edge* = nullptr,
                  uint8_t = 0,
                  const DampingPolicy* = nullptr,
                  const RetryPolicy* = nullptr) override {
             name = n ? n : "";
             role = r;
-            eval = e;
-            describe = d;
+            evalFn = e;
+            describeFn = d;
+            context = ctx;
+        }
+
+        PreconditionStatus eval() const {
+            return evalFn ? evalFn(context) : PreconditionStatus{};
+        }
+
+        void describe(Cause c, char* buf, size_t len) const {
+            if (describeFn) describeFn(c, buf, len, context);
         }
     } registry;
 
@@ -457,8 +468,8 @@ TEST_F(AuditModuleTest, PreconditionContributor_RegistrationAndEvaluation) {
 
     EXPECT_EQ(registry.name, "audit_health");
     EXPECT_EQ(registry.role, PreconditionRole::Operational);
-    ASSERT_TRUE(registry.eval != nullptr);
-    ASSERT_TRUE(registry.describe != nullptr);
+    ASSERT_TRUE(registry.evalFn != nullptr);
+    ASSERT_TRUE(registry.describeFn != nullptr);
 
     // Case 1: Not started
     setStarted(module, false);

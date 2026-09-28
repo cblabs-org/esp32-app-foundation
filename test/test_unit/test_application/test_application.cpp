@@ -654,7 +654,7 @@ TEST(PreconditionApiTest, RoutesRegistered) {
 class MockPreconditionContributor : public IPreconditionContributor {
 public:
     void registerPreconditions(IPreconditionRegistry& registry) override {
-        registry.add("Custom Op", PreconditionRole::Operational, []() -> PreconditionStatus {
+        registry.add("Custom Op", PreconditionRole::Operational, [](void*) -> PreconditionStatus {
             return {true, Cause::Met};
         });
     }

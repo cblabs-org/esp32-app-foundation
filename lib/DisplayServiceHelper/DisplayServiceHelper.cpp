@@ -20,10 +20,12 @@
 #include <vector>
 #include <cstring>
 
-DisplayServiceHelper::DisplayServiceHelper(IDisplayModule* display) : _display(display), _saveCallback(nullptr) {}
+DisplayServiceHelper::DisplayServiceHelper(IDisplayModule* display)
+    : _display(display), _saveCallback(nullptr), _saveCtx(nullptr), _isOtaActive(nullptr), _otaCtx(nullptr) {}
 
-void DisplayServiceHelper::setSaveCallback(std::function<void()> callback) {
+void DisplayServiceHelper::setSaveCallback(SaveCallback callback, void* ctx) {
     _saveCallback = callback;
+    _saveCtx = ctx;
 }
 
 void DisplayServiceHelper::registerBrightnessRoute(PsychicHttpServer& server) {
@@ -46,7 +48,7 @@ void DisplayServiceHelper::registerBrightnessRoute(PsychicHttpServer& server) {
             if (value > 255) value = 255;
 
             _display->setBrightness(static_cast<uint8_t>(value));
-            if (_saveCallback) _saveCallback();
+            if (_saveCallback) _saveCallback(_saveCtx);
 
             response->send(200, "application/json", "{\"status\":\"ok\"}");
             return ESP_OK;
@@ -74,7 +76,7 @@ bool DisplayServiceHelper::capturePNGToStream(BufferStream& stream) {
 
 void DisplayServiceHelper::registerScreenshotRoute(PsychicHttpServer& server) {
     server.on("/api/display/screenshot", HTTP_GET, [this](PsychicRequest* request, PsychicResponse* response) {
-        if (_isOtaActive()) {
+        if (isOtaActive()) {
             response->send(503, "application/json", "{\"error\":\"busy_during_update\"}");
             return ESP_FAIL;
         }
@@ -119,7 +121,7 @@ void DisplayServiceHelper::registerCaptureTool(MCPToolRegistry& registry) {
             auto* self = static_cast<DisplayServiceHelper*>(ctx);
             (void)params;
 
-            if (self->_isOtaActive()) {
+            if (self->isOtaActive()) {
                 result["error"] = "busy_during_update";
                 return;
             }

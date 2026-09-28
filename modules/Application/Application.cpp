@@ -710,7 +710,7 @@ void Application::_publishConfiguringEvent(bool isRegression) {
 
     _helpTextBuf[0] = '\0';
     if (blocking->describe) {
-        blocking->describe(blocking->dampedStatus.cause, _helpTextBuf, sizeof(_helpTextBuf));
+        blocking->describe(blocking->dampedStatus.cause, _helpTextBuf, sizeof(_helpTextBuf), blocking->context);
     }
 
     _lastPublishedGate   = blocking->name;

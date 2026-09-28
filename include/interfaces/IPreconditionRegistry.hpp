@@ -21,7 +21,6 @@
 #include "interfaces/IPrecondition.hpp"
 #include <cstddef>
 #include <cstdint>
-#include <functional>
 
 /**
  * @brief Abstract registry interface for registering preconditions.
@@ -32,10 +31,10 @@
 class IPreconditionRegistry {
 public:
     /// Fast-path evaluation callback invoked every tick cycle.
-    using EvalFn     = std::function<PreconditionStatus()>;
+    using EvalFn     = PreconditionStatus (*)(void* ctx);
 
     /// Cold-path description formatter writing into a caller-supplied buffer.
-    using DescribeFn = std::function<void(Cause, char*, size_t)>;
+    using DescribeFn = void (*)(Cause cause, char* buf, size_t len, void* ctx);
 
     /** @brief Destructor for IPreconditionRegistry. */
     virtual ~IPreconditionRegistry() = default;
@@ -47,6 +46,7 @@ public:
      * @param role       Precondition role (Operational, Startup, or Both).
      * @param evaluate   Fast-path evaluation function returning PreconditionStatus.
      * @param describe   Optional cold-path description formatter writing into a buffer.
+     * @param context    User context pointer passed to evaluate and describe callbacks.
      * @param edges      Optional pointer to array of dependency edges.
      * @param edgeCount  Number of dependency edges in the edges array.
      * @param damping    Optional per-precondition damping policy override (nullptr = engine default).
@@ -58,6 +58,7 @@ public:
                      PreconditionRole role,
                      EvalFn evaluate,
                      DescribeFn describe = nullptr,
+                     void* context = nullptr,
                      const Edge* edges = nullptr,
                      uint8_t edgeCount = 0,
                      const DampingPolicy* damping = nullptr,

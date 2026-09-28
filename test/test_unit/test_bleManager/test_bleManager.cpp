@@ -44,8 +44,17 @@ namespace {
     struct RegisteredPrecondition {
         std::string name;
         PreconditionRole role;
-        IPreconditionRegistry::EvalFn evaluate;
-        IPreconditionRegistry::DescribeFn describe;
+        IPreconditionRegistry::EvalFn evalFn;
+        IPreconditionRegistry::DescribeFn describeFn;
+        void* context;
+
+        PreconditionStatus evaluate() const {
+            return evalFn ? evalFn(context) : PreconditionStatus{};
+        }
+
+        void describe(Cause c, char* buf, size_t len) const {
+            if (describeFn) describeFn(c, buf, len, context);
+        }
     };
 
     class MockPreconditionRegistry : public IPreconditionRegistry {
@@ -54,12 +63,13 @@ namespace {
                  PreconditionRole role,
                  EvalFn evaluate,
                  DescribeFn describe = nullptr,
+                 void* context = nullptr,
                  const Edge* edges = nullptr,
                  uint8_t edgeCount = 0,
                  const DampingPolicy* damping = nullptr,
                  const RetryPolicy* retry = nullptr) override {
             (void)edges; (void)edgeCount; (void)damping; (void)retry;
-            _registered[name] = {name, role, evaluate, describe};
+            _registered[name] = {name, role, evaluate, describe, context};
         }
 
         std::map<std::string, RegisteredPrecondition> _registered;

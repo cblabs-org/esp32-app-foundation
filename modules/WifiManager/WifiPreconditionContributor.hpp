@@ -47,26 +47,28 @@ public:
      */
     void registerPreconditions(IPreconditionRegistry& reg) override {
         reg.add(PreconditionNames::WIFI_STATION, PreconditionRole::Startup,
-            [this]() -> PreconditionStatus {
-                if (_wifi.isReady() && !_wifi.getAPMode())
+            [](void* ctx) -> PreconditionStatus {
+                auto* self = static_cast<WifiPreconditionContributor*>(ctx);
+                if (self->_wifi.isReady() && !self->_wifi.getAPMode())
                     return {true, Cause::Met};
-                if (_wifi.getAPMode())
+                if (self->_wifi.getAPMode())
                     return {false, Cause::FallbackEngaged};
-                if (_wifi.hasCredentials())
+                if (self->_wifi.hasCredentials())
                     return {false, Cause::Connecting};
                 return {false, Cause::NotConfigured};
             },
-            [this](Cause c, char* buf, size_t len) {
+            [](Cause c, char* buf, size_t len, void* ctx) {
+                auto* self = static_cast<WifiPreconditionContributor*>(ctx);
                 switch (c) {
                     case Cause::NotConfigured:
                         snprintf(buf, len, "Connect to the device WiFi to configure");
                         break;
                     case Cause::Connecting:
-                        snprintf(buf, len, "Connecting to %s...", _wifi.getSSID());
+                        snprintf(buf, len, "Connecting to %s...", self->_wifi.getSSID());
                         break;
                     case Cause::FallbackEngaged:
                         snprintf(buf, len, "Can't reach your network. Connect to %s",
-                                 _wifi.getAPSSID());
+                                 self->_wifi.getAPSSID());
                         break;
                     case Cause::Rejected:
                         snprintf(buf, len, "WiFi password was refused");
@@ -75,7 +77,8 @@ public:
                         snprintf(buf, len, "WiFi unavailable");
                         break;
                 }
-            });
+            },
+            this);
     }
 
 private:

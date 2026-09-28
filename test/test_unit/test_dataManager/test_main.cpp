@@ -1063,9 +1063,11 @@ TEST_F(DataManagerTest, Reset_PreservesNeverConnected) {
 
 TEST(FetchContextTest, DeadlineTokenExpirationAndRemainingMs) {
     uint32_t simulatedTime = 1000;
-    auto timeProvider = [&]() -> uint32_t { return simulatedTime; };
+    auto timeProvider = [](void* ctx) -> uint32_t {
+        return *static_cast<uint32_t*>(ctx);
+    };
 
-    DeadlineToken token(1500, timeProvider);
+    DeadlineToken token(1500, timeProvider, &simulatedTime);
 
     // At t=1000, deadline=1500 -> remaining=500, not expired
     EXPECT_FALSE(token.isExpired());
@@ -1087,9 +1089,11 @@ TEST(FetchContextTest, DeadlineTokenExpirationAndRemainingMs) {
 
 TEST(FetchContextTest, DeadlineTokenCancellation) {
     uint32_t simulatedTime = 1000;
-    auto timeProvider = [&]() -> uint32_t { return simulatedTime; };
+    auto timeProvider = [](void* ctx) -> uint32_t {
+        return *static_cast<uint32_t*>(ctx);
+    };
 
-    DeadlineToken token(1500, timeProvider);
+    DeadlineToken token(1500, timeProvider, &simulatedTime);
 
     EXPECT_FALSE(token.isCancelled());
     EXPECT_FALSE(token.isExpired());

@@ -1,7 +1,6 @@
 #pragma once
 
 #include <ArduinoJson.h>
-#include <functional>
 #include "DeepStackExecutor.h"
 
 class IDisplayModule;
@@ -11,13 +10,19 @@ class BufferStream;
 
 class DisplayServiceHelper {
 public:
+    using SaveCallback = void (*)(void* ctx);
+    using OtaPredicate = bool (*)(void* ctx);
+
     explicit DisplayServiceHelper(IDisplayModule* display);
 
     /// Set optional callback to persist config after mutations (brightness, etc.)
-    void setSaveCallback(std::function<void()> callback);
+    void setSaveCallback(SaveCallback callback, void* ctx = nullptr);
 
     /// Set OTA active predicate to gate screenshots during updates
-    void setOtaPredicate(std::function<bool()> isOtaActive) { _isOtaActive = isOtaActive; }
+    void setOtaPredicate(OtaPredicate isOtaActive, void* ctx = nullptr) {
+        _isOtaActive = isOtaActive;
+        _otaCtx = ctx;
+    }
 
     // Route helpers
     void registerBrightnessRoute(PsychicHttpServer& server);
@@ -35,8 +40,14 @@ public:
 
 private:
     IDisplayModule* _display;
-    std::function<void()> _saveCallback;
-    std::function<bool()> _isOtaActive = [](){ return false; };
+    SaveCallback _saveCallback = nullptr;
+    void* _saveCtx = nullptr;
+    OtaPredicate _isOtaActive = nullptr;
+    void* _otaCtx = nullptr;
+
+    bool isOtaActive() const {
+        return _isOtaActive ? _isOtaActive(_otaCtx) : false;
+    }
 
     // Start with 16384, we will measure this and update it.
     // The PA will measure the peak high-water-mark using the ESP_LOGI output

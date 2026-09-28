@@ -53,6 +53,21 @@ TEST_F(DeepStackExecutorTest, RunBlocksUntilDone) {
     EXPECT_EQ(sentinel, 42);
 }
 
+TEST_F(DeepStackExecutorTest, RunWorkFnWithContext) {
+    DeepStackExecutor executor;
+    EXPECT_TRUE(executor.begin());
+    EXPECT_TRUE(executor.available());
+
+    int counter = 10;
+    auto workFn = [](void* ctx) {
+        int* val = static_cast<int*>(ctx);
+        *val += 5;
+    };
+
+    EXPECT_TRUE(executor.run(workFn, &counter, 1000));
+    EXPECT_EQ(counter, 15);
+}
+
 TEST_F(DeepStackExecutorTest, FallbackContractWhenNotAvailable) {
     // There isn't an explicit API in the public header to force stubAvailable to false
     // so we can't test it directly unless we modify the header or use friendship.

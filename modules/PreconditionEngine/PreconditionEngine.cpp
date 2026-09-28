@@ -22,6 +22,7 @@ void PreconditionEngine::add(const char* name,
                              PreconditionRole role,
                              EvalFn evaluate,
                              DescribeFn describe,
+                             void* context,
                              const Edge* edges,
                              uint8_t edgeCount,
                              const DampingPolicy* damping,
@@ -35,6 +36,7 @@ void PreconditionEngine::add(const char* name,
     p.role = role;
     p.evaluate = evaluate;
     p.describe = describe;
+    p.context = context;
     p.edges = edges;
     p.edgeCount = edgeCount;
     p.resolvedEdgeCount = 0;
@@ -145,7 +147,7 @@ void PreconditionEngine::tick(uint32_t nowMs) {
         
         // Step 1: Evaluate the precondition's own function first.
         if (p.evaluate) {
-            p.rawStatus = p.evaluate();
+            p.rawStatus = p.evaluate(p.context);
         } else {
             p.rawStatus = {false, Cause::InternalError};
         }

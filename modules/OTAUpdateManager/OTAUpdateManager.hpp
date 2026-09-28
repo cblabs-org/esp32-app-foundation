@@ -67,7 +67,6 @@
 #include <Arduino.h>
 #include <Stream.h>
 #include <freertos/task.h>
-#include <functional>
 
 
 #include "interfaces/IWebContributor.hpp"
@@ -259,12 +258,15 @@ public:
      */
     void rollbackFirmware();
 
+    using PreRebootHook = void (*)(void* ctx);
+
     /**
      * @brief Set a synchronous pre-reboot hook to be executed before restarting the device.
      *        Fulfills EO-08 to allow subscribers time to complete their work.
      * @param hook Function to execute.
+     * @param ctx  User context passed to the hook.
      */
-    void setPreRebootHook(std::function<void()> hook);
+    void setPreRebootHook(PreRebootHook hook, void* ctx = nullptr);
 
     // -------------------------------------------------------------------------
     // IMCPContributor Interface
@@ -408,7 +410,8 @@ private:
     OTAProgressEvent  _progressEvent{};                    // Persistent payload for async EventBus progress events
 
     TaskHandle_t  _taskHandle   = nullptr;             // FreeRTOS task handle for download
-    std::function<void()> _preRebootHook = nullptr;    // Hook to execute before reboot
+    PreRebootHook _preRebootHook    = nullptr;         // Hook to execute before reboot
+    void*         _preRebootHookCtx = nullptr;         // Context for pre-reboot hook
 
     // -------------------------------------------------------------------------
     // FreeRTOS task plumbing

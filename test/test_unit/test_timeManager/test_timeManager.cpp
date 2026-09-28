@@ -139,7 +139,7 @@ TEST(TimePreconditionContributorTest, EvaluationAndDescriptions) {
     EXPECT_EQ(tzState->severity, Severity::NeedsUser);
 
     char desc[128] = {};
-    tzState->describe(tzState->rawStatus.cause, desc, sizeof(desc));
+    tzState->describe(tzState->rawStatus.cause, desc, sizeof(desc), tzState->context);
     EXPECT_STREQ("Set your timezone in the Time settings", desc);
 
     // Time Sync: Requires WiFi Station which is unmet -> DependencyUnmet -> Blocked

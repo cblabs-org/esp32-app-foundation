@@ -15,11 +15,11 @@ protected:
 };
 
 TEST_F(PreconditionEngineTest, RegistrationAndEdgeResolution) {
-    engine.add("A", PreconditionRole::Operational, []() { return PreconditionStatus{true, Cause::Met}; });
-    engine.add("B", PreconditionRole::Operational, []() { return PreconditionStatus{true, Cause::Met}; });
+    engine.add("A", PreconditionRole::Operational, [](void*) { return PreconditionStatus{true, Cause::Met}; });
+    engine.add("B", PreconditionRole::Operational, [](void*) { return PreconditionStatus{true, Cause::Met}; });
     
     Edge edges[] = {{"A", EdgeKind::Requires}};
-    engine.add("C", PreconditionRole::Operational, []() { return PreconditionStatus{true, Cause::Met}; }, nullptr, edges, 1);
+    engine.add("C", PreconditionRole::Operational, [](void*) { return PreconditionStatus{true, Cause::Met}; }, nullptr, nullptr, edges, 1);
     
     EXPECT_TRUE(engine.resolveEdges());
     EXPECT_EQ(engine.getPreconditionCount(), 3);
@@ -32,7 +32,7 @@ TEST_F(PreconditionEngineTest, RegistrationAndEdgeResolution) {
 
 TEST_F(PreconditionEngineTest, EdgeResolutionUnknownRejection) {
     Edge edges[] = {{"Unknown", EdgeKind::Requires}};
-    engine.add("A", PreconditionRole::Operational, []() { return PreconditionStatus{true, Cause::Met}; }, nullptr, edges, 1);
+    engine.add("A", PreconditionRole::Operational, [](void*) { return PreconditionStatus{true, Cause::Met}; }, nullptr, nullptr, edges, 1);
     EXPECT_FALSE(engine.resolveEdges());
 }
 
@@ -40,15 +40,18 @@ TEST_F(PreconditionEngineTest, EdgeResolutionCycleDetection) {
     Edge edgesA[] = {{"B", EdgeKind::Requires}};
     Edge edgesB[] = {{"A", EdgeKind::Requires}};
     
-    engine.add("A", PreconditionRole::Operational, []() { return PreconditionStatus{true, Cause::Met}; }, nullptr, edgesA, 1);
-    engine.add("B", PreconditionRole::Operational, []() { return PreconditionStatus{true, Cause::Met}; }, nullptr, edgesB, 1);
+    engine.add("A", PreconditionRole::Operational, [](void*) { return PreconditionStatus{true, Cause::Met}; }, nullptr, nullptr, edgesA, 1);
+    engine.add("B", PreconditionRole::Operational, [](void*) { return PreconditionStatus{true, Cause::Met}; }, nullptr, nullptr, edgesB, 1);
     
     EXPECT_FALSE(engine.resolveEdges());
 }
 
 TEST_F(PreconditionEngineTest, BasicEvaluation) {
     bool met = false;
-    engine.add("A", PreconditionRole::Operational, [&]() { return PreconditionStatus{met, met ? Cause::Met : Cause::NotConfigured}; });
+    engine.add("A", PreconditionRole::Operational, [](void* ctx) {
+        bool m = *static_cast<bool*>(ctx);
+        return PreconditionStatus{m, m ? Cause::Met : Cause::NotConfigured};
+    }, nullptr, &met);
     EXPECT_TRUE(engine.resolveEdges());
     
     engine.tick(nowMs);
@@ -64,10 +67,13 @@ TEST_F(PreconditionEngineTest, BasicEvaluation) {
 
 TEST_F(PreconditionEngineTest, EdgePropagation) {
     bool aMet = false;
-    engine.add("A", PreconditionRole::Operational, [&]() { return PreconditionStatus{aMet, aMet ? Cause::Met : Cause::NotConfigured}; });
+    engine.add("A", PreconditionRole::Operational, [](void* ctx) {
+        bool m = *static_cast<bool*>(ctx);
+        return PreconditionStatus{m, m ? Cause::Met : Cause::NotConfigured};
+    }, nullptr, &aMet);
     
     Edge edgesB[] = {{"A", EdgeKind::Requires}};
-    engine.add("B", PreconditionRole::Operational, []() { return PreconditionStatus{true, Cause::Met}; }, nullptr, edgesB, 1);
+    engine.add("B", PreconditionRole::Operational, [](void*) { return PreconditionStatus{true, Cause::Met}; }, nullptr, nullptr, edgesB, 1);
 
     EXPECT_TRUE(engine.resolveEdges());
     engine.tick(nowMs);
@@ -96,7 +102,10 @@ TEST_F(PreconditionEngineTest, SeverityDerivation) {
 
 TEST_F(PreconditionEngineTest, TrustHistory) {
     bool met = false;
-    engine.add("A", PreconditionRole::Operational, [&]() { return PreconditionStatus{met, met ? Cause::Met : Cause::NotConfigured}; });
+    engine.add("A", PreconditionRole::Operational, [](void* ctx) {
+        bool m = *static_cast<bool*>(ctx);
+        return PreconditionStatus{m, m ? Cause::Met : Cause::NotConfigured};
+    }, nullptr, &met);
     EXPECT_TRUE(engine.resolveEdges());
     
     engine.tick(nowMs);
@@ -116,7 +125,10 @@ TEST_F(PreconditionEngineTest, TrustHistory) {
 
 TEST_F(PreconditionEngineTest, Damping) {
     bool met = false;
-    engine.add("A", PreconditionRole::Operational, [&]() { return PreconditionStatus{met, met ? Cause::Met : Cause::NotConfigured}; }); // weight 5
+    engine.add("A", PreconditionRole::Operational, [](void* ctx) {
+        bool m = *static_cast<bool*>(ctx);
+        return PreconditionStatus{m, m ? Cause::Met : Cause::NotConfigured};
+    }, nullptr, &met); // weight 5
     EXPECT_TRUE(engine.resolveEdges());
     engine.tick(nowMs); // init lastTickMs
     
@@ -187,7 +199,10 @@ TEST_F(PreconditionEngineTest, Damping) {
 
 TEST_F(PreconditionEngineTest, Breaker) {
     bool met = false;
-    engine.add("A", PreconditionRole::Operational, [&]() { return PreconditionStatus{met, Cause::Unreachable}; });
+    engine.add("A", PreconditionRole::Operational, [](void* ctx) {
+        bool m = *static_cast<bool*>(ctx);
+        return PreconditionStatus{m, Cause::Unreachable};
+    }, nullptr, &met);
     EXPECT_TRUE(engine.resolveEdges());
     
     engine.tick(nowMs);
@@ -217,8 +232,8 @@ TEST_F(PreconditionEngineTest, Breaker) {
 }
 
 TEST_F(PreconditionEngineTest, Projection) {
-    engine.add("A", PreconditionRole::Operational, []() { return PreconditionStatus{false, Cause::NotConfigured}; });
-    engine.add("B", PreconditionRole::Startup, []() { return PreconditionStatus{true, Cause::Met}; });
+    engine.add("A", PreconditionRole::Operational, [](void*) { return PreconditionStatus{false, Cause::NotConfigured}; });
+    engine.add("B", PreconditionRole::Startup, [](void*) { return PreconditionStatus{true, Cause::Met}; });
     EXPECT_TRUE(engine.resolveEdges());
     engine.tick(nowMs);
     
@@ -228,9 +243,12 @@ TEST_F(PreconditionEngineTest, Projection) {
 TEST_F(PreconditionEngineTest, CG8Invariant) {
     // Satisfaction propagates immediately (undamped); penalty never propagates across edges.
     bool aMet = false;
-    engine.add("A", PreconditionRole::Operational, [&]() { return PreconditionStatus{aMet, aMet ? Cause::Met : Cause::NotConfigured}; });
+    engine.add("A", PreconditionRole::Operational, [](void* ctx) {
+        bool m = *static_cast<bool*>(ctx);
+        return PreconditionStatus{m, m ? Cause::Met : Cause::NotConfigured};
+    }, nullptr, &aMet);
     Edge edges[] = {{"A", EdgeKind::Requires}};
-    engine.add("B", PreconditionRole::Operational, []() { return PreconditionStatus{true, Cause::Met}; }, nullptr, edges, 1);
+    engine.add("B", PreconditionRole::Operational, [](void*) { return PreconditionStatus{true, Cause::Met}; }, nullptr, nullptr, edges, 1);
     
     EXPECT_TRUE(engine.resolveEdges());
     
@@ -258,13 +276,22 @@ TEST_F(PreconditionEngineTest, BindsTo_TearsDown_WhenUpstreamRegresses) {
     bool aMet = true;
     bool bMet = true;
     bool cMet = true;
-    engine.add("A", PreconditionRole::Operational, [&]() { return PreconditionStatus{aMet, aMet ? Cause::Met : Cause::Unreachable}; });
+    engine.add("A", PreconditionRole::Operational, [](void* ctx) {
+        bool m = *static_cast<bool*>(ctx);
+        return PreconditionStatus{m, m ? Cause::Met : Cause::Unreachable};
+    }, nullptr, &aMet);
     
     Edge edgesB[] = {{"A", EdgeKind::BindsTo}};
-    engine.add("B", PreconditionRole::Operational, [&]() { return PreconditionStatus{bMet, bMet ? Cause::Met : Cause::NotConfigured}; }, nullptr, edgesB, 1);
+    engine.add("B", PreconditionRole::Operational, [](void* ctx) {
+        bool m = *static_cast<bool*>(ctx);
+        return PreconditionStatus{m, m ? Cause::Met : Cause::NotConfigured};
+    }, nullptr, &bMet, edgesB, 1);
     
     Edge edgesC[] = {{"A", EdgeKind::Requires}};
-    engine.add("C", PreconditionRole::Operational, [&]() { return PreconditionStatus{cMet, cMet ? Cause::Met : Cause::NotConfigured}; }, nullptr, edgesC, 1);
+    engine.add("C", PreconditionRole::Operational, [](void* ctx) {
+        bool m = *static_cast<bool*>(ctx);
+        return PreconditionStatus{m, m ? Cause::Met : Cause::NotConfigured};
+    }, nullptr, &cMet, edgesC, 1);
     
     EXPECT_TRUE(engine.resolveEdges());
     
@@ -302,10 +329,10 @@ TEST_F(PreconditionEngineTest, BindsTo_TearsDown_WhenUpstreamRegresses) {
 
 
 TEST_F(PreconditionEngineTest, EdgeMisalignment) {
-    engine.add("A", PreconditionRole::Operational, []() { return PreconditionStatus{true, Cause::Met}; });
+    engine.add("A", PreconditionRole::Operational, [](void*) { return PreconditionStatus{true, Cause::Met}; });
     
     Edge edgesB[] = {{"TYPO", EdgeKind::Requires}, {"A", EdgeKind::Requires}};
-    engine.add("B", PreconditionRole::Operational, []() { return PreconditionStatus{true, Cause::Met}; }, nullptr, edgesB, 2);
+    engine.add("B", PreconditionRole::Operational, [](void*) { return PreconditionStatus{true, Cause::Met}; }, nullptr, nullptr, edgesB, 2);
     
     EXPECT_FALSE(engine.resolveEdges());
     

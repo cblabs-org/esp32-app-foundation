@@ -50,22 +50,25 @@ public:
     void registerPreconditions(IPreconditionRegistry& reg) override {
         // 1. Timezone — Operational, no edges (settable in AP mode)
         reg.add(PreconditionNames::TIMEZONE, PreconditionRole::Operational,
-            [this]() -> PreconditionStatus {
-                return _timeManager.isConfigured()
+            [](void* ctx) -> PreconditionStatus {
+                auto* self = static_cast<TimePreconditionContributor*>(ctx);
+                return self->_timeManager.isConfigured()
                     ? PreconditionStatus{true, Cause::Met}
                     : PreconditionStatus{false, Cause::NotConfigured};
             },
-            [](Cause, char* buf, size_t len) {
+            [](Cause, char* buf, size_t len, void*) {
                 snprintf(buf, len, "Set your timezone in the Time settings");
-            });
+            },
+            this);
 
         // 2. Time Sync — Operational, Requires WiFi Station (§9.1)
         static const Edge syncEdges[] = {
             {PreconditionNames::WIFI_STATION, EdgeKind::Requires}
         };
         reg.add(PreconditionNames::TIME_SYNC, PreconditionRole::Operational,
-            [this]() -> PreconditionStatus {
-                auto status = _timeManager.getSyncStatus();
+            [](void* ctx) -> PreconditionStatus {
+                auto* self = static_cast<TimePreconditionContributor*>(ctx);
+                auto status = self->_timeManager.getSyncStatus();
                 if (status == TimeSyncStatus::SYNCED)
                     return {true, Cause::Met};
                 if (status == TimeSyncStatus::IN_PROGRESS)
@@ -73,6 +76,7 @@ public:
                 return {false, Cause::Unreachable};
             },
             nullptr,  // single-cause — no describe needed (CG-16)
+            this,
             syncEdges, 1);
     }
 

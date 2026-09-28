@@ -100,7 +100,7 @@ TEST(DisplayServiceHelperTest, ScreenshotOTAGate) {
     MockDisplayModuleForScreenshot display;
     DisplayServiceHelper helper(&display);
     
-    helper.setOtaPredicate([]() { return true; }); // OTA active
+    helper.setOtaPredicate([](void*) { return true; }); // OTA active
     
     PsychicHttpServer server;
     helper.registerScreenshotRoute(server);

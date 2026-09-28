@@ -187,9 +187,10 @@ bool LVGLDisplayModule::beginEarly() {
 void LVGLDisplayModule::begin(EventBus* eventBus) {
     _eventBus = eventBus;
 #ifndef UNIT_TEST
-    _serviceHelper.setSaveCallback([this]() {
-        if (_configManager) _configManager->saveModuleConfig(this);
-    });
+    _serviceHelper.setSaveCallback([](void* ctx) {
+        auto* self = static_cast<LVGLDisplayModule*>(ctx);
+        if (self->_configManager) self->_configManager->saveModuleConfig(self);
+    }, this);
 #endif
 
     // Phase 1 fallback: ensure bootstrapHardware() ran
@@ -1070,9 +1071,10 @@ void LVGLDisplayModule::registerRoutes(PsychicHttpServer& server) {
     // OTA predicate: uses dedicated _otaInProgress flag (not _pauseRendering,
     // which is cleared by non-OTA paths like clearStatus/restorePriorScreen).
     // Mirrors U8G2DisplayModule which uses the same pattern.
-    _serviceHelper.setOtaPredicate([this]() {
-        return _otaInProgress.load(std::memory_order_relaxed);
-    });
+    _serviceHelper.setOtaPredicate([](void* ctx) {
+        auto* self = static_cast<LVGLDisplayModule*>(ctx);
+        return self->_otaInProgress.load(std::memory_order_relaxed);
+    }, this);
 #endif
     _serviceHelper.registerBrightnessRoute(server);
     _serviceHelper.registerScreenshotRoute(server);

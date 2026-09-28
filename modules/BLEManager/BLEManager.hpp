@@ -266,6 +266,13 @@ private:
 
     std::vector<IBLEServiceProvider*>  _serviceProviders;
     std::vector<IBLEClientProvider*>   _clientProviders;
+
+    struct ClientProviderPrecContext {
+        BLEManager* mgr;
+        const char* providerId;
+    };
+    std::vector<ClientProviderPrecContext> _clientProviderPrecContexts;
+
     std::map<std::string, BLEReconnectPolicy> _reconnectPolicies;
     std::map<std::string, bool>        _clientConnected;
     std::map<std::string, bool>        _clientConnecting;

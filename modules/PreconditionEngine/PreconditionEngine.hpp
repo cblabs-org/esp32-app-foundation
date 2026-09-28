@@ -26,6 +26,7 @@ struct PreconditionState {
     PreconditionRole role;
     IPreconditionRegistry::EvalFn evaluate;
     IPreconditionRegistry::DescribeFn describe;
+    void* context = nullptr;
     const Edge* edges;
     uint8_t edgeCount;
     // Resolved edge indices (CG-7)
@@ -59,6 +60,7 @@ public:
              PreconditionRole role,
              EvalFn evaluate,
              DescribeFn describe = nullptr,
+             void* context = nullptr,
              const Edge* edges = nullptr,
              uint8_t edgeCount = 0,
              const DampingPolicy* damping = nullptr,

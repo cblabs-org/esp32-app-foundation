@@ -198,9 +198,10 @@ bool U8G2DisplayModule::beginEarly() {
  */
 void U8G2DisplayModule::begin(EventBus* eventBus) {
     _eventBus = eventBus;
-    _serviceHelper.setSaveCallback([this]() {
-        if (_configManager) _configManager->saveModuleConfig(this);
-    });
+    _serviceHelper.setSaveCallback([](void* ctx) {
+        auto* self = static_cast<U8G2DisplayModule*>(ctx);
+        if (self->_configManager) self->_configManager->saveModuleConfig(self);
+    }, this);
     
     _screensaver.setBoard(&_screensaverBoard);
 
@@ -815,9 +816,10 @@ void U8G2DisplayModule::registerRoutes(PsychicHttpServer& server) {
 #ifdef WITH_OTA
     // OTA predicate: uses _otaInProgress atomic flag set by _onOtaProgress EventBus callback.
     // Consistent with LVGLDisplayModule which uses _pauseRendering in the same pattern.
-    _serviceHelper.setOtaPredicate([this]() {
-        return _otaInProgress.load(std::memory_order_relaxed);
-    });
+    _serviceHelper.setOtaPredicate([](void* ctx) {
+        auto* self = static_cast<U8G2DisplayModule*>(ctx);
+        return self->_otaInProgress.load(std::memory_order_relaxed);
+    }, this);
 #endif
 #endif
     _serviceHelper.registerBrightnessRoute(server);

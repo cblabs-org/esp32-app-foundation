@@ -371,7 +371,7 @@ TEST(WifiPreconditionContributorTest, EvaluationAndDescriptions) {
     EXPECT_EQ(state->severity, Severity::NeedsUser);
 
     char desc[128] = {};
-    state->describe(Cause::NotConfigured, desc, sizeof(desc));
+    state->describe(Cause::NotConfigured, desc, sizeof(desc), state->context);
     EXPECT_STREQ("Connect to the device WiFi to configure", desc);
 
     // 2. Connecting with configured credentials
@@ -383,17 +383,17 @@ TEST(WifiPreconditionContributorTest, EvaluationAndDescriptions) {
     EXPECT_EQ(state->rawStatus.cause, Cause::Connecting);
     EXPECT_EQ(state->severity, Severity::Transient);
 
-    state->describe(Cause::Connecting, desc, sizeof(desc));
+    state->describe(Cause::Connecting, desc, sizeof(desc), state->context);
     EXPECT_STREQ("Connecting to MyNetwork...", desc);
 
     // 3. Fallback / Rejected / default describe messages
-    state->describe(Cause::FallbackEngaged, desc, sizeof(desc));
+    state->describe(Cause::FallbackEngaged, desc, sizeof(desc), state->context);
     EXPECT_TRUE(strstr(desc, "Can't reach your network") != nullptr);
 
-    state->describe(Cause::Rejected, desc, sizeof(desc));
+    state->describe(Cause::Rejected, desc, sizeof(desc), state->context);
     EXPECT_STREQ("WiFi password was refused", desc);
 
-    state->describe(Cause::Unreachable, desc, sizeof(desc));
+    state->describe(Cause::Unreachable, desc, sizeof(desc), state->context);
     EXPECT_STREQ("WiFi unavailable", desc);
 
     // 4. Severity derivation for FallbackEngaged (AP mode)

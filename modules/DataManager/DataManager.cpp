@@ -276,7 +276,9 @@ void DataManager::drainJobs(bool urgentOnly) {
 
         uint32_t jobStart = getCurrentTimeMs();
 
-        DeadlineToken token(jobStart + FetchContext::FETCH_TOTAL_TIMEOUT_MS, [this]() { return getCurrentTimeMs(); });
+        DeadlineToken token(jobStart + FetchContext::FETCH_TOTAL_TIMEOUT_MS,
+                            [](void* ctx) -> uint32_t { return static_cast<DataManager*>(ctx)->getCurrentTimeMs(); },
+                            this);
         FetchContext ctx{token};
 #ifdef ESP_PLATFORM
         FetchGuard fg(nullptr, ctx,
@@ -705,7 +707,9 @@ void DataManager::executeLoop() {
         // --- Execute the fetch cycle ---
         uint32_t fetchStart = getCurrentTimeMs();
 
-        DeadlineToken token(fetchStart + FetchContext::FETCH_TOTAL_TIMEOUT_MS, [this]() { return getCurrentTimeMs(); });
+        DeadlineToken token(fetchStart + FetchContext::FETCH_TOTAL_TIMEOUT_MS,
+                            [](void* ctx) -> uint32_t { return static_cast<DataManager*>(ctx)->getCurrentTimeMs(); },
+                            this);
         FetchContext ctx{token};
 #ifdef ESP_PLATFORM
         FetchGuard fg(fetchTarget, ctx, _secureClient, _plainClient);

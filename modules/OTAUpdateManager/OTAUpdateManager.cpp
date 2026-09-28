@@ -697,7 +697,7 @@ void OTAUpdateManager::performUpdateTask() {
 
     if (_preRebootHook) {
         ESP_LOGI(TAG, "Executing pre-reboot hook before restart");
-        _preRebootHook();
+        _preRebootHook(_preRebootHookCtx);
     }
 
     ESP_LOGI(TAG, "OTA task stack high-water mark: %u bytes free",
@@ -1049,8 +1049,9 @@ void OTAUpdateManager::markAppValid() {
     }
 }
 
-void OTAUpdateManager::setPreRebootHook(std::function<void()> hook) {
-    _preRebootHook = std::move(hook);
+void OTAUpdateManager::setPreRebootHook(PreRebootHook hook, void* ctx) {
+    _preRebootHook = hook;
+    _preRebootHookCtx = ctx;
 }
 
 /**
