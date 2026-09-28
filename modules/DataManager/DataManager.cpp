@@ -14,6 +14,7 @@
 #include "Application.hpp"
 #include "platform/LogShim.h"
 #include <algorithm>
+#include <new>
 
 static constexpr const char* TAG = "DataManager";
 #ifdef ESP_PLATFORM
@@ -178,9 +179,16 @@ void DataManager::begin() {
     }
 
 #ifdef ESP_PLATFORM
-    _secureClient = new FrameworkSecureClient();
-    _secureClient->useDefaultCertBundle();
-    _plainClient = new WiFiClient();
+    _secureClient = new (std::nothrow) FrameworkSecureClient();
+    if (_secureClient) {
+        _secureClient->useDefaultCertBundle();
+    } else {
+        ESP_LOGE(TAG, "Failed to allocate FrameworkSecureClient");
+    }
+    _plainClient = new (std::nothrow) WiFiClient();
+    if (!_plainClient) {
+        ESP_LOGE(TAG, "Failed to allocate WiFiClient");
+    }
 #endif
 
 

@@ -29,6 +29,7 @@
 #include <algorithm>
 #include <memory>
 #include <map>
+#include <new>
 
 // ─── Arduino BLE-in-use override ────────────────────────────────────
 // The Arduino core's initArduino() releases the BT controller's ROM
@@ -361,8 +362,12 @@ bool BLEStack::startServer() {
         if (!svc) continue;
         for (auto* chr : svc->getCharacteristics()) {
             if (!chr) continue;
-            auto* prev = chr->getCallbacks();
-            chr->setCallbacks(new ChainingCharCallbacks(prev, s_chainingStack, s_chainingQueue));
+            auto* cb = new (std::nothrow) ChainingCharCallbacks(prev, s_chainingStack, s_chainingQueue);
+            if (!cb) {
+                ESP_LOGE(TAG, "Failed to allocate ChainingCharCallbacks");
+                return false;
+            }
+            chr->setCallbacks(cb);
         }
     }
 
@@ -605,7 +610,14 @@ bool BLEStack::executeCentralConnect(const CentralConnectOptions& opts, const BL
         // N2: Set callbacks once at creation — NimBLE doesn't delete the old
         // callbacks on setClientCallbacks(), only in ~NimBLEClient(). Setting
         // on every reconnect leaks ~40 B per attempt.
-        pClient->setClientCallbacks(new ClientCallbacks(providerId), true);
+        auto* cb = new (std::nothrow) ClientCallbacks(providerId);
+        if (!cb) {
+            ESP_LOGE(TAG, "Failed to allocate ClientCallbacks for %s", providerId.c_str());
+            NimBLEDevice::deleteClient(pClient);
+            postCentralConnectFailure(opts.hostEventQueue, providerId, addr);
+            return false;
+        }
+        pClient->setClientCallbacks(cb, true);
     }
 
     // N6: Register client→provider mapping BEFORE subscribing so

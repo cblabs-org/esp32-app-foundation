@@ -14,6 +14,7 @@
 #include "modules/MCPServer/MCPToolRegistry.hpp"
 #include <map>
 #include <cstring>
+#include <new>
 
 #ifndef UNIT_TEST
 #include "iot_button.h"
@@ -23,6 +24,10 @@
 #else
 #include "iot_button.h"
 #endif
+
+#include "platform/LogShim.h"
+
+static constexpr const char* TAG = "ButtonModule";
 
 ButtonModule::ButtonModule() = default;
 
@@ -160,12 +165,16 @@ void ButtonModule::createGpioButton(const BoardButton& button) {
     }
 
     for (auto gesture : gestures) {
-        auto* ctx = new ShimContext{
+        auto* ctx = new (std::nothrow) ShimContext{
             .id = button.id,
             .gesture = gesture,
             .queue = _eventQueue,
             .droppedCount = 0
         };
+        if (!ctx) {
+            ESP_LOGE(TAG, "Failed to allocate ShimContext for button %s", button.id);
+            continue;
+        }
         _shimContexts.push_back(ctx);
 
 #ifndef UNIT_TEST
@@ -216,12 +225,16 @@ void ButtonModule::createAdcLadder(int8_t pin, const std::vector<const BoardButt
         }
 
         for (auto gesture : gestures) {
-            auto* ctx = new ShimContext{
+            auto* ctx = new (std::nothrow) ShimContext{
                 .id = button.id,
                 .gesture = gesture,
                 .queue = _eventQueue,
                 .droppedCount = 0
             };
+            if (!ctx) {
+                ESP_LOGE(TAG, "Failed to allocate ShimContext for button %s", button.id);
+                continue;
+            }
             _shimContexts.push_back(ctx);
 
 #ifndef UNIT_TEST
@@ -269,12 +282,16 @@ void ButtonModule::createMatrixButton(const BoardButton& button) {
     }
 
     for (auto gesture : gestures) {
-        auto* ctx = new ShimContext{
+        auto* ctx = new (std::nothrow) ShimContext{
             .id = button.id,
             .gesture = gesture,
             .queue = _eventQueue,
             .droppedCount = 0
         };
+        if (!ctx) {
+            ESP_LOGE(TAG, "Failed to allocate ShimContext for button %s", button.id);
+            continue;
+        }
         _shimContexts.push_back(ctx);
 
 #ifndef UNIT_TEST
