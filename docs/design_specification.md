@@ -1564,7 +1564,7 @@ The framework executes boot across 20 deterministic steps in `Application::begin
 13. **DataManager Begin:** Start background data worker FreeRTOS task and register all `IDataSource` workers.
 14. **Time Sync:** Initialize asynchronous NTP synchronization via `TimeManager` if present.
 15. **Display Hardware Init:** Initialize display adapter and show early boot splash.
-16. **WebServerManager Begin:** Start `PsychicHttpServer`, bind static PROGMEM assets, and register all contributor routes and tabs.
+16. **WebServerManager Begin:** Configure `PsychicHttpServer` (and `PsychicHttpsServer` in TLS mode), bind static PROGMEM assets, and register all contributor routes and tabs. The servers are **not** started here: `WebServerManager::tick()` starts them on the loop task once `WifiManager::isReady()` is true. This is deliberately tick-polled rather than EventBus-driven, to keep start-up in a single deterministic execution context (PR-24 WO10; microkernel MK-3/MK-3a).
 17. **MCP Server Init:** Register built-in tools and all `IMCPContributor` tools with `MCPToolRegistry`.
 18. **Lock Registration Vectors:** Call `_compactAndLock()` to seal module arrays and execute `_preconditionEngine.resolveEdges()`.
 19. **Firmware Self-Test Logging (Step 17b):** Log self-test pass. (App validation is delegated to the consumer; see §9.5).

@@ -42,10 +42,12 @@
  *          APP_RUNNING) should treat their reaction as best-effort within
  *          the next event-loop cycle. Callers MUST NOT assume the subscriber
  *          has acted by the time publish() returns.
- *        • The default event loop task has a finite stack (typically 4096
- *          bytes). Callbacks performing heavy work (large JSON serialization,
- *          LittleFS flushes, HTTP requests) risk stack overflow and should
- *          offload to a dedicated task or use a bounded working buffer.
+ *        • The default event loop task has a small stack
+ *          (CONFIG_ESP_SYSTEM_EVENT_TASK_STACK_SIZE — 2304 bytes in this
+ *          project's sdkconfigs). Callbacks performing heavy work (large JSON
+ *          serialization, LittleFS flushes, HTTP requests, starting servers)
+ *          risk stack overflow. Prefer setting an atomic flag and acting on it
+ *          in tick() (§6); otherwise offload to a dedicated task.
  *
  * 2. Blocking Behaviour:
  *    - publish() uses portMAX_DELAY when posting to the event queue. If the
