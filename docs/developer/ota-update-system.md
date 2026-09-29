@@ -250,7 +250,17 @@ Gate 3: Binary version header  → prevents flashing wrong version (esp_app_desc
 > the first 1KB of the downloaded binary against the expected version before
 > any flash partition writes occur (`BinaryVersionMismatch` error code -16).
 
-### 4.2 Channel Configuration
+### 4.2 Historical Context: Why Manifest-First?
+
+Prior versions of the ESP32 App Foundation queried the GitHub REST API (`/repos/{repo}/releases`) directly from the device to discover updates (tracked in Issue #102). This approach was fundamentally flawed for embedded systems:
+
+1. **Payload Size:** The GitHub releases API returns massive JSON payloads (often >100KB) containing verbose metadata for all release assets. The ESP32 cannot reliably buffer or stream-parse this without risking heap exhaustion or `JSON Parse Error: IncompleteInput` crashes.
+2. **Rate Limiting:** Unauthenticated API calls from devices sharing a NAT IP were quickly rate-limited by GitHub (60 requests/hour), breaking update checks entirely.
+3. **Pagination Complexity:** Finding the latest beta release often required paginating through multiple API responses on the device.
+
+PR-36 fully removed on-device GitHub API querying, replacing it with the **manifest-first** architecture. The `deploy_release.py` script now does the heavy lifting off-device: it queries the API, builds a compact (~3KB) `manifest.json`, signs it, and uploads it to a fixed `manifest-latest` release. The ESP32 only ever downloads this tiny, static, signed file via a direct CDN link (no rate limits), completely eliminating the JSON parse crashes and memory pressure of the REST API.
+
+### 4.3 Channel Configuration
 
 The active channel is persisted as an `IConfigurable` field in `/mod/ota.json`:
 
@@ -275,14 +285,14 @@ curl -X POST http://<device-ip>/api/ota \
 
 **Change channel via web portal:** Use the OTA tab → Channel dropdown.
 
-### 4.3 Implicit Downgrade
+### 4.4 Implicit Downgrade
 
 When the channel changes (e.g., `beta` → `stable`), `checkForUpdate()` detects
 that `_channel != _lastCheckedChannel` and signals "update available" even if the
 remote version is numerically lower than the running firmware. This allows
 seamless channel switching without manual intervention.
 
-### 4.4 SemVer Comparison
+### 4.5 SemVer Comparison
 
 The `SemVer` library provides zero-allocation version comparison:
 
