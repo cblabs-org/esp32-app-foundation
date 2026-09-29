@@ -117,6 +117,11 @@ public:
     bool isFull() const;
 
     /**
+     * @brief Returns the number of secrets that were rejected due to capacity or length.
+     */
+    uint32_t saturationCount() const;
+
+    /**
      * @brief Clears all registered secrets and wipes the plaintext.
      *        TEST ONLY — see the thread-safety contract above.
      */
@@ -134,6 +139,7 @@ private:
     char   _secrets[MAX_SECRETS][MAX_SECRET_LEN + 1];
     size_t _secretLens[MAX_SECRETS];
     std::atomic<size_t> _count{0};
+    std::atomic<uint32_t> _saturationCount{0};
 
 #ifdef ESP_PLATFORM
     portMUX_TYPE _writerLock;

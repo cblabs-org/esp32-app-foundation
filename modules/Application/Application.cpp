@@ -215,6 +215,7 @@ bool Application::begin(const FrameworkConfig& config) {
 #endif
 
     _wifiPrecondition.registerPreconditions(_preconditionEngine);
+    _redactorPrecondition.registerPreconditions(_preconditionEngine);
 
     // --- Step 8: ConfigManager.beginAll() — load all persisted config ---
     // Iterates the registry, loads each module's namespace file from

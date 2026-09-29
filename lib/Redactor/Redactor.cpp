@@ -99,7 +99,10 @@ Redactor::RegisterResult Redactor::registerSecret(const char* secret) {
 
     const size_t len = strnlen(secret, MAX_SECRET_LEN + 1);
     if (len < MIN_SECRET_LEN)  return RegisterResult::TooShort;
-    if (len > MAX_SECRET_LEN)  return RegisterResult::TooLong;
+    if (len > MAX_SECRET_LEN) {
+        _saturationCount.fetch_add(1, std::memory_order_relaxed);
+        return RegisterResult::TooLong;
+    }
 
     WriterLock lock(
 #ifdef ESP_PLATFORM
@@ -117,6 +120,7 @@ Redactor::RegisterResult Redactor::registerSecret(const char* secret) {
     }
 
     if (count >= MAX_SECRETS) {
+        _saturationCount.fetch_add(1, std::memory_order_relaxed);
         return RegisterResult::Full;
     }
 
@@ -202,6 +206,10 @@ bool Redactor::isFull() const {
     return _count.load(std::memory_order_acquire) >= MAX_SECRETS;
 }
 
+uint32_t Redactor::saturationCount() const {
+    return _saturationCount.load(std::memory_order_relaxed);
+}
+
 void Redactor::clearSecrets() {
     WriterLock lock(
 #ifdef ESP_PLATFORM
@@ -215,4 +223,5 @@ void Redactor::clearSecrets() {
     std::memset(_secrets, 0, sizeof(_secrets));
     std::memset(_secretLens, 0, sizeof(_secretLens));
     _count.store(0, std::memory_order_release);
+    _saturationCount.store(0, std::memory_order_relaxed);
 }
