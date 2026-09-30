@@ -22,6 +22,26 @@ if [ -d "$ROOT_DIR/esp32-app-foundation/.git" ] || [ -f "$ROOT_DIR/esp32-app-fou
     SUBMODULE_EXCLUDE="esp32-app-foundation"
 fi
 
+# Reusable path filter — replaces eval "$filter_chain" pattern.
+# Reads stdin, drops lines matching any excluded directory, writes to stdout.
+filter_excluded_paths() {
+    grep -v '/.pio/' \
+        | grep -v '/.pio-mcp-workspace/' \
+        | grep -v '/.git/' \
+        | grep -v '/.agents/' \
+        | grep -v '/test/' \
+        | grep -v '/tests/' \
+        | grep -v '/stubs/' \
+        | grep -v '/portal_assets/' \
+        | grep -v 'third_party' \
+        | grep -v 'vendor' \
+        | grep -v 'node_modules' \
+        | grep -v 'managed_components' \
+        | grep -v '/tmp/' \
+        | if [ -n "$SUBMODULE_EXCLUDE" ]; then grep -v "/$SUBMODULE_EXCLUDE/"; else cat; fi \
+        || true
+}
+
 TOTAL_CHECKS=0
 PASSED=0
 FINDINGS=0
@@ -120,12 +140,7 @@ run_check_grep() {
         "$ROOT_DIR" 2>/dev/null || true)
         
     if [ -n "$grep_out" ]; then
-        # Additional exact-path filtering to respect the full exclude rules
-        local filter_chain="grep -v '/.pio/' | grep -v '/.pio-mcp-workspace/' | grep -v '/.git/' | grep -v '/.agents/' | grep -v '/test/stubs/' | grep -v '/include/portal_assets/' | grep -v 'third_party' | grep -v 'vendor' | grep -v 'node_modules' | grep -v 'managed_components' | grep -v '/tmp/'"
-        if [ -n "$SUBMODULE_EXCLUDE" ]; then
-            filter_chain="$filter_chain | grep -v '/$SUBMODULE_EXCLUDE/'"
-        fi
-        grep_out=$(echo "$grep_out" | eval "$filter_chain" || true)
+        grep_out=$(echo "$grep_out" | filter_excluded_paths)
         
         if [ -n "$grep_out" ]; then
             hits=$(echo "$grep_out" | wc -l | tr -d ' ')
@@ -349,11 +364,7 @@ check_std_function_member() {
         $submod_excl 2>/dev/null || true)
         
     if [ -n "$grep_out" ]; then
-        local filter_chain="grep -v '/\.pio/' | grep -v '/\.pio-mcp-workspace/' | grep -v '/\.git/' | grep -v '/\.agents/' | grep -v '/test/' | grep -v '/tests/' | grep -v '/stubs/' | grep -v '/portal_assets/' | grep -v 'third_party' | grep -v 'vendor' | grep -v 'node_modules' | grep -v 'managed_components' | grep -v '/tmp/'"
-        if [ -n "$SUBMODULE_EXCLUDE" ]; then
-            filter_chain="$filter_chain | grep -v '/$SUBMODULE_EXCLUDE/'"
-        fi
-        grep_out=$(echo "$grep_out" | eval "$filter_chain" || true)
+        grep_out=$(echo "$grep_out" | filter_excluded_paths)
         
         if [ -n "$grep_out" ]; then
             hits=$(echo "$grep_out" | grep -v "^$" | wc -l | tr -d ' ')
@@ -399,12 +410,8 @@ check_missing_nothrow() {
         $submod_excl 2>/dev/null || true)
         
     if [ -n "$grep_out" ]; then
-        # Secondary filter chain to ensure nested excluded paths are dropped (#256)
-        local filter_chain="grep -v '/\.pio/' | grep -v '/\.pio-mcp-workspace/' | grep -v '/\.git/' | grep -v '/\.agents/' | grep -v '/test/' | grep -v '/tests/' | grep -v '/stubs/' | grep -v '/portal_assets/' | grep -v 'third_party' | grep -v 'vendor' | grep -v 'node_modules' | grep -v 'managed_components' | grep -v '/tmp/'"
-        if [ -n "$SUBMODULE_EXCLUDE" ]; then
-            filter_chain="$filter_chain | grep -v '/$SUBMODULE_EXCLUDE/'"
-        fi
-        grep_out=$(echo "$grep_out" | eval "$filter_chain" || true)
+        # Filter excluded paths to ensure nested directories are dropped (#256)
+        grep_out=$(echo "$grep_out" | filter_excluded_paths)
 
         # Strip full comment lines (//, *, /*, */)
         grep_out=$(echo "$grep_out" | grep -vE "^[^:]*:[^:]*:[[:space:]]*(\/\/|\*|\/\*|\*\/)" || true)
@@ -453,11 +460,7 @@ check_tick_heap_allocation() {
         --exclude-dir="managed_components" --exclude-dir="tmp" --exclude-dir="test" \
         --exclude-dir="tests" --exclude-dir=".git" $submod_excl 2>/dev/null || true)
     if [ -n "$grep_out" ]; then
-        local filter_chain="grep -v '/\.pio/' | grep -v '/\.pio-mcp-workspace/' | grep -v '/\.git/' | grep -v '/\.agents/' | grep -v '/test/' | grep -v '/tests/' | grep -v '/stubs/' | grep -v '/portal_assets/' | grep -v 'third_party' | grep -v 'vendor' | grep -v 'node_modules' | grep -v 'managed_components' | grep -v '/tmp/'"
-        if [ -n "$SUBMODULE_EXCLUDE" ]; then
-            filter_chain="$filter_chain | grep -v '/$SUBMODULE_EXCLUDE/'"
-        fi
-        grep_out=$(echo "$grep_out" | eval "$filter_chain" || true)
+        grep_out=$(echo "$grep_out" | filter_excluded_paths)
         if [ -n "$grep_out" ]; then
             hits=$(echo "$grep_out" | grep -v "^$" | wc -l | tr -d ' ')
             files=$(echo "$grep_out" | sed "s|^$ROOT_DIR/||" | sed "s|^\./||" | sort -u)
@@ -495,11 +498,7 @@ check_eventbus_thread_safety() {
         --exclude-dir="managed_components" --exclude-dir="tmp" --exclude-dir="test" \
         --exclude-dir="tests" --exclude-dir=".git" $submod_excl 2>/dev/null || true)
     if [ -n "$grep_out" ]; then
-        local filter_chain="grep -v '/\.pio/' | grep -v '/\.pio-mcp-workspace/' | grep -v '/\.git/' | grep -v '/\.agents/' | grep -v '/test/' | grep -v '/tests/' | grep -v '/stubs/' | grep -v '/portal_assets/' | grep -v 'third_party' | grep -v 'vendor' | grep -v 'node_modules' | grep -v 'managed_components' | grep -v '/tmp/'"
-        if [ -n "$SUBMODULE_EXCLUDE" ]; then
-            filter_chain="$filter_chain | grep -v '/$SUBMODULE_EXCLUDE/'"
-        fi
-        grep_out=$(echo "$grep_out" | eval "$filter_chain" || true)
+        grep_out=$(echo "$grep_out" | filter_excluded_paths)
         if [ -n "$grep_out" ]; then
             hits=$(echo "$grep_out" | grep -v "^$" | wc -l | tr -d ' ')
             files=$(echo "$grep_out" | sed "s|^$ROOT_DIR/||" | sed "s|^\./||" | sort -u)
