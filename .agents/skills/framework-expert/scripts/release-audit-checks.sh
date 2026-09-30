@@ -22,6 +22,26 @@ if [ -d "$ROOT_DIR/esp32-app-foundation/.git" ] || [ -f "$ROOT_DIR/esp32-app-fou
     SUBMODULE_EXCLUDE="esp32-app-foundation"
 fi
 
+# Reusable path filter — replaces eval "$filter_chain" pattern.
+# Reads stdin, drops lines matching any excluded directory, writes to stdout.
+filter_excluded_paths() {
+    grep -v '/.pio/' \
+        | grep -v '/.pio-mcp-workspace/' \
+        | grep -v '/.git/' \
+        | grep -v '/.agents/' \
+        | grep -v '/test/' \
+        | grep -v '/tests/' \
+        | grep -v '/stubs/' \
+        | grep -v '/portal_assets/' \
+        | grep -v 'third_party' \
+        | grep -v 'vendor' \
+        | grep -v 'node_modules' \
+        | grep -v 'managed_components' \
+        | grep -v '/tmp/' \
+        | if [ -n "$SUBMODULE_EXCLUDE" ]; then grep -v "/$SUBMODULE_EXCLUDE/"; else cat; fi \
+        || true
+}
+
 TOTAL_CHECKS=0
 PASSED=0
 FINDINGS=0
@@ -120,12 +140,7 @@ run_check_grep() {
         "$ROOT_DIR" 2>/dev/null || true)
         
     if [ -n "$grep_out" ]; then
-        # Additional exact-path filtering to respect the full exclude rules
-        local filter_chain="grep -v '/.pio/' | grep -v '/.pio-mcp-workspace/' | grep -v '/.git/' | grep -v '/.agents/' | grep -v '/test/stubs/' | grep -v '/include/portal_assets/' | grep -v 'third_party' | grep -v 'vendor' | grep -v 'node_modules' | grep -v 'managed_components' | grep -v '/tmp/'"
-        if [ -n "$SUBMODULE_EXCLUDE" ]; then
-            filter_chain="$filter_chain | grep -v '/$SUBMODULE_EXCLUDE/'"
-        fi
-        grep_out=$(echo "$grep_out" | eval "$filter_chain" || true)
+        grep_out=$(echo "$grep_out" | filter_excluded_paths)
         
         if [ -n "$grep_out" ]; then
             hits=$(echo "$grep_out" | wc -l | tr -d ' ')
@@ -321,12 +336,7 @@ check_extern_global_state() {
 }
 
 check_std_function_member() {
-    run_check_grep 2 "std_function_member" "std::function<.*>[[:space:]]+_[a-zA-Z0-9_]+[[:space:]]*;" "*.hpp"
-}
-
-check_missing_nothrow() {
-    # `new Type` without `(std::nothrow)` — only match C++ allocations,
-    # not the English word "new" in comments (#188).
+    # Match stored std::function members and 'using X = std::function<...>' aliases in headers (#254, #256).
     local hits=0
     local files=""
     
@@ -336,20 +346,92 @@ check_missing_nothrow() {
     fi
     
     local grep_out
-    # Match 'new' followed by an uppercase letter (type name) to skip prose
-    grep_out=$(grep -rn "new [A-Z]" "$ROOT_DIR" --include="*.cpp" \
-        --exclude-dir=".pio" --exclude-dir=".pio-mcp-workspace" \
-        --exclude-dir="vendor" --exclude-dir="third_party" \
-        --exclude-dir=".agents" --exclude-dir=".git" \
+    grep_out=$(grep -rnE "^[[:space:]]*(using[[:space:]]+[A-Za-z0-9_]+[[:space:]]*=[[:space:]]*std::function<|std::function<.*>[[:space:]]+[a-zA-Z0-9_]+[[:space:]]*(=|;|\{))" "$ROOT_DIR" \
+        --include="*.hpp" --include="*.h" \
+        --exclude-dir=".pio" \
+        --exclude-dir=".pio-mcp-workspace" \
+        --exclude-dir=".git" \
+        --exclude-dir=".agents" \
+        --exclude-dir="stubs" \
+        --exclude-dir="portal_assets" \
+        --exclude-dir="third_party" \
+        --exclude-dir="vendor" \
+        --exclude-dir="node_modules" \
+        --exclude-dir="managed_components" \
+        --exclude-dir="tmp" \
+        --exclude-dir="test" \
+        --exclude-dir="tests" \
         $submod_excl 2>/dev/null || true)
+        
     if [ -n "$grep_out" ]; then
-        # Strip comment lines (// at start or after whitespace)
-        grep_out=$(echo "$grep_out" | grep -v "^[^:]*:[^:]*:[[:space:]]*//" || true)
-        # Remove lines with nothrow
-        grep_out=$(echo "$grep_out" | grep -v "(std::nothrow)" || true)
+        grep_out=$(echo "$grep_out" | filter_excluded_paths)
+        
         if [ -n "$grep_out" ]; then
-            hits=$(echo "$grep_out" | wc -l | tr -d ' ')
-            files=$(echo "$grep_out" | cut -d: -f1 | sort -u | sed "s|^$ROOT_DIR/||" | sed "s|^\./||")
+            hits=$(echo "$grep_out" | grep -v "^$" | wc -l | tr -d ' ')
+            files=$(echo "$grep_out" | cut -d: -f1,2 | sed "s|^$ROOT_DIR/||" | sed "s|^\./||" | sort -u)
+        fi
+    fi
+    
+    if [ "$hits" -gt 0 ]; then
+        report 2 "std_function_member" "FAIL" "$hits" "$(echo $files | tr '\n' ' ')"
+    else
+        report 2 "std_function_member" "PASS" 0
+    fi
+}
+
+check_missing_nothrow() {
+    # `new Type` without `(std::nothrow)` — only match C++ allocations,
+    # not the English word "new" in comments or strings (#188, #256).
+    local hits=0
+    local files=""
+    
+    local submod_excl=""
+    if [ -n "$SUBMODULE_EXCLUDE" ]; then
+        submod_excl="--exclude-dir=$SUBMODULE_EXCLUDE"
+    fi
+    
+    local grep_out
+    # Search authored source files for 'new', excluding build/test/vendor/tmp directories (#256).
+    grep_out=$(grep -rnE "\bnew\b" "$ROOT_DIR" \
+        --include="*.cpp" --include="*.hpp" --include="*.h" \
+        --exclude-dir=".pio" \
+        --exclude-dir=".pio-mcp-workspace" \
+        --exclude-dir=".git" \
+        --exclude-dir=".agents" \
+        --exclude-dir="stubs" \
+        --exclude-dir="portal_assets" \
+        --exclude-dir="third_party" \
+        --exclude-dir="vendor" \
+        --exclude-dir="node_modules" \
+        --exclude-dir="managed_components" \
+        --exclude-dir="tmp" \
+        --exclude-dir="test" \
+        --exclude-dir="tests" \
+        $submod_excl 2>/dev/null || true)
+        
+    if [ -n "$grep_out" ]; then
+        # Filter excluded paths to ensure nested directories are dropped (#256)
+        grep_out=$(echo "$grep_out" | filter_excluded_paths)
+
+        # Strip full comment lines (//, *, /*, */)
+        grep_out=$(echo "$grep_out" | grep -vE "^[^:]*:[^:]*:[[:space:]]*(\/\/|\*|\/\*|\*\/)" || true)
+
+        # Remove lines that use nothrow
+        grep_out=$(echo "$grep_out" | grep -v "(std::nothrow)" | grep -v "(nothrow)" || true)
+
+        # Strip string literals so 'new' in log strings / literals does not match (#256)
+        grep_out=$(echo "$grep_out" | sed -E 's/"([^"\\]|\\.)*"/""/g' || true)
+
+        # Strip trailing inline comments (// to end of line)
+        grep_out=$(echo "$grep_out" | sed -E 's/\/\/.*//' || true)
+
+        # Match allocation syntax strictly: new Type(...), new Type{...}, new Type[...], or new Type;
+        grep_out=$(echo "$grep_out" | grep -E "\bnew[[:space:]]+[A-Za-z_][A-Za-z0-9_:<>]*[[:space:]]*[({[;]" || true)
+
+        if [ -n "$grep_out" ]; then
+            hits=$(echo "$grep_out" | grep -v "^$" | wc -l | tr -d ' ')
+            # Report file:line list so author can verify exact sites (#256)
+            files=$(echo "$grep_out" | cut -d: -f1,2 | sed "s|^$ROOT_DIR/||" | sed "s|^\./||" | sort -u)
         fi
     fi
     
@@ -374,10 +456,15 @@ check_tick_heap_allocation() {
     grep_out=$(grep -rlE "(new[[:space:]]|malloc\(|String\(|std::vector<)" "$ROOT_DIR" \
         --include="*.cpp" --exclude-dir=".pio" --exclude-dir=".pio-mcp-workspace" \
         --exclude-dir="vendor" --exclude-dir="third_party" --exclude-dir=".agents" \
-        --exclude-dir=".git" $submod_excl 2>/dev/null || true)
+        --exclude-dir="stubs" --exclude-dir="portal_assets" --exclude-dir="node_modules" \
+        --exclude-dir="managed_components" --exclude-dir="tmp" --exclude-dir="test" \
+        --exclude-dir="tests" --exclude-dir=".git" $submod_excl 2>/dev/null || true)
     if [ -n "$grep_out" ]; then
-        hits=$(echo "$grep_out" | wc -l | tr -d ' ')
-        files=$(echo "$grep_out" | sed "s|^$ROOT_DIR/||" | sed "s|^\./||" | sort -u)
+        grep_out=$(echo "$grep_out" | filter_excluded_paths)
+        if [ -n "$grep_out" ]; then
+            hits=$(echo "$grep_out" | grep -v "^$" | wc -l | tr -d ' ')
+            files=$(echo "$grep_out" | sed "s|^$ROOT_DIR/||" | sed "s|^\./||" | sort -u)
+        fi
     fi
     if [ "$hits" -gt 0 ]; then
         report 2 "tick_heap_allocation" "ADVISORY" "$hits" "$(echo $files | tr '\n' ' ')"
@@ -407,10 +494,15 @@ check_eventbus_thread_safety() {
     grep_out=$(grep -rlE "(lv_|WiFi\.|SPI\.)" "$ROOT_DIR" \
         --include="*.cpp" --exclude-dir=".pio" --exclude-dir=".pio-mcp-workspace" \
         --exclude-dir="vendor" --exclude-dir="third_party" --exclude-dir=".agents" \
-        --exclude-dir=".git" $submod_excl 2>/dev/null || true)
+        --exclude-dir="stubs" --exclude-dir="portal_assets" --exclude-dir="node_modules" \
+        --exclude-dir="managed_components" --exclude-dir="tmp" --exclude-dir="test" \
+        --exclude-dir="tests" --exclude-dir=".git" $submod_excl 2>/dev/null || true)
     if [ -n "$grep_out" ]; then
-        hits=$(echo "$grep_out" | wc -l | tr -d ' ')
-        files=$(echo "$grep_out" | sed "s|^$ROOT_DIR/||" | sed "s|^\./||" | sort -u)
+        grep_out=$(echo "$grep_out" | filter_excluded_paths)
+        if [ -n "$grep_out" ]; then
+            hits=$(echo "$grep_out" | grep -v "^$" | wc -l | tr -d ' ')
+            files=$(echo "$grep_out" | sed "s|^$ROOT_DIR/||" | sed "s|^\./||" | sort -u)
+        fi
     fi
     if [ "$hits" -gt 0 ]; then
         report 3 "eventbus_thread_safety" "ADVISORY" "$hits" "$(echo $files | tr '\n' ' ')"
