@@ -362,6 +362,7 @@ bool BLEStack::startServer() {
         if (!svc) continue;
         for (auto* chr : svc->getCharacteristics()) {
             if (!chr) continue;
+            auto* prev = chr->getCallbacks();
             auto* cb = new (std::nothrow) ChainingCharCallbacks(prev, s_chainingStack, s_chainingQueue);
             if (!cb) {
                 ESP_LOGE(TAG, "Failed to allocate ChainingCharCallbacks");
@@ -612,7 +613,7 @@ bool BLEStack::executeCentralConnect(const CentralConnectOptions& opts, const BL
         // on every reconnect leaks ~40 B per attempt.
         auto* cb = new (std::nothrow) ClientCallbacks(providerId);
         if (!cb) {
-            ESP_LOGE(TAG, "Failed to allocate ClientCallbacks for %s", providerId.c_str());
+            ESP_LOGE(TAG, "Failed to allocate ClientCallbacks for %s", providerId);
             NimBLEDevice::deleteClient(pClient);
             postCentralConnectFailure(opts.hostEventQueue, providerId, addr);
             return false;
