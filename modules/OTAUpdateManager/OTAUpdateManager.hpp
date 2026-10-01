@@ -73,6 +73,7 @@
 #include "interfaces/IConfigurable.hpp"
 #include "interfaces/ITickable.hpp"
 #include "interfaces/IMCPContributor.hpp"
+#include "interfaces/IPreconditionContributor.hpp"
 #include "utils/Periodic.hpp"
 
 // ---------------------------------------------------------------------------
@@ -155,7 +156,7 @@ static constexpr uint32_t OTA_TASK_DRAM_HEADROOM_BYTES = 8192; ///< Ota Task Dra
  *   - updatesEnabled     (bool):      Master kill-switch for applying firmware updates
  *   - learnedManifestUrl (char[256]): Learned manifest URL from last verified manifest
  */
-class OTAUpdateManager : public IWebContributor, public IConfigurable, public ITickable, public IMCPContributor {
+class OTAUpdateManager : public IWebContributor, public IConfigurable, public ITickable, public IMCPContributor, public IPreconditionContributor {
 public:
     /**
      * @brief Default constructor.
@@ -281,6 +282,15 @@ public:
      * @param registry The MCPToolRegistry to register tools with.
      */
     void registerMCPTools(MCPToolRegistry& registry) override;
+
+    // -------------------------------------------------------------------------
+    // IPreconditionContributor Interface
+    // -------------------------------------------------------------------------
+
+    /**
+     * @brief Register the OTA security warning precondition.
+     */
+    void registerPreconditions(IPreconditionRegistry& registry) override;
 
     // -------------------------------------------------------------------------
     // IWebContributor Interface

@@ -45,6 +45,7 @@
 #ifdef WITH_OTA
 
 #include "OTAUpdateManager.hpp"
+#include "interfaces/IPreconditionRegistry.hpp"
 #include "utils/Periodic.hpp"
 #include "utils/serveGzipAsset.hpp"
 #include "platform/LogShim.h"
@@ -231,6 +232,12 @@ void OTAUpdateManager::begin(Application& app) {
     _config        = &app.getConfig();
     _configManager = &app.getConfigManager();
     _eventBus      = &app.getEventBus();
+
+#ifdef OTA_ALLOW_UNSIGNED
+    if (_config->otaPublicKey == nullptr) {
+        ESP_LOGW(TAG, "SECURITY WARNING: Unsigned OTA is enabled (OTA_ALLOW_UNSIGNED) and otaPublicKey is null. Proceeding without verification.");
+    }
+#endif
 
     // --- Create the persistent OTA worker task (once per device lifetime) ---
     // Stack MUST be in DRAM (MALLOC_CAP_INTERNAL) because the OTA pipeline
@@ -918,7 +925,12 @@ bool OTAUpdateManager::fetchAndVerifyManifest_(OTAManifest& manifest) {
             }
             ESP_LOGI(TAG, "fetchAndVerifyManifest_: signature verified successfully");
         } else {
+#ifndef OTA_ALLOW_UNSIGNED
+            ESP_LOGE(TAG, "fetchAndVerifyManifest_: SECURITY ABORT: otaPublicKey missing and unsigned OTA is disabled");
+            continue;
+#else
             ESP_LOGW(TAG, "fetchAndVerifyManifest_: no otaPublicKey configured — skipping signature verification");
+#endif
         }
 
         // --- (d) Parse manifest ---
@@ -1181,6 +1193,18 @@ esp_err_t OTAUpdateManager::handleSignedUpload(PsychicRequest* request,
         // Clean up any previous verifier
         delete _uploadVerifier;
         _uploadVerifier = nullptr;
+
+#ifndef OTA_ALLOW_UNSIGNED
+        if (cfg.otaPublicKey == nullptr) {
+            ESP_LOGE(TAG, "Upload SECURITY ABORT: otaPublicKey missing and unsigned OTA is disabled");
+            _uploadAborted = true;
+            return ESP_FAIL;
+        }
+#else
+        if (cfg.otaPublicKey == nullptr) {
+            ESP_LOGW(TAG, "Upload SECURITY WARNING: Unsigned OTA is enabled (OTA_ALLOW_UNSIGNED) and otaPublicKey is null. Proceeding without verification.");
+        }
+#endif
 
         // Initialise MbedTLS verifier if a public key is configured
         if (cfg.otaPublicKey != nullptr) {
@@ -1520,6 +1544,29 @@ static const char* otaStateToString(OTAState state) {
         case OTAState::Error:       return "Error";
         default:                    return "Unknown";
     }
+}
+
+
+void OTAUpdateManager::registerPreconditions(IPreconditionRegistry& registry) {
+    registry.add("ota_signature", PreconditionRole::Operational,
+        [](void* ctx) -> PreconditionStatus {
+#ifdef OTA_ALLOW_UNSIGNED
+            auto* self = static_cast<OTAUpdateManager*>(ctx);
+            if (self->_config && self->_config->otaPublicKey == nullptr) {
+                return {false, Cause::FallbackEngaged};
+            }
+#endif
+            return {true, Cause::Met};
+        },
+        [](Cause c, char* buf, size_t len, void*) {
+            if (c == Cause::FallbackEngaged) {
+                snprintf(buf, len, "⚠️ OTA signature verification disabled.");
+            } else {
+                snprintf(buf, len, "OTA security healthy");
+            }
+        },
+        this
+    );
 }
 
 void OTAUpdateManager::registerMCPTools(MCPToolRegistry& registry) {
