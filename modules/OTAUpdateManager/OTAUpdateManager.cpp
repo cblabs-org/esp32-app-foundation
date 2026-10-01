@@ -128,7 +128,7 @@ const char* OTAUpdateManager::getConfigNamespace() const {
  * Increment this when a future firmware change requires a config migration.
  */
 int OTAUpdateManager::getSchemaVersion() const {
-    return 5;
+    return 6;
 }
 
 /**
@@ -144,6 +144,7 @@ void OTAUpdateManager::applyConfig(const JsonObject& section) {
     const char* ch = section["channel"] | "stable";
     strlcpy(_channel, ch, sizeof(_channel));
     _autoCheck      = section["autoCheck"]      | true;
+    _checkOnBoot    = section["checkOnBoot"]    | true;
     _updatesEnabled = section["updatesEnabled"] | true;
     const char* lcc = section["lastCheckedChannel"] | "";
     strlcpy(_lastCheckedChannel, lcc, sizeof(_lastCheckedChannel));
@@ -167,6 +168,7 @@ void OTAUpdateManager::applyConfig(const JsonObject& section) {
 void OTAUpdateManager::serializeConfig(JsonObject& section) const {
     section["channel"]            = _channel;
     section["autoCheck"]          = _autoCheck;
+    section["checkOnBoot"]        = _checkOnBoot;
     section["updatesEnabled"]     = _updatesEnabled;
     section["lastCheckedChannel"] = _lastCheckedChannel;
     section["checkHour"]          = _checkHour;
@@ -199,6 +201,10 @@ bool OTAUpdateManager::migrateConfig(JsonObject& section, int fromVersion) {
         section["learnedManifestUrl"] = "";
         ESP_LOGI(TAG, "Migrated OTA config v%d → v5: added learnedManifestUrl", fromVersion);
     }
+    if (fromVersion < 6) {
+        section["checkOnBoot"] = true;
+        ESP_LOGI(TAG, "Migrated OTA config v%d → v6: added checkOnBoot", fromVersion);
+    }
     return true;
 }
 
@@ -212,11 +218,12 @@ bool OTAUpdateManager::migrateConfig(JsonObject& section, int fromVersion) {
 void OTAUpdateManager::resetConfig() {
     strlcpy(_channel, "stable", sizeof(_channel));
     _autoCheck      = true;
+    _checkOnBoot    = true;
     _updatesEnabled = true;
     _lastCheckedChannel[0] = '\0';
     _checkHour = 3;
     _learnedManifestUrl[0] = '\0';
-    ESP_LOGI(TAG, "Config reset to defaults — channel='stable' autoCheck=true updatesEnabled=true checkHour=3 learnedManifestUrl=''");
+    ESP_LOGI(TAG, "Config reset to defaults — channel='stable' autoCheck=true checkOnBoot=true updatesEnabled=true checkHour=3 learnedManifestUrl=''");
 }
 
 
@@ -289,10 +296,14 @@ void OTAUpdateManager::tick(uint32_t currentMillis) {
     // --- Boot check: fire once, after Wi-Fi is confirmed connected ---
     if (!_hasBootChecked) {
         _hasBootChecked = true;
-        _silentCheck = true;  // Boot checks never show error modals
-        ESP_LOGI(TAG, "Auto-check: boot trigger (Wi-Fi confirmed connected)");
-        performUpdate();
-        return;
+        if (_checkOnBoot) {
+            _silentCheck = true;  // Boot checks never show error modals
+            ESP_LOGI(TAG, "Auto-check: boot trigger (Wi-Fi confirmed connected)");
+            performUpdate();
+            return;
+        } else {
+            ESP_LOGI(TAG, "Auto-check: boot trigger skipped (checkOnBoot=false)");
+        }
     }
 
     // --- Daily scheduled check at _checkHour ---
@@ -1407,6 +1418,18 @@ void OTAUpdateManager::registerRoutes(PsychicHttpServer& server) {
                         response->send(400, "application/json", "{\"status\":\"error\",\"msg\":\"Missing autoCheck boolean\"}");
                     }
                     return ESP_OK;
+                } else if (strcmp(action, "setCheckOnBoot") == 0) {
+                    if (doc["checkOnBoot"].is<bool>()) {
+                        this->_checkOnBoot = doc["checkOnBoot"].as<bool>();
+                        if (_configManager != nullptr) {
+                            _configManager->saveModuleConfig(static_cast<IConfigurable*>(this));
+                        }
+                        ESP_LOGI(TAG, "Check-on-boot changed to: %d", (int)this->_checkOnBoot);
+                        response->send(200, "application/json", "{\"status\":\"ok\"}");
+                    } else {
+                        response->send(400, "application/json", "{\"status\":\"error\",\"msg\":\"Missing checkOnBoot boolean\"}");
+                    }
+                    return ESP_OK;
                 } else if (strcmp(action, "setUpdatesEnabled") == 0) {
                     if (doc["updatesEnabled"].is<bool>()) {
                         this->_updatesEnabled = doc["updatesEnabled"].as<bool>();
@@ -1452,6 +1475,7 @@ void OTAUpdateManager::registerRoutes(PsychicHttpServer& server) {
                     resp["channel"]        = this->_channel;
                     resp["boardId"]        = BOARD_ID;
                     resp["autoCheck"]      = this->_autoCheck;
+                    resp["checkOnBoot"]    = this->_checkOnBoot;
                     resp["updatesEnabled"] = this->_updatesEnabled;
                     resp["checkHour"]      = this->_checkHour;
                     resp["dram_free_bytes"]  = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
@@ -1534,6 +1558,7 @@ void OTAUpdateManager::registerMCPTools(MCPToolRegistry& registry) {
                                      ? static_cast<long>(millis() - self->_lastCheckTimer.getLastFire())
                                      : -1;
             result["auto_check"]     = self->_autoCheck;
+            result["check_on_boot"]  = self->_checkOnBoot;
             result["updates_enabled"] = self->_updatesEnabled;
             if (self->_lastOtaError) {
                 result["last_error"] = self->_lastOtaError;
