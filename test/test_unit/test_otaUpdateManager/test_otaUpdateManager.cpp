@@ -14,13 +14,13 @@
 #ifdef WITH_OTA
 
 // Include the real Application header (Application now owns OTAUpdateManager)
-#include "../../../modules/Application/Application.hpp"
+#include "Application.hpp"
 
-#include "../../../modules/OTAUpdateManager/OTAUpdateManager.hpp"
+#include "OTAUpdateManager.hpp"
 #include "../test_helpers/MockTabRegistry.hpp"
 #include <ArduinoJson.h>
 
-#include "../../../modules/WebServer/WebServerManager.hpp"
+#include "WebServerManager.hpp"
 
 class OtaUpdateManagerTest : public ::testing::Test {
 protected:

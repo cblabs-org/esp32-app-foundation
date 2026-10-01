@@ -54,6 +54,15 @@ private:
     AppState _state = AppState::Running;
     EventBus _bus;
 };
+namespace ApplicationEvents {
+    constexpr const char* OTA_PROGRESS = "ota.progress";
+    struct OtaProgressPayload {
+        float progress;
+        const char* status;
+        bool complete;
+        bool success;
+    };
+}
 #endif
 
 #include "interfaces/IPreconditionRegistry.hpp"

@@ -15,6 +15,7 @@
 #include "MockLVGLHardwareAdapter.hpp"
 #include "EventBus.hpp"
 #include "OTAUpdateManager.hpp"
+#include "Application.hpp"
 
 class LVGLEventBusIntegrationTest : public ::testing::Test {
 protected:
@@ -30,7 +31,7 @@ protected:
 
 #ifdef WITH_OTA
 TEST_F(LVGLEventBusIntegrationTest, SubscribesToOtaProgress_UpdatesScreenAndRestores) {
-    OTAProgressPayload payload;
+    ApplicationEvents::OtaProgressPayload payload;
     payload.progress = 0.45f;
     payload.status = "Downloading firmware...";
     payload.complete = false;
@@ -50,7 +51,7 @@ TEST_F(LVGLEventBusIntegrationTest, SubscribesToOtaProgress_UpdatesScreenAndRest
 }
 
 TEST_F(LVGLEventBusIntegrationTest, SubscribesToOtaProgress_FailureShowsError) {
-    OTAProgressPayload payload;
+    ApplicationEvents::OtaProgressPayload payload;
     payload.progress = 0.20f;
     payload.status = "Downloading";
     payload.complete = false;
