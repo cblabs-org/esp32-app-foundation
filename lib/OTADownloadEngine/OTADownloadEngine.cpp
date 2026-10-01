@@ -148,6 +148,7 @@ void OTADownloadEngine::setExpectedVersion(const char* version) {
 int OTADownloadEngine::followRedirects(WiFiClient& client, HTTPClient& http,
                                         const std::string& url, const std::string& token) {
     std::string currentUrl = url;
+    String initialHost = extractHost(url);
 
     for (int hop = 0; hop < kMaxRedirects; hop++) {
         // --- Begin HTTP request for this hop ---
@@ -163,10 +164,11 @@ int OTADownloadEngine::followRedirects(WiFiClient& client, HTTPClient& http,
         http.setUserAgent("ESP32-http-Update");
         http.addHeader("Cache-Control", "no-cache");
         http.addHeader("Accept", "application/octet-stream");
-        if (!token.empty()) {
+
+        String currentHost = extractHost(currentUrl);
+        if (!token.empty() && currentHost.length() > 0 && currentHost == initialHost) {
             http.addHeader("Authorization", String(("Bearer " + token).c_str()));
         }
-
 
         int code = http.GET();
 
@@ -556,3 +558,12 @@ OTAError OTADownloadEngine::downloadAndFlash(WiFiClient& client, const std::stri
 }
 
 
+
+String OTADownloadEngine::extractHost(const std::string& urlStr) {
+    size_t idx = urlStr.find("://");
+    if (idx == std::string::npos) return "";
+    size_t start = idx + 3;
+    size_t end = urlStr.find("/", start);
+    if (end == std::string::npos) end = urlStr.length();
+    return String(urlStr.substr(start, end - start).c_str());
+}
