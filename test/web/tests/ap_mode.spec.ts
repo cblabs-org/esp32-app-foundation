@@ -54,7 +54,7 @@ async function bootPortal(page: Page, systemData: typeof MOCK_SYSTEM_AP_MODE) {
 
   await page.goto('/');
   await page.waitForFunction(() => (window as any).apiFetch !== undefined);
-  await expect(page.locator('#portal-title')).not.toHaveText('ESP32 App Foundation');
+  await expect(page.locator('body')).toHaveClass(/portal-ready/);
 }
 
 // ---------------------------------------------------------------------------

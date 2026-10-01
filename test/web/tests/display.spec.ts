@@ -85,7 +85,7 @@ async function bootPortal(page: Page, displayOverrides?: Partial<typeof MOCK_DIS
 
   await page.goto('/');
   await page.waitForFunction(() => (window as any).apiFetch !== undefined);
-  await expect(page.locator('#portal-title')).not.toHaveText('ESP32 App Foundation');
+  await expect(page.locator('body')).toHaveClass(/portal-ready/);
 }
 
 /** Navigate to the Display top-level tab and wait for the Settings sub-pill to render. */

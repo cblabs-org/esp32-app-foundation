@@ -6,6 +6,9 @@
   <meta name="description" content="ESP32 Device Configuration Portal">
   <title>ESP32 App Foundation</title>
   <link rel="stylesheet" href="app.css">
+  <style>
+    body:not(.portal-ready) #portal-title { visibility: hidden; }
+  </style>
 </head>
 <body>
   <a href="#tab-content-area" id="skip-nav" style="position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden;z-index:9999;padding:8px 16px;background:var(--primary);color:#fff;text-decoration:none;font-size:0.85rem;border-radius:0 0 8px 0;" onfocus="this.style.cssText='position:fixed;left:0;top:0;width:auto;height:auto;overflow:visible;z-index:9999;padding:8px 16px;background:var(--primary);color:#fff;text-decoration:none;font-size:0.85rem;border-radius:0 0 8px 0;'" onblur="this.style.cssText='position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden;'">Skip to main content</a>
