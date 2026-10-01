@@ -539,18 +539,17 @@ document.addEventListener('DOMContentLoaded', function() {
   // =========================================================================
 
   // App metadata is fetched once and cached here so the stylesheet can be
-  // injected early (before tab scripts, to kill the FOUC) while the title is
-  // applied late (after the nav is built).
+  // injected early (before tab scripts, to kill the FOUC) and the title
+  // applied immediately.
   //
-  // Ordering matters: the title changing is the portal's "ready" signal — both
-  // the UI and the e2e suite treat a branded #portal-title as "navigation is
-  // usable". Applying it before loadTabs() builds #pill-bar makes the portal
-  // look ready while it still isn't. Keep applyAppTitle() after loadTabs().
+  // Note: the explicit readiness marker `document.body.classList.add('portal-ready')`
+  // is set late (after the nav is built), replacing the title as the "ready" signal.
   var _appInfo = null;
 
   async function fetchAppInfoAndStyles() {
     try {
       _appInfo = await window.apiFetch('/api/app');
+      applyAppTitle();
     } catch (err) {
       console.warn('Failed to fetch /api/app');
       return;
@@ -660,8 +659,7 @@ document.addEventListener('DOMContentLoaded', function() {
   // Fetch app branding and /api/tabs in parallel to speed up boot.
   // fetchAppInfoAndStyles() awaits the stylesheet's onload internally, so CSS
   // is applied before tab scripts execute (kills the branding FOUC). The title
-  // is applied afterwards, once loadTabs() has built the navigation — see the
-  // note on applyAppTitle().
+  // is applied immediately upon fetch.
   Promise.all([fetchAppInfoAndStyles(), window.apiFetch('/api/tabs')]).then(function(results) {
     var tabs = results[1];
     // Extract declared script URLs, filtering out null/undefined and duplicates
@@ -673,15 +671,17 @@ document.addEventListener('DOMContentLoaded', function() {
     loadScripts(tabScripts, function() {
       // Scripts are loaded — now safe to build tabs and dispatch tab-changed
       loadTabs(tabs);
-      applyAppTitle();
-      checkApMode();
+      checkApMode().finally(function() {
+        document.body.classList.add('portal-ready');
+      });
     });
   }).catch(function(err) {
     console.warn('Failed to fetch /api/tabs during boot, loading without tab scripts');
     loadScripts([], function() {
       loadTabs();
-      applyAppTitle();
-      checkApMode();
+      checkApMode().finally(function() {
+        document.body.classList.add('portal-ready');
+      });
     });
   });
 });

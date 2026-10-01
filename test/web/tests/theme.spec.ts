@@ -50,7 +50,7 @@ async function bootPortal(page: Page) {
   await setupRoutes(page);
   await page.goto('/');
   await page.waitForFunction(() => (window as any).apiFetch !== undefined);
-  await expect(page.locator('#portal-title')).not.toHaveText('ESP32 App Foundation');
+  await expect(page.locator('body')).toHaveClass(/portal-ready/);
 }
 
 // ---------------------------------------------------------------------------
@@ -113,7 +113,7 @@ test.describe('Theme Toggle', () => {
     // Reload the page — routes survive reload, localStorage persists
     await page.reload();
     await page.waitForFunction(() => (window as any).apiFetch !== undefined);
-    await expect(page.locator('#portal-title')).not.toHaveText('ESP32 App Foundation');
+    await expect(page.locator('body')).toHaveClass(/portal-ready/);
 
     // After reload, dark should still be active (read from localStorage by initTheme)
     await expect(page.locator('.theme-btn[data-theme="dark"]')).toHaveClass(/theme-btn--active/);

@@ -63,7 +63,7 @@ async function bootPortal(page: Page) {
 
   await page.goto('/');
   await page.waitForFunction(() => (window as any).apiFetch !== undefined);
-  await expect(page.locator('#portal-title')).not.toHaveText('ESP32 App Foundation');
+  await expect(page.locator('body')).toHaveClass(/portal-ready/);
   // WiFi tab is active by default, so it auto-fetches status & starts scan
 }
 

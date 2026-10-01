@@ -63,7 +63,7 @@ async function bootAndNavigateToOta(page: Page) {
 
   await page.goto('/');
   await page.waitForFunction(() => (window as any).apiFetch !== undefined);
-  await expect(page.locator('#portal-title')).not.toHaveText('ESP32 App Foundation');
+  await expect(page.locator('body')).toHaveClass(/portal-ready/);
 
   // Navigate to System → OTA
   await page.locator('#bottom-nav [data-target="tab-system"]').click();
