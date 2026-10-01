@@ -104,7 +104,7 @@ bool DeepStackExecutor::available() const {
     return _available;
 }
 
-bool DeepStackExecutor::run(const std::function<void()>& work, uint32_t timeoutMs) {
+bool DeepStackExecutor::run(WorkFn work, void* ctx, uint32_t timeoutMs) {
     if (!_available) return false;
 
     // Mutex lock for serialization
@@ -115,7 +115,8 @@ bool DeepStackExecutor::run(const std::function<void()>& work, uint32_t timeoutM
     // Drain any stale semaphore from a previous cycle (N2 fix)
     xSemaphoreTake(static_cast<SemaphoreHandle_t>(_doneSem), 0);
 
-    _currentWork = work;
+    _workFn = work;
+    _workCtx = ctx;
     _busy = true;
 
     // Wake the worker
@@ -137,9 +138,20 @@ bool DeepStackExecutor::run(const std::function<void()>& work, uint32_t timeoutM
 
     // Always clean up — worker has finished either way
     _busy = false;
-    _currentWork = nullptr;
+    _workFn = nullptr;
+    _workCtx = nullptr;
     xSemaphoreGive(static_cast<SemaphoreHandle_t>(_mutex));
     return completed;
+}
+
+bool DeepStackExecutor::run(const std::function<void()>& work, uint32_t timeoutMs) {
+    auto invoker = [](void* ctx) {
+        auto* fn = static_cast<const std::function<void()>*>(ctx);
+        if (fn && *fn) {
+            (*fn)();
+        }
+    };
+    return run(invoker, const_cast<std::function<void()>*>(&work), timeoutMs);
 }
 
 size_t DeepStackExecutor::stackHighWaterMarkBytes() const {
@@ -152,8 +164,8 @@ void DeepStackExecutor::workerLoop(void* param) {
     auto* self = static_cast<DeepStackExecutor*>(param);
     for (;;) {
         ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
-        if (self->_currentWork) {
-            self->_currentWork();
+        if (self->_workFn) {
+            self->_workFn(self->_workCtx);
         }
         xSemaphoreGive(static_cast<SemaphoreHandle_t>(self->_doneSem));
     }
@@ -191,7 +203,17 @@ bool DeepStackExecutor::available() const {
     return _available;
 }
 
+bool DeepStackExecutor::run(WorkFn work, void* ctx, uint32_t timeoutMs) {
+    (void)timeoutMs;
+    if (!_available) return false;
+    if (work) {
+        work(ctx);
+    }
+    return true;
+}
+
 bool DeepStackExecutor::run(const std::function<void()>& work, uint32_t timeoutMs) {
+    (void)timeoutMs;
     if (!_available) return false;
     if (work) {
         work();

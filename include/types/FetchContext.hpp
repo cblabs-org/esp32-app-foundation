@@ -14,7 +14,6 @@
 
 #include <atomic>
 #include <cstdint>
-#include <functional>
 #include <Arduino.h>
 
 #ifdef ESP_PLATFORM
@@ -27,19 +26,23 @@
  * Provides a universal floor for all transports (HTTP, MQTT, serial).
  */
 class DeadlineToken {
+public:
+    using TimeProviderFn = uint32_t (*)(void* ctx);
+
 private:
     uint32_t _deadlineMs;
     std::atomic<bool> _cancelled{false};
-    std::function<uint32_t()> _timeProvider;
+    TimeProviderFn _timeFn{nullptr};
+    void* _timeCtx{nullptr};
 
 public:
-    DeadlineToken(uint32_t deadlineMs, std::function<uint32_t()> timeProvider = nullptr)
-        : _deadlineMs(deadlineMs), _timeProvider(timeProvider) {}
+    DeadlineToken(uint32_t deadlineMs, TimeProviderFn timeFn = nullptr, void* timeCtx = nullptr)
+        : _deadlineMs(deadlineMs), _timeFn(timeFn), _timeCtx(timeCtx) {}
 
     /** @brief Check if deadline has passed or token cancelled. */
     bool isExpired() const {
         if (_cancelled.load(std::memory_order_relaxed)) return true;
-        uint32_t now = _timeProvider ? _timeProvider() : millis();
+        uint32_t now = _timeFn ? _timeFn(_timeCtx) : millis();
         return now >= _deadlineMs;
     }
 
@@ -50,7 +53,7 @@ public:
 
     /** @brief Get remaining time until deadline in ms. */
     uint32_t remainingMs() const {
-        uint32_t now = _timeProvider ? _timeProvider() : millis();
+        uint32_t now = _timeFn ? _timeFn(_timeCtx) : millis();
         return (now >= _deadlineMs) ? 0 : (_deadlineMs - now);
     }
 

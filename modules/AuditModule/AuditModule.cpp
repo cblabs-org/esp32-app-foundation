@@ -727,16 +727,17 @@ void AuditModule::registerMCPTools(MCPToolRegistry& registry) {
 
 void AuditModule::registerPreconditions(IPreconditionRegistry& registry) {
     registry.add("audit_health", PreconditionRole::Operational,
-        [this]() -> PreconditionStatus {
-            if (!_started) {
+        [](void* ctx) -> PreconditionStatus {
+            auto* self = static_cast<AuditModule*>(ctx);
+            if (!self->_started) {
                 return {false, Cause::InternalError};
             }
-            if (_dropCount.load(std::memory_order_relaxed) > 0) {
+            if (self->_dropCount.load(std::memory_order_relaxed) > 0) {
                 return {true, Cause::FallbackEngaged};
             }
             return {true, Cause::Met};
         },
-        [](Cause c, char* buf, size_t len) {
+        [](Cause c, char* buf, size_t len, void*) {
             switch (c) {
                 case Cause::InternalError:
                     snprintf(buf, len, "Audit storage or task initialization failed");
@@ -748,7 +749,8 @@ void AuditModule::registerPreconditions(IPreconditionRegistry& registry) {
                     snprintf(buf, len, "Audit logging active");
                     break;
             }
-        });
+        },
+        this);
 }
 
 #endif // WITH_AUDIT

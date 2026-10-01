@@ -157,16 +157,29 @@ struct MockPreconditionRegistry : public IPreconditionRegistry {
     struct Spec {
         const char* name;
         PreconditionRole role;
-        EvalFn evaluate;
-        DescribeFn describe;
+        EvalFn evalFn;
+        DescribeFn describeFn;
+        void* context;
         const Edge* edges;
         uint8_t edgeCount;
+
+        PreconditionStatus evaluate() const {
+            return evalFn ? evalFn(context) : PreconditionStatus{};
+        }
+
+        void describe(Cause c, char* buf, size_t len) const {
+            if (describeFn) describeFn(c, buf, len, context);
+        }
     };
     std::vector<Spec> specs;
     void add(const char* name, PreconditionRole role, EvalFn evaluate,
-             DescribeFn describe = nullptr, const Edge* edges = nullptr,
-             uint8_t edgeCount = 0) override {
-        specs.push_back({name, role, evaluate, describe, edges, edgeCount});
+             DescribeFn describe = nullptr, void* context = nullptr,
+             const Edge* edges = nullptr, uint8_t edgeCount = 0,
+             const DampingPolicy* damping = nullptr,
+             const RetryPolicy* retry = nullptr) override {
+        (void)damping;
+        (void)retry;
+        specs.push_back({name, role, evaluate, describe, context, edges, edgeCount});
     }
     size_t count() const { return specs.size(); }
     const Spec& get(size_t i) const { return specs[i]; }
@@ -208,11 +221,11 @@ TEST_F(WeatherModuleTest, PreconditionWeatherLocation_ReflectsConfiguredState) {
     module.registerPreconditions(reg);
 
     ASSERT_EQ(reg.count(), 3u);
-    auto evalLoc = reg.get(1).evaluate;
+    const auto& specLoc = reg.get(1);
 
     // Initially not configured
-    EXPECT_FALSE(evalLoc().met);
-    EXPECT_EQ(evalLoc().cause, Cause::NotConfigured);
+    EXPECT_FALSE(specLoc.evaluate().met);
+    EXPECT_EQ(specLoc.evaluate().cause, Cause::NotConfigured);
 
     // Configure location
     JsonDocument doc;
@@ -221,13 +234,13 @@ TEST_F(WeatherModuleTest, PreconditionWeatherLocation_ReflectsConfiguredState) {
     obj["lon"] = -0.1278;
     module.applyConfig(obj);
 
-    EXPECT_TRUE(evalLoc().met);
-    EXPECT_EQ(evalLoc().cause, Cause::Met);
+    EXPECT_TRUE(specLoc.evaluate().met);
+    EXPECT_EQ(specLoc.evaluate().cause, Cause::Met);
 
     // Reset config
     module.resetConfig();
-    EXPECT_FALSE(evalLoc().met);
-    EXPECT_EQ(evalLoc().cause, Cause::NotConfigured);
+    EXPECT_FALSE(specLoc.evaluate().met);
+    EXPECT_EQ(specLoc.evaluate().cause, Cause::NotConfigured);
 }
 
 TEST_F(WeatherModuleTest, PreconditionNoKeyManager_ReturnsIndeterminate) {
@@ -246,9 +259,9 @@ TEST_F(WeatherModuleTest, PreconditionDescriptions) {
     module.registerPreconditions(reg);
 
     ASSERT_EQ(reg.count(), 3u);
-    ASSERT_NE(reg.get(0).describe, nullptr);
-    ASSERT_NE(reg.get(1).describe, nullptr);
-    ASSERT_NE(reg.get(2).describe, nullptr);
+    ASSERT_NE(reg.get(0).describeFn, nullptr);
+    ASSERT_NE(reg.get(1).describeFn, nullptr);
+    ASSERT_NE(reg.get(2).describeFn, nullptr);
 
     char buf[128] = {};
     reg.get(0).describe(Cause::NotConfigured, buf, sizeof(buf));

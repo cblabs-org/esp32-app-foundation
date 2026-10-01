@@ -1699,17 +1699,18 @@ void BLEManager::registerPreconditions(IPreconditionRegistry& registry) {
     registry.add(
         "BLE Stack",
         PreconditionRole::Operational,
-        [this]() -> PreconditionStatus {
-            auto guard = lockState();  // WO-9: reads _state, may run on any task
-            if (_state == State::Disabled) {
+        [](void* ctx) -> PreconditionStatus {
+            auto* self = static_cast<BLEManager*>(ctx);
+            auto guard = self->lockState();  // WO-9: reads _state, may run on any task
+            if (self->_state == State::Disabled) {
                 return {false, Cause::Unavailable};
             }
-            if (_state == State::Error || _providerRegistrationFault) {
+            if (self->_state == State::Error || self->_providerRegistrationFault) {
                 return {false, Cause::InternalError};
             }
             return {true, Cause::Met};
         },
-        [](Cause cause, char* buf, size_t len) {
+        [](Cause cause, char* buf, size_t len, void*) {
             switch (cause) {
                 case Cause::Unavailable:
                     std::snprintf(buf, len, "BLE disabled in configuration");
@@ -1721,21 +1722,23 @@ void BLEManager::registerPreconditions(IPreconditionRegistry& registry) {
                     std::snprintf(buf, len, "BLE stack operational");
                     break;
             }
-        }
+        },
+        this
     );
 
     // 2. "BLE Advertising" Precondition (Operational)
     registry.add(
         "BLE Advertising",
         PreconditionRole::Operational,
-        [this]() -> PreconditionStatus {
-            auto guard = lockState();  // WO-9: reads _advPackResult, may run on any task
-            if (_advPackResult.hasFault()) {
+        [](void* ctx) -> PreconditionStatus {
+            auto* self = static_cast<BLEManager*>(ctx);
+            auto guard = self->lockState();  // WO-9: reads _advPackResult, may run on any task
+            if (self->_advPackResult.hasFault()) {
                 return {false, Cause::Implausible};
             }
             return {true, Cause::Met};
         },
-        [](Cause cause, char* buf, size_t len) {
+        [](Cause cause, char* buf, size_t len, void*) {
             switch (cause) {
                 case Cause::Implausible:
                     std::snprintf(buf, len, "Required BLE advertising element exceeded PDU capacity");
@@ -1744,38 +1747,44 @@ void BLEManager::registerPreconditions(IPreconditionRegistry& registry) {
                     std::snprintf(buf, len, "BLE advertising normal");
                     break;
             }
-        }
+        },
+        this
     );
 
     // 3. Central Client Providers Preconditions
+    size_t clientIdx = 0;
     for (auto* p : _clientProviders) {
         if (!p) continue;
+        if (clientIdx >= _clientProviderPrecContexts.size()) break;
         // Y5: Use static lifetime storage — provider labels are stable after lock
         static char preconditionNames[4][40] = {};
-        static size_t preconditionIdx = 0;
-        if (preconditionIdx < 4) {
-            snprintf(preconditionNames[preconditionIdx], sizeof(preconditionNames[0]),
-                     "BLE: %s", p->getDeviceTypeLabel());
-        }
+        snprintf(preconditionNames[clientIdx], sizeof(preconditionNames[0]),
+                 "BLE: %s", p->getDeviceTypeLabel());
         
-        const char* precName = (preconditionIdx < 4) ? preconditionNames[preconditionIdx] : "BLE: ?";
-        if (preconditionIdx < 4) preconditionIdx++;
+        const char* precName = preconditionNames[clientIdx];
+
+        _clientProviderPrecContexts[clientIdx] = {this, p->getProviderId()};
+        auto* precCtx = &_clientProviderPrecContexts[clientIdx];
+        clientIdx++;
 
         registry.add(
             precName,
             PreconditionRole::Operational,
-            [this, pid = p->getProviderId()]() -> PreconditionStatus {
-                auto guard = lockState();  // WO-9: reads registry/_reconnectPolicies, may run on any task
+            [](void* ctx) -> PreconditionStatus {
+                auto* c = static_cast<ClientProviderPrecContext*>(ctx);
+                auto* self = c->mgr;
+                const char* pid = c->providerId;
+                auto guard = self->lockState();  // WO-9: reads registry/_reconnectPolicies, may run on any task
                 BLEStoredDevice stored;
-                if (!_deviceRegistry.get(pid, stored)) {
+                if (!self->_deviceRegistry.get(pid, stored)) {
                     return {false, Cause::NotConfigured};
                 }
                 
-                if (isClientConnected(pid)) {
+                if (self->isClientConnected(pid)) {
                     return {true, Cause::Met};
                 }
                 
-                auto& policy = const_cast<BLEManager*>(this)->_reconnectPolicies[pid];
+                auto& policy = self->_reconnectPolicies[pid];
                 if (policy.phase() == BLEReconnectPolicy::Phase::Fast) {
                     return {false, Cause::Connecting};
                 } else if (policy.phase() == BLEReconnectPolicy::Phase::Slow || policy.phase() == BLEReconnectPolicy::Phase::Exhausted) {
@@ -1787,7 +1796,7 @@ void BLEManager::registerPreconditions(IPreconditionRegistry& registry) {
                 
                 return {false, Cause::NotConfigured};
             },
-            [pid = p->getProviderId()](Cause cause, char* buf, size_t len) {
+            [](Cause cause, char* buf, size_t len, void*) {
                 switch (cause) {
                     case Cause::NotConfigured: std::snprintf(buf, len, "No paired device"); break;
                     case Cause::Connecting: std::snprintf(buf, len, "Connecting to device..."); break;
@@ -1796,7 +1805,8 @@ void BLEManager::registerPreconditions(IPreconditionRegistry& registry) {
                     case Cause::Met: std::snprintf(buf, len, "Connected"); break;
                     default: std::snprintf(buf, len, "Unknown state"); break;
                 }
-            }
+            },
+            precCtx
         );
     }
 }
