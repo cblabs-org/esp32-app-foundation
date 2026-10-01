@@ -80,6 +80,7 @@ static constexpr const char* TAG = "OTAUpdateManager";
 #include "MCPToolRegistry.hpp"
 #include "SemVer.hpp"
 #include "portal_assets/ota_js.hpp"
+#include "types/FrameworkSecureClient.hpp"
 
 // ---------------------------------------------------------------------------
 // Global instance — REMOVED (Application now owns _otaManager)
@@ -592,21 +593,19 @@ void OTAUpdateManager::performUpdateTask() {
         _state = OTAState::Downloading;
     }
 
-    // --- Step 7: Create WiFiClientSecure on the heap ---
-    std::unique_ptr<WiFiClientSecure> client(new (std::nothrow) WiFiClientSecure());
+    // --- Step 7: Create FrameworkSecureClient on the heap ---
+    std::unique_ptr<FrameworkSecureClient> client(new (std::nothrow) FrameworkSecureClient());
     if (!client) {
-        ESP_LOGE(TAG, "Failed to allocate WiFiClientSecure on heap");
+        ESP_LOGE(TAG, "Failed to allocate FrameworkSecureClient on heap");
         publishProgress(0.0f, "Memory allocation failed", true, false);
         _state = OTAState::Error;
-        _lastOtaError = "WiFiClientSecure heap allocation failed";
+        _lastOtaError = "FrameworkSecureClient heap allocation failed";
         return;
     }
-    // Binary download uses setInsecure() — the firmware payload is independently
-    // verified via MbedTLSSignatureVerifier (RSA-2048 signature). Transport
-    // security is redundant. GitHub CDN redirects use different certs than the API
-    // and root CAs may rotate over the device's operational lifetime.
-    client->setInsecure();
-    ESP_LOGI(TAG, "WiFiClientSecure allocated on heap");
+    // Use ESP-IDF root CA bundle for TLS validation instead of setInsecure().
+    // This protects the optional otaToken bearer token from MitM exposure.
+    client->useDefaultCertBundle();
+    ESP_LOGI(TAG, "FrameworkSecureClient allocated on heap");
 
     // --- Step 8: Create OTADownloadEngine and configure ---
     OTADownloadEngine engine;
@@ -749,60 +748,85 @@ void OTAUpdateManager::publishProgress(float progress, const char* status,
  */
 static bool downloadRawFile_(const char* url, const char* token,
                              char* buf, size_t bufSize, size_t& outLen) {
-    // --- Allocate WiFiClientSecure with CA-pinned certs ---
-    std::unique_ptr<WiFiClientSecure> client(new (std::nothrow) WiFiClientSecure());
-    if (!client) {
-        ESP_LOGE(TAG, "downloadRawFile_: WiFiClientSecure allocation failed");
-        return false;
-    }
-    client->setCACert(OTA_CA_BUNDLE);
+    std::string currentUrl = url;
+    auto getHost = [](const std::string& urlStr) -> String {
+        size_t idx = urlStr.find("://");
+        if (idx == std::string::npos) return "";
+        size_t start = idx + 3;
+        size_t end = urlStr.find("/", start);
+        if (end == std::string::npos) end = urlStr.length();
+        return String(urlStr.substr(start, end - start).c_str());
+    };
+    String initialHost = getHost(url);
 
     HTTPClient http;
-    http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
+    http.setFollowRedirects(HTTPC_DISABLE_FOLLOW_REDIRECTS);
 
-    if (!http.begin(*client, String(url))) {
-        ESP_LOGE(TAG, "downloadRawFile_: HTTPClient.begin() failed — url=%s", url);
-        return false;
-    }
+    std::unique_ptr<FrameworkSecureClient> client;
+    int httpCode = 0;
 
-    http.addHeader("Accept", "application/octet-stream");
-    if (token[0] != '\0') {
-        http.addHeader("Authorization", String((std::string("Bearer ") + token).c_str()));
-    }
-
-    int httpCode = http.GET();
-    if (httpCode < 0) {
-        ESP_LOGW(TAG, "downloadRawFile_: CA-pinned fetch failed (err=%d) — retrying insecure", httpCode);
-        http.end();
-
-        // Feed TWDT before retry — TLS handshake can be slow
-        esp_task_wdt_reset();
-
-        // MUST create a fresh WiFiClientSecure — the failed handshake leaves
-        // the mbedTLS context in a dirty state that cannot be reconfigured.
-        client.reset(new (std::nothrow) WiFiClientSecure());
+    for (int hop = 0; hop < 5; hop++) {
+        client.reset(new (std::nothrow) FrameworkSecureClient());
         if (!client) {
-            ESP_LOGE(TAG, "downloadRawFile_: WiFiClientSecure retry allocation failed");
+            ESP_LOGE(TAG, "downloadRawFile_: FrameworkSecureClient allocation failed");
             return false;
         }
-        // Manifest fallback uses setInsecure() — manifest.json and manifest.json.sig
-        // integrity and authenticity are independently verified via RSA-2048 signature.
-        // Transport security is redundant, and fallback prevents bricking if root CAs rotate.
-        client->setInsecure();
+        client->setCACert(OTA_CA_BUNDLE);
 
-        if (!http.begin(*client, String(url))) {
-            ESP_LOGE(TAG, "downloadRawFile_: HTTPClient.begin() retry failed — url=%s", url);
+        if (!http.begin(*client, String(currentUrl.c_str()))) {
+            ESP_LOGE(TAG, "downloadRawFile_: HTTPClient.begin() failed");
             return false;
         }
+
         http.addHeader("Accept", "application/octet-stream");
-        if (token[0] != '\0') {
+        if (token[0] != '\0' && getHost(currentUrl) == initialHost) {
             http.addHeader("Authorization", String((std::string("Bearer ") + token).c_str()));
         }
+
         httpCode = http.GET();
+
+        if (httpCode < 0) {
+            char errBuf[100];
+            int tlsErr = client->lastError(errBuf, sizeof(errBuf));
+            // Check if it's a TLS certificate error (mbedtls errors <= -0x2000 are crypto/x509/ssl)
+            if (tlsErr > -0x2000) {
+                ESP_LOGE(TAG, "downloadRawFile_: Transport failed (err=%d, tlsErr=-0x%04x)", httpCode, -tlsErr);
+                http.end();
+                return false;
+            }
+
+            ESP_LOGW(TAG, "downloadRawFile_: CA-pinned fetch failed (tlsErr=-0x%04x) — retrying with CA bundle", -tlsErr);
+            http.end();
+            esp_task_wdt_reset();
+
+            client.reset(new (std::nothrow) FrameworkSecureClient());
+            if (!client) return false;
+            
+            client->useDefaultCertBundle();
+
+            if (!http.begin(*client, String(currentUrl.c_str()))) {
+                return false;
+            }
+            http.addHeader("Accept", "application/octet-stream");
+            if (token[0] != '\0' && getHost(currentUrl) == initialHost) {
+                http.addHeader("Authorization", String((std::string("Bearer ") + token).c_str()));
+            }
+            httpCode = http.GET();
+        }
+
+        if (httpCode == HTTP_CODE_MOVED_PERMANENTLY || httpCode == HTTP_CODE_FOUND ||
+            httpCode == HTTP_CODE_TEMPORARY_REDIRECT || httpCode == HTTP_CODE_PERMANENT_REDIRECT) {
+            String newUrl = http.getLocation();
+            http.end();
+            if (newUrl.length() == 0) return false;
+            currentUrl = newUrl.c_str();
+            continue;
+        }
+        break;
     }
 
     if (httpCode != 200) {
-        ESP_LOGE(TAG, "downloadRawFile_: HTTP %d — url=%s", httpCode, url);
+        ESP_LOGE(TAG, "downloadRawFile_: HTTP %d — url=%s", httpCode, currentUrl.c_str());
         http.end();
         return false;
     }

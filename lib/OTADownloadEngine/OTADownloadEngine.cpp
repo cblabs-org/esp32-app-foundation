@@ -149,6 +149,16 @@ int OTADownloadEngine::followRedirects(WiFiClient& client, HTTPClient& http,
                                         const std::string& url, const std::string& token) {
     std::string currentUrl = url;
 
+    auto getHost = [](const std::string& urlStr) -> String {
+        size_t idx = urlStr.find("://");
+        if (idx == std::string::npos) return "";
+        size_t start = idx + 3;
+        size_t end = urlStr.find("/", start);
+        if (end == std::string::npos) end = urlStr.length();
+        return String(urlStr.substr(start, end - start).c_str());
+    };
+    String initialHost = getHost(url);
+
     for (int hop = 0; hop < kMaxRedirects; hop++) {
         // --- Begin HTTP request for this hop ---
         if (!http.begin(client, String(currentUrl.c_str()))) {
@@ -163,10 +173,9 @@ int OTADownloadEngine::followRedirects(WiFiClient& client, HTTPClient& http,
         http.setUserAgent("ESP32-http-Update");
         http.addHeader("Cache-Control", "no-cache");
         http.addHeader("Accept", "application/octet-stream");
-        if (!token.empty()) {
+        if (!token.empty() && getHost(currentUrl) == initialHost) {
             http.addHeader("Authorization", String(("Bearer " + token).c_str()));
         }
-
 
         int code = http.GET();
 
