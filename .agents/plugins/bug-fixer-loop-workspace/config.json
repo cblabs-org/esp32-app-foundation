@@ -38,6 +38,7 @@
   "branch_prefix": "fix",
   "triage_cron": "0 * * * *",
   "tick_cron": "*/10 * * * *",
+  "architect_cron": "*/15 * * * *",
   "trajectory_review_cron": "0 18 * * *",
   "milestone_priority_boost": true,
   "active_milestone": "next-beta",
