@@ -54,6 +54,21 @@
 
       <div style="display:flex; justify-content:space-between; align-items:center; padding:0.6rem 0; border-bottom:1px solid var(--border);">
         <div>
+          <span style="font-size:0.85rem; font-weight:600;">Check on Boot</span>
+          <span style="display:block; font-size:0.75rem; color:var(--text-muted); margin-top:2px;">Run a check immediately when Wi-Fi connects</span>
+        </div>
+        <label class="toggle-switch" style="position:relative; width:44px; height:24px; flex-shrink:0;">
+          <input type="checkbox" id="ota-check-on-boot" style="opacity:0; width:0; height:0;">
+          <span style="position:absolute; cursor:pointer; top:0; left:0; right:0; bottom:0;
+                       background:var(--border); border-radius:24px; transition:0.3s;">
+            <span style="position:absolute; height:18px; width:18px; left:3px; bottom:3px;
+                         background:white; border-radius:50%; transition:0.3s; box-shadow:0 1px 3px rgba(0,0,0,0.3);"></span>
+          </span>
+        </label>
+      </div>
+
+      <div style="display:flex; justify-content:space-between; align-items:center; padding:0.6rem 0; border-bottom:1px solid var(--border);">
+        <div>
           <span style="font-size:0.85rem; font-weight:600;">Daily Check Time</span>
           <span style="display:block; font-size:0.75rem; color:var(--text-muted); margin-top:2px;">Hour of day for automatic update check</span>
         </div>
@@ -238,6 +253,10 @@
       const autoCheckCb = document.getElementById('ota-autocheck');
       if (autoCheckCb && ota.hasOwnProperty('autoCheck')) {
         setToggleState(autoCheckCb, !!ota.autoCheck);
+      }
+      const checkOnBootCb = document.getElementById('ota-check-on-boot');
+      if (checkOnBootCb && ota.hasOwnProperty('checkOnBoot')) {
+        setToggleState(checkOnBootCb, !!ota.checkOnBoot);
       }
       if (ota.hasOwnProperty('checkHour')) {
         document.getElementById('ota-check-hour').value = ota.checkHour;
@@ -468,6 +487,31 @@
       } catch (error) {
         window.showToast('Failed to save setting.', 'error');
         setToggleState(autoCheckEl, !enabled); // Revert on failure
+      }
+    });
+  }
+
+  // -------------------------------------------------------------------------
+  // Card 2: Check on Boot toggle
+  // -------------------------------------------------------------------------
+  const checkOnBootEl = document.getElementById('ota-check-on-boot');
+  if (checkOnBootEl) {
+    checkOnBootEl.addEventListener('change', async (e) => {
+      const enabled  = e.target.checked;
+
+      // Optimistic UI update
+      setToggleState(checkOnBootEl, enabled);
+
+      try {
+        await window.apiFetch('/api/ota', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'setCheckOnBoot', checkOnBoot: enabled })
+        });
+        window.showToast('Check on Boot ' + (enabled ? 'enabled' : 'disabled'), 'success');
+      } catch (error) {
+        window.showToast('Failed to save setting.', 'error');
+        setToggleState(checkOnBootEl, !enabled); // Revert on failure
       }
     });
   }

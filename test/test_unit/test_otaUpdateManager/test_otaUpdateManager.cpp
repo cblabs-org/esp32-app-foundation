@@ -170,6 +170,65 @@ TEST_F(OtaUpdateManagerTest, ApplyConfig_MissingUpdatesEnabled_DefaultsTrue) {
     EXPECT_TRUE(out["updatesEnabled"].as<bool>());
 }
 
+// ---------------------------------------------------------------------------
+// checkOnBoot config tests
+// ---------------------------------------------------------------------------
+
+TEST_F(OtaUpdateManagerTest, ResetConfig_CheckOnBoot_DefaultsTrue) {
+    manager.resetConfig();
+    JsonDocument doc;
+    JsonObject section = doc.to<JsonObject>();
+    manager.serializeConfig(section);
+    ASSERT_TRUE(section["checkOnBoot"].is<bool>());
+    EXPECT_TRUE(section["checkOnBoot"].as<bool>());
+}
+
+TEST_F(OtaUpdateManagerTest, Config_CheckOnBoot_RoundTrips) {
+    JsonDocument inDoc;
+    inDoc["checkOnBoot"] = false;
+    manager.applyConfig(inDoc.as<JsonObject>());
+    JsonDocument outDoc;
+    JsonObject out = outDoc.to<JsonObject>();
+    manager.serializeConfig(out);
+    EXPECT_FALSE(out["checkOnBoot"].as<bool>());
+}
+
+TEST_F(OtaUpdateManagerTest, ApplyConfig_MissingCheckOnBoot_DefaultsTrue) {
+    JsonDocument inDoc;
+    manager.applyConfig(inDoc.as<JsonObject>());
+    JsonDocument outDoc;
+    JsonObject out = outDoc.to<JsonObject>();
+    manager.serializeConfig(out);
+    EXPECT_TRUE(out["checkOnBoot"].as<bool>());
+}
+
+TEST_F(OtaUpdateManagerTest, Tick_SkipsBootCheck_WhenCheckOnBootFalse) {
+    Application app;
+    manager.begin(app);
+    JsonDocument inDoc;
+    inDoc["checkOnBoot"] = false;
+    manager.applyConfig(inDoc.as<JsonObject>());
+    manager.tick(0); // Should skip performUpdate()
+    EXPECT_EQ(OTAState::Idle, manager.getState());
+}
+
+TEST_F(OtaUpdateManagerTest, Tick_PerformsBootCheck_WhenCheckOnBootTrue) {
+    Application app;
+    manager.begin(app);
+    JsonDocument inDoc;
+    inDoc["checkOnBoot"] = true;
+    manager.applyConfig(inDoc.as<JsonObject>());
+    manager.tick(0); // Should trigger performUpdate()
+    EXPECT_EQ(OTAState::Checking, manager.getState());
+}
+
+TEST_F(OtaUpdateManagerTest, MigrateConfig_V5_AddsCheckOnBoot) {
+    JsonDocument doc;
+    JsonObject section = doc.to<JsonObject>();
+    manager.migrateConfig(section, 5);
+    EXPECT_TRUE(section["checkOnBoot"].as<bool>());
+}
+
 #endif // WITH_OTA
 
 int main(int argc, char **argv) {

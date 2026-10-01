@@ -368,6 +368,7 @@ private:
     // -------------------------------------------------------------------------
     char    _channel[16]            = "stable";
     bool    _autoCheck              = true;
+    bool    _checkOnBoot            = true;  ///< Whether to run auto-check on boot
     bool    _updatesEnabled         = true;  ///< Master kill-switch for applying firmware updates
     char    _lastCheckedChannel[16] = "";
     uint8_t _checkHour              = 3;   ///< Hour (0-23) at which daily auto-check fires
