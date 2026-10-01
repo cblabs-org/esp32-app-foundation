@@ -159,6 +159,13 @@ public:
      */
     const char* getLastErrorString() const;
 
+    /**
+     * @brief Extract the host string from a URL safely.
+     * @param urlStr The full URL.
+     * @return The extracted host, or an empty string if malformed.
+     */
+    static String extractHost(const std::string& urlStr);
+
 private:
     IOTAVerifier*        verifier_    = nullptr;  // Optional verifier (not owned)
     OTAProgressCallback  progressCb_  = nullptr;  // Progress notification callback

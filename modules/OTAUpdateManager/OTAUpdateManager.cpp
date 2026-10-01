@@ -749,15 +749,7 @@ void OTAUpdateManager::publishProgress(float progress, const char* status,
 static bool downloadRawFile_(const char* url, const char* token,
                              char* buf, size_t bufSize, size_t& outLen) {
     std::string currentUrl = url;
-    auto getHost = [](const std::string& urlStr) -> String {
-        size_t idx = urlStr.find("://");
-        if (idx == std::string::npos) return "";
-        size_t start = idx + 3;
-        size_t end = urlStr.find("/", start);
-        if (end == std::string::npos) end = urlStr.length();
-        return String(urlStr.substr(start, end - start).c_str());
-    };
-    String initialHost = getHost(url);
+    String initialHost = OTADownloadEngine::extractHost(url);
 
     HTTPClient http;
     http.setFollowRedirects(HTTPC_DISABLE_FOLLOW_REDIRECTS);
@@ -779,7 +771,8 @@ static bool downloadRawFile_(const char* url, const char* token,
         }
 
         http.addHeader("Accept", "application/octet-stream");
-        if (token[0] != '\0' && getHost(currentUrl) == initialHost) {
+        String currentHost = OTADownloadEngine::extractHost(currentUrl);
+        if (token[0] != '\0' && currentHost.length() > 0 && currentHost == initialHost) {
             http.addHeader("Authorization", String((std::string("Bearer ") + token).c_str()));
         }
 
@@ -808,7 +801,7 @@ static bool downloadRawFile_(const char* url, const char* token,
                 return false;
             }
             http.addHeader("Accept", "application/octet-stream");
-            if (token[0] != '\0' && getHost(currentUrl) == initialHost) {
+            if (token[0] != '\0' && currentHost.length() > 0 && currentHost == initialHost) {
                 http.addHeader("Authorization", String((std::string("Bearer ") + token).c_str()));
             }
             httpCode = http.GET();
