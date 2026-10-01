@@ -1752,23 +1752,20 @@ void BLEManager::registerPreconditions(IPreconditionRegistry& registry) {
     );
 
     // 3. Central Client Providers Preconditions
-    _clientProviderPrecContexts.clear();
-    _clientProviderPrecContexts.reserve(_clientProviders.size());
+    size_t clientIdx = 0;
     for (auto* p : _clientProviders) {
         if (!p) continue;
+        if (clientIdx >= _clientProviderPrecContexts.size()) break;
         // Y5: Use static lifetime storage — provider labels are stable after lock
         static char preconditionNames[4][40] = {};
-        static size_t preconditionIdx = 0;
-        if (preconditionIdx < 4) {
-            snprintf(preconditionNames[preconditionIdx], sizeof(preconditionNames[0]),
-                     "BLE: %s", p->getDeviceTypeLabel());
-        }
+        snprintf(preconditionNames[clientIdx], sizeof(preconditionNames[0]),
+                 "BLE: %s", p->getDeviceTypeLabel());
         
-        const char* precName = (preconditionIdx < 4) ? preconditionNames[preconditionIdx] : "BLE: ?";
-        if (preconditionIdx < 4) preconditionIdx++;
+        const char* precName = preconditionNames[clientIdx];
 
-        _clientProviderPrecContexts.push_back({this, p->getProviderId()});
-        auto* precCtx = &_clientProviderPrecContexts.back();
+        _clientProviderPrecContexts[clientIdx] = {this, p->getProviderId()};
+        auto* precCtx = &_clientProviderPrecContexts[clientIdx];
+        clientIdx++;
 
         registry.add(
             precName,

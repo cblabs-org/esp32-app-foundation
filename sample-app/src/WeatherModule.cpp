@@ -579,10 +579,11 @@ void WeatherModule::registerPreconditions(IPreconditionRegistry& reg) {
         {PreconditionNames::WIFI_STATION, EdgeKind::Requires}
     };
     reg.add("Weather API Key", PreconditionRole::Startup,
-        [this]() -> PreconditionStatus {
-            if (!_keyManager)
+        [](void* ctx) -> PreconditionStatus {
+            auto* self = static_cast<WeatherModule*>(ctx);
+            if (!self->_keyManager)
                 return {false, Cause::Indeterminate};
-            std::string apiKey = _keyManager->getKeyById("owm_api_key");
+            std::string apiKey = self->_keyManager->getKeyById("owm_api_key");
             if (apiKey.empty()) {
                 ESP_LOGW("WeatherModule", "OWM API key empty — not configured or decryption error");
             }
@@ -590,7 +591,7 @@ void WeatherModule::registerPreconditions(IPreconditionRegistry& reg) {
             return hasKey ? PreconditionStatus{true, Cause::Met}
                           : PreconditionStatus{false, Cause::NotConfigured};
         },
-        [](Cause c, char* buf, size_t len) {
+        [](Cause c, char* buf, size_t len, void*) {
             switch (c) {
                 case Cause::NotConfigured:
                     snprintf(buf, len, "Enter your OpenWeatherMap API key in the Weather tab");
@@ -603,6 +604,7 @@ void WeatherModule::registerPreconditions(IPreconditionRegistry& reg) {
                     break;
             }
         },
+        this,
         apiKeyEdges, 1);
 
     // Precondition 2: Location — Startup, requires WiFi
@@ -610,12 +612,13 @@ void WeatherModule::registerPreconditions(IPreconditionRegistry& reg) {
         {PreconditionNames::WIFI_STATION, EdgeKind::Requires}
     };
     reg.add("Weather Location", PreconditionRole::Startup,
-        [this]() -> PreconditionStatus {
-            return _locationConfigured
+        [](void* ctx) -> PreconditionStatus {
+            auto* self = static_cast<WeatherModule*>(ctx);
+            return self->_locationConfigured
                 ? PreconditionStatus{true, Cause::Met}
                 : PreconditionStatus{false, Cause::NotConfigured};
         },
-        [](Cause c, char* buf, size_t len) {
+        [](Cause c, char* buf, size_t len, void*) {
             switch (c) {
                 case Cause::NotConfigured:
                     snprintf(buf, len, "Set latitude and longitude in the Weather tab");
@@ -625,6 +628,7 @@ void WeatherModule::registerPreconditions(IPreconditionRegistry& reg) {
                     break;
             }
         },
+        this,
         locationEdges, 1);
 
     // Precondition 3: API connectivity — Operational, requires both config preconditions
@@ -636,9 +640,10 @@ void WeatherModule::registerPreconditions(IPreconditionRegistry& reg) {
         {"Weather Location", EdgeKind::Requires}
     };
     reg.add("Weather API", PreconditionRole::Operational,
-        [this]() -> PreconditionStatus {
-            if (!_hasData.load(std::memory_order_acquire)) {
-                UpdateStatus lastStatus = _lastFetchStatus.load(std::memory_order_acquire);
+        [](void* ctx) -> PreconditionStatus {
+            auto* self = static_cast<WeatherModule*>(ctx);
+            if (!self->_hasData.load(std::memory_order_acquire)) {
+                UpdateStatus lastStatus = self->_lastFetchStatus.load(std::memory_order_acquire);
                 switch (lastStatus) {
                     case UpdateStatus::AuthError:
                         return {false, Cause::Rejected};
@@ -652,7 +657,7 @@ void WeatherModule::registerPreconditions(IPreconditionRegistry& reg) {
             }
             return {true, Cause::Met};
         },
-        [](Cause c, char* buf, size_t len) {
+        [](Cause c, char* buf, size_t len, void*) {
             switch (c) {
                 case Cause::Rejected:
                     snprintf(buf, len, "API key rejected — check your OpenWeatherMap key");
@@ -668,5 +673,6 @@ void WeatherModule::registerPreconditions(IPreconditionRegistry& reg) {
                     break;
             }
         },
+        this,
         apiEdges, 2);
 }

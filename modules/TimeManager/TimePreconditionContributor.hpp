@@ -75,7 +75,6 @@ public:
                     return {false, Cause::Connecting};
                 return {false, Cause::Unreachable};
             },
-            nullptr,  // single-cause — no describe needed (CG-16)
             this,
             syncEdges, 1);
     }

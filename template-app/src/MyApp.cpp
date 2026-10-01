@@ -222,9 +222,11 @@ void MyApp::registerMCPTools(MCPToolRegistry& registry) {
 
 void MyApp::registerPreconditions(IPreconditionRegistry& reg) {
     reg.add("MyApp Ready", PreconditionRole::Operational,
-        [this]() -> PreconditionStatus {
-            return _ready
+        [](void* ctx) -> PreconditionStatus {
+            auto* self = static_cast<MyApp*>(ctx);
+            return self->_ready
                 ? PreconditionStatus{true, Cause::Met}
                 : PreconditionStatus{false, Cause::Connecting};
-        });
+        },
+        this);
 }

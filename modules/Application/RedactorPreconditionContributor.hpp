@@ -31,13 +31,13 @@ class RedactorPreconditionContributor : public IPreconditionContributor {
 public:
     void registerPreconditions(IPreconditionRegistry& reg) override {
         reg.add(PreconditionNames::REDACTOR_HEALTH, PreconditionRole::Operational,
-            []() -> PreconditionStatus {
+            [](void*) -> PreconditionStatus {
                 if (Redactor::instance().isFull() || Redactor::instance().saturationCount() > 0) {
                     return {false, Cause::FallbackEngaged};
                 }
                 return {true, Cause::Met};
             },
-            [](Cause c, char* buf, size_t len) {
+            [](Cause c, char* buf, size_t len, void*) {
                 if (c == Cause::FallbackEngaged) {
                     snprintf(buf, len, "Redactor registry saturated (%zu/%zu secrets, %u rejected)",
                              Redactor::instance().secretCount(), Redactor::MAX_SECRETS,

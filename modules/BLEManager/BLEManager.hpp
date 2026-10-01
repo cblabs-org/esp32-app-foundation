@@ -51,6 +51,7 @@
 #include "interfaces/IPreconditionContributor.hpp"
 #include "types/AppState.hpp"
 
+#include <array>
 #include <vector>
 #include <string>
 #include <atomic>
@@ -268,10 +269,10 @@ private:
     std::vector<IBLEClientProvider*>   _clientProviders;
 
     struct ClientProviderPrecContext {
-        BLEManager* mgr;
-        const char* providerId;
+        BLEManager* mgr = nullptr;
+        const char* providerId = nullptr;
     };
-    std::vector<ClientProviderPrecContext> _clientProviderPrecContexts;
+    std::array<ClientProviderPrecContext, 4> _clientProviderPrecContexts{};
 
     std::map<std::string, BLEReconnectPolicy> _reconnectPolicies;
     std::map<std::string, bool>        _clientConnected;

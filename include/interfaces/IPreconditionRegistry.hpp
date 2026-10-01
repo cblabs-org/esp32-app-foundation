@@ -63,4 +63,27 @@ public:
                      uint8_t edgeCount = 0,
                      const DampingPolicy* damping = nullptr,
                      const RetryPolicy*  retry   = nullptr) = 0;
+
+    /**
+     * @brief Convenience overload for registering a precondition with context but no describe callback.
+     *
+     * @param name       Human-readable unique identifier for the precondition (static lifetime).
+     * @param role       Precondition role (Operational, Startup, or Both).
+     * @param evaluate   Fast-path evaluation function returning PreconditionStatus.
+     * @param context    User context pointer passed to evaluate callback.
+     * @param edges      Optional pointer to array of dependency edges.
+     * @param edgeCount  Number of dependency edges in the edges array.
+     * @param damping    Optional per-precondition damping policy override (nullptr = engine default).
+     * @param retry      Optional per-precondition retry policy override (nullptr = engine default).
+     */
+    void add(const char* name,
+             PreconditionRole role,
+             EvalFn evaluate,
+             void* context,
+             const Edge* edges = nullptr,
+             uint8_t edgeCount = 0,
+             const DampingPolicy* damping = nullptr,
+             const RetryPolicy* retry = nullptr) {
+        add(name, role, evaluate, nullptr, context, edges, edgeCount, damping, retry);
+    }
 };
