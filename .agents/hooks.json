@@ -54,5 +54,19 @@
         ]
       }
     ]
+  },
+  "bug-fixer-url-gate": {
+    "PreToolUse": [
+      {
+        "matcher": "read_url_content",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 /Users/mcneillm/Documents/Projects/esp32-app-foundation/.agents/plugins/bug-fixer-loop-plugin/scripts/github_url_gate.py",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
   }
 }
