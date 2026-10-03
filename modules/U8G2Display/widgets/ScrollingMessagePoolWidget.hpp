@@ -75,13 +75,13 @@ private:
 public:
     /**
      * @brief Construct a scrolling message pool widget.
-     * @param _x X coordinate of top-left corner.
-     * @param _y Y coordinate of top-left corner.
-     * @param _w Width of bounding box in pixels.
-     * @param _h Height of bounding box in pixels.
-     * @param _font U8G2 font for rendering (nullptr for default).
+     * @param x X coordinate of top-left corner.
+     * @param y Y coordinate of top-left corner.
+     * @param w Width of bounding box in pixels.
+     * @param h Height of bounding box in pixels.
+     * @param font U8G2 font for rendering (nullptr for default).
      */
-    ScrollingMessagePoolWidget(int _x, int _y, int _w, int _h, const uint8_t* _font = nullptr);
+    ScrollingMessagePoolWidget(int x, int y, int w, int h, const uint8_t* font = nullptr);
     /** @brief Destructor for ScrollingMessagePoolWidget. */
     virtual ~ScrollingMessagePoolWidget() = default;
 

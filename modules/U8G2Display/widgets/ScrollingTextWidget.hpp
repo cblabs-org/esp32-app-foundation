@@ -46,13 +46,13 @@ protected:
 public:
     /**
      * @brief Construct a new scrolling text widget.
-     * @param _x X coordinate of top-left corner.
-     * @param _y Y coordinate of top-left corner.
-     * @param _w Width of bounding box in pixels.
-     * @param _h Height of bounding box in pixels.
-     * @param _font U8G2 font array to use for rendering (nullptr for default).
+     * @param x X coordinate of top-left corner.
+     * @param y Y coordinate of top-left corner.
+     * @param w Width of bounding box in pixels.
+     * @param h Height of bounding box in pixels.
+     * @param font U8G2 font array to use for rendering (nullptr for default).
      */
-    ScrollingTextWidget(int _x, int _y, int _w, int _h, const uint8_t* _font = nullptr);
+    ScrollingTextWidget(int x, int y, int w, int h, const uint8_t* font = nullptr);
     /** @brief Destructor for ScrollingTextWidget. */
     virtual ~ScrollingTextWidget() = default;
 
@@ -65,9 +65,9 @@ public:
 
     /**
      * @brief Update the font used for rendering and trigger layout recalc.
-     * @param _font Pointer to U8G2 font array.
+     * @param font Pointer to U8G2 font array.
      */
-    void setFont(const uint8_t* _font) { _font = _font; _needsLayout = true; }
+    void setFont(const uint8_t* font) { _font = font; _needsLayout = true; }
 
     /**
      * @brief Check if the text has completed a full scroll loop off-screen.

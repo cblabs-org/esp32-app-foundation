@@ -32,11 +32,11 @@
 /**
  * @brief Construct the WiFi status widget with a fixed 16x16 bounding box.
  *        Initialises connection tracking state to "connected" (optimistic default).
- * @param _x X coordinate on the display.
- * @param _y Y coordinate on the display.
+ * @param x X coordinate on the display.
+ * @param y Y coordinate on the display.
  */
-WifiStatusWidget::WifiStatusWidget(int _x, int _y)
-    : IGfxWidget(_x, _y, 16, 16),
+WifiStatusWidget::WifiStatusWidget(int x, int y)
+    : IGfxWidget(x, y, 16, 16),
       _wasConnected(true), _disconnectTime(0),
       _blinkState(true), _lastBlinkMs(0), _lastRssiCategory(4) {
 }

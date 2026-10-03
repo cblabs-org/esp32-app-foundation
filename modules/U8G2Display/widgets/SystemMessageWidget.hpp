@@ -39,12 +39,12 @@ public:
     /**
      * @brief Construct a system message widget with the given bounding box.
      *        Defaults to full screen (128x64) for typical OLED displays.
-     * @param _x X coordinate (default 0).
-     * @param _y Y coordinate (default 0).
-     * @param _w Width in pixels (default 128).
-     * @param _h Height in pixels (default 64).
+     * @param x X coordinate (default 0).
+     * @param y Y coordinate (default 0).
+     * @param w Width in pixels (default 128).
+     * @param h Height in pixels (default 64).
      */
-    SystemMessageWidget(int _x = 0, int _y = 0, int _w = 128, int _h = 64);
+    SystemMessageWidget(int x = 0, int y = 0, int w = 128, int h = 64);
 
     /**
      * @brief Batch update the widget content.

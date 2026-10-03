@@ -50,14 +50,14 @@ private:
 public:
     /**
      * @brief Construct a new progress bar widget.
-     * @param _x X position on the display.
-     * @param _y Y position on the display.
-     * @param _w Width (-1 for full display width).
-     * @param _h Height (-1 for auto height).
-     * @param _font Pointer to the U8G2 font to use (nullptr for default).
+     * @param x X position on the display.
+     * @param y Y position on the display.
+     * @param w Width (-1 for full display width).
+     * @param h Height (-1 for auto height).
+     * @param font Pointer to the U8G2 font to use (nullptr for default).
      */
-    ProgressBarWidget(int _x, int _y, int _w = -1, int _h = -1,
-                      const uint8_t* _font = nullptr);
+    ProgressBarWidget(int x, int y, int w = -1, int h = -1,
+                      const uint8_t* font = nullptr);
 
     /**
      * @brief Set the status text displayed above the progress bar.
@@ -74,10 +74,10 @@ public:
 
     /**
      * @brief Update the font used for rendering the message and percentage text.
-     * @param _font Pointer to U8G2 font array. nullptr defers to the current
+     * @param font Pointer to U8G2 font array. nullptr defers to the current
      *              display font.
      */
-    void setFont(const uint8_t* _font) { _font = _font; }
+    void setFont(const uint8_t* font) { _font = font; }
 
     /**
      * @brief Set the progress value (0-100) with optional animation.

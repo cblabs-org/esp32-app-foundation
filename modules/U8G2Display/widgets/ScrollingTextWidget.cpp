@@ -25,15 +25,15 @@
 
 /**
  * @brief Initialize the scrolling text widget with default state.
- * @param _x X coordinate.
- * @param _y Y coordinate.
- * @param _w Width of bounding box.
- * @param _h Height of bounding box.
- * @param _font Optional font override (nullptr = use default).
+ * @param x X coordinate.
+ * @param y Y coordinate.
+ * @param w Width of bounding box.
+ * @param h Height of bounding box.
+ * @param font Optional font override (nullptr = use default).
  */
-ScrollingTextWidget::ScrollingTextWidget(int _x, int _y, int _w, int _h, const uint8_t* _font)
-    : IGfxWidget(_x, _y, _w, _h), _scrollX(0), _messageWidth(0), _lastScrollMs(0),
-      _needsScroll(false), _needsLayout(true), _font(_font), _scrollFinished(false) {
+ScrollingTextWidget::ScrollingTextWidget(int x, int y, int w, int h, const uint8_t* font)
+    : IGfxWidget(x, y, w, h), _scrollX(0), _messageWidth(0), _lastScrollMs(0),
+      _needsScroll(false), _needsLayout(true), _font(font), _scrollFinished(false) {
     _currentText[0] = '\0';
 }
 

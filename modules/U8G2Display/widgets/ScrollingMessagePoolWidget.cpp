@@ -30,14 +30,14 @@
 
 /**
  * @brief Initialise the message pool widget with empty circular buffer.
- * @param _x X coordinate.
- * @param _y Y coordinate.
- * @param _w Width of bounding box.
- * @param _h Height of bounding box.
- * @param _font Optional font override.
+ * @param x X coordinate.
+ * @param y Y coordinate.
+ * @param w Width of bounding box.
+ * @param h Height of bounding box.
+ * @param font Optional font override.
  */
-ScrollingMessagePoolWidget::ScrollingMessagePoolWidget(int _x, int _y, int _w, int _h, const uint8_t* _font)
-    : ScrollingTextWidget(_x, _y, _w, _h, _font),
+ScrollingMessagePoolWidget::ScrollingMessagePoolWidget(int x, int y, int w, int h, const uint8_t* font)
+    : ScrollingTextWidget(x, y, w, h, font),
       _writeIndex(0), _messageCount(0), _readIndex(0), _eventBus(nullptr) {
     // Clear all buffer slots
     for (size_t i = 0; i < MSG_POOL_BUFFER_SIZE; i++) {

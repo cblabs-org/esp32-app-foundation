@@ -27,20 +27,20 @@
 /**
  * @brief Initialize the clock with its time manager and default layout.
  *        Defaults to HH_MM format with blinking enabled.
- * @param _timeMgr Pointer to the TimeManager dependency (nullable).
- * @param _x X coordinate.
- * @param _y Y coordinate.
- * @param _w Width (-1 for auto).
- * @param _h Height (-1 for auto).
- * @param _font Optional font override.
+ * @param timeMgr Pointer to the TimeManager dependency (nullable).
+ * @param x X coordinate.
+ * @param y Y coordinate.
+ * @param w Width (-1 for auto).
+ * @param h Height (-1 for auto).
+ * @param font Optional font override.
  */
-ClockWidget::ClockWidget(TimeManager* _timeMgr, int _x, int _y, int _w, int _h,
-                         const uint8_t* _font)
-    : IGfxWidget(_x, _y, _w, _h),
+ClockWidget::ClockWidget(TimeManager* timeMgr, int x, int y, int w, int h,
+                         const uint8_t* font)
+    : IGfxWidget(x, y, w, h),
       _showColon(true), _oldColon(true), _blinkEnabled(true),
       _lastBlinkMs(0), _lastMinute(-1), _lastSecond(-1),
-      _format(ClockFormat::HH_MM), _font(_font), _secondaryFont(nullptr),
-      _alignment(1), _timeMgr(_timeMgr) {
+      _format(ClockFormat::HH_MM), _font(font), _secondaryFont(nullptr),
+      _alignment(1), _timeMgr(timeMgr) {
 }
 
 /**

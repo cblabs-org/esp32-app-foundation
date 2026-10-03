@@ -62,15 +62,15 @@ private:
 public:
     /**
      * @brief Construct the clock widget with a TimeManager dependency.
-     * @param _timeMgr Pointer to the TimeManager instance (may be nullptr for tests).
-     * @param _x X position on the display.
-     * @param _y Y position on the display.
-     * @param _w Width (-1 for auto).
-     * @param _h Height (-1 for auto).
-     * @param _font Pointer to the primary U8G2 font (nullptr for default).
+     * @param timeMgr Pointer to the TimeManager instance (may be nullptr for tests).
+     * @param x X position on the display.
+     * @param y Y position on the display.
+     * @param w Width (-1 for auto).
+     * @param h Height (-1 for auto).
+     * @param font Pointer to the primary U8G2 font (nullptr for default).
      */
-    ClockWidget(TimeManager* _timeMgr, int _x, int _y, int _w = -1, int _h = -1,
-                const uint8_t* _font = nullptr);
+    ClockWidget(TimeManager* timeMgr, int x, int y, int w = -1, int h = -1,
+                const uint8_t* font = nullptr);
 
     /**
      * @brief Update the primary font used by the clock.

@@ -40,12 +40,12 @@ private:
 public:
     /**
      * @brief Construct a new label widget.
-     * @param _x X coordinate on the display.
-     * @param _y Y coordinate (baseline) on the display.
-     * @param _w Width of the bounding box (-1 for unconstrained).
-     * @param _h Height of the bounding box (-1 for unconstrained).
+     * @param x X coordinate on the display.
+     * @param y Y coordinate (baseline) on the display.
+     * @param w Width of the bounding box (-1 for unconstrained).
+     * @param h Height of the bounding box (-1 for unconstrained).
      */
-    LabelWidget(int _x, int _y, int _w = -1, int _h = -1);
+    LabelWidget(int x, int y, int w = -1, int h = -1);
 
     /**
      * @brief Set the text payload for the label.

@@ -47,10 +47,10 @@ public:
     /**
      * @brief Construct a WiFi status widget at the given position.
      *        Fixed size of 16x16 pixels for the signal indicator icon.
-     * @param _x X coordinate on the display.
-     * @param _y Y coordinate on the display.
+     * @param x X coordinate on the display.
+     * @param y Y coordinate on the display.
      */
-    WifiStatusWidget(int _x, int _y);
+    WifiStatusWidget(int x, int y);
 
     /**
      * @brief Monitor WiFi connection state for changes and manage blink timer.

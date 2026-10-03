@@ -25,13 +25,13 @@
 
 /**
  * @brief Initialize the label widget with default alignment (left) and no truncation.
- * @param _x X coordinate.
- * @param _y Y coordinate (baseline).
- * @param _w Width (-1 for auto).
- * @param _h Height (-1 for auto).
+ * @param x X coordinate.
+ * @param y Y coordinate (baseline).
+ * @param w Width (-1 for auto).
+ * @param h Height (-1 for auto).
  */
-LabelWidget::LabelWidget(int _x, int _y, int _w, int _h)
-    : IGfxWidget(_x, _y, _w, _h), _font(nullptr), _alignment(0), _isTruncated(false) {
+LabelWidget::LabelWidget(int x, int y, int w, int h)
+    : IGfxWidget(x, y, w, h), _font(nullptr), _alignment(0), _isTruncated(false) {
     memset(_textBuffer, 0, sizeof(_textBuffer));
 }
 

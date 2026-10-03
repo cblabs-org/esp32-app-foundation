@@ -27,18 +27,18 @@
 
 /**
  * @brief Initialize the progress bar with default state (0% progress).
- * @param _x X coordinate.
- * @param _y Y coordinate.
- * @param _w Width (-1 for full display).
- * @param _h Height (-1 for auto).
- * @param _font Optional font override.
+ * @param x X coordinate.
+ * @param y Y coordinate.
+ * @param w Width (-1 for full display).
+ * @param h Height (-1 for auto).
+ * @param font Optional font override.
  */
-ProgressBarWidget::ProgressBarWidget(int _x, int _y, int _w, int _h, const uint8_t* _font)
-    : IGfxWidget(_x, _y, _w, _h),
+ProgressBarWidget::ProgressBarWidget(int x, int y, int w, int h, const uint8_t* font)
+    : IGfxWidget(x, y, w, h),
       _currentPercent(0), _targetPercent(0), _startPercent(0),
       _animStartTime(0), _animDurationMs(0),
       _oldPercent(0), _textChanged(false), _showPercentText(false),
-      _font(_font) {
+      _font(font) {
     _message[0] = '\0';
 }
 

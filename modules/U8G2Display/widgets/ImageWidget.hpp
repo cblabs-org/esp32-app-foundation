@@ -32,13 +32,13 @@ private:
 public:
     /**
      * @brief Construct the image widget with position, size, and bitmap data.
-     * @param _x X coordinate (top-left).
-     * @param _y Y coordinate (top-left).
-     * @param _w Pixel width of the image.
-     * @param _h Pixel height of the image.
+     * @param x X coordinate (top-left).
+     * @param y Y coordinate (top-left).
+     * @param w Pixel width of the image.
+     * @param h Pixel height of the image.
      * @param bits Pointer to the XBM byte array (may be nullptr for deferred assignment).
      */
-    ImageWidget(int _x, int _y, int _w, int _h, const unsigned char* bits);
+    ImageWidget(int x, int y, int w, int h, const unsigned char* bits);
 
     /**
      * @brief No-op. Static images do not need state updates.

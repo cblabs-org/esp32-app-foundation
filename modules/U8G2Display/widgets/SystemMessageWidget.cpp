@@ -26,13 +26,13 @@
 
 /**
  * @brief Initialise the system message widget with empty content.
- * @param _x X coordinate.
- * @param _y Y coordinate.
- * @param _w Width in pixels.
- * @param _h Height in pixels.
+ * @param x X coordinate.
+ * @param y Y coordinate.
+ * @param w Width in pixels.
+ * @param h Height in pixels.
  */
-SystemMessageWidget::SystemMessageWidget(int _x, int _y, int _w, int _h)
-    : IGfxWidget(_x, _y, _w, _h), _numLines(0) {
+SystemMessageWidget::SystemMessageWidget(int x, int y, int w, int h)
+    : IGfxWidget(x, y, w, h), _numLines(0) {
     _title[0] = '\0';
     _lines[0][0] = '\0';
     _lines[1][0] = '\0';
