@@ -86,6 +86,11 @@ public:
     class ScanInhibit {
     public:
         ScanInhibit() = default;
+        /**
+         * @brief Construct a scan-inhibit token that suppresses scanning for its lifetime.
+         * @param mgr  Owning BLEManager instance.
+         * @param reason Human-readable reason string (static lifetime).
+         */
         explicit ScanInhibit(BLEManager* mgr, const char* reason);
         ~ScanInhibit();
 
@@ -159,31 +164,86 @@ public:
 
     // --- State and Diagnostics ---
 
+    /** @brief Returns the current BLE manager lifecycle state. */
     State  getState() const;
+    /** @brief Returns true if a BLE scan (discovery or reconnect) is active. */
     bool   isScanning() const;
+    /** @brief Returns true if BLE advertising is currently running. */
     bool   isAdvertising() const;
+    /** @brief Returns the number of active peripheral connections. */
     size_t getPeripheralConnectionCount() const;
     const std::vector<BLEPeerInfo>& getActiveConnections() const { return _activeConnections; }
+    /**
+     * @brief Look up a connected peer by connection handle.
+     * @param handle Connection handle to query.
+     * @param out    Output peer info populated on success.
+     * @return true if found, false otherwise.
+     */
     bool   getPeerInfo(BLEConnHandle handle, BLEPeerInfo& out) const;
+    /**
+     * @brief Check whether a client provider's paired device is currently connected.
+     * @param providerId Provider identifier to query.
+     * @return true if the provider's device is connected.
+     */
     bool   isClientConnected(const char* providerId) const;
+    /**
+     * @brief Retrieve the stored (bonded) device for a client provider.
+     * @param providerId Provider identifier to query.
+     * @param out        Output stored device populated on success.
+     * @return true if a stored device exists for this provider.
+     */
     bool   getStoredDevice(const char* providerId, BLEStoredDevice& out) const;
     const BLEConfig& getConfig() const { return _config; }
     const BLEAdvPackResult& getLastPackResult() const { return _advPackResult; }
+    /** @brief Returns the number of queue messages dropped due to a full event queue. */
     uint32_t getDroppedEventsCount() const;
+    /** @brief Returns the number of times scan inhibition has been requested. */
     uint32_t getScanInhibitCount() const { return _scanInhibitCount; }
 
     // --- Discovery and Pairing (User-initiated) ---
 
+    /**
+     * @brief Start a user-initiated BLE discovery scan for a specific client provider.
+     * @param providerId Provider whose target service UUIDs filter scan results.
+     * @param durationMs Maximum scan duration in milliseconds (default 30 s).
+     * @return true if discovery started, false if already active or provider not found.
+     */
     bool   startDiscovery(const char* providerId, uint32_t durationMs = 30000);
+    /** @brief Stop an active discovery scan. */
     void   stopDiscovery();
+    /**
+     * @brief Copy discovery results into a caller-supplied buffer.
+     * @param out Buffer to receive scan results.
+     * @param max Maximum number of results to copy.
+     * @return Number of results written.
+     */
     size_t getDiscoveryResults(BLEScanResult* out, size_t max) const;
     const std::vector<BLEScanResult>& getDiscoveryResults() const;
+    /** @brief Returns true if a user-initiated discovery scan is in progress. */
     bool   isDiscoveryActive() const;
     const char* getDiscoveryProviderId() const;
+    /** @brief Returns the configured duration of the current/last discovery scan in ms. */
     uint32_t getDiscoveryDurationMs() const;
     const std::vector<IBLEClientProvider*>& getClientProviders() const { return _clientProviders; }
+    /**
+     * @brief Retrieve the reconnect policy for a client provider.
+     * @param providerId Provider identifier.
+     * @param out        Output policy populated on success.
+     * @return true if a policy exists for this provider.
+     */
     bool   getReconnectPolicy(const char* providerId, BLEReconnectPolicy& out) const;
+    /**
+     * @brief Pair with a discovered BLE peripheral for a given client provider.
+     * @param providerId Provider that will own the connection.
+     * @param addr       Bluetooth address of the peer to pair with.
+     * @return true if pairing was initiated, false on error.
+     */
     bool   pair(const char* providerId, const BLEPeerAddress& addr);
+    /**
+     * @brief Forget (unpair) the stored device for a client provider.
+     * @param providerId Provider whose stored device is removed.
+     * @return true if a device was forgotten, false if none was stored.
+     */
     bool   forget(const char* providerId);
     // --- Coexistence and Lifecycle Control ---
 
@@ -191,18 +251,43 @@ public:
     /// @note Thread-safe (O2): protected by _stateMutex, safe to call from any task
     ///       (e.g. the DataManager upload task or the httpd task).
     ScanInhibit inhibitScanning(const char* reason);
+    /** @brief Rebuild and restart advertising (e.g. after provider list changes). */
     void        refreshAdvertising();
+    /**
+     * @brief Pause the BLE stack (stops advertising and scanning).
+     * @param reason Human-readable reason for the pause (e.g. "OTA download").
+     */
     void        pause(const char* reason);
+    /** @brief Resume the BLE stack after a pause. */
     void        resume();
 
     // --- Testing helpers ---
+    /** @brief Lock provider registration (prevents further registerServiceProvider/registerClientProvider calls). */
     void lockRegistration() { _locked = true; }
+    /** @brief Override BLE manager state for unit testing. */
     void setStateForTesting(State s) { _state = s; }
+    /** @brief Override GATT-started flag for unit testing. */
     void setGattStartedForTesting(bool g) { _gattStarted = g; }
+    /** @brief Override provider-registration-fault flag for unit testing. */
     void setProviderRegistrationFaultForTesting(bool f) { _providerRegistrationFault = f; }
+    /**
+     * @brief Post a queue message directly for unit testing.
+     * @param msg Message to enqueue.
+     * @return true if posted, false if queue is full.
+     */
     bool postTestQueueMessage(const BLEQueueMessage& msg);
+    /**
+     * @brief Simulate OTA progress event for unit testing.
+     * @param complete True if OTA is finished.
+     * @param success  True if OTA succeeded.
+     */
     void handleOtaProgressForTesting(bool complete, bool success);
+    /** @brief Returns the effective AppState (test override or real). */
     AppState getEffectiveAppState() const;
+    /**
+     * @brief Override the AppState for unit testing.
+     * @param s AppState to inject.
+     */
     void setAppStateForTesting(AppState s) {
         _appStateForTesting = s;
         _hasAppStateForTesting = true;
@@ -210,25 +295,35 @@ public:
 
 
     // --- ITickable Interface ---
+    /** @brief Advance BLE manager state machine, dispatch queued events. */
     void tick(uint32_t currentMillis) override;
 
     // --- IConfigurable Interface ---
     const char* getConfigNamespace() const override { return "ble"; }
+    /** @brief Returns the BLE configuration schema version. */
     int         getSchemaVersion() const override { return 1; }
+    /** @brief Apply BLE configuration from a parsed JSON object. */
     void        applyConfig(const JsonObject& root) override;
+    /** @brief Serialize current BLE configuration to a JSON object. */
     void        serializeConfig(JsonObject& root) const override;
+    /** @brief Reset BLE configuration to factory defaults. */
     void        resetConfig() override;
 
     // --- IWebContributor Interface ---
+    /** @brief Register BLE REST API routes on the web server. */
     void        registerRoutes(PsychicHttpServer& server) override;
+    /** @brief Register BLE web portal tabs. */
     void        registerTabs(ITabRegistry& registry) override;
     const char* getApiPrefix() const override { return "/api/ble"; }
+    /** @brief Returns the maximum POST body size for BLE API endpoints. */
     size_t      getMaxPostBody() const override { return 512; }
 
     // --- IMCPContributor Interface ---
+    /** @brief Register BLE MCP tools (ble_status, ble_scan, ble_pair, ble_forget). */
     void registerMCPTools(MCPToolRegistry& registry) override;
 
     // --- IPreconditionContributor Interface ---
+    /** @brief Register BLE-related preconditions (GATT health, provider faults). */
     void registerPreconditions(IPreconditionRegistry& registry) override;
 
     /// @brief Acquire a scoped lock on BLEManager state.
@@ -240,6 +335,7 @@ public:
     }
 
 private:
+/** @brief [Auto-generated description] */
     friend class ScanInhibit;
     mutable std::recursive_mutex _stateMutex;  // O2: protects state vs httpd task
     static void centralWorkerTask(void* arg);
@@ -268,6 +364,7 @@ private:
     std::vector<IBLEServiceProvider*>  _serviceProviders;
     std::vector<IBLEClientProvider*>   _clientProviders;
 
+/** @brief [Auto-generated description] */
     struct ClientProviderPrecContext {
         BLEManager* mgr = nullptr;
         const char* providerId = nullptr;
@@ -289,7 +386,9 @@ private:
     std::atomic<bool>                  _configDirty{false};
 
     // --- Worker Task Queue ---
+/** @brief [Auto-generated description] */
     struct WorkerCommand {
+/** @brief [Auto-generated description] */
         enum class Type : uint8_t { Connect, Disconnect, Forget, Shutdown, Discover, StopDiscovery } type;
         char providerId[24] = {};  // R7: Owned copy, not a dangling const char*
         BLEPeerAddress addr;
@@ -317,6 +416,7 @@ private:
 
 
     // Central state
+/** @brief [Auto-generated description] */
     struct DiscoveryState {
         bool active = false;
         uint32_t startMs = 0;

@@ -37,6 +37,7 @@ class NimBLEScan;
  */
 class BLEStack {
 public:
+    /** @brief Metadata for a registered GATT characteristic (service index, handle, UUID). */
     struct CharacteristicEntry {
         size_t   serviceIndex = 0;
         uint16_t handle       = 0;
@@ -151,19 +152,56 @@ public:
     }
 
     // --- Central Role (WO-3) ---
+
+    /** @brief Options bundle for initiating a Central role connection. */
     struct CentralConnectOptions {
         BLEScanParams initiatorScan;
         BLEConnParams centralConnParams;
         IBLEClientProvider* provider;
         void* hostEventQueue;
     };
+    /**
+     * @brief Initiate a Central role connection to a peripheral.
+     * @param opts   Connection options (scan params, conn params, provider, queue).
+     * @param addr   Bluetooth address of the target peripheral.
+     * @param bondedOut Set to true if the connection is bonded.
+     * @return true on success, false on failure.
+     */
     bool executeCentralConnect(const CentralConnectOptions& opts, const BLEPeerAddress& addr, bool& bondedOut);
+    /**
+     * @brief Disconnect a Central role connection by provider ID.
+     * @param providerId Provider whose connection is terminated.
+     */
     void executeCentralDisconnect(const char* providerId);
+    /**
+     * @brief Forget (remove bond) for a Central role connection.
+     * @param providerId Provider whose bond is removed.
+     * @param addr       Bluetooth address of the bonded peer.
+     */
     void executeCentralForget(const char* providerId, const BLEPeerAddress& addr);
+    /**
+     * @brief Execute a BLE discovery scan for a specific client provider.
+     * @param params      Scan window/interval parameters.
+     * @param durationMs  Maximum scan duration in milliseconds.
+     * @param provider    Client provider whose service UUIDs filter results.
+     * @param hostEventQueue FreeRTOS queue for scan result delivery.
+     * @param resultsOut  Output vector populated with discovered peers.
+     */
     void executeDiscovery(const BLEScanParams& params, uint32_t durationMs, IBLEClientProvider* provider, void* hostEventQueue, std::vector<BLEScanResult>& resultsOut);
+    /** @brief Stop an active BLE discovery scan. */
     void stopDiscovery();
+    /** @brief Returns true if a BLE scan is currently active. */
     bool isScanning() const;
+    /**
+     * @brief Marshal a scan result to the host event queue.
+     * @param hostEventQueue FreeRTOS queue handle.
+     * @param res            Scan result to send.
+     */
     void sendScanResult(void* hostEventQueue, const BLEScanResult& res);
+    /**
+     * @brief Marshal a scan-complete event to the host event queue.
+     * @param hostEventQueue FreeRTOS queue handle.
+     */
     void sendScanComplete(void* hostEventQueue);
 
 private:

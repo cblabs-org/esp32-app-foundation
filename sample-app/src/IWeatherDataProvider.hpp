@@ -46,6 +46,7 @@
  */
 class IWeatherDataProvider {
 public:
+    /** @brief Virtual destructor. */
     virtual ~IWeatherDataProvider() = default;
 
     // --- Data availability ---

@@ -34,6 +34,7 @@ class BLEAdvertisingBuilder;
  */
 class IBLEServiceProvider {
 public:
+    /** @brief Virtual destructor. */
     virtual ~IBLEServiceProvider() = default;
 
     /**
