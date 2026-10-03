@@ -175,6 +175,14 @@ public:
     /** @brief Get the application name. Returns APP_TITLE if not set. */
     const char* getAppName() const { return _appName ? _appName : APP_TITLE; }
 
+    /**
+     * @brief Convert a display name to a valid hostname.
+     * Lowercase, spaces/underscores → hyphens, strip non-[a-z0-9-], collapse
+     * consecutive hyphens, trim leading/trailing hyphens, truncate to 32 chars.
+     * Returns "esp32-device" if the result is empty.
+     */
+    static String sanitiseHostname(const char* displayName);
+
     /** @brief Set the manufacturer name for device identity (DIS, portal). */
     void setManufacturer(const char* name) { _manufacturer = name; }
 

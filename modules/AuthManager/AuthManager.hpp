@@ -180,6 +180,22 @@ public:
     bool isCertGenerating() const { return _certGenRunning.load(); }
 
     /**
+     * @brief Set the device hostname used for TLS certificate Common Name and SAN.
+     *
+     * Stored in an internal member buffer so it is safe to access across the
+     * lifetime of background cert generation tasks.
+     *
+     * @param hostname Sanitised device hostname (e.g. "weather-station").
+     */
+    void setCertHostname(const char* hostname);
+
+    /**
+     * @brief Get the configured certificate hostname.
+     * @return Null-terminated string with the certificate hostname.
+     */
+    const char* getCertHostname() const { return _certHostname; }
+
+    /**
      * @brief Load the DER-encoded certificate and key from LittleFS.
      *
      * Reads /etc/server.crt and /etc/server.key into static buffers and
@@ -358,6 +374,7 @@ private:
     // -------------------------------------------------------------------------
 
     std::atomic<bool> _certGenRunning{false}; ///< True while a cert_gen task is executing
+    char _certHostname[33] = "esp32-device";  ///< Hostname for TLS certificate CN and SAN
 
     // -------------------------------------------------------------------------
     // Session token (16-byte; all-zero means no active session)

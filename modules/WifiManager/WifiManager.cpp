@@ -54,6 +54,7 @@
 #include <ArduinoJson.h>
 #include <WiFi.h>
 #include <DNSServer.h>
+#include <ESPmDNS.h>
 #include "esp_wifi.h"
 
 #include "platform/LogShim.h"
@@ -73,7 +74,7 @@ WifiManager::WifiManager() : _wifiDisconnectTimer(0) {
     memset(_wifiSsid, 0, sizeof(_wifiSsid));
     memset(_wifiPass, 0, sizeof(_wifiPass));
     memset(_currentHostname, 0, sizeof(_currentHostname));
-    strlcpy(_defaultHostname, "esp32-device", sizeof(_defaultHostname));
+    strlcpy(_defaultHostname, DEFAULT_HOSTNAME, sizeof(_defaultHostname));
     strlcpy(_myUrl, "http://0.0.0.0", sizeof(_myUrl));
 }
 
@@ -285,6 +286,18 @@ void WifiManager::onStaConnected(uint32_t now) {
     _fallbackApSuppressed = false;
     _wifiDisconnectTimer.setInterval(0); // Reset downtime tracker
     updateMyUrl();
+
+    // Initialise mDNS with the device hostname (issue #232)
+    // end() first to cleanly restart on WiFi reconnections — prevents
+    // "Service already exists" errors from duplicate addService() calls.
+    MDNS.end();
+    if (MDNS.begin(_currentHostname)) {
+        MDNS.addService("http", "tcp", 80);
+        ESP_LOGI(TAG, "mDNS started: %s.local", _currentHostname);
+    } else {
+        ESP_LOGW(TAG, "mDNS failed to start");
+    }
+
     if (_eventBus) {
         int count = _eventBus->publish(WifiEvents::WIFI_CONNECTED);
         ESP_LOGI(TAG, "Published WIFI_CONNECTED to %d subscribers", count);

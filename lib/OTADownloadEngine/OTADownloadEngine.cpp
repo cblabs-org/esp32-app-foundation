@@ -76,6 +76,23 @@ void OTADownloadEngine::setHttpTimeout(int timeoutMs) {
 }
 
 /**
+ * @brief Set the device identity for HTTP User-Agent header in download requests.
+ *
+ * Formats: "<sanitised-name>/<version> (ESP32-http-Update)"
+ * If name or version is nullptr or empty, defaults to "ESP32-http-Update".
+ *
+ * @param name    Sanitised device name (e.g. "weather-station").
+ * @param version Firmware version string (e.g. "0.1.0-dev.5" or BUILD_VERSION).
+ */
+void OTADownloadEngine::setDeviceIdentity(const char* name, const char* version) {
+    if (name && name[0] != '\0' && version && version[0] != '\0') {
+        snprintf(_userAgent, sizeof(_userAgent), "%s/%s (ESP32-http-Update)", name, version);
+    } else {
+        strlcpy(_userAgent, "ESP32-http-Update", sizeof(_userAgent));
+    }
+}
+
+/**
  * @brief Get the last error code.
  * @return The OTAError from the most recent operation.
  */
@@ -161,7 +178,7 @@ int OTADownloadEngine::followRedirects(WiFiClient& client, HTTPClient& http,
         http.useHTTP10(true);
         http.setTimeout(_httpTimeout);
         http.setFollowRedirects(HTTPC_DISABLE_FOLLOW_REDIRECTS);
-        http.setUserAgent("ESP32-http-Update");
+        http.setUserAgent(_userAgent);
         http.addHeader("Cache-Control", "no-cache");
         http.addHeader("Accept", "application/octet-stream");
 

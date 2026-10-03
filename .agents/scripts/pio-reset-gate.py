@@ -2,63 +2,101 @@
 """ESP32 App Foundation — Antigravity PreToolUse Hook
 .agents/scripts/pio-reset-gate.py
 
-Enforces MCP lock discipline: blocks autonomous reset_server_state calls.
-In interactive sessions, force_ask so the user approves each reset.
+Enforces rule 04 §3 (Never Reset Autonomously): blocks autonomous
+reset_server_state calls.
 
-All other call_mcp_tool invocations are allowed through.
+Two-mode enforcement:
+  - Autonomous session (bug-fixer dispatch) → deny (hard block)
+  - Interactive session                     → force_ask (user approves)
+
+Detection uses the bug-fixer-loop-plugin consumer hook API
+(bugfixer_api.BugFixer) when available. For MCP tool calls there is no
+CWD fallback heuristic, so if the API isn't installed all callers get
+force_ask.
+
+Uses "force_ask" (interactive) so the "Always Allow" cache is bypassed —
+every single reset invocation needs fresh human approval.
 """
 
 import json
+import os
 import sys
 
-# The dangerous tool that wipes locks and kills tracked PIDs.
-_GUARDED_TOOL = "reset_server_state"
+# ---------------------------------------------------------------------------
+# Autonomous mode detection
+# ---------------------------------------------------------------------------
 
-# Path segment that indicates a worktree (autonomous bug-fixer session).
-_WORKTREE_SEGMENT = "/worktrees/"
+_bugfixer_api = None
+try:
+    _plugin_scripts = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)),
+        os.pardir, "plugins", "bug-fixer-loop-plugin", "scripts",
+    )
+    sys.path.insert(0, os.path.normpath(_plugin_scripts))
+    from bugfixer_api import BugFixer as _BugFixer
+    _bugfixer_api = _BugFixer
+except ImportError:
+    pass
 
 
-def _is_autonomous(payload):
-    """Detect bug-fixer autonomous session via worktree CWD heuristic."""
-    # For call_mcp_tool, there's no CWD in args, so check the
-    # conversation context or fall back to conservative (allow).
-    context = payload.get("context", {})
-    cwd = context.get("cwd", "")
-    return _WORKTREE_SEGMENT in cwd
+def _is_autonomous(conversation_id: str) -> bool:
+    """Detect autonomous (bug-fixer) session via consumer hook API.
 
+    Returns False if the API isn't available (safe default — force_ask).
+    """
+    if _bugfixer_api is not None and conversation_id:
+        return _bugfixer_api.is_autonomous(conversation_id)
+    return False
+
+
+# ---------------------------------------------------------------------------
+# Decision emitters
+# ---------------------------------------------------------------------------
 
 def _allow():
+    """Emit allow decision and exit."""
     json.dump({"decision": "allow"}, sys.stdout)
     sys.exit(0)
 
 
 def _force_ask():
+    """Emit force_ask decision (interactive session) and exit."""
     json.dump({
         "decision": "force_ask",
         "reason": (
             "⚠️ `reset_server_state` is a destructive action that terminates "
-            "active builds and flashes, and wipes all queue locks.\n\n"
-            "Rule 04 §3 requires explicit human approval before resetting. "
-            "If a lock appears orphaned, verify with `get_lock_status` first.\n\n"
-            "Approve this specific invocation if you are sure no other "
-            "agent is actively building or flashing."
+            "active builds and flashes mid-operation. Rule 04 §3 prohibits "
+            "autonomous use.\n\n"
+            "Before approving, verify:\n"
+            "  1. The lock is genuinely orphaned (crashed/dead session)\n"
+            "  2. No other agent is actively building or flashing\n"
+            "  3. `get_lock_status` confirms no progress is being made\n\n"
+            "The approval will NOT be cached — each reset requires fresh "
+            "human permission."
         ),
     }, sys.stdout)
     sys.exit(0)
 
 
-def _deny():
+def _deny_autonomous():
+    """Emit deny decision (autonomous session) and exit."""
     json.dump({
         "decision": "deny",
         "reason": (
             "⛔ `reset_server_state` is prohibited in autonomous mode. "
-            "Rule 04 §3: agents MUST NEVER execute reset_server_state "
-            "autonomously. If a lock appears orphaned, exit cleanly and "
-            "let the human intervene."
+            "Rule 04 §3 requires explicit human approval for server resets.\n\n"
+            "If the MCP tools returned a lock error, wait your turn: call "
+            "`get_lock_status`, then retry after a delay. If the lock "
+            "appears orphaned, exit cleanly and let the next scheduled "
+            "run retry."
         ),
     }, sys.stdout)
     sys.exit(0)
 
+
+# ---------------------------------------------------------------------------
+# Entry point
+# ---------------------------------------------------------------------------
 
 def main():
     payload = json.load(sys.stdin)
@@ -70,16 +108,16 @@ def main():
         _allow()
 
     args = tool_call.get("args", {})
-    mcp_tool_name = args.get("ToolName", "")
+    mcp_tool = args.get("ToolName", "")
 
-    # Only guard reset_server_state — all others pass through
-    if mcp_tool_name != _GUARDED_TOOL:
-        _allow()
+    if mcp_tool == "reset_server_state":
+        conversation_id = payload.get("conversationId", "")
+        if _is_autonomous(conversation_id):
+            _deny_autonomous()
+        else:
+            _force_ask()
 
-    if _is_autonomous(payload):
-        _deny()
-    else:
-        _force_ask()
+    _allow()
 
 
 if __name__ == "__main__":

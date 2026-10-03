@@ -7,6 +7,7 @@
 
 #include <gtest/gtest.h>
 #include <ArduinoJson.h>
+#include <ESPmDNS.h>
 #include "../../../modules/WifiManager/WifiManager.hpp"
 #include "../test_helpers/MockTabRegistry.hpp"
 
@@ -36,6 +37,13 @@ TEST_F(WifiManagerTest, SetDefaultHostnameSeedsResetConfig) {
     EXPECT_STREQ("my-app-default", wifiManager.getHostname());
 }
 
+// getDefaultHostname() returns framework default or app-set default
+TEST_F(WifiManagerTest, GetDefaultHostnameReturnsExpectedValue) {
+    EXPECT_STREQ(WifiManager::DEFAULT_HOSTNAME, wifiManager.getDefaultHostname());
+    wifiManager.setDefaultHostname("my-app-default");
+    EXPECT_STREQ("my-app-default", wifiManager.getDefaultHostname());
+}
+
 // resetConfig() falls back to the framework default when no app default was set
 TEST_F(WifiManagerTest, ResetConfigUsesFrameworkDefaultHostname) {
     wifiManager.resetConfig();
@@ -49,6 +57,25 @@ TEST_F(WifiManagerTest, GetHostnameReflectsAppliedConfig) {
     section["hostname"] = "applied-host";
     wifiManager.applyConfig(section);
     EXPECT_STREQ("applied-host", wifiManager.getHostname());
+}
+
+// onStaConnected initialises mDNS with the effective hostname (issue #232)
+TEST_F(WifiManagerTest, OnStaConnectedInitialisesMDNS) {
+    MDNS.end();
+    wifiManager.setDefaultHostname("sensor-node");
+    wifiManager.resetConfig();
+    JsonDocument doc;
+    JsonObject section = doc.to<JsonObject>();
+    section["ssid"] = "HomeNet";
+    wifiManager.applyConfig(section);
+    wifiManager.begin();
+    wifiManager.tick(2000); // Init -> StaConnecting
+    wifiManager.tick(2001); // StaConnecting -> connected -> onStaConnected
+    EXPECT_TRUE(MDNS.began);
+    EXPECT_EQ("sensor-node", MDNS.hostname);
+    EXPECT_EQ("http", MDNS.service);
+    EXPECT_EQ("tcp", MDNS.proto);
+    EXPECT_EQ(80, MDNS.port);
 }
 
 // updateWiFi() stores SSID

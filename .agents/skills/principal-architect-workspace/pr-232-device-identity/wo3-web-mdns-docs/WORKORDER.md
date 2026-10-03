@@ -1,0 +1,139 @@
+---
+name: 232-device-identity-wo3
+description: Handoff instructions for Work Order 3 — Web client, mDNS, and documentation
+complexity: standard
+---
+
+# Role Definition
+> You are an expert senior software engineer and execution-focused worker agent. You are NOT the Principal Architect. Do not make high-level architectural decisions, do not branch, and do not plan. Your task is strictly limited to executing the checklist below.
+
+## Objective
+
+Fix the `auth.js` OpenSSL helper to use a dynamic hostname, implement explicit mDNS initialisation in `WifiManager`, and correct documentation that claims mDNS is a framework feature.
+
+## Context from WO1 & WO2
+
+- `Application::getAppName()` returns the display name (e.g., `"Weather Station"`), `const char*`
+- `WifiManager::getHostname()` returns `const char*` pointing to `_currentHostname` (e.g., `"weather-station"`)
+- All C++ module identity surfaces are now wired. This WO handles the remaining web/client and infrastructure gaps.
+
+## Key Implementation Details
+
+- `WifiManager::_currentHostname` is `char[33]` array
+- The WiFi manager uses Arduino WiFi events — look for `WiFiEventId_t` or `WiFi.onEvent()` handlers, or check for `ARDUINO_EVENT_WIFI_STA_GOT_IP` / `SYSTEM_EVENT_STA_GOT_IP` event handling
+- `ESPmDNS.h` is part of the Arduino-ESP32 core — no additional `lib_deps` needed
+- mDNS is currently documented in `README.md:38` and `docs/developer/hardware-setup.md:145` but has **zero implementation**
+- `web/portal/auth.js` runs in the browser and has access to `window.location.hostname`
+
+## Strict Boundary Box
+
+- **DO NOT** modify `Application::begin()`, `MCPServer`, `OTADownloadEngine`, `AuthManager`, `BLEManager`, `HomeAssistantModule`, or `src/main.cpp` — those were WO1/WO2.
+- **DO NOT** change any C++ module's existing public API.
+- **DO NOT** modify LVGL XML files — that was WO2.
+- mDNS implementation goes ONLY in `WifiManager`. Do not add a new module for it.
+
+## Tooling Constraints
+
+- Use the `platformio-mcp_platformio` MCP tools (`build_project`) for compilation verification — never raw `pio` CLI.
+
+## Line-Item Instructions
+
+- [ ] **`web/portal/auth.js`** — Around line 361, fix the hardcoded OpenSSL CN:
+  - **Current:**
+    ```javascript
+    'openssl req -x509 -newkey ec \\\n  -pkeyopt ec_paramgen_curve:prime256v1 \\\n  -keyout key.pem -out cert.pem \\\n  -days 3650 -nodes \\\n  -subj \'/CN=esp32-device.local\''
+    ```
+  - **Change to:** Make the CN dynamic using `window.location.hostname`:
+    ```javascript
+    'openssl req -x509 -newkey ec \\\n  -pkeyopt ec_paramgen_curve:prime256v1 \\\n  -keyout key.pem -out cert.pem \\\n  -days 3650 -nodes \\\n  -subj \'/CN=' + (window.location.hostname || 'esp32-device.local') + '\''
+    ```
+  - This way, when a user accesses the portal at `weather-station.local`, the generated command uses the correct CN. Falls back to `esp32-device.local` if hostname is empty.
+
+- [ ] **`modules/WifiManager/WifiManager.cpp`** — Add explicit mDNS initialisation:
+  - Add `#include <ESPmDNS.h>` at the top with the other includes.
+  - Find the WiFi STA connected/got-IP event handler. Search for where the code handles successful WiFi STA connection — it may be in an event callback, or in a state machine transition. Look for:
+    - `ARDUINO_EVENT_WIFI_STA_GOT_IP`
+    - `SYSTEM_EVENT_STA_GOT_IP` (older ESP-IDF)
+    - `WiFi.status() == WL_CONNECTED` in a state machine tick
+    - A method like `onStaConnected()` or `handleConnected()`
+  - In the appropriate location (after IP is obtained), add mDNS initialisation:
+    ```cpp
+    // Initialise mDNS with the device hostname (issue #232)
+    if (MDNS.begin(_currentHostname)) {
+        MDNS.addService("http", "tcp", 80);
+        ESP_LOGI(TAG, "mDNS started: %s.local", _currentHostname);
+    } else {
+        ESP_LOGW(TAG, "mDNS failed to start");
+    }
+    ```
+  - **IMPORTANT:** `_currentHostname` is a `char[33]` array, so `MDNS.begin(_currentHostname)` passes it as `const char*` — this is correct.
+  - **IMPORTANT:** Check if mDNS needs to be re-initialized on WiFi reconnection. If the WiFi manager has a reconnection path, ensure mDNS is re-started there too. If there's a single function that runs on every successful connection (including reconnections), place the mDNS init there.
+  - **IMPORTANT:** Only init mDNS in STA mode, not AP mode. In AP mode the device is on a local network without DNS.
+
+- [ ] **`modules/WifiManager/WifiManager.hpp`** — No structural changes needed unless types from `<ESPmDNS.h>` are needed in the header.
+
+- [ ] **`platformio.ini`** — Verify that `ESPmDNS` does NOT need a separate `lib_deps` entry (part of Arduino-ESP32 core). If the build fails, check if the project uses ESP-IDF directly — in that case, use the ESP-IDF mDNS API instead.
+
+- [ ] **Documentation verification** — Read these files and verify accuracy:
+  - `README.md` around line 38: mDNS claim is now accurate after implementation. No change needed.
+  - `docs/developer/hardware-setup.md` around line 145: check if hardcoded `"esp32-device.local"` example needs updating. Make minimal changes.
+
+## Verification Requirement
+
+1. Build the project using `build_project` MCP tool — must compile cleanly with zero errors.
+2. Verify the `auth.js` change by reading the modified code.
+3. Verify the mDNS implementation is in the correct event handler and covers reconnection.
+4. Verify documentation accuracy after changes.
+5. **CRITICAL:** Before committing, ask the user if they are happy with the changes.
+
+## Issue Surfacing
+
+If you discover a defect, upstream bug, or concern *outside your boundary box*, surface it in your Completion Report below — do not file issues directly. The Principal Architect will triage and file them under the correct author identity.
+
+---
+
+## Completion Report
+
+### Summary
+Successfully completed Work Order 3 (Web client, mDNS, and documentation).
+1. **Dynamic OpenSSL Helper (`web/portal/auth.js`)**: Updated the OpenSSL certificate generation command subject CN from hardcoded `/CN=esp32-device.local` to dynamic `/CN=' + (window.location.hostname || 'esp32-device.local') + '\''`. When users access the portal via their device hostname (e.g., `weather-station.local`), the generated command uses that hostname as CN with fallback to `esp32-device.local`.
+2. **mDNS Initialisation (`modules/WifiManager/WifiManager.cpp`)**: Added `#include <ESPmDNS.h>` and initialized `MDNS.begin(_currentHostname)` with HTTP service advertisement (`MDNS.addService("http", "tcp", 80)`) in `WifiManager::onStaConnected()`. This canonical hook handles successful initial STA connections as well as reconnections, ensuring mDNS is advertised exclusively in STA mode.
+3. **Platform Test Stub (`test/stubs/platform/ESPmDNS.h`)**: Created lightweight mock for `MDNSResponder` and global `MDNS` instance supporting host unit tests.
+4. **Unit Test Coverage (`test/test_unit/test_wifiManager/test_wifiManager.cpp`)**: Added unit test `OnStaConnectedInitialisesMDNS` verifying `onStaConnected()` begins mDNS with the effective hostname and adds the HTTP service on port 80.
+5. **Documentation Verification**: Verified `README.md:38` (mDNS claim is now backed by implementation) and `docs/developer/hardware-setup.md:145` (already documents `http://<hostname>.local`).
+
+### Files Modified / Created
+
+| File | Status | Description |
+|---|---|---|
+| `web/portal/auth.js` | Modified | Updated OpenSSL helper CN to dynamically use `window.location.hostname` with `'esp32-device.local'` fallback |
+| `modules/WifiManager/WifiManager.cpp` | Modified | Included `<ESPmDNS.h>` and initialized mDNS with HTTP service advertisement in `onStaConnected()` |
+| `test/stubs/platform/ESPmDNS.h` | Created | Added test stub for `MDNSResponder` / `MDNS` for native unit test builds |
+| `test/test_unit/test_wifiManager/test_wifiManager.cpp` | Modified | Added unit test `OnStaConnectedInitialisesMDNS` asserting mDNS initialization on STA connection |
+
+### Decisions Made
+1. **mDNS Initialisation in `onStaConnected()`** — Placed mDNS startup and HTTP service advertisement (`MDNS.begin(_currentHostname)`, `MDNS.addService("http", "tcp", 80)`) directly in `WifiManager::onStaConnected()`. This method is the single canonical entry point invoked upon successful STA connection (initial boot, backoff recovery, and link-loss reconnection), ensuring mDNS is active in STA mode and never in standalone AP mode.
+2. **Native Platform Stub for `ESPmDNS.h`** — Followed the repository's native stub architecture (`test/stubs/platform/`) to mock `MDNSResponder` and global `MDNS` instance, allowing native unit tests to verify mDNS lifecycle calls without ESP-IDF/Arduino dependencies.
+
+### Dead Ends & Warnings
+None.
+
+### Out-of-Scope Findings / Issues Surfaced
+- Confirmed pre-existing issue in `native_ha` environment: `test/test_unit/test_homeassistant/test_homeassistant.cpp:126:12: error: no member named '_drainStartMs' in 'HomeAssistantModule'`. Does not affect standard `native` unit tests or embedded targets.
+
+### Blockers
+None.
+
+### Verification
+
+| Environment | Result | Duration |
+|---|---|---|
+| `native` (unit tests) | ✅ 989/989 PASSED (+1 new test case) | 49.6s |
+| `esp32dev` (build) | ✅ SUCCESS (Flash: 1,335,975 B, RAM: 57,948 B) | 49s |
+| `esp32s3nano` (build) | ✅ SUCCESS (Flash: 1,370,367 B, RAM: 60,572 B) | 43s |
+| `scripts/doc_lint.py` | ✅ PASSED (0 warnings) | < 1s |
+| `scripts/lint_includes.py` | ✅ PASSED (0 boundary violations, 0 circular dependencies) | < 1s |
+
+**Branch:** `232-device-identity/wo3-web-mdns-docs`
+
+

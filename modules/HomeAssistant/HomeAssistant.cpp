@@ -16,6 +16,7 @@
 
 #ifdef WITH_HOMEASSISTANT
 
+#include "Application.hpp"
 #include "utils/serveGzipAsset.hpp"
 
 #include <esp_log.h>
@@ -71,6 +72,22 @@ void HomeAssistantModule::setEventBus(EventBus* eb) {
     if (_eventBus) {
         _eventBus->subscribe("wifi.connected", onWifiConnected, this);
         _eventBus->subscribe("wifi.disconnected", onWifiDisconnected, this);
+    }
+}
+
+/**
+ * @brief Auto-wires app identity (app name, manufacturer, version) from Application.
+ * @param app Reference to the framework Application hub.
+ */
+void HomeAssistantModule::begin(Application& app) {
+    if (_appName.empty()) {
+        _appName = app.getAppName();
+    }
+    if (_manufacturer.empty()) {
+        _manufacturer = app.getManufacturer();
+    }
+    if (_appVersion.empty()) {
+        _appVersion = BUILD_VERSION;
     }
 }
 
@@ -191,7 +208,7 @@ void HomeAssistantModule::generateDiscoveryJson(IHaEntity* entity, JsonObject& p
     JsonObject device = payload["device"].to<JsonObject>();
     device["identifiers"].add(_macPrefix);
     device["name"] = _appName.empty() ? "ESP32 Device (" + _macPrefix + ")" : _appName;
-    device["manufacturer"] = "CB Labs";
+    device["manufacturer"] = _manufacturer.empty() ? "CB Labs" : _manufacturer;
     device["model"] = _appName.empty() ? "App Foundation" : _appName;
     
     if (!_appVersion.empty()) {

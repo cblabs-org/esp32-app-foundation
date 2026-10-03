@@ -241,6 +241,9 @@ void OTAUpdateManager::begin(Application& app) {
     _configManager = &app.getConfigManager();
     _eventBus      = &app.getEventBus();
 
+    String sanitised = Application::sanitiseHostname(app.getAppName());
+    strlcpy(_deviceAppName, sanitised.c_str(), sizeof(_deviceAppName));
+
 #ifdef OTA_ALLOW_UNSIGNED
     if (_config->otaPublicKey == nullptr) {
         ESP_LOGW(TAG, "SECURITY WARNING: Unsigned OTA is enabled (OTA_ALLOW_UNSIGNED) and otaPublicKey is null. Proceeding without verification.");
@@ -627,6 +630,7 @@ void OTAUpdateManager::performUpdateTask() {
 
     // --- Step 8: Create OTADownloadEngine and configure ---
     OTADownloadEngine engine;
+    engine.setDeviceIdentity(_deviceAppName, BUILD_VERSION);
     if (verifierReady) {
         engine.setVerifier(&verifier);
     }

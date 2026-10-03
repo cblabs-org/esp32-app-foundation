@@ -73,6 +73,7 @@
 class ConfigManager;
 class KeyManager;
 class EventBus;
+class Application;
 
 #include <mqtt_client.h>
 
@@ -104,6 +105,7 @@ private:
     std::string _lwtTopic;                              ///< Last Will & Testament topic ("homeassistant/status/<mac>")
     std::string _appName;                               ///< Application name reported in HA device info
     std::string _appVersion;                            ///< Firmware version reported in HA device info
+    std::string _manufacturer;                          ///< Manufacturer string reported in HA device info
 
 
     std::atomic<bool> _mqttConnected{false};            ///< Thread-safe MQTT connection state flag
@@ -177,6 +179,12 @@ public:
 
     /** @brief Sets the firmware version reported in Home Assistant device info. */
     void setAppVersion(const std::string& appVersion) { _appVersion = appVersion; }
+
+    /** @brief Sets the manufacturer string reported in Home Assistant device info. */
+    void setManufacturer(const std::string& manufacturer) { _manufacturer = manufacturer; }
+
+    /** @brief Auto-wires app identity (app name, manufacturer, version) from Application. */
+    void begin(Application& app);
 
     /**
      * @brief Injects the EventBus and subscribes to wifi connect/disconnect events.

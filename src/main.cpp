@@ -109,9 +109,10 @@ void setup() {
     config.otaPublicKey = (const char*)public_key_pem;
 #endif
 
-    // App names its hostname default — WiFiManager owns the persisted value
-    // and falls back to this on factory reset (resetConfig()).
-    app.getWifiManager().setDefaultHostname("esp32-foundation");
+    // setAppName() auto-propagates to WiFi hostname (sanitised), BLE (via begin()),
+    // and web portal. HA requires manual wiring (optional Ring-2 module).
+    // To override the auto-derived hostname: app.getWifiManager().setDefaultHostname("custom");
+    app.setAppName("ESP32 Sample App");
 
 #ifdef WITH_OTA
     app.registerModule(&otaManager);
@@ -127,9 +128,8 @@ void setup() {
     haModule.setKeyManager(&app.getKeyManager());
     haModule.setEventBus(&app.getEventBus());
     haModule.setConfigManager(&app.getConfigManager());
-    haModule.setAppName(app.getAppName());
-    haModule.setAppVersion(BUILD_VERSION);
     app.registerModule(&haModule);
+    haModule.begin(app);
 #endif
 
 #if defined(WITH_DISPLAY_U8G2) || defined(WITH_DISPLAY_LVGL)

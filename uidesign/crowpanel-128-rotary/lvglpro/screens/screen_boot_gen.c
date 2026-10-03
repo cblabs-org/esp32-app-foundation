@@ -58,6 +58,7 @@ lv_obj_t * screen_boot_create(void)
 
         lv_obj_t * boot_title = lv_label_create(lv_obj_0);
         lv_obj_set_name(boot_title, "boot_title");
+        lv_label_bind_text(boot_title, &sys_app_title, NULL);
         lv_label_set_text(boot_title, "ESP32 App Foundation");
         lv_obj_set_align(boot_title, LV_ALIGN_CENTER);
         lv_obj_set_x(boot_title, 0);

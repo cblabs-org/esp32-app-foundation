@@ -192,6 +192,25 @@ TEST_F(OtaDownloadEngineTest, DownloadAndFlash_NativeStub_ReturnsError) {
     EXPECT_NE(result, OTAError::None);
 }
 
+/**
+ * @brief Default user agent should be "ESP32-http-Update".
+ */
+TEST_F(OtaDownloadEngineTest, SetDeviceIdentity_DefaultUserAgent) {
+    EXPECT_STREQ(engine.getUserAgent(), "ESP32-http-Update");
+}
+
+/**
+ * @brief Setting device identity populates formatted User-Agent.
+ */
+TEST_F(OtaDownloadEngineTest, SetDeviceIdentity_FormattedUserAgent) {
+    engine.setDeviceIdentity("weather-station", "0.1.0-dev.5");
+    EXPECT_STREQ(engine.getUserAgent(), "weather-station/0.1.0-dev.5 (ESP32-http-Update)");
+
+    // Null or empty resets to default
+    engine.setDeviceIdentity(nullptr, nullptr);
+    EXPECT_STREQ(engine.getUserAgent(), "ESP32-http-Update");
+}
+
 int main(int argc, char** argv) {
     ::testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();

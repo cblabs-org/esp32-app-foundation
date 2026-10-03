@@ -335,6 +335,11 @@ public:
     void setEventBus(EventBus* eb) { _eventBus = eb; }
 
     /**
+     * @brief Framework fallback default hostname when no app-supplied default exists.
+     */
+    static constexpr const char* DEFAULT_HOSTNAME = "esp32-device";
+
+    /**
      * @brief Set the app-supplied factory default hostname.
      *
      * Called by the downstream app (via Application::getWifiManager()) before
@@ -344,6 +349,12 @@ public:
      * @param hostname Default hostname to seed resetConfig() with (truncated to 32 chars).
      */
     void setDefaultHostname(const char* hostname);
+
+    /**
+     * @brief Returns the app-supplied factory default hostname.
+     * @return Default hostname string.
+     */
+    const char* getDefaultHostname() const { return _defaultHostname; }
 
     /**
      * @brief Returns the current effective hostname (persisted value or factory default).

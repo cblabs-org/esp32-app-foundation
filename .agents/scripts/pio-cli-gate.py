@@ -6,25 +6,61 @@ Enforces rule 04 §1 (MCP-First) and §2 (Lock Discipline) mechanistically:
 blocks direct pio / platformio / esptool CLI invocations via run_command.
 
 Two-mode enforcement:
-  - Worktree CWD (autonomous bug-fixer) → deny (hard block, no human present)
-  - Main workspace CWD (interactive)    → force_ask (user approves per-invocation)
+  - Autonomous session (bug-fixer dispatch) → deny (hard block, no human)
+  - Interactive session                     → force_ask (user approves)
+
+Detection uses the bug-fixer-loop-plugin consumer hook API
+(bugfixer_api.BugFixer) when available, with worktree CWD heuristic as
+fallback.
 
 Uses "force_ask" (interactive) so the "Always Allow" cache is bypassed —
-every single direct CLI invocation needs fresh human approval. This lets
-the user grant one-off permission for debugging without permanently
-weakening the gate.
+every single direct CLI invocation needs fresh human approval.
 """
 
 import json
+import os
 import re
 import sys
 
+# ---------------------------------------------------------------------------
+# Autonomous mode detection
+# ---------------------------------------------------------------------------
+
+# Path segment that indicates a worktree (fallback heuristic).
+_WORKTREE_SEGMENT = "/worktrees/"
+
+# Attempt to import bug-fixer consumer hook API for deterministic detection.
+# Falls back to worktree CWD heuristic if the plugin isn't installed.
+_bugfixer_api = None
+try:
+    _plugin_scripts = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)),
+        os.pardir, "plugins", "bug-fixer-loop-plugin", "scripts",
+    )
+    sys.path.insert(0, os.path.normpath(_plugin_scripts))
+    from bugfixer_api import BugFixer as _BugFixer
+    _bugfixer_api = _BugFixer
+except ImportError:
+    pass
+
+
+def _is_autonomous(conversation_id: str, cwd: str) -> bool:
+    """Detect autonomous (bug-fixer) session.
+
+    Primary: query bug-fixer dispatch tracking via consumer hook API.
+    Fallback: check if CWD is inside a worktrees/ directory.
+    """
+    if _bugfixer_api is not None and conversation_id:
+        return _bugfixer_api.is_autonomous(conversation_id)
+    return _WORKTREE_SEGMENT in cwd
+
+
+# ---------------------------------------------------------------------------
+# PIO / esptool CLI detection
+# ---------------------------------------------------------------------------
+
 # Patterns that indicate direct PIO/esptool CLI usage.
-# We check against individual command segments (split on shell operators).
-# Each pattern is matched against the first token (binary) of a segment,
-# or against the full segment for python-based invocations.
 _BINARY_PATTERNS = [
-    # Exact binary names (possibly at end of a path)
     re.compile(r"(?:^|/)pio$"),
     re.compile(r"(?:^|/)platformio$"),
     re.compile(r"(?:^|/)esptool$"),
@@ -40,22 +76,10 @@ _SEGMENT_PATTERNS = [
 # Shell operators that separate independent commands
 _SHELL_SPLIT = re.compile(r"\s*(?:&&|\|\|?|;)\s*")
 
-# Path segment that indicates a worktree (autonomous bug-fixer session).
-# Future: bug-fixer-loop-plugin#32 may provide a cleaner signal
-# (e.g. conversation-scoped metadata in the hook payload). The mechanism
-# needs design work — env vars won't propagate reliably through
-# Antigravity's hook subprocess chain.
-_WORKTREE_SEGMENT = "/worktrees/"
 
-
-def _is_autonomous(cwd: str) -> bool:
-    """Detect bug-fixer autonomous session via worktree CWD heuristic.
-
-    This checks whether the command's working directory is inside a
-    worktrees/ directory, which indicates an autonomous bug-fixer session.
-    """
-    return _WORKTREE_SEGMENT in cwd
-
+# ---------------------------------------------------------------------------
+# Decision emitters
+# ---------------------------------------------------------------------------
 
 def _allow():
     """Emit allow decision and exit."""
@@ -85,7 +109,7 @@ def _force_ask(matched_binary):
 
 
 def _deny_autonomous(matched_binary):
-    """Emit deny decision (autonomous/worktree session) and exit."""
+    """Emit deny decision (autonomous session) and exit."""
     json.dump({
         "decision": "deny",
         "reason": (
@@ -101,12 +125,15 @@ def _deny_autonomous(matched_binary):
     sys.exit(0)
 
 
+# ---------------------------------------------------------------------------
+# Command analysis
+# ---------------------------------------------------------------------------
+
 def _check_command(command_line):
     """Check if a command line contains direct pio/esptool invocations.
 
     Returns the matched binary string if found, None otherwise.
     """
-    # Split on shell operators to get individual command segments
     segments = _SHELL_SPLIT.split(command_line)
 
     for segment in segments:
@@ -125,10 +152,8 @@ def _check_command(command_line):
         binary_idx = 0
         for i, tok in enumerate(tokens):
             if "=" in tok and not tok.startswith("-"):
-                # Skip env var assignments (e.g. PORT=/dev/ttyUSB0)
                 continue
             if tok in ("sudo", "env", "command", "exec", "nohup", "nice"):
-                # Skip common wrapper binaries
                 continue
             binary_idx = i
             break
@@ -137,11 +162,14 @@ def _check_command(command_line):
             binary = tokens[binary_idx]
             for pattern in _BINARY_PATTERNS:
                 if pattern.search(binary):
-                    # Return a clean name for the message
                     return binary.split("/")[-1]
 
     return None
 
+
+# ---------------------------------------------------------------------------
+# Entry point
+# ---------------------------------------------------------------------------
 
 def main():
     payload = json.load(sys.stdin)
@@ -160,8 +188,9 @@ def main():
 
     matched = _check_command(command_line)
     if matched:
+        conversation_id = payload.get("conversationId", "")
         cwd = args.get("Cwd", "")
-        if _is_autonomous(cwd):
+        if _is_autonomous(conversation_id, cwd):
             _deny_autonomous(matched)
         else:
             _force_ask(matched)

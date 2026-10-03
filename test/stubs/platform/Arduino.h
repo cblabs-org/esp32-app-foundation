@@ -101,6 +101,11 @@ public:
     String substring(unsigned int beginIndex, unsigned int endIndex) const {
         return String(_str.substr(beginIndex, endIndex - beginIndex));
     }
+    void remove(unsigned int index, unsigned int count = 1000000) {
+        if (index < _str.length()) {
+            _str.erase(index, count);
+        }
+    }
 private:
     std::string _str;
 };

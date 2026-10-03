@@ -458,6 +458,73 @@ TEST_F(ApplicationBeginTest, Begin_NativeBuild_ReturnsTrue) {
     EXPECT_TRUE(app.begin(cfg));
 }
 
+/**
+ * begin() auto-propagates app name to WifiManager default hostname (Issue #232).
+ */
+TEST_F(ApplicationBeginTest, Begin_AutoPropagatesAppNameToWifiHostname) {
+    app.setAppName("Weather Station");
+    FrameworkConfig cfg;
+    EXPECT_TRUE(app.begin(cfg));
+    EXPECT_STREQ("weather-station", app.getWifiManager().getDefaultHostname());
+}
+
+/**
+ * begin() auto-propagates sanitised app name to AuthManager cert hostname (Issue #232).
+ */
+TEST_F(ApplicationBeginTest, Begin_AutoPropagatesAppNameToAuthCertHostname) {
+    app.setAppName("Weather Station");
+    FrameworkConfig cfg;
+    EXPECT_TRUE(app.begin(cfg));
+    EXPECT_STREQ("weather-station", app.getAuthManager().getCertHostname());
+}
+
+/**
+ * begin() respects explicitly configured default hostname if set before begin() (Issue #232).
+ */
+TEST_F(ApplicationBeginTest, Begin_PreservesExplicitCustomHostname) {
+    app.setAppName("Weather Station");
+    app.getWifiManager().setDefaultHostname("custom-device");
+    FrameworkConfig cfg;
+    EXPECT_TRUE(app.begin(cfg));
+    EXPECT_STREQ("custom-device", app.getWifiManager().getDefaultHostname());
+}
+
+// =============================================================================
+// Test Group: sanitiseHostname (Issue #232)
+// =============================================================================
+
+TEST(ApplicationSanitiseHostnameTest, StandardTransform) {
+    EXPECT_STREQ("weather-station", Application::sanitiseHostname("Weather Station").c_str());
+}
+
+TEST(ApplicationSanitiseHostnameTest, StripSpecialChars) {
+    EXPECT_STREQ("my-iot-device", Application::sanitiseHostname("My IoT Device!!").c_str());
+}
+
+TEST(ApplicationSanitiseHostnameTest, EmptyStringFallback) {
+    EXPECT_STREQ("esp32-device", Application::sanitiseHostname("").c_str());
+}
+
+TEST(ApplicationSanitiseHostnameTest, NullptrFallback) {
+    EXPECT_STREQ("esp32-device", Application::sanitiseHostname(nullptr).c_str());
+}
+
+TEST(ApplicationSanitiseHostnameTest, OnlyHyphensFallback) {
+    EXPECT_STREQ("esp32-device", Application::sanitiseHostname("---").c_str());
+}
+
+TEST(ApplicationSanitiseHostnameTest, ConsecutiveSeparatorsAndUnderscores) {
+    EXPECT_STREQ("foo-bar-baz", Application::sanitiseHostname("Foo__Bar   Baz").c_str());
+}
+
+TEST(ApplicationSanitiseHostnameTest, TruncateTo32Chars) {
+    String longName = "A Very Long Application Display Name That Exceeds Thirty Two Chars";
+    String sanitised = Application::sanitiseHostname(longName.c_str());
+    EXPECT_LE(sanitised.length(), 32u);
+    EXPECT_NE(sanitised[sanitised.length() - 1], '-');
+    EXPECT_EQ(sanitised, "a-very-long-application-display");
+}
+
 // =============================================================================
 // Test Group 6: ConfigManager Gateway
 // =============================================================================

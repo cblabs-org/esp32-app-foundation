@@ -321,6 +321,16 @@ bool AuthManager::_loadFromFile(const char* path,
     return (*outLen == fileSize);
 }
 
+/**
+ * @brief Set the device hostname used for TLS certificate Common Name and SAN.
+ *
+ * @param hostname Sanitised device hostname (e.g. "weather-station").
+ */
+void AuthManager::setCertHostname(const char* hostname) {
+    if (hostname && hostname[0] != '\0') {
+        strlcpy(_certHostname, hostname, sizeof(_certHostname));
+    }
+}
 
 // ---------------------------------------------------------------------------
 // Cert Helpers — Certificate Generation
@@ -684,7 +694,7 @@ void AuthManager::registerRoutes(PsychicHttpServer& server) {
                     BaseType_t certResult = xTaskCreate(
                         [](void* param) {
                             auto* self = static_cast<AuthManager*>(param);
-                            self->generateAndStoreCert("esp32-device");
+                            self->generateAndStoreCert(self->_certHostname);
                             self->_certGenRunning.store(false);
                             vTaskDelete(nullptr);
                         },
@@ -754,7 +764,7 @@ void AuthManager::registerRoutes(PsychicHttpServer& server) {
         BaseType_t certResult = xTaskCreate(
             [](void* param) {
                 auto* self = static_cast<AuthManager*>(param);
-                self->generateAndStoreCert("esp32-device");
+                self->generateAndStoreCert(self->_certHostname);
                 self->_certGenRunning.store(false);
                 vTaskDelete(nullptr);
             },
