@@ -213,7 +213,7 @@ select:focus {
 
 button {
   background: var(--primary);
-  /* color replaced */
+  color: var(--white);
   border: none;
   padding: 0.8rem 1.25rem;
   border-radius: 10px;
@@ -421,14 +421,14 @@ button.secondary:hover {
 .pill-btn--active,
 .pill-btn--active:hover {
   background: var(--primary);
-  /* color replaced */
+  color: var(--white);
   border-color: var(--primary);
 }
 
 /* Screenshot pixel colour preset — active state mirrors pill-btn--active */
 .btn-ss-colour--active {
   background: var(--primary);
-  /* color replaced */
+  color: var(--white);
   border-color: var(--primary);
 }
 
@@ -752,7 +752,6 @@ article.info-drawer > details > .info-drawer-content {
   border-radius: 10px;
   font-size: 0.85rem;
   font-weight: 600;
-  /* color replaced */
   background: var(--text);
   color: var(--bg);
   transform: translateY(20px);
@@ -861,7 +860,7 @@ dialog::backdrop {
 
 .btn--delete:hover {
   background: var(--error);
-  /* color replaced */
+  color: var(--white);
 }
 
 /* ==========================================================================
@@ -1191,7 +1190,7 @@ button.full-width {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  /* color replaced */
+  color: var(--white);
   gap: 1.25rem;
   opacity: 0;
   visibility: hidden;
@@ -1205,7 +1204,7 @@ button.full-width {
   width: 44px;
   height: 44px;
   border: 3px solid rgba(255, 255, 255, 0.25);
-  border-top-/* color replaced */
+  border-top-color: var(--white);
   border-radius: 50%;
   animation: reboot-spin 0.8s linear infinite;
 }
