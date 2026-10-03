@@ -41,7 +41,7 @@
 ## Work Order Decomposition
 
 - **[x] [wo1-core-propagation](wo1-core-propagation/WORKORDER.md):** Core identity plumbing — `sanitiseHostname()`, `Application::begin()` auto-propagation to WiFi + HA. Consumer `main.cpp` + `sample-app/main.cpp` simplification.
-- **[ ] [wo2-peripheral-surfaces](wo2-peripheral-surfaces/WORKORDER.md):** Peripheral identity surfaces — MCP server name, OTA User-Agent, TLS cert CN, boot serial banner, LVGL boot screen `bind_text` fix.
+- **[x] [wo2-peripheral-surfaces](wo2-peripheral-surfaces/WORKORDER.md):** Peripheral identity surfaces — MCP server name, OTA User-Agent, TLS cert CN, boot serial banner, LVGL boot screen `bind_text` fix.
 - **[ ] [wo3-web-mdns-docs](wo3-web-mdns-docs/WORKORDER.md):** Web client, mDNS implementation, auth.js fix, documentation corrections.
 
 ## Approval Status
@@ -56,4 +56,10 @@
 **Cross-cutting decisions**: HA auto-wiring deferred — HA is an optional Ring-2 module without direct Application access; manual `haModule.setAppName()` kept in consumer main.cpp with documenting comments.
 **Surfaced findings**: `HomeAssistantModule.cpp:194` hardcodes `"manufacturer": "CB Labs"` — should consume `app.getManufacturer()`. Deferred to future issue.
 **Verification**: 983/983 native tests passed, both target builds (esp32dev, esp32s3nano) green, doc lint clean.
+
+### 2026-10-03T17:29:00+01:00 — WO2 Complete: Peripheral Identity Surfaces
+**Summary**: Wired 5 remaining C++ module surfaces. MCPServer: `setAppName()` with fallback chain. OTA: `setDeviceIdentity()` formats User-Agent. AuthManager: `setCertHostname()` replaces hardcoded CN (char[33] async-safe). Boot banner includes app name. LVGL `bind_text` activates reactive binding.
+**Cross-cutting decisions**: MCPServer server name uses sanitised hostname (lowercase-hyphenated) for protocol compatibility, with fallback chain: appName → hostname → `"esp32-app-foundation"`. OTA User-Agent preserves `(ESP32-http-Update)` suffix for server-side compatibility.
+**Surfaced findings**: None — all changes were clean and within boundary box.
+**Verification**: 988/988 native tests passed (+5 new), both target builds green.
 
