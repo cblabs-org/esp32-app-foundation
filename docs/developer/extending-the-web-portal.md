@@ -61,7 +61,7 @@ void registerTabs(ITabRegistry& registry) override {
 The portal is a Single Page Application. It does **not** load HTML fragments from the filesystem. Instead, at boot `app.js` fetches the tab hierarchy from `/api/tabs`, and for each tab it loads that tab's **JavaScript** over the HTTP route the module registered (declared via `registry.addTab(…, script)` in `registerTabs()`). When the user activates a tab, that script builds its own DOM markup into the tab's container and talks to the REST endpoints your module registered in C++. There is no separate per-tab HTML file.
 
 ### C++ Web API Routes (Backend)
-Here is the route registration from the template file [myApp.cpp](../../template-app/src/myApp.cpp). It registers a GET route to retrieve status, and a POST route to update settings:
+Here is the route registration from the template file [MyApp.cpp](../../template-app/src/MyApp.cpp). It registers a GET route to retrieve status, and a POST route to update settings:
 
 ```cpp
 #ifdef ESP_PLATFORM

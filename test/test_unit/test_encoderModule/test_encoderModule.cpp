@@ -5,7 +5,7 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  *
- * Test: test/test_unit/test_encoderModule/test_EncoderModule.cpp
+ * Test: test/test_unit/test_encoderModule/test_encoderModule.cpp
  * Description: GoogleTest unit-test suite for EncoderModule. Validates EncoderConfig types,
  *              PCNT read/clear flow, delta accumulation, detent normalisation, acceleration
  *              curve, MCP diagnostic tool, and EventBus integration.
