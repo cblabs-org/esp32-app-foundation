@@ -50,11 +50,11 @@ static constexpr size_t MSG_POOL_MAX_MSG_LEN = 256;
  */
 class ScrollingMessagePoolWidget : public ScrollingTextWidget {
 private:
-    char messageBuffer[MSG_POOL_BUFFER_SIZE][MSG_POOL_MAX_MSG_LEN]; // Circular message buffer
-    size_t writeIndex;       // Next write position in circular buffer
-    size_t messageCount;     // Total messages currently in the buffer (max MSG_POOL_BUFFER_SIZE)
-    size_t readIndex;        // Current read position for sequential playback
-    EventBus* eventBus;      // Cached EventBus reference for unsubscribe (if needed)
+    char _messageBuffer[MSG_POOL_BUFFER_SIZE][MSG_POOL_MAX_MSG_LEN]; // Circular message buffer
+    size_t _writeIndex;      // Next write position in circular buffer
+    size_t _messageCount;    // Total messages currently in the buffer (max MSG_POOL_BUFFER_SIZE)
+    size_t _readIndex;       // Current read position for sequential playback
+    EventBus* _eventBus;     // Cached EventBus reference for unsubscribe (if needed)
 
     /**
      * @brief Load the next message from the circular buffer into the marquee.
@@ -75,13 +75,13 @@ private:
 public:
     /**
      * @brief Construct a scrolling message pool widget.
-     * @param _x X coordinate of top-left corner.
-     * @param _y Y coordinate of top-left corner.
-     * @param _w Width of bounding box in pixels.
-     * @param _h Height of bounding box in pixels.
-     * @param _font U8G2 font for rendering (nullptr for default).
+     * @param x X coordinate of top-left corner.
+     * @param y Y coordinate of top-left corner.
+     * @param w Width of bounding box in pixels.
+     * @param h Height of bounding box in pixels.
+     * @param font U8G2 font for rendering (nullptr for default).
      */
-    ScrollingMessagePoolWidget(int _x, int _y, int _w, int _h, const uint8_t* _font = nullptr);
+    ScrollingMessagePoolWidget(int x, int y, int w, int h, const uint8_t* font = nullptr);
     /** @brief Destructor for ScrollingMessagePoolWidget. */
     virtual ~ScrollingMessagePoolWidget() = default;
 
@@ -104,7 +104,7 @@ public:
      * @brief Return the number of messages currently in the circular buffer.
      * @return Message count (0 to MSG_POOL_BUFFER_SIZE).
      */
-    size_t getMessageCount() const { return messageCount; }
+    size_t getMessageCount() const { return _messageCount; }
 
     /**
      * @brief Tick handler: feeds messages to the marquee and handles transitions.

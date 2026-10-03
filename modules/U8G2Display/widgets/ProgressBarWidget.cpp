@@ -27,19 +27,19 @@
 
 /**
  * @brief Initialize the progress bar with default state (0% progress).
- * @param _x X coordinate.
- * @param _y Y coordinate.
- * @param _w Width (-1 for full display).
- * @param _h Height (-1 for auto).
- * @param _font Optional font override.
+ * @param x X coordinate.
+ * @param y Y coordinate.
+ * @param w Width (-1 for full display).
+ * @param h Height (-1 for auto).
+ * @param font Optional font override.
  */
-ProgressBarWidget::ProgressBarWidget(int _x, int _y, int _w, int _h, const uint8_t* _font)
-    : IGfxWidget(_x, _y, _w, _h),
-      currentPercent(0), targetPercent(0), startPercent(0),
-      animStartTime(0), animDurationMs(0),
-      oldPercent(0), textChanged(false), showPercentText(false),
-      font(_font) {
-    message[0] = '\0';
+ProgressBarWidget::ProgressBarWidget(int x, int y, int w, int h, const uint8_t* font)
+    : IGfxWidget(x, y, w, h),
+      _currentPercent(0), _targetPercent(0), _startPercent(0),
+      _animStartTime(0), _animDurationMs(0),
+      _oldPercent(0), _textChanged(false), _showPercentText(false),
+      _font(font) {
+    _message[0] = '\0';
 }
 
 /**
@@ -49,10 +49,10 @@ ProgressBarWidget::ProgressBarWidget(int _x, int _y, int _w, int _h, const uint8
  */
 void ProgressBarWidget::setMessage(const char* newMessage) {
     if (newMessage == nullptr) return;
-    if (strcmp(message, newMessage) != 0) {
-        strncpy(message, newMessage, sizeof(message) - 1);
-        message[sizeof(message) - 1] = '\0';
-        textChanged = true;
+    if (strcmp(_message, newMessage) != 0) {
+        strncpy(_message, newMessage, sizeof(_message) - 1);
+        _message[sizeof(_message) - 1] = '\0';
+        _textChanged = true;
     }
 }
 
@@ -61,9 +61,9 @@ void ProgressBarWidget::setMessage(const char* newMessage) {
  * @param show Boolean flag.
  */
 void ProgressBarWidget::setShowPercentText(bool show) {
-    if (showPercentText != show) {
-        showPercentText = show;
-        textChanged = true;
+    if (_showPercentText != show) {
+        _showPercentText = show;
+        _textChanged = true;
     }
 }
 
@@ -79,17 +79,17 @@ void ProgressBarWidget::setPercent(int percent, uint32_t durationMs) {
     if (percent < 0) percent = 0;
     if (percent > 100) percent = 100;
 
-    animDurationMs = durationMs;
+    _animDurationMs = durationMs;
 
-    if (animDurationMs > 0) {
+    if (_animDurationMs > 0) {
         // --- Initialize Animation Path ---
-        startPercent = currentPercent;
-        targetPercent = percent;
-        animStartTime = 0;   // Will be initialized on first tick()
+        _startPercent = _currentPercent;
+        _targetPercent = percent;
+        _animStartTime = 0;   // Will be initialized on first tick()
     } else {
         // --- Instant State Transition ---
-        currentPercent = percent;
-        targetPercent = percent;
+        _currentPercent = percent;
+        _targetPercent = percent;
     }
 }
 
@@ -99,25 +99,25 @@ void ProgressBarWidget::setPercent(int percent, uint32_t durationMs) {
  * @param currentMillis Milliseconds since boot.
  */
 void ProgressBarWidget::tick(uint32_t currentMillis) {
-    if (!isVisible) return;
+    if (!_isVisible) return;
 
-    if (animDurationMs > 0 && currentPercent != targetPercent) {
+    if (_animDurationMs > 0 && _currentPercent != _targetPercent) {
         // --- Lazy init of animation start time ---
         // animStartTime is set to 0 in setPercent() and initialized on first tick.
-        if (animStartTime == 0) {
-            animStartTime = currentMillis;
+        if (_animStartTime == 0) {
+            _animStartTime = currentMillis;
         }
 
-        uint32_t elapsed = currentMillis - animStartTime;
-        if (elapsed >= animDurationMs) {
+        uint32_t elapsed = currentMillis - _animStartTime;
+        if (elapsed >= _animDurationMs) {
             // --- Animation Complete ---
-            currentPercent = targetPercent;
+            _currentPercent = _targetPercent;
         } else {
             // --- Linear Interpolation ---
             // progress = elapsed / duration, scaled to the [start, target] range.
             // Uses integer math to avoid float on resource-constrained devices.
-            int range = targetPercent - startPercent;
-            currentPercent = startPercent + (int)((long)range * (long)elapsed / (long)animDurationMs);
+            int range = _targetPercent - _startPercent;
+            _currentPercent = _startPercent + (int)((long)range * (long)elapsed / (long)_animDurationMs);
         }
     }
 }
@@ -135,44 +135,44 @@ void ProgressBarWidget::tick(uint32_t currentMillis) {
  * @param display U8G2 reference.
  */
 void ProgressBarWidget::render(U8G2& display) {
-    if (!isVisible) return;
+    if (!_isVisible) return;
 
-    int renderW = (width > 0) ? width : (display.getDisplayWidth() - x);
-    int renderH = (height > 0) ? height : 20;
+    int renderW = (_width > 0) ? _width : (display.getDisplayWidth() - _x);
+    int renderH = (_height > 0) ? _height : 20;
 
     // --- Step 1: Clear the bounding box ---
-    blankArea(display, x, y, renderW, renderH);
+    blankArea(display, _x, _y, renderW, renderH);
 
     U8G2StateSaver stateSaver(display);
-    if (font) display.setFont(font);
+    if (_font) display.setFont(_font);
 
     // --- Step 2: Draw the message text (centered above bar) ---
-    if (message[0] != '\0' || showPercentText) {
+    if (_message[0] != '\0' || _showPercentText) {
         char fullStr[128];
 
-        if (showPercentText) {
-            if (message[0] != '\0') {
-                snprintf(fullStr, sizeof(fullStr), "%s %d%%", message, currentPercent);
+        if (_showPercentText) {
+            if (_message[0] != '\0') {
+                snprintf(fullStr, sizeof(fullStr), "%s %d%%", _message, _currentPercent);
             } else {
-                snprintf(fullStr, sizeof(fullStr), "%d%%", currentPercent);
+                snprintf(fullStr, sizeof(fullStr), "%d%%", _currentPercent);
             }
         } else {
-            strncpy(fullStr, message, sizeof(fullStr) - 1);
+            strncpy(fullStr, _message, sizeof(fullStr) - 1);
             fullStr[sizeof(fullStr) - 1] = '\0';
         }
 
-        drawText(display, fullStr, x, y, renderW, renderH - 4,
+        drawText(display, fullStr, _x, _y, renderW, renderH - 4,
                  TextAlign::Center, true);
     }
 
     // --- Step 3: Draw the bar at the bottom of the widget ---
-    int barY = y + renderH - 4;
-    int fill = (currentPercent * renderW) / 100;
+    int barY = _y + renderH - 4;
+    int fill = (_currentPercent * renderW) / 100;
     bool toggle = false;
 
     // Draw empty track background
     display.setDrawColor(0);
-    display.drawBox(x, barY, renderW, 2);
+    display.drawBox(_x, barY, renderW, 2);
     display.setDrawColor(1);
 
     // --- Checkered Stipple Pattern ---
@@ -180,11 +180,11 @@ void ProgressBarWidget::render(U8G2& display) {
     // to give a classic LCD/DMD "shaded" look without alpha blending.
     for (int i = 0; i < fill; i++) {
         if (toggle) {
-            display.drawHVLine(x + i, barY, 1, 1);
-            display.drawHVLine(x + i, barY + 1, 1, 0);
+            display.drawHVLine(_x + i, barY, 1, 1);
+            display.drawHVLine(_x + i, barY + 1, 1, 0);
         } else {
-            display.drawHVLine(x + i, barY, 1, 0);
-            display.drawHVLine(x + i, barY + 1, 1, 1);
+            display.drawHVLine(_x + i, barY, 1, 0);
+            display.drawHVLine(_x + i, barY + 1, 1, 1);
         }
         toggle = !toggle;
     }
@@ -197,19 +197,19 @@ void ProgressBarWidget::render(U8G2& display) {
  * @param currentMillis Milliseconds since boot.
  */
 void ProgressBarWidget::renderAnimationUpdate(U8G2& display, uint32_t currentMillis) {
-    if (!isVisible) return;
+    if (!_isVisible) return;
 
     tick(currentMillis);
 
-    if (currentPercent != oldPercent || textChanged) {
-        oldPercent = currentPercent;
-        textChanged = false;
+    if (_currentPercent != _oldPercent || _textChanged) {
+        _oldPercent = _currentPercent;
+        _textChanged = false;
 
         render(display);
 
-        int renderW = (width > 0) ? width : (display.getDisplayWidth() - x);
-        int renderH = (height > 0) ? height : 20;
-        display.updateDisplayArea(x / 8, y / 8, (renderW + 7) / 8, (renderH + 7) / 8);
+        int renderW = (_width > 0) ? _width : (display.getDisplayWidth() - _x);
+        int renderH = (_height > 0) ? _height : 20;
+        display.updateDisplayArea(_x / 8, _y / 8, (renderW + 7) / 8, (renderH + 7) / 8);
     }
 }
 

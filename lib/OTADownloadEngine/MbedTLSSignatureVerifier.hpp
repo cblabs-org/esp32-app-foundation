@@ -71,7 +71,7 @@ public:
     bool verify(const uint8_t* signature, size_t signatureLength) override;
 
 private:
-    mbedtls_pk_context   pk_;     // Public key context
-    mbedtls_md_context_t md_ctx_; // Message digest (SHA-256) context
-    bool initialized_ = false;    // Guard: true only after successful begin()
+    mbedtls_pk_context   _pk;          // Public key context
+    mbedtls_md_context_t _mdCtx;       // Message digest (SHA-256) context
+    bool                 _initialized = false; // Guard: true only after successful begin()
 };

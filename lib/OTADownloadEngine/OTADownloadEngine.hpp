@@ -71,7 +71,7 @@ using OTAProgressCallback = void(*)(void* context, size_t bytesWritten, size_t t
  *
  * The engine does NOT create its own WiFiClient — the caller provides
  * a configured client (secure or insecure). The caller is also responsible
- * for calling verifier_->begin(publicKey) before invoking downloadAndFlash().
+ * for calling _verifier->begin(publicKey) before invoking downloadAndFlash().
  */
 class OTADownloadEngine {
 public:
@@ -167,12 +167,12 @@ public:
     static String extractHost(const std::string& urlStr);
 
 private:
-    IOTAVerifier*        verifier_    = nullptr;  // Optional verifier (not owned)
-    OTAProgressCallback  progressCb_  = nullptr;  // Progress notification callback
-    void*                progressCtx_ = nullptr;  // Opaque context for progressCb_
-    int                  httpTimeout_ = 8000;     // HTTP client timeout in ms
-    OTAError             lastError_   = OTAError::None; // Most recent error
-    char                 expectedVersion_[32] = {};     // Expected version for pre-flash validation
+    IOTAVerifier*        _verifier        = nullptr;  // Optional verifier (not owned)
+    OTAProgressCallback  _progressCb      = nullptr;  // Progress notification callback
+    void*                _progressCtx     = nullptr;  // Opaque context for _progressCb
+    int                  _httpTimeout     = 8000;     // HTTP client timeout in ms
+    OTAError             _lastError       = OTAError::None; // Most recent error
+    char                 _expectedVersion[32] = {};   // Expected version for pre-flash validation
 
     static constexpr int kMaxRedirects = 5;       // Maximum redirect hops before failure ///< Maximum kmaxredirects
     static constexpr size_t kChunkSize = 1024;    // Streaming read/write buffer size ///< Size of kchunksize

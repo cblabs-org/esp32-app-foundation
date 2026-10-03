@@ -47,30 +47,30 @@ public:
     };
 
 private:
-    bool showColon;               // Current colon visibility state
-    bool oldColon;                // Previous colon state (for dedup in animation)
-    bool blinkEnabled;            // If true, colon blinks at 1Hz
-    uint32_t lastBlinkMs;         // Timestamp of the last blink toggle
-    int lastMinute;               // Cached minute for change detection
-    int lastSecond;               // Cached second for change detection
-    ClockFormat format;           // Active display format
-    const uint8_t* font;          // Primary font pointer
-    const uint8_t* secondaryFont; // Optional secondary font for seconds
-    int alignment;                // Horizontal justification: 0=Left, 1=Center, 2=Right
-    TimeManager* timeMgr;         // Injected TimeManager dependency
+    bool _showColon;               // Current colon visibility state
+    bool _oldColon;                // Previous colon state (for dedup in animation)
+    bool _blinkEnabled;            // If true, colon blinks at 1Hz
+    uint32_t _lastBlinkMs;         // Timestamp of the last blink toggle
+    int _lastMinute;               // Cached minute for change detection
+    int _lastSecond;               // Cached second for change detection
+    ClockFormat _format;           // Active display format
+    const uint8_t* _font;          // Primary font pointer
+    const uint8_t* _secondaryFont; // Optional secondary font for seconds
+    int _alignment;                // Horizontal justification: 0=Left, 1=Center, 2=Right
+    TimeManager* _timeMgr;         // Injected TimeManager dependency
 
 public:
     /**
      * @brief Construct the clock widget with a TimeManager dependency.
-     * @param _timeMgr Pointer to the TimeManager instance (may be nullptr for tests).
-     * @param _x X position on the display.
-     * @param _y Y position on the display.
-     * @param _w Width (-1 for auto).
-     * @param _h Height (-1 for auto).
-     * @param _font Pointer to the primary U8G2 font (nullptr for default).
+     * @param timeMgr Pointer to the TimeManager instance (may be nullptr for tests).
+     * @param x X position on the display.
+     * @param y Y position on the display.
+     * @param w Width (-1 for auto).
+     * @param h Height (-1 for auto).
+     * @param font Pointer to the primary U8G2 font (nullptr for default).
      */
-    ClockWidget(TimeManager* _timeMgr, int _x, int _y, int _w = -1, int _h = -1,
-                const uint8_t* _font = nullptr);
+    ClockWidget(TimeManager* timeMgr, int x, int y, int w = -1, int h = -1,
+                const uint8_t* font = nullptr);
 
     /**
      * @brief Update the primary font used by the clock.
@@ -94,13 +94,13 @@ public:
      * @brief Toggle the blinking colon animation.
      * @param enable True to enable blinking, false for solid colon.
      */
-    void setBlink(bool enable) { blinkEnabled = enable; showColon = true; }
+    void setBlink(bool enable) { _blinkEnabled = enable; _showColon = true; }
 
     /**
      * @brief Set the horizontal alignment strategy inside the widget width.
      * @param align 0=Left, 1=Center, 2=Right.
      */
-    void setAlignment(int align) { alignment = align; }
+    void setAlignment(int align) { _alignment = align; }
 
     /**
      * @brief Update the clock's internal blink state.

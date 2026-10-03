@@ -27,11 +27,11 @@ void PreconditionEngine::add(const char* name,
                              uint8_t edgeCount,
                              const DampingPolicy* damping,
                              const RetryPolicy*  retry) {
-    if (count_ >= MAX_PRECONDITIONS) {
+    if (_count >= MAX_PRECONDITIONS) {
         ESP_LOGE(TAG, "Cannot add %s: MAX_PRECONDITIONS reached", name);
         return;
     }
-    auto& p = preconditions_[count_++];
+    auto& p = _preconditions[_count++];
     p.name = name;
     p.role = role;
     p.evaluate = evaluate;
@@ -58,19 +58,19 @@ void PreconditionEngine::add(const char* name,
     p.lastAttemptMs = 0;
     p.dampingOverride = damping;
     p.retryOverride = retry;
-    const RetryPolicy& rp = retry ? *retry : retryPolicy_;
+    const RetryPolicy& rp = retry ? *retry : _retryPolicy;
     p.cooldownMs = rp.baseDelayMs;
 }
 
 bool PreconditionEngine::resolveEdges() {
     bool ok = true;
-    for (size_t i = 0; i < count_; ++i) {
-        auto& p = preconditions_[i];
+    for (size_t i = 0; i < _count; ++i) {
+        auto& p = _preconditions[i];
         p.resolvedEdgeCount = 0;
         for (uint8_t e = 0; e < p.edgeCount; ++e) {
             bool found = false;
-            for (size_t j = 0; j < count_; ++j) {
-                if (strcmp(preconditions_[j].name, p.edges[e].name) == 0) {
+            for (size_t j = 0; j < _count; ++j) {
+                if (strcmp(_preconditions[j].name, p.edges[e].name) == 0) {
                     if (p.resolvedEdgeCount < MAX_EDGES_PER_PRECONDITION) {
                         p.resolvedEdges[p.resolvedEdgeCount] = static_cast<uint8_t>(j);
                         p.resolvedEdgeKinds[p.resolvedEdgeCount] = p.edges[e].kind;
@@ -98,7 +98,7 @@ bool PreconditionEngine::resolveEdges() {
         if (visited[node] == 2) return false;
         
         visited[node] = 1;
-        const auto& p = preconditions_[node];
+        const auto& p = _preconditions[node];
         for (uint8_t e = 0; e < p.resolvedEdgeCount; ++e) {
             if (self(self, p.resolvedEdges[e])) {
                 ESP_LOGE(TAG, "Cycle detected involving '%s'", p.name);
@@ -109,7 +109,7 @@ bool PreconditionEngine::resolveEdges() {
         return false;
     };
 
-    for (size_t i = 0; i < count_; ++i) {
+    for (size_t i = 0; i < _count; ++i) {
         if (visited[i] == 0) {
             if (dfs(dfs, i)) {
                 ok = false;
@@ -118,13 +118,13 @@ bool PreconditionEngine::resolveEdges() {
     }
 
     if (ok) {
-        for (size_t i = 0; i < count_; ++i) {
-            const auto& p = preconditions_[i];
+        for (size_t i = 0; i < _count; ++i) {
+            const auto& p = _preconditions[i];
             if (p.edgeCount == 0) {
                 ESP_LOGI(TAG, "Graph: [%s]", p.name);
             } else {
                 for (uint8_t e = 0; e < p.resolvedEdgeCount; ++e) {
-                    ESP_LOGI(TAG, "Graph: [%s] -> [%s]", p.name, preconditions_[p.resolvedEdges[e]].name);
+                    ESP_LOGI(TAG, "Graph: [%s] -> [%s]", p.name, _preconditions[p.resolvedEdges[e]].name);
                 }
             }
         }
@@ -135,15 +135,15 @@ bool PreconditionEngine::resolveEdges() {
 
 void PreconditionEngine::tick(uint32_t nowMs) {
     float elapsedSec = 0.0f;
-    if (lastTickMs_ > 0 && nowMs > lastTickMs_) {
-        elapsedSec = (nowMs - lastTickMs_) / 1000.0f;
-    } else if (nowMs < lastTickMs_) {
+    if (_lastTickMs > 0 && nowMs > _lastTickMs) {
+        elapsedSec = (nowMs - _lastTickMs) / 1000.0f;
+    } else if (nowMs < _lastTickMs) {
         elapsedSec = 0.0f;
     }
-    lastTickMs_ = nowMs;
+    _lastTickMs = nowMs;
 
-    for (size_t i = 0; i < count_; ++i) {
-        auto& p = preconditions_[i];
+    for (size_t i = 0; i < _count; ++i) {
+        auto& p = _preconditions[i];
         
         // Step 1: Evaluate the precondition's own function first.
         if (p.evaluate) {
@@ -159,7 +159,7 @@ void PreconditionEngine::tick(uint32_t nowMs) {
         for (uint8_t e = 0; e < p.resolvedEdgeCount; ++e) {
             uint8_t idx = p.resolvedEdges[e];
             EdgeKind kind = p.resolvedEdgeKinds[e];
-            const auto& upstream = preconditions_[idx];
+            const auto& upstream = _preconditions[idx];
             
             bool upstreamMet = upstream.rawStatus.met;
             bool wasMet = p.prevUpstreamMet[e];
@@ -208,7 +208,7 @@ void PreconditionEngine::updateDamping(PreconditionState& state, float elapsedSe
     if (!state.everMet) return;
 
     // Per-precondition override (#154) or engine-wide default
-    const DampingPolicy& dp = state.dampingOverride ? *state.dampingOverride : dampingPolicy_;
+    const DampingPolicy& dp = state.dampingOverride ? *state.dampingOverride : _dampingPolicy;
 
     float weight = 1.0f;
     switch (state.severity) {
@@ -245,7 +245,7 @@ void PreconditionEngine::updateDamping(PreconditionState& state, float elapsedSe
 
 void PreconditionEngine::updateBreaker(PreconditionState& state, uint32_t nowMs) {
     // Per-precondition override (#154) or engine-wide default
-    const RetryPolicy& rp = state.retryOverride ? *state.retryOverride : retryPolicy_;
+    const RetryPolicy& rp = state.retryOverride ? *state.retryOverride : _retryPolicy;
 
     if (state.rawStatus.met) {
         state.breaker = BreakerState::Closed;
@@ -295,9 +295,9 @@ void PreconditionEngine::updateBreaker(PreconditionState& state, uint32_t nowMs)
 }
 
 bool PreconditionEngine::allStartupMet() const {
-    for (size_t i = 0; i < count_; ++i) {
-        if (preconditions_[i].role == PreconditionRole::Startup || preconditions_[i].role == PreconditionRole::Both) {
-            if (!preconditions_[i].dampedStatus.met) return false;
+    for (size_t i = 0; i < _count; ++i) {
+        if (_preconditions[i].role == PreconditionRole::Startup || _preconditions[i].role == PreconditionRole::Both) {
+            if (!_preconditions[i].dampedStatus.met) return false;
         }
     }
     return true;
@@ -308,40 +308,40 @@ bool PreconditionEngine::getAppRunning() const {
 }
 
 size_t PreconditionEngine::getPreconditionCount() const {
-    return count_;
+    return _count;
 }
 
 const PreconditionState& PreconditionEngine::getStateAt(size_t i) const {
-    assert(i < count_);
-    return preconditions_[i];
+    assert(i < _count);
+    return _preconditions[i];
 }
 
 const PreconditionState* PreconditionEngine::getStateByName(const char* name) const {
-    for (size_t i = 0; i < count_; ++i) {
-        if (strcmp(preconditions_[i].name, name) == 0) {
-            return &preconditions_[i];
+    for (size_t i = 0; i < _count; ++i) {
+        if (strcmp(_preconditions[i].name, name) == 0) {
+            return &_preconditions[i];
         }
     }
     return nullptr;
 }
 
 void PreconditionEngine::bumpIdentityEpoch(const char* name) {
-    for (size_t i = 0; i < count_; ++i) {
-        if (strcmp(preconditions_[i].name, name) == 0) {
-            preconditions_[i].identityEpoch++;
-            preconditions_[i].everMet = false;
+    for (size_t i = 0; i < _count; ++i) {
+        if (strcmp(_preconditions[i].name, name) == 0) {
+            _preconditions[i].identityEpoch++;
+            _preconditions[i].everMet = false;
             break;
         }
     }
 }
 
 void PreconditionEngine::requestRetry(const char* name) {
-    for (size_t i = 0; i < count_; ++i) {
-        if (strcmp(preconditions_[i].name, name) == 0) {
-            preconditions_[i].breaker = BreakerState::HalfOpen;
-            preconditions_[i].lastAttemptMs = 0; // force immediate retry
-            preconditions_[i].penalty = 0.0f;
-            preconditions_[i].suppressed = false;
+    for (size_t i = 0; i < _count; ++i) {
+        if (strcmp(_preconditions[i].name, name) == 0) {
+            _preconditions[i].breaker = BreakerState::HalfOpen;
+            _preconditions[i].lastAttemptMs = 0; // force immediate retry
+            _preconditions[i].penalty = 0.0f;
+            _preconditions[i].suppressed = false;
             break;
         }
     }

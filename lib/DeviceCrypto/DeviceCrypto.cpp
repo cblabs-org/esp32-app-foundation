@@ -45,17 +45,17 @@ void DeviceCrypto::begin() {
         mbedtls_md_update(&ctx, mac, 6);
         uint32_t salt = esp_random();
         mbedtls_md_update(&ctx, (const unsigned char*)&salt, sizeof(salt));
-        mbedtls_md_finish(&ctx, aesKey);
+        mbedtls_md_finish(&ctx, _aesKey);
         mbedtls_md_free(&ctx);
 
-        prefs.putBytes("aes_key", aesKey, 32);
+        prefs.putBytes("aes_key", _aesKey, 32);
         ESP_LOGD("CRYPTO", "Generated and firmly committed new MAC-derived 256-bit AES Hardware Key.");
     } else {
-        prefs.getBytes("aes_key", aesKey, 32);
+        prefs.getBytes("aes_key", _aesKey, 32);
         ESP_LOGD("CRYPTO", "Mounted existing persistent AES Master Key.");
     }
     prefs.end();
-    keyLoaded = true;
+    _keyLoaded = true;
 }
 
 /**
@@ -99,8 +99,8 @@ size_t DeviceCrypto::removePKCS7Padding(const uint8_t* buffer, size_t paddedLen)
  * @return Managed unique pointer to Base64-encoded string containing IV + Ciphertext.
  */
 std::unique_ptr<char[]> DeviceCrypto::encrypt(const char* plaintext, size_t inputLen, size_t* outLen) {
-    if (!keyLoaded || inputLen == 0) {
-        ESP_LOGE(TAG, "encrypt() failed: %s", !keyLoaded ? "key not loaded" : "empty input");
+    if (!_keyLoaded || inputLen == 0) {
+        ESP_LOGE(TAG, "encrypt() failed: %s", !_keyLoaded ? "key not loaded" : "empty input");
         if (outLen) *outLen = 0;
         return std::unique_ptr<char[]>();
     }
@@ -125,7 +125,7 @@ std::unique_ptr<char[]> DeviceCrypto::encrypt(const char* plaintext, size_t inpu
     
     mbedtls_aes_context aes;
     mbedtls_aes_init(&aes);
-    mbedtls_aes_setkey_enc(&aes, aesKey, 256);
+    mbedtls_aes_setkey_enc(&aes, _aesKey, 256);
     
     uint8_t processingIv[16];
     memcpy(processingIv, buffer, 16);
@@ -171,8 +171,8 @@ std::unique_ptr<char[]> DeviceCrypto::encrypt(const char* plaintext, size_t inpu
  * @return Managed unique pointer to processed plaintext, or nullptr if decryption failed.
  */
 std::unique_ptr<char[]> DeviceCrypto::decrypt(const char* ciphertext, size_t inputLen, size_t* outLen) {
-    if (!keyLoaded || inputLen == 0) {
-        ESP_LOGE(TAG, "decrypt() failed: %s", !keyLoaded ? "key not loaded" : "empty input");
+    if (!_keyLoaded || inputLen == 0) {
+        ESP_LOGE(TAG, "decrypt() failed: %s", !_keyLoaded ? "key not loaded" : "empty input");
         if (outLen) *outLen = 0;
         return std::unique_ptr<char[]>();
     }
@@ -215,7 +215,7 @@ std::unique_ptr<char[]> DeviceCrypto::decrypt(const char* ciphertext, size_t inp
     
     mbedtls_aes_context aes;
     mbedtls_aes_init(&aes);
-    mbedtls_aes_setkey_dec(&aes, aesKey, 256);
+    mbedtls_aes_setkey_dec(&aes, _aesKey, 256);
     
     mbedtls_aes_crypt_cbc(&aes, MBEDTLS_AES_DECRYPT, ciphertextLen, iv, buffer + 16, buffer + 16);
     mbedtls_aes_free(&aes);

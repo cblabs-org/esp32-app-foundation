@@ -25,14 +25,14 @@
 
 /**
  * @brief Initialize the label widget with default alignment (left) and no truncation.
- * @param _x X coordinate.
- * @param _y Y coordinate (baseline).
- * @param _w Width (-1 for auto).
- * @param _h Height (-1 for auto).
+ * @param x X coordinate.
+ * @param y Y coordinate (baseline).
+ * @param w Width (-1 for auto).
+ * @param h Height (-1 for auto).
  */
-LabelWidget::LabelWidget(int _x, int _y, int _w, int _h)
-    : IGfxWidget(_x, _y, _w, _h), font(nullptr), alignment(0), isTruncated(false) {
-    memset(textBuffer, 0, sizeof(textBuffer));
+LabelWidget::LabelWidget(int x, int y, int w, int h)
+    : IGfxWidget(x, y, w, h), _font(nullptr), _alignment(0), _isTruncated(false) {
+    memset(_textBuffer, 0, sizeof(_textBuffer));
 }
 
 /**
@@ -42,10 +42,10 @@ LabelWidget::LabelWidget(int _x, int _y, int _w, int _h)
  */
 void LabelWidget::setText(const char* text) {
     if (text) {
-        strncpy(textBuffer, text, sizeof(textBuffer) - 1);
-        textBuffer[sizeof(textBuffer) - 1] = '\0';
+        strncpy(_textBuffer, text, sizeof(_textBuffer) - 1);
+        _textBuffer[sizeof(_textBuffer) - 1] = '\0';
     } else {
-        textBuffer[0] = '\0';
+        _textBuffer[0] = '\0';
     }
 }
 
@@ -54,7 +54,7 @@ void LabelWidget::setText(const char* text) {
  * @param newFont Pointer to the U8G2 font array.
  */
 void LabelWidget::setFont(const uint8_t* newFont) {
-    font = newFont;
+    _font = newFont;
 }
 
 /**
@@ -62,7 +62,7 @@ void LabelWidget::setFont(const uint8_t* newFont) {
  * @param align 0=Left, 1=Center, 2=Right.
  */
 void LabelWidget::setAlignment(int align) {
-    alignment = align;
+    _alignment = align;
 }
 
 /**
@@ -70,7 +70,7 @@ void LabelWidget::setAlignment(int align) {
  * @param truncated True to enable.
  */
 void LabelWidget::setTruncated(bool truncated) {
-    isTruncated = truncated;
+    _isTruncated = truncated;
 }
 
 /**
@@ -94,25 +94,25 @@ void LabelWidget::tick(uint32_t currentMillis) {
  * @param display Reference to the U8G2 display driver.
  */
 void LabelWidget::render(U8G2& display) {
-    if (!isVisible || !font || textBuffer[0] == '\0') {
+    if (!_isVisible || !_font || _textBuffer[0] == '\0') {
         return;
     }
 
     U8G2StateSaver stateSaver(display);
-    display.setFont(font);
+    display.setFont(_font);
 
     // --- Vertical centering within bounding box ---
     // Calculate remaining height after font pixel height is subtracted
     // and split into top/bottom padding for visual centering.
     int yOffset = 0;
-    if (height > 0) {
+    if (_height > 0) {
         int fontHeight = display.getAscent() - display.getDescent();
-        yOffset = (height - fontHeight) / 2;
+        yOffset = (_height - fontHeight) / 2;
     }
 
     // drawText handles alignment, width boundary truncation, and layout
     // offsets transparently against the active U8G2 context.
-    drawText(display, textBuffer, x, y, width, height,
-             static_cast<TextAlign>(alignment), isTruncated, nullptr, yOffset);
+    drawText(display, _textBuffer, _x, _y, _width, _height,
+             static_cast<TextAlign>(_alignment), _isTruncated, nullptr, yOffset);
 }
 

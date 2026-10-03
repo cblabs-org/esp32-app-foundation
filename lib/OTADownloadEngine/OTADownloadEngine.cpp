@@ -42,11 +42,11 @@ static constexpr const char* TAG = "OTADownloadEngine";
  * @brief Default constructor — initializes all members to safe defaults.
  */
 OTADownloadEngine::OTADownloadEngine()
-    : verifier_(nullptr)
-    , progressCb_(nullptr)
-    , progressCtx_(nullptr)
-    , httpTimeout_(8000)
-    , lastError_(OTAError::None)
+    : _verifier(nullptr)
+    , _progressCb(nullptr)
+    , _progressCtx(nullptr)
+    , _httpTimeout(8000)
+    , _lastError(OTAError::None)
 {
 }
 
@@ -55,7 +55,7 @@ OTADownloadEngine::OTADownloadEngine()
  * @param verifier Pointer to an IOTAVerifier instance, or nullptr to disable verification.
  */
 void OTADownloadEngine::setVerifier(IOTAVerifier* verifier) {
-    verifier_ = verifier;
+    _verifier = verifier;
 }
 
 /**
@@ -63,8 +63,8 @@ void OTADownloadEngine::setVerifier(IOTAVerifier* verifier) {
  * @param cb Callback receiving (bytesWritten, totalSize).
  */
 void OTADownloadEngine::setProgressCallback(OTAProgressCallback cb, void* context) {
-    progressCb_ = cb;
-    progressCtx_ = context;
+    _progressCb = cb;
+    _progressCtx = context;
 }
 
 /**
@@ -72,7 +72,7 @@ void OTADownloadEngine::setProgressCallback(OTAProgressCallback cb, void* contex
  * @param timeoutMs Timeout value (default: 8000).
  */
 void OTADownloadEngine::setHttpTimeout(int timeoutMs) {
-    httpTimeout_ = timeoutMs;
+    _httpTimeout = timeoutMs;
 }
 
 /**
@@ -80,7 +80,7 @@ void OTADownloadEngine::setHttpTimeout(int timeoutMs) {
  * @return The OTAError from the most recent operation.
  */
 OTAError OTADownloadEngine::getLastError() const {
-    return lastError_;
+    return _lastError;
 }
 
 /**
@@ -88,14 +88,14 @@ OTAError OTADownloadEngine::getLastError() const {
  * @return Null-terminated C-string describing the error.
  */
 const char* OTADownloadEngine::getLastErrorString() const {
-    return otaErrorToString(lastError_);
+    return otaErrorToString(_lastError);
 }
 
 /**
  * @brief Set the expected firmware version for pre-flash validation.
  *
  * Stores the version string (stripping any leading 'v'/'V' prefix) into
- * the fixed-size expectedVersion_ buffer. When set, downloadAndFlash()
+ * the fixed-size _expectedVersion buffer. When set, downloadAndFlash()
  * will validate the binary's esp_app_desc_t.version field against this
  * string before any flash writes occur.
  *
@@ -108,10 +108,10 @@ void OTADownloadEngine::setExpectedVersion(const char* version) {
         if (v[0] == 'v' || v[0] == 'V') {
             v++;
         }
-        strncpy(expectedVersion_, v, sizeof(expectedVersion_) - 1);
-        expectedVersion_[sizeof(expectedVersion_) - 1] = '\0';
+        strncpy(_expectedVersion, v, sizeof(_expectedVersion) - 1);
+        _expectedVersion[sizeof(_expectedVersion) - 1] = '\0';
     } else {
-        expectedVersion_[0] = '\0';
+        _expectedVersion[0] = '\0';
     }
 }
 
@@ -159,7 +159,7 @@ int OTADownloadEngine::followRedirects(WiFiClient& client, HTTPClient& http,
 
         // Configure headers for GitHub release asset API
         http.useHTTP10(true);
-        http.setTimeout(httpTimeout_);
+        http.setTimeout(_httpTimeout);
         http.setFollowRedirects(HTTPC_DISABLE_FOLLOW_REDIRECTS);
         http.setUserAgent("ESP32-http-Update");
         http.addHeader("Cache-Control", "no-cache");
@@ -222,20 +222,20 @@ size_t OTADownloadEngine::fetchSignature(WiFiClient& client, const std::string& 
     if (code != HTTP_CODE_OK || contentLen <= 0 || static_cast<size_t>(contentLen) > sigBufSize) {
         ESP_LOGE(TAG, "Signature fetch failed — HTTP %d, Content-Length: %d", code, contentLen);
         http.end();
-        lastError_ = OTAError::SignatureFetchFailed;
+        _lastError = OTAError::SignatureFetchFailed;
         return 0;
     }
 
     // --- Read signature bytes with timeout guard ---
     WiFiClient* tcp = http.getStreamPtr();
     size_t bytesRead = 0;
-    unsigned long timeout = millis() + httpTimeout_;
+    unsigned long timeout = millis() + _httpTimeout;
 
     while (bytesRead < static_cast<size_t>(contentLen) && millis() < timeout) {
         if (tcp->available()) {
             int r = tcp->readBytes(sigBuf + bytesRead, contentLen - bytesRead);
             bytesRead += r;
-            timeout = millis() + httpTimeout_; // Reset timeout on progress
+            timeout = millis() + _httpTimeout; // Reset timeout on progress
         } else {
             delay(1); // Yield to RTOS scheduler
         }
@@ -245,7 +245,7 @@ size_t OTADownloadEngine::fetchSignature(WiFiClient& client, const std::string& 
 
     if (bytesRead != static_cast<size_t>(contentLen)) {
         ESP_LOGE(TAG, "Signature read incomplete — got %u of %d bytes", (unsigned)bytesRead, contentLen);
-        lastError_ = OTAError::SignatureFetchFailed;
+        _lastError = OTAError::SignatureFetchFailed;
         return 0;
     }
 
@@ -284,29 +284,29 @@ OTAError OTADownloadEngine::downloadAndFlash(WiFiClient& client, const std::stri
     if (code <= 0) {
         ESP_LOGE(TAG, "HTTP connection failed (code: %d)", code);
         http.end();
-        lastError_ = OTAError::HttpConnectionFailed;
-        return lastError_;
+        _lastError = OTAError::HttpConnectionFailed;
+        return _lastError;
     }
 
     if (code == HTTP_CODE_NOT_FOUND) {
         ESP_LOGE(TAG, "Binary not found — server returned 404");
         http.end();
-        lastError_ = OTAError::HttpFileNotFound;
-        return lastError_;
+        _lastError = OTAError::HttpFileNotFound;
+        return _lastError;
     }
 
     if (code == HTTP_CODE_FORBIDDEN) {
         ESP_LOGE(TAG, "Access forbidden — server returned 403");
         http.end();
-        lastError_ = OTAError::HttpForbidden;
-        return lastError_;
+        _lastError = OTAError::HttpForbidden;
+        return _lastError;
     }
 
     if (code != HTTP_CODE_OK) {
         ESP_LOGE(TAG, "Unexpected HTTP response code: %d", code);
         http.end();
-        lastError_ = OTAError::HttpWrongResponseCode;
-        return lastError_;
+        _lastError = OTAError::HttpWrongResponseCode;
+        return _lastError;
     }
 
     // --- Step 3: Validate content-length ---
@@ -314,8 +314,8 @@ OTAError OTADownloadEngine::downloadAndFlash(WiFiClient& client, const std::stri
     if (contentLen <= 0) {
         ESP_LOGE(TAG, "Server did not report Content-Length");
         http.end();
-        lastError_ = OTAError::ServerNoContentLength;
-        return lastError_;
+        _lastError = OTAError::ServerNoContentLength;
+        return _lastError;
     }
 
     ESP_LOGI(TAG, "Binary size reported: %d bytes", contentLen);
@@ -325,15 +325,15 @@ OTAError OTADownloadEngine::downloadAndFlash(WiFiClient& client, const std::stri
     if (freeSpace == 0) {
         ESP_LOGE(TAG, "No OTA partition available");
         http.end();
-        lastError_ = OTAError::NoOtaPartition;
-        return lastError_;
+        _lastError = OTAError::NoOtaPartition;
+        return _lastError;
     }
 
     if (contentLen > freeSpace) {
         ESP_LOGE(TAG, "Insufficient space — need %d bytes, have %d", contentLen, freeSpace);
         http.end();
-        lastError_ = OTAError::InsufficientSpace;
-        return lastError_;
+        _lastError = OTAError::InsufficientSpace;
+        return _lastError;
     }
 
     ESP_LOGI(TAG, "Partition space OK: %d free, %d needed", freeSpace, contentLen);
@@ -364,16 +364,16 @@ OTAError OTADownloadEngine::downloadAndFlash(WiFiClient& client, const std::stri
     if (firstChunkLen <= 0) {
         ESP_LOGE(TAG, "Failed to read first chunk — stream timeout");
         http.end();
-        lastError_ = OTAError::StreamReadTimeout;
-        return lastError_;
+        _lastError = OTAError::StreamReadTimeout;
+        return _lastError;
     }
 
     // --- Step 5a: Validate ESP32 binary magic byte ---
     if (buf[0] != 0xE9) {
         ESP_LOGE(TAG, "Binary header invalid — expected 0xE9, got 0x%02X", buf[0]);
         http.end();
-        lastError_ = OTAError::BinaryHeaderInvalid;
-        return lastError_;
+        _lastError = OTAError::BinaryHeaderInvalid;
+        return _lastError;
     }
 
     // --- Step 5b: Pre-flash binary version validation (safety gate) ---
@@ -382,7 +382,7 @@ OTAError OTADownloadEngine::downloadAndFlash(WiFiClient& client, const std::stri
     // kChunkSize is 1024, so this is always available in the first chunk.
     static constexpr size_t kAppDescOffset = sizeof(esp_image_header_t) + sizeof(esp_image_segment_header_t);
 
-    if (expectedVersion_[0] != '\0' &&
+    if (_expectedVersion[0] != '\0' &&
         static_cast<size_t>(firstChunkLen) >= kAppDescOffset + sizeof(esp_app_desc_t)) {
 
         const auto* appDesc = reinterpret_cast<const esp_app_desc_t*>(buf + kAppDescOffset);
@@ -397,22 +397,22 @@ OTAError OTADownloadEngine::downloadAndFlash(WiFiClient& client, const std::stri
             binaryVersion[sizeof(binaryVersion) - 1] = '\0';
 
             // Strip leading 'v'/'V' — ESP-IDF's PROJECT_VER (from git tags)
-            // often includes it, but expectedVersion_ already has it stripped.
+            // often includes it, but _expectedVersion already has it stripped.
             const char* cmpVersion = binaryVersion;
             if (cmpVersion[0] == 'v' || cmpVersion[0] == 'V') {
                 cmpVersion++;
             }
 
-            if (strncmp(cmpVersion, expectedVersion_, sizeof(binaryVersion)) != 0) {
+            if (strncmp(cmpVersion, _expectedVersion, sizeof(binaryVersion)) != 0) {
                 ESP_LOGE(TAG, "SAFETY ABORT: Binary version mismatch — binary contains '%s', expected '%s'",
-                         cmpVersion, expectedVersion_);
+                         cmpVersion, _expectedVersion);
                 http.end();
-                lastError_ = OTAError::BinaryVersionMismatch;
-                return lastError_;
+                _lastError = OTAError::BinaryVersionMismatch;
+                return _lastError;
             }
             ESP_LOGI(TAG, "Binary version validated: '%s' matches expected", cmpVersion);
         }
-    } else if (expectedVersion_[0] != '\0') {
+    } else if (_expectedVersion[0] != '\0') {
         ESP_LOGW(TAG, "First chunk too small for app descriptor (%d bytes) — skipping version check",
                  firstChunkLen);
     }
@@ -424,38 +424,38 @@ OTAError OTADownloadEngine::downloadAndFlash(WiFiClient& client, const std::stri
     if (!Update.begin(contentLen)) {
         ESP_LOGE(TAG, "Update.begin() failed for size %d", contentLen);
         http.end();
-        lastError_ = OTAError::UpdateBeginFailed;
-        return lastError_;
+        _lastError = OTAError::UpdateBeginFailed;
+        return _lastError;
     }
 
     // --- Step 7: Warn if no verifier set ---
-    if (verifier_ == nullptr) {
+    if (_verifier == nullptr) {
         ESP_LOGW(TAG, "No IOTAVerifier set — proceeding WITHOUT cryptographic verification");
     }
 
     // --- Step 8: Report initial progress ---
-    if (progressCb_) {
-        progressCb_(progressCtx_, 0, static_cast<size_t>(contentLen));
+    if (_progressCb) {
+        _progressCb(_progressCtx, 0, static_cast<size_t>(contentLen));
     }
 
     ESP_LOGI(TAG, "Streaming firmware (%d bytes) in %u-byte chunks...", contentLen, (unsigned)kChunkSize);
 
     // --- Step 8b: Write the already-buffered first chunk ---
-    if (verifier_ != nullptr) {
-        verifier_->update(buf, firstChunkLen);
+    if (_verifier != nullptr) {
+        _verifier->update(buf, firstChunkLen);
     }
     if (Update.write(buf, firstChunkLen) != static_cast<size_t>(firstChunkLen)) {
         ESP_LOGE(TAG, "Update.write() failed on first chunk");
         Update.abort();
         http.end();
-        lastError_ = OTAError::UpdateWriteFailed;
-        return lastError_;
+        _lastError = OTAError::UpdateWriteFailed;
+        return _lastError;
     }
 
     size_t totalWritten = static_cast<size_t>(firstChunkLen);
 
-    if (progressCb_) {
-        progressCb_(progressCtx_, totalWritten, static_cast<size_t>(contentLen));
+    if (_progressCb) {
+        _progressCb(_progressCtx, totalWritten, static_cast<size_t>(contentLen));
     }
 
     // --- Step 9: Chunked streaming write for remaining data ---
@@ -464,7 +464,7 @@ OTAError OTADownloadEngine::downloadAndFlash(WiFiClient& client, const std::stri
         size_t bytesToRead = (remaining < kChunkSize) ? remaining : kChunkSize;
 
         // Wait for data with retry — TLS record boundaries can cause
-        // brief gaps where no decrypted data is immediately available
+        // brief gaps where no decrypted data is practical
         int bytesRead = 0;
         readDeadline = millis() + 15000; // 15s hard deadline
 
@@ -482,13 +482,13 @@ OTAError OTADownloadEngine::downloadAndFlash(WiFiClient& client, const std::stri
                      (totalWritten * 100.0f) / contentLen);
             Update.abort();
             http.end();
-            lastError_ = OTAError::StreamReadTimeout;
-            return lastError_;
+            _lastError = OTAError::StreamReadTimeout;
+            return _lastError;
         }
 
         // Feed chunk to cryptographic verifier if present
-        if (verifier_ != nullptr) {
-            verifier_->update(buf, bytesRead);
+        if (_verifier != nullptr) {
+            _verifier->update(buf, bytesRead);
         }
 
         // Write chunk to OTA partition
@@ -496,8 +496,8 @@ OTAError OTADownloadEngine::downloadAndFlash(WiFiClient& client, const std::stri
             ESP_LOGE(TAG, "Update.write() failed at offset %u", (unsigned)totalWritten);
             Update.abort();
             http.end();
-            lastError_ = OTAError::UpdateWriteFailed;
-            return lastError_;
+            _lastError = OTAError::UpdateWriteFailed;
+            return _lastError;
         }
 
         totalWritten += bytesRead;
@@ -506,8 +506,8 @@ OTAError OTADownloadEngine::downloadAndFlash(WiFiClient& client, const std::stri
         delay(1);
 
         // Report progress
-        if (progressCb_) {
-            progressCb_(progressCtx_, totalWritten, static_cast<size_t>(contentLen));
+        if (_progressCb) {
+            _progressCb(_progressCtx, totalWritten, static_cast<size_t>(contentLen));
         }
 
         // Debug milestone logging at 25% intervals
@@ -522,21 +522,21 @@ OTAError OTADownloadEngine::downloadAndFlash(WiFiClient& client, const std::stri
     ESP_LOGI(TAG, "Download complete — %u bytes written to flash", (unsigned)totalWritten);
 
     // --- Step 10: Cryptographic signature verification ---
-    if (verifier_ != nullptr) {
+    if (_verifier != nullptr) {
         // Fail closed: verifier is set, signature MUST be present
         if (sigBuf == nullptr || sigLen == 0) {
             ESP_LOGE(TAG, "SECURITY ABORT: Verifier configured but no signature provided — aborting");
             Update.abort();
             http.end();
-            lastError_ = OTAError::SignatureFetchFailed;
-            return lastError_;
+            _lastError = OTAError::SignatureFetchFailed;
+            return _lastError;
         }
-        if (!verifier_->verify(sigBuf, sigLen)) {
+        if (!_verifier->verify(sigBuf, sigLen)) {
             ESP_LOGE(TAG, "Cryptographic signature verification FAILED — update discarded securely");
             Update.abort();
             http.end();
-            lastError_ = OTAError::SignatureVerifyFailed;
-            return lastError_;
+            _lastError = OTAError::SignatureVerifyFailed;
+            return _lastError;
         }
         ESP_LOGI(TAG, "Cryptographic signature verification PASSED");
     } else {
@@ -547,14 +547,14 @@ OTAError OTADownloadEngine::downloadAndFlash(WiFiClient& client, const std::stri
     if (!Update.end()) {
         ESP_LOGE(TAG, "Update.end() failed");
         http.end();
-        lastError_ = OTAError::UpdateEndFailed;
-        return lastError_;
+        _lastError = OTAError::UpdateEndFailed;
+        return _lastError;
     }
 
     http.end();
     ESP_LOGI(TAG, "OTA update finalized successfully");
-    lastError_ = OTAError::None;
-    return lastError_;
+    _lastError = OTAError::None;
+    return _lastError;
 }
 
 

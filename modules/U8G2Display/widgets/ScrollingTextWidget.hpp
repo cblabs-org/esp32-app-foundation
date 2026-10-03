@@ -34,25 +34,25 @@
  */
 class ScrollingTextWidget : public IGfxWidget {
 protected:
-    char currentText[512];        // Buffer for the active scrolling string
-    int scrollX;                  // Current pixel offset for the scroll
-    int messageWidth;             // Total rendered width of the string in pixels
-    uint32_t lastScrollMs;        // Timestamp of the last scroll tick
-    bool needsScroll;             // True if text is wider than bounding box
-    bool needsLayout;             // True when text/font changed (needs remeasure)
-    const uint8_t* font;          // Active font pointer
-    bool scrollFinished;          // True when text has fully exited the left bound
+    char _currentText[512];       // Buffer for the active scrolling string
+    int _scrollX;                 // Current pixel offset for the scroll
+    int _messageWidth;            // Total rendered width of the string in pixels
+    uint32_t _lastScrollMs;       // Timestamp of the last scroll tick
+    bool _needsScroll;            // True if text is wider than bounding box
+    bool _needsLayout;            // True when text/font changed (needs remeasure)
+    const uint8_t* _font;         // Active font pointer
+    bool _scrollFinished;         // True when text has fully exited the left bound
 
 public:
     /**
      * @brief Construct a new scrolling text widget.
-     * @param _x X coordinate of top-left corner.
-     * @param _y Y coordinate of top-left corner.
-     * @param _w Width of bounding box in pixels.
-     * @param _h Height of bounding box in pixels.
-     * @param _font U8G2 font array to use for rendering (nullptr for default).
+     * @param x X coordinate of top-left corner.
+     * @param y Y coordinate of top-left corner.
+     * @param w Width of bounding box in pixels.
+     * @param h Height of bounding box in pixels.
+     * @param font U8G2 font array to use for rendering (nullptr for default).
      */
-    ScrollingTextWidget(int _x, int _y, int _w, int _h, const uint8_t* _font = nullptr);
+    ScrollingTextWidget(int x, int y, int w, int h, const uint8_t* font = nullptr);
     /** @brief Destructor for ScrollingTextWidget. */
     virtual ~ScrollingTextWidget() = default;
 
@@ -65,16 +65,16 @@ public:
 
     /**
      * @brief Update the font used for rendering and trigger layout recalc.
-     * @param _font Pointer to U8G2 font array.
+     * @param font Pointer to U8G2 font array.
      */
-    void setFont(const uint8_t* _font) { font = _font; needsLayout = true; }
+    void setFont(const uint8_t* font) { _font = font; _needsLayout = true; }
 
     /**
      * @brief Check if the text has completed a full scroll loop off-screen.
      *        Useful for derived classes to trigger data loads or message cycling.
      * @return True when the scroll cycle is complete.
      */
-    bool isScrollFinished() const { return scrollFinished; }
+    bool isScrollFinished() const { return _scrollFinished; }
 
     /**
      * @brief Manually reset the scroll position to the starting position.

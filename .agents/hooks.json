@@ -27,6 +27,20 @@
       }
     ]
   },
+  "pio-reset-gate": {
+    "PreToolUse": [
+      {
+        "matcher": "call_mcp_tool",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ./scripts/pio-reset-gate.py",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  },
   "bug-fixer-file-gate": {
     "PreToolUse": [
       {

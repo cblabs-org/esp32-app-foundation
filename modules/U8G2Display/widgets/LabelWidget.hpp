@@ -32,20 +32,20 @@
  */
 class LabelWidget : public IGfxWidget {
 private:
-    char textBuffer[128];         // Internal storage for the display string
-    const uint8_t* font;          // Active font pointer (nullptr = use current)
-    int alignment;                // Horizontal justification: 0=Left, 1=Center, 2=Right
-    bool isTruncated;             // If true, append "..." when text exceeds width
+    char _textBuffer[128];        // Internal storage for the display string
+    const uint8_t* _font;         // Active font pointer (nullptr = use current)
+    int _alignment;               // Horizontal justification: 0=Left, 1=Center, 2=Right
+    bool _isTruncated;            // If true, append "..." when text exceeds width
 
 public:
     /**
      * @brief Construct a new label widget.
-     * @param _x X coordinate on the display.
-     * @param _y Y coordinate (baseline) on the display.
-     * @param _w Width of the bounding box (-1 for unconstrained).
-     * @param _h Height of the bounding box (-1 for unconstrained).
+     * @param x X coordinate on the display.
+     * @param y Y coordinate (baseline) on the display.
+     * @param w Width of the bounding box (-1 for unconstrained).
+     * @param h Height of the bounding box (-1 for unconstrained).
      */
-    LabelWidget(int _x, int _y, int _w = -1, int _h = -1);
+    LabelWidget(int x, int y, int w = -1, int h = -1);
 
     /**
      * @brief Set the text payload for the label.

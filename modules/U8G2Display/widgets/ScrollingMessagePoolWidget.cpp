@@ -30,18 +30,18 @@
 
 /**
  * @brief Initialise the message pool widget with empty circular buffer.
- * @param _x X coordinate.
- * @param _y Y coordinate.
- * @param _w Width of bounding box.
- * @param _h Height of bounding box.
- * @param _font Optional font override.
+ * @param x X coordinate.
+ * @param y Y coordinate.
+ * @param w Width of bounding box.
+ * @param h Height of bounding box.
+ * @param font Optional font override.
  */
-ScrollingMessagePoolWidget::ScrollingMessagePoolWidget(int _x, int _y, int _w, int _h, const uint8_t* _font)
-    : ScrollingTextWidget(_x, _y, _w, _h, _font),
-      writeIndex(0), messageCount(0), readIndex(0), eventBus(nullptr) {
+ScrollingMessagePoolWidget::ScrollingMessagePoolWidget(int x, int y, int w, int h, const uint8_t* font)
+    : ScrollingTextWidget(x, y, w, h, font),
+      _writeIndex(0), _messageCount(0), _readIndex(0), _eventBus(nullptr) {
     // Clear all buffer slots
     for (size_t i = 0; i < MSG_POOL_BUFFER_SIZE; i++) {
-        messageBuffer[i][0] = '\0';
+        _messageBuffer[i][0] = '\0';
     }
 }
 
@@ -54,7 +54,7 @@ ScrollingMessagePoolWidget::ScrollingMessagePoolWidget(int _x, int _y, int _w, i
  * @param bus Reference to the application's EventBus instance.
  */
 void ScrollingMessagePoolWidget::begin(EventBus& bus) {
-    eventBus = &bus;
+    _eventBus = &bus;
     bus.subscribe(U8G2DisplayEvents::DISPLAY_MESSAGE, _onMessage, this);
 }
 
@@ -87,13 +87,13 @@ void ScrollingMessagePoolWidget::_onMessage(const char* topic, const void* paylo
 void ScrollingMessagePoolWidget::pushMessage(const char* msg) {
     if (!msg) return;
 
-    strncpy(messageBuffer[writeIndex], msg, MSG_POOL_MAX_MSG_LEN - 1);
-    messageBuffer[writeIndex][MSG_POOL_MAX_MSG_LEN - 1] = '\0';
+    strncpy(_messageBuffer[_writeIndex], msg, MSG_POOL_MAX_MSG_LEN - 1);
+    _messageBuffer[_writeIndex][MSG_POOL_MAX_MSG_LEN - 1] = '\0';
 
-    writeIndex = (writeIndex + 1) % MSG_POOL_BUFFER_SIZE;
+    _writeIndex = (_writeIndex + 1) % MSG_POOL_BUFFER_SIZE;
 
-    if (messageCount < MSG_POOL_BUFFER_SIZE) {
-        messageCount++;
+    if (_messageCount < MSG_POOL_BUFFER_SIZE) {
+        _messageCount++;
     }
 }
 
@@ -103,22 +103,22 @@ void ScrollingMessagePoolWidget::pushMessage(const char* msg) {
  * @return True if a message was loaded; false if the buffer is empty.
  */
 bool ScrollingMessagePoolWidget::loadNextMessage() {
-    if (messageCount == 0) return false;
+    if (_messageCount == 0) return false;
 
     // Determine valid read range: if buffer not yet full, read [0, messageCount)
     // If full, read from readIndex wrapping around
-    if (readIndex >= messageCount && messageCount < MSG_POOL_BUFFER_SIZE) {
-        readIndex = 0;  // Wrap around to start
-    } else if (messageCount == MSG_POOL_BUFFER_SIZE) {
+    if (_readIndex >= _messageCount && _messageCount < MSG_POOL_BUFFER_SIZE) {
+        _readIndex = 0;  // Wrap around to start
+    } else if (_messageCount == MSG_POOL_BUFFER_SIZE) {
         // Full buffer — readIndex wraps modulo
-        readIndex = readIndex % MSG_POOL_BUFFER_SIZE;
+        _readIndex = _readIndex % MSG_POOL_BUFFER_SIZE;
     }
 
-    const char* msg = messageBuffer[readIndex];
+    const char* msg = _messageBuffer[_readIndex];
     if (msg[0] == '\0') return false;
 
     setText(msg);
-    readIndex = (readIndex + 1) % MSG_POOL_BUFFER_SIZE;
+    _readIndex = (_readIndex + 1) % MSG_POOL_BUFFER_SIZE;
     return true;
 }
 
@@ -133,10 +133,10 @@ bool ScrollingMessagePoolWidget::loadNextMessage() {
  * @param currentMillis System uptime in milliseconds.
  */
 void ScrollingMessagePoolWidget::tick(uint32_t currentMillis) {
-    if (!isVisible) return;
+    if (!_isVisible) return;
 
     // If we have no text currently, try to load one
-    if (currentText[0] == '\0') {
+    if (_currentText[0] == '\0') {
         if (!loadNextMessage()) return;
     }
 

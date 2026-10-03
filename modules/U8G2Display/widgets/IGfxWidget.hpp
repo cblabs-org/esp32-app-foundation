@@ -36,20 +36,20 @@ class U8G2;
  */
 class IGfxWidget {
 protected:
-    int x, y;                  // Top-left origin of the widget's bounding box
-    int width, height;         // Size in pixels (-1 = dynamic/auto)
-    bool isVisible = true;     // Rendering visibility flag
+    int _x, _y;                  // Top-left origin of the widget's bounding box
+    int _width, _height;         // Size in pixels (-1 = dynamic/auto)
+    bool _isVisible = true;     // Rendering visibility flag
 
 public:
     /**
      * @brief Construct a widget with position and optional size.
-     * @param _x X coordinate on the display.
-     * @param _y Y coordinate on the display.
-     * @param _w Width in pixels (-1 for dynamic or full width).
-     * @param _h Height in pixels (-1 for dynamic or full height).
+     * @param x X coordinate on the display.
+     * @param y Y coordinate on the display.
+     * @param w Width in pixels (-1 for dynamic or full width).
+     * @param h Height in pixels (-1 for dynamic or full height).
      */
-    IGfxWidget(int _x, int _y, int _w = -1, int _h = -1)
-        : x(_x), y(_y), width(_w), height(_h) {}
+    IGfxWidget(int x, int y, int w = -1, int h = -1)
+        : _x(x), _y(y), _width(w), _height(h) {}
 
     /**
      * @brief Virtual destructor for safe polymorphic deletion.
@@ -64,13 +64,13 @@ public:
      * @brief Set the rendering visibility of the widget.
      * @param visible True to render, false to skip during render passes.
      */
-    void setVisible(bool visible) { isVisible = visible; }
+    void setVisible(bool visible) { _isVisible = visible; }
 
     /**
      * @brief Check if the widget is currently visible.
      * @return True if the widget should be rendered.
      */
-    bool getVisible() const { return isVisible; }
+    bool getVisible() const { return _isVisible; }
 
     // -------------------------------------------------------------------------
     // Geometry API
@@ -78,23 +78,23 @@ public:
 
     /**
      * @brief Update the widget's position and size.
-     * @param _x New X coordinate.
-     * @param _y New Y coordinate.
-     * @param _w New width (-1 for dynamic).
-     * @param _h New height (-1 for dynamic).
+     * @param x New X coordinate.
+     * @param y New Y coordinate.
+     * @param w New width (-1 for dynamic).
+     * @param h New height (-1 for dynamic).
      */
-    void setCoords(int _x, int _y, int _w = -1, int _h = -1) {
-        x = _x; y = _y; width = _w; height = _h;
+    void setCoords(int x, int y, int w = -1, int h = -1) {
+        _x = x; _y = y; _width = w; _height = h;
     }
 
     /** @brief Get the X coordinate of the widget. */
-    int getX() const { return x; }
+    int getX() const { return _x; }
     /** @brief Get the Y coordinate of the widget. */
-    int getY() const { return y; }
+    int getY() const { return _y; }
     /** @brief Get the width of the widget (-1 if dynamic). */
-    int getW() const { return width; }
+    int getW() const { return _width; }
     /** @brief Get the height of the widget (-1 if dynamic). */
-    int getH() const { return height; }
+    int getH() const { return _height; }
 
     // -------------------------------------------------------------------------
     // Core virtual interface

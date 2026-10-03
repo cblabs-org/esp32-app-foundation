@@ -27,20 +27,20 @@
 /**
  * @brief Initialize the clock with its time manager and default layout.
  *        Defaults to HH_MM format with blinking enabled.
- * @param _timeMgr Pointer to the TimeManager dependency (nullable).
- * @param _x X coordinate.
- * @param _y Y coordinate.
- * @param _w Width (-1 for auto).
- * @param _h Height (-1 for auto).
- * @param _font Optional font override.
+ * @param timeMgr Pointer to the TimeManager dependency (nullable).
+ * @param x X coordinate.
+ * @param y Y coordinate.
+ * @param w Width (-1 for auto).
+ * @param h Height (-1 for auto).
+ * @param font Optional font override.
  */
-ClockWidget::ClockWidget(TimeManager* _timeMgr, int _x, int _y, int _w, int _h,
-                         const uint8_t* _font)
-    : IGfxWidget(_x, _y, _w, _h),
-      showColon(true), oldColon(true), blinkEnabled(true),
-      lastBlinkMs(0), lastMinute(-1), lastSecond(-1),
-      format(ClockFormat::HH_MM), font(_font), secondaryFont(nullptr),
-      alignment(1), timeMgr(_timeMgr) {
+ClockWidget::ClockWidget(TimeManager* timeMgr, int x, int y, int w, int h,
+                         const uint8_t* font)
+    : IGfxWidget(x, y, w, h),
+      _showColon(true), _oldColon(true), _blinkEnabled(true),
+      _lastBlinkMs(0), _lastMinute(-1), _lastSecond(-1),
+      _format(ClockFormat::HH_MM), _font(font), _secondaryFont(nullptr),
+      _alignment(1), _timeMgr(timeMgr) {
 }
 
 /**
@@ -48,7 +48,7 @@ ClockWidget::ClockWidget(TimeManager* _timeMgr, int _x, int _y, int _w, int _h,
  * @param newFont Pointer to the U8G2 font array.
  */
 void ClockWidget::setFont(const uint8_t* newFont) {
-    font = newFont;
+    _font = newFont;
 }
 
 /**
@@ -56,7 +56,7 @@ void ClockWidget::setFont(const uint8_t* newFont) {
  * @param newFont Pointer to the U8G2 font array (nullptr = use primary).
  */
 void ClockWidget::setSecondaryFont(const uint8_t* newFont) {
-    secondaryFont = newFont;
+    _secondaryFont = newFont;
 }
 
 /**
@@ -64,7 +64,7 @@ void ClockWidget::setSecondaryFont(const uint8_t* newFont) {
  * @param newFormat HH_MM or HH_MM_SS.
  */
 void ClockWidget::setFormat(ClockFormat newFormat) {
-    format = newFormat;
+    _format = newFormat;
 }
 
 /**
@@ -73,11 +73,11 @@ void ClockWidget::setFormat(ClockFormat newFormat) {
  * @param currentMillis System uptime in milliseconds.
  */
 void ClockWidget::tick(uint32_t currentMillis) {
-    if (!isVisible || !blinkEnabled) return;
+    if (!_isVisible || !_blinkEnabled) return;
 
-    if (currentMillis - lastBlinkMs >= 500) {
-        showColon = !showColon;
-        lastBlinkMs = currentMillis;
+    if (currentMillis - _lastBlinkMs >= 500) {
+        _showColon = !_showColon;
+        _lastBlinkMs = currentMillis;
     }
 }
 
@@ -96,22 +96,22 @@ void ClockWidget::tick(uint32_t currentMillis) {
  * @param display U8G2 reference.
  */
 void ClockWidget::render(U8G2& display) {
-    if (!isVisible) return;
+    if (!_isVisible) return;
 
-    int renderW = (width > 0) ? width : 56;
-    int renderH = (height > 0) ? height : 14;
+    int renderW = (_width > 0) ? _width : 56;
+    int renderH = (_height > 0) ? _height : 14;
 
     U8G2StateSaver stateSaver(display);
-    if (font) display.setFont(font);
+    if (_font) display.setFont(_font);
 
-    if (!timeMgr) return;
+    if (!_timeMgr) return;
 
     // --- Step 1: Acquire current time from injected TimeManager ---
     struct tm timeinfo;
-    if (!timeMgr->getLocalTime(&timeinfo)) return;
+    if (!_timeMgr->getLocalTime(&timeinfo)) return;
 
-    lastMinute = timeinfo.tm_min;
-    lastSecond = timeinfo.tm_sec;
+    _lastMinute = timeinfo.tm_min;
+    _lastSecond = timeinfo.tm_sec;
 
     // --- Step 2: Format time components as strings ---
     char hourStr[3];
@@ -133,43 +133,43 @@ void ClockWidget::render(U8G2& display) {
     int maxSecColonW = 0;
     int secW = 0;
 
-    if (format == ClockFormat::HH_MM_SS) {
-        if (secondaryFont) display.setFont(secondaryFont);
+    if (_format == ClockFormat::HH_MM_SS) {
+        if (_secondaryFont) display.setFont(_secondaryFont);
         secW = display.getStrWidth(secStr);
         maxSecW = display.getStrWidth("00");
         maxSecColonW = display.getStrWidth(":");
-        if (secondaryFont) display.setFont(font); // Restore main font
+        if (_secondaryFont) display.setFont(_font); // Restore main font
     }
 
     // --- Step 4: Calculate total footprint and alignment offset ---
     int actualW = maxHourW + colonW + maxMinW + 2; // 2px spacing between elements
-    if (format == ClockFormat::HH_MM_SS) {
+    if (_format == ClockFormat::HH_MM_SS) {
         actualW += maxSecColonW + maxSecW + 2;
     }
 
-    int startX = x;
-    if (alignment == 1) {       // CENTER
-        startX = x + (renderW - actualW) / 2;
-    } else if (alignment == 2) { // RIGHT
-        startX = x + renderW - actualW - 1;
+    int startX = _x;
+    if (_alignment == 1) {       // CENTER
+        startX = _x + (renderW - actualW) / 2;
+    } else if (_alignment == 2) { // RIGHT
+        startX = _x + renderW - actualW - 1;
     }
 
     // --- Step 5: Vertical centering within bounding box ---
     // setFontPosTop is used globally — calculate padding for visual centering.
     int fontHeight = display.getAscent() - display.getDescent();
-    int drawY = y + (renderH - fontHeight) / 2;
+    int drawY = _y + (renderH - fontHeight) / 2;
 
     int secDrawY = drawY;
-    if (format == ClockFormat::HH_MM_SS && secondaryFont) {
-        display.setFont(secondaryFont);
+    if (_format == ClockFormat::HH_MM_SS && _secondaryFont) {
+        display.setFont(_secondaryFont);
         int secFontHeight = display.getAscent() - display.getDescent();
         // Align bottoms of the two text boundaries (flushes numerical baselines)
         secDrawY = drawY + fontHeight - secFontHeight;
-        display.setFont(font);
+        display.setFont(_font);
     }
 
     // --- Step 6: Clear and draw ---
-    blankArea(display, x, y, renderW, renderH);
+    blankArea(display, _x, _y, renderW, renderH);
 
     // Draw hours right-aligned within its max bounding box
     int hOff = maxHourW - hourW;
@@ -178,7 +178,7 @@ void ClockWidget::render(U8G2& display) {
     int currentX = startX + maxHourW + 1;
 
     // Draw colon (visible/hidden for blink effect)
-    if (showColon) {
+    if (_showColon) {
         display.drawStr(currentX, drawY, ":");
     }
     currentX += colonW + 1;
@@ -189,8 +189,8 @@ void ClockWidget::render(U8G2& display) {
     currentX += maxMinW + 1;
 
     // --- Draw seconds if HH_MM_SS format ---
-    if (format == ClockFormat::HH_MM_SS) {
-        if (secondaryFont) display.setFont(secondaryFont);
+    if (_format == ClockFormat::HH_MM_SS) {
+        if (_secondaryFont) display.setFont(_secondaryFont);
 
         // Second colon is always visible (non-blinking)
         int sColonW = display.getStrWidth(":");
@@ -202,7 +202,7 @@ void ClockWidget::render(U8G2& display) {
         int sOff = maxSecW - secW;
         display.drawStr(currentX + sOff, secDrawY, secStr);
 
-        if (secondaryFont) display.setFont(font);
+        if (_secondaryFont) display.setFont(_font);
     }
 }
 
@@ -213,26 +213,26 @@ void ClockWidget::render(U8G2& display) {
  * @param currentMillis Milliseconds since boot.
  */
 void ClockWidget::renderAnimationUpdate(U8G2& display, uint32_t currentMillis) {
-    if (!isVisible || !timeMgr) return;
+    if (!_isVisible || !_timeMgr) return;
 
     struct tm timeinfo;
-    if (!timeMgr->getLocalTime(&timeinfo)) return;
+    if (!_timeMgr->getLocalTime(&timeinfo)) return;
 
-    bool minuteChanged = (timeinfo.tm_min != lastMinute);
+    bool minuteChanged = (timeinfo.tm_min != _lastMinute);
     bool secondChanged = false;
-    if (format == ClockFormat::HH_MM_SS) {
-        secondChanged = (timeinfo.tm_sec != lastSecond);
+    if (_format == ClockFormat::HH_MM_SS) {
+        secondChanged = (timeinfo.tm_sec != _lastSecond);
     }
 
-    if (oldColon != showColon || minuteChanged || secondChanged) {
-        oldColon = showColon;
-        lastMinute = timeinfo.tm_min;
-        lastSecond = timeinfo.tm_sec;
+    if (_oldColon != _showColon || minuteChanged || secondChanged) {
+        _oldColon = _showColon;
+        _lastMinute = timeinfo.tm_min;
+        _lastSecond = timeinfo.tm_sec;
         render(display);
 
-        int renderW = (width > 0) ? width : 56;
-        int renderH = (height > 0) ? height : 14;
-        display.updateDisplayArea(x / 8, y / 8, (renderW + 7) / 8, (renderH + 7) / 8);
+        int renderW = (_width > 0) ? _width : 56;
+        int renderH = (_height > 0) ? _height : 14;
+        display.updateDisplayArea(_x / 8, _y / 8, (renderW + 7) / 8, (renderH + 7) / 8);
     }
 }
 

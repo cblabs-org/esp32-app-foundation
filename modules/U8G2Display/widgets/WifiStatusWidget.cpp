@@ -32,13 +32,13 @@
 /**
  * @brief Construct the WiFi status widget with a fixed 16x16 bounding box.
  *        Initialises connection tracking state to "connected" (optimistic default).
- * @param _x X coordinate on the display.
- * @param _y Y coordinate on the display.
+ * @param x X coordinate on the display.
+ * @param y Y coordinate on the display.
  */
-WifiStatusWidget::WifiStatusWidget(int _x, int _y)
-    : IGfxWidget(_x, _y, 16, 16),
-      wasConnected(true), disconnectTime(0),
-      blinkState(true), lastBlinkMs(0), lastRssiCategory(4) {
+WifiStatusWidget::WifiStatusWidget(int x, int y)
+    : IGfxWidget(x, y, 16, 16),
+      _wasConnected(true), _disconnectTime(0),
+      _blinkState(true), _lastBlinkMs(0), _lastRssiCategory(4) {
 }
 
 // =============================================================================
@@ -51,27 +51,27 @@ WifiStatusWidget::WifiStatusWidget(int _x, int _y)
  * @param currentMillis System uptime in milliseconds.
  */
 void WifiStatusWidget::tick(uint32_t currentMillis) {
-    if (!isVisible) return;
+    if (!_isVisible) return;
 
     bool currentlyConnected = (WiFi.status() == WL_CONNECTED);
 
     if (currentlyConnected) {
         // --- Connection restored or maintained ---
-        disconnectTime = 0;
-        blinkState = true;
+        _disconnectTime = 0;
+        _blinkState = true;
     } else {
         // --- Handle disconnection ---
-        if (disconnectTime == 0) disconnectTime = currentMillis;
+        if (_disconnectTime == 0) _disconnectTime = currentMillis;
 
         // After 30 seconds of disconnection, start 1Hz blink
-        if (currentMillis - disconnectTime > 30000) {
-            if (currentMillis - lastBlinkMs > 1000) {
-                blinkState = !blinkState;
-                lastBlinkMs = currentMillis;
+        if (currentMillis - _disconnectTime > 30000) {
+            if (currentMillis - _lastBlinkMs > 1000) {
+                _blinkState = !_blinkState;
+                _lastBlinkMs = currentMillis;
             }
         } else {
             // Static icon for the first 30 seconds
-            blinkState = true;
+            _blinkState = true;
         }
     }
 }
@@ -103,14 +103,14 @@ int WifiStatusWidget::getRssiCategory() {
  * @param display Reference to the U8G2 display instance.
  */
 void WifiStatusWidget::render(U8G2& display) {
-    if (!isVisible) return;
+    if (!_isVisible) return;
 
-    blankArea(display, x, y, width, height);
+    blankArea(display, _x, _y, _width, _height);
 
     if (WiFi.status() != WL_CONNECTED) {
         // --- Disconnected: exclamation icon ---
-        if (blinkState) {
-            drawText(display, "!", x, y, width, height,
+        if (_blinkState) {
+            drawText(display, "!", _x, _y, _width, _height,
                      TextAlign::Center, false, AppFonts::defaultIcon());
         }
     } else {
@@ -121,8 +121,8 @@ void WifiStatusWidget::render(U8G2& display) {
         // Bar widths: 3px each, heights: 4, 7, 10, 13 pixels (ascending)
         int barW = 3;
         int gap = 1;
-        int baseY = y + height;   // Bottom edge
-        int startX = x + 1;
+        int baseY = _y + _height;   // Bottom edge
+        int startX = _x + 1;
 
         for (int i = 0; i < 4; i++) {
             int barH = 4 + (i * 3);  // Heights: 4, 7, 10, 13
@@ -147,41 +147,41 @@ void WifiStatusWidget::render(U8G2& display) {
  * @param currentMillis System uptime in milliseconds.
  */
 void WifiStatusWidget::renderAnimationUpdate(U8G2& display, uint32_t currentMillis) {
-    if (!isVisible) return;
+    if (!_isVisible) return;
 
     bool currentlyConnected = (WiFi.status() == WL_CONNECTED);
     int currentRssiCat = getRssiCategory();
 
-    bool prevBlinkState = blinkState;
+    bool prevBlinkState = _blinkState;
     tick(currentMillis);
 
     bool needsRedraw = false;
 
     // --- Transition: Connection restored ---
-    if (currentlyConnected && !wasConnected) {
-        wasConnected = true;
-        lastRssiCategory = currentRssiCat;
+    if (currentlyConnected && !_wasConnected) {
+        _wasConnected = true;
+        _lastRssiCategory = currentRssiCat;
         needsRedraw = true;
     }
     // --- Transition: RSSI category changed while connected ---
-    else if (currentlyConnected && wasConnected && currentRssiCat != lastRssiCategory) {
-        lastRssiCategory = currentRssiCat;
+    else if (currentlyConnected && _wasConnected && currentRssiCat != _lastRssiCategory) {
+        _lastRssiCategory = currentRssiCat;
         needsRedraw = true;
     }
     // --- Transition: Disconnected ---
     else if (!currentlyConnected) {
-        if (wasConnected) {
-            wasConnected = false;
-            lastRssiCategory = -1;
+        if (_wasConnected) {
+            _wasConnected = false;
+            _lastRssiCategory = -1;
             needsRedraw = true;
-        } else if (blinkState != prevBlinkState) {
+        } else if (_blinkState != prevBlinkState) {
             needsRedraw = true;
         }
     }
 
     if (needsRedraw) {
         render(display);
-        display.updateDisplayArea(x / 8, y / 8, (width + 7) / 8, (height + 7) / 8);
+        display.updateDisplayArea(_x / 8, _y / 8, (_width + 7) / 8, (_height + 7) / 8);
     }
 }
 

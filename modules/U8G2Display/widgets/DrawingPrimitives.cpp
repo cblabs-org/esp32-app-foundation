@@ -31,14 +31,14 @@
  *        Reads font, draw_color, and clip bounds from the u8g2_t struct.
  * @param _display Reference to the active U8G2 instance.
  */
-U8G2StateSaver::U8G2StateSaver(U8G2& _display) : display(_display) {
-    u8g2_t* u8g2 = display.getU8g2();
-    oldFont      = u8g2->font;
-    oldDrawColor = u8g2->draw_color;
-    oldClipX0    = u8g2->clip_x0;
-    oldClipY0    = u8g2->clip_y0;
-    oldClipX1    = u8g2->clip_x1;
-    oldClipY1    = u8g2->clip_y1;
+U8G2StateSaver::U8G2StateSaver(U8G2& _display) : _display(_display) {
+    u8g2_t* u8g2 = _display.getU8g2();
+    _oldFont      = u8g2->font;
+    _oldDrawColor = u8g2->draw_color;
+    _oldClipX0    = u8g2->clip_x0;
+    _oldClipY0    = u8g2->clip_y0;
+    _oldClipX1    = u8g2->clip_x1;
+    _oldClipY1    = u8g2->clip_y1;
 }
 
 /**
@@ -46,11 +46,11 @@ U8G2StateSaver::U8G2StateSaver(U8G2& _display) : display(_display) {
  *        Restores font, draw color, and clip window exactly as captured.
  */
 U8G2StateSaver::~U8G2StateSaver() {
-    if (oldFont != nullptr) {
-        display.setFont(oldFont);
+    if (_oldFont != nullptr) {
+        _display.setFont(_oldFont);
     }
-    display.setDrawColor(oldDrawColor);
-    display.setClipWindow(oldClipX0, oldClipY0, oldClipX1, oldClipY1);
+    _display.setDrawColor(_oldDrawColor);
+    _display.setClipWindow(_oldClipX0, _oldClipY0, _oldClipX1, _oldClipY1);
 }
 
 // =============================================================================

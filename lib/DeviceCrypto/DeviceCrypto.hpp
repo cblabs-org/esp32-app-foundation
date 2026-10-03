@@ -28,8 +28,8 @@
  */
 class DeviceCrypto {
 private:
-    uint8_t aesKey[32];     ///< 256-bit AES Master Key permanently held in RAM
-    bool keyLoaded = false; ///< Flag indicating if the AES key is active in memory
+    uint8_t _aesKey[32];     ///< 256-bit AES Master Key permanently held in RAM
+    bool _keyLoaded = false; ///< Flag indicating if the AES key is active in memory
 
     /**
      * @brief Padds a payload Buffer to adhere to the 16-byte CBC block size requirement.
