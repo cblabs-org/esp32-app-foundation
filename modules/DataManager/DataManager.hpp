@@ -296,6 +296,30 @@ private:
         bool _hasPendingHealthTransition = false;
     };
 
+    // --- GRAVE-05 exemption rationale (see #253) ---
+    //
+    // This struct is heap-allocated per job (new/delete) and holds a
+    // std::function.  This was flagged as GRAVE-05 (runtime heap churn from
+    // stored std::function) but audited and closed as not-a-problem:
+    //
+    //  1. std::function never escapes SBO here.  Every production and test
+    //     capture is ≤8 bytes on Xtensa-32 (typically [this] = 4B) vs the
+    //     16-byte SBO threshold.  Zero hidden heap allocations from the
+    //     callable payload.
+    //
+    //  2. The queue is bounded at JOB_QUEUE_DEPTH (8).  Max simultaneous
+    //     heap exposure is 8 × ~64 bytes ≈ 512 bytes of uniform-sized,
+    //     short-lived allocations that drain every ~100ms — the least
+    //     problematic pattern for fragmentation.
+    //
+    //  3. GRAVE-05 targets unbounded accumulation of stored callbacks that
+    //     grow over object lifetime.  A bounded, rapidly-draining work queue
+    //     is categorically different.
+    //
+    //  4. Replacing this with a by-value ring buffer is non-trivial: FreeRTOS
+    //     queues use memcpy internally and std::function is not trivially
+    //     copyable.  The refactor risk outweighs the ~512-byte benefit.
+    //
     struct DataJobEntry {
         std::function<void(const FetchContext&)> job;
         DataJobOptions options;
