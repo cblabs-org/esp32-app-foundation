@@ -72,7 +72,7 @@
 #endif
 #include "lvgl.h"
 #ifndef LV_LVGL_H_INCLUDE_SIMPLE
-#define LV_LVGL_H_INCLUDE_SIMPLE ///< Simple include path flag for LVGL header compatibility
+#define LV_LVGL_H_INCLUDE_SIMPLE
 #endif
 #include "ui.h"
 #include "ui_gen.h"
