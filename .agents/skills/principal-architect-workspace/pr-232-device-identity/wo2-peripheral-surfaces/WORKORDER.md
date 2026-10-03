@@ -104,5 +104,57 @@ If you discover a defect, upstream bug, or concern *outside your boundary box*, 
 ---
 
 ## Completion Report
-<!-- Written by the worker at task completion -->
+
+### Summary
+Successfully completed Work Order 2 (Peripheral Identity Surfaces). Propagated dynamic application identity across all remaining peripheral surfaces:
+1. **MCPServer**: Added `setAppName()` and internal sanitised storage `_appName[33]`. MCP `initialize` response now dynamically reports the configured app name, falling back to `WifiManager` hostname or `"esp32-app-foundation"`.
+2. **OTADownloadEngine & OTAUpdateManager**: Added `setDeviceIdentity(name, version)` and `_userAgent[96]` to `OTADownloadEngine`. Wired from `OTAUpdateManager::begin()` and `performUpdateTask()`, generating User-Agent `<sanitised-name>/<version> (ESP32-http-Update)` on HTTP requests.
+3. **AuthManager & TLS Certificate**: Added `setCertHostname()` and internal storage `_certHostname[33]` to `AuthManager` with safe lifetime for async FreeRTOS `cert_gen` tasks. Replaced hardcoded `"esp32-device"` with `self->_certHostname`. Auto-wired from `Application::begin()`.
+4. **Boot Serial Banner**: Updated `Application.cpp:140` boot banner log to include `getAppName()` (`ESP32 App Foundation v%s — %s — booting`).
+5. **LVGL Pro Boot Screen**: Added `bind_text="sys_app_title"` to `boot_title` in `screen_boot.xml` and synced `screen_boot_gen.c`.
+
+### Files Modified / Created
+
+| File | Status | Description |
+|---|---|---|
+| `modules/MCPServer/MCPServer.hpp` | Modified | Added `setAppName()` and `getAppName()` methods and `_appName[33]` member |
+| `modules/MCPServer/MCPServer.cpp` | Modified | Implemented `setAppName()` with hostname sanitisation; updated `_handleInitialize` to resolve serverInfo name dynamically |
+| `lib/OTADownloadEngine/OTADownloadEngine.hpp` | Modified | Added `setDeviceIdentity()` and `getUserAgent()` methods and `_userAgent[96]` member |
+| `lib/OTADownloadEngine/OTADownloadEngine.cpp` | Modified | Implemented `setDeviceIdentity()`; updated HTTP client `setUserAgent(_userAgent)` |
+| `modules/OTAUpdateManager/OTAUpdateManager.hpp` | Modified | Added `_deviceAppName[33]` member |
+| `modules/OTAUpdateManager/OTAUpdateManager.cpp` | Modified | Stored sanitised app name in `begin()`; wired `engine.setDeviceIdentity()` in `performUpdateTask()` |
+| `modules/AuthManager/AuthManager.hpp` | Modified | Added `setCertHostname()` and `getCertHostname()` methods and `_certHostname[33]` member |
+| `modules/AuthManager/AuthManager.cpp` | Modified | Implemented `setCertHostname()`; replaced `"esp32-device"` in background `cert_gen` tasks with `self->_certHostname` |
+| `modules/Application/Application.cpp` | Modified | Updated serial boot banner format to include app name; wired `_authManager.setCertHostname()` in `begin()` |
+| `uidesign/crowpanel-128-rotary/lvglpro/screens/screen_boot.xml` | Modified | Added `bind_text="sys_app_title"` attribute to `boot_title` lv_label |
+| `uidesign/crowpanel-128-rotary/lvglpro/screens/screen_boot_gen.c` | Modified | Added `lv_label_bind_text(boot_title, &sys_app_title, NULL);` |
+| `test/test_unit/test_mcpServer/test_mcpServer.cpp` | Modified | Added assertions and unit test `InitializeWithAppNameUsesSanitisedName` |
+| `test/test_unit/test_ota_download_engine/test_ota_download_engine.cpp` | Modified | Added unit tests `SetDeviceIdentity_DefaultUserAgent` and `SetDeviceIdentity_FormattedUserAgent` |
+| `test/test_unit/test_authManager/test_authManager.cpp` | Modified | Added unit test `test_cert_hostname_default_and_setter` |
+| `test/test_unit/test_application/test_application.cpp` | Modified | Added unit test `Begin_AutoPropagatesAppNameToAuthCertHostname` |
+
+### Decisions Made
+1. **Internal Buffer Storage for Async Task Safety** — `AuthManager` stores `_certHostname` in a dedicated fixed-size member buffer (`char _certHostname[33] = "esp32-device"`). When `Application::begin()` wires `_authManager.setCertHostname(sanitiseHostname(getAppName()).c_str())`, the temporary `String` is immediately copied into `_certHostname`, ensuring zero risk of dangling pointer dereferencing when the FreeRTOS `cert_gen` task asynchronously generates the cert.
+2. **Three-Tier Priority Fallback for MCPServer Name** — MCP Server `initialize` checks `_appName` (if explicitly configured) -> `_wifiManager->getHostname()` (if `_wifiManager` is present and hostname set) -> `"esp32-app-foundation"`. This ensures existing consumer configurations automatically inherit the sanitised app name without requiring changes to consumer `main.cpp` or interface registration loops.
+3. **C Code Sync for LVGL Pro UI** — Updated both XML source (`screen_boot.xml`) and the pre-rendered C source (`screen_boot_gen.c`) with `lv_label_bind_text` so that native tests, firmware builds, and UI designer tooling stay synchronized.
+
+### Dead Ends & Warnings
+None.
+
+### Out-of-Scope Findings / Issues Surfaced
+- Confirmed finding from WO1: `modules/HomeAssistant/HomeAssistant.cpp:194` hardcodes `"manufacturer": "CB Labs"`.
+
+### Blockers
+None.
+
+### Verification
+
+| Environment | Result | Duration |
+|---|---|---|
+| `native` (unit tests) | ✅ 988/988 PASSED (+5 new test cases) | 55.9s |
+| `esp32dev` (build) | ✅ SUCCESS (Flash: 1,300,015 B, RAM: 55,852 B) | 32s |
+| `esp32s3nano` (build) | ✅ SUCCESS (Flash: 1,334,127 B, RAM: 58,132 B) | 48s |
+| `scripts/doc_lint.py` | ✅ PASSED (0 warnings) | < 1s |
+
+**Branch:** `232-device-identity/wo2-peripheral-surfaces`
 

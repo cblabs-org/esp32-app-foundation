@@ -358,7 +358,7 @@
               'To generate a PEM certificate and key, you can use OpenSSL:' +
             '</p>' +
             '<pre style="font-size:0.7rem; background:var(--bg); border:1px solid var(--border); border-radius:8px; padding:0.75rem; overflow-x:auto; margin:0 0 0.75rem 0; white-space:pre-wrap; word-break:break-all;">' +
-              'openssl req -x509 -newkey ec \\\n  -pkeyopt ec_paramgen_curve:prime256v1 \\\n  -keyout key.pem -out cert.pem \\\n  -days 3650 -nodes \\\n  -subj \'/CN=esp32-device.local\'' +
+              'openssl req -x509 -newkey ec \\\n  -pkeyopt ec_paramgen_curve:prime256v1 \\\n  -keyout key.pem -out cert.pem \\\n  -days 3650 -nodes \\\n  -subj \'/CN=' + (window.location.hostname || 'esp32-device.local') + '\'' +
             '</pre>' +
             '<p style="font-size:0.8rem; color:var(--text-muted); margin:0 0 0.75rem 0;">' +
               'For the captive portal to work with TLS, you need a certificate signed by a trusted Certificate Authority (e.g., Let\'s Encrypt). Self-signed certificates will not work for captive portal detection.' +
