@@ -93,5 +93,47 @@ If you discover a defect, upstream bug, or concern *outside your boundary box*, 
 ---
 
 ## Completion Report
-<!-- Written by the worker at task completion -->
+
+### Summary
+Successfully completed Work Order 3 (Web client, mDNS, and documentation).
+1. **Dynamic OpenSSL Helper (`web/portal/auth.js`)**: Updated the OpenSSL certificate generation command subject CN from hardcoded `/CN=esp32-device.local` to dynamic `/CN=' + (window.location.hostname || 'esp32-device.local') + '\''`. When users access the portal via their device hostname (e.g., `weather-station.local`), the generated command uses that hostname as CN with fallback to `esp32-device.local`.
+2. **mDNS Initialisation (`modules/WifiManager/WifiManager.cpp`)**: Added `#include <ESPmDNS.h>` and initialized `MDNS.begin(_currentHostname)` with HTTP service advertisement (`MDNS.addService("http", "tcp", 80)`) in `WifiManager::onStaConnected()`. This canonical hook handles successful initial STA connections as well as reconnections, ensuring mDNS is advertised exclusively in STA mode.
+3. **Platform Test Stub (`test/stubs/platform/ESPmDNS.h`)**: Created lightweight mock for `MDNSResponder` and global `MDNS` instance supporting host unit tests.
+4. **Unit Test Coverage (`test/test_unit/test_wifiManager/test_wifiManager.cpp`)**: Added unit test `OnStaConnectedInitialisesMDNS` verifying `onStaConnected()` begins mDNS with the effective hostname and adds the HTTP service on port 80.
+5. **Documentation Verification**: Verified `README.md:38` (mDNS claim is now backed by implementation) and `docs/developer/hardware-setup.md:145` (already documents `http://<hostname>.local`).
+
+### Files Modified / Created
+
+| File | Status | Description |
+|---|---|---|
+| `web/portal/auth.js` | Modified | Updated OpenSSL helper CN to dynamically use `window.location.hostname` with `'esp32-device.local'` fallback |
+| `modules/WifiManager/WifiManager.cpp` | Modified | Included `<ESPmDNS.h>` and initialized mDNS with HTTP service advertisement in `onStaConnected()` |
+| `test/stubs/platform/ESPmDNS.h` | Created | Added test stub for `MDNSResponder` / `MDNS` for native unit test builds |
+| `test/test_unit/test_wifiManager/test_wifiManager.cpp` | Modified | Added unit test `OnStaConnectedInitialisesMDNS` asserting mDNS initialization on STA connection |
+
+### Decisions Made
+1. **mDNS Initialisation in `onStaConnected()`** — Placed mDNS startup and HTTP service advertisement (`MDNS.begin(_currentHostname)`, `MDNS.addService("http", "tcp", 80)`) directly in `WifiManager::onStaConnected()`. This method is the single canonical entry point invoked upon successful STA connection (initial boot, backoff recovery, and link-loss reconnection), ensuring mDNS is active in STA mode and never in standalone AP mode.
+2. **Native Platform Stub for `ESPmDNS.h`** — Followed the repository's native stub architecture (`test/stubs/platform/`) to mock `MDNSResponder` and global `MDNS` instance, allowing native unit tests to verify mDNS lifecycle calls without ESP-IDF/Arduino dependencies.
+
+### Dead Ends & Warnings
+None.
+
+### Out-of-Scope Findings / Issues Surfaced
+- Confirmed pre-existing issue in `native_ha` environment: `test/test_unit/test_homeassistant/test_homeassistant.cpp:126:12: error: no member named '_drainStartMs' in 'HomeAssistantModule'`. Does not affect standard `native` unit tests or embedded targets.
+
+### Blockers
+None.
+
+### Verification
+
+| Environment | Result | Duration |
+|---|---|---|
+| `native` (unit tests) | ✅ 989/989 PASSED (+1 new test case) | 49.6s |
+| `esp32dev` (build) | ✅ SUCCESS (Flash: 1,335,975 B, RAM: 57,948 B) | 49s |
+| `esp32s3nano` (build) | ✅ SUCCESS (Flash: 1,370,367 B, RAM: 60,572 B) | 43s |
+| `scripts/doc_lint.py` | ✅ PASSED (0 warnings) | < 1s |
+| `scripts/lint_includes.py` | ✅ PASSED (0 boundary violations, 0 circular dependencies) | < 1s |
+
+**Branch:** `232-device-identity/wo3-web-mdns-docs`
+
 

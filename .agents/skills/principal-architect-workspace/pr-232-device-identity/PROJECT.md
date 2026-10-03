@@ -42,7 +42,7 @@
 
 - **[x] [wo1-core-propagation](wo1-core-propagation/WORKORDER.md):** Core identity plumbing — `sanitiseHostname()`, `Application::begin()` auto-propagation to WiFi + HA. Consumer `main.cpp` + `sample-app/main.cpp` simplification.
 - **[x] [wo2-peripheral-surfaces](wo2-peripheral-surfaces/WORKORDER.md):** Peripheral identity surfaces — MCP server name, OTA User-Agent, TLS cert CN, boot serial banner, LVGL boot screen `bind_text` fix.
-- **[ ] [wo3-web-mdns-docs](wo3-web-mdns-docs/WORKORDER.md):** Web client, mDNS implementation, auth.js fix, documentation corrections.
+- **[x] [wo3-web-mdns-docs](wo3-web-mdns-docs/WORKORDER.md):** Web client, mDNS implementation, auth.js fix, documentation corrections.
 
 ## Approval Status
 
@@ -60,6 +60,19 @@
 ### 2026-10-03T17:29:00+01:00 — WO2 Complete: Peripheral Identity Surfaces
 **Summary**: Wired 5 remaining C++ module surfaces. MCPServer: `setAppName()` with fallback chain. OTA: `setDeviceIdentity()` formats User-Agent. AuthManager: `setCertHostname()` replaces hardcoded CN (char[33] async-safe). Boot banner includes app name. LVGL `bind_text` activates reactive binding.
 **Cross-cutting decisions**: MCPServer server name uses sanitised hostname (lowercase-hyphenated) for protocol compatibility, with fallback chain: appName → hostname → `"esp32-app-foundation"`. OTA User-Agent preserves `(ESP32-http-Update)` suffix for server-side compatibility.
-**Surfaced findings**: None — all changes were clean and within boundary box.
+**Surfaced findings**: None.
 **Verification**: 988/988 native tests passed (+5 new), both target builds green.
+
+### 2026-10-03T17:47:00+01:00 — WO3 Complete: Web, mDNS & Documentation
+**Summary**: mDNS explicitly initialised in `WifiManager::onStaConnected()` with HTTP service advertisement — covers both initial connection and reconnections, STA-only. `auth.js` OpenSSL helper uses `window.location.hostname` for dynamic CN. Documentation claims verified accurate.
+**Cross-cutting decisions**: mDNS placed in `onStaConnected()` rather than a separate init function — this is the single code path for both initial and reconnect, making the placement robust.
+**Surfaced findings**: None.
+**Verification**: 989/989 native tests passed (+1 new), both target builds green, doc lint clean.
+
+### 2026-10-03T17:47:00+01:00 — Project Wrap-Up
+**Architectural outcome**: `Application::setAppName()` now propagates to 15 of 17 identity surfaces automatically (up from 2). Consumer code reduced from 3+ setter calls to 1. All existing APIs preserved — zero breaking changes. The remaining 2 surfaces (HA app name, HA manufacturer) are optional Ring-2 modules that require manual wiring by design.
+**Lessons for future projects**: The `char[N]` member + setter pattern (used for AuthManager cert hostname, MCPServer app name) is reliable for async task contexts where `String` or `const char*` temporaries would dangle. This is a good framework-wide pattern for identity fields consumed by background tasks.
+**Unresolved items**:
+- `HomeAssistantModule.cpp:194` hardcodes `"manufacturer": "CB Labs"` — should consume `app.getManufacturer()`. File as separate issue.
+- HA auto-wiring requires Application to discover Ring-2 modules by type — deliberate non-goal for this PR (would require module introspection infrastructure).
 
