@@ -114,6 +114,37 @@ void MCPServer::processLineForTest(const char* line) {
     _processLine(line);
 }
 
+/**
+ * @brief Set the application name used for MCP server identification.
+ *
+ * Sanitised to lowercase alphanumeric and hyphens (hostname-safe) for protocol
+ * compatibility. Truncated to 32 characters.
+ */
+void MCPServer::setAppName(const char* name) {
+    if (!name || name[0] == '\0') {
+        _appName[0] = '\0';
+        return;
+    }
+    size_t outIdx = 0;
+    bool lastHyphen = false;
+    for (const char* p = name; *p && outIdx < sizeof(_appName) - 1; ++p) {
+        char c = *p;
+        if (c >= 'A' && c <= 'Z') c += 32;
+        if (c == ' ' || c == '_') c = '-';
+        if ((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9')) {
+            _appName[outIdx++] = c;
+            lastHyphen = false;
+        } else if (c == '-' && !lastHyphen && outIdx > 0) {
+            _appName[outIdx++] = c;
+            lastHyphen = true;
+        }
+    }
+    while (outIdx > 0 && _appName[outIdx - 1] == '-') {
+        outIdx--;
+    }
+    _appName[outIdx] = '\0';
+}
+
 // ---------------------------------------------------------------------------
 // JSON-RPC Dispatch
 // ---------------------------------------------------------------------------
@@ -198,9 +229,15 @@ void MCPServer::_handleInitialize(const JsonDocument& req, Print& out) {
     JsonObject result     = resp["result"].to<JsonObject>();
     result["protocolVersion"] = "2024-11-05";
 
-    // Server identity uses the compile-time version macro
+    // Server identity uses configured app name, WifiManager hostname, or default
     JsonObject serverInfo = result["serverInfo"].to<JsonObject>();
-    serverInfo["name"]    = "esp32-app-foundation";
+    const char* serverName = "esp32-app-foundation";
+    if (_appName[0] != '\0') {
+        serverName = _appName;
+    } else if (_wifiManager && _wifiManager->getHostname() && _wifiManager->getHostname()[0] != '\0') {
+        serverName = _wifiManager->getHostname();
+    }
+    serverInfo["name"]    = serverName;
     serverInfo["version"] = BUILD_VERSION;
 
     // Capabilities: we support tool listing but not dynamic listChanged

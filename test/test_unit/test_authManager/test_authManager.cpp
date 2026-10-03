@@ -704,6 +704,22 @@ TEST_F(AuthManagerTest, test_reset_does_not_depend_on_cert) {
     EXPECT_TRUE(auth.hasCert());
 }
 
+/**
+ * @brief Default cert hostname is "esp32-device"; setCertHostname updates it.
+ */
+TEST_F(AuthManagerTest, test_cert_hostname_default_and_setter) {
+    EXPECT_STREQ(auth.getCertHostname(), "esp32-device");
+
+    auth.setCertHostname("weather-station");
+    EXPECT_STREQ(auth.getCertHostname(), "weather-station");
+
+    // Null or empty does not overwrite
+    auth.setCertHostname(nullptr);
+    EXPECT_STREQ(auth.getCertHostname(), "weather-station");
+    auth.setCertHostname("");
+    EXPECT_STREQ(auth.getCertHostname(), "weather-station");
+}
+
 // ===========================================================================
 // Main entry point
 // ===========================================================================

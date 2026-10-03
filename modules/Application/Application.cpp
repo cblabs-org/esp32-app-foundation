@@ -137,7 +137,7 @@ bool Application::begin(const FrameworkConfig& config) {
 
     // --- Step 1: Boot banner ---
     // Print the firmware version so the first log line is always identifiable.
-    ESP_LOGI(TAG, "ESP32 App Foundation v%s — booting", BUILD_VERSION);
+    ESP_LOGI(TAG, "ESP32 App Foundation v%s — %s — booting", BUILD_VERSION, getAppName());
 
     // --- Step 1b: Install log pipeline ---
     // Intercepts all ESP_LOG* output for global secret redaction.
@@ -269,6 +269,9 @@ bool Application::begin(const FrameworkConfig& config) {
     // factory default seeded by resetConfig() (from setDefaultHostname()).
     _wifiManager.begin();
     ESP_LOGI(TAG, "WiFi setup initiated");
+
+    // Wire the TLS certificate hostname from the application name (sanitised)
+    _authManager.setCertHostname(sanitiseHostname(getAppName()).c_str());
 
     // Sync the AuthManager AP-mode bypass with WifiManager. The bypass applies
     // ONLY to first-boot setup (AP up and no stored credentials). A fallback AP

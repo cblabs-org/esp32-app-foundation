@@ -112,6 +112,22 @@ public:
      */
     bool isEnabled() const { return _mcpEnabled; }
 
+    /**
+     * @brief Set the application name used for MCP server identification.
+     *
+     * Sanitised to lowercase alphanumeric and hyphens (hostname-safe) for protocol
+     * compatibility. If not set, falls back to WifiManager hostname or default.
+     *
+     * @param name Null-terminated application name.
+     */
+    void setAppName(const char* name);
+
+    /**
+     * @brief Get the configured application name.
+     * @return Null-terminated string or empty string if not set.
+     */
+    const char* getAppName() const { return _appName; }
+
     // -----------------------------------------------------------------------
     // IWebContributor Implementation
     // -----------------------------------------------------------------------
@@ -191,6 +207,7 @@ private:
     ConfigManager*  _configManager = nullptr;     ///< Cached for runtime config persistence
     WifiManager*    _wifiManager = nullptr;       ///< Cached reference for status endpoint hostname (single source of truth)
     AuthManager*    _authManager = nullptr;       ///< Cached for bearer token auth on HTTP routes (WO6); nullptr = no auth
+    char            _appName[33] = {};            ///< Optional app name override (sanitised)
 
     /**
      * @brief Parse a complete JSON-RPC line and route to the appropriate handler.

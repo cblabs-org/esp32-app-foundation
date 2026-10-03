@@ -270,6 +270,24 @@ TEST(McpServerTest, InitializeReturnsCapabilities) {
     EXPECT_EQ(doc["id"].as<int>(), 1);
     EXPECT_TRUE(doc["result"]["protocolVersion"].is<const char*>());
     EXPECT_STREQ(doc["result"]["protocolVersion"].as<const char*>(), "2024-11-05");
+    EXPECT_STREQ(doc["result"]["serverInfo"]["name"].as<const char*>(), "esp32-app-foundation");
+}
+
+/** initialize with setAppName must return sanitised server name. */
+TEST(McpServerTest, InitializeWithAppNameUsesSanitisedName) {
+    MCPServer server;
+    server.setAppName("Weather Station Pro");
+    std::vector<IMCPContributor*> contributors;
+    server.begin(contributors, nullptr);
+
+    std::string response = processAndCapture(server,
+        R"({"jsonrpc":"2.0","id":1,"method":"initialize"})");
+
+    JsonDocument doc;
+    DeserializationError err = deserializeJson(doc, response);
+    ASSERT_FALSE(err) << "Response JSON parse error: " << err.c_str();
+
+    EXPECT_STREQ(doc["result"]["serverInfo"]["name"].as<const char*>(), "weather-station-pro");
 }
 
 /** ping must return an empty result object. */

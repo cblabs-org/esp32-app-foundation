@@ -383,6 +383,7 @@ private:
     char    _lastCheckedChannel[16] = "";
     uint8_t _checkHour              = 3;   ///< Hour (0-23) at which daily auto-check fires
     char    _learnedManifestUrl[256] = ""; ///< Learned manifest URL (persisted via IConfigurable)
+    char    _deviceAppName[33] = "esp32-app-foundation"; ///< Sanitised application name for OTA User-Agent identity
 
     // Scheduling state (not persisted — reset on each boot)
     uint32_t _lastCheckDay   = 0;     ///< Unix day of last scheduled check (seconds/86400)

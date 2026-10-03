@@ -114,6 +114,23 @@ public:
     void setExpectedVersion(const char* version);
 
     /**
+     * @brief Set the device identity for HTTP User-Agent header in download requests.
+     *
+     * Format generated: "<sanitised-name>/<version> (ESP32-http-Update)"
+     * If name or version is nullptr or empty, defaults to "ESP32-http-Update".
+     *
+     * @param name    Sanitised device name (e.g. "weather-station").
+     * @param version Firmware version string (e.g. "0.1.0-dev.5" or BUILD_VERSION).
+     */
+    void setDeviceIdentity(const char* name, const char* version);
+
+    /**
+     * @brief Get the configured User-Agent string.
+     * @return Null-terminated C-string with the User-Agent.
+     */
+    const char* getUserAgent() const { return _userAgent; }
+
+    /**
      * @brief Download the signature file from the given URL, following redirects.
      *
      * Performs a redirect-aware HTTP GET (up to kMaxRedirects hops) to fetch
@@ -173,6 +190,7 @@ private:
     int                  _httpTimeout     = 8000;     // HTTP client timeout in ms
     OTAError             _lastError       = OTAError::None; // Most recent error
     char                 _expectedVersion[32] = {};   // Expected version for pre-flash validation
+    char                 _userAgent[96]   = "ESP32-http-Update"; // HTTP User-Agent header string
 
     static constexpr int kMaxRedirects = 5;       // Maximum redirect hops before failure ///< Maximum kmaxredirects
     static constexpr size_t kChunkSize = 1024;    // Streaming read/write buffer size ///< Size of kchunksize

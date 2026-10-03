@@ -469,6 +469,16 @@ TEST_F(ApplicationBeginTest, Begin_AutoPropagatesAppNameToWifiHostname) {
 }
 
 /**
+ * begin() auto-propagates sanitised app name to AuthManager cert hostname (Issue #232).
+ */
+TEST_F(ApplicationBeginTest, Begin_AutoPropagatesAppNameToAuthCertHostname) {
+    app.setAppName("Weather Station");
+    FrameworkConfig cfg;
+    EXPECT_TRUE(app.begin(cfg));
+    EXPECT_STREQ("weather-station", app.getAuthManager().getCertHostname());
+}
+
+/**
  * begin() respects explicitly configured default hostname if set before begin() (Issue #232).
  */
 TEST_F(ApplicationBeginTest, Begin_PreservesExplicitCustomHostname) {
