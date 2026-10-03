@@ -43,7 +43,7 @@
 - **[x] [wo1-core-propagation](wo1-core-propagation/WORKORDER.md):** Core identity plumbing — `sanitiseHostname()`, `Application::begin()` auto-propagation to WiFi + HA. Consumer `main.cpp` + `sample-app/main.cpp` simplification.
 - **[x] [wo2-peripheral-surfaces](wo2-peripheral-surfaces/WORKORDER.md):** Peripheral identity surfaces — MCP server name, OTA User-Agent, TLS cert CN, boot serial banner, LVGL boot screen `bind_text` fix.
 - **[x] [wo3-web-mdns-docs](wo3-web-mdns-docs/WORKORDER.md):** Web client, mDNS implementation, auth.js fix, documentation corrections.
-- **[ ] [wo4-ha-identity-wiring](wo4-ha-identity-wiring/WORKORDER.md):** HomeAssistant identity auto-wiring — `begin(Application& app)` pattern, fix hardcoded `"CB Labs"` manufacturer.
+- **[x] [wo4-ha-identity-wiring](wo4-ha-identity-wiring/WORKORDER.md):** HomeAssistant identity auto-wiring — `begin(Application& app)` pattern, fix hardcoded `"CB Labs"` manufacturer.
 
 ## Approval Status
 
@@ -71,9 +71,13 @@
 **Verification**: 989/989 native tests passed (+1 new), both target builds green, doc lint clean.
 
 ### 2026-10-03T17:47:00+01:00 — Project Wrap-Up
-**Architectural outcome**: `Application::setAppName()` now propagates to 15 of 17 identity surfaces automatically (up from 2). Consumer code reduced from 3+ setter calls to 1. All existing APIs preserved — zero breaking changes. The remaining 2 surfaces (HA app name, HA manufacturer) are optional Ring-2 modules that require manual wiring by design.
-**Lessons for future projects**: The `char[N]` member + setter pattern (used for AuthManager cert hostname, MCPServer app name) is reliable for async task contexts where `String` or `const char*` temporaries would dangle. This is a good framework-wide pattern for identity fields consumed by background tasks.
-**Unresolved items**:
-- `HomeAssistantModule.cpp:194` hardcodes `"manufacturer": "CB Labs"` — should consume `app.getManufacturer()`. File as separate issue.
-- HA auto-wiring requires Application to discover Ring-2 modules by type — deliberate non-goal for this PR (would require module introspection infrastructure).
+**Architectural outcome**: `Application::setAppName()` now propagates to all 17 identity surfaces (up from 2). Consumer code reduced from 3+ setter calls to 1. All existing APIs preserved — zero breaking changes. Both BLE and HA use the same `begin(Application& app)` self-wiring pattern.
+**Lessons for future projects**: The `char[N]` member + setter pattern (used for AuthManager cert hostname, MCPServer app name) is reliable for async task contexts where `String` or `const char*` temporaries would dangle. The `begin(Application& app)` pattern for Ring-2 modules is the canonical way to auto-wire identity without requiring Application to know about optional modules.
+**Unresolved items**: None — all 17 surfaces covered.
+
+### 2026-10-03T21:37:00+01:00 — WO4 Complete: HomeAssistant Identity Auto-Wiring
+**Summary**: Added `HomeAssistantModule::begin(Application& app)` following the identical BLEManager pattern. Self-wires appName, manufacturer, version with `.empty()` guards. Replaced hardcoded `"CB Labs"` manufacturer with `app.getManufacturer()` (fallback preserved). Removed manual wiring from both consumer main.cpp files.
+**Cross-cutting decisions**: None — purely mechanical application of existing BLEManager pattern.
+**Surfaced findings**: None.
+**Verification**: Both target builds green.
 
