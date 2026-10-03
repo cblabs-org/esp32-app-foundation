@@ -12,7 +12,7 @@
 
 #include <gtest/gtest.h>
 #include "MockLVGLHardwareAdapter.hpp"
-#include "LVGLDisplayModule.hpp"
+#include "LVGLDisplay.hpp"
 
 class LVGLDisplayLifecycleTest : public ::testing::Test {
 protected:

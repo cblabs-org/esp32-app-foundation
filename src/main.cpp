@@ -38,7 +38,7 @@ static Application app;  ///< Single framework hub instance
 // --- Optional Ring-2 modules (composed explicitly) ---
 
 #ifdef WITH_HOMEASSISTANT
-#include "HomeAssistantModule.hpp"
+#include "HomeAssistant.hpp"
 static HomeAssistantModule haModule;
 #endif
 
@@ -82,12 +82,12 @@ static EncoderModule encoderModule;
 static constexpr BootBranding branding{"ESP32 App Foundation"};
 #endif
 #ifdef WITH_DISPLAY_LVGL
-#include "LVGLDisplayModule.hpp"
+#include "LVGLDisplay.hpp"
 #include "CrowPanel128Adapter.hpp"
 static CrowPanel128Adapter displayAdapter;
 static LVGLDisplayModule displayModule(displayAdapter, &branding, nullptr);
 #elif defined(WITH_DISPLAY_U8G2)
-#include "U8G2DisplayModule.hpp"
+#include "U8G2Display.hpp"
 #include "boards/DiagnosticsBoard.hpp"
 static U8G2DisplayModule displayModule(&branding);
 static DiagnosticsBoard diagnosticsBoard{256, 64};

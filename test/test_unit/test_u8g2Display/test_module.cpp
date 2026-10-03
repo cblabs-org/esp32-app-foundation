@@ -15,7 +15,7 @@
 
 #include <gtest/gtest.h>
 #include "NativeU8G2DisplayType.h"
-#include "U8G2DisplayModule.hpp"
+#include "U8G2Display.hpp"
 #include "modules/U8G2Display/IU8G2SystemScreens.hpp"
 #include "modules/U8G2Display/IDisplayBoard.hpp"
 

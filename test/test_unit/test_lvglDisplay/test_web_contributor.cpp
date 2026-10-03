@@ -7,7 +7,7 @@
  */
 
 #include <gtest/gtest.h>
-#include "LVGLDisplayModule.hpp"
+#include "LVGLDisplay.hpp"
 #include "MockLVGLHardwareAdapter.hpp"
 #include <PsychicHttp.h>
 #include <vector>

@@ -21,7 +21,7 @@
 #include "MCPBuiltinTools.hpp"
 #include "interfaces/IMCPContributor.hpp"
 #include "WifiManager.hpp"
-#include "WebServerManager.hpp"
+#include "WebServer.hpp"
 #include "AuthManager.hpp"
 #include "ConfigManager.hpp"
 #include "portal_assets/mcp_js.hpp"

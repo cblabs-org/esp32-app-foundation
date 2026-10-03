@@ -498,7 +498,7 @@ all interfaces implemented by the concrete type and wire them into their respect
 
 ```cpp
 #include <AppFoundation.h>
-#include <U8G2DisplayModule.hpp>
+#include <U8G2Display.hpp>
 #include <ButtonModule.hpp>
 
 static U8G2DisplayModule display;

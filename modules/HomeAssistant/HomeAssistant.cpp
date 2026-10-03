@@ -5,14 +5,14 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  *
- * Module: modules/HomeAssistant/HomeAssistantModule.cpp
+ * Module: modules/HomeAssistant/HomeAssistant.cpp
  * Description: Implementation of the HomeAssistantModule. Establishes and
  *              manages an ESP-MQTT client connection, publishes Home Assistant
  *              MQTT discovery payloads for all registered entities, handles
  *              inbound command dispatching, and exposes configuration via
  *              web portal REST endpoints and MCP tools.
  */
-#include "HomeAssistantModule.hpp"
+#include "HomeAssistant.hpp"
 
 #ifdef WITH_HOMEASSISTANT
 

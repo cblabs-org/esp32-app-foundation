@@ -68,7 +68,7 @@
 
 #include "EventBus.hpp"
 #include "DataManager.hpp"
-#include "WebServerManager.hpp"
+#include "WebServer.hpp"
 #include "ConfigManager.hpp"
 
 // Core domain services (owned by value — full includes required)

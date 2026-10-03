@@ -20,7 +20,7 @@
 #include "../test_helpers/MockTabRegistry.hpp"
 #include <ArduinoJson.h>
 
-#include "WebServerManager.hpp"
+#include "WebServer.hpp"
 
 class OtaUpdateManagerTest : public ::testing::Test {
 protected:

@@ -5,7 +5,7 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  *
- * Module: modules/U8G2Display/U8G2DisplayModule.cpp
+ * Module: modules/U8G2Display/U8G2Display.cpp
  * Description: Implementation of the U8G2 display module — pure service with
  *              three-layer rendering (Modal → Base/Carousel → Screensaver),
  *              carousel engine, sleep/wake power management, IStatusReporter
@@ -48,7 +48,7 @@
  * - U8G2DisplayModule::_onDisplayMessage(): Static EventBus callback for display messages
  */
 
-#include "U8G2DisplayModule.hpp"
+#include "U8G2Display.hpp"
 #include "utils/serveGzipAsset.hpp"
 #include "events/AppConfiguringPayload.hpp"
 #include "platform/LogShim.h"

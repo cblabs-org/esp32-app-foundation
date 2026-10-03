@@ -13,7 +13,7 @@ int mock_mqtt_publish_return_value = 0;
 
 #ifdef WITH_HOMEASSISTANT
 
-#include "../../../modules/HomeAssistant/HomeAssistantModule.hpp"
+#include "../../../modules/HomeAssistant/HomeAssistant.hpp"
 
 #include "../../../modules/HomeAssistant/entities/HaBinarySensor.hpp"
 #include "../../../modules/HomeAssistant/entities/HaButton.hpp"

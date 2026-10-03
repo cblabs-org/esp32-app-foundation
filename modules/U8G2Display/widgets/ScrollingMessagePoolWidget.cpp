@@ -21,7 +21,7 @@
 
 #include "ScrollingMessagePoolWidget.hpp"
 #include "EventBus.hpp"
-#include "U8G2DisplayModule.hpp"   // For DisplayMessagePayload struct
+#include "U8G2Display.hpp"   // For DisplayMessagePayload struct
 #include <cstring>
 
 // =============================================================================
