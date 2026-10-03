@@ -131,9 +131,8 @@ void setup() {
     haModule.setKeyManager(&app.getKeyManager());
     haModule.setEventBus(&app.getEventBus());
     haModule.setConfigManager(&app.getConfigManager());
-    haModule.setAppName(app.getAppName());  // HA requires manual wiring (optional Ring-2 module)
-    haModule.setAppVersion(BUILD_VERSION);
     app.registerModule(&haModule);
+    haModule.begin(app);
 #endif
 
 #ifdef WITH_TIME

@@ -128,10 +128,8 @@ void setup() {
     haModule.setKeyManager(&app.getKeyManager());
     haModule.setEventBus(&app.getEventBus());
     haModule.setConfigManager(&app.getConfigManager());
-    // HA requires manual wiring (optional Ring-2 module)
-    haModule.setAppName(app.getAppName());
-    haModule.setAppVersion(BUILD_VERSION);
     app.registerModule(&haModule);
+    haModule.begin(app);
 #endif
 
 #if defined(WITH_DISPLAY_U8G2) || defined(WITH_DISPLAY_LVGL)
