@@ -80,9 +80,9 @@
     let color, label;
     switch (status) {
       case 'SYNCED':
-        color = '#2e7d32'; label = 'Synced'; break;
+        color = 'var(--success)'; label = 'Synced'; break;
       case 'IN_PROGRESS':
-        color = '#f9a825'; label = 'Syncing…'; break;
+        color = 'var(--warning)'; label = 'Syncing…'; break;
       default:
         color = 'var(--text-muted)';    label = 'Not Synced'; break;
     }

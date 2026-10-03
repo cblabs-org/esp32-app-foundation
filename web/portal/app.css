@@ -21,6 +21,7 @@
   --error: #c62828;
   --warning: #f9a825;
   --font-size-base: 16px;
+  --white: #ffffff;
 }
 
 [data-theme="dark"] {
@@ -212,7 +213,7 @@ select:focus {
 
 button {
   background: var(--primary);
-  color: white;
+  color: var(--white);
   border: none;
   padding: 0.8rem 1.25rem;
   border-radius: 10px;
@@ -420,14 +421,14 @@ button.secondary:hover {
 .pill-btn--active,
 .pill-btn--active:hover {
   background: var(--primary);
-  color: white;
+  color: var(--white);
   border-color: var(--primary);
 }
 
 /* Screenshot pixel colour preset — active state mirrors pill-btn--active */
 .btn-ss-colour--active {
   background: var(--primary);
-  color: white;
+  color: var(--white);
   border-color: var(--primary);
 }
 
@@ -500,7 +501,7 @@ button.secondary:hover {
   position: absolute;
   cursor: pointer;
   top: 0; left: 0; right: 0; bottom: 0;
-  background: var(--border, #dee2e6);
+  background: var(--border);
   border-radius: 26px;
   transition: background 0.3s;
 }
@@ -519,7 +520,7 @@ button.secondary:hover {
 }
 
 .toggle-switch input:checked + .toggle-slider {
-  background: var(--primary, #2196F3);
+  background: var(--primary);
 }
 
 .toggle-switch input:checked + .toggle-slider::before {
@@ -527,9 +528,9 @@ button.secondary:hover {
 }
 
 #display-font-group label:has(input:checked) {
-  border-color: var(--primary, #2196F3);
+  border-color: var(--primary);
   background: rgba(33, 150, 243, 0.08);
-  color: var(--primary, #2196F3);
+  color: var(--primary);
 }
 
 /* ==========================================================================
@@ -539,14 +540,14 @@ button.secondary:hover {
    ========================================================================== */
 
 article.advanced-drawer {
-  border-color: var(--warning, #f9a825);
+  border-color: var(--warning);
   background: rgba(249, 168, 37, 0.04);
 }
 
 article.advanced-drawer > details > summary.advanced-summary {
   font-weight: 700;
   font-size: 1.1rem;
-  color: var(--warning, #f9a825);
+  color: var(--warning);
   cursor: pointer;
   list-style: none;
   display: flex;
@@ -574,7 +575,7 @@ article.advanced-drawer > details[open] > summary.advanced-summary::after {
 
 /* Keyboard focus ring */
 article.advanced-drawer > details > summary.advanced-summary:focus-visible {
-  outline: 2px solid var(--warning, #f9a825);
+  outline: 2px solid var(--warning);
   outline-offset: 3px;
   border-radius: 2px;
 }
@@ -600,7 +601,7 @@ article.advanced-drawer > details > summary.advanced-summary::-webkit-details-ma
    ========================================================================== */
 
 article.info-drawer {
-  border: 1px solid var(--border, #dee2e6);
+  border: 1px solid var(--border);
   border-radius: 10px;
   overflow: hidden;
   margin-bottom: 0.75rem;
@@ -609,7 +610,7 @@ article.info-drawer {
 article.info-drawer > details > summary.info-summary {
   font-weight: 600;
   font-size: 0.85rem;
-  color: var(--text-muted, #6c757d);
+  color: var(--text-muted);
   cursor: pointer;
   list-style: none;
   display: flex;
@@ -637,7 +638,7 @@ article.info-drawer > details[open] > summary.info-summary::after {
 
 /* Keyboard focus ring */
 article.info-drawer > details > summary.info-summary:focus-visible {
-  outline: 2px solid var(--border, #dee2e6);
+  outline: 2px solid var(--border);
   outline-offset: 2px;
   border-radius: 2px;
 }
@@ -751,8 +752,8 @@ article.info-drawer > details > .info-drawer-content {
   border-radius: 10px;
   font-size: 0.85rem;
   font-weight: 600;
-  color: white;
-  background: #333;
+  background: var(--text);
+  color: var(--bg);
   transform: translateY(20px);
   opacity: 0;
   transition: all 0.3s ease;
@@ -859,7 +860,7 @@ dialog::backdrop {
 
 .btn--delete:hover {
   background: var(--error);
-  color: white;
+  color: var(--white);
 }
 
 /* ==========================================================================
@@ -873,7 +874,7 @@ dialog::backdrop {
   width: 16px;
   height: 16px;
   border: 2px solid rgba(255, 255, 255, 0.3);
-  border-top-color: #fff;
+  border-top-color: currentColor;
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
   display: inline-block;
@@ -894,7 +895,7 @@ button[aria-busy="true"]::after {
   height: 14px;
   margin-left: 8px;
   border: 2px solid rgba(255, 255, 255, 0.4);
-  border-top-color: #fff;
+  border-top-color: currentColor;
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
   vertical-align: middle;
@@ -1104,7 +1105,7 @@ input[type="number"]::-webkit-inner-spin-button {
 
 [data-theme="dark"] .badge--warn {
   background: rgba(251, 191, 36, 0.2);
-  color: #fbbf24;
+  color: var(--warning);
   border-color: rgba(251, 191, 36, 0.3);
 }
 .badge--subtle {
@@ -1170,7 +1171,7 @@ button.danger {
 }
 button.danger:hover {
   background: var(--error);
-  color: #fff;
+  color: var(--white);
 }
 button.full-width {
   width: 100%;
@@ -1189,7 +1190,7 @@ button.full-width {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  color: white;
+  color: var(--white);
   gap: 1.25rem;
   opacity: 0;
   visibility: hidden;
@@ -1203,7 +1204,7 @@ button.full-width {
   width: 44px;
   height: 44px;
   border: 3px solid rgba(255, 255, 255, 0.25);
-  border-top-color: white;
+  border-top-color: var(--white);
   border-radius: 50%;
   animation: reboot-spin 0.8s linear infinite;
 }

@@ -44,16 +44,16 @@
       <!-- Status Header -->
       <div id="wifi-status-header" class="wifi-status-header" style="
         display:flex; align-items:center; gap:0.75rem; padding:0.75rem 1rem;
-        background:var(--card-bg, #f8f9fa); border-radius:12px;
+        background:var(--card-bg); border-radius:12px;
         margin-bottom:1rem; font-size:0.85rem; flex-wrap:wrap;
       ">
         <span id="wifi-mode-badge" style="
           display:inline-block; padding:2px 8px; border-radius:6px;
           font-size:0.7rem; font-weight:700; text-transform:uppercase;
-          letter-spacing:0.5px; background:var(--border,#dee2e6); color:var(--text-muted,#6c757d);
+          letter-spacing:0.5px; background:var(--border); color:var(--text-muted);
         ">--</span>
         <span id="wifi-status-ssid" style="font-weight:600;">--</span>
-        <span id="wifi-status-ip" style="color:var(--text-muted,#6c757d); font-size:0.8rem;">--</span>
+        <span id="wifi-status-ip" style="color:var(--text-muted); font-size:0.8rem;">--</span>
         <span id="wifi-status-signal" style="margin-left:auto;"></span>
       </div>
 
@@ -65,17 +65,17 @@
         ">Scan</button>
       </div>
       <div id="wifi-network-list" style="
-        max-height:220px; overflow-y:auto; border:1px solid var(--border,#dee2e6);
+        max-height:220px; overflow-y:auto; border:1px solid var(--border);
         border-radius:10px; margin-bottom:0.5rem;
       ">
-        <div style="padding:1rem; text-align:center; color:var(--text-muted,#6c757d); font-size:0.85rem;">
+        <div style="padding:1rem; text-align:center; color:var(--text-muted); font-size:0.85rem;">
           Press Scan to discover networks
         </div>
       </div>
 
       <!-- Hidden network toggle -->
       <button type="button" id="wifi-hidden-toggle" style="
-        background:transparent; border:none; color:var(--primary,#2196F3);
+        background:transparent; border:none; color:var(--primary);
         font-size:0.8rem; font-weight:600; padding:0.25rem 0; cursor:pointer;
         margin-bottom:0.75rem; display:flex; align-items:center; gap:4px;
       ">+ Hidden network...</button>
@@ -86,7 +86,7 @@
       <!-- Credentials Form -->
       <label for="wifi-ssid-input" style="font-size:0.85rem;">SSID</label>
       <input type="text" id="wifi-ssid-input" placeholder="Select or enter network" readonly
-        style="width:100%; box-sizing:border-box; margin-bottom:0.75rem; background:var(--card-bg,#f8f9fa); cursor:default;">
+        style="width:100%; box-sizing:border-box; margin-bottom:0.75rem; background:var(--card-bg); cursor:default;">
 
       <label for="wifi-pass-input" style="font-size:0.85rem;">Password</label>
       <div class="password-input-wrapper">
@@ -109,7 +109,7 @@
       <!-- Test/Save Result -->
       <div id="wifi-action-result" style="
         font-size:0.8rem; padding:0; margin-bottom:0.75rem; min-height:1.2em;
-        color:var(--text-muted,#6c757d);
+        color:var(--text-muted);
       "></div>
 
       <!-- Network Diagnostics Drawer -->
@@ -117,7 +117,7 @@
         <details id="wifi-diag-drawer">
           <summary class="info-summary">
             <span id="wifi-diag-dot" style="
-              width:8px; height:8px; border-radius:50%; background:var(--border,#dee2e6);
+              width:8px; height:8px; border-radius:50%; background:var(--border);
               display:inline-block; margin-right:0.5rem; flex-shrink:0;
             "></span>
             Network Diagnostics
@@ -132,8 +132,8 @@
       <!-- Forget Button -->
       <button type="button" id="wifi-forget-btn" style="
         width:100%; box-sizing:border-box; margin-top:0.5rem;
-        background:transparent; color:var(--error,#c62828);
-        border:1px solid var(--error,#c62828); padding:0.7rem;
+        background:transparent; color:var(--error);
+        border:1px solid var(--error); padding:0.7rem;
         font-size:0.85rem; font-weight:600; border-radius:10px;
         cursor:pointer; transition:all 0.2s;
       ">Forget Network</button>
@@ -176,16 +176,16 @@
       // --- Mode badge ---
       if (data.ap_mode) {
         modeBadge.textContent = 'AP';
-        modeBadge.style.background = 'var(--warning, #f9a825)';
+        modeBadge.style.background = 'var(--warning)';
         modeBadge.style.color = 'var(--text)';
       } else if (data.mode === 'STA') {
         modeBadge.textContent = 'STA';
-        modeBadge.style.background = 'var(--success, #2e7d32)';
-        modeBadge.style.color = '#fff';
+        modeBadge.style.background = 'var(--success)';
+        modeBadge.style.color = 'var(--white)';
       } else {
         modeBadge.textContent = 'OFF';
-        modeBadge.style.background = 'var(--error, #c62828)';
-        modeBadge.style.color = '#fff';
+        modeBadge.style.background = 'var(--error)';
+        modeBadge.style.color = 'var(--white)';
       }
 
       // --- Status fields ---
@@ -245,19 +245,19 @@
     ];
 
     diagTable.innerHTML = rows.map(([k, v]) =>
-      `<tr style="border-bottom:1px solid var(--border,#dee2e6);">
+      `<tr style="border-bottom:1px solid var(--border);">
         <td style="padding:4px 8px 4px 0; font-weight:600; white-space:nowrap;">${k}</td>
-        <td style="padding:4px 0; color:var(--text-muted,#6c757d);">${v}</td>
+        <td style="padding:4px 0; color:var(--text-muted);">${v}</td>
       </tr>`
     ).join('');
 
     // --- Dot color ---
     if (data.mode === 'STA') {
-      diagDot.style.background = 'var(--success, #2e7d32)';
+      diagDot.style.background = 'var(--success)';
     } else if (data.ap_mode) {
-      diagDot.style.background = 'var(--warning, #f9a825)';
+      diagDot.style.background = 'var(--warning)';
     } else {
-      diagDot.style.background = 'var(--error, #c62828)';
+      diagDot.style.background = 'var(--error)';
     }
   }
 
@@ -325,7 +325,7 @@
       return `<div class="wifi-net-item" data-ssid="${net.ssid}" style="
         display:flex; align-items:center; gap:0.5rem; padding:0.6rem 0.75rem;
         cursor:pointer; transition:background 0.15s;
-        ${i < networks.length - 1 ? 'border-bottom:1px solid var(--border,#dee2e6);' : ''}
+        ${i < networks.length - 1 ? 'border-bottom:1px solid var(--border);' : ''}
         ${isActive ? 'background:rgba(33,150,243,0.08);' : ''}
       ">
         <span style="flex:1; font-size:0.85rem; font-weight:${isActive ? '700' : '500'};">${net.ssid}</span>
@@ -424,7 +424,7 @@
 
     if (!ssid) {
       resultEl.textContent = 'Please select or enter a network SSID.';
-      resultEl.style.color = 'var(--error, #c62828)';
+      resultEl.style.color = 'var(--error)';
       return;
     }
 
@@ -442,14 +442,14 @@
 
       if (resp && resp.status === 'ok') {
         resultEl.innerHTML = `✓ Connected successfully. IP: <strong>${resp.ip}</strong>`;
-        resultEl.style.color = 'var(--success, #2e7d32)';
+        resultEl.style.color = 'var(--success)';
       } else {
         resultEl.textContent = '✗ Connection failed. Check password and try again.';
-        resultEl.style.color = 'var(--error, #c62828)';
+        resultEl.style.color = 'var(--error)';
       }
     } catch (err) {
       resultEl.textContent = '✗ Test failed. Device may be unreachable.';
-      resultEl.style.color = 'var(--error, #c62828)';
+      resultEl.style.color = 'var(--error)';
     } finally {
       testBtn.disabled = false;
       testBtn.textContent = 'Test Connection';
@@ -466,7 +466,7 @@
 
     if (!ssid) {
       resultEl.textContent = 'Please select or enter a network SSID.';
-      resultEl.style.color = 'var(--error, #c62828)';
+      resultEl.style.color = 'var(--error)';
       return;
     }
 
@@ -487,7 +487,7 @@
 
     } catch (err) {
       resultEl.textContent = '✗ Failed to save. Try again.';
-      resultEl.style.color = 'var(--error, #c62828)';
+      resultEl.style.color = 'var(--error)';
       saveBtn.disabled = false;
       saveBtn.textContent = 'Save & Connect';
     }
@@ -502,8 +502,8 @@
       // --- Arm the button (3s timeout) ---
       forgetArmed = true;
       forgetBtn.textContent = '⚠ Confirm Forget? (3s)';
-      forgetBtn.style.background = 'var(--error, #c62828)';
-      forgetBtn.style.color = '#fff';
+      forgetBtn.style.background = 'var(--error)';
+      forgetBtn.style.color = 'var(--white)';
 
       forgetTimer = setTimeout(() => {
         disarmForget();
@@ -528,7 +528,7 @@
 
     } catch (err) {
       resultEl.textContent = '✗ Forget failed. Try again.';
-      resultEl.style.color = 'var(--error, #c62828)';
+      resultEl.style.color = 'var(--error)';
       disarmForget();
       forgetBtn.disabled = false;
     }
@@ -538,7 +538,7 @@
     forgetArmed = false;
     forgetBtn.textContent = 'Forget Network';
     forgetBtn.style.background = 'transparent';
-    forgetBtn.style.color = 'var(--error, #c62828)';
+    forgetBtn.style.color = 'var(--error)';
   }
 
   // ==========================================================================

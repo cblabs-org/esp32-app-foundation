@@ -43,7 +43,7 @@
   function makeRadio(name, value, label) {
     return '<label style="' +
              'flex:1; display:flex; align-items:center; justify-content:center;' +
-             'padding:0.6rem; border:2px solid var(--border, #dee2e6); border-radius:10px;' +
+             'padding:0.6rem; border:2px solid var(--border); border-radius:10px;' +
              'cursor:pointer; font-weight:600; font-size:0.85rem; transition:all 0.2s;' +
            '">' +
              '<input type="radio" name="' + name + '" value="' + value + '" style="display:none;"> ' + label +

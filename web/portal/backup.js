@@ -23,8 +23,8 @@
 
     <article>
       <header>Restore Configuration</header>
-      <div style="background: rgba(249, 168, 37, 0.08); border: 1px solid var(--warning, #f9a825); border-radius: 10px; padding: 0.75rem; margin-bottom: 1rem;">
-        <p style="font-size: 0.8rem; color: var(--warning, #f9a825); margin: 0;">
+      <div style="background: rgba(249, 168, 37, 0.08); border: 1px solid var(--warning); border-radius: 10px; padding: 0.75rem; margin-bottom: 1rem;">
+        <p style="font-size: 0.8rem; color: var(--warning); margin: 0;">
           ⚠️ Restoring a configuration will overwrite all current settings
           and <strong>restart the device</strong>. Make sure the file is from a
           compatible device.

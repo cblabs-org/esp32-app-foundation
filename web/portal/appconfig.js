@@ -32,21 +32,21 @@
         '<div id="display-font-group" style="display:flex; gap:0.5rem;">' +
           '<label style="' +
             'flex:1; display:flex; align-items:center; justify-content:center;' +
-            'padding:0.6rem; border:2px solid var(--border, #dee2e6); border-radius:10px;' +
+            'padding:0.6rem; border:2px solid var(--border); border-radius:10px;' +
             'cursor:pointer; font-weight:600; font-size:0.85rem; transition:all 0.2s;' +
           '">' +
             '<input type="radio" name="display-font-size" value="1" style="display:none;"> Small' +
           '</label>' +
           '<label style="' +
             'flex:1; display:flex; align-items:center; justify-content:center;' +
-            'padding:0.6rem; border:2px solid var(--border, #dee2e6); border-radius:10px;' +
+            'padding:0.6rem; border:2px solid var(--border); border-radius:10px;' +
             'cursor:pointer; font-weight:600; font-size:0.85rem; transition:all 0.2s;' +
           '">' +
             '<input type="radio" name="display-font-size" value="2" checked style="display:none;"> Medium' +
           '</label>' +
           '<label style="' +
             'flex:1; display:flex; align-items:center; justify-content:center;' +
-            'padding:0.6rem; border:2px solid var(--border, #dee2e6); border-radius:10px;' +
+            'padding:0.6rem; border:2px solid var(--border); border-radius:10px;' +
             'cursor:pointer; font-weight:600; font-size:0.85rem; transition:all 0.2s;' +
           '">' +
             '<input type="radio" name="display-font-size" value="3" style="display:none;"> Large' +

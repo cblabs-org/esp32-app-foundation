@@ -517,7 +517,7 @@
     if (droppedEl) {
       const dropped = counters.droppedEvents || 0;
       droppedEl.textContent = String(dropped);
-      droppedEl.style.color = dropped > 0 ? 'var(--error, #c62828)' : 'inherit';
+      droppedEl.style.color = dropped > 0 ? 'var(--error)' : 'inherit';
     }
     if (inhibitEl) {
       inhibitEl.textContent = String(counters.scanInhibitCount || 0);
@@ -591,20 +591,20 @@
         justify-content: space-between;
         align-items: center;
         padding: 0.6rem 0;
-        border-bottom: 1px solid var(--border, #dee2e6);
+        border-bottom: 1px solid var(--border);
         font-size: 0.85rem;
       }
       #ble-tab .ble-stat-row:last-child {
         border-bottom: none;
       }
       #ble-tab .ble-label {
-        color: var(--text-muted, #6c757d);
+        color: var(--text-muted);
         font-size: 0.85rem;
       }
       #ble-tab .ble-value {
         font-weight: 600;
         font-size: 0.85rem;
-        color: var(--text, #212529);
+        color: var(--text);
       }
       #ble-tab .ble-value--mono {
         font-family: var(--font-mono, "Courier New", monospace);
@@ -623,26 +623,26 @@
       }
       #ble-tab .ble-badge--active {
         background: rgba(46, 125, 50, 0.12);
-        color: var(--success, #2e7d32);
+        color: var(--success);
       }
       #ble-tab .ble-badge--stopped {
-        background: var(--border, #dee2e6);
-        color: var(--text-muted, #6c757d);
+        background: var(--border);
+        color: var(--text-muted);
       }
       [data-theme="dark"] #ble-tab .ble-badge--active {
         background: rgba(74, 222, 128, 0.15);
-        color: #4ade80;
+        color: var(--terminal-fg);
       }
       [data-theme="dark"] #ble-tab .ble-badge--stopped {
         background: rgba(255, 255, 255, 0.1);
-        color: #9ca3af;
+        color: var(--text-muted);
       }
       #ble-tab .ble-provider {
-        border: 1px solid var(--border, #dee2e6);
+        border: 1px solid var(--border);
         border-radius: 10px;
         padding: 0.75rem;
         margin-bottom: 0.75rem;
-        background: var(--card-bg, #fff);
+        background: var(--card-bg);
       }
       #ble-tab .ble-provider:last-child {
         margin-bottom: 0;
@@ -659,7 +659,7 @@
       }
       #ble-tab .ble-provider-id {
         font-size: 0.75rem;
-        color: var(--text-muted, #6c757d);
+        color: var(--text-muted);
         margin-left: 4px;
         font-weight: normal;
       }
@@ -668,7 +668,7 @@
         justify-content: space-between;
         align-items: center;
         background: var(--bg-subtle, rgba(0,0,0,0.02));
-        border: 1px solid var(--border, #dee2e6);
+        border: 1px solid var(--border);
         border-radius: 8px;
         padding: 0.5rem 0.75rem;
         margin: 0.5rem 0;
@@ -687,11 +687,11 @@
       }
       #ble-tab .ble-stored-addr {
         font-size: 0.78rem;
-        color: var(--text-muted, #6c757d);
+        color: var(--text-muted);
       }
       #ble-tab .ble-no-device {
         font-size: 0.82rem;
-        color: var(--text-muted, #6c757d);
+        color: var(--text-muted);
         font-style: italic;
         padding: 0.4rem 0;
       }
@@ -714,12 +714,12 @@
         gap: 4px;
       }
       #ble-tab .ble-btn--primary {
-        background: var(--primary, #2196F3);
+        background: var(--primary);
         color: white;
         border: none;
       }
       #ble-tab .ble-btn--primary:hover {
-        background: var(--primary-hover, #1976D2);
+        background: var(--primary-hover);
       }
       #ble-tab .ble-btn--primary:disabled {
         opacity: 0.6;
@@ -727,25 +727,25 @@
       }
       #ble-tab .ble-btn--outline-danger {
         background: transparent;
-        color: var(--error, #c62828);
-        border: 1.5px solid var(--error, #c62828);
+        color: var(--error);
+        border: 1.5px solid var(--error);
       }
       #ble-tab .ble-btn--outline-danger:hover {
         background: rgba(198, 40, 40, 0.08);
       }
       #ble-tab .ble-btn--danger-armed {
-        background: var(--error, #c62828) !important;
+        background: var(--error) !important;
         color: white !important;
-        border-color: var(--error, #c62828) !important;
+        border-color: var(--error) !important;
       }
       #ble-tab .ble-scanning-indicator {
         font-size: 0.75rem;
-        color: var(--primary, #2196F3);
+        color: var(--primary);
         font-weight: 600;
       }
       #ble-tab .ble-scan-wrap {
         margin-top: 0.6rem;
-        border: 1px solid var(--border, #dee2e6);
+        border: 1px solid var(--border);
         border-radius: 8px;
         overflow: hidden;
         max-height: 200px;
@@ -760,17 +760,17 @@
         padding: 6px 8px;
         text-align: left;
         background: var(--bg-subtle, rgba(0,0,0,0.03));
-        border-bottom: 1px solid var(--border, #dee2e6);
+        border-bottom: 1px solid var(--border);
         font-size: 0.7rem;
         text-transform: uppercase;
-        color: var(--text-muted, #6c757d);
+        color: var(--text-muted);
       }
       [data-theme="dark"] #ble-tab .ble-scan-table th {
         background: rgba(255, 255, 255, 0.05);
       }
       #ble-tab .ble-scan-table td {
         padding: 6px 8px;
-        border-bottom: 1px solid var(--border, #dee2e6);
+        border-bottom: 1px solid var(--border);
         vertical-align: middle;
       }
       #ble-tab .ble-scan-table tr:last-child td {
@@ -781,7 +781,7 @@
         justify-content: space-between;
         align-items: center;
         padding: 0.6rem 0;
-        border-bottom: 1px solid var(--border, #dee2e6);
+        border-bottom: 1px solid var(--border);
         font-size: 0.85rem;
       }
       #ble-tab .ble-conn-item:last-child {
@@ -794,7 +794,7 @@
       }
       #ble-tab .ble-conn-handle {
         font-size: 0.75rem;
-        color: var(--text-muted, #6c757d);
+        color: var(--text-muted);
       }
       #ble-tab .ble-conn-right {
         display: flex;
@@ -804,7 +804,7 @@
       #ble-tab .ble-empty {
         text-align: center;
         padding: 1.25rem 0;
-        color: var(--text-muted, #6c757d);
+        color: var(--text-muted);
         font-size: 0.85rem;
       }
       #ble-tab .ble-diag-row {
@@ -812,7 +812,7 @@
         justify-content: space-between;
         align-items: center;
         padding: 0.4rem 0;
-        border-bottom: 1px solid var(--border, #dee2e6);
+        border-bottom: 1px solid var(--border);
         font-size: 0.85rem;
       }
       #ble-tab .ble-budget-block {
@@ -821,7 +821,7 @@
       #ble-tab .ble-budget-title {
         font-weight: 700;
         font-size: 0.75rem;
-        color: var(--text-muted, #6c757d);
+        color: var(--text-muted);
         text-transform: uppercase;
         letter-spacing: 0.5px;
         margin-bottom: 0.4rem;
@@ -837,18 +837,18 @@
       }
       #ble-tab .ble-progress {
         height: 6px;
-        background: var(--border, #dee2e6);
+        background: var(--border);
         border-radius: 3px;
         overflow: hidden;
       }
       #ble-tab .ble-progress-fill {
         height: 100%;
-        background: var(--primary, #2196F3);
+        background: var(--primary);
         border-radius: 3px;
         transition: width 0.3s ease;
       }
       #ble-tab .ble-progress-fill--warn {
-        background: var(--error, #c62828);
+        background: var(--error);
       }
       #ble-tab .ble-faults-hdr {
         display: flex;
@@ -856,7 +856,7 @@
         gap: 4px;
         font-weight: 700;
         font-size: 0.8rem;
-        color: var(--error, #c62828);
+        color: var(--error);
         margin-top: 0.8rem;
         margin-bottom: 0.4rem;
       }

@@ -51,7 +51,7 @@
           '<span id="display-screensaver-status" style="' +
             'display:inline-block; padding:2px 10px; border-radius:6px;' +
             'font-size:0.7rem; font-weight:700; text-transform:uppercase;' +
-            'letter-spacing:0.5px; background:var(--border,#dee2e6); color:var(--text-muted);' +
+            'letter-spacing:0.5px; background:var(--border); color:var(--text-muted);' +
           '">—</span>' +
         '</header>' +
 
@@ -292,19 +292,19 @@
 
     if (!data.screensaverEnabled) {
       screensaverStatusBadge.textContent = 'Disabled';
-      screensaverStatusBadge.style.background = 'var(--border, #dee2e6)';
-      screensaverStatusBadge.style.color = 'var(--text-muted, #6c757d)';
+      screensaverStatusBadge.style.background = 'var(--border)';
+      screensaverStatusBadge.style.color = 'var(--text-muted)';
     } else if (data.sleeping) {
       screensaverStatusBadge.textContent = 'Sleeping';
-      screensaverStatusBadge.style.background = 'var(--error, #c62828)';
+      screensaverStatusBadge.style.background = 'var(--error)';
       screensaverStatusBadge.style.color = '#fff';
     } else if (data.dimmed) {
       screensaverStatusBadge.textContent = 'Dimmed';
-      screensaverStatusBadge.style.background = 'var(--warning, #f9a825)';
+      screensaverStatusBadge.style.background = 'var(--warning)';
       screensaverStatusBadge.style.color = 'var(--text)';
     } else {
       screensaverStatusBadge.textContent = 'Active';
-      screensaverStatusBadge.style.background = 'var(--success, #2e7d32)';
+      screensaverStatusBadge.style.background = 'var(--success)';
       screensaverStatusBadge.style.color = '#fff';
     }
   }
