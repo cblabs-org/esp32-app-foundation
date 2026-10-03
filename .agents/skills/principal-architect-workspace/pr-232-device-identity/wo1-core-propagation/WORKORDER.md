@@ -39,7 +39,7 @@ Add a `sanitiseHostname()` utility to `Application` and extend `Application::beg
 
 ## Line-Item Instructions
 
-- [ ] **`modules/Application/Application.hpp`** — Add a public static utility method:
+- [x] **`modules/Application/Application.hpp`** — Add a public static utility method:
   ```cpp
   /**
    * @brief Convert a display name to a valid hostname.
@@ -51,7 +51,7 @@ Add a `sanitiseHostname()` utility to `Application` and extend `Application::beg
   ```
   Place it near `setAppName()` / `getAppName()` (around line 175). Note the return type is `String` (Arduino String).
 
-- [ ] **`modules/Application/Application.cpp`** — Implement `sanitiseHostname()`:
+- [x] **`modules/Application/Application.cpp`** — Implement `sanitiseHostname()`:
   ```cpp
   String Application::sanitiseHostname(const char* displayName) {
       if (!displayName || !displayName[0]) return "esp32-device";
@@ -83,7 +83,7 @@ Add a `sanitiseHostname()` utility to `Application` and extend `Application::beg
   }
   ```
 
-- [ ] **`modules/Application/Application.cpp`** — In `begin()`, add identity propagation. Insert AFTER the boot reporter propagation (after line 97) and BEFORE the web server propagation (before line 274). The propagation must happen before modules call `begin()`:
+- [x] **`modules/Application/Application.cpp`** — In `begin()`, add identity propagation. Insert AFTER the boot reporter propagation (after line 97) and BEFORE the web server propagation (before line 274). The propagation must happen before modules call `begin()`:
   ```cpp
   // --- Device identity auto-propagation (issue #232) ---
   // WiFi: derive hostname from app name. Only sets the factory default;
@@ -98,13 +98,13 @@ Add a `sanitiseHostname()` utility to `Application` and extend `Application::beg
   
   **Decision guidance:** If `Application` already has a way to iterate or access specific registered modules by type, use it. If not, do NOT add module type introspection — keep HA wiring in `main.cpp` and document the pattern in a comment.
 
-- [ ] **`modules/WifiManager/WifiManager.hpp`** — Add a public getter if not already present:
+- [x] **`modules/WifiManager/WifiManager.hpp`** — Add a public getter if not already present:
   ```cpp
   const char* getDefaultHostname() const { return _defaultHostname; }
   ```
   `getHostname()` already exists (returns `_currentHostname`). Also verify `DEFAULT_HOSTNAME` constant exists.
 
-- [ ] **`src/main.cpp`** — Update the consumer identity setup:
+- [x] **`src/main.cpp`** — Update the consumer identity setup:
   - Currently (line 114): `app.getWifiManager().setDefaultHostname("esp32-foundation");` — this is now auto-derived from the app name.
   - **Add** `app.setAppName("ESP32 Sample App");` before `app.begin()` if it doesn't already exist. This becomes the single identity call.
   - **Remove** the explicit `setDefaultHostname()` call (line 114) — it's now auto-derived.
@@ -118,7 +118,7 @@ Add a `sanitiseHostname()` utility to `Application` and extend `Application::beg
     // To override the auto-derived hostname: app.getWifiManager().setDefaultHostname("custom");
     ```
 
-- [ ] **`sample-app/src/main.cpp`** — Simplify the sample app:
+- [x] **`sample-app/src/main.cpp`** — Simplify the sample app:
   - Remove the local `sanitiseHostname` lambda (lines 106-118) — the framework now provides `Application::sanitiseHostname()`.
   - Remove the explicit `setDefaultHostname()` call (line 123) — auto-derived from `app.setAppName("Weather Station")`.
   - Keep `app.setAppName("Weather Station")` (line 102).
@@ -139,4 +139,46 @@ If you discover a defect, upstream bug, or concern *outside your boundary box*, 
 
 ## Completion Report
 <!-- Written by the worker at task completion -->
+
+### Status
+✅ **COMPLETE** — All checklist items implemented, tested, and validated. Approved by Principal Architect.
+
+### Changes Made
+
+| File | Action | Summary |
+|---|---|---|
+| `modules/WifiManager/WifiManager.hpp` | Modified | Added `DEFAULT_HOSTNAME` constant (`"esp32-device"`) and `getDefaultHostname()` getter |
+| `modules/WifiManager/WifiManager.cpp` | Modified | Updated constructor to use `DEFAULT_HOSTNAME` |
+| `modules/Application/Application.hpp` | Modified | Declared `static String sanitiseHostname(const char* displayName)` |
+| `modules/Application/Application.cpp` | Modified | Implemented `sanitiseHostname()` RFC 1123 conversion; added auto-propagation in `begin()` respecting explicit overrides |
+| `src/main.cpp` | Modified | Added `app.setAppName("ESP32 Sample App")`, removed explicit `setDefaultHostname()`, added propagation comment |
+| `sample-app/src/main.cpp` | Modified | Removed local `sanitiseHostname` lambda and explicit `setDefaultHostname()`, retained `setAppName("Weather Station")`, updated HA comment |
+| `test/stubs/platform/Arduino.h` | Modified | Added `remove()` method to native `String` stub to match Arduino String API |
+| `test/test_unit/test_application/test_application.cpp` | Modified | Added `ApplicationSanitiseHostnameTest` suite (7 tests) and `ApplicationBeginTest` auto-propagation & override tests (2 tests) |
+| `test/test_unit/test_wifiManager/test_wifiManager.cpp` | Modified | Added `GetDefaultHostnameReturnsExpectedValue` test |
+
+### Decisions Made
+1. **Preserve Explicit Custom Hostname Overrides** — In `Application::begin()`, identity auto-propagation only sets `_wifiManager.setDefaultHostname()` if the current default hostname matches `WifiManager::DEFAULT_HOSTNAME`. If a downstream application explicitly called `app.getWifiManager().setDefaultHostname("custom")` prior to `begin()`, that override is preserved.
+2. **Pragmatic HomeAssistant Wiring** — Retained manual `haModule.setAppName(app.getAppName())` in `main.cpp` and `sample-app/src/main.cpp`. `Application` uses interface-based module registration without runtime type introspection (`-fno-rtti` on embedded), so manual wiring for optional Ring-2 modules remains the appropriate design.
+3. **Native Arduino String Stub Completion** — Added `String::remove()` to `test/stubs/platform/Arduino.h` so that host-native GoogleTest runners match the standard ESP32/Arduino `WString.h` API used by `Application::sanitiseHostname()`.
+
+### Dead Ends & Warnings
+None.
+
+### Out-of-Scope Findings / Issues Surfaced
+- `modules/HomeAssistant/HomeAssistant.cpp:194` hardcodes `"manufacturer": "CB Labs"` instead of consuming `app.getManufacturer()`, and does not currently expose a `setManufacturer()` method. Surfaced for potential follow-up in subsequent work orders (WO2/WO3).
+
+### Blockers
+None.
+
+### Verification
+
+| Environment | Result | Duration |
+|---|---|---|
+| `native` (unit tests) | ✅ 983/983 PASSED | 1m 01s |
+| `esp32dev` (build) | ✅ SUCCESS (Flash: 1,299,775 B, RAM: 55,788 B) | 32s |
+| `esp32s3nano` (build) | ✅ SUCCESS (Flash: 1,333,827 B, RAM: 58,068 B) | 46s |
+| `scripts/doc_lint.py` | ✅ PASSED (0 warnings) | < 1s |
+
+**Branch:** `232-device-identity/wo1-core-propagation`
 
