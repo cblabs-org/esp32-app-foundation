@@ -234,6 +234,8 @@ check_undocumented_constants() {
                     if (line ~ /\(/) { prev=line; next }
                     # Skip if line is an array initializer
                     if (line ~ /\[\]/) { prev=line; next }
+                    # Skip #define without a value (include guards, empty flags)
+                    if (line ~ /^[ \t]*#define[ \t]+[A-Za-z0-9_]+[ \t]*$/) { prev=line; next }
                     # Skip if preceding line is a doc comment
                     if (prev ~ /\/\/\// || prev ~ /\/\*\*/ || prev ~ /\* @/ || prev ~ /\*\//) { prev=line; next }
                     # This is an undocumented constant
