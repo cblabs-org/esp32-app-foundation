@@ -288,6 +288,9 @@ void WifiManager::onStaConnected(uint32_t now) {
     updateMyUrl();
 
     // Initialise mDNS with the device hostname (issue #232)
+    // end() first to cleanly restart on WiFi reconnections — prevents
+    // "Service already exists" errors from duplicate addService() calls.
+    MDNS.end();
     if (MDNS.begin(_currentHostname)) {
         MDNS.addService("http", "tcp", 80);
         ESP_LOGI(TAG, "mDNS started: %s.local", _currentHostname);
