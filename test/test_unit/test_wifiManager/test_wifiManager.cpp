@@ -36,6 +36,13 @@ TEST_F(WifiManagerTest, SetDefaultHostnameSeedsResetConfig) {
     EXPECT_STREQ("my-app-default", wifiManager.getHostname());
 }
 
+// getDefaultHostname() returns framework default or app-set default
+TEST_F(WifiManagerTest, GetDefaultHostnameReturnsExpectedValue) {
+    EXPECT_STREQ(WifiManager::DEFAULT_HOSTNAME, wifiManager.getDefaultHostname());
+    wifiManager.setDefaultHostname("my-app-default");
+    EXPECT_STREQ("my-app-default", wifiManager.getDefaultHostname());
+}
+
 // resetConfig() falls back to the framework default when no app default was set
 TEST_F(WifiManagerTest, ResetConfigUsesFrameworkDefaultHostname) {
     wifiManager.resetConfig();

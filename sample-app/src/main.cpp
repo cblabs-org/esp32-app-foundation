@@ -101,27 +101,6 @@ void setup() {
     app.disableDefaultAppTab();
     app.setAppName("Weather Station");
 
-    // #232: Derive WiFi hostname from app name until framework auto-propagates.
-    // "Weather Station" → "weather-station"
-    auto sanitiseHostname = [](const char* name) -> String {
-        String hostname;
-        hostname.reserve(32);
-        for (const char* p = name; *p && hostname.length() < 31; ++p) {
-            char c = *p;
-            if (c >= 'A' && c <= 'Z') c += 32;  // tolower
-            if (c == ' ' || c == '_') c = '-';
-            if ((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-') {
-                hostname += c;
-            }
-        }
-        return hostname;
-    };
-
-    // App names its hostname default — WiFiManager owns the persisted value
-    // and falls back to this on factory reset (resetConfig()). Must be set
-    // before app.begin().
-    app.getWifiManager().setDefaultHostname(sanitiseHostname(app.getAppName()).c_str());
-
     // ADR-39: Module self-wires from Application via transient service locator.
     // F08: begin() is called BEFORE registerModule() because the module needs
     // its service references (KeyManager, EventBus, etc.) wired before the
@@ -152,7 +131,7 @@ void setup() {
     haModule.setKeyManager(&app.getKeyManager());
     haModule.setEventBus(&app.getEventBus());
     haModule.setConfigManager(&app.getConfigManager());
-    haModule.setAppName(app.getAppName());  // #232: Manual wiring until framework auto-propagates
+    haModule.setAppName(app.getAppName());  // HA requires manual wiring (optional Ring-2 module)
     haModule.setAppVersion(BUILD_VERSION);
     app.registerModule(&haModule);
 #endif

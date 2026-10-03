@@ -1,5 +1,5 @@
 # Principal Architect Memory
-<!-- Last updated: 2026-09-25T21:30:00+01:00 -->
+<!-- Last updated: 2026-10-03T16:49:00+01:00 -->
 
 ## Active Programs
 | Program | Plan | Status |
@@ -9,6 +9,7 @@
 ## Active Projects
 | Project | Status | Modules | Context |
 |---|---|---|---|
+| pr-232-device-identity | WO1/3 — executing | Application, WifiManager, BLEManager, HomeAssistantModule, AuthManager, MCPServer, OTADownloadEngine, LVGLDisplay, web/portal | [PROJECT.md](../pr-232-device-identity/PROJECT.md) |
 | sample-app-remediation | COMPLETE — 6/6 WOs, device verified, tagged v0.0.12-dev.83 | sample-app/src/WeatherModule, WeatherBoard, IWeatherDataProvider, main.cpp, web/weather.js | [PROJECT.md](../pr-sample-app-remediation/PROJECT.md) |
 | pr-drayton-consumer-fixes | WO5/5 — COMPLETE, soak-tested | DataManager, IDataSource, FetchContext, AppFoundation.h, WeatherModule, framework-expert skill | [PROJECT.md](../pr-drayton-consumer-fixes/PROJECT.md) |
 | pr-128-datamanager-resilience | WO7/7 (WO6 re-plan gated) | DataManager, IDataSource, FetchContext, Application, MCPServer, Display, Portal | [PROJECT.md](../pr-128-datamanager-resilience/PROJECT.md) |

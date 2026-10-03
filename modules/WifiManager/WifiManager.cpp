@@ -73,7 +73,7 @@ WifiManager::WifiManager() : _wifiDisconnectTimer(0) {
     memset(_wifiSsid, 0, sizeof(_wifiSsid));
     memset(_wifiPass, 0, sizeof(_wifiPass));
     memset(_currentHostname, 0, sizeof(_currentHostname));
-    strlcpy(_defaultHostname, "esp32-device", sizeof(_defaultHostname));
+    strlcpy(_defaultHostname, DEFAULT_HOSTNAME, sizeof(_defaultHostname));
     strlcpy(_myUrl, "http://0.0.0.0", sizeof(_myUrl));
 }
 

@@ -73,6 +73,35 @@ static constexpr const char* TAG = "Application";
 Application::~Application() {
 }
 
+String Application::sanitiseHostname(const char* displayName) {
+    if (!displayName || !displayName[0]) return "esp32-device";
+    
+    String hostname;
+    hostname.reserve(32);
+    bool lastWasHyphen = false;
+    
+    for (const char* p = displayName; *p && hostname.length() < 32; ++p) {
+        char c = *p;
+        if (c >= 'A' && c <= 'Z') c += 32;  // tolower
+        if (c == ' ' || c == '_') c = '-';
+        
+        if ((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9')) {
+            hostname += c;
+            lastWasHyphen = false;
+        } else if (c == '-' && !lastWasHyphen && hostname.length() > 0) {
+            hostname += c;
+            lastWasHyphen = true;
+        }
+    }
+    
+    // Trim trailing hyphen
+    while (hostname.length() > 0 && hostname[hostname.length() - 1] == '-') {
+        hostname.remove(hostname.length() - 1);
+    }
+    
+    return hostname.length() > 0 ? hostname : String("esp32-device");
+}
+
 // ---------------------------------------------------------------------------
 // Lifecycle
 // ---------------------------------------------------------------------------
@@ -96,7 +125,14 @@ bool Application::begin(const FrameworkConfig& config) {
         _statusReporter = _bootReporter;
     } else {
         _statusReporter = &_nullReporter;
+    }
 
+    // --- Device identity auto-propagation (issue #232) ---
+    // WiFi: derive hostname from app name. Only sets the factory default;
+    // persisted user config still wins on boot.
+    if (strcmp(_wifiManager.getDefaultHostname(), WifiManager::DEFAULT_HOSTNAME) == 0) {
+        String sanitised = sanitiseHostname(getAppName());
+        _wifiManager.setDefaultHostname(sanitised.c_str());
     }
 
     // --- Step 1: Boot banner ---
