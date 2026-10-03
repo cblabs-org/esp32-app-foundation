@@ -40,7 +40,7 @@
 
 ## Work Order Decomposition
 
-- **[ ] [wo1-core-propagation](wo1-core-propagation/WORKORDER.md):** Core identity plumbing — `sanitiseHostname()`, `Application::begin()` auto-propagation to WiFi + HA. Consumer `main.cpp` + `sample-app/main.cpp` simplification.
+- **[x] [wo1-core-propagation](wo1-core-propagation/WORKORDER.md):** Core identity plumbing — `sanitiseHostname()`, `Application::begin()` auto-propagation to WiFi + HA. Consumer `main.cpp` + `sample-app/main.cpp` simplification.
 - **[ ] [wo2-peripheral-surfaces](wo2-peripheral-surfaces/WORKORDER.md):** Peripheral identity surfaces — MCP server name, OTA User-Agent, TLS cert CN, boot serial banner, LVGL boot screen `bind_text` fix.
 - **[ ] [wo3-web-mdns-docs](wo3-web-mdns-docs/WORKORDER.md):** Web client, mDNS implementation, auth.js fix, documentation corrections.
 
@@ -50,4 +50,10 @@
 
 ## Session Log
 <!-- Progressively enriched by the PA as WOs complete -->
+
+### 2026-10-03T17:09:00+01:00 — WO1 Complete: Core Identity Propagation
+**Summary**: Added `Application::sanitiseHostname()` static utility and auto-propagation of app name → WiFi hostname in `Application::begin()`. Simplified both `src/main.cpp` and `sample-app/src/main.cpp` to single `setAppName()` calls. Guard prevents overwriting explicit consumer `setDefaultHostname()` calls.
+**Cross-cutting decisions**: HA auto-wiring deferred — HA is an optional Ring-2 module without direct Application access; manual `haModule.setAppName()` kept in consumer main.cpp with documenting comments.
+**Surfaced findings**: `HomeAssistantModule.cpp:194` hardcodes `"manufacturer": "CB Labs"` — should consume `app.getManufacturer()`. Deferred to future issue.
+**Verification**: 983/983 native tests passed, both target builds (esp32dev, esp32s3nano) green, doc lint clean.
 
