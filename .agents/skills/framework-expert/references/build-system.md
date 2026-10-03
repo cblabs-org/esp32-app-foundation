@@ -93,14 +93,27 @@ pio run -e esp32dev --target uploadfs
 
 ## Release Pipeline
 
-`deploy_release.py` handles build → sign → deploy:
+Build and deploy are **separate phases** with hardware validation in between:
+
 ```bash
+# Phase 1: Tag + Build + Validate
+git tag v0.1.4 && git push origin v0.1.4
+pio run -e esp32dev -t clean && pio run -e esp32dev    # build
+pio run -e esp32dev --target upload                     # flash
+# → Test on hardware, verify /api/system shows correct version
+
+# Phase 2: Deploy (when validated)
 python3 scripts/deploy_release.py \
-    --tag v0.1.4 --local --build \
+    --tag v0.1.4 --local \
     --private-key private_key.pem
 ```
 
-Steps: ensure tag on HEAD → build (optional) → collect binaries → sign → generate hashes → generate manifest → create GitHub Release → upload assets.
+`deploy_release.py --local` signs and publishes already-built binaries from
+`.pio/build/`. The `--build` flag is available as a convenience shortcut when
+you've already validated and want a clean rebuild for deployment.
+
+Steps: ensure tag on HEAD → collect binaries → sign → generate hashes →
+generate manifest → create GitHub Release → upload assets.
 
 ## Dual-Framework
 

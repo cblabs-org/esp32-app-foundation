@@ -107,7 +107,9 @@ git tag v0.1.4-beta.2 && git push origin v0.1.4-beta.2
 **Rules:**
 - Beta tags replace all `dev` tags for that patch — once a beta is cut,
   subsequent in-flight work targets the **next** patch's `dev` series.
-- Beta builds ARE published as GitHub pre-releases via `deploy_release.py`.
+- Beta builds are published as GitHub pre-releases via `deploy_release.py`
+  **after hardware validation**. Tagging a beta does not automatically deploy
+  it — build, flash, and validate on hardware first, then deploy when satisfied.
 - `scripts/deploy_release.py` will mark these as `--prerelease` automatically.
 
 ---
@@ -122,14 +124,22 @@ to stable under any circumstances.
 
 **Who can tag:** **HUMAN ONLY.** Agents MUST NOT create stable tags, ever.
 
-**How to tag:**
+**How to tag and release:**
 ```bash
+# Phase 1: Tag + Build + Validate
 git tag v0.1.4 && git push origin v0.1.4
-python3 scripts/deploy_release.py --local --build --private-key private_key.pem
+pio run -e esp32dev -t clean && pio run -e esp32dev
+pio run -e esp32dev --target upload
+# → Test on hardware: verify /api/system version, portal, basic operation
+# → Repeat for all board targets
+
+# Phase 2: Deploy (when validated)
+python3 scripts/deploy_release.py --local --private-key private_key.pem
 ```
 
 **Rules:**
 - Stable tags must point at HEAD at build time (`deploy_release.py` verifies this).
+- Build, flash, and validate on hardware **before** deploying.
 - Stable GitHub Releases are NOT marked as pre-release.
 - A new stable tag supersedes all beta and dev tags for that patch.
 
@@ -193,11 +203,15 @@ PR merged →
 User says "cut a beta" →
   → Confirm PATCH number (increment from last beta/stable patch).
   → Confirm PRE_NUM (1 unless a beta already exists for this patch).
-  → Tag and push, then run deploy_release.py (it auto-discovers the tag).
+  → Tag and push.
+  → Build, flash to hardware, and validate (version, portal, basic operation).
+  → When satisfied, run deploy_release.py --local to sign and publish.
 
 User says "promote to stable" →
   → Confirm the tag matches the last beta for that patch (drop the suffix).
-  → Run deploy_release.py (it auto-discovers the stable tag from HEAD).
+  → Tag and push.
+  → Build, flash to hardware, and validate.
+  → When satisfied, run deploy_release.py --local to sign and publish.
   → This is a human-gated action — do not initiate unless explicitly instructed.
 ```
 

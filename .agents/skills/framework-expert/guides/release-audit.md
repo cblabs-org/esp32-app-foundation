@@ -35,6 +35,14 @@ The audit ties to the [versioning policy](../../.agents/rules/03-versioning.md) 
 beta and stable tags require user approval, and the audit report provides the
 evidence for that decision.
 
+> [!IMPORTANT]
+> **Build and deploy are separate decisions.** After tagging a beta or stable
+> release, build and flash the firmware to representative hardware. Validate
+> boot, version string (`/api/system`), portal function, and basic operation.
+> Only run `deploy_release.py` (which signs and publishes to GitHub/OTA) **after**
+> hardware validation passes. The audit report covers code quality; hardware
+> validation covers runtime correctness.
+
 ## Authored-Code Scope Rule
 
 Audit **all authored C++ source** — not just `modules/`, `lib/`, `include/`, `src/`.

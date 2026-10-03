@@ -44,6 +44,13 @@ esptool/OTA upload command, stop and verify:
 
 * **Agents MUST NEVER execute `deploy_release.py` directly.** The private key requires an interactive passphrase, which causes background agent tasks to hang indefinitely on `openssl`. Always output the exact CLI command and ask the user to run it in their terminal.
 
+> [!NOTE]
+> **Deploy is a separate decision from build+flash.** The user builds, flashes,
+> and validates on hardware. If satisfied, the user then runs `deploy_release.py`
+> to sign and publish. Agents should not assume that a successful build+flash
+> means the user wants to deploy — wait for the user to explicitly request
+> deployment.
+
 ## Mechanical Enforcement
 
 This rule is **enforced by a `PreToolUse` lifecycle hook** (`.agents/hooks.json`
