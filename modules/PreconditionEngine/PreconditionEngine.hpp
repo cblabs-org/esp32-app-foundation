@@ -86,13 +86,13 @@ public:
     void requestRetry(const char* name);
 
 private:
-    PreconditionState preconditions_[MAX_PRECONDITIONS];
-    size_t count_ = 0;
-    uint32_t lastTickMs_ = 0;
+    PreconditionState _preconditions[MAX_PRECONDITIONS];
+    size_t _count = 0;
+    uint32_t _lastTickMs = 0;
     
     // CG-12 Damping policy parameters. Using defaults from IPrecondition.hpp
-    DampingPolicy dampingPolicy_;
-    RetryPolicy retryPolicy_;
+    DampingPolicy _dampingPolicy;
+    RetryPolicy _retryPolicy;
     
     void updateDamping(PreconditionState& state, float elapsedSec);
     void updateBreaker(PreconditionState& state, uint32_t nowMs);

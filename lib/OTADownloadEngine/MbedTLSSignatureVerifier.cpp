@@ -34,13 +34,13 @@ static constexpr const char* TAG = "MbedTLSSignatureVerifier";
 // =============================================================================
 
 MbedTLSSignatureVerifier::MbedTLSSignatureVerifier() {
-    mbedtls_pk_init(&pk_);
-    mbedtls_md_init(&md_ctx_);
+    mbedtls_pk_init(&_pk);
+    mbedtls_md_init(&_mdCtx);
 }
 
 MbedTLSSignatureVerifier::~MbedTLSSignatureVerifier() {
-    mbedtls_pk_free(&pk_);
-    mbedtls_md_free(&md_ctx_);
+    mbedtls_pk_free(&_pk);
+    mbedtls_md_free(&_mdCtx);
 }
 
 /**
@@ -58,7 +58,7 @@ bool MbedTLSSignatureVerifier::begin(const char* publicKeyPem) {
 
     // --- Step 1: Parse the PEM-encoded public key ---
     int ret = mbedtls_pk_parse_public_key(
-        &pk_,
+        &_pk,
         reinterpret_cast<const unsigned char*>(publicKeyPem),
         strlen(publicKeyPem) + 1  // mbedtls requires the null terminator
     );
@@ -74,40 +74,40 @@ bool MbedTLSSignatureVerifier::begin(const char* publicKeyPem) {
         return false;
     }
 
-    if (mbedtls_md_setup(&md_ctx_, md_info, 0) != 0) {
+    if (mbedtls_md_setup(&_mdCtx, md_info, 0) != 0) {
         ESP_LOGE(TAG, "mbedtls_md_setup failed");
         return false;
     }
 
-    if (mbedtls_md_starts(&md_ctx_) != 0) {
+    if (mbedtls_md_starts(&_mdCtx) != 0) {
         ESP_LOGE(TAG, "mbedtls_md_starts failed");
         return false;
     }
 
-    initialized_ = true;
+    _initialized = true;
     return true;
 }
 
 void MbedTLSSignatureVerifier::update(const uint8_t* data, size_t length) {
-    if (initialized_) {
-        mbedtls_md_update(&md_ctx_, data, length);
+    if (_initialized) {
+        mbedtls_md_update(&_mdCtx, data, length);
     }
 }
 
 bool MbedTLSSignatureVerifier::verify(const uint8_t* signature, size_t signatureLength) {
-    if (!initialized_) {
+    if (!_initialized) {
         return false;
     }
 
     // --- Finalize the SHA-256 digest ---
     unsigned char hash[32]; // SHA-256 produces 32 bytes
-    if (mbedtls_md_finish(&md_ctx_, hash) != 0) {
+    if (mbedtls_md_finish(&_mdCtx, hash) != 0) {
         ESP_LOGE(TAG, "mbedtls_md_finish failed");
         return false;
     }
 
     // --- Verify the signature against the accumulated hash ---
-    int ret = mbedtls_pk_verify(&pk_, MBEDTLS_MD_SHA256, hash, sizeof(hash),
+    int ret = mbedtls_pk_verify(&_pk, MBEDTLS_MD_SHA256, hash, sizeof(hash),
                                 signature, signatureLength);
     if (ret != 0) {
         ESP_LOGE(TAG, "mbedtls_pk_verify failed: -0x%04X", -ret);

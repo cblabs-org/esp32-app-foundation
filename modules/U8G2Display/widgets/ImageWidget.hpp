@@ -27,7 +27,7 @@
  */
 class ImageWidget : public IGfxWidget {
 private:
-    const unsigned char* imageBits;   // Pointer to the XBM byte array
+    const unsigned char* _imageBits;  // Pointer to the XBM byte array
 
 public:
     /**

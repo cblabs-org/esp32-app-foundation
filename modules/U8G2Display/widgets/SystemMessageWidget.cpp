@@ -32,11 +32,11 @@
  * @param _h Height in pixels.
  */
 SystemMessageWidget::SystemMessageWidget(int _x, int _y, int _w, int _h)
-    : IGfxWidget(_x, _y, _w, _h), numLines(0) {
-    title[0] = '\0';
-    lines[0][0] = '\0';
-    lines[1][0] = '\0';
-    lines[2][0] = '\0';
+    : IGfxWidget(_x, _y, _w, _h), _numLines(0) {
+    _title[0] = '\0';
+    _lines[0][0] = '\0';
+    _lines[1][0] = '\0';
+    _lines[2][0] = '\0';
 }
 
 // =============================================================================
@@ -56,16 +56,16 @@ void SystemMessageWidget::setMessage(const char* newTitle,
                                      const char* l2,
                                      const char* l3) {
     if (newTitle) {
-        strncpy(title, newTitle, sizeof(title) - 1);
-        title[sizeof(title) - 1] = '\0';
+        strncpy(_title, newTitle, sizeof(_title) - 1);
+        _title[sizeof(_title) - 1] = '\0';
     } else {
-        title[0] = '\0';
+        _title[0] = '\0';
     }
 
-    numLines = 0;
-    if (l1) { strncpy(lines[0], l1, sizeof(lines[0]) - 1); lines[0][sizeof(lines[0]) - 1] = '\0'; numLines = 1; }
-    if (l2) { strncpy(lines[1], l2, sizeof(lines[1]) - 1); lines[1][sizeof(lines[1]) - 1] = '\0'; numLines = 2; }
-    if (l3) { strncpy(lines[2], l3, sizeof(lines[2]) - 1); lines[2][sizeof(lines[2]) - 1] = '\0'; numLines = 3; }
+    _numLines = 0;
+    if (l1) { strncpy(_lines[0], l1, sizeof(_lines[0]) - 1); _lines[0][sizeof(_lines[0]) - 1] = '\0'; _numLines = 1; }
+    if (l2) { strncpy(_lines[1], l2, sizeof(_lines[1]) - 1); _lines[1][sizeof(_lines[1]) - 1] = '\0'; _numLines = 2; }
+    if (l3) { strncpy(_lines[2], l3, sizeof(_lines[2]) - 1); _lines[2][sizeof(_lines[2]) - 1] = '\0'; _numLines = 3; }
 }
 
 // =============================================================================
@@ -83,21 +83,21 @@ void SystemMessageWidget::setMessage(const char* newTitle,
  * @param display Reference to the U8G2 display instance.
  */
 void SystemMessageWidget::render(U8G2& display) {
-    if (!isVisible) return;
+    if (!_isVisible) return;
 
-    int renderW = (width > 0) ? width : display.getDisplayWidth();
-    int renderH = (height > 0) ? height : 14;
+    int renderW = (_width > 0) ? _width : display.getDisplayWidth();
+    int renderH = (_height > 0) ? _height : 14;
 
-    blankArea(display, x, y, renderW, renderH);
+    blankArea(display, _x, _y, renderW, renderH);
 
     // --- Title line: large font, centred ---
-    drawText(display, title, x, y, renderW, -1,
+    drawText(display, _title, _x, _y, renderW, -1,
              TextAlign::Center, false, AppFonts::defaultLarge());
 
     // --- Detail lines: small font, stacked below title ---
-    int yOffset = y + 28;
-    for (int i = 0; i < numLines; i++) {
-        drawText(display, lines[i], x, yOffset, renderW, -1,
+    int yOffset = _y + 28;
+    for (int i = 0; i < _numLines; i++) {
+        drawText(display, _lines[i], _x, yOffset, renderW, -1,
                  TextAlign::Center, false, AppFonts::defaultSmall());
         yOffset += 16;
     }

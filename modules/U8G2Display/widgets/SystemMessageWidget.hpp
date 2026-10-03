@@ -31,9 +31,9 @@
  */
 class SystemMessageWidget : public IGfxWidget {
 private:
-    char title[64];         // Primary heading text buffer
-    char lines[3][128];     // Up to 3 detail lines
-    int numLines;           // Number of active detail lines (0-3)
+    char _title[64];        // Primary heading text buffer
+    char _lines[3][128];    // Up to 3 detail lines
+    int _numLines;          // Number of active detail lines (0-3)
 
 public:
     /**

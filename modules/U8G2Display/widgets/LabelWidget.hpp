@@ -32,10 +32,10 @@
  */
 class LabelWidget : public IGfxWidget {
 private:
-    char textBuffer[128];         // Internal storage for the display string
-    const uint8_t* font;          // Active font pointer (nullptr = use current)
-    int alignment;                // Horizontal justification: 0=Left, 1=Center, 2=Right
-    bool isTruncated;             // If true, append "..." when text exceeds width
+    char _textBuffer[128];        // Internal storage for the display string
+    const uint8_t* _font;         // Active font pointer (nullptr = use current)
+    int _alignment;               // Horizontal justification: 0=Left, 1=Center, 2=Right
+    bool _isTruncated;            // If true, append "..." when text exceeds width
 
 public:
     /**

@@ -28,7 +28,7 @@
  * @param bits Pointer to XBM byte array (may be nullptr).
  */
 ImageWidget::ImageWidget(int _x, int _y, int _w, int _h, const unsigned char* bits)
-    : IGfxWidget(_x, _y, _w, _h), imageBits(bits) {
+    : IGfxWidget(_x, _y, _w, _h), _imageBits(bits) {
 }
 
 /**
@@ -45,12 +45,12 @@ void ImageWidget::tick(uint32_t currentMillis) {
 
 /**
  * @brief Renders the XBM image to the display buffer.
- *        Skips rendering if invisible or imageBits is nullptr.
+ *        Skips rendering if invisible or _imageBits is nullptr.
  * @param display Reference to the U8G2 display instance.
  */
 void ImageWidget::render(U8G2& display) {
-    if (isVisible && imageBits != nullptr) {
-        display.drawXBM(x, y, width, height, imageBits);
+    if (_isVisible && _imageBits != nullptr) {
+        display.drawXBM(_x, _y, _width, _height, _imageBits);
     }
 }
 

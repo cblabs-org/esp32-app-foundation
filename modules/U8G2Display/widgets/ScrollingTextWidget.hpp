@@ -34,14 +34,14 @@
  */
 class ScrollingTextWidget : public IGfxWidget {
 protected:
-    char currentText[512];        // Buffer for the active scrolling string
-    int scrollX;                  // Current pixel offset for the scroll
-    int messageWidth;             // Total rendered width of the string in pixels
-    uint32_t lastScrollMs;        // Timestamp of the last scroll tick
-    bool needsScroll;             // True if text is wider than bounding box
-    bool needsLayout;             // True when text/font changed (needs remeasure)
-    const uint8_t* font;          // Active font pointer
-    bool scrollFinished;          // True when text has fully exited the left bound
+    char _currentText[512];       // Buffer for the active scrolling string
+    int _scrollX;                 // Current pixel offset for the scroll
+    int _messageWidth;            // Total rendered width of the string in pixels
+    uint32_t _lastScrollMs;       // Timestamp of the last scroll tick
+    bool _needsScroll;            // True if text is wider than bounding box
+    bool _needsLayout;            // True when text/font changed (needs remeasure)
+    const uint8_t* _font;         // Active font pointer
+    bool _scrollFinished;         // True when text has fully exited the left bound
 
 public:
     /**
@@ -67,14 +67,14 @@ public:
      * @brief Update the font used for rendering and trigger layout recalc.
      * @param _font Pointer to U8G2 font array.
      */
-    void setFont(const uint8_t* _font) { font = _font; needsLayout = true; }
+    void setFont(const uint8_t* _font) { _font = _font; _needsLayout = true; }
 
     /**
      * @brief Check if the text has completed a full scroll loop off-screen.
      *        Useful for derived classes to trigger data loads or message cycling.
      * @return True when the scroll cycle is complete.
      */
-    bool isScrollFinished() const { return scrollFinished; }
+    bool isScrollFinished() const { return _scrollFinished; }
 
     /**
      * @brief Manually reset the scroll position to the starting position.

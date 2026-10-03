@@ -32,9 +32,9 @@
  * @param _font Optional font override (nullptr = use default).
  */
 ScrollingTextWidget::ScrollingTextWidget(int _x, int _y, int _w, int _h, const uint8_t* _font)
-    : IGfxWidget(_x, _y, _w, _h), scrollX(0), messageWidth(0), lastScrollMs(0),
-      needsScroll(false), needsLayout(true), font(_font), scrollFinished(false) {
-    currentText[0] = '\0';
+    : IGfxWidget(_x, _y, _w, _h), _scrollX(0), _messageWidth(0), _lastScrollMs(0),
+      _needsScroll(false), _needsLayout(true), _font(_font), _scrollFinished(false) {
+    _currentText[0] = '\0';
 }
 
 /**
@@ -45,28 +45,28 @@ ScrollingTextWidget::ScrollingTextWidget(int _x, int _y, int _w, int _h, const u
  */
 void ScrollingTextWidget::setText(const char* newText) {
     if (newText == nullptr) {
-        currentText[0] = '\0';
-        needsLayout = true;
+        _currentText[0] = '\0';
+        _needsLayout = true;
         return;
     }
 
     // --- Dedup check: skip if identical to prevent layout thrash ---
-    if (strcmp(currentText, newText) == 0) return;
+    if (strcmp(_currentText, newText) == 0) return;
 
-    strncpy(currentText, newText, sizeof(currentText) - 1);
-    currentText[sizeof(currentText) - 1] = '\0';
+    strncpy(_currentText, newText, sizeof(_currentText) - 1);
+    _currentText[sizeof(_currentText) - 1] = '\0';
 
-    needsLayout = true;
-    scrollFinished = false;
+    _needsLayout = true;
+    _scrollFinished = false;
 }
 
 /**
  * @brief Rewinds scroll to start position and resets delay timers.
  */
 void ScrollingTextWidget::resetScroll() {
-    scrollX = 0;
-    lastScrollMs = 0;    // Trigger initialization delay in tick()
-    scrollFinished = false;
+    _scrollX = 0;
+    _lastScrollMs = 0;    // Trigger initialization delay in tick()
+    _scrollFinished = false;
 }
 
 /**
@@ -76,40 +76,40 @@ void ScrollingTextWidget::resetScroll() {
  * @param currentMillis System uptime in milliseconds.
  */
 void ScrollingTextWidget::tick(uint32_t currentMillis) {
-    if (!isVisible) return;
+    if (!_isVisible) return;
 
     // --- Step 1: Initial Delay ---
     // Wait 3 seconds before starting the animation. lastScrollMs == 0
     // is the sentinel value indicating the delay hasn't been initialized.
-    if (lastScrollMs == 0) {
-        lastScrollMs = currentMillis + 3000;
+    if (_lastScrollMs == 0) {
+        _lastScrollMs = currentMillis + 3000;
         return;
     }
 
-    if (!needsScroll) {
+    if (!_needsScroll) {
         // --- Static Text Dwell Logic ---
         // After 5 seconds total dwell (3s initial + 2s extra), signal finished.
-        if (currentMillis > lastScrollMs + 2000) {
-            scrollFinished = true;
+        if (currentMillis > _lastScrollMs + 2000) {
+            _scrollFinished = true;
         }
         return;
     }
 
-    if (currentMillis > lastScrollMs) {
+    if (currentMillis > _lastScrollMs) {
         // --- Step 2: Pixel Shift at ~25 FPS (40ms interval) ---
-        scrollX++;
+        _scrollX++;
 
-        int maxW = (width > 0) ? width : 256; // Fallback; runtime width preferred
+        int maxW = (_width > 0) ? _width : 256; // Fallback; runtime width preferred
 
         // --- Step 3: Loop/Exit Evaluation ---
         // Check if the string has fully exited the screen left bound.
         // The 30px buffer ensures the text fully disappears before wrapping.
-        if (scrollX > messageWidth + 30) {
-            scrollFinished = true;
-            scrollX = -maxW;   // Wrap completely around to the right edge
+        if (_scrollX > _messageWidth + 30) {
+            _scrollFinished = true;
+            _scrollX = -maxW;   // Wrap completely around to the right edge
         }
 
-        lastScrollMs = currentMillis + 40;  // Maintain ~25 FPS pacing
+        _lastScrollMs = currentMillis + 40;  // Maintain ~25 FPS pacing
     }
 }
 
@@ -126,37 +126,37 @@ void ScrollingTextWidget::tick(uint32_t currentMillis) {
  * @param display U8G2 reference.
  */
 void ScrollingTextWidget::render(U8G2& display) {
-    if (!isVisible || currentText[0] == '\0') return;
+    if (!_isVisible || _currentText[0] == '\0') return;
 
     // --- Layout recalculation if text or font changed ---
-    if (needsLayout) {
-        if (font) display.setFont(font);
-        messageWidth = getStringWidth(display, currentText);
-        int maxW = (width > 0) ? width : display.getDisplayWidth();
-        needsScroll = (messageWidth > maxW);
+    if (_needsLayout) {
+        if (_font) display.setFont(_font);
+        _messageWidth = getStringWidth(display, _currentText);
+        int maxW = (_width > 0) ? _width : display.getDisplayWidth();
+        _needsScroll = (_messageWidth > maxW);
         resetScroll();
-        needsLayout = false;
+        _needsLayout = false;
     }
 
-    int renderW = (width > 0) ? width : display.getDisplayWidth();
-    int renderH = (height > 0) ? height : 12;
+    int renderW = (_width > 0) ? _width : display.getDisplayWidth();
+    int renderH = (_height > 0) ? _height : 12;
 
-    blankArea(display, x, y, renderW, renderH);
+    blankArea(display, _x, _y, renderW, renderH);
 
     U8G2StateSaver stateSaver(display);
-    if (font) display.setFont(font);
+    if (_font) display.setFont(_font);
 
-    if (needsScroll) {
+    if (_needsScroll) {
         // --- Arcane Logic ---
         // U8g2 coordinates are handled as 8-bit unsigned integers internally.
         // If x + renderW equals 256, it rolls over to 0, destroying the clipping zone.
         // We subtract 1 to ensure boundaries remain inclusive [0, 255].
-        display.setClipWindow(x, y, x + renderW - 1, y + renderH - 1);
-        drawText(display, currentText, x - scrollX, y, renderW + scrollX, renderH,
+        display.setClipWindow(_x, _y, _x + renderW - 1, _y + renderH - 1);
+        drawText(display, _currentText, _x - _scrollX, _y, renderW + _scrollX, renderH,
                  TextAlign::Left, false);
     } else {
         // If it fits, center it statically
-        drawText(display, currentText, x, y, renderW, renderH,
+        drawText(display, _currentText, _x, _y, renderW, renderH,
                  TextAlign::Center, false);
     }
 }
@@ -169,44 +169,44 @@ void ScrollingTextWidget::render(U8G2& display) {
  * @param currentMillis Milliseconds since boot.
  */
 void ScrollingTextWidget::renderAnimationUpdate(U8G2& display, uint32_t currentMillis) {
-    if (!isVisible || currentText[0] == '\0') return;
+    if (!_isVisible || _currentText[0] == '\0') return;
 
     // --- Layout recalculation if needed ---
-    if (needsLayout) {
-        if (font) display.setFont(font);
-        messageWidth = getStringWidth(display, currentText);
-        int maxW = (width > 0) ? width : display.getDisplayWidth();
-        needsScroll = (messageWidth > maxW);
+    if (_needsLayout) {
+        if (_font) display.setFont(_font);
+        _messageWidth = getStringWidth(display, _currentText);
+        int maxW = (_width > 0) ? _width : display.getDisplayWidth();
+        _needsScroll = (_messageWidth > maxW);
         resetScroll();
-        needsLayout = false;
+        _needsLayout = false;
     }
 
-    if (!needsScroll) {
+    if (!_needsScroll) {
         tick(currentMillis); // Process static text dwell timer
         return;
     }
 
-    int oldScrollX = scrollX;
+    int oldScrollX = _scrollX;
     tick(currentMillis);
 
     // --- Deduplicate: only draw if math changed our coordinate ---
-    if (scrollX != oldScrollX) {
-        int renderW = (width > 0) ? width : display.getDisplayWidth();
-        int renderH = (height > 0) ? height : 12;
+    if (_scrollX != oldScrollX) {
+        int renderW = (_width > 0) ? _width : display.getDisplayWidth();
+        int renderH = (_height > 0) ? _height : 12;
 
         U8G2StateSaver stateSaver(display);
 
         // --- Arcane Logic ---
         // Prevent 8-bit boundary wraps (256 -> 0) by using inclusive end coordinates.
-        display.setClipWindow(x, y, x + renderW - 1, y + renderH - 1);
-        blankArea(display, x, y, renderW, renderH);
+        display.setClipWindow(_x, _y, _x + renderW - 1, _y + renderH - 1);
+        blankArea(display, _x, _y, renderW, renderH);
 
-        if (font) display.setFont(font);
-        drawText(display, currentText, x - scrollX, y, renderW + scrollX, renderH,
+        if (_font) display.setFont(_font);
+        drawText(display, _currentText, _x - _scrollX, _y, renderW + _scrollX, renderH,
                  TextAlign::Left, false);
 
         // Convert pixel coordinates to tile coordinates for partial refresh
-        display.updateDisplayArea(x / 8, y / 8, (renderW + 7) / 8, (renderH + 7) / 8);
+        display.updateDisplayArea(_x / 8, _y / 8, (renderW + 7) / 8, (renderH + 7) / 8);
     }
 }
 

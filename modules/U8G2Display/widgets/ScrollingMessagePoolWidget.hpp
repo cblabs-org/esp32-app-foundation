@@ -50,11 +50,11 @@ static constexpr size_t MSG_POOL_MAX_MSG_LEN = 256;
  */
 class ScrollingMessagePoolWidget : public ScrollingTextWidget {
 private:
-    char messageBuffer[MSG_POOL_BUFFER_SIZE][MSG_POOL_MAX_MSG_LEN]; // Circular message buffer
-    size_t writeIndex;       // Next write position in circular buffer
-    size_t messageCount;     // Total messages currently in the buffer (max MSG_POOL_BUFFER_SIZE)
-    size_t readIndex;        // Current read position for sequential playback
-    EventBus* eventBus;      // Cached EventBus reference for unsubscribe (if needed)
+    char _messageBuffer[MSG_POOL_BUFFER_SIZE][MSG_POOL_MAX_MSG_LEN]; // Circular message buffer
+    size_t _writeIndex;      // Next write position in circular buffer
+    size_t _messageCount;    // Total messages currently in the buffer (max MSG_POOL_BUFFER_SIZE)
+    size_t _readIndex;       // Current read position for sequential playback
+    EventBus* _eventBus;     // Cached EventBus reference for unsubscribe (if needed)
 
     /**
      * @brief Load the next message from the circular buffer into the marquee.
@@ -104,7 +104,7 @@ public:
      * @brief Return the number of messages currently in the circular buffer.
      * @return Message count (0 to MSG_POOL_BUFFER_SIZE).
      */
-    size_t getMessageCount() const { return messageCount; }
+    size_t getMessageCount() const { return _messageCount; }
 
     /**
      * @brief Tick handler: feeds messages to the marquee and handles transitions.

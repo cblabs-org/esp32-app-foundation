@@ -58,13 +58,13 @@ enum class TextAlign : uint8_t {
  */
 class U8G2StateSaver {
 private:
-    U8G2& display;               // Reference to the display context
-    const uint8_t* oldFont;      // Cached font pointer
-    uint8_t oldDrawColor;        // Cached draw color
-    u8g2_uint_t oldClipX0;       // Cached top-left X clip bound
-    u8g2_uint_t oldClipY0;       // Cached top-left Y clip bound
-    u8g2_uint_t oldClipX1;       // Cached bottom-right X clip bound
-    u8g2_uint_t oldClipY1;       // Cached bottom-right Y clip bound
+    U8G2& _display;               // Reference to the display context
+    const uint8_t* _oldFont;      // Cached font pointer
+    uint8_t _oldDrawColor;        // Cached draw color
+    u8g2_uint_t _oldClipX0;       // Cached top-left X clip bound
+    u8g2_uint_t _oldClipY0;       // Cached top-left Y clip bound
+    u8g2_uint_t _oldClipX1;       // Cached bottom-right X clip bound
+    u8g2_uint_t _oldClipY1;       // Cached bottom-right Y clip bound
 
 public:
     /**

@@ -31,11 +31,11 @@
  */
 class WifiStatusWidget : public IGfxWidget {
 private:
-    bool wasConnected;              // Tracks previous connection state for transition detection
-    unsigned long disconnectTime;   // Timestamp when disconnection was first detected
-    bool blinkState;                // Current blink toggle for disconnected icon
-    unsigned long lastBlinkMs;      // Timestamp of last blink toggle
-    int lastRssiCategory;           // Cached RSSI category (1-4 bars, -1 disconnected)
+    bool _wasConnected;             // Tracks previous connection state for transition detection
+    unsigned long _disconnectTime;  // Timestamp when disconnection was first detected
+    bool _blinkState;               // Current blink toggle for disconnected icon
+    unsigned long _lastBlinkMs;     // Timestamp of last blink toggle
+    int _lastRssiCategory;          // Cached RSSI category (1-4 bars, -1 disconnected)
 
     /**
      * @brief Categorise the current WiFi RSSI into a 1-4 signal strength scale.

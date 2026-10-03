@@ -33,19 +33,19 @@
  */
 class ProgressBarWidget : public IGfxWidget {
 private:
-    char message[256];            // Status text displayed above the bar
-    int currentPercent;           // Current visual percentage (0-100)
-    int targetPercent;            // Target percentage for animation
-    int startPercent;             // Starting percentage for current animation
-    uint32_t animStartTime;       // Timestamp when current animation began
-    uint32_t animDurationMs;      // Duration of current animation in milliseconds
+    char _message[256];           // Status text displayed above the bar
+    int _currentPercent;          // Current visual percentage (0-100)
+    int _targetPercent;           // Target percentage for animation
+    int _startPercent;            // Starting percentage for current animation
+    uint32_t _animStartTime;      // Timestamp when current animation began
+    uint32_t _animDurationMs;     // Duration of current animation in milliseconds
 
     // State tracking for deduplication
-    int oldPercent;               // Previous percent (for animation update dedup)
-    bool textChanged;             // True if message changed since last render
-    bool showPercentText;         // If true, render numeric percentage (e.g. "45%")
+    int _oldPercent;              // Previous percent (for animation update dedup)
+    bool _textChanged;            // True if message changed since last render
+    bool _showPercentText;        // If true, render numeric percentage (e.g. "45%")
 
-    const uint8_t* font;          // Active font pointer
+    const uint8_t* _font;         // Active font pointer
 
 public:
     /**
@@ -77,7 +77,7 @@ public:
      * @param _font Pointer to U8G2 font array. nullptr defers to the current
      *              display font.
      */
-    void setFont(const uint8_t* _font) { font = _font; }
+    void setFont(const uint8_t* _font) { _font = _font; }
 
     /**
      * @brief Set the progress value (0-100) with optional animation.
