@@ -92,9 +92,9 @@
       <header>Updates</header>
       <!-- Low-memory advisory — shown when free DRAM < OTA stack threshold -->
       <div id="ota-low-memory-warning"
-        style="display:none; background:rgba(249,168,37,0.12); border:1px solid var(--warning,#f9a825);
+        style="display:none; background:rgba(249,168,37,0.12); border:1px solid var(--warning);
                border-radius:8px; padding:0.6rem 0.8rem; margin-bottom:0.8rem; font-size:0.82rem;
-               color:var(--warning,#f9a825); line-height:1.4;">
+               color:var(--warning); line-height:1.4;">
         ⚠️ <strong>Low memory</strong> — OTA task may fail to start.<br>
         <span id="ota-low-memory-detail"></span>
       </div>
@@ -166,8 +166,8 @@
       </div>
       <div id="ota-upload-status" style="font-size:0.8rem; text-align:center; margin-bottom:0.8rem;"></div>
 
-      <div style="border-top:1px solid var(--warning, #f9a825); padding-top:0.8rem;">
-        <button id="btn-ota-rollback" style="width:100%; background:var(--card-bg); color:var(--warning, #f9a825); border:1px solid var(--warning, #f9a825);">
+      <div style="border-top:1px solid var(--warning); padding-top:0.8rem;">
+        <button id="btn-ota-rollback" style="width:100%; background:var(--card-bg); color:var(--warning); border:1px solid var(--warning);">
           Rollback to Previous
         </button>
       </div>
@@ -394,7 +394,7 @@
           break;
         case 'complete':
           pct = 100; label = 'Update complete — rebooting...';
-          barColor = 'var(--success, #2e7d32)';
+          barColor = 'var(--success)';
           stopStatusPolling();
           checkInFlight = false;
           statusEl.style.color = 'var(--success)';
@@ -403,7 +403,7 @@
           break;
         case 'error':
           pct = 100; label = 'Error: ' + (response.lastError || 'Unknown error');
-          barColor = 'var(--error, #c62828)';
+          barColor = 'var(--error)';
           stopStatusPolling();
           checkInFlight = false;
           wrapper.style.display = 'none';
@@ -623,7 +623,7 @@
       barEl.style.width = '100%';
       pctEl.textContent = '100%';
       labelEl.textContent = 'Verifying signature & writing to flash...';
-      barEl.style.background = 'var(--warning, #f9a825)';
+      barEl.style.background = 'var(--warning)';
       statusEl.style.color = 'var(--text-muted)';
       statusEl.textContent = 'Please do not disconnect.';
     };

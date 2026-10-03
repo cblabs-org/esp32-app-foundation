@@ -349,8 +349,8 @@
         `<div style="display:flex; justify-content:space-between; padding:0.5rem 0; font-size:0.8rem; color:var(--text-muted);">
           <span>Registered Tools: <strong>${status.toolCount || 0}</strong></span>
           <span>Status: ${status.initialized
-            ? '<span style="color:#2e7d32;">● Active</span>'
-            : '<span style="color:#c62828;">● Inactive</span>'}</span>
+            ? '<span style="color:var(--success);">● Active</span>'
+            : '<span style="color:var(--error);">● Inactive</span>'}</span>
         </div>`;
 
       wireToggle('mcp-toggle-enabled', 'enabled', function() { refreshToolList(); });

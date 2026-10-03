@@ -13,3 +13,9 @@ public:
     std::shared_ptr<sslclient_context> sslclient;
     bool _use_ca_bundle = false;
 };
+
+struct DeadlineToken;
+struct FrameworkSecureClient : public WiFiClientSecure {
+    void useDefaultCertBundle() {}
+    void applyDeadline(const DeadlineToken& d) {}
+};

@@ -143,7 +143,7 @@
     ];
     var svg = '<svg width="18" height="16" viewBox="0 0 17 16" style="vertical-align:middle">';
     barData.forEach(function(b, i) {
-      var fill = i < bars ? 'var(--primary, #2196F3)' : 'var(--border, #dee2e6)';
+      var fill = i < bars ? 'var(--primary)' : 'var(--border)';
       svg += '<rect x="' + b.x + '" y="' + b.y + '" width="3" height="' + b.h + '" rx="1" fill="' + fill + '"/>';
     });
     svg += '</svg>';
