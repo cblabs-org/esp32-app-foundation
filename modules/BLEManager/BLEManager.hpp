@@ -335,7 +335,6 @@ public:
     }
 
 private:
-/** @brief [Auto-generated description] */
     friend class ScanInhibit;
     mutable std::recursive_mutex _stateMutex;  // O2: protects state vs httpd task
     static void centralWorkerTask(void* arg);
@@ -364,7 +363,6 @@ private:
     std::vector<IBLEServiceProvider*>  _serviceProviders;
     std::vector<IBLEClientProvider*>   _clientProviders;
 
-/** @brief [Auto-generated description] */
     struct ClientProviderPrecContext {
         BLEManager* mgr = nullptr;
         const char* providerId = nullptr;
@@ -386,9 +384,7 @@ private:
     std::atomic<bool>                  _configDirty{false};
 
     // --- Worker Task Queue ---
-/** @brief [Auto-generated description] */
     struct WorkerCommand {
-/** @brief [Auto-generated description] */
         enum class Type : uint8_t { Connect, Disconnect, Forget, Shutdown, Discover, StopDiscovery } type;
         char providerId[24] = {};  // R7: Owned copy, not a dangling const char*
         BLEPeerAddress addr;
@@ -416,7 +412,6 @@ private:
 
 
     // Central state
-/** @brief [Auto-generated description] */
     struct DiscoveryState {
         bool active = false;
         uint32_t startMs = 0;
