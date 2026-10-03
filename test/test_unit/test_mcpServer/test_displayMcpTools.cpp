@@ -24,7 +24,7 @@
 #include <ArduinoJson.h>
 #include <U8g2lib.h>
 #include "MCPToolRegistry.hpp"
-#include "U8G2DisplayModule.hpp"
+#include "U8G2Display.hpp"
 
 // =============================================================================
 // Mock IDisplayBoard — minimal concrete board for carousel state tests

@@ -44,4 +44,23 @@ struct FrameworkSecureClient : public WiFiClientSecure {
     }
 };
 
+#else
+
+#include <WiFiClientSecure.h>
+#include "types/FetchContext.hpp"
+
+/**
+ * @brief Native build mock for FrameworkSecureClient.
+ */
+struct FrameworkSecureClient : public WiFiClientSecure {
+    /** @brief Mock for default cert bundle attachment on native. */
+    void useDefaultCertBundle() {}
+
+    /** @brief Mock for deadline application on native. */
+    void applyDeadline(const DeadlineToken& d) {}
+
+    /** @brief Mock for last error retrieval on native. */
+    int lastError(char* buf, size_t size) { return 0; }
+};
+
 #endif

@@ -5,7 +5,7 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  *
- * Test: test/test_unit/test_buttonModule/test_ButtonModule.cpp
+ * Test: test/test_unit/test_buttonModule/test_buttonModule.cpp
  * Description: GoogleTest unit-test suite for ButtonModule. Validates ButtonConfig types,
  *              addButton() registration, queue drain logic, EventBus topic dispatch,
  *              ring buffer wrapping, drain cap, and MCP diagnostic tool.

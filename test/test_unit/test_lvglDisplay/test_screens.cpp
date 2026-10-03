@@ -12,7 +12,7 @@
 
 #include <gtest/gtest.h>
 #include <string>
-#include "LVGLDisplayModule.hpp"
+#include "LVGLDisplay.hpp"
 #include "MockLVGLHardwareAdapter.hpp"
 #include "screens/FaultScreen.hpp"
 #include "lvgl.h"

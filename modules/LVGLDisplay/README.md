@@ -153,7 +153,7 @@ All UI state synchronization is driven through 23 contracted LVGL subjects:
 
 ```cpp
 #include "Application.hpp"
-#include "modules/LVGLDisplay/LVGLDisplayModule.hpp"
+#include "modules/LVGLDisplay/LVGLDisplay.hpp"
 #include "adapters/lvgl/CrowPanel128Adapter.hpp"
 
 // 1. Instantiate hardware adapter & branding

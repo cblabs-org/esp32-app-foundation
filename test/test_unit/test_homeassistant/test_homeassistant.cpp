@@ -14,7 +14,7 @@ int mock_mqtt_publish_return_value = 0;
 #ifdef WITH_HOMEASSISTANT
 
 #define private public
-#include "../../../modules/HomeAssistant/HomeAssistantModule.hpp"
+#include "../../../modules/HomeAssistant/HomeAssistant.hpp"
 #undef private
 
 

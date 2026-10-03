@@ -162,7 +162,7 @@ That's it. The framework dispatches `tick()` to all registered `ITickable` modul
 
 ## Act 1: Learning the Framework — The `MyApp` Skeleton
 
-The `MyApp` class in `template-app/src/myApp.hpp` is a **standalone, independently buildable starting point** — a minimal module that demonstrates all five primary interfaces with clear, stub logic. It lives in its own `template-app/` directory with its own `main.cpp` and `platformio.ini`, so you can copy the entire directory to begin your project.
+The `MyApp` class in `template-app/src/MyApp.hpp` is a **standalone, independently buildable starting point** — a minimal module that demonstrates all five primary interfaces with clear, stub logic. It lives in its own `template-app/` directory with its own `main.cpp` and `platformio.ini`, so you can copy the entire directory to begin your project.
 
 > **Ready to start?** The `template-app/` directory includes its own `main.cpp` that registers `MyApp` — it builds and runs out of the box. Copy it as your starting point.
 

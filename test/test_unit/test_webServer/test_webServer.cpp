@@ -6,7 +6,7 @@
  */
 
 #include <gtest/gtest.h>
-#include "WebServerManager.hpp"
+#include "WebServer.hpp"
 #include "interfaces/IWebContributor.hpp"
 #include "../test_helpers/MockTabRegistry.hpp"
 

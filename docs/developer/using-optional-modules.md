@@ -93,7 +93,7 @@ If you omit the guard:
 
 ## 3. Display Module — Worked Example
 
-The [U8G2DisplayModule](../../modules/U8G2Display/U8G2DisplayModule.hpp) is the most complex optional module in the framework. It demonstrates how a hardware-dependent module can implement six interfaces and expose sub-objects while remaining fully guarded for native builds.
+The [U8G2DisplayModule](../../modules/U8G2Display/U8G2Display.hpp) is the most complex optional module in the framework. It demonstrates how a hardware-dependent module can implement six interfaces and expose sub-objects while remaining fully guarded for native builds.
 
 > [!IMPORTANT]
 > U8G2 is a **replaceable reference implementation**, not a mandatory component. The framework's display architecture is designed so that downstream applications can swap to TFT, e-ink, or headless operation. See [Replacing the Display](#replacing-the-display) below.
@@ -367,7 +367,7 @@ Framework optional modules follow the exact same composition rules as custom mod
 static Application app;
 
 #ifdef WITH_HOMEASSISTANT
-#include "HomeAssistantModule.hpp"
+#include "HomeAssistant.hpp"
 static HomeAssistantModule haModule;
 #endif
 

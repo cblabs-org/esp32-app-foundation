@@ -16,7 +16,7 @@
 
 #include <gtest/gtest.h>
 #include <ArduinoJson.h>
-#include "LVGLDisplayModule.hpp"
+#include "LVGLDisplay.hpp"
 #include "MockLVGLHardwareAdapter.hpp"
 #include "MCPToolRegistry.hpp"
 #include "ConfigManager.hpp"

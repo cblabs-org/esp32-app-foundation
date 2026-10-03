@@ -241,7 +241,7 @@ lib_extra_dirs =
 #### Example: Consumer `main.cpp`
 
 ```cpp
-#include <LVGLDisplay/LVGLDisplayModule.hpp>
+#include <LVGLDisplay/LVGLDisplay.hpp>
 #include <MyAdapter.hpp>
 
 static BootBranding branding = { .appTitle = "My Product" };

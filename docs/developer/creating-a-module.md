@@ -7,8 +7,8 @@
 ---
 
 This tutorial walks through creating a custom application module. We will use the built-in template files as our reference:
-- [myApp.hpp](../../template-app/src/myApp.hpp)
-- [myApp.cpp](../../template-app/src/myApp.cpp)
+- [MyApp.hpp](../../template-app/src/MyApp.hpp)
+- [MyApp.cpp](../../template-app/src/MyApp.cpp)
 - [main.cpp](../../template-app/src/main.cpp)
 
 ---
@@ -34,7 +34,7 @@ Use this decision table to guide your implementation:
 
 ## 2. Declaring Your Module Class
 
-The template module `MyApp` implements five different interfaces using multiple inheritance. Here is the class declaration from [myApp.hpp](../../template-app/src/myApp.hpp):
+The template module `MyApp` implements five different interfaces using multiple inheritance. Here is the class declaration from [MyApp.hpp](../../template-app/src/MyApp.hpp):
 
 ```cpp
 #pragma once
@@ -101,7 +101,7 @@ private:
 
 ## 3. Implementing the Module Logic
 
-Let's examine how each interface is implemented in [myApp.cpp](../../template-app/src/myApp.cpp).
+Let's examine how each interface is implemented in [MyApp.cpp](../../template-app/src/MyApp.cpp).
 
 ### The Tick Loop & Injected Time
 The `ITickable::tick()` function is called repeatedly on every main-loop execution. To ensure testability, the current time is captured once at the beginning of the framework tick cycle and passed to you as `currentMillis`. 

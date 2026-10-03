@@ -14,7 +14,7 @@
 #include "ScreensaverController.hpp"
 #include "MockLVGLHardwareAdapter.hpp"
 #include "EventBus.hpp"
-#include "LVGLDisplayModule.hpp"
+#include "LVGLDisplay.hpp"
 
 // =============================================================================
 // Test Group: ScreensaverController — Enable/Disable

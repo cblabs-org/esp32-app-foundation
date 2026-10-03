@@ -70,7 +70,7 @@
 class ConfigManager;
 class KeyManager;
 
-// Forward declaration only — full stub is in WebServerManager.hpp
+// Forward declaration only — full stub is in WebServer.hpp
 class PsychicRequest;
 class PsychicResponse;
 class PsychicHttpServer;

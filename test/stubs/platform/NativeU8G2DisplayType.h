@@ -6,12 +6,12 @@
  *              host-test builds.  The native env sets WITH_DISPLAY_U8G2 but
  *              does not have a real display.  This stub defines a trivial
  *              U8G2 subclass that compiles with BOTH constructor paths in
- *              U8G2DisplayModule.hpp on native:
+ *              U8G2Display.hpp on native:
  *
  *                  U8G2_DISPLAY_TYPE _u8g2{U8G2_R0, PIN_DISPLAY_CS, ...};  // SPI path
  *                  U8G2_DISPLAY_TYPE _u8g2{U8G2_R0};                       // I2C path
  *
- *              Must be included BEFORE U8G2DisplayModule.hpp so the macro
+ *              Must be included BEFORE U8G2Display.hpp so the macro
  *              guard `#ifndef U8G2_DISPLAY_TYPE` sees our definition first.
  */
 #pragma once
@@ -44,7 +44,7 @@ public:
 };
 
 /**
- * Define U8G2_DISPLAY_TYPE for native builds BEFORE U8G2DisplayModule.hpp's
+ * Define U8G2_DISPLAY_TYPE for native builds BEFORE U8G2Display.hpp's
  * fallback #define fires.  Also satisfy board_contract.h's #ifndef guard.
  */
 #ifndef U8G2_DISPLAY_TYPE

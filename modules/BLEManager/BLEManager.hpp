@@ -326,7 +326,7 @@ private:
     } _discovery;
 
     // Ring buffers for EventBus published payloads
-    static constexpr size_t RING_SIZE = 4;
+    static constexpr size_t RING_SIZE = 4; ///< Capacity of EventBus payload ring buffers
     BLEStatePayload          _stateRing[RING_SIZE];
     uint8_t                  _stateRingHead = 0;
 

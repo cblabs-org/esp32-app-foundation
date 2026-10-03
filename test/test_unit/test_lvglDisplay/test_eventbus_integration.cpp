@@ -11,7 +11,7 @@
  */
 
 #include <gtest/gtest.h>
-#include "LVGLDisplayModule.hpp"
+#include "LVGLDisplay.hpp"
 #include "MockLVGLHardwareAdapter.hpp"
 #include "EventBus.hpp"
 #include "OTAUpdateManager.hpp"

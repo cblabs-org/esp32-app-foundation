@@ -109,7 +109,7 @@ BASE_PREAMBLE = """
 #include "IDisplayBoard.hpp"
 #include <U8g2lib.h>
 #include "NativeU8G2DisplayType.h"
-#include "U8G2DisplayModule.hpp"
+#include "U8G2Display.hpp"
 
 // Forward declarations for application sample types
 class WeatherModule;

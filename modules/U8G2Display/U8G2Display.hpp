@@ -5,7 +5,7 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  *
- * Module: modules/U8G2Display/U8G2DisplayModule.hpp
+ * Module: modules/U8G2Display/U8G2Display.hpp
  * Description: Pure-service U8G2 monochrome display module with three-layer
  *              rendering architecture (Modal → Base/Carousel → Screensaver).
  *              Accepts commands from callers; does NOT poll Application state

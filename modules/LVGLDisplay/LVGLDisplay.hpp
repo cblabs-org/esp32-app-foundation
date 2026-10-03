@@ -5,7 +5,7 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  *
- * Module: modules/LVGLDisplay/LVGLDisplayModule.hpp
+ * Module: modules/LVGLDisplay/LVGLDisplay.hpp
  * Description: Generic LVGL v9 colour-TFT display module core. Manages LVGL
  *              lifecycle, draw buffer allocation, tick updates, input device
  *              focus groups, system screens, and two-stage boot splash.

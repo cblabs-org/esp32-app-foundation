@@ -55,7 +55,7 @@ To use an adapter in your application, instantiate it and pass it to the `LVGLDi
 
 ```cpp
 #include "Application.hpp"
-#include "modules/LVGLDisplay/LVGLDisplayModule.hpp"
+#include "modules/LVGLDisplay/LVGLDisplay.hpp"
 #include "adapters/lvgl/CrowPanel128Adapter.hpp"
 
 // 1. Instantiate the adapter

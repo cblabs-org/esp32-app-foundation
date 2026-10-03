@@ -5,7 +5,7 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  *
- * Module: modules/HomeAssistant/HomeAssistantModule.hpp
+ * Module: modules/HomeAssistant/HomeAssistant.hpp
  * Description: MQTT integration module for Home Assistant auto-discovery.
  *              Manages an ESP-MQTT client that connects to an MQTT broker,
  *              publishes HA MQTT discovery payloads for registered entities,

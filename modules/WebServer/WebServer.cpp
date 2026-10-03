@@ -19,10 +19,10 @@
  *              - PROGMEM static routes for all portal assets
  *
  * Exported Functions/Classes:
- * - WebServerManager: see WebServerManager.hpp
+ * - WebServerManager: see WebServer.hpp
  */
 
-#include "WebServerManager.hpp"
+#include "WebServer.hpp"
 #include "utils/serveGzipAsset.hpp"
 #include <ArduinoJson.h>
 

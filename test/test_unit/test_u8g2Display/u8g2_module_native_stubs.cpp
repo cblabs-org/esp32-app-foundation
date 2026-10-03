@@ -3,7 +3,7 @@
  *
  * Module: test/test_unit/test_u8g2Display/u8g2_module_native_stubs.cpp
  * Description: Stub implementations of U8G2DisplayModule methods for native
- *              host-test builds. The real U8G2DisplayModule.cpp is excluded
+ *              host-test builds. The real U8G2Display.cpp is excluded
  *              on native via exclude_on_native.py because it pulls hardware
  *              dependencies (PsychicHttp, SPI, FreeRTOS task creation).
  *
@@ -19,7 +19,7 @@
  */
 
 #include "NativeU8G2DisplayType.h"
-#include "U8G2DisplayModule.hpp"
+#include "U8G2Display.hpp"
 #include "EventBus.hpp"
 #include "events/AppConfiguringPayload.hpp"
 #include <cstring>

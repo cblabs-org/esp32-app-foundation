@@ -5,7 +5,7 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  *
- * Module: modules/WebServer/WebServerManager.hpp
+ * Module: modules/WebServer/WebServer.hpp
  * Description: Manages the ESPAsyncWebServer instance and coordinates the
  *              registration of REST routes via the IWebContributor interface.
  *              Initializes basic routing for static files, caps POST body sizes

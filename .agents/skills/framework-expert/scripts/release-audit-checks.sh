@@ -234,6 +234,8 @@ check_undocumented_constants() {
                     if (line ~ /\(/) { prev=line; next }
                     # Skip if line is an array initializer
                     if (line ~ /\[\]/) { prev=line; next }
+                    # Skip #define without a value (include guards, empty flags)
+                    if (line ~ /^[ \t]*#define[ \t]+[A-Za-z0-9_]+[ \t]*$/) { prev=line; next }
                     # Skip if preceding line is a doc comment
                     if (prev ~ /\/\/\// || prev ~ /\/\*\*/ || prev ~ /\* @/ || prev ~ /\*\//) { prev=line; next }
                     # This is an undocumented constant
@@ -281,20 +283,56 @@ check_tag_mismatch() {
 check_directory_file_mismatch() {
     local hits=0
     local files=""
+
+    # 1. Primary Header Alignment: Every module and library directory must have a primary header ($dir.hpp or $dir.h)
+    for d in "$ROOT_DIR"/modules/*/ "$ROOT_DIR"/lib/*/; do
+        [ -d "$d" ] || continue
+        local dir_name
+        dir_name=$(basename "$d")
+        if [ ! -f "$d/$dir_name.hpp" ] && [ ! -f "$d/$dir_name.h" ]; then
+            hits=$((hits + 1))
+            files="$files ${d#$ROOT_DIR/}"
+        fi
+    done
+
+    # 2. Casing and naming convention mismatches between files and parent directories
     for f in $(get_source_files); do
-        local dir
-        dir=$(basename "$(dirname "$f")")
-        local base
-        base=$(basename "$f" | sed 's/\.[a-z]*$//')
-        # If dir starts with uppercase, it likely represents a module/component directory
-        if [[ "$dir" =~ ^[A-Z] ]]; then
-            # Ignore interface files
-            if [ "$dir" != "$base" ] && [ "$base" != "ITickable" ] && [[ ! "$base" =~ ^I[A-Z] ]]; then
+        local parent_dir
+        parent_dir=$(dirname "$f")
+        local grandparent_dir
+        grandparent_dir=$(basename "$(dirname "$parent_dir")")
+
+        # Check files directly in module, lib, or test_unit directories
+        if [ "$grandparent_dir" = "modules" ] || [ "$grandparent_dir" = "lib" ] || [ "$grandparent_dir" = "test_unit" ]; then
+            local dir
+            dir=$(basename "$parent_dir")
+            local base
+            base=$(basename "$f" | sed 's/\.[a-z]*$//')
+
+            local dir_lower
+            dir_lower=$(echo "$dir" | tr "[:upper:]" "[:lower:]")
+            local base_lower
+            base_lower=$(echo "$base" | tr "[:upper:]" "[:lower:]")
+
+            # Case mismatch: same characters case-insensitively, but casing differs
+            if [ "$dir_lower" = "$base_lower" ] && [ "$dir" != "$base" ]; then
+                hits=$((hits + 1))
+                files="$files ${f#$ROOT_DIR/}"
+                continue
+            fi
+
+            # Naming convention mismatch: same characters ignoring case and underscores (e.g. camelCase vs snake_case)
+            local dir_clean
+            dir_clean=$(echo "$dir_lower" | tr -d "_")
+            local base_clean
+            base_clean=$(echo "$base_lower" | tr -d "_")
+            if [ "$dir_clean" = "$base_clean" ] && [ "$dir_lower" != "$base_lower" ]; then
                 hits=$((hits + 1))
                 files="$files ${f#$ROOT_DIR/}"
             fi
         fi
     done
+
     if [ $hits -gt 0 ]; then
         report 1 "directory_file_mismatch" "FAIL" "$hits" "$files"
     else

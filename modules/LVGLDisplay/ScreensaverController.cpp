@@ -12,7 +12,7 @@
 #include "ScreensaverController.hpp"
 #include "ILVGLHardwareAdapter.hpp"
 #include "EventBus.hpp"
-#include "LVGLDisplayModule.hpp"
+#include "LVGLDisplay.hpp"
 
 void ScreensaverController::setEnabled(bool enabled) {
     _enabled = enabled;
