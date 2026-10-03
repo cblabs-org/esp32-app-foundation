@@ -19,6 +19,9 @@
 
 class NimBLECharacteristic;
 
+/**
+ * @brief Sample Heart Rate Service provider that re-broadcasts HR measurements from a client.
+ */
 class SampleHrRepeater : public IBLEServiceProvider {
 public:
     SampleHrRepeater() = default;
@@ -26,14 +29,21 @@ public:
 
     const char* getProviderId() const override { return "hr_repeater"; }
 
+    /** @brief Create HRS service and HR Measurement characteristic. */
     bool registerServices(NimBLEServer& server) override;
+    /** @brief Add HRS service UUID to advertising data. */
     void contributeAdvertising(BLEAdvertisingBuilder& adv) override;
 
+    /** @brief Handle central peer connection event. */
     void onPeerConnected(const BLEPeerInfo& peer) override;
+    /** @brief Handle central peer disconnection event. */
     void onPeerDisconnected(BLEConnHandle handle, BLEDisconnectReason reason) override;
+    /** @brief Track subscription state for HR Measurement characteristic. */
     void onSubscriptionChanged(BLEConnHandle handle, uint16_t attrHandle, uint16_t uuid16,
                                bool notify, bool indicate) override;
+    /** @brief Suspend HR notifications while stack is paused. */
     void onStackPaused() override;
+    /** @brief Resume HR notifications after stack resumes. */
     void onStackResumed() override;
 
     /**

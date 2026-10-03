@@ -29,6 +29,7 @@
  */
 class RedactorPreconditionContributor : public IPreconditionContributor {
 public:
+    /** @brief Registers the Redactor health precondition with the engine. */
     void registerPreconditions(IPreconditionRegistry& reg) override {
         reg.add(PreconditionNames::REDACTOR_HEALTH, PreconditionRole::Operational,
             [](void*) -> PreconditionStatus {

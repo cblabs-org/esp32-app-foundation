@@ -1,3 +1,16 @@
+/*
+ * ESP32 App Foundation (c) 2026 CB Labs
+ *
+ * https://github.com/matthewmcneill/esp32-app-foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Module: test/test_unit/test_bleManager/test_bleManagerCentral.cpp
+ * Description: Unit tests for BLEManager Central role operations — device registry
+ *              updates on pair/forget, reconnect policy lifecycle, and discovery
+ *              result filtering.
+ */
+
 #include <gtest/gtest.h>
 #include "BLEManager/BLEManager.hpp"
 #include "BLEManager/BLEDeviceRegistry.hpp"

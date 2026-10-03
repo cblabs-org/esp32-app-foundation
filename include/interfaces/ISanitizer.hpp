@@ -21,6 +21,7 @@
  */
 class ISanitizer {
 public:
+    /** @brief Virtual destructor for safe polymorphic deletion. */
     virtual ~ISanitizer() = default;
 
     /**

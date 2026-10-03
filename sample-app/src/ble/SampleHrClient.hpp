@@ -16,21 +16,34 @@
 
 class SampleHrRepeater;
 
+/**
+ * @brief Sample Heart Rate Service client provider consuming HR measurements from a peripheral.
+ */
 class SampleHrClient : public IBLEClientProvider, public ITickable {
 public:
+    /**
+     * @brief Construct with a pointer to the repeater that re-broadcasts received HR data.
+     * @param repeater Repeater instance to feed heart rate values to.
+     */
     explicit SampleHrClient(SampleHrRepeater* repeater) : _repeater(repeater) {}
     ~SampleHrClient() override = default;
 
     const char* getProviderId() const override { return "hr_client"; }
     const char* getDeviceTypeLabel() const override { return "Heart Rate Monitor"; }
 
+    /** @brief Return the 16-bit HRS service UUID for discovery filtering. */
     size_t getTargetServiceUUIDs(uint16_t* out, size_t max) const override;
+    /** @brief Return the HR Measurement characteristic subscription. */
     size_t getSubscriptions(BLESubscriptionSpec* out, size_t max) const override;
 
+    /** @brief Handle successful connection to a heart rate peripheral. */
     void onConnected(const BLEStoredDevice& device) override;
+    /** @brief Process an incoming heart rate measurement notification. */
     void onNotification(const BLENotification& notification) override;
+    /** @brief Handle disconnection from the heart rate peripheral. */
     void onDisconnected(BLEDisconnectReason reason) override;
 
+    /** @brief Periodic tick — manages HR data freshness tracking. */
     void tick(uint32_t currentMillis) override;
 
 private:

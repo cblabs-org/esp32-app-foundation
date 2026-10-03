@@ -53,6 +53,7 @@ struct BLENotification {
  */
 class IBLEClientProvider {
 public:
+    /** @brief Virtual destructor. */
     virtual ~IBLEClientProvider() = default;
 
     /**
