@@ -43,6 +43,7 @@
 - **[x] [wo1-core-propagation](wo1-core-propagation/WORKORDER.md):** Core identity plumbing — `sanitiseHostname()`, `Application::begin()` auto-propagation to WiFi + HA. Consumer `main.cpp` + `sample-app/main.cpp` simplification.
 - **[x] [wo2-peripheral-surfaces](wo2-peripheral-surfaces/WORKORDER.md):** Peripheral identity surfaces — MCP server name, OTA User-Agent, TLS cert CN, boot serial banner, LVGL boot screen `bind_text` fix.
 - **[x] [wo3-web-mdns-docs](wo3-web-mdns-docs/WORKORDER.md):** Web client, mDNS implementation, auth.js fix, documentation corrections.
+- **[ ] [wo4-ha-identity-wiring](wo4-ha-identity-wiring/WORKORDER.md):** HomeAssistant identity auto-wiring — `begin(Application& app)` pattern, fix hardcoded `"CB Labs"` manufacturer.
 
 ## Approval Status
 
