@@ -47,8 +47,8 @@ These rules are enforced by two `PreToolUse` lifecycle hooks
 
 | Hook | Intercepts | Decision |
 |------|-----------|----------|
-| `pio-cli-gate` | `run_command` containing `pio`/`platformio`/`esptool` | `deny` (worktree) · `force_ask` (interactive) |
-| `pio-reset-gate` | `call_mcp_tool` with `reset_server_state` | `force_ask` |
+| `pio-cli-gate` | `run_command` containing `pio`/`platformio`/`esptool` | `deny` (autonomous) · `force_ask` (interactive) |
+| `pio-reset-gate` | `call_mcp_tool` with `reset_server_state` | `deny` (autonomous) · `force_ask` (interactive) |
 
 **For agents:** Do not attempt to use `pio`, `esptool`, or `reset_server_state`
 directly. Use the MCP tools and respect the lock queue. If the hook blocks you,
