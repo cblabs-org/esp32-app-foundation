@@ -1223,3 +1223,20 @@ button.full-width {
   max-width: 320px;
   line-height: 1.5;
 }
+
+/* ==========================================================================
+   12. LOADING SPLASH (Issue #288)
+   ========================================================================== */
+#loading-splash {
+  background: var(--bg);
+  color: var(--text);
+}
+
+#loading-splash .splash-text {
+  color: var(--text-muted);
+}
+
+body.portal-ready #loading-splash {
+  display: none !important;
+}
+

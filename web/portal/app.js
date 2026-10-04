@@ -656,6 +656,11 @@ document.addEventListener('DOMContentLoaded', function() {
   // 8. Boot Sequence
   // =========================================================================
 
+  function dismissLoadingSplash() {
+    var splash = document.getElementById('loading-splash');
+    if (splash) splash.remove();
+  }
+
   // Fetch app branding and /api/tabs in parallel to speed up boot.
   // fetchAppInfoAndStyles() awaits the stylesheet's onload internally, so CSS
   // is applied before tab scripts execute (kills the branding FOUC). The title
@@ -673,6 +678,7 @@ document.addEventListener('DOMContentLoaded', function() {
       loadTabs(tabs);
       checkApMode().finally(function() {
         document.body.classList.add('portal-ready');
+        dismissLoadingSplash();
       });
     });
   }).catch(function(err) {
@@ -681,7 +687,9 @@ document.addEventListener('DOMContentLoaded', function() {
       loadTabs();
       checkApMode().finally(function() {
         document.body.classList.add('portal-ready');
+        dismissLoadingSplash();
       });
     });
   });
+
 });
