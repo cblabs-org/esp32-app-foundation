@@ -1,0 +1,16 @@
+{
+    "name": "U8G2GLUI",
+    "version": "1.0.0",
+    "description": "U8G2GL generated UI for the 256x64 SSD1322 boards",
+    "license": "MIT",
+    "dependencies": [
+        {
+            "name": "u8g2gl",
+            "version": "*"
+        }
+    ],
+    "build": {
+        "srcDir": "generated",
+        "includeDir": "generated"
+    }
+}

@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ESP32 App Foundation (c) 2026 CB Labs
+  https://github.com/matthewmcneill/esp32-app-foundation
+  SPDX-License-Identifier: Apache-2.0
+
+  Module: uidesign/ssd1322-256x64/u8g2gl/u8g2gl.xml
+  Description: U8G2GL project for the 256x64 SSD1322 panel that esp32dev and
+               esp32s3nano share, which is why the directory is named for the
+               panel and not for either board. Today it holds one screen, the
+               diagnostics board; its generated/ directory is committed and is
+               consumed through lib_extra_dirs as the PlatformIO library
+               U8G2GLUI (library.json beside this file).
+
+               Regenerate with the pre-build hook (scripts/u8g2gl_generate.py)
+               when U8G2GL_CLI points at a CLI checkout, or by hand:
+                 node <u8g2gl>/cli/dist/node/cli.js generate \
+                     uidesign/ssd1322-256x64/u8g2gl --target ssd1322
+
+  Target: setup is the constructor the firmware builds
+          (modules/U8G2Display/U8G2Display.hpp, hardware/esp32dev/board.h:93).
+-->
+<u8g2gl schema="0.4" name="ssd1322_256x64" version="1.0.0">
+    <targets>
+        <target name="ssd1322" setup="U8G2_SSD1322_NHD_256X64_F_4W_HW_SPI" rotation="R0" />
+    </targets>
+    <output dir="generated" />
+</u8g2gl>
