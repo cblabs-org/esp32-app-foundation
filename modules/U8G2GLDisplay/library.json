@@ -1,0 +1,30 @@
+{
+  "name": "U8G2GLDisplay",
+  "version": "0.1.0",
+  "description": "Hosts generated U8G2GL screens as IDisplayBoard boards inside the legacy U8G2Display carousel",
+  "license": "Apache-2.0",
+  "dependencies": [
+    {
+      "name": "u8g2gl",
+      "version": "https://github.com/cblabs-org/u8g2gl.git#69c37e01f75198a4aa3fa84b8926fcf139e30f02"
+    },
+    {
+      "name": "U8g2",
+      "owner": "olikraus",
+      "version": "^2.36.18"
+    },
+    {
+      "name": "U8G2GLUI",
+      "version": "*"
+    },
+    {
+      "name": "U8G2Display",
+      "version": "*"
+    }
+  ],
+  "build": {
+    "flags": [
+      "-I../../include"
+    ]
+  }
+}

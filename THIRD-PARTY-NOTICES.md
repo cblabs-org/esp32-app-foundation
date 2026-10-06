@@ -18,6 +18,9 @@ All third-party dependencies listed below utilize permissive open-source license
 | **ESP32Encoder** | [github.com/Madhephaestus/ESP32Encoder](https://github.com/Madhephaestus/ESP32Encoder) | MIT | Hardware rotary encoder pulse counting library |
 | **LovyanGFX** | [github.com/lovyan03/LovyanGFX](https://github.com/lovyan03/LovyanGFX) | FreeBSD (BSD-2-Clause) | High-performance display driver graphics library |
 | **GoogleTest** | [github.com/google/googletest](https://github.com/google/googletest) | BSD-3-Clause | Host C++ unit testing framework (`env:native`) |
+| **U8G2GL** | [github.com/cblabs-org/u8g2gl](https://github.com/cblabs-org/u8g2gl) | MIT | Declarative UI runtime for U8G2 displays (`modules/U8G2GLDisplay`) |
+
+The C++ that `u8g2gl generate` writes (under `uidesign/*/u8g2gl/generated/`) is MIT-licensed as well, per the U8G2GL design specification (section 22), so those files carry no Apache-2.0 header. The XML they are generated from is this project's own and is Apache-2.0.
 
 ---
 
