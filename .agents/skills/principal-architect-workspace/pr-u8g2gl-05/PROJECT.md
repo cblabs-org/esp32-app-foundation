@@ -88,11 +88,16 @@ and web diagnostics (R7).
 ## Work Order Ledger
 
 - **[ ] [wo1-baseline](wo1-baseline/WORKORDER.md):** the "before" evidence.
-  - **Part 1** (host pixel baseline, line counts): *dispatched*.
+  - **Part 1** (host pixel baseline, line counts): **complete, verified by the PA**.
   - **Part 2** (flash/RAM, native suite count, legacy edit-loop timing): **pending the
-    PlatformIO MCP**.
-- **[ ] wo2-module:** the board host, the generated UI, the pinned dependency, the hook, the
-  notices row, and the `main.cpp` switch. *Needs WO-A's pushed commit and the MCP.*
+    PlatformIO MCP**. It measures the **legacy** firmware, so it runs in a separate detached
+    worktree at `u8g2gl-integration/wo1-baseline` (read-only measurement). Its numbers are
+    recorded into `EVIDENCE.md` on the stack tip. That keeps it independent of WO-B2's
+    `main.cpp` switch.
+- **[ ] [wo2-module](wo2-module/WORKORDER.md):** the board host, the generated UI, the pinned
+  dependency (`69c37e01f75198a4aa3fa84b8926fcf139e30f02`), the hook, the notices row, and the
+  `main.cpp` switch. It renders through the host harness and compares against the baseline.
+  *Dispatched.* Its firmware build waits for the MCP.
 - **[ ] wo3-evidence:** the "after" measurements through the same harness, `EVIDENCE.md`, and the
   PR description.
 - **[ ] wo4-readability:** a house-style pass (`.agents/skills/house-style-docs`).
@@ -108,3 +113,27 @@ reads them there and does not re-derive them.
 
 - **2026-10-06 — dispatch.** Worktree created at `e5342373`. The `house-style-docs` submodule
   initialised in it. WO-B1 Part 1 dispatched, in parallel with U8G2GL WO-A.
+- **2026-10-06 — WO-B1 Part 1 verified.**
+  - **Reproduced byte for byte:** the PA rebuilt the harness from clean (U8G2 override
+    `../U8G2GL-05/extern/u8g2` @ 2.36.18), re-rendered all four scenarios, and every `.bin` and
+    `.pbm` matches the committed baseline (`connected.bin` sha256 `50567054…7251`).
+  - **Warnings:** 9 build warnings, all `-Wunused-parameter` in unmodified legacy
+    `IGfxWidget.hpp:137`. None come from the harness.
+  - **Finding (PA, from the rendered image, not in the worker's report): the legacy board clips
+    its descenders.** "My" renders as "Mv", and the "p" in "Up" and "Heap" loses its tail.
+    - Code reading: `DrawingPrimitives.cpp` drawText passes `y + h - 1` and `x + w - 1` to
+      `setClipWindow`, whose far corner U8G2 treats as **exclusive** (`u8g2.h:352/354`, also
+      cited in U8G2GL's spec §11). The last row and column of each label are therefore lost. With
+      `h = getMaxCharHeight()` under `setFontRefHeightAll()`, that cuts into the descender.
+    - The exact rows lost are for WO-B2 to measure.
+    - This is a legacy defect that the baseline faithfully records. The gate as written asks for
+      pixel identity, so WO-B2 targets **bug-for-bug** identity. Whether to then fix it is an
+      owner question, recorded in the twin PROJECT.
+  - **Other legacy findings (the worker's):**
+    - The "·" separator never renders: an 8-column gap.
+    - The long SSID is clipped mid-glyph because truncation is not enabled.
+    - `Fonts.hpp` includes `<U8g2lib.h>` inside `namespace AppFonts`.
+    - The `DrawingPrimitives.cpp` header names the file in the wrong case.
+
+    All four are legacy, outside scope, and become frozen-module correctness candidates after
+    PD-4.
