@@ -7,7 +7,7 @@
   "build_version_define": "0.0.12-dev.83",
   "display_setup_call": "u8g2_Setup_ssd1322_nhd_256x64_f(u8g2, U8G2_R0, u8x8_byte_empty, u8x8_dummy_cb)",
   "display_state_calls": ["begin()", "setDrawColor(1)", "setFontMode(1)", "setFontRefHeightAll()", "setFontPosTop()", "setContrast(0)", "setFlipMode(0)"],
-  "display_state_source": "modules/U8G2Display/U8G2Display.cpp lines 139-148",
+  "display_state_source": "modules/U8G2Display/U8G2Display.cpp lines 137-148",
   "frame_sequence": "clearBuffer(); board.render(u8g2); no sendBuffer() (modules/U8G2Display/U8G2Display.cpp:1413)",
   "buffer_format": "Raw getBufferPtr() bytes, 2048 = 8 * 8 tile rows * 32 tile columns. U8G2 tile format: 8 horizontal bands of 8 pixel rows; byte index = band * 256 + x; bit 0 is the top pixel row of the band; 1 is lit.",
   "pbm_format": "Binary PBM (P4), 256x64, row-major, MSB first, 1 = lit pixel.",

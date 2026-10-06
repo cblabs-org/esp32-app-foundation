@@ -94,13 +94,13 @@ public:
      * @brief Set up the SSD1322 256x64 full buffer and reproduce the legacy begin state.
      *
      * The state calls mirror U8G2Display.cpp lines 143-148 in order, after
-     * _u8g2.begin() at line 139. setContrast and setFlipMode do not touch the
+     * _u8g2.begin() at line 137. setContrast and setFlipMode do not touch the
      * buffer; they are repeated so the display object is in the same state.
      */
     HostDisplay() : U8G2() {
         u8g2_Setup_ssd1322_nhd_256x64_f(&u8g2, U8G2_R0, u8x8_byte_empty, u8x8_dummy_cb);
 
-        begin();                 // U8G2Display.cpp:139  _u8g2.begin()
+        begin();                 // U8G2Display.cpp:137  _u8g2.begin()
         setDrawColor(1);         // U8G2Display.cpp:143
         setFontMode(1);          // U8G2Display.cpp:144
         setFontRefHeightAll();   // U8G2Display.cpp:145
@@ -374,7 +374,7 @@ static bool writeInputsJson(const fs::path& path, const RenderTarget& target,
     fprintf(file, "  \"display_setup_call\": %s,\n", jsonString(DISPLAY_SETUP_CALL).c_str());
     fprintf(file, "  \"display_state_calls\": [\"begin()\", \"setDrawColor(1)\", \"setFontMode(1)\", "
                   "\"setFontRefHeightAll()\", \"setFontPosTop()\", \"setContrast(0)\", \"setFlipMode(0)\"],\n");
-    fprintf(file, "  \"display_state_source\": \"modules/U8G2Display/U8G2Display.cpp lines 139-148\",\n");
+    fprintf(file, "  \"display_state_source\": \"modules/U8G2Display/U8G2Display.cpp lines 137-148\",\n");
     fprintf(file, "  \"frame_sequence\": \"clearBuffer(); board.render(u8g2); no sendBuffer() "
                   "(modules/U8G2Display/U8G2Display.cpp:1413)\",\n");
     fprintf(file, "  \"buffer_format\": \"Raw getBufferPtr() bytes, 2048 = 8 * 8 tile rows * 32 tile "

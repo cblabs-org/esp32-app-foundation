@@ -66,7 +66,7 @@ fixed at `"0.0.12-dev.83"`. The firmware's U8G2 flags are used as they are in
 `platformio.ini`: `-DU8G2_WITHOUT_FONT_ROTATION -DU8G2_WITHOUT_UNICODE`, with no
 `UNIT_TEST` or `NATIVE_BUILD`, so the real fonts are used.
 
-The display is put into the state `U8G2Display.cpp` establishes at lines 139-148
+The display is put into the state `U8G2Display.cpp` establishes at lines 137-148
 (`begin()`, `setDrawColor(1)`, `setFontMode(1)`, `setFontRefHeightAll()`,
 `setFontPosTop()`, `setContrast(0)`, `setFlipMode(0)`). A frame is `clearBuffer()`
 then `board.render(u8g2)`, with no `sendBuffer()` (`U8G2Display.cpp:1413`).
