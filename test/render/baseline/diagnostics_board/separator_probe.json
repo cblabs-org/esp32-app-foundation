@@ -1,0 +1,15 @@
+{
+  "font": "u8g2_font_helvR08_tr",
+  "flags": "-DU8G2_WITHOUT_FONT_ROTATION -DU8G2_WITHOUT_UNICODE",
+  "glyph_0xB7_in_font": false,
+  "getUTF8Width_byte_0xB7_px": 0,
+  "getStrWidth_byte_0xB7_px": 0,
+  "getUTF8Width_utf8_C2B7_px": 0,
+  "getUTF8Width_space_px": 3,
+  "drawUTF8_byte_0xB7_alone_lit_pixels": 0,
+  "drawUTF8_utf8_C2B7_alone_lit_pixels": 0,
+  "row2_with_byte_equals_two_spaces": true,
+  "row2_with_byte_equals_one_space": false,
+  "long_ssid_row2_unclipped_max_lit_x": 255,
+  "long_ssid_row2_unclipped_lit_pixels_beyond_x251": 4
+}
