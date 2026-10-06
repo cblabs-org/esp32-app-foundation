@@ -97,7 +97,13 @@ and web diagnostics (R7).
 - **[ ] [wo2-module](wo2-module/WORKORDER.md):** the board host, the generated UI, the pinned
   dependency (`69c37e01f75198a4aa3fa84b8926fcf139e30f02`), the hook, the notices row, and the
   `main.cpp` switch. It renders through the host harness and compares against the baseline.
-  *Dispatched.* Its firmware build waits for the MCP.
+  **Part 1 complete and verified by the PA: pixel-identical in all four scenarios.**
+  **Part 2 (pending the MCP):**
+  - the `esp32dev`/`esp32s3nano` builds, the `env:native` count, and the hook inside a real build;
+  - **the capacities**: apply `u8g2gl_generated_config.h` to the u8g2gl library's own sources
+    only, through a PlatformIO build middleware (`env.AddBuildMiddleware`) in the hook script.
+    Not the project-wide `-include` the generated header suggests: that would reach C units and
+    libraries that cannot resolve `u8g2gl/`. Measure RAM with and without it.
 - **[ ] wo3-evidence:** the "after" measurements through the same harness, `EVIDENCE.md`, and the
   PR description.
 - **[ ] wo4-readability:** a house-style pass (`.agents/skills/house-style-docs`).
@@ -137,3 +143,27 @@ reads them there and does not re-derive them.
 
     All four are legacy, outside scope, and become frozen-module correctness candidates after
     PD-4.
+- **2026-10-06 — WO-B2 Part 1 verified.**
+  - **Clean rebuild:** from `git archive HEAD` (the WO-B1 lesson: a git-ignored
+    `test/render/CMakeLists.txt` had escaped the PA's first check, which built from the working
+    tree). U8G2 and U8G2GL are both overridden to `../U8G2GL-05`, whose runtime matches
+    `69c37e0`.
+  - **Pixels:** all four scenarios byte-identical, legacy against U8G2GL, and both against the
+    committed `baseline/` and `after/`.
+  - **No degenerate pass:** the `u8g2gl` target links runtime, generated UI and module, and not
+    the legacy board library.
+  - **Generated code:** the committed `generated/` equals a fresh `generate --target ssd1322`.
+  - **Warnings:** only legacy `IGfxWidget.hpp:137`.
+  - **Gate signal, criterion 2:** authored code is **138 lines against legacy's 99**. That is XML 33,
+    board C++ 99 and `main.cpp` 6, plus a one-off host of 86. Part of the board C++ is the
+    hardware-read/format split this WO required for testability. EVIDENCE §2 says so; PR-07 judges
+    it.
+  - **Gate signal, criterion 1:** bug-for-bug identity needed heights of 16 and 10 and data-row
+    width 247, each one smaller than legacy's arguments, to reproduce legacy's off-by-one clip.
+    The XML documents why.
+  - **U8G2GL findings** (consolidated in the twin PROJECT for the Chief Architect):
+    - `setFontPosTop` is never established by the runtime (measured: 15 lit pixels against 1392);
+    - a null-font crash in the state saver;
+    - the font mode is not restored;
+    - screen files not named `screen_*` are skipped silently;
+    - the PlatformIO forced-include guidance.
