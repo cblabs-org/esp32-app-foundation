@@ -1,0 +1,13 @@
+{
+  "method": "each row drawn unclipped at its legacy position; a pixel lit there and dark in the rendered frame was removed by the clip. The _inclusive_ figures repeat the measurement through a window whose far corner includes the label's last column and row (what the legacy code evidently intended); whatever that still removes lies outside the label's own height.",
+  "scenarios": {
+    "connected": {"unclipped_lit": 1403, "rendered_lit": 1392, "removed_by_clip": 11, "added_by_render": 0, "removed_by_pixel_row": {"16": 2, "17": 2, "26": 1, "27": 2, "40": 1, "41": 1, "54": 1, "55": 1},
+      "removed_if_far_corner_were_inclusive": 6, "removed_if_far_corner_were_inclusive_by_pixel_row": {"17": 2, "27": 2, "41": 1, "55": 1}},
+    "ap_mode": {"unclipped_lit": 1475, "rendered_lit": 1465, "removed_by_clip": 10, "added_by_render": 0, "removed_by_pixel_row": {"16": 2, "17": 2, "26": 1, "27": 1, "40": 1, "41": 1, "54": 1, "55": 1},
+      "removed_if_far_corner_were_inclusive": 5, "removed_if_far_corner_were_inclusive_by_pixel_row": {"17": 2, "27": 1, "41": 1, "55": 1}},
+    "disconnected": {"unclipped_lit": 1326, "rendered_lit": 1318, "removed_by_clip": 8, "added_by_render": 0, "removed_by_pixel_row": {"16": 2, "17": 2, "40": 1, "41": 1, "54": 1, "55": 1},
+      "removed_if_far_corner_were_inclusive": 4, "removed_if_far_corner_were_inclusive_by_pixel_row": {"17": 2, "41": 1, "55": 1}},
+    "long_ssid": {"unclipped_lit": 1714, "rendered_lit": 1695, "removed_by_clip": 19, "added_by_render": 0, "removed_by_pixel_row": {"16": 2, "17": 2, "19": 1, "24": 1, "25": 2, "26": 2, "27": 5, "40": 1, "41": 1, "54": 1, "55": 1},
+      "removed_if_far_corner_were_inclusive": 13, "removed_if_far_corner_were_inclusive_by_pixel_row": {"17": 2, "19": 1, "24": 1, "25": 2, "27": 5, "41": 1, "55": 1}}
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "scenario": "connected",
+  "reference": "the normal migrated connected frame (legacy display state)",
+  "font_mode_before": 1,
+  "font_mode_after_runtime_render_fn": 0,
+  "font_mode_after_board_render": 1,
+  "font_mode_note": "1 = transparent (legacy), 0 = solid. The runtime's label sets the mode per draw and its state saver does not restore it.",
+  "variants": [
+    {"name": "no_font_pos_top", "description": "legacy begin state minus setFontPosTop(); rendered by the board", "lit_pixels": 15, "identical_to_normal": false, "differing_pixels": 1407, "rendered_only": 15, "normal_only": 1392, "rows": [0, 53], "columns": [5, 194]},
+    {"name": "no_font_ref_height_all", "description": "legacy begin state minus setFontRefHeightAll(); rendered by the board", "lit_pixels": 1397, "identical_to_normal": false, "differing_pixels": 1137, "rendered_only": 571, "normal_only": 566, "rows": [1, 53], "columns": [5, 194]},
+    {"name": "plain_user_ui_handler", "description": "begin() only (no drawColor, fontMode, refHeight, posTop); drawn by ui_handler()", "lit_pixels": 15, "identical_to_normal": false, "differing_pixels": 1407, "rendered_only": 15, "normal_only": 1392, "rows": [0, 53], "columns": [5, 194]}
+  ]
+}

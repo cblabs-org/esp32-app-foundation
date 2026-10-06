@@ -12,18 +12,25 @@
  *              buffer, a PBM image and an inputs record per scenario. The first
  *              render target is the legacy DiagnosticsBoard, compiled unmodified
  *              from modules/U8G2Display; further targets register in kTargets
- *              and are selected with --board.
+ *              and are selected with --board. The second target, u8g2gl, is the
+ *              migrated board: modules/U8G2GLDisplay's DiagnosticsScreenBoard
+ *              running the generated U8G2GL screen, compiled from the committed
+ *              generated/ UI and the pinned runtime. Its output can be compared
+ *              byte for byte with the legacy baseline (--compare).
  *
  *              The platform the board reads (WiFi, millis, heap, hostname) is the
  *              set of shims in test/render/shim, driven through HostEnvironment.
  *
  * Exported Functions:
- * - main(): Parse --board / --out / --ascii / --probe-separator, render every
- *           scenario of the chosen target and write its baseline files.
+ * - main(): Parse --board / --out / --ascii / --probe-separator / --compare /
+ *           --probe-state / --probe-clip, render every scenario of the chosen
+ *           target, write its files, and optionally compare them with another
+ *           output root.
  *
  * Usage:
  *   render_harness --board legacy --out <dir>
  *   render_harness --board legacy --ascii connected
+ *   render_harness --board u8g2gl --out <dir> --compare <baseline-root> --probe-state --probe-clip
  */
 
 // --- Standard and U8G2 headers first, so the access hack below touches only the board ---
@@ -54,6 +61,12 @@
 
 #include "fonts/Fonts.hpp"
 
+#ifdef HARNESS_HAS_U8G2GL
+#include "U8G2GLDisplay.hpp"
+#include "boards/DiagnosticsScreenBoard.hpp"
+#include "ui.hpp"  // Generated: ui_screen_diagnostics, ui_subject_diag_*
+#endif
+
 namespace fs = std::filesystem;
 
 // =============================================================================
@@ -82,6 +95,19 @@ static constexpr const char* DISPLAY_SETUP_CALL =
 // =============================================================================
 
 /**
+ * @brief Which of the legacy module's begin-time U8G2 calls to reproduce.
+ *
+ * The default is the legacy state, exactly. The other values exist for the
+ * u8g2gl target's probes, which ask what a screen needs that a plain U8G2GL
+ * user, who has made none of these calls, would not have.
+ */
+struct DisplayState {
+    bool fontPosTop = true;        ///< setFontPosTop(), U8G2Display.cpp:146
+    bool fontRefHeightAll = true;  ///< setFontRefHeightAll(), U8G2Display.cpp:145
+    bool legacyCalls = true;       ///< false: only begin(), as a plain U8G2GL user has
+};
+
+/**
  * @brief The firmware's U8G2_SSD1322_NHD_256X64_F_4W_HW_SPI, with null I/O.
  *
  * Same setup call as that class (U8g2lib.h: u8g2_Setup_ssd1322_nhd_256x64_f), so
@@ -96,15 +122,18 @@ public:
      * The state calls mirror U8G2Display.cpp lines 143-148 in order, after
      * _u8g2.begin() at line 137. setContrast and setFlipMode do not touch the
      * buffer; they are repeated so the display object is in the same state.
+     *
+     * @param state Which calls to make; the default reproduces the legacy module.
      */
-    HostDisplay() : U8G2() {
+    explicit HostDisplay(const DisplayState& state = DisplayState()) : U8G2() {
         u8g2_Setup_ssd1322_nhd_256x64_f(&u8g2, U8G2_R0, u8x8_byte_empty, u8x8_dummy_cb);
 
         begin();                 // U8G2Display.cpp:137  _u8g2.begin()
+        if (!state.legacyCalls) return;
         setDrawColor(1);         // U8G2Display.cpp:143
         setFontMode(1);          // U8G2Display.cpp:144
-        setFontRefHeightAll();   // U8G2Display.cpp:145
-        setFontPosTop();         // U8G2Display.cpp:146
+        if (state.fontRefHeightAll) setFontRefHeightAll();   // U8G2Display.cpp:145
+        if (state.fontPosTop) setFontPosTop();               // U8G2Display.cpp:146
         setContrast(0);          // U8G2Display.cpp:147
         setFlipMode(0);          // U8G2Display.cpp:148  (_flipScreen defaults to false)
     }
@@ -206,11 +235,101 @@ static RenderedRows renderLegacyDiagnostics(const Scenario& scenario, U8G2& disp
     return result;
 }
 
+#ifdef HARNESS_HAS_U8G2GL
+
+/// Count of cross-checks that failed during the run; any non-zero fails the harness.
+static int g_selfCheckFailures = 0;
+
+/**
+ * @brief Prove formatDiagnostics() is pure by driving it with fixed inputs.
+ *
+ * The board reads the platform through readDiagnosticsInputs() and the shims.
+ * This builds a DiagnosticsInputs by hand from the scenario's literals, formats
+ * it, and requires the same three rows the board published. It fails the run if
+ * the formatter depends on anything but its input.
+ *
+ * @param scenario The scenario that was rendered.
+ * @param wifi     Row 2 as the board published it.
+ * @param uptime   Row 3 as the board published it.
+ * @param heap     Row 4 as the board published it.
+ */
+static void crossCheckFormatDiagnostics(const Scenario& scenario, const std::string& wifi,
+                                        const std::string& uptime, const std::string& heap) {
+    DiagnosticsInputs inputs;
+    inputs.wifiConnected = scenario.connected;
+    inputs.apMode        = scenario.apMode;
+    snprintf(inputs.hostname, sizeof(inputs.hostname), "%s", scenario.hostname);
+    if (scenario.ssid) snprintf(inputs.ssid, sizeof(inputs.ssid), "%s", scenario.ssid);
+    if (scenario.ip)   snprintf(inputs.ip, sizeof(inputs.ip), "%s", scenario.ip);
+    inputs.uptimeMs      = scenario.uptimeMs;
+    inputs.freeHeapBytes = scenario.freeHeapBytes;
+
+    DiagnosticsLines lines;
+    formatDiagnostics(inputs, lines);
+    if (wifi != lines.wifi || uptime != lines.uptime || heap != lines.heap) {
+        fprintf(stderr, "SELF-CHECK FAILED (%s): formatDiagnostics(fixed inputs) differs from the board's rows\n",
+                scenario.name);
+        ++g_selfCheckFailures;
+    }
+}
+
+/**
+ * @brief Render the migrated DiagnosticsScreenBoard for one scenario.
+ *
+ * Follows the legacy frame sequence the carousel runs: onActivate(), tick(),
+ * clearBuffer(), render(); there is no sendBuffer(). The board is built and
+ * configured as src/main.cpp does, after U8G2GLDisplay::begin(). The generated
+ * UI is initialised once (begin() is idempotent) and every scenario overwrites
+ * all four subjects, so no scenario inherits another's text.
+ *
+ * @param scenario Inputs to render.
+ * @param display  Display to draw into (already in the legacy begin state).
+ * @return The strings the screen's subjects held, row by row.
+ */
+static RenderedRows renderU8G2GLDiagnostics(const Scenario& scenario, U8G2& display) {
+    // --- Step 1: platform inputs ---
+    applyScenario(scenario);
+
+    // --- Step 2: start the runtime once, then construct and configure the board ---
+    U8G2GLDisplay::begin();
+    DiagnosticsScreenBoard board;
+    WifiManager fakeWifi;
+    board.configure(&fakeWifi);
+
+    // --- Step 3: the carousel's switch-in, then a tick past the 1-second throttle ---
+    board.onActivate();
+    board.tick(static_cast<uint32_t>(scenario.uptimeMs));
+
+    // --- Step 4: draw ---
+    display.clearBuffer();
+    board.render(display);
+    board.onDeactivate();
+
+    // --- Step 5: read back the text each label was bound to ---
+    RenderedRows result;
+    result.rows  = {ui_subject_diag_hostname.get(), ui_subject_diag_wifi.get(),
+                    ui_subject_diag_uptime.get(),   ui_subject_diag_heap.get()};
+    result.fonts = {"u8g2_font_helvB12_tr", "u8g2_font_helvR08_tr",
+                    "u8g2_font_helvR08_tr", "u8g2_font_helvR08_tr"};
+
+    // --- Step 6: the formatter, driven by fixed inputs, must agree ---
+    crossCheckFormatDiagnostics(scenario, result.rows[1], result.rows[2], result.rows[3]);
+    return result;
+}
+
+#endif  // HARNESS_HAS_U8G2GL
+
 /** @brief Every render target; add a line here to render another board. */
 static const std::vector<RenderTarget> kTargets = {
     {"legacy", "diagnostics_board",
      "Legacy DiagnosticsBoard (modules/U8G2Display/boards/DiagnosticsBoard.cpp), compiled unmodified",
      renderLegacyDiagnostics},
+#ifdef HARNESS_HAS_U8G2GL
+    {"u8g2gl", "diagnostics_board",
+     "Migrated board: modules/U8G2GLDisplay DiagnosticsScreenBoard running the generated U8G2GL "
+     "screen (uidesign/ssd1322-256x64/u8g2gl)",
+     renderU8G2GLDiagnostics},
+#endif
 };
 
 // =============================================================================
@@ -369,22 +488,40 @@ static bool writeInputsJson(const fs::path& path, const RenderTarget& target,
     fprintf(file, "  \"legacy_source_commit\": %s,\n", jsonString(LEGACY_SOURCE_COMMIT).c_str());
     fprintf(file, "  \"u8g2\": {\"version\": %s, \"source\": %s},\n",
             jsonString(U8G2_PINNED_VERSION).c_str(), jsonString(U8G2_SOURCE_DESCRIPTION).c_str());
+#ifdef HARNESS_HAS_U8G2GL
+    if (std::string(target.id) == "u8g2gl") {
+        fprintf(file, "  \"u8g2gl\": {\"pinned_sha\": %s, \"source\": %s, "
+                      "\"generated_ui\": \"uidesign/ssd1322-256x64/u8g2gl/generated (committed, not regenerated)\", "
+                      "\"module\": \"modules/U8G2GLDisplay\", "
+                      "\"runtime_capacities\": \"runtime defaults: the generated config is not force-included, "
+                      "as platformio.ini does not force it\"},\n",
+                jsonString(U8G2GL_PINNED_SHA).c_str(), jsonString(U8G2GL_SOURCE_DESCRIPTION).c_str());
+    }
+#endif
     fprintf(file, "  \"u8g2_compile_flags\": %s,\n", jsonString(HARNESS_U8G2_FLAGS).c_str());
     fprintf(file, "  \"build_version_define\": %s,\n", jsonString(BUILD_VERSION).c_str());
     fprintf(file, "  \"display_setup_call\": %s,\n", jsonString(DISPLAY_SETUP_CALL).c_str());
     fprintf(file, "  \"display_state_calls\": [\"begin()\", \"setDrawColor(1)\", \"setFontMode(1)\", "
                   "\"setFontRefHeightAll()\", \"setFontPosTop()\", \"setContrast(0)\", \"setFlipMode(0)\"],\n");
     fprintf(file, "  \"display_state_source\": \"modules/U8G2Display/U8G2Display.cpp lines 137-148\",\n");
-    fprintf(file, "  \"frame_sequence\": \"clearBuffer(); board.render(u8g2); no sendBuffer() "
-                  "(modules/U8G2Display/U8G2Display.cpp:1413)\",\n");
+    const bool migrated = std::string(target.id) == "u8g2gl";
+    fprintf(file, "  \"frame_sequence\": %s,\n",
+            jsonString(migrated
+                ? "U8G2GLDisplay::begin() once; board.configure(); board.onActivate(); board.tick(); "
+                  "clearBuffer(); board.render(u8g2); board.onDeactivate(); no sendBuffer() "
+                  "(modules/U8G2Display/U8G2Display.cpp:1413)"
+                : "clearBuffer(); board.render(u8g2); no sendBuffer() "
+                  "(modules/U8G2Display/U8G2Display.cpp:1413)").c_str());
     fprintf(file, "  \"buffer_format\": \"Raw getBufferPtr() bytes, 2048 = 8 * 8 tile rows * 32 tile "
                   "columns. U8G2 tile format: 8 horizontal bands of 8 pixel rows; byte index = "
                   "band * 256 + x; bit 0 is the top pixel row of the band; 1 is lit.\",\n");
     fprintf(file, "  \"pbm_format\": \"Binary PBM (P4), 256x64, row-major, MSB first, 1 = lit pixel.\",\n");
     fprintf(file, "  \"strings_encoding\": \"Non-ASCII bytes are written as \\\\u00XX escapes of the raw "
                   "byte value; the legacy separator is the single byte 0xB7 and appears as \\\\u00b7.\",\n");
-    fprintf(file, "  \"rerun\": \"cmake -S test/render -B tmp/render-build && "
-                  "cmake --build tmp/render-build --target baseline\",\n");
+    fprintf(file, "  \"rerun\": %s,\n",
+            jsonString(migrated
+                ? "cmake -S test/render -B tmp/render-build && cmake --build tmp/render-build --target after"
+                : "cmake -S test/render -B tmp/render-build && cmake --build tmp/render-build --target baseline").c_str());
     fprintf(file, "  \"scenarios\": {\n");
 
     for (size_t i = 0; i < results.size(); ++i) {
@@ -407,6 +544,10 @@ static bool writeInputsJson(const fs::path& path, const RenderTarget& target,
         }
         fprintf(file, "      ],\n");
         fprintf(file, "      \"lit_pixels\": %d,\n", countLit(r.buffer));
+        // The legacy label passes x + w - 1 = 251 as the far corner of its clip, which U8G2
+        // treats as exclusive; the migrated label's far corner is x + w = 251 for the same
+        // columns. Either way columns 4..250 are drawable, so the range recorded is the
+        // legacy argument for legacy and the same corner for the migrated board.
         fprintf(file, "      \"row2\": {\"natural_width_px\": %d, \"clip_x_range\": [4, 251], "
                       "\"lit_x_range\": [%d, %d], \"band_rows\": [16, 29]}\n",
                 r.row2NaturalWidthPx, row2Band.x0, row2Band.x1);
@@ -502,12 +643,393 @@ static bool writeSeparatorProbe(const fs::path& path) {
 }
 
 // =============================================================================
+// Comparison with another output root
+// =============================================================================
+
+/** @brief How two display buffers differ. */
+struct BufferDiff {
+    int differingPixels = 0;  ///< Pixels lit in exactly one of the two buffers
+    int onlyInA = 0;          ///< Lit in A (the reference) and dark in B
+    int onlyInB = 0;          ///< Dark in A and lit in B
+    int rowMin = DISPLAY_HEIGHT;  ///< First row holding a difference
+    int rowMax = -1;              ///< Last row holding a difference
+    int colMin = DISPLAY_WIDTH;   ///< First column holding a difference
+    int colMax = -1;              ///< Last column holding a difference
+};
+
+/** @brief Compare two buffers pixel by pixel. A is the reference. */
+static BufferDiff diffBuffers(const std::vector<uint8_t>& a, const std::vector<uint8_t>& b) {
+    BufferDiff diff;
+    for (int y = 0; y < DISPLAY_HEIGHT; ++y) {
+        for (int x = 0; x < DISPLAY_WIDTH; ++x) {
+            const bool litA = pixelLit(a, x, y);
+            const bool litB = pixelLit(b, x, y);
+            if (litA == litB) continue;
+            ++diff.differingPixels;
+            if (litA) ++diff.onlyInA; else ++diff.onlyInB;
+            diff.rowMin = std::min(diff.rowMin, y);
+            diff.rowMax = std::max(diff.rowMax, y);
+            diff.colMin = std::min(diff.colMin, x);
+            diff.colMax = std::max(diff.colMax, x);
+        }
+    }
+    return diff;
+}
+
+/** @brief Read a raw buffer file; empty if it is missing or the wrong size. */
+static std::vector<uint8_t> readBin(const fs::path& path) {
+    std::vector<uint8_t> buffer(2048);
+    FILE* file = fopen(path.string().c_str(), "rb");
+    if (!file) return {};
+    const size_t got = fread(buffer.data(), 1, buffer.size(), file);
+    const bool extra = fgetc(file) != EOF;
+    fclose(file);
+    return (got == buffer.size() && !extra) ? buffer : std::vector<uint8_t>{};
+}
+
+/**
+ * @brief Print the pixels where two buffers differ, for the worst case.
+ *
+ * '#' lit in both, '+' lit only in the rendered buffer, '-' lit only in the
+ * reference, '.' dark in both. Only rows that contain something are printed,
+ * with their row number.
+ */
+static void printAsciiDiff(const std::vector<uint8_t>& reference, const std::vector<uint8_t>& rendered) {
+    printf("  ASCII diff ('#' both, '+' rendered only, '-' reference only):\n");
+    for (int y = 0; y < DISPLAY_HEIGHT; ++y) {
+        std::string line;
+        bool any = false;
+        for (int x = 0; x < DISPLAY_WIDTH; ++x) {
+            const bool litA = pixelLit(reference, x, y);
+            const bool litB = pixelLit(rendered, x, y);
+            line += litA && litB ? '#' : (litB ? '+' : (litA ? '-' : '.'));
+            any = any || litA || litB;
+        }
+        if (any) printf("  %2d %s\n", y, line.c_str());
+    }
+}
+
+/**
+ * @brief Compare every scenario's rendered buffer with a reference output root.
+ *
+ * Reads <referenceRoot>/<subdir>/<scenario>.bin, as written by an earlier run.
+ *
+ * @param referenceRoot Root holding the reference output (e.g. baseline/).
+ * @param target        The target whose subdirectory is compared.
+ * @param results       What was just rendered.
+ * @return true only if every scenario is byte-identical to its reference.
+ */
+static bool compareWithReference(const fs::path& referenceRoot, const RenderTarget& target,
+                                 const std::vector<ScenarioResult>& results) {
+    bool allIdentical = true;
+    printf("compare with %s\n", (referenceRoot / target.outputSubdir).string().c_str());
+    for (const ScenarioResult& r : results) {
+        const std::vector<uint8_t> reference =
+            readBin(referenceRoot / target.outputSubdir / (std::string(r.scenario->name) + ".bin"));
+        if (reference.empty()) {
+            printf("  %-13s reference missing or not 2048 bytes\n", r.scenario->name);
+            allIdentical = false;
+            continue;
+        }
+        const BufferDiff diff = diffBuffers(reference, r.buffer);
+        const bool identical = reference == r.buffer;
+        printf("  %-13s identical=%s differing_pixels=%d", r.scenario->name,
+               identical ? "yes" : "NO", diff.differingPixels);
+        if (diff.differingPixels > 0) {
+            printf(" (rendered-only %d, reference-only %d) rows %d..%d columns %d..%d",
+                   diff.onlyInB, diff.onlyInA, diff.rowMin, diff.rowMax, diff.colMin, diff.colMax);
+        }
+        printf("\n");
+        if (!identical) {
+            allIdentical = false;
+            if (diff.differingPixels > 0) printAsciiDiff(reference, r.buffer);
+        }
+    }
+    return allIdentical;
+}
+
+// =============================================================================
+// Clip probe: what the label clip removes
+// =============================================================================
+
+/**
+ * @brief Measure the pixels the labels' clip removes, row by row.
+ *
+ * Draws each scenario's four strings with no clip at all, where the legacy board
+ * draws them (the same x, y and font, centred in 256 for row 1), and reports
+ * which lit pixels of that unclipped frame are dark in the rendered frame, by pixel
+ * row. This is the legacy descender defect, measured: legacy drawText() passes
+ * x + w - 1 and y + h - 1 as the far corner of setClipWindow(), U8G2 treats that
+ * corner as exclusive (u8g2.h:352/354), so the last column and row of each label
+ * are lost; with h = getMaxCharHeight() that is the descenders' last row.
+ *
+ * @param path    Where to write clip_probe.json.
+ * @param results The rendered scenarios of the chosen target.
+ * @return true on success.
+ */
+static bool writeClipProbe(const fs::path& path, const std::vector<ScenarioResult>& results) {
+    struct RowPlacement { int x; int y; bool centred; const char* font; };  // Legacy placement of each row
+    const RowPlacement placements[4] = {
+        {0, 0,  true,  "large"}, {4, 16, false, "small"},
+        {4, 30, false, "small"}, {4, 44, false, "small"},
+    };
+
+    FILE* file = fopen(path.string().c_str(), "wb");
+    if (!file) return false;
+    fprintf(file, "{\n  \"method\": \"each row drawn unclipped at its legacy position; a pixel lit there and dark in the "
+                  "rendered frame was removed by the clip. The _inclusive_ figures repeat the measurement through a "
+                  "window whose far corner includes the label's last column and row (what the legacy code evidently "
+                  "intended); whatever that still removes lies outside the label's own height.\",\n  \"scenarios\": {\n");
+    for (size_t i = 0; i < results.size(); ++i) {
+        const ScenarioResult& r = results[i];
+
+        // --- Step 1: the unclipped frame ---
+        HostDisplay display;
+        display.clearBuffer();
+        for (int row = 0; row < 4; ++row) {
+            const RowPlacement& place = placements[row];
+            display.setFont(place.font[0] == 'l' ? AppFonts::defaultLarge() : AppFonts::defaultSmall());
+            int x = place.x;
+            if (place.centred) x += (DISPLAY_WIDTH - display.getUTF8Width(r.rows.rows[row].c_str())) / 2;
+            display.drawUTF8(x, place.y, r.rows.rows[row].c_str());
+        }
+        const std::vector<uint8_t> unclipped = copyBuffer(display);
+
+        // --- Step 1b: the clip the legacy code evidently intended ---
+        // The same rows through a window whose far corner is INCLUSIVE of the label's last
+        // column and row, i.e. setClipWindow(x, y, x + w, y + h) with h = getMaxCharHeight().
+        // What this still removes is not the exclusive-corner defect: it is glyph pixels
+        // outside the label's own height.
+        HostDisplay intended;
+        intended.clearBuffer();
+        for (int row = 0; row < 4; ++row) {
+            const RowPlacement& place = placements[row];
+            intended.setFont(place.font[0] == 'l' ? AppFonts::defaultLarge() : AppFonts::defaultSmall());
+            const int width = place.centred ? DISPLAY_WIDTH : DISPLAY_WIDTH - 8;  // Legacy label widths
+            int x = place.x;
+            if (place.centred) x += (DISPLAY_WIDTH - intended.getUTF8Width(r.rows.rows[row].c_str())) / 2;
+            intended.setClipWindow(place.x, place.y, place.x + width, place.y + intended.getMaxCharHeight());
+            intended.drawUTF8(x, place.y, r.rows.rows[row].c_str());
+            intended.setMaxClipWindow();
+        }
+        const std::vector<uint8_t> intendedFrame = copyBuffer(intended);
+
+        // --- Step 2: what the clip removed, and anything it added (nothing should be) ---
+        const BufferDiff diff = diffBuffers(unclipped, r.buffer);
+        auto lostByRow = [&](const std::vector<uint8_t>& kept) {
+            std::string out;
+            for (int y = 0; y < DISPLAY_HEIGHT; ++y) {
+                int lostInRow = 0;
+                for (int x = 0; x < DISPLAY_WIDTH; ++x) {
+                    if (pixelLit(unclipped, x, y) && !pixelLit(kept, x, y)) ++lostInRow;
+                }
+                if (lostInRow > 0) {
+                    out += (out.empty() ? "" : ", ") + std::string("\"") + std::to_string(y) + "\": " +
+                           std::to_string(lostInRow);
+                }
+            }
+            return out;
+        };
+        const BufferDiff intendedDiff = diffBuffers(unclipped, intendedFrame);
+        fprintf(file, "    %s: {\"unclipped_lit\": %d, \"rendered_lit\": %d, \"removed_by_clip\": %d, "
+                      "\"added_by_render\": %d, \"removed_by_pixel_row\": {%s},\n"
+                      "      \"removed_if_far_corner_were_inclusive\": %d, "
+                      "\"removed_if_far_corner_were_inclusive_by_pixel_row\": {%s}}%s\n",
+                jsonString(r.scenario->name).c_str(), countLit(unclipped), countLit(r.buffer),
+                diff.onlyInA, diff.onlyInB, lostByRow(r.buffer).c_str(),
+                intendedDiff.onlyInA, lostByRow(intendedFrame).c_str(), i + 1 < results.size() ? "," : "");
+    }
+    fprintf(file, "  }\n}\n");
+    fclose(file);
+    return true;
+}
+
+#ifdef HARNESS_HAS_U8G2GL
+
+// =============================================================================
+// State probe: what the screen inherits from the legacy display state
+// =============================================================================
+
+/** @brief One probe variant: how the rendered `connected` frame differs from the normal one. */
+struct StateProbe {
+    const char* name;         ///< Variant id
+    const char* description;  ///< What differs from the normal render
+    std::vector<uint8_t> buffer;  ///< The frame rendered under this variant
+    BufferDiff diff;          ///< Versus the normal migrated `connected` frame
+};
+
+/** @brief The `connected` scenario, looked up by name. */
+static const Scenario& connectedScenario() {
+    for (const Scenario& scenario : kScenarios) {
+        if (std::string(scenario.name) == "connected") return scenario;
+    }
+    return kScenarios.front();
+}
+
+/**
+ * @brief Render `connected` through ui_handler(), as a plain U8G2GL user would.
+ *
+ * ui_handler() clears, ticks, renders and sends the buffer itself, and a
+ * screen must be active. No board is involved, and no legacy state has been set.
+ */
+static std::vector<uint8_t> renderConnectedViaUiHandler(U8G2& display) {
+    const Scenario& scenario = connectedScenario();
+    applyScenario(scenario);
+    U8G2GLDisplay::begin();
+    DiagnosticsScreenBoard board;           // Feeds the subjects, as in the firmware
+    WifiManager fakeWifi;
+    board.configure(&fakeWifi);
+    board.tick(static_cast<uint32_t>(scenario.uptimeMs));
+    // A font must be current before the first frame: the runtime's state saver puts back
+    // whatever font was current, and with none set that is nullptr, which U8G2 then
+    // dereferences (u8g2_font.c:114). Measured: the first run of this probe without
+    // this line crashed there. Every label sets its own font, so this changes no pixel.
+    display.setFont(AppFonts::defaultSmall());
+    u8g2gl_set_active_screen(&ui_screen_diagnostics);
+    ui_handler(display);
+    u8g2gl_set_active_screen(nullptr);
+    return copyBuffer(display);
+}
+
+/**
+ * @brief Measure what the screen needs from the U8G2 state the legacy module sets.
+ *
+ * Renders the `connected` scenario under display states that lack one legacy
+ * call each, and reports how each frame differs from the normal one. Also
+ * reads the font mode after the runtime's render_fn and after the board's
+ * render(), to show that the board restores what the runtime leaves changed.
+ *
+ * The suspected gap: the spec calls font-position-top "the framework default",
+ * but nothing in the runtime's src/ calls setFontPosTop().
+ *
+ * @param path   Where to write state_probe.json.
+ * @param normal The normal migrated `connected` frame.
+ * @return true on success.
+ */
+static bool writeStateProbe(const fs::path& path, const std::vector<uint8_t>& normal) {
+    const Scenario& scenario = connectedScenario();
+    const RenderTarget* target = nullptr;
+    for (const RenderTarget& t : kTargets) {
+        if (std::string(t.id) == "u8g2gl") target = &t;
+    }
+    if (!target) return false;
+
+    std::vector<StateProbe> probes;
+    auto addProbe = [&](const char* name, const char* description, std::vector<uint8_t> buffer) {
+        StateProbe probe{name, description, std::move(buffer), {}};
+        probe.diff = diffBuffers(normal, probe.buffer);
+        probes.push_back(std::move(probe));
+    };
+
+    // --- Variant 1: the legacy state without setFontPosTop() ---
+    {
+        DisplayState state;
+        state.fontPosTop = false;
+        HostDisplay display(state);
+        target->render(scenario, display);
+        addProbe("no_font_pos_top",
+                 "legacy begin state minus setFontPosTop(); rendered by the board", copyBuffer(display));
+    }
+    // --- Variant 2: the legacy state without setFontRefHeightAll() ---
+    {
+        DisplayState state;
+        state.fontRefHeightAll = false;
+        HostDisplay display(state);
+        target->render(scenario, display);
+        addProbe("no_font_ref_height_all",
+                 "legacy begin state minus setFontRefHeightAll(); rendered by the board", copyBuffer(display));
+    }
+    // --- Variant 3: a plain U8G2GL user: begin() only, drawn through ui_handler() ---
+    {
+        DisplayState state;
+        state.legacyCalls = false;
+        HostDisplay display(state);
+        addProbe("plain_user_ui_handler",
+                 "begin() only (no drawColor, fontMode, refHeight, posTop); drawn by ui_handler()",
+                 renderConnectedViaUiHandler(display));
+    }
+
+    // --- Font mode after the runtime's render versus the board's render ---
+    int modeAfterRuntime = -1;
+    int modeAfterBoard = -1;
+    {
+        HostDisplay display;   // legacy state: font mode 1 (transparent)
+        applyScenario(scenario);
+        U8G2GLDisplay::begin();
+        DiagnosticsScreenBoard board;
+        WifiManager fakeWifi;
+        board.configure(&fakeWifi);
+        board.tick(static_cast<uint32_t>(scenario.uptimeMs));
+        // The runtime alone needs a current font (see renderConnectedViaUiHandler); the board
+        // supplies one itself, so only this bypass has to.
+        display.setFont(AppFonts::defaultSmall());
+        display.clearBuffer();
+        ui_screen_diagnostics.render_fn(display);  // the runtime alone, bypassing the board
+        modeAfterRuntime = display.getU8g2()->font_decode.is_transparent;
+
+        display.setFontMode(1);
+        display.clearBuffer();
+        board.render(display);                     // through the board host
+        modeAfterBoard = display.getU8g2()->font_decode.is_transparent;
+    }
+
+    // The frames themselves, so "what it changes" can be looked at, not only counted.
+    for (const StateProbe& p : probes) {
+        if (!writePbm(path.parent_path() / (std::string("probe_") + p.name + ".pbm"), p.buffer)) return false;
+    }
+
+    FILE* file = fopen(path.string().c_str(), "wb");
+    if (!file) return false;
+    fprintf(file, "{\n");
+    fprintf(file, "  \"scenario\": \"connected\",\n");
+    fprintf(file, "  \"reference\": \"the normal migrated connected frame (legacy display state)\",\n");
+    fprintf(file, "  \"font_mode_before\": 1,\n");
+    fprintf(file, "  \"font_mode_after_runtime_render_fn\": %d,\n", modeAfterRuntime);
+    fprintf(file, "  \"font_mode_after_board_render\": %d,\n", modeAfterBoard);
+    fprintf(file, "  \"font_mode_note\": \"1 = transparent (legacy), 0 = solid. The runtime's label sets the mode "
+                  "per draw and its state saver does not restore it.\",\n");
+    fprintf(file, "  \"variants\": [\n");
+    for (size_t i = 0; i < probes.size(); ++i) {
+        const StateProbe& p = probes[i];
+        fprintf(file, "    {\"name\": %s, \"description\": %s, \"lit_pixels\": %d, "
+                      "\"identical_to_normal\": %s, \"differing_pixels\": %d, "
+                      "\"rendered_only\": %d, \"normal_only\": %d, "
+                      "\"rows\": [%d, %d], \"columns\": [%d, %d]}%s\n",
+                jsonString(p.name).c_str(), jsonString(p.description).c_str(), countLit(p.buffer),
+                p.diff.differingPixels == 0 ? "true" : "false", p.diff.differingPixels,
+                p.diff.onlyInB, p.diff.onlyInA,
+                p.diff.differingPixels ? p.diff.rowMin : -1, p.diff.differingPixels ? p.diff.rowMax : -1,
+                p.diff.differingPixels ? p.diff.colMin : -1, p.diff.differingPixels ? p.diff.colMax : -1,
+                i + 1 < probes.size() ? "," : "");
+    }
+    fprintf(file, "  ]\n}\n");
+    fclose(file);
+
+    // Echo to stdout for the run log.
+    printf("state probe (connected, versus the normal migrated frame):\n");
+    for (const StateProbe& p : probes) {
+        printf("  %-24s differing_pixels=%d (rendered-only %d, normal-only %d)", p.name,
+               p.diff.differingPixels, p.diff.onlyInB, p.diff.onlyInA);
+        if (p.diff.differingPixels) {
+            printf(" rows %d..%d columns %d..%d", p.diff.rowMin, p.diff.rowMax, p.diff.colMin, p.diff.colMax);
+        }
+        printf("\n");
+    }
+    printf("  font mode after runtime render_fn=%d, after board render=%d (before=1)\n",
+           modeAfterRuntime, modeAfterBoard);
+    return true;
+}
+
+#endif  // HARNESS_HAS_U8G2GL
+
+// =============================================================================
 // Entry point
 // =============================================================================
 
 /** @brief Print usage and return a failure code. */
 static int usage() {
-    fprintf(stderr, "usage: render_harness --board <id> --out <dir> [--ascii <scenario>] [--probe-separator]\n");
+    fprintf(stderr, "usage: render_harness --board <id> --out <dir> [--ascii <scenario>] [--probe-separator]\n"
+                    "                       [--compare <reference-root>] [--probe-state] [--probe-clip]\n");
     fprintf(stderr, "boards:");
     for (const RenderTarget& t : kTargets) fprintf(stderr, " %s", t.id);
     fprintf(stderr, "\n");
@@ -520,12 +1042,18 @@ int main(int argc, char** argv) {
     fs::path outRoot;
     std::string asciiScenario;
     bool probeSeparator = false;
+    fs::path compareRoot;
+    bool probeState = false;
+    bool probeClip = false;
     for (int i = 1; i < argc; ++i) {
         const std::string arg = argv[i];
         if (arg == "--board" && i + 1 < argc)       boardId = argv[++i];
         else if (arg == "--out" && i + 1 < argc)    outRoot = argv[++i];
         else if (arg == "--ascii" && i + 1 < argc)  asciiScenario = argv[++i];
         else if (arg == "--probe-separator")        probeSeparator = true;
+        else if (arg == "--compare" && i + 1 < argc) compareRoot = argv[++i];
+        else if (arg == "--probe-state")            probeState = true;
+        else if (arg == "--probe-clip")             probeClip = true;
         else return usage();
     }
     if (boardId.empty()) return usage();
@@ -559,7 +1087,13 @@ int main(int argc, char** argv) {
         }
     }
 
-    if (outRoot.empty()) return 0;
+    // --- Step 3b: comparison with a reference output root, when asked ---
+    bool identicalToReference = true;
+    if (!compareRoot.empty()) {
+        identicalToReference = compareWithReference(compareRoot, *target, results);
+    }
+
+    if (outRoot.empty()) return identicalToReference ? 0 : 3;
 
     // --- Step 4: files ---
     const fs::path outDir = outRoot / target->outputSubdir;
@@ -575,5 +1109,25 @@ int main(int argc, char** argv) {
     }
     if (!writeInputsJson(outDir / "inputs.json", *target, results)) return 1;
     if (probeSeparator && !writeSeparatorProbe(outDir / "separator_probe.json")) return 1;
-    return 0;
+    if (probeClip && !writeClipProbe(outDir / "clip_probe.json", results)) return 1;
+#ifdef HARNESS_HAS_U8G2GL
+    if (probeState) {
+        // The normal frame the probe variants are measured against: the target's `connected` result.
+        std::vector<uint8_t> normal;
+        for (const ScenarioResult& r : results) {
+            if (std::string(r.scenario->name) == "connected") normal = r.buffer;
+        }
+        if (std::string(target->id) != "u8g2gl" || !writeStateProbe(outDir / "state_probe.json", normal)) {
+            fprintf(stderr, "--probe-state needs --board u8g2gl\n");
+            return 1;
+        }
+    }
+    if (g_selfCheckFailures != 0) return 4;
+#else
+    if (probeState) {
+        fprintf(stderr, "--probe-state needs a build with RENDER_U8G2GL=ON\n");
+        return 1;
+    }
+#endif
+    return identicalToReference ? 0 : 3;
 }

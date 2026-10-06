@@ -1,3 +1,5 @@
 # The repository ignores *.bin globally (.gitignore line 9). The raw U8G2 buffers
-# under baseline/ are the committed pixel baseline, so they must be tracked.
+# under baseline/ (legacy board) and after/ (migrated board) are the committed
+# pixel evidence, so they must be tracked.
 !baseline/**/*.bin
+!after/**/*.bin

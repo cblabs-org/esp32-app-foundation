@@ -6,9 +6,15 @@ exists because `env:native` cannot do this: its U8G2 drawing calls are no-op stu
 and `AppFonts` returns `nullptr` there, so nothing real is ever drawn. No
 PlatformIO, no `pio`, no hardware.
 
-The first target is the **legacy `DiagnosticsBoard`**, compiled unmodified from
-`modules/U8G2Display` (commit `e5342373`). Its committed output is the "before"
-baseline for the U8G2GL migration.
+There are two targets, selected with `--board`:
+
+| `--board` | Renders | Output |
+|---|---|---|
+| `legacy` | The legacy `DiagnosticsBoard`, compiled unmodified from `modules/U8G2Display` (commit `e5342373`) | `baseline/`, the "before" evidence |
+| `u8g2gl` | The migrated board: `modules/U8G2GLDisplay`'s `DiagnosticsScreenBoard` running the generated U8G2GL screen from `uidesign/ssd1322-256x64/u8g2gl`, over the pinned U8G2GL runtime | `after/`, the "after" evidence |
+
+Both run the same four scenarios, through the same U8G2, flags, shims and legacy
+display state, so their `.bin` files compare directly.
 
 ## Run
 
@@ -30,6 +36,30 @@ cmake -S test/render -B tmp/render-build \
 The checkout must be at tag `2.36.18`; CMake warns if it is not. Both sources
 were measured to produce byte-identical `.bin` files.
 
+The migrated board is built and rendered by the second target, which also
+compares every scenario byte for byte with `baseline/` and writes
+`after/diagnostics_board/state_probe.json`:
+
+```bash
+cmake --build tmp/render-build --target after
+```
+
+It exits non-zero if any scenario differs from the baseline, so it doubles as the
+regression guard for the pixel-identity gate. The U8G2GL runtime is fetched from
+the pinned git sha (`FetchContent`; the repository is private, so git needs
+credentials for it, and its submodules are never fetched). To use an existing
+checkout instead (read, never written; its `src/` and `include/` must equal that
+sha):
+
+```bash
+cmake -S test/render -B tmp/render-build -DU8G2GL_SOURCE_DIR=/path/to/u8g2gl
+```
+
+Configuring fetches the U8G2GL runtime by default, even for the `baseline`
+target, because both targets share one executable. `-DRENDER_U8G2GL=OFF` builds
+the legacy target only, so the baseline can be reproduced without it. `-DRENDER_AFTER_DIR=<dir>` redirects the
+migrated board's output, as `-DRENDER_OUTPUT_DIR` does the baseline's.
+
 To write somewhere other than the committed `baseline/` (for example to compare
 two runs), add `-DRENDER_OUTPUT_DIR=<dir>`.
 
@@ -50,6 +80,18 @@ Requirements: CMake 3.20+, a C++17 compiler, git (for the fetch).
 `inputs.json` writes bytes at or above `0x80` as `\u00XX` escapes of the raw byte,
 because the legacy separator is a lone `0xB7`, which is not valid UTF-8.
 
+`after/diagnostics_board/` holds the same files for the migrated board, plus:
+
+| File | Content |
+|---|---|
+| `state_probe.json` | What the screen inherits from the legacy display state: the `connected` frame rendered without `setFontPosTop()`, without `setFontRefHeightAll()`, and as a plain U8G2GL user would draw it (`begin()` only, through `ui_handler()`), each compared with the normal frame; and the font mode after the runtime's `render_fn` versus after the board's `render()`. |
+| `probe_<variant>.pbm` | Each probe frame, to look at. |
+
+For the migrated board, `inputs.json`'s `rows` are the text the screen's subjects
+held. Every scenario also cross-checks that `formatDiagnostics()`, driven with
+fixed `DiagnosticsInputs` built from the scenario's literals, produces the same
+three rows the board published, and the run fails if it does not.
+
 ## What is real and what is shimmed
 
 | Real | Shimmed (`shim/`) |
@@ -58,6 +100,7 @@ because the legacy separator is a lone `0xB7`, which is not valid UTF-8.
 | The fonts (`u8g2_font_helvB12_tr`, `u8g2_font_helvR08_tr`) | `WifiManager.hpp`: the three getters the board calls |
 | `DiagnosticsBoard.cpp`, `LabelWidget.cpp`, `DrawingPrimitives.cpp`, unmodified | `WiFi.h`: `isConnected()` and `localIP().toString().c_str()` |
 | The display setup, `u8g2_Setup_ssd1322_nhd_256x64_f` | `esp_heap_caps.h`: `heap_caps_get_free_size()` |
+| The U8G2GL runtime (`src/*.cpp` at the pinned sha), the committed `generated/` UI, and `U8G2GLDisplay`, `U8G2GLScreenBoard`, `DiagnosticsScreenBoard`, unmodified | The same shims: the migrated board reads the platform through the same `readDiagnosticsInputs()` it uses in firmware |
 
 `shim/` is first on the include path, so the board's `#include "WifiManager.hpp"`,
 `<WiFi.h>` and the rest resolve to the shims. Every shim answers from one
@@ -86,13 +129,17 @@ and returns the row strings. The target writes to
 `baseline/<output_subdir>/`, so a migrated board renders beside the legacy one
 with the same scenarios, and the two sets of `.bin` files compare directly.
 Add the board's sources and include paths to `CMakeLists.txt` as a second library
-beside `legacy_diagnostics`, and a `--board <id>` custom target if wanted.
+beside `legacy_diagnostics`, and a `--board <id>` custom target if wanted. The
+`u8g2gl` target is the worked example: `u8g2gl_board`, `u8g2gl_ui` and
+`u8g2gl_runtime` in `CMakeLists.txt`, `renderU8G2GLDiagnostics` and its entry in
+`kTargets` in `main.cpp`.
 
 Run the executable directly for other views:
 
 ```bash
 tmp/render-build/render_harness --board legacy --ascii connected   # '#' lit, '.' dark, to stdout
 tmp/render-build/render_harness --board legacy --out <dir> --probe-separator
+tmp/render-build/render_harness --board u8g2gl --out <dir> --compare baseline --probe-state
 ```
 
 ## count_lines.py
