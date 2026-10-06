@@ -1,7 +1,7 @@
 {
   "entries": [
     {
-      "path": "~/.gemini/config/plugins/bug-fixer-daemon/workspace-plugin"
+      "path": "~/.gemini/config/plugins/bug-fixer-daemon/workspace-plugin/bug-fixer"
     }
   ]
 }
