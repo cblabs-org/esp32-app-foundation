@@ -58,7 +58,7 @@ set(RENDER_OUTPUT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/baseline" CACHE PATH "Where b
 set(RENDER_AFTER_DIR  "${CMAKE_CURRENT_SOURCE_DIR}/after"    CACHE PATH "Where the migrated board's files are written")
 option(RENDER_U8G2GL "Also build the --board u8g2gl target (needs the U8G2GL runtime)" ON)
 # The U8G2GL runtime, pinned by git commit exactly as modules/U8G2GLDisplay/library.json pins it (R6).
-set(U8G2GL_PINNED_SHA "69c37e01f75198a4aa3fa84b8926fcf139e30f02")
+set(U8G2GL_PINNED_SHA "0fe144f5da57b4e81283668b7453f6d635c44b85")
 get_filename_component(REPO_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../.." ABSOLUTE)
 
 # --- U8G2 source -------------------------------------------------------------------

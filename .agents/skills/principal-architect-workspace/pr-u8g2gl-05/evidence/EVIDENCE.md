@@ -93,7 +93,7 @@ Report.
 **Method.** The same harness, second target: `render_harness --board u8g2gl`. It uses the same U8G2
 `2.36.18` sources, flags, display state (`U8G2Display.cpp:137-148`), shims and four scenarios as
 the legacy target. What it compiles instead of the legacy board:
-- the **U8G2GL runtime**, every `src/*.cpp` at the pinned sha `69c37e01f75198a4aa3fa84b8926fcf139e30f02`
+- the **U8G2GL runtime**, every `src/*.cpp` at the pinned sha `0fe144f5da57b4e81283668b7453f6d635c44b85` (re-pinned from `69c37e0`, whose runtime is identical: only `library.json` changed. All 13 `after/` render files re-produced byte for byte at the new pin)
   (fetched with `FetchContent`; byte-identical to `src/` and `include/` of `U8G2GL-05`, shown by an
   empty `git diff --stat 69c37e0 HEAD -- src include`). The generated config header is **not**
   force-included, as `platformio.ini` does not force it, so the runtime's binding pool has its

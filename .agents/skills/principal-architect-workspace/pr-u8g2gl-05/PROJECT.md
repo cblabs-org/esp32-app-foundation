@@ -95,7 +95,7 @@ and web diagnostics (R7).
     recorded into `EVIDENCE.md` on the stack tip. That keeps it independent of WO-B2's
     `main.cpp` switch.
 - **[ ] [wo2-module](wo2-module/WORKORDER.md):** the board host, the generated UI, the pinned
-  dependency (`69c37e01f75198a4aa3fa84b8926fcf139e30f02`), the hook, the notices row, and the
+  dependency (`0fe144f5da57b4e81283668b7453f6d635c44b85`; re-pinned 2026-10-06 from `69c37e0`, see the session log), the hook, the notices row, and the
   `main.cpp` switch. It renders through the host harness and compares against the baseline.
   **Part 1 complete and verified by the PA: pixel-identical in all four scenarios.**
   **Part 2 (pending the MCP):**
@@ -167,3 +167,13 @@ reads them there and does not re-derive them.
     - the font mode is not restored;
     - screen files not named `screen_*` are skipped silently;
     - the PlatformIO forced-include guidance.
+- **2026-10-06 — re-pinned to `0fe144f`.** The owner asked that their email address not be
+  published. It was in U8G2GL `library.json`, added by WO-A in `1dee2db`.
+  - Removed in `0fe144f` and pushed. The runtime is unchanged: `git diff 69c37e0 0fe144f` touches
+    only `library.json`.
+  - Foundation now pins `0fe144f` (`modules/U8G2GLDisplay/library.json`,
+    `test/render/CMakeLists.txt`). A `FetchContent` of the new sha re-produced all 13 `after/`
+    render files byte for byte.
+  - **The address remains in the U8G2GL branch's history** (`1dee2db`, `69c37e0`), in a private
+    repository. Removing it needs a history rewrite and force-push of that branch, which is the
+    owner's call. A squash merge would also keep it out of `main`.
