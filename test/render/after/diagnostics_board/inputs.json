@@ -3,7 +3,7 @@
   "description": "Migrated board: modules/U8G2GLDisplay DiagnosticsScreenBoard running the generated U8G2GL screen (uidesign/ssd1322-256x64/u8g2gl)",
   "legacy_source_commit": "e5342373",
   "u8g2": {"version": "2.36.18", "source": "FetchContent https://github.com/olikraus/u8g2.git tag 2.36.18"},
-  "u8g2gl": {"pinned_sha": "0fe144f5da57b4e81283668b7453f6d635c44b85", "source": "FetchContent https://github.com/cblabs-org/u8g2gl.git sha 0fe144f5da57b4e81283668b7453f6d635c44b85", "generated_ui": "uidesign/ssd1322-256x64/u8g2gl/generated (committed, not regenerated)", "module": "modules/U8G2GLDisplay", "runtime_capacities": "runtime defaults: the generated config is not force-included, as platformio.ini does not force it"},
+  "u8g2gl": {"pinned_sha": "82ec83f2bbce02080c3dd1ab6618bcf6559bfde5", "source": "FetchContent https://github.com/cblabs-org/u8g2gl.git sha 82ec83f2bbce02080c3dd1ab6618bcf6559bfde5", "generated_ui": "uidesign/ssd1322-256x64/u8g2gl/generated (committed, not regenerated)", "module": "modules/U8G2GLDisplay", "runtime_capacities": "runtime defaults: the generated config is not force-included, as platformio.ini does not force it"},
   "u8g2_compile_flags": "-DU8G2_WITHOUT_FONT_ROTATION -DU8G2_WITHOUT_UNICODE",
   "build_version_define": "0.0.12-dev.83",
   "display_setup_call": "u8g2_Setup_ssd1322_nhd_256x64_f(u8g2, U8G2_R0, u8x8_byte_empty, u8x8_dummy_cb)",

@@ -95,7 +95,7 @@ and web diagnostics (R7).
     recorded into `EVIDENCE.md` on the stack tip. That keeps it independent of WO-B2's
     `main.cpp` switch.
 - **[ ] [wo2-module](wo2-module/WORKORDER.md):** the board host, the generated UI, the pinned
-  dependency (`0fe144f5da57b4e81283668b7453f6d635c44b85`; re-pinned 2026-10-06 from `69c37e0`, see the session log), the hook, the notices row, and the
+  dependency (`82ec83f2bbce02080c3dd1ab6618bcf6559bfde5`, after U8G2GL's history rewrite; see the session log), the hook, the notices row, and the
   `main.cpp` switch. It renders through the host harness and compares against the baseline.
   **Part 1 complete and verified by the PA: pixel-identical in all four scenarios.**
   **Part 2 (pending the MCP):**
@@ -177,3 +177,18 @@ reads them there and does not re-derive them.
   - **The address remains in the U8G2GL branch's history** (`1dee2db`, `69c37e0`), in a private
     repository. Removing it needs a history rewrite and force-push of that branch, which is the
     owner's call. A squash merge would also keep it out of `main`.
+- **2026-10-06 — U8G2GL history rewritten; final pin `82ec83f`.** At the owner's instruction, the
+  U8G2GL branch's history was rewritten so the address never appears.
+  - `git filter-branch --prune-empty` over `1254eb3..`. The removal commit `0fe144f` became empty
+    and was dropped.
+  - Force-pushed with lease against `0fe144f`.
+  - The old shas `1dee2db`, `69c37e0`, `47618b5` and `0fe144f` are **gone from every ref**, and
+    their reflogs are expired.
+  - **New pin:** `82ec83f2bbce02080c3dd1ab6618bcf6559bfde5`, the rewritten `69c37e0`. It is
+    identical apart from `library.json`.
+  - **Verified:** a fresh `FetchContent` checks out `82ec83f`, and all 13 `after/` render files
+    match byte for byte.
+  - **Scratch cleaned:** the build caches in `tmp/` and the scratchpad that held the old commit
+    were deleted.
+  - Older entries above that cite `69c37e0` or `0fe144f` describe what was verified at the time;
+    those commits no longer exist.
