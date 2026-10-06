@@ -88,9 +88,10 @@ static CrowPanel128Adapter displayAdapter;
 static LVGLDisplayModule displayModule(displayAdapter, &branding, nullptr);
 #elif defined(WITH_DISPLAY_U8G2)
 #include "U8G2Display.hpp"
-#include "boards/DiagnosticsBoard.hpp"
+#include "U8G2GLDisplay.hpp"
+#include "boards/DiagnosticsScreenBoard.hpp"
 static U8G2DisplayModule displayModule(&branding);
-static DiagnosticsBoard diagnosticsBoard{256, 64};
+static DiagnosticsScreenBoard diagnosticsBoard;
 #endif
 
 /**
@@ -208,6 +209,7 @@ void setup() {
     displayModule.setConfigManager(&app.getConfigManager());
     displayModule.begin(&app.getEventBus());
 #ifdef WITH_DISPLAY_U8G2
+    U8G2GLDisplay::begin();
     diagnosticsBoard.configure(&app.getWifiManager());
     displayModule.boards.configuringStatus.setEngine(&app.getPreconditionEngine());
     displayModule.carousel.add(&diagnosticsBoard);
