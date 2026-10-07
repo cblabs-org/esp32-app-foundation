@@ -6,7 +6,7 @@
   "dependencies": [
     {
       "name": "u8g2gl",
-      "version": "https://github.com/cblabs-org/u8g2gl.git#82ec83f2bbce02080c3dd1ab6618bcf6559bfde5"
+      "version": "*"
     },
     {
       "name": "U8g2",
