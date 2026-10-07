@@ -265,3 +265,82 @@ Files with findings: 15 of 34. Files with none: 19 (all listed above).
   `after/diagnostics_board/state_probe.json`, 1392 lit pixels against 15).
 - **O5 (legacy, existing).** `platformio.ini` line 3-8 still says "Three environments" and lists
   four; not part of this PR.
+
+## Remediation (WO-B4b)
+
+Worker: WO-B4b, branch `u8g2gl-integration/wo4-readability`. Commits: `c239b7b2` (comment, documentation
+and naming fixes) and `874f1ab2` (`test(render)`: the harness capacities, plus the harness-code items
+below). Both fixes to `test/render/CMakeLists.txt` and `test/render/main.cpp` are in the second commit,
+because those two files hold both kinds of change; the comment fixes in them are listed as fixed here.
+Evidence for the verification is in the WO-B4b Completion Report. The review text above is unchanged.
+
+### Must fix (6 of 6 fixed)
+
+- [x] `test/render/CMakeLists.txt:119-122` capacity comment: rewritten, and made true by forcing the
+  generated config into the `u8g2gl_runtime` target (see Observation O3 below).
+- [x] `test/render/main.cpp:496-497` `runtime_capacities` string: reworded; `after/` regenerated, and
+  `inputs.json` is the only file that changed.
+- [x] `test/render/CMakeLists.txt:60` pin citation: now says the pin is `platformio.ini` `[u8g2gl]`, that
+  `U8G2GL_PINNED_SHA` is the harness's copy, that `library.json` does not pin, and that both are
+  re-pinned before merge.
+- [x] `platformio.ini:59`: "the one place the firmware build pins it", with the harness's second pin named.
+- [x] `test/render/shim/Print.h:27-28`: states what is true (the ESP32 core does declare a virtual
+  destructor; the harness omits it as unnecessary).
+- [x] `U8G2GLScreenBoard.cpp:50-52`: "the frame has 15 lit pixels and none is where the 1392 normal ones are".
+
+### Should fix (13 of 13 fixed)
+
+- [x] `U8G2GLDisplay.cpp:34-37, 57-59`: the tick callback is described as registered for completeness
+  (only `ui_handler()` reads it; this module's boards never call it).
+- [x] `DiagnosticsScreenBoard.hpp` header: "Exported Constants" added for both capacities.
+- [x] Workspace citations in `U8G2GLDisplay.hpp`, `U8G2GLScreenBoard.hpp`, `U8G2GLScreenBoard.cpp`,
+  `platformio.ini`, `screen_diagnostics.xml`: each names "U8G2GL PR-05" and a path that opens in this
+  repository (`.../pr-u8g2gl-05/PROJECT.md`, `.../evidence/EVIDENCE.md`).
+- [x] `main.cpp` `writeInputsJson()`: three step comments added.
+- [x] `main.cpp`: `ROW2_TOP`, `ROW3_TOP`, `ROW2_CLIP_X0`, `ROW2_CLIP_X1` named and used in the call and
+  the JSON (the written values are unchanged, `after/` shows it).
+- [x] `test/render/README.md`: `clip_probe.json` and `--probe-clip` documented.
+- [x] `test/render/README.md`: output location is `<out>/<output_subdir>/`.
+- [x] `count_lines.py` raw-string prefix: **commented, not changed** (the handled prefix is `u8`; `LR`,
+  `uR`, `UR` are a documented limitation). The review allowed a comment; no code change means the
+  measurements in EVIDENCE.md cannot move.
+- [x] `count_lines.py` blank-in-block: the header and the `BLANK` constant now say "empty"; a spaces-only
+  line in a block comment counts as comment. Again a comment, not a behaviour change.
+- [x] `test/render/README.md` line 60 re-wrapped; the stale `src/main.cpp:91,93,211,213` example replaced
+  (also in the `count_lines.py` header).
+- [x] `test_screen_board.cpp`: `Counters` members and the five fakes documented.
+- [x] `main.cpp` `--compare` without `--out`: the `formatDiagnostics()` cross-check now returns 4 before
+  the early return, matching the `--out` path.
+- [x] `screen_diagnostics.xml:12-13`: states the consequence of pixel identity and how to fix the clip later.
+
+### Nit (12: 10 fixed, 2 skipped)
+
+- [x] `DiagnosticsScreenBoard.hpp:63`: cites `:135 and :137`.
+- [x] `U8G2GLScreenBoard.hpp`: `render()` Doxygen and exported list say the font mode is restored and a font
+  is set if none was.
+- [x] `U8G2GLScreenBoard.hpp`: protected `screen()` listed in the exported list.
+- [x] "(U8G2 2.36.18)" added to the U8G2 line citations in `U8G2GLScreenBoard.cpp`, `screen_diagnostics.xml`
+  and `main.cpp`.
+- [x] `main.cpp:56-57`: "In practice (GCC and Clang)", with the C++23 caveat.
+- [x] `main.cpp` `RowPlacement`: `bool large` replaces the string compare, and all four fields documented.
+- [x] `main.cpp` usage text: `--out` shown as optional.
+- [x] `count_lines.py`: exported list now covers all seven functions; "cloc is not installed here" reworded.
+- [x] `u8g2gl_generate.py`: `resolve_cli` docstring reordered with `Returns:`; `_apply_capacities` has a docstring.
+- [x] `src/main.cpp:212`: ordering comment on `U8G2GLDisplay::begin()`.
+- [ ] **Skipped** `u8g2gl_generate.py:183` substring test: the fix changes what the build hook matches, which is
+  behaviour, and this WO changes none. The substring risk is real only for a directory named
+  `uidesign/ssd1322-256x64-other`, which does not exist. Left for a later work order.
+- [ ] **Skipped** `u8g2gl_native_stubs.c` header (repo URL line, 14-stub list): the review marked it optional and
+  it matches the legacy stub's precedent.
+
+### Observations
+
+- **O1** (in-flight edits): not present in this worktree; nothing to do.
+- **O2, O4** (U8G2GL generator and runtime): out of scope; reported, not fixed.
+- **O3** (harness capacities): **resolved.** The harness now builds the runtime with the generated
+  capacities. Note the review's byte figures were off: the binding pool is 4 x 40 B = 160 B against
+  256 x 40 B = 10240 B by default (`size -m` on `u8g2gl_obj.cpp.o`: `__bss` 160 B against 10240 B), not
+  96 B against 6144 B.
+- **O5** (`platformio.ini` "Three environments"): left, as the WORKORDER directs.
+- The regenerated U8G2GL sources are unchanged by the `screen_diagnostics.xml` comment edits: running the
+  committed generator against a copy under `tmp/` produced byte-identical `generated/` files.
