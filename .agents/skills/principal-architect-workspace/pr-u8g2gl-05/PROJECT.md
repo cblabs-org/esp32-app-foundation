@@ -94,24 +94,22 @@ and web diagnostics (R7).
     worktree at `u8g2gl-integration/wo1-baseline` (read-only measurement). Its numbers are
     recorded into `EVIDENCE.md` on the stack tip. That keeps it independent of WO-B2's
     `main.cpp` switch.
-- **[ ] [wo2-module](wo2-module/WORKORDER.md):** the board host, the generated UI, the pinned
-  dependency (`82ec83f2bbce02080c3dd1ab6618bcf6559bfde5`, after U8G2GL's history rewrite; see the session log), the hook, the notices row, and the
-  `main.cpp` switch. It renders through the host harness and compares against the baseline.
-  **[x] COMPLETE: Part 1 and Part 2 verified by the PA.** Pixel-identical in all four scenarios;
-  `esp32dev` and `esp32s3nano` build; native 1018/1018.
-  **Part 2 (pending the MCP):**
-  - the `esp32dev`/`esp32s3nano` builds, the `env:native` count, and the hook inside a real build;
-  - **the capacities**: apply `u8g2gl_generated_config.h` to the u8g2gl library's own sources
-    only, through a PlatformIO build middleware (`env.AddBuildMiddleware`) in the hook script.
-    Not the project-wide `-include` the generated header suggests: that would reach C units and
-    libraries that cannot resolve `u8g2gl/`. Measure RAM with and without it.
+- **[x] [wo2-module](wo2-module/WORKORDER.md):** the board host, the generated UI, the pinned
+  dependency (`82ec83f`, now in `platformio.ini` `[u8g2gl]`), the hook with its scoped
+  capacities, the notices row, the `main.cpp` switch, and the native suite. **Complete: Parts 1
+  and 2 verified by the PA.** Pixel-identical in all four scenarios; `esp32dev` and
+  `esp32s3nano` build; native 1018/1018.
 - **[x] [wo3-evidence](wo3-evidence/WORKORDER.md):** **Complete, verified by the PA.** The
   after-size evidence and the `PR-DESCRIPTION.md` draft are done. Its edit-loop timing is
   superseded by WO-B3b.
-- **[ ] [wo3b-timing](wo3b-timing/WORKORDER.md):** the legacy and U8G2GL edit loops measured
-  interleaved, with load recorded. *Dispatched 2026-10-07.* the "after" measurements through the same harness, `EVIDENCE.md`, and the
-  PR description.
-- **[ ] wo4-readability:** a house-style pass (`.agents/skills/house-style-docs`).
+- **[x] [wo3b-timing](wo3b-timing/WORKORDER.md):** the legacy and U8G2GL edit loops measured
+  interleaved, with load recorded. **Complete, verified by the PA.** It supersedes the WO-B1 and
+  WO-B3 timing for the gate.
+- **[x] [wo4-readability](wo4-readability/WORKORDER.md):** the review phase is done; `REVIEW.md`
+  has 6 must-fix, 13 should-fix and 12 nit findings. The PA confirmed both wrong-citation
+  findings in source.
+- **[ ] [wo4b-remediation](wo4b-remediation/WORKORDER.md):** fix the Must and Should findings, and
+  have the harness build the runtime with the firmware's capacities. *Dispatched 2026-10-07.*
 - **[ ] wo5-device (interactive):** host render vs on-device capture, when the owner is at the
   bench.
 
@@ -268,3 +266,27 @@ reads them there and does not re-derive them.
     verification). The generator costs about 0.05 s. WO-B3b re-measures both loops interleaved.
   - **New downstream user:** `template-app` also uses the legacy `DiagnosticsBoard`. It is listed
     in the PR description.
+- **2026-10-07 — WO-B3b verified: the edit-loop result for gate criterion 4.** There were five
+  interleaved rounds through the MCP, at load averages of 4 to 8.5. Medians of the task time:
+
+  | Build | Legacy | U8G2GL |
+  |---|---:|---:|
+  | Edit and rebuild | 26.92 s | **31.90 s** |
+  | No-change rebuild | 21.60 s | 27.92 s |
+  | Per-edit compile cost (edit minus no-change) | 4.65 s | **3.90 s** |
+
+  - **Paired, U8G2GL edit minus legacy edit:** median **+4.99 s**. It survives the pairing.
+  - **The whole gap is fixed per-build overhead (+6.16 s), not the generator** (0.05 to 0.07 s; a
+    hook-off experiment rules the hook out). The verbose logs show PlatformIO's library
+    dependency graph growing by 42.6% (6266 to 8935 lines). `U8G2GLDisplay`, `U8G2GLUI` and
+    `u8g2gl` are new, and the `U8G2GLDisplay` subtree alone is 2665 lines under
+    `lib_ldf_mode = deep`. That is inferred from the logs; it could not be timed separately
+    without the CLI.
+  - **Candidate reduction, not done:** `U8G2GLDisplay`'s `library.json` declares `U8G2Display`
+    as a dependency, for `IDisplayBoard`. That can make the deep finder walk the legacy module's
+    graph a second time. An experiment could cut the overhead; it is put to the owner, not done
+    here.
+  - **The PA's error:** the PA committed the WO-B4 review files to this worktree during WO-B3b's
+    run. Foundation's `inject_version.py` stamps the git state into `esp_app_desc`, so the new
+    HEAD forced a recompile and relink in round 4. That caused both outliers. The medians absorb
+    it. **Lesson: no commits to a worktree while a timing run is live.**
