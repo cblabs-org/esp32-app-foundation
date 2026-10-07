@@ -97,7 +97,8 @@ and web diagnostics (R7).
 - **[ ] [wo2-module](wo2-module/WORKORDER.md):** the board host, the generated UI, the pinned
   dependency (`82ec83f2bbce02080c3dd1ab6618bcf6559bfde5`, after U8G2GL's history rewrite; see the session log), the hook, the notices row, and the
   `main.cpp` switch. It renders through the host harness and compares against the baseline.
-  **Part 1 complete and verified by the PA: pixel-identical in all four scenarios.**
+  **[x] COMPLETE: Part 1 and Part 2 verified by the PA.** Pixel-identical in all four scenarios;
+  `esp32dev` and `esp32s3nano` build; native 1018/1018.
   **Part 2 (pending the MCP):**
   - the `esp32dev`/`esp32s3nano` builds, the `env:native` count, and the hook inside a real build;
   - **the capacities**: apply `u8g2gl_generated_config.h` to the u8g2gl library's own sources
@@ -222,3 +223,30 @@ reads them there and does not re-derive them.
     with its measurements intact.
   - **Owner direction for Part 2:** no crowpanel build; bring the module into `env:native` with
     tests on foundation's stubs.
+- **2026-10-07 — WO-B2 Part 2 verified.**
+  - **Raw logs, cross-checked by the PA:**
+
+    | Build | RAM | Flash |
+    |---|---:|---:|
+    | `esp32dev` | **57340 B** | **1342279 B** (85.3%) |
+    | `esp32s3nano` | 59964 B | 1376723 B |
+
+  - **Native, re-run by the PA through the MCP from the committed tree: 1018/1018** (989 + 29 new
+    in `test_u8g2glDisplay`). The newest log in the worktree had been the worker's deliberate
+    mutation run, which is why the PA re-ran rather than read it.
+  - **Gate signal, criterion 3 (provisional; WO-B3 re-measures from clean):**
+    - against legacy, **RAM −160 B** and **flash +6136 B** on `esp32dev`;
+    - the scoped capacities are what make RAM come out lower: `s_binding_pool` is 96 B instead
+      of 6144 B, and RAM is 63388 B without them against 57340 B with them.
+  - **Integration decisions made in Part 2:**
+    - **The pin moved to a `[u8g2gl]` section in `platformio.ini`.** PlatformIO does not install
+      git dependencies declared by `lib_extra_dirs` libraries, which the worker measured
+      ("Ignored `u8g2gl` dependency"). The single pin is still single.
+    - **The capacities come from a build middleware** in `scripts/u8g2gl_generate.py`, adding
+      the include to exactly the 15 runtime sources. The PA confirmed this from the verbose log.
+    - **Native** compiles the runtime through a test-local unity file, because the runtime's
+      `frameworks: arduino` excludes it from a native env.
+  - **Unverified:** `crowpanel-128-rotary`'s added `lib_ignore`. The owner directed it not be
+    built.
+  - **To re-pin before merge:** `platformio.ini` `[u8g2gl]`, and `test/render/CMakeLists.txt`
+    `U8G2GL_PINNED_SHA`.
