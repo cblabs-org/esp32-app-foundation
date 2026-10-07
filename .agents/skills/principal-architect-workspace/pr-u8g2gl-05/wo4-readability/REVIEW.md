@@ -338,9 +338,12 @@ Evidence for the verification is in the WO-B4b Completion Report. The review tex
 - **O1** (in-flight edits): not present in this worktree; nothing to do.
 - **O2, O4** (U8G2GL generator and runtime): out of scope; reported, not fixed.
 - **O3** (harness capacities): **resolved.** The harness now builds the runtime with the generated
-  capacities. Note the review's byte figures were off: the binding pool is 4 x 40 B = 160 B against
-  256 x 40 B = 10240 B by default (`size -m` on `u8g2gl_obj.cpp.o`: `__bss` 160 B against 10240 B), not
-  96 B against 6144 B.
+  capacities. On the 64-bit macOS harness the binding pool is 4 x 40 B = 160 B against
+  256 x 40 B = 10240 B by default (`size -m` on `u8g2gl_obj.cpp.o`: `__bss` 160 B against 10240 B).
+  *PA correction, 2026-10-07:* the review's 96 B / 6144 B are also right. They are the
+  **firmware** figures: on the ESP32, with 4-byte pointers, a binding descriptor is 24 B. The
+  firmware ELF shows `s_binding_pool` at `0x60` = 96 B (`nm -S`, EVIDENCE §3). The two pairs
+  differ by platform, not by error. For the gate, the firmware figure is the one that counts.
 - **O5** (`platformio.ini` "Three environments"): left, as the WORKORDER directs.
 - The regenerated U8G2GL sources are unchanged by the `screen_diagnostics.xml` comment edits: running the
   committed generator against a copy under `tmp/` produced byte-identical `generated/` files.

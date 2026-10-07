@@ -104,8 +104,9 @@ and web diagnostics (R7).
 - **[x] [wo4-readability](wo4-readability/WORKORDER.md):** the review phase is done; `REVIEW.md`
   has 6 must-fix, 13 should-fix and 12 nit findings. The PA confirmed both wrong-citation
   findings in source.
-- **[ ] [wo4b-remediation](wo4b-remediation/WORKORDER.md):** fix the Must and Should findings, and
-  have the harness build the runtime with the firmware's capacities. *Dispatched 2026-10-07.*
+- **[x] [wo4b-remediation](wo4b-remediation/WORKORDER.md):** fix the Must and Should findings, and
+  have the harness build the runtime with the firmware's capacities. **Complete, verified by the
+  PA:** 6/6 Must, 13/13 Should and 10/12 Nit fixed; the two skipped nits are justified.
 - **[ ] wo5-device (interactive):** host render vs on-device capture, when the owner is at the
   bench.
 
@@ -286,3 +287,12 @@ reads them there and does not re-derive them.
     run. Foundation's `inject_version.py` stamps the git state into `esp_app_desc`, so the new
     HEAD forced a recompile and relink in round 4. That caused both outliers. The medians absorb
     it. **Lesson: no commits to a worktree while a timing run is live.**
+- **2026-10-07 — WO-B4b verified.**
+  - **Pixels, re-checked by the PA from `git archive HEAD`:** 0 differing pixels in all four
+    scenarios, and every scenario file is identical to `after/`. The only warnings are legacy
+    `IGfxWidget.hpp:137`.
+  - **Worker-reported:** native 1018/1018 through the MCP; `esp32dev` RAM 57340 B, unchanged.
+  - **Corrected by the PA:** the worker's `REVIEW.md` note called the review's 96 B / 6144 B pool
+    figures wrong. They are the **ESP32** figures (24 B per binding; the firmware ELF shows
+    `0x60`). The worker's 160 B / 10240 B are the **64-bit host** figures (40 B per binding).
+    Both are right for their platform. No source comment carried the wrong claim.
