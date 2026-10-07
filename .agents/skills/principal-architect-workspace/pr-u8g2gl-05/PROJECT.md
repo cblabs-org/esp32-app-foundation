@@ -87,13 +87,9 @@ and web diagnostics (R7).
 
 ## Work Order Ledger
 
-- **[ ] [wo1-baseline](wo1-baseline/WORKORDER.md):** the "before" evidence.
-  - **Part 1** (host pixel baseline, line counts): **complete, verified by the PA**.
-  - **Part 2** (flash/RAM, native suite count, legacy edit-loop timing): **pending the
-    PlatformIO MCP**. It measures the **legacy** firmware, so it runs in a separate detached
-    worktree at `u8g2gl-integration/wo1-baseline` (read-only measurement). Its numbers are
-    recorded into `EVIDENCE.md` on the stack tip. That keeps it independent of WO-B2's
-    `main.cpp` switch.
+- **[x] [wo1-baseline](wo1-baseline/WORKORDER.md):** the "before" evidence. **Complete: Part 1
+  (host pixel baseline, line counts) and Part 2 (flash/RAM, native 989, edit loop), verified by
+  the PA.** Part 2 measured in the detached legacy worktree at `7396e43d`.
 - **[x] [wo2-module](wo2-module/WORKORDER.md):** the board host, the generated UI, the pinned
   dependency (`82ec83f`, now in `platformio.ini` `[u8g2gl]`), the hook with its scoped
   capacities, the notices row, the `main.cpp` switch, and the native suite. **Complete: Parts 1
