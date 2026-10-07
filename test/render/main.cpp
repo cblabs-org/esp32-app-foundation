@@ -52,9 +52,10 @@
 // The harness reads back the exact strings the board formatted (_wifiLine and
 // each LabelWidget's _textBuffer) rather than re-deriving them with a second copy
 // of the snprintf formats. Those members are private, so this translation unit
-// alone widens access while it includes the board headers. Access specifiers do
-// not change object layout, so DiagnosticsBoard.cpp (compiled normally) and this
-// file agree on the layout.
+// alone widens access while it includes the board headers. In practice (GCC and
+// Clang) access specifiers do not change object layout, though the standard does
+// not promise it before C++23, so DiagnosticsBoard.cpp (compiled normally) and
+// this file agree on the layout.
 #define private public
 #include "boards/DiagnosticsBoard.hpp"
 #undef private
@@ -75,6 +76,10 @@ namespace fs = std::filesystem;
 
 static constexpr int DISPLAY_WIDTH  = 256;   // Panel width in pixels (SSD1322 NHD 256x64)
 static constexpr int DISPLAY_HEIGHT = 64;    // Panel height in pixels
+static constexpr int ROW2_TOP = 16;          // First pixel row of row 2, the WiFi line (legacy y)
+static constexpr int ROW3_TOP = 30;          // First pixel row of row 3, the uptime (legacy y); row 2 ends above it
+static constexpr int ROW2_CLIP_X0 = 4;       // Row 2's first drawable column (legacy x)
+static constexpr int ROW2_CLIP_X1 = 251;     // Row 2's far clip corner, x + w - 1 = 4 + 248 - 1 (exclusive in U8G2)
 static constexpr const char* LEGACY_SOURCE_COMMIT = "e5342373";  // Commit whose DiagnosticsBoard is rendered
 static constexpr const char* DISPLAY_SETUP_CALL =
     "u8g2_Setup_ssd1322_nhd_256x64_f(u8g2, U8G2_R0, u8x8_byte_empty, u8x8_dummy_cb)";
@@ -482,6 +487,8 @@ static bool writeInputsJson(const fs::path& path, const RenderTarget& target,
     FILE* file = fopen(path.string().c_str(), "wb");
     if (!file) return false;
 
+    // --- Step 1: target and toolchain facts ---
+    // Which board was rendered, from which sources, and how U8G2 and the U8G2GL runtime were built.
     fprintf(file, "{\n");
     fprintf(file, "  \"target\": %s,\n", jsonString(target.id).c_str());
     fprintf(file, "  \"description\": %s,\n", jsonString(target.description).c_str());
@@ -493,11 +500,14 @@ static bool writeInputsJson(const fs::path& path, const RenderTarget& target,
         fprintf(file, "  \"u8g2gl\": {\"pinned_sha\": %s, \"source\": %s, "
                       "\"generated_ui\": \"uidesign/ssd1322-256x64/u8g2gl/generated (committed, not regenerated)\", "
                       "\"module\": \"modules/U8G2GLDisplay\", "
-                      "\"runtime_capacities\": \"runtime defaults: the generated config is not force-included, "
-                      "as platformio.ini does not force it\"},\n",
+                      "\"runtime_capacities\": \"harness build: the generated capacities are forced into the "
+                      "runtime sources, as the firmware build does via scripts/u8g2gl_generate.py\"},\n",
                 jsonString(U8G2GL_PINNED_SHA).c_str(), jsonString(U8G2GL_SOURCE_DESCRIPTION).c_str());
     }
 #endif
+    // --- Step 2: fixed descriptions ---
+    // The display state calls, the buffer and PBM formats, the string encoding and the re-run command.
+    // None of these varies per scenario, so they are written once, before the scenarios.
     fprintf(file, "  \"u8g2_compile_flags\": %s,\n", jsonString(HARNESS_U8G2_FLAGS).c_str());
     fprintf(file, "  \"build_version_define\": %s,\n", jsonString(BUILD_VERSION).c_str());
     fprintf(file, "  \"display_setup_call\": %s,\n", jsonString(DISPLAY_SETUP_CALL).c_str());
@@ -524,11 +534,13 @@ static bool writeInputsJson(const fs::path& path, const RenderTarget& target,
                 : "cmake -S test/render -B tmp/render-build && cmake --build tmp/render-build --target baseline").c_str());
     fprintf(file, "  \"scenarios\": {\n");
 
+    // --- Step 3: one block per scenario ---
+    // Its inputs, the rows as drawn, the lit-pixel count and the row-2 geometry measured from the buffer.
     for (size_t i = 0; i < results.size(); ++i) {
         const ScenarioResult& r = results[i];
         const Scenario& s = *r.scenario;
 
-        const BoundingBox row2Band = measureBand(r.buffer, 16, 30);
+        const BoundingBox row2Band = measureBand(r.buffer, ROW2_TOP, ROW3_TOP);
 
         fprintf(file, "    %s: {\n", jsonString(s.name).c_str());
         fprintf(file, "      \"inputs\": {\"connected\": %s, \"ap_mode\": %s, \"hostname\": %s, "
@@ -548,9 +560,11 @@ static bool writeInputsJson(const fs::path& path, const RenderTarget& target,
         // treats as exclusive; the migrated label's far corner is x + w = 251 for the same
         // columns. Either way columns 4..250 are drawable, so the range recorded is the
         // legacy argument for legacy and the same corner for the migrated board.
-        fprintf(file, "      \"row2\": {\"natural_width_px\": %d, \"clip_x_range\": [4, 251], "
-                      "\"lit_x_range\": [%d, %d], \"band_rows\": [16, 29]}\n",
-                r.row2NaturalWidthPx, row2Band.x0, row2Band.x1);
+        // band_rows is inclusive: row 2 occupies ROW2_TOP up to the row above ROW3_TOP.
+        fprintf(file, "      \"row2\": {\"natural_width_px\": %d, \"clip_x_range\": [%d, %d], "
+                      "\"lit_x_range\": [%d, %d], \"band_rows\": [%d, %d]}\n",
+                r.row2NaturalWidthPx, ROW2_CLIP_X0, ROW2_CLIP_X1, row2Band.x0, row2Band.x1,
+                ROW2_TOP, ROW3_TOP - 1);
         fprintf(file, "    }%s\n", i + 1 < results.size() ? "," : "");
     }
 
@@ -599,7 +613,7 @@ static bool writeSeparatorProbe(const fs::path& path) {
     // pixel-identical to "%s  %s" (two spaces, the byte removed).
     auto drawRow = [&](const char* text) {
         display.clearBuffer();
-        display.drawUTF8(4, 16, text);
+        display.drawUTF8(ROW2_CLIP_X0, ROW2_TOP, text);
         return copyBuffer(display);
     };
     const std::vector<uint8_t> withByte  = drawRow("MyNetwork \xB7 192.168.1.42");
@@ -607,7 +621,7 @@ static bool writeSeparatorProbe(const fs::path& path) {
     const std::vector<uint8_t> oneSpace  = drawRow("MyNetwork 192.168.1.42");
 
     // --- Step 3: the long-SSID row without the widget's clip window ---
-    // The legacy row-2 widget clips to x = 4..251. Drawing the same string with
+    // The legacy row-2 widget clips to x = ROW2_CLIP_X0..ROW2_CLIP_X1 (4..251). Drawing the same string with
     // no clip shows how much the clip suppresses.
     const std::string longRow = std::string("ThisIsAVeryLongNetworkNameForOverflow1") + " \xB7 10.100.200.250";
     const std::vector<uint8_t> unclipped = drawRow(longRow.c_str());
@@ -617,7 +631,7 @@ static bool writeSeparatorProbe(const fs::path& path) {
         for (int x = 0; x < DISPLAY_WIDTH; ++x) {
             if (!pixelLit(unclipped, x, y)) continue;
             unclippedMaxX = std::max(unclippedMaxX, x);
-            if (x > 251) ++unclippedLitBeyond251;
+            if (x > ROW2_CLIP_X1) ++unclippedLitBeyond251;
         }
     }
 
@@ -768,10 +782,16 @@ static bool compareWithReference(const fs::path& referenceRoot, const RenderTarg
  * @return true on success.
  */
 static bool writeClipProbe(const fs::path& path, const std::vector<ScenarioResult>& results) {
-    struct RowPlacement { int x; int y; bool centred; const char* font; };  // Legacy placement of each row
+    /** @brief Legacy placement of one row. */
+    struct RowPlacement {
+        int x;          ///< Left edge of the label
+        int y;          ///< Top pixel row of the label
+        bool centred;   ///< Centred in the display width (row 1 only)
+        bool large;     ///< The large (bold) font, else the small one
+    };
     const RowPlacement placements[4] = {
-        {0, 0,  true,  "large"}, {4, 16, false, "small"},
-        {4, 30, false, "small"}, {4, 44, false, "small"},
+        {0, 0,  true,  true},  {ROW2_CLIP_X0, ROW2_TOP, false, false},
+        {4, ROW3_TOP, false, false}, {4, 44, false, false},
     };
 
     FILE* file = fopen(path.string().c_str(), "wb");
@@ -788,7 +808,7 @@ static bool writeClipProbe(const fs::path& path, const std::vector<ScenarioResul
         display.clearBuffer();
         for (int row = 0; row < 4; ++row) {
             const RowPlacement& place = placements[row];
-            display.setFont(place.font[0] == 'l' ? AppFonts::defaultLarge() : AppFonts::defaultSmall());
+            display.setFont(place.large ? AppFonts::defaultLarge() : AppFonts::defaultSmall());
             int x = place.x;
             if (place.centred) x += (DISPLAY_WIDTH - display.getUTF8Width(r.rows.rows[row].c_str())) / 2;
             display.drawUTF8(x, place.y, r.rows.rows[row].c_str());
@@ -804,7 +824,7 @@ static bool writeClipProbe(const fs::path& path, const std::vector<ScenarioResul
         intended.clearBuffer();
         for (int row = 0; row < 4; ++row) {
             const RowPlacement& place = placements[row];
-            intended.setFont(place.font[0] == 'l' ? AppFonts::defaultLarge() : AppFonts::defaultSmall());
+            intended.setFont(place.large ? AppFonts::defaultLarge() : AppFonts::defaultSmall());
             const int width = place.centred ? DISPLAY_WIDTH : DISPLAY_WIDTH - 8;  // Legacy label widths
             int x = place.x;
             if (place.centred) x += (DISPLAY_WIDTH - intended.getUTF8Width(r.rows.rows[row].c_str())) / 2;
@@ -882,7 +902,7 @@ static std::vector<uint8_t> renderConnectedViaUiHandler(U8G2& display) {
     board.tick(static_cast<uint32_t>(scenario.uptimeMs));
     // A font must be current before the first frame: the runtime's state saver puts back
     // whatever font was current, and with none set that is nullptr, which U8G2 then
-    // dereferences (u8g2_font.c:114). Measured: the first run of this probe without
+    // dereferences (u8g2_font.c:114, U8G2 2.36.18). Measured: the first run of this probe without
     // this line crashed there. Every label sets its own font, so this changes no pixel.
     display.setFont(AppFonts::defaultSmall());
     u8g2gl_set_active_screen(&ui_screen_diagnostics);
@@ -1028,7 +1048,7 @@ static bool writeStateProbe(const fs::path& path, const std::vector<uint8_t>& no
 
 /** @brief Print usage and return a failure code. */
 static int usage() {
-    fprintf(stderr, "usage: render_harness --board <id> --out <dir> [--ascii <scenario>] [--probe-separator]\n"
+    fprintf(stderr, "usage: render_harness --board <id> [--out <dir>] [--ascii <scenario>] [--probe-separator]\n"
                     "                       [--compare <reference-root>] [--probe-state] [--probe-clip]\n");
     fprintf(stderr, "boards:");
     for (const RenderTarget& t : kTargets) fprintf(stderr, " %s", t.id);
@@ -1093,7 +1113,12 @@ int main(int argc, char** argv) {
         identicalToReference = compareWithReference(compareRoot, *target, results);
     }
 
-    if (outRoot.empty()) return identicalToReference ? 0 : 3;
+    if (outRoot.empty()) {
+#ifdef HARNESS_HAS_U8G2GL
+        if (g_selfCheckFailures != 0) return 4;  // The cross-check runs while rendering, so it counts here too
+#endif
+        return identicalToReference ? 0 : 3;
+    }
 
     // --- Step 4: files ---
     const fs::path outDir = outRoot / target->outputSubdir;

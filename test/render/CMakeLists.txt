@@ -57,7 +57,10 @@ set(HARNESS_U8G2_FLAGS "-DU8G2_WITHOUT_FONT_ROTATION -DU8G2_WITHOUT_UNICODE")
 set(RENDER_OUTPUT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/baseline" CACHE PATH "Where baseline files are written")
 set(RENDER_AFTER_DIR  "${CMAKE_CURRENT_SOURCE_DIR}/after"    CACHE PATH "Where the migrated board's files are written")
 option(RENDER_U8G2GL "Also build the --board u8g2gl target (needs the U8G2GL runtime)" ON)
-# The U8G2GL runtime, pinned by git commit exactly as modules/U8G2GLDisplay/library.json pins it (R6).
+# The U8G2GL runtime, pinned by git commit. This is the harness's copy of the pin: the firmware's is
+# platformio.ini [u8g2gl] (library.json does not pin; it names u8g2gl at "*"). The two must be kept
+# equal (ruling R6 of U8G2GL PR-05, in
+# .agents/skills/principal-architect-workspace/pr-u8g2gl-05/PROJECT.md); re-pin both before merge.
 set(U8G2GL_PINNED_SHA "82ec83f2bbce02080c3dd1ab6618bcf6559bfde5")
 get_filename_component(REPO_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../.." ABSOLUTE)
 
@@ -117,9 +120,10 @@ target_compile_options(legacy_diagnostics PRIVATE -Wall -Wextra)
 # --- The migrated board: U8G2GL runtime + generated UI + modules/U8G2GLDisplay -----------
 if(RENDER_U8G2GL)
   # U8G2GL runtime. Compiled the way PlatformIO compiles the library: every
-  # src/*.cpp, include/ on the path, and NOT the generated config forced in
-  # (platformio.ini does not force-include it), so the binding pool has the
-  # runtime's default capacity, as it will in the firmware.
+  # src/*.cpp, include/ on the path, and the generated capacities forced into
+  # these sources only (see the target_compile_options below), as
+  # scripts/u8g2gl_generate.py does in the firmware build. The binding pool is
+  # therefore the generated 4 bindings, not the runtime's default of 256.
   set(U8G2GL_SOURCE_DIR "" CACHE PATH "Existing U8G2GL checkout (skips the fetch)")
   if(U8G2GL_SOURCE_DIR)
     if(NOT EXISTS "${U8G2GL_SOURCE_DIR}/include/u8g2gl/u8g2gl_core.h")
@@ -147,6 +151,14 @@ if(RENDER_U8G2GL)
   add_library(u8g2gl_runtime STATIC ${U8G2GL_RUNTIME_SOURCES})
   target_include_directories(u8g2gl_runtime PUBLIC "${U8G2GL_DIR}/include")
   target_link_libraries(u8g2gl_runtime PUBLIC u8g2_real)
+  # Force the generated capacities (U8G2GL_MAX_* in u8g2gl_generated_config.h) into the runtime's
+  # own sources, and nothing else: the runtime sizes its pools in src/ files that never include
+  # the header, so without this the library keeps its defaults. PRIVATE on this one target means
+  # no consumer inherits it; the generated UI and the board include the header themselves.
+  # SHELL: keeps "-include" and its path together so CMake's option de-duplication cannot split them.
+  set(U8G2GL_CAPACITY_HEADER
+      "${REPO_ROOT}/uidesign/ssd1322-256x64/u8g2gl/generated/u8g2gl_generated_config.h")
+  target_compile_options(u8g2gl_runtime PRIVATE "SHELL:-include ${U8G2GL_CAPACITY_HEADER}")
 
   # The committed generated/ UI (U8G2GLUI): compiled as it stands, never regenerated here.
   set(U8G2GL_UI_DIR "${REPO_ROOT}/uidesign/ssd1322-256x64/u8g2gl/generated")

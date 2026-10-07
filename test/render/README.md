@@ -105,6 +105,11 @@ three rows the board published, and the run fails if it does not.
 | The display setup, `u8g2_Setup_ssd1322_nhd_256x64_f` | `esp_heap_caps.h`: `heap_caps_get_free_size()` |
 | The U8G2GL runtime (`src/*.cpp` at the pinned sha), the committed `generated/` UI, and `U8G2GLDisplay`, `U8G2GLScreenBoard`, `DiagnosticsScreenBoard`, unmodified | The same shims: the migrated board reads the platform through the same `readDiagnosticsInputs()` it uses in firmware |
 
+The U8G2GL runtime is compiled with the generated capacities
+(`u8g2gl_generated_config.h`, 4 bindings) forced into its own sources only, as
+`scripts/u8g2gl_generate.py` does in the firmware build, so the binding pool is
+the firmware's size and not the runtime's default of 256. Pixels do not depend on it.
+
 `shim/` is first on the include path, so the board's `#include "WifiManager.hpp"`,
 `<WiFi.h>` and the rest resolve to the shims. Every shim answers from one
 `HostEnvironment` struct that the harness fills per scenario. `BUILD_VERSION` is
