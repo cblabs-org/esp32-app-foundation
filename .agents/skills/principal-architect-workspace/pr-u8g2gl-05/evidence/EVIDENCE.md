@@ -11,6 +11,7 @@ commit that holds this file, so the baseline also describes that commit's legacy
 **Status**: sections 1 and 2 Before are filled (WO-B1 Part 1). Sections 1 and 2 After are filled
 (WO-B2 Part 1, on host). Sections 3 and 4 Before are filled (WO-B1 Part 2, legacy worktree
 `7396e43d`, PlatformIO MCP); sections 3 and 4 After are filled (WO-B3, stack worktree `20d1d1fb`, PlatformIO MCP).
+Section 4's timing is superseded by the interleaved re-measurement (WO-B3b), appended at the end of section 4.
 
 ---
 
@@ -796,6 +797,11 @@ a full rebuild. Three timed runs, same flags:
 
 ### The reading
 
+> **Superseded for the gate.** The timing comparison below was made across sessions under unequal load.
+> The interleaved re-measurement in the next subsection (**Interleaved re-measurement (WO-B3b)**,
+> at the end of this section) replaces it: legacy 26.9 s against U8G2GL 31.9 s, a paired median of
+> +5.0 s, all of it fixed overhead. The reading that follows is kept as the record of what WO-B3 saw.
+
 *Time.* Both loops recompile one object and relink. Measured here, the configured XML loop's median
 was 48.81 s against the legacy C++ loop's 29.94 s, and the unconfigured loop's 38.47 s (31.60 s of
 tool time). The generate step contributes about 0.05 s of that (1.3 s as an upper bound for the whole
@@ -816,3 +822,192 @@ Neither the line counts of section 2 nor this section judge which is better; PR-
 
 **Revert and cleanliness.** Both temporary edits were reverted with `git checkout -- platformio.ini
 uidesign/`. `git status --short` printed nothing before this file was edited, `name="uptime" x="4" y="30"` is back at `screen_diagnostics.xml:63`, and `get_lock_status` reported `isLocked: false`. Build logs are in the stack worktree's `.pio-mcp-workspace/logs/build/` (git-ignored). Configured warm-up `build-2026-10-07T21-04-21-469Z-f68bccbb.log`; configured timed runs `...T21-08-26-693Z-edcc9ba6`, `...T21-10-22-584Z-94933abb`, `...T21-11-21-305Z-bbd3736d`; unconfigured warm-up `...T21-12-33-513Z-d4e22166`; unconfigured timed runs `...T21-15-55-133Z-704c263a`, `...T21-16-36-723Z-0bcd7c0f`, `...T21-17-50-323Z-3bb70f38`. The timestamp scripts and the nm comparison inputs are in the stack worktree's `tmp/wob3/` (git-ignored).
+
+### Interleaved re-measurement (WO-B3b)
+
+**Which figure the gate uses.** This subsection **supersedes** the two comparisons above for
+criterion 4. WO-B1's 29.94 s (legacy) and WO-B3's 48.81 s (U8G2GL) were measured hours apart; WO-B3's
+host ran at load averages of 5.5 to 20.7. They stay above as the record of what each session saw, and
+**neither is to be quoted against the other**. The figures below are from one session in which the two
+trees were built alternately.
+
+**Task.** The same two edits as before, now interleaved. *L-edit:* legacy
+`modules/U8G2Display/boards/DiagnosticsBoard.cpp` row 3 constructor argument `_row3(4, 30, ...)`,
+30 to 31 or back. *N-edit:* `uidesign/ssd1322-256x64/u8g2gl/screens/screen_diagnostics.xml` row 3
+(`name="uptime"`) `y`, 30 to 31 or back, with `custom_u8g2gl_cli` set so the hook regenerates.
+*L-noop* and *N-noop:* the same build with no source change.
+
+**Method.** 2026-10-07, 21:27 to 21:44 UTC. Trees: legacy worktree `7396e43d` (detached), stack
+worktree `u8g2gl-integration/wo3-evidence`. Every timed build was a foreground `build_project`,
+`environment: esp32dev`, `forceExecution: true`, `verbose: true`, run one at a time through the MCP.
+Setup: `custom_u8g2gl_cli` added to `[env:esp32dev]`; one untimed warm-up of each tree (stack 108.05 s,
+a full rebuild because `platformio.ini` changed; legacy 25.65 s); an untimed no-change build of the
+stack tree (34.80 s). Both trees then built incrementally with no change in under a minute (the
+requirement was "about a minute"). Five rounds, each in the order L-edit, N-edit, L-noop, N-noop,
+alternating the edit direction (30 to 31 in rounds 1, 3 and 5; 31 to 30 in rounds 2 and 4). Per
+build, a script wrote the edit (if any), printed a UTC timestamp and the `uptime` load averages
+immediately before the build call; the table gives:
+
+- **Task start to end:** the start time in the build log's file name to the result's `observedAt`.
+  This is the tool's own time and the **figure the analysis uses**.
+- **Edit to success:** the timestamp printed after the edit, to `observedAt`. It includes the
+  **dispatch gap** (column 5), the time between the edit and the MCP starting the task. The gap is
+  agent latency, not build time: 2.0 to 8.8 s in 18 of 20 builds, **34.9 s before R4 L-edit** and
+  14.3 s before R5 L-noop. Paired differences on this column are therefore contaminated and are given
+  only for completeness.
+- **`Took`:** PlatformIO's own `[SUCCESS] Took N seconds` line.
+- **Recompiled:** the `-o <file>.o` compiler invocations in the verbose log; **Link:** whether
+  `firmware.elf` was linked.
+
+All 20 rows (`L` is legacy, `N` is U8G2GL; load is the 1, 5 and 15 minute averages):
+
+| Round | Kind | Edit | Load 1/5/15 min | Dispatch gap | Edit to success | Task start to end | PlatformIO `Took` | Recompiled | Link |
+|---|---|---|---|---:|---:|---:|---:|---|---|
+| 1 | L-edit | 30 to 31 | 5.80 / 6.81 / 8.45 | 2.2 s | 28.80 s | 26.63 s | 26.44 s | `DiagnosticsBoard.cpp.o` | Y |
+| 1 | N-edit | 30 to 31 | 4.60 / 6.31 / 8.15 | 2.5 s | 34.12 s | 31.62 s | 31.39 s | `ui_screen_diagnostics.cpp.o` | Y |
+| 1 | L-noop | none | 4.98 / 6.22 / 8.05 | 2.8 s | 24.78 s | 21.99 s | 21.77 s | none | N |
+| 1 | N-noop | none | 4.16 / 5.85 / 7.81 | 2.9 s | 30.82 s | 27.92 s | 27.72 s | none | N |
+| 2 | L-edit | 31 to 30 | 4.18 / 5.68 / 7.67 | 8.8 s | 35.72 s | 26.92 s | 26.67 s | `DiagnosticsBoard.cpp.o` | Y |
+| 2 | N-edit | 31 to 30 | 5.07 / 5.72 / 7.61 | 4.3 s | 38.53 s | 34.25 s | 33.90 s | `ui_screen_diagnostics.cpp.o` | Y |
+| 2 | L-noop | none | 6.47 / 6.05 / 7.64 | 2.1 s | 25.04 s | 22.91 s | 22.67 s | none | N |
+| 2 | N-noop | none | 6.15 / 6.02 / 7.57 | 2.2 s | 32.71 s | 30.55 s | 30.29 s | none | N |
+| 3 | L-edit | 30 to 31 | 5.45 / 5.87 / 7.45 | 2.2 s | 29.56 s | 27.38 s | 27.14 s | `DiagnosticsBoard.cpp.o` | Y |
+| 3 | N-edit | 30 to 31 | 4.43 / 5.48 / 7.19 | 2.5 s | 34.41 s | 31.90 s | 31.61 s | `ui_screen_diagnostics.cpp.o` | Y |
+| 3 | L-noop | none | 4.04 / 5.27 / 7.04 | 4.5 s | 26.11 s | 21.60 s | 21.36 s | none | N |
+| 3 | N-noop | none | 4.36 / 5.23 / 6.96 | 2.0 s | 29.62 s | 27.62 s | 27.43 s | none | N |
+| 4 | L-edit | 31 to 30 | 4.26 / 5.11 / 6.86 | 34.9 s | 60.67 s | 25.81 s | 25.57 s | `DiagnosticsBoard.cpp.o` | Y |
+| 4 | N-edit | 31 to 30 | 5.99 / 5.33 / 6.80 | 7.8 s | 51.50 s | 43.69 s | 43.45 s | `ui_screen_diagnostics.cpp.o` | Y |
+| 4 | L-noop | none | 4.64 / 5.06 / 6.61 | 2.5 s | 23.75 s | 21.29 s | 21.03 s | none | N |
+| 4 | N-noop | none | 4.33 / 4.96 / 6.52 | 7.4 s | 43.28 s | 35.89 s | 35.71 s | `esp_app_desc.c.o` | Y |
+| 5 | L-edit | 30 to 31 | 4.59 / 4.92 / 6.43 | 2.8 s | 30.72 s | 27.96 s | 27.68 s | `DiagnosticsBoard.cpp.o` | Y |
+| 5 | N-edit | 30 to 31 | 5.21 / 5.04 / 6.41 | 2.1 s | 33.46 s | 31.41 s | 31.21 s | `ui_screen_diagnostics.cpp.o` | Y |
+| 5 | L-noop | none | 4.85 / 4.97 / 6.32 | 14.3 s | 35.65 s | 21.35 s | 21.09 s | none | N |
+| 5 | N-noop | none | 4.46 / 4.85 / 6.21 | 2.2 s | 29.72 s | 27.50 s | 27.25 s | none | N |
+
+**Load.** Immediately before the 20 timed builds the 1-minute average was **4.04 to 6.47**, the
+5-minute **4.85 to 6.81**, the 15-minute **6.21 to 8.45**, drifting down through the session. WO-B3's
+runs saw 5.5 to 20.7. During the warm-up (a full rebuild) it was 3 to 8. Load is the same order for
+both trees in every round, which is what interleaving is for.
+
+**Medians per kind (n = 5):**
+
+| Kind | Task start to end | Edit to success | `Took` |
+|---|---:|---:|---:|
+| L-edit | **26.92 s** | 30.72 s | 26.67 s |
+| N-edit | **31.90 s** | 34.41 s | 31.61 s |
+| L-noop | **21.60 s** | 25.04 s | 21.36 s |
+| N-noop | **27.92 s** | 30.82 s | 27.72 s |
+
+Ranges, task time: L-edit 25.81 to 27.96; N-edit 31.41 to 43.69; L-noop 21.29 to 22.91; N-noop 27.50
+to 35.89. Legacy is steady (a 2.2 s spread); the U8G2GL tree has two round-4 outliers (below).
+
+**Paired differences, N-edit minus L-edit, same round (task time):**
+R1 +4.99, R2 +7.33, R3 +4.51, R4 +17.88, R5 +3.44. **Median +4.99 s** (18% of the legacy median).
+Without round 4: +4.99, +7.33, +4.51, +3.44, median +4.75 s. On `Took` the median is +4.95 s. On the
+contaminated edit-to-success column: +5.31, +2.81, +4.85, -9.17, +2.74, median +2.81 s (the -9.17 is
+R4's 34.9 s dispatch gap before the *legacy* build).
+
+**Per-edit compile cost, edit minus noop within the tree and round (task time):**
+
+| | R1 | R2 | R3 | R4 | R5 | Median |
+|---|---:|---:|---:|---:|---:|---:|
+| Legacy | 4.65 | 4.01 | 5.78 | 4.52 | 6.62 | **4.65 s** |
+| U8G2GL | 3.71 | 3.71 | 4.28 | 7.80 | 3.90 | **3.90 s** |
+
+The cost of an edit, one object compiled plus the link and image, is about 4 to 5 s in both trees.
+The U8G2GL figure is not larger (3.90 s against 4.65 s). The R4 U8G2GL value is the outlier.
+
+**Does a difference survive the pairing? Yes: about +5 s, and all of it is fixed overhead, none is
+per-edit work.**
+
+- N-edit is slower than L-edit in all five pairs (+3.4 to +17.9 s; four of five within +3.4 to +7.3 s).
+- The no-change builds differ by nearly the same amount: **N-noop minus L-noop is +5.93, +7.64,
+  +6.01, +14.60, +6.16 s, median +6.16 s** (task time). A build in which nothing is compiled
+  already costs U8G2GL about 6 s more.
+- The edit-specific work is not larger in U8G2GL (3.90 s against 4.65 s). The arithmetic closes:
+  +6.16 s of fixed overhead, -0.75 s of per-edit work, gives +5.4 s, against the measured +5.0 s.
+- WO-B3's 48.81 s against 29.94 s (+18.9 s) was mostly load and session drift. With the trees
+  alternated at load 4 to 6.5, the gap is **+5 s on a base of about 27 s**.
+
+**What differs in the fixed overhead, with evidence.**
+
+1. **It is not the hook.** I removed `custom_u8g2gl_cli` (which is the committed `platformio.ini`
+   state), ran an untimed warm-up of the stack tree (104.71 s, a full rebuild) and one settling build
+   (34.82 s), then ran four more interleaved pairs of L-noop against N-noop **with the hook off**.
+   `Took`, seconds:
+
+   | Pair | L-noop | N-noop, hook off | Difference | Load 1-min at the L build |
+   |---|---:|---:|---:|---:|
+   | S1 | 25.56 | 26.66 | +1.10 | 10.22 (my own rebuild's tail) |
+   | S2 | 20.91 | 27.50 | +6.59 | 6.74 |
+   | S3 | 20.80 | 27.22 | +6.42 | 5.22 |
+   | S4 | 21.06 | 27.20 | +6.14 | 5.02 |
+
+   S2 to S4: the gap is **+6.1 to +6.6 s with no hook**, the same as with it (+5.9 to +7.6 s). N-noop
+   with the hook on took `Took` 27.72, 30.29, 27.43, 35.71 and 27.25 s (median 27.72 s); with it off,
+   27.50, 27.22 and 27.20 s. The hook's effect on a no-change build is within about 0.5 s. The
+   generator itself runs in 0.05 to 0.07 s alone (three `time -p` runs of `node <cli> generate
+   uidesign/ssd1322-256x64/u8g2gl --target ssd1322`, each `unchanged`), consistent with WO-B3's
+   0.05 s. **Not captured:** a per-edit timestamp for the hook's generate step. The build log carries
+   no timestamps and I reverted the generated files before I thought to read their modification
+   times. The no-hook pairs bound the hook's total effect instead.
+2. **The two verbose logs differ in the library dependency graph.** Last no-change pair (R5; the log
+   file names are in the Dead Ends below):
+
+   | | Legacy | U8G2GL |
+   |---|---:|---:|
+   | `Found N compatible libraries` | 78 | **81** |
+   | `Dependency Graph` lines (from `Dependency Graph` to `Building in release mode`) | 6,266 | **8,935** (+42.6%) |
+   | Top-level graph entries | 14 | 16 |
+   | Lines in the `U8G2GLDisplay` subtree | none | **2,665** |
+   | Lines in the `U8G2Display` subtree | 2,595 | 2,595 |
+
+   `lib_ldf_mode = deep` makes PlatformIO's Library Dependency Finder walk every library's sources.
+   The three libraries that appear only in the U8G2GL graph are `U8G2GLDisplay` (the module),
+   `U8G2GLUI` (the generated project in `uidesign/ssd1322-256x64`, added through `lib_extra_dirs`)
+   and `u8g2gl` (the runtime, from the git `lib_deps` entry). They add a 2,665-line subtree on top
+   of the walk the legacy tree already pays for. The other steps the logs show are the same in both:
+   the pre-build scripts (four in legacy, five in U8G2GL, the fifth being the hook), the `Reading
+   CMake configuration...` read, and a `checkprogsize` that reports without relinking.
+3. **What I can and cannot say.** The step that is structurally larger is the deep dependency walk
+   (+42.6% on graph size). The ~6 s sits in PlatformIO's own overhead rather than in compiling, in the
+   hook, or in a library fetch (the only `git` and `download` strings in either log are tag warnings and
+   package URLs; neither log shows a library being installed or cloned). **I could not time the walk on its own**: the verbose log has no timestamps and a
+   timed run would need the `pio` CLI, which rule 04 forbids. Attributing the 6 s to the walk is
+   therefore an inference from the structural difference plus the elimination of the hook, not a
+   measured split.
+
+**Outliers and surprises, reported as seen.**
+
+- **R4 U8G2GL builds were slow** (N-edit 43.69 s, N-noop 35.89 s against 31 to 34 s and 27.5 to 30.6 s
+  in the other rounds). The R4 N-noop log shows an extra compile, `esp_app_format/esp_app_desc.c.o`,
+  followed by a link, which no other no-change build shows. In between R3 and R4, another agent
+  committed two documentation files to this branch (`a9ab6fae`, `bce7db8a`, the WO-B4 review; the
+  second at 21:39:09 UTC, my R3 N-noop ended 21:38:57 and R4 N-edit began 21:40:10). ESP-IDF's app
+  descriptor is the file that embeds build identity, so a moved `HEAD` is a plausible cause. I did not
+  test it, so this is a hypothesis. It was not a collision: the 12 stack-tree build logs from 21:27 to
+  21:44 are all mine. The medians do not move materially without round 4 (N-edit 31.76 s, N-noop
+  27.77 s, paired median +4.75 s).
+- **The first no-change legacy build took 25.65 s** and the five timed L-noop builds 21.3 to 22.9 s.
+  WO-B1 recorded 50.64 s for its first no-change build and did not explain it; I did not see that
+  here (the legacy warm-up had been built before, so it was already settled).
+- **Dispatch gaps** (above) are why edit-to-success is not used for the analysis.
+
+**Conclusion for the gate (criterion 4).** On this host, interleaved at load 4 to 6.5, the
+edit-and-rebuild loop is **26.9 s for legacy and 31.9 s for U8G2GL (task time; 30.7 s and 34.4 s edit
+to success)**: U8G2GL is **about 5 s (18%) slower**. The difference exists with no edit at all and
+with the hook off, so it is a fixed cost of the larger project in PlatformIO's dependency walk, not of
+the XML workflow, the generator (0.05 s) or the hook. The per-edit compile work is no larger. WO-B3's
++18.9 s was a load artefact; WO-B1's 29.94 s and WO-B3's 48.81 s should not be compared. PR-07 decides
+whether 5 s matters; this subsection does not.
+
+**Revert and cleanliness.** Legacy: the edit was reverted with `git checkout -- .`; `_row3(4, 30,
+...)` is at `DiagnosticsBoard.cpp:50`, `git status --short` empty, HEAD `7396e43d`. Stack:
+`git checkout -- platformio.ini uidesign/` removed the temporary `custom_u8g2gl_cli` and the XML edit
+(`name="uptime" x="4" y="30"` at `screen_diagnostics.xml:63`); the path was never committed. The
+no-hook experiment needed no further revert because the committed `platformio.ini` has no
+`custom_u8g2gl_cli`. `get_lock_status` reported `isLocked: false`. Scratch scripts and tables are in
+the stack worktree's `tmp/wob3b/` (git-ignored). Logs (git-ignored, in each worktree's
+`.pio-mcp-workspace/logs/build/`): the 20 timed builds are the files named in `tmp/wob3b/obs.tsv`;
+the R5 pair compared in item 2 are legacy `...T21-43-32-200Z-c5fbdbde` and stack
+`...T21-44-06-049Z-cf690932`.
