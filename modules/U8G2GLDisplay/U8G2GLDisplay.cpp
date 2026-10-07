@@ -33,8 +33,10 @@ namespace {
  *
  * u8g2gl_set_tick_cb() takes a plain function pointer returning uint32_t, and
  * Arduino's millis() returns unsigned long, so a one-line adapter is needed.
- * The runtime only uses it for animation deadlines; the diagnostics board has
- * none, but a screen added later may.
+ * Registered for completeness: only the runtime's ui_handler() reads it, and
+ * this module's boards never call that (ruling R1 of U8G2GL PR-05: the legacy
+ * module owns the draw loop; the board passes the carousel's time to tick_fn
+ * directly), but anything that does would otherwise see time stuck at 0.
  *
  * @return Milliseconds since boot.
  */
@@ -55,8 +57,8 @@ void U8G2GLDisplay::begin() {
     _begun = true;
 
     // --- Step 1: Time source ---
-    // Before ui_init(), so nothing the generated code does can ask the runtime
-    // for the time while it is still unset (it would read 0 forever).
+    // Registered before ui_init() so the time source is in place before any
+    // generated code runs; a caller of ui_handler() would otherwise see 0.
     u8g2gl_set_tick_cb(tickNow);
 
     // --- Step 2: Generated subjects, styles and screens ---

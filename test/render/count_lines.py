@@ -9,9 +9,9 @@
 # Module: test/render/count_lines.py
 # Description: Counts total, blank, comment-only and code lines in C/C++ and XML
 #              source, so that the legacy C++ and its replacement are measured
-#              the same way (cloc is not installed here). A line that holds both
-#              code and a trailing comment counts as code. A blank line inside a
-#              block comment counts as blank.
+#              the same way (a self-contained script, so no cloc install is needed). A line that holds both code and a trailing comment
+#              counts as code. A completely empty line inside a block comment
+#              counts as blank; a line of only spaces there counts as comment.
 #
 #              C/C++ (.c .cc .cpp .cxx .h .hh .hpp .hxx .ino): '//' and '/* */'
 #              comments, string-aware: comment markers inside "..." strings,
@@ -21,13 +21,17 @@
 #              XML (.xml .svg): '<!-- -->' comments.
 #
 # Exported Functions:
-# - classify_lines(): Label every line of a source text blank / comment / code.
-# - count_file():     Count one file, optionally restricted to selected lines.
-# - main():           Command line: count_lines.py [--json] FILE[:LINES] ...
+# - classify_lines():   Label every line of a source text blank / comment / code.
+# - classify_c_family(): The C/C++ labeller classify_lines() delegates to.
+# - classify_xml():     The XML labeller classify_lines() delegates to.
+# - parse_line_spec():  Parse a "91,93,200-214" selection into 1-based line numbers.
+# - count_file():       Count one file, optionally restricted to selected lines.
+# - self_test():        Check the labellers against known snippets (--self-test).
+# - main():             Command line: count_lines.py [--json] FILE[:LINES] ...
 #
 # Usage:
 #   count_lines.py modules/U8G2Display/boards/DiagnosticsBoard.hpp
-#   count_lines.py src/main.cpp:91,93,211,213        # only those 1-based lines
+#   count_lines.py src/main.cpp:211,213            # only those 1-based lines
 #   count_lines.py src/main.cpp:200-214              # a range
 #   count_lines.py --self-test
 
@@ -36,7 +40,7 @@ import json
 import os
 import sys
 
-BLANK = "blank"      # Whitespace only (including inside a block comment)
+BLANK = "blank"      # Empty or whitespace only (a spaces-only line inside a block comment is COMMENT)
 COMMENT = "comment"  # Comment text and whitespace, no code
 CODE = "code"        # At least one code character
 
@@ -111,6 +115,10 @@ def classify_c_family(text):
                 i += 2
                 in_number = False
                 continue
+            # A raw string starts at R" when the R is not the tail of an identifier. The
+            # one exception that works is the u8R"(...)" prefix (the two characters before
+            # the R spell u8). The one-letter prefixes (LR, uR, UR) are listed but cannot
+            # match, because the test compares two characters; a known limitation.
             if ch == "R" and nxt == '"' and (i == 0 or not (line[i - 1].isalnum() or line[i - 1] == "_")
                                               or line[max(0, i - 2):i] in ("u8", "L", "u", "U")):
                 # Raw string: R"delim( ... )delim"

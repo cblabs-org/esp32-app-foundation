@@ -9,19 +9,21 @@
                uptime, and heap plus version, on the 256x64 SSD1322.
 
   Geometry is chosen to reproduce the legacy DiagnosticsBoard pixel for pixel,
-  defects included (the gate asks for identity; whether to fix the defects is
-  the owner's call). Every number below is measured, see the render harness
-  (test/render/) and EVIDENCE.md section 1.
+  defects included: these widths and heights reproduce the legacy clip bug
+  for bug on purpose, because the migration requires pixel identity. Fixing the
+  clip later means growing each label by one pixel in each direction. Every
+  number below is measured, see the render harness (test/render/) and section 1
+  of .agents/skills/principal-architect-workspace/pr-u8g2gl-05/evidence/EVIDENCE.md.
 -->
 <screen name="diagnostics">
     <view>
         <!-- Why every height is one less than the legacy label's, and every
-             width one less on the data rows (EVIDENCE section 1).
+             width one less on the data rows (section 1 of the EVIDENCE.md cited above).
 
              Legacy drawText() clips to setClipWindow(x, y, x + w - 1, y + h - 1)
              with h = getMaxCharHeight(). U8G2 treats that far corner as
-             EXCLUSIVE (u8g2.h:352/354), so the last column and the last row
-             were never drawn. The U8G2GL runtime converts a rect {x, y, w, h}
+             EXCLUSIVE (u8g2.h:352/354, U8G2 2.36.18), so the last column and
+             the last row were never drawn. The U8G2GL runtime converts a rect {x, y, w, h}
              to setClipWindow(x, y, x + w, y + h) (u8g2gl_apply_clip()), so its
              last row and column ARE drawn. To clip where legacy really clipped,
              the rect must be one smaller than legacy's argument. Measured under

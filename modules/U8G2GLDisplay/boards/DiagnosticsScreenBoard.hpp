@@ -26,6 +26,10 @@
  *              glyph for, so it draws nothing: pixel identity with legacy means
  *              reproducing that, not fixing it.
  *
+ * Exported Constants:
+ * - DIAGNOSTICS_NAME_CAPACITY: Bytes held for a hostname or SSID, with terminator (64)
+ * - DIAGNOSTICS_IP_CAPACITY:   Bytes held for a dotted IPv4 address, with terminator (16)
+ *
  * Exported Types:
  * - DiagnosticsInputs: Everything one refresh reads from the platform
  * - DiagnosticsLines:  The three formatted rows
@@ -60,7 +64,7 @@ class WifiManager;
  *
  * The row they feed is a 64-byte line, so a name longer than 63 characters could
  * never be shown in full anyway. WifiManager itself stores at most 32 characters
- * (char[33], WifiManager.hpp:137), so this is headroom; it also lets a test
+ * (char[33], WifiManager.hpp:135 and :137), so this is headroom; it also lets a test
  * hand in an SSID longer than the real limit, as the legacy board, which read
  * the pointer directly, would have rendered it (the harness's long_ssid scenario).
  */

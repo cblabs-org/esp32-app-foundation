@@ -209,6 +209,8 @@ void setup() {
     displayModule.setConfigManager(&app.getConfigManager());
     displayModule.begin(&app.getEventBus());
 #ifdef WITH_DISPLAY_U8G2
+    // Order matters: after displayModule.begin() and before configure(), so the
+    // generated UI exists before any board that feeds it is configured.
     U8G2GLDisplay::begin();
     diagnosticsBoard.configure(&app.getWifiManager());
     displayModule.boards.configuringStatus.setEngine(&app.getPreconditionEngine());

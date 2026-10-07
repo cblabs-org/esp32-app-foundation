@@ -44,7 +44,8 @@ compares every scenario byte for byte with `baseline/` and writes
 cmake --build tmp/render-build --target after
 ```
 
-It exits non-zero if any scenario differs from the baseline, so it doubles as the
+It also writes `after/diagnostics_board/clip_probe.json` (see below). It exits
+non-zero if any scenario differs from the baseline, so it doubles as the
 regression guard for the pixel-identity gate. The U8G2GL runtime is fetched from
 the pinned git sha (`FetchContent`; the repository is private, so git needs
 credentials for it, and its submodules are never fetched). To use an existing
@@ -57,8 +58,9 @@ cmake -S test/render -B tmp/render-build -DU8G2GL_SOURCE_DIR=/path/to/u8g2gl
 
 Configuring fetches the U8G2GL runtime by default, even for the `baseline`
 target, because both targets share one executable. `-DRENDER_U8G2GL=OFF` builds
-the legacy target only, so the baseline can be reproduced without it. `-DRENDER_AFTER_DIR=<dir>` redirects the
-migrated board's output, as `-DRENDER_OUTPUT_DIR` does the baseline's.
+the legacy target only, so the baseline can be reproduced without it.
+`-DRENDER_AFTER_DIR=<dir>` redirects the migrated board's output, as
+`-DRENDER_OUTPUT_DIR` does the baseline's.
 
 To write somewhere other than the committed `baseline/` (for example to compare
 two runs), add `-DRENDER_OUTPUT_DIR=<dir>`.
@@ -85,6 +87,7 @@ because the legacy separator is a lone `0xB7`, which is not valid UTF-8.
 | File | Content |
 |---|---|
 | `state_probe.json` | What the screen inherits from the legacy display state: the `connected` frame rendered without `setFontPosTop()`, without `setFontRefHeightAll()`, and as a plain U8G2GL user would draw it (`begin()` only, through `ui_handler()`), each compared with the normal frame; and the font mode after the runtime's `render_fn` versus after the board's `render()`. |
+| `clip_probe.json` | The pixels each label's clip removes, row by row, measured against the same strings drawn with no clip (`--probe-clip`). It backs the geometry arithmetic in `screen_diagnostics.xml`. |
 | `probe_<variant>.pbm` | Each probe frame, to look at. |
 
 For the migrated board, `inputs.json`'s `rows` are the text the screen's subjects
@@ -126,8 +129,10 @@ target. Add an entry to `kTargets` in `main.cpp`:
 `renderFunction(const Scenario&, U8G2&)` loads the scenario's inputs, builds the
 board, draws it into the display it was given (already in the legacy begin state)
 and returns the row strings. The target writes to
-`baseline/<output_subdir>/`, so a migrated board renders beside the legacy one
-with the same scenarios, and the two sets of `.bin` files compare directly.
+`<out>/<output_subdir>/`, where `<out>` is the run's `--out`. The legacy target's
+`--out` is `baseline/` and the migrated one's is `after/`, so a migrated board
+renders beside the legacy one with the same scenarios, and the two sets of `.bin`
+files compare directly.
 Add the board's sources and include paths to `CMakeLists.txt` as a second library
 beside `legacy_diagnostics`, and a `--board <id>` custom target if wanted. The
 `u8g2gl` target is the worked example: `u8g2gl_board`, `u8g2gl_ui` and
@@ -140,6 +145,7 @@ Run the executable directly for other views:
 tmp/render-build/render_harness --board legacy --ascii connected   # '#' lit, '.' dark, to stdout
 tmp/render-build/render_harness --board legacy --out <dir> --probe-separator
 tmp/render-build/render_harness --board u8g2gl --out <dir> --compare baseline --probe-state
+tmp/render-build/render_harness --board u8g2gl --out <dir> --probe-clip    # writes clip_probe.json
 ```
 
 ## count_lines.py
@@ -150,6 +156,6 @@ measured the same way. A line with code and a trailing comment is code.
 
 ```bash
 python3 test/render/count_lines.py modules/U8G2Display/boards/DiagnosticsBoard.hpp
-python3 test/render/count_lines.py src/main.cpp:91,93,211,213    # only those lines
+python3 test/render/count_lines.py src/main.cpp:200-214          # only those lines
 python3 test/render/count_lines.py --self-test
 ```

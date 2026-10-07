@@ -9,9 +9,12 @@
  * Description: One-time start-up of the U8G2GL runtime for the firmware.
  *              U8G2GLDisplay does not own a display. The legacy
  *              U8G2DisplayModule keeps the panel, the draw loop, the carousel
- *              and the screensaver (PR-05 ruling R1); this module only makes
- *              the generated UI ready, so U8G2GLScreenBoard instances can run
- *              generated screens inside that carousel.
+ *              and the screensaver, until a later programme step replaces them
+ *              (ruling R1 of U8G2GL PR-05, in
+ *              .agents/skills/principal-architect-workspace/pr-u8g2gl-05/PROJECT.md);
+ *              this module only makes the generated UI ready, so
+ *              U8G2GLScreenBoard instances can run generated screens inside
+ *              that carousel.
  *
  *              It does two things, once:
  *                1. registers millis() as the runtime's time source, and

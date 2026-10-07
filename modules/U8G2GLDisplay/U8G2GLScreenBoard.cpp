@@ -39,8 +39,9 @@ U8G2GLScreenBoard::U8G2GLScreenBoard(u8g2gl_screen& screen, const char* boardNam
  * @brief Draw the screen into the legacy module's display.
  *
  * What the screen inherits from the legacy module, and what it changes, were
- * read from the code and measured with the render harness (test/render,
- * EVIDENCE.md section 1):
+ * read from the code and measured with the render harness (test/render; the
+ * figures are in section 1 of
+ * .agents/skills/principal-architect-workspace/pr-u8g2gl-05/evidence/EVIDENCE.md):
  *
  *  - INHERITED, left alone. setFontPosTop(), setFontRefHeightAll(),
  *    setDrawColor(1) and setFontMode(1) are set once at U8G2Display.cpp:143-146
@@ -49,12 +50,13 @@ U8G2GLScreenBoard::U8G2GLScreenBoard(u8g2gl_screen& screen, const char* boardNam
  *    "the framework default" but nothing in its src/ sets it. Measured
  *    (test/render/after/diagnostics_board/state_probe.json): without
  *    setFontPosTop() the glyphs are drawn above their y and the labels' clip
- *    removes all but 15 of the 1392 lit pixels; without setFontRefHeightAll()
+ *    removes them: the frame has 15 lit pixels and none is where the 1392
+ *    normal ones are; without setFontRefHeightAll()
  *    every row sits 1 pixel higher. The legacy module guarantees both, so the
  *    board does not set them again.
  *  - A FONT MUST BE SET. The runtime's state saver captures whatever font is
  *    current and puts it back after every object, and with none set that is
- *    nullptr, which U8G2 then reads: a null dereference (u8g2_font.c:114),
+ *    nullptr, which U8G2 then reads: a null dereference (u8g2_font.c:114, U8G2 2.36.18),
  *    reproduced in the harness. The legacy module does not set one in begin();
  *    the legacy boards' own state saver skips a null font, so they never hit
  *    it. If no font is set yet, one that is already linked for the legacy

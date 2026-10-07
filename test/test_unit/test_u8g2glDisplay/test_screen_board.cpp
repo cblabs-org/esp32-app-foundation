@@ -28,27 +28,32 @@ namespace {
 
 /** @brief Call counters for one fake screen. */
 struct Counters {
-    int activate = 0;
-    int deactivate = 0;
-    int tick = 0;
-    int render = 0;
-    uint32_t lastTickMs = 0;
-    int fontModeDuringRender = -1;
+    int activate = 0;                ///< Times the screen's activate_fn ran
+    int deactivate = 0;              ///< Times the screen's deactivate_fn ran
+    int tick = 0;                    ///< Times the screen's tick_fn ran
+    int render = 0;                  ///< Times the screen's render_fn ran
+    uint32_t lastTickMs = 0;         ///< The time passed to the most recent tick_fn
+    int fontModeDuringRender = -1;   ///< is_transparent as seen inside render_fn; -1 if never rendered
 };
 
 Counters g_a;   ///< Counters of screen A
 Counters g_b;   ///< Counters of screen B
 
+/** @brief Screen A's activate_fn: counts the call. */
 void activateA() { ++g_a.activate; }
+/** @brief Screen A's deactivate_fn: counts the call. */
 void deactivateA() { ++g_a.deactivate; }
+/** @brief Screen A's tick_fn: counts the call, records the time, reports no deadline. */
 uint32_t tickA(uint32_t now) { ++g_a.tick; g_a.lastTickMs = now; return U8G2GL_IDLE; }
-/** Draws nothing but behaves like a runtime label: sets the font mode to solid and leaves it. */
+/** @brief Draws nothing but behaves like a runtime label: sets the font mode to solid and leaves it. */
 void renderA(U8G2& display) {
     ++g_a.render;
     display.setFontMode(0);
     g_a.fontModeDuringRender = display.getU8g2()->font_decode.is_transparent;
 }
+/** @brief Screen B's activate_fn: counts the call. */
 void activateB() { ++g_b.activate; }
+/** @brief Screen B's deactivate_fn: counts the call. */
 void deactivateB() { ++g_b.deactivate; }
 
 /** @brief A screen with no objects and the given lifecycle functions. */

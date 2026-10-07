@@ -7,10 +7,12 @@
  *
  * Module: modules/U8G2GLDisplay/U8G2GLScreenBoard.hpp
  * Description: A generic IDisplayBoard that runs one generated U8G2GL screen
- *              inside the legacy carousel. This is the "board host" of PR-05
- *              ruling R1: it adapts the carousel's calls to the screen's own
- *              lifecycle functions and draws into the display the legacy module
- *              already owns.
+ *              inside the legacy carousel. This is the "board host" of
+ *              ruling R1 of U8G2GL PR-05 (see
+ *              .agents/skills/principal-architect-workspace/pr-u8g2gl-05/PROJECT.md):
+ *              the legacy module keeps the display, and this class adapts the
+ *              carousel's calls to the screen's own lifecycle functions and
+ *              draws into that display.
  *
  *              It never calls ui_handler(). ui_handler() clears the buffer and
  *              sends it, and the legacy module does both itself around every
@@ -30,12 +32,15 @@
  *   - U8G2GLScreenBoard(): Bind a generated screen and a board name
  *
  *   IDisplayBoard:
- *   - render():       Draw the screen into the legacy display, leaving its state as found
+ *   - render():       Draw the screen into the legacy display, restoring the font mode
  *   - tick():         Tick the screen (animation deadlines)
  *   - isExpired():    Always false (a permanent carousel board)
  *   - getBoardName(): The name given at construction
  *   - onActivate():   Make the screen the runtime's active screen
  *   - onDeactivate(): Release the active screen if it is this one
+ *
+ *   Protected:
+ *   - screen():       The bound screen, for a derived board to reach its tick or render
  */
 
 #pragma once
@@ -71,9 +76,11 @@ public:
      * @brief Draw the screen into the legacy module's display.
      *
      * Calls the screen's render_fn only. The carousel has already cleared the
-     * buffer and will send it afterwards. U8G2 state is left as it was found:
-     * the runtime's labels set the font mode and do not restore it, and the
-     * legacy module sets it once and relies on it for every other board.
+     * buffer and will send it afterwards. The font mode is restored: the
+     * runtime's labels set it and do not put it back, and the legacy module
+     * sets it once and relies on it for every other board. The one other
+     * change is that a font is set if none was (see the .cpp), which is
+     * harmless because every label sets its own.
      *
      * @param u8g2 The legacy module's U8G2 instance.
      */

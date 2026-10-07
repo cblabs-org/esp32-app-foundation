@@ -72,12 +72,15 @@ PREFIX = "[u8g2gl_generate]"                    # Prefix of every line this scri
 def resolve_cli(environ, option_value):
     """Return the configured path to cli.js, or None when nothing is configured.
 
+    The environment variable takes precedence over the option. A leading ~ is
+    expanded; the result is otherwise returned as written.
+
     Args:
         environ: Mapping of environment variables (os.environ).
         option_value: The env's custom_u8g2gl_cli option, or None/"" if unset.
 
-    The environment variable takes precedence over the option. A leading ~ is
-    expanded; the result is otherwise returned as written.
+    Returns:
+        The expanded path to cli.js, or None when neither source names one.
     """
     chosen = (environ.get(CLI_ENV_VAR) or "").strip() or (option_value or "").strip()
     if not chosen:
@@ -200,6 +203,7 @@ if env is not None:
         _header = capacity_header_path(_root)
 
         def _apply_capacities(lib_env, node):
+            """Rebuild one runtime source node with the generated capacity header forced in."""
             # The two-argument form hands over the environment of the library being built,
             # which carries that library's own include paths: using the project env here
             # drops them (measured: u8g2gl/u8g2gl_version.h not found). env.Object()

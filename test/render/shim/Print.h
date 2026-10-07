@@ -24,8 +24,9 @@
 /**
  * @brief Arduino's character-output base class, as far as U8G2 uses it.
  *
- * No virtual destructor, matching the Arduino core: U8G2 is never deleted
- * through a Print pointer.
+ * No virtual destructor here: the harness never deletes a U8G2 through a Print
+ * pointer. (The ESP32 Arduino core, which the firmware builds against, does
+ * declare one in cores/esp32/Print.h; it is omitted as unnecessary.)
  */
 class Print {
 public:
