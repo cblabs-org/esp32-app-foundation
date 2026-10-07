@@ -9,8 +9,8 @@
 commit that holds this file, so the baseline also describes that commit's legacy board.
 
 **Status**: sections 1 and 2 Before are filled (WO-B1 Part 1). Sections 1 and 2 After are filled
-(WO-B2 Part 1, on host). Sections 3 and 4 Before are pending the PlatformIO MCP (WO-B1 Part 2);
-sections 3 and 4 After are pending WO-B3 and the MCP.
+(WO-B2 Part 1, on host). Sections 3 and 4 Before are filled (WO-B1 Part 2, legacy worktree
+`7396e43d`, PlatformIO MCP); sections 3 and 4 After are pending WO-B3 and the MCP.
 
 ---
 
@@ -304,7 +304,115 @@ The six `src/main.cpp` lines exist only for this board:
 
 ### Before (legacy)
 
-PENDING — needs the PlatformIO MCP (WO-B1 Part 2)
+**What was built.** The detached legacy worktree
+`/Users/mcneillm/Documents/Projects/esp32-app-foundation-u8g2gl-legacy`, HEAD `7396e43d`. Its `src/`
+and `modules/` are byte-identical to `e5342373`, so this is the firmware that `e5342373` builds.
+The build ran through the PlatformIO MCP only (`clean_project` then `build_project`, with
+`forceExecution`), on 2026-10-07.
+
+**`esp32dev`, clean build** (build log
+`.pio-mcp-workspace/logs/build/build-2026-10-07T06-08-10-264Z-ba58ce9f.log` in the legacy worktree;
+`[SUCCESS] Took 111.71 seconds`, which includes fetching the libraries into a fresh worktree). The
+exact lines:
+
+```
+RAM:   [==        ]  17.5% (used 57500 bytes from 327680 bytes)
+Flash: [========  ]  84.9% (used 1336143 bytes from 1572864 bytes)
+```
+
+Image: `Total image size: 1336368 bytes` in the first (clean) build's table; `firmware.bin` is
+1,336,544 bytes (padded).
+
+**A 32-byte wobble to know about.** Every later incremental build of the same source, including the
+three timed runs in section 4, reports `Flash: ... (used 1336111 bytes from 1572864 bytes)`, and
+`RAM` stays `57500`. The 32 bytes are all in `.text` (966568 clean, 966536 incremental). The source
+did not change, so this is link-order or build-state noise. **PR-07 should compare to the clean-build
+figure, and treat 32 bytes as the noise floor.**
+
+**`size_report` on the clean `esp32dev` ELF** (`sha256 e4a68e85c4e4c89b82102a92fd784c78f2a2afdac42b169f84b047005772ceb5`,
+25,501,832 bytes), with the tool's own field names:
+
+| `sections[].section` | `size` | `region` |
+|---|---:|---|
+| `.flash.text` | 966568 | flash |
+| `.flash.rodata` | 261948 | flash |
+| `.iram0.text` | 90843 | both |
+| `.dram0.bss` | 41744 | ram |
+| `.dram0.data` | 15756 | both |
+| `.flash.rodata_noload` | 13808 | flash |
+| `.iram0.vectors` | 1028 | ram |
+| `.flash.appdesc` | 256 | flash |
+| `.rtc.force_slow` | 32 | ram |
+| `.rtc_slow_reserved` | 24 | ram |
+| `.flash.tdata` | 1 | flash |
+| `.iram0.text_end` | 1 | ram |
+| `.xt.prop`, `.xt.lit`, `.xtensa.info` (no load) | 35184, 1000, 56 | other |
+
+`totals`: `text` 1072503, `data` 277736, `bss` 41770, `flashEstimate` 1350239, `ramEstimate` 319506.
+`memory` (the PlatformIO figures): `ram` 57500 of 327680 (17.5%), `flash` 1336143 of 1572864 (84.9%).
+`symbolCount` 9560. The tool's `notes` say static RAM excludes stack and heap, and that the
+estimates are not partition capacities.
+
+**The legacy board's own footprint** (`size_report` with `filter: DiagnosticsBoard`, 12 symbols):
+`diagnosticsBoard` instance in `.bss`, **812 B** (`src/main.cpp:93`); code in
+`DiagnosticsBoard.cpp` **726 B** (`tick` 289, constructor 129, `configure` 120, `render` 44,
+`getBoardName` 8, `isExpired` 7); `DiagnosticsBoard.hpp` code 26 B (destructors); `vtable` 44 B
+(`.flash.rodata`). That is roughly 812 B of RAM and 0.8 KB of flash for the board itself. PR-07's
+gate is about the whole firmware, and the whole firmware's deltas will be dominated by what the
+runtime library and generated code add, not by this board.
+
+**`esp32s3nano`** (secondary; the gate names `esp32dev`), clean build, `[SUCCESS] Took 114.34 seconds`
+(log `build-2026-10-07T06-12-34-838Z-81c25252.log`):
+
+```
+RAM:   [==        ]  18.3% (used 60124 bytes from 327680 bytes)
+Flash: [===       ]  32.7% (used 1370475 bytes from 4194304 bytes)
+```
+
+`size_report` (ELF `sha256 e7e22c2e669dc1534c720bb97b08a1cab54423debf31d146af2950317c44fbf4`):
+`.flash.text` 981896, `.flash.rodata` 273820, `.iram0.text` 94671, `.dram0.bss` 41064,
+`.dram0.data` 19060, `.flash.rodata_noload` 13694. Its `totals.bss` (2414222) and `ramEstimate`
+(2707134) include the PSRAM and flash-mapping placeholder sections `.ext_ram.dummy` (1310688) and
+`.flash_rodata_dummy` (983040); **use the `RAM:` and `Flash:` lines, not those `totals`.**
+
+**Tool versions** (from the build log and `system_info`; WO-B3 must build with the same):
+
+| Item | Version |
+|---|---|
+| PlatformIO Core | 6.1.19 (`/opt/homebrew/bin/platformio`) |
+| Platform `espressif32` | `Espressif 32 (55.3.311+sha.5f39b6d)`, from `git+https://github.com/pioarduino/platform-espressif32.git` |
+| `framework-arduinoespressif32` | 3.3.11 |
+| `framework-arduinoespressif32-libs` | 5.5.5+sha.b774170ff46 |
+| `framework-espidf` | 3.50505.0 (ESP-IDF 5.5.5) |
+| `toolchain-xtensa-esp-elf` | 14.2.0+20260121 |
+| `tool-esptoolpy` | 5.3.0 (`esptool v5.3.0` in the image step) |
+| `tool-cmake` / `tool-ninja` / `tool-scons` | 4.0.3 / 1.13.1 / 4.8.1 (4.40801.0) |
+| Python (PlatformIO) / ESP-IDF penv | 3.14.6 / `.espidf-5.5.5` |
+| U8g2 | 2.36.18 |
+| ArduinoJson / PsychicHttp / JsonStreamingParser | 7.4.3 / 3.1.2 / 1.0.5 |
+| Host | macOS-26.6.2, darwin_arm64 |
+
+**Version stamp.** `scripts/inject_version.py` found no exact tag at HEAD and stamped
+`0.0.12-beta.2` (nearest ancestor `v0.0.12-beta.2`). It is a string in the image, so it moves flash
+by a few bytes at most. The host harness in section 1 used `0.0.12-dev.83` because the on-device
+frame carries that text; the two do not need to match for the size gate, but WO-B3 should say which
+it used.
+
+**Native suite at baseline** (`run_tests`, `environment: native`, legacy worktree; log
+`.pio-mcp-workspace/logs/test/test-2026-10-07T06-16-37-944Z-ffdf012f.log`). The runner's own
+summary line:
+
+```
+================ 989 test cases: 989 succeeded in 00:01:13.071 ================
+```
+
+Passed 989, failed 0, total 989. Skipped test cases: none reported. At suite level, the `native`
+rows are 36 `PASSED` and 10 `SKIPPED`, and every `native_ha` row (46) and every other-environment
+row is `SKIPPED`. The skipped `native` rows are the `test_native`, `test_native/test_hardware_board`,
+`test_native/test_homeassistant`, `test_unit` (the container), `test_unit/test_helpers`,
+`test_unit/test_homeassistant`, `test_hardware`, `test_hardware/test_wifi`, `test_hardware/test_ota`
+and `test_e2e` rows. There were no failures to record. `test_unit/test_u8g2Display` is among the
+passes.
 
 ### After (U8G2GL)
 
@@ -316,7 +424,58 @@ PENDING — WO-B3
 
 ### Before (legacy)
 
-PENDING — needs the PlatformIO MCP (WO-B1 Part 2)
+**Task.** "Edit C++, rebuild": change `modules/U8G2Display/boards/DiagnosticsBoard.cpp` row 3's
+constructor argument `_row3(4, 30, ...)` to `31`, or back, then `build_project` of `esp32dev`.
+WO-B3 times "edit XML, regenerate, rebuild" the same way.
+
+**Method.** In the legacy worktree (HEAD `7396e43d`) on 2026-10-07, after the clean build in
+section 3. One warm-up incremental `build_project` (no source change, `forceExecution: true`,
+untimed; it took 50.64 s by the runner's own line, so a no-change rebuild still pays about 50 s
+of PlatformIO, CMake and link overhead). Then three runs, each: write the edit with `sed` and
+print a UTC timestamp, then call `build_project` (foreground, `environment: esp32dev`,
+`forceExecution: true`, `verbose: true`), then read the result. Edits were 30 to 31, 31 to 30,
+30 to 31; the file was reverted to 30 afterwards. Two measures per run from the MCP and the clock:
+
+- **Edit to success (wall clock).** From the UTC time the edit was written to the `observedAt` of
+  the `build_project` result. This includes the MCP call overhead and is what an author waits.
+- **Task start to end.** From the timestamp in the build log's file name to the result's
+  `diagnostic.timestamp`.
+- The runner's own line, `[SUCCESS] Took N seconds`, from the build log.
+
+| Run | Edit | Edit written (UTC) | Success reported (UTC) | Edit to success | Task start to end | PlatformIO `Took` |
+|---|---|---|---|---:|---:|---:|
+| 1 | 30 to 31 | 06:19:30.995 | 06:20:00.392 | **29.40 s** | 27.44 s | 27.21 s |
+| 2 | 31 to 30 | 06:20:07.820 | 06:20:37.761 | **29.94 s** | 26.86 s | 26.62 s |
+| 3 | 30 to 31 | 06:20:42.133 | 06:21:12.171 | **30.04 s** | 27.03 s | 26.81 s |
+| **Median** | | | | **29.94 s** | **27.03 s** | **26.81 s** |
+
+The edit-to-success figure is the headline for the "edit loop" criterion: **median 29.94 s** (range
+29.40 to 30.04 s). The task's own start-to-end timestamps give 27.03 s. The 2 to 3 s gap sits at the start: the build log's first timestamp is 1.95 s, 3.08 s and 3.00 s
+after my edit was written (call dispatch). The end timestamps agree to within 6 ms.
+
+**What was recompiled.** Each timed log (verbose) shows exactly two compiler invocations after the
+pre-build scripts and the CMake configuration read:
+
+1. `xtensa-esp32-elf-g++ -o .pio/build/esp32dev/libb3a/U8G2Display/boards/DiagnosticsBoard.cpp.o`
+   (the one changed file; no other `.o` was rewritten, checked in run 1 with a modification-time
+   scan of `.pio/build/esp32dev`);
+2. the link of `.pio/build/esp32dev/firmware.elf`.
+
+Then `Creating ESP32 image...` (`firmware.bin`) and `firmware.factory.bin`. Every run also executes
+the extra scripts (`sync_sdkconfig`, the web-portal asset step, `inject_version`) and re-reads the
+ESP-IDF CMake configuration; the compile and link are a part of the roughly 27 s, and I did not
+split the fixed cost from the compile. The no-change warm-up took 50.64 s, longer than the timed
+runs. I did not establish why (a first relink after the `size_report` calls is a guess, not a
+measurement). The web test script prints `node_modules/ not found in test/web/ ... Skipping`, so
+it does no work.
+
+Each timed build ended with `RAM: 17.5% (used 57500 bytes from 327680 bytes)` and
+`Flash: 84.9% (used 1336111 bytes from 1572864 bytes)`.
+
+**Revert and cleanliness.** The edit was reverted; `grep` shows `_row3(4, 30, ...)` at
+`DiagnosticsBoard.cpp:50`, and `git -C <legacy> status --short` printed nothing, HEAD `7396e43d`.
+(PlatformIO's `.pio/` and `.pio-mcp-workspace/` are git-ignored there.) The queue lock was free
+(`get_lock_status`: `isLocked: false`).
 
 ### After (U8G2GL)
 
