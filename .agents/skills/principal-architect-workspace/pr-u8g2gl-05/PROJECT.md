@@ -201,3 +201,24 @@ reads them there and does not re-derive them.
     comes later (WO-B5).
   - **Order:** WO-B1 Part 2, then WO-B2 Part 2, then WO-B3, serially, because builds share the
     MCP queue lock.
+- **2026-10-07 — WO-B1 Part 2 verified; WO-B2 Part 2 dispatched.**
+  - **Legacy figures, re-checked by the PA against the raw MCP build and test logs:**
+
+    | Measurement | Legacy |
+    |---|---|
+    | `esp32dev` RAM | **57500 B** (17.5%) |
+    | `esp32dev` flash | **1336143 B** (84.9%) |
+    | `esp32s3nano` RAM | 60124 B |
+    | `esp32s3nano` flash | 1370475 B |
+    | Native suite | **989/989** |
+    | Edit → rebuild, median of 3 | **29.94 s** |
+
+  - **Gate signal, criterion 3: `esp32dev` flash is already 84.9% full**, with about 237 KB left
+    of the 1.5 MB app partition before any U8G2GL code. Whatever the runtime and generated UI
+    add is measured against that headroom.
+  - **The stop and resume:** the owner stopped the worker on a hook prompt. It was the PA's
+    plugin hook misreading `esptool` inside a quoted grep regex; the worker never invoked
+    esptool. The hook was fixed (quote-aware splitting, 20 test cases) and the worker resumed
+    with its measurements intact.
+  - **Owner direction for Part 2:** no crowpanel build; bring the module into `env:native` with
+    tests on foundation's stubs.

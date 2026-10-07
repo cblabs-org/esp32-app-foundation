@@ -5,7 +5,7 @@ title: "U8G2GLDisplay hosts the migrated DiagnosticsBoard"
 branch: u8g2gl-integration/wo2-module
 base: u8g2gl-integration/wo1-baseline
 complexity: standard
-status: Part 1 complete (committed, verified on host); Part 2 pending the PlatformIO MCP
+status: Part 1 complete (verified); Part 2 dispatched 2026-10-07
 ---
 
 # WO-B2: the integration module, and the first board rendered by U8G2GL
@@ -284,11 +284,112 @@ runtime code (cite file and line). Do not guess at the cause.
    `test(render): render the migrated board`, and `docs(pa): …`. End each message with
    `Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>`.
 
-## Part 2 — PENDING (do not start; resumed when the PlatformIO MCP is connected)
+## Part 2 — DISPATCHED 2026-10-07 (the PlatformIO MCP is connected)
 
-- The `esp32dev` firmware builds with the pin resolved, and `env:native` still builds and passes
-  at its baseline count.
-- The hook runs during a real PlatformIO build, both configured and not configured.
+**Owner direction, 2026-10-07:**
+- Build `esp32dev` and `esp32s3nano`.
+- **Do not build `crowpanel-128-rotary`.** It has no matrix display.
+- Bring the new module into `env:native` with tests, reusing foundation's existing native stubs.
+- The device comes later (WO-B5). This part is the development, build and test loop only.
+
+### Tooling
+
+- **PlatformIO through the MCP only.** The tools are `mcp__plugin_platformio-mcp_platformio__*`
+  (`build_project`, `clean_project`, `run_tests`, `size_report`, `check_task_status`,
+  `get_lock_status`, `release_lock`). Load the `platformio-mcp:pio-manager` skill first.
+- **Always pass `projectDir`** (`/Users/mcneillm/Documents/Projects/esp32-app-foundation-u8g2gl`)
+  **and `environment`.**
+- **If the MCP tools are unavailable, stop and report.** Never use the CLI. Never call
+  `reset_server_state`. Builds are serial: one at a time.
+- **Bash hygiene, because a PreToolUse hook is installed:** never put `pio`, `platformio` or
+  `esptool` after a `|` or inside a `|`-separated regex in a Bash command. To search for one of
+  those words, use a separate, plain grep.
+- **Read-only toolchain inspection** of built artefacts is allowed: the ESP32 toolchain's `nm`,
+  `size` or `objdump` on `firmware.elf`, invoked by its full path under `~/.platformio/packages/`.
+  It is not a PlatformIO operation.
+- **The legacy worktree** `../esp32-app-foundation-u8g2gl-legacy` is not yours. Do not touch it.
+
+### Line items
+
+1. [ ] **`esp32dev` builds.** Run `clean_project` then `build_project` on the stack worktree.
+   - Fix integration failures **inside the Boundary Box**: `modules/U8G2GLDisplay/`,
+     `uidesign/ssd1322-256x64/u8g2gl/library.json`, `scripts/u8g2gl_generate.py`, and the
+     `platformio.ini` lines this WO added. Things to watch:
+     - whether `lib_ldf_mode = deep` finds `U8G2GLUI`;
+     - whether `lib_compat_mode = strict` accepts `u8g2gl` (it declares `frameworks: arduino`);
+     - whether the pinned git dependency `82ec83f` resolves (private repo; the system git has
+       credentials);
+     - name collisions from `ui.hpp`, and warnings.
+   - **A U8G2GL runtime or generator defect is reported, not fixed.**
+   - Record the exact `RAM:` and `Flash:` lines, and confirm from the build log that the hook
+     printed its "not configured" line.
+2. [ ] **`esp32s3nano` builds**, the same way.
+3. [ ] **The capacities.** `u8g2gl_generated_config.h` must reach the runtime's own sources,
+   where `src/u8g2gl_obj.cpp` sizes the binding pool. Today the runtime builds with its defaults
+   (256 binding slots, where this project needs 4).
+   - **(a) Measure the generated header's own advice first.** Temporarily add
+     `build_flags = -include <abs path>/generated/u8g2gl_generated_config.h` to `[env:esp32dev]`,
+     build, and record the outcome verbatim. Then revert it. If it fails, that confirms U8G2GL
+     finding 5; if it succeeds, say so, and the finding is withdrawn.
+   - **(b) Implement the scoped form.** In `scripts/u8g2gl_generate.py`, or a sibling `pre:`
+     script, use PlatformIO's documented build middleware: `env.AddBuildMiddleware(callback,
+     pattern)`, matching only the `u8g2gl` library's `src/*.cpp`. The callback returns
+     `env.Object(node, CCFLAGS=env["CCFLAGS"] + ["-include", <abs header>])`. Keep the path
+     absolute and derived from the project dir, never hard-coded.
+   - **(c) Prove it took effect,** both from the compile command recorded in the verbose log and
+     from the size of the binding-pool symbol in `firmware.elf` (`nm -S`). Measure without and
+     with: report the symbol size and the `RAM:` line both ways.
+4. [ ] **The hook inside a real build.**
+   - **Not configured:** already shown in item 1.
+   - **Configured:** temporarily add
+     `custom_u8g2gl_cli = /Users/mcneillm/Documents/Projects/U8G2GL-05/cli/dist/node/cli.js` to
+     `[env:esp32dev]`. Build; show from the log that `generate` ran; then show that
+     `git status --short uidesign/` is empty, so the committed output is current.
+   - **Broken XML:** with the option still set, temporarily break
+     `screens/screen_diagnostics.xml` (an unknown attribute). Show that the build **fails** with
+     the CLI's diagnostic, then restore the file.
+   - Revert the option. **Never commit an absolute machine path.**
+5. [ ] **Native.**
+   - **Bring the module in.** Remove `U8G2GLDisplay` from `[env:native]`'s `lib_ignore`, and make
+     the module, the pinned `u8g2gl` runtime and `U8G2GLUI` build there.
+     - Native links U8G2's drawing as no-op stubs
+       (`test/test_unit/test_u8g2Display/u8g2_native_stubs.c`) and has Arduino and platform
+       stubs in `test/stubs/platform/`. Reuse those first.
+     - Add only the stubs the runtime's U8G2 calls need, in the same style, inside a new test
+       directory.
+     - If the private git dependency makes native resolution unworkable, keep the `lib_ignore`.
+       State exactly why, with the error.
+   - **Add `test/test_unit/test_u8g2glDisplay/`** in GoogleTest, as the existing suites are. Test
+     **logic, not pixels** (pixels are the render harness's job):
+     - `formatDiagnostics()` produces legacy's strings byte for byte, using the four `inputs.json`
+       scenarios, including `\xB7`;
+     - the 1-second throttle (no refresh before 1000 ms; one refresh at or after it);
+     - the hostname is set once at `configure()`;
+     - `onActivate()` makes the screen active and `onDeactivate()` releases it, but not when
+       another screen has already taken over;
+     - `U8G2GLDisplay::begin()` is idempotent.
+   - **Run** `run_tests` on `env:native`. It must pass. Report the total, against WO-B1 Part 2's
+     legacy baseline count plus your new tests. Any pre-existing failure WO-B1 recorded is
+     **not** yours; any new failure is.
+6. [ ] **`EVIDENCE.md`.** Add a "Build integration" note under §3 with the capacities result
+   (a)–(c). Leave §3 and §4 **After** to WO-B3: it re-measures from clean, with WO-B1's method.
+7. [ ] **Commit** in logical steps, for example `build(display): scope the generated config to the
+   u8g2gl runtime`, `test(display): native suite for U8G2GLDisplay`, `fix(...)` for each
+   integration fix. End each message with
+   `Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>`. Run
+   `git branch --show-current` first and confirm `u8g2gl-integration/wo2-module`.
+
+### Part 2 verification
+
+- `esp32dev` and `esp32s3nano` build green from clean.
+- `env:native` passes, and every new test is listed.
+- Every temporary edit (the `-include` flag, `custom_u8g2gl_cli`, the broken XML) is reverted.
+  `git status` is clean after the final commit.
+- The pixel harness still reproduces `after/` byte for byte. Rebuild it from
+  `git archive HEAD`, since this part may touch module sources.
+- Locks are released.
+- Append a "Part 2" subsection to the Completion Report, including every integration fix made
+  and why.
 
 ## Verification Requirement (Part 1)
 
