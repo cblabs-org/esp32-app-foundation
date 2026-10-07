@@ -4,10 +4,12 @@ ESP32 App Foundation (c) 2026 CB Labs
 SPDX-License-Identifier: Apache-2.0
 
 PlatformIO pre-build script: scripts/u8g2gl_generate.py
-Description: Regenerates the U8G2GL UI of the 256x64 SSD1322 boards before a build,
-             when a U8G2GL CLI checkout is configured, and otherwise leaves the
-             committed generated/ directory as it is ([D-11]: a build never needs
-             the generator).
+Description: Two jobs for the U8G2GL UI of the 256x64 SSD1322 boards.
+             1. Regenerates it before a build, when a U8G2GL CLI checkout is
+                configured, and otherwise leaves the committed generated/ directory
+                as it is ([D-11]: a build never needs the generator).
+             2. Applies its generated capacities to the U8G2GL runtime's own sources
+                (build middleware, below).
 
     The project is uidesign/ssd1322-256x64/u8g2gl; its generated/ output is
     committed and consumed through lib_extra_dirs as the library U8G2GLUI.
@@ -25,6 +27,17 @@ Description: Regenerates the U8G2GL UI of the 256x64 SSD1322 boards before a bui
     A configured path that does not exist is an error, not a silent skip: whoever
     set it expects regeneration, and building from a stale generated/ would hide
     that it did not happen.
+
+    Capacities: generated/u8g2gl_generated_config.h holds the capacities counted from the
+    XML (here 4 bindings, where the runtime's default is 256). Only the runtime's own
+    src/u8g2gl_obj.cpp reads them, to size its binding pool, so the header has to reach
+    that file. The header's own advice, `build_flags = -include <header>`, forces it into
+    EVERY translation unit of the build, including the Arduino core, the ESP-IDF
+    components and unrelated libraries, none of which has u8g2gl on its include path:
+    measured, it fails the first of them (`u8g2gl/u8g2gl_version.h: No such file`). The
+    scoped form used here is PlatformIO's build middleware: a callback that adds
+    `-include <header>` to the compile of the u8g2gl library's src/*.cpp only. The header
+    path is derived from the project directory, never written down.
 
     The eventual shape, once the CLI is published, is `npx u8g2gl generate ...`.
     This script never calls npx: until then it would fetch an unpinned package
@@ -51,6 +64,8 @@ UI_TARGET = "ssd1322"                           # The <target name> in its u8g2g
 CLI_ENV_VAR = "U8G2GL_CLI"                      # Environment variable holding the path to cli.js
 CLI_OPTION = "custom_u8g2gl_cli"                # Env option in platformio.ini, used when the variable is unset
 UI_LIB_DIR = "uidesign/ssd1322-256x64"          # lib_extra_dirs entry that makes an env use this UI
+CAPACITY_HEADER = UI_PROJECT + "/generated/u8g2gl_generated_config.h"  # Capacities, relative to the project root
+RUNTIME_SOURCES = "*/u8g2gl/src/*.cpp"          # Glob (on the node path) matching only the runtime's own sources
 PREFIX = "[u8g2gl_generate]"                    # Prefix of every line this script prints
 
 
@@ -130,6 +145,31 @@ def run_hook(project_root, environ, option_value, out=print, runner=subprocess.r
     return code
 
 
+def capacity_header_path(project_root):
+    """Absolute path of the generated capacities header, derived from the project root.
+
+    Raises:
+        FileNotFoundError: if the header does not exist (nothing was generated or committed).
+    """
+    path = os.path.join(project_root, CAPACITY_HEADER)
+    if not os.path.isfile(path):
+        raise FileNotFoundError("%s generated capacities header not found: %s" % (PREFIX, path))
+    return path
+
+
+def capacity_cc_flags(base_flags, header):
+    """CCFLAGS for compiling one runtime source with the capacities header forced in.
+
+    Args:
+        base_flags: The env's CCFLAGS (a list).
+        header: Absolute path from capacity_header_path().
+
+    Returns:
+        A new list; the env's own list is left alone, so no other source is affected.
+    """
+    return list(base_flags) + ["-include", header]
+
+
 def env_uses_ui(lib_extra_dirs):
     """True if an env's lib_extra_dirs makes it see this UI project.
 
@@ -150,9 +190,26 @@ def env_uses_ui(lib_extra_dirs):
 if env is not None:
     _libs = env.GetProjectOption("lib_extra_dirs", "")
     if env_uses_ui(_libs):
-        _code = run_hook(env.subst("$PROJECT_DIR"), os.environ, env.GetProjectOption(CLI_OPTION, None))
+        _root = env.subst("$PROJECT_DIR")
+        _code = run_hook(_root, os.environ, env.GetProjectOption(CLI_OPTION, None))
         if _code != 0:
             env.Exit(1)
+
+        # Scope the generated capacities to the runtime's own sources. The middleware runs for
+        # every source node but only acts on the ones matching RUNTIME_SOURCES.
+        _header = capacity_header_path(_root)
+
+        def _apply_capacities(lib_env, node):
+            # The two-argument form hands over the environment of the library being built,
+            # which carries that library's own include paths: using the project env here
+            # drops them (measured: u8g2gl/u8g2gl_version.h not found). env.Object()
+            # returns a list, and the espressif32 platform's own middleware
+            # (frameworks/espidf.py) calls node.srcnode() on whatever the previous one
+            # returned, so hand on the single object node, not the list.
+            return lib_env.Object(node, CCFLAGS=capacity_cc_flags(lib_env["CCFLAGS"], _header))[0]
+
+        env.AddBuildMiddleware(_apply_capacities, RUNTIME_SOURCES)
+        print("%s capacities %s forced into the u8g2gl runtime sources only" % (PREFIX, _header))
     else:
         print("%s %s does not use %s: nothing to do" % (PREFIX, env.get("PIOENV"), UI_LIB_DIR))
 elif __name__ == "__main__":
