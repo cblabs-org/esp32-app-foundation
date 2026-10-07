@@ -5,7 +5,7 @@ title: "Capture the legacy DiagnosticsBoard before it is replaced"
 branch: u8g2gl-integration/wo1-baseline
 base: main @ e5342373
 complexity: standard
-status: Part 1 complete (committed); Part 2 dispatched 2026-10-07
+status: Part 1 and Part 2 complete (committed)
 ---
 
 # WO-B1: the "before" evidence for PR-07's gate
@@ -237,7 +237,7 @@ on the stack branch, so the stack worktree no longer builds the legacy board.
 
 ### Line items
 
-1. [ ] **Flash and RAM, `esp32dev`, legacy.**
+1. [x] **Flash and RAM, `esp32dev`, legacy.**
    - Do a clean build (`clean_project`, then `build_project`) of `esp32dev`, so nothing is
      inherited.
    - Record the exact `RAM:` and `Flash:` lines: bytes used, bytes available, and percent.
@@ -245,13 +245,13 @@ on the stack branch, so the stack worktree no longer builds the legacy board.
      `.bss`, or whatever it exposes), with the tool's own field names.
    - Record the PlatformIO and espressif32 platform versions the build used (from the build log
      or `system_info`). WO-B3 must build with the same ones.
-2. [ ] **The same for `esp32s3nano`.** This is secondary evidence, since the gate names `esp32dev`.
+2. [x] **The same for `esp32s3nano`.** This is secondary evidence, since the gate names `esp32dev`.
    If it cannot be built, record why and move on.
-3. [ ] **Native suite at baseline.**
+3. [x] **Native suite at baseline.**
    - Use `run_tests` on `env:native` in the legacy worktree. Record passed, failed, skipped and
      total, plus the runner's own summary line.
    - **Any failure is a finding, not something to fix.** Record the failing test names exactly.
-4. [ ] **Legacy edit-loop timing.**
+4. [x] **Legacy edit-loop timing.**
    - Do one warm-up incremental `build_project` of `esp32dev`, untimed.
    - **Three timed runs.** Each run changes `modules/U8G2Display/boards/DiagnosticsBoard.cpp` row
      3's `y` from 30 to 31, or back again, so every run is a real change. It then times an
@@ -262,10 +262,10 @@ on the stack branch, so the stack worktree no longer builds the legacy board.
    - **Revert the edit**, and show that the legacy worktree's `git status` is clean.
    - Report every value, the median, and which steps the build log shows were recompiled.
    - This is "edit C++ → rebuild". WO-B3 will time "edit XML → regenerate → rebuild" the same way.
-5. [ ] **`EVIDENCE.md`.** Fill §3 Before and §4 Before with the numbers, the method, the tool
+5. [x] **`EVIDENCE.md`.** Fill §3 Before and §4 Before with the numbers, the method, the tool
    versions and the commit (`7396e43d`, whose firmware equals `e5342373`). Leave every After for
    WO-B3.
-6. [ ] **Commit** in the stack worktree, for example `docs(pa): U8G2GL PR-05 WO-B1 Part 2
+6. [x] **Commit** in the stack worktree, for example `docs(pa): U8G2GL PR-05 WO-B1 Part 2
    evidence`, ending with `Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>`. Run
    `git branch --show-current` first and confirm `u8g2gl-integration/wo2-module`.
 
@@ -534,3 +534,107 @@ implementation gave the same 24 and 71 code lines).
 None for Part 1. **Part 2 is pending the PlatformIO MCP** (`esp32dev` flash and RAM, the native
 suite count, the legacy edit-loop timing); `EVIDENCE.md` §3 and §4 Before say so. No `pio`,
 `platformio` or `esptool` was run.
+
+### Part 2 Completion Report
+
+#### Status
+
+**Part 2 complete.** Authorization verified from committed artifacts: this WORKORDER names
+`pr-u8g2gl-05`, its `status` said "Part 2 dispatched 2026-10-07", and `../PROJECT.md` "Human
+Approval" quotes the owner's approval of the decomposition (2026-10-06). Every build and test ran
+through the PlatformIO MCP (`mcp__plugin_platformio-mcp_platformio__*`); no `pio`, `platformio` or
+`esptool` command was run, and `reset_server_state` was not called. The PlatformIO queue lock was
+never contended; `get_lock_status` read `isLocked: false` before, between and after.
+
+Commits on `u8g2gl-integration/wo2-module` (branch confirmed with `git branch --show-current`
+before each):
+- `3f533b95` docs(pa): U8G2GL PR-05 WO-B1 Part 2 evidence (`EVIDENCE.md` §3 and §4 Before)
+- the commit holding this report is the branch tip (this file cannot name its own commit)
+
+Measured in `/Users/mcneillm/Documents/Projects/esp32-app-foundation-u8g2gl-legacy` (detached, HEAD
+`7396e43d`, `src/` and `modules/` equal to `e5342373`). Its `git status --short` is empty and the
+file is back at `_row3(4, 30, ...)` (`DiagnosticsBoard.cpp:50`). The worktree's `.pio/` and
+`.pio-mcp-workspace/` (logs) are git-ignored there.
+
+#### Results (full detail and quoted lines in `EVIDENCE.md` §3 and §4)
+
+- **`esp32dev`, clean build**, `[SUCCESS] Took 111.71 seconds`:
+  `RAM:   [==        ]  17.5% (used 57500 bytes from 327680 bytes)` and
+  `Flash: [========  ]  84.9% (used 1336143 bytes from 1572864 bytes)`.
+- **`esp32s3nano`, clean build**: `RAM: 18.3% (used 60124 bytes from 327680 bytes)`,
+  `Flash: 32.7% (used 1370475 bytes from 4194304 bytes)`.
+- **`size_report`** per-section figures (`esp32dev`): `.flash.text` 966568, `.flash.rodata` 261948,
+  `.iram0.text` 90843, `.dram0.bss` 41744, `.dram0.data` 15756, `.flash.rodata_noload` 13808. The
+  legacy board alone: `diagnosticsBoard` 812 B of `.bss`, 726 B of code in `DiagnosticsBoard.cpp`.
+- **Native suite** (`env:native`): `989 test cases: 989 succeeded in 00:01:13.071`. Passed 989,
+  failed 0, total 989; 36 suites passed, 10 suite rows reported `SKIPPED`.
+  No failures.
+- **Edit loop** (edit written to build success, `esp32dev`, three runs): 29.40 s, 29.94 s, 30.04 s;
+  **median 29.94 s**. Task start to end: 27.44, 26.86, 27.03 s (median 27.03 s). PlatformIO's own
+  `Took`: 27.21, 26.62, 26.81 s. Recompiled each time: `DiagnosticsBoard.cpp.o` only, then the link
+  and the image.
+- **Tool versions**: PlatformIO Core 6.1.19; `Espressif 32 (55.3.311+sha.5f39b6d)`
+  (pioarduino platform); `framework-arduinoespressif32` 3.3.11; `framework-espidf` 3.50505.0
+  (ESP-IDF 5.5.5); `toolchain-xtensa-esp-elf` 14.2.0+20260121; `tool-esptoolpy` 5.3.0; U8g2 2.36.18;
+  Python 3.14.6; macOS-26.6.2 darwin_arm64.
+
+#### Decisions Made
+
+- **Timing method.** Wall clock from the edit's UTC timestamp (printed by `python3` right after
+  `sed`) to the `observedAt` of the foreground `build_project` result, as the headline, with the task's
+  own timestamps and PlatformIO's `Took` line alongside. The MCP does not report a start time in
+  its result; the build log's file name carries it.
+- **Builds used `forceExecution: true` and `verbose: true`.** The first so the content-hash cache
+  could never turn a run into a no-op; the second so the log shows the compiler invocations. A
+  verbose log is larger but the compile and link are the same work. WO-B3 should use the same flags.
+- **`size_report` needs `expectedElfSha256`.** Without it the first call failed with
+  `ANALYSIS_ELF_MISMATCH`, and after a failed call the `.elf` on disk had a different hash from the one
+  the build left (seen for `esp32s3nano`; for `esp32dev` I hashed only after the failed call). The
+  calls passed once I supplied the hash of the file on disk at that moment, and repeat calls with
+  that hash passed. The `RAM:` and `Flash:` figures did not change, so I take them from the
+  build log and treat `size_report` as the section breakdown only. The hashes are in `EVIDENCE.md`.
+- **Clean-build figure is the reference.** Flash 1336143 on the clean build, 1336111 on every later
+  incremental build of the same source (a 32-byte `.text` difference); recorded in `EVIDENCE.md`.
+
+#### Dead Ends & Warnings
+
+- The first build in this worktree fetched all libraries (it has no `.pio/libdeps`) and so is
+  slower than a build in a warm checkout. The `111.71 s` clean-build duration includes that fetch;
+  the `esp32s3nano` build (`114.34 s`) ran after it and did not need to fetch libraries again.
+- **A warm-up with no source change took 50.64 s**, about twice a timed run. I did not establish
+  why, and I did not repeat it. It is not used in any figure.
+- **`inject_version` stamped `0.0.12-beta.2`**, not `0.0.12-dev.83`, because HEAD has no exact tag
+  and the worktree is detached. That is a few bytes of string; `EVIDENCE.md` says so. I did not
+  tag anything.
+- `esp32s3nano`'s `size_report` `totals.bss` and `ramEstimate` include placeholder PSRAM and
+  flash-map sections and are not usable as RAM; use the `RAM:` line.
+- A Bash `grep` of mine, whose pattern named a flasher tool as one alternative after a `|`, tripped
+  a PreToolUse hook; the coordinator confirmed it was a false positive in the hook and the grep
+  was a plain log search, not a flash. I re-ran the search without that word. No flash tool was
+  invoked at any point.
+- The build runs wrote nothing tracked in the legacy worktree. The stack worktree's only
+  scratch use was `tmp/` (git-ignored), for two text fragments assembled into `EVIDENCE.md`.
+
+#### Verification
+
+- Every build and test used the MCP; no CLI. Yes.
+- Legacy worktree clean: `git -C .../esp32-app-foundation-u8g2gl-legacy status --short` printed
+  nothing after the revert; `DiagnosticsBoard.cpp:50` reads `_row3(4, 30, ...)`; HEAD `7396e43d`.
+- Locks released: `get_lock_status` read `isLocked: false`.
+- `EVIDENCE.md` §3 and §4 Before are filled from the measured output, with the exact `RAM:` and
+  `Flash:` lines quoted, and the Afters still read `PENDING — WO-B3`.
+- `python3 scripts/doc_lint.py` exited 0 with no findings.
+- The stack worktree touched only `.agents/skills/principal-architect-workspace/pr-u8g2gl-05/`
+  (`evidence/EVIDENCE.md` and this WORKORDER).
+
+#### Out-of-Scope Findings (not filed)
+
+1. **A no-change `build_project` still costs about 50 s** (warm-up) and an edit-rebuild about 27 s,
+   which is mostly fixed overhead (scripts, CMake read, link) rather than the one-file compile.
+   WO-B3's edit-XML loop will carry the same floor, so the comparison is mostly about what the
+   generator step adds on top of it.
+2. **`size_report` rejected a correct, unpinned call with `ANALYSIS_ELF_MISMATCH`**, and the ELF's
+   hash differed afterwards (seen on `esp32s3nano`). I did not find the cause; supplying the
+   current `expectedElfSha256` worked.
+3. The `Flash memory size mismatch detected. Expected 4MB, found 2MB!` warning prints on every
+   `esp32dev` build (`sdkconfig.defaults`). Pre-existing; the build succeeds.
