@@ -5,7 +5,7 @@ title: "Capture the legacy DiagnosticsBoard before it is replaced"
 branch: u8g2gl-integration/wo1-baseline
 base: main @ e5342373
 complexity: standard
-status: Part 1 complete (committed); Part 2 pending the PlatformIO MCP
+status: Part 1 complete (committed); Part 2 dispatched 2026-10-07
 ---
 
 # WO-B1: the "before" evidence for PR-07's gate
@@ -207,14 +207,75 @@ later, in WO-B5.
    then `docs(pa): U8G2GL PR-05 WO-B1 Part 1 evidence`. End each message with
    `Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>`.
 
-## Part 2 — PENDING (do not start; the PA resumes it once the PlatformIO MCP is connected)
+## Part 2 — DISPATCHED 2026-10-07 (the PlatformIO MCP is connected)
 
-- `esp32dev` flash and RAM for the root project at this commit, via the MCP `build_project`. Record
-  the exact `RAM:` / `Flash:` lines, plus the `.map`/`size` sections if the MCP exposes them.
-- The native suite count at baseline, via the MCP `run_tests` on `env:native`.
-- Legacy edit-loop timing. Change `DiagnosticsBoard.cpp`'s row-3 `y` from 30 to 31, run an
-  incremental `build_project` for `esp32dev`, time it, and revert. Three runs, after one warm-up
-  build. Report the median and every value.
+### Where Part 2 runs
+
+**Measure the legacy firmware in the detached worktree
+`/Users/mcneillm/Documents/Projects/esp32-app-foundation-u8g2gl-legacy`** (HEAD `7396e43d`). Its
+`src/` and `modules/` are byte-identical to `e5342373`; WO-B2 has since switched `src/main.cpp`
+on the stack branch, so the stack worktree no longer builds the legacy board.
+
+- **Treat that worktree as read-only.** The one exception is the timed edit below, which must be
+  reverted: `git -C <legacy> status --short` is empty when you finish.
+- **Record results** in `EVIDENCE.md` §3 and §4 Before, and in this Completion Report, in the
+  **stack** worktree `/Users/mcneillm/Documents/Projects/esp32-app-foundation-u8g2gl` on branch
+  `u8g2gl-integration/wo2-module`. Commit there, and only there.
+
+### Tooling
+
+- **PlatformIO through the MCP only.** The tools are named `mcp__plugin_platformio-mcp_platformio__*`
+  (for example `build_project`, `run_tests`, `size_report`, `check_task_status`,
+  `get_lock_status`, `release_lock`). Load the `platformio-mcp:pio-manager` skill first.
+- **Always pass `projectDir` and `environment` explicitly.**
+- **If those tools are not in your toolset, stop and report.** Never fall back to the `pio` CLI;
+  a hook will ask the user anyway, and nobody is there to answer.
+- **Lock discipline (rule 04).** Builds take the queue lock. Use `background: true` and poll
+  `check_task_status`. On "busy", wait and retry. **Never** call `reset_server_state`.
+- **Network.** The first build of an environment may download toolchains and packages. That is
+  expected; do not count it in any timing.
+
+### Line items
+
+1. [ ] **Flash and RAM, `esp32dev`, legacy.**
+   - Do a clean build (`clean_project`, then `build_project`) of `esp32dev`, so nothing is
+     inherited.
+   - Record the exact `RAM:` and `Flash:` lines: bytes used, bytes available, and percent.
+   - Run `size_report` and record the per-section figures it gives (`.text`, `.rodata`, `.data`,
+     `.bss`, or whatever it exposes), with the tool's own field names.
+   - Record the PlatformIO and espressif32 platform versions the build used (from the build log
+     or `system_info`). WO-B3 must build with the same ones.
+2. [ ] **The same for `esp32s3nano`.** This is secondary evidence, since the gate names `esp32dev`.
+   If it cannot be built, record why and move on.
+3. [ ] **Native suite at baseline.**
+   - Use `run_tests` on `env:native` in the legacy worktree. Record passed, failed, skipped and
+     total, plus the runner's own summary line.
+   - **Any failure is a finding, not something to fix.** Record the failing test names exactly.
+4. [ ] **Legacy edit-loop timing.**
+   - Do one warm-up incremental `build_project` of `esp32dev`, untimed.
+   - **Three timed runs.** Each run changes `modules/U8G2Display/boards/DiagnosticsBoard.cpp` row
+     3's `y` from 30 to 31, or back again, so every run is a real change. It then times an
+     incremental `build_project` of `esp32dev`, from the edit being written to the task
+     reporting success.
+   - Use the task's own start and end timestamps where the MCP reports them, otherwise wall clock
+     around the call. Say which.
+   - **Revert the edit**, and show that the legacy worktree's `git status` is clean.
+   - Report every value, the median, and which steps the build log shows were recompiled.
+   - This is "edit C++ → rebuild". WO-B3 will time "edit XML → regenerate → rebuild" the same way.
+5. [ ] **`EVIDENCE.md`.** Fill §3 Before and §4 Before with the numbers, the method, the tool
+   versions and the commit (`7396e43d`, whose firmware equals `e5342373`). Leave every After for
+   WO-B3.
+6. [ ] **Commit** in the stack worktree, for example `docs(pa): U8G2GL PR-05 WO-B1 Part 2
+   evidence`, ending with `Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>`. Run
+   `git branch --show-current` first and confirm `u8g2gl-integration/wo2-module`.
+
+### Part 2 verification
+
+- Every build used the MCP; no CLI.
+- The legacy worktree is clean.
+- The locks are released (`get_lock_status`).
+- `EVIDENCE.md` §3 and §4 Before are filled from measured output, with the exact lines quoted.
+- Append a "Part 2" subsection to the Completion Report.
 
 ## Verification Requirement
 

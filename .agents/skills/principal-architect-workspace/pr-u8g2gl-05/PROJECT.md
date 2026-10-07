@@ -192,3 +192,12 @@ reads them there and does not re-derive them.
     were deleted.
   - Older entries above that cite `69c37e0` or `0fe144f` describe what was verified at the time;
     those commits no longer exist.
+- **2026-10-07 — PlatformIO MCP connected; WO-B1 Part 2 dispatched.**
+  - **Connection:** the owner installed the local `platformio-mcp` Claude Code plugin. The PA
+    confirmed tool access with `project_envs` (8 envs) and `get_lock_status` (unlocked).
+  - **Legacy worktree:** `../esp32-app-foundation-u8g2gl-legacy`, detached at `7396e43d`, whose
+    firmware equals `e5342373`.
+  - **Scope:** the owner directs focus on the development, build and test loops. The device
+    comes later (WO-B5).
+  - **Order:** WO-B1 Part 2, then WO-B2 Part 2, then WO-B3, serially, because builds share the
+    MCP queue lock.
