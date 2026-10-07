@@ -414,6 +414,62 @@ row is `SKIPPED`. The skipped `native` rows are the `test_native`, `test_native/
 and `test_e2e` rows. There were no failures to record. `test_unit/test_u8g2Display` is among the
 passes.
 
+### Build integration (WO-B2 Part 2; indicative figures, WO-B3 re-measures from clean)
+
+Built through the PlatformIO MCP on the stack worktree, `esp32dev` and `esp32s3nano`, 2026-10-07.
+Figures here come from builds made while integrating, some incremental, so treat them as indicative:
+the **After** rows below stay for WO-B3, which measures from clean with section 3's method.
+
+**Integration fixes the first builds needed:**
+- The `u8g2gl` dependency in the module's `library.json` was never installed (`Warning: Ignored
+  u8g2gl dependency`) and `U8G2GLUI` failed on `u8g2gl/u8g2gl_version.h`. PlatformIO installs git
+  dependencies only for the project's own `lib_deps`. The one pin now lives in a `[u8g2gl]` section of
+  `platformio.ini`, which `esp32dev`, `esp32s3nano` and `native` take through `lib_deps`.
+- The capacities, below.
+
+**The capacities.** `generated/u8g2gl_generated_config.h` counts 4 bindings for this project; the
+runtime's default is 256, and only `u8g2gl_obj.cpp` reads it (`s_binding_pool`).
+
+| | `s_binding_pool` (`nm -S`) | `RAM:` (`esp32dev`) | `Flash:` (`esp32dev`) |
+|---|---:|---|---|
+| (a) the header's advice, `build_flags = -include <header>` | build fails | n/a | n/a |
+| runtime defaults (no capacities applied) | **6144 B** (`0x1800`, 256 x 24 B) | 63388 B (19.3%) | 1342251 B (85.3%) |
+| (b) scoped build middleware | **96 B** (`0x60`, 4 x 24 B) | 57340 B (17.5%) | 1342243 B (85.3%) |
+| legacy, for reference (section 3 Before) | n/a | 57500 B (17.5%) | 1336143 B (84.9%) |
+
+- **(a) fails**, verbatim, on the first translation units that are not the runtime's (the Arduino `FS`
+  library, then `PsychicHttp`): `u8g2gl_generated_config.h:30:10: fatal error: u8g2gl/u8g2gl_version.h:
+  No such file or directory`. A forced include reaches every unit, and none of them has `u8g2gl` on
+  its include path, so the failure comes before the C-versus-`static_assert` question and U8G2GL
+  finding 5 is confirmed in a stronger form: the documented PlatformIO integration cannot work in this
+  repository's build. (The earlier hypothesis about C units was not reached and stays untested.)
+- **(b)** `scripts/u8g2gl_generate.py` registers `env.AddBuildMiddleware(callback,
+  "*/u8g2gl/src/*.cpp")`. The callback must take the library's own environment (the two-argument
+  form), or the library's include paths are lost, and must return one object node, not the list
+  `env.Object()` gives, or the espressif32 platform's own middleware raises `AttributeError: 'NodeList'
+  object has no attribute 'srcnode'`. Both were hit and fixed.
+- **(c) it took effect.** The verbose log shows `-include <abs path>/generated/u8g2gl_generated_config.h`
+  on exactly the 15 `u8g2gl` runtime sources (`libd07/u8g2gl/u8g2gl*.cpp.o`) and on no other compile
+  line, including none of the generated `ui*.cpp` (they include the header themselves). `nm -S -C
+  firmware.elf` shows `s_binding_pool` at 6144 B without and 96 B with, and `RAM:` falls by 6048 B.
+- Effect on the gate: with the capacities applied, `esp32dev` RAM is 57340 B, **160 B under the legacy
+  firmware's 57500 B**, and flash is about **+6.1 KB** (1342243 against 1336143, +0.4 points of the
+  1572864 B partition, leaving about 230 KB). `esp32s3nano` (clean build, capacities applied):
+  RAM 59964 B (legacy 60124 B), Flash 1376723 B (legacy 1370475 B, +6248 B).
+- Flash moves by tens of bytes between builds of unchanged source (1342243, 1342279, 1342295 seen),
+  the same kind of noise as the 32-byte wobble above.
+
+**The hook in a real build.** Not configured: the log prints `[u8g2gl_generate] U8G2GL_CLI is not set
+and custom_u8g2gl_cli is empty: using the committed ...`. Configured (`custom_u8g2gl_cli` set
+temporarily in `[env:esp32dev]`): the log prints `regenerating ... with <cli>`, the CLI reports all
+eight files `unchanged`, the build succeeds, and `git status --short uidesign/` is empty. Broken XML
+(an unknown attribute, temporarily): the build **fails in 0.79 s** with the CLI's diagnostic
+(`Unknown attribute 'bogus_attr' on <u8g2gl_label>`, "Generation refused ... Nothing was written") and
+`[u8g2gl_generate] FAILED (exit 1)`. All three temporary edits were reverted.
+
+**Native.** `env:native` runs the new `test_unit/test_u8g2glDisplay` suite (29 cases) beside the
+legacy 989: **1018 of 1018 passed**.
+
 ### After (U8G2GL)
 
 PENDING — WO-B3
