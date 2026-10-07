@@ -105,7 +105,11 @@ and web diagnostics (R7).
     only, through a PlatformIO build middleware (`env.AddBuildMiddleware`) in the hook script.
     Not the project-wide `-include` the generated header suggests: that would reach C units and
     libraries that cannot resolve `u8g2gl/`. Measure RAM with and without it.
-- **[ ] [wo3-evidence](wo3-evidence/WORKORDER.md):** *Dispatched 2026-10-07.* the "after" measurements through the same harness, `EVIDENCE.md`, and the
+- **[x] [wo3-evidence](wo3-evidence/WORKORDER.md):** **Complete, verified by the PA.** The
+  after-size evidence and the `PR-DESCRIPTION.md` draft are done. Its edit-loop timing is
+  superseded by WO-B3b.
+- **[ ] [wo3b-timing](wo3b-timing/WORKORDER.md):** the legacy and U8G2GL edit loops measured
+  interleaved, with load recorded. *Dispatched 2026-10-07.* the "after" measurements through the same harness, `EVIDENCE.md`, and the
   PR description.
 - **[ ] wo4-readability:** a house-style pass (`.agents/skills/house-style-docs`).
 - **[ ] wo5-device (interactive):** host render vs on-device capture, when the owner is at the
@@ -250,3 +254,17 @@ reads them there and does not re-derive them.
     built.
   - **To re-pin before merge:** `platformio.ini` `[u8g2gl]`, and `test/render/CMakeLists.txt`
     `U8G2GL_PINNED_SHA`.
+- **2026-10-07 — WO-B3 verified; WO-B3b dispatched.**
+  - **Size after, `esp32dev`, clean:** RAM 57340 B (**−160 B**), flash 1342247 B (**+6104 B**,
+    85.3%). 230617 B of the app partition is left; the migration spends 2.6% of the legacy
+    headroom.
+  - **Where the flash goes:** the runtime and the U8g2 shape code it links make up about 74% of
+    what was added.
+  - **Unexplained flash shift:** adding a `custom_` option to `platformio.ini` moved flash by
+    −1780 B, in ESP-IDF diagnostics symbols only, with no U8G2GL change. The quoted figures are
+    the clean builds. This is a caveat on any delta under about 2 KB.
+  - **The timing is not decision-grade.** WO-B3's 48.81 s against WO-B1's 29.94 s was measured
+    hours apart, with load averages of 5.5 to 20.7 (the PA saw 8.9 over 15 minutes at
+    verification). The generator costs about 0.05 s. WO-B3b re-measures both loops interleaved.
+  - **New downstream user:** `template-app` also uses the legacy `DiagnosticsBoard`. It is listed
+    in the PR description.
