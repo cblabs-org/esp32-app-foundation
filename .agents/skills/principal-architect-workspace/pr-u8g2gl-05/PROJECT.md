@@ -105,7 +105,7 @@ and web diagnostics (R7).
     only, through a PlatformIO build middleware (`env.AddBuildMiddleware`) in the hook script.
     Not the project-wide `-include` the generated header suggests: that would reach C units and
     libraries that cannot resolve `u8g2gl/`. Measure RAM with and without it.
-- **[ ] wo3-evidence:** the "after" measurements through the same harness, `EVIDENCE.md`, and the
+- **[ ] [wo3-evidence](wo3-evidence/WORKORDER.md):** *Dispatched 2026-10-07.* the "after" measurements through the same harness, `EVIDENCE.md`, and the
   PR description.
 - **[ ] wo4-readability:** a house-style pass (`.agents/skills/house-style-docs`).
 - **[ ] wo5-device (interactive):** host render vs on-device capture, when the owner is at the
