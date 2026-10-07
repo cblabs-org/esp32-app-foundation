@@ -10,7 +10,7 @@ commit that holds this file, so the baseline also describes that commit's legacy
 
 **Status**: sections 1 and 2 Before are filled (WO-B1 Part 1). Sections 1 and 2 After are filled
 (WO-B2 Part 1, on host). Sections 3 and 4 Before are filled (WO-B1 Part 2, legacy worktree
-`7396e43d`, PlatformIO MCP); sections 3 and 4 After are pending WO-B3 and the MCP.
+`7396e43d`, PlatformIO MCP); sections 3 and 4 After are filled (WO-B3, stack worktree `20d1d1fb`, PlatformIO MCP).
 
 ---
 
@@ -472,7 +472,168 @@ legacy 989: **1018 of 1018 passed**.
 
 ### After (U8G2GL)
 
-PENDING — WO-B3
+**What was built.** The stack worktree `/Users/mcneillm/Documents/Projects/esp32-app-foundation-u8g2gl`,
+branch `u8g2gl-integration/wo3-evidence`, HEAD `20d1d1fb` (its `src/`, `modules/`, `uidesign/`,
+`scripts/` and `platformio.ini` are those of `u8g2gl-integration/wo2-module`; the only commits
+above it are PA files). Clean builds through the PlatformIO MCP only (`clean_project`, then
+`build_project` with `forceExecution: true` and `verbose: true`, one environment at a time), on
+2026-10-07, with the same toolchain and libraries as Before (section 3 Before, Tool versions;
+the build log's `PACKAGES` block shows the same framework, libs, ESP-IDF, toolchain, esptool, CMake,
+Ninja and SCons versions, U8g2 2.36.18, and PlatformIO Core 6.1.19). The runtime is
+`u8g2gl @ 0.7.0+sha.82ec83f`. The hook ran **unconfigured**: the log prints `[u8g2gl_generate]
+U8G2GL_CLI is not set and custom_u8g2gl_cli is empty: using the committed ...`, and the 15 runtime
+sources took the capacities (`... forced into the u8g2gl runtime sources only`). The version stamp is
+`0.0.12-beta.2`, as in Before (`inject_version` found no exact tag at HEAD and used the nearest
+ancestor).
+
+**`esp32dev`, clean build** (log `.pio-mcp-workspace/logs/build/build-2026-10-07T20-54-56-025Z-f2fb6504.log`
+in the stack worktree; `[SUCCESS] Took 105.88 seconds`). The exact lines:
+
+```
+RAM:   [==        ]  17.5% (used 57340 bytes from 327680 bytes)
+Flash: [========= ]  85.3% (used 1342247 bytes from 1572864 bytes)
+```
+
+`Total image size: 1342504 bytes`; `firmware.bin` is 1,342,656 bytes (padded).
+
+**`size_report` on the clean `esp32dev` ELF.** The first call, with `expectedElfSha256` taken from the
+freshly built ELF (`3fed17876b44371150f9dcdca9d2c814316029a099793cb3a540b135da801843`, 25,894,712
+bytes), failed: `ANALYSIS_ELF_MISMATCH`, "ELF does not match the selected firmware artifact". The call
+had **relinked** the ELF before comparing: the file on disk then had a new sha256 and size (below).
+The second call, with the relinked ELF's sha, succeeded, and its `memory` block is the same as the
+build's lines. So `size_report` needs the sha of the ELF **after** its own relink, which WO-B1's
+note ("fails without `expectedElfSha256`") did not say. The ELF: sha256
+`7b57c3f0ad3bad0afc972841df8503c6e08404dad2108c70e9ea8bc8e66f61f8`, 25,895,064 bytes.
+
+| `sections[].section` | After | Before (clean) | Delta |
+|---|---:|---:|---:|
+| `.flash.text` | 972008 | 966568 | **+5440** |
+| `.flash.rodata` | 262356 | 261948 | **+408** |
+| `.iram0.text` | 90843 | 90843 | 0 |
+| `.dram0.bss` | 41328 | 41744 | **-416** |
+| `.dram0.data` | 16012 | 15756 | **+256** |
+| `.flash.rodata_noload` | 13808 | 13808 | 0 |
+| `.iram0.vectors` | 1028 | 1028 | 0 |
+| `.flash.appdesc` | 256 | 256 | 0 |
+| `.rtc.force_slow`, `.rtc_slow_reserved` | 32, 24 | 32, 24 | 0 |
+| `.xt.prop` (no load) | 35436 | 35184 | +252 |
+
+`memory` (the PlatformIO figures): `ram` 57340 of 327680 (17.5%), `flash` 1342247 of 1572864 (85.3%).
+`symbolCount` 9671 (Before 9560, +111). Flash is `.flash.text + .flash.rodata + .iram0.text +
+.dram0.data + .iram0.vectors` (972008 + 262356 + 90843 + 16012 + 1028 = 1342247) and RAM is
+`.dram0.data + .dram0.bss` (16012 + 41328 = 57340); the same sums reproduce Before's 1336143 and 57500.
+
+**`esp32s3nano`, clean build** (secondary; log `build-2026-10-07T20-59-45-305Z-cd55b1d7.log`,
+`[SUCCESS] Took 120.56 seconds`):
+
+```
+RAM:   [==        ]  18.3% (used 59964 bytes from 327680 bytes)
+Flash: [===       ]  32.8% (used 1376723 bytes from 4194304 bytes)
+```
+
+`size_report` (built ELF `1d61514a8db06f39267dd71ab4bfcf7c2c6e3c81697d2cdbf394976b4a9d1167` failed the
+same way; relinked ELF `1628d175e86eed06715fdb2c195394a760bc013bfe54f5a99909540edbbf1ed0` passed):
+`.flash.text` 987472, `.flash.rodata` 274236, `.iram0.text` 94671, `.dram0.bss` 40648, `.dram0.data`
+19316, `.flash.rodata_noload` 13694. Against Before: text +5576, rodata +416, bss -416, data +256, iram 0.
+As in Before, use the `RAM:` and `Flash:` lines, not the tool's `totals` (they include the PSRAM and
+flash-mapping placeholder sections).
+
+**Before to After delta** (Before is the clean legacy build of section 3 Before):
+
+| | Before | After | Delta (bytes) | Delta (%) |
+|---|---:|---:|---:|---:|
+| `esp32dev` RAM | 57500 (17.5%) | 57340 (17.5%) | **-160** | -0.28% |
+| `esp32dev` flash | 1336143 (84.9%) | 1342247 (85.3%) | **+6104** | +0.46% (+0.39 points of the partition) |
+| `esp32s3nano` RAM | 60124 (18.3%) | 59964 (18.3%) | **-160** | -0.27% |
+| `esp32s3nano` flash | 1370475 (32.7%) | 1376723 (32.8%) | **+6248** | +0.46% (+0.15 points) |
+
+The section deltas for `esp32dev` are in the table above; they add up: flash +5440 +408 +256 = +6104,
+RAM +256 -416 = -160. All of the flash delta is in `.flash.text` (+5440), `.flash.rodata` (+408) and initialised
+`.dram0.data` (+256); RAM falls because the legacy board's 792 B instance in `.bss` is replaced by 377 B
+of new `.bss` (below) while 256 B of new initialised `.data` appears.
+
+**Headroom, `esp32dev`.** The app partition is `app0` (and `app1`, for OTA) of `0x180000` = 1,572,864
+bytes (`hardware/esp32dev/partitions.csv`). After the migration:
+
+| | Used | Left | Left as % of the partition |
+|---|---:|---:|---:|
+| Before | 1336143 | 236721 | 15.05% |
+| After | 1342247 | **230617** (225.2 KiB) | **14.66%** |
+
+The migration spends 6104 B, which is 2.6% of the headroom the legacy firmware had. Criterion 3 asks
+whether what is left is "comfortable"; this section supplies the figures and does not judge. Two facts
+bear on it: the flash was already 84.9% full before the migration, and 4532 B of the 6104 B is the
+runtime and the U8g2 code it links, which a second board using the same widgets would not pay again
+(see the reading below).
+
+**Where the flash delta comes from** (`xtensa-esp32-elf-nm -S --size-sort -C` on both ELFs, by full
+path `~/.platformio/packages/toolchain-xtensa-esp-elf/bin/xtensa-esp32-elf-nm`; symbols joined by
+name, aliases that share an address and size counted once). The "after" ELF is the relinked one
+above. The "before" ELF is the **legacy worktree's file on disk**,
+`../esp32-app-foundation-u8g2gl-legacy/.pio/build/esp32dev/firmware.elf` (sha256
+`872f76fd4f570252368f755097194fa3e1230e5bd2917a655fa544b470dcc217`, 25,501,832 bytes, read only,
+copied to `tmp/`). It was last built by WO-B1's third timed run, with row 3 at y=31 (since reverted
+in source), so it differs from the clean legacy build by a few bytes at most: its `.flash.text` is
+966536 against the clean build's 966568 (32 B, the known wobble), and its symbols are the same.
+It is fine for symbol attribution, and it is not the source of any figure in the tables above, which
+all come from the clean builds' logs and `size_report`.
+
+| Group | Flash-resident bytes | What it is |
+|---|---:|---|
+| **U8G2GL runtime** | **+3178** | `u8g2gl_label` methods 1164 (`render_animation_update` 252, `render` 247, `tick` 228, `render_static` 188, `render_scroll` 144, destructor 56), `u8g2gl_effective_clip` 286, `u8g2gl_partial_refresh` 180, `u8g2gl_rect_intersect` 127, `u8g2gl_allocate_binding` 100, `u8g2gl_draw_box` 98, `bound_text` 90, `render_object` 87, string-subject `set` / constructor / `bind_text` 74 / 80 / 83, and 32 B of data |
+| **U8g2 shape code only the new image links** | **+1354** | `u8g2_DrawRFrame` 247, `u8g2_DrawRBox` 236, `u8g2_draw_disc_section` 187, `u8g2_draw_circle_section` 159, `u8g2_DrawDisc` 150, `u8g2_DrawCircle` 150, `u8g2_DrawFrame` 130, `u8g2_DrawPixel` 47, `u8g2_DrawVLine` 24, `u8g2_DrawHLine` 24. The runtime's box and primitive drawing refers to them; no legacy board did. Present in the new image and absent from the legacy one, which is what nm shows; the cause (the runtime's draw calls) is read from the names, not measured |
+| **Generated UI** (`ui_*`) | **+865** | `_GLOBAL__sub_I_ui_subject_diag_hostname` 163 and `_GLOBAL__sub_I__Z26ui_screen_diagnostics_initv` 67 (static initialisers), `ui_screen_diagnostics_init` 150, `_render` 56, `_tick` 49, four `ui_obj_*` label objects of 56 B each (initialised data, 224), four `ui_set_diag_*` setters of 13 B, and small tables |
+| **Module** (`U8G2GLDisplay`) | **+709** | `formatDiagnostics` 179, `readDiagnosticsInputs` 146, `DiagnosticsScreenBoard::tick` 84 and constructor 60, `U8G2GLScreenBoard::render` 48, two vtables 44 each, `U8G2GLDisplay::begin` 29, the rest under 25 each |
+| Small statics | +10 | `tickNow`, `s_tick_cb`, `s_active_screen` |
+| **Added, total** | **+6116** | |
+| **Removed with the legacy board** | **-657** | `DiagnosticsBoard::tick` 289, constructor 129, `configure` 120, `render` 44, vtable 44, destructor 16, `getBoardName` 8, `isExpired` 7 |
+| Existing symbols that moved | +23 | `setup()` +4 and `_GLOBAL__sub_I__Z5setupv` -5 (the `main.cpp` switch), `network_prov_mgr_deinit` +4, a `WebServerManager` `std::function` handler +20 (no source in this branch touches it; not investigated) |
+| **Named-symbol net** | **+5482** | |
+| Not in any symbol | +622 | `6104 - 5482`: string literals, alignment and padding, and literal pools, which nm does not name. Not attributable from these tables |
+
+The `.bss` side: added `s_binding_pool` 96 (4 bindings x 24 B, the scoped capacity), the four
+`ui_subject_diag_*` string subjects 272 (wifi 88, heap 72, uptime 56, hostname 56), module and
+statics 9, total 377; removed the legacy `diagnosticsBoard` instance 792. Net -415 against the
+section figure -416. (Section 3 Before quoted 812 B for that instance from a filtered
+`size_report`; nm on the legacy ELF on disk reports 792 B. The 20 B difference is not explained here
+and does not affect the totals.)
+
+**Reading of the attribution.**
+- **Nearly all of the flash is the runtime, not the board.** The runtime's label, clip, binding and
+  subject code (+3178) plus the U8g2 shape code it brings in (+1354) is 4532 B, 74% of the 6116 B
+  added. The generated UI is 865 B and the board and host module 709 B. The board is the cheap part;
+  this is largely a first-board cost: a second board that uses the same widgets would add its own
+  screen's generated code, and a board using widgets this one does not would link more runtime.
+- **What disappeared with the legacy board is small:** 657 B of flash and 792 B of `.bss`.
+  `LabelWidget` and `DrawingPrimitives` are not in the removed list: other legacy boards still use
+  them, so they stay linked.
+- **For scale,** the five largest symbols in the whole image are `http_parser_execute` 7763 B and the
+  gzipped portal assets (`system_js_gz` 7262, `app_js_gz` 7024, `auth_js_gz` 6745, `app_css_gz` 6148),
+  from `size_report`'s `topSymbols`. The largest single U8G2GL symbol is 286 B.
+- **RAM is lower than legacy only because of the scoped capacities** (WO-B2 Part 2): without them
+  `s_binding_pool` is 6144 B and RAM is 63388 B.
+
+**The noise floor, stated plainly.** Do not over-read any difference below about 100 B.
+- WO-B1 saw 32 B on the legacy build (clean 1336143, incremental 1336111). WO-B2 saw 1342243,
+  1342279 and 1342295 on this tree. This WO's clean build gave **1342247**, and the rebuild after
+  reverting `platformio.ini` gave **1342311** (+64). So tens of bytes is the floor, as the work order
+  expected.
+- **A larger variation than that appeared, and it is not a U8G2GL effect.** The rebuilds made after
+  *adding* the `custom_u8g2gl_cli` line to `platformio.ini` (section 4) reported `Flash: ... (used
+  1340467 bytes ...)` and `RAM: ... (used 57324 bytes ...)`: **1780 B below** the clean build. nm on that
+  ELF against the clean one shows the difference is five ESP-IDF diagnostics symbols that the linker
+  kept in the clean build and dropped in that one (`diag_log_add` 1543, `esp_diag_log_write` 116,
+  `esp_diag_timestamp_get` 70, `append_arg$constprop$0` 54, `s_priv_data` 16); nothing of U8G2GL's
+  changed. The legacy ELF also contains `diag_log_add`, so the clean-to-clean comparison above is
+  like for like. The mechanism (what makes the linker keep or drop that code after a
+  `platformio.ini` change; `sdkconfig.esp32dev` is identical to the legacy worktree's) was not
+  established. **PR-07 should quote the clean-build figures, and know that the same source can land
+  anywhere from 1340467 to 1342311 depending on build state: a spread of 1.8 KB, not 32 B.** The
+  headroom figure above uses the clean build, which is the higher (more conservative) flash use.
+
+**Native suite.** Not re-run in this WO. The last full run is WO-B2 Part 2's, re-run by the PA through
+the MCP from the committed tree: **1018 of 1018 passed** (989 legacy cases + 29 in
+`test_u8g2glDisplay`), against 989 of 989 in Before.
 
 ---
 
@@ -535,4 +696,123 @@ Each timed build ended with `RAM: 17.5% (used 57500 bytes from 327680 bytes)` an
 
 ### After (U8G2GL)
 
-PENDING — WO-B3
+**Task.** "Edit XML, regenerate, rebuild", timed the way Before timed "edit C++, rebuild". Change
+`screens/screen_diagnostics.xml` row 3 (`name="uptime"`) `y` from 30 to 31, or back, then
+`build_project` of `esp32dev`.
+
+**Method.** In the stack worktree (HEAD `20d1d1fb`) on 2026-10-07, after the clean builds in section 3.
+The same flags as Before: `build_project` foreground, `environment: esp32dev`, `forceExecution: true`,
+`verbose: true`. Each run: write the edit with `sed` and print a UTC timestamp, then call
+`build_project`, then read the result. The same two measures as Before: **edit to success** (from the
+UTC time the edit was written to the result's `observedAt`) and **task start to end** (from the
+timestamp in the build log's file name to `observedAt`), plus the runner's own `Took` line. Edits
+were 30 to 31, 31 to 30, 30 to 31, and the file was restored from git afterwards.
+
+**Setup for the configured loop.** `custom_u8g2gl_cli =
+/Users/mcneillm/Documents/Projects/U8G2GL-05/cli/dist/node/cli.js` added to `[env:esp32dev]`, so the
+hook regenerates on every build. The log then prints `[u8g2gl_generate] regenerating
+uidesign/ssd1322-256x64/u8g2gl with <cli>`. The warm-up (one untimed `build_project`) took **206.11 s**
+by the runner's line: editing `platformio.ini` made PlatformIO rebuild everything (1931 `-o` compile lines in its log), so the warm-up did the full rebuild and the timed runs below start from a
+settled tree.
+
+**Conditions to know before reading the numbers.** The host was **not idle**. `uptime` printed load
+averages (1, 5, 15 min) of 5.69 / 13.32 / 11.64 just before run 3, 20.65 / 18.47 / 14.24 after the
+unconfigured warm-up, and 5.50 / 12.29 / 12.43 after the last run. `ps` showed `Finder` at 88 to 110%
+CPU and a VS Code `Code Helper (Plugin)` at 67 to 103% throughout. WO-B1 recorded no load figure for
+the Before runs. I cannot say what load the Before runs saw, so the comparison below carries that
+uncertainty. I did not stop other processes.
+
+### The configured loop (hook regenerates on every build)
+
+| Run | Edit | Edit written (UTC) | Success reported (UTC) | Edit to success | Task start to end | PlatformIO `Took` |
+|---|---|---|---|---:|---:|---:|
+| 1 | 30 to 31 | 21:08:24.653 | 21:09:18.357 | **53.70 s** | 51.66 s | 51.37 s |
+| 2 | 31 to 30 | 21:10:20.429 | 21:11:09.244 | **48.81 s** | 46.66 s | 46.37 s |
+| 3 | 30 to 31 | 21:11:18.805 | 21:12:07.449 | **48.64 s** | 46.14 s | 45.85 s |
+| **Median** | | | | **48.81 s** | **46.66 s** | **46.37 s** |
+
+Range 48.64 to 53.70 s. **The fair comparison with WO-B1's 29.94 s is this median, 48.81 s: 18.87 s
+(63%) longer on this host, under the load above.** The task-start-to-end medians are 46.66 s against
+Before's 27.03 s. Each timed build ended with `RAM: 17.5% (used 57324 bytes from 327680 bytes)` and
+`Flash: 85.2% (used 1340467 bytes from 1572864 bytes)` (the build-state variation explained in section
+3 After, not a U8G2GL effect).
+
+**The split into generate and compile-and-link.** The build log carries no timestamps, so the split
+uses file modification times against the logged task start (each value measured, none estimated):
+
+| Run | Edit to task start (call dispatch) | Generate: task start to `generated/ui_screen_diagnostics.cpp` written | `ui_screen_diagnostics.cpp.o` finished | `firmware.elf` linked | `firmware.bin` written | Success reported |
+|---|---:|---:|---:|---:|---:|---:|
+| 1 | 2.04 s | **1.30 s** (21:08:27.993) | 21:09:05.148 | 21:09:17.159 | 21:09:17.561 | 21:09:18.357 |
+| 2 | 2.15 s | **1.27 s** (21:10:23.853) | 21:11:01.621 | 21:11:07.942 | 21:11:08.431 | 21:11:09.244 |
+| 3 | 2.50 s | **1.23 s** (21:11:22.536) | 21:11:58.699 | 21:12:06.100 | 21:12:06.564 | 21:12:07.449 |
+| **Median** | 2.15 s | **1.27 s** | | | | |
+
+- **Generate is about 1.3 s, and that is an upper bound.** It runs from the task start to the moment
+  the one changed file was written, so it includes the pre-build scripts that run before the hook in
+  the log (`sync_sdkconfig`, the web-portal asset step, `inject_version`). The generator itself,
+  run alone, takes **0.05 s** (section "unconfigured" below).
+- **Compile and link is everything after that, about 45 s of the 46.7 s.** It is not one number: the
+  window from the generated file to the finished `.o` (37.2, 37.8 and 36.2 s for runs 1 to 3) includes PlatformIO's
+  CMake-configuration read and library scan, which have no timestamps in the log, and the single
+  compile of `ui_screen_diagnostics.cpp`. I did not separate the two. The link (object to ELF) took
+  12.0, 6.3 and 7.4 s, the image step 0.4 to 0.5 s, then 0.8 to 0.9 s to the reported success.
+- Before could not split its fixed cost from its compile either (its "27 s"), so there is no
+  like-for-like split to set these against.
+
+**What was recompiled.** Every timed log shows exactly **two** compiler invocations after the
+pre-build scripts: `xtensa-esp32-elf-g++ -o .pio/build/esp32dev/lib8b7/u8g2gl/ui_screen_diagnostics.cpp.o`
+(the regenerated screen, the only changed file) and the link of `.pio/build/esp32dev/firmware.elf`.
+The same shape as Before (one changed object, then the link). The generator reported seven files
+`unchanged` and `updated: ui_screen_diagnostics.cpp` in each run; its output is deterministic, so an
+edit that changes one screen touches one generated file.
+
+### The unconfigured loop (the author runs `u8g2gl generate` by hand)
+
+No `custom_u8g2gl_cli`: the hook prints `[u8g2gl_generate] U8G2GL_CLI is not set and custom_u8g2gl_cli
+is empty: using the committed ...` and builds from `generated/` as it stands. The author's steps: edit
+the XML, run `node <cli> generate uidesign/ssd1322-256x64/u8g2gl --target ssd1322` (the command the
+hook runs), then build. After reverting `platformio.ini` the warm-up (untimed) took **173.67 s**, again
+a full rebuild. Three timed runs, same flags:
+
+| Run | Edit | Edit written (UTC) | CLI run (alone) | Build task start to end | `Took` | Success reported (UTC) | Edit to success | CLI + build task |
+|---|---|---|---:|---:|---:|---|---:|---:|
+| 1 | 30 to 31 | 21:15:51.620 | 0.08 s | 34.95 s | 34.72 s | 21:16:30.085 | **38.47 s** | 35.03 s |
+| 2 | 31 to 30 | 21:16:33.541 | 0.07 s | 31.18 s | 31.00 s | 21:17:07.901 | **34.36 s** | 31.25 s |
+| 3 | 30 to 31 | 21:17:42.216 | 0.08 s | 31.52 s | 31.34 s | 21:18:21.843 | **39.63 s** | 31.60 s |
+| **Median** | | | **0.08 s** | **31.52 s** | **31.34 s** | | **38.47 s** | **31.60 s** |
+
+- **CLI run:** 0.084, 0.073 and 0.077 s between two timestamps around the command (they include the
+  timestamp call's own cost); three further runs under `/usr/bin/time -p` each printed `real 0.05`.
+  Every run reported seven files `unchanged` and `updated: ui_screen_diagnostics.cpp`.
+- **Edit to success includes agent overhead**, not tool time: the gap between the edit and the build
+  call was 3.5, 3.2 and 8.1 s here (the edit and the generate were one shell call, the build a second
+  call). That is why **CLI + build task** (31.60 s median) is the cleaner figure for this loop, and
+  it excludes the time a person takes to type the second command.
+- Each ended `RAM: 17.5% (used 57340 bytes ...)`, `Flash: 85.3% (used 1342311 bytes ...)`. The
+  compiler invocations were the same two as above.
+- **Configured against unconfigured:** the configured runs took 46.66 s of task time, the unconfigured
+  31.52 s: 15 s longer, although the only added work is the generator (about 0.05 s in the CLI, and 1.3
+  s at most for the whole pre-hook span). The runs were made a few minutes apart, under changing load, so the 15 s is not attributable to the hook. It is a measure of how much this host's timing moves, and the reason the comparison with Before's 29.94 s is held loosely. The work order names the configured median as the fair comparison; both rows are reported.
+
+### The reading
+
+*Time.* Both loops recompile one object and relink. Measured here, the configured XML loop's median
+was 48.81 s against the legacy C++ loop's 29.94 s, and the unconfigured loop's 38.47 s (31.60 s of
+tool time). The generate step contributes about 0.05 s of that (1.3 s as an upper bound for the whole
+pre-hook span). The 10 to 19 s gaps between the loops (configured against unconfigured, and against Before) are far larger than the work the generator does,
+the host load was visible and unequal, and the Before runs recorded no load, so the timing does
+not show a cost of the XML workflow; it shows only that this tree's incremental build is on the order
+of 30 to 50 s on this machine either way. Section 4's number for Before is a single session's three
+runs; a re-measure of the legacy loop under the same load was not made (the legacy worktree is
+read-only for this WO).
+
+*What the timing cannot capture,* both facts about the code:
+- **Legacy:** a geometry change to a legacy label means touching C++ constructor arguments, for
+  example `_row3(4, 30, ...)` in `DiagnosticsBoard.cpp:50`, where the coordinates, size and clip of a
+  widget are positional arguments to a constructor.
+- **XML:** the same change is one attribute (`y="30"` on the `u8g2gl_label`), and the generator re-checks the layout against the display every time it runs. Each run's report names the target (`ssd1322`, `U8G2_SSD1322_NHD_256X64_F_4W_HW_SPI 256x64`). U8G2GL's geometry pass (`cli/src/core/validator/validate-geometry.ts`, pass 6, read in source and not triggered here) holds every element inside its container, which for a screen's top level is the display, and the generator refuses to write anything when validation fails (WO-B2 Part 2 saw the build fail in 0.79 s with `Generation refused ... Nothing was written` for an unknown attribute).
+
+Neither the line counts of section 2 nor this section judge which is better; PR-07 does.
+
+**Revert and cleanliness.** Both temporary edits were reverted with `git checkout -- platformio.ini
+uidesign/`. `git status --short` printed nothing before this file was edited, `name="uptime" x="4" y="30"` is back at `screen_diagnostics.xml:63`, and `get_lock_status` reported `isLocked: false`. Build logs are in the stack worktree's `.pio-mcp-workspace/logs/build/` (git-ignored). Configured warm-up `build-2026-10-07T21-04-21-469Z-f68bccbb.log`; configured timed runs `...T21-08-26-693Z-edcc9ba6`, `...T21-10-22-584Z-94933abb`, `...T21-11-21-305Z-bbd3736d`; unconfigured warm-up `...T21-12-33-513Z-d4e22166`; unconfigured timed runs `...T21-15-55-133Z-704c263a`, `...T21-16-36-723Z-0bcd7c0f`, `...T21-17-50-323Z-3bb70f38`. The timestamp scripts and the nm comparison inputs are in the stack worktree's `tmp/wob3/` (git-ignored).

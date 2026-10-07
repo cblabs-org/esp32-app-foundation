@@ -5,7 +5,7 @@ title: "The after evidence, and the PR description"
 branch: u8g2gl-integration/wo3-evidence
 base: u8g2gl-integration/wo2-module
 complexity: standard
-status: dispatched
+status: complete (committed)
 ---
 
 # WO-B3: measure the migrated board as WO-B1 measured the legacy one
@@ -169,6 +169,144 @@ Report defects or surprises in the Completion Report. Do not fix or file them.
 
 ## Completion Report
 
-<!-- Written by the worker: Status, Changes Made, Decisions Made, Dead Ends & Warnings,
-Out-of-Scope Findings, Blockers; plus the delta tables, the timing table and the flash
-attribution. -->
+### Status
+
+**Complete.** Every line item was done; all numbers are quoted from logs and tool output. The temporary
+edits are reverted (`git status --short` was empty before the evidence edit), the queue lock is free
+(`get_lock_status`: `isLocked: false`), and nothing was pushed, tagged, flashed or opened as a PR.
+Authorization checked from the committed files: `../PROJECT.md` "Human Approval" quotes the owner,
+its ledger lists `wo3-evidence`, and this WORKORDER's status was `dispatched`.
+
+### Changes Made
+
+- `../evidence/EVIDENCE.md`: section 3 After (clean builds, deltas, attribution, headroom, noise) and
+  section 4 After (configured and unconfigured loops, the reading); the status line.
+- `../PR-DESCRIPTION.md` (new): the foundation PR description, with the PD-4 freeze announced first.
+- This Completion Report.
+- Temporary, reverted: `custom_u8g2gl_cli` in `[env:esp32dev]` of `platformio.ini`, and
+  `screens/screen_diagnostics.xml` row 3 `y` (30/31). Reverted with `git checkout -- platformio.ini
+  uidesign/`. No source, config or test file is in the diff.
+
+### The after figures (all from the MCP build logs and `size_report`)
+
+| `esp32dev`, clean | Before | After | Delta |
+|---|---:|---:|---:|
+| RAM | 57500 B (17.5%) | **57340 B (17.5%)** | **-160 B** |
+| Flash | 1336143 B (84.9%) | **1342247 B (85.3%)** | **+6104 B** |
+| App partition left | 236721 B (15.05%) | **230617 B (14.66%)** | -6104 B |
+
+Exact lines: `RAM:   [==        ]  17.5% (used 57340 bytes from 327680 bytes)` and `Flash: [========= ]
+85.3% (used 1342247 bytes from 1572864 bytes)` (log `build-2026-10-07T20-54-56-025Z-f2fb6504.log`,
+`Took 105.88 seconds`). `esp32s3nano`: RAM 59964 B (-160), flash 1376723 B (+6248), 32.8% of 4 MB.
+
+Section deltas, `esp32dev`: `.flash.text` +5440, `.flash.rodata` +408, `.dram0.data` +256,
+`.dram0.bss` -416, `.iram0.text` 0, `.flash.rodata_noload` 0. Flash +6104 = 5440 + 408 + 256; RAM
+-160 = 256 - 416.
+
+**Flash attribution** (`xtensa-esp32-elf-nm -S --size-sort -C` on both ELFs, aliases counted once):
+
+| Group | Bytes |
+|---|---:|
+| U8G2GL runtime (label 1164, clip 286, partial_refresh 180, rect_intersect 127, bindings, subjects) | +3178 |
+| U8g2 shape code only the new image links (RFrame, RBox, disc/circle sections, Frame, ...) | +1354 |
+| Generated UI (`ui_*`, initialisers, four 56 B label objects) | +865 |
+| Module (`formatDiagnostics` 179, `readDiagnosticsInputs` 146, board and host) | +709 |
+| Small statics | +10 |
+| **Added** | **+6116** |
+| Removed with the legacy `DiagnosticsBoard` (+ its 792 B `.bss` instance) | -657 |
+| Existing symbols that moved | +23 |
+| **Named-symbol net** | **+5482** |
+| In no named symbol (literals, padding) | +622 |
+
+The runtime and the U8g2 code it links are 74% of what was added. Legacy ELF used: the file in the
+legacy worktree (`.pio/build/esp32dev/firmware.elf`, sha256 `872f76fd...cc217`), **last built from
+WO-B1's third timed run with row 3 at y=31**. Per the PA's note, that differs from the clean legacy
+build by a few bytes at most (its `.flash.text` is 966536 against 966568 clean, the known 32 B wobble),
+so it is fine for symbol attribution. It was read only (copied to `tmp/wob3/`), never rebuilt.
+
+**Headroom.** 230617 B of the 1,572,864 B `app0` partition remain (225.2 KiB, 14.66%), against 236721
+B (15.05%) before: the migration spends 2.6% of the headroom. Whether that is "comfortable" is PR-07's
+call; the figures are in EVIDENCE §3.
+
+**Noise floor.** Tens of bytes (clean 1342247, rebuild 1342311). **But see the first dead end:** a
+1.8 KB variation also appeared.
+
+### The edit-loop timing
+
+Method matched to WO-B1: foreground `build_project`, `esp32dev`, `forceExecution: true`, `verbose:
+true`, one untimed warm-up, three timed runs from the edit being written to the result's `observedAt`.
+
+| Loop | Run 1 | Run 2 | Run 3 | **Median** | WO-B1 legacy |
+|---|---:|---:|---:|---:|---:|
+| **Configured** (hook regenerates), edit to success | 53.70 s | 48.81 s | 48.64 s | **48.81 s** | **29.94 s** |
+| Configured, task start to end | 51.66 s | 46.66 s | 46.14 s | 46.66 s | 27.03 s |
+| **Unconfigured** (CLI by hand, then build), edit to success | 38.47 s | 34.36 s | 39.63 s | **38.47 s** | |
+| Unconfigured, CLI alone | 0.08 s | 0.07 s | 0.08 s | 0.08 s (0.05 s under `time -p`) | |
+| Unconfigured, build task start to end | 34.95 s | 31.18 s | 31.52 s | 31.52 s | |
+| Unconfigured, CLI + build task | 35.03 s | 31.25 s | 31.60 s | **31.60 s** | |
+
+**Generate / compile-and-link split (configured).** Generate: 1.30, 1.27, 1.23 s (task start to the
+generated file being written; an upper bound, it includes the pre-build scripts that run first). The
+rest, 45 s, is compile and link: the `.o` finished 37.2, 37.8 and 36.2 s after the generated file
+(this window includes PlatformIO's CMake read and library scan, which the untimestamped log cannot
+separate from the one-file compile), then the link took 12.0, 6.3 and 7.4 s, then 1 to 1.4 s of image
+steps. **Recompiled in every run:** `lib8b7/u8g2gl/ui_screen_diagnostics.cpp.o` (the regenerated
+screen) and the link; two compiler invocations, the same shape as legacy's `DiagnosticsBoard.cpp.o`
+plus link. The warm-ups took 206.11 s (configured) and 173.67 s (unconfigured): editing
+`platformio.ini` rebuilds everything.
+
+**Reading of the comparison (caution).** The fair comparison the work order names is 48.81 s against
+29.94 s (+18.87 s). It is confounded: the host was loaded (`uptime` 5.5 to 20.7 on the 1-minute
+average; `Finder` at 88 to 110% CPU and a VS Code helper at 67 to 103% throughout), and WO-B1 recorded
+no load. The generator costs about 0.05 s, while the configured and unconfigured loops differ by 10 s
+of edit-to-success. The data does not show a cost of the XML workflow. I did not re-measure the legacy
+loop (it needs a build in the legacy worktree, which is forbidden). If PR-07 wants a decision-grade
+timing, the legacy and migrated loops should be re-measured back to back on an idle host.
+
+### Decisions Made
+
+- **Used the clean-build figures** for every size claim (not the post-edit rebuilds), as the work order
+  and WO-B1 specify, and because the clean figure is the higher flash use.
+- **Reported the 1.8 KB variation** in EVIDENCE §3 and the PR description and did not "correct" the
+  headline with it.
+- **Split generate from compile by file modification times**, because the build log has no timestamps;
+  stated in EVIDENCE §4 with the upper-bound caveat.
+- **Ran the unconfigured loop three times** (the work order asked for a second row, not a count) so it
+  has a median.
+- **Took `size_report` twice** per environment: the first call, with the freshly built ELF's sha,
+  fails; the second, with the relinked ELF's sha, passes (below).
+- **Wrote the PR description as a draft in the workspace**, with repo-root-relative links, for the PA to
+  submit.
+
+### Dead Ends & Warnings
+
+1. **A 1.8 KB flash variation, not caused by U8G2GL.** The rebuilds after adding `custom_u8g2gl_cli`
+   gave `Flash: 1340467` / `RAM: 57324`, 1780 B below the clean build. nm shows the difference is
+   ESP-IDF diagnostics code (`diag_log_add` 1543 B, `esp_diag_log_write` 116, `esp_diag_timestamp_get`
+   70, `append_arg$constprop$0` 54, `s_priv_data` 16) kept by the linker in the clean build and
+   dropped in that one. The legacy ELF also has `diag_log_add`; `sdkconfig.esp32dev` is identical to
+   the legacy worktree's. The mechanism was not established. After reverting `platformio.ini` the
+   rebuild gave 1342311 B. The 32 B noise floor of WO-B1 understates this tree's variation.
+2. **`size_report` relinks the ELF**, so `expectedElfSha256` from the built file fails with
+   `ANALYSIS_ELF_MISMATCH` on the first call (both environments); the second call, with the sha of the
+   file as it is after that call, succeeds. WO-B1's note ("fails without it") is incomplete.
+3. **The build result is too large to read inline** (`verbose: true` returns 67 to 243 KB); it is saved to a
+   file and I read it with `jq`. The raw log paths are in EVIDENCE §4.
+4. **The Before text quotes 812 B for the legacy `diagnosticsBoard` instance**; nm on the legacy ELF
+   gives 792 B. Not explained; the totals are unaffected.
+5. **Host load** (above) is the main caveat on every timing.
+
+### Out-of-Scope Findings (not filed, not fixed)
+
+- The two from dead ends 1 and 2 (the linker variation; the `size_report` relink behaviour).
+- The legacy defects already on record (the clipped descenders, the `0xB7` separator, the SSID clip,
+  `Fonts.hpp`, the `DrawingPrimitives.cpp` header case) are listed in the PR description as
+  correctness candidates under the freeze, with the clip an owner question.
+- `template-app/src/main.cpp` also uses the legacy `DiagnosticsBoard`; the PR description says so
+  (the project ledger names only `sample-app` and departures-board-v3).
+- No defect in the migrated board or in U8G2GL was exposed by these measurements.
+
+### Blockers
+
+None. Not done: no on-device measurement (WO-B5); the native suite was not re-run in this WO (the
+1018 of 1018 is WO-B2 Part 2's, re-run by the PA); the legacy loop was not re-measured.
