@@ -107,8 +107,11 @@ and web diagnostics (R7).
 - **[x] [wo4b-remediation](wo4b-remediation/WORKORDER.md):** fix the Must and Should findings, and
   have the harness build the runtime with the firmware's capacities. **Complete, verified by the
   PA:** 6/6 Must, 13/13 Should and 10/12 Nit fixed; the two skipped nits are justified.
-- **[ ] wo5-device (interactive):** host render vs on-device capture, when the owner is at the
-  bench.
+- **[x] wo5-device (interactive, PA and owner):** `esp32s3nano` flashed with `v0.0.12-dev.91`. The
+  owner confirmed the panel shows the board correctly, with no tearing, and the screensaver
+  working. A strict device-vs-host pixel comparison is folded into WO-B6 as step 0.
+- **[ ] [wo6-defects](wo6-defects/WORKORDER.md):** fix the three legacy defects in both boards (R8)
+  and keep them pixel-identical. *Dispatched 2026-10-10.*
 
 ## Evidence
 
@@ -314,3 +317,27 @@ reads them there and does not re-derive them.
     The `esp32s3nano` pinout in `board.h` (SCK 48, MOSI 38, MISO 47, CS 10, DC 9, RST none) is
     passed to `SPI.begin()` by the legacy module, and this PR does not touch it. The owner
     approved tagging `v0.0.12-dev.91`, pushing it, and flashing (foundation rule 03's flash gate).
+- **2026-10-10 — WO-B5 at the bench (ESP32-S3 Nano with SSD1322, `/dev/cu.usbmodem101`).**
+  - **Policy.** `upload_firmware` needed approval even under `lab_admin`: the server applies a
+    project's permission increases only after operator enrollment, and dashboard approval needs
+    an operator session. **The owner enrolled the stack worktree**
+    (`policy-enroll`, digest `b95486aa…`). The policy now reports `enrolled: true` and no
+    approval-required operations. The legacy worktree and the main checkout are **not**
+    enrolled.
+  - **A blocked port.** An orphaned `mcp_pio_proxy.py … device monitor` (PID 61634, 4 October,
+    environment `ex3-waveshare-nano`, from a Gemini-era session) held the server's monitor record.
+    The server rightly refused PID-only termination. The owner approved `kill 61634`; the
+    server's `stop_monitor` then cleared the record.
+  - **The flash.** Tagged `v0.0.12-dev.91` (pushed) on `ade5072e` (foundation rule 03), then built
+    and flashed through the MCP: RAM 59964 B, flash 1376715 B. Clean boot; WiFi `cb-iot`,
+    192.168.20.186; no panics.
+  - **The display.** The device frame
+    (`evidence/device/dev91-esp32s3nano-diagnostics.png`) shows the migrated board with live
+    values and the expected copied defects. The **owner confirmed the physical panel is
+    correct**: no tearing or flicker, and the screensaver works.
+  - **Two tooling findings (foundation):**
+    1. **`captureU8g2.py` is stale.** The firmware returns a PNG; the script expects a tile
+       buffer. A working fetch is `evidence/device/grab_display.py`.
+    2. **The MCP `capture_display` can return a torn frame.** It reads the buffer while the
+       carousel redraws: 2 of 8 captures tore at tile boundaries, and the panel does not. Take
+       several captures.
