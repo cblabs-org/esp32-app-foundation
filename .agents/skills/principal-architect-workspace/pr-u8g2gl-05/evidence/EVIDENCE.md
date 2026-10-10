@@ -16,7 +16,8 @@ Section 1b (WO-B6) records the device check of the shipped renderer and the owne
 legacy defects (R8). Section 1 describes the board **as shipped**, defects included, and the files it cites
 (`baseline/`, `after/` as of `e5342373` and `82ec83f`) are the earlier ones in git history, up to commit
 `761a21ff`; the committed `baseline/` and `after/` are now the fixed boards (section 1b). Sections 2 to 4 measure
-the shipped boards and are not re-measured, except that 1b gives the flash cost of the fixes.
+the shipped boards and are not re-measured, except that 1b gives the flash cost of the fixes. Section 1c (WO-B7)
+records the default label height fix for the other legacy boards.
 
 ---
 
@@ -491,7 +492,151 @@ alone because it is placement, not clipping.
 **A finding for the PA, not fixed (out of scope).** The `h == -1` callers above still lose the last row of a
 descender: `drawText()` resolves the default height to `getMaxCharHeight()`, one short for the same
 reason as the diagnostics labels. Resolving it to `getMaxCharHeight() + 1` would fix all of them in one line;
-it changes every board that uses a default height, so it is the owner's call.
+it changes every board that uses a default height, so it is the owner's call. *Resolved by WO-B7: see section 1c.*
+
+---
+
+## 1c. The default label height (WO-B7)
+
+Written by WO-B7, at `671f9351` (the fix) and `78a6ffb7` (the render targets). WO-B6 left one finding: a
+caller that passes `h = -1` gets `h = getMaxCharHeight()`, which loses the last descender row. This section
+reads every such caller, renders the boards, and records the one-line fix.
+
+### Every caller that reaches `drawText()` with `h = -1`
+
+Font heights, measured under the legacy state (`setFontPosTop()`, `setFontRefHeightAll()`): `helvB12_tr`
+(`defaultLarge`) `getMaxCharHeight()` = 17; `helvR10_tr` (`defaultMedium`) = 15; `helvR08_tr` (`defaultSmall`) = 11.
+A label drawn at `y` lights rows `y+1 .. y + getMaxCharHeight()`, so the fix reveals exactly row
+`y + getMaxCharHeight()`. These labels span the display width, so no column is involved.
+
+| Board | Label (declared at, `y`, font) | Revealed row | What else is in that row | Verdict |
+|---|---|---|---|---|
+| `BootBoard` splash | title (`BootBoard.cpp:49`, 0, large) | 17 | Nothing is drawn in row 17; row 18 holds the logo (`:50-56`, `y` 18, 110x32, columns 73..182). | **Touches, does not overlap** (finding 2) |
+| `BootBoard` splash | version (`:57`, 50, small) | 61 | Nothing; the display ends at row 63. | Clear |
+| `BootBoard` loading | title (large, 0) | 17 | The logo is not drawn in this phase; the status label's ink starts at row 25. | Clear |
+| `BootBoard` loading | status (`:58`, 24, small) | 35 | The progress bar's box starts at row 38 (`:59`; `ProgressBarWidget.cpp:144`) and is rendered after it. | Clear |
+| `ConfiguringStatusBoard` | header (`ConfiguringStatusBoard.cpp:74`, 0, large) | 17 | Item row 0 is `drawStr` at `startY` 16 (`:331`, `:344`); its ink starts at row 18. | **Touches, does not overlap** (finding 1) |
+| `ConfiguringStatusBoard` waiting | status (`:75`, 24, small) | 35 | Nothing: items, bar and footer are not drawn with no preconditions (the footer is at row 53). | Clear |
+| `OTAProgressBoard` | title (`OTAProgressBoard.hpp:47`, 2, medium) | 17 | The bar box starts at row 18 (`:48`) and blanks from there, after the title. | Clear |
+| `OTAProgressBoard` | status (`:49`, 50, small) | 61 | Nothing. | Clear |
+| `SystemMessageWidget` (`ErrorBoard`, `WiFiWizardBoard`, `GenericGateHelperBoard`) | title (`SystemMessageWidget.cpp:94`, 0, large) | 17 | Nothing: the first detail line is at `y` 28. | Clear |
+| same | detail line 1 (`:100`, 28, small) | 39 | Nothing: line 2 is at `y` 44. | Clear |
+| same | detail line 2 (44, small) | 55 | Nothing. | Clear |
+| same | detail line 3 (60, small) | 71 | Off the display; no board sets a third line. | n/a |
+
+Callers that do **not** change: `ProgressBarWidget` (explicit box `renderH - 4`), `ScrollingTextWidget` (explicit
+default `renderH` 12), `WifiStatusWidget` (explicit `_height`), `ScreensaverBoard` and `DiagnosticsBoard` (explicit
+heights) and the `sample-app` `WeatherWidget` (the `h == -1` fast path draws with no clip). The vertical centring
+in `LabelWidget::render` is unaffected: `yOffset` is computed only when `_height > 0`, and every affected label has
+`_height = -1`, so `yOffset` stays 0 and no text moves.
+
+**Findings (reported, not fixed; they are layout, which is out of scope).**
+1. **`ConfiguringStatusBoard`: the header's descender now touches the first item.** The `g` tails of
+   "Configuring..." gain a pixel row at row 17, columns 121..124 and 161..164. Item row 0 has ink from row 18, so the
+   one-row gap there before the fix is gone: the pixels are adjacent, not shared. With the harness items, row 18
+   has ink directly under the left tail.
+2. **`BootBoard` splash: the real title's `p` descender now touches the logo.** With the root firmware's title,
+   "ESP32 App Foundation" (`src/main.cpp:82`), the first `p` gains row 17 at columns 105..106 and the logo's top ink
+   (row 18, column 106) sits directly below it. Adjacent, not shared; the logo's top row is mostly empty.
+
+No revealed row overlaps another element's ink.
+
+### The render, before and after
+
+`test/render/legacy_boards.cpp` is a separate executable from `render_harness`, so the diagnostics gate is
+untouched. It renders nine states with fixed strings, through the real U8G2 and the unmodified boards:
+`error_nonfatal`, `error_fatal`, `wifi_wizard`, `gate_helper`, `boot_splash`, `boot_loading`, `ota_progress`,
+`configuring_items`, `configuring_waiting`. Every affected board rendered: `BootBoard` needs only `millis()`, and
+`ConfiguringStatusBoard` is built from snapshots with its two `PreconditionEngine` read methods stubbed.
+
+`test/render/legacy_boards/before/` is `drawText()` at `getMaxCharHeight()`; `after/` is `getMaxCharHeight() + 1`.
+Both reproduce from a `git archive HEAD` build in `tmp/`, from clean (the before set by reverting the one line in
+that copy). `render_legacy_boards --diff before after` (`#` in both, `-` before only, `+` after only):
+
+```
+== error_nonfatal
+row 39, columns  94..154: +..............++......................................+++.++
+8 pixels differ
+== error_fatal
+row 39, columns  90..189: +++.......................................................................+........................+
+row 55, columns 101..102: ++
+7 pixels differ
+== wifi_wizard
+row 39, columns 179..179: +
+row 55, columns 113..113: +
+2 pixels differ
+== gate_helper
+row 17, columns 186..187: ++
+row 39, columns  93..164: ++...............................++....................................+
+row 55, columns  90.. 90: +
+8 pixels differ
+== boot_splash
+row 17, columns 105..116: ++........++
+4 pixels differ
+== boot_loading
+row 17, columns 105..116: ++........++
+row 35, columns  58..199: ++........................+++...................................................+.+................................+...................+++...+
+16 pixels differ
+== ota_progress
+row 17, columns 147..147: +
+row 61, columns 136..149: +++..........+
+5 pixels differ
+== configuring_items
+row 17, columns 121..164: ++++....................................++++
+8 pixels differ
+== configuring_waiting
+row 17, columns 121..164: ++++....................................++++
+row 35, columns 136..138: +++
+11 pixels differ
+
+9 of 9 frames differ
+```
+
+Every difference is a `+`, never a `-`, and every one is in row `y + getMaxCharHeight()` of a label in the table
+(rows 17, 35, 39, 55, 61). Nothing else moves; the new pixels are the tails of `p`, `g`, `y` and `,`. For one
+frame, the area around the revealed row:
+
+```
+wifi_wizard, rows 46..55 (the "visit: http://..." line, y 44), columns 70..189
+46 ..........#......#..#........#......#...#.............#..#..#....###...###.......#....###...###........#.......#........
+47 ....................#........#......#...#.............#..#.##...#...#.#...#.....##...#...#.#...#......##......##........
+48 ....#...#.#..##..#.###..#....#.##..###.###.#.##...#..#..#...#...#...#.....#......#...#.....#...#.....#.#.......#........
+49 ....#...#.#.#..#.#..#........##..#..#...#..##..#.....#..#...#...#...#.....#......#...####...###......#.#.......#........
+50 .....#.#..#..##..#..#........#...#..#...#..#...#.....#..#...#....####...##.......#...#...#.#...#....#..#.......#........
+51 .....#.#..#....#.#..#........#...#..#...#..#...#.....#..#...#.......#..#.........#...#...#.#...#....#####......#........
+52 ......#...#.#..#.#..#........#...#..#...#..##..#....#..#....#...#...#.#..........#...#...#.#...#.......#.......#........
+53 ......#...#..##..#..##..#....#...#..##..##.#.##...#.#..#....#....###..#####..#...#....###...###...#....#...#...#........
+54 ...........................................#............................................................................
+55 ...........................................+............................................................................
+```
+
+### Identity, native and firmware
+
+| Check | Result |
+|---|---|
+| Diagnostics identity (`after` target, clean `git archive HEAD` build) | **0/5 differing**: `connected`, `ap_mode`, `disconnected`, `long_ssid`, `device_dev91` all `identical=yes differing_pixels=0` |
+| Committed `baseline/` and `after/` | Every `.bin` and `.pbm` byte-identical to the committed files. Only the `source` string in `inputs.json` differs (the rebuild used local U8G2 and U8G2GL checkouts: "override" where the committed text says "FetchContent"). The committed files are unchanged. |
+| Native (`env:native`, MCP `run_tests`) | **1018/1018** pass, the same total as WO-B2 to WO-B6. No native test pins the old behaviour: a native build draws nothing. |
+| `esp32dev` (clean, `forceExecution`) | `RAM: 17.5% (used 57340 bytes from 327680 bytes)`, `Flash: 85.5% (used 1344575 bytes from 1572864 bytes)`; RAM delta 0, Flash **+16 B** against WO-B6 (1344559 B) |
+| `esp32s3nano` (clean, `forceExecution`) | `RAM: 18.3% (used 59964 bytes from 327680 bytes)`, `Flash: 32.9% (used 1378979 bytes from 4194304 bytes)`; RAM delta 0, Flash **+12 B** against WO-B6 (1378967 B) |
+
+The deltas are the `+ 1`. Unlike WO-B6's clip change, this one is in the firmware image: the firmware links the
+legacy `drawText()`, since the other boards use it.
+
+### Which affected boards appear on a normally configured device
+
+| Board | Appears |
+|---|---|
+| `BootBoard` | **At every boot**: the splash (title, logo, version) for 3 s, then the status text and bar until boot completes. The easiest check: the title's two `p`s and the status text's descenders. |
+| `ConfiguringStatusBoard` | While the app is in its configuring phase (`app.configuring`): at boot until the startup preconditions are met, and whenever one is lost. Brief or absent on a normally configured device; its "Waiting..." state shows before the first snapshot arrives. |
+| `OTAProgressBoard` | Only during a firmware update. |
+| `ErrorBoard` | Only on an error (`showError`). |
+| `WiFiWizardBoard` | Only when WiFi is unconfigured (the `WIFI_STATION` precondition needs the user: AP/setup mode). |
+| `GenericGateHelperBoard` | Only when another precondition needs the user (for example a missing API key). |
+
+So on a configured device only `BootBoard` is guaranteed, at boot. The others need a forced state (erase the WiFi
+credentials for the wizard, an OTA for the progress board, an injected error).
+
 
 ---
 

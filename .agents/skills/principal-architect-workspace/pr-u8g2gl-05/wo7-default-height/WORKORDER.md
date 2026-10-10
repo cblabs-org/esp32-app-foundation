@@ -123,4 +123,57 @@ The owner approved fixing this (R8 follow-up). It is a correctness fix under the
 
 ## Completion Report
 
-<!-- Written by the worker. -->
+**Status: complete.** Authorization checked from committed files: `../PROJECT.md` "Human Approval" quotes the
+owner, its 2026-10-10 log entry records "(2) that would be nice" for this follow-up, and this WORKORDER's status
+was `dispatched`. Branch `u8g2gl-integration/wo7-default-height` was verified before each commit. Nothing pushed,
+tagged, uploaded or flashed. PlatformIO ran through the MCP only; no `reset_server_state`. The full record is
+`../evidence/EVIDENCE.md` section 1c.
+
+**Commits** (each ends with the `Co-Authored-By` line):
+- `671f9351` `fix(display)`: `drawText()` default height is `getMaxCharHeight() + 1`; the Doxygen `@param h` in the
+  `.cpp` and `.hpp` updated. Cites the PD-4 correctness exemption.
+- `78a6ffb7` `test(render)`: `render_legacy_boards` (new `legacy_boards.cpp`, CMake targets, README section), with
+  the committed `legacy_boards/before/` and `after/` frames.
+- The `docs(pa)` commit holding `EVIDENCE.md` section 1c and this report.
+
+**Line item 1: every caller, by reading.** Fonts: large 17, medium 15, small 11 (`getMaxCharHeight()`); the fix
+reveals row `y + getMaxCharHeight()`. Revealed rows: title 17 (`y` 0 large; `y` 2 medium on OTA), status 35 (`y` 24),
+version and OTA status 61 (`y` 50), message lines 39 and 55 (`y` 28, 44). Only these are touched:
+`BootBoard`, `ConfiguringStatusBoard`, `OTAProgressBoard` labels and `SystemMessageWidget` (all three message
+boards). Nothing is drawn **in** any revealed row. `yOffset` is unaffected (`_height = -1`, so centring does not
+apply), as expected. Two **overlap-adjacent findings**, reported and not fixed:
+1. `ConfiguringStatusBoard`: the header's `g` tails (row 17, columns 121..124 and 161..164) are now directly above
+   item row 0's ink (from row 18); the old one-row gap is gone.
+2. `BootBoard` splash with the real title "ESP32 App Foundation": the first `p` tail (row 17, columns 105..106) sits
+   directly above the logo's top ink (row 18, column 106).
+Both are adjacent pixels, not shared ones; the layout is untouched.
+
+**Line item 2: boards rendered.** All of them: `ErrorBoard` (non-fatal, fatal), `WiFiWizardBoard`,
+`GenericGateHelperBoard`, `BootBoard` (splash, loading), `OTAProgressBoard`, `ConfiguringStatusBoard` (items,
+waiting): nine frames. `BootBoard` shimmed cheaply; `ConfiguringStatusBoard` needed its two `PreconditionEngine`
+read methods stubbed in the harness (never run). The before/after diff is all `+`, nothing `-`, and each is the
+row `y + getMaxCharHeight()`. Pixels added per frame: error_nonfatal 8, error_fatal 7, wifi_wizard 2,
+gate_helper 8, boot_splash 4, boot_loading 16, ota_progress 5, configuring_items 8, configuring_waiting 11; 9 of 9
+frames differ. Before and after both reproduce from a clean `git archive HEAD` build in
+`tmp/`. The harness boot title is the root firmware's own, "ESP32 App Foundation".
+
+**Line item 4: verification.**
+- Diagnostics identity: **0/5 differing**, `baseline/` and `after/` unchanged (`.bin` and `.pbm` byte-identical;
+  only the `inputs.json` `source` string differs in the scratch rebuild, which is not committed).
+- Native: **1018/1018**.
+- `esp32dev` clean: `RAM: 17.5% (used 57340 bytes from 327680 bytes)`, `Flash: 85.5% (used 1344575 bytes from
+  1572864 bytes)`; delta against WO-B6: RAM 0, Flash **+16 B**.
+- `esp32s3nano` clean: `RAM: 18.3% (used 59964 bytes from 327680 bytes)`, `Flash: 32.9% (used 1378979 bytes from
+  4194304 bytes)`; delta: RAM 0, Flash **+12 B**.
+- `doc_lint.py`: see the check below.
+
+**Line item 6: on a normally configured device.** `BootBoard` at every boot (splash 3 s, then status and bar):
+the one to check. `ConfiguringStatusBoard` only while configuring (brief or absent when configured). `OTAProgressBoard`
+only during an update; `ErrorBoard` only on an error; `WiFiWizardBoard` only when WiFi is unconfigured (setup/AP
+mode); `GenericGateHelperBoard` only when a non-WiFi precondition needs the user.
+
+**Could not do / left for the PA.** No device check (ordered). The two layout findings above are the owner's call.
+The PROJECT.md ledger line for WO-B7 is not ticked (outside the Boundary Box). The scratch builds in `tmp/b7`
+used local U8G2 (`../U8G2GL-05/extern/u8g2` @ 2.36.18) and a `git archive` of U8G2GL at the pinned sha `82ec83f`
+as the runtime; neither repository was written. `get_lock_status` after the last build: not locked (`release_lock` needs a
+`sessionId` and I held no explicit lock).
