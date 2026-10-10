@@ -8,6 +8,8 @@
     "disconnected": {"unclipped_lit": 1326, "rendered_lit": 1318, "removed_by_clip": 8, "added_by_render": 0, "removed_by_pixel_row": {"16": 2, "17": 2, "40": 1, "41": 1, "54": 1, "55": 1},
       "removed_if_far_corner_were_inclusive": 4, "removed_if_far_corner_were_inclusive_by_pixel_row": {"17": 2, "41": 1, "55": 1}},
     "long_ssid": {"unclipped_lit": 1714, "rendered_lit": 1695, "removed_by_clip": 19, "added_by_render": 0, "removed_by_pixel_row": {"16": 2, "17": 2, "19": 1, "24": 1, "25": 2, "26": 2, "27": 5, "40": 1, "41": 1, "54": 1, "55": 1},
-      "removed_if_far_corner_were_inclusive": 13, "removed_if_far_corner_were_inclusive_by_pixel_row": {"17": 2, "19": 1, "24": 1, "25": 2, "27": 5, "41": 1, "55": 1}}
+      "removed_if_far_corner_were_inclusive": 13, "removed_if_far_corner_were_inclusive_by_pixel_row": {"17": 2, "19": 1, "24": 1, "25": 2, "27": 5, "41": 1, "55": 1}},
+    "device_dev91": {"unclipped_lit": 1360, "rendered_lit": 1352, "removed_by_clip": 8, "added_by_render": 0, "removed_by_pixel_row": {"16": 2, "17": 2, "40": 1, "41": 1, "54": 1, "55": 1},
+      "removed_if_far_corner_were_inclusive": 4, "removed_if_far_corner_were_inclusive_by_pixel_row": {"17": 2, "41": 1, "55": 1}}
   }
 }

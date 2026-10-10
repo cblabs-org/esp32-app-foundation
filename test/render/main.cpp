@@ -91,6 +91,9 @@ static constexpr const char* DISPLAY_SETUP_CALL =
 #ifndef U8G2_SOURCE_DESCRIPTION
 #define U8G2_SOURCE_DESCRIPTION "unknown"
 #endif
+#ifndef HARNESS_DEFAULT_BUILD_VERSION
+#define HARNESS_DEFAULT_BUILD_VERSION "unknown"
+#endif
 #ifndef HARNESS_U8G2_FLAGS
 #define HARNESS_U8G2_FLAGS "unknown"
 #endif
@@ -158,18 +161,29 @@ struct Scenario {
     const char* ip;          ///< WiFi.localIP().toString(), or nullptr when the branch never reads it
     unsigned long uptimeMs;  ///< Value of millis() and of the tick() argument
     size_t freeHeapBytes;    ///< heap_caps_get_free_size(MALLOC_CAP_8BIT), bytes (KB x 1024)
+    const char* buildVersion;  ///< BUILD_VERSION for this scenario, or nullptr for HARNESS_DEFAULT_BUILD_VERSION
 };
 
-/** @brief The four scenarios; between them they cover every row-2 branch. */
+/**
+ * @brief The scenarios; between them they cover every row-2 branch.
+ *
+ * The first four are synthetic. `device_dev91` replays the live values of the
+ * ESP32-S3 Nano at the bench (hostname, SSID, IP, uptime, free heap and firmware
+ * version as the device reported them), so a render can be compared pixel for
+ * pixel with a frame captured from the device itself.
+ */
 static const std::vector<Scenario> kScenarios = {
     {"connected",    true,  false, "esp32-foundation", "MyNetwork", "192.168.1.42",
-        (2UL * 3600 + 14 * 60 + 36) * 1000UL, 278 * 1024},
+        (2UL * 3600 + 14 * 60 + 36) * 1000UL, 278 * 1024, nullptr},
     {"ap_mode",      false, true,  "esp32-foundation", nullptr, nullptr,
-        42UL * 1000UL, 301 * 1024},
+        42UL * 1000UL, 301 * 1024, nullptr},
     {"disconnected", false, false, "esp32-foundation", nullptr, nullptr,
-        (3UL * 60 + 5) * 1000UL, 290 * 1024},
+        (3UL * 60 + 5) * 1000UL, 290 * 1024, nullptr},
     {"long_ssid",    true,  false, "esp32-foundation", "ThisIsAVeryLongNetworkNameForOverflow1",
-        "10.100.200.250", (99UL * 3600 + 59 * 60 + 59) * 1000UL, 4 * 1024},
+        "10.100.200.250", (99UL * 3600 + 59 * 60 + 59) * 1000UL, 4 * 1024, nullptr},
+    // Device values: "Up: 0h 1m 36s" is 96 000 ms; 8 515 584 B is the 8316 KB the panel showed.
+    {"device_dev91", true,  false, "esp32-foundation", "cb-iot", "192.168.20.186",
+        96000UL, 8316UL * 1024, "0.0.12-dev.91"},
 };
 
 // =============================================================================
@@ -203,6 +217,7 @@ static void applyScenario(const Scenario& scenario) {
     env.ssid          = scenario.ssid ? scenario.ssid : "";
     env.localIP       = scenario.ip ? scenario.ip : "";
     env.freeHeapBytes = scenario.freeHeapBytes;
+    env.buildVersion  = scenario.buildVersion ? scenario.buildVersion : HARNESS_DEFAULT_BUILD_VERSION;
 }
 
 /**
@@ -509,7 +524,8 @@ static bool writeInputsJson(const fs::path& path, const RenderTarget& target,
     // The display state calls, the buffer and PBM formats, the string encoding and the re-run command.
     // None of these varies per scenario, so they are written once, before the scenarios.
     fprintf(file, "  \"u8g2_compile_flags\": %s,\n", jsonString(HARNESS_U8G2_FLAGS).c_str());
-    fprintf(file, "  \"build_version_define\": %s,\n", jsonString(BUILD_VERSION).c_str());
+    fprintf(file, "  \"build_version_define\": \"harnessBuildVersion(): per scenario, default %s\",\n",
+            HARNESS_DEFAULT_BUILD_VERSION);
     fprintf(file, "  \"display_setup_call\": %s,\n", jsonString(DISPLAY_SETUP_CALL).c_str());
     fprintf(file, "  \"display_state_calls\": [\"begin()\", \"setDrawColor(1)\", \"setFontMode(1)\", "
                   "\"setFontRefHeightAll()\", \"setFontPosTop()\", \"setContrast(0)\", \"setFlipMode(0)\"],\n");
@@ -544,10 +560,11 @@ static bool writeInputsJson(const fs::path& path, const RenderTarget& target,
 
         fprintf(file, "    %s: {\n", jsonString(s.name).c_str());
         fprintf(file, "      \"inputs\": {\"connected\": %s, \"ap_mode\": %s, \"hostname\": %s, "
-                      "\"ssid\": %s, \"ip\": %s, \"millis\": %lu, \"free_heap_bytes\": %zu},\n",
+                      "\"ssid\": %s, \"ip\": %s, \"millis\": %lu, \"free_heap_bytes\": %zu, \"build_version\": %s},\n",
                 s.connected ? "true" : "false", s.apMode ? "true" : "false",
                 jsonString(s.hostname).c_str(), jsonOptional(s.ssid).c_str(),
-                jsonOptional(s.ip).c_str(), s.uptimeMs, s.freeHeapBytes);
+                jsonOptional(s.ip).c_str(), s.uptimeMs, s.freeHeapBytes,
+                jsonString(s.buildVersion ? s.buildVersion : HARNESS_DEFAULT_BUILD_VERSION).c_str());
         fprintf(file, "      \"rows\": [\n");
         for (size_t row = 0; row < r.rows.rows.size(); ++row) {
             fprintf(file, "        {\"row\": %zu, \"font\": %s, \"text\": %s}%s\n", row + 1,

@@ -13,8 +13,13 @@ There are two targets, selected with `--board`:
 | `legacy` | The legacy `DiagnosticsBoard`, compiled unmodified from `modules/U8G2Display` (commit `e5342373`) | `baseline/`, the "before" evidence |
 | `u8g2gl` | The migrated board: `modules/U8G2GLDisplay`'s `DiagnosticsScreenBoard` running the generated U8G2GL screen from `uidesign/ssd1322-256x64/u8g2gl`, over the pinned U8G2GL runtime | `after/`, the "after" evidence |
 
-Both run the same four scenarios, through the same U8G2, flags, shims and legacy
-display state, so their `.bin` files compare directly.
+Both run the same five scenarios, through the same U8G2, flags, shims and legacy
+display state, so their `.bin` files compare directly. Four are synthetic
+(`connected`, `ap_mode`, `disconnected`, `long_ssid`). The fifth, `device_dev91`,
+replays the live values of the ESP32-S3 Nano at the bench (hostname
+`esp32-foundation`, SSID `cb-iot`, IP `192.168.20.186`, 96 s of uptime, 8316 KB
+free, version `0.0.12-dev.91`), so a render can be compared with a frame captured
+from the device (see `compare_png.py`).
 
 ## Run
 
@@ -70,7 +75,7 @@ Requirements: CMake 3.20+, a C++17 compiler, git (for the fetch).
 ## Output
 
 `baseline/diagnostics_board/` holds, for each scenario (`connected`, `ap_mode`,
-`disconnected`, `long_ssid`):
+`disconnected`, `long_ssid`, `device_dev91`):
 
 | File | Content |
 |---|---|
@@ -113,7 +118,10 @@ the firmware's size and not the runtime's default of 256. Pixels do not depend o
 `shim/` is first on the include path, so the board's `#include "WifiManager.hpp"`,
 `<WiFi.h>` and the rest resolve to the shims. Every shim answers from one
 `HostEnvironment` struct that the harness fills per scenario. `BUILD_VERSION` is
-fixed at `"0.0.12-dev.83"`. The firmware's U8G2 flags are used as they are in
+compiled as a call, `harnessBuildVersion()`, that answers from the scenario's
+version: `"0.0.12-dev.83"` unless the scenario names its own (`device_dev91` uses
+`"0.0.12-dev.91"`). Every use in the boards is a `"%s"` argument, so the boards
+are compiled unmodified. The firmware's U8G2 flags are used as they are in
 `platformio.ini`: `-DU8G2_WITHOUT_FONT_ROTATION -DU8G2_WITHOUT_UNICODE`, with no
 `UNIT_TEST` or `NATIVE_BUILD`, so the real fonts are used.
 
@@ -152,6 +160,23 @@ tmp/render-build/render_harness --board legacy --out <dir> --probe-separator
 tmp/render-build/render_harness --board u8g2gl --out <dir> --compare baseline --probe-state
 tmp/render-build/render_harness --board u8g2gl --out <dir> --probe-clip    # writes clip_probe.json
 ```
+
+## compare_png.py
+
+Compares a render with a frame captured from the device, pixel for pixel. The
+device's `capture_display` returns a PNG (`grab_display.py` in the PR's evidence
+folder fetches one); the script converts it to 1 bit (white = lit) and reads the
+render's `.pbm`:
+
+```bash
+python3 -I test/render/compare_png.py \
+    test/render/after/diagnostics_board/device_dev91.pbm <device-capture>.png
+```
+
+It prints the lit counts and the differing-pixel count, and an ASCII diff of the
+rows that differ (`#` lit in both, `+` render only, `-` device only). Exit status
+0 means identical. It needs Pillow. The device's capture can come back torn at
+8-row tile boundaries; take several and compare a whole one.
 
 ## count_lines.py
 

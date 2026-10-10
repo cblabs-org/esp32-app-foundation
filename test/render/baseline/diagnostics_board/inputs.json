@@ -4,7 +4,7 @@
   "legacy_source_commit": "e5342373",
   "u8g2": {"version": "2.36.18", "source": "FetchContent https://github.com/olikraus/u8g2.git tag 2.36.18"},
   "u8g2_compile_flags": "-DU8G2_WITHOUT_FONT_ROTATION -DU8G2_WITHOUT_UNICODE",
-  "build_version_define": "0.0.12-dev.83",
+  "build_version_define": "harnessBuildVersion(): per scenario, default 0.0.12-dev.83",
   "display_setup_call": "u8g2_Setup_ssd1322_nhd_256x64_f(u8g2, U8G2_R0, u8x8_byte_empty, u8x8_dummy_cb)",
   "display_state_calls": ["begin()", "setDrawColor(1)", "setFontMode(1)", "setFontRefHeightAll()", "setFontPosTop()", "setContrast(0)", "setFlipMode(0)"],
   "display_state_source": "modules/U8G2Display/U8G2Display.cpp lines 137-148",
@@ -15,7 +15,7 @@
   "rerun": "cmake -S test/render -B tmp/render-build && cmake --build tmp/render-build --target baseline",
   "scenarios": {
     "connected": {
-      "inputs": {"connected": true, "ap_mode": false, "hostname": "esp32-foundation", "ssid": "MyNetwork", "ip": "192.168.1.42", "millis": 8076000, "free_heap_bytes": 284672},
+      "inputs": {"connected": true, "ap_mode": false, "hostname": "esp32-foundation", "ssid": "MyNetwork", "ip": "192.168.1.42", "millis": 8076000, "free_heap_bytes": 284672, "build_version": "0.0.12-dev.83"},
       "rows": [
         {"row": 1, "font": "u8g2_font_helvB12_tr", "text": "esp32-foundation"},
         {"row": 2, "font": "u8g2_font_helvR08_tr", "text": "MyNetwork \u00b7 192.168.1.42"},
@@ -26,7 +26,7 @@
       "row2": {"natural_width_px": 123, "clip_x_range": [4, 251], "lit_x_range": [5, 125], "band_rows": [16, 29]}
     },
     "ap_mode": {
-      "inputs": {"connected": false, "ap_mode": true, "hostname": "esp32-foundation", "ssid": null, "ip": null, "millis": 42000, "free_heap_bytes": 308224},
+      "inputs": {"connected": false, "ap_mode": true, "hostname": "esp32-foundation", "ssid": null, "ip": null, "millis": 42000, "free_heap_bytes": 308224, "build_version": "0.0.12-dev.83"},
       "rows": [
         {"row": 1, "font": "u8g2_font_helvB12_tr", "text": "esp32-foundation"},
         {"row": 2, "font": "u8g2_font_helvR08_tr", "text": "AP: esp32-foundation \u00b7 192.168.4.1"},
@@ -37,7 +37,7 @@
       "row2": {"natural_width_px": 162, "clip_x_range": [4, 251], "lit_x_range": [4, 165], "band_rows": [16, 29]}
     },
     "disconnected": {
-      "inputs": {"connected": false, "ap_mode": false, "hostname": "esp32-foundation", "ssid": null, "ip": null, "millis": 185000, "free_heap_bytes": 296960},
+      "inputs": {"connected": false, "ap_mode": false, "hostname": "esp32-foundation", "ssid": null, "ip": null, "millis": 185000, "free_heap_bytes": 296960, "build_version": "0.0.12-dev.83"},
       "rows": [
         {"row": 1, "font": "u8g2_font_helvB12_tr", "text": "esp32-foundation"},
         {"row": 2, "font": "u8g2_font_helvR08_tr", "text": "WiFi: Not connected"},
@@ -48,7 +48,7 @@
       "row2": {"natural_width_px": 93, "clip_x_range": [4, 251], "lit_x_range": [4, 96], "band_rows": [16, 29]}
     },
     "long_ssid": {
-      "inputs": {"connected": true, "ap_mode": false, "hostname": "esp32-foundation", "ssid": "ThisIsAVeryLongNetworkNameForOverflow1", "ip": "10.100.200.250", "millis": 359999000, "free_heap_bytes": 4096},
+      "inputs": {"connected": true, "ap_mode": false, "hostname": "esp32-foundation", "ssid": "ThisIsAVeryLongNetworkNameForOverflow1", "ip": "10.100.200.250", "millis": 359999000, "free_heap_bytes": 4096, "build_version": "0.0.12-dev.83"},
       "rows": [
         {"row": 1, "font": "u8g2_font_helvB12_tr", "text": "esp32-foundation"},
         {"row": 2, "font": "u8g2_font_helvR08_tr", "text": "ThisIsAVeryLongNetworkNameForOverflow1 \u00b7 10.100.200.250"},
@@ -57,6 +57,17 @@
       ],
       "lit_pixels": 1695,
       "row2": {"natural_width_px": 289, "clip_x_range": [4, 251], "lit_x_range": [4, 250], "band_rows": [16, 29]}
+    },
+    "device_dev91": {
+      "inputs": {"connected": true, "ap_mode": false, "hostname": "esp32-foundation", "ssid": "cb-iot", "ip": "192.168.20.186", "millis": 96000, "free_heap_bytes": 8515584, "build_version": "0.0.12-dev.91"},
+      "rows": [
+        {"row": 1, "font": "u8g2_font_helvB12_tr", "text": "esp32-foundation"},
+        {"row": 2, "font": "u8g2_font_helvR08_tr", "text": "cb-iot \u00b7 192.168.20.186"},
+        {"row": 3, "font": "u8g2_font_helvR08_tr", "text": "Up: 0h 1m 36s"},
+        {"row": 4, "font": "u8g2_font_helvR08_tr", "text": "Heap: 8316KB  v0.0.12-dev.91"}
+      ],
+      "lit_pixels": 1352,
+      "row2": {"natural_width_px": 107, "clip_x_range": [4, 251], "lit_x_range": [4, 110], "band_rows": [16, 29]}
     }
   }
 }

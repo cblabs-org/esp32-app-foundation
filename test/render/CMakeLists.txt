@@ -49,7 +49,7 @@ endif()
 
 # --- Fixed inputs of the build ---------------------------------------------------
 set(U8G2_PINNED_VERSION "2.36.18")   # What olikraus/U8g2@^2.36.18 resolves to in .pio/libdeps/*/U8g2
-set(HARNESS_BUILD_VERSION "0.0.12-dev.83")  # BUILD_VERSION shown on row 4
+set(HARNESS_BUILD_VERSION "0.0.12-dev.83")  # Version shown on row 4 by every scenario that does not name its own
 # The firmware's U8G2 flags, as in platformio.ini [env:esp32dev]. UNIT_TEST and
 # NATIVE_BUILD are deliberately NOT defined, so AppFonts returns the real fonts.
 set(HARNESS_U8G2_FLAGS "-DU8G2_WITHOUT_FONT_ROTATION -DU8G2_WITHOUT_UNICODE")
@@ -113,7 +113,9 @@ add_library(legacy_diagnostics STATIC
 target_include_directories(legacy_diagnostics PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}/shim   # FIRST: WifiManager.hpp, WiFi.h, Arduino.h, esp_heap_caps.h resolve here
   ${LEGACY_DIR})                     # then IDisplayBoard.hpp, widgets/, fonts/
-target_compile_definitions(legacy_diagnostics PUBLIC BUILD_VERSION="${HARNESS_BUILD_VERSION}")
+# BUILD_VERSION is a call, not a literal, so each scenario can carry its own version
+# (shim/Arduino.h: harnessBuildVersion()). Every use in the boards is a "%s" argument.
+target_compile_definitions(legacy_diagnostics PUBLIC BUILD_VERSION=harnessBuildVersion\(\))
 target_link_libraries(legacy_diagnostics PUBLIC u8g2_real)
 target_compile_options(legacy_diagnostics PRIVATE -Wall -Wextra)
 
@@ -178,7 +180,7 @@ if(RENDER_U8G2GL)
     ${CMAKE_CURRENT_SOURCE_DIR}/shim   # FIRST: WifiManager.hpp, WiFi.h, Arduino.h, esp_heap_caps.h resolve here
     ${U8G2GL_MODULE_DIR}
     ${LEGACY_DIR})                     # IDisplayBoard.hpp only; the legacy board is not compiled into this library
-  target_compile_definitions(u8g2gl_board PUBLIC BUILD_VERSION="${HARNESS_BUILD_VERSION}")
+  target_compile_definitions(u8g2gl_board PUBLIC BUILD_VERSION=harnessBuildVersion\(\))
   target_link_libraries(u8g2gl_board PUBLIC u8g2gl_ui)
   target_compile_options(u8g2gl_board PRIVATE -Wall -Wextra)
 endif()
@@ -190,6 +192,7 @@ add_executable(render_harness
 target_link_libraries(render_harness PRIVATE legacy_diagnostics)
 target_compile_definitions(render_harness PRIVATE
   U8G2_PINNED_VERSION="${U8G2_PINNED_VERSION}"
+  HARNESS_DEFAULT_BUILD_VERSION="${HARNESS_BUILD_VERSION}"
   U8G2_SOURCE_DESCRIPTION="${U8G2_SOURCE_DESCRIPTION}"
   HARNESS_U8G2_FLAGS="${HARNESS_U8G2_FLAGS}")
 target_compile_options(render_harness PRIVATE -Wall -Wextra)

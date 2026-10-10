@@ -20,6 +20,7 @@
  *   - localIP:       Text returned by WiFi.localIP().toString().
  *   - freeHeapBytes: Value returned by heap_caps_get_free_size().
  *   - hostname/ssid/apMode: Values returned by the WifiManager getters.
+ *   - buildVersion:  Value of BUILD_VERSION, per scenario.
  * - hostEnvironment(): The one process-wide instance.
  */
 
@@ -39,6 +40,7 @@ struct HostEnvironment {
     std::string hostname;            ///< WifiManager::getHostname() result
     std::string ssid;                ///< WifiManager::getSSID() result
     bool apMode = false;             ///< WifiManager::getAPMode() result
+    std::string buildVersion;        ///< BUILD_VERSION: the firmware version shown on row 4
 };
 
 /** @brief The single process-wide HostEnvironment the shim headers read. */

@@ -12,6 +12,7 @@
  * Exported Functions:
  * - hostEnvironment(): Returns the process-wide HostEnvironment.
  * - millis():          Arduino millis(), answered from the HostEnvironment.
+ * - harnessBuildVersion(): The scenario's firmware version, answered from the HostEnvironment.
  */
 
 #include "HostEnvironment.hpp"
@@ -26,4 +27,9 @@ HostEnvironment& hostEnvironment() {
 /** @brief Arduino millis(): the harness-controlled clock, not real time. */
 unsigned long millis() {
     return hostEnvironment().millis;
+}
+
+/** @brief The firmware version of the scenario being rendered (BUILD_VERSION expands to a call to this). */
+const char* harnessBuildVersion() {
+    return hostEnvironment().buildVersion.c_str();
 }

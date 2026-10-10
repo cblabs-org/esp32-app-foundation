@@ -208,6 +208,55 @@ comment):
 
 ---
 
+## 1b. After the R8 defect fixes
+
+Written by WO-B6. Section 1 above is the record of the board **as shipped** (the defects included);
+this section records the device check of that shipped renderer (step 0), then the three owner-ruled
+fixes (R8) and the new baseline.
+
+### Step 0: the shipped renderer against the device (before any fix)
+
+**What was compared.** The device frame `device/dev91-esp32s3nano-diagnostics.png` (ESP32-S3 Nano,
+firmware `v0.0.12-dev.91`, the pre-fix bug-for-bug board; sha256
+`7bfec20bde83dadd1f246a6b681cb0c961c57a086b8966e992fa2a734325daf2`) against the host harness's
+render of the same live values, for **both** targets, at the unfixed HEAD of the stack (the harness
+change aside, no `modules/` or `uidesign/` file differs from `3bab9f32`).
+
+**The scenario.** `device_dev91` in `test/render/main.cpp`:
+
+| Input | Value |
+|---|---|
+| hostname | `esp32-foundation` |
+| WiFi | connected, SSID `cb-iot`, IP `192.168.20.186` |
+| `millis()` | 96 000 ("Up: 0h 1m 36s") |
+| free heap | 8 515 584 B (8316 KB) |
+| `BUILD_VERSION` | `0.0.12-dev.91` |
+
+The harness's `BUILD_VERSION` had been a compile definition fixed at `0.0.12-dev.83`. It is now
+**per scenario**: the build defines `BUILD_VERSION` as a call to `harnessBuildVersion()`
+(`test/render/shim/Arduino.h`), which answers from the scenario's version (default `0.0.12-dev.83`).
+That was the smaller change: no board source is touched, and every use of the macro in the boards
+is a `"%s"` argument. The four earlier scenarios render byte-identically to before.
+
+**Method.** `test/render/compare_png.py` converts the device PNG to 1 bit (white = lit) and compares
+it with each target's `.pbm`, pixel for pixel. It is non-vacuous: the same PNG against the
+`connected` render differs in 790 pixels.
+
+| Target | Lit (render) | Lit (device) | **Differing pixels** |
+|---|---:|---:|---:|
+| `legacy` (`baseline/device_dev91`) | 1352 | 1352 | **0** |
+| `u8g2gl` (`after/device_dev91`) | 1352 | 1352 | **0** |
+
+Both targets reproduce the device frame exactly. **Host = device for the shipped renderer**, for
+the legacy board and for the migrated one, with real fonts, real U8G2 and the device's live values.
+`device_dev91.bin` sha256 (both targets, byte-identical):
+`bd1a69b86f9f86294c44e1307b6583dc6195fa53808a9ef47ce5f9033fee80ea`.
+
+The scenario is kept. After the fixes it renders the post-fix frame, which the PA compares against a
+fresh device capture.
+
+---
+
 ## 2. Lines and a reading
 
 ### Before (legacy)
