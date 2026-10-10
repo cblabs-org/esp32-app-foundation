@@ -40,18 +40,21 @@ void ui_screen_diagnostics_init() {
     // No styles to apply.
 
     // --- Step 3: Set properties ---
-    ui_obj_hostname.set_coords(0, 0, 256, 16);
+    ui_obj_hostname.set_coords(0, 0, 256, 18);
     ui_obj_hostname.set_font(ui_font_u8g2_font_helvB12_tr);
     ui_obj_hostname.set_align(U8G2GL_ALIGN_CENTER);
 
-    ui_obj_wifi.set_coords(4, 16, 247, 10);
-    ui_obj_wifi.set_font(ui_font_u8g2_font_helvR08_tr);
+    ui_obj_wifi.set_coords(4, 16, 248, 14);
+    ui_obj_wifi.set_font(ui_font_u8g2_font_helvR08_tf);
+    ui_obj_wifi.set_long_mode(U8G2GL_LONG_DOTS);
 
-    ui_obj_uptime.set_coords(4, 30, 247, 10);
+    ui_obj_uptime.set_coords(4, 30, 248, 12);
     ui_obj_uptime.set_font(ui_font_u8g2_font_helvR08_tr);
+    ui_obj_uptime.set_long_mode(U8G2GL_LONG_DOTS);
 
-    ui_obj_heap.set_coords(4, 44, 247, 10);
+    ui_obj_heap.set_coords(4, 44, 248, 12);
     ui_obj_heap.set_font(ui_font_u8g2_font_helvR08_tr);
+    ui_obj_heap.set_long_mode(U8G2GL_LONG_DOTS);
 
     // --- Step 4: Register bindings, last, so no observer fires against a
     // partly configured object (§13.7) ---

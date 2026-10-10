@@ -31,9 +31,12 @@
     </subjects>
 
     <fonts>
-        <!-- The two fonts the legacy board draws with: AppFonts::defaultLarge()
-             and AppFonts::defaultSmall() (modules/U8G2Display/fonts/Fonts.hpp). -->
+        <!-- The three fonts the legacy board draws with: AppFonts::defaultLarge(),
+             AppFonts::defaultSmall() and AppFonts::defaultSmallLatin1()
+             (modules/U8G2Display/fonts/Fonts.hpp). The `_tf` font is Latin-1, so it
+             has the middle dot U+00B7 that the WiFi line's separator needs. -->
         <builtin name="u8g2_font_helvB12_tr" />
         <builtin name="u8g2_font_helvR08_tr" />
+        <builtin name="u8g2_font_helvR08_tf" />
     </fonts>
 </globals>

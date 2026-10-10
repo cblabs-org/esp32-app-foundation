@@ -86,7 +86,7 @@ TEST_F(DiagnosticsBoardTest, NoRefreshBeforeOneSecond) {
 TEST_F(DiagnosticsBoardTest, RefreshesAtOneSecond) {
     board.configure(&wifi);
     board.tick(1000);
-    EXPECT_STREQ(ui_subject_diag_wifi.get(), "TestNet \xB7 192.168.1.100");
+    EXPECT_STREQ(ui_subject_diag_wifi.get(), "TestNet \xC2\xB7 192.168.1.100");
     EXPECT_STREQ(ui_subject_diag_uptime.get(), "Up: 0h 0m 0s");   // millis() stub is 0
     EXPECT_EQ(std::string(ui_subject_diag_heap.get()), std::string("Heap: 195KB  v") + BUILD_VERSION);
 }
@@ -98,10 +98,10 @@ TEST_F(DiagnosticsBoardTest, ThrottlesToOneRefreshPerSecond) {
 
     setWifi("SecondNet", "host-a");
     board.tick(1999);   // 999 ms after the refresh: no refresh
-    EXPECT_STREQ(ui_subject_diag_wifi.get(), "TestNet \xB7 192.168.1.100");
+    EXPECT_STREQ(ui_subject_diag_wifi.get(), "TestNet \xC2\xB7 192.168.1.100");
 
     board.tick(2000);   // exactly 1000 ms after: refresh
-    EXPECT_STREQ(ui_subject_diag_wifi.get(), "SecondNet \xB7 192.168.1.100");
+    EXPECT_STREQ(ui_subject_diag_wifi.get(), "SecondNet \xC2\xB7 192.168.1.100");
 }
 
 /** The hostname is written once at configure() and not by later refreshes. */

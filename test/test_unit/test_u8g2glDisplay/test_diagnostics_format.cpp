@@ -9,8 +9,9 @@
  * Description: formatDiagnostics() must produce the legacy DiagnosticsBoard's
  *              strings byte for byte. The four scenarios are those of the render
  *              harness (test/render/baseline/diagnostics_board/inputs.json), so
- *              the expected text is what the legacy board was measured to give,
- *              including the lone 0xB7 separator byte. readDiagnosticsInputs()
+ *              the expected text is what the legacy board is measured to give,
+ *              including the separator, U+00B7 as UTF-8 ("\xC2\xB7"; it was once
+ *              a lone 0xB7 byte, fixed under owner ruling R8). readDiagnosticsInputs()
  *              is checked against the native platform stubs.
  *
  * Exported Functions:
@@ -51,12 +52,12 @@ std::string heapRow(const char* kb) {
 
 }  // namespace
 
-/** `connected`: SSID and IP joined by the single byte 0xB7. */
+/** `connected`: SSID and IP joined by U+00B7 (UTF-8 0xC2 0xB7). */
 TEST(DiagnosticsFormat, Connected) {
     DiagnosticsLines lines;
     formatDiagnostics(makeInputs(true, false, "esp32-foundation", "MyNetwork", "192.168.1.42",
                                  (2UL * 3600 + 14 * 60 + 36) * 1000UL, 278 * 1024), lines);
-    EXPECT_STREQ(lines.wifi, "MyNetwork \xB7 192.168.1.42");
+    EXPECT_STREQ(lines.wifi, "MyNetwork \xC2\xB7 192.168.1.42");
     EXPECT_STREQ(lines.uptime, "Up: 2h 14m 36s");
     EXPECT_EQ(std::string(lines.heap), heapRow("278"));
 }
@@ -65,7 +66,7 @@ TEST(DiagnosticsFormat, Connected) {
 TEST(DiagnosticsFormat, ApMode) {
     DiagnosticsLines lines;
     formatDiagnostics(makeInputs(false, true, "esp32-foundation", nullptr, nullptr, 42UL * 1000UL, 301 * 1024), lines);
-    EXPECT_STREQ(lines.wifi, "AP: esp32-foundation \xB7 192.168.4.1");
+    EXPECT_STREQ(lines.wifi, "AP: esp32-foundation \xC2\xB7 192.168.4.1");
     EXPECT_STREQ(lines.uptime, "Up: 0h 0m 42s");
     EXPECT_EQ(std::string(lines.heap), heapRow("301"));
 }
@@ -84,18 +85,21 @@ TEST(DiagnosticsFormat, LongSsid) {
     DiagnosticsLines lines;
     formatDiagnostics(makeInputs(true, false, "esp32-foundation", "ThisIsAVeryLongNetworkNameForOverflow1",
                                  "10.100.200.250", (99UL * 3600 + 59 * 60 + 59) * 1000UL, 4 * 1024), lines);
-    EXPECT_STREQ(lines.wifi, "ThisIsAVeryLongNetworkNameForOverflow1 \xB7 10.100.200.250");
+    EXPECT_STREQ(lines.wifi, "ThisIsAVeryLongNetworkNameForOverflow1 \xC2\xB7 10.100.200.250");
     EXPECT_STREQ(lines.uptime, "Up: 99h 59m 59s");
     EXPECT_EQ(std::string(lines.heap), heapRow("4"));
 }
 
-/** The separator is the single byte 0xB7, not the two-byte UTF-8 form U+00B7 (0xC2 0xB7). */
-TEST(DiagnosticsFormat, SeparatorIsTheSingleLegacyByte) {
+/**
+ * The separator is U+00B7 as UTF-8, the two bytes 0xC2 0xB7. It was once the lone byte
+ * 0xB7, which is not valid UTF-8 and which no glyph of the `_tr` fonts covered.
+ */
+TEST(DiagnosticsFormat, SeparatorIsTheUtf8MiddleDot) {
     DiagnosticsLines lines;
     formatDiagnostics(makeInputs(true, false, "h", "A", "1.2.3.4", 0, 0), lines);
-    ASSERT_EQ(std::strlen(lines.wifi), std::strlen("A \xB7 1.2.3.4"));
-    EXPECT_EQ(static_cast<unsigned char>(lines.wifi[2]), 0xB7);
-    EXPECT_EQ(std::strchr(lines.wifi, '\xC2'), nullptr);
+    ASSERT_EQ(std::strlen(lines.wifi), std::strlen("A \xC2\xB7 1.2.3.4"));
+    EXPECT_EQ(static_cast<unsigned char>(lines.wifi[2]), 0xC2);  // Lead byte of U+00B7
+    EXPECT_EQ(static_cast<unsigned char>(lines.wifi[3]), 0xB7);  // Its continuation byte
 }
 
 /** Free heap is whole kilobytes, truncated (legacy divided by 1024 as an integer). */
@@ -120,7 +124,7 @@ TEST(DiagnosticsFormat, UptimeBreakdown) {
 TEST(DiagnosticsFormat, ConnectedWinsOverApMode) {
     DiagnosticsLines lines;
     formatDiagnostics(makeInputs(true, true, "h", "Net", "1.1.1.1", 0, 0), lines);
-    EXPECT_STREQ(lines.wifi, "Net \xB7 1.1.1.1");
+    EXPECT_STREQ(lines.wifi, "Net \xC2\xB7 1.1.1.1");
 }
 
 /** Fixture for readDiagnosticsInputs(): the native WiFi, millis() and heap stubs plus a real WifiManager. */

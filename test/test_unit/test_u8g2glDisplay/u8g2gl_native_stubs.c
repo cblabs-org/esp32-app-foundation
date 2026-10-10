@@ -19,6 +19,11 @@
 
 #include "../test_u8g2Display/u8g2_native_stubs.c"
 
+/* ── Font data the generated UI references and the legacy stubs do not define ── */
+
+/* The WiFi row's Latin-1 font (globals.xml). Empty like the legacy stubs' fonts: nothing is drawn. */
+const uint8_t u8g2_font_helvR08_tf[] = { 0 };
+
 /* ── Drawing functions the runtime calls and the legacy stubs do not provide ─ */
 
 void u8g2_ClearBuffer(u8g2_t *u8g2) { (void)u8g2; }

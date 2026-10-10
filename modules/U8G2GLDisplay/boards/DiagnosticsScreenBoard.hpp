@@ -22,9 +22,8 @@
  *              WiFi, millis() and the heap. The formatting, formatDiagnostics(),
  *              is pure, so a host test can drive it with fixed inputs. Its
  *              format strings are byte for byte those of the legacy board,
- *              including the lone 0xB7 byte that U8G2's `_tr` fonts have no
- *              glyph for, so it draws nothing: pixel identity with legacy means
- *              reproducing that, not fixing it.
+ *              including the separator, U+00B7 as UTF-8 ("\xC2\xB7"), which the
+ *              WiFi line's Latin-1 font draws as a middle dot.
  *
  * Exported Constants:
  * - DIAGNOSTICS_NAME_CAPACITY: Bytes held for a hostname or SSID, with terminator (64)
@@ -94,7 +93,7 @@ struct DiagnosticsInputs {
  *        the max_len of the generated subjects (globals.xml).
  */
 struct DiagnosticsLines {
-    char wifi[64] = {0};    ///< Row 2: "<SSID> \xB7 <IP>", "AP: <host> \xB7 192.168.4.1" or "WiFi: Not connected"
+    char wifi[64] = {0};    ///< Row 2: "<SSID> \xC2\xB7 <IP>", "AP: <host> \xC2\xB7 192.168.4.1" or "WiFi: Not connected"
     char uptime[32] = {0};  ///< Row 3: "Up: Xh Xm Xs"
     char heap[48] = {0};    ///< Row 4: "Heap: <KB>KB  v<BUILD_VERSION>"
 };

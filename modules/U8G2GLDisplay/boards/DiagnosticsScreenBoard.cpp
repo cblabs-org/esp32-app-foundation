@@ -80,11 +80,11 @@ DiagnosticsInputs readDiagnosticsInputs(WifiManager* wifiManager) {
 /**
  * @brief Format the three telemetry rows.
  *
- * Each snprintf below is the legacy one, byte for byte. Do not "tidy" them:
- * "\xB7" is a single byte, not the UTF-8 form of U+00B7, and U8G2's `_tr` fonts
- * have no glyph for it, so it draws nothing and takes no width. The legacy row
- * therefore shows an 8-column gap where a dot was meant. Changing it would
- * change the pixels and break the identity the render harness checks.
+ * Each snprintf below is the legacy one, byte for byte, so the render harness can
+ * hold the two boards pixel-identical. The separator is U+00B7 (middle dot) as
+ * UTF-8, "\xC2\xB7", which the row-2 font (u8g2_font_helvR08_tf, Latin-1) draws as a
+ * 2-pixel dot. It was once the lone byte 0xB7, which is not UTF-8 and which no
+ * glyph covered, so the row showed an 8-column gap instead (owner ruling R8).
  *
  * @param inputs What the platform reported.
  * @param lines  Receives the rows.
@@ -92,9 +92,9 @@ DiagnosticsInputs readDiagnosticsInputs(WifiManager* wifiManager) {
 void formatDiagnostics(const DiagnosticsInputs& inputs, DiagnosticsLines& lines) {
     // --- Row 2: WiFi SSID + IP ---
     if (inputs.wifiConnected) {
-        snprintf(lines.wifi, sizeof(lines.wifi), "%s \xB7 %s", inputs.ssid, inputs.ip);
+        snprintf(lines.wifi, sizeof(lines.wifi), "%s \xC2\xB7 %s", inputs.ssid, inputs.ip);
     } else if (inputs.apMode) {
-        snprintf(lines.wifi, sizeof(lines.wifi), "AP: %s \xB7 192.168.4.1", inputs.hostname);
+        snprintf(lines.wifi, sizeof(lines.wifi), "AP: %s \xC2\xB7 192.168.4.1", inputs.hostname);
     } else {
         snprintf(lines.wifi, sizeof(lines.wifi), "WiFi: Not connected");
     }

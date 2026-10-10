@@ -56,6 +56,7 @@ void ui_set_diag_heap(const char* value);
 // --- Fonts (§14.1) ---
 extern const uint8_t* const ui_font_u8g2_font_helvB12_tr;
 extern const uint8_t* const ui_font_u8g2_font_helvR08_tr;
+extern const uint8_t* const ui_font_u8g2_font_helvR08_tf;
 
 // --- Images (§14.2) ---
 // globals.xml declares no <xbm> images.
