@@ -12,6 +12,11 @@ commit that holds this file, so the baseline also describes that commit's legacy
 (WO-B2 Part 1, on host). Sections 3 and 4 Before are filled (WO-B1 Part 2, legacy worktree
 `7396e43d`, PlatformIO MCP); sections 3 and 4 After are filled (WO-B3, stack worktree `20d1d1fb`, PlatformIO MCP).
 Section 4's timing is superseded by the interleaved re-measurement (WO-B3b), appended at the end of section 4.
+Section 1b (WO-B6) records the device check of the shipped renderer and the owner-ruled fixes of the three
+legacy defects (R8). Section 1 describes the board **as shipped**, defects included, and the files it cites
+(`baseline/`, `after/` as of `e5342373` and `82ec83f`) are the earlier ones in git history, up to commit
+`761a21ff`; the committed `baseline/` and `after/` are now the fixed boards (section 1b). Sections 2 to 4 measure
+the shipped boards and are not re-measured, except that 1b gives the flash cost of the fixes.
 
 ---
 
@@ -254,6 +259,239 @@ the legacy board and for the migrated one, with real fonts, real U8G2 and the de
 
 The scenario is kept. After the fixes it renders the post-fix frame, which the PA compares against a
 fresh device capture.
+
+### The three fixes (owner ruling R8), in both boards
+
+Both boards carry the same three fixes, so the pair stay pixel-identical. Commits on
+`u8g2gl-integration/wo6-defects`: the harness and device scenario (`761a21ff`), the legacy fix
+(`a4a463e1`, `fix(display)`, citing the PD-4 correctness exemption), the U8G2GL fix (`94941a76`), the
+re-captured baseline (`c7eb5096`).
+
+**1. Descenders.** Two causes, found by measurement:
+- *The clip's far corner.* `drawText()` passed `x + w - 1` and `y + h - 1` to `setClipWindow()`, whose far
+  corner U8G2 treats as exclusive (`u8g2.h:352/354`). It now passes `x + w` and `y + h`.
+- *The label height.* WO-B2 measured that 6 of the 11 clipped pixels lay below the label's own height, and
+  the fixed corner alone leaves them clipped. Measured over every glyph of each font under the display's
+  `setFontRefHeightAll()` + `setFontPosTop()` state (a scratch program against the harness's U8G2 build):
+
+  | Font | `getMaxCharHeight()` | ascent | descent | Lit rows relative to `y` | Needed height |
+  |---|---:|---:|---:|---|---:|
+  | `u8g2_font_helvB12_tr` (ASCII) | 17 | 13 | -4 | 1..17 | **18** |
+  | `u8g2_font_helvR08_tr` (ASCII) | 11 | 9 | -2 | 1..11 | **12** |
+  | `u8g2_font_helvR08_tf` (ASCII) | 13 | 11 | -2 | 3..13 | **14** |
+  | `u8g2_font_helvR08_tf` (Latin-1, all) | 13 | 11 | -2 | 1..13 | **14** |
+
+  The lit rows run to `y + getMaxCharHeight()` inclusive, one more row than `getMaxCharHeight()` counts. So a
+  label needs `getMaxCharHeight() + 1`. **The row height does not contain the descender tips; the fix gives
+  it one more row.** Legacy: the board passes explicit heights 18, 14, 12, 12 (`ROW1_HEIGHT`,
+  `ROW2_HEIGHT`, `DATA_ROW_HEIGHT` in `DiagnosticsBoard.hpp`), the smallest change: `drawText()`'s
+  `h == -1` default is left alone because it would also change `SystemMessageWidget`. U8G2GL: the XML
+  heights are 18, 14, 12, 12 and the data-row widths are 248 (the legacy argument), the off-by-one
+  compensation and its comment are gone. `(height - (ascent - descent)) / 2` is 0 in every case, so the text
+  sits at `y`, where it was.
+- *Rows do not overlap.* Lit pixel rows of the fixed frame, identical in all five scenarios: row 1 2..17,
+  row 2 20..29 (20..27 when no descender), row 3 32..41, row 4 46..55. They are disjoint with two or more
+  dark rows between. The label *boxes* overlap by two rows (row 1's 0..17 against row 2's 16..29), but
+  nothing of row 2 is lit above row 19. `clip_probe.json`: a row that fits loses 0 pixels in every scenario.
+
+**2. The separator is a real middle dot.** Row 2's font is `u8g2_font_helvR08_tf` in both boards (legacy
+through a new `AppFonts::defaultSmallLatin1()`, which changes no other board's font; U8G2GL through a
+`<builtin>` in `globals.xml`). The format strings carry `"\xC2\xB7"`. Measured (`separator_probe.json`),
+firmware flags `-DU8G2_WITHOUT_UNICODE`:
+
+| | `_tr` (old row 2) | `_tf` (row 2 now) |
+|---|---|---|
+| glyph U+00B7 in the font | no | **yes** |
+| lone byte `0xB7`: width / lit | 0 / 0 | 2 / 2 |
+| UTF-8 `0xC2 0xB7`: width / lit | 0 / 0 | **2 / 2** |
+
+`drawUTF8` decodes code points up to U+00FF even with `U8G2_WITHOUT_UNICODE`, and `_tf` covers them. The dot
+is **2 lit pixels** wide and adds 2 pixels to the `connected` row 2 (the row with the dot against the same
+row with the dot removed). `_tf` makes row 2's text sit two pixel rows lower than `_tr` did (ascent 11
+against 9), which is also why its height is 14. **Flash cost of `_tf` against `_tr`:** the U8G2 font arrays are
+2180 B and 1041 B (`u8g2_fonts.c`), so `_tf` is **1139 B larger**, and since rows 3 and 4 and other boards
+keep `_tr` the net is the whole **+2180 B** of an extra font. Only row 2 changes font.
+
+**3. Long text ends in an ellipsis.** Legacy: `setTruncated(true)` on rows 2 to 4. U8G2GL:
+`long_mode="dots"` on the same rows. The hostname is neither. Two things measured:
+- *Legacy truncation with the fixed clip renders correctly.* `long_ssid` ends `...10.1...` inside the row
+  (columns 4..251), and `clip_probe.json` shows only the tail the ellipsis replaces is removed (34 pixels,
+  columns 243..253, row 2 only).
+- *A latent defect, fixed.* `drawText()` trimmed the text one **byte** at a time. The text is now UTF-8, and a
+  cut that lands on the two-byte separator leaves a lone lead byte, which U8G2 decodes together with the
+  first `.` and draws as a stray glyph (measured: `ab \xC2...` draws a "(R)"-like glyph). The trim now
+  removes whole characters. Checked against an oracle (the longest whole-character prefix that fits,
+  then `...`, drawn through a plain clip) over 189 widths and four strings: **0 mismatches**; the old
+  byte trim gives 14 mismatches under the same oracle (a scratch program, not committed).
+
+### Identity
+
+Re-captured `baseline/` from the fixed legacy board and re-rendered `after/`, both from a clean build
+(U8G2 2.36.18 and the pinned U8G2GL sha fetched with `FetchContent`; the committed `generated/` equals a
+fresh `generate --target ssd1322 --check`). `--compare test/render/baseline`:
+
+| Scenario | Differing pixels | Lit | `.bin` sha256 (baseline = after) | Lit before the fixes |
+|---|---:|---:|---|---:|
+| `connected` | **0** | 1405 | `b9042618dac87853d16f56f103b19352b3683428b15a9699b303583878d0f62d` | 1392 |
+| `ap_mode` | **0** | 1477 | `5837eddd948b47c9f654218fc1bc6bac4daf07e420679106d68f805f4db9879f` | 1465 |
+| `disconnected` | **0** | 1326 | `24631738bdc867e412c7dfa8d0c9e8b24abcf8215f3e6ea85e795e7710d2c528` | 1318 |
+| `long_ssid` | **0** | 1679 | `1432ac1e340fee82e3022d8500a08e08f15071c9f56bfeb86f1cb4fd2ad9fdb3` | 1695 |
+| `device_dev91` | **0** | 1362 | `873d8ef1a3e528f175c710776e30e84a258ce47668bc2a72498208187802b892` | 1352 |
+
+`.pbm` sha256 (baseline): `connected` `4d4d07177f37fa91ad27d2fbee811765c7af3b65c0d52bf4867972c60e8719a2`,
+`ap_mode` `c84447f90871120a7d5394894e98fc7d68928fad75b876caa1c0532b2c440cd6`, `disconnected`
+`f96c1f631b800d73674fe91db68b291a53ac4febff6a3a521a53329ef9a1365c`, `long_ssid`
+`42288b17d4e1a49e619190c550d3cd52b16a02d8c6b1289f7874dde9aab2d927`, `device_dev91`
+`d91f6fb418375b9336f42370111c853760652bbc83f5e692accc19d80655fceb`.
+
+Identity is **5/5** (the four earlier scenarios and `device_dev91`). `connected` gains 13 pixels (11
+descender pixels and the 2-pixel dot); `long_ssid` loses 16 net (its tail is truncated).
+
+**Why identity holds, and how far.** The runtime's `dots` mode draws the whole line, then blanks a box at
+the right edge and draws `...` there, where the legacy board trims whole characters and puts `...` after the
+last one. One passing scenario would not show they agree, so `--probe-truncation` sweeps four SSIDs (the
+long scenario's, 40 `W`, 60 `i`, one with Latin-1 letters) through every length: **181 of 181 lengths are
+identical, 41 of them truncated** (`after/diagnostics_board/truncation_probe.json`).
+
+**One divergence found, outside the gate.** Row 2's `dots` box covers the label's full height, rows 16..29,
+and row 1's box is rows 0..17, so when row 2 is truncated the box can blank a hostname descender at
+columns 243..251. Measured by temporarily giving `long_ssid` the hostname `pppp...p` (32 characters, so a `p`
+tail falls there): legacy and U8G2GL then differ by **4 pixels** (rows 16..17, columns 249..250), U8G2GL
+missing them. It needs a 32-character hostname of descender letters reaching the right edge together
+with a truncated WiFi line. Not fixed: closing it means shortening row 2's box or moving a row, which
+changes the owner's layout, or a runtime change. Not committed as a scenario.
+
+**Row 2, `connected`, before and after** (columns 0..139; rows 14..31; `#` lit). Before: the dot is an
+8-column gap, and the "y" of "My" loses its tail:
+
+```
+14 ...............................................................................##...........................................................
+15 ...............................................................................##...........................................................
+16 ............................................................................................................................................
+17 ............................................................................................................................................
+18 .....#.....#.......##...#.......#....................#............#....###...###.......#....###...###.......#.........#...###...............
+19 .....##...##.......##...#.......#....................#...........##...#...#.#...#.....##...#...#.#...#.....##........##..#...#..............
+20 .....##...##.#..#..#.#..#..##..###.#..#..#..###..#.#.#..#.........#...#...#.....#......#...#.....#...#......#.......#.#......#..............
+21 .....#.#.#.#.#..#..#.#..#.#..#..#..#..#..#.#...#.##..#.#..........#...#...#.....#......#...####...###.......#.......#.#......#..............
+22 .....#.#.#.#.#.#...#..#.#.####..#...#.#.#..#...#.#...##...........#....####...##.......#...#...#.#...#......#......#..#....##...............
+23 .....#..#..#.#.#...#..#.#.#.....#...#.#.#..#...#.#...#.#..........#.......#..#.........#...#...#.#...#......#......#####..#.................
+24 .....#..#..#..##...#...##.#..#..#....#.#...#...#.#...#..#.........#...#...#.#..........#...#...#.#...#......#.........#..#..................
+25 .....#..#..#..#....#...##..##...##...#.#....###..#...#..#.........#....###..#####..#...#....###...###...#...#....#....#..#####..............
+26 ............................................................................................................................................
+27 ............................................................................................................................................
+28 ............................................................................................................................................
+29 ............................................................................................................................................
+30 ............................................................................................................................................
+31 ............................................................................................................................................
+```
+
+After: the dot is at columns 61..62, row 24, and "My" has its descender:
+
+```
+14 ...............................................................................##...........................................................
+15 ...............................................................................##...........................................................
+16 ...............................................................................##...........................................................
+17 ...............................................................................##...........................................................
+18 ............................................................................................................................................
+19 ............................................................................................................................................
+20 .....#.....#.......##...#.......#....................#...............#....###...###.......#....###...###.......#.........#...###............
+21 .....##...##.......##...#.......#....................#..............##...#...#.#...#.....##...#...#.#...#.....##........##..#...#...........
+22 .....##...##.#..#..#.#..#..##..###.#..#..#..###..#.#.#..#............#...#...#.....#......#...#.....#...#......#.......#.#......#...........
+23 .....#.#.#.#.#..#..#.#..#.#..#..#..#..#..#.#...#.##..#.#.............#...#...#.....#......#...####...###.......#.......#.#......#...........
+24 .....#.#.#.#.#.#...#..#.#.####..#...#.#.#..#...#.#...##......##......#....####...##.......#...#...#.#...#......#......#..#....##............
+25 .....#..#..#.#.#...#..#.#.#.....#...#.#.#..#...#.#...#.#.............#.......#..#.........#...#...#.#...#......#......#####..#..............
+26 .....#..#..#..##...#...##.#..#..#....#.#...#...#.#...#..#............#...#...#.#..........#...#...#.#...#......#.........#..#...............
+27 .....#..#..#..#....#...##..##...##...#.#....###..#...#..#............#....###..#####..#...#....###...###...#...#....#....#..#####...........
+28 ..............#.............................................................................................................................
+29 ............##..............................................................................................................................
+30 ............................................................................................................................................
+31 ............................................................................................................................................
+```
+
+**Row 2, `long_ssid`, before and after** (full width; rows 14..31). Before: cut mid-glyph at column 250.
+After: ends in `...` inside the row (columns 244, 247, 250):
+
+```
+14 ...............................................................................##...............................................................................................................................................................................
+15 ...............................................................................##...............................................................................................................................................................................
+16 ................................................................................................................................................................................................................................................................
+17 ................................................................................................................................................................................................................................................................
+18 ....######.....#.......#.........#...#.....#...............#.......................##...#.......#....................#.....##...#....................#####............####...................###.................#...........#....###.......#....###...###......
+19 ......#..#.............#.........#...#.....#...............#.......................##...#.......#....................#.....##...#....................#...............#....#.................#..#................##..........##...#...#.....##...#...#.#...#.....
+20 ......#..#.##..#..##...#..##....#.#...#...#..##..#.#.#..#..#.....###..#.##...##.#..#.#..#..##..###.#..#..#..###..#.#.#..#..#.#..#.###..###.##...##...#.....###..#.#..#....#.#...#..##..#.#.###.#..###..#..#..#...#...........#...#...#......#...#...#.#...#.....
+21 ......#..##..#.#.#..#..#.#..#...#.#...#...#.#..#.##..#..#..#....#...#.##..#.#..##..#.#..#.#..#..#..#..#..#.#...#.##..#.#...#.#..#....#.#..#..#.#..#..####.#...#.##...#....#.#...#.#..#.##...#..#.#...#.#..#..#...#...........#...#...#......#...#...#.#...#.....
+22 ......#..#...#.#..##...#..##...#...#..#...#.####.#...#.#...#....#...#.#...#.#...#..#..#.#.####..#...#.#.#..#...#.#...##....#..#.#..###.#..#..#.####..#....#...#.#....#....#..#.#..####.#....#..#.#...#..#.#.#....#...........#...#...#......#...#...#.#...#.....
+23 ......#..#...#.#....#..#....#..#####...#.#..#....#...#.#...#....#...#.#...#.#...#..#..#.#.#.....#...#.#.#..#...#.#...#.#...#..#.#.#..#.#..#..#.#.....#....#...#.#....#....#..#.#..#....#....#..#.#...#..#.#.#....#...........#...#...#......#...#...#.#...#.....
+24 ......#..#...#.#.#..#..#.#..#.#.....#..#.#..#..#.#....##...#....#...#.#...#.#..##..#...##.#..#..#....#.#...#...#.#...#..#..#...##.#..#.#..#..#.#..#..#....#...#.#....#....#...#...#..#.#....#..#.#...#...#.#.....#...........#...#...#......#...#...#.#...#.....
+25 ......#..#...#.#..##...#..##..#.....#...#....##..#....#....####..###..#...#..##.#..#...##..##...##...#.#....###..#...#..#..#...##..##.##..#..#..##...#.....###..#.....####....#....##..#....#..#..###....#.#.....#...........#....###...#...#....###...###......
+26 ................................................................................................................................................................................................................................................................
+27 ................................................................................................................................................................................................................................................................
+28 ................................................................................................................................................................................................................................................................
+29 ................................................................................................................................................................................................................................................................
+30 ................................................................................................................................................................................................................................................................
+31 ................................................................................................................................................................................................................................................................
+```
+
+```
+14 ...............................................................................##...............................................................................................................................................................................
+15 ...............................................................................##...............................................................................................................................................................................
+16 ...............................................................................##...............................................................................................................................................................................
+17 ...............................................................................##...............................................................................................................................................................................
+18 ................................................................................................................................................................................................................................................................
+19 ................................................................................................................................................................................................................................................................
+20 ....######.....#.......#.........#...#.....#...............#.......................##...#.......#....................#.....##...#....................#####............####...................###.................#..............#....###.......#................
+21 ......#..#.............#.........#...#.....#...............#.......................##...#.......#....................#.....##...#....................#...............#....#.................#..#................##.............##...#...#.....##................
+22 ......#..#.##..#..##...#..##....#.#...#...#..##..#.#.#..#..#.....###..#.##...##.#..#.#..#..##..###.#..#..#..###..#.#.#..#..#.#..#.###..###.##...##...#.....###..#.#..#....#.#...#..##..#.#.###.#..###..#..#..#...#..............#...#...#......#................
+23 ......#..##..#.#.#..#..#.#..#...#.#...#...#.#..#.##..#..#..#....#...#.##..#.#..##..#.#..#.#..#..#..#..#..#.#...#.##..#.#...#.#..#....#.#..#..#.#..#..####.#...#.##...#....#.#...#.#..#.##...#..#.#...#.#..#..#...#..............#...#...#......#................
+24 ......#..#...#.#..##...#..##...#...#..#...#.####.#...#.#...#....#...#.#...#.#...#..#..#.#.####..#...#.#.#..#...#.#...##....#..#.#..###.#..#..#.####..#....#...#.#....#....#..#.#..####.#....#..#.#...#..#.#.#....#......##......#...#...#......#................
+25 ......#..#...#.#....#..#....#..#####...#.#..#....#...#.#...#....#...#.#...#.#...#..#..#.#.#.....#...#.#.#..#...#.#...#.#...#..#.#.#..#.#..#..#.#.....#....#...#.#....#....#..#.#..#....#....#..#.#...#..#.#.#....#..............#...#...#......#................
+26 ......#..#...#.#.#..#..#.#..#.#.....#..#.#..#..#.#....##...#....#...#.#...#.#..##..#...##.#..#..#....#.#...#...#.#...#..#..#...##.#..#.#..#..#.#..#..#....#...#.#....#....#...#...#..#.#....#..#.#...#...#.#.....#..............#...#...#......#................
+27 ......#..#...#.#..##...#..##..#.....#...#....##..#....#....####..###..#...#..##.#..#...##..##...##...#.#....###..#...#..#..#...##..##.##..#..#..##...#.....###..#.....####....#....##..#....#..#..###....#.#.....#..............#....###...#...#....#..#..#.....
+28 ......................................................#.........................#...............................................................................................................................................................................
+29 ....................................................##.......................###................................................................................................................................................................................
+30 ................................................................................................................................................................................................................................................................
+31 ................................................................................................................................................................................................................................................................
+```
+
+### The flash cost of the fixes
+
+Clean builds through the MCP, `forceExecution`, at `c7eb5096`:
+
+| Build | RAM | Flash | RAM delta | Flash delta | Against |
+|---|---:|---:|---:|---:|---|
+| `esp32dev` | 57340 B (17.5%) | 1344559 B (85.5%) | 0 | **+2312 B** | WO-B3: 57340 / 1342247 |
+| `esp32s3nano` | 59964 B (18.3%) | 1378967 B (32.9%) | 0 | **+2244 B** | WO-B2: 59964 / 1376723 |
+
+The `_tf` font array is 2180 B of the `esp32dev` delta; the other 132 B were not attributed (the root
+firmware links the U8G2GL board, so the legacy `drawText()` change is not in it). RAM does not change: fonts live in
+flash. The `esp32s3nano` figure for the `v0.0.12-dev.91` flash was 1376715 B (WO-B5), so against that
+the delta is +2252 B. The caveat of section 3 stands: deltas under about 2 KB are within the unexplained
+shift, and these are above it.
+
+### The `drawText()` callers, and what the clip fix changes for each
+
+The clip fix changes every caller that passes a width and height: each gains the last column and last
+row of its box. Read from code; not rendered. In a native build nothing is drawn, so no native test pins any of it.
+
+| Caller | Instantiated by | What changes |
+|---|---|---|
+| `LabelWidget::render` (`LabelWidget.cpp:115`), explicit `h` | `DiagnosticsBoard` (now 18/14/12/12), `ScreensaverBoard` clock (256x64 box) | Diagnostics: the fix. Screensaver: the box's last column and row are beyond the text, nothing visible changes. |
+| `LabelWidget::render`, `h = -1` (resolves to `getMaxCharHeight()`) | `BootBoard` (title, version, status), `ConfiguringStatusBoard` (header, status), `OTAProgressBoard` (title, status) | One more row shows: the second-last lit row of a glyph (`y + getMaxCharHeight() - 1`), which was clipped. The last lit row, `y + getMaxCharHeight()`, is **still clipped**: a descender loses one pixel row, not two. Width is the full display width, so column 255 now draws. |
+| `LabelWidget::render`, fast path (`w == -1`, `h == -1`, left, no truncation) | `sample-app` `WeatherWidget` | Nothing: the fast path draws with no clip window. |
+| `ScrollingTextWidget::render`, scrolling branch (`ScrollingTextWidget.cpp:155`) and `renderAnimationUpdate` (`:205`) | No in-repo board (a toolkit widget; `ScrollingMessagePoolWidget` derives from it) | Nothing: the widget sets a clip window of its own box first, `x + w - 1` and `y + h - 1`, and `drawText()` intersects with it, so the tighter, unchanged window wins. That window has the same exclusive off-by-one the old `drawText()` had; it is out of scope. |
+| `ScrollingTextWidget::render`, static branch (`:159`) | No in-repo board | The box's last column and row show. Its default height is 12, so 8 pt text gains the second-last descender row. |
+| `WifiStatusWidget::render` (`WifiStatusWidget.cpp:113`, the "!" icon) | No in-repo board | The icon's last column and row show if the glyph reaches the widget's edge. |
+| `ProgressBarWidget::render` (`ProgressBarWidget.cpp:164`, message, centred, truncating, box `renderH - 4`) | `BootBoard`, `ConfiguringStatusBoard`, `OTAProgressBoard` | One more column and row of the message show; the new row ends above the bar (`y + renderH - 4`), so the message does not touch it. Truncation now trims whole UTF-8 characters, which only differs for multi-byte text. |
+| `SystemMessageWidget::render` (`SystemMessageWidget.cpp:94, 100`, `h = -1`) | `ErrorBoard`, `GenericGateHelperBoard`, `WiFiWizardBoard` (via `MessageBoardBase`) | As the `h = -1` labels: one more row shows, and the very last row of each descender is still clipped. |
+
+Right-aligned text keeps its `- 1` shift (`drawX += (w - textW) - 1`, "to prevent clipping overhang"), which the
+old clip made necessary and the fixed clip does not; no caller in the repository right-aligns. It was left
+alone because it is placement, not clipping.
+
+**A finding for the PA, not fixed (out of scope).** The `h == -1` callers above still lose the last row of a
+descender: `drawText()` resolves the default height to `getMaxCharHeight()`, one short for the same
+reason as the diagnostics labels. Resolving it to `getMaxCharHeight() + 1` would fix all of them in one line;
+it changes every board that uses a default height, so it is the owner's call.
 
 ---
 
