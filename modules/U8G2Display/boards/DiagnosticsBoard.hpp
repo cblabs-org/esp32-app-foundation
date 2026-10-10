@@ -39,7 +39,7 @@ class WifiManager;
  *
  * Renders four rows of live device information on a 256×64 SSD1322 display:
  *   Row 1: Hostname (bold, centred) — e.g. "esp32-foundation"
- *   Row 2: WiFi SSID + IP address  — e.g. "MyNetwork • 192.168.1.42"
+ *   Row 2: WiFi SSID + IP address  — e.g. "MyNetwork · 192.168.1.42"
  *   Row 3: System uptime           — e.g. "Up: 2h 14m 36s"
  *   Row 4: Free heap + version     — e.g. "Heap: 278KB  v0.1.0"
  *
@@ -97,6 +97,16 @@ public:
 
 private:
     WifiManager* _wifiManager = nullptr;  ///< Injected WiFi service (for SSID access)
+
+    // --- Label heights ---
+    // Under the display's FontRefHeightAll + FontPosTop state (U8G2Display.cpp:145-146) a
+    // font's lit pixel rows run from y+1 to y+getMaxCharHeight() inclusive: one more row than
+    // getMaxCharHeight() counts (measured over every glyph of each font; test/render/). A
+    // label shorter than that clips its descenders, so each height is getMaxCharHeight() + 1.
+    // (height - (ascent - descent)) / 2 is then 0, so the text sits where it always did.
+    static constexpr int ROW1_HEIGHT     = 18;  ///< Hostname, helvB12_tr: getMaxCharHeight() 17
+    static constexpr int ROW2_HEIGHT     = 14;  ///< WiFi line, helvR08_tf: getMaxCharHeight() 13
+    static constexpr int DATA_ROW_HEIGHT = 12;  ///< Uptime and heap rows, helvR08_tr: getMaxCharHeight() 11
 
     // --- Row label widgets ---
     LabelWidget _row1;  ///< Hostname (bold, centred)
