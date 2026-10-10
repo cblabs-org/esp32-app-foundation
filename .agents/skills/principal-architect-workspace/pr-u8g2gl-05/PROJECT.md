@@ -296,3 +296,21 @@ reads them there and does not re-derive them.
     figures wrong. They are the **ESP32** figures (24 B per binding; the firmware ELF shows
     `0x60`). The worker's 160 B / 10240 B are the **64-bit host** figures (40 B per binding).
     Both are right for their platform. No source comment carried the wrong claim.
+- **2026-10-10 — PRs opened; owner rulings on the bench and the legacy defects.**
+  - **PRs:** U8G2GL [cblabs-org/u8g2gl#11](https://github.com/cblabs-org/u8g2gl/pull/11) is ready.
+    Foundation [matthewmcneill/esp32-app-foundation#292](https://github.com/matthewmcneill/esp32-app-foundation/pull/292)
+    is a **draft** from `u8g2gl-integration/wo4-readability`, until the device check and the defect
+    fixes land. The owner said: "OK to open the PR."
+  - **On the 5 s edit-loop gap:** the owner asked why it matters. It is only a gate-wording issue
+    (criterion 4 says "faster"). The dependency-scan experiment is **dropped**.
+  - **R8, the legacy defects are fixed** (owner: "We should fix the legacy defects"). They are
+    fixed in **both** boards, so the pair stay pixel-identical, as a correctness fix under the
+    PD-4 freeze. The owner's choices:
+    - **the separator** is a real middle dot: `u8g2_font_helvR08_tf` (Latin-1) with `·` sent as
+      UTF-8;
+    - **long text** gets an ellipsis (legacy `setTruncated(true)`; U8G2GL `long_mode="dots"`);
+    - **the descenders** must not be clipped.
+  - **R9, the bench:** an ESP32-S3 Nano with the SSD1322 is attached at `/dev/cu.usbmodem101`.
+    The `esp32s3nano` pinout in `board.h` (SCK 48, MOSI 38, MISO 47, CS 10, DC 9, RST none) is
+    passed to `SPI.begin()` by the legacy module, and this PR does not touch it. The owner
+    approved tagging `v0.0.12-dev.91`, pushing it, and flashing (foundation rule 03's flash gate).
