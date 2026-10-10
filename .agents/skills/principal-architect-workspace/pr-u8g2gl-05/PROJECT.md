@@ -110,8 +110,8 @@ and web diagnostics (R7).
 - **[x] wo5-device (interactive, PA and owner):** `esp32s3nano` flashed with `v0.0.12-dev.91`. The
   owner confirmed the panel shows the board correctly, with no tearing, and the screensaver
   working. A strict device-vs-host pixel comparison is folded into WO-B6 as step 0.
-- **[ ] [wo6-defects](wo6-defects/WORKORDER.md):** fix the three legacy defects in both boards (R8)
-  and keep them pixel-identical. *Dispatched 2026-10-10.*
+- **[x] [wo6-defects](wo6-defects/WORKORDER.md):** fix the three legacy defects in both boards (R8)
+  and keep them pixel-identical. **Complete, verified by the PA, and on the device.**
 
 ## Evidence
 
@@ -341,3 +341,27 @@ reads them there and does not re-derive them.
     2. **The MCP `capture_display` can return a torn frame.** It reads the buffer while the
        carousel redraws: 2 of 8 captures tore at tile boundaries, and the panel does not. Take
        several captures.
+- **2026-10-10 — WO-B6 verified; `v0.0.12-dev.92` flashed.**
+  - **Step 0, before any fix.** The device's `dev.91` frame equals the host render of the same
+    live values, with **0 differing pixels for both renderers**. The same PNG against `connected`
+    differs by 790 pixels, so the comparison is not vacuous.
+  - **The fixes.**
+    - **The legacy `drawText` clip** is now exclusive (`x + w`, `y + h`). Labels get
+      `getMaxCharHeight() + 1` rows (heights 18/14/12/12), and the descenders show.
+    - **Row 2 uses `helvR08_tf`** with a UTF-8 `·`.
+    - **Ellipsis** on rows 2 to 4. A latent legacy bug went with it: truncation cut UTF-8
+      characters mid-sequence.
+    - **The U8G2GL XML** now uses the natural geometry; the off-by-one compensation is gone.
+  - **Identity, re-checked by the PA from `git archive`:** 0/5 scenarios differ. The worker's
+    truncation sweep found 181/181 identical.
+  - **Out-of-gate divergence:** with a 32-character hostname *and* a truncated WiFi line, the
+    two boards differ in **4 pixels**. Row 2's `dots` box blanks the hostname's last 2 rows.
+    That is a layout question, recorded and not fixed.
+  - **Cost:** RAM unchanged; flash **+2312 B** on `esp32dev` (1344559 B) and **+2244 B** on
+    `esp32s3nano`. Most of it is the `_tf` font. Native passes 1018/1018.
+  - **`drawText` callers:** listed in EVIDENCE §1b. Several legacy boards gain their last
+    row and column. Labels with a default height (`h = -1`) still lose the last descender row:
+    a one-line follow-up for the owner.
+  - **Device, `dev.92`** (tag pushed on `9dddb42c`): clean boot. Rows 0 to 31 of the device frame
+    equal the host render in **5 of 6 captures**; the sixth was torn (the known capture race). The
+    capture is `evidence/device/dev92-esp32s3nano-diagnostics-fixed.png`.
