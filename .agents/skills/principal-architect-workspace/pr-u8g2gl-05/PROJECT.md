@@ -396,3 +396,6 @@ reads them there and does not re-derive them.
     U8G2GL `main`.
   - **Before cut-over:** merge foundation `main` into the stack, re-pin to the then-current
     U8G2GL `main`, and re-verify everything, including the device.
+- **2026-10-10 — the owner confirmed `dev.93` on the panel** ("all looks good"). The PR #292 head
+  was fast-forwarded to `a34b807d`, and its description updated for R10 (held, freeze at cut-over)
+  and for WO-B6 and WO-B7.

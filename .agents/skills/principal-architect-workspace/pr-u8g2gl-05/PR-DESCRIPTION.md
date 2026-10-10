@@ -4,22 +4,30 @@
 > from the tip of the `u8g2gl-integration/wo<N>-*` stack against `main`. Not to be confused with this
 > repository's own 2026 `pr-05-display-module`: the `u8g2gl-` prefix names the U8G2GL programme.
 
-## Freeze notice: `modules/U8G2Display` is frozen from this merge (PD-4)
+## Held off `main` until a planned cut-over (owner ruling R10)
+
+This stack is **not to be merged yet**. U8G2GL keeps developing and merging in its own
+repository. Foundation `main` stays on the legacy display module until a planned cut-over, once
+the renderer is more complete. The PR stays a draft as the verified record of the first migrated
+board, and as PR-07's evidence.
+
+## Freeze notice: `modules/U8G2Display` is frozen from the cut-over (PD-4)
 
 Per U8G2GL `docs/implementation_plan.md` §2, PD-4 (strangler-fig), the legacy display module stops
-being maintained the day the first board is migrated, and this PR migrates it. **From the merge of
-this PR:**
+being maintained when the first migrated board lands on `main`. Under R10 that is the cut-over,
+not this draft. **From the cut-over merge:**
 
 - **`modules/U8G2Display` is frozen.** Correctness and security fixes only.
 - **No new features, no new boards, no new widgets** in `modules/U8G2Display`.
 - **New work targets `modules/U8G2GLDisplay/`.**
 - **A bug fixed in both modules** during the frozen window must reference the same issue in both
-  commits, so that divergence is visible in history and not discovered later.
-- **Enforced at review:** a PR that adds a feature to the legacy module is rejected and redirected.
-- **Nothing is deleted here.** `modules/U8G2Display` still compiles and still runs every other board.
-  PR-10 migrates the remaining boards and retires the module, on the schedule in PD-4's table
-  (frozen now, deprecated when PR-10 lands, removed when departures-board-v3 advances its
-  `framework.lock` past PR-10).
+  commits.
+- **Enforced at review:** a PR adding a feature to the legacy module is rejected and redirected.
+- **Nothing is deleted here.** PR-10 retires the module, on PD-4's schedule.
+
+Until the cut-over, `modules/U8G2Display` on `main` is active as normal. The correctness fixes
+below (descenders, separator, ellipsis, default label height) live on this branch and reach
+`main` with the cut-over.
 
 ## What this PR does
 
@@ -177,58 +185,71 @@ Same task on both sides: move row 3 by one pixel. The same flags were used throu
 
 ## What the migrated board does and does not do, compared with legacy
 
-**It does the same, defects included.** In the four host scenarios the frame is pixel-identical to the
-legacy board's, **bug for bug**, because the gate asks for identity:
+**First, bug for bug.** The four host scenarios, and the device running `v0.0.12-dev.91`, show the
+migrated board pixel-identical to the legacy one, **defects included**: clipped descenders, an
+invisible "·", and a long SSID cut mid-glyph. On the device, the frame and the host render of
+the same live values differ in **0 pixels for both renderers**.
 
-- **The clipped descenders.** The legacy label clip keeps one row and one column too few (the far
-  corner of U8G2's clip window is exclusive), so "My" renders as "Mv" and the "p" in "Up" and "Heap"
-  loses its tail. The XML reproduces this with a label height of 16 and 10 and a data-row width of
-  247, each one smaller than the legacy arguments, and says so in the file.
-- **The invisible "·".** The legacy fonts are `_tr` and have no glyph `0xB7`, so the separator draws
-  nothing and takes no width: the `connected` row shows `MyNetwork`, an 8-column gap, then the IP.
-  The migrated board keeps the byte and gets the same gap.
-- **The mid-glyph SSID clip.** A long SSID is cut at column 250 with no ellipsis.
+**Then fixed, in both boards (owner ruling R8)**, so they stay identical. These are correctness
+fixes to the legacy module under PD-4:
 
-**Also identical:** the 1-second refresh cadence (`REFRESH_INTERVAL_MS`, first refresh when
-`millis()` reaches 1000, as in legacy), the three text formats byte for byte, and the board name
-(`"APP: Diagnostics"`), so the carousel and the web Screenshot tab (R7: no new web diagnostics) see the
-same board.
+- **Descenders.** The legacy `drawText` clip lost the box's last row and column, because U8G2's
+  clip far corner is exclusive. That is fixed. The diagnostics labels get
+  `getMaxCharHeight() + 1` rows (heights 18/14/12/12), and so does `drawText`'s default height,
+  which helps the other legacy boards.
+- **Separator.** Row 2 uses `u8g2_font_helvR08_tf`, with a UTF-8 `·`.
+- **Long text.** An ellipsis on rows 2 to 4 (legacy `setTruncated(true)`, U8G2GL
+  `long_mode="dots"`). A latent legacy bug went with it: truncation could cut a UTF-8 character
+  in half.
 
-**Not verified on a device yet.** Everything above is host-rendered and builds green; the on-device
-capture comparison is WO-B5 and waits for the bench. The on-device frame has not been compared with
-the host frame.
+**Identity after the fixes:**
+- **Host:** 0/5 scenarios differ, and 181/181 truncation lengths are identical.
+- **Device (`dev.92`):** the hostname and WiFi rows equal the host render in 5 of 6 captures. The
+  sixth was a torn capture: the screenshot reads the buffer mid-redraw, and the panel itself does
+  not tear.
+- **Owner's check on the panel:** correct, including the screensaver.
 
-**The defects get fixed, in both boards, after the identity check.** The owner has decided the legacy
-defects are to be fixed. The fix lands in both the legacy board and the migrated one, as a
-correctness fix under the freeze, so the two stay pixel-identical and the gate comparison keeps its
-meaning. It is tracked in the PR's workspace.
+**Other legacy boards, through the shared `drawText` fixes (`dev.93`):**
+- **Rendered:** 9 frames. Every change is pixels added in the formerly clipped descender row.
+- **No overlaps.** Two near-misses (pixels touching, none shared) are left as layout findings:
+  `ConfiguringStatusBoard`'s header and the `BootBoard` splash title.
+- **Owner's check on the boot screen:** correct.
+
+**Also identical:** the 1-second refresh cadence, the text formats, and the board name.
+
+**Not addressed:** with a 32-character hostname *and* a truncated WiFi line, the two boards differ
+in 4 pixels. Row 2's text box blanks the hostname's last two rows. That is a layout question.
 
 ## Tests
 
-- **Native:** **989 to 1018** (989 existing + 29 new in `test/test_unit/test_u8g2glDisplay/`: the
-  board host, the formatter, the screen board and the display). 1018 of 1018 pass, re-run through the
-  PlatformIO MCP from the committed tree. The module's tests compile the runtime through a test-local
-  unity file, because the runtime's `frameworks: arduino` excludes it from a native environment.
-- **Host pixel harness:** `test/render/` renders the legacy and the migrated board against real U8G2
-  and compares byte for byte (`cmake -S test/render -B tmp/render-build && cmake --build
-  tmp/render-build --target after`). Builds were byte-identical across three clean builds. The
-  committed `baseline/` and `after/` files are its output.
-- **Builds:** `esp32dev` and `esp32s3nano` build clean through the MCP. `crowpanel-128-rotary`
-  gained a `lib_ignore` that was **not built** (the owner directed that it not be).
-- **Not run:** anything on hardware.
+- **Native:** **989 to 1018** (29 new in `test/test_unit/test_u8g2glDisplay/`). 1018/1018 pass
+  through the PlatformIO MCP.
+- **Host pixel harness:** `test/render/`. `render_harness` renders the legacy and migrated
+  diagnostics boards, in 5 scenarios including the device's live values, and compares byte for
+  byte. `render_legacy_boards` renders the other legacy boards before and after the default-height
+  fix. `compare_png.py` compares a harness frame with a device capture.
+- **Builds (final):**
+  - `esp32dev`: RAM 57340 B, flash 1344575 B (85.5%);
+  - `esp32s3nano`: RAM 59964 B, flash 1378979 B.
 
-## Before merge
+  The defect fixes cost +2.3 KB of flash, mostly the `_tf` font. `crowpanel-128-rotary` was not
+  built (owner direction).
+- **Hardware:** an ESP32-S3 Nano with an SSD1322, flashed with `dev.91`, `dev.92` and `dev.93`.
+  All booted cleanly, and the owner confirmed the panel each time.
 
-1. **The U8G2GL PR merges first.** This PR depends on the runtime and the generator that PR lands.
-2. **Re-pin `u8g2gl` to the U8G2GL merge commit on `main`**, in both places:
-   - `platformio.ini`, `[u8g2gl]` (`lib_deps`);
+## Before the cut-over merge
+
+1. **Merge foundation `main` into this stack.** It is held off `main` and will have drifted.
+2. **Re-pin `u8g2gl` to the then-current U8G2GL `main`,** in both places:
+   - `platformio.ini`, `[u8g2gl]`;
    - `test/render/CMakeLists.txt`, `U8G2GL_PINNED_SHA`.
 
-   They currently pin `82ec83f2bbce02080c3dd1ab6618bcf6559bfde5`, on the U8G2GL branch
-   `u8g2gl-05/wo1-packaging`. After re-pinning, re-run the host harness (`--target after`): the 13
-   `after/` files must still match byte for byte, and `esp32dev` and `esp32s3nano` must still build.
-3. **Check the flash headroom once more on the re-pinned build** (the figures above are for the
-   current pin).
+   The current pin is `82ec83f`, reachable from U8G2GL `main` since #11 merged as `3bc2a08`.
+3. **Re-verify everything:**
+   - the host harness (0/5 identity);
+   - native;
+   - `esp32dev` and `esp32s3nano` builds, and the flash headroom;
+   - a device flash and a panel check.
 
 ## Known findings, carried to U8G2GL
 
