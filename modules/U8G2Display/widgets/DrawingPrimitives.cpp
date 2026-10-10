@@ -101,7 +101,7 @@ int getStringWidth(U8G2& display, const char* message) {
  * @param x Left edge of the text area.
  * @param y Top edge of the text area.
  * @param w Width (-1 resolves to display width minus x).
- * @param h Height (-1 resolves to max char height).
+ * @param h Height (-1 resolves to max char height + 1, the descender row).
  * @param align Justification within the bounding box.
  * @param truncate Append '...' if text exceeds the bounding width.
  * @param font Optional font override (nullptr = keep current).
@@ -127,7 +127,11 @@ void drawText(U8G2& display, const char* message, int x, int y,
     // --- Step 1: Resolve bounding box defaults ---
     // Use display width dynamically instead of hardcoding 256 (WD-08)
     if (w == -1) w = display.getDisplayWidth() - x;
-    if (h == -1) h = display.getMaxCharHeight();
+    // A label's lit rows run y+1 .. y + getMaxCharHeight() inclusive (measured under
+    // setFontPosTop() + setFontRefHeightAll()), so the box needs one row more than
+    // getMaxCharHeight() to show the last descender row. The clip's far corner is
+    // exclusive (Step 3), which is why the plain maximum character height cut it.
+    if (h == -1) h = display.getMaxCharHeight() + 1;
 
     int drawX = x;
     int textW = 0;
