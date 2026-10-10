@@ -112,9 +112,9 @@ and web diagnostics (R7).
   working. A strict device-vs-host pixel comparison is folded into WO-B6 as step 0.
 - **[x] [wo6-defects](wo6-defects/WORKORDER.md):** fix the three legacy defects in both boards (R8)
   and keep them pixel-identical. **Complete, verified by the PA, and on the device.**
-- **[ ] [wo7-default-height](wo7-default-height/WORKORDER.md):** legacy `drawText`'s default
-  height includes the descender row, for the other legacy boards (the R8 follow-up). *Dispatched
-  2026-10-10.*
+- **[x] [wo7-default-height](wo7-default-height/WORKORDER.md):** legacy `drawText`'s default
+  height includes the descender row, for the other legacy boards (the R8 follow-up). **Complete,
+  verified by the PA.**
 
 ## Evidence
 
@@ -377,3 +377,22 @@ reads them there and does not re-derive them.
   - **Follow-up approved:** the owner said "(2) that would be nice" to the default-height fix for
     the other legacy boards. It is dispatched as WO-B7.
   - **Left as a recorded layout question:** the 32-character hostname overlap.
+- **2026-10-10 — WO-B7 verified.**
+  - **The fix:** one line, `h = getMaxCharHeight() + 1`.
+  - **Rendered:** 9 legacy board frames. Every difference is an added pixel, in exactly the
+    revealed row.
+  - **No overlaps.** Two near-misses are recorded as layout findings: `ConfiguringStatusBoard`'s
+    header `g` and the `BootBoard` splash `p` now touch, but do not share pixels with, the
+    element below.
+  - **Diagnostics identity:** 5/5, PA re-checked from `git archive`.
+  - **Native:** 1018/1018.
+  - **Flash:** +16 B on `esp32dev`, +12 B on `esp32s3nano`.
+- **2026-10-10 — R10, owner ruling: foundation is held off `main`.**
+  - **The ruling:** "We will continue to develop and merge in the u8g2gl repo as normal. I just
+    don't want to destabilise the esp32-app-foundation until we are at a more mature stage."
+  - **#292 stays a draft stack** until a planned cut-over.
+  - **PD-4's freeze** starts at that cut-over, not now.
+  - **U8G2GL #11 merged** as `3bc2a08` (a merge commit). The pin `82ec83f` is reachable from
+    U8G2GL `main`.
+  - **Before cut-over:** merge foundation `main` into the stack, re-pin to the then-current
+    U8G2GL `main`, and re-verify everything, including the device.
