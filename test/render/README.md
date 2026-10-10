@@ -170,6 +170,29 @@ tmp/render-build/render_harness --board u8g2gl --out <dir> --probe-clip    # wri
 tmp/render-build/render_harness --board u8g2gl --out <dir> --probe-truncation  # writes truncation_probe.json
 ```
 
+## The other legacy boards (`render_legacy_boards`)
+
+A second executable, `legacy_boards.cpp`, renders the legacy boards that reach `drawText()` with the
+default height (`h = -1`): `BootBoard` (splash and loading), `ConfiguringStatusBoard` (with items,
+and waiting), `OTAProgressBoard`, `ErrorBoard` (non-fatal and fatal), `WiFiWizardBoard` and
+`GenericGateHelperBoard`. It is separate from `render_harness` so the diagnostics identity gate is
+untouched. The boards and widgets are compiled unmodified, against the same U8G2, flags, shims and
+legacy display state; every string is fixed and contains descenders.
+
+```bash
+cmake -S test/render -B tmp/render-build
+cmake --build tmp/render-build --target legacy_boards            # writes legacy_boards/ (or -DRENDER_LEGACY_BOARDS_DIR)
+tmp/render-build/render_legacy_boards --ascii wifi_wizard        # one frame to stdout
+tmp/render-build/render_legacy_boards --diff <dirA> <dirB>       # '#' both, '-' only A, '+' only B
+```
+
+`legacy_boards/before/` is the render with `drawText()`'s default height at `getMaxCharHeight()`;
+`legacy_boards/after/` is the render with `getMaxCharHeight() + 1` (WO-B7). Diffing them shows
+exactly the descender rows the old default clipped.
+
+`ConfiguringStatusBoard` is built from snapshots; the two `PreconditionEngine` read methods it
+links against are stubbed in `legacy_boards.cpp` because they never run without a bound engine.
+
 ## compare_png.py
 
 Compares a render with a frame captured from the device, pixel for pixel. The

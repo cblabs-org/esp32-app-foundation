@@ -18,6 +18,11 @@
 #              uidesign/ssd1322-256x64/u8g2gl, and modules/U8G2GLDisplay, through
 #              the same U8G2, flags, display state and shims.
 #
+#              A third, separate executable (render_legacy_boards, legacy_boards.cpp)
+#              renders the other legacy boards that call drawText() with the default
+#              height, so a change to drawText() can be shown as a before/after diff.
+#              It does not touch the diagnostics gate above.
+#
 # Usage:
 #   cmake -S test/render -B tmp/render-build
 #   cmake --build tmp/render-build --target baseline   # legacy board  -> baseline/
@@ -30,6 +35,8 @@
 #                               beside this file (the committed location).
 #   -DRENDER_AFTER_DIR=<path>   Where the migrated board's files go. Default:
 #                               after/ beside this file (the committed location).
+#   -DRENDER_LEGACY_BOARDS_DIR=<path>  Where the legacy_boards target writes its frames.
+#                               Default: legacy_boards/ beside this file.
 #   -DU8G2GL_SOURCE_DIR=<path>  Use an existing U8G2GL checkout instead of
 #                               fetching the pinned sha (read, never written).
 #                               Its src/ and include/ must equal the pinned sha.
@@ -185,6 +192,38 @@ if(RENDER_U8G2GL)
   target_compile_options(u8g2gl_board PRIVATE -Wall -Wextra)
 endif()
 
+# --- The other legacy boards: compiled unmodified, rendered by render_legacy_boards ------
+set(RENDER_LEGACY_BOARDS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/legacy_boards" CACHE PATH "Where the other legacy boards' frames are written")
+add_library(legacy_boards_lib STATIC
+  ${LEGACY_DIR}/boards/BootBoard.cpp
+  ${LEGACY_DIR}/boards/ConfiguringStatusBoard.cpp
+  ${LEGACY_DIR}/boards/OTAProgressBoard.cpp
+  ${LEGACY_DIR}/boards/ErrorBoard.cpp
+  ${LEGACY_DIR}/boards/GenericGateHelperBoard.cpp
+  ${LEGACY_DIR}/boards/WiFiWizardBoard.cpp
+  ${LEGACY_DIR}/boards/MessageBoardBase.cpp
+  ${LEGACY_DIR}/widgets/LabelWidget.cpp
+  ${LEGACY_DIR}/widgets/DrawingPrimitives.cpp
+  ${LEGACY_DIR}/widgets/SystemMessageWidget.cpp
+  ${LEGACY_DIR}/widgets/ProgressBarWidget.cpp
+  ${LEGACY_DIR}/widgets/ImageWidget.cpp)
+target_include_directories(legacy_boards_lib PUBLIC
+  ${CMAKE_CURRENT_SOURCE_DIR}/shim   # FIRST: Arduino.h and the other platform shims
+  ${LEGACY_DIR}                      # IDisplayBoard.hpp, widgets/, fonts/, gfx/
+  ${REPO_ROOT}/include               # interfaces/IPrecondition.hpp, events/PreconditionHealthPayload.hpp
+  ${REPO_ROOT}/modules)              # PreconditionEngine/PreconditionEngine.hpp
+# PROGMEM is an AVR/ESP attribute (cblabs_logo.h uses it); on a host it is empty. Defined here
+# rather than in shim/Arduino.h so the shared shim, and the diagnostics gate, are untouched.
+target_compile_definitions(legacy_boards_lib PUBLIC BUILD_VERSION=harnessBuildVersion\(\) PROGMEM=)
+target_link_libraries(legacy_boards_lib PUBLIC u8g2_real)
+target_compile_options(legacy_boards_lib PRIVATE -Wall -Wextra)
+
+add_executable(render_legacy_boards
+  legacy_boards.cpp
+  shim/HostEnvironment.cpp)
+target_link_libraries(render_legacy_boards PRIVATE legacy_boards_lib)
+target_compile_options(render_legacy_boards PRIVATE -Wall -Wextra)
+
 # --- The harness --------------------------------------------------------------------
 add_executable(render_harness
   main.cpp
@@ -225,3 +264,11 @@ if(RENDER_U8G2GL)
     COMMENT "Rendering the migrated DiagnosticsScreenBoard into ${RENDER_AFTER_DIR}, comparing with ${RENDER_OUTPUT_DIR}"
     VERBATIM)
 endif()
+
+# Renders the other legacy boards into RENDER_LEGACY_BOARDS_DIR. Run it once per state of
+# drawText() and compare the two directories with `render_legacy_boards --diff <A> <B>`.
+add_custom_target(legacy_boards
+  COMMAND render_legacy_boards --out "${RENDER_LEGACY_BOARDS_DIR}"
+  DEPENDS render_legacy_boards
+  COMMENT "Rendering the other legacy boards into ${RENDER_LEGACY_BOARDS_DIR}"
+  VERBATIM)
