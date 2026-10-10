@@ -112,6 +112,9 @@ and web diagnostics (R7).
   working. A strict device-vs-host pixel comparison is folded into WO-B6 as step 0.
 - **[x] [wo6-defects](wo6-defects/WORKORDER.md):** fix the three legacy defects in both boards (R8)
   and keep them pixel-identical. **Complete, verified by the PA, and on the device.**
+- **[ ] [wo7-default-height](wo7-default-height/WORKORDER.md):** legacy `drawText`'s default
+  height includes the descender row, for the other legacy boards (the R8 follow-up). *Dispatched
+  2026-10-10.*
 
 ## Evidence
 
@@ -367,3 +370,10 @@ reads them there and does not re-derive them.
     capture is `evidence/device/dev92-esp32s3nano-diagnostics-fixed.png`.
   - **Owner confirmed on the panel (2026-10-10):** "Yes they look good, and the drop clipping is
     fixed too. Nice!" Descenders, separator and screensaver are correct on `dev.92`.
+- **2026-10-10 — PR #292 fast-forwarded; WO-B7 dispatched.**
+  - **PR update:** the owner said "1) ok" to the update. `u8g2gl-integration/wo4-readability`
+    (the PR head) now points at `wo6-defects`' tip `28987896`. It stays a draft. The PR text is
+    updated once WO-B7 lands.
+  - **Follow-up approved:** the owner said "(2) that would be nice" to the default-height fix for
+    the other legacy boards. It is dispatched as WO-B7.
+  - **Left as a recorded layout question:** the 32-character hostname overlap.
