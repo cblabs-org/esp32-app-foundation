@@ -207,7 +207,7 @@ endif()
 # --- One command: build and run -------------------------------------------------------
 # cmake --build <dir> --target baseline
 add_custom_target(baseline
-  COMMAND render_harness --board legacy --out "${RENDER_OUTPUT_DIR}" --probe-separator
+  COMMAND render_harness --board legacy --out "${RENDER_OUTPUT_DIR}" --probe-separator --probe-clip
   DEPENDS render_harness
   COMMENT "Rendering the legacy DiagnosticsBoard into ${RENDER_OUTPUT_DIR}"
   VERBATIM)
@@ -220,7 +220,7 @@ add_custom_target(baseline
 if(RENDER_U8G2GL)
   add_custom_target(after
     COMMAND render_harness --board u8g2gl --out "${RENDER_AFTER_DIR}"
-            --compare "${RENDER_OUTPUT_DIR}" --probe-state --probe-clip
+            --compare "${RENDER_OUTPUT_DIR}" --probe-state --probe-clip --probe-truncation
     DEPENDS render_harness
     COMMENT "Rendering the migrated DiagnosticsScreenBoard into ${RENDER_AFTER_DIR}, comparing with ${RENDER_OUTPUT_DIR}"
     VERBATIM)

@@ -1,0 +1,10 @@
+{
+  "method": "connected scenario, IP 10.100.200.250, SSID cut to N characters (whole UTF-8 characters); legacy and u8g2gl frames compared pixel for pixel",
+  "families": [
+    {"family": "long_ssid_scenario", "lengths": 38, "identical": 38, "truncated_lengths": 9, "truncated_and_identical": 9, "first_differing": null},
+    {"family": "all_wide_W", "lengths": 40, "identical": 40, "truncated_lengths": 22, "truncated_and_identical": 22, "first_differing": null},
+    {"family": "all_narrow_i", "lengths": 60, "identical": 60, "truncated_lengths": 0, "truncated_and_identical": 0, "first_differing": null},
+    {"family": "latin1", "lengths": 43, "identical": 43, "truncated_lengths": 10, "truncated_and_identical": 10, "first_differing": null}
+  ],
+  "lengths": 181, "identical": 181, "truncated_lengths": 41, "truncated_and_identical": 41
+}

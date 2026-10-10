@@ -23,7 +23,7 @@
  *
  * Exported Functions:
  * - main(): Parse --board / --out / --ascii / --probe-separator / --compare /
- *           --probe-state / --probe-clip, render every scenario of the chosen
+ *           --probe-state / --probe-clip / --probe-truncation, render every scenario of the chosen
  *           target, write its files, and optionally compare them with another
  *           output root.
  *
@@ -79,7 +79,7 @@ static constexpr int DISPLAY_HEIGHT = 64;    // Panel height in pixels
 static constexpr int ROW2_TOP = 16;          // First pixel row of row 2, the WiFi line (legacy y)
 static constexpr int ROW3_TOP = 30;          // First pixel row of row 3, the uptime (legacy y); row 2 ends above it
 static constexpr int ROW2_CLIP_X0 = 4;       // Row 2's first drawable column (legacy x)
-static constexpr int ROW2_CLIP_X1 = 251;     // Row 2's far clip corner, x + w - 1 = 4 + 248 - 1 (exclusive in U8G2)
+static constexpr int ROW2_CLIP_X1 = 251;     // Row 2's last drawable column, x + w - 1 = 4 + 248 - 1
 static constexpr const char* LEGACY_SOURCE_COMMIT = "e5342373";  // Commit whose DiagnosticsBoard is rendered
 static constexpr const char* DISPLAY_SETUP_CALL =
     "u8g2_Setup_ssd1322_nhd_256x64_f(u8g2, U8G2_R0, u8x8_byte_empty, u8x8_dummy_cb)";
@@ -250,7 +250,7 @@ static RenderedRows renderLegacyDiagnostics(const Scenario& scenario, U8G2& disp
     RenderedRows result;
     result.rows  = {board._row1._textBuffer, board._row2._textBuffer,
                     board._row3._textBuffer, board._row4._textBuffer};
-    result.fonts = {"u8g2_font_helvB12_tr", "u8g2_font_helvR08_tr",
+    result.fonts = {"u8g2_font_helvB12_tr", "u8g2_font_helvR08_tf",
                     "u8g2_font_helvR08_tr", "u8g2_font_helvR08_tr"};
     return result;
 }
@@ -329,7 +329,7 @@ static RenderedRows renderU8G2GLDiagnostics(const Scenario& scenario, U8G2& disp
     RenderedRows result;
     result.rows  = {ui_subject_diag_hostname.get(), ui_subject_diag_wifi.get(),
                     ui_subject_diag_uptime.get(),   ui_subject_diag_heap.get()};
-    result.fonts = {"u8g2_font_helvB12_tr", "u8g2_font_helvR08_tr",
+    result.fonts = {"u8g2_font_helvB12_tr", "u8g2_font_helvR08_tf",
                     "u8g2_font_helvR08_tr", "u8g2_font_helvR08_tr"};
 
     // --- Step 6: the formatter, driven by fixed inputs, must agree ---
@@ -460,9 +460,10 @@ static void printAscii(const std::vector<uint8_t>& buffer) {
 /**
  * @brief Quote a string for JSON.
  *
- * Bytes at or above 0x80 are written as \u00XX of the raw byte value. The legacy
- * board emits a lone 0xB7 byte (not valid UTF-8), so the raw bytes cannot be
- * embedded; the escape keeps the file valid JSON and the byte recoverable.
+ * Bytes at or above 0x80 are written as \u00XX of the raw byte value. The boards'
+ * strings are UTF-8 (the separator is the two bytes 0xC2 0xB7), but a raw-byte escape is
+ * unambiguous whatever a string holds, and keeps the file valid JSON with every byte
+ * recoverable.
  */
 static std::string jsonString(const char* text) {
     std::string out = "\"";
@@ -543,7 +544,7 @@ static bool writeInputsJson(const fs::path& path, const RenderTarget& target,
                   "band * 256 + x; bit 0 is the top pixel row of the band; 1 is lit.\",\n");
     fprintf(file, "  \"pbm_format\": \"Binary PBM (P4), 256x64, row-major, MSB first, 1 = lit pixel.\",\n");
     fprintf(file, "  \"strings_encoding\": \"Non-ASCII bytes are written as \\\\u00XX escapes of the raw "
-                  "byte value; the legacy separator is the single byte 0xB7 and appears as \\\\u00b7.\",\n");
+                  "byte value; the separator U+00B7 is the two UTF-8 bytes 0xC2 0xB7 and appears as \\\\u00c2\\\\u00b7.\",\n");
     fprintf(file, "  \"rerun\": %s,\n",
             jsonString(migrated
                 ? "cmake -S test/render -B tmp/render-build && cmake --build tmp/render-build --target after"
@@ -573,10 +574,8 @@ static bool writeInputsJson(const fs::path& path, const RenderTarget& target,
         }
         fprintf(file, "      ],\n");
         fprintf(file, "      \"lit_pixels\": %d,\n", countLit(r.buffer));
-        // The legacy label passes x + w - 1 = 251 as the far corner of its clip, which U8G2
-        // treats as exclusive; the migrated label's far corner is x + w = 251 for the same
-        // columns. Either way columns 4..250 are drawable, so the range recorded is the
-        // legacy argument for legacy and the same corner for the migrated board.
+        // Both boards clip row 2 to columns 4..251 (x = 4, w = 248; U8G2's far corner is
+        // exclusive, so the corner passed is x + w = 252). clip_x_range is inclusive.
         // band_rows is inclusive: row 2 occupies ROW2_TOP up to the row above ROW3_TOP.
         fprintf(file, "      \"row2\": {\"natural_width_px\": %d, \"clip_x_range\": [%d, %d], "
                       "\"lit_x_range\": [%d, %d], \"band_rows\": [%d, %d]}\n",
@@ -586,89 +585,6 @@ static bool writeInputsJson(const fs::path& path, const RenderTarget& target,
     }
 
     fprintf(file, "  }\n}\n");
-    fclose(file);
-    return true;
-}
-
-// =============================================================================
-// Separator probe
-// =============================================================================
-
-/**
- * @brief Measure what the legacy 0xB7 separator actually does under the row-2 font.
- *
- * Settles whether the byte draws anything, by measurement: glyph presence,
- * width and lit pixels of the byte alone, and whether the full row-2 string is
- * pixel-identical to the same string with the byte removed. Also measures how
- * far the long-SSID row-2 string reaches when the widget's clip is absent.
- *
- * @param path Where to write separator_probe.json.
- * @return true on success.
- */
-static bool writeSeparatorProbe(const fs::path& path) {
-    HostDisplay display;
-    display.setFont(AppFonts::defaultSmall());  // u8g2_font_helvR08_tr, the row-2 font
-    u8g2_t* raw = display.getU8g2();
-
-    // --- Step 1: the byte alone, and its Unicode form ---
-    const int widthByte      = display.getUTF8Width("\xB7");
-    const int widthStrByte   = display.getStrWidth("\xB7");
-    const int widthUtf8Form  = display.getUTF8Width("\xC2\xB7");   // U+00B7 as UTF-8
-    const int widthSpace     = display.getUTF8Width(" ");
-    const bool glyphB7Present = u8g2_IsGlyph(raw, 0xB7) != 0;
-
-    auto litAfterDraw = [&](const char* text) {
-        display.clearBuffer();
-        display.drawUTF8(10, 10, text);
-        return countLit(copyBuffer(display));
-    };
-    const int litByteAlone = litAfterDraw("\xB7");
-    const int litUtf8Form  = litAfterDraw("\xC2\xB7");
-
-    // --- Step 2: the connected row-2 string with and without the byte ---
-    // The legacy format is "%s \xB7 %s". If the byte draws nothing, it is
-    // pixel-identical to "%s  %s" (two spaces, the byte removed).
-    auto drawRow = [&](const char* text) {
-        display.clearBuffer();
-        display.drawUTF8(ROW2_CLIP_X0, ROW2_TOP, text);
-        return copyBuffer(display);
-    };
-    const std::vector<uint8_t> withByte  = drawRow("MyNetwork \xB7 192.168.1.42");
-    const std::vector<uint8_t> twoSpaces = drawRow("MyNetwork  192.168.1.42");
-    const std::vector<uint8_t> oneSpace  = drawRow("MyNetwork 192.168.1.42");
-
-    // --- Step 3: the long-SSID row without the widget's clip window ---
-    // The legacy row-2 widget clips to x = ROW2_CLIP_X0..ROW2_CLIP_X1 (4..251). Drawing the same string with
-    // no clip shows how much the clip suppresses.
-    const std::string longRow = std::string("ThisIsAVeryLongNetworkNameForOverflow1") + " \xB7 10.100.200.250";
-    const std::vector<uint8_t> unclipped = drawRow(longRow.c_str());
-    int unclippedMaxX = -1;
-    int unclippedLitBeyond251 = 0;
-    for (int y = 0; y < DISPLAY_HEIGHT; ++y) {
-        for (int x = 0; x < DISPLAY_WIDTH; ++x) {
-            if (!pixelLit(unclipped, x, y)) continue;
-            unclippedMaxX = std::max(unclippedMaxX, x);
-            if (x > ROW2_CLIP_X1) ++unclippedLitBeyond251;
-        }
-    }
-
-    FILE* file = fopen(path.string().c_str(), "wb");
-    if (!file) return false;
-    fprintf(file, "{\n");
-    fprintf(file, "  \"font\": \"u8g2_font_helvR08_tr\",\n");
-    fprintf(file, "  \"flags\": %s,\n", jsonString(HARNESS_U8G2_FLAGS).c_str());
-    fprintf(file, "  \"glyph_0xB7_in_font\": %s,\n", glyphB7Present ? "true" : "false");
-    fprintf(file, "  \"getUTF8Width_byte_0xB7_px\": %d,\n", widthByte);
-    fprintf(file, "  \"getStrWidth_byte_0xB7_px\": %d,\n", widthStrByte);
-    fprintf(file, "  \"getUTF8Width_utf8_C2B7_px\": %d,\n", widthUtf8Form);
-    fprintf(file, "  \"getUTF8Width_space_px\": %d,\n", widthSpace);
-    fprintf(file, "  \"drawUTF8_byte_0xB7_alone_lit_pixels\": %d,\n", litByteAlone);
-    fprintf(file, "  \"drawUTF8_utf8_C2B7_alone_lit_pixels\": %d,\n", litUtf8Form);
-    fprintf(file, "  \"row2_with_byte_equals_two_spaces\": %s,\n", withByte == twoSpaces ? "true" : "false");
-    fprintf(file, "  \"row2_with_byte_equals_one_space\": %s,\n", withByte == oneSpace ? "true" : "false");
-    fprintf(file, "  \"long_ssid_row2_unclipped_max_lit_x\": %d,\n", unclippedMaxX);
-    fprintf(file, "  \"long_ssid_row2_unclipped_lit_pixels_beyond_x251\": %d\n", unclippedLitBeyond251);
-    fprintf(file, "}\n");
     fclose(file);
     return true;
 }
@@ -780,43 +696,144 @@ static bool compareWithReference(const fs::path& referenceRoot, const RenderTarg
 }
 
 // =============================================================================
+// Separator probe
+// =============================================================================
+
+/**
+ * @brief Measure what the row-2 separator does, in the font it uses and in the one it left.
+ *
+ * The separator was once the lone byte 0xB7 under u8g2_font_helvR08_tr, which has no
+ * glyph for it: it drew nothing and took no width, leaving an 8-column gap. It is now U+00B7
+ * as UTF-8 ("\xC2\xB7") under u8g2_font_helvR08_tf, which has the glyph. This measures both:
+ * glyph presence, width and lit pixels of each form alone, then how many pixels the dot adds to
+ * the `connected` row-2 string (the row with the dot against the same row with the dot
+ * removed and two spaces left), and how far the long-SSID row-2 string reaches without a clip.
+ *
+ * @param path Where to write separator_probe.json.
+ * @return true on success.
+ */
+static bool writeSeparatorProbe(const fs::path& path) {
+    HostDisplay display;
+    u8g2_t* raw = display.getU8g2();
+
+    /** @brief What one separator form measures under one font. */
+    struct FormMeasure {
+        int width;          ///< getUTF8Width of the form alone
+        int lit;            ///< Lit pixels after drawing the form alone
+    };
+    auto measure = [&](const uint8_t* font, const char* form) {
+        display.setFont(font);
+        display.clearBuffer();
+        display.drawUTF8(10, 10, form);
+        return FormMeasure{display.getUTF8Width(form), countLit(copyBuffer(display))};
+    };
+
+    // --- Step 1: each form alone, under each font ---
+    const uint8_t* const fontTr = AppFonts::defaultSmall();        // u8g2_font_helvR08_tr, the old row-2 font
+    const uint8_t* const fontTf = AppFonts::defaultSmallLatin1();  // u8g2_font_helvR08_tf, the row-2 font now
+    display.setFont(fontTr);
+    const bool glyphInTr = u8g2_IsGlyph(raw, 0xB7) != 0;
+    display.setFont(fontTf);
+    const bool glyphInTf = u8g2_IsGlyph(raw, 0xB7) != 0;
+    const FormMeasure loneTr = measure(fontTr, "\xB7");
+    const FormMeasure utf8Tr = measure(fontTr, "\xC2\xB7");
+    const FormMeasure loneTf = measure(fontTf, "\xB7");
+    const FormMeasure utf8Tf = measure(fontTf, "\xC2\xB7");
+
+    // --- Step 2: what the dot adds to the connected row-2 string, under the row-2 font ---
+    display.setFont(fontTf);
+    auto drawRow = [&](const char* text) {
+        display.clearBuffer();
+        display.drawUTF8(ROW2_CLIP_X0, ROW2_TOP, text);
+        return copyBuffer(display);
+    };
+    const std::vector<uint8_t> withDot   = drawRow("MyNetwork \xC2\xB7 192.168.1.42");
+    const std::vector<uint8_t> twoSpaces = drawRow("MyNetwork  192.168.1.42");
+    const int dotAddsPixels = countLit(withDot) - countLit(twoSpaces);
+    const BufferDiff dotDiff = diffBuffers(twoSpaces, withDot);
+
+    // --- Step 3: the long-SSID row without the widget's clip window ---
+    // The row-2 widget clips to columns ROW2_CLIP_X0..ROW2_CLIP_X1 (4..251). Drawing the same string with
+    // no clip shows how far it overflows.
+    const std::string longRow = std::string("ThisIsAVeryLongNetworkNameForOverflow1") + " \xC2\xB7 10.100.200.250";
+    const std::vector<uint8_t> unclipped = drawRow(longRow.c_str());
+    int unclippedMaxX = -1;
+    int unclippedLitBeyond = 0;
+    for (int y = 0; y < DISPLAY_HEIGHT; ++y) {
+        for (int x = 0; x < DISPLAY_WIDTH; ++x) {
+            if (!pixelLit(unclipped, x, y)) continue;
+            unclippedMaxX = std::max(unclippedMaxX, x);
+            if (x > ROW2_CLIP_X1) ++unclippedLitBeyond;
+        }
+    }
+
+    FILE* file = fopen(path.string().c_str(), "wb");
+    if (!file) return false;
+    fprintf(file, "{\n");
+    fprintf(file, "  \"flags\": %s,\n", jsonString(HARNESS_U8G2_FLAGS).c_str());
+    fprintf(file, "  \"note\": \"lone_byte is 0xB7 (what the board sent before owner ruling R8); utf8_form is "
+                  "0xC2 0xB7 (U+00B7, what it sends now). tr is u8g2_font_helvR08_tr (the old row-2 font), tf is "
+                  "u8g2_font_helvR08_tf (the row-2 font now).\",\n");
+    fprintf(file, "  \"glyph_0xB7_in_tr\": %s,\n", glyphInTr ? "true" : "false");
+    fprintf(file, "  \"glyph_0xB7_in_tf\": %s,\n", glyphInTf ? "true" : "false");
+    fprintf(file, "  \"tr_lone_byte\": {\"width_px\": %d, \"lit_pixels\": %d},\n", loneTr.width, loneTr.lit);
+    fprintf(file, "  \"tr_utf8_form\": {\"width_px\": %d, \"lit_pixels\": %d},\n", utf8Tr.width, utf8Tr.lit);
+    fprintf(file, "  \"tf_lone_byte\": {\"width_px\": %d, \"lit_pixels\": %d},\n", loneTf.width, loneTf.lit);
+    fprintf(file, "  \"tf_utf8_form\": {\"width_px\": %d, \"lit_pixels\": %d},\n", utf8Tf.width, utf8Tf.lit);
+    fprintf(file, "  \"connected_row2_dot_adds_pixels\": %d,\n", dotAddsPixels);
+    fprintf(file, "  \"connected_row2_dot_vs_two_spaces_differing_pixels\": %d,\n", dotDiff.differingPixels);
+    fprintf(file, "  \"long_ssid_row2_unclipped_max_lit_x\": %d,\n", unclippedMaxX);
+    fprintf(file, "  \"long_ssid_row2_unclipped_lit_pixels_beyond_clip\": %d\n", unclippedLitBeyond);
+    fprintf(file, "}\n");
+    fclose(file);
+    return true;
+}
+
+// =============================================================================
 // Clip probe: what the label clip removes
 // =============================================================================
 
 /**
  * @brief Measure the pixels the labels' clip removes, row by row.
  *
- * Draws each scenario's four strings with no clip at all, where the legacy board
- * draws them (the same x, y and font, centred in 256 for row 1), and reports
- * which lit pixels of that unclipped frame are dark in the rendered frame, by pixel
- * row. This is the legacy descender defect, measured: legacy drawText() passes
- * x + w - 1 and y + h - 1 as the far corner of setClipWindow(), U8G2 treats that
- * corner as exclusive (u8g2.h:352/354), so the last column and row of each label
- * are lost; with h = getMaxCharHeight() that is the descenders' last row.
+ * Draws each scenario's four strings with no clip at all, where the board draws
+ * them (the same x, y and font, centred in 256 for row 1), and reports which lit
+ * pixels of that unclipped frame are dark in the rendered frame, by pixel row,
+ * and which are lit only in the rendered frame. This is the descender check: with
+ * the defects fixed, a row that fits loses nothing. A row that does not fit
+ * (`long_ssid`) loses its tail at the right edge, and gains the ellipsis that
+ * replaces it, so its removed pixels all lie beyond the last character drawn.
+ *
+ * Before the fix drawText() passed x + w - 1 and y + h - 1 as the far corner of
+ * setClipWindow(), which U8G2 treats as exclusive (u8g2.h:352/354), and the labels
+ * were too short for their glyphs: `connected` lost 11 pixels, all descenders
+ * (the committed record of that is section 1 of EVIDENCE.md and the git history of baseline/).
  *
  * @param path    Where to write clip_probe.json.
  * @param results The rendered scenarios of the chosen target.
  * @return true on success.
  */
 static bool writeClipProbe(const fs::path& path, const std::vector<ScenarioResult>& results) {
-    /** @brief Legacy placement of one row. */
+    /** @brief Placement of one row. */
     struct RowPlacement {
         int x;          ///< Left edge of the label
         int y;          ///< Top pixel row of the label
         bool centred;   ///< Centred in the display width (row 1 only)
-        bool large;     ///< The large (bold) font, else the small one
+        const uint8_t* font;  ///< The row's font
     };
     const RowPlacement placements[4] = {
-        {0, 0,  true,  true},  {ROW2_CLIP_X0, ROW2_TOP, false, false},
-        {4, ROW3_TOP, false, false}, {4, 44, false, false},
+        {0, 0,  true,  AppFonts::defaultLarge()},
+        {ROW2_CLIP_X0, ROW2_TOP, false, AppFonts::defaultSmallLatin1()},
+        {4, ROW3_TOP, false, AppFonts::defaultSmall()},
+        {4, 44, false, AppFonts::defaultSmall()},
     };
 
     FILE* file = fopen(path.string().c_str(), "wb");
     if (!file) return false;
-    fprintf(file, "{\n  \"method\": \"each row drawn unclipped at its legacy position; a pixel lit there and dark in the "
-                  "rendered frame was removed by the clip. The _inclusive_ figures repeat the measurement through a "
-                  "window whose far corner includes the label's last column and row (what the legacy code evidently "
-                  "intended); whatever that still removes lies outside the label's own height.\",\n  \"scenarios\": {\n");
+    fprintf(file, "{\n  \"method\": \"each row drawn unclipped at its position; a pixel lit there and dark in the "
+                  "rendered frame was removed by the clip (or, for a long line, by truncation); a pixel lit only in "
+                  "the rendered frame was added by it (the ellipsis). A row that fits loses nothing.\",\n"
+                  "  \"scenarios\": {\n");
     for (size_t i = 0; i < results.size(); ++i) {
         const ScenarioResult& r = results[i];
 
@@ -825,56 +842,38 @@ static bool writeClipProbe(const fs::path& path, const std::vector<ScenarioResul
         display.clearBuffer();
         for (int row = 0; row < 4; ++row) {
             const RowPlacement& place = placements[row];
-            display.setFont(place.large ? AppFonts::defaultLarge() : AppFonts::defaultSmall());
+            display.setFont(place.font);
             int x = place.x;
             if (place.centred) x += (DISPLAY_WIDTH - display.getUTF8Width(r.rows.rows[row].c_str())) / 2;
             display.drawUTF8(x, place.y, r.rows.rows[row].c_str());
         }
         const std::vector<uint8_t> unclipped = copyBuffer(display);
 
-        // --- Step 1b: the clip the legacy code evidently intended ---
-        // The same rows through a window whose far corner is INCLUSIVE of the label's last
-        // column and row, i.e. setClipWindow(x, y, x + w, y + h) with h = getMaxCharHeight().
-        // What this still removes is not the exclusive-corner defect: it is glyph pixels
-        // outside the label's own height.
-        HostDisplay intended;
-        intended.clearBuffer();
-        for (int row = 0; row < 4; ++row) {
-            const RowPlacement& place = placements[row];
-            intended.setFont(place.large ? AppFonts::defaultLarge() : AppFonts::defaultSmall());
-            const int width = place.centred ? DISPLAY_WIDTH : DISPLAY_WIDTH - 8;  // Legacy label widths
-            int x = place.x;
-            if (place.centred) x += (DISPLAY_WIDTH - intended.getUTF8Width(r.rows.rows[row].c_str())) / 2;
-            intended.setClipWindow(place.x, place.y, place.x + width, place.y + intended.getMaxCharHeight());
-            intended.drawUTF8(x, place.y, r.rows.rows[row].c_str());
-            intended.setMaxClipWindow();
-        }
-        const std::vector<uint8_t> intendedFrame = copyBuffer(intended);
-
-        // --- Step 2: what the clip removed, and anything it added (nothing should be) ---
+        // --- Step 2: what the clip removed, by pixel row, and the columns it removed from ---
         const BufferDiff diff = diffBuffers(unclipped, r.buffer);
-        auto lostByRow = [&](const std::vector<uint8_t>& kept) {
-            std::string out;
-            for (int y = 0; y < DISPLAY_HEIGHT; ++y) {
-                int lostInRow = 0;
-                for (int x = 0; x < DISPLAY_WIDTH; ++x) {
-                    if (pixelLit(unclipped, x, y) && !pixelLit(kept, x, y)) ++lostInRow;
-                }
-                if (lostInRow > 0) {
-                    out += (out.empty() ? "" : ", ") + std::string("\"") + std::to_string(y) + "\": " +
-                           std::to_string(lostInRow);
+        std::string byRow;
+        int removedColMin = DISPLAY_WIDTH;
+        int removedColMax = -1;
+        for (int y = 0; y < DISPLAY_HEIGHT; ++y) {
+            int lostInRow = 0;
+            for (int x = 0; x < DISPLAY_WIDTH; ++x) {
+                if (pixelLit(unclipped, x, y) && !pixelLit(r.buffer, x, y)) {
+                    ++lostInRow;
+                    removedColMin = std::min(removedColMin, x);
+                    removedColMax = std::max(removedColMax, x);
                 }
             }
-            return out;
-        };
-        const BufferDiff intendedDiff = diffBuffers(unclipped, intendedFrame);
+            if (lostInRow > 0) {
+                byRow += (byRow.empty() ? "" : ", ") + std::string("\"") + std::to_string(y) + "\": " +
+                         std::to_string(lostInRow);
+            }
+        }
         fprintf(file, "    %s: {\"unclipped_lit\": %d, \"rendered_lit\": %d, \"removed_by_clip\": %d, "
-                      "\"added_by_render\": %d, \"removed_by_pixel_row\": {%s},\n"
-                      "      \"removed_if_far_corner_were_inclusive\": %d, "
-                      "\"removed_if_far_corner_were_inclusive_by_pixel_row\": {%s}}%s\n",
+                      "\"added_by_render\": %d, \"removed_by_pixel_row\": {%s}, \"removed_columns\": [%d, %d]}%s\n",
                 jsonString(r.scenario->name).c_str(), countLit(unclipped), countLit(r.buffer),
-                diff.onlyInA, diff.onlyInB, lostByRow(r.buffer).c_str(),
-                intendedDiff.onlyInA, lostByRow(intendedFrame).c_str(), i + 1 < results.size() ? "," : "");
+                diff.onlyInA, diff.onlyInB, byRow.c_str(),
+                diff.onlyInA ? removedColMin : -1, diff.onlyInA ? removedColMax : -1,
+                i + 1 < results.size() ? "," : "");
     }
     fprintf(file, "  }\n}\n");
     fclose(file);
@@ -1057,6 +1056,105 @@ static bool writeStateProbe(const fs::path& path, const std::vector<uint8_t>& no
     return true;
 }
 
+// =============================================================================
+// Truncation probe: do the two boards truncate alike at every length?
+// =============================================================================
+
+/**
+ * @brief Render both boards with an SSID cut to every length, and count the differing pixels.
+ *
+ * The four scenarios hold one long line. The legacy board truncates by trimming whole
+ * characters until the text and an ellipsis fit, so its ellipsis follows the last character.
+ * The U8G2GL label (`long_mode="dots"`) draws the whole line clipped, then blanks a box at the
+ * right edge and draws the ellipsis there. Whether the two agree depends on where the legacy trim
+ * lands, so one passing scenario would not show it. This sweeps the `connected` scenario's SSID
+ * from 1 character to its full length, for several SSIDs of different character widths (the
+ * long scenario's, all wide, all narrow, and one with Latin-1 characters), and records for each
+ * length whether the two frames are identical, so how often the boards agree is measured.
+ *
+ * @param path Where to write truncation_probe.json.
+ * @return true on success.
+ */
+static bool writeTruncationProbe(const fs::path& path) {
+    const RenderTarget* legacy = nullptr;
+    const RenderTarget* migrated = nullptr;
+    for (const RenderTarget& t : kTargets) {
+        if (std::string(t.id) == "legacy") legacy = &t;
+        if (std::string(t.id) == "u8g2gl") migrated = &t;
+    }
+    if (!legacy || !migrated) return false;
+
+    // A name, then the SSID that is cut. The Latin-1 one is UTF-8: "caf\xC3\xA9" is "cafe" with an acute e.
+    const struct { const char* name; std::string ssid; } families[] = {
+        {"long_ssid_scenario", "ThisIsAVeryLongNetworkNameForOverflow1"},
+        {"all_wide_W",         std::string(40, 'W')},
+        {"all_narrow_i",       std::string(60, 'i')},
+        {"latin1",             "caf\xC3\xA9 Z\xC3\xBCrich \xC3\x85ngstr\xC3\xB6m R\xC3\xA9seau Sans-Fil Maison"},
+    };
+
+    FILE* file = fopen(path.string().c_str(), "wb");
+    if (!file) return false;
+    fprintf(file, "{\n  \"method\": \"connected scenario, IP 10.100.200.250, SSID cut to N characters (whole UTF-8 "
+                  "characters); legacy and u8g2gl frames compared pixel for pixel\",\n  \"families\": [\n");
+    int totalLengths = 0;
+    int totalIdentical = 0;
+    int totalTruncated = 0;
+    int totalTruncatedIdentical = 0;
+    for (size_t f = 0; f < sizeof(families) / sizeof(families[0]); ++f) {
+        const std::string& full = families[f].ssid;
+        int lengths = 0;
+        int identical = 0;
+        int truncated = 0;
+        int truncatedIdentical = 0;
+        std::string firstDiffering;
+        for (size_t n = 1; n <= full.size(); ++n) {
+            // Cut on a character boundary: never leave a UTF-8 lead byte without its continuation.
+            if (n < full.size() && (static_cast<unsigned char>(full[n]) & 0xC0) == 0x80) continue;
+            const std::string ssid = full.substr(0, n);
+            const Scenario scenario = {"truncation_sweep", true, false, "esp32-foundation", ssid.c_str(),
+                                       "10.100.200.250", 360000UL, 4 * 1024, nullptr};
+            HostDisplay legacyDisplay;
+            HostDisplay migratedDisplay;
+            const RenderedRows legacyRows = legacy->render(scenario, legacyDisplay);
+            migrated->render(scenario, migratedDisplay);
+            const BufferDiff diff = diffBuffers(copyBuffer(legacyDisplay), copyBuffer(migratedDisplay));
+
+            // Natural width of row 2 under its font, to tell a line that fits from one that is truncated.
+            legacyDisplay.setFont(AppFonts::defaultSmallLatin1());
+            const bool overflows = legacyDisplay.getUTF8Width(legacyRows.rows[1].c_str()) > 248;
+            ++lengths;
+            identical += diff.differingPixels == 0 ? 1 : 0;
+            if (overflows) {
+                ++truncated;
+                truncatedIdentical += diff.differingPixels == 0 ? 1 : 0;
+            }
+            if (diff.differingPixels != 0 && firstDiffering.empty()) {
+                firstDiffering = "{\"ssid_chars\": " + std::to_string(n) + ", \"truncated\": " +
+                                 (overflows ? "true" : "false") + ", \"differing_pixels\": " +
+                                 std::to_string(diff.differingPixels) + "}";
+            }
+        }
+        fprintf(file, "    {\"family\": %s, \"lengths\": %d, \"identical\": %d, \"truncated_lengths\": %d, "
+                      "\"truncated_and_identical\": %d, \"first_differing\": %s}%s\n",
+                jsonString(families[f].name).c_str(), lengths, identical, truncated, truncatedIdentical,
+                firstDiffering.empty() ? "null" : firstDiffering.c_str(),
+                f + 1 < sizeof(families) / sizeof(families[0]) ? "," : "");
+        printf("  %-20s %2d lengths, %2d identical; %2d truncated, %2d of those identical\n",
+               families[f].name, lengths, identical, truncated, truncatedIdentical);
+        totalLengths += lengths;
+        totalIdentical += identical;
+        totalTruncated += truncated;
+        totalTruncatedIdentical += truncatedIdentical;
+    }
+    fprintf(file, "  ],\n  \"lengths\": %d, \"identical\": %d, \"truncated_lengths\": %d, "
+                  "\"truncated_and_identical\": %d\n}\n",
+            totalLengths, totalIdentical, totalTruncated, totalTruncatedIdentical);
+    fclose(file);
+    printf("truncation probe: %d of %d lengths identical; of the %d truncated, %d identical\n",
+           totalIdentical, totalLengths, totalTruncated, totalTruncatedIdentical);
+    return true;
+}
+
 #endif  // HARNESS_HAS_U8G2GL
 
 // =============================================================================
@@ -1066,7 +1164,8 @@ static bool writeStateProbe(const fs::path& path, const std::vector<uint8_t>& no
 /** @brief Print usage and return a failure code. */
 static int usage() {
     fprintf(stderr, "usage: render_harness --board <id> [--out <dir>] [--ascii <scenario>] [--probe-separator]\n"
-                    "                       [--compare <reference-root>] [--probe-state] [--probe-clip]\n");
+                    "                       [--compare <reference-root>] [--probe-state] [--probe-clip]\n"
+                    "                       [--probe-truncation]\n");
     fprintf(stderr, "boards:");
     for (const RenderTarget& t : kTargets) fprintf(stderr, " %s", t.id);
     fprintf(stderr, "\n");
@@ -1082,6 +1181,7 @@ int main(int argc, char** argv) {
     fs::path compareRoot;
     bool probeState = false;
     bool probeClip = false;
+    bool probeTruncation = false;
     for (int i = 1; i < argc; ++i) {
         const std::string arg = argv[i];
         if (arg == "--board" && i + 1 < argc)       boardId = argv[++i];
@@ -1091,6 +1191,7 @@ int main(int argc, char** argv) {
         else if (arg == "--compare" && i + 1 < argc) compareRoot = argv[++i];
         else if (arg == "--probe-state")            probeState = true;
         else if (arg == "--probe-clip")             probeClip = true;
+        else if (arg == "--probe-truncation")       probeTruncation = true;
         else return usage();
     }
     if (boardId.empty()) return usage();
@@ -1111,7 +1212,7 @@ int main(int argc, char** argv) {
         result.buffer = copyBuffer(display);
 
         // Natural width of row 2 under its own font, to tell clipping from fit.
-        display.setFont(AppFonts::defaultSmall());
+        display.setFont(AppFonts::defaultSmallLatin1());  // The row-2 font
         result.row2NaturalWidthPx = display.getUTF8Width(result.rows.rows[1].c_str());
 
         results.push_back(std::move(result));
@@ -1164,10 +1265,11 @@ int main(int argc, char** argv) {
             return 1;
         }
     }
+    if (probeTruncation && !writeTruncationProbe(outDir / "truncation_probe.json")) return 1;
     if (g_selfCheckFailures != 0) return 4;
 #else
-    if (probeState) {
-        fprintf(stderr, "--probe-state needs a build with RENDER_U8G2GL=ON\n");
+    if (probeState || probeTruncation) {
+        fprintf(stderr, "--probe-state and --probe-truncation need a build with RENDER_U8G2GL=ON\n");
         return 1;
     }
 #endif

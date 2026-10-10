@@ -10,7 +10,7 @@ There are two targets, selected with `--board`:
 
 | `--board` | Renders | Output |
 |---|---|---|
-| `legacy` | The legacy `DiagnosticsBoard`, compiled unmodified from `modules/U8G2Display` (commit `e5342373`) | `baseline/`, the "before" evidence |
+| `legacy` | The legacy `DiagnosticsBoard`, compiled unmodified from `modules/U8G2Display` | `baseline/`, the reference the migrated board is held to |
 | `u8g2gl` | The migrated board: `modules/U8G2GLDisplay`'s `DiagnosticsScreenBoard` running the generated U8G2GL screen from `uidesign/ssd1322-256x64/u8g2gl`, over the pinned U8G2GL runtime | `after/`, the "after" evidence |
 
 Both run the same five scenarios, through the same U8G2, flags, shims and legacy
@@ -20,6 +20,12 @@ replays the live values of the ESP32-S3 Nano at the bench (hostname
 `esp32-foundation`, SSID `cb-iot`, IP `192.168.20.186`, 96 s of uptime, 8316 KB
 free, version `0.0.12-dev.91`), so a render can be compared with a frame captured
 from the device (see `compare_png.py`).
+
+`baseline/` is the legacy board **with the three legacy defects fixed** (owner ruling R8): the
+descenders are no longer clipped, the separator is a real middle dot, and a long line ends in an
+ellipsis. The board as it shipped, defects included, is the earlier `baseline/` in git history
+(the commit that added `device_dev91`, `761a21ff`, holds all five scenarios as shipped and the
+device comparison); the PR's `EVIDENCE.md` section 1 describes it.
 
 ## Run
 
@@ -49,7 +55,7 @@ compares every scenario byte for byte with `baseline/` and writes
 cmake --build tmp/render-build --target after
 ```
 
-It also writes `after/diagnostics_board/clip_probe.json` (see below). It exits
+It also writes `clip_probe.json` and `truncation_probe.json` there (see below). It exits
 non-zero if any scenario differs from the baseline, so it doubles as the
 regression guard for the pixel-identity gate. The U8G2GL runtime is fetched from
 the pinned git sha (`FetchContent`; the repository is private, so git needs
@@ -82,17 +88,19 @@ Requirements: CMake 3.20+, a C++17 compiler, git (for the fetch).
 | `<scenario>.bin` | The raw U8G2 buffer: 2048 bytes, exactly what `getBufferPtr()` holds. Eight horizontal bands of eight pixel rows; byte index is `band * 256 + x`; bit 0 is the band's top row. |
 | `<scenario>.pbm` | Binary PBM (P4), 256x64, row-major, MSB first, 1 = lit pixel. |
 | `inputs.json` | Per scenario: the inputs, the exact string each row was given, the lit-pixel count, and the row-2 geometry. Also the U8G2 version and source, the flags, the display setup and state calls, the buffer format and how to re-run. |
-| `separator_probe.json` | What the legacy `0xB7` separator byte measurably does under the row-2 font, and how far the long-SSID row reaches without its clip. |
+| `separator_probe.json` | What the separator measurably does: the lone byte `0xB7` and the UTF-8 form `0xC2 0xB7`, each under `u8g2_font_helvR08_tr` (the old row-2 font, no glyph) and `u8g2_font_helvR08_tf` (the row-2 font now), how many pixels the dot adds to the `connected` row, and how far the long-SSID row reaches without a clip. |
+| `clip_probe.json` | The pixels each label's clip removes, row by row, against the same strings drawn with no clip. A row that fits loses nothing; a truncated row loses only the tail the ellipsis replaces. |
 
-`inputs.json` writes bytes at or above `0x80` as `\u00XX` escapes of the raw byte,
-because the legacy separator is a lone `0xB7`, which is not valid UTF-8.
+`inputs.json` writes bytes at or above `0x80` as `\u00XX` escapes of the raw byte, so
+the separator U+00B7 (the UTF-8 bytes `0xC2 0xB7`) appears as `\u00c2\u00b7`.
 
 `after/diagnostics_board/` holds the same files for the migrated board, plus:
 
 | File | Content |
 |---|---|
 | `state_probe.json` | What the screen inherits from the legacy display state: the `connected` frame rendered without `setFontPosTop()`, without `setFontRefHeightAll()`, and as a plain U8G2GL user would draw it (`begin()` only, through `ui_handler()`), each compared with the normal frame; and the font mode after the runtime's `render_fn` versus after the board's `render()`. |
-| `clip_probe.json` | The pixels each label's clip removes, row by row, measured against the same strings drawn with no clip (`--probe-clip`). It backs the geometry arithmetic in `screen_diagnostics.xml`. |
+| `clip_probe.json` | The same measurement for the migrated board (`--probe-clip`). |
+| `truncation_probe.json` | Whether the two boards truncate alike at every length (`--probe-truncation`): the `connected` SSID cut to 1..N characters for four SSIDs of different character widths (the long scenario's, all `W`, all `i`, one with Latin-1 letters), the legacy and migrated frames compared pixel for pixel. It exists because the legacy board trims whole characters and puts the ellipsis after the last one, while the runtime's `long_mode="dots"` draws the whole line and overdraws a box at the right edge, and one passing scenario would not show that they agree. |
 | `probe_<variant>.pbm` | Each probe frame, to look at. |
 
 For the migrated board, `inputs.json`'s `rows` are the text the screen's subjects
@@ -105,7 +113,7 @@ three rows the board published, and the run fails if it does not.
 | Real | Shimmed (`shim/`) |
 |---|---|
 | U8G2 `csrc/*.c` and `cppsrc/U8g2lib.cpp` | `Arduino.h`, `Print.h`: the types, `millis()` and `Print` that `U8g2lib.h` needs |
-| The fonts (`u8g2_font_helvB12_tr`, `u8g2_font_helvR08_tr`) | `WifiManager.hpp`: the three getters the board calls |
+| The fonts (`u8g2_font_helvB12_tr`, `u8g2_font_helvR08_tr`, `u8g2_font_helvR08_tf`) | `WifiManager.hpp`: the three getters the board calls |
 | `DiagnosticsBoard.cpp`, `LabelWidget.cpp`, `DrawingPrimitives.cpp`, unmodified | `WiFi.h`: `isConnected()` and `localIP().toString().c_str()` |
 | The display setup, `u8g2_Setup_ssd1322_nhd_256x64_f` | `esp_heap_caps.h`: `heap_caps_get_free_size()` |
 | The U8G2GL runtime (`src/*.cpp` at the pinned sha), the committed `generated/` UI, and `U8G2GLDisplay`, `U8G2GLScreenBoard`, `DiagnosticsScreenBoard`, unmodified | The same shims: the migrated board reads the platform through the same `readDiagnosticsInputs()` it uses in firmware |
@@ -159,6 +167,7 @@ tmp/render-build/render_harness --board legacy --ascii connected   # '#' lit, '.
 tmp/render-build/render_harness --board legacy --out <dir> --probe-separator
 tmp/render-build/render_harness --board u8g2gl --out <dir> --compare baseline --probe-state
 tmp/render-build/render_harness --board u8g2gl --out <dir> --probe-clip    # writes clip_probe.json
+tmp/render-build/render_harness --board u8g2gl --out <dir> --probe-truncation  # writes truncation_probe.json
 ```
 
 ## compare_png.py
