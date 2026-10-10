@@ -148,21 +148,32 @@ and not others) appeared in this tree, so the clean-build figures above are the 
 
 ### 4. Edit, regenerate, rebuild faster than editing C++: [EVIDENCE §4](.agents/skills/principal-architect-workspace/pr-u8g2gl-05/evidence/EVIDENCE.md)
 
-Same task on both sides (move row 3 by one pixel), same flags, one untimed warm-up and three timed
-runs, timed from the edit being written to the build reporting success.
+Same task on both sides: move row 3 by one pixel. The same flags were used throughout (WO-B3b).
 
-| Loop | Edit to success, median of 3 | Range |
-|---|---:|---|
-| Legacy: edit C++ constructor argument, rebuild | **29.94 s** | 29.40 to 30.04 s |
-| Migrated, hook configured: edit XML, build regenerates | **48.81 s** | 48.64 to 53.70 s |
-| Migrated, unconfigured: edit XML, run `u8g2gl generate`, build | 38.47 s (31.60 s of tool time) | 34.36 to 39.63 s |
+- **Interleaved:** five rounds of four builds. Each round was a legacy edit, a migrated edit, a
+  legacy no-change build and a migrated no-change build.
+- **Load:** recorded before every build, with load averages of 4.0 to 8.5.
+- **Figures:** medians of the build task's own start-to-end time.
 
-The generator takes about 0.05 s; both loops recompile one object and relink. **The two sides were
-not measured under the same load** (the migrated runs saw load averages of 5 to 20 and busy
-background processes; the legacy runs recorded none), so the 19 s gap is not attributable to the XML
-workflow from this data. EVIDENCE §4 says what the timing cannot capture (a geometry change is a
-constructor argument in C++ and one attribute in XML, and the generator re-checks the layout against
-the display), and leaves the judgement to PR-07.
+| Build | Legacy | Migrated (hook regenerates) |
+|---|---:|---:|
+| Edit, rebuild | 26.92 s | **31.90 s** |
+| No-change rebuild | 21.60 s | 27.92 s |
+| Compile work for the edit itself (edit − no-change) | 4.65 s | **3.90 s** |
+
+- **The gap is real.** Paired within each round, the migrated loop is **+4.99 s** slower (median),
+  and the difference survives the pairing.
+- **The XML workflow does not cause it.** The edit itself costs slightly *less* than the C++ edit,
+  and the generator runs in 0.05 to 0.07 s. A run with the hook switched off still shows the gap.
+- **The whole gap is fixed per-build overhead (+6.16 s on a no-change build).** The verbose logs
+  show PlatformIO's library dependency graph growing by 42.6% under `lib_ldf_mode = deep`, from the
+  three new libraries (`U8G2GLDisplay`, `U8G2GLUI`, `u8g2gl`). That attribution is inferred from the
+  logs; timing the scan on its own would need the `pio` CLI, which rule 04 forbids.
+- **What the timing cannot capture:** a geometry change is a constructor argument in C++ and one
+  attribute in XML, and the generator re-checks the layout against the display. EVIDENCE §4 says so,
+  and leaves the judgement to PR-07.
+- **Superseded figures:** WO-B1's (29.94 s) and WO-B3's (48.81 s) timings remain in EVIDENCE as the
+  record. WO-B3's were taken hours apart, under much heavier load.
 
 ## What the migrated board does and does not do, compared with legacy
 
@@ -187,9 +198,10 @@ same board.
 capture comparison is WO-B5 and waits for the bench. The on-device frame has not been compared with
 the host frame.
 
-**Fixing the defects is a separate decision.** The clip off-by-one costs 11 lit pixels in `connected`;
-fixing the corner alone would restore only 5 of them (EVIDENCE §1 has the measurement). That is an
-owner question, recorded in the twin PROJECT, not changed here.
+**The defects get fixed, in both boards, after the identity check.** The owner has decided the legacy
+defects are to be fixed. The fix lands in both the legacy board and the migrated one, as a
+correctness fix under the freeze, so the two stay pixel-identical and the gate comparison keeps its
+meaning. It is tracked in the PR's workspace.
 
 ## Tests
 
