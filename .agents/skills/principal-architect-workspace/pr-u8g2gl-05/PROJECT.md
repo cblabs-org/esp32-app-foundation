@@ -365,3 +365,5 @@ reads them there and does not re-derive them.
   - **Device, `dev.92`** (tag pushed on `9dddb42c`): clean boot. Rows 0 to 31 of the device frame
     equal the host render in **5 of 6 captures**; the sixth was torn (the known capture race). The
     capture is `evidence/device/dev92-esp32s3nano-diagnostics-fixed.png`.
+  - **Owner confirmed on the panel (2026-10-10):** "Yes they look good, and the drop clipping is
+    fixed too. Nice!" Descenders, separator and screensaver are correct on `dev.92`.
