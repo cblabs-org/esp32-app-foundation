@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "ops": [
+    {
+      "type": "add",
+      "entry_id": "seed-c9c80767",
+      "dossier_scope": "root",
+      "timestamp": "2026-08-26T11:26:11+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": null,
+        "entry_type": "decision",
+        "text": "Used `std::vector\u003cDataSourceHealthPayload\u003e` buffered during `EventBus` callback in display modules (due to B5 and N6) to safely transition to the main `tick()` loop."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-f363484d",
+      "dossier_scope": "root",
+      "timestamp": "2026-08-26T11:26:11+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": null,
+        "entry_type": "decision",
+        "text": "Restored missing `DisplayConfigMigration.h` and corrected LVGL/U8G2 screen header imports (`#include \"interfaces/IDataSource.hpp\"`)."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-32c0cb1c",
+      "dossier_scope": "root",
+      "timestamp": "2026-08-26T11:26:11+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": null,
+        "entry_type": "ruled-out",
+        "text": "MCP `run_tests` runs natively, but tests for unsupported boards in `platformio.ini` cause timeouts. `platformio test -e native` was isolated for success."
+      }
+    }
+  ],
+  "created_at": "2026-08-26T10:26:11Z",
+  "batch_id": "01M0YSP7DRTPSZ940XTX2MTT0M"
+}

@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "ops": [
+    {
+      "type": "add",
+      "entry_id": "seed-c56efa6b",
+      "dossier_scope": "root",
+      "timestamp": "2026-08-25T21:52:31+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": null,
+        "entry_type": "decision",
+        "text": "`getStateByName` changes required propagating pointer access syntaxes across multiple isolated unit test files (`-\u003e` instead of `.`, and null checks) to satisfy the strict native tests requirements."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-3ae5abad",
+      "dossier_scope": "root",
+      "timestamp": "2026-08-25T21:52:31+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": null,
+        "entry_type": "ruled-out",
+        "text": "When `getStateByName` signature changed, fixing compile errors required modifying several test files outside of the precondition engine boundary (`test_wifiManager`, `test_timeManager`, `test_eventbus`, `test_application`). These modifications were mandatory to achieve the `pio test -e native` requirement."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-1c2e54f4",
+      "dossier_scope": "root",
+      "timestamp": "2026-08-25T21:52:31+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": null,
+        "entry_type": "ruled-out",
+        "text": "The `crowpanel-128-rotary` environment sporadically failed during the parallel test run due to ESP-IDF missing `.codespellrc` cache corruption (a known PlatformIO concurrent build issue). Running `rm -rf managed_components/espressif__esp-dsp/` and rebuilding fixed it."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-aead5eaa",
+      "dossier_scope": "root",
+      "timestamp": "2026-08-25T21:52:31+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": null,
+        "entry_type": "open-issue",
+        "text": "None directly found inside the engine logic beyond the ones addressed. The concurrent build issue in PlatformIO `esp-dsp` component download is an external friction point."
+      }
+    }
+  ],
+  "created_at": "2026-08-25T20:52:31Z",
+  "batch_id": "01M0XB4BMRVSDRF65CAV9F0A4N"
+}

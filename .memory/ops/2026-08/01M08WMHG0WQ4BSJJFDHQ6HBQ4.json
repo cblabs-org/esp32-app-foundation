@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "ops": [
+    {
+      "type": "add",
+      "entry_id": "seed-1c16cd52",
+      "dossier_scope": "hardware",
+      "timestamp": "2026-08-17T23:14:24+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "hardware/_common/board_contract.h",
+          "test/test_unit/test_webServer/test_webServer.cpp"
+        ],
+        "entry_type": "decision",
+        "text": "Added `getHttpStackSize()` and `getHttpMaxOpenSockets()` inspector methods to `WebServerManager` to enable clean unit testing of configuration without breaking encapsulation or reaching into PsychicHttp internals."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-b1b4bd19",
+      "dossier_scope": "hardware",
+      "timestamp": "2026-08-17T23:14:24+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "hardware/_common/board_contract.h",
+          "test/test_unit/test_webServer/test_webServer.cpp"
+        ],
+        "entry_type": "decision",
+        "text": "Kept `#ifndef UNIT_TEST` guards around `_httpServer.config` and `_httpsServer-\u003econfig` access in `WebServerManager.cpp` to preserve compatibility with the native test stub while supporting board configuration on real hardware."
+      }
+    }
+  ],
+  "created_at": "2026-08-17T22:14:24Z",
+  "batch_id": "01M08WMHG0WQ4BSJJFDHQ6HBQ4"
+}

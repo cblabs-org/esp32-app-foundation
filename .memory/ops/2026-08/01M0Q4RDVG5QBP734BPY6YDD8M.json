@@ -1,0 +1,82 @@
+{
+  "version": 1,
+  "ops": [
+    {
+      "type": "add",
+      "entry_id": "seed-66067307",
+      "dossier_scope": "modules",
+      "timestamp": "2026-08-23T12:05:42+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "modules/PreconditionEngine/PreconditionEngine.hpp",
+          "test/test_unit/test_precondition_engine/test_precondition_engine.cpp"
+        ],
+        "entry_type": "decision",
+        "text": "Set `MAX_PRECONDITIONS = 16` and `MAX_EDGES_PER_PRECONDITION = 8`."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-845afbd3",
+      "dossier_scope": "modules",
+      "timestamp": "2026-08-23T12:05:42+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "modules/PreconditionEngine/PreconditionEngine.hpp",
+          "test/test_unit/test_precondition_engine/test_precondition_engine.cpp"
+        ],
+        "entry_type": "decision",
+        "text": "In the test suite, directly `#include \"modules/PreconditionEngine/PreconditionEngine.cpp\"` to bypass PlatformIO's Library Dependency Finder not compiling the module by default for unit tests."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-baf43b71",
+      "dossier_scope": "modules",
+      "timestamp": "2026-08-23T12:05:42+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "modules/PreconditionEngine/PreconditionEngine.hpp",
+          "test/test_unit/test_precondition_engine/test_precondition_engine.cpp"
+        ],
+        "entry_type": "decision",
+        "text": "Used `std::pow(0.5f, elapsedSec / halfLifeSec)` in `PreconditionEngine.cpp` for accurate fractional exponential decay."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-258ab8e2",
+      "dossier_scope": "modules",
+      "timestamp": "2026-08-23T12:05:42+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "modules/PreconditionEngine/PreconditionEngine.hpp",
+          "test/test_unit/test_precondition_engine/test_precondition_engine.cpp"
+        ],
+        "entry_type": "ruled-out",
+        "text": "When building tests, the macOS sandbox blocked PlatformIO from finding `~/.platformio` toolchains, requiring the test to be run with `--gtest_filter` in the shell outside the sandbox to see compilation errors."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-93a32691",
+      "dossier_scope": "modules",
+      "timestamp": "2026-08-23T12:05:42+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "modules/PreconditionEngine/PreconditionEngine.hpp",
+          "test/test_unit/test_precondition_engine/test_precondition_engine.cpp"
+        ],
+        "entry_type": "ruled-out",
+        "text": "Testing the `Damping` mechanism with large `nowMs` jumps caused the penalty precision to fail; tests were updated to use more frequent `tick()` intervals to simulate the passage of time accurately."
+      }
+    }
+  ],
+  "created_at": "2026-08-23T11:05:42Z",
+  "batch_id": "01M0Q4RDVG5QBP734BPY6YDD8M"
+}

@@ -1,0 +1,49 @@
+{
+  "version": 1,
+  "ops": [
+    {
+      "type": "add",
+      "entry_id": "seed-4380bdce",
+      "dossier_scope": "include",
+      "timestamp": "2026-08-23T12:35:14+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "include/events/PreconditionHealthPayload.hpp"
+        ],
+        "entry_type": "decision",
+        "text": "Used Python-based find/replace scripts to safely navigate complex, multi-line C++ file surgeries during execution."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-4d1d9b0a",
+      "dossier_scope": "include",
+      "timestamp": "2026-08-23T12:35:14+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "include/events/PreconditionHealthPayload.hpp"
+        ],
+        "entry_type": "decision",
+        "text": "Completely `DISABLED_` legacy test cases reliant upon `DataManagerGatingTest` asserting that the app suppressed fetching when `setAppRunning(false)`, as `DataManager`'s standalone fetching behavior had been modified."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-93b450e6",
+      "dossier_scope": "include",
+      "timestamp": "2026-08-23T12:35:14+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "include/events/PreconditionHealthPayload.hpp"
+        ],
+        "entry_type": "ruled-out",
+        "text": "Encountered a short detour where `TaskHandle_t _workerTask` was mistakenly removed from `DataManager.hpp` during refactoring, bringing down a batch of unit tests. It was quickly diagnosed and reverted."
+      }
+    }
+  ],
+  "created_at": "2026-08-23T11:35:14Z",
+  "batch_id": "01M0Q6EGAG8YT10J0D92FW6216"
+}

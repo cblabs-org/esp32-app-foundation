@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "ops": [
+    {
+      "type": "add",
+      "entry_id": "seed-4c3e5026",
+      "dossier_scope": "lib",
+      "timestamp": "2026-08-17T14:07:13+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "lib/DeepStackExecutor",
+          "library.json",
+          "test/test_unit/test_deepStackExecutor/test_deepStackExecutor.cpp"
+        ],
+        "entry_type": "decision",
+        "text": "Used `#ifndef UNIT_TEST` stubs for native environment, removing the need to add `DeepStackExecutor` to `lib_ignore`."
+      }
+    }
+  ],
+  "created_at": "2026-08-17T13:07:13Z",
+  "batch_id": "01M07XAKZ8N5VA4MRD2NZXKFCF"
+}

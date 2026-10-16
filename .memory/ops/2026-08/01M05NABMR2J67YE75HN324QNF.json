@@ -1,0 +1,49 @@
+{
+  "version": 1,
+  "ops": [
+    {
+      "type": "add",
+      "entry_id": "seed-1884e514",
+      "dossier_scope": "scripts",
+      "timestamp": "2026-08-16T17:08:47+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "scripts/portalBuilder.py"
+        ],
+        "entry_type": "decision",
+        "text": "Helper is a free function in a new lightweight header (pre-agreed), not a"
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-1584e01d",
+      "dossier_scope": "scripts",
+      "timestamp": "2026-08-16T17:08:47+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "scripts/portalBuilder.py"
+        ],
+        "entry_type": "ruled-out",
+        "text": "Worker (sonnet) repeatedly parked itself while long first-time ESP-IDF builds"
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-2e367d70",
+      "dossier_scope": "scripts",
+      "timestamp": "2026-08-16T17:08:47+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "scripts/portalBuilder.py"
+        ],
+        "entry_type": "open-issue",
+        "text": "**Shared output dir (`include/portal_assets/`) is cross-consumer global.**"
+      }
+    }
+  ],
+  "created_at": "2026-08-16T16:08:47Z",
+  "batch_id": "01M05NABMR2J67YE75HN324QNF"
+}

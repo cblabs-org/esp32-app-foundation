@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "ops": [
+    {
+      "type": "add",
+      "entry_id": "seed-e435855c",
+      "dossier_scope": "modules",
+      "timestamp": "2026-08-29T18:33:57+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "modules/DataManager/DataManager.hpp",
+          "modules/DataManager/DataManager.cpp"
+        ],
+        "entry_type": "decision",
+        "text": "Replaced stack allocation with member variable storage on `DataManager` instance per Issue #175 resolution instructions."
+      }
+    }
+  ],
+  "created_at": "2026-08-29T17:33:57Z",
+  "batch_id": "01M179BMW8N6NTKG6K1YPD2P4E"
+}

@@ -1,0 +1,196 @@
+{
+  "version": 1,
+  "ops": [
+    {
+      "type": "add",
+      "entry_id": "seed-5b4dbc71",
+      "dossier_scope": "test/test-unit/test-bleManager",
+      "timestamp": "2026-09-24T21:07:53+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "modules/BLEManager/BLEQueueMessage.hpp",
+          "modules/BLEManager/BLERoutingTable.hpp",
+          "modules/BLEManager/BLEAdvertisingDecision.hpp",
+          "modules/BLEManager/BLEStack.hpp",
+          "modules/BLEManager/BLEStack.cpp",
+          "modules/BLEManager/BLEManager.hpp",
+          "modules/BLEManager/BLEManager.cpp",
+          "modules/BLEManager/README.md",
+          "sample-app/src/ble/SampleFtmsProvider.hpp",
+          "sample-app/src/ble/SampleHrRepeater.hpp",
+          "sample-app/src/main.cpp",
+          "test/test_unit/test_bleManager/test_bleRouting.cpp",
+          "test/test_unit/test_bleManager/test_bleAdvertisingDecision.cpp",
+          "test/test_unit/test_bleManager/test_bleManager.cpp"
+        ],
+        "entry_type": "decision",
+        "text": "**Header Isolation \u0026 Private Member Access**: `BLEManager.cpp` and all public headers remain completely free of `\u003cNimBLE*.h\u003e` includes (D6). In `esp-nimble-cpp` v2, `NimBLEServer::m_svcVec` is private without a public vector getter; rather than hacking headers or leaking stack abstractions, standard C++ template friend instantiation (`template struct Rob\u003c...\u003e`) was used in `BLEStack.cpp` to safely access `m_svcVec` at zero runtime cost."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-e5d38d4e",
+      "dossier_scope": "test/test-unit/test-bleManager",
+      "timestamp": "2026-09-24T21:07:53+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "modules/BLEManager/BLEQueueMessage.hpp",
+          "modules/BLEManager/BLERoutingTable.hpp",
+          "modules/BLEManager/BLEAdvertisingDecision.hpp",
+          "modules/BLEManager/BLEStack.hpp",
+          "modules/BLEManager/BLEStack.cpp",
+          "modules/BLEManager/BLEManager.hpp",
+          "modules/BLEManager/BLEManager.cpp",
+          "modules/BLEManager/README.md",
+          "sample-app/src/ble/SampleFtmsProvider.hpp",
+          "sample-app/src/ble/SampleHrRepeater.hpp",
+          "sample-app/src/main.cpp",
+          "test/test_unit/test_bleManager/test_bleRouting.cpp",
+          "test/test_unit/test_bleManager/test_bleAdvertisingDecision.cpp",
+          "test/test_unit/test_bleManager/test_bleManager.cpp"
+        ],
+        "entry_type": "decision",
+        "text": "**Application Decoupling**: Avoided including `modules/Application/Application.hpp` inside `BLEManager.cpp` to prevent circular LDF dependency chains pulling `MCPServer` into native test runs. Declared only the minimal non-virtual interface needed (`getState()` and `getEventBus()`)."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-71ac6ee1",
+      "dossier_scope": "test/test-unit/test-bleManager",
+      "timestamp": "2026-09-24T21:07:53+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "modules/BLEManager/BLEQueueMessage.hpp",
+          "modules/BLEManager/BLERoutingTable.hpp",
+          "modules/BLEManager/BLEAdvertisingDecision.hpp",
+          "modules/BLEManager/BLEStack.hpp",
+          "modules/BLEManager/BLEStack.cpp",
+          "modules/BLEManager/BLEManager.hpp",
+          "modules/BLEManager/BLEManager.cpp",
+          "modules/BLEManager/README.md",
+          "sample-app/src/ble/SampleFtmsProvider.hpp",
+          "sample-app/src/ble/SampleHrRepeater.hpp",
+          "sample-app/src/main.cpp",
+          "test/test_unit/test_bleManager/test_bleRouting.cpp",
+          "test/test_unit/test_bleManager/test_bleAdvertisingDecision.cpp",
+          "test/test_unit/test_bleManager/test_bleManager.cpp"
+        ],
+        "entry_type": "decision",
+        "text": "**Queue Event Dispatching**: Followed the bounded processing pattern from `ButtonModule`, processing up to 16 queue events per `tick()` to maintain predictable frame timing without starving other modules."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-95f3a0f3",
+      "dossier_scope": "test/test-unit/test-bleManager",
+      "timestamp": "2026-09-24T21:07:53+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "modules/BLEManager/BLEQueueMessage.hpp",
+          "modules/BLEManager/BLERoutingTable.hpp",
+          "modules/BLEManager/BLEAdvertisingDecision.hpp",
+          "modules/BLEManager/BLEStack.hpp",
+          "modules/BLEManager/BLEStack.cpp",
+          "modules/BLEManager/BLEManager.hpp",
+          "modules/BLEManager/BLEManager.cpp",
+          "modules/BLEManager/README.md",
+          "sample-app/src/ble/SampleFtmsProvider.hpp",
+          "sample-app/src/ble/SampleHrRepeater.hpp",
+          "sample-app/src/main.cpp",
+          "test/test_unit/test_bleManager/test_bleRouting.cpp",
+          "test/test_unit/test_bleManager/test_bleAdvertisingDecision.cpp",
+          "test/test_unit/test_bleManager/test_bleManager.cpp"
+        ],
+        "entry_type": "ruled-out",
+        "text": "**`NimBLEServer::getServices()`**: In `esp-nimble-cpp` v2, `NimBLEClient` has `getServices()` but `NimBLEServer` does not. Attempting to call `_server-\u003egetServices()` fails compilation. Use `getServerServices(_server)` via `Rob` accessor in `BLEStack.cpp`."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-7bbef916",
+      "dossier_scope": "test/test-unit/test-bleManager",
+      "timestamp": "2026-09-24T21:07:53+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "modules/BLEManager/BLEQueueMessage.hpp",
+          "modules/BLEManager/BLERoutingTable.hpp",
+          "modules/BLEManager/BLEAdvertisingDecision.hpp",
+          "modules/BLEManager/BLEStack.hpp",
+          "modules/BLEManager/BLEStack.cpp",
+          "modules/BLEManager/BLEManager.hpp",
+          "modules/BLEManager/BLEManager.cpp",
+          "modules/BLEManager/README.md",
+          "sample-app/src/ble/SampleFtmsProvider.hpp",
+          "sample-app/src/ble/SampleHrRepeater.hpp",
+          "sample-app/src/main.cpp",
+          "test/test_unit/test_bleManager/test_bleRouting.cpp",
+          "test/test_unit/test_bleManager/test_bleAdvertisingDecision.cpp",
+          "test/test_unit/test_bleManager/test_bleManager.cpp"
+        ],
+        "entry_type": "ruled-out",
+        "text": "**`ble_svc_gap_ppcp_set()`**: GAP PPCP is not set via a runtime C API function in NimBLE ESP-IDF; it is configured via Mynewt syscfg and advertising parameters (`pAdv-\u003esetPreferredParams()`)."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-a9fdef8b",
+      "dossier_scope": "test/test-unit/test-bleManager",
+      "timestamp": "2026-09-24T21:07:53+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "modules/BLEManager/BLEQueueMessage.hpp",
+          "modules/BLEManager/BLERoutingTable.hpp",
+          "modules/BLEManager/BLEAdvertisingDecision.hpp",
+          "modules/BLEManager/BLEStack.hpp",
+          "modules/BLEManager/BLEStack.cpp",
+          "modules/BLEManager/BLEManager.hpp",
+          "modules/BLEManager/BLEManager.cpp",
+          "modules/BLEManager/README.md",
+          "sample-app/src/ble/SampleFtmsProvider.hpp",
+          "sample-app/src/ble/SampleHrRepeater.hpp",
+          "sample-app/src/main.cpp",
+          "test/test_unit/test_bleManager/test_bleRouting.cpp",
+          "test/test_unit/test_bleManager/test_bleAdvertisingDecision.cpp",
+          "test/test_unit/test_bleManager/test_bleManager.cpp"
+        ],
+        "entry_type": "ruled-out",
+        "text": "**`library.json` Dependency on Application**: Adding `\"Application\": \"*\"` to `BLEManager/library.json` causes PlatformIO's LDF in native test environments to transitively pull `MCPServer`, which fails on native without `WifiManager.hpp`. `BLEManager` must not declare `Application` in `library.json`."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-651da57f",
+      "dossier_scope": "test/test-unit/test-bleManager",
+      "timestamp": "2026-09-24T21:07:53+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "modules/BLEManager/BLEQueueMessage.hpp",
+          "modules/BLEManager/BLERoutingTable.hpp",
+          "modules/BLEManager/BLEAdvertisingDecision.hpp",
+          "modules/BLEManager/BLEStack.hpp",
+          "modules/BLEManager/BLEStack.cpp",
+          "modules/BLEManager/BLEManager.hpp",
+          "modules/BLEManager/BLEManager.cpp",
+          "modules/BLEManager/README.md",
+          "sample-app/src/ble/SampleFtmsProvider.hpp",
+          "sample-app/src/ble/SampleHrRepeater.hpp",
+          "sample-app/src/main.cpp",
+          "test/test_unit/test_bleManager/test_bleRouting.cpp",
+          "test/test_unit/test_bleManager/test_bleAdvertisingDecision.cpp",
+          "test/test_unit/test_bleManager/test_bleManager.cpp"
+        ],
+        "entry_type": "open-issue",
+        "text": "`test_unit/test_lvgl_stubs` fails compilation on native environment due to missing `ConfigManager.hpp` / `WifiManager.hpp` in its include search path when compiling `MCPServer`."
+      }
+    }
+  ],
+  "created_at": "2026-09-24T20:07:53Z",
+  "batch_id": "01M3AGG6D8C392JCD03ZT0H1J8"
+}

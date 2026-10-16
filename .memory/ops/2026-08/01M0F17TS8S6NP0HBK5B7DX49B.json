@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "ops": [
+    {
+      "type": "add",
+      "entry_id": "seed-5db143f2",
+      "dossier_scope": "root",
+      "timestamp": "2026-08-20T08:30:17+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": null,
+        "entry_type": "decision",
+        "text": "**Chose the simpler approach** (volatile `_fetchStartMs` + post-fetch WDT reset) over the `esp_timer` feeder. Rationale: no `esp_timer` stub needed for native tests, less code surface, and the WO explicitly sanctions the watchdog firing on genuinely infinite hangs as the correct outcome. The key invariant — task stays subscribed to TWDT at all times — is preserved."
+      }
+    }
+  ],
+  "created_at": "2026-08-20T07:30:17Z",
+  "batch_id": "01M0F17TS8S6NP0HBK5B7DX49B"
+}

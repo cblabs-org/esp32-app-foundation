@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "ops": [
+    {
+      "type": "add",
+      "entry_id": "seed-ed1d79bb",
+      "dossier_scope": "modules",
+      "timestamp": "2026-08-12T12:48:44+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "modules/ButtonModule/ButtonConfig.h",
+          "modules/EncoderModule/EncoderConfig.h",
+          "platformio.ini"
+        ],
+        "entry_type": "ruled-out",
+        "text": "Initial include path iteration using `modules/ButtonModule/` prefix was revised to `ButtonModule/` per PA directive. Adding `-I modules` to `platformio.ini` was required to allow `ButtonModule/Header.h` resolution."
+      }
+    }
+  ],
+  "created_at": "2026-08-12T11:48:44Z",
+  "batch_id": "01KZTWVAB0ESW7P25CRMND89FZ"
+}

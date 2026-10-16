@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "ops": [
+    {
+      "type": "add",
+      "entry_id": "seed-5182479b",
+      "dossier_scope": "root",
+      "timestamp": "2026-08-20T08:30:17+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": null,
+        "entry_type": "decision",
+        "text": "Used `ESP_LOGI` (ESP-IDF logging) instead of `Log.infoln` (ArduinoLog) from WO template — entire codebase uses `ESP_LOGI` consistently."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-ffcf22c1",
+      "dossier_scope": "root",
+      "timestamp": "2026-08-20T08:30:17+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": null,
+        "entry_type": "decision",
+        "text": "Used `xTaskGetHandle(\"httpd\")` with null-check rather than caching the handle — the httpd task is created internally by PsychicHttp/ESP-IDF, so the handle isn't available at `begin()` time. The lookup is lightweight and only runs once per 60s or once on first request."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-feff1525",
+      "dossier_scope": "root",
+      "timestamp": "2026-08-20T08:30:17+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": null,
+        "entry_type": "decision",
+        "text": "Static variables for cadence tracking (`lastHwmLogMs`, `hwmLogged`) — matches the DataManager pattern and is safe since `tick()` runs on the main loop task."
+      }
+    }
+  ],
+  "created_at": "2026-08-20T07:30:17Z",
+  "batch_id": "01M0F17TS8S6NP0HBK5F56XPTJ"
+}

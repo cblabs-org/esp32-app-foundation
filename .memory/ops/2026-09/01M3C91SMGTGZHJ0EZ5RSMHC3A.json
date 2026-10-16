@@ -1,0 +1,143 @@
+{
+  "version": 1,
+  "ops": [
+    {
+      "type": "add",
+      "entry_id": "seed-4c883f50",
+      "dossier_scope": "test/test-unit/test-bleManager",
+      "timestamp": "2026-09-25T13:36:10+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "modules/BLEManager/BLEStack.cpp",
+          "modules/BLEManager/BLEQueueMessage.hpp",
+          "modules/BLEManager/BLEManager.cpp",
+          "test/test_unit/test_bleManager/test_bleManager.cpp"
+        ],
+        "entry_type": "decision",
+        "text": "Chose to erase the `s_clients` entry *before* `disconnect()`/`deleteClient()` in `executeCentralForget()` (WORKORDER allowed either order — \"before or together with\"). Erasing first is strictly safer: it closes the (currently theoretical, single-threaded-worker-task) window where a re-entrant call could look up the map while the pointer is being torn down."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-e74ecaaa",
+      "dossier_scope": "test/test-unit/test-bleManager",
+      "timestamp": "2026-09-25T13:36:10+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "modules/BLEManager/BLEStack.cpp",
+          "modules/BLEManager/BLEQueueMessage.hpp",
+          "modules/BLEManager/BLEManager.cpp",
+          "test/test_unit/test_bleManager/test_bleManager.cpp"
+        ],
+        "entry_type": "decision",
+        "text": "Reset `scanCB.targetUuidCount = 0` unconditionally at the top of `executeDiscovery()` before the `if (provider)` check, so a discovery started with a null provider (defensive case) or one whose provider returns 0 UUIDs correctly clears any stale filter left by a previous discovery's provider — `ScanCallbacks` is a function-local `static`, so its state persists across calls."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-16d7deb9",
+      "dossier_scope": "test/test-unit/test-bleManager",
+      "timestamp": "2026-09-25T13:36:10+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "modules/BLEManager/BLEStack.cpp",
+          "modules/BLEManager/BLEQueueMessage.hpp",
+          "modules/BLEManager/BLEManager.cpp",
+          "test/test_unit/test_bleManager/test_bleManager.cpp"
+        ],
+        "entry_type": "decision",
+        "text": "`postCentralConnectFailure()` takes `hostEventQueue` explicitly (not just relying on the file-static `s_hostQueue`) to keep it a pure, independently testable-in-principle helper and to mirror the existing call sites, which all had `opts.hostEventQueue` in scope."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-af2d37ee",
+      "dossier_scope": "test/test-unit/test-bleManager",
+      "timestamp": "2026-09-25T13:36:10+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "modules/BLEManager/BLEStack.cpp",
+          "modules/BLEManager/BLEQueueMessage.hpp",
+          "modules/BLEManager/BLEManager.cpp",
+          "test/test_unit/test_bleManager/test_bleManager.cpp"
+        ],
+        "entry_type": "ruled-out",
+        "text": "Did **not** add advertised service-UUID list, appearance, or connectable-flag plumbing to `BLEQueueMessage`/`ScanResult` beyond RSSI. The WORKORDER marked these optional (\"if that's cheap\"). I could not find a way to verify the exact `NimBLEAdvertisedDevice` accessor signatures (e.g. `getServiceUUID(index)`, `haveAppearance()`/`getAppearance()`, a connectable-flag getter) against the vendored esp-nimble-cpp 2.5.0 headers from within this worktree before compiling — the headers are fetched into `~/.platformio` only during the actual PlatformIO build, and I did not want to guess unverified API signatures for a field the WORKORDER marked optional, especially with the `isAdvertisingService(NimBLEUUID)` filtering already the highest-value/required part of R8. The `esp32s3nano_ble` build (which does have access to the real headers) compiled cleanly with just the `rssi` field and the `isAdvertisingService()` filter call, confirming those two calls are correct against the real API; the additional optional fields remain a follow-up if wanted."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-2da19a68",
+      "dossier_scope": "test/test-unit/test-bleManager",
+      "timestamp": "2026-09-25T13:36:10+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "modules/BLEManager/BLEStack.cpp",
+          "modules/BLEManager/BLEQueueMessage.hpp",
+          "modules/BLEManager/BLEManager.cpp",
+          "test/test_unit/test_bleManager/test_bleManager.cpp"
+        ],
+        "entry_type": "ruled-out",
+        "text": "Native tests cannot exercise the NimBLE-dependent code in `BLEStack.cpp` (client-lifecycle reuse, `isAdvertisingService()` filtering) at all — that file's real logic only compiles under `#if defined(ESP_PLATFORM) \u0026\u0026 defined(WITH_BLE)`. The new native test (`ScanResultCarriesRssi`) only covers the reachable-natively part: `BLEManager::dispatchQueueEvents()`'s `ScanResult` case correctly copying `msg.rssi` into the stored `BLEScanResult`. The `s_clients` use-after-free fix and the `isAdvertisingService()` filter were verified only by (a) code reading/self-review against the WORKORDER's exact description of the defect, and (b) the `esp32s3nano_ble` hardware build compiling cleanly with no new warnings in `modules/BLEManager/*`. No on-hardware or emulated central-connect test was run (none exists in this codebase's native harness, and flashing is out of scope for this WO)."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-153fbb15",
+      "dossier_scope": "test/test-unit/test-bleManager",
+      "timestamp": "2026-09-25T13:36:10+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "modules/BLEManager/BLEStack.cpp",
+          "modules/BLEManager/BLEQueueMessage.hpp",
+          "modules/BLEManager/BLEManager.cpp",
+          "test/test_unit/test_bleManager/test_bleManager.cpp"
+        ],
+        "entry_type": "ruled-out",
+        "text": "Native `pio test -e native` (full suite, no filter) shows two `ERRORED` environments: `test_unit/test_lvglDisplay` and `test_unit/test_lvgl_stubs`. Both fail during the *build* stage with `fatal error: 'portal_assets/hardware_js.hpp' file not found` (and, for `test_lvgl_stubs`, additionally `'ConfigManager.hpp' file not found` / `'WifiManager.hpp' file not found` — an LDF dependency-resolution gap for that specific test target). Neither touches any file in this WO's Strict Boundary Box (`git diff --stat` confirms only `BLEManager.cpp`, `BLEQueueMessage.hpp`, `BLEStack.cpp`, and the one test file changed); `portal_assets/hardware_js.hpp` is a generated web-portal asset header unrelated to BLE. The WORKORDER's Verification Requirement §2 expected only `test_lvgl_stubs` to be a pre-existing failure; in this worktree `test_lvglDisplay` is *also* pre-existing-broken for the same root cause (missing generated portal asset), not something introduced by this WO. Flagged under Out-of-Scope Findings below rather than fixed."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-3340f7cc",
+      "dossier_scope": "test/test-unit/test-bleManager",
+      "timestamp": "2026-09-25T13:36:10+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "modules/BLEManager/BLEStack.cpp",
+          "modules/BLEManager/BLEQueueMessage.hpp",
+          "modules/BLEManager/BLEManager.cpp",
+          "test/test_unit/test_bleManager/test_bleManager.cpp"
+        ],
+        "entry_type": "open-issue",
+        "text": "`test_unit/test_lvglDisplay` fails to build natively (`portal_assets/hardware_js.hpp` not found), in addition to the already-known `test_unit/test_lvgl_stubs` native build failure (`portal_assets/hardware_js.hpp` plus `ConfigManager.hpp`/`WifiManager.hpp` not found for that target's LDF resolution). Both look like a missing pre-build codegen step (the portal-assets header generator) not running before `pio test -e native`, or an LDF library-dependency gap for those two test targets specifically. Not part of BLEManager and not touched by WO-8; worth a follow-up WO/issue so `pio test -e native` (unfiltered) is fully green again."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-cfdbcb9c",
+      "dossier_scope": "test/test-unit/test-bleManager",
+      "timestamp": "2026-09-25T13:36:10+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "modules/BLEManager/BLEStack.cpp",
+          "modules/BLEManager/BLEQueueMessage.hpp",
+          "modules/BLEManager/BLEManager.cpp",
+          "test/test_unit/test_bleManager/test_bleManager.cpp"
+        ],
+        "entry_type": "open-issue",
+        "text": "Not a defect, but noted for WO-9: `BLEManager::executeCentralDisconnect()`'s caller path and `_clientConnecting[pid]` bookkeeping around repeated failed connects were read but not touched — WO-9 owns `BLEManager.cpp` locking/`forget()`/persistence/`tick()`, and I stayed out of it per the Strict Boundary Box."
+      }
+    }
+  ],
+  "created_at": "2026-09-25T12:36:10Z",
+  "batch_id": "01M3C91SMGTGZHJ0EZ5RSMHC3A"
+}

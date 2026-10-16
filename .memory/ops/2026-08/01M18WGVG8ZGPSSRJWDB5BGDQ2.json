@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "ops": [
+    {
+      "type": "add",
+      "entry_id": "seed-3ba3a2f8",
+      "dossier_scope": "lib/Redactor",
+      "timestamp": "2026-08-30T09:28:05+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "lib/Redactor/Redactor.h",
+          "lib/Redactor/Redactor.cpp",
+          "lib/Redactor/library.json",
+          "test/test_unit/test_redactor/test_redactor.cpp"
+        ],
+        "entry_type": "decision",
+        "text": "Added defensive check in `Redactor::redact` for null pointer and zero buffer size to prevent underflow."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-b18e1ee7",
+      "dossier_scope": "lib/Redactor",
+      "timestamp": "2026-08-30T09:28:05+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "lib/Redactor/Redactor.h",
+          "lib/Redactor/Redactor.cpp",
+          "lib/Redactor/library.json",
+          "test/test_unit/test_redactor/test_redactor.cpp"
+        ],
+        "entry_type": "decision",
+        "text": "Retained Logger shims with identical signatures for backward compatibility across existing call sites."
+      }
+    }
+  ],
+  "created_at": "2026-08-30T08:28:05Z",
+  "batch_id": "01M18WGVG8ZGPSSRJWDB5BGDQ2"
+}

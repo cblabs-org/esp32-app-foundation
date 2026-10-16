@@ -1,0 +1,105 @@
+{
+  "version": 1,
+  "ops": [
+    {
+      "type": "add",
+      "entry_id": "seed-0916a7a6",
+      "dossier_scope": "root",
+      "timestamp": "2026-09-25T22:31:34+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "platformio.ini"
+        ],
+        "entry_type": "decision",
+        "text": "Used the provided JSON DeserializationFilter snippet for exact parsing logic."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-24bfc620",
+      "dossier_scope": "root",
+      "timestamp": "2026-09-25T22:31:34+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "platformio.ini"
+        ],
+        "entry_type": "decision",
+        "text": "Maintained thread-safety mechanisms (atomics and mutex) unchanged, simply delegating them via the interface overrides."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-7dd3d273",
+      "dossier_scope": "root",
+      "timestamp": "2026-09-25T22:31:34+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "platformio.ini"
+        ],
+        "entry_type": "ruled-out",
+        "text": "Hit an initial compilation error where `_city` was used instead of `_cityName` in the updated `fetchUpdate` string copy code. Fixed."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-baa229ad",
+      "dossier_scope": "root",
+      "timestamp": "2026-09-25T22:31:34+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "platformio.ini"
+        ],
+        "entry_type": "ruled-out",
+        "text": "Corrected an invalid status `UpdateStatus::NewData` in the provided JSON snippet to `UpdateStatus::Success` during the rewrite."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-89f259d6",
+      "dossier_scope": "root",
+      "timestamp": "2026-09-25T22:31:34+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "platformio.ini"
+        ],
+        "entry_type": "open-issue",
+        "text": "`getKeyById()` returns a plain `std::string`, which is empty on both \"not found\" and \"decryption error\" scenarios. It provides no error codes."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-fe5f5dae",
+      "dossier_scope": "root",
+      "timestamp": "2026-09-25T22:31:34+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "platformio.ini"
+        ],
+        "entry_type": "open-issue",
+        "text": "There is no direct `hasKey()` method. However, `getKeyMetadata(const char* id, KeyInfo\u0026 outInfo)` can be used to check if an entry exists before attempting decryption."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-dd624a43",
+      "dossier_scope": "root",
+      "timestamp": "2026-09-25T22:31:34+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "platformio.ini"
+        ],
+        "entry_type": "open-issue",
+        "text": "To allow consumers to distinguish \"not configured\" from \"decryption error\", `KeyManager` could either return a `std::expected\u003cstd::string, ErrorCode\u003e` / `std::optional\u003cstd::string\u003e`, or consumers could query `getKeyMetadata` first to verify existence."
+      }
+    }
+  ],
+  "created_at": "2026-09-25T21:31:34Z",
+  "batch_id": "01M3D7P4QGHT01SWM1P7H87T20"
+}

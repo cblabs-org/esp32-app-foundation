@@ -1,0 +1,61 @@
+{
+  "version": 1,
+  "ops": [
+    {
+      "type": "add",
+      "entry_id": "seed-0d94c671",
+      "dossier_scope": "modules/U8G2Display",
+      "timestamp": "2026-08-12T16:15:58+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "modules/U8G2Display/exclude_on_native.py",
+          "modules/U8G2Display/library.json",
+          "test/stubs/platform/SPI.h",
+          "hardware/native/board.h",
+          "platformio.ini"
+        ],
+        "entry_type": "decision",
+        "text": "Added `-I .pio/libdeps/native/U8g2/src` and `-I .pio/libdeps/native/U8g2/src/clib` to native `build_flags` so the real U8G2 C library headers resolve cleanly during native compilation."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-f4989b7b",
+      "dossier_scope": "modules/U8G2Display",
+      "timestamp": "2026-08-12T16:15:58+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "modules/U8G2Display/exclude_on_native.py",
+          "modules/U8G2Display/library.json",
+          "test/stubs/platform/SPI.h",
+          "hardware/native/board.h",
+          "platformio.ini"
+        ],
+        "entry_type": "decision",
+        "text": "Defined `PIN_DISPLAY_RST` / `PIN_DISPLAY_RESET` on native null board to satisfy `board_contract.h` assertions when `WITH_DISPLAY_U8G2` flag is set."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-59bd24ff",
+      "dossier_scope": "modules/U8G2Display",
+      "timestamp": "2026-08-12T16:15:58+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "modules/U8G2Display/exclude_on_native.py",
+          "modules/U8G2Display/library.json",
+          "test/stubs/platform/SPI.h",
+          "hardware/native/board.h",
+          "platformio.ini"
+        ],
+        "entry_type": "open-issue",
+        "text": "Unit tests in `test_unit/test_u8g2Display` have GoogleTest fixture compilation errors due to bit-rot; fixing these test files is scoped for WO3."
+      }
+    }
+  ],
+  "created_at": "2026-08-12T15:15:58Z",
+  "batch_id": "01KZV8PRXG7H1TQEYG7VP163FY"
+}

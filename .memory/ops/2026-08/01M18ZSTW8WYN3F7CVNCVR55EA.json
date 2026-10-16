@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "ops": [
+    {
+      "type": "add",
+      "entry_id": "seed-23707259",
+      "dossier_scope": "modules/AuditModule",
+      "timestamp": "2026-08-30T10:25:25+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "modules/AuditModule/AuditModule.hpp",
+          "modules/AuditModule/AuditModule.cpp",
+          "test/test_unit/test_audit_module/test_audit_module.cpp"
+        ],
+        "entry_type": "decision",
+        "text": "Runtime disabling writes `audit_disabled` prior to clearing `_enabled`, ensuring the disabling record itself is safely committed into the audit stream."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-50b24f5f",
+      "dossier_scope": "modules/AuditModule",
+      "timestamp": "2026-08-30T10:25:25+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "modules/AuditModule/AuditModule.hpp",
+          "modules/AuditModule/AuditModule.cpp",
+          "test/test_unit/test_audit_module/test_audit_module.cpp"
+        ],
+        "entry_type": "decision",
+        "text": "Internal events (`source == \"audit\"`) bypass the runtime enabled check in both `log()` and `auditSync()`, ensuring audit state transitions and throttling notifications are never silently lost."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-3a019bf6",
+      "dossier_scope": "modules/AuditModule",
+      "timestamp": "2026-08-30T10:25:25+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "modules/AuditModule/AuditModule.hpp",
+          "modules/AuditModule/AuditModule.cpp",
+          "test/test_unit/test_audit_module/test_audit_module.cpp"
+        ],
+        "entry_type": "decision",
+        "text": "Precondition `\"audit_health\"` is registered with `PreconditionRole::Operational` to reflect its non-blocking diagnostic role."
+      }
+    }
+  ],
+  "created_at": "2026-08-30T09:25:25Z",
+  "batch_id": "01M18ZSTW8WYN3F7CVNCVR55EA"
+}

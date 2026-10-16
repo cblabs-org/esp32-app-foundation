@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "ops": [
+    {
+      "type": "add",
+      "entry_id": "seed-55eb3724",
+      "dossier_scope": "root",
+      "timestamp": "2026-08-26T10:53:38+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": null,
+        "entry_type": "decision",
+        "text": "Replaced direct `bool`/`int` usage in `esp_task_wdt_reconfigure` (due to IDF 5.x compiler complaints about missing structs) with accurate `esp_task_wdt_config_t` structure layouts holding `FAR_OUTER_BACKSTOP_S * 1000` to avoid type mismatch compilation errors."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-70357e33",
+      "dossier_scope": "root",
+      "timestamp": "2026-08-26T10:53:38+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": null,
+        "entry_type": "decision",
+        "text": "Shifted initial `jobStart` timer assignment from `millis()` to `getCurrentTimeMs()` since the deadline context evaluates against the simulated time clock. If it had been fed a raw hardware monotonic clock, the deadlines in unit testing would trigger prematurely."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-0f52e399",
+      "dossier_scope": "root",
+      "timestamp": "2026-08-26T10:53:38+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": null,
+        "entry_type": "ruled-out",
+        "text": "Hit `[Errno 1] Operation not permitted` trying to evaluate raw commands without sandbox permissions, specifically with test routines utilizing PIO CLIs. Resolved successfully by using MCP lazy tools instead."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-9438da1c",
+      "dossier_scope": "root",
+      "timestamp": "2026-08-26T10:53:38+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": null,
+        "entry_type": "open-issue",
+        "text": "None explicitly blocking this component."
+      }
+    }
+  ],
+  "created_at": "2026-08-26T09:53:38Z",
+  "batch_id": "01M0YQTM6GX5BH1EP4MV046507"
+}

@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "ops": [
+    {
+      "type": "add",
+      "entry_id": "seed-da5bd6fb",
+      "dossier_scope": "modules/LVGLDisplay",
+      "timestamp": "2026-08-13T10:34:56+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "modules/LVGLDisplay/lv_conf.h"
+        ],
+        "entry_type": "decision",
+        "text": "OQ-3: pruned montserrat 10/28 (unreferenced across `modules/`, `src/`, `include/`) to save flash."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-e717fad0",
+      "dossier_scope": "modules/LVGLDisplay",
+      "timestamp": "2026-08-13T10:34:56+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "modules/LVGLDisplay/lv_conf.h"
+        ],
+        "entry_type": "ruled-out",
+        "text": "⚠️ **The human's SLS tweaks renamed more widgets than the raw download diff showed.** Several Error/OTA globals flipped naming form (now `ui_uiSystemErrorTitle`, `ui_uiSystemOTAStatus`, but `ui_ui_SystemOTABar/Percent/Title`). **The export is the authoritative symbol set for WO3** — WO3's mapping table (built from the pre-tweak download) is superseded; map straight from `modules/LVGLDisplay/ui/*.h`."
+      }
+    }
+  ],
+  "created_at": "2026-08-13T09:34:56Z",
+  "batch_id": "01KZX7K1G0SAEAG2EN0EWM9A27"
+}

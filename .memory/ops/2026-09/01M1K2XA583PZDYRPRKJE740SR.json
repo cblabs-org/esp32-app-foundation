@@ -1,0 +1,115 @@
+{
+  "version": 1,
+  "ops": [
+    {
+      "type": "add",
+      "entry_id": "seed-a5840402",
+      "dossier_scope": "test/stubs/platform",
+      "timestamp": "2026-09-03T08:32:09+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "platformio.ini",
+          "library.json",
+          "test/stubs/platform",
+          "test/test_unit",
+          "docs/developer/adr"
+        ],
+        "entry_type": "decision",
+        "text": "Formatted Architectural Decision Log with an explicit Status column (`Implemented`, `Superseded`, `Deferred`) for every entry D1–D54."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-bf946bdd",
+      "dossier_scope": "test/stubs/platform",
+      "timestamp": "2026-09-03T08:32:09+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "platformio.ini",
+          "library.json",
+          "test/stubs/platform",
+          "test/test_unit",
+          "docs/developer/adr"
+        ],
+        "entry_type": "decision",
+        "text": "Adopted strict Stub-Header Architecture documentation in §16, fully obsoleting `#ifndef NATIVE_BUILD` in production code and documenting `-Itest/stubs/platform`."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-10be90e2",
+      "dossier_scope": "test/stubs/platform",
+      "timestamp": "2026-09-03T08:32:09+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "platformio.ini",
+          "library.json",
+          "test/stubs/platform",
+          "test/test_unit",
+          "docs/developer/adr"
+        ],
+        "entry_type": "decision",
+        "text": "Defined the two-tier architectural decision documentation model: §17 is the summary ledger/index in the design specification; `docs/developer/adr/` contains deep ADR documents for multi-module architectural trade-offs."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-74d70437",
+      "dossier_scope": "test/stubs/platform",
+      "timestamp": "2026-09-03T08:32:09+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "platformio.ini",
+          "library.json",
+          "test/stubs/platform",
+          "test/test_unit",
+          "docs/developer/adr"
+        ],
+        "entry_type": "ruled-out",
+        "text": "Avoided substituting fresh static numbers in §14 and §16 per [PA-9]/[PA-10] — only pointers to dynamic measurement procedures were documented."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-0980777d",
+      "dossier_scope": "test/stubs/platform",
+      "timestamp": "2026-09-03T08:32:09+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "platformio.ini",
+          "library.json",
+          "test/stubs/platform",
+          "test/test_unit",
+          "docs/developer/adr"
+        ],
+        "entry_type": "ruled-out",
+        "text": "In D41, rephrased \"ESPAsyncWebServer\" to \"legacy asynchronous web server library\" so that zero occurrences of `AsyncWebServer` are found in §12–§17."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-fdf166e6",
+      "dossier_scope": "test/stubs/platform",
+      "timestamp": "2026-09-03T08:32:09+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "platformio.ini",
+          "library.json",
+          "test/stubs/platform",
+          "test/test_unit",
+          "docs/developer/adr"
+        ],
+        "entry_type": "open-issue",
+        "text": "`docs/design_specification.md` still contains isolated mentions of `AsyncWebServer` (line 1623 in §9) and `NATIVE_BUILD` (lines 227, 1589, 1889 in §2, §8, §11A), which belong to sections outside WO5's boundary box (§12–§17). These should be cleaned up during their respective work orders or in a final cleanup pass."
+      }
+    }
+  ],
+  "created_at": "2026-09-03T07:32:09Z",
+  "batch_id": "01M1K2XA583PZDYRPRKJE740SR"
+}

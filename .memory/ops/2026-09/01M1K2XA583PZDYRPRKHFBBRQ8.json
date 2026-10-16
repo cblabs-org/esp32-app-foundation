@@ -1,0 +1,67 @@
+{
+  "version": 1,
+  "ops": [
+    {
+      "type": "add",
+      "entry_id": "seed-d3b52309",
+      "dossier_scope": "docs",
+      "timestamp": "2026-09-03T08:32:09+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "docs/design_specification.md",
+          "lib/ConfigManifest"
+        ],
+        "entry_type": "decision",
+        "text": "Confined all specification changes strictly to §7–§11A (lines 1085–2061, 978 lines). §1–§6, §12–§17, source code, and agent skills remained completely untouched."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-c08dbb93",
+      "dossier_scope": "docs",
+      "timestamp": "2026-09-03T08:32:09+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "docs/design_specification.md",
+          "lib/ConfigManifest"
+        ],
+        "entry_type": "decision",
+        "text": "Cleanly separated historical design rationale (`docs/design/config-gate.md`) from normative technical specification (§8/§9)."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-fded3dff",
+      "dossier_scope": "docs",
+      "timestamp": "2026-09-03T08:32:09+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "docs/design_specification.md",
+          "lib/ConfigManifest"
+        ],
+        "entry_type": "decision",
+        "text": "Documented `markAppValid()` as explicitly delegated to the downstream application rather than called during the boot sequence."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-97e5ccc8",
+      "dossier_scope": "docs",
+      "timestamp": "2026-09-03T08:32:09+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "docs/design_specification.md",
+          "lib/ConfigManifest"
+        ],
+        "entry_type": "open-issue",
+        "text": "Lines 2092, 2107, 2155, 3341, 3343 in §12 and §17 still reference `AsyncWebServer` and legacy `AppState` values; these will be addressed in Work Order 5 (§12–§17)."
+      }
+    }
+  ],
+  "created_at": "2026-09-03T07:32:09Z",
+  "batch_id": "01M1K2XA583PZDYRPRKHFBBRQ8"
+}

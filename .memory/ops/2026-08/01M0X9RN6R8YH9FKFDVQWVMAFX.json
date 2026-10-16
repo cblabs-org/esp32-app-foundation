@@ -1,0 +1,45 @@
+{
+  "version": 1,
+  "ops": [
+    {
+      "type": "add",
+      "entry_id": "seed-97aa86b7",
+      "dossier_scope": "include/interfaces",
+      "timestamp": "2026-08-25T21:28:39+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "include/interfaces/IPreconditionRegistry.hpp",
+          "include/interfaces/ITabRegistry.hpp",
+          "include/interfaces/IPreconditionContributor.hpp",
+          "include/interfaces/IWebContributor.hpp",
+          "modules/PreconditionEngine/PreconditionEngine.hpp",
+          "include/AppFoundation.h"
+        ],
+        "entry_type": "decision",
+        "text": "Maintained `struct TabEntry` inside `include/interfaces/ITabRegistry.hpp` without an `I` prefix since it is a plain data struct (POD) rather than a pure virtual interface."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-a8121254",
+      "dossier_scope": "include/interfaces",
+      "timestamp": "2026-08-25T21:28:39+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "include/interfaces/IPreconditionRegistry.hpp",
+          "include/interfaces/ITabRegistry.hpp",
+          "include/interfaces/IPreconditionContributor.hpp",
+          "include/interfaces/IWebContributor.hpp",
+          "modules/PreconditionEngine/PreconditionEngine.hpp",
+          "include/AppFoundation.h"
+        ],
+        "entry_type": "decision",
+        "text": "Added `IPreconditionRegistry.hpp` and `ITabRegistry.hpp` to `include/AppFoundation.h` so consumer applications importing the single façade header have full type visibility for registration signatures."
+      }
+    }
+  ],
+  "created_at": "2026-08-25T20:28:39Z",
+  "batch_id": "01M0X9RN6R8YH9FKFDVQWVMAFX"
+}

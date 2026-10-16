@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "ops": [
+    {
+      "type": "add",
+      "entry_id": "seed-f117ca95",
+      "dossier_scope": "root",
+      "timestamp": "2026-08-13T10:34:56+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": null,
+        "entry_type": "decision",
+        "text": "Screen-load guard `scr != lv_screen_active()`: the provider's factory methods toggle visibility groups in place on the single System screen, so the fade animation runs only on first entry; group/text still update every re-publish (factory + `onConfiguring` run unconditionally)."
+      }
+    }
+  ],
+  "created_at": "2026-08-13T09:34:56Z",
+  "batch_id": "01KZX7K1G0SAEAG2EN0N15WRVG"
+}

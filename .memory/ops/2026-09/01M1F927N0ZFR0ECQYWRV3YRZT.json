@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "ops": [
+    {
+      "type": "add",
+      "entry_id": "seed-7d8ff9ad",
+      "dossier_scope": "lib/LogPipeline",
+      "timestamp": "2026-09-01T21:02:44+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "lib/LogPipeline/LogPipeline.h",
+          "lib/LogPipeline/LogPipeline.cpp",
+          "lib/LogPipeline/library.json",
+          "test/stubs/platform/esp_log.h",
+          "modules/Application/Application.cpp"
+        ],
+        "entry_type": "decision",
+        "text": "Stored native stubs in `test/stubs/platform/esp_log.h` (the platform stub header on the native include path) rather than modifying `include/platform/LogShim.h`, maintaining the clean `#include \"esp_log.h\"` forwarding in `LogShim.h`."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-eaf44e3f",
+      "dossier_scope": "lib/LogPipeline",
+      "timestamp": "2026-09-01T21:02:44+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "lib/LogPipeline/LogPipeline.h",
+          "lib/LogPipeline/LogPipeline.cpp",
+          "lib/LogPipeline/library.json",
+          "test/stubs/platform/esp_log.h",
+          "modules/Application/Application.cpp"
+        ],
+        "entry_type": "decision",
+        "text": "Set 2 KB static buffer (`s_formatBuf`) in `.bss` as designed to zero stack and heap overhead during log formatting."
+      }
+    }
+  ],
+  "created_at": "2026-09-01T20:02:44Z",
+  "batch_id": "01M1F927N0ZFR0ECQYWRV3YRZT"
+}

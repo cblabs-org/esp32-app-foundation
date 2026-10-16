@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "ops": [
+    {
+      "type": "add",
+      "entry_id": "seed-ae4a818b",
+      "dossier_scope": "lib/LogPipeline",
+      "timestamp": "2026-09-01T21:17:30+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "lib/LogPipeline",
+          "lib/Redactor"
+        ],
+        "entry_type": "decision",
+        "text": "Replaced all historical mentions of `Logger` and `LogRouter` with `LogPipeline` and `Redactor` across living documentation."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-116dece8",
+      "dossier_scope": "lib/LogPipeline",
+      "timestamp": "2026-09-01T21:17:30+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "lib/LogPipeline",
+          "lib/Redactor"
+        ],
+        "entry_type": "decision",
+        "text": "Explicitly documented the deferred status and architectural reasoning for `ILogSink` and RAM ring buffer in §11A.5, §11A.6, D29, and D30."
+      }
+    }
+  ],
+  "created_at": "2026-09-01T20:17:30Z",
+  "batch_id": "01M1F9X8WG14Q4K36T589A94G5"
+}

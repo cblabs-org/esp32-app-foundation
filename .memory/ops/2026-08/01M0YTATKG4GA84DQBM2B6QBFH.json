@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "ops": [
+    {
+      "type": "add",
+      "entry_id": "seed-fd2b7a4a",
+      "dossier_scope": "docs/developer",
+      "timestamp": "2026-08-26T11:37:26+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "docs/developer/scheduling-data-fetches.md",
+          "docs/developer/README.md"
+        ],
+        "entry_type": "decision",
+        "text": "Updated existing `scheduling-data-fetches.md` and `docs/developer/README.md` to ensure cross-document consistency and discoverability for downstream developers."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-fbd32dcf",
+      "dossier_scope": "docs/developer",
+      "timestamp": "2026-08-26T11:37:26+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "docs/developer/scheduling-data-fetches.md",
+          "docs/developer/README.md"
+        ],
+        "entry_type": "decision",
+        "text": "Documented both `std::function\u003cvoid(const FetchContext\u0026)\u003e` signature change for `queueDataJob` and `fetchesWhileConfiguring()` opt-in method on `IDataSource`."
+      }
+    }
+  ],
+  "created_at": "2026-08-26T10:37:26Z",
+  "batch_id": "01M0YTATKG4GA84DQBM2B6QBFH"
+}
