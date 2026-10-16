@@ -637,7 +637,14 @@ bool BLEStack::executeCentralConnect(const CentralConnectOptions& opts, const BL
         opts.initiatorScan.windowMs * 1000 / 625
     );
     
-    NimBLEAddress bleAddr(addr.bytes, static_cast<uint8_t>(addr.type));
+    // N9: BLEPeerAddress.bytes is little-endian (same byte order as ble_addr_t.val).
+    // NimBLEAddress(uint8_t[], type) applies std::reverse_copy() expecting big-endian
+    // esp_bd_addr_t — which would invert the address. Use the ble_addr_t constructor
+    // which copies bytes directly without reversal.
+    ble_addr_t rawAddr;
+    rawAddr.type = static_cast<uint8_t>(addr.type);
+    memcpy(rawAddr.val, addr.bytes, 6);
+    NimBLEAddress bleAddr(rawAddr);
     if (!pClient->connect(bleAddr)) {
         // R3/R8: Report failure. The client is kept in s_clients for reuse on the
         // next attempt — it is never deleted here (see executeCentralForget()).
@@ -738,7 +745,11 @@ void BLEStack::executeCentralForget(const char* providerId, const BLEPeerAddress
 
     // O9: Delete the NVS bond unconditionally using the stored address.
     // This works even after reboot when no client object exists.
-    NimBLEAddress bleAddr(addr.bytes, static_cast<uint8_t>(addr.type));
+    // N9: Same byte-order fix as executeCentralConnect() — see comment there.
+    ble_addr_t rawAddr;
+    rawAddr.type = static_cast<uint8_t>(addr.type);
+    memcpy(rawAddr.val, addr.bytes, 6);
+    NimBLEAddress bleAddr(rawAddr);
     NimBLEDevice::deleteBond(bleAddr);
 
     // R8: This is the only place a client is ever deleted. Erase the s_clients
