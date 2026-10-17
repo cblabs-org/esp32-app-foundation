@@ -473,6 +473,11 @@ bool BLEManager::getReconnectPolicy(const char* providerId, BLEReconnectPolicy& 
 bool BLEManager::pair(const char* providerId, const BLEPeerAddress& addr) {
     if (!providerId) return false;
 
+    // Stop any active discovery scan — the user has chosen a device.
+    // Leaving discovery active blocks the reconnect scheduler (isScanning()
+    // returns true while _discovery.active) and prevents future scans.
+    stopDiscovery();
+
     BLEStoredDevice device;
     device.address = addr;
     strncpy(device.providerId, providerId, sizeof(device.providerId) - 1);
