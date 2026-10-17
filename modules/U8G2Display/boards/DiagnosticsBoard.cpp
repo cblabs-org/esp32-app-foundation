@@ -37,18 +37,21 @@
  *
  * Layout (256×64):
  *   Y=0   Row 1: Hostname — defaultLarge(), centred, full width
- *   Y=16  Row 2: WiFi SSID + IP — defaultSmall(), left-aligned, 4px padding
+ *   Y=16  Row 2: WiFi SSID + IP — defaultSmallLatin1(), left-aligned, 4px padding
  *   Y=30  Row 3: Uptime — defaultSmall(), left-aligned, 4px padding
  *   Y=44  Row 4: Heap + Version — defaultSmall(), left-aligned, 4px padding
+ *
+ * Each label's height is its font's getMaxCharHeight() + 1 (see the constants in
+ * DiagnosticsBoard.hpp), which is what shows the descenders.
  *
  * @param displayWidth  Display width in pixels (e.g. 256).
  * @param displayHeight Display height in pixels (e.g. 64).
  */
 DiagnosticsBoard::DiagnosticsBoard(uint16_t displayWidth, uint16_t displayHeight)
-    : _row1(0, 0, static_cast<int>(displayWidth), -1),
-      _row2(4, 16, static_cast<int>(displayWidth) - 8, -1),
-      _row3(4, 30, static_cast<int>(displayWidth) - 8, -1),
-      _row4(4, 44, static_cast<int>(displayWidth) - 8, -1),
+    : _row1(0, 0, static_cast<int>(displayWidth), ROW1_HEIGHT),
+      _row2(4, 16, static_cast<int>(displayWidth) - 8, ROW2_HEIGHT),
+      _row3(4, 30, static_cast<int>(displayWidth) - 8, DATA_ROW_HEIGHT),
+      _row4(4, 44, static_cast<int>(displayWidth) - 8, DATA_ROW_HEIGHT),
       _wifiLine{0},
       _uptimeLine{0},
       _heapLine{0}
@@ -84,9 +87,16 @@ void DiagnosticsBoard::configure(WifiManager* wifiManager) {
     _row3.setAlignment(0);  // LEFT
     _row4.setAlignment(0);  // LEFT
 
+    // --- Long text ends in an ellipsis, not a cut glyph ---
+    // Only the three data rows: the owner's ruling (R8) covers them, and the centred hostname is left as it was.
+    _row2.setTruncated(true);
+    _row3.setTruncated(true);
+    _row4.setTruncated(true);
+
     // --- Assign fonts (hardware only — fonts return nullptr in native) ---
+    // Row 2 uses the Latin-1 font: it holds the U+00B7 separator, which the ASCII-only `_tr` fonts lack.
     _row1.setFont(AppFonts::defaultLarge());
-    _row2.setFont(AppFonts::defaultSmall());
+    _row2.setFont(AppFonts::defaultSmallLatin1());
     _row3.setFont(AppFonts::defaultSmall());
     _row4.setFont(AppFonts::defaultSmall());
 }
@@ -98,7 +108,7 @@ void DiagnosticsBoard::configure(WifiManager* wifiManager) {
  * All hardware API calls (WiFi, millis, heap_caps) are using native test stubs.
  *
  * Formatted rows:
- *   Row 2: "<SSID> • <IP>" or "WiFi: Not connected"
+ *   Row 2: "<SSID> · <IP>" or "WiFi: Not connected"
  *   Row 3: "Up: Xh Xm Xs"
  *   Row 4: "Heap: <KB>KB  v<VERSION>"
  *
@@ -114,11 +124,12 @@ void DiagnosticsBoard::tick(uint32_t currentMillis) {
 
     // --- Row 2: WiFi SSID + IP ---
     if (WiFi.isConnected()) {
-        snprintf(_wifiLine, sizeof(_wifiLine), "%s \xB7 %s",
+        // "\xC2\xB7" is U+00B7 (middle dot) in UTF-8: drawUTF8() decodes it, and the row-2 font has the glyph.
+        snprintf(_wifiLine, sizeof(_wifiLine), "%s \xC2\xB7 %s",
                  _wifiManager->getSSID(),
                  WiFi.localIP().toString().c_str());
     } else if (_wifiManager->getAPMode()) {
-        snprintf(_wifiLine, sizeof(_wifiLine), "AP: %s \xB7 192.168.4.1",
+        snprintf(_wifiLine, sizeof(_wifiLine), "AP: %s \xC2\xB7 192.168.4.1",
                  _wifiManager->getHostname());
     } else {
         snprintf(_wifiLine, sizeof(_wifiLine), "WiFi: Not connected");

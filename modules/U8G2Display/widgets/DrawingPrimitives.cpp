@@ -101,7 +101,7 @@ int getStringWidth(U8G2& display, const char* message) {
  * @param x Left edge of the text area.
  * @param y Top edge of the text area.
  * @param w Width (-1 resolves to display width minus x).
- * @param h Height (-1 resolves to max char height).
+ * @param h Height (-1 resolves to max char height + 1, the descender row).
  * @param align Justification within the bounding box.
  * @param truncate Append '...' if text exceeds the bounding width.
  * @param font Optional font override (nullptr = keep current).
@@ -127,7 +127,11 @@ void drawText(U8G2& display, const char* message, int x, int y,
     // --- Step 1: Resolve bounding box defaults ---
     // Use display width dynamically instead of hardcoding 256 (WD-08)
     if (w == -1) w = display.getDisplayWidth() - x;
-    if (h == -1) h = display.getMaxCharHeight();
+    // A label's lit rows run y+1 .. y + getMaxCharHeight() inclusive (measured under
+    // setFontPosTop() + setFontRefHeightAll()), so the box needs one row more than
+    // getMaxCharHeight() to show the last descender row. The clip's far corner is
+    // exclusive (Step 3), which is why the plain maximum character height cut it.
+    if (h == -1) h = display.getMaxCharHeight() + 1;
 
     int drawX = x;
     int textW = 0;
@@ -143,15 +147,21 @@ void drawText(U8G2& display, const char* message, int x, int y,
     }
 
     // --- Step 3: Clipping — intersect with existing clip window ---
+    // U8G2's far corner is EXCLUSIVE (u8g2.h:352/354, "right corner of the clip
+    // window (excluded)"): a pixel is drawn when clip_x0 <= x < clip_x1. The box
+    // x..x+w-1 by y..y+h-1 therefore ends at x + w and y + h. Passing x + w - 1
+    // and y + h - 1 (as this function once did) lost the box's last column and
+    // last row, which cut the descenders off every label.
     u8g2_t* u8g2_struct = display.getU8g2();
 
     u8g2_uint_t new_x0 = (x > u8g2_struct->clip_x0) ? x : u8g2_struct->clip_x0;
     u8g2_uint_t new_y0 = (y > u8g2_struct->clip_y0) ? y : u8g2_struct->clip_y0;
-    u8g2_uint_t new_x1 = ((x + w - 1) < u8g2_struct->clip_x1) ? (x + w - 1) : u8g2_struct->clip_x1;
-    u8g2_uint_t new_y1 = ((y + h - 1) < u8g2_struct->clip_y1) ? (y + h - 1) : u8g2_struct->clip_y1;
+    u8g2_uint_t new_x1 = ((x + w) < u8g2_struct->clip_x1) ? (x + w) : u8g2_struct->clip_x1;
+    u8g2_uint_t new_y1 = ((y + h) < u8g2_struct->clip_y1) ? (y + h) : u8g2_struct->clip_y1;
 
-    // Apply intersected clip if valid, otherwise squash to zero
-    if (new_x0 <= new_x1 && new_y0 <= new_y1) {
+    // Apply intersected clip if it holds at least one pixel (exclusive far
+    // corner, so x0 == x1 is empty), otherwise squash to zero
+    if (new_x0 < new_x1 && new_y0 < new_y1) {
         display.setClipWindow(new_x0, new_y0, new_x1, new_y1);
     } else {
         display.setClipWindow(0, 0, 0, 0);
@@ -163,9 +173,16 @@ void drawText(U8G2& display, const char* message, int x, int y,
         strlcpy(buf, message, sizeof(buf));
         int ellipsisW = display.getUTF8Width("...");
 
-        // Trim characters until the truncated text + ellipsis fits
-        while (strlen(buf) > 0 && display.getUTF8Width(buf) > (w - ellipsisW)) {
-            buf[strlen(buf) - 1] = '\0';
+        // Trim characters until the truncated text + ellipsis fits. A character
+        // is removed whole: the text is UTF-8, and cutting only the last byte of
+        // a multi-byte character (the U+00B7 separator is two) leaves a lead byte
+        // that U8G2 decodes together with the first '.', drawing a stray glyph.
+        size_t len = strlen(buf);
+        while (len > 0 && display.getUTF8Width(buf) > (w - ellipsisW)) {
+            do {
+                --len;
+            } while (len > 0 && (static_cast<uint8_t>(buf[len]) & 0xC0) == 0x80);  // Step back over continuation bytes (10xxxxxx)
+            buf[len] = '\0';
         }
         strcat(buf, "...");
         display.drawUTF8(drawX, y + textOffsetY, buf);

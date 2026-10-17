@@ -1,0 +1,9 @@
+# The repository ignores *.bin globally (.gitignore line 9). The raw U8G2 buffers
+# under baseline/ (legacy board) and after/ (migrated board) are the committed
+# pixel evidence, so they must be tracked.
+!baseline/**/*.bin
+!after/**/*.bin
+
+# The repository ignores CMakeLists.txt globally (.gitignore line 20, for the ESP-IDF
+# build). This directory's CMakeLists.txt is the harness's build and must be tracked.
+!CMakeLists.txt

@@ -1,0 +1,10 @@
+{
+  "method": "each row drawn unclipped at its position; a pixel lit there and dark in the rendered frame was removed by the clip (or, for a long line, by truncation); a pixel lit only in the rendered frame was added by it (the ellipsis). A row that fits loses nothing.",
+  "scenarios": {
+    "connected": {"unclipped_lit": 1405, "rendered_lit": 1405, "removed_by_clip": 0, "added_by_render": 0, "removed_by_pixel_row": {}, "removed_columns": [-1, -1]},
+    "ap_mode": {"unclipped_lit": 1477, "rendered_lit": 1477, "removed_by_clip": 0, "added_by_render": 0, "removed_by_pixel_row": {}, "removed_columns": [-1, -1]},
+    "disconnected": {"unclipped_lit": 1326, "rendered_lit": 1326, "removed_by_clip": 0, "added_by_render": 0, "removed_by_pixel_row": {}, "removed_columns": [-1, -1]},
+    "long_ssid": {"unclipped_lit": 1712, "rendered_lit": 1679, "removed_by_clip": 34, "added_by_render": 1, "removed_by_pixel_row": {"20": 6, "21": 4, "22": 4, "23": 4, "24": 4, "25": 4, "26": 4, "27": 4}, "removed_columns": [243, 253]},
+    "device_dev91": {"unclipped_lit": 1362, "rendered_lit": 1362, "removed_by_clip": 0, "added_by_render": 0, "removed_by_pixel_row": {}, "removed_columns": [-1, -1]}
+  }
+}

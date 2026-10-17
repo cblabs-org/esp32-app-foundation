@@ -1,0 +1,14 @@
+{
+  "flags": "-DU8G2_WITHOUT_FONT_ROTATION -DU8G2_WITHOUT_UNICODE",
+  "note": "lone_byte is 0xB7 (what the board sent before owner ruling R8); utf8_form is 0xC2 0xB7 (U+00B7, what it sends now). tr is u8g2_font_helvR08_tr (the old row-2 font), tf is u8g2_font_helvR08_tf (the row-2 font now).",
+  "glyph_0xB7_in_tr": false,
+  "glyph_0xB7_in_tf": true,
+  "tr_lone_byte": {"width_px": 0, "lit_pixels": 0},
+  "tr_utf8_form": {"width_px": 0, "lit_pixels": 0},
+  "tf_lone_byte": {"width_px": 2, "lit_pixels": 2},
+  "tf_utf8_form": {"width_px": 2, "lit_pixels": 2},
+  "connected_row2_dot_adds_pixels": 2,
+  "connected_row2_dot_vs_two_spaces_differing_pixels": 240,
+  "long_ssid_row2_unclipped_max_lit_x": 253,
+  "long_ssid_row2_unclipped_lit_pixels_beyond_clip": 8
+}

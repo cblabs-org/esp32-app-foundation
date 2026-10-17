@@ -18,6 +18,7 @@
  *
  * Exported Functions (namespace AppFonts):
  * - defaultSmall():   Returns U8G2 Helvetica 8pt regular font.
+ * - defaultSmallLatin1(): Returns U8G2 Helvetica 8pt regular, full Latin-1 (has U+00B7 and accents).
  * - defaultMedium():  Returns U8G2 Helvetica 10pt regular font.
  * - defaultLarge():   Returns U8G2 Helvetica 12pt bold font.
  * - defaultClock():   Returns U8G2 Helvetica 10pt bold font (clock displays).
@@ -38,6 +39,7 @@ namespace AppFonts {
     #if defined(UNIT_TEST) || defined(NATIVE_BUILD)
     // Native test builds: U8G2 fonts are unavailable / stub arrays.
     inline const uint8_t* defaultSmall()  { return nullptr; }
+    inline const uint8_t* defaultSmallLatin1() { return nullptr; }
     inline const uint8_t* defaultMedium() { return nullptr; }
     inline const uint8_t* defaultLarge()  { return nullptr; }
     inline const uint8_t* defaultClock()  { return nullptr; }
@@ -47,6 +49,16 @@ namespace AppFonts {
 
     /** @brief Small text — U8G2 Helvetica 8pt regular. */
     inline const uint8_t* defaultSmall()  { return u8g2_font_helvR08_tr; }
+
+    /**
+     * @brief Small text with the full Latin-1 range — U8G2 Helvetica 8pt regular.
+     *
+     *        defaultSmall() is a `_tr` font (ASCII only). This `_tf` variant adds
+     *        U+00A0..U+00FF, among them the middle dot U+00B7, so text drawn with
+     *        drawUTF8() can use it. It is a separate accessor, and costs flash only
+     *        in a board that calls it, so no other board's font changes.
+     */
+    inline const uint8_t* defaultSmallLatin1() { return u8g2_font_helvR08_tf; }
 
     /** @brief Medium text — U8G2 Helvetica 10pt regular. */
     inline const uint8_t* defaultMedium() { return u8g2_font_helvR10_tr; }

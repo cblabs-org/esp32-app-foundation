@@ -110,7 +110,7 @@ int getStringWidth(U8G2& display, const char* message);
  * @param x Top-left X coordinate of the text area.
  * @param y Top-left Y coordinate of the text area.
  * @param w Width of the area (-1 for screen width minus x).
- * @param h Height of the area (-1 for font height).
+ * @param h Height of the area (-1 for font height + 1, which includes the descender row).
  * @param align Alignment within the width (Left, Center, Right).
  * @param truncate If true, appends '...' if text exceeds width.
  * @param font Optional font override. If nullptr, current font is used.

@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ESP32 App Foundation (c) 2026 CB Labs
+  https://github.com/matthewmcneill/esp32-app-foundation
+  SPDX-License-Identifier: Apache-2.0
+
+  Module: uidesign/ssd1322-256x64/u8g2gl/screens/screen_diagnostics.xml
+  Description: The diagnostics board: hostname (bold, centred), WiFi line,
+               uptime, and heap plus version, on the 256x64 SSD1322.
+
+  Geometry matches the legacy DiagnosticsBoard pixel for pixel (the render
+  harness in test/render/ compares the two), with the three legacy defects
+  fixed in both (owner ruling R8): descenders are not clipped, the separator is
+  a real middle dot, and a long line ends in an ellipsis. Every number below is
+  measured, see section 1b of
+  .agents/skills/principal-architect-workspace/pr-u8g2gl-05/evidence/EVIDENCE.md.
+-->
+<screen name="diagnostics">
+    <view>
+        <!-- Label heights. Under the legacy display state (setFontRefHeightAll and
+             setFontPosTop, which the host board inherits) a font's lit pixel rows run
+             from y+1 to y+getMaxCharHeight() inclusive, one more row than
+             getMaxCharHeight() counts. The runtime clips a label to its rect, rows
+             y..y+height-1, so a height of getMaxCharHeight() + 1 is what shows the
+             descenders:
+               helvB12_tr  getMaxCharHeight() 17 -> height 18
+               helvR08_tf  getMaxCharHeight() 13 -> height 14
+               helvR08_tr  getMaxCharHeight() 11 -> height 12
+             The runtime draws at y + (height - (ascent - descent)) / 2. ascent - descent
+             equals getMaxCharHeight(), so that is (1) / 2 = 0 each time and the text
+             sits at y, where legacy draws it.
+
+             The rows are 16, 14 and 14 pixels apart (y = 0, 16, 30, 44). Row 1's box
+             (rows 0..17) reaches into row 2's (16..29) by two rows, but the glyphs do not
+             meet: row 1's last lit row is 17 and row 2's first is 19 (the `_tf` font's
+             ascii glyphs start at y+3) or 17 for a Latin-1 capital. Rows 2 and 3 are
+             disjoint (16..29 and 30..41). -->
+
+        <!-- Row 1: hostname. Legacy: x=0 y=0 w=256, centred. -->
+        <u8g2gl_label name="hostname" x="0" y="0" width="256" height="18"
+                      font="u8g2_font_helvB12_tr" align="center" bind_text="diag_hostname" />
+
+        <!-- Row 2: WiFi line. Legacy: x=4 y=16 w=248. The `_tf` font has the U+00B7
+             separator that the `_tr` fonts lack (the board sends it as UTF-8).
+             long_mode="dots" ends an overflowing line in an ellipsis, as legacy's
+             setTruncated(true) does. -->
+        <u8g2gl_label name="wifi" x="4" y="16" width="248" height="14"
+                      font="u8g2_font_helvR08_tf" long_mode="dots" bind_text="diag_wifi" />
+
+        <!-- Row 3: uptime. Legacy: x=4 y=30. -->
+        <u8g2gl_label name="uptime" x="4" y="30" width="248" height="12"
+                      font="u8g2_font_helvR08_tr" long_mode="dots" bind_text="diag_uptime" />
+
+        <!-- Row 4: free heap and firmware version. Legacy: x=4 y=44. -->
+        <u8g2gl_label name="heap" x="4" y="44" width="248" height="12"
+                      font="u8g2_font_helvR08_tr" long_mode="dots" bind_text="diag_heap" />
+    </view>
+</screen>

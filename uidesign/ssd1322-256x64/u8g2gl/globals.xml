@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ESP32 App Foundation (c) 2026 CB Labs
+  https://github.com/matthewmcneill/esp32-app-foundation
+  SPDX-License-Identifier: Apache-2.0
+
+  Module: uidesign/ssd1322-256x64/u8g2gl/globals.xml
+  Description: Subjects and fonts shared by the screens of this project. The
+               four string subjects are the values the diagnostics board
+               publishes once a second (DiagnosticsScreenBoard::tick()); the
+               screen binds its labels to them and redraws when one changes.
+
+  Sizes: max_len excludes the terminator. Each mirrors the buffer the legacy
+         DiagnosticsBoard formatted into, so a string that fitted before fits
+         now and one that was truncated is truncated at the same byte.
+-->
+<globals>
+    <subjects>
+        <!-- WifiManager::_currentHostname is char[33] (modules/WifiManager/WifiManager.hpp:137),
+             so a hostname is at most 32 characters. -->
+        <string name="diag_hostname" max_len="32" />
+
+        <!-- Legacy DiagnosticsBoard::_wifiLine is char[64] (DiagnosticsBoard.hpp). -->
+        <string name="diag_wifi" max_len="63" />
+
+        <!-- Legacy DiagnosticsBoard::_uptimeLine is char[32]. -->
+        <string name="diag_uptime" max_len="31" />
+
+        <!-- Legacy DiagnosticsBoard::_heapLine is char[48]. -->
+        <string name="diag_heap" max_len="47" />
+    </subjects>
+
+    <fonts>
+        <!-- The three fonts the legacy board draws with: AppFonts::defaultLarge(),
+             AppFonts::defaultSmall() and AppFonts::defaultSmallLatin1()
+             (modules/U8G2Display/fonts/Fonts.hpp). The `_tf` font is Latin-1, so it
+             has the middle dot U+00B7 that the WiFi line's separator needs. -->
+        <builtin name="u8g2_font_helvB12_tr" />
+        <builtin name="u8g2_font_helvR08_tr" />
+        <builtin name="u8g2_font_helvR08_tf" />
+    </fonts>
+</globals>
