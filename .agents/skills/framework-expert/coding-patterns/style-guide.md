@@ -24,6 +24,18 @@ We follow a strict naming scheme to ensure consistency across the codebase:
 
 Acronyms and initialisms **preserve their canonical uppercase casing** when embedded in PascalCase names (e.g., `OTAUpdateManager`, `MCPServer`, `_mcpServer`). The exception is `WiFi`, which retains its mixed casing to match the ESP32 SDK (`WifiManager`).
 
+### Naming Exemptions
+
+The following repository-specific files and paths are exempt from the standard naming conventions:
+
+| Category | Reason | Example |
+|----------|--------|---------|
+| **Test files** | PlatformIO requires `test_` prefix for test discovery | `test/test_unit/test_configManager/test_configManager.cpp` |
+| **Auto-generated portal assets** | Generated from web filenames; changing breaks the build pipeline | `include/portal_assets/app_css.hpp` |
+| **Binary/XBM assets** | Embedded image data with conventional names | `cblabs_logo.h` |
+| **Third-party / SDK mock stubs** | Must match upstream header names for compatibility | `Arduino.h`, `WiFi.h`, `HTTPClient.h` (in `test/stubs/platform/`) |
+| **PlatformIO structural dirs** | Framework-mandated directory names | `src/`, `lib/`, `include/`, `test/`, `modules/` |
+
 ## 2. Directory ↔ File ↔ Class Alignment
 
 The directory, primary file, and primary class MUST all use the exact same PascalCase name. This eliminates mixed-casing in `#include` paths.
@@ -73,4 +85,10 @@ Use Doxygen-style block comments (`/** ... */`) for all public declarations. Inc
 
 ## 5. Native Test Stubs
 
-When providing mock/stub definitions for native testing (under `#ifndef ESP_PLATFORM`), define the stub in **exactly one authoritative header file** and use forward declarations everywhere else. This prevents redefinition errors during the build process.
+Hardware and framework APIs are mocked using the **Stub-Header Architecture** in `test/stubs/platform/`.
+
+- **Never** use `#ifdef NATIVE_BUILD` to mock classes in your module headers. Use `#ifndef ESP_PLATFORM` when compile-time guards are necessary.
+- **Always** create a matching header file (e.g., `test/stubs/platform/WiFi.h`) that provides the minimum necessary definitions for the compiler to resolve your API calls.
+- Stubs are selected at compile-time via include path priority during `env:native` builds.
+- When providing mock/stub definitions for native testing (under `#ifndef ESP_PLATFORM`), define the stub in **exactly one authoritative header file** and use forward declarations everywhere else. This prevents redefinition errors during the build process.
+
