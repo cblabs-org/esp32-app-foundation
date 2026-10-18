@@ -87,24 +87,24 @@ If you discover a defect, upstream bug, or concern *outside your boundary box*, 
 ---
 
 ## Completion Report
-<!-- Written by the worker at task completion -->
-<!-- TEMPLATE — do not fill in until work is done
 
 ### Status
-complete | partial | blocked
+complete
 
 ### Changes Made
-- `path/to/file` — what changed and why
+- `modules/BLEManager/BLEManager.cpp` — Converted `if (!BLEAdvertisingDecision::shouldAdvertise(...))` in `dispatchQueueEvents()` under `case BLEQueueMessage::Type::PeerConnected` to an `if / else if` branch. If advertising is permitted and the manager is `Active` while `!_stack.isAdvertising()`, it calls `_stack.startAdvertising(_advPackResult, _config.peripheralPreferredConnParams)` so the device remains discoverable to other centrals after accepting a connection while below the maximum connections cap (Issue #309).
+- `test/test_unit/test_bleManager/test_bleManager.cpp` — Added unit test `TEST(BLEManagerTest, ReadvertiseAfterPeripheralConnectBelowCap)` verifying that when a `PeerConnected` event is processed while below connection cap, the manager stays `Active`, records the connection, and exercises the re-advertise branch without faults.
 
 ### Decisions Made
-- Decision description and rationale
+- Matched the exact re-advertise branch pattern already present in the `PeerDisconnected` handler for symmetry and safety.
+- Handled host-stub testing in native runner: documented that `BLEStack::isAdvertising()` unconditionally returns false in native test builds, allowing the test to verify state retention and exercising `_stack.startAdvertising()` through the negative condition while noting that full hardware validation requires target hardware or a mock stack.
 
 ### Dead Ends & Warnings
-- What was attempted, why it failed, and what to avoid
+- Calling `build_project` for `native` attempts to build the main firmware binary which lacks `main()` (native targets are test-runner environments run via `run_tests`). Use `run_tests` with `environment: native` or `compileOnly: true` for native verification.
 
 ### Out-of-Scope Findings
-- Finding description and suggested action
+(none)
 
 ### Blockers
 (none)
--->
+
