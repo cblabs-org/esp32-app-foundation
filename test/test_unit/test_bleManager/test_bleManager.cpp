@@ -12,6 +12,7 @@
  */
 
 #include <gtest/gtest.h>
+#include <ArduinoJson.h>
 #include "EventBus.hpp"
 #include "BLEManager.hpp"
 #include "interfaces/IPreconditionRegistry.hpp"
@@ -493,6 +494,17 @@ TEST(BLEManagerTest, AdvertisingStopsAtConnectionCap) {
     mgr.tick(0);
     EXPECT_FALSE(mgr.isAdvertising());
     EXPECT_EQ(mgr.getPeripheralConnectionCount(), 3);
+
+    // Disconnect connection 2 (2 < 3) -> should restart advertising
+    BLEQueueMessage discMsg;
+    discMsg.type = BLEQueueMessage::Type::PeerDisconnected;
+    discMsg.handle = 2;
+    discMsg.address = c2.address;
+    discMsg.reason = BLEDisconnectReason::PeerTerminated;
+    EXPECT_TRUE(mgr.postTestQueueMessage(discMsg));
+    mgr.tick(0);
+    EXPECT_TRUE(mgr.isAdvertising());
+    EXPECT_EQ(mgr.getPeripheralConnectionCount(), 2);
 }
 
 TEST(BLEManagerTest, NoReadvertiseWhilePaused) {
@@ -521,4 +533,30 @@ TEST(BLEManagerTest, NoReadvertiseWhilePaused) {
     EXPECT_FALSE(mgr.isAdvertising());
     EXPECT_EQ(mgr.getPeripheralConnectionCount(), 1);
 }
+
+TEST(BLEManagerTest, NoReadvertiseWhileDisabled) {
+    BLEManager mgr;
+    mgr.setStateForTesting(BLEManager::State::Active);
+    mgr.setGattStartedForTesting(true);
+
+    JsonDocument doc;
+    doc["enabled"] = false;
+    mgr.applyConfig(doc.as<JsonObject>());
+    EXPECT_FALSE(mgr.isAdvertising());
+
+    // Post a connection while disabled
+    BLEQueueMessage connMsg;
+    connMsg.type = BLEQueueMessage::Type::PeerConnected;
+    connMsg.handle = 1;
+    BLEPeerAddress::parse("AA:BB:CC:DD:EE:01", BLEPeerAddress::Type::Public, connMsg.address);
+    connMsg.mtu = 256;
+    connMsg.params.minIntervalUnits = 24;
+    connMsg.params.maxIntervalUnits = 40;
+    EXPECT_TRUE(mgr.postTestQueueMessage(connMsg));
+    mgr.tick(0);
+
+    EXPECT_FALSE(mgr.isAdvertising());
+    EXPECT_EQ(mgr.getPeripheralConnectionCount(), 1);
+}
+
 
