@@ -195,6 +195,11 @@ function createMockEnvironment() {
     if (sel.startsWith('#')) {
       return node.id === sel.slice(1);
     }
+    // Combined like .ble-provider[data-provider="..."]
+    const comb = /^\.([a-zA-Z0-9_-]+)\[([a-zA-Z0-9_-]+)="([^"]*)"\]$/.exec(sel);
+    if (comb) {
+      return node.classList.contains(comb[1]) && node.getAttribute(comb[2]) === comb[3];
+    }
     if (sel.startsWith('.')) {
       const className = sel.slice(1);
       return node.classList.contains(className);
@@ -206,11 +211,6 @@ function createMockEnvironment() {
         if (match[2] === undefined) return val !== null;
         return val === match[2];
       }
-    }
-    // Combined like .ble-provider[data-provider="..."]
-    const comb = /^\.([a-zA-Z0-9_-]+)\[([a-zA-Z0-9_-]+)="([^"]*)"\]$/.exec(sel);
-    if (comb) {
-      return node.classList.contains(comb[1]) && node.getAttribute(comb[2]) === comb[3];
     }
     return node.tagName.toLowerCase() === sel.toLowerCase();
   }
@@ -246,16 +246,30 @@ function createMockEnvironment() {
     },
   };
 
-  // Create the main tab container
+  let intervalCallbacks = [];
+  const mockSetInterval = (fn, ms) => {
+    const id = { fn, ms };
+    intervalCallbacks.push(id);
+    return id;
+  };
+  const mockClearInterval = (id) => {
+    intervalCallbacks = intervalCallbacks.filter(item => item !== id);
+  };
+  const triggerPoll = async () => {
+    for (const item of [...intervalCallbacks]) {
+      await item.fn();
+    }
+  };
+
   const tabBluetooth = new MockElement('div', 'tab-bluetooth');
   document.body.appendChild(tabBluetooth);
   elements.set('tab-bluetooth', tabBluetooth);
 
-  return { window, document, elements, tabBluetooth };
+  return { window, document, elements, tabBluetooth, mockSetInterval, mockClearInterval, triggerPoll };
 }
 
 test('BLE portal tab DOM lifecycle updates without refresh', async () => {
-  const { window, document, tabBluetooth } = createMockEnvironment();
+  const { window, document, tabBluetooth, mockSetInterval, mockClearInterval, triggerPoll } = createMockEnvironment();
 
   try {
     // Load ble.js script in the mock environment
@@ -312,8 +326,8 @@ test('BLE portal tab DOM lifecycle updates without refresh', async () => {
     };
 
     // Run script
-    const fn = new Function('window', 'document', scriptContent);
-    fn(window, document);
+    const fn = new Function('window', 'document', 'setInterval', 'clearInterval', scriptContent);
+    fn(window, document, mockSetInterval, mockClearInterval);
 
     // 1. Activate tab-bluetooth
     window.dispatchEvent({ type: 'tab-changed', detail: 'tab-bluetooth' });
@@ -345,8 +359,8 @@ test('BLE portal tab DOM lifecycle updates without refresh', async () => {
     // Background connect event arrives: device is now connected
     currentBleStatus.devices[0].connected = true;
 
-    // Next poll or refresh happens
-    window.dispatchEvent({ type: 'tab-changed', detail: 'tab-bluetooth' });
+    // Next 1 Hz background poll arrives
+    await triggerPoll();
     await new Promise(r => setTimeout(r, 20));
 
     // Verify State After Pair: Device is displayed, "No device paired yet" is GONE
@@ -398,27 +412,27 @@ test('BLE portal tab DOM lifecycle updates without refresh', async () => {
     });
     currentBleStatus.devices[0].connected = true;
     currentBleStatus.devices[0].reconnect = { phase: 'Idle', suspended: false };
-    window.dispatchEvent({ type: 'tab-changed', detail: 'tab-bluetooth' });
+    await triggerPoll();
     await new Promise(r => setTimeout(r, 20));
     assert.match(badgeContainer.innerHTML, /Connected/);
 
     // Connection drops -> Reconnecting (Fast)
     currentBleStatus.devices[0].connected = false;
     currentBleStatus.devices[0].reconnect = { phase: 'Fast', suspended: false };
-    window.dispatchEvent({ type: 'tab-changed', detail: 'tab-bluetooth' });
+    await triggerPoll();
     await new Promise(r => setTimeout(r, 20));
     assert.match(badgeContainer.innerHTML, /Reconnecting \(Fast\)/);
 
     // Connection retrying -> Reconnecting (Slow)
     currentBleStatus.devices[0].reconnect = { phase: 'Slow', suspended: false };
-    window.dispatchEvent({ type: 'tab-changed', detail: 'tab-bluetooth' });
+    await triggerPoll();
     await new Promise(r => setTimeout(r, 20));
     assert.match(badgeContainer.innerHTML, /Reconnecting \(Slow\)/);
 
     // Reconnected successfully
     currentBleStatus.devices[0].connected = true;
     currentBleStatus.devices[0].reconnect = { phase: 'Idle', suspended: false };
-    window.dispatchEvent({ type: 'tab-changed', detail: 'tab-bluetooth' });
+    await triggerPoll();
     await new Promise(r => setTimeout(r, 20));
     assert.match(badgeContainer.innerHTML, /Connected/);
   } catch (err) {

@@ -107,7 +107,7 @@
       } catch (_) { /* ignore */ }
     }
 
-    fetchPromise = (async () => {
+    const currentPromise = (async () => {
       try {
         const status = await apiCall('/api/ble/status');
         renderStatusCard(status);
@@ -128,10 +128,13 @@
       } catch (err) {
         console.error('[BLE] status fetch error:', err);
       } finally {
-        fetchPromise = null;
+        if (fetchPromise === currentPromise) {
+          fetchPromise = null;
+        }
       }
     })();
 
+    fetchPromise = currentPromise;
     return fetchPromise;
   }
 
@@ -246,7 +249,7 @@
     } else {
       // Update dynamic fields in place without disrupting armed buttons or scan tables
       devices.forEach(dev => {
-        updateProviderElement(dev, status);
+        updateProviderElement(dev, status, container);
       });
     }
   }
@@ -351,10 +354,10 @@
     `;
   }
 
-  function updateProviderElement(dev, status) {
-    const el = Array.from(document.querySelectorAll('.ble-provider'))
-      .find(p => p.getAttribute('data-provider') === dev.providerId) ||
-      document.querySelector(`.ble-provider[data-provider="${dev.providerId}"]`);
+  function updateProviderElement(dev, status, container) {
+    const root = container || document.getElementById('ble-devices-list') || document;
+    const safePid = (typeof CSS !== 'undefined' && CSS.escape) ? CSS.escape(dev.providerId) : dev.providerId.replace(/["\\]/g, '\\$&');
+    const el = root.querySelector(`.ble-provider[data-provider="${safePid}"]`);
     if (!el) return;
 
     // Update status badge
@@ -529,6 +532,7 @@
           });
           showToast(`Pairing initiated with ${addr}`, 'success');
           isScanningLocal = false;
+          scanProviderId = null;
           const scanResultsContainer = document.querySelector(`.ble-scan-results-container[data-provider="${pid}"]`);
           if (scanResultsContainer) {
             scanResultsContainer.innerHTML = '';
@@ -1074,7 +1078,6 @@
         initTab(container);
         if (document.visibilityState === 'visible') {
           startPolling();
-          fetchStatus();
         }
       }
     } else {

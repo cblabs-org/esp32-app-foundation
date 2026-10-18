@@ -2,7 +2,8 @@
   "name": "esp32-app-foundation-web-tests",
   "private": true,
   "scripts": {
-    "test": "playwright test",
+    "test": "npm run test:unit && playwright test",
+    "test:unit": "node --test ble_lifecycle.test.js",
     "test:headed": "playwright test --headed",
     "server": "node server.js"
   },
