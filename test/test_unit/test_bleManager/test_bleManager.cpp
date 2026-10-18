@@ -522,3 +522,49 @@ TEST(BLEManagerTest, NoReadvertiseWhilePaused) {
     EXPECT_EQ(mgr.getPeripheralConnectionCount(), 1);
 }
 
+// Fix #303: ScanResult dispatch must carry connectable through queue message boolVal1.
+TEST(BLEManagerTest, ScanResultCarriesConnectable) {
+    BLEManager mgr;
+    DummyClientProvider cli;
+    mgr.registerClientProvider(&cli);
+    mgr.setStateForTesting(BLEManager::State::Active);
+
+    EXPECT_TRUE(mgr.startDiscovery("dummy_cli", 5000));
+
+    // First result: connectable = true
+    BLEQueueMessage scanMsg1;
+    scanMsg1.type = BLEQueueMessage::Type::ScanResult;
+    BLEPeerAddress::parse("11:22:33:44:55:66", BLEPeerAddress::Type::Public, scanMsg1.address);
+    strncpy(scanMsg1.providerId, "ConnectableDev", sizeof(scanMsg1.providerId) - 1);
+    scanMsg1.rssi = -50;
+    scanMsg1.boolVal1 = true;
+
+    // Second result: connectable = false
+    BLEQueueMessage scanMsg2;
+    scanMsg2.type = BLEQueueMessage::Type::ScanResult;
+    BLEPeerAddress::parse("AA:BB:CC:DD:EE:FF", BLEPeerAddress::Type::Public, scanMsg2.address);
+    strncpy(scanMsg2.providerId, "NonConnectableDev", sizeof(scanMsg2.providerId) - 1);
+    scanMsg2.rssi = -80;
+    scanMsg2.boolVal1 = false;
+
+    EXPECT_TRUE(mgr.postTestQueueMessage(scanMsg1));
+    EXPECT_TRUE(mgr.postTestQueueMessage(scanMsg2));
+    mgr.tick(0);
+
+    const std::vector<BLEScanResult>& results = mgr.getDiscoveryResults();
+    ASSERT_EQ(results.size(), 2u);
+    EXPECT_TRUE(results[0].connectable);
+    EXPECT_FALSE(results[1].connectable);
+
+    // Updating existing scan result updates connectable
+    BLEQueueMessage scanMsg1Update = scanMsg1;
+    scanMsg1Update.boolVal1 = false;
+    EXPECT_TRUE(mgr.postTestQueueMessage(scanMsg1Update));
+    mgr.tick(0);
+
+    const std::vector<BLEScanResult>& updatedResults = mgr.getDiscoveryResults();
+    ASSERT_EQ(updatedResults.size(), 2u);
+    EXPECT_FALSE(updatedResults[0].connectable);
+}
+
+

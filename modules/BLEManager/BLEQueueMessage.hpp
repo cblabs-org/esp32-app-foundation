@@ -42,7 +42,7 @@ struct BLEQueueMessage {
     uint16_t            uuid16          = 0;
     uint16_t            mtu             = 23;
     BLEConnParams       params;
-    bool                boolVal1        = false; // notify (sub) or encrypted (conn)
+    bool                boolVal1        = false; // notify (sub), encrypted (conn), or connectable (scan)
     bool                boolVal2        = false; // indicate (sub)
     char                providerId[24]  = {};
     uint8_t             rawBytes[64]    = {};

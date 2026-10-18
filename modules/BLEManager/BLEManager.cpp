@@ -1146,6 +1146,8 @@ void BLEManager::dispatchQueueEvents() {
                     strncpy(res.name, msg.providerId, sizeof(res.name) - 1);
                     // R8: RSSI now carried in its own queue-message field.
                     res.rssi = msg.rssi;
+                    // Issue #303: Populate connectable flag from discovery message.
+                    res.connectable = msg.boolVal1;
                     if (prov->acceptScanResult(res)) {
                         bool found = false;
                         for (auto& existing : _discovery.results) {
