@@ -444,12 +444,81 @@ TEST(BLEManagerTest, ReadvertiseAfterPeripheralConnectBelowCap) {
     EXPECT_EQ(srv.connectedPeers.size(), 1);
     EXPECT_EQ(srv.connectedPeers[0].handle, 1);
 
-    // Note on advertising verification:
-    // In native unit test builds, host stubs in BLEStack.hpp make isAdvertising()
-    // unconditionally return false. Full verification of hardware advertising restart
-    // requires target hardware or a mock stack. Here we verify that below the connection
-    // cap, the manager processes the connection, stays Active, and does not stop or fault.
-    // The host stub returns false, exercising the !_stack.isAdvertising() check in the
-    // re-advertise branch.
-    EXPECT_FALSE(mgr.isAdvertising()); // Host stub returns false on native
+    // With the stateful host stub, we can directly assert that advertising restarted:
+    EXPECT_TRUE(mgr.isAdvertising());
 }
+
+TEST(BLEManagerTest, AdvertisingStopsAtConnectionCap) {
+    BLEManager mgr;
+    MockDetailedServiceProvider srv;
+    mgr.registerServiceProvider(&srv);
+    mgr.setStateForTesting(BLEManager::State::Active);
+    EXPECT_EQ(mgr.getState(), BLEManager::State::Active);
+
+    // Connection 1 (1 < 3) -> should re-advertise
+    BLEQueueMessage c1;
+    c1.type = BLEQueueMessage::Type::PeerConnected;
+    c1.handle = 1;
+    BLEPeerAddress::parse("AA:BB:CC:DD:EE:01", BLEPeerAddress::Type::Public, c1.address);
+    c1.mtu = 256;
+    c1.params.minIntervalUnits = 24;
+    c1.params.maxIntervalUnits = 40;
+    EXPECT_TRUE(mgr.postTestQueueMessage(c1));
+    mgr.tick(0);
+    EXPECT_TRUE(mgr.isAdvertising());
+    EXPECT_EQ(mgr.getPeripheralConnectionCount(), 1);
+
+    // Connection 2 (2 < 3) -> should still advertise
+    BLEQueueMessage c2;
+    c2.type = BLEQueueMessage::Type::PeerConnected;
+    c2.handle = 2;
+    BLEPeerAddress::parse("AA:BB:CC:DD:EE:02", BLEPeerAddress::Type::Public, c2.address);
+    c2.mtu = 256;
+    c2.params.minIntervalUnits = 24;
+    c2.params.maxIntervalUnits = 40;
+    EXPECT_TRUE(mgr.postTestQueueMessage(c2));
+    mgr.tick(0);
+    EXPECT_TRUE(mgr.isAdvertising());
+    EXPECT_EQ(mgr.getPeripheralConnectionCount(), 2);
+
+    // Connection 3 (3 == 3, cap reached) -> should stop advertising
+    BLEQueueMessage c3;
+    c3.type = BLEQueueMessage::Type::PeerConnected;
+    c3.handle = 3;
+    BLEPeerAddress::parse("AA:BB:CC:DD:EE:03", BLEPeerAddress::Type::Public, c3.address);
+    c3.mtu = 256;
+    c3.params.minIntervalUnits = 24;
+    c3.params.maxIntervalUnits = 40;
+    EXPECT_TRUE(mgr.postTestQueueMessage(c3));
+    mgr.tick(0);
+    EXPECT_FALSE(mgr.isAdvertising());
+    EXPECT_EQ(mgr.getPeripheralConnectionCount(), 3);
+}
+
+TEST(BLEManagerTest, NoReadvertiseWhilePaused) {
+    BLEManager mgr;
+    MockDetailedServiceProvider srv;
+    mgr.registerServiceProvider(&srv);
+    mgr.setStateForTesting(BLEManager::State::Active);
+    mgr.setGattStartedForTesting(true);
+
+    mgr.pause("test");
+    EXPECT_EQ(mgr.getState(), BLEManager::State::Paused);
+    EXPECT_FALSE(mgr.isAdvertising());
+
+    // Post a connection while paused
+    BLEQueueMessage connMsg;
+    connMsg.type = BLEQueueMessage::Type::PeerConnected;
+    connMsg.handle = 1;
+    BLEPeerAddress::parse("AA:BB:CC:DD:EE:01", BLEPeerAddress::Type::Public, connMsg.address);
+    connMsg.mtu = 256;
+    connMsg.params.minIntervalUnits = 24;
+    connMsg.params.maxIntervalUnits = 40;
+    EXPECT_TRUE(mgr.postTestQueueMessage(connMsg));
+    mgr.tick(0);
+
+    EXPECT_EQ(mgr.getState(), BLEManager::State::Paused);
+    EXPECT_FALSE(mgr.isAdvertising());
+    EXPECT_EQ(mgr.getPeripheralConnectionCount(), 1);
+}
+
