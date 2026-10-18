@@ -945,10 +945,13 @@ void BLEManager::dispatchQueueEvents() {
 
                 // Stop advertising if reached cap
                 if (!BLEAdvertisingDecision::shouldAdvertise(_activeConnections.size(),
-                                                            _config.maxPeripheralConnections,
-                                                            _state == State::Paused,
-                                                            _config.enabled)) {
+                                                             _config.maxPeripheralConnections,
+                                                             _state == State::Paused,
+                                                             _config.enabled)) {
                     _stack.stopAdvertising();
+                } else if (_state == State::Active && !_stack.isAdvertising()) {
+                    // Re-advertise to allow additional connections (Issue #309)
+                    _stack.startAdvertising(_advPackResult, _config.peripheralPreferredConnParams);
                 }
 
                 _peerConnRing[_peerConnRingHead].handle = peer.handle;

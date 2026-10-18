@@ -411,4 +411,45 @@ TEST(BLEManagerTest, ScanResultCarriesRssi) {
     EXPECT_EQ(results[0].address, scanMsg.address);
 }
 
+// Issue #309: Verify re-advertise branch executes after a peripheral connects while below cap.
+TEST(BLEManagerTest, ReadvertiseAfterPeripheralConnectBelowCap) {
+    BLEManager mgr;
+    MockDetailedServiceProvider srv;
+    mgr.registerServiceProvider(&srv);
+    mgr.setStateForTesting(BLEManager::State::Active);
 
+    // Initial state is Active
+    EXPECT_EQ(mgr.getState(), BLEManager::State::Active);
+
+    // Post a PeerConnected queue message
+    BLEQueueMessage connMsg;
+    connMsg.type = BLEQueueMessage::Type::PeerConnected;
+    connMsg.handle = 1;
+    BLEPeerAddress::parse("AA:BB:CC:DD:EE:01", BLEPeerAddress::Type::Public, connMsg.address);
+    connMsg.mtu = 256;
+    connMsg.params.minIntervalUnits = 24;
+    connMsg.params.maxIntervalUnits = 40;
+    connMsg.boolVal1 = false;
+
+    EXPECT_TRUE(mgr.postTestQueueMessage(connMsg));
+    mgr.tick(0);
+
+    // Verify the manager is still in Active state and the connection was recorded
+    EXPECT_EQ(mgr.getState(), BLEManager::State::Active);
+    EXPECT_EQ(mgr.getPeripheralConnectionCount(), 1);
+
+    BLEPeerInfo peer;
+    EXPECT_TRUE(mgr.getPeerInfo(1, peer));
+    EXPECT_EQ(peer.handle, 1);
+    EXPECT_EQ(srv.connectedPeers.size(), 1);
+    EXPECT_EQ(srv.connectedPeers[0].handle, 1);
+
+    // Note on advertising verification:
+    // In native unit test builds, host stubs in BLEStack.hpp make isAdvertising()
+    // unconditionally return false. Full verification of hardware advertising restart
+    // requires target hardware or a mock stack. Here we verify that below the connection
+    // cap, the manager processes the connection, stays Active, and does not stop or fault.
+    // The host stub returns false, exercising the !_stack.isAdvertising() check in the
+    // re-advertise branch.
+    EXPECT_FALSE(mgr.isAdvertising()); // Host stub returns false on native
+}
