@@ -424,13 +424,15 @@ bool BLEManager::startDiscovery(const char* providerId, uint32_t durationMs) {
     return true;
 }
 
-void BLEManager::stopDiscovery() {
+bool BLEManager::stopDiscovery() {
     if (_discovery.active) {
         _discovery.active = false;
         WorkerCommand cmd;
         cmd.type = WorkerCommand::Type::StopDiscovery;
         xQueueSend(static_cast<QueueHandle_t>(_workerQueue), &cmd, 0);
+        return true;
     }
+    return false;
 }
 
 size_t BLEManager::getDiscoveryResults(BLEScanResult* out, size_t max) const {
@@ -476,7 +478,13 @@ bool BLEManager::pair(const char* providerId, const BLEPeerAddress& addr) {
     // Stop any active discovery scan — the user has chosen a device.
     // Leaving discovery active blocks the reconnect scheduler (isScanning()
     // returns true while _discovery.active) and prevents future scans.
-    stopDiscovery();
+    // If discovery was active, notify subscribers.
+    if (stopDiscovery()) {
+        _scanRing[_scanRingHead].kind = BLEScanPayload::Kind::Discovery;
+        _scanRing[_scanRingHead].reason = "paired";
+        if (_eventBus) _eventBus->publish(BLEEvents::SCAN_STOPPED, &_scanRing[_scanRingHead]);
+        _scanRingHead = (_scanRingHead + 1) % RING_SIZE;
+    }
 
     BLEStoredDevice device;
     device.address = addr;
@@ -540,8 +548,7 @@ BLEManager::ScanInhibit BLEManager::inhibitScanning(const char* reason) {
              reason ? reason : "unspecified", _scanInhibitCount.load());
 
     if (_scanInhibitCount == 1) {
-        if (_discovery.active) {
-            stopDiscovery();
+        if (stopDiscovery()) {
             _scanRing[_scanRingHead].kind = BLEScanPayload::Kind::Discovery;
             _scanRing[_scanRingHead].reason = "inhibited";
             if (_eventBus) _eventBus->publish(BLEEvents::SCAN_STOPPED, &_scanRing[_scanRingHead]);
@@ -619,8 +626,7 @@ void BLEManager::pause(const char* reason) {
         _stack.stopAdvertising();
 
         // Stop active scans while paused
-        if (_discovery.active) {
-            stopDiscovery();
+        if (stopDiscovery()) {
             _scanRing[_scanRingHead].kind = BLEScanPayload::Kind::Discovery;
             _scanRing[_scanRingHead].reason = "paused";
             if (_eventBus) _eventBus->publish(BLEEvents::SCAN_STOPPED, &_scanRing[_scanRingHead]);
