@@ -411,4 +411,114 @@ TEST(BLEManagerTest, ScanResultCarriesRssi) {
     EXPECT_EQ(results[0].address, scanMsg.address);
 }
 
+// Issue #309: Verify re-advertise branch executes after a peripheral connects while below cap.
+TEST(BLEManagerTest, ReadvertiseAfterPeripheralConnectBelowCap) {
+    BLEManager mgr;
+    MockDetailedServiceProvider srv;
+    mgr.registerServiceProvider(&srv);
+    mgr.setStateForTesting(BLEManager::State::Active);
+
+    // Initial state is Active
+    EXPECT_EQ(mgr.getState(), BLEManager::State::Active);
+
+    // Post a PeerConnected queue message
+    BLEQueueMessage connMsg;
+    connMsg.type = BLEQueueMessage::Type::PeerConnected;
+    connMsg.handle = 1;
+    BLEPeerAddress::parse("AA:BB:CC:DD:EE:01", BLEPeerAddress::Type::Public, connMsg.address);
+    connMsg.mtu = 256;
+    connMsg.params.minIntervalUnits = 24;
+    connMsg.params.maxIntervalUnits = 40;
+    connMsg.boolVal1 = false;
+
+    EXPECT_TRUE(mgr.postTestQueueMessage(connMsg));
+    mgr.tick(0);
+
+    // Verify the manager is still in Active state and the connection was recorded
+    EXPECT_EQ(mgr.getState(), BLEManager::State::Active);
+    EXPECT_EQ(mgr.getPeripheralConnectionCount(), 1);
+
+    BLEPeerInfo peer;
+    EXPECT_TRUE(mgr.getPeerInfo(1, peer));
+    EXPECT_EQ(peer.handle, 1);
+    EXPECT_EQ(srv.connectedPeers.size(), 1);
+    EXPECT_EQ(srv.connectedPeers[0].handle, 1);
+
+    // With the stateful host stub, we can directly assert that advertising restarted:
+    EXPECT_TRUE(mgr.isAdvertising());
+}
+
+TEST(BLEManagerTest, AdvertisingStopsAtConnectionCap) {
+    BLEManager mgr;
+    MockDetailedServiceProvider srv;
+    mgr.registerServiceProvider(&srv);
+    mgr.setStateForTesting(BLEManager::State::Active);
+    EXPECT_EQ(mgr.getState(), BLEManager::State::Active);
+
+    // Connection 1 (1 < 3) -> should re-advertise
+    BLEQueueMessage c1;
+    c1.type = BLEQueueMessage::Type::PeerConnected;
+    c1.handle = 1;
+    BLEPeerAddress::parse("AA:BB:CC:DD:EE:01", BLEPeerAddress::Type::Public, c1.address);
+    c1.mtu = 256;
+    c1.params.minIntervalUnits = 24;
+    c1.params.maxIntervalUnits = 40;
+    EXPECT_TRUE(mgr.postTestQueueMessage(c1));
+    mgr.tick(0);
+    EXPECT_TRUE(mgr.isAdvertising());
+    EXPECT_EQ(mgr.getPeripheralConnectionCount(), 1);
+
+    // Connection 2 (2 < 3) -> should still advertise
+    BLEQueueMessage c2;
+    c2.type = BLEQueueMessage::Type::PeerConnected;
+    c2.handle = 2;
+    BLEPeerAddress::parse("AA:BB:CC:DD:EE:02", BLEPeerAddress::Type::Public, c2.address);
+    c2.mtu = 256;
+    c2.params.minIntervalUnits = 24;
+    c2.params.maxIntervalUnits = 40;
+    EXPECT_TRUE(mgr.postTestQueueMessage(c2));
+    mgr.tick(0);
+    EXPECT_TRUE(mgr.isAdvertising());
+    EXPECT_EQ(mgr.getPeripheralConnectionCount(), 2);
+
+    // Connection 3 (3 == 3, cap reached) -> should stop advertising
+    BLEQueueMessage c3;
+    c3.type = BLEQueueMessage::Type::PeerConnected;
+    c3.handle = 3;
+    BLEPeerAddress::parse("AA:BB:CC:DD:EE:03", BLEPeerAddress::Type::Public, c3.address);
+    c3.mtu = 256;
+    c3.params.minIntervalUnits = 24;
+    c3.params.maxIntervalUnits = 40;
+    EXPECT_TRUE(mgr.postTestQueueMessage(c3));
+    mgr.tick(0);
+    EXPECT_FALSE(mgr.isAdvertising());
+    EXPECT_EQ(mgr.getPeripheralConnectionCount(), 3);
+}
+
+TEST(BLEManagerTest, NoReadvertiseWhilePaused) {
+    BLEManager mgr;
+    MockDetailedServiceProvider srv;
+    mgr.registerServiceProvider(&srv);
+    mgr.setStateForTesting(BLEManager::State::Active);
+    mgr.setGattStartedForTesting(true);
+
+    mgr.pause("test");
+    EXPECT_EQ(mgr.getState(), BLEManager::State::Paused);
+    EXPECT_FALSE(mgr.isAdvertising());
+
+    // Post a connection while paused
+    BLEQueueMessage connMsg;
+    connMsg.type = BLEQueueMessage::Type::PeerConnected;
+    connMsg.handle = 1;
+    BLEPeerAddress::parse("AA:BB:CC:DD:EE:01", BLEPeerAddress::Type::Public, connMsg.address);
+    connMsg.mtu = 256;
+    connMsg.params.minIntervalUnits = 24;
+    connMsg.params.maxIntervalUnits = 40;
+    EXPECT_TRUE(mgr.postTestQueueMessage(connMsg));
+    mgr.tick(0);
+
+    EXPECT_EQ(mgr.getState(), BLEManager::State::Paused);
+    EXPECT_FALSE(mgr.isAdvertising());
+    EXPECT_EQ(mgr.getPeripheralConnectionCount(), 1);
+}
 

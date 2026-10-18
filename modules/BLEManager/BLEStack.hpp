@@ -209,6 +209,7 @@ private:
     NimBLEServer* _server             = nullptr;
     void*         _eventQueue         = nullptr;
     uint32_t      _droppedEventsCount = 0;
+    bool          _advertisingStub    = false;
 };
 
 #if !defined(ESP_PLATFORM) || !defined(WITH_BLE)
@@ -246,13 +247,15 @@ inline bool BLEStack::startServer() {
     return true;
 }
 inline bool BLEStack::startAdvertising(const BLEAdvPackResult& /*packResult*/, const BLEConnParams& /*preferredParams*/) {
+    _advertisingStub = true;
     return true;
 }
 inline bool BLEStack::stopAdvertising() {
+    _advertisingStub = false;
     return true;
 }
 inline bool BLEStack::isAdvertising() const {
-    return false;
+    return _advertisingStub;
 }
 inline bool BLEStack::disconnect(BLEConnHandle /*handle*/, uint8_t /*reason*/) {
     return true;
