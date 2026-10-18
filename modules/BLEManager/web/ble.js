@@ -93,30 +93,46 @@
   // Data Fetching & Polling
   // =========================================================================
 
+  let fetchPromise = null;
+
   /**
    * Fetch current BLE status and update all cards.
+   * @param {boolean} [forceFresh] - When true, ensures a fresh fetch even if one is currently in-flight.
    */
-  async function fetchStatus() {
-    try {
-      const status = await apiCall('/api/ble/status');
-      renderStatusCard(status);
-      renderDevicesCard(status);
-      renderConnectionsCard(status);
-      renderDiagnosticsDrawer(status);
-
-      // If system reports scanning active, keep fetching scan results
-      if (status.isScanning || (status.discovery && status.discovery.active)) {
-        isScanningLocal = true;
-        scanProviderId = (status.discovery && status.discovery.providerId) ? status.discovery.providerId : scanProviderId;
-        await fetchScanResults(scanProviderId);
-      } else if (isScanningLocal) {
-        // Just finished scanning
-        isScanningLocal = false;
-        await fetchScanResults(scanProviderId);
-      }
-    } catch (err) {
-      console.error('[BLE] status fetch error:', err);
+  async function fetchStatus(forceFresh) {
+    if (fetchPromise) {
+      if (!forceFresh) return fetchPromise;
+      try {
+        await fetchPromise;
+      } catch (_) { /* ignore */ }
     }
+
+    fetchPromise = (async () => {
+      try {
+        const status = await apiCall('/api/ble/status');
+        renderStatusCard(status);
+        renderDevicesCard(status);
+        renderConnectionsCard(status);
+        renderDiagnosticsDrawer(status);
+
+        // If system reports scanning active, keep fetching scan results
+        if (status.isScanning || (status.discovery && status.discovery.active)) {
+          isScanningLocal = true;
+          scanProviderId = (status.discovery && status.discovery.providerId) ? status.discovery.providerId : scanProviderId;
+          await fetchScanResults(scanProviderId);
+        } else if (isScanningLocal) {
+          // Just finished scanning
+          isScanningLocal = false;
+          await fetchScanResults(scanProviderId);
+        }
+      } catch (err) {
+        console.error('[BLE] status fetch error:', err);
+      } finally {
+        fetchPromise = null;
+      }
+    })();
+
+    return fetchPromise;
   }
 
   /**
@@ -235,28 +251,24 @@
     }
   }
 
-  function buildProviderHtml(dev, status) {
-    const pid = escapeHtml(dev.providerId);
-    const label = escapeHtml(dev.label || dev.providerId);
-    const isScanning = isScanningLocal && scanProviderId === dev.providerId;
-    const bleActive = status.state === 'Active';
-
-    let statusBadgeHtml = '';
+  function buildStatusBadgeHtml(dev) {
     if (dev.connected) {
-      statusBadgeHtml = '<span class="status-badge"><span class="dot dot--green"></span><span style="font-size:0.75rem; font-weight:700; text-transform:uppercase;">Connected</span></span>';
+      return '<span class="status-badge"><span class="dot dot--green"></span><span style="font-size:0.75rem; font-weight:700; text-transform:uppercase;">Connected</span></span>';
     } else if (dev.reconnect && dev.reconnect.phase && dev.reconnect.phase !== 'Idle') {
-      statusBadgeHtml = '<span class="status-badge"><span class="dot dot--yellow dot--pulse"></span><span style="font-size:0.75rem; font-weight:700; text-transform:uppercase;">Reconnecting (' + escapeHtml(dev.reconnect.phase) + ')</span></span>';
+      return '<span class="status-badge"><span class="dot dot--yellow dot--pulse"></span><span style="font-size:0.75rem; font-weight:700; text-transform:uppercase;">Reconnecting (' + escapeHtml(dev.reconnect.phase) + ')</span></span>';
     } else {
-      statusBadgeHtml = '<span class="status-badge"><span class="dot dot--grey"></span><span style="font-size:0.75rem; font-weight:700; text-transform:uppercase;">Disconnected</span></span>';
+      return '<span class="status-badge"><span class="dot dot--grey"></span><span style="font-size:0.75rem; font-weight:700; text-transform:uppercase;">Disconnected</span></span>';
     }
+  }
 
-    let storedHtml = '';
+  function buildStoredHtml(dev) {
+    const pid = escapeHtml(dev.providerId);
     if (dev.stored) {
       const devName = escapeHtml(dev.stored.name || '(unnamed device)');
       const devAddr = escapeHtml(dev.stored.address || dev.stored.addressRedacted || '—');
       const devType = escapeHtml(dev.stored.addressType || '');
       const bondedBadge = dev.stored.bonded ? '<span class="badge badge--subtle" style="margin-left:6px;">Bonded</span>' : '';
-      storedHtml = `
+      return `
         <div class="ble-stored" id="ble-stored-${pid}">
           <div class="ble-stored-info">
             <div class="ble-stored-name">${devName}${bondedBadge}</div>
@@ -265,8 +277,50 @@
           <button type="button" class="ble-btn ble-btn--outline-danger ble-forget-btn" data-provider="${pid}">Forget</button>
         </div>
       `;
-    } else {
-      storedHtml = `<div class="ble-no-device" id="ble-stored-${pid}">No device paired yet. Scan below to discover and pair.</div>`;
+    }
+    return `<div class="ble-no-device" id="ble-stored-${pid}">No device paired yet. Scan below to discover and pair.</div>`;
+  }
+
+  function wireForgetButton(btn) {
+    if (!btn || btn._wired) return;
+    btn._wired = true;
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      const pid = btn.getAttribute('data-provider');
+      armForgetButton(btn, async () => {
+        try {
+          await apiCall('/api/ble/forget', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ providerId: pid })
+          });
+          showToast('Device forgotten for ' + pid, 'info');
+          await fetchStatus(true);
+        } catch (err) {
+          showToast('Forget failed: ' + err.message, 'error');
+          btn.disabled = false;
+          btn.textContent = 'Forget';
+        }
+      });
+    });
+  }
+
+  function buildProviderHtml(dev, status) {
+    const pid = escapeHtml(dev.providerId);
+    const label = escapeHtml(dev.label || dev.providerId);
+    const isScanning = isScanningLocal && scanProviderId === dev.providerId;
+    const bleActive = status.state === 'Active';
+
+    const statusBadgeHtml = buildStatusBadgeHtml(dev);
+    const storedHtml = buildStoredHtml(dev);
+
+    let storedAttrs = '';
+    if (dev.stored) {
+      const devName = escapeHtml(dev.stored.name || '(unnamed device)');
+      const devAddr = escapeHtml(dev.stored.address || dev.stored.addressRedacted || '—');
+      const devType = escapeHtml(dev.stored.addressType || '');
+      const bonded = !!dev.stored.bonded;
+      storedAttrs = ` data-stored-addr="${devAddr}" data-stored-name="${devName}" data-stored-bonded="${bonded}" data-stored-type="${devType}"`;
     }
 
     const scanBtnDisabled = (!bleActive || isScanningLocal) ? 'disabled' : '';
@@ -282,7 +336,7 @@
           <div class="ble-provider-badge-container">${statusBadgeHtml}</div>
         </div>
 
-        <div class="ble-stored-container">${storedHtml}</div>
+        <div class="ble-stored-container"${storedAttrs}>${storedHtml}</div>
 
         <div class="ble-provider-actions">
           <button type="button" class="ble-btn ble-btn--primary ble-scan-btn" data-provider="${pid}" ${scanBtnDisabled}>
@@ -298,18 +352,56 @@
   }
 
   function updateProviderElement(dev, status) {
-    const el = document.querySelector(`.ble-provider[data-provider="${dev.providerId}"]`);
+    const el = Array.from(document.querySelectorAll('.ble-provider'))
+      .find(p => p.getAttribute('data-provider') === dev.providerId) ||
+      document.querySelector(`.ble-provider[data-provider="${dev.providerId}"]`);
     if (!el) return;
 
     // Update status badge
     const badgeContainer = el.querySelector('.ble-provider-badge-container');
     if (badgeContainer) {
-      if (dev.connected) {
-        badgeContainer.innerHTML = '<span class="status-badge"><span class="dot dot--green"></span><span style="font-size:0.75rem; font-weight:700; text-transform:uppercase;">Connected</span></span>';
-      } else if (dev.reconnect && dev.reconnect.phase && dev.reconnect.phase !== 'Idle') {
-        badgeContainer.innerHTML = '<span class="status-badge"><span class="dot dot--yellow dot--pulse"></span><span style="font-size:0.75rem; font-weight:700; text-transform:uppercase;">Reconnecting (' + escapeHtml(dev.reconnect.phase) + ')</span></span>';
+      badgeContainer.innerHTML = buildStatusBadgeHtml(dev);
+    }
+
+    // Update stored device info
+    const storedContainer = el.querySelector('.ble-stored-container');
+    if (storedContainer) {
+      const storedEl = storedContainer.querySelector('.ble-stored');
+      const noDeviceEl = storedContainer.querySelector('.ble-no-device');
+      const forgetBtn = storedContainer.querySelector('.ble-forget-btn');
+      const isArmed = forgetBtn && forgetBtn.getAttribute('data-armed') === 'true';
+
+      if (dev.stored) {
+        const devName = dev.stored.name || '(unnamed device)';
+        const devAddr = dev.stored.address || dev.stored.addressRedacted || '—';
+        const devType = dev.stored.addressType || '';
+        const bonded = !!dev.stored.bonded;
+
+        // If no device was shown previously, or if stored device details changed (and not armed)
+        if (!storedEl || (!isArmed && (
+            storedContainer.getAttribute('data-stored-addr') !== devAddr ||
+            storedContainer.getAttribute('data-stored-name') !== devName ||
+            storedContainer.getAttribute('data-stored-bonded') !== String(bonded) ||
+            storedContainer.getAttribute('data-stored-type') !== devType))) {
+          if (forgetBtn && forgetBtn._armTimer) clearTimeout(forgetBtn._armTimer);
+          storedContainer.innerHTML = buildStoredHtml(dev);
+          storedContainer.setAttribute('data-stored-addr', devAddr);
+          storedContainer.setAttribute('data-stored-name', devName);
+          storedContainer.setAttribute('data-stored-bonded', String(bonded));
+          storedContainer.setAttribute('data-stored-type', devType);
+          const newForgetBtn = storedContainer.querySelector('.ble-forget-btn');
+          if (newForgetBtn) wireForgetButton(newForgetBtn);
+        }
       } else {
-        badgeContainer.innerHTML = '<span class="status-badge"><span class="dot dot--grey"></span><span style="font-size:0.75rem; font-weight:700; text-transform:uppercase;">Disconnected</span></span>';
+        // No stored device
+        if (!noDeviceEl) {
+          if (forgetBtn && forgetBtn._armTimer) clearTimeout(forgetBtn._armTimer);
+          storedContainer.innerHTML = buildStoredHtml(dev);
+          storedContainer.removeAttribute('data-stored-addr');
+          storedContainer.removeAttribute('data-stored-name');
+          storedContainer.removeAttribute('data-stored-bonded');
+          storedContainer.removeAttribute('data-stored-type');
+        }
       }
     }
 
@@ -331,27 +423,7 @@
 
   function wireProviderListeners(container) {
     // Forget buttons
-    container.querySelectorAll('.ble-forget-btn').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.preventDefault();
-        const pid = btn.getAttribute('data-provider');
-        armForgetButton(btn, async () => {
-          try {
-            await apiCall('/api/ble/forget', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ providerId: pid })
-            });
-            showToast('Device forgotten for ' + pid, 'info');
-            await fetchStatus();
-          } catch (err) {
-            showToast('Forget failed: ' + err.message, 'error');
-            btn.disabled = false;
-            btn.textContent = 'Forget';
-          }
-        });
-      });
-    });
+    container.querySelectorAll('.ble-forget-btn').forEach(wireForgetButton);
 
     // Scan buttons
     container.querySelectorAll('.ble-scan-btn').forEach(btn => {
@@ -373,7 +445,7 @@
             body: JSON.stringify({ providerId: pid, durationMs: 30000 })
           });
           showToast('BLE discovery scan started', 'info');
-          await fetchStatus();
+          await fetchStatus(true);
         } catch (err) {
           isScanningLocal = false;
           scanProviderId = null;
@@ -393,7 +465,7 @@
     const target = document.querySelector(`.ble-scan-results-container[data-provider="${providerId}"]`);
     if (!target) return;
 
-    if (!results || results.length === 0) {
+    if (!results || !Array.isArray(results) || results.length === 0) {
       if (isScanningLocal) {
         target.innerHTML = '<div style="font-size:0.8rem; color:var(--text-muted); padding:0.5rem 0;">Scanning for matching devices...</div>';
       } else {
@@ -457,7 +529,14 @@
           });
           showToast(`Pairing initiated with ${addr}`, 'success');
           isScanningLocal = false;
-          await fetchStatus();
+          const scanResultsContainer = document.querySelector(`.ble-scan-results-container[data-provider="${pid}"]`);
+          if (scanResultsContainer) {
+            scanResultsContainer.innerHTML = '';
+          }
+          if (scanResultsCache[pid]) {
+            delete scanResultsCache[pid];
+          }
+          await fetchStatus(true);
         } catch (err) {
           showToast(`Pair failed: ${err.message}`, 'error');
           btn.disabled = false;
@@ -995,6 +1074,7 @@
         initTab(container);
         if (document.visibilityState === 'visible') {
           startPolling();
+          fetchStatus();
         }
       }
     } else {
