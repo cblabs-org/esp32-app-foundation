@@ -553,6 +553,8 @@ namespace {
 
             // R8: RSSI now carried in its own dedicated field, not packed into handle.
             msg.rssi = (int8_t)advertisedDevice->getRSSI();
+            // Issue #303: Carry connectable flag from NimBLE scan result to host loop.
+            msg.boolVal1 = advertisedDevice->isConnectable();
 
             xQueueSend(static_cast<QueueHandle_t>(s_hostQueue), &msg, 0);
         }
