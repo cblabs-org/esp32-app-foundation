@@ -209,8 +209,11 @@ public:
      * @return true if discovery started, false if already active or provider not found.
      */
     bool   startDiscovery(const char* providerId, uint32_t durationMs = 30000);
-    /** @brief Stop an active discovery scan. */
-    void   stopDiscovery();
+    /**
+     * @brief Stop an active discovery scan.
+     * @return true if a scan was active and stopped, false otherwise.
+     */
+    bool   stopDiscovery();
     /**
      * @brief Copy discovery results into a caller-supplied buffer.
      * @param out Buffer to receive scan results.
@@ -291,6 +294,10 @@ public:
     void setAppStateForTesting(AppState s) {
         _appStateForTesting = s;
         _hasAppStateForTesting = true;
+    }
+    /** @brief Set the EventBus instance for testing. */
+    void setEventBusForTesting(EventBus* bus) {
+        _eventBus = bus;
     }
 
 

@@ -12,10 +12,13 @@
  */
 
 #include <gtest/gtest.h>
+#include <string>
+#include "EventBus.hpp"
 #include "BLEManager/BLEManager.hpp"
 #include "BLEManager/BLEDeviceRegistry.hpp"
 #include "BLEManager/BLEReconnectPolicy.hpp"
 #include "BLEManager/IBLEClientProvider.hpp"
+#include "BLEManager/BLEEvents.hpp"
 
 namespace {
     // Minimal stand-in central client provider, mirroring the one in
@@ -111,4 +114,101 @@ TEST(BLEManagerCentralTest, ForgetClosesReconnectRaceImmediately) {
         EXPECT_EQ(policy.phase(), BLEReconnectPolicy::Phase::Idle);
     }
 }
+
+namespace {
+    struct ScanStoppedEventCapture {
+        int count = 0;
+        BLEScanPayload::Kind kind = BLEScanPayload::Kind::Discovery;
+        std::string reason;
+    };
+
+    void onScanStoppedTestCallback(const char* /*topic*/, const void* payload, void* ctx) {
+        if (!ctx || !payload) return;
+        auto* cap = static_cast<ScanStoppedEventCapture*>(ctx);
+        const auto* scanPayload = static_cast<const BLEScanPayload*>(payload);
+        cap->count++;
+        cap->kind = scanPayload->kind;
+        cap->reason = scanPayload->reason ? scanPayload->reason : "";
+    }
+}
+
+TEST(BLEManagerCentralTest, PairPublishesScanStoppedWhenDiscoveryActive) {
+    BLEManager mgr;
+    WO9DummyClientProvider cli;
+    ASSERT_TRUE(mgr.registerClientProvider(&cli));
+    mgr.setStateForTesting(BLEManager::State::Active);
+    mgr.setAppStateForTesting(AppState::Running);
+
+    EventBus bus;
+    bus.begin();
+    mgr.setEventBusForTesting(&bus);
+
+    ScanStoppedEventCapture capture;
+    ASSERT_TRUE(bus.subscribe(BLEEvents::SCAN_STOPPED, onScanStoppedTestCallback, &capture));
+
+    // Start discovery
+    ASSERT_TRUE(mgr.startDiscovery("wo9_cli", 5000));
+    EXPECT_TRUE(mgr.isDiscoveryActive());
+    EXPECT_TRUE(mgr.isScanning());
+
+    // Pair a device while discovery is active
+    BLEPeerAddress addr;
+    ASSERT_TRUE(BLEPeerAddress::parse("AA:BB:CC:DD:EE:FF", BLEPeerAddress::Type::Public, addr));
+    EXPECT_TRUE(mgr.pair("wo9_cli", addr));
+
+    // Discovery should now be stopped
+    EXPECT_FALSE(mgr.isDiscoveryActive());
+
+    // SCAN_STOPPED event must have been published with reason "paired"
+    EXPECT_EQ(capture.count, 1);
+    EXPECT_EQ(capture.kind, BLEScanPayload::Kind::Discovery);
+    EXPECT_EQ(capture.reason, "paired");
+}
+
+TEST(BLEManagerCentralTest, PairDoesNotPublishScanStoppedWhenDiscoveryInactive) {
+    BLEManager mgr;
+    WO9DummyClientProvider cli;
+    ASSERT_TRUE(mgr.registerClientProvider(&cli));
+    mgr.setStateForTesting(BLEManager::State::Active);
+    mgr.setAppStateForTesting(AppState::Running);
+
+    EventBus bus;
+    bus.begin();
+    mgr.setEventBusForTesting(&bus);
+
+    ScanStoppedEventCapture capture;
+    ASSERT_TRUE(bus.subscribe(BLEEvents::SCAN_STOPPED, onScanStoppedTestCallback, &capture));
+
+    EXPECT_FALSE(mgr.isDiscoveryActive());
+
+    // Pair a device when discovery is NOT active
+    BLEPeerAddress addr;
+    ASSERT_TRUE(BLEPeerAddress::parse("AA:BB:CC:DD:EE:FF", BLEPeerAddress::Type::Public, addr));
+    EXPECT_TRUE(mgr.pair("wo9_cli", addr));
+
+    // No SCAN_STOPPED event should be published
+    EXPECT_EQ(capture.count, 0);
+}
+
+TEST(BLEManagerCentralTest, StopDiscoveryReturnsTrueWhenActiveAndFalseWhenInactive) {
+    BLEManager mgr;
+    WO9DummyClientProvider cli;
+    ASSERT_TRUE(mgr.registerClientProvider(&cli));
+    mgr.setStateForTesting(BLEManager::State::Active);
+    mgr.setAppStateForTesting(AppState::Running);
+
+    // When inactive, stopDiscovery() returns false
+    EXPECT_FALSE(mgr.isDiscoveryActive());
+    EXPECT_FALSE(mgr.stopDiscovery());
+
+    // When active, stopDiscovery() returns true
+    ASSERT_TRUE(mgr.startDiscovery("wo9_cli", 5000));
+    EXPECT_TRUE(mgr.isDiscoveryActive());
+    EXPECT_TRUE(mgr.stopDiscovery());
+    EXPECT_FALSE(mgr.isDiscoveryActive());
+
+    // Subsequent call returns false (idempotent)
+    EXPECT_FALSE(mgr.stopDiscovery());
+}
+
 
