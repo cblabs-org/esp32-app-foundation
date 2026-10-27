@@ -503,7 +503,7 @@
                   <td style="color:var(--text-muted); font-size:0.75rem;">${rssi}</td>
                   <td style="text-align:right;">
                     <button type="button" class="ble-btn ble-btn--primary ble-pair-btn" style="padding:0.25rem 0.6rem; font-size:0.75rem;"
-                      data-provider="${providerId}" data-address="${fullAddr}" data-type="${addrType}">Pair</button>
+                      data-provider="${providerId}" data-address="${fullAddr}" data-type="${addrType}" data-name="${escapeHtml(r.name || '')}">Pair</button>
                   </td>
                 </tr>
               `;
@@ -520,15 +520,20 @@
         const pid = btn.getAttribute('data-provider');
         const addr = btn.getAttribute('data-address');
         const type = btn.getAttribute('data-type');
+        const devName = btn.getAttribute('data-name');
 
         btn.disabled = true;
         btn.textContent = 'Pairing...';
 
         try {
+          const pairPayload = { providerId: pid, address: addr, addressType: type };
+          if (devName) {
+            pairPayload.name = devName;
+          }
           await apiCall('/api/ble/pair', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ providerId: pid, address: addr, addressType: type })
+            body: JSON.stringify(pairPayload)
           });
           showToast(`Pairing initiated with ${addr}`, 'success');
           isScanningLocal = false;

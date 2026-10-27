@@ -239,9 +239,10 @@ public:
      * @brief Pair with a discovered BLE peripheral for a given client provider.
      * @param providerId Provider that will own the connection.
      * @param addr       Bluetooth address of the peer to pair with.
+     * @param name       Optional device name (if omitted or null, looks up from discovery results).
      * @return true if pairing was initiated, false on error.
      */
-    bool   pair(const char* providerId, const BLEPeerAddress& addr);
+    bool   pair(const char* providerId, const BLEPeerAddress& addr, const char* name = nullptr);
     /**
      * @brief Forget (unpair) the stored device for a client provider.
      * @param providerId Provider whose stored device is removed.

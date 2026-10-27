@@ -320,6 +320,26 @@ TEST(BLESerializationTest, RegisterMCPToolsAndExecution) {
         EXPECT_STREQ(result["error"], "invalid address");
     }
 
+    // Execute ble_pair with valid address and name -> should store device with name
+    {
+        JsonDocument paramsDoc;
+        JsonObject params = paramsDoc.to<JsonObject>();
+        params["providerId"] = "hrm";
+        params["address"] = "11:22:33:44:55:66";
+        params["addressType"] = "Public";
+        params["name"] = "My Heart Rate Monitor";
+        JsonDocument resultDoc;
+        JsonObject result = resultDoc.to<JsonObject>();
+
+        pairTool->handler(pairTool->context, params, result);
+        EXPECT_FALSE(result["isError"].as<bool>());
+        EXPECT_STREQ(result["status"], "pairing");
+
+        BLEStoredDevice stored;
+        EXPECT_TRUE(mgr.getStoredDevice("hrm", stored));
+        EXPECT_STREQ(stored.name, "My Heart Rate Monitor");
+    }
+
     // Execute ble_forget with unknown provider -> should report error
     {
         JsonDocument paramsDoc;
