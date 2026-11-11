@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "ops": [
+    {
+      "type": "add",
+      "entry_id": "seed-81385e64",
+      "dossier_scope": "test/stubs/platform",
+      "timestamp": "2026-08-29T22:53:05+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "test/stubs/platform/WiFi.h",
+          "test/stubs/platform/esp_wifi.h",
+          "test/test_unit/test_wifiManager/test_wifiManager.cpp"
+        ],
+        "entry_type": "decision",
+        "text": "Chose `-75 dBm` as the default RSSI threshold: this provides a robust balance between connection resilience in fringe locations and filtering out weak beacons when stronger mesh nodes are present on the same SSID."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-9fdf9b81",
+      "dossier_scope": "test/stubs/platform",
+      "timestamp": "2026-08-29T22:53:05+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "test/stubs/platform/WiFi.h",
+          "test/stubs/platform/esp_wifi.h",
+          "test/test_unit/test_wifiManager/test_wifiManager.cpp"
+        ],
+        "entry_type": "decision",
+        "text": "Used ESP-IDF `wifi_sta_config_t` directly during connection setup (`WiFi.begin(..., false)` followed by `esp_wifi_get_config`/`esp_wifi_set_config` and `esp_wifi_connect`) to avoid Arduino core's default override of `threshold.rssi = -127` and disabled BTM flags."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-95626753",
+      "dossier_scope": "test/stubs/platform",
+      "timestamp": "2026-08-29T22:53:05+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "test/stubs/platform/WiFi.h",
+          "test/stubs/platform/esp_wifi.h",
+          "test/test_unit/test_wifiManager/test_wifiManager.cpp"
+        ],
+        "entry_type": "ruled-out",
+        "text": "Calling `WiFi.begin(ssid, pass)` directly in Arduino-ESP32 resets `threshold.rssi` to `-127` and clears `btm_enabled`/`rm_enabled`. Using the two-stage configuration (`WiFi.begin(..., false)` + `esp_wifi_set_config`) cleanly sets these parameters before initiating association."
+      }
+    }
+  ],
+  "created_at": "2026-08-29T21:53:05Z",
+  "batch_id": "01M17R64F856BY43R6Q60ZG3TD"
+}

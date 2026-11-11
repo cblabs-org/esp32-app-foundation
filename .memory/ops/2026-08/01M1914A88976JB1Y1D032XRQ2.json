@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "ops": [
+    {
+      "type": "add",
+      "entry_id": "seed-412fe43e",
+      "dossier_scope": "include",
+      "timestamp": "2026-08-30T10:48:37+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "include/Audit.h",
+          ".agents/skills/framework-expert/references/build-system.md",
+          ".agents/skills/framework-expert/systems/mcp-server/overview.md",
+          ".agents/skills/framework-expert/systems/web-portal/routes.md",
+          ".agents/skills/framework-expert/skill_manifest.json"
+        ],
+        "entry_type": "decision",
+        "text": "Maintained strict isolation of documentation to `.agents/skills/framework-expert/` per the Strict Boundary Box."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-89c2b5dc",
+      "dossier_scope": "include",
+      "timestamp": "2026-08-30T10:48:37+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "include/Audit.h",
+          ".agents/skills/framework-expert/references/build-system.md",
+          ".agents/skills/framework-expert/systems/mcp-server/overview.md",
+          ".agents/skills/framework-expert/systems/web-portal/routes.md",
+          ".agents/skills/framework-expert/skill_manifest.json"
+        ],
+        "entry_type": "decision",
+        "text": "Documented both `AUDIT()` and `AUDIT_SYNC()` in the two-tier API section to provide full coverage of asynchronous and synchronous use cases."
+      }
+    }
+  ],
+  "created_at": "2026-08-30T09:48:37Z",
+  "batch_id": "01M1914A88976JB1Y1D032XRQ2"
+}

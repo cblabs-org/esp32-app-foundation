@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "ops": [
+    {
+      "type": "add",
+      "entry_id": "seed-a00e212b",
+      "dossier_scope": "root",
+      "timestamp": "2026-08-16T17:41:09+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": null,
+        "entry_type": "decision",
+        "text": "Docs scope deliberately bounded: fully fixed the two issue-named skill docs +"
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-9554717a",
+      "dossier_scope": "root",
+      "timestamp": "2026-08-16T17:41:09+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": null,
+        "entry_type": "decision",
+        "text": "Executed by PA rather than a worker (see Execution note)."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-7c3c6ed8",
+      "dossier_scope": "root",
+      "timestamp": "2026-08-16T17:41:09+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": null,
+        "entry_type": "ruled-out",
+        "text": "None specific to WO2. (See WO1 for the worker-parking pattern.)"
+      }
+    }
+  ],
+  "created_at": "2026-08-16T16:41:09Z",
+  "batch_id": "01M05Q5M48ZXT3QWM3DKRGG17G"
+}

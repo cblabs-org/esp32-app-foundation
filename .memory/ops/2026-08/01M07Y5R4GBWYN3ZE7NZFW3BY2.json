@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "ops": [
+    {
+      "type": "add",
+      "entry_id": "seed-3e64b8f1",
+      "dossier_scope": "root",
+      "timestamp": "2026-08-17T14:22:02+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": null,
+        "entry_type": "decision",
+        "text": "Used the `DeepStackExecutor` natively available property to drive logic fallbacks (if begin fails, it falls back to stored PNG)."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-cecf0a9a",
+      "dossier_scope": "root",
+      "timestamp": "2026-08-17T14:22:02+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": null,
+        "entry_type": "decision",
+        "text": "Bypassed adding a heavy mock HTTP environment in the test by isolating route handlers and directly invoking the lambda."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-a08a5eff",
+      "dossier_scope": "root",
+      "timestamp": "2026-08-17T14:22:02+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": null,
+        "entry_type": "decision",
+        "text": "The `ESP_LOGI` for `PNG Worker stack high water mark` logs post-capture for the PA's physical test."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-755cdcc3",
+      "dossier_scope": "root",
+      "timestamp": "2026-08-17T14:22:02+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": null,
+        "entry_type": "ruled-out",
+        "text": "Tests for `DisplayServiceHelper` require skipping native build if it doesn't mock dependencies (`mbedtls`, etc). The PA correctly moved it to `test_displayServiceHelper` and excluded it from native."
+      }
+    }
+  ],
+  "created_at": "2026-08-17T13:22:02Z",
+  "batch_id": "01M07Y5R4GBWYN3ZE7NZFW3BY2"
+}

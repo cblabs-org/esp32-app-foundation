@@ -1,0 +1,126 @@
+{
+  "version": 1,
+  "ops": [
+    {
+      "type": "add",
+      "entry_id": "seed-f8950fce",
+      "dossier_scope": "test/test-unit/test-bleManager",
+      "timestamp": "2026-09-25T13:50:09+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "modules/BLEManager/BLEManager.hpp",
+          "modules/BLEManager/BLEManager.cpp",
+          "test/test_unit/test_bleManager/test_bleManagerCentral.cpp",
+          "test/test_unit/test_bleManager/test_bleConfig.cpp"
+        ],
+        "entry_type": "decision",
+        "text": "Kept the `lockState()` call inside `dispatchQueueEvents()` rather than removing it, since the mutex is recursive and the call documents/enforces that `dispatchQueueEvents()` is itself safe to call directly (it's implicitly `private` but called only from `tick()` today — kept as defense-in-depth per the WORKORDER's stated option)."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-13ba2db2",
+      "dossier_scope": "test/test-unit/test-bleManager",
+      "timestamp": "2026-09-25T13:50:09+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "modules/BLEManager/BLEManager.hpp",
+          "modules/BLEManager/BLEManager.cpp",
+          "test/test_unit/test_bleManager/test_bleManagerCentral.cpp",
+          "test/test_unit/test_bleManager/test_bleConfig.cpp"
+        ],
+        "entry_type": "decision",
+        "text": "`forget()` now does the registry removal itself (a private-state mutation), rather than routing it through a helper — kept the diff minimal and consistent with how `_clientConnected`/`_clientConnecting`/`_reconnectPolicies` were already erased in the same function."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-30a3d47b",
+      "dossier_scope": "test/test-unit/test-bleManager",
+      "timestamp": "2026-09-25T13:50:09+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "modules/BLEManager/BLEManager.hpp",
+          "modules/BLEManager/BLEManager.cpp",
+          "test/test_unit/test_bleManager/test_bleManagerCentral.cpp",
+          "test/test_unit/test_bleManager/test_bleConfig.cpp"
+        ],
+        "entry_type": "decision",
+        "text": "Did not add a std::mutex-based \"hasPolicy\" assert to a hard `EXPECT_FALSE` in the new race test — used a conditional (`if (hasPolicy) EXPECT_EQ(... Idle)`) because the WORKORDER's acceptance text explicitly allows either \"absent, or phase Idle\", and the current implementation actually leaves it absent (the registry gate prevents policy creation entirely), so the conditional is future-proofing against a legitimate alternate implementation, not a weakening of this test."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-de3ce23a",
+      "dossier_scope": "test/test-unit/test-bleManager",
+      "timestamp": "2026-09-25T13:50:09+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "modules/BLEManager/BLEManager.hpp",
+          "modules/BLEManager/BLEManager.cpp",
+          "test/test_unit/test_bleManager/test_bleManagerCentral.cpp",
+          "test/test_unit/test_bleManager/test_bleConfig.cpp"
+        ],
+        "entry_type": "decision",
+        "text": "No multi-threaded/concurrency test was written, per the WORKORDER's explicit instruction (\"Don't try to unit-test real multi-threading; say so in the report\"). All new coverage is single-threaded, exercising the synchronous-ordering guarantee (registry gone before `forget()` returns) rather than true concurrent access."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-7575e1ca",
+      "dossier_scope": "test/test-unit/test-bleManager",
+      "timestamp": "2026-09-25T13:50:09+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "modules/BLEManager/BLEManager.hpp",
+          "modules/BLEManager/BLEManager.cpp",
+          "test/test_unit/test_bleManager/test_bleManagerCentral.cpp",
+          "test/test_unit/test_bleManager/test_bleConfig.cpp"
+        ],
+        "entry_type": "ruled-out",
+        "text": "None. The change was mechanical once the lock/flush boundary was decided; no dead ends encountered."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-8b9c26c3",
+      "dossier_scope": "test/test-unit/test-bleManager",
+      "timestamp": "2026-09-25T13:50:09+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "modules/BLEManager/BLEManager.hpp",
+          "modules/BLEManager/BLEManager.cpp",
+          "test/test_unit/test_bleManager/test_bleManagerCentral.cpp",
+          "test/test_unit/test_bleManager/test_bleConfig.cpp"
+        ],
+        "entry_type": "open-issue",
+        "text": "`_discovery.results.clear()` (`stopDiscovery()`, called from `startDiscovery()`/`inhibitScanning()`) and `_pauseReason.clear()` (`pause()`) are containers/state mutated outside `_stateMutex` in some call paths. They weren't in the WORKORDER's named lock-scope list (`_reconnectPolicies`, `_state`, `_advPackResult`, `isClientConnected`, registry) and weren't flagged in the PA's Background section, so left untouched per the Strict Boundary Box — flagging for a future review pass in case `_discovery`/`_pauseReason` also need `_stateMutex` coverage."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-4afe660e",
+      "dossier_scope": "test/test-unit/test-bleManager",
+      "timestamp": "2026-09-25T13:50:09+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "modules/BLEManager/BLEManager.hpp",
+          "modules/BLEManager/BLEManager.cpp",
+          "test/test_unit/test_bleManager/test_bleManagerCentral.cpp",
+          "test/test_unit/test_bleManager/test_bleConfig.cpp"
+        ],
+        "entry_type": "open-issue",
+        "text": "`registerPreconditions()`'s per-provider evaluator does `const_cast\u003cBLEManager*\u003e(this)-\u003e_reconnectPolicies[pid]` to get a non-const reference from a `const`-context lambda capture pattern; this now happens inside the newly-added `lockState()` in that lambda, so it's correctly synchronized, but the `const_cast` pattern itself is pre-existing and outside this WORKORDER's scope to change."
+      }
+    }
+  ],
+  "created_at": "2026-09-25T12:50:09Z",
+  "batch_id": "01M3C9VCZ8XT36XJBK2EYYXM60"
+}

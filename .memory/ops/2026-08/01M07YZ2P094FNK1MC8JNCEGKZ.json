@@ -1,0 +1,64 @@
+{
+  "version": 1,
+  "ops": [
+    {
+      "type": "add",
+      "entry_id": "seed-d60260a3",
+      "dossier_scope": "docs/developer",
+      "timestamp": "2026-08-17T14:35:52+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          ".agents/skills/framework-expert/systems/web-portal/dram-tuning.md",
+          ".agents/skills/framework-expert/skill_manifest.json",
+          "docs/developer/performance-guide.md",
+          "docs/developer/custom-boards.md",
+          "docs/developer/extending-the-web-portal.md",
+          "lib/DeepStackExecutor/DeepStackExecutor.h"
+        ],
+        "entry_type": "decision",
+        "text": "Unified all HTTP stack / DRAM architecture documentation across both `framework-expert` skill files and framework developer guides (`docs/developer/`)."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-28627af8",
+      "dossier_scope": "docs/developer",
+      "timestamp": "2026-08-17T14:35:52+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          ".agents/skills/framework-expert/systems/web-portal/dram-tuning.md",
+          ".agents/skills/framework-expert/skill_manifest.json",
+          "docs/developer/performance-guide.md",
+          "docs/developer/custom-boards.md",
+          "docs/developer/extending-the-web-portal.md",
+          "lib/DeepStackExecutor/DeepStackExecutor.h"
+        ],
+        "entry_type": "decision",
+        "text": "Prominently highlighted the OTA flash-safety rules as a standing architectural rule for any future PSRAM deep-stack offload."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-3bbece3c",
+      "dossier_scope": "docs/developer",
+      "timestamp": "2026-08-17T14:35:52+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          ".agents/skills/framework-expert/systems/web-portal/dram-tuning.md",
+          ".agents/skills/framework-expert/skill_manifest.json",
+          "docs/developer/performance-guide.md",
+          "docs/developer/custom-boards.md",
+          "docs/developer/extending-the-web-portal.md",
+          "lib/DeepStackExecutor/DeepStackExecutor.h"
+        ],
+        "entry_type": "ruled-out",
+        "text": "PR #116 added early docs with debunked claims (async workers, 32 KB pool, max 9 sockets); PR #116 should be closed in favor of this PR head."
+      }
+    }
+  ],
+  "created_at": "2026-08-17T13:35:52Z",
+  "batch_id": "01M07YZ2P094FNK1MC8JNCEGKZ"
+}

@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "ops": [
+    {
+      "type": "add",
+      "entry_id": "seed-716a85ab",
+      "dossier_scope": "root",
+      "timestamp": "2026-08-20T08:30:17+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": null,
+        "entry_type": "decision",
+        "text": "**`_pauseRendering` over `getState()`:** The boundary box prohibits `.hpp` changes, so no `_otaManager` member could be added. The module's `_pauseRendering` atomic flag serves the identical purpose (gating screenshots during OTA) and is already maintained by the EventBus `_onOtaProgress` subscription. This is arguably cleaner than a cross-module pointer dependency."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-2aab49d2",
+      "dossier_scope": "root",
+      "timestamp": "2026-08-20T08:30:17+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": null,
+        "entry_type": "ruled-out",
+        "text": "Initially attempted to find an `Application\u0026` path to obtain the OTA manager reference, as suggested in the work order. The module's `begin()` takes `EventBus*` (not `Application\u0026`), `registerRoutes()` receives only `PsychicHttpServer\u0026`, and there is no `getModule\u003cT\u003e()` template. All paths require header modification, which the boundary box prohibits."
+      }
+    }
+  ],
+  "created_at": "2026-08-20T07:30:17Z",
+  "batch_id": "01M0F17TS8S6NP0HBK5AMWZ1P0"
+}

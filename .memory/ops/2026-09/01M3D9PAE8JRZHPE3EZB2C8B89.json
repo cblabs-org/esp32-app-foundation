@@ -1,0 +1,67 @@
+{
+  "version": 1,
+  "ops": [
+    {
+      "type": "add",
+      "entry_id": "seed-7af17826",
+      "dossier_scope": "root",
+      "timestamp": "2026-09-25T23:06:37+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": null,
+        "entry_type": "decision",
+        "text": "Maintained strict DIP compliance: `WeatherBoard` and `WeatherWidget` continue to consume only `IWeatherDataProvider*`, preventing any coupling to concrete `WeatherModule` implementation details."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-431810ca",
+      "dossier_scope": "root",
+      "timestamp": "2026-09-25T23:06:37+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": null,
+        "entry_type": "decision",
+        "text": "Retained `fetchesWhileConfiguring() const override { return false; }` with explicit documentation as an architectural teaching example for developers writing `IDataSource` implementations."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-32237260",
+      "dossier_scope": "root",
+      "timestamp": "2026-09-25T23:06:37+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": null,
+        "entry_type": "decision",
+        "text": "Flashed and verified against the attached ESP32-S3 hardware (`/dev/cu.usbmodem101`) while compiling and validating both `esp32dev` and `esp32s3nano` environments."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-7d7a2018",
+      "dossier_scope": "root",
+      "timestamp": "2026-09-25T23:06:37+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": null,
+        "entry_type": "ruled-out",
+        "text": "Host native tests in `sample-app` currently exclude `test_weather` via `platformio.ini` (`test_ignore = test_unit/test_weather`) because `WeatherModule.hpp` includes display headers referencing `U8g2lib.h`. Running native tests without `test_ignore` fails to link. This is well-documented in `platformio.ini` and `sample-app/README.md`."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-e9d15152",
+      "dossier_scope": "root",
+      "timestamp": "2026-09-25T23:06:37+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": null,
+        "entry_type": "open-issue",
+        "text": "None blocking this work order. Framework native suite passes 942 unit tests."
+      }
+    }
+  ],
+  "created_at": "2026-09-25T22:06:37Z",
+  "batch_id": "01M3D9PAE8JRZHPE3EZB2C8B89"
+}

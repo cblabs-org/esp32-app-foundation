@@ -1,0 +1,52 @@
+{
+  "version": 1,
+  "ops": [
+    {
+      "type": "add",
+      "entry_id": "seed-03c4aa31",
+      "dossier_scope": "test/stubs/platform",
+      "timestamp": "2026-08-13T10:34:56+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "test/stubs/platform/lvgl.h",
+          "modules/LVGLDisplay/library.json"
+        ],
+        "entry_type": "decision",
+        "text": "**Do NOT compile the generated `ui/*.c` on native.** It's SquareLine-generated widget construction (regenerated each export) and is verified by the hardware compile + on-device visual check — not a unit-test target. Native tests cover *our* logic (`SLSSystemScreens`, `LVGLDisplayModule`) against mock `lv_obj_t` widgets. (Confirmed acceptable with the human mid-WO.)"
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-dee360e5",
+      "dossier_scope": "test/stubs/platform",
+      "timestamp": "2026-08-13T10:34:56+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "test/stubs/platform/lvgl.h",
+          "modules/LVGLDisplay/library.json"
+        ],
+        "entry_type": "decision",
+        "text": "Made `lv_label` stubs stateful rather than keeping tests structural — unlocks value assertions (SSID/URL/message population) for a few lines."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-ca1b7fe1",
+      "dossier_scope": "test/stubs/platform",
+      "timestamp": "2026-08-13T10:34:56+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "test/stubs/platform/lvgl.h",
+          "modules/LVGLDisplay/library.json"
+        ],
+        "entry_type": "open-issue",
+        "text": "Same recipe (a stateful stub + a suite-local `ui`/board stub + drop the ignore) would revive `test_u8g2Display` and `test_application`, still dormant. Left for a separate item."
+      }
+    }
+  ],
+  "created_at": "2026-08-13T09:34:56Z",
+  "batch_id": "01KZX7K1G0SAEAG2EN0VDV8K69"
+}

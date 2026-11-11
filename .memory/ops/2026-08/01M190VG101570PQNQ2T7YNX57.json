@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "ops": [
+    {
+      "type": "add",
+      "entry_id": "seed-16f9428f",
+      "dossier_scope": "include",
+      "timestamp": "2026-08-30T10:43:48+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "include/Audit.h",
+          "modules/AuditModule/AuditModule.hpp",
+          "modules/AuditModule/AuditModule.cpp",
+          "modules/Application/Application.hpp",
+          "modules/Application/Application.cpp",
+          "platformio.ini",
+          "test/test_unit/test_audit_module/test_audit_module.cpp"
+        ],
+        "entry_type": "decision",
+        "text": "Guarded `AuditModule.cpp` with `#ifdef WITH_AUDIT` so that builds with `WITH_AUDIT` disabled do not fail on the `#error` guard in `AuditModule.hpp`."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-5029580f",
+      "dossier_scope": "include",
+      "timestamp": "2026-08-30T10:43:48+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "include/Audit.h",
+          "modules/AuditModule/AuditModule.hpp",
+          "modules/AuditModule/AuditModule.cpp",
+          "modules/Application/Application.hpp",
+          "modules/Application/Application.cpp",
+          "platformio.ini",
+          "test/test_unit/test_audit_module/test_audit_module.cpp"
+        ],
+        "entry_type": "decision",
+        "text": "Placed `auditModule.begin()` before `registerModule(\u0026auditModule)` in `Application::begin()` (Step 7) to guarantee task and queue initialization after LittleFS mount in Step 4 and prior to `_configManager.beginAll()` in Step 8."
+      }
+    }
+  ],
+  "created_at": "2026-08-30T09:43:48Z",
+  "batch_id": "01M190VG101570PQNQ2T7YNX57"
+}

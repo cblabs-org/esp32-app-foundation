@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "ops": [
+    {
+      "type": "add",
+      "entry_id": "seed-b77a2383",
+      "dossier_scope": "web/portal",
+      "timestamp": "2026-08-13T11:16:24+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "web/portal/app.js",
+          "web/display/display.js",
+          "test/web/server.js"
+        ],
+        "entry_type": "ruled-out",
+        "text": "None. All optional module scripts (`ota.js`, `mcp.js`, `display.js`, `time.js`, `homeassistant.js`) are now dynamically discovered via `/api/tabs`."
+      }
+    }
+  ],
+  "created_at": "2026-08-13T10:16:24Z",
+  "batch_id": "01KZX9YZ60DG1NZX9PRD2VAD4Y"
+}

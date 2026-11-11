@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "ops": [
+    {
+      "type": "add",
+      "entry_id": "seed-1dade7eb",
+      "dossier_scope": "root",
+      "timestamp": "2026-08-13T10:34:56+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": null,
+        "entry_type": "decision",
+        "text": "`gateHelperScreen` returns nullptr for `GateNames::WIFI_STATION` so the module's Tier-2 (`wifiWizardScreen`, Setup group) owns WiFi; generic gates get the Message group."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-ace8953f",
+      "dossier_scope": "root",
+      "timestamp": "2026-08-13T10:34:56+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": null,
+        "entry_type": "open-issue",
+        "text": "⚠️ **The entire `test_unit/test_lvglDisplay` suite (incl. `test_sls_screens.cpp`) is dormant.** `platformio.ini` `lib_ignore`s `LVGLDisplay` on `native` (line 177), so the module can't link natively, and the suite is `test_ignore`d (line 178) — present since `f5d459a` (2026-07-30, hardware-board scaffold). Consequence: the SLS bridge tests (WO13's and mine) have **never actually executed**; native \"417/417\" excludes them. Production code is verified only via the crowpanel compile. My test edits are correct-by-construction against the crowpanel-validated API but unrun. **Recommend a tracked issue** to restore native LVGL-display test coverage (e.g. compile `SLSSystemScreens.cpp` into the native suite against the existing lvgl stubs, independent of the ESP-only `LVGLDisplayModule.cpp`). → PA to file."
+      }
+    }
+  ],
+  "created_at": "2026-08-13T09:34:56Z",
+  "batch_id": "01KZX7K1G0SAEAG2EN0R1V6ZPN"
+}

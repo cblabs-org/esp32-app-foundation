@@ -1,0 +1,4 @@
+doc_seeds:
+  - "docs/**/*.md"
+  - ".agents/skills/**/SKILL.md"
+turn_notes: "on"

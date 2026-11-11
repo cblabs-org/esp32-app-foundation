@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "ops": [
+    {
+      "type": "add",
+      "entry_id": "seed-8bfdb43a",
+      "dossier_scope": "lib",
+      "timestamp": "2026-08-29T18:41:02+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "lib/PngWriter/PngWriter.cpp",
+          "test/test_unit/test_pngWriter/test_pngWriter.cpp",
+          "test/stubs/platform/lvgl.h",
+          "test/test_unit/test_mcpServer"
+        ],
+        "entry_type": "decision",
+        "text": "Guarded `tdefl` functions in `PngWriter.cpp` using `#if defined(ESP_PLATFORM)` so `writeRGB565ToRGB888` falls back directly to `writeRGB565Stored` on native host builds without needing mock ROM compression headers."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-73efc4ea",
+      "dossier_scope": "lib",
+      "timestamp": "2026-08-29T18:41:02+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "lib/PngWriter/PngWriter.cpp",
+          "test/test_unit/test_pngWriter/test_pngWriter.cpp",
+          "test/stubs/platform/lvgl.h",
+          "test/test_unit/test_mcpServer"
+        ],
+        "entry_type": "decision",
+        "text": "Defined `LV_SYMBOL_OK`, `LV_SYMBOL_CLOSE`, and `LV_SYMBOL_WARNING` in `test/stubs/platform/lvgl.h` to ensure all LVGL display tests build and pass on native runner."
+      }
+    }
+  ],
+  "created_at": "2026-08-29T17:41:02Z",
+  "batch_id": "01M179RKXGV8PZBR355BA6KYVT"
+}

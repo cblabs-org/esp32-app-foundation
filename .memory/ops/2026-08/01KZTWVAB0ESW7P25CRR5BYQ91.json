@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "ops": [
+    {
+      "type": "add",
+      "entry_id": "seed-85c1845c",
+      "dossier_scope": "test/test-unit/test-u8g2Display",
+      "timestamp": "2026-08-12T12:48:44+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "modules/U8G2Display/U8G2BootLogo.h",
+          "modules/U8G2Display/IU8G2SystemScreens.hpp",
+          "modules/U8G2Display/IDisplayBoard.hpp",
+          "modules/U8G2Display",
+          "include/AppFoundation.h",
+          "test/test_unit/test_u8g2Display/test_module.cpp",
+          "test/test_unit/test_u8g2Display/test_eventbus_integration.cpp"
+        ],
+        "entry_type": "ruled-out",
+        "text": "None. All file moves and include updates compiled and passed tests cleanly without side effects."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-76ba1c89",
+      "dossier_scope": "test/test-unit/test-u8g2Display",
+      "timestamp": "2026-08-12T12:48:44+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "modules/U8G2Display/U8G2BootLogo.h",
+          "modules/U8G2Display/IU8G2SystemScreens.hpp",
+          "modules/U8G2Display/IDisplayBoard.hpp",
+          "modules/U8G2Display",
+          "include/AppFoundation.h",
+          "test/test_unit/test_u8g2Display/test_module.cpp",
+          "test/test_unit/test_u8g2Display/test_eventbus_integration.cpp"
+        ],
+        "entry_type": "open-issue",
+        "text": "Documentation file `docs/developer/custom-branding.md` (lines 77, 108, 157, 181) contains references to old header paths (`include/types/U8G2BootLogo.h` and `include/interfaces/IU8G2SystemScreens.hpp`). Per Strict Boundary Box rules, external docs were not modified and are surfaced for PA doc updates."
+      }
+    }
+  ],
+  "created_at": "2026-08-12T11:48:44Z",
+  "batch_id": "01KZTWVAB0ESW7P25CRR5BYQ91"
+}

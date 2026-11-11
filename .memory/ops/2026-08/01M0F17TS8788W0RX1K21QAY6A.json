@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "ops": [
+    {
+      "type": "add",
+      "entry_id": "seed-5092ec44",
+      "dossier_scope": "root",
+      "timestamp": "2026-08-20T08:30:17+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": null,
+        "entry_type": "decision",
+        "text": "**`getPolicy()` already existed** on `ScreensaverController` (inline getter, line 100) — no header modification needed."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-a2721083",
+      "dossier_scope": "root",
+      "timestamp": "2026-08-20T08:30:17+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": null,
+        "entry_type": "decision",
+        "text": "**Added `resetConfig()` policy reset** — not in WO instructions but necessary for config round-trip consistency (resetConfig must mirror applyConfig/serializeConfig)."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-4fec165f",
+      "dossier_scope": "root",
+      "timestamp": "2026-08-20T08:30:17+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": null,
+        "entry_type": "decision",
+        "text": "**REST API coverage** — added policy to both `GET /api/display/status` and `POST /api/display/sleep` in addition to MCP tools, since the portal JS reads/writes via REST not MCP."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-80d171da",
+      "dossier_scope": "root",
+      "timestamp": "2026-08-20T08:30:17+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": null,
+        "entry_type": "open-issue",
+        "text": "**U8G2Display has the same gap**: `modules/U8G2Display/ScreensaverController.hpp` is missing `getPolicy()` entirely, and `U8G2DisplayModule` does not persist or expose `screensaverPolicy` in config, REST API, or MCP tools. Per WO boundary box, not touched."
+      }
+    }
+  ],
+  "created_at": "2026-08-20T07:30:17Z",
+  "batch_id": "01M0F17TS8788W0RX1K21QAY6A"
+}

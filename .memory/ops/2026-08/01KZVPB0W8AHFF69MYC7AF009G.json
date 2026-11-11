@@ -1,0 +1,52 @@
+{
+  "version": 1,
+  "ops": [
+    {
+      "type": "add",
+      "entry_id": "seed-648d0893",
+      "dossier_scope": "test/stubs/platform",
+      "timestamp": "2026-08-12T20:14:13+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.cpp",
+          "test/stubs/platform"
+        ],
+        "entry_type": "decision",
+        "text": "Keeps `exclude_on_native.py` unchanged (respects the WO boundary box — no module `.cpp` modifications)."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-dc7fd0b8",
+      "dossier_scope": "test/stubs/platform",
+      "timestamp": "2026-08-12T20:14:13+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.cpp",
+          "test/stubs/platform"
+        ],
+        "entry_type": "decision",
+        "text": "The shim compiles Application.cpp as part of the test translation unit, giving the linker all needed symbols."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-9ed13ddb",
+      "dossier_scope": "test/stubs/platform",
+      "timestamp": "2026-08-12T20:14:13+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.cpp",
+          "test/stubs/platform"
+        ],
+        "entry_type": "decision",
+        "text": "The shim is self-documenting and only affects the test_application build target."
+      }
+    }
+  ],
+  "created_at": "2026-08-12T19:14:13Z",
+  "batch_id": "01KZVPB0W8AHFF69MYC7AF009G"
+}

@@ -1,0 +1,277 @@
+{
+  "version": 1,
+  "ops": [
+    {
+      "type": "add",
+      "entry_id": "seed-344ac710",
+      "dossier_scope": "docs/developer",
+      "timestamp": "2026-09-25T13:50:58+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "modules/WifiManager/WifiManager.hpp",
+          "modules/WifiManager/WifiManager.cpp",
+          "modules/Application/Application.cpp",
+          "test/test_unit/test_wifiManager/test_wifiManager.cpp",
+          "docs/developer/security.md"
+        ],
+        "entry_type": "decision",
+        "text": "**One new state (`StaBackoff`).** The fallback AP is raised only from it, between attempts, so the radio mode never changes mid-association. With the schedule this puts it at ≈ 3 min 10 s after link loss."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-66f6b781",
+      "dossier_scope": "docs/developer",
+      "timestamp": "2026-09-25T13:50:58+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "modules/WifiManager/WifiManager.hpp",
+          "modules/WifiManager/WifiManager.cpp",
+          "modules/Application/Application.cpp",
+          "test/test_unit/test_wifiManager/test_wifiManager.cpp",
+          "docs/developer/security.md"
+        ],
+        "entry_type": "decision",
+        "text": "**`WiFi.disconnect(false)` on attempt timeout** (was `disconnect(true)`). It aborts the association without disabling the STA interface, so a running fallback AP is untouched and the radio isn't cycled off/on every minute. The next attempt re-applies the mode."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-70d49bfe",
+      "dossier_scope": "docs/developer",
+      "timestamp": "2026-09-25T13:50:58+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "modules/WifiManager/WifiManager.hpp",
+          "modules/WifiManager/WifiManager.cpp",
+          "modules/Application/Application.cpp",
+          "test/test_unit/test_wifiManager/test_wifiManager.cpp",
+          "docs/developer/security.md"
+        ],
+        "entry_type": "decision",
+        "text": "**The downtime tracker starts at the first attempt**, not only at link loss. A device that boots while its router is off therefore also gets the fallback AP (and `isWifiPersistentError()`) after 3 min."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-71b2fbf9",
+      "dossier_scope": "docs/developer",
+      "timestamp": "2026-09-25T13:50:58+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "modules/WifiManager/WifiManager.hpp",
+          "modules/WifiManager/WifiManager.cpp",
+          "modules/Application/Application.cpp",
+          "test/test_unit/test_wifiManager/test_wifiManager.cpp",
+          "docs/developer/security.md"
+        ],
+        "entry_type": "decision",
+        "text": "**Pairing `WIFI_CONNECTED` after a re-association within the grace period.** Previously only `WIFI_DISCONNECTED` fired, which left HomeAssistant MQTT disconnected (`HomeAssistantModule::onWifiDisconnected` → `disconnectMqtt()`). This uses an existing event, not a new one."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-aa53ae47",
+      "dossier_scope": "docs/developer",
+      "timestamp": "2026-09-25T13:50:58+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "modules/WifiManager/WifiManager.hpp",
+          "modules/WifiManager/WifiManager.cpp",
+          "modules/Application/Application.cpp",
+          "test/test_unit/test_wifiManager/test_wifiManager.cpp",
+          "docs/developer/security.md"
+        ],
+        "entry_type": "decision",
+        "text": "**`isReady()` includes `_isAPMode`.** `WebServerManager::tick()` starts the HTTP server on the first `isReady()`. Without this, a device that booted with its router off would never serve the portal on the fallback AP."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-96b15988",
+      "dossier_scope": "docs/developer",
+      "timestamp": "2026-09-25T13:50:58+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "modules/WifiManager/WifiManager.hpp",
+          "modules/WifiManager/WifiManager.cpp",
+          "modules/Application/Application.cpp",
+          "test/test_unit/test_wifiManager/test_wifiManager.cpp",
+          "docs/developer/security.md"
+        ],
+        "entry_type": "decision",
+        "text": "**Setup AP plus credentials applied at runtime** (for example a config import): `Ready` sets `_reconnectRequested`, so STA-first takes over rather than sitting in AP-only mode with credentials."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-24f45fea",
+      "dossier_scope": "docs/developer",
+      "timestamp": "2026-09-25T13:50:58+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "modules/WifiManager/WifiManager.hpp",
+          "modules/WifiManager/WifiManager.cpp",
+          "modules/Application/Application.cpp",
+          "test/test_unit/test_wifiManager/test_wifiManager.cpp",
+          "docs/developer/security.md"
+        ],
+        "entry_type": "decision",
+        "text": "**Power-save gate: `!UNIT_TEST \u0026\u0026 (WITH_BLE || CONFIG_BT_ENABLED)`.** `sdkconfig.defaults` sets `CONFIG_BT_ENABLED=n` and only `sdkconfig.ble.defaults` sets it to `y`, so non-BLE envs keep `WIFI_PS_NONE`. Native is excluded because its WiFi stub has no `WIFI_PS_MIN_MODEM`."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-78c5d885",
+      "dossier_scope": "docs/developer",
+      "timestamp": "2026-09-25T13:50:58+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "modules/WifiManager/WifiManager.hpp",
+          "modules/WifiManager/WifiManager.cpp",
+          "modules/Application/Application.cpp",
+          "test/test_unit/test_wifiManager/test_wifiManager.cpp",
+          "docs/developer/security.md"
+        ],
+        "entry_type": "decision",
+        "text": "**No event on AP stop.** None exists, and none was invented."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-6b1208c2",
+      "dossier_scope": "docs/developer",
+      "timestamp": "2026-09-25T13:50:58+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "modules/WifiManager/WifiManager.hpp",
+          "modules/WifiManager/WifiManager.cpp",
+          "modules/Application/Application.cpp",
+          "test/test_unit/test_wifiManager/test_wifiManager.cpp",
+          "docs/developer/security.md"
+        ],
+        "entry_type": "ruled-out",
+        "text": "**Native stub limits.** `test/stubs/platform/WiFi.h` always returns `WL_CONNECTED` and `WiFi.mode()` is a no-op with no getter, and the stub is outside my boundary. So a real STA failure can't be driven through `tick()`, and the AP_STA radio mode can't be observed natively. The failure-path decisions were factored into the pure helpers that `tick()` calls, and those are what is tested. The AP+STA mode choice and the teardown are verified by code review only."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-cd8d7861",
+      "dossier_scope": "docs/developer",
+      "timestamp": "2026-09-25T13:50:58+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "modules/WifiManager/WifiManager.hpp",
+          "modules/WifiManager/WifiManager.cpp",
+          "modules/Application/Application.cpp",
+          "test/test_unit/test_wifiManager/test_wifiManager.cpp",
+          "docs/developer/security.md"
+        ],
+        "entry_type": "ruled-out",
+        "text": "**Hardware not exercised** (flashing is not allowed). The issue's hardware check is still outstanding: drop the AP for 60 s and for more than 3 min on `esp32s3nano_ble`, with BLE churn, and confirm that the \"Should enable WiFi modem sleep\" log line is gone."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-29daadb1",
+      "dossier_scope": "docs/developer",
+      "timestamp": "2026-09-25T13:50:58+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "modules/WifiManager/WifiManager.hpp",
+          "modules/WifiManager/WifiManager.cpp",
+          "modules/Application/Application.cpp",
+          "test/test_unit/test_wifiManager/test_wifiManager.cpp",
+          "docs/developer/security.md"
+        ],
+        "entry_type": "ruled-out",
+        "text": "**Asynchronous event dispatch on target.** EventBus dispatch is asynchronous there, so the bypass re-evaluation on `WIFI_CONNECTED` / `WIFI_AP_STARTED` lags by a loop iteration. The only case where the bypass is still true once credentials exist is setup mode → `updateWiFi()` → STA up, until the queued `WIFI_CONNECTED` is dispatched. The setup AP is already torn down at that point."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-936192b0",
+      "dossier_scope": "docs/developer",
+      "timestamp": "2026-09-25T13:50:58+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "modules/WifiManager/WifiManager.hpp",
+          "modules/WifiManager/WifiManager.cpp",
+          "modules/Application/Application.cpp",
+          "test/test_unit/test_wifiManager/test_wifiManager.cpp",
+          "docs/developer/security.md"
+        ],
+        "entry_type": "open-issue",
+        "text": "**`docs/design_specification.md` is stale.** L1563 and L1743 still say `wifi.ap_started` enables the AuthManager bypass unconditionally. This file is outside `docs/developer/`."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-9a4fafbb",
+      "dossier_scope": "docs/developer",
+      "timestamp": "2026-09-25T13:50:58+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "modules/WifiManager/WifiManager.hpp",
+          "modules/WifiManager/WifiManager.cpp",
+          "modules/Application/Application.cpp",
+          "test/test_unit/test_wifiManager/test_wifiManager.cpp",
+          "docs/developer/security.md"
+        ],
+        "entry_type": "open-issue",
+        "text": "**`docs/developer/bluetooth.md` §6 (Coexistence)** should mention modem sleep (`WIFI_PS_MIN_MODEM`) on BLE builds, as #236 suggests. That isn't old AP-fallback or auth-bypass text, so I left it."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-8c62c444",
+      "dossier_scope": "docs/developer",
+      "timestamp": "2026-09-25T13:50:58+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "modules/WifiManager/WifiManager.hpp",
+          "modules/WifiManager/WifiManager.cpp",
+          "modules/Application/Application.cpp",
+          "test/test_unit/test_wifiManager/test_wifiManager.cpp",
+          "docs/developer/security.md"
+        ],
+        "entry_type": "open-issue",
+        "text": "**`testConnection()`** runs blocking `WiFi.*` calls (`disconnect(true)`, `begin`, `delay` polling) from the HTTP handler thread. This is pre-existing and not main-loop confined. On the fallback AP it can briefly flip the radio mode."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-dea36097",
+      "dossier_scope": "docs/developer",
+      "timestamp": "2026-09-25T13:50:58+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "modules/WifiManager/WifiManager.hpp",
+          "modules/WifiManager/WifiManager.cpp",
+          "modules/Application/Application.cpp",
+          "test/test_unit/test_wifiManager/test_wifiManager.cpp",
+          "docs/developer/security.md"
+        ],
+        "entry_type": "open-issue",
+        "text": "**`WifiPreconditionContributor`** reports `FallbackEngaged` for any AP mode, and its describe text for that cause might want wording that fits the fallback AP (STA still retrying). No change was needed for correctness."
+      }
+    }
+  ],
+  "created_at": "2026-09-25T12:50:58Z",
+  "batch_id": "01M3C9WWTGV2TFX7HEB1WMFGQC"
+}

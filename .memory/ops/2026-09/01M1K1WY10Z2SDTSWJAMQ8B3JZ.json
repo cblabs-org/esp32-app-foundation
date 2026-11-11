@@ -1,0 +1,83 @@
+{
+  "version": 1,
+  "ops": [
+    {
+      "type": "add",
+      "entry_id": "seed-0ff2f0d8",
+      "dossier_scope": "modules/HomeAssistant",
+      "timestamp": "2026-09-03T08:14:28+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "include/types/FrameworkConfig.hpp",
+          "platformio.ini",
+          "include/interfaces/IOTAVerifier.hpp",
+          "modules/U8G2Display/IDisplayBoard.hpp",
+          "modules/LVGLDisplay/ILVGLHardwareAdapter.hpp",
+          "modules/HomeAssistant/entities/IHaEntity.hpp"
+        ],
+        "entry_type": "decision",
+        "text": "**Stale Identifier Elimination in §6.1**: Rather than mentioning historical camelCase `i` prefixes in a transitional note, the text unconditionally asserts that all framework interfaces use the PascalCase `I` prefix. This satisfied the strict zero-occurrence lint criteria for `iConfigurable` and `iDataSource`."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-547329c8",
+      "dossier_scope": "modules/HomeAssistant",
+      "timestamp": "2026-09-03T08:14:28+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "include/types/FrameworkConfig.hpp",
+          "platformio.ini",
+          "include/interfaces/IOTAVerifier.hpp",
+          "modules/U8G2Display/IDisplayBoard.hpp",
+          "modules/LVGLDisplay/ILVGLHardwareAdapter.hpp",
+          "modules/HomeAssistant/entities/IHaEntity.hpp"
+        ],
+        "entry_type": "decision",
+        "text": "**Module-Local Extension Points**: Located and documented all 3 module-local extension points (`IDisplayBoard`, `ILVGLHardwareAdapter`, and `IHaEntity`) in dedicated subsections under §6.16 to preserve the clean boundary between kernel-level and subsystem-specific extension points."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-8b7ee3e9",
+      "dossier_scope": "modules/HomeAssistant",
+      "timestamp": "2026-09-03T08:14:28+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "include/types/FrameworkConfig.hpp",
+          "platformio.ini",
+          "include/interfaces/IOTAVerifier.hpp",
+          "modules/U8G2Display/IDisplayBoard.hpp",
+          "modules/LVGLDisplay/ILVGLHardwareAdapter.hpp",
+          "modules/HomeAssistant/entities/IHaEntity.hpp"
+        ],
+        "entry_type": "decision",
+        "text": "**Light Touches in §2**: Updated lingering stale references in §2.5, §2.7, and §2.8 to maintain conceptual consistency across the front matter of the specification."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-5feb66a7",
+      "dossier_scope": "modules/HomeAssistant",
+      "timestamp": "2026-09-03T08:14:28+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "include/types/FrameworkConfig.hpp",
+          "platformio.ini",
+          "include/interfaces/IOTAVerifier.hpp",
+          "modules/U8G2Display/IDisplayBoard.hpp",
+          "modules/LVGLDisplay/ILVGLHardwareAdapter.hpp",
+          "modules/HomeAssistant/entities/IHaEntity.hpp"
+        ],
+        "entry_type": "open-issue",
+        "text": "Sections §7 through §17 of `docs/design_specification.md` still contain legacy identifiers (`reapplyConfig`, `AsyncWebServer`, `NATIVE_BUILD`, `isScrollFinished`, `reportProgress`, `reportMessage`, etc.). These are out of scope for WO3 and are scheduled for remediation in WO4 and WO5."
+      }
+    }
+  ],
+  "created_at": "2026-09-03T07:14:28Z",
+  "batch_id": "01M1K1WY10Z2SDTSWJAMQ8B3JZ"
+}

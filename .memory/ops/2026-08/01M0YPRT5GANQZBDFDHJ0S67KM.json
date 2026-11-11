@@ -1,0 +1,49 @@
+{
+  "version": 1,
+  "ops": [
+    {
+      "type": "add",
+      "entry_id": "seed-6d95e66b",
+      "dossier_scope": "include",
+      "timestamp": "2026-08-26T10:35:10+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "include/types/FetchContext.hpp"
+        ],
+        "entry_type": "decision",
+        "text": "Modified `queueDataJob` and `DataJobEntry` closures to accept `const FetchContext\u0026` so that jobs can use the context deadline/client, fulfilling the \"Same deadline pattern\" instruction for `drainJobs()`."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-0605bde3",
+      "dossier_scope": "include",
+      "timestamp": "2026-08-26T10:35:10+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "include/types/FetchContext.hpp"
+        ],
+        "entry_type": "decision",
+        "text": "Added `FrameworkSecureClient` in `DataManager.cpp` with `attach_ssl_certificate_bundle` to fulfill the framework-owned client requirement without changing global SSL context."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-51c05871",
+      "dossier_scope": "include",
+      "timestamp": "2026-08-26T10:35:10+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "include/types/FetchContext.hpp"
+        ],
+        "entry_type": "ruled-out",
+        "text": "When migrating `test_main.cpp` test cases, updating `queueDataJob` required changing the closure signatures, which cascaded to over 10 test closures. All closures were successfully updated and passed."
+      }
+    }
+  ],
+  "created_at": "2026-08-26T09:35:10Z",
+  "batch_id": "01M0YPRT5GANQZBDFDHJ0S67KM"
+}

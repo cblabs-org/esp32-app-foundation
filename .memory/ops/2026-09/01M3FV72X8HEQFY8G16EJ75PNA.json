@@ -1,0 +1,45 @@
+{
+  "version": 1,
+  "ops": [
+    {
+      "type": "add",
+      "entry_id": "seed-437048b3",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-09-26T22:51:21+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "modules/Application/Application.cpp",
+          "web/portal/system.js",
+          "scripts/portalBuilder.py",
+          "test/test_unit/test_application/test_application.cpp",
+          "test/web/tests/system.spec.ts"
+        ],
+        "entry_type": "decision",
+        "text": "Used an inner `PreconditionWebContributor` in `Application` rather than hardcoding routes in `WebServerManager` to keep precondition engine knowledge encapsulated within Application while following the established `IWebContributor` pattern."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-40fdb339",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-09-26T22:51:21+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "modules/Application/Application.cpp",
+          "web/portal/system.js",
+          "scripts/portalBuilder.py",
+          "test/test_unit/test_application/test_application.cpp",
+          "test/web/tests/system.spec.ts"
+        ],
+        "entry_type": "decision",
+        "text": "Supported both JSON body `{ \"name\": \"...\" }` and query parameter `?name=...` for `POST /api/preconditions/retry` with 1024-byte body size limit."
+      }
+    }
+  ],
+  "created_at": "2026-09-26T21:51:21Z",
+  "batch_id": "01M3FV72X8HEQFY8G16EJ75PNA"
+}
