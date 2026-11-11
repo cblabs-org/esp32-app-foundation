@@ -4,9 +4,6 @@
 [submodule ".agents/skills/oo-expert"]
 	path = .agents/skills/oo-expert
 	url = https://github.com/mm-skills/oo-expert
-[submodule ".agents/skills/principal-architect"]
-	path = .agents/skills/principal-architect
-	url = https://github.com/mm-skills/principal-architect
 [submodule ".agents/skills/house-style-docs"]
 	path = .agents/skills/house-style-docs
 	url = https://github.com/mm-skills/house-style-docs
