@@ -211,4 +211,117 @@ TEST(BLEManagerCentralTest, StopDiscoveryReturnsTrueWhenActiveAndFalseWhenInacti
     EXPECT_FALSE(mgr.stopDiscovery());
 }
 
+TEST(BLEManagerCentralTest, PairCopiesDeviceNameFromDiscoveryResults) {
+    BLEManager mgr;
+    WO9DummyClientProvider cli;
+    ASSERT_TRUE(mgr.registerClientProvider(&cli));
+    mgr.setStateForTesting(BLEManager::State::Active);
+    mgr.setAppStateForTesting(AppState::Running);
+
+    ASSERT_TRUE(mgr.startDiscovery("wo9_cli", 5000));
+
+    BLEPeerAddress addr;
+    ASSERT_TRUE(BLEPeerAddress::parse("11:22:33:44:55:66", BLEPeerAddress::Type::Public, addr));
+
+    // Simulate scan result arriving from worker task
+    BLEQueueMessage scanMsg;
+    scanMsg.type = BLEQueueMessage::Type::ScanResult;
+    scanMsg.address = addr;
+    strncpy(scanMsg.providerId, "EBEAT-12345", sizeof(scanMsg.providerId) - 1);
+    scanMsg.rssi = -60;
+    scanMsg.boolVal1 = true; // connectable
+    ASSERT_TRUE(mgr.postTestQueueMessage(scanMsg));
+    mgr.tick(0);
+
+    // Verify discovery results contain the device with name
+    const auto& results = mgr.getDiscoveryResults();
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_STREQ(results[0].name, "EBEAT-12345");
+
+    // Pair device — should populate stored name from discovery results
+    ASSERT_TRUE(mgr.pair("wo9_cli", addr));
+
+    BLEStoredDevice stored;
+    ASSERT_TRUE(mgr.getStoredDevice("wo9_cli", stored));
+    EXPECT_EQ(stored.address, addr);
+    EXPECT_STREQ(stored.name, "EBEAT-12345");
+}
+
+TEST(BLEManagerCentralTest, PairWithExplicitName) {
+    BLEManager mgr;
+    WO9DummyClientProvider cli;
+    ASSERT_TRUE(mgr.registerClientProvider(&cli));
+    mgr.setStateForTesting(BLEManager::State::Active);
+    mgr.setAppStateForTesting(AppState::Running);
+
+    BLEPeerAddress addr;
+    ASSERT_TRUE(BLEPeerAddress::parse("22:33:44:55:66:77", BLEPeerAddress::Type::Public, addr));
+
+    // Pair device with explicit name
+    ASSERT_TRUE(mgr.pair("wo9_cli", addr, "Polar H10"));
+
+    BLEStoredDevice stored;
+    ASSERT_TRUE(mgr.getStoredDevice("wo9_cli", stored));
+    EXPECT_EQ(stored.address, addr);
+    EXPECT_STREQ(stored.name, "Polar H10");
+}
+
+TEST(BLEManagerCentralTest, PairWithoutDiscoveryLeavesNameEmpty) {
+    BLEManager mgr;
+    WO9DummyClientProvider cli;
+    ASSERT_TRUE(mgr.registerClientProvider(&cli));
+    mgr.setStateForTesting(BLEManager::State::Active);
+    mgr.setAppStateForTesting(AppState::Running);
+
+    BLEPeerAddress addr;
+    ASSERT_TRUE(BLEPeerAddress::parse("33:44:55:66:77:88", BLEPeerAddress::Type::Public, addr));
+
+    ASSERT_TRUE(mgr.pair("wo9_cli", addr));
+
+    BLEStoredDevice stored;
+    ASSERT_TRUE(mgr.getStoredDevice("wo9_cli", stored));
+    EXPECT_EQ(stored.address, addr);
+    EXPECT_STREQ(stored.name, "");
+}
+
+TEST(BLEManagerCentralTest, CentralConnectedBackfillsStoredDeviceName) {
+    BLEManager mgr;
+    WO9DummyClientProvider cli;
+    ASSERT_TRUE(mgr.registerClientProvider(&cli));
+    mgr.setStateForTesting(BLEManager::State::Active);
+    mgr.setAppStateForTesting(AppState::Running);
+
+    BLEPeerAddress addr;
+    ASSERT_TRUE(BLEPeerAddress::parse("44:55:66:77:88:99", BLEPeerAddress::Type::Public, addr));
+
+    // Pair without discovery -> name is empty
+    ASSERT_TRUE(mgr.pair("wo9_cli", addr));
+    BLEStoredDevice stored;
+    ASSERT_TRUE(mgr.getStoredDevice("wo9_cli", stored));
+    EXPECT_STREQ(stored.name, "");
+
+    // Now discovery runs and finds the device
+    ASSERT_TRUE(mgr.startDiscovery("wo9_cli", 5000));
+    BLEQueueMessage scanMsg;
+    scanMsg.type = BLEQueueMessage::Type::ScanResult;
+    scanMsg.address = addr;
+    strncpy(scanMsg.providerId, "BackfilledDevice", sizeof(scanMsg.providerId) - 1);
+    ASSERT_TRUE(mgr.postTestQueueMessage(scanMsg));
+    mgr.tick(0);
+
+    // Simulate CentralConnected arriving
+    BLEQueueMessage connMsg;
+    connMsg.type = BLEQueueMessage::Type::CentralConnected;
+    strncpy(connMsg.providerId, "wo9_cli", sizeof(connMsg.providerId) - 1);
+    connMsg.boolVal1 = true; // bonded
+    ASSERT_TRUE(mgr.postTestQueueMessage(connMsg));
+    mgr.tick(0);
+
+    // Device in registry should now have backfilled name
+    ASSERT_TRUE(mgr.getStoredDevice("wo9_cli", stored));
+    EXPECT_STREQ(stored.name, "BackfilledDevice");
+    EXPECT_TRUE(stored.bonded);
+}
+
+
 

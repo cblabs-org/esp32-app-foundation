@@ -472,7 +472,7 @@ bool BLEManager::getReconnectPolicy(const char* providerId, BLEReconnectPolicy& 
     return false;
 }
 
-bool BLEManager::pair(const char* providerId, const BLEPeerAddress& addr) {
+bool BLEManager::pair(const char* providerId, const BLEPeerAddress& addr, const char* name) {
     if (!providerId) return false;
 
     // Stop any active discovery scan — the user has chosen a device.
@@ -489,7 +489,29 @@ bool BLEManager::pair(const char* providerId, const BLEPeerAddress& addr) {
     BLEStoredDevice device;
     device.address = addr;
     strncpy(device.providerId, providerId, sizeof(device.providerId) - 1);
-    
+
+    if (name && name[0] != '\0') {
+        strncpy(device.name, name, sizeof(device.name) - 1);
+        device.name[sizeof(device.name) - 1] = '\0';
+    } else {
+        // Copy name from discovery results if available
+        for (const auto& res : _discovery.results) {
+            if (res.address == addr && res.name[0] != '\0') {
+                strncpy(device.name, res.name, sizeof(device.name) - 1);
+                device.name[sizeof(device.name) - 1] = '\0';
+                break;
+            }
+        }
+        // If still empty, check whether the registry already knew this device's name
+        if (device.name[0] == '\0') {
+            BLEStoredDevice existing;
+            if (_deviceRegistry.get(providerId, existing) && existing.address == addr && existing.name[0] != '\0') {
+                strncpy(device.name, existing.name, sizeof(device.name) - 1);
+                device.name[sizeof(device.name) - 1] = '\0';
+            }
+        }
+    }
+
     _deviceRegistry.set(device);
     // R8/WO-9: Persist paired devices to flash so they survive reboot. Defer the
     // actual flash write to the end of tick() — don't block callers (potentially
@@ -1057,9 +1079,11 @@ void BLEManager::dispatchQueueEvents() {
                     // Also copy device name from discovery results if available
                     if (stored.name[0] == '\0' && !_discovery.results.empty()) {
                         for (size_t i = 0; i < _discovery.results.size(); ++i) {
-                            if (_discovery.results[i].address == stored.address) {
+                            if (_discovery.results[i].address == stored.address && _discovery.results[i].name[0] != '\0') {
                                 strncpy(stored.name, _discovery.results[i].name, sizeof(stored.name) - 1);
+                                stored.name[sizeof(stored.name) - 1] = '\0';
                                 _deviceRegistry.set(stored);
+                                _configDirty = true;
                                 break;
                             }
                         }
@@ -1474,7 +1498,8 @@ void BLEManager::registerRoutes(PsychicHttpServer& server) {
         if (!BLEPeerAddress::parse(addrStr, addrType, addr) || !addr.isValid()) {
             return response->send(400, "application/json", "{\"error\":\"invalid address\"}");
         }
-        if (!pair(providerId, addr)) {
+        const char* nameStr = doc["name"] | "";
+        if (!pair(providerId, addr, (nameStr && nameStr[0] != '\0') ? nameStr : nullptr)) {
             return response->send(500, "application/json", "{\"error\":\"pair failed\"}");
         }
         return response->send(202, "application/json", "{\"status\":\"pairing\"}");
@@ -1612,6 +1637,8 @@ void BLEManager::registerMCPTools(MCPToolRegistry& registry) {
     enumArr.add("RandomResolvable");
     enumArr.add("RandomNonResolvable");
     pairProps["addressType"]["description"] = "Bluetooth address type classification";
+    pairProps["name"]["type"] = "string";
+    pairProps["name"]["description"] = "Optional device name (defaults to discovery name if known)";
     JsonArray pairReq = pairSchema["required"].to<JsonArray>();
     pairReq.add("providerId");
     pairReq.add("address");
@@ -1656,7 +1683,8 @@ void BLEManager::registerMCPTools(MCPToolRegistry& registry) {
                 result["isError"] = true;
                 return;
             }
-            if (!mgr->pair(providerId, addr)) {
+            const char* nameStr = params["name"] | "";
+            if (!mgr->pair(providerId, addr, (nameStr && nameStr[0] != '\0') ? nameStr : nullptr)) {
                 result["error"] = "pair failed";
                 result["isError"] = true;
                 return;
