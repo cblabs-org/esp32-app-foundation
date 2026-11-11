@@ -10,9 +10,6 @@
 [submodule ".agents/skills/pio-manager"]
 	path = .agents/skills/pio-manager
 	url = https://github.com/mm-skills/pio-manager
-[submodule ".agents/skills/systematic-debugging"]
-	path = .agents/skills/systematic-debugging
-	url = https://github.com/mm-skills/systematic-debugging
 [submodule ".agents/skills/squareline-studio-expert"]
 	path = .agents/skills/squareline-studio-expert
 	url = https://github.com/mm-skills/squareline-studio-expert
