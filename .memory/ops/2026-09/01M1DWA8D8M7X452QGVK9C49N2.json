@@ -1,0 +1,67 @@
+{
+  "version": 1,
+  "ops": [
+    {
+      "type": "add",
+      "entry_id": "seed-cc6f2fa9",
+      "dossier_scope": "src",
+      "timestamp": "2026-09-01T08:00:41+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "src/main.cpp",
+          "modules/LVGLDisplay/library.json"
+        ],
+        "entry_type": "decision",
+        "text": "Provided a legacy delegating constructor in `LVGLDisplayModule.hpp` so that existing caller sites (`src/main.cpp`) remain ABI/API compatible without modifying files outside the WO2 boundary box, until WO4 removes `SLSSystemScreens`."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-533c2c54",
+      "dossier_scope": "src",
+      "timestamp": "2026-09-01T08:00:41+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "src/main.cpp",
+          "modules/LVGLDisplay/library.json"
+        ],
+        "entry_type": "decision",
+        "text": "Guarded `ui.h` and `ui_gen.h` with `LV_LVGL_H_INCLUDE_SIMPLE` and configured it in `library.json` so LVGL Pro headers resolve `lvgl.h` properly within the PlatformIO build system."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-5e22fdee",
+      "dossier_scope": "src",
+      "timestamp": "2026-09-01T08:00:41+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "src/main.cpp",
+          "modules/LVGLDisplay/library.json"
+        ],
+        "entry_type": "open-issue",
+        "text": "`DiagCarouselController.cpp:15` compilation error (`ui/ui.h: No such file or directory`) was observed during verification and is scoped for resolution in WO3."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-878f4adf",
+      "dossier_scope": "src",
+      "timestamp": "2026-09-01T08:00:41+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "src/main.cpp",
+          "modules/LVGLDisplay/library.json"
+        ],
+        "entry_type": "open-issue",
+        "text": "`uidesign/crowpanel-128-rotary/lvglpro/` generated C files need `-DLV_LVGL_H_INCLUDE_SIMPLE` defined during standalone compilation of the `UIDesign` library."
+      }
+    }
+  ],
+  "created_at": "2026-09-01T07:00:41Z",
+  "batch_id": "01M1DWA8D8M7X452QGVK9C49N2"
+}

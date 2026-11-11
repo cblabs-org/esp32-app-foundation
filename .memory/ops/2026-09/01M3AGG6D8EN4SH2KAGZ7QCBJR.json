@@ -1,0 +1,111 @@
+{
+  "version": 1,
+  "ops": [
+    {
+      "type": "add",
+      "entry_id": "seed-87869044",
+      "dossier_scope": "test/test-unit/test-bleManager",
+      "timestamp": "2026-09-24T21:07:53+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "modules/BLEManager/BLETypes.hpp",
+          "modules/BLEManager/BLEManager.hpp",
+          "modules/BLEManager/BLEManager.cpp",
+          "modules/BLEManager/BLEStack.cpp",
+          "test/test_unit/test_bleManager/test_bleTypes.cpp",
+          "test/test_unit/test_bleManager/test_bleManager.cpp",
+          "modules/BLEManager/README.md",
+          "docs/developer/bluetooth.md",
+          "docs/developer/using-optional-modules.md",
+          "docs/developer/README.md",
+          ".agents/skills/framework-expert/systems/ble/overview.md",
+          ".agents/skills/framework-expert/SKILL.md",
+          "CHANGELOG.md"
+        ],
+        "entry_type": "decision",
+        "text": "**D8 Fallback Decision**: Per human decision and spawn instructions, implemented the defensive reading pattern for `ota.progress` events in `BLEManager::tick()`. Marked with 5 `// FALLBACK(#227)` comments for easy follow-up."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-cf437aad",
+      "dossier_scope": "test/test-unit/test-bleManager",
+      "timestamp": "2026-09-24T21:07:53+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "modules/BLEManager/BLETypes.hpp",
+          "modules/BLEManager/BLEManager.hpp",
+          "modules/BLEManager/BLEManager.cpp",
+          "modules/BLEManager/BLEStack.cpp",
+          "test/test_unit/test_bleManager/test_bleTypes.cpp",
+          "test/test_unit/test_bleManager/test_bleManager.cpp",
+          "modules/BLEManager/README.md",
+          "docs/developer/bluetooth.md",
+          "docs/developer/using-optional-modules.md",
+          "docs/developer/README.md",
+          ".agents/skills/framework-expert/systems/ble/overview.md",
+          ".agents/skills/framework-expert/SKILL.md",
+          "CHANGELOG.md"
+        ],
+        "entry_type": "decision",
+        "text": "**Client Pointer Management**: Tracked active `NimBLEClient*` instances in `BLEStack.cpp` via an internal `s_clients` map keyed by `providerId` to support clean programmatic disconnect on OTA pause and forget operations."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-031ba5d1",
+      "dossier_scope": "test/test-unit/test-bleManager",
+      "timestamp": "2026-09-24T21:07:53+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "modules/BLEManager/BLETypes.hpp",
+          "modules/BLEManager/BLEManager.hpp",
+          "modules/BLEManager/BLEManager.cpp",
+          "modules/BLEManager/BLEStack.cpp",
+          "test/test_unit/test_bleManager/test_bleTypes.cpp",
+          "test/test_unit/test_bleManager/test_bleManager.cpp",
+          "modules/BLEManager/README.md",
+          "docs/developer/bluetooth.md",
+          "docs/developer/using-optional-modules.md",
+          "docs/developer/README.md",
+          ".agents/skills/framework-expert/systems/ble/overview.md",
+          ".agents/skills/framework-expert/SKILL.md",
+          "CHANGELOG.md"
+        ],
+        "entry_type": "ruled-out",
+        "text": "**Unit Test Header Isolation**: In `test/test_unit/test_bleManager/test_bleManager.cpp`, do not `#include \"Application.hpp\"` because `Application.cpp` is intentionally omitted from the native unit test suite. Use `BLEManager::setAppStateForTesting(AppState)` which relies on the standalone `types/AppState.hpp` enum header."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-eda36e9a",
+      "dossier_scope": "test/test-unit/test-bleManager",
+      "timestamp": "2026-09-24T21:07:53+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "modules/BLEManager/BLETypes.hpp",
+          "modules/BLEManager/BLEManager.hpp",
+          "modules/BLEManager/BLEManager.cpp",
+          "modules/BLEManager/BLEStack.cpp",
+          "test/test_unit/test_bleManager/test_bleTypes.cpp",
+          "test/test_unit/test_bleManager/test_bleManager.cpp",
+          "modules/BLEManager/README.md",
+          "docs/developer/bluetooth.md",
+          "docs/developer/using-optional-modules.md",
+          "docs/developer/README.md",
+          ".agents/skills/framework-expert/systems/ble/overview.md",
+          ".agents/skills/framework-expert/SKILL.md",
+          "CHANGELOG.md"
+        ],
+        "entry_type": "ruled-out",
+        "text": "**Synchronous Discovery Cancellation**: `stopDiscovery()` must set `_discovery.active = false` immediately rather than waiting for `ScanCompleted` to traverse the host FreeRTOS event queue, ensuring immediate consistency for `isScanning()` inquiries."
+      }
+    }
+  ],
+  "created_at": "2026-09-24T20:07:53Z",
+  "batch_id": "01M3AGG6D8EN4SH2KAGZ7QCBJR"
+}

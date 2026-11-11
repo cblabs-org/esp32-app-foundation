@@ -1,0 +1,49 @@
+{
+  "version": 1,
+  "ops": [
+    {
+      "type": "add",
+      "entry_id": "seed-2a83fadd",
+      "dossier_scope": "sample-app",
+      "timestamp": "2026-09-25T22:42:09+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "sample-app/src/main.cpp"
+        ],
+        "entry_type": "decision",
+        "text": "`bootstrapHardware()` is called automatically by `Application::begin()` through `_bootReporter-\u003ebeginEarly()` when `displayModule` is registered prior to `app.begin()`, conforming to the framework's two-phase display initialization architecture without requiring an explicit call in `setup()`."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-4dda07d0",
+      "dossier_scope": "sample-app",
+      "timestamp": "2026-09-25T22:42:09+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "sample-app/src/main.cpp"
+        ],
+        "entry_type": "decision",
+        "text": "Grouped `sanitiseHostname` and `app.getWifiManager().setDefaultHostname(...)` directly after `app.setAppName(\"Weather Station\")` at the beginning of `setup()` to consolidate identity initialization in a single location."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-5cf73a2a",
+      "dossier_scope": "sample-app",
+      "timestamp": "2026-09-25T22:42:09+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "sample-app/src/main.cpp"
+        ],
+        "entry_type": "open-issue",
+        "text": "Issue #232 tracking: Automatic propagation of device application name to peripheral identifiers (such as BLE advertising local name and WiFi default hostname) remains a desirable future framework-level feature."
+      }
+    }
+  ],
+  "created_at": "2026-09-25T21:42:09Z",
+  "batch_id": "01M3D89GV864SJZ7N3SXXN913B"
+}

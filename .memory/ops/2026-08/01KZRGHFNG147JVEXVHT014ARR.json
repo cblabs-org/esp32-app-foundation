@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "ops": [
+    {
+      "type": "add",
+      "entry_id": "seed-ea52b7b7",
+      "dossier_scope": "web/portal",
+      "timestamp": "2026-08-11T14:35:10+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "web/portal/index.html",
+          "web/portal/app.js"
+        ],
+        "entry_type": "decision",
+        "text": "None — all changes followed the WORKORDER specification exactly."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-7018411d",
+      "dossier_scope": "web/portal",
+      "timestamp": "2026-08-11T14:35:10+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "web/portal/index.html",
+          "web/portal/app.js"
+        ],
+        "entry_type": "ruled-out",
+        "text": "Worker used `pio run` CLI instead of the `platformio` MCP `build_project` tool, violating rule 04 and the WORKORDER Tooling Constraints. PA re-verified via MCP `build_project` after worker completion. Future WORKORDERs should reinforce MCP constraints in the Line-Item Instructions section."
+      }
+    }
+  ],
+  "created_at": "2026-08-11T13:35:10Z",
+  "batch_id": "01KZRGHFNG147JVEXVHT014ARR"
+}

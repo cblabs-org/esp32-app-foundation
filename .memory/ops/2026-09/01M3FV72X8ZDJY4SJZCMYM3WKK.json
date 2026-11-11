@@ -1,0 +1,133 @@
+{
+  "version": 1,
+  "ops": [
+    {
+      "type": "add",
+      "entry_id": "seed-035e172b",
+      "dossier_scope": "test/test-unit/test-bleManager",
+      "timestamp": "2026-09-26T22:51:21+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "modules/BLEManager/BLESerialization.hpp",
+          "modules/BLEManager/BLESerialization.cpp",
+          "modules/BLEManager/BLEManager.hpp",
+          "modules/BLEManager/BLEManager.cpp",
+          "modules/BLEManager/web/ble.js",
+          "scripts/portalBuilder.py",
+          "test/test_unit/test_bleManager/test_bleSerialization.cpp",
+          "modules/BLEManager/README.md"
+        ],
+        "entry_type": "decision",
+        "text": "**Central Worker Task Native Isolation**: On native environments, FreeRTOS task creation was executing synchronously during `begin()`, causing tests to loop infinitely on the queue. Guarded `xTaskCreate` with `#if defined(ESP_PLATFORM)` so background central worker runs on hardware while native tests interact deterministically via queue messages."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-321942ca",
+      "dossier_scope": "test/test-unit/test-bleManager",
+      "timestamp": "2026-09-26T22:51:21+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "modules/BLEManager/BLESerialization.hpp",
+          "modules/BLEManager/BLESerialization.cpp",
+          "modules/BLEManager/BLEManager.hpp",
+          "modules/BLEManager/BLEManager.cpp",
+          "modules/BLEManager/web/ble.js",
+          "scripts/portalBuilder.py",
+          "test/test_unit/test_bleManager/test_bleSerialization.cpp",
+          "modules/BLEManager/README.md"
+        ],
+        "entry_type": "decision",
+        "text": "**Pure Serialization Layer**: Extracted JSON serialization and validation to `BLESerialization` to guarantee pure, fully testable functions decoupled from hardware and network dependencies."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-29c3e68d",
+      "dossier_scope": "test/test-unit/test-bleManager",
+      "timestamp": "2026-09-26T22:51:21+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "modules/BLEManager/BLESerialization.hpp",
+          "modules/BLEManager/BLESerialization.cpp",
+          "modules/BLEManager/BLEManager.hpp",
+          "modules/BLEManager/BLEManager.cpp",
+          "modules/BLEManager/web/ble.js",
+          "scripts/portalBuilder.py",
+          "test/test_unit/test_bleManager/test_bleSerialization.cpp",
+          "modules/BLEManager/README.md"
+        ],
+        "entry_type": "decision",
+        "text": "**Privacy Redaction Parameter**: Added a boolean flag `redactAddresses` to `serializeStatus` and `serializeScanResults` ensuring MCP tools (`ble_status`) strictly mask MAC addresses (`**:**:**:**:EE:FF`), while authenticated REST (`/api/ble/status`) preserves full MACs for administrative management."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-7e302626",
+      "dossier_scope": "test/test-unit/test-bleManager",
+      "timestamp": "2026-09-26T22:51:21+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "modules/BLEManager/BLESerialization.hpp",
+          "modules/BLEManager/BLESerialization.cpp",
+          "modules/BLEManager/BLEManager.hpp",
+          "modules/BLEManager/BLEManager.cpp",
+          "modules/BLEManager/web/ble.js",
+          "scripts/portalBuilder.py",
+          "test/test_unit/test_bleManager/test_bleSerialization.cpp",
+          "modules/BLEManager/README.md"
+        ],
+        "entry_type": "decision",
+        "text": "**Web Tests Note**: There is no existing headless web runner for module tabs in `test/web/`; verified DOM scaffolding, event listeners, and API schemas via native mock unit tests and target build asset generation."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-c96d44de",
+      "dossier_scope": "test/test-unit/test-bleManager",
+      "timestamp": "2026-09-26T22:51:21+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "modules/BLEManager/BLESerialization.hpp",
+          "modules/BLEManager/BLESerialization.cpp",
+          "modules/BLEManager/BLEManager.hpp",
+          "modules/BLEManager/BLEManager.cpp",
+          "modules/BLEManager/web/ble.js",
+          "scripts/portalBuilder.py",
+          "test/test_unit/test_bleManager/test_bleSerialization.cpp",
+          "modules/BLEManager/README.md"
+        ],
+        "entry_type": "ruled-out",
+        "text": "Avoid calling `toString()` or `toRedactedString()` on `BLEPeerAddress` without passing destination buffer and size (`void toString(char*, size_t)`)."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-9f0e13c4",
+      "dossier_scope": "test/test-unit/test-bleManager",
+      "timestamp": "2026-09-26T22:51:21+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "modules/BLEManager/BLESerialization.hpp",
+          "modules/BLEManager/BLESerialization.cpp",
+          "modules/BLEManager/BLEManager.hpp",
+          "modules/BLEManager/BLEManager.cpp",
+          "modules/BLEManager/web/ble.js",
+          "scripts/portalBuilder.py",
+          "test/test_unit/test_bleManager/test_bleSerialization.cpp",
+          "modules/BLEManager/README.md"
+        ],
+        "entry_type": "ruled-out",
+        "text": "Ensure `parseAddressType` handles case-insensitivity since portal JSON or MCP agents may pass mixed-case strings."
+      }
+    }
+  ],
+  "created_at": "2026-09-26T21:51:21Z",
+  "batch_id": "01M3FV72X8ZDJY4SJZCMYM3WKK"
+}

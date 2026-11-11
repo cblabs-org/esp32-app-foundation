@@ -1,0 +1,61 @@
+{
+  "version": 1,
+  "ops": [
+    {
+      "type": "add",
+      "entry_id": "seed-6a4329a1",
+      "dossier_scope": "modules/AuditModule",
+      "timestamp": "2026-08-30T09:46:16+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "modules/AuditModule/AuditModule.hpp",
+          "modules/AuditModule/AuditModule.cpp",
+          "modules/AuditModule/library.json",
+          "test/test_unit/test_audit_module/test_audit_module.cpp",
+          "test/stubs/platform/freertos/semphr.h"
+        ],
+        "entry_type": "decision",
+        "text": "Used `std::mutex` for token-bucket rate limiter thread safety to allow concurrent `log()` / `auditSync()` calls across FreeRTOS tasks."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-ba3a1f86",
+      "dossier_scope": "modules/AuditModule",
+      "timestamp": "2026-08-30T09:46:16+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "modules/AuditModule/AuditModule.hpp",
+          "modules/AuditModule/AuditModule.cpp",
+          "modules/AuditModule/library.json",
+          "test/test_unit/test_audit_module/test_audit_module.cpp",
+          "test/stubs/platform/freertos/semphr.h"
+        ],
+        "entry_type": "decision",
+        "text": "In `AuditModule::formatRecord()`, omitted `target_id` and `details` fields when empty string to save flash bytes and adhere to schema spec."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-ddd8c262",
+      "dossier_scope": "modules/AuditModule",
+      "timestamp": "2026-08-30T09:46:16+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "modules/AuditModule/AuditModule.hpp",
+          "modules/AuditModule/AuditModule.cpp",
+          "modules/AuditModule/library.json",
+          "test/test_unit/test_audit_module/test_audit_module.cpp",
+          "test/stubs/platform/freertos/semphr.h"
+        ],
+        "entry_type": "decision",
+        "text": "Added `#ifndef ESP_PLATFORM break; #endif` inside `writerLoop` on native builds to avoid blocking single-threaded test runner while maintaining full FreeRTOS loop behavior on hardware."
+      }
+    }
+  ],
+  "created_at": "2026-08-30T08:46:16Z",
+  "batch_id": "01M18XJ4Y0897A3K56WC7VFH0B"
+}

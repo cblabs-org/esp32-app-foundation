@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "ops": [
+    {
+      "type": "add",
+      "entry_id": "seed-c26c9433",
+      "dossier_scope": "modules",
+      "timestamp": "2026-08-12T17:32:20+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "modules/OTAUpdateManager/OTAUpdateManager.cpp",
+          "web/portal/app.css"
+        ],
+        "entry_type": "ruled-out",
+        "text": "Initial edit of `OTAUpdateManager.cpp` resulted in a syntax error (include directive inside function body) due to multi-edit tool interaction; quickly repaired."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-ee8335b3",
+      "dossier_scope": "modules",
+      "timestamp": "2026-08-12T17:32:20+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "modules/OTAUpdateManager/OTAUpdateManager.cpp",
+          "web/portal/app.css"
+        ],
+        "entry_type": "ruled-out",
+        "text": "The WORKORDER specified `esp32dev_ota` as an environment to build, but it was not present in the configuration; I built `esp32dev` and `esp32s3nano` as proxies."
+      }
+    }
+  ],
+  "created_at": "2026-08-12T16:32:20Z",
+  "batch_id": "01KZVD2KH08SQ44G0DPBPPS3ZP"
+}

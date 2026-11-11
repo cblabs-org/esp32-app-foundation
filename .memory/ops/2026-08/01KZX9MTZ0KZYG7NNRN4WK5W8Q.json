@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "ops": [
+    {
+      "type": "add",
+      "entry_id": "seed-7c4e3aa1",
+      "dossier_scope": "web/portal",
+      "timestamp": "2026-08-13T11:10:52+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "scripts/portalBuilder.py",
+          "web/portal",
+          "web/display",
+          "web/portal",
+          "web/display"
+        ],
+        "entry_type": "ruled-out",
+        "text": "None. Initial build verification timed out on initial cold build, resolved by background execution (`background: true`)."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-93ec9f5b",
+      "dossier_scope": "web/portal",
+      "timestamp": "2026-08-13T11:10:52+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "scripts/portalBuilder.py",
+          "web/portal",
+          "web/display",
+          "web/portal",
+          "web/display"
+        ],
+        "entry_type": "open-issue",
+        "text": "None. Web application tests run during full PlatformIO test suites will need WO2 route updates to serve moved assets from module endpoints."
+      }
+    }
+  ],
+  "created_at": "2026-08-13T10:10:52Z",
+  "batch_id": "01KZX9MTZ0KZYG7NNRN4WK5W8Q"
+}

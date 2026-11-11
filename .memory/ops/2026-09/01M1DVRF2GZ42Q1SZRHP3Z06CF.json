@@ -1,0 +1,51 @@
+{
+  "version": 1,
+  "ops": [
+    {
+      "type": "add",
+      "entry_id": "seed-8a3d68ef",
+      "dossier_scope": "uidesign/crowpanel-128-rotary/lvglpro",
+      "timestamp": "2026-09-01T07:50:58+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "uidesign/crowpanel-128-rotary",
+          "uidesign/crowpanel-128-rotary/lvglpro/project.xml",
+          "uidesign/crowpanel-128-rotary/lvglpro/globals.xml",
+          "uidesign/crowpanel-128-rotary/lvglpro/ui.h",
+          "uidesign/crowpanel-128-rotary/lvglpro/library.json",
+          "platformio.ini",
+          "uidesign/crowpanel-128-rotary",
+          "modules/LVGLDisplay/exclude_ui_on_native.py",
+          ".gitignore"
+        ],
+        "entry_type": "decision",
+        "text": "Updated the generated C files in `lvglpro/` (`ui.c`, `ui.h`, `ui_gen.c`, `ui_gen.h`, etc.) to match the renamed project `name=\"ui\"` and `sys_*` subjects so that PlatformIO library compilation resolves cleanly without undefined symbols or obsolete names."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-f08dbc3a",
+      "dossier_scope": "uidesign/crowpanel-128-rotary/lvglpro",
+      "timestamp": "2026-09-01T07:50:58+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "uidesign/crowpanel-128-rotary",
+          "uidesign/crowpanel-128-rotary/lvglpro/project.xml",
+          "uidesign/crowpanel-128-rotary/lvglpro/globals.xml",
+          "uidesign/crowpanel-128-rotary/lvglpro/ui.h",
+          "uidesign/crowpanel-128-rotary/lvglpro/library.json",
+          "platformio.ini",
+          "uidesign/crowpanel-128-rotary",
+          "modules/LVGLDisplay/exclude_ui_on_native.py",
+          ".gitignore"
+        ],
+        "entry_type": "open-issue",
+        "text": "None. `DiagCarouselController.cpp` missing header error during PIO build verification is expected and scoped for WO2/WO3."
+      }
+    }
+  ],
+  "created_at": "2026-09-01T06:50:58Z",
+  "batch_id": "01M1DVRF2GZ42Q1SZRHP3Z06CF"
+}

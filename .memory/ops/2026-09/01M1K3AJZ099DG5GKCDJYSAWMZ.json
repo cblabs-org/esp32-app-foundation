@@ -1,0 +1,75 @@
+{
+  "version": 1,
+  "ops": [
+    {
+      "type": "add",
+      "entry_id": "seed-387bf339",
+      "dossier_scope": "scripts",
+      "timestamp": "2026-09-03T08:39:24+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "scripts/doc_lint.py",
+          "docs/README.md",
+          "CONTRIBUTING.md",
+          "platformio.ini"
+        ],
+        "entry_type": "decision",
+        "text": "Used precise regex word boundaries (`\\b`) for the banned identifier checks to prevent accidental substring matches (e.g. `ESPAsyncWebServer` vs `AsyncWebServer`)."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-1d723fa3",
+      "dossier_scope": "scripts",
+      "timestamp": "2026-09-03T08:39:24+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "scripts/doc_lint.py",
+          "docs/README.md",
+          "CONTRIBUTING.md",
+          "platformio.ini"
+        ],
+        "entry_type": "decision",
+        "text": "Decided to skip creating a unit test in `test/test_unit/test_doc_lint/` because sandbox restrictions blocked file creation, and the live repo data provided a comprehensive test corpus."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-bb6475bd",
+      "dossier_scope": "scripts",
+      "timestamp": "2026-09-03T08:39:24+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "scripts/doc_lint.py",
+          "docs/README.md",
+          "CONTRIBUTING.md",
+          "platformio.ini"
+        ],
+        "entry_type": "ruled-out",
+        "text": "Sandbox restricted creating `test/test_unit/test_doc_lint/` for native tests."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-a57ddbdd",
+      "dossier_scope": "scripts",
+      "timestamp": "2026-09-03T08:39:24+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "scripts/doc_lint.py",
+          "docs/README.md",
+          "CONTRIBUTING.md",
+          "platformio.ini"
+        ],
+        "entry_type": "open-issue",
+        "text": "Running the linter surfaces ~47 genuine findings in the existing documentation estate (e.g., `NATIVE_BUILD` lingering in developer guides, and a missing status banner in `docs/config-gate-design.md`). Left unmodified as they are outside the Strict Boundary Box."
+      }
+    }
+  ],
+  "created_at": "2026-09-03T07:39:24Z",
+  "batch_id": "01M1K3AJZ099DG5GKCDJYSAWMZ"
+}

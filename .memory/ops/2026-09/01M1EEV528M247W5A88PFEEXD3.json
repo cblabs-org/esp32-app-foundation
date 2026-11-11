@@ -1,0 +1,49 @@
+{
+  "version": 1,
+  "ops": [
+    {
+      "type": "add",
+      "entry_id": "seed-7f266318",
+      "dossier_scope": "src",
+      "timestamp": "2026-09-01T13:24:29+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "src/main.cpp",
+          "modules/LVGLDisplay/README.md",
+          "test/stubs/platform/lvgl.h",
+          "test/stubs/platform/ui.h",
+          "test/stubs/platform/ui_gen.h",
+          "test/test_unit/test_lvglDisplay/ui_stubs.cpp",
+          "test/test_unit/test_lvglDisplay/test_screens.cpp",
+          "test/test_unit/test_lvgl_stubs/test_lvgl_stubs.cpp"
+        ],
+        "entry_type": "decision",
+        "text": "Defined weak event callback hooks (`ui_boot_fade_overlay_loaded`, `ui_system_dismiss_clicked`) directly in `LVGLDisplayModule.cpp` to resolve linker dependencies when compiling without `LV_EDITOR_PREVIEW`."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-a2dbc586",
+      "dossier_scope": "src",
+      "timestamp": "2026-09-01T13:24:29+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "src/main.cpp",
+          "modules/LVGLDisplay/README.md",
+          "test/stubs/platform/lvgl.h",
+          "test/stubs/platform/ui.h",
+          "test/stubs/platform/ui_gen.h",
+          "test/test_unit/test_lvglDisplay/ui_stubs.cpp",
+          "test/test_unit/test_lvglDisplay/test_screens.cpp",
+          "test/test_unit/test_lvgl_stubs/test_lvgl_stubs.cpp"
+        ],
+        "entry_type": "decision",
+        "text": "Created platform stubs `ui.h` and `ui_gen.h` in `test/stubs/platform/` to allow full native unit testing of `LVGLDisplayModule` and `DiagCarouselController` without requiring hardware-specific `UIDesign` libraries."
+      }
+    }
+  ],
+  "created_at": "2026-09-01T12:24:29Z",
+  "batch_id": "01M1EEV528M247W5A88PFEEXD3"
+}

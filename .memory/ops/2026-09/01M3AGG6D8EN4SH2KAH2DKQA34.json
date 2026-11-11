@@ -1,0 +1,79 @@
+{
+  "version": 1,
+  "ops": [
+    {
+      "type": "add",
+      "entry_id": "seed-4e6fa0c7",
+      "dossier_scope": "root",
+      "timestamp": "2026-09-24T21:07:53+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": null,
+        "entry_type": "decision",
+        "text": "Replaced forward-declared `class Application` stub in `BLEManager.cpp` with `#include \"Application.hpp\"` under `#ifndef UNIT_TEST` so that `app.getManufacturer()` and `app.getAppName()` inline accessors are available directly without linking issues, while preserving the mock class for native `UNIT_TEST` builds."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-b5abf604",
+      "dossier_scope": "root",
+      "timestamp": "2026-09-24T21:07:53+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": null,
+        "entry_type": "decision",
+        "text": "Added `#if defined(ESP_PLATFORM)` guards around Arduino headers and `\u003cesp_system.h\u003e` on native so that `ESP.getChipModel()` compiles across all targets."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-a4dafa93",
+      "dossier_scope": "root",
+      "timestamp": "2026-09-24T21:07:53+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": null,
+        "entry_type": "decision",
+        "text": "Positioned DIS auto-registration immediately before `_locked = true` in `BLEManager::begin()`, ensuring DIS is guaranteed to be the first registered service provider and is created prior to consumer providers."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-0efc18ff",
+      "dossier_scope": "root",
+      "timestamp": "2026-09-24T21:07:53+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": null,
+        "entry_type": "ruled-out",
+        "text": "Content-hash cache hit during rebuild after tagging: When git tag was bumped without file changes, MCP build cache hit immediately. Called `clean_project` to ensure `inject_version.py` ran and baked `v0.0.12-dev.66` into the target binary."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-4278bca3",
+      "dossier_scope": "root",
+      "timestamp": "2026-09-24T21:07:53+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": null,
+        "entry_type": "ruled-out",
+        "text": "Port auto-detection with multiple serial ports: When multiple serial ports (`/dev/cu.debug-console` and `/dev/cu.usbmodem101`) are enumerated on macOS, `upload_firmware` requires explicit `port: \"/dev/cu.usbmodem101\"`."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-b073e2a4",
+      "dossier_scope": "root",
+      "timestamp": "2026-09-24T21:07:53+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": null,
+        "entry_type": "open-issue",
+        "text": "None within BLEManager. Native test `test_lvgl_stubs` has pre-existing Playwright error documented in `PROJECT.md`."
+      }
+    }
+  ],
+  "created_at": "2026-09-24T20:07:53Z",
+  "batch_id": "01M3AGG6D8EN4SH2KAH2DKQA34"
+}

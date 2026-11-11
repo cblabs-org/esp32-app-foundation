@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "ops": [
+    {
+      "type": "add",
+      "entry_id": "seed-2c7ec8b9",
+      "dossier_scope": "root",
+      "timestamp": "2026-08-19T23:25:31+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": null,
+        "entry_type": "decision",
+        "text": "**Did not re-implement existing C++ code.** Verified each checklist item was already present and functionally correct rather than blindly duplicating work."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-2d5791fe",
+      "dossier_scope": "root",
+      "timestamp": "2026-08-19T23:25:31+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": null,
+        "entry_type": "decision",
+        "text": "**Removed duplicate `loadAppInfo()` calls** from both the success and error branches of the boot sequence. Since `loadAppInfo()` now runs first in the promise chain, it no longer needs to be called inside `loadScripts()` callbacks."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-c306fd66",
+      "dossier_scope": "root",
+      "timestamp": "2026-08-19T23:25:31+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": null,
+        "entry_type": "ruled-out",
+        "text": "The `pre_build_test` hook in the `crowpanel-128-rotary` environment runs Playwright browser E2E tests as part of `pio run`. This caused the MCP build task to appear \"stuck\" and report a false-negative diagnostic while Playwright tests ran. The firmware compilation itself succeeded cleanly."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-70a86f9e",
+      "dossier_scope": "root",
+      "timestamp": "2026-08-19T23:25:31+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": null,
+        "entry_type": "open-issue",
+        "text": "**28 pre-existing Playwright E2E test failures** in the `pre_build_test` hook — all timeout-related failures in display settings, OTA, system status, and backup tests. These are not caused by WO4 changes and appear to be a pre-existing test infrastructure issue."
+      }
+    }
+  ],
+  "created_at": "2026-08-19T22:25:31Z",
+  "batch_id": "01M0E22AVRGYQZ2E5CV1M7B40V"
+}

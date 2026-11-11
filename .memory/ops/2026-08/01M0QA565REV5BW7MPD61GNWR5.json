@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "ops": [
+    {
+      "type": "add",
+      "entry_id": "seed-493a6540",
+      "dossier_scope": "test/test-unit/test-u8g2Display",
+      "timestamp": "2026-08-23T13:40:03+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "modules/U8G2Display/library.json",
+          "src/main.cpp",
+          "test/test_unit/test_u8g2Display/u8g2_module_native_stubs.cpp",
+          "test/test_unit/test_u8g2Display/test_boards.cpp",
+          "test/test_unit/test_u8g2Display/test_eventbus_integration.cpp"
+        ],
+        "entry_type": "ruled-out",
+        "text": "**Direct U8G2 Render in Native Tests**: Initial attempt to invoke `board.render(u8g2)` in native tests with an uninitialized `U8G2` mock driver caused memory faults due to null internal font pointers; updated tests to validate state calculation, snapshot mapping, and cause properties directly."
+      }
+    }
+  ],
+  "created_at": "2026-08-23T12:40:03Z",
+  "batch_id": "01M0QA565REV5BW7MPD61GNWR5"
+}

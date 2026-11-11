@@ -1,0 +1,121 @@
+{
+  "version": 1,
+  "ops": [
+    {
+      "type": "add",
+      "entry_id": "seed-a6a016c8",
+      "dossier_scope": "docs",
+      "timestamp": "2026-09-03T08:05:27+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "docs/README.md",
+          "CONTRIBUTING.md",
+          "docs/README.md",
+          "docs/design_specification.md",
+          "docs/archive/lvgl-display-design.md",
+          "modules/LVGLDisplay/README.md"
+        ],
+        "entry_type": "decision",
+        "text": "**Link protocol for conversation audit source:** Replaced `../conversation://8b733dfa-645a-478e-b6cc-e08c50620730` in the disposition table preamble with `conversation://8b733dfa-645a-478e-b6cc-e08c50620730` so the custom URI scheme parses cleanly as an active link rather than a broken relative filesystem path."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-9d8627c5",
+      "dossier_scope": "docs",
+      "timestamp": "2026-09-03T08:05:27+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "docs/README.md",
+          "CONTRIBUTING.md",
+          "docs/README.md",
+          "docs/design_specification.md",
+          "docs/archive/lvgl-display-design.md",
+          "modules/LVGLDisplay/README.md"
+        ],
+        "entry_type": "decision",
+        "text": "**Disposition table placement:** Positioned immediately following the front matter metadata block (`Last Updated: 2026-09-03` / `---`) and before `## Table of Contents` so that any agent or human reviewing the specification is warned prior to navigating into individual sections."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-40d61690",
+      "dossier_scope": "docs",
+      "timestamp": "2026-09-03T08:05:27+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "docs/README.md",
+          "CONTRIBUTING.md",
+          "docs/README.md",
+          "docs/design_specification.md",
+          "docs/archive/lvgl-display-design.md",
+          "modules/LVGLDisplay/README.md"
+        ],
+        "entry_type": "decision",
+        "text": "**Relative link repairs in archived doc:** When moving `lvgl-display-design.md` into `docs/archive/`, adjusted relative paths (`../modules/LVGLDisplay/README.md` → `../../modules/LVGLDisplay/README.md`, `developer/*.md` → `../developer/*.md`, `design_specification.md` → `../design_specification.md`) to avoid broken links."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-f465187b",
+      "dossier_scope": "docs",
+      "timestamp": "2026-09-03T08:05:27+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "docs/README.md",
+          "CONTRIBUTING.md",
+          "docs/README.md",
+          "docs/design_specification.md",
+          "docs/archive/lvgl-display-design.md",
+          "modules/LVGLDisplay/README.md"
+        ],
+        "entry_type": "decision",
+        "text": "**Severity bands relabeling:** Checked repository for in-repo quotations of the severity classification. None found, so skipped as instructed."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-8f26371f",
+      "dossier_scope": "docs",
+      "timestamp": "2026-09-03T08:05:27+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "docs/README.md",
+          "CONTRIBUTING.md",
+          "docs/README.md",
+          "docs/design_specification.md",
+          "docs/archive/lvgl-display-design.md",
+          "modules/LVGLDisplay/README.md"
+        ],
+        "entry_type": "open-issue",
+        "text": "Lines 391 and 617 of `docs/design_specification.md` still contain links to `lvgl-display-design.md`. Per the Strict Boundary Box, body content was left untouched for WO3/WO4 to update as part of the section rewrites."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-f55ee1fa",
+      "dossier_scope": "docs",
+      "timestamp": "2026-09-03T08:05:27+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "docs/README.md",
+          "CONTRIBUTING.md",
+          "docs/README.md",
+          "docs/design_specification.md",
+          "docs/archive/lvgl-display-design.md",
+          "modules/LVGLDisplay/README.md"
+        ],
+        "entry_type": "open-issue",
+        "text": "`docs/hardware-configuration-design.md` line 724 references `lvgl-display-design.md`, but this file was explicitly marked as out-of-scope (Risk R2, feature branch) and was not modified."
+      }
+    }
+  ],
+  "created_at": "2026-09-03T07:05:27Z",
+  "batch_id": "01M1K1CDPR7T1G2PXW3JVY64AW"
+}

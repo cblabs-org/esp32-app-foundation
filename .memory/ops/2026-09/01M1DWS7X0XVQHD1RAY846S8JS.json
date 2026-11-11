@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "ops": [
+    {
+      "type": "add",
+      "entry_id": "seed-67d06d5f",
+      "dossier_scope": "modules/LVGLDisplay",
+      "timestamp": "2026-09-01T08:08:52+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "modules/LVGLDisplay/DiagCarouselController.hpp",
+          "modules/LVGLDisplay/DiagCarouselController.cpp"
+        ],
+        "entry_type": "decision",
+        "text": "Added a fallback by child index to `findChildByName` in case `LV_USE_OBJ_NAME` is not active in a downstream build configuration: the 5 child widgets of `screen_diag` are created in stable order (0: arc, 1: category, 2: counter, 3: value, 4: status)."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-cbeacd2e",
+      "dossier_scope": "modules/LVGLDisplay",
+      "timestamp": "2026-09-01T08:08:52+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "modules/LVGLDisplay/DiagCarouselController.hpp",
+          "modules/LVGLDisplay/DiagCarouselController.cpp"
+        ],
+        "entry_type": "open-issue",
+        "text": "The `UIDesign` library (`uidesign/crowpanel-128-rotary/lvglpro/library.json`) lacks `\"flags\": [\"-DLV_LVGL_H_INCLUDE_SIMPLE\"]` (or `-DLV_LVGL_H_INCLUDE_SIMPLE` under `[env:crowpanel-128-rotary]` in `platformio.ini`), which causes its C headers to attempt `#include \"lvgl/lvgl.h\"` instead of `\"lvgl.h\"`. Surfaced for PA to address before/in WO4."
+      }
+    }
+  ],
+  "created_at": "2026-09-01T07:08:52Z",
+  "batch_id": "01M1DWS7X0XVQHD1RAY846S8JS"
+}

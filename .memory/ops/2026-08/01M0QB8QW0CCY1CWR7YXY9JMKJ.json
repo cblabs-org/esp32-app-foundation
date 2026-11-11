@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "ops": [
+    {
+      "type": "add",
+      "entry_id": "seed-258721c3",
+      "dossier_scope": "root",
+      "timestamp": "2026-08-23T13:59:28+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": null,
+        "entry_type": "decision",
+        "text": "Re-enabled `test_application` despite earlier native linker errors by recognizing that the platformio native environment is only tailored for testing, and should not be used with `pio run -e native`."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-62ced803",
+      "dossier_scope": "root",
+      "timestamp": "2026-08-23T13:59:28+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": null,
+        "entry_type": "decision",
+        "text": "Ensured that `IConfigGate` documentation was fully transitioned to `IPreconditionContributor` concepts and design docs."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-4dcc98d0",
+      "dossier_scope": "root",
+      "timestamp": "2026-08-23T13:59:28+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": null,
+        "entry_type": "ruled-out",
+        "text": "When using `PsychicHttp` base pointer mock objects in native tests, ensure virtual method dispatch is correctly wired. Native stubs that omit the `virtual` keyword will bypass the mock behavior and invoke the stub's base method, which causes subtle test failures or memory segmentation faults if passing uninitialized references."
+      }
+    }
+  ],
+  "created_at": "2026-08-23T12:59:28Z",
+  "batch_id": "01M0QB8QW0CCY1CWR7YXY9JMKJ"
+}

@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "ops": [
+    {
+      "type": "add",
+      "entry_id": "seed-8e840206",
+      "dossier_scope": "modules/AuditModule",
+      "timestamp": "2026-08-30T10:11:59+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "modules/AuditModule/AuditModule.hpp",
+          "modules/AuditModule/AuditModule.cpp",
+          "modules/MCPServer/MCPBuiltinTools.cpp",
+          "test/test_unit/test_mcpServer/test_mcpServer.cpp",
+          "test/test_unit/test_audit_module/test_audit_module.cpp"
+        ],
+        "entry_type": "decision",
+        "text": "`AUDIT_FILE_PREFIX`: Used `#ifdef ESP_PLATFORM` to map to `/littlefs/audit_` on embedded hardware and `test/tmp/audit_` on native host tests (matching `ConfigRoot` pattern)."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-90a6c2b5",
+      "dossier_scope": "modules/AuditModule",
+      "timestamp": "2026-08-30T10:11:59+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "modules/AuditModule/AuditModule.hpp",
+          "modules/AuditModule/AuditModule.cpp",
+          "modules/MCPServer/MCPBuiltinTools.cpp",
+          "test/test_unit/test_mcpServer/test_mcpServer.cpp",
+          "test/test_unit/test_audit_module/test_audit_module.cpp"
+        ],
+        "entry_type": "decision",
+        "text": "`Crash tolerance`: Implemented partial line dropping in `readAuditFile()` if EOF is reached without a newline `\\n`."
+      }
+    }
+  ],
+  "created_at": "2026-08-30T09:11:59Z",
+  "batch_id": "01M18Z17RRMEPCVCSRDP2XAA2Q"
+}

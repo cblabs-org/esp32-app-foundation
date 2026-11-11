@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "ops": [
+    {
+      "type": "add",
+      "entry_id": "seed-4daeeb83",
+      "dossier_scope": "modules/WifiManager",
+      "timestamp": "2026-09-01T21:10:36+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "library.json",
+          "lib/DeviceCrypto/DeviceCrypto.cpp",
+          "modules/WifiManager/WifiManager.cpp",
+          "modules/KeyManager/KeyManager.cpp"
+        ],
+        "entry_type": "decision",
+        "text": "Converted `LOG_SECURE` call sites in `DeviceCrypto.cpp` to `ESP_LOGD` (debug level) rather than `ESP_LOGI`, preserving debug utility while stripping crypto internals from production builds."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-2478db74",
+      "dossier_scope": "modules/WifiManager",
+      "timestamp": "2026-09-01T21:10:36+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "library.json",
+          "lib/DeviceCrypto/DeviceCrypto.cpp",
+          "modules/WifiManager/WifiManager.cpp",
+          "modules/KeyManager/KeyManager.cpp"
+        ],
+        "entry_type": "decision",
+        "text": "Retained explicit secret registration in `WifiManager::updateWiFi` to ensure web form inputs are redacted immediately upon arrival."
+      }
+    }
+  ],
+  "created_at": "2026-09-01T20:10:36Z",
+  "batch_id": "01M1F9GMK0RF6E52AR17N1V03Q"
+}

@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "ops": [
+    {
+      "type": "add",
+      "entry_id": "seed-e6e28e87",
+      "dossier_scope": "root",
+      "timestamp": "2026-09-25T22:14:26+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": null,
+        "entry_type": "decision",
+        "text": "`getUnits()` continues to return `std::string` for API stability, but now builds a thread-safe copy from `_units` under `_dataMutex`."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-d0767481",
+      "dossier_scope": "root",
+      "timestamp": "2026-09-25T22:14:26+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": null,
+        "entry_type": "decision",
+        "text": "`tick()` logic added to successfully drain `_publishPending` safely on the main thread."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-ecc62a2c",
+      "dossier_scope": "root",
+      "timestamp": "2026-09-25T22:14:26+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": null,
+        "entry_type": "open-issue",
+        "text": "None discovered."
+      }
+    }
+  ],
+  "created_at": "2026-09-25T21:14:26Z",
+  "batch_id": "01M3D6PRTGJCTFVA3ENPKNG6M5"
+}

@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "ops": [
+    {
+      "type": "add",
+      "entry_id": "seed-6f35af4f",
+      "dossier_scope": "root",
+      "timestamp": "2026-08-25T21:26:31+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": null,
+        "entry_type": "decision",
+        "text": "`getTabIcon()` retained as a **non-virtual helper** on AuthManager, HomeAssistantModule, LVGLDisplayModule, U8G2DisplayModule, WeatherModule — called from within their `registerTabs()` implementations. This avoids duplicating large SVG string literals."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-59ba112e",
+      "dossier_scope": "root",
+      "timestamp": "2026-08-25T21:26:31+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": null,
+        "entry_type": "decision",
+        "text": "`WebServerManager::registerRoutes()` is a no-op since its routes are registered inline in `begin()`. The `registerTabs()` method registers the Status sub-pill."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-31f00db4",
+      "dossier_scope": "root",
+      "timestamp": "2026-08-25T21:26:31+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": null,
+        "entry_type": "decision",
+        "text": "Dead `TabStub()` calls in `sample-app/src/main.cpp` and `template-app/src/main.cpp` removed — these referenced methods already deleted in WO1 from the display modules."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-40baf813",
+      "dossier_scope": "root",
+      "timestamp": "2026-08-25T21:26:31+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": null,
+        "entry_type": "ruled-out",
+        "text": "**Missed test files on first pass**: `test_wifiManager.cpp` and `test_configManager.cpp` both called removed scalar getters (`getTabName()`, `getParentTab()`, `getTabOrder()`), causing ERRORED status on the initial test run. These were caught during parent review and fixed with registerTabs() collector tests. Root cause: initial test sweep searched for `-\u003egetTabName()` pattern (pointer dereference) but missed the `wifiManager.getTabName()` pattern (dot access on stack object)."
+      }
+    }
+  ],
+  "created_at": "2026-08-25T20:26:31Z",
+  "batch_id": "01M0X9MR6RRNWTR7JSPWAKNXTE"
+}

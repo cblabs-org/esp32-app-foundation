@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "ops": [
+    {
+      "type": "add",
+      "entry_id": "seed-8fce4b98",
+      "dossier_scope": "root",
+      "timestamp": "2026-08-19T23:16:53+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": null,
+        "entry_type": "decision",
+        "text": "Relocated the `ui_ui_DiagScreen` weak extern declaration to the top of the file to ensure it was in scope for `tick()`."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-4ca88625",
+      "dossier_scope": "root",
+      "timestamp": "2026-08-19T23:16:53+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": null,
+        "entry_type": "ruled-out",
+        "text": "The frontend web portal tests (`ota.spec.ts`) failed via timeout during the web asset build of `build_project`, which aborted the firmware compilation step. However, the native test suite passed entirely, validating the C++ syntax and behavior."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-de584c44",
+      "dossier_scope": "root",
+      "timestamp": "2026-08-19T23:16:53+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": null,
+        "entry_type": "open-issue",
+        "text": "No other direct LVGL calls in EventBus subscribers were addressed as per boundary box constraints."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-a7a2b3c6",
+      "dossier_scope": "root",
+      "timestamp": "2026-08-19T23:16:53+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": null,
+        "entry_type": "open-issue",
+        "text": "`_diagCarousel.begin()` is now deferred to the main loop as required."
+      }
+    }
+  ],
+  "created_at": "2026-08-19T22:16:53Z",
+  "batch_id": "01M0E1JH08N302S16YF7WP5S76"
+}

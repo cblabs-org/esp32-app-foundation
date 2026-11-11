@@ -1,0 +1,63 @@
+{
+  "version": 1,
+  "ops": [
+    {
+      "type": "add",
+      "entry_id": "seed-61583d42",
+      "dossier_scope": "docs/developer",
+      "timestamp": "2026-08-19T23:25:31+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "docs/developer/scheduling-data-fetches.md"
+        ],
+        "entry_type": "decision",
+        "text": "Skipped `startWdtFeederTimer()` as it was not present in the workspace base branch from WO2, relying instead on `_fetchStartMs` updates directly."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-f624980c",
+      "dossier_scope": "docs/developer",
+      "timestamp": "2026-08-19T23:25:31+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "docs/developer/scheduling-data-fetches.md"
+        ],
+        "entry_type": "decision",
+        "text": "Used `std::deque` in native mock queue implementation to allow `push_front` needed by `drainJobs(true)` skipping non-urgent jobs."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-56ecb3a9",
+      "dossier_scope": "docs/developer",
+      "timestamp": "2026-08-19T23:25:31+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "docs/developer/scheduling-data-fetches.md"
+        ],
+        "entry_type": "ruled-out",
+        "text": "Mock queue implementation required `std::deque` substitution to mock FreeRTOS `xQueueSendToFront`."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "seed-b088cc32",
+      "dossier_scope": "docs/developer",
+      "timestamp": "2026-08-19T23:25:31+01:00",
+      "source": "seed",
+      "fields": {
+        "anchors": [
+          "docs/developer/scheduling-data-fetches.md"
+        ],
+        "entry_type": "ruled-out",
+        "text": "`executeLoop()` processes exactly one `IDataSource` fetch per iteration, requiring unit tests to avoid staging multiple due tasks when testing precise fetch order with logs."
+      }
+    }
+  ],
+  "created_at": "2026-08-19T22:25:31Z",
+  "batch_id": "01M0E22AVRKT7ZV2B6NCCM376J"
+}
