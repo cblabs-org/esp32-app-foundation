@@ -43,8 +43,8 @@ main (5f15490) ← merged PR-21
 - `modules/Application/Application.cpp` / `.hpp` — WiFi wizard modal wiring + %zu format
 
 ### PA Workspace
-- `.agents/skills/principal-architect-workspace/MEMORY.md` — PR-21 registered + marked complete
-- `.agents/skills/principal-architect-workspace/pr-21-ota-task-hardening/PROJECT.md` — full project ledger
+- `.agents/plugins/principal-architect-workspace/MEMORY.md` — PR-21 registered + marked complete
+- `.agents/plugins/principal-architect-workspace/pr-21-ota-task-hardening/PROJECT.md` — full project ledger
 - `wo1-firmware-heap-guard/` — WORKORDER + distillation artifacts
 - `wo2-portal-memory-warning/` — WORKORDER + distillation artifacts
 - `pr-22-portal-ui-consistency/` — pre-staged PROJECT.md by WO2 worker (included in merge)

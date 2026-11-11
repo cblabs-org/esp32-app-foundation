@@ -98,7 +98,7 @@ All existing tests must pass.
 After completing all checklist items:
 1. Confirm all Playwright tests pass.
 2. **STOP and ask the user** if they are happy with the changes.
-3. Only after user approval: commit your changes with message `fix(portal): preserve error body in apiFetch on non-2xx (Issue #31)`, then invoke the `@distillery` skill to package the state, passing `.agents/skills/principal-architect-workspace/pr-46-open-issues-batch/wo2-apifetch-error-body/` as the target directory.
+3. Only after user approval: commit your changes with message `fix(portal): preserve error body in apiFetch on non-2xx (Issue #31)`, then invoke the `@distillery` skill to package the state, passing `.agents/plugins/principal-architect-workspace/pr-46-open-issues-batch/wo2-apifetch-error-body/` as the target directory.
 4. Append a status update to this WORKORDER.md and send a completion message to the PA.
 
 ## Status Log

@@ -29,7 +29,7 @@ Add debug-build-only, per-module tick-duration instrumentation to the `Applicati
 1. Run `platformio` MCP tool `build_project` for `native` and `esp32dev` to ensure the project still compiles.
 2. Run `platformio` MCP tool `run_tests` to ensure tests pass.
 3. Verify that in a debug build, an over-budget module logs a warning. (The project spec expects a warning for a deliberately-slow test module if applicable, or just verify the code logic is sound).
-4. Stop and ask the user (me, the Principal Architect) if they are happy with the changes. **Only after approval**, invoke the `@distillery` skill to package the state and drop control, passing `.agents/skills/principal-architect-workspace/microkernel-refactor/pr-mk02-kernel-hardening/wo2-debug-instrumentation/` as the target directory.
+4. Stop and ask the user (me, the Principal Architect) if they are happy with the changes. **Only after approval**, invoke the `@distillery` skill to package the state and drop control, passing `.agents/plugins/principal-architect-workspace/microkernel-refactor/pr-mk02-kernel-hardening/wo2-debug-instrumentation/` as the target directory.
 5. Append a status update to this `WORKORDER.md` file and terminate your session.
 
 ## Status Update

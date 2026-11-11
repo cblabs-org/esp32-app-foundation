@@ -14,7 +14,7 @@ complexity: standard   # mechanical | standard | architect
 Rename two abstract interfaces to follow the project's `I`-prefix convention and relocate them from `include/utils/` to `include/interfaces/`. Update every includer, reference, and documentation file. Verify zero old-name references remain.
 
 **Parent project:** PR #151 — Interface Naming Convention Cleanup  
-**Parent PROJECT.md:** `.agents/skills/principal-architect-workspace/pr-151-interface-naming-cleanup/PROJECT.md`
+**Parent PROJECT.md:** `.agents/plugins/principal-architect-workspace/pr-151-interface-naming-cleanup/PROJECT.md`
 
 ## Strict Boundary Box
 

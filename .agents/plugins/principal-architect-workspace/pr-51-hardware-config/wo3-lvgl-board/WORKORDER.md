@@ -95,5 +95,5 @@ the PA in your report; do not file issues yourself.
   - Deleted 13 `-DLCD/TOUCH/ENCODER_*` build flags from `platformio.ini` and set `-DBOARD_HEADER`.
   - Co-located `hardware/crowpanel-128-rotary/partitions.csv` (HC-10).
   - `crowpanel-128-rotary` compiles green (`SUCCESS`). All 358 native unit tests pass.
-  - Committed at `d045511`. Distilled to `.agents/skills/principal-architect-workspace/pr-51-hardware-config/wo3-lvgl-board/`.
+  - Committed at `d045511`. Distilled to `.agents/plugins/principal-architect-workspace/pr-51-hardware-config/wo3-lvgl-board/`.
 

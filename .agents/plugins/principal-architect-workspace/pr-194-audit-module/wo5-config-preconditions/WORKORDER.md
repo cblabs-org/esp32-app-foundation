@@ -13,7 +13,7 @@ complexity: standard
 Add runtime configuration and health reporting to the AuditModule. The module becomes configurable via the portal (enable/disable, rate limit tuning) and reports its operational health via the precondition engine.
 
 ## Context
-**Parent project**: `pr-194-audit-module` — see `.agents/skills/principal-architect-workspace/pr-194-audit-module/PROJECT.md`
+**Parent project**: `pr-194-audit-module` — see `.agents/plugins/principal-architect-workspace/pr-194-audit-module/PROJECT.md`
 
 WO1-WO4 are already complete. The AuditModule has its core engine, board constants, REST endpoints, and MCP tools. This WO adds the remaining two framework interfaces.
 

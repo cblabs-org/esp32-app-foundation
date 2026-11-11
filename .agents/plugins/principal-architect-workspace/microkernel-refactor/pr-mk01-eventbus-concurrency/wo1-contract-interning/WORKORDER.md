@@ -28,12 +28,12 @@ Use the `platformio` MCP tools (`build_project`, `run_tests`) — **not** raw `p
 - [x] Check if publisher/subscriber calls in `modules/EventBus` need adaptation.
 - [x] Verify compilation on `esp32dev` env using `call_mcp_tool` with `platformio` `build_project`.
 - [x] Verify native tests on `native` env using `call_mcp_tool` with `platformio` `run_tests`.
-- [x] Ask the user for approval. Only after explicit approval, invoke `@distillery` to package the output targeting `.agents/skills/principal-architect-workspace/microkernel-refactor/pr-mk01-eventbus-concurrency/wo1-contract-interning/`.
+- [x] Ask the user for approval. Only after explicit approval, invoke `@distillery` to package the output targeting `.agents/plugins/principal-architect-workspace/microkernel-refactor/pr-mk01-eventbus-concurrency/wo1-contract-interning/`.
 - [x] Append a status update to this `WORKORDER.md` file.
 
 # Status Log
 
 | Date | Entry |
 |---|---|
-| 2026-07-29 | **COMPLETED & VALIDATED.** Concurrency contract docstring added; topic interning implemented via FNV-1a 32-bit hash; in-place dispatch with soft-deletion tombstones for re-entrancy safety. Hardware build (`esp32dev`) and 489 native unit tests passed. User approved execution. Distillery output generated at `.agents/skills/principal-architect-workspace/microkernel-refactor/pr-mk01-eventbus-concurrency/wo1-contract-interning/`. |
+| 2026-07-29 | **COMPLETED & VALIDATED.** Concurrency contract docstring added; topic interning implemented via FNV-1a 32-bit hash; in-place dispatch with soft-deletion tombstones for re-entrancy safety. Hardware build (`esp32dev`) and 489 native unit tests passed. User approved execution. Distillery output generated at `.agents/plugins/principal-architect-workspace/microkernel-refactor/pr-mk01-eventbus-concurrency/wo1-contract-interning/`. |
 

@@ -26,7 +26,7 @@ Promote the "≤10 ms per tick()" obligation from a comment to an explicit contr
 ## Verification Requirement
 1. Run `platformio` MCP tool `build_project` for `native` and `esp32dev` to ensure the project still compiles.
 2. Run `platformio` MCP tool `run_tests` to ensure tests pass.
-3. Stop and ask the user (me, the Principal Architect) if they are happy with the changes. **Only after approval**, invoke the `@distillery` skill to package the state and drop control, passing `.agents/skills/principal-architect-workspace/microkernel-refactor/pr-mk02-kernel-hardening/wo1-contract-docs/` as the target directory.
+3. Stop and ask the user (me, the Principal Architect) if they are happy with the changes. **Only after approval**, invoke the `@distillery` skill to package the state and drop control, passing `.agents/plugins/principal-architect-workspace/microkernel-refactor/pr-mk02-kernel-hardening/wo1-contract-docs/` as the target directory.
 4. Append a status update to this `WORKORDER.md` file and terminate your session.
 
 ## Status Update - 2026-07-29

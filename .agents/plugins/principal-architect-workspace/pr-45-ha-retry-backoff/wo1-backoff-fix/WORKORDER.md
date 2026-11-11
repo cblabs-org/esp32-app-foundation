@@ -234,8 +234,8 @@ Add tests to the existing test file or create a new one. The tests need a mock f
 
 Read these if you need context:
 - [Issue #34 assessment](file:///Users/mcneillm/.gemini/antigravity/brain/000a3e6b-44c7-46d7-9147-da9c2da4a3c3/issue_34_assessment.md) — full root cause analysis
-- [PR-42 ADR](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/.agents/skills/principal-architect-workspace/pr-42-ha-discovery-pacing/context_artifacts/adr_paced_discovery.md) — why tick-driven, why two-phase
-- [PR-42 graveyard](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/.agents/skills/principal-architect-workspace/pr-42-ha-discovery-pacing/context_artifacts/graveyard_rejected_approaches.md) — rejected approaches
+- [PR-42 ADR](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/.agents/plugins/principal-architect-workspace/pr-42-ha-discovery-pacing/context_artifacts/adr_paced_discovery.md) — why tick-driven, why two-phase
+- [PR-42 graveyard](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/.agents/plugins/principal-architect-workspace/pr-42-ha-discovery-pacing/context_artifacts/graveyard_rejected_approaches.md) — rejected approaches
 
 ## Status Update (2026-07-21)
 - **Status:** COMPLETED

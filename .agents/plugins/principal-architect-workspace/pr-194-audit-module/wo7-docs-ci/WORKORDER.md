@@ -13,7 +13,7 @@ complexity: standard
 Update the framework-expert skill to include AuditModule in its knowledge base, add developer guidance on audit usage patterns, and ensure the skill's routing table includes audit-related trigger terms.
 
 ## Context
-**Parent project**: `pr-194-audit-module` — see `.agents/skills/principal-architect-workspace/pr-194-audit-module/PROJECT.md`
+**Parent project**: `pr-194-audit-module` — see `.agents/plugins/principal-architect-workspace/pr-194-audit-module/PROJECT.md`
 
 WO1-WO6 are complete. The AuditModule is fully implemented, gated, and documented in the microkernel design doc. This final WO updates the agent skill documentation so future AI-assisted development sessions know about the audit system.
 

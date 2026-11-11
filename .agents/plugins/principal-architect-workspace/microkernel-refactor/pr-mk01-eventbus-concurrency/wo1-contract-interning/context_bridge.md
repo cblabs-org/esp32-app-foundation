@@ -3,8 +3,8 @@ title: "WO1 Distillation — EventBus Concurrency Contract & Topic Interning"
 distilled_at: "2026-07-29T09:53:00Z"
 original_plan_id: "pr-mk01-eventbus-concurrency-wo1"
 artifacts:
-  - .agents/skills/principal-architect-workspace/microkernel-refactor/pr-mk01-eventbus-concurrency/wo1-contract-interning/context_artifacts/adr_wo1_eventbus_concurrency_interning.md
-  - .agents/skills/principal-architect-workspace/microkernel-refactor/pr-mk01-eventbus-concurrency/wo1-contract-interning/context_artifacts/graveyard_wo1_build_fixes.md
+  - .agents/plugins/principal-architect-workspace/microkernel-refactor/pr-mk01-eventbus-concurrency/wo1-contract-interning/context_artifacts/adr_wo1_eventbus_concurrency_interning.md
+  - .agents/plugins/principal-architect-workspace/microkernel-refactor/pr-mk01-eventbus-concurrency/wo1-contract-interning/context_artifacts/graveyard_wo1_build_fixes.md
 ---
 
 # Executive Summary

@@ -315,5 +315,5 @@ Once **both** verification steps above pass:
    - Any design decisions you made and why
    - Any concerns or edge cases you noticed
 3. Wait for the PA's explicit approval before invoking `@distillery`.
-4. Once approved, invoke the `@distillery` skill, passing `.agents/skills/principal-architect-workspace/pr-23-display-tab/wo1-rename-and-subtabs/` as the target directory.
+4. Once approved, invoke the `@distillery` skill, passing `.agents/plugins/principal-architect-workspace/pr-23-display-tab/wo1-rename-and-subtabs/` as the target directory.
 5. Append a status update to this WORKORDER.md and terminate your session.

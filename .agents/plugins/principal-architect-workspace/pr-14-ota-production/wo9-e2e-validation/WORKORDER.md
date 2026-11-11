@@ -15,7 +15,7 @@ Run the full automated test suite, both hardware builds, and validate the comple
 
 - ✅ You MAY run `pio test` and `pio run` commands
 - ✅ You MAY run scripts for validation (e.g., `generate_manifest.py --help`)
-- ✅ You MAY create a validation report file at `.agents/skills/principal-architect-workspace/pr-14-ota-production/wo9-e2e-validation/VALIDATION_REPORT.md`
+- ✅ You MAY create a validation report file at `.agents/plugins/principal-architect-workspace/pr-14-ota-production/wo9-e2e-validation/VALIDATION_REPORT.md`
 - ❌ Do NOT modify any source code, scripts, docs, or config files
 - ❌ Do NOT create branches or manage git
 - ❌ Do NOT flash any hardware

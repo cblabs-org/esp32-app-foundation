@@ -27,7 +27,7 @@ warrant a new dev tag.
 - Do **NOT** modify `sdkconfig.defaults` or any source code
 - Do **NOT** create any branches or make git commits
 - You **MUST** read the WO2 results file at:
-  `.agents/skills/principal-architect-workspace/pr-27-tls-optimization/wo2-build-test-measure/RESULTS.md`
+  `.agents/plugins/principal-architect-workspace/pr-27-tls-optimization/wo2-build-test-measure/RESULTS.md`
   to incorporate measured data.
 
 ## Prerequisites
@@ -37,7 +37,7 @@ WO2 must be complete with `RESULTS.md` containing measured heap and flash metric
 ## Line-Item Instructions
 
 - [ ] **1. Read the WO2 results** from:
-  `.agents/skills/principal-architect-workspace/pr-27-tls-optimization/wo2-build-test-measure/RESULTS.md`
+  `.agents/plugins/principal-architect-workspace/pr-27-tls-optimization/wo2-build-test-measure/RESULTS.md`
 
 - [ ] **2. Read the TLS analysis** from:
   `.gemini/antigravity/brain/07cb3857-55da-4085-b60a-2fecec6a6dec/tls_optimization_analysis.md`

@@ -15,8 +15,8 @@ stay inside the boundary box; surface anything bigger.
 ## First actions (before touching hardware)
 1. **Read every file in `.agents/rules/` in filename order** — unconditional operating law
    (plan gate, flash gate/versioning, tmp workspace, MCP-first tooling). Do this first.
-2. Read your work order: `.agents/skills/principal-architect-workspace/pr-sls-screen-redesign/wo7-hardware-test-debug/WORKORDER.md`.
-3. Read the test plan you'll execute: `.agents/skills/principal-architect-workspace/pr-sls-screen-redesign/HARDWARE-TEST-PLAN.md`.
+2. Read your work order: `.agents/plugins/principal-architect-workspace/pr-sls-screen-redesign/wo7-hardware-test-debug/WORKORDER.md`.
+3. Read the test plan you'll execute: `.agents/plugins/principal-architect-workspace/pr-sls-screen-redesign/HARDWARE-TEST-PLAN.md`.
 4. Load the skills you'll need: **`pio-manager`** (all build/flash/monitor go through the
    `platformio` MCP — never raw `pio`), **`systematic-debugging`** (use it the moment
    anything misbehaves), and **`framework-expert`** (device-MCP scripts + module patterns).

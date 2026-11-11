@@ -39,7 +39,7 @@ optional modules must implement. Zero implementation logic lives here — header
 
 > [!IMPORTANT]
 > Check the exact file names in the PROGRAM-PLAN.md deliverables list:
-> `.agents/skills/principal-architect-workspace/esp32-app-foundation/PROGRAM-PLAN.md`
+> `.agents/plugins/principal-architect-workspace/esp32-app-foundation/PROGRAM-PLAN.md`
 > Use the exact capitalisation specified there.
 
 ## Strict Boundary Box
@@ -579,7 +579,7 @@ Before considering this WO complete, confirm:
 5. Every public class/method/enum has Doxygen `@brief` documentation
 
 **STOP and ask the user to confirm the work before committing or invoking the distillery.**  
-Once approved, invoke the `@distillery` skill, passing `.agents/skills/principal-architect-workspace/pr-01-kernel-interfaces/wo2-interfaces/` as the target directory. Then append a `## Status` section to this WORKORDER.md and drop control.
+Once approved, invoke the `@distillery` skill, passing `.agents/plugins/principal-architect-workspace/pr-01-kernel-interfaces/wo2-interfaces/` as the target directory. Then append a `## Status` section to this WORKORDER.md and drop control.
 
 ---
 

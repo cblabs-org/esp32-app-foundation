@@ -31,7 +31,7 @@ The EncoderModule (PR #56) was merged into `input-module/wo3-tests-docs` 4½ hou
 - Do NOT touch U8G2Display, LVGLDisplay, or other unrelated modules
 - Do NOT attempt to flash — hardware not attached
 - Do NOT create new branches beyond the one already checked out
-- Do NOT modify `.agents/skills/principal-architect-workspace/` files
+- Do NOT modify `.agents/plugins/principal-architect-workspace/` files
 
 ## Tooling Constraints
 

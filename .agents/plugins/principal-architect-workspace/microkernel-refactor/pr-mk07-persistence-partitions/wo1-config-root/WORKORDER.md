@@ -26,7 +26,7 @@ Abstract the hardcoded filesystem paths (`/etc`, `/mod`) in `KeyManager`, `AuthM
 - [x] Update `modules/WebServer/WebServerManager.cpp` where it loops over `/etc` and `/mod` to erase them (lines ~470-500) to use the accessor.
 - [x] Update `#include` directives in these modules as needed to include `ConfigRoot.hpp`.
 - [x] Build the project for `native`, `esp32dev`, and `esp32s3nano` using the `build_project` MCP tool to verify it still compiles cleanly.
-- [x] **CRITICAL**: Ask the user if they are happy before completing. Only after approval, invoke the `@distillery` skill to package the state passing `.agents/skills/principal-architect-workspace/microkernel-refactor/pr-mk07-persistence-partitions/wo1-config-root/` as the target directory.
+- [x] **CRITICAL**: Ask the user if they are happy before completing. Only after approval, invoke the `@distillery` skill to package the state passing `.agents/plugins/principal-architect-workspace/microkernel-refactor/pr-mk07-persistence-partitions/wo1-config-root/` as the target directory.
 - [x] Append a status update to this `WORKORDER.md` file indicating completion.
 
 ## Status Update

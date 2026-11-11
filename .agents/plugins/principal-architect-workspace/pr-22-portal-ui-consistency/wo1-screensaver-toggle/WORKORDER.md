@@ -190,7 +190,7 @@ No regressions in the full suite.
 
 Do NOT wrap up, distill, or commit until the PA explicitly approves. Once approved,
 invoke the `@distillery` skill passing
-`.agents/skills/principal-architect-workspace/pr-22-portal-ui-consistency/wo1-screensaver-toggle/`
+`.agents/plugins/principal-architect-workspace/pr-22-portal-ui-consistency/wo1-screensaver-toggle/`
 as the target directory. Append a status update to this WORKORDER.md file, then
 terminate your session.
 

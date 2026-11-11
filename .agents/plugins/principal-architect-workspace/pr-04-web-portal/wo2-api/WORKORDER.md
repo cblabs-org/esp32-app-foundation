@@ -41,4 +41,4 @@ Implement the REST API handlers for the ESP32 App Foundation web portal.
 
 ## Closure Gate
 - Confirm tests (`test_unit` and hardware tests if any) compile and pass.
-- **Distillation Requirement**: When you have completed and verified all code changes, you MUST invoke the `@distillery` skill to package your WO output. Pass `.agents/skills/principal-architect-workspace/pr-04-web-portal/wo2-api/` as the target directory. Wait for it to finish before dropping control back to the PA.
+- **Distillation Requirement**: When you have completed and verified all code changes, you MUST invoke the `@distillery` skill to package your WO output. Pass `.agents/plugins/principal-architect-workspace/pr-04-web-portal/wo2-api/` as the target directory. Wait for it to finish before dropping control back to the PA.

@@ -208,4 +208,4 @@ Before reporting completion:
 - [ ] All tests pass
 - [ ] Both envs compile
 - [ ] **User Approval**: Stop and ask the user if they are happy with the implementation before proceeding to distillation.
-- [ ] **Distillation Requirement**: When you have completed and verified all code changes, you MUST invoke the `@distillery` skill to package your WO output. Pass `.agents/skills/principal-architect-workspace/pr-05b-mcp-server/wo3-integration/` as the target directory. Wait for it to finish before dropping control back to the PA.
+- [ ] **Distillation Requirement**: When you have completed and verified all code changes, you MUST invoke the `@distillery` skill to package your WO output. Pass `.agents/plugins/principal-architect-workspace/pr-05b-mcp-server/wo3-integration/` as the target directory. Wait for it to finish before dropping control back to the PA.

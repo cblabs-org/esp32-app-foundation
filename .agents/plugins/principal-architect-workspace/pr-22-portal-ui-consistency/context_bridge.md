@@ -18,7 +18,7 @@ upgrade, WiFi diagnostics migration, and a11y additions. Device running
 # Next Steps
 
 1. **Raise PR-22 GitHub PR** — branch `pr-22-portal-ui-consistency/wo2-advanced-drawers`
-   merged to `main`. PR description in `.agents/skills/principal-architect-workspace/pr-22-portal-ui-consistency/`.
+   merged to `main`. PR description in `.agents/plugins/principal-architect-workspace/pr-22-portal-ui-consistency/`.
 2. **OTA beta-channel debug** — see `todo.md` item "Debug and harden the beta-channel
    OTA GitHub check". Root cause of `IncompleteInput` on `/releases` endpoint unknown;
    premature `Accept-Encoding: identity` fix was reverted.

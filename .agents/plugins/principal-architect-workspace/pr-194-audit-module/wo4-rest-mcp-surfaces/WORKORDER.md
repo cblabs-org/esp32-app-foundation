@@ -13,7 +13,7 @@ complexity: standard
 Wire up the diagnostic endpoints for the AuditModule: REST routes via `IWebContributor` and MCP tools via `IMCPContributor`. Also rename the existing `get_logs` MCP stub to `get_debug_logs` to separate the volatile debug-log plane from the durable audit-log plane.
 
 ## Context
-**Parent project**: `pr-194-audit-module` — see `.agents/skills/principal-architect-workspace/pr-194-audit-module/PROJECT.md`
+**Parent project**: `pr-194-audit-module` — see `.agents/plugins/principal-architect-workspace/pr-194-audit-module/PROJECT.md`
 
 The AuditModule core engine (WO2) is already implemented with `log()`, `auditSync()`, `clearAll()`, and diagnostic counters. This WO adds the external-facing surfaces.
 

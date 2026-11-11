@@ -13,7 +13,7 @@ complexity: mechanical
 Add `BOARD_AUDIT_BYTES` to each board definition and provide a sensible fallback in `board_contract.h`. The AuditModule (already implemented in WO2) uses `BOARD_AUDIT_BYTES` via `#ifdef BOARD_AUDIT_BYTES` to set its flash budget. The fallback provides a safe default; board-specific overrides tune it for the available storage partition.
 
 ## Context
-**Parent project**: `pr-194-audit-module` — see `.agents/skills/principal-architect-workspace/pr-194-audit-module/PROJECT.md`
+**Parent project**: `pr-194-audit-module` — see `.agents/plugins/principal-architect-workspace/pr-194-audit-module/PROJECT.md`
 
 **Storage partition sizes** (from `hardware/*/partitions.csv`):
 | Board | Storage Partition |

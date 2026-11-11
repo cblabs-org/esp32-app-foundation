@@ -28,5 +28,5 @@ Implement the layout-agnostic dual-mount boot probe. At boot, probe the partitio
 - [ ] Thoroughly update all instances of `LittleFS.exists`, `LittleFS.open`, `LittleFS.mkdir`, `LittleFS.remove` in the config modules to use `stat`, `fopen`, `mkdir`, `remove`, `unlink`, etc. 
 - [ ] Ensure that native tests (`run_tests`) pass. You may need to update the native stubs if you moved away from `LittleFS` to POSIX I/O. Native builds already use POSIX I/O via standard stdio, but check how `ConfigRoot` affects it.
 - [ ] Build the project for `native`, `esp32dev`, and `esp32s3nano` using `build_project` MCP tool to verify it compiles cleanly.
-- [ ] **CRITICAL**: Ask the user if they are happy before completing. Only after approval, invoke the `@distillery` skill to package the state passing `.agents/skills/principal-architect-workspace/microkernel-refactor/pr-mk07-persistence-partitions/wo2-partition-mount/` as the target directory.
+- [ ] **CRITICAL**: Ask the user if they are happy before completing. Only after approval, invoke the `@distillery` skill to package the state passing `.agents/plugins/principal-architect-workspace/microkernel-refactor/pr-mk07-persistence-partitions/wo2-partition-mount/` as the target directory.
 - [ ] Append a status update to this `WORKORDER.md` file indicating completion.

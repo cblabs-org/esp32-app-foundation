@@ -183,7 +183,7 @@ All PlatformIO operations MUST go through the MCP server (Tier 1).
   Do not invoke `@distillery` or wrap up until I explicitly approve the work.
 
 Once approved, invoke the `@distillery` skill passing
-`.agents/skills/principal-architect-workspace/pr-21-ota-task-hardening/wo1-firmware-heap-guard/`
+`.agents/plugins/principal-architect-workspace/pr-21-ota-task-hardening/wo1-firmware-heap-guard/`
 as the target directory. Then append a status update to this WORKORDER.md and terminate.
 
 ---
@@ -214,7 +214,7 @@ as the target directory. Then append a status update to this WORKORDER.md and te
 
 ### Distillery
 
-Context archived to: `.agents/skills/principal-architect-workspace/pr-21-ota-task-hardening/wo1-firmware-heap-guard/`
+Context archived to: `.agents/plugins/principal-architect-workspace/pr-21-ota-task-hardening/wo1-firmware-heap-guard/`
 - `context_bridge.md` — Index and end-state
 - `sessions.md` — Session registry
 - `context_artifacts/adr_psram_task_allocation.md` — Design decisions

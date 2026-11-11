@@ -23,5 +23,5 @@ Work Order 1 (`wo1-framework-core`) has been fully implemented and verified. Cre
 > [!WARNING]
 > Do NOT read the detailed artifacts below unless your current task explicitly requires the deep context. If needed, use your read tool on `context_artifacts/[filename]`.
 
-- `.agents/skills/principal-architect-workspace/pr-53-encoder-module/wo1-framework-core/context_artifacts/adr_encoder_framework_core.md` — Technical decisions behind raw ESP-IDF PCNT driver usage, atomic exchange accumulators, quadratic acceleration formula, and pure stubbing architecture.
-- `.agents/skills/principal-architect-workspace/pr-53-encoder-module/wo1-framework-core/context_artifacts/state_wo1_verification.md` — Verified build and test state after completing WO1.
+- `.agents/plugins/principal-architect-workspace/pr-53-encoder-module/wo1-framework-core/context_artifacts/adr_encoder_framework_core.md` — Technical decisions behind raw ESP-IDF PCNT driver usage, atomic exchange accumulators, quadratic acceleration formula, and pure stubbing architecture.
+- `.agents/plugins/principal-architect-workspace/pr-53-encoder-module/wo1-framework-core/context_artifacts/state_wo1_verification.md` — Verified build and test state after completing WO1.

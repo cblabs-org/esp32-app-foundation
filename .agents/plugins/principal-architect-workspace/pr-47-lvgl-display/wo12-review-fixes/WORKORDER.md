@@ -109,5 +109,5 @@ Use the **`platformio` MCP server** tools, never raw `pio` CLI. Route all builds
 ## Completion Protocol
 1. When implementation is validated, **STOP and send a message back to the Principal Architect** reporting results and any issues. Surface any out-of-boundary findings.
 2. **Do not wrap up or distill until the human explicitly approves.**
-3. Once approved: invoke the `@distillery` skill, passing `.agents/skills/principal-architect-workspace/pr-47-lvgl-display/wo12-review-fixes/` as the target directory.
+3. Once approved: invoke the `@distillery` skill, passing `.agents/plugins/principal-architect-workspace/pr-47-lvgl-display/wo12-review-fixes/` as the target directory.
 4. Append a status update to this `WORKORDER.md` and terminate your session.

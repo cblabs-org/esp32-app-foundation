@@ -95,7 +95,7 @@ Mark the following item `[x]` in `.agents/todo/todo.md` (if it exists on the `to
 
 ## MEMORY.md PR-24 Entry Location
 
-Insert after the PR-23 entry in `.agents/skills/principal-architect-workspace/MEMORY.md`.
+Insert after the PR-23 entry in `.agents/plugins/principal-architect-workspace/MEMORY.md`.
 
 ---
 

@@ -258,7 +258,7 @@ Expected result: zero hits.
 
 Once the Principal Architect approves:
 - Invoke the `@distillery` skill, passing
-  `.agents/skills/principal-architect-workspace/pr-17-display-refactor/wo3-screensaver-controller/`
+  `.agents/plugins/principal-architect-workspace/pr-17-display-refactor/wo3-screensaver-controller/`
   as the target directory
 - Append a status update block to the bottom of this WORKORDER.md
 - Terminate your session

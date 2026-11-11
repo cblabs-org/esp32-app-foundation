@@ -28,7 +28,7 @@ Introduce a `Periodic` helper class (header-only) to DRY out the `millis()` thro
 - [x] Migrate any other core kernel/application throttles (not specific feature modules like Wifi or WebServer) if applicable.
 - [x] Verify `native` + `esp32dev` environments are green.
 - [x] Ask the user if they are happy with the implementation.
-- [x] Upon user approval, invoke the `@distillery` skill to package the state and drop control, passing `.agents/skills/principal-architect-workspace/microkernel-refactor/pr-mk06-periodic-helper/wo1-first-cohort/` as the target directory.
+- [x] Upon user approval, invoke the `@distillery` skill to package the state and drop control, passing `.agents/plugins/principal-architect-workspace/microkernel-refactor/pr-mk06-periodic-helper/wo1-first-cohort/` as the target directory.
 - [x] Append a status update to this `WORKORDER.md` file and terminate your session.
 
 ## Status Update
@@ -42,4 +42,4 @@ Introduce a `Periodic` helper class (header-only) to DRY out the `millis()` thro
   - Added `LVGLDisplay` to `lib_ignore` for `base_esp32` in `platformio.ini`.
   - Verified `native` environment: 490/490 unit tests passed.
   - Verified `esp32dev` environment: firmware compilation succeeded.
-  - Distillation package created in `.agents/skills/principal-architect-workspace/microkernel-refactor/pr-mk06-periodic-helper/wo1-first-cohort/`.
+  - Distillation package created in `.agents/plugins/principal-architect-workspace/microkernel-refactor/pr-mk06-periodic-helper/wo1-first-cohort/`.

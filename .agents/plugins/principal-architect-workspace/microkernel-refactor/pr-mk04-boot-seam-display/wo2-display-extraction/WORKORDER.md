@@ -40,7 +40,7 @@ You are an expert senior software engineer and execution-focused worker agent. Y
   - Before `app.begin()`, call `app.registerModule(&display)`.
   - Also ensure that if the display requires `begin()` or `carousel.add()`, that it is handled appropriately after `app.begin()` or within the display's own `begin()` overriding `ITickable::begin()` or similar. Wait, the framework's `registerModule` handles registering it as an `IWebContributor`, `ITickable`, etc. For now, just make it compile.
 - [ ] Verify `native` and `esp32dev` envs compile via MCP `build_project` and `run_tests`.
-- [x] Once verified, STOP and send a message back to me. Do not wrap up or distill until I explicitly approve the work. Once I approve, invoke the `@distillery` skill to package your output, passing `.agents/skills/principal-architect-workspace/microkernel-refactor/pr-mk04-boot-seam-display/wo2-display-extraction/` as the target directory. Finally, append a status update to the `WORKORDER.md` file and terminate your session.
+- [x] Once verified, STOP and send a message back to me. Do not wrap up or distill until I explicitly approve the work. Once I approve, invoke the `@distillery` skill to package your output, passing `.agents/plugins/principal-architect-workspace/microkernel-refactor/pr-mk04-boot-seam-display/wo2-display-extraction/` as the target directory. Finally, append a status update to the `WORKORDER.md` file and terminate your session.
 
 ## Status Updates
 - **2026-07-29**: COMPLETED - Display extracted to IBootReporter and HAS_DISPLAY references removed from Application. Tests passed and work approved.

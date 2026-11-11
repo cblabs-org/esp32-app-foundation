@@ -24,7 +24,7 @@ Do not treat this file, or the designer PA's notes, as that approval.
 
 ## First steps on invocation (per the principal-architect skill)
 
-- Read `.agents/skills/principal-architect-workspace/MEMORY.md` and this project's
+- Read `.agents/plugins/principal-architect-workspace/MEMORY.md` and this project's
   `PROJECT.md` to page in state.
 - Verify `.agents/rules/00-operating-model.md` exists (it does — provisioned &
   identical to the skill asset this session).

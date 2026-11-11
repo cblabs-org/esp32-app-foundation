@@ -115,5 +115,5 @@ Key files likely needing updates:
 
 | Date | Status | Details |
 |---|---|---|
-| 2026-08-05 | ✅ **Completed & Validated** | Adopted BEM naming convention ADR (`adr-css-naming-convention.md`). Migrated ~24 legacy classes in `app.css` and updated all HTML, JS, and Playwright test references (`70/70 passed`). User approved implementation and distilled memory paging artifacts to `.agents/skills/principal-architect-workspace/pr-55-portal-design-system/wo1-naming-convention/`. |
+| 2026-08-05 | ✅ **Completed & Validated** | Adopted BEM naming convention ADR (`adr-css-naming-convention.md`). Migrated ~24 legacy classes in `app.css` and updated all HTML, JS, and Playwright test references (`70/70 passed`). User approved implementation and distilled memory paging artifacts to `.agents/plugins/principal-architect-workspace/pr-55-portal-design-system/wo1-naming-convention/`. |
 

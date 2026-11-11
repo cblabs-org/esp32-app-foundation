@@ -197,5 +197,5 @@ Send a message back to the Principal Architect reporting:
   - `esp32dev`: ✅ Compiled cleanly (`-D WITH_INPUT`)
   - `esp32s3nano`: ✅ Compiled cleanly (`-D WITH_INPUT`)
   - `native`: ✅ Unit tests passed cleanly (15/15 sample-app, 358/358 root workspace)
-- **Artifacts Distilled:** `.agents/skills/principal-architect-workspace/pr-52-input-module/wo2-board-wiring/`
+- **Artifacts Distilled:** `.agents/plugins/principal-architect-workspace/pr-52-input-module/wo2-board-wiring/`
 

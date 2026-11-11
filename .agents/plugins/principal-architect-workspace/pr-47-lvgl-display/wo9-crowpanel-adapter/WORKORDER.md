@@ -56,5 +56,5 @@ Implement the reference hardware adapter `CrowPanel128Adapter` (implements `ILVG
 ## Completion Protocol
 1. Validate, then **STOP and message the Principal Architect** with results, the OQ-2 backend actually used, and the measured firmware size. Surface out-of-boundary findings (e.g. interface gaps) in your report — do not file issues or widen interfaces.
 2. **Do not distill until the human approves.**
-3. On approval: `@distillery` with target `.agents/skills/principal-architect-workspace/pr-47-lvgl-display/wo9-crowpanel-adapter/`.
+3. On approval: `@distillery` with target `.agents/plugins/principal-architect-workspace/pr-47-lvgl-display/wo9-crowpanel-adapter/`.
 4. Append a status update to this `WORKORDER.md` and terminate.

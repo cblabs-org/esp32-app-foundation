@@ -15,7 +15,7 @@ Extract the secret registry and redaction logic from `lib/Logger` into a new dep
 ## Context
 This is a prerequisite for RFC #194 (AuditModule). The AuditModule needs to redact secrets from audit records before writing them to flash. Today, redaction lives inside `lib/Logger` as a private method. We need to extract it so both Logger and AuditModule can share one secret registry without coupling to each other.
 
-**Parent project**: `pr-194-audit-module` — see `.agents/skills/principal-architect-workspace/pr-194-audit-module/PROJECT.md`
+**Parent project**: `pr-194-audit-module` — see `.agents/plugins/principal-architect-workspace/pr-194-audit-module/PROJECT.md`
 
 ## Strict Boundary Box
 - **DO NOT** create the AuditModule — that is WO2.

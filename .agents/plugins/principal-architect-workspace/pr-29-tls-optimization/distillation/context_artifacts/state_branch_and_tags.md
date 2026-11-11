@@ -55,7 +55,7 @@ main
 
 | File | Purpose |
 |---|---|
-| `.agents/skills/principal-architect-workspace/pr-29-tls-optimization/PROJECT.md` | Project registry |
+| `.agents/plugins/principal-architect-workspace/pr-29-tls-optimization/PROJECT.md` | Project registry |
 | `.../wo1-sdkconfig-changes/WORKORDER.md` | WO1 instructions |
 | `.../wo2-build-test-measure/WORKORDER.md` | WO2 instructions |
 | `.../wo2-build-test-measure/RESULTS.md` | Measured heap/flash data |

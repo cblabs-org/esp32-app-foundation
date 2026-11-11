@@ -121,5 +121,5 @@ Send a message back to the Principal Architect reporting:
   - `modules/KeyManager/KeyManager.hpp`
   - `test/stubs/platform/freertos/queue.h`
   - `test/test_unit/test_inputModule/test_InputModule.cpp`
-- **Distillery archive:** `.agents/skills/principal-architect-workspace/pr-52-input-module/wo3-tests-docs/`
+- **Distillery archive:** `.agents/plugins/principal-architect-workspace/pr-52-input-module/wo3-tests-docs/`
 

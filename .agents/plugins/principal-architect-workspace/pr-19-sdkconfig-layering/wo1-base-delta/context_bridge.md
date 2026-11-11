@@ -35,7 +35,7 @@ WO2 is `scripts/sync_sdkconfig.py` — a drift detection script. Key information
 3. The script should diff base against delta and alert when a setting appears in the delta that also exists
    in the base with the same value (i.e., unnecessary duplication crept back in)
 4. It should be wired as a `pre:` script in `platformio.ini` or run as a standalone CI check
-5. See `.agents/skills/principal-architect-workspace/pr-19-sdkconfig-layering/` for the project-level PLAN
+5. See `.agents/plugins/principal-architect-workspace/pr-19-sdkconfig-layering/` for the project-level PLAN
 
 ## Deep Context Menu
 

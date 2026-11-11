@@ -25,7 +25,7 @@ Migrate the remaining `millis()` throttle sites in the feature modules and `lib/
 - [x] Find and migrate periodic throttles in `modules/` and `lib/` that use `millis()`.
 - [x] Verify `native` + `esp32dev` environments are green.
 - [x] Ask the user if they are happy with the implementation.
-- [x] Upon user approval, invoke the `@distillery` skill to package the state and drop control, passing `.agents/skills/principal-architect-workspace/microkernel-refactor/pr-mk06-periodic-helper/wo2-module-migration/` as the target directory.
+- [x] Upon user approval, invoke the `@distillery` skill to package the state and drop control, passing `.agents/plugins/principal-architect-workspace/microkernel-refactor/pr-mk06-periodic-helper/wo2-module-migration/` as the target directory.
 - [x] Append a status update to this `WORKORDER.md` file and terminate your session.
 
 ## Status Update (2026-07-29)

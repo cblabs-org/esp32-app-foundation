@@ -45,5 +45,5 @@ Before distilling or committing, you MUST ask the user if they are happy. Only *
 
 ## Status Update
 
-- **2026-08-01**: Work Order 1 fully implemented, validated against 368 native test cases, compiled cleanly for `esp32dev` and `esp32s3nano` targets, approved by coordinator, and distilled to `.agents/skills/principal-architect-workspace/pr-39-branding/wo1-shared-types/`. Status: COMPLETE.
+- **2026-08-01**: Work Order 1 fully implemented, validated against 368 native test cases, compiled cleanly for `esp32dev` and `esp32s3nano` targets, approved by coordinator, and distilled to `.agents/plugins/principal-architect-workspace/pr-39-branding/wo1-shared-types/`. Status: COMPLETE.
 

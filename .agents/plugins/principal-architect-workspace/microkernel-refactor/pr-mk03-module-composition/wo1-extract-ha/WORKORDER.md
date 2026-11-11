@@ -47,5 +47,5 @@ Before distilling or committing, you MUST ask the user if they are happy. Only a
 - **Date**: 2026-07-29
 - **Commit**: `f22d778` (`feat(mk03): extract HomeAssistant from Application owned members into main.cpp composition`)
 - **Verification**: `esp32dev` PlatformIO build passed; 491/491 `native` unit tests passed.
-- **Distillery**: Packaged at `.agents/skills/principal-architect-workspace/microkernel-refactor/pr-mk03-module-composition/wo1-extract-ha/`
+- **Distillery**: Packaged at `.agents/plugins/principal-architect-workspace/microkernel-refactor/pr-mk03-module-composition/wo1-extract-ha/`
 

@@ -40,4 +40,4 @@ Before distilling or committing, you MUST ask the user if they are happy. Only a
   - `native` (flag-off): 467/467 test cases passed.
   - `native_ha` (flag-on): 491/491 test cases passed.
 - **Documentation**: Updated `using-optional-modules.md` (two-axis optionality model + `HomeAssistantModule` injection example) and `creating-a-module.md` (unified composition model note).
-- **Distillery**: Packaged into `.agents/skills/principal-architect-workspace/microkernel-refactor/pr-mk03-module-composition/wo2-tests-docs/`.
+- **Distillery**: Packaged into `.agents/plugins/principal-architect-workspace/microkernel-refactor/pr-mk03-module-composition/wo2-tests-docs/`.

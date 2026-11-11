@@ -187,7 +187,7 @@ Expected: appears in `BoardCatalog.hpp` (definition) and `U8G2DisplayModule.hpp`
 
 Once the Principal Architect approves:
 - Invoke the `@distillery` skill, passing
-  `.agents/skills/principal-architect-workspace/pr-17-display-refactor/wo2-board-catalog/`
+  `.agents/plugins/principal-architect-workspace/pr-17-display-refactor/wo2-board-catalog/`
   as the target directory
 - Append a status update block to the bottom of this WORKORDER.md
 - Terminate your session

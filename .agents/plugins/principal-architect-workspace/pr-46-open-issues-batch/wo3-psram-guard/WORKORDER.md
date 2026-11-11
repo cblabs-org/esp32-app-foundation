@@ -85,7 +85,7 @@ After completing all checklist items:
 1. Confirm native build passes (all tests green).
 2. Confirm esp32s3nano build passes (no compile errors).
 3. **STOP and ask the user** if they are happy with the changes.
-4. Only after user approval: commit your changes with message `fix(build): add PSRAM config guard, remove inert S3 flag (Issue #36)`, then invoke the `@distillery` skill to package the state, passing `.agents/skills/principal-architect-workspace/pr-46-open-issues-batch/wo3-psram-guard/` as the target directory.
+4. Only after user approval: commit your changes with message `fix(build): add PSRAM config guard, remove inert S3 flag (Issue #36)`, then invoke the `@distillery` skill to package the state, passing `.agents/plugins/principal-architect-workspace/pr-46-open-issues-batch/wo3-psram-guard/` as the target directory.
 5. Append a status update to this WORKORDER.md and send a completion message to the PA.
 
 ## Status Update

@@ -20,4 +20,4 @@ We have successfully rewritten the `getLatestReleaseForChannel()` hardware imple
 > [!WARNING]
 > Do NOT read the detailed artifacts below unless your current task explicitly requires the deep context. If needed, use your read tool on `context_artifacts/[filename]`.
 
-- [adr_paginated_scanner.md](file://.agents/skills/principal-architect-workspace/pr-26-ota-pagination/wo1-paginated-scanner/context_artifacts/adr_paginated_scanner.md) - Describes the paginated scanning strategy and early exits design.
+- [adr_paginated_scanner.md](file://.agents/plugins/principal-architect-workspace/pr-26-ota-pagination/wo1-paginated-scanner/context_artifacts/adr_paginated_scanner.md) - Describes the paginated scanning strategy and early exits design.

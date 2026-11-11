@@ -15,7 +15,7 @@ You should also read the following reference materials to distill from:
 - `.agents/skills/oo-expert/SKILL.md`
 - `.agents/skills/oo-expert/references/hierarchical-object-model.md`
 - `.agents/skills/oo-expert/references/service-module-pattern.md`
-- `.agents/skills/principal-architect-workspace/adhoc-oo-expert-review/context_bridge.md`
+- `.agents/plugins/principal-architect-workspace/adhoc-oo-expert-review/context_bridge.md`
 - `.agents/skills/house-style-docs/references/cpp-embedded.md`
 
 ## Execution Steps

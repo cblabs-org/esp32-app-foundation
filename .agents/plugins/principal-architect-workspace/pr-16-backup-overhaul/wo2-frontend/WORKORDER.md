@@ -89,4 +89,4 @@ Once verified, **STOP and send a message back to the Principal Architect** with 
 - **Commit:** `2a5b9b6` on branch `pr-16-backup-overhaul-wo2-frontend`
 - **Commit message:** `feat(backup): raise restore guard to 16KB, add _meta summary and module preview UX`
 - **Completed at:** 2026-06-03T22:22:00Z
-- **Distillation:** `.agents/skills/principal-architect-workspace/pr-16-backup-overhaul/wo2-frontend/context_bridge.md`
+- **Distillation:** `.agents/plugins/principal-architect-workspace/pr-16-backup-overhaul/wo2-frontend/context_bridge.md`

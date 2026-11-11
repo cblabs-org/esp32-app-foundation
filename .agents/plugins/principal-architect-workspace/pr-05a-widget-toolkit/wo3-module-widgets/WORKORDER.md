@@ -239,7 +239,7 @@ Before distilling or committing, you MUST ask the user if they are happy with th
 - [ ] Code follows house-style documentation standards
 - [ ] Refactored boards produce visually identical output to originals
 - [ ] No regressions in existing test suite
-- [x] **Distillation Requirement**: When you have completed and verified all code changes, you MUST invoke the `@distillery` skill to package your WO output. Pass `.agents/skills/principal-architect-workspace/pr-05a-widget-toolkit/wo3-module-widgets/` as the target directory. Wait for it to finish before dropping control back to the PA.
+- [x] **Distillation Requirement**: When you have completed and verified all code changes, you MUST invoke the `@distillery` skill to package your WO output. Pass `.agents/plugins/principal-architect-workspace/pr-05a-widget-toolkit/wo3-module-widgets/` as the target directory. Wait for it to finish before dropping control back to the PA.
 
 ---
 

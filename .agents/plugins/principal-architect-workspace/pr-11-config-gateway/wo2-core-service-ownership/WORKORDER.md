@@ -16,7 +16,7 @@ Application currently owns only infrastructure services (ConfigManager, EventBus
 ## Context Bootstrap
 
 1. Read `.agents/project_index.md` for project architecture orientation
-2. Read `.agents/skills/principal-architect-workspace/pr-11-config-gateway/PROJECT.md` for project context
+2. Read `.agents/plugins/principal-architect-workspace/pr-11-config-gateway/PROJECT.md` for project context
 3. Load `.agents/skills/house-style-docs/SKILL.md` before writing any code
 4. You are on branch `pr-11-config-gateway` in the `esp32-app-foundation` repo
 

@@ -95,5 +95,5 @@ Expected output: no matches.
 After completing all checklist items:
 1. Confirm the final grep returns zero matches (excluding `docs/archive/` if left as-is).
 2. **STOP and ask the user** if they are happy with the changes.
-3. Only after user approval: commit your changes with message `docs: replace StaticJsonDocument/DynamicJsonDocument with ArduinoJson 7 JsonDocument (Issue #29)`, then invoke the `@distillery` skill to package the state, passing `.agents/skills/principal-architect-workspace/pr-46-open-issues-batch/wo4-arduinojson-docs/` as the target directory.
+3. Only after user approval: commit your changes with message `docs: replace StaticJsonDocument/DynamicJsonDocument with ArduinoJson 7 JsonDocument (Issue #29)`, then invoke the `@distillery` skill to package the state, passing `.agents/plugins/principal-architect-workspace/pr-46-open-issues-batch/wo4-arduinojson-docs/` as the target directory.
 4. Append a status update to this WORKORDER.md and send a completion message to the PA.

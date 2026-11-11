@@ -38,4 +38,4 @@ Build the Single Page Application (SPA) frontend for the web portal.
 - Ensure the UX looks clean, responsive, and robust.
 
 ## Closure Gate
-- **Distillation Requirement**: When you have completed and verified all code changes, you MUST invoke the `@distillery` skill to package your WO output. Pass `.agents/skills/principal-architect-workspace/pr-04-web-portal/wo3-spa/` as the target directory. Wait for it to finish before dropping control back to the PA.
+- **Distillation Requirement**: When you have completed and verified all code changes, you MUST invoke the `@distillery` skill to package your WO output. Pass `.agents/plugins/principal-architect-workspace/pr-04-web-portal/wo3-spa/` as the target directory. Wait for it to finish before dropping control back to the PA.

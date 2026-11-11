@@ -25,7 +25,7 @@ Moved `U8G2DisplayModule` and `DiagnosticsBoard` ownership from file-scope in `m
 - **WO5 hooks**: `_onEnterConfiguring()` suspends carousel + shows ConfiguringStatusBoard; `_onEnterRunning()` clears overlays + resumes carousel
 
 ### PR-18 Planning
-- Created `.agents/skills/principal-architect-workspace/pr-18-screensaver-settings/` with 3 WOs + bridge prompt
+- Created `.agents/plugins/principal-architect-workspace/pr-18-screensaver-settings/` with 3 WOs + bridge prompt
 
 ## Verification Results
 

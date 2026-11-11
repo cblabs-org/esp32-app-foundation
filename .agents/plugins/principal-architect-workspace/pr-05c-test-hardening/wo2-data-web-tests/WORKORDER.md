@@ -136,7 +136,7 @@ Append to `test/test_unit/test_webServer/test_webServer.cpp`. Use the existing m
 
 ## Closure
 
-Once verified, **STOP and ASK the user** if the implementation is validated and if any iteration is needed. Do not wrap up or distill until explicitly approved. Once approved, invoke the `@distillery` skill to package your output, passing `.agents/skills/principal-architect-workspace/pr-05c-test-hardening/wo2-data-web-tests/` as the target directory. Finally, append a status update to this `WORKORDER.md` file and drop control back.
+Once verified, **STOP and ASK the user** if the implementation is validated and if any iteration is needed. Do not wrap up or distill until explicitly approved. Once approved, invoke the `@distillery` skill to package your output, passing `.agents/plugins/principal-architect-workspace/pr-05c-test-hardening/wo2-data-web-tests/` as the target directory. Finally, append a status update to this `WORKORDER.md` file and drop control back.
 
 ## Execution Status Update
 - **Branch Checked Out**: `pr-05c-wo2-data-web-tests`

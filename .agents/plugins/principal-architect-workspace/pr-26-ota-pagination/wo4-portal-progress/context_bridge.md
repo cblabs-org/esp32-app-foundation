@@ -19,4 +19,4 @@ Exposed real OTA update progress percentage via `/api/ota` status JSON and align
 > [!WARNING]
 > Do NOT read the detailed artifacts below unless your current task explicitly requires the deep context. If needed, use your read tool on `context_artifacts/[filename]`.
 
-- [context_artifacts/adr_ota_progress.md](file://.agents/skills/principal-architect-workspace/pr-26-ota-pagination/wo4-portal-progress/context_artifacts/adr_ota_progress.md) - Detail on the API extension and UI updates for real-time progress.
+- [context_artifacts/adr_ota_progress.md](file://.agents/plugins/principal-architect-workspace/pr-26-ota-pagination/wo4-portal-progress/context_artifacts/adr_ota_progress.md) - Detail on the API extension and UI updates for real-time progress.

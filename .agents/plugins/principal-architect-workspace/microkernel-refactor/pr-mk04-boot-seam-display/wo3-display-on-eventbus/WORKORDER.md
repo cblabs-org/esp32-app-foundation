@@ -27,7 +27,7 @@ You are an expert senior software engineer and execution-focused worker agent. Y
 - [x] In `modules/Application/Application.cpp`:
   - Delete any remaining commented-out `_display.*` direct calls from `_onEnterConfiguring()` and `_onEnterRunning()` that were disabled in WO2.
 - [x] Verify `native` and `esp32dev` envs compile via MCP `build_project` and `run_tests`.
-- [x] Once verified, STOP and send a message back to me. Do not wrap up or distill until I explicitly approve the work. Once I approve, invoke the `@distillery` skill to package your output, passing `.agents/skills/principal-architect-workspace/microkernel-refactor/pr-mk04-boot-seam-display/wo3-display-on-eventbus/` as the target directory. Finally, append a status update to the `WORKORDER.md` file and terminate your session.
+- [x] Once verified, STOP and send a message back to me. Do not wrap up or distill until I explicitly approve the work. Once I approve, invoke the `@distillery` skill to package your output, passing `.agents/plugins/principal-architect-workspace/microkernel-refactor/pr-mk04-boot-seam-display/wo3-display-on-eventbus/` as the target directory. Finally, append a status update to the `WORKORDER.md` file and terminate your session.
 
 ## Status Log
 

@@ -60,7 +60,7 @@ Use the `platformio` MCP tools (`build_project`, `run_tests`) — never raw `pio
       Replace with an honest comment rather than leaving code that implies protection.
 - [ ] `test/test_unit/test_dataManager/test_main.cpp` — add coverage asserting `_fetchStartMs`
       is cleared before the supervisor is torn down, via the existing native seam.
-- [ ] `.agents/skills/principal-architect-workspace/pr-128-datamanager-resilience/wo1-race-fix-twdt-audit/TWDT-AUDIT.md`
+- [ ] `.agents/plugins/principal-architect-workspace/pr-128-datamanager-resilience/wo1-race-fix-twdt-audit/TWDT-AUDIT.md`
       — the audit artifact: every task, its subscription state, budget, and stack.
 
 ## Verification Requirement

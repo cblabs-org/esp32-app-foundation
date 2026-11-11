@@ -15,7 +15,7 @@ Implement the core `AuditModule` — a flash-persisted, FreeRTOS-driven audit tr
 ## Context
 This is part of RFC #194. The `lib/Redactor` extraction (WO1) is already merged on this branch. The AuditModule uses `Redactor::redact()` to sanitize audit record `details` before writing to flash.
 
-**Parent project**: `pr-194-audit-module` — see `.agents/skills/principal-architect-workspace/pr-194-audit-module/PROJECT.md`
+**Parent project**: `pr-194-audit-module` — see `.agents/plugins/principal-architect-workspace/pr-194-audit-module/PROJECT.md`
 
 **Key design decisions that govern this implementation**:
 - **D1**: Board-derived flash budget via `BOARD_AUDIT_BYTES` (not yet defined in board.h — use a default constant for now, WO3 adds board overrides)

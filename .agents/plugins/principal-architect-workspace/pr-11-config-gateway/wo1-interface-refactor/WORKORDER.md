@@ -16,7 +16,7 @@ Refactor `ConfigManager` from a passive `SystemConfig` struct holder into the si
 ## Context Bootstrap
 
 1. Read `.agents/project_index.md` for project architecture orientation
-2. Read `.agents/skills/principal-architect-workspace/pr-11-config-gateway/PROJECT.md` for project context
+2. Read `.agents/plugins/principal-architect-workspace/pr-11-config-gateway/PROJECT.md` for project context
 3. You are on branch `pr-11-config-gateway-wo1-interface-refactor`
 
 ## Strict Boundary Box

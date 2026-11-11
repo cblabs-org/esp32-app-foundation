@@ -214,7 +214,7 @@ expected test update — do NOT revert the drawer pattern to fix tests.
 
 Do NOT wrap up, distill, or commit until the PA explicitly approves. Once approved,
 invoke the `@distillery` skill passing
-`.agents/skills/principal-architect-workspace/pr-22-portal-ui-consistency/wo2-advanced-drawers/`
+`.agents/plugins/principal-architect-workspace/pr-22-portal-ui-consistency/wo2-advanced-drawers/`
 as the target directory. Append a status update to this WORKORDER.md file, then
 terminate your session.
 
@@ -251,7 +251,7 @@ Fix: `await page.locator('#tab-ota article.advanced-drawer details').evaluate((e
 
 ### Distillery Output
 
-Packaged to: `.agents/skills/principal-architect-workspace/pr-22-portal-ui-consistency/wo2-advanced-drawers/`
+Packaged to: `.agents/plugins/principal-architect-workspace/pr-22-portal-ui-consistency/wo2-advanced-drawers/`
 - `context_bridge.md`
 - `sessions.md`
 - `context_artifacts/adr_advanced_drawer_pattern.md`

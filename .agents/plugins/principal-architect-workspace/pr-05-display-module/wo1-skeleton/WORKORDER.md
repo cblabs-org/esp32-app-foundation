@@ -202,7 +202,7 @@ feat(display): Add u8g2Display module skeleton with carousel engine and board sl
 - [x] Native unit tests pass
 - [x] Code committed to `pr-05-wo1-skeleton` branch
 - [x] **Ask the user if they are happy with the implementation before proceeding**
-- [x] **Distillation Requirement**: When you have completed and verified all code changes, you MUST invoke the `@distillery` skill to package your WO output. Pass `.agents/skills/principal-architect-workspace/pr-05-display-module/wo1-skeleton/` as the target directory. Wait for it to finish before dropping control back to the PA.
+- [x] **Distillation Requirement**: When you have completed and verified all code changes, you MUST invoke the `@distillery` skill to package your WO output. Pass `.agents/plugins/principal-architect-workspace/pr-05-display-module/wo1-skeleton/` as the target directory. Wait for it to finish before dropping control back to the PA.
 
 ---
 

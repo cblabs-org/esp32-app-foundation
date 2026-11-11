@@ -22,11 +22,11 @@ Determine exactly what `web/portal/appconfig.js` surfaces in the portal, resolve
 - **DO NOT** modify `web/portal/appconfig.js`, `app.js`, or `index.html`.
 - **DO NOT** apply, pop, or merge any stash into the working tree. You may **inspect** stashes read-only (`git stash show -p`). Dropping a stash is allowed **only** in the final step and **only** after explicit user approval.
 - **DO NOT** branch, merge, or rebase. The PA owns branch state.
-- Your **only** write is the findings document at `.agents/skills/principal-architect-workspace/pr-20-config-refactor/wo1-appconfig-clarity/FINDINGS.md` (and, on approval, the documented stash drop).
+- Your **only** write is the findings document at `.agents/plugins/principal-architect-workspace/pr-20-config-refactor/wo1-appconfig-clarity/FINDINGS.md` (and, on approval, the documented stash drop).
 
 ## Line-Item Instructions
 
-- [ ] **Read prior context:** `.agents/skills/principal-architect-workspace/adhoc-app-tab-rules-bug/context_bridge.md` (and its `context_artifacts/` only if needed) — this session partially built the App tab and left the stash unresolved.
+- [ ] **Read prior context:** `.agents/plugins/principal-architect-workspace/adhoc-app-tab-rules-bug/context_bridge.md` (and its `context_artifacts/` only if needed) — this session partially built the App tab and left the stash unresolved.
 - [ ] **Inspect `appconfig.js`:** read `web/portal/appconfig.js` and determine every configuration key it reads/writes and which device endpoint(s) it talks to.
 - [ ] **Trace tab wiring:** read `web/portal/app.js` (tab registration) and `web/portal/index.html` (tab loading) to confirm whether the appconfig tab is actually registered/active or still dormant.
 - [ ] **Inspect the stash (read-only):** the target is **`stash@{1}`** = `580f2f5` "portal-tab-wip" (NOTE: the original work order said `stash@{2}` — the index has drifted; verify by hash). Run `git stash show -p stash@{1}` and confirm its hash with `git stash list --format="%gd %H %gs"`.

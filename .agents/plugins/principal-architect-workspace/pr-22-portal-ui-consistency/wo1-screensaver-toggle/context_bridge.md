@@ -27,7 +27,7 @@ WO1 is **fully complete and committed**. The screensaver (and flip-screen) toggl
 WO2 scope is `ota.js`, `time.js`, `system.js`, `wifi.js` — the remaining portal UI consistency work in the parent PR plan.
 
 1. Check out / confirm the WO2 branch assigned by the PA
-2. Read the WO2 WORKORDER.md in `.agents/skills/principal-architect-workspace/pr-22-portal-ui-consistency/`
+2. Read the WO2 WORKORDER.md in `.agents/plugins/principal-architect-workspace/pr-22-portal-ui-consistency/`
 3. The toggle CSS canonical rules are now in `app.css` section 9b — other JS modules can use `.toggle-switch` / `.toggle-slider` classes without dynamic injection
 
 **Stash note:** `setClockFont` is confirmed present in `modules/U8G2Display/boards/ScreensaverBoard.hpp` (line 91) — stash is already in `main`. No action needed.

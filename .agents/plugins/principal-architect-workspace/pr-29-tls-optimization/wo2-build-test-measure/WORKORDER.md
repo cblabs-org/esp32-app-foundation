@@ -91,7 +91,7 @@ WO1 must be complete — `sdkconfig.defaults` must already contain the PR-27 TLS
 ### Phase E: Results Documentation
 
 - [ ] **E1.** Create a results file at:
-  `.agents/skills/principal-architect-workspace/pr-27-tls-optimization/wo2-build-test-measure/RESULTS.md`
+  `.agents/plugins/principal-architect-workspace/pr-27-tls-optimization/wo2-build-test-measure/RESULTS.md`
 
   Include:
   - Before/after heap metrics (idle steady-state)

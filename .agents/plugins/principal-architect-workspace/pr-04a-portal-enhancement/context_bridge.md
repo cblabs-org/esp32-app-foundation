@@ -16,7 +16,7 @@ Extended the web portal with a Status sub-pill, screenshot tool, and multiple UX
 ## Next Steps
 
 1. **Commit and push** — All changes are staged on `main` (already done by this session's wrap-up).
-2. **Web testing infrastructure** — Bridge prompt exists at `.agents/skills/principal-architect-workspace/pr-15-web-testing/`. Establishes a 3-phase testing pipeline (local mock → build gate → hardware).
+2. **Web testing infrastructure** — Bridge prompt exists at `.agents/plugins/principal-architect-workspace/pr-15-web-testing/`. Establishes a 3-phase testing pipeline (local mock → build gate → hardware).
 3. **MCP server hardening** — Bridge prompt was written in a prior session. Adds runtime controls, secure-by-default logic, tool mutation tagging.
 4. **Branch management post-mortem** — Establish a workflow rule to prevent uncommitted changes from being lost when spawning architect sessions. Options: mandatory WIP commits, `git worktree`, or stash guards.
 5. **Diagnostics script field update** — The `diagnostics.py` was rewritten this session; the `captureU8g2.py` and `capture_display.py` scripts are unchanged and still functional.

@@ -140,4 +140,4 @@ Promote the existing SVG signal-bars renderer from `wifi.js` local scope to `uti
 - **2026-08-05:** Work Order 4 fully implemented and verified.
   - Implemented card grid modifiers, dot size variable scaling, subtle badge, and promoted signal bars renderer.
   - Verified 70/70 Playwright test suite green.
-  - User approval confirmed; output distilled to `.agents/skills/principal-architect-workspace/pr-55-portal-design-system/wo4-consolidation/`.
+  - User approval confirmed; output distilled to `.agents/plugins/principal-architect-workspace/pr-55-portal-design-system/wo4-consolidation/`.

@@ -21,7 +21,7 @@ Use the `platformio` MCP tools (`build_project`) to compile and verify your code
 
 # Context
 Read the project plan:
-`.agents/skills/principal-architect-workspace/pr-36-manifest-first-ota/PROJECT.md`
+`.agents/plugins/principal-architect-workspace/pr-36-manifest-first-ota/PROJECT.md`
 
 # Line-Item Instructions
 

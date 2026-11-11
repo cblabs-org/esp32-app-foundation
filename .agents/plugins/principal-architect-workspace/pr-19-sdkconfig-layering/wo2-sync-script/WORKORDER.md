@@ -240,7 +240,7 @@ Skips gracefully for native env and unconfigured environments."
 - [ ] **Ask the user if they are happy before distilling or doing anything else**
 
 Once the user approves, invoke the `@distillery` skill targeting
-`.agents/skills/principal-architect-workspace/pr-19-sdkconfig-layering/wo2-sync-script/`
+`.agents/plugins/principal-architect-workspace/pr-19-sdkconfig-layering/wo2-sync-script/`
 and then terminate your session.
 
 ---

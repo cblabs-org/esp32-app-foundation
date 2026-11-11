@@ -424,7 +424,7 @@ Once **both** D1 and D2 pass with zero failures:
    - Any design decisions you made and why
    - Any concerns or edge cases you noticed
 3. Wait for PA's explicit approval.
-4. Once approved, invoke `@distillery`, passing `.agents/skills/principal-architect-workspace/pr-23-display-tab/wo1-display-tab/` as the target directory.
+4. Once approved, invoke `@distillery`, passing `.agents/plugins/principal-architect-workspace/pr-23-display-tab/wo1-display-tab/` as the target directory.
 5. Append a status update to this `WORKORDER.md` and terminate your session.
 
 ---

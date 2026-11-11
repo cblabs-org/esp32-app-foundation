@@ -10,7 +10,7 @@ Worker agent spawned with `Workspace: "branch"` immediately failed on every file
 
 ## Failed Attempts
 
-- Worker tried to read `.agents/skills/principal-architect-workspace/pr-23-display-tab/wo1-display-tab/WORKORDER.md` → permission denied
+- Worker tried to read `.agents/plugins/principal-architect-workspace/pr-23-display-tab/wo1-display-tab/WORKORDER.md` → permission denied
 - Worker tried to read project source files → permission denied
 - Worker could not even read rules files to understand what was happening
 

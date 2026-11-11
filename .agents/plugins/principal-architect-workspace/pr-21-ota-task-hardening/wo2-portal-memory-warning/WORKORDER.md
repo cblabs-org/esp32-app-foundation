@@ -128,7 +128,7 @@ No hardware or build step is required — this is a pure JavaScript file change.
   Do not invoke `@distillery` or wrap up until I explicitly approve the work.
 
 Once approved, invoke the `@distillery` skill passing
-`.agents/skills/principal-architect-workspace/pr-21-ota-task-hardening/wo2-portal-memory-warning/`
+`.agents/plugins/principal-architect-workspace/pr-21-ota-task-hardening/wo2-portal-memory-warning/`
 as the target directory. Then append a status update to this WORKORDER.md and terminate.
 
 ---
@@ -153,6 +153,6 @@ as the target directory. Then append a status update to this WORKORDER.md and te
 - Backward-compat guards in place for devices without WO1 fields
 
 ### Distillery artifacts written
-- `.agents/skills/principal-architect-workspace/pr-21-ota-task-hardening/wo2-portal-memory-warning/context_bridge.md`
-- `.agents/skills/principal-architect-workspace/pr-21-ota-task-hardening/wo2-portal-memory-warning/sessions.md`
-- `.agents/skills/principal-architect-workspace/pr-21-ota-task-hardening/wo2-portal-memory-warning/context_artifacts/adr_wo2_low_memory_warning.md`
+- `.agents/plugins/principal-architect-workspace/pr-21-ota-task-hardening/wo2-portal-memory-warning/context_bridge.md`
+- `.agents/plugins/principal-architect-workspace/pr-21-ota-task-hardening/wo2-portal-memory-warning/sessions.md`
+- `.agents/plugins/principal-architect-workspace/pr-21-ota-task-hardening/wo2-portal-memory-warning/context_artifacts/adr_wo2_low_memory_warning.md`

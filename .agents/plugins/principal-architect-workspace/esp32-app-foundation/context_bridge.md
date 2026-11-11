@@ -5,7 +5,7 @@ original_plan_id: "f4e779d9-4aa1-46e2-8115-e1e8edc4fa42"
 artifacts:
   - context_artifacts/adr_program_decisions.md
   - context_artifacts/graveyard_rejected_approaches.md
-program_plan: .agents/skills/principal-architect-workspace/esp32-app-foundation/PROGRAM-PLAN.md
+program_plan: .agents/plugins/principal-architect-workspace/esp32-app-foundation/PROGRAM-PLAN.md
 implementation_plan: "(session artifact — see parent conversation)"
 pa01_conversation_id: "30aaf023-db75-4615-bf03-5b7bf9e9bacc"
 ---

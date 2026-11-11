@@ -189,7 +189,7 @@ this duplication and WO2 (sync_sdkconfig.py) adds drift detection."
 - [x] User approved before distilling
 
 Once the user approves, invoke the `@distillery` skill targeting
-`.agents/skills/principal-architect-workspace/pr-19-sdkconfig-layering/wo1-base-delta/`
+`.agents/plugins/principal-architect-workspace/pr-19-sdkconfig-layering/wo1-base-delta/`
 and then terminate your session.
 
 ---
@@ -218,5 +218,5 @@ and then terminate your session.
 
 ### Distillery
 
-Context bridge written to `.agents/skills/principal-architect-workspace/pr-19-sdkconfig-layering/wo1-base-delta/context_bridge.md`
+Context bridge written to `.agents/plugins/principal-architect-workspace/pr-19-sdkconfig-layering/wo1-base-delta/context_bridge.md`
 

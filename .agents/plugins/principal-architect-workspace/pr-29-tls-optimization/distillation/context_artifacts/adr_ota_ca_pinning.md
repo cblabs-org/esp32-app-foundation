@@ -45,6 +45,6 @@ Verified via: `openssl s_client -connect objects.githubusercontent.com:443`
 
 ## WO4 Handoff
 
-Work order written at: `.agents/skills/principal-architect-workspace/pr-29-tls-optimization/wo4-ota-ca-pinning/WORKORDER.md`
+Work order written at: `.agents/plugins/principal-architect-workspace/pr-29-tls-optimization/wo4-ota-ca-pinning/WORKORDER.md`
 
 Handed off to the OTA architect for implementation. Boundary box: `lib/GithubClient/` + `modules/OTAUpdateManager/OTAUpdateManager.cpp` only.

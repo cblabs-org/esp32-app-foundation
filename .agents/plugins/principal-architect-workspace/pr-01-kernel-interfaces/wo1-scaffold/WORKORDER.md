@@ -351,7 +351,7 @@ Before considering this WO complete, confirm:
 4. The directory skeleton matches the layout in the PROGRAM-PLAN.md
 
 **STOP and ask the user to confirm the work before committing or invoking the distillery.**  
-Once approved, invoke the `@distillery` skill, passing `.agents/skills/principal-architect-workspace/pr-01-kernel-interfaces/wo1-scaffold/` as the target directory. Then append a `## Status` section to this WORKORDER.md with the outcome and drop control.
+Once approved, invoke the `@distillery` skill, passing `.agents/plugins/principal-architect-workspace/pr-01-kernel-interfaces/wo1-scaffold/` as the target directory. Then append a `## Status` section to this WORKORDER.md with the outcome and drop control.
 
 ---
 

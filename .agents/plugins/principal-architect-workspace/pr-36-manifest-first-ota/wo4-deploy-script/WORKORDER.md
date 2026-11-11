@@ -20,7 +20,7 @@ Test the scripts locally with `--dry-run` to verify command generation.
 
 # Context
 Read the project plan for the full manifest schema and hosting design:
-`.agents/skills/principal-architect-workspace/pr-36-manifest-first-ota/PROJECT.md`
+`.agents/plugins/principal-architect-workspace/pr-36-manifest-first-ota/PROJECT.md`
 
 # Line-Item Instructions
 

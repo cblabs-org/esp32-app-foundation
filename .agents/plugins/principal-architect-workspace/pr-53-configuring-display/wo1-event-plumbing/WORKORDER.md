@@ -158,5 +158,5 @@ Reference implementation:
 
 | Date | Status | Details |
 |------|--------|---------|
-| 2026-08-02 | ✅ Complete & Approved | Implementation finished, verified with `esp32s3nano` build and native test suite (368/368 passed). User approval received. Distillation package generated at `.agents/skills/principal-architect-workspace/pr-53-configuring-display/wo1-event-plumbing/`. |
+| 2026-08-02 | ✅ Complete & Approved | Implementation finished, verified with `esp32s3nano` build and native test suite (368/368 passed). User approval received. Distillation package generated at `.agents/plugins/principal-architect-workspace/pr-53-configuring-display/wo1-event-plumbing/`. |
 

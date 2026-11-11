@@ -32,4 +32,4 @@ Do NOT modify any existing framework files outside the new `template/` directory
 - [ ] Ensure all C++ files follow the House Style Documentation.
 
 ## Closure Gate
-- **Distillation Requirement**: When you have completed and verified all code changes, you MUST invoke the `@distillery` skill to package your WO output. Pass `.agents/skills/principal-architect-workspace/pr-07-template-repo/wo1-skeleton/` as the target directory. Wait for it to finish before dropping control back to the PA.
+- **Distillation Requirement**: When you have completed and verified all code changes, you MUST invoke the `@distillery` skill to package your WO output. Pass `.agents/plugins/principal-architect-workspace/pr-07-template-repo/wo1-skeleton/` as the target directory. Wait for it to finish before dropping control back to the PA.

@@ -19,10 +19,10 @@ fully planned but **not yet approved for execution**.
 3. **Page in the program state** by reading, in this order:
    - Design authority: `docs/microkernel-architecture-design.md` (decisions
      `MK-1…MK-18`, open questions `OQ-MK-1…OQ-MK-5`).
-   - `.agents/skills/principal-architect-workspace/microkernel-refactor/PROGRAM.md`
+   - `.agents/plugins/principal-architect-workspace/microkernel-refactor/PROGRAM.md`
      and `PROGRAM-PLAN.md`.
    - All seven `pr-mk0[1-7]-*/PROJECT.md` files under that program folder.
-   - Workspace index: `.agents/skills/principal-architect-workspace/MEMORY.md`.
+   - Workspace index: `.agents/plugins/principal-architect-workspace/MEMORY.md`.
    - Context: RFC **#48** (consumer review, open) and issue **#40**
      (config/asset partition separation).
 

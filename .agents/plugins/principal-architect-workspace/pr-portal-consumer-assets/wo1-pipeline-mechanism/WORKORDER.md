@@ -8,7 +8,7 @@ complexity: standard
 
 **Parent project:** `pr-portal-consumer-assets` — decomposition approved by the
 human on 2026-08-16 (see
-`.agents/skills/principal-architect-workspace/pr-portal-consumer-assets/PROJECT.md`,
+`.agents/plugins/principal-architect-workspace/pr-portal-consumer-assets/PROJECT.md`,
 §Human Approval). This is your authorization to implement this WORKORDER
 autonomously within its Strict Boundary Box. Closes the mechanism half of
 issue #111.

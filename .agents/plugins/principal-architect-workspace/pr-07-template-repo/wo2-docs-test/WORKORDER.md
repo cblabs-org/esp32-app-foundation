@@ -31,4 +31,4 @@ Do NOT modify any existing framework files outside the new `template/` directory
 - [ ] Verify that building the template succeeds. You must use `mcp_platformio_build_project` with `projectDir` set to the absolute path of the `template/` folder. Wait for the background task to complete and use `mcp_platformio_query_logs` to ensure it compiled successfully against `esp32dev` and `esp32s3nano`. Fix any compilation errors in the template if they arise.
 
 ## Closure Gate
-- **Distillation Requirement**: When you have completed and verified all code changes, you MUST invoke the `@distillery` skill to package your WO output. Pass `.agents/skills/principal-architect-workspace/pr-07-template-repo/wo2-docs-test/` as the target directory. Wait for it to finish before dropping control back to the PA.
+- **Distillation Requirement**: When you have completed and verified all code changes, you MUST invoke the `@distillery` skill to package your WO output. Pass `.agents/plugins/principal-architect-workspace/pr-07-template-repo/wo2-docs-test/` as the target directory. Wait for it to finish before dropping control back to the PA.

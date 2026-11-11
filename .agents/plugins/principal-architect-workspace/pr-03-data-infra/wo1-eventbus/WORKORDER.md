@@ -35,4 +35,4 @@ Implement the EventBus system in `modules/eventBus/`.
 ## Closure Gate
 - Confirm native tests pass.
 - Confirm build succeeds on both environments.
-- **Distillation Requirement**: When you have completed and verified all code changes, you MUST invoke the `@distillery` skill to package your WO output. Pass `.agents/skills/principal-architect-workspace/pr-03-data-infra/wo1-eventbus/` as the target directory. Wait for it to finish before dropping control back to the PA.
+- **Distillation Requirement**: When you have completed and verified all code changes, you MUST invoke the `@distillery` skill to package your WO output. Pass `.agents/plugins/principal-architect-workspace/pr-03-data-infra/wo1-eventbus/` as the target directory. Wait for it to finish before dropping control back to the PA.

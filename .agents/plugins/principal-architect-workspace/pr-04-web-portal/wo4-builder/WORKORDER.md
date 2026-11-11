@@ -39,4 +39,4 @@ Create the `portalBuilder.py` build script to compile the SPA frontend into PROG
 - Ensure the generated headers have proper include guards.
 
 ## Closure Gate
-- **Distillation Requirement**: When you have completed and verified all code changes, you MUST invoke the `@distillery` skill to package your WO output. Pass `.agents/skills/principal-architect-workspace/pr-04-web-portal/wo4-builder/` as the target directory. Wait for it to finish before dropping control back to the PA.
+- **Distillation Requirement**: When you have completed and verified all code changes, you MUST invoke the `@distillery` skill to package your WO output. Pass `.agents/plugins/principal-architect-workspace/pr-04-web-portal/wo4-builder/` as the target directory. Wait for it to finish before dropping control back to the PA.

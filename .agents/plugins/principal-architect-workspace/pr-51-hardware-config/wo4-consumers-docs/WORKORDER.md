@@ -74,5 +74,5 @@ Surface out-of-boundary findings to the PA; do not file issues yourself.
   - `sample-app/platformio.ini` and `template-app/platformio.ini` migrated to `-DBOARD_HEADER=\".../hardware/<id>/board.h\"` and `hardware/<id>/partitions.csv`.
   - Created [`docs/developer/custom-boards.md`](../../../../docs/developer/custom-boards.md) for zero-edit custom-board authoring (HC-11). Updated developer guides (`hardware-setup.md`, `using-optional-modules.md`, `README.md`).
   - Full-stack build and test verification passed across all 8 environments (root native 358 tests green, root esp32dev/esp32s3nano/crowpanel-128-rotary, sample-app esp32dev/esp32s3nano, template-app esp32dev/esp32s3nano).
-  - Explicit approval received; distilled artifacts created at `.agents/skills/principal-architect-workspace/pr-51-hardware-config/wo4-consumers-docs/`. WO4 complete.
+  - Explicit approval received; distilled artifacts created at `.agents/plugins/principal-architect-workspace/pr-51-hardware-config/wo4-consumers-docs/`. WO4 complete.
 

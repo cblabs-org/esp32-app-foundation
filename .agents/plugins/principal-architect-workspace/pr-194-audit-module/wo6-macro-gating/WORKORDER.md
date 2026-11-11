@@ -13,7 +13,7 @@ complexity: standard
 Create the `AUDIT()` convenience macro header, add `WITH_AUDIT` compile-time gating to `Application` module registration, add the sentinel compile-error pattern for direct API usage without the flag, and add `-D WITH_AUDIT` to each board's build flags in `platformio.ini`.
 
 ## Context
-**Parent project**: `pr-194-audit-module` — see `.agents/skills/principal-architect-workspace/pr-194-audit-module/PROJECT.md`
+**Parent project**: `pr-194-audit-module` — see `.agents/plugins/principal-architect-workspace/pr-194-audit-module/PROJECT.md`
 
 WO1-WO5 are complete. The AuditModule is fully implemented but not yet gated behind `WITH_AUDIT`. This WO creates the compile-time integration layer.
 

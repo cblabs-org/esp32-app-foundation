@@ -26,7 +26,7 @@ Use the `platformio` MCP tools (`build_project`, `run_tests`) — **not** raw `p
 - [x] Under `#ifdef NATIVE_BUILD`, retain the synchronous vector-based dispatch logic from WO1 as the native stub.
 - [x] Verify compilation on `esp32dev` env using `call_mcp_tool` with `platformio` `build_project`.
 - [x] Verify native tests on `native` env using `call_mcp_tool` with `platformio` `run_tests`.
-- [ ] Ask the user for approval. Only after explicit approval, invoke `@distillery` to package the output targeting `.agents/skills/principal-architect-workspace/microkernel-refactor/pr-mk01-eventbus-concurrency/wo2-on-target-backing/`.
+- [ ] Ask the user for approval. Only after explicit approval, invoke `@distillery` to package the output targeting `.agents/plugins/principal-architect-workspace/microkernel-refactor/pr-mk01-eventbus-concurrency/wo2-on-target-backing/`.
 - [x] Append a status update to this `WORKORDER.md` file.
 
 ### Status Update

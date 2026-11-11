@@ -113,5 +113,5 @@ Do not wrap up or distill until the PA explicitly approves.
 - **Status**: COMPLETED & DISTILLED
 - **Verification**: 417/417 native unit tests passed, `esp32s3nano` firmware compiled cleanly.
 - **Commit**: `b8315a5` (PR #78 created).
-- **Distillation**: Artifacts packaged under `.agents/skills/principal-architect-workspace/pr-tick-budget-override/wo1-budget-override/`.
+- **Distillation**: Artifacts packaged under `.agents/plugins/principal-architect-workspace/pr-tick-budget-override/wo1-budget-override/`.
 

@@ -40,7 +40,7 @@ The worker must verify that the code compiles. Verify your changes via unit test
 
 **Status:** ✅ COMPLETED & APPROVED  
 **Completion Date:** 2026-08-04  
-**Distillery Artifact:** `.agents/skills/principal-architect-workspace/pr-55-keymanager-mcp/wo1-keymanager-mcp/context_bridge.md`  
+**Distillery Artifact:** `.agents/plugins/principal-architect-workspace/pr-55-keymanager-mcp/wo1-keymanager-mcp/context_bridge.md`  
 
 ### Execution Summary
 1. Implemented `IMCPContributor` on `KeyManager`, exposing 4 MCP tools: `key_list`, `key_get`, `key_add`, and `key_delete`.

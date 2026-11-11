@@ -16,7 +16,7 @@ Update all documentation and the `/framework-expert` skill to reflect the manife
 
 # Context
 Read the project plan for the full architecture description:
-`.agents/skills/principal-architect-workspace/pr-36-manifest-first-ota/PROJECT.md`
+`.agents/plugins/principal-architect-workspace/pr-36-manifest-first-ota/PROJECT.md`
 
 # Line-Item Instructions
 

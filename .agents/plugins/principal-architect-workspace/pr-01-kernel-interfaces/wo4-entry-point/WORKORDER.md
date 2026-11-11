@@ -422,7 +422,7 @@ Before considering this WO complete, confirm:
 5. Torvalds Standard PR description is drafted and ready
 
 **STOP and ask the user to confirm the work before invoking the distillery.**  
-Once approved, invoke the `@distillery` skill, passing `.agents/skills/principal-architect-workspace/pr-01-kernel-interfaces/wo4-entry-point/` as the target directory. Then append a `## Status` section to this WORKORDER.md with the full git log output and drop control.
+Once approved, invoke the `@distillery` skill, passing `.agents/plugins/principal-architect-workspace/pr-01-kernel-interfaces/wo4-entry-point/` as the target directory. Then append a `## Status` section to this WORKORDER.md with the full git log output and drop control.
 
 ---
 

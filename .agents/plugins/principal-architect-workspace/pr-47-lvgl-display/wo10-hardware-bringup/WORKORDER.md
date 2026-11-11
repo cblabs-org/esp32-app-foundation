@@ -47,5 +47,5 @@ Bring up the LVGL module + CrowPanel128Adapter on real hardware: verify display,
 ## Completion Protocol
 1. Validate on hardware, then **STOP and message the Principal Architect** with the full bring-up results + measured numbers + PCB revision. Surface any out-of-boundary defects; do not file issues.
 2. **Do not distill until the human approves.**
-3. On approval: `@distillery` with target `.agents/skills/principal-architect-workspace/pr-47-lvgl-display/wo10-hardware-bringup/`.
+3. On approval: `@distillery` with target `.agents/plugins/principal-architect-workspace/pr-47-lvgl-display/wo10-hardware-bringup/`.
 4. Append a status update to this `WORKORDER.md` and terminate.

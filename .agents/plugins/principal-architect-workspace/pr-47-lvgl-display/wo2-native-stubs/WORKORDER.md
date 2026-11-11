@@ -45,5 +45,5 @@ Use the `platformio` MCP tools (`build_project`, `run_tests`) via the `pio-manag
 ## Completion Protocol
 1. Validate, then **STOP and message the Principal Architect** with results/iteration needs. Surface out-of-boundary findings in your report; do not file issues.
 2. **Do not distill until the human approves.**
-3. On approval: invoke `@distillery` with target `.agents/skills/principal-architect-workspace/pr-47-lvgl-display/wo2-native-stubs/`.
+3. On approval: invoke `@distillery` with target `.agents/plugins/principal-architect-workspace/pr-47-lvgl-display/wo2-native-stubs/`.
 4. Append a status update to this `WORKORDER.md` and terminate.
