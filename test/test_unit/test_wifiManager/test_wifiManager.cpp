@@ -7,6 +7,7 @@
 
 #include <gtest/gtest.h>
 #include <ArduinoJson.h>
+#include <WiFi.h>
 #include <ESPmDNS.h>
 #include "../../../modules/WifiManager/WifiManager.hpp"
 #include "../test_helpers/MockTabRegistry.hpp"
@@ -57,6 +58,50 @@ TEST_F(WifiManagerTest, GetHostnameReflectsAppliedConfig) {
     section["hostname"] = "applied-host";
     wifiManager.applyConfig(section);
     EXPECT_STREQ("applied-host", wifiManager.getHostname());
+}
+
+// setDefaultHostname() immediately updates getHostname() and getAPSSID() (issue #294)
+TEST_F(WifiManagerTest, SetDefaultHostnameImmediatelyUpdatesHostnameAndAPSSID) {
+    wifiManager.setDefaultHostname("my-device");
+    EXPECT_STREQ("my-device", wifiManager.getHostname());
+    EXPECT_STREQ("my-device", wifiManager.getAPSSID());
+}
+
+// setDefaultHostname() does not overwrite user-configured hostname from applyConfig() (issue #294)
+TEST_F(WifiManagerTest, SetDefaultHostnameDoesNotOverwriteUserConfiguredHostname) {
+    JsonDocument doc;
+    JsonObject section = doc.to<JsonObject>();
+    section["hostname"] = "user-configured";
+    wifiManager.applyConfig(section);
+    EXPECT_STREQ("user-configured", wifiManager.getHostname());
+
+    wifiManager.setDefaultHostname("new-default");
+    EXPECT_STREQ("new-default", wifiManager.getDefaultHostname());
+    EXPECT_STREQ("user-configured", wifiManager.getHostname());
+    EXPECT_STREQ("user-configured", wifiManager.getAPSSID());
+}
+
+// applyConfig() with generic "esp32-device" does not overwrite app-supplied default (issue #294)
+TEST_F(WifiManagerTest, ApplyConfigWithGenericDefaultDoesNotOverwriteAppDefault) {
+    wifiManager.setDefaultHostname("my-device");
+    JsonDocument doc;
+    JsonObject section = doc.to<JsonObject>();
+    section["hostname"] = "esp32-device";
+    wifiManager.applyConfig(section);
+    EXPECT_STREQ("my-device", wifiManager.getHostname());
+    EXPECT_STREQ("my-device", wifiManager.getAPSSID());
+}
+
+// SoftAP uses app-supplied hostname as SSID (issue #294)
+TEST(WifiSetupModeTest, SoftAPUsesAppSuppliedHostname) {
+    WifiManager wifi;
+    wifi.setDefaultHostname("weather-station");
+    wifi.begin();
+    wifi.tick(2000);   // Init -> ApStarting
+    wifi.tick(2001);   // ApStarting -> Ready (AP up)
+    EXPECT_TRUE(wifi.getAPMode());
+    EXPECT_STREQ("weather-station", wifi.getAPSSID());
+    EXPECT_EQ("weather-station", WiFi.last_softAP_ssid);
 }
 
 // onStaConnected initialises mDNS with the effective hostname (issue #232)
