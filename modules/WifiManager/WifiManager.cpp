@@ -115,7 +115,11 @@ void WifiManager::applyConfig(const JsonObject& section) {
     // --- Read hostname ---
     if (section["hostname"].is<const char*>()) {
         const char* h = section["hostname"];
-        if (strlen(h) > 0 && !(strcmp(h, DEFAULT_HOSTNAME) == 0 && strcmp(_defaultHostname, DEFAULT_HOSTNAME) != 0)) {
+        // Reject a stale persisted "esp32-device" when the app has supplied
+        // a custom default hostname (e.g. via setDefaultHostname()).
+        const bool isStaleDefault = (strcmp(h, DEFAULT_HOSTNAME) == 0 &&
+                                     strcmp(_defaultHostname, DEFAULT_HOSTNAME) != 0);
+        if (strlen(h) > 0 && !isStaleDefault) {
             strlcpy(_currentHostname, h, sizeof(_currentHostname));
         } else if (strlen(_defaultHostname) > 0) {
             strlcpy(_currentHostname, _defaultHostname, sizeof(_currentHostname));

@@ -464,7 +464,7 @@ public:
      */
     const char* getAPSSID() const {
         const char* host = getHostname();
-        if (host != nullptr && strlen(host) > 0 && strcmp(host, DEFAULT_HOSTNAME) != 0) {
+        if (strlen(host) > 0 && strcmp(host, DEFAULT_HOSTNAME) != 0) {
             return host;
         }
         return DEFAULT_AP_SSID;
