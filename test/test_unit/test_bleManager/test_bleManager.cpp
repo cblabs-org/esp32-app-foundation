@@ -639,6 +639,3 @@ TEST(BLEManagerTest, ScanResultClampsServiceUUIDCount) {
     EXPECT_EQ(results[0].uuids16[0], 0x1800);
     EXPECT_EQ(results[0].uuids16[5], 0x1805);
 }
-
-
-

@@ -562,7 +562,7 @@ namespace {
             }
 
             uint8_t svcCount = advertisedDevice->getServiceUUIDCount();
-            for (uint8_t i = 0; i < svcCount && msg.uuid16Count < 6; ++i) {
+            for (uint8_t i = 0; i < svcCount && msg.uuid16Count < (sizeof(msg.uuids16) / sizeof(msg.uuids16[0])); ++i) {
                 NimBLEUUID u = advertisedDevice->getServiceUUID(i);
                 if (u.bitSize() == 128) {
                     u.to16();
