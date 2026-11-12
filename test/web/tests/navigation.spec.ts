@@ -3,11 +3,8 @@ import { test, expect, Page } from '@playwright/test';
 // ---------------------------------------------------------------------------
 // Mock data — matches server.js MOCK_TABS (parent uses the exact Name casing)
 //
-// PORTAL BUG: app.js sorts children with `(a.order || 100)`, so order:0 is
-// treated as falsy and becomes 100. The first child is whichever has the
-// lowest non-zero order. With the standard tab set, Keys (order:1) sorts
-// before Status (order:0 → 100). Tests account for this by NOT assuming
-// Status is the default active child.
+// Tabs specify numeric orders. Status has order: 0 and Keys has order: 1.
+// Status sorts first under System.
 // ---------------------------------------------------------------------------
 
 const MOCK_TABS = [
@@ -146,14 +143,13 @@ test.describe('Tab Navigation', () => {
     await expect(page.locator('#tab-wifi')).not.toHaveClass(/tab-content--active/);
 
     // The System tab has children, so a child sub-pill should become active
-    // Due to portal's order:0||100 bug, Keys (order:1) sorts first, not Status
+    // Status (order: 0) sorts first and is the default active sub-pill
     await expect(page.locator('#pill-bar')).toBeVisible();
-    // At least one child tab-content should be active
+    // Status tab-content should be active
     const activeChild = page.locator('.tab-content--active');
     await expect(activeChild).toBeVisible();
-    // And it should NOT be tab-wifi
     const activeId = await activeChild.getAttribute('id');
-    expect(activeId).not.toBe('tab-wifi');
+    expect(activeId).toBe('tab-status');
   });
 
   test('sub-pill bar appears when System tab is active', async ({ page }) => {
@@ -167,11 +163,28 @@ test.describe('Tab Navigation', () => {
     // Pill bar should now be visible with child pills
     await expect(pillBar).toBeVisible();
 
-    // Check expected sub-pill labels (order depends on portal sorting)
+    // Check expected sub-pill labels in exact ascending order (order: 0 before order: 1)
     const pillNames = ['Status', 'Keys', 'MCP', 'Backup', 'OTA'];
-    for (const name of pillNames) {
-      await expect(pillBar.locator('.pill-btn', { hasText: name })).toBeVisible();
+    const pillBtns = pillBar.locator('.pill-btn');
+    await expect(pillBtns).toHaveCount(pillNames.length);
+    for (let i = 0; i < pillNames.length; i++) {
+      await expect(pillBtns.nth(i)).toHaveText(pillNames[i]);
     }
+  });
+
+  test('falsy order 0 is not coerced to 100 — Status (order: 0) sorts before Keys (order: 1)', async ({ page }) => {
+    // Navigate to System tab
+    await page.locator('#bottom-nav [data-target="tab-system"]').click();
+    await expect(page.locator('#pill-bar')).toBeVisible();
+
+    const pillBtns = page.locator('#pill-bar .pill-btn');
+    // First child is Status (order: 0), second is Keys (order: 1)
+    await expect(pillBtns.first()).toHaveText('Status');
+    await expect(pillBtns.nth(1)).toHaveText('Keys');
+
+    // First child (Status) is active by default without needing manual click
+    await expect(pillBtns.first()).toHaveClass(/pill-btn--active/);
+    await expect(page.locator('#tab-status')).toHaveClass(/tab-content--active/);
   });
 
   test('sub-pill activation — clicking a sub-pill shows its content panel', async ({ page }) => {
