@@ -567,4 +567,75 @@ TEST(BLEManagerTest, ScanResultCarriesConnectable) {
     EXPECT_FALSE(updatedResults[0].connectable);
 }
 
+// Fix #308: ScanResult dispatch must carry appearance and 16-bit service UUIDs through BLEQueueMessage.
+TEST(BLEManagerTest, ScanResultCarriesAppearanceAndServiceUUIDs) {
+    BLEManager mgr;
+    DummyClientProvider cli;
+    mgr.registerClientProvider(&cli);
+    mgr.setStateForTesting(BLEManager::State::Active);
 
+    EXPECT_TRUE(mgr.startDiscovery("dummy_cli", 5000));
+
+    BLEQueueMessage scanMsg;
+    scanMsg.type = BLEQueueMessage::Type::ScanResult;
+    BLEPeerAddress::parse("11:22:33:44:55:66", BLEPeerAddress::Type::Public, scanMsg.address);
+    strncpy(scanMsg.providerId, "TestSensor", sizeof(scanMsg.providerId) - 1);
+    scanMsg.rssi = -65;
+    scanMsg.boolVal1 = true;
+    scanMsg.appearance = 0x0340; // Heart Rate Sensor appearance
+    scanMsg.uuids16[0] = 0x180D; // Heart Rate Service
+    scanMsg.uuids16[1] = 0x180A; // Device Information Service
+    scanMsg.uuid16Count = 2;
+
+    EXPECT_TRUE(mgr.postTestQueueMessage(scanMsg));
+    mgr.tick(0);
+
+    const std::vector<BLEScanResult>& results = mgr.getDiscoveryResults();
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].appearance, 0x0340);
+    EXPECT_EQ(results[0].uuid16Count, 2);
+    EXPECT_EQ(results[0].uuids16[0], 0x180D);
+    EXPECT_EQ(results[0].uuids16[1], 0x180A);
+    EXPECT_TRUE(results[0].connectable);
+
+    // Updating existing scan result updates appearance and service UUIDs
+    BLEQueueMessage scanMsgUpdate = scanMsg;
+    scanMsgUpdate.appearance = 0x0341;
+    scanMsgUpdate.uuids16[0] = 0x180F; // Battery Service
+    scanMsgUpdate.uuid16Count = 1;
+    EXPECT_TRUE(mgr.postTestQueueMessage(scanMsgUpdate));
+    mgr.tick(0);
+
+    const std::vector<BLEScanResult>& updatedResults = mgr.getDiscoveryResults();
+    ASSERT_EQ(updatedResults.size(), 1u);
+    EXPECT_EQ(updatedResults[0].appearance, 0x0341);
+    EXPECT_EQ(updatedResults[0].uuid16Count, 1);
+    EXPECT_EQ(updatedResults[0].uuids16[0], 0x180F);
+}
+
+// Fix #308: ScanResult dispatch clamps uuid16Count to array capacity (6).
+TEST(BLEManagerTest, ScanResultClampsServiceUUIDCount) {
+    BLEManager mgr;
+    DummyClientProvider cli;
+    mgr.registerClientProvider(&cli);
+    mgr.setStateForTesting(BLEManager::State::Active);
+
+    EXPECT_TRUE(mgr.startDiscovery("dummy_cli", 5000));
+
+    BLEQueueMessage scanMsg;
+    scanMsg.type = BLEQueueMessage::Type::ScanResult;
+    BLEPeerAddress::parse("22:33:44:55:66:77", BLEPeerAddress::Type::Public, scanMsg.address);
+    scanMsg.uuid16Count = 10; // Exceeds array capacity of 6
+    for (uint8_t i = 0; i < 6; ++i) {
+        scanMsg.uuids16[i] = static_cast<uint16_t>(0x1800 + i);
+    }
+
+    EXPECT_TRUE(mgr.postTestQueueMessage(scanMsg));
+    mgr.tick(0);
+
+    const std::vector<BLEScanResult>& results = mgr.getDiscoveryResults();
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].uuid16Count, 6);
+    EXPECT_EQ(results[0].uuids16[0], 0x1800);
+    EXPECT_EQ(results[0].uuids16[5], 0x1805);
+}

@@ -49,4 +49,7 @@ struct BLEQueueMessage {
     uint8_t             rawLen          = 0;
     uint32_t            receivedAtMs    = 0;    ///< O3: host-task timestamp for latency measurement
     int8_t              rssi            = 0;    ///< R8: ScanResult RSSI, carried in its own field (not packed into handle)
+    uint16_t            appearance      = 0;    ///< Issue #308: ScanResult appearance
+    uint16_t            uuids16[6]      = {};   ///< Issue #308: ScanResult advertised 16-bit service UUIDs
+    uint8_t             uuid16Count     = 0;    ///< Issue #308: ScanResult advertised 16-bit service UUID count
 };

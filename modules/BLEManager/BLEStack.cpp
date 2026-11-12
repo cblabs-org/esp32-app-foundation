@@ -556,6 +556,32 @@ namespace {
             // Issue #303: Carry connectable flag from NimBLE scan result to host loop.
             msg.boolVal1 = advertisedDevice->isConnectable();
 
+            // Issue #308: Carry appearance and 16-bit service UUIDs across queue boundary.
+            if (advertisedDevice->haveAppearance()) {
+                msg.appearance = advertisedDevice->getAppearance();
+            }
+
+            uint8_t svcCount = advertisedDevice->getServiceUUIDCount();
+            for (uint8_t i = 0; i < svcCount && msg.uuid16Count < (sizeof(msg.uuids16) / sizeof(msg.uuids16[0])); ++i) {
+                NimBLEUUID u = advertisedDevice->getServiceUUID(i);
+                if (u.bitSize() == 128) {
+                    u.to16();
+                }
+                if (u.bitSize() == 16 && u.getBase() != nullptr) {
+                    uint16_t val = reinterpret_cast<const ble_uuid16_t*>(u.getBase())->value;
+                    bool exists = false;
+                    for (uint8_t j = 0; j < msg.uuid16Count; ++j) {
+                        if (msg.uuids16[j] == val) {
+                            exists = true;
+                            break;
+                        }
+                    }
+                    if (!exists) {
+                        msg.uuids16[msg.uuid16Count++] = val;
+                    }
+                }
+            }
+
             xQueueSend(static_cast<QueueHandle_t>(s_hostQueue), &msg, 0);
         }
 
