@@ -132,15 +132,15 @@ test.describe('Tab Navigation', () => {
     expect(secIndex).toBeGreaterThan(bleIndex);
   });
 
-  test('tab switching — clicking System shows system content, hides WiFi', async ({ page }) => {
-    // WiFi is active by default
-    await expect(page.locator('#tab-wifi')).toHaveClass(/tab-content--active/);
+  test('tab switching — clicking System shows system content, hides previously active tab', async ({ page }) => {
+    // In STA mode with app tabs, the lowest-order app tab is active by default (tab-settings under Display)
+    await expect(page.locator('#tab-settings')).toHaveClass(/tab-content--active/);
 
     // Click System tab
     await page.locator('#bottom-nav [data-target="tab-system"]').click();
 
-    // WiFi content should no longer be active
-    await expect(page.locator('#tab-wifi')).not.toHaveClass(/tab-content--active/);
+    // Previous tab content should no longer be active
+    await expect(page.locator('#tab-settings')).not.toHaveClass(/tab-content--active/);
 
     // The System tab has children, so a child sub-pill should become active
     // Status (order: 0) sorts first and is the default active sub-pill
@@ -152,8 +152,9 @@ test.describe('Tab Navigation', () => {
     expect(activeId).toBe('tab-status');
   });
 
-  test('sub-pill bar appears when System tab is active', async ({ page }) => {
-    // Initially pill bar should be hidden (WiFi has no children)
+  test('sub-pill bar appears when System tab is active, hides when WiFi tab is active', async ({ page }) => {
+    // Switch to WiFi tab (WiFi has no children, so pill bar should be hidden)
+    await page.locator('#bottom-nav [data-target="tab-wifi"]').click();
     const pillBar = page.locator('#pill-bar');
     await expect(pillBar).toBeHidden();
 
@@ -244,5 +245,114 @@ test.describe('Tab Navigation', () => {
     await page.locator('#bottom-nav [data-target="tab-system"]').click();
     await expect(page.locator('#tab-status')).toHaveClass(/tab-content--active/);
     await expect(page.locator('#pill-bar .pill-btn[data-target="tab-status"]')).toHaveClass(/pill-btn--active/);
+  });
+
+  test('STA mode default — defaults to primary app tab when WiFi is configured', async ({ page }) => {
+    // In STA mode with MOCK_TABS (Display at 30, App at 40), the lowest-order non-framework
+    // tab is Display. Because Display has children (Settings at 10, Screenshot at 20),
+    // its first child tab-settings should be active by default.
+    await expect(page.locator('#tab-settings')).toHaveClass(/tab-content--active/);
+    await expect(page.locator('#tab-wifi')).not.toHaveClass(/tab-content--active/);
+    await expect(page.locator('#bottom-nav [data-target="tab-display"]')).toHaveClass(/tab-link--active/);
+    await expect(page.locator('#bottom-nav [data-target="tab-wifi"]')).not.toHaveClass(/tab-link--active/);
+  });
+
+  test('STA mode fallback — defaults to tab-wifi when no app tabs are registered', async ({ page }) => {
+    const frameworkOnlyTabs = [
+      { name: 'WiFi',     id: 'wifi',     parent: null,     order: 0   },
+      { name: 'Security', id: 'security', parent: null,     order: 50  },
+      { name: 'System',   id: 'system',   parent: null,     order: 100 },
+      { name: 'Status',   id: 'system',   parent: 'System', order: 0   },
+    ];
+    await page.route('**/api/tabs', route => route.fulfill({ json: frameworkOnlyTabs }));
+    await page.goto('/');
+    await page.waitForFunction(() => (window as any).apiFetch !== undefined);
+    await expect(page.locator('body')).toHaveClass(/portal-ready/);
+
+    await expect(page.locator('#tab-wifi')).toHaveClass(/tab-content--active/);
+    await expect(page.locator('#bottom-nav [data-target="tab-wifi"]')).toHaveClass(/tab-link--active/);
+  });
+
+  test('AP mode default — defaults to tab-wifi even when app tabs exist', async ({ page }) => {
+    const apSystem = { ...MOCK_SYSTEM, ap_mode: true };
+    await page.route('**/api/system', route => route.fulfill({ json: apSystem }));
+    await page.goto('/');
+    await page.waitForFunction(() => (window as any).apiFetch !== undefined);
+    await expect(page.locator('body')).toHaveClass(/portal-ready/);
+
+    await expect(page.locator('#tab-wifi')).toHaveClass(/tab-content--active/);
+    await expect(page.locator('#bottom-nav [data-target="tab-wifi"]')).toHaveClass(/tab-link--active/);
+  });
+
+  test('URL hash navigation — activates matching top-level tab', async ({ page }) => {
+    await page.goto('/#tab-app');
+    await page.waitForFunction(() => (window as any).apiFetch !== undefined);
+    await expect(page.locator('body')).toHaveClass(/portal-ready/);
+
+    await expect(page.locator('#tab-app')).toHaveClass(/tab-content--active/);
+    await expect(page.locator('#bottom-nav [data-target="tab-app"]')).toHaveClass(/tab-link--active/);
+  });
+
+  test('URL hash navigation — activates matching sub-pill (#tab-keys)', async ({ page }) => {
+    await page.goto('/#tab-keys');
+    await page.waitForFunction(() => (window as any).apiFetch !== undefined);
+    await expect(page.locator('body')).toHaveClass(/portal-ready/);
+
+    await expect(page.locator('#tab-keys')).toHaveClass(/tab-content--active/);
+    await expect(page.locator('#bottom-nav [data-target="tab-system"]')).toHaveClass(/tab-link--active/);
+    await expect(page.locator('#pill-bar .pill-btn[data-target="tab-keys"]')).toHaveClass(/pill-btn--active/);
+  });
+
+  test('URL hash navigation — supports slug without tab- prefix (/#wifi, /#app)', async ({ page }) => {
+    await page.goto('/#app');
+    await page.waitForFunction(() => (window as any).apiFetch !== undefined);
+    await expect(page.locator('body')).toHaveClass(/portal-ready/);
+
+    await expect(page.locator('#tab-app')).toHaveClass(/tab-content--active/);
+    await expect(page.locator('#bottom-nav [data-target="tab-app"]')).toHaveClass(/tab-link--active/);
+  });
+
+  test('hash history sync — updates window.location.hash on tab selection', async ({ page }) => {
+    // Initial hash in STA mode defaults to active tab (#tab-settings for Display)
+    expect(await page.evaluate(() => window.location.hash)).toBe('#tab-settings');
+
+    // Click WiFi tab
+    await page.locator('#bottom-nav [data-target="tab-wifi"]').click();
+    expect(await page.evaluate(() => window.location.hash)).toBe('#tab-wifi');
+
+    // Click System tab
+    await page.locator('#bottom-nav [data-target="tab-system"]').click();
+    const systemHash = await page.evaluate(() => window.location.hash);
+    expect(systemHash).toMatch(/^#tab-(keys|status|mcp|backup|ota)$/);
+
+    // Click Keys sub-pill
+    await page.locator('#pill-bar .pill-btn[data-target="tab-keys"]').click();
+    expect(await page.evaluate(() => window.location.hash)).toBe('#tab-keys');
+  });
+
+  test('browser history navigation — back/forward buttons switch tabs via popstate', async ({ page }) => {
+    // Click WiFi
+    await page.locator('#bottom-nav [data-target="tab-wifi"]').click();
+    await expect(page.locator('#tab-wifi')).toHaveClass(/tab-content--active/);
+
+    // Click System -> auto-selects Status (first child), then click Keys
+    await page.locator('#bottom-nav [data-target="tab-system"]').click();
+    await page.locator('#pill-bar .pill-btn[data-target="tab-keys"]').click();
+    await expect(page.locator('#tab-keys')).toHaveClass(/tab-content--active/);
+
+    // Navigate back — history: …#tab-wifi → #tab-status → #tab-keys
+    // First back goes to #tab-status (the auto-selected child when System was clicked)
+    await page.goBack();
+    await expect(page.locator('#tab-status')).toHaveClass(/tab-content--active/);
+    await expect(page.locator('#bottom-nav [data-target="tab-system"]')).toHaveClass(/tab-link--active/);
+
+    // Second back goes to #tab-wifi
+    await page.goBack();
+    await expect(page.locator('#tab-wifi')).toHaveClass(/tab-content--active/);
+    await expect(page.locator('#bottom-nav [data-target="tab-wifi"]')).toHaveClass(/tab-link--active/);
+
+    // Navigate forward returns to #tab-status
+    await page.goForward();
+    await expect(page.locator('#tab-status')).toHaveClass(/tab-content--active/);
   });
 });
