@@ -1178,6 +1178,10 @@ void BLEManager::dispatchQueueEvents() {
                     res.rssi = msg.rssi;
                     // Issue #303: Populate connectable flag from discovery message.
                     res.connectable = msg.boolVal1;
+                    // Issue #308: Populate appearance and service UUIDs from discovery message.
+                    res.appearance = msg.appearance;
+                    res.uuid16Count = std::min<uint8_t>(msg.uuid16Count, static_cast<uint8_t>(sizeof(res.uuids16) / sizeof(res.uuids16[0])));
+                    memcpy(res.uuids16, msg.uuids16, sizeof(res.uuids16));
                     if (prov->acceptScanResult(res)) {
                         bool found = false;
                         for (auto& existing : _discovery.results) {
