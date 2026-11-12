@@ -340,6 +340,11 @@ public:
     static constexpr const char* DEFAULT_HOSTNAME = "esp32-device";
 
     /**
+     * @brief Framework fallback SoftAP SSID when no hostname is available.
+     */
+    static constexpr const char* DEFAULT_AP_SSID = "ESP32-Setup";
+
+    /**
      * @brief Set the app-supplied factory default hostname.
      *
      * Called by the downstream app (via Application::getWifiManager()) before
@@ -360,7 +365,12 @@ public:
      * @brief Returns the current effective hostname (persisted value or factory default).
      * @return Current hostname string.
      */
-    const char* getHostname() const { return _currentHostname; }
+    const char* getHostname() const {
+        if (strlen(_currentHostname) > 0) {
+            return _currentHostname;
+        }
+        return (strlen(_defaultHostname) > 0) ? _defaultHostname : DEFAULT_HOSTNAME;
+    }
 
     /**
      * @brief Record that an API request was received to keep AP mode alive.
@@ -450,9 +460,15 @@ public:
 
     /**
      * @brief Returns the SSID of the AP mode captive portal network.
-     * @return AP SSID (hostname or "ESP32-Setup")
+     * @return AP SSID (effective hostname or "ESP32-Setup")
      */
-    const char* getAPSSID() const { return (strlen(_currentHostname) > 0) ? _currentHostname : "ESP32-Setup"; }
+    const char* getAPSSID() const {
+        const char* host = getHostname();
+        if (strlen(host) > 0 && strcmp(host, DEFAULT_HOSTNAME) != 0) {
+            return host;
+        }
+        return DEFAULT_AP_SSID;
+    }
 
     /**
      * @brief Returns true if a password is set.

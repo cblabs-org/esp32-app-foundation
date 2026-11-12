@@ -34,8 +34,17 @@ public:
     std::string softAPmacAddress() { return "AA:BB:CC:DD:EE:FF"; }
     std::string SSID(int i = 0) { (void)i; return "TEST_SSID"; }
     std::string softAPSSID() { return "TEST_AP_SSID"; }
-    void setHostname(const char* hostname) { (void)hostname; }
-    bool softAP(const char* ssid, const char* passphrase = nullptr, int channel = 1, int ssid_hidden = 0, int max_connection = 4) { return true; }
+    std::string last_softAP_ssid;
+    std::string last_hostname;
+    void resetTestStubs() {
+        last_softAP_ssid.clear();
+        last_hostname.clear();
+    }
+    void setHostname(const char* hostname) { last_hostname = hostname ? hostname : ""; }
+    bool softAP(const char* ssid, const char* passphrase = nullptr, int channel = 1, int ssid_hidden = 0, int max_connection = 4) {
+        last_softAP_ssid = ssid ? ssid : "";
+        return true;
+    }
     bool softAPConfig(IPAddress local_ip, IPAddress gateway, IPAddress subnet) { return true; }
     bool softAPdisconnect(bool wifioff = false) { return true; }
     int32_t RSSI(int i = 0) { (void)i; return -50; }

@@ -114,7 +114,16 @@ void WifiManager::applyConfig(const JsonObject& section) {
 
     // --- Read hostname ---
     if (section["hostname"].is<const char*>()) {
-        strlcpy(_currentHostname, section["hostname"], sizeof(_currentHostname));
+        const char* h = section["hostname"];
+        // Reject a stale persisted "esp32-device" when the app has supplied
+        // a custom default hostname (e.g. via setDefaultHostname()).
+        const bool isStaleDefault = (strcmp(h, DEFAULT_HOSTNAME) == 0 &&
+                                     strcmp(_defaultHostname, DEFAULT_HOSTNAME) != 0);
+        if (strlen(h) > 0 && !isStaleDefault) {
+            strlcpy(_currentHostname, h, sizeof(_currentHostname));
+        } else if (strlen(_defaultHostname) > 0) {
+            strlcpy(_currentHostname, _defaultHostname, sizeof(_currentHostname));
+        }
         if (strlen(_currentHostname) > 0) {
             ESP_LOGI(TAG, "Config applied — Hostname: %s", _currentHostname);
         }
@@ -212,7 +221,7 @@ void WifiManager::begin() {
     
     _stateTimer.setInterval(2000);  // 2s debounce before Init fires (pre-MK: `elapsed > 2000`)
     transitionTo(WiFiState::Init, millis());
-    ESP_LOGI(TAG, "WiFi Manager initialized in NON-BLOCKING mode. Hostname: %s", _currentHostname);
+    ESP_LOGI(TAG, "WiFi Manager initialized in NON-BLOCKING mode. Hostname: %s", getHostname());
 }
 
 /**
@@ -260,8 +269,9 @@ void WifiManager::startStaAttempt(uint32_t now) {
              _isAPMode ? ", fallback AP active" : "");
     WiFi.mode(_isAPMode ? WIFI_AP_STA : WIFI_STA);
     applyPowerSave();
-    if (strlen(_currentHostname) > 0) {
-        WiFi.setHostname(_currentHostname);
+    const char* host = getHostname();
+    if (strlen(host) > 0) {
+        WiFi.setHostname(host);
     }
     connectStation(_wifiSsid, _wifiPass);
     // Downtime counts from the first attempt, so a device that boots while its
@@ -291,9 +301,10 @@ void WifiManager::onStaConnected(uint32_t now) {
     // end() first to cleanly restart on WiFi reconnections — prevents
     // "Service already exists" errors from duplicate addService() calls.
     MDNS.end();
-    if (MDNS.begin(_currentHostname)) {
+    const char* host = getHostname();
+    if (MDNS.begin(host)) {
         MDNS.addService("http", "tcp", 80);
-        ESP_LOGI(TAG, "mDNS started: %s.local", _currentHostname);
+        ESP_LOGI(TAG, "mDNS started: %s.local", host);
     } else {
         ESP_LOGW(TAG, "mDNS failed to start");
     }
@@ -324,7 +335,7 @@ void WifiManager::startAccessPoint(uint32_t now) {
     IPAddress apIP(192, 168, 4, 1);
     WiFi.softAPConfig(apIP, apIP, IPAddress(255, 255, 255, 0));
 
-    const char* portalName = (strlen(_currentHostname) > 0) ? _currentHostname : "ESP32-Setup";
+    const char* portalName = getAPSSID();
     bool apResult = WiFi.softAP(portalName);
     ESP_LOGI(TAG, "softAP('%s') returned %s", portalName, apResult ? "true" : "FALSE");
 
@@ -544,7 +555,13 @@ void WifiManager::notifyApiActivity() {
  */
 void WifiManager::setDefaultHostname(const char* hostname) {
     if (hostname != nullptr) {
+        bool shouldUpdateCurrent = (strlen(_currentHostname) == 0 ||
+                                    strcmp(_currentHostname, DEFAULT_HOSTNAME) == 0 ||
+                                    strcmp(_currentHostname, _defaultHostname) == 0);
         strlcpy(_defaultHostname, hostname, sizeof(_defaultHostname));
+        if (shouldUpdateCurrent) {
+            strlcpy(_currentHostname, hostname, sizeof(_currentHostname));
+        }
     }
 }
 
