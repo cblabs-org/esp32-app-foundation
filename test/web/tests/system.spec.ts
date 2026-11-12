@@ -3,9 +3,7 @@ import { test, expect, Page } from '@playwright/test';
 // ---------------------------------------------------------------------------
 // Mock data
 //
-// PORTAL BUG: app.js sorts children with `(a.order || 100)`, so order:0 is
-// treated as falsy and becomes 100. Status (order:0→100) sorts AFTER Keys
-// (order:1). Tests must explicitly navigate to the Status sub-pill.
+// Status has order: 0 and Keys has order: 1. Status sorts first under System.
 // ---------------------------------------------------------------------------
 
 const MOCK_TABS = [
@@ -117,7 +115,7 @@ async function bootAndNavigateToStatus(page: Page, systemData = MOCK_SYSTEM_GREE
   await page.locator('#bottom-nav [data-target="tab-system"]').click();
   await expect(page.locator('#pill-bar')).toBeVisible();
 
-  // Explicitly click the Status sub-pill (NOT the default due to order:0||100 bug)
+  // Ensure Status sub-pill is active
   await page.locator('#pill-bar .pill-btn[data-target="tab-status"]').click();
   await expect(page.locator('#tab-status')).toHaveClass(/tab-content--active/);
 

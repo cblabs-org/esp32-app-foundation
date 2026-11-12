@@ -249,6 +249,18 @@ document.addEventListener('DOMContentLoaded', function() {
   // =========================================================================
 
   /**
+   * @brief Helper to resolve numeric tab order with a default of 100.
+   * Handles explicit order 0 safely without falsy coercion.
+   * @param {Object} tab - Tab object with optional order property
+   * @returns {number} Numeric order value
+   */
+  function getTabOrder(tab) {
+    if (!tab || tab.order === undefined || tab.order === null) return 100;
+    var n = Number(tab.order);
+    return isNaN(n) ? 100 : n;
+  }
+
+  /**
    * @brief Fetch the tab hierarchy and build navigation.
    */
   async function loadTabs(prefetchedTabs) {
@@ -273,10 +285,10 @@ document.addEventListener('DOMContentLoaded', function() {
       }
     }
 
-    // Sort by order
-    topLevelTabs.sort(function(a, b) { return (a.order || 100) - (b.order || 100); });
+    // Sort by order (safely handling order: 0)
+    topLevelTabs.sort(function(a, b) { return getTabOrder(a) - getTabOrder(b); });
     for (var key in childTabs) {
-      childTabs[key].sort(function(a, b) { return (a.order || 100) - (b.order || 100); });
+      childTabs[key].sort(function(a, b) { return getTabOrder(a) - getTabOrder(b); });
     }
 
     // Warn about orphaned child tabs (parent not registered)
@@ -351,7 +363,7 @@ document.addEventListener('DOMContentLoaded', function() {
       link.className = 'tab-link';
       link.setAttribute('data-target', tabId);
       link.setAttribute('data-injected', 'true');
-      var tabOrder = (tab.order !== undefined && tab.order !== null) ? Number(tab.order) : 100;
+      var tabOrder = getTabOrder(tab);
       link.setAttribute('data-order', String(tabOrder));
       link.setAttribute('role', 'tab');
       link.setAttribute('aria-selected', 'false');
