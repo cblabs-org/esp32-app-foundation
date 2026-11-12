@@ -179,8 +179,10 @@ document.addEventListener('DOMContentLoaded', function() {
   var tabHierarchy = [];           // Full /api/tabs response
   var topLevelTabs = [];           // Tabs with parent === null
   var childTabs = {};              // Map: parent name → array of child tabs
-  var activeTopTab = 'tab-wifi';   // Currently active top-level tab
+  var activeTopTab = null;         // Currently active top-level tab
   var activeSubPill = {};          // Map: parent tab id → active child tab id
+
+  var FRAMEWORK_TABS = ['tab-wifi', 'tab-security', 'tab-system', 'tab-credits', 'tab-bluetooth'];
 
   // --- DOM references ---
   var bottomNav = document.getElementById('bottom-nav');
@@ -303,8 +305,9 @@ document.addEventListener('DOMContentLoaded', function() {
     // Build bottom nav for any app-contributed top-level tabs
     buildBottomNav();
 
-    // Set initial active tab
-    activateTopTab(activeTopTab, true);
+    // Determine and set initial active tab
+    var initialTab = determineInitialTab();
+    activateTopTab(initialTab, true);
   }
 
   // =========================================================================
@@ -423,7 +426,7 @@ document.addEventListener('DOMContentLoaded', function() {
   /**
    * @brief Activate a top-level tab, show its sub-pill bar if it has children.
    * @param {string} tabId - The tab content div id (e.g. 'tab-wifi').
-   * @param {boolean} isInit - True on initial load (skip dispatch on first).
+   * @param {boolean} isInit - True on initial load (or popstate).
    */
   function activateTopTab(tabId, isInit) {
     activeTopTab = tabId;
@@ -434,7 +437,6 @@ document.addEventListener('DOMContentLoaded', function() {
       link.classList.toggle('tab-link--active', isActive);
       link.setAttribute('aria-selected', isActive ? 'true' : 'false');
     });
-
 
     // --- Find the parent tab name for this tabId ---
     var parentName = tabIdToName(tabId);
@@ -450,12 +452,13 @@ document.addEventListener('DOMContentLoaded', function() {
       // Activate the stored sub-pill (or first child)
       var storedPill = activeSubPill[parentName];
       var firstChildId = 'tab-' + children[0].name.toLowerCase().replace(/\s+/g, '-');
-      activateSubPill(storedPill || firstChildId, parentName);
+      activateSubPill(storedPill || firstChildId, parentName, isInit);
     } else {
       // No children — hide pill bar and show the tab directly
       pillBar.style.display = 'none';
       showContentDiv(tabId);
       window.dispatchEvent(new CustomEvent('tab-changed', { detail: tabId }));
+      updateHash(tabId, isInit);
     }
   }
 
@@ -504,7 +507,7 @@ document.addEventListener('DOMContentLoaded', function() {
       btn.addEventListener('click', function(e) {
         var target = e.currentTarget.getAttribute('data-target');
         var parent = e.currentTarget.getAttribute('data-parent');
-        activateSubPill(target, parent);
+        activateSubPill(target, parent, false);
       });
 
       pillBar.appendChild(btn);
@@ -515,8 +518,9 @@ document.addEventListener('DOMContentLoaded', function() {
    * @brief Activate a sub-pill (child tab) within a parent.
    * @param {string} childId - The content div id of the child tab.
    * @param {string} parentName - The parent tab name (for tracking).
+   * @param {boolean} isInit - True on initial load (or popstate).
    */
-  function activateSubPill(childId, parentName) {
+  function activateSubPill(childId, parentName, isInit) {
     activeSubPill[parentName] = childId;
 
     // Update pill active state
@@ -531,6 +535,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Dispatch tab-changed event so fragments can react
     window.dispatchEvent(new CustomEvent('tab-changed', { detail: childId }));
+    updateHash(childId, isInit);
   }
 
   /**
@@ -545,6 +550,146 @@ document.addEventListener('DOMContentLoaded', function() {
     var target = document.getElementById(targetId);
     if (target) target.classList.add('tab-content--active');
   }
+
+  /**
+   * @brief Parse a URL hash into a clean slug (e.g. '#/strava' -> 'strava', '#tab-wifi' -> 'tab-wifi').
+   * @param {string} hash
+   * @returns {string|null}
+   */
+  function parseHash(hash) {
+    if (!hash) return null;
+    var clean = hash.replace(/^[#/]+/, '').trim().toLowerCase();
+    return clean || null;
+  }
+
+  /**
+   * @brief Search for a top-level tab or sub-pill matching the given URL hash.
+   * @param {string} hash - e.g. '#tab-strava', '#strava', '#/keys', '#tab-keys'
+   * @returns {object|null} - { topTabId, subPillId, parentName } or null
+   */
+  function findTabByHash(hash) {
+    var clean = parseHash(hash);
+    if (!clean) return null;
+    var candidateId = clean.indexOf('tab-') === 0 ? clean : 'tab-' + clean;
+    var slug = clean.indexOf('tab-') === 0 ? clean.slice(4) : clean;
+
+    // 1. Check top-level tabs
+    for (var i = 0; i < topLevelTabs.length; i++) {
+      var topTab = topLevelTabs[i];
+      var topId = 'tab-' + topTab.name.toLowerCase().replace(/\s+/g, '-');
+      var topSlug = topTab.name.toLowerCase().replace(/\s+/g, '-');
+      var topRawId = topTab.id ? topTab.id.toLowerCase() : '';
+      if (topId === candidateId || topSlug === slug || topRawId === slug || ('tab-' + topRawId) === candidateId) {
+        return { topTabId: topId, subPillId: null };
+      }
+    }
+
+    // 2. Check child tabs (sub-pills)
+    for (var parent in childTabs) {
+      var children = childTabs[parent];
+      for (var j = 0; j < children.length; j++) {
+        var child = children[j];
+        var childId = 'tab-' + child.name.toLowerCase().replace(/\s+/g, '-');
+        var childSlug = child.name.toLowerCase().replace(/\s+/g, '-');
+        var childRawId = child.id ? child.id.toLowerCase() : '';
+        if (childId === candidateId || childSlug === slug || childRawId === slug || ('tab-' + childRawId) === candidateId) {
+          var parentTopId = 'tab-' + parent.toLowerCase().replace(/\s+/g, '-');
+          return { topTabId: parentTopId, subPillId: childId, parentName: parent };
+        }
+      }
+    }
+
+    // 3. Check DOM elements directly in case an injected or hardcoded tab doesn't match topLevelTabs
+    var targetEl = document.getElementById(candidateId);
+    if (targetEl && targetEl.classList.contains('tab-content')) {
+      var pillBtn = document.querySelector('.pill-btn[data-target="' + candidateId + '"]');
+      if (pillBtn) {
+        var pName = pillBtn.getAttribute('data-parent');
+        return { topTabId: 'tab-' + pName.toLowerCase().replace(/\s+/g, '-'), subPillId: candidateId, parentName: pName };
+      }
+      return { topTabId: candidateId, subPillId: null };
+    }
+
+    return null;
+  }
+
+  /**
+   * @brief Determine which top-level tab should be active at boot.
+   * 1. URL Hash: If window.location.hash matches a tab or sub-pill, activate it.
+   * 2. AP Mode: If in AP mode (body.ap-mode), default to tab-wifi.
+   * 3. STA Mode: If WiFi is configured/connected, select the lowest-order
+   *    non-framework tab (primary application tab).
+   * 4. Fallback: tab-wifi.
+   * @returns {string} tabId to activate
+   */
+  function determineInitialTab() {
+    // 1. URL hash matching
+    var hashMatch = findTabByHash(window.location.hash);
+    if (hashMatch) {
+      if (hashMatch.subPillId && hashMatch.parentName) {
+        activeSubPill[hashMatch.parentName] = hashMatch.subPillId;
+      }
+      return hashMatch.topTabId;
+    }
+
+    // 2. AP mode fallback
+    if (document.body.classList.contains('ap-mode')) {
+      return 'tab-wifi';
+    }
+
+    // 3. STA mode default: lowest-order non-framework top-level tab
+    for (var i = 0; i < topLevelTabs.length; i++) {
+      var tab = topLevelTabs[i];
+      var tabId = 'tab-' + tab.name.toLowerCase().replace(/\s+/g, '-');
+      if (FRAMEWORK_TABS.indexOf(tabId) === -1) {
+        return tabId;
+      }
+    }
+
+    // 4. Default fallback
+    return 'tab-wifi';
+  }
+
+  /**
+   * @brief Sync the URL hash with the active tab for bookmarking and refresh.
+   * @param {string} tabId - Active tab content id (e.g. 'tab-wifi', 'tab-keys').
+   * @param {boolean} isInit - If true, replaces state rather than pushing.
+   */
+  function updateHash(tabId, isInit) {
+    if (!tabId) return;
+    var newHash = '#' + tabId;
+    if (window.location.hash === newHash) return;
+
+    if (window.history) {
+      if (isInit) {
+        if (window.history.replaceState) {
+          window.history.replaceState(null, '', newHash);
+        }
+      } else {
+        if (window.history.pushState) {
+          window.history.pushState(null, '', newHash);
+        } else {
+          window.location.hash = newHash;
+        }
+      }
+    } else {
+      window.location.hash = newHash;
+    }
+  }
+
+  // Listen for browser Back/Forward navigation
+  window.addEventListener('popstate', function() {
+    var match = findTabByHash(window.location.hash);
+    if (match) {
+      if (match.subPillId && match.parentName) {
+        activeSubPill[match.parentName] = match.subPillId;
+      }
+      activateTopTab(match.topTabId, true);
+    } else {
+      var defaultTab = determineInitialTab();
+      activateTopTab(defaultTab, true);
+    }
+  });
 
   // =========================================================================
   // 5. Load App Metadata (/api/app)
@@ -673,11 +818,11 @@ document.addEventListener('DOMContentLoaded', function() {
     if (splash) splash.remove();
   }
 
-  // Fetch app branding and /api/tabs in parallel to speed up boot.
+  // Fetch app branding, /api/tabs, and AP mode in parallel to speed up boot.
   // fetchAppInfoAndStyles() awaits the stylesheet's onload internally, so CSS
   // is applied before tab scripts execute (kills the branding FOUC). The title
   // is applied immediately upon fetch.
-  Promise.all([fetchAppInfoAndStyles(), window.apiFetch('/api/tabs')]).then(function(results) {
+  Promise.all([fetchAppInfoAndStyles(), window.apiFetch('/api/tabs'), checkApMode()]).then(function(results) {
     var tabs = results[1];
     // Extract declared script URLs, filtering out null/undefined and duplicates
     var tabScripts = tabs
@@ -688,16 +833,14 @@ document.addEventListener('DOMContentLoaded', function() {
     loadScripts(tabScripts, function() {
       // Scripts are loaded — now safe to build tabs and dispatch tab-changed
       loadTabs(tabs);
-      checkApMode().finally(function() {
-        document.body.classList.add('portal-ready');
-        dismissLoadingSplash();
-      });
+      document.body.classList.add('portal-ready');
+      dismissLoadingSplash();
     });
   }).catch(function(err) {
     console.warn('Failed to fetch /api/tabs during boot, loading without tab scripts');
     loadScripts([], function() {
-      loadTabs();
       checkApMode().finally(function() {
+        loadTabs();
         document.body.classList.add('portal-ready');
         dismissLoadingSplash();
       });
