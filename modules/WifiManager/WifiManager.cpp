@@ -217,7 +217,7 @@ void WifiManager::begin() {
     
     _stateTimer.setInterval(2000);  // 2s debounce before Init fires (pre-MK: `elapsed > 2000`)
     transitionTo(WiFiState::Init, millis());
-    ESP_LOGI(TAG, "WiFi Manager initialized in NON-BLOCKING mode. Hostname: %s", _currentHostname);
+    ESP_LOGI(TAG, "WiFi Manager initialized in NON-BLOCKING mode. Hostname: %s", getHostname());
 }
 
 /**
@@ -551,8 +551,11 @@ void WifiManager::notifyApiActivity() {
  */
 void WifiManager::setDefaultHostname(const char* hostname) {
     if (hostname != nullptr) {
+        bool shouldUpdateCurrent = (strlen(_currentHostname) == 0 ||
+                                    strcmp(_currentHostname, DEFAULT_HOSTNAME) == 0 ||
+                                    strcmp(_currentHostname, _defaultHostname) == 0);
         strlcpy(_defaultHostname, hostname, sizeof(_defaultHostname));
-        if (strlen(_currentHostname) == 0 || strcmp(_currentHostname, DEFAULT_HOSTNAME) == 0) {
+        if (shouldUpdateCurrent) {
             strlcpy(_currentHostname, hostname, sizeof(_currentHostname));
         }
     }

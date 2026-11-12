@@ -14,6 +14,9 @@
 
 class WifiManagerTest : public ::testing::Test {
 protected:
+    void SetUp() override {
+        WiFi.resetTestStubs();
+    }
     WifiManager wifiManager;
 };
 
@@ -23,6 +26,8 @@ TEST_F(WifiManagerTest, ConstructionDefaults) {
     EXPECT_FALSE(wifiManager.hasPassword());
     EXPECT_FALSE(wifiManager.getAPMode());
     EXPECT_FALSE(wifiManager.isReady());
+    EXPECT_STREQ(WifiManager::DEFAULT_AP_SSID, wifiManager.getAPSSID());
+    EXPECT_STREQ(WifiManager::DEFAULT_HOSTNAME, wifiManager.getHostname());
 }
 
 // begin() initializes state machine
@@ -67,6 +72,18 @@ TEST_F(WifiManagerTest, SetDefaultHostnameImmediatelyUpdatesHostnameAndAPSSID) {
     EXPECT_STREQ("my-device", wifiManager.getAPSSID());
 }
 
+// setDefaultHostname() called multiple times updates both default and current hostname (issue #294)
+TEST_F(WifiManagerTest, SetDefaultHostnameMultipleTimesUpdatesCurrentHostname) {
+    wifiManager.setDefaultHostname("first-default");
+    EXPECT_STREQ("first-default", wifiManager.getHostname());
+    EXPECT_STREQ("first-default", wifiManager.getAPSSID());
+
+    wifiManager.setDefaultHostname("second-default");
+    EXPECT_STREQ("second-default", wifiManager.getDefaultHostname());
+    EXPECT_STREQ("second-default", wifiManager.getHostname());
+    EXPECT_STREQ("second-default", wifiManager.getAPSSID());
+}
+
 // setDefaultHostname() does not overwrite user-configured hostname from applyConfig() (issue #294)
 TEST_F(WifiManagerTest, SetDefaultHostnameDoesNotOverwriteUserConfiguredHostname) {
     JsonDocument doc;
@@ -92,8 +109,22 @@ TEST_F(WifiManagerTest, ApplyConfigWithGenericDefaultDoesNotOverwriteAppDefault)
     EXPECT_STREQ("my-device", wifiManager.getAPSSID());
 }
 
+// SoftAP uses default AP SSID ("ESP32-Setup") when unconfigured (issue #294)
+TEST(WifiSetupModeTest, SoftAPUsesDefaultAPSSIDWhenUnconfigured) {
+    WiFi.resetTestStubs();
+    WifiManager wifi;
+    EXPECT_STREQ(WifiManager::DEFAULT_AP_SSID, wifi.getAPSSID());
+    wifi.begin();
+    wifi.tick(2000);   // Init -> ApStarting
+    wifi.tick(2001);   // ApStarting -> Ready (AP up)
+    EXPECT_TRUE(wifi.getAPMode());
+    EXPECT_STREQ("ESP32-Setup", wifi.getAPSSID());
+    EXPECT_EQ("ESP32-Setup", WiFi.last_softAP_ssid);
+}
+
 // SoftAP uses app-supplied hostname as SSID (issue #294)
 TEST(WifiSetupModeTest, SoftAPUsesAppSuppliedHostname) {
+    WiFi.resetTestStubs();
     WifiManager wifi;
     wifi.setDefaultHostname("weather-station");
     wifi.begin();

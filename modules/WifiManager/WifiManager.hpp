@@ -366,7 +366,7 @@ public:
      * @return Current hostname string.
      */
     const char* getHostname() const {
-        if (strlen(_currentHostname) > 0 && (strcmp(_currentHostname, DEFAULT_HOSTNAME) != 0 || strcmp(_defaultHostname, DEFAULT_HOSTNAME) == 0)) {
+        if (strlen(_currentHostname) > 0) {
             return _currentHostname;
         }
         return (strlen(_defaultHostname) > 0) ? _defaultHostname : DEFAULT_HOSTNAME;
@@ -463,17 +463,9 @@ public:
      * @return AP SSID (effective hostname or "ESP32-Setup")
      */
     const char* getAPSSID() const {
-        if (strlen(_currentHostname) > 0 && strcmp(_currentHostname, DEFAULT_HOSTNAME) != 0) {
-            return _currentHostname;
-        }
-        if (strlen(_defaultHostname) > 0 && strcmp(_defaultHostname, DEFAULT_HOSTNAME) != 0) {
-            return _defaultHostname;
-        }
-        if (strlen(_currentHostname) > 0) {
-            return _currentHostname;
-        }
-        if (strlen(_defaultHostname) > 0) {
-            return _defaultHostname;
+        const char* host = getHostname();
+        if (host != nullptr && strlen(host) > 0 && strcmp(host, DEFAULT_HOSTNAME) != 0) {
+            return host;
         }
         return DEFAULT_AP_SSID;
     }

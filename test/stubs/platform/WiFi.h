@@ -36,6 +36,10 @@ public:
     std::string softAPSSID() { return "TEST_AP_SSID"; }
     std::string last_softAP_ssid;
     std::string last_hostname;
+    void resetTestStubs() {
+        last_softAP_ssid.clear();
+        last_hostname.clear();
+    }
     void setHostname(const char* hostname) { last_hostname = hostname ? hostname : ""; }
     bool softAP(const char* ssid, const char* passphrase = nullptr, int channel = 1, int ssid_hidden = 0, int max_connection = 4) {
         last_softAP_ssid = ssid ? ssid : "";
