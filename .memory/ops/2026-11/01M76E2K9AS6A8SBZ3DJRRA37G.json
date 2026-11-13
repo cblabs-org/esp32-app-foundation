@@ -1,0 +1,3023 @@
+{
+  "version": 1,
+  "ops": [
+    {
+      "type": "add",
+      "entry_id": "docseed-a67d69f8",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-08-07T20:02:18Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "include/AppFoundation.h",
+          "include/interfaces",
+          "modules"
+        ],
+        "entry_type": "invariant",
+        "evidence": [
+          "doc:.agents/skills/embedded-systems/SKILL.md"
+        ],
+        "kind": "semantic",
+        "source_doc_blob_sha": "77128e2c266232a11047c8dd154576ddda77bb4c",
+        "source_doc_path": ".agents/skills/embedded-systems/SKILL.md",
+        "text": "Developing firmware for microcontrollers (STM32, ESP32, Nordic, etc.)"
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-92bbfc13",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-08-07T20:02:18Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "include/AppFoundation.h",
+          "include/interfaces",
+          "modules"
+        ],
+        "entry_type": "invariant",
+        "evidence": [
+          "doc:.agents/skills/embedded-systems/SKILL.md"
+        ],
+        "kind": "semantic",
+        "source_doc_blob_sha": "77128e2c266232a11047c8dd154576ddda77bb4c",
+        "source_doc_path": ".agents/skills/embedded-systems/SKILL.md",
+        "text": "Implementing RTOS-based applications (FreeRTOS, Zephyr)"
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-4433141c",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-08-07T20:02:18Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "include/AppFoundation.h",
+          "include/interfaces",
+          "modules"
+        ],
+        "entry_type": "invariant",
+        "evidence": [
+          "doc:.agents/skills/embedded-systems/SKILL.md"
+        ],
+        "kind": "semantic",
+        "source_doc_blob_sha": "77128e2c266232a11047c8dd154576ddda77bb4c",
+        "source_doc_path": ".agents/skills/embedded-systems/SKILL.md",
+        "text": "Creating hardware drivers and HAL layers"
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-65e09e5d",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-08-07T20:02:18Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "include/AppFoundation.h",
+          "include/interfaces",
+          "modules"
+        ],
+        "entry_type": "recipe",
+        "evidence": [
+          "doc:.agents/skills/embedded-systems/SKILL.md"
+        ],
+        "kind": "procedural",
+        "source_doc_blob_sha": "77128e2c266232a11047c8dd154576ddda77bb4c",
+        "source_doc_path": ".agents/skills/embedded-systems/SKILL.md",
+        "text": "Optimizing power consumption and memory usage"
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-ae44789c",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-08-07T20:02:18Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "include/AppFoundation.h",
+          "include/interfaces",
+          "modules"
+        ],
+        "entry_type": "invariant",
+        "evidence": [
+          "doc:.agents/skills/embedded-systems/SKILL.md"
+        ],
+        "kind": "semantic",
+        "source_doc_blob_sha": "77128e2c266232a11047c8dd154576ddda77bb4c",
+        "source_doc_path": ".agents/skills/embedded-systems/SKILL.md",
+        "text": "Building real-time systems with strict timing requirements"
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-881e8c32",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-08-07T20:02:18Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "include/AppFoundation.h",
+          "include/interfaces",
+          "modules"
+        ],
+        "entry_type": "invariant",
+        "evidence": [
+          "doc:.agents/skills/embedded-systems/SKILL.md"
+        ],
+        "kind": "semantic",
+        "source_doc_blob_sha": "77128e2c266232a11047c8dd154576ddda77bb4c",
+        "source_doc_path": ".agents/skills/embedded-systems/SKILL.md",
+        "text": "Implementing communication protocols (I2C, SPI, UART, CAN)"
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-a49a2a9c",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-08-07T20:02:18Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "include/AppFoundation.h",
+          "include/interfaces",
+          "modules"
+        ],
+        "entry_type": "invariant",
+        "evidence": [
+          "doc:.agents/skills/embedded-systems/SKILL.md"
+        ],
+        "kind": "semantic",
+        "source_doc_blob_sha": "77128e2c266232a11047c8dd154576ddda77bb4c",
+        "source_doc_path": ".agents/skills/embedded-systems/SKILL.md",
+        "text": "Designing secure architectures (secure boot, cryptography, secure OTA)"
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-1333802f",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-08-07T20:02:18Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "include/AppFoundation.h",
+          "include/interfaces",
+          "modules"
+        ],
+        "entry_type": "invariant",
+        "evidence": [
+          "doc:.agents/skills/embedded-systems/SKILL.md"
+        ],
+        "kind": "semantic",
+        "source_doc_blob_sha": "77128e2c266232a11047c8dd154576ddda77bb4c",
+        "source_doc_path": ".agents/skills/embedded-systems/SKILL.md",
+        "text": "Drafting implementation plans for resource-constrained devices (requires rigorous impact assessments)"
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-ae0585c1",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-08-07T20:02:18Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "include/AppFoundation.h",
+          "include/interfaces",
+          "modules"
+        ],
+        "entry_type": "recipe",
+        "evidence": [
+          "doc:.agents/skills/embedded-systems/SKILL.md"
+        ],
+        "kind": "procedural",
+        "source_doc_blob_sha": "77128e2c266232a11047c8dd154576ddda77bb4c",
+        "source_doc_path": ".agents/skills/embedded-systems/SKILL.md",
+        "text": "**Analyze constraints** - Identify MCU specs, memory limits, timing requirements, power budget"
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-b2f280c9",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-08-07T20:02:18Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "include/AppFoundation.h",
+          "include/interfaces",
+          "modules"
+        ],
+        "entry_type": "recipe",
+        "evidence": [
+          "doc:.agents/skills/embedded-systems/SKILL.md"
+        ],
+        "kind": "procedural",
+        "source_doc_blob_sha": "77128e2c266232a11047c8dd154576ddda77bb4c",
+        "source_doc_path": ".agents/skills/embedded-systems/SKILL.md",
+        "text": "**Design architecture** - Plan task structure, interrupts, peripherals, memory layout"
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-981ebffe",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-08-07T20:02:18Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "include/AppFoundation.h",
+          "include/interfaces",
+          "modules"
+        ],
+        "entry_type": "recipe",
+        "evidence": [
+          "doc:.agents/skills/embedded-systems/SKILL.md"
+        ],
+        "kind": "procedural",
+        "source_doc_blob_sha": "77128e2c266232a11047c8dd154576ddda77bb4c",
+        "source_doc_path": ".agents/skills/embedded-systems/SKILL.md",
+        "text": "**Implement drivers** - Write HAL, peripheral drivers, RTOS integration"
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-48d97fcc",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-08-07T20:02:18Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "include/AppFoundation.h",
+          "include/interfaces",
+          "modules"
+        ],
+        "entry_type": "recipe",
+        "evidence": [
+          "doc:.agents/skills/embedded-systems/SKILL.md"
+        ],
+        "kind": "procedural",
+        "source_doc_blob_sha": "77128e2c266232a11047c8dd154576ddda77bb4c",
+        "source_doc_path": ".agents/skills/embedded-systems/SKILL.md",
+        "text": "**Optimize resources** - Minimize code size, RAM usage, power consumption"
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-eb81850c",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-08-07T20:02:18Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "include/AppFoundation.h",
+          "include/interfaces",
+          "modules"
+        ],
+        "entry_type": "recipe",
+        "evidence": [
+          "doc:.agents/skills/embedded-systems/SKILL.md"
+        ],
+        "kind": "procedural",
+        "source_doc_blob_sha": "77128e2c266232a11047c8dd154576ddda77bb4c",
+        "source_doc_path": ".agents/skills/embedded-systems/SKILL.md",
+        "text": "**Test and verify** - Validate timing, test edge cases, measure performance"
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-81038c03",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-08-07T20:02:18Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "include/AppFoundation.h",
+          "include/interfaces",
+          "modules"
+        ],
+        "entry_type": "invariant",
+        "evidence": [
+          "doc:.agents/skills/embedded-systems/SKILL.md"
+        ],
+        "kind": "semantic",
+        "source_doc_blob_sha": "77128e2c266232a11047c8dd154576ddda77bb4c",
+        "source_doc_path": ".agents/skills/embedded-systems/SKILL.md",
+        "text": "Implement proper interrupt handling (short ISRs)"
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-bd724464",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-08-07T20:02:18Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "include/AppFoundation.h",
+          "include/interfaces",
+          "modules"
+        ],
+        "entry_type": "recipe",
+        "evidence": [
+          "doc:.agents/skills/embedded-systems/SKILL.md"
+        ],
+        "kind": "procedural",
+        "source_doc_blob_sha": "77128e2c266232a11047c8dd154576ddda77bb4c",
+        "source_doc_path": ".agents/skills/embedded-systems/SKILL.md",
+        "text": "Document resource usage (flash, RAM, power)"
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-24860459",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-08-07T20:02:18Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "include/AppFoundation.h",
+          "include/interfaces",
+          "modules"
+        ],
+        "entry_type": "invariant",
+        "evidence": [
+          "doc:.agents/skills/embedded-systems/SKILL.md"
+        ],
+        "kind": "semantic",
+        "source_doc_blob_sha": "77128e2c266232a11047c8dd154576ddda77bb4c",
+        "source_doc_path": ".agents/skills/embedded-systems/SKILL.md",
+        "text": "**CRITICAL: When drafting an implementation plan, you MUST include a \"Resource Impact Assessment\" section covering Memory (Flash/RAM/Stack/Heap), Power, and Security impacts.**"
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-db059cc4",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-08-07T20:02:18Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "include/AppFoundation.h",
+          "include/interfaces",
+          "modules"
+        ],
+        "entry_type": "invariant",
+        "evidence": [
+          "doc:.agents/skills/embedded-systems/SKILL.md"
+        ],
+        "kind": "semantic",
+        "source_doc_blob_sha": "77128e2c266232a11047c8dd154576ddda77bb4c",
+        "source_doc_path": ".agents/skills/embedded-systems/SKILL.md",
+        "text": "Allocate memory dynamically without bounds checking"
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-02330395",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-08-07T20:02:18Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "include/AppFoundation.h",
+          "include/interfaces",
+          "modules"
+        ],
+        "entry_type": "invariant",
+        "evidence": [
+          "doc:.agents/skills/embedded-systems/SKILL.md"
+        ],
+        "kind": "semantic",
+        "source_doc_blob_sha": "77128e2c266232a11047c8dd154576ddda77bb4c",
+        "source_doc_path": ".agents/skills/embedded-systems/SKILL.md",
+        "text": "Use floating-point without hardware support awareness"
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-af8c5082",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-08-07T20:02:18Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "include/AppFoundation.h",
+          "include/interfaces",
+          "modules"
+        ],
+        "entry_type": "invariant",
+        "evidence": [
+          "doc:.agents/skills/embedded-systems/SKILL.md"
+        ],
+        "kind": "semantic",
+        "source_doc_blob_sha": "77128e2c266232a11047c8dd154576ddda77bb4c",
+        "source_doc_path": ".agents/skills/embedded-systems/SKILL.md",
+        "text": "Access shared resources without synchronization"
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-b0e527fb",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-08-07T20:02:18Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "include/AppFoundation.h",
+          "include/interfaces",
+          "modules"
+        ],
+        "entry_type": "invariant",
+        "evidence": [
+          "doc:.agents/skills/embedded-systems/SKILL.md"
+        ],
+        "kind": "semantic",
+        "source_doc_blob_sha": "77128e2c266232a11047c8dd154576ddda77bb4c",
+        "source_doc_path": ".agents/skills/embedded-systems/SKILL.md",
+        "text": "Hardware initialization code (clocks, peripherals, GPIO)"
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-afea4ba9",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-08-07T20:02:18Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "include/AppFoundation.h",
+          "include/interfaces",
+          "modules"
+        ],
+        "entry_type": "invariant",
+        "evidence": [
+          "doc:.agents/skills/embedded-systems/SKILL.md"
+        ],
+        "kind": "semantic",
+        "source_doc_blob_sha": "77128e2c266232a11047c8dd154576ddda77bb4c",
+        "source_doc_path": ".agents/skills/embedded-systems/SKILL.md",
+        "text": "Driver implementation (HAL layer, interrupt handlers)"
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-5b0b2017",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-08-07T20:02:18Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "include/AppFoundation.h",
+          "include/interfaces",
+          "modules"
+        ],
+        "entry_type": "invariant",
+        "evidence": [
+          "doc:.agents/skills/embedded-systems/SKILL.md"
+        ],
+        "kind": "semantic",
+        "source_doc_blob_sha": "77128e2c266232a11047c8dd154576ddda77bb4c",
+        "source_doc_path": ".agents/skills/embedded-systems/SKILL.md",
+        "text": "Application code (RTOS tasks or main loop)"
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-293cf660",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-08-07T20:02:18Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "include/AppFoundation.h",
+          "include/interfaces",
+          "modules"
+        ],
+        "entry_type": "recipe",
+        "evidence": [
+          "doc:.agents/skills/embedded-systems/SKILL.md"
+        ],
+        "kind": "procedural",
+        "source_doc_blob_sha": "77128e2c266232a11047c8dd154576ddda77bb4c",
+        "source_doc_path": ".agents/skills/embedded-systems/SKILL.md",
+        "text": "Resource usage summary (flash, RAM, power estimate)"
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-a3ef10a7",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-08-07T20:02:18Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "include/AppFoundation.h",
+          "include/interfaces",
+          "modules"
+        ],
+        "entry_type": "invariant",
+        "evidence": [
+          "doc:.agents/skills/embedded-systems/SKILL.md"
+        ],
+        "kind": "semantic",
+        "source_doc_blob_sha": "77128e2c266232a11047c8dd154576ddda77bb4c",
+        "source_doc_path": ".agents/skills/embedded-systems/SKILL.md",
+        "text": "Brief explanation of timing and optimization decisions"
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-693cb6e5",
+      "dossier_scope": "house-style-docs",
+      "timestamp": "2026-08-07T20:02:18Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "platformio.ini"
+        ],
+        "entry_type": "contract",
+        "evidence": [
+          "doc:.agents/skills/house-style-docs/SKILL.md"
+        ],
+        "kind": "semantic",
+        "source_doc_blob_sha": "2d17bf50f1955ad528c632d0af1b296f7f25f22b",
+        "source_doc_path": ".agents/skills/house-style-docs/SKILL.md",
+        "text": "The reference file contains the **concrete examples, templates, and naming tables** for the detected language. Do not apply conventions from one language context to another."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-57558d5a",
+      "dossier_scope": "house-style-docs",
+      "timestamp": "2026-08-07T20:02:18Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "platformio.ini"
+        ],
+        "entry_type": "invariant",
+        "evidence": [
+          "doc:.agents/skills/house-style-docs/SKILL.md"
+        ],
+        "kind": "semantic",
+        "source_doc_blob_sha": "2d17bf50f1955ad528c632d0af1b296f7f25f22b",
+        "source_doc_path": ".agents/skills/house-style-docs/SKILL.md",
+        "text": "**Goal Description**: Clear, concise explanation of the objective."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-8d4f27df",
+      "dossier_scope": "house-style-docs",
+      "timestamp": "2026-08-07T20:02:18Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "platformio.ini"
+        ],
+        "entry_type": "gotcha",
+        "evidence": [
+          "doc:.agents/skills/house-style-docs/SKILL.md"
+        ],
+        "kind": "semantic",
+        "source_doc_blob_sha": "2d17bf50f1955ad528c632d0af1b296f7f25f22b",
+        "source_doc_path": ".agents/skills/house-style-docs/SKILL.md",
+        "text": "**User Review Required**: Highlight critical decisions or breaking changes using GitHub alerts (`IMPORTANT`, `WARNING`, `CAUTION`)."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-d19b8697",
+      "dossier_scope": "house-style-docs",
+      "timestamp": "2026-08-07T20:02:18Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "platformio.ini"
+        ],
+        "entry_type": "invariant",
+        "evidence": [
+          "doc:.agents/skills/house-style-docs/SKILL.md"
+        ],
+        "kind": "semantic",
+        "source_doc_blob_sha": "2d17bf50f1955ad528c632d0af1b296f7f25f22b",
+        "source_doc_path": ".agents/skills/house-style-docs/SKILL.md",
+        "text": "**Proposed Changes**: Grouped by component, using `[MODIFY]`, `[NEW]`, and `[DELETE]` tags with repository-relative file links (e.g., `[file.cpp](modules/foo/file.cpp)`). Absolute paths to the project directory are FORBIDDEN."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-ec5ed5e6",
+      "dossier_scope": "house-style-docs",
+      "timestamp": "2026-08-07T20:02:18Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "platformio.ini"
+        ],
+        "entry_type": "invariant",
+        "evidence": [
+          "doc:.agents/skills/house-style-docs/SKILL.md"
+        ],
+        "kind": "semantic",
+        "source_doc_blob_sha": "2d17bf50f1955ad528c632d0af1b296f7f25f22b",
+        "source_doc_path": ".agents/skills/house-style-docs/SKILL.md",
+        "text": "**Verification Plan**: Practical steps for automated and manual verification."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-47d2bbb6",
+      "dossier_scope": "house-style-docs",
+      "timestamp": "2026-08-07T20:02:18Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "platformio.ini"
+        ],
+        "entry_type": "recipe",
+        "evidence": [
+          "doc:.agents/skills/house-style-docs/SKILL.md"
+        ],
+        "kind": "procedural",
+        "source_doc_blob_sha": "2d17bf50f1955ad528c632d0af1b296f7f25f22b",
+        "source_doc_path": ".agents/skills/house-style-docs/SKILL.md",
+        "text": "Detect the project context and load the appropriate language reference file."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-73bdf14f",
+      "dossier_scope": "house-style-docs",
+      "timestamp": "2026-08-07T20:02:18Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "platformio.ini"
+        ],
+        "entry_type": "recipe",
+        "evidence": [
+          "doc:.agents/skills/house-style-docs/SKILL.md"
+        ],
+        "kind": "procedural",
+        "source_doc_blob_sha": "2d17bf50f1955ad528c632d0af1b296f7f25f22b",
+        "source_doc_path": ".agents/skills/house-style-docs/SKILL.md",
+        "text": "Read the target file OR implementation plan."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-633c1ecf",
+      "dossier_scope": "house-style-docs",
+      "timestamp": "2026-08-07T20:02:18Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "platformio.ini"
+        ],
+        "entry_type": "recipe",
+        "evidence": [
+          "doc:.agents/skills/house-style-docs/SKILL.md"
+        ],
+        "kind": "procedural",
+        "source_doc_blob_sha": "2d17bf50f1955ad528c632d0af1b296f7f25f22b",
+        "source_doc_path": ".agents/skills/house-style-docs/SKILL.md",
+        "text": "Identify missing or substandard documentation/content based on the universal principles above AND the language-specific reference."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-3ebd98f8",
+      "dossier_scope": "house-style-docs",
+      "timestamp": "2026-08-07T20:02:18Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "platformio.ini"
+        ],
+        "entry_type": "recipe",
+        "evidence": [
+          "doc:.agents/skills/house-style-docs/SKILL.md"
+        ],
+        "kind": "procedural",
+        "source_doc_blob_sha": "2d17bf50f1955ad528c632d0af1b296f7f25f22b",
+        "source_doc_path": ".agents/skills/house-style-docs/SKILL.md",
+        "text": "Verify all naming conventions match the language-specific naming table."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-5f519cbb",
+      "dossier_scope": "house-style-docs",
+      "timestamp": "2026-08-07T20:02:18Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "platformio.ini"
+        ],
+        "entry_type": "recipe",
+        "evidence": [
+          "doc:.agents/skills/house-style-docs/SKILL.md"
+        ],
+        "kind": "procedural",
+        "source_doc_blob_sha": "2d17bf50f1955ad528c632d0af1b296f7f25f22b",
+        "source_doc_path": ".agents/skills/house-style-docs/SKILL.md",
+        "text": "For implementation plans, ensure all standard sections are present and correctly formatted."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-0544b3e1",
+      "dossier_scope": "house-style-docs",
+      "timestamp": "2026-08-07T20:02:18Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "platformio.ini"
+        ],
+        "entry_type": "recipe",
+        "evidence": [
+          "doc:.agents/skills/house-style-docs/SKILL.md"
+        ],
+        "kind": "procedural",
+        "source_doc_blob_sha": "2d17bf50f1955ad528c632d0af1b296f7f25f22b",
+        "source_doc_path": ".agents/skills/house-style-docs/SKILL.md",
+        "text": "Regenerate the content with the improved house style."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-3d7d7d83",
+      "dossier_scope": "house-style-docs",
+      "timestamp": "2026-08-07T20:02:18Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "platformio.ini"
+        ],
+        "entry_type": "recipe",
+        "evidence": [
+          "doc:.agents/skills/house-style-docs/SKILL.md"
+        ],
+        "kind": "procedural",
+        "source_doc_blob_sha": "2d17bf50f1955ad528c632d0af1b296f7f25f22b",
+        "source_doc_path": ".agents/skills/house-style-docs/SKILL.md",
+        "text": "Ensure existing logic or plan details are PRESERVED exactly; only formatting and clarity should change."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-21aba106",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-11-11T23:11:19.191833Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "include/AppFoundation.h",
+          "include/interfaces",
+          "modules"
+        ],
+        "entry_type": "recipe",
+        "evidence": [
+          "doc:.agents/skills/lvgl-pro-expert/SKILL.md"
+        ],
+        "kind": "procedural",
+        "source_doc_blob_sha": "078a7fd954cda8e4eb8a73c9c89a07a7e96e546e",
+        "source_doc_path": ".agents/skills/lvgl-pro-expert/SKILL.md",
+        "text": "**Display**: Resolution (width × height), shape (rectangular or round with `radius`)"
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-6a78a9e9",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-11-11T23:11:19.191833Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "include/AppFoundation.h",
+          "include/interfaces",
+          "modules"
+        ],
+        "entry_type": "recipe",
+        "evidence": [
+          "doc:.agents/skills/lvgl-pro-expert/SKILL.md"
+        ],
+        "kind": "procedural",
+        "source_doc_blob_sha": "078a7fd954cda8e4eb8a73c9c89a07a7e96e546e",
+        "source_doc_path": ".agents/skills/lvgl-pro-expert/SKILL.md",
+        "text": "**Ecosystem**: Zephyr (7 named boards), Linux, VSCode, or UI-only? → Read `references/targets/ecosystems-overview.md` for details."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-5fbfd57c",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-11-11T23:11:19.191833Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "include/AppFoundation.h",
+          "include/interfaces",
+          "modules"
+        ],
+        "entry_type": "recipe",
+        "evidence": [
+          "doc:.agents/skills/lvgl-pro-expert/SKILL.md"
+        ],
+        "kind": "procedural",
+        "source_doc_blob_sha": "078a7fd954cda8e4eb8a73c9c89a07a7e96e546e",
+        "source_doc_path": ".agents/skills/lvgl-pro-expert/SKILL.md",
+        "text": "**Screens**: How many, navigation flow between them"
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-9402e42a",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-11-11T23:11:19.191833Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "include/AppFoundation.h",
+          "include/interfaces",
+          "modules"
+        ],
+        "entry_type": "recipe",
+        "evidence": [
+          "doc:.agents/skills/lvgl-pro-expert/SKILL.md"
+        ],
+        "kind": "procedural",
+        "source_doc_blob_sha": "078a7fd954cda8e4eb8a73c9c89a07a7e96e546e",
+        "source_doc_path": ".agents/skills/lvgl-pro-expert/SKILL.md",
+        "text": "**Widgets**: What UI elements on each screen"
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-1b16f025",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-11-11T23:11:19.191833Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "include/AppFoundation.h",
+          "include/interfaces",
+          "modules"
+        ],
+        "entry_type": "recipe",
+        "evidence": [
+          "doc:.agents/skills/lvgl-pro-expert/SKILL.md"
+        ],
+        "kind": "procedural",
+        "source_doc_blob_sha": "078a7fd954cda8e4eb8a73c9c89a07a7e96e546e",
+        "source_doc_path": ".agents/skills/lvgl-pro-expert/SKILL.md",
+        "text": "**Data binding**: Any dynamic values that change at runtime (use subjects)"
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-c1ac4fd8",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-11-11T23:11:19.191833Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "include/AppFoundation.h",
+          "include/interfaces",
+          "modules"
+        ],
+        "entry_type": "recipe",
+        "evidence": [
+          "doc:.agents/skills/lvgl-pro-expert/SKILL.md"
+        ],
+        "kind": "procedural",
+        "source_doc_blob_sha": "078a7fd954cda8e4eb8a73c9c89a07a7e96e546e",
+        "source_doc_path": ".agents/skills/lvgl-pro-expert/SKILL.md",
+        "text": "**Theming**: Light/dark mode switching? (use `\u003cbind_style\u003e`)"
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-a4916ddd",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-11-11T23:11:19.191833Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "include/AppFoundation.h",
+          "include/interfaces",
+          "modules"
+        ],
+        "entry_type": "recipe",
+        "evidence": [
+          "doc:.agents/skills/lvgl-pro-expert/SKILL.md"
+        ],
+        "kind": "procedural",
+        "source_doc_blob_sha": "078a7fd954cda8e4eb8a73c9c89a07a7e96e546e",
+        "source_doc_path": ".agents/skills/lvgl-pro-expert/SKILL.md",
+        "text": "Step 2: Generate Project Scaffold: `python3 scripts/generate_project.py \\`"
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-0a08e81e",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-11-11T23:11:19.191833Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "include/AppFoundation.h",
+          "include/interfaces",
+          "modules"
+        ],
+        "entry_type": "recipe",
+        "evidence": [
+          "doc:.agents/skills/lvgl-pro-expert/SKILL.md"
+        ],
+        "kind": "procedural",
+        "source_doc_blob_sha": "078a7fd954cda8e4eb8a73c9c89a07a7e96e546e",
+        "source_doc_path": ".agents/skills/lvgl-pro-expert/SKILL.md",
+        "text": "**Constants** (`\u003cconsts\u003e`): Named values reused across the UI"
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-9ce26290",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-11-11T23:11:19.191833Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "include/AppFoundation.h",
+          "include/interfaces",
+          "modules"
+        ],
+        "entry_type": "recipe",
+        "evidence": [
+          "doc:.agents/skills/lvgl-pro-expert/SKILL.md"
+        ],
+        "kind": "procedural",
+        "source_doc_blob_sha": "078a7fd954cda8e4eb8a73c9c89a07a7e96e546e",
+        "source_doc_path": ".agents/skills/lvgl-pro-expert/SKILL.md",
+        "text": "**Subjects** (`\u003csubjects\u003e`): Reactive data bindings"
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-3edb69e6",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-11-11T23:11:19.191833Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "include/AppFoundation.h",
+          "include/interfaces",
+          "modules"
+        ],
+        "entry_type": "recipe",
+        "evidence": [
+          "doc:.agents/skills/lvgl-pro-expert/SKILL.md"
+        ],
+        "kind": "procedural",
+        "source_doc_blob_sha": "078a7fd954cda8e4eb8a73c9c89a07a7e96e546e",
+        "source_doc_path": ".agents/skills/lvgl-pro-expert/SKILL.md",
+        "text": "**Styles** (`\u003cstyles\u003e`): Reusable style definitions"
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-a09223a2",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-11-11T23:11:19.191833Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "include/AppFoundation.h",
+          "include/interfaces",
+          "modules"
+        ],
+        "entry_type": "recipe",
+        "evidence": [
+          "doc:.agents/skills/lvgl-pro-expert/SKILL.md"
+        ],
+        "kind": "procedural",
+        "source_doc_blob_sha": "078a7fd954cda8e4eb8a73c9c89a07a7e96e546e",
+        "source_doc_path": ".agents/skills/lvgl-pro-expert/SKILL.md",
+        "text": "Step 8: Validate: `python3 scripts/validate_project.py /path/to/project/` (`lvglpro validate /path/to/project/`)"
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-3bb4a9dc",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-11-11T23:11:19.191833Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "include/AppFoundation.h",
+          "include/interfaces",
+          "modules"
+        ],
+        "entry_type": "recipe",
+        "evidence": [
+          "doc:.agents/skills/lvgl-pro-expert/SKILL.md"
+        ],
+        "kind": "procedural",
+        "source_doc_blob_sha": "078a7fd954cda8e4eb8a73c9c89a07a7e96e546e",
+        "source_doc_path": ".agents/skills/lvgl-pro-expert/SKILL.md",
+        "text": "**Ground attribute usage in the schema files.** Never invent XML attributes. The official widget schemas at `lvgl_widgets_xml/\u003cversion\u003e/lv_*.xml` are the source of truth. If an attribute isn't in the schema, it doesn't exist."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-3d1077e0",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-11-11T23:11:19.191833Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "include/AppFoundation.h",
+          "include/interfaces",
+          "modules"
+        ],
+        "entry_type": "invariant",
+        "evidence": [
+          "doc:.agents/skills/lvgl-pro-expert/SKILL.md"
+        ],
+        "kind": "semantic",
+        "source_doc_blob_sha": "078a7fd954cda8e4eb8a73c9c89a07a7e96e546e",
+        "source_doc_path": ".agents/skills/lvgl-pro-expert/SKILL.md",
+        "text": "**Ground with the MCP server or the skill's references — choose based on your environment.** See the **MCP Harnesses** section below."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-a02d0289",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-11-11T23:11:19.191833Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "include/AppFoundation.h",
+          "include/interfaces",
+          "modules"
+        ],
+        "entry_type": "invariant",
+        "evidence": [
+          "doc:.agents/skills/lvgl-pro-expert/SKILL.md"
+        ],
+        "kind": "semantic",
+        "source_doc_blob_sha": "078a7fd954cda8e4eb8a73c9c89a07a7e96e546e",
+        "source_doc_path": ".agents/skills/lvgl-pro-expert/SKILL.md",
+        "text": "**Prefer `\u003ccomponent\u003e` over `\u003cwidget\u003e`.** Components are pure XML and require no C code. Only create a `\u003cwidget\u003e` when you need custom rendering or low-level algorithms that XML composition can't express."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-99b2d6e2",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-11-11T23:11:19.191833Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "include/AppFoundation.h",
+          "include/interfaces",
+          "modules"
+        ],
+        "entry_type": "invariant",
+        "evidence": [
+          "doc:.agents/skills/lvgl-pro-expert/SKILL.md"
+        ],
+        "kind": "semantic",
+        "source_doc_blob_sha": "078a7fd954cda8e4eb8a73c9c89a07a7e96e546e",
+        "source_doc_path": ".agents/skills/lvgl-pro-expert/SKILL.md",
+        "text": "**Check `globals.xml` before adding ad-hoc values.** Reuse existing palettes, typography scales, and spacing tokens. Only add new constants or styles when the existing design system doesn't cover the need."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-439f341b",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-11-11T23:11:19.191833Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "include/AppFoundation.h",
+          "include/interfaces",
+          "modules"
+        ],
+        "entry_type": "recipe",
+        "evidence": [
+          "doc:.agents/skills/lvgl-pro-expert/SKILL.md"
+        ],
+        "kind": "procedural",
+        "source_doc_blob_sha": "078a7fd954cda8e4eb8a73c9c89a07a7e96e546e",
+        "source_doc_path": ".agents/skills/lvgl-pro-expert/SKILL.md",
+        "text": "**Iterate with the CLI workflow.** Write XML → run `lvglpro validate` → run `lvglpro screenshot` → visually verify the result. Guessing is not the same as knowing. Always run `scripts/validate_project.py` or `lvglpro validate` on generated output before presenting it to the user."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-9bdd3855",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-11-11T23:11:19.191833Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "include/AppFoundation.h",
+          "include/interfaces",
+          "modules"
+        ],
+        "entry_type": "invariant",
+        "evidence": [
+          "doc:.agents/skills/lvgl-pro-expert/SKILL.md"
+        ],
+        "kind": "semantic",
+        "source_doc_blob_sha": "078a7fd954cda8e4eb8a73c9c89a07a7e96e546e",
+        "source_doc_path": ".agents/skills/lvgl-pro-expert/SKILL.md",
+        "text": "Ask: *\"look up the lv_chart series API\"*"
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-8f9f890b",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-11-11T23:11:19.191833Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "include/AppFoundation.h",
+          "include/interfaces",
+          "modules"
+        ],
+        "entry_type": "invariant",
+        "evidence": [
+          "doc:.agents/skills/lvgl-pro-expert/SKILL.md"
+        ],
+        "kind": "semantic",
+        "source_doc_blob_sha": "078a7fd954cda8e4eb8a73c9c89a07a7e96e546e",
+        "source_doc_path": ".agents/skills/lvgl-pro-expert/SKILL.md",
+        "text": "Ask: *\"check the LVGL docs for scroll_snap values\"*"
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-c8c13a78",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-11-11T23:11:19.191833Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "include/AppFoundation.h",
+          "include/interfaces",
+          "modules"
+        ],
+        "entry_type": "recipe",
+        "evidence": [
+          "doc:.agents/skills/lvgl-pro-expert/SKILL.md"
+        ],
+        "kind": "procedural",
+        "source_doc_blob_sha": "078a7fd954cda8e4eb8a73c9c89a07a7e96e546e",
+        "source_doc_path": ".agents/skills/lvgl-pro-expert/SKILL.md",
+        "text": "Prompt phrasing *\"look up\"* / *\"check the LVGL docs\"* nudges the assistant to invoke the server rather than answer from memory."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-2871905c",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-11-11T23:11:19.191833Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "include/AppFoundation.h",
+          "include/interfaces",
+          "modules"
+        ],
+        "entry_type": "recipe",
+        "evidence": [
+          "doc:.agents/skills/lvgl-pro-expert/SKILL.md"
+        ],
+        "kind": "procedural",
+        "source_doc_blob_sha": "078a7fd954cda8e4eb8a73c9c89a07a7e96e546e",
+        "source_doc_path": ".agents/skills/lvgl-pro-expert/SKILL.md",
+        "text": "Read the widget schema directly from the upstream repo (if network available): (`curl -s https://raw.githubusercontent.com/lvgl/lvgl_pro/master/\\`)"
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-034a3c3e",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-11-11T23:11:19.191833Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "include/AppFoundation.h",
+          "include/interfaces",
+          "modules"
+        ],
+        "entry_type": "invariant",
+        "evidence": [
+          "doc:.agents/skills/lvgl-pro-expert/SKILL.md"
+        ],
+        "kind": "semantic",
+        "source_doc_blob_sha": "078a7fd954cda8e4eb8a73c9c89a07a7e96e546e",
+        "source_doc_path": ".agents/skills/lvgl-pro-expert/SKILL.md",
+        "text": "Read `references/format/widget-catalog.md` — covers all 30+ widgets."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-05a9250e",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-11-11T23:11:19.191833Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "include/AppFoundation.h",
+          "include/interfaces",
+          "modules"
+        ],
+        "entry_type": "invariant",
+        "evidence": [
+          "doc:.agents/skills/lvgl-pro-expert/SKILL.md"
+        ],
+        "kind": "semantic",
+        "source_doc_blob_sha": "078a7fd954cda8e4eb8a73c9c89a07a7e96e546e",
+        "source_doc_path": ".agents/skills/lvgl-pro-expert/SKILL.md",
+        "text": "Read `docs/xml_format_specification.md` — the complete XML format spec."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-f31efeec",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-11-11T23:11:19.191833Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "include/AppFoundation.h",
+          "include/interfaces",
+          "modules"
+        ],
+        "entry_type": "invariant",
+        "evidence": [
+          "doc:.agents/skills/lvgl-pro-expert/SKILL.md"
+        ],
+        "kind": "semantic",
+        "source_doc_blob_sha": "078a7fd954cda8e4eb8a73c9c89a07a7e96e546e",
+        "source_doc_path": ".agents/skills/lvgl-pro-expert/SKILL.md",
+        "text": "Read `references/upstream/official-agents-guide.md` — ground rules and sigils."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-e1a93e0a",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-11-11T23:11:19.191833Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "include/AppFoundation.h",
+          "include/interfaces",
+          "modules"
+        ],
+        "entry_type": "failure-signature",
+        "evidence": [
+          "doc:.agents/skills/lvgl-pro-expert/SKILL.md"
+        ],
+        "kind": "procedural",
+        "source_doc_blob_sha": "078a7fd954cda8e4eb8a73c9c89a07a7e96e546e",
+        "source_doc_path": ".agents/skills/lvgl-pro-expert/SKILL.md",
+        "text": "Run `scripts/validate_project.py` — catches structural errors locally without any network or CLI license."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-69bf3658",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-11-11T23:11:19.191833Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "include/AppFoundation.h",
+          "include/interfaces",
+          "modules"
+        ],
+        "entry_type": "invariant",
+        "evidence": [
+          "doc:.agents/skills/lvgl-pro-expert/SKILL.md"
+        ],
+        "kind": "semantic",
+        "source_doc_blob_sha": "078a7fd954cda8e4eb8a73c9c89a07a7e96e546e",
+        "source_doc_path": ".agents/skills/lvgl-pro-expert/SKILL.md",
+        "text": "`project.xml` exists with `\u003ctargets\u003e` and `\u003cdisplay\u003e`"
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-37d3c9c0",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-11-11T23:11:19.191833Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "include/AppFoundation.h",
+          "include/interfaces",
+          "modules"
+        ],
+        "entry_type": "invariant",
+        "evidence": [
+          "doc:.agents/skills/lvgl-pro-expert/SKILL.md"
+        ],
+        "kind": "semantic",
+        "source_doc_blob_sha": "078a7fd954cda8e4eb8a73c9c89a07a7e96e546e",
+        "source_doc_path": ".agents/skills/lvgl-pro-expert/SKILL.md",
+        "text": "`globals.xml` exists with required sections (`\u003capi\u003e`, `\u003cconsts\u003e`, `\u003csubjects\u003e`, etc.)"
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-f617b736",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-11-11T23:11:19.191833Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "include/AppFoundation.h",
+          "include/interfaces",
+          "modules"
+        ],
+        "entry_type": "invariant",
+        "evidence": [
+          "doc:.agents/skills/lvgl-pro-expert/SKILL.md"
+        ],
+        "kind": "semantic",
+        "source_doc_blob_sha": "078a7fd954cda8e4eb8a73c9c89a07a7e96e546e",
+        "source_doc_path": ".agents/skills/lvgl-pro-expert/SKILL.md",
+        "text": "At least one screen XML file exists in `screens/`"
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-dedd709e",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-11-11T23:11:19.191833Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "include/AppFoundation.h",
+          "include/interfaces",
+          "modules"
+        ],
+        "entry_type": "invariant",
+        "evidence": [
+          "doc:.agents/skills/lvgl-pro-expert/SKILL.md"
+        ],
+        "kind": "semantic",
+        "source_doc_blob_sha": "078a7fd954cda8e4eb8a73c9c89a07a7e96e546e",
+        "source_doc_path": ".agents/skills/lvgl-pro-expert/SKILL.md",
+        "text": "Widget names are unique within each screen"
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-a1ddd353",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-11-11T23:11:19.191833Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "include/AppFoundation.h",
+          "include/interfaces",
+          "modules"
+        ],
+        "entry_type": "invariant",
+        "evidence": [
+          "doc:.agents/skills/lvgl-pro-expert/SKILL.md"
+        ],
+        "kind": "semantic",
+        "source_doc_blob_sha": "078a7fd954cda8e4eb8a73c9c89a07a7e96e546e",
+        "source_doc_path": ".agents/skills/lvgl-pro-expert/SKILL.md",
+        "text": "All subject references (`bind_text`, `bind_value`) match declarations in `globals.xml`"
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-d9ee4152",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-11-11T23:11:19.191833Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "include/AppFoundation.h",
+          "include/interfaces",
+          "modules"
+        ],
+        "entry_type": "invariant",
+        "evidence": [
+          "doc:.agents/skills/lvgl-pro-expert/SKILL.md"
+        ],
+        "kind": "semantic",
+        "source_doc_blob_sha": "078a7fd954cda8e4eb8a73c9c89a07a7e96e546e",
+        "source_doc_path": ".agents/skills/lvgl-pro-expert/SKILL.md",
+        "text": "Constant references (`#name`) match declarations in `\u003cconsts\u003e`"
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-13e585d9",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-11-11T23:11:19.191833Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "include/AppFoundation.h",
+          "include/interfaces",
+          "modules"
+        ],
+        "entry_type": "invariant",
+        "evidence": [
+          "doc:.agents/skills/lvgl-pro-expert/SKILL.md"
+        ],
+        "kind": "semantic",
+        "source_doc_blob_sha": "078a7fd954cda8e4eb8a73c9c89a07a7e96e546e",
+        "source_doc_path": ".agents/skills/lvgl-pro-expert/SKILL.md",
+        "text": "Screen navigation targets reference existing screen files"
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-ae24cd44",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-11-11T23:11:19.191833Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "include/AppFoundation.h",
+          "include/interfaces",
+          "modules"
+        ],
+        "entry_type": "invariant",
+        "evidence": [
+          "doc:.agents/skills/lvgl-pro-expert/SKILL.md"
+        ],
+        "kind": "semantic",
+        "source_doc_blob_sha": "078a7fd954cda8e4eb8a73c9c89a07a7e96e546e",
+        "source_doc_path": ".agents/skills/lvgl-pro-expert/SKILL.md",
+        "text": "Dropdown/roller options use `\u0026#10;` for separators"
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-2616b2ae",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-11-11T23:11:19.191833Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "include/AppFoundation.h",
+          "include/interfaces",
+          "modules"
+        ],
+        "entry_type": "invariant",
+        "evidence": [
+          "doc:.agents/skills/lvgl-pro-expert/SKILL.md"
+        ],
+        "kind": "semantic",
+        "source_doc_blob_sha": "078a7fd954cda8e4eb8a73c9c89a07a7e96e546e",
+        "source_doc_path": ".agents/skills/lvgl-pro-expert/SKILL.md",
+        "text": "Style selectors use hyphenated syntax (`style_prop-part-state`)"
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-e01c5197",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-11-11T23:11:19.191833Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "include/AppFoundation.h",
+          "include/interfaces",
+          "modules"
+        ],
+        "entry_type": "invariant",
+        "evidence": [
+          "doc:.agents/skills/lvgl-pro-expert/SKILL.md"
+        ],
+        "kind": "semantic",
+        "source_doc_blob_sha": "078a7fd954cda8e4eb8a73c9c89a07a7e96e546e",
+        "source_doc_path": ".agents/skills/lvgl-pro-expert/SKILL.md",
+        "text": "No unknown widget types (check against the 30+ supported types)"
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-dda48bf9",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-11-11T23:11:19.191833Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "include/AppFoundation.h",
+          "include/interfaces",
+          "modules"
+        ],
+        "entry_type": "invariant",
+        "evidence": [
+          "doc:.agents/skills/lvgl-pro-expert/SKILL.md"
+        ],
+        "kind": "semantic",
+        "source_doc_blob_sha": "078a7fd954cda8e4eb8a73c9c89a07a7e96e546e",
+        "source_doc_path": ".agents/skills/lvgl-pro-expert/SKILL.md",
+        "text": "Round displays use `radius` attribute on `\u003cdisplay\u003e`"
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-30aee9e4",
+      "dossier_scope": "modules/ConfigManager",
+      "timestamp": "2026-08-07T20:02:18Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "include/types/AppState.hpp",
+          "modules/BLEManager/BLEManager.hpp",
+          "modules/ConfigManager/ConfigManager.hpp"
+        ],
+        "entry_type": "invariant",
+        "evidence": [
+          "doc:.agents/skills/oo-expert/SKILL.md"
+        ],
+        "kind": "semantic",
+        "source_doc_blob_sha": "efbdeaf7c266fa4e3783f37e7d725a3fa3356a6f",
+        "source_doc_path": ".agents/skills/oo-expert/SKILL.md",
+        "text": "**Single Responsibility Principle (SRP)**: Every class, module, or function should have one, and only one, reason to change."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-d67976dd",
+      "dossier_scope": "modules/ConfigManager",
+      "timestamp": "2026-08-07T20:02:18Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "include/types/AppState.hpp",
+          "modules/BLEManager/BLEManager.hpp",
+          "modules/ConfigManager/ConfigManager.hpp"
+        ],
+        "entry_type": "contract",
+        "evidence": [
+          "doc:.agents/skills/oo-expert/SKILL.md"
+        ],
+        "kind": "semantic",
+        "source_doc_blob_sha": "efbdeaf7c266fa4e3783f37e7d725a3fa3356a6f",
+        "source_doc_path": ".agents/skills/oo-expert/SKILL.md",
+        "text": "**Open/Closed Principle (OCP)**: Software entities should be open for extension but closed for modification. Use interfaces and polymorphism to allow new features without changing existing code."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-79e4ee14",
+      "dossier_scope": "modules/ConfigManager",
+      "timestamp": "2026-08-07T20:02:18Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "include/types/AppState.hpp",
+          "modules/BLEManager/BLEManager.hpp",
+          "modules/ConfigManager/ConfigManager.hpp"
+        ],
+        "entry_type": "contract",
+        "evidence": [
+          "doc:.agents/skills/oo-expert/SKILL.md"
+        ],
+        "kind": "semantic",
+        "source_doc_blob_sha": "efbdeaf7c266fa4e3783f37e7d725a3fa3356a6f",
+        "source_doc_path": ".agents/skills/oo-expert/SKILL.md",
+        "text": "**Dependency Inversion Principle (DIP)**: High-level modules should not depend on low-level modules. Both should depend on abstractions (e.g., interfaces). Abstractions should not depend on details. Details should depend on abstractions."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-4b995d99",
+      "dossier_scope": "modules/ConfigManager",
+      "timestamp": "2026-08-07T20:02:18Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "include/types/AppState.hpp",
+          "modules/BLEManager/BLEManager.hpp",
+          "modules/ConfigManager/ConfigManager.hpp"
+        ],
+        "entry_type": "invariant",
+        "evidence": [
+          "doc:.agents/skills/oo-expert/SKILL.md"
+        ],
+        "kind": "semantic",
+        "source_doc_blob_sha": "efbdeaf7c266fa4e3783f37e7d725a3fa3356a6f",
+        "source_doc_path": ".agents/skills/oo-expert/SKILL.md",
+        "text": "**Law of Demeter (Principle of Least Knowledge)**: A component should only talk to its immediate friends and avoid reaching through multiple objects."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-88ec11c8",
+      "dossier_scope": "modules/ConfigManager",
+      "timestamp": "2026-08-07T20:02:18Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "include/types/AppState.hpp",
+          "modules/BLEManager/BLEManager.hpp",
+          "modules/ConfigManager/ConfigManager.hpp"
+        ],
+        "entry_type": "invariant",
+        "evidence": [
+          "doc:.agents/skills/oo-expert/SKILL.md"
+        ],
+        "kind": "semantic",
+        "source_doc_blob_sha": "efbdeaf7c266fa4e3783f37e7d725a3fa3356a6f",
+        "source_doc_path": ".agents/skills/oo-expert/SKILL.md",
+        "text": "**Data Hiding**: All member variables should be `private` or `protected`. State changes should only occur through clearly defined public methods."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-4c4c5e13",
+      "dossier_scope": "modules/ConfigManager",
+      "timestamp": "2026-08-07T20:02:18Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "include/types/AppState.hpp",
+          "modules/BLEManager/BLEManager.hpp",
+          "modules/ConfigManager/ConfigManager.hpp"
+        ],
+        "entry_type": "invariant",
+        "evidence": [
+          "doc:.agents/skills/oo-expert/SKILL.md"
+        ],
+        "kind": "semantic",
+        "source_doc_blob_sha": "efbdeaf7c266fa4e3783f37e7d725a3fa3356a6f",
+        "source_doc_path": ".agents/skills/oo-expert/SKILL.md",
+        "text": "**Minimize Global State**: Avoid global variables (`extern` or globally scoped instances) whenever possible. Global state makes testing difficult and obscures dependencies. Use Dependency Injection (DI) or Singleton patterns selectively instead of floating global objects."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-853d88fa",
+      "dossier_scope": "modules/ConfigManager",
+      "timestamp": "2026-08-07T20:02:18Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "include/types/AppState.hpp",
+          "modules/BLEManager/BLEManager.hpp",
+          "modules/ConfigManager/ConfigManager.hpp"
+        ],
+        "entry_type": "contract",
+        "evidence": [
+          "doc:.agents/skills/oo-expert/SKILL.md"
+        ],
+        "kind": "semantic",
+        "source_doc_blob_sha": "efbdeaf7c266fa4e3783f37e7d725a3fa3356a6f",
+        "source_doc_path": ".agents/skills/oo-expert/SKILL.md",
+        "text": "**Clear Interfaces**: Public methods should define *what* the object does, not *how* it does it."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-6ba95ac0",
+      "dossier_scope": "modules/ConfigManager",
+      "timestamp": "2026-08-07T20:02:18Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "include/types/AppState.hpp",
+          "modules/BLEManager/BLEManager.hpp",
+          "modules/ConfigManager/ConfigManager.hpp"
+        ],
+        "entry_type": "invariant",
+        "evidence": [
+          "doc:.agents/skills/oo-expert/SKILL.md"
+        ],
+        "kind": "semantic",
+        "source_doc_blob_sha": "efbdeaf7c266fa4e3783f37e7d725a3fa3356a6f",
+        "source_doc_path": ".agents/skills/oo-expert/SKILL.md",
+        "text": "**Immutable State**: If an object does not need to change state after creation, initialize it via the constructor and do not expose setters."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-4384cb27",
+      "dossier_scope": "modules/ConfigManager",
+      "timestamp": "2026-08-07T20:02:18Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "include/types/AppState.hpp",
+          "modules/BLEManager/BLEManager.hpp",
+          "modules/ConfigManager/ConfigManager.hpp"
+        ],
+        "entry_type": "contract",
+        "evidence": [
+          "doc:.agents/skills/oo-expert/SKILL.md"
+        ],
+        "kind": "semantic",
+        "source_doc_blob_sha": "efbdeaf7c266fa4e3783f37e7d725a3fa3356a6f",
+        "source_doc_path": ".agents/skills/oo-expert/SKILL.md",
+        "text": "**Use Interfaces (`i`-prefixed abstract classes)**: Define contracts for behaviors. This decouples the consumer from the concrete implementation."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-ec55056a",
+      "dossier_scope": "modules/ConfigManager",
+      "timestamp": "2026-08-07T20:02:18Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "include/types/AppState.hpp",
+          "modules/BLEManager/BLEManager.hpp",
+          "modules/ConfigManager/ConfigManager.hpp"
+        ],
+        "entry_type": "invariant",
+        "evidence": [
+          "doc:.agents/skills/oo-expert/SKILL.md"
+        ],
+        "kind": "semantic",
+        "source_doc_blob_sha": "efbdeaf7c266fa4e3783f37e7d725a3fa3356a6f",
+        "source_doc_path": ".agents/skills/oo-expert/SKILL.md",
+        "text": "**Decouple Hardware from Logic**: Separate hardware-specific calls from business logic."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-4ef3ff97",
+      "dossier_scope": "modules/ConfigManager",
+      "timestamp": "2026-08-07T20:02:18Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "include/types/AppState.hpp",
+          "modules/BLEManager/BLEManager.hpp",
+          "modules/ConfigManager/ConfigManager.hpp"
+        ],
+        "entry_type": "invariant",
+        "evidence": [
+          "doc:.agents/skills/oo-expert/SKILL.md"
+        ],
+        "kind": "semantic",
+        "source_doc_blob_sha": "efbdeaf7c266fa4e3783f37e7d725a3fa3356a6f",
+        "source_doc_path": ".agents/skills/oo-expert/SKILL.md",
+        "text": "**Dependency Injection**: Pass dependencies into constructors or `begin()` methods rather than having components instantiate their own dependencies."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-5e07c6bc",
+      "dossier_scope": "modules/ConfigManager",
+      "timestamp": "2026-08-07T20:02:18Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "include/types/AppState.hpp",
+          "modules/BLEManager/BLEManager.hpp",
+          "modules/ConfigManager/ConfigManager.hpp"
+        ],
+        "entry_type": "recipe",
+        "evidence": [
+          "doc:.agents/skills/oo-expert/SKILL.md"
+        ],
+        "kind": "procedural",
+        "source_doc_blob_sha": "efbdeaf7c266fa4e3783f37e7d725a3fa3356a6f",
+        "source_doc_path": ".agents/skills/oo-expert/SKILL.md",
+        "text": "Overcrowded files or classes violating SRP."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-6321136f",
+      "dossier_scope": "modules/ConfigManager",
+      "timestamp": "2026-08-07T20:02:18Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "include/types/AppState.hpp",
+          "modules/BLEManager/BLEManager.hpp",
+          "modules/ConfigManager/ConfigManager.hpp"
+        ],
+        "entry_type": "recipe",
+        "evidence": [
+          "doc:.agents/skills/oo-expert/SKILL.md"
+        ],
+        "kind": "procedural",
+        "source_doc_blob_sha": "efbdeaf7c266fa4e3783f37e7d725a3fa3356a6f",
+        "source_doc_path": ".agents/skills/oo-expert/SKILL.md",
+        "text": "Disorganized global state or excessive `extern` variables."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-3c5d29c1",
+      "dossier_scope": "modules/ConfigManager",
+      "timestamp": "2026-08-07T20:02:18Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "include/types/AppState.hpp",
+          "modules/BLEManager/BLEManager.hpp",
+          "modules/ConfigManager/ConfigManager.hpp"
+        ],
+        "entry_type": "recipe",
+        "evidence": [
+          "doc:.agents/skills/oo-expert/SKILL.md"
+        ],
+        "kind": "procedural",
+        "source_doc_blob_sha": "efbdeaf7c266fa4e3783f37e7d725a3fa3356a6f",
+        "source_doc_path": ".agents/skills/oo-expert/SKILL.md",
+        "text": "Missing interfaces for swappable components."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-86983b76",
+      "dossier_scope": "modules/ConfigManager",
+      "timestamp": "2026-08-07T20:02:18Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "include/types/AppState.hpp",
+          "modules/BLEManager/BLEManager.hpp",
+          "modules/ConfigManager/ConfigManager.hpp"
+        ],
+        "entry_type": "recipe",
+        "evidence": [
+          "doc:.agents/skills/oo-expert/SKILL.md"
+        ],
+        "kind": "procedural",
+        "source_doc_blob_sha": "efbdeaf7c266fa4e3783f37e7d725a3fa3356a6f",
+        "source_doc_path": ".agents/skills/oo-expert/SKILL.md",
+        "text": "Direct instantiation of complex dependencies instead of DI."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-2a4f524d",
+      "dossier_scope": "modules/ConfigManager",
+      "timestamp": "2026-08-07T20:02:18Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "include/types/AppState.hpp",
+          "modules/BLEManager/BLEManager.hpp",
+          "modules/ConfigManager/ConfigManager.hpp"
+        ],
+        "entry_type": "recipe",
+        "evidence": [
+          "doc:.agents/skills/oo-expert/SKILL.md"
+        ],
+        "kind": "procedural",
+        "source_doc_blob_sha": "efbdeaf7c266fa4e3783f37e7d725a3fa3356a6f",
+        "source_doc_path": ".agents/skills/oo-expert/SKILL.md",
+        "text": "**Modular Structure \u0026 Responsibilities**: What should be extracted?"
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-9ab44779",
+      "dossier_scope": "modules/ConfigManager",
+      "timestamp": "2026-08-07T20:02:18Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "include/types/AppState.hpp",
+          "modules/BLEManager/BLEManager.hpp",
+          "modules/ConfigManager/ConfigManager.hpp"
+        ],
+        "entry_type": "recipe",
+        "evidence": [
+          "doc:.agents/skills/oo-expert/SKILL.md"
+        ],
+        "kind": "procedural",
+        "source_doc_blob_sha": "efbdeaf7c266fa4e3783f37e7d725a3fa3356a6f",
+        "source_doc_path": ".agents/skills/oo-expert/SKILL.md",
+        "text": "**Encapsulation \u0026 Global State**: Which globals can be grouped or injected?"
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-17600b4c",
+      "dossier_scope": "modules/ConfigManager",
+      "timestamp": "2026-08-07T20:02:18Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "include/types/AppState.hpp",
+          "modules/BLEManager/BLEManager.hpp",
+          "modules/ConfigManager/ConfigManager.hpp"
+        ],
+        "entry_type": "recipe",
+        "evidence": [
+          "doc:.agents/skills/oo-expert/SKILL.md"
+        ],
+        "kind": "procedural",
+        "source_doc_blob_sha": "efbdeaf7c266fa4e3783f37e7d725a3fa3356a6f",
+        "source_doc_path": ".agents/skills/oo-expert/SKILL.md",
+        "text": "**Abstraction \u0026 Interfaces**: What interfaces need to be created?"
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-9cf52f18",
+      "dossier_scope": "modules/ConfigManager",
+      "timestamp": "2026-08-07T20:02:18Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "include/types/AppState.hpp",
+          "modules/BLEManager/BLEManager.hpp",
+          "modules/ConfigManager/ConfigManager.hpp"
+        ],
+        "entry_type": "recipe",
+        "evidence": [
+          "doc:.agents/skills/oo-expert/SKILL.md"
+        ],
+        "kind": "procedural",
+        "source_doc_blob_sha": "efbdeaf7c266fa4e3783f37e7d725a3fa3356a6f",
+        "source_doc_path": ".agents/skills/oo-expert/SKILL.md",
+        "text": "Shift global state into localized configurations or manager classes."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-585b27ed",
+      "dossier_scope": "modules/ConfigManager",
+      "timestamp": "2026-08-07T20:02:18Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "include/types/AppState.hpp",
+          "modules/BLEManager/BLEManager.hpp",
+          "modules/ConfigManager/ConfigManager.hpp"
+        ],
+        "entry_type": "recipe",
+        "evidence": [
+          "doc:.agents/skills/oo-expert/SKILL.md"
+        ],
+        "kind": "procedural",
+        "source_doc_blob_sha": "efbdeaf7c266fa4e3783f37e7d725a3fa3356a6f",
+        "source_doc_path": ".agents/skills/oo-expert/SKILL.md",
+        "text": "Update the bootstrapping code to use Dependency Injection."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-5616217d",
+      "dossier_scope": "modules/ConfigManager",
+      "timestamp": "2026-08-07T20:02:18Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "include/types/AppState.hpp",
+          "modules/BLEManager/BLEManager.hpp",
+          "modules/ConfigManager/ConfigManager.hpp"
+        ],
+        "entry_type": "recipe",
+        "evidence": [
+          "doc:.agents/skills/oo-expert/SKILL.md"
+        ],
+        "kind": "procedural",
+        "source_doc_blob_sha": "efbdeaf7c266fa4e3783f37e7d725a3fa3356a6f",
+        "source_doc_path": ".agents/skills/oo-expert/SKILL.md",
+        "text": "Ensure the code remains compilable after each logical step. If you remove global variables, ensure they are properly passed into the dependent objects."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-fe0122d8",
+      "dossier_scope": "modules/ConfigManager",
+      "timestamp": "2026-08-07T20:02:18Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "include/types/AppState.hpp",
+          "modules/BLEManager/BLEManager.hpp",
+          "modules/ConfigManager/ConfigManager.hpp"
+        ],
+        "entry_type": "invariant",
+        "evidence": [
+          "doc:.agents/skills/oo-expert/SKILL.md"
+        ],
+        "kind": "semantic",
+        "source_doc_blob_sha": "efbdeaf7c266fa4e3783f37e7d725a3fa3356a6f",
+        "source_doc_path": ".agents/skills/oo-expert/SKILL.md",
+        "text": "*Issue*: `moduleX.cpp` handles both networking and display logic."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-89caba26",
+      "dossier_scope": "modules/ConfigManager",
+      "timestamp": "2026-08-07T20:02:18Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "include/types/AppState.hpp",
+          "modules/BLEManager/BLEManager.hpp",
+          "modules/ConfigManager/ConfigManager.hpp"
+        ],
+        "entry_type": "invariant",
+        "evidence": [
+          "doc:.agents/skills/oo-expert/SKILL.md"
+        ],
+        "kind": "semantic",
+        "source_doc_blob_sha": "efbdeaf7c266fa4e3783f37e7d725a3fa3356a6f",
+        "source_doc_path": ".agents/skills/oo-expert/SKILL.md",
+        "text": "*Recommendation*: Extract networking logic into a new `NetworkManager` class."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-9209944c",
+      "dossier_scope": "modules/ConfigManager",
+      "timestamp": "2026-08-07T20:02:18Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "include/types/AppState.hpp",
+          "modules/BLEManager/BLEManager.hpp",
+          "modules/ConfigManager/ConfigManager.hpp"
+        ],
+        "entry_type": "invariant",
+        "evidence": [
+          "doc:.agents/skills/oo-expert/SKILL.md"
+        ],
+        "kind": "semantic",
+        "source_doc_blob_sha": "efbdeaf7c266fa4e3783f37e7d725a3fa3356a6f",
+        "source_doc_path": ".agents/skills/oo-expert/SKILL.md",
+        "text": "*Issue*: `int globalStateMode` is exposed globally."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-350addae",
+      "dossier_scope": "modules/ConfigManager",
+      "timestamp": "2026-08-07T20:02:18Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "modules/ConfigManager/ConfigManager.hpp"
+        ],
+        "entry_type": "invariant",
+        "evidence": [
+          "doc:.agents/skills/oo-expert/SKILL.md"
+        ],
+        "kind": "semantic",
+        "source_doc_blob_sha": "efbdeaf7c266fa4e3783f37e7d725a3fa3356a6f",
+        "source_doc_path": ".agents/skills/oo-expert/SKILL.md",
+        "text": "*Recommendation*: Move `globalStateMode` into `ConfigManager` and inject it where needed."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-c06ceca2",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-11-11T23:11:19.191833Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "include/AppFoundation.h",
+          "include/interfaces",
+          "modules"
+        ],
+        "entry_type": "invariant",
+        "evidence": [
+          "doc:.agents/skills/squareline-studio-expert/SKILL.md"
+        ],
+        "kind": "semantic",
+        "source_doc_blob_sha": "0e979744fe35c337f56b07f6b2c25793904f83b6",
+        "source_doc_path": ".agents/skills/squareline-studio-expert/SKILL.md",
+        "text": "`SquareLine_Project.spj` — Widget tree, events, animations"
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-ee1d981c",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-11-11T23:11:19.191833Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "include/AppFoundation.h",
+          "include/interfaces",
+          "modules"
+        ],
+        "entry_type": "invariant",
+        "evidence": [
+          "doc:.agents/skills/squareline-studio-expert/SKILL.md"
+        ],
+        "kind": "semantic",
+        "source_doc_blob_sha": "0e979744fe35c337f56b07f6b2c25793904f83b6",
+        "source_doc_path": ".agents/skills/squareline-studio-expert/SKILL.md",
+        "text": "`SquareLine_Project.sll` — Project metadata (board, resolution, LVGL version)"
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-319f9907",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-11-11T23:11:19.191833Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "include/AppFoundation.h",
+          "include/interfaces",
+          "modules"
+        ],
+        "entry_type": "invariant",
+        "evidence": [
+          "doc:.agents/skills/squareline-studio-expert/SKILL.md"
+        ],
+        "kind": "semantic",
+        "source_doc_blob_sha": "0e979744fe35c337f56b07f6b2c25793904f83b6",
+        "source_doc_path": ".agents/skills/squareline-studio-expert/SKILL.md",
+        "text": "`flags: 51` = content-fit sizing (used on Labels by default)"
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-ab4238ef",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-11-11T23:11:19.191833Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "include/AppFoundation.h",
+          "include/interfaces",
+          "modules"
+        ],
+        "entry_type": "recipe",
+        "evidence": [
+          "doc:.agents/skills/squareline-studio-expert/SKILL.md"
+        ],
+        "kind": "procedural",
+        "source_doc_blob_sha": "0e979744fe35c337f56b07f6b2c25793904f83b6",
+        "source_doc_path": ".agents/skills/squareline-studio-expert/SKILL.md",
+        "text": "`flags: 1048576` = section header flag (on Flags, States, Scrolling group headers)"
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-9ae52ee5",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-11-11T23:11:19.191833Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "include/AppFoundation.h",
+          "include/interfaces",
+          "modules"
+        ],
+        "entry_type": "invariant",
+        "evidence": [
+          "doc:.agents/skills/squareline-studio-expert/SKILL.md"
+        ],
+        "kind": "semantic",
+        "source_doc_blob_sha": "0e979744fe35c337f56b07f6b2c25793904f83b6",
+        "source_doc_path": ".agents/skills/squareline-studio-expert/SKILL.md",
+        "text": "Background, border, text, shadow colors: `[R, G, B, A]` (4 values, 0-255)"
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-996b75cc",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-11-11T23:11:19.191833Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "include/AppFoundation.h",
+          "include/interfaces",
+          "modules"
+        ],
+        "entry_type": "invariant",
+        "evidence": [
+          "doc:.agents/skills/squareline-studio-expert/SKILL.md"
+        ],
+        "kind": "semantic",
+        "source_doc_blob_sha": "0e979744fe35c337f56b07f6b2c25793904f83b6",
+        "source_doc_path": ".agents/skills/squareline-studio-expert/SKILL.md",
+        "text": "Gradient color: `[R, G, B]` (3 values, NO alpha)"
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-933ea582",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-11-11T23:11:19.191833Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "include/AppFoundation.h",
+          "include/interfaces",
+          "modules"
+        ],
+        "entry_type": "invariant",
+        "evidence": [
+          "doc:.agents/skills/squareline-studio-expert/SKILL.md"
+        ],
+        "kind": "semantic",
+        "source_doc_blob_sha": "0e979744fe35c337f56b07f6b2c25793904f83b6",
+        "source_doc_path": ".agents/skills/squareline-studio-expert/SKILL.md",
+        "text": "Always check the reference for the specific property"
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-ebfecc37",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-11-11T23:11:19.191833Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "include/AppFoundation.h",
+          "include/interfaces",
+          "modules"
+        ],
+        "entry_type": "invariant",
+        "evidence": [
+          "doc:.agents/skills/squareline-studio-expert/SKILL.md"
+        ],
+        "kind": "semantic",
+        "source_doc_blob_sha": "0e979744fe35c337f56b07f6b2c25793904f83b6",
+        "source_doc_path": ".agents/skills/squareline-studio-expert/SKILL.md",
+        "text": "**COLORWHEEL** is v8 only — removed in LVGL 9"
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-649473fd",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-11-11T23:11:19.191833Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "include/AppFoundation.h",
+          "include/interfaces",
+          "modules"
+        ],
+        "entry_type": "invariant",
+        "evidence": [
+          "doc:.agents/skills/squareline-studio-expert/SKILL.md"
+        ],
+        "kind": "semantic",
+        "source_doc_blob_sha": "0e979744fe35c337f56b07f6b2c25793904f83b6",
+        "source_doc_path": ".agents/skills/squareline-studio-expert/SKILL.md",
+        "text": "**CONTAINER** is the LVGL 9 name for PANEL (both work in SLS)"
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-245205b3",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-11-11T23:11:19.191833Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "include/AppFoundation.h",
+          "include/interfaces",
+          "modules"
+        ],
+        "entry_type": "invariant",
+        "evidence": [
+          "doc:.agents/skills/squareline-studio-expert/SKILL.md"
+        ],
+        "kind": "semantic",
+        "source_doc_blob_sha": "0e979744fe35c337f56b07f6b2c25793904f83b6",
+        "source_doc_path": ".agents/skills/squareline-studio-expert/SKILL.md",
+        "text": "Most popular boards (Arduino TFT_eSPI, CrowPanel, MaTouch, M5Stack) now target **v9.5** (as of SLS 1.6.2)"
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-a7ab98f8",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-11-11T23:11:19.191833Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "include/AppFoundation.h",
+          "include/interfaces",
+          "modules"
+        ],
+        "entry_type": "invariant",
+        "evidence": [
+          "doc:.agents/skills/squareline-studio-expert/SKILL.md"
+        ],
+        "kind": "semantic",
+        "source_doc_blob_sha": "0e979744fe35c337f56b07f6b2c25793904f83b6",
+        "source_doc_path": ".agents/skills/squareline-studio-expert/SKILL.md",
+        "text": "All 15 bundled SLS examples use **v9.2.2**"
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-cc8a3df6",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-11-11T23:11:19.191833Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "include/AppFoundation.h",
+          "include/interfaces",
+          "modules"
+        ],
+        "entry_type": "invariant",
+        "evidence": [
+          "doc:.agents/skills/squareline-studio-expert/SKILL.md"
+        ],
+        "kind": "semantic",
+        "source_doc_blob_sha": "0e979744fe35c337f56b07f6b2c25793904f83b6",
+        "source_doc_path": ".agents/skills/squareline-studio-expert/SKILL.md",
+        "text": "Default to **v9** for new projects unless the user specifies a v8 board."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-e39afc2e",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-11-11T23:11:19.191833Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "include/AppFoundation.h",
+          "include/interfaces",
+          "modules"
+        ],
+        "entry_type": "recipe",
+        "evidence": [
+          "doc:.agents/skills/squareline-studio-expert/SKILL.md"
+        ],
+        "kind": "procedural",
+        "source_doc_blob_sha": "0e979744fe35c337f56b07f6b2c25793904f83b6",
+        "source_doc_path": ".agents/skills/squareline-studio-expert/SKILL.md",
+        "text": "**License tier**: Personal (free), Small Business, Business, or Enterprise? Default to **Personal (free)** unless the user specifies otherwise."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-8180d507",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-11-11T23:11:19.191833Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "include/AppFoundation.h",
+          "include/interfaces",
+          "modules"
+        ],
+        "entry_type": "recipe",
+        "evidence": [
+          "doc:.agents/skills/squareline-studio-expert/SKILL.md"
+        ],
+        "kind": "procedural",
+        "source_doc_blob_sha": "0e979744fe35c337f56b07f6b2c25793904f83b6",
+        "source_doc_path": ".agents/skills/squareline-studio-expert/SKILL.md",
+        "text": "**Display**: Resolution (width × height), shape (RECTANGLE/CIRCLE), color depth"
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-16c7a307",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-11-11T23:11:19.191833Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "include/AppFoundation.h",
+          "include/interfaces",
+          "modules"
+        ],
+        "entry_type": "recipe",
+        "evidence": [
+          "doc:.agents/skills/squareline-studio-expert/SKILL.md"
+        ],
+        "kind": "procedural",
+        "source_doc_blob_sha": "0e979744fe35c337f56b07f6b2c25793904f83b6",
+        "source_doc_path": ".agents/skills/squareline-studio-expert/SKILL.md",
+        "text": "**Board**: Target hardware (e.g., \"ESP32S335D - MaTouch 3.5-inch\")"
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-e5752b0c",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-11-11T23:11:19.191833Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "include/AppFoundation.h",
+          "include/interfaces",
+          "modules"
+        ],
+        "entry_type": "recipe",
+        "evidence": [
+          "doc:.agents/skills/squareline-studio-expert/SKILL.md"
+        ],
+        "kind": "procedural",
+        "source_doc_blob_sha": "0e979744fe35c337f56b07f6b2c25793904f83b6",
+        "source_doc_path": ".agents/skills/squareline-studio-expert/SKILL.md",
+        "text": "**LVGL version**: Determined by board selection. Default to **v9** for new projects. If the user mentions a specific board, check its `supported_lvgl_version`. → Read `references/format/lvgl-version-guide.md` if uncertain."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-44614143",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-11-11T23:11:19.191833Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "include/AppFoundation.h",
+          "include/interfaces",
+          "modules"
+        ],
+        "entry_type": "recipe",
+        "evidence": [
+          "doc:.agents/skills/squareline-studio-expert/SKILL.md"
+        ],
+        "kind": "procedural",
+        "source_doc_blob_sha": "0e979744fe35c337f56b07f6b2c25793904f83b6",
+        "source_doc_path": ".agents/skills/squareline-studio-expert/SKILL.md",
+        "text": "**Screens**: How many screens, navigation flow between them"
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-ec70a655",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-11-11T23:11:19.191833Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "include/AppFoundation.h",
+          "include/interfaces",
+          "modules"
+        ],
+        "entry_type": "recipe",
+        "evidence": [
+          "doc:.agents/skills/squareline-studio-expert/SKILL.md"
+        ],
+        "kind": "procedural",
+        "source_doc_blob_sha": "0e979744fe35c337f56b07f6b2c25793904f83b6",
+        "source_doc_path": ".agents/skills/squareline-studio-expert/SKILL.md",
+        "text": "**Widgets**: What UI elements on each screen"
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-cd644799",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-11-11T23:11:19.191833Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "include/AppFoundation.h",
+          "include/interfaces",
+          "modules"
+        ],
+        "entry_type": "recipe",
+        "evidence": [
+          "doc:.agents/skills/squareline-studio-expert/SKILL.md"
+        ],
+        "kind": "procedural",
+        "source_doc_blob_sha": "0e979744fe35c337f56b07f6b2c25793904f83b6",
+        "source_doc_path": ".agents/skills/squareline-studio-expert/SKILL.md",
+        "text": "**Interactions**: Touch events, value changes, screen transitions"
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-24988ae0",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-11-11T23:11:19.191833Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "include/AppFoundation.h",
+          "include/interfaces",
+          "modules"
+        ],
+        "entry_type": "recipe",
+        "evidence": [
+          "doc:.agents/skills/squareline-studio-expert/SKILL.md"
+        ],
+        "kind": "procedural",
+        "source_doc_blob_sha": "0e979744fe35c337f56b07f6b2c25793904f83b6",
+        "source_doc_path": ".agents/skills/squareline-studio-expert/SKILL.md",
+        "text": "Step 3: Generate Project Scaffold: `python3 scripts/generate_project.py \\`"
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-5b190477",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-11-11T23:11:19.191833Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "include/AppFoundation.h",
+          "include/interfaces",
+          "modules"
+        ],
+        "entry_type": "recipe",
+        "evidence": [
+          "doc:.agents/skills/squareline-studio-expert/SKILL.md"
+        ],
+        "kind": "procedural",
+        "source_doc_blob_sha": "0e979744fe35c337f56b07f6b2c25793904f83b6",
+        "source_doc_path": ".agents/skills/squareline-studio-expert/SKILL.md",
+        "text": "Step 7: Validate: `python3 scripts/validate_project.py /path/to/output/`"
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-c3737255",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-11-11T23:11:19.191833Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "include/AppFoundation.h",
+          "include/interfaces",
+          "modules"
+        ],
+        "entry_type": "contract",
+        "evidence": [
+          "doc:.agents/skills/squareline-studio-expert/SKILL.md"
+        ],
+        "kind": "semantic",
+        "source_doc_blob_sha": "0e979744fe35c337f56b07f6b2c25793904f83b6",
+        "source_doc_path": ".agents/skills/squareline-studio-expert/SKILL.md",
+        "text": "**Follow by default** — use recommended patterns, sizes, and layouts unless the user specifies otherwise. These patterns are drawn from mobile UI conventions that most users are already familiar with."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-3e53fbd5",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-11-11T23:11:19.191833Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "include/AppFoundation.h",
+          "include/interfaces",
+          "modules"
+        ],
+        "entry_type": "recipe",
+        "evidence": [
+          "doc:.agents/skills/squareline-studio-expert/SKILL.md"
+        ],
+        "kind": "procedural",
+        "source_doc_blob_sha": "0e979744fe35c337f56b07f6b2c25793904f83b6",
+        "source_doc_path": ".agents/skills/squareline-studio-expert/SKILL.md",
+        "text": "**Flag concerns, don't block** — if a user's request conflicts with a guideline, implement what they ask but note the concern: \u003e ⚠️ **UX note:** The touch targets on this screen are 30×30px, below the \u003e recommended 48×48px minimum for embedded displays. This may be difficult to \u003e tap accurately. Let me know if you'd like me to adjust sizing."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-5cdc2fc5",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-11-11T23:11:19.191833Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "include/AppFoundation.h",
+          "include/interfaces",
+          "modules"
+        ],
+        "entry_type": "invariant",
+        "evidence": [
+          "doc:.agents/skills/squareline-studio-expert/SKILL.md"
+        ],
+        "kind": "semantic",
+        "source_doc_blob_sha": "0e979744fe35c337f56b07f6b2c25793904f83b6",
+        "source_doc_path": ".agents/skills/squareline-studio-expert/SKILL.md",
+        "text": "**Never refuse** — these are guidelines, not rules. The user's intent always takes priority over best practice."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-db912fc1",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-11-11T23:11:19.191833Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "include/AppFoundation.h",
+          "include/interfaces",
+          "modules"
+        ],
+        "entry_type": "invariant",
+        "evidence": [
+          "doc:.agents/skills/squareline-studio-expert/SKILL.md"
+        ],
+        "kind": "semantic",
+        "source_doc_blob_sha": "0e979744fe35c337f56b07f6b2c25793904f83b6",
+        "source_doc_path": ".agents/skills/squareline-studio-expert/SKILL.md",
+        "text": "**Suggest improvements** — when generating from scratch, proactively apply best practices and briefly mention which guidelines informed your choices."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-990acc55",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-11-11T23:11:19.191833Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "include/AppFoundation.h",
+          "include/interfaces",
+          "modules"
+        ],
+        "entry_type": "invariant",
+        "evidence": [
+          "doc:.agents/skills/squareline-studio-expert/SKILL.md"
+        ],
+        "kind": "semantic",
+        "source_doc_blob_sha": "0e979744fe35c337f56b07f6b2c25793904f83b6",
+        "source_doc_path": ".agents/skills/squareline-studio-expert/SKILL.md",
+        "text": "**Consider the input model** — if the device has a rotary encoder, prefer sequential navigation patterns and scroll-friendly layouts. If touch-only, prioritise clear tap targets and gesture affordances."
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-93b7c0a5",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-11-11T23:11:19.191833Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "include/AppFoundation.h",
+          "include/interfaces",
+          "modules"
+        ],
+        "entry_type": "invariant",
+        "evidence": [
+          "doc:.agents/skills/squareline-studio-expert/SKILL.md"
+        ],
+        "kind": "semantic",
+        "source_doc_blob_sha": "0e979744fe35c337f56b07f6b2c25793904f83b6",
+        "source_doc_path": ".agents/skills/squareline-studio-expert/SKILL.md",
+        "text": "`.spj`, `.sll`, and `Themes.slt` all exist"
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-82b5a764",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-11-11T23:11:19.191833Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "include/AppFoundation.h",
+          "include/interfaces",
+          "modules"
+        ],
+        "entry_type": "invariant",
+        "evidence": [
+          "doc:.agents/skills/squareline-studio-expert/SKILL.md"
+        ],
+        "kind": "semantic",
+        "source_doc_blob_sha": "0e979744fe35c337f56b07f6b2c25793904f83b6",
+        "source_doc_path": ".agents/skills/squareline-studio-expert/SKILL.md",
+        "text": "`nidcnt` in `.sll` exceeds the highest `nid` used"
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-73aebcb4",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-11-11T23:11:19.191833Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "include/AppFoundation.h",
+          "include/interfaces",
+          "modules"
+        ],
+        "entry_type": "invariant",
+        "evidence": [
+          "doc:.agents/skills/squareline-studio-expert/SKILL.md"
+        ],
+        "kind": "semantic",
+        "source_doc_blob_sha": "0e979744fe35c337f56b07f6b2c25793904f83b6",
+        "source_doc_path": ".agents/skills/squareline-studio-expert/SKILL.md",
+        "text": "Every widget has `saved_objtypeKey` set correctly"
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-6b56732d",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-11-11T23:11:19.191833Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "include/AppFoundation.h",
+          "include/interfaces",
+          "modules"
+        ],
+        "entry_type": "invariant",
+        "evidence": [
+          "doc:.agents/skills/squareline-studio-expert/SKILL.md"
+        ],
+        "kind": "semantic",
+        "source_doc_blob_sha": "0e979744fe35c337f56b07f6b2c25793904f83b6",
+        "source_doc_path": ".agents/skills/squareline-studio-expert/SKILL.md",
+        "text": "Every widget has `OBJECT/Name` with a unique name"
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-8e9a81cf",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-11-11T23:11:19.191833Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "include/AppFoundation.h",
+          "include/interfaces",
+          "modules"
+        ],
+        "entry_type": "invariant",
+        "evidence": [
+          "doc:.agents/skills/squareline-studio-expert/SKILL.md"
+        ],
+        "kind": "semantic",
+        "source_doc_blob_sha": "0e979744fe35c337f56b07f6b2c25793904f83b6",
+        "source_doc_path": ".agents/skills/squareline-studio-expert/SKILL.md",
+        "text": "Event `Screen_to` values reference valid screen GUIDs"
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-b1114df7",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-11-11T23:11:19.191833Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "include/AppFoundation.h",
+          "include/interfaces",
+          "modules"
+        ],
+        "entry_type": "invariant",
+        "evidence": [
+          "doc:.agents/skills/squareline-studio-expert/SKILL.md"
+        ],
+        "kind": "semantic",
+        "source_doc_blob_sha": "0e979744fe35c337f56b07f6b2c25793904f83b6",
+        "source_doc_path": ".agents/skills/squareline-studio-expert/SKILL.md",
+        "text": "Style property key names match EXACTLY (check spaces and typos)"
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-8ffbcce0",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-11-11T23:11:19.191833Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "include/AppFoundation.h",
+          "include/interfaces",
+          "modules"
+        ],
+        "entry_type": "invariant",
+        "evidence": [
+          "doc:.agents/skills/squareline-studio-expert/SKILL.md"
+        ],
+        "kind": "semantic",
+        "source_doc_blob_sha": "0e979744fe35c337f56b07f6b2c25793904f83b6",
+        "source_doc_path": ".agents/skills/squareline-studio-expert/SKILL.md",
+        "text": "Color arrays have correct length (4 for RGBA, 3 for gradient)"
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-c63ebfa1",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-11-11T23:11:19.191833Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "include/AppFoundation.h",
+          "include/interfaces",
+          "modules"
+        ],
+        "entry_type": "invariant",
+        "evidence": [
+          "doc:.agents/skills/squareline-studio-expert/SKILL.md"
+        ],
+        "kind": "semantic",
+        "source_doc_blob_sha": "0e979744fe35c337f56b07f6b2c25793904f83b6",
+        "source_doc_path": ".agents/skills/squareline-studio-expert/SKILL.md",
+        "text": "`.sll` `width`/`height` match the target display resolution"
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-10bf33c4",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-11-11T23:11:19.191833Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "include/AppFoundation.h",
+          "include/interfaces",
+          "modules"
+        ],
+        "entry_type": "invariant",
+        "evidence": [
+          "doc:.agents/skills/squareline-studio-expert/SKILL.md"
+        ],
+        "kind": "semantic",
+        "source_doc_blob_sha": "0e979744fe35c337f56b07f6b2c25793904f83b6",
+        "source_doc_path": ".agents/skills/squareline-studio-expert/SKILL.md",
+        "text": "**SmartWatch_392x392** — circular display, 290 widgets, 9 screens"
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-59efa64b",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-11-11T23:11:19.191833Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "include/AppFoundation.h",
+          "include/interfaces",
+          "modules"
+        ],
+        "entry_type": "invariant",
+        "evidence": [
+          "doc:.agents/skills/squareline-studio-expert/SKILL.md"
+        ],
+        "kind": "semantic",
+        "source_doc_blob_sha": "0e979744fe35c337f56b07f6b2c25793904f83b6",
+        "source_doc_path": ".agents/skills/squareline-studio-expert/SKILL.md",
+        "text": "**Caffee_Machnine_800x480** — most complex: 504 widgets, 78 events, 32 animations"
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-9e9953e1",
+      "dossier_scope": "modules/Application",
+      "timestamp": "2026-11-11T23:11:19.191833Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "modules/Application/Application.hpp",
+          "include/AppFoundation.h",
+          "include/interfaces",
+          "modules"
+        ],
+        "entry_type": "recipe",
+        "evidence": [
+          "doc:.agents/skills/squareline-studio-expert/SKILL.md"
+        ],
+        "kind": "procedural",
+        "source_doc_blob_sha": "0e979744fe35c337f56b07f6b2c25793904f83b6",
+        "source_doc_path": ".agents/skills/squareline-studio-expert/SKILL.md",
+        "text": "**Futuristic_Ebike_800x480** — heavy button/slider usage with animations"
+      }
+    },
+    {
+      "type": "add",
+      "entry_id": "docseed-d5798417",
+      "dossier_scope": "lib",
+      "timestamp": "2026-06-19T12:19:10Z",
+      "source": "doc-seed",
+      "fields": {
+        "anchors": [
+          "lib/OtaDownloadEngine/OtaDownloadEngine.hpp"
+        ],
+        "entry_type": "invariant",
+        "evidence": [
+          "doc:docs/archive/embedded-best-practices-assessment.md"
+        ],
+        "kind": "semantic",
+        "source_doc_blob_sha": "80c09e131a92eba75d535f730cf351b56403d20c",
+        "source_doc_path": "docs/archive/embedded-best-practices-assessment.md",
+        "text": "Make OTA verification **fail closed** (High — small, localized change in `OtaDownloadEngine` + `otaUpdateManager`)."
+      }
+    }
+  ],
+  "created_at": "2026-11-11T23:11:19.850653Z",
+  "batch_id": "01M76E2K9AS6A8SBZ3DJRRA37G"
+}

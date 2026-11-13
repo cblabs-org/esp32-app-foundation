@@ -1,4 +1,21 @@
-doc_seeds:
-  - "docs/**/*.md"
-  - ".agents/skills/**/SKILL.md"
 turn_notes: "on"
+doc_seeds:
+    - docs/**/*.md
+    - .agents/skills/**/SKILL.md
+spend:
+    quota_floor: 0.25
+    jobs:
+        backfill:
+            min_interval: 6h
+            max_items: 25
+        consolidation:
+            min_interval: 24h
+            max_items: 40
+        fallback:
+            min_interval: 1h
+            max_items: 10
+        gardening:
+            min_interval: 168h
+            max_items: 20
+gaps:
+    threshold: 0.5
