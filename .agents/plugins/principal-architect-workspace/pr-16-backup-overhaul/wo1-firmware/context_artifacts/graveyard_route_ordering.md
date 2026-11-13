@@ -35,4 +35,4 @@ server.on("/api/config", HTTP_GET, [...]);            // ← generic fallback la
 
 ## Verification
 
-After fix: `curl http://192.168.20.186/api/config/backup` returns the full backup JSON with `_meta`. `curl http://192.168.20.186/api/config` returns `{"namespaces":[...],"count":5}`. Both confirmed on device running `4c67b43`.
+After fix: `curl http://<device-ip>/api/config/backup` returns the full backup JSON with `_meta`. `curl http://<device-ip>/api/config` returns `{"namespaces":[...],"count":5}`. Both confirmed on device running `4c67b43`.

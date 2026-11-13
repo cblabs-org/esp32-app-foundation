@@ -2,14 +2,14 @@
 
 ## Live Endpoint: GET /api/config/backup
 
-Device IP: `192.168.20.186` (hostname: `esp32-foundation`)
+Device IP: `<device-ip>` (hostname: `esp32-foundation`)
 
 ```json
 {
   "_meta": {
     "backup_version": 1,
     "firmware_version": "unknown",
-    "device_id": "80:65:99:A1:8E:90",
+    "device_id": "<device-wifi-mac>",
     "device_type": "ESP32-S3",
     "datetime": "2026-06-03T22:17:11Z",
     "timezone": "UTC",
@@ -25,7 +25,7 @@ Device IP: `192.168.20.186` (hostname: `esp32-foundation`)
     "_v": 2
   },
   "wifi": {
-    "ssid": "cb-iot",
+    "ssid": "<home-ssid>",
     "hostname": "esp32-foundation",
     "_v": 1
   },

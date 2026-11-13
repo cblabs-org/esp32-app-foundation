@@ -150,7 +150,7 @@ The display driver and geometry pseudo-constants are fully guarded:
 
 ### The `IDisplayBoard` Interface
 
-The [IDisplayBoard](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/include/interfaces/IDisplayBoard.hpp) interface defines the contract for any UI board (pane) that participates in the carousel rotation. Each board is a full-screen rendering unit managed by the `CarouselEngine`.
+The [IDisplayBoard](../../modules/U8G2Display/IDisplayBoard.hpp) interface defines the contract for any UI board (pane) that participates in the carousel rotation. Each board is a full-screen rendering unit managed by the `CarouselEngine`.
 
 ```cpp
 class IDisplayBoard {
@@ -252,7 +252,7 @@ When the `ScreensaverController` transitions state, it iterates through all regi
 
 ### 3.4 LVGL Display Module (Colour TFT & Hardware Adapters)
 
-For full-colour TFT screens, the framework provides [LVGLDisplayModule](../../modules/LVGLDisplay/README.md) as a peer to `U8G2DisplayModule`. Powered by LVGL v9.5, it separates generic display lifecycle and framework interface implementation from board-specific hardware drivers using the [`ILVGLHardwareAdapter`](../../include/interfaces/ILVGLHardwareAdapter.hpp) pattern.
+For full-colour TFT screens, the framework provides [LVGLDisplayModule](../../modules/LVGLDisplay/README.md) as a peer to `U8G2DisplayModule`. Powered by LVGL v9.5, it separates generic display lifecycle and framework interface implementation from board-specific hardware drivers using the [`ILVGLHardwareAdapter`](../../modules/LVGLDisplay/ILVGLHardwareAdapter.hpp) pattern.
 
 #### Architecture Highlights
 

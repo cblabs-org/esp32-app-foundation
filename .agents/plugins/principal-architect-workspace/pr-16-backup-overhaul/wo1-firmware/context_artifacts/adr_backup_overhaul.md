@@ -27,7 +27,7 @@ The backup endpoint `GET /api/config/backup` was silently broken. ESPAsyncWebSer
 {
   "backup_version": 1,
   "firmware_version": "unknown",
-  "device_id": "80:65:99:A1:8E:90",
+  "device_id": "<device-wifi-mac>",
   "device_type": "ESP32-S3",
   "datetime": "2026-06-03T22:17:11Z",
   "timezone": "UTC",

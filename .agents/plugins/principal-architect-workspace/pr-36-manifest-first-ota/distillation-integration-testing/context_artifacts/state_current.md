@@ -50,7 +50,7 @@ Signature verified OK with `public_key.pem`. Firmware binary signature and SHA25
 
 - **Board:** esp32dev on `/dev/cu.usbserial-5AA70033491`
 - **Running firmware:** `v0.0.12-dev.2` (with `manifest-latest` URL compiled in)
-- **IP:** `192.168.20.215`
+- **IP:** `<device-ip>`
 - **OTA status:** Manifest fetch returns HTTP 404 — **repo is private, PAT not configured**
 - **`OTA_GITHUB_TOKEN`:** NOT defined in build flags; `main.cpp` has `#ifdef` guard but macro never set
 

@@ -29,9 +29,9 @@ The MCP subsystem consists of three components:
 
 | Component | File | Responsibility |
 |---|---|---|
-| [`MCPServer`](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/modules/MCPServer/MCPServer.hpp) | `modules/MCPServer/MCPServer.hpp` | JSON-RPC dispatcher, Serial polling, HTTP route handler, config persistence |
-| [`MCPToolRegistry`](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/modules/MCPServer/MCPToolRegistry.hpp) | `modules/MCPServer/MCPToolRegistry.hpp` | Tool collection with name-based lookup |
-| [`MCPBuiltinTools`](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/modules/MCPServer/MCPBuiltinTools.hpp) | `modules/MCPServer/MCPBuiltinTools.hpp` | Foundation-level tools always available in the framework |
+| [`MCPServer`](../../modules/MCPServer/MCPServer.hpp) | `modules/MCPServer/MCPServer.hpp` | JSON-RPC dispatcher, Serial polling, HTTP route handler, config persistence |
+| [`MCPToolRegistry`](../../modules/MCPServer/MCPToolRegistry.hpp) | `modules/MCPServer/MCPToolRegistry.hpp` | Tool collection with name-based lookup |
+| [`MCPBuiltinTools`](../../modules/MCPServer/MCPBuiltinTools.hpp) | `modules/MCPServer/MCPBuiltinTools.hpp` | Foundation-level tools always available in the framework |
 
 ### Boot Sequence
 
@@ -45,7 +45,7 @@ During `MCPServer::begin()`:
 
 ## 3. Implementing `IMCPContributor`
 
-Any module can expose MCP tools by implementing the [`IMCPContributor`](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/include/interfaces/IMCPContributor.hpp) interface:
+Any module can expose MCP tools by implementing the [`IMCPContributor`](../../include/interfaces/IMCPContributor.hpp) interface:
 
 ```cpp
 #include "interfaces/IMCPContributor.hpp"

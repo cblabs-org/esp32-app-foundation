@@ -23,7 +23,7 @@ git checkout pr-12-state-machine
 **File:** `modules/u8g2Display/u8g2DisplayModule.cpp`
 **Location:** `_onStateChanged()` method, the WiFi gate branch (~L898-910)
 
-**Problem:** When the state first transitions to CONFIGURING, WiFi hasn't timed out yet. `getAPMode()` returns false, so the code uses the stored SSID ("cb-iot") instead of the hostname. The AP mode only activates ~15s later.
+**Problem:** When the state first transitions to CONFIGURING, WiFi hasn't timed out yet. `getAPMode()` returns false, so the code uses the stored SSID ("<home-ssid>") instead of the hostname. The AP mode only activates ~15s later.
 
 **Fix:** The WiFi wizard is shown when the WiFi gate is unsatisfied. This means the device IS or WILL BE in AP mode. The AP always broadcasts as the hostname. So always use hostname:
 

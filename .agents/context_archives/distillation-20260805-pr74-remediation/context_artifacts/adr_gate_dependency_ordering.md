@@ -37,7 +37,7 @@ Any gate that requires network access to be actionable (web portal configuration
 ```
 I (7859) Application: State → CONFIGURING
 I (7869) Config gate unsatisfied: WiFi Station (status=1)   ← InProgress, shown first
-I (9880) sta ip: 192.168.20.186                              ← WiFi connects
+I (9880) sta ip: <device-ip>                              ← WiFi connects
 I (9906) Application: State → RUNNING                        ← All gates satisfied
 ```
 

@@ -32,7 +32,7 @@ The device gets **HTTP 404** fetching `manifest-latest` from the private GitHub 
    ```
    Then either wait for boot auto-check or call:
    ```bash
-   curl -sk https://192.168.20.215/api/mcp -H 'Content-Type: application/json' \
+   curl -sk https://<device-ip>/api/mcp -H 'Content-Type: application/json' \
      -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"ota_check_now","arguments":{}}}'
    ```
 

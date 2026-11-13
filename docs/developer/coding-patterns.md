@@ -53,19 +53,19 @@ The framework's architecture directly maps to each of the five SOLID principles.
 
 > *A module must have a single reason to change.*
 
-Each interface represents exactly one concern. The `ConfigManager` handles persistence *routing*, but the modules themselves own their configuration structure via [IConfigurable](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/include/interfaces/IConfigurable.hpp). This means adding a new config field to `WifiManager` never requires modifying `ConfigManager`.
+Each interface represents exactly one concern. The `ConfigManager` handles persistence *routing*, but the modules themselves own their configuration structure via [IConfigurable](../../include/interfaces/IConfigurable.hpp). This means adding a new config field to `WifiManager` never requires modifying `ConfigManager`.
 
 ### Open/Closed Principle (OCP)
 
 > *Open for extension, closed for modification.*
 
-You extend the framework by creating new modules that implement interfaces — you never modify the `Application` class. Need a new web tab? Implement [IWebContributor](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/include/interfaces/IWebContributor.hpp). Need a new background data fetch? Implement [IDataSource](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/include/interfaces/IDataSource.hpp). The framework core doesn't change.
+You extend the framework by creating new modules that implement interfaces — you never modify the `Application` class. Need a new web tab? Implement [IWebContributor](../../include/interfaces/IWebContributor.hpp). Need a new background data fetch? Implement [IDataSource](../../include/interfaces/IDataSource.hpp). The framework core doesn't change.
 
 ### Liskov Substitution Principle (LSP)
 
 > *Any implementation of an interface must be perfectly substitutable.*
 
-The `CarouselEngine` can accept any [IDisplayBoard](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/include/interfaces/IDisplayBoard.hpp) without knowing its concrete type. A `WeatherBoard` and an `ErrorBoard` are interchangeable from the engine's perspective — both implement `render(U8G2&)`, `isExpired()`, `getBoardName()`, `onActivate()`, `onDeactivate()`, and `tick(uint32_t)`.
+The `CarouselEngine` can accept any [IDisplayBoard](../../modules/U8G2Display/IDisplayBoard.hpp) without knowing its concrete type. A `WeatherBoard` and an `ErrorBoard` are interchangeable from the engine's perspective — both implement `render(U8G2&)`, `isExpired()`, `getBoardName()`, `onActivate()`, `onDeactivate()`, and `tick(uint32_t)`.
 
 ### Interface Segregation Principle (ISP)
 
@@ -75,12 +75,12 @@ Instead of a monolithic `IModule` super-interface, the framework provides granul
 
 | Interface | Purpose |
 | :--- | :--- |
-| [ITickable](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/include/interfaces/ITickable.hpp) | `tick(uint32_t currentMillis)` — periodic main-loop execution |
-| [IConfigurable](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/include/interfaces/IConfigurable.hpp) | `applyConfig(const JsonObject&)` — config persistence |
-| [IWebContributor](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/include/interfaces/IWebContributor.hpp) | `registerRoutes(PsychicHttpServer&)` — REST API routes |
-| [IMCPContributor](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/include/interfaces/IMCPContributor.hpp) | `registerMCPTools(MCPToolRegistry&)` — JSON-RPC tools |
-| [IPreconditionContributor](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/include/interfaces/IPreconditionContributor.hpp) | `registerPreconditions()` — boot prerequisites |
-| [IDataSource](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/include/interfaces/IDataSource.hpp) | `fetchUpdate()` — background data fetching |
+| [ITickable](../../include/interfaces/ITickable.hpp) | `tick(uint32_t currentMillis)` — periodic main-loop execution |
+| [IConfigurable](../../include/interfaces/IConfigurable.hpp) | `applyConfig(const JsonObject&)` — config persistence |
+| [IWebContributor](../../include/interfaces/IWebContributor.hpp) | `registerRoutes(PsychicHttpServer&)` — REST API routes |
+| [IMCPContributor](../../include/interfaces/IMCPContributor.hpp) | `registerMCPTools(MCPToolRegistry&)` — JSON-RPC tools |
+| [IPreconditionContributor](../../include/interfaces/IPreconditionContributor.hpp) | `registerPreconditions()` — boot prerequisites |
+| [IDataSource](../../include/interfaces/IDataSource.hpp) | `fetchUpdate()` — background data fetching |
 
 A module that only needs periodic execution implements `ITickable` alone — it never touches config or web routes.
 
@@ -408,7 +408,7 @@ struct AppConfig {
 
 **Why it's wrong:** Violates SRP and OCP. Every time a module is added, the central config must change. Serialising the entire struct requires a massive contiguous memory allocation.
 
-**What to do instead:** Each module implements [IConfigurable](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/include/interfaces/IConfigurable.hpp) and owns its own config structure. The `ConfigManager` routes persistence to `/mod/<namespace>.json` files. See [Config System](config-system.md).
+**What to do instead:** Each module implements [IConfigurable](../../include/interfaces/IConfigurable.hpp) and owns its own config structure. The `ConfigManager` routes persistence to `/mod/<namespace>.json` files. See [Config System](config-system.md).
 
 ---
 
@@ -494,7 +494,7 @@ void setup() {
 
 **Why it was rejected:** The lowest-common-denominator approach ruins the unique capabilities of each display type. E-ink requires damage-rect partial refresh. TFT supports 16-bit colour. OLED uses 1-bit buffers. No single interface captures all three without becoming a leaky abstraction.
 
-**What to do instead:** Use the concrete driver directly (e.g., `U8G2` for OLED displays via [IDisplayBoard](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/include/interfaces/IDisplayBoard.hpp)). If swapping display hardware, replace the entire Display Module rather than trying to abstract behind a universal driver.
+**What to do instead:** Use the concrete driver directly (e.g., `U8G2` for OLED displays via [IDisplayBoard](../../modules/U8G2Display/IDisplayBoard.hpp)). If swapping display hardware, replace the entire Display Module rather than trying to abstract behind a universal driver.
 
 ---
 

@@ -56,4 +56,4 @@ These are tracked in `.agents/todo/todo.md` (items under 🔒 Security).
 
 - **Branch**: `pr-29-tls-optimization` merged to `main` at `18798d0`
 - **Tag**: `v0.0.11-dev.7` — verified running on esp32dev device
-- **Device**: `192.168.20.215`, OTA channel `dev`, heap 205 KB free
+- **Device**: `<device-ip>`, OTA channel `dev`, heap 205 KB free

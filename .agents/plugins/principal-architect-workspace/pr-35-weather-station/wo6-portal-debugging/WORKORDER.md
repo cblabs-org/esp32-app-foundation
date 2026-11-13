@@ -5,16 +5,16 @@ complexity: standard
 ---
 
 # Objective
-The user reports that the "Home Assistant" and "Weather" tabs do not load in the web portal on the device. The device is live at `http://192.168.20.215/`. You need to rigorously debug this frontend/backend interaction.
+The user reports that the "Home Assistant" and "Weather" tabs do not load in the web portal on the device. The device is live at `http://<device-ip>/`. You need to rigorously debug this frontend/backend interaction.
 
 # Tooling Constraints
-- Use the `read_url_content` tool or the `chrome-devtools` skill to inspect the portal at `http://192.168.20.215/`.
+- Use the `read_url_content` tool or the `chrome-devtools` skill to inspect the portal at `http://<device-ip>/`.
 - Check the browser console logs (if using chrome-devtools) or review the raw HTML/JS in `sample-app/data/` to identify the bug.
-- Verify the REST endpoints on the device (e.g., `http://192.168.20.215/api/weather/config` and `http://192.168.20.215/api/homeassistant/config`) to see if they are returning valid JSON or crashing.
+- Verify the REST endpoints on the device (e.g., `http://<device-ip>/api/weather/config` and `http://<device-ip>/api/homeassistant/config`) to see if they are returning valid JSON or crashing.
 - DO NOT rewrite the entire architecture. Pinpoint the exact bug (likely a missing DOM element, a JS typo, or a 404 endpoint).
 
 # Checklist
-- [x] Connect to `http://192.168.20.215/` and identify why the tabs fail to load.
+- [x] Connect to `http://<device-ip>/` and identify why the tabs fail to load.
 - [x] Check if the device's `/api/...` endpoints are functioning correctly via `curl` / `run_command` or HTTP read tools.
 - [x] Inspect the `data/` folder files (e.g., `index.html`, `js` files) for syntax errors or mismatches in tab IDs.
 - [x] Fix the bug in the source code.

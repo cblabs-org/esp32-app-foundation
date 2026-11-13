@@ -100,7 +100,7 @@ void U8g2DisplayModule::_onStateChanged(AppState newState) {
 }
 ```
 
-**IMPORTANT — AP SSID fix:** When WiFi is in AP mode, use `_app->getConfig().hostname` (the AP broadcasts as the hostname, e.g., "esp32-foundation"). When NOT in AP mode, use the stored SSID. This fixes the bug where the WiFi wizard showed "cb-iot" (stored SSID) instead of the actual AP name.
+**IMPORTANT — AP SSID fix:** When WiFi is in AP mode, use `_app->getConfig().hostname` (the AP broadcasts as the hostname, e.g., "esp32-foundation"). When NOT in AP mode, use the stored SSID. This fixes the bug where the WiFi wizard showed "<home-ssid>" (stored SSID) instead of the actual AP name.
 
 ### 4. Add state polling to `tick()` in `u8g2DisplayModule.cpp`
 

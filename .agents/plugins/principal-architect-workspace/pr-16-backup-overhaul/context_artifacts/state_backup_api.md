@@ -2,14 +2,14 @@
 
 ## Live Backup Response — `GET /api/config/backup`
 
-Validated on device `192.168.20.186` (MAC `80:65:99:A1:8E:90`) after merge commit `4d48d36`:
+Validated on device `<device-ip>` (MAC `<device-wifi-mac>`) after merge commit `4d48d36`:
 
 ```json
 {
   "_meta": {
     "backup_version": 1,
     "firmware_version": "0.1.0",
-    "device_id": "80:65:99:A1:8E:90",
+    "device_id": "<device-wifi-mac>",
     "device_type": "ESP32-S3",
     "datetime": "2026-06-03T22:30:01Z",
     "timezone": "UTC",
@@ -25,7 +25,7 @@ Validated on device `192.168.20.186` (MAC `80:65:99:A1:8E:90`) after merge commi
     "_v": 2
   },
   "wifi": {
-    "ssid": "cb-iot",
+    "ssid": "<home-ssid>",
     "hostname": "esp32-foundation",
     "_v": 1
   },
@@ -90,7 +90,7 @@ Namespace: `"ota"` | Schema version: `1` | File: `/mod/ota.json`
 1. `apiFetch('/api/config/backup')` → parsed JSON object
 2. `JSON.stringify` → `Blob` → `<a>` download trigger → file saved as `config-backup.json`
 3. If `_meta` present in response: display summary in `#backup-download-status`:
-   `"Downloaded: 5 modules — firmware v0.1.0, ESP32-S3 (80:65:99:A1:8E:90) — 2026-06-03T22:30Z"`
+   `"Downloaded: 5 modules — firmware v0.1.0, ESP32-S3 (<device-wifi-mac>) — 2026-06-03T22:30Z"`
 
 ### Restore flow
 1. File selected → `FileReader` reads immediately → parse JSON

@@ -72,7 +72,7 @@ Restored `board_upload.arduino.flash_extra_images =` (with the 4-line explanator
 
 ### Verification Results
 - **Doc Lint (`python3 scripts/doc_lint.py`):** Exited `0` with zero errors.
-- **PlatformIO MCP Build (`acquire_lock` -> `build_project(projectDir="/Users/mcneillm/Documents/Projects/esp32-app-foundation", environment="esp32s3nano", forceExecution=true)` -> `release_lock`):**
+- **PlatformIO MCP Build (`acquire_lock` -> `build_project(projectDir="<repo-root>", environment="esp32s3nano", forceExecution=true)` -> `release_lock`):**
   - Status: `SUCCESS` in `00:02:26.144` (`146.14s`), including `[web-tests] All web tests passed`.
   - Memory usage: RAM `18.6%` (`61,084` / `327,680` bytes), Flash `32.9%` (`1,381,139` / `4,194,304` bytes).
   - Build log (`.pio-mcp-workspace/logs/build/build-2026-11-15T13-16-29-488Z-e5571604.log`): confirmed `board_upload.arduino.flash_extra_images: ;`, zero occurrences of `nora_recovery` in the build output, and `firmware.factory.bin` assembled cleanly from `bootloader.bin` (`0x0`), `partitions.bin` (`0x8000`), `boot_app0.bin` (`0xe000`), and `firmware.bin` (`0x10000`).

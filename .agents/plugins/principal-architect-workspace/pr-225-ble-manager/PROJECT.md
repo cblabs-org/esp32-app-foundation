@@ -427,7 +427,7 @@ The BLE controller's `NimBLEDevice::init()` on ESP32-S3 acquires cross-core heap
 - PR #235 review comment posted with full validation matrix
 
 **Validation (v0.0.12-dev.80 on ESP32-S3-Nano):**
-- WiFi STA: connected to `cb-iot`, IP 192.168.20.186, uptime 327s+
+- WiFi STA: connected to `<home-ssid>`, IP <device-ip>, uptime 327s+
 - Portal: `/api/system`, `/api/tabs`, `/api/ble/status`, MCP `tools/list` all ✅
 - BLE: 4 Mac CoreBluetooth connect/disconnect cycles, MTU 185, FW version read, 3s hold stable, all clean disconnects (reason 0x213)
 - Serial: supervision timeout safely updated 720ms → 4.0s on every connection, zero GATT errors
@@ -436,7 +436,7 @@ The BLE controller's `NimBLEDevice::init()` on ESP32-S3 acquires cross-core heap
 
 **Summary:** Rebased wo7-portal-redesign (12 commits → 6) onto WO-8–WO-11. Tagged dev.81 and flashed — WiFi entered persistent AUTH_EXPIRE, BLE connections timed out due to WiFi radio starvation. Root-caused to WO-10's `WIFI_PS_MIN_MODEM` introduction. Fixed by removing modem sleep and restoring 30s STA timeout. Validated with 15-minute soak test and Android nRF Connect. PR #235 updated with all commits.
 
-**Root cause:** WO-10 (#236) added `WIFI_PS_MIN_MODEM` for BLE builds. On congested 2.4 GHz networks (cb-iot router), modem sleep caused the WiFi radio to sleep between DTIM beacons, missing 802.11 auth response frames. This produced:
+**Root cause:** WO-10 (#236) added `WIFI_PS_MIN_MODEM` for BLE builds. On congested 2.4 GHz networks (<home-ssid> router), modem sleep caused the WiFi radio to sleep between DTIM beacons, missing 802.11 auth response frames. This produced:
 1. **Persistent AUTH_EXPIRE** — WiFi couldn't authenticate (328+s to first connect, then dropped again)
 2. **BLE GATT CONN TIMEOUT** — constant WiFi auth retries (12 per 15s window across 3 channels) starved BLE of radio time
 3. **Android GATT cache poisoning** — the 147+133 cascade from failed BLE connections persisted across attempts, requiring a phone reboot to clear

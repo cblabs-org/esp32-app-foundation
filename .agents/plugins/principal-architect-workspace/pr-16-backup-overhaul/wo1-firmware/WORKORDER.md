@@ -140,7 +140,7 @@ Do NOT distill or commit until the Principal Architect explicitly approves.
 - **Commit:** `4c67b43` on branch `pr-16-backup-overhaul-wo1-firmware`
 - **Branch:** `pr-16-backup-overhaul`
 - **Build:** esp32s3nano — SUCCESS (Flash 58.5%, RAM 15.5%)
-- **Flash:** SUCCESS — device at 192.168.20.186
+- **Flash:** SUCCESS — device at <device-ip>
 - **Live endpoint:** `GET /api/config/backup` returns `_meta` envelope + 5 module sections (display, wifi, mcp, time, ota)
 
 ### Simplification notes

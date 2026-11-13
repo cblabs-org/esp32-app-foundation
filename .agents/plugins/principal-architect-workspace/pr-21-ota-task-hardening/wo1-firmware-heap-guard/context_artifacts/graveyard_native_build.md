@@ -37,7 +37,7 @@ The esp32s3nano build compiled with zero errors, confirming the include path res
 
 ## Issue 3: Device HTTP API unreachable from host
 
-**Symptom:** `curl http://192.168.4.1/api/ota` times out. Host is on 192.168.86.x.
+**Symptom:** `curl http://192.168.4.1/api/ota` times out. Host is on <home-subnet>.
 
 **Root cause:** The device had no WiFi station credentials configured (NVS wiped or
 stale credentials). It fell back to captive-portal AP mode (`esp32-foundation` SSID,

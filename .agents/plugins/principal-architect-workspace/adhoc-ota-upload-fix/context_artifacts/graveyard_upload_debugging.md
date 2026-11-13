@@ -13,7 +13,7 @@ Suspected the `ApiQueue` in `app.js` was blocking the upload. While the queue IS
 Investigated whether ESP32 httpd was running out of sockets or rejecting the 1.3 MB binary. Confirmed `MAX_UPLOAD_SIZE` was 2 MB (sufficient) and curl could complete the upload (proving the socket layer worked).
 
 ## Key Insight: curl Worked But Got No Response
-The breakthrough was that `curl -v -X POST -F "firmware=@..." -F "signature=@..." http://192.168.20.215/api/ota/upload` uploaded all 1251 KB successfully but **timed out waiting for a response** (exit code 28). This proved:
+The breakthrough was that `curl -v -X POST -F "firmware=@..." -F "signature=@..." http://<device-ip>/api/ota/upload` uploaded all 1251 KB successfully but **timed out waiting for a response** (exit code 28). This proved:
 - The TCP connection was fine
 - Data transfer was fine
 - The server was silently dropping the data (not processing it)

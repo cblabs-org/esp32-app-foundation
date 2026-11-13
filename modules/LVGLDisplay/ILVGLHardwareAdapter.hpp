@@ -3,7 +3,6 @@
  *
  * @file ILVGLHardwareAdapter.hpp
  * @brief Hardware adaptation interface for LVGL display drivers
- * @author Matthew McNeill
  * 
  * Module: modules/LVGLDisplay/ILVGLHardwareAdapter.hpp
  * Project: esp32-app-foundation

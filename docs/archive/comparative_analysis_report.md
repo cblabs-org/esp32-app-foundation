@@ -2,7 +2,7 @@
 
 **Evaluator Role:** Senior Embedded Systems Architect & OOP Expert  
 **Date:** 2026-05-22  
-**Spec Evaluated Against:** [PROGRAM-PLAN.md](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/.agents/skills/principal-architect-workspace/esp32-app-foundation/PROGRAM-PLAN.md) + [design_specification.md](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/docs/design_specification.md)
+**Spec Evaluated Against:** [PROGRAM-PLAN.md](../../.agents/plugins/principal-architect-workspace/esp32-app-foundation/PROGRAM-PLAN.md) + [design_specification.md](../design_specification.md)
 
 ---
 
@@ -10,8 +10,8 @@
 
 | Label | Path | Agent Stack | Role |
 |-------|------|-------------|------|
-| **T1** | [esp32-app-foundation](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation) | Principal Architect Skill + Claude Opus 4.6 / Gemini Pro 3.1 | Multi-agent orchestrated (PA → Workers) |
-| **T2** | [esp32-app-foundation-t2](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation-t2) | Antigravity Teamwork-Preview + Gemini Flash 3.5 High | Teamwork collaborative agents |
+| **T1** | `esp32-app-foundation` | Principal Architect Skill + Claude Opus 4.6 / Gemini Pro 3.1 | Multi-agent orchestrated (PA → Workers) |
+| **T2** | `esp32-app-foundation-t2` | Antigravity Teamwork-Preview + Gemini Flash 3.5 High | Teamwork collaborative agents |
 
 ---
 
@@ -37,11 +37,11 @@ Both implementations deliver a functional ESP32 application framework, but they 
 
 | Artefact | Spec Requirement | T1 | T2 |
 |----------|-----------------|----|----|
-| `src/main.cpp` | Framework entry point | ✅ [main.cpp](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/src/main.cpp) | ❌ **Missing** — only in `template/` |
-| `library.json` | PlatformIO manifest | ✅ [library.json](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/library.json) (1.4KB) | ❌ **Missing** at root |
+| `src/main.cpp` | Framework entry point | ✅ [main.cpp](../../src/main.cpp) | ❌ **Missing** — only in `template/` |
+| `library.json` | PlatformIO manifest | ✅ [library.json](../../library.json) (1.4KB) | ❌ **Missing** at root |
 | `.gitignore` | Repo hygiene | ✅ Present | ❌ **Missing** |
-| `README.md` | Project docs | ✅ [README.md](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/README.md) | ❌ **Missing** |
-| `CONTRIBUTING.md` | Developer guide | ✅ [CONTRIBUTING.md](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/CONTRIBUTING.md) | ❌ **Missing** |
+| `README.md` | Project docs | ✅ [README.md](../../README.md) | ❌ **Missing** |
+| `CONTRIBUTING.md` | Developer guide | ✅ [CONTRIBUTING.md](../../CONTRIBUTING.md) | ❌ **Missing** |
 | `sdkconfig.defaults` | ESP-IDF config | ✅ At root (797B) | ⚠️ Only inside `template/` |
 | `sdkconfig.defaults.esp32s3nano` | S3 variant | ✅ At root (763B) | ⚠️ Only inside `template/` |
 | `CMakeLists.txt` | ESP-IDF compat | ✅ Present | ❌ Missing |
@@ -80,7 +80,7 @@ Both implementations deliver a functional ESP32 application framework, but they 
 
 Both builds correctly implement the Application hub as a **composition root** using the **Hollywood Principle** (framework owns `setup()`/`loop()`). Both implement the **two-tier vector model** with `_compactAndLock()`. Key differences:
 
-#### T1 — [Application.hpp](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/modules/application/Application.hpp) (258 lines) + [Application.cpp](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/modules/application/Application.cpp) (388 lines)
+#### T1 — [Application.hpp](../../modules/application/Application.hpp) (258 lines) + [Application.cpp](../../modules/application/Application.cpp) (388 lines)
 
 **Strengths:**
 - **Return-value registration**: All `register*()` methods return `bool` — callers know if registration succeeded or was rejected
@@ -94,7 +94,7 @@ Both builds correctly implement the Application hub as a **composition root** us
 - WiFiManager, ConfigManager, KeyManager, TimeManager, OtaUpdateManager are **not wired into the hub** — `begin()` has TODOs. These services exist as standalone modules but aren't composed
 - No configManager/keyManager accessors exposed
 
-#### T2 — [Application.hpp](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation-t2/modules/application/Application.hpp) (205 lines) + [Application.cpp](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation-t2/modules/application/Application.cpp) (202 lines)
+#### T2 — `Application.hpp` (205 lines) + `Application.cpp` (202 lines)
 
 **Strengths:**
 - **All 9 kernel services owned by value** and fully wired — ConfigManager, KeyManager, WifiManager, TimeManager, OtaUpdateManager are all composed and booted
@@ -166,12 +166,12 @@ Both builds correctly implement the Application hub as a **composition root** us
 | Pattern | T1 | T2 |
 |---------|----|----|
 | NATIVE_BUILD compile guards | ✅ All ESP-IDF calls wrapped | ✅ All ESP-IDF calls wrapped |
-| Native mock infrastructure | ⚠️ `String` stub duplicated in 4+ files | ✅ Centralised mock directory: [test/mocks/](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation-t2/test/mocks) |
+| Native mock infrastructure | ⚠️ `String` stub duplicated in 4+ files | ✅ Centralised mock directory: `test/mocks/` |
 | Native test framework | GoogleTest 1.15.2 | ArduinoFake 0.4.0 + custom test_main |
 | C++ standard | `-std=gnu++17` | `-std=gnu++14` (hardware) |
 
 > [!TIP]
-> T2's centralised [test/mocks/](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation-t2/test/mocks) directory with mock headers for `FS.h`, `WiFi.h`, `Preferences.h`, `U8g2lib.h`, and FreeRTOS stubs is a **better pattern** than T1's repeated inline `String` stub duplication. T1 should extract these to a shared mock header.
+> T2's centralised `test/mocks/` directory with mock headers for `FS.h`, `WiFi.h`, `Preferences.h`, `U8g2lib.h`, and FreeRTOS stubs is a **better pattern** than T1's repeated inline `String` stub duplication. T1 should extract these to a shared mock header.
 
 ### 3.4 Build Configuration
 

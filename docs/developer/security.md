@@ -37,7 +37,7 @@ The framework assumes:
 
 ## 3. Hardware Encryption (DeviceCrypto)
 
-[`DeviceCrypto`](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/lib/DeviceCrypto/DeviceCrypto.hpp) provides AES-256-CBC encryption using a 256-bit master key stored in NVS (Non-Volatile Storage).
+[`DeviceCrypto`](../../lib/DeviceCrypto/DeviceCrypto.hpp) provides AES-256-CBC encryption using a 256-bit master key stored in NVS (Non-Volatile Storage).
 
 ### API
 
@@ -60,7 +60,7 @@ Both `encrypt()` and `decrypt()` are `virtual`, allowing test mocks in native bu
 
 ## 4. Credential Storage (KeyManager)
 
-[`KeyManager`](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/modules/KeyManager/KeyManager.hpp) builds on `DeviceCrypto` to provide a named credential registry. It is a kernel service implementing `IWebContributor` (tab: "Keys", parent: "System", order: 20).
+[`KeyManager`](../../modules/KeyManager/KeyManager.hpp) builds on `DeviceCrypto` to provide a named credential registry. It is a kernel service implementing `IWebContributor` (tab: "Keys", parent: "System", order: 20).
 
 ### API
 
@@ -161,7 +161,7 @@ Constrained devices should limit allowed cipher suites to faster, more memory-ef
 
 ## 6. Web Portal & MCP Authentication
 
-[`AuthManager`](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/modules/AuthManager/AuthManager.hpp) provides session-based authentication with SHA-256 password hashing for the Web Portal and bearer-token authentication for the MCP API.
+[`AuthManager`](../../modules/AuthManager/AuthManager.hpp) provides session-based authentication with SHA-256 password hashing for the Web Portal and bearer-token authentication for the MCP API.
 
 ### Password Storage
 
@@ -271,7 +271,7 @@ The framework implements a multi-layer OTA security model: cryptographic signatu
 
 ### Firmware Signature Verification
 
-All OTA firmware updates can be verified using RSA-2048 signature verification via the [`IOTAVerifier`](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/include/interfaces/IOTAVerifier.hpp) interface.
+All OTA firmware updates can be verified using RSA-2048 signature verification via the [`IOTAVerifier`](../../include/interfaces/IOTAVerifier.hpp) interface.
 
 #### IOTAVerifier Interface
 
@@ -350,7 +350,7 @@ The OTA FreeRTOS task stack MUST reside in DRAM (not PSRAM) because the OTA pipe
 
 ### FrameworkConfig — OTA Key Injection
 
-The public key for OTA signature verification is provided at boot time via [`FrameworkConfig`](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/include/FrameworkConfig.hpp):
+The public key for OTA signature verification is provided at boot time via [`FrameworkConfig`](../../include/types/FrameworkConfig.hpp):
 
 ```cpp
 struct FrameworkConfig {

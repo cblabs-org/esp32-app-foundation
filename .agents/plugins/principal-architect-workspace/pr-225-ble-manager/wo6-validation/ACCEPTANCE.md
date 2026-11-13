@@ -1,7 +1,7 @@
 # WO-6 Hardware Acceptance Report
 
 **Firmware:** `v0.0.12-dev.67`  
-**Device:** Waveshare ESP32-S3 Nano (MAC WiFi: `80:65:99:A1:8E:90`, MAC BLE: `80:65:99:A1:8E:92`)  
+**Device:** Waveshare ESP32-S3 Nano (MAC WiFi: `<device-wifi-mac>`, MAC BLE: `<device-ble-mac>`)  
 **Branch:** `ble-manager/wo6-validation`  
 **Date:** 2026-09-23  
 **Tester:** Automated (Mac BLE via bleak + MCP API + serial monitor)
@@ -111,7 +111,7 @@ I (7495) PreconditionEngine: Graph: [BLE Advertising]
 I (7808) BLEManager: BLEManager wired to Application. Providers locked.
 I (17673) BLEManager: Transitioning Idle -> Starting. Initializing stack...
 I (17673) BLEStack: Initializing NimBLE stack as 'ESP32'...
-I (17675) BLE_INIT: Bluetooth MAC: 80:65:99:a1:8e:92
+I (17675) BLE_INIT: Bluetooth MAC: <device-ble-mac>
 I (17682) NimBLEDevice: NimBLE Started!
 I (17692) BLEStack: NimBLE stack initialized successfully. Host task running.
 I (17693) DeviceInfoService: Device Information Service (0x180A) registered
@@ -188,6 +188,6 @@ Footer: "Built with **ESP32 App Foundation** by CB Labs"
 
 - **Mac:** macOS, Apple M-series, BLE via CoreBluetooth
 - **BLE library:** bleak 3.0.2 (Python)
-- **MCP API:** HTTP JSON-RPC at `http://192.168.20.186/api/mcp`
-- **REST API:** `GET http://192.168.20.186/api/ble/status`, `/api/system`
+- **MCP API:** HTTP JSON-RPC at `http://<device-ip>/api/mcp`
+- **REST API:** `GET http://<device-ip>/api/ble/status`, `/api/system`
 - **Serial:** PlatformIO monitor on `/dev/cu.usbmodem101`

@@ -6,7 +6,7 @@
 
 ---
 
-The ESP32 App Foundation features a synchronous, in-memory publish-subscribe [EventBus](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/modules/EventBus/EventBus.hpp) that allows optional modules to communicate without direct dependencies.
+The ESP32 App Foundation features a synchronous, in-memory publish-subscribe [EventBus](../../modules/EventBus/EventBus.hpp) that allows optional modules to communicate without direct dependencies.
 
 For architectural decisions and structure details, see the [Inter-Module Communication](../design_specification.md#11-inter-module-communication) section in the Design Specification.
 
@@ -88,13 +88,13 @@ The framework core modules publish several system events that custom modules can
 
 | Topic Constant | String Value | Publisher | Payload Type | Description |
 | :--- | :--- | :--- | :--- | :--- |
-| `ApplicationEvents::SYSTEM_HEAP` | `"system.heap"` | [Application](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/modules/Application/Application.hpp) | `const uint32_t*` | Emitted periodically containing the current free heap memory in bytes. |
-| `ApplicationEvents::APP_RUNNING` | `"app.running"` | [Application](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/modules/Application/Application.hpp) | `nullptr` | Emitted when all configuration gates are satisfied and the system enters the RUNNING state. |
-| `ApplicationEvents::APP_CONFIGURING` | `"app.configuring"` | [Application](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/modules/Application/Application.hpp) | `const AppConfiguringPayload*` | Emitted when entering the CONFIGURING state. Payload contains `gateName`, `helpText`, `actionStatus` (GateActionStatus enum), `isRegression`, `hostname`, `deviceIP` (see [AppConfiguringPayload.hpp](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/include/events/AppConfiguringPayload.hpp)). |
-| `OTAUpdateManagerEvents::OTA_PROGRESS` | `"ota.progress"` | [OTAUpdateManager](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/modules/OTAUpdateManager/OTAUpdateManager.hpp) | `const OTAProgressEvent*` | Emitted during an active firmware download. Payload contains `progress` (0.0–1.0), `status` string, `complete` flag, and `success` flag. |
-| `U8G2DisplayEvents::DISPLAY_SLEEP` | `"display.sleep"` | [U8G2DisplayModule](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/modules/U8G2Display/U8G2Display.hpp) | `nullptr` | Published when the screen saver kicks in and the display shuts down to prevent OLED burn-in. |
-| `U8G2DisplayEvents::DISPLAY_WAKE` | `"display.wake"` | [U8G2DisplayModule](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/modules/U8G2Display/U8G2Display.hpp) | `nullptr` | Published when user interaction wakes the screen back up. |
-| `U8G2DisplayEvents::DISPLAY_BOARD_CHANGED` | `"display.board.changed"` | [U8G2DisplayModule](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/modules/U8G2Display/U8G2Display.hpp) | `const DisplayBoardChangedPayload*` | Emitted when the visible board on the U8G2 carousel changes. Payload contains `boardName` and `boardIndex`. |
+| `ApplicationEvents::SYSTEM_HEAP` | `"system.heap"` | [Application](../../modules/Application/Application.hpp) | `const uint32_t*` | Emitted periodically containing the current free heap memory in bytes. |
+| `ApplicationEvents::APP_RUNNING` | `"app.running"` | [Application](../../modules/Application/Application.hpp) | `nullptr` | Emitted when all configuration gates are satisfied and the system enters the RUNNING state. |
+| `ApplicationEvents::APP_CONFIGURING` | `"app.configuring"` | [Application](../../modules/Application/Application.hpp) | `const AppConfiguringPayload*` | Emitted when entering the CONFIGURING state. Payload contains `gateName`, `helpText`, `actionStatus` (GateActionStatus enum), `isRegression`, `hostname`, `deviceIP` (see [AppConfiguringPayload.hpp](../../include/events/AppConfiguringPayload.hpp)). |
+| `OTAUpdateManagerEvents::OTA_PROGRESS` | `"ota.progress"` | [OTAUpdateManager](../../modules/OTAUpdateManager/OTAUpdateManager.hpp) | `const OTAProgressEvent*` | Emitted during an active firmware download. Payload contains `progress` (0.0–1.0), `status` string, `complete` flag, and `success` flag. |
+| `U8G2DisplayEvents::DISPLAY_SLEEP` | `"display.sleep"` | [U8G2DisplayModule](../../modules/U8G2Display/U8G2Display.hpp) | `nullptr` | Published when the screen saver kicks in and the display shuts down to prevent OLED burn-in. |
+| `U8G2DisplayEvents::DISPLAY_WAKE` | `"display.wake"` | [U8G2DisplayModule](../../modules/U8G2Display/U8G2Display.hpp) | `nullptr` | Published when user interaction wakes the screen back up. |
+| `U8G2DisplayEvents::DISPLAY_BOARD_CHANGED` | `"display.board.changed"` | [U8G2DisplayModule](../../modules/U8G2Display/U8G2Display.hpp) | `const DisplayBoardChangedPayload*` | Emitted when the visible board on the U8G2 carousel changes. Payload contains `boardName` and `boardIndex`. |
 | `U8G2DisplayEvents::DISPLAY_MESSAGE` | `"display.message"` | *Any Module* | `const DisplayMessagePayload*` | Subscribed to by the display module. Any module can publish to this topic to display a scrolling message overlay. Payload contains `message` and `durationMs`. |
 
 ---

@@ -1,6 +1,6 @@
 # Graveyard: Portal UI Bugs Found During Live Testing
 
-Five bugs discovered during live hardware testing on CrowPanel 1.28" (ESP32-S3, IP `192.168.20.62`).
+Five bugs discovered during live hardware testing on CrowPanel 1.28" (ESP32-S3, IP `<device-ip>`).
 
 ## Bug 1: Card Title "Brightness & Orientation"
 **Symptom:** Settings card header said "Brightness & Orientation" after flip controls moved to Hardware pill.
