@@ -1,7 +1,7 @@
 /*
  * ESP32 App Foundation (c) 2026 CB Labs
  *
- * https://github.com/matthewmcneill/esp32-app-foundation
+ * https://github.com/cblabs-org/esp32-app-foundation
  *
  * Module: test/test_unit/test_otaUpdateManager/test_otaUpdateManager.cpp
  * Description: Native unit tests for the OTAUpdateManager OTA orchestrator.

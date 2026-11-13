@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "library": "/Users/mcneillm/.gemini/skill-library",
+  "library": "~/.gemini/skill-library",
   "skills": {
     "embedded-systems": {
       "type": "authored",
@@ -49,11 +49,6 @@
         "forkedAt": "2026-06-15T17:06:57Z"
       },
       "importedAt": "2026-05-15T22:32:44Z"
-    },
-    "house-style-docs": {
-      "type": "authored",
-      "origin": null,
-      "importedAt": "2026-05-15T23:16:04Z"
     },
     "systematic-debugging": {
       "type": "imported",

@@ -465,7 +465,7 @@ Apps consume the framework via **git submodule**:
 
 ```bash
 # Add the framework as a submodule (pinned to a commit SHA)
-git submodule add https://github.com/matthewmcneill/esp32-app-foundation.git framework
+git submodule add https://github.com/cblabs-org/esp32-app-foundation.git framework
 git submodule update --init
 ```
 
@@ -2147,7 +2147,7 @@ esp32-app-foundation/           ← Monorepo root
 Apps consume the framework either as a **git submodule** pinned to a commit SHA or as a PlatformIO library:
 
 ```bash
-git submodule add https://github.com/matthewmcneill/esp32-app-foundation.git framework
+git submodule add https://github.com/cblabs-org/esp32-app-foundation.git framework
 git submodule update --init
 ```
 

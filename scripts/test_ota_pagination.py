@@ -6,7 +6,7 @@ import argparse
 def fetch_page(per_page, page):
     # Fetch from GH API. We unset GITHUB_TOKEN to avoid 'Bad credentials' if token is invalid,
     # ensuring we hit the public endpoint.
-    cmd = f'unset GITHUB_TOKEN && gh api "/repos/matthewmcneill/esp32-app-foundation/releases?per_page={per_page}&page={page}"'
+    cmd = f'unset GITHUB_TOKEN && gh api "/repos/cblabs-org/esp32-app-foundation/releases?per_page={per_page}&page={page}"'
     result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
     if result.returncode != 0:
         # Check if it's just an empty array or an error

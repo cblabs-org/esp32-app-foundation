@@ -1,6 +1,6 @@
 #
 # ESP32 App Foundation (c) 2026 CB Labs
-# https://github.com/matthewmcneill/esp32-app-foundation
+# https://github.com/cblabs-org/esp32-app-foundation
 #
 # Library build hook for LVGLDisplay — owns the src filter.
 #

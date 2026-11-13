@@ -34,7 +34,7 @@ Use this table to determine the appropriate workflow for your change:
 
 ### How to File a Proposal
 
-File a GitHub issue on `matthewmcneill/esp32-app-foundation` with the `P4-enhancement` label.
+File a GitHub issue on `cblabs-org/esp32-app-foundation` with the `P4-enhancement` label.
 
 ### Lightweight Proposal Format
 

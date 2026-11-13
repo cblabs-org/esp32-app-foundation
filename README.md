@@ -259,7 +259,7 @@ significantly more headroom for TLS handshakes, large JSON payloads, and additio
 ### Path A — Explore the sample app (fastest)
 
 ```bash
-git clone https://github.com/matthewmcneill/esp32-app-foundation.git
+git clone https://github.com/cblabs-org/esp32-app-foundation.git
 cd esp32-app-foundation
 pio run -e esp32dev --target upload
 pio run -e esp32dev --target uploadfs
@@ -275,7 +275,7 @@ Connect to the `ESP32-App-Setup` WiFi AP and open `http://192.168.4.1` to config
 ```bash
 mkdir my-device && cd my-device
 git init
-git submodule add https://github.com/matthewmcneill/esp32-app-foundation.git lib/esp32-app-foundation
+git submodule add https://github.com/cblabs-org/esp32-app-foundation.git lib/esp32-app-foundation
 cp lib/esp32-app-foundation/platformio.ini .
 cp lib/esp32-app-foundation/src/main.cpp src/
 ```

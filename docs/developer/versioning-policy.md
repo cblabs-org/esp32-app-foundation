@@ -32,6 +32,44 @@ v<MAJOR>.<MINOR>.<PATCH>[-<CHANNEL>.<PRE_NUM>]
 | `v0.1.3`            | Stable release of patch 3 — manually promoted                   |
 | `v0.2.0`            | Minor bump — new capability boundary, human decision             |
 
+**Channel precedence** (low → high): `dev < beta < rc < stable`. `v0.1.3-beta.1`
+is *higher* than `v0.1.3-dev.9`. Plain `git tag --sort=-version:refname` sorts
+`dev` above `beta` alphabetically, so never use it to find "the latest tag".
+
+---
+
+## Choosing the Next Tag — `scripts/next_version.py`
+
+Always get the next tag from the script rather than working it out by hand:
+
+```bash
+python3 scripts/next_version.py --current                # highest tag per channel + each channel's next tag
+python3 scripts/next_version.py --fetch --channel dev    # next dev tag
+python3 scripts/next_version.py --channel beta           # next beta (print only)
+python3 scripts/next_version.py --channel beta --bump major   # e.g. v1.0.0-beta.1 (print only)
+python3 scripts/next_version.py --channel dev --tag --push    # create + push a dev tag
+```
+
+What it guarantees:
+
+- A new tag always sorts **above every existing tag of the same or a higher
+  channel** — it never produces a version regression.
+- `dev` continues the newest dev series, or opens the next PATCH once that
+  core already has a `beta`, `rc` or stable tag.
+- `beta`, `rc` and stable promote the core of the newest beta-or-higher tag,
+  moving to the next PATCH once that core has reached a higher channel.
+- `--bump patch|minor|major` and `--target X.Y.Z` pick the core explicitly
+  (human decisions).
+- `--tag` only creates **dev** tags, and only within the current dev series;
+  a dev tag that opens a new PATCH needs `--new-series`, which agents pass
+  only after the user approves. Beta, rc, stable, MINOR and MAJOR are always
+  tagged by the user.
+
+`scripts/inject_version.py` runs inside the PlatformIO build and keeps its own
+copy of the tag parser, so `scripts/tests/test_next_version.py` checks that the
+two agree on the tag pattern and channel ranks. Run the tests with
+`python3 -m pytest scripts/tests`.
+
 ---
 
 ## Single Source of Truth
@@ -73,12 +111,14 @@ git tag v0.1.4-dev.2 && git push origin v0.1.4-dev.2
 ```
 
 **Rules:**
-- `PATCH` should be the *next* unreleased patch number (i.e. current stable patch + 1).
+- `PATCH` is the next patch above the highest tag of **any** channel —
+  `next_version.py --channel dev` works it out. Opening a new PATCH series
+  needs user approval; continuing the current dev series does not.
 - `PRE_NUM` starts at 1 and increments with each functionally-distinct build.
-- Dev tags ARE published as GitHub pre-releases via `deploy_release.py` so that
-  devices on the `dev` OTA channel can receive in-flight builds.
-- Agents MAY run `deploy_release.py` for `dev` tags autonomously (same autonomy
-  as tag creation). Beta/stable deploys still require user approval.
+- Dev tags can be published as GitHub pre-releases via `deploy_release.py` so
+  that devices on the `dev` OTA channel receive in-flight builds. The **user**
+  runs `deploy_release.py` for every channel: the signing key needs an
+  interactive passphrase, so agents output the command instead of running it.
 
 ---
 
@@ -145,6 +185,23 @@ python3 scripts/deploy_release.py --local --private-key private_key.pem
 
 ---
 
+## Long-Running Public Beta (1.0.0)
+
+The first public release opens a beta series that stays open until outside
+feedback says 1.0.0 is mature — potentially a long time. During that period:
+
+- **Betas stay on `v1.0.0-beta.N`.** Each beta-worthy merge gets the next
+  `beta.N` (`next_version.py --channel beta`), not a new PATCH.
+- **Dev builds run ahead on `v1.0.1-dev.N`**, because a dev tag must sort
+  above the open beta. Bench devices on the `dev` channel therefore never
+  "upgrade" back down to a beta.
+- **`v1.0.0` is promoted from a chosen beta** when the maintainer decides it
+  is ready (`next_version.py --channel stable` → `v1.0.0`).
+- After promotion the normal per-PR PATCH rule resumes: the next beta is
+  `v1.0.1-beta.1`, and dev moves on to `v1.0.2-dev.N` once that beta exists.
+
+---
+
 ## Minor and Major Bumps
 
 | Bump    | Trigger                                                                | Who decides |
@@ -188,10 +245,11 @@ implementation plan and let the user confirm.
 
 ```
 Building firmware with new functionality →
-  Does a dev tag already exist for the current target patch?
-  ├─ YES: Increment PRE_NUM → CREATE v0.X.Y-dev.N+1 (autonomous ✅)
-  └─ NO:  Start at PRE_NUM=1 → CREATE v0.X.Y-dev.1 (autonomous ✅)
-      where X.Y = next unreleased patch (last stable/beta patch + 1)
+  Run: python3 scripts/next_version.py --fetch --channel dev
+  Does the suggested tag continue the current dev series (same PATCH)?
+  ├─ YES: next_version.py --channel dev --tag --push (autonomous ✅)
+  └─ NO (opens a new PATCH): STOP, ask the user to approve the tag,
+         then re-run with --new-series
 
 Building firmware with NO new functionality →
   → No new tag. inject_version.py will use the nearest ancestor tag.
@@ -201,17 +259,17 @@ PR merged →
   → User will decide whether to cut a beta and at what patch number.
 
 User says "cut a beta" →
-  → Confirm PATCH number (increment from last beta/stable patch).
-  → Confirm PRE_NUM (1 unless a beta already exists for this patch).
-  → Tag and push.
+  → Show the user next_version.py --channel beta (plus --bump/--target if
+    they asked for a new PATCH/MINOR/MAJOR) and confirm the tag.
+  → The user tags and pushes (beta tags are human-only).
   → Build, flash to hardware, and validate (version, portal, basic operation).
-  → When satisfied, run deploy_release.py --local to sign and publish.
+  → When satisfied, give the user the deploy_release.py command to run.
 
 User says "promote to stable" →
-  → Confirm the tag matches the last beta for that patch (drop the suffix).
-  → Tag and push.
+  → Show the user next_version.py --channel stable and confirm the tag.
+  → The user tags and pushes.
   → Build, flash to hardware, and validate.
-  → When satisfied, run deploy_release.py --local to sign and publish.
+  → When satisfied, give the user the deploy_release.py command to run.
   → This is a human-gated action — do not initiate unless explicitly instructed.
 ```
 
@@ -225,8 +283,8 @@ User says "promote to stable" →
 | Create `beta` tag             | ❌ No          | Yes                    |
 | Create `rc` tag               | ❌ No          | Yes                    |
 | Create `stable` tag           | ❌ No          | Yes                    |
-| Increment `PATCH`             | ❌ No          | Yes                    |
+| Continue a `dev` series        | ✅ Yes         | No                     |
+| Open a new `PATCH` (incl. dev) | ❌ No          | Yes                    |
 | Increment `MINOR` or `MAJOR`  | ❌ No          | Yes                    |
-| Run `deploy_release.py` (dev) | ✅ Yes         | No                     |
-| Run `deploy_release.py` (β/stable) | ❌ No    | Yes                    |
+| Run `deploy_release.py` (any) | ❌ No          | Yes (user runs the CLI) |
 | Move/force-push a tag         | ❌ No          | Yes (state in plan)    |

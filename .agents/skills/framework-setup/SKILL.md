@@ -30,7 +30,7 @@ modules against pure virtual interfaces (`ITickable`, `IConfigurable`,
 configuration persistence, OTA updates, a web portal, a display carousel, and
 an on-device MCP server out of the box — you focus on your application logic.
 
-**Repository:** `https://github.com/matthewmcneill/esp32-app-foundation`
+**Repository:** `https://github.com/cblabs-org/esp32-app-foundation`
 
 ---
 
@@ -64,7 +64,7 @@ suggest they use `framework-expert` directly. Stop here.
 ## Step 2 — Add the Framework as a Submodule
 
 ```bash
-git submodule add https://github.com/matthewmcneill/esp32-app-foundation.git framework
+git submodule add https://github.com/cblabs-org/esp32-app-foundation.git framework
 git submodule update --init
 ```
 
@@ -95,8 +95,8 @@ These two skills provide:
 - **framework-portal-design** — UI kit, brand tokens, and portal styling
   guidelines.
 
-> **Note:** Additional skills (embedded-systems, house-style-docs,
-> systematic-debugging, etc.) are available in the framework submodule at
+> **Note:** Additional skills (embedded-systems, oo-expert,
+> lvgl-pro-expert, etc.) are available in the framework submodule at
 > `framework/.agents/skills/`. Symlink more as needed:
 > `ln -s ../../framework/.agents/skills/<name> .agents/skills/<name>`
 

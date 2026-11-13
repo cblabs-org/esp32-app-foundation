@@ -206,7 +206,7 @@
       return ver === 'unknown' ? 'unknown' : 'v' + (ver || '?');
     }
     const tag = (ver.startsWith('v') || ver.startsWith('V')) ? ver : 'v' + ver;
-    const template = baseUrl || 'https://github.com/matthewmcneill/esp32-app-foundation-releases/releases/tag/{version}';
+    const template = baseUrl || 'https://github.com/cblabs-org/esp32-app-foundation-releases/releases/tag/{version}';
     const url = template.includes('{version}')
       ? template.replace('{version}', encodeURIComponent(tag))
       : template.replace(/\/+$/, '') + '/' + encodeURIComponent(tag);

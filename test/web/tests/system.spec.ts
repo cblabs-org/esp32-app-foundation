@@ -140,7 +140,7 @@ test.describe('System Status Sub-pill', () => {
 
     const versionLink = deviceInfo.locator('a[href*="releases/tag"]');
     await expect(versionLink).toHaveText('v1.0.0-test');
-    await expect(versionLink).toHaveAttribute('href', 'https://github.com/matthewmcneill/esp32-app-foundation-releases/releases/tag/v1.0.0-test');
+    await expect(versionLink).toHaveAttribute('href', 'https://github.com/cblabs-org/esp32-app-foundation-releases/releases/tag/v1.0.0-test');
     await expect(versionLink).toHaveAttribute('target', '_blank');
     await expect(versionLink).toHaveAttribute('rel', 'noopener noreferrer');
   });

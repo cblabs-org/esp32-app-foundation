@@ -106,7 +106,7 @@ Solder or connect the 6 SPI wires between the display and your ESP32 board.
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/matthewmcneill/esp32-app-foundation.git
+git clone https://github.com/cblabs-org/esp32-app-foundation.git
 cd esp32-app-foundation
 ```
 

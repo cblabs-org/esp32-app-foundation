@@ -96,8 +96,12 @@ pio run -e esp32dev --target uploadfs
 
 Build and deploy are **separate phases** with hardware validation in between:
 
+Get the tag from `scripts/next_version.py --channel <dev|beta|rc|stable>`; never
+derive it by hand (see `docs/developer/versioning-policy.md`).
+
 ```bash
 # Phase 1: Tag + Build + Validate
+python3 scripts/next_version.py --channel stable        # → v0.1.4
 git tag v0.1.4 && git push origin v0.1.4
 pio run -e esp32dev -t clean && pio run -e esp32dev    # build
 pio run -e esp32dev --target upload                     # flash
