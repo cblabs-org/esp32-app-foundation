@@ -68,4 +68,4 @@ Single-PR programme targeting `feat/dhcp-ntp-timezone` (based on `main` at `6a1c
 
 ## 3. Programme Session Log
 
-- **2026-11-14 (Tier 1 Chief Architect):** Initialized `prog-dhcp-ntp-timezone` (`status: ACTIVE`), authored and locked `PR-320` Part I Charter ([`PROJECT.md`](../pr-320-dhcp-ntp-timezone/PROJECT.md)) on `feat/dhcp-ntp-timezone`, committed `PROGRAM.md` and `PROJECT.md`, and prepared `PR-320` via `pa pr start PR-320 --no-spawn`.
+- **2026-11-14 (Tier 1 Chief Architect):** Initialized `prog-dhcp-ntp-timezone` (`status: ACTIVE`), authored and locked `PR-320` Part I Charter ([`PROJECT.md`](../pr-320-dhcp-ntp-timezone/PROJECT.md)) on `feat/dhcp-ntp-timezone`, committed `PROGRAM.md` and `PROJECT.md`, and prepared `PR-320` via `pa pr start PR-320`. Tier 2 Principal Architect completed Work Order decomposition (`WO-320.1`..`WO-320.3`) and plan is approved (`status: APPROVED`). Handoff to Tier 2 PA for execution dispatch on `WO-320.1`.
