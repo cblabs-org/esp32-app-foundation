@@ -36,6 +36,7 @@ Once you are building or shipping an application, read these for production read
 18. [Reporting Framework Issues](issue-management.md) — How to raise, label, and track defects on the framework repo; the consumer-pointer convention for audit files.
 19. [Migration Guide: fetchUpdate](migration-guide-fetchupdate.md) — Downstream migration guide for the breaking `fetchUpdate(const FetchContext&)` and `queueDataJob()` APIs.
 20. [Bluetooth Low Energy (BLE)](bluetooth.md) — Managed BLE infrastructure, Peripheral and Central role providers, threading contracts, and Wi-Fi/BLE coexistence.
+21. [AI-Native Development](ai-native-development.md) — How the repository is built with AI agents: rules, skills, planning records, repository memory, and using agents on your own app.
 
 ## Quick Reference
 

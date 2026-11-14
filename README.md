@@ -4,404 +4,276 @@
 
 # ESP32 App Foundation
 
-**A production-ready firmware framework for ESP32 IoT devices.**
+**A modular C++ firmware framework for ESP32 devices: you write the application modules, the framework provides the device.**
 
-Drop in a single git submodule and get a complete, professional IoT device in hours —
-not weeks. Web portal, OLED display carousel, Home Assistant integration, OTA updates,
-full TLS security, and a built-in MCP server that lets AI agents query and control
-your device over JSON-RPC.
-
-[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-[![PlatformIO](https://img.shields.io/badge/PlatformIO-ESP32-orange?logo=platformio)](https://platformio.org)
-[![Framework](https://img.shields.io/badge/Framework-Arduino%20%7C%20ESP--IDF-blue)](https://docs.espressif.com/projects/esp-idf/)
-[![AI Ready](https://img.shields.io/badge/AI%20Ready-MCP%20Server-purple)](docs/developer/README.md)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
+[![Status: 1.0 public beta](https://img.shields.io/badge/status-1.0%20public%20beta-yellow)](#project-status)
+[![Latest release](https://img.shields.io/github/v/release/cblabs-org/esp32-app-foundation?include_prereleases&sort=semver)](https://github.com/cblabs-org/esp32-app-foundation/releases)
+[![PlatformIO](https://img.shields.io/badge/PlatformIO-ESP32%20%7C%20ESP32--S3-orange?logo=platformio)](https://platformio.org)
+[![Framework](https://img.shields.io/badge/Arduino%20as%20ESP--IDF%20component-blue)](https://docs.espressif.com/projects/arduino-esp32/en/latest/esp-idf_component.html)
 
 </div>
 
 ---
 
-## What Is This?
+## What is it?
 
-ESP32 App Foundation is a **composition-root firmware framework**. You write your
-application as a collection of independent modules. The framework wires everything
-together at startup — web routes, config persistence, OLED display boards, MQTT
-entities, MCP tools — with zero boilerplate per module.
+ESP32 App Foundation is a firmware framework for Wi-Fi connected ESP32 and
+ESP32-S3 devices. Your application is a set of small modules that implement
+pure virtual interfaces. You register them in `setup()`, and the framework
+wires each one into the services it asked for: configuration storage, the web
+portal, the display, Home Assistant, an on-device MCP server for AI agents, and
+signed OTA updates.
 
-```cpp
-// This is your entire main.cpp
-AppFoundation app;
-app.registerModule(new WeatherModule());
-app.registerModule(new HomeAssistantModule());
-app.begin();
-```
+It is for makers and small teams who want a device that is configurable,
+updatable and observable from the first build, without writing Wi-Fi
+provisioning, a config UI or an update pipeline again for every project.
 
-The framework handles the rest: WiFi, mDNS, the web portal, OTA updates, display
-cycling, credential encryption, and session auth. **You write the logic; the
-framework provides the infrastructure.**
+What you get:
 
----
-
-## ✨ Feature Highlights
-
-| | |
-|---|---|
-| 🌐 **Full SPA Web Portal** | Module-contributed tabs, REST API, responsive UI served from LittleFS |
-| 🤖 **Built-in MCP Server** | AI agents can discover and call device tools over JSON-RPC (HTTP + Serial) |
-| 📟 **OLED Display Carousel** | Pluggable display boards cycle automatically; weather, clock, system stats |
-| 🏠 **Home Assistant Integration** | MQTT auto-discovery with 10 entity types; zero HA configuration needed |
-| 🔐 **Production Security** | AES-256 credential encryption, HTTPS portal, RSA-2048 signed OTA, JWT auth |
-| 🔄 **3-Tier OTA Updates** | Signed firmware manifests with dev/beta/stable channel support |
-| ⚙️ **9 Extension Interfaces** | Register once; automatically gains web routes, display, config, MCP tools |
-| 📡 **EventBus** | Lightweight publish/subscribe for decoupled inter-module communication |
-| 🧪 **Native Test Build** | Full module logic testable on desktop via `native` PlatformIO environment |
-
----
-
-## Architecture at a Glance
-
-The framework enforces a strict **3-tier separation** via compile-time interface contracts.
-Your modules never import framework internals — they only depend on the interfaces.
-
-![Architecture Diagram](docs/img/architecture-diagram.jpg)
-
-```
-┌─────────────────────────────────────────────┐
-│              Your Application               │
-│   WeatherModule  SensorModule  MyModule     │
-└──────────┬──────────────────────┬───────────┘
-           │  implements          │
-┌──────────▼──────────────────────▼───────────┐
-│            Interface Contracts              │
-│  ITickable  IConfigurable  IWebContributor  │
-│  IMCPContributor  IDisplayBoard  IDataSource│
-└──────────┬──────────────────────┬───────────┘
-           │  managed by          │
-┌──────────▼──────────────────────▼───────────┐
-│             Framework Kernel                │
-│  Application  ConfigManager  EventBus       │
-│  WebServer    MCPServer      OTAManager     │
-│  HomeAssistant  KeyManager   AuthManager    │
-└─────────────────────────────────────────────┘
-```
-
----
-
-## Capabilities
-
-### 🌐 Web Portal
-
-Every module that implements `IWebContributor` automatically gets a tab in the web
-portal. The portal is a single-page application served directly from the device over
-HTTP or HTTPS.
-
-![Web Portal](docs/img/web-portal-screenshot.jpg)
-
-- **Custom tabs** — contribute HTML, REST routes, and a tab icon with a single interface
-- **Responsive** — works on desktop and mobile browsers
-- **HTTPS** — when auth is enabled, `WebServerManager` spins up a `PsychicHttpsServer`
-  on port 443 with HTTP → HTTPS redirect on port 80
-- **Built-in tabs**: System, WiFi, Keys, OTA — plus tabs from any registered modules
-
----
-
-### 🤖 MCP Agent Tools
-
-The framework runs a **Model Context Protocol (MCP) server** at `/api/mcp`. Any AI agent
-with MCP support can discover available tools (`tools/list`) and call them
-(`tools/call`) over JSON-RPC 2.0 — with no middleware or proxy required.
-
-![MCP Agent](docs/img/mcp-agent-screenshot.jpg)
-
-Modules register tools by implementing `IMCPContributor`. The framework-expert AI skill
-(see [AI-Assisted Development](#-ai-assisted-development) below) understands the full
-interface and can generate correct tool implementations from a description.
-
-**Example tools registered by built-in modules:**
-
-| Tool | Module | What it does |
-|---|---|---|
-| `system_info` | SystemModule | Returns firmware version, uptime, heap, chip info |
-| `capture_display` | DisplayModule | Returns a base64 PNG of the current OLED frame |
-| `wifi_get_status` | WiFiModule | Returns SSID, IP, RSSI, connection state |
-| `ota_get_status` | OTAModule | Returns channel, available version, last check time |
-| `ha_get_state` | HomeAssistantModule | Returns current state of a registered HA entity |
-| `ha_call_service` | HomeAssistantModule | Calls an HA service (e.g. turn on a light) |
-
-The MCP server is also served over HTTPS when TLS mode is active — no changes needed
-in your module code.
-
----
-
-### 📟 OLED Display Carousel
-
-Modules implement `IDisplayBoard` to contribute a display screen. The framework's
-`CarouselEngine` cycles through all registered boards automatically, with configurable
-dwell times and a screensaver.
-
-![Display Carousel](docs/img/display-carousel.jpg)
-
-The display driver supports the **SSD1322 256×64 OLED** via U8G2. Adding a new board
-is a single-class implementation — override `render(U8G2& u8g2)` and return your
-screen layout.
-
----
-
-### 🏠 Home Assistant Integration
-
-The `HomeAssistantModule` provides **zero-configuration MQTT auto-discovery**. Add the
-module, configure your broker address, and your device appears in Home Assistant
-automatically — no YAML, no manual entity registration.
-
-![Home Assistant](docs/img/homeassistant-dashboard.jpg)
-
-**10 built-in entity types:**
-
-| Entity | Class | Typical use |
-|---|---|---|
-| Sensor | `HaSensor` | Temperature, humidity, voltage readings |
-| Binary Sensor | `HaBinarySensor` | Door open/closed, motion detected |
-| Switch | `HaSwitch` | Relay control, feature toggles |
-| Light | `HaLight` | Dimmable LED, RGB strip |
-| Climate | `HaClimate` | Thermostat set-point and mode |
-| Cover | `HaCover` | Blinds, garage door position |
-| Fan | `HaFan` | Fan speed control |
-| Button | `HaButton` | Trigger an action (e.g. restart) |
-| Number | `HaNumber` | Configurable numeric value |
-| Select | `HaSelect` | Enum selection (e.g. display mode) |
-
-**Key features:**
-- **LWT (Last Will & Testament)** — device shows `offline` in HA gracefully on power loss
-- **Inbound command topics** — control switches, lights, and other actuators from HA
-- **Optional TLS MQTT** — supply a CA certificate, stored encrypted via `KeyManager`
-- **MCP tools** — `ha_get_state` and `ha_call_service` for AI agent integration
+1. **A finished device shell.** Captive-portal Wi-Fi setup, mDNS, an
+   authenticated web portal, encrypted credential storage, and readiness
+   tracking for every external dependency your app has.
+2. **Contracts instead of glue code.** Implement `IConfigurable` and your
+   settings persist; implement `IWebContributor` and you get a portal tab and
+   REST routes; implement `IMCPContributor` and AI agents can call your tools.
+3. **A release pipeline.** Version tags become firmware versions, releases are
+   RSA-signed, and devices update themselves from a signed manifest on the
+   `dev`, `beta` or `stable` channel.
 
 ```cpp
-// Register entities in your module's begin():
-_ha->addEntity(new HaSensor("temperature", "Temperature", "temperature", "°C"));
-_ha->addEntity(new HaSwitch("led", "Status LED", onCommand));
-```
+#include "AppFoundation.h"
+#include "WeatherModule.hpp"
 
----
+static Application app;
+static WeatherModule weather;
 
-### 🔐 Security
+void setup() {
+    FrameworkConfig config;              // OTA manifest URL, public key, ...
+    app.setAppName("Weather Station");   // also sets the hostname and setup AP name
+    app.registerModule(&weather);        // interfaces are detected at compile time
+    app.begin(config);
+}
 
-Security is layered throughout the stack — not bolted on at the end.
-
-| Layer | Implementation |
-|---|---|
-| **Credential storage** | AES-256-CBC encrypted via `DeviceCrypto`; master key in hardware NVS |
-| **Web portal auth** | SHA-256 salted password hash; `HttpOnly` session cookie; constant-time comparison |
-| **HTTPS portal + MCP** | EC P-256 self-signed cert generated by `AuthManager`, stored in LittleFS; `PsychicHttpsServer` on port 443; HTTP port 80 redirects to HTTPS |
-| **Bearer token (MCP)** | Deterministic from password hash; validated by `AuthManager` middleware |
-| **External API TLS** | Explicit `setCACert()` with pinned root CAs; no Mozilla CA bundle loaded by default |
-| **OTA transport** | `setInsecure()` — encrypted but unverified; firmware is RSA-2048 signed independently |
-| **OTA payload** | RSA-2048 signature verification via `IOTAVerifier`; streaming SHA-256 accumulation |
-| **Anti-rollback** | Monotonic `SECURITY_VERSION` counter in NVS; downgrades rejected |
-| **MQTT TLS** | Optional broker CA cert stored encrypted in `KeyManager` |
-
-> The `setInsecure()` OTA pattern is an intentional design decision: the firmware binary
-> is cryptographically signed so transport verification is redundant. Payload integrity
-> is a stronger guarantee than transport integrity for OTA.
-
----
-
-### 🔄 OTA Updates
-
-Firmware updates are delivered via **signed GitHub Releases** (or any HTTPS server).
-The framework supports three channels — `dev`, `beta`, `stable` — and checks for updates
-on a configurable schedule.
-
-```json
-// manifest.json (on your release server)
-{
-  "version": "1.2.3",
-  "channel": "stable",
-  "firmware_url": "https://github.com/you/releases/v1.2.3/firmware.bin",
-  "signature":    "base64-encoded-RSA2048-signature"
+void loop() {
+    app.tick();
 }
 ```
 
-The OTA tab in the web portal shows current version, available version, last check
-time, and a manual trigger button.
+---
+
+## Features
+
+| Area | What the framework provides |
+|---|---|
+| **Module model** | `registerModule()` detects which interfaces a module implements at compile time and wires it up. Modules never include framework internals; `AppFoundation.h` is the only header they need. |
+| **Wi-Fi & provisioning** | First boot opens a captive-portal access point. Once configured, the device retries its network indefinitely with backoff and opens a fallback AP (portal login still required) after 3 minutes offline. mDNS hostname derived from the app name. |
+| **Web portal** | Single-page portal served from flash. Built-in System, Wi-Fi, Keys and OTA tabs, plus a tab for each module that contributes one. Session login, optional HTTPS with a device-generated certificate. |
+| **Configuration** | Per-module JSON config in LittleFS with schema versions and migration, and a config manifest that carries settings across OTA updates. |
+| **Credentials** | `KeyManager` stores API keys and passwords AES-256 encrypted with a device-bound key. Secrets are redacted from logs. |
+| **Readiness** | `PreconditionEngine` tracks what the device needs before it can run (Wi-Fi, an API key, a location) and what it needs to keep running, and shows the gaps on the portal and display. |
+| **Background data** | `DataManager` runs `IDataSource` fetches on a worker task with deadlines, a framework-managed TLS client, and per-source health with exponential backoff. A failing source degrades; it never reboots the device. |
+| **OTA updates** | Signed manifest and signed firmware, three channels, anti-rollback counter, bootloader rollback if the new image fails its self-test, and manual signed upload from the portal. |
+| **MCP server** | JSON-RPC 2.0 at `POST /api/mcp` and over serial. Built-in tools for system info, Wi-Fi, OTA, keys, config, data-source health, audit log and display state; modules add their own. Read-only by default. |
+| **Displays** | Monochrome OLED carousel via U8g2 (`IDisplayBoard`), or full-colour LVGL 9 UIs designed in LVGL Pro behind a hardware adapter (`ILVGLHardwareAdapter`). |
+| **Home Assistant** | MQTT auto-discovery with 11 entity types (sensor, binary sensor, switch, light, climate, cover, fan, button, number, select, device trigger), LWT and optional TLS. |
+| **Bluetooth LE** | `BLEManager` (ESP32-S3) hosts peripheral GATT services and central clients side by side, with Wi-Fi coexistence handling. |
+| **Input** | Debounced buttons and rotary encoders publishing gestures on the EventBus. |
+| **Audit trail** | Optional flash-backed, rate-limited audit log (`AUDIT()`), readable from the portal and MCP. |
+| **Testing** | GoogleTest suites run on the host through the `native` environment, plus Playwright tests for the portal. |
+
+Optional modules are compiled in with `WITH_*` build flags, so you pay only for
+what you use: `WITH_DISPLAY_U8G2`, `WITH_DISPLAY_LVGL`, `WITH_BUTTONS`,
+`WITH_ENCODER`, `WITH_MCP`, `WITH_HOMEASSISTANT`, `WITH_OTA`, `WITH_TIME`,
+`WITH_BLE` and `WITH_AUDIT`. See
+[Using Optional Modules](docs/developer/using-optional-modules.md).
+
+<p align="center">
+  <img src="docs/img/web-portal-screenshot.jpg" alt="Web portal" width="48%">
+  <img src="docs/img/display-carousel.jpg" alt="OLED display carousel" width="48%">
+</p>
 
 ---
 
-## Supported Hardware
+## Choose your path
 
-The framework supports any ESP32 board via the `board.h` mechanism. The stock boards provided (e.g., `esp32dev`, `esp32s3nano`) are **reference implementations** that exist so the framework's sample apps compile.
+### Requirements
 
-Consumer applications should **author their own `board.h`** (using `hardware/_TEMPLATE/board.h` as a starting point) with their app-specific pin assignments. This is the normal workflow, not an advanced override. Your board header is the single source of truth for ALL your hardware pin assignments — display, buttons, sensors, LEDs, and anything else your app needs. See the [Custom Board Authoring Guide](docs/developer/custom-boards.md) for details.
+- [PlatformIO](https://platformio.org/install) (the VS Code extension or the CLI) and Python 3.
+  PlatformIO downloads the toolchain, ESP-IDF and Arduino-ESP32 on the first build.
+- An ESP32 or ESP32-S3 board. The sample app targets `esp32dev` and `esp32s3nano`
+  without changes; any other board needs a `board.h` (see [Custom Boards](docs/developer/custom-boards.md)).
+- A USB cable that carries data.
 
-The reference implementations are tested on two boards. Both use the same 3.12″ SSD1322 OLED display.
+The first build takes several minutes while PlatformIO installs the platform.
 
-| | ESP32-DevKit V1 | Waveshare ESP32-S3-Nano |
-|---|---|---|
-| **Photo** | ![ESP32-DevKit](docs/img/hardware-esp32dev.jpg) | ![ESP32-S3-Nano](docs/img/hardware-s3nano.jpg) |
-| **SoC** | ESP32-WROOM-32 | ESP32-S3 |
-| **Flash** | 4 MB | 8 MB |
-| **PSRAM** | None | 8 MB QSPI |
-| **USB** | Micro-USB | USB-C |
-| **PlatformIO env** | `esp32dev` | `esp32s3nano` |
-| **Display CS** | IO26 | IO10 |
-| **Display DC** | IO5 | IO9 |
-| **SPI CLK** | IO18 | IO48 |
-| **SPI MOSI** | IO23 | IO38 |
+### (a) Flash the sample app
 
-The ESP32-S3-Nano is the **recommended target** for new builds — the extra PSRAM gives
-significantly more headroom for TLS handshakes, large JSON payloads, and additional modules.
-
-📖 **[Full Hardware Setup Guide →](docs/developer/hardware-setup.md)**
-
----
-
-## Quick Start
-
-### Path A — Explore the sample app (fastest)
+The sample app is a weather station that uses most of the framework: a
+background data source, preconditions, a portal tab, an MCP tool and a display
+board.
 
 ```bash
 git clone https://github.com/cblabs-org/esp32-app-foundation.git
-cd esp32-app-foundation
-pio run -e esp32dev --target upload
-pio run -e esp32dev --target uploadfs
+cd esp32-app-foundation/sample-app
+pio run -e esp32s3nano -t upload      # or -e esp32dev
+pio run -e esp32s3nano -t uploadfs    # config manifest and timezone data
 pio device monitor
 ```
 
-Connect to the `ESP32-App-Setup` WiFi AP and open `http://192.168.4.1` to configure.
+On first boot the device opens an open Wi-Fi network named after its hostname
+(`weather-station`). Join it and the captive portal opens; if it doesn't,
+browse to `http://192.168.4.1`. Choose your network, then reconnect to your
+own Wi-Fi and open `http://weather-station.local`. The Weather tab asks for a
+free [OpenWeatherMap](https://openweathermap.org/appid) API key and a
+location; once both are set the device moves from *configuring* to *running*.
+
+Walkthrough: [Sample App Walkthrough](docs/developer/sample-app-walkthrough.md) ·
+[sample-app/README.md](sample-app/README.md)
+
+### (b) Start your own app from the template
+
+`template-app/` is a minimal module (`MyApp`) that shows five interfaces with
+stub logic. Add the framework to your repository as a submodule and copy the
+template in:
+
+```bash
+mkdir my-device && cd my-device && git init
+git submodule add https://github.com/cblabs-org/esp32-app-foundation.git framework
+cp -r framework/template-app/. .
+```
+
+The template's `platformio.ini` assumes it sits inside the framework, so point
+its `../` paths at `framework/` instead. Leave the `BOARD_HEADER` lines alone:
+that path is resolved from the framework's `hardware/` folder.
+
+```bash
+sed -i.bak '/BOARD_HEADER/!s#\.\./#framework/#g' platformio.ini && rm platformio.ini.bak
+git add -A && git commit -m "Start from the App Foundation template"
+pio run -e esp32dev
+```
+
+Make that first commit before building: the ESP-IDF build reads the git
+revision and fails in a repository with no commits.
+
+Next, copy `framework/hardware/_TEMPLATE/` to `hardware/<your-board>/` and
+describe your own pins. Guides: [template-app/README.md](template-app/README.md) ·
+[Creating a Module](docs/developer/creating-a-module.md) ·
+[Custom Boards](docs/developer/custom-boards.md)
+
+### (c) Let an AI coding agent set it up
+
+The repository ships agent skills that know the framework's contracts, rules
+and patterns. The `framework-setup` skill turns an empty folder into a wired
+project: it adds the framework as a submodule at `framework/`, links the
+`framework-expert` and `framework-portal-design` skills, and writes the agent
+bootstrap files for Claude Code and Antigravity. It then hands over to
+`framework-expert`, which can walk you through a design spec and scaffold your
+first module.
+
+For Claude Code, install the setup skill once:
+
+```bash
+mkdir -p ~/.claude/skills/framework-setup
+curl -fsSL https://raw.githubusercontent.com/cblabs-org/esp32-app-foundation/main/.agents/skills/framework-setup/SKILL.md \
+  -o ~/.claude/skills/framework-setup/SKILL.md
+```
+
+Then open an empty folder and ask: *"Set up a new ESP32 App Foundation project."*
+Other agents can read the same `SKILL.md` and follow its steps.
+More on how the repository is built with agents:
+[AI-Native Development](docs/developer/ai-native-development.md).
 
 ---
 
-### Path B — New project via git submodule
+## Supported hardware
 
-```bash
-mkdir my-device && cd my-device
-git init
-git submodule add https://github.com/cblabs-org/esp32-app-foundation.git lib/esp32-app-foundation
-cp lib/esp32-app-foundation/platformio.ini .
-cp lib/esp32-app-foundation/src/main.cpp src/
-```
+The framework builds for any ESP32 or ESP32-S3 board through a per-board
+`board.h`. These boards are the reference targets that the framework and sample
+apps are built and tested on:
 
-Then edit `src/main.cpp` to register your modules and run:
+| Board | Chip | PSRAM | Display | PlatformIO env |
+|---|---|---|---|---|
+| ESP32-DevKit V1 | ESP32-WROOM-32 | none | SSD1322 256×64 OLED (SPI) | `esp32dev` |
+| Waveshare ESP32-S3-Nano | ESP32-S3 | 8 MB | SSD1322 256×64 OLED (SPI) | `esp32s3nano`, `esp32s3nano_ble` |
+| Elecrow CrowPanel 1.28″ HMI Rotary | ESP32-S3 | 8 MB | GC9A01 240×240 round LCD, touch, rotary encoder | `crowpanel-128-rotary` |
 
-```bash
-pio run -e esp32dev --target upload
-pio run -e esp32dev --target uploadfs
-```
+The ESP32-S3 boards are recommended for new work: PSRAM leaves room for TLS,
+large JSON documents and LVGL. Bluetooth LE support targets the ESP32-S3.
+Wiring tables and first-flash steps: [Hardware Setup](docs/developer/hardware-setup.md).
 
-See [Architecture Overview](docs/developer/architecture-overview.md) for the module
-pattern and interface contracts.
-
----
-
-### Path C — Start with the sample app as a template
-
-Clone or fork the [sample app repository](#) (coming soon) which provides a working
-`WeatherStation` module as a concrete starting point.
+The stock board headers are reference implementations. Your application should
+own its `board.h`, the single place that defines every pin it uses.
 
 ---
 
-## 🤖 AI-Assisted Development
+## Security
 
-The framework ships with a `framework-expert` AI skill that loads full knowledge of
-the architecture, interfaces, naming conventions, and security patterns into your AI
-coding assistant. The skill has been used extensively to build and extend the framework
-itself.
+The security model assumes a device on a local network, protecting against
+other devices on that network, tampered updates and credential theft from
+flash. In summary:
 
-### Install for your AI harness
-
-**Antigravity (Google DeepMind)**
-```bash
-mkdir -p .agents/skills
-cp -r lib/esp32-app-foundation/.agents/skills/framework-expert .agents/skills/
-```
-
-**Claude Code**
-```bash
-# Claude Code reads from .claude/ → symlink to .agents/ or copy directly:
-mkdir -p .claude/skills
-cp -r lib/esp32-app-foundation/.agents/skills/framework-expert .claude/skills/
-```
-
-**Cursor**
-```bash
-mkdir -p .cursor/rules
-cp lib/esp32-app-foundation/.agents/skills/framework-expert/SKILL.md \
-   .cursor/rules/framework-expert.md
-```
-
-Once installed, your AI assistant will automatically load framework knowledge when you
-work on ESP32 App Foundation projects. Ask it to design a new module, explain an
-interface contract, or generate a compliant implementation — it knows the full API.
-
-📖 **[Skill file →](.agents/skills/framework-expert/SKILL.md)**
-
----
-
-## Extension Interfaces
-
-Implement any combination of these interfaces in your module. The framework
-auto-discovers them at registration time.
-
-| Interface | Purpose |
+| Layer | Implementation |
 |---|---|
-| `ITickable` | `tick(uint32_t ms)` called every loop iteration — polling, state machines |
-| `IConfigurable` | Persistent JSON config in LittleFS; loaded/saved automatically |
-| `IWebContributor` | Contribute REST routes and a portal tab (name, icon, order) |
-| `IMCPContributor` | Register MCP tools callable by AI agents over JSON-RPC |
-| `IDisplayBoard` | Contribute an OLED screen to the display carousel |
-| `IDataSource` | Provide named data values consumable by other modules |
-| `IOTAVerifier` | Plug in custom firmware signature verification |
-| `IConfigGate` | Guard config writes with custom validation logic |
-| `IHaEntity` | Home Assistant entity (sensor, switch, light, climate, …) |
+| Credentials at rest | AES-256-CBC via `DeviceCrypto`, master key generated on the device and kept in NVS; `KeyManager` stores secrets encrypted |
+| Portal and MCP access | Salted SHA-256 password hash, `HttpOnly` session cookie, bearer token for MCP; login is skipped only during first-boot setup |
+| Portal transport | Optional HTTPS on port 443 with a device-generated EC P-256 certificate, HTTP redirected |
+| Outbound TLS | Data sources get a `FrameworkSecureClient` validated against the ESP-IDF root CA bundle |
+| OTA | Manifest and firmware each carry an RSA-2048 / SHA-256 signature, verified while streaming; certificate-validated TLS; image version checked before flashing |
+| Anti-rollback | Monotonic `SECURITY_VERSION` in NVS; older security versions are rejected |
 
-A module implementing all relevant interfaces might look like:
-
-```cpp
-class WeatherModule
-    : public ITickable
-    , public IConfigurable
-    , public IWebContributor
-    , public IMCPContributor
-    , public IDisplayBoard
-    , public IDataSource
-{
-    // Each interface adds one capability — zero coupling to other modules
-};
-```
+Details and trade-offs: [Security](docs/developer/security.md) and
+[OTA Update System](docs/developer/ota-update-system.md). To report a
+vulnerability, see [SECURITY.md](SECURITY.md).
 
 ---
 
-## Developer Documentation
+## Documentation
 
-| Document | Description |
+| Start here | |
 |---|---|
-| [Architecture Overview](docs/developer/architecture-overview.md) | 3-tier design, composition root, module lifecycle |
-| [Hardware Setup](docs/developer/hardware-setup.md) | Wiring tables, display prep, first flash |
-| [Build System](docs/developer/build-system.md) | PlatformIO environments, flags, native builds |
-| [Security](docs/developer/security.md) | Credential encryption, TLS, OTA signing, auth |
-| [OTA Update System](docs/developer/ota-update-system.md) | Manifest format, channels, signing workflow |
-| [Web Portal](docs/developer/extending-the-web-portal.md) | IWebContributor patterns, REST conventions |
-| [Display System](docs/developer/creating-a-module.md) | CarouselEngine, IDisplayBoard, U8G2 usage |
-| [MCP Server](docs/developer/mcp-server.md) | IMCPContributor, JSON-RPC, tool schema |
-| [EventBus](docs/developer/event-bus.md) | Publish/subscribe, topic conventions |
-| [Developer README](docs/developer/README.md) | Full documentation index |
+| [Developer Guide](docs/developer/README.md) | Index of the developer documentation, with a reading order |
+| [Architecture Overview](docs/developer/architecture-overview.md) | Boot lifecycle, the 3-tier model, how registration works |
+| [Creating a Module](docs/developer/creating-a-module.md) | Writing a module against the interfaces |
+| [Coding Patterns](docs/developer/coding-patterns.md) | Service modules, ownership, threading rules |
+| [Extending the Web Portal](docs/developer/extending-the-web-portal.md) | Tabs, REST routes, front-end conventions |
+| [Scheduling Data Fetches](docs/developer/scheduling-data-fetches.md) | `IDataSource`, `FetchContext`, health and backoff |
+| [MCP Server](docs/developer/mcp-server.md) | Tool registration and the JSON-RPC protocol |
+| [Bluetooth LE](docs/developer/bluetooth.md) | `BLEManager`, providers, memory budget, coexistence |
+| [OTA Update System](docs/developer/ota-update-system.md) | Keys, signing, manifest, channels, deploy |
+| [Versioning Policy](docs/developer/versioning-policy.md) | Tags, channels and how releases are cut |
+| [Testing](docs/developer/testing.md) | Native unit tests and portal tests |
+| [Design Specification](docs/design_specification.md) | The architectural specification and its invariants |
+
+For AI agents, `.agents/skills/framework-expert/` holds the same knowledge in a
+form organised for agents.
+
+---
+
+## Project status
+
+**1.0 public beta.** The interfaces and module model are the ones intended for
+1.0, and the framework runs on the reference boards above. During the beta,
+releases are tagged `v1.0.0-beta.N` and breaking changes are still possible;
+each one is listed in [CHANGELOG.md](CHANGELOG.md) with a migration note.
+`v1.0.0` will follow once the framework has had outside use and feedback.
+
+Feedback is the point of the beta. Please
+[open an issue](https://github.com/cblabs-org/esp32-app-foundation/issues/new/choose)
+for bugs, rough edges in the docs, boards you have tried, or features you
+need.
 
 ---
 
 ## Contributing
 
-The project is under active development. Contributions, bug reports, and hardware
-compatibility reports are welcome. Please read the [contributor guidelines](CONTRIBUTING.md)
-before opening a pull request.
-
-The framework-expert AI skill is available to help contributors understand the
-architecture and generate compliant implementations.
+Contributions are welcome: bug reports, fixes, documentation, board support and
+new modules. Start with [CONTRIBUTING.md](CONTRIBUTING.md), which covers the
+build and test setup and what a pull request needs. Everyone taking part is
+expected to follow the [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ---
 
 ## License
 
-[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-
-© 2026 CB Labs. Licensed under the [Apache License 2.0](https://opensource.org/licenses/Apache-2.0).
-
-You are free to use, modify, and distribute this software in source or binary form, subject to the terms of the Apache License 2.0.
+© 2026 CB Labs. Licensed under the [Apache License 2.0](LICENSE).

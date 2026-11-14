@@ -31,7 +31,7 @@ audience — each dimension notes its primary applicability.
 | `vX.Y.Z` (stable) | **Yes** | The final gate. The audit report IS the evidence for the human's tag approval. |
 | Consumer: after framework submodule bump | **Yes** | Config shadowing and parallel mechanism issues only emerge after a bump. |
 
-The audit ties to the [versioning policy](../../.agents/rules/03-versioning.md) —
+The audit ties to the [versioning policy](../../../rules/03-versioning.md) —
 beta and stable tags require user approval, and the audit report provides the
 evidence for that decision.
 

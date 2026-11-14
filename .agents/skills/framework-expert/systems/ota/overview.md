@@ -75,7 +75,7 @@ After reboot, the new firmware enters **pending verification**. The `Application
 
 ## Cross-References
 
-- **Human docs:** [`docs/developer/ota-update-system.md`](../../../../docs/developer/ota-update-system.md)
+- **Human docs:** [`docs/developer/ota-update-system.md`](../../../../../docs/developer/ota-update-system.md)
 - **Interface contract:** [`interfaces/ota-verifier.md`](../../interfaces/ota-verifier.md)
 - **Security concerns:** [`security/ota-security.md`](../../security/ota-security.md)
 - **Config lifecycle details:** [`systems/ota/config-lifecycle.md`](config-lifecycle.md)

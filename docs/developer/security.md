@@ -37,7 +37,7 @@ The framework assumes:
 
 ## 3. Hardware Encryption (DeviceCrypto)
 
-[`DeviceCrypto`](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/lib/DeviceCrypto/DeviceCrypto.hpp) provides AES-256-CBC encryption using a 256-bit master key stored in NVS (Non-Volatile Storage).
+[`DeviceCrypto`](../../lib/DeviceCrypto/DeviceCrypto.hpp) provides AES-256-CBC encryption using a 256-bit master key stored in NVS (Non-Volatile Storage).
 
 ### API
 
@@ -60,7 +60,7 @@ Both `encrypt()` and `decrypt()` are `virtual`, allowing test mocks in native bu
 
 ## 4. Credential Storage (KeyManager)
 
-[`KeyManager`](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/modules/KeyManager/KeyManager.hpp) builds on `DeviceCrypto` to provide a named credential registry. It is a kernel service implementing `IWebContributor` (tab: "Keys", parent: "System", order: 20).
+[`KeyManager`](../../modules/KeyManager/KeyManager.hpp) builds on `DeviceCrypto` to provide a named credential registry. It is a kernel service implementing `IWebContributor` (tab: "Keys", parent: "System", order: 20).
 
 ### API
 
@@ -146,22 +146,22 @@ Constrained devices should limit allowed cipher suites to faster, more memory-ef
 
 | Scenario | TLS Required | Rationale |
 |---|---|---|
-| **External API calls** | Always | Connections to external services (GitHub API, cloud backends) MUST use TLS. The `GithubClient` uses `setCACert()` to pin the GitHub root CA. |
+| **External API calls** | Always | Connections to external services MUST use TLS. `IDataSource` fetches get a `FrameworkSecureClient` from `DataManager` via `FetchContext`, validated against the ESP-IDF root CA bundle. |
 | **Local Web Portal** | Optional | TLS costs ~40KB heap. Self-signed certs trigger browser warnings. When `AuthManager` has generated an EC P-256 certificate, `WebServerManager` can serve HTTPS on port 443 with HTTP→HTTPS redirect on port 80. |
-| **OTA Downloads** | Encrypted, not verified | Uses `setInsecure()` — see below. |
+| **OTA Downloads** | Always, verified | Manifest and signature fetches validate against the pinned roots in `lib/OTACerts/OTACerts.h`; firmware downloads use the ESP-IDF root CA bundle. See [§8](#ota-transport-security). |
 
 ### `setInsecure()` — When It's Acceptable
 
-`setInsecure()` disables TLS certificate verification. The connection is still encrypted, but the server's identity is not verified.
+`setInsecure()` disables TLS certificate verification. The connection is still encrypted, but the server's identity is not verified. The framework itself does not use it.
 
-- **Acceptable:** When payload integrity is verified independently. The OTA pipeline uses `setInsecure()` for both manifest and firmware binary downloads because the firmware is cryptographically signed via `MbedTLSSignatureVerifier`. Transport security is redundant with payload verification.
-- **NOT acceptable:** When transmitting credentials or when the server's identity matters (e.g., `GithubClient` API calls that return release metadata — these use `setCACert()` with the pinned GitHub root CA).
+- **Acceptable (consumer code only):** When payload integrity is verified independently by a signature check and no credentials travel on the connection.
+- **NOT acceptable:** When transmitting credentials or tokens, or when the server's identity matters. Use the `FetchContext`-provided client instead.
 
 ---
 
 ## 6. Web Portal & MCP Authentication
 
-[`AuthManager`](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/modules/AuthManager/AuthManager.hpp) provides session-based authentication with SHA-256 password hashing for the Web Portal and bearer-token authentication for the MCP API.
+[`AuthManager`](../../modules/AuthManager/AuthManager.hpp) provides session-based authentication with SHA-256 password hashing for the Web Portal and bearer-token authentication for the MCP API.
 
 ### Password Storage
 
@@ -271,7 +271,7 @@ The framework implements a multi-layer OTA security model: cryptographic signatu
 
 ### Firmware Signature Verification
 
-All OTA firmware updates can be verified using RSA-2048 signature verification via the [`IOTAVerifier`](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/include/interfaces/IOTAVerifier.hpp) interface.
+All OTA firmware updates can be verified using RSA-2048 signature verification via the [`IOTAVerifier`](../../include/interfaces/IOTAVerifier.hpp) interface.
 
 #### IOTAVerifier Interface
 
@@ -334,15 +334,12 @@ If no public key is configured (`cfg.otaPublicKey == nullptr`), the verifier is 
 
 ### OTA Transport Security
 
-The OTA download uses `setInsecure()` (TLS encryption without certificate verification). This is an intentional tradeoff:
+OTA connections verify the server certificate. This protects the optional `otaToken` bearer token from interception; payload integrity still rests on the signatures above.
 
-- **Why acceptable:** The downloaded firmware is cryptographically signed. `MbedTLSSignatureVerifier` provides payload integrity independent of transport security.
-- **Why not CA-pinned:** CA certificates expire, and the device may operate for years without firmware updates. A pinned cert that expires would permanently brick OTA capability.
+1. **Manifest and signature downloads** (`manifest.json`, `manifest.json.sig`, `.bin.sig`) — `FrameworkSecureClient` with `setCACert(OTA_CA_BUNDLE)`, the root CAs pinned in `lib/OTACerts/OTACerts.h` for `github.com`, `raw.githubusercontent.com` and the GitHub CDN. Redirects are followed manually (at most 5 hops), so each hop is validated.
+2. **Firmware binary download** — `FrameworkSecureClient::useDefaultCertBundle()`, the ESP-IDF root CA bundle.
 
-The `setInsecure()` usage appears in two places:
-
-1. **Manifest download** — fetching `manifest.json` for board-specific asset selection.
-2. **Firmware binary download** — fetching the `.bin` file from GitHub CDN (which uses different certs than the GitHub API).
+Pinned roots can rotate before a device is next updated. If a host moves to a CA outside `OTA_CA_BUNDLE`, update the bundle and ship a release before the old root is withdrawn; the compiled-in manifest URL and the signatures stay the trust anchor.
 
 ### OTA Task DRAM Constraint
 
@@ -350,7 +347,7 @@ The OTA FreeRTOS task stack MUST reside in DRAM (not PSRAM) because the OTA pipe
 
 ### FrameworkConfig — OTA Key Injection
 
-The public key for OTA signature verification is provided at boot time via [`FrameworkConfig`](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/include/FrameworkConfig.hpp):
+The public key for OTA signature verification is provided at boot time via [`FrameworkConfig`](../../include/types/FrameworkConfig.hpp):
 
 ```cpp
 struct FrameworkConfig {

@@ -197,11 +197,11 @@ the manifest — no scanning, no GitHub API pagination, no floating tags.
 
 ### 4.1.1 Manifest Signing
 
-The manifest is signed with the same ECDSA key used for firmware binaries:
+The manifest is signed with the same RSA-2048 key used for firmware binaries:
 
 ```
 manifest.json         (~3 KB)   — the manifest itself
-manifest.json.sig     (~256 B)  — detached ECDSA signature
+manifest.json.sig     (256 B)   — detached RSA-2048 / SHA-256 signature
 ```
 
 **Threat model — why signing is required:**

@@ -1,0 +1,33 @@
+name: Board report
+description: Tell us how the framework runs on a board, working or not.
+title: "[Board] "
+labels: ["question"]
+body:
+  - type: input
+    id: board
+    attributes:
+      label: Board
+      placeholder: "Vendor, model and chip (e.g. ESP32-C3, ESP32-S3 with 8 MB PSRAM)"
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Framework version or commit
+    validations:
+      required: true
+  - type: dropdown
+    id: result
+    attributes:
+      label: Result
+      options:
+        - Works
+        - Works with changes (described below)
+        - Does not work
+    validations:
+      required: true
+  - type: textarea
+    id: details
+    attributes:
+      label: Details
+      description: Your board.h or pin choices, modules and WITH_* flags used, what worked and what didn't. Logs welcome.

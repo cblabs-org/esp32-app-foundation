@@ -57,7 +57,7 @@ To reclaim internal DRAM without sacrificing real-time PNG screenshot generation
 
 ### DeepStackExecutor
 
-`DeepStackExecutor` ([lib/DeepStackExecutor/DeepStackExecutor.h](../../../../lib/DeepStackExecutor/DeepStackExecutor.h)) is a reusable framework service that:
+`DeepStackExecutor` ([lib/DeepStackExecutor/DeepStackExecutor.h](../../../../../lib/DeepStackExecutor/DeepStackExecutor.h)) is a reusable framework service that:
 1. Spawns a persistent worker task whose stack resides in **external PSRAM** using `xTaskCreateWithCaps(..., MALLOC_CAP_SPIRAM)` (matching the pattern used by `OTAUpdateManager`).
 2. Provides a synchronous, serialized `run(callable, timeoutMs)` interface to execute heavy callables on the PSRAM worker thread.
 3. Automatically falls back to `available() == false` if PSRAM stack allocation is unsupported or fails at boot.
@@ -117,7 +117,7 @@ The HTTP server task stack **MUST NEVER** be placed in PSRAM (`task_caps` must r
 
 ### Board Contract Defaults
 
-Default HTTP server task settings are defined in [hardware/_common/board_contract.h](../../../../hardware/_common/board_contract.h):
+Default HTTP server task settings are defined in [hardware/_common/board_contract.h](../../../../../hardware/_common/board_contract.h):
 
 ```cpp
 #ifndef BOARD_HTTP_STACK_SIZE
@@ -147,7 +147,7 @@ app.getWebServerManager().setHttpConfig(8192, 7);
 
 ## 6. See Also
 
-- [DeepStackExecutor Header](../../../../lib/DeepStackExecutor/DeepStackExecutor.h)
-- [WebServerManager Header](../../../../modules/WebServer/WebServerManager.hpp)
-- [Performance & Memory Guide](../../../performance/overview.md)
+- [DeepStackExecutor Header](../../../../../lib/DeepStackExecutor/DeepStackExecutor.h)
+- [WebServerManager Header](../../../../../modules/WebServer/WebServer.hpp)
+- [Performance & Memory Guide](../../performance/overview.md)
 - [OTA Security & Lifecycle](../../security/ota-security.md)

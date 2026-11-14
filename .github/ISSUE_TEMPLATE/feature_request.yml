@@ -1,0 +1,27 @@
+name: Feature request
+description: Propose a new capability or a change to an existing one.
+title: "[Module/Area] "
+labels: ["enhancement", "P4-enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do?
+      description: The problem or use case, from your application's point of view.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: What you would like the framework to provide. Interfaces, config or API sketches help.
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives and workarounds
+      description: What you do today without it, and other approaches you considered.
+  - type: textarea
+    id: cost
+    attributes:
+      label: Resource cost
+      description: Optional. Expected flash, DRAM or PSRAM impact, and whether it should be behind a WITH_* flag.

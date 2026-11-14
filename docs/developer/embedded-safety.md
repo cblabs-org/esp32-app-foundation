@@ -18,7 +18,7 @@ The ESP32 has no MMU (Memory Management Unit). There is no virtual memory, no sw
 
 ### Rule 1: No Heap Allocation in `tick()`
 
-Code inside an [ITickable::tick()](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/include/interfaces/ITickable.hpp) function executes dozens of times per second. Dynamic allocation in this hot path causes heap fragmentation that accumulates over hours and days.
+Code inside an [ITickable::tick()](../../include/interfaces/ITickable.hpp) function executes dozens of times per second. Dynamic allocation in this hot path causes heap fragmentation that accumulates over hours and days.
 
 **Banned operations inside `tick()`:**
 - `new` / `malloc` / `calloc`
@@ -143,7 +143,7 @@ std::function<void()> fn = [this, a, b, c, d, e]() {
 };
 ```
 
-This is why the framework's [EventBus](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/modules/EventBus/EventBus.hpp) uses static function pointers with `void*` context instead of `std::function`. See GRAVE-05 in [Section 4: Design Graveyard](#41-stdfunctioneventbus-grave-05).
+This is why the framework's [EventBus](../../modules/EventBus/EventBus.hpp) uses static function pointers with `void*` context instead of `std::function`. See GRAVE-05 in [Section 4: Design Graveyard](#41-stdfunctioneventbus-grave-05).
 
 ---
 
@@ -181,7 +181,7 @@ graph LR
 
 ### DataManager Task Context
 
-Network fetches in `DataManager` (implementing [IDataSource](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/include/interfaces/IDataSource.hpp)) execute in a **separate FreeRTOS task**, distinct from the main thread. This means:
+Network fetches in `DataManager` (implementing [IDataSource](../../include/interfaces/IDataSource.hpp)) execute in a **separate FreeRTOS task**, distinct from the main thread. This means:
 
 - `fetchUpdate()` runs on a different core from `tick()`.
 - Data fetched and parsed in the fetch task must be safely transferred to the main thread for rendering.
@@ -326,7 +326,7 @@ The framework's architecture is shaped by past failures. These 10 designs were p
 
 **Why it was rejected:** The ESP32's Small Buffer Optimisation (SBO) threshold is ~16 bytes. Any lambda capturing more than a single pointer exceeds this limit, forcing `std::function` to perform a hidden **heap allocation**. In a 24/7 system processing hundreds of events per second, these micro-allocations create catastrophic heap fragmentation, eventually causing OOM.
 
-**What we do instead:** The [EventBus](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/modules/EventBus/EventBus.hpp) uses static function pointers with an explicit `void*` context parameter. Zero heap allocations, deterministic memory usage:
+**What we do instead:** The [EventBus](../../modules/EventBus/EventBus.hpp) uses static function pointers with an explicit `void*` context parameter. Zero heap allocations, deterministic memory usage:
 
 ```cpp
 // Static function pointer — guaranteed zero allocation
@@ -345,13 +345,13 @@ bus.subscribe("topic", onEvent, this);
 
 **Why it was rejected:** Each display technology requires a radically different rendering paradigm. E-ink needs damage-rect partial refresh to avoid ghosting. TFT supports 16-bit colour and high frame rates. OLED uses 1-bit buffers with full-screen refresh. The lowest-common-denominator API would strip away the unique capabilities of each technology, producing a leaky abstraction that satisfies no one.
 
-**What we do instead:** Use the concrete driver directly. The framework defines [IDisplayBoard](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/include/interfaces/IDisplayBoard.hpp) as the abstraction for *content rendering* (which is display-agnostic), while the display *driver* remains concrete. If swapping display hardware, replace the entire Display Module rather than abstracting the driver.
+**What we do instead:** Use the concrete driver directly. The framework defines [IDisplayBoard](../../modules/U8G2Display/IDisplayBoard.hpp) as the abstraction for *content rendering* (which is display-agnostic), while the display *driver* remains concrete. If swapping display hardware, replace the entire Display Module rather than abstracting the driver.
 
 ---
 
 ### 4.3. Dynamic Board Factory
 
-**What was proposed:** Instantiate [IDisplayBoard](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/include/interfaces/IDisplayBoard.hpp) objects on-the-fly when their display time arrives in the carousel rotation.
+**What was proposed:** Instantiate [IDisplayBoard](../../modules/U8G2Display/IDisplayBoard.hpp) objects on-the-fly when their display time arrives in the carousel rotation.
 
 **Why it was rejected:** Violates the "No Heap in Tick" rule. Creating objects with `new` during the display carousel's tick loop causes unpredictable latency spikes and OOM crashes. On a device running 24/7, any allocation that isn't eventually freed is a memory leak.
 
@@ -365,7 +365,7 @@ bus.subscribe("topic", onEvent, this);
 
 **Why it was rejected:** The ESP32's flash is too small. A 2 MB firmware plus a 2 MB temporary buffer would require 4 MB just for OTA staging, leaving no room for app partitions, LittleFS, or web assets. On a 4 MB flash chip, this is physically impossible.
 
-**What we do instead:** Streaming decryption directly to the OTA partition (ADR-13). The [IOTAVerifier](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/include/interfaces/IOTAVerifier.hpp) interface accumulates a SHA-256 hash incrementally via `update(const uint8_t* data, size_t length)` as chunks arrive, then verifies the final digest against a detached signature via `verify(const uint8_t* signature, size_t signatureLength)`. No intermediate storage is needed.
+**What we do instead:** Streaming decryption directly to the OTA partition (ADR-13). The [IOTAVerifier](../../include/interfaces/IOTAVerifier.hpp) interface accumulates a SHA-256 hash incrementally via `update(const uint8_t* data, size_t length)` as chunks arrive, then verifies the final digest against a detached signature via `verify(const uint8_t* signature, size_t signatureLength)`. No intermediate storage is needed.
 
 ---
 
@@ -375,7 +375,7 @@ bus.subscribe("topic", onEvent, this);
 
 **Why it was rejected:** Creates impossible merge conflicts between unrelated modules. Violates SRP (every module change modifies the central config) and OCP (adding a module requires changing the config structure). Serialising a massive document requires a large contiguous memory allocation.
 
-**What we do instead:** The [ConfigManager](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/modules/ConfigManager/ConfigManager.hpp) routes persistence, but each module owns its own config structure via [IConfigurable](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/include/interfaces/IConfigurable.hpp). Config files are stored at `/mod/<namespace>.json` — each module serialises and deserialises independently. See [Config System](config-system.md).
+**What we do instead:** The [ConfigManager](../../modules/ConfigManager/ConfigManager.hpp) routes persistence, but each module owns its own config structure via [IConfigurable](../../include/interfaces/IConfigurable.hpp). Config files are stored at `/mod/<namespace>.json` — each module serialises and deserialises independently. See [Config System](config-system.md).
 
 ---
 
