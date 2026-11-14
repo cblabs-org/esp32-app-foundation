@@ -10,18 +10,6 @@
       },
       "importedAt": "2026-05-15T23:13:02Z"
     },
-    "oo-expert": {
-      "type": "forked",
-      "origin": {
-        "repo": "unknown",
-        "branch": "unknown",
-        "path": "oo-expert",
-        "pinnedHash": null,
-        "forkedFromHash": null,
-        "forkedAt": "2026-05-15T23:19:02Z"
-      },
-      "importedAt": "2026-05-15T23:19:02Z"
-    },
     "principal-architect": {
       "type": "imported",
       "origin": {

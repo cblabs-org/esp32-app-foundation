@@ -1,9 +1,6 @@
 [submodule ".agents/skills/embedded-systems"]
 	path = .agents/skills/embedded-systems
 	url = https://github.com/mm-skills/embedded-systems
-[submodule ".agents/skills/oo-expert"]
-	path = .agents/skills/oo-expert
-	url = https://github.com/mm-skills/oo-expert
 [submodule ".agents/skills/squareline-studio-expert"]
 	path = .agents/skills/squareline-studio-expert
 	url = https://github.com/mm-skills/squareline-studio-expert

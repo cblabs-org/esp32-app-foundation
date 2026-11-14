@@ -95,7 +95,7 @@ These two skills provide:
 - **framework-portal-design** — UI kit, brand tokens, and portal styling
   guidelines.
 
-> **Note:** Additional skills (embedded-systems, oo-expert,
+> **Note:** Additional skills (embedded-systems,
 > lvgl-pro-expert, etc.) are available in the framework submodule at
 > `framework/.agents/skills/`. Symlink more as needed:
 > `ln -s ../../framework/.agents/skills/<name> .agents/skills/<name>`
