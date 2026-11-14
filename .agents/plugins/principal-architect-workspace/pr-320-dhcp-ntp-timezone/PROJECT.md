@@ -38,10 +38,32 @@ charter:
   - cd test/web && npx playwright test
   charter_locked: true
   charter_hash: bf1fda80a26da0b3d34c2034d7e64f92f1900cd89421bc0d5a9f0f734f31b367
-status: PLANNED
-approved_at: null
+status: APPROVED
+approved_at: '2026-11-14T18:30:07.889014Z'
 github_pr: null
-work_orders: []
+work_orders:
+- id: WO-320.1
+  slug: wo1-lwip-dhcp-hooks
+  title: Configure LwIP DHCP Option 42/100/101 hooks, sdkconfigs, and repo hygiene
+  complexity: standard
+  status: PENDING
+  attempts: 0
+  commit_sha: null
+- id: WO-320.2
+  slug: wo2-timemanager-dhcp
+  title: Implement DHCP NTP & Timezone in TimeManager, MCP telemetry, main wiring,
+    and native tests
+  complexity: architect
+  status: PENDING
+  attempts: 0
+  commit_sha: null
+- id: WO-320.3
+  slug: wo3-portal-docs-tests
+  title: Add Time portal DHCP UI, Playwright E2E tests, and update developer docs/skills
+  complexity: standard
+  status: PENDING
+  attempts: 0
+  commit_sha: null
 ---
 
 # PR-320 — feat(time): DHCP NTP (RFC 2132 opt 42) and DHCP Timezone (RFC 4833 opts 100/101)
@@ -103,5 +125,18 @@ work_orders: []
   - `build_project` (`esp32dev_all_on`, `esp32dev_all_off` in `sample-app`)
 
 ## 3. Implementation Plan & Work Order Breakdown
+
+`PR-320` is decomposed into three strictly sequential Work Orders with non-overlapping concerns and full coverage of all three build targets (`esp32-app-foundation`, `sample-app`, `template-app`):
+
+| WO ID | Slug | Title | Complexity | Dependencies |
+| --- | --- | --- | --- | --- |
+| `WO-320.1` | `wo1-lwip-dhcp-hooks` | Configure LwIP DHCP Option 42/100/101 hooks, sdkconfigs, and repo hygiene | `standard` | Charter locked |
+| `WO-320.2` | `wo2-timemanager-dhcp` | Implement DHCP NTP & Timezone in TimeManager, MCP telemetry, main wiring, and native tests | `architect` | `WO-320.1` |
+| `WO-320.3` | `wo3-portal-docs-tests` | Add Time portal DHCP UI, Playwright E2E tests, and update developer docs/skills | `standard` | `WO-320.2` |
+
+### Sequencing Notes
+1. `WO-320.1` lays down `.memory/.gitignore`, Kconfig SNTP/LwIP DHCP flags across all 3 projects, `include/lwip_dhcp_tz_hooks.h`, and CMake `ESP_IDF_LWIP_HOOK_FILENAME` injection so LwIP builds cleanly before `TimeManager` implements the strong hook symbol.
+2. `WO-320.2` implements `TimeManager` schema v2 (`migrateConfig`), `setEventBus(WIFI_CONNECTED)`, Option 42 SNTP + trailing slot fallback preservation, RFC 4833 Option 100/101 spinlock staging & streaming `/timezones.json` lookup, REST API fields, `MCPBuiltinTools` `"system_info"` telemetry, 3-target `main.cpp` wiring, and stateful host stubs/GoogleTests.
+3. `WO-320.3` adds the portal UI controls (`modules/TimeManager/web/time.js`), mock routes (`test/web/server.js`), Playwright E2E suite (`test/web/tests/time.spec.ts`), and developer/skill documentation (`docs/developer/**`, `.agents/skills/framework-expert/**`).
 
 ## 4. Outcome & Session Log
