@@ -40,7 +40,7 @@ charter:
   - cd test/web && npx playwright test
   charter_locked: true
   charter_hash: 5733b8ef2ccf4779ecd126f949d67ccdc427e192e9b164aadb4a50db1440e434
-status: APPROVED
+status: AUDIT_APPROVED
 approved_at: '2026-11-14T18:30:07.889014Z'
 github_pr: null
 work_orders:
