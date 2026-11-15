@@ -5,7 +5,7 @@ pr_id: PR-320
 title: Implement DHCP NTP & Timezone in TimeManager, MCP telemetry, main wiring, and
   native tests
 complexity: architect
-status: PENDING
+status: COMPLETED
 allowed_files:
 - modules/TimeManager/TimeManager.hpp
 - modules/TimeManager/TimeManager.cpp
@@ -28,7 +28,46 @@ verification_command: python3 scripts/doc_lint.py
 max_attempts: 5
 max_structural_failures: 2
 spec_hash: e77b2ac4601c2910039495b3bd815a3112ab8019b64e37bb5b97b7af7d6ba310
-completion: null
+completion:
+  status: COMPLETED
+  attempt_num: 1
+  receipt_id: rcpt_1cc38419b229
+  commit_sha: 41bb5fb7c147decdd82b4be69bc3409e2cd49cba
+  files_modified:
+  - modules/MCPServer/MCPBuiltinTools.cpp
+  - modules/TimeManager/TimeManager.cpp
+  - modules/TimeManager/TimeManager.hpp
+  - sample-app/src/main.cpp
+  - src/main.cpp
+  - template-app/src/main.cpp
+  - test/stubs/platform/esp_sntp.h
+  - test/stubs/platform/freertos/FreeRTOS.h
+  - test/test_unit/test_mcpServer/test_mcpServer.cpp
+  - test/test_unit/test_timeManager/test_timeManager.cpp
+  verification_summary: doc_lint.py ok; native 1019/1019 (36 suites); builds ok (root
+    esp32dev/s3nano/crowpanel, sample all_on/all_off); nm strong lwip_dhcp hooks ok.
+    Blocked on pa wo verify .lstrip('./') bug.
+  out_of_scope_findings: []
+  escalation_request: null
+  decisions_made:
+  - Implemented strong extern "C" lwip_dhcp_on_extra_option and lwip_dhcp_tz_take_pending
+    behind a static portMUX_TYPE spinlock in TimeManager.cpp, filtering strictly for
+    accepted lease states (REQUESTING/RENEWING/REBINDING/REBOOTING/BOUND), Options
+    100/101 only (never Option 2), printable ASCII, and bounded length (<64), with
+    zero heap/VFS/EventBus/TZ/logging inside the hook.
+  - 'Guarded esp_sntp_servermode_dhcp() behind #if defined(CONFIG_LWIP_DHCP_GET_NTP_SRV)
+    && CONFIG_LWIP_DHCP_GET_NTP_SRV and bounded SNTP slot iteration via EFFECTIVE_SNTP_SLOTS
+    (min(MAX_SNTP_SLOTS, CONFIG_LWIP_SNTP_MAX_SERVERS)) so boards with SNTP_MAX_SERVERS=1
+    and DHCP SNTP disabled (esp32s3nano, crowpanel-128-rotary) compile and run safely.'
+  - Subscribed directly to the "wifi.connected" EventBus topic literal inside TimeManager.cpp
+    to avoid introducing an LDF header dependency on WifiManager.hpp, matching HomeAssistant
+    and decoupling display test targets.
+  - Implemented a fixed-256-byte-buffer streaming JSON key/value parser in TimeManager::_lookupIanaPosixTz()
+    to resolve Option 101 TCode IANA names from LittleFS /timezones.json without heap
+    allocation.
+  - Left TimePreconditionContributor.hpp unmodified after confirming it already reads
+    TimeManager::isConfigured() and TimeManager::getSyncStatus().
+  dead_ends: []
 ---
 
 # WO-320.2 — Implement DHCP NTP & Timezone in TimeManager, MCP telemetry, main wiring, and native tests
@@ -161,3 +200,42 @@ Implement complete DHCP NTP (RFC 2132 Option 42) and DHCP Timezone (RFC 4833 Opt
 3. Update `completion` & `## Completion Report` in this `WORKORDER.md` BEFORE running `pa wo verify WO-320.2`.
 
 ## Completion Report
+
+### Execution Summary
+Implemented DHCP Option 42 (NTP server discovery) and RFC 4833 Options 100 (`PCode`) & 101 (`TCode`) timezone discovery across `TimeManager`, `MCPBuiltinTools`, all three app entry points, native host stubs, and unit tests:
+
+1. **LwIP Hook & Spinlock Handoff (`modules/TimeManager/TimeManager.cpp`):**
+   - Implemented strong `extern "C"` `lwip_dhcp_on_extra_option(...)` and `lwip_dhcp_tz_take_pending(...)` guarded by `portMUX_TYPE s_dhcpTzMux`.
+   - Accepts only `DHCP_STATE_REQUESTING`, `DHCP_STATE_RENEWING`, `DHCP_STATE_REBINDING`, `DHCP_STATE_REBOOTING`, and `DHCP_STATE_BOUND` (ignoring `DHCP_STATE_SELECTING`), accepts only Options 100 and 101 (no Option 2), rejects `len == 0` / `len >= 64` / `nullptr` / non-printable ASCII / embedded NULs / outer whitespace, and performs zero heap, VFS, EventBus, `setenv`/`tzset`, or heavy logging inside the hook.
+2. **Schema v2 & Zero Flash Wear (`modules/TimeManager/TimeManager.hpp`, `modules/TimeManager/TimeManager.cpp`):**
+   - Upgraded `getSchemaVersion()` to `2` with `migrateConfig()` migrating v1->v2 (`dhcpNtp=true`, `dhcpTz=false` when manual v1 timezone or non-`"GMT0"` POSIX rule is configured, else `true`).
+   - Kept volatile `_dhcpNtp*` and `_dhcpTz*` state strictly out of `serializeConfig()` and never overwrote persisted `_timezone`/`_posixTz` or called `saveModuleConfig()` on DHCP updates.
+3. **Runtime Consumption & EventBus Wiring (`TimeManager.cpp`, `src/main.cpp`, `sample-app/src/main.cpp`, `template-app/src/main.cpp`):**
+   - Added `TimeManager::setEventBus(EventBus*)` subscribing idempotently to `"wifi.connected"` and setting only `std::atomic<bool> _wifiConnectedPending` in the EventBus callback.
+   - Wired `timeManager.setEventBus(&app.getEventBus())` inside `#ifdef WITH_TIME` across all three `main.cpp` files.
+   - Updated `begin()`, `_reinitNtp()`, and `tick()` (before `IN_PROGRESS` early return) to stop/clear SNTP slots, invoke `esp_sntp_servermode_dhcp(_dhcpNtpEnabled)` before `configTzTime`, prioritize Option 100 `PCode` while preserving `TCode` display label, resolve Option 101 `TCode` via fixed-stack streaming scan of `/timezones.json`, and preserve non-duplicate static fallback servers in trailing SNTP slots.
+4. **REST API & MCP Telemetry (`TimeManager.cpp`, `modules/MCPServer/MCPBuiltinTools.cpp`):**
+   - Extended `GET`/`POST /api/time/config` with `activeTimezone`, `activePosix`, `dhcpNtp`, `dhcpTz`, `dhcpNtpActive`, `dhcpNtpServers`, `dhcpTzActive`, and `dhcpTzSource`.
+   - Extended `"system_info"` in `MCPBuiltinTools.cpp` with `time_dhcp_ntp_enabled`, `time_dhcp_ntp_active`, `time_dhcp_ntp_servers`, `time_dhcp_tz_enabled`, `time_dhcp_tz_active`, and `time_dhcp_tz_source` without adding extra tools.
+5. **Native Stubs & GoogleTests (`test/stubs/platform/*`, `test/test_unit/test_timeManager/`, `test/test_unit/test_mcpServer/`):**
+   - Upgraded `FreeRTOS.h` (`portMUX_TYPE`, critical section macros) and stateful `esp_sntp.h` (`stub_sntp_*`, `ip_addr_t`, `pbuf`, `dhcp`, SNTP slot APIs).
+   - Preserved all existing tests and added tests covering hook filtering, malformed payloads, schema v2 migration, zero flash wear, Option 42 trailing fallbacks, Option 100/101 precedence, streaming `/timezones.json`, preconditions, `EventBus` handoff, REST config, and MCP `system_info`.
+
+### Verification Results
+- **Doc Lint:** `python3 scripts/doc_lint.py` passed (exit 0).
+- **Native Unit Tests (`native`):** PlatformIO MCP `run_tests` passed all 1019/1019 test cases across all 36 suites (`failed: 0, errored: 0, skipped: 0`) in 53.21s, including 22/22 in `test_unit/test_timeManager` and 76/76 in `test_unit/test_mcpServer`.
+- **Root Firmware Builds (PlatformIO MCP `build_project`):**
+  - `esp32dev`: SUCCEEDED (RAM 58,460 B, Flash 1,345,243 B)
+  - `esp32s3nano`: SUCCEEDED (RAM 61,084 B, Flash 1,379,551 B)
+  - `crowpanel-128-rotary`: SUCCEEDED (RAM 64,828 B, Flash 1,912,095 B)
+- **Sample App Firmware Builds (PlatformIO MCP `build_project`):**
+  - `esp32dev_all_on`: SUCCEEDED (RAM 65,460 B, Flash 1,559,559 B)
+  - `esp32dev_all_off`: SUCCEEDED (RAM 58,516 B, Flash 1,488,147 B)
+- **ELF Strong Symbol Verification (`xtensa-esp32-elf-nm`):**
+  - `.pio/build/esp32dev/firmware.elf`: `400e71fc T lwip_dhcp_on_extra_option`, `400e72bc T lwip_dhcp_tz_take_pending`
+  - `sample-app/.pio/build/esp32dev_all_on/firmware.elf`: `400e9410 T lwip_dhcp_on_extra_option`, `400e94d0 T lwip_dhcp_tz_take_pending`
+
+### Escalation Notice
+`pa wo verify WO-320.2` failed scope hygiene with:
+`Error: Scope hygiene check failed for WO-320.2; modified or untracked files outside allowed_files: agents/plugins/principal-architect-workspace/pr-320-dhcp-ntp-timezone/wo2-timemanager-dhcp/WORKORDER.md`
+because `pa_cli.py:_parse_porcelain_paths()` calls `.lstrip("./")`, stripping the leading `.` from `.agents/.../WORKORDER.md` (same known harness defect encountered by `WO-320.1`). All 10 modified code/test files are strictly inside `allowed_files`, `spec_hash` is intact, and every verification requirement has passed. Escalating to the Principal Architect (`pa`) for cryptographic receipt stamping and commit creation.

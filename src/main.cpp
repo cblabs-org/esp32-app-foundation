@@ -120,6 +120,7 @@ void setup() {
 
 #ifdef WITH_TIME
     timeManager.setConfigManager(&app.getConfigManager());
+    timeManager.setEventBus(&app.getEventBus());
     app.registerModule(&timeManager);
     app.registerModule(&timePrecondition);
 #endif

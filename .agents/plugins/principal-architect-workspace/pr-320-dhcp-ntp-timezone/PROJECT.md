@@ -55,9 +55,9 @@ work_orders:
   title: Implement DHCP NTP & Timezone in TimeManager, MCP telemetry, main wiring,
     and native tests
   complexity: architect
-  status: PENDING
-  attempts: 0
-  commit_sha: null
+  status: COMPLETED
+  attempts: 1
+  commit_sha: 41bb5fb7c147decdd82b4be69bc3409e2cd49cba
 - id: WO-320.3
   slug: wo3-portal-docs-tests
   title: Add Time portal DHCP UI, Playwright E2E tests, and update developer docs/skills
