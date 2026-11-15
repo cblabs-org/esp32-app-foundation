@@ -10,6 +10,7 @@ charter:
   base_branch: main
   depends_on: []
   allowed_modules:
+  - .gitignore
   - .memory/.gitignore
   - CMakeLists.txt
   - sdkconfig.defaults
@@ -37,7 +38,7 @@ charter:
   - python3 scripts/doc_lint.py
   - cd test/web && npx playwright test
   charter_locked: true
-  charter_hash: bf1fda80a26da0b3d34c2034d7e64f92f1900cd89421bc0d5a9f0f734f31b367
+  charter_hash: 0df216b0bf1a70f09c03578ddf488e7bf5378cd56d5e5c92c5a758001344915d
 status: APPROVED
 approved_at: '2026-11-14T18:30:07.889014Z'
 github_pr: null

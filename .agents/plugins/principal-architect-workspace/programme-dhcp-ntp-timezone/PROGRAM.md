@@ -13,6 +13,7 @@ prs:
   base_branch: main
   depends_on: []
   allowed_modules:
+  - .gitignore
   - .memory/.gitignore
   - CMakeLists.txt
   - sdkconfig.defaults

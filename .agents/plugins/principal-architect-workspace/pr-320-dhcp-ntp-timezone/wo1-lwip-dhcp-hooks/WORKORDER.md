@@ -6,6 +6,7 @@ title: Configure LwIP DHCP Option 42/100/101 hooks, sdkconfigs, and repo hygiene
 complexity: standard
 status: PENDING
 allowed_files:
+- .gitignore
 - .memory/.gitignore
 - CMakeLists.txt
 - sdkconfig.defaults
@@ -24,47 +25,8 @@ required_skills:
 verification_command: python3 scripts/doc_lint.py
 max_attempts: 5
 max_structural_failures: 2
-spec_hash: 3fd7270b421823cefc88401ec0fe90053e9f19dcd579c881f53e10ec97a14980
-completion:
-  status: PENDING
-  attempt_num: 1
-  receipt_id: null
-  commit_sha: null
-  files_modified:
-  - .agents/skills/framework-expert/coding-patterns/style-guide.md
-  - .memory/.gitignore
-  - CMakeLists.txt
-  - sdkconfig.defaults
-  - include/lwip_dhcp_tz_hooks.h
-  - sample-app/CMakeLists.txt
-  - sample-app/sdkconfig.defaults
-  - template-app/CMakeLists.txt
-  - template-app/sdkconfig.defaults
-  verification_summary: All implementation complete; doc_lint.py exits 0; 1008 native
-    tests pass; esp32dev builds clean; pa wo verify blocked by harness lstrip bug
-    on WORKORDER.md
-  out_of_scope_findings: []
-  escalation_request:
-    blocker_type: structural
-    reason_code: HARNESS_BUG_PORCELAIN_LSTRIP
-    target_role: pa
-    requested_files: []
-    summary: pa_cli._parse_porcelain_paths line 2171 uses .lstrip('./') which strips
-      the leading dot from .agents/...; this causes 'if rel_p == wo_rel_posix:' (line
-      2297) to compare 'agents/.../WORKORDER.md' != '.agents/.../WORKORDER.md', falsely
-      flagging WORKORDER.md itself as an out-of-scope dirty file during pa wo verify.
-  decisions_made:
-  - Configured CONFIG_LWIP_SNTP_MAX_SERVERS=3, CONFIG_LWIP_DHCP_GET_NTP_SRV=y, CONFIG_LWIP_DHCP_MAX_NTP_SERVERS=2,
-    and CONFIG_LWIP_HOOK_DHCP_EXTRA_OPTION_DEFAULT=y across sdkconfig.defaults in
-    root, sample-app, and template-app.
-  - Created include/lwip_dhcp_tz_hooks.h with RFC 4833 options 100/101, leading comma
-    in DHCP_ADD_EXTRA_REQUEST_OPTIONS, and pure-C lwip_dhcp_tz_take_pending declaration.
-  - Injected lwip hook compilation settings via CMakeLists.txt across root, sample-app,
-    and template-app.
-  - Created .memory/.gitignore ignoring .cache/, .enrolled, and local/.
-  - 'Remediated style-guide.md line 90 with ''legacy #ifdef NATIVE_BUILD'' per Section
-    2.5.'
-  dead_ends: []
+spec_hash: 89b8d4d9ab4160ba5bb4dc36e9820ac20bcca7296f0b5ef3103ff3bb01a4ab19
+completion: null
 ---
 
 # WO-320.1 — Configure LwIP DHCP Option 42/100/101 hooks, sdkconfigs, and repo hygiene
@@ -75,14 +37,24 @@ Prepare repository hygiene, ESP-IDF LwIP Kconfig defaults, CMake LwIP hook injec
 
 ## 2. Detailed Specification
 
-### 2.1 Repo Hygiene (`.memory/.gitignore`)
+### 2.1 Repo Hygiene (`.memory/.gitignore`, `.gitignore`)
 - Create `.memory/.gitignore` ignoring volatile runtime state produced by PA / repo-memory:
   ```gitignore
   .cache/
   .enrolled
   local/
   ```
-- Confirm `.memory/.enrolled` no longer appears in `git status --porcelain`.
+  Confirm `.memory/.enrolled` no longer appears in `git status --porcelain`.
+- Update root `.gitignore` under `# Generated ESP-IDF configuration files` so root `CMakeLists.txt` and `template-app/CMakeLists.txt` (alongside `sample-app/CMakeLists.txt`) are tracked in git rather than ignored, while generated `src/CMakeLists.txt` and `*/src/CMakeLists.txt` remain ignored. Keep `src/CMakeLists.txt` ignored, add `*/src/CMakeLists.txt`, and immediately below `CMakeLists.txt` add explicit negations:
+  ```gitignore
+  src/CMakeLists.txt
+  */src/CMakeLists.txt
+  CMakeLists.txt
+  !/CMakeLists.txt
+  !/sample-app/CMakeLists.txt
+  !/template-app/CMakeLists.txt
+  ```
+- Verify `git check-ignore -v CMakeLists.txt sample-app/CMakeLists.txt template-app/CMakeLists.txt` produces empty output (all 3 tracked), while `git check-ignore -v src/CMakeLists.txt` matches `.gitignore`.
 
 ### 2.2 Kconfig Defaults (`sdkconfig.defaults`, `sample-app/sdkconfig.defaults`, `template-app/sdkconfig.defaults`)
 Append a clearly commented section (preserving all existing settings) enabling:
@@ -129,16 +101,16 @@ Create `include/lwip_dhcp_tz_hooks.h` with strict C & C++ compatibility (`#pragm
 
 ### 2.4 CMake LwIP Hook Injection (`CMakeLists.txt`, `sample-app/CMakeLists.txt`, `template-app/CMakeLists.txt`)
 In all three `CMakeLists.txt` files **after** `project(...)`, inject our header into the `lwip` component using the ESP-IDF hook pattern:
-- Root `CMakeLists.txt`:
+- Root `CMakeLists.txt` (preserving the existing `EXCLUDE_COMPONENTS` block before `include($ENV{IDF_PATH}/tools/cmake/project.cmake)`):
   ```cmake
   idf_component_get_property(lwip lwip COMPONENT_LIB)
   if(lwip)
-      target_compile_options(${lwip} PRIVATE "-I${PROJECT_DIR}/include")
+      target_compile_options(${lwip} PRIVATE "-I${CMAKE_CURRENT_LIST_DIR}/include")
       target_compile_definitions(${lwip} PRIVATE "-DESP_IDF_LWIP_HOOK_FILENAME=\"lwip_dhcp_tz_hooks.h\"")
   endif()
   ```
-- `sample-app/CMakeLists.txt` and `template-app/CMakeLists.txt`:
-  Note that `include/lwip_dhcp_tz_hooks.h` lives in the parent framework repo (`../include` relative to `sample-app/` and `template-app/`). Resolve it reliably via `CMAKE_CURRENT_LIST_DIR`:
+- `sample-app/CMakeLists.txt`:
+  Note that `include/lwip_dhcp_tz_hooks.h` lives in the parent framework repo (`../include` relative to `sample-app/`). Resolve it reliably via `CMAKE_CURRENT_LIST_DIR`:
   ```cmake
   idf_component_get_property(lwip lwip COMPONENT_LIB)
   if(lwip)
@@ -147,6 +119,58 @@ In all three `CMakeLists.txt` files **after** `project(...)`, inject our header 
       target_compile_definitions(${lwip} PRIVATE "-DESP_IDF_LWIP_HOOK_FILENAME=\"lwip_dhcp_tz_hooks.h\"")
   endif()
   ```
+- `template-app/CMakeLists.txt`:
+  1. Include the `EXCLUDE_COMPONENTS` block (matching root `CMakeLists.txt`) **before** `include($ENV{IDF_PATH}/tools/cmake/project.cmake)`:
+     ```cmake
+     set(EXCLUDE_COMPONENTS
+         # Rainmaker ecosystem (cloud platform — not used)
+         espressif__esp_rainmaker
+         espressif__rmaker_common
+         espressif__esp_insights
+         espressif__esp_diagnostics
+         espressif__esp_diag_data_store
+         espressif__cbor
+         espressif__qrcode
+         # Industrial protocols (Modbus — not used)
+         espressif__esp-modbus
+         # Cellular modem (no modem hardware)
+         espressif__esp_modem
+         # Zigbee (not used)
+         espressif__esp-zboss-lib
+         espressif__esp-zigbee-lib
+         # DSP / Speech / Audio (not used)
+         espressif__esp-dsp
+         espressif__esp-sr
+         chmorgan__esp-libhelix-mp3
+         # Crypto (mbedTLS handles all framework crypto needs)
+         espressif__libsodium
+         # Network provisioning (framework has its own wifiManager)
+         espressif__network_provisioning
+         # Unused filesystems
+         spiffs
+         fatfs
+         # Console REPL (framework uses MCP over serial)
+         console
+     )
+     include($ENV{IDF_PATH}/tools/cmake/project.cmake)
+     project(template-app)
+     ```
+  2. **After** `project(template-app)`, auto-detect standalone Path B (`framework/include/lwip_dhcp_tz_hooks.h`) vs in-repo Path A (`../include/lwip_dhcp_tz_hooks.h`) for LwIP hook injection:
+     ```cmake
+     if(EXISTS "${CMAKE_CURRENT_LIST_DIR}/framework/include/lwip_dhcp_tz_hooks.h")
+         idf_component_get_property(lwip_lib lwip COMPONENT_LIB)
+         if(lwip_lib)
+             target_include_directories(${lwip_lib} PRIVATE "${CMAKE_CURRENT_LIST_DIR}/framework/include")
+             target_compile_definitions(${lwip_lib} PRIVATE "ESP_IDF_LWIP_HOOK_FILENAME=\"lwip_dhcp_tz_hooks.h\"")
+         endif()
+     elseif(EXISTS "${CMAKE_CURRENT_LIST_DIR}/../include/lwip_dhcp_tz_hooks.h")
+         idf_component_get_property(lwip_lib lwip COMPONENT_LIB)
+         if(lwip_lib)
+             target_include_directories(${lwip_lib} PRIVATE "${CMAKE_CURRENT_LIST_DIR}/../include")
+             target_compile_definitions(${lwip_lib} PRIVATE "ESP_IDF_LWIP_HOOK_FILENAME=\"lwip_dhcp_tz_hooks.h\"")
+         endif()
+     endif()
+     ```
 
 ### 2.5 Style Guide Lint Remediation (`.agents/skills/framework-expert/coding-patterns/style-guide.md`)
 Fix pre-existing banned identifier on line 90 by updating:
@@ -157,32 +181,17 @@ so `scripts/doc_lint.py` historical context exemption matches.
 
 ## 3. Verification Requirements
 
-1. Inspect `scripts/sync_sdkconfig.py` and run PlatformIO MCP `build_project` (ALWAYS `acquire_lock` -> `build_project` -> `release_lock`, never shell `pio`!) on:
+1. Verify `.gitignore` tracking rules via `git check-ignore -v`:
+   - `git check-ignore -v CMakeLists.txt sample-app/CMakeLists.txt template-app/CMakeLists.txt` MUST produce empty output (all 3 top-level `CMakeLists.txt` files tracked/un-ignored).
+   - `git check-ignore -v src/CMakeLists.txt` MUST match `.gitignore` (generated `src/CMakeLists.txt` remains ignored).
+2. Inspect `scripts/sync_sdkconfig.py` and run PlatformIO MCP `build_project` (ALWAYS `acquire_lock` -> `build_project` -> `release_lock`, never shell `pio`!) on:
    - Root project `esp32dev` (verifies `lwip` compiles `dhcp.c` and `lwip_default_hooks.c` cleanly with `include/lwip_dhcp_tz_hooks.h` and new Kconfig flags; also check generated `sdkconfig` / `sdkconfig.esp32dev` includes `CONFIG_LWIP_DHCP_GET_NTP_SRV=y` and `CONFIG_LWIP_HOOK_DHCP_EXTRA_OPTION_DEFAULT=y`, and check if cached `sdkconfig.*` files are untracked/gitignored or need attention).
+   - `template-app` project `esp32dev` (verifies `template-app/CMakeLists.txt` `EXCLUDE_COMPONENTS` + Path A `../include/lwip_dhcp_tz_hooks.h` hook injection and `template-app/sdkconfig.defaults` build cleanly).
    - Root project `native` `run_tests` (ensure existing unit tests still pass).
-2. Run `python3 scripts/doc_lint.py` and confirm exit `0`.
-3. Verify `git status --porcelain` shows only your `allowed_files` modified/added (and `.memory/.enrolled` is ignored).
-4. Record your work summary in Part II (`completion.verification_summary`, `completion.decisions_made`, `## Completion Report`) BEFORE running `pa wo verify WO-320.1` as your final mutating action.
+3. Run `python3 scripts/doc_lint.py` and confirm exit `0`.
+4. Verify `git status --porcelain` shows only your `allowed_files` modified/added (including `.gitignore`, `CMakeLists.txt`, `template-app/CMakeLists.txt`, and `.memory/.gitignore`, while `.memory/.enrolled` is ignored).
+5. Record your work summary in Part II (`completion.verification_summary`, `completion.decisions_made`, `## Completion Report`) BEFORE running `pa wo verify WO-320.1` as your final mutating action.
 
 ## Completion Report
 
-### Implementation Summary
-- **Repo Hygiene**: Created `.memory/.gitignore` ignoring `.cache/`, `.enrolled`, and `local/`. Verified `.memory/.enrolled` no longer appears in `git status`.
-- **Kconfig Defaults**: Configured DHCP Option 42 (NTP) and RFC 4833 Option 100/101 (Timezone) Kconfig symbols in `sdkconfig.defaults`, `sample-app/sdkconfig.defaults`, and `template-app/sdkconfig.defaults`:
-  - `CONFIG_LWIP_SNTP_MAX_SERVERS=3`
-  - `CONFIG_LWIP_DHCP_GET_NTP_SRV=y`
-  - `CONFIG_LWIP_DHCP_MAX_NTP_SERVERS=2`
-  - `CONFIG_LWIP_HOOK_DHCP_EXTRA_OPTION_DEFAULT=y`
-- **Pure-C LwIP Hook Header**: Created `include/lwip_dhcp_tz_hooks.h` with `LWIP_DHCP_OPTION_TZ_PCODE 100`, `LWIP_DHCP_OPTION_TZ_TCODE 101`, `LWIP_DHCP_TZ_MAX_LEN 64`, mandatory leading-comma `DHCP_ADD_EXTRA_REQUEST_OPTIONS`, and pure-C `lwip_dhcp_tz_take_pending()` declaration without Arduino/FreeRTOS headers.
-- **CMake Hook Injection**: Verified/injected LwIP component compile options and `ESP_IDF_LWIP_HOOK_FILENAME` definition into `CMakeLists.txt`, `sample-app/CMakeLists.txt`, and `template-app/CMakeLists.txt`.
-- **Style Guide Remediation**: Updated line 90 of `.agents/skills/framework-expert/coding-patterns/style-guide.md` from `#ifdef NATIVE_BUILD` to `legacy #ifdef NATIVE_BUILD` per Section 2.5.
-
-### Verification Results
-- **Doc Lint Gate**: `python3 scripts/doc_lint.py` exited 0 (clean).
-- **Native Unit Tests**: `pio test -e native` succeeded across 46 test suites and all 1008 test cases.
-- **Hardware Build**: `pio run -e esp32dev` succeeded cleanly (RAM: 17.7%, Flash: 85.1%).
-- **Scope Hygiene**: `git status --porcelain -uall` contains only allowed files.
-
-### Escalation Note (esc_0c4841e22f87)
-`pa wo verify WO-320.1` fails at the scope hygiene check because `pa_cli._parse_porcelain_paths` (line 2171) executes `cleaned = part.strip().strip('"').lstrip("./")`, which strips the leading dot from `.agents/...`. As a result, `rel_p` becomes `"agents/.../WORKORDER.md"`, while `wo_rel_posix` at line 2288 is `".agents/.../WORKORDER.md"`. The equality test `if rel_p == wo_rel_posix:` (line 2297) evaluates to `False`, falsely reporting `WORKORDER.md` itself as an out-of-scope dirty file.
-Fix needed in `pa_cli.py`: change line 2171 to `.removeprefix("./").lstrip("/")` (matching line 2188) and line 2297 to normalize both paths.
+_Populated by pa-engineer upon completion._
