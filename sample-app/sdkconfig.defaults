@@ -151,3 +151,15 @@ CONFIG_MBEDTLS_PEM_WRITE_C=y
 
 # Enable ESP-IDF HTTPS Server (required by PsychicHttpsServer)
 CONFIG_ESP_HTTPS_SERVER_ENABLE=y
+
+# --- PR-320: DHCP NTP (Option 42) & DHCP Timezone (RFC 4833 Options 100/101) ---
+# Allow up to 3 SNTP slots total: DHCP Option 42 fills at most 2 slots,
+# reserving trailing slot(s) for configured static fallback NTP servers.
+CONFIG_LWIP_SNTP_MAX_SERVERS=3
+CONFIG_LWIP_DHCP_GET_NTP_SRV=y
+CONFIG_LWIP_DHCP_MAX_NTP_SERVERS=2
+# Emit __weak lwip_dhcp_on_extra_option() in lwip_default_hooks.c so TimeManager
+# can override it strongly when WITH_TIME is enabled, while -UWITH_TIME builds
+# continue linking cleanly against the weak default.
+CONFIG_LWIP_HOOK_DHCP_EXTRA_OPTION_DEFAULT=y
+

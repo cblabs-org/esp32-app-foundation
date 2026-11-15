@@ -47,9 +47,9 @@ work_orders:
   slug: wo1-lwip-dhcp-hooks
   title: Configure LwIP DHCP Option 42/100/101 hooks, sdkconfigs, and repo hygiene
   complexity: standard
-  status: PENDING
-  attempts: 0
-  commit_sha: null
+  status: COMPLETED
+  attempts: 1
+  commit_sha: b0f8ce56d6799c1f6d673a877c91c460575c23fc
 - id: WO-320.2
   slug: wo2-timemanager-dhcp
   title: Implement DHCP NTP & Timezone in TimeManager, MCP telemetry, main wiring,

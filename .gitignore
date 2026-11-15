@@ -17,7 +17,11 @@ sdkconfig.*
 !sdkconfig.defaults
 !sdkconfig.defaults.*
 src/CMakeLists.txt
+*/src/CMakeLists.txt
 CMakeLists.txt
+!/CMakeLists.txt
+!/sample-app/CMakeLists.txt
+!/template-app/CMakeLists.txt
 dependencies.lock
 idf_component.yml
 !src/idf_component.yml
