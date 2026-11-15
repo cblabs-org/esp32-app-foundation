@@ -168,3 +168,128 @@
 | [pr-38](../pr-38-portal-remediation/PROJECT.md) | HA metadata ADR, RAII mutex ADR (from PR-35 review) | [distillation](../pr-38-portal-remediation/context_bridge.md) |
 | [pr-42](../pr-42-ha-discovery-pacing/PROJECT.md) | Issue #16: Paced discovery/state publish, outbox limit, drain-completion signal | PROJECT.md |
 
+## .gitignore
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-320-dhcp-ntp-timezone](../pr-320-dhcp-ntp-timezone/PROJECT.md) | feat(time): DHCP NTP (RFC 2132 opt 42) and DHCP Timezone (RFC 4833 opts 100/101) | [PROJECT.md](../pr-320-dhcp-ntp-timezone/PROJECT.md) |
+
+## .memory/.gitignore
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-320-dhcp-ntp-timezone](../pr-320-dhcp-ntp-timezone/PROJECT.md) | feat(time): DHCP NTP (RFC 2132 opt 42) and DHCP Timezone (RFC 4833 opts 100/101) | [PROJECT.md](../pr-320-dhcp-ntp-timezone/PROJECT.md) |
+
+## CMakeLists.txt
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-320-dhcp-ntp-timezone](../pr-320-dhcp-ntp-timezone/PROJECT.md) | feat(time): DHCP NTP (RFC 2132 opt 42) and DHCP Timezone (RFC 4833 opts 100/101) | [PROJECT.md](../pr-320-dhcp-ntp-timezone/PROJECT.md) |
+
+## platformio.ini
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-320-dhcp-ntp-timezone](../pr-320-dhcp-ntp-timezone/PROJECT.md) | feat(time): DHCP NTP (RFC 2132 opt 42) and DHCP Timezone (RFC 4833 opts 100/101) | [PROJECT.md](../pr-320-dhcp-ntp-timezone/PROJECT.md) |
+
+## sdkconfig.defaults
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-320-dhcp-ntp-timezone](../pr-320-dhcp-ntp-timezone/PROJECT.md) | feat(time): DHCP NTP (RFC 2132 opt 42) and DHCP Timezone (RFC 4833 opts 100/101) | [PROJECT.md](../pr-320-dhcp-ntp-timezone/PROJECT.md) |
+
+## include/lwip_dhcp_tz_hooks.h
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-320-dhcp-ntp-timezone](../pr-320-dhcp-ntp-timezone/PROJECT.md) | feat(time): DHCP NTP (RFC 2132 opt 42) and DHCP Timezone (RFC 4833 opts 100/101) | [PROJECT.md](../pr-320-dhcp-ntp-timezone/PROJECT.md) |
+
+## src/main.cpp
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-320-dhcp-ntp-timezone](../pr-320-dhcp-ntp-timezone/PROJECT.md) | feat(time): DHCP NTP (RFC 2132 opt 42) and DHCP Timezone (RFC 4833 opts 100/101) | [PROJECT.md](../pr-320-dhcp-ntp-timezone/PROJECT.md) |
+
+## sample-app/CMakeLists.txt
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-320-dhcp-ntp-timezone](../pr-320-dhcp-ntp-timezone/PROJECT.md) | feat(time): DHCP NTP (RFC 2132 opt 42) and DHCP Timezone (RFC 4833 opts 100/101) | [PROJECT.md](../pr-320-dhcp-ntp-timezone/PROJECT.md) |
+
+## sample-app/sdkconfig.defaults
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-320-dhcp-ntp-timezone](../pr-320-dhcp-ntp-timezone/PROJECT.md) | feat(time): DHCP NTP (RFC 2132 opt 42) and DHCP Timezone (RFC 4833 opts 100/101) | [PROJECT.md](../pr-320-dhcp-ntp-timezone/PROJECT.md) |
+
+## sample-app/src/main.cpp
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-320-dhcp-ntp-timezone](../pr-320-dhcp-ntp-timezone/PROJECT.md) | feat(time): DHCP NTP (RFC 2132 opt 42) and DHCP Timezone (RFC 4833 opts 100/101) | [PROJECT.md](../pr-320-dhcp-ntp-timezone/PROJECT.md) |
+
+## template-app/CMakeLists.txt
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-320-dhcp-ntp-timezone](../pr-320-dhcp-ntp-timezone/PROJECT.md) | feat(time): DHCP NTP (RFC 2132 opt 42) and DHCP Timezone (RFC 4833 opts 100/101) | [PROJECT.md](../pr-320-dhcp-ntp-timezone/PROJECT.md) |
+
+## template-app/sdkconfig.defaults
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-320-dhcp-ntp-timezone](../pr-320-dhcp-ntp-timezone/PROJECT.md) | feat(time): DHCP NTP (RFC 2132 opt 42) and DHCP Timezone (RFC 4833 opts 100/101) | [PROJECT.md](../pr-320-dhcp-ntp-timezone/PROJECT.md) |
+
+## template-app/src/main.cpp
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-320-dhcp-ntp-timezone](../pr-320-dhcp-ntp-timezone/PROJECT.md) | feat(time): DHCP NTP (RFC 2132 opt 42) and DHCP Timezone (RFC 4833 opts 100/101) | [PROJECT.md](../pr-320-dhcp-ntp-timezone/PROJECT.md) |
+
+## modules/TimeManager/**
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-320-dhcp-ntp-timezone](../pr-320-dhcp-ntp-timezone/PROJECT.md) | feat(time): DHCP NTP (RFC 2132 opt 42) and DHCP Timezone (RFC 4833 opts 100/101) | [PROJECT.md](../pr-320-dhcp-ntp-timezone/PROJECT.md) |
+
+## modules/MCPServer/**
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-320-dhcp-ntp-timezone](../pr-320-dhcp-ntp-timezone/PROJECT.md) | feat(time): DHCP NTP (RFC 2132 opt 42) and DHCP Timezone (RFC 4833 opts 100/101) | [PROJECT.md](../pr-320-dhcp-ntp-timezone/PROJECT.md) |
+
+## test/stubs/**
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-320-dhcp-ntp-timezone](../pr-320-dhcp-ntp-timezone/PROJECT.md) | feat(time): DHCP NTP (RFC 2132 opt 42) and DHCP Timezone (RFC 4833 opts 100/101) | [PROJECT.md](../pr-320-dhcp-ntp-timezone/PROJECT.md) |
+
+## test/test_unit/test_timeManager/**
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-320-dhcp-ntp-timezone](../pr-320-dhcp-ntp-timezone/PROJECT.md) | feat(time): DHCP NTP (RFC 2132 opt 42) and DHCP Timezone (RFC 4833 opts 100/101) | [PROJECT.md](../pr-320-dhcp-ntp-timezone/PROJECT.md) |
+
+## test/test_unit/test_mcpServer/**
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-320-dhcp-ntp-timezone](../pr-320-dhcp-ntp-timezone/PROJECT.md) | feat(time): DHCP NTP (RFC 2132 opt 42) and DHCP Timezone (RFC 4833 opts 100/101) | [PROJECT.md](../pr-320-dhcp-ntp-timezone/PROJECT.md) |
+
+## test/web/**
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-320-dhcp-ntp-timezone](../pr-320-dhcp-ntp-timezone/PROJECT.md) | feat(time): DHCP NTP (RFC 2132 opt 42) and DHCP Timezone (RFC 4833 opts 100/101) | [PROJECT.md](../pr-320-dhcp-ntp-timezone/PROJECT.md) |
+
+## docs/developer/**
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-320-dhcp-ntp-timezone](../pr-320-dhcp-ntp-timezone/PROJECT.md) | feat(time): DHCP NTP (RFC 2132 opt 42) and DHCP Timezone (RFC 4833 opts 100/101) | [PROJECT.md](../pr-320-dhcp-ntp-timezone/PROJECT.md) |
+
+## .agents/skills/framework-expert/**
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-320-dhcp-ntp-timezone](../pr-320-dhcp-ntp-timezone/PROJECT.md) | feat(time): DHCP NTP (RFC 2132 opt 42) and DHCP Timezone (RFC 4833 opts 100/101) | [PROJECT.md](../pr-320-dhcp-ntp-timezone/PROJECT.md) |

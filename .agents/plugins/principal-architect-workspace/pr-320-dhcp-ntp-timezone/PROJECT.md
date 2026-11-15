@@ -40,7 +40,7 @@ charter:
   - cd test/web && npx playwright test
   charter_locked: true
   charter_hash: 5733b8ef2ccf4779ecd126f949d67ccdc427e192e9b164aadb4a50db1440e434
-status: AUDIT_APPROVED
+status: GRADUATED
 approved_at: '2026-11-14T18:30:07.889014Z'
 github_pr: null
 work_orders:
@@ -178,3 +178,19 @@ work_orders:
 
 ### Follow-Ups Noted for Stage 3 (`PR-B` Release Audit)
 - `sample-app/platformio.ini` and `template-app/platformio.ini` still specify `board = um_nanos3`, whereas root `platformio.ini` uses `board = arduino_nano_esp32`. Audit and reconcile during Stage 3 (`PR-B`).
+
+<!-- pa:graduation-summary start -->
+### Graduation Summary (`PR-320` / `pr-320-dhcp-ntp-timezone` — `GRADUATED`)
+
+- **Completed Date:** 2026-11-14
+- **Graduation Mode:** `builtin`
+- **Latest Audit:** Round 1 — `APPROVED` (`971ffb4ed3f6`)
+
+| WO-ID | Status | Attempts | Commit SHA |
+|---|---|---|---|
+| WO-320.1 | COMPLETED | 1 | `41bb5fb7c147` |
+| WO-320.2 | COMPLETED | 1 | `70dfa3f92d0a` |
+| WO-320.3 | COMPLETED | 1 | `d1b478ec2a0e` |
+| WO-320.4 | COMPLETED | 1 | `01e4571e5d8e` |
+| WO-320.5 | COMPLETED | 1 | `6b670d7f365e` |
+<!-- pa:graduation-summary end -->

@@ -38,7 +38,7 @@ prs:
   - embedded-systems
   - framework-expert
   - pio-manager
-  status: PLANNED
+  status: GRADUATED
   github_pr: null
 ---
 
