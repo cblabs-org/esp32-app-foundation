@@ -3,7 +3,7 @@ schema_version: 1
 programme_id: prog-dhcp-ntp-timezone
 title: DHCP NTP (Option 42) & DHCP Timezone (RFC 4833 Options 100/101)
 base_branch: main
-status: ACTIVE
+status: COMPLETED
 prs:
 - id: PR-320
   slug: pr-320-dhcp-ntp-timezone
@@ -71,3 +71,4 @@ Single-PR programme targeting `feat/dhcp-ntp-timezone` (based on `main` at `6a1c
 ## 3. Programme Session Log
 
 - **2026-11-14 (Tier 1 Chief Architect):** Initialized `prog-dhcp-ntp-timezone` (`status: ACTIVE`), authored and locked `PR-320` Part I Charter ([`PROJECT.md`](../pr-320-dhcp-ntp-timezone/PROJECT.md)) on `feat/dhcp-ntp-timezone`, committed `PROGRAM.md` and `PROJECT.md`, and prepared `PR-320` via `pa pr start PR-320`. Tier 2 Principal Architect completed Work Order decomposition (`WO-320.1`..`WO-320.3`) and plan is approved (`status: APPROVED`). Handoff to Tier 2 PA for execution dispatch on `WO-320.1`.
+- **2026-11-15 (Tier 1 Chief Architect):** PR-320 successfully executed and verified all 5 Work Orders (`WO-320.1` through `WO-320.5`), passed Step 6A Cold-Firewall Audit, and graduated (`status: GRADUATED`). Programme `prog-dhcp-ntp-timezone` is completed (`status: COMPLETED`).
