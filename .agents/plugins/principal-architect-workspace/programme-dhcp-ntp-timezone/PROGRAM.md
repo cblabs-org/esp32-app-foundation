@@ -16,6 +16,7 @@ prs:
   - .gitignore
   - .memory/.gitignore
   - CMakeLists.txt
+  - platformio.ini
   - sdkconfig.defaults
   - include/lwip_dhcp_tz_hooks.h
   - src/main.cpp
