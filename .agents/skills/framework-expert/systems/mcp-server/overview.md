@@ -136,7 +136,12 @@ build_serial, sdk_version, firmware_version
 chip_model, chip_revision, chip_cores, flash_size
 ap_mode, wifi_ssid, wifi_ip, wifi_mac, wifi_rssi
 partition                                               (active OTA partition)
-time_configured, time_synced, time_local                (NTP state)
+time_configured, time_synced, time_timezone, time_posix (effective time state)
+time_sync_status, time_local                            ("UNSYNCED"|"IN_PROGRESS"|"SYNCED", ISO local time)
+time_dhcp_ntp_enabled, time_dhcp_ntp_active             (DHCP Option 42 enable & active flags)
+time_dhcp_ntp_servers                                   (array of active Option 42 IP strings)
+time_dhcp_tz_enabled, time_dhcp_tz_active               (RFC 4833 Option 100/101 enable & active flags)
+time_dhcp_tz_source                                     ("none"|"pcode"|"tcode")
 ```
 
 ## Adding New Tools

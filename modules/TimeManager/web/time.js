@@ -153,12 +153,118 @@
     }
   }
 
+  function esc(val) {
+    return window.escapeHtml(val == null ? '' : String(val));
+  }
+
+  function escAttr(val) {
+    return esc(val).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  function dhcpTzSourceLabel(source) {
+    switch (source) {
+      case 'pcode': return 'DHCP Option 100 (PCode)';
+      case 'tcode': return 'DHCP Option 101 (TCode)';
+      default: return 'DHCP Timezone';
+    }
+  }
+
+  function renderDhcpTzStatusHTML(config, dhcpTzChecked) {
+    if (!dhcpTzChecked) {
+      return `
+        <div style="display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap; padding:0.5rem 0.75rem; border:1px solid var(--border); border-radius:8px; background:var(--bg); font-size:0.8rem;">
+          <span class="badge badge--subtle">Manual</span>
+          <span style="color:var(--text-muted);">DHCP timezone override disabled; using saved selector / POSIX fallback.</span>
+        </div>
+      `;
+    }
+
+    if (config && config.dhcpTzActive) {
+      const sourceText = dhcpTzSourceLabel(config.dhcpTzSource);
+      const activeTz = config.activeTimezone || config.activePosix || '—';
+      const activePosix = config.activePosix || '';
+      const fallbackTz = config.timezone || '';
+      return `
+        <div class="alert alert--info" style="margin-bottom:0;">
+          <div style="display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap; margin-bottom:0.25rem;">
+            <span class="badge badge--ok">${esc(sourceText)}</span>
+            <strong>${esc(activeTz)}</strong>
+          </div>
+          ${activePosix ? `<div style="font-size:0.75rem; font-family:monospace; color:var(--text);">Active POSIX: ${esc(activePosix)}</div>` : ''}
+          ${fallbackTz ? `<div style="font-size:0.75rem; color:var(--text-muted); margin-top:0.2rem;">Saved fallback: ${esc(fallbackTz)}</div>` : ''}
+        </div>
+      `;
+    }
+
+    const fallbackLabel = (config && (config.timezone || config.posix)) || 'UTC';
+    return `
+      <div style="display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap; padding:0.5rem 0.75rem; border:1px solid var(--border); border-radius:8px; background:var(--bg); font-size:0.8rem;">
+        <span class="badge badge--subtle">Manual Fallback</span>
+        <span style="color:var(--text-muted);">Waiting for DHCP Option 100/101; active fallback: <strong>${esc(fallbackLabel)}</strong></span>
+      </div>
+    `;
+  }
+
+  function renderDhcpNtpServersHTML(config, dhcpNtpChecked) {
+    const servers = (config && Array.isArray(config.dhcpNtpServers)) ? config.dhcpNtpServers : [];
+    if (!dhcpNtpChecked) {
+      return `
+        <div style="display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap; padding:0.5rem 0.75rem; border:1px solid var(--border); border-radius:8px; background:var(--bg); font-size:0.8rem;">
+          <span class="badge badge--subtle">Manual</span>
+          <span style="color:var(--text-muted);">DHCP Option 42 disabled; using static NTP servers below.</span>
+        </div>
+      `;
+    }
+
+    if (config && config.dhcpNtpActive && servers.length > 0) {
+      const items = servers.map(function(srv) {
+        return '<code style="margin-right:0.35rem;">' + esc(srv) + '</code>';
+      }).join('');
+      return `
+        <div class="alert alert--info" style="margin-bottom:0;">
+          <div style="display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap; margin-bottom:0.25rem;">
+            <span class="badge badge--ok">Option 42 Active</span>
+            <strong>DHCP NTP Servers</strong>
+          </div>
+          <div style="font-size:0.8rem;">${items}</div>
+        </div>
+      `;
+    }
+
+    return `
+      <div style="display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap; padding:0.5rem 0.75rem; border:1px solid var(--border); border-radius:8px; background:var(--bg); font-size:0.8rem;">
+        <span class="badge badge--subtle">Option 42 Enabled</span>
+        <span style="color:var(--text-muted);">No DHCP NTP servers advertised on current lease; using static fallback below.</span>
+      </div>
+    `;
+  }
+
   // -------------------------------------------------------------------------
-  // Build timezone selector with optgroups by region + filter input
+  // Build timezone selector with DHCP toggle + optgroups by region + filter
   // -------------------------------------------------------------------------
-  function buildTimezoneSelector(zones, selectedTz) {
+  function buildTimezoneSelector(zones, selectedTz, config) {
+    const dhcpTzChecked = !config || config.dhcpTz !== false;
+    let html = `
+      <div style="margin-bottom:0.75rem;">
+        <div style="display:flex; align-items:center; gap:0.5rem;">
+          <input type="checkbox" id="time-dhcp-tz" aria-describedby="time-dhcp-tz-help"
+                 style="width:auto; min-width:1rem; height:1rem; margin:0; cursor:pointer;"
+                 ${dhcpTzChecked ? 'checked' : ''} />
+          <label for="time-dhcp-tz" style="font-size:0.9rem; font-weight:600; margin:0; cursor:pointer;">
+            Use DHCP Timezone (RFC 4833 Options 100/101)
+          </label>
+        </div>
+        <p id="time-dhcp-tz-help" style="font-size:0.78rem; color:var(--text-muted); margin:0.25rem 0 0 1.5rem;">
+          Applies router DHCP timezone in RAM without flash wear. The saved selection below is used as fallback.
+        </p>
+      </div>
+      <div id="time-dhcp-tz-status" style="margin-bottom:0.75rem;">
+        ${renderDhcpTzStatusHTML(config, dhcpTzChecked)}
+      </div>
+    `;
+
     if (!zones) {
-      return '<p style="color:var(--error); font-size:0.85rem;">Failed to load timezone list.</p>';
+      return html + '<p style="color:var(--error); font-size:0.85rem;">Failed to load timezone list.</p>';
     }
 
     // Group zones by region (first segment before '/')
@@ -177,12 +283,12 @@
     const regionNames = Object.keys(groups).sort();
     for (let r = 0; r < regionNames.length; r++) {
       const region = regionNames[r];
-      selectHTML += '<optgroup label="' + window.escapeHtml(region) + '">';
+      selectHTML += '<optgroup label="' + escAttr(region) + '">';
       for (let z = 0; z < groups[region].length; z++) {
         const tz = groups[region][z];
         const selected = tz === selectedTz ? ' selected' : '';
-        selectHTML += '<option value="' + window.escapeHtml(tz) + '"' + selected + '>' +
-                      window.escapeHtml(tz) + '</option>';
+        selectHTML += '<option value="' + escAttr(tz) + '"' + selected + '>' +
+                      esc(tz) + '</option>';
       }
       selectHTML += '</optgroup>';
     }
@@ -191,39 +297,77 @@
     // Resolved POSIX display
     const posix = selectedTz && zones[selectedTz] ? zones[selectedTz] : '';
 
-    return `
+    return html + `
+      <label for="time-tz-filter" style="font-size:0.75rem; color:var(--text-muted); display:block; margin-bottom:0.25rem;">
+        Fallback / Manual Timezone
+      </label>
       <input type="text" id="time-tz-filter" placeholder="Filter timezones…"
              style="margin-bottom:0.5rem; font-size:0.85rem;" autocomplete="off" />
       ${selectHTML}
       <div id="time-posix-display" style="margin-top:0.5rem; font-size:0.75rem; color:var(--text-muted); font-family:monospace;">
-        POSIX rule: <span id="time-posix-value">${window.escapeHtml(posix)}</span>
+        POSIX rule: <span id="time-posix-value">${esc(posix)}</span>
       </div>
     `;
   }
 
   // -------------------------------------------------------------------------
-  // Build NTP server inputs
+  // Build NTP server inputs with DHCP Option 42 toggle
   // -------------------------------------------------------------------------
   function buildNtpSection(config) {
+    const dhcpNtpChecked = !config || config.dhcpNtp !== false;
     return `
+      <div style="margin-bottom:0.75rem;">
+        <div style="display:flex; align-items:center; gap:0.5rem;">
+          <input type="checkbox" id="time-dhcp-ntp" aria-describedby="time-dhcp-ntp-help"
+                 style="width:auto; min-width:1rem; height:1rem; margin:0; cursor:pointer;"
+                 ${dhcpNtpChecked ? 'checked' : ''} />
+          <label for="time-dhcp-ntp" style="font-size:0.85rem; font-weight:600; margin:0; cursor:pointer;">
+            Use DHCP NTP Servers (Option 42)
+          </label>
+        </div>
+        <p id="time-dhcp-ntp-help" style="font-size:0.75rem; color:var(--text-muted); margin:0.25rem 0 0 1.5rem;">
+          Discovered DHCP servers take priority; static servers fill remaining SNTP slots and act as fallback.
+        </p>
+      </div>
+      <div id="time-dhcp-ntp-servers" style="margin-bottom:0.75rem;">
+        ${renderDhcpNtpServersHTML(config, dhcpNtpChecked)}
+      </div>
       <div style="display:flex; flex-direction:column; gap:0.5rem;">
         <div>
-          <label style="font-size:0.75rem; color:var(--text-muted); display:block; margin-bottom:2px;">NTP Server 1</label>
-          <input type="text" id="time-ntp1" value="${window.escapeHtml(config.ntpServer1 || '')}"
+          <label for="time-ntp1" style="font-size:0.75rem; color:var(--text-muted); display:block; margin-bottom:2px;">NTP Server 1</label>
+          <input type="text" id="time-ntp1" value="${escAttr(config.ntpServer1 || '')}"
                  placeholder="pool.ntp.org" autocomplete="off" />
         </div>
         <div>
-          <label style="font-size:0.75rem; color:var(--text-muted); display:block; margin-bottom:2px;">NTP Server 2</label>
-          <input type="text" id="time-ntp2" value="${window.escapeHtml(config.ntpServer2 || '')}"
+          <label for="time-ntp2" style="font-size:0.75rem; color:var(--text-muted); display:block; margin-bottom:2px;">NTP Server 2</label>
+          <input type="text" id="time-ntp2" value="${escAttr(config.ntpServer2 || '')}"
                  placeholder="time.nist.gov" autocomplete="off" />
         </div>
         <div>
-          <label style="font-size:0.75rem; color:var(--text-muted); display:block; margin-bottom:2px;">NTP Server 3</label>
-          <input type="text" id="time-ntp3" value="${window.escapeHtml(config.ntpServer3 || '')}"
+          <label for="time-ntp3" style="font-size:0.75rem; color:var(--text-muted); display:block; margin-bottom:2px;">NTP Server 3</label>
+          <input type="text" id="time-ntp3" value="${escAttr(config.ntpServer3 || '')}"
                  placeholder="time.windows.com" autocomplete="off" />
         </div>
       </div>
     `;
+  }
+
+  function wireDhcpToggles() {
+    const dhcpTzEl = document.getElementById('time-dhcp-tz');
+    const dhcpTzStatusEl = document.getElementById('time-dhcp-tz-status');
+    if (dhcpTzEl && dhcpTzStatusEl) {
+      dhcpTzEl.addEventListener('change', function() {
+        dhcpTzStatusEl.innerHTML = renderDhcpTzStatusHTML(currentConfig, dhcpTzEl.checked);
+      });
+    }
+
+    const dhcpNtpEl = document.getElementById('time-dhcp-ntp');
+    const dhcpNtpServersEl = document.getElementById('time-dhcp-ntp-servers');
+    if (dhcpNtpEl && dhcpNtpServersEl) {
+      dhcpNtpEl.addEventListener('change', function() {
+        dhcpNtpServersEl.innerHTML = renderDhcpNtpServersHTML(currentConfig, dhcpNtpEl.checked);
+      });
+    }
   }
 
   // -------------------------------------------------------------------------
@@ -283,10 +427,30 @@
       const syncEl = document.getElementById('time-sync-status');
       let syncHTML = syncStatusHTML(config.syncStatus);
       syncHTML += infoRow('Device Time', '<span id="time-live-clock">' +
-        window.escapeHtml(config.localTime || '—') + '</span>');
-      if (config.timezone) {
-        syncHTML += infoRow('Timezone', config.timezone);
+        esc(config.localTime || '—') + '</span>');
+
+      const effectiveTz = config.activeTimezone || config.timezone || config.activePosix || '';
+      if (effectiveTz) {
+        let tzValueHtml = esc(effectiveTz);
+        if (config.dhcpTzActive && config.dhcpTz !== false) {
+          tzValueHtml += ' <span class="badge badge--ok" style="margin-left:0.35rem;">' +
+            esc(dhcpTzSourceLabel(config.dhcpTzSource)) + '</span>';
+        }
+        syncHTML += infoRow('Timezone', tzValueHtml);
       }
+
+      const effectivePosix = config.activePosix || config.posix || '';
+      if (effectivePosix) {
+        syncHTML += infoRow('POSIX Rule', '<code>' + esc(effectivePosix) + '</code>');
+      }
+
+      if (config.dhcpNtpActive && config.dhcpNtp !== false &&
+          Array.isArray(config.dhcpNtpServers) && config.dhcpNtpServers.length > 0) {
+        syncHTML += infoRow('DHCP NTP',
+          config.dhcpNtpServers.map(function(srv) { return '<code>' + esc(srv) + '</code>'; }).join(' ') +
+          ' <span class="badge badge--ok" style="margin-left:0.35rem;">Option 42</span>');
+      }
+
       if (config.configured !== undefined) {
         syncHTML += infoRow('Configured', config.configured ? 'Yes' : 'No');
       }
@@ -298,13 +462,14 @@
 
       // --- Timezone selector ---
       const tzEl = document.getElementById('time-tz-section');
-      tzEl.innerHTML = buildTimezoneSelector(zones, config.timezone);
+      tzEl.innerHTML = buildTimezoneSelector(zones, config.timezone, config);
       wireTimezoneFilter();
       wireTimezoneSelect();
 
       // --- NTP servers ---
       const ntpEl = document.getElementById('time-ntp-section');
       ntpEl.innerHTML = buildNtpSection(config);
+      wireDhcpToggles();
 
       // --- Advanced POSIX override ---
       const overrideInput = document.getElementById('time-posix-override');
@@ -326,8 +491,10 @@
     const saveBtn = document.getElementById('btn-time-save');
     const select = document.getElementById('time-tz-select');
     const overrideInput = document.getElementById('time-posix-override');
+    const dhcpNtpEl = document.getElementById('time-dhcp-ntp');
+    const dhcpTzEl = document.getElementById('time-dhcp-tz');
 
-    const timezone = select ? select.value : '';
+    const timezone = select ? select.value : ((currentConfig && currentConfig.timezone) || '');
     const overridePosix = overrideInput ? overrideInput.value.trim() : '';
 
     // Use override POSIX if provided, otherwise resolve from zones cache
@@ -337,7 +504,7 @@
     } else if (zonesCache && timezone) {
       posix = zonesCache[timezone] || '';
     } else {
-      posix = '';
+      posix = (currentConfig && currentConfig.posix) || '';
     }
 
     const payload = {
@@ -345,7 +512,9 @@
       posix: posix,
       ntpServer1: (document.getElementById('time-ntp1') || {}).value || '',
       ntpServer2: (document.getElementById('time-ntp2') || {}).value || '',
-      ntpServer3: (document.getElementById('time-ntp3') || {}).value || ''
+      ntpServer3: (document.getElementById('time-ntp3') || {}).value || '',
+      dhcpNtp: dhcpNtpEl ? Boolean(dhcpNtpEl.checked) : true,
+      dhcpTz: dhcpTzEl ? Boolean(dhcpTzEl.checked) : true
     };
 
     saveBtn.disabled = true;

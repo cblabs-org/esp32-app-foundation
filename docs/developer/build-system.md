@@ -95,6 +95,18 @@ The ESP-IDF SDK is configured via `sdkconfig.defaults` files:
 
 The `scripts/sync_sdkconfig.py` pre-build script ensures the SDK configuration is synchronized before each build.
 
+### LwIP DHCP NTP & Timezone Hook Configuration (`PR-320`)
+
+All three repository build targets (root, `sample-app/`, and `template-app/`) keep identical LwIP DHCP configuration in `sdkconfig.defaults` and `CMakeLists.txt`:
+
+1. **`sdkconfig.defaults` options:**
+   - `CONFIG_LWIP_SNTP_MAX_SERVERS=3` — reserves 3 total SNTP slots (DHCP Option 42 occupies at most 2, leaving trailing slot(s) for configured static fallback servers).
+   - `CONFIG_LWIP_DHCP_GET_NTP_SRV=y` and `CONFIG_LWIP_DHCP_MAX_NTP_SERVERS=2` — enables DHCP Option 42 NTP discovery.
+   - `CONFIG_LWIP_HOOK_DHCP_EXTRA_OPTION_DEFAULT=y` — emits `__weak lwip_dhcp_on_extra_option()` in `lwip_default_hooks.c` so `TimeManager` overrides it strongly when `WITH_TIME` is enabled while `-UWITH_TIME` builds continue linking cleanly.
+2. **`CMakeLists.txt` post-`project(...)` LwIP hook injection:**
+   - Injects [include/lwip_dhcp_tz_hooks.h](../../include/lwip_dhcp_tz_hooks.h) into the `lwip` component target via `ESP_IDF_LWIP_HOOK_FILENAME="lwip_dhcp_tz_hooks.h"` so LwIP requests RFC 4833 Options `100` (`PCode`) and `101` (`TCode`) in DHCP Option `55` (`DHCP_ADD_EXTRA_REQUEST_OPTIONS`) and forwards received options to the staging hook.
+   - In downstream consumer projects using a `framework/` subdirectory, conditionally resolve `${CMAKE_CURRENT_LIST_DIR}/framework/include/lwip_dhcp_tz_hooks.h` (see `template-app/CMakeLists.txt`).
+
 ### `sdkconfig` Tuning
 
 For advanced applications, you may need to tune the ESP-IDF SDK configuration to optimise for your use case:

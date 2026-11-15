@@ -343,6 +343,13 @@ name and look up `<pio_board_id>` from the PlatformIO registry.
 #include "AppFoundation.h"
 #include "<AppName>.h"
 
+#ifdef WITH_TIME
+#include "TimeManager.hpp"
+#include "TimePreconditionContributor.hpp"
+static TimeManager timeManager;
+static TimePreconditionContributor timePrecondition{timeManager};
+#endif
+
 // ---------------------------------------------------------------------------
 // Module instances (global scope — do NOT move inside setup())
 // ---------------------------------------------------------------------------
@@ -355,11 +362,22 @@ Application     app;
 void setup() {
     Serial.begin(115200);
 
+#ifdef WITH_TIME
+    timeManager.setConfigManager(&app.getConfigManager());
+    timeManager.setEventBus(&app.getEventBus());
+    app.registerModule(&timeManager);
+    app.registerModule(&timePrecondition);
+#endif
+
     app.registerModule(&myApp);
 
     FrameworkConfig config;
     config.appTitle = APP_TITLE;
     app.begin(config);
+
+#ifdef WITH_TIME
+    timeManager.begin();
+#endif
 }
 
 void loop() {
@@ -436,6 +454,31 @@ private:
     // uint32_t m_lastUpdate = 0;
     // String   m_mySetting;
 };
+```
+
+---
+
+### File 4 — `CMakeLists.txt` & `sdkconfig.defaults` (LwIP DHCP Hook Parity)
+
+Ensure the consumer project's root `CMakeLists.txt` (post-`project(...)`) and `sdkconfig.defaults` include the framework's DHCP Option 42 (NTP) and RFC 4833 Option 100/101 (Timezone) configuration (`template-app/` provides a complete working template):
+
+```cmake
+# CMakeLists.txt — immediately after project(<app-name>)
+if(EXISTS "${CMAKE_CURRENT_LIST_DIR}/framework/include/lwip_dhcp_tz_hooks.h")
+    idf_component_get_property(lwip_lib lwip COMPONENT_LIB)
+    if(lwip_lib)
+        target_include_directories(${lwip_lib} PRIVATE "${CMAKE_CURRENT_LIST_DIR}/framework/include")
+        target_compile_definitions(${lwip_lib} PRIVATE "ESP_IDF_LWIP_HOOK_FILENAME=\"lwip_dhcp_tz_hooks.h\"")
+    endif()
+endif()
+```
+
+```ini
+# sdkconfig.defaults — DHCP NTP (Option 42) & RFC 4833 Timezone (Options 100/101)
+CONFIG_LWIP_SNTP_MAX_SERVERS=3
+CONFIG_LWIP_DHCP_GET_NTP_SRV=y
+CONFIG_LWIP_DHCP_MAX_NTP_SERVERS=2
+CONFIG_LWIP_HOOK_DHCP_EXTRA_OPTION_DEFAULT=y
 ```
 
 ---

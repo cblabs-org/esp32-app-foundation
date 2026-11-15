@@ -62,9 +62,9 @@ work_orders:
   slug: wo3-portal-docs-tests
   title: Add Time portal DHCP UI, Playwright E2E tests, and update developer docs/skills
   complexity: standard
-  status: PENDING
-  attempts: 0
-  commit_sha: null
+  status: COMPLETED
+  attempts: 1
+  commit_sha: 70dfa3f92d0aa4d4203971f1eb1200abf98b7251
 ---
 
 # PR-320 — feat(time): DHCP NTP (RFC 2132 opt 42) and DHCP Timezone (RFC 4833 opts 100/101)

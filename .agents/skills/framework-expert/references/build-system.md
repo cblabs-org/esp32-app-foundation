@@ -33,6 +33,7 @@ Consumers gate optional modules and display drivers via `build_flags` in
 |:---|:---|:---|
 | `WITH_BUTTONS` | `ButtonModule` | `systems/input/button-module.md` |
 | `WITH_ENCODER` | `EncoderModule` | `systems/input/encoder-module.md` |
+| `WITH_TIME` | `TimeManager` (SNTP, `/api/time/*`, DHCP Option 42/100/101) | `docs/developer/using-optional-modules.md` |
 | `WITH_AUDIT` | `AuditModule` | `references/audit-module-guide.md` |
 | `WITH_DISPLAY_LVGL` | LVGL colour-TFT display module | `systems/display/` |
 | `WITH_DISPLAY_U8G2` | U8G2 monochrome display module | `systems/display/` |
@@ -119,6 +120,26 @@ generate manifest → create GitHub Release → upload assets.
 
 `framework = arduino, espidf` — enables Arduino APIs alongside ESP-IDF primitives (FreeRTOS, mbedTLS).
 SDK config via `sdkconfig.defaults` files, synchronized by `sync_sdkconfig.py` pre-build script.
+
+### LwIP DHCP NTP (Option 42) & Timezone (RFC 4833 Options 100/101)
+
+`TimeManager` (`WITH_TIME`) relies on two build-layer pieces in every consumer or sample app:
+
+1. **`sdkconfig.defaults` Kconfig flags:**
+   - `CONFIG_LWIP_SNTP_MAX_SERVERS=3` (up to 2 DHCP Option 42 slots + trailing static fallback slot(s))
+   - `CONFIG_LWIP_DHCP_GET_NTP_SRV=y` and `CONFIG_LWIP_DHCP_MAX_NTP_SERVERS=2`
+   - `CONFIG_LWIP_HOOK_DHCP_EXTRA_OPTION_DEFAULT=y` (weak hook overridden strongly when `WITH_TIME` links `TimeManager`; safe to keep enabled on `-UWITH_TIME` builds)
+2. **`CMakeLists.txt` post-`project(...)` LwIP hook injection:**
+   Inject `lwip_dhcp_tz_hooks.h` into ESP-IDF's `lwip` component target so LwIP requests Options 100 (`PCode`) and 101 (`TCode`) via `DHCP_ADD_EXTRA_REQUEST_OPTIONS` and forwards them to the spinlock staging hook (`lwip_dhcp_tz_take_pending`):
+   ```cmake
+   if(EXISTS "${CMAKE_CURRENT_LIST_DIR}/framework/include/lwip_dhcp_tz_hooks.h")
+       idf_component_get_property(lwip_lib lwip COMPONENT_LIB)
+       if(lwip_lib)
+           target_include_directories(${lwip_lib} PRIVATE "${CMAKE_CURRENT_LIST_DIR}/framework/include")
+           target_compile_definitions(${lwip_lib} PRIVATE "ESP_IDF_LWIP_HOOK_FILENAME=\"lwip_dhcp_tz_hooks.h\"")
+       endif()
+   endif()
+   ```
 
 ## PSRAM Configuration
 

@@ -182,6 +182,25 @@ The framework registers 6 built-in tools via `mcpBuiltinTools::registerAll()`. T
 
 *(Note: The `capture_display` tool is no longer built-in; it is self-registered by display modules and returns base64 PNG).*
 
+### `system_info` Time & DHCP Telemetry Fields
+
+When `TimeManager` is wired into `MCPServer`, `system_info` reports effective runtime timezone/NTP state alongside persisted DHCP enable flags and active lease discovery state:
+
+| Field | Type | Description |
+|---|---|---|
+| `time_configured` | `bool` | True if manual config was loaded/saved or a DHCP timezone override is active |
+| `time_synced` | `bool` | True once SNTP has completed at least one sync (`TimeSyncStatus::SYNCED`) |
+| `time_timezone` | `string` | Active effective timezone (DHCP IANA/POSIX override when active, else persisted fallback) |
+| `time_posix` | `string` | Active effective POSIX TZ string passed to `TZ` |
+| `time_sync_status` | `string` | `"UNSYNCED"`, `"IN_PROGRESS"`, or `"SYNCED"` |
+| `time_local` | `string` | Local ISO timestamp (`YYYY-MM-DDTHH:MM:SS`), present only when `time_synced` is true |
+| `time_dhcp_ntp_enabled` | `bool` | Persisted `dhcpNtp` opt-in flag (`Option 42`) |
+| `time_dhcp_ntp_active` | `bool` | True when at least one DHCP Option 42 NTP server occupies an SNTP slot |
+| `time_dhcp_ntp_servers` | `string[]` | Active Option 42 NTP server IP addresses discovered from DHCP (up to 3) |
+| `time_dhcp_tz_enabled` | `bool` | Persisted `dhcpTz` opt-in flag (RFC 4833 Options `100`/`101`) |
+| `time_dhcp_tz_active` | `bool` | True when a DHCP Option 100 or 101 override is actively applied in RAM |
+| `time_dhcp_tz_source` | `string` | Source of active DHCP timezone override: `"none"`, `"pcode"` (Option 100), or `"tcode"` (Option 101) |
+
 ### Display Module Contributed Tools
 
 Optional display modules contribute additional MCP tools when registered:

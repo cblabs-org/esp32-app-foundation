@@ -124,6 +124,15 @@ bool MyApp::migrateConfig(JsonObject& section, int fromVersion) {
 }
 ```
 
+### Framework Example: `TimeManager` Schema v2 (`time` Namespace)
+
+`TimeManager` (`getConfigNamespace() == "time"`, `getSchemaVersion() == 2`) uses this migration contract to introduce DHCP NTP (`dhcpNtp`) and DHCP Timezone (`dhcpTz`) discovery without breaking upgrades from schema v1:
+
+- **`v1` → `v2` migration (`TimeManager::migrateConfig`)**:
+  - Seeds `dhcpNtp = true` when missing.
+  - Seeds `dhcpTz = !manualTzConfigured` when missing: sets `dhcpTz = false` if the v1 config already specified a non-empty IANA `timezone` or a `posix` string other than `"GMT0"`, preserving explicit manual timezone selections; sets `dhcpTz = true` on unconfigured devices.
+- **Zero Flash Wear Invariant**: `TimeManager::serializeConfig()` writes **only** persisted fallback settings (`timezone`, `posix`, `ntpServer1`, `ntpServer2`, `ntpServer3`, `dhcpNtp`, `dhcpTz`) to `/mod/time.json`. Runtime DHCP Option 42/100/101 discoveries (`activeTimezone`, `activePosix`, `dhcpNtpServers`) remain strictly in RAM and never trigger LittleFS writes.
+
 ---
 
 ## 5. ArduinoJson v7 Best Practices
