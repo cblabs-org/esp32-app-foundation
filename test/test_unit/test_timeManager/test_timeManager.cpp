@@ -105,6 +105,35 @@ TEST_F(TimeManagerTest, BeginSetsSynced) {
     EXPECT_TRUE(timeManager.isTimeSet());
 }
 
+// begin() and POST /api/time/config initialize esp_netif before any esp_sntp_* calls
+TEST_F(TimeManagerTest, BeginInitializesNetifBeforeAnySntpCalls) {
+    EXPECT_FALSE(stub_sntp_state().netifInitialized);
+    EXPECT_FALSE(stub_sntp_state().sntpCalledBeforeNetifInit);
+    EXPECT_EQ(stub_sntp_state().netifInitCount, 0u);
+
+    timeManager.begin();
+
+    EXPECT_TRUE(stub_sntp_state().netifInitialized);
+    EXPECT_FALSE(stub_sntp_state().sntpCalledBeforeNetifInit);
+    const size_t countAfterBegin = stub_sntp_state().netifInitCount;
+    EXPECT_GE(countAfterBegin, 1u);
+
+    PsychicHttpServer server;
+    timeManager.registerRoutes(server);
+    const auto* postRoute = findRoute(server, "/api/time/config", HTTP_POST);
+    ASSERT_NE(postRoute, nullptr);
+
+    MockPsychicRequest postReq(
+        "{\"timezone\":\"Europe/London\",\"posix\":\"GMT0BST,M3.5.0/1,M10.5.0\",\"dhcpNtp\":false}");
+    MockPsychicResponse postResp;
+    EXPECT_EQ(postRoute->handler(&postReq, &postResp), ESP_OK);
+    EXPECT_EQ(postResp.lastCode, 200);
+
+    EXPECT_TRUE(stub_sntp_state().netifInitialized);
+    EXPECT_FALSE(stub_sntp_state().sntpCalledBeforeNetifInit);
+    EXPECT_GT(stub_sntp_state().netifInitCount, countAfterBegin);
+}
+
 // getLocalTime() before begin
 TEST_F(TimeManagerTest, GetLocalTimeBeforeBegin) {
     struct tm timeinfo;

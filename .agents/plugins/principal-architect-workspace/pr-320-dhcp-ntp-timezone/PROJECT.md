@@ -79,9 +79,9 @@ work_orders:
   title: Initialize esp_netif before esp_sntp calls in TimeManager::_reinitNtp() to
     prevent boot abort
   complexity: standard
-  status: PENDING
-  attempts: 0
-  commit_sha: null
+  status: COMPLETED
+  attempts: 1
+  commit_sha: 698fef9af632782aa0aa1db6516aff62ff9fd596
 ---
 
 # PR-320 — feat(time): DHCP NTP (RFC 2132 opt 42) and DHCP Timezone (RFC 4833 opts 100/101)

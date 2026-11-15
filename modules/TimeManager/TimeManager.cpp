@@ -39,6 +39,7 @@
 #include <cctype>
 #include <cstdlib>
 #include <cstring>
+#include <esp_netif.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 
@@ -1089,12 +1090,15 @@ bool TimeManager::_lookupIanaPosixTz(const char* iana, char* outPosix, size_t ou
 /**
  * @brief Reinitialize the SNTP client with current NTP server and DHCP settings.
  *
- * Applies the active POSIX timezone, stops/clears existing SNTP slots (since
- * configTzTime does not clear sntp_servers[i].addr), enables/disables LwIP DHCP
- * Option 42 server acquisition before initializing SNTP, and resets _syncStatus
- * to IN_PROGRESS so tick() begins polling.
+ * Ensures esp_netif_init() has initialized LwIP's tcpip_thread/tcpip_mbox before
+ * any esp_sntp_* calls, applies the active POSIX timezone, stops existing SNTP if
+ * active, configures LwIP DHCP Option 42 server mode ahead of the synchronous
+ * esp_sntp_setserver() slot-clearing barrier (so pending tcpip_callback messages
+ * drain before configTzTime() runs), and resets _syncStatus to IN_PROGRESS.
  */
 void TimeManager::_reinitNtp() {
+    (void)esp_netif_init();
+
     const char* effectivePosix = getPosixTz();
     setTimezone(effectivePosix);
 
@@ -1102,13 +1106,13 @@ void TimeManager::_reinitNtp() {
         esp_sntp_stop();
     }
 
-    for (size_t i = 0; i < EFFECTIVE_SNTP_SLOTS; ++i) {
-        esp_sntp_setserver(static_cast<uint8_t>(i), nullptr);
-    }
-
 #if defined(CONFIG_LWIP_DHCP_GET_NTP_SRV) && CONFIG_LWIP_DHCP_GET_NTP_SRV
     esp_sntp_servermode_dhcp(_dhcpNtpEnabled ? 1 : 0);
 #endif
+
+    for (size_t i = 0; i < EFFECTIVE_SNTP_SLOTS; ++i) {
+        esp_sntp_setserver(static_cast<uint8_t>(i), nullptr);
+    }
 
     const char* s1 = (_ntpServer1[0] != '\0') ? _ntpServer1 : nullptr;
     const char* s2 = (EFFECTIVE_SNTP_SLOTS >= 2 && _ntpServer2[0] != '\0') ? _ntpServer2 : nullptr;

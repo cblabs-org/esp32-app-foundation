@@ -96,6 +96,9 @@ struct SntpStubState {
     sntp_sync_status_t syncStatus = SNTP_SYNC_STATUS_COMPLETED;
     bool enabled = false;
     bool dhcpMode = false;
+    bool netifInitialized = false;
+    bool sntpCalledBeforeNetifInit = false;
+    size_t netifInitCount = 0;
     std::array<SntpStubSlot, SNTP_MAX_SERVERS> slots{};
 };
 
@@ -109,6 +112,9 @@ inline void stub_sntp_reset() {
     st.syncStatus = SNTP_SYNC_STATUS_COMPLETED;
     st.enabled = false;
     st.dhcpMode = false;
+    st.netifInitialized = false;
+    st.sntpCalledBeforeNetifInit = false;
+    st.netifInitCount = 0;
     for (size_t i = 0; i < SNTP_MAX_SERVERS; ++i) {
         st.slots[i].addr = ip_addr_t{};
         st.slots[i].nameStorage.clear();
@@ -190,11 +196,18 @@ inline bool esp_sntp_enabled(void) {
 }
 
 inline void esp_sntp_stop(void) {
-    stub_sntp_state().enabled = false;
+    auto& st = stub_sntp_state();
+    if (!st.netifInitialized) {
+        st.sntpCalledBeforeNetifInit = true;
+    }
+    st.enabled = false;
 }
 
 inline void esp_sntp_setserver(uint8_t idx, const ip_addr_t* addr) {
     auto& st = stub_sntp_state();
+    if (!st.netifInitialized) {
+        st.sntpCalledBeforeNetifInit = true;
+    }
     if (idx < SNTP_MAX_SERVERS) {
         if (addr != nullptr) {
             st.slots[idx].addr = *addr;
@@ -208,6 +221,9 @@ inline void esp_sntp_setserver(uint8_t idx, const ip_addr_t* addr) {
 
 inline void esp_sntp_setservername(uint8_t idx, const char* server) {
     auto& st = stub_sntp_state();
+    if (!st.netifInitialized) {
+        st.sntpCalledBeforeNetifInit = true;
+    }
     if (idx < SNTP_MAX_SERVERS) {
         if (server != nullptr) {
             st.slots[idx].nameStorage = server;
@@ -237,7 +253,11 @@ inline const ip_addr_t* esp_sntp_getserver(uint8_t idx) {
 }
 
 inline void esp_sntp_servermode_dhcp(bool enable) {
-    stub_sntp_state().dhcpMode = enable;
+    auto& st = stub_sntp_state();
+    if (!st.netifInitialized) {
+        st.sntpCalledBeforeNetifInit = true;
+    }
+    st.dhcpMode = enable;
 }
 
 inline void stub_sntp_simulate_dhcp_servers(uint8_t num, const ip4_addr_t* servers) {
@@ -257,13 +277,16 @@ inline void stub_sntp_simulate_dhcp_servers(uint8_t num, const ip4_addr_t* serve
 }
 
 inline void configTzTime(const char* tz, const char* server1, const char* server2, const char* server3) {
+    auto& st = stub_sntp_state();
+    st.netifInitialized = true;
+    ++st.netifInitCount;
     if (esp_sntp_enabled()) {
         esp_sntp_stop();
     }
     esp_sntp_setservername(0, server1);
     esp_sntp_setservername(1, server2);
     esp_sntp_setservername(2, server3);
-    stub_sntp_state().enabled = true;
+    st.enabled = true;
     if (tz != nullptr) {
         setenv("TZ", tz, 1);
         tzset();

@@ -5,7 +5,7 @@ pr_id: PR-320
 title: Initialize esp_netif before esp_sntp calls in TimeManager::_reinitNtp() to
   prevent boot abort
 complexity: standard
-status: PENDING
+status: COMPLETED
 allowed_files:
 - modules/TimeManager/TimeManager.cpp
 - test/stubs/platform/esp_netif.h
@@ -21,7 +21,32 @@ verification_command: python3 scripts/doc_lint.py
 max_attempts: 5
 max_structural_failures: 2
 spec_hash: 63bf3e0a3af673f2936912ed6f54d7b5b252a8a2360abb9d98c08fed087cf0b0
-completion: null
+completion:
+  status: COMPLETED
+  attempt_num: 1
+  receipt_id: rcpt_b9a095767923
+  commit_sha: 698fef9af632782aa0aa1db6516aff62ff9fd596
+  files_modified:
+  - modules/TimeManager/TimeManager.cpp
+  - test/stubs/platform/esp_netif.h
+  - test/stubs/platform/esp_sntp.h
+  - test/test_unit/test_timeManager/test_timeManager.cpp
+  verification_summary: doc_lint.py exited 0; native tests 1020/1020 passed (including
+    BeginInitializesNetifBeforeAnySntpCalls); esp32s3nano, esp32dev, and crowpanel-128-rotary
+    MCP builds succeeded.
+  out_of_scope_findings: []
+  escalation_request: null
+  decisions_made:
+  - Added host stub test/stubs/platform/esp_netif.h and instrumented test/stubs/platform/esp_sntp.h
+    (SntpStubState + configTzTime) to detect any esp_sntp_* call preceding esp_netif_init().
+  - Included <esp_netif.h> in TimeManager.cpp, invoked (void)esp_netif_init() at the
+    very top of TimeManager::_reinitNtp(), and moved esp_sntp_servermode_dhcp() ahead
+    of the synchronous esp_sntp_setserver() slot-clearing loop so tcpip_callback messages
+    drain before configTzTime().
+  - Added TimeManagerTest.BeginInitializesNetifBeforeAnySntpCalls verifying pre-begin,
+    post-begin(), and post-POST /api/time/config netif initialization ordering and
+    count increments.
+  dead_ends: []
 ---
 
 # WO-320.5 — Initialize esp_netif before esp_sntp calls in TimeManager::_reinitNtp() to prevent boot abort
@@ -86,4 +111,21 @@ Add `TEST_F(TimeManagerTest, BeginInitializesNetifBeforeAnySntpCalls)` verifying
 
 ## Completion Report
 
-_Populated by pa-engineer upon completion._
+### Execution Summary
+- Created `test/stubs/platform/esp_netif.h` providing host-native `esp_netif_init()` that records `netifInitialized = true` and increments `netifInitCount` in `stub_sntp_state()`.
+- Updated `test/stubs/platform/esp_sntp.h` (`SntpStubState`, `stub_sntp_reset()`, `esp_sntp_stop()`, `esp_sntp_setserver()`, `esp_sntp_setservername()`, `esp_sntp_servermode_dhcp()`, and `configTzTime()`) to track whether any SNTP API was called prior to `esp_netif_init()`.
+- Updated `modules/TimeManager/TimeManager.cpp` to `#include <esp_netif.h>` across both ESP-IDF and `env:native`, call `(void)esp_netif_init();` at the very top of `TimeManager::_reinitNtp()` before any `esp_sntp_*` calls, and invoke `esp_sntp_servermode_dhcp(_dhcpNtpEnabled ? 1 : 0)` ahead of the synchronous `esp_sntp_setserver()` slot-clearing loop so `tcpip_callback` messages drain on `tcpip_mbox` before `configTzTime()` executes.
+- Added `TEST_F(TimeManagerTest, BeginInitializesNetifBeforeAnySntpCalls)` in `test/test_unit/test_timeManager/test_timeManager.cpp` validating netif initialization ordering before `begin()`, after `begin()`, and after `POST /api/time/config`.
+
+### Verification Results
+- **Doc Lint (`python3 scripts/doc_lint.py`):** Exited `0` with zero errors.
+- **Native Unit Tests (`platformio-mcp_platformio` `run_tests`, `environment: "native"`):** `SUCCESS` — all 36 suites passed (`1020 / 1020` test cases succeeded in `82.48s`), including `TimeManagerTest.BeginInitializesNetifBeforeAnySntpCalls`.
+- **Target Firmware Builds (`platformio-mcp_platformio` `acquire_lock` -> `build_project` -> `release_lock`, `sessionId: "wo-320-5-bd4cda46"`):**
+  - `esp32s3nano` (`forceExecution: true`): `SUCCESS` (`cacheHit: false`, RAM `61,084` bytes, Flash `1,381,143` bytes).
+  - `esp32dev`: `SUCCESS` (`cacheHit: false`, RAM `58,460` bytes, Flash `1,346,835` bytes).
+  - `crowpanel-128-rotary`: `SUCCESS` (`cacheHit: false`, RAM `64,828` bytes, Flash `1,913,691` bytes).
+  - Hardware lock explicitly released.
+- **Boundary & Spec Integrity:** `git status --short` contains only the 4 `allowed_files` plus this `WORKORDER.md` Part II update, and Part I `spec_hash` (`63bf3e0a3af673f2936912ed6f54d7b5b252a8a2360abb9d98c08fed087cf0b0`) is verified intact.
+
+### Escalation Notice
+`pa wo verify WO-320.5` was intentionally skipped per instructions (`HARNESS_PORCELAIN_LSTRIP_BUG`), because `pa_cli.py:_parse_porcelain_paths()` strips the leading dot from `.agents/.../WORKORDER.md`. Ready for parent PA receipt stamping and commit creation.
