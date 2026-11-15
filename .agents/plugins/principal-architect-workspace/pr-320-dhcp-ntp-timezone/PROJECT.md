@@ -74,6 +74,14 @@ work_orders:
   status: COMPLETED
   attempts: 1
   commit_sha: 504bb1ee44b1cc9a4f5bdbf809f9cd231ab3c033
+- id: WO-320.5
+  slug: wo5-netif-init-before-sntp
+  title: Initialize esp_netif before esp_sntp calls in TimeManager::_reinitNtp() to
+    prevent boot abort
+  complexity: standard
+  status: PENDING
+  attempts: 0
+  commit_sha: null
 ---
 
 # PR-320 — feat(time): DHCP NTP (RFC 2132 opt 42) and DHCP Timezone (RFC 4833 opts 100/101)
@@ -136,7 +144,7 @@ work_orders:
 
 ## 3. Implementation Plan & Work Order Breakdown
 
-`PR-320` is decomposed into four sequential Work Orders with non-overlapping concerns and full coverage of all three build targets (`esp32-app-foundation`, `sample-app`, `template-app`):
+`PR-320` is decomposed into five sequential Work Orders with non-overlapping concerns and full coverage of all three build targets (`esp32-app-foundation`, `sample-app`, `template-app`):
 
 | WO ID | Slug | Title | Complexity | Dependencies |
 | --- | --- | --- | --- | --- |
@@ -144,11 +152,13 @@ work_orders:
 | `WO-320.2` | `wo2-timemanager-dhcp` | Implement DHCP NTP & Timezone in TimeManager, MCP telemetry, main wiring, and native tests | `architect` | `WO-320.1` |
 | `WO-320.3` | `wo3-portal-docs-tests` | Add Time portal DHCP UI, Playwright E2E tests, and update developer docs/skills | `standard` | `WO-320.2` |
 | `WO-320.4` | `wo4-s3nano-flash-fix` | Restore board_upload.arduino.flash_extra_images suppression for esp32s3nano in platformio.ini | `standard` | `WO-320.3` |
+| `WO-320.5` | `wo5-netif-init-before-sntp` | Initialize esp_netif before esp_sntp calls in TimeManager::_reinitNtp() to prevent boot abort | `standard` | `WO-320.4` |
 
 ### Sequencing Notes
 1. `WO-320.1` lays down `.memory/.gitignore`, Kconfig SNTP/LwIP DHCP flags across all 3 projects, `include/lwip_dhcp_tz_hooks.h`, and CMake `ESP_IDF_LWIP_HOOK_FILENAME` injection so LwIP builds cleanly before `TimeManager` implements the strong hook symbol.
 2. `WO-320.2` implements `TimeManager` schema v2 (`migrateConfig`), `setEventBus(WIFI_CONNECTED)`, Option 42 SNTP + trailing slot fallback preservation, RFC 4833 Option 100/101 spinlock staging & streaming `/timezones.json` lookup, REST API fields, `MCPBuiltinTools` `"system_info"` telemetry, 3-target `main.cpp` wiring, and stateful host stubs/GoogleTests.
 3. `WO-320.3` adds the portal UI controls (`modules/TimeManager/web/time.js`), mock routes (`test/web/server.js`), Playwright E2E suite (`test/web/tests/time.spec.ts`), and developer/skill documentation (`docs/developer/**`, `.agents/skills/framework-expert/**`).
 4. `WO-320.4` restores `board_upload.arduino.flash_extra_images =` suppression under `[env:esp32s3nano]` in `platformio.ini` (inherited by `[env:esp32s3nano_ble]`) so hybrid `arduino, espidf` builds and flashes for `esp32s3nano` do not fail trying to merge `nora_recovery.ino.bin` with a broken Tasmota-prefixed path.
+5. `WO-320.5` initializes `esp_netif_init()` at the top of `TimeManager::_reinitNtp()` and orders `esp_sntp_servermode_dhcp()` ahead of the synchronous `esp_sntp_setserver()` clearing loop so `tcpip_thread`/`tcpip_mbox` exist before SNTP calls execute during `TimeManager::begin()` (preventing the `esp32s3nano` boot abort) and `tcpip_callback` messages drain before `configTzTime()`, backed by host-native stub tracking and unit tests.
 
 ## 4. Outcome & Session Log
