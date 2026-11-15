@@ -1,14 +1,16 @@
 # Principal Architect Memory
-<!-- Last updated: 2026-10-03T16:49:00+01:00 -->
+<!-- Last updated: 2026-11-15T15:58:00Z -->
 
 ## Active Programs
 | Program | Plan | Status |
 |---|---|---|
 | `esp32-app-foundation` | [PROGRAM-PLAN.md](../esp32-app-foundation/PROGRAM-PLAN.md) | PR-01 through PR-40 delivered |
+| `prog-dhcp-ntp-timezone` | [PROGRAM.md](../programme-dhcp-ntp-timezone/PROGRAM.md) | PR-320 (5/5 WOs complete, soak-validated, ready for Step 6A audit) |
 
 ## Active Projects
 | Project | Status | Modules | Context |
 |---|---|---|---|
+| pr-320-dhcp-ntp-timezone | 5/5 WOs COMPLETE — v1.0.0-dev.3 hardware soak passed (273s), ready for Step 6A audit | TimeManager, MCPServer, include/lwip_dhcp_tz_hooks.h, CMakeLists, sdkconfig.defaults, platformio.ini, web/time.js, test/stubs, docs, framework-expert skill | [PROJECT.md](../pr-320-dhcp-ntp-timezone/PROJECT.md) |
 | pr-309-ble-readvertise | COMPLETE — PR [#311](https://github.com/matthewmcneill/esp32-app-foundation/pull/311) raised | BLEManager | [PROJECT.md](../pr-309-ble-readvertise/PROJECT.md) |
 | pr-232-device-identity | WO3/3 — executing | Application, WifiManager, BLEManager, HomeAssistantModule, AuthManager, MCPServer, OTADownloadEngine, LVGLDisplay, web/portal | [PROJECT.md](../pr-232-device-identity/PROJECT.md) |
 | sample-app-remediation | COMPLETE — 6/6 WOs, device verified, tagged v0.0.12-dev.83 | sample-app/src/WeatherModule, WeatherBoard, IWeatherDataProvider, main.cpp, web/weather.js | [PROJECT.md](../pr-sample-app-remediation/PROJECT.md) |
@@ -28,4 +30,17 @@
 97 completed projects.
 Full project history: [PROJECT_INDEX.md](PROJECT_INDEX.md)
 Cross-cutting module index: [MODULE_INDEX.md](MODULE_INDEX.md)
+
+## Architectural Invariants & Stage 3 Audit Follow-Ups (PR-320)
+- **`TimeManager` DHCP Option 42 + RFC 4833 Options 100/101:**
+  - `include/lwip_dhcp_tz_hooks.h` injects Option 100 (`PCode`) and Option 101 (`TCode`) into LwIP's Parameter Request List (`DHCP_ADD_EXTRA_REQUEST_OPTIONS` with mandatory leading comma) via CMake `ESP_IDF_LWIP_HOOK_FILENAME`.
+  - Strong `lwip_dhcp_on_extra_option()` in `modules/TimeManager/TimeManager.cpp` runs in LwIP TCP/IP task context with **zero** heap, VFS, EventBus, `setenv`, or `tzset` calls; it copies bounded bytes behind `portMUX_TYPE` for `TimeManager::tick()` to drain via `lwip_dhcp_tz_take_pending()`.
+  - Option 101 `TCode` resolves via fixed-stack 256B streaming scan of `/timezones.json`; Option 42 (`CONFIG_LWIP_DHCP_MAX_NTP_SERVERS=2`, `CONFIG_LWIP_SNTP_MAX_SERVERS=3`) preserves static fallback NTP servers in trailing SNTP slots; Schema v2 (`migrateConfig` v1 -> v2) enforces zero flash wear for runtime DHCP values; `timeManager.setEventBus(&app.getEventBus())` subscribes to `WifiEvents::WIFI_CONNECTED` across root, `sample-app`, and `template-app`.
+- **`esp_netif_init()` Pre-SNTP Ordering Invariant:**
+  - `TimeManager::_reinitNtp()` MUST invoke `(void)esp_netif_init()` at the top before any `esp_sntp_*` calls (preventing boot-time abort when `TimeManager::begin()` runs before `WiFi` initializes `tcpip_thread`/`tcpip_mbox`).
+  - `esp_sntp_servermode_dhcp()` MUST precede the synchronous `esp_sntp_setserver()` clearing loop so preceding `tcpip_callback` messages drain before `configTzTime()`. Enforced in native tests via `test/stubs/platform/esp_netif.h` and `test/stubs/platform/esp_sntp.h`.
+- **`esp32s3nano` `flash_extra_images` Suppression Invariant:**
+  - `[env:esp32s3nano]` in `platformio.ini` MUST keep `board_upload.arduino.flash_extra_images =` (inherited by `[env:esp32s3nano_ble]`) to suppress the broken Tasmota-prefixed `nora_recovery.ino.bin` merge path in `espressif32` hybrid `arduino, espidf` builds.
+- **Stage 3 (`PR-B` Release Audit) Follow-Up:**
+  - `sample-app/platformio.ini` and `template-app/platformio.ini` still specify `board = um_nanos3`, unlike root `platformio.ini` (`board = arduino_nano_esp32`); audit and align during `PR-B`.
 

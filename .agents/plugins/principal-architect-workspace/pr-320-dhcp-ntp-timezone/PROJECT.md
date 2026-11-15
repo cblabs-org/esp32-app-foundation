@@ -50,7 +50,7 @@ work_orders:
   complexity: standard
   status: COMPLETED
   attempts: 1
-  commit_sha: b0f8ce56d6799c1f6d673a877c91c460575c23fc
+  commit_sha: 41bb5fb7c147decdd82b4be69bc3409e2cd49cba
 - id: WO-320.2
   slug: wo2-timemanager-dhcp
   title: Implement DHCP NTP & Timezone in TimeManager, MCP telemetry, main wiring,
@@ -58,14 +58,14 @@ work_orders:
   complexity: architect
   status: COMPLETED
   attempts: 1
-  commit_sha: 41bb5fb7c147decdd82b4be69bc3409e2cd49cba
+  commit_sha: 70dfa3f92d0aa4d4203971f1eb1200abf98b7251
 - id: WO-320.3
   slug: wo3-portal-docs-tests
   title: Add Time portal DHCP UI, Playwright E2E tests, and update developer docs/skills
   complexity: standard
   status: COMPLETED
   attempts: 1
-  commit_sha: 70dfa3f92d0aa4d4203971f1eb1200abf98b7251
+  commit_sha: d1b478ec2a0eaa5a69b662b11016977340e6824a
 - id: WO-320.4
   slug: wo4-s3nano-flash-fix
   title: Restore board_upload.arduino.flash_extra_images suppression for esp32s3nano
@@ -73,7 +73,7 @@ work_orders:
   complexity: standard
   status: COMPLETED
   attempts: 1
-  commit_sha: 504bb1ee44b1cc9a4f5bdbf809f9cd231ab3c033
+  commit_sha: 01e4571e5d8e36cf58537c4ad409fc5f4d4d957c
 - id: WO-320.5
   slug: wo5-netif-init-before-sntp
   title: Initialize esp_netif before esp_sntp calls in TimeManager::_reinitNtp() to
@@ -81,7 +81,7 @@ work_orders:
   complexity: standard
   status: COMPLETED
   attempts: 1
-  commit_sha: 698fef9af632782aa0aa1db6516aff62ff9fd596
+  commit_sha: 6b670d7f365eded3e9f7cd0644af17f1e3cee4a0
 ---
 
 # PR-320 — feat(time): DHCP NTP (RFC 2132 opt 42) and DHCP Timezone (RFC 4833 opts 100/101)
@@ -162,3 +162,19 @@ work_orders:
 5. `WO-320.5` initializes `esp_netif_init()` at the top of `TimeManager::_reinitNtp()` and orders `esp_sntp_servermode_dhcp()` ahead of the synchronous `esp_sntp_setserver()` clearing loop so `tcpip_thread`/`tcpip_mbox` exist before SNTP calls execute during `TimeManager::begin()` (preventing the `esp32s3nano` boot abort) and `tcpip_callback` messages drain before `configTzTime()`, backed by host-native stub tracking and unit tests.
 
 ## 4. Outcome & Session Log
+
+### Completed Work Orders
+- **`WO-320.1` (`41bb5fb7`, `rcpt_51d44372e7e1`)** — Added `include/lwip_dhcp_tz_hooks.h` (pure-C Option 100/101 definitions, leading-comma `DHCP_ADD_EXTRA_REQUEST_OPTIONS`, `lwip_dhcp_tz_take_pending()`), injected `ESP_IDF_LWIP_HOOK_FILENAME` and `template-app` `EXCLUDE_COMPONENTS` + Path B/Path A auto-detection across root/`sample-app`/`template-app` `CMakeLists.txt`, enabled LwIP Option 42/extra-option flags in `sdkconfig.defaults` across all 3 targets, added `.memory/.gitignore` and root `.gitignore` `CMakeLists.txt` un-ignore rules (`!/CMakeLists.txt`, `!/sample-app/CMakeLists.txt`, `!/template-app/CMakeLists.txt`, `*/src/CMakeLists.txt`), and remediated `style-guide.md` lint exemption.
+- **`WO-320.2` (`70dfa3f9`, `rcpt_1cc38419b229`)** — Implemented `TimeManager` DHCP Option 42 + RFC 4833 Options 100 (`PCode`) & 101 (`TCode`) spinlock staging, fixed-stack streaming 256B `/timezones.json` lookup, Schema v2 migration (`migrateConfig`), zero flash wear (volatile runtime DHCP state), `setEventBus(WIFI_CONNECTED)` wiring across all three `main.cpp` files, extended `GET`/`POST /api/time/config` and MCP `"system_info"` `time_dhcp_*` telemetry, upgraded host stubs (`esp_sntp.h`, `FreeRTOS.h`), and added unit tests (`1019/1019` native tests passed; root + `sample-app` builds passed).
+- **`WO-320.3` (`d1b478ec`, `rcpt_91de1537e539`)** — Added Time portal DHCP toggles & status badges (`modules/TimeManager/web/time.js` using `var(--...)` CSS variables and `esc()`/`escAttr()`), updated `test/web/server.js`, added Playwright specs (`92/92` passed), updated developer docs (`check_doc_cpp_samples.py`: 50 contracts / 40 samples passed), and updated `framework-expert` skill files.
+- **`WO-320.4` (`01e4571e`, `rcpt_5137802c5a45`)** — Restored `board_upload.arduino.flash_extra_images =` suppression under `[env:esp32s3nano]` in `platformio.ini` (inherited by `[env:esp32s3nano_ble]`), resolving the hybrid `arduino, espidf` `nora_recovery.ino.bin` merge failure.
+- **`WO-320.5` (`6b670d7f`, `rcpt_b9a095767923`)** — Included `<esp_netif.h>`, called `(void)esp_netif_init()` at the top of `TimeManager::_reinitNtp()` to prevent the boot-time `esp_sntp_setserver` abort before `tcpip_thread`/`tcpip_mbox` initialization, ordered `esp_sntp_servermode_dhcp()` ahead of the synchronous `esp_sntp_setserver()` loop, added `test/stubs/platform/esp_netif.h`, and added `TimeManagerTest.BeginInitializesNetifBeforeAnySntpCalls` (`1020/1020` native tests passed across 36 suites; `esp32s3nano`, `esp32dev`, and `crowpanel-128-rotary` builds passed).
+
+### Hardware Validation (`v1.0.0-dev.3` on `esp32s3nano` + `U8G2Display` SSD1322 OLED)
+- Flashed firmware-only preserving LittleFS, and verified live schema `v1 -> v2` migration on device (`Europe/London`, `dhcpNtp=true`, `dhcpTz=false`).
+- Verified `U8G2DisplayModule` initialization and screensaver dim transition at `150s`.
+- Verified Wi-Fi association (`<redacted-ssid>`, `<redacted-lan-ip>`), NTP synchronization (`SYNCED`), `GET /api/system` (`firmware_version: "1.0.0-dev.3"`, `status: "ok"`), and `GET /api/time/config`.
+- Completed `273s` (>4.5 min) continuous hardware soak with zero resets or panics and zero heap/DRAM drift (`free_heap=8531859B`, `dram=146171B`, `dram_min=107716B` flat from `150s` through `270s`).
+
+### Follow-Ups Noted for Stage 3 (`PR-B` Release Audit)
+- `sample-app/platformio.ini` and `template-app/platformio.ini` still specify `board = um_nanos3`, whereas root `platformio.ini` uses `board = arduino_nano_esp32`. Audit and reconcile during Stage 3 (`PR-B`).
