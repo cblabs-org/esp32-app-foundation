@@ -71,9 +71,9 @@ work_orders:
   title: Restore board_upload.arduino.flash_extra_images suppression for esp32s3nano
     in platformio.ini
   complexity: standard
-  status: PENDING
-  attempts: 0
-  commit_sha: null
+  status: COMPLETED
+  attempts: 1
+  commit_sha: 504bb1ee44b1cc9a4f5bdbf809f9cd231ab3c033
 ---
 
 # PR-320 — feat(time): DHCP NTP (RFC 2132 opt 42) and DHCP Timezone (RFC 4833 opts 100/101)
