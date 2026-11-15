@@ -119,6 +119,12 @@ Apple and Android guidelines mandate waiting ≥5 seconds after connection befor
 ### How do WiFi and BLE coexist?
 `CONFIG_ESP_COEX_SW_COEXIST_ENABLE=y` in sdkconfig enables hardware-level RF time-sharing. The framework adds five application-level mechanisms: Running-Only gating, ScanInhibit tokens, Administrative Pause, Duty Cycle Clamping, and Exponential Backoff. See `docs/developer/bluetooth.md` § Coexistence & Radio Hardening.
 
+### How does `TimeManager` handle DHCP NTP and Timezone?
+- **Wiring (`WITH_TIME`):** Wire both `timeManager.setConfigManager(&app.getConfigManager())` and `timeManager.setEventBus(&app.getEventBus())` in `setup()` before `app.registerModule(&timeManager)` (matches `src/main.cpp`, `sample-app/src/main.cpp`, and `template-app/src/main.cpp`), then call `timeManager.begin()` after `app.begin(config)`.
+- **Build Parity (`CMakeLists.txt` + `sdkconfig.defaults`):** Inject `include/lwip_dhcp_tz_hooks.h` into the `lwip` CMake component via `ESP_IDF_LWIP_HOOK_FILENAME="lwip_dhcp_tz_hooks.h"` after `project(...)`, and enable `CONFIG_LWIP_SNTP_MAX_SERVERS=3`, `CONFIG_LWIP_DHCP_GET_NTP_SRV=y`, `CONFIG_LWIP_DHCP_MAX_NTP_SERVERS=2`, and `CONFIG_LWIP_HOOK_DHCP_EXTRA_OPTION_DEFAULT=y`.
+- **RFC Precedence, Threading & Zero Flash Wear:** Option 42 fills leading SNTP slots while `TimeManager` preserves static `_ntpServer1..3` fallback servers in cleared trailing slots. For timezone, RFC 4833 Option `100` (`PCode`, direct POSIX) takes precedence over Option `101` (`TCode`, IANA name resolved by streaming `/timezones.json` on LittleFS). LwIP hook callbacks run on the TCPIP thread into a `portMUX_TYPE` spinlock buffer and are drained safely in `TimeManager::tick()`. DHCP Option 2 (`Time Offset`) is intentionally excluded (no DST rules; deprecated by RFC 4833). Runtime DHCP discoveries stay in RAM and never write to `/mod/time.json`.
+- **Schema v2 & Telemetry:** `TimeManager` uses Schema v2 (`dhcpNtp`, `dhcpTz`; `v1` migrates with `dhcpNtp=true` and `dhcpTz = !manualTzConfigured`), exposes `/api/time/config` (`activeTimezone`, `activePosix`, `dhcpNtp*`, `dhcpTz*`), and populates `time_dhcp_*` fields in MCP `system_info`.
+
 ### Framework-Reserved Include Prefixes
 
 The following subdirectories of `include/` are reserved by the framework:
@@ -365,7 +371,9 @@ These references are optimized distillations for AI agents. If the human develop
   "IStatusReporter", "IDisplayBoard", "ILVGLHardwareAdapter", "ITabRegistry", "registerTabs".
 - **Core systems**: "EventBus", "ConfigManager", "FrameworkConfig", "config system",
   "extension point", "framework architecture", "AppFoundation.h", "tick function",
-  "boot sequence", "LittleFS layout", "DataManager", "fetchUpdate", "queueDataJob".
+  "boot sequence", "LittleFS layout", "DataManager", "fetchUpdate", "queueDataJob",
+  "TimeManager", "WITH_TIME", "DHCP NTP", "Option 42", "RFC 4833", "Option 100", "Option 101",
+  "lwip_dhcp_tz_hooks.h", "dhcpNtp", "dhcpTz", "time_dhcp_ntp", "time_dhcp_tz".
 - **Display**: "display board", "carousel", "screensaver", "replace the display",
   "use a TFT", "different screen", "e-ink display", "LVGL Pro", "UIDesign",
   "uidesign", "ILVGLHardwareAdapter", "LVGLDisplayModule", "subjects", "sys_*",
@@ -419,7 +427,8 @@ These references are optimized distillations for AI agents. If the human develop
   "readOnly mode", "JSON-RPC", "call a tool on the device", "talk to the device",
   "query the device", "device telemetry".
 - **REST APIs**: "/api/data/sources", "/api/data/sources/reset", "/api/mcp",
-  "/api/wifi/status", "/api/system", "/api/system/audit", "/api/system/audit/clear".
+  "/api/wifi/status", "/api/system", "/api/system/audit", "/api/system/audit/clear",
+  "/api/time/config", "/api/time/zones".
 
 Also trigger when an agent is working on code that extends the framework and needs
 guidance on interface contracts, patterns, performance, or embedded safety.

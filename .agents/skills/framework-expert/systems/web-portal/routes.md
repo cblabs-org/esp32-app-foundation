@@ -89,6 +89,15 @@ Registered by `DataSourceWebContributor` on `Application`:
 - `GET /api/data/sources`: Returns JSON array of all registered data sources, their health states (`HEALTHY`, `DEGRADED`, `QUARANTINED`, `SUSPENDED`, `UNKNOWN`), failure counts, and active backoff durations.
 - `POST /api/data/sources/reset`: Resets a suspended or quarantined data source's health history (`{"name": "sourceName"}` or query param `?name=sourceName`), clearing backoff and resuming scheduled fetches.
 
+## Time & DHCP REST Endpoints
+
+Registered by `TimeManager` (requires `-D WITH_TIME`):
+
+- `GET /api/time/config`: Returns persisted fallback settings (`timezone`, `posix`, `ntpServer1`, `ntpServer2`, `ntpServer3`, `dhcpNtp`, `dhcpTz`) plus live runtime state (`activeTimezone`, `activePosix`, `dhcpNtpActive`, `dhcpNtpServers`, `dhcpTzActive`, `dhcpTzSource` (`"none"|"pcode"|"tcode"`), `configured`, `syncStatus`, and `localTime` when synced).
+- `POST /api/time/config`: Updates persisted fallback settings and `dhcpNtp`/`dhcpTz` booleans (`{"status": "ok"}`). Runtime DHCP values are never written to flash.
+- `GET /api/time/zones`: Serves `/timezones.json` IANA-to-POSIX map from LittleFS.
+- `POST /api/time/zones/update`: Replaces `/timezones.json` database on LittleFS.
+
 ## Audit REST Endpoints
 
 Registered by `AuditModule` (requires `-D WITH_AUDIT` build flag):

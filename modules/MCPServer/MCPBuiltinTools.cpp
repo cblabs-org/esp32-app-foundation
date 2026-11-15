@@ -173,6 +173,20 @@ void mcpBuiltinTools::registerAll(MCPToolRegistry& registry,
                             result["time_local"] = buf;
                         }
                     }
+
+                    result["time_dhcp_ntp_enabled"] = c->timeManager->isDhcpNtpEnabled();
+                    result["time_dhcp_ntp_active"]  = c->timeManager->isDhcpNtpActive();
+                    JsonArray dhcpNtpArr = result["time_dhcp_ntp_servers"].to<JsonArray>();
+                    size_t dhcpNtpCount = c->timeManager->getDhcpNtpServerCount();
+                    for (size_t i = 0; i < dhcpNtpCount; ++i) {
+                        const char* srv = c->timeManager->getDhcpNtpServer(i);
+                        if (srv != nullptr && srv[0] != '\0') {
+                            dhcpNtpArr.add(srv);
+                        }
+                    }
+                    result["time_dhcp_tz_enabled"]  = c->timeManager->isDhcpTzEnabled();
+                    result["time_dhcp_tz_active"]   = c->timeManager->isDhcpTzActive();
+                    result["time_dhcp_tz_source"]   = c->timeManager->getDhcpTzSourceStr();
                 }
             result["firmware_version"] = BUILD_VERSION;
         },

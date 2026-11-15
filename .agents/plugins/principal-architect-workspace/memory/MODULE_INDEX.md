@@ -20,6 +20,7 @@
 | [pr-38](../pr-38-portal-remediation/PROJECT.md) | Portal UX remediation — CSS/JS fixes, information depth, branding | [distillation](../pr-38-portal-remediation/context_bridge.md) |
 | [adhoc-app-tab-rules-bug](../adhoc-app-tab-rules-bug/context_bridge.md) | App tab config wiring (clock font size) | context_bridge |
 | [pr-55](../pr-55-portal-design-system/PROJECT.md) | Portal Design System — BEM convention, `.card`/`.alert` formalization, ApiQueue priority lanes, component library | PROJECT.md |
+| [pr-320](../pr-320-dhcp-ntp-timezone/PROJECT.md) | Time portal DHCP NTP/TZ toggles, active source badges, `var(--...)` styling, Playwright `time.spec.ts` | PROJECT.md |
 
 ## OTA (Over-the-Air Updates)
 | Project | Scope | Context |
@@ -60,6 +61,7 @@
 | [pr-20](../pr-20-config-refactor/PROJECT.md) | FrameworkConfig refactor — 5 runtime defaults → module `resetConfig()`; FrameworkConfig = 3 OTA secrets | [distillation](../pr-20-config-refactor/context_bridge.md) |
 | [pr-34](../pr-34-mcp-tools/PROJECT.md) | `config_get_schema_version`, `config_factory_reset` MCP tools | [distillation](../pr-34-mcp-tools/context_bridge.md) |
 | [adhoc-app-tab-rules-bug](../adhoc-app-tab-rules-bug/context_bridge.md) | `appconfig.js` scope unclear, stash pending | context_bridge |
+| [pr-320](../pr-320-dhcp-ntp-timezone/PROJECT.md) | `TimeManager` Schema v2 (`migrateConfig` v1 -> v2), `dhcpNtp`/`dhcpTz` flags, zero flash wear for volatile DHCP state | PROJECT.md |
 
 ## Security, Authentication & TLS
 | Project | Scope | Context |
@@ -81,6 +83,7 @@
 | [pr-27](../pr-27-security-mcp-docs/PROJECT.md) | `mcp-server.md` developer docs | PROJECT.md |
 | [pr-34](../pr-34-mcp-tools/PROJECT.md) | 8 module-contributed tools (WiFi, OTA, Config, Display), `last_check_ms` fix, skill updates | [distillation](../pr-34-mcp-tools/context_bridge.md) |
 | [adhoc-issue-13-mcp-args](../adhoc-issue-13-mcp-args/context_bridge.md) | ArduinoJson 7 const-variant bug — `is<JsonObjectConst>()` fix, regression test, doc guard (GitHub PR #14) | [distillation](../adhoc-issue-13-mcp-args/context_bridge.md) |
+| [pr-320](../pr-320-dhcp-ntp-timezone/PROJECT.md) | `"system_info"` `time_dhcp_*` telemetry (`time_dhcp_ntp_enabled/active/servers`, `time_dhcp_tz_enabled/active/source`) | PROJECT.md |
 
 ## Architecture & Framework Design
 | Project | Scope | Context |
@@ -116,6 +119,7 @@
 | [pr-19](../pr-19-sdkconfig-layering/PROJECT.md) | Base+delta layering, fix PSRAM regression, build guard | PROJECT.md |
 | [adhoc-sub-app-pipeline](../adhoc-sub-app-pipeline/context_bridge.md) | `merge_framework_data.py`, portalBuilder, OTA separation, esp32s3nano template | context_bridge |
 | [Include Architecture](../../context_archives/distillation-20260811-include-architecture/context_bridge.md) | LDF mode alignment, `lib_ldf_mode=deep` on native, exclude_on_native.py pattern, library.json for all modules | context_bridge |
+| [pr-320](../pr-320-dhcp-ntp-timezone/PROJECT.md) | LwIP CMake hook injection (`ESP_IDF_LWIP_HOOK_FILENAME`), `template-app` `EXCLUDE_COMPONENTS` + Path B/A detection, `.gitignore` CMake tracking, `esp32s3nano` `flash_extra_images =` suppression invariant (Stage 3 audit note: `sample-app`/`template-app` `platformio.ini` still use `board = um_nanos3` vs root `arduino_nano_esp32`) | PROJECT.md |
 
 ## Testing Infrastructure
 | Project | Scope | Context |
@@ -125,6 +129,7 @@
 | [pr-15](../pr-15-web-testing/PROJECT.md) | Mock server + Playwright + build gate | PROJECT.md |
 | [pr-39](../pr-39-sample-app-remediation/PROJECT.md) | Sample app remediation — EventBus demo, real tests, 15/15 passing | PROJECT.md |
 | [pr-40](../pr-40-docs-excellence/PROJECT.md) | 590/590 test compliance verification across all modules | [distillation](../pr-40-docs-excellence/context_bridge.md) |
+| [pr-320](../pr-320-dhcp-ntp-timezone/PROJECT.md) | `test/stubs/platform/esp_netif.h` + stateful `esp_sntp.h` (`netifInitialized` ordering checks), `FreeRTOS.h` spinlock stubs, `test_timeManager`/`test_mcpServer` (1020/1020), Playwright `time.spec.ts` (92/92) | PROJECT.md |
 
 ## WiFi & Networking
 | Project | Scope | Context |
@@ -132,6 +137,7 @@
 | pr-02 WO4 | WiFi + captive portal, AppState transitions | [PROGRAM-PLAN §PR-02](../esp32-app-foundation/PROGRAM-PLAN.md#pr-02) |
 | [pr-34](../pr-34-mcp-tools/PROJECT.md) | `wifi_get_status`, `wifi_scan_networks`, `wifi_forget` MCP tools | [distillation](../pr-34-mcp-tools/context_bridge.md) |
 | [adhoc-boot-wifi-bugfixes](../adhoc-boot-wifi-bugfixes/context_bridge.md) | PKCS7 padding → AUTH_EXPIRE; WiFi wizard modal; `%zu` Newlib nano printf | context_bridge |
+| [pr-320](../pr-320-dhcp-ntp-timezone/PROJECT.md) | `TimeManager` DHCP Option 42 + RFC 4833 Options 100/101 (`include/lwip_dhcp_tz_hooks.h`), `portMUX_TYPE` spinlock handoff, 256B `/timezones.json` streaming scan, `esp_netif_init()` pre-SNTP invariant & `esp_sntp_servermode_dhcp()` ordering before `esp_sntp_setserver()`, `setEventBus(WIFI_CONNECTED)` | PROJECT.md |
 
 ## Crypto & Key Management
 | Project | Scope | Context |
@@ -153,6 +159,7 @@
 | [pr-40](../pr-40-docs-excellence/PROJECT.md) | Documentation Excellence — 10/10 compliance across template-app, sample-app, framework modules | [distillation](../pr-40-docs-excellence/context_bridge.md) |
 | [Group 3 Code Quality](../../context_archives/distillation-20260814-group3-code-quality/context_bridge.md) | board.h stock-vs-consumer ownership docs, `_TEMPLATE/` restructure, framework-expert skill Hardware Abstraction section, 5 doc path updates | context_bridge |
 | pr-151-interface-naming-cleanup | `framework-expert` skill trigger keywords and interface docs updated for `IPreconditionRegistry`/`ITabRegistry` rename | [PROJECT.md](../pr-151-interface-naming-cleanup/PROJECT.md) |
+| [pr-320](../pr-320-dhcp-ntp-timezone/PROJECT.md) | Developer docs (`build-system`, `config-system`, `mcp-server`, `using-optional-modules`) and `framework-expert` skill updated for DHCP NTP/TZ + style-guide lint fix | PROJECT.md |
 
 ## Home Assistant & Weather
 | Project | Scope | Context |
@@ -161,3 +168,128 @@
 | [pr-38](../pr-38-portal-remediation/PROJECT.md) | HA metadata ADR, RAII mutex ADR (from PR-35 review) | [distillation](../pr-38-portal-remediation/context_bridge.md) |
 | [pr-42](../pr-42-ha-discovery-pacing/PROJECT.md) | Issue #16: Paced discovery/state publish, outbox limit, drain-completion signal | PROJECT.md |
 
+## .gitignore
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-320-dhcp-ntp-timezone](../pr-320-dhcp-ntp-timezone/PROJECT.md) | feat(time): DHCP NTP (RFC 2132 opt 42) and DHCP Timezone (RFC 4833 opts 100/101) | [PROJECT.md](../pr-320-dhcp-ntp-timezone/PROJECT.md) |
+
+## .memory/.gitignore
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-320-dhcp-ntp-timezone](../pr-320-dhcp-ntp-timezone/PROJECT.md) | feat(time): DHCP NTP (RFC 2132 opt 42) and DHCP Timezone (RFC 4833 opts 100/101) | [PROJECT.md](../pr-320-dhcp-ntp-timezone/PROJECT.md) |
+
+## CMakeLists.txt
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-320-dhcp-ntp-timezone](../pr-320-dhcp-ntp-timezone/PROJECT.md) | feat(time): DHCP NTP (RFC 2132 opt 42) and DHCP Timezone (RFC 4833 opts 100/101) | [PROJECT.md](../pr-320-dhcp-ntp-timezone/PROJECT.md) |
+
+## platformio.ini
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-320-dhcp-ntp-timezone](../pr-320-dhcp-ntp-timezone/PROJECT.md) | feat(time): DHCP NTP (RFC 2132 opt 42) and DHCP Timezone (RFC 4833 opts 100/101) | [PROJECT.md](../pr-320-dhcp-ntp-timezone/PROJECT.md) |
+
+## sdkconfig.defaults
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-320-dhcp-ntp-timezone](../pr-320-dhcp-ntp-timezone/PROJECT.md) | feat(time): DHCP NTP (RFC 2132 opt 42) and DHCP Timezone (RFC 4833 opts 100/101) | [PROJECT.md](../pr-320-dhcp-ntp-timezone/PROJECT.md) |
+
+## include/lwip_dhcp_tz_hooks.h
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-320-dhcp-ntp-timezone](../pr-320-dhcp-ntp-timezone/PROJECT.md) | feat(time): DHCP NTP (RFC 2132 opt 42) and DHCP Timezone (RFC 4833 opts 100/101) | [PROJECT.md](../pr-320-dhcp-ntp-timezone/PROJECT.md) |
+
+## src/main.cpp
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-320-dhcp-ntp-timezone](../pr-320-dhcp-ntp-timezone/PROJECT.md) | feat(time): DHCP NTP (RFC 2132 opt 42) and DHCP Timezone (RFC 4833 opts 100/101) | [PROJECT.md](../pr-320-dhcp-ntp-timezone/PROJECT.md) |
+
+## sample-app/CMakeLists.txt
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-320-dhcp-ntp-timezone](../pr-320-dhcp-ntp-timezone/PROJECT.md) | feat(time): DHCP NTP (RFC 2132 opt 42) and DHCP Timezone (RFC 4833 opts 100/101) | [PROJECT.md](../pr-320-dhcp-ntp-timezone/PROJECT.md) |
+
+## sample-app/sdkconfig.defaults
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-320-dhcp-ntp-timezone](../pr-320-dhcp-ntp-timezone/PROJECT.md) | feat(time): DHCP NTP (RFC 2132 opt 42) and DHCP Timezone (RFC 4833 opts 100/101) | [PROJECT.md](../pr-320-dhcp-ntp-timezone/PROJECT.md) |
+
+## sample-app/src/main.cpp
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-320-dhcp-ntp-timezone](../pr-320-dhcp-ntp-timezone/PROJECT.md) | feat(time): DHCP NTP (RFC 2132 opt 42) and DHCP Timezone (RFC 4833 opts 100/101) | [PROJECT.md](../pr-320-dhcp-ntp-timezone/PROJECT.md) |
+
+## template-app/CMakeLists.txt
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-320-dhcp-ntp-timezone](../pr-320-dhcp-ntp-timezone/PROJECT.md) | feat(time): DHCP NTP (RFC 2132 opt 42) and DHCP Timezone (RFC 4833 opts 100/101) | [PROJECT.md](../pr-320-dhcp-ntp-timezone/PROJECT.md) |
+
+## template-app/sdkconfig.defaults
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-320-dhcp-ntp-timezone](../pr-320-dhcp-ntp-timezone/PROJECT.md) | feat(time): DHCP NTP (RFC 2132 opt 42) and DHCP Timezone (RFC 4833 opts 100/101) | [PROJECT.md](../pr-320-dhcp-ntp-timezone/PROJECT.md) |
+
+## template-app/src/main.cpp
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-320-dhcp-ntp-timezone](../pr-320-dhcp-ntp-timezone/PROJECT.md) | feat(time): DHCP NTP (RFC 2132 opt 42) and DHCP Timezone (RFC 4833 opts 100/101) | [PROJECT.md](../pr-320-dhcp-ntp-timezone/PROJECT.md) |
+
+## modules/TimeManager/**
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-320-dhcp-ntp-timezone](../pr-320-dhcp-ntp-timezone/PROJECT.md) | feat(time): DHCP NTP (RFC 2132 opt 42) and DHCP Timezone (RFC 4833 opts 100/101) | [PROJECT.md](../pr-320-dhcp-ntp-timezone/PROJECT.md) |
+
+## modules/MCPServer/**
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-320-dhcp-ntp-timezone](../pr-320-dhcp-ntp-timezone/PROJECT.md) | feat(time): DHCP NTP (RFC 2132 opt 42) and DHCP Timezone (RFC 4833 opts 100/101) | [PROJECT.md](../pr-320-dhcp-ntp-timezone/PROJECT.md) |
+
+## test/stubs/**
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-320-dhcp-ntp-timezone](../pr-320-dhcp-ntp-timezone/PROJECT.md) | feat(time): DHCP NTP (RFC 2132 opt 42) and DHCP Timezone (RFC 4833 opts 100/101) | [PROJECT.md](../pr-320-dhcp-ntp-timezone/PROJECT.md) |
+
+## test/test_unit/test_timeManager/**
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-320-dhcp-ntp-timezone](../pr-320-dhcp-ntp-timezone/PROJECT.md) | feat(time): DHCP NTP (RFC 2132 opt 42) and DHCP Timezone (RFC 4833 opts 100/101) | [PROJECT.md](../pr-320-dhcp-ntp-timezone/PROJECT.md) |
+
+## test/test_unit/test_mcpServer/**
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-320-dhcp-ntp-timezone](../pr-320-dhcp-ntp-timezone/PROJECT.md) | feat(time): DHCP NTP (RFC 2132 opt 42) and DHCP Timezone (RFC 4833 opts 100/101) | [PROJECT.md](../pr-320-dhcp-ntp-timezone/PROJECT.md) |
+
+## test/web/**
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-320-dhcp-ntp-timezone](../pr-320-dhcp-ntp-timezone/PROJECT.md) | feat(time): DHCP NTP (RFC 2132 opt 42) and DHCP Timezone (RFC 4833 opts 100/101) | [PROJECT.md](../pr-320-dhcp-ntp-timezone/PROJECT.md) |
+
+## docs/developer/**
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-320-dhcp-ntp-timezone](../pr-320-dhcp-ntp-timezone/PROJECT.md) | feat(time): DHCP NTP (RFC 2132 opt 42) and DHCP Timezone (RFC 4833 opts 100/101) | [PROJECT.md](../pr-320-dhcp-ntp-timezone/PROJECT.md) |
+
+## .agents/skills/framework-expert/**
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-320-dhcp-ntp-timezone](../pr-320-dhcp-ntp-timezone/PROJECT.md) | feat(time): DHCP NTP (RFC 2132 opt 42) and DHCP Timezone (RFC 4833 opts 100/101) | [PROJECT.md](../pr-320-dhcp-ntp-timezone/PROJECT.md) |

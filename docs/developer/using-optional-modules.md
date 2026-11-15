@@ -430,6 +430,49 @@ void setup() {
 
 For full details on provider contracts, threading rules, and Wi-Fi/BLE coexistence, see [Bluetooth Low Energy](bluetooth.md).
 
+### Framework Optional Module Example: `TimeManager` (NTP & DHCP Discovery)
+
+`TimeManager` (`WITH_TIME`) follows the same static composition pattern across `src/main.cpp`, `sample-app/src/main.cpp`, and `template-app/src/main.cpp`. It requires **both** `ConfigManager` (Schema v2 fallback settings) and `EventBus` (to receive `"wifi.connected"` events without polling):
+
+```cpp
+#include "AppFoundation.h"
+
+static Application app;
+
+#ifdef WITH_TIME
+#include "TimeManager.hpp"
+#include "TimePreconditionContributor.hpp"
+static TimeManager timeManager;
+static TimePreconditionContributor timePrecondition{timeManager};
+#endif
+
+void setup() {
+    app.getWifiManager().setDefaultHostname("esp32-foundation");
+
+#ifdef WITH_TIME
+    timeManager.setConfigManager(&app.getConfigManager());
+    timeManager.setEventBus(&app.getEventBus());
+    app.registerModule(&timeManager);
+    app.registerModule(&timePrecondition);
+#endif
+
+    FrameworkConfig config;
+    app.begin(config);
+
+#ifdef WITH_TIME
+    timeManager.begin();
+#endif
+}
+```
+
+**DHCP Option 42 & RFC 4833 Option 100/101 Architecture:**
+
+- **DHCP NTP (RFC 2132 Option 42):** `TimeManager` enables `esp_sntp_servermode_dhcp` when `dhcpNtp` is `true` and dynamically re-populates cleared trailing SNTP slots with configured static fallback servers (`_ntpServer1`–`_ntpServer3`) when DHCP returns fewer than 3 servers or none.
+- **DHCP Timezone (RFC 4833 Options 100 & 101):** [include/lwip_dhcp_tz_hooks.h](../../include/lwip_dhcp_tz_hooks.h) injects `LWIP_DHCP_OPTION_TZ_PCODE` (`100`) and `LWIP_DHCP_OPTION_TZ_TCODE` (`101`) into LwIP's Option 55 Parameter Request List. Because LwIP invokes `lwip_dhcp_on_extra_option()` on the TCPIP task thread, `TimeManager.cpp` stages the raw ASCII payload into a `portMUX_TYPE` spinlock-guarded fixed buffer and drains it safely on the main loop inside `TimeManager::tick()` via `lwip_dhcp_tz_take_pending()`.
+- **Precedence, Streaming Lookup & Zero Flash Wear:** Option `100` (`PCode`, direct POSIX TZ rule) takes precedence over Option `101` (`TCode`, IANA name), which is resolved by streaming `/timezones.json` on LittleFS using fixed 256-byte stack buffers. Discovered DHCP NTP servers and timezones live strictly in RAM and **never** overwrite persisted fallback config in `/mod/time.json`.
+- **Non-Goal — DHCP Option 2 Exclusion:** RFC 2132 Option 2 (`Time Offset`) supplies only a static UTC offset in seconds with no DST transition rules and is superseded by RFC 4833; it is intentionally **not** implemented.
+- **REST Contract (`/api/time/config`):** `GET /api/time/config` returns both persisted fallback fields (`timezone`, `posix`, `ntpServer1..3`, `dhcpNtp`, `dhcpTz`) and runtime effective/DHCP telemetry (`activeTimezone`, `activePosix`, `dhcpNtpActive`, `dhcpNtpServers`, `dhcpTzActive`, `dhcpTzSource`, `configured`, `syncStatus`, `localTime`). `POST /api/time/config` updates persisted settings (`timezone`, `posix`, `ntpServer1..3`, `dhcpNtp`, `dhcpTz`) cleanly.
+
 ### Step 4 — Provide Native Build Stubs or Mocks
 
 For unit testing, you have two options:

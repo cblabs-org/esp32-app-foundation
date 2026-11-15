@@ -149,6 +149,32 @@ const MOCK_CONFIG = {
   count: 5,
 };
 
+const MOCK_TIME_ZONES = {
+  'America/New_York': 'EST5EDT,M3.2.0,M11.1.0',
+  'Europe/London':    'GMT0BST,M3.5.0/1,M10.5.0',
+  'Europe/Paris':     'CET-1CEST,M3.5.0,M10.5.0/3',
+  'UTC':              'GMT0',
+};
+
+let mockTimeConfig = {
+  timezone:       'Europe/London',
+  posix:          'GMT0BST,M3.5.0/1,M10.5.0',
+  activeTimezone: 'America/New_York',
+  activePosix:    'EST5EDT,M3.2.0,M11.1.0',
+  ntpServer1:     'pool.ntp.org',
+  ntpServer2:     'time.nist.gov',
+  ntpServer3:     '',
+  dhcpNtp:        true,
+  dhcpTz:         true,
+  dhcpNtpActive:  true,
+  dhcpNtpServers: ['192.168.1.1', '192.168.1.2'],
+  dhcpTzActive:   true,
+  dhcpTzSource:   'tcode',
+  configured:     true,
+  syncStatus:     'SYNCED',
+  localTime:      '2026-06-03T22:00:00',
+};
+
 // ── Helpers ──────────────────────────────────────────────────────────
 
 /** Send a JSON response with the given status code. */
@@ -294,6 +320,52 @@ async function handleApiRoute(req, res) {
     return jsonResponse(res, 200, { status: 'ok' });
   }
   if (method === 'POST' && url === '/api/display/clockFontSize') {
+    return jsonResponse(res, 200, { status: 'ok' });
+  }
+
+  // ── Time ─────────────────────────────────────────────────────────
+  if (method === 'GET' && url === '/api/time/config') {
+    return jsonResponse(res, 200, mockTimeConfig);
+  }
+  if (method === 'POST' && url === '/api/time/config') {
+    const body = await collectBody(req);
+    try {
+      const parsed = JSON.parse(body);
+      if (typeof parsed.timezone === 'string') mockTimeConfig.timezone = parsed.timezone;
+      if (typeof parsed.posix === 'string') mockTimeConfig.posix = parsed.posix;
+      if (typeof parsed.ntpServer1 === 'string') mockTimeConfig.ntpServer1 = parsed.ntpServer1;
+      if (typeof parsed.ntpServer2 === 'string') mockTimeConfig.ntpServer2 = parsed.ntpServer2;
+      if (typeof parsed.ntpServer3 === 'string') mockTimeConfig.ntpServer3 = parsed.ntpServer3;
+      if (typeof parsed.dhcpNtp === 'boolean') {
+        mockTimeConfig.dhcpNtp = parsed.dhcpNtp;
+        if (!parsed.dhcpNtp) {
+          mockTimeConfig.dhcpNtpActive = false;
+        } else if (mockTimeConfig.dhcpNtpServers.length > 0) {
+          mockTimeConfig.dhcpNtpActive = true;
+        }
+      }
+      if (typeof parsed.dhcpTz === 'boolean') {
+        mockTimeConfig.dhcpTz = parsed.dhcpTz;
+        if (!parsed.dhcpTz) {
+          mockTimeConfig.dhcpTzActive = false;
+          mockTimeConfig.dhcpTzSource = 'none';
+          mockTimeConfig.activeTimezone = mockTimeConfig.timezone;
+          mockTimeConfig.activePosix = mockTimeConfig.posix;
+        }
+      }
+      if (!mockTimeConfig.dhcpTzActive) {
+        mockTimeConfig.activeTimezone = mockTimeConfig.timezone;
+        mockTimeConfig.activePosix = mockTimeConfig.posix;
+      }
+      return jsonResponse(res, 200, { status: 'ok' });
+    } catch {
+      return jsonResponse(res, 400, { error: 'Invalid JSON' });
+    }
+  }
+  if (method === 'GET' && url === '/api/time/zones') {
+    return jsonResponse(res, 200, MOCK_TIME_ZONES);
+  }
+  if (method === 'POST' && url === '/api/time/zones/update') {
     return jsonResponse(res, 200, { status: 'ok' });
   }
 

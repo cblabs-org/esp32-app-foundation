@@ -29,6 +29,8 @@
 #include "interfaces/IMCPContributor.hpp"
 #include "KeyManager.hpp"
 #include "DeviceCrypto.hpp"
+#include "TimeManager.hpp"
+#include "lwip_dhcp_tz_hooks.h"
 #include <unistd.h>
 
 // =============================================================================
@@ -940,6 +942,64 @@ TEST_F(KeyManagerMcpTest, KeyListMetadata) {
     listTool->handler(listTool->context, args, res);
     JsonArray keys = res["keys"].as<JsonArray>();
     EXPECT_EQ(keys.size(), 3u);
+}
+
+/** system_info must expose live TimeManager DHCP NTP & timezone telemetry without registering extra tools. */
+TEST(McpBuiltinToolsTest, SystemInfoIncludesDhcpTimeFields) {
+    stub_sntp_reset();
+    lwip_dhcp_tz_take_pending(nullptr, 0, nullptr, nullptr, 0, nullptr);
+
+    MCPToolRegistry baselineRegistry;
+    mcpBuiltinTools::registerAll(baselineRegistry, nullptr);
+    size_t baselineCount = baselineRegistry.size();
+
+    TimeManager tm;
+    tm.resetConfig();
+    tm.begin();
+
+    char pcode[] = "CST6CDT,M3.2.0,M11.1.0";
+    char tcode[] = "America/Chicago";
+    struct pbuf pP{nullptr, pcode, static_cast<uint16_t>(strlen(pcode)), static_cast<uint16_t>(strlen(pcode))};
+    struct pbuf pT{nullptr, tcode, static_cast<uint16_t>(strlen(tcode)), static_cast<uint16_t>(strlen(tcode))};
+    struct dhcp d{DHCP_STATE_BOUND};
+    lwip_dhcp_on_extra_option(&d, DHCP_STATE_BOUND, LWIP_DHCP_OPTION_TZ_PCODE,
+                              static_cast<uint8_t>(strlen(pcode)), &pP, 0);
+    lwip_dhcp_on_extra_option(&d, DHCP_STATE_BOUND, LWIP_DHCP_OPTION_TZ_TCODE,
+                              static_cast<uint8_t>(strlen(tcode)), &pT, 0);
+
+    ip4_addr_t srv = stub_sntp_make_ip4(10, 0, 0, 50);
+    stub_sntp_simulate_dhcp_servers(1, &srv);
+    tm.tick(100);
+
+    MCPToolRegistry registry;
+    mcpBuiltinTools::registerAll(registry, nullptr, &tm);
+    EXPECT_EQ(registry.size(), baselineCount);
+    EXPECT_EQ(registry.findTool("time_dhcp_status"), nullptr);
+
+    const MCPToolEntry* tool = registry.findTool("system_info");
+    ASSERT_NE(tool, nullptr);
+
+    JsonDocument argsDoc;
+    JsonObject args = argsDoc.to<JsonObject>();
+    JsonDocument resultDoc;
+    JsonObject resultObj = resultDoc.to<JsonObject>();
+    tool->handler(tool->context, args, resultObj);
+
+    EXPECT_TRUE(resultObj["time_configured"].as<bool>());
+    EXPECT_STREQ("America/Chicago", resultObj["time_timezone"].as<const char*>());
+    EXPECT_STREQ("CST6CDT,M3.2.0,M11.1.0", resultObj["time_posix"].as<const char*>());
+    EXPECT_TRUE(resultObj["time_dhcp_ntp_enabled"].as<bool>());
+    EXPECT_TRUE(resultObj["time_dhcp_ntp_active"].as<bool>());
+    ASSERT_TRUE(resultObj["time_dhcp_ntp_servers"].is<JsonArray>());
+    JsonArray srvs = resultObj["time_dhcp_ntp_servers"].as<JsonArray>();
+    ASSERT_EQ(srvs.size(), 1u);
+    EXPECT_STREQ("10.0.0.50", srvs[0].as<const char*>());
+    EXPECT_TRUE(resultObj["time_dhcp_tz_enabled"].as<bool>());
+    EXPECT_TRUE(resultObj["time_dhcp_tz_active"].as<bool>());
+    EXPECT_STREQ("pcode", resultObj["time_dhcp_tz_source"].as<const char*>());
+
+    stub_sntp_reset();
+    lwip_dhcp_tz_take_pending(nullptr, 0, nullptr, nullptr, 0, nullptr);
 }
 
 // =============================================================================
