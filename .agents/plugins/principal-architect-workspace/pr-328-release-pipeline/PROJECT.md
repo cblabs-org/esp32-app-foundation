@@ -30,7 +30,7 @@ work_orders:
   complexity: standard
   status: COMPLETED
   attempts: 1
-  commit_sha: 1a0916c7ae36d0eaabc2df149283f650d5e39300
+  commit_sha: 4f621a64054ee41b6ed54a8abc157165a1512b9d
 ---
 
 # PR-328 — fix(release): infer split-repo slug from releases_dir and prune sub-floor manifest channels
@@ -82,3 +82,16 @@ work_orders:
    - **`releases/README.md`:** Update line 5 source link to `https://github.com/cblabs-org/esp32-app-foundation` (removing `(private)`), modifying the file on disk only since `./releases` is a gitignored nested clone committed on its own repository branch later.
 
 ## 4. Outcome & Session Log
+
+### Completed Work Orders
+- **`WO-328.1` (`4f621a64054ee41b6ed54a8abc157165a1512b9d`, `rcpt_465446788d19`, `tree_hash: 465446788d190659556d6c7c4e24b183c75216f66f0a9448a8c86c72e5a30922`)**:
+  - **`scripts/deploy_release.py`:** Added `parse_github_slug()`, updated `get_repo_slug(target_repo=None, releases_dir=None)` to infer `owner/repo` from `<releases_dir>/.git` (`origin` -> `gh repo view` in `releases_dir`, falling back to CWD when no split-repo checkout is present, or `"UNKNOWN/REPO"`), updated `main()` to resolve `releases_dir` before `repo_slug` and pass `target_repo=(repo_slug if repo_slug != "UNKNOWN/REPO" else args.repo)` to `create_release()` and resolved `releases_dir` to `update_manifest()`, updated `apply_risk_floor(manifest, new_version_str, repo_slug=None)` to prune invalid/sub-floor channels, promote eligible channels, and rewrite surviving `https://github.com/<owner>/<repo>/releases/download/` URLs to `repo_slug` (called with `repo_slug=repo_slug` from `update_manifest()`), and updated stale `ECDSA` private-key strings to `RSA-2048`.
+  - **`scripts/test_ota_pagination.py`:** Repointed default repo to `cblabs-org/esp32-app-foundation-releases` and added `--repo` CLI option.
+  - **`scripts/tests/test_deploy_release.py`:** Added 43 offline hermetic pytest tests covering `parse_github_slug`, `get_repo_slug`, `apply_risk_floor` (including pruning `"stable": "v0.0.12-dev.9"` and normalizing `"stable": "v1.0.0"` URLs), `update_manifest(..., dry_run=True)`, and `main()` split-repo target propagation using `legacy-owner` fixtures.
+  - **`releases/README.md`:** Updated line 5 source link to `https://github.com/cblabs-org/esp32-app-foundation` (removing `(private)`), left modified on disk only inside the gitignored `./releases` nested checkout for its separate releases-repo PR.
+
+### Verification Summary (Pre-Step 6A Cold-Firewall Audit)
+- `pytest scripts/tests/`: `136 passed in 1.11s` (`43` in `scripts/tests/test_deploy_release.py`, `35` in `scripts/tests/test_next_version.py`, `58` in `scripts/tests/test_run_web_tests.py`)
+- `python3 scripts/doc_lint.py`: exit `0`
+- Legacy maintainer username check across `scripts/`: `0` matches (`CLEAN`)
+- `git -C releases diff`: only `README.md` line 5 modified (uncommitted in nested checkout)
