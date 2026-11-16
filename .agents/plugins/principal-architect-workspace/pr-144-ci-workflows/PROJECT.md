@@ -24,7 +24,7 @@ charter:
   - pytest scripts/tests/ && python3 scripts/doc_lint.py
   charter_locked: true
   charter_hash: 038cb30232b08217e3f4ac10e61d5d790820d8fc7c8c45716a15c59d69a87447
-status: AUDIT_APPROVED
+status: GRADUATED
 approved_at: '2026-11-15T23:45:43.180039Z'
 github_pr: null
 work_orders:
@@ -71,3 +71,15 @@ work_orders:
 - PlatformIO MCP `run_tests` (`native`): `1020 test cases: 1020 succeeded in 00:01:11.635`
 - `python3 scripts/check_doc_cpp_samples.py`: `49` contracts passed, `41` samples passed, `0` failed (`22.76s`)
 - PlatformIO MCP `build_project` (`pioarduino` `55.03.311` zip pin): root `esp32dev` `SUCCESS` (`RAM: 17.8%`, `Flash: 85.6%`) and `sample-app` `esp32dev` `SUCCESS` (`RAM: 17.9%`, `Flash: 94.6%`)
+
+<!-- pa:graduation-summary start -->
+### Graduation Summary (`PR-144` / `pr-144-ci-workflows` — `GRADUATED`)
+
+- **Completed Date:** 2026-11-15
+- **Graduation Mode:** `builtin`
+- **Latest Audit:** Round 1 — `APPROVED` (`058d5a448f99`)
+
+| WO-ID | Status | Attempts | Commit SHA |
+|---|---|---|---|
+| WO-144.1 | COMPLETED | 1 | `a9e83ababe39` |
+<!-- pa:graduation-summary end -->

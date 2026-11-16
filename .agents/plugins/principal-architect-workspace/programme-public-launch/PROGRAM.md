@@ -23,7 +23,7 @@ prs:
   - scripts/tests/
   - test/web/playwright.config.ts
   required_skills: []
-  status: PLANNED
+  status: GRADUATED
   github_pr: null
 ---
 
